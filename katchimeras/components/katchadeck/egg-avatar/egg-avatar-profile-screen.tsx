@@ -2,18 +2,21 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useState } from 'react';
 
 import { EggAvatar } from '@/components/katchadeck/egg-avatar/egg-avatar';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { EGG_AVATAR_SKINS } from '@/constants/egg-avatar-skins';
+import { EGG_AVATAR_FACES } from '@/constants/egg-avatar-faces';
 import { Meadow } from '@/constants/meadow-theme';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
-import type { EggAvatarSkinDefinition } from '@/types/egg-avatar';
+import type { EggAvatarFaceDefinition, EggAvatarSkinDefinition } from '@/types/egg-avatar';
 
 export function EggAvatarProfileScreen() {
   const { width } = useWindowDimensions();
-  const { equippedSkin, equippedSkinId, equipSkin } = useEggAvatar();
+  const { equippedFace, equippedFaceId, equippedSkin, equippedSkinId, equipFace, equipSkin } = useEggAvatar();
+  const [category, setCategory] = useState<'body' | 'face'>('body');
   const cardWidth = Math.max(142, Math.min(190, (width - Meadow.space.page * 2 - 12) / 2));
   const heroSize = Math.min(286, width - 80);
 
@@ -21,6 +24,12 @@ export function EggAvatarProfileScreen() {
     if (skin.id === equippedSkinId) return;
     if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
     equipSkin(skin.id);
+  };
+
+  const handleSelectFace = (face: EggAvatarFaceDefinition) => {
+    if (face.id === equippedFaceId) return;
+    if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+    equipFace(face.id);
   };
 
   return (
@@ -41,31 +50,49 @@ export function EggAvatarProfileScreen() {
       >
         <LinearGradient colors={['#F8EBD2', '#DFC08D']} style={styles.heroCard}>
           <View style={[styles.heroHalo, { backgroundColor: `${equippedSkin.accent}36` }]} />
-          <EggAvatar key={equippedSkinId} presentation="hero" size={heroSize} skinId={equippedSkinId} />
+          <EggAvatar faceId={equippedFaceId} key={`${equippedSkinId}-${equippedFaceId}`} presentation="hero" size={heroSize} skinId={equippedSkinId} />
           <View style={styles.heroCopy}>
             <ThemedText selectable style={styles.eyebrow} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
               YOUR EGG
             </ThemedText>
             <ThemedText selectable style={styles.heroTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-              {equippedSkin.name}
+              {equippedSkin.name} · {equippedFace.name}
             </ThemedText>
             <ThemedText selectable style={styles.heroDescription} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-              {equippedSkin.description}
+              Mix a body and face independently. Your choice appears everywhere the egg does.
             </ThemedText>
           </View>
         </LinearGradient>
 
         <View style={styles.sectionHeading}>
           <ThemedText selectable style={styles.sectionTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-            Choose your look
+            Build your egg
           </ThemedText>
           <ThemedText selectable style={styles.sectionCopy} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-            Every launch skin is yours to use.
+            Choose a body, then give it a face.
           </ThemedText>
         </View>
 
+        <View accessibilityRole="tablist" style={styles.segment}>
+          {(['body', 'face'] as const).map((item) => {
+            const active = category === item;
+            return (
+              <Pressable
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                key={item}
+                onPress={() => setCategory(item)}
+                style={[styles.segmentButton, active && styles.segmentButtonActive]}>
+                <ThemedText style={[styles.segmentLabel, active && styles.segmentLabelActive]} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+                  {item === 'body' ? 'Body' : 'Face'}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+
         <View style={styles.grid}>
-          {EGG_AVATAR_SKINS.map((skin) => {
+          {category === 'body' ? EGG_AVATAR_SKINS.map((skin) => {
             const selected = skin.id === equippedSkinId;
             return (
               <Pressable
@@ -82,7 +109,7 @@ export function EggAvatarProfileScreen() {
                 ]}
               >
                 <View style={[styles.skinPreview, { backgroundColor: `${skin.accent}22` }]}>
-                  <EggAvatar presentation="grid" size={cardWidth - 28} skinId={skin.id} />
+                  <EggAvatar faceId={equippedFaceId} presentation="grid" size={cardWidth - 28} skinId={skin.id} />
                   {selected ? (
                     <View style={[styles.check, { backgroundColor: skin.accent }]}>
                       <IconSymbol color="#FFF9EC" name="checkmark" size={15} />
@@ -96,6 +123,26 @@ export function EggAvatarProfileScreen() {
                   <ThemedText selectable numberOfLines={2} style={styles.skinDescription} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
                     {skin.description}
                   </ThemedText>
+                </View>
+              </Pressable>
+            );
+          }) : EGG_AVATAR_FACES.map((face) => {
+            const selected = face.id === equippedFaceId;
+            return (
+              <Pressable
+                accessibilityLabel={`${face.name} face${selected ? ', selected' : ''}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                key={face.id}
+                onPress={() => handleSelectFace(face)}
+                style={({ pressed }) => [styles.skinCard, { width: cardWidth }, selected && { borderColor: equippedSkin.accent, borderWidth: 2 }, pressed && styles.skinCardPressed]}>
+                <View style={[styles.skinPreview, { backgroundColor: `${equippedSkin.accent}22` }]}>
+                  <EggAvatar faceId={face.id} presentation="grid" size={cardWidth - 28} skinId={equippedSkinId} />
+                  {selected ? <View style={[styles.check, { backgroundColor: equippedSkin.accent }]}><IconSymbol color="#FFF9EC" name="checkmark" size={15} /></View> : null}
+                </View>
+                <View style={styles.skinCopy}>
+                  <ThemedText selectable style={styles.skinName} lightColor={Meadow.ink} darkColor={Meadow.ink}>{face.name}</ThemedText>
+                  <ThemedText selectable numberOfLines={2} style={styles.skinDescription} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{face.description}</ThemedText>
                 </View>
               </Pressable>
             );
@@ -144,6 +191,11 @@ const styles = StyleSheet.create({
   sectionHeading: { gap: 4, maxWidth: 520, width: '100%' },
   sectionTitle: { fontFamily: 'InstrumentSerif', fontSize: 27, lineHeight: 33 },
   sectionCopy: { fontSize: 13.5, lineHeight: 20 },
+  segment: { backgroundColor: 'rgba(125,83,43,0.12)', borderRadius: 16, flexDirection: 'row', maxWidth: 520, padding: 4, width: '100%' },
+  segmentButton: { alignItems: 'center', borderRadius: 12, flex: 1, paddingVertical: 10 },
+  segmentButtonActive: { backgroundColor: '#FFF4DE', boxShadow: '0 3px 10px rgba(71,45,21,0.14)' },
+  segmentLabel: { fontSize: 14, fontWeight: '700', opacity: 0.62 },
+  segmentLabelActive: { opacity: 1 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center', maxWidth: 520, width: '100%' },
   skinCard: {
     backgroundColor: '#E8CFAB',

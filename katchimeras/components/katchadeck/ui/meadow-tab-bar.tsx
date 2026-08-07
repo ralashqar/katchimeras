@@ -25,7 +25,7 @@ const INACTIVE = 'rgba(226, 221, 238, 0.72)';
 export function MeadowTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { equippedSkinId } = useEggAvatar();
+  const { equippedFaceId, equippedSkinId } = useEggAvatar();
   const bottomPadding = Math.max(insets.bottom, HOME_TAB_BAR_MIN_BOTTOM_PADDING);
   const items = state.routes.filter((route) => {
     if (HIDDEN_ROUTES.has(route.name)) return false;
@@ -84,7 +84,7 @@ export function MeadowTabBar({ state, descriptors, navigation }: BottomTabBarPro
         style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
       >
         <View style={styles.avatarIcon}>
-          <EggAvatar presentation="button" size={30} skinId={equippedSkinId} />
+          <EggAvatar faceId={equippedFaceId} presentation="button" size={30} skinId={equippedSkinId} />
         </View>
         <ThemedText numberOfLines={1} style={styles.label} lightColor={INACTIVE} darkColor={INACTIVE}>
           YOU

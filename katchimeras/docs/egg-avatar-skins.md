@@ -4,7 +4,7 @@
 
 The equipped egg skin is the player's character everywhere: profile, bottom navigation, and the forming egg on Today. Switching a skin must update all three immediately.
 
-The v2 identity master is the approved cute egg reference: a softly rounded cream egg with two small feet, aqua and tan speckles, friendly black-and-brown cartoon eyes, tiny curved brows, rosy cheeks, and a small happy mouth. Every skin preserves that face, expression, pose, camera, and body proportions. Art-direction v3 adds a canonical face-safe layout so future eyes, brows, blush, and mouths can become independent interchangeable layers without regenerating body skins.
+The v2 identity master is the approved cute egg reference: a softly rounded cream egg with two small feet and a clear, simple face. Art-direction v4 separates that identity into an interchangeable body and atomic face set while preserving one canonical canvas and feature layout.
 
 Baristabbit remains the Katchimeras rendering reference: cozy premium 3D toy art, broad rounded forms, tactile painted materials, warm low-contrast cinematic light, and emotional friendliness. Avoid uncanny doll eyes, hollow pupils, realistic wet eyeballs, grime, photoreal shell texture, harsh contrast, and plastic shine.
 
@@ -15,6 +15,10 @@ Baristabbit remains the Katchimeras rendering reference: cozy premium 3D toy art
 - `assets/images/katchimeras/egg-avatars/thumbnails/<skin>.webp`: 256 px picker/navigation asset.
 - `assets/images/katchimeras/egg-avatars/effects/crack-*.png|webp`: reusable transparent hatch overlays shown above the equipped skin.
 - `assets/images/katchimeras/egg-avatars/manifest.json`: approved references, models, art-direction version, hashes, and outputs.
+- `assets/images/katchimeras/egg-avatars/bases/<skin>.png|webp`: runtime faceless bodies.
+- `assets/images/katchimeras/egg-avatars/bases/thumbnails/<skin>.webp`: picker/navigation bodies.
+- `assets/images/katchimeras/egg-avatars/faces/<face>.png|webp`: full-canvas atomic faces.
+- `assets/images/katchimeras/egg-avatars/faces/thumbnails/<face>.webp`: picker/navigation faces.
 
 Review candidates stay under ignored `.tmp` folders. Application code must only use production assets.
 
@@ -40,15 +44,19 @@ Change only the theme block when making a new skin.
 
 All coordinates are normalized against the shared 2048 x 2048 production canvas and are defined in `constants/egg-avatar-face-layout.ts` and the asset manifest.
 
-- Protected ellipse: left `0.22`, top `0.34`, right `0.78`, bottom `0.66`.
+- Protected rounded rectangle: left `0.22`, top `0.34`, right `0.78`, bottom `0.66`.
 - Eyes: `(0.385, 0.505)` and `(0.615, 0.505)`.
 - Brows: `(0.39, 0.405)` and `(0.61, 0.405)`.
 - Blush: `(0.31, 0.565)` and `(0.69, 0.565)`.
 - Mouth: `(0.50, 0.57)`.
 
-Inside the protected ellipse, a body skin must remain smooth, low-detail, and visually continuous. No seam, groove, ridge, pattern, emblem, accessory, hard shadow edge, specular hotspot, or material transition may cross behind or touch a facial feature. Pumpkin lobes, robot panel seams, cracks, vines, moss, frost, stars, and similar motifs must route around the ellipse. The rule applies even while face details remain baked into v1 assets.
+Inside the protected rounded rectangle, a body skin must remain smooth, low-detail, and visually continuous. No seam, groove, ridge, pattern, emblem, accessory, hard shadow edge, specular hotspot, or material transition may cross behind or touch a facial feature. Pumpkin lobes, robot panel seams, cracks, vines, moss, frost, stars, and similar motifs must route around it.
 
-The eventual layered render order is `body skin -> blush -> eyes -> brows -> mouth -> accessories/effects`. Every face-layer file must use the same full canvas rather than a tightly cropped image, making skins and face sets interchangeable without per-skin offsets.
+The runtime render order is `body -> atomic face -> cracks/effects`. The atomic face currently contains blush, eyes, brows, and mouth together. Every layer uses the same full canvas, so no per-body offsets are allowed.
+
+Runtime presentation calibration is deliberately separate from the art canvas contract. `EggAvatarArtwork` applies one global face scale and optional per-body `presentation` values from `constants/egg-avatar-skins.ts`. Use these only to normalize the perceived core egg silhouette when a hat, sprout, stem, or other extension made the generated body appear smaller. The face remains centered on the canonical canvas and is never scaled with the accessory-heavy body. Keep overrides restrained, review them in Profile and Today, and prefer `scale` plus a small normalized `offsetY` over regenerating approved art.
+
+Selection is stored as schema v2 (`equippedSkinId` plus `equippedFaceId`). A stored v1 body choice migrates automatically and receives `classic-smile`.
 
 ## FAL.ai production workflow
 
@@ -61,6 +69,20 @@ python scripts/generate-egg-avatar-skins.py matte --skin moss
 python scripts/generate-egg-avatar-skins.py approve --skin moss --candidate 1
 npm run art:egg-avatars:validate
 ```
+
+To create or refresh the separated layer set:
+
+```powershell
+python scripts/generate-egg-avatar-skins.py layered-generate --source-dir tmp/imagegen/egg-avatar-layers
+python scripts/generate-egg-avatar-skins.py layered-matte --source-dir tmp/imagegen/egg-avatar-layers
+# Inspect every neutral body and face at full size before promotion.
+python scripts/generate-egg-avatar-skins.py import-layered-v1 --source-dir tmp/imagegen/egg-avatar-layers
+npm run art:egg-avatars:validate
+```
+
+`layered-generate` uses `fal-ai/nano-banana-2/edit`. Solid body silhouettes are matted by `fal-ai/birefnet/v2`, General Use (Heavy), at `1024x1024` with foreground refinement. A face is a disconnected set of dark eyes and semi-transparent blush marks; it must pass a separate empty-background alpha gate. Component-aware chroma matting is the recorded fallback when BiRefNet treats the plate between disconnected features as foreground.
+
+Faces are generated from scratch; never extract face pixels from a baked egg. The body image may be supplied only as a layout/personality reference. Require exactly seven isolated shapes, crisp antialiased vector-like boundaries, shading contained inside each shape, and bounded opaque blush rather than airbrushed blush. Never accept shell-colored rims, fuzzy edges, or a matte that retains key-color pixels.
 
 Reviewed art created through the built-in reference workflow can be promoted with the same normalization and manifest contract:
 
@@ -76,10 +98,11 @@ python scripts/generate-egg-avatar-skins.py import-art-direction-v2 --source-dir
 
 ## Approval gates
 
-- The character matches Classic's face, feet, body proportions, pose, and camera.
+- The body has no eyebrow, eye, mouth, blush, tint, indentation, outline, or facial ghost.
+- The recomposed character matches Classic's face, feet, body proportions, pose, and camera.
 - Eyes have intact dark pupils and small catchlights; they are friendly, not glassy or looming.
 - Brows, blush, and happy mouth remain readable and correctly positioned.
-- The entire canonical face-safe ellipse is free of theme seams, grooves, patterns, accessories, and hard lighting transitions.
+- The entire canonical face-safe rounded rectangle is free of theme seams, grooves, patterns, accessories, and hard lighting transitions.
 - The theme does not obscure the face and uses at most one restrained accessory.
 - There is no scenery, cast shadow, text, watermark, extra anatomy, or baked hatch state.
 - Alpha corners are transparent, edges are clean, and the subject is centered.
@@ -89,7 +112,7 @@ python scripts/generate-egg-avatar-skins.py import-art-direction-v2 --source-dir
 
 ## Today and hatch behavior
 
-`EggShell` reads the equipped skin from `EggAvatarProvider`. Hatch progress never swaps it back to Classic. Instead, reusable transparent golden crack effects crossfade above the selected asset, preserving the chosen identity through both growth stages.
+`EggShell` reads both selections from `EggAvatarProvider`. Hatch progress never swaps either one back to Classic. Reusable transparent golden crack effects crossfade above body and face, preserving the chosen identity through both growth stages.
 
 ## Adding a future skin
 

@@ -12,6 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useEffect } from 'react';
 
+import { EggAvatarArtwork, eggAvatarBodyPresentationStyle } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import type { EggVisualState } from '@/types/home';
 
@@ -57,7 +58,7 @@ export function EggShell({
   reactionKey = 0,
   crackStage = 0,
 }: EggShellProps) {
-  const { equippedSkin } = useEggAvatar();
+  const { equippedFaceId, equippedSkinId } = useEggAvatar();
   const breathe = useSharedValue(0);
   const reaction = useSharedValue(0);
   const crackOne = useSharedValue(0);
@@ -125,14 +126,13 @@ export function EggShell({
     <Animated.View pointerEvents="none" style={[styles.eggWrap, shellStyle]}>
       {/* allowDownscaling=false keeps the full-res texture, so the egg stays crisp
           when the World view shrinks it then zooms back in (it's drawn small there). */}
-      <Image
+      <EggAvatarArtwork
         allowDownscaling={false}
-        cachePolicy="memory-disk"
-        contentFit="contain"
+        faceId={equippedFaceId}
         priority="high"
-        source={highResolution ? equippedSkin.highResolutionSource : equippedSkin.fullSource}
+        resolution={highResolution ? 'high' : 'app'}
+        skinId={equippedSkinId}
         style={styles.eggImage}
-        transition={0}
       />
       {crackStage >= 1 ? (
         <AnimatedImage
@@ -141,7 +141,7 @@ export function EggShell({
           contentFit="contain"
           priority="high"
           source={highResolution ? eggCrackOneHighResolution : eggCrackOne}
-          style={[styles.eggImage, crackOneStyle]}
+          style={[styles.eggImage, eggAvatarBodyPresentationStyle(equippedSkinId), crackOneStyle]}
           transition={0}
         />
       ) : null}
@@ -152,7 +152,7 @@ export function EggShell({
           contentFit="contain"
           priority="high"
           source={highResolution ? eggCrackTwoHighResolution : eggCrackTwo}
-          style={[styles.eggImage, crackTwoStyle]}
+          style={[styles.eggImage, eggAvatarBodyPresentationStyle(equippedSkinId), crackTwoStyle]}
           transition={0}
         />
       ) : null}

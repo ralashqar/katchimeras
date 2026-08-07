@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "pipelineVersion": "egg-avatar-skins-v3",
+  "schemaVersion": 2,
+  "pipelineVersion": "egg-avatar-layers-v1",
   "skins": {
     "classic": {
       "name": "Classic",
@@ -44,7 +44,47 @@
           "sha256": "90adb842fbc90d900bb02c246f1911f7c76b2608c3e77f2dcfc903a0d9f82f7c"
         }
       },
-      "faceLayoutVersion": 1
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Remove only eyebrows, eyes, mouth, and blush; reconstruct clean shell beneath them; preserve the exact approved silhouette, accessories, palette, patterns, lighting, feet, pose, and canvas.",
+      "baseGenerationModel": "fal-ai/nano-banana-2/edit",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseEditMask": {
+        "shape": "roundedRectangle",
+        "bounds": [
+          0.2,
+          0.3,
+          0.8,
+          0.7
+        ],
+        "featherPixels": 12,
+        "outsideMaskSource": "assets/images/katchimeras/egg-avatars/classic.png"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/classic.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "ebf43f92efb5078c928816d7d706d13447592101c04a38ec5e36c75ea40e1c4e"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/classic.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "fb2a50d34fc04cef9bd2cbb1589351e1fa4850669adb6a34cc9bf95d1c000ea3"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/classic.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "f5ba1ea05e22c4e7c3bab92df58fd89ca321317ec5007689fd3e7d43265a53b0"
+        }
+      },
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true
+      }
     },
     "moss": {
       "name": "Moss",
@@ -88,7 +128,47 @@
           "sha256": "e1a296fa026077d380588d6f88a38af39eae80b3129a0fe9fc17fcced8ce9f03"
         }
       },
-      "faceLayoutVersion": 1
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Remove only eyebrows, eyes, mouth, and blush; reconstruct clean shell beneath them; preserve the exact approved silhouette, accessories, palette, patterns, lighting, feet, pose, and canvas.",
+      "baseGenerationModel": "fal-ai/nano-banana-2/edit",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseEditMask": {
+        "shape": "roundedRectangle",
+        "bounds": [
+          0.2,
+          0.3,
+          0.8,
+          0.7
+        ],
+        "featherPixels": 12,
+        "outsideMaskSource": "assets/images/katchimeras/egg-avatars/moss.png"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/moss.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "2fc13150b422845d0f3fd9b7687e14c75cc738e1034438e7bb78d17f421eeb07"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/moss.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "58a14371b1bbf3074d9cce82dbc5e3cf77e903e9c8ac0f4bf8ae53d283d91cd0"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/moss.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "055fe3a921ea9f25eaf4ad49da584500c934edc81dfd9f14c7f6d1cf88d823e9"
+        }
+      },
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true
+      }
     },
     "tide": {
       "name": "Tide",
@@ -132,7 +212,47 @@
           "sha256": "5ab883dd747c5a9761be3ab1f469536c751c34edcee8d3781c1d51e5c01c3d60"
         }
       },
-      "faceLayoutVersion": 1
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Remove only eyebrows, eyes, mouth, and blush; reconstruct clean shell beneath them; preserve the exact approved silhouette, accessories, palette, patterns, lighting, feet, pose, and canvas.",
+      "baseGenerationModel": "fal-ai/nano-banana-2/edit",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseEditMask": {
+        "shape": "roundedRectangle",
+        "bounds": [
+          0.2,
+          0.3,
+          0.8,
+          0.7
+        ],
+        "featherPixels": 12,
+        "outsideMaskSource": "assets/images/katchimeras/egg-avatars/tide.png"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/tide.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "f4a88699d7a4ba54865c3b89ce8fe1b4bb4280a071662a5eb1c36d5fc9840e99"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/tide.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "89e3d9f8378c633150ac538b5d79b750cc87dc445b5b10b6bace8b73952239bf"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/tide.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "10404268b5510ddfe4e392321deda2b2021342c61ca5191360858051154e7c55"
+        }
+      },
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true
+      }
     },
     "sunset": {
       "name": "Sunset",
@@ -176,7 +296,47 @@
           "sha256": "f05ac2ce46047c92ae42ee0974a9128c982eb6415cf89dd8f238ecd0c652013d"
         }
       },
-      "faceLayoutVersion": 1
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Remove only eyebrows, eyes, mouth, and blush; reconstruct clean shell beneath them; preserve the exact approved silhouette, accessories, palette, patterns, lighting, feet, pose, and canvas.",
+      "baseGenerationModel": "fal-ai/nano-banana-2/edit",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseEditMask": {
+        "shape": "roundedRectangle",
+        "bounds": [
+          0.2,
+          0.3,
+          0.8,
+          0.7
+        ],
+        "featherPixels": 12,
+        "outsideMaskSource": "assets/images/katchimeras/egg-avatars/sunset.png"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/sunset.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "c2a0f3fba842f08cd0699a2da1294beef99833b57a2daa02a4c0bb0b2a9f6ea6"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/sunset.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "6c59f4ad3c434803928af2a3acd197b93bc03cad4912bd5b3f351890d9e304ae"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/sunset.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "89fc2652f1187d25b9e6dff07044b584eabaf10f79f7ceefdd982108fe9bcad3"
+        }
+      },
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true
+      }
     },
     "starglow": {
       "name": "Starglow",
@@ -220,7 +380,47 @@
           "sha256": "bdec1af0ba1cf681adbfdd4a26a8781764a32d76e818979295d41fcdaa58f8cf"
         }
       },
-      "faceLayoutVersion": 1
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Remove only eyebrows, eyes, mouth, and blush; reconstruct clean shell beneath them; preserve the exact approved silhouette, accessories, palette, patterns, lighting, feet, pose, and canvas.",
+      "baseGenerationModel": "fal-ai/nano-banana-2/edit",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseEditMask": {
+        "shape": "roundedRectangle",
+        "bounds": [
+          0.2,
+          0.3,
+          0.8,
+          0.7
+        ],
+        "featherPixels": 12,
+        "outsideMaskSource": "assets/images/katchimeras/egg-avatars/starglow.png"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/starglow.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "d52e435b79dbd09296edbad701e7f1c5b3b55e61512c948a7ecdaaa78a030599"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/starglow.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "4fd2a220547938a99a76cd2659bab4ef2ded5e9025b3ea0159f7109a96dba58a"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/starglow.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "9bd3ac0a6571c87b1a05cd0d4cafe7d7374a88f518d29a23dfede0586fa30044"
+        }
+      },
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true
+      }
     },
     "frost": {
       "name": "Frost",
@@ -264,7 +464,47 @@
           "sha256": "7b6b66622a73003e83ec5249ecaf5a050e026ca8728cfb753a55af1878008968"
         }
       },
-      "faceLayoutVersion": 1
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Remove only eyebrows, eyes, mouth, and blush; reconstruct clean shell beneath them; preserve the exact approved silhouette, accessories, palette, patterns, lighting, feet, pose, and canvas.",
+      "baseGenerationModel": "fal-ai/nano-banana-2/edit",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseEditMask": {
+        "shape": "roundedRectangle",
+        "bounds": [
+          0.2,
+          0.3,
+          0.8,
+          0.7
+        ],
+        "featherPixels": 12,
+        "outsideMaskSource": "assets/images/katchimeras/egg-avatars/frost.png"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/frost.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "89fe56fee57f995cfaf690f06510429fe015dffe79d2a8d4a11485d4c17ee938"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/frost.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "439b9d5c59d497744685ac71889f974c6bbb68ebf93b64193bb0eaf32a880f49"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/frost.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "ba3aecd372a6fd9be2402599c4edaecd5863a475ac53a779eb3e5aef59a27b20"
+        }
+      },
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true
+      }
     },
     "ember": {
       "name": "Ember",
@@ -308,7 +548,47 @@
           "sha256": "fdbee9871c2d570ca558df61aad614212e8f18fbb0515a6b2191648b5097e69f"
         }
       },
-      "faceLayoutVersion": 1
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Remove only eyebrows, eyes, mouth, and blush; reconstruct clean shell beneath them; preserve the exact approved silhouette, accessories, palette, patterns, lighting, feet, pose, and canvas.",
+      "baseGenerationModel": "fal-ai/nano-banana-2/edit",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseEditMask": {
+        "shape": "roundedRectangle",
+        "bounds": [
+          0.2,
+          0.3,
+          0.8,
+          0.7
+        ],
+        "featherPixels": 12,
+        "outsideMaskSource": "assets/images/katchimeras/egg-avatars/ember.png"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/ember.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "1868bb24d79da405287704ba623ce74f87d3a18feebf988e0974219890a5035c"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/ember.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "a52c40a026735c01a4b736538d9ef388cc6a71847e5b81f673447fc3237e859a"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/ember.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "fe01336c8a36838ef0446f229c76c43b6af303847b41bb0d695dbe56e2130f58"
+        }
+      },
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true
+      }
     },
     "barista": {
       "name": "Barista",
@@ -352,7 +632,47 @@
           "sha256": "bf621697868af67b9ef67441d54beabb76436e2eac4be65eaab86caee0ab609c"
         }
       },
-      "faceLayoutVersion": 1
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Remove only eyebrows, eyes, mouth, and blush; reconstruct clean shell beneath them; preserve the exact approved silhouette, accessories, palette, patterns, lighting, feet, pose, and canvas.",
+      "baseGenerationModel": "fal-ai/nano-banana-2/edit",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseEditMask": {
+        "shape": "roundedRectangle",
+        "bounds": [
+          0.2,
+          0.3,
+          0.8,
+          0.7
+        ],
+        "featherPixels": 12,
+        "outsideMaskSource": "assets/images/katchimeras/egg-avatars/barista.png"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/barista.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "92ab5384d4c7e54580d98c6c9df03071537b2274dbb99a6b7bf281e7b9ef4b78"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/barista.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "698be2633c867258a32b745e67d9ae528aa9b4237d9f81add6f8bdee44a011e9"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/barista.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "d26f00e0219179c9b833d458accfde1c1c28543bf18cf6f7fc1ff06358ee4cd2"
+        }
+      },
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true
+      }
     },
     "robot": {
       "name": "Robot",
@@ -397,6 +717,46 @@
           "height": 256,
           "sha256": "7ecfee5d7149470c1bf1bafb6c6c7f513f5d01b85d3d35f445eb1ab5d76a7d09"
         }
+      },
+      "baseVersion": 1,
+      "basePrompt": "Remove only eyebrows, eyes, mouth, and blush; reconstruct clean shell beneath them; preserve the exact approved silhouette, accessories, palette, patterns, lighting, feet, pose, and canvas.",
+      "baseGenerationModel": "fal-ai/nano-banana-2/edit",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseEditMask": {
+        "shape": "roundedRectangle",
+        "bounds": [
+          0.2,
+          0.3,
+          0.8,
+          0.7
+        ],
+        "featherPixels": 12,
+        "outsideMaskSource": "assets/images/katchimeras/egg-avatars/robot.png"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/robot.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "ff5e079e437a11d367f7cc26f055fed937ce58e3cef2f70f76db2be0ee7c4ff0"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/robot.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "a51b14346a80ba5f0ba470585d46d67caeb72ffb61a8e118443a08a2bc4a5b7e"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/robot.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "d3e42035061258799443a6b210a874684ede7bf1add4944983d5ef36243d465f"
+        }
+      },
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true
       }
     },
     "pumpkin": {
@@ -442,10 +802,50 @@
           "height": 256,
           "sha256": "5ff97bb18adde2511243ad3d8d3adefe2a23d5bb520cc5aef9d3afcafbca6167"
         }
+      },
+      "baseVersion": 1,
+      "basePrompt": "Remove only eyebrows, eyes, mouth, and blush; reconstruct clean shell beneath them; preserve the exact approved silhouette, accessories, palette, patterns, lighting, feet, pose, and canvas.",
+      "baseGenerationModel": "fal-ai/nano-banana-2/edit",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseEditMask": {
+        "shape": "roundedRectangle",
+        "bounds": [
+          0.2,
+          0.3,
+          0.8,
+          0.7
+        ],
+        "featherPixels": 12,
+        "outsideMaskSource": "assets/images/katchimeras/egg-avatars/pumpkin.png"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/pumpkin.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "a28d975195de14190145e327b54fa43ed199a0d8825b1db47971f1e1e82ae09e"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/pumpkin.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "cb20d7642f1df43f9b6d65b040f005604b382d0a985828f8762666ec6d29f118"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/pumpkin.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "088cb32cc4da806bf58261f82d6b221ea9755ca02422298558f731d5609f70be"
+        }
+      },
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true
       }
     }
   },
-  "updatedAt": "2026-08-07T14:32:08.579435+00:00",
+  "updatedAt": "2026-08-07T15:57:01.047921+00:00",
   "gameplay": {
     "version": 2,
     "mode": "equipped skin with reusable crack overlays",
@@ -525,7 +925,7 @@
       }
     }
   },
-  "artDirectionVersion": 3,
+  "artDirectionVersion": 4,
   "effects": {
     "crack-1": {
       "png": {
@@ -563,7 +963,7 @@
       "height": 2048
     },
     "safeZone": {
-      "shape": "ellipse",
+      "shape": "roundedRectangle",
       "left": 0.22,
       "top": 0.34,
       "right": 0.78,
@@ -599,5 +999,61 @@
         "y": 0.57
       }
     }
+  },
+  "faces": {
+    "classic-smile": {
+      "name": "Classic Smile",
+      "version": 2,
+      "approvedAt": "2026-08-07T15:57:01.047921+00:00",
+      "faceLayoutVersion": 1,
+      "prompt": "Generate a new clean face sprite from scratch; image 1 is only a layout, personality, and premium-toy style reference. Do not extract, trace, crop, or copy its pixels. Create exactly seven separated components: two simple glossy oval eyes, two small curved eyebrows, one tiny smiling mouth, and two compact solid rounded blush ovals. Use clean vector-like silhouettes with subtle premium 3D toy shading confined inside each shape, crisp professionally antialiased boundaries, and smooth Bezier-like curves. Blush must have a finite opaque edge, never airbrushed, fuzzy, translucent, textured, or feathered. Do not add cream, white, or gray outer rims. Keep the friendly relative placement, scale, symmetry, warm brown-black eye colors, restrained white catchlights, and amber lower irises. Include no egg shell, feet, body texture, accessory, shadow, glow, or extra mark. Keep the face centered at its original relative layout on a full square canvas and place it on a perfectly uniform flat #00FF00 background. No gradient, floor, checkerboard, text, watermark, or additional object.",
+      "generationModel": "OpenAI built-in image generation",
+      "mattingModel": "component-aware chroma soft matte",
+      "mattingSettings": {
+        "keyColor": "#00FF00",
+        "disconnectedComponents": true,
+        "edgeMode": "soft",
+        "despill": true
+      },
+      "qa": {
+        "birefnetCandidateRejected": "visible key-color fringe on disconnected components"
+      },
+      "layerBounds": [
+        0.23,
+        0.365,
+        0.77,
+        0.625
+      ],
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/faces/classic-smile.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "91d12056c1d790778e848c23cf0bb4eeeb538ed28fe3638ddacf17848d458f75"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/faces/classic-smile.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "c48507725c2f2af84b6b20db84e3b8179bb73f15f9b186c154e7cc526d250bbf"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/faces/thumbnails/classic-smile.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "ee7d178ffc77313dc2a55bcb0c150fbac9fddaa87776fd44f6d9ea3764332697"
+        }
+      }
+    }
+  },
+  "layering": {
+    "version": 1,
+    "order": [
+      "body",
+      "face",
+      "effects"
+    ],
+    "defaultFaceId": "classic-smile",
+    "legacyCompositePathsRetained": true
   }
 }

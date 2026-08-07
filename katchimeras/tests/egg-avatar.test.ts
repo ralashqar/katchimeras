@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
-import { EGG_AVATAR_SKIN_IDS } from '../types/egg-avatar';
+import { EGG_AVATAR_FACE_IDS, EGG_AVATAR_SKIN_IDS } from '../types/egg-avatar';
 import { EGG_AVATAR_FACE_LAYOUT } from '../constants/egg-avatar-face-layout';
 import {
   DEFAULT_EGG_AVATAR_SELECTION,
@@ -15,11 +15,17 @@ const root = path.resolve(import.meta.dirname, '..');
 
 test('egg avatar selection accepts only the versioned launch catalog', () => {
   assert.deepEqual(normalizeEggAvatarSelection({ version: 1, equippedSkinId: 'moss' }), {
-    version: 1,
+    version: 2,
     equippedSkinId: 'moss',
+    equippedFaceId: 'classic-smile',
   });
   assert.deepEqual(normalizeEggAvatarSelection({ version: 1, equippedSkinId: 'missing' }), DEFAULT_EGG_AVATAR_SELECTION);
-  assert.deepEqual(normalizeEggAvatarSelection({ version: 2, equippedSkinId: 'moss' }), DEFAULT_EGG_AVATAR_SELECTION);
+  assert.deepEqual(normalizeEggAvatarSelection({ version: 2, equippedSkinId: 'moss', equippedFaceId: 'classic-smile' }), {
+    version: 2,
+    equippedSkinId: 'moss',
+    equippedFaceId: 'classic-smile',
+  });
+  assert.deepEqual(normalizeEggAvatarSelection({ version: 2, equippedSkinId: 'moss', equippedFaceId: 'missing' }), DEFAULT_EGG_AVATAR_SELECTION);
   assert.deepEqual(normalizeEggAvatarSelection(null), DEFAULT_EGG_AVATAR_SELECTION);
   assert.equal(isEggAvatarSkinId('barista'), true);
   assert.equal(isEggAvatarSkinId('robot'), true);
@@ -39,10 +45,11 @@ test('every launch skin has approved production assets and manifest provenance',
     artDirectionVersion?: number;
     effects?: Record<string, unknown>;
     faceLayout?: typeof EGG_AVATAR_FACE_LAYOUT;
-    skins?: Record<string, { version?: number; faceLayoutVersion?: number }>;
+    faces?: Record<string, { faceLayoutVersion?: number }>;
+    skins?: Record<string, { version?: number; faceLayoutVersion?: number; baseOutputs?: unknown }>;
   };
 
-  assert.equal(manifest.artDirectionVersion, 3);
+  assert.equal(manifest.artDirectionVersion, 4);
   assert.deepEqual(manifest.faceLayout, EGG_AVATAR_FACE_LAYOUT);
 
   for (const skinId of EGG_AVATAR_SKIN_IDS) {
@@ -51,6 +58,17 @@ test('every launch skin has approved production assets and manifest provenance',
     assert.equal(existsSync(path.join(assetRoot, 'thumbnails', `${skinId}.webp`)), true, `${skinId} thumbnail`);
     assert.ok(manifest.skins?.[skinId], `${skinId} manifest entry`);
     assert.ok((manifest.skins?.[skinId]?.version ?? 0) >= 2, `${skinId} art version`);
+    assert.equal(existsSync(path.join(assetRoot, 'bases', `${skinId}.png`)), true, `${skinId} base png`);
+    assert.equal(existsSync(path.join(assetRoot, 'bases', `${skinId}.webp`)), true, `${skinId} base webp`);
+    assert.equal(existsSync(path.join(assetRoot, 'bases', 'thumbnails', `${skinId}.webp`)), true, `${skinId} base thumbnail`);
+    assert.ok(manifest.skins?.[skinId]?.baseOutputs, `${skinId} layered base manifest`);
+  }
+
+  for (const faceId of EGG_AVATAR_FACE_IDS) {
+    assert.equal(existsSync(path.join(assetRoot, 'faces', `${faceId}.png`)), true, `${faceId} face png`);
+    assert.equal(existsSync(path.join(assetRoot, 'faces', `${faceId}.webp`)), true, `${faceId} face webp`);
+    assert.equal(existsSync(path.join(assetRoot, 'faces', 'thumbnails', `${faceId}.webp`)), true, `${faceId} face thumbnail`);
+    assert.ok(manifest.faces?.[faceId], `${faceId} face manifest`);
   }
 
   for (const stage of ['crack-1', 'crack-2']) {
@@ -68,7 +86,7 @@ test('canonical face anchors stay inside the protected compositing zone', () => 
   }
 });
 
-test('Today egg renders the equipped skin instead of a fixed Classic asset', () => {
+test('Today egg uses the shared calibrated body and face compositor', () => {
   const sources = [
     path.join('components', 'katchadeck', 'home', 'egg-shell.tsx'),
     path.join('components', 'katchadeck', 'home', 'today-kingdom-egg-hero.tsx'),
@@ -78,7 +96,26 @@ test('Today egg renders the equipped skin instead of a fixed Classic asset', () 
 
   for (const source of sources) {
     assert.match(source, /useEggAvatar\(\)/);
-    assert.match(source, /equippedSkin\.(fullSource|highResolutionSource)/);
+    assert.match(source, /EggAvatarArtwork/);
+    assert.match(source, /equippedSkinId/);
+    assert.match(source, /equippedFaceId/);
     assert.doesNotMatch(source, /cutouts\/egg-base/);
+  }
+
+  const compositor = readFileSync(
+    path.join(root, 'components', 'katchadeck', 'egg-avatar', 'egg-avatar-artwork.tsx'),
+    'utf8'
+  );
+  assert.match(compositor, /EGG_AVATAR_FACE_PRESENTATION_SCALE = 0\.92/);
+  assert.ok(compositor.indexOf('egg-body-') < compositor.indexOf('egg-face-'), 'body renders before face');
+});
+
+test('accessory-heavy skins carry explicit core-silhouette calibration', () => {
+  const catalog = readFileSync(path.join(root, 'constants', 'egg-avatar-skins.ts'), 'utf8');
+  for (const skinId of ['moss', 'barista', 'pumpkin']) {
+    const start = catalog.indexOf(`id: '${skinId}'`);
+    const next = catalog.indexOf("id: '", start + 5);
+    const entry = catalog.slice(start, next < 0 ? undefined : next);
+    assert.match(entry, /presentation: \{ scale: 1\.0[5-8], offsetX: 0, offsetY: -0\.0(?:1|12|18) \}/);
   }
 });

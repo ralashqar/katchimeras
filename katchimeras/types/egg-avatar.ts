@@ -13,6 +13,10 @@ export const EGG_AVATAR_SKIN_IDS = [
 
 export type EggAvatarSkinId = (typeof EGG_AVATAR_SKIN_IDS)[number];
 
+export const EGG_AVATAR_FACE_IDS = ['classic-smile'] as const;
+
+export type EggAvatarFaceId = (typeof EGG_AVATAR_FACE_IDS)[number];
+
 export type EggAvatarSkinDefinition = {
   id: EggAvatarSkinId;
   name: string;
@@ -24,9 +28,27 @@ export type EggAvatarSkinDefinition = {
   faceLayoutVersion: 1;
   isDefault?: boolean;
   version: number;
+  presentation?: {
+    scale: number;
+    offsetX: number;
+    offsetY: number;
+  };
+};
+
+export type EggAvatarFaceDefinition = {
+  id: EggAvatarFaceId;
+  name: string;
+  description: string;
+  fullSource: number;
+  highResolutionSource: number;
+  thumbnailSource: number;
+  faceLayoutVersion: 1;
+  isDefault?: boolean;
+  version: number;
 };
 
 export type EggAvatarSelectionState = {
-  version: 1;
+  version: 2;
   equippedSkinId: EggAvatarSkinId;
+  equippedFaceId: EggAvatarFaceId;
 };

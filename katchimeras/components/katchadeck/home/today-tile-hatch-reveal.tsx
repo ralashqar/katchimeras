@@ -16,6 +16,7 @@ import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-sh
 import { buildCreatureKicker } from '@/components/katchadeck/home/creature-hero';
 import { ThemedText } from '@/components/themed-text';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
+import { EggAvatarArtwork, eggAvatarBodyPresentationStyle } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
 import todayScene from '@/data/today-scene.json';
 import type { HomeArchetypeId } from '@/types/world-identity';
 import type { TodayHatchPresentation, TodayHatchPhase } from '@/utils/today-hatch-presentation';
@@ -47,7 +48,7 @@ export function TodayTileHatchReveal({
   onAssetsReady,
   presentation,
 }: TodayTileHatchRevealProps) {
-  const { equippedSkin } = useEggAvatar();
+  const { equippedFaceId, equippedSkinId } = useEggAvatar();
   const { width: windowWidth } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
   const homeTile = kingdomHomeTileForIdentity(homeArchetypeId);
@@ -170,14 +171,13 @@ export function TodayTileHatchReveal({
           ]}>
           {presentation.egg ? (
             <>
-              <Image
+              <EggAvatarArtwork
                 allowDownscaling={false}
-                cachePolicy="memory-disk"
-                contentFit="contain"
+                faceId={equippedFaceId}
                 priority="high"
-                source={equippedSkin.highResolutionSource}
+                resolution="high"
+                skinId={equippedSkinId}
                 style={StyleSheet.absoluteFill}
-                transition={0}
               />
               <AnimatedImage
                 allowDownscaling={false}
@@ -185,7 +185,7 @@ export function TodayTileHatchReveal({
                 contentFit="contain"
                 priority="high"
                 source={eggCrackOne}
-                style={[StyleSheet.absoluteFill, crackOneStyle]}
+                style={[StyleSheet.absoluteFill, eggAvatarBodyPresentationStyle(equippedSkinId), crackOneStyle]}
                 transition={0}
               />
               <AnimatedImage
@@ -194,7 +194,7 @@ export function TodayTileHatchReveal({
                 contentFit="contain"
                 priority="high"
                 source={eggCrackTwo}
-                style={[StyleSheet.absoluteFill, crackTwoStyle]}
+                style={[StyleSheet.absoluteFill, eggAvatarBodyPresentationStyle(equippedSkinId), crackTwoStyle]}
                 transition={0}
               />
             </>

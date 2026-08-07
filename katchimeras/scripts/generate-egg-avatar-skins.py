@@ -29,6 +29,10 @@ ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = ROOT / "assets" / "images" / "katchimeras" / "egg-avatars"
 THUMB_DIR = OUTPUT_DIR / "thumbnails"
 EFFECTS_DIR = OUTPUT_DIR / "effects"
+BASES_DIR = OUTPUT_DIR / "bases"
+BASE_THUMBS_DIR = BASES_DIR / "thumbnails"
+FACES_DIR = OUTPUT_DIR / "faces"
+FACE_THUMBS_DIR = FACES_DIR / "thumbnails"
 REVIEW_DIR = ROOT / ".tmp" / "egg-avatar-skins"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 CURRENT_EGG = ROOT / "assets" / "images" / "katchimeras" / "cutouts" / "egg-base.png"
@@ -37,12 +41,13 @@ CLASSIC_APPROVED = OUTPUT_DIR / "classic.png"
 CUTOUTS_DIR = ROOT / "assets" / "images" / "katchimeras" / "cutouts"
 GENERATION_MODEL = "fal-ai/nano-banana-2/edit"
 MATTING_MODEL = "fal-ai/birefnet/v2"
-PIPELINE_VERSION = "egg-avatar-skins-v3"
+PIPELINE_VERSION = "egg-avatar-layers-v1"
+DEFAULT_FACE_ID = "classic-smile"
 
 FACE_LAYOUT = {
     "version": 1,
     "canvas": {"width": 2048, "height": 2048},
-    "safeZone": {"shape": "ellipse", "left": 0.22, "top": 0.34, "right": 0.78, "bottom": 0.66},
+    "safeZone": {"shape": "roundedRectangle", "left": 0.22, "top": 0.34, "right": 0.78, "bottom": 0.66},
     "anchors": {
         "leftBrow": {"x": 0.39, "y": 0.405},
         "rightBrow": {"x": 0.61, "y": 0.405},
@@ -53,6 +58,11 @@ FACE_LAYOUT = {
         "mouth": {"x": 0.5, "y": 0.57},
     },
 }
+
+# Feathered facial canvas where generated clean shell is allowed to replace the
+# approved composite. Everything outside this region remains source-exact.
+FACE_REMOVAL_BOUNDS = (0.20, 0.30, 0.80, 0.70)
+FACE_LAYER_BOUNDS = (0.230, 0.365, 0.770, 0.625)
 
 SKINS: dict[str, dict[str, str]] = {
     "classic": {
@@ -137,7 +147,7 @@ IDENTITY_LOCK = (
 )
 
 FACE_LAYOUT_LOCK = (
-    "Treat the canonical central facial canvas as a protected ellipse spanning normalized x 0.22 to 0.78 and "
+    "Treat the canonical central facial canvas as a protected rounded rectangle spanning normalized x 0.22 to 0.78 and "
     "y 0.34 to 0.66 on the final square canvas. Keep this zone smooth, low-detail, and uninterrupted. No seam, "
     "groove, ridge, pattern, emblem, accessory, hard shadow edge, specular hotspot, or material boundary may cross "
     "behind or touch the brows, eyes, blush, or mouth. Preserve generous clear space around each facial feature so "
@@ -493,6 +503,293 @@ def normalize_overlay(source: Path, identity_source: Path) -> Image.Image:
     return canvas
 
 
+def face_removal_mask(size: tuple[int, int] = (2048, 2048), feather: int = 12) -> Image.Image:
+    mask = Image.new("L", size, 0)
+    draw = ImageDraw.Draw(mask)
+    width, height = size
+    left, top, right, bottom = FACE_REMOVAL_BOUNDS
+    draw.rounded_rectangle(
+        (round(left * width), round(top * height), round(right * width), round(bottom * height)),
+        radius=round(width * 0.05),
+        fill=255,
+    )
+    return mask.filter(ImageFilter.GaussianBlur(feather))
+
+
+def align_generated_subject(generated: Image.Image, reference: Image.Image) -> Image.Image:
+    generated = generated.convert("RGBA")
+    reference = reference.convert("RGBA")
+    generated_box = generated.getchannel("A").getbbox()
+    reference_box = reference.getchannel("A").getbbox()
+    if not generated_box or not reference_box:
+        raise RuntimeError("Layer source or reference has no visible subject")
+    subject = generated.crop(generated_box).resize(
+        (reference_box[2] - reference_box[0], reference_box[3] - reference_box[1]),
+        Image.Resampling.LANCZOS,
+    )
+    canvas = Image.new("RGBA", reference.size, (0, 0, 0, 0))
+    canvas.alpha_composite(subject, (reference_box[0], reference_box[1]))
+    return canvas
+
+
+def build_faceless_base(reference_path: Path, generated_path: Path) -> tuple[Image.Image, Image.Image]:
+    reference = Image.open(reference_path).convert("RGBA")
+    generated = Image.open(generated_path).convert("RGBA")
+    aligned = align_generated_subject(generated, reference)
+    mask = face_removal_mask(reference.size)
+    mask = ImageChops.multiply(mask, reference.getchannel("A"))
+    return Image.composite(aligned, reference, mask), mask
+
+
+def build_face_layer(source: Path) -> Image.Image:
+    generated = Image.open(source).convert("RGBA")
+    source_box = generated.getchannel("A").getbbox()
+    if not source_box:
+        raise RuntimeError(f"No visible face in {source}")
+    face = generated.crop(source_box)
+    left, top, right, bottom = FACE_LAYER_BOUNDS
+    target_box = (
+        round(left * 2048),
+        round(top * 2048),
+        round(right * 2048),
+        round(bottom * 2048),
+    )
+    face = face.resize(
+        (target_box[2] - target_box[0], target_box[3] - target_box[1]),
+        Image.Resampling.LANCZOS,
+    )
+    canvas = Image.new("RGBA", (2048, 2048), (0, 0, 0, 0))
+    canvas.alpha_composite(face, (target_box[0], target_box[1]))
+    return canvas
+
+
+def layered_body_prompt(skin_id: str) -> str:
+    return " ".join([
+        "This is a precise production asset edit of image 1, not a redesign.",
+        "Remove the COMPLETE face: both eyebrows, both eyes including every rim and highlight, the mouth, and both pink cheek/blush marks.",
+        "There must be no face, expression, pink cheek tint, indentation, ghost, outline, or facial remnant anywhere.",
+        "Reconstruct the missing area with the continuous underlying shell material and lighting so it is a clean neutral interchangeable body layer.",
+        "Keep every non-face element identical to image 1: exact canvas, silhouette, proportions, position, camera, feet, accessory, pattern, seams outside the face area, palette, texture, highlights, and shadows.",
+        "Keep the central facial canvas smooth and low-detail.",
+        "Place the one complete object on a perfectly uniform flat #FF00FF background with no floor, cast shadow, gradient, texture, or extra object.",
+        STYLE_LOCK,
+        NEGATIVES,
+    ])
+
+
+def layered_face_prompt() -> str:
+    return " ".join([
+        "Generate a new clean face sprite from scratch; image 1 is only a layout, personality, and premium-toy style reference. Do not extract, trace, crop, or copy its pixels.",
+        "Create exactly seven separated components: two simple glossy oval eyes, two small curved eyebrows, one tiny smiling mouth, and two compact solid rounded blush ovals.",
+        "Use clean vector-like silhouettes with subtle premium 3D toy shading confined inside each shape, crisp professionally antialiased boundaries, and smooth Bezier-like curves.",
+        "Blush must have a finite opaque edge, never airbrushed, fuzzy, translucent, textured, or feathered. Do not add cream, white, or gray outer rims.",
+        "Keep the friendly relative placement, scale, symmetry, warm brown-black eye colors, restrained white catchlights, and amber lower irises.",
+        "Include no egg shell, feet, body texture, accessory, shadow, glow, or extra mark.",
+        "Keep the face centered at its original relative layout on a full square canvas and place it on a perfectly uniform flat #00FF00 background.",
+        "No gradient, floor, checkerboard, text, watermark, or additional object.",
+    ])
+
+
+def generate_layered_sources(source_dir: Path) -> None:
+    source_dir.mkdir(parents=True, exist_ok=True)
+    run: dict[str, Any] = {
+        "schemaVersion": 1,
+        "pipelineVersion": PIPELINE_VERSION,
+        "generationModel": GENERATION_MODEL,
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "bodies": {},
+    }
+    for skin_id in SKINS:
+        print(f"generating faceless FAL source for {skin_id}...", flush=True)
+        prompt = layered_body_prompt(skin_id)
+        result = call_function("generate-katchimera-art", {
+            "modelId": GENERATION_MODEL,
+            "input": {
+                "image_urls": [image_data_uri(OUTPUT_DIR / f"{skin_id}.png", max_side=1536)],
+                "aspect_ratio": "1:1",
+                "resolution": "2K",
+            },
+            "assetType": "other",
+            "assetKey": f"egg-avatar-layer:{skin_id}:body-v1",
+            "skinId": skin_id,
+            "pipelineVersion": PIPELINE_VERSION,
+            "renderProfile": {
+                "id": f"egg_avatar_{skin_id}_faceless_body_v1",
+                "displayName": f"{SKINS[skin_id]['name']} faceless egg body v1",
+                "topLevelType": "avatar-layer",
+                "triggerCategory": "egg-avatar",
+                "triggerSubtype": "body",
+                "theme": skin_id,
+                "creatureKind": "egg-avatar-body",
+                "caption": "faceless interchangeable egg avatar body",
+                "skinId": skin_id,
+                "imagePrompt": prompt,
+            },
+        })
+        record = result.get("record") or {}
+        image_url = record.get("image_url")
+        if not image_url:
+            raise RuntimeError(f"No FAL body image URL for {skin_id}: {result}")
+        output = source_dir / f"{skin_id}-keyed-fal.png"
+        download(image_url, output)
+        run["bodies"][skin_id] = {"prompt": prompt, "imageUrl": image_url, "recordId": record.get("id")}
+
+    print("generating FAL classic face layer source...", flush=True)
+    prompt = layered_face_prompt()
+    result = call_function("generate-katchimera-art", {
+        "modelId": GENERATION_MODEL,
+        "input": {
+            "image_urls": [image_data_uri(OUTPUT_DIR / "classic.png", max_side=1536)],
+            "aspect_ratio": "1:1",
+            "resolution": "2K",
+        },
+        "assetType": "other",
+        "assetKey": f"egg-avatar-layer:{DEFAULT_FACE_ID}:face-v1",
+        "pipelineVersion": PIPELINE_VERSION,
+        "renderProfile": {
+            "id": f"egg_avatar_{DEFAULT_FACE_ID.replace('-', '_')}_face_v1",
+            "displayName": "Classic Smile egg face layer v1",
+            "topLevelType": "avatar-layer",
+            "triggerCategory": "egg-avatar",
+            "triggerSubtype": "face",
+            "theme": "classic",
+            "creatureKind": "egg-avatar-face",
+            "caption": "interchangeable egg avatar face",
+            "imagePrompt": prompt,
+        },
+    })
+    record = result.get("record") or {}
+    image_url = record.get("image_url")
+    if not image_url:
+        raise RuntimeError(f"No FAL face image URL: {result}")
+    download(image_url, source_dir / f"{DEFAULT_FACE_ID}-keyed-fal.png")
+    run["face"] = {"id": DEFAULT_FACE_ID, "prompt": prompt, "imageUrl": image_url, "recordId": record.get("id")}
+    (source_dir / "layered-run.json").write_text(json.dumps(run, indent=2) + "\n", encoding="utf-8")
+
+
+def matte_layered_sources(source_dir: Path) -> None:
+    ids = [*SKINS.keys(), DEFAULT_FACE_ID]
+    records: dict[str, Any] = {}
+    for asset_id in ids:
+        keyed = source_dir / f"{asset_id}-keyed-fal.png"
+        if not keyed.exists():
+            keyed = source_dir / f"{asset_id}-keyed.png"
+        if not keyed.exists():
+            raise SystemExit(f"Missing keyed layer source for {asset_id}")
+        print(f"matting {asset_id} with BiRefNet Heavy...", flush=True)
+        encoded = base64.b64encode(keyed.read_bytes()).decode()
+        result = call_function("remove-image-background", {
+            "imageBase64": encoded,
+            "outputName": f"egg-avatar-layer-{asset_id.replace('_', '-')}-v1",
+        })
+        image_url = result.get("imageUrl")
+        if not image_url:
+            raise RuntimeError(f"No BiRefNet image URL for {asset_id}: {result}")
+        download(image_url, source_dir / f"{asset_id}-birefnet.png")
+        records[asset_id] = {
+            "imageUrl": image_url,
+            "model": MATTING_MODEL,
+            "modelProfile": result.get("falModelInput", "General Use (Heavy)"),
+            "operatingResolution": result.get("operatingResolution", "1024x1024"),
+            "refineForeground": result.get("refineForeground", True),
+        }
+    (source_dir / "layered-matting.json").write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
+
+
+def save_layer_asset(image: Image.Image, directory: Path, thumbnails: Path, asset_id: str) -> dict[str, Any]:
+    directory.mkdir(parents=True, exist_ok=True)
+    thumbnails.mkdir(parents=True, exist_ok=True)
+    png_path = directory / f"{asset_id}.png"
+    webp_path = directory / f"{asset_id}.webp"
+    thumb_path = thumbnails / f"{asset_id}.webp"
+    image.save(png_path, optimize=True)
+    image.resize((1024, 1024), Image.Resampling.LANCZOS).save(webp_path, format="WEBP", quality=92, method=6)
+    image.resize((256, 256), Image.Resampling.LANCZOS).save(thumb_path, format="WEBP", quality=88, method=6)
+    return {
+        "png": {"path": str(png_path.relative_to(ROOT)).replace("\\", "/"), "width": 2048, "height": 2048, "sha256": sha256(png_path)},
+        "webp": {"path": str(webp_path.relative_to(ROOT)).replace("\\", "/"), "width": 1024, "height": 1024, "sha256": sha256(webp_path)},
+        "thumbnail": {"path": str(thumb_path.relative_to(ROOT)).replace("\\", "/"), "width": 256, "height": 256, "sha256": sha256(thumb_path)},
+    }
+
+
+def import_layered_v1(source_dir: Path) -> None:
+    def layer_source(asset_id: str) -> Path:
+        birefnet = source_dir / f"{asset_id}-birefnet.png"
+        return birefnet if birefnet.exists() else source_dir / f"{asset_id}-matted.png"
+
+    missing = [skin_id for skin_id in SKINS if not layer_source(skin_id).exists()]
+    # A face is a set of disconnected dark and semi-transparent components;
+    # BiRefNet may treat the key plate between them as foreground. The
+    # component-aware chroma matte is authoritative unless a future face matte
+    # passes the disconnected-component QA gate.
+    face_source = source_dir / f"{DEFAULT_FACE_ID}-matted.png"
+    if not face_source.exists():
+        missing.append(DEFAULT_FACE_ID)
+    if missing:
+        sys.exit(f"Missing layered source art: {', '.join(missing)}")
+
+    manifest = load_manifest()
+    approved_at = datetime.now(timezone.utc).isoformat()
+    body_prompt = (
+        "Remove only eyebrows, eyes, mouth, and blush; reconstruct clean shell beneath them; preserve the exact "
+        "approved silhouette, accessories, palette, patterns, lighting, feet, pose, and canvas."
+    )
+    for skin_id in SKINS:
+        reference_path = OUTPUT_DIR / f"{skin_id}.png"
+        base, mask = build_faceless_base(reference_path, layer_source(skin_id))
+        outputs = save_layer_asset(base, BASES_DIR, BASE_THUMBS_DIR, skin_id)
+        entry = manifest["skins"][skin_id]
+        entry["baseVersion"] = 1
+        entry["faceLayoutVersion"] = FACE_LAYOUT["version"]
+        entry["basePrompt"] = body_prompt
+        entry["baseGenerationModel"] = GENERATION_MODEL if (source_dir / f"{skin_id}-keyed-fal.png").exists() else "OpenAI built-in image generation"
+        entry["baseMattingModel"] = MATTING_MODEL if (source_dir / f"{skin_id}-birefnet.png").exists() else "local chroma-key soft matte"
+        entry["baseMattingSettings"] = {"model": "General Use (Heavy)", "operatingResolution": "1024x1024", "refineForeground": True}
+        entry["baseEditMask"] = {
+            "shape": "roundedRectangle",
+            "bounds": list(FACE_REMOVAL_BOUNDS),
+            "featherPixels": 12,
+            "outsideMaskSource": str(reference_path.relative_to(ROOT)).replace("\\", "/"),
+        }
+        entry["baseOutputs"] = outputs
+        # Keep a QA composite beside review inputs, never as a runtime asset.
+        qa_dir = source_dir / "qa"
+        qa_dir.mkdir(parents=True, exist_ok=True)
+        base.save(qa_dir / f"{skin_id}-base.png", optimize=True)
+        mask.save(qa_dir / f"{skin_id}-edit-mask.png", optimize=True)
+
+    face = build_face_layer(face_source)
+    face_outputs = save_layer_asset(face, FACES_DIR, FACE_THUMBS_DIR, DEFAULT_FACE_ID)
+    manifest["faces"] = {
+        DEFAULT_FACE_ID: {
+            "name": "Classic Smile",
+            "version": 2,
+            "approvedAt": approved_at,
+            "faceLayoutVersion": FACE_LAYOUT["version"],
+            "prompt": layered_face_prompt(),
+            "generationModel": "OpenAI built-in image generation",
+            "mattingModel": "component-aware chroma soft matte",
+            "mattingSettings": {"keyColor": "#00FF00", "disconnectedComponents": True, "edgeMode": "soft", "despill": True},
+            "qa": {"birefnetCandidateRejected": "visible key-color fringe on disconnected components"},
+            "layerBounds": list(FACE_LAYER_BOUNDS),
+            "outputs": face_outputs,
+        }
+    }
+    manifest["schemaVersion"] = 2
+    manifest["pipelineVersion"] = PIPELINE_VERSION
+    manifest["artDirectionVersion"] = 4
+    manifest["faceLayout"] = FACE_LAYOUT
+    manifest["layering"] = {
+        "version": 1,
+        "order": ["body", "face", "effects"],
+        "defaultFaceId": DEFAULT_FACE_ID,
+        "legacyCompositePathsRetained": True,
+    }
+    manifest["updatedAt"] = approved_at
+    MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    print(f"imported {len(SKINS)} faceless bases and face {DEFAULT_FACE_ID}")
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -795,6 +1092,69 @@ def validate(skin_id: str | None = None) -> None:
             errors.append(f"manifest missing {item}")
         elif manifest["skins"][item].get("faceLayoutVersion") != FACE_LAYOUT["version"]:
             errors.append(f"manifest skin {item} does not use canonical face layout v{FACE_LAYOUT['version']}")
+        for path, expected_size in [
+            (BASES_DIR / f"{item}.png", (2048, 2048)),
+            (BASES_DIR / f"{item}.webp", (1024, 1024)),
+            (BASE_THUMBS_DIR / f"{item}.webp", (256, 256)),
+        ]:
+            if not path.exists():
+                errors.append(f"missing layered base {path.relative_to(ROOT)}")
+                continue
+            metrics = image_metrics(path)
+            if tuple(metrics["size"]) != expected_size:
+                errors.append(f"wrong layered base size {path.relative_to(ROOT)}: {metrics['size']}")
+            if any(metrics["corners"]):
+                errors.append(f"non-transparent layered base corner in {path.relative_to(ROOT)}")
+        original_path = OUTPUT_DIR / f"{item}.png"
+        base_path = BASES_DIR / f"{item}.png"
+        if original_path.exists() and base_path.exists():
+            original = Image.open(original_path).convert("RGBA")
+            base = Image.open(base_path).convert("RGBA")
+            outside = Image.eval(face_removal_mask(original.size), lambda value: 255 if value == 0 else 0)
+            outside_difference = ImageChops.difference(original, base).convert("RGB")
+            if ImageChops.multiply(outside_difference, Image.merge("RGB", (outside, outside, outside))).getbbox():
+                errors.append(f"layered base changed source pixels outside face mask: {item}")
+        if item in manifest.get("skins", {}) and not manifest["skins"][item].get("baseOutputs"):
+            errors.append(f"manifest missing layered base outputs for {item}")
+    face_entry = manifest.get("faces", {}).get(DEFAULT_FACE_ID)
+    if not face_entry:
+        errors.append(f"manifest missing face {DEFAULT_FACE_ID}")
+    for path, expected_size in [
+        (FACES_DIR / f"{DEFAULT_FACE_ID}.png", (2048, 2048)),
+        (FACES_DIR / f"{DEFAULT_FACE_ID}.webp", (1024, 1024)),
+        (FACE_THUMBS_DIR / f"{DEFAULT_FACE_ID}.webp", (256, 256)),
+    ]:
+        if not path.exists():
+            errors.append(f"missing face layer {path.relative_to(ROOT)}")
+            continue
+        metrics = image_metrics(path)
+        if tuple(metrics["size"]) != expected_size:
+            errors.append(f"wrong face layer size {path.relative_to(ROOT)}: {metrics['size']}")
+        if any(metrics["corners"]):
+            errors.append(f"non-transparent face layer corner in {path.relative_to(ROOT)}")
+    face_master = FACES_DIR / f"{DEFAULT_FACE_ID}.png"
+    if face_master.exists():
+        face_rgba = Image.open(face_master).convert("RGBA")
+        alpha = face_rgba.getchannel("A")
+        left, top, right, bottom = FACE_LAYOUT["safeZone"]["left"], FACE_LAYOUT["safeZone"]["top"], FACE_LAYOUT["safeZone"]["right"], FACE_LAYOUT["safeZone"]["bottom"]
+        safe = Image.new("L", alpha.size, 0)
+        ImageDraw.Draw(safe).rounded_rectangle((round(left * alpha.width), round(top * alpha.height), round(right * alpha.width), round(bottom * alpha.height)), radius=round(alpha.width * 0.04), fill=255)
+        if ImageChops.subtract(alpha, safe).getbbox():
+            errors.append(f"face layer escapes canonical safe zone: {DEFAULT_FACE_ID}")
+        visible_pixels = 0
+        green_spill_pixels = 0
+        partial_pixels = 0
+        for red, green, blue, opacity in face_rgba.getdata():
+            if opacity > 16:
+                visible_pixels += 1
+                if green > 80 and green > red * 1.4 and green > blue * 1.4:
+                    green_spill_pixels += 1
+            if 16 < opacity < 239:
+                partial_pixels += 1
+        if green_spill_pixels:
+            errors.append(f"face layer contains {green_spill_pixels} visible key-color pixels: {DEFAULT_FACE_ID}")
+        if visible_pixels and partial_pixels / visible_pixels > 0.08:
+            errors.append(f"face layer has implausibly soft edges: {DEFAULT_FACE_ID}")
     if errors:
         raise SystemExit("\n".join(errors))
     print(f"validated {len(ids)} egg-avatar skin(s)")
@@ -823,6 +1183,12 @@ def main() -> None:
     import_skin = sub.add_parser("import-approved-skin")
     import_skin.add_argument("--skin", required=True, choices=SKINS.keys())
     import_skin.add_argument("--source", type=Path, required=True)
+    import_layers = sub.add_parser("import-layered-v1")
+    import_layers.add_argument("--source-dir", type=Path, required=True)
+    generate_layers = sub.add_parser("layered-generate")
+    generate_layers.add_argument("--source-dir", type=Path, required=True)
+    matte_layers = sub.add_parser("layered-matte")
+    matte_layers.add_argument("--source-dir", type=Path, required=True)
     args = parser.parse_args()
     if args.command == "generate":
         generate(args.skin, args.count)
@@ -840,6 +1206,12 @@ def main() -> None:
         import_art_direction_v2(args.source_dir)
     elif args.command == "import-approved-skin":
         import_approved_skin(args.skin, args.source)
+    elif args.command == "import-layered-v1":
+        import_layered_v1(args.source_dir)
+    elif args.command == "layered-generate":
+        generate_layered_sources(args.source_dir)
+    elif args.command == "layered-matte":
+        matte_layered_sources(args.source_dir)
     else:
         gameplay_approve(args.crack_one, args.crack_two)
 

@@ -130,7 +130,9 @@ test('forming nurture presentation does not mount the legacy Today scene underne
   assert.match(todaySource, /actionListLocked=\{[\s\S]*?energyLoopStatus === 'launching'[\s\S]*?energyLoopStatus === 'awaiting_completion'[\s\S]*?energyLoopStatus === 'rewarding'/);
   assert.match(heroSource, /enabled=\{!hideKingdomEnvironmentArt\}/);
   assert.match(heroSource, /useEggAvatar\(\)/);
-  assert.match(heroSource, /source=\{equippedSkin\.highResolutionSource\}/);
+  assert.match(heroSource, /<EggAvatarArtwork/);
+  assert.match(heroSource, /skinId=\{equippedSkinId\}/);
+  assert.match(heroSource, /faceId=\{equippedFaceId\}/);
   assert.doesNotMatch(heroSource, /cutouts\/egg-base/);
   assert.match(nurtureSource, /FadeInUp\.delay\(55\)\.duration\(320\)/);
   assert.match(nurtureSource, /function useActionRowLayout[\s\S]*?LinearTransition\.duration\(300\)/);

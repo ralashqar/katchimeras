@@ -1,8 +1,8 @@
-import { Image } from 'expo-image';
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import type { DailyCardSize } from '@/components/katchadeck/cards/daily-card';
+import { EggAvatarArtwork } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 
 type FormingEggItemProps = {
@@ -22,19 +22,17 @@ export function FormingEggItem({
   heroTop: requestedHeroTop,
   locked,
 }: FormingEggItemProps) {
-  const { equippedSkin } = useEggAvatar();
+  const { equippedFaceId, equippedSkinId } = useEggAvatar();
   const heroTop = Math.max(52, Math.min(98, requestedHeroTop ?? cardSize.height * 0.18));
   const heroSize = Math.min(258, cardSize.height * 0.52);
   return (
     <View pointerEvents="box-none" style={[styles.item, { height: cardSize.height, width: cardSize.width }]}>
       <View pointerEvents="box-none" style={[styles.hero, { height: heroSize, top: heroTop }]}>
         {children ?? (
-          <Image
-            cachePolicy="memory-disk"
-            contentFit="contain"
-            source={equippedSkin.fullSource}
+          <EggAvatarArtwork
+            faceId={equippedFaceId}
+            skinId={equippedSkinId}
             style={[styles.egg, locked ? styles.eggLocked : null]}
-            transition={0}
           />
         )}
       </View>

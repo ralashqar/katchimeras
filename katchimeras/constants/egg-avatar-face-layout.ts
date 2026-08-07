@@ -9,7 +9,7 @@ export const EGG_AVATAR_FACE_LAYOUT = {
   version: 1,
   canvas: { width: 2048, height: 2048 },
   safeZone: {
-    shape: 'ellipse',
+    shape: 'roundedRectangle',
     left: 0.22,
     top: 0.34,
     right: 0.78,

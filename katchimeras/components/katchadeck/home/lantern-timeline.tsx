@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-nativ
 import Animated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { EggAvatarArtwork } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
 import { Meadow } from '@/constants/meadow-theme';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { getCreatureVisual } from '@/game/days';
@@ -35,7 +36,7 @@ export function LanternTimeline({
   selectedId,
   onSelect,
 }: LanternTimelineProps) {
-  const { equippedSkin } = useEggAvatar();
+  const { equippedFaceId, equippedSkinId } = useEggAvatar();
   const dayRecords = days.filter((day): day is HomeDayRecord => day.kind === 'day').slice(-4);
   const tomorrow = days.find((day) => day.kind === 'tomorrow');
   const hatchingToday = Boolean(hatchPresentation?.daySnapshot?.isToday);
@@ -115,7 +116,7 @@ export function LanternTimeline({
                   </>
                 ) : (
                   <View style={[styles.eggRing, day.isToday ? styles.eggRingToday : null]}>
-                    <Image contentFit="contain" source={equippedSkin.thumbnailSource} style={styles.egg} transition={0} />
+                    <EggAvatarArtwork faceId={equippedFaceId} resolution="thumbnail" skinId={equippedSkinId} style={styles.egg} />
                   </View>
                 )}
               </Animated.View>
@@ -147,7 +148,7 @@ export function LanternTimeline({
               style={styles.orbContent}>
               <View style={styles.emptyRing}>
                 {todayHatched ? (
-                  <Image contentFit="contain" source={equippedSkin.thumbnailSource} style={styles.egg} transition={0} />
+                  <EggAvatarArtwork faceId={equippedFaceId} resolution="thumbnail" skinId={equippedSkinId} style={styles.egg} />
                 ) : (
                   <ThemedText style={styles.emptyMark} lightColor="rgba(251,243,228,0.75)" darkColor="rgba(251,243,228,0.75)">
                     ?

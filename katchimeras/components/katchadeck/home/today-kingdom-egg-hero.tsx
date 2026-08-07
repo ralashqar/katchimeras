@@ -50,6 +50,7 @@ import {
 import { TodayFallbackCloudScene } from '@/components/katchadeck/home/today-fallback-cloud-scene';
 import { useTodayEnvironmentMotionValues } from '@/components/katchadeck/home/today-environment-motion';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
+import { EggAvatarArtwork } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
 import todayScene from '@/data/today-scene.json';
 
 type TodayKingdomEggHeroProps = {
@@ -120,7 +121,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   showDormantIndicator = true,
   targetRef,
 }: TodayKingdomEggHeroProps) {
-  const { equippedSkin } = useEggAvatar();
+  const { equippedFaceId, equippedSkinId } = useEggAvatar();
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
   const tile = kingdomHomeTileForIdentity(homeArchetypeId);
@@ -433,15 +434,13 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
               disabled={!onEggPress}
               onPress={onEggPress}
               style={styles.eggImageFrame}>
-              <Image
-                cachePolicy="memory-disk"
-                contentFit="contain"
-                pointerEvents="none"
+              <EggAvatarArtwork
+                allowDownscaling={false}
+                faceId={equippedFaceId}
                 priority="high"
-                recyclingKey={`today-equipped-egg-${equippedSkin.id}`}
-                source={equippedSkin.highResolutionSource}
+                resolution="high"
+                skinId={equippedSkinId}
                 style={StyleSheet.absoluteFill}
-                transition={0}
               />
             </Pressable>
           </Animated.View>
