@@ -9,6 +9,7 @@ export const EGG_AVATAR_SKINS: readonly EggAvatarSkinDefinition[] = [
     fullSource: require('../assets/images/katchimeras/egg-avatars/classic.webp'),
     highResolutionSource: require('../assets/images/katchimeras/egg-avatars/classic.png'),
     thumbnailSource: require('../assets/images/katchimeras/egg-avatars/thumbnails/classic.webp'),
+    faceLayoutVersion: 1,
     isDefault: true,
     version: 2,
   },
@@ -20,6 +21,7 @@ export const EGG_AVATAR_SKINS: readonly EggAvatarSkinDefinition[] = [
     fullSource: require('../assets/images/katchimeras/egg-avatars/moss.webp'),
     highResolutionSource: require('../assets/images/katchimeras/egg-avatars/moss.png'),
     thumbnailSource: require('../assets/images/katchimeras/egg-avatars/thumbnails/moss.webp'),
+    faceLayoutVersion: 1,
     version: 2,
   },
   {
@@ -30,6 +32,7 @@ export const EGG_AVATAR_SKINS: readonly EggAvatarSkinDefinition[] = [
     fullSource: require('../assets/images/katchimeras/egg-avatars/tide.webp'),
     highResolutionSource: require('../assets/images/katchimeras/egg-avatars/tide.png'),
     thumbnailSource: require('../assets/images/katchimeras/egg-avatars/thumbnails/tide.webp'),
+    faceLayoutVersion: 1,
     version: 2,
   },
   {
@@ -40,6 +43,7 @@ export const EGG_AVATAR_SKINS: readonly EggAvatarSkinDefinition[] = [
     fullSource: require('../assets/images/katchimeras/egg-avatars/sunset.webp'),
     highResolutionSource: require('../assets/images/katchimeras/egg-avatars/sunset.png'),
     thumbnailSource: require('../assets/images/katchimeras/egg-avatars/thumbnails/sunset.webp'),
+    faceLayoutVersion: 1,
     version: 2,
   },
   {
@@ -50,6 +54,7 @@ export const EGG_AVATAR_SKINS: readonly EggAvatarSkinDefinition[] = [
     fullSource: require('../assets/images/katchimeras/egg-avatars/starglow.webp'),
     highResolutionSource: require('../assets/images/katchimeras/egg-avatars/starglow.png'),
     thumbnailSource: require('../assets/images/katchimeras/egg-avatars/thumbnails/starglow.webp'),
+    faceLayoutVersion: 1,
     version: 2,
   },
   {
@@ -60,6 +65,7 @@ export const EGG_AVATAR_SKINS: readonly EggAvatarSkinDefinition[] = [
     fullSource: require('../assets/images/katchimeras/egg-avatars/frost.webp'),
     highResolutionSource: require('../assets/images/katchimeras/egg-avatars/frost.png'),
     thumbnailSource: require('../assets/images/katchimeras/egg-avatars/thumbnails/frost.webp'),
+    faceLayoutVersion: 1,
     version: 2,
   },
   {
@@ -70,6 +76,7 @@ export const EGG_AVATAR_SKINS: readonly EggAvatarSkinDefinition[] = [
     fullSource: require('../assets/images/katchimeras/egg-avatars/ember.webp'),
     highResolutionSource: require('../assets/images/katchimeras/egg-avatars/ember.png'),
     thumbnailSource: require('../assets/images/katchimeras/egg-avatars/thumbnails/ember.webp'),
+    faceLayoutVersion: 1,
     version: 2,
   },
   {
@@ -80,7 +87,30 @@ export const EGG_AVATAR_SKINS: readonly EggAvatarSkinDefinition[] = [
     fullSource: require('../assets/images/katchimeras/egg-avatars/barista.webp'),
     highResolutionSource: require('../assets/images/katchimeras/egg-avatars/barista.png'),
     thumbnailSource: require('../assets/images/katchimeras/egg-avatars/thumbnails/barista.webp'),
+    faceLayoutVersion: 1,
     version: 2,
+  },
+  {
+    id: 'robot',
+    name: 'Robot',
+    description: 'A warm little machine with a bright cyan spark.',
+    accent: '#65CFE4',
+    fullSource: require('../assets/images/katchimeras/egg-avatars/robot.webp'),
+    highResolutionSource: require('../assets/images/katchimeras/egg-avatars/robot.png'),
+    thumbnailSource: require('../assets/images/katchimeras/egg-avatars/thumbnails/robot.webp'),
+    faceLayoutVersion: 1,
+    version: 3,
+  },
+  {
+    id: 'pumpkin',
+    name: 'Pumpkin',
+    description: 'Cozy harvest curls and a sunny orange shell.',
+    accent: '#E58A32',
+    fullSource: require('../assets/images/katchimeras/egg-avatars/pumpkin.webp'),
+    highResolutionSource: require('../assets/images/katchimeras/egg-avatars/pumpkin.png'),
+    thumbnailSource: require('../assets/images/katchimeras/egg-avatars/thumbnails/pumpkin.webp'),
+    faceLayoutVersion: 1,
+    version: 3,
   },
 ] as const;
 

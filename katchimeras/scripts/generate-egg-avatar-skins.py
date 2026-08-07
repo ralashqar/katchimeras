@@ -37,7 +37,22 @@ CLASSIC_APPROVED = OUTPUT_DIR / "classic.png"
 CUTOUTS_DIR = ROOT / "assets" / "images" / "katchimeras" / "cutouts"
 GENERATION_MODEL = "fal-ai/nano-banana-2/edit"
 MATTING_MODEL = "fal-ai/birefnet/v2"
-PIPELINE_VERSION = "egg-avatar-skins-v2"
+PIPELINE_VERSION = "egg-avatar-skins-v3"
+
+FACE_LAYOUT = {
+    "version": 1,
+    "canvas": {"width": 2048, "height": 2048},
+    "safeZone": {"shape": "ellipse", "left": 0.22, "top": 0.34, "right": 0.78, "bottom": 0.66},
+    "anchors": {
+        "leftBrow": {"x": 0.39, "y": 0.405},
+        "rightBrow": {"x": 0.61, "y": 0.405},
+        "leftEye": {"x": 0.385, "y": 0.505},
+        "rightEye": {"x": 0.615, "y": 0.505},
+        "leftBlush": {"x": 0.31, "y": 0.565},
+        "rightBlush": {"x": 0.69, "y": 0.565},
+        "mouth": {"x": 0.5, "y": 0.57},
+    },
+}
 
 SKINS: dict[str, dict[str, str]] = {
     "classic": {
@@ -89,6 +104,22 @@ SKINS: dict[str, dict[str, str]] = {
             "Keep the cream and caramel shell and add a small soft barista beret plus a tiny apron-pocket motif."
         ),
     },
+    "robot": {
+        "name": "Robot",
+        "theme": (
+            "Use a warm pearl-ivory ceramic-metal shell, sparse rounded panel seams outside the face-safe zone, "
+            "small cyan circular energy ports on the outer upper sides, and softly brushed graphite-metal feet. "
+            "Keep the face directly on a clean warm ivory panel; never replace it with a visor."
+        ),
+    },
+    "pumpkin": {
+        "name": "Pumpkin",
+        "theme": (
+            "Use a warm pumpkin-orange shell with soft vertical lobes outside the face-safe zone, one small curled "
+            "brown stem, and restrained green leaves and vine curls around the crown and lower outer edges. "
+            "Keep the central face panel smooth and make it cozy rather than spooky."
+        ),
+    },
 }
 
 STYLE_LOCK = (
@@ -103,6 +134,14 @@ IDENTITY_LOCK = (
     "cartoon eyes with intact pupils and small catchlights, tiny curved eyebrows, rosy cheeks, happy open mouth, "
     "and warm expression. Do not move, resize, remove, or redesign any facial feature or foot. The egg must remain "
     "unmistakably the same character. Any accessory is singular, small, and does not obscure the face."
+)
+
+FACE_LAYOUT_LOCK = (
+    "Treat the canonical central facial canvas as a protected ellipse spanning normalized x 0.22 to 0.78 and "
+    "y 0.34 to 0.66 on the final square canvas. Keep this zone smooth, low-detail, and uninterrupted. No seam, "
+    "groove, ridge, pattern, emblem, accessory, hard shadow edge, specular hotspot, or material boundary may cross "
+    "behind or touch the brows, eyes, blush, or mouth. Preserve generous clear space around each facial feature so "
+    "the body remains compatible with future separately composited face layers."
 )
 
 NEGATIVES = (
@@ -182,10 +221,11 @@ def download(url: str, path: Path) -> None:
 
 
 def prompt_for(skin_id: str) -> str:
-    key_color = "#FF00FF" if skin_id == "moss" else "#00FF00"
+    key_color = "#FF00FF" if skin_id in {"moss", "robot", "pumpkin"} else "#00FF00"
     return " ".join(
         [
             IDENTITY_LOCK,
+            FACE_LAYOUT_LOCK,
             STYLE_LOCK,
             SKINS[skin_id]["theme"],
             f"Set the whole image on a perfectly flat, uniform solid {key_color} background for matting. ",
@@ -490,9 +530,12 @@ def approve(skin_id: str, candidate_index: int) -> None:
 
     manifest = load_manifest()
     manifest["updatedAt"] = datetime.now(timezone.utc).isoformat()
+    manifest["pipelineVersion"] = PIPELINE_VERSION
+    manifest["artDirectionVersion"] = 3
+    manifest["faceLayout"] = FACE_LAYOUT
     manifest["skins"][skin_id] = {
         "name": SKINS[skin_id]["name"],
-        "version": 1,
+        "version": 3,
         "approvedCandidate": candidate_index,
         "approvedAt": datetime.now(timezone.utc).isoformat(),
         "prompt": run["prompt"],
@@ -501,6 +544,7 @@ def approve(skin_id: str, candidate_index: int) -> None:
         "references": run["references"],
         "mattingModel": candidate.get("mattingModel"),
         "mattingSettings": candidate.get("mattingSettings"),
+        "faceLayoutVersion": FACE_LAYOUT["version"],
         "outputs": {
             "png": {"path": str(png_path.relative_to(ROOT)).replace("\\", "/"), "width": 2048, "height": 2048, "sha256": sha256(png_path)},
             "webp": {"path": str(webp_path.relative_to(ROOT)).replace("\\", "/"), "width": 1024, "height": 1024, "sha256": sha256(webp_path)},
@@ -509,6 +553,53 @@ def approve(skin_id: str, candidate_index: int) -> None:
     }
     MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(f"approved {skin_id} candidate {candidate_index}")
+
+
+def import_approved_skin(skin_id: str, source: Path) -> None:
+    """Promote one reviewed, already-matted reference-led skin."""
+    if not source.exists():
+        sys.exit(f"Missing approved source art: {source}")
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    THUMB_DIR.mkdir(parents=True, exist_ok=True)
+    full = normalize(source)
+    png_path = OUTPUT_DIR / f"{skin_id}.png"
+    webp_path = OUTPUT_DIR / f"{skin_id}.webp"
+    thumb_path = THUMB_DIR / f"{skin_id}.webp"
+    full.save(png_path, optimize=True)
+    full.resize((1024, 1024), Image.Resampling.LANCZOS).save(webp_path, format="WEBP", quality=92, method=6)
+    full.resize((256, 256), Image.Resampling.LANCZOS).save(thumb_path, format="WEBP", quality=88, method=6)
+
+    approved_at = datetime.now(timezone.utc).isoformat()
+    manifest = load_manifest()
+    manifest["updatedAt"] = approved_at
+    manifest["pipelineVersion"] = PIPELINE_VERSION
+    manifest["artDirectionVersion"] = 3
+    manifest["faceLayout"] = FACE_LAYOUT
+    for existing_skin in manifest["skins"].values():
+        existing_skin.setdefault("faceLayoutVersion", FACE_LAYOUT["version"])
+    manifest["skins"][skin_id] = {
+        "name": SKINS[skin_id]["name"],
+        "version": 3,
+        "approvedCandidate": "reference-locked-built-in-v1",
+        "approvedAt": approved_at,
+        "prompt": prompt_for(skin_id),
+        "generationModel": "OpenAI built-in image generation",
+        "references": [
+            {"path": "assets/images/katchimeras/egg-avatars/classic.png", "role": "identity and face anchor master"},
+            {"path": "user-provided Robot and Pumpkin concept crop", "role": "theme reference"},
+            {"path": "assets/images/katchimeras/cutouts/baristabbit.png", "role": "Katchimeras premium 3D toy style"},
+        ],
+        "artDirection": "Reference-led theme with the canonical v1 facial safe zone kept visually clear for future face-layer compositing.",
+        "faceLayoutVersion": FACE_LAYOUT["version"],
+        "mattingModel": "local chroma-key soft matte",
+        "outputs": {
+            "png": {"path": str(png_path.relative_to(ROOT)).replace("\\", "/"), "width": 2048, "height": 2048, "sha256": sha256(png_path)},
+            "webp": {"path": str(webp_path.relative_to(ROOT)).replace("\\", "/"), "width": 1024, "height": 1024, "sha256": sha256(webp_path)},
+            "thumbnail": {"path": str(thumb_path.relative_to(ROOT)).replace("\\", "/"), "width": 256, "height": 256, "sha256": sha256(thumb_path)},
+        },
+    }
+    MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    print(f"imported approved {skin_id} skin")
 
 
 def import_art_direction_v2(source_dir: Path) -> None:
@@ -542,6 +633,7 @@ def import_art_direction_v2(source_dir: Path) -> None:
             ],
             "artDirection": "Approved happy egg reference: rounded shell, two feet, large friendly cartoon eyes, curved brows, blush, smiling mouth, warm low-contrast premium toy lighting.",
             "mattingModel": "local chroma-key soft matte",
+            "faceLayoutVersion": FACE_LAYOUT["version"],
             "outputs": {
                 "png": {"path": str(png_path.relative_to(ROOT)).replace("\\", "/"), "width": 2048, "height": 2048, "sha256": sha256(png_path)},
                 "webp": {"path": str(webp_path.relative_to(ROOT)).replace("\\", "/"), "width": 1024, "height": 1024, "sha256": sha256(webp_path)},
@@ -582,8 +674,9 @@ def import_art_direction_v2(source_dir: Path) -> None:
             "webp": {"path": str(webp_path.relative_to(ROOT)).replace("\\", "/"), "width": 1024, "height": 1024, "sha256": sha256(webp_path)},
         }
     manifest["updatedAt"] = approved_at
-    manifest["artDirectionVersion"] = 2
+    manifest["artDirectionVersion"] = 3
     manifest["pipelineVersion"] = PIPELINE_VERSION
+    manifest["faceLayout"] = FACE_LAYOUT
     manifest["effects"] = effects
     manifest["gameplay"] = {
         "version": 2,
@@ -679,6 +772,8 @@ def validate(skin_id: str | None = None) -> None:
     ids = [skin_id] if skin_id else list(SKINS)
     errors: list[str] = []
     manifest = load_manifest()
+    if manifest.get("faceLayout") != FACE_LAYOUT:
+        errors.append("manifest facial layout is missing or differs from the canonical v1 contract")
     for item in ids:
         for path, expected_size in [
             (OUTPUT_DIR / f"{item}.png", (2048, 2048)),
@@ -698,6 +793,8 @@ def validate(skin_id: str | None = None) -> None:
             print(item, path.suffix, metrics)
         if item not in manifest.get("skins", {}):
             errors.append(f"manifest missing {item}")
+        elif manifest["skins"][item].get("faceLayoutVersion") != FACE_LAYOUT["version"]:
+            errors.append(f"manifest skin {item} does not use canonical face layout v{FACE_LAYOUT['version']}")
     if errors:
         raise SystemExit("\n".join(errors))
     print(f"validated {len(ids)} egg-avatar skin(s)")
@@ -723,6 +820,9 @@ def main() -> None:
     gameplay_approval.add_argument("--crack-two", type=int, required=True)
     import_v2 = sub.add_parser("import-art-direction-v2")
     import_v2.add_argument("--source-dir", type=Path, required=True)
+    import_skin = sub.add_parser("import-approved-skin")
+    import_skin.add_argument("--skin", required=True, choices=SKINS.keys())
+    import_skin.add_argument("--source", type=Path, required=True)
     args = parser.parse_args()
     if args.command == "generate":
         generate(args.skin, args.count)
@@ -738,6 +838,8 @@ def main() -> None:
         gameplay_matte()
     elif args.command == "import-art-direction-v2":
         import_art_direction_v2(args.source_dir)
+    elif args.command == "import-approved-skin":
+        import_approved_skin(args.skin, args.source)
     else:
         gameplay_approve(args.crack_one, args.crack_two)
 

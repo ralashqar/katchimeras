@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pipelineVersion": "egg-avatar-skins-v2",
+  "pipelineVersion": "egg-avatar-skins-v3",
   "skins": {
     "classic": {
       "name": "Classic",
@@ -43,7 +43,8 @@
           "height": 256,
           "sha256": "90adb842fbc90d900bb02c246f1911f7c76b2608c3e77f2dcfc903a0d9f82f7c"
         }
-      }
+      },
+      "faceLayoutVersion": 1
     },
     "moss": {
       "name": "Moss",
@@ -86,7 +87,8 @@
           "height": 256,
           "sha256": "e1a296fa026077d380588d6f88a38af39eae80b3129a0fe9fc17fcced8ce9f03"
         }
-      }
+      },
+      "faceLayoutVersion": 1
     },
     "tide": {
       "name": "Tide",
@@ -129,7 +131,8 @@
           "height": 256,
           "sha256": "5ab883dd747c5a9761be3ab1f469536c751c34edcee8d3781c1d51e5c01c3d60"
         }
-      }
+      },
+      "faceLayoutVersion": 1
     },
     "sunset": {
       "name": "Sunset",
@@ -172,7 +175,8 @@
           "height": 256,
           "sha256": "f05ac2ce46047c92ae42ee0974a9128c982eb6415cf89dd8f238ecd0c652013d"
         }
-      }
+      },
+      "faceLayoutVersion": 1
     },
     "starglow": {
       "name": "Starglow",
@@ -215,7 +219,8 @@
           "height": 256,
           "sha256": "bdec1af0ba1cf681adbfdd4a26a8781764a32d76e818979295d41fcdaa58f8cf"
         }
-      }
+      },
+      "faceLayoutVersion": 1
     },
     "frost": {
       "name": "Frost",
@@ -258,7 +263,8 @@
           "height": 256,
           "sha256": "7b6b66622a73003e83ec5249ecaf5a050e026ca8728cfb753a55af1878008968"
         }
-      }
+      },
+      "faceLayoutVersion": 1
     },
     "ember": {
       "name": "Ember",
@@ -301,7 +307,8 @@
           "height": 256,
           "sha256": "fdbee9871c2d570ca558df61aad614212e8f18fbb0515a6b2191648b5097e69f"
         }
-      }
+      },
+      "faceLayoutVersion": 1
     },
     "barista": {
       "name": "Barista",
@@ -344,10 +351,101 @@
           "height": 256,
           "sha256": "bf621697868af67b9ef67441d54beabb76436e2eac4be65eaab86caee0ab609c"
         }
+      },
+      "faceLayoutVersion": 1
+    },
+    "robot": {
+      "name": "Robot",
+      "version": 3,
+      "approvedCandidate": "reference-locked-built-in-v1",
+      "approvedAt": "2026-08-07T14:31:59.608409+00:00",
+      "prompt": "The subject is the exact upright front-facing egg character from image 1. Preserve its softly rounded silhouette, camera, scale, placement, two small feet, aqua and tan speckles, large friendly black-and-brown cartoon eyes with intact pupils and small catchlights, tiny curved eyebrows, rosy cheeks, happy open mouth, and warm expression. Do not move, resize, remove, or redesign any facial feature or foot. The egg must remain unmistakably the same character. Any accessory is singular, small, and does not obscure the face. Treat the canonical central facial canvas as a protected ellipse spanning normalized x 0.22 to 0.78 and y 0.34 to 0.66 on the final square canvas. Keep this zone smooth, low-detail, and uninterrupted. No seam, groove, ridge, pattern, emblem, accessory, hard shadow edge, specular hotspot, or material boundary may cross behind or touch the brows, eyes, blush, or mouth. Preserve generous clear space around each facial feature so the body remains compatible with future separately composited face layers. Premium cute 3D cartoon mascot art matching Baristabbit: cozy handcrafted toy quality, broad rounded forms, tactile painted shell and soft materials, warm low-contrast cinematic key light, gentle peach bounce, and restrained eye gloss. Emotionally friendly and playful, never realistic or uncanny. Use a warm pearl-ivory ceramic-metal shell, sparse rounded panel seams outside the face-safe zone, small cyan circular energy ports on the outer upper sides, and softly brushed graphite-metal feet. Keep the face directly on a clean warm ivory panel; never replace it with a visor. Set the whole image on a perfectly flat, uniform solid #FF00FF background for matting.  The background has no gradient, texture, floor, reflection, shadow, atmosphere, or lighting variation. No text, letters, numbers, logos, watermark, UI, frame, multiple characters, broken shell, photorealism, flat illustration, uncanny doll eyes, hollow pupils, missing mouth, missing feet, realistic animal anatomy, grime, mold, busy ornament, glossy plastic finish, or background objects.",
+      "generationModel": "OpenAI built-in image generation",
+      "references": [
+        {
+          "path": "assets/images/katchimeras/egg-avatars/classic.png",
+          "role": "identity and face anchor master"
+        },
+        {
+          "path": "user-provided Robot and Pumpkin concept crop",
+          "role": "theme reference"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "Katchimeras premium 3D toy style"
+        }
+      ],
+      "artDirection": "Reference-led theme with the canonical v1 facial safe zone kept visually clear for future face-layer compositing.",
+      "faceLayoutVersion": 1,
+      "mattingModel": "local chroma-key soft matte",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/robot.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "3d10310151de44c8f4c6dc4c7aad1c9c4bc312a8e31deca00af3fa88551581df"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/robot.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "a927ea322e387547469b88462d89e54c0aeed0c43e789b0832875c592ee637aa"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/robot.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "7ecfee5d7149470c1bf1bafb6c6c7f513f5d01b85d3d35f445eb1ab5d76a7d09"
+        }
+      }
+    },
+    "pumpkin": {
+      "name": "Pumpkin",
+      "version": 3,
+      "approvedCandidate": "reference-locked-built-in-v1",
+      "approvedAt": "2026-08-07T14:32:08.579435+00:00",
+      "prompt": "The subject is the exact upright front-facing egg character from image 1. Preserve its softly rounded silhouette, camera, scale, placement, two small feet, aqua and tan speckles, large friendly black-and-brown cartoon eyes with intact pupils and small catchlights, tiny curved eyebrows, rosy cheeks, happy open mouth, and warm expression. Do not move, resize, remove, or redesign any facial feature or foot. The egg must remain unmistakably the same character. Any accessory is singular, small, and does not obscure the face. Treat the canonical central facial canvas as a protected ellipse spanning normalized x 0.22 to 0.78 and y 0.34 to 0.66 on the final square canvas. Keep this zone smooth, low-detail, and uninterrupted. No seam, groove, ridge, pattern, emblem, accessory, hard shadow edge, specular hotspot, or material boundary may cross behind or touch the brows, eyes, blush, or mouth. Preserve generous clear space around each facial feature so the body remains compatible with future separately composited face layers. Premium cute 3D cartoon mascot art matching Baristabbit: cozy handcrafted toy quality, broad rounded forms, tactile painted shell and soft materials, warm low-contrast cinematic key light, gentle peach bounce, and restrained eye gloss. Emotionally friendly and playful, never realistic or uncanny. Use a warm pumpkin-orange shell with soft vertical lobes outside the face-safe zone, one small curled brown stem, and restrained green leaves and vine curls around the crown and lower outer edges. Keep the central face panel smooth and make it cozy rather than spooky. Set the whole image on a perfectly flat, uniform solid #FF00FF background for matting.  The background has no gradient, texture, floor, reflection, shadow, atmosphere, or lighting variation. No text, letters, numbers, logos, watermark, UI, frame, multiple characters, broken shell, photorealism, flat illustration, uncanny doll eyes, hollow pupils, missing mouth, missing feet, realistic animal anatomy, grime, mold, busy ornament, glossy plastic finish, or background objects.",
+      "generationModel": "OpenAI built-in image generation",
+      "references": [
+        {
+          "path": "assets/images/katchimeras/egg-avatars/classic.png",
+          "role": "identity and face anchor master"
+        },
+        {
+          "path": "user-provided Robot and Pumpkin concept crop",
+          "role": "theme reference"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "Katchimeras premium 3D toy style"
+        }
+      ],
+      "artDirection": "Reference-led theme with the canonical v1 facial safe zone kept visually clear for future face-layer compositing.",
+      "faceLayoutVersion": 1,
+      "mattingModel": "local chroma-key soft matte",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/pumpkin.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "b5b89eb8ec6f57de247efa510a7bbb8f9ef402040acfa4802dacfc0abf70d66e"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/pumpkin.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "d63c1fc186b0ff0967845e7d910aa5f5e3eb0897f14da027e561fb3e2d551646"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/pumpkin.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "5ff97bb18adde2511243ad3d8d3adefe2a23d5bb520cc5aef9d3afcafbca6167"
+        }
       }
     }
   },
-  "updatedAt": "2026-08-07T13:31:53.013676+00:00",
+  "updatedAt": "2026-08-07T14:32:08.579435+00:00",
   "gameplay": {
     "version": 2,
     "mode": "equipped skin with reusable crack overlays",
@@ -427,7 +525,7 @@
       }
     }
   },
-  "artDirectionVersion": 2,
+  "artDirectionVersion": 3,
   "effects": {
     "crack-1": {
       "png": {
@@ -455,6 +553,50 @@
         "width": 1024,
         "height": 1024,
         "sha256": "6f936acaa2ee4e97337bf6883ed0afbde470e612081bcc8dd0876fe1ed3e7464"
+      }
+    }
+  },
+  "faceLayout": {
+    "version": 1,
+    "canvas": {
+      "width": 2048,
+      "height": 2048
+    },
+    "safeZone": {
+      "shape": "ellipse",
+      "left": 0.22,
+      "top": 0.34,
+      "right": 0.78,
+      "bottom": 0.66
+    },
+    "anchors": {
+      "leftBrow": {
+        "x": 0.39,
+        "y": 0.405
+      },
+      "rightBrow": {
+        "x": 0.61,
+        "y": 0.405
+      },
+      "leftEye": {
+        "x": 0.385,
+        "y": 0.505
+      },
+      "rightEye": {
+        "x": 0.615,
+        "y": 0.505
+      },
+      "leftBlush": {
+        "x": 0.31,
+        "y": 0.565
+      },
+      "rightBlush": {
+        "x": 0.69,
+        "y": 0.565
+      },
+      "mouth": {
+        "x": 0.5,
+        "y": 0.57
       }
     }
   }
