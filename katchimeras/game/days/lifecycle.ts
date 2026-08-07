@@ -1,4 +1,4 @@
-import { HOME_HATCH_HOUR } from '@/constants/home-mvp';
+import { HOME_HATCH_HOUR } from '@/constants/hatch';
 import type { HomeDayState, StoredHomeDayRecord } from '@/types/home';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
 import { resolveDayLifecycleState } from '@/utils/day-state';
@@ -23,6 +23,8 @@ export function resolveDayState(day: StoredHomeDayRecord, now: Date, hatchHour: 
     isSameDay: isToday,
     hour: now.getHours(),
     minute: now.getMinutes(),
+    second: now.getSeconds(),
+    millisecond: now.getMilliseconds(),
     hatchHour,
     earlyHatchMinutes: growth.savedMinutes,
   });

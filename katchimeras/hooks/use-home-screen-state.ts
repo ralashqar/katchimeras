@@ -580,8 +580,8 @@ export function useHomeScreenState({
   // two can never disagree.
 
 
-  const refreshState = useCallback(() => {
-    syncState();
+  const refreshState = useCallback((forceDerive = false) => {
+    syncState(forceDerive);
   }, [syncState]);
 
   const resetHomeState = useCallback(() => {

@@ -236,6 +236,7 @@ function HomeScreen() {
   const selectedCareGoalCompletionRef = useRef<(() => void) | null>(null);
   const [todayPhotoLibrarySheet, setTodayPhotoLibrarySheet] = useState<TodayPhotoLibrarySheetContent | null>(null);
   const incubationActivatedRef = useRef<boolean | null>(null);
+  const acceleratedHatchReadyRef = useRef(false);
   const {
     clearIntent: clearCareIntent,
     completionEvent: queuedCareCompletion,
@@ -352,6 +353,7 @@ function HomeScreen() {
   } = useTodayHatchRevealController({
     selectedDay,
     triggerHatchIfReady,
+    acceleratedReadyRef: acceleratedHatchReadyRef,
   });
   const { days: allDays } = useAllDays();
   const isDay = selectedDay?.kind === 'day';
@@ -510,7 +512,10 @@ function HomeScreen() {
   }, [backfillStatus.completedVersion, refreshState]);
 
   const handleRevealPress = useCallback(() => {
-    if (selectedDay?.kind !== 'day' || !selectedDay.canHatch) return;
+    if (
+      selectedDay?.kind !== 'day'
+      || (!selectedDay.canHatch && !acceleratedHatchReadyRef.current)
+    ) return;
     const reason = hatchCheckInEligibility(selectedDay);
     if (reason) {
       if (!selectedDay.hatchCheckIn) startHatchCheckIn(selectedDay.id, reason);
@@ -573,9 +578,12 @@ function HomeScreen() {
         )
       : null;
   const explorationSubjectFrame = explorationCreatureFrame ?? explorationEggFrame;
-  // While a prompt is showing, the page collapses to just the egg + prompt: the
-  // forming quote and the add/camera buttons hide until it's answered/dismissed.
-  const hasActivePrompt = isForming && Boolean(formingActivePrompt);
+  // Contextual photo suggestions still populate the legacy prompt model, but
+  // the nurture experience does not auto-mount that strip. Only a prompt that
+  // is actually presented may disable gestures or defer completion animation.
+  // Treating the hidden forming prompt as visible is what locked the page as
+  // soon as the background Photo Library scan finished after Mood + Sleep.
+  const hasVisibleLegacyPrompt = !isForming && Boolean(formingActivePrompt);
 
   // The day the page is LOOKING AT — the forming day while it forms, or a
   // hatched day being revisited. Sheets/readers bind to this; write handlers
@@ -956,6 +964,19 @@ function HomeScreen() {
         : undefined,
     );
   }, [formingDay, growthNow, onTomorrowForming]);
+  useEffect(() => {
+    setGrowthNow(new Date());
+  }, [formingDay]);
+  acceleratedHatchReadyRef.current = Boolean(isFormingToday && nurtureGrowth?.isReady);
+  useEffect(() => {
+    if (!nurtureGrowth?.isActivated || nurtureGrowth.isReady || !isFormingToday) return;
+    const remainingMs = nurtureGrowth.effectiveHatchAt.getTime() - Date.now();
+    const timer = setTimeout(() => {
+      setGrowthNow(new Date());
+      refreshState(true);
+    }, Math.max(0, remainingMs) + 40);
+    return () => clearTimeout(timer);
+  }, [isFormingToday, nurtureGrowth, refreshState]);
   useEffect(() => {
     if (!nurtureGrowth) {
       incubationActivatedRef.current = null;
@@ -1388,7 +1409,7 @@ function HomeScreen() {
     quickGoalJournal !== null ||
     selectedCareGoalId !== null ||
     hatchCheckInOpen ||
-    hasActivePrompt ||
+    hasVisibleLegacyPrompt ||
     promptSheetOpen ||
     memoryVaultOpen ||
     foodPickerOpen ||
@@ -1517,9 +1538,12 @@ function HomeScreen() {
       ? todayScene.homeEnvironment.motion.explorationPinchSoftLimitRange
       : 0,
   });
-  const pageGesture = explorationPresentationActive
-    ? Gesture.Simultaneous(explorationMotion.gesture, environmentGesture)
-    : Gesture.Simultaneous(swipeGesture, environmentGesture);
+  const pageGesture = useMemo(
+    () => explorationPresentationActive
+      ? Gesture.Simultaneous(explorationMotion.gesture, environmentGesture)
+      : Gesture.Simultaneous(swipeGesture, environmentGesture),
+    [environmentGesture, explorationMotion.gesture, explorationPresentationActive, swipeGesture],
+  );
   const handleHeroStageLayout = useCallback((event: LayoutChangeEvent) => {
     const nextTop = event.nativeEvent.layout.y;
     setHeroStageTop((current) => (
@@ -1733,7 +1757,7 @@ function HomeScreen() {
                     />
                   </TodayKingdomEggAboveOverlay>
                 ) : null}
-                {!hasActivePrompt && !quickGoalsOpen ? (
+                {!hasVisibleLegacyPrompt && !quickGoalsOpen ? (
                   <TodayCategoryRing
                     categories={goalRingItems}
                     onPress={() => setQuickGoalsOpen(true)}
@@ -1796,7 +1820,7 @@ function HomeScreen() {
               ) : null}
               {/* The same category ring circles the hatched creature when
                   revisiting a day, anchored to the shared art stage. */}
-              {(isForming || isHatched) && !isHatching && !hasActivePrompt && !quickGoalsOpen ? (
+              {(isForming || isHatched) && !isHatching && !hasVisibleLegacyPrompt && !quickGoalsOpen ? (
                 <TodayCategoryRing
                   categories={goalRingItems}
                   onPress={() => setQuickGoalsOpen(true)}
@@ -1864,6 +1888,7 @@ function HomeScreen() {
           onRewardFlight={handleCareRewardFlight}
           onSelectDay={navigateToDay}
           careSwipeExternalGesture={explorationMotion.gesture}
+          environmentGesture={environmentGesture}
           sceneTranslateX={explorationMotion.translateX}
           timelineDays={timelineDays}
           topInset={insets.top}
@@ -1877,7 +1902,7 @@ function HomeScreen() {
           page collapsed and during the hatch reveal. The panel also shows on
           the TOMORROW view once today has hatched (viewedDay resolves it);
           before the hatch, tomorrow stays a locked egg with no panel. */}
-      {!isFormingToday && !isHatching && !quickGoalsOpen && !hasActivePrompt ? (
+      {!isFormingToday && !isHatching && !quickGoalsOpen && !hasVisibleLegacyPrompt ? (
         <Pressable
           accessibilityLabel={`Discoveries. ${discoveryProgress.unlocked} of ${discoveryProgress.total} found`}
           accessibilityRole="button"
@@ -1911,7 +1936,7 @@ function HomeScreen() {
           state={quickGoals.state}
         />
       ) : null}
-      {!isForming && (!isHatching || hatchShowsResident) && !hasActivePrompt && !quickGoalsOpen ? (
+      {!isForming && (!isHatching || hatchShowsResident) && !hasVisibleLegacyPrompt && !quickGoalsOpen ? (
         <TodayBottomDock
           canHatch={isDay ? selectedDay.canHatch : false}
           isForming={isForming}

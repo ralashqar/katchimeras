@@ -13,7 +13,13 @@ export const EGG_AVATAR_SKIN_IDS = [
 
 export type EggAvatarSkinId = (typeof EGG_AVATAR_SKIN_IDS)[number];
 
-export const EGG_AVATAR_FACE_IDS = ['classic-smile'] as const;
+export const EGG_AVATAR_FACE_IDS = [
+  'classic-smile',
+  'happy-squint',
+  'sleepy',
+  'curious',
+  'determined',
+] as const;
 
 export type EggAvatarFaceId = (typeof EGG_AVATAR_FACE_IDS)[number];
 

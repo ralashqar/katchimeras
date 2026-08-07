@@ -8,7 +8,7 @@ import {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import todayScene from '@/data/today-scene.json';
@@ -184,7 +184,7 @@ export function useTodayNavigationController({
     });
   }, [navigateToDay, navigation, selectedDayId, timelineDays]);
 
-  const swipeGesture = Gesture.Pan()
+  const swipeGesture = useMemo(() => Gesture.Pan()
     .maxPointers(1)
     .activeOffsetX([-24, 24])
     .failOffsetY([-18, 18])
@@ -195,7 +195,7 @@ export function useTodayNavigationController({
       } else if (event.translationX < -60) {
         runOnJS(goToAdjacentDay)(1);
       }
-    });
+    }), [comicOpen, goToAdjacentDay, isHatching, promptSheetOpen]);
 
   return {
     cameraProgress,

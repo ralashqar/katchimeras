@@ -85,6 +85,8 @@ test('the final feed token publishes only after its Energy commit can render', (
   assert.match(controllerSource, /Haptics\.ImpactFeedbackStyle\.Light/);
   assert.match(controllerSource, /Haptics\.ImpactFeedbackStyle\.Medium/);
   assert.match(controllerSource, /growthHapticTimerRef\.current = setTimeout\([\s\S]*?170/);
+  assert.match(controllerSource, /const FEED_ARRIVAL_WATCHDOG_MS = 2_500/);
+  assert.match(controllerSource, /feedArrivalWatchdogRef\.current = setTimeout\([\s\S]*?settleActiveFeedRef\.current\(nextFeed\.nonce\)/);
 });
 
 test('manual journal action feedback waits until its native sheet is dismissed', () => {
@@ -126,6 +128,8 @@ test('forming nurture presentation does not mount the legacy Today scene underne
     'utf8',
   );
   assert.match(todaySource, /\{!isForming \? \(\s*<>[\s\S]*?<ScrollView/);
+  assert.match(todaySource, /const hasVisibleLegacyPrompt = !isForming && Boolean\(formingActivePrompt\)/);
+  assert.doesNotMatch(todaySource, /const hasActivePrompt = isForming && Boolean\(formingActivePrompt\)/);
   assert.match(todaySource, /energyLoopStatus === 'rewarding'[\s\S]*?\|\| energyLoopStatus === 'entering'/);
   assert.match(todaySource, /actionListLocked=\{[\s\S]*?energyLoopStatus === 'launching'[\s\S]*?energyLoopStatus === 'awaiting_completion'[\s\S]*?energyLoopStatus === 'rewarding'/);
   assert.match(heroSource, /enabled=\{!hideKingdomEnvironmentArt\}/);
@@ -146,6 +150,9 @@ test('forming nurture presentation does not mount the legacy Today scene underne
   assert.ok((nurtureSource.match(/FadeInUp\.delay\(entryDelayMs\)\.duration\(300\)/g) ?? []).length >= 2);
   assert.match(nurtureSource, /actionStackOpacity\.value = withTiming\(1,[\s\S]*?duration: reduceMotion \? 100 : 360/);
   assert.match(nurtureSource, /pointerEvents=\{actionStackInteractive \? 'auto' : 'none'\}/);
+  assert.match(nurtureSource, /Gesture\.Native\(\)\.simultaneousWithExternalGesture\([\s\S]*?careSwipeExternalGesture,[\s\S]*?environmentGesture/);
+  assert.match(nurtureSource, /\.activeOffsetX\(CARE_SWIPE_ACTIVATION_DISTANCE\)[\s\S]*?\.failOffsetX\(-CARE_SWIPE_ACTIVATION_DISTANCE\)/);
+  assert.match(nurtureSource, /<HatchRevealAction onAdd=\{onAddJournal\}/);
   assert.match(nurtureSource, /fixedActionClusterTop \+ fixedActionClusterHeight \+ 8/);
   assert.match(
     nurtureSource,

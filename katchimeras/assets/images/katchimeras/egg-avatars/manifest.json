@@ -845,7 +845,7 @@
       }
     }
   },
-  "updatedAt": "2026-08-07T15:57:01.047921+00:00",
+  "updatedAt": "2026-08-07T16:43:50.635783+00:00",
   "gameplay": {
     "version": 2,
     "mode": "equipped skin with reusable crack overlays",
@@ -1042,6 +1042,182 @@
           "width": 256,
           "height": 256,
           "sha256": "ee7d178ffc77313dc2a55bcb0c150fbac9fddaa87776fd44f6d9ea3764332697"
+        }
+      }
+    },
+    "happy-squint": {
+      "name": "Happy Squint",
+      "description": "Closed happy eyes and a delighted little grin.",
+      "version": 1,
+      "approvedAt": "2026-08-07T16:43:50.635783+00:00",
+      "faceLayoutVersion": 1,
+      "prompt": "Generate a new clean face sprite from scratch; image 1 is only a layout, personality, and premium-toy style reference. Do not extract, trace, crop, or copy its pixels. Create exactly seven separated components: two simple glossy oval eyes, two small curved eyebrows, one tiny smiling mouth, and two compact solid rounded blush ovals. Use clean vector-like silhouettes with subtle premium 3D toy shading confined inside each shape, crisp professionally antialiased boundaries, and smooth Bezier-like curves. Blush must have a finite opaque edge, never airbrushed, fuzzy, translucent, textured, or feathered. Do not add cream, white, or gray outer rims. Keep the friendly relative placement, scale, symmetry, warm brown-black eye colors, restrained white catchlights, and amber lower irises. Include no egg shell, feet, body texture, accessory, shadow, glow, or extra mark. Keep the face centered at its original relative layout on a full square canvas and place it on a perfectly uniform flat #00FF00 background. No gradient, floor, checkerboard, text, watermark, or additional object.",
+      "expressionDirection": "Closed upward-curving happy eyes with an open delighted smile.",
+      "generationModel": "OpenAI built-in image generation",
+      "mattingModel": "component-aware chroma soft matte",
+      "mattingSettings": {
+        "keyColor": "#00FF00",
+        "disconnectedComponents": true,
+        "edgeMode": "soft",
+        "despill": true,
+        "edgeContractPixels": 2
+      },
+      "layerBounds": [
+        0.23,
+        0.365,
+        0.77,
+        0.625
+      ],
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/faces/happy-squint.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "9ad75abb8d3d35fb1ca7c08363ccc7857856a6681140722bedb0c0f73b0792c3"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/faces/happy-squint.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "2aa72d2479f42f47de49a2771ebe458d31cb0f96b7407a153ab2d4ced3ba0729"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/faces/thumbnails/happy-squint.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "276e6ecdb57a3c381cb0fe898f9b0673309ba0eb7c5d1de196b80fec20a5eac7"
+        }
+      }
+    },
+    "sleepy": {
+      "name": "Sleepy",
+      "description": "Restful closed eyes and a peaceful smile.",
+      "version": 1,
+      "approvedAt": "2026-08-07T16:43:50.635783+00:00",
+      "faceLayoutVersion": 1,
+      "prompt": "Generate a new clean face sprite from scratch; image 1 is only a layout, personality, and premium-toy style reference. Do not extract, trace, crop, or copy its pixels. Create exactly seven separated components: two simple glossy oval eyes, two small curved eyebrows, one tiny smiling mouth, and two compact solid rounded blush ovals. Use clean vector-like silhouettes with subtle premium 3D toy shading confined inside each shape, crisp professionally antialiased boundaries, and smooth Bezier-like curves. Blush must have a finite opaque edge, never airbrushed, fuzzy, translucent, textured, or feathered. Do not add cream, white, or gray outer rims. Keep the friendly relative placement, scale, symmetry, warm brown-black eye colors, restrained white catchlights, and amber lower irises. Include no egg shell, feet, body texture, accessory, shadow, glow, or extra mark. Keep the face centered at its original relative layout on a full square canvas and place it on a perfectly uniform flat #00FF00 background. No gradient, floor, checkerboard, text, watermark, or additional object.",
+      "expressionDirection": "Relaxed closed eyelids with a tiny content smile.",
+      "generationModel": "OpenAI built-in image generation",
+      "mattingModel": "component-aware chroma soft matte",
+      "mattingSettings": {
+        "keyColor": "#00FF00",
+        "disconnectedComponents": true,
+        "edgeMode": "soft",
+        "despill": true,
+        "edgeContractPixels": 1
+      },
+      "layerBounds": [
+        0.23,
+        0.365,
+        0.77,
+        0.625
+      ],
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/faces/sleepy.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "1993317a5351550e4a3c8e799c09bf2154bca62f2bc8ab40860a90eb9573f82d"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/faces/sleepy.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "e4800dd94aa73b16babc9af66975e2cefc4b3bde3bfb08cebc2b8ebbce5414dd"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/faces/thumbnails/sleepy.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "b095a1194501216dab5daef6a8f4de93249e3c80fd2de3c3462d0467b4d6c211"
+        }
+      }
+    },
+    "curious": {
+      "name": "Curious",
+      "description": "Wondering eyes and a tiny surprised mouth.",
+      "version": 1,
+      "approvedAt": "2026-08-07T16:43:50.635783+00:00",
+      "faceLayoutVersion": 1,
+      "prompt": "Generate a new clean face sprite from scratch; image 1 is only a layout, personality, and premium-toy style reference. Do not extract, trace, crop, or copy its pixels. Create exactly seven separated components: two simple glossy oval eyes, two small curved eyebrows, one tiny smiling mouth, and two compact solid rounded blush ovals. Use clean vector-like silhouettes with subtle premium 3D toy shading confined inside each shape, crisp professionally antialiased boundaries, and smooth Bezier-like curves. Blush must have a finite opaque edge, never airbrushed, fuzzy, translucent, textured, or feathered. Do not add cream, white, or gray outer rims. Keep the friendly relative placement, scale, symmetry, warm brown-black eye colors, restrained white catchlights, and amber lower irises. Include no egg shell, feet, body texture, accessory, shadow, glow, or extra mark. Keep the face centered at its original relative layout on a full square canvas and place it on a perfectly uniform flat #00FF00 background. No gradient, floor, checkerboard, text, watermark, or additional object.",
+      "expressionDirection": "Eyes looking upward with one raised brow and a tiny round mouth.",
+      "generationModel": "OpenAI built-in image generation",
+      "mattingModel": "component-aware chroma soft matte",
+      "mattingSettings": {
+        "keyColor": "#00FF00",
+        "disconnectedComponents": true,
+        "edgeMode": "soft",
+        "despill": true,
+        "edgeContractPixels": 1
+      },
+      "layerBounds": [
+        0.23,
+        0.365,
+        0.77,
+        0.625
+      ],
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/faces/curious.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "eef1dea85c1affd368bf67980a6c72680a9d80b84ad4a054da50fe5e21460600"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/faces/curious.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "54e53fe0235dd161362fc99cef15e1bf6a648648d8d61b7779b3d40bc3bc6b50"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/faces/thumbnails/curious.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "9eb3a8508e57453f3993780468721605dc3baa34b4cdaa2131fe05950f41d26c"
+        }
+      }
+    },
+    "determined": {
+      "name": "Determined",
+      "description": "A cute, confident ready-to-try expression.",
+      "version": 1,
+      "approvedAt": "2026-08-07T16:43:50.635783+00:00",
+      "faceLayoutVersion": 1,
+      "prompt": "Generate a new clean face sprite from scratch; image 1 is only a layout, personality, and premium-toy style reference. Do not extract, trace, crop, or copy its pixels. Create exactly seven separated components: two simple glossy oval eyes, two small curved eyebrows, one tiny smiling mouth, and two compact solid rounded blush ovals. Use clean vector-like silhouettes with subtle premium 3D toy shading confined inside each shape, crisp professionally antialiased boundaries, and smooth Bezier-like curves. Blush must have a finite opaque edge, never airbrushed, fuzzy, translucent, textured, or feathered. Do not add cream, white, or gray outer rims. Keep the friendly relative placement, scale, symmetry, warm brown-black eye colors, restrained white catchlights, and amber lower irises. Include no egg shell, feet, body texture, accessory, shadow, glow, or extra mark. Keep the face centered at its original relative layout on a full square canvas and place it on a perfectly uniform flat #00FF00 background. No gradient, floor, checkerboard, text, watermark, or additional object.",
+      "expressionDirection": "Friendly focused eyes, confident brows, and a small closed smile.",
+      "generationModel": "OpenAI built-in image generation",
+      "mattingModel": "component-aware chroma soft matte",
+      "mattingSettings": {
+        "keyColor": "#00FF00",
+        "disconnectedComponents": true,
+        "edgeMode": "soft",
+        "despill": true,
+        "edgeContractPixels": 1
+      },
+      "layerBounds": [
+        0.23,
+        0.365,
+        0.77,
+        0.625
+      ],
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/faces/determined.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "5827b7c8bf4b8e7433f9620651f05117e43b58af1def65d77eef02d7e0778c65"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/faces/determined.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "7e0660e40fad0ea8654d5a6d8aff42e8dd3857678b8903fc4b666b9c3c3c43f7"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/faces/thumbnails/determined.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "376c545cc943ca9f08a96982c10d86b3b71d14802885a3507c5851423004d3ae"
         }
       }
     }

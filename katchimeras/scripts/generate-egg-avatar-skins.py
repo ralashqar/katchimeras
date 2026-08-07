@@ -44,6 +44,34 @@ MATTING_MODEL = "fal-ai/birefnet/v2"
 PIPELINE_VERSION = "egg-avatar-layers-v1"
 DEFAULT_FACE_ID = "classic-smile"
 
+FACE_VARIATIONS: dict[str, dict[str, str]] = {
+    "classic-smile": {
+        "name": "Classic Smile",
+        "description": "Bright eyes, a tiny smile, and warm rosy cheeks.",
+        "expression": "Friendly open-eyed smile with a tiny open mouth.",
+    },
+    "happy-squint": {
+        "name": "Happy Squint",
+        "description": "Closed happy eyes and a delighted little grin.",
+        "expression": "Closed upward-curving happy eyes with an open delighted smile.",
+    },
+    "sleepy": {
+        "name": "Sleepy",
+        "description": "Restful closed eyes and a peaceful smile.",
+        "expression": "Relaxed closed eyelids with a tiny content smile.",
+    },
+    "curious": {
+        "name": "Curious",
+        "description": "Wondering eyes and a tiny surprised mouth.",
+        "expression": "Eyes looking upward with one raised brow and a tiny round mouth.",
+    },
+    "determined": {
+        "name": "Determined",
+        "description": "A cute, confident ready-to-try expression.",
+        "expression": "Friendly focused eyes, confident brows, and a small closed smile.",
+    },
+}
+
 FACE_LAYOUT = {
     "version": 1,
     "canvas": {"width": 2048, "height": 2048},
@@ -790,6 +818,55 @@ def import_layered_v1(source_dir: Path) -> None:
     print(f"imported {len(SKINS)} faceless bases and face {DEFAULT_FACE_ID}")
 
 
+def import_face_set(source_dir: Path) -> None:
+    """Promote reviewed, component-aware matted expressions without touching bodies."""
+    face_ids = [face_id for face_id in FACE_VARIATIONS if face_id != DEFAULT_FACE_ID]
+    missing = [face_id for face_id in face_ids if not (source_dir / f"{face_id}-matted.png").exists()]
+    if missing:
+        sys.exit(f"Missing reviewed face mattes: {', '.join(missing)}")
+
+    manifest = load_manifest()
+    approved_at = datetime.now(timezone.utc).isoformat()
+    faces = manifest.setdefault("faces", {})
+    qa_dir = source_dir / "qa"
+    qa_dir.mkdir(parents=True, exist_ok=True)
+    classic_body = Image.open(BASES_DIR / "classic.png").convert("RGBA")
+    for face_id in face_ids:
+        definition = FACE_VARIATIONS[face_id]
+        face = build_face_layer(source_dir / f"{face_id}-matted.png")
+        outputs = save_layer_asset(face, FACES_DIR, FACE_THUMBS_DIR, face_id)
+        faces[face_id] = {
+            "name": definition["name"],
+            "description": definition["description"],
+            "version": 1,
+            "approvedAt": approved_at,
+            "faceLayoutVersion": FACE_LAYOUT["version"],
+            "prompt": layered_face_prompt(),
+            "expressionDirection": definition["expression"],
+            "generationModel": "OpenAI built-in image generation",
+            "mattingModel": "component-aware chroma soft matte",
+            "mattingSettings": {
+                "keyColor": "#00FF00",
+                "disconnectedComponents": True,
+                "edgeMode": "soft",
+                "despill": True,
+                "edgeContractPixels": 2 if face_id == "happy-squint" else 1,
+            },
+            "layerBounds": list(FACE_LAYER_BOUNDS),
+            "outputs": outputs,
+        }
+        # Match EggAvatarArtwork's current global face presentation scale so
+        # reviewers see the same proportions the app will render.
+        runtime_size = round(face.width * 0.92)
+        runtime_face = face.resize((runtime_size, runtime_size), Image.Resampling.LANCZOS)
+        preview = classic_body.copy()
+        preview.alpha_composite(runtime_face, ((preview.width - runtime_size) // 2, (preview.height - runtime_size) // 2))
+        preview.resize((512, 512), Image.Resampling.LANCZOS).save(qa_dir / f"{face_id}-classic-preview.png", optimize=True)
+    manifest["updatedAt"] = approved_at
+    MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    print(f"imported {len(face_ids)} interchangeable face variations")
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -1116,31 +1193,35 @@ def validate(skin_id: str | None = None) -> None:
                 errors.append(f"layered base changed source pixels outside face mask: {item}")
         if item in manifest.get("skins", {}) and not manifest["skins"][item].get("baseOutputs"):
             errors.append(f"manifest missing layered base outputs for {item}")
-    face_entry = manifest.get("faces", {}).get(DEFAULT_FACE_ID)
-    if not face_entry:
-        errors.append(f"manifest missing face {DEFAULT_FACE_ID}")
-    for path, expected_size in [
-        (FACES_DIR / f"{DEFAULT_FACE_ID}.png", (2048, 2048)),
-        (FACES_DIR / f"{DEFAULT_FACE_ID}.webp", (1024, 1024)),
-        (FACE_THUMBS_DIR / f"{DEFAULT_FACE_ID}.webp", (256, 256)),
-    ]:
-        if not path.exists():
-            errors.append(f"missing face layer {path.relative_to(ROOT)}")
+    for face_id in FACE_VARIATIONS:
+        face_entry = manifest.get("faces", {}).get(face_id)
+        if not face_entry:
+            errors.append(f"manifest missing face {face_id}")
+        elif face_entry.get("faceLayoutVersion") != FACE_LAYOUT["version"]:
+            errors.append(f"manifest face {face_id} does not use canonical face layout v{FACE_LAYOUT['version']}")
+        for path, expected_size in [
+            (FACES_DIR / f"{face_id}.png", (2048, 2048)),
+            (FACES_DIR / f"{face_id}.webp", (1024, 1024)),
+            (FACE_THUMBS_DIR / f"{face_id}.webp", (256, 256)),
+        ]:
+            if not path.exists():
+                errors.append(f"missing face layer {path.relative_to(ROOT)}")
+                continue
+            metrics = image_metrics(path)
+            if tuple(metrics["size"]) != expected_size:
+                errors.append(f"wrong face layer size {path.relative_to(ROOT)}: {metrics['size']}")
+            if any(metrics["corners"]):
+                errors.append(f"non-transparent face layer corner in {path.relative_to(ROOT)}")
+        face_master = FACES_DIR / f"{face_id}.png"
+        if not face_master.exists():
             continue
-        metrics = image_metrics(path)
-        if tuple(metrics["size"]) != expected_size:
-            errors.append(f"wrong face layer size {path.relative_to(ROOT)}: {metrics['size']}")
-        if any(metrics["corners"]):
-            errors.append(f"non-transparent face layer corner in {path.relative_to(ROOT)}")
-    face_master = FACES_DIR / f"{DEFAULT_FACE_ID}.png"
-    if face_master.exists():
         face_rgba = Image.open(face_master).convert("RGBA")
         alpha = face_rgba.getchannel("A")
         left, top, right, bottom = FACE_LAYOUT["safeZone"]["left"], FACE_LAYOUT["safeZone"]["top"], FACE_LAYOUT["safeZone"]["right"], FACE_LAYOUT["safeZone"]["bottom"]
         safe = Image.new("L", alpha.size, 0)
         ImageDraw.Draw(safe).rounded_rectangle((round(left * alpha.width), round(top * alpha.height), round(right * alpha.width), round(bottom * alpha.height)), radius=round(alpha.width * 0.04), fill=255)
         if ImageChops.subtract(alpha, safe).getbbox():
-            errors.append(f"face layer escapes canonical safe zone: {DEFAULT_FACE_ID}")
+            errors.append(f"face layer escapes canonical safe zone: {face_id}")
         visible_pixels = 0
         green_spill_pixels = 0
         partial_pixels = 0
@@ -1152,9 +1233,9 @@ def validate(skin_id: str | None = None) -> None:
             if 16 < opacity < 239:
                 partial_pixels += 1
         if green_spill_pixels:
-            errors.append(f"face layer contains {green_spill_pixels} visible key-color pixels: {DEFAULT_FACE_ID}")
+            errors.append(f"face layer contains {green_spill_pixels} visible key-color pixels: {face_id}")
         if visible_pixels and partial_pixels / visible_pixels > 0.08:
-            errors.append(f"face layer has implausibly soft edges: {DEFAULT_FACE_ID}")
+            errors.append(f"face layer has implausibly soft edges: {face_id}")
     if errors:
         raise SystemExit("\n".join(errors))
     print(f"validated {len(ids)} egg-avatar skin(s)")
@@ -1185,6 +1266,8 @@ def main() -> None:
     import_skin.add_argument("--source", type=Path, required=True)
     import_layers = sub.add_parser("import-layered-v1")
     import_layers.add_argument("--source-dir", type=Path, required=True)
+    import_faces = sub.add_parser("import-face-set")
+    import_faces.add_argument("--source-dir", type=Path, required=True)
     generate_layers = sub.add_parser("layered-generate")
     generate_layers.add_argument("--source-dir", type=Path, required=True)
     matte_layers = sub.add_parser("layered-matte")
@@ -1208,6 +1291,8 @@ def main() -> None:
         import_approved_skin(args.skin, args.source)
     elif args.command == "import-layered-v1":
         import_layered_v1(args.source_dir)
+    elif args.command == "import-face-set":
+        import_face_set(args.source_dir)
     elif args.command == "layered-generate":
         generate_layered_sources(args.source_dir)
     elif args.command == "layered-matte":

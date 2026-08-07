@@ -25,6 +25,7 @@ type EggFeedRequest = {
 };
 
 const EGG_FEED_TARGET_Y_RATIO = 0.64;
+const FEED_ARRIVAL_WATCHDOG_MS = 2_500;
 
 export function useEggFeedController() {
   const [eggFeed, setEggFeed] = useState<EggFeed | null>(null);
@@ -39,15 +40,19 @@ export function useEggFeedController() {
   const queuedFeedsRef = useRef<EggFeedRequest[]>([]);
   const launchPendingRef = useRef(false);
   const launchRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const feedArrivalWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settleActiveFeedRef = useRef<(feedNonce?: number) => void>(() => {});
   const growthHapticTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finalEnergyFeedbackFrameRef = useRef<number | null>(null);
   const pendingFinalEnergyFeedbackRef = useRef<{ amount: number; count: number; index: number } | null>(null);
 
   useEffect(() => () => {
     if (launchRetryTimerRef.current) clearTimeout(launchRetryTimerRef.current);
+    if (feedArrivalWatchdogRef.current) clearTimeout(feedArrivalWatchdogRef.current);
     if (growthHapticTimerRef.current) clearTimeout(growthHapticTimerRef.current);
     if (finalEnergyFeedbackFrameRef.current != null) cancelAnimationFrame(finalEnergyFeedbackFrameRef.current);
     launchRetryTimerRef.current = null;
+    feedArrivalWatchdogRef.current = null;
     growthHapticTimerRef.current = null;
     finalEnergyFeedbackFrameRef.current = null;
     pendingFinalEnergyFeedbackRef.current = null;
@@ -97,6 +102,11 @@ export function useEggFeedController() {
       };
       eggFeedRef.current = nextFeed;
       setEggFeed(nextFeed);
+      if (feedArrivalWatchdogRef.current) clearTimeout(feedArrivalWatchdogRef.current);
+      feedArrivalWatchdogRef.current = setTimeout(() => {
+        feedArrivalWatchdogRef.current = null;
+        settleActiveFeedRef.current(nextFeed.nonce);
+      }, FEED_ARRIVAL_WATCHDOG_MS);
     };
 
     const eggDestination = eggTargetRef.current;
@@ -144,7 +154,10 @@ export function useEggFeedController() {
     launchFeedRequest(request);
   }, [launchFeedRequest]);
 
-  const handleEggFeedArrive = useCallback(() => {
+  const handleEggFeedArrive = useCallback((feedNonce?: number) => {
+    if (feedNonce != null && eggFeedRef.current?.nonce !== feedNonce) return;
+    if (feedArrivalWatchdogRef.current) clearTimeout(feedArrivalWatchdogRef.current);
+    feedArrivalWatchdogRef.current = null;
     // Mood and sleep commit on the fifth token. Publish that final arrival on
     // the next frame so React has first rendered the newly earned Energy. The
     // egg then grows and pulses from the same up-to-date value instead of
@@ -166,6 +179,7 @@ export function useEggFeedController() {
     const next = queuedFeedsRef.current.shift();
     if (next) launchFeedRequest(next);
   }, [clearFeed, launchFeedRequest]);
+  settleActiveFeedRef.current = handleEggFeedArrive;
 
   const handleEnergyTokenArrive = useCallback((amount: number, index: number, count: number) => {
     if (index === count - 1) {

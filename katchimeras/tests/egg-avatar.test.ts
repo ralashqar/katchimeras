@@ -25,6 +25,11 @@ test('egg avatar selection accepts only the versioned launch catalog', () => {
     equippedSkinId: 'moss',
     equippedFaceId: 'classic-smile',
   });
+  assert.deepEqual(normalizeEggAvatarSelection({ version: 2, equippedSkinId: 'pumpkin', equippedFaceId: 'curious' }), {
+    version: 2,
+    equippedSkinId: 'pumpkin',
+    equippedFaceId: 'curious',
+  });
   assert.deepEqual(normalizeEggAvatarSelection({ version: 2, equippedSkinId: 'moss', equippedFaceId: 'missing' }), DEFAULT_EGG_AVATAR_SELECTION);
   assert.deepEqual(normalizeEggAvatarSelection(null), DEFAULT_EGG_AVATAR_SELECTION);
   assert.equal(isEggAvatarSkinId('barista'), true);
@@ -37,6 +42,9 @@ test('launch catalog has stable unique ids and Classic is first', () => {
   assert.equal(EGG_AVATAR_SKIN_IDS.length, 10);
   assert.equal(new Set(EGG_AVATAR_SKIN_IDS).size, EGG_AVATAR_SKIN_IDS.length);
   assert.equal(EGG_AVATAR_SKIN_IDS[0], 'classic');
+  assert.equal(EGG_AVATAR_FACE_IDS.length, 5);
+  assert.equal(new Set(EGG_AVATAR_FACE_IDS).size, EGG_AVATAR_FACE_IDS.length);
+  assert.equal(EGG_AVATAR_FACE_IDS[0], 'classic-smile');
 });
 
 test('every launch skin has approved production assets and manifest provenance', () => {

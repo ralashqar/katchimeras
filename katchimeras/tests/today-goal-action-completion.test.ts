@@ -59,7 +59,7 @@ test('first rotating journal completion is queued after its native sheet dismiss
 
   assert.match(today, /const completingCareAction = pendingCareIntent/);
   assert.match(today, /queueCareCompletionAfterJournalDismiss\(completingCareAction\)/);
-  assert.match(today, /addManualJournalEntry\(submission, formingTarget\);[\s\S]*?closeManualJournal\(\)/);
+  assert.match(today, /addManualJournalEntry\(submission, [^)]+\);[\s\S]*?closeManualJournal\(\)/);
 });
 
 test('mood and sleep fly frameless artwork to the egg', () => {

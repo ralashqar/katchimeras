@@ -84,6 +84,15 @@ npm run art:egg-avatars:validate
 
 Faces are generated from scratch; never extract face pixels from a baked egg. The body image may be supplied only as a layout/personality reference. Require exactly seven isolated shapes, crisp antialiased vector-like boundaries, shading contained inside each shape, and bounded opaque blush rather than airbrushed blush. Never accept shell-colored rims, fuzzy edges, or a matte that retains key-color pixels.
 
+The v1 expression test set is `classic-smile`, `happy-squint`, `sleepy`, `curious`, and `determined`. Every expression shares the full-canvas contract and is normalized into the same face-layer bounds; only the feature silhouettes change. After reviewing keyed sources, create component-aware chroma mattes with pure `#00FF00`, despill, a soft antialiased matte, and a one- or two-pixel edge contraction selected by the green-spill QA gate, then promote the complete reviewed set:
+
+```powershell
+python scripts/generate-egg-avatar-skins.py import-face-set --source-dir tmp/imagegen/egg-avatar-faces-v1
+npm run art:egg-avatars:validate
+```
+
+The source directory must contain `<face-id>-matted.png` for each non-default variation. Promotion writes the 2048 px PNG, 1024 px WebP, 256 px picker thumbnail, hashes, expression direction, and matting provenance without changing any approved body asset.
+
 Reviewed art created through the built-in reference workflow can be promoted with the same normalization and manifest contract:
 
 ```powershell

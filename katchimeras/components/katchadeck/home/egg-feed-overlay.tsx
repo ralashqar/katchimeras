@@ -37,7 +37,7 @@ export type EggFeed = {
 
 type EggFeedOverlayProps = {
   feed: EggFeed | null;
-  onArrive: () => void;
+  onArrive: (feedNonce: number) => void;
   onEnergyTokenArrive?: (amount: number, index: number, count: number) => void;
 };
 
@@ -63,7 +63,7 @@ export function EggFeedOverlay({ feed, onArrive, onEnergyTokenArrive }: EggFeedO
     <FeedPayout
       feed={feed}
       key={feed.nonce}
-      onArrive={onArrive}
+      onArrive={() => onArrive(feed.nonce)}
       onEnergyTokenArrive={onEnergyTokenArrive}
     />
   );

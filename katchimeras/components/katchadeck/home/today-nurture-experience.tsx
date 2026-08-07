@@ -84,6 +84,7 @@ type TodayNurtureExperienceProps = {
   onRewardFlight: (from: FeedSourceRect, action: RankedTodayCareAction, onArrive: () => void) => void;
   onSelectDay: (dayId: string) => void;
   careSwipeExternalGesture: GestureType;
+  environmentGesture: GestureType;
   sceneTranslateX: SharedValue<number>;
   topInset: number;
   bottomInset: number;
@@ -132,6 +133,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   onRewardFlight,
   onSelectDay,
   careSwipeExternalGesture,
+  environmentGesture,
   sceneTranslateX,
   timelineDays,
   topInset,
@@ -256,6 +258,13 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
       ? undefined
       : LinearTransition.duration(300).easing(Easing.inOut(Easing.cubic)),
     [reduceMotion],
+  );
+  const actionScrollGesture = useMemo(
+    () => Gesture.Native().simultaneousWithExternalGesture(
+      careSwipeExternalGesture,
+      environmentGesture,
+    ),
+    [careSwipeExternalGesture, environmentGesture],
   );
   const eggPanStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: sceneTranslateX.value }],
@@ -382,7 +391,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
       </Animated.View>
       <View onLayout={handleFixedActionClusterLayout} style={[styles.fixedActionCluster, { top: fixedActionClusterTop }]}>
         {ready ? (
-          <HatchRevealAction onReveal={onReveal} reduceMotion={reduceMotion} />
+          <HatchRevealAction onAdd={onAddJournal} onReveal={onReveal} reduceMotion={reduceMotion} />
         ) : (
           <FormingActionCluster
             onAdd={onAddJournal}
@@ -392,11 +401,13 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
         )}
       </View>
       <MicrocopyToast message={microcopy} placementStyle={{ top: nurtureToastTop }} />
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: tabBarHeight + HOME_ACTIONS_TAB_BAR_GAP, paddingTop: topInset + 8 }}
-        contentInsetAdjustmentBehavior="never"
-        showsVerticalScrollIndicator={false}
-        style={styles.contentScroll}>
+      <GestureDetector gesture={actionScrollGesture}>
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: tabBarHeight + HOME_ACTIONS_TAB_BAR_GAP, paddingTop: topInset + 8 }}
+          contentInsetAdjustmentBehavior="never"
+          directionalLockEnabled
+          showsVerticalScrollIndicator={false}
+          style={styles.contentScroll}>
         <Animated.View
           layout={actionHandoffLayout}
           pointerEvents="none"
@@ -494,7 +505,8 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           ) : null}
           </Animated.View>
         </Animated.View>
-      </ScrollView>
+        </ScrollView>
+      </GestureDetector>
     </View>
   );
 });
@@ -519,7 +531,8 @@ function FormingActionCluster({ onAdd, onCamera, onNote }: {
   );
 }
 
-function HatchRevealAction({ onReveal, reduceMotion }: {
+function HatchRevealAction({ onAdd, onReveal, reduceMotion }: {
+  onAdd: () => void;
   onReveal: () => void;
   reduceMotion: boolean;
 }) {
@@ -543,6 +556,13 @@ function HatchRevealAction({ onReveal, reduceMotion }: {
         style={({ pressed }) => [styles.reveal, pressed && styles.revealPressed]}>
         <IconSymbol color={Meadow.ink} name="sparkles" size={22} />
         <ThemedText style={styles.revealLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>Reveal the hatch</ThemedText>
+      </Pressable>
+      <Pressable
+        accessibilityLabel="Add another journal entry"
+        accessibilityRole="button"
+        onPress={onAdd}
+        style={({ pressed }) => [styles.readyAdd, pressed && styles.revealPressed]}>
+        <IconSymbol color={Meadow.ink} name="plus" size={22} />
       </Pressable>
     </Animated.View>
   );
@@ -1282,7 +1302,10 @@ function CareSwipeShell({ children, disabled = false, externalGesture, label, on
   const gesture = useMemo(() => Gesture.Pan()
     .enabled(!disabled)
     .maxPointers(1)
-    .activeOffsetX([-CARE_SWIPE_ACTIVATION_DISTANCE, CARE_SWIPE_ACTIVATION_DISTANCE])
+    // Rows only own a deliberate right swipe. A left swipe fails this child
+    // recognizer immediately so the parent day-page gesture remains available.
+    .activeOffsetX(CARE_SWIPE_ACTIVATION_DISTANCE)
+    .failOffsetX(-CARE_SWIPE_ACTIVATION_DISTANCE)
     .failOffsetY([-14, 14])
     .blocksExternalGesture(externalGesture)
     .onBegin(() => {
@@ -1558,7 +1581,7 @@ const styles = StyleSheet.create({
   fill: { ...StyleSheet.absoluteFillObject, backgroundColor: '#82B94D', borderRadius: 999, transformOrigin: 'left' },
   trackShine: { backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 999, height: 4, left: 7, position: 'absolute', right: 7, top: 3 },
   addMemoryCluster: { alignItems: 'center', minHeight: 67, paddingBottom: 5 },
-  hatchRevealCluster: { alignItems: 'center', justifyContent: 'center', minHeight: 72, paddingBottom: 5 },
+  hatchRevealCluster: { alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'center', minHeight: 72, paddingBottom: 5 },
   doorIcon: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.54)', borderColor: 'rgba(255,248,230,0.56)', borderCurve: 'continuous', borderRadius: 11, borderWidth: 1, height: 36, justifyContent: 'center', width: 36 },
   doorIconArt: { height: 32, width: 32 },
   rowPressed: { backgroundColor: 'rgba(255,244,204,0.55)', transform: [{ scale: 0.988 }] },
@@ -1603,5 +1626,6 @@ const styles = StyleSheet.create({
   smallIconWell: { alignItems: 'center', backgroundColor: 'rgba(229,190,106,0.18)', borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
   reveal: { alignItems: 'center', backgroundColor: Meadow.gold, borderColor: 'rgba(255,244,204,0.72)', borderRadius: 999, borderWidth: 1, boxShadow: '-3px 6px 16px rgba(92,57,20,0.25), inset 0 1px 0 rgba(255,252,234,0.78)', flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 56, paddingHorizontal: 20 },
   revealLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '900' },
+  readyAdd: { alignItems: 'center', backgroundColor: Meadow.gold, borderColor: 'rgba(255,244,204,0.72)', borderRadius: 999, borderWidth: 1, boxShadow: '-3px 6px 16px rgba(92,57,20,0.25), inset 0 1px 0 rgba(255,252,234,0.78)', height: 56, justifyContent: 'center', width: 56 },
   revealPressed: { opacity: 0.88, transform: [{ translateY: 1 }, { scale: 0.97 }] },
 });

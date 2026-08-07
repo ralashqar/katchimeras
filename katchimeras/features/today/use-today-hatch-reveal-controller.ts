@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef, type RefObject } from 'react';
 import { AppState } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
@@ -13,6 +13,7 @@ import {
 type UseTodayHatchRevealControllerParams = {
   selectedDay: HomeTimelineDay | null;
   triggerHatchIfReady: () => Promise<HatchCommitResult>;
+  acceleratedReadyRef?: RefObject<boolean>;
 };
 
 const HATCH_REVEAL_WATCHDOG_MS = 12_000;
@@ -34,6 +35,7 @@ const REDUCED_PHASE_DELAYS_MS = {
 export function useTodayHatchRevealController({
   selectedDay,
   triggerHatchIfReady,
+  acceleratedReadyRef,
 }: UseTodayHatchRevealControllerParams) {
   const reduceMotion = useReducedMotion();
   const [presentation, dispatch] = useReducer(
@@ -117,7 +119,11 @@ export function useTodayHatchRevealController({
   );
 
   const handleReveal = useCallback(async () => {
-    if (hatchingActiveRef.current || selectedDay?.kind !== 'day' || !selectedDay.canHatch) {
+    if (
+      hatchingActiveRef.current
+      || selectedDay?.kind !== 'day'
+      || (!selectedDay.canHatch && !acceleratedReadyRef?.current)
+    ) {
       return;
     }
 
@@ -162,7 +168,7 @@ export function useTodayHatchRevealController({
     // Bundled art normally decodes while the crack stage is appearing. The
     // fallback prevents a malformed asset from holding interaction forever.
     phaseTimersRef.current.push(setTimeout(() => schedulePresentation(runId), 1_200));
-  }, [clearTimers, handleHatchComplete, schedulePresentation, selectedDay, triggerHatchIfReady]);
+  }, [acceleratedReadyRef, clearTimers, handleHatchComplete, schedulePresentation, selectedDay, triggerHatchIfReady]);
 
   return {
     isHatching: presentation.phase !== 'idle',

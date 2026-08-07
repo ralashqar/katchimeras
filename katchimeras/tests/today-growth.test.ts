@@ -15,6 +15,7 @@ import {
 import { journalFlowCompletesTodayCareAction, rankTodayCareActions } from '../utils/today-care';
 import { buildTodayPhotoRollSuggestion } from '../utils/today-photo-roll-suggestion';
 import { splitEnergyAcrossTokens } from '../utils/energy-payout';
+import { resolveDayLifecycleState } from '../utils/day-state';
 import {
   cancelTodayCareGameRound,
   completeTodayCareGameRound,
@@ -46,6 +47,20 @@ function day(overrides: Partial<StoredHomeDayRecord> = {}): StoredHomeDayRecord 
     ...overrides,
   };
 }
+
+test('accelerated hatch readiness respects seconds instead of waiting for the next minute', () => {
+  assert.equal(resolveDayLifecycleState({
+    earlyHatchMinutes: 29.5,
+    hasCreature: false,
+    hasShape: true,
+    hatchHour: 18,
+    hour: 17,
+    isSameDay: true,
+    minute: 30,
+    second: 31,
+    storedState: 'forming',
+  }), 'ready_to_hatch');
+});
 
 function afterCareCheckIns(record: StoredHomeDayRecord = day()): StoredHomeDayRecord {
   return {
