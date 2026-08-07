@@ -3,8 +3,7 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import type { DailyCardSize } from '@/components/katchadeck/cards/daily-card';
-
-const eggBase = require('../../../../assets/images/katchimeras/cutouts/egg-base.webp');
+import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 
 type FormingEggItemProps = {
   cardSize: DailyCardSize;
@@ -23,6 +22,7 @@ export function FormingEggItem({
   heroTop: requestedHeroTop,
   locked,
 }: FormingEggItemProps) {
+  const { equippedSkin } = useEggAvatar();
   const heroTop = Math.max(52, Math.min(98, requestedHeroTop ?? cardSize.height * 0.18));
   const heroSize = Math.min(258, cardSize.height * 0.52);
   return (
@@ -32,7 +32,7 @@ export function FormingEggItem({
           <Image
             cachePolicy="memory-disk"
             contentFit="contain"
-            source={eggBase}
+            source={equippedSkin.fullSource}
             style={[styles.egg, locked ? styles.eggLocked : null]}
             transition={0}
           />
@@ -54,4 +54,3 @@ const styles = StyleSheet.create({
   countdown: { alignItems: 'center', left: 0, position: 'absolute', right: 0, zIndex: 5 },
   footer: { alignItems: 'center', bottom: 4, justifyContent: 'center', left: 0, position: 'absolute', right: 0, zIndex: 8 },
 });
-

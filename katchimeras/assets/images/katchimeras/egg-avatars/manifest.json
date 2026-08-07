@@ -1,0 +1,461 @@
+{
+  "schemaVersion": 1,
+  "pipelineVersion": "egg-avatar-skins-v2",
+  "skins": {
+    "classic": {
+      "name": "Classic",
+      "version": 2,
+      "approvedCandidate": "reference-locked-v2",
+      "approvedAt": "2026-08-07T13:31:53.013676+00:00",
+      "generationModel": "OpenAI built-in image generation",
+      "references": [
+        {
+          "path": "user-provided egg customisation concept",
+          "role": "cute face proportions and skin concepts"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "Katchimeras premium 3D toy style"
+        },
+        {
+          "path": "classic v2 identity master",
+          "role": "silhouette, camera, and face lock"
+        }
+      ],
+      "artDirection": "Approved happy egg reference: rounded shell, two feet, large friendly cartoon eyes, curved brows, blush, smiling mouth, warm low-contrast premium toy lighting.",
+      "mattingModel": "local chroma-key soft matte",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/classic.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "28be36228fc69531daa2183a1b07c6162bc7ced8509a579cab7670bd8a12175b"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/classic.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "4e4b61f3253d747c8ee82cb123dd607c6db1c8d63aeb87db18d19ec25f83fb46"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/classic.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "90adb842fbc90d900bb02c246f1911f7c76b2608c3e77f2dcfc903a0d9f82f7c"
+        }
+      }
+    },
+    "moss": {
+      "name": "Moss",
+      "version": 2,
+      "approvedCandidate": "reference-locked-v2",
+      "approvedAt": "2026-08-07T13:31:53.013676+00:00",
+      "generationModel": "OpenAI built-in image generation",
+      "references": [
+        {
+          "path": "user-provided egg customisation concept",
+          "role": "cute face proportions and skin concepts"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "Katchimeras premium 3D toy style"
+        },
+        {
+          "path": "classic v2 identity master",
+          "role": "silhouette, camera, and face lock"
+        }
+      ],
+      "artDirection": "Approved happy egg reference: rounded shell, two feet, large friendly cartoon eyes, curved brows, blush, smiling mouth, warm low-contrast premium toy lighting.",
+      "mattingModel": "local chroma-key soft matte",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/moss.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "385737644b1807f09e4ec449f0469a8e16e2279a57c71b481e391a0bf184ca78"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/moss.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "d403be18cfd10887238542656fbc231a119c847abb024450695f337868b37b08"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/moss.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "e1a296fa026077d380588d6f88a38af39eae80b3129a0fe9fc17fcced8ce9f03"
+        }
+      }
+    },
+    "tide": {
+      "name": "Tide",
+      "version": 2,
+      "approvedCandidate": "reference-locked-v2",
+      "approvedAt": "2026-08-07T13:31:53.013676+00:00",
+      "generationModel": "OpenAI built-in image generation",
+      "references": [
+        {
+          "path": "user-provided egg customisation concept",
+          "role": "cute face proportions and skin concepts"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "Katchimeras premium 3D toy style"
+        },
+        {
+          "path": "classic v2 identity master",
+          "role": "silhouette, camera, and face lock"
+        }
+      ],
+      "artDirection": "Approved happy egg reference: rounded shell, two feet, large friendly cartoon eyes, curved brows, blush, smiling mouth, warm low-contrast premium toy lighting.",
+      "mattingModel": "local chroma-key soft matte",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/tide.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "694df70b2ea93462c6af787be3d2416f812a705e7dbb6fc13bf9ef0d6cdc1faa"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/tide.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "936dba97dbd842d36bcf4ec2e98a7ea937f6f26735800a07f5ed1d9c6099075d"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/tide.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "5ab883dd747c5a9761be3ab1f469536c751c34edcee8d3781c1d51e5c01c3d60"
+        }
+      }
+    },
+    "sunset": {
+      "name": "Sunset",
+      "version": 2,
+      "approvedCandidate": "reference-locked-v2",
+      "approvedAt": "2026-08-07T13:31:53.013676+00:00",
+      "generationModel": "OpenAI built-in image generation",
+      "references": [
+        {
+          "path": "user-provided egg customisation concept",
+          "role": "cute face proportions and skin concepts"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "Katchimeras premium 3D toy style"
+        },
+        {
+          "path": "classic v2 identity master",
+          "role": "silhouette, camera, and face lock"
+        }
+      ],
+      "artDirection": "Approved happy egg reference: rounded shell, two feet, large friendly cartoon eyes, curved brows, blush, smiling mouth, warm low-contrast premium toy lighting.",
+      "mattingModel": "local chroma-key soft matte",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/sunset.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "7f91af760010d7f5a62c3948236c2b682fc978e8cc480640cf7d42427b4aa8f6"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/sunset.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "e87379a0b6830c2f414442aa08db88f539c7dac0dab27daf82b36cb5d1d15816"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/sunset.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "f05ac2ce46047c92ae42ee0974a9128c982eb6415cf89dd8f238ecd0c652013d"
+        }
+      }
+    },
+    "starglow": {
+      "name": "Starglow",
+      "version": 2,
+      "approvedCandidate": "reference-locked-v2",
+      "approvedAt": "2026-08-07T13:31:53.013676+00:00",
+      "generationModel": "OpenAI built-in image generation",
+      "references": [
+        {
+          "path": "user-provided egg customisation concept",
+          "role": "cute face proportions and skin concepts"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "Katchimeras premium 3D toy style"
+        },
+        {
+          "path": "classic v2 identity master",
+          "role": "silhouette, camera, and face lock"
+        }
+      ],
+      "artDirection": "Approved happy egg reference: rounded shell, two feet, large friendly cartoon eyes, curved brows, blush, smiling mouth, warm low-contrast premium toy lighting.",
+      "mattingModel": "local chroma-key soft matte",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/starglow.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "9e62b03febd192f8269dfb9001b5481aaae527dc9c0858b7f7f360aac600c285"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/starglow.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "5f8dcab0f90d9a0d8c162c99ada9a9c64c8ddca7634c86367eb98509dc64ddfb"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/starglow.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "bdec1af0ba1cf681adbfdd4a26a8781764a32d76e818979295d41fcdaa58f8cf"
+        }
+      }
+    },
+    "frost": {
+      "name": "Frost",
+      "version": 2,
+      "approvedCandidate": "reference-locked-v2",
+      "approvedAt": "2026-08-07T13:31:53.013676+00:00",
+      "generationModel": "OpenAI built-in image generation",
+      "references": [
+        {
+          "path": "user-provided egg customisation concept",
+          "role": "cute face proportions and skin concepts"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "Katchimeras premium 3D toy style"
+        },
+        {
+          "path": "classic v2 identity master",
+          "role": "silhouette, camera, and face lock"
+        }
+      ],
+      "artDirection": "Approved happy egg reference: rounded shell, two feet, large friendly cartoon eyes, curved brows, blush, smiling mouth, warm low-contrast premium toy lighting.",
+      "mattingModel": "local chroma-key soft matte",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/frost.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "f701516b976a4515646a84e189f19342e6391418e13546764fbf6158053cf52d"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/frost.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "47aea63f9f83dcf257820f7303591ffcc9186d9e6a86f6259118439d488bb420"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/frost.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "7b6b66622a73003e83ec5249ecaf5a050e026ca8728cfb753a55af1878008968"
+        }
+      }
+    },
+    "ember": {
+      "name": "Ember",
+      "version": 2,
+      "approvedCandidate": "reference-locked-v2",
+      "approvedAt": "2026-08-07T13:31:53.013676+00:00",
+      "generationModel": "OpenAI built-in image generation",
+      "references": [
+        {
+          "path": "user-provided egg customisation concept",
+          "role": "cute face proportions and skin concepts"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "Katchimeras premium 3D toy style"
+        },
+        {
+          "path": "classic v2 identity master",
+          "role": "silhouette, camera, and face lock"
+        }
+      ],
+      "artDirection": "Approved happy egg reference: rounded shell, two feet, large friendly cartoon eyes, curved brows, blush, smiling mouth, warm low-contrast premium toy lighting.",
+      "mattingModel": "local chroma-key soft matte",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/ember.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "7e2bcc9a7372b8a7390bf7aca1da4c49748d8d05370a203a241141e01ef82aa9"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/ember.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "025bfaba3fb0c9181a92df83c68aa671f734ad35ac1fec664e2b2204a6a99f9a"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/ember.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "fdbee9871c2d570ca558df61aad614212e8f18fbb0515a6b2191648b5097e69f"
+        }
+      }
+    },
+    "barista": {
+      "name": "Barista",
+      "version": 2,
+      "approvedCandidate": "reference-locked-v2",
+      "approvedAt": "2026-08-07T13:31:53.013676+00:00",
+      "generationModel": "OpenAI built-in image generation",
+      "references": [
+        {
+          "path": "user-provided egg customisation concept",
+          "role": "cute face proportions and skin concepts"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "Katchimeras premium 3D toy style"
+        },
+        {
+          "path": "classic v2 identity master",
+          "role": "silhouette, camera, and face lock"
+        }
+      ],
+      "artDirection": "Approved happy egg reference: rounded shell, two feet, large friendly cartoon eyes, curved brows, blush, smiling mouth, warm low-contrast premium toy lighting.",
+      "mattingModel": "local chroma-key soft matte",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/barista.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "1eaa87fbbe9c74f302176e5e365d3306e0e8f405636f4c9568f62b9c0ddfb8d6"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/barista.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "7df044a2b6e6c95ea6521c806d6116044f6516f2c2144fb8a0a35f755776bd08"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/barista.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "bf621697868af67b9ef67441d54beabb76436e2eac4be65eaab86caee0ab609c"
+        }
+      }
+    }
+  },
+  "updatedAt": "2026-08-07T13:31:53.013676+00:00",
+  "gameplay": {
+    "version": 2,
+    "mode": "equipped skin with reusable crack overlays",
+    "base": "The Today runtime reads EggAvatarProvider.equippedSkin.",
+    "effects": {
+      "crack-1": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/effects/crack-1.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "a5c9623096a2cfd2cda4eca0c798e4e5ff03550be3f861adc0ab4f451094583e"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/effects/crack-1.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "fbabb13d125254ad793f38ed0c0ee88ab51e7cc5f32c2ef7e920959cb1193672"
+        }
+      },
+      "crack-2": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/effects/crack-2.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "1d9c82bc6a09ddcdac91d44eed433efcdcf5374772c0b844409299596d43df6a"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/effects/crack-2.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "6f936acaa2ee4e97337bf6883ed0afbde470e612081bcc8dd0876fe1ed3e7464"
+        }
+      }
+    },
+    "legacyClassicOutputs": {
+      "egg-base": {
+        "png": {
+          "path": "assets/images/katchimeras/cutouts/egg-base.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "28be36228fc69531daa2183a1b07c6162bc7ced8509a579cab7670bd8a12175b"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/cutouts/egg-base.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "4e4b61f3253d747c8ee82cb123dd607c6db1c8d63aeb87db18d19ec25f83fb46"
+        }
+      },
+      "egg-crack-1": {
+        "png": {
+          "path": "assets/images/katchimeras/cutouts/egg-crack-1.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "cda1b9d79895e73969a89143f25e5762ec993cbb874624ae2ddb71c0d54a1ba9"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/cutouts/egg-crack-1.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "09b4d5b36868f3eb6ae2ce169935b06840f147f76a0f40931e43536bec9a48fe"
+        }
+      },
+      "egg-crack-2": {
+        "png": {
+          "path": "assets/images/katchimeras/cutouts/egg-crack-2.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "f5ebbb9d97efea9486cf42a6e3a6b9f5591ab49e1450fbe3d2ad637e61bc634f"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/cutouts/egg-crack-2.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "ac7231a08264c36fa23ac3dcc8707bdf9f827c37e11fc0b433ee1ea0ba7593d0"
+        }
+      }
+    }
+  },
+  "artDirectionVersion": 2,
+  "effects": {
+    "crack-1": {
+      "png": {
+        "path": "assets/images/katchimeras/egg-avatars/effects/crack-1.png",
+        "width": 2048,
+        "height": 2048,
+        "sha256": "a5c9623096a2cfd2cda4eca0c798e4e5ff03550be3f861adc0ab4f451094583e"
+      },
+      "webp": {
+        "path": "assets/images/katchimeras/egg-avatars/effects/crack-1.webp",
+        "width": 1024,
+        "height": 1024,
+        "sha256": "fbabb13d125254ad793f38ed0c0ee88ab51e7cc5f32c2ef7e920959cb1193672"
+      }
+    },
+    "crack-2": {
+      "png": {
+        "path": "assets/images/katchimeras/egg-avatars/effects/crack-2.png",
+        "width": 2048,
+        "height": 2048,
+        "sha256": "1d9c82bc6a09ddcdac91d44eed433efcdcf5374772c0b844409299596d43df6a"
+      },
+      "webp": {
+        "path": "assets/images/katchimeras/egg-avatars/effects/crack-2.webp",
+        "width": 1024,
+        "height": 1024,
+        "sha256": "6f936acaa2ee4e97337bf6883ed0afbde470e612081bcc8dd0876fe1ed3e7464"
+      }
+    }
+  }
+}

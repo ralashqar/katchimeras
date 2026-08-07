@@ -33,6 +33,8 @@ const CREATURE_WORLD_SIZE = CREATURE_BASE_SIZE * kingdomWorldViewConfig.katchime
 const EGG_STAGE_WIDTH = 200;
 const EGG_SHELL_WIDTH = 196;
 const EGG_SHELL_HEIGHT = 224;
+export const TODAY_EGG_GLOBAL_SCALE = 1.15 * 1.2 * 1.05;
+export const TODAY_EGG_VERTICAL_SHIFT_HEIGHT_RATIO = 0.1;
 const TILE_ASSET_SIZE = 1024;
 const FULL_IMAGE_BOUNDS = { left: 0, top: 0, right: 1024, bottom: 1024 };
 
@@ -124,7 +126,9 @@ export function todayKingdomHeroLayout(
     environmentBottomY,
     // LanternEgg's visible shell is 196px wide. Scaling that exact art width to
     // Kingdom's 70-world-unit egg reproduces the Kingdom egg-to-tile ratio.
-    eggStageScale: (eggWorldWidth / EGG_SHELL_WIDTH) * todayScene.homeEgg.scale,
+    eggStageScale: (eggWorldWidth / EGG_SHELL_WIDTH)
+      * todayScene.homeEgg.scale
+      * TODAY_EGG_GLOBAL_SCALE,
     logicalTileWidth,
     tileCenterY,
     // The boundary where the walkable top face becomes the stair/cliff edge.
@@ -138,9 +142,11 @@ export function todayKingdomHeroLayout(
 
 /** Top edge for UI that must sit fully below the scaled Today egg shell. */
 export function todayEggCountdownTop(eggCenterY: number, eggStageScale: number): number {
+  const stageHeight = TODAY_KINGDOM_STAGE_HEIGHT * eggStageScale;
   const shellBottom = eggCenterY
     + TODAY_KINGDOM_STAGE_HEIGHT * todayScene.homeEgg.verticalLowerStageHeightRatio
-    + (EGG_SHELL_HEIGHT * eggStageScale) / 2;
+    + (EGG_SHELL_HEIGHT * eggStageScale) / 2
+    + stageHeight * TODAY_EGG_VERTICAL_SHIFT_HEIGHT_RATIO;
   return shellBottom
     + TODAY_KINGDOM_STAGE_HEIGHT * todayScene.homeHatchCountdown.verticalLowerStageHeightRatio;
 }
@@ -150,7 +156,8 @@ export function todayEggCountdownTop(eggCenterY: number, eggStageScale: number):
 export function todayEggStageFrame(eggCenterY: number, eggStageScale: number) {
   const height = TODAY_KINGDOM_STAGE_HEIGHT * eggStageScale;
   const centerY = eggCenterY
-    + TODAY_KINGDOM_STAGE_HEIGHT * todayScene.homeEgg.verticalLowerStageHeightRatio;
+    + TODAY_KINGDOM_STAGE_HEIGHT * todayScene.homeEgg.verticalLowerStageHeightRatio
+    + height * TODAY_EGG_VERTICAL_SHIFT_HEIGHT_RATIO;
   return {
     height,
     top: centerY - height / 2,
@@ -173,11 +180,14 @@ export function todayExplorationEggStageFrame(
   const eggWidth = Math.min(
     windowWidth * config.eggWidthViewportWidthRatio,
     windowHeight * config.eggWidthViewportHeightRatio,
-  );
+  ) * TODAY_EGG_GLOBAL_SCALE;
   const scale = eggWidth / EGG_STAGE_WIDTH;
   const height = TODAY_KINGDOM_STAGE_HEIGHT * scale;
   const contactY = windowHeight * config.eggContactYRatio;
-  const top = contactY - stageScreenTop - height;
+  const top = contactY
+    - stageScreenTop
+    - height
+    + height * TODAY_EGG_VERTICAL_SHIFT_HEIGHT_RATIO;
   return {
     centerY: top + height / 2,
     contactY,

@@ -21,7 +21,11 @@ import {
 } from '../utils/kingdom-rendering';
 import { kingdomTileArtFrame } from '../utils/kingdom-tile-alignment';
 import {
+  TODAY_EGG_GLOBAL_SCALE,
+  TODAY_EGG_VERTICAL_SHIFT_HEIGHT_RATIO,
+  TODAY_KINGDOM_STAGE_HEIGHT,
   TODAY_KINGDOM_TILE_CENTER_Y,
+  todayEggStageFrame,
   todayKingdomHeroLayout,
 } from '../utils/today-kingdom-hero-layout';
 import {
@@ -200,10 +204,19 @@ test('Today applies its resident and egg framing ratios while enlarging the tile
   assertClose(layout.creatureSize / layout.logicalTileWidth, kingdomCreatureWorldSize / HEX_TILE_W);
   assertClose(
     (layout.eggStageScale * 196) / layout.logicalTileWidth,
-    (kingdomEggWorldWidth * todayScene.homeEgg.scale) / HEX_TILE_W,
+    (kingdomEggWorldWidth * todayScene.homeEgg.scale * TODAY_EGG_GLOBAL_SCALE) / HEX_TILE_W,
   );
   assertClose(layout.creatureTop, expectedCreatureTop);
   assertClose(layout.eggCenterY, expectedEggCenterY);
+
+  const unshiftedTop = expectedEggCenterY
+    + TODAY_KINGDOM_STAGE_HEIGHT * todayScene.homeEgg.verticalLowerStageHeightRatio
+    - (TODAY_KINGDOM_STAGE_HEIGHT * layout.eggStageScale) / 2;
+  const eggFrame = todayEggStageFrame(layout.eggCenterY, layout.eggStageScale);
+  assertClose(
+    eggFrame.top - unshiftedTop,
+    eggFrame.height * TODAY_EGG_VERTICAL_SHIFT_HEIGHT_RATIO,
+  );
 });
 
 test('Today anchors every visible environment bottom before placing its resident', () => {

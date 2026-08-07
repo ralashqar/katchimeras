@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { Colors } from '@/constants/theme';
+import { EggAvatarProvider } from '@/features/egg-avatar/egg-avatar-provider';
 import { AppActivityProvider } from '@/features/performance/app-activity';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import '@/utils/travel-memory-task';
@@ -76,8 +77,9 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={navigationTheme}>
-        <AppActivityProvider>
-          <Stack>
+        <EggAvatarProvider>
+          <AppActivityProvider>
+            <Stack>
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="art-lab" options={{ title: 'Katchimera Art Lab' }} />
@@ -94,6 +96,7 @@ export default function RootLayout() {
           <Stack.Screen name="card/[cardId]" options={{ title: 'Daily card' }} />
           <Stack.Screen name="life-map" options={{ headerShown: false, title: 'Life Map' }} />
           <Stack.Screen name="discoveries" options={{ headerShown: false, title: 'Discoveries' }} />
+          <Stack.Screen name="profile" options={{ title: 'Profile' }} />
           <Stack.Screen name="streak" options={{ animation: 'fade', headerShown: false, title: 'Streak Story' }} />
           <Stack.Screen name="location-privacy" options={{ title: 'Photo places' }} />
           <Stack.Screen name="hatch-your-past" options={{ headerShown: false, gestureEnabled: false, title: 'Hatch your past' }} />
@@ -102,8 +105,9 @@ export default function RootLayout() {
           <Stack.Screen name="katchimera/[creatureId]/quest/[questId]/game" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="game/[questId]" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Katchimeras Preview' }} />
-          </Stack>
-        </AppActivityProvider>
+            </Stack>
+          </AppActivityProvider>
+        </EggAvatarProvider>
         <StatusBar style={colorScheme === 'light' ? 'dark' : 'light'} />
       </ThemeProvider>
     </GestureHandlerRootView>

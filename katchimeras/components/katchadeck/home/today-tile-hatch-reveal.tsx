@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react';
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
 import { buildCreatureKicker } from '@/components/katchadeck/home/creature-hero';
 import { ThemedText } from '@/components/themed-text';
+import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import todayScene from '@/data/today-scene.json';
 import type { HomeArchetypeId } from '@/types/world-identity';
 import type { TodayHatchPresentation, TodayHatchPhase } from '@/utils/today-hatch-presentation';
@@ -32,9 +33,8 @@ import {
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 const softGlow = require('../../../assets/images/katchimeras/soft-glow.png');
-const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.png');
-const eggCrackOne = require('../../../assets/images/katchimeras/cutouts/egg-crack-1.png');
-const eggCrackTwo = require('../../../assets/images/katchimeras/cutouts/egg-crack-2.png');
+const eggCrackOne = require('../../../assets/images/katchimeras/egg-avatars/effects/crack-1.png');
+const eggCrackTwo = require('../../../assets/images/katchimeras/egg-avatars/effects/crack-2.png');
 
 type TodayTileHatchRevealProps = {
   homeArchetypeId?: HomeArchetypeId | null;
@@ -47,6 +47,7 @@ export function TodayTileHatchReveal({
   onAssetsReady,
   presentation,
 }: TodayTileHatchRevealProps) {
+  const { equippedSkin } = useEggAvatar();
   const { width: windowWidth } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
   const homeTile = kingdomHomeTileForIdentity(homeArchetypeId);
@@ -174,7 +175,7 @@ export function TodayTileHatchReveal({
                 cachePolicy="memory-disk"
                 contentFit="contain"
                 priority="high"
-                source={eggBase}
+                source={equippedSkin.highResolutionSource}
                 style={StyleSheet.absoluteFill}
                 transition={0}
               />

@@ -12,6 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useEffect } from 'react';
 
+import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import type { EggVisualState } from '@/types/home';
 
 export type EggAuraMotionValues = {
@@ -40,12 +41,10 @@ type EggShellProps = {
 const DRAG_TILT_RANGE = 60;
 const MAX_TILT_DEG = 9;
 
-const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
-const eggCrackOne = require('../../../assets/images/katchimeras/cutouts/egg-crack-1.webp');
-const eggCrackTwo = require('../../../assets/images/katchimeras/cutouts/egg-crack-2.webp');
-const eggBaseHighResolution = require('../../../assets/images/katchimeras/cutouts/egg-base.png');
-const eggCrackOneHighResolution = require('../../../assets/images/katchimeras/cutouts/egg-crack-1.png');
-const eggCrackTwoHighResolution = require('../../../assets/images/katchimeras/cutouts/egg-crack-2.png');
+const eggCrackOne = require('../../../assets/images/katchimeras/egg-avatars/effects/crack-1.webp');
+const eggCrackTwo = require('../../../assets/images/katchimeras/egg-avatars/effects/crack-2.webp');
+const eggCrackOneHighResolution = require('../../../assets/images/katchimeras/egg-avatars/effects/crack-1.png');
+const eggCrackTwoHighResolution = require('../../../assets/images/katchimeras/egg-avatars/effects/crack-2.png');
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
@@ -58,6 +57,7 @@ export function EggShell({
   reactionKey = 0,
   crackStage = 0,
 }: EggShellProps) {
+  const { equippedSkin } = useEggAvatar();
   const breathe = useSharedValue(0);
   const reaction = useSharedValue(0);
   const crackOne = useSharedValue(0);
@@ -130,7 +130,7 @@ export function EggShell({
         cachePolicy="memory-disk"
         contentFit="contain"
         priority="high"
-        source={highResolution ? eggBaseHighResolution : eggBase}
+        source={highResolution ? equippedSkin.highResolutionSource : equippedSkin.fullSource}
         style={styles.eggImage}
         transition={0}
       />

@@ -5,6 +5,7 @@ import Animated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, wi
 
 import { ThemedText } from '@/components/themed-text';
 import { Meadow } from '@/constants/meadow-theme';
+import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { getCreatureVisual } from '@/game/days';
 import type { HomeDayRecord, HomeTimelineDay } from '@/types/home';
 import {
@@ -14,7 +15,6 @@ import {
 } from '@/utils/today-hatch-presentation';
 
 const auroraRing = require('../../../assets/images/katchimeras/aurora-ring.png');
-const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
 
 type LanternTimelineProps = {
   days: HomeTimelineDay[];
@@ -35,6 +35,7 @@ export function LanternTimeline({
   selectedId,
   onSelect,
 }: LanternTimelineProps) {
+  const { equippedSkin } = useEggAvatar();
   const dayRecords = days.filter((day): day is HomeDayRecord => day.kind === 'day').slice(-4);
   const tomorrow = days.find((day) => day.kind === 'tomorrow');
   const hatchingToday = Boolean(hatchPresentation?.daySnapshot?.isToday);
@@ -114,7 +115,7 @@ export function LanternTimeline({
                   </>
                 ) : (
                   <View style={[styles.eggRing, day.isToday ? styles.eggRingToday : null]}>
-                    <Image contentFit="contain" source={eggBase} style={styles.egg} transition={0} />
+                    <Image contentFit="contain" source={equippedSkin.thumbnailSource} style={styles.egg} transition={0} />
                   </View>
                 )}
               </Animated.View>
@@ -146,7 +147,7 @@ export function LanternTimeline({
               style={styles.orbContent}>
               <View style={styles.emptyRing}>
                 {todayHatched ? (
-                  <Image contentFit="contain" source={eggBase} style={styles.egg} transition={0} />
+                  <Image contentFit="contain" source={equippedSkin.thumbnailSource} style={styles.egg} transition={0} />
                 ) : (
                   <ThemedText style={styles.emptyMark} lightColor="rgba(251,243,228,0.75)" darkColor="rgba(251,243,228,0.75)">
                     ?

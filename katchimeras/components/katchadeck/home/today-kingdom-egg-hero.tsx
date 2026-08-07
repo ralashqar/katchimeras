@@ -49,6 +49,7 @@ import {
 } from '@/features/today/today-energy-feedback';
 import { TodayFallbackCloudScene } from '@/components/katchadeck/home/today-fallback-cloud-scene';
 import { useTodayEnvironmentMotionValues } from '@/components/katchadeck/home/today-environment-motion';
+import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import todayScene from '@/data/today-scene.json';
 
 type TodayKingdomEggHeroProps = {
@@ -84,10 +85,10 @@ type TodayKingdomEggOverlayProps = {
   homeArchetypeId?: HomeArchetypeId | null;
 };
 
-const TODAY_EGG_SOURCE = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
 const SOFT_RING_SOURCE = require('../../../assets/images/katchimeras/soft-ring.png');
 const EGG_RAY_COUNT = 12;
 const EGG_RAY_INDICES = Array.from({ length: EGG_RAY_COUNT }, (_, index) => index);
+const EGG_RAY_SCALE = 0.8;
 const ACTIVATION_CONFETTI_COLORS = ['#FFE68A', '#FFB85C', '#F49AC1', '#91D8C7', '#A7D5FF'] as const;
 const ACTIVATION_CONFETTI = Array.from({ length: 18 }, (_, index) => ({
   angle: (-160 + index * (320 / 17)) * (Math.PI / 180),
@@ -119,6 +120,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   showDormantIndicator = true,
   targetRef,
 }: TodayKingdomEggHeroProps) {
+  const { equippedSkin } = useEggAvatar();
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
   const tile = kingdomHomeTileForIdentity(homeArchetypeId);
@@ -436,8 +438,8 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
                 contentFit="contain"
                 pointerEvents="none"
                 priority="high"
-                recyclingKey="today-original-egg-high-resolution"
-                source={TODAY_EGG_SOURCE}
+                recyclingKey={`today-equipped-egg-${equippedSkin.id}`}
+                source={equippedSkin.highResolutionSource}
                 style={StyleSheet.absoluteFill}
                 transition={0}
               />
@@ -704,7 +706,8 @@ function EggRadiance({
   const reduceMotion = useReducedMotion();
   const rotation = useSharedValue(0);
   const breath = useSharedValue(0);
-  const raySize = 430 * stageScale;
+  const rayScale = stageScale * EGG_RAY_SCALE;
+  const raySize = 430 * rayScale;
 
   useEffect(() => {
     cancelAnimation(rotation);
@@ -760,8 +763,8 @@ function EggRadiance({
         ]}>
         {EGG_RAY_INDICES.map((index) => {
           const longRay = index % 2 === 0;
-          const rayLength = 205 * stageScale;
-          const rayWidth = (longRay ? 20 : 15) * stageScale;
+          const rayLength = 205 * rayScale;
+          const rayWidth = (longRay ? 20 : 15) * rayScale;
           const haloWidth = rayWidth * 2.35;
           const rayTop = raySize / 2 - rayLength;
           return (
