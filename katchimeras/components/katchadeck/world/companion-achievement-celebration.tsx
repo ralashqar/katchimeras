@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   cancelAnimation,
@@ -21,7 +22,9 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withDelay,
   withRepeat,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -41,6 +44,7 @@ const SPLASH_GOLD = '#F6C653';
 const SPLASH_GOLD_DEEP = '#75450A';
 const SPLASH_INK = '#173D57';
 const ACHIEVEMENT_RAY_COUNT = 18;
+const CONFETTI_LOOP_MS = 3_400;
 const ACHIEVEMENT_RAY_INDICES = Array.from(
   { length: ACHIEVEMENT_RAY_COUNT },
   (_, index) => index,
@@ -178,6 +182,7 @@ export function CompanionAchievementCelebration({
                     styles.achievementStage,
                     {
                       height: iconSize,
+                      transform: [{ translateY: -medallionSize * 0.045 }],
                       width: iconSize,
                     },
                   ]}>
@@ -431,36 +436,83 @@ function AchievementRays({ size }: { size: number }) {
   );
 }
 
-export function CelebrationParticles({ tier, tint }: { tier: number; tint: string }) {
+export function CelebrationParticles({
+  layerStyle,
+  tier,
+  tint,
+}: {
+  layerStyle?: StyleProp<ViewStyle>;
+  tier: number;
+  tint: string;
+}) {
   const reduceMotion = useReducedMotion();
   if (reduceMotion) return null;
+  const pieceCount = 20 + tier * 9;
   return (
-    <View pointerEvents="none" style={styles.confettiLayer}>
-      {Array.from({ length: 12 + tier * 8 }, (_, index) => (
-        <ConfettiPiece index={index} key={index} tier={tier} tint={tint} />
+    <View pointerEvents="none" style={[styles.confettiLayer, layerStyle]}>
+      {Array.from({ length: pieceCount }, (_, index) => (
+        <ConfettiPiece index={index} key={index} pieceCount={pieceCount} tier={tier} tint={tint} />
       ))}
     </View>
   );
 }
 
-function ConfettiPiece({ index, tier, tint }: { index: number; tier: number; tint: string }) {
+function ConfettiPiece({
+  index,
+  pieceCount,
+  tier,
+  tint,
+}: {
+  index: number;
+  pieceCount: number;
+  tier: number;
+  tint: string;
+}) {
   const progress = useSharedValue(0);
-  const angle = (index / (12 + tier * 8)) * Math.PI * 2;
-  const distance = 118 + (index % 5) * 27 + tier * 9;
-  const verticalBias = 52 + (index % 4) * 13;
+  const angle = (index / pieceCount) * Math.PI * 2;
+  const distance = 126 + (index % 6) * 24 + tier * 9;
+  const verticalBias = 58 + (index % 5) * 13;
+  const flightDuration = 780 + (index % 6) * 55;
+  const restDuration = Math.max(1, CONFETTI_LOOP_MS - flightDuration - 2);
   useEffect(() => {
-    progress.value = withTiming(1, { duration: 760 + (index % 6) * 70, easing: Easing.out(Easing.cubic) });
-  }, [index, progress]);
-  const style = useAnimatedStyle(() => ({
-    opacity: 1 - Math.max(0, progress.value - 0.78) / 0.22,
-    transform: [
-      { translateX: Math.cos(angle) * distance * progress.value },
-      { translateY: Math.sin(angle) * distance * progress.value + verticalBias * progress.value * progress.value },
-      { rotate: `${index * 31 + progress.value * 240}deg` },
-      { scale: 0.55 + progress.value * 0.45 },
-    ],
-  }));
-  return <Animated.View style={[styles.confetti, { backgroundColor: index % 3 === 0 ? '#F6D66E' : index % 3 === 1 ? tint : '#F8F1D5' }, style]} />;
+    cancelAnimation(progress);
+    progress.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: flightDuration, easing: Easing.out(Easing.cubic) }),
+        withTiming(0, { duration: 1 }),
+        withDelay(restDuration, withTiming(0, { duration: 1 })),
+      ),
+      -1,
+      false,
+    );
+    return () => cancelAnimation(progress);
+  }, [flightDuration, progress, restDuration]);
+  const style = useAnimatedStyle(() => {
+    const entranceOpacity = Math.min(1, progress.value / 0.035);
+    const exitOpacity = 1 - Math.max(0, progress.value - 0.74) / 0.26;
+    return {
+      opacity: Math.min(entranceOpacity, exitOpacity),
+      transform: [
+        { translateX: Math.cos(angle) * distance * progress.value },
+        { translateY: Math.sin(angle) * distance * progress.value + verticalBias * progress.value * progress.value },
+        { rotate: `${index * 31 + progress.value * 285}deg` },
+        { scale: 0.58 + progress.value * 0.52 },
+      ],
+    };
+  });
+  return (
+    <Animated.View
+      style={[
+        styles.confetti,
+        {
+          backgroundColor: index % 4 === 0 ? '#FFF3A6' : index % 4 === 1 ? tint : index % 4 === 2 ? '#F6C653' : '#FFFDF0',
+          height: 10 + (index % 3) * 2,
+          width: 6 + (index % 2) * 2,
+        },
+        style,
+      ]}
+    />
+  );
 }
 
 const styles = StyleSheet.create({

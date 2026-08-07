@@ -9,6 +9,7 @@ import { StreakHeroTitle } from '@/components/katchadeck/streak/streak-hero-titl
 import { StreakWeekRow } from '@/components/katchadeck/streak/streak-week-row';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { CelebrationParticles } from '@/components/katchadeck/world/companion-achievement-celebration';
 import { TODAY_ATMOSPHERE_BACKGROUND_SOURCES } from '@/constants/today-atmosphere-background-sources.gen';
 import { AppFontFamilies } from '@/constants/theme';
 import { streakRepository } from '@/storage/repositories/streak-repository';
@@ -43,7 +44,16 @@ export function StreakMilestoneCelebration({
           <Animated.View entering={FadeInUp.duration(reduceMotion ? 80 : 320)} style={styles.heroBlock}>
             <ThemedText selectable style={styles.eyebrow} lightColor="#75450A" darkColor="#75450A">Life milestone</ThemedText>
             <StreakHeroStage size={heroSize} />
-            <View style={styles.streakCopy}><StreakHeroTitle days={milestone.days} /></View>
+            <View style={styles.streakCopy}>
+              <CelebrationParticles
+                layerStyle={styles.streakConfetti}
+                tier={streakCelebrationTier(milestone.days)}
+                tint="#D69A32"
+              />
+              <View style={styles.streakTitleLayer}>
+                <StreakHeroTitle days={milestone.days} />
+              </View>
+            </View>
           </Animated.View>
 
           <View style={styles.weekBlock}>
@@ -95,13 +105,23 @@ function milestoneCopy(days: number): string {
   return 'Your life is becoming a story you can return to.';
 }
 
+function streakCelebrationTier(days: number): number {
+  if (days >= 100) return 5;
+  if (days >= 30) return 4;
+  if (days >= 14) return 3;
+  if (days >= 7) return 2;
+  return 1;
+}
+
 const styles = StyleSheet.create({
   screen: { backgroundColor: '#E9F4F8', flex: 1 },
   wash: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(239,248,248,0.28)' },
   content: { gap: 18, justifyContent: 'space-between', paddingHorizontal: 22 },
   heroBlock: { alignItems: 'center' },
   eyebrow: { backgroundColor: 'rgba(255,247,218,0.82)', borderRadius: 999, fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '900', letterSpacing: 1.3, overflow: 'hidden', paddingHorizontal: 12, paddingVertical: 6, textTransform: 'uppercase' },
-  streakCopy: { alignItems: 'center', marginTop: -24 },
+  streakCopy: { alignItems: 'center', marginTop: -24, overflow: 'visible', position: 'relative', width: '100%' },
+  streakConfetti: { top: '46%', zIndex: 0 },
+  streakTitleLayer: { alignItems: 'center', zIndex: 1 },
   weekBlock: { gap: 9 },
   weekTitle: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 18, textAlign: 'center' },
   subtitle: { alignSelf: 'center', fontFamily: AppFontFamilies.manrope, fontSize: 14.5, fontWeight: '800', lineHeight: 21, maxWidth: 355, textAlign: 'center' },
