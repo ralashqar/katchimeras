@@ -1695,7 +1695,7 @@ export type StoredHomeState = {
 };
 
 // Which forming day an input (moment / prompt / capture) targets.
-export type DayInputTarget = 'today' | 'tomorrow';
+export type DayInputTarget = 'today' | 'tomorrow' | 'yesterday';
 
 export type WeekProfile = DayScores;
 

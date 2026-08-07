@@ -86,6 +86,8 @@ export type JournalComposerProps = {
   promptTitle?: string;
   saveLabel?: string;
   hapticOnSave?: boolean;
+  dateTarget?: 'today' | 'yesterday';
+  onDateTargetChange?: (target: 'today' | 'yesterday') => void;
   initialInputMode?: QuestJournalCaptureMode;
   onBackFromInitial?: () => void;
   returnToOriginOnBack?: boolean;
@@ -125,6 +127,8 @@ export function JournalComposer({
   promptTitle,
   saveLabel = 'Save memory',
   hapticOnSave = true,
+  dateTarget,
+  onDateTargetChange,
   initialInputMode = 'guided',
   onBackFromInitial,
   returnToOriginOnBack = false,
@@ -533,6 +537,24 @@ export function JournalComposer({
           subtitle={stage === 'flow' ? undefined : subtitle}
           title={title}
         />
+        {dateTarget && onDateTargetChange ? (
+          <View accessibilityRole="radiogroup" style={styles.dateTargetRow}>
+            {(['yesterday', 'today'] as const).map((target) => {
+              const selected = dateTarget === target;
+              return (
+                <Pressable
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  key={target}
+                  onPress={() => onDateTargetChange(target)}
+                  style={[styles.dateTargetChip, selected && styles.dateTargetChipSelected]}>
+                  <IconSymbol color={selected ? '#FFF9E9' : Meadow.inkSoft} name={target === 'yesterday' ? 'arrow.counterclockwise' : 'calendar'} size={14} />
+                  <ThemedText style={styles.dateTargetLabel} lightColor={selected ? '#FFF9E9' : Meadow.inkSoft} darkColor={selected ? '#FFF9E9' : Meadow.inkSoft}>{target === 'yesterday' ? 'Add to yesterday' : 'Add to today'}</ThemedText>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
 
         <ScrollView
           ref={scrollRef}
@@ -1014,6 +1036,10 @@ function successHaptic() {
 
 const styles = StyleSheet.create({
   composer: { flex: 1, minHeight: 0 },
+  dateTargetRow: { flexDirection: 'row', gap: 8, paddingBottom: 7, paddingHorizontal: 2 },
+  dateTargetChip: { alignItems: 'center', backgroundColor: 'rgba(70,54,37,0.07)', borderColor: 'rgba(70,54,37,0.16)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 6, paddingHorizontal: 11, paddingVertical: 8 },
+  dateTargetChipSelected: { backgroundColor: Meadow.goldDeep, borderColor: Meadow.goldDeep },
+  dateTargetLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '800' },
   header: { minHeight: 146, paddingBottom: 10, paddingHorizontal: 4, paddingTop: 4 },
   headerCompact: { minHeight: 120 },
   headerBack: { alignItems: 'center', height: 44, justifyContent: 'center', left: -5, position: 'absolute', top: 42, width: 44, zIndex: 2 },

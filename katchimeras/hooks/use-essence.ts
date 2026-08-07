@@ -7,12 +7,15 @@ import { earnedTotal, essenceBalance } from '@/utils/essence-engine';
 import { loadEssenceState, recordSpend, saveEssenceState } from '@/utils/essence-storage';
 import { loadCompanionQuests } from '@/utils/katchimera-quests';
 import { loadWorldIdentity } from '@/utils/world-identity';
+import { useStreak } from '@/hooks/use-streak';
+import { streakRepository } from '@/storage/repositories/streak-repository';
 
 // Essence balance for the UI. Earned is re-derived from all of history (+ unlocked
 // discoveries) on every archive change; spent is read from storage. Spending lands
 // in Phase C. See docs/progression-customisation-plan.md Phase A.
 export function useEssence() {
   const { days } = useAllDays();
+  const streak = useStreak();
   const [state, setState] = useState(() => loadEssenceState());
 
   // Unlocked discoveries drive their essence rewards. Read from storage (the
@@ -31,8 +34,14 @@ export function useEssence() {
   }, [days]);
 
   const earned = useMemo(
-    () => earnedTotal(days, unlockedDiscoveries, completedQuestCount, loadWorldIdentity().zodiacRitualCompletions.length),
-    [days, unlockedDiscoveries, completedQuestCount]
+    () => earnedTotal(
+      days,
+      unlockedDiscoveries,
+      completedQuestCount,
+      loadWorldIdentity().zodiacRitualCompletions.length,
+      Object.values(streakRepository.load().milestones).reduce((total, milestone) => total + milestone.essenceReward, 0),
+    ),
+    [days, unlockedDiscoveries, completedQuestCount, streak.snapshot.pendingMilestones]
   );
   const balance = essenceBalance(earned, state.spent);
 

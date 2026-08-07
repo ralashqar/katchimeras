@@ -50,7 +50,13 @@ export function readInputDay(
   profile: OnboardingProfile,
   now: Date
 ): StoredHomeDayRecord {
-  return resolveInputTarget(state, target) === 'tomorrow' ? ensureTomorrowDay(state, profile, now) : state.today;
+  const resolved = resolveInputTarget(state, target);
+  if (resolved === 'tomorrow') return ensureTomorrowDay(state, profile, now);
+  if (resolved === 'yesterday') {
+    const yesterday = toLocalDateId(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 12));
+    return state.archivedDays.find((day) => day.isoDate === yesterday) ?? state.today;
+  }
+  return state.today;
 }
 
 export function writeInputDay(
@@ -58,10 +64,19 @@ export function writeInputDay(
   target: DayInputTarget,
   day: StoredHomeDayRecord
 ): StoredHomeState {
-  return resolveInputTarget(state, target) === 'tomorrow' ? { ...state, tomorrow: day } : { ...state, today: day };
+  const resolved = resolveInputTarget(state, target);
+  if (resolved === 'tomorrow') return { ...state, tomorrow: day };
+  if (resolved === 'yesterday') {
+    return {
+      ...state,
+      archivedDays: state.archivedDays.map((archived) => archived.isoDate === day.isoDate ? day : archived),
+    };
+  }
+  return { ...state, today: day };
 }
 
 export function resolveInputTarget(state: StoredHomeState, target: DayInputTarget): DayInputTarget {
+  if (target === 'yesterday') return target;
   if (state.today.state === 'hatched') {
     return 'tomorrow';
   }

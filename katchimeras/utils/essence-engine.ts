@@ -66,7 +66,8 @@ export function earnedTotal(
   // Completed companion quests each pay once (the ledger persists completedAt,
   // so this stays deterministic + anti-farm like the rest of `earned`).
   completedQuestCount = 0,
-  zodiacRitualCompletionCount = 0
+  zodiacRitualCompletionCount = 0,
+  streakMilestoneEssence = 0,
 ): number {
   let total = 0;
   for (const day of days) total += essenceAwardsForDay(day);
@@ -75,6 +76,7 @@ export function earnedTotal(
   total += Math.floor(finalised / DAYS_PER_RECAP) * ESSENCE_AWARD.weeklyRecap;
   total += completedQuestCount * ESSENCE_AWARD.questComplete;
   total += zodiacRitualCompletionCount * ESSENCE_AWARD.zodiacRitual;
+  total += Math.max(0, streakMilestoneEssence);
   return total;
 }
 

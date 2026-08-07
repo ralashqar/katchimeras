@@ -2,6 +2,7 @@ import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
 
 import { DayCaptureSession } from '@/components/katchadeck/home/day-capture-session';
+import { StreakBootstrap } from '@/components/katchadeck/streak/streak-bootstrap';
 import { MeadowTabBar } from '@/components/katchadeck/ui/meadow-tab-bar';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
@@ -24,6 +25,7 @@ export default function TabLayout() {
   return (
     <>
       <DayCaptureSession />
+      <StreakBootstrap />
       <Tabs
         // The carved-wood Meadow bar (generated art + centre capture button)
         // replaces the stock bar entirely.

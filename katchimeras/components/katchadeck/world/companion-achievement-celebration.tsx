@@ -164,9 +164,7 @@ export function CompanionAchievementCelebration({
                     </ThemedText>
                   ) : null}
                 </View>
-                <ThemedText selectable style={[styles.title, { fontSize: titleSize, lineHeight: titleSize + 3 }]} lightColor={SPLASH_GOLD} darkColor={SPLASH_GOLD}>
-                  {featured.name}
-                </ThemedText>
+                <AchievementHeroTitle fontSize={titleSize} title={featured.name} />
                 <ThemedText selectable style={styles.description} lightColor={SPLASH_INK} darkColor={SPLASH_INK}>
                   {featured.description}
                 </ThemedText>
@@ -263,6 +261,28 @@ export function CompanionAchievementCelebration({
         ) : null}
       </View>
     </Modal>
+  );
+}
+
+function AchievementHeroTitle({ fontSize, title }: { fontSize: number; title: string }) {
+  const dynamicStyle = { fontSize, lineHeight: fontSize + 5 };
+  return (
+    <View accessibilityLabel={title} style={styles.titleStack}>
+      <ThemedText
+        accessibilityElementsHidden
+        lightColor={SPLASH_GOLD_DEEP}
+        darkColor={SPLASH_GOLD_DEEP}
+        style={[styles.title, styles.titleShadow, dynamicStyle]}>
+        {title}
+      </ThemedText>
+      <ThemedText
+        selectable
+        lightColor={SPLASH_GOLD}
+        darkColor={SPLASH_GOLD}
+        style={[styles.title, dynamicStyle]}>
+        {title}
+      </ThemedText>
+    </View>
   );
 }
 
@@ -452,7 +472,29 @@ const styles = StyleSheet.create({
   headingMeta: { alignItems: 'center', backgroundColor: 'rgba(255,247,218,0.76)', borderColor: 'rgba(255,255,255,0.7)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 12, justifyContent: 'center', minHeight: 29, paddingHorizontal: 13, paddingVertical: 5 },
   eyebrow: { fontFamily: 'Manrope', fontSize: 11.5, fontWeight: '900', letterSpacing: 1.4, textTransform: 'uppercase' },
   queueCount: { fontFamily: 'Manrope', fontSize: 11.5, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: 0.2 },
-  title: { fontFamily: 'FredokaBold', letterSpacing: -1.05, maxWidth: 540, textAlign: 'center', textShadowColor: 'rgba(78,54,18,0.3)', textShadowOffset: { height: 2, width: 0 }, textShadowRadius: 3 },
+  titleStack: { alignItems: 'center', maxWidth: 540, overflow: 'visible', width: '100%' },
+  title: {
+    fontFamily: 'FredokaBold',
+    letterSpacing: -1.05,
+    overflow: 'visible',
+    paddingBottom: 8,
+    paddingHorizontal: 12,
+    paddingTop: 3,
+    textAlign: 'center',
+    textShadowColor: 'rgba(255,250,207,0.9)',
+    textShadowOffset: { height: -1, width: 0 },
+    textShadowRadius: 1.5,
+    width: '100%',
+  },
+  titleShadow: {
+    left: 0,
+    position: 'absolute',
+    textShadowColor: 'rgba(92,53,7,0.25)',
+    textShadowOffset: { height: 0, width: 0 },
+    textShadowRadius: 7,
+    top: 0,
+    transform: [{ translateY: 4 }],
+  },
   description: { fontFamily: 'Manrope', fontSize: 16, fontWeight: '800', letterSpacing: -0.15, lineHeight: 23, maxWidth: 410, textAlign: 'center', textShadowColor: 'rgba(255,255,255,0.62)', textShadowOffset: { height: 1, width: 0 }, textShadowRadius: 2 },
   hero: { alignItems: 'center', justifyContent: 'center', position: 'relative' },
   achievementStage: { alignItems: 'center', justifyContent: 'center', overflow: 'visible', position: 'relative' },

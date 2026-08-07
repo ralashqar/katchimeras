@@ -94,6 +94,7 @@ const MAPPING = {
   'lock.fill': 'lock',
   'diamond.fill': 'diamond',
   'flame.fill': 'local-fire-department',
+  'shield.fill': 'shield',
   'chevron.down': 'keyboard-arrow-down',
   'book.closed.fill': 'auto-stories',
   'exclamationmark.triangle.fill': 'warning',

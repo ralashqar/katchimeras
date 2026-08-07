@@ -14,6 +14,7 @@ import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { SectionHeader } from '@/components/katchadeck/ui/section-header';
 import { ThemedText } from '@/components/themed-text';
+import { StreakMilestoneCelebration } from '@/components/katchadeck/streak/streak-milestone-celebration';
 import { CompanionAchievementCelebration } from '@/components/katchadeck/world/companion-achievement-celebration';
 import { createStarterReveal } from '@/constants/katchadeck';
 import { COMPANION_ACHIEVEMENT_CATALOG } from '@/constants/companion-achievements';
@@ -43,7 +44,9 @@ import { resetWorldIdentityOnboarding } from '@/utils/world-identity';
 import { setAllKatchimerasAvailableEnabled } from '@/utils/dev-settings';
 import type { DayVisionSummary, PhotoVisionResult, StoredHomeDayRecord } from '@/types/home';
 import type { CompanionAchievementDef } from '@/types/companion-achievements';
+import type { StreakMilestone } from '@/types/streak';
 import { pickRandomAchievement } from '@/utils/achievement-celebration';
+import { STREAK_MILESTONE_REWARDS } from '@/utils/streak-engine';
 
 export default function ExploreScreen() {
   const router = useRouter();
@@ -64,6 +67,8 @@ export default function ExploreScreen() {
   const [promptPhotoLoading, setPromptPhotoLoading] = useState(false);
   const [achievementPreview, setAchievementPreview] = useState<CompanionAchievementDef | null>(null);
   const [lastAchievementPreviewId, setLastAchievementPreviewId] = useState<string | null>(null);
+  const [streakPreview, setStreakPreview] = useState<StreakMilestone | null>(null);
+  const [lastStreakPreviewDays, setLastStreakPreviewDays] = useState<number | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -335,8 +340,20 @@ export default function ExploreScreen() {
 
   function handlePreviewRandomAchievement() {
     const next = pickRandomAchievement(COMPANION_ACHIEVEMENT_CATALOG, lastAchievementPreviewId);
+    setStreakPreview(null);
     setAchievementPreview(next);
     setLastAchievementPreviewId(next?.id ?? null);
+  }
+
+  function handlePreviewRandomStreak() {
+    const milestones = [...STREAK_MILESTONE_REWARDS.entries()];
+    const candidates = milestones.length > 1 && lastStreakPreviewDays != null
+      ? milestones.filter(([days]) => days !== lastStreakPreviewDays)
+      : milestones;
+    const [days, essenceReward] = candidates[Math.floor(Math.random() * candidates.length)] ?? milestones[0];
+    setAchievementPreview(null);
+    setStreakPreview({ days, essenceReward, reachedAt: new Date().toISOString() });
+    setLastStreakPreviewDays(days);
   }
 
   return (
@@ -420,6 +437,7 @@ export default function ExploreScreen() {
                 />
                 <KatchaButton label="Preview comic beats (LLM)" onPress={handlePreviewComicBeats} variant="secondary" />
                 <KatchaButton label="Preview random achievement splash" onPress={handlePreviewRandomAchievement} variant="secondary" />
+                <KatchaButton label="Preview random streak splash" onPress={handlePreviewRandomStreak} variant="secondary" />
                 <KatchaButton label="Preview Hatch Your Past" onPress={() => router.push('/hatch-your-past')} variant="secondary" />
                 <KatchaButton label="Reset home loop" onPress={handleResetHomeLoop} variant="secondary" />
                 <KatchaButton label="Replay personality + zodiac" onPress={handleReplayWorldIdentity} variant="secondary" />
@@ -588,6 +606,13 @@ export default function ExploreScreen() {
           achievements={[achievementPreview]}
           onAchievementSeen={() => {}}
           onComplete={() => setAchievementPreview(null)}
+          preview
+        />
+      ) : null}
+      {streakPreview ? (
+        <StreakMilestoneCelebration
+          milestone={streakPreview}
+          onDismiss={() => setStreakPreview(null)}
           preview
         />
       ) : null}

@@ -5,6 +5,8 @@ import { toLocalDateId } from '@/game/days/date';
 import type { StoredHomeState } from '@/types/home';
 import { loadOnboardingProfile, type OnboardingProfile } from '@/utils/onboarding-state';
 import { homeRepository } from '@/storage/repositories/home-repository';
+import { newQualifyingCaptureIntents } from '@/utils/streak-qualification';
+import { enqueueStreakCaptures } from '@/utils/streak-sync';
 
 type HomeStateMutation = (
   state: StoredHomeState,
@@ -36,11 +38,16 @@ export function useHomeStateMutation(
       const hydratedAt = performance.now();
       const next = mutation(baseState, profile, now);
       const mutatedAt = performance.now();
+      const streakCaptures = newQualifyingCaptureIntents(baseState, next, now);
 
       if (storedStateRef) storedStateRef.current = next;
       if (scheduledStateRef) scheduledStateRef.current = next;
       setStoredState(next);
-      void homeRepository.saveDeferred(next, { notify: false, preserveArchive: true });
+      void homeRepository.saveDeferred(next, {
+        notify: false,
+        preserveArchive: next.archivedDays === baseState.archivedDays,
+      });
+      enqueueStreakCaptures(streakCaptures);
       const completedAt = performance.now();
       if (__DEV__ && completedAt - startedAt > 80) {
         console.warn(

@@ -18,6 +18,7 @@ import { KatchaDeckUI, Lantern } from '@/constants/theme';
 import { getCreatureVisual, hydrateHomeState } from '@/game/days';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useDiscoveries } from '@/hooks/use-discoveries';
+import { useStreak } from '@/hooks/use-streak';
 import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import type { DailyCreatureCard, HomeRarityTier, StoredHomeState } from '@/types/home';
@@ -28,6 +29,8 @@ import { loadCompanionQuests } from '@/utils/katchimera-quests';
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { requestSelectedDay } from '@/utils/selected-day-signal';
+import { dayState, localDateId } from '@/utils/streak-engine';
+import { streakRepository } from '@/storage/repositories/streak-repository';
 
 type CollectionView = 'cards' | 'calendar' | 'species';
 type CardFilters = { year: string; species: string; rarity: string; trait: string };
@@ -59,6 +62,8 @@ export default function CollectionScreen() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const { days } = useAllDays();
   const { unlockedCount: discoveriesUnlocked, totalCount: discoveriesTotal } = useDiscoveries();
+  useStreak();
+  const storedStreak = streakRepository.load();
 
   useFocusEffect(
     useCallback(() => {
@@ -152,6 +157,7 @@ export default function CollectionScreen() {
             </View>
             <CalendarMonth
               days={days}
+              streakStateForDate={(isoDate) => dayState(storedStreak, isoDate, localDateId(new Date()))}
               onSelectDay={(dayId) => {
                 requestSelectedDay(dayId);
                 router.replace('/today');

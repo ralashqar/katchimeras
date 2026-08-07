@@ -2,6 +2,7 @@ import type { StoredHomeState } from '@/types/home';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
 import { resolveHatchHour } from '@/game/days';
 import { todayGrowthSummary } from '@/utils/today-growth';
+import { getStoredRaw, removeStoredValue, setStoredRaw } from '@/utils/app-storage';
 
 // The one notification that matters: "your day is ready to hatch" at the
 // user's chosen hour. A single dated notification is scheduled for the next
@@ -9,6 +10,7 @@ import { todayGrowthSummary } from '@/utils/today-growth';
 // day never fires (the reschedule after hatching targets tomorrow).
 
 let notificationsModule: typeof import('expo-notifications') | null | undefined;
+const HATCH_NOTIFICATION_ID_KEY = 'katchimera.hatch.notification-id.v1';
 
 async function getNotifications() {
   if (notificationsModule !== undefined) {
@@ -73,8 +75,12 @@ export async function syncHatchNotification(state: StoredHomeState, profile: Onb
     }
 
     const target = resolveNextHatchDate(state, profile);
-    await Notifications.cancelAllScheduledNotificationsAsync();
-    await Notifications.scheduleNotificationAsync({
+    const existingId = getStoredRaw(HATCH_NOTIFICATION_ID_KEY);
+    if (existingId) {
+      await Notifications.cancelScheduledNotificationAsync(existingId).catch(() => {});
+      removeStoredValue(HATCH_NOTIFICATION_ID_KEY);
+    }
+    const identifier = await Notifications.scheduleNotificationAsync({
       content: {
         title: 'Your day is ready to hatch',
         body: "Tonight's katchimera is waiting to be revealed.",
@@ -85,6 +91,7 @@ export async function syncHatchNotification(state: StoredHomeState, profile: Onb
         date: target,
       },
     });
+    setStoredRaw(HATCH_NOTIFICATION_ID_KEY, identifier);
   } catch {
     // Notification scheduling is best-effort; the in-app ritual still works.
   }

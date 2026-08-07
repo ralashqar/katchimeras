@@ -94,6 +94,7 @@ export default function RootLayout() {
           <Stack.Screen name="card/[cardId]" options={{ title: 'Daily card' }} />
           <Stack.Screen name="life-map" options={{ headerShown: false, title: 'Life Map' }} />
           <Stack.Screen name="discoveries" options={{ headerShown: false, title: 'Discoveries' }} />
+          <Stack.Screen name="streak" options={{ animation: 'fade', headerShown: false, title: 'Streak Story' }} />
           <Stack.Screen name="location-privacy" options={{ title: 'Photo places' }} />
           <Stack.Screen name="hatch-your-past" options={{ headerShown: false, gestureEnabled: false, title: 'Hatch your past' }} />
           <Stack.Screen name="katchimera/[creatureId]" options={{ headerShown: false }} />

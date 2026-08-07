@@ -7,6 +7,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
 import { getCreatureVisual } from '@/game/days';
 import type { HomeDayRecord } from '@/types/home';
+import type { StreakDayState } from '@/types/streak';
 
 const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
 // The glassy membrane that sits over the egg on the Today page (LanternEgg).
@@ -59,9 +60,11 @@ const MONTH_NAMES = [
 export function CalendarMonth({
   days,
   onSelectDay,
+  streakStateForDate,
 }: {
   days: HomeDayRecord[];
   onSelectDay: (dayId: string) => void;
+  streakStateForDate?: (isoDate: string) => StreakDayState;
 }) {
   const now = new Date();
   const todayIso = toIso(now);
@@ -153,6 +156,7 @@ export function CalendarMonth({
               isToday={isToday}
               isUpcoming={isUpcoming}
               record={day}
+              streakState={streakStateForDate?.(cell.iso)}
               onPress={day ? () => onSelectDay(day.id) : undefined}
             />
           );
@@ -182,11 +186,13 @@ function DayCell({
   isToday,
   isUpcoming,
   onPress,
+  streakState,
 }: {
   record: HomeDayRecord | null;
   isToday: boolean;
   isUpcoming: boolean;
   onPress?: () => void;
+  streakState?: StreakDayState;
 }) {
   const creature = record?.creature ?? null;
   const visual = creature ? getCreatureVisual(creature.visualKey).source : null;
@@ -219,6 +225,11 @@ function DayCell({
       ) : (
         <View style={styles.emptyDot} />
       )}
+      {streakState === 'captured' || streakState === 'repaired' ? (
+        <View style={[styles.streakBadge, streakState === 'repaired' && styles.streakBadgeRepaired]}>
+          <IconSymbol color="#FFF9EC" name={streakState === 'repaired' ? 'shield.fill' : 'checkmark'} size={9} />
+        </View>
+      ) : streakState === 'missed' ? <View style={styles.streakMissed} /> : null}
     </Pressable>
   );
 }
@@ -334,6 +345,9 @@ const styles = StyleSheet.create({
     height: 5,
     width: 5,
   },
+  streakBadge: { alignItems: 'center', backgroundColor: '#D6A94E', borderColor: '#1C1830', borderRadius: 999, borderWidth: 1.5, bottom: 1, height: 17, justifyContent: 'center', position: 'absolute', right: 2, width: 17 },
+  streakBadgeRepaired: { backgroundColor: '#71866B' },
+  streakMissed: { borderColor: 'rgba(201,194,232,0.34)', borderRadius: 999, borderWidth: 1.5, bottom: 5, height: 6, position: 'absolute', width: 6 },
   legend: {
     flexDirection: 'row',
     gap: 18,

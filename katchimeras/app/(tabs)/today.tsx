@@ -88,6 +88,9 @@ import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-a
 import { useBackfillStatus } from '@/utils/backfill-status';
 import { DiscoveryReveal } from '@/components/katchadeck/world/discovery-reveal';
 import { CompanionAchievementCelebration } from '@/components/katchadeck/world/companion-achievement-celebration';
+import { DayCapturedCelebration } from '@/components/katchadeck/streak/day-captured-celebration';
+import { StreakRepairSheet } from '@/components/katchadeck/streak/streak-repair-sheet';
+import { StreakMilestoneCelebration } from '@/components/katchadeck/streak/streak-milestone-celebration';
 import { ProgressBackfillNotice } from '@/components/katchadeck/world/progress-backfill-notice';
 import { useEggFeedController } from '@/features/today/use-egg-feed-controller';
 import { usePromptSheetController } from '@/features/today/use-prompt-sheet-controller';
@@ -97,6 +100,7 @@ import { useTodayActionRouter } from '@/features/today/use-today-action-router';
 import { useObservatoryController } from '@/features/today/use-observatory-controller';
 import { useDiscoveryRevealController } from '@/features/today/use-discovery-reveal-controller';
 import { useCompanionAchievements } from '@/hooks/use-companion-achievements';
+import { useStreak } from '@/hooks/use-streak';
 import { useNoteCaptureController } from '@/features/today/use-note-capture-controller';
 import { useTodayMemoryWriters } from '@/features/today/use-today-memory-writers';
 import { useTodayPromptAnswerController } from '@/features/today/use-today-prompt-answer-controller';
@@ -111,7 +115,7 @@ import { useAppActivity } from '@/features/performance/app-activity';
 import { resolveHomeLoopPresentation } from '@/features/today/home-loop-presentation';
 import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
 import { MemoryClarificationSheet } from '@/components/katchadeck/world/memory-clarification-sheet';
-import type { ClassifiedMemory, HomeDayRecord, HomeTimelineDay, MemoryDomain } from '@/types/home';
+import type { ClassifiedMemory, DayInputTarget, HomeDayRecord, HomeTimelineDay, MemoryDomain } from '@/types/home';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import { consumeQuestActionIntent } from '@/utils/quest-action-signal';
 import { consumeCompanionNavigationIntent } from '@/utils/companion-navigation-intent';
@@ -119,6 +123,8 @@ import { planContextualPrompts } from '@/utils/intelligence/prompt-planner';
 import { noteRoutesForSignals, noteSuggestedSpecific } from '@/utils/journal-input-adapters';
 import { journalNoteRouteNeedsConfirmation } from '@/utils/journal-routing';
 import { runAfterNativeModalDismiss } from '@/utils/native-modal-navigation';
+import { trackStreakEvent } from '@/utils/streak-sync';
+import { defaultStreakCaptureTarget } from '@/utils/streak-engine';
 import { hatchCheckInEligibility } from '@/utils/hatch-check-in';
 import { loadWorldIdentity } from '@/utils/world-identity';
 import {
@@ -217,6 +223,10 @@ function HomeScreen() {
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const streak = useStreak();
+  const pendingStreakMilestone = streak.snapshot.pendingMilestones.length > 0
+    ? [...streak.snapshot.pendingMilestones].sort((left, right) => right.days - left.days)[0]
+    : null;
   const [homeArchetypeId, setHomeArchetypeId] = useState(() => loadWorldIdentity().selectedHomeArchetypeId);
   const [heroStageTop, setHeroStageTop] = useState<number | null>(null);
   const [manualJournalOpen, setManualJournalOpen] = useState(false);
@@ -261,19 +271,23 @@ function HomeScreen() {
   const [manualJournalInitialFlowId, setManualJournalInitialFlowId] = useState<string | null>(null);
   const [manualJournalInitialChoiceId, setManualJournalInitialChoiceId] = useState<string | null>(null);
   const [manualJournalInitialContextId, setManualJournalInitialContextId] = useState<string | null>(null);
+  const [manualJournalTarget, setManualJournalTarget] = useState<DayInputTarget | null>(null);
   const deferredJournalCareCompletionRef = useRef<string | null>(null);
   const deferredJournalCareTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const openManualJournal = useCallback((flowId?: string, categoryId?: string, contextId?: string | null) => {
+  const openManualJournal = useCallback((flowId?: string, categoryId?: string, contextId?: string | null, target?: DayInputTarget) => {
+    const captureTarget = defaultStreakCaptureTarget(new Date(), streak.snapshot.recentDays.at(-2)?.state);
     setManualJournalInitialFlowId(flowId ?? null);
     setManualJournalInitialChoiceId(categoryId ?? null);
     setManualJournalInitialContextId(contextId ?? null);
+    setManualJournalTarget(target ?? (captureTarget === 'yesterday' ? 'yesterday' : null));
     setManualJournalOpen(true);
-  }, []);
+  }, [streak.snapshot.recentDays]);
   const closeManualJournal = useCallback(() => {
     setManualJournalOpen(false);
     setManualJournalInitialFlowId(null);
     setManualJournalInitialChoiceId(null);
     setManualJournalInitialContextId(null);
+    setManualJournalTarget(null);
   }, []);
   const queueCareCompletionAfterJournalDismiss = useCallback((action: RankedTodayCareAction) => {
     if (deferredJournalCareTimerRef.current) clearTimeout(deferredJournalCareTimerRef.current);
@@ -2044,6 +2058,10 @@ function HomeScreen() {
           initialChoiceId={manualJournalInitialChoiceId}
           initialContext={manualJournalInitialContextId}
           hapticOnSave={!pendingCareIntent}
+          dateTarget={manualJournalTarget === 'yesterday' || new Date().getHours() < 3
+            ? (manualJournalTarget === 'yesterday' ? 'yesterday' : 'today')
+            : undefined}
+          onDateTargetChange={(target) => setManualJournalTarget(target)}
           onClose={closeManualJournal}
           onSave={(submission) => {
             const completingCareAction = pendingCareIntent
@@ -2054,7 +2072,7 @@ function HomeScreen() {
             if (completingCareAction) {
               queueCareCompletionAfterJournalDismiss(completingCareAction);
             }
-            addManualJournalEntry(submission, formingTarget);
+            addManualJournalEntry(submission, manualJournalTarget ?? formingTarget);
             closeManualJournal();
             const hasPhotoText = submission.sourceType === 'photo'
               && Boolean(submission.note?.trim() || Object.values(submission.fields).some((value) => Array.isArray(value) ? value.length > 0 : Boolean(value)));
@@ -2251,6 +2269,35 @@ function HomeScreen() {
         setDayName={setDayName}
       />
       <MicrocopyToast message={isForming && formingDay && nurtureGrowth && !isHatching ? null : microcopy} />
+      {streak.celebration && !flowBusy ? (
+        <DayCapturedCelebration
+          days={streak.celebration.result.snapshot.currentStreak}
+          onDismiss={streak.dismissCelebration}
+        />
+      ) : null}
+      {!streak.celebration && pendingStreakMilestone && !flowBusy ? (
+        <StreakMilestoneCelebration
+          milestone={pendingStreakMilestone}
+          onDismiss={() => {
+            streak.markMilestoneSeen(pendingStreakMilestone.days);
+            void trackStreakEvent('streak_milestone_reached', { days: pendingStreakMilestone.days });
+          }}
+        />
+      ) : null}
+      {screenFocused
+        && streak.snapshot.repairableDate
+        && !manualJournalOpen
+        && !flowBusy
+        && !streak.celebration
+        && !pendingStreakMilestone ? (
+          <StreakRepairSheet
+            currentStreak={streak.snapshot.repairableStreak}
+            onAddYesterday={() => openManualJournal(undefined, undefined, null, 'yesterday')}
+            onDecline={() => streak.declineRepair(streak.snapshot.repairableDate!)}
+            onRepair={() => streak.repair(streak.snapshot.repairableDate!)}
+            repairsAvailable={streak.snapshot.repairsAvailable}
+          />
+        ) : null}
 
       {celebrateDiscovery && !flowBusy ? (
         <DiscoveryReveal discovery={celebrateDiscovery} onDismiss={() => markDiscoverySeen(celebrateDiscovery.id)} />
