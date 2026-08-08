@@ -89,6 +89,22 @@ npm run art:egg-avatar-bodies -- honeycomb render --review-only
 
 Review the raw GPT Image result and BiRefNet output together in the app and in the recorded `.tmp` source folder. Replace the body by rerunning its explicit ID even after it is `ready`; replacement promotion increments its catalog and manifest version. Regenerate when it has a face remnant, changed camera/canvas registration, crown ornament, central detail crossing the face-safe region, missing feet, hollow body region, scenery, pedestal, or style drift. Costume collars, scarves, lapels, trim, straps, belts, buttons, jewels, seams, and panel boundaries must remain below normalized `y = 0.68` across the central `x = 0.22–0.78` face span. Do not manually erase or repair generated pixels. Promotion uses only the established solid-body enclosed-hole flood-fill normalization; the BiRefNet exterior edge remains authoritative.
 
+Faces use the Classic face layer as the exact full-canvas edit target, with Baristabbit and the runtime Today environment as locked style references. The edit target and generated face use a perfectly flat `#FF00FF` background before BiRefNet Heavy so dark pupils and eye outlines cannot be mistaken for a black backdrop; magenta is forbidden inside face features. Held props use the same two-stage contract as hats: generate exact viewer-right geometry against the Classic egg, style-map that unchanged geometry with Baristabbit and Today, then run BiRefNet Heavy. Held source pixels remain on their generated full canvas; a catalogued `presentation` scale and offset fits the untouched layer into the canonical right-side slot.
+
+```powershell
+# Generate and promote one face, or the next four planned faces
+npm run art:egg-avatar-faces -- gentle-smile
+npm run art:egg-avatar-faces -- batch
+
+# Rebuild legacy held art first, then continue through new planned props
+npm run art:egg-avatar-held -- warm-lantern
+npm run art:egg-avatar-held -- batch
+
+# Generate the next four planned hats; visually review, then promote each reviewed target
+npm run art:egg-avatar-hats -- batch
+npm run art:egg-avatar-hats -- acorn-cap promote
+```
+
 ```powershell
 python scripts/generate-egg-avatar-skins.py generate --skin moss --count 4
 python scripts/generate-egg-avatar-skins.py matte --skin moss

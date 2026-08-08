@@ -90,17 +90,17 @@ test('ready catalog has stable unique ids and Classic is first', () => {
   assert.ok(EGG_AVATAR_SKIN_IDS.length >= 10);
   assert.equal(new Set(EGG_AVATAR_SKIN_IDS).size, EGG_AVATAR_SKIN_IDS.length);
   assert.equal(EGG_AVATAR_SKIN_IDS[0], 'classic');
-  assert.equal(EGG_AVATAR_FACE_IDS.length, 5);
+  assert.ok(EGG_AVATAR_FACE_IDS.length >= 5);
   assert.equal(new Set(EGG_AVATAR_FACE_IDS).size, EGG_AVATAR_FACE_IDS.length);
   assert.equal(EGG_AVATAR_FACE_IDS[0], 'classic-smile');
-  assert.equal(EGG_AVATAR_HAT_IDS.length, 6);
+  assert.ok(EGG_AVATAR_HAT_IDS.length >= 6);
   assert.equal(new Set(EGG_AVATAR_HAT_IDS).size, EGG_AVATAR_HAT_IDS.length);
-  assert.equal(EGG_AVATAR_HELD_ACCESSORY_IDS.length, 6);
+  assert.ok(EGG_AVATAR_HELD_ACCESSORY_IDS.length >= 6);
   assert.equal(new Set(EGG_AVATAR_HELD_ACCESSORY_IDS).size, EGG_AVATAR_HELD_ACCESSORY_IDS.length);
 });
 
 test('the complete avatar roadmap is data driven while artless entries stay unavailable', () => {
-  const expectedCounts = { body: 50, face: 30, hat: 40, held: 6 } as const;
+  const expectedCounts = { body: 50, face: 30, hat: 40, held: 20 } as const;
   const expectedReadyCounts = {
     body: EGG_AVATAR_SKIN_IDS.length,
     face: EGG_AVATAR_FACE_IDS.length,
@@ -152,13 +152,8 @@ test('the complete avatar roadmap is data driven while artless entries stay unav
   ]) {
     const costume = allEggAvatarItems('body').find((item) => item.id === costumeId);
     assert.ok(costume, `${costumeId} is catalogued`);
-    if (['wizard-robes', 'football-kit', 'sunny-raincoat', 'knight-tunic', 'astronaut-suit', 'explorer-vest', 'royal-robe', 'party-outfit', 'sailor-uniform', 'chef-apron', 'superhero-suit'].includes(costumeId)) {
-      assert.equal(costume.availability, 'ready', `${costumeId} is promoted after generation`);
-      assert.ok(costume.assetRefs, `${costumeId} has production art`);
-    } else {
-      assert.equal(costume.availability, 'planned', `${costumeId} remains hidden until art is generated`);
-      assert.equal(costume.assetRefs, null, `${costumeId} has no placeholder art`);
-    }
+    assert.equal(costume.availability, 'ready', `${costumeId} is promoted after generation`);
+    assert.ok(costume.assetRefs, `${costumeId} has production art`);
   }
 });
 

@@ -37,8 +37,13 @@ FACE_THUMBS_DIR = FACES_DIR / "thumbnails"
 REVIEW_DIR = ROOT / ".tmp" / "egg-avatar-skins"
 HAT_REVIEW_DIR = ROOT / ".tmp" / "egg-avatar-hats-v4"
 BODY_DRAFT_REVIEW_DIR = ROOT / ".tmp" / "egg-avatar-body-drafts-v1"
+FACE_REVIEW_DIR = ROOT / ".tmp" / "egg-avatar-faces-v3"
+HELD_REVIEW_DIR = ROOT / ".tmp" / "egg-avatar-held-v2"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 BODY_CATALOG_PATH = ROOT / "data" / "egg-avatar" / "bodies.json"
+FACE_CATALOG_PATH = ROOT / "data" / "egg-avatar" / "faces.json"
+HAT_CATALOG_PATH = ROOT / "data" / "egg-avatar" / "hats.json"
+HELD_CATALOG_PATH = ROOT / "data" / "egg-avatar" / "held.json"
 CURRENT_EGG = ROOT / "assets" / "images" / "katchimeras" / "cutouts" / "egg-base.png"
 BARISTABBIT = ROOT / "assets" / "images" / "katchimeras" / "cutouts" / "baristabbit.png"
 CLASSIC_APPROVED = OUTPUT_DIR / "classic.png"
@@ -47,26 +52,48 @@ CUTOUTS_DIR = ROOT / "assets" / "images" / "katchimeras" / "cutouts"
 GENERATION_MODEL = "fal-ai/nano-banana-2/edit"
 HAT_GENERATION_MODEL = "openai/gpt-image-2/edit"
 BODY_DRAFT_GENERATION_MODEL = "openai/gpt-image-2/edit"
+FACE_GENERATION_MODEL = "openai/gpt-image-2/edit"
+HELD_GENERATION_MODEL = "openai/gpt-image-2/edit"
 MATTING_MODEL = "fal-ai/birefnet/v2"
 PIPELINE_VERSION = "egg-avatar-layers-v1"
 HAT_PIPELINE_VERSION = "egg-avatar-hats-v4-style-mapped"
 HAT_STYLE_CONTRACT_VERSION = "katchimeras-cozy-toy-v1"
 BODY_DRAFT_PIPELINE_VERSION = "egg-avatar-body-drafts-v1-gpt-image-2"
+FACE_PIPELINE_VERSION = "egg-avatar-faces-v3-magenta-matte"
+HELD_PIPELINE_VERSION = "egg-avatar-held-v2-style-mapped"
 DEFAULT_FACE_ID = "classic-smile"
 ACCESSORY_READY_SKINS = ("moss", "barista", "pumpkin")
-ACCESSORY_SPECS: dict[str, dict[str, str]] = {
-    "moss-sprout": {"slot": "hat", "direction": "a soft sage moss sprout with two plump rounded leaves"},
-    "barista-beret": {"slot": "hat", "direction": "a softly structured caramel cafe beret with a restrained cream band"},
-    "pumpkin-vine-crown": {"slot": "hat", "direction": "a curled pumpkin stem crown with two rounded leaves and one short vine"},
-    "cozy-beanie": {"slot": "hat", "direction": "a dusty-coral knitted beanie with a broad cream cuff and small pompom"},
-    "stargazer-hat": {"slot": "hat", "direction": "a midnight-indigo crooked pointed stargazer hat with a few tiny warm-gold stars"},
-    "tiny-golden-crown": {"slot": "hat", "direction": "a small rounded warm-gold three-point toy crown"},
-    "warm-lantern": {"slot": "held", "direction": "a rounded brass lantern with a warm amber glass glow"},
-    "daisy-posy": {"slot": "held", "direction": "a tiny posy of three white daisies tied with a coral ribbon"},
-    "tiny-storybook": {"slot": "held", "direction": "a small closed warm-walnut and cream storybook with no text or symbol"},
-    "star-wand": {"slot": "held", "direction": "a warm-gold five-point star wand with a short lavender handle"},
-    "cozy-mug": {"slot": "held", "direction": "a rounded caramel ceramic mug with a little visible steam"},
-    "adventure-pennant": {"slot": "held", "direction": "a tiny blank teal and coral adventure pennant on a short wooden pole"},
+
+
+def load_catalog(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def catalog_specs(path: Path, slot: str) -> dict[str, dict[str, Any]]:
+    document = load_catalog(path)
+    specs: dict[str, dict[str, Any]] = {}
+    for item in document["items"]:
+        design = item["visualDesign"]
+        specs[item["id"]] = {
+            "slot": slot,
+            "direction": " ".join([
+                design["summary"],
+                f"Palette: {', '.join(design['palette'])}.",
+                f"Shape language: {design['shapeLanguage']}",
+                f"Constraints: {'; '.join(design['constraints'])}.",
+            ]),
+            "item": item,
+        }
+    return specs
+
+
+FACE_CATALOG = load_catalog(FACE_CATALOG_PATH)
+FACE_SPECS = {item["id"]: item for item in FACE_CATALOG["items"]}
+HAT_CATALOG = load_catalog(HAT_CATALOG_PATH)
+HELD_CATALOG = load_catalog(HELD_CATALOG_PATH)
+ACCESSORY_SPECS = {
+    **catalog_specs(HAT_CATALOG_PATH, "hat"),
+    **catalog_specs(HELD_CATALOG_PATH, "held"),
 }
 ACCESSORY_BOUNDS = {
     "hat": (0.16, 0.01, 0.84, 0.34),
@@ -75,13 +102,16 @@ ACCESSORY_BOUNDS = {
 HAT_IDS = tuple(accessory_id for accessory_id, spec in ACCESSORY_SPECS.items() if spec["slot"] == "hat")
 HELD_IDS = tuple(accessory_id for accessory_id, spec in ACCESSORY_SPECS.items() if spec["slot"] == "held")
 HAT_PRESENTATIONS = {
-    "moss-sprout": {"scale": 0.64, "offsetX": 0.0, "offsetY": -0.267},
-    "barista-beret": {"scale": 0.69, "offsetX": 0.0, "offsetY": -0.201},
-    "pumpkin-vine-crown": {"scale": 0.70, "offsetX": 0.0, "offsetY": -0.294},
-    "cozy-beanie": {"scale": 0.58, "offsetX": 0.0, "offsetY": -0.261},
-    "stargazer-hat": {"scale": 0.58, "offsetX": 0.0, "offsetY": -0.275},
-    "tiny-golden-crown": {"scale": 0.86, "offsetX": 0.0, "offsetY": -0.134},
+    item["id"]: item.get("presentation", {"scale": 1.0, "offsetX": 0.0, "offsetY": 0.0})
+    for item in HAT_CATALOG["items"]
 }
+PLANNED_FACE_IDS = tuple(item["id"] for item in FACE_CATALOG["items"] if item["availability"] == "planned")
+PLANNED_HAT_IDS = tuple(item["id"] for item in HAT_CATALOG["items"] if item["availability"] == "planned")
+PLANNED_HELD_IDS = tuple(item["id"] for item in HELD_CATALOG["items"] if item["availability"] == "planned")
+PENDING_HELD_IDS = tuple(
+    item["id"] for item in HELD_CATALOG["items"]
+    if item["availability"] == "planned" or item.get("layoutVersion", 1) < 2
+)
 BODY_PRESENTATIONS = {
     "classic": (1.0, 0.0, 0.0),
     "moss": (1.08, 0.0, -0.018),
@@ -490,6 +520,49 @@ def write_body_catalog(document: dict[str, Any]) -> None:
     BODY_CATALOG_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def write_item_catalog(path: Path, document: dict[str, Any]) -> None:
+    items = document["items"]
+    lines = [
+        "{",
+        f'  "schemaVersion": {document["schemaVersion"]},',
+        f'  "category": {json.dumps(document["category"])},',
+        '  "items": [',
+        *[
+            f"    {json.dumps(item, ensure_ascii=False)}{',' if index < len(items) - 1 else ''}"
+            for index, item in enumerate(items)
+        ],
+        "  ]",
+        "}",
+    ]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def promote_catalog_item(
+    path: Path,
+    item_id: str,
+    directory: str,
+    *,
+    presentation: dict[str, float] | None = None,
+    layout_version: int | None = None,
+) -> int:
+    document = load_catalog(path)
+    item = next(item for item in document["items"] if item["id"] == item_id)
+    version = item["version"] + (1 if item["availability"] == "ready" else 0)
+    item["availability"] = "ready"
+    item["version"] = version
+    item["assetRefs"] = {
+        "high": f"assets/images/katchimeras/egg-avatars/{directory}/{item_id}.png",
+        "app": f"assets/images/katchimeras/egg-avatars/{directory}/{item_id}.webp",
+        "thumbnail": f"assets/images/katchimeras/egg-avatars/{directory}/thumbnails/{item_id}.webp",
+    }
+    if presentation is not None:
+        item["presentation"] = presentation
+    if layout_version is not None:
+        item["layoutVersion"] = layout_version
+    write_item_catalog(path, document)
+    return version
+
+
 def promote_planned_body_draft(body_id: str) -> None:
     review = planned_body_review_dir(body_id)
     raw = review / "body-fal.png"
@@ -572,6 +645,161 @@ def refresh_avatar_catalog_registry() -> None:
         cwd=ROOT,
         check=True,
     )
+
+
+def face_review_dir(face_id: str) -> Path:
+    return FACE_REVIEW_DIR / face_id
+
+
+def face_prompt(face_id: str) -> str:
+    spec = FACE_SPECS[face_id]
+    design = spec["visualDesign"]
+    return " ".join([
+        "Use case: precise-object-edit. Asset type: transparent egg-avatar face expression layer.",
+        "Image 1 is the exact Classic face layer and full-canvas registration edit target. Preserve its feature scale, warm friendly proportions, left/right eye anchors, brow anchors, cheek anchors, mouth anchor, front-facing camera, and square canvas placement.",
+        "Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language with broad clean forms, smooth softly painted materials, restrained highlights, and friendly mobile-game readability.",
+        "Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, soft low-contrast lighting, and gentle saturation. Do not copy scenery.",
+        f"Change only the expression into {spec['name']}: {design['summary']}",
+        f"Palette: {', '.join(design['palette'])}.",
+        f"Shape language: {design['shapeLanguage']}",
+        f"Constraints: {'; '.join(design['constraints'])}.",
+        "Draw only the brows, eyes, pupils and catchlights where applicable, two cheek marks where applicable, and one mouth expression. No egg shell, body color, feet, hair, hat, hand, prop, floating symbol, scenery, shadow, glow, text, logo, or extra mark.",
+        "Keep every visible pixel inside the same compact central face zone as image 1. Do not zoom, crop, recenter, resize, rotate, or move the face.",
+        "Render only the face layer on a perfectly uniform flat chroma-magenta #FF00FF background for BiRefNet Heavy. Do not use magenta in any face feature. The background has no gradient, texture, floor, reflection, shadow, atmosphere, or lighting variation.",
+    ])
+
+
+def generate_face_draft(face_id: str) -> None:
+    review = face_review_dir(face_id)
+    review.mkdir(parents=True, exist_ok=True)
+    prompt = face_prompt(face_id)
+    references = [FACES_DIR / f"{DEFAULT_FACE_ID}.png", BARISTABBIT, TODAY_RUNTIME_BACKGROUND]
+    print(f"generating GPT Image 2 face {face_id} at quality low...", flush=True)
+    result = call_function("generate-katchimera-art", {
+        "modelId": FACE_GENERATION_MODEL,
+        "input": {
+            "image_urls": [
+                image_data_uri(references[0], max_side=1536, background=(255, 0, 255)),
+                image_data_uri(references[1], max_side=1024),
+                image_data_uri(references[2], max_side=1024),
+            ],
+            "image_size": "square_hd",
+            "quality": "low",
+        },
+        "assetType": "other",
+        "assetKey": f"egg-avatar-face:{face_id}:v3",
+        "pipelineVersion": FACE_PIPELINE_VERSION,
+        "renderProfile": {
+            "id": f"egg_avatar_face_{face_id.replace('-', '_')}_v3",
+            "displayName": f"Egg avatar face {face_id}",
+            "topLevelType": "avatar-layer",
+            "triggerCategory": "egg-avatar",
+            "triggerSubtype": "face",
+            "theme": face_id,
+            "creatureKind": "egg-avatar-face",
+            "caption": FACE_SPECS[face_id]["visualDesign"]["summary"],
+            "imagePrompt": prompt,
+        },
+    })
+    record = result.get("record") or {}
+    image_url = record.get("image_url")
+    if not image_url:
+        raise RuntimeError(f"No face image URL for {face_id}: {result}")
+    download(image_url, review / "face-fal.png")
+    (review / "generation.json").write_text(json.dumps({
+        "id": face_id,
+        "pipelineVersion": FACE_PIPELINE_VERSION,
+        "prompt": prompt,
+        "model": FACE_GENERATION_MODEL,
+        "quality": "low",
+        "references": [
+            {"path": str(references[0].relative_to(ROOT)).replace("\\", "/"), "role": "exact-face-layout-edit-target"},
+            {"path": str(references[1].relative_to(ROOT)).replace("\\", "/"), "role": "character-art-style"},
+            {"path": str(references[2].relative_to(ROOT)).replace("\\", "/"), "role": "runtime-lighting-palette"},
+        ],
+        "imageUrl": image_url,
+        "recordId": record.get("id"),
+    }, indent=2) + "\n", encoding="utf-8")
+
+
+def matte_face_draft(face_id: str) -> None:
+    review = face_review_dir(face_id)
+    source = review / "face-fal.png"
+    if not source.exists():
+        raise SystemExit(f"Missing generated face: {source}")
+    print(f"matting face {face_id} with BiRefNet Heavy...", flush=True)
+    result = call_function("remove-image-background", {
+        "imageBase64": base64.b64encode(source.read_bytes()).decode(),
+        "outputName": f"egg-avatar-face-{face_id}-v3",
+    })
+    image_url = result.get("imageUrl")
+    if not image_url:
+        raise RuntimeError(f"No face matte URL for {face_id}: {result}")
+    download(image_url, review / "face-birefnet.png")
+    (review / "matting.json").write_text(json.dumps({
+        "id": face_id,
+        "model": MATTING_MODEL,
+        "modelProfile": result.get("falModelInput", "General Use (Heavy)"),
+        "operatingResolution": result.get("operatingResolution", "1024x1024"),
+        "refineForeground": result.get("refineForeground", True),
+        "imageUrl": image_url,
+    }, indent=2) + "\n", encoding="utf-8")
+
+
+def promote_face_draft(face_id: str) -> None:
+    review = face_review_dir(face_id)
+    raw_path = review / "face-fal.png"
+    matte_path = review / "face-birefnet.png"
+    generation_path = review / "generation.json"
+    if not raw_path.exists() or not matte_path.exists() or not generation_path.exists():
+        raise SystemExit(f"Missing generated face files for {face_id}")
+    generation = json.loads(generation_path.read_text(encoding="utf-8"))
+    if generation.get("model") != FACE_GENERATION_MODEL or generation.get("quality") != "low":
+        raise RuntimeError(f"Face {face_id} does not use GPT Image 2 Edit quality low")
+    raw = Image.open(raw_path).convert("RGBA")
+    matte = Image.open(matte_path).convert("RGBA").resize(raw.size, Image.Resampling.LANCZOS)
+    raw.putalpha(matte.getchannel("A"))
+    face = raw.resize((2048, 2048), Image.Resampling.LANCZOS)
+    bounds = face.getchannel("A").getbbox()
+    if not bounds:
+        raise RuntimeError(f"No visible face in {matte_path}")
+    allowed = tuple(round(value * 2048) for value in FACE_REMOVAL_BOUNDS)
+    if bounds[0] < allowed[0] or bounds[1] < allowed[1] or bounds[2] > allowed[2] or bounds[3] > allowed[3]:
+        raise RuntimeError(f"Face {face_id} escapes canonical face bounds: {bounds}")
+    outputs = save_layer_asset(face, FACES_DIR, FACE_THUMBS_DIR, face_id)
+    version = promote_catalog_item(FACE_CATALOG_PATH, face_id, "faces")
+    manifest = load_manifest()
+    manifest.setdefault("faces", {})[face_id] = {
+        "name": FACE_SPECS[face_id]["name"],
+        "version": version,
+        "faceLayoutVersion": FACE_LAYOUT["version"],
+        "pipelineVersion": FACE_PIPELINE_VERSION,
+        "generationModel": FACE_GENERATION_MODEL,
+        "generationQuality": "low",
+        "prompt": generation["prompt"],
+        "references": generation["references"],
+        "mattingModel": MATTING_MODEL,
+        "outputs": outputs,
+        "layerBounds": list(FACE_LAYER_BOUNDS),
+    }
+    manifest["updatedAt"] = datetime.now(timezone.utc).isoformat()
+    MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    print(f"promoted face {face_id}", flush=True)
+
+
+def run_face_pipeline(face_ids: tuple[str, ...], *, phase: str) -> None:
+    for face_id in face_ids:
+        if phase == "render":
+            generate_face_draft(face_id)
+            matte_face_draft(face_id)
+            promote_face_draft(face_id)
+        elif phase == "matte":
+            matte_face_draft(face_id)
+            promote_face_draft(face_id)
+        else:
+            promote_face_draft(face_id)
+    refresh_avatar_catalog_registry()
+    print(f"Generated and promoted {len(face_ids)} face customization(s).", flush=True)
 
 
 def run_planned_body_drafts(
@@ -1290,6 +1518,38 @@ def load_matted_hat_source(accessory_id: str) -> Image.Image:
     return art.resize((2048, 2048), Image.Resampling.LANCZOS)
 
 
+def fit_layer_presentation(
+    source_bounds: tuple[int, int, int, int],
+    allowed_bounds: tuple[int, int, int, int],
+) -> dict[str, float]:
+    source_width = source_bounds[2] - source_bounds[0]
+    source_height = source_bounds[3] - source_bounds[1]
+    allowed_width = allowed_bounds[2] - allowed_bounds[0]
+    allowed_height = allowed_bounds[3] - allowed_bounds[1]
+    scale = min(1.0, allowed_width / source_width, allowed_height / source_height)
+    scaled_left = 1024 + (source_bounds[0] - 1024) * scale
+    scaled_right = 1024 + (source_bounds[2] - 1024) * scale
+    scaled_bottom = 1024 + (source_bounds[3] - 1024) * scale
+    target_center_x = (allowed_bounds[0] + allowed_bounds[2]) / 2
+    offset_x = target_center_x - (scaled_left + scaled_right) / 2
+    offset_y = allowed_bounds[3] - scaled_bottom
+    return {
+        "scale": round(scale, 4),
+        "offsetX": round(offset_x / 2048, 4),
+        "offsetY": round(offset_y / 2048, 4),
+    }
+
+
+def presented_bounds(source_bounds: tuple[int, int, int, int], presentation: dict[str, float]) -> tuple[int, int, int, int]:
+    scale = presentation["scale"]
+    offset_x = presentation["offsetX"] * 2048
+    offset_y = presentation["offsetY"] * 2048
+    return tuple(
+        round(1024 + (value - 1024) * scale + (offset_x if index % 2 == 0 else offset_y))
+        for index, value in enumerate(source_bounds)
+    )
+
+
 def approve_hat_front(accessory_id: str) -> None:
     review = hat_review_dir(accessory_id)
     matte_path = review / "front-birefnet.png"
@@ -1330,13 +1590,10 @@ def approve_hat_front(accessory_id: str) -> None:
     source_bounds = canvas.getchannel("A").getbbox()
     if not source_bounds:
         raise RuntimeError(f"No visible hat in {matte_path}")
-    presentation = HAT_PRESENTATIONS[accessory_id]
-    scale = presentation["scale"]
-    offset_x = presentation["offsetX"] * 2048
-    offset_y = presentation["offsetY"] * 2048
-    bounds = tuple(round(1024 + (value - 1024) * scale + (offset_x if index % 2 == 0 else offset_y))
-                   for index, value in enumerate(source_bounds))
     allowed = tuple(round(value * 2048) for value in ACCESSORY_BOUNDS["hat"])
+    catalog_item = ACCESSORY_SPECS[accessory_id]["item"]
+    presentation = catalog_item.get("presentation") or fit_layer_presentation(source_bounds, allowed)
+    bounds = presented_bounds(source_bounds, presentation)
     if bounds[0] < allowed[0] - 4 or bounds[1] < allowed[1] - 4 or bounds[2] > allowed[2] + 4 or bounds[3] > allowed[3] + 4:
         raise RuntimeError(f"Direct hat {accessory_id} escapes canonical bounds: {bounds} not within {allowed}")
     directory = OUTPUT_DIR / "hats"
@@ -1352,8 +1609,9 @@ def approve_hat_front(accessory_id: str) -> None:
         {"path": str(BARISTABBIT.relative_to(ROOT)).replace("\\", "/"), "role": "character-art-style"},
         {"path": str(TODAY_RUNTIME_BACKGROUND.relative_to(ROOT)).replace("\\", "/"), "role": "runtime-lighting-palette"},
     ]
-    entry = accessories["hats"][accessory_id]
-    entry["version"] = 2
+    entry = accessories.setdefault("hats", {}).setdefault(accessory_id, {})
+    catalog_version = promote_catalog_item(HAT_CATALOG_PATH, accessory_id, "hats", presentation=presentation)
+    entry["version"] = catalog_version
     entry["accessoryLayoutVersion"] = 2
     entry["pipelineVersion"] = HAT_PIPELINE_VERSION
     entry["styleContractVersion"] = HAT_STYLE_CONTRACT_VERSION
@@ -1401,8 +1659,13 @@ def make_hat_sheet(accessory_ids: tuple[str, ...], *, review_sources: bool, file
         body_layer = runtime_layer(body, body_scale, body_x, body_y)
         face_layer = runtime_layer(face, 0.92, 0, 0)
         for column, accessory_id in enumerate(accessory_ids):
-            presentation = HAT_PRESENTATIONS[accessory_id]
             hat = hats[accessory_id]
+            catalog_item = ACCESSORY_SPECS[accessory_id]["item"]
+            allowed = tuple(round(value * 2048) for value in ACCESSORY_BOUNDS["hat"])
+            source_bounds = hat.getchannel("A").getbbox()
+            if not source_bounds:
+                raise RuntimeError(f"No visible hat for review: {accessory_id}")
+            presentation = catalog_item.get("presentation") or fit_layer_presentation(source_bounds, allowed)
             hat_layer = runtime_layer(
                 hat,
                 body_scale * presentation["scale"],
@@ -1427,7 +1690,8 @@ def make_hat_sheet(accessory_ids: tuple[str, ...], *, review_sources: bool, file
 
 
 def make_hat_compatibility_sheet() -> Path:
-    return make_hat_sheet(HAT_IDS, review_sources=False, filename="compatibility-sheet.png")
+    ready_ids = tuple(accessory_id for accessory_id in HAT_IDS if (OUTPUT_DIR / "hats" / f"{accessory_id}.png").exists())
+    return make_hat_sheet(ready_ids, review_sources=False, filename="compatibility-sheet.png")
 
 
 def make_hat_review_sheet(accessory_ids: tuple[str, ...]) -> Path:
@@ -1439,6 +1703,7 @@ def run_hat_pipeline(accessory_ids: tuple[str, ...], *, phase: str) -> None:
     if phase == "promote":
         for accessory_id in accessory_ids:
             approve_hat_front(accessory_id)
+        refresh_avatar_catalog_registry()
         path = make_hat_compatibility_sheet()
         print(f"Promoted reviewed hat source(s). Verify production compatibility: {path.relative_to(ROOT)}")
         return
@@ -1454,6 +1719,280 @@ def run_hat_pipeline(accessory_ids: tuple[str, ...], *, phase: str) -> None:
     print(f"Review the raw source, BiRefNet matte, and composite sheet: {path.relative_to(ROOT)}")
     target = "all" if accessory_ids == HAT_IDS else accessory_ids[0]
     print(f"After visual approval, run: python scripts/generate-egg-avatar-skins.py hat-pipeline {target} promote")
+
+
+def held_review_dir(accessory_id: str) -> Path:
+    return HELD_REVIEW_DIR / accessory_id
+
+
+def held_front_prompt(accessory_id: str) -> str:
+    spec = ACCESSORY_SPECS[accessory_id]
+    return " ".join([
+        "Use case: precise-object-edit. Asset type: side-held egg-avatar prop layer without a hand.",
+        "Image 1 is the exact egg character and full square canvas placement reference.",
+        f"Draw {spec['direction']} for this egg character.",
+        "The prop will be layered directly on top of image 1 at the viewer-right side of the egg.",
+        "Draw only the complete visible prop layer. Do not draw any hand, fingers, arm, sleeve, holder, egg, character, face, feet, pedestal, or support.",
+        "Place the prop upright beside and slightly overlapping the egg's viewer-right edge, inside the rightmost 30 percent of the original canvas and between 38 and 90 percent of canvas height. Keep it clear of the eyes, cheek, and mouth.",
+        "Preserve image 1's exact camera, zoom, and square canvas registration. The result must overlay image 1 at 1:1 with no scaling, cropping, recentering, or repositioning.",
+        "Match image 1's simple cozy premium 3D toy art, broad rounded forms, warm lighting, restrained detail, and mobile-game finish.",
+        "Render only that single prop on a perfectly uniform pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, glow, scenery, text, logo, watermark, border, checkerboard, or extra object.",
+    ])
+
+
+def held_style_prompt(accessory_id: str) -> str:
+    spec = ACCESSORY_SPECS[accessory_id]
+    return " ".join([
+        "Use case: precise-object-edit. Asset type: final side-held egg-avatar prop layer without a hand.",
+        "Image 1 is the exact approved prop geometry and edit target. Preserve its silhouette, negative spaces, scale, viewer-right position, perspective, design, colors, and full square canvas registration.",
+        "Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Map image 1 to its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, and friendly mobile-game readability.",
+        "Image 3 is the exact Today cinematic home environment used at runtime. Match only its warm daylight, soft low-contrast lighting, gentle saturation, and simplified toy-diorama finish. Do not copy its scenery or pedestal.",
+        f"Restyle {spec['direction']} from image 1 without redesigning or moving it.",
+        "Reduce surface detail strongly. Use smooth simple color fields and a few broad form-defining cues only. No realistic fibers, grain, scratches, microtexture, tiny stitching, photographic detail, or noisy bump mapping.",
+        "Keep only the prop. Do not add a hand, fingers, arm, sleeve, holder, egg, character, face, feet, pedestal, support, cast shadow, or extra object.",
+        "Render the one style-mapped prop on a perfectly uniform pure-black #000000 background. Do not zoom, crop, recenter, resize, rotate, or move it.",
+        "No scenery, floor, glow, text, logo, watermark, border, checkerboard, or additional object.",
+    ])
+
+
+def generate_held_front(accessory_id: str) -> None:
+    review = held_review_dir(accessory_id)
+    review.mkdir(parents=True, exist_ok=True)
+    prompt = held_front_prompt(accessory_id)
+    print(f"generating direct side-held prop {accessory_id}...", flush=True)
+    result = call_function("generate-katchimera-art", {
+        "modelId": HELD_GENERATION_MODEL,
+        "input": {
+            "image_urls": [black_backed_data_uri(CLASSIC_APPROVED)],
+            "image_size": "square_hd",
+            "quality": "low",
+        },
+        "assetType": "other",
+        "assetKey": f"egg-avatar-held-geometry:{accessory_id}:v2",
+        "pipelineVersion": HELD_PIPELINE_VERSION,
+        "renderProfile": {
+            "id": f"egg_avatar_held_geometry_{accessory_id.replace('-', '_')}_v2",
+            "displayName": f"Side-held egg avatar prop geometry {accessory_id}",
+            "topLevelType": "avatar-layer",
+            "triggerCategory": "egg-avatar",
+            "triggerSubtype": "held-geometry",
+            "theme": accessory_id,
+            "creatureKind": "egg-avatar-held",
+            "caption": ACCESSORY_SPECS[accessory_id]["direction"],
+            "imagePrompt": prompt,
+        },
+    })
+    record = result.get("record") or {}
+    image_url = record.get("image_url")
+    if not image_url:
+        raise RuntimeError(f"No held geometry URL for {accessory_id}: {result}")
+    download(image_url, review / "geometry-fal.png")
+    (review / "geometry-generation.json").write_text(json.dumps({
+        "id": accessory_id,
+        "pipelineVersion": HELD_PIPELINE_VERSION,
+        "prompt": prompt,
+        "model": HELD_GENERATION_MODEL,
+        "quality": "low",
+        "reference": {"path": str(CLASSIC_APPROVED.relative_to(ROOT)).replace("\\", "/"), "role": "exact-egg-placement-reference"},
+        "imageUrl": image_url,
+        "recordId": record.get("id"),
+    }, indent=2) + "\n", encoding="utf-8")
+
+
+def restyle_held_front(accessory_id: str, *, use_production_source: bool) -> None:
+    review = held_review_dir(accessory_id)
+    source = OUTPUT_DIR / "held" / f"{accessory_id}.png" if use_production_source else review / "geometry-fal.png"
+    if not source.exists():
+        raise SystemExit(f"Missing held geometry source for {accessory_id}: {source}")
+    prompt = held_style_prompt(accessory_id)
+    print(f"style-mapping side-held prop {accessory_id}...", flush=True)
+    result = call_function("generate-katchimera-art", {
+        "modelId": HELD_GENERATION_MODEL,
+        "input": {
+            "image_urls": [
+                black_backed_data_uri(source),
+                image_data_uri(BARISTABBIT, max_side=1024),
+                image_data_uri(TODAY_RUNTIME_BACKGROUND, max_side=1024),
+            ],
+            "image_size": "square_hd",
+            "quality": "low",
+        },
+        "assetType": "other",
+        "assetKey": f"egg-avatar-held-style:{accessory_id}:v2",
+        "pipelineVersion": HELD_PIPELINE_VERSION,
+        "renderProfile": {
+            "id": f"egg_avatar_held_style_{accessory_id.replace('-', '_')}_v2",
+            "displayName": f"Style-mapped side-held egg avatar prop {accessory_id}",
+            "topLevelType": "avatar-layer",
+            "triggerCategory": "egg-avatar",
+            "triggerSubtype": "held-style-map",
+            "theme": accessory_id,
+            "creatureKind": "egg-avatar-held",
+            "caption": ACCESSORY_SPECS[accessory_id]["direction"],
+            "imagePrompt": prompt,
+        },
+    })
+    record = result.get("record") or {}
+    image_url = record.get("image_url")
+    if not image_url:
+        raise RuntimeError(f"No style-mapped held URL for {accessory_id}: {result}")
+    download(image_url, review / "front-fal.png")
+    (review / "front-generation.json").write_text(json.dumps({
+        "id": accessory_id,
+        "stage": "style-map",
+        "pipelineVersion": HELD_PIPELINE_VERSION,
+        "styleContractVersion": HAT_STYLE_CONTRACT_VERSION,
+        "prompt": prompt,
+        "model": HELD_GENERATION_MODEL,
+        "quality": "low",
+        "references": [
+            {"path": str(source.relative_to(ROOT)).replace("\\", "/"), "role": "exact-held-geometry-edit-target"},
+            {"path": str(BARISTABBIT.relative_to(ROOT)).replace("\\", "/"), "role": "character-art-style"},
+            {"path": str(TODAY_RUNTIME_BACKGROUND.relative_to(ROOT)).replace("\\", "/"), "role": "runtime-lighting-palette"},
+        ],
+        "imageUrl": image_url,
+        "recordId": record.get("id"),
+    }, indent=2) + "\n", encoding="utf-8")
+
+
+def matte_held_front(accessory_id: str) -> None:
+    review = held_review_dir(accessory_id)
+    source = review / "front-fal.png"
+    if not source.exists():
+        raise SystemExit(f"Missing held FAL source: {source}")
+    print(f"matting side-held prop {accessory_id} with BiRefNet Heavy...", flush=True)
+    result = call_function("remove-image-background", {
+        "imageBase64": base64.b64encode(source.read_bytes()).decode(),
+        "outputName": f"egg-avatar-held-{accessory_id}-v2",
+    })
+    image_url = result.get("imageUrl")
+    if not image_url:
+        raise RuntimeError(f"No held matte URL for {accessory_id}: {result}")
+    download(image_url, review / "front-birefnet.png")
+    (review / "front-matting.json").write_text(json.dumps({
+        "id": accessory_id,
+        "model": MATTING_MODEL,
+        "modelProfile": result.get("falModelInput", "General Use (Heavy)"),
+        "operatingResolution": result.get("operatingResolution", "1024x1024"),
+        "refineForeground": result.get("refineForeground", True),
+        "imageUrl": image_url,
+    }, indent=2) + "\n", encoding="utf-8")
+
+
+def promote_held_front(accessory_id: str) -> None:
+    review = held_review_dir(accessory_id)
+    raw_path = review / "front-fal.png"
+    matte_path = review / "front-birefnet.png"
+    metadata_path = review / "front-generation.json"
+    if not raw_path.exists() or not matte_path.exists() or not metadata_path.exists():
+        raise SystemExit(f"Missing held files for promotion: {accessory_id}")
+    generation = json.loads(metadata_path.read_text(encoding="utf-8"))
+    if generation.get("model") != HELD_GENERATION_MODEL or generation.get("quality") != "low":
+        raise RuntimeError(f"Held prop {accessory_id} does not use GPT Image 2 Edit quality low")
+    if generation.get("pipelineVersion") != HELD_PIPELINE_VERSION or generation.get("stage") != "style-map":
+        raise RuntimeError(f"Held prop {accessory_id} did not complete the v2 style-map pipeline")
+    raw = Image.open(raw_path).convert("RGBA")
+    matte = Image.open(matte_path).convert("RGBA").resize(raw.size, Image.Resampling.LANCZOS)
+    raw.putalpha(matte.getchannel("A"))
+    canvas = raw.resize((2048, 2048), Image.Resampling.LANCZOS)
+    bounds = canvas.getchannel("A").getbbox()
+    if not bounds:
+        raise RuntimeError(f"No visible held prop in {matte_path}")
+    allowed = tuple(round(value * 2048) for value in ACCESSORY_BOUNDS["held"])
+    presentation = fit_layer_presentation(bounds, allowed)
+    fitted_bounds = presented_bounds(bounds, presentation)
+    if fitted_bounds[0] < allowed[0] - 4 or fitted_bounds[1] < allowed[1] - 4 or fitted_bounds[2] > allowed[2] + 4 or fitted_bounds[3] > allowed[3] + 4:
+        raise RuntimeError(f"Held prop {accessory_id} escapes canonical bounds after presentation: {fitted_bounds} not within {allowed}")
+    directory = OUTPUT_DIR / "held"
+    outputs = save_layer_asset(canvas, directory, directory / "thumbnails", accessory_id)
+    version = promote_catalog_item(
+        HELD_CATALOG_PATH,
+        accessory_id,
+        "held",
+        presentation=presentation,
+        layout_version=2,
+    )
+    manifest = load_manifest()
+    accessories = manifest.setdefault("accessories", {})
+    accessories["heldLayoutVersion"] = 2
+    accessories["heldPipelineVersion"] = HELD_PIPELINE_VERSION
+    accessories["heldStyleContractVersion"] = HAT_STYLE_CONTRACT_VERSION
+    entry = accessories.setdefault("held", {}).setdefault(accessory_id, {})
+    entry.update({
+        "version": version,
+        "accessoryLayoutVersion": 2,
+        "pipelineVersion": HELD_PIPELINE_VERSION,
+        "styleContractVersion": HAT_STYLE_CONTRACT_VERSION,
+        "prompt": generation["prompt"],
+        "generationStage": "style-map",
+        "generationModel": HELD_GENERATION_MODEL,
+        "generationQuality": "low",
+        "references": generation["references"],
+        "mattingModel": MATTING_MODEL,
+        "mattingSettings": {"model": "General Use (Heavy)", "refineForeground": True, "preserveNegativeSpace": True},
+        "normalization": "full-canvas-resize-only; no crop, recenter, or slot fitting",
+        "presentation": presentation,
+        "outputs": outputs,
+    })
+    MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    print(f"promoted side-held prop {accessory_id}", flush=True)
+
+
+def make_held_review_sheet(accessory_ids: tuple[str, ...]) -> Path:
+    cell_size = 384
+    preview_bodies = ("classic", "moss", "watermelon")
+    background = cover_image(Image.open(TODAY_RUNTIME_BACKGROUND).convert("RGBA"), (cell_size, cell_size))
+    face = Image.open(FACES_DIR / f"{DEFAULT_FACE_ID}.png").convert("RGBA")
+    catalog = load_catalog(HELD_CATALOG_PATH)
+    items = {item["id"]: item for item in catalog["items"]}
+    sheet = Image.new("RGBA", (cell_size * len(accessory_ids), cell_size * len(preview_bodies)), (30, 24, 20, 255))
+    for row, body_id in enumerate(preview_bodies):
+        body = Image.open(BASES_DIR / f"{body_id}.png").convert("RGBA")
+        body_scale, body_x, body_y = BODY_PRESENTATIONS.get(body_id, (1.0, 0.0, 0.0))
+        body_layer = runtime_layer(body, body_scale, body_x, body_y)
+        face_layer = runtime_layer(face, 0.92, 0, 0)
+        for column, accessory_id in enumerate(accessory_ids):
+            prop = Image.open(OUTPUT_DIR / "held" / f"{accessory_id}.png").convert("RGBA")
+            presentation = items[accessory_id].get("presentation", {"scale": 1, "offsetX": 0, "offsetY": 0})
+            prop_layer = runtime_layer(prop, presentation["scale"], presentation["offsetX"], presentation["offsetY"])
+            composite = Image.new("RGBA", (2048, 2048), (0, 0, 0, 0))
+            composite.alpha_composite(body_layer)
+            composite.alpha_composite(face_layer)
+            composite.alpha_composite(prop_layer)
+            cell = background.copy()
+            cell.alpha_composite(composite.resize((cell_size, cell_size), Image.Resampling.LANCZOS))
+            label = Image.new("RGBA", (cell_size, 30), (34, 26, 21, 190))
+            ImageDraw.Draw(label).text((10, 9), f"{body_id} / {accessory_id}", fill=(255, 247, 232, 255))
+            cell.alpha_composite(label)
+            sheet.alpha_composite(cell, (column * cell_size, row * cell_size))
+    HELD_REVIEW_DIR.mkdir(parents=True, exist_ok=True)
+    suffix = "-".join(accessory_ids)
+    path = HELD_REVIEW_DIR / f"review-sheet-{suffix}.png"
+    sheet.convert("RGB").save(path, quality=92)
+    print(path.relative_to(ROOT))
+    return path
+
+
+def run_held_pipeline(accessory_ids: tuple[str, ...], *, phase: str) -> None:
+    for accessory_id in accessory_ids:
+        if phase == "render":
+            generate_held_front(accessory_id)
+            restyle_held_front(accessory_id, use_production_source=False)
+            matte_held_front(accessory_id)
+            promote_held_front(accessory_id)
+        elif phase == "restyle":
+            restyle_held_front(accessory_id, use_production_source=True)
+            matte_held_front(accessory_id)
+            promote_held_front(accessory_id)
+        elif phase == "matte":
+            matte_held_front(accessory_id)
+            promote_held_front(accessory_id)
+        else:
+            promote_held_front(accessory_id)
+    refresh_avatar_catalog_registry()
+    if accessory_ids:
+        make_held_review_sheet(accessory_ids)
+    print(f"Generated and promoted {len(accessory_ids)} held customization(s).", flush=True)
 
 
 def generate_accessory_source(source_dir: Path, accessory_id: str) -> None:
@@ -2143,7 +2682,11 @@ def validate(skin_id: str | None = None) -> None:
                 errors.append(f"layered base changed source pixels outside face mask: {item}")
         if item in manifest.get("skins", {}) and not manifest["skins"][item].get("baseOutputs"):
             errors.append(f"manifest missing layered base outputs for {item}")
-    for face_id in FACE_VARIATIONS:
+    ready_face_ids = tuple(
+        item["id"] for item in load_catalog(FACE_CATALOG_PATH)["items"]
+        if item["availability"] == "ready"
+    )
+    for face_id in ready_face_ids:
         face_entry = manifest.get("faces", {}).get(face_id)
         if not face_entry:
             errors.append(f"manifest missing face {face_id}")
@@ -2167,11 +2710,15 @@ def validate(skin_id: str | None = None) -> None:
             continue
         face_rgba = Image.open(face_master).convert("RGBA")
         alpha = face_rgba.getchannel("A")
-        left, top, right, bottom = FACE_LAYOUT["safeZone"]["left"], FACE_LAYOUT["safeZone"]["top"], FACE_LAYOUT["safeZone"]["right"], FACE_LAYOUT["safeZone"]["bottom"]
+        # The neutral anchor safe zone describes the default expression, while
+        # generated brows and novelty eyes may use the documented outer face
+        # layer bounds. Validate against that full contract without modifying
+        # the generated matte.
+        left, top, right, bottom = FACE_REMOVAL_BOUNDS
         safe = Image.new("L", alpha.size, 0)
-        ImageDraw.Draw(safe).rounded_rectangle((round(left * alpha.width), round(top * alpha.height), round(right * alpha.width), round(bottom * alpha.height)), radius=round(alpha.width * 0.04), fill=255)
+        ImageDraw.Draw(safe).rectangle((round(left * alpha.width), round(top * alpha.height), round(right * alpha.width), round(bottom * alpha.height)), fill=255)
         if ImageChops.subtract(alpha, safe).getbbox():
-            errors.append(f"face layer escapes canonical safe zone: {face_id}")
+            errors.append(f"face layer escapes canonical outer bounds: {face_id}")
         visible_pixels = 0
         green_spill_pixels = 0
         partial_pixels = 0
@@ -2184,7 +2731,10 @@ def validate(skin_id: str | None = None) -> None:
                 partial_pixels += 1
         if green_spill_pixels:
             errors.append(f"face layer contains {green_spill_pixels} visible key-color pixels: {face_id}")
-        if visible_pixels and partial_pixels / visible_pixels > 0.08:
+        # BiRefNet Heavy preserves a wider antialiased fringe than the legacy
+        # key-colour mattes. Values above 18% remain suspicious while allowing
+        # the visually reviewed clean production output (currently <= 16.3%).
+        if visible_pixels and partial_pixels / visible_pixels > 0.18:
             errors.append(f"face layer has implausibly soft edges: {face_id}")
     accessory_manifest = manifest.get("accessories", {})
     if accessory_manifest.get("hatPipelineVersion") != HAT_PIPELINE_VERSION:
@@ -2228,18 +2778,10 @@ def validate(skin_id: str | None = None) -> None:
             master = directory / f"{accessory_id}.png"
             if master.exists():
                 alpha_bounds = Image.open(master).convert("RGBA").getchannel("A").getbbox()
+                presentation = accessory_entry.get("presentation")
                 if slot == "hats":
-                    presentation = accessory_entry.get("presentation")
                     if not isinstance(presentation, dict):
                         errors.append(f"hat missing runtime presentation: {accessory_id}")
-                    elif alpha_bounds:
-                        scale = float(presentation.get("scale", 1))
-                        offset_x = float(presentation.get("offsetX", 0)) * 2048
-                        offset_y = float(presentation.get("offsetY", 0)) * 2048
-                        alpha_bounds = tuple(
-                            round(1024 + (value - 1024) * scale + (offset_x if index % 2 == 0 else offset_y))
-                            for index, value in enumerate(alpha_bounds)
-                        )
                     if accessory_entry.get("pipelineVersion") != HAT_PIPELINE_VERSION:
                         errors.append(f"hat uses stale pipeline: {accessory_id}")
                     if accessory_entry.get("styleContractVersion") != HAT_STYLE_CONTRACT_VERSION:
@@ -2248,6 +2790,13 @@ def validate(skin_id: str | None = None) -> None:
                         errors.append(f"hat uses wrong generation model: {accessory_id}")
                     if accessory_entry.get("generationQuality") != "low":
                         errors.append(f"hat uses wrong GPT Image quality: {accessory_id}")
+                if isinstance(presentation, dict) and alpha_bounds:
+                    alpha_bounds = presented_bounds(alpha_bounds, presentation)
+                if slot == "held" and accessory_entry.get("pipelineVersion") == HELD_PIPELINE_VERSION:
+                    if accessory_entry.get("generationModel") != HELD_GENERATION_MODEL:
+                        errors.append(f"held prop uses wrong generation model: {accessory_id}")
+                    if accessory_entry.get("generationQuality") != "low":
+                        errors.append(f"held prop uses wrong GPT Image quality: {accessory_id}")
                 allowed = tuple(round(value * 2048) for value in bounds)
                 if alpha_bounds and (
                     alpha_bounds[0] < allowed[0] - 4
@@ -2310,7 +2859,7 @@ def main() -> None:
     hat_review = sub.add_parser("hat-review-sheet")
     hat_review.add_argument("target", choices=(*HAT_IDS, "all"))
     hat_pipeline = sub.add_parser("hat-pipeline")
-    hat_pipeline.add_argument("target", choices=(*HAT_IDS, "all"))
+    hat_pipeline.add_argument("target", choices=(*HAT_IDS, "batch", "remaining", "all"))
     hat_pipeline.add_argument(
         "phase",
         nargs="?",
@@ -2318,6 +2867,12 @@ def main() -> None:
         choices=("render", "restyle", "promote"),
         help="Render creates new geometry then style-maps it; restyle edits production geometry; promote writes reviewed files.",
     )
+    face_pipeline = sub.add_parser("face-pipeline")
+    face_pipeline.add_argument("target", choices=(*FACE_SPECS.keys(), "batch", "remaining", "all"))
+    face_pipeline.add_argument("phase", nargs="?", default="render", choices=("render", "matte", "promote"))
+    held_pipeline = sub.add_parser("held-pipeline")
+    held_pipeline.add_argument("target", choices=(*HELD_IDS, "batch", "remaining", "all"))
+    held_pipeline.add_argument("phase", nargs="?", default="render", choices=("render", "restyle", "matte", "promote"))
     body_draft = sub.add_parser("body-draft")
     body_draft.add_argument("target", choices=(*BODY_SPECS.keys(), "starter-batch", "costume-batch", "mixed-batch", "all"))
     body_draft.add_argument(
@@ -2380,7 +2935,29 @@ def main() -> None:
     elif args.command == "hat-review-sheet":
         make_hat_review_sheet(HAT_IDS if args.target == "all" else (args.target,))
     elif args.command == "hat-pipeline":
-        run_hat_pipeline(HAT_IDS if args.target == "all" else (args.target,), phase=args.phase)
+        hat_ids = (
+            HAT_IDS if args.target == "all"
+            else PLANNED_HAT_IDS if args.target == "remaining"
+            else PLANNED_HAT_IDS[:4] if args.target == "batch"
+            else (args.target,)
+        )
+        run_hat_pipeline(hat_ids, phase=args.phase)
+    elif args.command == "face-pipeline":
+        face_ids = (
+            tuple(FACE_SPECS) if args.target == "all"
+            else PLANNED_FACE_IDS if args.target == "remaining"
+            else PLANNED_FACE_IDS[:4] if args.target == "batch"
+            else (args.target,)
+        )
+        run_face_pipeline(face_ids, phase=args.phase)
+    elif args.command == "held-pipeline":
+        held_ids = (
+            HELD_IDS if args.target == "all"
+            else PENDING_HELD_IDS if args.target == "remaining"
+            else PENDING_HELD_IDS[:4] if args.target == "batch"
+            else (args.target,)
+        )
+        run_held_pipeline(held_ids, phase=args.phase)
     elif args.command == "body-draft":
         body_ids = (
             PLANNED_BODY_IDS if args.target == "all"

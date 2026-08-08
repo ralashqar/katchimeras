@@ -42,6 +42,8 @@
     "art:egg-avatars": "python scripts/generate-egg-avatar-skins.py",
     "art:egg-avatars:validate": "python scripts/generate-egg-avatar-skins.py validate",
     "art:egg-avatar-hats": "python scripts/generate-egg-avatar-skins.py hat-pipeline",
+    "art:egg-avatar-faces": "python scripts/generate-egg-avatar-skins.py face-pipeline",
+    "art:egg-avatar-held": "python scripts/generate-egg-avatar-skins.py held-pipeline",
     "art:egg-avatar-hats:review": "python scripts/generate-egg-avatar-skins.py hat-review-sheet",
     "art:egg-avatar-hats:preview": "python scripts/generate-egg-avatar-skins.py hat-compatibility-sheet",
     "art:egg-avatar-bodies": "python scripts/generate-egg-avatar-skins.py body-draft",

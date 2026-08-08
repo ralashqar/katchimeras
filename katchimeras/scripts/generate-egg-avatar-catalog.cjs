@@ -11,7 +11,7 @@ const categories = [
   ['body', 'bodies.json', 50],
   ['face', 'faces.json', 30],
   ['hat', 'hats.json', 40],
-  ['held', 'held.json', 6],
+  ['held', 'held.json', 20],
 ];
 const minimumReadyCount = { body: 10, face: 5, hat: 6, held: 6 };
 const rarityValues = new Set(['common', 'rare', 'epic', 'legendary']);

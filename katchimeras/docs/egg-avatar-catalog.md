@@ -7,7 +7,7 @@ The player avatar catalog is data driven. Product metadata lives in JSON; applic
 - `data/egg-avatar/bodies.json`: 50 body designs, including a broad costume family.
 - `data/egg-avatar/faces.json`: 30 face designs.
 - `data/egg-avatar/hats.json`: 40 hat designs.
-- `data/egg-avatar/held.json`: held-accessory designs (the initial six are production-ready).
+- `data/egg-avatar/held.json`: 20 held-accessory designs; legacy art is replaced through the v2 reference-locked pipeline before new designs are promoted.
 - `data/egg-avatar/body-accents.json`: UI accent color for each ready body.
 - `data/egg-avatar/catalog.schema.json`: documented data contract.
 
