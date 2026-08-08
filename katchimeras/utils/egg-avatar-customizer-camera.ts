@@ -2,6 +2,10 @@ import { homeTabBarHeight } from '@/constants/home-loop-layout';
 
 const CUSTOMIZER_CAMERA_SCALE = 1.18;
 
+export function eggAvatarCustomizerPanelHeight(viewportHeight: number) {
+  return Math.min(430, Math.max(320, viewportHeight * 0.46));
+}
+
 type EggAvatarCustomizerCameraInput = {
   bottomInset: number;
   subjectCenterY: number;
@@ -15,7 +19,7 @@ export function eggAvatarCustomizerCamera({
   topInset,
   viewportHeight,
 }: EggAvatarCustomizerCameraInput) {
-  const panelHeight = Math.min(430, Math.max(320, viewportHeight * 0.46));
+  const panelHeight = eggAvatarCustomizerPanelHeight(viewportHeight);
   const panelTop = viewportHeight - homeTabBarHeight(bottomInset) - panelHeight;
   const targetCenterY = topInset + (panelTop - topInset) / 2;
 

@@ -164,6 +164,17 @@ export function todayEggStageFrame(eggCenterY: number, eggStageScale: number) {
   };
 }
 
+/** Full-growth companion geometry relative to the centre of the Egg stage.
+ * The live hero multiplies the offsets and size by the Egg's visual-growth
+ * scale so the Wisp remains over the shell's right shoulder while it grows. */
+export function todayEggShoulderWispFrame(eggStageScale: number) {
+  return {
+    size: 64 * eggStageScale,
+    translateX: 108 * eggStageScale,
+    translateY: -62 * eggStageScale,
+  };
+}
+
 /**
  * Places the separately rendered egg onto the fixed platform authored into the
  * square exploration background. `stageScreenTop` is the hero stage's y

@@ -2,7 +2,8 @@ import type { WispId } from '@/types/wisp';
 
 export type WispAsset = { full: number; thumbnail: number };
 
-export const WISP_ASSETS: Partial<Record<WispId, WispAsset>> = {
+export const WISP_ASSETS: Record<WispId, WispAsset> = {
+  sunbeam: { full: require('../assets/images/katchimeras/wisps/sunbeam.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/sunbeam.webp') },
   sprout: { full: require('../assets/images/katchimeras/wisps/sprout.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/sprout.webp') },
   steam: { full: require('../assets/images/katchimeras/wisps/steam.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/steam.webp') },
   flash: { full: require('../assets/images/katchimeras/wisps/flash.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/flash.webp') },
@@ -19,9 +20,42 @@ export const WISP_ASSETS: Partial<Record<WispId, WispAsset>> = {
   dream: { full: require('../assets/images/katchimeras/wisps/dream.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/dream.webp') },
   relic: { full: require('../assets/images/katchimeras/wisps/relic.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/relic.webp') },
   spark: { full: require('../assets/images/katchimeras/wisps/spark.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/spark.webp') },
+  puddle: { full: require('../assets/images/katchimeras/wisps/puddle.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/puddle.webp') },
+  aurora: { full: require('../assets/images/katchimeras/wisps/aurora.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/aurora.webp') },
+  breeze: { full: require('../assets/images/katchimeras/wisps/breeze.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/breeze.webp') },
+  focus: { full: require('../assets/images/katchimeras/wisps/focus.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/focus.webp') },
+  giggle: { full: require('../assets/images/katchimeras/wisps/giggle.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/giggle.webp') },
+  orbit: { full: require('../assets/images/katchimeras/wisps/orbit.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/orbit.webp') },
+  flame: { full: require('../assets/images/katchimeras/wisps/flame.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/flame.webp') },
+  shore: { full: require('../assets/images/katchimeras/wisps/shore.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/shore.webp') },
+  fern: { full: require('../assets/images/katchimeras/wisps/fern.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/fern.webp') },
+  shelf: { full: require('../assets/images/katchimeras/wisps/shelf.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/shelf.webp') },
+  feast: { full: require('../assets/images/katchimeras/wisps/feast.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/feast.webp') },
+  flicker: { full: require('../assets/images/katchimeras/wisps/flicker.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/flicker.webp') },
+  pulse: { full: require('../assets/images/katchimeras/wisps/pulse.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/pulse.webp') },
+  platform: { full: require('../assets/images/katchimeras/wisps/platform.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/platform.webp') },
+  spire: { full: require('../assets/images/katchimeras/wisps/spire.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/spire.webp') },
+  market: { full: require('../assets/images/katchimeras/wisps/market.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/market.webp') },
+  nest: { full: require('../assets/images/katchimeras/wisps/nest.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/nest.webp') },
+  stride: { full: require('../assets/images/katchimeras/wisps/stride.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/stride.webp') },
+  rush: { full: require('../assets/images/katchimeras/wisps/rush.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/rush.webp') },
+  wheel: { full: require('../assets/images/katchimeras/wisps/wheel.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/wheel.webp') },
+  ripple: { full: require('../assets/images/katchimeras/wisps/ripple.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/ripple.webp') },
+  sizzle: { full: require('../assets/images/katchimeras/wisps/sizzle.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/sizzle.webp') },
+  sketch: { full: require('../assets/images/katchimeras/wisps/sketch.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/sketch.webp') },
+  note: { full: require('../assets/images/katchimeras/wisps/note.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/note.webp') },
+  whisker: { full: require('../assets/images/katchimeras/wisps/whisker.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/whisker.webp') },
+  flurry: { full: require('../assets/images/katchimeras/wisps/flurry.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/flurry.webp') },
+  dawn: { full: require('../assets/images/katchimeras/wisps/dawn.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/dawn.webp') },
+  starlit: { full: require('../assets/images/katchimeras/wisps/starlit.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/starlit.webp') },
+  comet: { full: require('../assets/images/katchimeras/wisps/comet.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/comet.webp') },
+  chronicle: { full: require('../assets/images/katchimeras/wisps/chronicle.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/chronicle.webp') },
+  explorer: { full: require('../assets/images/katchimeras/wisps/explorer.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/explorer.webp') },
+  confetti: { full: require('../assets/images/katchimeras/wisps/confetti.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/confetti.webp') },
+  recall: { full: require('../assets/images/katchimeras/wisps/recall.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/recall.webp') },
 };
 
 export function wispAsset(id: WispId, thumbnail = false) {
   const asset = WISP_ASSETS[id];
-  return asset ? (thumbnail ? asset.thumbnail : asset.full) : null;
+  return thumbnail ? asset.thumbnail : asset.full;
 }

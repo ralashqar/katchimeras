@@ -59,7 +59,6 @@ import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
 import { DayPromptStrip } from '@/components/katchadeck/home/day-prompt-strip';
 import { EggFeedOverlay } from '@/components/katchadeck/home/egg-feed-overlay';
 import { EggAvatarProfileScreen } from '@/components/katchadeck/egg-avatar/egg-avatar-profile-screen';
-import { WispCompanion } from '@/components/katchadeck/wisps/wisp-companion';
 import { WispDiscoveryReveal } from '@/components/katchadeck/wisps/wisp-discovery-reveal';
 import { TodayCategoryRing, type TodayCategoryRingItem } from '@/components/katchadeck/home/today-category-ring';
 import { TodayBottomDock } from '@/components/katchadeck/home/today-bottom-dock';
@@ -1339,6 +1338,7 @@ function HomeScreen() {
     return (
       <TodayKingdomEggHero
         accentColor={day?.egg.accentColor}
+        companionWispId={active && !isHatching ? activeWispId : null}
         coreColor={day?.egg.coreColor}
         explorationStageTop={pageUsesExplorationFraming
           ? resolvedHeroStageTop
@@ -1355,6 +1355,7 @@ function HomeScreen() {
   }, [
     eggFeedKey,
     eggTargetRef,
+    activeWispId,
     explorationBackgroundActive,
     handleHatchSubjectReady,
     hatchPresentation,
@@ -1873,7 +1874,6 @@ function HomeScreen() {
               ) : null}
             </>
           )}
-          {activeWispId && !isHatching ? <WispCompanion id={activeWispId} size={64} style={styles.activeWisp} /> : null}
         </Animated.View>
 
         {isHatching ? null : isHatched ? (
@@ -1912,6 +1912,7 @@ function HomeScreen() {
           actions={nurtureCare.active}
           bottomInset={insets.bottom}
           completionEvent={queuedCareCompletion?.action.category === 'check_in' ? queuedCareCompletion : flowBusy ? null : queuedCareCompletion}
+          companionWispId={activeWispId}
           day={formingDay}
           eggTargetRef={eggTargetRef}
           feedbackKey={eggFeedKey}
@@ -2469,7 +2470,6 @@ const styles = StyleSheet.create({
     // z-indices internal to the neighborhood.
     zIndex: 0,
   },
-  activeWisp: { position: 'absolute', right: '18%', top: '24%', zIndex: 70 },
   timelineLayer: {
     position: 'relative',
     zIndex: 20,

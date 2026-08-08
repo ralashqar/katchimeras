@@ -422,6 +422,10 @@ test('You button opens an in-place customizer above the Today UI', () => {
   assert.match(today, /customizerChromeHidden/);
   assert.match(today, /<EggAvatarProfileScreen/);
   assert.match(customizer, /elevation: 100, zIndex: 100/);
+  assert.match(customizer, /eggAvatarCustomizerPanelHeight\(height\)/);
+  assert.doesNotMatch(customizer, /styles\.heroNameAnchor/);
+  assert.doesNotMatch(customizer, />YOU</);
+  assert.doesNotMatch(customizer, /styles\.headingWisp/);
   assert.doesNotMatch(customizer, /today_pedestal|presentation="hero"/);
 });
 

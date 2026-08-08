@@ -20,5 +20,5 @@ for (const [index, item] of catalog.items.entries()) {
   }
 }
 if (catalog.items.length !== 50) throw new Error(`Expected 50 Wisps, found ${catalog.items.length}`);
-if (ready !== 16) throw new Error(`Expected 16 ready Wisps, found ${ready}`);
-console.log(`Verified ${catalog.items.length} Wisp definitions and ${ready} launch assets.`);
+if (ready !== 50) throw new Error(`Expected 50 ready Wisps, found ${ready}`);
+console.log(`Verified ${catalog.items.length} Wisp definitions and ${ready} production assets.`);

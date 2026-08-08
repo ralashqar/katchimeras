@@ -5,7 +5,6 @@ import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 're
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { EggAvatar } from '@/components/katchadeck/egg-avatar/egg-avatar';
-import { WispCompanion } from '@/components/katchadeck/wisps/wisp-companion';
 import { WispArtwork } from '@/components/katchadeck/wisps/wisp-artwork';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -20,6 +19,7 @@ import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { useWisps } from '@/features/wisps/wisp-provider';
 import { useAllDays } from '@/hooks/use-all-days';
 import type { EggAvatarFaceId, EggAvatarHatId, EggAvatarHeldAccessoryId, EggAvatarSkinId } from '@/types/egg-avatar';
+import { eggAvatarCustomizerPanelHeight } from '@/utils/egg-avatar-customizer-camera';
 
 type Category = 'body' | 'face' | 'hat' | 'held';
 type YouMode = 'egg' | 'wisps';
@@ -48,7 +48,7 @@ export function EggAvatarProfileScreen({ bottomInset = 0 }: { bottomInset?: numb
   const [wispFilter, setWispFilter] = useState<WispFilter>('all');
   useEffect(() => { wisps.syncFromDays(days); }, [days, wisps]);
   const tabBarHeight = homeTabBarHeight(bottomInset);
-  const panelHeight = Math.min(510, Math.max(390, height * 0.56));
+  const panelHeight = eggAvatarCustomizerPanelHeight(height);
   const cellWidth = (width - PANEL_HORIZONTAL_BORDER - GRID_HORIZONTAL_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
 
   const options: readonly Option[] = category === 'body' ? EGG_AVATAR_SKINS : category === 'face' ? EGG_AVATAR_FACES : category === 'hat'
@@ -73,15 +73,6 @@ export function EggAvatarProfileScreen({ bottomInset = 0 }: { bottomInset?: numb
     <Animated.View entering={FadeIn.duration(240)} exiting={FadeOut.duration(180)} pointerEvents="box-none" style={styles.screen}>
       <View style={[styles.panel, { bottom: tabBarHeight, height: panelHeight }]}>
         <View style={styles.grabber} />
-        <View style={styles.heading}>
-          <View style={styles.headingCopy}>
-            <ThemedText selectable style={styles.eyebrow} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>YOU</ThemedText>
-            <ThemedText selectable numberOfLines={1} style={styles.title} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-              {mode === 'egg' ? `${avatar.equippedSkin.name} · ${avatar.equippedFace.name}` : wisps.equippedWispId ? `${READY_WISPS.find((item) => item.id === wisps.equippedWispId)?.name ?? 'Wisp'} is with you` : 'Choose a little companion'}
-            </ThemedText>
-          </View>
-          {wisps.equippedWispId ? <WispCompanion id={wisps.equippedWispId} size={54} style={styles.headingWisp} /> : null}
-        </View>
 
         <View accessibilityRole="tablist" style={styles.modeTabs}>
           {(['egg', 'wisps'] as const).map((item) => {
@@ -140,20 +131,15 @@ function categoryPreview(category: Category, id: string | null, avatar: ReturnTy
 
 const styles = StyleSheet.create({
   screen: { ...StyleSheet.absoluteFillObject, elevation: 100, zIndex: 100 },
-  panel: { backgroundColor: 'rgba(248,235,210,0.97)', borderColor: 'rgba(125,83,43,0.18)', borderCurve: 'continuous', borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, boxShadow: '0 -14px 34px rgba(22,16,13,0.24)', gap: 9, left: 0, overflow: 'hidden', paddingTop: 8, position: 'absolute', right: 0 },
-  grabber: { alignSelf: 'center', backgroundColor: 'rgba(97,66,38,0.25)', borderRadius: 99, height: 4, width: 38 },
-  heading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 48, paddingHorizontal: 16 },
-  headingCopy: { flex: 1 },
-  headingWisp: { marginRight: 2 },
-  eyebrow: { fontSize: 9.5, fontWeight: '900', letterSpacing: 1.4 },
-  title: { fontFamily: 'InstrumentSerif', fontSize: 25, lineHeight: 29 },
-  modeTabs: { alignSelf: 'center', backgroundColor: 'rgba(70,49,30,0.9)', borderRadius: 16, flexDirection: 'row', padding: 3, width: 210 },
-  modeTab: { alignItems: 'center', borderRadius: 13, flex: 1, paddingVertical: 8 },
+  panel: { backgroundColor: 'rgba(248,235,210,0.97)', borderColor: 'rgba(125,83,43,0.18)', borderCurve: 'continuous', borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, boxShadow: '0 -14px 34px rgba(22,16,13,0.24)', gap: 6, left: 0, overflow: 'hidden', paddingTop: 6, position: 'absolute', right: 0 },
+  grabber: { alignSelf: 'center', backgroundColor: 'rgba(97,66,38,0.25)', borderRadius: 99, height: 4, width: 34 },
+  modeTabs: { alignSelf: 'center', backgroundColor: 'rgba(70,49,30,0.9)', borderRadius: 14, flexDirection: 'row', padding: 2, width: 196 },
+  modeTab: { alignItems: 'center', borderRadius: 12, flex: 1, justifyContent: 'center', minHeight: 34, paddingVertical: 5 },
   modeTabActive: { backgroundColor: '#FFF1D7' },
   modeTabLabel: { fontSize: 13, fontWeight: '800', opacity: 0.78 },
   modeTabLabelActive: { opacity: 1 },
-  tabs: { backgroundColor: 'rgba(125,83,43,0.11)', borderRadius: 15, flexDirection: 'row', marginHorizontal: 14, padding: 3 },
-  tab: { alignItems: 'center', borderRadius: 12, flex: 1, paddingVertical: 7 },
+  tabs: { backgroundColor: 'rgba(125,83,43,0.11)', borderRadius: 13, flexDirection: 'row', marginHorizontal: 14, padding: 2 },
+  tab: { alignItems: 'center', borderRadius: 11, flex: 1, justifyContent: 'center', minHeight: 32, paddingVertical: 4 },
   tabActive: { backgroundColor: '#FFF5E2', boxShadow: '0 2px 8px rgba(71,45,21,0.13)' },
   tabLabel: { fontSize: 11.5, fontWeight: '800', opacity: 0.58 },
   tabLabelActive: { opacity: 1 },

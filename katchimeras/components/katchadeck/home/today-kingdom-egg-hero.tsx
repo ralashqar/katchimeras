@@ -34,6 +34,7 @@ import type { HomeArchetypeId } from '@/types/world-identity';
 import { kingdomHomeTileForIdentity, kingdomSurfaceTileAlignment } from '@/utils/kingdom-surface-tiles';
 import {
   todayEggCountdownTop,
+  todayEggShoulderWispFrame,
   todayEggStageFrame,
   todayExplorationEggStageFrame,
   todayKingdomHeroLayout,
@@ -51,11 +52,14 @@ import { useTodayEnvironmentMotionValues } from '@/components/katchadeck/home/to
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { EggAvatarArtwork } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
 import { RadialSunburstCanvas } from '@/components/katchadeck/ui/radial-sunburst';
+import { WispCompanion } from '@/components/katchadeck/wisps/wisp-companion';
+import type { WispId } from '@/types/wisp';
 import todayScene from '@/data/today-scene.json';
 
 type TodayKingdomEggHeroProps = {
   accentColor?: string;
   coreColor?: string;
+  companionWispId?: WispId | null;
   feedbackKey?: number;
   explorationStageTop?: number;
   homeArchetypeId?: HomeArchetypeId | null;
@@ -104,6 +108,7 @@ const ACTIVATION_CONFETTI_BY_COLOR = ACTIVATION_CONFETTI_COLORS.map((_, colorInd
 export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   accentColor = '#F4CE7A',
   coreColor = '#FFF1B8',
+  companionWispId,
   feedbackKey = 0,
   explorationStageTop,
   homeArchetypeId,
@@ -130,6 +135,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   const eggFrame = explorationEggFrame
     ?? todayEggStageFrame(layout.eggCenterY, layout.eggStageScale);
   const eggStageScale = explorationEggFrame?.scale ?? layout.eggStageScale;
+  const companionFrame = todayEggShoulderWispFrame(eggStageScale);
   // Readiness is controlled by incubation time; visual size is controlled by
   // earned Energy. Never promote the visual ratio when the hatch clock becomes
   // ready, otherwise activation after an elapsed wait jumps a partly-fed egg
@@ -358,6 +364,16 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
       ],
     };
   });
+  const companionAnchorStyle = useAnimatedStyle(() => {
+    const eggGrowthScale = 0.5 + visualGrowth.value * 0.5;
+    return {
+      transform: [
+        { translateX: companionFrame.translateX * eggGrowthScale },
+        { translateY: companionFrame.translateY * eggGrowthScale },
+        { scale: eggGrowthScale },
+      ],
+    };
+  });
 
   return (
     <View pointerEvents="box-none" style={styles.stage}>
@@ -442,6 +458,22 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
               />
             </Pressable>
           </Animated.View>
+          {companionWispId ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.eggShoulderWisp,
+                {
+                  height: companionFrame.size,
+                  marginLeft: -companionFrame.size / 2,
+                  marginTop: -companionFrame.size / 2,
+                  width: companionFrame.size,
+                },
+                companionAnchorStyle,
+              ]}>
+              <WispCompanion id={companionWispId} size={companionFrame.size} />
+            </Animated.View>
+          ) : null}
           {!isActivated && showDormantIndicator ? <DormantEggZzz growth={visualGrowth} reduceMotion={reduceMotion} stageScale={eggStageScale} /> : null}
         </View>
       </TodayFallbackCloudScene>
@@ -925,6 +957,12 @@ const styles = StyleSheet.create({
     height: '100%',
     transformOrigin: 'center bottom',
     zIndex: 3,
+  },
+  eggShoulderWisp: {
+    left: '50%',
+    position: 'absolute',
+    top: '50%',
+    zIndex: 8,
   },
   activationCelebration: {
     alignItems: 'center',

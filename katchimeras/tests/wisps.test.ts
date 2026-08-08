@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 
 import type { HomeDayRecord } from '@/types/home';
 import { earnedWispIds, selectFeaturedWisps, wispProgress } from '@/utils/wisp-engine';
 import { normalizeWispState } from '@/utils/wisp-state';
+import { todayEggShoulderWispFrame } from '@/utils/today-kingdom-hero-layout';
 
 function day(id: string, overrides: Partial<HomeDayRecord> = {}): HomeDayRecord {
   return {
@@ -74,4 +77,28 @@ test('seven unique consecutive hatched dates unlock Spark idempotently', () => {
 
 test('invalid equipped IDs normalize to null', () => {
   assert.equal(normalizeWispState({ version: 1, equippedWispId: 'unknown', unlocked: {}, baselinedCatalogVersion: 1 }).equippedWispId, null);
+});
+
+test('the Egg shoulder companion frame scales proportionally with the Egg stage', () => {
+  assert.deepEqual(todayEggShoulderWispFrame(1), {
+    size: 64,
+    translateX: 108,
+    translateY: -62,
+  });
+  assert.deepEqual(todayEggShoulderWispFrame(1.5), {
+    size: 96,
+    translateX: 162,
+    translateY: -93,
+  });
+});
+
+test('Today passes the equipped Wisp into the Egg hero instead of a page overlay', () => {
+  const root = path.resolve(__dirname, '..');
+  const todaySource = fs.readFileSync(path.join(root, 'app/(tabs)/today.tsx'), 'utf8');
+  const heroSource = fs.readFileSync(path.join(root, 'components/katchadeck/home/today-kingdom-egg-hero.tsx'), 'utf8');
+  assert.match(todaySource, /companionWispId=\{active && !isHatching \? activeWispId : null\}/);
+  assert.match(todaySource, /companionWispId=\{activeWispId\}/);
+  assert.doesNotMatch(todaySource, /styles\.activeWisp/);
+  assert.match(heroSource, /styles\.eggShoulderWisp/);
+  assert.match(heroSource, /todayEggShoulderWispFrame\(eggStageScale\)/);
 });

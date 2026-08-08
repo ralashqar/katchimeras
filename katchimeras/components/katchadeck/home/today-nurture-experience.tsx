@@ -47,6 +47,7 @@ import { Meadow } from '@/constants/meadow-theme';
 import { GROWTH_ENERGY_ART, todayCareArt } from '@/constants/today-care-art';
 import type { HomeDayRecord, HomeTimelineDay, SleepQuality } from '@/types/home';
 import type { HomeArchetypeId } from '@/types/world-identity';
+import type { WispId } from '@/types/wisp';
 import type { RankedTodayCareAction } from '@/utils/today-care';
 import type { TodayGrowthSummary } from '@/utils/today-growth';
 import type { CompanionQuickGoalCompletionReceipt } from '@/hooks/use-companion-quick-goals';
@@ -67,6 +68,7 @@ type TodayNurtureExperienceProps = {
   actions: RankedTodayCareAction[];
   completionEvent: TodayCareCompletionEvent | null;
   day: HomeDayRecord;
+  companionWispId?: WispId | null;
   feedbackKey: number;
   focusMode?: boolean;
   growth: TodayGrowthSummary;
@@ -115,6 +117,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   actions,
   bottomInset,
   completionEvent,
+  companionWispId,
   day,
   eggTargetRef,
   feedbackKey,
@@ -378,6 +381,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
         <Animated.View pointerEvents="none" style={[styles.eggStage, { top: stageTop + sceneLift }, eggPanStyle]}>
           <TodayKingdomEggHero
             accentColor={day.egg.accentColor}
+            companionWispId={companionWispId}
             coreColor={day.egg.coreColor}
             deferGrowthUntilEnergyArrival
             explorationStageTop={stageTop}

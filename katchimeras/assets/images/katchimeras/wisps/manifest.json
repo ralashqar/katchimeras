@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "generatedAt": "2026-08-08",
   "pipeline": "OpenAI image generation -> chroma-key matte extraction -> lossless WebP derivatives",
   "styleReferences": [
@@ -16,21 +16,255 @@
     "keyedSource": "sources/<id>-keyed.png"
   },
   "assets": [
-    { "id": "sprout", "motif": "pear-green seed orb with leaf wings", "source": "exec-1fc8c273-ad59-4e80-a9e1-71a9672dffb9.png" },
-    { "id": "steam", "motif": "warm coffee orb with a cream steam curl", "source": "exec-c16133b7-1cf3-4690-b3f9-32cb161f956b.png" },
-    { "id": "flash", "motif": "lavender camera-lens orb with translucent fins", "source": "exec-4379fd7a-1f53-4079-a20d-e35bb2d44496.png" },
-    { "id": "drizzle", "motif": "translucent sky-blue raindrop", "source": "exec-d5f96a44-37fa-4345-8092-a1d21406f295.png" },
-    { "id": "moonlit", "motif": "sleepy deep-violet crescent", "source": "exec-a5e6b89c-d6f2-489f-8ae7-d6e6739e2c6d.png" },
-    { "id": "page", "motif": "warm ivory open book", "source": "exec-f484b4cc-ccc0-43c2-9a14-d29074dee835.png" },
-    { "id": "wander", "motif": "pale sky-blue wind orb and curling tail", "source": "exec-e6b84ec8-c1f9-4838-b2ea-0b5ee8d73fe7.png" },
-    { "id": "heartlet", "motif": "coral heart orb with feather fins", "source": "exec-a6d9bd12-7770-4398-9295-e8650113a72d.png" },
-    { "id": "sunset", "motif": "gold-to-coral sun orb with mauve cloud curl", "source": "exec-a7b20753-e416-49c1-8a53-5d38e8a27e4c.png" },
-    { "id": "bloom", "motif": "blush flower-bud orb", "source": "exec-9b09a04e-b4bd-4126-aec3-720b7fe14ef2.png" },
-    { "id": "pixel", "motif": "rounded teal voxel orb", "source": "exec-75c02aaa-8c38-4df1-9ddc-81941690e7f9.png" },
-    { "id": "buddy", "motif": "honey companion orb with floppy ears and curled tail", "source": "exec-0a8bec0e-347e-4970-8458-8799d1149483.png" },
-    { "id": "crumb", "motif": "golden baked crumb orb", "source": "exec-241fb602-478d-4790-a7ad-845f354ff457.png" },
-    { "id": "dream", "motif": "indigo-lavender sleeping cloud", "source": "exec-db313563-7aed-4559-a466-7242ed119316.png" },
-    { "id": "relic", "motif": "moss-capped carved stone artifact", "source": "exec-6c024934-daa3-4ec9-9f6e-c5bd1fc850ce.png" },
-    { "id": "spark", "motif": "golden living-light teardrop", "source": "exec-0f75eaa2-c750-4528-bf69-8514c01a358d.png" }
+    {
+      "id": "sunbeam",
+      "motif": "Golden sun orb with short ray fins.",
+      "source": "exec-f85f63ce-9cc7-4c1a-b49d-ba634d6caf27.png"
+    },
+    {
+      "id": "sprout",
+      "motif": "Green seed orb with two leaf wings.",
+      "source": "exec-1fc8c273-ad59-4e80-a9e1-71a9672dffb9.png"
+    },
+    {
+      "id": "steam",
+      "motif": "Warm brown droplet with a cream steam curl.",
+      "source": "exec-c16133b7-1cf3-4690-b3f9-32cb161f956b.png"
+    },
+    {
+      "id": "flash",
+      "motif": "Lavender lens orb with shutter-like wings.",
+      "source": "exec-4379fd7a-1f53-4079-a20d-e35bb2d44496.png"
+    },
+    {
+      "id": "drizzle",
+      "motif": "Blue raindrop with a tiny cloud cap.",
+      "source": "exec-d5f96a44-37fa-4345-8092-a1d21406f295.png"
+    },
+    {
+      "id": "moonlit",
+      "motif": "Sleepy violet crescent with a star spark.",
+      "source": "exec-a5e6b89c-d6f2-489f-8ae7-d6e6739e2c6d.png"
+    },
+    {
+      "id": "page",
+      "motif": "Ivory page orb with folded corners.",
+      "source": "exec-f484b4cc-ccc0-43c2-9a14-d29074dee835.png"
+    },
+    {
+      "id": "wander",
+      "motif": "Air-blue compass spark with wing fins.",
+      "source": "exec-e6b84ec8-c1f9-4838-b2ea-0b5ee8d73fe7.png"
+    },
+    {
+      "id": "heartlet",
+      "motif": "Coral heart orb with soft winglets.",
+      "source": "exec-a6d9bd12-7770-4398-9295-e8650113a72d.png"
+    },
+    {
+      "id": "sunset",
+      "motif": "Peach horizon orb with a cloud trail.",
+      "source": "exec-a7b20753-e416-49c1-8a53-5d38e8a27e4c.png"
+    },
+    {
+      "id": "bloom",
+      "motif": "Pink flower orb with petal wings.",
+      "source": "exec-9b09a04e-b4bd-4126-aec3-720b7fe14ef2.png"
+    },
+    {
+      "id": "pixel",
+      "motif": "Teal voxel spirit with square particles.",
+      "source": "exec-75c02aaa-8c38-4df1-9ddc-81941690e7f9.png"
+    },
+    {
+      "id": "buddy",
+      "motif": "Honey pup-like orb with floppy ears.",
+      "source": "exec-0a8bec0e-347e-4970-8458-8799d1149483.png"
+    },
+    {
+      "id": "crumb",
+      "motif": "Toasted cookie orb with one missing bite.",
+      "source": "exec-241fb602-478d-4790-a7ad-845f354ff457.png"
+    },
+    {
+      "id": "dream",
+      "motif": "Purple cloud orb with closed eyes.",
+      "source": "exec-db313563-7aed-4559-a466-7242ed119316.png"
+    },
+    {
+      "id": "relic",
+      "motif": "Floating warm-stone rune with moss flecks.",
+      "source": "exec-6c024934-daa3-4ec9-9f6e-c5bd1fc850ce.png"
+    },
+    {
+      "id": "spark",
+      "motif": "Butter-gold flame seed with tiny wings.",
+      "source": "exec-0f75eaa2-c750-4528-bf69-8514c01a358d.png"
+    },
+    {
+      "id": "puddle",
+      "motif": "Aqua splash orb.",
+      "source": "exec-f236ac2b-4256-4293-b31a-44ec387d3c67.png"
+    },
+    {
+      "id": "aurora",
+      "motif": "Prismatic ribbon spirit.",
+      "source": "exec-ae2b331d-0e33-4ded-b6ea-5aa810859322.png"
+    },
+    {
+      "id": "breeze",
+      "motif": "Mint spiral with translucent fins.",
+      "source": "exec-b1415767-08a6-48d5-b8f9-fb5ee173cfb6.png"
+    },
+    {
+      "id": "focus",
+      "motif": "Blue concentric lens orb.",
+      "source": "exec-22c8561a-f1eb-4c48-ab0f-da10c6e810b5.png"
+    },
+    {
+      "id": "giggle",
+      "motif": "Yellow bubble with cheek sparks.",
+      "source": "exec-05a13d5e-8a61-4549-ab9f-0a41c9fb7e0f.png"
+    },
+    {
+      "id": "orbit",
+      "motif": "Midnight planet orb with warm ring.",
+      "source": "exec-d2c13425-4994-4a76-822d-cfd162b0bf4a.png"
+    },
+    {
+      "id": "flame",
+      "motif": "Orange flame with ember trail.",
+      "source": "exec-15e2a6dc-40a5-4acd-969d-d5ff82234d2e.png"
+    },
+    {
+      "id": "shore",
+      "motif": "Sea-glass shell orb with foam fins.",
+      "source": "exec-18b671fe-a80d-4686-927b-bf0e58bbc4fe.png"
+    },
+    {
+      "id": "fern",
+      "motif": "Moss-green spore with fern wings.",
+      "source": "exec-e17ba1d0-89f7-4867-8c9a-d67a70e60f33.png"
+    },
+    {
+      "id": "shelf",
+      "motif": "Parchment-tab spirit.",
+      "source": "exec-4efbb5b1-e09b-406c-a03b-9a4db2ad3a7e.png"
+    },
+    {
+      "id": "feast",
+      "motif": "Golden dumpling orb with steam fins.",
+      "source": "exec-cd0c28a9-209d-41e3-bcff-38e5d464cb6a.png"
+    },
+    {
+      "id": "flicker",
+      "motif": "Amber projector flame.",
+      "source": "exec-7bca0d90-71d4-4c07-94f0-a3e325c7b22d.png"
+    },
+    {
+      "id": "pulse",
+      "motif": "Warm-red rhythmic orb.",
+      "source": "exec-5378f35d-f5ae-4c64-b453-038448e9e3df.png"
+    },
+    {
+      "id": "platform",
+      "motif": "Silver-blue ticket spirit.",
+      "source": "exec-487c67a3-056c-49e8-ba02-ad5e7195801b.png"
+    },
+    {
+      "id": "spire",
+      "motif": "Floating stone-and-gold landmark shard.",
+      "source": "exec-5c80ee1c-17a5-4f2d-8785-216d2be39ccf.png"
+    },
+    {
+      "id": "market",
+      "motif": "Berry-and-cream awning orb.",
+      "source": "exec-43f17928-e8cb-4ce6-b885-25815b943523.png"
+    },
+    {
+      "id": "nest",
+      "motif": "Cream feather orb with tucked wings.",
+      "source": "exec-a4cf8e55-1812-4c1d-8f81-7039886aab80.png"
+    },
+    {
+      "id": "stride",
+      "motif": "Green motion seed with trailing fins.",
+      "source": "exec-faa0d24c-24fb-4db9-ad0b-10efd4e469c3.png"
+    },
+    {
+      "id": "rush",
+      "motif": "Scarlet comet drop.",
+      "source": "exec-a84f180b-ac61-4c1f-96dc-c62e6165ac06.png"
+    },
+    {
+      "id": "wheel",
+      "motif": "Cyan ring spirit.",
+      "source": "exec-1c0a712c-6133-40ef-89d8-10f545274c4a.png"
+    },
+    {
+      "id": "ripple",
+      "motif": "Aqua ring-and-drop spirit.",
+      "source": "exec-ae10abb8-1bd2-4ff4-9911-eaf4f38706af.png"
+    },
+    {
+      "id": "sizzle",
+      "motif": "Copper ember with a chef-like tuft.",
+      "source": "exec-cf6b858a-2884-4d8a-a63d-97f611f53fcd.png"
+    },
+    {
+      "id": "sketch",
+      "motif": "Coral paint daub with brushstroke wings.",
+      "source": "exec-fc1c8ad0-2243-4696-9d38-0024858eff2d.png"
+    },
+    {
+      "id": "note",
+      "motif": "Indigo sound drop with echo fins.",
+      "source": "exec-ff656a6c-71f7-4865-9a5a-0d22da140e2b.png"
+    },
+    {
+      "id": "whisker",
+      "motif": "Lilac cat-like orb.",
+      "source": "exec-4ad56c83-1153-4e71-a3d2-81ca4740c7a3.png"
+    },
+    {
+      "id": "flurry",
+      "motif": "Powder-blue snow puff.",
+      "source": "exec-70a36c82-8b31-49b8-baea-94ff9ee9ef81.png"
+    },
+    {
+      "id": "dawn",
+      "motif": "Peach ray seed.",
+      "source": "exec-0d742893-549d-4c71-9d1b-ac8cc700767b.png"
+    },
+    {
+      "id": "starlit",
+      "motif": "Navy star orb with gold pinlights.",
+      "source": "exec-50ee248d-5904-4465-b724-fd41c1f3284a.png"
+    },
+    {
+      "id": "comet",
+      "motif": "Gold-violet celestial comet.",
+      "source": "exec-f0428b64-00d0-4292-ac33-583f2552a0ff.png"
+    },
+    {
+      "id": "chronicle",
+      "motif": "Ivory scroll spark.",
+      "source": "exec-76831624-63bb-4c1e-a858-841c2ee48103.png"
+    },
+    {
+      "id": "explorer",
+      "motif": "Moss-and-gold compass spirit.",
+      "source": "exec-523eb77e-f011-4546-8ff9-940ba32ba6ca.png"
+    },
+    {
+      "id": "confetti",
+      "motif": "Coral ribbon orb.",
+      "source": "exec-0da32a0a-68e9-4190-a5e4-8ad50ed21288.png"
+    },
+    {
+      "id": "recall",
+      "motif": "Violet memory-tile spirit.",
+      "source": "exec-619b6cf1-7726-458d-9665-3c8e6d2deada.png"
+    }
   ]
 }
