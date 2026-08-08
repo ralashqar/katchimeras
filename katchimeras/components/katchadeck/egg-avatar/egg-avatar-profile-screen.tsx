@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
@@ -46,6 +47,10 @@ export function EggAvatarProfileScreen({ bottomInset = 0 }: { bottomInset?: numb
   const [mode, setMode] = useState<YouMode>('egg');
   const [category, setCategory] = useState<Category>('body');
   const [wispFilter, setWispFilter] = useState<WispFilter>('all');
+  const gridScrollGesture = useMemo(
+    () => Gesture.Native().disallowInterruption(true),
+    [],
+  );
   useEffect(() => { wisps.syncFromDays(days); }, [days, wisps]);
   const tabBarHeight = homeTabBarHeight(bottomInset);
   const panelHeight = eggAvatarCustomizerPanelHeight(height);
@@ -70,7 +75,7 @@ export function EggAvatarProfileScreen({ bottomInset = 0 }: { bottomInset?: numb
   };
 
   return (
-    <Animated.View entering={FadeIn.duration(240)} exiting={FadeOut.duration(180)} pointerEvents="box-none" style={styles.screen}>
+    <Animated.View entering={FadeIn.duration(240)} exiting={FadeOut.duration(180)} pointerEvents="auto" style={styles.screen}>
       <View style={[styles.panel, { bottom: tabBarHeight, height: panelHeight }]}>
         <View style={styles.grabber} />
 
@@ -92,7 +97,18 @@ export function EggAvatarProfileScreen({ bottomInset = 0 }: { bottomInset?: numb
           })}
         </View>
 
-        <ScrollView contentContainerStyle={styles.grid} contentInsetAdjustmentBehavior="never" showsVerticalScrollIndicator={false}>
+        <GestureDetector gesture={gridScrollGesture}>
+        <ScrollView
+          alwaysBounceVertical
+          bounces
+          contentContainerStyle={styles.grid}
+          contentInsetAdjustmentBehavior="never"
+          decelerationRate="fast"
+          directionalLockEnabled
+          nestedScrollEnabled
+          scrollsToTop={false}
+          showsVerticalScrollIndicator={false}
+          style={styles.gridScroll}>
           {mode === 'egg' ? options.map((option) => {
             const selected = option.id === selectedId;
             const previewProps = categoryPreview(category, option.id, avatar);
@@ -117,6 +133,7 @@ export function EggAvatarProfileScreen({ bottomInset = 0 }: { bottomInset?: numb
             </Pressable>;
           })}
         </ScrollView>
+        </GestureDetector>
       </View>
     </Animated.View>
   );
@@ -143,6 +160,7 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: '#FFF5E2', boxShadow: '0 2px 8px rgba(71,45,21,0.13)' },
   tabLabel: { fontSize: 11.5, fontWeight: '800', opacity: 0.58 },
   tabLabelActive: { opacity: 1 },
+  gridScroll: { flex: 1, minHeight: 0 },
   grid: { columnGap: GRID_GAP, flexDirection: 'row', flexWrap: 'wrap', paddingBottom: 20, paddingHorizontal: GRID_HORIZONTAL_PADDING, rowGap: GRID_GAP },
   item: { backgroundColor: 'rgba(232,207,171,0.76)', borderColor: 'rgba(120,78,38,0.14)', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, gap: 3, overflow: 'hidden', padding: 5 },
   itemPressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },

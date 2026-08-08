@@ -1512,7 +1512,7 @@ function HomeScreen() {
     activeKey: selectedDayId,
     canSwipeNext: explorationTransitionPages.next != null,
     canSwipePrevious: explorationTransitionPages.previous != null,
-    enabled: explorationBackgroundActive && !flowBusy,
+    enabled: explorationBackgroundActive && !flowBusy && !customizerActive,
     onQuickSwipe: commitExplorationTransition,
     onTransitionStart: beginExplorationTransition,
     pageTransitionEnabled: true,

@@ -426,6 +426,12 @@ test('You button opens an in-place customizer above the Today UI', () => {
   assert.doesNotMatch(customizer, /styles\.heroNameAnchor/);
   assert.doesNotMatch(customizer, />YOU</);
   assert.doesNotMatch(customizer, /styles\.headingWisp/);
+  assert.match(today, /enabled: explorationBackgroundActive && !flowBusy && !customizerActive/);
+  assert.match(customizer, /Gesture\.Native\(\)\.disallowInterruption\(true\)/);
+  assert.match(customizer, /pointerEvents="auto"/);
+  assert.match(customizer, /directionalLockEnabled/);
+  assert.match(customizer, /nestedScrollEnabled/);
+  assert.match(customizer, /gridScroll: \{ flex: 1, minHeight: 0 \}/);
   assert.doesNotMatch(customizer, /today_pedestal|presentation="hero"/);
 });
 
