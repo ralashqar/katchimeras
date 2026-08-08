@@ -129,8 +129,8 @@
         }
       },
       "faceLayoutVersion": 1,
-      "baseVersion": 1,
-      "basePrompt": "Remove only eyebrows, eyes, mouth, and blush; reconstruct clean shell beneath them; preserve the exact approved silhouette, accessories, palette, patterns, lighting, feet, pose, and canvas.",
+      "baseVersion": 2,
+      "basePrompt": "This is a precise production asset edit of image 1, not a redesign. Create the same egg as a clean faceless body base for a layered avatar system. Remove the complete top sprout and its leaves. Keep the lower moss clusters. Remove the complete face: eyebrows, eyes, eye highlights, mouth, and both blush marks. Regenerate the newly exposed shell naturally; it must be solid, continuous, intact, and free of holes or ghost outlines. Preserve the exact egg identity, shell material, palette, markings, feet, proportions, front camera, lighting direction, and canvas placement. Add no replacement hat, headwear, top ornament, face, text, scenery, platform, cast shadow, or extra object. Place the one complete egg on a perfectly uniform flat pure-black #000000 background for BiRefNet Heavy. Premium cute 3D cartoon mascot art matching Baristabbit: cozy handcrafted toy quality, broad rounded forms, tactile painted shell and soft materials, warm low-contrast cinematic key light, gentle peach bounce, and restrained eye gloss. Emotionally friendly and playful, never realistic or uncanny. No text, letters, numbers, logos, watermark, UI, frame, multiple characters, broken shell, photorealism, flat illustration, uncanny doll eyes, hollow pupils, missing mouth, missing feet, realistic animal anatomy, grime, mold, busy ornament, glossy plastic finish, or background objects.",
       "baseGenerationModel": "fal-ai/nano-banana-2/edit",
       "baseMattingModel": "fal-ai/birefnet/v2",
       "baseEditMask": {
@@ -149,25 +149,27 @@
           "path": "assets/images/katchimeras/egg-avatars/bases/moss.png",
           "width": 2048,
           "height": 2048,
-          "sha256": "2fc13150b422845d0f3fd9b7687e14c75cc738e1034438e7bb78d17f421eeb07"
+          "sha256": "1c9356bd1608a7403025557dbbbd27f53d2c17ab75b42cea27803db52fba2c10"
         },
         "webp": {
           "path": "assets/images/katchimeras/egg-avatars/bases/moss.webp",
           "width": 1024,
           "height": 1024,
-          "sha256": "58a14371b1bbf3074d9cce82dbc5e3cf77e903e9c8ac0f4bf8ae53d283d91cd0"
+          "sha256": "2c842efd402d137669d71a5b0130793b3cace0b40eb5dadfba9f0620749e8773"
         },
         "thumbnail": {
           "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/moss.webp",
           "width": 256,
           "height": 256,
-          "sha256": "055fe3a921ea9f25eaf4ad49da584500c934edc81dfd9f14c7f6d1cf88d823e9"
+          "sha256": "7e51dc501f0033c43b4362e36c2c162b11b43bfb6f4a336071530f01a8bea0de"
         }
       },
       "baseMattingSettings": {
         "model": "General Use (Heavy)",
         "operatingResolution": "1024x1024",
-        "refineForeground": true
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "exteriorEdgeSource": "BiRefNet"
       }
     },
     "tide": {
@@ -633,8 +635,8 @@
         }
       },
       "faceLayoutVersion": 1,
-      "baseVersion": 1,
-      "basePrompt": "Remove only eyebrows, eyes, mouth, and blush; reconstruct clean shell beneath them; preserve the exact approved silhouette, accessories, palette, patterns, lighting, feet, pose, and canvas.",
+      "baseVersion": 2,
+      "basePrompt": "This is a precise production asset edit of image 1, not a redesign. Create the same egg as a clean faceless body base for a layered avatar system. Remove the complete brown beret. Keep the small coffee pocket on the lower shell. Remove the complete face: eyebrows, eyes, eye highlights, mouth, and both blush marks. Regenerate the newly exposed shell naturally; it must be solid, continuous, intact, and free of holes or ghost outlines. Preserve the exact egg identity, shell material, palette, markings, feet, proportions, front camera, lighting direction, and canvas placement. Add no replacement hat, headwear, top ornament, face, text, scenery, platform, cast shadow, or extra object. Place the one complete egg on a perfectly uniform flat pure-black #000000 background for BiRefNet Heavy. Premium cute 3D cartoon mascot art matching Baristabbit: cozy handcrafted toy quality, broad rounded forms, tactile painted shell and soft materials, warm low-contrast cinematic key light, gentle peach bounce, and restrained eye gloss. Emotionally friendly and playful, never realistic or uncanny. No text, letters, numbers, logos, watermark, UI, frame, multiple characters, broken shell, photorealism, flat illustration, uncanny doll eyes, hollow pupils, missing mouth, missing feet, realistic animal anatomy, grime, mold, busy ornament, glossy plastic finish, or background objects.",
       "baseGenerationModel": "fal-ai/nano-banana-2/edit",
       "baseMattingModel": "fal-ai/birefnet/v2",
       "baseEditMask": {
@@ -653,25 +655,27 @@
           "path": "assets/images/katchimeras/egg-avatars/bases/barista.png",
           "width": 2048,
           "height": 2048,
-          "sha256": "92ab5384d4c7e54580d98c6c9df03071537b2274dbb99a6b7bf281e7b9ef4b78"
+          "sha256": "c1714cc286c4bb62deb535af12d7e246ff14242cdd4c05eb63c3d53ee479d3d4"
         },
         "webp": {
           "path": "assets/images/katchimeras/egg-avatars/bases/barista.webp",
           "width": 1024,
           "height": 1024,
-          "sha256": "698be2633c867258a32b745e67d9ae528aa9b4237d9f81add6f8bdee44a011e9"
+          "sha256": "e778e5e72fcf77894fceeb6dd883dbbbdbf5f50c7e72e2236d95de052546f671"
         },
         "thumbnail": {
           "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/barista.webp",
           "width": 256,
           "height": 256,
-          "sha256": "d26f00e0219179c9b833d458accfde1c1c28543bf18cf6f7fc1ff06358ee4cd2"
+          "sha256": "d400c5d1a19188216af7ef899b0a7446df8fcdd56bc44c6f1c042d3b1b332fb1"
         }
       },
       "baseMattingSettings": {
         "model": "General Use (Heavy)",
         "operatingResolution": "1024x1024",
-        "refineForeground": true
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "exteriorEdgeSource": "BiRefNet"
       }
     },
     "robot": {
@@ -803,8 +807,8 @@
           "sha256": "5ff97bb18adde2511243ad3d8d3adefe2a23d5bb520cc5aef9d3afcafbca6167"
         }
       },
-      "baseVersion": 1,
-      "basePrompt": "Remove only eyebrows, eyes, mouth, and blush; reconstruct clean shell beneath them; preserve the exact approved silhouette, accessories, palette, patterns, lighting, feet, pose, and canvas.",
+      "baseVersion": 2,
+      "basePrompt": "This is a precise production asset edit of image 1, not a redesign. Create the same egg as a clean faceless body base for a layered avatar system. Remove the complete top stem. Keep the orange pumpkin shell, lobes, lower side vines, and leaves. Remove the complete face: eyebrows, eyes, eye highlights, mouth, and both blush marks. Regenerate the newly exposed shell naturally; it must be solid, continuous, intact, and free of holes or ghost outlines. Preserve the exact egg identity, shell material, palette, markings, feet, proportions, front camera, lighting direction, and canvas placement. Add no replacement hat, headwear, top ornament, face, text, scenery, platform, cast shadow, or extra object. Place the one complete egg on a perfectly uniform flat pure-black #000000 background for BiRefNet Heavy. Premium cute 3D cartoon mascot art matching Baristabbit: cozy handcrafted toy quality, broad rounded forms, tactile painted shell and soft materials, warm low-contrast cinematic key light, gentle peach bounce, and restrained eye gloss. Emotionally friendly and playful, never realistic or uncanny. No text, letters, numbers, logos, watermark, UI, frame, multiple characters, broken shell, photorealism, flat illustration, uncanny doll eyes, hollow pupils, missing mouth, missing feet, realistic animal anatomy, grime, mold, busy ornament, glossy plastic finish, or background objects.",
       "baseGenerationModel": "fal-ai/nano-banana-2/edit",
       "baseMattingModel": "fal-ai/birefnet/v2",
       "baseEditMask": {
@@ -823,29 +827,1279 @@
           "path": "assets/images/katchimeras/egg-avatars/bases/pumpkin.png",
           "width": 2048,
           "height": 2048,
-          "sha256": "a28d975195de14190145e327b54fa43ed199a0d8825b1db47971f1e1e82ae09e"
+          "sha256": "cf5727daa5907ba4187ddd243619c022f1753ab08502262753f7d4b605181cc8"
         },
         "webp": {
           "path": "assets/images/katchimeras/egg-avatars/bases/pumpkin.webp",
           "width": 1024,
           "height": 1024,
-          "sha256": "cb20d7642f1df43f9b6d65b040f005604b382d0a985828f8762666ec6d29f118"
+          "sha256": "c42546a33b8983fd97509423331e17107df81ac5b797a17c35fc5cfce123286b"
         },
         "thumbnail": {
           "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/pumpkin.webp",
           "width": 256,
           "height": 256,
-          "sha256": "088cb32cc4da806bf58261f82d6b221ea9755ca02422298558f731d5609f70be"
+          "sha256": "ae060726a7f7189626658de00a23df517efdcd0fbd97bd1cb1433047356cf534"
         }
       },
       "baseMattingSettings": {
         "model": "General Use (Heavy)",
         "operatingResolution": "1024x1024",
-        "refineForeground": true
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "exteriorEdgeSource": "BiRefNet"
+      }
+    },
+    "honeycomb": {
+      "name": "Honeycomb",
+      "version": 1,
+      "approvedCandidate": "auto-promoted-single-gpt-image-2-draft",
+      "approvedAt": "2026-08-08T04:57:40.568594+00:00",
+      "generationModel": "openai/gpt-image-2/edit",
+      "generationQuality": "low",
+      "pipelineVersion": "egg-avatar-body-drafts-v1-gpt-image-2",
+      "references": [
+        {
+          "path": "assets/images/katchimeras/egg-avatars/bases/classic.png",
+          "role": "exact-faceless-body-edit-target"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "character-art-style"
+        },
+        {
+          "path": "assets/images/katchimeras/world/today/today_bg.webp",
+          "role": "runtime-lighting-palette"
+        }
+      ],
+      "artDirection": "Warm honey shell with broad lower hexagons and a cream face-safe centre.",
+      "mattingModel": "fal-ai/birefnet/v2",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/honeycomb.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "81245f99cf3d0c8a13a6154a811fda693e7607d574eae0d81c9b32838e97b887"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/honeycomb.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "148ac5d3b2e66d2bbb3d9a96812a00e6c10aa8e8195b410f3c53361da4c85ed9"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/honeycomb.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "e78e5c3b43d3a2cc998f417417bbbd43032cf8d6f9827aa4a9aad984472855ba"
+        }
+      },
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Use case: precise-object-edit. Asset type: faceless layered egg-avatar body. Image 1 is the exact faceless Classic egg body and the edit target. Preserve its full square canvas registration, upright front-facing camera, scale, placement, softly rounded egg silhouette, and two small feet. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, warm low-contrast light, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, gentle saturation, simplified toy-diorama finish, and soft lighting direction. Do not copy its scenery or pedestal. Transform only the egg body's shell design into Honeycomb: Warm honey shell with broad lower hexagons and a cream face-safe centre. Palette: honey gold, butter cream, warm amber. Shape language: Smooth egg with oversized shallow hexagonal forms. Design constraints: No detailed comb texture; No baked face, hat, or held prop. The central rounded face-safe area from normalized x 0.22 to 0.78 and y 0.34 to 0.66 must remain smooth, intact, low-detail, and empty so a separate face layer can be added later. Keep the crown clear for separately layered hats and keep both outer sides clear enough for a separately layered held accessory. This body must contain no eyebrows, eyes, pupils, catchlights, mouth, blush, face marks, facial indentation, facial ghost, hat, headwear, top ornament, held prop, hand, arm, pedestal, nest, or scenery. Preserve a single solid continuous egg body with no transparent-looking holes, cutouts, broken shell, floating pieces, or missing interior regions. Render the one complete faceless egg body on a perfectly uniform pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, reflection, glow, gradient, texture, border, text, logo, watermark, or extra object. Do not zoom, crop, recenter, resize, rotate, or change the camera.",
+      "baseGenerationModel": "openai/gpt-image-2/edit",
+      "baseGenerationQuality": "low",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "exteriorEdgeSource": "BiRefNet"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/honeycomb.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "7acd1ea5501e4c0e11e5ebe85f77d2c41c235978e8aa929e7b0730fb40672ac9"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/honeycomb.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "982c4db0d89dbdc5930233d4a13fa09682846a46b6787b375e1968a38ba046fc"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/honeycomb.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "5e544a50808131be8bb656b22b3c0d3f49a59fd1d3145f9b0809cc6302bfbef8"
+        }
+      }
+    },
+    "strawberry-cream": {
+      "name": "Strawberry Cream",
+      "version": 1,
+      "approvedCandidate": "auto-promoted-single-gpt-image-2-draft",
+      "approvedAt": "2026-08-08T04:57:57.062317+00:00",
+      "generationModel": "openai/gpt-image-2/edit",
+      "generationQuality": "low",
+      "pipelineVersion": "egg-avatar-body-drafts-v1-gpt-image-2",
+      "references": [
+        {
+          "path": "assets/images/katchimeras/egg-avatars/bases/classic.png",
+          "role": "exact-faceless-body-edit-target"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "character-art-style"
+        },
+        {
+          "path": "assets/images/katchimeras/world/today/today_bg.webp",
+          "role": "runtime-lighting-palette"
+        }
+      ],
+      "artDirection": "Soft berry-pink shell with a cream lower band and sparse seed marks.",
+      "mattingModel": "fal-ai/birefnet/v2",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/strawberry-cream.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "0d334ba0f1650115b8646b7de6be76adac205b108ae500b3e193d583571afdb7"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/strawberry-cream.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "2a724d2e16080dea3af8f04c8b449b890922fc071ec121828246bb86f045b294"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/strawberry-cream.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "67a688527fceddb13e331b91caa55df0424bdb09f7b4a79cebb06538e8d1903d"
+        }
+      },
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Use case: precise-object-edit. Asset type: faceless layered egg-avatar body. Image 1 is the exact faceless Classic egg body and the edit target. Preserve its full square canvas registration, upright front-facing camera, scale, placement, softly rounded egg silhouette, and two small feet. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, warm low-contrast light, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, gentle saturation, simplified toy-diorama finish, and soft lighting direction. Do not copy its scenery or pedestal. Transform only the egg body's shell design into Strawberry Cream: Soft berry-pink shell with a cream lower band and sparse seed marks. Palette: berry pink, vanilla cream, leaf green. Shape language: Classic egg with broad dessert-like colour blocking. Design constraints: Seeds stay outside the face-safe centre; No fruit topper. The central rounded face-safe area from normalized x 0.22 to 0.78 and y 0.34 to 0.66 must remain smooth, intact, low-detail, and empty so a separate face layer can be added later. Keep the crown clear for separately layered hats and keep both outer sides clear enough for a separately layered held accessory. This body must contain no eyebrows, eyes, pupils, catchlights, mouth, blush, face marks, facial indentation, facial ghost, hat, headwear, top ornament, held prop, hand, arm, pedestal, nest, or scenery. Preserve a single solid continuous egg body with no transparent-looking holes, cutouts, broken shell, floating pieces, or missing interior regions. Render the one complete faceless egg body on a perfectly uniform pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, reflection, glow, gradient, texture, border, text, logo, watermark, or extra object. Do not zoom, crop, recenter, resize, rotate, or change the camera.",
+      "baseGenerationModel": "openai/gpt-image-2/edit",
+      "baseGenerationQuality": "low",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "exteriorEdgeSource": "BiRefNet"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/strawberry-cream.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "dc694f81f6fd08b4fd8e381b055910822925c91d820ea8e61e64bb5654963ef0"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/strawberry-cream.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "7f3d87d549d36b1c4141f46e04d29885ef982a90703057be87e146db8908e893"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/strawberry-cream.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "6f1d3ef7a705a69967902b46cf5eece554d8ad34b1b5154353e560a8f0289241"
+        }
+      }
+    },
+    "blueberry-swirl": {
+      "name": "Blueberry Swirl",
+      "version": 1,
+      "approvedCandidate": "auto-promoted-single-gpt-image-2-draft",
+      "approvedAt": "2026-08-08T04:58:12.417184+00:00",
+      "generationModel": "openai/gpt-image-2/edit",
+      "generationQuality": "low",
+      "pipelineVersion": "egg-avatar-body-drafts-v1-gpt-image-2",
+      "references": [
+        {
+          "path": "assets/images/katchimeras/egg-avatars/bases/classic.png",
+          "role": "exact-faceless-body-edit-target"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "character-art-style"
+        },
+        {
+          "path": "assets/images/katchimeras/world/today/today_bg.webp",
+          "role": "runtime-lighting-palette"
+        }
+      ],
+      "artDirection": "Milky lavender shell with two broad blueberry swirls.",
+      "mattingModel": "fal-ai/birefnet/v2",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/blueberry-swirl.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "5290cda7e6937dfea30034c175ecef04c21d37f0d2e590fee0666bd5f752956d"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/blueberry-swirl.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "760ed62a5afa9047b146107383b485fecb3e2e0ba6735789785a99f4a432e11e"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/blueberry-swirl.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "2e03fbb9977d61aee33c05da7b34abd41f078beca85a7513763d941e705bc789"
+        }
+      },
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Use case: precise-object-edit. Asset type: faceless layered egg-avatar body. Image 1 is the exact faceless Classic egg body and the edit target. Preserve its full square canvas registration, upright front-facing camera, scale, placement, softly rounded egg silhouette, and two small feet. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, warm low-contrast light, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, gentle saturation, simplified toy-diorama finish, and soft lighting direction. Do not copy its scenery or pedestal. Transform only the egg body's shell design into Blueberry Swirl: Milky lavender shell with two broad blueberry swirls. Palette: milky lavender, blueberry indigo, cream. Shape language: Smooth egg with large painterly spiral bands. Design constraints: No tiny berries; Keep the facial field calm. The central rounded face-safe area from normalized x 0.22 to 0.78 and y 0.34 to 0.66 must remain smooth, intact, low-detail, and empty so a separate face layer can be added later. Keep the crown clear for separately layered hats and keep both outer sides clear enough for a separately layered held accessory. This body must contain no eyebrows, eyes, pupils, catchlights, mouth, blush, face marks, facial indentation, facial ghost, hat, headwear, top ornament, held prop, hand, arm, pedestal, nest, or scenery. Preserve a single solid continuous egg body with no transparent-looking holes, cutouts, broken shell, floating pieces, or missing interior regions. Render the one complete faceless egg body on a perfectly uniform pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, reflection, glow, gradient, texture, border, text, logo, watermark, or extra object. Do not zoom, crop, recenter, resize, rotate, or change the camera.",
+      "baseGenerationModel": "openai/gpt-image-2/edit",
+      "baseGenerationQuality": "low",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "exteriorEdgeSource": "BiRefNet"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/blueberry-swirl.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "41304f9fa24f03f4e96f1a237247494679594a3d0d9ce3d10badf7581346c130"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/blueberry-swirl.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "377038681078ad30736696c1f798ea6f71b2e149b7495b8ea668c881b663d3ba"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/blueberry-swirl.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "1a8184c8097a6551da9d08f028a74134ade9446110bad2a05589b27222befbbf"
+        }
+      }
+    },
+    "matcha-marble": {
+      "name": "Matcha Marble",
+      "version": 1,
+      "approvedCandidate": "auto-promoted-single-gpt-image-2-draft",
+      "approvedAt": "2026-08-08T04:58:28.381305+00:00",
+      "generationModel": "openai/gpt-image-2/edit",
+      "generationQuality": "low",
+      "pipelineVersion": "egg-avatar-body-drafts-v1-gpt-image-2",
+      "references": [
+        {
+          "path": "assets/images/katchimeras/egg-avatars/bases/classic.png",
+          "role": "exact-faceless-body-edit-target"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "character-art-style"
+        },
+        {
+          "path": "assets/images/katchimeras/world/today/today_bg.webp",
+          "role": "runtime-lighting-palette"
+        }
+      ],
+      "artDirection": "Cream and muted matcha-green softly painted marbling.",
+      "mattingModel": "fal-ai/birefnet/v2",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/matcha-marble.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "58d15398c8b2406791b5fff6c91bf0ee64666b1c7d6f22459057d86f1f524231"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/matcha-marble.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "2637a50bd6bec908321ec8345269d9748735e2d9eed11d788dcdffa7a153ab42"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/matcha-marble.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "0dd2fb32863f51b546cc5a6ba8bc219359ec88f3d91788d7b43e3adba52700e8"
+        }
+      },
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Use case: precise-object-edit. Asset type: faceless layered egg-avatar body. Image 1 is the exact faceless Classic egg body and the edit target. Preserve its full square canvas registration, upright front-facing camera, scale, placement, softly rounded egg silhouette, and two small feet. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, warm low-contrast light, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, gentle saturation, simplified toy-diorama finish, and soft lighting direction. Do not copy its scenery or pedestal. Transform only the egg body's shell design into Matcha Marble: Cream and muted matcha-green softly painted marbling. Palette: matcha green, oat cream, soft sage. Shape language: Classic egg with broad flowing marble fields. Design constraints: No stone microtexture; Keep contrast low behind the face. The central rounded face-safe area from normalized x 0.22 to 0.78 and y 0.34 to 0.66 must remain smooth, intact, low-detail, and empty so a separate face layer can be added later. Keep the crown clear for separately layered hats and keep both outer sides clear enough for a separately layered held accessory. This body must contain no eyebrows, eyes, pupils, catchlights, mouth, blush, face marks, facial indentation, facial ghost, hat, headwear, top ornament, held prop, hand, arm, pedestal, nest, or scenery. Preserve a single solid continuous egg body with no transparent-looking holes, cutouts, broken shell, floating pieces, or missing interior regions. Render the one complete faceless egg body on a perfectly uniform pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, reflection, glow, gradient, texture, border, text, logo, watermark, or extra object. Do not zoom, crop, recenter, resize, rotate, or change the camera.",
+      "baseGenerationModel": "openai/gpt-image-2/edit",
+      "baseGenerationQuality": "low",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "exteriorEdgeSource": "BiRefNet"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/matcha-marble.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "8e5d72c09ec080aa024ff761d8d26a2203302d17365b1294c4ea082d8adf1e1c"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/matcha-marble.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "b986eaae209ee270f1b7a909344dd6c82854f05d5eedac8009f284a1c5d5d16b"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/matcha-marble.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "8fcd30d14e9587d7f896d83f83b408777b7f5ee5aaa1b89409a3e5f77dbfe30a"
+        }
+      }
+    },
+    "wizard-robes": {
+      "name": "Wizard Robes",
+      "version": 1,
+      "approvedCandidate": "auto-promoted-single-gpt-image-2-draft",
+      "approvedAt": "2026-08-08T05:15:24.250055+00:00",
+      "generationModel": "openai/gpt-image-2/edit",
+      "generationQuality": "low",
+      "pipelineVersion": "egg-avatar-body-drafts-v1-gpt-image-2",
+      "references": [
+        {
+          "path": "assets/images/katchimeras/egg-avatars/bases/classic.png",
+          "role": "exact-faceless-body-edit-target"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "character-art-style"
+        },
+        {
+          "path": "assets/images/katchimeras/world/today/today_bg.webp",
+          "role": "runtime-lighting-palette"
+        }
+      ],
+      "artDirection": "Midnight-blue robe wrapped around the lower shell with a soft rope belt and sparse warm-gold stars.",
+      "mattingModel": "fal-ai/birefnet/v2",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/wizard-robes.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "f1845a24824c5044f1fce49329d66b68eecd757ed03d6a3d42f1907baf841014"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/wizard-robes.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "690b00f868ccd226233e97857db5ccbc949e64e6547b10298a8bbe0460393e11"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/wizard-robes.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "07d90e4988400a4e57c01668ede7214a69f6162e7a80030c3f320131deeeb509"
+        }
+      },
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Use case: precise-object-edit. Asset type: faceless layered egg-avatar body. Image 1 is the exact faceless Classic egg body and the edit target. Preserve its full square canvas registration, upright front-facing camera, scale, placement, softly rounded egg silhouette, and two small feet. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, warm low-contrast light, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, gentle saturation, simplified toy-diorama finish, and soft lighting direction. Do not copy its scenery or pedestal. Transform only the egg body's shell design into Wizard Robes: Midnight-blue robe wrapped around the lower shell with a soft rope belt and sparse warm-gold stars. Palette: midnight blue, muted violet, warm gold, cream. Shape language: Broad robe panels following the egg curvature with a simple low hem. Design constraints: No arms, hands, sleeves, beard, staff, or baked hat; Keep stars and belt outside the face-safe centre. The central rounded face-safe area from normalized x 0.22 to 0.78 and y 0.34 to 0.66 must remain smooth, intact, low-detail, and empty so a separate face layer can be added later. Keep the crown clear for separately layered hats and keep both outer sides clear enough for a separately layered held accessory. This body must contain no eyebrows, eyes, pupils, catchlights, mouth, blush, face marks, facial indentation, facial ghost, hat, headwear, top ornament, held prop, hand, arm, pedestal, nest, or scenery. Preserve a single solid continuous egg body with no transparent-looking holes, cutouts, broken shell, floating pieces, or missing interior regions. Render the one complete faceless egg body on a perfectly uniform pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, reflection, glow, gradient, texture, border, text, logo, watermark, or extra object. Do not zoom, crop, recenter, resize, rotate, or change the camera.",
+      "baseGenerationModel": "openai/gpt-image-2/edit",
+      "baseGenerationQuality": "low",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "exteriorEdgeSource": "BiRefNet"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/wizard-robes.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "eefcfc0a8fbba2da253315e344a5c2930b7cec49947bb3dbbb1d52fca19a71ad"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/wizard-robes.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "7fb175de9b421e233dcd9c2d409019100924cb50b3d760ffac297caca5f0617d"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/wizard-robes.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "0be92826606dc99a40c2a3885fbda4905af7766027ccb4495bfc6e770679140d"
+        }
+      }
+    },
+    "football-kit": {
+      "name": "Football Kit",
+      "version": 1,
+      "approvedCandidate": "auto-promoted-single-gpt-image-2-draft",
+      "approvedAt": "2026-08-08T05:16:20.983244+00:00",
+      "generationModel": "openai/gpt-image-2/edit",
+      "generationQuality": "low",
+      "pipelineVersion": "egg-avatar-body-drafts-v1-gpt-image-2",
+      "references": [
+        {
+          "path": "assets/images/katchimeras/egg-avatars/bases/classic.png",
+          "role": "exact-faceless-body-edit-target"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "character-art-style"
+        },
+        {
+          "path": "assets/images/katchimeras/world/today/today_bg.webp",
+          "role": "runtime-lighting-palette"
+        }
+      ],
+      "artDirection": "Toy football shirt wrapped around the shell with broad teal-and-cream stripes, a soft collar, and a simple blank shield badge.",
+      "mattingModel": "fal-ai/birefnet/v2",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/football-kit.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "d9f697222bf619dfd4107e189c47cd3bfa03cd8779fe32d4b40bc56b6960c5be"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/football-kit.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "4a5a6afeaf928b85dfe2e18f158b31d5f7dd8e3096502d61e5ed7ef1b4f3f808"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/football-kit.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "091b738824b4846fddd758ee269f938ca243af0d59b9f095bad1387d51b088d6"
+        }
+      },
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Use case: precise-object-edit. Asset type: faceless layered egg-avatar body. Image 1 is the exact faceless Classic egg body and the edit target. Preserve its full square canvas registration, upright front-facing camera, scale, placement, softly rounded egg silhouette, and two small feet. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, warm low-contrast light, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, gentle saturation, simplified toy-diorama finish, and soft lighting direction. Do not copy its scenery or pedestal. Transform only the egg body's shell design into Football Kit: Toy football shirt wrapped around the shell with broad teal-and-cream stripes, a soft collar, and a simple blank shield badge. Palette: deep teal, warm cream, coral accent. Shape language: Clean athletic torso panels curved around the egg body. Design constraints: No arms, sleeves, hands, branded crest, sponsor, letters, or numbers; Keep the collar and badge clear of facial anchors. The central rounded face-safe area from normalized x 0.22 to 0.78 and y 0.34 to 0.66 must remain smooth, intact, low-detail, and empty so a separate face layer can be added later. Keep the crown clear for separately layered hats and keep both outer sides clear enough for a separately layered held accessory. This body must contain no eyebrows, eyes, pupils, catchlights, mouth, blush, face marks, facial indentation, facial ghost, hat, headwear, top ornament, held prop, hand, arm, pedestal, nest, or scenery. Preserve a single solid continuous egg body with no transparent-looking holes, cutouts, broken shell, floating pieces, or missing interior regions. Render the one complete faceless egg body on a perfectly uniform pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, reflection, glow, gradient, texture, border, text, logo, watermark, or extra object. Do not zoom, crop, recenter, resize, rotate, or change the camera.",
+      "baseGenerationModel": "openai/gpt-image-2/edit",
+      "baseGenerationQuality": "low",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "exteriorEdgeSource": "BiRefNet"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/football-kit.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "025a490e76b297b51f85ed415f01e779252c4d0917363df9cdfb241d2855478d"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/football-kit.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "2947282e35bbf327dd3a500e4aa0e22aef071fde6404541a9a608c73ac6f7745"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/football-kit.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "9fe3d1aefd43b917bf245fe20195c51f61e237843c55d9977499bdb42d6324ab"
+        }
+      }
+    },
+    "sunny-raincoat": {
+      "name": "Sunny Raincoat",
+      "version": 1,
+      "approvedCandidate": "auto-promoted-single-gpt-image-2-draft",
+      "approvedAt": "2026-08-08T05:17:09.870066+00:00",
+      "generationModel": "openai/gpt-image-2/edit",
+      "generationQuality": "low",
+      "pipelineVersion": "egg-avatar-body-drafts-v1-gpt-image-2",
+      "references": [
+        {
+          "path": "assets/images/katchimeras/egg-avatars/bases/classic.png",
+          "role": "exact-faceless-body-edit-target"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "character-art-style"
+        },
+        {
+          "path": "assets/images/katchimeras/world/today/today_bg.webp",
+          "role": "runtime-lighting-palette"
+        }
+      ],
+      "artDirection": "Butter-yellow raincoat body with a broad cream placket, three oversized toggles, and a rounded teal lower hem.",
+      "mattingModel": "fal-ai/birefnet/v2",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/sunny-raincoat.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "d7862b5561f197c0f1efa1e6bd64de36d99ab6de087a9262e4099f4319c24928"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/sunny-raincoat.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "c5d3605af1a310d8f3280391144b65828d328aab4add35b5c5806a5cdabf9f72"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/sunny-raincoat.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "c2e6fcb9f65e973a865ae74ba6ef0ac231c196f84b5a698140edec4fad269456"
+        }
+      },
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Use case: precise-object-edit. Asset type: faceless layered egg-avatar body. Image 1 is the exact faceless Classic egg body and the edit target. Preserve its full square canvas registration, upright front-facing camera, scale, placement, softly rounded egg silhouette, and two small feet. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, warm low-contrast light, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, gentle saturation, simplified toy-diorama finish, and soft lighting direction. Do not copy its scenery or pedestal. Transform only the egg body's shell design into Sunny Raincoat: Butter-yellow raincoat body with a broad cream placket, three oversized toggles, and a rounded teal lower hem. Palette: butter yellow, warm cream, puddle teal. Shape language: Simple coat-front panels molded smoothly around the lower shell. Design constraints: No arms, sleeves, hands, hood, umbrella, or raindrops; Keep toggles below the face-safe centre. The central rounded face-safe area from normalized x 0.22 to 0.78 and y 0.34 to 0.66 must remain smooth, intact, low-detail, and empty so a separate face layer can be added later. Keep the crown clear for separately layered hats and keep both outer sides clear enough for a separately layered held accessory. This body must contain no eyebrows, eyes, pupils, catchlights, mouth, blush, face marks, facial indentation, facial ghost, hat, headwear, top ornament, held prop, hand, arm, pedestal, nest, or scenery. Preserve a single solid continuous egg body with no transparent-looking holes, cutouts, broken shell, floating pieces, or missing interior regions. Render the one complete faceless egg body on a perfectly uniform pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, reflection, glow, gradient, texture, border, text, logo, watermark, or extra object. Do not zoom, crop, recenter, resize, rotate, or change the camera.",
+      "baseGenerationModel": "openai/gpt-image-2/edit",
+      "baseGenerationQuality": "low",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "exteriorEdgeSource": "BiRefNet"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/sunny-raincoat.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "ef03dbb12e00b1635e2e4f6dce918d1e8254830d13c4582c94a74d86e1955fd9"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/sunny-raincoat.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "37d10cf587b36a34a1527c824ad520360a96bc94b06ebd3cb730ac01abf5976c"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/sunny-raincoat.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "3e051ae3e64bd4f0c564c701ba0a26bc3f3859aaa440173f3fbedddc1810b0ff"
+        }
+      }
+    },
+    "knight-tunic": {
+      "name": "Knight Tunic",
+      "version": 1,
+      "approvedCandidate": "auto-promoted-single-gpt-image-2-draft",
+      "approvedAt": "2026-08-08T05:18:24.946529+00:00",
+      "generationModel": "openai/gpt-image-2/edit",
+      "generationQuality": "low",
+      "pipelineVersion": "egg-avatar-body-drafts-v1-gpt-image-2",
+      "references": [
+        {
+          "path": "assets/images/katchimeras/egg-avatars/bases/classic.png",
+          "role": "exact-faceless-body-edit-target"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "character-art-style"
+        },
+        {
+          "path": "assets/images/katchimeras/world/today/today_bg.webp",
+          "role": "runtime-lighting-palette"
+        }
+      ],
+      "artDirection": "Padded cream knight tunic with broad sage side panels, a warm-gold belt, and one simple shield emblem low on the shell.",
+      "mattingModel": "fal-ai/birefnet/v2",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/knight-tunic.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "52be32a151f2716c8ae82778f433b7dbd79c22539e1a34465623562ef7e776d1"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/knight-tunic.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "17288d0c3ccbbdfd55820b62791c844536a56a9e4e4f81d90a90e938a7b2ffe9"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/knight-tunic.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "d25ebf57a34c2497ac93e63ff69678c7aadf8e0eed9c8562831919b80482f45c"
+        }
+      },
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Use case: precise-object-edit. Asset type: faceless layered egg-avatar body. Image 1 is the exact faceless Classic egg body and the edit target. Preserve its full square canvas registration, upright front-facing camera, scale, placement, softly rounded egg silhouette, and two small feet. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, warm low-contrast light, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, gentle saturation, simplified toy-diorama finish, and soft lighting direction. Do not copy its scenery or pedestal. Transform only the egg body's shell design into Knight Tunic: Padded cream knight tunic with broad sage side panels, a warm-gold belt, and one simple shield emblem low on the shell. Palette: warm cream, sage, soft graphite, warm gold. Shape language: Rounded quilted torso panels with a restrained protective silhouette. Design constraints: No arms, gauntlets, weapons, cape, chainmail microtexture, or baked helmet; Keep the shield and seams below the face. The central rounded face-safe area from normalized x 0.22 to 0.78 and y 0.34 to 0.66 must remain smooth, intact, low-detail, and empty so a separate face layer can be added later. Keep the crown clear for separately layered hats and keep both outer sides clear enough for a separately layered held accessory. This body must contain no eyebrows, eyes, pupils, catchlights, mouth, blush, face marks, facial indentation, facial ghost, hat, headwear, top ornament, held prop, hand, arm, pedestal, nest, or scenery. Preserve a single solid continuous egg body with no transparent-looking holes, cutouts, broken shell, floating pieces, or missing interior regions. Render the one complete faceless egg body on a perfectly uniform pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, reflection, glow, gradient, texture, border, text, logo, watermark, or extra object. Do not zoom, crop, recenter, resize, rotate, or change the camera.",
+      "baseGenerationModel": "openai/gpt-image-2/edit",
+      "baseGenerationQuality": "low",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "exteriorEdgeSource": "BiRefNet"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/knight-tunic.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "6c86b27e6b713e587a53ff9fbc398cd2b1a67a55a4b1659cee5f544153d95ea5"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/knight-tunic.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "96fdba17874334b64e923a614d2fcb755a3c56cfa79d6fb41702f4a3ac0c0e54"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/knight-tunic.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "2fe80327a3e86631a3465148ad010a95debc9dc018e88dbd0abd169401aa890a"
+        }
+      }
+    },
+    "watermelon": {
+      "name": "Watermelon",
+      "version": 1,
+      "approvedCandidate": "auto-promoted-single-gpt-image-2-draft",
+      "approvedAt": "2026-08-08T05:23:19.673313+00:00",
+      "generationModel": "openai/gpt-image-2/edit",
+      "generationQuality": "low",
+      "pipelineVersion": "egg-avatar-body-drafts-v1-gpt-image-2",
+      "references": [
+        {
+          "path": "assets/images/katchimeras/egg-avatars/bases/classic.png",
+          "role": "exact-faceless-body-edit-target"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "character-art-style"
+        },
+        {
+          "path": "assets/images/katchimeras/world/today/today_bg.webp",
+          "role": "runtime-lighting-palette"
+        }
+      ],
+      "artDirection": "Coral shell with dark seed accents and a green lower rind.",
+      "mattingModel": "fal-ai/birefnet/v2",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/watermelon.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "4d77a0067abd2761b4edee0c2242b3ae7e38ee2d1913e10c9733ca02624bd88e"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/watermelon.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "0b8e43955fe64401ed3e9d00492e1aee209de083090e747fe36e8f0e99452f84"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/watermelon.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "18e9a6ddf178962d9e904aaca18d5f129bae39deacf96d2556fa0e3488cdf65f"
+        }
+      },
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Use case: precise-object-edit. Asset type: faceless layered egg-avatar body. Image 1 is the exact faceless Classic egg body and the edit target. Preserve its full square canvas registration, upright front-facing camera, scale, placement, softly rounded egg silhouette, and two small feet. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, warm low-contrast light, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, gentle saturation, simplified toy-diorama finish, and soft lighting direction. Do not copy its scenery or pedestal. Transform only the egg body's shell design into Watermelon: Coral shell with dark seed accents and a green lower rind. Palette: watermelon coral, rind green, cream. Shape language: Classic egg with a broad curved lower rind. Design constraints: Keep seeds sparse and outside facial anchors; No fruit wedge hat. The central rounded face-safe area from normalized x 0.22 to 0.78 and y 0.34 to 0.66 must remain smooth, intact, low-detail, and empty so a separate face layer can be added later. Keep the crown clear for separately layered hats and keep both outer sides clear enough for a separately layered held accessory. This body must contain no eyebrows, eyes, pupils, catchlights, mouth, blush, face marks, facial indentation, facial ghost, hat, headwear, top ornament, held prop, hand, arm, pedestal, nest, or scenery. Preserve a single solid continuous egg body with no transparent-looking holes, cutouts, broken shell, floating pieces, or missing interior regions. Render the one complete faceless egg body on a perfectly uniform pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, reflection, glow, gradient, texture, border, text, logo, watermark, or extra object. Do not zoom, crop, recenter, resize, rotate, or change the camera.",
+      "baseGenerationModel": "openai/gpt-image-2/edit",
+      "baseGenerationQuality": "low",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "exteriorEdgeSource": "BiRefNet"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/watermelon.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "6aa6cea88e8df5aaab470075c4ffbc69f02d36507cc7aeea615f021cc90d8f93"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/watermelon.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "e17c189eb8b233158839bd435774af29718e9ba3dfec969bb3f5e29e11789097"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/watermelon.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "a28243eb5e48c927d87c18d7941a6d03d883b2b7827ff35d0e7ca59af06b97a6"
+        }
+      }
+    },
+    "astronaut-suit": {
+      "name": "Astronaut Suit",
+      "version": 1,
+      "approvedCandidate": "auto-promoted-single-gpt-image-2-draft",
+      "approvedAt": "2026-08-08T05:24:10.491591+00:00",
+      "generationModel": "openai/gpt-image-2/edit",
+      "generationQuality": "low",
+      "pipelineVersion": "egg-avatar-body-drafts-v1-gpt-image-2",
+      "references": [
+        {
+          "path": "assets/images/katchimeras/egg-avatars/bases/classic.png",
+          "role": "exact-faceless-body-edit-target"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "character-art-style"
+        },
+        {
+          "path": "assets/images/katchimeras/world/today/today_bg.webp",
+          "role": "runtime-lighting-palette"
+        }
+      ],
+      "artDirection": "Warm-ivory toy spacesuit body with a rounded chest panel, muted orange tabs, and a soft graphite utility belt.",
+      "mattingModel": "fal-ai/birefnet/v2",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/astronaut-suit.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "ae3abf98a1e9b328ee6da2945104d717e086f3e4771da0ec3fe1588df498b127"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/astronaut-suit.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "c53191f956121d616fd2cb1193ddd103b4da74647d1d606bee165618b7f012d1"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/astronaut-suit.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "7a0e64be5edc7052aae34446db47f7b59a879480d2367b6872eba480fe1e6d7c"
+        }
+      },
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Use case: precise-object-edit. Asset type: faceless layered egg-avatar body. Image 1 is the exact faceless Classic egg body and the edit target. Preserve its full square canvas registration, upright front-facing camera, scale, placement, softly rounded egg silhouette, and two small feet. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, warm low-contrast light, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, gentle saturation, simplified toy-diorama finish, and soft lighting direction. Do not copy its scenery or pedestal. Transform only the egg body's shell design into Astronaut Suit: Warm-ivory toy spacesuit body with a rounded chest panel, muted orange tabs, and a soft graphite utility belt. Palette: warm ivory, soft graphite, muted orange, pale cyan. Shape language: Broad simplified suit panels integrated into the egg silhouette. Design constraints: No arms, gloves, backpack, flags, text, logos, or baked helmet; Keep all panel seams outside the face-safe centre. The central rounded face-safe area from normalized x 0.22 to 0.78 and y 0.34 to 0.66 must remain smooth, intact, low-detail, and empty so a separate face layer can be added later. Keep the crown clear for separately layered hats and keep both outer sides clear enough for a separately layered held accessory. This body must contain no eyebrows, eyes, pupils, catchlights, mouth, blush, face marks, facial indentation, facial ghost, hat, headwear, top ornament, held prop, hand, arm, pedestal, nest, or scenery. Preserve a single solid continuous egg body with no transparent-looking holes, cutouts, broken shell, floating pieces, or missing interior regions. Render the one complete faceless egg body on a perfectly uniform pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, reflection, glow, gradient, texture, border, text, logo, watermark, or extra object. Do not zoom, crop, recenter, resize, rotate, or change the camera.",
+      "baseGenerationModel": "openai/gpt-image-2/edit",
+      "baseGenerationQuality": "low",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "exteriorEdgeSource": "BiRefNet"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/astronaut-suit.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "8093d0120cde5c462b577b77f2c6e5b575e0ef39cfb1b0ba36f57d0f9c6004c1"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/astronaut-suit.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "7b2a4748ef45bbf6eb71558c8a405feed9f53bc937506a5dca017121a95fc2b7"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/astronaut-suit.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "bf624f6ee2352c6ad16cad5d8da28bfce2af7bc95c2e48226474b27ec2a86b47"
+        }
+      }
+    },
+    "explorer-vest": {
+      "name": "Explorer Vest",
+      "version": 2,
+      "approvedCandidate": "auto-promoted-single-gpt-image-2-draft",
+      "approvedAt": "2026-08-08T05:28:35.364158+00:00",
+      "generationModel": "openai/gpt-image-2/edit",
+      "generationQuality": "low",
+      "pipelineVersion": "egg-avatar-body-drafts-v1-gpt-image-2",
+      "references": [
+        {
+          "path": "assets/images/katchimeras/egg-avatars/bases/classic.png",
+          "role": "exact-faceless-body-edit-target"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "character-art-style"
+        },
+        {
+          "path": "assets/images/katchimeras/world/today/today_bg.webp",
+          "role": "runtime-lighting-palette"
+        }
+      ],
+      "artDirection": "Warm khaki explorer vest wrapped around only the lower shell with two broad pockets and a small coral neckerchief tied very low beneath the face-safe area.",
+      "mattingModel": "fal-ai/birefnet/v2",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/explorer-vest.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "81a4dbbb38332765dfdd6fb426d7702fe458421f95c8cb6fd0d6390f20bfb2db"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/explorer-vest.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "bebc6607da9c4c6d76baacff691f2af3252c83971b62a9646cd891b648d78d94"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/explorer-vest.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "2f346728c1ef4089a47eae16bdc674349337bf2fa161a6d3827490c2796f3d75"
+        }
+      },
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Use case: precise-object-edit. Asset type: faceless layered egg-avatar body. Image 1 is the exact faceless Classic egg body and the edit target. Preserve its full square canvas registration, upright front-facing camera, scale, placement, softly rounded egg silhouette, and two small feet. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, warm low-contrast light, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, gentle saturation, simplified toy-diorama finish, and soft lighting direction. Do not copy its scenery or pedestal. Transform only the egg body's shell design into Explorer Vest: Warm khaki explorer vest wrapped around only the lower shell with two broad pockets and a small coral neckerchief tied very low beneath the face-safe area. Palette: warm khaki, oat cream, coral, walnut brown. Shape language: Simple low vest panels and oversized toy pockets following the lower shell. Design constraints: No arms, sleeves, hands, backpack, tools, or baked hat; The neckerchief, collar, vest edges, pockets, and every costume detail must stay entirely below normalized y 0.68. The central rounded face-safe area from normalized x 0.22 to 0.78 and y 0.34 to 0.66 must remain smooth, intact, low-detail, and empty so a separate face layer can be added later. Across normalized x 0.22 to 0.78, every collar, neckline, scarf, neckerchief, lapel, trim, strap, belt, button, jewel, seam, panel boundary, and costume edge must stay entirely below normalized y 0.68. Keep the crown clear for separately layered hats and keep both outer sides clear enough for a separately layered held accessory. This body must contain no eyebrows, eyes, pupils, catchlights, mouth, blush, face marks, facial indentation, facial ghost, hat, headwear, top ornament, held prop, hand, arm, pedestal, nest, or scenery. Preserve a single solid continuous egg body with no transparent-looking holes, cutouts, broken shell, floating pieces, or missing interior regions. Render the one complete faceless egg body on a perfectly uniform pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, reflection, glow, gradient, texture, border, text, logo, watermark, or extra object. Do not zoom, crop, recenter, resize, rotate, or change the camera.",
+      "baseGenerationModel": "openai/gpt-image-2/edit",
+      "baseGenerationQuality": "low",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "exteriorEdgeSource": "BiRefNet"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/explorer-vest.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "db0fef3e235c391409cf6fdca7af32a484d60d9d225a9d62cc786c529d5a9fc6"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/explorer-vest.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "77902e16846882d7ce6dbb2ab27af22c76aad2aa3b37cae466fa6354e65d0bb7"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/explorer-vest.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "d6a29934a933295236c1501d3e1819071c30651888077b848864df44ece92d82"
+        }
+      }
+    },
+    "royal-robe": {
+      "name": "Royal Robe",
+      "version": 1,
+      "approvedCandidate": "auto-promoted-single-gpt-image-2-draft",
+      "approvedAt": "2026-08-08T05:25:52.367161+00:00",
+      "generationModel": "openai/gpt-image-2/edit",
+      "generationQuality": "low",
+      "pipelineVersion": "egg-avatar-body-drafts-v1-gpt-image-2",
+      "references": [
+        {
+          "path": "assets/images/katchimeras/egg-avatars/bases/classic.png",
+          "role": "exact-faceless-body-edit-target"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "character-art-style"
+        },
+        {
+          "path": "assets/images/katchimeras/world/today/today_bg.webp",
+          "role": "runtime-lighting-palette"
+        }
+      ],
+      "artDirection": "Berry-red royal robe around the lower shell with broad cream trim, a warm-gold waist band, and three toy jewel buttons.",
+      "mattingModel": "fal-ai/birefnet/v2",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/royal-robe.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "d773684ba777374ce7dd521b9f3ea98fd9909760e9f19f4444e1699d54187c00"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/royal-robe.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "3f54b7320eb0b04bc3468da0bf1fdb2ceec9d8637bc5c1336127c4a1f58596f8"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/royal-robe.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "4b5c9d82f884cf2588e697e69c0231da80bdb39b45cd7127baf1456e9e81e7c9"
+        }
+      },
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Use case: precise-object-edit. Asset type: faceless layered egg-avatar body. Image 1 is the exact faceless Classic egg body and the edit target. Preserve its full square canvas registration, upright front-facing camera, scale, placement, softly rounded egg silhouette, and two small feet. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, warm low-contrast light, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, gentle saturation, simplified toy-diorama finish, and soft lighting direction. Do not copy its scenery or pedestal. Transform only the egg body's shell design into Royal Robe: Berry-red royal robe around the lower shell with broad cream trim, a warm-gold waist band, and three toy jewel buttons. Palette: berry red, warm cream, muted gold, plum. Shape language: Symmetrical robe panels with a soft rounded hem. Design constraints: No arms, sleeves, hands, scepter, cape train, or baked crown; Keep jewels and trim below the face-safe centre. The central rounded face-safe area from normalized x 0.22 to 0.78 and y 0.34 to 0.66 must remain smooth, intact, low-detail, and empty so a separate face layer can be added later. Keep the crown clear for separately layered hats and keep both outer sides clear enough for a separately layered held accessory. This body must contain no eyebrows, eyes, pupils, catchlights, mouth, blush, face marks, facial indentation, facial ghost, hat, headwear, top ornament, held prop, hand, arm, pedestal, nest, or scenery. Preserve a single solid continuous egg body with no transparent-looking holes, cutouts, broken shell, floating pieces, or missing interior regions. Render the one complete faceless egg body on a perfectly uniform pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, reflection, glow, gradient, texture, border, text, logo, watermark, or extra object. Do not zoom, crop, recenter, resize, rotate, or change the camera.",
+      "baseGenerationModel": "openai/gpt-image-2/edit",
+      "baseGenerationQuality": "low",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "exteriorEdgeSource": "BiRefNet"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/royal-robe.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "4c531757360f37eaa9191b91074a640a1d944d9a9708f2b2fbfe13ebe27661ad"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/royal-robe.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "e672a60d051c554efe9e7d2f273adb2f50e2941c51c9564b1084a6f876e27f75"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/royal-robe.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "7dfa21c4ffd6fbc7da40212e01b782f307fcc126d5d2c7cb784829c74950d8e3"
+        }
+      }
+    },
+    "party-outfit": {
+      "name": "Party Outfit",
+      "version": 1,
+      "approvedCandidate": "auto-promoted-single-gpt-image-2-draft",
+      "approvedAt": "2026-08-08T07:24:13.624352+00:00",
+      "generationModel": "openai/gpt-image-2/edit",
+      "generationQuality": "low",
+      "pipelineVersion": "egg-avatar-body-drafts-v1-gpt-image-2",
+      "references": [
+        {
+          "path": "assets/images/katchimeras/egg-avatars/bases/classic.png",
+          "role": "exact-faceless-body-edit-target"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "character-art-style"
+        },
+        {
+          "path": "assets/images/katchimeras/world/today/today_bg.webp",
+          "role": "runtime-lighting-palette"
+        }
+      ],
+      "artDirection": "Vanilla party waistcoat with broad coral lapels, teal buttons, and sparse warm-gold confetti along the lower edge.",
+      "mattingModel": "fal-ai/birefnet/v2",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/party-outfit.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "b279fe16e1503e4d4ece7a8042c35bfefabc067b038ee0cb213ad20d7a743108"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/party-outfit.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "ce54c7b09f34d9c005766d723a2ccc2f59617bdde3dc110982a34b07a9f450ca"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/party-outfit.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "f6d6047a98f3e3ca816d42ae0fa5d556d27a1c9bfdd59a713d3562f0c9208512"
+        }
+      },
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Use case: precise-object-edit. Asset type: faceless layered egg-avatar body. Image 1 is the exact faceless Classic egg body and the edit target. Preserve its full square canvas registration, upright front-facing camera, scale, placement, softly rounded egg silhouette, and two small feet. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, warm low-contrast light, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, gentle saturation, simplified toy-diorama finish, and soft lighting direction. Do not copy its scenery or pedestal. Transform only the egg body's shell design into Party Outfit: Vanilla party waistcoat with broad coral lapels, teal buttons, and sparse warm-gold confetti along the lower edge. Palette: vanilla, coral, teal, warm gold. Shape language: Simple festive vest panels integrated into the egg body. Design constraints: No arms, sleeves, hands, cake, candle, bow tie over the face, or baked party hat; Keep confetti sparse and below the facial anchors. The central rounded face-safe area from normalized x 0.22 to 0.78 and y 0.34 to 0.66 must remain smooth, intact, low-detail, and empty so a separate face layer can be added later. Across normalized x 0.22 to 0.78, every collar, neckline, scarf, neckerchief, lapel, trim, strap, belt, button, jewel, seam, panel boundary, and costume edge must stay entirely below normalized y 0.68. Keep the crown clear for separately layered hats and keep both outer sides clear enough for a separately layered held accessory. This body must contain no eyebrows, eyes, pupils, catchlights, mouth, blush, face marks, facial indentation, facial ghost, hat, headwear, top ornament, held prop, hand, arm, pedestal, nest, or scenery. Preserve a single solid continuous egg body with no transparent-looking holes, cutouts, broken shell, floating pieces, or missing interior regions. Render the one complete faceless egg body on a perfectly uniform pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, reflection, glow, gradient, texture, border, text, logo, watermark, or extra object. Do not zoom, crop, recenter, resize, rotate, or change the camera.",
+      "baseGenerationModel": "openai/gpt-image-2/edit",
+      "baseGenerationQuality": "low",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "exteriorEdgeSource": "BiRefNet"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/party-outfit.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "281667ac1feb32da81529807fc7f289e787ae9c15ef1afe0460af68058e1c84e"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/party-outfit.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "33330bd6fd205fb2fb72e94600835c9874ebcdb43f92ad9479853170c76c6c3e"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/party-outfit.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "e947e0c8ce1441cd3410e74b91bac1884160250b0048473146a7ba23763a2bb0"
+        }
+      }
+    },
+    "sailor-uniform": {
+      "name": "Sailor Uniform",
+      "version": 2,
+      "approvedCandidate": "auto-promoted-single-gpt-image-2-draft",
+      "approvedAt": "2026-08-08T07:29:42.012137+00:00",
+      "generationModel": "openai/gpt-image-2/edit",
+      "generationQuality": "low",
+      "pipelineVersion": "egg-avatar-body-drafts-v1-gpt-image-2",
+      "references": [
+        {
+          "path": "assets/images/katchimeras/egg-avatars/bases/classic.png",
+          "role": "exact-faceless-body-edit-target"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "character-art-style"
+        },
+        {
+          "path": "assets/images/katchimeras/world/today/today_bg.webp",
+          "role": "runtime-lighting-palette"
+        }
+      ],
+      "artDirection": "Cream egg with a low navy sailor collar, a small coral necktie, and two warm-gold toy buttons, all confined to the lowest third of the shell.",
+      "mattingModel": "fal-ai/birefnet/v2",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/sailor-uniform.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "3b664d4c55a42089df7b7645e42197ce0cad8c71c4873a3a9896cd0d822ff8c4"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/sailor-uniform.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "97fab81514649e46ceb031e57e1a45b8bb59badb3a1510c6356c7e11cc42b5a0"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/sailor-uniform.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "a9f9e4f2183217d733ab520d6343a1f14555326ec681a5518b5e4d077233bcd3"
+        }
+      },
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Use case: precise-object-edit. Asset type: faceless layered egg-avatar body. Image 1 is the exact faceless Classic egg body and the edit target. Preserve its full square canvas registration, upright front-facing camera, scale, placement, softly rounded egg silhouette, and two small feet. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, warm low-contrast light, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, gentle saturation, simplified toy-diorama finish, and soft lighting direction. Do not copy its scenery or pedestal. Transform only the egg body's shell design into Sailor Uniform: Cream egg with a low navy sailor collar, a small coral necktie, and two warm-gold toy buttons, all confined to the lowest third of the shell. Palette: warm cream, navy blue, coral, warm gold. Shape language: Low rounded collar and uniform panels following only the bottom of the shell. Design constraints: No arms, sleeves, hands, anchor text, rope, or baked sailor cap; Leave the entire upper two-thirds as uninterrupted plain cream shell; The collar, necktie, buttons, and every navy uniform edge begin below both cheeks and the mouth and stay in the lowest third. The central rounded face-safe area from normalized x 0.22 to 0.78 and y 0.34 to 0.66 must remain smooth, intact, low-detail, and empty so a separate face layer can be added later. Across normalized x 0.22 to 0.78, every collar, neckline, scarf, neckerchief, lapel, trim, strap, belt, button, jewel, seam, panel boundary, and costume edge must stay entirely below normalized y 0.68. In plain visual terms, treat the upper two-thirds of the egg as its unobstructed head and the lowest third as the costume torso; no clothing or emblem may overlap the eyes, cheeks, or mouth area. Keep the crown clear for separately layered hats and keep both outer sides clear enough for a separately layered held accessory. This body must contain no eyebrows, eyes, pupils, catchlights, mouth, blush, face marks, facial indentation, facial ghost, hat, headwear, top ornament, held prop, hand, arm, pedestal, nest, or scenery. Preserve a single solid continuous egg body with no transparent-looking holes, cutouts, broken shell, floating pieces, or missing interior regions. Render the one complete faceless egg body on a perfectly uniform pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, reflection, glow, gradient, texture, border, text, logo, watermark, or extra object. Do not zoom, crop, recenter, resize, rotate, or change the camera.",
+      "baseGenerationModel": "openai/gpt-image-2/edit",
+      "baseGenerationQuality": "low",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "exteriorEdgeSource": "BiRefNet"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/sailor-uniform.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "5bdae3dba0c88a9b455b60be9fed892a68e5ec63b602125af78e76bce27974b9"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/sailor-uniform.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "993a1a390973136eed73da6003e7b280394d122a08e5324c3084cf71458ef2a7"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/sailor-uniform.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "48781b813a37a6732168b585c1af853b9e2fab74a0faf9cb1f2736016e5d28d5"
+        }
+      }
+    },
+    "chef-apron": {
+      "name": "Chef Apron",
+      "version": 2,
+      "approvedCandidate": "auto-promoted-single-gpt-image-2-draft",
+      "approvedAt": "2026-08-08T07:26:40.360357+00:00",
+      "generationModel": "openai/gpt-image-2/edit",
+      "generationQuality": "low",
+      "pipelineVersion": "egg-avatar-body-drafts-v1-gpt-image-2",
+      "references": [
+        {
+          "path": "assets/images/katchimeras/egg-avatars/bases/classic.png",
+          "role": "exact-faceless-body-edit-target"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "character-art-style"
+        },
+        {
+          "path": "assets/images/katchimeras/world/today/today_bg.webp",
+          "role": "runtime-lighting-palette"
+        }
+      ],
+      "artDirection": "Oat-cream apron over a caramel lower shell with a broad checked pocket and three simple wooden buttons.",
+      "mattingModel": "fal-ai/birefnet/v2",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/chef-apron.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "214e060dbf7017f3302246183bf4532b3889bf872eb7fd53aa5fca98358e697f"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/chef-apron.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "c684b23e8d0d613512db0be4aaa4448c5ba97b226674dd03f46192e0cf0fd2e6"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/chef-apron.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "3df765aaef1ee804efc3cdaee8ce399f22320cc2ef3f20f6c3f1d6ea76a3915a"
+        }
+      },
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Use case: precise-object-edit. Asset type: faceless layered egg-avatar body. Image 1 is the exact faceless Classic egg body and the edit target. Preserve its full square canvas registration, upright front-facing camera, scale, placement, softly rounded egg silhouette, and two small feet. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, warm low-contrast light, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, gentle saturation, simplified toy-diorama finish, and soft lighting direction. Do not copy its scenery or pedestal. Transform only the egg body's shell design into Chef Apron: Oat-cream apron over a caramel lower shell with a broad checked pocket and three simple wooden buttons. Palette: oat cream, caramel, sage, warm brown. Shape language: Large apron bib and rounded pocket molded cleanly to the egg. Design constraints: No arms, sleeves, hands, utensils, food, text, or baked chef hat; Keep the apron bib below the facial anchors. The central rounded face-safe area from normalized x 0.22 to 0.78 and y 0.34 to 0.66 must remain smooth, intact, low-detail, and empty so a separate face layer can be added later. Across normalized x 0.22 to 0.78, every collar, neckline, scarf, neckerchief, lapel, trim, strap, belt, button, jewel, seam, panel boundary, and costume edge must stay entirely below normalized y 0.68. Keep the crown clear for separately layered hats and keep both outer sides clear enough for a separately layered held accessory. This body must contain no eyebrows, eyes, pupils, catchlights, mouth, blush, face marks, facial indentation, facial ghost, hat, headwear, top ornament, held prop, hand, arm, pedestal, nest, or scenery. Preserve a single solid continuous egg body with no transparent-looking holes, cutouts, broken shell, floating pieces, or missing interior regions. Render the one complete faceless egg body on a perfectly uniform pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, reflection, glow, gradient, texture, border, text, logo, watermark, or extra object. Do not zoom, crop, recenter, resize, rotate, or change the camera.",
+      "baseGenerationModel": "openai/gpt-image-2/edit",
+      "baseGenerationQuality": "low",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "exteriorEdgeSource": "BiRefNet"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/chef-apron.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "d6473992fbc999bdcad0563e981b25064062b0224455e33818c743dea6ae454c"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/chef-apron.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "dfd2adb46e644e0aca2dcc93f23e5d534c12a97043490ac2986dc9bbfc31a752"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/chef-apron.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "ebddb1dcc9e0e6529f5389f904501f53318559f45d21f4aae684c1ae3a20c6fd"
+        }
+      }
+    },
+    "superhero-suit": {
+      "name": "Superhero Suit",
+      "version": 2,
+      "approvedCandidate": "auto-promoted-single-gpt-image-2-draft",
+      "approvedAt": "2026-08-08T07:30:36.369243+00:00",
+      "generationModel": "openai/gpt-image-2/edit",
+      "generationQuality": "low",
+      "pipelineVersion": "egg-avatar-body-drafts-v1-gpt-image-2",
+      "references": [
+        {
+          "path": "assets/images/katchimeras/egg-avatars/bases/classic.png",
+          "role": "exact-faceless-body-edit-target"
+        },
+        {
+          "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+          "role": "character-art-style"
+        },
+        {
+          "path": "assets/images/katchimeras/world/today/today_bg.webp",
+          "role": "runtime-lighting-palette"
+        }
+      ],
+      "artDirection": "Deep teal egg with a compact warm-gold chest burst, coral belt, and two tiny cape edges, all confined to the lowest third of the shell.",
+      "mattingModel": "fal-ai/birefnet/v2",
+      "outputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/superhero-suit.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "c1e66694f8c4e1c151fa13d54f1c98a7a293d3f830a578fbe71d305e31eda5e1"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/superhero-suit.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "72e89ca783c30f44a3c8be05f1b6ebc7b4286953a53d2f39bb83df9f694dd12f"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/thumbnails/superhero-suit.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "69b726389b106c47c3ad3337e8d459fd27a8815d611114ee6386c3fcb832ebec"
+        }
+      },
+      "faceLayoutVersion": 1,
+      "baseVersion": 1,
+      "basePrompt": "Use case: precise-object-edit. Asset type: faceless layered egg-avatar body. Image 1 is the exact faceless Classic egg body and the edit target. Preserve its full square canvas registration, upright front-facing camera, scale, placement, softly rounded egg silhouette, and two small feet. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, warm low-contrast light, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, gentle saturation, simplified toy-diorama finish, and soft lighting direction. Do not copy its scenery or pedestal. Transform only the egg body's shell design into Superhero Suit: Deep teal egg with a compact warm-gold chest burst, coral belt, and two tiny cape edges, all confined to the lowest third of the shell. Palette: deep teal, warm gold, coral, cream. Shape language: A small rounded chest emblem and simple belt across only the lower torso. Design constraints: No arms, fists, hands, letters, logos, mask, or full cape; Leave the entire upper two-thirds as uninterrupted plain deep teal shell; The highest tip of the chest burst must begin below the mouth and cheeks and remain in the lowest third. The central rounded face-safe area from normalized x 0.22 to 0.78 and y 0.34 to 0.66 must remain smooth, intact, low-detail, and empty so a separate face layer can be added later. Across normalized x 0.22 to 0.78, every collar, neckline, scarf, neckerchief, lapel, trim, strap, belt, button, jewel, seam, panel boundary, and costume edge must stay entirely below normalized y 0.68. In plain visual terms, treat the upper two-thirds of the egg as its unobstructed head and the lowest third as the costume torso; no clothing or emblem may overlap the eyes, cheeks, or mouth area. Keep the crown clear for separately layered hats and keep both outer sides clear enough for a separately layered held accessory. This body must contain no eyebrows, eyes, pupils, catchlights, mouth, blush, face marks, facial indentation, facial ghost, hat, headwear, top ornament, held prop, hand, arm, pedestal, nest, or scenery. Preserve a single solid continuous egg body with no transparent-looking holes, cutouts, broken shell, floating pieces, or missing interior regions. Render the one complete faceless egg body on a perfectly uniform pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, reflection, glow, gradient, texture, border, text, logo, watermark, or extra object. Do not zoom, crop, recenter, resize, rotate, or change the camera.",
+      "baseGenerationModel": "openai/gpt-image-2/edit",
+      "baseGenerationQuality": "low",
+      "baseMattingModel": "fal-ai/birefnet/v2",
+      "baseMattingSettings": {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "exteriorEdgeSource": "BiRefNet"
+      },
+      "baseOutputs": {
+        "png": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/superhero-suit.png",
+          "width": 2048,
+          "height": 2048,
+          "sha256": "2f315947e9cbe73da4c3cc98f72d78a1e5265a90181e23f120b46015cc3d2181"
+        },
+        "webp": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/superhero-suit.webp",
+          "width": 1024,
+          "height": 1024,
+          "sha256": "935666fa4be1e80422ba721dbdeb14145cc32b7d63beabe8a15cc2b9a4b91370"
+        },
+        "thumbnail": {
+          "path": "assets/images/katchimeras/egg-avatars/bases/thumbnails/superhero-suit.webp",
+          "width": 256,
+          "height": 256,
+          "sha256": "63c71baa97b8df5d9249140c7120520806a0c7681b6664fcb94442a1ae5e622d"
+        }
       }
     }
   },
-  "updatedAt": "2026-08-07T16:43:50.635783+00:00",
+  "updatedAt": "2026-08-08T07:30:36.369243+00:00",
   "gameplay": {
     "version": 2,
     "mode": "equipped skin with reusable crack overlays",
@@ -925,7 +2179,7 @@
       }
     }
   },
-  "artDirectionVersion": 4,
+  "artDirectionVersion": 6,
   "effects": {
     "crack-1": {
       "png": {
@@ -1222,11 +2476,510 @@
       }
     }
   },
+  "accessories": {
+    "layoutVersion": 1,
+    "canvas": {
+      "width": 2048,
+      "height": 2048
+    },
+    "generationModel": "fal-ai/nano-banana-2/edit",
+    "matting": "fal-ai/birefnet/v2 General Use (Heavy), refined foreground; alpha preserved exactly",
+    "hatBounds": [
+      0.16,
+      0.01,
+      0.84,
+      0.34
+    ],
+    "heldBounds": [
+      0.7,
+      0.38,
+      0.99,
+      0.9
+    ],
+    "separatedTopAccessoryBodies": [
+      "moss",
+      "barista",
+      "pumpkin"
+    ],
+    "hats": {
+      "moss-sprout": {
+        "version": 2,
+        "promptDirection": "soft sage two-leaf moss sprout",
+        "prompt": "Use case: precise-object-edit. Asset type: final visible-front egg avatar hat layer. Image 1 is the exact approved hat geometry and the edit target. Preserve its silhouette, front-only construction, lower contact edge, scale, position, perspective, design, colors, and full square canvas registration. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Map image 1 to its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic home environment used at runtime. Match only its warm daylight, soft low-contrast lighting, gentle saturation, and simplified toy-diorama finish. Do not copy its scenery, pedestal, nest, trees, path, sky, or objects. Restyle the existing a soft sage moss sprout with two plump rounded leaves from image 1 without redesigning it. Reduce surface detail strongly. Use smooth simple color fields and a few broad form-defining cues only. No realistic fibers, individual yarn strands, fabric fuzz, leather grain, embossing, pores, scratches, microtexture, noisy bump mapping, tiny stitching, photographic material detail, or hyper-detailed surface variation. Keep only the visible front layer. Do not add an underside, inside, rear brim, back layer, hidden surface, egg, face, feet, body, pedestal, hand, cast shadow, or extra object. Render that one style-mapped hat on a perfectly uniform pure-black #000000 background. Do not zoom, crop, recenter, resize, rotate, or move it. No scenery, floor, glow, text, logo, watermark, border, checkerboard, or additional object.",
+        "generationModel": "openai/gpt-image-2/edit",
+        "mattingModel": "fal-ai/birefnet/v2",
+        "mattingSettings": {
+          "model": "General Use (Heavy)",
+          "refineForeground": true,
+          "preserveNegativeSpace": true
+        },
+        "outputs": {
+          "png": {
+            "path": "assets/images/katchimeras/egg-avatars/hats/moss-sprout.png",
+            "width": 2048,
+            "height": 2048,
+            "sha256": "c4f9287abe181c605e1162194c2acb54a7765cf2d8bbea890aae3738d03b05f6"
+          },
+          "webp": {
+            "path": "assets/images/katchimeras/egg-avatars/hats/moss-sprout.webp",
+            "width": 1024,
+            "height": 1024,
+            "sha256": "a09fa6f88e2a6e8ece227aebeec6a4b3f4467c60f1b970228851a018fd2e2fa2"
+          },
+          "thumbnail": {
+            "path": "assets/images/katchimeras/egg-avatars/hats/thumbnails/moss-sprout.webp",
+            "width": 256,
+            "height": 256,
+            "sha256": "594c8dbcc13ccf6160ff96b914f6aad8cf80493e579f8042b5463a4351345e33"
+          }
+        },
+        "accessoryLayoutVersion": 2,
+        "pipelineVersion": "egg-avatar-hats-v4-style-mapped",
+        "generationQuality": "low",
+        "presentation": {
+          "scale": 0.64,
+          "offsetX": 0.0,
+          "offsetY": -0.267
+        },
+        "normalization": "full-canvas-resize-only; no crop, recenter, or slot fitting",
+        "generationStage": "style-map",
+        "styleContractVersion": "katchimeras-cozy-toy-v1"
+      },
+      "barista-beret": {
+        "version": 2,
+        "promptDirection": "caramel cafe beret with cream band",
+        "prompt": "Use case: precise-object-edit. Asset type: final visible-front egg avatar hat layer. Image 1 is the exact approved hat geometry and the edit target. Preserve its silhouette, front-only construction, lower contact edge, scale, position, perspective, design, colors, and full square canvas registration. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Map image 1 to its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic home environment used at runtime. Match only its warm daylight, soft low-contrast lighting, gentle saturation, and simplified toy-diorama finish. Do not copy its scenery, pedestal, nest, trees, path, sky, or objects. Restyle the existing a softly structured caramel cafe beret with a restrained cream band from image 1 without redesigning it. Reduce surface detail strongly. Use smooth simple color fields and a few broad form-defining cues only. No realistic fibers, individual yarn strands, fabric fuzz, leather grain, embossing, pores, scratches, microtexture, noisy bump mapping, tiny stitching, photographic material detail, or hyper-detailed surface variation. Keep only the visible front layer. Do not add an underside, inside, rear brim, back layer, hidden surface, egg, face, feet, body, pedestal, hand, cast shadow, or extra object. Render that one style-mapped hat on a perfectly uniform pure-black #000000 background. Do not zoom, crop, recenter, resize, rotate, or move it. No scenery, floor, glow, text, logo, watermark, border, checkerboard, or additional object.",
+        "generationModel": "openai/gpt-image-2/edit",
+        "mattingModel": "fal-ai/birefnet/v2",
+        "mattingSettings": {
+          "model": "General Use (Heavy)",
+          "refineForeground": true,
+          "preserveNegativeSpace": true
+        },
+        "outputs": {
+          "png": {
+            "path": "assets/images/katchimeras/egg-avatars/hats/barista-beret.png",
+            "width": 2048,
+            "height": 2048,
+            "sha256": "2bbc8f6c88bd146b9d57d8bb8345c92031c3b5f1f15843e0feff1587275b24f3"
+          },
+          "webp": {
+            "path": "assets/images/katchimeras/egg-avatars/hats/barista-beret.webp",
+            "width": 1024,
+            "height": 1024,
+            "sha256": "35a2693a0c470501e4b4faeda039049e201b6cfdad73f55a51f902f591191f20"
+          },
+          "thumbnail": {
+            "path": "assets/images/katchimeras/egg-avatars/hats/thumbnails/barista-beret.webp",
+            "width": 256,
+            "height": 256,
+            "sha256": "9425a4e1f0cb0dd89f3658b4bf2bcdfc409978c24a748e6706152caa1164afa1"
+          }
+        },
+        "accessoryLayoutVersion": 2,
+        "pipelineVersion": "egg-avatar-hats-v4-style-mapped",
+        "generationQuality": "low",
+        "presentation": {
+          "scale": 0.69,
+          "offsetX": 0.0,
+          "offsetY": -0.201
+        },
+        "normalization": "full-canvas-resize-only; no crop, recenter, or slot fitting",
+        "generationStage": "style-map",
+        "styleContractVersion": "katchimeras-cozy-toy-v1"
+      },
+      "pumpkin-vine-crown": {
+        "version": 2,
+        "promptDirection": "curled pumpkin stem, leaves and vine crown",
+        "prompt": "Use case: precise-object-edit. Asset type: final visible-front egg avatar hat layer. Image 1 is the exact approved hat geometry and the edit target. Preserve its silhouette, front-only construction, lower contact edge, scale, position, perspective, design, colors, and full square canvas registration. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Map image 1 to its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic home environment used at runtime. Match only its warm daylight, soft low-contrast lighting, gentle saturation, and simplified toy-diorama finish. Do not copy its scenery, pedestal, nest, trees, path, sky, or objects. Restyle the existing a curled pumpkin stem crown with two rounded leaves and one short vine from image 1 without redesigning it. Reduce surface detail strongly. Use smooth simple color fields and a few broad form-defining cues only. No realistic fibers, individual yarn strands, fabric fuzz, leather grain, embossing, pores, scratches, microtexture, noisy bump mapping, tiny stitching, photographic material detail, or hyper-detailed surface variation. Keep only the visible front layer. Do not add an underside, inside, rear brim, back layer, hidden surface, egg, face, feet, body, pedestal, hand, cast shadow, or extra object. Render that one style-mapped hat on a perfectly uniform pure-black #000000 background. Do not zoom, crop, recenter, resize, rotate, or move it. No scenery, floor, glow, text, logo, watermark, border, checkerboard, or additional object.",
+        "generationModel": "openai/gpt-image-2/edit",
+        "mattingModel": "fal-ai/birefnet/v2",
+        "mattingSettings": {
+          "model": "General Use (Heavy)",
+          "refineForeground": true,
+          "preserveNegativeSpace": true
+        },
+        "outputs": {
+          "png": {
+            "path": "assets/images/katchimeras/egg-avatars/hats/pumpkin-vine-crown.png",
+            "width": 2048,
+            "height": 2048,
+            "sha256": "4a00bbb73754630fd983caa25b0ab42ae3cfd431b804a807228825b98cce2923"
+          },
+          "webp": {
+            "path": "assets/images/katchimeras/egg-avatars/hats/pumpkin-vine-crown.webp",
+            "width": 1024,
+            "height": 1024,
+            "sha256": "eccca0ab365040f2c95bd9ce8ab2481af7529bbd2e25e1222a6bfced5a20ad96"
+          },
+          "thumbnail": {
+            "path": "assets/images/katchimeras/egg-avatars/hats/thumbnails/pumpkin-vine-crown.webp",
+            "width": 256,
+            "height": 256,
+            "sha256": "23f4e7a9c0221f2f5ac239a97139ef40f10af69df22aff54a3195c9353ff133a"
+          }
+        },
+        "accessoryLayoutVersion": 2,
+        "pipelineVersion": "egg-avatar-hats-v4-style-mapped",
+        "generationQuality": "low",
+        "presentation": {
+          "scale": 0.7,
+          "offsetX": 0.0,
+          "offsetY": -0.294
+        },
+        "normalization": "full-canvas-resize-only; no crop, recenter, or slot fitting",
+        "generationStage": "style-map",
+        "styleContractVersion": "katchimeras-cozy-toy-v1"
+      },
+      "cozy-beanie": {
+        "version": 2,
+        "promptDirection": "dusty-coral knit beanie with cream cuff",
+        "prompt": "Use case: precise-object-edit. Asset type: final visible-front egg avatar hat layer. Image 1 is the exact approved hat geometry and the edit target. Preserve its silhouette, front-only construction, lower contact edge, scale, position, perspective, design, colors, and full square canvas registration. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Map image 1 to its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic home environment used at runtime. Match only its warm daylight, soft low-contrast lighting, gentle saturation, and simplified toy-diorama finish. Do not copy its scenery, pedestal, nest, trees, path, sky, or objects. Restyle the existing a dusty-coral knitted beanie with a broad cream cuff and small pompom from image 1 without redesigning it. Reduce surface detail strongly. Use smooth simple color fields and a few broad form-defining cues only. No realistic fibers, individual yarn strands, fabric fuzz, leather grain, embossing, pores, scratches, microtexture, noisy bump mapping, tiny stitching, photographic material detail, or hyper-detailed surface variation. Keep only the visible front layer. Do not add an underside, inside, rear brim, back layer, hidden surface, egg, face, feet, body, pedestal, hand, cast shadow, or extra object. Render that one style-mapped hat on a perfectly uniform pure-black #000000 background. Do not zoom, crop, recenter, resize, rotate, or move it. No scenery, floor, glow, text, logo, watermark, border, checkerboard, or additional object.",
+        "generationModel": "openai/gpt-image-2/edit",
+        "mattingModel": "fal-ai/birefnet/v2",
+        "mattingSettings": {
+          "model": "General Use (Heavy)",
+          "refineForeground": true,
+          "preserveNegativeSpace": true
+        },
+        "outputs": {
+          "png": {
+            "path": "assets/images/katchimeras/egg-avatars/hats/cozy-beanie.png",
+            "width": 2048,
+            "height": 2048,
+            "sha256": "b982611d9eff86eaa9e09aed31c753a8c03368af05755d18c9f115c866e033f6"
+          },
+          "webp": {
+            "path": "assets/images/katchimeras/egg-avatars/hats/cozy-beanie.webp",
+            "width": 1024,
+            "height": 1024,
+            "sha256": "8d457f52bea40af5f6965df1260826ac98a859ef3875821758259e4863854cc7"
+          },
+          "thumbnail": {
+            "path": "assets/images/katchimeras/egg-avatars/hats/thumbnails/cozy-beanie.webp",
+            "width": 256,
+            "height": 256,
+            "sha256": "bf031b411381e800f76738eab8ce6c74a73742b86695af3e966fca86338948c9"
+          }
+        },
+        "accessoryLayoutVersion": 2,
+        "pipelineVersion": "egg-avatar-hats-v4-style-mapped",
+        "generationQuality": "low",
+        "presentation": {
+          "scale": 0.58,
+          "offsetX": 0.0,
+          "offsetY": -0.261
+        },
+        "normalization": "full-canvas-resize-only; no crop, recenter, or slot fitting",
+        "generationStage": "style-map",
+        "styleContractVersion": "katchimeras-cozy-toy-v1"
+      },
+      "stargazer-hat": {
+        "version": 2,
+        "promptDirection": "midnight-indigo pointed hat with restrained stars",
+        "prompt": "Use case: precise-object-edit. Asset type: final visible-front egg avatar hat layer. Image 1 is the exact approved hat geometry and the edit target. Preserve its silhouette, front-only construction, lower contact edge, scale, position, perspective, design, colors, and full square canvas registration. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Map image 1 to its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic home environment used at runtime. Match only its warm daylight, soft low-contrast lighting, gentle saturation, and simplified toy-diorama finish. Do not copy its scenery, pedestal, nest, trees, path, sky, or objects. Restyle the existing a midnight-indigo crooked pointed stargazer hat with a few tiny warm-gold stars from image 1 without redesigning it. Reduce surface detail strongly. Use smooth simple color fields and a few broad form-defining cues only. No realistic fibers, individual yarn strands, fabric fuzz, leather grain, embossing, pores, scratches, microtexture, noisy bump mapping, tiny stitching, photographic material detail, or hyper-detailed surface variation. Keep only the visible front layer. Do not add an underside, inside, rear brim, back layer, hidden surface, egg, face, feet, body, pedestal, hand, cast shadow, or extra object. Render that one style-mapped hat on a perfectly uniform pure-black #000000 background. Do not zoom, crop, recenter, resize, rotate, or move it. No scenery, floor, glow, text, logo, watermark, border, checkerboard, or additional object.",
+        "generationModel": "openai/gpt-image-2/edit",
+        "mattingModel": "fal-ai/birefnet/v2",
+        "mattingSettings": {
+          "model": "General Use (Heavy)",
+          "refineForeground": true,
+          "preserveNegativeSpace": true
+        },
+        "outputs": {
+          "png": {
+            "path": "assets/images/katchimeras/egg-avatars/hats/stargazer-hat.png",
+            "width": 2048,
+            "height": 2048,
+            "sha256": "6f4ad130c6a7eefe674cee2c5cd30ebebf1ad9628fb7fc0caf5514f8176a4e85"
+          },
+          "webp": {
+            "path": "assets/images/katchimeras/egg-avatars/hats/stargazer-hat.webp",
+            "width": 1024,
+            "height": 1024,
+            "sha256": "4b17c57b4bb07d7f6466ec02b87bc8ec3550072371b6cf809a9525cd2c39e97f"
+          },
+          "thumbnail": {
+            "path": "assets/images/katchimeras/egg-avatars/hats/thumbnails/stargazer-hat.webp",
+            "width": 256,
+            "height": 256,
+            "sha256": "df7797baf8e2089b381edf267a17820a85f42590c1d05ef3c0046faf3b5604ae"
+          }
+        },
+        "accessoryLayoutVersion": 2,
+        "pipelineVersion": "egg-avatar-hats-v4-style-mapped",
+        "generationQuality": "low",
+        "presentation": {
+          "scale": 0.58,
+          "offsetX": 0.0,
+          "offsetY": -0.275
+        },
+        "normalization": "full-canvas-resize-only; no crop, recenter, or slot fitting",
+        "generationStage": "style-map",
+        "styleContractVersion": "katchimeras-cozy-toy-v1"
+      },
+      "tiny-golden-crown": {
+        "version": 2,
+        "promptDirection": "rounded warm-gold three-point crown",
+        "prompt": "Use case: precise-object-edit. Asset type: final visible-front egg avatar hat layer. Image 1 is the exact approved hat geometry and the edit target. Preserve its silhouette, front-only construction, lower contact edge, scale, position, perspective, design, colors, and full square canvas registration. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Map image 1 to its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic home environment used at runtime. Match only its warm daylight, soft low-contrast lighting, gentle saturation, and simplified toy-diorama finish. Do not copy its scenery, pedestal, nest, trees, path, sky, or objects. Restyle the existing a small rounded warm-gold three-point toy crown from image 1 without redesigning it. Reduce surface detail strongly. Use smooth simple color fields and a few broad form-defining cues only. No realistic fibers, individual yarn strands, fabric fuzz, leather grain, embossing, pores, scratches, microtexture, noisy bump mapping, tiny stitching, photographic material detail, or hyper-detailed surface variation. Keep only the visible front layer. Do not add an underside, inside, rear brim, back layer, hidden surface, egg, face, feet, body, pedestal, hand, cast shadow, or extra object. Render that one style-mapped hat on a perfectly uniform pure-black #000000 background. Do not zoom, crop, recenter, resize, rotate, or move it. No scenery, floor, glow, text, logo, watermark, border, checkerboard, or additional object.",
+        "generationModel": "openai/gpt-image-2/edit",
+        "mattingModel": "fal-ai/birefnet/v2",
+        "mattingSettings": {
+          "model": "General Use (Heavy)",
+          "refineForeground": true,
+          "preserveNegativeSpace": true
+        },
+        "outputs": {
+          "png": {
+            "path": "assets/images/katchimeras/egg-avatars/hats/tiny-golden-crown.png",
+            "width": 2048,
+            "height": 2048,
+            "sha256": "ea3c0622e4d3ee7d6d2c665d84b587448b7026e0b911153a47e1b1f84ac2f2d7"
+          },
+          "webp": {
+            "path": "assets/images/katchimeras/egg-avatars/hats/tiny-golden-crown.webp",
+            "width": 1024,
+            "height": 1024,
+            "sha256": "84c6fe065c0ba727c5aac4fe1a24f9a572347f14cdcfc73a9d4bfb862052635b"
+          },
+          "thumbnail": {
+            "path": "assets/images/katchimeras/egg-avatars/hats/thumbnails/tiny-golden-crown.webp",
+            "width": 256,
+            "height": 256,
+            "sha256": "b282a30fc07879f2906da619e0ba2f4357d33e77fb710d8678ef6ce63186044b"
+          }
+        },
+        "accessoryLayoutVersion": 2,
+        "pipelineVersion": "egg-avatar-hats-v4-style-mapped",
+        "generationQuality": "low",
+        "presentation": {
+          "scale": 0.86,
+          "offsetX": 0.0,
+          "offsetY": -0.134
+        },
+        "normalization": "full-canvas-resize-only; no crop, recenter, or slot fitting",
+        "generationStage": "style-map",
+        "styleContractVersion": "katchimeras-cozy-toy-v1"
+      }
+    },
+    "held": {
+      "warm-lantern": {
+        "version": 1,
+        "promptDirection": "rounded brass and amber lantern",
+        "prompt": "Image 1 is the strict Katchimeras material, lighting, camera, and scale reference; do not copy its body or face. Generate a rounded brass lantern with a warm amber glass glow. Create only the side-held prop, upright in a front three-quarter view for placement at the viewer-right side of the egg in image 1. Do not render a hand, arm, holder, egg, character, or support. Premium cozy 3D toy-game art, broad rounded forms, tactile painted material, warm upper-left key light, restrained soft highlights, readable mobile-game silhouette. Center the single complete object on a perfectly uniform flat pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, scenery, text, logo, watermark, border, checkerboard, extra object, or cropped edge.",
+        "generationModel": "fal-ai/nano-banana-2/edit",
+        "mattingModel": "fal-ai/birefnet/v2",
+        "mattingSettings": {
+          "model": "General Use (Heavy)",
+          "refineForeground": true,
+          "preserveNegativeSpace": true
+        },
+        "outputs": {
+          "png": {
+            "path": "assets/images/katchimeras/egg-avatars/held/warm-lantern.png",
+            "width": 2048,
+            "height": 2048,
+            "sha256": "eb3c78403009fc511e1daace084e3e13b30428974ed54c952a492b7e978efa9a"
+          },
+          "webp": {
+            "path": "assets/images/katchimeras/egg-avatars/held/warm-lantern.webp",
+            "width": 1024,
+            "height": 1024,
+            "sha256": "bb66920246e6385bf7b0f31f16cf46ab15d26b708ae5400496c8a11f08bf83e3"
+          },
+          "thumbnail": {
+            "path": "assets/images/katchimeras/egg-avatars/held/thumbnails/warm-lantern.webp",
+            "width": 256,
+            "height": 256,
+            "sha256": "98a0ef39cb07b99dc592168ee2cd25b01cadc04dd090825862b9aaa61b1b39b8"
+          }
+        }
+      },
+      "daisy-posy": {
+        "version": 1,
+        "promptDirection": "three toy daisies with coral ribbon",
+        "prompt": "Image 1 is the strict Katchimeras material, lighting, camera, and scale reference; do not copy its body or face. Generate a tiny posy of three white daisies tied with a coral ribbon. Create only the side-held prop, upright in a front three-quarter view for placement at the viewer-right side of the egg in image 1. Do not render a hand, arm, holder, egg, character, or support. Premium cozy 3D toy-game art, broad rounded forms, tactile painted material, warm upper-left key light, restrained soft highlights, readable mobile-game silhouette. Center the single complete object on a perfectly uniform flat pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, scenery, text, logo, watermark, border, checkerboard, extra object, or cropped edge.",
+        "generationModel": "fal-ai/nano-banana-2/edit",
+        "mattingModel": "fal-ai/birefnet/v2",
+        "mattingSettings": {
+          "model": "General Use (Heavy)",
+          "refineForeground": true,
+          "preserveNegativeSpace": true
+        },
+        "outputs": {
+          "png": {
+            "path": "assets/images/katchimeras/egg-avatars/held/daisy-posy.png",
+            "width": 2048,
+            "height": 2048,
+            "sha256": "f3f196915b4ebf487e000e08331d26d59237e80ad5de5078e7d80b2535c73af6"
+          },
+          "webp": {
+            "path": "assets/images/katchimeras/egg-avatars/held/daisy-posy.webp",
+            "width": 1024,
+            "height": 1024,
+            "sha256": "081fb57cf6474b3faba9b684c925a5edae4fb5909bfea656e5ef57faa8246df5"
+          },
+          "thumbnail": {
+            "path": "assets/images/katchimeras/egg-avatars/held/thumbnails/daisy-posy.webp",
+            "width": 256,
+            "height": 256,
+            "sha256": "24ec864d9a4dfbfcd444d78794154f0f86c617bde442850264324c67b5513c3a"
+          }
+        }
+      },
+      "tiny-storybook": {
+        "version": 1,
+        "promptDirection": "blank warm-walnut and cream storybook",
+        "prompt": "Image 1 is the strict Katchimeras material, lighting, camera, and scale reference; do not copy its body or face. Generate a small closed warm-walnut and cream storybook with no text or symbol. Create only the side-held prop, upright in a front three-quarter view for placement at the viewer-right side of the egg in image 1. Do not render a hand, arm, holder, egg, character, or support. Premium cozy 3D toy-game art, broad rounded forms, tactile painted material, warm upper-left key light, restrained soft highlights, readable mobile-game silhouette. Center the single complete object on a perfectly uniform flat pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, scenery, text, logo, watermark, border, checkerboard, extra object, or cropped edge.",
+        "generationModel": "fal-ai/nano-banana-2/edit",
+        "mattingModel": "fal-ai/birefnet/v2",
+        "mattingSettings": {
+          "model": "General Use (Heavy)",
+          "refineForeground": true,
+          "preserveNegativeSpace": true
+        },
+        "outputs": {
+          "png": {
+            "path": "assets/images/katchimeras/egg-avatars/held/tiny-storybook.png",
+            "width": 2048,
+            "height": 2048,
+            "sha256": "ea724e201bf841b87d5a9bdb245ef81ced2537ed00b3786d546fdf9a01898eab"
+          },
+          "webp": {
+            "path": "assets/images/katchimeras/egg-avatars/held/tiny-storybook.webp",
+            "width": 1024,
+            "height": 1024,
+            "sha256": "6aaced5e3cc77d3568eee5dc245e66124e676c26690573f06c0289938d4f08dd"
+          },
+          "thumbnail": {
+            "path": "assets/images/katchimeras/egg-avatars/held/thumbnails/tiny-storybook.webp",
+            "width": 256,
+            "height": 256,
+            "sha256": "c8725d196e0e3279fb091550aeee0d8d18d9da61b457bf79fd4c22d02a5b2dd0"
+          }
+        }
+      },
+      "star-wand": {
+        "version": 1,
+        "promptDirection": "warm-gold star wand with lavender handle",
+        "prompt": "Image 1 is the strict Katchimeras material, lighting, camera, and scale reference; do not copy its body or face. Generate a warm-gold five-point star wand with a short lavender handle. Create only the side-held prop, upright in a front three-quarter view for placement at the viewer-right side of the egg in image 1. Do not render a hand, arm, holder, egg, character, or support. Premium cozy 3D toy-game art, broad rounded forms, tactile painted material, warm upper-left key light, restrained soft highlights, readable mobile-game silhouette. Center the single complete object on a perfectly uniform flat pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, scenery, text, logo, watermark, border, checkerboard, extra object, or cropped edge.",
+        "generationModel": "fal-ai/nano-banana-2/edit",
+        "mattingModel": "fal-ai/birefnet/v2",
+        "mattingSettings": {
+          "model": "General Use (Heavy)",
+          "refineForeground": true,
+          "preserveNegativeSpace": true
+        },
+        "outputs": {
+          "png": {
+            "path": "assets/images/katchimeras/egg-avatars/held/star-wand.png",
+            "width": 2048,
+            "height": 2048,
+            "sha256": "bb755555bca71c413eb8e19a491ab9223bdb0c161f8c690f74478b493bcd0a60"
+          },
+          "webp": {
+            "path": "assets/images/katchimeras/egg-avatars/held/star-wand.webp",
+            "width": 1024,
+            "height": 1024,
+            "sha256": "2bca96270853b43aa3401e6b98f18d9bf74afec431f51576044d3de8e775232d"
+          },
+          "thumbnail": {
+            "path": "assets/images/katchimeras/egg-avatars/held/thumbnails/star-wand.webp",
+            "width": 256,
+            "height": 256,
+            "sha256": "ca64f13a77376d5972dcd17aec4c2cc1763854d8358902629ecf323aa6742679"
+          }
+        }
+      },
+      "cozy-mug": {
+        "version": 1,
+        "promptDirection": "rounded caramel ceramic mug",
+        "prompt": "Image 1 is the strict Katchimeras material, lighting, camera, and scale reference; do not copy its body or face. Generate a rounded caramel ceramic mug with a little visible steam. Create only the side-held prop, upright in a front three-quarter view for placement at the viewer-right side of the egg in image 1. Do not render a hand, arm, holder, egg, character, or support. Premium cozy 3D toy-game art, broad rounded forms, tactile painted material, warm upper-left key light, restrained soft highlights, readable mobile-game silhouette. Center the single complete object on a perfectly uniform flat pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, scenery, text, logo, watermark, border, checkerboard, extra object, or cropped edge.",
+        "generationModel": "fal-ai/nano-banana-2/edit",
+        "mattingModel": "fal-ai/birefnet/v2",
+        "mattingSettings": {
+          "model": "General Use (Heavy)",
+          "refineForeground": true,
+          "preserveNegativeSpace": true
+        },
+        "outputs": {
+          "png": {
+            "path": "assets/images/katchimeras/egg-avatars/held/cozy-mug.png",
+            "width": 2048,
+            "height": 2048,
+            "sha256": "24eb8be37c10f27358f58e077e65e6e898ffb4239f453fcc77b12fd76adc47f0"
+          },
+          "webp": {
+            "path": "assets/images/katchimeras/egg-avatars/held/cozy-mug.webp",
+            "width": 1024,
+            "height": 1024,
+            "sha256": "daa5595c9926e299316f2a62146e9dbf1884937187c5637b6e2194abef2c20c3"
+          },
+          "thumbnail": {
+            "path": "assets/images/katchimeras/egg-avatars/held/thumbnails/cozy-mug.webp",
+            "width": 256,
+            "height": 256,
+            "sha256": "e01bb1632a4d1c6dd28430284ccb108718c2c711bd5b5ce230b24706a637c4a2"
+          }
+        }
+      },
+      "adventure-pennant": {
+        "version": 1,
+        "promptDirection": "blank teal and coral pennant",
+        "prompt": "Image 1 is the strict Katchimeras material, lighting, camera, and scale reference; do not copy its body or face. Generate a tiny blank teal and coral adventure pennant on a short wooden pole. Create only the side-held prop, upright in a front three-quarter view for placement at the viewer-right side of the egg in image 1. Do not render a hand, arm, holder, egg, character, or support. Premium cozy 3D toy-game art, broad rounded forms, tactile painted material, warm upper-left key light, restrained soft highlights, readable mobile-game silhouette. Center the single complete object on a perfectly uniform flat pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, scenery, text, logo, watermark, border, checkerboard, extra object, or cropped edge.",
+        "generationModel": "fal-ai/nano-banana-2/edit",
+        "mattingModel": "fal-ai/birefnet/v2",
+        "mattingSettings": {
+          "model": "General Use (Heavy)",
+          "refineForeground": true,
+          "preserveNegativeSpace": true
+        },
+        "outputs": {
+          "png": {
+            "path": "assets/images/katchimeras/egg-avatars/held/adventure-pennant.png",
+            "width": 2048,
+            "height": 2048,
+            "sha256": "0cfa6c17581e5e546378b5b7cbb4c9e6cbd0df1c3da96c81a26881ab2c703da1"
+          },
+          "webp": {
+            "path": "assets/images/katchimeras/egg-avatars/held/adventure-pennant.webp",
+            "width": 1024,
+            "height": 1024,
+            "sha256": "e9befacb996ac89f45a676a49f327f72207168b48fc15a452a6ba41c11e2b6cd"
+          },
+          "thumbnail": {
+            "path": "assets/images/katchimeras/egg-avatars/held/thumbnails/adventure-pennant.webp",
+            "width": 256,
+            "height": 256,
+            "sha256": "ed1f9fa191254e691b1eb2053c7f2d1f59c4a6d6d28d2cc4c157ad639e5b390e"
+          }
+        }
+      }
+    },
+    "hatLayoutVersion": 2,
+    "hatPipelineVersion": "egg-avatar-hats-v4-style-mapped",
+    "hatReferences": [
+      {
+        "path": "assets/images/katchimeras/egg-avatars/hats/<hat-id>.png",
+        "role": "exact-hat-geometry-edit-target"
+      },
+      {
+        "path": "assets/images/katchimeras/cutouts/baristabbit.png",
+        "role": "character-art-style"
+      },
+      {
+        "path": "assets/images/katchimeras/world/today/today_bg.webp",
+        "role": "runtime-lighting-palette"
+      }
+    ],
+    "hatStyleContractVersion": "katchimeras-cozy-toy-v1"
+  },
   "layering": {
-    "version": 1,
+    "version": 2,
     "order": [
       "body",
       "face",
+      "hat",
+      "held",
       "effects"
     ],
     "defaultFaceId": "classic-smile",

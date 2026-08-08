@@ -1,5 +1,5 @@
-import { EggAvatarProfileScreen } from '@/components/katchadeck/egg-avatar/egg-avatar-profile-screen';
+import { Redirect } from 'expo-router';
 
 export default function ProfileRoute() {
-  return <EggAvatarProfileScreen />;
+  return <Redirect href="/(tabs)/today?customize=1" />;
 }

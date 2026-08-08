@@ -59,6 +59,7 @@ import {
   TODAY_KINGDOM_STAGE_HEIGHT,
 } from '@/utils/today-kingdom-hero-layout';
 import { useTodayEnergyFeedback } from '@/features/today/today-energy-feedback';
+import { eggAvatarCustomizerCamera } from '@/utils/egg-avatar-customizer-camera';
 
 type TodayNurtureExperienceProps = {
   actionListLocked: boolean;
@@ -67,6 +68,7 @@ type TodayNurtureExperienceProps = {
   completionEvent: TodayCareCompletionEvent | null;
   day: HomeDayRecord;
   feedbackKey: number;
+  focusMode?: boolean;
   growth: TodayGrowthSummary;
   homeArchetypeId?: HomeArchetypeId | null;
   microcopy: string | null;
@@ -116,6 +118,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   day,
   eggTargetRef,
   feedbackKey,
+  focusMode = false,
   growth,
   homeArchetypeId,
   microcopy,
@@ -152,6 +155,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   const reduceMotion = useReducedMotion();
   const actionStackOpacity = useSharedValue(0);
   const actionStackTranslateY = useSharedValue(reduceMotion ? 0 : 22);
+  const focusProgress = useSharedValue(focusMode ? 1 : 0);
   const ready = growth.isActivated && (day.canHatch || growth.isReady);
   const moodAction = actions.find((action) => action.id === 'mood');
   const sleepAction = actions.find((action) => action.id === 'sleep');
@@ -240,6 +244,12 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
     stageTop,
   );
   const scenePinchFocusY = stageTop + sceneLift + explorationEggFrame.centerY;
+  const customizerCamera = useMemo(() => eggAvatarCustomizerCamera({
+    bottomInset,
+    subjectCenterY: scenePinchFocusY,
+    topInset,
+    viewportHeight: windowHeight,
+  }), [bottomInset, scenePinchFocusY, topInset, windowHeight]);
   const fixedActionClusterTop = explorationEggFrame.contactY + sceneLift + HOME_EGG_ACTIONS_GAP;
   const basePanelStart = Math.max(316, windowHeight * 0.465) + contentVerticalNudge;
   const minimumPanelStart = fixedActionClusterHeight === 0
@@ -268,6 +278,20 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   );
   const eggPanStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: sceneTranslateX.value }],
+  }));
+  useEffect(() => {
+    focusProgress.value = reduceMotion
+      ? focusMode ? 1 : 0
+      : withTiming(focusMode ? 1 : 0, {
+          duration: 360,
+          easing: Easing.inOut(Easing.cubic),
+        });
+  }, [focusMode, focusProgress, reduceMotion]);
+  const focusSceneStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: customizerCamera.translateY * focusProgress.value },
+      { scale: 1 + (customizerCamera.scale - 1) * focusProgress.value },
+    ],
   }));
   const actionStackRevealStyle = useAnimatedStyle(() => ({
     opacity: actionStackOpacity.value,
@@ -341,6 +365,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
 
   return (
     <View style={styles.root}>
+      <Animated.View pointerEvents="none" style={[styles.focusScene, focusSceneStyle]}>
       <TodayEnvironmentViewportMotionLayer
         focusY={scenePinchFocusY}
         viewportHeight={windowHeight}>
@@ -369,6 +394,10 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           />
         </Animated.View>
       </TodayEnvironmentViewportMotionLayer>
+      </Animated.View>
+      <View
+        pointerEvents={focusMode ? 'none' : 'box-none'}
+        style={[styles.chrome, focusMode && styles.chromeHidden]}>
       {!growth.isActivated ? (
         <TodayDormantEggIndicator
           energyRatio={growth.energyRatio}
@@ -505,8 +534,9 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           ) : null}
           </Animated.View>
         </Animated.View>
-        </ScrollView>
+          </ScrollView>
       </GestureDetector>
+      </View>
     </View>
   );
 });
@@ -1562,6 +1592,9 @@ function formatCountdown(target: Date): string {
 
 const styles = StyleSheet.create({
   root: { ...StyleSheet.absoluteFillObject, backgroundColor: '#F7F1E2', zIndex: 40 },
+  focusScene: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
+  chrome: { ...StyleSheet.absoluteFillObject },
+  chromeHidden: { opacity: 0 },
   contentScroll: { position: 'relative', zIndex: 6 },
   timelineFixed: { left: 0, paddingHorizontal: 2, position: 'absolute', right: 0, zIndex: 20 },
   fixedActionCluster: { left: 0, position: 'absolute', right: 0, zIndex: 12 },

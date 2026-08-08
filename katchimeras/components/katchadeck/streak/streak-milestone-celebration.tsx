@@ -43,7 +43,12 @@ export function StreakMilestoneCelebration({
           showsVerticalScrollIndicator={false}>
           <Animated.View entering={FadeInUp.duration(reduceMotion ? 80 : 320)} style={styles.heroBlock}>
             <ThemedText selectable style={styles.eyebrow} lightColor="#75450A" darkColor="#75450A">Life milestone</ThemedText>
-            <StreakHeroStage size={heroSize} />
+            <StreakHeroStage
+              heroMode="active-egg-avatar"
+              rayScale={1.3}
+              rayStrength={0.94}
+              size={heroSize}
+            />
             <View style={styles.streakCopy}>
               <CelebrationParticles
                 layerStyle={styles.streakConfetti}

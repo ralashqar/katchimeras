@@ -3,17 +3,19 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { EggAvatarArtwork } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
 import { eggAvatarSkin } from '@/constants/egg-avatar-skins';
 import { DEFAULT_EGG_AVATAR_FACE_ID } from '@/constants/egg-avatar-faces';
-import type { EggAvatarFaceId, EggAvatarSkinId } from '@/types/egg-avatar';
+import type { EggAvatarFaceId, EggAvatarHatId, EggAvatarHeldAccessoryId, EggAvatarSkinId } from '@/types/egg-avatar';
 
 type EggAvatarProps = {
   skinId: EggAvatarSkinId;
   faceId?: EggAvatarFaceId;
+  hatId?: EggAvatarHatId | null;
+  heldAccessoryId?: EggAvatarHeldAccessoryId | null;
   size: number;
   presentation?: 'hero' | 'grid' | 'button';
   style?: StyleProp<ViewStyle>;
 };
 
-export function EggAvatar({ skinId, faceId = DEFAULT_EGG_AVATAR_FACE_ID, size, presentation = 'hero', style }: EggAvatarProps) {
+export function EggAvatar({ skinId, faceId = DEFAULT_EGG_AVATAR_FACE_ID, hatId, heldAccessoryId, size, presentation = 'hero', style }: EggAvatarProps) {
   const skin = eggAvatarSkin(skinId);
 
   return (
@@ -24,10 +26,12 @@ export function EggAvatar({ skinId, faceId = DEFAULT_EGG_AVATAR_FACE_ID, size, p
     >
       <EggAvatarArtwork
         faceId={faceId}
+        hatId={hatId}
+        heldAccessoryId={heldAccessoryId}
         priority={presentation === 'button' ? 'high' : 'normal'}
         resolution={presentation === 'button' ? 'thumbnail' : 'app'}
         skinId={skinId}
-        transition={presentation === 'button' ? 0 : 140}
+        transition={0}
       />
     </View>
   );

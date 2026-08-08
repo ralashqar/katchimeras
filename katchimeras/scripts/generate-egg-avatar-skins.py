@@ -15,6 +15,7 @@ import io
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import time
 import urllib.error
@@ -34,15 +35,90 @@ BASE_THUMBS_DIR = BASES_DIR / "thumbnails"
 FACES_DIR = OUTPUT_DIR / "faces"
 FACE_THUMBS_DIR = FACES_DIR / "thumbnails"
 REVIEW_DIR = ROOT / ".tmp" / "egg-avatar-skins"
+HAT_REVIEW_DIR = ROOT / ".tmp" / "egg-avatar-hats-v4"
+BODY_DRAFT_REVIEW_DIR = ROOT / ".tmp" / "egg-avatar-body-drafts-v1"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
+BODY_CATALOG_PATH = ROOT / "data" / "egg-avatar" / "bodies.json"
 CURRENT_EGG = ROOT / "assets" / "images" / "katchimeras" / "cutouts" / "egg-base.png"
 BARISTABBIT = ROOT / "assets" / "images" / "katchimeras" / "cutouts" / "baristabbit.png"
 CLASSIC_APPROVED = OUTPUT_DIR / "classic.png"
+TODAY_RUNTIME_BACKGROUND = ROOT / "assets" / "images" / "katchimeras" / "world" / "today" / "today_bg.webp"
 CUTOUTS_DIR = ROOT / "assets" / "images" / "katchimeras" / "cutouts"
 GENERATION_MODEL = "fal-ai/nano-banana-2/edit"
+HAT_GENERATION_MODEL = "openai/gpt-image-2/edit"
+BODY_DRAFT_GENERATION_MODEL = "openai/gpt-image-2/edit"
 MATTING_MODEL = "fal-ai/birefnet/v2"
 PIPELINE_VERSION = "egg-avatar-layers-v1"
+HAT_PIPELINE_VERSION = "egg-avatar-hats-v4-style-mapped"
+HAT_STYLE_CONTRACT_VERSION = "katchimeras-cozy-toy-v1"
+BODY_DRAFT_PIPELINE_VERSION = "egg-avatar-body-drafts-v1-gpt-image-2"
 DEFAULT_FACE_ID = "classic-smile"
+ACCESSORY_READY_SKINS = ("moss", "barista", "pumpkin")
+ACCESSORY_SPECS: dict[str, dict[str, str]] = {
+    "moss-sprout": {"slot": "hat", "direction": "a soft sage moss sprout with two plump rounded leaves"},
+    "barista-beret": {"slot": "hat", "direction": "a softly structured caramel cafe beret with a restrained cream band"},
+    "pumpkin-vine-crown": {"slot": "hat", "direction": "a curled pumpkin stem crown with two rounded leaves and one short vine"},
+    "cozy-beanie": {"slot": "hat", "direction": "a dusty-coral knitted beanie with a broad cream cuff and small pompom"},
+    "stargazer-hat": {"slot": "hat", "direction": "a midnight-indigo crooked pointed stargazer hat with a few tiny warm-gold stars"},
+    "tiny-golden-crown": {"slot": "hat", "direction": "a small rounded warm-gold three-point toy crown"},
+    "warm-lantern": {"slot": "held", "direction": "a rounded brass lantern with a warm amber glass glow"},
+    "daisy-posy": {"slot": "held", "direction": "a tiny posy of three white daisies tied with a coral ribbon"},
+    "tiny-storybook": {"slot": "held", "direction": "a small closed warm-walnut and cream storybook with no text or symbol"},
+    "star-wand": {"slot": "held", "direction": "a warm-gold five-point star wand with a short lavender handle"},
+    "cozy-mug": {"slot": "held", "direction": "a rounded caramel ceramic mug with a little visible steam"},
+    "adventure-pennant": {"slot": "held", "direction": "a tiny blank teal and coral adventure pennant on a short wooden pole"},
+}
+ACCESSORY_BOUNDS = {
+    "hat": (0.16, 0.01, 0.84, 0.34),
+    "held": (0.70, 0.38, 0.99, 0.90),
+}
+HAT_IDS = tuple(accessory_id for accessory_id, spec in ACCESSORY_SPECS.items() if spec["slot"] == "hat")
+HELD_IDS = tuple(accessory_id for accessory_id, spec in ACCESSORY_SPECS.items() if spec["slot"] == "held")
+HAT_PRESENTATIONS = {
+    "moss-sprout": {"scale": 0.64, "offsetX": 0.0, "offsetY": -0.267},
+    "barista-beret": {"scale": 0.69, "offsetX": 0.0, "offsetY": -0.201},
+    "pumpkin-vine-crown": {"scale": 0.70, "offsetX": 0.0, "offsetY": -0.294},
+    "cozy-beanie": {"scale": 0.58, "offsetX": 0.0, "offsetY": -0.261},
+    "stargazer-hat": {"scale": 0.58, "offsetX": 0.0, "offsetY": -0.275},
+    "tiny-golden-crown": {"scale": 0.86, "offsetX": 0.0, "offsetY": -0.134},
+}
+BODY_PRESENTATIONS = {
+    "classic": (1.0, 0.0, 0.0),
+    "moss": (1.08, 0.0, -0.018),
+    "tide": (1.0, 0.0, 0.0),
+    "sunset": (1.0, 0.0, 0.0),
+    "starglow": (1.0, 0.0, 0.0),
+    "frost": (1.0, 0.0, 0.0),
+    "ember": (1.0, 0.0, 0.0),
+    "barista": (1.06, 0.0, -0.012),
+    "robot": (1.0, 0.0, 0.0),
+    "pumpkin": (1.05, 0.0, -0.01),
+}
+
+
+def load_body_specs() -> dict[str, dict[str, Any]]:
+    document = json.loads(BODY_CATALOG_PATH.read_text(encoding="utf-8"))
+    return {item["id"]: item for item in document["items"]}
+
+
+BODY_SPECS = load_body_specs()
+PLANNED_BODY_SPECS = {
+    body_id: item for body_id, item in BODY_SPECS.items()
+    if item["availability"] == "planned"
+}
+PLANNED_BODY_IDS = tuple(PLANNED_BODY_SPECS)
+STARTER_BODY_BATCH = PLANNED_BODY_IDS[:4]
+COSTUME_BODY_IDS = (
+    "wizard-robes", "football-kit", "sunny-raincoat", "knight-tunic", "astronaut-suit",
+    "explorer-vest", "royal-robe", "party-outfit", "sailor-uniform", "chef-apron",
+    "superhero-suit", "cozy-pajamas", "garden-overalls", "detective-coat", "pirate-coat",
+    "ballet-wrap", "racing-suit", "artist-smock",
+)
+NEXT_COSTUME_BODY_BATCH = tuple(body_id for body_id in COSTUME_BODY_IDS if body_id in PLANNED_BODY_SPECS)[:4]
+MIXED_BODY_BATCH = (
+    *(("watermelon",) if "watermelon" in PLANNED_BODY_SPECS else ()),
+    *NEXT_COSTUME_BODY_BATCH[:3],
+)
 
 FACE_VARIATIONS: dict[str, dict[str, str]] = {
     "classic-smile": {
@@ -243,14 +319,280 @@ def call_function(name: str, payload: dict[str, Any], timeout: int = 360) -> dic
     raise RuntimeError(f"{name} failed after retries")
 
 
-def image_data_uri(path: Path, max_side: int = 768) -> str:
+def image_data_uri(path: Path, max_side: int = 768, background: tuple[int, int, int] = (244, 238, 225)) -> str:
     image = Image.open(path).convert("RGBA")
     image.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
-    canvas = Image.new("RGB", image.size, (244, 238, 225))
+    canvas = Image.new("RGB", image.size, background)
     canvas.paste(image, (0, 0), image)
     buffer = io.BytesIO()
     canvas.save(buffer, format="PNG")
     return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
+
+
+def black_backed_data_uri(path: Path, max_side: int = 1536) -> str:
+    return image_data_uri(path, max_side=max_side, background=(0, 0, 0))
+
+
+def planned_body_prompt(body_id: str) -> str:
+    spec = BODY_SPECS[body_id]
+    design = spec["visualDesign"]
+    return " ".join([
+        "Use case: precise-object-edit. Asset type: faceless layered egg-avatar body.",
+        "Image 1 is the exact faceless Classic egg body and the edit target. Preserve its full square canvas registration, upright front-facing camera, scale, placement, softly rounded egg silhouette, and two small feet.",
+        "Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, warm low-contrast light, and friendly mobile-game readability.",
+        "Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, gentle saturation, simplified toy-diorama finish, and soft lighting direction. Do not copy its scenery or pedestal.",
+        f"Transform only the egg body's shell design into {spec['name']}: {design['summary']}",
+        f"Palette: {', '.join(design['palette'])}.",
+        f"Shape language: {design['shapeLanguage']}",
+        f"Design constraints: {'; '.join(design['constraints'])}.",
+        "The central rounded face-safe area from normalized x 0.22 to 0.78 and y 0.34 to 0.66 must remain smooth, intact, low-detail, and empty so a separate face layer can be added later.",
+        "Across normalized x 0.22 to 0.78, every collar, neckline, scarf, neckerchief, lapel, trim, strap, belt, button, jewel, seam, panel boundary, and costume edge must stay entirely below normalized y 0.68.",
+        "In plain visual terms, treat the upper two-thirds of the egg as its unobstructed head and the lowest third as the costume torso; no clothing or emblem may overlap the eyes, cheeks, or mouth area.",
+        "Keep the crown clear for separately layered hats and keep both outer sides clear enough for a separately layered held accessory.",
+        "This body must contain no eyebrows, eyes, pupils, catchlights, mouth, blush, face marks, facial indentation, facial ghost, hat, headwear, top ornament, held prop, hand, arm, pedestal, nest, or scenery.",
+        "Preserve a single solid continuous egg body with no transparent-looking holes, cutouts, broken shell, floating pieces, or missing interior regions.",
+        "Render the one complete faceless egg body on a perfectly uniform pure-black #000000 background for BiRefNet Heavy. No floor, cast shadow, reflection, glow, gradient, texture, border, text, logo, watermark, or extra object.",
+        "Do not zoom, crop, recenter, resize, rotate, or change the camera.",
+    ])
+
+
+def planned_body_review_dir(body_id: str) -> Path:
+    return BODY_DRAFT_REVIEW_DIR / body_id
+
+
+def generate_planned_body_draft(body_id: str) -> None:
+    spec = BODY_SPECS[body_id]
+    review = planned_body_review_dir(body_id)
+    review.mkdir(parents=True, exist_ok=True)
+    prompt = planned_body_prompt(body_id)
+    references = [
+        BASES_DIR / "classic.png",
+        BARISTABBIT,
+        TODAY_RUNTIME_BACKGROUND,
+    ]
+    if not all(path.exists() for path in references):
+        missing = [str(path) for path in references if not path.exists()]
+        raise SystemExit(f"Missing planned-body reference(s): {', '.join(missing)}")
+    print(f"generating GPT Image 2 body draft {body_id} at quality low...", flush=True)
+    result = call_function("generate-katchimera-art", {
+        "modelId": BODY_DRAFT_GENERATION_MODEL,
+        "input": {
+            "image_urls": [
+                black_backed_data_uri(references[0]),
+                image_data_uri(references[1], max_side=1024),
+                image_data_uri(references[2], max_side=1024),
+            ],
+            "image_size": "square_hd",
+            "quality": "low",
+        },
+        "assetType": "other",
+        "assetKey": f"egg-avatar-body-draft:{body_id}:v1",
+        "skinId": body_id,
+        "pipelineVersion": BODY_DRAFT_PIPELINE_VERSION,
+        "renderProfile": {
+            "id": f"egg_avatar_body_draft_{body_id.replace('-', '_')}_v1",
+            "displayName": f"{spec['name']} faceless egg body draft v1",
+            "topLevelType": "avatar-layer",
+            "triggerCategory": "egg-avatar",
+            "triggerSubtype": "body-draft",
+            "theme": body_id,
+            "creatureKind": "egg-avatar-body",
+            "caption": design_caption(spec),
+            "skinId": body_id,
+            "imagePrompt": prompt,
+        },
+    })
+    record = result.get("record") or {}
+    image_url = record.get("image_url")
+    if not image_url:
+        raise RuntimeError(f"No GPT Image 2 body image URL for {body_id}: {result}")
+    output = review / "body-fal.png"
+    download(image_url, output)
+    (review / "generation.json").write_text(json.dumps({
+        "id": body_id,
+        "pipelineVersion": BODY_DRAFT_PIPELINE_VERSION,
+        "prompt": prompt,
+        "model": BODY_DRAFT_GENERATION_MODEL,
+        "quality": "low",
+        "references": [
+            {"path": str(references[0].relative_to(ROOT)).replace("\\", "/"), "role": "exact-faceless-body-edit-target"},
+            {"path": str(references[1].relative_to(ROOT)).replace("\\", "/"), "role": "character-art-style"},
+            {"path": str(references[2].relative_to(ROOT)).replace("\\", "/"), "role": "runtime-lighting-palette"},
+        ],
+        "imageUrl": image_url,
+        "recordId": record.get("id"),
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+    }, indent=2) + "\n", encoding="utf-8")
+
+
+def design_caption(spec: dict[str, Any]) -> str:
+    return spec["visualDesign"]["summary"]
+
+
+def matte_planned_body_draft(body_id: str) -> None:
+    review = planned_body_review_dir(body_id)
+    raw = review / "body-fal.png"
+    if not raw.exists():
+        raise SystemExit(f"Missing GPT Image 2 draft: {raw}")
+    print(f"matting body draft {body_id} with BiRefNet Heavy...", flush=True)
+    result = call_function("remove-image-background", {
+        "imageBase64": base64.b64encode(raw.read_bytes()).decode(),
+        "outputName": f"egg-avatar-body-draft-{body_id}-v1",
+    })
+    image_url = result.get("imageUrl")
+    if not image_url:
+        raise RuntimeError(f"No BiRefNet body image URL for {body_id}: {result}")
+    download(image_url, review / "body-birefnet.png")
+    (review / "matting.json").write_text(json.dumps({
+        "id": body_id,
+        "model": MATTING_MODEL,
+        "modelProfile": result.get("falModelInput", "General Use (Heavy)"),
+        "operatingResolution": result.get("operatingResolution", "1024x1024"),
+        "refineForeground": result.get("refineForeground", True),
+        "imageUrl": image_url,
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+    }, indent=2) + "\n", encoding="utf-8")
+
+
+def derive_body_accent(image: Image.Image) -> str:
+    sample = image.convert("RGBA").resize((128, 128), Image.Resampling.LANCZOS)
+    colorful: list[tuple[int, int, int]] = []
+    fallback: list[tuple[int, int, int]] = []
+    for red, green, blue, alpha in sample.getdata():
+        if alpha < 200:
+            continue
+        fallback.append((red, green, blue))
+        high, low = max(red, green, blue), min(red, green, blue)
+        if high - low >= 28 and 45 <= (red + green + blue) / 3 <= 225:
+            colorful.append((red, green, blue))
+    pixels = colorful or fallback
+    if not pixels:
+        return "#B99C72"
+    pixels.sort(key=lambda color: sum(color))
+    middle = pixels[len(pixels) // 2]
+    return f"#{middle[0]:02X}{middle[1]:02X}{middle[2]:02X}"
+
+
+def write_body_catalog(document: dict[str, Any]) -> None:
+    items = document["items"]
+    lines = [
+        "{",
+        f'  "schemaVersion": {document["schemaVersion"]},',
+        f'  "category": {json.dumps(document["category"])},',
+        '  "items": [',
+        *[
+            f"    {json.dumps(item, ensure_ascii=False)}{',' if index < len(items) - 1 else ''}"
+            for index, item in enumerate(items)
+        ],
+        "  ]",
+        "}",
+    ]
+    BODY_CATALOG_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def promote_planned_body_draft(body_id: str) -> None:
+    review = planned_body_review_dir(body_id)
+    raw = review / "body-fal.png"
+    matted = review / "body-birefnet.png"
+    generation_path = review / "generation.json"
+    if not raw.exists() or not matted.exists() or not generation_path.exists():
+        raise SystemExit(f"Missing generated body draft files for promotion: {review}")
+    generation = json.loads(generation_path.read_text(encoding="utf-8"))
+    if generation.get("model") != BODY_DRAFT_GENERATION_MODEL or generation.get("quality") != "low":
+        raise RuntimeError(f"Body {body_id} was not generated with GPT Image 2 Edit at quality low")
+
+    spec = load_body_specs()[body_id]
+    base = normalize(matted, rgb_source=raw)
+    base_outputs = save_layer_asset(base, BASES_DIR, BASE_THUMBS_DIR, body_id)
+
+    face = Image.open(FACES_DIR / f"{DEFAULT_FACE_ID}.png").convert("RGBA")
+    runtime_face_size = round(face.width * 0.92)
+    runtime_face = face.resize((runtime_face_size, runtime_face_size), Image.Resampling.LANCZOS)
+    composite = base.copy()
+    composite.alpha_composite(
+        runtime_face,
+        ((composite.width - runtime_face_size) // 2, (composite.height - runtime_face_size) // 2),
+    )
+    outputs = save_layer_asset(composite, OUTPUT_DIR, THUMB_DIR, body_id)
+
+    approved_at = datetime.now(timezone.utc).isoformat()
+    promotion_version = spec["version"] + (1 if spec["availability"] == "ready" else 0)
+    manifest = load_manifest()
+    manifest.setdefault("skins", {})[body_id] = {
+        "name": spec["name"],
+        "version": promotion_version,
+        "approvedCandidate": "auto-promoted-single-gpt-image-2-draft",
+        "approvedAt": approved_at,
+        "generationModel": BODY_DRAFT_GENERATION_MODEL,
+        "generationQuality": "low",
+        "pipelineVersion": BODY_DRAFT_PIPELINE_VERSION,
+        "references": generation["references"],
+        "artDirection": design_caption(spec),
+        "mattingModel": MATTING_MODEL,
+        "outputs": outputs,
+        "faceLayoutVersion": FACE_LAYOUT["version"],
+        "baseVersion": 1,
+        "basePrompt": generation["prompt"],
+        "baseGenerationModel": BODY_DRAFT_GENERATION_MODEL,
+        "baseGenerationQuality": "low",
+        "baseMattingModel": MATTING_MODEL,
+        "baseMattingSettings": {
+            "model": "General Use (Heavy)",
+            "operatingResolution": "1024x1024",
+            "refineForeground": True,
+            "enclosedAlphaHoleRepair": True,
+            "exteriorEdgeSource": "BiRefNet",
+        },
+        "baseOutputs": base_outputs,
+    }
+    manifest["updatedAt"] = approved_at
+    MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+    catalog = json.loads(BODY_CATALOG_PATH.read_text(encoding="utf-8"))
+    item = next(item for item in catalog["items"] if item["id"] == body_id)
+    item["version"] = promotion_version
+    item["availability"] = "ready"
+    item["assetRefs"] = {
+        "high": f"assets/images/katchimeras/egg-avatars/bases/{body_id}.png",
+        "app": f"assets/images/katchimeras/egg-avatars/bases/{body_id}.webp",
+        "thumbnail": f"assets/images/katchimeras/egg-avatars/bases/thumbnails/{body_id}.webp",
+    }
+    write_body_catalog(catalog)
+
+    accents_path = BODY_CATALOG_PATH.parent / "body-accents.json"
+    accents = json.loads(accents_path.read_text(encoding="utf-8"))
+    accents[body_id] = derive_body_accent(base)
+    accents_path.write_text(json.dumps(accents, indent=2) + "\n", encoding="utf-8")
+    print(f"promoted body {body_id} into production assets and catalog", flush=True)
+
+
+def refresh_avatar_catalog_registry() -> None:
+    subprocess.run(
+        ["node", str(ROOT / "scripts" / "generate-egg-avatar-catalog.cjs")],
+        cwd=ROOT,
+        check=True,
+    )
+
+
+def run_planned_body_drafts(
+    body_ids: tuple[str, ...],
+    *,
+    phase: str,
+    review_only: bool,
+) -> None:
+    for body_id in body_ids:
+        if phase == "render":
+            generate_planned_body_draft(body_id)
+            matte_planned_body_draft(body_id)
+        elif phase == "matte":
+            matte_planned_body_draft(body_id)
+        if not review_only:
+            promote_planned_body_draft(body_id)
+    if not review_only:
+        refresh_avatar_catalog_registry()
+        print(f"Generated and promoted {len(body_ids)} body customization(s).")
+    else:
+        print(f"Created {len(body_ids)} review-only body draft(s) under {BODY_DRAFT_REVIEW_DIR.relative_to(ROOT)}.")
 
 
 def download(url: str, path: Path) -> None:
@@ -616,6 +958,608 @@ def layered_face_prompt() -> str:
         "Keep the face centered at its original relative layout on a full square canvas and place it on a perfectly uniform flat #00FF00 background.",
         "No gradient, floor, checkerboard, text, watermark, or additional object.",
     ])
+
+
+def accessory_ready_body_prompt(skin_id: str) -> str:
+    removals = {
+        "moss": "Remove the complete top sprout and its leaves. Keep the lower moss clusters.",
+        "barista": "Remove the complete brown beret. Keep the small coffee pocket on the lower shell.",
+        "pumpkin": "Remove the complete top stem. Keep the orange pumpkin shell, lobes, lower side vines, and leaves.",
+    }
+    return " ".join([
+        "This is a precise production asset edit of image 1, not a redesign.",
+        "Create the same egg as a clean faceless body base for a layered avatar system.",
+        removals[skin_id],
+        "Remove the complete face: eyebrows, eyes, eye highlights, mouth, and both blush marks.",
+        "Regenerate the newly exposed shell naturally; it must be solid, continuous, intact, and free of holes or ghost outlines.",
+        "Preserve the exact egg identity, shell material, palette, markings, feet, proportions, front camera, lighting direction, and canvas placement.",
+        "Add no replacement hat, headwear, top ornament, face, text, scenery, platform, cast shadow, or extra object.",
+        "Place the one complete egg on a perfectly uniform flat pure-black #000000 background for BiRefNet Heavy.",
+        STYLE_LOCK,
+        NEGATIVES,
+    ])
+
+
+def generate_accessory_ready_base(source_dir: Path, skin_id: str) -> None:
+    source_dir.mkdir(parents=True, exist_ok=True)
+    prompt = accessory_ready_body_prompt(skin_id)
+    print(f"generating accessory-ready FAL base for {skin_id}...", flush=True)
+    result = call_function("generate-katchimera-art", {
+        "modelId": GENERATION_MODEL,
+        "input": {
+            "image_urls": [image_data_uri(OUTPUT_DIR / f"{skin_id}.png", max_side=1536)],
+            "aspect_ratio": "1:1",
+            "resolution": "2K",
+        },
+        "assetType": "other",
+        "assetKey": f"egg-avatar-accessory-ready:{skin_id}:body-v1",
+        "skinId": skin_id,
+        "pipelineVersion": PIPELINE_VERSION,
+        "renderProfile": {
+            "id": f"egg_avatar_{skin_id}_accessory_ready_body_v1",
+            "displayName": f"{SKINS[skin_id]['name']} accessory-ready egg body v1",
+            "topLevelType": "avatar-layer",
+            "triggerCategory": "egg-avatar",
+            "triggerSubtype": "body",
+            "theme": skin_id,
+            "creatureKind": "egg-avatar-body",
+            "caption": "faceless body with removable head accessory",
+            "imagePrompt": prompt,
+        },
+    })
+    record = result.get("record") or {}
+    image_url = record.get("image_url")
+    if not image_url:
+        raise RuntimeError(f"No FAL body image URL for {skin_id}: {result}")
+    download(image_url, source_dir / f"{skin_id}-keyed-fal.png")
+    (source_dir / f"{skin_id}-generation.json").write_text(json.dumps({
+        "skinId": skin_id,
+        "prompt": prompt,
+        "model": GENERATION_MODEL,
+        "imageUrl": image_url,
+        "recordId": record.get("id"),
+    }, indent=2) + "\n", encoding="utf-8")
+
+
+def matte_accessory_ready_base(source_dir: Path, skin_id: str) -> None:
+    keyed = source_dir / f"{skin_id}-keyed-fal.png"
+    if not keyed.exists():
+        raise SystemExit(f"Missing FAL source: {keyed}")
+    print(f"matting accessory-ready {skin_id} with BiRefNet Heavy...", flush=True)
+    result = call_function("remove-image-background", {
+        "imageBase64": base64.b64encode(keyed.read_bytes()).decode(),
+        "outputName": f"egg-avatar-{skin_id}-accessory-ready-v1",
+    })
+    image_url = result.get("imageUrl")
+    if not image_url:
+        raise RuntimeError(f"No BiRefNet image URL for {skin_id}: {result}")
+    download(image_url, source_dir / f"{skin_id}-birefnet.png")
+    (source_dir / f"{skin_id}-matting.json").write_text(json.dumps({
+        "skinId": skin_id,
+        "model": MATTING_MODEL,
+        "modelProfile": result.get("falModelInput", "General Use (Heavy)"),
+        "operatingResolution": result.get("operatingResolution", "1024x1024"),
+        "refineForeground": result.get("refineForeground", True),
+        "imageUrl": image_url,
+    }, indent=2) + "\n", encoding="utf-8")
+
+
+def approve_accessory_ready_base(source_dir: Path, skin_id: str) -> None:
+    keyed = source_dir / f"{skin_id}-keyed-fal.png"
+    birefnet = source_dir / f"{skin_id}-birefnet.png"
+    if not keyed.exists() or not birefnet.exists():
+        raise SystemExit(f"Missing generated or BiRefNet source for {skin_id}")
+    # BiRefNet owns the exterior edge. The existing flood-fill repair restores
+    # only fully enclosed alpha tears, while raw FAL pixels supply their colour.
+    body = normalize(birefnet, rgb_source=keyed)
+    outputs = save_layer_asset(body, BASES_DIR, BASE_THUMBS_DIR, skin_id)
+    manifest = load_manifest()
+    entry = manifest["skins"][skin_id]
+    entry["baseVersion"] = 2
+    entry["basePrompt"] = accessory_ready_body_prompt(skin_id)
+    entry["baseGenerationModel"] = GENERATION_MODEL
+    entry["baseMattingModel"] = MATTING_MODEL
+    entry["baseMattingSettings"] = {
+        "model": "General Use (Heavy)",
+        "operatingResolution": "1024x1024",
+        "refineForeground": True,
+        "enclosedAlphaHoleRepair": True,
+        "exteriorEdgeSource": "BiRefNet",
+    }
+    entry.pop("baseEditMask", None)
+    entry["baseOutputs"] = outputs
+    MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    print(f"approved accessory-ready FAL/BiRefNet base for {skin_id}")
+
+
+def accessory_prompt(accessory_id: str) -> str:
+    spec = ACCESSORY_SPECS[accessory_id]
+    if spec["slot"] == "hat":
+        fit = (
+            "Create only the wearable head accessory, front-facing with a gentle concave underside that follows the crown of the egg in image 1. "
+            "Keep its silhouette broad and compact; it must fit entirely above the face without covering the eyes. Do not render the egg."
+        )
+    else:
+        fit = (
+            "Create only the side-held prop, upright in a front three-quarter view for placement at the viewer-right side of the egg in image 1. "
+            "Do not render a hand, arm, holder, egg, character, or support."
+        )
+    return " ".join([
+        "Image 1 is the strict Katchimeras material, lighting, camera, and scale reference; do not copy its body or face.",
+        f"Generate {spec['direction']}.",
+        fit,
+        "Premium cozy 3D toy-game art, broad rounded forms, tactile painted material, warm upper-left key light, restrained soft highlights, readable mobile-game silhouette.",
+        "Center the single complete object on a perfectly uniform flat pure-black #000000 background for BiRefNet Heavy.",
+        "No floor, cast shadow, scenery, text, logo, watermark, border, checkerboard, extra object, or cropped edge.",
+    ])
+
+
+def hat_front_prompt(accessory_id: str) -> str:
+    spec = ACCESSORY_SPECS[accessory_id]
+    if spec["slot"] != "hat":
+        raise ValueError(f"{accessory_id} is not a hat")
+    return " ".join([
+        "Image 1 is the exact egg character and canvas placement reference.",
+        f"Draw {spec['direction']} for this egg character.",
+        "The hat will be layered directly on top of image 1 in the app.",
+        "Draw only the front part of the hat layer that will show when fitted on this egg image.",
+        "The visible lower edge must overlap the top of the egg enough to preserve the egg's rounded head shape.",
+        "Do not draw an underside, inside, rear brim, back layer, hidden surface, egg, face, feet, body, pedestal, hand, or extra object.",
+        "Preserve image 1's exact camera, zoom, and full square canvas registration. Do not zoom in on the hat or turn it into a centered product shot.",
+        "Keep every hat pixel within the top 34 percent of the original canvas. Its lowest front edge sits just over the egg crown and remains entirely above the eyebrows and face.",
+        "The result must overlay image 1 at 1:1 with no scaling, cropping, recentering, or repositioning.",
+        "Match image 1's simple cozy premium 3D toy art, soft rounded forms, warm lighting, restrained detail, and mobile-game finish exactly.",
+        "Render only that single visible-front hat layer on a perfectly uniform pure-black #000000 background with no floor, cast shadow, glow, scenery, text, logo, watermark, border, or checkerboard.",
+    ])
+
+
+def hat_style_prompt(accessory_id: str) -> str:
+    spec = ACCESSORY_SPECS[accessory_id]
+    return " ".join([
+        "Use case: precise-object-edit. Asset type: final visible-front egg avatar hat layer.",
+        "Image 1 is the exact approved hat geometry and the edit target. Preserve its silhouette, front-only construction, lower contact edge, scale, position, perspective, design, colors, and full square canvas registration.",
+        "Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Map image 1 to its simple cozy premium 3D toy language: broad rounded forms, smooth softly painted materials, clean transitions, restrained highlights, and friendly mobile-game readability.",
+        "Image 3 is the exact Today cinematic home environment used at runtime. Match only its warm daylight, soft low-contrast lighting, gentle saturation, and simplified toy-diorama finish. Do not copy its scenery, pedestal, nest, trees, path, sky, or objects.",
+        f"Restyle {spec['direction']} from image 1 without redesigning it.",
+        "Reduce surface detail strongly. Use smooth simple color fields and a few broad form-defining cues only.",
+        "No realistic fibers, individual yarn strands, fabric fuzz, leather grain, embossing, pores, scratches, microtexture, noisy bump mapping, tiny stitching, photographic material detail, or hyper-detailed surface variation.",
+        "Keep only the visible front layer. Do not add an underside, inside, rear brim, back layer, hidden surface, egg, face, feet, body, pedestal, hand, cast shadow, or extra object.",
+        "Render that one style-mapped hat on a perfectly uniform pure-black #000000 background. Do not zoom, crop, recenter, resize, rotate, or move it.",
+        "No scenery, floor, glow, text, logo, watermark, border, checkerboard, or additional object.",
+    ])
+
+
+def generate_hat_front(accessory_id: str) -> None:
+    if accessory_id not in HAT_IDS:
+        raise SystemExit(f"{accessory_id} is not a supported hat")
+    review = hat_review_dir(accessory_id)
+    review.mkdir(parents=True, exist_ok=True)
+    prompt = hat_front_prompt(accessory_id)
+    print(f"generating direct visible-front hat {accessory_id}...", flush=True)
+    result = call_function("generate-katchimera-art", {
+        "modelId": HAT_GENERATION_MODEL,
+        "input": {
+            "image_urls": [black_backed_data_uri(CLASSIC_APPROVED)],
+            "image_size": "square_hd",
+            "quality": "low",
+        },
+        "assetType": "other",
+        "assetKey": f"egg-avatar-hat-geometry:{accessory_id}:v4",
+        "pipelineVersion": HAT_PIPELINE_VERSION,
+        "renderProfile": {
+            "id": f"egg_avatar_hat_geometry_{accessory_id.replace('-', '_')}_v4",
+            "displayName": f"Visible-front egg avatar hat geometry {accessory_id}",
+            "topLevelType": "avatar-layer",
+            "triggerCategory": "egg-avatar",
+            "triggerSubtype": "hat-front",
+            "theme": accessory_id,
+            "creatureKind": "egg-avatar-hat-front",
+            "caption": ACCESSORY_SPECS[accessory_id]["direction"],
+            "imagePrompt": prompt,
+        },
+    })
+    record = result.get("record") or {}
+    image_url = record.get("image_url")
+    if not image_url:
+        raise RuntimeError(f"No direct hat image URL for {accessory_id}: {result}")
+    download(image_url, review / "geometry-fal.png")
+    (review / "geometry-generation.json").write_text(json.dumps({
+        "id": accessory_id,
+        "pipelineVersion": HAT_PIPELINE_VERSION,
+        "prompt": prompt,
+        "model": HAT_GENERATION_MODEL,
+        "quality": "low",
+        "reference": {
+            "path": str(CLASSIC_APPROVED.relative_to(ROOT)).replace("\\", "/"),
+            "role": "exact-egg-geometry-style-and-placement",
+        },
+        "imageUrl": image_url,
+        "recordId": record.get("id"),
+    }, indent=2) + "\n", encoding="utf-8")
+
+
+def restyle_hat_front(accessory_id: str, *, use_production_source: bool) -> None:
+    review = hat_review_dir(accessory_id)
+    review.mkdir(parents=True, exist_ok=True)
+    source = OUTPUT_DIR / "hats" / f"{accessory_id}.png" if use_production_source else review / "geometry-fal.png"
+    if not source.exists():
+        raise SystemExit(f"Missing hat geometry source for {accessory_id}: {source}")
+    prompt = hat_style_prompt(accessory_id)
+    print(f"style-mapping visible-front hat {accessory_id}...", flush=True)
+    result = call_function("generate-katchimera-art", {
+        "modelId": HAT_GENERATION_MODEL,
+        "input": {
+            "image_urls": [
+                black_backed_data_uri(source),
+                image_data_uri(BARISTABBIT, max_side=1024),
+                image_data_uri(TODAY_RUNTIME_BACKGROUND, max_side=1024),
+            ],
+            "image_size": "square_hd",
+            "quality": "low",
+        },
+        "assetType": "other",
+        "assetKey": f"egg-avatar-hat-style:{accessory_id}:v4",
+        "pipelineVersion": HAT_PIPELINE_VERSION,
+        "renderProfile": {
+            "id": f"egg_avatar_hat_style_{accessory_id.replace('-', '_')}_v4",
+            "displayName": f"Style-mapped visible-front egg avatar hat {accessory_id}",
+            "topLevelType": "avatar-layer",
+            "triggerCategory": "egg-avatar",
+            "triggerSubtype": "hat-front-style-map",
+            "theme": accessory_id,
+            "creatureKind": "egg-avatar-hat-front",
+            "caption": ACCESSORY_SPECS[accessory_id]["direction"],
+            "imagePrompt": prompt,
+        },
+    })
+    record = result.get("record") or {}
+    image_url = record.get("image_url")
+    if not image_url:
+        raise RuntimeError(f"No style-mapped hat image URL for {accessory_id}: {result}")
+    download(image_url, review / "front-fal.png")
+    (review / "front-generation.json").write_text(json.dumps({
+        "id": accessory_id,
+        "stage": "style-map",
+        "pipelineVersion": HAT_PIPELINE_VERSION,
+        "styleContractVersion": HAT_STYLE_CONTRACT_VERSION,
+        "prompt": prompt,
+        "model": HAT_GENERATION_MODEL,
+        "quality": "low",
+        "references": [
+            {"path": str(source.relative_to(ROOT)).replace("\\", "/"), "role": "exact-hat-geometry-edit-target"},
+            {"path": str(BARISTABBIT.relative_to(ROOT)).replace("\\", "/"), "role": "character-art-style"},
+            {"path": str(TODAY_RUNTIME_BACKGROUND.relative_to(ROOT)).replace("\\", "/"), "role": "runtime-lighting-palette"},
+        ],
+        "imageUrl": image_url,
+        "recordId": record.get("id"),
+    }, indent=2) + "\n", encoding="utf-8")
+
+
+def hat_review_dir(accessory_id: str) -> Path:
+    return HAT_REVIEW_DIR / accessory_id
+
+
+def cover_image(image: Image.Image, size: tuple[int, int]) -> Image.Image:
+    scale = max(size[0] / image.width, size[1] / image.height)
+    resized = image.resize((round(image.width * scale), round(image.height * scale)), Image.Resampling.LANCZOS)
+    left = (resized.width - size[0]) // 2
+    top = (resized.height - size[1]) // 2
+    return resized.crop((left, top, left + size[0], top + size[1]))
+
+
+def matte_hat_front(accessory_id: str) -> None:
+    review = hat_review_dir(accessory_id)
+    source = review / "front-fal.png"
+    if not source.exists():
+        raise SystemExit(f"Missing direct FAL source: {source}")
+    print(f"matting direct visible-front hat {accessory_id} with BiRefNet Heavy...", flush=True)
+    result = call_function("remove-image-background", {
+        "imageBase64": base64.b64encode(source.read_bytes()).decode(),
+        "outputName": f"egg-avatar-hat-front-{accessory_id}-v4",
+    })
+    image_url = result.get("imageUrl")
+    if not image_url:
+        raise RuntimeError(f"No direct hat matte URL for {accessory_id}: {result}")
+    download(image_url, review / "front-birefnet.png")
+    (review / "front-matting.json").write_text(json.dumps({
+        "id": accessory_id,
+        "model": MATTING_MODEL,
+        "modelProfile": result.get("falModelInput", "General Use (Heavy)"),
+        "operatingResolution": result.get("operatingResolution", "1024x1024"),
+        "refineForeground": result.get("refineForeground", True),
+        "imageUrl": image_url,
+    }, indent=2) + "\n", encoding="utf-8")
+
+
+def load_matted_hat_source(accessory_id: str) -> Image.Image:
+    review = hat_review_dir(accessory_id)
+    raw_path = review / "front-fal.png"
+    matte_path = review / "front-birefnet.png"
+    if not raw_path.exists() or not matte_path.exists():
+        raise SystemExit(f"Missing direct generated or BiRefNet source for {accessory_id}")
+    raw = Image.open(raw_path).convert("RGBA")
+    matte = Image.open(matte_path).convert("RGBA")
+    if raw.width != raw.height or matte.width != matte.height:
+        raise RuntimeError(f"Hat source must remain square: raw={raw.size}, matte={matte.size}")
+    alpha = matte.getchannel("A")
+    if alpha.size != raw.size:
+        alpha = alpha.resize(raw.size, Image.Resampling.LANCZOS)
+    raw.putalpha(alpha)
+    interior = alpha.point(lambda value: 255 if value > 250 else 0).filter(ImageFilter.MinFilter(9))
+    art = Image.composite(raw, matte.resize(raw.size, Image.Resampling.LANCZOS), interior)
+    return art.resize((2048, 2048), Image.Resampling.LANCZOS)
+
+
+def approve_hat_front(accessory_id: str) -> None:
+    review = hat_review_dir(accessory_id)
+    matte_path = review / "front-birefnet.png"
+    metadata_path = review / "front-generation.json"
+    if not matte_path.exists() or not metadata_path.exists():
+        raise SystemExit(f"Missing direct generated or BiRefNet source for {accessory_id}")
+    generation = json.loads(metadata_path.read_text(encoding="utf-8"))
+    if generation.get("model") != HAT_GENERATION_MODEL:
+        raise RuntimeError(f"Reviewed hat {accessory_id} was not generated with {HAT_GENERATION_MODEL}")
+    if generation.get("quality") != "low":
+        raise RuntimeError(f"Reviewed hat {accessory_id} was not generated at GPT Image quality low")
+    if generation.get("pipelineVersion") != HAT_PIPELINE_VERSION:
+        raise RuntimeError(f"Reviewed hat {accessory_id} uses a stale pipeline version")
+    if generation.get("styleContractVersion") != HAT_STYLE_CONTRACT_VERSION:
+        raise RuntimeError(f"Reviewed hat {accessory_id} uses a stale or missing style contract")
+    if generation.get("stage") != "style-map":
+        raise RuntimeError(f"Reviewed hat {accessory_id} did not complete the required style-map stage")
+    references = generation.get("references")
+    expected_style_references = {
+        ("character-art-style", str(BARISTABBIT.relative_to(ROOT)).replace("\\", "/")),
+        ("runtime-lighting-palette", str(TODAY_RUNTIME_BACKGROUND.relative_to(ROOT)).replace("\\", "/")),
+    }
+    recorded_style_references = {
+        (reference.get("role"), reference.get("path"))
+        for reference in references
+        if isinstance(reference, dict)
+    } if isinstance(references, list) else set()
+    if not any(
+        isinstance(reference, dict) and reference.get("role") == "exact-hat-geometry-edit-target"
+        for reference in references or []
+    ):
+        raise RuntimeError(f"Reviewed hat {accessory_id} is missing its exact geometry edit target")
+    if not expected_style_references.issubset(recorded_style_references):
+        raise RuntimeError(f"Reviewed hat {accessory_id} is missing the locked Baristabbit or Today style reference")
+    # Preserve normalized full-canvas placement. Never crop, recenter, or fit to
+    # a generic box: those operations reintroduce the floating-hat defect.
+    canvas = load_matted_hat_source(accessory_id)
+    source_bounds = canvas.getchannel("A").getbbox()
+    if not source_bounds:
+        raise RuntimeError(f"No visible hat in {matte_path}")
+    presentation = HAT_PRESENTATIONS[accessory_id]
+    scale = presentation["scale"]
+    offset_x = presentation["offsetX"] * 2048
+    offset_y = presentation["offsetY"] * 2048
+    bounds = tuple(round(1024 + (value - 1024) * scale + (offset_x if index % 2 == 0 else offset_y))
+                   for index, value in enumerate(source_bounds))
+    allowed = tuple(round(value * 2048) for value in ACCESSORY_BOUNDS["hat"])
+    if bounds[0] < allowed[0] - 4 or bounds[1] < allowed[1] - 4 or bounds[2] > allowed[2] + 4 or bounds[3] > allowed[3] + 4:
+        raise RuntimeError(f"Direct hat {accessory_id} escapes canonical bounds: {bounds} not within {allowed}")
+    directory = OUTPUT_DIR / "hats"
+    outputs = save_layer_asset(canvas, directory, directory / "thumbnails", accessory_id)
+    manifest = load_manifest()
+    manifest["artDirectionVersion"] = max(6, int(manifest.get("artDirectionVersion", 0)))
+    accessories = manifest.setdefault("accessories", {})
+    accessories["hatLayoutVersion"] = 2
+    accessories["hatPipelineVersion"] = HAT_PIPELINE_VERSION
+    accessories["hatStyleContractVersion"] = HAT_STYLE_CONTRACT_VERSION
+    accessories["hatReferences"] = [
+        {"path": "assets/images/katchimeras/egg-avatars/hats/<hat-id>.png", "role": "exact-hat-geometry-edit-target"},
+        {"path": str(BARISTABBIT.relative_to(ROOT)).replace("\\", "/"), "role": "character-art-style"},
+        {"path": str(TODAY_RUNTIME_BACKGROUND.relative_to(ROOT)).replace("\\", "/"), "role": "runtime-lighting-palette"},
+    ]
+    entry = accessories["hats"][accessory_id]
+    entry["version"] = 2
+    entry["accessoryLayoutVersion"] = 2
+    entry["pipelineVersion"] = HAT_PIPELINE_VERSION
+    entry["styleContractVersion"] = HAT_STYLE_CONTRACT_VERSION
+    entry.pop("selectedFitCandidate", None)
+    entry.pop("fitPrompt", None)
+    entry.pop("extractionPrompt", None)
+    entry["prompt"] = generation["prompt"]
+    entry["generationStage"] = generation.get("stage", "style-map")
+    entry["generationModel"] = HAT_GENERATION_MODEL
+    entry["generationQuality"] = generation["quality"]
+    entry["presentation"] = presentation
+    entry["mattingModel"] = MATTING_MODEL
+    entry["mattingSettings"] = {"model": "General Use (Heavy)", "refineForeground": True, "preserveNegativeSpace": True}
+    entry["normalization"] = "full-canvas-resize-only; no crop, recenter, or slot fitting"
+    entry["outputs"] = outputs
+    MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    print(f"approved direct visible-front hat {accessory_id}")
+
+
+def runtime_layer(image: Image.Image, scale: float, offset_x: float, offset_y: float) -> Image.Image:
+    size = round(2048 * scale)
+    resized = image.convert("RGBA").resize((size, size), Image.Resampling.LANCZOS)
+    left = round((2048 - size) / 2 + offset_x * 2048)
+    top = round((2048 - size) / 2 + offset_y * 2048)
+    canvas = Image.new("RGBA", (2048, 2048), (0, 0, 0, 0))
+    canvas.alpha_composite(resized, (left, top))
+    return canvas
+
+
+def make_hat_sheet(accessory_ids: tuple[str, ...], *, review_sources: bool, filename: str) -> Path:
+    cell_size = 384
+    background = cover_image(Image.open(TODAY_RUNTIME_BACKGROUND).convert("RGBA"), (cell_size, cell_size))
+    face = Image.open(FACES_DIR / f"{DEFAULT_FACE_ID}.png").convert("RGBA")
+    hats = {
+        accessory_id: (
+            load_matted_hat_source(accessory_id)
+            if review_sources
+            else Image.open(OUTPUT_DIR / "hats" / f"{accessory_id}.png").convert("RGBA")
+        )
+        for accessory_id in accessory_ids
+    }
+    sheet = Image.new("RGBA", (cell_size * len(accessory_ids), cell_size * len(BODY_PRESENTATIONS)), (30, 24, 20, 255))
+    for row, (skin_id, (body_scale, body_x, body_y)) in enumerate(BODY_PRESENTATIONS.items()):
+        body = Image.open(BASES_DIR / f"{skin_id}.png").convert("RGBA")
+        body_layer = runtime_layer(body, body_scale, body_x, body_y)
+        face_layer = runtime_layer(face, 0.92, 0, 0)
+        for column, accessory_id in enumerate(accessory_ids):
+            presentation = HAT_PRESENTATIONS[accessory_id]
+            hat = hats[accessory_id]
+            hat_layer = runtime_layer(
+                hat,
+                body_scale * presentation["scale"],
+                body_x + presentation["offsetX"],
+                body_y + presentation["offsetY"],
+            )
+            composite = Image.new("RGBA", (2048, 2048), (0, 0, 0, 0))
+            composite.alpha_composite(body_layer)
+            composite.alpha_composite(face_layer)
+            composite.alpha_composite(hat_layer)
+            cell = background.copy()
+            cell.alpha_composite(composite.resize((cell_size, cell_size), Image.Resampling.LANCZOS))
+            label = Image.new("RGBA", (cell_size, 30), (34, 26, 21, 190))
+            ImageDraw.Draw(label).text((10, 9), f"{skin_id} / {accessory_id}", fill=(255, 247, 232, 255))
+            cell.alpha_composite(label)
+            sheet.alpha_composite(cell, (column * cell_size, row * cell_size))
+    HAT_REVIEW_DIR.mkdir(parents=True, exist_ok=True)
+    path = HAT_REVIEW_DIR / filename
+    sheet.convert("RGB").save(path, quality=92)
+    print(path.relative_to(ROOT))
+    return path
+
+
+def make_hat_compatibility_sheet() -> Path:
+    return make_hat_sheet(HAT_IDS, review_sources=False, filename="compatibility-sheet.png")
+
+
+def make_hat_review_sheet(accessory_ids: tuple[str, ...]) -> Path:
+    suffix = "all" if accessory_ids == HAT_IDS else "-".join(accessory_ids)
+    return make_hat_sheet(accessory_ids, review_sources=True, filename=f"review-sheet-{suffix}.png")
+
+
+def run_hat_pipeline(accessory_ids: tuple[str, ...], *, phase: str) -> None:
+    if phase == "promote":
+        for accessory_id in accessory_ids:
+            approve_hat_front(accessory_id)
+        path = make_hat_compatibility_sheet()
+        print(f"Promoted reviewed hat source(s). Verify production compatibility: {path.relative_to(ROOT)}")
+        return
+    for accessory_id in accessory_ids:
+        if phase == "render":
+            generate_hat_front(accessory_id)
+            restyle_hat_front(accessory_id, use_production_source=False)
+        else:
+            restyle_hat_front(accessory_id, use_production_source=True)
+        matte_hat_front(accessory_id)
+    path = make_hat_review_sheet(accessory_ids)
+    print("Generation stopped at the required human review gate.")
+    print(f"Review the raw source, BiRefNet matte, and composite sheet: {path.relative_to(ROOT)}")
+    target = "all" if accessory_ids == HAT_IDS else accessory_ids[0]
+    print(f"After visual approval, run: python scripts/generate-egg-avatar-skins.py hat-pipeline {target} promote")
+
+
+def generate_accessory_source(source_dir: Path, accessory_id: str) -> None:
+    source_dir.mkdir(parents=True, exist_ok=True)
+    prompt = accessory_prompt(accessory_id)
+    print(f"generating FAL accessory {accessory_id}...", flush=True)
+    result = call_function("generate-katchimera-art", {
+        "modelId": GENERATION_MODEL,
+        "input": {
+            "image_urls": [image_data_uri(CLASSIC_APPROVED, max_side=1536)],
+            "aspect_ratio": "1:1",
+            "resolution": "2K",
+        },
+        "assetType": "other",
+        "assetKey": f"egg-avatar-accessory:{accessory_id}:v1",
+        "pipelineVersion": PIPELINE_VERSION,
+        "renderProfile": {
+            "id": f"egg_avatar_accessory_{accessory_id.replace('-', '_')}_v1",
+            "displayName": f"Egg avatar accessory {accessory_id}",
+            "topLevelType": "avatar-layer",
+            "triggerCategory": "egg-avatar",
+            "triggerSubtype": ACCESSORY_SPECS[accessory_id]["slot"],
+            "theme": accessory_id,
+            "creatureKind": "egg-avatar-accessory",
+            "caption": ACCESSORY_SPECS[accessory_id]["direction"],
+            "imagePrompt": prompt,
+        },
+    })
+    record = result.get("record") or {}
+    image_url = record.get("image_url")
+    if not image_url:
+        raise RuntimeError(f"No FAL accessory image URL for {accessory_id}: {result}")
+    download(image_url, source_dir / f"{accessory_id}-fal.png")
+    (source_dir / f"{accessory_id}-generation.json").write_text(json.dumps({
+        "id": accessory_id,
+        "prompt": prompt,
+        "model": GENERATION_MODEL,
+        "imageUrl": image_url,
+        "recordId": record.get("id"),
+    }, indent=2) + "\n", encoding="utf-8")
+
+
+def matte_accessory_source(source_dir: Path, accessory_id: str) -> None:
+    source = source_dir / f"{accessory_id}-fal.png"
+    if not source.exists():
+        raise SystemExit(f"Missing FAL source: {source}")
+    print(f"matting {accessory_id} with BiRefNet Heavy...", flush=True)
+    result = call_function("remove-image-background", {
+        "imageBase64": base64.b64encode(source.read_bytes()).decode(),
+        "outputName": f"egg-avatar-accessory-{accessory_id}-v1",
+    })
+    image_url = result.get("imageUrl")
+    if not image_url:
+        raise RuntimeError(f"No BiRefNet image URL for {accessory_id}: {result}")
+    download(image_url, source_dir / f"{accessory_id}-birefnet.png")
+    (source_dir / f"{accessory_id}-matting.json").write_text(json.dumps({
+        "id": accessory_id,
+        "model": MATTING_MODEL,
+        "modelProfile": result.get("falModelInput", "General Use (Heavy)"),
+        "operatingResolution": result.get("operatingResolution", "1024x1024"),
+        "refineForeground": result.get("refineForeground", True),
+        "imageUrl": image_url,
+    }, indent=2) + "\n", encoding="utf-8")
+
+
+def approve_accessory_source(source_dir: Path, accessory_id: str) -> None:
+    raw_path = source_dir / f"{accessory_id}-fal.png"
+    matte_path = source_dir / f"{accessory_id}-birefnet.png"
+    if not raw_path.exists() or not matte_path.exists():
+        raise SystemExit(f"Missing generated or BiRefNet source for {accessory_id}")
+    matte = Image.open(matte_path).convert("RGBA")
+    raw = Image.open(raw_path).convert("RGBA")
+    if raw.size != matte.size:
+        raw = raw.resize(matte.size, Image.Resampling.LANCZOS)
+    raw.putalpha(matte.getchannel("A"))
+    # Props can contain intentional negative spaces (handles, crown openings,
+    # hat undersides), so BiRefNet's alpha is authoritative and is never
+    # flood-filled. Only opaque interior RGB is restored from the FAL source.
+    interior = matte.getchannel("A").point(lambda value: 255 if value > 250 else 0).filter(ImageFilter.MinFilter(9))
+    art = Image.composite(raw, matte, interior)
+    bounds = art.getchannel("A").getbbox()
+    if not bounds:
+        raise RuntimeError(f"No visible accessory in {matte_path}")
+    subject = art.crop(bounds)
+    slot = ACCESSORY_SPECS[accessory_id]["slot"]
+    left, top, right, bottom = ACCESSORY_BOUNDS[slot]
+    subject.thumbnail((round((right - left) * 2048), round((bottom - top) * 2048)), Image.Resampling.LANCZOS)
+    x = round((left + right) * 1024 - subject.width / 2)
+    y = round(bottom * 2048 - subject.height)
+    canvas = Image.new("RGBA", (2048, 2048), (0, 0, 0, 0))
+    canvas.alpha_composite(subject, (x, y))
+    directory = OUTPUT_DIR / ("hats" if slot == "hat" else "held")
+    outputs = save_layer_asset(canvas, directory, directory / "thumbnails", accessory_id)
+    manifest = load_manifest()
+    accessories = manifest.setdefault("accessories", {})
+    accessories["generationModel"] = GENERATION_MODEL
+    accessories["matting"] = "fal-ai/birefnet/v2 General Use (Heavy), refined foreground; alpha preserved exactly"
+    entry = accessories["hats" if slot == "hat" else "held"][accessory_id]
+    entry.pop("keyColor", None)
+    entry["prompt"] = accessory_prompt(accessory_id)
+    entry["generationModel"] = GENERATION_MODEL
+    entry["mattingModel"] = MATTING_MODEL
+    entry["mattingSettings"] = {"model": "General Use (Heavy)", "refineForeground": True, "preserveNegativeSpace": True}
+    entry["outputs"] = outputs
+    MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    print(f"approved FAL/BiRefNet accessory {accessory_id}")
 
 
 def generate_layered_sources(source_dir: Path) -> None:
@@ -1143,7 +2087,10 @@ def image_metrics(path: Path) -> dict[str, Any]:
 
 
 def validate(skin_id: str | None = None) -> None:
-    ids = [skin_id] if skin_id else list(SKINS)
+    ids = [skin_id] if skin_id else [
+        body_id for body_id, item in load_body_specs().items()
+        if item["availability"] == "ready"
+    ]
     errors: list[str] = []
     manifest = load_manifest()
     if manifest.get("faceLayout") != FACE_LAYOUT:
@@ -1184,7 +2131,10 @@ def validate(skin_id: str | None = None) -> None:
                 errors.append(f"non-transparent layered base corner in {path.relative_to(ROOT)}")
         original_path = OUTPUT_DIR / f"{item}.png"
         base_path = BASES_DIR / f"{item}.png"
-        if original_path.exists() and base_path.exists():
+        separated_top_accessories = set(
+            manifest.get("accessories", {}).get("separatedTopAccessoryBodies", [])
+        )
+        if original_path.exists() and base_path.exists() and item not in separated_top_accessories:
             original = Image.open(original_path).convert("RGBA")
             base = Image.open(base_path).convert("RGBA")
             outside = Image.eval(face_removal_mask(original.size), lambda value: 255 if value == 0 else 0)
@@ -1236,6 +2186,76 @@ def validate(skin_id: str | None = None) -> None:
             errors.append(f"face layer contains {green_spill_pixels} visible key-color pixels: {face_id}")
         if visible_pixels and partial_pixels / visible_pixels > 0.08:
             errors.append(f"face layer has implausibly soft edges: {face_id}")
+    accessory_manifest = manifest.get("accessories", {})
+    if accessory_manifest.get("hatPipelineVersion") != HAT_PIPELINE_VERSION:
+        errors.append("manifest hat pipeline version is missing or stale")
+    if accessory_manifest.get("hatStyleContractVersion") != HAT_STYLE_CONTRACT_VERSION:
+        errors.append("manifest hat style contract is missing or stale")
+    expected_hat_references = {
+        ("character-art-style", str(BARISTABBIT.relative_to(ROOT)).replace("\\", "/")),
+        ("runtime-lighting-palette", str(TODAY_RUNTIME_BACKGROUND.relative_to(ROOT)).replace("\\", "/")),
+    }
+    recorded_hat_references = {
+        (reference.get("role"), reference.get("path"))
+        for reference in accessory_manifest.get("hatReferences", [])
+        if isinstance(reference, dict)
+    }
+    if not expected_hat_references.issubset(recorded_hat_references):
+        errors.append("manifest is missing the locked Baristabbit or Today hat style reference")
+    for slot, directory_name, bounds_key in [
+        ("hats", "hats", "hatBounds"),
+        ("held", "held", "heldBounds"),
+    ]:
+        directory = OUTPUT_DIR / directory_name
+        bounds = accessory_manifest.get(bounds_key)
+        if not isinstance(bounds, list) or len(bounds) != 4:
+            errors.append(f"manifest missing canonical {slot} bounds")
+            continue
+        for accessory_id, accessory_entry in accessory_manifest.get(slot, {}).items():
+            for path, expected_size in [
+                (directory / f"{accessory_id}.png", (2048, 2048)),
+                (directory / f"{accessory_id}.webp", (1024, 1024)),
+                (directory / "thumbnails" / f"{accessory_id}.webp", (256, 256)),
+            ]:
+                if not path.exists():
+                    errors.append(f"missing accessory layer {path.relative_to(ROOT)}")
+                    continue
+                metrics = image_metrics(path)
+                if tuple(metrics["size"]) != expected_size:
+                    errors.append(f"wrong accessory size {path.relative_to(ROOT)}: {metrics['size']}")
+                if any(metrics["corners"]):
+                    errors.append(f"non-transparent accessory corner in {path.relative_to(ROOT)}")
+            master = directory / f"{accessory_id}.png"
+            if master.exists():
+                alpha_bounds = Image.open(master).convert("RGBA").getchannel("A").getbbox()
+                if slot == "hats":
+                    presentation = accessory_entry.get("presentation")
+                    if not isinstance(presentation, dict):
+                        errors.append(f"hat missing runtime presentation: {accessory_id}")
+                    elif alpha_bounds:
+                        scale = float(presentation.get("scale", 1))
+                        offset_x = float(presentation.get("offsetX", 0)) * 2048
+                        offset_y = float(presentation.get("offsetY", 0)) * 2048
+                        alpha_bounds = tuple(
+                            round(1024 + (value - 1024) * scale + (offset_x if index % 2 == 0 else offset_y))
+                            for index, value in enumerate(alpha_bounds)
+                        )
+                    if accessory_entry.get("pipelineVersion") != HAT_PIPELINE_VERSION:
+                        errors.append(f"hat uses stale pipeline: {accessory_id}")
+                    if accessory_entry.get("styleContractVersion") != HAT_STYLE_CONTRACT_VERSION:
+                        errors.append(f"hat uses stale style contract: {accessory_id}")
+                    if accessory_entry.get("generationModel") != HAT_GENERATION_MODEL:
+                        errors.append(f"hat uses wrong generation model: {accessory_id}")
+                    if accessory_entry.get("generationQuality") != "low":
+                        errors.append(f"hat uses wrong GPT Image quality: {accessory_id}")
+                allowed = tuple(round(value * 2048) for value in bounds)
+                if alpha_bounds and (
+                    alpha_bounds[0] < allowed[0] - 4
+                    or alpha_bounds[1] < allowed[1] - 4
+                    or alpha_bounds[2] > allowed[2] + 4
+                    or alpha_bounds[3] > allowed[3] + 4
+                ):
+                    errors.append(f"accessory escapes canonical {slot} bounds: {accessory_id}")
     if errors:
         raise SystemExit("\n".join(errors))
     print(f"validated {len(ids)} egg-avatar skin(s)")
@@ -1252,7 +2272,7 @@ def main() -> None:
         if command == "approve":
             child.add_argument("--candidate", type=int, required=True)
     check = sub.add_parser("validate")
-    check.add_argument("--skin", choices=SKINS.keys())
+    check.add_argument("--skin", choices=BODY_SPECS.keys())
     gameplay_generation = sub.add_parser("gameplay-generate")
     gameplay_generation.add_argument("--count", type=int, default=3)
     sub.add_parser("gameplay-matte")
@@ -1272,6 +2292,46 @@ def main() -> None:
     generate_layers.add_argument("--source-dir", type=Path, required=True)
     matte_layers = sub.add_parser("layered-matte")
     matte_layers.add_argument("--source-dir", type=Path, required=True)
+    for command in ("accessory-base-generate", "accessory-base-matte", "accessory-base-approve"):
+        child = sub.add_parser(command)
+        child.add_argument("--source-dir", type=Path, required=True)
+        child.add_argument("--skin", required=True, choices=ACCESSORY_READY_SKINS)
+    for command in ("accessory-generate", "accessory-matte", "accessory-approve"):
+        child = sub.add_parser(command)
+        child.add_argument("--source-dir", type=Path, required=True)
+        child.add_argument("--id", required=True, choices=HELD_IDS)
+    hat_generation = sub.add_parser("hat-generate")
+    hat_generation.add_argument("--id", required=True, choices=HAT_IDS)
+    hat_matte = sub.add_parser("hat-matte")
+    hat_matte.add_argument("--id", required=True, choices=HAT_IDS)
+    hat_approval = sub.add_parser("hat-approve")
+    hat_approval.add_argument("--id", required=True, choices=HAT_IDS)
+    sub.add_parser("hat-compatibility-sheet")
+    hat_review = sub.add_parser("hat-review-sheet")
+    hat_review.add_argument("target", choices=(*HAT_IDS, "all"))
+    hat_pipeline = sub.add_parser("hat-pipeline")
+    hat_pipeline.add_argument("target", choices=(*HAT_IDS, "all"))
+    hat_pipeline.add_argument(
+        "phase",
+        nargs="?",
+        default="render",
+        choices=("render", "restyle", "promote"),
+        help="Render creates new geometry then style-maps it; restyle edits production geometry; promote writes reviewed files.",
+    )
+    body_draft = sub.add_parser("body-draft")
+    body_draft.add_argument("target", choices=(*BODY_SPECS.keys(), "starter-batch", "costume-batch", "mixed-batch", "all"))
+    body_draft.add_argument(
+        "phase",
+        nargs="?",
+        default="render",
+        choices=("render", "matte", "promote"),
+        help="Render creates, mattes, and promotes; matte reruns BiRefNet before promotion; promote uses existing draft files.",
+    )
+    body_draft.add_argument(
+        "--review-only",
+        action="store_true",
+        help="Keep generated files under .tmp instead of promoting them into the runtime catalog.",
+    )
     args = parser.parse_args()
     if args.command == "generate":
         generate(args.skin, args.count)
@@ -1297,6 +2357,39 @@ def main() -> None:
         generate_layered_sources(args.source_dir)
     elif args.command == "layered-matte":
         matte_layered_sources(args.source_dir)
+    elif args.command == "accessory-base-generate":
+        generate_accessory_ready_base(args.source_dir, args.skin)
+    elif args.command == "accessory-base-matte":
+        matte_accessory_ready_base(args.source_dir, args.skin)
+    elif args.command == "accessory-base-approve":
+        approve_accessory_ready_base(args.source_dir, args.skin)
+    elif args.command == "accessory-generate":
+        generate_accessory_source(args.source_dir, args.id)
+    elif args.command == "accessory-matte":
+        matte_accessory_source(args.source_dir, args.id)
+    elif args.command == "accessory-approve":
+        approve_accessory_source(args.source_dir, args.id)
+    elif args.command == "hat-generate":
+        generate_hat_front(args.id)
+    elif args.command == "hat-matte":
+        matte_hat_front(args.id)
+    elif args.command == "hat-approve":
+        approve_hat_front(args.id)
+    elif args.command == "hat-compatibility-sheet":
+        make_hat_compatibility_sheet()
+    elif args.command == "hat-review-sheet":
+        make_hat_review_sheet(HAT_IDS if args.target == "all" else (args.target,))
+    elif args.command == "hat-pipeline":
+        run_hat_pipeline(HAT_IDS if args.target == "all" else (args.target,), phase=args.phase)
+    elif args.command == "body-draft":
+        body_ids = (
+            PLANNED_BODY_IDS if args.target == "all"
+            else STARTER_BODY_BATCH if args.target == "starter-batch"
+            else NEXT_COSTUME_BODY_BATCH if args.target == "costume-batch"
+            else MIXED_BODY_BATCH if args.target == "mixed-batch"
+            else (args.target,)
+        )
+        run_planned_body_drafts(body_ids, phase=args.phase, review_only=args.review_only)
     else:
         gameplay_approve(args.crack_one, args.crack_two)
 

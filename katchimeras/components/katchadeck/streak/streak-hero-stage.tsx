@@ -1,5 +1,4 @@
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useEffect, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
@@ -14,15 +13,28 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
+import { EggAvatarArtwork } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
+import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
+import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { getCreatureVisual } from '@/game/days';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import type { HomeVisualKey } from '@/types/home';
 
 const EGG_SOURCE = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
-const RAYS = Array.from({ length: 16 }, (_, index) => index);
 
-export const StreakHeroStage = memo(function StreakHeroStage({ size }: { size: number }) {
+export const StreakHeroStage = memo(function StreakHeroStage({
+  heroMode = 'latest-katchimera',
+  rayScale = 1,
+  rayStrength = 0.76,
+  size,
+}: {
+  heroMode?: 'active-egg-avatar' | 'latest-katchimera';
+  rayScale?: number;
+  rayStrength?: number;
+  size: number;
+}) {
   const reduceMotion = useReducedMotion();
+  const { equippedFaceId, equippedSkinId } = useEggAvatar();
   const float = useSharedValue(0);
   const hero = useMemo(resolveHero, []);
 
@@ -44,26 +56,35 @@ export const StreakHeroStage = memo(function StreakHeroStage({ size }: { size: n
   }, [float, reduceMotion]);
 
   const floatingStyle = useAnimatedStyle(() => ({ transform: [{ translateY: float.value }] }));
-  const artSize = size * 0.57;
+  const showsEggAvatar = heroMode === 'active-egg-avatar';
+  const artSize = size * (showsEggAvatar ? 0.64 : 0.57);
+  const raySize = size * rayScale;
+  const rayOffset = (size - raySize) / 2;
 
   return (
-    <View accessibilityLabel={hero.name} style={{ height: size, width: size }}>
-      <View pointerEvents="none" style={styles.rays}>
-        {RAYS.map((index) => (
-          <View key={index} style={[styles.rayFrame, { transform: [{ rotate: `${index * 22.5}deg` }] }]}>
-            <LinearGradient
-              colors={['rgba(255,250,211,0.52)', 'rgba(244,202,96,0.16)', 'rgba(244,202,96,0)']}
-              end={{ x: 0.5, y: 0 }}
-              start={{ x: 0.5, y: 1 }}
-              style={[styles.ray, { height: size * 0.46, left: size / 2 - 7, top: size * 0.04 }]}
-            />
-          </View>
-        ))}
-        <View style={[styles.halo, { height: size * 0.58, left: size * 0.21, top: size * 0.21, width: size * 0.58 }]} />
-      </View>
+    <View accessibilityLabel={showsEggAvatar ? 'Your active egg avatar' : hero.name} style={{ height: size, width: size }}>
+      <RotatingRadialSunburst
+        baseOpacity={rayStrength}
+        size={raySize}
+        style={[styles.rays, { left: rayOffset, top: rayOffset }]}
+      />
       <Animated.View style={[styles.artFrame, { height: artSize, left: (size - artSize) / 2, top: size * 0.2, width: artSize }, floatingStyle]}>
-        {hero.visualKey ? <CreatureGroundShadow frameSize={artSize} visualKey={hero.visualKey} /> : <View style={styles.eggShadow} />}
-        <Image accessibilityLabel={hero.name} contentFit="contain" source={hero.source} style={StyleSheet.absoluteFill} transition={0} />
+        {showsEggAvatar || !hero.visualKey
+          ? <View style={styles.eggShadow} />
+          : <CreatureGroundShadow frameSize={artSize} visualKey={hero.visualKey} />}
+        {showsEggAvatar ? (
+          <EggAvatarArtwork
+            allowDownscaling={false}
+            faceId={equippedFaceId}
+            priority="high"
+            resolution="high"
+            skinId={equippedSkinId}
+            style={StyleSheet.absoluteFill}
+            transition={140}
+          />
+        ) : (
+          <Image accessibilityLabel={hero.name} contentFit="contain" source={hero.source} style={StyleSheet.absoluteFill} transition={0} />
+        )}
       </Animated.View>
     </View>
   );
@@ -85,10 +106,7 @@ function resolveHero(): { name: string; source: ReturnType<typeof getCreatureVis
 }
 
 const styles = StyleSheet.create({
-  rays: { ...StyleSheet.absoluteFillObject, borderRadius: 999, overflow: 'hidden' },
-  rayFrame: { ...StyleSheet.absoluteFillObject },
-  ray: { borderRadius: 999, position: 'absolute', width: 14 },
-  halo: { backgroundColor: 'rgba(255,245,190,0.42)', borderColor: 'rgba(255,255,255,0.66)', borderRadius: 999, borderWidth: 2, position: 'absolute' },
+  rays: { position: 'absolute' },
   artFrame: { position: 'absolute' },
   eggShadow: { alignSelf: 'center', backgroundColor: 'rgba(28,50,50,0.18)', borderRadius: 999, bottom: '8%', height: '10%', position: 'absolute', width: '48%' },
 });

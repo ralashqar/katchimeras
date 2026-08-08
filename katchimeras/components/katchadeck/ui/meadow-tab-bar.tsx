@@ -1,6 +1,5 @@
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
 import { Fragment } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EggAvatar } from '@/components/katchadeck/egg-avatar/egg-avatar';
 import { ThemedText } from '@/components/themed-text';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
+import { useEggAvatarCustomizerMode } from '@/features/egg-avatar/egg-avatar-customizer-mode';
 import { homeTabBarHeight, HOME_TAB_BAR_MIN_BOTTOM_PADDING } from '@/constants/home-loop-layout';
 import { Lantern } from '@/constants/theme';
 import { Meadow } from '@/constants/meadow-theme';
@@ -24,8 +24,8 @@ const INACTIVE = 'rgba(226, 221, 238, 0.72)';
 
 export function MeadowTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const { equippedFaceId, equippedSkinId } = useEggAvatar();
+  const { active: customizerActive, close: closeCustomizer, open: openCustomizer } = useEggAvatarCustomizerMode();
   const bottomPadding = Math.max(insets.bottom, HOME_TAB_BAR_MIN_BOTTOM_PADDING);
   const items = state.routes.filter((route) => {
     if (HIDDEN_ROUTES.has(route.name)) return false;
@@ -45,12 +45,14 @@ export function MeadowTabBar({ state, descriptors, navigation }: BottomTabBarPro
       ]}>
       {items.map((route, index) => {
         const { options } = descriptors[route.key];
-        const focused = state.routes[state.index]?.key === route.key;
+        const routeFocused = state.routes[state.index]?.key === route.key;
+        const focused = route.name === 'today' ? routeFocused && !customizerActive : routeFocused;
         const color = focused ? Meadow.navActive : INACTIVE;
         const onPress = () => {
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          if (customizerActive) closeCustomizer();
           const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-          if (!focused && !event.defaultPrevented) {
+          if (!routeFocused && !event.defaultPrevented) {
             navigation.navigate(route.name);
           }
         };
@@ -79,14 +81,15 @@ export function MeadowTabBar({ state, descriptors, navigation }: BottomTabBarPro
         accessibilityRole="button"
         onPress={() => {
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          router.push('/profile');
+          openCustomizer();
+          navigation.navigate('today', { customize: String(Date.now()) });
         }}
-        style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
+        style={({ pressed }) => [styles.item, customizerActive && styles.itemActive, pressed && styles.itemPressed]}
       >
         <View style={styles.avatarIcon}>
           <EggAvatar faceId={equippedFaceId} presentation="button" size={30} skinId={equippedSkinId} />
         </View>
-        <ThemedText numberOfLines={1} style={styles.label} lightColor={INACTIVE} darkColor={INACTIVE}>
+        <ThemedText numberOfLines={1} style={styles.label} lightColor={customizerActive ? Meadow.navActive : INACTIVE} darkColor={customizerActive ? Meadow.navActive : INACTIVE}>
           YOU
         </ThemedText>
       </Pressable>

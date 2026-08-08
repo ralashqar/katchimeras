@@ -1,16 +1,18 @@
-import type { EggAvatarFaceId, EggAvatarSelectionState, EggAvatarSkinId } from '@/types/egg-avatar';
+import type { EggAvatarFaceId, EggAvatarHatId, EggAvatarHeldAccessoryId, EggAvatarSelectionState, EggAvatarSkinId } from '@/types/egg-avatar';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { DEFAULT_EGG_AVATAR_SELECTION, normalizeEggAvatarSelection } from '@/utils/egg-avatar-rules';
 
-export const EGG_AVATAR_STORAGE_KEY = 'katchimera.egg-avatar.v2';
+export const EGG_AVATAR_STORAGE_KEY = 'katchimera.egg-avatar.v3';
+export const VERSION_TWO_EGG_AVATAR_STORAGE_KEY = 'katchimera.egg-avatar.v2';
 export const LEGACY_EGG_AVATAR_STORAGE_KEY = 'katchimera.egg-avatar.v1';
 
 export function loadEggAvatarSelection(): EggAvatarSelectionState {
   const current = getStoredJson<unknown>(EGG_AVATAR_STORAGE_KEY, null);
   if (current) return normalizeEggAvatarSelection(current);
-  const migrated = normalizeEggAvatarSelection(
-    getStoredJson<unknown>(LEGACY_EGG_AVATAR_STORAGE_KEY, DEFAULT_EGG_AVATAR_SELECTION)
-  );
+  const migrated = normalizeEggAvatarSelection(getStoredJson<unknown>(
+    VERSION_TWO_EGG_AVATAR_STORAGE_KEY,
+    getStoredJson<unknown>(LEGACY_EGG_AVATAR_STORAGE_KEY, DEFAULT_EGG_AVATAR_SELECTION),
+  ));
   saveEggAvatarSelection(migrated);
   return migrated;
 }
@@ -29,6 +31,20 @@ export function equipEggAvatarSkin(skinId: EggAvatarSkinId): EggAvatarSelectionS
 export function equipEggAvatarFace(faceId: EggAvatarFaceId): EggAvatarSelectionState {
   const current = loadEggAvatarSelection();
   const next: EggAvatarSelectionState = { ...current, equippedFaceId: faceId };
+  saveEggAvatarSelection(next);
+  return next;
+}
+
+export function equipEggAvatarHat(hatId: EggAvatarHatId | null): EggAvatarSelectionState {
+  const current = loadEggAvatarSelection();
+  const next: EggAvatarSelectionState = { ...current, equippedHatId: hatId };
+  saveEggAvatarSelection(next);
+  return next;
+}
+
+export function equipEggAvatarHeldAccessory(accessoryId: EggAvatarHeldAccessoryId | null): EggAvatarSelectionState {
+  const current = loadEggAvatarSelection();
+  const next: EggAvatarSelectionState = { ...current, equippedHeldAccessoryId: accessoryId };
   saveEggAvatarSelection(next);
   return next;
 }

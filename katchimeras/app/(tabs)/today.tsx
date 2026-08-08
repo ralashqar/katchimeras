@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import {
   ActivityIndicator,
@@ -58,6 +58,7 @@ import {
 import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
 import { DayPromptStrip } from '@/components/katchadeck/home/day-prompt-strip';
 import { EggFeedOverlay } from '@/components/katchadeck/home/egg-feed-overlay';
+import { EggAvatarProfileScreen } from '@/components/katchadeck/egg-avatar/egg-avatar-profile-screen';
 import { TodayCategoryRing, type TodayCategoryRingItem } from '@/components/katchadeck/home/today-category-ring';
 import { TodayBottomDock } from '@/components/katchadeck/home/today-bottom-dock';
 import {
@@ -112,6 +113,7 @@ import { useTodayEnergyLoop } from '@/features/today/use-today-energy-loop';
 import { useTodayEnergyFrameProbe } from '@/features/today/use-today-energy-frame-probe';
 import { TodayEnergyProfiler } from '@/features/today/today-energy-profiler';
 import { useAppActivity } from '@/features/performance/app-activity';
+import { useEggAvatarCustomizerMode } from '@/features/egg-avatar/egg-avatar-customizer-mode';
 import { resolveHomeLoopPresentation } from '@/features/today/home-loop-presentation';
 import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
 import { MemoryClarificationSheet } from '@/components/katchadeck/world/memory-clarification-sheet';
@@ -127,6 +129,7 @@ import { trackStreakEvent } from '@/utils/streak-sync';
 import { defaultStreakCaptureTarget } from '@/utils/streak-engine';
 import { hatchCheckInEligibility } from '@/utils/hatch-check-in';
 import { loadWorldIdentity } from '@/utils/world-identity';
+import { eggAvatarCustomizerCamera } from '@/utils/egg-avatar-customizer-camera';
 import {
   todayExplorationCreatureStageFrame,
   todayExplorationEggStageFrame,
@@ -211,8 +214,21 @@ export default function TodayRouteScreen() {
 
 function HomeScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ customize?: string }>();
+  const { active: customizerActive, close: closeCustomizer, open: openCustomizer } = useEggAvatarCustomizerMode();
   const { beginCriticalInteraction, criticalInteractionActive } = useAppActivity();
   const screenFocused = useIsFocused();
+  useEffect(() => {
+    if (params.customize) openCustomizer();
+  }, [openCustomizer, params.customize]);
+  useEffect(() => {
+    if (!customizerActive) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      closeCustomizer();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [closeCustomizer, customizerActive]);
   const [growthNow, setGrowthNow] = useState(() => new Date());
   useEffect(() => {
     if (!screenFocused) return;
@@ -437,6 +453,7 @@ function HomeScreen() {
   const [clarificationMemory, setClarificationMemory] = useState<ClassifiedMemory | null>(null);
   const reduceMotion = useReducedMotion();
   const goalsFocusProgress = useSharedValue(0);
+  const customizerFocusProgress = useSharedValue(0);
   const backfillStatus = useBackfillStatus();
   const {
     eggFeed,
@@ -1384,7 +1401,7 @@ function HomeScreen() {
     timelineDays,
     isTodayHatched,
     isHatching,
-    promptSheetOpen: promptSheetOpen || hatchCheckInOpen || quickGoalsOpen,
+    promptSheetOpen: promptSheetOpen || hatchCheckInOpen || quickGoalsOpen || customizerActive,
     comicOpen: Boolean(comicGen),
     deferCaptureRewardToCare: pendingCareIntent?.completionKey === 'photo',
     selectTimelineDay,
@@ -1529,7 +1546,7 @@ function HomeScreen() {
     selectedDayId,
   ]);
   const { environmentGesture, environmentMotion } = useTodayEnvironmentMotion({
-    enabled: !flowBusy,
+    enabled: !flowBusy && !customizerActive,
     hoverEnabled: !explorationPresentationActive,
     maxPinchScale: explorationPresentationActive
       ? todayScene.homeEnvironment.motion.explorationMaxPinchScale
@@ -1559,6 +1576,14 @@ function HomeScreen() {
         });
   }, [goalsFocusProgress, quickGoalsOpen, reduceMotion]);
   useEffect(() => {
+    customizerFocusProgress.value = reduceMotion
+      ? customizerActive ? 1 : 0
+      : withTiming(customizerActive ? 1 : 0, {
+          duration: 360,
+          easing: Easing.inOut(Easing.cubic),
+        });
+  }, [customizerActive, customizerFocusProgress, reduceMotion]);
+  useEffect(() => {
     if (!quickGoalsOpen) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (quickGoalSheetMode) {
@@ -1577,6 +1602,18 @@ function HomeScreen() {
   const goalsChromeStyle = useAnimatedStyle(() => ({
     opacity: 1 - goalsFocusProgress.value,
   }));
+  const customizerCamera = useMemo(() => eggAvatarCustomizerCamera({
+    bottomInset: insets.bottom,
+    subjectCenterY: resolvedHeroStageTop + explorationSubjectFrame.centerY,
+    topInset: insets.top,
+    viewportHeight: windowHeight,
+  }), [explorationSubjectFrame.centerY, insets.bottom, insets.top, resolvedHeroStageTop, windowHeight]);
+  const customizerCameraStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: customizerCamera.translateY * customizerFocusProgress.value },
+      { scale: 1 + (customizerCamera.scale - 1) * customizerFocusProgress.value },
+    ],
+  }));
   const goalsListTop = Math.max(
     insets.top + 248,
     Math.min(390, windowHeight * (windowHeight < 735 ? 0.4 : 0.43)),
@@ -1587,7 +1624,7 @@ function HomeScreen() {
     <View style={styles.screen}>
       {!isForming ? (
       <>
-      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, goalsSceneLiftStyle]}>
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, goalsSceneLiftStyle, customizerCameraStyle]}>
       {isHatching ? (
         <TodayHatchEnvironmentCrossfade
           imageSize={Math.max(windowHeight, windowWidth)}
@@ -1690,6 +1727,7 @@ function HomeScreen() {
       <ScrollView
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}
         contentInsetAdjustmentBehavior="never"
+        pointerEvents={customizerActive ? 'none' : 'auto'}
         style={styles.contentPlane}
         scrollEnabled={false}
         bounces={false}
@@ -1697,7 +1735,7 @@ function HomeScreen() {
         <Animated.View
           entering={presenceEnter(20)}
           pointerEvents={quickGoalsOpen ? 'none' : 'auto'}
-          style={[styles.timelineLayer, goalsChromeStyle]}>
+          style={[styles.timelineLayer, goalsChromeStyle, customizerActive && styles.customizerChromeHidden]}>
           <LanternTimeline
             days={timelineDays}
             hatchPresentation={hatchPresentation}
@@ -1711,7 +1749,7 @@ function HomeScreen() {
           ref={heroStageRef}
           entering={presenceEnter(70)}
           onLayout={handleHeroStageLayout}
-          style={[styles.heroStage, goalsSceneLiftStyle]}>
+          style={[styles.heroStage, goalsSceneLiftStyle, customizerCameraStyle]}>
           {explorationPresentationActive && selectedDay ? (
             <>
               {displayedExplorationPrevious ? (
@@ -1747,7 +1785,7 @@ function HomeScreen() {
                   displayedExplorationCurrent?.backgroundKey != null,
                 )}
                 {renderTimelineOverlay(selectedDay, true)}
-                {voiceNote.phase !== 'idle' && !quickNoteOpen ? (
+                {voiceNote.phase !== 'idle' && !quickNoteOpen && !customizerActive ? (
                   <TodayKingdomEggAboveOverlay
                     explorationStageTop={resolvedHeroStageTop}
                     homeArchetypeId={homeArchetypeId}>
@@ -1757,7 +1795,7 @@ function HomeScreen() {
                     />
                   </TodayKingdomEggAboveOverlay>
                 ) : null}
-                {!hasVisibleLegacyPrompt && !quickGoalsOpen ? (
+                {!hasVisibleLegacyPrompt && !quickGoalsOpen && !customizerActive ? (
                   <TodayCategoryRing
                     categories={goalRingItems}
                     onPress={() => setQuickGoalsOpen(true)}
@@ -1810,7 +1848,7 @@ function HomeScreen() {
                 renderDay={renderTimelineHero}
                 renderDayOverlay={renderTimelineOverlay}
               />
-              {voiceNote.phase !== 'idle' && !quickNoteOpen ? (
+              {voiceNote.phase !== 'idle' && !quickNoteOpen && !customizerActive ? (
                 <TodayKingdomEggAboveOverlay homeArchetypeId={homeArchetypeId}>
                   <InlineVoiceNote
                     elapsed={voiceNote.elapsed}
@@ -1820,7 +1858,7 @@ function HomeScreen() {
               ) : null}
               {/* The same category ring circles the hatched creature when
                   revisiting a day, anchored to the shared art stage. */}
-              {(isForming || isHatched) && !isHatching && !hasVisibleLegacyPrompt && !quickGoalsOpen ? (
+              {(isForming || isHatched) && !isHatching && !hasVisibleLegacyPrompt && !quickGoalsOpen && !customizerActive ? (
                 <TodayCategoryRing
                   categories={goalRingItems}
                   onPress={() => setQuickGoalsOpen(true)}
@@ -1835,7 +1873,7 @@ function HomeScreen() {
         {isHatching ? null : isHatched ? (
           null
         ) : (
-          <Animated.View entering={presenceEnter(120)} style={styles.formingCopy}>
+          <Animated.View entering={presenceEnter(120)} style={[styles.formingCopy, customizerActive && styles.customizerChromeHidden]}>
             {/* The forming quote AND tomorrow's one-liner are hidden — the week
                 strip's egg orb + the panel below already tell the story. */}
             {isForming ? (
@@ -1871,6 +1909,7 @@ function HomeScreen() {
           day={formingDay}
           eggTargetRef={eggTargetRef}
           feedbackKey={eggFeedKey}
+          focusMode={customizerActive}
           growth={nurtureGrowth}
           homeArchetypeId={homeArchetypeId}
           microcopy={microcopy}
@@ -2368,6 +2407,7 @@ function HomeScreen() {
         onRetry={handleRetryComic}
         onShare={handleShareGeneratedComic}
       />
+      {customizerActive ? <EggAvatarProfileScreen bottomInset={insets.bottom} /> : null}
     </View>
     </GestureDetector>
     </TodayEnvironmentMotionProvider>
@@ -2376,6 +2416,7 @@ function HomeScreen() {
 
 const styles = StyleSheet.create({
   inactiveScreen: { backgroundColor: '#11131B', flex: 1 },
+  customizerChromeHidden: { opacity: 0 },
   screen: {
     backgroundColor: Lantern.ink950,
     flex: 1,

@@ -7,6 +7,7 @@ import { MeadowTabBar } from '@/components/katchadeck/ui/meadow-tab-bar';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
+import { EggAvatarCustomizerModeProvider } from '@/features/egg-avatar/egg-avatar-customizer-mode';
 
 // Today is the daily capture surface. The lightweight Katchimeras roster is
 // visible in navigation; the persistent world route remains registered but
@@ -23,7 +24,7 @@ export default function TabLayout() {
   }
 
   return (
-    <>
+    <EggAvatarCustomizerModeProvider>
       <DayCaptureSession />
       <StreakBootstrap />
       <Tabs
@@ -93,6 +94,6 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
-    </>
+    </EggAvatarCustomizerModeProvider>
   );
 }

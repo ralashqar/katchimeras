@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "katchimeras://egg-avatar-catalog.schema.json",
+  "title": "Egg Avatar Category Catalogue",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "category", "items"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "category": { "enum": ["body", "face", "hat", "held"] },
+    "items": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/item" }
+    }
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "description", "visualDesign", "rarity", "access", "availability", "assetRefs", "sortOrder", "version", "layoutVersion"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "visualDesign": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["summary", "palette", "shapeLanguage", "constraints"],
+          "properties": {
+            "summary": { "type": "string", "minLength": 1 },
+            "palette": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+            "shapeLanguage": { "type": "string", "minLength": 1 },
+            "constraints": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+          }
+        },
+        "rarity": { "enum": ["common", "rare", "epic", "legendary"] },
+        "access": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "essencePrice"],
+          "properties": {
+            "mode": { "enum": ["free", "premium", "essence"] },
+            "essencePrice": { "type": ["integer", "null"], "minimum": 1 }
+          }
+        },
+        "availability": { "enum": ["ready", "planned"] },
+        "assetRefs": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["high", "app", "thumbnail"],
+              "properties": {
+                "high": { "type": "string", "minLength": 1 },
+                "app": { "type": "string", "minLength": 1 },
+                "thumbnail": { "type": "string", "minLength": 1 }
+              }
+            }
+          ]
+        },
+        "isDefault": { "type": "boolean" },
+        "sortOrder": { "type": "integer", "minimum": 1 },
+        "version": { "type": "integer", "minimum": 1 },
+        "layoutVersion": { "type": "integer", "minimum": 1 },
+        "presentation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scale", "offsetX", "offsetY"],
+          "properties": {
+            "scale": { "type": "number", "exclusiveMinimum": 0 },
+            "offsetX": { "type": "number" },
+            "offsetY": { "type": "number" }
+          }
+        }
+      }
+    }
+  }
+}

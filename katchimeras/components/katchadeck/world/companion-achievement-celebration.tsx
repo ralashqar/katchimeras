@@ -1,10 +1,4 @@
 import * as Haptics from 'expo-haptics';
-import {
-  Canvas,
-  Circle,
-  RadialGradient as SkiaRadialGradient,
-  vec,
-} from '@shopify/react-native-skia';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
@@ -29,6 +23,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { companionAchievementIconSource } from '@/constants/achievement-icon-sources';
 import { katchimeraFamilyById } from '@/constants/katchimera-skins';
@@ -43,12 +38,7 @@ const TRANSITION_OUT_MS = 180;
 const SPLASH_GOLD = '#F6C653';
 const SPLASH_GOLD_DEEP = '#75450A';
 const SPLASH_INK = '#173D57';
-const ACHIEVEMENT_RAY_COUNT = 18;
 const CONFETTI_LOOP_MS = 3_400;
-const ACHIEVEMENT_RAY_INDICES = Array.from(
-  { length: ACHIEVEMENT_RAY_COUNT },
-  (_, index) => index,
-);
 
 type Props = {
   achievements: readonly CompanionAchievementDef[];
@@ -175,7 +165,7 @@ export function CompanionAchievementCelebration({
               </View>
 
               <View style={[styles.hero, { height: raySize, width: raySize }]}>
-                <AchievementRays size={raySize} />
+                <RotatingRadialSunburst baseOpacity={0.9} size={raySize} style={styles.rays} />
                 <Animated.View
                   entering={reduceMotion ? FadeIn.duration(100) : FadeIn.duration(220).delay(80)}
                   style={[
@@ -327,115 +317,6 @@ function BreathingAchievementIcon({
   );
 }
 
-function AchievementRays({ size }: { size: number }) {
-  const reduceMotion = useReducedMotion();
-  const rotation = useSharedValue(0);
-  const breath = useSharedValue(0);
-  useEffect(() => {
-    cancelAnimation(rotation);
-    cancelAnimation(breath);
-    if (reduceMotion) {
-      rotation.value = 0;
-      breath.value = 0.45;
-      return;
-    }
-    rotation.value = withRepeat(withTiming(360, { duration: 32_000, easing: Easing.linear }), -1, false);
-    breath.value = withRepeat(withTiming(1, { duration: 2_800, easing: Easing.inOut(Easing.sin) }), -1, true);
-    return () => {
-      cancelAnimation(rotation);
-      cancelAnimation(breath);
-    };
-  }, [breath, reduceMotion, rotation]);
-  const style = useAnimatedStyle(() => ({
-    opacity: 0.76 + breath.value * 0.1,
-    transform: [
-      { rotate: `${rotation.value}deg` },
-      { scale: 0.985 + breath.value * 0.03 },
-    ],
-  }));
-  return (
-    <Animated.View pointerEvents="none" style={[styles.rays, { height: size, width: size }, style]}>
-      <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}>
-        <Circle cx={size / 2} cy={size / 2} r={size * 0.39}>
-          <SkiaRadialGradient
-            c={vec(size / 2, size / 2)}
-            colors={[
-              'rgba(255, 252, 218, 0.82)',
-              'rgba(255, 230, 121, 0.38)',
-              'rgba(255, 211, 74, 0.12)',
-              'rgba(255, 205, 62, 0)',
-            ]}
-            positions={[0, 0.34, 0.7, 1]}
-            r={size * 0.39}
-          />
-        </Circle>
-      </Canvas>
-      {ACHIEVEMENT_RAY_INDICES.map((index) => {
-        const longRay = index % 3 === 0;
-        const rayLength = size * (longRay ? 0.47 : index % 2 === 0 ? 0.42 : 0.38);
-        const rayWidth = size * (longRay ? 0.024 : 0.015);
-        const haloWidth = rayWidth * 2.6;
-        const rayTop = size / 2 - rayLength;
-        return (
-          <View
-            key={index}
-            style={[styles.raySpokeFrame, { transform: [{ rotate: `${index * (360 / ACHIEVEMENT_RAY_COUNT)}deg` }] }]}>
-            <LinearGradient
-              colors={[
-                'rgba(255, 242, 167, 0.48)',
-                'rgba(255, 226, 104, 0.3)',
-                'rgba(255, 211, 66, 0.11)',
-                'rgba(255, 204, 54, 0)',
-              ]}
-              end={{ x: 0.5, y: 0 }}
-              locations={[0, 0.55, 0.78, 1]}
-              start={{ x: 0.5, y: 1 }}
-              style={[
-                styles.rayBeam,
-                {
-                  borderRadius: haloWidth / 2,
-                  height: rayLength,
-                  left: size / 2 - haloWidth / 2,
-                  top: rayTop,
-                  width: haloWidth,
-                },
-              ]}
-            />
-            <LinearGradient
-              colors={longRay
-                ? [
-                    'rgba(255, 253, 220, 0.96)',
-                    'rgba(255, 236, 142, 0.74)',
-                    'rgba(255, 213, 75, 0.28)',
-                    'rgba(255, 205, 58, 0)',
-                  ]
-                : [
-                    'rgba(255, 248, 198, 0.84)',
-                    'rgba(255, 228, 119, 0.58)',
-                    'rgba(255, 207, 67, 0.2)',
-                    'rgba(255, 199, 49, 0)',
-                  ]}
-              end={{ x: 0.5, y: 0 }}
-              locations={[0, 0.56, 0.79, 1]}
-              start={{ x: 0.5, y: 1 }}
-              style={[
-                styles.rayBeam,
-                {
-                  borderRadius: rayWidth / 2,
-                  height: rayLength,
-                  left: size / 2 - rayWidth / 2,
-                  top: rayTop,
-                  width: rayWidth,
-                },
-              ]}
-            />
-          </View>
-        );
-      })}
-    </Animated.View>
-  );
-}
-
 export function CelebrationParticles({
   layerStyle,
   tier,
@@ -552,8 +433,6 @@ const styles = StyleSheet.create({
   achievementStage: { alignItems: 'center', justifyContent: 'center', overflow: 'visible', position: 'relative' },
   achievementIcon: { zIndex: 2 },
   rays: { alignItems: 'center', justifyContent: 'center', position: 'absolute' },
-  raySpokeFrame: { ...StyleSheet.absoluteFillObject },
-  rayBeam: { position: 'absolute' },
   medallion: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 999, boxShadow: '0 14px 34px rgba(159,109,29,0.24), inset 0 2px 0 rgba(255,255,255,0.76)', justifyContent: 'center', overflow: 'visible', position: 'absolute', zIndex: 0 },
   medallionGradient: { borderRadius: 999 },
   medallionInset: { alignItems: 'center', backgroundColor: 'rgba(255,251,220,0.2)', borderRadius: 999, height: '86%', justifyContent: 'center', overflow: 'visible', width: '86%' },

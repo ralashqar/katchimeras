@@ -1,5 +1,4 @@
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   BlendColor,
   Canvas,
@@ -51,6 +50,7 @@ import { TodayFallbackCloudScene } from '@/components/katchadeck/home/today-fall
 import { useTodayEnvironmentMotionValues } from '@/components/katchadeck/home/today-environment-motion';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { EggAvatarArtwork } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
+import { RadialSunburstCanvas } from '@/components/katchadeck/ui/radial-sunburst';
 import todayScene from '@/data/today-scene.json';
 
 type TodayKingdomEggHeroProps = {
@@ -87,9 +87,6 @@ type TodayKingdomEggOverlayProps = {
 };
 
 const SOFT_RING_SOURCE = require('../../../assets/images/katchimeras/soft-ring.png');
-const EGG_RAY_COUNT = 12;
-const EGG_RAY_INDICES = Array.from({ length: EGG_RAY_COUNT }, (_, index) => index);
-const EGG_RAY_SCALE = 0.8;
 const ACTIVATION_CONFETTI_COLORS = ['#FFE68A', '#FFB85C', '#F49AC1', '#91D8C7', '#A7D5FF'] as const;
 const ACTIVATION_CONFETTI = Array.from({ length: 18 }, (_, index) => ({
   angle: (-160 + index * (320 / 17)) * (Math.PI / 180),
@@ -441,6 +438,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
                 resolution="high"
                 skinId={equippedSkinId}
                 style={StyleSheet.absoluteFill}
+                transition={0}
               />
             </Pressable>
           </Animated.View>
@@ -705,8 +703,7 @@ function EggRadiance({
   const reduceMotion = useReducedMotion();
   const rotation = useSharedValue(0);
   const breath = useSharedValue(0);
-  const rayScale = stageScale * EGG_RAY_SCALE;
-  const raySize = 430 * rayScale;
+  const raySize = 520 * stageScale;
 
   useEffect(() => {
     cancelAnimation(rotation);
@@ -739,10 +736,10 @@ function EggRadiance({
   }, [breath, growthIntensity, reduceMotion, rotation]);
 
   const rayStyle = useAnimatedStyle(() => ({
-    opacity: Math.min(1, 0.08 + growth.value * 0.72 + breath.value * 0.05 + flare.value * 0.15),
+    opacity: Math.min(1, 0.1 + growth.value * 0.76 + breath.value * 0.045 + flare.value * 0.14),
     transform: [
       { rotate: `${rotation.value * 360}deg` },
-      { scale: 0.58 + growth.value * 0.4 + breath.value * 0.025 },
+      { scale: 0.6 + growth.value * 0.36 + breath.value * 0.018 },
     ],
   }));
   return (
@@ -760,70 +757,7 @@ function EggRadiance({
           },
           rayStyle,
         ]}>
-        {EGG_RAY_INDICES.map((index) => {
-          const longRay = index % 2 === 0;
-          const rayLength = 205 * rayScale;
-          const rayWidth = (longRay ? 20 : 15) * rayScale;
-          const haloWidth = rayWidth * 2.35;
-          const rayTop = raySize / 2 - rayLength;
-          return (
-            <View
-              key={`egg-ray-${index}`}
-              style={[styles.raySpokeFrame, { transform: [{ rotate: `${index * (360 / EGG_RAY_COUNT)}deg` }] }]}>
-              <LinearGradient
-                colors={[
-                  'rgba(255, 228, 100, 0.52)',
-                  'rgba(255, 220, 78, 0.42)',
-                  'rgba(255, 207, 60, 0.24)',
-                  'rgba(255, 201, 56, 0)',
-                ]}
-                end={{ x: 0.5, y: 0 }}
-                locations={[0, 0.55, 0.78, 1]}
-                pointerEvents="none"
-                start={{ x: 0.5, y: 1 }}
-                style={[
-                  styles.rayBeam,
-                  {
-                    borderRadius: haloWidth / 2,
-                    height: rayLength,
-                    left: raySize / 2 - haloWidth / 2,
-                    top: rayTop,
-                    width: haloWidth,
-                  },
-                ]}
-              />
-              <LinearGradient
-                colors={longRay
-                  ? [
-                      'rgba(255, 249, 188, 1)',
-                      'rgba(255, 231, 108, 0.88)',
-                      'rgba(255, 211, 62, 0.56)',
-                      'rgba(255, 200, 50, 0)',
-                    ]
-                  : [
-                      'rgba(255, 241, 154, 0.92)',
-                      'rgba(255, 222, 86, 0.76)',
-                      'rgba(255, 204, 54, 0.44)',
-                      'rgba(255, 195, 45, 0)',
-                    ]}
-                end={{ x: 0.5, y: 0 }}
-                locations={[0, 0.56, 0.79, 1]}
-                pointerEvents="none"
-                start={{ x: 0.5, y: 1 }}
-                style={[
-                  styles.rayBeam,
-                  {
-                    borderRadius: rayWidth / 2,
-                    height: rayLength,
-                    left: raySize / 2 - rayWidth / 2,
-                    top: rayTop,
-                    width: rayWidth,
-                  },
-                ]}
-              />
-            </View>
-          );
-        })}
+        <RadialSunburstCanvas size={raySize} />
       </Animated.View>
       <EggGlowField
         accentColor={accentColor}
@@ -1009,12 +943,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     position: 'absolute',
     zIndex: 0,
-  },
-  raySpokeFrame: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  rayBeam: {
-    position: 'absolute',
   },
   ambientGlow: {
     alignSelf: 'center',
