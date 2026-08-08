@@ -1,5 +1,6 @@
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import type { PhotoPlaceResolution } from '@/types/photo-place';
+import type { FeaturedWisp } from '@/types/wisp';
 import type {
   KatchimeraCompanionId,
   KatchimeraFamilyId,
@@ -1127,8 +1128,8 @@ export type DailyCreatureCard = {
   id: string;
   dayId: string;
   isoDate: string;
-  schemaVersion: 1 | 2 | 3 | 4;
-  engineVersion: 'daily-card-v1' | 'daily-card-v2' | 'daily-card-v3' | 'daily-card-v4';
+  schemaVersion: 1 | 2 | 3 | 4 | 5;
+  engineVersion: 'daily-card-v1' | 'daily-card-v2' | 'daily-card-v3' | 'daily-card-v4' | 'daily-card-v5';
   provenance: 'live_hatch' | 'legacy_backfill';
   creatureId: string;
   speciesId: string | null;
@@ -1153,6 +1154,7 @@ export type DailyCreatureCard = {
   dayFacts?: CardDayFacts;
   dayGlyphs?: CardDayGlyph[];
   scene?: CardScene;
+  featuredWisps?: FeaturedWisp[];
   sealedInputSignature: string;
   sealedAt: string;
 };
@@ -1671,7 +1673,7 @@ export type StoredHomeDayRecord = {
 };
 
 export type StoredHomeState = {
-  version: 19;
+  version: 20;
   locationPermission: LocationPermissionState;
   activityPermission: ActivityPermissionState;
   healthPermission: HealthPermissionState;

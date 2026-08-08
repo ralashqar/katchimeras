@@ -7,7 +7,7 @@ import { mergeStoredHomeState, splitStoredHomeState } from '@/utils/home-storage
 test('home persistence partition round-trips without copying archive into active state', () => {
   const archivedDay = { id: 'archived', isoDate: '2026-08-04' } as StoredHomeState['archivedDays'][number];
   const state = {
-    version: 19,
+    version: 20,
     archivedDays: [archivedDay],
     today: { id: 'today', isoDate: '2026-08-05' },
   } as unknown as StoredHomeState;
@@ -19,7 +19,7 @@ test('home persistence partition round-trips without copying archive into active
 
 test('home persistence rejects incomplete partition migration', () => {
   const state = {
-    version: 19,
+    version: 20,
     archivedDays: [],
     today: { id: 'today', isoDate: '2026-08-05' },
   } as unknown as StoredHomeState;

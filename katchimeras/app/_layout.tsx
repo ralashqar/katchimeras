@@ -10,6 +10,7 @@ import 'react-native-reanimated';
 
 import { Colors } from '@/constants/theme';
 import { EggAvatarProvider } from '@/features/egg-avatar/egg-avatar-provider';
+import { WispProvider } from '@/features/wisps/wisp-provider';
 import { AppActivityProvider } from '@/features/performance/app-activity';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import '@/utils/travel-memory-task';
@@ -78,6 +79,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={navigationTheme}>
         <EggAvatarProvider>
+          <WispProvider>
           <AppActivityProvider>
             <Stack>
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
@@ -101,12 +103,14 @@ export default function RootLayout() {
           <Stack.Screen name="location-privacy" options={{ title: 'Photo places' }} />
           <Stack.Screen name="hatch-your-past" options={{ headerShown: false, gestureEnabled: false, title: 'Hatch your past' }} />
           <Stack.Screen name="katchimera/[creatureId]" options={{ headerShown: false }} />
+          <Stack.Screen name="wisp/[wispId]" options={{ headerShown: false }} />
           <Stack.Screen name="katchimera/[creatureId]/achievements" options={{ headerShown: false }} />
           <Stack.Screen name="katchimera/[creatureId]/quest/[questId]/game" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="game/[questId]" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Katchimeras Preview' }} />
             </Stack>
           </AppActivityProvider>
+          </WispProvider>
         </EggAvatarProvider>
         <StatusBar style={colorScheme === 'light' ? 'dark' : 'light'} />
       </ThemeProvider>

@@ -17,6 +17,7 @@ import type {
 import type { KatchimeraFamilyId, KatchimeraSkinId, LifeAspectId } from '@/types/katchimera';
 import { identityForEncounter } from '@/utils/katchimera-identity';
 import { dayForDevHatchSelection } from '@/utils/forced-low-signal-hatch';
+import { selectFeaturedWisps } from '@/utils/wisp-engine';
 
 // Hatch Engine v2 — the probabilistic draw.
 //
@@ -125,10 +126,14 @@ export function scoreField(
   // every candidate (each then takes the higher of this and its own floor).
   const livingRarity = computeLivingRarity(hatchInputDay);
   const month = isoMonth(hatchInputDay.isoDate);
+  const featuredWispIds = new Set(selectFeaturedWisps(hatchInputDay).map((item) => item.wispId));
 
   const scored = candidates
     .map((candidate) => {
       const scored = scoreCandidate(candidate, { day: hatchInputDay, livingRarity, month, yesterdayProfileId });
+      const wispBonus = Math.min(0.1, wispAffinityBonus(featuredWispIds, candidate.castEntry.seedId));
+      scored.modifiers.contextualPriority = round3((scored.modifiers.contextualPriority ?? 0) + wispBonus);
+      scored.score = clamp(scored.score + wispBonus, SCORE_FLOOR, SCORE_CEIL);
       return {
         candidate,
         score: scored.score,
@@ -173,6 +178,17 @@ export function scoreField(
         stableHash(`${hatchInputDay.isoDate}|${right.candidate.castEntry.seedId}`)
       );
     });
+}
+
+function wispAffinityBonus(wisps: ReadonlySet<string>, seedId: string) {
+  const affinities: Record<string, string[]> = {
+    sprout: ['park', 'garden'], steam: ['coffee_shop'], flash: ['photo_day'], drizzle: ['rain_day'],
+    moonlit: ['night_owl', 'late_night'], page: ['bookstore'], wander: ['travel', 'airport', 'new_place'],
+    heartlet: ['social_gathering'], sunset: ['golden_hour'], bloom: ['garden', 'spring_blossom'],
+    pixel: ['gaming_session'], buddy: ['dog_day'], crumb: ['feast'], dream: ['rest_day'], relic: ['museum'],
+  };
+  for (const id of wisps) if (affinities[id]?.includes(seedId)) return 0.05;
+  return 0;
 }
 
 // The leading candidate's *kind of day* (category label + seed) without naming

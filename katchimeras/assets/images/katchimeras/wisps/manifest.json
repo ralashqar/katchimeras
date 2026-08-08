@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-08",
+  "pipeline": "OpenAI image generation -> chroma-key matte extraction -> lossless WebP derivatives",
+  "styleReferences": [
+    "assets/images/katchimeras/cutouts/baristabbit.png",
+    "assets/images/katchimeras/world/today/today_bg.webp",
+    "assets/images/katchimeras/egg-avatars/classic.png",
+    "user-provided Motes concept sheet"
+  ],
+  "sharedPromptContract": "One tiny floating companion, one dominant life-signal silhouette, polished 3D storybook clay material, Katchimeras face language, sparse particles, centered square icon, no text/scenery/platform; generated against a uniform chroma key and extracted to transparency.",
+  "derivatives": {
+    "archival": "<id>.png",
+    "app": "<id>.webp (1024x1024 lossless)",
+    "thumbnail": "thumbnails/<id>.webp (256x256 lossless)",
+    "keyedSource": "sources/<id>-keyed.png"
+  },
+  "assets": [
+    { "id": "sprout", "motif": "pear-green seed orb with leaf wings", "source": "exec-1fc8c273-ad59-4e80-a9e1-71a9672dffb9.png" },
+    { "id": "steam", "motif": "warm coffee orb with a cream steam curl", "source": "exec-c16133b7-1cf3-4690-b3f9-32cb161f956b.png" },
+    { "id": "flash", "motif": "lavender camera-lens orb with translucent fins", "source": "exec-4379fd7a-1f53-4079-a20d-e35bb2d44496.png" },
+    { "id": "drizzle", "motif": "translucent sky-blue raindrop", "source": "exec-d5f96a44-37fa-4345-8092-a1d21406f295.png" },
+    { "id": "moonlit", "motif": "sleepy deep-violet crescent", "source": "exec-a5e6b89c-d6f2-489f-8ae7-d6e6739e2c6d.png" },
+    { "id": "page", "motif": "warm ivory open book", "source": "exec-f484b4cc-ccc0-43c2-9a14-d29074dee835.png" },
+    { "id": "wander", "motif": "pale sky-blue wind orb and curling tail", "source": "exec-e6b84ec8-c1f9-4838-b2ea-0b5ee8d73fe7.png" },
+    { "id": "heartlet", "motif": "coral heart orb with feather fins", "source": "exec-a6d9bd12-7770-4398-9295-e8650113a72d.png" },
+    { "id": "sunset", "motif": "gold-to-coral sun orb with mauve cloud curl", "source": "exec-a7b20753-e416-49c1-8a53-5d38e8a27e4c.png" },
+    { "id": "bloom", "motif": "blush flower-bud orb", "source": "exec-9b09a04e-b4bd-4126-aec3-720b7fe14ef2.png" },
+    { "id": "pixel", "motif": "rounded teal voxel orb", "source": "exec-75c02aaa-8c38-4df1-9ddc-81941690e7f9.png" },
+    { "id": "buddy", "motif": "honey companion orb with floppy ears and curled tail", "source": "exec-0a8bec0e-347e-4970-8458-8799d1149483.png" },
+    { "id": "crumb", "motif": "golden baked crumb orb", "source": "exec-241fb602-478d-4790-a7ad-845f354ff457.png" },
+    { "id": "dream", "motif": "indigo-lavender sleeping cloud", "source": "exec-db313563-7aed-4559-a466-7242ed119316.png" },
+    { "id": "relic", "motif": "moss-capped carved stone artifact", "source": "exec-6c024934-daa3-4ec9-9f6e-c5bd1fc850ce.png" },
+    { "id": "spark", "motif": "golden living-light teardrop", "source": "exec-0f75eaa2-c750-4528-bf69-8514c01a358d.png" }
+  ]
+}

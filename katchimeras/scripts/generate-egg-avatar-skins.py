@@ -37,7 +37,7 @@ FACE_THUMBS_DIR = FACES_DIR / "thumbnails"
 REVIEW_DIR = ROOT / ".tmp" / "egg-avatar-skins"
 HAT_REVIEW_DIR = ROOT / ".tmp" / "egg-avatar-hats-v4"
 BODY_DRAFT_REVIEW_DIR = ROOT / ".tmp" / "egg-avatar-body-drafts-v1"
-FACE_REVIEW_DIR = ROOT / ".tmp" / "egg-avatar-faces-v3"
+FACE_REVIEW_DIR = ROOT / ".tmp" / "egg-avatar-faces-v4"
 HELD_REVIEW_DIR = ROOT / ".tmp" / "egg-avatar-held-v2"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 BODY_CATALOG_PATH = ROOT / "data" / "egg-avatar" / "bodies.json"
@@ -59,7 +59,7 @@ PIPELINE_VERSION = "egg-avatar-layers-v1"
 HAT_PIPELINE_VERSION = "egg-avatar-hats-v4-style-mapped"
 HAT_STYLE_CONTRACT_VERSION = "katchimeras-cozy-toy-v1"
 BODY_DRAFT_PIPELINE_VERSION = "egg-avatar-body-drafts-v1-gpt-image-2"
-FACE_PIPELINE_VERSION = "egg-avatar-faces-v3-magenta-matte"
+FACE_PIPELINE_VERSION = "egg-avatar-faces-v4-magenta-matte-enclosed-hole-repair"
 HELD_PIPELINE_VERSION = "egg-avatar-held-v2-style-mapped"
 DEFAULT_FACE_ID = "classic-smile"
 ACCESSORY_READY_SKINS = ("moss", "barista", "pumpkin")
@@ -745,6 +745,71 @@ def matte_face_draft(face_id: str) -> None:
         "imageUrl": image_url,
     }, indent=2) + "\n", encoding="utf-8")
 
+    # Save the exact automatically repaired layer used by promotion so review
+    # catches both BiRefNet edge loss and any enclosed-hole restoration.
+    compose_face_draft(source, review / "face-birefnet.png").save(review / "face-review.png")
+
+
+def despill_chroma_edges(image: Image.Image, key: tuple[int, int, int] = (255, 0, 255)) -> Image.Image:
+    """Suppress only chroma-magenta contamination in BiRefNet edge RGB."""
+    image = image.convert("RGBA")
+    corrected: list[tuple[int, int, int, int]] = []
+    for red, green, blue, alpha in image.getdata():
+        if alpha == 0:
+            corrected.append((0, 0, 0, 0))
+            continue
+        # BiRefNet can retain a partial- or fully-opaque one-pixel key fringe.
+        # Chroma magenta is forbidden in face art, so remove only the shared
+        # red/blue excess over green without dividing or amplifying channels.
+        if red > 120 and blue > 120 and green + 40 < min(red, blue):
+            spill = min(red, blue) - green
+            red = max(0, red - spill)
+            blue = max(0, blue - spill)
+        # Lanczos resizing can ring a despilled edge into one or two isolated
+        # green-dominant pixels. Face art contains no green, so clamp only that
+        # validator-defined key-colour condition back to the neighbouring
+        # red/blue channel range.
+        if green > 80 and green > red * 1.4 and green > blue * 1.4:
+            green = max(red, blue)
+        corrected.append((red, green, blue, alpha))
+    image.putdata(corrected)
+    return image
+
+
+def compose_face_draft(raw_path: Path, matte_path: Path) -> Image.Image:
+    """Combine raw face RGB with BiRefNet alpha and restore enclosed alpha tears.
+
+    BiRefNet remains authoritative for the exterior silhouette. A transparent
+    region is restored only when it is completely disconnected from the canvas
+    border, which safely recovers dark pupils or mouth interiors but cannot
+    invent pixels across an eye whose damaged matte is open to the background.
+    """
+    raw = Image.open(raw_path).convert("RGBA")
+    matte = Image.open(matte_path).convert("RGBA").resize(raw.size, Image.Resampling.LANCZOS)
+    original_alpha = matte.getchannel("A")
+
+    layered_raw = raw.copy()
+    layered_raw.putalpha(original_alpha)
+    repaired = repair_enclosed_alpha_holes(layered_raw)
+    repaired_alpha = repaired.getchannel("A")
+
+    # BiRefNet provides the antialiased exterior edge. Suppress only positively
+    # identified chroma-magenta spill there. Untouched GPT RGB is restored only
+    # in opaque interiors and proven enclosed holes.
+    matte.putalpha(repaired_alpha)
+    edge = despill_chroma_edges(matte)
+    raw.putalpha(repaired_alpha)
+    opaque_interior = repaired_alpha.point(lambda value: 255 if value > 250 else 0)
+    opaque_interior = opaque_interior.filter(ImageFilter.MinFilter(5))
+    repaired_holes = Image.new("L", repaired_alpha.size)
+    repaired_holes.putdata([
+        255 if before <= 8 and after > 8 else 0
+        for before, after in zip(original_alpha.getdata(), repaired_alpha.getdata())
+    ])
+    repaired_holes = repaired_holes.filter(ImageFilter.MaxFilter(3))
+    raw_regions = ImageChops.lighter(opaque_interior, repaired_holes)
+    return Image.composite(raw, edge, raw_regions)
+
 
 def promote_face_draft(face_id: str) -> None:
     review = face_review_dir(face_id)
@@ -756,16 +821,25 @@ def promote_face_draft(face_id: str) -> None:
     generation = json.loads(generation_path.read_text(encoding="utf-8"))
     if generation.get("model") != FACE_GENERATION_MODEL or generation.get("quality") != "low":
         raise RuntimeError(f"Face {face_id} does not use GPT Image 2 Edit quality low")
-    raw = Image.open(raw_path).convert("RGBA")
-    matte = Image.open(matte_path).convert("RGBA").resize(raw.size, Image.Resampling.LANCZOS)
-    raw.putalpha(matte.getchannel("A"))
-    face = raw.resize((2048, 2048), Image.Resampling.LANCZOS)
+    face = compose_face_draft(raw_path, matte_path).resize((2048, 2048), Image.Resampling.LANCZOS)
+    face = despill_chroma_edges(face)
+    magenta_pixels = sum(
+        1
+        for red, green, blue, alpha in face.getdata()
+        if alpha > 8 and red > 120 and blue > 120 and green + 40 < min(red, blue)
+    )
+    if magenta_pixels:
+        raise RuntimeError(f"Face {face_id} retains {magenta_pixels} visible chroma-magenta pixels")
     bounds = face.getchannel("A").getbbox()
     if not bounds:
         raise RuntimeError(f"No visible face in {matte_path}")
     allowed = tuple(round(value * 2048) for value in FACE_REMOVAL_BOUNDS)
     if bounds[0] < allowed[0] or bounds[1] < allowed[1] or bounds[2] > allowed[2] or bounds[3] > allowed[3]:
         raise RuntimeError(f"Face {face_id} escapes canonical face bounds: {bounds}")
+    face.save(review / "face-review.png")
+    review_composite = Image.open(BASES_DIR / "classic.png").convert("RGBA")
+    review_composite.alpha_composite(face)
+    review_composite.save(review / "face-composite.png")
     outputs = save_layer_asset(face, FACES_DIR, FACE_THUMBS_DIR, face_id)
     version = promote_catalog_item(FACE_CATALOG_PATH, face_id, "faces")
     manifest = load_manifest()
@@ -779,6 +853,13 @@ def promote_face_draft(face_id: str) -> None:
         "prompt": generation["prompt"],
         "references": generation["references"],
         "mattingModel": MATTING_MODEL,
+        "mattingSettings": {
+            "model": "General Use (Heavy)",
+            "refineForeground": True,
+            "enclosedAlphaHoleRepair": True,
+            "chromaEdgeDespill": "red-blue dominance suppression for #FF00FF",
+            "exteriorEdgeSource": "BiRefNet",
+        },
         "outputs": outputs,
         "layerBounds": list(FACE_LAYER_BOUNDS),
     }
@@ -787,19 +868,24 @@ def promote_face_draft(face_id: str) -> None:
     print(f"promoted face {face_id}", flush=True)
 
 
-def run_face_pipeline(face_ids: tuple[str, ...], *, phase: str) -> None:
+def run_face_pipeline(face_ids: tuple[str, ...], *, phase: str, review_only: bool = False) -> None:
     for face_id in face_ids:
         if phase == "render":
             generate_face_draft(face_id)
             matte_face_draft(face_id)
-            promote_face_draft(face_id)
+            if not review_only:
+                promote_face_draft(face_id)
         elif phase == "matte":
             matte_face_draft(face_id)
-            promote_face_draft(face_id)
+            if not review_only:
+                promote_face_draft(face_id)
         else:
             promote_face_draft(face_id)
-    refresh_avatar_catalog_registry()
-    print(f"Generated and promoted {len(face_ids)} face customization(s).", flush=True)
+    if review_only:
+        print(f"Created {len(face_ids)} face review draft(s) under {FACE_REVIEW_DIR.relative_to(ROOT)}.", flush=True)
+    else:
+        refresh_avatar_catalog_registry()
+        print(f"Generated and promoted {len(face_ids)} face customization(s).", flush=True)
 
 
 def run_planned_body_drafts(
@@ -2870,6 +2956,11 @@ def main() -> None:
     face_pipeline = sub.add_parser("face-pipeline")
     face_pipeline.add_argument("target", choices=(*FACE_SPECS.keys(), "batch", "remaining", "all"))
     face_pipeline.add_argument("phase", nargs="?", default="render", choices=("render", "matte", "promote"))
+    face_pipeline.add_argument(
+        "--review-only",
+        action="store_true",
+        help="Generate and matte into the review directory without replacing production assets.",
+    )
     held_pipeline = sub.add_parser("held-pipeline")
     held_pipeline.add_argument("target", choices=(*HELD_IDS, "batch", "remaining", "all"))
     held_pipeline.add_argument("phase", nargs="?", default="render", choices=("render", "restyle", "matte", "promote"))
@@ -2949,7 +3040,7 @@ def main() -> None:
             else PLANNED_FACE_IDS[:4] if args.target == "batch"
             else (args.target,)
         )
-        run_face_pipeline(face_ids, phase=args.phase)
+        run_face_pipeline(face_ids, phase=args.phase, review_only=args.review_only)
     elif args.command == "held-pipeline":
         held_ids = (
             HELD_IDS if args.target == "all"

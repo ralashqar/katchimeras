@@ -21,6 +21,7 @@ import {
   resolveDailyCardAtmosphere,
   resolveDailyCardEnvironment,
 } from '@/utils/daily-card-scene';
+import { selectFeaturedWisps } from '@/utils/wisp-engine';
 
 type CardBuildMode = 'live_hatch' | 'legacy_backfill';
 
@@ -33,7 +34,7 @@ type BuildDailyCreatureCardOptions = {
 
 type TraitCandidate = CardTrait;
 
-const CARD_ENGINE_VERSION = 'daily-card-v4' as const;
+const CARD_ENGINE_VERSION = 'daily-card-v5' as const;
 
 const CONFIDENCE_RANK: Record<CardTrait['confidence'], number> = {
   explicit: 3,
@@ -128,7 +129,7 @@ export function buildDailyCreatureCard(
     id: `card:${day.id}`,
     dayId: day.id,
     isoDate: day.isoDate,
-    schemaVersion: 4,
+    schemaVersion: 5,
     engineVersion: CARD_ENGINE_VERSION,
     provenance: options.mode,
     creatureId: creature.id,
@@ -152,6 +153,9 @@ export function buildDailyCreatureCard(
     dayFacts,
     dayGlyphs,
     scene: resolveScene(dayWithCreature, treatment, traits),
+    featuredWisps: options.mode === 'live_hatch'
+      ? selectFeaturedWisps(dayWithCreature, options.pastDays ?? [])
+      : [],
     sealedInputSignature: dayInputSignature(dayWithCreature),
     sealedAt: options.sealedAt,
   };
@@ -163,13 +167,14 @@ export function upgradeDailyCreatureCard(
   creature: LocalCreatureRecord
 ): DailyCreatureCard {
   if (
-    card.schemaVersion === 4
+    card.schemaVersion === 5
     && card.facets
     && card.dayFacts
     && card.dayGlyphs
     && card.scene?.environment
     && card.scene.atmosphere
     && card.storyLine
+    && card.featuredWisps
   ) {
     const selectedPhoto = resolveDayPhoto(day);
     const mood = resolveMoodFacet(day, card.state);
@@ -208,6 +213,7 @@ export function upgradeDailyCreatureCard(
     traits: card.traits,
     memorySpark: card.memorySpark,
     treatment: card.treatment,
+    featuredWisps: card.featuredWisps ?? [],
     sealedInputSignature: card.sealedInputSignature,
     sealedAt: card.sealedAt,
   };

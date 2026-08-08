@@ -3971,7 +3971,7 @@
       }
     }
   },
-  "updatedAt": "2026-08-08T10:01:49.537412+00:00",
+  "updatedAt": "2026-08-08T12:39:14.661147+00:00",
   "gameplay": {
     "version": 2,
     "mode": "equipped skin with reusable crack overlays",
@@ -4349,12 +4349,12 @@
     },
     "gentle-smile": {
       "name": "Gentle Smile",
-      "version": 1,
+      "version": 6,
       "faceLayoutVersion": 1,
-      "pipelineVersion": "egg-avatar-faces-v2-gpt-image-2",
+      "pipelineVersion": "egg-avatar-faces-v4-magenta-matte-enclosed-hole-repair",
       "generationModel": "openai/gpt-image-2/edit",
       "generationQuality": "low",
-      "prompt": "Use case: precise-object-edit. Asset type: transparent egg-avatar face expression layer. Image 1 is the exact Classic face layer and full-canvas registration edit target. Preserve its feature scale, warm friendly proportions, left/right eye anchors, brow anchors, cheek anchors, mouth anchor, front-facing camera, and square canvas placement. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language with broad clean forms, smooth softly painted materials, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, soft low-contrast lighting, and gentle saturation. Do not copy scenery. Change only the expression into Gentle Smile: Soft open eyes, relaxed brows, light blush, and a tiny peaceful smile. Palette: espresso brown, soft coral. Shape language: Rounded understated features with generous spacing. Constraints: No extra marks; Stay inside face layout v1. Draw only the brows, eyes, pupils and catchlights where applicable, two cheek marks where applicable, and one mouth expression. No egg shell, body color, feet, hair, hat, hand, prop, floating symbol, scenery, shadow, glow, text, logo, or extra mark. Keep every visible pixel inside the same compact central face zone as image 1. Do not zoom, crop, recenter, resize, rotate, or move the face. Render only the face layer on a perfectly uniform pure-black #000000 background for BiRefNet Heavy.",
+      "prompt": "Use case: precise-object-edit. Asset type: transparent egg-avatar face expression layer. Image 1 is the exact Classic face layer and full-canvas registration edit target. Preserve its feature scale, warm friendly proportions, left/right eye anchors, brow anchors, cheek anchors, mouth anchor, front-facing camera, and square canvas placement. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language with broad clean forms, smooth softly painted materials, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, soft low-contrast lighting, and gentle saturation. Do not copy scenery. Change only the expression into Gentle Smile: Soft open eyes, relaxed brows, light blush, and a tiny peaceful smile. Palette: espresso brown, soft coral. Shape language: Rounded understated features with generous spacing. Constraints: No extra marks; Stay inside face layout v1. Draw only the brows, eyes, pupils and catchlights where applicable, two cheek marks where applicable, and one mouth expression. No egg shell, body color, feet, hair, hat, hand, prop, floating symbol, scenery, shadow, glow, text, logo, or extra mark. Keep every visible pixel inside the same compact central face zone as image 1. Do not zoom, crop, recenter, resize, rotate, or move the face. Render only the face layer on a perfectly uniform flat chroma-magenta #FF00FF background for BiRefNet Heavy. Do not use magenta in any face feature. The background has no gradient, texture, floor, reflection, shadow, atmosphere, or lighting variation.",
       "references": [
         {
           "path": "assets/images/katchimeras/egg-avatars/faces/classic-smile.png",
@@ -4370,24 +4370,31 @@
         }
       ],
       "mattingModel": "fal-ai/birefnet/v2",
+      "mattingSettings": {
+        "model": "General Use (Heavy)",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "chromaEdgeDespill": "red-blue dominance suppression for #FF00FF",
+        "exteriorEdgeSource": "BiRefNet"
+      },
       "outputs": {
         "png": {
           "path": "assets/images/katchimeras/egg-avatars/faces/gentle-smile.png",
           "width": 2048,
           "height": 2048,
-          "sha256": "0af18865f3d5b0631a310543f47431a1e803e5330e9c0858ad0da168815139d9"
+          "sha256": "b4b3943a1615402260d7a2a444238f7ad2937ab7c40f65183a6d55d23c5902f5"
         },
         "webp": {
           "path": "assets/images/katchimeras/egg-avatars/faces/gentle-smile.webp",
           "width": 1024,
           "height": 1024,
-          "sha256": "e56073341b1d09dc3e531e149b111f97623ab441598f427e83a3c0d482945e3a"
+          "sha256": "942b73c3192000fd5b60348b90423669179d76b23ebe819317289234761fd71a"
         },
         "thumbnail": {
           "path": "assets/images/katchimeras/egg-avatars/faces/thumbnails/gentle-smile.webp",
           "width": 256,
           "height": 256,
-          "sha256": "220fcd1b7db05c85edf574f27e6731ed5070976c57e1cfc3ad5b20ee22e64912"
+          "sha256": "1611370ab04449d9a26d3f4d83bf157afd32496e1b0c0092981a9cf995f022b9"
         }
       },
       "layerBounds": [
@@ -4449,12 +4456,12 @@
     },
     "single-wink": {
       "name": "Wink",
-      "version": 1,
+      "version": 4,
       "faceLayoutVersion": 1,
-      "pipelineVersion": "egg-avatar-faces-v2-gpt-image-2",
+      "pipelineVersion": "egg-avatar-faces-v4-magenta-matte-enclosed-hole-repair",
       "generationModel": "openai/gpt-image-2/edit",
       "generationQuality": "low",
-      "prompt": "Use case: precise-object-edit. Asset type: transparent egg-avatar face expression layer. Image 1 is the exact Classic face layer and full-canvas registration edit target. Preserve its feature scale, warm friendly proportions, left/right eye anchors, brow anchors, cheek anchors, mouth anchor, front-facing camera, and square canvas placement. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language with broad clean forms, smooth softly painted materials, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, soft low-contrast lighting, and gentle saturation. Do not copy scenery. Change only the expression into Wink: One bright open eye, one cheerful wink, curved brows, blush, and small smile. Palette: warm black, espresso brown, coral blush. Shape language: One rounded eye balanced by one clean curved stroke. Constraints: No floating spark; Stay inside face layout v1. Draw only the brows, eyes, pupils and catchlights where applicable, two cheek marks where applicable, and one mouth expression. No egg shell, body color, feet, hair, hat, hand, prop, floating symbol, scenery, shadow, glow, text, logo, or extra mark. Keep every visible pixel inside the same compact central face zone as image 1. Do not zoom, crop, recenter, resize, rotate, or move the face. Render only the face layer on a perfectly uniform pure-black #000000 background for BiRefNet Heavy.",
+      "prompt": "Use case: precise-object-edit. Asset type: transparent egg-avatar face expression layer. Image 1 is the exact Classic face layer and full-canvas registration edit target. Preserve its feature scale, warm friendly proportions, left/right eye anchors, brow anchors, cheek anchors, mouth anchor, front-facing camera, and square canvas placement. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language with broad clean forms, smooth softly painted materials, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, soft low-contrast lighting, and gentle saturation. Do not copy scenery. Change only the expression into Wink: One bright open eye, one cheerful wink, curved brows, blush, and small smile. Palette: warm black, espresso brown, coral blush. Shape language: One rounded eye balanced by one clean curved stroke. Constraints: No floating spark; Stay inside face layout v1. Draw only the brows, eyes, pupils and catchlights where applicable, two cheek marks where applicable, and one mouth expression. No egg shell, body color, feet, hair, hat, hand, prop, floating symbol, scenery, shadow, glow, text, logo, or extra mark. Keep every visible pixel inside the same compact central face zone as image 1. Do not zoom, crop, recenter, resize, rotate, or move the face. Render only the face layer on a perfectly uniform flat chroma-magenta #FF00FF background for BiRefNet Heavy. Do not use magenta in any face feature. The background has no gradient, texture, floor, reflection, shadow, atmosphere, or lighting variation.",
       "references": [
         {
           "path": "assets/images/katchimeras/egg-avatars/faces/classic-smile.png",
@@ -4470,24 +4477,31 @@
         }
       ],
       "mattingModel": "fal-ai/birefnet/v2",
+      "mattingSettings": {
+        "model": "General Use (Heavy)",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "chromaEdgeDespill": "red-blue dominance suppression for #FF00FF",
+        "exteriorEdgeSource": "BiRefNet"
+      },
       "outputs": {
         "png": {
           "path": "assets/images/katchimeras/egg-avatars/faces/single-wink.png",
           "width": 2048,
           "height": 2048,
-          "sha256": "489d21231feb0f508b43a7730458f43f3e246340cc7f97b4e99dfb64c6f6ca80"
+          "sha256": "c2d9b7998b377c2da9bad50419cc91d1501385a394315e87f07b2e2151e5dbd0"
         },
         "webp": {
           "path": "assets/images/katchimeras/egg-avatars/faces/single-wink.webp",
           "width": 1024,
           "height": 1024,
-          "sha256": "e14440f9349c1f03092bf215174a779064562988f1e8715e16dc64cff5378fff"
+          "sha256": "edb8542c70c5fda8010334b6bd2c02c5a7f23016313205e1f0208c937cf55236"
         },
         "thumbnail": {
           "path": "assets/images/katchimeras/egg-avatars/faces/thumbnails/single-wink.webp",
           "width": 256,
           "height": 256,
-          "sha256": "ab5213e078e12a85fa49199054fd8abd816a89038c4eaf6ce064d5a196c321b2"
+          "sha256": "14960177867b4884c07b7e2cafaffc26d4395deffdca7da27067a3ccccf2fe3f"
         }
       },
       "layerBounds": [
@@ -4499,12 +4513,12 @@
     },
     "heart-eyes": {
       "name": "Heart Eyes",
-      "version": 1,
+      "version": 4,
       "faceLayoutVersion": 1,
-      "pipelineVersion": "egg-avatar-faces-v2-gpt-image-2",
+      "pipelineVersion": "egg-avatar-faces-v4-magenta-matte-enclosed-hole-repair",
       "generationModel": "openai/gpt-image-2/edit",
       "generationQuality": "low",
-      "prompt": "Use case: precise-object-edit. Asset type: transparent egg-avatar face expression layer. Image 1 is the exact Classic face layer and full-canvas registration edit target. Preserve its feature scale, warm friendly proportions, left/right eye anchors, brow anchors, cheek anchors, mouth anchor, front-facing camera, and square canvas placement. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language with broad clean forms, smooth softly painted materials, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, soft low-contrast lighting, and gentle saturation. Do not copy scenery. Change only the expression into Heart Eyes: Rounded heart-shaped pupils, high brows, rosy cheeks, and delighted mouth. Palette: espresso brown, berry pink, coral blush. Shape language: Large soft hearts contained inside normal eye bounds. Constraints: Hearts replace pupils only; Stay inside face layout v1. Draw only the brows, eyes, pupils and catchlights where applicable, two cheek marks where applicable, and one mouth expression. No egg shell, body color, feet, hair, hat, hand, prop, floating symbol, scenery, shadow, glow, text, logo, or extra mark. Keep every visible pixel inside the same compact central face zone as image 1. Do not zoom, crop, recenter, resize, rotate, or move the face. Render only the face layer on a perfectly uniform pure-black #000000 background for BiRefNet Heavy.",
+      "prompt": "Use case: precise-object-edit. Asset type: transparent egg-avatar face expression layer. Image 1 is the exact Classic face layer and full-canvas registration edit target. Preserve its feature scale, warm friendly proportions, left/right eye anchors, brow anchors, cheek anchors, mouth anchor, front-facing camera, and square canvas placement. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language with broad clean forms, smooth softly painted materials, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, soft low-contrast lighting, and gentle saturation. Do not copy scenery. Change only the expression into Heart Eyes: Rounded heart-shaped pupils, high brows, rosy cheeks, and delighted mouth. Palette: espresso brown, berry pink, coral blush. Shape language: Large soft hearts contained inside normal eye bounds. Constraints: Hearts replace pupils only; Stay inside face layout v1. Draw only the brows, eyes, pupils and catchlights where applicable, two cheek marks where applicable, and one mouth expression. No egg shell, body color, feet, hair, hat, hand, prop, floating symbol, scenery, shadow, glow, text, logo, or extra mark. Keep every visible pixel inside the same compact central face zone as image 1. Do not zoom, crop, recenter, resize, rotate, or move the face. Render only the face layer on a perfectly uniform flat chroma-magenta #FF00FF background for BiRefNet Heavy. Do not use magenta in any face feature. The background has no gradient, texture, floor, reflection, shadow, atmosphere, or lighting variation.",
       "references": [
         {
           "path": "assets/images/katchimeras/egg-avatars/faces/classic-smile.png",
@@ -4520,24 +4534,31 @@
         }
       ],
       "mattingModel": "fal-ai/birefnet/v2",
+      "mattingSettings": {
+        "model": "General Use (Heavy)",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "chromaEdgeDespill": "red-blue dominance suppression for #FF00FF",
+        "exteriorEdgeSource": "BiRefNet"
+      },
       "outputs": {
         "png": {
           "path": "assets/images/katchimeras/egg-avatars/faces/heart-eyes.png",
           "width": 2048,
           "height": 2048,
-          "sha256": "72de569dda59a2b561ff98150ec96de0ad65294dc5d95fca08eba54b256468f8"
+          "sha256": "52c5d6fbe50937d1d14eae984a43ef326ba0ef690bc1b26a8e34c40702120791"
         },
         "webp": {
           "path": "assets/images/katchimeras/egg-avatars/faces/heart-eyes.webp",
           "width": 1024,
           "height": 1024,
-          "sha256": "3b13c91ad2f8fb2c2748d596a5a350d05e0377661ceaa4281a8760805fcb3253"
+          "sha256": "d34f89c67560969860ee7f7530a62204b2ad98bf6814546b22cc5dfa59cf0376"
         },
         "thumbnail": {
           "path": "assets/images/katchimeras/egg-avatars/faces/thumbnails/heart-eyes.webp",
           "width": 256,
           "height": 256,
-          "sha256": "d2f659394d35968ea0ffeb5df42c67c65f04d2252f0eb1ea1bcf957ef1f60121"
+          "sha256": "3f4d90006cc426a8359ed90279dafb7e10ba7268a8359cd07a080cd0b0871b10"
         }
       },
       "layerBounds": [
@@ -4599,12 +4620,12 @@
     },
     "sparkle-awe": {
       "name": "Sparkle Awe",
-      "version": 1,
+      "version": 4,
       "faceLayoutVersion": 1,
-      "pipelineVersion": "egg-avatar-faces-v2-gpt-image-2",
+      "pipelineVersion": "egg-avatar-faces-v4-magenta-matte-enclosed-hole-repair",
       "generationModel": "openai/gpt-image-2/edit",
       "generationQuality": "low",
-      "prompt": "Use case: precise-object-edit. Asset type: transparent egg-avatar face expression layer. Image 1 is the exact Classic face layer and full-canvas registration edit target. Preserve its feature scale, warm friendly proportions, left/right eye anchors, brow anchors, cheek anchors, mouth anchor, front-facing camera, and square canvas placement. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language with broad clean forms, smooth softly painted materials, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, soft low-contrast lighting, and gentle saturation. Do not copy scenery. Change only the expression into Sparkle Awe: Wide shining eyes with restrained diamond catchlights and tiny open mouth. Palette: warm black, cream, soft coral. Shape language: Large circular eyes and very small round mouth. Constraints: Catchlights remain inside eyes; Stay inside face layout v1. Draw only the brows, eyes, pupils and catchlights where applicable, two cheek marks where applicable, and one mouth expression. No egg shell, body color, feet, hair, hat, hand, prop, floating symbol, scenery, shadow, glow, text, logo, or extra mark. Keep every visible pixel inside the same compact central face zone as image 1. Do not zoom, crop, recenter, resize, rotate, or move the face. Render only the face layer on a perfectly uniform pure-black #000000 background for BiRefNet Heavy.",
+      "prompt": "Use case: precise-object-edit. Asset type: transparent egg-avatar face expression layer. Image 1 is the exact Classic face layer and full-canvas registration edit target. Preserve its feature scale, warm friendly proportions, left/right eye anchors, brow anchors, cheek anchors, mouth anchor, front-facing camera, and square canvas placement. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language with broad clean forms, smooth softly painted materials, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, soft low-contrast lighting, and gentle saturation. Do not copy scenery. Change only the expression into Sparkle Awe: Wide shining eyes with restrained diamond catchlights and tiny open mouth. Palette: warm black, cream, soft coral. Shape language: Large circular eyes and very small round mouth. Constraints: Catchlights remain inside eyes; Stay inside face layout v1. Draw only the brows, eyes, pupils and catchlights where applicable, two cheek marks where applicable, and one mouth expression. No egg shell, body color, feet, hair, hat, hand, prop, floating symbol, scenery, shadow, glow, text, logo, or extra mark. Keep every visible pixel inside the same compact central face zone as image 1. Do not zoom, crop, recenter, resize, rotate, or move the face. Render only the face layer on a perfectly uniform flat chroma-magenta #FF00FF background for BiRefNet Heavy. Do not use magenta in any face feature. The background has no gradient, texture, floor, reflection, shadow, atmosphere, or lighting variation.",
       "references": [
         {
           "path": "assets/images/katchimeras/egg-avatars/faces/classic-smile.png",
@@ -4620,24 +4641,31 @@
         }
       ],
       "mattingModel": "fal-ai/birefnet/v2",
+      "mattingSettings": {
+        "model": "General Use (Heavy)",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "chromaEdgeDespill": "red-blue dominance suppression for #FF00FF",
+        "exteriorEdgeSource": "BiRefNet"
+      },
       "outputs": {
         "png": {
           "path": "assets/images/katchimeras/egg-avatars/faces/sparkle-awe.png",
           "width": 2048,
           "height": 2048,
-          "sha256": "6f55d034c8b01a493c45523b0816156f31e5705fda33665fdf2201ed9178a440"
+          "sha256": "976b05de5c78b52876ed08a0b3d4e679410361dd99594872202f0079089dfdbe"
         },
         "webp": {
           "path": "assets/images/katchimeras/egg-avatars/faces/sparkle-awe.webp",
           "width": 1024,
           "height": 1024,
-          "sha256": "2464e6a17acd01a019bccb393ccdbfdcddb70024fb6ff6b6f3f7b76f8fa98062"
+          "sha256": "95dfd0dd72143c3ca35e108581154ad8634d31cd1c4747c0fd8bd25bd5aad6b9"
         },
         "thumbnail": {
           "path": "assets/images/katchimeras/egg-avatars/faces/thumbnails/sparkle-awe.webp",
           "width": 256,
           "height": 256,
-          "sha256": "3fa2bfd08a0ab835974272a1ea1bb91e505c498d2387f74564bb400591a342bc"
+          "sha256": "d0546ec581152874b516b2bc206ced052f84650b07ea21da32c664b01b20ff9f"
         }
       },
       "layerBounds": [
@@ -4649,12 +4677,12 @@
     },
     "shy-glance": {
       "name": "Shy Glance",
-      "version": 1,
+      "version": 5,
       "faceLayoutVersion": 1,
-      "pipelineVersion": "egg-avatar-faces-v2-gpt-image-2",
+      "pipelineVersion": "egg-avatar-faces-v4-magenta-matte-enclosed-hole-repair",
       "generationModel": "openai/gpt-image-2/edit",
       "generationQuality": "low",
-      "prompt": "Use case: precise-object-edit. Asset type: transparent egg-avatar face expression layer. Image 1 is the exact Classic face layer and full-canvas registration edit target. Preserve its feature scale, warm friendly proportions, left/right eye anchors, brow anchors, cheek anchors, mouth anchor, front-facing camera, and square canvas placement. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language with broad clean forms, smooth softly painted materials, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, soft low-contrast lighting, and gentle saturation. Do not copy scenery. Change only the expression into Shy Glance: Eyes turned aside, slightly raised brows, restrained blush, and soft smile. Palette: espresso brown, warm black, coral blush. Shape language: Rounded eyes with coordinated side-looking pupils. Constraints: Both pupils look the same direction; Stay inside face layout v1. Draw only the brows, eyes, pupils and catchlights where applicable, two cheek marks where applicable, and one mouth expression. No egg shell, body color, feet, hair, hat, hand, prop, floating symbol, scenery, shadow, glow, text, logo, or extra mark. Keep every visible pixel inside the same compact central face zone as image 1. Do not zoom, crop, recenter, resize, rotate, or move the face. Render only the face layer on a perfectly uniform pure-black #000000 background for BiRefNet Heavy.",
+      "prompt": "Use case: precise-object-edit. Asset type: transparent egg-avatar face expression layer. Image 1 is the exact Classic face layer and full-canvas registration edit target. Preserve its feature scale, warm friendly proportions, left/right eye anchors, brow anchors, cheek anchors, mouth anchor, front-facing camera, and square canvas placement. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language with broad clean forms, smooth softly painted materials, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, soft low-contrast lighting, and gentle saturation. Do not copy scenery. Change only the expression into Shy Glance: Eyes turned aside, slightly raised brows, restrained blush, and soft smile. Palette: espresso brown, warm black, coral blush. Shape language: Rounded eyes with coordinated side-looking pupils. Constraints: Both pupils look the same direction; Stay inside face layout v1. Draw only the brows, eyes, pupils and catchlights where applicable, two cheek marks where applicable, and one mouth expression. No egg shell, body color, feet, hair, hat, hand, prop, floating symbol, scenery, shadow, glow, text, logo, or extra mark. Keep every visible pixel inside the same compact central face zone as image 1. Do not zoom, crop, recenter, resize, rotate, or move the face. Render only the face layer on a perfectly uniform flat chroma-magenta #FF00FF background for BiRefNet Heavy. Do not use magenta in any face feature. The background has no gradient, texture, floor, reflection, shadow, atmosphere, or lighting variation.",
       "references": [
         {
           "path": "assets/images/katchimeras/egg-avatars/faces/classic-smile.png",
@@ -4670,24 +4698,31 @@
         }
       ],
       "mattingModel": "fal-ai/birefnet/v2",
+      "mattingSettings": {
+        "model": "General Use (Heavy)",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "chromaEdgeDespill": "red-blue dominance suppression for #FF00FF",
+        "exteriorEdgeSource": "BiRefNet"
+      },
       "outputs": {
         "png": {
           "path": "assets/images/katchimeras/egg-avatars/faces/shy-glance.png",
           "width": 2048,
           "height": 2048,
-          "sha256": "f8c0dd63d66ad88d4dd6a93dc2274a22508a09f91522579caa8d04bcb6f89433"
+          "sha256": "c842ec4929b7d31639c674039a5c23be34bb844b3aff962ed95e2a61045136f1"
         },
         "webp": {
           "path": "assets/images/katchimeras/egg-avatars/faces/shy-glance.webp",
           "width": 1024,
           "height": 1024,
-          "sha256": "2074baababd6e3c9b1f1d25413dafa7b0fb97613503cd1e682fffdbb26261ded"
+          "sha256": "a2efdfd01beb4f408f08336626c520fa2e37a0221a39225dd3450e415f524560"
         },
         "thumbnail": {
           "path": "assets/images/katchimeras/egg-avatars/faces/thumbnails/shy-glance.webp",
           "width": 256,
           "height": 256,
-          "sha256": "51de7de753582a5c9c8f2a877975679dcc7c3c2cfd21397affeb7f4a86ff649c"
+          "sha256": "d6fc5ee44565028785609f31f3062c205bcd0ec36264876542b15bb521b7e7b3"
         }
       },
       "layerBounds": [
@@ -4699,12 +4734,12 @@
     },
     "bashful-smile": {
       "name": "Bashful Smile",
-      "version": 1,
+      "version": 5,
       "faceLayoutVersion": 1,
-      "pipelineVersion": "egg-avatar-faces-v2-gpt-image-2",
+      "pipelineVersion": "egg-avatar-faces-v4-magenta-matte-enclosed-hole-repair",
       "generationModel": "openai/gpt-image-2/edit",
       "generationQuality": "low",
-      "prompt": "Use case: precise-object-edit. Asset type: transparent egg-avatar face expression layer. Image 1 is the exact Classic face layer and full-canvas registration edit target. Preserve its feature scale, warm friendly proportions, left/right eye anchors, brow anchors, cheek anchors, mouth anchor, front-facing camera, and square canvas placement. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language with broad clean forms, smooth softly painted materials, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, soft low-contrast lighting, and gentle saturation. Do not copy scenery. Change only the expression into Bashful Smile: Lowered eyes, gentle brows, warm cheeks, and a tiny curved smile. Palette: espresso brown, warm coral. Shape language: Soft lowered curves with prominent bounded blush. Constraints: No airbrushed blush; Stay inside face layout v1. Draw only the brows, eyes, pupils and catchlights where applicable, two cheek marks where applicable, and one mouth expression. No egg shell, body color, feet, hair, hat, hand, prop, floating symbol, scenery, shadow, glow, text, logo, or extra mark. Keep every visible pixel inside the same compact central face zone as image 1. Do not zoom, crop, recenter, resize, rotate, or move the face. Render only the face layer on a perfectly uniform pure-black #000000 background for BiRefNet Heavy.",
+      "prompt": "Use case: precise-object-edit. Asset type: transparent egg-avatar face expression layer. Image 1 is the exact Classic face layer and full-canvas registration edit target. Preserve its feature scale, warm friendly proportions, left/right eye anchors, brow anchors, cheek anchors, mouth anchor, front-facing camera, and square canvas placement. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language with broad clean forms, smooth softly painted materials, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, soft low-contrast lighting, and gentle saturation. Do not copy scenery. Change only the expression into Bashful Smile: Lowered eyes, gentle brows, warm cheeks, and a tiny curved smile. Palette: espresso brown, warm coral. Shape language: Soft lowered curves with prominent bounded blush. Constraints: No airbrushed blush; Stay inside face layout v1. Draw only the brows, eyes, pupils and catchlights where applicable, two cheek marks where applicable, and one mouth expression. No egg shell, body color, feet, hair, hat, hand, prop, floating symbol, scenery, shadow, glow, text, logo, or extra mark. Keep every visible pixel inside the same compact central face zone as image 1. Do not zoom, crop, recenter, resize, rotate, or move the face. Render only the face layer on a perfectly uniform flat chroma-magenta #FF00FF background for BiRefNet Heavy. Do not use magenta in any face feature. The background has no gradient, texture, floor, reflection, shadow, atmosphere, or lighting variation.",
       "references": [
         {
           "path": "assets/images/katchimeras/egg-avatars/faces/classic-smile.png",
@@ -4720,24 +4755,31 @@
         }
       ],
       "mattingModel": "fal-ai/birefnet/v2",
+      "mattingSettings": {
+        "model": "General Use (Heavy)",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "chromaEdgeDespill": "red-blue dominance suppression for #FF00FF",
+        "exteriorEdgeSource": "BiRefNet"
+      },
       "outputs": {
         "png": {
           "path": "assets/images/katchimeras/egg-avatars/faces/bashful-smile.png",
           "width": 2048,
           "height": 2048,
-          "sha256": "40b8113600f14fe5a0e3dfc0a2e02438f9ebb85fe78cf3dde7c2dfcb1fe94623"
+          "sha256": "d07bec72d078817c07cc1275c0353d8a02af77eb4f633b7ca769610b1c52e921"
         },
         "webp": {
           "path": "assets/images/katchimeras/egg-avatars/faces/bashful-smile.webp",
           "width": 1024,
           "height": 1024,
-          "sha256": "1eead06623caec8d6e23fe19143926481b8c105863d05464e6a018cd876146e3"
+          "sha256": "964f99f7d5a86f7f4ecd15e183d10850ddce456c2d515debc412c5cf5b047b97"
         },
         "thumbnail": {
           "path": "assets/images/katchimeras/egg-avatars/faces/thumbnails/bashful-smile.webp",
           "width": 256,
           "height": 256,
-          "sha256": "df9e660cb4cf187c2e01988d01746777c09684416fbfc04bf907068e1ad28b51"
+          "sha256": "42e8cbf45f7d5450bb83c265b92a3dec570e1add95a21dda52fc408ba9c794c0"
         }
       },
       "layerBounds": [
@@ -4899,12 +4941,12 @@
     },
     "grumpy-cute": {
       "name": "Grumpy Cute",
-      "version": 1,
+      "version": 4,
       "faceLayoutVersion": 1,
-      "pipelineVersion": "egg-avatar-faces-v2-gpt-image-2",
+      "pipelineVersion": "egg-avatar-faces-v4-magenta-matte-enclosed-hole-repair",
       "generationModel": "openai/gpt-image-2/edit",
       "generationQuality": "low",
-      "prompt": "Use case: precise-object-edit. Asset type: transparent egg-avatar face expression layer. Image 1 is the exact Classic face layer and full-canvas registration edit target. Preserve its feature scale, warm friendly proportions, left/right eye anchors, brow anchors, cheek anchors, mouth anchor, front-facing camera, and square canvas placement. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language with broad clean forms, smooth softly painted materials, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, soft low-contrast lighting, and gentle saturation. Do not copy scenery. Change only the expression into Grumpy Cute: Angled brows, rounded eyes, strong cheeks, and harmless little frown. Palette: espresso brown, warm black, coral blush. Shape language: Firm brow diagonals balanced by large friendly eyes. Constraints: Never aggressive or uncanny; Stay inside face layout v1. Draw only the brows, eyes, pupils and catchlights where applicable, two cheek marks where applicable, and one mouth expression. No egg shell, body color, feet, hair, hat, hand, prop, floating symbol, scenery, shadow, glow, text, logo, or extra mark. Keep every visible pixel inside the same compact central face zone as image 1. Do not zoom, crop, recenter, resize, rotate, or move the face. Render only the face layer on a perfectly uniform pure-black #000000 background for BiRefNet Heavy.",
+      "prompt": "Use case: precise-object-edit. Asset type: transparent egg-avatar face expression layer. Image 1 is the exact Classic face layer and full-canvas registration edit target. Preserve its feature scale, warm friendly proportions, left/right eye anchors, brow anchors, cheek anchors, mouth anchor, front-facing camera, and square canvas placement. Image 2, Baristabbit, is the authoritative Katchimeras character-art reference. Match its simple cozy premium 3D toy language with broad clean forms, smooth softly painted materials, restrained highlights, and friendly mobile-game readability. Image 3 is the exact Today cinematic environment used at runtime. Match only its warm daylight, soft low-contrast lighting, and gentle saturation. Do not copy scenery. Change only the expression into Grumpy Cute: Angled brows, rounded eyes, strong cheeks, and harmless little frown. Palette: espresso brown, warm black, coral blush. Shape language: Firm brow diagonals balanced by large friendly eyes. Constraints: Never aggressive or uncanny; Stay inside face layout v1. Draw only the brows, eyes, pupils and catchlights where applicable, two cheek marks where applicable, and one mouth expression. No egg shell, body color, feet, hair, hat, hand, prop, floating symbol, scenery, shadow, glow, text, logo, or extra mark. Keep every visible pixel inside the same compact central face zone as image 1. Do not zoom, crop, recenter, resize, rotate, or move the face. Render only the face layer on a perfectly uniform flat chroma-magenta #FF00FF background for BiRefNet Heavy. Do not use magenta in any face feature. The background has no gradient, texture, floor, reflection, shadow, atmosphere, or lighting variation.",
       "references": [
         {
           "path": "assets/images/katchimeras/egg-avatars/faces/classic-smile.png",
@@ -4920,24 +4962,31 @@
         }
       ],
       "mattingModel": "fal-ai/birefnet/v2",
+      "mattingSettings": {
+        "model": "General Use (Heavy)",
+        "refineForeground": true,
+        "enclosedAlphaHoleRepair": true,
+        "chromaEdgeDespill": "red-blue dominance suppression for #FF00FF",
+        "exteriorEdgeSource": "BiRefNet"
+      },
       "outputs": {
         "png": {
           "path": "assets/images/katchimeras/egg-avatars/faces/grumpy-cute.png",
           "width": 2048,
           "height": 2048,
-          "sha256": "de88fdd7bea2c3dd04e5ac5e848a5ae725fb71a9f59199f3c5f02624c08c6c89"
+          "sha256": "5985b03672a213976b1b57dba7f83898bb50a2cbd999f712771aa6dd92dabecb"
         },
         "webp": {
           "path": "assets/images/katchimeras/egg-avatars/faces/grumpy-cute.webp",
           "width": 1024,
           "height": 1024,
-          "sha256": "4de7f3bbaeb31e0bb59895f2ac4b50b5c0fdef14bc84898c8d9dfbe6bac5b593"
+          "sha256": "429c22ffe8f8e61107f3fc080f6edef7f00f38cb6c0542b6531875beb277319f"
         },
         "thumbnail": {
           "path": "assets/images/katchimeras/egg-avatars/faces/thumbnails/grumpy-cute.webp",
           "width": 256,
           "height": 256,
-          "sha256": "7df00a9794ab6a948c5413d2919234b44253a9fd553a49621ff40cf642548107"
+          "sha256": "e7a611acdf07dd0e0fd94394d7c8f6a2a5ba7655a661759f83fcd02b9e9d144d"
         }
       },
       "layerBounds": [

@@ -92,8 +92,8 @@ test('daily card resolution is deterministic and keeps trait families distinct',
 
   assert.deepEqual(first, second);
   assert.equal(first.id, `card:${day.id}`);
-  assert.equal(first.schemaVersion, 4);
-  assert.equal(first.engineVersion, 'daily-card-v4');
+  assert.equal(first.schemaVersion, 5);
+  assert.equal(first.engineVersion, 'daily-card-v5');
   assert.equal(first.state.label, 'Calm & Well Rested');
   assert.equal(first.meetingNumber, 4);
   assert.equal(first.bondStage, 0);
@@ -267,11 +267,11 @@ test('v12 migration backfills one stable card without rerolling creature or rari
   const migratedAgain = upgradeStoredHomeState(migrated);
   const card = migrated.archivedDays[0].card;
 
-  assert.equal(migrated.version, 19);
+  assert.equal(migrated.version, 20);
   assert.equal(card?.provenance, 'legacy_backfill');
   assert.equal(card?.creatureId, creature.id);
   assert.equal(card?.rarity, 'rare');
-  assert.equal(card?.schemaVersion, 4);
+  assert.equal(card?.schemaVersion, 5);
   assert.deepEqual(migratedAgain.archivedDays[0].card, card);
 });
 
@@ -297,8 +297,8 @@ test('v13 migration enriches a v1 card without changing its collectible identity
 
   const migrated = upgradeStoredHomeState(v13State);
   const card = migrated.archivedDays[0].card;
-  assert.equal(migrated.version, 19);
-  assert.equal(card?.schemaVersion, 4);
+  assert.equal(migrated.version, 20);
+  assert.equal(card?.schemaVersion, 5);
   assert.equal(card?.id, built.id);
   assert.equal(card?.creatureId, built.creatureId);
   assert.equal(card?.rarity, built.rarity);
@@ -324,7 +324,7 @@ test('a v3 card gains sealed scene layers without changing collectible identity'
 
   const upgraded = upgradeDailyCreatureCard(v3Card, day, creature);
 
-  assert.equal(upgraded.schemaVersion, 4);
+  assert.equal(upgraded.schemaVersion, 5);
   assert.equal(upgraded.id, v3Card.id);
   assert.equal(upgraded.creatureId, v3Card.creatureId);
   assert.equal(upgraded.rarity, v3Card.rarity);

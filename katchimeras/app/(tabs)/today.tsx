@@ -59,6 +59,8 @@ import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
 import { DayPromptStrip } from '@/components/katchadeck/home/day-prompt-strip';
 import { EggFeedOverlay } from '@/components/katchadeck/home/egg-feed-overlay';
 import { EggAvatarProfileScreen } from '@/components/katchadeck/egg-avatar/egg-avatar-profile-screen';
+import { WispCompanion } from '@/components/katchadeck/wisps/wisp-companion';
+import { WispDiscoveryReveal } from '@/components/katchadeck/wisps/wisp-discovery-reveal';
 import { TodayCategoryRing, type TodayCategoryRingItem } from '@/components/katchadeck/home/today-category-ring';
 import { TodayBottomDock } from '@/components/katchadeck/home/today-bottom-dock';
 import {
@@ -114,6 +116,7 @@ import { useTodayEnergyFrameProbe } from '@/features/today/use-today-energy-fram
 import { TodayEnergyProfiler } from '@/features/today/today-energy-profiler';
 import { useAppActivity } from '@/features/performance/app-activity';
 import { useEggAvatarCustomizerMode } from '@/features/egg-avatar/egg-avatar-customizer-mode';
+import { useWisps } from '@/features/wisps/wisp-provider';
 import { resolveHomeLoopPresentation } from '@/features/today/home-loop-presentation';
 import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
 import { MemoryClarificationSheet } from '@/components/katchadeck/world/memory-clarification-sheet';
@@ -372,6 +375,8 @@ function HomeScreen() {
     acceleratedReadyRef: acceleratedHatchReadyRef,
   });
   const { days: allDays } = useAllDays();
+  const { equippedWispId: activeWispId, syncFromDays: syncWispsFromDays, pendingDiscoveryId, dismissDiscovery } = useWisps();
+  useEffect(() => { syncWispsFromDays(allDays); }, [allDays, syncWispsFromDays]);
   const isDay = selectedDay?.kind === 'day';
   const homeLoopPresentation = useMemo(() => resolveHomeLoopPresentation({
     activeDayPrompt,
@@ -1868,6 +1873,7 @@ function HomeScreen() {
               ) : null}
             </>
           )}
+          {activeWispId && !isHatching ? <WispCompanion id={activeWispId} size={64} style={styles.activeWisp} /> : null}
         </Animated.View>
 
         {isHatching ? null : isHatched ? (
@@ -2408,6 +2414,7 @@ function HomeScreen() {
         onShare={handleShareGeneratedComic}
       />
       {customizerActive ? <EggAvatarProfileScreen bottomInset={insets.bottom} /> : null}
+      {pendingDiscoveryId && !isHatching ? <WispDiscoveryReveal id={pendingDiscoveryId} onDismiss={() => dismissDiscovery(pendingDiscoveryId)} /> : null}
     </View>
     </GestureDetector>
     </TodayEnvironmentMotionProvider>
@@ -2462,6 +2469,7 @@ const styles = StyleSheet.create({
     // z-indices internal to the neighborhood.
     zIndex: 0,
   },
+  activeWisp: { position: 'absolute', right: '18%', top: '24%', zIndex: 70 },
   timelineLayer: {
     position: 'relative',
     zIndex: 20,

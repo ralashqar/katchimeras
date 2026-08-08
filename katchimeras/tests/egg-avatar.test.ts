@@ -188,7 +188,18 @@ test('every launch skin has approved production assets and manifest provenance',
     artDirectionVersion?: number;
     effects?: Record<string, unknown>;
     faceLayout?: typeof EGG_AVATAR_FACE_LAYOUT;
-    faces?: Record<string, { faceLayoutVersion?: number }>;
+    faces?: Record<string, {
+      faceLayoutVersion?: number;
+      pipelineVersion?: string;
+      generationModel?: string;
+      generationQuality?: string;
+      mattingSettings?: {
+        model?: string;
+        enclosedAlphaHoleRepair?: boolean;
+        chromaEdgeDespill?: string;
+        exteriorEdgeSource?: string;
+      };
+    }>;
     skins?: Record<string, {
       version?: number;
       faceLayoutVersion?: number;
@@ -236,6 +247,25 @@ test('every launch skin has approved production assets and manifest provenance',
     assert.equal(existsSync(path.join(assetRoot, 'faces', `${faceId}.webp`)), true, `${faceId} face webp`);
     assert.equal(existsSync(path.join(assetRoot, 'faces', 'thumbnails', `${faceId}.webp`)), true, `${faceId} face thumbnail`);
     assert.ok(manifest.faces?.[faceId], `${faceId} face manifest`);
+  }
+
+  for (const repairedFaceId of [
+    'gentle-smile',
+    'single-wink',
+    'heart-eyes',
+    'sparkle-awe',
+    'shy-glance',
+    'bashful-smile',
+    'grumpy-cute',
+  ]) {
+    const face = manifest.faces?.[repairedFaceId];
+    assert.equal(face?.pipelineVersion, 'egg-avatar-faces-v4-magenta-matte-enclosed-hole-repair');
+    assert.equal(face?.generationModel, 'openai/gpt-image-2/edit');
+    assert.equal(face?.generationQuality, 'low');
+    assert.equal(face?.mattingSettings?.model, 'General Use (Heavy)');
+    assert.equal(face?.mattingSettings?.enclosedAlphaHoleRepair, true);
+    assert.equal(face?.mattingSettings?.chromaEdgeDespill, 'red-blue dominance suppression for #FF00FF');
+    assert.equal(face?.mattingSettings?.exteriorEdgeSource, 'BiRefNet');
   }
 
   for (const stage of ['crack-1', 'crack-2']) {
@@ -303,6 +333,18 @@ test('hat generation uses GPT Image front-layer geometry followed by reference-l
     'python scripts/generate-egg-avatar-skins.py hat-pipeline',
   );
   assert.equal(existsSync(path.join(root, 'docs', 'egg-avatar-hat-pipeline.md')), true);
+});
+
+test('face generation protects dark features and repairs only enclosed matte tears', () => {
+  const pipeline = readFileSync(path.join(root, 'scripts', 'generate-egg-avatar-skins.py'), 'utf8');
+  assert.match(pipeline, /FACE_GENERATION_MODEL = "openai\/gpt-image-2\/edit"/);
+  assert.match(pipeline, /FACE_PIPELINE_VERSION = "egg-avatar-faces-v4-magenta-matte-enclosed-hole-repair"/);
+  assert.match(pipeline, /quality": "low"/);
+  assert.match(pipeline, /flat chroma-magenta #FF00FF background/);
+  assert.match(pipeline, /def repair_enclosed_alpha_holes/);
+  assert.match(pipeline, /def despill_chroma_edges/);
+  assert.match(pipeline, /visible chroma-magenta pixels/);
+  assert.match(pipeline, /--review-only/);
 });
 
 test('canonical face anchors stay inside the protected compositing zone', () => {

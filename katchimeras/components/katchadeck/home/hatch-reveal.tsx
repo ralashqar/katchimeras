@@ -17,6 +17,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import type { DailyCreatureCard, EggVisualState, LocalCreatureRecord } from '@/types/home';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
+import { WispCompanion } from '@/components/katchadeck/wisps/wisp-companion';
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 const softGlow = require('../../../assets/images/katchimeras/soft-glow.png');
@@ -154,6 +155,15 @@ export function HatchReveal({ egg, card, creature, onComplete, onSettled, hideCa
   return (
     <View style={styles.stage}>
       <View style={styles.eggArea}>
+        {(card?.featuredWisps ?? []).slice(0, 2).map((featured, index) => (
+          <WispCompanion
+            behavior={phase === 'build' ? 'orbit' : phase === 'hatch' ? 'back-away' : 'celebrate'}
+            id={featured.wispId}
+            key={featured.wispId}
+            size={58}
+            style={[styles.hatchWisp, index === 0 ? styles.hatchWispLeft : styles.hatchWispRight]}
+          />
+        ))}
         <Animated.View pointerEvents="none" style={eggStyle}>
           <LanternEgg crackStage={crackStage} egg={egg} lanternColor={lanternColor} />
         </Animated.View>
@@ -212,6 +222,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
   },
+  hatchWisp: { position: 'absolute', top: '18%', zIndex: 6 },
+  hatchWispLeft: { left: '8%' },
+  hatchWispRight: { right: '8%' },
   creatureWrap: {
     alignItems: 'center',
     bottom: 0,

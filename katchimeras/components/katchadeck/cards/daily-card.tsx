@@ -14,6 +14,7 @@ import {
   OrnateCardFrame,
 } from '@/components/katchadeck/cards/ornate-card-frame';
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
+import { WispArtwork } from '@/components/katchadeck/wisps/wisp-artwork';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { TODAY_ATMOSPHERE_BACKGROUND_SOURCES } from '@/constants/today-atmosphere-background-sources.gen';
@@ -442,6 +443,19 @@ function Scene({ card, compact, renderTier, scale, sceneArt }: { card: DailyCrea
             transition={0}
           />
         )}
+      {(card.featuredWisps ?? []).slice(0, 2).map((featured, index) => (
+        <WispArtwork
+          id={featured.wispId}
+          key={featured.wispId}
+          size={(compact ? 88 : 78) * scale}
+          thumbnail={compact}
+          style={[
+            styles.featuredWisp,
+            index === 0 ? styles.featuredWispLeft : styles.featuredWispRight,
+            { top: (compact ? 95 : 86) * scale },
+          ]}
+        />
+      ))}
       <CardGlyphStrip compact={compact} glyphs={card.dayGlyphs ?? []} scale={scale} />
     </LinearGradient>
   );
@@ -730,6 +744,9 @@ const styles = StyleSheet.create({
   sceneImage: { ...StyleSheet.absoluteFillObject, opacity: 0.82 },
   kingdomSceneImage: { left: '50%', position: 'absolute', zIndex: 1 },
   creature: { bottom: '1%', height: '83%', position: 'absolute', width: '85%', zIndex: 2 },
+  featuredWisp: { position: 'absolute', zIndex: 4 },
+  featuredWispLeft: { left: '7%' },
+  featuredWispRight: { right: '7%' },
   compactCreature: { bottom: '5%' },
   kingdomCreatureFrame: { left: '50%', position: 'absolute', zIndex: 2 },
   weather: { ...StyleSheet.absoluteFillObject, zIndex: 3 },
