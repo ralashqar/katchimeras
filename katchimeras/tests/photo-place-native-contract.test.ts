@@ -24,7 +24,9 @@ test('the Expo bridge exposes the photo place lookup contract', async () => {
   assert.match(swift, /CLGeocoder/);
   assert.match(swift, /areasOfInterest/);
   assert.match(swift, /resolveAreasOfInterest/);
+  assert.match(swift, /#available\(iOS 18\.0, \*\)/);
   assert.match(swift, /request\.resultTypes = \[\.pointOfInterest, \.physicalFeature\]/);
+  assert.match(swift, /request\.resultTypes = \[\.pointOfInterest\]/);
   assert.match(swift, /"areaCandidates"/);
   assert.match(swift, /"nameMatchScore"/);
   assert.match(swift, /latitudinalMeters: 10_000/);

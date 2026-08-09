@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState } from 'react';
 
 import { WispCompanion } from '@/components/katchadeck/wisps/wisp-companion';
 import { ThemedText } from '@/components/themed-text';
@@ -11,19 +12,25 @@ import { useWisps } from '@/features/wisps/wisp-provider';
 import { useAllDays } from '@/hooks/use-all-days';
 import type { WispId } from '@/types/wisp';
 import { resolveWispCandidates } from '@/utils/wisp-engine';
+import { useEconomy } from '@/features/economy/economy-provider';
+import { historyDaysForAccess } from '@/utils/history-access';
 
 export default function WispDetailScreen() {
   const router = useRouter();
   const { wispId } = useLocalSearchParams<{ wispId: string }>();
   const definition = WISPS_BY_ID.get(wispId as WispId);
   const wisps = useWisps();
+  const economy = useEconomy();
+  const [buying, setBuying] = useState(false);
   const { days } = useAllDays();
   if (!definition) return null;
   const owned = wisps.isOwned(definition.id);
   const equipped = wisps.equippedWispId === definition.id;
   const progress = wisps.progressFor(definition.id, days);
   const matchingDays = days.filter((day, index) => resolveWispCandidates(day, days.slice(0, index)).some((item) => item.wispId === definition.id));
+  const visibleMatchingDays = historyDaysForAccess(matchingDays, economy.snapshot.activePlus);
   const unlock = wisps.state.unlocked[definition.id];
+  const shopOffer = economy.config.shop.offers.find((offer) => offer.enabled && offer.collectibleType === 'wisp' && offer.collectibleId === definition.id && offer.currency === 'essence');
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -51,11 +58,19 @@ export default function WispDetailScreen() {
         {owned ? <Pressable accessibilityRole="button" onPress={() => wisps.equip(equipped ? null : definition.id)} style={({ pressed }) => [styles.equip, pressed && styles.pressed]}>
           <ThemedText style={styles.equipText} lightColor="#FFF8E7" darkColor="#FFF8E7">{equipped ? 'Let it rest' : 'Equip Wisp'}</ThemedText>
         </Pressable> : null}
+        {!owned && shopOffer && economy.config.flags.wispShop ? <Pressable accessibilityRole="button" disabled={buying || economy.snapshot.essenceBalance < shopOffer.price} onPress={async () => {
+          setBuying(true);
+          await economy.purchaseWithEssence(shopOffer.id);
+          setBuying(false);
+        }} style={({ pressed }) => [styles.equip, (buying || economy.snapshot.essenceBalance < shopOffer.price) && styles.disabled, pressed && styles.pressed]}>
+          <ThemedText style={styles.equipText} lightColor="#FFF8E7" darkColor="#FFF8E7">{buying ? 'Inviting…' : `${shopOffer.price} Essence`}</ThemedText>
+        </Pressable> : null}
 
         <View style={styles.history}>
           <ThemedText style={styles.sectionTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>Your history</ThemedText>
-          <ThemedText style={styles.historyNumber} lightColor={Meadow.ink} darkColor={Meadow.ink}>{matchingDays.length}</ThemedText>
-          <ThemedText style={styles.historyLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>days together</ThemedText>
+          <ThemedText style={styles.historyNumber} lightColor={Meadow.ink} darkColor={Meadow.ink}>{visibleMatchingDays.length}</ThemedText>
+          <ThemedText style={styles.historyLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{economy.snapshot.activePlus ? 'days together' : 'days in your latest 14 days'}</ThemedText>
+          {!economy.snapshot.activePlus && visibleMatchingDays.length < matchingDays.length ? <Pressable accessibilityRole="button" onPress={() => router.push('/modal')} style={styles.longMemory}><ThemedText style={styles.longMemoryText} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>See your full history with Plus</ThemedText></Pressable> : null}
           {unlock ? <ThemedText style={styles.firstLine} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>First discovered {new Date(unlock.unlockedAt).toLocaleDateString()}</ThemedText> : null}
           {matchingDays[0] ? <ThemedText style={styles.firstLine} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>First memory: {matchingDays[0].dayName ?? matchingDays[0].dateLabel}</ThemedText> : null}
         </View>
@@ -83,9 +98,12 @@ const styles = StyleSheet.create({
   rule: { fontSize: 13, lineHeight: 19, marginTop: 12 },
   equip: { alignItems: 'center', backgroundColor: '#5D6F43', borderCurve: 'continuous', borderRadius: 18, marginTop: 14, paddingVertical: 14, width: '100%' },
   equipText: { fontSize: 14, fontWeight: '900' },
+  disabled: { opacity: 0.45 },
   history: { alignItems: 'center', marginTop: 30, width: '100%' },
   sectionTitle: { alignSelf: 'flex-start', fontFamily: 'InstrumentSerif', fontSize: 28 },
   historyNumber: { fontFamily: 'InstrumentSerif', fontSize: 52, marginTop: 10 },
   historyLabel: { fontSize: 13, fontWeight: '700' },
   firstLine: { fontSize: 13, marginTop: 8 },
+  longMemory: { backgroundColor: 'rgba(255,247,228,0.82)', borderRadius: 999, marginTop: 12, paddingHorizontal: 14, paddingVertical: 8 },
+  longMemoryText: { fontSize: 11.5, fontWeight: '900' },
 });

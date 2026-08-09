@@ -11,6 +11,8 @@ import 'react-native-reanimated';
 import { Colors } from '@/constants/theme';
 import { EggAvatarProvider } from '@/features/egg-avatar/egg-avatar-provider';
 import { WispProvider } from '@/features/wisps/wisp-provider';
+import { EconomyProvider } from '@/features/economy/economy-provider';
+import { AvatarAccessReconciler } from '@/features/economy/avatar-access-reconciler';
 import { AppActivityProvider } from '@/features/performance/app-activity';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import '@/utils/travel-memory-task';
@@ -78,7 +80,9 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={navigationTheme}>
+        <EconomyProvider>
         <EggAvatarProvider>
+          <AvatarAccessReconciler />
           <WispProvider>
           <AppActivityProvider>
             <Stack>
@@ -90,6 +94,7 @@ export default function RootLayout() {
           <Stack.Screen name="dev-environment-gallery" options={{ title: 'Environment Gallery', headerShown: false }} />
           <Stack.Screen name="dev-katchimera-tile-lab" options={{ title: 'Katchimera Tile Lab' }} />
           <Stack.Screen name="dev-photo-place-lab" options={{ title: 'Photo Place Lab' }} />
+          <Stack.Screen name="dev-subscription-lab" options={{ title: 'Subscription Simulator' }} />
           <Stack.Screen name="intelligence-lab" options={{ title: 'Intelligence Lab' }} />
           <Stack.Screen name="moment-capture" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="note-capture" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
@@ -112,6 +117,7 @@ export default function RootLayout() {
           </AppActivityProvider>
           </WispProvider>
         </EggAvatarProvider>
+        </EconomyProvider>
         <StatusBar style={colorScheme === 'light' ? 'dark' : 'light'} />
       </ThemeProvider>
     </GestureHandlerRootView>

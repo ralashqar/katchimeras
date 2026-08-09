@@ -2,7 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { requireOptionalNativeModule } from 'expo-modules-core';
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -421,6 +421,7 @@ export default function ExploreScreen() {
                 <KatchaButton label="Katchimera Hex Tile Lab" onPress={() => router.push('/dev-katchimera-tile-lab')} variant="secondary" />
                 <KatchaButton label="Atmosphere Lab" onPress={() => router.push('/dev-atmosphere-lab')} variant="secondary" />
                 <KatchaButton label="Photo Place Lab" onPress={() => router.push('/dev-photo-place-lab')} variant="secondary" />
+                <KatchaButton label="Subscription Simulator" onPress={() => router.push('/dev-subscription-lab' as Href)} variant="secondary" />
                 <KatchaButton label="🧩 Tile Layout Lab (iso adjacency)" onPress={() => router.push('/dev-tile-lab')} variant="secondary" />
                 <KatchaButton label="Analyze a photo (vision)" onPress={handleAnalyzePickedPhoto} variant="secondary" />
                 <KatchaButton label="Last photo intelligence (JSON)" onPress={() => router.push('/intelligence-lab')} variant="secondary" />

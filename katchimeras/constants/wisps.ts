@@ -1,4 +1,4 @@
-import catalogData from '@/data/wisps/catalog.json';
+import catalogData from '@/data/wisps/catalog.generated.json';
 import type { WispCatalogItem, WispId } from '@/types/wisp';
 
 export const WISP_CATALOG_VERSION = catalogData.version;

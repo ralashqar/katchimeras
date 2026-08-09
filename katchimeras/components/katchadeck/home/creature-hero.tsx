@@ -247,6 +247,12 @@ export function buildCreatureKicker(creature: LocalCreatureRecord) {
   return encounterCue;
 }
 
+export function hatchNoveltyLabel(creature: LocalCreatureRecord) {
+  if ((creature.bondVisitCount ?? 1) <= 1) return 'New companion';
+  if (creature.repeatDepth <= 0) return 'New form';
+  return 'Returned today';
+}
+
 // The living conditions that made this creature rare, surfaced as the poetic
 // "you can only collect it by having the day" beat. Only shown when the day
 // actually earned rarity above the common floor.

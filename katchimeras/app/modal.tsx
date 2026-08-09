@@ -1,158 +1,110 @@
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import Animated from 'react-native-reanimated';
+import { useEffect, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AmbientBackground } from '@/components/katchadeck/ambient-background';
-import { HoodedAvatar } from '@/components/katchadeck/hooded-avatar';
-import { presenceEnter, rewardEnter } from '@/components/katchadeck/motion';
-import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
+import { WispArtwork } from '@/components/katchadeck/wisps/wisp-artwork';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
-import { KatchaDeckUI } from '@/constants/theme';
+import { Meadow } from '@/constants/meadow-theme';
+import { useEconomy } from '@/features/economy/economy-provider';
 import { safeGoBack } from '@/utils/safe-navigation';
+import { useDevSubscriptionSimulator } from '@/hooks/use-dev-subscription-simulator';
 
-export default function ModalScreen() {
+export default function PlusScreen() {
   const router = useRouter();
+  const economy = useEconomy();
+  const simulator = useDevSubscriptionSimulator();
+  const { loadPackages } = economy;
+  const [busy, setBusy] = useState<string | null>(null);
+
+  useEffect(() => { void loadPackages(); }, [loadPackages]);
+
+  const purchase = async (packageId: string) => {
+    setBusy(packageId);
+    const result = await economy.purchasePlus(packageId);
+    setBusy(null);
+    if (!result.ok) Alert.alert('Purchase not completed', 'Nothing was charged. Please try again or restore an existing purchase.');
+  };
+
+  const claim = async () => {
+    setBusy('claim');
+    const result = await economy.claimMonthlyPlus();
+    setBusy(null);
+    Alert.alert(
+      result.ok ? 'Opal joined you' : result.reason === 'disabled' ? 'Not available yet' : 'Could not claim Opal',
+      result.ok
+        ? 'Your permanent monthly Wisp is now in your collection.'
+        : result.reason === 'disabled'
+          ? 'The monthly Wisp will appear when Plus rolls out.'
+          : 'Please try again in a moment.',
+    );
+  };
 
   return (
-    <View style={styles.screen}>
-      <AmbientBackground
-        accentColor="rgba(227,160,110,0.14)"
-        colors={['#0B0D16', '#17152A', '#1E1832']}
-        meshColors={['rgba(200,216,255,0.12)', 'rgba(240,223,255,0.14)', 'rgba(255,216,192,0.14)', 'rgba(106,95,232,0.12)']}
-      />
-      <ScrollView
-        contentContainerStyle={styles.container}
-        contentInsetAdjustmentBehavior="automatic"
-        showsVerticalScrollIndicator={false}>
-        <Animated.View entering={rewardEnter()} style={styles.hero}>
-          <View style={styles.heroCopy}>
-            <ThemedText type="label" style={styles.kicker} lightColor="#FFE7D7" darkColor="#FFE7D7">
-              Premium preview
-            </ThemedText>
-            <ThemedText type="display" style={styles.title} lightColor="#FFF8F4" darkColor="#FFF8F4">
-              Unlock the full version of your life.
-            </ThemedText>
-            <ThemedText type="bodyLarge" style={styles.body} lightColor="#F2E6E1" darkColor="#F2E6E1">
-              Premium gives your deck deeper identity reads, story-comic moments, evolved variants,
-              and the richer sense that your life is building into something distinct.
-            </ThemedText>
+    <SafeAreaView style={styles.safe}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {simulator.enabled ? (
+          <View style={styles.simulatorBanner}>
+            <ThemedText selectable style={styles.simulatorBannerText} lightColor="#5A3D08" darkColor="#5A3D08">LOCAL SUBSCRIPTION SIMULATION · NO CHARGE</ThemedText>
           </View>
-          <HoodedAvatar size={116} />
-        </Animated.View>
+        ) : null}
+        <View style={styles.hero}>
+          <View style={styles.wisp}><WispArtwork id="orbit" size={108} /></View>
+          <ThemedText style={styles.eyebrow} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>KATCHIMERAS PLUS</ThemedText>
+          <ThemedText style={styles.title} lightColor={Meadow.ink} darkColor={Meadow.ink}>More ways to remember.</ThemedText>
+          <ThemedText style={styles.subtitle} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Your daily hatch, every companion, every quest and every Journey stay free.</ThemedText>
+        </View>
 
-        <Animated.View entering={presenceEnter(120)}>
-          <GlassPanel
-            contentStyle={styles.panel}
-            fillColor="rgba(255, 239, 231, 0.08)"
-            gradientColors={['rgba(221,232,255,0.14)', 'rgba(240,223,255,0.12)', 'rgba(255,216,192,0.08)']}>
-            <FeatureRow title="Enhanced variants" body="See stronger forms of the creatures shaped by your repeated places and rituals." />
-            <FeatureRow title="Story + comic moments" body="Turn standout days into illustrated memory fragments worth revisiting." />
-            <FeatureRow title="Deeper identity insight" body="Get more articulate reflections about who you are becoming over time." />
-            <FeatureRow title="Evolution + fusion" body="Let familiar routes and patterns combine into rarer long-form deck growth." />
-          </GlassPanel>
-        </Animated.View>
+        <View style={styles.card}>
+          <Feature title="Long Memory" body="Revisit patterns and companion reflections across your complete history instead of the latest 14 days." />
+          <Feature title="Full avatar wardrobe" body="Wear Plus Egg looks while your membership is active. Anything bought with Essence remains yours forever." />
+          <Feature title="Monthly Wisp" body="Claim one permanent cosmetic Wisp each month, starting with Opal." />
+          <Feature title="Bigger visitor shop" body="See six rotating cosmetic visitors instead of three. Life-earned Wisps are never sold." />
+        </View>
 
-        <Animated.View entering={presenceEnter(220)}>
-          <GlassPanel contentStyle={styles.subpanel}>
-            <ThemedText type="label" style={styles.subpanelLabel} lightColor="#FFE7D7" darkColor="#FFE7D7">
-              Placeholder paywall
-            </ThemedText>
-            <ThemedText style={styles.subpanelBody} lightColor="#F2E6E1" darkColor="#F2E6E1">
-              Billing is not wired yet. This screen exists to validate tone, premium positioning, and
-              future upgrade placement.
-            </ThemedText>
-          </GlassPanel>
-        </Animated.View>
-
-        <Animated.View entering={presenceEnter(280)} style={styles.ctaRow}>
-          <KatchaButton disabled label="Premium coming soon" variant="premium" />
-          <KatchaButton label="Back to reveal" onPress={() => safeGoBack(router)} variant="secondary" />
-        </Animated.View>
+        {economy.snapshot.activePlus ? (
+          <View style={styles.actions}>
+            <KatchaButton disabled={economy.snapshot.monthlyPlusClaimed} fullWidth icon="sparkles" label={economy.snapshot.monthlyPlusClaimed ? 'This month’s Wisp claimed' : 'Claim this month’s Opal'} loading={busy === 'claim'} onPress={() => void claim()} />
+            <KatchaButton fullWidth label="Restore purchases" loading={busy === 'restore'} onPress={() => { setBusy('restore'); void economy.reconcilePurchases(true).finally(() => setBusy(null)); }} variant="secondary" />
+          </View>
+        ) : (
+          <View style={styles.actions}>
+            {economy.packages.map((item) => (
+              <KatchaButton fullWidth key={item.identifier} label={`${item.period === 'annual' ? 'Annual' : item.period === 'monthly' ? 'Monthly' : item.title} · ${item.priceString}`} loading={busy === item.identifier} onPress={() => void purchase(item.identifier)} variant={item.period === 'annual' ? 'premium' : 'secondary'} />
+            ))}
+            {!economy.packages.length ? <ThemedText style={styles.storeNote} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Store plans will appear here when RevenueCat’s Plus offering is available in this build.</ThemedText> : null}
+            <KatchaButton fullWidth label="Restore purchases" loading={busy === 'restore'} onPress={() => { setBusy('restore'); void economy.reconcilePurchases(true).finally(() => setBusy(null)); }} variant="tertiary" />
+          </View>
+        )}
+        <ThemedText style={styles.terms} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>7-day trial where offered. Subscription renews unless cancelled through your App Store account. No hatch odds, acceleration or companions are sold.</ThemedText>
+        <KatchaButton fullWidth label="Not now" onPress={() => safeGoBack(router)} variant="tertiary" />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
-function FeatureRow({ title, body }: { title: string; body: string }) {
-  return (
-    <View style={styles.featureRow}>
-      <View style={styles.featureDot} />
-      <View style={styles.featureCopy}>
-        <ThemedText type="subtitle" style={styles.featureTitle} lightColor="#FFF8F4" darkColor="#FFF8F4">
-          {title}
-        </ThemedText>
-        <ThemedText style={styles.featureBody} lightColor="#F2E6E1" darkColor="#F2E6E1">
-          {body}
-        </ThemedText>
-      </View>
-    </View>
-  );
+function Feature({ title, body }: { title: string; body: string }) {
+  return <View style={styles.feature}><View style={styles.dot} /><View style={styles.featureCopy}><ThemedText style={styles.featureTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{title}</ThemedText><ThemedText style={styles.featureBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{body}</ThemedText></View></View>;
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    backgroundColor: '#090B12',
-    flex: 1,
-  },
-  container: {
-    gap: KatchaDeckUI.spacing.lg,
-    justifyContent: 'center',
-    minHeight: '100%',
-    padding: 24,
-  },
-  hero: {
-    gap: 18,
-  },
-  heroCopy: {
-    gap: 12,
-  },
-  kicker: {
-    fontSize: 11,
-  },
-  title: {
-    fontSize: 46,
-    lineHeight: 48,
-  },
-  body: {
-    maxWidth: 340,
-  },
-  panel: {
-    gap: 16,
-  },
-  featureRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  featureDot: {
-    backgroundColor: '#FFD6B6',
-    borderRadius: 999,
-    height: 9,
-    marginTop: 8,
-    width: 9,
-  },
-  featureCopy: {
-    flex: 1,
-    gap: 4,
-  },
-  featureTitle: {
-    fontSize: 20,
-  },
-  featureBody: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  subpanel: {
-    gap: 10,
-  },
-  subpanelLabel: {
-    fontSize: 11,
-  },
-  subpanelBody: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  ctaRow: {
-    gap: 10,
-  },
+  safe: { backgroundColor: '#F5E7CB', flex: 1 },
+  content: { gap: 18, padding: 22, paddingBottom: 42 },
+  hero: { alignItems: 'center', gap: 7, paddingTop: 8 },
+  wisp: { alignItems: 'center', height: 112, justifyContent: 'center' },
+  eyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.4 },
+  title: { fontFamily: 'InstrumentSerif', fontSize: 43, lineHeight: 46, textAlign: 'center' },
+  subtitle: { fontSize: 14, lineHeight: 21, maxWidth: 330, textAlign: 'center' },
+  card: { backgroundColor: 'rgba(255,248,231,0.78)', borderColor: 'rgba(125,83,43,0.16)', borderCurve: 'continuous', borderRadius: 24, borderWidth: 1, gap: 16, padding: 18 },
+  feature: { flexDirection: 'row', gap: 11 },
+  dot: { backgroundColor: Meadow.goldDeep, borderRadius: 99, height: 8, marginTop: 7, width: 8 },
+  featureCopy: { flex: 1, gap: 2 },
+  featureTitle: { fontSize: 15, fontWeight: '900' },
+  featureBody: { fontSize: 12.5, lineHeight: 18 },
+  actions: { gap: 9 },
+  storeNote: { fontSize: 12.5, lineHeight: 18, paddingHorizontal: 12, textAlign: 'center' },
+  terms: { fontSize: 10.5, lineHeight: 15, paddingHorizontal: 8, textAlign: 'center' },
+  simulatorBanner: { alignItems: 'center', backgroundColor: '#FFE09A', borderCurve: 'continuous', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  simulatorBannerText: { fontSize: 9.5, fontWeight: '900', letterSpacing: 0.8 },
 });

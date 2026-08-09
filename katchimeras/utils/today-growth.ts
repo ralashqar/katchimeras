@@ -26,6 +26,13 @@ export const TODAY_GROWTH_REWARDS: Readonly<Record<TodayGrowthSource, number>> =
 export const TODAY_GROWTH_STAGE_THRESHOLDS = [0, 15, 35, 55, 70, 85, 100] as const;
 export const TODAY_ENERGY_TARGET = 100;
 export const TODAY_ACTIVATION_ACTION_COUNT = 2;
+export const TODAY_MEANINGFUL_ACTIVATION_SOURCES: ReadonlySet<TodayGrowthSource> = new Set([
+  'photo',
+  'voice_note',
+  'journal',
+  'reflection',
+  'place',
+]);
 export const TODAY_TIME_FLOOR_RATIO = 0.7;
 export const TODAY_MAX_ACCELERATION_RATIO = 1 - TODAY_TIME_FLOOR_RATIO;
 
@@ -177,7 +184,8 @@ export function todayGrowthActivation(day: Pick<StoredHomeDayRecord, 'growth'>):
       const timestamp = left.awardedAt.getTime() - right.awardedAt.getTime();
       return timestamp || left.event.id.localeCompare(right.event.id);
     });
-  const activationEvent = qualifyingEvents[TODAY_ACTIVATION_ACTION_COUNT - 1] ?? null;
+  const meaningfulEvent = qualifyingEvents.find(({ event }) => TODAY_MEANINGFUL_ACTIVATION_SOURCES.has(event.source)) ?? null;
+  const activationEvent = meaningfulEvent ?? qualifyingEvents[TODAY_ACTIVATION_ACTION_COUNT - 1] ?? null;
   return {
     qualifyingActionCount: qualifyingEvents.length,
     incubationStartedAt: activationEvent?.awardedAt ?? null,

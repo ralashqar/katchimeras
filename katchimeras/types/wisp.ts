@@ -1,22 +1,21 @@
-export const WISP_IDS = [
-  'sunbeam', 'sprout', 'steam', 'flash', 'drizzle', 'moonlit', 'page', 'wander', 'heartlet', 'sunset',
-  'bloom', 'pixel', 'buddy', 'crumb', 'dream', 'relic', 'spark', 'puddle', 'aurora', 'breeze',
-  'focus', 'giggle', 'orbit', 'flame', 'shore', 'fern', 'shelf', 'feast', 'flicker', 'pulse',
-  'platform', 'spire', 'market', 'nest', 'stride', 'rush', 'wheel', 'ripple', 'sizzle', 'sketch',
-  'note', 'whisker', 'flurry', 'dawn', 'starlit', 'comet', 'chronicle', 'explorer', 'confetti', 'recall',
-] as const;
+import { WISP_IDS } from '@/constants/wisp-ids.generated';
+
+export { WISP_IDS } from '@/constants/wisp-ids.generated';
 
 export type WispId = (typeof WISP_IDS)[number];
 export type WispCategory = 'place' | 'activity' | 'experience' | 'pattern' | 'achievement';
 export type WispAcquisition = 'experience' | 'achievement' | 'game' | 'social' | 'shop' | 'seasonal' | 'premium';
 export type WispRarity = 'common' | 'rare' | 'epic' | 'legendary';
 export type WispConfidence = 'explicit' | 'confirmed' | 'inferred';
+export type WispSemanticClass = 'experience' | 'achievement' | 'family_signature' | 'cosmetic' | 'seasonal' | 'social' | 'game_reward';
+export type WispGiftPolicy = 'not_giftable' | 'duplicate_only';
+export type WispDuplicatePolicy = 'convert' | 'convert_or_gift';
 
 export type WispRuleDefinition = {
   id: string;
   target: number;
   unit: string;
-  params?: Record<string, string | number | string[]>;
+  params?: Record<string, string | number | string[] | unknown[]>;
 };
 
 export type WispCatalogItem = {
@@ -37,6 +36,14 @@ export type WispCatalogItem = {
   availability: 'planned' | 'ready';
   sortOrder: number;
   version: number;
+  semanticClass: WispSemanticClass;
+  primaryAcquisition: WispAcquisition;
+  primaryFamilyId: string | null;
+  affinityFamilyIds: string[];
+  seriesId: string | null;
+  giftPolicy: WispGiftPolicy;
+  duplicatePolicy: WispDuplicatePolicy;
+  assetRefs: { art: string; runtime: string; thumbnail: string } | null;
 };
 
 export type WispDayCandidate = {
@@ -55,10 +62,21 @@ export type WispUnlockRecord = {
   seenReveal: boolean;
 };
 
+export type WispGrantSource = 'experience' | 'achievement' | 'family_achievement' | 'essence_shop' | 'visitor' | 'plus_claim' | 'purchase' | 'season' | 'game' | 'social' | 'gift' | 'migration';
+
+export type WispInventoryRecord = {
+  wispId: WispId;
+  quantity: number;
+  sources: WispGrantSource[];
+  firstGrantedAt: number;
+  giftableQuantity: number;
+};
+
 export type WispCollectionState = {
-  version: 1;
+  version: 2;
   equippedWispId: WispId | null;
   unlocked: Partial<Record<WispId, WispUnlockRecord>>;
+  inventory: Partial<Record<WispId, WispInventoryRecord>>;
   baselinedCatalogVersion: number;
 };
 

@@ -2,11 +2,12 @@ import * as Haptics from 'expo-haptics';
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { EggAvatar } from '@/components/katchadeck/egg-avatar/egg-avatar';
 import { WispArtwork } from '@/components/katchadeck/wisps/wisp-artwork';
+import { VisitorChoiceCard } from '@/components/katchadeck/wisps/visitor-choice-card';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { EGG_AVATAR_FACES } from '@/constants/egg-avatar-faces';
@@ -18,6 +19,7 @@ import { Meadow } from '@/constants/meadow-theme';
 import { READY_WISPS } from '@/constants/wisps';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { useWisps } from '@/features/wisps/wisp-provider';
+import { useEconomy } from '@/features/economy/economy-provider';
 import type { HomeDayRecord } from '@/types/home';
 import type { EggAvatarFaceId, EggAvatarHatId, EggAvatarHeldAccessoryId, EggAvatarSkinId } from '@/types/egg-avatar';
 import { eggAvatarCustomizerPanelHeight } from '@/utils/egg-avatar-customizer-camera';
@@ -46,6 +48,7 @@ export function EggAvatarProfileScreen({ bottomInset = 0, days }: { bottomInset?
   const { height, width } = useWindowDimensions();
   const avatar = useEggAvatar();
   const wisps = useWisps();
+  const economy = useEconomy();
   const [mode, setMode] = useState<YouMode>('egg');
   const [category, setCategory] = useState<Category>('body');
   const [wispFilter, setWispFilter] = useState<WispFilter>('all');
@@ -68,7 +71,7 @@ export function EggAvatarProfileScreen({ bottomInset = 0, days }: { bottomInset?
     : visibleWisps.map((wisp) => ({ key: `wisp:${wisp.id}`, kind: 'wisp' as const, wisp })),
   [mode, options, visibleWisps]);
 
-  const selectEgg = (id: string | null) => {
+  const equipEgg = (id: string | null) => {
     if (id === selectedId) return;
     if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
     if (category === 'body') avatar.equipSkin(id as EggAvatarSkinId);
@@ -77,10 +80,37 @@ export function EggAvatarProfileScreen({ bottomInset = 0, days }: { bottomInset?
     else avatar.equipHeldAccessory(id as EggAvatarHeldAccessoryId | null);
   };
 
+  const selectEgg = (id: string | null) => {
+    if (id == null) { equipEgg(null); return; }
+    const catalogItem = (category === 'body' ? EGG_AVATAR_SKINS : category === 'face' ? EGG_AVATAR_FACES : category === 'hat' ? EGG_AVATAR_HATS : EGG_AVATAR_HELD_ACCESSORIES).find((item) => item.id === id);
+    if (!catalogItem) return;
+    const access = economy.avatarAccess({ category, itemId: id, rarity: catalogItem.rarity, access: catalogItem.access });
+    if (access.hasAccess) { equipEgg(id); return; }
+    if (access.source === 'locked-plus') {
+      router.push('/modal');
+      return;
+    }
+    Alert.alert(
+      `Unlock ${catalogItem.name}?`,
+      `${access.price} Essence · Your balance is ${economy.snapshot.essenceBalance}.`,
+      [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Unlock', onPress: () => { void economy.purchaseAvatar({ category, itemId: id, rarity: catalogItem.rarity, access: catalogItem.access }).then((result) => { if (result.ok) equipEgg(id); else Alert.alert('Could not unlock', result.reason === 'insufficient_essence' ? 'You need a little more Essence.' : 'Please try again when you are online.'); }); } },
+      ],
+    );
+  };
+
   return (
     <Animated.View entering={FadeIn.duration(240)} exiting={FadeOut.duration(180)} pointerEvents="auto" style={styles.screen}>
       <View style={[styles.panel, { bottom: tabBarHeight, height: panelHeight }]}>
         <View style={styles.grabber} />
+
+        <View style={styles.economyBar}>
+          <ThemedText selectable style={styles.balance} lightColor={Meadow.ink} darkColor={Meadow.ink}>✦ {economy.snapshot.essenceBalance}</ThemedText>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/modal')} style={({ pressed }) => [styles.plusPill, economy.snapshot.activePlus && styles.plusPillActive, pressed && styles.itemPressed]}>
+            <ThemedText style={styles.plusLabel} lightColor="#FFF8E7" darkColor="#FFF8E7">{economy.snapshot.activePlus ? 'PLUS ACTIVE' : 'KATCHIMERAS PLUS'}</ThemedText>
+          </Pressable>
+        </View>
 
         <View accessibilityRole="tablist" style={styles.modeTabs}>
           {(['egg', 'wisps'] as const).map((item) => {
@@ -100,6 +130,8 @@ export function EggAvatarProfileScreen({ bottomInset = 0, days }: { bottomInset?
           })}
         </View>
 
+        {mode === 'wisps' ? <VisitorChoiceCard /> : null}
+
         <FlashList
           contentContainerStyle={styles.grid}
           data={gridItems}
@@ -110,10 +142,15 @@ export function EggAvatarProfileScreen({ bottomInset = 0, days }: { bottomInset?
               const option = item.option;
             const selected = option.id === selectedId;
             const previewProps = categoryPreview(category, option.id, avatar);
-              return <Pressable accessibilityLabel={`${option.name}${selected ? ', selected' : ''}`} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => selectEgg(option.id)} style={({ pressed }) => [styles.item, { width: cellWidth }, selected && { borderColor: avatar.equippedSkin.accent, borderWidth: 2 }, pressed && styles.itemPressed]}>
+            const catalogItem = option.id == null ? null : (category === 'body' ? EGG_AVATAR_SKINS : category === 'face' ? EGG_AVATAR_FACES : category === 'hat' ? EGG_AVATAR_HATS : EGG_AVATAR_HELD_ACCESSORIES).find((entry) => entry.id === option.id);
+            const access = catalogItem ? economy.avatarAccess({ category, itemId: option.id!, rarity: catalogItem.rarity, access: catalogItem.access }) : null;
+            const owned = access?.hasAccess ?? true;
+              return <Pressable accessibilityLabel={`${option.name}${selected ? ', selected' : ''}${owned ? '' : ', locked'}`} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => selectEgg(option.id)} style={({ pressed }) => [styles.item, { width: cellWidth }, !owned && styles.itemLocked, selected && { borderColor: avatar.equippedSkin.accent, borderWidth: 2 }, pressed && styles.itemPressed]}>
               <View style={[styles.itemPreview, { height: cellWidth - 12, backgroundColor: `${avatar.equippedSkin.accent}1C` }]}>
                 {option.id == null ? <IconSymbol color={Meadow.inkSoft} name="nosign" size={24} /> : <EggAvatar presentation="grid" size={cellWidth - 18} {...previewProps} />}
                 {selected ? <View style={[styles.check, { backgroundColor: avatar.equippedSkin.accent }]}><IconSymbol color="#FFF9EC" name="checkmark" size={11} /></View> : null}
+                {!owned ? <View style={styles.lock}><IconSymbol color="#FFF9EC" name="lock.fill" size={10} /></View> : null}
+                {!owned && access ? <View style={styles.priceBadge}><ThemedText style={styles.priceText} lightColor={Meadow.ink} darkColor={Meadow.ink}>{access.source === 'locked-plus' ? 'PLUS' : `✦ ${access.price}`}</ThemedText></View> : null}
               </View>
               <ThemedText selectable numberOfLines={1} style={styles.itemLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>{option.name}</ThemedText>
             </Pressable>;
@@ -149,6 +186,11 @@ const styles = StyleSheet.create({
   screen: { ...StyleSheet.absoluteFillObject, elevation: 100, zIndex: 100 },
   panel: { backgroundColor: 'rgba(248,235,210,0.97)', borderColor: 'rgba(125,83,43,0.18)', borderCurve: 'continuous', borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, boxShadow: '0 -14px 34px rgba(22,16,13,0.24)', gap: 6, left: 0, overflow: 'hidden', paddingTop: 6, position: 'absolute', right: 0 },
   grabber: { alignSelf: 'center', backgroundColor: 'rgba(97,66,38,0.25)', borderRadius: 99, height: 4, width: 34 },
+  economyBar: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 26, paddingHorizontal: 14 },
+  balance: { fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '900' },
+  plusPill: { backgroundColor: '#5C4633', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  plusPillActive: { backgroundColor: '#667A4D' },
+  plusLabel: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.7 },
   modeTabs: { alignSelf: 'center', backgroundColor: 'rgba(70,49,30,0.9)', borderRadius: 14, flexDirection: 'row', padding: 2, width: 196 },
   modeTab: { alignItems: 'center', borderRadius: 12, flex: 1, justifyContent: 'center', minHeight: 34, paddingVertical: 5 },
   modeTabActive: { backgroundColor: '#FFF1D7' },
@@ -163,10 +205,14 @@ const styles = StyleSheet.create({
   grid: { paddingBottom: 20, paddingHorizontal: GRID_HORIZONTAL_PADDING },
   item: { backgroundColor: 'rgba(232,207,171,0.76)', borderColor: 'rgba(120,78,38,0.14)', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, gap: 3, marginBottom: GRID_GAP, overflow: 'hidden', padding: 5 },
   itemPressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
+  itemLocked: { opacity: 0.58 },
+  lock: { alignItems: 'center', backgroundColor: 'rgba(49,36,27,0.76)', borderRadius: 999, height: 21, justifyContent: 'center', position: 'absolute', right: 4, top: 4, width: 21 },
   wispEquipped: { backgroundColor: 'rgba(255,244,218,0.96)', borderColor: 'rgba(89,123,78,0.58)', borderWidth: 2 },
   itemPreview: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 12, justifyContent: 'center', overflow: 'hidden' },
   itemLabel: { fontSize: 10.5, fontWeight: '800', paddingBottom: 3, paddingHorizontal: 2, textAlign: 'center' },
   check: { alignItems: 'center', borderColor: 'rgba(255,255,255,0.72)', borderRadius: 999, borderWidth: 1, height: 21, justifyContent: 'center', position: 'absolute', right: 4, top: 4, width: 21 },
   progressBadge: { backgroundColor: 'rgba(255,247,228,0.9)', borderRadius: 8, bottom: 4, paddingHorizontal: 5, paddingVertical: 2, position: 'absolute', right: 4 },
   progressText: { fontSize: 9, fontVariant: ['tabular-nums'], fontWeight: '900' },
+  priceBadge: { backgroundColor: 'rgba(255,247,228,0.94)', borderRadius: 8, bottom: 4, left: 4, paddingHorizontal: 5, paddingVertical: 2, position: 'absolute' },
+  priceText: { fontSize: 8, fontWeight: '900' },
 });

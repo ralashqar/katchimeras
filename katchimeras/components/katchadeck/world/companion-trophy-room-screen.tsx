@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Alert, FlatList, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -21,6 +21,11 @@ import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back
 import { companionAchievementIconSource } from '@/constants/achievement-icon-sources';
 import { companionQuestListSpacer } from '@/utils/companion-home-layout';
 import { todayKatchimeraExplorationBackgroundKeyForEnvironment } from '@/utils/today-exploration-backgrounds';
+import { wispFamilySeries } from '@/constants/wisp-family-series';
+import { wispDefinition } from '@/constants/wisps';
+import { useWisps } from '@/features/wisps/wisp-provider';
+import type { KatchimeraFamilyId } from '@/types/katchimera';
+import { WispArtwork } from '@/components/katchadeck/wisps/wisp-artwork';
 
 import { CompanionCinematicStage } from './companion-cinematic-stage';
 
@@ -147,7 +152,11 @@ function TrophyArchive({
   familyId: string;
   unlocked: number;
 }) {
+  const router = useRouter();
   const reduceMotion = useReducedMotion();
+  const wisps = useWisps();
+  const constellation = wispFamilySeries(familyId as KatchimeraFamilyId);
+  const visibleConstellationWispIds = constellation?.featuredWispIds ?? [];
   const [openHelpSectionId, setOpenHelpSectionId] = useState<string | null>(null);
   const sections = useMemo(() => companionAchievementSections(familyId), [familyId]);
   const [cabinetFilter, setCabinetFilter] = useState('all');
@@ -179,6 +188,40 @@ function TrophyArchive({
       accessibilityLabel={`${unlocked} of ${entries.length} trophies earned`}
       entering={reduceMotion ? undefined : FadeInDown.duration(320)}
       style={styles.archive}>
+      {constellation?.pilot ? (
+        <View style={styles.constellation}>
+          <View style={styles.constellationHeader}>
+            <View style={styles.cabinetTitleRow}>
+              <IconSymbol color="#6D5B9B" name="sparkles" size={17} weight="semibold" />
+              <ThemedText selectable style={styles.cabinetTitle} lightColor="#3B2A1B" darkColor="#3B2A1B">Companion constellation</ThemedText>
+            </View>
+            <ThemedText selectable style={styles.cabinetMeta} lightColor="#725B44" darkColor="#725B44">
+              {visibleConstellationWispIds.filter(wisps.isOwned).length}/{visibleConstellationWispIds.length}
+            </ThemedText>
+          </View>
+          <ThemedText selectable style={styles.constellationCopy} lightColor="#78644E" darkColor="#78644E">
+            Achievements, life Wisps and matching Egg pieces gathered around this Katchimera family.
+          </ThemedText>
+          <View style={styles.constellationWisps}>
+            {visibleConstellationWispIds.map((id) => {
+              const definition = wispDefinition(id);
+              const owned = wisps.isOwned(id);
+              return (
+                <Pressable accessibilityLabel={`${definition.name}, ${owned ? 'owned' : 'locked'}`} accessibilityRole="button" key={id} onPress={() => definition.availability === 'ready' ? router.push({ pathname: '/wisp/[wispId]', params: { wispId: id } }) : Alert.alert(definition.name, `${definition.description}\n\nIts artwork is being prepared for a future catalog release.`)} style={({ pressed }) => [styles.constellationWisp, !owned && styles.constellationWispLocked, pressed && styles.helpButtonPressed]}>
+                  <View style={styles.constellationArt}>
+                    {definition.availability === 'ready'
+                      ? <WispArtwork id={id} size={54} thumbnail silhouette={!owned} />
+                      : <IconSymbol color={owned ? '#6D5B9B' : '#8D8378'} name="sparkles" size={24} />}
+                  </View>
+                  <ThemedText numberOfLines={1} style={styles.constellationName} lightColor="#3B2A1B" darkColor="#3B2A1B">
+                    {owned || !definition.hidden ? definition.name : '???'}
+                  </ThemedText>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
       <View style={styles.cabinet}>
         <View style={styles.cabinetHeader}>
           <View style={styles.cabinetTitleRow}>
@@ -394,6 +437,14 @@ const styles = StyleSheet.create({
   topBalance: { height: 44, width: 44 },
   archive: { backgroundColor: KatchaUI.companionPanel.background, borderColor: KatchaUI.companionPanel.border, borderCurve: 'continuous', borderRadius: 29, borderWidth: 1, boxShadow: KatchaUI.companionPanel.shadow, gap: 12, overflow: 'hidden', paddingBottom: 18, paddingHorizontal: 13, paddingTop: 15, position: 'relative', zIndex: 4 },
   cabinet: { gap: 9 },
+  constellation: { backgroundColor: 'rgba(116,95,151,0.08)', borderColor: 'rgba(98,77,137,0.18)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, gap: 8, padding: 11 },
+  constellationHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  constellationCopy: { ...KatchaUI.type.meta, fontSize: 10.5, lineHeight: 14 },
+  constellationWisps: { flexDirection: 'row', gap: 6, justifyContent: 'space-between' },
+  constellationWisp: { alignItems: 'center', flex: 1, gap: 3, minWidth: 0 },
+  constellationWispLocked: { opacity: 0.45 },
+  constellationArt: { alignItems: 'center', backgroundColor: 'rgba(255,249,234,0.68)', borderRadius: 14, height: 58, justifyContent: 'center', width: '100%' },
+  constellationName: { ...KatchaUI.type.meta, fontSize: 8.5, fontWeight: '800', maxWidth: '100%' },
   cabinetHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 3 },
   cabinetTitleRow: { alignItems: 'center', flexDirection: 'row', gap: 9 },
   cabinetTitle: { ...KatchaUI.type.title, fontSize: 18, lineHeight: 22 },

@@ -156,17 +156,16 @@ test('Waiting changes incubation progress without changing an Energy-driven egg 
   assert.equal(evening.stage, morning.stage);
 });
 
-test('Incubation requires two rewarded actions even after the scheduled hatch time', () => {
+test('One meaningful memory activates incubation even after the scheduled hatch time', () => {
   const first = awardGrowth(day(), {
     source: 'journal',
     sourceId: 'entry-1',
     awardedAt: new Date(2026, 7, 5, 8, 0),
   }).day;
   const dormant = todayGrowthSummary(first, 20, new Date(2026, 7, 5, 21, 0));
-  assert.equal(dormant.isActivated, false);
+  assert.equal(dormant.isActivated, true);
   assert.equal(dormant.qualifyingActionCount, 1);
-  assert.equal(dormant.progress, 0);
-  assert.equal(dormant.isReady, false);
+  assert.equal(dormant.isReady, true);
 
   const second = awardGrowth(first, {
     source: 'sleep',
@@ -175,7 +174,7 @@ test('Incubation requires two rewarded actions even after the scheduled hatch ti
   }).day;
   const activated = todayGrowthSummary(second, 20, new Date(2026, 7, 5, 21, 1));
   assert.equal(activated.isActivated, true);
-  assert.equal(activated.incubationStartedAt?.getTime(), new Date(2026, 7, 5, 21, 1).getTime());
+  assert.equal(activated.incubationStartedAt?.getTime(), new Date(2026, 7, 5, 8, 0).getTime());
   assert.equal(activated.isReady, true);
 });
 
@@ -794,6 +793,14 @@ test('Completed concrete quests remain available to the completion animator', ()
   const ranked = rankTodayCareActions({ day: day(), memoryQuests: [quest], now: new Date(2026, 7, 5, 20, 0) });
   assert.equal(ranked.active.some((action) => action.sourceId === quest.id), false);
   assert.equal(ranked.completed.some((action) => action.sourceId === quest.id), true);
+});
+
+test('Two supported lightweight actions activate incubation', () => {
+  let record = awardGrowth(day(), { source: 'mood', sourceId: 'mood', awardedAt: new Date(2026, 7, 5, 8, 0) }).day;
+  record = awardGrowth(record, { source: 'sleep', sourceId: 'sleep', awardedAt: new Date(2026, 7, 5, 8, 5) }).day;
+  const summary = todayGrowthSummary(record, 20, new Date(2026, 7, 5, 9, 0));
+  assert.equal(summary.isActivated, true);
+  assert.equal(summary.incubationStartedAt?.getTime(), new Date(2026, 7, 5, 8, 5).getTime());
 });
 
 test('About Today rotates one stable prompt at a time and stops after two answers', () => {

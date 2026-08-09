@@ -9,6 +9,7 @@ const projectRoot = path.join(__dirname, '..');
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'katchimera-continuity-'));
 
 const SPECIFIER_MAP = {
+  '@/constants/day-prompts': './day-prompts',
   '@/utils/memory-roles-engine': './memory-roles-engine',
   '@/utils/memory-display': './memory-display',
   '@/utils/studio-detect': './studio-detect',
@@ -26,6 +27,7 @@ function transpile(rel, out) {
 }
 
 transpile('utils/studio-detect.ts', 'studio-detect.js');
+transpile('constants/day-prompts.ts', 'day-prompts.js');
 transpile('utils/memory-display.ts', 'memory-display.js');
 transpile('utils/memory-roles-engine.ts', 'memory-roles-engine.js');
 transpile('utils/continuity-engine.ts', 'continuity-engine.js');

@@ -24,8 +24,12 @@ export type KatchimeraSkinDefinition = {
   status: 'live' | 'dormant' | 'planned';
 };
 
-// Temporary testing policy. Turning this off restores hatch-derived ownership.
-export const ALL_KATCHIMERA_SKINS_UNLOCKED = true;
+// Development-only collection override. Production ownership must always come
+// from completed hatches; enabling a debug build never persists grants.
+export const ALL_KATCHIMERA_SKINS_UNLOCKED =
+  typeof __DEV__ !== 'undefined' &&
+  __DEV__ &&
+  process.env.EXPO_PUBLIC_UNLOCK_ALL_KATCHIMERAS === 'true';
 
 const form = (
   id: HomeVisualKey,

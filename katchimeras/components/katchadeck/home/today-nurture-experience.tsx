@@ -160,6 +160,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   const actionStackTranslateY = useSharedValue(reduceMotion ? 0 : 22);
   const focusProgress = useSharedValue(focusMode ? 1 : 0);
   const ready = growth.isActivated && (day.canHatch || growth.isReady);
+  const quietDayAvailable = !growth.isActivated && Date.now() >= growth.scheduledHatchAt.getTime();
   const moodAction = actions.find((action) => action.id === 'mood');
   const sleepAction = actions.find((action) => action.id === 'sleep');
   useEffect(() => {
@@ -423,6 +424,12 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
         <LanternTimeline days={timelineDays} interactionLocked={false} onSelect={onSelectDay} selectedId={day.id} />
       </Animated.View>
       <View onLayout={handleFixedActionClusterLayout} style={[styles.fixedActionCluster, { top: fixedActionClusterTop }]}>
+        {quietDayAvailable ? (
+          <Pressable accessibilityHint="Opens a short note so this quiet day can hatch" accessibilityRole="button" onPress={onAddTextNote} style={({ pressed }) => [styles.quietDayAction, pressed && styles.actionPressed]}>
+            <IconSymbol color={Meadow.goldDeep} name="moon.stars.fill" size={15} />
+            <ThemedText style={styles.quietDayLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>Keep today as a quiet day</ThemedText>
+          </Pressable>
+        ) : null}
         {ready ? (
           <HatchRevealAction onAdd={onAddJournal} onReveal={onReveal} reduceMotion={reduceMotion} />
         ) : (
@@ -1578,7 +1585,10 @@ const styles = StyleSheet.create({
   chromeHidden: { opacity: 0 },
   contentScroll: { position: 'relative', zIndex: 6 },
   timelineFixed: { left: 0, paddingHorizontal: 2, position: 'absolute', right: 0, zIndex: 20 },
-  fixedActionCluster: { left: 0, position: 'absolute', right: 0, zIndex: 12 },
+  fixedActionCluster: { alignItems: 'center', gap: 6, left: 0, position: 'absolute', right: 0, zIndex: 12 },
+  quietDayAction: { alignItems: 'center', backgroundColor: 'rgba(255,247,225,0.94)', borderColor: 'rgba(139,101,37,0.24)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 6, minHeight: 34, paddingHorizontal: 13 },
+  quietDayLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '900' },
+  actionPressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
   eggStage: { alignItems: 'center', height: TODAY_KINGDOM_STAGE_HEIGHT, justifyContent: 'center', left: 0, overflow: 'visible', position: 'absolute', right: 0, zIndex: 2 },
   environmentFade: { bottom: 0, experimental_backgroundImage: 'linear-gradient(to bottom, rgba(247,241,226,0) 0%, rgba(247,241,226,0.72) 62%, #F7F1E2 100%)', height: 150, left: 0, position: 'absolute', right: 0, zIndex: 1 },
   meterAnchor: { left: 0, position: 'absolute', right: 0, zIndex: 4 },

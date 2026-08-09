@@ -25,13 +25,13 @@ const restCreature: KingdomCreature = {
   accentColor: '#F0C9A0',
 };
 
-test('testing wardrobe exposes every approved Rest form', () => {
+test('production wardrobe shows approved Rest forms without granting ownership', () => {
   const skins = skinsForKingdomCompanion('bedrotte', new Set());
   assert.deepEqual(
     skins.map((skin) => skin.id),
     ['bedrotte', 'snoozle', 'vesperitt', 'duskle', 'twinklet']
   );
-  assert.equal(skins.every((skin) => skin.unlocked), true);
+  assert.equal(skins.every((skin) => !skin.unlocked), true);
 });
 
 test('placeholder forms and newly illustrated parent forms are selectable', () => {

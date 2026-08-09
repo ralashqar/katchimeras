@@ -10,17 +10,18 @@ import { isReflectiveDayPromptKind } from '@/constants/day-prompts';
 export const ESSENCE_AWARD = {
   photoWithMeaning: 5,
   heroPhoto: 5,
-  voice: 8,
+  voice: 6,
   reflection: 4,
-  place: 6,
-  newPlaceBonus: 4, // makes the first `newPlaceCount` confirmed places effectively +10
-  food: 5,
-  studio: 5,
-  bigMoment: 15,
+  place: 5,
+  newPlaceBonus: 3,
+  food: 4,
+  studio: 4,
+  bigMoment: 10,
   weeklyRecap: 25,
-  questComplete: 12, // a companion quest fulfilled (docs/katchimera-engagement-v1.md)
+  questComplete: 8,
   zodiacRitual: 1, // first completed Zodiac ritual per local day
 } as const;
+export const ORDINARY_DAILY_ESSENCE_CAP = 20;
 
 // Discovery essence by rarity (a def may override via essenceReward).
 const RARITY_ESSENCE: Record<DiscoveryRarity, number> = {
@@ -42,19 +43,22 @@ export function discoveryEssence(def: Pick<DiscoveryDef, 'rarity' | 'essenceRewa
 // Essence a single day's recorded events are worth. Pure over the day's signals.
 export function essenceAwardsForDay(day: HomeDayRecord): number {
   let total = 0;
-  total += (day.capturedMeanings?.length ?? 0) * ESSENCE_AWARD.photoWithMeaning;
-  if (day.heroPhoto) total += ESSENCE_AWARD.heroPhoto;
-  total += (day.notes ?? []).filter((note) => note.kind === 'voice').length * ESSENCE_AWARD.voice;
+  const photoIds = new Set([
+    ...(day.capturedMeanings ?? []).map((meaning) => meaning.sourceId ?? meaning.createdAt),
+    ...(day.heroPhoto ? [day.heroPhoto.assetId] : []),
+  ]);
+  total += Math.min(2, photoIds.size) * ESSENCE_AWARD.photoWithMeaning;
+  total += Math.min(1, (day.notes ?? []).filter((note) => note.kind === 'voice').length) * ESSENCE_AWARD.voice;
   total +=
-    (day.promptAnswers ?? []).filter((answer) => !answer.dismissed && isReflectiveDayPromptKind(answer.kind)).length *
+    Math.min(1, (day.promptAnswers ?? []).filter((answer) => !answer.dismissed && isReflectiveDayPromptKind(answer.kind)).length) *
     ESSENCE_AWARD.reflection;
   const places = day.confirmedPlaces?.length ?? 0;
   total += places * ESSENCE_AWARD.place;
   total += Math.min(day.newPlaceCount ?? 0, places) * ESSENCE_AWARD.newPlaceBonus;
-  total += (day.foodMoments?.length ?? 0) * ESSENCE_AWARD.food;
-  total += (day.studioMoments?.length ?? 0) * ESSENCE_AWARD.studio;
-  total += (day.bigMoments?.length ?? 0) * ESSENCE_AWARD.bigMoment;
-  return total;
+  total += Math.min(1, day.foodMoments?.length ?? 0) * ESSENCE_AWARD.food;
+  total += Math.min(1, day.studioMoments?.length ?? 0) * ESSENCE_AWARD.studio;
+  total += Math.min(1, day.bigMoments?.length ?? 0) * ESSENCE_AWARD.bigMoment;
+  return Math.min(ORDINARY_DAILY_ESSENCE_CAP, total);
 }
 
 // Total essence EARNED across all of history: per-day events + unlocked-discovery

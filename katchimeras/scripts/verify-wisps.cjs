@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
-const catalog = JSON.parse(fs.readFileSync(path.join(root, 'data/wisps/catalog.json'), 'utf8'));
+const catalog = JSON.parse(fs.readFileSync(path.join(root, 'data/wisps/catalog.generated.json'), 'utf8'));
 const ids = new Set();
 let ready = 0;
 for (const [index, item] of catalog.items.entries()) {
@@ -19,6 +19,9 @@ for (const [index, item] of catalog.items.entries()) {
     ]) if (!fs.existsSync(path.join(root, relative))) throw new Error(`Missing ready Wisp asset: ${relative}`);
   }
 }
-if (catalog.items.length !== 50) throw new Error(`Expected 50 Wisps, found ${catalog.items.length}`);
+if (catalog.items.length !== 120) throw new Error(`Expected 120 Wisps, found ${catalog.items.length}`);
 if (ready !== 50) throw new Error(`Expected 50 ready Wisps, found ${ready}`);
-console.log(`Verified ${catalog.items.length} Wisp definitions and ${ready} production assets.`);
+for (const item of catalog.items.filter((entry) => entry.availability === 'planned')) {
+  if (item.assetRefs !== null) throw new Error(`Planned Wisp ${item.id} must not claim assets`);
+}
+console.log(`Verified ${catalog.items.length} Wisp definitions, ${ready} production asset sets, and ${catalog.items.length - ready} planned art briefs.`);

@@ -107,7 +107,24 @@ test('the all-Katchimeras developer switch unlocks Wisps without persisting debu
   const root = path.resolve(__dirname, '..');
   const providerSource = fs.readFileSync(path.join(root, 'features/wisps/wisp-provider.tsx'), 'utf8');
   assert.match(providerSource, /useDevAllKatchimerasAvailable\(\)/);
-  assert.match(providerSource, /allKatchimerasAvailable \|\| Boolean\(state\.unlocked\[id\]\)/);
+  assert.match(providerSource, /allKatchimerasAvailable \|\| Boolean\(\(state\.inventory\[id\]\?\.quantity \?\? 0\) \+ serverQuantity/);
   assert.match(providerSource, /if \(allKatchimerasAvailable\) \{\s*setDebugEquippedWispId\(id\);\s*return;/);
   assert.match(providerSource, /if \(!allKatchimerasAvailable\) setDebugEquippedWispId\(undefined\)/);
+});
+
+test('legacy Wisp unlocks migrate into quantity-based inventory', () => {
+  const state = normalizeWispState({
+    version: 1,
+    equippedWispId: 'sprout',
+    unlocked: { sprout: { wispId: 'sprout', unlockedAt: 123, sourceDayId: 'day', seenReveal: true } },
+    baselinedCatalogVersion: 2,
+  });
+  assert.equal(state.version, 2);
+  assert.deepEqual(state.inventory.sprout, { wispId: 'sprout', quantity: 1, sources: ['migration'], firstGrantedAt: 123, giftableQuantity: 0 });
+  assert.equal(state.equippedWispId, 'sprout');
+});
+
+test('family signature progress counts distinct achievement sections', () => {
+  const achievements = new Set(['mossprout.park-visits.1', 'mossprout.nature-places.1', 'mossprout.blooms-kept.1']);
+  assert.deepEqual(wispProgress('grovelight', [], { unlockedAchievementIds: achievements }), { current: 3, target: 3, unit: 'Mossprout paths' });
 });

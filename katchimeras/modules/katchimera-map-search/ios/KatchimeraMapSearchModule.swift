@@ -147,7 +147,11 @@ public final class KatchimeraMapSearchModule: Module {
         latitudinalMeters: 10_000,
         longitudinalMeters: 10_000
       )
-      request.resultTypes = [.pointOfInterest, .physicalFeature]
+      if #available(iOS 18.0, *) {
+        request.resultTypes = [.pointOfInterest, .physicalFeature]
+      } else {
+        request.resultTypes = [.pointOfInterest]
+      }
 
       do {
         let response = try await MKLocalSearch(request: request).start()

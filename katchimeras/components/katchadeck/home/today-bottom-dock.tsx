@@ -69,7 +69,6 @@ export function TodayBottomDock({
   cameraBadge,
   momentCount,
   sharingBusy,
-  comicBusy,
   statAttention,
   categories,
   categoryDataLoading = false,
@@ -81,7 +80,6 @@ export function TodayBottomDock({
   onAdd,
   onOpenMap,
   onShareDay,
-  onMakeComic,
   onStatPress,
   onCategoryPress,
 }: TodayBottomDockProps) {
@@ -203,9 +201,6 @@ export function TodayBottomDock({
           </Animated.View>
           <Animated.View entering={popEnter(185)}>
             <IconAction icon="paperplane.fill" label="Card" busy={sharingBusy} onPress={onShareDay} />
-          </Animated.View>
-          <Animated.View entering={popEnter(230)}>
-            <IconAction icon="sparkles" label="Comic" busy={comicBusy} onPress={onMakeComic} />
           </Animated.View>
         </View>
       ) : null}

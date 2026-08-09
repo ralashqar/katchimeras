@@ -13,7 +13,7 @@ import Animated, {
 import { useEffect, useState } from 'react';
 
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
-import { buildCreatureKicker } from '@/components/katchadeck/home/creature-hero';
+import { hatchNoveltyLabel } from '@/components/katchadeck/home/creature-hero';
 import { ThemedText } from '@/components/themed-text';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { EggAvatarArtwork, eggAvatarBodyPresentationStyle } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
@@ -252,7 +252,7 @@ export function TodayTileHatchReveal({
             titleStyle,
           ]}>
           <ThemedText selectable type="onboardingLabel" style={styles.kicker} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
-            {buildCreatureKicker(creature)}
+            {hatchNoveltyLabel(creature)}
           </ThemedText>
           <ThemedText selectable type="display" style={styles.name} lightColor="#F2D48A" darkColor="#F2D48A">
             {creature.name}

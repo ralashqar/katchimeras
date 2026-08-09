@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useQuestCapabilities } from '@/hooks/use-quest-capabilities';
 import { homeRepository } from '@/storage/repositories/home-repository';
-import type { HomeDayRecord, MemoryQualityScore } from '@/types/home';
+import type { HomeDayRecord, MemoryQualityScore, StoredHomeDayRecord } from '@/types/home';
 import type { KingdomCreature, KingdomState } from '@/types/kingdom';
 import type { CompanionDestination, CompanionNavigationIntent, QuestCaptureFeedback } from '@/types/companion-interaction';
 import {
@@ -127,6 +127,8 @@ import { refreshQuestFacts } from '@/utils/quests/facts';
 import type { Facts } from '@/utils/signals/facts';
 import { recalibrateClassifiedMemory, repairUrbanPhotoCentrality, withQualityConfirmation } from '@/utils/intelligence/classification';
 import { buildPhotoEvidence, upsertEvidence } from '@/utils/intelligence/evidence';
+import { useEconomy } from '@/features/economy/economy-provider';
+import { historyDaysForAccess } from '@/utils/history-access';
 
 type SelectedResident = {
   creature: KingdomCreature;
@@ -165,6 +167,7 @@ export type { QuestCaptureFeedback } from '@/types/companion-interaction';
 
 export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args) {
   const router = useRouter();
+  const economy = useEconomy();
   const [microcopy, setMicrocopy] = useState<string | null>(null);
   const [selectedResident, setSelectedResident] = useState<SelectedResident | null>(null);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
@@ -488,7 +491,15 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         ...insightForArchetype({
         archetype: selectedCompanionData.archetype,
         text: selectedCompanionData.line,
-        count: insightCount(selectedCompanionData.archetype, kingdom),
+        count: insightCount(
+          selectedCompanionData.archetype,
+          kingdom,
+          economy.snapshot.activePlus || !storedHomeState ? null : historyDaysForAccess([
+            ...storedHomeState.archivedDays,
+            storedHomeState.today,
+            ...(storedHomeState.tomorrow ? [storedHomeState.tomorrow] : []),
+          ], false),
+        ),
         }),
         evidenceLabel: selectedRole
           ? `${selectedRole.insightThemes[Math.min(selectedBondProgress.level - 1, selectedRole.insightThemes.length - 1)]} · ${selectedBondProgress.label}`
@@ -1764,7 +1775,14 @@ function resolveInteractiveConfig(
   return undefined;
 }
 
-function insightCount(archetype: string, kingdom: KingdomState): number | null {
+function insightCount(archetype: string, kingdom: KingdomState, scopedDays: readonly StoredHomeDayRecord[] | null = null): number | null {
+  if (scopedDays) {
+    if (archetype === 'food' || archetype === 'savour') return scopedDays.reduce((total, day) => total + (day.foodMoments?.length ?? 0), 0);
+    if (archetype === 'culture') return scopedDays.reduce((total, day) => total + (day.studioMoments?.length ?? 0), 0);
+    if (archetype === 'places') return scopedDays.reduce((total, day) => total + (day.confirmedPlaces?.length ?? 0), 0);
+    if (archetype === 'journey' || archetype === 'active') return scopedDays.filter((day) => day.state === 'hatched').length;
+    if (archetype === 'craft' || archetype === 'memory' || archetype === 'tender') return scopedDays.reduce((total, day) => total + (day.notes?.length ?? 0), 0);
+  }
   if (archetype === 'food' || archetype === 'savour') return kingdom.totals.foodMoments;
   if (archetype === 'culture') return kingdom.totals.studioMoments;
   if (archetype === 'places') return kingdom.totals.places;
