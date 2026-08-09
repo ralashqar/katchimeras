@@ -50,10 +50,11 @@ every animation commit.
 - Today and You are separate routes. Opening You unmounts Today instead of
   retaining its gestures, timers, sensors, and UI-thread scene animations below
   an overlay.
-- Avatar runtime art is capped at 512 px for bodies, faces, and hats and 256 px
-  for held items and Wisps. The 2048 px masters remain source assets but are not
+- Avatar runtime art is capped at 512 px for bodies, faces, hats, and full Wisp
+  artwork and 256 px for held items and Wisp thumbnails. The high-resolution
+  masters remain source assets but are not
   imported by the application. `npm run avatar:runtime-assets:check` enforces
-  dimensions and an 8 MiB aggregate runtime budget (currently 3.62 MiB).
+  dimensions and an 8 MiB aggregate runtime budget (currently 4.20 MiB).
 - The customization collection is virtualized in four columns and renders 256 px
   thumbnails. Only the standalone hero requests the 512 px display layers.
 - Today mounts one cinematic background at rest. A neighboring page is mounted

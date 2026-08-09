@@ -1,10 +1,11 @@
-import { createContext, type PropsWithChildren, use, useCallback, useMemo, useState } from 'react';
+import { createContext, type PropsWithChildren, use, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { WISP_CATALOG_VERSION } from '@/constants/wisps';
 import type { HomeDayRecord } from '@/types/home';
 import type { WispCollectionState, WispId } from '@/types/wisp';
 import { earnedWispIds, wispProgress } from '@/utils/wisp-engine';
 import { loadWispState, saveWispState } from '@/utils/wisp-storage';
+import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
 
 type WispContextValue = {
   state: WispCollectionState;
@@ -20,14 +21,29 @@ type WispContextValue = {
 const WispContext = createContext<WispContextValue | null>(null);
 
 export function WispProvider({ children }: PropsWithChildren) {
+  const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   const [state, setState] = useState(loadWispState);
+  const [debugEquippedWispId, setDebugEquippedWispId] = useState<WispId | null | undefined>(undefined);
+  useEffect(() => {
+    if (!allKatchimerasAvailable) setDebugEquippedWispId(undefined);
+  }, [allKatchimerasAvailable]);
+  const equippedWispId = allKatchimerasAvailable && debugEquippedWispId !== undefined
+    ? debugEquippedWispId
+    : state.equippedWispId;
   const equip = useCallback((id: WispId | null) => {
+    if (allKatchimerasAvailable) {
+      setDebugEquippedWispId(id);
+      return;
+    }
     setState((current) => saveWispState({
       ...current,
       equippedWispId: id && current.unlocked[id] ? id : null,
     }));
-  }, []);
-  const isOwned = useCallback((id: WispId) => Boolean(state.unlocked[id]), [state.unlocked]);
+  }, [allKatchimerasAvailable]);
+  const isOwned = useCallback(
+    (id: WispId) => allKatchimerasAvailable || Boolean(state.unlocked[id]),
+    [allKatchimerasAvailable, state.unlocked],
+  );
   const syncFromDays = useCallback((days: readonly HomeDayRecord[]) => {
     const earned = earnedWispIds(days);
     const newIds = earned.filter((id) => !state.unlocked[id]);
@@ -50,7 +66,7 @@ export function WispProvider({ children }: PropsWithChildren) {
       return record ? saveWispState({ ...current, unlocked: { ...current.unlocked, [id]: { ...record, seenReveal: true } } }) : current;
     });
   }, []);
-  const value = useMemo<WispContextValue>(() => ({ state, equippedWispId: state.equippedWispId, isOwned, equip, syncFromDays, progressFor, pendingDiscoveryId, dismissDiscovery }), [dismissDiscovery, equip, isOwned, pendingDiscoveryId, progressFor, state, syncFromDays]);
+  const value = useMemo<WispContextValue>(() => ({ state, equippedWispId, isOwned, equip, syncFromDays, progressFor, pendingDiscoveryId, dismissDiscovery }), [dismissDiscovery, equip, equippedWispId, isOwned, pendingDiscoveryId, progressFor, state, syncFromDays]);
   return <WispContext value={value}>{children}</WispContext>;
 }
 

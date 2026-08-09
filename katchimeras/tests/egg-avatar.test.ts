@@ -433,6 +433,8 @@ test('You button navigates to a separately mounted, virtualized customizer route
   assert.match(you, /eggAvatarCustomizerCamera\(/);
   assert.match(you, /transform: \[\s*\{ translateY: camera\.translateY \},\s*\{ scale: camera\.scale \}/);
   assert.match(you, /verticalOffset=\{HOME_SCENE_Y_OFFSET\}/);
+  assert.match(you, /const YOU_AVATAR_RELATIVE_Y_OFFSET = 18/);
+  assert.match(you, /top: stageTop \+ YOU_AVATAR_RELATIVE_Y_OFFSET/);
   assert.match(you, /<TodayKingdomEggHero[\s\S]*?explorationStageTop=\{stageTop\}/);
   assert.match(you, /companionWispId=\{equippedWispId\}/);
   assert.match(customizer, /elevation: 100, zIndex: 100/);
@@ -445,6 +447,15 @@ test('You button navigates to a separately mounted, virtualized customizer route
   assert.match(customizer, /pointerEvents="auto"/);
   assert.match(customizer, /gridScroll: \{ flex: 1, minHeight: 0 \}/);
   assert.doesNotMatch(customizer, /today_pedestal|presentation="hero"/);
+});
+
+test('Today and You egg heroes omit the rotating radial ray layer', () => {
+  const hero = readFileSync(
+    path.join(root, 'components', 'katchadeck', 'home', 'today-kingdom-egg-hero.tsx'),
+    'utf8'
+  );
+
+  assert.doesNotMatch(hero, /RadialSunburstCanvas|styles\.rayField|rayStyle/);
 });
 
 test('customizer camera centres the existing egg in the unobstructed top region', () => {

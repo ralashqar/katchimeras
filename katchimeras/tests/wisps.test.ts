@@ -102,3 +102,12 @@ test('Today passes the equipped Wisp into the Egg hero instead of a page overlay
   assert.match(heroSource, /styles\.eggShoulderWisp/);
   assert.match(heroSource, /todayEggShoulderWispFrame\(eggStageScale\)/);
 });
+
+test('the all-Katchimeras developer switch unlocks Wisps without persisting debug ownership', () => {
+  const root = path.resolve(__dirname, '..');
+  const providerSource = fs.readFileSync(path.join(root, 'features/wisps/wisp-provider.tsx'), 'utf8');
+  assert.match(providerSource, /useDevAllKatchimerasAvailable\(\)/);
+  assert.match(providerSource, /allKatchimerasAvailable \|\| Boolean\(state\.unlocked\[id\]\)/);
+  assert.match(providerSource, /if \(allKatchimerasAvailable\) \{\s*setDebugEquippedWispId\(id\);\s*return;/);
+  assert.match(providerSource, /if \(!allKatchimerasAvailable\) setDebugEquippedWispId\(undefined\)/);
+});

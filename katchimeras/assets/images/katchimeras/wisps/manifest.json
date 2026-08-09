@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-08",
+  "generatedAt": "2026-08-09",
   "pipeline": "OpenAI image generation -> chroma-key matte extraction -> lossless WebP derivatives",
   "styleReferences": [
     "assets/images/katchimeras/cutouts/baristabbit.png",
@@ -11,7 +11,7 @@
   "sharedPromptContract": "One tiny floating companion, one dominant life-signal silhouette, polished 3D storybook clay material, Katchimeras face language, sparse particles, centered square icon, no text/scenery/platform; generated against a uniform chroma key and extracted to transparency.",
   "derivatives": {
     "archival": "<id>.png",
-    "app": "<id>.webp (1024x1024 lossless)",
+    "app": "<id>.webp (512x512 high-quality)",
     "thumbnail": "thumbnails/<id>.webp (256x256 lossless)",
     "keyedSource": "sources/<id>-keyed.png"
   },

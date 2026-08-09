@@ -19,6 +19,8 @@ import {
 } from '@/utils/today-kingdom-hero-layout';
 import { todayGrowthSummary } from '@/utils/today-growth';
 
+const YOU_AVATAR_RELATIVE_Y_OFFSET = 18;
+
 export default function YouScreen() {
   const focused = useIsFocused();
   const insets = useSafeAreaInsets();
@@ -65,7 +67,7 @@ export default function YouScreen() {
           imageSize={imageSize}
           verticalOffset={HOME_SCENE_Y_OFFSET}
         />
-        <View style={[styles.heroStage, { top: stageTop }]}>
+        <View style={[styles.heroStage, { top: stageTop + YOU_AVATAR_RELATIVE_Y_OFFSET }]}>
           <TodayKingdomEggHero
             accentColor={today?.egg.accentColor}
             companionWispId={equippedWispId}

@@ -1,8 +1,10 @@
-"""Build small runtime avatar derivatives while preserving source masters.
+"""Build display-sized runtime avatar derivatives while preserving source masters.
 
-Egg bodies, faces, and hats are capped at 512px. Held items and all wisps are
-capped at 256px. The catalogue's high-resolution files remain available to art
-tooling but are deliberately absent from the application import graph.
+Egg bodies, faces, hats, and full Wisp artwork are capped at 512px. Held items
+and Wisp collection thumbnails remain capped at 256px. Full Wisp artwork is
+rebuilt from archival PNGs for large reveal/detail surfaces. The catalogue's
+high-resolution files remain available to art tooling but are deliberately
+absent from the application import graph.
 """
 
 from __future__ import annotations
@@ -36,6 +38,16 @@ def optimize(path: Path, maximum: int) -> tuple[int, int]:
     return before, path.stat().st_size
 
 
+def build_wisp_display_asset(source_path: Path, output_path: Path) -> tuple[int, int]:
+    """Rebuild from the archival PNG so a previous 256px derivative is never upscaled."""
+    before = output_path.stat().st_size
+    with Image.open(source_path) as source:
+        image = source.convert("RGBA")
+        image.thumbnail((512, 512), Image.Resampling.LANCZOS)
+        image.save(output_path, "WEBP", quality=88, method=6)
+    return before, output_path.stat().st_size
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true", help="Verify without rewriting assets")
@@ -50,8 +62,16 @@ def main() -> None:
             files[ROOT / refs["app"]] = display_cap
             files[ROOT / refs["thumbnail"]] = 256
 
-    for path in WISP_ROOT.glob("*.webp"):
-        files[path] = 256
+    wisp_display_paths = sorted(WISP_ROOT.glob("*.webp"))
+    if not args.check:
+        for path in wisp_display_paths:
+            source_path = path.with_suffix(".png")
+            if not source_path.exists():
+                raise RuntimeError(f"missing archival Wisp source: {source_path}")
+            build_wisp_display_asset(source_path, path)
+
+    for path in wisp_display_paths:
+        files[path] = 512
     for path in (WISP_ROOT / "thumbnails").glob("*.webp"):
         files[path] = 256
 
@@ -67,6 +87,8 @@ def main() -> None:
         with Image.open(path) as image:
             if max(image.size) > cap:
                 raise RuntimeError(f"{path} exceeds {cap}px: {image.size}")
+            if path.parent == WISP_ROOT and image.size != (512, 512):
+                raise RuntimeError(f"full Wisp artwork must be 512x512: {path} is {image.size}")
 
     maximum_runtime_bytes = 8 * 1024 * 1024
     if after_total > maximum_runtime_bytes:

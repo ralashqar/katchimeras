@@ -45,7 +45,6 @@ import {
 import { useTodayEnvironmentMotionValues } from '@/components/katchadeck/home/today-environment-motion';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { EggAvatarArtwork } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
-import { RadialSunburstCanvas } from '@/components/katchadeck/ui/radial-sunburst';
 import { WispCompanion } from '@/components/katchadeck/wisps/wisp-companion';
 import type { WispId } from '@/types/wisp';
 
@@ -713,56 +712,26 @@ function EggRadiance({
   stageHeight: number;
   stageScale: number;
 }) {
-  const reduceMotion = useReducedMotion();
-  const rotation = useSharedValue(0);
   const breath = useSharedValue(0);
-  const raySize = 520 * stageScale;
 
   useEffect(() => {
-    cancelAnimation(rotation);
     cancelAnimation(breath);
-    rotation.value = 0;
     breath.value = 0.45;
     return () => {
-      cancelAnimation(rotation);
       cancelAnimation(breath);
     };
-  }, [breath, growthIntensity, reduceMotion, rotation]);
+  }, [breath, growthIntensity]);
 
-  const rayStyle = useAnimatedStyle(() => ({
-    opacity: Math.min(1, 0.1 + growth.value * 0.76 + breath.value * 0.045 + flare.value * 0.14),
-    transform: [
-      { rotate: `${rotation.value * 360}deg` },
-      { scale: 0.6 + growth.value * 0.36 + breath.value * 0.018 },
-    ],
-  }));
   return (
-    <>
-      <Animated.View
-        pointerEvents="none"
-        renderToHardwareTextureAndroid
-        shouldRasterizeIOS
-        style={[
-          styles.rayField,
-          {
-            height: raySize,
-            top: (stageHeight - raySize) / 2,
-            width: raySize,
-          },
-          rayStyle,
-        ]}>
-        <RadialSunburstCanvas size={raySize} />
-      </Animated.View>
-      <EggGlowField
-        accentColor={accentColor}
-        breath={breath}
-        coreColor={coreColor}
-        flare={flare}
-        growth={growth}
-        stageHeight={stageHeight}
-        stageScale={stageScale}
-      />
-    </>
+    <EggGlowField
+      accentColor={accentColor}
+      breath={breath}
+      coreColor={coreColor}
+      flare={flare}
+      growth={growth}
+      stageHeight={stageHeight}
+      stageScale={stageScale}
+    />
   );
 }
 
@@ -934,11 +903,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     position: 'absolute',
     zIndex: 2,
-  },
-  rayField: {
-    alignSelf: 'center',
-    position: 'absolute',
-    zIndex: 0,
   },
   ambientGlow: {
     alignSelf: 'center',
