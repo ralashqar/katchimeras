@@ -300,7 +300,7 @@ export function TodayExplorationBackground({
           panStyle,
         ]}>
         <Image
-          allowDownscaling={false}
+          allowDownscaling
           cachePolicy="memory-disk"
           contentFit="fill"
           pointerEvents="none"

@@ -2,6 +2,7 @@ import type { HomeDayRecord } from '@/types/home';
 import type { KingdomBuildingId } from '@/types/kingdom';
 import { isGenericStudioLabel } from '@/utils/studio-detect';
 import { resolveFoodMomentDisplay, resolveStudioMomentDisplay } from '@/utils/memory-display';
+import { isReflectiveDayPromptKind } from '@/constants/day-prompts';
 
 // The Kingdom buildings' lifetime archives — every inspiration, meal and
 // reflection ever logged, folded from the full day archive and grouped by
@@ -48,7 +49,6 @@ const FOOD_MEANING_LABEL: Record<string, string> = {
   fuel: 'Fuel',
   discovery: 'Discovery',
 };
-const REFLECTIVE_KINDS = new Set(['feeling', 'inner_weather', 'day_word', 'gratitude', 'highlight', 'intention']);
 
 function entryTime(createdAt: string | null | undefined, isoDate: string): number {
   const exact = createdAt ? Date.parse(createdAt) : NaN;
@@ -102,7 +102,7 @@ function collect(days: HomeDayRecord[], buildingId: KingdomBuildingId): KingdomA
       }
     } else if (buildingId === 'sanctuary') {
       for (const answer of day.promptAnswers ?? []) {
-        if (answer.dismissed || !REFLECTIVE_KINDS.has(answer.kind) || answer.labels.length === 0) continue;
+        if (answer.dismissed || !isReflectiveDayPromptKind(answer.kind) || answer.labels.length === 0) continue;
         entries.push({
           id: `reflect-${day.id}-${answer.id}`,
           emoji: '🌿',
@@ -217,6 +217,11 @@ export function archiveModalConfig(buildingId: KingdomBuildingId): {
           { key: 'gratitude', label: 'Gratitude' },
           { key: 'highlight', label: 'Highlights' },
           { key: 'day_word', label: 'Day words' },
+          { key: 'day_focus', label: 'Day focus' },
+          { key: 'day_character', label: 'Day shape' },
+          { key: 'day_outcome', label: 'Day gave me' },
+          { key: 'for_who', label: 'For who' },
+          { key: 'energy', label: 'Pace' },
           { key: 'inner_weather', label: 'Inner weather' },
         ],
       };

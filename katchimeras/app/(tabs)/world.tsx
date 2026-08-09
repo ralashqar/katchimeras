@@ -1,5 +1,5 @@
-import { KingdomCompanionScreen } from '@/components/katchadeck/world/kingdom-companion-screen';
+import { Redirect } from 'expo-router';
 
 export default function KingdomScreen() {
-  return <KingdomCompanionScreen />;
+  return <Redirect href="/katchimeras" />;
 }

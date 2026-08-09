@@ -29,7 +29,7 @@ export function EggAvatar({ skinId, faceId = DEFAULT_EGG_AVATAR_FACE_ID, hatId, 
         hatId={hatId}
         heldAccessoryId={heldAccessoryId}
         priority={presentation === 'button' ? 'high' : 'normal'}
-        resolution={presentation === 'button' ? 'thumbnail' : 'app'}
+        resolution={presentation === 'button' || presentation === 'grid' ? 'thumbnail' : 'app'}
         skinId={skinId}
         transition={0}
       />

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { StoredHomeDayRecord } from '../types/home';
+import { dayPromptRegistry } from '../constants/day-prompts';
 import {
   activeGrowthEnergy,
   awardGrowth,
@@ -11,6 +12,7 @@ import {
   growthStageForEnergy,
   TODAY_ENERGY_TARGET,
   todayGrowthSummary,
+  pendingGrowthAwards,
 } from '../utils/today-growth';
 import { journalFlowCompletesTodayCareAction, rankTodayCareActions } from '../utils/today-care';
 import { buildTodayPhotoRollSuggestion } from '../utils/today-photo-roll-suggestion';
@@ -792,6 +794,57 @@ test('Completed concrete quests remain available to the completion animator', ()
   const ranked = rankTodayCareActions({ day: day(), memoryQuests: [quest], now: new Date(2026, 7, 5, 20, 0) });
   assert.equal(ranked.active.some((action) => action.sourceId === quest.id), false);
   assert.equal(ranked.completed.some((action) => action.sourceId === quest.id), true);
+});
+
+test('About Today rotates one stable prompt at a time and stops after two answers', () => {
+  const base = afterCareCheckIns();
+  const now = new Date(2026, 7, 5, 13, 0);
+  const first = rankTodayCareActions({ day: base, now });
+  const firstAbout = first.active.filter((action) => action.id.startsWith('about_today:'));
+  assert.equal(firstAbout.length, 1);
+  assert.equal(firstAbout[0]?.id, 'about_today:day_focus');
+
+  const people = dayPromptRegistry.day_focus.options.find((option) => option.id === 'people')!;
+  const afterFirst = {
+    ...base,
+    promptAnswers: [...base.promptAnswers, {
+      id: 'about-1', kind: 'day_focus' as const, choiceIds: [people.id], labels: [people.label],
+      createdAt: '2026-08-05T13:01:00.000Z', source: 'prompt_chip' as const,
+      semanticTags: people.semanticTags, scoreBias: people.scoreBias,
+      encounterSeedBias: people.encounterSeedBias,
+    }],
+  };
+  const second = rankTodayCareActions({ day: afterFirst, now });
+  assert.equal(second.completed.some((action) => action.id === 'about_today:day_focus'), true);
+  assert.equal(second.active.filter((action) => action.id.startsWith('about_today:')).length, 1);
+
+  const shape = dayPromptRegistry.day_character.options[0]!;
+  const afterSecond = {
+    ...afterFirst,
+    promptAnswers: [...afterFirst.promptAnswers, {
+      id: 'about-2', kind: 'day_character' as const, choiceIds: [shape.id], labels: [shape.label],
+      createdAt: '2026-08-05T13:02:00.000Z', source: 'prompt_chip' as const,
+      semanticTags: shape.semanticTags, scoreBias: shape.scoreBias,
+      encounterSeedBias: shape.encounterSeedBias,
+    }],
+  };
+  const finished = rankTodayCareActions({ day: afterSecond, now });
+  assert.equal(finished.active.some((action) => action.id.startsWith('about_today:')), false);
+});
+
+test('About Today options carry hatch trait signal and produce distinct reflection rewards', () => {
+  const option = dayPromptRegistry.day_focus.options.find((candidate) => candidate.id === 'people')!;
+  const answered = day({ promptAnswers: [{
+    id: 'about-people', kind: 'day_focus', choiceIds: [option.id], labels: [option.label],
+    createdAt: '2026-08-05T13:00:00.000Z', source: 'prompt_chip', semanticTags: option.semanticTags,
+    scoreBias: option.scoreBias, encounterSeedBias: option.encounterSeedBias,
+  }] });
+  assert.ok((option.scoreBias.social ?? 0) >= 0.26);
+  assert.equal(option.encounterSeedBias?.[0]?.seedId, 'social_gathering');
+  assert.deepEqual(
+    pendingGrowthAwards(answered).map((award) => [award.source, award.actionId]),
+    [['reflection', 'about_today:day_focus']],
+  );
 });
 
 test('Reflection actions are withheld when no working reflection flow exists', () => {

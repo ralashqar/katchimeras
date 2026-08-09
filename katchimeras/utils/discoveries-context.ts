@@ -1,6 +1,7 @@
 import type { HomeDayRecord } from '@/types/home';
 import type { DiscoveryContext } from '@/types/discoveries';
 import { buildPhotoAchievementSnapshot } from '@/utils/photo-achievements';
+import { isReflectiveDayPromptKind } from '@/constants/day-prompts';
 
 // Folds every hydrated day (+ optional native health aggregates) into the lifetime
 // aggregates the Discovery rules read. Pure: inject `now`, no storage access. The
@@ -16,7 +17,6 @@ export type HealthAggregates = {
 
 // Reflection prompt kinds that count as "a reflection" (matches the Memory Quests
 // engine's REFLECTION_KINDS so the two stay consistent).
-const REFLECTION_KINDS = new Set(['feeling', 'inner_weather', 'day_word', 'meaning', 'gratitude', 'highlight']);
 
 // A day counts as a "walking day" if Health gave it a healthy step count or it has
 // a walk moment.
@@ -112,7 +112,7 @@ export function buildDiscoveryContext(
 
     // Reflection
     reflectionCount += (day.promptAnswers ?? []).filter(
-      (answer) => !answer.dismissed && REFLECTION_KINDS.has(answer.kind)
+      (answer) => !answer.dismissed && isReflectiveDayPromptKind(answer.kind)
     ).length;
     if (isCalmDay(day)) calmDayCount += 1;
 

@@ -3,708 +3,568 @@
 export const EGG_AVATAR_READY_ASSETS = {
   body: {
     'classic': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/classic.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/classic.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/classic.webp'),
     },
     'moss': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/moss.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/moss.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/moss.webp'),
     },
     'tide': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/tide.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/tide.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/tide.webp'),
     },
     'sunset': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/sunset.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/sunset.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/sunset.webp'),
     },
     'starglow': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/starglow.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/starglow.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/starglow.webp'),
     },
     'frost': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/frost.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/frost.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/frost.webp'),
     },
     'ember': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/ember.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/ember.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/ember.webp'),
     },
     'barista': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/barista.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/barista.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/barista.webp'),
     },
     'robot': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/robot.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/robot.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/robot.webp'),
     },
     'pumpkin': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/pumpkin.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/pumpkin.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/pumpkin.webp'),
     },
     'honeycomb': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/honeycomb.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/honeycomb.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/honeycomb.webp'),
     },
     'strawberry-cream': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/strawberry-cream.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/strawberry-cream.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/strawberry-cream.webp'),
     },
     'blueberry-swirl': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/blueberry-swirl.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/blueberry-swirl.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/blueberry-swirl.webp'),
     },
     'matcha-marble': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/matcha-marble.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/matcha-marble.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/matcha-marble.webp'),
     },
     'wizard-robes': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/wizard-robes.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/wizard-robes.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/wizard-robes.webp'),
     },
     'watermelon': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/watermelon.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/watermelon.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/watermelon.webp'),
     },
     'porcelain-blue': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/porcelain-blue.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/porcelain-blue.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/porcelain-blue.webp'),
     },
     'kintsugi': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/kintsugi.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/kintsugi.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/kintsugi.webp'),
     },
     'football-kit': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/football-kit.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/football-kit.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/football-kit.webp'),
     },
     'rose-quartz': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/rose-quartz.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/rose-quartz.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/rose-quartz.webp'),
     },
     'cloud-puff': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/cloud-puff.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/cloud-puff.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/cloud-puff.webp'),
     },
     'sunny-raincoat': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/sunny-raincoat.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/sunny-raincoat.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/sunny-raincoat.webp'),
     },
     'aurora-shell': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/aurora-shell.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/aurora-shell.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/aurora-shell.webp'),
     },
     'meadow-bloom': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/meadow-bloom.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/meadow-bloom.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/meadow-bloom.webp'),
     },
     'toadstool-speckle': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/toadstool-speckle.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/toadstool-speckle.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/toadstool-speckle.webp'),
     },
     'cactus-bud': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/cactus-bud.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/cactus-bud.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/cactus-bud.webp'),
     },
     'coral-cove': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/coral-cove.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/coral-cove.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/coral-cove.webp'),
     },
     'honeybee-stripe': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/honeybee-stripe.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/honeybee-stripe.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/honeybee-stripe.webp'),
     },
     'knight-tunic': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/knight-tunic.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/knight-tunic.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/knight-tunic.webp'),
     },
     'astronaut-suit': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/astronaut-suit.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/astronaut-suit.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/astronaut-suit.webp'),
     },
     'dragon-scale': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/dragon-scale.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/dragon-scale.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/dragon-scale.webp'),
     },
     'axolotl-frill': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/axolotl-frill.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/axolotl-frill.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/axolotl-frill.webp'),
     },
     'penguin-tux': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/penguin-tux.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/penguin-tux.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/penguin-tux.webp'),
     },
     'calico-patch': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/calico-patch.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/calico-patch.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/calico-patch.webp'),
     },
     'explorer-vest': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/explorer-vest.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/explorer-vest.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/explorer-vest.webp'),
     },
     'cozy-quilt': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/cozy-quilt.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/cozy-quilt.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/cozy-quilt.webp'),
     },
     'royal-robe': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/royal-robe.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/royal-robe.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/royal-robe.webp'),
     },
     'party-outfit': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/party-outfit.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/party-outfit.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/party-outfit.webp'),
     },
     'disco-egg': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/disco-egg.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/disco-egg.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/disco-egg.webp'),
     },
     'storybook-ink': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/storybook-ink.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/storybook-ink.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/storybook-ink.webp'),
     },
     'sailor-uniform': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/sailor-uniform.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/sailor-uniform.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/sailor-uniform.webp'),
     },
     'chef-apron': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/chef-apron.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/chef-apron.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/chef-apron.webp'),
     },
     'superhero-suit': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/superhero-suit.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/superhero-suit.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/superhero-suit.webp'),
     },
     'cozy-pajamas': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/cozy-pajamas.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/cozy-pajamas.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/cozy-pajamas.webp'),
     },
     'garden-overalls': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/garden-overalls.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/garden-overalls.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/garden-overalls.webp'),
     },
     'detective-coat': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/detective-coat.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/detective-coat.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/detective-coat.webp'),
     },
     'pirate-coat': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/pirate-coat.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/pirate-coat.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/pirate-coat.webp'),
     },
     'ballet-wrap': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/ballet-wrap.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/ballet-wrap.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/ballet-wrap.webp'),
     },
     'racing-suit': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/racing-suit.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/racing-suit.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/racing-suit.webp'),
     },
     'artist-smock': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/bases/artist-smock.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/bases/artist-smock.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/bases/thumbnails/artist-smock.webp'),
     },
   },
   face: {
     'classic-smile': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/classic-smile.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/classic-smile.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/classic-smile.webp'),
     },
     'happy-squint': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/happy-squint.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/happy-squint.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/happy-squint.webp'),
     },
     'sleepy': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/sleepy.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/sleepy.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/sleepy.webp'),
     },
     'curious': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/curious.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/curious.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/curious.webp'),
     },
     'determined': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/determined.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/determined.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/determined.webp'),
     },
     'gentle-smile': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/gentle-smile.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/gentle-smile.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/gentle-smile.webp'),
     },
     'big-grin': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/big-grin.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/big-grin.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/big-grin.webp'),
     },
     'single-wink': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/single-wink.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/single-wink.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/single-wink.webp'),
     },
     'heart-eyes': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/heart-eyes.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/heart-eyes.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/heart-eyes.webp'),
     },
     'starry-eyed': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/starry-eyed.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/starry-eyed.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/starry-eyed.webp'),
     },
     'sparkle-awe': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/sparkle-awe.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/sparkle-awe.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/sparkle-awe.webp'),
     },
     'shy-glance': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/shy-glance.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/shy-glance.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/shy-glance.webp'),
     },
     'bashful-smile': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/bashful-smile.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/bashful-smile.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/bashful-smile.webp'),
     },
     'belly-laugh': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/belly-laugh.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/belly-laugh.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/belly-laugh.webp'),
     },
     'tiny-giggle': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/tiny-giggle.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/tiny-giggle.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/tiny-giggle.webp'),
     },
     'cute-pout': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/cute-pout.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/cute-pout.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/cute-pout.webp'),
     },
     'grumpy-cute': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/grumpy-cute.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/grumpy-cute.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/grumpy-cute.webp'),
     },
     'little-worried': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/little-worried.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/little-worried.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/little-worried.webp'),
     },
     'happy-tears': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/happy-tears.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/happy-tears.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/happy-tears.webp'),
     },
     'soft-sad': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/soft-sad.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/soft-sad.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/soft-sad.webp'),
     },
     'big-surprise': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/big-surprise.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/big-surprise.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/big-surprise.webp'),
     },
     'dizzy-swirls': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/dizzy-swirls.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/dizzy-swirls.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/dizzy-swirls.webp'),
     },
     'mischief': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/mischief.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/mischief.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/mischief.webp'),
     },
     'smug-smirk': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/smug-smirk.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/smug-smirk.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/smug-smirk.webp'),
     },
     'laser-focus': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/laser-focus.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/laser-focus.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/laser-focus.webp'),
     },
     'daydream': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/daydream.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/daydream.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/daydream.webp'),
     },
     'sleepy-yawn': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/sleepy-yawn.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/sleepy-yawn.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/sleepy-yawn.webp'),
     },
     'tongue-out': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/tongue-out.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/tongue-out.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/tongue-out.webp'),
     },
     'kissy-face': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/kissy-face.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/kissy-face.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/kissy-face.webp'),
     },
     'heroic-glint': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/faces/heroic-glint.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/faces/heroic-glint.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/faces/thumbnails/heroic-glint.webp'),
     },
   },
   hat: {
     'moss-sprout': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/moss-sprout.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/moss-sprout.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/moss-sprout.webp'),
     },
     'barista-beret': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/barista-beret.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/barista-beret.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/barista-beret.webp'),
     },
     'pumpkin-vine-crown': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/pumpkin-vine-crown.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/pumpkin-vine-crown.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/pumpkin-vine-crown.webp'),
     },
     'cozy-beanie': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/cozy-beanie.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/cozy-beanie.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/cozy-beanie.webp'),
     },
     'stargazer-hat': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/stargazer-hat.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/stargazer-hat.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/stargazer-hat.webp'),
     },
     'tiny-golden-crown': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/tiny-golden-crown.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/tiny-golden-crown.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/tiny-golden-crown.webp'),
     },
     'acorn-cap': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/acorn-cap.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/acorn-cap.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/acorn-cap.webp'),
     },
     'daisy-crown': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/daisy-crown.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/daisy-crown.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/daisy-crown.webp'),
     },
     'mushroom-cap': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/mushroom-cap.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/mushroom-cap.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/mushroom-cap.webp'),
     },
     'cloud-cap': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/cloud-cap.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/cloud-cap.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/cloud-cap.webp'),
     },
     'floppy-sunhat': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/floppy-sunhat.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/floppy-sunhat.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/floppy-sunhat.webp'),
     },
     'party-cone': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/party-cone.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/party-cone.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/party-cone.webp'),
     },
     'chef-toque': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/chef-toque.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/chef-toque.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/chef-toque.webp'),
     },
     'sailor-cap': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/sailor-cap.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/sailor-cap.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/sailor-cap.webp'),
     },
     'explorer-cap': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/explorer-cap.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/explorer-cap.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/explorer-cap.webp'),
     },
     'detective-deerstalker': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/detective-deerstalker.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/detective-deerstalker.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/detective-deerstalker.webp'),
     },
     'moon-bonnet': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/moon-bonnet.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/moon-bonnet.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/moon-bonnet.webp'),
     },
     'pancake-stack': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/pancake-stack.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/pancake-stack.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/pancake-stack.webp'),
     },
     'strawberry-topper': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/strawberry-topper.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/strawberry-topper.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/strawberry-topper.webp'),
     },
     'blueberry-cap': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/blueberry-cap.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/blueberry-cap.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/blueberry-cap.webp'),
     },
     'watermelon-visor': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/watermelon-visor.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/watermelon-visor.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/watermelon-visor.webp'),
     },
     'duckling-cap': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/duckling-cap.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/duckling-cap.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/duckling-cap.webp'),
     },
     'frog-hood': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/frog-hood.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/frog-hood.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/frog-hood.webp'),
     },
     'cat-ear-headband': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/cat-ear-headband.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/cat-ear-headband.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/cat-ear-headband.webp'),
     },
     'bunny-ears': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/bunny-ears.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/bunny-ears.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/bunny-ears.webp'),
     },
     'bear-hood': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/bear-hood.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/bear-hood.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/bear-hood.webp'),
     },
     'dragon-horns': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/dragon-horns.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/dragon-horns.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/dragon-horns.webp'),
     },
     'dino-spikes': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/dino-spikes.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/dino-spikes.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/dino-spikes.webp'),
     },
     'astronaut-helmet': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/astronaut-helmet.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/astronaut-helmet.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/astronaut-helmet.webp'),
     },
     'knight-circlet': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/knight-circlet.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/knight-circlet.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/knight-circlet.webp'),
     },
     'pirate-tricorn': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/pirate-tricorn.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/pirate-tricorn.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/pirate-tricorn.webp'),
     },
     'graduation-cap': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/graduation-cap.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/graduation-cap.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/graduation-cap.webp'),
     },
     'cozy-headphones': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/cozy-headphones.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/cozy-headphones.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/cozy-headphones.webp'),
     },
     'fluffy-earmuffs': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/fluffy-earmuffs.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/fluffy-earmuffs.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/fluffy-earmuffs.webp'),
     },
     'soft-halo': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/soft-halo.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/soft-halo.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/soft-halo.webp'),
     },
     'woodland-antlers': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/woodland-antlers.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/woodland-antlers.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/woodland-antlers.webp'),
     },
     'snowflake-tiara': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/snowflake-tiara.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/snowflake-tiara.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/snowflake-tiara.webp'),
     },
     'rainbow-arch': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/rainbow-arch.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/rainbow-arch.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/rainbow-arch.webp'),
     },
     'blossom-crown': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/blossom-crown.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/blossom-crown.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/blossom-crown.webp'),
     },
     'sleepy-nightcap': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/hats/sleepy-nightcap.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/hats/sleepy-nightcap.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/hats/thumbnails/sleepy-nightcap.webp'),
     },
   },
   held: {
     'warm-lantern': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/warm-lantern.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/warm-lantern.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/warm-lantern.webp'),
     },
     'daisy-posy': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/daisy-posy.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/daisy-posy.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/daisy-posy.webp'),
     },
     'tiny-storybook': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/tiny-storybook.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/tiny-storybook.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/tiny-storybook.webp'),
     },
     'star-wand': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/star-wand.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/star-wand.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/star-wand.webp'),
     },
     'cozy-mug': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/cozy-mug.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/cozy-mug.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/cozy-mug.webp'),
     },
     'adventure-pennant': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/adventure-pennant.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/adventure-pennant.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/adventure-pennant.webp'),
     },
     'tiny-umbrella': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/tiny-umbrella.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/tiny-umbrella.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/tiny-umbrella.webp'),
     },
     'watering-can': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/watering-can.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/watering-can.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/watering-can.webp'),
     },
     'magnifying-glass': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/magnifying-glass.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/magnifying-glass.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/magnifying-glass.webp'),
     },
     'berry-lollipop': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/berry-lollipop.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/berry-lollipop.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/berry-lollipop.webp'),
     },
     'paintbrush': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/paintbrush.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/paintbrush.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/paintbrush.webp'),
     },
     'toy-sword': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/toy-sword.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/toy-sword.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/toy-sword.webp'),
     },
     'little-guitar': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/little-guitar.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/little-guitar.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/little-guitar.webp'),
     },
     'seashell': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/seashell.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/seashell.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/seashell.webp'),
     },
     'potion-bottle': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/potion-bottle.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/potion-bottle.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/potion-bottle.webp'),
     },
     'snow-globe': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/snow-globe.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/snow-globe.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/snow-globe.webp'),
     },
     'plush-bunny': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/plush-bunny.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/plush-bunny.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/plush-bunny.webp'),
     },
     'picnic-basket': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/picnic-basket.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/picnic-basket.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/picnic-basket.webp'),
     },
     'telescope': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/telescope.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/telescope.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/telescope.webp'),
     },
     'flower-balloon': {
-      highResolutionSource: require('../assets/images/katchimeras/egg-avatars/held/flower-balloon.png'),
       fullSource: require('../assets/images/katchimeras/egg-avatars/held/flower-balloon.webp'),
       thumbnailSource: require('../assets/images/katchimeras/egg-avatars/held/thumbnails/flower-balloon.webp'),
     },

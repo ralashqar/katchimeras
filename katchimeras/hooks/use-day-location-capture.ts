@@ -1,13 +1,10 @@
-import { useIsFocused } from '@react-navigation/native';
-import { useEffect, useState } from 'react';
-import { AppState } from 'react-native';
+import { useEffect, useRef } from 'react';
 
 import type { LocationPermissionState } from '@/types/home';
-import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 
 type UseDayLocationCaptureOptions = {
   enabled: boolean;
-  requireFocus?: boolean;
+  requestKey: number;
   permissionState: LocationPermissionState;
   onPermissionResolved: (permission: LocationPermissionState) => void;
   onSample: (sample: {
@@ -20,29 +17,25 @@ type UseDayLocationCaptureOptions = {
 
 export function useDayLocationCapture({
   enabled,
-  requireFocus = true,
+  requestKey,
   permissionState,
   onPermissionResolved,
   onSample,
 }: UseDayLocationCaptureOptions) {
-  const isFocused = useIsFocused();
-  const [appActive, setAppActive] = useState(() => AppState.currentState === 'active');
+  const lastStartedRequestKeyRef = useRef(0);
 
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      setAppActive(nextState === 'active');
-    });
-    return () => subscription.remove();
-  }, []);
-
-  useEffect(() => {
-    if (process.env.EXPO_OS === 'web' || !enabled || !appActive || (requireFocus && !isFocused)) {
+    if (
+      process.env.EXPO_OS === 'web' ||
+      !enabled ||
+      requestKey <= 0 ||
+      lastStartedRequestKeyRef.current >= requestKey
+    ) {
       return;
     }
+    lastStartedRequestKeyRef.current = requestKey;
 
     let active = true;
-    let subscription: { remove: () => void } | null = null;
-    let releaseResource: (() => void) | null = null;
 
     async function startWatching() {
       const Location = await import('expo-location');
@@ -54,7 +47,7 @@ export function useDayLocationCapture({
 
       if (existingPermission.granted) {
         onPermissionResolved('granted');
-        await captureAndWatch(Location);
+        await captureOnce(Location);
         return;
       }
 
@@ -66,7 +59,7 @@ export function useDayLocationCapture({
       // Mounting the Today tab must never trigger a system prompt by itself.
     }
 
-    async function captureAndWatch(Location: typeof import('expo-location')) {
+    async function captureOnce(Location: typeof import('expo-location')) {
       try {
         const current = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
@@ -81,47 +74,14 @@ export function useDayLocationCapture({
           });
         }
       } catch {
-        // Ignore single-shot failures and still try the foreground watcher.
+        // The scheduler will retry after its location cooldown.
       }
-
-      if (!active) {
-        return;
-      }
-
-      const nextSubscription = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.Balanced,
-          distanceInterval: 120,
-          timeInterval: 180000,
-          mayShowUserSettingsDialog: true,
-        },
-        (position) => {
-          if (!active) {
-            return;
-          }
-
-          onSample({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-            capturedAt: new Date(position.timestamp).toISOString(),
-            accuracyMeters: position.coords.accuracy ?? undefined,
-          });
-        }
-      );
-      if (!active) {
-        nextSubscription.remove();
-        return;
-      }
-      subscription = nextSubscription;
-      releaseResource = acquireLifecycleResource('location_watcher', 'day-capture');
     }
 
     startWatching();
 
     return () => {
       active = false;
-      subscription?.remove();
-      releaseResource?.();
     };
-  }, [appActive, enabled, isFocused, onPermissionResolved, onSample, permissionState, requireFocus]);
+  }, [enabled, onPermissionResolved, onSample, permissionState, requestKey]);
 }

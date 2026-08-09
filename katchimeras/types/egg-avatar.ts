@@ -77,7 +77,6 @@ export type EggAvatarCatalogItem<Id extends string = string> = {
 
 type ReadyArtSources = {
   fullSource: number;
-  highResolutionSource: number;
   thumbnailSource: number;
 };
 

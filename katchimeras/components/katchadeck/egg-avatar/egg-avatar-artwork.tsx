@@ -67,20 +67,14 @@ export function EggAvatarArtwork({
   );
   const bodySource = resolution === 'thumbnail'
     ? skin.thumbnailSource
-    : resolution === 'high'
-      ? skin.highResolutionSource
-      : skin.fullSource;
+    : skin.fullSource;
   const faceSource = resolution === 'thumbnail'
     ? face.thumbnailSource
-    : resolution === 'high'
-      ? face.highResolutionSource
-      : face.fullSource;
-  const accessorySource = <T extends { thumbnailSource: number; highResolutionSource: number; fullSource: number }>(item: T) => (
+    : face.fullSource;
+  const accessorySource = <T extends { thumbnailSource: number; fullSource: number }>(item: T) => (
     resolution === 'thumbnail'
       ? item.thumbnailSource
-      : resolution === 'high'
-        ? item.highResolutionSource
-        : item.fullSource
+      : item.fullSource
   );
 
   return (

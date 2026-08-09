@@ -54,11 +54,16 @@ test('nested critical interactions release deferred work only after the final le
   releaseSecond();
 });
 
-test('native watcher creation is guarded against late async completion', () => {
+test('passive capture is one-shot while live game watchers guard late async completion', () => {
   const locationSource = readFileSync(path.join(process.cwd(), 'hooks', 'use-day-location-capture.ts'), 'utf8');
+  const stepSource = readFileSync(path.join(process.cwd(), 'hooks', 'use-day-step-capture.ts'), 'utf8');
   const liveStepSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'quests', 'live-step-quest.tsx'), 'utf8');
-  assert.match(locationSource, /const nextSubscription = await Location\.watchPositionAsync/);
-  assert.match(locationSource, /if \(!active\) \{\s*nextSubscription\.remove\(\)/);
+  assert.match(locationSource, /Location\.getCurrentPositionAsync/);
+  assert.doesNotMatch(locationSource, /watchPositionAsync|location_watcher/);
+  assert.match(locationSource, /lastStartedRequestKeyRef\.current >= requestKey/);
+  assert.match(stepSource, /Pedometer\.getStepCountAsync/);
+  assert.doesNotMatch(stepSource, /Pedometer\.watchStepCount|pedometer_watcher/);
+  assert.match(stepSource, /lastStartedRequestKeyRef\.current >= requestKey/);
   assert.match(liveStepSource, /if \(!mounted\.current\) \{\s*nextWatch\.remove\(\)/);
   assert.match(liveStepSource, /mounted\.current = false;\s*cleanup\(\)/);
 });
@@ -70,8 +75,25 @@ test('game mode releases background UI work and avoids full Kingdom hydration', 
   const gameSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'game-hub-game-route-screen.tsx'), 'utf8');
   assert.match(tabsSource, /name="today"[\s\S]*?freezeOnBlur: false/);
   assert.match(todaySource, /if \(!screenFocused\) return <View style=\{styles\.inactiveScreen\}/);
-  assert.match(captureSource, /enabled: !!todayId && !gameActive/g);
+  assert.ok((captureSource.match(/enabled: captureGates\.captureEnabled/g) ?? []).length >= 3);
+  assert.match(captureSource, /const captureActive = pathname === '\/today'/);
   assert.doesNotMatch(gameSource, /useAllDays|deriveKingdom|applyWardrobeToKingdom/);
+});
+
+test('Today capture uses staggered cooldown gates and incremental photo cursors', () => {
+  const gateSource = readFileSync(path.join(process.cwd(), 'hooks', 'use-passive-capture-gates.ts'), 'utf8');
+  const captureSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'home', 'day-capture-session.tsx'), 'utf8');
+  const photoSource = readFileSync(path.join(process.cwd(), 'hooks', 'use-recent-photo-map-seeding.ts'), 'utf8');
+  assert.match(gateSource, /PASSIVE_CAPTURE_STEP_COOLDOWN_MS = 15 \* 60_000/);
+  assert.match(gateSource, /PASSIVE_CAPTURE_LOCATION_COOLDOWN_MS = 30 \* 60_000/);
+  assert.match(gateSource, /PASSIVE_CAPTURE_INITIAL_STEP_DELAY_MS = 700/);
+  assert.match(gateSource, /PASSIVE_CAPTURE_INITIAL_LOCATION_DELAY_MS = 1_200/);
+  assert.match(gateSource, /PASSIVE_CAPTURE_INITIAL_PHOTO_DELAY_MS = 2_400/);
+  assert.match(gateSource, /AppState\.addEventListener\('change'/);
+  assert.match(captureSource, /blocked: criticalInteractionActive \|\| gameActive/);
+  assert.match(photoSource, /LAST_SCANNED_PHOTO_CREATED_AT_KEY/);
+  assert.match(photoSource, /lastScannedCreatedAt \+ 1/);
+  assert.doesNotMatch(photoSource, /recent-photo-map-seeded-day/);
 });
 
 test('Today buffers passive samples and persistence while its reward loop is active', () => {

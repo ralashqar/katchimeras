@@ -6,6 +6,7 @@ import type {
   TodayGrowthSource,
   TodayEnergyActionCompletion,
 } from '@/types/home';
+import { isAboutTodayPromptKind, isRewardedReflectionPromptKind } from '@/constants/day-prompts';
 
 export const TODAY_GROWTH_REWARDS: Readonly<Record<TodayGrowthSource, number>> = {
   mood: 5,
@@ -197,8 +198,12 @@ export function pendingGrowthAwards(day: StoredHomeDayRecord): PendingGrowthAwar
   for (const answer of day.promptAnswers) {
     if (answer.dismissed) continue;
     if (answer.kind === 'feeling') push({ source: 'mood', sourceId: answer.id, actionId: 'mood' });
-    if (['meaning', 'highlight', 'gratitude', 'day_word'].includes(answer.kind)) {
-      push({ source: 'reflection', sourceId: answer.id, actionId: 'reflection' });
+    if (isRewardedReflectionPromptKind(answer.kind)) {
+      push({
+        source: 'reflection',
+        sourceId: answer.id,
+        actionId: isAboutTodayPromptKind(answer.kind) ? `about_today:${answer.kind}` : 'reflection',
+      });
     }
   }
   if (day.sleep) push({ source: 'sleep', sourceId: day.sleep.recordedAt ?? `${day.isoDate}:sleep`, actionId: 'sleep' });

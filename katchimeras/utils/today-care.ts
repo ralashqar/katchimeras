@@ -1,6 +1,8 @@
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
+import { aboutTodayPromptKinds, isRewardedReflectionPromptKind } from '@/constants/day-prompts';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
-import type { StoredHomeDayRecord, TodayGrowthSource } from '@/types/home';
+import type { DayPromptKind, StoredHomeDayRecord, TodayGrowthSource } from '@/types/home';
+import { buildAboutTodayPrompt, selectAboutTodayPrompt } from '@/utils/day-prompt-engine';
 import type { MemoryQuest, MemoryQuestType } from '@/utils/memory-quests-engine';
 import { normalizeDayGrowthState, TODAY_GROWTH_REWARDS } from '@/utils/today-growth';
 
@@ -27,7 +29,7 @@ export type TodayCareDestination =
   | { kind: 'inline_mood' }
   | { kind: 'inline_sleep' }
   | { kind: 'quick_category'; category: 'photo' | 'voice_note' | 'manual_journal' | 'place' | 'movement' | 'food' | 'studio' | 'people' | 'work' | 'life_event' }
-  | { kind: 'reflection' }
+  | { kind: 'reflection'; promptId?: DayPromptKind }
   | { kind: 'memory_quest'; questType: MemoryQuestType }
   | { kind: 'quick_goal'; goalId: string; familyId: KatchimeraFamilyId }
   | {
@@ -125,12 +127,6 @@ const CARE_CATALOG: TodayCareActionDefinition[] = [
     eligibleTimeOfDay: ALL_DAY, journalFocused: true,
   }),
   action({
-    id: 'reflection', title: 'Reflect on today', description: 'Answer one guided question about your day.',
-    icon: 'book.closed.fill', artKey: 'reflection', category: 'memory', completionKey: 'reflection', completionMode: 'artifact',
-    destination: { kind: 'reflection' }, growthSource: 'reflection', priority: 96,
-    eligibleTimeOfDay: ['evening'], journalFocused: true,
-  }),
-  action({
     id: 'place', title: 'Add a place you visited', description: 'Journal where you went and what happened.',
     icon: 'mappin.and.ellipse', artKey: 'place', category: 'memory', completionKey: 'place', completionMode: 'artifact',
     destination: { kind: 'quick_category', category: 'place' }, growthSource: 'place', priority: 76,
@@ -181,6 +177,7 @@ export function rankTodayCareActions(input: {
 }): { active: RankedTodayCareAction[]; completed: RankedTodayCareAction[] } {
   const now = input.now ?? new Date();
   const bucket = careTimeBucket(now);
+  const selectedAboutToday = selectAboutTodayPrompt(input.day, now);
   const state = normalizeDayGrowthState(input.day.growth);
   const stateById = new Map(state.careActions.map((item) => [item.instanceId, item]));
   const contextualKeys = new Set<string>(input.contextualCategories ?? []);
@@ -192,6 +189,27 @@ export function rankTodayCareActions(input: {
     .filter((definition) => definition.eligibleTimeOfDay.includes(bucket) || contextualKeys.has(definition.completionKey))
     .filter((definition) => definition.id !== 'reflection' || input.reflectionAvailable !== false)
     .map((definition) => ranked(definition, input.day.isoDate, 'system', isDefinitionAlreadySatisfied(definition.id, input.day)));
+
+  for (const kind of aboutTodayPromptKinds) {
+    const prompt = buildAboutTodayPrompt(kind);
+    if (!prompt) continue;
+    const definition = action({
+      id: `about_today:${kind}`,
+      title: prompt.title,
+      description: 'Choose one answer. One tap.',
+      icon: prompt.categoryIcon,
+      artKey: 'reflection',
+      category: 'memory',
+      completionKey: `reflection:${kind}`,
+      completionMode: 'artifact',
+      destination: { kind: 'reflection', promptId: kind },
+      growthSource: 'reflection',
+      priority: 96,
+      eligibleTimeOfDay: AFTER_MORNING,
+      journalFocused: true,
+    });
+    candidates.push(ranked(definition, input.day.isoDate, 'system', isDefinitionAlreadySatisfied(definition.id, input.day)));
+  }
 
   if (input.miniGameSuggestion) {
     const game = input.miniGameSuggestion;
@@ -247,7 +265,9 @@ export function rankTodayCareActions(input: {
 
   for (const quest of input.memoryQuests ?? []) {
     if (quest.type === 'namePatch' || quest.type === 'markBigMoment') continue;
-    if (quest.type === 'answerReflection' && input.reflectionAvailable === false) continue;
+    // About Today owns the live slot. Preserve an already-completed legacy
+    // quest candidate so the existing row-outro/reward animator can finish it.
+    if (quest.type === 'answerReflection' && !quest.completed) continue;
     const definition = memoryQuestAction(quest);
     candidates.push({
       ...ranked(definition, input.day.isoDate, 'memory_quest', quest.completed),
@@ -307,6 +327,9 @@ export function rankTodayCareActions(input: {
     if (dismissedKeys.has(candidate.completionKey)) return false;
     if (stored?.status === 'not_today') return false;
     if (stored?.deferredUntil && new Date(stored.deferredUntil).getTime() > now.getTime()) return false;
+    if (candidate.id.startsWith('about_today:') && candidate.destination.kind === 'reflection') {
+      return candidate.destination.promptId === selectedAboutToday?.id;
+    }
     return true;
   });
 
@@ -369,6 +392,7 @@ function storedCompletionKey(definitionId: string): string[] {
   if (definitionId.startsWith('memory-quest:')) return [definitionId.slice('memory-quest:'.length)];
   if (definitionId === 'photo_roll') return ['photo'];
   if (definitionId.startsWith('mini_game_round:')) return [`mini_game:${definitionId.slice('mini_game_round:'.length)}`];
+  if (definitionId.startsWith('about_today:')) return [`reflection:${definitionId.slice('about_today:'.length)}`];
   return [definitionId];
 }
 
@@ -468,7 +492,11 @@ function isDefinitionAlreadySatisfied(id: string, day: StoredHomeDayRecord): boo
   if (id === 'place') return Boolean(day.confirmedPlaces?.length || hasJournalFlow(day, 'went_somewhere'));
   if (id === 'movement') return Boolean(day.stepsInterpretation || day.stepsCount >= 1000 || hasJournalFlow(day, 'movement'));
   if (id === 'food') return Boolean(day.foodMoments?.length || hasJournalFlow(day, 'food'));
-  if (id === 'reflection') return day.promptAnswers.some((answer) => ['meaning', 'highlight', 'gratitude', 'day_word'].includes(answer.kind) && !answer.dismissed);
+  if (id.startsWith('about_today:')) {
+    const kind = id.slice('about_today:'.length) as DayPromptKind;
+    return day.promptAnswers.some((answer) => answer.kind === kind && !answer.dismissed);
+  }
+  if (id === 'reflection') return day.promptAnswers.some((answer) => isRewardedReflectionPromptKind(answer.kind) && !answer.dismissed);
   return false;
 }
 
@@ -500,8 +528,10 @@ function artifactCompletionKeys(day: StoredHomeDayRecord): Set<string> {
   if (day.confirmedPlaces?.length) keys.add('place');
   if (day.stepsInterpretation || day.stepsCount >= 1000) keys.add('movement');
   if (day.foodMoments?.length) keys.add('food');
-  if (day.promptAnswers.some((answer) => ['meaning', 'highlight', 'gratitude', 'day_word'].includes(answer.kind) && !answer.dismissed)) {
+  for (const answer of day.promptAnswers) {
+    if (answer.dismissed || !isRewardedReflectionPromptKind(answer.kind)) continue;
     keys.add('reflection');
+    keys.add(`reflection:${answer.kind}`);
   }
   for (const record of day.journalRecords ?? []) {
     if (record.source.kind === 'photo') keys.add('photo');

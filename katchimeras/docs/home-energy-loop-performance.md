@@ -47,6 +47,28 @@ every animation commit.
   asset-page cache, preventing two near-simultaneous camera-roll enumerations.
 - The display-sized egg uses the WebP source and permits image downscaling. The
   authored full-spread scene does not also mount the fallback moving-cloud layer.
+- Today and You are separate routes. Opening You unmounts Today instead of
+  retaining its gestures, timers, sensors, and UI-thread scene animations below
+  an overlay.
+- Avatar runtime art is capped at 512 px for bodies, faces, and hats and 256 px
+  for held items and Wisps. The 2048 px masters remain source assets but are not
+  imported by the application. `npm run avatar:runtime-assets:check` enforces
+  dimensions and an 8 MiB aggregate runtime budget (currently 3.62 MiB).
+- The customization collection is virtualized in four columns and renders 256 px
+  thumbnails. Only the standalone hero requests the 512 px display layers.
+- Today mounts one cinematic background at rest. A neighboring page is mounted
+  only during an active transition, and unsupported Katchimeras use the Home
+  cinematic instead of loading the retired hex renderer.
+- Energy numbers commit once per token while the meter fill animates on the UI
+  thread. Ripple/confetti canvases mount only for active feedback and are
+  released after the effect completes.
+- Passive capture is event-driven and active only on Today. After the opening
+  transition settles, steps receive a one-shot read, location receives a
+  one-shot balanced-accuracy sample, and Photos receives one incremental scan.
+  Continuous passive native watchers are not retained. Step and location reads
+  use 15- and 30-minute cooldowns; Photos persists its newest creation-time
+  cursor so later sessions enumerate only new assets. Blur, backgrounding,
+  games, and critical reward interactions cancel scheduled or in-flight work.
 
 ## Acceptance scenarios
 

@@ -174,7 +174,7 @@ test('roster reconciliation preserves unchanged card identities and replaces onl
   }
 });
 
-test('the bottom bar exposes Katchimeras while retaining the hidden world route', () => {
+test('the bottom bar exposes Katchimeras while the retired world route redirects to it', () => {
   const layout = fs.readFileSync(
     path.join(process.cwd(), 'app', '(tabs)', '_layout.tsx'),
     'utf8',
@@ -185,7 +185,8 @@ test('the bottom bar exposes Katchimeras while retaining the hidden world route'
   );
   assert.match(layout, /name="world"[\s\S]*?href: null/);
   assert.match(layout, /name="katchimeras"[\s\S]*?title: 'Katchimeras'/);
-  assert.match(worldRoute, /KingdomCompanionScreen/);
+  assert.match(worldRoute, /<Redirect href="\/katchimeras"/);
+  assert.doesNotMatch(worldRoute, /KingdomCompanionScreen|KingdomHexCanvas/);
 });
 
 test('the dev toggle exposes virtual companions across roster, companion, games, goals, and Dex surfaces', () => {

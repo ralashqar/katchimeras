@@ -1,4 +1,4 @@
-import type { ComponentProps } from 'react';
+import { type ComponentProps, useCallback, useEffect, useRef } from 'react';
 
 import { BigMomentPickerSheet } from '@/components/katchadeck/world/big-moment-picker-sheet';
 import { JourneyDetailSheet } from '@/components/katchadeck/world/cell-detail-sheet';
@@ -89,6 +89,7 @@ export function TodaySheetHost({
   setMicrocopy,
   setDayName,
 }: TodaySheetHostProps) {
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const {
     memoryVaultOpen,
     memoryVaultTab,
@@ -125,10 +126,17 @@ export function TodaySheetHost({
   // React Native can retain an invisible interaction layer when one native
   // Modal is removed in the same commit that another is mounted. Sequence
   // reader-to-reader transitions so the first portal fully releases touches.
-  const transitionSheet = (close: () => void, open: () => void) => {
+  useEffect(() => () => {
+    if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+  }, []);
+  const transitionSheet = useCallback((close: () => void, open: () => void) => {
+    if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
     close();
-    setTimeout(open, 220);
-  };
+    transitionTimerRef.current = setTimeout(() => {
+      transitionTimerRef.current = null;
+      open();
+    }, 220);
+  }, []);
   if (!viewedDay) {
     return null;
   }

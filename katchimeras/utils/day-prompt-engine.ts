@@ -1,4 +1,12 @@
-import { dayPromptRegistry, launchedDayPrompts, type Daypart, type DayPromptDefinition } from '@/constants/day-prompts';
+import {
+  ABOUT_TODAY_MAX_PER_DAY,
+  aboutTodayPromptKinds,
+  dayPromptRegistry,
+  isAboutTodayPromptKind,
+  launchedDayPrompts,
+  type Daypart,
+  type DayPromptDefinition,
+} from '@/constants/day-prompts';
 import type { DayPromptKind, StoredHomeDayRecord } from '@/types/home';
 
 const CAMERA_ROLL_PREFIX = 'camera-roll-photo-';
@@ -15,6 +23,52 @@ export type DayPromptPhotoCandidate = {
 export type ActiveDayPrompt = DayPromptDefinition & {
   photoCandidates: DayPromptPhotoCandidate[];
 };
+
+export function buildAboutTodayPrompt(kind: DayPromptKind): ActiveDayPrompt | null {
+  const prompt = dayPromptRegistry[kind];
+  if (!prompt || !isAboutTodayPromptKind(kind) || prompt.options.length === 0) return null;
+  return { ...prompt, photoCandidates: [] };
+}
+
+/** Chooses one stable, unanswered low-friction reflection for the action list. */
+export function selectAboutTodayPrompt(
+  day: StoredHomeDayRecord,
+  now: Date = new Date(),
+): ActiveDayPrompt | null {
+  if (day.state === 'hatched' || now.getHours() < 11) return null;
+  const answered = new Set(
+    (day.promptAnswers ?? [])
+      .filter((answer) => !answer.dismissed && isAboutTodayPromptKind(answer.kind))
+      .map((answer) => answer.kind),
+  );
+  const dismissed = new Set<DayPromptKind>(
+    (day.growth?.careActions ?? []).flatMap((action) => {
+      if (action.status !== 'not_today' || !action.definitionId.startsWith('about_today:')) return [];
+      return [action.definitionId.slice('about_today:'.length) as DayPromptKind];
+    }),
+  );
+  if (answered.size >= ABOUT_TODAY_MAX_PER_DAY) return null;
+
+  const socialDay = (day.vision?.maxFaceCount ?? 0) >= 2
+    || (day.moments ?? []).some((moment) => moment.type === 'social');
+  const activeDay = day.stepsCount >= 7000;
+  const later = now.getHours() >= 17;
+  const preference: DayPromptKind[] = answered.size === 0
+    ? ['day_focus']
+    : [
+        ...(socialDay ? ['for_who' as const] : []),
+        ...(activeDay ? ['energy' as const] : []),
+        ...(later ? ['day_outcome' as const, 'day_character' as const, 'day_word' as const] : []),
+        'day_character',
+        'energy',
+        'for_who',
+        'day_outcome',
+        'day_word',
+      ];
+  const kind = preference.find((candidate) => !answered.has(candidate) && !dismissed.has(candidate))
+    ?? aboutTodayPromptKinds.find((candidate) => !answered.has(candidate) && !dismissed.has(candidate));
+  return kind ? buildAboutTodayPrompt(kind) : null;
+}
 
 // The only STRIP prompts that ever auto-surface: the contextual photo pair
 // (photo-gated, so they fire only when the roll has something worth keeping).

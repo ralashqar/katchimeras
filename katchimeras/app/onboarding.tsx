@@ -33,7 +33,7 @@ import { saveHomeAnchor } from '@/utils/home-location';
 import { defaultOnboardingProfile, loadOnboardingProfile, saveOnboardingProfile } from '@/utils/onboarding-state';
 import { safeGoBack } from '@/utils/safe-navigation';
 import { deriveZodiacSign, homePreset, loadWorldIdentity, saveWorldIdentity, scorePersonality, zodiacProfile } from '@/utils/world-identity';
-import { KINGDOM_HOME_HEX_TILES } from '@/utils/world-visuals';
+import { TODAY_EXPLORATION_BACKGROUND_SOURCES } from '@/constants/today-exploration-background-sources.gen';
 
 const totalSteps = 9;
 
@@ -432,7 +432,7 @@ export default function OnboardingScreen() {
           </Animated.View>
           <View style={[styles.homePreview, { borderColor: `${selectedHome.accent}66` }]}>
             <View pointerEvents="none" style={[styles.homeGlow, { backgroundColor: `${selectedHome.accent}20` }]} />
-            <Image contentFit="contain" source={KINGDOM_HOME_HEX_TILES[selectedHome.id].source} style={styles.homeTilePreview} />
+            <Image contentFit="cover" source={TODAY_EXPLORATION_BACKGROUND_SOURCES.home.source} style={styles.homeTilePreview} />
             <View style={styles.keywordRow}>{selectedHome.keywords.map((keyword) => <View key={keyword} style={[styles.keyword, { borderColor: `${selectedHome.accent}55` }]}><ThemedText style={styles.keywordText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{keyword}</ThemedText></View>)}</View>
           </View>
           <View style={styles.choiceSectionHeader}>
@@ -441,7 +441,7 @@ export default function OnboardingScreen() {
           </View>
           <View style={styles.homeChoiceGrid}>{HOME_PRESETS.map((preset) => {
             const selected = preset.id === selectedHome.id;
-            return <Pressable accessibilityRole="radio" accessibilityState={{ checked: selected }} key={preset.id} onPress={() => setIdentity((current) => ({ ...current, selectedHomeArchetypeId: preset.id, recommendedHomeArchetypeId: recommendedHomeId }))} style={({ pressed }) => [styles.homeChoice, selected && styles.homeChoiceSelected, selected && { borderColor: `${preset.accent}AA` }, pressed && styles.identityOptionPressed]}><View style={styles.homeChoiceArt}><Image contentFit="contain" source={KINGDOM_HOME_HEX_TILES[preset.id].sources?.thumb ?? KINGDOM_HOME_HEX_TILES[preset.id].source} style={styles.homeChoiceImage} />{selected ? <View style={[styles.homeChoiceCheck, { backgroundColor: preset.accent }]}><IconSymbol name="checkmark" color={Lantern.emberInk} size={13} /></View> : null}</View><ThemedText style={styles.homeChoiceName} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{preset.name}</ThemedText><ThemedText numberOfLines={1} style={styles.homeChoiceKeywords} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{preset.keywords.join(' · ')}</ThemedText></Pressable>;
+            return <Pressable accessibilityRole="radio" accessibilityState={{ checked: selected }} key={preset.id} onPress={() => setIdentity((current) => ({ ...current, selectedHomeArchetypeId: preset.id, recommendedHomeArchetypeId: recommendedHomeId }))} style={({ pressed }) => [styles.homeChoice, selected && styles.homeChoiceSelected, selected && { borderColor: `${preset.accent}AA` }, pressed && styles.identityOptionPressed]}><View style={styles.homeChoiceArt}><Image contentFit="cover" source={TODAY_EXPLORATION_BACKGROUND_SOURCES.home.source} style={styles.homeChoiceImage} />{selected ? <View style={[styles.homeChoiceCheck, { backgroundColor: preset.accent }]}><IconSymbol name="checkmark" color={Lantern.emberInk} size={13} /></View> : null}</View><ThemedText style={styles.homeChoiceName} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{preset.name}</ThemedText><ThemedText numberOfLines={1} style={styles.homeChoiceKeywords} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{preset.keywords.join(' · ')}</ThemedText></Pressable>;
           })}</View>
         </View>
       );

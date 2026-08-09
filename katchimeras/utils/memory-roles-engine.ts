@@ -1,5 +1,6 @@
 import type { HomeDayRecord } from '@/types/home';
 import { resolveBigMomentDisplay, resolveFoodMomentDisplay, resolveStudioMomentDisplay } from '@/utils/memory-display';
+import { isReflectiveDayPromptKind } from '@/constants/day-prompts';
 
 export type MemoryRoleId =
   | 'anchor_place'
@@ -28,7 +29,6 @@ export type DayMemoryRole = {
   source: MemoryRoleSource;
 };
 
-const REFLECTION_KINDS = new Set(['feeling', 'inner_weather', 'day_word', 'meaning', 'gratitude', 'highlight']);
 const COMFORT_PLACE_CATEGORIES = new Set(['cafe', 'home', 'food']);
 const DISCOVERY_PLACE_CATEGORIES = new Set(['museum', 'park', 'cinema', 'gallery', 'landmark', 'travel']);
 
@@ -38,7 +38,7 @@ function pushUnique(roles: DayMemoryRole[], role: DayMemoryRole) {
 }
 
 function hasReflection(day: HomeDayRecord): boolean {
-  return (day.promptAnswers ?? []).some((answer) => !answer.dismissed && REFLECTION_KINDS.has(answer.kind));
+  return (day.promptAnswers ?? []).some((answer) => !answer.dismissed && isReflectiveDayPromptKind(answer.kind));
 }
 
 function hasSocialSignal(day: HomeDayRecord): boolean {

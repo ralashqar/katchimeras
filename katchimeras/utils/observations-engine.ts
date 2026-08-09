@@ -1,6 +1,7 @@
 import type { HomeDayRecord } from '@/types/home';
 import { deriveContinuityMotifs, type ContinuityMotif, type ContinuityMotifKind } from '@/utils/continuity-engine';
 import { resolveMovementDisplay } from '@/utils/memory-display';
+import { isReflectiveDayPromptKind } from '@/constants/day-prompts';
 
 export type ObservationKind = ContinuityMotifKind | 'life' | 'reflection';
 
@@ -24,7 +25,6 @@ export type ObservationInput = {
   limit?: number;
 };
 
-const REFLECTION_KINDS = new Set(['feeling', 'inner_weather', 'day_word', 'meaning', 'gratitude', 'highlight']);
 
 function pushObservation(observations: Observation[], observation: Observation) {
   if (observations.some((item) => item.id === observation.id)) return;
@@ -73,7 +73,7 @@ function selectedDayObservations(day: HomeDayRecord): Observation[] {
   const newPlaces = day.newPlaceCount ?? 0;
   const steps = day.stepsCount ?? 0;
   const reflectionCount = (day.promptAnswers ?? []).filter(
-    (answer) => !answer.dismissed && REFLECTION_KINDS.has(answer.kind) && answer.labels.length > 0
+    (answer) => !answer.dismissed && isReflectiveDayPromptKind(answer.kind) && answer.labels.length > 0
   ).length;
   const bigMoment = day.bigMoments?.[0];
 

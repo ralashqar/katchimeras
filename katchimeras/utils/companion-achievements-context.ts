@@ -8,6 +8,7 @@ import type { CompanionQuickGoalState } from '@/utils/companion-quick-goals';
 import type { CompanionQuestState } from '@/utils/katchimera-quests';
 import { questDefinition } from '@/utils/quests/definitions';
 import { buildPhotoAchievementSnapshot, MOSS_PHOTO_ACHIEVEMENT_RULES } from '@/utils/photo-achievements';
+import { isReflectiveDayPromptKind } from '@/constants/day-prompts';
 
 export type CompanionAchievementSources = {
   days: HomeDayRecord[];
@@ -28,7 +29,6 @@ type JournalLike = {
 };
 
 const DAY_MS = 86_400_000;
-const REFLECTION_KINDS = new Set(['feeling', 'inner_weather', 'day_word', 'meaning', 'gratitude', 'highlight']);
 
 function ownerFamily(value: string | null | undefined): KatchimeraFamilyId | null {
   return familyIdFromCompanionId(value) ?? canonicalFamilyId(value);
@@ -227,7 +227,7 @@ export function buildCompanionAchievementContexts(
     }
 
     for (const answer of day.promptAnswers ?? []) {
-      if (!answer.dismissed && REFLECTION_KINDS.has(answer.kind)) add('mendle', 'mendle.reflectionEntries', `reflection:${day.id}:${answer.id}`, day.id);
+      if (!answer.dismissed && isReflectiveDayPromptKind(answer.kind)) add('mendle', 'mendle.reflectionEntries', `reflection:${day.id}:${answer.id}`, day.id);
     }
     for (const big of day.bigMoments ?? []) {
       add('cheerlet', 'cheerlet.bigMoments', `big:${day.id}:${big.id}`, day.id);

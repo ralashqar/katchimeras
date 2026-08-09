@@ -1,8 +1,8 @@
 import * as Haptics from 'expo-haptics';
+import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { EggAvatar } from '@/components/katchadeck/egg-avatar/egg-avatar';
@@ -18,7 +18,7 @@ import { Meadow } from '@/constants/meadow-theme';
 import { READY_WISPS } from '@/constants/wisps';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { useWisps } from '@/features/wisps/wisp-provider';
-import { useAllDays } from '@/hooks/use-all-days';
+import type { HomeDayRecord } from '@/types/home';
 import type { EggAvatarFaceId, EggAvatarHatId, EggAvatarHeldAccessoryId, EggAvatarSkinId } from '@/types/egg-avatar';
 import { eggAvatarCustomizerPanelHeight } from '@/utils/egg-avatar-customizer-camera';
 
@@ -26,6 +26,9 @@ type Category = 'body' | 'face' | 'hat' | 'held';
 type YouMode = 'egg' | 'wisps';
 type WispFilter = 'all' | 'life' | 'achieve' | 'special';
 type Option = { id: string | null; name: string };
+type GridItem =
+  | { key: string; kind: 'egg'; option: Option }
+  | { key: string; kind: 'wisp'; wisp: (typeof READY_WISPS)[number] };
 
 const CATEGORIES: readonly { id: Category; label: string }[] = [
   { id: 'body', label: 'Body' }, { id: 'face', label: 'Face' }, { id: 'hat', label: 'Hats' }, { id: 'held', label: 'Held' },
@@ -38,32 +41,32 @@ const GRID_GAP = 8;
 const GRID_HORIZONTAL_PADDING = 14;
 const PANEL_HORIZONTAL_BORDER = 2;
 
-export function EggAvatarProfileScreen({ bottomInset = 0 }: { bottomInset?: number }) {
+export function EggAvatarProfileScreen({ bottomInset = 0, days }: { bottomInset?: number; days: HomeDayRecord[] }) {
   const router = useRouter();
   const { height, width } = useWindowDimensions();
   const avatar = useEggAvatar();
   const wisps = useWisps();
-  const { days } = useAllDays({ refreshOnFocus: false });
   const [mode, setMode] = useState<YouMode>('egg');
   const [category, setCategory] = useState<Category>('body');
   const [wispFilter, setWispFilter] = useState<WispFilter>('all');
-  const gridScrollGesture = useMemo(
-    () => Gesture.Native().disallowInterruption(true),
-    [],
-  );
-  useEffect(() => { wisps.syncFromDays(days); }, [days, wisps]);
+  const syncWispsFromDays = wisps.syncFromDays;
+  useEffect(() => { syncWispsFromDays(days); }, [days, syncWispsFromDays]);
   const tabBarHeight = homeTabBarHeight(bottomInset);
   const panelHeight = eggAvatarCustomizerPanelHeight(height);
   const cellWidth = (width - PANEL_HORIZONTAL_BORDER - GRID_HORIZONTAL_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
 
-  const options: readonly Option[] = category === 'body' ? EGG_AVATAR_SKINS : category === 'face' ? EGG_AVATAR_FACES : category === 'hat'
+  const options = useMemo<readonly Option[]>(() => category === 'body' ? EGG_AVATAR_SKINS : category === 'face' ? EGG_AVATAR_FACES : category === 'hat'
     ? [{ id: null, name: 'None' }, ...EGG_AVATAR_HATS]
-    : [{ id: null, name: 'None' }, ...EGG_AVATAR_HELD_ACCESSORIES];
+    : [{ id: null, name: 'None' }, ...EGG_AVATAR_HELD_ACCESSORIES], [category]);
   const selectedId = category === 'body' ? avatar.equippedSkinId : category === 'face' ? avatar.equippedFaceId : category === 'hat' ? avatar.equippedHatId : avatar.equippedHeldAccessoryId;
-  const visibleWisps = READY_WISPS.filter((item) => wispFilter === 'all'
+  const visibleWisps = useMemo(() => READY_WISPS.filter((item) => wispFilter === 'all'
     || (wispFilter === 'life' && item.acquisition === 'experience')
     || (wispFilter === 'achieve' && item.acquisition === 'achievement')
-    || (wispFilter === 'special' && !['experience', 'achievement'].includes(item.acquisition)));
+    || (wispFilter === 'special' && !['experience', 'achievement'].includes(item.acquisition))), [wispFilter]);
+  const gridItems = useMemo<readonly GridItem[]>(() => mode === 'egg'
+    ? options.map((option) => ({ key: `egg:${option.id ?? 'none'}`, kind: 'egg' as const, option }))
+    : visibleWisps.map((wisp) => ({ key: `wisp:${wisp.id}`, kind: 'wisp' as const, wisp })),
+  [mode, options, visibleWisps]);
 
   const selectEgg = (id: string | null) => {
     if (id === selectedId) return;
@@ -97,43 +100,39 @@ export function EggAvatarProfileScreen({ bottomInset = 0 }: { bottomInset?: numb
           })}
         </View>
 
-        <GestureDetector gesture={gridScrollGesture}>
-        <ScrollView
-          alwaysBounceVertical
-          bounces
+        <FlashList
           contentContainerStyle={styles.grid}
-          contentInsetAdjustmentBehavior="never"
-          decelerationRate="fast"
-          directionalLockEnabled
-          nestedScrollEnabled
-          scrollsToTop={false}
-          showsVerticalScrollIndicator={false}
-          style={styles.gridScroll}>
-          {mode === 'egg' ? options.map((option) => {
+          data={gridItems}
+          keyExtractor={(item) => item.key}
+          numColumns={GRID_COLUMNS}
+          renderItem={({ item }) => {
+            if (item.kind === 'egg') {
+              const option = item.option;
             const selected = option.id === selectedId;
             const previewProps = categoryPreview(category, option.id, avatar);
-            return <Pressable accessibilityLabel={`${option.name}${selected ? ', selected' : ''}`} accessibilityRole="button" accessibilityState={{ selected }} key={option.id ?? 'none'} onPress={() => selectEgg(option.id)} style={({ pressed }) => [styles.item, { width: cellWidth }, selected && { borderColor: avatar.equippedSkin.accent, borderWidth: 2 }, pressed && styles.itemPressed]}>
+              return <Pressable accessibilityLabel={`${option.name}${selected ? ', selected' : ''}`} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => selectEgg(option.id)} style={({ pressed }) => [styles.item, { width: cellWidth }, selected && { borderColor: avatar.equippedSkin.accent, borderWidth: 2 }, pressed && styles.itemPressed]}>
               <View style={[styles.itemPreview, { height: cellWidth - 12, backgroundColor: `${avatar.equippedSkin.accent}1C` }]}>
                 {option.id == null ? <IconSymbol color={Meadow.inkSoft} name="nosign" size={24} /> : <EggAvatar presentation="grid" size={cellWidth - 18} {...previewProps} />}
                 {selected ? <View style={[styles.check, { backgroundColor: avatar.equippedSkin.accent }]}><IconSymbol color="#FFF9EC" name="checkmark" size={11} /></View> : null}
               </View>
               <ThemedText selectable numberOfLines={1} style={styles.itemLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>{option.name}</ThemedText>
             </Pressable>;
-          }) : visibleWisps.map((item) => {
-            const owned = wisps.isOwned(item.id);
-            const equipped = wisps.equippedWispId === item.id;
-            const progress = wisps.progressFor(item.id, days);
-            return <Pressable accessibilityLabel={`${item.name}${owned ? ', discovered' : `, ${progress.current} of ${progress.target}`}${equipped ? ', equipped' : ''}`} accessibilityRole="button" accessibilityState={{ selected: equipped }} key={item.id} onPress={() => router.push({ pathname: '/wisp/[wispId]', params: { wispId: item.id } })} style={({ pressed }) => [styles.item, { width: cellWidth }, equipped && styles.wispEquipped, pressed && styles.itemPressed]}>
+            }
+            const owned = wisps.isOwned(item.wisp.id);
+            const equipped = wisps.equippedWispId === item.wisp.id;
+            const progress = wisps.progressFor(item.wisp.id, days);
+            return <Pressable accessibilityLabel={`${item.wisp.name}${owned ? ', discovered' : `, ${progress.current} of ${progress.target}`}${equipped ? ', equipped' : ''}`} accessibilityRole="button" accessibilityState={{ selected: equipped }} onPress={() => router.push({ pathname: '/wisp/[wispId]', params: { wispId: item.wisp.id } })} style={({ pressed }) => [styles.item, { width: cellWidth }, equipped && styles.wispEquipped, pressed && styles.itemPressed]}>
               <View style={[styles.itemPreview, { height: cellWidth - 12, backgroundColor: `${avatar.equippedSkin.accent}1C` }]}>
-                <WispArtwork id={item.id} size={cellWidth - 22} thumbnail silhouette={!owned} />
+                <WispArtwork id={item.wisp.id} size={cellWidth - 22} thumbnail silhouette={!owned} />
                 {equipped ? <View style={[styles.check, { backgroundColor: avatar.equippedSkin.accent }]}><IconSymbol color="#FFF9EC" name="checkmark" size={11} /></View> : null}
                 {!owned ? <View style={styles.progressBadge}><ThemedText style={styles.progressText} lightColor={Meadow.ink} darkColor={Meadow.ink}>{progress.current}/{progress.target}</ThemedText></View> : null}
               </View>
-              <ThemedText selectable numberOfLines={1} style={styles.itemLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>{owned ? item.name : item.hidden ? '???' : item.name}</ThemedText>
+              <ThemedText selectable numberOfLines={1} style={styles.itemLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>{owned ? item.wisp.name : item.wisp.hidden ? '???' : item.wisp.name}</ThemedText>
             </Pressable>;
-          })}
-        </ScrollView>
-        </GestureDetector>
+          }}
+          showsVerticalScrollIndicator={false}
+          style={styles.gridScroll}
+        />
       </View>
     </Animated.View>
   );
@@ -161,8 +160,8 @@ const styles = StyleSheet.create({
   tabLabel: { fontSize: 11.5, fontWeight: '800', opacity: 0.58 },
   tabLabelActive: { opacity: 1 },
   gridScroll: { flex: 1, minHeight: 0 },
-  grid: { columnGap: GRID_GAP, flexDirection: 'row', flexWrap: 'wrap', paddingBottom: 20, paddingHorizontal: GRID_HORIZONTAL_PADDING, rowGap: GRID_GAP },
-  item: { backgroundColor: 'rgba(232,207,171,0.76)', borderColor: 'rgba(120,78,38,0.14)', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, gap: 3, overflow: 'hidden', padding: 5 },
+  grid: { paddingBottom: 20, paddingHorizontal: GRID_HORIZONTAL_PADDING },
+  item: { backgroundColor: 'rgba(232,207,171,0.76)', borderColor: 'rgba(120,78,38,0.14)', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, gap: 3, marginBottom: GRID_GAP, overflow: 'hidden', padding: 5 },
   itemPressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
   wispEquipped: { backgroundColor: 'rgba(255,244,218,0.96)', borderColor: 'rgba(89,123,78,0.58)', borderWidth: 2 },
   itemPreview: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 12, justifyContent: 'center', overflow: 'hidden' },

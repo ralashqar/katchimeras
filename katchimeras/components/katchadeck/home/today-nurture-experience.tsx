@@ -1466,8 +1466,7 @@ function GrowthMeter({ growth }: { growth: TodayGrowthSummary }) {
   const feedback = useTodayEnergyFeedback();
   const reduceMotion = useReducedMotion();
   const [meterTargetEnergy, setMeterTargetEnergy] = useState(growth.activeEnergy);
-  const [displayedEnergy, setDisplayedEnergy] = useState(growth.activeEnergy);
-  const displayedEnergyRef = useRef(growth.activeEnergy);
+  const displayedEnergy = meterTargetEnergy;
   const previousEnergyRef = useRef(growth.activeEnergy);
   const lastLandingAtRef = useRef(0);
   const seenFeedbackKeyRef = useRef(feedback.key);
@@ -1475,7 +1474,6 @@ function GrowthMeter({ growth }: { growth: TodayGrowthSummary }) {
   const iconPulse = useSharedValue(0);
   const targetGlow = useSharedValue(0);
   const targetReachedRef = useRef(growth.activeEnergy >= growth.energyTarget);
-  displayedEnergyRef.current = displayedEnergy;
   useEffect(() => () => {
     cancelAnimation(progress);
     cancelAnimation(iconPulse);
@@ -1512,27 +1510,6 @@ function GrowthMeter({ growth }: { growth: TodayGrowthSummary }) {
       easing: Easing.out(Easing.cubic),
     });
   }, [growth.energyTarget, meterTargetEnergy, progress, reduceMotion]);
-  useEffect(() => {
-    const from = displayedEnergyRef.current;
-    const to = meterTargetEnergy;
-    if (from === to || reduceMotion) {
-      setDisplayedEnergy(to);
-      return;
-    }
-    const startedAt = performance.now();
-    const duration = 240;
-    let frame = 0;
-    const tick = (now: number) => {
-      const elapsed = Math.min(1, (now - startedAt) / duration);
-      const eased = 1 - Math.pow(1 - elapsed, 3);
-      const next = Math.round(from + (to - from) * eased);
-      displayedEnergyRef.current = next;
-      setDisplayedEnergy(next);
-      if (elapsed < 1) frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [meterTargetEnergy, reduceMotion]);
   const fillStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: progress.value }] }));
   const iconPulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 1.46 + iconPulse.value * 0.34 }],

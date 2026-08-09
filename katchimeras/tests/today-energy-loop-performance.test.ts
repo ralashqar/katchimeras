@@ -132,7 +132,9 @@ test('forming nurture presentation does not mount the legacy Today scene underne
   assert.doesNotMatch(todaySource, /const hasActivePrompt = isForming && Boolean\(formingActivePrompt\)/);
   assert.match(todaySource, /energyLoopStatus === 'rewarding'[\s\S]*?\|\| energyLoopStatus === 'entering'/);
   assert.match(todaySource, /actionListLocked=\{[\s\S]*?energyLoopStatus === 'launching'[\s\S]*?energyLoopStatus === 'awaiting_completion'[\s\S]*?energyLoopStatus === 'rewarding'/);
-  assert.match(heroSource, /enabled=\{!hideKingdomEnvironmentArt\}/);
+  assert.doesNotMatch(heroSource, /kingdom-surface-tiles|world-visuals|TodayFallbackCloudScene/);
+  assert.match(heroSource, /transientEffectsMounted \? \(/);
+  assert.match(heroSource, /setTransientEffectsMounted\(false\)/);
   assert.match(heroSource, /useEggAvatar\(\)/);
   assert.match(heroSource, /<EggAvatarArtwork/);
   assert.match(heroSource, /skinId=\{equippedSkinId\}/);

@@ -105,6 +105,21 @@ HAT_PRESENTATIONS = {
     item["id"]: item.get("presentation", {"scale": 1.0, "offsetX": 0.0, "offsetY": 0.0})
     for item in HAT_CATALOG["items"]
 }
+CROWN_ALIGNED_HAT_IDS = {
+    "bear-hood",
+    "bunny-ears",
+    "cat-ear-headband",
+    "dino-spikes",
+    "dragon-horns",
+    "duckling-cap",
+    "frog-hood",
+    "graduation-cap",
+    "knight-circlet",
+    "pirate-tricorn",
+    "rainbow-arch",
+    "snowflake-tiara",
+    "soft-halo",
+}
 PLANNED_FACE_IDS = tuple(item["id"] for item in FACE_CATALOG["items"] if item["availability"] == "planned")
 PLANNED_HAT_IDS = tuple(item["id"] for item in HAT_CATALOG["items"] if item["availability"] == "planned")
 PLANNED_HELD_IDS = tuple(item["id"] for item in HELD_CATALOG["items"] if item["availability"] == "planned")
@@ -2868,6 +2883,13 @@ def validate(skin_id: str | None = None) -> None:
                 if slot == "hats":
                     if not isinstance(presentation, dict):
                         errors.append(f"hat missing runtime presentation: {accessory_id}")
+                    else:
+                        values = [presentation.get(key) for key in ("scale", "offsetX", "offsetY")]
+                        if not all(isinstance(value, (int, float)) for value in values) or presentation.get("scale", 0) <= 0:
+                            errors.append(f"hat has invalid runtime presentation: {accessory_id}")
+                        catalog_presentation = ACCESSORY_SPECS.get(accessory_id, {}).get("item", {}).get("presentation")
+                        if presentation != catalog_presentation:
+                            errors.append(f"hat catalog/manifest presentation mismatch: {accessory_id}")
                     if accessory_entry.get("pipelineVersion") != HAT_PIPELINE_VERSION:
                         errors.append(f"hat uses stale pipeline: {accessory_id}")
                     if accessory_entry.get("styleContractVersion") != HAT_STYLE_CONTRACT_VERSION:
@@ -2878,6 +2900,12 @@ def validate(skin_id: str | None = None) -> None:
                         errors.append(f"hat uses wrong GPT Image quality: {accessory_id}")
                 if isinstance(presentation, dict) and alpha_bounds:
                     alpha_bounds = presented_bounds(alpha_bounds, presentation)
+                    if slot == "hats" and accessory_id in CROWN_ALIGNED_HAT_IDS:
+                        presented_width = alpha_bounds[2] - alpha_bounds[0]
+                        if presented_width > 1210:
+                            errors.append(f"crown-aligned hat is too wide ({presented_width}px): {accessory_id}")
+                        if not 690 <= alpha_bounds[3] <= 702:
+                            errors.append(f"crown-aligned hat lost its contact edge ({alpha_bounds[3]}px): {accessory_id}")
                 if slot == "held" and accessory_entry.get("pipelineVersion") == HELD_PIPELINE_VERSION:
                     if accessory_entry.get("generationModel") != HELD_GENERATION_MODEL:
                         errors.append(f"held prop uses wrong generation model: {accessory_id}")

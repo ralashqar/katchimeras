@@ -1,4 +1,3 @@
-import { Image } from 'expo-image';
 import {
   BlendColor,
   Canvas,
@@ -11,7 +10,7 @@ import {
   usePathValue,
   vec,
 } from '@shopify/react-native-skia';
-import { memo, type ReactNode, type RefObject, useCallback, useEffect, useRef } from 'react';
+import { memo, type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -31,30 +30,24 @@ import Animated, {
 
 import { ThemedText } from '@/components/themed-text';
 import type { HomeArchetypeId } from '@/types/world-identity';
-import { kingdomHomeTileForIdentity, kingdomSurfaceTileAlignment } from '@/utils/kingdom-surface-tiles';
 import {
-  todayEggCountdownTop,
   todayEggShoulderWispFrame,
-  todayEggStageFrame,
   todayExplorationEggStageFrame,
-  todayKingdomHeroLayout,
+  TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA,
   TODAY_KINGDOM_STAGE_HEIGHT,
 } from '@/utils/today-kingdom-hero-layout';
-import { kingdomHexTileSourceForLod } from '@/utils/world-visuals';
 import { eggVisualGrowthForEnergyRatio } from '@/utils/today-growth';
 import {
   getTodayEnergyFeedbackSnapshot,
   isRecentFinalTodayEnergyArrival,
   subscribeTodayEnergyFeedback,
 } from '@/features/today/today-energy-feedback';
-import { TodayFallbackCloudScene } from '@/components/katchadeck/home/today-fallback-cloud-scene';
 import { useTodayEnvironmentMotionValues } from '@/components/katchadeck/home/today-environment-motion';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { EggAvatarArtwork } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
 import { RadialSunburstCanvas } from '@/components/katchadeck/ui/radial-sunburst';
 import { WispCompanion } from '@/components/katchadeck/wisps/wisp-companion';
 import type { WispId } from '@/types/wisp';
-import todayScene from '@/data/today-scene.json';
 
 type TodayKingdomEggHeroProps = {
   accentColor?: string;
@@ -111,30 +104,25 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   companionWispId,
   feedbackKey = 0,
   explorationStageTop,
-  homeArchetypeId,
-  hideKingdomEnvironmentArt = false,
   isActivated = true,
   isReady = false,
   growthStage = 0,
   growthProgress,
   deferGrowthUntilEnergyArrival = false,
   onEggPress,
-  pinchStrength = 1,
   showDormantIndicator = true,
   targetRef,
 }: TodayKingdomEggHeroProps) {
   const { equippedFaceId, equippedSkinId } = useEggAvatar();
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
-  const tile = kingdomHomeTileForIdentity(homeArchetypeId);
-  const layout = todayKingdomHeroLayout(windowWidth, kingdomSurfaceTileAlignment(tile));
-  const tileSource = kingdomHexTileSourceForLod(tile, layout.tileSize > 512 ? 'full' : 'medium');
-  const explorationEggFrame = explorationStageTop == null
-    ? null
-    : todayExplorationEggStageFrame(windowWidth, windowHeight, explorationStageTop);
-  const eggFrame = explorationEggFrame
-    ?? todayEggStageFrame(layout.eggCenterY, layout.eggStageScale);
-  const eggStageScale = explorationEggFrame?.scale ?? layout.eggStageScale;
+  const explorationEggFrame = todayExplorationEggStageFrame(
+    windowWidth,
+    windowHeight,
+    explorationStageTop ?? TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA,
+  );
+  const eggFrame = explorationEggFrame;
+  const eggStageScale = explorationEggFrame.scale;
   const companionFrame = todayEggShoulderWispFrame(eggStageScale);
   // Readiness is controlled by incubation time; visual size is controlled by
   // earned Energy. Never promote the visual ratio when the hatch clock becomes
@@ -159,6 +147,16 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   const ripple = useSharedValue(1);
   const rippleEcho = useSharedValue(1);
   const readyShake = useSharedValue(0);
+  const [transientEffectsMounted, setTransientEffectsMounted] = useState(false);
+  const transientEffectsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountTransientEffects = useCallback(() => {
+    if (transientEffectsTimerRef.current) clearTimeout(transientEffectsTimerRef.current);
+    setTransientEffectsMounted(true);
+    transientEffectsTimerRef.current = setTimeout(() => {
+      transientEffectsTimerRef.current = null;
+      setTransientEffectsMounted(false);
+    }, reduceMotion ? 520 : 900);
+  }, [reduceMotion]);
 
   const triggerRadianceFlare = useCallback(() => {
     cancelAnimation(radianceFlare);
@@ -172,6 +170,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   }, [radianceFlare, reduceMotion]);
 
   const startActivationCelebration = useCallback(() => {
+    mountTransientEffects();
     activationStateRef.current = 'running';
     if (activationFallbackTimerRef.current) clearTimeout(activationFallbackTimerRef.current);
     if (activationResetTimerRef.current) clearTimeout(activationResetTimerRef.current);
@@ -192,7 +191,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
       activationResetTimerRef.current = null;
       activationStateRef.current = 'idle';
     }, reduceMotion ? 460 : 760);
-  }, [activationCelebration, activationPulse, reduceMotion]);
+  }, [activationCelebration, activationPulse, mountTransientEffects, reduceMotion]);
 
   useEffect(() => {
     const wasActivated = previousActivationRef.current;
@@ -228,6 +227,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   useEffect(() => () => {
     if (activationFallbackTimerRef.current) clearTimeout(activationFallbackTimerRef.current);
     if (activationResetTimerRef.current) clearTimeout(activationResetTimerRef.current);
+    if (transientEffectsTimerRef.current) clearTimeout(transientEffectsTimerRef.current);
   }, []);
 
   useEffect(() => {
@@ -262,6 +262,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   // The shell rattles independently from the two outward energy rings, matching
   // the original LanternEgg feedback instead of scaling the shell itself.
   const triggerEggFeedback = useCallback(() => {
+    mountTransientEffects();
     cancelAnimation(feedbackShake);
     cancelAnimation(feedbackPulse);
     feedbackPulse.value = withSequence(
@@ -291,7 +292,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
         easing: Easing.out(Easing.cubic),
       }),
     );
-  }, [feedbackPulse, feedbackShake, reduceMotion, ripple, rippleEcho]);
+  }, [feedbackPulse, feedbackShake, mountTransientEffects, reduceMotion, ripple, rippleEcho]);
 
   useEffect(() => {
     if (feedbackKey <= 0) return;
@@ -377,31 +378,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
 
   return (
     <View pointerEvents="box-none" style={styles.stage}>
-      <TodayFallbackCloudScene
-        enabled={!hideKingdomEnvironmentArt}
-        focusY={explorationEggFrame?.centerY
-          ?? layout.eggCenterY
-            + TODAY_KINGDOM_STAGE_HEIGHT * todayScene.homeEgg.verticalLowerStageHeightRatio}
-        pinchStrength={pinchStrength}
-        environment={hideKingdomEnvironmentArt ? null : (
-          <Image
-            cachePolicy="memory-disk"
-            contentFit="contain"
-            pointerEvents="none"
-            source={tileSource}
-            style={[
-              styles.tile,
-              {
-                height: layout.tileFrame.height,
-                marginLeft: layout.tileFrame.left,
-                top: layout.tileFrame.top,
-                width: layout.tileFrame.width,
-              },
-            ]}
-            transition={0}
-          />
-        )}
-        frontTop={layout.tileFaceBottomY}>
+      <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
         <View
           pointerEvents="box-none"
           ref={targetRef}
@@ -421,20 +398,24 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
             stageHeight={eggFrame.height}
             stageScale={eggStageScale}
           />
-          <EggActivationCelebration
-            progress={activationCelebration}
-            reduceMotion={reduceMotion}
-            stageHeight={eggFrame.height}
-            stageScale={eggStageScale}
-          />
-          <EggRippleField
-            accentColor={accentColor}
-            coreColor={coreColor}
-            primary={ripple}
-            secondary={rippleEcho}
-            stageHeight={eggFrame.height}
-            stageScale={eggStageScale}
-          />
+          {transientEffectsMounted ? (
+            <>
+              <EggActivationCelebration
+                progress={activationCelebration}
+                reduceMotion={reduceMotion}
+                stageHeight={eggFrame.height}
+                stageScale={eggStageScale}
+              />
+              <EggRippleField
+                accentColor={accentColor}
+                coreColor={coreColor}
+                primary={ripple}
+                secondary={rippleEcho}
+                stageHeight={eggFrame.height}
+                stageScale={eggStageScale}
+              />
+            </>
+          ) : null}
           <Animated.View
             style={[
               styles.eggMotionFrame,
@@ -476,7 +457,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
           ) : null}
           {!isActivated && showDormantIndicator ? <DormantEggZzz growth={visualGrowth} reduceMotion={reduceMotion} stageScale={eggStageScale} /> : null}
         </View>
-      </TodayFallbackCloudScene>
+      </View>
     </View>
   );
 });
@@ -740,27 +721,8 @@ function EggRadiance({
   useEffect(() => {
     cancelAnimation(rotation);
     cancelAnimation(breath);
-    if (reduceMotion) {
-      rotation.value = 0;
-      breath.value = 0.45;
-      return;
-    }
-    rotation.value = withRepeat(
-      withTiming(1, {
-        duration: 36_000 - growthIntensity * 12_000,
-        easing: Easing.linear,
-      }),
-      -1,
-      false,
-    );
-    breath.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 2400, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0, { duration: 2400, easing: Easing.inOut(Easing.sin) }),
-      ),
-      -1,
-      false,
-    );
+    rotation.value = 0;
+    breath.value = 0.45;
     return () => {
       cancelAnimation(rotation);
       cancelAnimation(breath);
@@ -875,14 +837,13 @@ function EggGlowField({ accentColor, breath, coreColor, flare, growth, stageHeig
 export function TodayKingdomEggOverlay({
   children,
   explorationStageTop,
-  homeArchetypeId,
 }: TodayKingdomEggOverlayProps) {
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
-  const tile = kingdomHomeTileForIdentity(homeArchetypeId);
-  const layout = todayKingdomHeroLayout(windowWidth, kingdomSurfaceTileAlignment(tile));
-  const explorationEggFrame = explorationStageTop == null
-    ? null
-    : todayExplorationEggStageFrame(windowWidth, windowHeight, explorationStageTop);
+  const explorationEggFrame = todayExplorationEggStageFrame(
+    windowWidth,
+    windowHeight,
+    explorationStageTop ?? TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA,
+  );
 
   return (
     <View
@@ -890,9 +851,7 @@ export function TodayKingdomEggOverlay({
       style={[
         styles.belowEgg,
         {
-          top: explorationEggFrame
-            ? explorationEggFrame.top + explorationEggFrame.height + 14
-            : todayEggCountdownTop(layout.eggCenterY, layout.eggStageScale),
+          top: explorationEggFrame.top + explorationEggFrame.height + 14,
         },
       ]}>
       {children}
@@ -905,14 +864,13 @@ export function TodayKingdomEggAboveOverlay({
   aboveEggClearance,
   children,
   explorationStageTop,
-  homeArchetypeId,
 }: TodayKingdomEggOverlayProps) {
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
-  const tile = kingdomHomeTileForIdentity(homeArchetypeId);
-  const layout = todayKingdomHeroLayout(windowWidth, kingdomSurfaceTileAlignment(tile));
-  const eggFrame = explorationStageTop == null
-    ? todayEggStageFrame(layout.eggCenterY, layout.eggStageScale)
-    : todayExplorationEggStageFrame(windowWidth, windowHeight, explorationStageTop);
+  const eggFrame = todayExplorationEggStageFrame(
+    windowWidth,
+    windowHeight,
+    explorationStageTop ?? TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA,
+  );
 
   return (
     <View

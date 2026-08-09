@@ -10,7 +10,7 @@ import { loadRecentPhotoAssetPage } from '@/utils/recent-photo-assets';
 
 // Scan a multi-day window so photos land on the days they were actually taken
 // (today and recent past), not just the newest handful that might all be old.
-const LAST_SEEDED_DAY_KEY = 'katchadeck.recent-photo-map-seeded-day-v1';
+const LAST_SCANNED_PHOTO_CREATED_AT_KEY = 'katchadeck.recent-photo-map-cursor-v1';
 const MAX_RECENT_PHOTO_SEEDS = 24;
 const RECENT_PHOTO_SCAN_SIZE = 60;
 const RECENT_PHOTO_WINDOW_DAYS = 6;
@@ -20,20 +20,20 @@ type UseRecentPhotoMapSeedingOptions = {
   enabled: boolean;
   dayId: string | null;
   onSeed: (photos: RecentPhotoAsset[]) => void;
+  requestKey: number;
 };
 
-export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPhotoMapSeedingOptions) {
+export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed, requestKey }: UseRecentPhotoMapSeedingOptions) {
   const lastSeededDayIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!enabled || !dayId) {
+    if (!enabled || !dayId || requestKey <= 0) {
       return;
     }
     const seedDayId = dayId;
 
     if (
       lastSeededDayIdRef.current === seedDayId ||
-      getStoredJson<string | null>(LAST_SEEDED_DAY_KEY, null) === seedDayId ||
       inFlightSeedDays.has(seedDayId)
     ) {
       return;
@@ -47,7 +47,6 @@ export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPh
       const mediaLibraryNative = requireOptionalNativeModule('ExpoMediaLibrary');
       if (!mediaLibraryNative) {
         lastSeededDayIdRef.current = seedDayId;
-        setStoredJson(LAST_SEEDED_DAY_KEY, seedDayId);
         inFlightSeedDays.delete(seedDayId);
         return;
       }
@@ -65,9 +64,14 @@ export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPh
         windowStart.setDate(windowStart.getDate() - RECENT_PHOTO_WINDOW_DAYS);
         windowStart.setHours(0, 0, 0, 0);
 
+        const lastScannedCreatedAt = getStoredJson<number | null>(LAST_SCANNED_PHOTO_CREATED_AT_KEY, null);
+        const createdAfter = Math.max(
+          windowStart.getTime(),
+          lastScannedCreatedAt == null ? 0 : lastScannedCreatedAt + 1,
+        );
         const assets = await loadRecentPhotoAssetPage(
           MediaLibrary,
-          windowStart.getTime(),
+          createdAfter,
           RECENT_PHOTO_SCAN_SIZE,
         );
 
@@ -120,7 +124,13 @@ export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPh
         }
 
         lastSeededDayIdRef.current = seedDayId;
-        setStoredJson(LAST_SEEDED_DAY_KEY, seedDayId);
+        const newestCreationTime = assets.reduce(
+          (latest, asset) => Math.max(latest, asset.creationTime),
+          lastScannedCreatedAt ?? 0,
+        );
+        if (newestCreationTime > 0) {
+          setStoredJson(LAST_SCANNED_PHOTO_CREATED_AT_KEY, newestCreationTime);
+        }
         if (recentGeotaggedPhotos.length > 0) {
           onSeed(recentGeotaggedPhotos);
         }
@@ -144,5 +154,5 @@ export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPh
         clearTimeout(timeout);
       }
     };
-  }, [dayId, enabled, onSeed]);
+  }, [dayId, enabled, onSeed, requestKey]);
 }

@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import {
   ActivityIndicator,
@@ -33,14 +33,11 @@ import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
 import { HatchCheckInSheet } from '@/components/katchadeck/home/hatch-check-in-sheet';
 import { HatchCountdown } from '@/components/katchadeck/home/hatch-countdown';
 import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
-import { TodayHexNeighborhood } from '@/components/katchadeck/home/today-hex-neighborhood';
-import type { TodayTileRenderMode } from '@/components/katchadeck/home/today-hex-neighborhood';
 import {
   TodayKingdomEggAboveOverlay,
   TodayKingdomEggHero,
   TodayKingdomEggOverlay,
 } from '@/components/katchadeck/home/today-kingdom-egg-hero';
-import { TodaySceneBackdrop } from '@/components/katchadeck/home/today-scene-backdrop';
 import {
   TodayExplorationBackground,
   TodayExplorationPageLayer,
@@ -58,7 +55,6 @@ import {
 import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
 import { DayPromptStrip } from '@/components/katchadeck/home/day-prompt-strip';
 import { EggFeedOverlay } from '@/components/katchadeck/home/egg-feed-overlay';
-import { EggAvatarProfileScreen } from '@/components/katchadeck/egg-avatar/egg-avatar-profile-screen';
 import { WispDiscoveryReveal } from '@/components/katchadeck/wisps/wisp-discovery-reveal';
 import { TodayCategoryRing, type TodayCategoryRingItem } from '@/components/katchadeck/home/today-category-ring';
 import { TodayBottomDock } from '@/components/katchadeck/home/today-bottom-dock';
@@ -114,7 +110,6 @@ import { useTodayEnergyLoop } from '@/features/today/use-today-energy-loop';
 import { useTodayEnergyFrameProbe } from '@/features/today/use-today-energy-frame-probe';
 import { TodayEnergyProfiler } from '@/features/today/today-energy-profiler';
 import { useAppActivity } from '@/features/performance/app-activity';
-import { useEggAvatarCustomizerMode } from '@/features/egg-avatar/egg-avatar-customizer-mode';
 import { useWisps } from '@/features/wisps/wisp-provider';
 import { resolveHomeLoopPresentation } from '@/features/today/home-loop-presentation';
 import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
@@ -131,7 +126,6 @@ import { trackStreakEvent } from '@/utils/streak-sync';
 import { defaultStreakCaptureTarget } from '@/utils/streak-engine';
 import { hatchCheckInEligibility } from '@/utils/hatch-check-in';
 import { loadWorldIdentity } from '@/utils/world-identity';
-import { eggAvatarCustomizerCamera } from '@/utils/egg-avatar-customizer-camera';
 import {
   todayExplorationCreatureStageFrame,
   todayExplorationEggStageFrame,
@@ -139,11 +133,7 @@ import {
   TODAY_KINGDOM_STAGE_HEIGHT,
 } from '@/utils/today-kingdom-hero-layout';
 import { atmosphereSettingsForPlan, resolveDayAtmosphere } from '@/utils/day-atmosphere';
-import {
-  todayAtmosphereBackgroundForDay,
-  type TodayAtmosphereBackground,
-} from '@/utils/day-background-scene';
-import { todayHatchShowsResident, todayHatchShowsTomorrow } from '@/utils/today-hatch-presentation';
+import { todayHatchShowsResident } from '@/utils/today-hatch-presentation';
 import { identityForCreature } from '@/utils/katchimera-identity';
 import {
   todayKatchimeraExplorationBackgroundKeyForPresentation,
@@ -162,6 +152,7 @@ import {
   requestTodayCareGameRound,
 } from '@/utils/today-care-game-round';
 import { pendingGrowthAwards, TODAY_GROWTH_REWARDS, todayGrowthSummary } from '@/utils/today-growth';
+import { buildAboutTodayPrompt } from '@/utils/day-prompt-engine';
 import { selectTodayCareGame } from '@/utils/game-hub';
 import { loadGameHubItemsForDays } from '@/utils/game-hub-state';
 import { buildTodayPhotoRollSuggestion } from '@/utils/today-photo-roll-suggestion';
@@ -180,8 +171,7 @@ const SHOW_HATCHED_ACTION_DOCK = true;
 const SHOW_HATCHED_REFLECTION_CARD = false;
 
 type TodayExplorationPageDescriptor = {
-  backgroundKey: TodayExplorationBackgroundKey | null;
-  fallbackBackground: TodayAtmosphereBackground | null;
+  backgroundKey: TodayExplorationBackgroundKey;
   timelineDay: HomeTimelineDay;
 };
 
@@ -216,21 +206,8 @@ export default function TodayRouteScreen() {
 
 function HomeScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ customize?: string }>();
-  const { active: customizerActive, close: closeCustomizer, open: openCustomizer } = useEggAvatarCustomizerMode();
   const { beginCriticalInteraction, criticalInteractionActive } = useAppActivity();
   const screenFocused = useIsFocused();
-  useEffect(() => {
-    if (params.customize) openCustomizer();
-  }, [openCustomizer, params.customize]);
-  useEffect(() => {
-    if (!customizerActive) return;
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      closeCustomizer();
-      return true;
-    });
-    return () => subscription.remove();
-  }, [closeCustomizer, customizerActive]);
   const [growthNow, setGrowthNow] = useState(() => new Date());
   useEffect(() => {
     if (!screenFocused) return;
@@ -457,7 +434,6 @@ function HomeScreen() {
   const [clarificationMemory, setClarificationMemory] = useState<ClassifiedMemory | null>(null);
   const reduceMotion = useReducedMotion();
   const goalsFocusProgress = useSharedValue(0);
-  const customizerFocusProgress = useSharedValue(0);
   const backfillStatus = useBackfillStatus();
   const {
     eggFeed,
@@ -572,10 +548,10 @@ function HomeScreen() {
           environmentVisualKey: selectedDay.card?.scene?.environment?.visualKey,
         })
       : null;
-  const explorationBackgroundKey: TodayExplorationBackgroundKey | null = isForming
+  const explorationBackgroundKey: TodayExplorationBackgroundKey = isForming
     ? 'home'
-    : selectedKatchimeraExplorationKey;
-  const explorationBackgroundActive = explorationBackgroundKey != null && !isHatching;
+    : selectedKatchimeraExplorationKey ?? 'home';
+  const explorationBackgroundActive = !isHatching;
   // LanternTimeline's visual row is ~85dp tall. This estimate gives the egg a
   // correct first frame; onLayout replaces it with the measured stage y.
   const resolvedHeroStageTop =
@@ -612,8 +588,6 @@ function HomeScreen() {
   const viewedDay: HomeDayRecord | null = isDay ? selectedDay : onTomorrowForming ? (tomorrowDay ?? null) : null;
   const viewedIsForming = isForming;
   const hatchShowsResident = todayHatchShowsResident(hatchPresentation.phase);
-  const hatchShowsTomorrow = todayHatchShowsTomorrow(hatchPresentation.phase);
-  const hatchIsCurrentToday = Boolean(hatchPresentation.daySnapshot?.isToday);
   const atmosphereDay = isHatching && !hatchShowsResident
     ? hatchPresentation.daySnapshot
     : viewedDay;
@@ -621,10 +595,6 @@ function HomeScreen() {
   const dayAtmosphereSettings = useMemo(
     () => atmosphereSettingsForPlan(dayAtmosphere),
     [dayAtmosphere],
-  );
-  const dayBackground = useMemo(
-    () => todayAtmosphereBackgroundForDay(atmosphereDay, allDays),
-    [allDays, atmosphereDay],
   );
   const explorationTransitionPages = useMemo(() => {
     const selectedIndex = timelineDays.findIndex(
@@ -637,7 +607,7 @@ function HomeScreen() {
       if (target.kind === 'tomorrow' && !isTodayHatched) return null;
 
       const resolvedDay = target.kind === 'day' ? target : tomorrowDay;
-      let backgroundKey: TodayExplorationBackgroundKey | null = null;
+      let backgroundKey: TodayExplorationBackgroundKey = 'home';
       if (target.kind === 'tomorrow') {
         backgroundKey = 'home';
       } else if (
@@ -654,14 +624,11 @@ function HomeScreen() {
             creature: resolvedDay.creature,
             environmentVisualKey:
               resolvedDay.card?.scene?.environment?.visualKey,
-          });
+          }) ?? 'home';
       }
 
       return {
         backgroundKey,
-        fallbackBackground: backgroundKey
-          ? null
-          : todayAtmosphereBackgroundForDay(resolvedDay, allDays),
         timelineDay: target,
       };
     };
@@ -671,7 +638,6 @@ function HomeScreen() {
       previous: pageAt(-1),
     };
   }, [
-    allDays,
     isTodayHatched,
     selectedDayId,
     timelineDays,
@@ -681,12 +647,10 @@ function HomeScreen() {
     () => selectedDay
       ? {
           backgroundKey: explorationBackgroundKey,
-          fallbackBackground: explorationBackgroundKey ? null : dayBackground,
           timelineDay: selectedDay,
         }
       : null,
     [
-      dayBackground,
       explorationBackgroundKey,
       selectedDay,
     ],
@@ -714,12 +678,12 @@ function HomeScreen() {
     ? explorationTransitionSnapshot.direction === -1
       ? explorationTransitionSnapshot.target
       : null
-    : explorationTransitionPages.previous;
+    : null;
   const displayedExplorationNext = explorationTransitionSnapshot
     ? explorationTransitionSnapshot.direction === 1
       ? explorationTransitionSnapshot.target
       : null
-    : explorationTransitionPages.next;
+    : null;
   const explorationTargetCommitted = Boolean(
     explorationTransitionSnapshot
     && explorationTransitionSnapshot.target.timelineDay.id === selectedDayId,
@@ -841,7 +805,8 @@ function HomeScreen() {
     answerDayPrompt,
     answerPhotoMeaning,
     closePromptSheet,
-    deferRewardToCare: pendingCareIntent?.completionKey === 'reflection',
+    deferRewardToCare: pendingCareIntent?.completionKey === 'reflection'
+      || pendingCareIntent?.completionKey.startsWith('reflection:') === true,
     startEggFeed,
   });
   const todayPhotoRollSuggestion = useMemo(() => {
@@ -1097,9 +1062,11 @@ function HomeScreen() {
         void handleQuest(action.destination.questType);
         return;
       case 'reflection': {
-        const reflection = formingPrompts.find((prompt) =>
-          ['gratitude', 'highlight', 'meaning', 'day_word', 'inner_weather'].includes(prompt.id)
-        );
+        const reflection = action.destination.promptId
+          ? buildAboutTodayPrompt(action.destination.promptId)
+          : formingPrompts.find((prompt) =>
+              ['gratitude', 'highlight', 'meaning', 'day_word', 'inner_weather'].includes(prompt.id)
+            );
         if (reflection) openPromptSheet(reflection);
         else openManualJournal();
         return;
@@ -1285,7 +1252,7 @@ function HomeScreen() {
 
   const renderTimelineHero = useCallback((
     timelineDay: HomeTimelineDay,
-    mode: TodayTileRenderMode,
+    mode: 'active' | 'neighbor',
     explorationFramingOverride?: boolean,
   ) => {
     const active = mode === 'active';
@@ -1310,13 +1277,7 @@ function HomeScreen() {
     }
     const day = timelineDay.kind === 'day' ? timelineDay : tomorrowDay;
     if (day?.state === 'hatched' && day.creature) {
-      const dayExplorationKey =
-        todayKatchimeraExplorationBackgroundKeyForPresentation({
-          creature: day.creature,
-          environmentVisualKey: day.card?.scene?.environment?.visualKey,
-        });
-      const usesExplorationFraming =
-        pageUsesExplorationFraming && dayExplorationKey != null;
+      const usesExplorationFraming = pageUsesExplorationFraming;
       return (
         <CreatureHero
           artLod={active ? 'medium' : 'thumb'}
@@ -1395,10 +1356,8 @@ function HomeScreen() {
   }, [explorationBackgroundActive, homeArchetypeId, isHatching, quickGoalsOpen, resolvedHeroStageTop]);
 
   const {
-    cameraProgress,
     goToAdjacentDay,
     navigateToDay,
-    renderedIndices,
     swipeGesture,
   } = useTodayNavigationController({
     windowWidth,
@@ -1407,7 +1366,7 @@ function HomeScreen() {
     timelineDays,
     isTodayHatched,
     isHatching,
-    promptSheetOpen: promptSheetOpen || hatchCheckInOpen || quickGoalsOpen || customizerActive,
+    promptSheetOpen: promptSheetOpen || hatchCheckInOpen || quickGoalsOpen,
     comicOpen: Boolean(comicGen),
     deferCaptureRewardToCare: pendingCareIntent?.completionKey === 'photo',
     selectTimelineDay,
@@ -1512,7 +1471,7 @@ function HomeScreen() {
     activeKey: selectedDayId,
     canSwipeNext: explorationTransitionPages.next != null,
     canSwipePrevious: explorationTransitionPages.previous != null,
-    enabled: explorationBackgroundActive && !flowBusy && !customizerActive,
+    enabled: explorationBackgroundActive && !flowBusy,
     onQuickSwipe: commitExplorationTransition,
     onTransitionStart: beginExplorationTransition,
     pageTransitionEnabled: true,
@@ -1552,7 +1511,7 @@ function HomeScreen() {
     selectedDayId,
   ]);
   const { environmentGesture, environmentMotion } = useTodayEnvironmentMotion({
-    enabled: !flowBusy && !customizerActive,
+    enabled: !flowBusy,
     hoverEnabled: !explorationPresentationActive,
     maxPinchScale: explorationPresentationActive
       ? todayScene.homeEnvironment.motion.explorationMaxPinchScale
@@ -1582,14 +1541,6 @@ function HomeScreen() {
         });
   }, [goalsFocusProgress, quickGoalsOpen, reduceMotion]);
   useEffect(() => {
-    customizerFocusProgress.value = reduceMotion
-      ? customizerActive ? 1 : 0
-      : withTiming(customizerActive ? 1 : 0, {
-          duration: 360,
-          easing: Easing.inOut(Easing.cubic),
-        });
-  }, [customizerActive, customizerFocusProgress, reduceMotion]);
-  useEffect(() => {
     if (!quickGoalsOpen) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (quickGoalSheetMode) {
@@ -1608,18 +1559,6 @@ function HomeScreen() {
   const goalsChromeStyle = useAnimatedStyle(() => ({
     opacity: 1 - goalsFocusProgress.value,
   }));
-  const customizerCamera = useMemo(() => eggAvatarCustomizerCamera({
-    bottomInset: insets.bottom,
-    subjectCenterY: resolvedHeroStageTop + explorationSubjectFrame.centerY,
-    topInset: insets.top,
-    viewportHeight: windowHeight,
-  }), [explorationSubjectFrame.centerY, insets.bottom, insets.top, resolvedHeroStageTop, windowHeight]);
-  const customizerCameraStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: customizerCamera.translateY * customizerFocusProgress.value },
-      { scale: 1 + (customizerCamera.scale - 1) * customizerFocusProgress.value },
-    ],
-  }));
   const goalsListTop = Math.max(
     insets.top + 248,
     Math.min(390, windowHeight * (windowHeight < 735 ? 0.4 : 0.43)),
@@ -1630,7 +1569,7 @@ function HomeScreen() {
     <View style={styles.screen}>
       {!isForming ? (
       <>
-      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, goalsSceneLiftStyle, customizerCameraStyle]}>
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, goalsSceneLiftStyle]}>
       {isHatching ? (
         <TodayHatchEnvironmentCrossfade
           imageSize={Math.max(windowHeight, windowWidth)}
@@ -1657,18 +1596,11 @@ function HomeScreen() {
               transitionProgress={explorationMotion.transitionProgress}
               transitionRole="incoming"
               translateX={explorationMotion.translateX}>
-              {displayedExplorationPrevious.backgroundKey ? (
-                <TodayExplorationBackground
-                  backgroundKey={displayedExplorationPrevious.backgroundKey}
-                  imageSize={explorationMotion.imageSize}
-                  verticalOffset={HOME_SCENE_Y_OFFSET}
-                />
-              ) : displayedExplorationPrevious.fallbackBackground ? (
-                <TodaySceneBackdrop
-                  background={displayedExplorationPrevious.fallbackBackground}
-                  scene={null}
-                />
-              ) : null}
+              <TodayExplorationBackground
+                backgroundKey={displayedExplorationPrevious.backgroundKey}
+                imageSize={explorationMotion.imageSize}
+                verticalOffset={HOME_SCENE_Y_OFFSET}
+              />
             </TodayExplorationPageLayer>
           ) : null}
           {displayedExplorationCurrent ? (
@@ -1677,18 +1609,11 @@ function HomeScreen() {
               transitionProgress={explorationMotion.transitionProgress}
               transitionRole="current"
               translateX={explorationMotion.translateX}>
-              {displayedExplorationCurrent.backgroundKey ? (
-                <TodayExplorationBackground
-                  backgroundKey={displayedExplorationCurrent.backgroundKey}
-                  imageSize={explorationMotion.imageSize}
-                  verticalOffset={HOME_SCENE_Y_OFFSET}
-                />
-              ) : displayedExplorationCurrent.fallbackBackground ? (
-                <TodaySceneBackdrop
-                  background={displayedExplorationCurrent.fallbackBackground}
-                  scene={null}
-                />
-              ) : null}
+              <TodayExplorationBackground
+                backgroundKey={displayedExplorationCurrent.backgroundKey}
+                imageSize={explorationMotion.imageSize}
+                verticalOffset={HOME_SCENE_Y_OFFSET}
+              />
             </TodayExplorationPageLayer>
           ) : null}
           {displayedExplorationNext ? (
@@ -1704,28 +1629,16 @@ function HomeScreen() {
               transitionProgress={explorationMotion.transitionProgress}
               transitionRole="incoming"
               translateX={explorationMotion.translateX}>
-              {displayedExplorationNext.backgroundKey ? (
-                <TodayExplorationBackground
-                  backgroundKey={displayedExplorationNext.backgroundKey}
-                  imageSize={explorationMotion.imageSize}
-                  verticalOffset={HOME_SCENE_Y_OFFSET}
-                />
-              ) : displayedExplorationNext.fallbackBackground ? (
-                <TodaySceneBackdrop
-                  background={displayedExplorationNext.fallbackBackground}
-                  scene={null}
-                />
-              ) : null}
+              <TodayExplorationBackground
+                backgroundKey={displayedExplorationNext.backgroundKey}
+                imageSize={explorationMotion.imageSize}
+                verticalOffset={HOME_SCENE_Y_OFFSET}
+              />
             </TodayExplorationPageLayer>
           ) : null}
           </TodayEnvironmentViewportMotionLayer>
         </View>
-      ) : (
-        <TodaySceneBackdrop
-          background={dayBackground}
-          scene={null}
-        />
-      )}
+      ) : null}
       </Animated.View>
       {/* Today is a FIXED composition — no page scrolling; everything anchors.
           (Readers/sheets keep their own scrolling.) The ScrollView shell stays
@@ -1733,7 +1646,7 @@ function HomeScreen() {
       <ScrollView
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}
         contentInsetAdjustmentBehavior="never"
-        pointerEvents={customizerActive ? 'none' : 'auto'}
+        pointerEvents="auto"
         style={styles.contentPlane}
         scrollEnabled={false}
         bounces={false}
@@ -1741,7 +1654,7 @@ function HomeScreen() {
         <Animated.View
           entering={presenceEnter(20)}
           pointerEvents={quickGoalsOpen ? 'none' : 'auto'}
-          style={[styles.timelineLayer, goalsChromeStyle, customizerActive && styles.customizerChromeHidden]}>
+          style={[styles.timelineLayer, goalsChromeStyle]}>
           <LanternTimeline
             days={timelineDays}
             hatchPresentation={hatchPresentation}
@@ -1755,7 +1668,7 @@ function HomeScreen() {
           ref={heroStageRef}
           entering={presenceEnter(70)}
           onLayout={handleHeroStageLayout}
-          style={[styles.heroStage, goalsSceneLiftStyle, customizerCameraStyle]}>
+          style={[styles.heroStage, goalsSceneLiftStyle]}>
           {explorationPresentationActive && selectedDay ? (
             <>
               {displayedExplorationPrevious ? (
@@ -1791,7 +1704,7 @@ function HomeScreen() {
                   displayedExplorationCurrent?.backgroundKey != null,
                 )}
                 {renderTimelineOverlay(selectedDay, true)}
-                {voiceNote.phase !== 'idle' && !quickNoteOpen && !customizerActive ? (
+                {voiceNote.phase !== 'idle' && !quickNoteOpen ? (
                   <TodayKingdomEggAboveOverlay
                     explorationStageTop={resolvedHeroStageTop}
                     homeArchetypeId={homeArchetypeId}>
@@ -1801,7 +1714,7 @@ function HomeScreen() {
                     />
                   </TodayKingdomEggAboveOverlay>
                 ) : null}
-                {!hasVisibleLegacyPrompt && !quickGoalsOpen && !customizerActive ? (
+                {!hasVisibleLegacyPrompt && !quickGoalsOpen ? (
                   <TodayCategoryRing
                     categories={goalRingItems}
                     onPress={() => setQuickGoalsOpen(true)}
@@ -1835,51 +1748,13 @@ function HomeScreen() {
                 </TodayExplorationSceneLayer>
               ) : null}
             </>
-          ) : (
-            <>
-              <TodayHexNeighborhood
-                allowTomorrow={
-                  isTodayHatched
-                  && (!isHatching || !hatchIsCurrentToday || hatchShowsTomorrow)
-                }
-                cameraProgress={cameraProgress}
-                days={selectedDay && !timelineDays.some((day) => day.id === selectedDay.id)
-                  ? [selectedDay]
-                  : timelineDays}
-                foreground={<ResolvedAtmosphereLayer plane="foreground" settings={dayAtmosphereSettings} target="today" />}
-                interactionLocked={isHatching}
-                onSelect={navigateToDay}
-                renderedIndices={renderedIndices}
-                selectedId={selectedDayId}
-                renderDay={renderTimelineHero}
-                renderDayOverlay={renderTimelineOverlay}
-              />
-              {voiceNote.phase !== 'idle' && !quickNoteOpen && !customizerActive ? (
-                <TodayKingdomEggAboveOverlay homeArchetypeId={homeArchetypeId}>
-                  <InlineVoiceNote
-                    elapsed={voiceNote.elapsed}
-                    phase={voiceNote.phase}
-                  />
-                </TodayKingdomEggAboveOverlay>
-              ) : null}
-              {/* The same category ring circles the hatched creature when
-                  revisiting a day, anchored to the shared art stage. */}
-              {(isForming || isHatched) && !isHatching && !hasVisibleLegacyPrompt && !quickGoalsOpen && !customizerActive ? (
-                <TodayCategoryRing
-                  categories={goalRingItems}
-                  onPress={() => setQuickGoalsOpen(true)}
-                  anchorHeight={TODAY_KINGDOM_STAGE_HEIGHT}
-                  centerOffsetY={24}
-                />
-              ) : null}
-            </>
-          )}
+          ) : null}
         </Animated.View>
 
         {isHatching ? null : isHatched ? (
           null
         ) : (
-          <Animated.View entering={presenceEnter(120)} style={[styles.formingCopy, customizerActive && styles.customizerChromeHidden]}>
+          <Animated.View entering={presenceEnter(120)} style={styles.formingCopy}>
             {/* The forming quote AND tomorrow's one-liner are hidden — the week
                 strip's egg orb + the panel below already tell the story. */}
             {isForming ? (
@@ -1916,7 +1791,7 @@ function HomeScreen() {
           day={formingDay}
           eggTargetRef={eggTargetRef}
           feedbackKey={eggFeedKey}
-          focusMode={customizerActive}
+          focusMode={false}
           growth={nurtureGrowth}
           homeArchetypeId={homeArchetypeId}
           microcopy={microcopy}
@@ -2032,10 +1907,8 @@ function HomeScreen() {
         onEnergyTokenArrive={handleEnergyArrival}
       />
 
-      {/* Cinematic egg and Katchimera scenes bypass TodayHexNeighborhood, whose
-          foreground slot normally owns rain, snow, motes, petals, and other
-          authored atmosphere. Restore that plane across the full viewport,
-          above the page composition while remaining touch-through. */}
+      {/* The cinematic background is the only environment renderer. Atmosphere
+          remains a separate touch-through foreground plane. */}
       {explorationPresentationActive ? (
         <ResolvedAtmosphereLayer
           plane="foreground"
@@ -2414,7 +2287,6 @@ function HomeScreen() {
         onRetry={handleRetryComic}
         onShare={handleShareGeneratedComic}
       />
-      {customizerActive ? <EggAvatarProfileScreen bottomInset={insets.bottom} /> : null}
       {pendingDiscoveryId && !isHatching ? <WispDiscoveryReveal id={pendingDiscoveryId} onDismiss={() => dismissDiscovery(pendingDiscoveryId)} /> : null}
     </View>
     </GestureDetector>
@@ -2424,7 +2296,6 @@ function HomeScreen() {
 
 const styles = StyleSheet.create({
   inactiveScreen: { backgroundColor: '#11131B', flex: 1 },
-  customizerChromeHidden: { opacity: 0 },
   screen: {
     backgroundColor: Lantern.ink950,
     flex: 1,

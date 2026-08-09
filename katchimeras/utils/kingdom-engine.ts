@@ -11,6 +11,7 @@ import type {
 } from '@/types/kingdom';
 import { katchimeraFamilyById } from '@/constants/katchimera-skins';
 import { identityForCreature } from '@/utils/katchimera-identity';
+import { isReflectiveDayPromptKind } from '@/constants/day-prompts';
 
 // deriveKingdom — the pure fold from every day ever lived to the persistent
 // Kingdom. No incremental updates, no stored world state: recomputing from the
@@ -34,7 +35,6 @@ const LEVEL_THRESHOLDS: Record<KingdomBuildingId, [number, number, number, numbe
   foodPavilion: [1, 5, 20, 60], // food memories
 };
 
-const REFLECTIVE_KINDS = new Set(['feeling', 'inner_weather', 'day_word', 'gratitude', 'highlight', 'intention']);
 
 function levelFor(count: number, thresholds: [number, number, number, number]): KingdomBuildingLevel {
   let level: KingdomBuildingLevel = 0;
@@ -107,7 +107,7 @@ export function deriveKingdom(days: HomeDayRecord[]): KingdomState {
     totals.places += Math.max(day.confirmedPlaces?.length ?? 0, day.visitedPlaceCount ?? 0);
     totals.steps += day.stepsCount ?? 0;
     totals.reflections += (day.promptAnswers ?? []).filter(
-      (answer) => !answer.dismissed && REFLECTIVE_KINDS.has(answer.kind) && answer.choiceIds.length > 0
+      (answer) => !answer.dismissed && isReflectiveDayPromptKind(answer.kind) && answer.choiceIds.length > 0
     ).length;
     totals.foodMoments += day.foodMoments?.length ?? 0;
     totals.studioMoments += day.studioMoments?.length ?? 0;

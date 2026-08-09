@@ -21,19 +21,10 @@ import { weatherIconName, weatherLabel } from '@/utils/day-weather';
 import type { DayWeather, HomeVisualKey, LocalCreatureRecord } from '@/types/home';
 import type { HomeArchetypeId } from '@/types/world-identity';
 import { AppFontFamilies, KatchaDeckUI, Lantern } from '@/constants/theme';
-import todayScene from '@/data/today-scene.json';
 import {
-  kingdomHomeTileForIdentity,
-  kingdomResidentTileForIdentity,
-  kingdomSurfaceTileAlignment,
-} from '@/utils/kingdom-surface-tiles';
-import { kingdomHexTileSourceForLod } from '@/utils/world-visuals';
-import {
-  TODAY_KINGDOM_STAGE_HEIGHT,
   todayExplorationCreatureStageFrame,
-  todayKingdomHeroLayout,
+  TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA,
 } from '@/utils/today-kingdom-hero-layout';
-import { TodayFallbackCloudScene } from '@/components/katchadeck/home/today-fallback-cloud-scene';
 
 type CreatureHeroProps = {
   creature: LocalCreatureRecord;
@@ -63,12 +54,8 @@ export const CreatureHero = memo(function CreatureHero({
   weather,
   compact = false,
   hideCompactCard = false,
-  hideKingdomEnvironmentArt = false,
-  environmentVisualKey,
   explorationStageTop,
   kingdomEnvironment = false,
-  kingdomHomeArchetypeId,
-  pinchStrength = 1,
   artLod = 'full',
 }: CreatureHeroProps) {
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
@@ -79,38 +66,13 @@ export const CreatureHero = memo(function CreatureHero({
     lod: artLod,
     variantCell: creature.variantCell,
   });
-  const kingdomTile = kingdomEnvironment
-    ? kingdomResidentTileForIdentity({ visualKey: environmentVisualKey ?? creature.visualKey })
-    : null;
-  // Today uses the forming egg's home tile as its canonical camera/framing
-  // plate. Resident days keep their bespoke environment art, but no longer
-  // jump vertically because their bitmap bounds differ from the home tile.
-  const kingdomAnchorTile = kingdomEnvironment
-    ? kingdomHomeTileForIdentity(kingdomHomeArchetypeId)
-    : null;
-  const kingdomLayout = todayKingdomHeroLayout(
+  const explorationFrame = todayExplorationCreatureStageFrame(
     windowWidth,
-    kingdomTile ? kingdomSurfaceTileAlignment(kingdomTile) : undefined,
-    kingdomAnchorTile ? kingdomSurfaceTileAlignment(kingdomAnchorTile) : undefined,
+    windowHeight,
+    explorationStageTop ?? TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA,
+    creature.visualKey,
   );
-  const todayCreatureSize = kingdomLayout.creatureSize * TODAY_KATCHIMERA_SCALE;
-  const todayCreatureTop = kingdomLayout.creatureTop
-    - (todayCreatureSize - kingdomLayout.creatureSize) / 2;
-  const kingdomTileSource = kingdomTile
-    ? kingdomHexTileSourceForLod(kingdomTile, kingdomLayout.tileSize > 512 ? 'full' : 'medium')
-    : null;
-  const explorationFrame = explorationStageTop == null
-    ? null
-    : todayExplorationCreatureStageFrame(
-        windowWidth,
-        windowHeight,
-        explorationStageTop,
-        creature.visualKey,
-      );
-  const usesExplorationLayout = explorationFrame != null;
-  const usesKingdomLayout = Boolean(
-    !usesExplorationLayout && kingdomEnvironment && kingdomTileSource,
-  );
+  const usesExplorationLayout = compact && kingdomEnvironment;
   const float = useSharedValue(0);
   const glow = useSharedValue(0.2);
 
@@ -163,32 +125,10 @@ export const CreatureHero = memo(function CreatureHero({
     return (
       <View style={styles.shellCompact}>
         <View style={styles.stage}>
-          <TodayFallbackCloudScene
-            enabled={usesKingdomLayout && !hideKingdomEnvironmentArt}
-            focusY={explorationFrame?.centerY
-              ?? kingdomLayout.creatureTop + kingdomLayout.creatureSize / 2}
-            pinchStrength={pinchStrength}
-            environment={kingdomTileSource && !hideKingdomEnvironmentArt ? (
-              <Image
-                cachePolicy="memory-disk"
-                contentFit="contain"
-                pointerEvents="none"
-                source={kingdomTileSource}
-                style={[
-                  styles.kingdomTile,
-                  {
-                    height: kingdomLayout.tileFrame.height,
-                    marginLeft: kingdomLayout.tileFrame.left,
-                    top: kingdomLayout.tileFrame.top,
-                    width: kingdomLayout.tileFrame.width,
-                  },
-                ]}
-                transition={0}
-              />
-            ) : usesKingdomLayout || usesExplorationLayout ? null : (
+          <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+            {!usesExplorationLayout ? (
               <Animated.View style={[styles.halo, { backgroundColor: `${visual.accentColor}2E` }, haloStyle]} />
-            )}
-            frontTop={explorationFrame?.stageContactY ?? kingdomLayout.tileFaceBottomY}>
+            ) : null}
             <Animated.View
               style={[
                 usesExplorationLayout
@@ -201,22 +141,12 @@ export const CreatureHero = memo(function CreatureHero({
                       width: explorationFrame.size,
                       zIndex: 3,
                     }
-                  : usesKingdomLayout
-                  ? {
-                      height: todayCreatureSize,
-                      left: '50%',
-                      marginLeft: -todayCreatureSize / 2,
-                      position: 'absolute',
-                      top: todayCreatureTop,
-                      width: todayCreatureSize,
-                      zIndex: 3,
-                    }
                   : null,
                 visualStyle,
               ]}>
-              {usesExplorationLayout || usesKingdomLayout ? (
+              {usesExplorationLayout ? (
                 <CreatureGroundShadow
-                  frameSize={explorationFrame?.size ?? todayCreatureSize}
+                  frameSize={explorationFrame.size}
                   visualKey={creature.visualKey}
                 />
               ) : null}
@@ -224,33 +154,23 @@ export const CreatureHero = memo(function CreatureHero({
                 pointerEvents="none"
                 contentFit="contain"
                 source={heroSource}
-                style={usesExplorationLayout || usesKingdomLayout
+                style={usesExplorationLayout
                   ? StyleSheet.absoluteFill
                   : styles.image}
                 transition={0}
               />
             </Animated.View>
-          </TodayFallbackCloudScene>
+          </View>
         </View>
         {hideCompactCard ? null : (
           <View
             key={`${creature.id}-compact-name`}
             style={[
               styles.compactCard,
-              explorationFrame
-                ? {
-                    position: 'absolute',
-                    top: explorationFrame.stageContactY + 8,
-                  }
-                : kingdomEnvironment
-                ? {
-                    transform: [{
-                      translateY: todayScene.homeKatchimera.nameCardOffsetY
-                        + TODAY_KINGDOM_STAGE_HEIGHT
-                          * todayScene.homeKatchimera.nameCardAdditionalStageHeightRatio,
-                    }],
-                  }
-                : null,
+              {
+                position: 'absolute',
+                top: explorationFrame.stageContactY + 8,
+              },
             ]}>
             <ThemedText numberOfLines={1} type="onboardingLabel" style={styles.compactKicker} lightColor="#F8FCFF" darkColor="#F8FCFF">
               {buildCreatureKicker(creature)}

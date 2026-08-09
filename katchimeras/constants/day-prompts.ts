@@ -23,6 +23,8 @@ export type DayPromptDefinition = {
   options: DayPromptOption[];
   maxOptions: number;
   launchEnabled: boolean;
+  /** Eligible for the low-friction, rotating "About today" action card. */
+  aboutTodayEnabled?: boolean;
   photoGated?: boolean;
   minPhotoCandidates?: number;
 };
@@ -210,6 +212,7 @@ export const dayPromptRegistry: Record<DayPromptKind, DayPromptDefinition> = {
     dayparts: ['evening'],
     maxOptions: 8,
     launchEnabled: true,
+    aboutTodayEnabled: true,
     options: [
       { id: 'cozy', label: 'Cozy', emoji: 'Cozy', icon: 'moon.stars.fill', semanticTags: ['word:cozy', 'feeling:calm'], scoreBias: { calm: 0.16 } },
       { id: 'productive', label: 'Productive', emoji: 'Done', icon: 'bolt.fill', semanticTags: ['word:productive'], scoreBias: { focus: 0.16 } },
@@ -219,6 +222,60 @@ export const dayPromptRegistry: Record<DayPromptKind, DayPromptDefinition> = {
       { id: 'full', label: 'Full', emoji: 'Full', icon: 'sun.max.fill', semanticTags: ['word:full'], scoreBias: { energy: 0.08, social: 0.08 } },
       { id: 'quiet', label: 'Quiet', emoji: 'Quiet', icon: 'cloud.fill', semanticTags: ['word:quiet'], scoreBias: { calm: 0.14 } },
       { id: 'big', label: 'Big', emoji: 'Big', icon: 'sparkles', semanticTags: ['word:big', 'novelty'], scoreBias: { exploration: 0.12, energy: 0.08 } },
+    ],
+  },
+  day_focus: {
+    id: 'day_focus',
+    title: 'What was today mostly about?',
+    body: 'Choose the closest fit.',
+    categoryIcon: 'sparkles',
+    dayparts: ['midday', 'evening'],
+    maxOptions: 6,
+    launchEnabled: false,
+    aboutTodayEnabled: true,
+    options: [
+      { id: 'people', label: 'People', emoji: 'People', icon: 'person.2.fill', semanticTags: ['day_focus:people'], scoreBias: { social: 0.26, calm: 0.06 }, encounterSeedBias: [{ seedId: 'social_gathering', intensity: 0.42 }] },
+      { id: 'progress', label: 'Progress', emoji: 'Progress', icon: 'briefcase.fill', semanticTags: ['day_focus:progress'], scoreBias: { focus: 0.28 }, encounterSeedBias: [{ seedId: 'focus_day', intensity: 0.42 }] },
+      { id: 'places', label: 'Places', emoji: 'Places', icon: 'mappin.and.ellipse', semanticTags: ['day_focus:places'], scoreBias: { exploration: 0.28, energy: 0.06 }, encounterSeedBias: [{ seedId: 'travel_day', intensity: 0.38 }] },
+      { id: 'rest', label: 'Rest', emoji: 'Rest', icon: 'moon.stars.fill', semanticTags: ['day_focus:rest'], scoreBias: { calm: 0.28 }, encounterSeedBias: [{ seedId: 'home_evening', intensity: 0.4 }] },
+      { id: 'fun', label: 'Fun', emoji: 'Fun', icon: 'party.popper.fill', semanticTags: ['day_focus:fun'], scoreBias: { social: 0.12, energy: 0.16 }, encounterSeedBias: [{ seedId: 'celebration', intensity: 0.38 }] },
+      { id: 'getting_through', label: 'Getting through', emoji: 'Through', icon: 'cloud.rain.fill', semanticTags: ['day_focus:getting_through', 'tender_day'], scoreBias: { calm: 0.16, focus: 0.1 }, encounterSeedBias: [{ seedId: 'tender_day', intensity: 0.38 }] },
+    ],
+  },
+  day_character: {
+    id: 'day_character',
+    title: 'What kind of day was it?',
+    body: 'Choose the shape it took.',
+    categoryIcon: 'sun.max.fill',
+    dayparts: ['midday', 'evening'],
+    maxOptions: 6,
+    launchEnabled: false,
+    aboutTodayEnabled: true,
+    options: [
+      { id: 'building', label: 'Building', emoji: 'Building', icon: 'briefcase.fill', semanticTags: ['day_character:building'], scoreBias: { focus: 0.24 }, encounterSeedBias: [{ seedId: 'focus_day', intensity: 0.38 }] },
+      { id: 'connecting', label: 'Connecting', emoji: 'Connecting', icon: 'person.2.fill', semanticTags: ['day_character:connecting'], scoreBias: { social: 0.26 }, encounterSeedBias: [{ seedId: 'social_gathering', intensity: 0.42 }] },
+      { id: 'exploring', label: 'Exploring', emoji: 'Exploring', icon: 'mappin.and.ellipse', semanticTags: ['day_character:exploring'], scoreBias: { exploration: 0.27 }, encounterSeedBias: [{ seedId: 'travel_day', intensity: 0.4 }] },
+      { id: 'recovering', label: 'Recovering', emoji: 'Recovering', icon: 'moon.stars.fill', semanticTags: ['day_character:recovering'], scoreBias: { calm: 0.27 }, encounterSeedBias: [{ seedId: 'home_evening', intensity: 0.38 }] },
+      { id: 'celebrating', label: 'Celebrating', emoji: 'Celebrating', icon: 'party.popper.fill', semanticTags: ['day_character:celebrating'], scoreBias: { social: 0.18, energy: 0.12 }, encounterSeedBias: [{ seedId: 'celebration', intensity: 0.42 }] },
+      { id: 'enduring', label: 'Enduring', emoji: 'Enduring', icon: 'cloud.rain.fill', semanticTags: ['day_character:enduring', 'tender_day'], scoreBias: { calm: 0.14, focus: 0.12 }, encounterSeedBias: [{ seedId: 'tender_day', intensity: 0.38 }] },
+    ],
+  },
+  day_outcome: {
+    id: 'day_outcome',
+    title: 'What did today give you?',
+    body: 'Choose what you are taking from it.',
+    categoryIcon: 'leaf.fill',
+    dayparts: ['midday', 'evening'],
+    maxOptions: 6,
+    launchEnabled: false,
+    aboutTodayEnabled: true,
+    options: [
+      { id: 'progress', label: 'Progress', emoji: 'Progress', icon: 'briefcase.fill', semanticTags: ['day_outcome:progress'], scoreBias: { focus: 0.22 }, encounterSeedBias: [{ seedId: 'focus_day', intensity: 0.34 }] },
+      { id: 'connection', label: 'Connection', emoji: 'Connection', icon: 'heart.fill', semanticTags: ['day_outcome:connection'], scoreBias: { social: 0.24, calm: 0.06 }, encounterSeedBias: [{ seedId: 'social_gathering', intensity: 0.38 }] },
+      { id: 'energy', label: 'Energy', emoji: 'Energy', icon: 'bolt.fill', semanticTags: ['day_outcome:energy'], scoreBias: { energy: 0.24 }, encounterSeedBias: [{ seedId: 'high_steps_day', intensity: 0.32 }] },
+      { id: 'rest', label: 'Rest', emoji: 'Rest', icon: 'moon.stars.fill', semanticTags: ['day_outcome:rest'], scoreBias: { calm: 0.26 }, encounterSeedBias: [{ seedId: 'home_evening', intensity: 0.36 }] },
+      { id: 'perspective', label: 'Perspective', emoji: 'Perspective', icon: 'sparkles', semanticTags: ['day_outcome:perspective'], scoreBias: { exploration: 0.12, focus: 0.14 }, encounterSeedBias: [{ seedId: 'creative_day', intensity: 0.28 }] },
+      { id: 'a_memory', label: 'A memory', emoji: 'Memory', icon: 'star.fill', semanticTags: ['day_outcome:memory'], scoreBias: { calm: 0.1, social: 0.08, exploration: 0.08 }, encounterSeedBias: [{ seedId: 'golden_hour', intensity: 0.28 }] },
     ],
   },
   meaningful_photo: {
@@ -237,13 +294,48 @@ export const dayPromptRegistry: Record<DayPromptKind, DayPromptDefinition> = {
     options: [],
   },
   intention: { id: 'intention', title: 'What do you want from today?', categoryIcon: 'sparkles', dayparts: ['morning'], maxOptions: 5, launchEnabled: false, options: [] },
-  energy: { id: 'energy', title: "What's the pace today?", categoryIcon: 'bolt.fill', dayparts: ['midday', 'evening'], maxOptions: 4, launchEnabled: false, options: [] },
+  energy: { id: 'energy', title: "What was today's pace?", categoryIcon: 'bolt.fill', dayparts: ['midday', 'evening'], maxOptions: 6, launchEnabled: false, aboutTodayEnabled: true, options: [
+    { id: 'slow', label: 'Slow', emoji: 'Slow', icon: 'moon.stars.fill', semanticTags: ['pace:slow'], scoreBias: { calm: 0.22 }, encounterSeedBias: [{ seedId: 'home_evening', intensity: 0.3 }] },
+    { id: 'steady', label: 'Steady', emoji: 'Steady', icon: 'figure.walk', semanticTags: ['pace:steady'], scoreBias: { focus: 0.16, calm: 0.08 } },
+    { id: 'busy', label: 'Busy', emoji: 'Busy', icon: 'briefcase.fill', semanticTags: ['pace:busy'], scoreBias: { focus: 0.14, energy: 0.12 }, encounterSeedBias: [{ seedId: 'errand_loop', intensity: 0.3 }] },
+    { id: 'intense', label: 'Intense', emoji: 'Intense', icon: 'bolt.fill', semanticTags: ['pace:intense'], scoreBias: { energy: 0.22, focus: 0.08 }, encounterSeedBias: [{ seedId: 'high_steps_day', intensity: 0.3 }] },
+    { id: 'stop_start', label: 'Stop-start', emoji: 'Stop-start', icon: 'cloud.fog.fill', semanticTags: ['pace:stop_start'], scoreBias: { exploration: 0.1, calm: 0.06 } },
+    { id: 'easy_going', label: 'Easy-going', emoji: 'Easy', icon: 'cloud.fill', semanticTags: ['pace:easy_going'], scoreBias: { calm: 0.24 }, encounterSeedBias: [{ seedId: 'home_evening', intensity: 0.3 }] },
+  ] },
   inner_weather: { id: 'inner_weather', title: "Today's inner weather?", categoryIcon: 'cloud.sun.fill', dayparts: ['midday', 'evening'], maxOptions: 6, launchEnabled: false, options: [] },
   highlight: { id: 'highlight', title: 'Best bit so far?', categoryIcon: 'star.fill', dayparts: ['evening'], maxOptions: 6, launchEnabled: false, options: [] },
   gratitude: { id: 'gratitude', title: 'One good thing today?', categoryIcon: 'heart.fill', dayparts: ['evening'], maxOptions: 4, launchEnabled: false, options: [] },
   body: { id: 'body', title: "How's the body?", categoryIcon: 'figure.walk', dayparts: ['midday', 'evening'], maxOptions: 4, launchEnabled: false, options: [] },
-  for_who: { id: 'for_who', title: 'Who was today really about?', categoryIcon: 'person.2.fill', dayparts: ['evening'], maxOptions: 5, launchEnabled: false, options: [] },
+  for_who: { id: 'for_who', title: 'Who was today really about?', categoryIcon: 'person.2.fill', dayparts: ['midday', 'evening'], maxOptions: 6, launchEnabled: false, aboutTodayEnabled: true, options: [
+    { id: 'just_me', label: 'Just me', emoji: 'Me', icon: 'moon.stars.fill', semanticTags: ['for_who:self'], scoreBias: { calm: 0.14, focus: 0.06 } },
+    { id: 'partner', label: 'My partner', emoji: 'Partner', icon: 'heart.fill', semanticTags: ['for_who:partner'], scoreBias: { social: 0.24, calm: 0.08 }, encounterSeedBias: [{ seedId: 'close_relationship', intensity: 0.42 }] },
+    { id: 'family', label: 'Family', emoji: 'Family', icon: 'person.2.fill', semanticTags: ['for_who:family'], scoreBias: { social: 0.26, calm: 0.06 }, encounterSeedBias: [{ seedId: 'social_gathering', intensity: 0.38 }] },
+    { id: 'friends', label: 'Friends', emoji: 'Friends', icon: 'bubble.left.and.bubble.right.fill', semanticTags: ['for_who:friends'], scoreBias: { social: 0.26 }, encounterSeedBias: [{ seedId: 'social_gathering', intensity: 0.4 }] },
+    { id: 'work_community', label: 'Work / community', emoji: 'Community', icon: 'briefcase.fill', semanticTags: ['for_who:community'], scoreBias: { social: 0.14, focus: 0.14 }, encounterSeedBias: [{ seedId: 'community_contribution', intensity: 0.36 }] },
+    { id: 'a_mix', label: 'A mix', emoji: 'Mix', icon: 'sparkles', semanticTags: ['for_who:mix'], scoreBias: { social: 0.14, exploration: 0.08 } },
+  ] },
 };
+
+export const ABOUT_TODAY_MAX_PER_DAY = 2;
+export const aboutTodayPromptKinds = Object.values(dayPromptRegistry)
+  .filter((prompt) => prompt.aboutTodayEnabled)
+  .map((prompt) => prompt.id);
+const ABOUT_TODAY_KIND_SET = new Set<DayPromptKind>(aboutTodayPromptKinds);
+const REFLECTIVE_KIND_SET = new Set<DayPromptKind>([
+  'feeling', 'inner_weather', 'meaning', 'gratitude', 'highlight', 'intention', ...aboutTodayPromptKinds,
+]);
+
+export function isAboutTodayPromptKind(kind: DayPromptKind): boolean {
+  return ABOUT_TODAY_KIND_SET.has(kind);
+}
+
+export function isReflectiveDayPromptKind(kind: DayPromptKind): boolean {
+  return REFLECTIVE_KIND_SET.has(kind);
+}
+
+export function isRewardedReflectionPromptKind(kind: DayPromptKind): boolean {
+  return kind === 'meaning' || kind === 'highlight' || kind === 'gratitude' || isAboutTodayPromptKind(kind);
+}
 
 export const launchedDayPrompts = Object.values(dayPromptRegistry).filter((prompt) => prompt.launchEnabled);
 
@@ -257,6 +349,9 @@ export const dayPromptMenuLabels: Record<DayPromptKind, string> = {
   people: 'People',
   meaning: 'Photo meaning',
   day_word: 'A word',
+  day_focus: 'Day focus',
+  day_character: 'Day shape',
+  day_outcome: 'Day gave me',
   meaningful_photo: 'Recent photo',
   intention: 'Intention',
   energy: 'Energy',

@@ -4,13 +4,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import {
-  KingdomHexCanvas,
-  kingdomResidentHexTiles,
-} from '@/components/katchadeck/world/kingdom-hex-canvas';
 import { CompanionAchievementCelebration } from '@/components/katchadeck/world/companion-achievement-celebration';
 import { CompanionInteractionSheet } from '@/components/katchadeck/world/companion-interaction-sheet';
 import { HomeIdentitySheet } from '@/components/katchadeck/world/home-identity-sheet';
@@ -19,12 +13,10 @@ import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-
 import { CompanionReflectionComposerModal } from '@/components/katchadeck/world/companion-reflection-composer-modal';
 import { KatchaDialog } from '@/components/katchadeck/ui/katcha-dialog';
 import { KatchimeraRosterScreen } from '@/components/katchadeck/roster/katchimera-roster-screen';
-import { ThemedText } from '@/components/themed-text';
 import { hasQuickGoalTemplates } from '@/constants/companion-quick-goals';
-import { AppFontFamilies, KatchaDeckUI, Lantern } from '@/constants/theme';
+import { AppFontFamilies, KatchaDeckUI } from '@/constants/theme';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
-import { useDiscoveriesFromArchive } from '@/hooks/use-discoveries';
 import { useKingdomQuests } from '@/hooks/use-kingdom-quests';
 import { useCompanionQuickGoals } from '@/hooks/use-companion-quick-goals';
 import { useCompanionAchievements } from '@/hooks/use-companion-achievements';
@@ -203,7 +195,6 @@ export function KingdomCompanionScreen({
 }) {
   const isFocused = useIsFocused();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const archive = useAllDays();
   const { days } = archive;
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
@@ -211,10 +202,6 @@ export function KingdomCompanionScreen({
     () => withDevAvailableKatchimeras(deriveKingdom(days), allKatchimerasAvailable),
     [allKatchimerasAvailable, days],
   );
-  const {
-    unlockedCount: discoveriesUnlocked,
-    totalCount: discoveriesTotal,
-  } = useDiscoveriesFromArchive(archive);
 
   const [identity, setIdentity] = useState<WorldIdentityState>(loadWorldIdentity);
   const [wardrobe, setWardrobe] = useState<KatchimeraWardrobeState>(loadKatchimeraWardrobe);
@@ -252,11 +239,6 @@ export function KingdomCompanionScreen({
     [kingdom.creatures]
   );
   const residents = useMemo(() => deriveResidents(hatches), [hatches]);
-  const residentTiles = useMemo(
-    () => kingdomResidentHexTiles(residents, presentationKingdom.creatures),
-    [presentationKingdom.creatures, residents]
-  );
-  const eggVisual = useMemo(() => days.find((day) => day.isToday)?.egg ?? days[days.length - 1]?.egg ?? null, [days]);
   const today = useMemo(() => days.find((day) => day.isToday) ?? null, [days]);
   const kingdomBackground = useMemo(
     () => todayAtmosphereBackgroundForDay(today, days),
@@ -322,6 +304,7 @@ export function KingdomCompanionScreen({
     return (
       todayKatchimeraExplorationBackgroundKeyForEnvironment(creature.visualKey)
       ?? todayKatchimeraExplorationBackgroundKeyForFamily(creature.familyId)
+      ?? 'home'
     );
   }, [quests.selectedResident?.creature]);
   const selectedSkinOptions = useMemo(
@@ -460,58 +443,15 @@ export function KingdomCompanionScreen({
     }
   };
 
-  const subtitle = [
-    `${kingdom.totals.daysHatched} ${kingdom.totals.daysHatched === 1 ? 'day' : 'days'}`,
-    `${residents.length} ${residents.length === 1 ? 'tile' : 'tiles'}`,
-    `${discoveriesUnlocked}/${discoveriesTotal} discoveries`,
-  ].join('  ·  ');
-
   return (
     <GestureHandlerRootView style={styles.screen}>
-      {presentation === 'roster' ? (
+      {presentation === 'roster' || presentation === 'world' ? (
         <KatchimeraRosterScreen
           background={kingdomBackground}
           items={rosterItems}
           onGoToday={() => router.navigate('/today')}
           onSelectCreature={quests.selectResident}
         />
-      ) : presentation === 'world' ? (
-      <View style={styles.stage}>
-        {isFocused && !questExperienceActive ? (
-          <KingdomHexCanvas
-            background={kingdomBackground}
-            residents={residentTiles}
-            identity={identity}
-            eggVisual={eggVisual}
-            residentStatusGlyphs={quests.residentStatusGlyphs}
-            onSelectResident={quests.selectResident}
-            onSelectHome={() => setHomeIdentityOpen(true)}
-            onSelectZodiac={() => setZodiacOpen(true)}
-          />
-        ) : null}
-
-        <View pointerEvents="none" style={[styles.header, { top: insets.top + 12 }]}>
-          <ThemedText style={styles.headerKicker} lightColor="#FFD36E" darkColor="#FFD36E">
-            YOUR KINGDOM
-          </ThemedText>
-          <ThemedText style={styles.headerSubtitle} lightColor="#F8FCFF" darkColor="#F8FCFF">
-            {subtitle}
-          </ThemedText>
-        </View>
-
-        {quests.microcopy ? (
-          <Animated.View
-            key={quests.microcopy}
-            entering={FadeInDown.duration(240)}
-            exiting={FadeOut.duration(180)}
-            pointerEvents="none"
-            style={styles.microcopy}>
-            <ThemedText style={styles.microcopyText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-              {quests.microcopy}
-            </ThemedText>
-          </Animated.View>
-        ) : null}
-      </View>
       ) : <View style={styles.companionRouteStage} />}
 
       {homeIdentityOpen ? <HomeIdentitySheet identity={identity} onChange={updateIdentity} onClose={() => setHomeIdentityOpen(false)} /> : null}

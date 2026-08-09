@@ -3971,7 +3971,7 @@
       }
     }
   },
-  "updatedAt": "2026-08-08T12:39:14.661147+00:00",
+  "updatedAt": "2026-08-08T19:50:03.061075+00:00",
   "gameplay": {
     "version": 2,
     "mode": "equipped skin with reusable crack overlays",
@@ -6562,7 +6562,7 @@
         }
       },
       "duckling-cap": {
-        "version": 1,
+        "version": 2,
         "accessoryLayoutVersion": 2,
         "pipelineVersion": "egg-avatar-hats-v4-style-mapped",
         "styleContractVersion": "katchimeras-cozy-toy-v1",
@@ -6571,9 +6571,9 @@
         "generationModel": "openai/gpt-image-2/edit",
         "generationQuality": "low",
         "presentation": {
-          "scale": 0.9489,
+          "scale": 0.76,
           "offsetX": 0.0002,
-          "offsetY": -0.111
+          "offsetY": -0.1208
         },
         "mattingModel": "fal-ai/birefnet/v2",
         "mattingSettings": {
@@ -6604,7 +6604,7 @@
         }
       },
       "frog-hood": {
-        "version": 1,
+        "version": 2,
         "accessoryLayoutVersion": 2,
         "pipelineVersion": "egg-avatar-hats-v4-style-mapped",
         "styleContractVersion": "katchimeras-cozy-toy-v1",
@@ -6613,9 +6613,9 @@
         "generationModel": "openai/gpt-image-2/edit",
         "generationQuality": "low",
         "presentation": {
-          "scale": 0.8264,
+          "scale": 0.74,
           "offsetX": -0.0016,
-          "offsetY": -0.2481
+          "offsetY": -0.2389
         },
         "mattingModel": "fal-ai/birefnet/v2",
         "mattingSettings": {
@@ -6646,7 +6646,7 @@
         }
       },
       "cat-ear-headband": {
-        "version": 1,
+        "version": 2,
         "accessoryLayoutVersion": 2,
         "pipelineVersion": "egg-avatar-hats-v4-style-mapped",
         "styleContractVersion": "katchimeras-cozy-toy-v1",
@@ -6655,9 +6655,9 @@
         "generationModel": "openai/gpt-image-2/edit",
         "generationQuality": "low",
         "presentation": {
-          "scale": 0.9349,
+          "scale": 0.74,
           "offsetX": 0.0007,
-          "offsetY": -0.178
+          "offsetY": -0.1743
         },
         "mattingModel": "fal-ai/birefnet/v2",
         "mattingSettings": {
@@ -6688,7 +6688,7 @@
         }
       },
       "bunny-ears": {
-        "version": 1,
+        "version": 2,
         "accessoryLayoutVersion": 2,
         "pipelineVersion": "egg-avatar-hats-v4-style-mapped",
         "styleContractVersion": "katchimeras-cozy-toy-v1",
@@ -6697,9 +6697,9 @@
         "generationModel": "openai/gpt-image-2/edit",
         "generationQuality": "low",
         "presentation": {
-          "scale": 0.6969,
+          "scale": 0.61,
           "offsetX": -0.0032,
-          "offsetY": -0.2081
+          "offsetY": -0.2021
         },
         "mattingModel": "fal-ai/birefnet/v2",
         "mattingSettings": {
@@ -6730,7 +6730,7 @@
         }
       },
       "bear-hood": {
-        "version": 1,
+        "version": 2,
         "accessoryLayoutVersion": 2,
         "pipelineVersion": "egg-avatar-hats-v4-style-mapped",
         "styleContractVersion": "katchimeras-cozy-toy-v1",
@@ -6739,9 +6739,9 @@
         "generationModel": "openai/gpt-image-2/edit",
         "generationQuality": "low",
         "presentation": {
-          "scale": 0.8963,
+          "scale": 0.72,
           "offsetX": 0.0002,
-          "offsetY": -0.1181
+          "offsetY": -0.1264
         },
         "mattingModel": "fal-ai/birefnet/v2",
         "mattingSettings": {
@@ -6772,7 +6772,7 @@
         }
       },
       "dragon-horns": {
-        "version": 1,
+        "version": 2,
         "accessoryLayoutVersion": 2,
         "pipelineVersion": "egg-avatar-hats-v4-style-mapped",
         "styleContractVersion": "katchimeras-cozy-toy-v1",
@@ -6781,9 +6781,9 @@
         "generationModel": "openai/gpt-image-2/edit",
         "generationQuality": "low",
         "presentation": {
-          "scale": 0.8237,
+          "scale": 0.66,
           "offsetX": 0.0,
-          "offsetY": -0.2531
+          "offsetY": -0.2346
         },
         "mattingModel": "fal-ai/birefnet/v2",
         "mattingSettings": {
@@ -6814,7 +6814,7 @@
         }
       },
       "dino-spikes": {
-        "version": 1,
+        "version": 2,
         "accessoryLayoutVersion": 2,
         "pipelineVersion": "egg-avatar-hats-v4-style-mapped",
         "styleContractVersion": "katchimeras-cozy-toy-v1",
@@ -6823,9 +6823,9 @@
         "generationModel": "openai/gpt-image-2/edit",
         "generationQuality": "low",
         "presentation": {
-          "scale": 0.9755,
+          "scale": 0.78,
           "offsetX": -0.0002,
-          "offsetY": -0.062
+          "offsetY": -0.0817
         },
         "mattingModel": "fal-ai/birefnet/v2",
         "mattingSettings": {
@@ -6898,7 +6898,7 @@
         }
       },
       "knight-circlet": {
-        "version": 1,
+        "version": 2,
         "accessoryLayoutVersion": 2,
         "pipelineVersion": "egg-avatar-hats-v4-style-mapped",
         "styleContractVersion": "katchimeras-cozy-toy-v1",
@@ -6907,9 +6907,9 @@
         "generationModel": "openai/gpt-image-2/edit",
         "generationQuality": "low",
         "presentation": {
-          "scale": 0.7607,
+          "scale": 0.61,
           "offsetX": 0.0,
-          "offsetY": -0.0565
+          "offsetY": -0.077
         },
         "mattingModel": "fal-ai/birefnet/v2",
         "mattingSettings": {
@@ -6940,7 +6940,7 @@
         }
       },
       "pirate-tricorn": {
-        "version": 1,
+        "version": 2,
         "accessoryLayoutVersion": 2,
         "pipelineVersion": "egg-avatar-hats-v4-style-mapped",
         "styleContractVersion": "katchimeras-cozy-toy-v1",
@@ -6949,9 +6949,9 @@
         "generationModel": "openai/gpt-image-2/edit",
         "generationQuality": "low",
         "presentation": {
-          "scale": 0.8755,
+          "scale": 0.7,
           "offsetX": -0.0013,
-          "offsetY": -0.1529
+          "offsetY": -0.1544
         },
         "mattingModel": "fal-ai/birefnet/v2",
         "mattingSettings": {
@@ -6982,7 +6982,7 @@
         }
       },
       "graduation-cap": {
-        "version": 1,
+        "version": 2,
         "accessoryLayoutVersion": 2,
         "pipelineVersion": "egg-avatar-hats-v4-style-mapped",
         "styleContractVersion": "katchimeras-cozy-toy-v1",
@@ -6991,9 +6991,9 @@
         "generationModel": "openai/gpt-image-2/edit",
         "generationQuality": "low",
         "presentation": {
-          "scale": 0.8556,
+          "scale": 0.69,
           "offsetX": -0.0002,
-          "offsetY": -0.1572
+          "offsetY": -0.1578
         },
         "mattingModel": "fal-ai/birefnet/v2",
         "mattingSettings": {
@@ -7108,7 +7108,7 @@
         }
       },
       "soft-halo": {
-        "version": 1,
+        "version": 2,
         "accessoryLayoutVersion": 2,
         "pipelineVersion": "egg-avatar-hats-v4-style-mapped",
         "styleContractVersion": "katchimeras-cozy-toy-v1",
@@ -7117,9 +7117,9 @@
         "generationModel": "openai/gpt-image-2/edit",
         "generationQuality": "low",
         "presentation": {
-          "scale": 0.9393,
+          "scale": 0.76,
           "offsetX": -0.0073,
-          "offsetY": -0.0102
+          "offsetY": -0.0388
         },
         "mattingModel": "fal-ai/birefnet/v2",
         "mattingSettings": {
@@ -7192,7 +7192,7 @@
         }
       },
       "snowflake-tiara": {
-        "version": 1,
+        "version": 2,
         "accessoryLayoutVersion": 2,
         "pipelineVersion": "egg-avatar-hats-v4-style-mapped",
         "styleContractVersion": "katchimeras-cozy-toy-v1",
@@ -7201,9 +7201,9 @@
         "generationModel": "openai/gpt-image-2/edit",
         "generationQuality": "low",
         "presentation": {
-          "scale": 0.7245,
+          "scale": 0.58,
           "offsetX": -0.0021,
-          "offsetY": -0.3013
+          "offsetY": -0.2731
         },
         "mattingModel": "fal-ai/birefnet/v2",
         "mattingSettings": {
@@ -7234,7 +7234,7 @@
         }
       },
       "rainbow-arch": {
-        "version": 1,
+        "version": 2,
         "accessoryLayoutVersion": 2,
         "pipelineVersion": "egg-avatar-hats-v4-style-mapped",
         "styleContractVersion": "katchimeras-cozy-toy-v1",
@@ -7243,9 +7243,9 @@
         "generationModel": "openai/gpt-image-2/edit",
         "generationQuality": "low",
         "presentation": {
-          "scale": 0.74,
+          "scale": 0.64,
           "offsetX": -0.0002,
-          "offsetY": -0.2418
+          "offsetY": -0.2308
         },
         "mattingModel": "fal-ai/birefnet/v2",
         "mattingSettings": {

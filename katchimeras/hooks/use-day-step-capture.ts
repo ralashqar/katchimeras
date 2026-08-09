@@ -1,10 +1,7 @@
-import { useIsFocused } from '@react-navigation/native';
-import { useEffect, useState } from 'react';
-import { AppState } from 'react-native';
+import { useEffect, useRef } from 'react';
 
 import type { ActivityPermissionState } from '@/types/home';
 import { toLocalDateId } from '@/game/days/date';
-import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 
 export type DayStepCountReading = {
   stepsCount: number;
@@ -14,7 +11,7 @@ export type DayStepCountReading = {
 
 type UseDayStepCaptureOptions = {
   enabled: boolean;
-  requireFocus?: boolean;
+  requestKey: number;
   permissionState: ActivityPermissionState;
   onPermissionResolved: (permission: ActivityPermissionState) => void;
   onStepCount: (reading: DayStepCountReading) => void;
@@ -22,46 +19,26 @@ type UseDayStepCaptureOptions = {
 
 export function useDayStepCapture({
   enabled,
-  requireFocus = true,
+  requestKey,
   permissionState,
   onPermissionResolved,
   onStepCount,
 }: UseDayStepCaptureOptions) {
-  const isFocused = useIsFocused();
-  const [appActive, setAppActive] = useState(() => AppState.currentState === 'active');
-  const [localDayId, setLocalDayId] = useState(() => toLocalDateId(new Date()));
+  const lastStartedRequestKeyRef = useRef(0);
 
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      setAppActive(nextState === 'active');
-      if (nextState === 'active') {
-        setLocalDayId(toLocalDateId(new Date()));
-      }
-    });
-    return () => subscription.remove();
-  }, []);
-
-  useEffect(() => {
-    if (!enabled || !appActive || (requireFocus && !isFocused)) return;
-    const interval = setInterval(() => {
-      setLocalDayId((current) => {
-        const next = toLocalDateId(new Date());
-        return next === current ? current : next;
-      });
-    }, 60_000);
-
-    return () => clearInterval(interval);
-  }, [appActive, enabled, isFocused, requireFocus]);
-
-  useEffect(() => {
-    if (process.env.EXPO_OS === 'web' || !enabled || !appActive || (requireFocus && !isFocused)) {
+    if (
+      process.env.EXPO_OS === 'web' ||
+      !enabled ||
+      requestKey <= 0 ||
+      lastStartedRequestKeyRef.current >= requestKey
+    ) {
       return;
     }
+    lastStartedRequestKeyRef.current = requestKey;
 
     let active = true;
-    let watchSubscription: { remove: () => void } | null = null;
-    let releaseResource: (() => void) | null = null;
-    let baselineSteps = 0;
+    const localDayId = toLocalDateId(new Date());
 
     function getStartOfDay() {
       const start = new Date(`${localDayId}T00:00:00`);
@@ -118,33 +95,17 @@ export function useDayStepCapture({
       try {
         const result = await Pedometer.getStepCountAsync(getStartOfDay(), new Date());
         if (active) {
-          baselineSteps = Math.max(0, result.steps ?? 0);
-          emitStepCount(baselineSteps);
+          emitStepCount(Math.max(0, result.steps ?? 0));
         }
       } catch {
-        baselineSteps = 0;
+        // The scheduler will retry after its step cooldown.
       }
-
-      if (!active) {
-        return;
-      }
-
-      watchSubscription = Pedometer.watchStepCount((result) => {
-        if (!active) {
-          return;
-        }
-
-        emitStepCount(baselineSteps + (result.steps ?? 0));
-      });
-      releaseResource = acquireLifecycleResource('pedometer_watcher', 'day-capture');
     }
 
     void startWatching();
 
     return () => {
       active = false;
-      watchSubscription?.remove();
-      releaseResource?.();
     };
-  }, [appActive, enabled, isFocused, localDayId, onPermissionResolved, onStepCount, permissionState, requireFocus]);
+  }, [enabled, onPermissionResolved, onStepCount, permissionState, requestKey]);
 }

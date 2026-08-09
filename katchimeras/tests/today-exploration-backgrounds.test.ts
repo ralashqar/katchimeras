@@ -108,7 +108,7 @@ test('an explicit unsupported environment does not borrow the creature backgroun
   );
 });
 
-test('families without an exported background retain the hex presentation', () => {
+test('families without an exported background signal the shared Home fallback', () => {
   assert.equal(
     todayKatchimeraExplorationBackgroundKeyForFamily('baristabbit'),
     null,

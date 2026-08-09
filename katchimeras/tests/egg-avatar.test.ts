@@ -285,6 +285,12 @@ test('every launch skin has approved production assets and manifest provenance',
     assert.equal(hat?.generationStage, 'style-map');
     assert.equal(hat?.styleContractVersion, 'katchimeras-cozy-toy-v1');
     assert.ok(hat?.presentation && hat.presentation.scale > 0, `${hatId} presentation`);
+    const catalogPresentation = allEggAvatarItems('hat').find((item) => item.id === hatId)?.presentation;
+    assert.ok(catalogPresentation, `${hatId} catalog presentation`);
+    assert.equal(Number.isFinite(catalogPresentation.scale), true, `${hatId} finite scale`);
+    assert.equal(Number.isFinite(catalogPresentation.offsetX), true, `${hatId} finite horizontal offset`);
+    assert.equal(Number.isFinite(catalogPresentation.offsetY), true, `${hatId} finite vertical offset`);
+    assert.deepEqual(hat?.presentation, catalogPresentation, `${hatId} catalog/manifest presentation`);
   }
   assert.equal(manifest.accessories?.hatPipelineVersion, 'egg-avatar-hats-v4-style-mapped');
   assert.equal(manifest.accessories?.hatStyleContractVersion, 'katchimeras-cozy-toy-v1');
@@ -404,33 +410,39 @@ test('accessory-heavy skins carry explicit core-silhouette calibration', () => {
   }
 });
 
-test('You button opens an in-place customizer above the Today UI', () => {
+test('You button navigates to a separately mounted, virtualized customizer route', () => {
   const tabBar = readFileSync(
     path.join(root, 'components', 'katchadeck', 'ui', 'meadow-tab-bar.tsx'),
     'utf8'
   );
   const today = readFileSync(path.join(root, 'app', '(tabs)', 'today.tsx'), 'utf8');
+  const you = readFileSync(path.join(root, 'app', '(tabs)', 'you.tsx'), 'utf8');
   const customizer = readFileSync(
     path.join(root, 'components', 'katchadeck', 'egg-avatar', 'egg-avatar-profile-screen.tsx'),
     'utf8'
   );
 
-  assert.match(tabBar, /openCustomizer\(\)/);
-  assert.match(tabBar, /navigation\.navigate\('today', \{ customize: String\(Date\.now\(\)\) \}\)/);
-  assert.match(today, /customizerActive \? 'none' : 'auto'/);
-  assert.match(today, /customizerCameraStyle/);
-  assert.match(today, /customizerChromeHidden/);
-  assert.match(today, /<EggAvatarProfileScreen/);
+  assert.match(tabBar, /navigation\.navigate\('you'\)/);
+  assert.doesNotMatch(tabBar, /openCustomizer|customize:/);
+  assert.doesNotMatch(today, /<EggAvatarProfileScreen|customizerCameraStyle/);
+  assert.match(you, /if \(!focused\) return <View style=\{styles\.inactive\}/);
+  assert.match(you, /<EggAvatarProfileScreen/);
+  assert.match(you, /backgroundKey="home"/);
+  assert.match(you, /const eggFrame = todayExplorationEggStageFrame\(width, height, stageTop\)/);
+  assert.match(you, /subjectCenterY: stageTop \+ eggFrame\.centerY/);
+  assert.match(you, /eggAvatarCustomizerCamera\(/);
+  assert.match(you, /transform: \[\s*\{ translateY: camera\.translateY \},\s*\{ scale: camera\.scale \}/);
+  assert.match(you, /verticalOffset=\{HOME_SCENE_Y_OFFSET\}/);
+  assert.match(you, /<TodayKingdomEggHero[\s\S]*?explorationStageTop=\{stageTop\}/);
+  assert.match(you, /companionWispId=\{equippedWispId\}/);
   assert.match(customizer, /elevation: 100, zIndex: 100/);
   assert.match(customizer, /eggAvatarCustomizerPanelHeight\(height\)/);
   assert.doesNotMatch(customizer, /styles\.heroNameAnchor/);
   assert.doesNotMatch(customizer, />YOU</);
   assert.doesNotMatch(customizer, /styles\.headingWisp/);
-  assert.match(today, /enabled: explorationBackgroundActive && !flowBusy && !customizerActive/);
-  assert.match(customizer, /Gesture\.Native\(\)\.disallowInterruption\(true\)/);
+  assert.match(customizer, /<FlashList/);
+  assert.match(customizer, /numColumns=\{GRID_COLUMNS\}/);
   assert.match(customizer, /pointerEvents="auto"/);
-  assert.match(customizer, /directionalLockEnabled/);
-  assert.match(customizer, /nestedScrollEnabled/);
   assert.match(customizer, /gridScroll: \{ flex: 1, minHeight: 0 \}/);
   assert.doesNotMatch(customizer, /today_pedestal|presentation="hero"/);
 });

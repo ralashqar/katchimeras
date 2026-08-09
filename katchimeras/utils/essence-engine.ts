@@ -1,5 +1,6 @@
 import type { HomeDayRecord } from '@/types/home';
 import type { DiscoveryDef, DiscoveryRarity } from '@/types/discoveries';
+import { isReflectiveDayPromptKind } from '@/constants/day-prompts';
 
 // Pure Essence economy. Earned is DERIVED from immutable history (each real event
 // pays once → can't be farmed, survives reinstall); spent is passed in. No side
@@ -29,7 +30,6 @@ const RARITY_ESSENCE: Record<DiscoveryRarity, number> = {
   legendary: 100,
 };
 
-const REFLECTION_KINDS = new Set(['feeling', 'inner_weather', 'day_word', 'meaning', 'gratitude', 'highlight']);
 
 // Every 7 finalised days earns one weekly-recap reward (a simple, deterministic
 // proxy for "a week of patches" — avoids calendar-week edge cases).
@@ -46,7 +46,7 @@ export function essenceAwardsForDay(day: HomeDayRecord): number {
   if (day.heroPhoto) total += ESSENCE_AWARD.heroPhoto;
   total += (day.notes ?? []).filter((note) => note.kind === 'voice').length * ESSENCE_AWARD.voice;
   total +=
-    (day.promptAnswers ?? []).filter((answer) => !answer.dismissed && REFLECTION_KINDS.has(answer.kind)).length *
+    (day.promptAnswers ?? []).filter((answer) => !answer.dismissed && isReflectiveDayPromptKind(answer.kind)).length *
     ESSENCE_AWARD.reflection;
   const places = day.confirmedPlaces?.length ?? 0;
   total += places * ESSENCE_AWARD.place;

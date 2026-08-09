@@ -1,6 +1,7 @@
 import type { StoredHomeDayRecord } from '@/types/home';
 import type { CalendarEventContext } from '@/utils/chronicle-engine';
 import { acceptedFoodDetection, acceptedStudioDetection, dayRejectsDomain } from '@/utils/intelligence/classification-policy';
+import { isReflectiveDayPromptKind } from '@/constants/day-prompts';
 
 // Memory Quests (Patch Systems V3) — they replace the generic "Daily Seeds".
 // Quests are never chores: each one is a meaningful capture/reflection that grows
@@ -55,7 +56,6 @@ type QuestDayInput = Pick<
   | 'manualJournalEntries'
 >;
 
-const REFLECTION_KINDS = new Set(['feeling', 'inner_weather', 'day_word', 'meaning', 'gratitude', 'highlight']);
 
 const CATALOG: Record<MemoryQuestType, Omit<MemoryQuest, 'id' | 'completed'>> = {
   captureMoment: {
@@ -138,7 +138,7 @@ export function isQuestComplete(type: MemoryQuestType, day: QuestDayInput): bool
     case 'recordVoiceMemory':
       return (day.notes ?? []).some((note) => note.kind === 'voice');
     case 'answerReflection':
-      return (day.promptAnswers ?? []).some((answer) => !answer.dismissed && REFLECTION_KINDS.has(answer.kind));
+      return (day.promptAnswers ?? []).some((answer) => !answer.dismissed && isReflectiveDayPromptKind(answer.kind));
     case 'markPlace':
       return (day.confirmedPlaces?.length ?? 0) > 0;
     case 'markBigMoment':
