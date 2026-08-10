@@ -10,12 +10,15 @@ import type { ConversationDefinition } from '@/types/companion-conversation';
 import type { StoredHomeDayRecord } from '@/types/home';
 import {
   answerConversation,
+  conversationGameQuestion,
   continueConversation,
   createConversationSession,
   restartInsightConversation,
   selectConversationDefinition,
+  selectConversationForMode,
   selectConversationFromPool,
   validateConversationDefinitions,
+  validateProfileQuestionGraph,
 } from '@/utils/companion-conversation';
 import { reconcileConversationJournalSignals } from '@/utils/companion-conversation-signals';
 import {
@@ -104,7 +107,9 @@ test('signature game scores authored form affinities without unlocking a skin', 
     .find((item) => item.format === 'profile_game')!;
   let session = createConversationSession({ definition, formId: 'baristabbit', dayId: '2026-08-10', createdAt: 1 });
   const game = definition.nodes.find((node) => node.kind === 'profile_game')!;
-  for (const question of game.questions) {
+  for (let pick = 0; pick < 3; pick += 1) {
+    const question = conversationGameQuestion(game, session);
+    assert.ok(question);
     const teaChoice = question.options.find((option) => option.affinity?.hearthsip) ?? question.options[0]!;
     session = answerConversation(session, definition, teaChoice.id, session.updatedAt + 1).session;
     session = continueConversation(session, definition, session.updatedAt + 1);
@@ -252,6 +257,38 @@ test('opener answers branch into an authored topic pool', () => {
   const branched = selectConversationFromPool({ familyId: 'baristabbit', poolId: 'ritual', definitions, sessions: [session], seed: 'branch-1' });
   assert.ok(branched?.tags?.includes('ritual'));
   assert.equal(branched?.contextualOnly, undefined);
+});
+
+test('Talk starts one of the original non-game topic threads instead of the mode chooser', () => {
+  for (const familyId of familyIds) {
+    const definitions = companionConversationDefinitionsForFamily(familyId);
+    const definition = selectConversationForMode({
+      familyId,
+      mode: 'talk',
+      definitions,
+      sessions: [],
+      seed: `${familyId}:talk`,
+    });
+    assert.ok(definition);
+    assert.notEqual(definition.format, 'opener');
+    assert.notEqual(definition.format, 'poll');
+    assert.notEqual(definition.format, 'profile_game');
+    assert.equal(Boolean(definition.isOpener), false);
+    const originalTalkPools = new Set(definitions.flatMap((candidate) => candidate.isOpener
+      ? candidate.nodes.flatMap((node) => node.kind === 'choice'
+          ? node.options.flatMap((option) => option.transition?.kind === 'pool'
+              && option.transition.poolId !== 'play'
+              && option.transition.poolId !== 'goals'
+            ? [option.transition.poolId]
+            : [])
+          : [])
+      : []));
+    assert.ok(definition.tags?.some((tag) => originalTalkPools.has(tag)));
+    const first = definition.nodes.find((node) => node.id === definition.entryNodeId);
+    if (first?.kind === 'choice') {
+      assert.ok(first.options.every((option) => option.transition === undefined));
+    }
+  }
 });
 
 test('continuous conversations can select multiple chapters on the same day and avoid recent repeats', () => {
@@ -406,13 +443,15 @@ test('explicit goal-plan actions rename and preserve paused history', () => {
   assert.equal(replacement.state.goals.find((goal) => goal.id === replacement.createdGoalId)?.status, 'active');
 });
 
-test('launch-family insights use five meaningful questions while form games stay at three', () => {
+test('launch-family insights use five meaningful questions while every form-game branch takes three picks', () => {
   for (const familyId of familyIds) {
     const games = companionConversationDefinitionsForFamily(familyId)
       .flatMap((definition) => definition.nodes)
       .filter((node) => node.kind === 'profile_game' || node.kind === 'insight_game');
     assert.equal(games.length, 5);
-    assert.equal(games.filter((game) => game.kind === 'profile_game').every((game) => game.questions.length === 3), true);
+    for (const game of games.filter((candidate) => candidate.kind === 'profile_game')) {
+      assert.deepEqual(validateProfileQuestionGraph(`${familyId}:test`, game), []);
+    }
     assert.equal(games.filter((game) => game.kind === 'insight_game').every((game) => game.questions.length === 5), true);
   }
 });

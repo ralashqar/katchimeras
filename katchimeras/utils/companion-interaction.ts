@@ -47,6 +47,22 @@ export function companionInteractionReducer(
         reviewItemId: null,
         route: { kind: 'visit' },
       };
+    case 'show_chat_lobby':
+      return {
+        ...state,
+        destination: null,
+        direction: state.route.kind === 'conversation' ? -1 : 1,
+        reviewItemId: null,
+        route: { kind: 'chat_lobby' },
+      };
+    case 'show_conversation':
+      return {
+        ...state,
+        destination: null,
+        direction: 1,
+        reviewItemId: null,
+        route: { kind: 'conversation' },
+      };
     case 'show_dashboard':
       return { ...state, destination: null, direction: -1, reviewItemId: null, route: { kind: 'dashboard' } };
     case 'open_shared_history':
@@ -145,6 +161,7 @@ export type CompanionBackAction =
   | 'confirm_attempt_exit'
   | 'return_to_destination'
   | 'return_to_home'
+  | 'return_to_chat_lobby'
   | 'close_experience';
 
 /**
@@ -158,6 +175,8 @@ export function companionRouteBackAction(
     return 'confirm_attempt_exit';
   }
   if (state.route.kind === 'dashboard') return 'close_experience';
+  if (state.route.kind === 'chat_lobby') return 'return_to_home';
+  if (state.route.kind === 'conversation') return 'return_to_chat_lobby';
   if (state.route.kind === 'visit' || state.route.kind === 'introduction') return 'return_to_home';
   if (state.route.kind === 'shared_history') return 'return_to_home';
   if (state.route.kind === 'destination') return 'return_to_home';

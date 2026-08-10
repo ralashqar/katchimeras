@@ -17,9 +17,7 @@ export function CompanionBondMeter({ name, progress }: { name: string; progress:
   const { tokens } = useKatchaSurface();
   const reduceMotion = useReducedMotion();
   const animatedProgress = useSharedValue(0);
-  const valueLabel = progress.isMax
-    ? 'Max'
-    : `${progress.segmentPoints}/${progress.segmentTarget}`;
+  const valueLabel = `${progress.totalPoints}`;
   const hint = progress.isMax
     ? `You and ${name} have reached the deepest bond.`
     : `${progress.pointsRemaining} bond until ${progress.nextLabel}.`;

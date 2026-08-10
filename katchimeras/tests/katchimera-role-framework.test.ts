@@ -212,7 +212,7 @@ test('quest lanes use distinct rewards and mini-game daily ids deduplicate', () 
   assert.equal(questBondEventKind(realLife), 'real_life_quest_completed');
   assert.equal(questBondEventKind(miniGame), 'mini_game_completed');
   assert.equal(COMPANION_BOND_REWARDS.real_life_quest_completed, 25);
-  assert.equal(COMPANION_BOND_REWARDS.mini_game_completed, 10);
+  assert.equal(COMPANION_BOND_REWARDS.mini_game_completed, 8);
 
   const first = recordCompanionBondEvent(emptyCompanionBondState(), {
     id: 'mini-game:companion:steppling:2026-07-25',

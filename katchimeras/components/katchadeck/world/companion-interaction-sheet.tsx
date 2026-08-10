@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   AppState,
   Keyboard,
   ScrollView,
@@ -52,7 +53,7 @@ import {
 } from './companion-ui-primitives';
 import { CompanionQuestChoices, CompanionQuestThread } from './companion-quest-thread';
 import type { InteractiveQuestExecution, QuestResult } from '@/utils/quests/experiences/types';
-import type { CompanionBondProgress } from '@/utils/companion-bond';
+import { companionBondProgressForTotal, type CompanionBondAwardReceipt, type CompanionBondProgress } from '@/utils/companion-bond';
 import type {
   CompanionIntroductionAnswer,
   CompanionIntroductionRecord,
@@ -67,7 +68,7 @@ import type {
 import { companionFormGreeting } from '@/utils/companion-dialogue';
 import { CompanionSkinsThread } from './companion-skins-thread';
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
-import type { ConversationDefinition, ConversationNode, ConversationOutcomeDestination, ConversationSession } from '@/types/companion-conversation';
+import type { ConversationDefinition, ConversationMode, ConversationNode, ConversationOutcomeDestination, ConversationSession, ConversationSignalKind } from '@/types/companion-conversation';
 import type { KingdomSkinOption } from '@/utils/katchimera-wardrobe';
 import { CompanionDiscoveryThread } from './companion-discovery-thread';
 import {
@@ -116,6 +117,7 @@ import { CompanionDashboard } from './companion-dashboard';
 import { CompanionSharedHistory } from './companion-shared-history';
 import { completedVisitCopy } from '@/utils/companion-visit';
 import { CompanionConversationScene, conversationSpeechLine } from './companion-conversation-scene';
+import { CompanionChatLobby, type CompanionChatStarter } from './companion-chat-lobby';
 import { CompanionConversationLab } from './companion-conversation-lab';
 import { companionConversationDefinitionsForFamily } from '@/constants/companion-conversations-v2';
 import { isConversationV2Family } from '@/types/companion-conversation';
@@ -178,6 +180,8 @@ export type CompanionInteractionSheetProps = {
   onInsightAction: () => void;
   memorySaved?: boolean;
   bondProgress: CompanionBondProgress;
+  pendingBondCelebration: CompanionBondAwardReceipt | null;
+  onBondCelebrationComplete: (receipt: CompanionBondAwardReceipt) => void;
   introductionDefinition: CompanionIntroductionDefinition | null;
   introductionRecord: CompanionIntroductionRecord | null;
   introductionShouldAutoOpen: boolean;
@@ -240,11 +244,15 @@ export type CompanionInteractionSheetProps = {
   onDismissQuickGoalSuggestions: () => void;
   conversationSession: ConversationSession | null;
   conversationDefinition: ConversationDefinition | null;
+  conversationRecommendation: { definitionId: string; sourceKind: ConversationSignalKind } | null;
+  conversationStarters: readonly CompanionChatStarter[];
+  idealSkinDefinitionId: string | null;
+  idealSkinOnboardingRequired: boolean;
   conversationQuestOffer: { id: string; title: string; hint: string } | null;
   onAnswerConversation: (optionId: string) => void;
   onContinueConversation: () => void;
+  onStartConversation: (input?: { definitionId?: string; mode?: ConversationMode; poolId?: string; recommendation?: boolean }) => void;
   onKeepTalkingConversation: (poolId?: string) => void;
-  onArchiveConversation: () => void;
   onMemoryConversationDecision: (remember: boolean, summary: string) => void;
   onGoalConversationDecision: (selectedTemplateIds: readonly string[] | null, node: Extract<ConversationNode, { kind: 'goal_proposal' }>) => void;
   onQuickGoalConversationDecision: (accept: boolean, node: Extract<ConversationNode, { kind: 'quick_goal_proposal' }>) => void;
@@ -264,37 +272,115 @@ export type CompanionInteractionSheetProps = {
   onSayMoreVisit: () => void;
   onUpdateMemory: (input: { memoryId: string; status: 'confirmed' | 'rejected' | 'forgotten'; summary?: string }) => void;
   onInsightConversationDecision: (accept: boolean, node: Extract<ConversationNode, { kind: 'insight_reveal' }>) => void;
-  onAdjustConversationInsight: (questionIndex?: number) => void;
   onResetMemory?: () => void;
   onSharedHistoryOpened: () => void;
 };
 
 export function CompanionInteractionSheet(props: CompanionInteractionSheetProps) {
   const insets = useSafeAreaInsets();
-  const { height: viewportHeight } = useWindowDimensions();
+  const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const onExperienceActiveChange = props.onExperienceActiveChange;
+  const onBondCelebrationComplete = props.onBondCelebrationComplete;
   const creatureRewardTargetRef = useRef<ViewType | null>(null);
   const [bondReward, setBondReward] = useState<{
     from: GoalTaskSourceRect;
-    points: number;
+    receipt: CompanionBondAwardReceipt;
     to: GoalTaskSourceRect;
   } | null>(null);
+  const [rewardPulseKey, setRewardPulseKey] = useState(0);
+  const [displayedBondTotal, setDisplayedBondTotal] = useState<number | null>(null);
+  const pendingRewardSourceRef = useRef<GoalTaskSourceRect | null>(null);
+  const rewardLaunchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rewardFinishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showQuickGoalReward = useCallback((
     receipt: CompanionQuickGoalCompletionReceipt,
     source: GoalTaskSourceRect | null
   ) => {
     if (!receipt.bondAward) return;
-    creatureRewardTargetRef.current?.measureInWindow((x, y, width, height) => {
-      const target = { height, width, x, y };
-      setBondReward({ from: source ?? target, points: receipt.bondAward!.points, to: target });
-    });
+    pendingRewardSourceRef.current = source;
   }, []);
+  const displayedBondProgress = useMemo(
+    () => displayedBondTotal == null ? props.bondProgress : companionBondProgressForTotal(displayedBondTotal),
+    [displayedBondTotal, props.bondProgress]
+  );
+  useEffect(() => {
+    if (rewardFinishTimerRef.current) clearTimeout(rewardFinishTimerRef.current);
+    rewardFinishTimerRef.current = null;
+    setDisplayedBondTotal(null);
+    setBondReward(null);
+    pendingRewardSourceRef.current = null;
+  }, [props.creatureId]);
+
+  useEffect(() => {
+    const receipt = props.pendingBondCelebration;
+    if (!receipt || bondReward) return;
+    setDisplayedBondTotal(receipt.beforeTotal);
+    let cancelled = false;
+    const launch = (attempt = 0) => {
+      if (cancelled) return;
+      const targetView = creatureRewardTargetRef.current;
+      if (!targetView) {
+        if (attempt < 120) {
+          rewardLaunchTimerRef.current = setTimeout(() => launch(attempt + 1), 50);
+        } else {
+          const target = { height: 160, width: 160, x: viewportWidth * 0.58, y: viewportHeight * 0.24 };
+          const fallback = { height: 52, width: 104, x: viewportWidth / 2 - 52, y: viewportHeight - 150 };
+          setBondReward({ from: pendingRewardSourceRef.current ?? fallback, receipt, to: target });
+          pendingRewardSourceRef.current = null;
+        }
+        return;
+      }
+      targetView.measureInWindow((x, y, width, height) => {
+        if (cancelled) return;
+        if ((!width || !height) && attempt < 120) {
+          rewardLaunchTimerRef.current = setTimeout(() => launch(attempt + 1), 50);
+          return;
+        }
+        const target = { height, width, x, y };
+        const fallback = { height: 52, width: 104, x: viewportWidth / 2 - 52, y: viewportHeight - 150 };
+        setBondReward({ from: pendingRewardSourceRef.current ?? fallback, receipt, to: target });
+        pendingRewardSourceRef.current = null;
+      });
+    };
+    launch();
+    return () => {
+      cancelled = true;
+      if (rewardLaunchTimerRef.current) clearTimeout(rewardLaunchTimerRef.current);
+      rewardLaunchTimerRef.current = null;
+    };
+  }, [bondReward, props.pendingBondCelebration, viewportHeight, viewportWidth]);
+
+  useEffect(() => () => {
+    if (rewardLaunchTimerRef.current) clearTimeout(rewardLaunchTimerRef.current);
+    if (rewardFinishTimerRef.current) clearTimeout(rewardFinishTimerRef.current);
+  }, []);
+  useEffect(() => {
+    if (!bondReward) return;
+    if (rewardFinishTimerRef.current) clearTimeout(rewardFinishTimerRef.current);
+    rewardFinishTimerRef.current = setTimeout(() => {
+      setDisplayedBondTotal(bondReward.receipt.afterTotal);
+      onBondCelebrationComplete(bondReward.receipt);
+      setBondReward(null);
+      rewardFinishTimerRef.current = null;
+    }, 2_800);
+    return () => {
+      if (rewardFinishTimerRef.current) clearTimeout(rewardFinishTimerRef.current);
+      rewardFinishTimerRef.current = null;
+    };
+  }, [bondReward, onBondCelebrationComplete]);
   const experience = useCompanionExperienceController({
     creatureId: props.creatureId,
     initialDestination: props.initialDestination,
     onClose: props.onClose,
     onSelectDestination: props.onSelectDestination,
   });
+  const idealSkinDefinitionId = props.idealSkinDefinitionId;
+  const idealSkinOnboardingRequired = props.idealSkinOnboardingRequired;
+  const onboardingCreatureId = props.creatureId;
+  const onboardingConversationDefinitionId = props.conversationSession?.definitionId;
+  const onboardingConversationStatus = props.conversationSession?.status;
+  const startConversation = props.onStartConversation;
+  const showConversation = experience.showConversation;
   const {
     activeAttemptId,
     checkInOpen,
@@ -401,6 +487,50 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       setHasShownHome(true);
     }
   }, [hasShownHome, route.kind]);
+
+  const hasActiveIdealSkinQuestionnaire = Boolean(
+    idealSkinDefinitionId
+    && onboardingConversationDefinitionId === idealSkinDefinitionId
+    && onboardingConversationStatus === 'active'
+  );
+
+  // Prepare first and navigate only once the matching questionnaire session
+  // is observable. This avoids dispatching navigation during the same render
+  // cycle that creates or hydrates the session.
+  useEffect(() => {
+    if (!idealSkinOnboardingRequired || !idealSkinDefinitionId) return;
+    if (!hasActiveIdealSkinQuestionnaire) {
+      startConversation({ definitionId: idealSkinDefinitionId });
+    }
+  }, [
+    hasActiveIdealSkinQuestionnaire,
+    idealSkinDefinitionId,
+    idealSkinOnboardingRequired,
+    onboardingCreatureId,
+    startConversation,
+  ]);
+
+  useEffect(() => {
+    if (!hasActiveIdealSkinQuestionnaire || route.kind === 'conversation') return;
+    showConversation();
+  }, [hasActiveIdealSkinQuestionnaire, route.kind, showConversation]);
+
+  // A one-shot launch can be lost while persisted state is being reset or
+  // hydrated. Keep ensuring until the matching active session is observable;
+  // the idempotency guard prevents duplicate sessions between retries.
+  useEffect(() => {
+    if (!idealSkinOnboardingRequired || !idealSkinDefinitionId || hasActiveIdealSkinQuestionnaire) return;
+    const retry = setInterval(() => {
+      startConversation({ definitionId: idealSkinDefinitionId });
+    }, 250);
+    return () => clearInterval(retry);
+  }, [
+    hasActiveIdealSkinQuestionnaire,
+    idealSkinDefinitionId,
+    idealSkinOnboardingRequired,
+    onboardingCreatureId,
+    startConversation,
+  ]);
 
   useEffect(() => {
     setActiveCheckIn(props.journeyCheckIn);
@@ -570,7 +700,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const conversationExperience = props.conversationSession && props.conversationDefinition
     ? { session: props.conversationSession, definition: props.conversationDefinition }
     : null;
-  const visitStageSpeech = conversationExperience
+  const idealSkinPreparing = idealSkinOnboardingRequired && !conversationExperience;
+  const visitStageSpeech = idealSkinPreparing
+    ? 'Let’s find the form that feels most like you.'
+    : conversationExperience
     ? conversationSpeechLine(conversationExperience.session, conversationExperience.definition)
     : visitSpeech;
   const respondToVisit = (response: CompanionVisitResponse) => {
@@ -618,7 +751,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       openIntroduction();
       return;
     }
-    experience.showVisit();
+    if (isConversationV2Family(props.familyId)) experience.showChatLobby();
+    else experience.showVisit();
   };
   const conversationLabDefinitions = isConversationV2Family(props.familyId)
     ? companionConversationDefinitionsForFamily(props.familyId)
@@ -630,7 +764,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       onExitPreview={props.onExitConversationPreview}
       onSelectDefinition={(definitionId) => {
         props.onPreviewConversation(definitionId);
-        experience.showVisit();
+        experience.showConversation();
       }}
     />
   ) : null;
@@ -650,7 +784,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const destinationHeroBody = destination === 'goals'
     ? activeJourneyFocus
       ? 'See your plan, add a small step, or talk through what you want next.'
-      : 'Choose a small step or answer three questions to find a useful direction.'
+      : 'Choose a small step or answer four questions to find a useful direction.'
     : undefined;
   const questGameContent = questGameVisible
     && interactiveExecution
@@ -721,19 +855,24 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           />
         ) : !questionnaireExperience ? (
           <CompanionCinematicStage
-            bubbleBody={quickGoalPickerOpen ? 'Choose one for today, or make a small goal of your own.' : destinationHeroBody}
+            bubbleBody={idealSkinPreparing
+              ? 'A few quick choices will shape your closest skin match.'
+              : quickGoalPickerOpen ? 'Choose one for today, or make a small goal of your own.' : destinationHeroBody}
             bubbleVariant={quickGoalPickerOpen ? 'questionnaire' : 'default'}
-            celebrate={Boolean(route.kind === 'visit' && conversationExperience?.session.outcomePresentation?.celebrate)}
+            celebrate={Boolean((route.kind === 'visit' || route.kind === 'conversation') && conversationExperience?.session.outcomePresentation?.celebrate)}
             creature={visual.source}
             creatureTargetRef={creatureRewardTargetRef}
-            enterFromLifted={route.kind === 'visit' && hasShownHome}
+            enterFromLifted={(route.kind === 'visit' || route.kind === 'conversation') && hasShownHome}
             environmentKey={props.homeEnvironmentKey ?? null}
             lifted
             name={props.name}
+            rewardPulseKey={rewardPulseKey}
             showSpeechBubble
             title={quickGoalPickerOpen
               ? 'Which small step feels right?'
-              : route.kind === 'visit'
+              : route.kind === 'chat_lobby'
+                ? 'What are you in the mood for?'
+              : route.kind === 'visit' || route.kind === 'conversation'
                 ? visitStageSpeech
                 : route.kind === 'shared_history'
                   ? 'Here is what I remember with you.'
@@ -743,23 +882,40 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             visualKey={props.visualKey}
           />
         ) : null}
-        {route.kind === 'visit' ? (
+        {idealSkinPreparing ? (
+          <View accessibilityLabel="Preparing ideal skin questionnaire" accessibilityLiveRegion="polite" style={styles.onboardingLoading}>
+            <ActivityIndicator color="#75450A" size="small" />
+            <ThemedText selectable style={styles.onboardingLoadingText} lightColor="#4F3A25" darkColor="#4F3A25">
+              Preparing your first question…
+            </ThemedText>
+          </View>
+        ) : null}
+        {route.kind === 'chat_lobby' && isConversationV2Family(props.familyId) ? (
+          <CompanionChatLobby
+            activeSession={props.conversationSession?.status === 'active' ? props.conversationSession : null}
+            familyId={props.familyId}
+            name={props.name}
+            onBack={experience.showHome}
+            onOpenConversation={experience.showConversation}
+            onOpenHistory={openHistory}
+            onStart={props.onStartConversation}
+            recommendation={props.conversationRecommendation}
+            starters={props.conversationStarters}
+          />
+        ) : route.kind === 'visit' || route.kind === 'conversation' ? (
           conversationExperience ? <CompanionConversationScene
             definition={conversationExperience.definition}
             developerContent={conversationLab}
             hasActiveFocus={Boolean(activeJourneyFocus)}
             name={props.name}
             onAnswer={props.onAnswerConversation}
-            onArchive={() => {
-              props.onArchiveConversation();
-              experience.showHome();
-            }}
-            onClose={experience.showHome}
+            onClose={props.idealSkinOnboardingRequired
+              ? props.onClose
+              : route.kind === 'conversation' ? experience.showChatLobby : experience.showHome}
             onContinue={props.onContinueConversation}
             onEquipForm={conversationExperience.session.preview ? () => undefined : props.onEquipSkin}
             onGoalDecision={props.onGoalConversationDecision}
             onInsightDecision={props.onInsightConversationDecision}
-            onAdjustInsight={props.onAdjustConversationInsight}
             onKeepTalking={props.onKeepTalkingConversation}
             onDismissOutcome={props.onDismissConversationOutcome}
             onOpenOutcomeDestination={(outcomeDestination: ConversationOutcomeDestination) => {
@@ -779,8 +935,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             session={conversationExperience.session}
             skins={props.skins}
             questOffer={props.conversationQuestOffer}
-          /> : <CompanionVisitScene
-            bondProgress={props.bondProgress}
+          /> : idealSkinOnboardingRequired ? null : (route.kind === 'visit' ? <CompanionVisitScene
+            bondProgress={displayedBondProgress}
             completed={Boolean(props.visitReceipt)}
             completionKind={visitCompletionKind}
             memoryCount={props.memories.filter((memory) => memory.status === 'confirmed').length}
@@ -790,7 +946,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             onOpenMore={experience.showHome}
             onRespond={respondToVisit}
             plan={visitPlan}
-          />
+          /> : null)
         ) : (
           <>
         {questGameVisible && !questGameFullBleed ? (
@@ -803,6 +959,11 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               }}
               tone="night"
             />
+          </View>
+        ) : null}
+        {idealSkinPreparing ? (
+          <View style={[styles.gameBackPosition, { top: insets.top + 10 }]}>
+            <CompanionBackAction label="Kingdom" onPress={props.onClose} />
           </View>
         ) : null}
         {(route.kind === 'destination' || route.kind === 'dashboard' || route.kind === 'shared_history' || quickGoalPickerOpen) && !questGameVisible && !questionnaireExperience ? (
@@ -892,8 +1053,13 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   }}
                   onStartFocus={(preference, supportStyle) => {
                     props.onCompleteIntroduction(preference, supportStyle);
-                    props.onStartJourneyConversation(preference);
-                    experience.openJourneyQuestionnaire(null);
+                    if (isConversationV2Family(props.familyId)) {
+                      props.onStartConversation({ mode: 'plan' });
+                      experience.showConversation();
+                    } else {
+                      props.onStartJourneyConversation(preference);
+                      experience.openJourneyQuestionnaire(null);
+                    }
                   }}
                   visualKey={props.visualKey}
                 />
@@ -969,7 +1135,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   resultReady={Boolean(journeyQuestionnaireSessionId && !props.journeyConversation)}
                   visualKey={props.visualKey}
                 />
-              ) : route.kind === 'dashboard' ? (
+              ) : idealSkinOnboardingRequired ? null : route.kind === 'dashboard' ? (
                 <CompanionDashboard
                   companionName={props.name}
                   developerContent={conversationLab}
@@ -1059,6 +1225,19 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               ) : destination === 'goals' ? (
                 <View style={styles.youStack}>
                 {quickGoalPanel}
+                {isConversationV2Family(props.familyId) ? (
+                  <CompanionSection
+                    description={activeJourneyFocus
+                      ? 'Talk through what fits now and add concrete steps without replacing your current plan.'
+                      : 'Answer four short questions to find a useful direction and choose optional next steps.'}
+                    label={activeJourneyFocus ? 'Talk through your next direction' : 'Find a direction'}>
+                    <CompanionPrimaryAction
+                      icon="bubble.left.and.bubble.right.fill"
+                      label={activeJourneyFocus ? 'Choose a Plan conversation' : 'Find a direction with me'}
+                      onPress={experience.showChatLobby}
+                    />
+                  </CompanionSection>
+                ) : null}
                 {props.introductionRecord?.status === 'deferred' && props.introductionDefinition ? (
                   <CompanionSection
                     description="I can ask two short questions now, or wait until another day."
@@ -1070,7 +1249,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                     />
                   </CompanionSection>
                 ) : null}
-                {props.journeyDefinition && (!activeJourneyFocus || props.journeyConversation) ? (
+                {!isConversationV2Family(props.familyId) && props.journeyDefinition && (!activeJourneyFocus || props.journeyConversation) ? (
                   <CompanionJourneyDiscoveryThread
                     companionName={props.name}
                     conversation={props.journeyConversation}
@@ -1099,7 +1278,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                     }}
                     supportStyle={props.introductionRecord?.supportStyle}
                   />
-                {props.journeyDefinition && activeJourneyFocus && !props.journeyConversation ? (
+                {!isConversationV2Family(props.familyId) && props.journeyDefinition && activeJourneyFocus && !props.journeyConversation ? (
                   <CompanionJourneyDiscoveryThread
                     companionName={props.name}
                     conversation={props.journeyConversation}
@@ -1136,12 +1315,13 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   onRemoveInsight={props.onRemoveInsight}
                   onRetakeInsight={(definitionId) => {
                     props.onRetakeInsight(definitionId);
-                    experience.showVisit();
+                    experience.showConversation();
                   }}
                 />
               ) : destination === 'skins' ? (
-                <CompanionSkinsThread
-                  companionName={props.name}
+                  <CompanionSkinsThread
+                    activePlus={props.historyIsPlus}
+                    companionName={props.name}
                   equippedSkinId={props.equippedSkinId}
                   onEquip={props.onEquipSkin}
                   showHeading={false}
@@ -1191,8 +1371,24 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         {bondReward ? (
           <BondRewardFlightOverlay
             from={bondReward.from}
-            onFinish={() => setBondReward(null)}
-            points={bondReward.points}
+            onFinish={() => {
+              if (rewardFinishTimerRef.current) clearTimeout(rewardFinishTimerRef.current);
+              setDisplayedBondTotal(bondReward.receipt.afterTotal);
+              setRewardPulseKey((key) => key + 1);
+              rewardFinishTimerRef.current = setTimeout(() => {
+                onBondCelebrationComplete(bondReward.receipt);
+                setBondReward(null);
+                rewardFinishTimerRef.current = null;
+              }, reduceMotion ? 120 : 420);
+            }}
+            onTokenArrive={(amount) => {
+              setDisplayedBondTotal((total) => Math.min(
+                bondReward.receipt.afterTotal,
+                (total ?? bondReward.receipt.beforeTotal) + amount
+              ));
+              setRewardPulseKey((key) => key + 1);
+            }}
+            points={bondReward.receipt.points}
             to={bondReward.to}
           />
         ) : null}
@@ -1216,6 +1412,23 @@ const styles = StyleSheet.create({
     zIndex: 80,
   },
   openGameAction: { paddingTop: 12 },
+  onboardingLoading: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255,249,224,0.9)',
+    borderColor: 'rgba(255,255,255,0.78)',
+    borderCurve: 'continuous',
+    borderRadius: 999,
+    borderWidth: 1,
+    bottom: 34,
+    flexDirection: 'row',
+    gap: 10,
+    minHeight: 48,
+    paddingHorizontal: 18,
+    position: 'absolute',
+    zIndex: 92,
+  },
+  onboardingLoadingText: { fontFamily: 'Manrope', fontSize: 14, fontWeight: '800' },
   quickGoalStack: { gap: 8, marginBottom: 12 },
   youStack: {
     backgroundColor: KatchaUI.companionPanel.background,

@@ -1,11 +1,13 @@
 import * as Haptics from 'expo-haptics';
 import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { CompanionAchievementCelebration } from '@/components/katchadeck/world/companion-achievement-celebration';
+import { CompanionBondLevelUpCelebration } from '@/components/katchadeck/world/companion-bond-level-up-celebration';
+import type { CompanionBondAwardReceipt } from '@/utils/companion-bond';
 import { CompanionInteractionSheet } from '@/components/katchadeck/world/companion-interaction-sheet';
 import { HomeIdentitySheet } from '@/components/katchadeck/world/home-identity-sheet';
 import { ZodiacTileSheet } from '@/components/katchadeck/world/zodiac-tile-sheet';
@@ -45,6 +47,7 @@ import {
 import {
   loadKatchimeraWardrobe,
   saveKatchimeraWardrobe,
+  subscribeKatchimeraWardrobeResets,
 } from '@/utils/katchimera-wardrobe-storage';
 import { companionIdForFamily } from '@/constants/katchimera-skins';
 import type { CompanionQuickGoal, CompanionQuickGoalCompletion } from '@/utils/companion-quick-goals';
@@ -58,6 +61,7 @@ import { beginQuestCapture, cancelQuestCapture } from '@/utils/quest-capture-ses
 import { completeSemanticNoteQuestCapture } from '@/utils/quests/semantic-note-capture';
 import { manualJournalFlow } from '@/utils/manual-journal-registry';
 import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability';
+import { useEconomy } from '@/features/economy/economy-provider';
 
 type QuestJournalReviewContext = {
   initialFlowId: string;
@@ -200,6 +204,7 @@ export function KingdomCompanionScreen({
 }) {
   const isFocused = useIsFocused();
   const router = useRouter();
+  const economy = useEconomy();
   const archive = useAllDays();
   const { days } = archive;
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
@@ -210,6 +215,7 @@ export function KingdomCompanionScreen({
 
   const [identity, setIdentity] = useState<WorldIdentityState>(loadWorldIdentity);
   const [wardrobe, setWardrobe] = useState<KatchimeraWardrobeState>(loadKatchimeraWardrobe);
+  const [pendingPlusSkin, setPendingPlusSkin] = useState<{ familyId: KatchimeraFamilyId; skinId: KatchimeraSkinId } | null>(null);
   const [homeIdentityOpen, setHomeIdentityOpen] = useState(false);
   const [zodiacOpen, setZodiacOpen] = useState(false);
   const [embeddedJournal, setEmbeddedJournal] = useState<EmbeddedJournalReview | null>(null);
@@ -217,12 +223,18 @@ export function KingdomCompanionScreen({
   const [questNoteMismatch, setQuestNoteMismatch] = useState<QuestNoteMismatch | null>(null);
   const [savedOrigin, setSavedOrigin] = useState<'insight' | 'quest' | 'visit' | null>(null);
   const [questExperienceActive, setQuestExperienceActive] = useState(false);
+  const [bondLevelUp, setBondLevelUp] = useState<CompanionBondAwardReceipt | null>(null);
   const { addManualJournalEntry, cloudIntelligenceEnabled } = useHomeScreenState({
     enableInteractiveServices: false,
   });
   const presentationKingdom = useMemo(
-    () => applyWardrobeToKingdom(kingdom, wardrobe),
-    [kingdom, wardrobe]
+    () => economy.snapshot.activePlus ? applyWardrobeToKingdom(kingdom, wardrobe) : kingdom,
+    [economy.snapshot.activePlus, kingdom, wardrobe]
+  );
+
+  useEffect(
+    () => subscribeKatchimeraWardrobeResets(() => setWardrobe(loadKatchimeraWardrobe())),
+    [],
   );
 
   const ownedSkinIds = useMemo(
@@ -261,6 +273,11 @@ export function KingdomCompanionScreen({
     today,
     todayFacts,
   });
+  const acknowledgeBondCelebration = quests.acknowledgeBondCelebration;
+  const completeBondCelebration = useCallback((receipt: CompanionBondAwardReceipt) => {
+    acknowledgeBondCelebration(receipt.id);
+    if (receipt.afterLevel > receipt.beforeLevel) setBondLevelUp(receipt);
+  }, [acknowledgeBondCelebration]);
   const quickGoalFamilyIds = useMemo(() => {
     const ids = new Set<KatchimeraFamilyId>();
     for (const creature of kingdom.creatures) {
@@ -358,11 +375,29 @@ export function KingdomCompanionScreen({
   };
   const equipSelectedSkin = (skinId: KatchimeraSkinId) => {
     if (!selectedFamilyId) return;
+    if (!quests.selectedHistoryIsPlus) {
+      setPendingPlusSkin({ familyId: selectedFamilyId, skinId });
+      router.push({
+        pathname: '/modal',
+        params: { source: 'katchimera-skin', familyId: selectedFamilyId, skinId },
+      });
+      return;
+    }
     const next = equipKatchimeraSkin(wardrobe, selectedFamilyId, skinId);
     if (next === wardrobe) return;
     saveKatchimeraWardrobe(next);
     setWardrobe(next);
   };
+
+  useEffect(() => {
+    if (!quests.selectedHistoryIsPlus || !pendingPlusSkin) return;
+    setWardrobe((current) => {
+      const next = equipKatchimeraSkin(current, pendingPlusSkin.familyId, pendingPlusSkin.skinId);
+      if (next !== current) saveKatchimeraWardrobe(next);
+      return next;
+    });
+    setPendingPlusSkin(null);
+  }, [pendingPlusSkin, quests.selectedHistoryIsPlus]);
   const refreshQuestState = quests.refreshQuestState;
 
   useEffect(() => {
@@ -377,7 +412,6 @@ export function KingdomCompanionScreen({
   const handleInsightAction = () => {
     const action = quests.selectedInsight?.action;
     if (!action) return;
-    quests.awardSelectedInsightBond();
     if (action.intent.kind === 'journal_flow') {
       setEmbeddedJournal({
         origin: 'insight',
@@ -531,6 +565,8 @@ export function KingdomCompanionScreen({
           onInsightAction={handleInsightAction}
           memorySaved={Boolean(savedOrigin)}
           bondProgress={quests.selectedBondProgress}
+          pendingBondCelebration={bondLevelUp ? null : quests.selectedPendingBondCelebration}
+          onBondCelebrationComplete={completeBondCelebration}
           achievementProgress={selectedAchievementProgress}
           introductionDefinition={quests.selectedIntroductionDefinition}
           introductionRecord={quests.selectedIntroduction}
@@ -595,11 +631,15 @@ export function KingdomCompanionScreen({
           onDismissQuickGoalSuggestions={quests.dismissQuickGoalSuggestions}
           conversationSession={quests.selectedConversationSession}
           conversationDefinition={quests.selectedConversationDefinition}
+          conversationRecommendation={quests.selectedConversationRecommendation}
+          conversationStarters={quests.selectedConversationStarters}
+          idealSkinDefinitionId={quests.selectedIdealSkinDefinitionId}
+          idealSkinOnboardingRequired={quests.selectedIdealSkinOnboardingRequired}
           conversationQuestOffer={quests.selectedConversationQuestOffer}
           onAnswerConversation={quests.answerSelectedConversation}
           onContinueConversation={quests.continueSelectedConversation}
+          onStartConversation={quests.startSelectedConversation}
           onKeepTalkingConversation={quests.keepTalkingSelectedConversation}
-          onArchiveConversation={quests.archiveSelectedConversation}
           onMemoryConversationDecision={quests.decideSelectedConversationMemory}
           onGoalConversationDecision={(selectedTemplateIds, node) => {
             const addedTemplateIds = selectedTemplateIds && !quests.selectedConversationSession?.preview
@@ -609,7 +649,6 @@ export function KingdomCompanionScreen({
             if (addedTemplateIds.length && !quests.selectedConversationSession?.preview) quests.refreshQuestState();
           }}
           onInsightConversationDecision={quests.decideSelectedConversationInsight}
-          onAdjustConversationInsight={quests.adjustSelectedConversationInsight}
           onQuickGoalConversationDecision={(accept, node) => {
             const added = accept && !quests.selectedConversationSession?.preview
               ? quickGoals.addTemplates([node.templateId]).includes(node.templateId)
@@ -843,7 +882,13 @@ export function KingdomCompanionScreen({
           }}
         />
       ) : null}
-      {isFocused && companionAchievements.pending.length > 0 && !questExperienceActive && !embeddedJournal && !questNoteCapture ? (
+      {isFocused && bondLevelUp ? (
+        <CompanionBondLevelUpCelebration
+          onContinue={() => setBondLevelUp(null)}
+          receipt={bondLevelUp}
+        />
+      ) : null}
+      {isFocused && companionAchievements.pending.length > 0 && !bondLevelUp && !quests.selectedPendingBondCelebration && !questExperienceActive && !embeddedJournal && !questNoteCapture ? (
         <CompanionAchievementCelebration
           achievements={companionAchievements.pending}
           onAchievementSeen={(id) => companionAchievements.markSeen([id])}

@@ -110,6 +110,23 @@ export function useCompanionQuickGoals({
     saveCompanionQuickGoalState(next);
     setState(next);
   }, []);
+  const awardGoalCreation = useCallback((familyId: KatchimeraFamilyId) => {
+    if (!dayId) return;
+    const homeState = homeRepository.load();
+    const resolveCompanionId = companionIdResolverForHomeState(homeState);
+    const questState = loadCompanionQuests(resolveCompanionId);
+    const bondState = loadCompanionBondState(questState, resolveCompanionId, homeState);
+    const creatureId = companionIdForFamily(familyId);
+    const result = recordCompanionBondEvent(bondState, {
+      id: `goal-created-daily:${creatureId}:${dayId}`,
+      creatureId,
+      kind: 'goal_created',
+      occurredAt: Date.now(),
+      dayId,
+    }, { queueCelebration: true });
+    if (result.awarded) saveCompanionBondState(result.state);
+    onBondChanged?.();
+  }, [dayId, onBondChanged]);
 
   const addTemplate = useCallback((templateId: string) => {
     if (!dayId) return { added: false, reason: 'missing_day' as const };
@@ -126,8 +143,9 @@ export function useCompanionQuickGoals({
     });
     if (!result.goal) return { added: false, reason: result.reason };
     commit(result.state);
+    awardGoalCreation(template.familyId);
     return { added: true, reason: null };
-  }, [availableFamilySet, commit, dayId, state]);
+  }, [availableFamilySet, awardGoalCreation, commit, dayId, state]);
 
   const addTemplates = useCallback((templateIds: readonly string[]) => {
     if (!dayId) return [];
@@ -148,8 +166,10 @@ export function useCompanionQuickGoals({
       addedTemplateIds.push(template.id);
     }
     if (next !== state) commit(next);
+    const awardedFamilies = new Set(addedTemplateIds.map((id) => companionQuickGoalTemplateById.get(id)?.familyId).filter((id): id is KatchimeraFamilyId => Boolean(id)));
+    awardedFamilies.forEach(awardGoalCreation);
     return addedTemplateIds;
-  }, [availableFamilySet, commit, dayId, state]);
+  }, [availableFamilySet, awardGoalCreation, commit, dayId, state]);
 
   const addCustom = useCallback((
     familyId: KatchimeraFamilyId,
@@ -162,8 +182,9 @@ export function useCompanionQuickGoals({
     const result = addCompanionQuickGoal(current, { familyId, title, cadence });
     if (!result.goal) return { added: false, reason: result.reason };
     commit(result.state);
+    awardGoalCreation(familyId);
     return { added: true, reason: null };
-  }, [availableFamilySet, commit, dayId, state]);
+  }, [availableFamilySet, awardGoalCreation, commit, dayId, state]);
 
   const editGoal = useCallback((
     goalId: string,
@@ -190,12 +211,12 @@ export function useCompanionQuickGoals({
     const questState = loadCompanionQuests(resolveCompanionId);
     const bondState = loadCompanionBondState(questState, resolveCompanionId, homeState);
     const awarded = recordCompanionBondEvent(bondState, {
-      id: `quick-goal-daily:${companionIdForFamily(result.completion.familyId)}:${result.completion.dayId}`,
+      id: `quick-goal:${companionIdForFamily(result.completion.familyId)}:${goalId}:${result.completion.dayId}`,
       creatureId: companionIdForFamily(result.completion.familyId),
       kind: 'quick_goal_completed',
       occurredAt: result.completion.completedAt,
       dayId: result.completion.dayId,
-    });
+    }, { queueCelebration: true });
     if (awarded.awarded) saveCompanionBondState(awarded.state);
     onBondChanged?.();
     return {
@@ -221,16 +242,10 @@ export function useCompanionQuickGoals({
     const resolveCompanionId = companionIdResolverForHomeState(homeState);
     const questState = loadCompanionQuests(resolveCompanionId);
     const bondState = loadCompanionBondState(questState, resolveCompanionId, homeState);
-    const anotherCompletionRemains = result.state.completions.some((completion) =>
-      completion.familyId === result.completion!.familyId
-      && completion.dayId === result.completion!.dayId
+    const removed = removeCompanionBondEvent(
+      bondState,
+      `quick-goal:${companionIdForFamily(result.completion.familyId)}:${goalId}:${result.completion.dayId}`
     );
-    const removed = anotherCompletionRemains
-      ? { state: bondState, removed: false, points: 0 }
-      : removeCompanionBondEvent(
-          bondState,
-          `quick-goal-daily:${companionIdForFamily(result.completion.familyId)}:${result.completion.dayId}`
-        );
     if (removed.removed) saveCompanionBondState(removed.state);
     onBondChanged?.();
     return true;

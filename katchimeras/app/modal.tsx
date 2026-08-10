@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,13 +10,19 @@ import { Meadow } from '@/constants/meadow-theme';
 import { useEconomy } from '@/features/economy/economy-provider';
 import { safeGoBack } from '@/utils/safe-navigation';
 import { useDevSubscriptionSimulator } from '@/hooks/use-dev-subscription-simulator';
+import { katchimeraFamilyById, katchimeraSkinById } from '@/constants/katchimera-skins';
+import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 
 export default function PlusScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ familyId?: string; skinId?: string; source?: string }>();
   const economy = useEconomy();
   const simulator = useDevSubscriptionSimulator();
   const { loadPackages } = economy;
   const [busy, setBusy] = useState<string | null>(null);
+  const skinOffer = params.source === 'katchimera-skin';
+  const family = skinOffer ? katchimeraFamilyById.get(params.familyId as KatchimeraFamilyId) : null;
+  const skin = skinOffer ? katchimeraSkinById.get(params.skinId as KatchimeraSkinId) : null;
 
   useEffect(() => { void loadPackages(); }, [loadPackages]);
 
@@ -25,6 +31,7 @@ export default function PlusScreen() {
     const result = await economy.purchasePlus(packageId);
     setBusy(null);
     if (!result.ok) Alert.alert('Purchase not completed', 'Nothing was charged. Please try again or restore an existing purchase.');
+    else if (skinOffer) safeGoBack(router);
   };
 
   const claim = async () => {
@@ -51,14 +58,19 @@ export default function PlusScreen() {
         ) : null}
         <View style={styles.hero}>
           <View style={styles.wisp}><WispArtwork id="orbit" size={108} /></View>
-          <ThemedText style={styles.eyebrow} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>KATCHIMERAS PLUS</ThemedText>
-          <ThemedText style={styles.title} lightColor={Meadow.ink} darkColor={Meadow.ink}>More ways to remember.</ThemedText>
-          <ThemedText style={styles.subtitle} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Your daily hatch, every companion, every quest and every Journey stay free.</ThemedText>
+          <ThemedText style={styles.eyebrow} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>{skinOffer && family ? `${family.displayName.toLocaleUpperCase()} SKINS · PLUS` : 'KATCHIMERAS PLUS'}</ThemedText>
+          <ThemedText style={styles.title} lightColor={Meadow.ink} darkColor={Meadow.ink}>{skinOffer && skin ? `Wear ${skin.displayName}.` : 'More ways to remember.'}</ThemedText>
+          <ThemedText style={styles.subtitle} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{skinOffer && family
+            ? `Your match is ready. Plus unlocks every ${family.displayName} form and richer ways to revisit and share your days.`
+            : 'Your daily hatch, every companion, every quest and every Journey stay free.'}</ThemedText>
         </View>
 
         <View style={styles.card}>
+          {skinOffer && family ? <>
+            <Feature title={`${family.displayName} wardrobe`} body={`Equip every available ${family.displayName} form, including your questionnaire match.`} />
+            <Feature title="Share every day card" body="Create and share day cards from any saved day in your history." />
+          </> : <Feature title="Full avatar wardrobe" body="Wear Plus Egg looks while your membership is active. Anything bought with Essence remains yours forever." />}
           <Feature title="Long Memory" body="Revisit patterns and companion reflections across your complete history instead of the latest 14 days." />
-          <Feature title="Full avatar wardrobe" body="Wear Plus Egg looks while your membership is active. Anything bought with Essence remains yours forever." />
           <Feature title="Monthly Wisp" body="Claim one permanent cosmetic Wisp each month, starting with Opal." />
           <Feature title="Bigger visitor shop" body="See six rotating cosmetic visitors instead of three. Life-earned Wisps are never sold." />
         </View>

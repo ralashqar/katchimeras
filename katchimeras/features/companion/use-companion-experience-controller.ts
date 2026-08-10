@@ -46,15 +46,24 @@ export function useCompanionExperienceController({
     dispatch({ type: 'show_dashboard' });
     onSelectDestination?.(null);
   }, [onSelectDestination]);
+  const showChatLobby = useCallback(() => {
+    dispatch({ type: 'show_chat_lobby' });
+    onSelectDestination?.(null);
+  }, [onSelectDestination]);
+  const showConversation = useCallback(() => {
+    dispatch({ type: 'show_conversation' });
+    onSelectDestination?.(null);
+  }, [onSelectDestination]);
   const openSharedHistory = useCallback(() => dispatch({ type: 'open_shared_history' }), []);
 
   const requestBack = useCallback(() => {
     const action = companionRouteBackAction(state);
     if (action === 'return_to_destination') dispatch({ type: 'return_to_destination' });
     else if (action === 'return_to_home') showDashboard();
+    else if (action === 'return_to_chat_lobby') showChatLobby();
     else if (action === 'close_experience') onClose();
     return action;
-  }, [onClose, showDashboard, state]);
+  }, [onClose, showChatLobby, showDashboard, state]);
 
   const openQuickGoalPicker = useCallback(
     () => dispatch({ type: 'open_quick_goal_picker' }),
@@ -117,6 +126,8 @@ export function useCompanionExperienceController({
     selectDestination,
     showHome: showDashboard,
     showDashboard,
+    showChatLobby,
+    showConversation,
     showVisit,
     openSharedHistory,
     requestBack,

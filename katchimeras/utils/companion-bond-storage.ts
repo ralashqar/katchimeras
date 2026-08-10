@@ -5,12 +5,15 @@ import {
   emptyCompanionBondState,
   migrateCompanionBondIdentity,
   normaliseCompanionBondState,
+  resetCompanionBondForCreatures,
   type CompanionBondState,
 } from '@/utils/companion-bond';
+import { companionIdForFamily } from '@/constants/katchimera-skins';
 import type { CompanionQuestState } from '@/utils/katchimera-quests';
 import type { StoredHomeState } from '@/types/home';
 
 const STORAGE_KEY = 'katchadeck.companion-bond-v1';
+const listeners = new Set<() => void>();
 
 export function loadCompanionBondState(
   questState?: CompanionQuestState,
@@ -27,4 +30,21 @@ export function loadCompanionBondState(
 
 export function saveCompanionBondState(state: CompanionBondState): void {
   setStoredJson(STORAGE_KEY, normaliseCompanionBondState(state));
+  queueMicrotask(() => listeners.forEach((listener) => listener()));
+}
+
+export function subscribeCompanionBondState(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+export function resetLaunchCompanionBondsForDebug(resetAt = Date.now()): void {
+  const stored = normaliseCompanionBondState(
+    getStoredJson<CompanionBondState>(STORAGE_KEY, emptyCompanionBondState())
+  );
+  saveCompanionBondState(resetCompanionBondForCreatures(
+    stored,
+    ['steppling', 'baristabbit', 'flexel'].map(companionIdForFamily),
+    resetAt
+  ));
 }

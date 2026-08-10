@@ -122,15 +122,15 @@ export function BlockBlastRouteScreen({
       latest.homeState,
     );
     const bond = recordCompanionBondEvent(bondState, {
-      id: `mini-game:${creatureId}:${dayId}`,
+      id: `mini-game:${creatureId}:${questId}:${dayId}`,
       creatureId,
       kind: questBondEventKind(definition),
       occurredAt: completedAt,
       dayId,
-    });
+    }, { queueCelebration: true });
     if (bond.awarded) saveCompanionBondState(bond.state);
     router.back();
-  }, [creatureId, definition, router]);
+  }, [creatureId, definition, questId, router]);
 
   if (!valid) {
     return (

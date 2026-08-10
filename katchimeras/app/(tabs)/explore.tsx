@@ -47,6 +47,10 @@ import type { CompanionAchievementDef } from '@/types/companion-achievements';
 import type { StreakMilestone } from '@/types/streak';
 import { pickRandomAchievement } from '@/utils/achievement-celebration';
 import { STREAK_MILESTONE_REWARDS } from '@/utils/streak-engine';
+import { resetIdealSkinOnboardingForDebug } from '@/utils/companion-content-storage';
+import { resetDevSubscriptionSimulator } from '@/utils/dev-subscription-simulator';
+import { resetKatchimeraWardrobeForDebug } from '@/utils/katchimera-wardrobe-storage';
+import { resetLaunchCompanionBondsForDebug } from '@/utils/companion-bond-storage';
 
 export default function ExploreScreen() {
   const router = useRouter();
@@ -64,6 +68,27 @@ export default function ExploreScreen() {
     beats: string[] | null;
   } | null>(null);
   const [backfilling, setBackfilling] = useState(false);
+
+  const handleResetIdealSkinOnboarding = () => {
+    Alert.alert(
+      'Reset skin questionnaires?',
+      'This clears applied skins, chat progress, and bond levels. Steppling, Baristabbit, and Flexel will restart at question one with 0 bond. Local Plus access will reset to Free.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            resetIdealSkinOnboardingForDebug();
+            resetKatchimeraWardrobeForDebug();
+            resetLaunchCompanionBondsForDebug();
+            resetDevSubscriptionSimulator();
+            Alert.alert('Katchimeras reset', 'Skins, conversations, and bond are reset. Open a launch Katchimera to begin its questionnaire from question one.');
+          },
+        },
+      ],
+    );
+  };
   const [promptPhotoLoading, setPromptPhotoLoading] = useState(false);
   const [achievementPreview, setAchievementPreview] = useState<CompanionAchievementDef | null>(null);
   const [lastAchievementPreviewId, setLastAchievementPreviewId] = useState<string | null>(null);
@@ -404,6 +429,7 @@ export default function ExploreScreen() {
                 </View>
                 <KatchaButton label="🔄 Reset to fresh profile (full first-run)" onPress={handleFreshProfile} variant="primary" />
                 <KatchaButton label="Reset today only" onPress={handleResetToday} variant="secondary" />
+                <KatchaButton label="Reset Katchimera skin questionnaires" onPress={handleResetIdealSkinOnboarding} variant="secondary" />
                 <KatchaButton
                   label="Unhatch egg · replay adaptive questions"
                   onPress={() => handlePrepareTodayRehatch('adaptive')}

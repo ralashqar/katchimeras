@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeInUp, useReducedMotion } from 'react-native-reanimated';
@@ -19,7 +20,8 @@ import type {
   ConversationSession,
 } from '@/types/companion-conversation';
 import type { KatchimeraSkinId } from '@/types/katchimera';
-import { conversationNode } from '@/utils/companion-conversation';
+import { conversationGameQuestion, conversationNode } from '@/utils/companion-conversation';
+import { getCreatureVisual } from '@/game/days';
 import { companionHomeHeroSpacer } from '@/utils/companion-home-layout';
 import type { KingdomSkinOption } from '@/utils/katchimera-wardrobe';
 import type { CompanionMemory } from '@/utils/companion-content';
@@ -42,7 +44,7 @@ export function conversationSpeechLine(
   if (!node) return 'We can stay here quietly for a moment.';
   if (node.kind === 'choice' || node.kind === 'poll') return conversationPrompt(node.prompt, definition, session);
   if (node.kind === 'profile_game' || node.kind === 'insight_game') {
-    const question = node.questions[session.gameQuestionIndex];
+    const question = conversationGameQuestion(node, session);
     const priorOptionId = session.turns.at(-1)?.optionId;
     return (priorOptionId ? question?.promptByPriorOptionId?.[priorOptionId] : null) ?? question?.prompt ?? node.title;
   }
@@ -60,14 +62,12 @@ export function CompanionConversationScene({
   developerContent,
   name,
   onAnswer,
-  onArchive,
   onClose,
   onContinue,
   onEquipForm,
   onMemoryDecision,
   onGoalDecision,
   onInsightDecision,
-  onAdjustInsight,
   onKeepTalking,
   onDismissOutcome,
   onOpenOutcomeDestination,
@@ -85,14 +85,12 @@ export function CompanionConversationScene({
   developerContent?: ReactNode;
   name: string;
   onAnswer: (optionId: string) => void;
-  onArchive: () => void;
   onClose: () => void;
   onContinue: () => void;
   onEquipForm: (formId: KatchimeraSkinId) => void;
   onMemoryDecision: (remember: boolean, summary: string) => void;
   onGoalDecision: (selectedTemplateIds: readonly string[] | null, node: Extract<ConversationNode, { kind: 'goal_proposal' }>) => void;
   onInsightDecision: (accept: boolean, node: Extract<ConversationNode, { kind: 'insight_reveal' }>) => void;
-  onAdjustInsight: (questionIndex?: number) => void;
   onKeepTalking: (poolId?: string) => void;
   onDismissOutcome: () => void;
   onOpenOutcomeDestination: (destination: ConversationOutcomeDestination) => void;
@@ -109,13 +107,14 @@ export function CompanionConversationScene({
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
+  const [changingPendingAnswer, setChangingPendingAnswer] = useState(false);
   const node = conversationNode(definition, session.currentNodeId);
   const lastTurn = session.turns.at(-1);
   const lastLabel = optionLabel(definition, session, lastTurn?.optionId ?? null);
   const haptic = () => {
     if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
   };
-  const answer = (optionId: string) => { haptic(); onAnswer(optionId); };
+  const answer = (optionId: string) => { haptic(); setChangingPendingAnswer(false); onAnswer(optionId); };
   const next = () => { haptic(); onContinue(); };
   const progress = conversationProgress(definition, session);
   const showConversationProgress = !session.outcomePresentation
@@ -190,14 +189,6 @@ export function CompanionConversationScene({
           </View>
         </> : null}
 
-        {showConversationProgress && lastLabel && session.pendingReply === undefined ? (
-          <View style={{ alignSelf: 'flex-end', backgroundColor: 'rgba(255,255,255,0.56)', borderCurve: 'continuous', borderRadius: 18, maxWidth: '88%', paddingHorizontal: 13, paddingVertical: 9 }}>
-            <ThemedText selectable style={{ fontSize: 13, fontWeight: '800', lineHeight: 18 }} lightColor="#5D4630" darkColor="#5D4630">
-              {lastLabel}
-            </ThemedText>
-          </View>
-        ) : null}
-
         {session.outcomePresentation ? (
           <ConversationOutcomeCard
             outcome={session.outcomePresentation}
@@ -210,16 +201,22 @@ export function CompanionConversationScene({
           />
         ) : session.pendingReply !== undefined ? (
           <View style={{ gap: 12 }}>
-            <ChoiceOptions
+            {changingPendingAnswer ? <ChoiceOptions
               onAnswer={answer}
               options={answeredOptions(definition, session)}
               selectedOptionId={lastTurn?.optionId ?? null}
-            />
-            <ThemedText selectable style={{ fontSize: 11, fontWeight: '700', lineHeight: 15, textAlign: 'center' }} lightColor="#806B56" darkColor="#806B56">
-              You can change your answer before continuing.
-            </ThemedText>
+            /> : <View style={{ alignItems: 'center', backgroundColor: '#F5D985', borderColor: 'rgba(139,96,29,0.36)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 10, paddingHorizontal: 14, paddingVertical: 11 }}>
+              <View style={{ alignItems: 'center', backgroundColor: '#806040', borderRadius: 999, height: 26, justifyContent: 'center', width: 26 }}>
+                <IconSymbol color="#FFF8E7" name="checkmark" size={13} weight="bold" />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <ThemedText selectable style={{ fontSize: 9.5, fontWeight: '900', letterSpacing: 0.9 }} lightColor="#806126" darkColor="#806126">YOUR ANSWER</ThemedText>
+                <ThemedText selectable style={{ fontSize: 14, fontWeight: '900', lineHeight: 19 }} lightColor="#3B2C20" darkColor="#3B2C20">{lastLabel}</ThemedText>
+              </View>
+            </View>}
             {session.pollResult ? <PollResult session={session} definition={definition} /> : null}
             <PrimaryAction label={session.pollResult ? 'See the result' : 'Continue'} onPress={next} />
+            <SecondaryAction label={changingPendingAnswer ? 'Keep this answer' : 'Change answer'} onPress={() => setChangingPendingAnswer((current) => !current)} />
           </View>
         ) : session.status === 'completed' || node?.kind === 'end' ? (
           session.preview ? <View style={{ alignItems: 'center', gap: 10, paddingVertical: 6 }}>
@@ -239,16 +236,11 @@ export function CompanionConversationScene({
         ) : node?.kind === 'poll' ? (
           <ChoiceOptions options={node.options} onAnswer={answer} />
         ) : node?.kind === 'profile_game' || node?.kind === 'insight_game' ? (
-          <View style={{ gap: 12 }}>
-            <ThemedText selectable style={{ fontSize: 13, lineHeight: 18 }} lightColor="#6E5B48" darkColor="#6E5B48">
-              {node.questions[session.gameQuestionIndex]?.helperText ?? 'Choose quickly. There is no wrong form.'}
-            </ThemedText>
-            <ChoiceOptions options={node.questions[session.gameQuestionIndex]?.options ?? []} onAnswer={answer} />
-          </View>
+          <ChoiceOptions options={conversationGameQuestion(node, session)?.options ?? []} onAnswer={answer} />
         ) : node?.kind === 'form_reveal' ? (
-          <FormReveal node={node} onContinue={next} onEquip={onEquipForm} preview={Boolean(session.preview)} session={session} skins={skins} />
+          <FormReveal definition={definition} node={node} onContinue={next} onEquip={onEquipForm} preview={Boolean(session.preview)} session={session} skins={skins} />
         ) : node?.kind === 'insight_reveal' ? (
-          <InsightReveal node={node} onAdjust={onAdjustInsight} onDecision={onInsightDecision} preview={Boolean(session.preview)} session={session} />
+          <InsightReveal node={node} onDecision={onInsightDecision} preview={Boolean(session.preview)} session={session} />
         ) : node?.kind === 'memory_proposal' ? (
           <MemoryProposal node={node} onDecision={onMemoryDecision} session={session} />
         ) : node?.kind === 'goal_proposal' ? (
@@ -273,7 +265,6 @@ export function CompanionConversationScene({
             {questOffer ? <SecondaryAction label="Not now" onPress={() => onQuestHandoff(false, node)} /> : null}
           </View>
         ) : null}
-        {session.status === 'active' && !session.preview && (node?.kind === 'choice' || node?.kind === 'poll' || node?.kind === 'profile_game' || node?.kind === 'insight_game') ? <SecondaryAction label="End this conversation" onPress={onArchive} /> : null}
       </Animated.View>
       {developerContent}
     </ScrollView>
@@ -490,7 +481,8 @@ function ConversationOutcomeCard({ outcome, onClose, onKeepTalking, onOpenDestin
   </Animated.View>;
 }
 
-function FormReveal({ node, onContinue, onEquip, preview, session, skins }: {
+function FormReveal({ definition, node, onContinue, onEquip, preview, session, skins }: {
+  definition: ConversationDefinition;
   node: Extract<ConversationNode, { kind: 'form_reveal' }>;
   onContinue: () => void;
   onEquip: (id: KatchimeraSkinId) => void;
@@ -503,67 +495,52 @@ function FormReveal({ node, onContinue, onEquip, preview, session, skins }: {
   const top = skins.find((skin) => skin.id === topId);
   const topName = top?.displayName ?? katchimeraSkinById.get(topId)?.displayName ?? topId;
   const runnerName = runnerId ? skins.find((skin) => skin.id === runnerId)?.displayName ?? katchimeraSkinById.get(runnerId)?.displayName : null;
+  const topVisual = top ? getCreatureVisual(top.visualKey) : null;
+  const reasons = session.turns
+    .filter((turn) => Boolean(turn.questionId))
+    .slice(-3)
+    .map((turn) => optionLabel(definition, session, turn.optionId))
+    .filter((label): label is string => Boolean(label));
   return <View style={{ gap: 11 }}>
     <View style={{ backgroundColor: '#FFF5D8', borderCurve: 'continuous', borderRadius: 22, gap: 8, padding: 16 }}>
       <ThemedText selectable style={{ fontSize: 11, fontWeight: '900', letterSpacing: 1.1 }} lightColor="#8B672E" darkColor="#8B672E">YOUR CLOSEST FORM</ThemedText>
+      {topVisual ? <View style={{ alignItems: 'center', height: 170, justifyContent: 'center' }}>
+        <Image contentFit="contain" source={topVisual.source} style={{ height: 170, width: '100%' }} transition={220} />
+      </View> : null}
       <ThemedText selectable style={{ fontSize: 26, fontWeight: '900' }} lightColor="#3B2C20" darkColor="#3B2C20">{topName}</ThemedText>
       <ThemedText selectable style={{ fontSize: 14, lineHeight: 20 }} lightColor="#64513B" darkColor="#64513B">{node.descriptions[topId] ?? 'A form that fits the choices you made today.'}</ThemedText>
+      <ThemedText selectable style={{ fontSize: 9.5, fontWeight: '900', letterSpacing: 1 }} lightColor="#806126" darkColor="#806126">BECAUSE YOU CHOSE</ThemedText>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+        {reasons.map((reason) => <View key={reason} style={{ backgroundColor: 'rgba(217,164,62,0.15)', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 6 }}>
+          <ThemedText selectable style={{ fontSize: 10.5, fontWeight: '800' }} lightColor="#74572C" darkColor="#74572C">{reason}</ThemedText>
+        </View>)}
+      </View>
       {runnerName ? <ThemedText selectable style={{ fontSize: 12, fontWeight: '800' }} lightColor="#806126" darkColor="#806126">Runner-up: {runnerName}</ThemedText> : null}
       {!top?.unlocked ? <ThemedText selectable style={{ fontSize: 12, lineHeight: 17 }} lightColor="#806126" darkColor="#806126">Not discovered yet. Its hatch cues will stay visible in your collection.</ThemedText> : null}
     </View>
-    {top?.unlocked && top.id !== session.formId && !preview ? <PrimaryAction label={`Equip ${topName}`} onPress={() => onEquip(top.id)} /> : null}
+    {top && top.id !== session.formId && !preview ? <PrimaryAction label={`Equip ${topName}`} onPress={() => onEquip(top.id)} /> : null}
     <SecondaryAction label="Continue" onPress={onContinue} />
   </View>;
 }
 
-function InsightReveal({ node, onAdjust, onDecision, preview, session }: {
+function InsightReveal({ node, onDecision, preview, session }: {
   node: Extract<ConversationNode, { kind: 'insight_reveal' }>;
-  onAdjust: (questionIndex?: number) => void;
   onDecision: (accept: boolean, node: Extract<ConversationNode, { kind: 'insight_reveal' }>) => void;
   preview: boolean;
   session: ConversationSession;
 }) {
   const result = session.insightResult;
-  const definitionQuestions = session.turns
-    .filter((turn) => Boolean(turn.questionId))
-    .map((turn) => ({ turn, label: result ? result.supportingTraits : [] }));
   if (!result) return <View style={{ gap: 10 }}>
     <ThemedText selectable style={{ fontSize: 14, lineHeight: 20, textAlign: 'center' }} lightColor="#64513B" darkColor="#64513B">I could not resolve this result yet. Try the conversation again.</ThemedText>
-    <SecondaryAction label="Review my answers" onPress={onAdjust} />
+    <SecondaryAction label="Close" onPress={() => onDecision(false, node)} />
   </View>;
-  return <Animated.View entering={FadeInUp.duration(260)} style={{ gap: 12 }}>
-    <View style={{ backgroundColor: '#FFF6DA', borderColor: 'rgba(174,119,38,0.36)', borderCurve: 'continuous', borderRadius: 25, borderWidth: 1, boxShadow: '0 12px 28px rgba(112,76,30,0.14)', gap: 11, overflow: 'hidden', padding: 17 }}>
-      <View style={{ alignItems: 'center', flexDirection: 'row', gap: 11 }}>
-        <View style={{ alignItems: 'center', backgroundColor: '#D9A43E', borderColor: 'rgba(255,255,255,0.72)', borderRadius: 999, borderWidth: 2, height: 48, justifyContent: 'center', width: 48 }}>
-          <IconSymbol color="#FFF9E9" name="sparkles" size={22} weight="bold" />
-        </View>
-        <View style={{ flex: 1, gap: 2 }}>
-          <ThemedText selectable style={{ fontSize: 10, fontWeight: '900', letterSpacing: 1.2 }} lightColor="#8B672E" darkColor="#8B672E">A NEW INSIGHT</ThemedText>
-          <ThemedText selectable style={{ fontSize: 23, fontWeight: '900', lineHeight: 27 }} lightColor="#38291D" darkColor="#38291D">{result.title}</ThemedText>
-        </View>
-      </View>
-      <ThemedText selectable style={{ fontSize: 15, fontWeight: '700', lineHeight: 22 }} lightColor="#4D3B2A" darkColor="#4D3B2A">{result.summary}</ThemedText>
-      {result.secondaryTitle ? <View style={{ backgroundColor: 'rgba(217,164,62,0.12)', borderRadius: 15, gap: 3, paddingHorizontal: 12, paddingVertical: 10 }}>
-        <ThemedText selectable style={{ fontSize: 9.5, fontWeight: '900', letterSpacing: 1 }} lightColor="#806126" darkColor="#806126">A SECONDARY THREAD</ThemedText>
-        <ThemedText selectable style={{ fontSize: 13, fontWeight: '800', lineHeight: 18 }} lightColor="#5E4932" darkColor="#5E4932">You also showed signs of {result.secondaryTitle}.</ThemedText>
-      </View> : null}
-      <ThemedText selectable style={{ fontSize: 9.5, fontWeight: '900', letterSpacing: 1 }} lightColor="#806126" darkColor="#806126">WHY THIS RESULT</ThemedText>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
-        {result.supportingTraits.map((trait) => <View key={trait} style={{ backgroundColor: 'rgba(217,164,62,0.15)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 }}>
-          <ThemedText selectable style={{ fontSize: 11, fontWeight: '800' }} lightColor="#74572C" darkColor="#74572C">{trait}</ThemedText>
-        </View>)}
-      </View>
-      {!preview ? <View style={{ borderTopColor: 'rgba(126,88,39,0.16)', borderTopWidth: 1, gap: 7, paddingTop: 11 }}>
-        <ThemedText selectable style={{ fontSize: 9.5, fontWeight: '900', letterSpacing: 1 }} lightColor="#806126" darkColor="#806126">REVIEW YOUR ANSWERS</ThemedText>
-        {definitionQuestions.map(({ turn }, index) => <Pressable key={turn.id} accessibilityHint="Returns to this question and recalculates later answers" accessibilityRole="button" onPress={() => onAdjust(index)} style={({ pressed }) => ({ alignItems: 'center', borderRadius: 12, flexDirection: 'row', gap: 8, minHeight: 38, opacity: pressed ? 0.65 : 1, paddingHorizontal: 4 })}>
-          <ThemedText selectable numberOfLines={1} style={{ flex: 1, fontSize: 11.5, fontWeight: '800' }} lightColor="#5E4932" darkColor="#5E4932">{result.supportingTraits[index] ?? `Answer ${index + 1}`}</ThemedText>
-          <ThemedText selectable style={{ fontSize: 10.5, fontWeight: '800' }} lightColor="#8B672E" darkColor="#8B672E">Change</ThemedText>
-        </Pressable>)}
-      </View> : null}
+  return <Animated.View entering={FadeInUp.duration(260)} style={{ gap: 10 }}>
+    <View style={{ backgroundColor: '#FFF6DA', borderColor: 'rgba(174,119,38,0.3)', borderCurve: 'continuous', borderRadius: 21, borderWidth: 1, gap: 6, paddingHorizontal: 16, paddingVertical: 15 }}>
+      <ThemedText selectable style={{ fontSize: 22, fontWeight: '900', lineHeight: 26 }} lightColor="#38291D" darkColor="#38291D">{result.title}</ThemedText>
+      <ThemedText selectable style={{ fontSize: 14, lineHeight: 20 }} lightColor="#4D3B2A" darkColor="#4D3B2A">{result.summary}</ThemedText>
     </View>
     <PrimaryAction label={preview ? 'Preview this outcome' : 'Save this insight'} onPress={() => onDecision(true, node)} />
-    {!preview ? <SecondaryAction label="Replay from the beginning" onPress={() => onAdjust(0)} /> : null}
-    <SecondaryAction label={preview ? 'Continue preview' : 'Not quite — don’t save this'} onPress={() => onDecision(false, node)} />
+    <SecondaryAction label={preview ? 'Continue preview' : 'Don’t save'} onPress={() => onDecision(false, node)} />
   </Animated.View>;
 }
 
@@ -640,8 +617,9 @@ function conversationProgress(definition: ConversationDefinition, session: Conve
   const node = conversationNode(definition, session.currentNodeId);
   if (session.status === 'completed') return { label: 'Done', ratio: 1 };
   if (node?.kind === 'profile_game' || node?.kind === 'insight_game') {
-    const total = node.questions.length;
-    const current = Math.min(total, session.gameQuestionIndex + 1);
+    const total = node.kind === 'profile_game' ? 3 : node.questions.length;
+    const answered = session.turns.filter((turn) => turn.nodeId === node.id).length;
+    const current = Math.min(total, answered + (session.pendingReply !== undefined ? 0 : 1));
     return { label: `${current} of ${total}`, ratio: current / total };
   }
   const target = Math.max(1, session.encounterTargetTurns ?? 3);

@@ -6,6 +6,7 @@ import type {
   ConversationOption,
   ConversationPollResult,
   ConversationSession,
+  ConversationMode,
   ConversationV2FamilyId,
   QueuedConversationSignal,
 } from '@/types/companion-conversation';
@@ -28,6 +29,16 @@ export function conversationNode(
   return definition.nodes.find((node) => node.id === nodeId) ?? null;
 }
 
+export function conversationGameQuestion(
+  node: Extract<ConversationNode, { kind: 'profile_game' | 'insight_game' }>,
+  session: ConversationSession
+) {
+  if (node.kind === 'profile_game' && session.gameQuestionId) {
+    return node.questions.find((question) => question.id === session.gameQuestionId) ?? null;
+  }
+  return node.questions[session.gameQuestionIndex] ?? null;
+}
+
 export function createConversationSession(input: {
   definition: ConversationDefinition;
   formId: KatchimeraSkinId;
@@ -41,6 +52,10 @@ export function createConversationSession(input: {
   encounterTurns?: number;
 }): ConversationSession {
   const createdAt = input.createdAt ?? Date.now();
+  const entryNode = conversationNode(input.definition, input.definition.entryNodeId);
+  const gameQuestionId = entryNode?.kind === 'profile_game'
+    ? entryNode.entryQuestionId ?? entryNode.questions[0]?.id
+    : undefined;
   return {
     id: input.sessionId ?? `companion-conversation-v2:${input.definition.familyId}:${input.dayId}`,
     definitionId: input.definition.id,
@@ -51,6 +66,7 @@ export function createConversationSession(input: {
     servedDayId: input.dayId,
     currentNodeId: input.definition.entryNodeId,
     gameQuestionIndex: 0,
+    ...(gameQuestionId ? { gameQuestionId } : {}),
     turns: [],
     affinityScores: {},
     evidenceRefs: [...(input.evidenceRefs ?? [])],
@@ -100,14 +116,17 @@ export function answerConversation(
     };
   }
   if (node.kind !== 'profile_game' && node.kind !== 'insight_game') return { session, completedGame: false };
-  const question = node.questions[workingSession.gameQuestionIndex];
+  const question = conversationGameQuestion(node, workingSession);
   const option = question?.options.find((candidate) => candidate.id === optionId);
   if (!question || !option) return { session, completedGame: false };
   const affinityScores = node.kind === 'profile_game'
     ? mergeAffinity(workingSession.affinityScores, option.affinity)
     : workingSession.affinityScores;
-  const nextQuestionIndex = workingSession.gameQuestionIndex + 1;
-  const completedGame = nextQuestionIndex >= node.questions.length;
+  const sequentialNext = node.questions[workingSession.gameQuestionIndex + 1]?.id ?? null;
+  const nextQuestionId = node.kind === 'profile_game'
+    ? option.nextQuestionId === undefined ? sequentialNext : option.nextQuestionId
+    : sequentialNext;
+  const completedGame = nextQuestionId === null;
   const formResult = completedGame && node.kind === 'profile_game' ? resolveFormResult(affinityScores, workingSession.formId) : undefined;
   const turns = [...workingSession.turns, {
     id: `conversation-turn:${workingSession.id}:${workingSession.turns.length + 1}`,
@@ -127,7 +146,10 @@ export function answerConversation(
     completedGame,
     session: {
       ...workingSession,
-      gameQuestionIndex: nextQuestionIndex,
+      gameQuestionIndex: node.kind === 'profile_game'
+        ? Math.max(0, node.questions.findIndex((candidate) => candidate.id === nextQuestionId))
+        : workingSession.gameQuestionIndex + 1,
+      ...(node.kind === 'profile_game' && nextQuestionId ? { gameQuestionId: nextQuestionId } : {}),
       pendingReply: option.reply,
       pendingNextNodeId: completedGame ? node.revealNodeId : node.id,
       turns,
@@ -282,6 +304,52 @@ export function selectConversationFromPool(input: {
   return chooseRecentAware(candidates, input.sessions, input.seed);
 }
 
+export function selectConversationForMode(input: {
+  familyId: ConversationV2FamilyId;
+  mode: ConversationMode;
+  definitions: readonly ConversationDefinition[];
+  sessions: readonly ConversationSession[];
+  seed: string;
+  hasActiveFocus?: boolean;
+  hasActiveQuest?: boolean;
+}): ConversationDefinition | null {
+  const talkPoolIds = new Set(input.definitions.flatMap((definition) => definition.isOpener
+    ? definition.nodes.flatMap((node) => node.kind === 'choice'
+        ? node.options.flatMap((option) => option.transition?.kind === 'pool'
+            && option.transition.poolId !== 'play'
+            && option.transition.poolId !== 'goals'
+          ? [option.transition.poolId]
+          : [])
+        : [])
+    : []));
+  const candidates = input.definitions.filter((definition) => {
+    if (definition.familyId !== input.familyId || definition.contextualOnly) return false;
+    if (definition.requiresActiveFocus && !input.hasActiveFocus) return false;
+    if (definition.requiresNoActiveFocus && input.hasActiveFocus) return false;
+    if (definition.requiresNoActiveQuest && input.hasActiveQuest) return false;
+    if (input.mode === 'play') return definition.format === 'profile_game' || definition.format === 'poll';
+    if (input.mode === 'discover') return definition.format === 'insight_game';
+    if (input.mode === 'plan') return definition.id.endsWith(':goal-discovery');
+    return !definition.isOpener
+      && definition.format !== 'poll'
+      && definition.format !== 'profile_game'
+      && Boolean(definition.tags?.some((tag) => talkPoolIds.has(tag)));
+  });
+  if (input.mode === 'play') {
+    const formGame = candidates.find((definition) =>
+      definition.format === 'profile_game'
+      && !input.sessions.some((session) => session.definitionId === definition.id && session.status === 'completed')
+    );
+    if (formGame) return formGame;
+  }
+  return chooseRecentAware(candidates, input.sessions, input.seed);
+}
+
+export function conversationQuestionCount(definition: ConversationDefinition): number {
+  if (definition.format === 'profile_game') return 3;
+  return maximumQuestionCount(definition);
+}
+
 export function validateConversationDefinitions(definitions: readonly ConversationDefinition[]): string[] {
   const issues: string[] = [];
   const definitionIds = new Set<string>();
@@ -307,7 +375,7 @@ export function validateConversationDefinitions(definitions: readonly Conversati
         }
       }
       if (node.kind === 'profile_game' || node.kind === 'insight_game') {
-        if (node.kind === 'profile_game' && node.questions.length !== 3) issues.push(`${definition.id}:${node.id}: form game must use exactly three questions`);
+        if (node.kind === 'profile_game') issues.push(...validateProfileQuestionGraph(definition.id, node));
         if (node.kind === 'insight_game' && node.questions.length < 4) issues.push(`${definition.id}:${node.id}: insight game needs at least four questions`);
         if (node.kind === 'insight_game' && node.questions.length > 6) issues.push(`${definition.id}:${node.id}: insight game exceeds six questions`);
         for (const [questionIndex, question] of node.questions.entries()) {
@@ -374,6 +442,46 @@ function maximumQuestionCount(definition: ConversationDefinition): number {
     return own + Math.max(0, ...referencedNodeIds(node).map((next) => next ? visit(next, nextSeen) : 0));
   };
   return visit(definition.entryNodeId, new Set());
+}
+
+export function validateProfileQuestionGraph(
+  definitionId: string,
+  node: Extract<ConversationNode, { kind: 'profile_game' }>
+): string[] {
+  const issues: string[] = [];
+  const byId = new Map(node.questions.map((question) => [question.id, question]));
+  const entryId = node.entryQuestionId ?? node.questions[0]?.id;
+  if (!entryId || !byId.has(entryId)) return [`${definitionId}:${node.id}: missing profile-game entry question`];
+  const reachable = new Set<string>();
+  const visit = (questionId: string, depth: number, path: ReadonlySet<string>) => {
+    if (path.has(questionId)) {
+      issues.push(`${definitionId}:${node.id}:${questionId}: profile-game question cycle`);
+      return;
+    }
+    const question = byId.get(questionId);
+    if (!question) {
+      issues.push(`${definitionId}:${node.id}:${questionId}: missing profile-game question`);
+      return;
+    }
+    reachable.add(questionId);
+    const nextPath = new Set(path).add(questionId);
+    for (const option of question.options) {
+      const sequentialIndex = node.questions.findIndex((candidate) => candidate.id === questionId) + 1;
+      const nextId = option.nextQuestionId === undefined
+        ? node.questions[sequentialIndex]?.id ?? null
+        : option.nextQuestionId;
+      if (!nextId) {
+        if (depth !== 3) issues.push(`${definitionId}:${node.id}:${questionId}:${option.id}: form-game path must use exactly three answers`);
+      } else {
+        visit(nextId, depth + 1, nextPath);
+      }
+    }
+  };
+  visit(entryId, 1, new Set());
+  for (const question of node.questions) {
+    if (!reachable.has(question.id)) issues.push(`${definitionId}:${node.id}:${question.id}: unreachable profile-game question`);
+  }
+  return [...new Set(issues)];
 }
 
 function hasOutcomeLessEnding(definition: ConversationDefinition): boolean {
@@ -451,6 +559,9 @@ function rewindPendingAnswer(
   return {
     ...session,
     gameQuestionIndex: questionIndex >= 0 ? questionIndex : session.gameQuestionIndex,
+    ...((node?.kind === 'profile_game' || node?.kind === 'insight_game') && removedTurn.questionId
+      ? { gameQuestionId: removedTurn.questionId }
+      : {}),
     pendingReply: undefined,
     pendingNextNodeId: undefined,
     lastReply: replyForTurn(definition, turns.at(-1)) ?? undefined,

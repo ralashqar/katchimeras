@@ -149,6 +149,8 @@ export type CompanionInteractionState = {
 
 export type CompanionRoute =
   | { kind: 'dashboard' }
+  | { kind: 'chat_lobby' }
+  | { kind: 'conversation' }
   | { kind: 'visit' }
   | { kind: 'shared_history' }
   | { kind: 'introduction' }
@@ -162,6 +164,8 @@ export type CompanionInteractionAction =
   | { type: 'select_destination'; destination: CompanionDestination }
   | { type: 'open_introduction' }
   | { type: 'show_dashboard' }
+  | { type: 'show_chat_lobby' }
+  | { type: 'show_conversation' }
   | { type: 'show_visit' }
   | { type: 'open_shared_history' }
   | { type: 'review_item'; itemId: string | null }

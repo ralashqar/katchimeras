@@ -141,7 +141,8 @@ test('You questionnaires require answer confirmation and task consent', () => {
   assert.doesNotMatch(zodiac, /label="Save reflection"/);
   assert.match(interaction, /Your goals and next steps/);
   assert.match(interaction, /emphasized=\{Boolean\(activeJourneyFocus/);
-  assert.match(interaction, /bubbleBody=\{quickGoalPickerOpen \?.*destinationHeroBody\}/);
+  assert.match(interaction, /bubbleBody=\{idealSkinPreparing/);
+  assert.match(interaction, /quickGoalPickerOpen \? 'Choose one for today, or make a small goal of your own\.' : destinationHeroBody/);
   assert.match(interaction, /bubbleVariant=\{quickGoalPickerOpen \? 'questionnaire' : 'default'\}/);
   assert.match(interaction, /showSpeechBubble/);
   assert.doesNotMatch(interaction, /styles\.youHeading|styles\.youIntro/);
@@ -149,6 +150,33 @@ test('You questionnaires require answer confirmation and task consent', () => {
   assert.doesNotMatch(interaction, /talk about you/i);
   assert.doesNotMatch(journey, /Find a new focus/);
   assert.doesNotMatch(journey, /previous focus kept in history/);
+});
+
+test('bond rewards queue, fly into the creature, respect reduced motion, and gate level-up splashes', () => {
+  const overlay = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'goals', 'bond-reward-overlay.tsx'), 'utf8');
+  const stage = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-home-environment-stage.tsx'), 'utf8');
+  const interaction = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'), 'utf8');
+  const levelUp = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-bond-level-up-celebration.tsx'), 'utf8');
+  const kingdom = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-companion-screen.tsx'), 'utf8');
+
+  assert.match(overlay, /Math\.min\(5/);
+  assert.match(overlay, /onTokenArrive/);
+  assert.match(overlay, /useReducedMotion/);
+  assert.match(overlay, /Haptics\.impactAsync/);
+  assert.match(stage, /rewardPulseKey/);
+  assert.match(stage, /withSequence/);
+  assert.match(interaction, /pendingBondCelebration/);
+  assert.match(interaction, /2_800/);
+  assert.match(levelUp, /Bond level up/);
+  assert.match(levelUp, /RisingArrow/);
+  assert.match(kingdom, /!bondLevelUp && !quests\.selectedPendingBondCelebration/);
+});
+
+test('every accepted conversation insight queues bond once per session, including updated insight slots', () => {
+  const questHook = fs.readFileSync(path.join(process.cwd(), 'hooks', 'use-kingdom-quests.ts'), 'utf8');
+  assert.match(questHook, /id: `insight-saved:\$\{selectedResident\.creature\.creatureId\}:\$\{selectedConversationSession\.id\}:\$\{node\.id\}`/);
+  assert.match(questHook, /kind: 'insight_saved'/);
+  assert.doesNotMatch(questHook, /if \(accept && isNewInsight/);
 });
 
 test('conversation outcomes stay visible and provisional answers remain editable', () => {
@@ -168,12 +196,11 @@ test('conversation outcomes stay visible and provisional answers remain editable
     path.join(process.cwd(), 'hooks', 'use-kingdom-quests.ts'),
     'utf8',
   );
-  assert.match(scene, /You can change your answer before continuing/);
+  assert.match(scene, /Change answer/);
   assert.match(scene, /<ConversationOutcomeCard/);
   assert.doesNotMatch(scene, /CONVERSATION TAKEAWAY|Finish this thought|reflection_reveal/);
   assert.match(scene, /Save this insight/);
-  assert.match(scene, /A SECONDARY THREAD/);
-  assert.match(scene, /WHY THIS RESULT/);
+  assert.doesNotMatch(scene, /A SECONDARY THREAD|WHY THIS RESULT|REVIEW YOUR ANSWERS|Replay from the beginning/);
   assert.match(scene, /A QUEST PICKED FOR YOU/);
   assert.match(scene, /label="Take this quest"/);
   assert.doesNotMatch(scene, /There is no matching quest available right now/);
@@ -192,7 +219,8 @@ test('conversation outcomes stay visible and provisional answers remain editable
   assert.match(stage, /<CelebrationParticles/);
   assert.match(interaction, /onOpenOutcomeDestination/);
   assert.doesNotMatch(interaction, /if \(accept\) selectExperienceDestination\('quest'\)/);
-  assert.match(scene, /showConversationProgress && lastLabel/);
+  assert.doesNotMatch(scene, /showConversationProgress && lastLabel/);
+  assert.doesNotMatch(scene, /Choose quickly\. There is no wrong form\./);
   assert.match(scene, /\{showConversationProgress \? <>/);
   assert.doesNotMatch(scene, /session\.status === 'completed' \? 'KEEP TALKING'/);
 });
@@ -329,11 +357,22 @@ test('focused companion routes unwind to their destination, then home, then King
   assert.equal(companionRouteBackAction(home), 'close_experience');
 });
 
-test('Chat and Shared History return to the dashboard', () => {
+test('the launch chat lobby nests conversations while Shared History returns to the dashboard', () => {
   const initial = createCompanionInteractionState({});
-  const chat = companionInteractionReducer(initial, { type: 'show_visit' });
-  assert.deepEqual(chat.route, { kind: 'visit' });
+  const chat = companionInteractionReducer(initial, { type: 'show_chat_lobby' });
+  assert.deepEqual(chat.route, { kind: 'chat_lobby' });
   assert.equal(companionRouteBackAction(chat), 'return_to_home');
+  const conversation = companionInteractionReducer(chat, { type: 'show_conversation' });
+  assert.deepEqual(conversation.route, { kind: 'conversation' });
+  assert.equal(companionRouteBackAction(conversation), 'return_to_chat_lobby');
+  assert.deepEqual(
+    companionInteractionReducer(conversation, { type: 'show_chat_lobby' }).route,
+    { kind: 'chat_lobby' },
+  );
+
+  const legacyVisit = companionInteractionReducer(initial, { type: 'show_visit' });
+  assert.deepEqual(legacyVisit.route, { kind: 'visit' });
+  assert.equal(companionRouteBackAction(legacyVisit), 'return_to_home');
   const history = companionInteractionReducer(initial, { type: 'open_shared_history' });
   assert.deepEqual(history.route, { kind: 'shared_history' });
   assert.equal(companionRouteBackAction(history), 'return_to_home');
@@ -359,6 +398,49 @@ test('Chat and Shared History return to the dashboard', () => {
   assert.match(interaction, /const openChat = \(\) =>/);
   assert.match(interaction, /onChat=\{openChat\}/);
   assert.doesNotMatch(interaction, /autoIntroductionCreatureRef/);
+});
+
+test('ideal-skin onboarding gates launch companions and skin equipment opens a bespoke Plus offer', () => {
+  const interaction = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'),
+    'utf8',
+  );
+  const kingdom = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-companion-screen.tsx'),
+    'utf8',
+  );
+  const questHook = fs.readFileSync(path.join(process.cwd(), 'hooks', 'use-kingdom-quests.ts'), 'utf8');
+  const paywall = fs.readFileSync(path.join(process.cwd(), 'app', 'modal.tsx'), 'utf8');
+  const profile = fs.readFileSync(path.join(process.cwd(), 'app', '(tabs)', 'explore.tsx'), 'utf8');
+
+  assert.match(questHook, /selectedIdealSkinOnboardingRequired/);
+  assert.match(questHook, /session\.currentNodeId !== selectedIdealSkinDefinition\.entryNodeId/);
+  assert.match(interaction, /startConversation\(\{ definitionId: idealSkinDefinitionId \}\)/);
+  assert.match(interaction, /if \(!hasActiveIdealSkinQuestionnaire\) \{\s*startConversation\(\{ definitionId: idealSkinDefinitionId \}\);/);
+  assert.match(interaction, /if \(!hasActiveIdealSkinQuestionnaire \|\| route\.kind === 'conversation'\) return;\s*showConversation\(\);/);
+  assert.doesNotMatch(interaction, /useLayoutEffect/);
+  assert.match(interaction, /setInterval\(\(\) => \{\s*startConversation\(\{ definitionId: idealSkinDefinitionId \}\);\s*\}, 250\)/);
+  assert.match(questHook, /const existingExplicitSession = input\.definitionId/);
+  assert.match(questHook, /if \(existingExplicitSession\) return current/);
+  assert.match(interaction, /idealSkinOnboardingRequired\s*\? props\.onClose/);
+  assert.match(kingdom, /source: 'katchimera-skin'/);
+  assert.match(kingdom, /economy\.snapshot\.activePlus \? applyWardrobeToKingdom/);
+  assert.match(paywall, /Share every day card/);
+  assert.match(paywall, /questionnaire match/);
+  assert.match(profile, /Reset Katchimera skin questionnaires/);
+  assert.match(profile, /resetDevSubscriptionSimulator\(\)/);
+  assert.match(profile, /resetKatchimeraWardrobeForDebug\(\)/);
+  assert.match(profile, /resetLaunchCompanionBondsForDebug\(\)/);
+  assert.match(profile, /begin its questionnaire from question one/);
+  assert.match(questHook, /today\?\.isoDate \?\? localDayId\(new Date\(occurredAt\)\)/);
+  assert.doesNotMatch(questHook, /if \(!selectedFamilyId \|\| !today\?\.isoDate \|\| !isConversationV2Family\(selectedFamilyId\)\) return null/);
+  assert.doesNotMatch(interaction, /label="Start questionnaire"/);
+  assert.doesNotMatch(interaction, /The first question did not open automatically/);
+  assert.match(interaction, /Preparing your first question…/);
+  assert.match(interaction, /CompanionBackAction label="Kingdom" onPress=\{props\.onClose\}/);
+  assert.match(interaction, /idealSkinOnboardingRequired \? null : \(route\.kind === 'visit'/);
+  assert.match(questHook, /setCompanionContentState\(\(current\) => \{\s*const migrated = migrateCompanionIntroduction\(current/);
+  assert.doesNotMatch(questHook, /setCompanionContentState\(visit\.state\)/);
 });
 
 test('active mini-games require confirmation and reset their instance on return', () => {
@@ -407,7 +489,7 @@ test('goal picker returns to the dedicated goals destination', () => {
   const returned = companionInteractionReducer(picker, { type: 'return_to_destination' });
 
   assert.deepEqual(returned.route, { kind: 'destination', destination: 'goals' });
-  assert.match(interaction, /route\.kind === 'visit'\s*\? visitStageSpeech/);
+  assert.match(interaction, /route\.kind === 'visit' \|\| route\.kind === 'conversation'\s*\? visitStageSpeech/);
   assert.match(interaction, /backLabel=\{quickGoalPickerOpen \? 'Goals'/);
   assert.match(interaction, /\) : !questionnaireExperience \? \(\s*<CompanionCinematicStage/);
   assert.match(interaction, /route\.kind === 'destination' \|\| route\.kind === 'dashboard' \|\| route\.kind === 'shared_history' \|\| quickGoalPickerOpen/);

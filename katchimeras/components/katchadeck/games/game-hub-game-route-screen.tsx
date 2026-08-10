@@ -169,17 +169,17 @@ export function GameHubGameRouteScreen() {
     saveCompanionQuests(next);
     const bondState = loadCompanionBondState(next, latest.resolveCompanionId, latest.homeState);
     const bond = recordCompanionBondEvent(bondState, {
-      id: `mini-game:${creatureId}:${dayId}`,
+      id: `mini-game:${creatureId}:${questId}:${dayId}`,
       creatureId,
       kind: questBondEventKind(definition),
       occurredAt: completedAt,
       dayId,
-    });
+    }, { queueCelebration: true });
     if (bond.awarded) saveCompanionBondState(bond.state);
     setRunningAttemptId(null);
     if (fromTodayCare) completeTodayCareGameRound(attemptId, completedAt);
     returnAfterRound();
-  }, [creatureId, definition, fromTodayCare, returnAfterRound]);
+  }, [creatureId, definition, fromTodayCare, questId, returnAfterRound]);
 
   const handleRunningChange = useCallback((running: boolean, attemptId?: string | null) => {
     if (running) {

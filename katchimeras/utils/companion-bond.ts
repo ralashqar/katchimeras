@@ -4,17 +4,23 @@ import { identityForCreature } from '@/utils/katchimera-identity';
 import { questDefinition, type QuestDefinition } from '@/utils/quests/definitions';
 import {
   companionIdForFamily,
+  canonicalFamilyId,
   familyIdFromCompanionId,
 } from '@/constants/katchimera-skins';
 
 export type CompanionBondEventKind =
   | 'hatch'
+  | 'ideal_skin_questionnaire_completed'
+  | 'goal_created'
+  | 'goal_completed'
   | 'real_life_quest_completed'
   | 'mini_game_completed'
   | 'quick_goal_completed'
   | 'discovery_answered'
   | 'quest_completed'
   | 'reflection_saved'
+  | 'check_in_completed'
+  | 'insight_saved'
   | 'insight_engaged'
   | 'conversation_completed';
 
@@ -27,9 +33,24 @@ export type CompanionBondEvent = {
   dayId?: string | null;
 };
 
+export type CompanionBondAwardReceipt = {
+  id: string;
+  eventId: string;
+  creatureId: string;
+  kind: CompanionBondEventKind;
+  points: number;
+  occurredAt: number;
+  beforeTotal: number;
+  afterTotal: number;
+  beforeLevel: 1 | 2 | 3 | 4;
+  afterLevel: 1 | 2 | 3 | 4;
+};
+
 export type CompanionBondState = {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   events: CompanionBondEvent[];
+  pendingCelebrations?: CompanionBondAwardReceipt[];
+  resetCutoffsByCreature?: Record<string, number>;
 };
 
 export type CompanionBondProgress = {
@@ -47,15 +68,20 @@ export type CompanionBondProgress = {
 
 export const COMPANION_BOND_REWARDS: Record<CompanionBondEventKind, number> = {
   hatch: 10,
+  ideal_skin_questionnaire_completed: 20,
+  goal_created: 15,
+  goal_completed: 20,
   real_life_quest_completed: 25,
-  mini_game_completed: 10,
+  mini_game_completed: 8,
   quick_goal_completed: 5,
   discovery_answered: 15,
   // Retained for events created before quest lanes existed.
   quest_completed: 25,
-  reflection_saved: 15,
+  reflection_saved: 10,
+  check_in_completed: 10,
+  insight_saved: 15,
   insight_engaged: 10,
-  conversation_completed: 10,
+  conversation_completed: 8,
 };
 
 export function questBondEventKind(
@@ -66,13 +92,13 @@ export function questBondEventKind(
 
 export const COMPANION_BOND_LEVELS = [
   { level: 1, label: 'New', threshold: 0 },
-  { level: 2, label: 'Familiar', threshold: 100 },
-  { level: 3, label: 'Devoted', threshold: 250 },
-  { level: 4, label: 'Kindred', threshold: 500 },
+  { level: 2, label: 'Familiar', threshold: 50 },
+  { level: 3, label: 'Devoted', threshold: 150 },
+  { level: 4, label: 'Kindred', threshold: 400 },
 ] as const;
 
 export function emptyCompanionBondState(): CompanionBondState {
-  return { schemaVersion: 1, events: [] };
+  return { schemaVersion: 2, events: [], pendingCelebrations: [], resetCutoffsByCreature: {} };
 }
 
 export function migrateCompanionBondIdentity(
@@ -90,15 +116,62 @@ export function migrateCompanionBondIdentity(
 
 export function recordCompanionBondEvent(
   state: CompanionBondState,
-  event: Omit<CompanionBondEvent, 'points'> & { points?: number }
-): { state: CompanionBondState; awarded: boolean; points: number } {
-  if (state.events.some((item) => item.id === event.id)) return { state, awarded: false, points: 0 };
+  event: Omit<CompanionBondEvent, 'points'> & { points?: number },
+  options: { queueCelebration?: boolean } = {}
+): { state: CompanionBondState; awarded: boolean; points: number; receipt: CompanionBondAwardReceipt | null } {
+  if (state.events.some((item) => item.id === event.id)) return { state, awarded: false, points: 0, receipt: null };
   const points = event.points ?? COMPANION_BOND_REWARDS[event.kind];
+  const before = companionBondProgress(state, event.creatureId);
+  const nextEvents = [...state.events, { ...event, points }];
+  const progressState = { ...state, events: nextEvents };
+  const after = companionBondProgress(progressState, event.creatureId);
+  const receipt: CompanionBondAwardReceipt = {
+    id: `bond-reward:${event.id}`,
+    eventId: event.id,
+    creatureId: event.creatureId,
+    kind: event.kind,
+    points,
+    occurredAt: event.occurredAt,
+    beforeTotal: before.totalPoints,
+    afterTotal: after.totalPoints,
+    beforeLevel: before.level,
+    afterLevel: after.level,
+  };
   const next = normaliseCompanionBondState({
-    schemaVersion: 1,
-    events: [...state.events, { ...event, points }],
+    ...state,
+    schemaVersion: 2,
+    events: nextEvents,
+    pendingCelebrations: options.queueCelebration
+      ? [...(state.pendingCelebrations ?? []), receipt]
+      : state.pendingCelebrations ?? [],
   });
-  return { state: next, awarded: true, points };
+  return { state: next, awarded: true, points, receipt };
+}
+
+export function acknowledgeCompanionBondCelebration(state: CompanionBondState, receiptId: string): CompanionBondState {
+  if (!(state.pendingCelebrations ?? []).some((item) => item.id === receiptId)) return state;
+  return { ...state, pendingCelebrations: (state.pendingCelebrations ?? []).filter((item) => item.id !== receiptId) };
+}
+
+export function resetCompanionBondForCreatures(
+  state: CompanionBondState,
+  creatureIds: readonly string[],
+  resetAt = Date.now()
+): CompanionBondState {
+  const familyFor = (id: string) => familyIdFromCompanionId(id) ?? canonicalFamilyId(id);
+  const targets = new Set(creatureIds.map(familyFor).filter(Boolean));
+  const matches = (creatureId: string) => targets.has(familyFor(creatureId));
+  const resetCutoffsByCreature = { ...(state.resetCutoffsByCreature ?? {}) };
+  for (const creatureId of creatureIds) {
+    const familyId = familyFor(creatureId);
+    if (familyId) resetCutoffsByCreature[companionIdForFamily(familyId)] = resetAt;
+  }
+  return normaliseCompanionBondState({
+    ...state,
+    events: state.events.filter((event) => !matches(event.creatureId)),
+    pendingCelebrations: (state.pendingCelebrations ?? []).filter((receipt) => !matches(receipt.creatureId)),
+    resetCutoffsByCreature,
+  });
 }
 
 export function removeCompanionBondEvent(
@@ -111,6 +184,7 @@ export function removeCompanionBondEvent(
     state: normaliseCompanionBondState({
       ...state,
       events: state.events.filter((item) => item.id !== eventId),
+      pendingCelebrations: (state.pendingCelebrations ?? []).filter((item) => item.eventId !== eventId),
     }),
     removed: true,
     points: event.points,
@@ -118,14 +192,18 @@ export function removeCompanionBondEvent(
 }
 
 export function companionBondProgress(state: CompanionBondState, creatureId: string): CompanionBondProgress {
-  const familyId = familyIdFromCompanionId(creatureId);
+  const familyId = familyIdFromCompanionId(creatureId) ?? canonicalFamilyId(creatureId);
   const canonicalCreatureId = familyId ? companionIdForFamily(familyId) : creatureId;
   const totalPoints = state.events
     .filter((event) => {
-      const eventFamilyId = familyIdFromCompanionId(event.creatureId);
+      const eventFamilyId = familyIdFromCompanionId(event.creatureId) ?? canonicalFamilyId(event.creatureId);
       return (eventFamilyId ? companionIdForFamily(eventFamilyId) : event.creatureId) === canonicalCreatureId;
     })
     .reduce((sum, event) => sum + event.points, 0);
+  return companionBondProgressForTotal(totalPoints);
+}
+
+export function companionBondProgressForTotal(totalPoints: number): CompanionBondProgress {
   const current = [...COMPANION_BOND_LEVELS].reverse().find((item) => totalPoints >= item.threshold) ?? COMPANION_BOND_LEVELS[0];
   const next = COMPANION_BOND_LEVELS.find((item) => item.level === current.level + 1) ?? null;
   const segmentTarget = next ? next.threshold - current.threshold : 0;
@@ -152,14 +230,19 @@ export function backfillQuestBondEvents(state: CompanionBondState, quests: Compa
   let next = state;
   const completedRows = quests.quests.filter((quest) => typeof quest.completedAt === 'number');
   for (const quest of completedRows) {
+    const cutoff = resetCutoffForCreature(next, quest.creatureId);
+    if ((quest.completedAt ?? 0) <= cutoff) continue;
     const matchingSubmission = quests.submissions.find((item) => item.creatureId === quest.creatureId && item.questId === quest.questId && item.submittedAt === quest.completedAt);
     const matchingAttempt = quests.attempts.find((item) => item.creatureId === quest.creatureId && item.questId === quest.questId && item.status === 'succeeded' && item.endedAt === quest.completedAt);
     const kind = questBondEventKind(questDefinition(quest.questId));
+    const legacyMiniGameId = `mini-game:${quest.creatureId}:${matchingAttempt?.dayId ?? quest.completedDayId}`;
     next = recordCompanionBondEvent(next, {
       id: matchingSubmission
         ? `quest-submission:${matchingSubmission.id}`
         : matchingAttempt && kind === 'mini_game_completed'
-          ? `mini-game:${quest.creatureId}:${matchingAttempt.dayId}`
+          ? state.events.some((event) => event.id === legacyMiniGameId)
+            ? legacyMiniGameId
+            : `mini-game:${quest.creatureId}:${quest.questId}:${matchingAttempt.dayId}`
           : matchingAttempt
             ? `quest-attempt:${matchingAttempt.id}`
             : questBondEventId(quest.creatureId, quest.questId, quest.acceptedAt),
@@ -170,6 +253,7 @@ export function backfillQuestBondEvents(state: CompanionBondState, quests: Compa
     }).state;
   }
   for (const submission of quests.submissions) {
+    if (submission.submittedAt <= resetCutoffForCreature(next, submission.creatureId)) continue;
     next = recordCompanionBondEvent(next, {
       id: `quest-submission:${submission.id}`,
       creatureId: submission.creatureId,
@@ -179,10 +263,14 @@ export function backfillQuestBondEvents(state: CompanionBondState, quests: Compa
     }).state;
   }
   for (const attempt of quests.attempts.filter((item) => item.status === 'succeeded')) {
+    if ((attempt.endedAt ?? attempt.startedAt ?? 0) <= resetCutoffForCreature(next, attempt.creatureId)) continue;
     const kind = questBondEventKind(questDefinition(attempt.questId));
+    const legacyMiniGameId = `mini-game:${attempt.creatureId}:${attempt.dayId}`;
     next = recordCompanionBondEvent(next, {
       id: kind === 'mini_game_completed'
-        ? `mini-game:${attempt.creatureId}:${attempt.dayId}`
+        ? state.events.some((event) => event.id === legacyMiniGameId)
+          ? legacyMiniGameId
+          : `mini-game:${attempt.creatureId}:${attempt.questId}:${attempt.dayId}`
         : `quest-attempt:${attempt.id}`,
       creatureId: attempt.creatureId,
       kind,
@@ -208,25 +296,41 @@ export function backfillHatchBondEvents(
     if (!day.creature) continue;
     const identity = identityForCreature(day.creature);
     if (!identity) continue;
+    const occurredAt = new Date(`${day.isoDate}T12:00:00`).getTime();
+    if (occurredAt <= resetCutoffForCreature(next, identity.companionId)) continue;
     next = recordCompanionBondEvent(next, {
       id: `hatch:${day.id}:${identity.companionId}`,
       creatureId: identity.companionId,
       kind: 'hatch',
-      occurredAt: new Date(`${day.isoDate}T12:00:00`).getTime(),
+      occurredAt,
       dayId: day.isoDate,
     }).state;
   }
   return next;
 }
 
-export function normaliseCompanionBondState(value: CompanionBondState): CompanionBondState {
+function resetCutoffForCreature(state: CompanionBondState, creatureId: string): number {
+  const familyId = familyIdFromCompanionId(creatureId) ?? canonicalFamilyId(creatureId);
+  const canonical = familyId ? companionIdForFamily(familyId) : creatureId;
+  return state.resetCutoffsByCreature?.[canonical] ?? 0;
+}
+
+export function normaliseCompanionBondState(value: CompanionBondState | Record<string, unknown>): CompanionBondState {
+  const candidate = value as Partial<CompanionBondState>;
   const seen = new Set<string>();
-  const events = Array.isArray(value?.events)
-    ? value.events.filter((event) => {
+  const events = Array.isArray(candidate?.events)
+    ? candidate.events.filter((event) => {
         if (!event?.id || !event.creatureId || seen.has(event.id) || !Number.isFinite(event.points) || event.points <= 0) return false;
         seen.add(event.id);
         return true;
-      })
+    })
     : [];
-  return { schemaVersion: 1, events };
+  const eventIds = new Set(events.map((event) => event.id));
+  const pendingCelebrations = Array.isArray(candidate.pendingCelebrations)
+    ? candidate.pendingCelebrations.filter((receipt) => receipt?.id && eventIds.has(receipt.eventId))
+    : [];
+  const resetCutoffsByCreature = candidate.resetCutoffsByCreature && typeof candidate.resetCutoffsByCreature === 'object'
+    ? Object.fromEntries(Object.entries(candidate.resetCutoffsByCreature).filter(([, cutoff]) => Number.isFinite(cutoff) && cutoff > 0))
+    : {};
+  return { schemaVersion: 2, events, pendingCelebrations, resetCutoffsByCreature };
 }

@@ -6,6 +6,7 @@ import {
 } from '@/utils/katchimera-wardrobe';
 
 const STORAGE_KEY = 'katchimeras.wardrobe.v1';
+const resetListeners = new Set<() => void>();
 
 export function loadKatchimeraWardrobe(): KatchimeraWardrobeState {
   return normalizeKatchimeraWardrobe(
@@ -15,4 +16,14 @@ export function loadKatchimeraWardrobe(): KatchimeraWardrobeState {
 
 export function saveKatchimeraWardrobe(state: KatchimeraWardrobeState): void {
   setStoredJson(STORAGE_KEY, normalizeKatchimeraWardrobe(state));
+}
+
+export function resetKatchimeraWardrobeForDebug(): void {
+  saveKatchimeraWardrobe(EMPTY_KATCHIMERA_WARDROBE);
+  resetListeners.forEach((listener) => listener());
+}
+
+export function subscribeKatchimeraWardrobeResets(listener: () => void): () => void {
+  resetListeners.add(listener);
+  return () => resetListeners.delete(listener);
 }

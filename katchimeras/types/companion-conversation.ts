@@ -3,6 +3,7 @@ import type { CompanionEvidenceRef } from '@/types/companion-interaction';
 
 export const CONVERSATION_V2_FAMILIES = ['baristabbit', 'steppling', 'flexel'] as const;
 export type ConversationV2FamilyId = typeof CONVERSATION_V2_FAMILIES[number];
+export type ConversationMode = 'talk' | 'play' | 'discover' | 'plan';
 
 export type ConversationTriggerKind =
   | 'evergreen'
@@ -23,6 +24,8 @@ export type ConversationOption = {
   label: string;
   reply: string;
   nextNodeId: string | null;
+  /** Profile games may branch to another question inside the same node. */
+  nextQuestionId?: string | null;
   transition?: ConversationTransition;
   intentId?: string;
   affinity?: Partial<Record<KatchimeraSkinId, number>>;
@@ -79,6 +82,7 @@ export type ConversationNode =
       id: string;
       kind: 'profile_game';
       title: string;
+      entryQuestionId?: string;
       questions: readonly ConversationProfileQuestion[];
       revealNodeId: string;
     }
@@ -225,6 +229,7 @@ export type ConversationSession = {
   servedDayId: string;
   currentNodeId: string;
   gameQuestionIndex: number;
+  gameQuestionId?: string;
   pendingReply?: string;
   lastReply?: string;
   pendingNextNodeId?: string | null;

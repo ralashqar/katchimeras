@@ -7,6 +7,7 @@ import {
   emptyCompanionBondState,
   questBondEventId,
   recordCompanionBondEvent,
+  resetCompanionBondForCreatures,
 } from '@/utils/companion-bond';
 import type { CompanionQuestState } from '@/utils/katchimera-quests';
 import { selectBalancedQuestOffers, selectRankedQuestOffers, sortQuestOffersByAvailability } from '@/utils/quest-offer-order';
@@ -29,14 +30,14 @@ test('companion bond resolves every level boundary and segment', () => {
     schemaVersion: 1 as const,
     events: points ? [{ id: `points-${points}`, creatureId: 'feastle', kind: 'quest_completed' as const, points, occurredAt: 1 }] : [],
   });
-  assert.deepEqual([0, 99, 100, 249, 250, 499, 500].map((points) => {
+  assert.deepEqual([0, 49, 50, 149, 150, 399, 400].map((points) => {
     const progress = companionBondProgress(state(points), 'feastle');
     return [progress.level, progress.segmentPoints, progress.segmentTarget, progress.pointsRemaining, progress.isMax];
   }), [
-    [1, 0, 100, 100, false],
-    [1, 99, 100, 1, false],
-    [2, 0, 150, 150, false],
-    [2, 149, 150, 1, false],
+    [1, 0, 50, 50, false],
+    [1, 49, 50, 1, false],
+    [2, 0, 100, 100, false],
+    [2, 99, 100, 1, false],
     [3, 0, 250, 250, false],
     [3, 249, 250, 1, false],
     [4, 0, 0, 0, true],
@@ -53,6 +54,30 @@ test('bond events are idempotent and use their configured reward', () => {
   assert.equal(duplicate.state.events.length, 1);
 });
 
+test('live awards queue a before/after receipt and reset removes it at true zero', () => {
+  const first = recordCompanionBondEvent(emptyCompanionBondState(), {
+    id: 'questionnaire:steppling:1',
+    creatureId: 'steppling',
+    kind: 'ideal_skin_questionnaire_completed',
+    occurredAt: 100,
+  }, { queueCelebration: true });
+  assert.equal(first.receipt?.beforeTotal, 0);
+  assert.equal(first.receipt?.afterTotal, 20);
+  assert.equal(first.state.pendingCelebrations?.length, 1);
+
+  const reset = resetCompanionBondForCreatures(first.state, ['steppling'], 200);
+  assert.equal(companionBondProgress(reset, 'steppling').totalPoints, 0);
+  assert.equal(reset.pendingCelebrations?.length, 0);
+  assert.equal(reset.resetCutoffsByCreature?.['companion:steppling'], 200);
+
+  const historicalQuestState: CompanionQuestState = {
+    schemaVersion: 2,
+    quests: [{ questId: 'quest-steppling-walk', creatureId: 'steppling', title: 'Walk', hint: 'Go', acceptedAt: 20, completedAt: 90, completedDayId: '2026-07-15' }],
+    submissions: [], offerCycles: [], attempts: [],
+  };
+  assert.equal(companionBondProgress(backfillQuestBondEvents(reset, historicalQuestState), 'steppling').totalPoints, 0);
+});
+
 test('quest migration deduplicates completed rows and applies the quest lane reward', () => {
   const quest = { questId: 'quest-feastle-sort', creatureId: 'feastle', title: 'Set the table', hint: 'Sort it', acceptedAt: 10, completedAt: 20, completedDayId: '2026-07-15' };
   const quests: CompanionQuestState = {
@@ -65,7 +90,7 @@ test('quest migration deduplicates completed rows and applies the quest lane rew
   const migrated = backfillQuestBondEvents(emptyCompanionBondState(), quests);
   assert.equal(migrated.events.length, 1);
   assert.equal(migrated.events[0]?.id, 'quest-submission:submission-1');
-  assert.equal(companionBondProgress(migrated, 'feastle').totalPoints, 10);
+  assert.equal(companionBondProgress(migrated, 'feastle').totalPoints, 8);
 });
 
 test('daily quest choices are deterministic, weighted, and capped at three', () => {

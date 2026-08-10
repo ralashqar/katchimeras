@@ -11,12 +11,14 @@ import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { KingdomSkinOption } from '@/utils/katchimera-wardrobe';
 
 export function CompanionSkinsThread({
+  activePlus,
   companionName,
   equippedSkinId,
   onEquip,
   showHeading = true,
   skins,
 }: {
+  activePlus: boolean;
   companionName: string;
   equippedSkinId: KatchimeraSkinId | null;
   onEquip: (skinId: KatchimeraSkinId) => void;
@@ -42,13 +44,13 @@ export function CompanionSkinsThread({
         {skins.map((skin) => {
           if (!skin.visualKey) return null;
           const selected = skin.id === equippedSkinId;
+        const available = activePlus;
           const visual = getCreatureVisual(skin.visualKey);
           return (
             <Pressable
-              accessibilityLabel={`${skin.unlocked ? 'Equip' : 'Locked'} ${skin.displayName}`}
+              accessibilityLabel={`${available ? 'Equip' : 'Unlock with Plus'} ${skin.displayName}`}
               accessibilityRole="button"
-              accessibilityState={{ disabled: !skin.unlocked, selected }}
-              disabled={!skin.unlocked}
+              accessibilityState={{ selected }}
               key={skin.id}
               onPress={() => {
                 if (selected) return;
@@ -59,7 +61,7 @@ export function CompanionSkinsThread({
                 styles.card,
                 { backgroundColor: 'rgba(255,248,232,0.93)', borderColor: tokens.border, boxShadow: '0 8px 22px rgba(37,42,29,0.18), inset 0 1px 0 rgba(255,255,255,0.76)' },
                 selected && [styles.selectedCard, { backgroundColor: 'rgba(255,244,204,0.97)', borderColor: tokens.accentPressed }],
-                !skin.unlocked && styles.lockedCard,
+                !available && styles.lockedCard,
                 pressed && styles.pressedCard,
               ]}>
               <View style={[styles.artStage, { backgroundColor: `${visual.accentColor}28` }]}>
@@ -92,7 +94,7 @@ export function CompanionSkinsThread({
                   style={[styles.status, selected && styles.selectedStatus]}
                   lightColor={selected ? tokens.accentPressed : tokens.textTertiary}
                   darkColor={selected ? tokens.accentPressed : tokens.textTertiary}>
-                  {selected ? 'Equipped' : skin.unlocked ? 'Available' : 'Locked'}
+                  {selected ? 'Equipped' : available ? 'Available' : 'Plus'}
                 </ThemedText>
               </View>
             </Pressable>
