@@ -12,6 +12,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { CelebrationParticles } from '@/components/katchadeck/world/companion-achievement-celebration';
 import { KatchaSurfacePalette, KatchaUI } from '@/constants/katcha-ui';
 import type { HomeVisualKey } from '@/types/home';
 import type { QuestionnaireImageSource } from '@/utils/companion-questionnaire-presentation';
@@ -32,6 +33,7 @@ export function CompanionCinematicStage({
   creatureTargetRef,
   bubbleBody,
   bubbleVariant = 'default',
+  celebrate = false,
   enterFromLifted = false,
   environmentKey,
   lifted,
@@ -43,6 +45,7 @@ export function CompanionCinematicStage({
 }: {
   bubbleBody?: string;
   bubbleVariant?: 'default' | 'questionnaire';
+  celebrate?: boolean;
   creature: QuestionnaireImageSource;
   creatureTargetRef?: RefObject<ViewType | null>;
   enterFromLifted?: boolean;
@@ -163,6 +166,14 @@ export function CompanionCinematicStage({
               />
             ) : null}
           </Animated.View>
+        ) : null}
+
+        {celebrate ? (
+          <CelebrationParticles
+            layerStyle={{ left: width >= 700 ? '68%' : '72%', top: '50%', zIndex: 0 }}
+            tier={1}
+            tint="#E4B34B"
+          />
         ) : null}
 
         <CompanionHomeEnvironmentStage

@@ -23,6 +23,9 @@ import type {
   CompanionInsight,
   CompanionQuestOfferViewModel,
   CompanionReflectionDraft,
+  CompanionVisitPlan,
+  CompanionVisitResponse,
+  CompanionConversationReceipt,
   QuestCaptureFeedback,
 } from '@/types/companion-interaction';
 import { getCreatureVisual } from '@/game/days';
@@ -36,7 +39,6 @@ import {
   companionQuestPresentation,
   companionViewportResetKey,
 } from '@/utils/companion-interaction';
-import { CompanionHomeScene } from './companion-home-scene';
 import { CompanionCinematicStage } from './companion-cinematic-stage';
 import { CompanionGameBackdrop } from './companion-game-backdrop';
 import { CompanionInsightThread } from './companion-insight-thread';
@@ -55,6 +57,8 @@ import type {
   CompanionIntroductionAnswer,
   CompanionIntroductionRecord,
   CompanionVisitGreeting,
+  CompanionMemory,
+  CompanionInsightRecord,
 } from '@/utils/companion-content';
 import type {
   CompanionIntroductionDefinition,
@@ -63,6 +67,7 @@ import type {
 import { companionFormGreeting } from '@/utils/companion-dialogue';
 import { CompanionSkinsThread } from './companion-skins-thread';
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
+import type { ConversationDefinition, ConversationNode, ConversationOutcomeDestination, ConversationSession } from '@/types/companion-conversation';
 import type { KingdomSkinOption } from '@/utils/katchimera-wardrobe';
 import { CompanionDiscoveryThread } from './companion-discovery-thread';
 import {
@@ -106,6 +111,14 @@ import type { GoalTaskSourceRect } from '@/components/katchadeck/goals/goal-task
 import { BondRewardFlightOverlay } from '@/components/katchadeck/goals/bond-reward-overlay';
 import { CompanionIntroduction } from './companion-introduction';
 import { CompanionTrophyRoomScreen } from './companion-trophy-room-screen';
+import { CompanionVisitScene } from './companion-visit-scene';
+import { CompanionDashboard } from './companion-dashboard';
+import { CompanionSharedHistory } from './companion-shared-history';
+import { completedVisitCopy } from '@/utils/companion-visit';
+import { CompanionConversationScene, conversationSpeechLine } from './companion-conversation-scene';
+import { CompanionConversationLab } from './companion-conversation-lab';
+import { companionConversationDefinitionsForFamily } from '@/constants/companion-conversations-v2';
+import { isConversationV2Family } from '@/types/companion-conversation';
 
 const LazyQuestExperienceHost = lazy(async () => {
   const module = await import('./quests/quest-experience-host');
@@ -225,6 +238,35 @@ export type CompanionInteractionSheetProps = {
   quickGoalSuggestionIds: readonly string[];
   onAddQuickGoalSuggestions: (templateIds: readonly string[]) => readonly string[];
   onDismissQuickGoalSuggestions: () => void;
+  conversationSession: ConversationSession | null;
+  conversationDefinition: ConversationDefinition | null;
+  conversationQuestOffer: { id: string; title: string; hint: string } | null;
+  onAnswerConversation: (optionId: string) => void;
+  onContinueConversation: () => void;
+  onKeepTalkingConversation: (poolId?: string) => void;
+  onArchiveConversation: () => void;
+  onMemoryConversationDecision: (remember: boolean, summary: string) => void;
+  onGoalConversationDecision: (selectedTemplateIds: readonly string[] | null, node: Extract<ConversationNode, { kind: 'goal_proposal' }>) => void;
+  onQuickGoalConversationDecision: (accept: boolean, node: Extract<ConversationNode, { kind: 'quick_goal_proposal' }>) => void;
+  onQuestConversationHandoff: (accept: boolean, node: Extract<ConversationNode, { kind: 'quest_handoff' }>) => void;
+  onDismissConversationOutcome: () => void;
+  onPreviewConversation: (definitionId: string) => void;
+  onExitConversationPreview: () => void;
+  visitPlan: CompanionVisitPlan | null;
+  visitReceipt: CompanionConversationReceipt | null;
+  memories: readonly CompanionMemory[];
+  insights: readonly CompanionInsightRecord[];
+  onRemoveInsight: (insightId: string) => void;
+  onRetakeInsight: (definitionId: string) => void;
+  historyIsPlus: boolean;
+  hasOlderHistory: boolean;
+  onRespondVisit: (response: CompanionVisitResponse) => void;
+  onSayMoreVisit: () => void;
+  onUpdateMemory: (input: { memoryId: string; status: 'confirmed' | 'rejected' | 'forgotten'; summary?: string }) => void;
+  onInsightConversationDecision: (accept: boolean, node: Extract<ConversationNode, { kind: 'insight_reveal' }>) => void;
+  onAdjustConversationInsight: (questionIndex?: number) => void;
+  onResetMemory?: () => void;
+  onSharedHistoryOpened: () => void;
 };
 
 export function CompanionInteractionSheet(props: CompanionInteractionSheetProps) {
@@ -262,7 +304,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     introductionOpen,
     journeyQuestionnaireOpen,
     journeyQuestionnaireSessionId,
+    openSharedHistory,
     openIntroduction,
+    selectDestination: selectExperienceDestination,
     resetQuestExperience,
     questExperienceOpen,
     quickGoalPickerOpen,
@@ -275,7 +319,6 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const [leaveQuestOpen, setLeaveQuestOpen] = useState(false);
   const [activeCheckIn, setActiveCheckIn] = useState<CompanionJourneyCheckIn | null>(props.journeyCheckIn);
   const [hasShownHome, setHasShownHome] = useState(false);
-  const autoIntroductionCreatureRef = useRef<string | null>(null);
   const contentRef = useRef<ScrollView>(null);
   const reduceMotion = useReducedMotion();
   const visual = getCreatureVisual(props.visualKey);
@@ -351,21 +394,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
 
   useEffect(() => {
     setHasShownHome(false);
-    autoIntroductionCreatureRef.current = null;
   }, [props.creatureId]);
 
   useEffect(() => {
-    if (
-      !props.introductionShouldAutoOpen
-      || props.initialDestination
-      || autoIntroductionCreatureRef.current === props.creatureId
-    ) return;
-    autoIntroductionCreatureRef.current = props.creatureId;
-    openIntroduction();
-  }, [openIntroduction, props.creatureId, props.initialDestination, props.introductionShouldAutoOpen]);
-
-  useEffect(() => {
-    if (route.kind === 'home' && !hasShownHome) {
+    if (route.kind === 'dashboard' && !hasShownHome) {
       setHasShownHome(true);
     }
   }, [hasShownHome, route.kind]);
@@ -476,33 +508,24 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         )
       : destination === 'quest'
         ? null
-      : destination === 'insight' && props.insight.action
-        ? <CompanionPrimaryAction label={props.insight.action.label} icon={props.insight.action.icon} onPress={props.onInsightAction} />
       : null;
   const visibleFooter = quickGoalPickerOpen || questionnaireExperience ? null : actionFooter;
   const entering = reduceMotion ? FadeIn.duration(100) : direction > 0 ? FadeInRight.duration(210) : FadeInLeft.duration(210);
   const destinationLabel =
     destination === 'quest'
       ? 'Quests'
-      : destination === 'discovery'
-        ? 'You'
-        : destination === 'goals'
+      : destination === 'goals'
           ? 'Goals'
           : destination === 'achievements'
             ? 'Trophy room'
             : destination === 'insight'
-              ? 'Insight'
+              ? 'Your insights'
               : 'Skins';
   const questStatus = props.activeQuest
     ? 'Quest in progress'
     : props.offers.length
       ? `${props.offers.length} available`
       : 'All quiet for now';
-  const youStatus = props.journeyCheckIn?.completedAt
-    ? 'Today’s check-in saved'
-    : props.journeyConversation
-      ? 'Continue your questions'
-      : 'Ready when you are';
   const goalStatus = !props.quickGoalsEnabled
     ? 'Coming soon'
     : goalsRemaining
@@ -517,29 +540,117 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         ? companionFormGreeting(props.name)
         : props.introductionDefinition.homeGreeting
     : 'Where shall we begin today?';
+  const visitPlan = props.visitPlan ?? {
+    id: `companion-visit-plan:${props.familyId}:${props.quickGoalDayId}`,
+    familyId: props.familyId,
+    dayId: props.quickGoalDayId,
+    subject: 'quiet' as const,
+    eyebrow: 'JUST VISITING',
+    opening: homeGreeting,
+    helperText: 'Staying for a moment is enough.',
+    responses: [
+      { id: 'stay', label: 'Stay a moment', action: 'stay' as const },
+      { id: 'later', label: 'Maybe later', action: 'defer' as const },
+    ],
+    evidenceRefs: [],
+    createdAt: 0,
+  };
+  const visitCompletionKind = props.visitReceipt?.offerOutcome === 'deferred'
+    ? 'deferred' as const
+    : visitPlan.subject === 'quiet'
+      ? 'quiet' as const
+      : visitPlan.subject === 'memory_confirmation'
+        ? 'remembered' as const
+        : 'answered' as const;
+  const visitSpeech = props.visitReceipt
+    ? visitCompletionKind === 'deferred'
+      ? 'That’s alright. We can leave it here for today.'
+      : completedVisitCopy(visitPlan.subject)
+    : visitPlan.opening;
+  const conversationExperience = props.conversationSession && props.conversationDefinition
+    ? { session: props.conversationSession, definition: props.conversationDefinition }
+    : null;
+  const visitStageSpeech = conversationExperience
+    ? conversationSpeechLine(conversationExperience.session, conversationExperience.definition)
+    : visitSpeech;
+  const respondToVisit = (response: CompanionVisitResponse) => {
+    props.onRespondVisit(response);
+    if (response.action === 'open_achievements') {
+      selectDestination('achievements');
+      return;
+    }
+    if (response.action === 'say_more') {
+      props.onSayMoreVisit();
+      return;
+    }
+    if (response.action === 'accept_quest') {
+      props.onAccept(visitPlan.questId);
+      return;
+    }
+    if (response.action === 'open_quest') {
+      if (visitPlan.questId) props.onSelectOffer(visitPlan.questId);
+      selectDestination('quest');
+      return;
+    }
+    if (response.action === 'open_focus') {
+      if (props.introductionRecord?.status !== 'completed' && props.introductionDefinition) {
+        openIntroduction();
+        return;
+      }
+      if (props.journeyDefinition) {
+        if (!props.journeyConversation) props.onStartJourneyConversation();
+        experience.openJourneyQuestionnaire(props.journeyConversation?.id);
+        return;
+      }
+      selectDestination('goals');
+    }
+  };
+  const openHistory = () => {
+    props.onSharedHistoryOpened();
+    openSharedHistory();
+  };
+  const openChat = () => {
+    if (
+      props.introductionShouldAutoOpen
+      && props.introductionDefinition
+      && props.journeyDefinition
+    ) {
+      openIntroduction();
+      return;
+    }
+    experience.showVisit();
+  };
+  const conversationLabDefinitions = isConversationV2Family(props.familyId)
+    ? companionConversationDefinitionsForFamily(props.familyId)
+    : [];
+  const conversationLab = typeof __DEV__ !== 'undefined' && __DEV__ && conversationLabDefinitions.length ? (
+    <CompanionConversationLab
+      currentSession={props.conversationSession}
+      definitions={conversationLabDefinitions}
+      onExitPreview={props.onExitConversationPreview}
+      onSelectDefinition={(definitionId) => {
+        props.onPreviewConversation(definitionId);
+        experience.showVisit();
+      }}
+    />
+  ) : null;
   const destinationHeroTitle = destination === 'quest'
     ? props.activeQuest
       ? 'Ready to keep going?'
       : 'Ready for a little adventure?'
-    : destination === 'discovery'
-      ? props.journeyConversation
-        ? 'Let’s pick up where we left off.'
-        : !activeJourneyFocus
-          ? 'What would you like to shape?'
-          : props.journeyCheckIn?.completedAt
-            ? 'I’ll keep today in mind.'
-            : 'How did today feel?'
-      : destination === 'goals'
-        ? 'What feels doable today?'
+    : destination === 'goals'
+        ? activeJourneyFocus
+          ? 'Your goals and next steps.'
+          : 'What feels doable today?'
         : destination === 'achievements'
           ? 'Look what we’ve achieved together!'
           : destination === 'insight'
-            ? 'Here’s what I noticed.'
+            ? 'Here’s what your Katchimeras have learned about you.'
             : 'Which form feels like me?';
-  const destinationHeroBody = destination === 'discovery'
+  const destinationHeroBody = destination === 'goals'
     ? activeJourneyFocus
-      ? 'Check in with me today, or adjust the focus we are working on together.'
-      : 'I can ask a few quick questions to learn what would be useful right now.'
+      ? 'See your plan, add a small step, or talk through what you want next.'
+      : 'Choose a small step or answer three questions to find a useful direction.'
     : undefined;
   const questGameContent = questGameVisible
     && interactiveExecution
@@ -611,36 +722,74 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         ) : !questionnaireExperience ? (
           <CompanionCinematicStage
             bubbleBody={quickGoalPickerOpen ? 'Choose one for today, or make a small goal of your own.' : destinationHeroBody}
-            bubbleVariant={destination === 'discovery' || quickGoalPickerOpen ? 'questionnaire' : 'default'}
+            bubbleVariant={quickGoalPickerOpen ? 'questionnaire' : 'default'}
+            celebrate={Boolean(route.kind === 'visit' && conversationExperience?.session.outcomePresentation?.celebrate)}
             creature={visual.source}
             creatureTargetRef={creatureRewardTargetRef}
-            enterFromLifted={route.kind === 'home' && hasShownHome}
+            enterFromLifted={route.kind === 'visit' && hasShownHome}
             environmentKey={props.homeEnvironmentKey ?? null}
             lifted
             name={props.name}
             showSpeechBubble
-            title={quickGoalPickerOpen ? 'Which small step feels right?' : route.kind === 'home' ? homeGreeting : destinationHeroTitle}
+            title={quickGoalPickerOpen
+              ? 'Which small step feels right?'
+              : route.kind === 'visit'
+                ? visitStageSpeech
+                : route.kind === 'shared_history'
+                  ? 'Here is what I remember with you.'
+                  : route.kind === 'dashboard'
+                    ? 'What should we do together?'
+                    : destinationHeroTitle}
             visualKey={props.visualKey}
           />
         ) : null}
-        {route.kind === 'home' ? (
-          <CompanionHomeScene
-            animateEntrance={!hasShownHome}
-            bondProgress={props.bondProgress}
-            creature={visual.source}
-            environmentKey={props.homeEnvironmentKey ?? null}
-            goalStatus={goalStatus}
-            homeGreeting={homeGreeting}
+        {route.kind === 'visit' ? (
+          conversationExperience ? <CompanionConversationScene
+            definition={conversationExperience.definition}
+            developerContent={conversationLab}
+            hasActiveFocus={Boolean(activeJourneyFocus)}
             name={props.name}
-            onClose={props.onClose}
-            onOpenAchievements={() => selectDestination('achievements')}
-            onSelectDestination={selectDestination}
-            achievementProgress={props.achievementProgress}
-            questStatus={questStatus}
-            showStage={false}
-            showSkins={props.skins.length > 1}
-            visualKey={props.visualKey}
-            youStatus={youStatus}
+            onAnswer={props.onAnswerConversation}
+            onArchive={() => {
+              props.onArchiveConversation();
+              experience.showHome();
+            }}
+            onClose={experience.showHome}
+            onContinue={props.onContinueConversation}
+            onEquipForm={conversationExperience.session.preview ? () => undefined : props.onEquipSkin}
+            onGoalDecision={props.onGoalConversationDecision}
+            onInsightDecision={props.onInsightConversationDecision}
+            onAdjustInsight={props.onAdjustConversationInsight}
+            onKeepTalking={props.onKeepTalkingConversation}
+            onDismissOutcome={props.onDismissConversationOutcome}
+            onOpenOutcomeDestination={(outcomeDestination: ConversationOutcomeDestination) => {
+              props.onDismissConversationOutcome();
+              if (outcomeDestination === 'memory') {
+                openHistory();
+                return;
+              }
+              selectExperienceDestination(outcomeDestination);
+            }}
+            onQuickGoalDecision={props.onQuickGoalConversationDecision}
+            onQuestHandoff={props.onQuestConversationHandoff}
+            onMemoryDecision={props.onMemoryConversationDecision}
+            memories={props.memories}
+            onOpenMore={experience.showHome}
+            onUpdateMemory={props.onUpdateMemory}
+            session={conversationExperience.session}
+            skins={props.skins}
+            questOffer={props.conversationQuestOffer}
+          /> : <CompanionVisitScene
+            bondProgress={props.bondProgress}
+            completed={Boolean(props.visitReceipt)}
+            completionKind={visitCompletionKind}
+            memoryCount={props.memories.filter((memory) => memory.status === 'confirmed').length}
+            name={props.name}
+            onClose={experience.showHome}
+            onOpenHistory={openHistory}
+            onOpenMore={experience.showHome}
+            onRespond={respondToVisit}
+            plan={visitPlan}
           />
         ) : (
           <>
@@ -656,17 +805,19 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             />
           </View>
         ) : null}
-        {(route.kind === 'destination' || quickGoalPickerOpen) && !questGameVisible && !questionnaireExperience ? (
+        {(route.kind === 'destination' || route.kind === 'dashboard' || route.kind === 'shared_history' || quickGoalPickerOpen) && !questGameVisible && !questionnaireExperience ? (
           <CompanionDestinationHeader
-            backLabel={quickGoalPickerOpen ? 'Goals' : destination === 'quest' && canReturnToQuestList ? 'Quest list' : 'Home'}
-            label={destinationLabel}
+            backLabel={quickGoalPickerOpen ? 'Goals' : destination === 'quest' && canReturnToQuestList ? 'Quest list' : route.kind === 'dashboard' ? 'Kingdom' : 'Dashboard'}
+            label={route.kind === 'dashboard' ? 'Dashboard' : route.kind === 'shared_history' ? 'Shared history' : destinationLabel}
             titleTone={destination === 'achievements' ? 'gold' : 'default'}
             onBack={
               quickGoalPickerOpen
                 ? experience.returnToDestination
                 : destination === 'quest' && canReturnToQuestList
                 ? () => setLeaveQuestOpen(true)
-                : experience.showHome
+                : route.kind === 'dashboard'
+                  ? requestClose
+                  : experience.showHome
             }
           />
         ) : null}
@@ -710,13 +861,12 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               entering={entering}
               exiting={FadeOut.duration(100)}
               style={activeAttemptId || questionnaireExperience ? styles.activeExperience : undefined}>
-              {(route.kind === 'destination' || quickGoalPickerOpen) && !questionnaireExperience ? (
+              {(route.kind === 'destination' || route.kind === 'dashboard' || route.kind === 'shared_history' || quickGoalPickerOpen) && !questionnaireExperience ? (
                 <View
                   accessibilityElementsHidden
                   pointerEvents="none"
                   style={[
                     styles.destinationStageSpacer,
-                    destination === 'discovery' && styles.youStageSpacer,
                     destination === 'quest' && {
                       minHeight: companionQuestListSpacer(viewportHeight),
                     },
@@ -819,6 +969,31 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   resultReady={Boolean(journeyQuestionnaireSessionId && !props.journeyConversation)}
                   visualKey={props.visualKey}
                 />
+              ) : route.kind === 'dashboard' ? (
+                <CompanionDashboard
+                  companionName={props.name}
+                  developerContent={conversationLab}
+                  onChat={openChat}
+                  onSelect={selectDestination}
+                  statuses={{
+                    quest: questStatus,
+                    goals: goalStatus,
+                    achievements: `${props.achievementProgress.earned} of ${props.achievementProgress.total} earned`,
+                    insight: props.insights.length ? `${props.insights.length} insight${props.insights.length === 1 ? '' : 's'} discovered` : 'Discover something about yourself',
+                    skins: `${props.skins.filter((skin) => skin.unlocked).length} of ${props.skins.length} forms available`,
+                  }}
+                />
+              ) : route.kind === 'shared_history' ? (
+                <CompanionSharedHistory
+                  activeFocusTitle={activeJourneyFocus?.title}
+                  activePlus={props.historyIsPlus}
+                  hasOlderHistory={props.hasOlderHistory}
+                  activeQuestTitle={props.activeQuest?.title}
+                  companionName={props.name}
+                  memories={props.memories}
+                  onUpdateMemory={props.onUpdateMemory}
+                  onResetMemory={props.onResetMemory}
+                />
               ) : quickGoalPickerOpen ? (
                 <CompanionQuickGoalPicker
                   dayId={props.quickGoalDayId}
@@ -881,8 +1056,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                     </View>
                   ) : null}
                 </View>
-              ) : destination === 'discovery' ? (
+              ) : destination === 'goals' ? (
                 <View style={styles.youStack}>
+                {quickGoalPanel}
                 {props.introductionRecord?.status === 'deferred' && props.introductionDefinition ? (
                   <CompanionSection
                     description="I can ask two short questions now, or wait until another day."
@@ -950,18 +1126,19 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   />
                 ) : null}
                 </View>
-              ) : destination === 'goals' ? (
-                quickGoalPanel ?? (
-                  <CompanionSection
-                    description="Small goals will appear here when this companion supports them."
-                    label="Goals are coming soon">
-                    <View />
-                  </CompanionSection>
-                )
               ) : destination === 'achievements' ? (
                 <CompanionTrophyRoomScreen creatureId={props.creatureId} embedded />
               ) : destination === 'insight' ? (
-                <CompanionInsightThread insight={props.insight} />
+                <CompanionInsightThread
+                  currentFamilyId={props.familyId}
+                  insight={props.insight}
+                  insights={props.insights}
+                  onRemoveInsight={props.onRemoveInsight}
+                  onRetakeInsight={(definitionId) => {
+                    props.onRetakeInsight(definitionId);
+                    experience.showVisit();
+                  }}
+                />
               ) : destination === 'skins' ? (
                 <CompanionSkinsThread
                   companionName={props.name}

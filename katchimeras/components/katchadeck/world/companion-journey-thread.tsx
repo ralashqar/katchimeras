@@ -57,7 +57,7 @@ export function CompanionJourneyDiscoveryThread({
       <View style={styles.goalTopRow}>
         <View style={styles.goalCopy}>
           <ThemedText style={styles.goalMeta} lightColor="#806126" darkColor="#806126">
-            YOUR CURRENT FOCUS
+            YOUR GOAL PLAN
           </ThemedText>
           <ThemedText selectable style={styles.goalTitle} lightColor={KatchaUI.companionPanel.ink} darkColor={KatchaUI.companionPanel.ink}>
             {activeFocus.title}
@@ -78,13 +78,13 @@ export function CompanionJourneyDiscoveryThread({
         </View>
         <View style={styles.startCopy}>
           <ThemedText style={styles.startTitle} lightColor={KatchaUI.companionPanel.ink} darkColor={KatchaUI.companionPanel.ink}>
-            {conversation ? 'Continue where you left off' : activeFocus ? 'Choose a different focus' : 'Choose your first focus'}
+            {conversation ? 'Continue where you left off' : activeFocus ? 'Find a new direction' : 'Find goals that fit'}
           </ThemedText>
           <ThemedText style={styles.helper} lightColor={KatchaUI.companionPanel.inkSoft} darkColor={KatchaUI.companionPanel.inkSoft}>
             {conversation
               ? 'Your completed answers are saved.'
               : activeFocus
-                ? 'I’ll ask three quick questions about a new direction. Your current focus stays until you finish.'
+                ? 'I’ll ask three quick questions about a new direction. Your current goals stay until you finish.'
                 : 'I’ll ask three quick questions, then help you choose a direction that fits.'}
           </ThemedText>
         </View>
@@ -108,10 +108,10 @@ export function CompanionJourneyDiscoveryThread({
           YOU &amp; {companionName.toUpperCase()}
         </ThemedText>
         <ThemedText selectable style={styles.title} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-          Your focus
+          Your goal plan
         </ThemedText>
         <ThemedText selectable style={styles.description} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-          Answer a few quick questions when you want more direction. I’ll turn them into a focus and suggest optional small steps.
+          Answer three quick questions when you want more direction. I’ll suggest optional goals and small steps.
         </ThemedText>
       </View> : null}
 
@@ -182,10 +182,10 @@ export function LegacyCompanionJourneyDiscoveryThread({
           YOU &amp; {companionName.toUpperCase()}
         </ThemedText>
         <ThemedText selectable style={styles.title} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-          Your focus
+          Your goal plan
         </ThemedText>
         <ThemedText selectable style={styles.description} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-          I’ll ask a few deeper questions about what matters. Your focus can then shape optional goals, quests, and reflections.
+          I’ll ask three questions about what matters. Your answers can shape optional goals, quests, and reflections.
         </ThemedText>
       </View>
 
@@ -194,7 +194,7 @@ export function LegacyCompanionJourneyDiscoveryThread({
           <View style={styles.goalTopRow}>
             <View style={styles.goalCopy}>
               <ThemedText style={styles.goalMeta} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>
-                CURRENT FOCUS
+                CURRENT GOAL PLAN
               </ThemedText>
               <ThemedText selectable style={styles.goalTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
                 {activeFocus.title}
@@ -303,10 +303,10 @@ export function LegacyCompanionJourneyDiscoveryThread({
         <View style={styles.startCard}>
           <View style={styles.startCopy}>
             <ThemedText style={styles.startTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-              {activeFocus ? 'Change your focus' : 'Choose a focus'}
+              {activeFocus ? 'Find another direction' : 'Find goals that fit'}
             </ThemedText>
             <ThemedText style={styles.helper} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-              I’ll ask a short set of questions, then suggest a direction and a few small goals. Choosing a new focus pauses the old one.
+              I’ll ask three questions, then suggest a direction and a few optional goals. Your existing goals stay available.
             </ThemedText>
           </View>
           <Pressable
@@ -428,11 +428,11 @@ export function CompanionJourneyQuestionnairePage({
         companionName={companionName}
         creature={creature}
         environmentKey={environmentKey}
-        helperText="This direction can shape future questions, quests, and reflections."
+        helperText="This direction can shape future questions, goals, quests, and reflections."
         onBack={onBack}
         result
         stepLabel="Your direction"
-        title={activeFocus?.title ?? 'Your focus is ready'}
+        title={activeFocus?.title ?? 'Your goal plan is ready'}
         visualKey={visualKey}>
         <QuestionnaireResultNotice
           body={alreadyAdded ? 'Those steps were already waiting for you.' : undefined}

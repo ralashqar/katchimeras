@@ -37,18 +37,24 @@ export function useCompanionExperienceController({
     onSelectDestination?.(destination);
   }, [onSelectDestination]);
 
-  const showHome = useCallback(() => {
-    dispatch({ type: 'show_home' });
+  const showVisit = useCallback(() => {
+    dispatch({ type: 'show_visit' });
     onSelectDestination?.(null);
   }, [onSelectDestination]);
+
+  const showDashboard = useCallback(() => {
+    dispatch({ type: 'show_dashboard' });
+    onSelectDestination?.(null);
+  }, [onSelectDestination]);
+  const openSharedHistory = useCallback(() => dispatch({ type: 'open_shared_history' }), []);
 
   const requestBack = useCallback(() => {
     const action = companionRouteBackAction(state);
     if (action === 'return_to_destination') dispatch({ type: 'return_to_destination' });
-    else if (action === 'return_to_home') showHome();
+    else if (action === 'return_to_home') showDashboard();
     else if (action === 'close_experience') onClose();
     return action;
-  }, [onClose, showHome, state]);
+  }, [onClose, showDashboard, state]);
 
   const openQuickGoalPicker = useCallback(
     () => dispatch({ type: 'open_quick_goal_picker' }),
@@ -109,7 +115,10 @@ export function useCompanionExperienceController({
     checkInOpen: state.route.kind === 'check_in',
     introductionOpen: state.route.kind === 'introduction',
     selectDestination,
-    showHome,
+    showHome: showDashboard,
+    showDashboard,
+    showVisit,
+    openSharedHistory,
     requestBack,
     openQuickGoalPicker,
     openIntroduction,

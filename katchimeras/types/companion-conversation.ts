@@ -1,0 +1,299 @@
+import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
+import type { CompanionEvidenceRef } from '@/types/companion-interaction';
+
+export const CONVERSATION_V2_FAMILIES = ['baristabbit', 'steppling', 'flexel'] as const;
+export type ConversationV2FamilyId = typeof CONVERSATION_V2_FAMILIES[number];
+
+export type ConversationTriggerKind =
+  | 'evergreen'
+  | 'journal'
+  | 'bond'
+  | 'goal_debrief'
+  | 'quest_debrief'
+  | 'signature_game'
+  | 'poll';
+
+export type ConversationTransition =
+  | { kind: 'definition'; definitionId: string }
+  | { kind: 'pool'; poolId: string }
+  | { kind: 'continuation'; destination?: 'menu' | 'memory' };
+
+export type ConversationOption = {
+  id: string;
+  label: string;
+  reply: string;
+  nextNodeId: string | null;
+  transition?: ConversationTransition;
+  intentId?: string;
+  affinity?: Partial<Record<KatchimeraSkinId, number>>;
+};
+
+export type ConversationProfileQuestion = {
+  id: string;
+  prompt: string;
+  /** Optional authored prompt variants keyed by the immediately preceding answer id. */
+  promptByPriorOptionId?: Readonly<Record<string, string>>;
+  helperText?: string;
+  options: readonly ConversationOption[];
+};
+
+export type ConversationInsightResultDefinition = {
+  id: string;
+  title: string;
+  reflection: string;
+  summary: string;
+  emblemId: string;
+  /** Option ids which add one point to this result. Highest score wins deterministically. */
+  matchOptionIds: readonly string[];
+};
+
+export type ConversationInsightResult = {
+  insightKey: string;
+  category: string;
+  resultId: string;
+  title: string;
+  reflection: string;
+  summary: string;
+  emblemId: string;
+  supportingTraits: readonly string[];
+  secondaryResultId?: string;
+  secondaryTitle?: string;
+  confidence: 'clear' | 'mixed';
+  scoreMargin: number;
+};
+
+export type ConversationPhase = 'opening' | 'explore' | 'deepen' | 'resolve';
+export type ConversationFocusAction = 'create' | 'rename' | 'pause' | 'complete' | 'replace';
+
+export type ConversationNode =
+  | {
+      id: string;
+      kind: 'choice';
+      prompt: string;
+      helperText?: string;
+      options: readonly ConversationOption[];
+      allowFreeResponse?: boolean;
+      phase?: ConversationPhase;
+    }
+  | {
+      id: string;
+      kind: 'profile_game';
+      title: string;
+      questions: readonly ConversationProfileQuestion[];
+      revealNodeId: string;
+    }
+  | {
+      id: string;
+      kind: 'insight_game';
+      title: string;
+      questions: readonly ConversationProfileQuestion[];
+      revealNodeId: string;
+    }
+  | {
+      id: string;
+      kind: 'poll';
+      prompt: string;
+      helperText?: string;
+      options: readonly (ConversationOption & { villageWeight: number })[];
+      nextNodeId: string | null;
+    }
+  | {
+      id: string;
+      kind: 'form_reveal';
+      title: string;
+      descriptions: Partial<Record<KatchimeraSkinId, string>>;
+      memoryKey: string;
+      nextNodeId: string | null;
+    }
+  | {
+      id: string;
+      kind: 'insight_reveal';
+      title: string;
+      insightKey: string;
+      category: string;
+      results: readonly ConversationInsightResultDefinition[];
+      nextNodeId: string | null;
+    }
+  | {
+      id: string;
+      kind: 'memory_proposal';
+      prompt: string;
+      summary: string;
+      memoryKey: string;
+      sensitivity: 'ordinary' | 'personal';
+      nextNodeId: string | null;
+    }
+  | {
+      id: string;
+      kind: 'goal_proposal';
+      prompt: string;
+      goalTypeId: string;
+      goalTitle: string;
+      summary?: string;
+      suggestedQuickGoalIds: readonly string[];
+      nextNodeId: string | null;
+      action?: ConversationFocusAction;
+    }
+  | {
+      id: string;
+      kind: 'quick_goal_proposal';
+      prompt: string;
+      templateId: string;
+      title: string;
+      nextNodeId: string | null;
+    }
+  | {
+      id: string;
+      kind: 'quest_handoff';
+      prompt: string;
+      suggestedQuestIds: readonly string[];
+      fallbackNodeId: string;
+      nextNodeId: string | null;
+    }
+  | {
+      id: string;
+      kind: 'end';
+      message: string;
+    };
+
+export type ConversationDefinition = {
+  id: string;
+  version: number;
+  familyId: ConversationV2FamilyId;
+  title: string;
+  trigger: ConversationTriggerKind;
+  triggerRouteKeys?: readonly string[];
+  minimumBondLevel: 1 | 2 | 3 | 4;
+  cooldownDays: number;
+  entryNodeId: string;
+  nodes: readonly ConversationNode[];
+  tags?: readonly string[];
+  isOpener?: boolean;
+  contextualOnly?: boolean;
+  weight?: number;
+  format?: 'opener' | 'narrative' | 'poll' | 'profile_game' | 'insight_game' | 'outcome';
+  requiresActiveFocus?: boolean;
+  requiresNoActiveFocus?: boolean;
+  requiresNoActiveQuest?: boolean;
+};
+
+export type ConversationTurn = {
+  id: string;
+  nodeId: string;
+  questionId?: string;
+  optionId: string;
+  intentId?: string;
+  answeredAt: number;
+};
+
+export type ConversationFormResult = {
+  topFormId: KatchimeraSkinId;
+  runnerUpFormId: KatchimeraSkinId | null;
+  scores: Partial<Record<KatchimeraSkinId, number>>;
+};
+
+export type ConversationPollResult = {
+  selectedOptionId: string;
+  percentages: Readonly<Record<string, number>>;
+  label: 'Katchimera village poll - fictional';
+};
+
+export type ConversationOutcomeDestination = 'goals' | 'quest' | 'memory' | 'insight';
+
+export type ConversationOutcomePresentation = {
+  id: string;
+  kind: 'task' | 'goal' | 'focus' | 'quest' | 'memory' | 'insight';
+  eyebrow: string;
+  title: string;
+  message: string;
+  items?: readonly string[];
+  celebrate: boolean;
+  destination?: ConversationOutcomeDestination;
+  destinationLabel?: string;
+  createdAt: number;
+};
+
+export type ConversationSessionStatus = 'active' | 'completed' | 'archived';
+
+export type ConversationSession = {
+  id: string;
+  definitionId: string;
+  definitionVersion: number;
+  familyId: ConversationV2FamilyId;
+  formId: KatchimeraSkinId;
+  createdDayId: string;
+  servedDayId: string;
+  currentNodeId: string;
+  gameQuestionIndex: number;
+  pendingReply?: string;
+  lastReply?: string;
+  pendingNextNodeId?: string | null;
+  turns: ConversationTurn[];
+  affinityScores: Partial<Record<KatchimeraSkinId, number>>;
+  formResult?: ConversationFormResult;
+  insightResult?: ConversationInsightResult;
+  pollResult?: ConversationPollResult;
+  outcomePresentation?: ConversationOutcomePresentation;
+  evidenceRefs: CompanionEvidenceRef[];
+  status: ConversationSessionStatus;
+  createdAt: number;
+  updatedAt: number;
+  completedAt?: number;
+  archivedAt?: number;
+  outcomeIds: string[];
+  encounterId?: string;
+  exitTransition?: ConversationTransition;
+  encounterTargetTurns?: number;
+  encounterTurns?: number;
+  /** Development-only dialogue browser session. It cannot write player outcomes. */
+  preview?: boolean;
+};
+
+export type ConversationSignalKind = 'journal' | 'goal_debrief' | 'quest_debrief' | 'bond' | 'achievement';
+
+export type QueuedConversationSignal = {
+  id: string;
+  kind: ConversationSignalKind;
+  familyId: ConversationV2FamilyId;
+  sourceId: string;
+  dayId: string;
+  routeKey?: string;
+  feeling?: string | null;
+  context?: string | null;
+  createdAt: number;
+  expiresAt: number;
+  consumedAt?: number;
+};
+
+export type ConversationTelemetryKind =
+  | 'conversation_started'
+  | 'turn_answered'
+  | 'game_completed'
+  | 'memory_proposed'
+  | 'memory_confirmed'
+  | 'memory_rejected'
+  | 'goal_proposed'
+  | 'goal_accepted'
+  | 'insight_revealed'
+  | 'insight_confirmed'
+  | 'insight_adjusted'
+  | 'insight_dismissed'
+  | 'insight_viewed'
+  | 'conversation_completed'
+  | 'conversation_archived'
+  | 'conversation_fallback';
+
+export type ConversationTelemetryEvent = {
+  id: string;
+  familyId: KatchimeraFamilyId;
+  sessionId: string;
+  definitionId: string;
+  kind: ConversationTelemetryKind;
+  nodeId?: string;
+  optionId?: string;
+  occurredAt: number;
+};
+
+export function isConversationV2Family(value: string | null | undefined): value is ConversationV2FamilyId {
+  return CONVERSATION_V2_FAMILIES.includes(value as ConversationV2FamilyId);
+}

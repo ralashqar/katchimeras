@@ -19,16 +19,25 @@ import { COMPANION_SPEECH_COPY_LIMITS } from '@/constants/companion-speech-copy'
 import {
   emptyCompanionContentState,
   completeCompanionIntroduction,
+  completeCompanionVisit,
   deferCompanionIntroduction,
   ensureCompanionInvitation,
+  ensureCompanionVisitPlan,
   invitationForDay,
   introductionForFamily,
   migrateCompanionIntroduction,
+  normaliseCompanionContentState,
   recordCompanionVisit,
-  rememberCompanionAnswer,
+  resetCompanionMemory,
   selectCompanionDailyInvitation,
   updateCompanionInvitation,
+  updateCompanionMemoryStatus,
+  upsertCompanionInsight,
+  upsertCompanionMemory,
 } from '@/utils/companion-content';
+import { buildCompanionVisitPlan } from '@/utils/companion-visit';
+import { deriveCompanionPatternCandidates } from '@/utils/companion-memory-patterns';
+import type { StoredHomeDayRecord } from '@/types/home';
 import { companionFirstPersonText } from '@/utils/companion-dialogue';
 import { companionCheckInQuestion } from '@/utils/companion-check-in';
 import {
@@ -515,7 +524,7 @@ test('resume work and Focus setup take priority over rotating content', () => {
   assert.equal(selectCompanionDailyInvitation({ ...base, hasActiveGoal: false }).kind, 'focus_setup');
 });
 
-test('invitation lifecycle and remembered answers are idempotent and contain no journal text', () => {
+test('invitation lifecycle is idempotent and ordinary answers do not enter Long Memory', () => {
   const invitation = selectCompanionDailyInvitation({
     state: emptyCompanionContentState(), companionId: 'companion:mossprout', familyId: 'mossprout',
     dayId: '2026-08-02', bondLevel: 1, content: mossContent, hasActiveGoal: true,
@@ -525,14 +534,10 @@ test('invitation lifecycle and remembered answers are idempotent and contain no 
   state = updateCompanionInvitation(state, invitation.id, 'opened', 2);
   state = updateCompanionInvitation(state, invitation.id, 'completed', 3);
   state = updateCompanionInvitation(state, invitation.id, 'completed', 4);
-  state = rememberCompanionAnswer(state, {
-    companionId: invitation.companionId, familyId: invitation.familyId,
-    key: invitation.contentItemId ?? 'pulse', value: 'I noticed something new', sourceId: invitation.id, occurredAt: 3,
-  });
   assert.equal(state.invitations[0].status, 'completed');
   assert.equal(state.events.filter((event) => event.kind === 'completed').length, 1);
-  assert.equal(state.memoryFacts[0].value, 'I noticed something new');
-  assert.equal(JSON.stringify(state.events).includes('I noticed something new'), false);
+  assert.deepEqual(state.memoryFacts, []);
+  assert.deepEqual(state.memories, []);
 });
 
 test('repeatable real-life quests rotate presentation variants and retain evidence identity', () => {
@@ -557,4 +562,216 @@ test('repeatable real-life quests rotate presentation variants and retain eviden
   });
   assert.equal(second.id, first.id);
   assert.notEqual(second.presentationVariantId, first.presentationVariantId);
+});
+
+test('schema v6 removes promoted answers and generic patterns while preserving explicit moments', () => {
+  const state = normaliseCompanionContentState({
+    schemaVersion: 4,
+    invitations: [],
+    memoryFacts: [{
+      id: 'companion-memory:companion:mossprout:focus:place',
+      companionId: 'companion:mossprout',
+      familyId: 'mossprout',
+      key: 'focus:place',
+      value: 'Quiet green spaces',
+      sourceId: 'conversation-1',
+      firstRecordedAt: 10,
+      lastConfirmedAt: 20,
+    }],
+    memories: [{
+      id: 'legacy-focus-answer', scope: 'family', familyId: 'mossprout', kind: 'confirmed_fact',
+      key: 'focus:place', summary: 'Quiet green spaces', evidenceRefs: [], confidence: 1,
+      status: 'confirmed', sensitivity: 'ordinary', firstRecordedAt: 10,
+    }, {
+      id: 'generic-recurrence', scope: 'family', familyId: 'mossprout', kind: 'pattern',
+      key: 'pattern:mossprout:recurring-days', summary: 'This part of life returned.', evidenceRefs: [], confidence: 0.8,
+      status: 'confirmed', sensitivity: 'ordinary', firstRecordedAt: 11,
+    }, {
+      id: 'saved-moment', scope: 'family', familyId: 'mossprout', kind: 'shared_moment',
+      key: 'shared:1', summary: 'A walk I wanted to keep', evidenceRefs: [], confidence: 1,
+      status: 'confirmed', sensitivity: 'personal', firstRecordedAt: 12,
+    }],
+    visitPlans: [{
+      id: 'old-memory-plan', familyId: 'mossprout', dayId: '2026-08-09', subject: 'memory_confirmation',
+      eyebrow: 'OLD', opening: 'Old question', responses: [], evidenceRefs: [], createdAt: 12,
+    }],
+    conversationReceipts: [{
+      id: 'old-receipt', visitPlanId: 'old-memory-plan', familyId: 'mossprout', dayId: '2026-08-09',
+      responseIds: [], affectedMemoryIds: [], completedAt: 13,
+    }],
+    events: [],
+    introductions: [],
+    visits: [],
+  });
+  assert.equal(state.schemaVersion, 7);
+  assert.equal(state.memories.length, 1);
+  assert.equal(state.memories[0].id, 'saved-moment');
+  assert.deepEqual(state.memoryFacts, []);
+  assert.deepEqual(state.visitPlans, []);
+  assert.deepEqual(state.conversationReceipts, []);
+});
+
+test('insights keep one active slot and preserve changed results as history', () => {
+  const first = upsertCompanionInsight(emptyCompanionContentState(), {
+    familyId: 'baristabbit', insightKey: 'drink-compass', category: 'Drinks', resultId: 'classic',
+    title: 'The Reliable Classic', summary: 'A trusted cup clears a small piece of the day.', emblemId: 'classic-cup',
+    supportingTraits: ['Coffee', 'Warm'], evidenceRefs: [{ sourceType: 'conversation', sourceId: 'session-1' }],
+    sourceDefinitionId: 'baristabbit:insight:drink-compass', sourceSessionId: 'session-1', recordedAt: 100,
+  });
+  const updated = upsertCompanionInsight(first, {
+    familyId: 'baristabbit', insightKey: 'drink-compass', category: 'Drinks', resultId: 'curious',
+    title: 'The Curious Menu', summary: 'A drink can be a small adventure.', emblemId: 'curious-cup',
+    supportingTraits: ['Seasonal', 'Cold'], evidenceRefs: [{ sourceType: 'conversation', sourceId: 'session-2' }],
+    sourceDefinitionId: 'baristabbit:insight:drink-compass', sourceSessionId: 'session-2', recordedAt: 200,
+  });
+  assert.equal(updated.insights.length, 1);
+  assert.equal(updated.insights[0]?.title, 'The Curious Menu');
+  assert.equal(updated.insights[0]?.revisions[0]?.title, 'The Reliable Classic');
+  assert.equal(upsertCompanionInsight(updated, {
+    familyId: 'baristabbit', insightKey: 'drink-compass', category: 'Drinks', resultId: 'curious',
+    title: 'The Curious Menu', summary: 'A drink can be a small adventure.', emblemId: 'curious-cup', supportingTraits: [], evidenceRefs: [],
+    sourceDefinitionId: 'baristabbit:insight:drink-compass', sourceSessionId: 'session-2', recordedAt: 300,
+  }), updated);
+});
+
+test('confirming a multi-day journal pattern promotes it to About You without raw journal text', () => {
+  const memory = {
+    id: 'memory-pattern', scope: 'family' as const, familyId: 'steppling' as const, kind: 'pattern' as const,
+    key: 'pattern:v2:steppling:movement-on-foot', summary: 'Walking, running or hiking has returned across several recorded days.',
+    evidenceSummary: 'Based on 3 recorded days across 21 days.',
+    evidenceRefs: [1, 2, 3].map((day) => ({ sourceType: 'day' as const, sourceId: `day-${day}`, dayId: `2026-07-${day}` })),
+    confidence: 0.82, status: 'provisional' as const, sensitivity: 'ordinary' as const, firstRecordedAt: 10,
+  };
+  const state = upsertCompanionMemory(emptyCompanionContentState(), memory);
+  const confirmed = updateCompanionMemoryStatus(state, { memoryId: memory.id, familyId: 'steppling', dayId: '2026-08-10', status: 'confirmed', occurredAt: 100 });
+  assert.equal(confirmed.insights.length, 1);
+  assert.equal(confirmed.insights[0]?.title, 'The Route That Returns');
+  assert.equal(confirmed.insights[0]?.evidenceRefs.length, 3);
+});
+
+test('one deterministic Visit plan is persisted and completed idempotently', () => {
+  const invitation = selectCompanionDailyInvitation({
+    state: emptyCompanionContentState(),
+    companionId: 'companion:mossprout',
+    familyId: 'mossprout',
+    dayId: '2026-08-09',
+    bondLevel: 1,
+    content: mossContent,
+    hasActiveGoal: true,
+    questCompletions: 0,
+    reflections: 0,
+    eligibleQuestIds: [],
+    createdAt: 100,
+  });
+  const plan = buildCompanionVisitPlan({
+    familyId: 'mossprout',
+    dayId: '2026-08-09',
+    invitation,
+    contentItem: invitation.contentItemId ? mossContent.find((item) => item.id === invitation.contentItemId) : null,
+    homeGreeting: 'I found something green in your day.',
+    createdAt: 100,
+  });
+  const withPlan = ensureCompanionVisitPlan(emptyCompanionContentState(), plan);
+  assert.equal(withPlan.visitPlans.length, 1);
+  assert.equal(ensureCompanionVisitPlan(withPlan, plan), withPlan);
+  const completed = completeCompanionVisit(withPlan, {
+    visitPlanId: plan.id,
+    familyId: plan.familyId,
+    dayId: plan.dayId,
+    responseIds: [plan.responses[0].id],
+    affectedMemoryIds: [],
+    completedAt: 200,
+  });
+  assert.equal(completed.conversationReceipts.length, 1);
+  assert.equal(completeCompanionVisit(completed, {
+    visitPlanId: plan.id,
+    familyId: plan.familyId,
+    dayId: plan.dayId,
+    responseIds: ['different'],
+    affectedMemoryIds: [],
+    completedAt: 300,
+  }), completed);
+});
+
+test('patterns require specific evidence across three days and two weeks', () => {
+  const day = (id: string, park = true): StoredHomeDayRecord => ({
+    id,
+    isoDate: id,
+    confirmedPlaces: park ? [{ id: `park-${id}`, category: 'park', archetype: 'calm', label: 'Park', confirmedAt: `${id}T12:00:00Z` }] : [],
+  } as StoredHomeDayRecord);
+  assert.deepEqual(deriveCompanionPatternCandidates({
+    familyId: 'mossprout',
+    days: [day('2026-08-01'), day('2026-08-08')],
+    existingMemories: [],
+    now: 100,
+  }), []);
+  assert.deepEqual(deriveCompanionPatternCandidates({
+    familyId: 'mossprout',
+    days: [day('2026-08-01'), day('2026-08-08'), day('2026-08-15', false)],
+    existingMemories: [],
+    now: 100,
+  }), []);
+  const candidates = deriveCompanionPatternCandidates({
+    familyId: 'mossprout',
+    days: [day('2026-08-01'), day('2026-08-08'), day('2026-08-15')],
+    existingMemories: [],
+    now: 100,
+  });
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].status, 'provisional');
+  assert.equal(candidates[0].evidenceRefs.length, 3);
+  assert.match(candidates[0].confirmationPrompt ?? '', /parks or green spaces/i);
+  assert.match(candidates[0].evidenceSummary ?? '', /3 recorded days across 14 days/i);
+  const state = updateCompanionMemoryStatus({
+    ...emptyCompanionContentState(),
+    memories: candidates,
+  }, {
+    memoryId: candidates[0].id,
+    familyId: 'mossprout',
+    dayId: '2026-08-03',
+    status: 'confirmed',
+    occurredAt: 200,
+  });
+  assert.equal(state.memories[0].status, 'confirmed');
+  assert.equal(state.telemetry[0].kind, 'memory_confirmed');
+});
+
+test('the supplied free or Plus history window controls evidence without changing detector quality', () => {
+  const day = (id: string): StoredHomeDayRecord => ({
+    id,
+    isoDate: id,
+    studioMoments: [{ id: `book-${id}`, label: 'A book', mediaType: 'book', emoji: 'Book', createdAt: `${id}T12:00:00Z` }],
+  } as StoredHomeDayRecord);
+  const days = [day('2026-01-01'), day('2026-03-03'), day('2026-05-05'), day('2026-08-08')];
+  const free = deriveCompanionPatternCandidates({ familyId: 'pagelet', days: days.slice(-2), existingMemories: [], fullHistory: false, now: 1 });
+  const plus = deriveCompanionPatternCandidates({ familyId: 'pagelet', days, existingMemories: [], fullHistory: true, now: 1 });
+  assert.deepEqual(free, []);
+  assert.equal(plus.length, 1);
+  assert.match(plus[0].confirmationPrompt ?? '', /books or reading/i);
+});
+
+test('rejected evidence-specific patterns do not return and dev reset preserves Focus state', () => {
+  const days = ['2026-07-01', '2026-07-08', '2026-07-15'].map((id) => ({
+    id, isoDate: id, moments: [{ id: `social-${id}`, type: 'social' }],
+  } as StoredHomeDayRecord));
+  const memory = deriveCompanionPatternCandidates({
+    familyId: 'gatherglow',
+    days,
+    existingMemories: [],
+    now: 1,
+  })[0];
+  assert.ok(memory);
+  const rejected = { ...memory, status: 'rejected' as const };
+  assert.deepEqual(deriveCompanionPatternCandidates({
+    familyId: 'gatherglow', days, existingMemories: [rejected], now: 2,
+  }), []);
+  const state = resetCompanionMemory({
+    ...emptyCompanionContentState(),
+    memories: [memory],
+    introductions: [{
+      id: 'intro', companionId: 'companion:gatherglow', familyId: 'gatherglow', status: 'completed', firstSeenAt: 1, completedAt: 1,
+    }],
+  }, 'gatherglow');
+  assert.deepEqual(state.memories, []);
+  assert.equal(state.introductions.length, 1);
 });

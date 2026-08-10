@@ -149,7 +149,7 @@ function threeQuestionJourney(config: ThreeQuestionJourneyConfig): CompanionJour
       { id: 'choose', title: 'Choose a direction', description: `Name the ${config.reflectionSubject} you want to explore.`, requirement: { kind: 'goal_created', target: 1 } },
       { id: 'practice', title: config.practiceTitle, description: config.practiceDescription, requirement: { kind: 'quest_completions', target: 3 } },
       { id: 'review', title: 'Notice the pattern', description: `Reflect on what your ${config.reflectionSubject} moments are showing you.`, requirement: { kind: 'reflections', target: 1 } },
-      { id: 'decide', title: 'Choose what continues', description: 'Keep, reshape, pause, or complete this Focus.', requirement: { kind: 'goal_resolved', target: 1 } },
+      { id: 'decide', title: 'Choose what continues', description: 'Keep, reshape, pause, or complete this goal plan.', requirement: { kind: 'goal_resolved', target: 1 } },
     ],
     reflectionPrompts: {
       choose: `What would make this ${config.reflectionSubject} direction worth returning to?`,
@@ -236,7 +236,7 @@ const flexel = focusedPracticeJourney({
   secondPrompt: 'What most affects whether training fits?',
   secondHelperText: 'Pain, symptoms, access, uncertainty, and recovery needs are real constraints—not failures of motivation.',
   secondOptions: ['Finding time or access', 'Knowing what suits my body', 'Confidence or belonging', 'Pain, fatigue, or recovery', 'Equipment or support needs'],
-  goalHelperText: 'Choose an adaptable direction. Reducing, changing, resting, or getting appropriate guidance can all belong in the Focus.',
+  goalHelperText: 'Choose an adaptable direction. Reducing, changing, resting, or getting appropriate guidance can all belong in the plan.',
   directions: [
     { label: 'Find a repeatable, flexible rhythm', goalTitle: 'Build a flexible training rhythm that suits my capacity', quickGoals: ['flexel:show-up', 'flexel:weekday-training'] },
     { label: 'Build useful strength gradually', goalTitle: 'Explore gradual strength progress without comparison', quickGoals: ['flexel:one-exercise', 'flexel:record-set'] },
@@ -260,7 +260,7 @@ const sprintail = focusedPracticeJourney({
   secondPrompt: 'What most affects whether running fits?',
   secondHelperText: 'Pain, symptoms, route safety, weather, access, and recovery are valid reasons to adapt or not run.',
   secondOptions: ['Starting or finding time', 'Pacing or expectations', 'Route, weather, or access', 'Pain, fatigue, or recovery', 'Running does not fit right now'],
-  goalHelperText: 'Choose a low-pressure experiment. Walking intervals, stopping, recovery, and pausing the Focus are valid.',
+  goalHelperText: 'Choose a low-pressure experiment. Walking intervals, stopping, recovery, and pausing the plan are valid.',
   directions: [
     { label: 'Find a realistic running rhythm', goalTitle: 'Build a flexible running or run-walk rhythm', quickGoals: ['sprintail:shoes-on', 'sprintail:weekday-run'] },
     { label: 'Explore endurance gently', goalTitle: 'Explore sustainable endurance with permission to slow or stop', quickGoals: ['sprintail:ten-minute-run', 'sprintail:easy-pace'] },
@@ -712,7 +712,7 @@ const flickerbun = threeQuestionJourney({
   second: {
     id: 'watching-friction',
     prompt: 'What most often makes watching feel less satisfying?',
-    helperText: 'Flickerbun will keep the Focus practical.',
+    helperText: 'Flickerbun will keep the goal practical.',
     options: [
       { id: 'browsing', label: 'Too much browsing, not enough choosing' },
       { id: 'distraction', label: 'I watch while distracted' },
@@ -1091,7 +1091,7 @@ const steppling: CompanionJourneyDefinition = {
     },
   ],
   goalTypes: {
-    'walking-rhythm': { label: 'Walking Focus', fallbackTitle: 'Find a kind of walking that fits' },
+    'walking-rhythm': { label: 'Walking plan', fallbackTitle: 'Find a kind of walking that fits' },
   },
   checkIn: {
     prompt: 'What was walking like for you today?',
@@ -1107,7 +1107,7 @@ const steppling: CompanionJourneyDefinition = {
     { id: 'choose', title: 'Choose a starting point', description: 'Decide what you would like from walking now.', requirement: { kind: 'goal_created', target: 1 } },
     { id: 'walk', title: 'Try it in real life', description: 'Share three walking moments from different days.', requirement: { kind: 'quest_completions', target: 3 } },
     { id: 'review', title: 'Notice what fits', description: 'Look at what helped, what did not, and what you want to change.', requirement: { kind: 'reflections', target: 1 } },
-    { id: 'decide', title: 'Choose what happens next', description: 'Continue, change, pause, or complete this walking Focus.', requirement: { kind: 'goal_resolved', target: 1 } },
+    { id: 'decide', title: 'Choose what happens next', description: 'Continue, change, pause, or complete this walking plan.', requirement: { kind: 'goal_resolved', target: 1 } },
   ],
   reflectionPrompts: {
     choose: 'What would make “{goal}” feel worthwhile and realistic?',
@@ -1827,7 +1827,7 @@ function newFamilyJourney(family: (typeof katchimeraFamilies)[number]): Companio
     id: `${family.id}-life-area-focus`,
     version: 1,
     familyId: family.id,
-    title: `${family.displayName} Focus`,
+    title: `${family.displayName} goal plan`,
     introduction: family.description,
     subject: family.lifeAreaLabel.toLowerCase(),
     firstPrompt: `What would you most like ${family.displayName} to support?`,

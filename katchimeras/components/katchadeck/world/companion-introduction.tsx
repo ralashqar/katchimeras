@@ -141,7 +141,7 @@ export function CompanionIntroduction({
       title="I’ll remember that."
       visualKey={visualKey}>
       <QuestionnaireResultNotice
-        body="That is enough for today. If you want, we can also turn it into a longer-term focus."
+        body="That is enough for today. If you want, we can also turn it into a few optional goals."
         tasks={[]}
         title="We can begin gently"
       />

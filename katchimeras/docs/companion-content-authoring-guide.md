@@ -346,7 +346,34 @@ short walk. Avoid unsafe combinations such as walking while handling an
 attention-heavy call. Use “before or after” when combining activities is not
 necessary. Cadence is a schedule setting, not a streak promise.
 
+## Writing goal-discovery conversations
+
+Goal discovery is a short planning conversation, not a category picker and not an insight assessment. The launch-family contract is four questions:
+
+1. desired change;
+2. personal context;
+3. real friction;
+4. realistic starting shape.
+
+Offer four literal, specific answers at each step. Context must change the friction prompt, friction must change the final framing, and starting shape must change the ranked supporting steps. Finish with a named goal, a short explanation grounded in the conversation, and two or three existing quick-goal templates. Do not show or mention Focus, ask the player to diagnose a goal type, or save planning intent as an insight.
+
 ## Implementation and migration
+
+## Writing insight outcomes
+
+Insight games are coherent self-discovery conversations, not a stack of unrelated preference questions. Write four to six questions that explore one named theme from different angles; the launch standard is five. Every option must answer the visible question literally and contribute to a known result family. Each result must be supported by options across at least four separate questions.
+
+Each result requires:
+
+- a concrete, memorable title that does not rank the player;
+- a Katchimera reflection grounded in what the answers actually imply;
+- a two-to-three sentence summary explaining the pattern in everyday language;
+- a stable emblem ID and stable insight key;
+- explicit matching option IDs.
+
+Do not use shared endings such as “What would you like to do with that answer?”, generic personality praise, clinical language, fake certainty, or unverified claims. Prefer “You told Baristabbit…” for direct answers and “Across several recorded days…” for journal evidence. Never expose raw journal text on an insight card.
+
+Casual dialogue and fictional polls stay conversational; neither earns an insight emblem or a ceremonial completion card. Action intent routes to a goal or quest rather than becoming an identity claim. A single journal callback may offer explicit Long Memory, while a journal-backed insight needs evidence from at least three distinct recorded days and explicit confirmation. A changed result updates its existing slot and preserves history rather than creating contradictory cards. Close assessment scores should expose a secondary thread rather than pretending the leading result is absolute.
 
 Reference files:
 

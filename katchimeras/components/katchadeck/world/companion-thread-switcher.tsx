@@ -3,7 +3,6 @@ import type { CompanionThread } from '@/types/companion-interaction';
 
 const THREADS: InteractionThreadOption<CompanionThread>[] = [
   { id: 'quest', label: 'Do', icon: 'checkmark' },
-  { id: 'discovery', label: 'You', icon: 'square.and.pencil' },
   { id: 'insight', label: 'Insight', icon: 'star.fill' },
   { id: 'skins', label: 'Skins', icon: 'circle.grid.2x2.fill' },
 ];

@@ -1,5 +1,7 @@
 # Companion Journeys
 
+> Player-facing Focus UI was retired in August 2026. Journey-backed records now appear as goal plans inside Goals. See [Goals and conversation consolidation](./goals-conversation-consolidation.md) for the current product contract; references to Focus below describe legacy storage or historical design.
+
 ## Editorial content rollout
 
 Steppling and Batch 1 (Sleep/Rest, Tasklet, Mossprout, and Gatherglow) use fully
@@ -81,6 +83,28 @@ Steppling remains responsible for everyday walking. Voltstep and Pulsepounce
 remain unchanged pending a later overlap audit informed by these authored roles.
 
 ## Current interaction model
+
+### Conversation-first Visit
+
+An ordinary companion entry opens **Visit**, not a feature dashboard. The
+daily invitation selector builds one persisted, deterministic conversation for
+that family and local day. Quests, Focus, goals, achievements, and insights are
+inputs to the encounter; their management views remain available under
+**More** and through existing restoration links.
+
+A Visit asks at most one meaningful question and offers at most one action.
+Completing it writes an idempotent conversation receipt, so reopening on the
+same day becomes quiet companionship instead of another reward opportunity.
+The optional **Say more** path uses the normal local journal and can create a
+user-confirmed shared moment.
+
+**Shared history** is family-owned and shared by every skin. Existing remembered
+answers migrate to confirmed structured memories. Derived patterns remain
+provisional until the player confirms them and every pattern keeps local
+evidence references plus correction, rejection, and forgetting controls. Free
+history derivation uses the latest fourteen days while confirmed relationship
+facts remain available; Plus can derive and browse long-range patterns from the
+full local archive.
 
 ### Evolving daily companion content
 

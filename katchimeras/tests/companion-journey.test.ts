@@ -464,6 +464,21 @@ test('legacy foundation and specialist discovery goals migrate once', () => {
   assert.equal(primaryGoalForFamily(first, 'shellio')?.title, 'Return to the canal safely');
 });
 
+test('legacy journey goals normalise into schema-v4 goal plans without losing progress', () => {
+  const state = normaliseCompanionJourneyState({
+    schemaVersion: 3,
+    goals: [{
+      id: 'legacy-focus', familyId: 'steppling', goalTypeId: 'walking-rhythm', title: 'Walk for headspace',
+      status: 'active', isPrimary: true, createdAt: 10, updatedAt: 20,
+    }],
+    conversations: [], questEvents: [], momentEvents: [], reflectionEvents: [], checkIns: [],
+  });
+  assert.equal(state.schemaVersion, 4);
+  assert.equal(state.goals[0]?.kind, 'plan');
+  assert.equal(state.goals[0]?.title, 'Walk for headspace');
+  assert.equal(state.goals[0]?.isPrimary, true);
+});
+
 test('daily check-ins branch over three taps and reward journey progress only once', () => {
   let state = emptyCompanionJourneyState();
   state = startJourneyConversation(state, 'tasklet', 100);

@@ -32,7 +32,17 @@ Katchimera is not a habit tracker, journal, camera roll, or chatbot. The gamepla
 
 4. **AI is the intelligence layer, not the product surface**
    - AI classifies memories, enriches context, writes day reflections, shapes Chronicle copy, and creates optional comic/story outputs.
-   - V1 does not include an AI chat companion.
+   - V1 does not include an unrestricted AI chat companion. Companion Visits
+     are authored, deterministic conversations assembled from local evidence,
+     confirmed preferences, Focus, quests, and relationship history.
+   - Long Memory has three layers: Visit answers are temporary conversation
+     context; Focus, goals, and support choices remain working context in their
+     owning systems; Shared History contains only explicitly saved moments and
+     evidence-specific patterns the user confirmed.
+   - Schema v5 removes questionnaire fragments promoted by schema v4. A pattern
+     requires a typed detector, three matching recorded days across at least
+     fourteen days, a human-readable evidence explanation, and confirmation.
+     Repeatedly hatching the same family is not pattern evidence.
    - If AI is unavailable, the app remains useful through local fallback copy and local-first state.
 
 5. **Progression rewards real life**

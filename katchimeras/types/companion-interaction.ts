@@ -3,9 +3,61 @@ import type { JournalNoteDraft } from '@/types/home';
 import type { QuestSubmissionItem } from '@/utils/quests/report-back-evidence';
 import type { QuestNextAction, QuestRuntimeState } from '@/utils/quests/runtime';
 import type { KatchimeraActivityLane, KatchimeraBondLevel } from '@/constants/katchimera-roles';
+import type { KatchimeraFamilyId } from '@/types/katchimera';
 
-export type CompanionThread = 'quest' | 'discovery' | 'insight' | 'skins';
+export type CompanionThread = 'quest' | 'insight' | 'skins';
 export type CompanionDestination = CompanionThread | 'goals' | 'achievements';
+
+export type CompanionVisitSubject =
+  | 'introduction'
+  | 'celebration'
+  | 'resume'
+  | 'today'
+  | 'memory_confirmation'
+  | 'focus'
+  | 'quest'
+  | 'daily_pulse'
+  | 'quiet';
+
+export type CompanionEvidenceRef = {
+  sourceType: 'day' | 'memory' | 'conversation' | 'journal' | 'quest' | 'goal' | 'achievement';
+  sourceId: string;
+  dayId?: string;
+};
+
+export type CompanionVisitResponse = {
+  id: string;
+  label: string;
+  action: 'answer' | 'say_more' | 'open_focus' | 'accept_quest' | 'open_quest' | 'open_achievements' | 'defer' | 'stay';
+  value?: string;
+};
+
+export type CompanionVisitPlan = {
+  id: string;
+  familyId: KatchimeraFamilyId;
+  dayId: string;
+  invitationId?: string;
+  contentItemId?: string;
+  questId?: string;
+  subject: CompanionVisitSubject;
+  eyebrow: string;
+  opening: string;
+  helperText?: string;
+  responses: readonly CompanionVisitResponse[];
+  evidenceRefs: readonly CompanionEvidenceRef[];
+  createdAt: number;
+};
+
+export type CompanionConversationReceipt = {
+  id: string;
+  visitPlanId: string;
+  familyId: KatchimeraFamilyId;
+  dayId: string;
+  responseIds: string[];
+  offerOutcome?: 'accepted' | 'declined' | 'deferred';
+  affectedMemoryIds: string[];
+  completedAt: number;
+};
 
 export type CompanionQuestOfferViewModel = {
   id: string;
@@ -96,18 +148,22 @@ export type CompanionInteractionState = {
 };
 
 export type CompanionRoute =
-  | { kind: 'home' }
+  | { kind: 'dashboard' }
+  | { kind: 'visit' }
+  | { kind: 'shared_history' }
   | { kind: 'introduction' }
   | { kind: 'destination'; destination: CompanionDestination }
   | { kind: 'quick_goal_picker'; destination: 'goals' }
-  | { kind: 'journey_questionnaire'; destination: 'discovery'; sessionId: string | null }
-  | { kind: 'check_in'; destination: 'discovery'; checkInId: string }
+  | { kind: 'journey_questionnaire'; destination: 'goals'; sessionId: string | null }
+  | { kind: 'check_in'; destination: 'goals'; checkInId: string }
   | { kind: 'quest_experience'; destination: 'quest'; attemptId: string | null };
 
 export type CompanionInteractionAction =
   | { type: 'select_destination'; destination: CompanionDestination }
   | { type: 'open_introduction' }
-  | { type: 'show_home' }
+  | { type: 'show_dashboard' }
+  | { type: 'show_visit' }
+  | { type: 'open_shared_history' }
   | { type: 'review_item'; itemId: string | null }
   | { type: 'open_quick_goal_picker' }
   | { type: 'open_journey_questionnaire'; sessionId?: string | null }

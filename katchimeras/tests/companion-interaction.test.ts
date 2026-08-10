@@ -139,16 +139,81 @@ test('You questionnaires require answer confirmation and task consent', () => {
   assert.match(reflectionComposer, /!text\.trim\(\) && !voiceDraft\?\.audioUri/);
   assert.match(zodiac, /onSave=\{saveReflection\}/);
   assert.doesNotMatch(zodiac, /label="Save reflection"/);
-  assert.match(interaction, /How did today feel\?/);
+  assert.match(interaction, /Your goals and next steps/);
   assert.match(interaction, /emphasized=\{Boolean\(activeJourneyFocus/);
   assert.match(interaction, /bubbleBody=\{quickGoalPickerOpen \?.*destinationHeroBody\}/);
-  assert.match(interaction, /bubbleVariant=\{destination === 'discovery' \|\| quickGoalPickerOpen \? 'questionnaire' : 'default'\}/);
+  assert.match(interaction, /bubbleVariant=\{quickGoalPickerOpen \? 'questionnaire' : 'default'\}/);
   assert.match(interaction, /showSpeechBubble/);
   assert.doesNotMatch(interaction, /styles\.youHeading|styles\.youIntro/);
   assert.match(interaction, /backgroundColor: KatchaUI\.companionPanel\.background/);
   assert.doesNotMatch(interaction, /talk about you/i);
   assert.doesNotMatch(journey, /Find a new focus/);
   assert.doesNotMatch(journey, /previous focus kept in history/);
+});
+
+test('conversation outcomes stay visible and provisional answers remain editable', () => {
+  const scene = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-conversation-scene.tsx'),
+    'utf8',
+  );
+  const stage = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-cinematic-stage.tsx'),
+    'utf8',
+  );
+  const interaction = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'),
+    'utf8',
+  );
+  const questHook = fs.readFileSync(
+    path.join(process.cwd(), 'hooks', 'use-kingdom-quests.ts'),
+    'utf8',
+  );
+  assert.match(scene, /You can change your answer before continuing/);
+  assert.match(scene, /<ConversationOutcomeCard/);
+  assert.doesNotMatch(scene, /CONVERSATION TAKEAWAY|Finish this thought|reflection_reveal/);
+  assert.match(scene, /Save this insight/);
+  assert.match(scene, /A SECONDARY THREAD/);
+  assert.match(scene, /WHY THIS RESULT/);
+  assert.match(scene, /A QUEST PICKED FOR YOU/);
+  assert.match(scene, /label="Take this quest"/);
+  assert.doesNotMatch(scene, /There is no matching quest available right now/);
+  assert.match(scene, /function GoalBundleProposal/);
+  assert.match(scene, /accessibilityRole="checkbox"/);
+  assert.match(scene, /BEST MATCH/);
+  assert.match(scene, /Add \$\{selectedIds\.length\} goals/);
+  assert.match(scene, /outcome\.items\?\.map/);
+  assert.match(interaction, /destination === 'goals'/);
+  assert.doesNotMatch(interaction, /destination === 'discovery'/);
+  assert.match(questHook, /destinationLabel: 'View all goals'/);
+  assert.match(questHook, /destinationLabel: 'View this quest'/);
+  assert.match(questHook, /selectedConversationDefinition\.isOpener/);
+  assert.match(questHook, /enteredNode\.fallbackNodeId/);
+  assert.doesNotMatch(scene, /Show me the quests/);
+  assert.match(stage, /<CelebrationParticles/);
+  assert.match(interaction, /onOpenOutcomeDestination/);
+  assert.doesNotMatch(interaction, /if \(accept\) selectExperienceDestination\('quest'\)/);
+  assert.match(scene, /showConversationProgress && lastLabel/);
+  assert.match(scene, /\{showConversationProgress \? <>/);
+  assert.doesNotMatch(scene, /session\.status === 'completed' \? 'KEEP TALKING'/);
+});
+
+test('companion insights stay scoped to the Katchimera being visited', () => {
+  const thread = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-insight-thread.tsx'),
+    'utf8',
+  );
+  const questHook = fs.readFileSync(
+    path.join(process.cwd(), 'hooks', 'use-kingdom-quests.ts'),
+    'utf8',
+  );
+  const interaction = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'),
+    'utf8',
+  );
+  assert.match(questHook, /insightsForFamily\(companionContentState, selectedFamilyId\)/);
+  assert.match(thread, /insights\.filter\(\(item\) => item\.familyId === currentFamilyId\)/);
+  assert.doesNotMatch(thread, /accessibilityRole="tablist"|<FilterChip/);
+  assert.doesNotMatch(interaction, /destination === 'insight' && props\.insights\.length === 0 && props\.insight\.action/);
 });
 
 test('Mossprout, Feastle, and Tasklet games use the full-bleed game shell', () => {
@@ -195,29 +260,29 @@ function runtime(overrides: Partial<QuestRuntimeStatus> = {}): QuestRuntimeStatu
   };
 }
 
-test('ordinary companion visits open on the new home route', () => {
+test('ordinary companion visits open on the dashboard route', () => {
   const initial = createCompanionInteractionState({});
-  assert.deepEqual(initial.route, { kind: 'home' });
+  assert.deepEqual(initial.route, { kind: 'dashboard' });
   assert.equal(initial.destination, null);
   assert.equal(companionRouteBackAction(initial), 'close_experience');
 });
 
-test('the first-meeting introduction is a focused route that returns home', () => {
+test('the first-meeting introduction is a focused route that returns to the dashboard', () => {
   const initial = createCompanionInteractionState({});
   const introduction = companionInteractionReducer(initial, { type: 'open_introduction' });
   assert.deepEqual(introduction.route, { kind: 'introduction' });
-  assert.equal(companionRouteBackAction(introduction), 'return_to_destination');
+  assert.equal(companionRouteBackAction(introduction), 'return_to_home');
   const home = companionInteractionReducer(introduction, { type: 'return_to_destination' });
-  assert.deepEqual(home.route, { kind: 'home' });
+  assert.deepEqual(home.route, { kind: 'dashboard' });
 });
 
 test('companion destinations clear focused review state and preserve direction', () => {
   const initial = createCompanionInteractionState({ initialDestination: 'quest' });
   const reviewing = companionInteractionReducer(initial, { type: 'review_item', itemId: 'evidence-1' });
-  const you = companionInteractionReducer(reviewing, { type: 'select_destination', destination: 'discovery' });
+  const you = companionInteractionReducer(reviewing, { type: 'select_destination', destination: 'goals' });
   const insight = companionInteractionReducer(you, { type: 'select_destination', destination: 'insight' });
-  const backToYou = companionInteractionReducer(insight, { type: 'select_destination', destination: 'discovery' });
-  assert.equal(you.destination, 'discovery');
+  const backToYou = companionInteractionReducer(insight, { type: 'select_destination', destination: 'goals' });
+  assert.equal(you.destination, 'goals');
   assert.equal(you.reviewItemId, null);
   assert.equal(insight.direction, 1);
   assert.equal(backToYou.direction, -1);
@@ -242,26 +307,58 @@ test('achievements open as a companion destination instead of remounting a route
   );
   assert.match(interaction, /selectDestination\('achievements'\)/);
   assert.match(interaction, /CompanionTrophyRoomScreen creatureId=\{props\.creatureId\} embedded/);
-  assert.match(interaction, /route\.kind === 'home' \? homeGreeting : destinationHeroTitle/);
-  assert.match(interaction, /showStage=\{false\}/);
+  assert.match(interaction, /route\.kind === 'visit'/);
+  assert.match(interaction, /<CompanionVisitScene/);
   assert.doesNotMatch(kingdom, /pathname:\s*['"]\/katchimera\/\[creatureId\]\/achievements/);
 });
 
 test('focused companion routes unwind to their destination, then home, then Kingdom', () => {
-  const initial = createCompanionInteractionState({ initialDestination: 'discovery' });
+  const initial = createCompanionInteractionState({ initialDestination: 'goals' });
   const questionnaire = companionInteractionReducer(initial, {
     type: 'open_journey_questionnaire',
     sessionId: 'journey-1',
   });
   assert.equal(companionRouteBackAction(questionnaire), 'return_to_destination');
 
-  const discovery = companionInteractionReducer(questionnaire, { type: 'return_to_destination' });
-  assert.deepEqual(discovery.route, { kind: 'destination', destination: 'discovery' });
-  assert.equal(companionRouteBackAction(discovery), 'return_to_home');
+  const goals = companionInteractionReducer(questionnaire, { type: 'return_to_destination' });
+  assert.deepEqual(goals.route, { kind: 'destination', destination: 'goals' });
+  assert.equal(companionRouteBackAction(goals), 'return_to_home');
 
-  const home = companionInteractionReducer(discovery, { type: 'show_home' });
-  assert.deepEqual(home.route, { kind: 'home' });
+  const home = companionInteractionReducer(goals, { type: 'show_dashboard' });
+  assert.deepEqual(home.route, { kind: 'dashboard' });
   assert.equal(companionRouteBackAction(home), 'close_experience');
+});
+
+test('Chat and Shared History return to the dashboard', () => {
+  const initial = createCompanionInteractionState({});
+  const chat = companionInteractionReducer(initial, { type: 'show_visit' });
+  assert.deepEqual(chat.route, { kind: 'visit' });
+  assert.equal(companionRouteBackAction(chat), 'return_to_home');
+  const history = companionInteractionReducer(initial, { type: 'open_shared_history' });
+  assert.deepEqual(history.route, { kind: 'shared_history' });
+  assert.equal(companionRouteBackAction(history), 'return_to_home');
+  assert.deepEqual(companionInteractionReducer(history, { type: 'show_dashboard' }).route, { kind: 'dashboard' });
+
+  const dashboard = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-dashboard.tsx'),
+    'utf8',
+  );
+  assert.match(dashboard, />\s*Chat\s*</);
+  assert.ok(
+    dashboard.indexOf('onPress={onChat}') < dashboard.indexOf("ITEMS.map"),
+    'Chat belongs above the dashboard destinations',
+  );
+  for (const destination of ['quest', 'goals', 'achievements', 'insight', 'skins']) {
+    assert.match(dashboard, new RegExp(`destination: '${destination}'`));
+  }
+
+  const interaction = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'),
+    'utf8',
+  );
+  assert.match(interaction, /const openChat = \(\) =>/);
+  assert.match(interaction, /onChat=\{openChat\}/);
+  assert.doesNotMatch(interaction, /autoIntroductionCreatureRef/);
 });
 
 test('active mini-games require confirmation and reset their instance on return', () => {
@@ -310,10 +407,10 @@ test('goal picker returns to the dedicated goals destination', () => {
   const returned = companionInteractionReducer(picker, { type: 'return_to_destination' });
 
   assert.deepEqual(returned.route, { kind: 'destination', destination: 'goals' });
-  assert.match(interaction, /quickGoalPickerOpen \? 'Which small step feels right\?' : route\.kind === 'home' \? homeGreeting : destinationHeroTitle/);
+  assert.match(interaction, /route\.kind === 'visit'\s*\? visitStageSpeech/);
   assert.match(interaction, /backLabel=\{quickGoalPickerOpen \? 'Goals'/);
   assert.match(interaction, /\) : !questionnaireExperience \? \(\s*<CompanionCinematicStage/);
-  assert.match(interaction, /\(route\.kind === 'destination' \|\| quickGoalPickerOpen\) && !questGameVisible && !questionnaireExperience/);
+  assert.match(interaction, /route\.kind === 'destination' \|\| route\.kind === 'dashboard' \|\| route\.kind === 'shared_history' \|\| quickGoalPickerOpen/);
   assert.match(quickGoals, /backgroundColor: KatchaUI\.companionPanel\.background/);
   assert.match(quickGoals, /styles\.scopedPresetRow/);
   assert.match(quickGoals, /<QuickGoalComposerModal/);
@@ -360,7 +457,7 @@ test('companion viewport resets across destinations and content-shape transition
     questMode: 'offer' as const,
   };
   const quest = companionViewportResetKey(base);
-  assert.notEqual(companionViewportResetKey({ ...base, destination: 'discovery' }), quest);
+  assert.notEqual(companionViewportResetKey({ ...base, destination: 'insight' }), quest);
   assert.notEqual(companionViewportResetKey({ ...base, questMode: 'active', activeQuestTitle: 'The small hours' }), quest);
   assert.notEqual(companionViewportResetKey({ ...base, journeyNodeId: 'understand-goal' }), quest);
   assert.notEqual(companionViewportResetKey({ ...base, activeAttemptId: 'attempt-1' }), quest);

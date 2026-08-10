@@ -9,23 +9,30 @@ quests or artwork.
 
 The root flow is:
 
-`Kingdom resident → companion home → Quests / You / Goals`
+`Kingdom resident → Visit → response / optional action`
 
-Insight and Skins are secondary destinations on companion home. A normal
-resident tap always opens home. An explicit launch intent, such as returning
-from quest evidence capture, may open its owning destination directly.
+Shared History and More are secondary routes from Visit. More contains Quests,
+Focus, Goals, Achievements, and the latest Insight. Skins remain in You
+customisation. A normal resident tap always opens Visit. An explicit launch
+intent, such as returning from quest evidence capture, may open its owning
+destination directly.
+
+Shared History is not a questionnaire-answer archive. Proposed observations
+are reviewed one at a time during Visit. Only confirmed observations and
+explicitly saved moments appear in history; editing and forgetting are
+secondary controls behind the per-memory manage action.
 
 Focused work opens from a destination:
 
 - Quests → quest preview → active quest → result
 - You → journey questionnaire or daily check-in → result
 - Goals → companion-specific goals → goal picker
-- Insight and Skins remain lightweight destination content
+- Insight remains lightweight destination content; Skins live in You customisation
 
 Back always unwinds one level. An active mini-game asks for confirmation and
 then returns to Quests. A questionnaire, check-in, goal picker, or quest preview
-returns directly to its owning destination. A destination returns to companion
-home, and companion home returns to Kingdom.
+returns directly to its owning destination. A destination, More, or Shared
+History returns to Visit, and Visit returns to Kingdom.
 
 `CompanionRoute` in `types/companion-interaction.ts` is the source of truth.
 Do not add a new `*Open` boolean for a navigable companion subflow. Add a route
@@ -47,8 +54,8 @@ case and reducer action instead.
 
 ## Layout and type rules
 
-- The whole visit is full-screen. Companion home provides navigation; do not
-  reintroduce a persistent tab or thread switcher inside destinations.
+- The whole visit is full-screen. The character speaks before navigation is
+  offered; do not reintroduce a dashboard, persistent tab, or thread switcher.
 - Standard destinations keep the identity header above one scrolling region.
   The day atmosphere remains the page background, and a shared companion
   speech-bubble hero introduces the destination.

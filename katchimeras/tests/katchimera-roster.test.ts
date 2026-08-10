@@ -308,7 +308,7 @@ test('Block Blast completes its occupied-cell loss cascade before showing minima
 
 test('Katchimera navigation surfaces share one back-button treatment', () => {
   const files = [
-    path.join('components', 'katchadeck', 'world', 'companion-home-scene.tsx'),
+    path.join('components', 'katchadeck', 'world', 'companion-visit-scene.tsx'),
     path.join('components', 'katchadeck', 'world', 'companion-ui-primitives.tsx'),
     path.join('components', 'katchadeck', 'ui', 'meadow-interaction-primitives.tsx'),
     path.join('components', 'katchadeck', 'ui', 'screen-close-button.tsx'),

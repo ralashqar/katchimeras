@@ -15,7 +15,8 @@ export type CompanionBondEventKind =
   | 'discovery_answered'
   | 'quest_completed'
   | 'reflection_saved'
-  | 'insight_engaged';
+  | 'insight_engaged'
+  | 'conversation_completed';
 
 export type CompanionBondEvent = {
   id: string;
@@ -54,6 +55,7 @@ export const COMPANION_BOND_REWARDS: Record<CompanionBondEventKind, number> = {
   quest_completed: 25,
   reflection_saved: 15,
   insight_engaged: 10,
+  conversation_completed: 10,
 };
 
 export function questBondEventKind(

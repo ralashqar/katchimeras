@@ -18,7 +18,7 @@ export function createCompanionInteractionState(input: {
     destination,
     direction: 1,
     reviewItemId: null,
-    route: destination ? { kind: 'destination', destination } : { kind: 'home' },
+    route: destination ? { kind: 'destination', destination } : { kind: 'dashboard' },
     experienceInstance: 0,
   };
 }
@@ -29,7 +29,7 @@ export function companionInteractionReducer(
 ): CompanionInteractionState {
   switch (action.type) {
     case 'select_destination': {
-      const order: CompanionDestination[] = ['quest', 'discovery', 'goals', 'achievements', 'insight', 'skins'];
+      const order: CompanionDestination[] = ['quest', 'goals', 'achievements', 'insight', 'skins'];
       return {
         ...state,
         destination: action.destination,
@@ -39,14 +39,18 @@ export function companionInteractionReducer(
         route: { kind: 'destination', destination: action.destination },
       };
     }
-    case 'show_home':
+    case 'show_visit':
       return {
         ...state,
         destination: null,
         direction: -1,
         reviewItemId: null,
-        route: { kind: 'home' },
+        route: { kind: 'visit' },
       };
+    case 'show_dashboard':
+      return { ...state, destination: null, direction: -1, reviewItemId: null, route: { kind: 'dashboard' } };
+    case 'open_shared_history':
+      return { ...state, destination: null, direction: 1, reviewItemId: null, route: { kind: 'shared_history' } };
     case 'open_introduction':
       return {
         ...state,
@@ -66,11 +70,11 @@ export function companionInteractionReducer(
     case 'open_journey_questionnaire':
       return {
         ...state,
-        destination: 'discovery',
+        destination: 'goals',
         reviewItemId: null,
         route: {
           kind: 'journey_questionnaire',
-          destination: 'discovery',
+          destination: 'goals',
           sessionId: action.sessionId ?? null,
         },
       };
@@ -81,9 +85,9 @@ export function companionInteractionReducer(
     case 'open_check_in':
       return {
         ...state,
-        destination: 'discovery',
+        destination: 'goals',
         reviewItemId: null,
-        route: { kind: 'check_in', destination: 'discovery', checkInId: action.checkInId },
+        route: { kind: 'check_in', destination: 'goals', checkInId: action.checkInId },
       };
     case 'open_quest_experience':
       return {
@@ -102,14 +106,14 @@ export function companionInteractionReducer(
           ...state,
           destination: null,
           reviewItemId: null,
-          route: { kind: 'home' },
+          route: { kind: 'dashboard' },
         };
       }
       const destination: CompanionDestination =
         state.route.kind === 'quick_goal_picker'
           ? 'goals'
           : state.route.kind === 'journey_questionnaire' || state.route.kind === 'check_in'
-            ? 'discovery'
+            ? 'goals'
             : state.route.kind === 'quest_experience'
               ? 'quest'
               : state.destination ?? 'quest';
@@ -153,8 +157,9 @@ export function companionRouteBackAction(
   if (state.route.kind === 'quest_experience' && state.route.attemptId) {
     return 'confirm_attempt_exit';
   }
-  if (state.route.kind === 'home') return 'close_experience';
-  if (state.route.kind === 'introduction') return 'return_to_destination';
+  if (state.route.kind === 'dashboard') return 'close_experience';
+  if (state.route.kind === 'visit' || state.route.kind === 'introduction') return 'return_to_home';
+  if (state.route.kind === 'shared_history') return 'return_to_home';
   if (state.route.kind === 'destination') return 'return_to_home';
   return 'return_to_destination';
 }

@@ -89,6 +89,11 @@ type EmbeddedJournalReview =
       initialChoiceId?: string | null;
       noteExpanded: boolean;
     }
+  | {
+      origin: 'visit';
+      initialFlowId: string;
+      noteExpanded: boolean;
+    }
   | ({
       origin: 'quest';
     } & QuestJournalReviewContext)
@@ -210,7 +215,7 @@ export function KingdomCompanionScreen({
   const [embeddedJournal, setEmbeddedJournal] = useState<EmbeddedJournalReview | null>(null);
   const [questNoteCapture, setQuestNoteCapture] = useState<QuestNoteCapture | null>(null);
   const [questNoteMismatch, setQuestNoteMismatch] = useState<QuestNoteMismatch | null>(null);
-  const [savedOrigin, setSavedOrigin] = useState<'insight' | 'quest' | null>(null);
+  const [savedOrigin, setSavedOrigin] = useState<'insight' | 'quest' | 'visit' | null>(null);
   const [questExperienceActive, setQuestExperienceActive] = useState(false);
   const { addManualJournalEntry, cloudIntelligenceEnabled } = useHomeScreenState({
     enableInteractiveServices: false,
@@ -520,6 +525,9 @@ export function KingdomCompanionScreen({
             ? (questId) => onOpenQuestGame(quests.selectedResident!.creature.creatureId, questId)
             : undefined}
           insight={quests.selectedInsight ?? { text: 'This tile remembers the day we met.', action: null }}
+          insights={quests.selectedInsights}
+          onRemoveInsight={quests.removeSelectedInsight}
+          onRetakeInsight={quests.retakeSelectedInsight}
           onInsightAction={handleInsightAction}
           memorySaved={Boolean(savedOrigin)}
           bondProgress={quests.selectedBondProgress}
@@ -585,6 +593,52 @@ export function KingdomCompanionScreen({
             return addedTemplateIds;
           }}
           onDismissQuickGoalSuggestions={quests.dismissQuickGoalSuggestions}
+          conversationSession={quests.selectedConversationSession}
+          conversationDefinition={quests.selectedConversationDefinition}
+          conversationQuestOffer={quests.selectedConversationQuestOffer}
+          onAnswerConversation={quests.answerSelectedConversation}
+          onContinueConversation={quests.continueSelectedConversation}
+          onKeepTalkingConversation={quests.keepTalkingSelectedConversation}
+          onArchiveConversation={quests.archiveSelectedConversation}
+          onMemoryConversationDecision={quests.decideSelectedConversationMemory}
+          onGoalConversationDecision={(selectedTemplateIds, node) => {
+            const addedTemplateIds = selectedTemplateIds && !quests.selectedConversationSession?.preview
+              ? quickGoals.addTemplates(selectedTemplateIds)
+              : selectedTemplateIds ?? [];
+            quests.decideSelectedConversationGoal(selectedTemplateIds, node, addedTemplateIds);
+            if (addedTemplateIds.length && !quests.selectedConversationSession?.preview) quests.refreshQuestState();
+          }}
+          onInsightConversationDecision={quests.decideSelectedConversationInsight}
+          onAdjustConversationInsight={quests.adjustSelectedConversationInsight}
+          onQuickGoalConversationDecision={(accept, node) => {
+            const added = accept && !quests.selectedConversationSession?.preview
+              ? quickGoals.addTemplates([node.templateId]).includes(node.templateId)
+              : false;
+            quests.decideSelectedConversationQuickGoal(accept, added, node);
+          }}
+          onQuestConversationHandoff={(accept, node) => {
+            const quest = quests.selectedConversationQuestOffer;
+            const accepted = Boolean(
+              accept
+              && quest
+              && !quests.selectedConversationSession?.preview
+              && quests.acceptSelectedQuest(quest.id, { openDestination: false })
+            );
+            quests.decideSelectedConversationQuestHandoff(accept, accepted, node, quest);
+          }}
+          onDismissConversationOutcome={quests.dismissSelectedConversationOutcome}
+          onPreviewConversation={quests.previewSelectedConversation}
+          onExitConversationPreview={quests.exitSelectedConversationPreview}
+          visitPlan={quests.selectedVisitPlan}
+          visitReceipt={quests.selectedVisitReceipt}
+          memories={quests.selectedMemories}
+          historyIsPlus={quests.selectedHistoryIsPlus}
+          hasOlderHistory={quests.selectedHasOlderHistory}
+          onRespondVisit={quests.respondToSelectedVisit}
+          onSayMoreVisit={() => setEmbeddedJournal({ origin: 'visit', initialFlowId: 'general', noteExpanded: true })}
+          onUpdateMemory={quests.updateSelectedMemory}
+          onResetMemory={quests.resetSelectedCompanionMemory}
+          onSharedHistoryOpened={quests.recordSelectedSharedHistoryOpened}
         />
       ) : null}
       {embeddedJournal ? (
@@ -617,6 +671,16 @@ export function KingdomCompanionScreen({
               completionId: embeddedJournal.completion.id,
               goalTitle: embeddedJournal.goal.title,
             },
+          } : embeddedJournal.origin === 'visit' && quests.selectedResident && quests.selectedVisitPlan ? {
+            kind: 'manual',
+            sourceId: quests.selectedVisitPlan.id,
+            origin: {
+              kind: 'companion_reflection',
+              creatureId: quests.selectedResident.creature.creatureId,
+              familyId: quests.selectedResident.creature.familyId,
+              promptId: quests.selectedVisitPlan.id,
+              promptText: quests.selectedVisitPlan.opening,
+            },
           } : undefined}
           returnToOriginOnBack
           onBackFromInitial={() => {
@@ -631,6 +695,14 @@ export function KingdomCompanionScreen({
           onSave={(submission) => {
             addManualJournalEntry(submission, 'today');
             const origin = embeddedJournal.origin;
+            if (origin === 'visit') {
+              const specific = typeof submission.fields.specific === 'string' ? submission.fields.specific : '';
+              const summary = submission.linkedNote?.text?.trim() || submission.note?.trim() || specific.trim() || 'A moment we talked about';
+              quests.rememberSelectedSharedMoment({
+                sourceId: submission.journalSource?.sourceId ?? submission.sessionId ?? `visit:${Date.now().toString(36)}`,
+                summary,
+              });
+            }
             if (embeddedJournal.origin === 'quick_goal') {
               quickGoals.markJournaled(embeddedJournal.completion.id);
             }

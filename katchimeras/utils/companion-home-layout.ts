@@ -73,9 +73,8 @@ export function companionDestinationStageLift(viewportHeight: number): number {
 }
 
 /**
- * Home keeps a little more breathing room than destination pages because its
- * three primary paths sit side by side, while still handing content off much
- * earlier than the old low cinematic pose.
+ * Visit keeps enough breathing room for the cinematic character and speech,
+ * while handing the page to the response tray before it falls below the fold.
  */
 export function companionHomeHeroSpacer(viewportHeight: number): number {
   return viewportHeight < 735

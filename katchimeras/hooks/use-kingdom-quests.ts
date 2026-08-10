@@ -7,7 +7,8 @@ import { useQuestCapabilities } from '@/hooks/use-quest-capabilities';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import type { HomeDayRecord, MemoryQualityScore, StoredHomeDayRecord } from '@/types/home';
 import type { KingdomCreature, KingdomState } from '@/types/kingdom';
-import type { CompanionDestination, CompanionNavigationIntent, QuestCaptureFeedback } from '@/types/companion-interaction';
+import type { KatchimeraSkinId } from '@/types/katchimera';
+import type { CompanionDestination, CompanionNavigationIntent, CompanionVisitResponse, QuestCaptureFeedback } from '@/types/companion-interaction';
 import {
   archetypeForCreature,
   companionUnit,
@@ -67,11 +68,20 @@ import {
 } from '@/constants/companion-introductions';
 import { companionContentById, companionContentForFamily } from '@/constants/companion-content';
 import {
+  companionConversationDefinitionById,
+  companionConversationDefinitionsForFamily,
+} from '@/constants/companion-conversations-v2';
+import { katchimeraSkinById } from '@/constants/katchimera-skins';
+import { companionQuickGoalTemplateById } from '@/constants/companion-quick-goals';
+import type { ConversationDefinition, ConversationNode, ConversationOutcomePresentation } from '@/types/companion-conversation';
+import { isConversationV2Family } from '@/types/companion-conversation';
+import {
   activeConversationForFamily,
   answerJourneyCheckIn,
   answerJourneyConversation,
   backJourneyCheckIn,
   checkInForDay,
+  createJourneyGoalFromProposal,
   currentJourneyConversationNode,
   editJourneyCheckIn,
   goalsForJourneyFamily,
@@ -79,6 +89,7 @@ import {
   journeyProgressForGoal,
   primaryGoalForFamily,
   recordJourneyMoment,
+  renameJourneyGoal,
   setJourneyGoalStatus,
   setJourneyCheckInTaskSuggestionStatus,
   setPrimaryJourneyGoal,
@@ -89,19 +100,46 @@ import {
 } from '@/utils/companion-journey';
 import { companionCheckInSuggestedGoalIds } from '@/utils/companion-check-in';
 import {
+  activeConversationSessionForFamily,
+  consumeConversationSignal,
   ensureCompanionInvitation,
   completeCompanionIntroduction,
+  completeCompanionVisit,
   deferCompanionIntroduction,
+  ensureCompanionVisitPlan,
   introductionForFamily,
+  insightsForFamily,
+  memoriesForFamily,
   migrateCompanionIntroduction,
   recordCompanionVisit,
-  rememberCompanionAnswer,
+  recordCompanionVisitTelemetry,
+  recordConversationTelemetry,
+  receiptForVisitPlan,
+  resetCompanionMemory,
+  removeCompanionInsight,
   selectCompanionDailyInvitation,
+  updateCompanionMemoryStatus,
   updateCompanionInvitation,
+  upsertCompanionMemory,
+  upsertCompanionInsight,
+  upsertConversationSession,
+  previewConversationSessionForFamily,
+  visitPlanForDay,
   type CompanionContentState,
   type CompanionIntroductionAnswer,
   type CompanionVisitGreeting,
 } from '@/utils/companion-content';
+import {
+  answerConversation,
+  archiveConversationSession,
+  continueConversation,
+  createConversationSession,
+  recordConversationOutcome,
+  restartInsightConversation,
+  selectConversationDefinition,
+  selectConversationFromPool,
+} from '@/utils/companion-conversation';
+import { reconcileConversationJournalSignals } from '@/utils/companion-conversation-signals';
 import { loadCompanionContentState, saveCompanionContentState } from '@/utils/companion-content-storage';
 import { loadCompanionJourneyState, saveCompanionJourneyState } from '@/utils/companion-journey-storage';
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
@@ -129,6 +167,8 @@ import { recalibrateClassifiedMemory, repairUrbanPhotoCentrality, withQualityCon
 import { buildPhotoEvidence, upsertEvidence } from '@/utils/intelligence/evidence';
 import { useEconomy } from '@/features/economy/economy-provider';
 import { historyDaysForAccess } from '@/utils/history-access';
+import { buildCompanionVisitPlan } from '@/utils/companion-visit';
+import { deriveCompanionPatternCandidates } from '@/utils/companion-memory-patterns';
 
 type SelectedResident = {
   creature: KingdomCreature;
@@ -170,6 +210,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   const economy = useEconomy();
   const [microcopy, setMicrocopy] = useState<string | null>(null);
   const [selectedResident, setSelectedResident] = useState<SelectedResident | null>(null);
+  const [selectedEncounterId, setSelectedEncounterId] = useState<string | null>(null);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
   const [companionQuestState, setCompanionQuestState] = useState<CompanionQuestState>(loadIdentityAwareCompanionQuests);
   const [companionBondState, setCompanionBondState] = useState(loadIdentityAwareCompanionBondState);
@@ -282,6 +323,19 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     const timeout = setTimeout(() => setMicrocopy(null), 2300);
     return () => clearTimeout(timeout);
   }, [microcopy]);
+
+  const conversationJournalDays = useMemo(() => storedHomeState ? [
+    ...storedHomeState.archivedDays,
+    storedHomeState.today,
+    ...(storedHomeState.tomorrow ? [storedHomeState.tomorrow] : []),
+  ] : [], [storedHomeState]);
+  useEffect(() => {
+    setCompanionContentState((current) => {
+      const next = reconcileConversationJournalSignals(current, conversationJournalDays);
+      if (next !== current) saveCompanionContentState(next);
+      return next;
+    });
+  }, [conversationJournalDays]);
 
   useEffect(() => {
     setCompanionJourneyState((current) => {
@@ -448,7 +502,6 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     || selectedJourneyGoals.length > 0
     || selectedJourneyConversation
     || (selectedFamilyId && answersForCompanion(companionDiscoveryState, selectedFamilyId).length > 0)
-    || (selectedFamilyId && companionContentState.memoryFacts.some((fact) => fact.familyId === selectedFamilyId))
     || (selectedFamilyId && companionContentState.events.some((event) =>
       event.familyId === selectedFamilyId && event.kind !== 'shown'))
   );
@@ -649,6 +702,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       : undefined;
   const selectedDailyInvitation = useMemo(() => {
     if (!selectedResident || !selectedFamilyId || !today?.isoDate) return null;
+    if (isConversationV2Family(selectedFamilyId)) return null;
     const titles = Object.fromEntries(selectedOfferOptions.map((offer) => [offer.id, offer.title]));
     return selectCompanionDailyInvitation({
       state: companionContentState,
@@ -712,6 +766,205 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       return next;
     });
   }, [companionQuestState, selectedDailyInvitation, selectedJourneyConversation, selectedResident, today?.isoDate]);
+  const selectedHistoryDays = useMemo(() => {
+    if (!storedHomeState) return [];
+    return historyDaysForAccess([
+      ...storedHomeState.archivedDays,
+      storedHomeState.today,
+      ...(storedHomeState.tomorrow ? [storedHomeState.tomorrow] : []),
+    ], economy.snapshot.activePlus);
+  }, [economy.snapshot.activePlus, storedHomeState]);
+  const selectedHasOlderHistory = Boolean(
+    !economy.snapshot.activePlus
+    && storedHomeState
+    && storedHomeState.archivedDays.length + 1 > selectedHistoryDays.length
+  );
+  const selectedMemories = useMemo(
+    () => selectedFamilyId
+      ? memoriesForFamily(companionContentState, selectedFamilyId, { includeProvisional: true })
+      : [],
+    [companionContentState, selectedFamilyId]
+  );
+  const selectedInsights = useMemo(
+    () => selectedFamilyId ? insightsForFamily(companionContentState, selectedFamilyId) : [],
+    [companionContentState, selectedFamilyId]
+  );
+  useEffect(() => {
+    if (!selectedFamilyId) return;
+    const candidates = deriveCompanionPatternCandidates({
+      familyId: selectedFamilyId,
+      days: selectedHistoryDays,
+      existingMemories: memoriesForFamily(companionContentState, selectedFamilyId, { includeProvisional: true, includeInactive: true }),
+      fullHistory: economy.snapshot.activePlus,
+    });
+    if (!candidates.length) return;
+    setCompanionContentState((current) => {
+      const next = candidates.reduce((state, candidate) => recordCompanionVisitTelemetry(
+        upsertCompanionMemory(state, candidate),
+        {
+          familyId: selectedFamilyId,
+          dayId: today?.isoDate ?? candidate.evidenceRefs.at(-1)?.dayId ?? 'unknown',
+          kind: 'memory_proposed',
+          occurredAt: candidate.firstRecordedAt,
+        }
+      ), current);
+      if (next !== current) saveCompanionContentState(next);
+      return next;
+    });
+  }, [companionContentState, economy.snapshot.activePlus, selectedFamilyId, selectedHistoryDays, today?.isoDate]);
+  const selectedVisitPlan = useMemo(() => {
+    if (!selectedFamilyId || !today?.isoDate || !selectedCompanionData) return null;
+    const existingPlan = visitPlanForDay(companionContentState, selectedFamilyId, today.isoDate);
+    if (isConversationV2Family(selectedFamilyId) && !existingPlan) return null;
+    const contentItem = selectedDailyInvitation?.contentItemId
+      ? companionContentById.get(selectedDailyInvitation.contentItemId) ?? null
+      : null;
+    const greeting = selectedIntroductionDefinition
+      ? selectedVisitGreeting === 'returning'
+        ? selectedIntroductionDefinition.returnGreeting
+        : selectedIntroductionDefinition.homeGreeting
+      : selectedCompanionData.line;
+    return buildCompanionVisitPlan({
+      familyId: selectedFamilyId,
+      dayId: today.isoDate,
+      invitation: selectedDailyInvitation,
+      contentItem,
+      existingPlan,
+      homeGreeting: greeting,
+      provisionalMemories: selectedMemories.filter((memory) => memory.status === 'provisional'),
+      activeQuestTitle: selectedLiveQuest?.title,
+      activeFocusTitle: selectedJourneyProgress?.goal.title,
+    });
+  }, [companionContentState, selectedCompanionData, selectedDailyInvitation, selectedFamilyId, selectedIntroductionDefinition, selectedJourneyProgress?.goal.title, selectedLiveQuest?.title, selectedMemories, selectedVisitGreeting, today?.isoDate]);
+  useEffect(() => {
+    if (!selectedVisitPlan) return;
+    setCompanionContentState((current) => {
+      const next = ensureCompanionVisitPlan(current, selectedVisitPlan);
+      if (next !== current) saveCompanionContentState(next);
+      return next;
+    });
+  }, [selectedVisitPlan]);
+  const selectedVisitReceipt = selectedVisitPlan
+    ? receiptForVisitPlan(companionContentState, selectedVisitPlan.id)
+    : null;
+  const selectedConversationSession = useMemo(() => {
+    if (!selectedFamilyId || !today?.isoDate || !isConversationV2Family(selectedFamilyId)) return null;
+    const preview = typeof __DEV__ !== 'undefined' && __DEV__
+      ? previewConversationSessionForFamily(companionContentState, selectedFamilyId)
+      : null;
+    return preview
+      ?? activeConversationSessionForFamily(companionContentState, selectedFamilyId)
+      ?? [...companionContentState.conversationSessions]
+        .reverse()
+        .find((session) => session.familyId === selectedFamilyId && !session.preview && session.status !== 'archived')
+      ?? null;
+  }, [companionContentState, selectedFamilyId, today?.isoDate]);
+  const selectedConversationDefinition = selectedConversationSession
+    ? companionConversationDefinitionById.get(selectedConversationSession.definitionId) ?? null
+    : null;
+  const selectedConversationNode = selectedConversationDefinition?.nodes.find(
+    (node) => node.id === selectedConversationSession?.currentNodeId
+  ) ?? null;
+  const selectedConversationQuestOffer = selectedConversationNode?.kind === 'quest_handoff'
+    ? selectedConversationNode.suggestedQuestIds
+        .map((questId) => eligibleSelectedOffers.find((offer) => offer.id === questId))
+        .find((offer) => Boolean(offer))
+      ?? (selectedConversationSession?.preview
+        ? selectedConversationNode.suggestedQuestIds
+            .map((questId) => questDefinition(questId))
+            .find((definition) => Boolean(definition)) ?? null
+        : null)
+    : null;
+  useEffect(() => {
+    if (
+      selectedConversationNode?.kind !== 'quest_handoff'
+      || selectedConversationSession?.preview
+      || selectedConversationQuestOffer
+      || !selectedConversationSession
+    ) return;
+    const fallbackNode = selectedConversationDefinition?.nodes.find((node) => node.id === selectedConversationNode.fallbackNodeId);
+    if (!fallbackNode) return;
+    setCompanionContentState((current) => {
+      const session = current.conversationSessions.find((item) => item.id === selectedConversationSession.id);
+      if (!session || session.currentNodeId !== selectedConversationNode.id) return current;
+      const next = upsertConversationSession(current, { ...session, currentNodeId: fallbackNode.id, updatedAt: Date.now() });
+      saveCompanionContentState(next);
+      return next;
+    });
+  }, [selectedConversationDefinition, selectedConversationNode, selectedConversationQuestOffer, selectedConversationSession]);
+  useEffect(() => {
+    if (!selectedConversationSession || selectedConversationSession.preview || selectedConversationSession.status !== 'active') return;
+    const definition = companionConversationDefinitionById.get(selectedConversationSession.definitionId);
+    if (definition && definition.version === selectedConversationSession.definitionVersion && definition.nodes.some((node) => node.id === selectedConversationSession.currentNodeId)) return;
+    setCompanionContentState((current) => {
+      const stale = current.conversationSessions.find((session) => session.id === selectedConversationSession.id);
+      if (!stale || stale.status !== 'active') return current;
+      const next = upsertConversationSession(current, { ...archiveConversationSession(stale), encounterId: undefined });
+      saveCompanionContentState(next);
+      return next;
+    });
+  }, [selectedConversationSession]);
+  useEffect(() => {
+    if (!selectedResident || !selectedFamilyId || !selectedEncounterId || !today?.isoDate || !isConversationV2Family(selectedFamilyId)) return;
+    const familyId = selectedFamilyId;
+    const dayId = today.isoDate;
+    const formId = (selectedResident.creature.skinId ?? selectedResident.creature.visualKey) as KatchimeraSkinId;
+    setCompanionContentState((current) => {
+      if (activeConversationSessionForFamily(current, familyId)) return current;
+      if (current.conversationSessions.some((session) => session.encounterId === selectedEncounterId && !session.preview)) return current;
+      const selection = selectConversationDefinition({
+        familyId,
+        dayId,
+        definitions: companionConversationDefinitionsForFamily(familyId),
+        sessions: current.conversationSessions,
+        signals: current.conversationSignals,
+        bondLevel: selectedBondProgress.level,
+        selectionSeed: selectedEncounterId,
+      });
+      if (!selection) return current;
+      const occurredAt = Date.now();
+      const session = createConversationSession({
+        definition: selection.definition,
+        formId,
+        dayId,
+        evidenceRefs: selection.signal ? [{
+          sourceType: selection.signal.kind === 'journal' ? 'journal' : selection.signal.kind === 'quest_debrief' ? 'quest' : 'goal',
+          sourceId: selection.signal.sourceId,
+          dayId: selection.signal.dayId,
+        }] : [],
+        createdAt: occurredAt,
+        encounterId: selectedEncounterId,
+        encounterTargetTurns: conversationTurnTarget(selectedEncounterId, selection.definition),
+        sessionId: `companion-conversation-v2:${familyId}:${occurredAt}:${current.conversationSessions.length}`,
+      });
+      const withoutActiveThread = {
+        ...current,
+        conversationSessions: current.conversationSessions.map((item) => item.familyId === selectedFamilyId && item.status === 'active'
+          ? archiveConversationSession(item, occurredAt)
+          : item),
+      };
+      let next = upsertConversationSession(withoutActiveThread, session);
+      if (selection.signal) next = consumeConversationSignal(next, selection.signal.id, occurredAt);
+      next = recordConversationTelemetry(next, {
+        id: `${session.id}:started`,
+        familyId,
+        sessionId: session.id,
+        definitionId: session.definitionId,
+        kind: 'conversation_started',
+        occurredAt,
+      });
+      saveCompanionContentState(next);
+      return next;
+    });
+  }, [
+    companionContentState.conversationSignals.length,
+    selectedBondProgress.level,
+    selectedEncounterId,
+    selectedFamilyId,
+    selectedResident,
+    selectedConversationSession?.status,
+    today?.isoDate,
+  ]);
   const selectedQuestAdvancesJourneyGoal = useMemo(() => {
     const goal = selectedJourneyProgress?.goal;
     const currentQuestId = selectedActiveQuest?.questId ?? selectedOffer?.id;
@@ -830,15 +1083,18 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
             : { resident, creature, destination: null }
         );
         setSelectedOfferId(null);
+        setSelectedEncounterId(`encounter:${creatureId}:${Date.now()}`);
       }
     },
     [creatureById, residentById]
   );
 
-  const acceptSelectedQuest = useCallback((offerId?: string) => {
-    if (!selectedResident) return;
-    const offer = selectedOfferOptions.find((item) => item.id === offerId) ?? selectedOffer;
-    if (!offer) return;
+  const acceptSelectedQuest = useCallback((offerId?: string, options?: { openDestination?: boolean }) => {
+    if (!selectedResident) return false;
+    const offer = selectedOfferOptions.find((item) => item.id === offerId)
+      ?? eligibleSelectedOffers.find((item) => item.id === offerId)
+      ?? selectedOffer;
+    if (!offer) return false;
     if (
       today?.isoDate
       && !canAcceptQuestForDay(
@@ -851,7 +1107,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       setMicrocopy(questDefinition(offer.id)?.lane === 'mini_game'
         ? 'Finish the active quest first'
         : 'Today’s real-life quest is already complete');
-      return;
+      return false;
     }
     const definition = questDefinition(offer.id);
     const offerRuntime = evaluateQuestRuntime({
@@ -862,7 +1118,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     });
     if (offerRuntime.state === 'unavailable' || offerRuntime.state === 'impossible_today') {
       setMicrocopy(offerRuntime.userMessage);
-      return;
+      return false;
     }
     const seed = `${selectedResident.creature.creatureId}:${today?.isoDate ?? 'today'}:${offer.id}`;
     const resolvedConfig = resolveInteractiveConfig(
@@ -888,12 +1144,15 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     );
     if (!next) {
       setMicrocopy('Quest already active');
-      return;
+      return false;
     }
     commitCompanionQuestState(next);
     setMicrocopy('Quest accepted');
-    setSelectedResident((current) => (current ? { ...current, destination: 'quest' } : current));
-  }, [commitCompanionQuestState, companionQuestState, questCapabilities, questDay, questFacts, selectedOffer, selectedOfferOptions, selectedResident, today?.isoDate]);
+    if (options?.openDestination !== false) {
+      setSelectedResident((current) => (current ? { ...current, destination: 'quest' } : current));
+    }
+    return true;
+  }, [commitCompanionQuestState, companionQuestState, eligibleSelectedOffers, questCapabilities, questDay, questFacts, selectedOffer, selectedOfferOptions, selectedResident, today?.isoDate]);
 
   const selectOffer = useCallback((offerId: string) => {
     setSelectedOfferId(offerId);
@@ -1163,6 +1422,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   }, []);
   const closeSelectedResident = useCallback(() => {
     setSelectedResident(null);
+    setSelectedEncounterId(null);
     setSelectedOfferId(null);
     setQuickGoalSuggestions(null);
     setCompletedQuestPreview(null);
@@ -1284,21 +1544,11 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     if (result.state === companionJourneyState) return [];
     saveCompanionJourneyState(result.state);
     setCompanionJourneyState(result.state);
-    const session = result.state.conversations.find((item) => item.id === sessionId);
-    const latestAnswer = session?.answers.at(-1);
-    if (latestAnswer) {
+    // Journey answers remain in the goal-plan session that owns their question and
+    // timeframe. They are not durable Long Memory facts.
+    if (result.completed && selectedDailyInvitation) {
       setCompanionContentState((current) => {
-        let next = rememberCompanionAnswer(current, {
-          companionId: selectedResident.creature.creatureId,
-          familyId: selectedFamilyId,
-          key: `focus:${latestAnswer.nodeId}`,
-          value: latestAnswer.value,
-          sourceId: sessionId,
-          occurredAt: latestAnswer.answeredAt,
-        });
-        if (result.completed && selectedDailyInvitation) {
-          next = updateCompanionInvitation(next, selectedDailyInvitation.id, 'completed', latestAnswer.answeredAt);
-        }
+        const next = updateCompanionInvitation(current, selectedDailyInvitation.id, 'completed');
         saveCompanionContentState(next);
         return next;
       });
@@ -1317,7 +1567,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         occurredAt: Date.now(),
         dayId: today?.isoDate,
       });
-      setMicrocopy('Focus updated');
+      setMicrocopy('Goal plan updated');
     }
     return result.completed ? result.suggestedQuickGoalIds : [];
   }, [awardBond, companionJourneyState, selectedDailyInvitation, selectedFamilyId, selectedJourneyDefinition, selectedResident, today?.isoDate]);
@@ -1385,20 +1635,9 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         occurredAt: Date.now(),
         dayId: result.checkIn?.dayId ?? today?.isoDate,
       });
-      setMicrocopy('Check-in remembered');
-      const firstAnswer = result.checkIn?.answers[0];
+      setMicrocopy('Check-in complete');
       setCompanionContentState((current) => {
         let next = current;
-        if (firstAnswer && result.checkIn) {
-          next = rememberCompanionAnswer(next, {
-            companionId: selectedResident.creature.creatureId,
-            familyId: result.checkIn.familyId,
-            key: result.checkIn.contentItemId ?? `daily-pulse:${result.checkIn.dayId}`,
-            value: firstAnswer.label,
-            sourceId: result.checkIn.id,
-            occurredAt: firstAnswer.answeredAt,
-          });
-        }
         if (selectedDailyInvitation) {
           next = updateCompanionInvitation(next, selectedDailyInvitation.id, 'completed');
         }
@@ -1427,6 +1666,768 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     });
     setMicrocopy('Invitation left for today');
   }, [selectedDailyInvitation]);
+  const respondToSelectedVisit = useCallback((response: CompanionVisitResponse) => {
+    if (!selectedVisitPlan || !selectedResident || !selectedFamilyId || selectedVisitReceipt) return;
+    const occurredAt = Date.now();
+    const affectedMemoryIds: string[] = [];
+    setCompanionContentState((current) => {
+      let next = current;
+      if (selectedVisitPlan.subject === 'memory_confirmation' && response.action === 'answer') {
+        const memory = selectedVisitPlan.evidenceRefs.length
+          ? selectedMemories.find((item) => item.status === 'provisional' && item.evidenceRefs.some((ref) =>
+              selectedVisitPlan.evidenceRefs.some((planRef) => planRef.sourceType === ref.sourceType && planRef.sourceId === ref.sourceId)
+            ))
+          : selectedMemories.find((item) => item.status === 'provisional');
+        if (memory) {
+          affectedMemoryIds.push(memory.id);
+          next = updateCompanionMemoryStatus(next, {
+            memoryId: memory.id,
+            familyId: selectedFamilyId,
+            dayId: selectedVisitPlan.dayId,
+            status: response.value === 'reject' ? 'rejected' : 'confirmed',
+            ...(response.value === 'correct' ? { summary: `Sometimes, ${memory.summary.charAt(0).toLowerCase()}${memory.summary.slice(1)}` } : {}),
+            occurredAt,
+          });
+        }
+      }
+      if (selectedVisitPlan.invitationId) {
+        next = updateCompanionInvitation(
+          next,
+          selectedVisitPlan.invitationId,
+          response.action === 'defer' ? 'skipped' : response.action === 'open_quest' ? 'opened' : 'completed',
+          occurredAt
+        );
+      }
+      if (response.action === 'defer') {
+        next = recordCompanionVisitTelemetry(next, {
+          familyId: selectedFamilyId,
+          dayId: selectedVisitPlan.dayId,
+          kind: 'visit_skipped',
+          subject: selectedVisitPlan.subject,
+          occurredAt,
+        });
+      }
+      next = completeCompanionVisit(next, {
+        visitPlanId: selectedVisitPlan.id,
+        familyId: selectedFamilyId,
+        dayId: selectedVisitPlan.dayId,
+        responseIds: [response.id],
+        offerOutcome: response.action === 'defer'
+          ? 'deferred'
+          : response.action === 'accept_quest' || response.action === 'open_focus' || response.action === 'open_quest'
+            ? 'accepted'
+            : undefined,
+        affectedMemoryIds,
+        completedAt: occurredAt,
+      });
+      saveCompanionContentState(next);
+      return next;
+    });
+    if (response.action !== 'defer' && response.action !== 'stay') {
+      awardBond({
+        id: `conversation:${selectedResident.creature.creatureId}:${selectedVisitPlan.dayId}`,
+        creatureId: selectedResident.creature.creatureId,
+        kind: 'conversation_completed',
+        occurredAt,
+        dayId: selectedVisitPlan.dayId,
+      });
+    }
+  }, [awardBond, selectedFamilyId, selectedMemories, selectedResident, selectedVisitPlan, selectedVisitReceipt]);
+  const answerSelectedConversation = useCallback((optionId: string) => {
+    if (!selectedConversationSession || !selectedConversationDefinition) return;
+    const occurredAt = Date.now();
+    setCompanionContentState((current) => {
+      const currentSession = current.conversationSessions.find((session) => session.id === selectedConversationSession.id);
+      if (!currentSession) return current;
+      const revisingPendingAnswer = currentSession.pendingReply !== undefined;
+      const result = answerConversation(currentSession, selectedConversationDefinition, optionId, occurredAt);
+      if (result.session === currentSession) return current;
+      const turn = result.session.turns.at(-1);
+      let next = upsertConversationSession(current, result.session);
+      if (turn && !result.session.preview) {
+        const telemetryId = `${turn.id}:answered`;
+        const telemetry = {
+          id: telemetryId,
+          familyId: result.session.familyId,
+          sessionId: result.session.id,
+          definitionId: result.session.definitionId,
+        kind: 'turn_answered',
+        nodeId: turn.nodeId,
+          optionId: turn.optionId,
+          occurredAt,
+        } as const;
+        next = revisingPendingAnswer
+          ? {
+              ...next,
+              conversationTelemetry: next.conversationTelemetry.map((event) => event.id === telemetryId ? telemetry : event),
+            }
+          : recordConversationTelemetry(next, telemetry);
+      }
+      if (result.completedGame && !result.session.preview) next = recordConversationTelemetry(next, {
+        id: `${result.session.id}:game-completed`,
+        familyId: result.session.familyId,
+        sessionId: result.session.id,
+        definitionId: result.session.definitionId,
+        kind: 'game_completed',
+        nodeId: result.session.currentNodeId,
+        occurredAt,
+      });
+      saveCompanionContentState(next);
+      return next;
+    });
+  }, [selectedConversationDefinition, selectedConversationSession]);
+  const continueSelectedConversation = useCallback(() => {
+    if (!selectedConversationSession || !selectedConversationDefinition || !selectedResident) return;
+    const occurredAt = Date.now();
+    let nextSession = continueConversation(selectedConversationSession, selectedConversationDefinition, occurredAt);
+    if (nextSession === selectedConversationSession) return;
+    let enteredNode = selectedConversationDefinition.nodes.find((node) => node.id === nextSession.currentNodeId);
+    if (enteredNode?.kind === 'quest_handoff' && !nextSession.preview) {
+      const availableQuest = enteredNode.suggestedQuestIds.some((questId) => eligibleSelectedOffers.some((offer) => offer.id === questId));
+      if (!availableQuest) {
+        const fallbackNodeId = enteredNode.fallbackNodeId;
+        const fallbackNode = selectedConversationDefinition.nodes.find((node) => node.id === fallbackNodeId);
+        if (fallbackNode) {
+          nextSession = { ...nextSession, currentNodeId: fallbackNode.id, updatedAt: occurredAt };
+          enteredNode = fallbackNode;
+        }
+      }
+    }
+    setCompanionContentState((current) => {
+      let next = upsertConversationSession(current, nextSession);
+      if (!nextSession.preview && enteredNode?.kind === 'insight_reveal' && selectedConversationSession.currentNodeId !== nextSession.currentNodeId) {
+        next = recordConversationTelemetry(next, {
+          id: `${nextSession.id}:${enteredNode.id}:revealed`,
+          familyId: nextSession.familyId,
+          sessionId: nextSession.id,
+          definitionId: nextSession.definitionId,
+          kind: 'insight_revealed',
+          nodeId: enteredNode.id,
+          occurredAt,
+        });
+      }
+      if (!nextSession.preview && nextSession.status === 'completed' && selectedConversationSession.status !== 'completed') {
+        next = recordConversationTelemetry(next, {
+          id: `${nextSession.id}:completed`,
+          familyId: nextSession.familyId,
+          sessionId: nextSession.id,
+          definitionId: nextSession.definitionId,
+          kind: 'conversation_completed',
+          occurredAt,
+        });
+      }
+      const transition = nextSession.exitTransition;
+      if (nextSession.status === 'completed' && selectedConversationDefinition.isOpener && transition && transition.kind !== 'continuation') {
+        const definition = transition.kind === 'definition'
+          ? companionConversationDefinitionById.get(transition.definitionId) ?? null
+          : selectConversationFromPool({
+              familyId: nextSession.familyId,
+              poolId: transition.poolId,
+              definitions: companionConversationDefinitionsForFamily(nextSession.familyId),
+              sessions: next.conversationSessions,
+              seed: `${nextSession.id}:${transition.poolId}:${occurredAt}`,
+              hasActiveFocus: Boolean(primaryGoalForFamily(companionJourneyState, nextSession.familyId)),
+              hasActiveQuest: Boolean(selectedActiveQuest),
+            }) ?? selectConversationFromPool({
+              familyId: nextSession.familyId,
+              definitions: companionConversationDefinitionsForFamily(nextSession.familyId),
+              sessions: next.conversationSessions,
+              seed: `${nextSession.id}:fallback:${occurredAt}`,
+              hasActiveFocus: Boolean(primaryGoalForFamily(companionJourneyState, nextSession.familyId)),
+              hasActiveQuest: Boolean(selectedActiveQuest),
+            });
+        if (definition && definition.familyId === nextSession.familyId) {
+          const followUp = createConversationSession({
+            definition,
+            formId: nextSession.formId,
+            dayId: nextSession.servedDayId,
+            createdAt: occurredAt + 1,
+            encounterId: nextSession.encounterId,
+            encounterTargetTurns: nextSession.encounterTargetTurns,
+            encounterTurns: nextSession.encounterTurns,
+            evidenceRefs: nextSession.evidenceRefs,
+            preview: nextSession.preview,
+            sessionId: `companion-conversation-v2:${nextSession.familyId}:${occurredAt + 1}:${next.conversationSessions.length}`,
+          });
+          next = upsertConversationSession(next, followUp);
+          if (!followUp.preview) next = recordConversationTelemetry(next, {
+            id: `${followUp.id}:started`, familyId: followUp.familyId, sessionId: followUp.id,
+            definitionId: followUp.definitionId, kind: 'conversation_started', occurredAt: occurredAt + 1,
+          });
+        }
+      }
+      saveCompanionContentState(next);
+      return next;
+    });
+  }, [companionJourneyState, eligibleSelectedOffers, selectedActiveQuest, selectedConversationDefinition, selectedConversationSession, selectedResident]);
+
+  const keepTalkingSelectedConversation = useCallback((poolId?: string) => {
+    if (!selectedResident || !selectedFamilyId || !today?.isoDate || !isConversationV2Family(selectedFamilyId)) return;
+    const occurredAt = Date.now();
+    setCompanionContentState((current) => {
+      const definition = selectConversationFromPool({
+        familyId: selectedFamilyId,
+        ...(poolId ? { poolId } : {}),
+        definitions: companionConversationDefinitionsForFamily(selectedFamilyId),
+        sessions: current.conversationSessions,
+        excludeDefinitionIds: selectedConversationSession
+          ? [selectedConversationSession.definitionId]
+          : [],
+        seed: `${selectedEncounterId ?? 'encounter'}:${poolId ?? 'anything'}:${occurredAt}:${current.conversationSessions.length}`,
+        hasActiveFocus: Boolean(primaryGoalForFamily(companionJourneyState, selectedFamilyId)),
+        hasActiveQuest: Boolean(selectedActiveQuest),
+      });
+      if (!definition) return current;
+      const session = createConversationSession({
+        definition,
+        formId: (selectedResident.creature.skinId ?? selectedResident.creature.visualKey) as KatchimeraSkinId,
+        dayId: today.isoDate,
+        createdAt: occurredAt,
+        encounterId: selectedEncounterId ?? `encounter:${selectedResident.creature.creatureId}:${occurredAt}`,
+        encounterTargetTurns: conversationTurnTarget(`${selectedEncounterId ?? selectedResident.creature.creatureId}:${occurredAt}`, definition),
+        sessionId: `companion-conversation-v2:${selectedFamilyId}:${occurredAt}:${current.conversationSessions.length}`,
+      });
+      const withoutActiveThread = {
+        ...current,
+        conversationSessions: current.conversationSessions.map((item) => item.familyId === selectedFamilyId && item.status === 'active'
+          ? archiveConversationSession(item, occurredAt)
+          : item),
+      };
+      let next = upsertConversationSession(withoutActiveThread, session);
+      next = recordConversationTelemetry(next, {
+        id: `${session.id}:started`, familyId: session.familyId, sessionId: session.id,
+        definitionId: session.definitionId, kind: 'conversation_started', occurredAt,
+      });
+      saveCompanionContentState(next);
+      return next;
+    });
+  }, [companionJourneyState, selectedActiveQuest, selectedConversationSession, selectedEncounterId, selectedFamilyId, selectedResident, today?.isoDate]);
+  const retakeSelectedInsight = useCallback((definitionId: string) => {
+    if (!selectedResident || !selectedFamilyId || !today?.isoDate || !isConversationV2Family(selectedFamilyId)) return;
+    const definition = companionConversationDefinitionById.get(definitionId);
+    if (!definition || definition.familyId !== selectedFamilyId || !['insight_game', 'profile_game'].includes(definition.format ?? '')) return;
+    const occurredAt = Date.now();
+    setCompanionContentState((current) => {
+      const session = createConversationSession({
+        definition,
+        formId: (selectedResident.creature.skinId ?? selectedResident.creature.visualKey) as KatchimeraSkinId,
+        dayId: today.isoDate,
+        createdAt: occurredAt,
+        encounterId: selectedEncounterId ?? `encounter:${selectedResident.creature.creatureId}:${occurredAt}`,
+        encounterTargetTurns: 5,
+        sessionId: `companion-conversation-v2:${selectedFamilyId}:${occurredAt}:${current.conversationSessions.length}`,
+      });
+      const withoutActiveThread = {
+        ...current,
+        conversationSessions: current.conversationSessions.map((item) => item.familyId === selectedFamilyId && item.status === 'active'
+          ? archiveConversationSession(item, occurredAt)
+          : item),
+      };
+      let next = upsertConversationSession(withoutActiveThread, session);
+      next = recordConversationTelemetry(next, {
+        id: `${session.id}:started`, familyId: session.familyId, sessionId: session.id,
+        definitionId: session.definitionId, kind: 'conversation_started', occurredAt,
+      });
+      saveCompanionContentState(next);
+      return next;
+    });
+  }, [selectedEncounterId, selectedFamilyId, selectedResident, today?.isoDate]);
+  const archiveSelectedConversation = useCallback(() => {
+    if (!selectedConversationSession) return;
+    const occurredAt = Date.now();
+    const archived = archiveConversationSession(selectedConversationSession, occurredAt);
+    if (archived === selectedConversationSession) return;
+    setCompanionContentState((current) => {
+      let next = upsertConversationSession(current, archived);
+      if (!archived.preview) next = recordConversationTelemetry(next, {
+        id: `${archived.id}:archived`,
+        familyId: archived.familyId,
+        sessionId: archived.id,
+        definitionId: archived.definitionId,
+        kind: 'conversation_archived',
+        occurredAt,
+      });
+      saveCompanionContentState(next);
+      return next;
+    });
+  }, [selectedConversationSession]);
+  const decideSelectedConversationMemory = useCallback((remember: boolean, summary: string) => {
+    if (!selectedConversationSession || !selectedConversationDefinition || !selectedFamilyId || !selectedResident) return;
+    const node = selectedConversationDefinition.nodes.find((candidate) => candidate.id === selectedConversationSession.currentNodeId);
+    if (node?.kind !== 'memory_proposal') return;
+    const occurredAt = Date.now();
+    const formResult = selectedConversationSession.formResult;
+    const formReveal = selectedConversationDefinition.nodes.find((candidate) => candidate.kind === 'form_reveal');
+    const isFormInsight = Boolean(node.memoryKey.includes(':form-match') && formResult && formReveal?.kind === 'form_reveal');
+    const topFormId = formResult?.topFormId;
+    const topFormName = topFormId ? katchimeraSkinById.get(topFormId)?.displayName ?? topFormId : null;
+    const runnerUpName = formResult?.runnerUpFormId ? katchimeraSkinById.get(formResult.runnerUpFormId)?.displayName ?? formResult.runnerUpFormId : null;
+    const formSummary = topFormId && formReveal?.kind === 'form_reveal'
+      ? formReveal.descriptions[topFormId] ?? summary.trim()
+      : summary.trim();
+    let outcomeSession = recordConversationOutcome(
+      selectedConversationSession,
+      `${remember ? 'memory-confirmed' : 'memory-rejected'}:${node.memoryKey}`,
+      occurredAt
+    );
+    outcomeSession = continueConversation(outcomeSession, selectedConversationDefinition, occurredAt);
+    if (remember) {
+      outcomeSession = withConversationOutcome(outcomeSession, {
+        kind: isFormInsight ? 'insight' : 'memory',
+        eyebrow: selectedConversationSession.preview ? 'PREVIEW OUTCOME' : isFormInsight ? 'FORM INSIGHT ADDED' : 'SAVED TO LONG MEMORY',
+        title: isFormInsight && topFormName ? `Your closest form: ${topFormName}` : summary.trim(),
+        message: selectedConversationSession.preview
+          ? `This is how the saved ${isFormInsight ? 'form insight' : 'memory'} outcome will look. Nothing was changed.`
+          : isFormInsight
+            ? `${formSummary} This does not unlock or equip the skin, and you can retake the game whenever your match changes.`
+            : 'I will keep this with the context that helped us learn it. You can edit or forget it anytime.',
+        celebrate: !selectedConversationSession.preview,
+        destination: isFormInsight ? 'insight' : 'memory',
+        destinationLabel: isFormInsight ? 'See all my insights' : 'See what you remember',
+      }, occurredAt);
+    }
+    setCompanionContentState((current) => {
+      let next = current;
+      if (!selectedConversationSession.preview) next = recordConversationTelemetry(next, {
+        id: `${selectedConversationSession.id}:${node.id}:proposed`,
+        familyId: selectedConversationSession.familyId,
+        sessionId: selectedConversationSession.id,
+        definitionId: selectedConversationSession.definitionId,
+        kind: 'memory_proposed',
+        nodeId: node.id,
+        occurredAt,
+      });
+      if (remember && !selectedConversationSession.preview) next = upsertCompanionMemory(next, {
+        id: `companion-memory:${selectedFamilyId}:${node.memoryKey}`,
+        scope: 'family',
+        familyId: selectedFamilyId,
+        kind: 'preference',
+        key: node.memoryKey,
+        summary: summary.trim(),
+        evidenceRefs: [
+          ...selectedConversationSession.evidenceRefs,
+          { sourceType: 'conversation', sourceId: selectedConversationSession.id, dayId: selectedConversationSession.servedDayId },
+        ],
+        confidence: 1,
+        status: 'confirmed',
+        sensitivity: node.sensitivity,
+        firstRecordedAt: occurredAt,
+        lastConfirmedAt: occurredAt,
+      });
+      if (remember && isFormInsight && topFormId && topFormName && !selectedConversationSession.preview) next = upsertCompanionInsight(next, {
+        familyId: selectedConversationSession.familyId,
+        insightKey: 'form-match',
+        category: 'Katchimera form',
+        resultId: topFormId,
+        title: `Your closest form: ${topFormName}`,
+        summary: formSummary,
+        emblemId: `form-match:${topFormId}`,
+        supportingTraits: [
+          `Closest match: ${topFormName}`,
+          ...(runnerUpName ? [`Runner-up: ${runnerUpName}`] : []),
+          `Based on ${selectedConversationSession.turns.filter((turn) => turn.questionId).length} choices`,
+        ],
+        evidenceRefs: [
+          ...selectedConversationSession.evidenceRefs,
+          { sourceType: 'conversation', sourceId: selectedConversationSession.id, dayId: selectedConversationSession.servedDayId },
+        ],
+        sourceDefinitionId: selectedConversationDefinition.id,
+        sourceSessionId: selectedConversationSession.id,
+        recordedAt: occurredAt,
+      });
+      if (!selectedConversationSession.preview) next = recordConversationTelemetry(next, {
+        id: `${selectedConversationSession.id}:${node.id}:${remember ? 'confirmed' : 'rejected'}`,
+        familyId: selectedConversationSession.familyId,
+        sessionId: selectedConversationSession.id,
+        definitionId: selectedConversationSession.definitionId,
+        kind: remember ? 'memory_confirmed' : 'memory_rejected',
+        nodeId: node.id,
+        occurredAt,
+      });
+      next = upsertConversationSession(next, outcomeSession);
+      if (!outcomeSession.preview && outcomeSession.status === 'completed') next = recordConversationTelemetry(next, {
+        id: `${outcomeSession.id}:completed`,
+        familyId: outcomeSession.familyId,
+        sessionId: outcomeSession.id,
+        definitionId: outcomeSession.definitionId,
+        kind: 'conversation_completed',
+        occurredAt,
+      });
+      saveCompanionContentState(next);
+      return next;
+    });
+    setMicrocopy(selectedConversationSession.preview
+      ? 'Preview only — memory was not changed'
+      : remember ? isFormInsight ? 'Form match saved to Your insights' : 'Saved to Long Memory' : 'Not remembered');
+  }, [selectedConversationDefinition, selectedConversationSession, selectedFamilyId, selectedResident]);
+  const decideSelectedConversationInsight = useCallback((accept: boolean, node: Extract<ConversationNode, { kind: 'insight_reveal' }>) => {
+    if (!selectedConversationSession || !selectedConversationDefinition || !selectedConversationSession.insightResult) return;
+    const occurredAt = Date.now();
+    const result = selectedConversationSession.insightResult;
+    let outcomeSession = recordConversationOutcome(selectedConversationSession, `${accept ? 'insight-confirmed' : 'insight-dismissed'}:${node.insightKey}`, occurredAt);
+    outcomeSession = continueConversation(outcomeSession, selectedConversationDefinition, occurredAt);
+    if (accept) {
+      outcomeSession = withConversationOutcome(outcomeSession, {
+        kind: 'insight',
+        eyebrow: selectedConversationSession.preview ? 'PREVIEW OUTCOME' : 'INSIGHT ADDED',
+        title: result.title,
+        message: selectedConversationSession.preview
+          ? 'This is how the insight celebration will look. Nothing was saved.'
+          : `${result.summary} You can revisit or update this anytime in Your insights.`,
+        celebrate: !selectedConversationSession.preview,
+        destination: 'insight',
+        destinationLabel: 'See all my insights',
+      }, occurredAt);
+    }
+    setCompanionContentState((current) => {
+      let next = current;
+      if (accept && !selectedConversationSession.preview) next = upsertCompanionInsight(next, {
+        familyId: selectedConversationSession.familyId,
+        insightKey: result.insightKey,
+        category: result.category,
+        resultId: result.resultId,
+        title: result.title,
+        summary: result.summary,
+        emblemId: result.emblemId,
+        supportingTraits: [...result.supportingTraits],
+        ...(result.secondaryResultId ? { secondaryResultId: result.secondaryResultId } : {}),
+        ...(result.secondaryTitle ? { secondaryTitle: result.secondaryTitle } : {}),
+        confidence: result.confidence,
+        scoreMargin: result.scoreMargin,
+        evidenceRefs: [
+          ...selectedConversationSession.evidenceRefs,
+          { sourceType: 'conversation', sourceId: selectedConversationSession.id, dayId: selectedConversationSession.servedDayId },
+        ],
+        sourceDefinitionId: selectedConversationDefinition.id,
+        sourceSessionId: selectedConversationSession.id,
+        recordedAt: occurredAt,
+      });
+      if (!selectedConversationSession.preview) next = recordConversationTelemetry(next, {
+        id: `${selectedConversationSession.id}:${node.id}:${accept ? 'confirmed' : 'dismissed'}`,
+        familyId: selectedConversationSession.familyId,
+        sessionId: selectedConversationSession.id,
+        definitionId: selectedConversationSession.definitionId,
+        kind: accept ? 'insight_confirmed' : 'insight_dismissed',
+        nodeId: node.id,
+        occurredAt,
+      });
+      next = upsertConversationSession(next, outcomeSession);
+      saveCompanionContentState(next);
+      return next;
+    });
+  }, [selectedConversationDefinition, selectedConversationSession]);
+
+  const adjustSelectedConversationInsight = useCallback((questionIndex = 0) => {
+    if (!selectedConversationSession || !selectedConversationDefinition) return;
+    const occurredAt = Date.now();
+    setCompanionContentState((current) => {
+      const currentSession = current.conversationSessions.find((session) => session.id === selectedConversationSession.id);
+      if (!currentSession) return current;
+      let next = upsertConversationSession(current, restartInsightConversation(currentSession, selectedConversationDefinition, occurredAt, questionIndex));
+      if (!currentSession.preview) next = recordConversationTelemetry(next, {
+        id: `${currentSession.id}:insight-adjusted:${occurredAt}`,
+        familyId: currentSession.familyId,
+        sessionId: currentSession.id,
+        definitionId: currentSession.definitionId,
+        kind: 'insight_adjusted',
+        occurredAt,
+      });
+      saveCompanionContentState(next);
+      return next;
+    });
+  }, [selectedConversationDefinition, selectedConversationSession]);
+
+  const removeSelectedInsight = useCallback((insightId: string) => {
+    setCompanionContentState((current) => {
+      const next = removeCompanionInsight(current, insightId);
+      if (next !== current) saveCompanionContentState(next);
+      return next;
+    });
+  }, []);
+
+  const decideSelectedConversationGoal = useCallback((selectedTemplateIds: readonly string[] | null, node: Extract<ConversationNode, { kind: 'goal_proposal' }>, addedTemplateIds: readonly string[] = []) => {
+    if (!selectedConversationSession || !selectedConversationDefinition || !selectedFamilyId || !selectedResident) return;
+    const occurredAt = Date.now();
+    const accept = selectedTemplateIds !== null;
+    let accepted = false;
+    if (accept && !selectedConversationSession.preview) {
+      const action = node.action ?? 'create';
+      const currentGoal = primaryGoalForFamily(companionJourneyState, selectedFamilyId);
+      let nextJourneyState = companionJourneyState;
+      if ((action === 'rename' || action === 'pause' || action === 'complete') && !currentGoal) {
+        setMicrocopy('There is no current goal plan to change');
+      } else if (action === 'rename' && currentGoal) {
+        nextJourneyState = renameJourneyGoal(nextJourneyState, currentGoal.id, node.goalTitle, occurredAt);
+        accepted = nextJourneyState !== companionJourneyState;
+        setMicrocopy('Goal plan renamed');
+      } else if ((action === 'pause' || action === 'complete') && currentGoal) {
+        nextJourneyState = setJourneyGoalStatus(nextJourneyState, currentGoal.id, action === 'pause' ? 'paused' : 'completed', occurredAt);
+        accepted = nextJourneyState !== companionJourneyState;
+        setMicrocopy(action === 'pause' ? 'Goal plan paused' : 'Goal plan completed');
+      } else {
+        if (action === 'replace' && currentGoal) nextJourneyState = setJourneyGoalStatus(nextJourneyState, currentGoal.id, 'paused', occurredAt);
+        const result = createJourneyGoalFromProposal(nextJourneyState, {
+          familyId: selectedFamilyId,
+          goalTypeId: node.goalTypeId,
+          title: node.goalTitle,
+          suggestedQuickGoalIds: selectedTemplateIds ?? [],
+          createdAt: occurredAt,
+        });
+        nextJourneyState = result.state;
+        accepted = !result.blockedReason;
+        if (result.blockedReason) {
+          setMicrocopy(currentGoal ? 'Your goal plan was kept and the selected steps were added' : 'The goal plan could not be changed');
+        } else {
+          setMicrocopy(action === 'replace' && currentGoal ? 'Previous goal plan paused; new plan added' : 'Goal plan added');
+        }
+      }
+      if (accepted) {
+        accepted = true;
+        saveCompanionJourneyState(nextJourneyState);
+        setCompanionJourneyState(nextJourneyState);
+      }
+    }
+    if (selectedConversationSession.preview) setMicrocopy('Preview only — goals were not changed');
+    let outcomeSession = recordConversationOutcome(
+      selectedConversationSession,
+      `${accepted ? 'goal-accepted' : accept ? 'goal-small-step' : 'goal-declined'}:${node.goalTypeId}`,
+      occurredAt
+    );
+    outcomeSession = continueConversation(outcomeSession, selectedConversationDefinition, occurredAt);
+    if (accept && (accepted || addedTemplateIds.length || selectedConversationSession.preview)) {
+      const addedTitles = addedTemplateIds
+        .map((id) => companionQuickGoalTemplateById.get(id)?.title)
+        .filter((title): title is string => Boolean(title));
+      outcomeSession = withConversationOutcome(outcomeSession, {
+        kind: 'goal',
+        eyebrow: selectedConversationSession.preview ? 'PREVIEW OUTCOME' : addedTitles.length > 1 ? 'GOALS ADDED' : 'GOAL ADDED',
+        title: selectedConversationSession.preview ? node.goalTitle : addedTitles.length > 1 ? `${addedTitles.length} steps are ready` : addedTitles[0] ?? node.goalTitle,
+        message: selectedConversationSession.preview
+          ? 'This is how the selected goals would be confirmed. Nothing was changed.'
+          : accepted
+            ? 'I saved the direction from our conversation and added the concrete steps you chose.'
+            : 'I kept your existing goal plan and added the concrete steps you chose.',
+        items: addedTitles,
+        celebrate: !selectedConversationSession.preview,
+        destination: 'goals',
+        destinationLabel: 'View my goals',
+      }, occurredAt);
+    }
+    setCompanionContentState((current) => {
+      let next = selectedConversationSession.preview ? current : recordConversationTelemetry(current, {
+        id: `${selectedConversationSession.id}:${node.id}:proposed`,
+        familyId: selectedConversationSession.familyId,
+        sessionId: selectedConversationSession.id,
+        definitionId: selectedConversationSession.definitionId,
+        kind: 'goal_proposed',
+        nodeId: node.id,
+        occurredAt,
+      });
+      if (accepted && !selectedConversationSession.preview) next = recordConversationTelemetry(next, {
+        id: `${selectedConversationSession.id}:${node.id}:accepted`,
+        familyId: selectedConversationSession.familyId,
+        sessionId: selectedConversationSession.id,
+        definitionId: selectedConversationSession.definitionId,
+        kind: 'goal_accepted',
+        nodeId: node.id,
+        occurredAt,
+      });
+      next = upsertConversationSession(next, outcomeSession);
+      if (!outcomeSession.preview && outcomeSession.status === 'completed') next = recordConversationTelemetry(next, {
+        id: `${outcomeSession.id}:completed`,
+        familyId: outcomeSession.familyId,
+        sessionId: outcomeSession.id,
+        definitionId: outcomeSession.definitionId,
+        kind: 'conversation_completed',
+        occurredAt,
+      });
+      saveCompanionContentState(next);
+      return next;
+    });
+  }, [companionJourneyState, selectedConversationDefinition, selectedConversationSession, selectedFamilyId, selectedResident]);
+  const decideSelectedConversationQuickGoal = useCallback((accept: boolean, added: boolean, node: Extract<ConversationNode, { kind: 'quick_goal_proposal' }>) => {
+    if (!selectedConversationSession || !selectedConversationDefinition) return;
+    const occurredAt = Date.now();
+    let outcomeSession = recordConversationOutcome(
+      selectedConversationSession,
+      `${accept && added ? 'quick-goal-added' : accept ? 'quick-goal-unavailable' : 'quick-goal-declined'}:${node.templateId}`,
+      occurredAt
+    );
+    outcomeSession = continueConversation(outcomeSession, selectedConversationDefinition, occurredAt);
+    if (accept) {
+      outcomeSession = withConversationOutcome(outcomeSession, {
+        kind: 'task',
+        eyebrow: selectedConversationSession.preview
+          ? 'PREVIEW OUTCOME'
+          : added ? 'ADDED TO YOUR GOALS' : 'ALREADY IN YOUR GOALS',
+        title: node.title,
+        message: selectedConversationSession.preview
+          ? 'This is how the added-task confirmation will look. Nothing was changed.'
+          : added
+            ? 'It is on your goals list now. Nothing else was added.'
+            : 'This task is already active, so I left your list unchanged.',
+        celebrate: added && !selectedConversationSession.preview,
+        destination: 'goals',
+        destinationLabel: 'View all goals',
+      }, occurredAt);
+    }
+    setCompanionContentState((current) => {
+      const next = upsertConversationSession(current, outcomeSession);
+      saveCompanionContentState(next);
+      return next;
+    });
+    setMicrocopy(selectedConversationSession.preview
+      ? 'Preview only — task was not changed'
+      : accept && added ? 'Task added' : accept ? 'That task is already active' : 'No task added');
+  }, [selectedConversationDefinition, selectedConversationSession]);
+  const decideSelectedConversationQuestHandoff = useCallback((
+    accept: boolean,
+    accepted: boolean,
+    node: Extract<ConversationNode, { kind: 'quest_handoff' }>,
+    quest: { id: string; title: string; hint: string } | null
+  ) => {
+    if (!selectedConversationSession || !selectedConversationDefinition) return;
+    const occurredAt = Date.now();
+    let outcomeSession = recordConversationOutcome(
+      selectedConversationSession,
+      `${accepted ? 'quest-accepted' : accept ? 'quest-unavailable' : 'quest-declined'}:${quest?.id ?? node.id}`,
+      occurredAt
+    );
+    outcomeSession = continueConversation(outcomeSession, selectedConversationDefinition, occurredAt);
+    if (accept && quest && (accepted || selectedConversationSession.preview)) {
+      outcomeSession = withConversationOutcome(outcomeSession, {
+        kind: 'quest',
+        eyebrow: selectedConversationSession.preview ? 'PREVIEW OUTCOME' : 'QUEST ACCEPTED',
+        title: quest.title,
+        message: selectedConversationSession.preview
+          ? 'This is how an accepted quest would be confirmed. Nothing was changed.'
+          : quest.hint,
+        celebrate: !selectedConversationSession.preview,
+        destination: 'quest',
+        destinationLabel: 'View this quest',
+      }, occurredAt);
+    }
+    setCompanionContentState((current) => {
+      const next = upsertConversationSession(current, outcomeSession);
+      saveCompanionContentState(next);
+      return next;
+    });
+  }, [selectedConversationDefinition, selectedConversationSession]);
+  const dismissSelectedConversationOutcome = useCallback(() => {
+    if (!selectedConversationSession?.outcomePresentation) return;
+    setCompanionContentState((current) => {
+      const session = current.conversationSessions.find((candidate) => candidate.id === selectedConversationSession.id);
+      if (!session?.outcomePresentation) return current;
+      const next = upsertConversationSession(current, { ...session, outcomePresentation: undefined, updatedAt: Date.now() });
+      saveCompanionContentState(next);
+      return next;
+    });
+  }, [selectedConversationSession]);
+  const previewSelectedConversation = useCallback((definitionId: string) => {
+    if (typeof __DEV__ === 'undefined' || !__DEV__ || !selectedResident || !selectedFamilyId || !today?.isoDate || !isConversationV2Family(selectedFamilyId)) return;
+    const definition = companionConversationDefinitionById.get(definitionId);
+    if (!definition || definition.familyId !== selectedFamilyId) return;
+    const occurredAt = Date.now();
+    const preview = createConversationSession({
+      definition,
+      formId: (selectedResident.creature.skinId ?? selectedResident.creature.visualKey) as KatchimeraSkinId,
+      dayId: today.isoDate,
+      createdAt: occurredAt,
+      preview: true,
+      encounterTargetTurns: conversationTurnTarget(`preview:${definition.id}:${occurredAt}`, definition),
+      sessionId: `companion-conversation-preview:${selectedFamilyId}:${definition.id}:${occurredAt}`,
+    });
+    setCompanionContentState((current) => {
+      const withoutOldPreviews = {
+        ...current,
+        conversationSessions: current.conversationSessions.filter((session) => !(session.familyId === selectedFamilyId && session.preview)),
+      };
+      const next = upsertConversationSession(withoutOldPreviews, preview);
+      saveCompanionContentState(next);
+      return next;
+    });
+    setMicrocopy(`Previewing ${definition.title}`);
+  }, [selectedFamilyId, selectedResident, today?.isoDate]);
+  const exitSelectedConversationPreview = useCallback(() => {
+    if (typeof __DEV__ === 'undefined' || !__DEV__ || !selectedFamilyId) return;
+    setCompanionContentState((current) => {
+      const conversationSessions = current.conversationSessions.filter((session) => !(session.familyId === selectedFamilyId && session.preview));
+      if (conversationSessions.length === current.conversationSessions.length) return current;
+      const next = { ...current, conversationSessions };
+      saveCompanionContentState(next);
+      return next;
+    });
+    setMicrocopy('Conversation preview closed');
+  }, [selectedFamilyId]);
+  const updateSelectedMemory = useCallback((input: {
+    memoryId: string;
+    status: 'confirmed' | 'rejected' | 'forgotten';
+    summary?: string;
+  }) => {
+    if (!selectedFamilyId || !today?.isoDate) return;
+    setCompanionContentState((current) => {
+      const next = updateCompanionMemoryStatus(current, {
+        ...input,
+        familyId: selectedFamilyId,
+        dayId: today.isoDate,
+      });
+      if (next !== current) saveCompanionContentState(next);
+      return next;
+    });
+  }, [selectedFamilyId, today?.isoDate]);
+  const resetSelectedCompanionMemory = useCallback(() => {
+    if (!selectedFamilyId) return;
+    setCompanionContentState((current) => {
+      const next = resetCompanionMemory(current, selectedFamilyId);
+      saveCompanionContentState(next);
+      return next;
+    });
+    setMicrocopy('Companion memory reset');
+  }, [selectedFamilyId]);
+  const rememberSelectedSharedMoment = useCallback((input: { sourceId: string; summary: string }) => {
+    if (!selectedFamilyId || !today?.isoDate) return;
+    const summary = input.summary.trim();
+    if (!summary) return;
+    setCompanionContentState((current) => {
+      const next = upsertCompanionMemory(current, {
+        id: `companion-memory:${selectedFamilyId}:shared:${input.sourceId}`,
+        scope: 'family',
+        familyId: selectedFamilyId,
+        kind: 'shared_moment',
+        key: `shared:${input.sourceId}`,
+        summary,
+        evidenceRefs: [{ sourceType: 'memory', sourceId: input.sourceId, dayId: today.isoDate }],
+        confidence: 1,
+        status: 'confirmed',
+        sensitivity: 'personal',
+        firstRecordedAt: Date.now(),
+        lastConfirmedAt: Date.now(),
+      });
+      saveCompanionContentState(next);
+      return next;
+    });
+  }, [selectedFamilyId, today?.isoDate]);
+  const recordSelectedSharedHistoryOpened = useCallback(() => {
+    if (!selectedFamilyId || !today?.isoDate) return;
+    setCompanionContentState((current) => {
+      const next = recordCompanionVisitTelemetry(current, {
+        familyId: selectedFamilyId,
+        dayId: today.isoDate,
+        kind: 'shared_history_opened',
+        occurredAt: Date.now(),
+      });
+      const withPlusPrompt = selectedHasOlderHistory
+        ? recordCompanionVisitTelemetry(next, {
+            familyId: selectedFamilyId,
+            dayId: today.isoDate,
+            kind: 'plus_history_prompted',
+            occurredAt: Date.now(),
+          })
+        : next;
+      if (withPlusPrompt !== current) saveCompanionContentState(withPlusPrompt);
+      return withPlusPrompt;
+    });
+  }, [selectedFamilyId, selectedHasOlderHistory, today?.isoDate]);
   const backSelectedJourneyCheckIn = useCallback((checkInId: string) => {
     setCompanionJourneyState((current) => {
       const next = backJourneyCheckIn(current, checkInId);
@@ -1457,7 +2458,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       if (next !== current) saveCompanionJourneyState(next);
       return next;
     });
-    setMicrocopy(status === 'completed' ? 'Focus completed' : status === 'abandoned' ? 'Focus released' : 'Focus updated');
+    setMicrocopy(status === 'completed' ? 'Goal plan completed' : status === 'abandoned' ? 'Goal plan released' : 'Goal plan updated');
   }, []);
   const setSelectedPrimaryJourneyGoal = useCallback((goalId: string) => {
     setCompanionJourneyState((current) => {
@@ -1575,6 +2576,36 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     selectedDailyInvitation,
     openSelectedDailyInvitation,
     skipSelectedDailyInvitation,
+    selectedVisitPlan,
+    selectedVisitReceipt,
+    selectedConversationSession,
+    selectedConversationDefinition,
+    selectedConversationQuestOffer,
+    selectedMemories,
+    selectedInsights,
+    selectedHistoryDays,
+    selectedHistoryIsPlus: economy.snapshot.activePlus,
+    selectedHasOlderHistory,
+    respondToSelectedVisit,
+    answerSelectedConversation,
+    continueSelectedConversation,
+    decideSelectedConversationInsight,
+    adjustSelectedConversationInsight,
+    removeSelectedInsight,
+    retakeSelectedInsight,
+    keepTalkingSelectedConversation,
+    archiveSelectedConversation,
+    decideSelectedConversationMemory,
+    decideSelectedConversationGoal,
+    decideSelectedConversationQuickGoal,
+    decideSelectedConversationQuestHandoff,
+    dismissSelectedConversationOutcome,
+    previewSelectedConversation,
+    exitSelectedConversationPreview,
+    updateSelectedMemory,
+    resetSelectedCompanionMemory,
+    rememberSelectedSharedMoment,
+    recordSelectedSharedHistoryOpened,
     selectedOffer,
     selectedOfferId: selectedOffer?.id ?? null,
     selectedOffers: sortQuestOffersByAvailability(selectedOfferOptions.map((offer, index) => {
@@ -1710,6 +2741,27 @@ function dayDistance(from: string, to: string): number {
   const start = new Date(`${from}T12:00:00`).getTime();
   const end = new Date(`${to}T12:00:00`).getTime();
   return Math.floor((end - start) / 86_400_000);
+}
+
+function conversationTurnTarget(seed: string, definition?: ConversationDefinition): number {
+  void seed;
+  if (definition?.id.endsWith(':goal-discovery')) return 4;
+  return 3;
+}
+
+function withConversationOutcome(
+  session: ReturnType<typeof continueConversation>,
+  presentation: Omit<ConversationOutcomePresentation, 'id' | 'createdAt'>,
+  createdAt: number
+) {
+  return {
+    ...session,
+    outcomePresentation: {
+      ...presentation,
+      id: `conversation-outcome:${session.id}:${createdAt}`,
+      createdAt,
+    },
+  };
 }
 
 function resolveInteractiveConfig(

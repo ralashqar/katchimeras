@@ -35,6 +35,9 @@ export type CompanionJourneyGoal = {
   goalTypeId: string;
   title: string;
   status: CompanionJourneyGoalStatus;
+  /** Journey-backed goals are presented as ordinary goal plans in the Goals area. */
+  kind?: 'plan';
+  /** @deprecated Retained only to migrate the former Focus model. */
   isPrimary: boolean;
   createdAt: number;
   updatedAt: number;
@@ -118,7 +121,7 @@ export type CompanionJourneyCheckIn = {
 };
 
 export type CompanionJourneyState = {
-  schemaVersion: 2 | 3;
+  schemaVersion: 2 | 3 | 4;
   goals: CompanionJourneyGoal[];
   conversations: CompanionJourneyConversationSession[];
   questEvents: CompanionJourneyQuestEvent[];
@@ -162,8 +165,14 @@ export type AnswerJourneyConversationResult = {
   suggestedQuickGoalIds: readonly string[];
 };
 
+export type CreateJourneyGoalProposalResult = {
+  state: CompanionJourneyState;
+  createdGoalId: string | null;
+  blockedReason: 'active_goal_limit' | null;
+};
+
 export function emptyCompanionJourneyState(): CompanionJourneyState {
-  return { schemaVersion: 3, goals: [], conversations: [], questEvents: [], momentEvents: [], reflectionEvents: [], checkIns: [] };
+  return { schemaVersion: 4, goals: [], conversations: [], questEvents: [], momentEvents: [], reflectionEvents: [], checkIns: [] };
 }
 
 export function normaliseCompanionJourneyState(value: unknown): CompanionJourneyState {
@@ -175,6 +184,7 @@ export function normaliseCompanionJourneyState(value: unknown): CompanionJourney
         const familyId = canonicalFamilyId(goal.familyId) ?? goal.familyId;
         return {
           ...goal,
+          kind: 'plan' as const,
           familyId,
           title: LEGACY_GOAL_TITLE_REPLACEMENTS[`${goal.familyId}:${title}`] ?? title,
         };
@@ -211,7 +221,7 @@ export function normaliseCompanionJourneyState(value: unknown): CompanionJourney
       }); }))
     : [];
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     goals: uniqueById(goals),
     conversations: uniqueById(conversations),
     questEvents,
@@ -258,6 +268,7 @@ export function migrateLegacyDiscoveryGoals(
       goalTypeId: mapped.goalTypeId,
       title: answer.value.trim(),
       status,
+      kind: 'plan',
       isPrimary: status === 'active' && !hasPrimary,
       createdAt: answer.answeredAt || migratedAt,
       updatedAt: answer.answeredAt || migratedAt,
@@ -286,6 +297,40 @@ export function primaryGoalForFamily(
   const ownerFamilyId = canonicalFamilyId(familyId) ?? familyId;
   const active = state.goals.filter((goal) => goal.familyId === ownerFamilyId && goal.status === 'active');
   return active.find((goal) => goal.isPrimary) ?? active.sort((left, right) => right.updatedAt - left.updatedAt)[0] ?? null;
+}
+
+/** Preferred name for the journey-backed parent goal shown in the Goals area. */
+export const activeGoalPlanForFamily = primaryGoalForFamily;
+
+export function createJourneyGoalFromProposal(
+  state: CompanionJourneyState,
+  input: {
+    familyId: KatchimeraFamilyId;
+    goalTypeId: string;
+    title: string;
+    suggestedQuickGoalIds: readonly string[];
+    createdAt?: number;
+  }
+): CreateJourneyGoalProposalResult {
+  const familyId = canonicalFamilyId(input.familyId) ?? input.familyId;
+  if (primaryGoalForFamily(state, familyId)) {
+    return { state, createdGoalId: null, blockedReason: 'active_goal_limit' };
+  }
+  const createdAt = input.createdAt ?? Date.now();
+  const createdGoalId = `journey-goal:${familyId}:${createdAt}`;
+  const goal: CompanionJourneyGoal = {
+    id: createdGoalId,
+    familyId,
+    goalTypeId: input.goalTypeId,
+    title: input.title.trim(),
+    status: 'active',
+    kind: 'plan',
+    isPrimary: true,
+    createdAt,
+    updatedAt: createdAt,
+    suggestedQuickGoalIds: [...input.suggestedQuickGoalIds],
+  };
+  return { state: { ...state, goals: [...state.goals, goal] }, createdGoalId, blockedReason: null };
 }
 
 export function activeConversationForFamily(
@@ -477,6 +522,20 @@ export function setJourneyGoalStatus(
     if (replacement) goals = goals.map((goal) => goal.id === replacement.id ? { ...goal, isPrimary: true } : goal);
   }
   return { ...state, goals };
+}
+
+export function renameJourneyGoal(
+  state: CompanionJourneyState,
+  goalId: string,
+  title: string,
+  updatedAt = Date.now()
+): CompanionJourneyState {
+  const cleanTitle = title.trim();
+  if (!cleanTitle || !state.goals.some((goal) => goal.id === goalId)) return state;
+  return {
+    ...state,
+    goals: state.goals.map((goal) => goal.id === goalId ? { ...goal, title: cleanTitle, updatedAt } : goal),
+  };
 }
 
 export function setPrimaryJourneyGoal(
