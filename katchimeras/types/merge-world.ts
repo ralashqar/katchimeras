@@ -125,6 +125,7 @@ export type MergeWorldCommand =
   | { type: 'claimInbox'; entryId: string; now: number }
   | { type: 'unlockExpansion'; expansionId: string; now: number }
   | { type: 'grantActivityEnergy'; receiptId: string; amount: number; now: number }
+  | { type: 'grantActivityEnergyBatch'; rewards: Array<{ receiptId: string; amount: number }>; now: number }
   | { type: 'reconcileCharacters'; characterIds: string[]; now: number }
   | { type: 'ackExternalReward'; receiptId: string; now: number };
 

@@ -30,7 +30,7 @@
   "exportedAt": "2026-07-27T06:37:35.830110+00:00",
   "outputs": {
     "master": "design/exploration-backgrounds/candidates/feastle-exploration-v5-master-2k.png",
-    "runtime": "assets/images/katchimeras/world/backgrounds/feastle-exploration-v5.png",
+    "runtime": "assets/images/katchimeras/world/backgrounds/feastle-exploration-v5.webp",
     "guide": "design/exploration-backgrounds/candidates/feastle-exploration-v5-platform-guide.png"
   },
   "sha256": {

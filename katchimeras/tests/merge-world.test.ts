@@ -1,15 +1,19 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 
 import { MERGE_GENERATOR_COOLDOWN_MS, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import type { MergeBoardItem, MergeWorldState } from '@/types/merge-world';
 import { companionFriendshipProgress, emptyCompanionBondState } from '@/utils/companion-bond';
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin } from '@/utils/merge-world/board-geometry';
+import { mergeWorldPendingPersistence } from '@/utils/merge-world/persistence-buffer';
 import {
   createInitialMergeWorldState,
   mergeOrderReady,
   mergeWorldCatalogIssues,
   normalizeMergeWorldState,
+  readyMergeOrderIds,
   reduceMergeWorld,
 } from '@/utils/merge-world/engine';
 
@@ -108,6 +112,38 @@ test('generators can move to empty cells and swap with other occupants', () => {
   assert.equal((result.state.board[29].occupant as MergeBoardItem).instanceId, 'ingredient');
 });
 
+test('rapid sequential moves preserve the same item identity and latest destination', () => {
+  let state = createInitialMergeWorldState(NOW);
+  const board = [...state.board];
+  board[29] = { ...board[29], locked: false, occupant: item('rapid-item', 'food:table:1') };
+  for (const cell of [30, 37, 38]) board[cell] = { ...board[cell], locked: false, occupant: null };
+  state = { ...state, board };
+  for (const [index, [from, to]] of [[29, 30], [30, 37], [37, 38]].entries()) {
+    const result = reduceMergeWorld(state, { type: 'move', from, to, now: NOW + index + 1 });
+    assert.equal(result.changed, true);
+    state = result.state;
+  }
+  assert.equal(state.board[29].occupant, null);
+  assert.equal(state.board[30].occupant, null);
+  assert.equal(state.board[37].occupant, null);
+  assert.equal((state.board[38].occupant as MergeBoardItem).instanceId, 'rapid-item');
+});
+
+test('persistent merge input uses one static board recognizer and epoch-guarded ownership', () => {
+  const source = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'feastle-persistent-merge-board.tsx'), 'utf8');
+  const spriteSource = source.slice(source.indexOf('const PersistentSprite'), source.indexOf('function PersistentGeneratorArt'));
+  assert.match(source, /const boardGesture = useMemo\(\(\) => Gesture\.Pan\(\)/);
+  assert.match(source, /\.minDistance\(0\)/);
+  assert.match(source, /const BOARD_TAP_SLOP = 9/);
+  assert.match(source, /maxGestureDistance\.value <= BOARD_TAP_SLOP/);
+  assert.match(source, /\.onTouchesUp\(\(event\) =>/);
+  assert.match(source, /if \(!id \|\| gestureFinished\.value\) return/);
+  assert.match(source, /if \(dragEpoch\.value !== epoch\) return/);
+  assert.match(source, /occupancyIds\.value = ids/);
+  assert.doesNotMatch(source, /Gesture\.Exclusive/);
+  assert.doesNotMatch(spriteSource, /GestureDetector|Gesture\.Pan|pointerEvents=\{enabled/);
+});
+
 test('activity receipts are idempotent and Energy remains capped', () => {
   const state = { ...createInitialMergeWorldState(NOW), energy: { value: 80, cap: 100, lastRegenAt: NOW } };
   const first = reduceMergeWorld(state, { type: 'grantActivityEnergy', receiptId: 'journal:1', amount: 10, now: NOW + 1 });
@@ -116,6 +152,65 @@ test('activity receipts are idempotent and Energy remains capped', () => {
   assert.equal(first.state.energy.value, 90);
   assert.equal(duplicate.changed, false);
   assert.equal(capped.state.energy.value, 100);
+});
+
+test('activity rewards reconcile in one idempotent batch', () => {
+  const state = { ...createInitialMergeWorldState(NOW), energy: { value: 40, cap: 100, lastRegenAt: NOW } };
+  const rewards = [
+    { receiptId: 'journal:batch:1', amount: 10 },
+    { receiptId: 'steps:batch:1', amount: 15 },
+    { receiptId: 'journal:batch:1', amount: 10 },
+  ];
+  const first = reduceMergeWorld(state, { type: 'grantActivityEnergyBatch', rewards, now: NOW + 1 });
+  const duplicate = reduceMergeWorld(first.state, { type: 'grantActivityEnergyBatch', rewards, now: NOW + 2 });
+  assert.equal(first.state.energy.value, 65);
+  assert.equal(first.state.revision, state.revision + 1);
+  assert.equal(duplicate.changed, false);
+});
+
+test('rapid generator taps remain deterministic without losing commands', () => {
+  let state = { ...createInitialMergeWorldState(NOW), energy: { value: 50, cap: 100, lastRegenAt: NOW } };
+  for (let index = 0; index < 12; index += 1) {
+    const result = reduceMergeWorld(state, {
+      type: 'tapGenerator',
+      generatorId: 'starter-pantry',
+      now: NOW + index + 1,
+      seed: `rapid:${index}`,
+    });
+    assert.equal(result.changed, true);
+    state = result.state;
+  }
+  assert.equal(state.generators['starter-pantry'].charges, 0);
+  assert.equal(state.board.filter((cell) => cell.occupant?.kind === 'item').length, 12);
+  assert.equal(new Set(state.board.flatMap((cell) => cell.occupant?.kind === 'item' ? [cell.occupant.instanceId] : [])).size, 12);
+});
+
+test('persistence buffering keeps the latest snapshot and all receipt deltas', () => {
+  const initial = createInitialMergeWorldState(NOW);
+  const first = { ...initial, revision: 4 };
+  const latest = { ...initial, revision: 7 };
+  let pending = mergeWorldPendingPersistence(null, first, ['receipt:a']);
+  pending = mergeWorldPendingPersistence(pending, latest, ['receipt:b']);
+  pending = mergeWorldPendingPersistence(pending, { ...initial, revision: 5 }, ['receipt:a', 'receipt:c']);
+  assert.equal(pending.state.revision, 7);
+  assert.equal(pending.coalescedCommands, 3);
+  assert.deepEqual([...pending.receiptIds].sort(), ['receipt:a', 'receipt:b', 'receipt:c']);
+});
+
+test('ready order ids count the board once and identify every ready order', () => {
+  let state = createInitialMergeWorldState(NOW, ['feastle']);
+  const placements: Array<[number, MergeBoardItem]> = [];
+  let cell = 29;
+  for (const order of state.activeOrders) {
+    for (const requirement of order.requirements) {
+      for (let count = 0; count < requirement.quantity; count += 1) {
+        placements.push([cell++, item(`ready:${cell}`, requirement.definitionId)]);
+      }
+    }
+  }
+  state = withItems(state, placements);
+  const ready = readyMergeOrderIds(state);
+  state.activeOrders.forEach((order) => assert.equal(ready.has(order.id), true));
 });
 
 test('depleted generators recover from timestamps without background timers', () => {

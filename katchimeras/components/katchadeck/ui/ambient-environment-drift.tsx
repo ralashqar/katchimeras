@@ -3,11 +3,13 @@ import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
+  useAnimatedReaction,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
 
 const BACKGROUND_SCALE = 1.065;
@@ -15,7 +17,7 @@ const SAFE_DRIFT_FRACTION = 0.85;
 const DEFAULT_LEG_DURATION = 22_000;
 
 /** Slow UI-thread drift for full-screen environment artwork. */
-export function AmbientEnvironmentDrift({ children }: { children: ReactNode }) {
+export function AmbientEnvironmentDrift({ children, paused }: { children: ReactNode; paused?: SharedValue<number> }) {
   const reduceMotion = useReducedMotion();
   const { width } = useWindowDimensions();
   const safeDistance = width * ((BACKGROUND_SCALE - 1) / 2) * SAFE_DRIFT_FRACTION;
@@ -40,6 +42,22 @@ export function AmbientEnvironmentDrift({ children }: { children: ReactNode }) {
 
     return () => cancelAnimation(translateX);
   }, [reduceMotion, safeDistance, translateX]);
+
+  useAnimatedReaction(
+    () => paused?.value ?? 0,
+    (isPaused, wasPaused) => {
+      if (isPaused === wasPaused || reduceMotion) return;
+      cancelAnimation(translateX);
+      if (isPaused === 0) {
+        translateX.value = withRepeat(
+          withTiming(safeDistance, { duration: DEFAULT_LEG_DURATION, easing: Easing.inOut(Easing.sin) }),
+          -1,
+          true,
+        );
+      }
+    },
+    [reduceMotion, safeDistance],
+  );
 
   const driftStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],

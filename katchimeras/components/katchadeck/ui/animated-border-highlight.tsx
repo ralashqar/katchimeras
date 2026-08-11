@@ -4,11 +4,13 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import {
   cancelAnimation,
   Easing,
+  useAnimatedReaction,
   useDerivedValue,
   useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
 
 const DEFAULT_COLORS = [
@@ -34,6 +36,7 @@ export type AnimatedBorderHighlightProps = {
   inset?: number;
   orbitDurationMs?: number;
   pauseDurationMs?: number;
+  paused?: SharedValue<number>;
   positions?: number[];
   staticAngle?: number;
   strokeWidth?: number;
@@ -54,6 +57,7 @@ export function AnimatedBorderHighlight({
   inset = 2,
   orbitDurationMs = 3000,
   pauseDurationMs = 1000,
+  paused,
   positions = DEFAULT_POSITIONS,
   staticAngle = 0.1,
   strokeWidth = 1.25,
@@ -73,6 +77,16 @@ export function AnimatedBorderHighlight({
     }
     return () => cancelAnimation(progress);
   }, [cycleDuration, progress, reduceMotion]);
+
+  useAnimatedReaction(
+    () => paused?.value ?? 0,
+    (isPaused, wasPaused) => {
+      if (isPaused === wasPaused || reduceMotion) return;
+      cancelAnimation(progress);
+      if (isPaused === 0) progress.value = withRepeat(withTiming(1, { duration: cycleDuration, easing: Easing.linear }), -1);
+    },
+    [cycleDuration, reduceMotion],
+  );
 
   const gradientTransform = useDerivedValue(() => {
     if (reduceMotion) return [{ rotate: staticAngle * Math.PI * 2 }];

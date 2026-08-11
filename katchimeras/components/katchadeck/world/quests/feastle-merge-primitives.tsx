@@ -22,7 +22,7 @@ export const FeastleMergeItemArt = memo(function FeastleMergeItemArt({ artKey, t
     { height: size, width: size },
     bare ? styles.foodArtBare : { backgroundColor: `${color}20`, borderColor: `${color}55` },
   ]}>
-    <Image accessibilityIgnoresInvertColors contentFit="contain" source={source} style={[styles.foodImage, bare && styles.foodImageBare]} />
+    <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={`feastle-merge-${artKey}`} source={source} style={[styles.foodImage, bare && styles.foodImageBare]} transition={0} />
     <View style={[styles.tierBadge, { backgroundColor: color }]}><ThemedText darkColor={Lantern.emberInk} lightColor={Lantern.emberInk} style={styles.tierText}>{tier}</ThemedText></View>
   </View>;
 });

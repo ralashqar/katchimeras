@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useSharedValue } from 'react-native-reanimated';
 
 import { MergeWorldScreen } from '@/components/katchadeck/games/merge-world-screen';
 import { CompanionGameBackdrop } from '@/components/katchadeck/world/companion-game-backdrop';
@@ -22,6 +23,7 @@ const FEASTLE_ART = resolveCreatureArtSource('feastle');
 const FEASTLE_ENVIRONMENT = todayKatchimeraExplorationBackgroundKeyForEnvironment('feastle');
 
 export function MergeWorldRouteScreen() {
+  const effectsPaused = useSharedValue(0);
   const { days } = useAllDays();
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   const persistent = useMemo(() => {
@@ -41,10 +43,10 @@ export function MergeWorldRouteScreen() {
 
   return (
     <View style={styles.screen}>
-      <CompanionGameBackdrop backgroundKey={FEASTLE_ENVIRONMENT} creature={FEASTLE_ART} name="Feastle" visualKey="feastle" />
+      <CompanionGameBackdrop backgroundKey={FEASTLE_ENVIRONMENT} creature={FEASTLE_ART} name="Feastle" paused={effectsPaused} visualKey="feastle" />
       <View style={styles.world}>
         <MergeWorldProvider characterIds={persistent.characterIds} days={days} questState={persistent.quests}>
-          <MergeWorldScreen />
+          <MergeWorldScreen effectsPaused={effectsPaused} />
         </MergeWorldProvider>
       </View>
     </View>

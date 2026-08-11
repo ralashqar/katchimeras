@@ -23,8 +23,10 @@ expo-env.d.ts
 
 # local art generation and build-audit output
 /.tmp/
+/.expo-gesture-verify/
 /tmp/imagegen/
 /tmp/today-growth-energy-v2/
+/assets/images/katchimeras/merge-world/ui/*.png
 
 # debug
 npm-debug.*

@@ -18,7 +18,7 @@ export const TODAY_EXPLORATION_BACKGROUND_SOURCES = {
   },
   'feastle': {
     recyclingKey: 'today-feastle-exploration-v5',
-    source: require('../assets/images/katchimeras/world/backgrounds/feastle-exploration-v5.png'),
+    source: require('../assets/images/katchimeras/world/backgrounds/feastle-exploration-v5.webp'),
   },
   'flickerbun': {
     recyclingKey: 'today-flickerbun-exploration-v1',

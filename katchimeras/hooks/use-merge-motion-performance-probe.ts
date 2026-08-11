@@ -2,20 +2,20 @@ import { runOnJS, useFrameCallback, useSharedValue, type SharedValue } from 'rea
 
 const MERGE_PERF_ENABLED = __DEV__ && process.env.EXPO_PUBLIC_MERGE_PERF === '1';
 
-function reportMergeMotionSample(sample: { durationMs: number; slowFrames: number; longestFrameMs: number }) {
-  if (!MERGE_PERF_ENABLED) return;
-  console[sample.longestFrameMs > 34 ? 'warn' : 'info']('[merge-motion]', sample);
+export type MergeMotionPerformanceSample = { durationMs: number; slowFrames: number; longestFrameMs: number };
+
+function reportMergeMotionSample(sample: MergeMotionPerformanceSample) {
+  if (MERGE_PERF_ENABLED) console[sample.longestFrameMs > 34 ? 'warn' : 'info']('[merge-motion]', sample);
 }
 
 /** UI-thread frame probe for drag settlement, swaps, merges, and generator launches. */
-export function useMergeMotionPerformanceProbe(active: SharedValue<number>) {
+export function useMergeMotionPerformanceProbe(active: SharedValue<number>, onSample?: (sample: MergeMotionPerformanceSample) => void) {
   const wasActive = useSharedValue(0);
   const startedAt = useSharedValue(0);
   const slowFrames = useSharedValue(0);
   const longestFrameMs = useSharedValue(0);
 
   useFrameCallback((frame) => {
-    if (!MERGE_PERF_ENABLED) return;
     if (active.value === 1) {
       if (wasActive.value === 0) {
         wasActive.value = 1;
@@ -30,10 +30,12 @@ export function useMergeMotionPerformanceProbe(active: SharedValue<number>) {
     }
     if (wasActive.value === 0) return;
     wasActive.value = 0;
-    runOnJS(reportMergeMotionSample)({
+    const sample = {
       durationMs: Math.max(0, frame.timestamp - startedAt.value),
       slowFrames: slowFrames.value,
       longestFrameMs: longestFrameMs.value,
-    });
-  }, MERGE_PERF_ENABLED);
+    };
+    runOnJS(reportMergeMotionSample)(sample);
+    if (onSample) runOnJS(onSample)(sample);
+  }, true);
 }

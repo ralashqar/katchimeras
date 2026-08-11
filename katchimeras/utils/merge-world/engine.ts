@@ -92,6 +92,8 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
       return unlockExpansion(current, command.expansionId, command.now);
     case 'grantActivityEnergy':
       return grantActivityEnergy(current, command.receiptId, command.amount, command.now);
+    case 'grantActivityEnergyBatch':
+      return grantActivityEnergyBatch(current, command.rewards, command.now);
     case 'reconcileCharacters': {
       const next = reconcileCharacters(current, command.characterIds, command.now);
       return result(state, next, next === current ? undefined : 'Merge World welcomed new visitors.');
@@ -109,6 +111,13 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
 export function mergeOrderReady(state: MergeWorldState, order: MergeOrder): boolean {
   const counts = boardItemCounts(state);
   return order.requirements.every((requirement) => (counts.get(requirement.definitionId) ?? 0) >= requirement.quantity);
+}
+
+export function readyMergeOrderIds(state: MergeWorldState): Set<string> {
+  const counts = boardItemCounts(state);
+  return new Set(state.activeOrders
+    .filter((order) => order.requirements.every((requirement) => (counts.get(requirement.definitionId) ?? 0) >= requirement.quantity))
+    .map((order) => order.id));
 }
 
 export function availableExpansion(state: MergeWorldState) {
@@ -347,6 +356,25 @@ function grantActivityEnergy(state: MergeWorldState, receiptId: string, amount: 
     energy: { ...state.energy, value: Math.min(state.energy.cap, state.energy.value + safeAmount) },
     processedActivityReceiptIds: [...state.processedActivityReceiptIds, receiptId],
   }, now), `Real life added ${safeAmount} Merge Energy.`);
+}
+
+function grantActivityEnergyBatch(state: MergeWorldState, rewards: Array<{ receiptId: string; amount: number }>, now: number): MergeWorldCommandResult {
+  if (!rewards.length) return unchanged(state);
+  const processed = new Set(state.processedActivityReceiptIds);
+  let amount = 0;
+  let changedState = false;
+  for (const reward of rewards) {
+    if (!reward.receiptId || processed.has(reward.receiptId)) continue;
+    processed.add(reward.receiptId);
+    amount += Math.max(0, Math.floor(reward.amount));
+    changedState = true;
+  }
+  if (!changedState) return unchanged(state);
+  return changed(touch({
+    ...state,
+    energy: { ...state.energy, value: Math.min(state.energy.cap, state.energy.value + amount) },
+    processedActivityReceiptIds: [...processed],
+  }, now), `Real life added ${amount} Merge Energy.`);
 }
 
 function reconcileCharacters(state: MergeWorldState, ids: string[], now: number): MergeWorldState {

@@ -1,16 +1,17 @@
 import { createContext, type PropsWithChildren, use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
+import { companionIdForFamily } from '@/constants/katchimera-skins';
 import { useWisps } from '@/features/wisps/wisp-provider';
 import type { HomeDayRecord } from '@/types/home';
-import type { MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
-import type { MergeCharacterId } from '@/types/merge-world';
-import { companionIdForFamily } from '@/constants/katchimera-skins';
-import { mergeActivityRewards, mergeQuestActivityRewards } from '@/utils/merge-world/activity-rewards';
-import { reduceMergeWorld } from '@/utils/merge-world/engine';
-import { loadMergeWorldState, saveMergeWorldState } from '@/utils/merge-world/repository';
+import type { MergeCharacterId, MergeExternalRewardReceipt, MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
 import { companionFriendshipProgress, recordCompanionBondEvent } from '@/utils/companion-bond';
 import { loadCompanionBondState, saveCompanionBondState } from '@/utils/companion-bond-storage';
 import type { CompanionQuestState } from '@/utils/katchimera-quests';
+import { mergeActivityRewards, mergeQuestActivityRewards } from '@/utils/merge-world/activity-rewards';
+import { reduceMergeWorld } from '@/utils/merge-world/engine';
+import { mergeWorldPendingPersistence, type MergeWorldPendingPersistence } from '@/utils/merge-world/persistence-buffer';
+import { loadMergeWorldState, saveMergeWorldState } from '@/utils/merge-world/repository';
 
 type MergeWorldContextValue = {
   state: MergeWorldState | null;
@@ -18,10 +19,24 @@ type MergeWorldContextValue = {
   error: string | null;
   lastResult: MergeWorldCommandResult | null;
   friendshipLevels: Partial<Record<MergeCharacterId, number>>;
-  send: (command: MergeWorldCommand) => Promise<MergeWorldCommandResult | null>;
+  dispatch: (command: MergeWorldCommand) => MergeWorldCommandResult | null;
+  flush: () => Promise<void>;
 };
 
+const RETRY_DELAYS_MS = [250, 1_000, 4_000] as const;
+const MERGE_PERF_ENABLED = __DEV__ && process.env.EXPO_PUBLIC_MERGE_PERF === '1';
 const MergeWorldContext = createContext<MergeWorldContextValue | null>(null);
+
+function changedReceiptIds(before: MergeWorldState, after: MergeWorldState) {
+  const previous = new Map(before.externalRewardReceipts.map((receipt) => [receipt.id, receipt.appliedAt]));
+  return after.externalRewardReceipts
+    .filter((receipt) => previous.get(receipt.id) !== receipt.appliedAt || !previous.has(receipt.id))
+    .map((receipt) => receipt.id);
+}
+
+function delay(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
 
 export function MergeWorldProvider({
   characterIds,
@@ -36,57 +51,145 @@ export function MergeWorldProvider({
   const [lastResult, setLastResult] = useState<MergeWorldCommandResult | null>(null);
   const [friendshipLevels, setFriendshipLevels] = useState<Partial<Record<MergeCharacterId, number>>>({});
   const stateRef = useRef(state);
+  const mountedRef = useRef(true);
+  const pendingPersistenceRef = useRef<MergeWorldPendingPersistence | null>(null);
+  const persistenceWorkerRef = useRef<Promise<void> | null>(null);
+  const externalWorkerRef = useRef<Promise<void> | null>(null);
   stateRef.current = state;
-  const queue = useRef(Promise.resolve());
 
   const refreshFriendshipLevels = useCallback(() => {
     const bond = loadCompanionBondState();
     const ids: MergeCharacterId[] = ['feastle', 'mossprout', 'steppling', 'shellio', 'voyagle'];
-    setFriendshipLevels(Object.fromEntries(ids.map((id) => [id, companionFriendshipProgress(bond, companionIdForFamily(id)).level])));
+    if (mountedRef.current) setFriendshipLevels(Object.fromEntries(ids.map((id) => [id, companionFriendshipProgress(bond, companionIdForFamily(id)).level])));
   }, []);
 
-  const applyExternalRewards = useCallback(async (input: MergeWorldState) => {
-    let next = input;
-    for (const receipt of input.externalRewardReceipts.filter((item) => item.appliedAt == null)) {
-      if (receipt.kind === 'friendship') {
-        const currentBond = loadCompanionBondState();
-        const awarded = recordCompanionBondEvent(currentBond, {
-          id: receipt.id,
-          creatureId: companionIdForFamily(receipt.characterId),
-          kind: 'merge_order_completed',
-          points: receipt.amount,
-          occurredAt: receipt.createdAt,
-        }, { queueCelebration: true });
-        if (awarded.awarded) saveCompanionBondState(awarded.state);
-      } else if (receipt.wispId) {
-        wisps.grant(receipt.wispId, receipt.id, 'game');
-      }
-      next = reduceMergeWorld(next, { type: 'ackExternalReward', receiptId: receipt.id, now: Date.now() }).state;
+  const applyReceiptSideEffect = useCallback((receipt: MergeExternalRewardReceipt) => {
+    if (receipt.kind === 'friendship') {
+      const currentBond = loadCompanionBondState();
+      const awarded = recordCompanionBondEvent(currentBond, {
+        id: receipt.id,
+        creatureId: companionIdForFamily(receipt.characterId),
+        kind: 'merge_order_completed',
+        points: receipt.amount,
+        occurredAt: receipt.createdAt,
+      }, { queueCelebration: true });
+      if (awarded.awarded) saveCompanionBondState(awarded.state);
+      return;
     }
-    refreshFriendshipLevels();
-    return next;
-  }, [refreshFriendshipLevels, wisps]);
+    if (receipt.wispId) wisps.grant(receipt.wispId, receipt.id, 'game');
+  }, [wisps]);
+
+  const drainPersistence = useCallback(async () => {
+    while (pendingPersistenceRef.current) {
+      const pending = pendingPersistenceRef.current;
+      pendingPersistenceRef.current = null;
+      let saved = false;
+      let caughtError: unknown = null;
+      for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
+        try {
+          const startedAt = MERGE_PERF_ENABLED ? performance.now() : 0;
+          await saveMergeWorldState(pending.state, [...pending.receiptIds]);
+          if (MERGE_PERF_ENABLED) console.info('[merge-persistence]', {
+            coalescedCommands: pending.coalescedCommands,
+            durationMs: Math.round((performance.now() - startedAt) * 10) / 10,
+            receiptCount: pending.receiptIds.size,
+            revision: pending.state.revision,
+          });
+          saved = true;
+          break;
+        } catch (caught) {
+          caughtError = caught;
+          if (attempt < RETRY_DELAYS_MS.length) await delay(RETRY_DELAYS_MS[attempt]);
+        }
+      }
+      if (saved) {
+        if (mountedRef.current) setError(null);
+        continue;
+      }
+      pendingPersistenceRef.current = mergeWorldPendingPersistence(
+        pendingPersistenceRef.current,
+        pending.state,
+        [...pending.receiptIds],
+      );
+      if (mountedRef.current) setError(caughtError instanceof Error ? caughtError.message : 'Progress could not be saved.');
+      break;
+    }
+  }, []);
+
+  const startPersistenceWorker = useCallback(() => {
+    if (!persistenceWorkerRef.current) {
+      const worker = drainPersistence();
+      persistenceWorkerRef.current = worker;
+      void worker.finally(() => {
+        if (persistenceWorkerRef.current === worker) persistenceWorkerRef.current = null;
+      });
+    }
+    return persistenceWorkerRef.current;
+  }, [drainPersistence]);
+
+  const enqueuePersistence = useCallback((next: MergeWorldState, receiptIds: readonly string[] = []) => {
+    pendingPersistenceRef.current = mergeWorldPendingPersistence(pendingPersistenceRef.current, next, receiptIds);
+    void startPersistenceWorker();
+  }, [startPersistenceWorker]);
+
+  const flush = useCallback(async () => {
+    const worker = startPersistenceWorker();
+    if (worker) await worker;
+  }, [startPersistenceWorker]);
+
+  const applyPendingExternalRewards = useCallback(() => {
+    if (externalWorkerRef.current) return externalWorkerRef.current;
+    const worker = (async () => {
+      let appliedAny = false;
+      while (true) {
+        await flush();
+        if (pendingPersistenceRef.current) break;
+        const pending = stateRef.current?.externalRewardReceipts.filter((receipt) => receipt.appliedAt == null) ?? [];
+        if (!pending.length) break;
+        for (const receipt of pending) {
+          applyReceiptSideEffect(receipt);
+          const current = stateRef.current;
+          if (!current) continue;
+          const result = reduceMergeWorld(current, { type: 'ackExternalReward', receiptId: receipt.id, now: Date.now() });
+          if (!result.changed) continue;
+          stateRef.current = result.state;
+          if (mountedRef.current) setState(result.state);
+          enqueuePersistence(result.state, [receipt.id]);
+          appliedAny = true;
+        }
+      }
+      if (appliedAny) refreshFriendshipLevels();
+    })().catch((caught) => {
+      if (mountedRef.current) setError(caught instanceof Error ? caught.message : 'Merge rewards could not be applied.');
+    });
+    externalWorkerRef.current = worker;
+    void worker.finally(() => {
+      if (externalWorkerRef.current === worker) externalWorkerRef.current = null;
+    });
+    return worker;
+  }, [applyReceiptSideEffect, enqueuePersistence, flush, refreshFriendshipLevels]);
 
   useEffect(() => {
+    mountedRef.current = true;
     let cancelled = false;
     void (async () => {
       try {
         let next = await loadMergeWorldState();
         next = reduceMergeWorld(next, { type: 'reconcileCharacters', characterIds, now: Date.now() }).state;
-        for (const reward of [...mergeActivityRewards(days), ...mergeQuestActivityRewards(questState)]) {
-          next = reduceMergeWorld(next, {
-            type: 'grantActivityEnergy', receiptId: reward.receiptId, amount: reward.amount, now: Date.now(),
-          }).state;
+        const rewards = [...mergeActivityRewards(days), ...mergeQuestActivityRewards(questState)];
+        next = reduceMergeWorld(next, { type: 'grantActivityEnergyBatch', rewards, now: Date.now() }).state;
+        await saveMergeWorldState(next);
+        const appliedIds: string[] = [];
+        for (const receipt of next.externalRewardReceipts.filter((item) => item.appliedAt == null)) {
+          applyReceiptSideEffect(receipt);
+          next = reduceMergeWorld(next, { type: 'ackExternalReward', receiptId: receipt.id, now: Date.now() }).state;
+          appliedIds.push(receipt.id);
         }
-        // Persist the authoritative board and pending outbox before applying
-        // any cross-system reward. A crash can then only leave replayable work,
-        // never an awarded receipt paired with an unconsumed order.
-        await saveMergeWorldState(next);
-        next = await applyExternalRewards(next);
-        await saveMergeWorldState(next);
+        if (appliedIds.length) await saveMergeWorldState(next, appliedIds);
         if (!cancelled) {
           stateRef.current = next;
           setState(next);
+          refreshFriendshipLevels();
           setLoading(false);
         }
       } catch (caught) {
@@ -96,54 +199,54 @@ export function MergeWorldProvider({
         }
       }
     })();
-    return () => { cancelled = true; };
-    // Initial hydration intentionally owns the bulk activity projection. Later
-    // focus changes are reconciled by the lightweight effects below.
+    return () => {
+      cancelled = true;
+      mountedRef.current = false;
+      void flush();
+    };
+    // Initial hydration owns the full activity projection. Later changes use
+    // the lightweight batch reconciliation effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (!stateRef.current) return;
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState !== 'active') void flush();
+    });
+    return () => subscription.remove();
+  }, [flush]);
+
+  useEffect(() => {
+    const current = stateRef.current;
+    if (!current) return;
     const now = Date.now();
-    let next = reduceMergeWorld(stateRef.current, { type: 'reconcileCharacters', characterIds, now }).state;
-    for (const reward of [...mergeActivityRewards(days), ...mergeQuestActivityRewards(questState)]) {
-      next = reduceMergeWorld(next, { type: 'grantActivityEnergy', receiptId: reward.receiptId, amount: reward.amount, now }).state;
-    }
-    if (next === stateRef.current) return;
+    let next = reduceMergeWorld(current, { type: 'reconcileCharacters', characterIds, now }).state;
+    const rewards = [...mergeActivityRewards(days), ...mergeQuestActivityRewards(questState)];
+    next = reduceMergeWorld(next, { type: 'grantActivityEnergyBatch', rewards, now }).state;
+    if (next === current) return;
     stateRef.current = next;
     setState(next);
-    void saveMergeWorldState(next).catch((caught) => setError(caught instanceof Error ? caught.message : 'Progress could not be saved.'));
-  }, [characterIds, days, questState]);
+    enqueuePersistence(next);
+  }, [characterIds, days, enqueuePersistence, questState]);
 
-  const send = useCallback((command: MergeWorldCommand) => new Promise<MergeWorldCommandResult | null>((resolve) => {
-    queue.current = queue.current.then(async () => {
-      const current = stateRef.current;
-      if (!current) {
-        resolve(null);
-        return;
-      }
-      try {
-        const result = reduceMergeWorld(current, command);
-        let next = result.state;
-        if (result.changed) {
-          await saveMergeWorldState(next);
-          next = await applyExternalRewards(next);
-          await saveMergeWorldState(next);
-          stateRef.current = next;
-          setState(next);
-        }
-        const resolved = next === result.state ? result : { ...result, state: next };
-        setLastResult(resolved);
-        setError(null);
-        resolve(resolved);
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : 'Progress could not be saved.');
-        resolve(null);
-      }
-    });
-  }), [applyExternalRewards]);
+  const dispatch = useCallback((command: MergeWorldCommand): MergeWorldCommandResult | null => {
+    const current = stateRef.current;
+    if (!current) return null;
+    const result = reduceMergeWorld(current, command);
+    setLastResult(result);
+    if (!result.changed) return result;
+    const receiptIds = changedReceiptIds(current, result.state);
+    stateRef.current = result.state;
+    setState(result.state);
+    setError(null);
+    enqueuePersistence(result.state, receiptIds);
+    if (result.state.externalRewardReceipts.some((receipt) => receipt.appliedAt == null)) {
+      void applyPendingExternalRewards();
+    }
+    return result;
+  }, [applyPendingExternalRewards, enqueuePersistence]);
 
-  const value = useMemo<MergeWorldContextValue>(() => ({ state, loading, error, lastResult, friendshipLevels, send }), [error, friendshipLevels, lastResult, loading, send, state]);
+  const value = useMemo<MergeWorldContextValue>(() => ({ state, loading, error, lastResult, friendshipLevels, dispatch, flush }), [dispatch, error, flush, friendshipLevels, lastResult, loading, state]);
   return <MergeWorldContext value={value}>{children}</MergeWorldContext>;
 }
 

@@ -9,27 +9,35 @@ const LOCAL_PROFILE_ID = 'local';
 let databasePromise: ReturnType<typeof SQLite.openDatabaseAsync> | null = null;
 
 async function database() {
-  databasePromise ??= SQLite.openDatabaseAsync(DATABASE_NAME);
-  const db = await databasePromise;
-  await db.execAsync(`
-    PRAGMA journal_mode = WAL;
-    CREATE TABLE IF NOT EXISTS merge_world_snapshot (
-      profile_id TEXT PRIMARY KEY NOT NULL,
-      schema_version INTEGER NOT NULL,
-      revision INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      state_json TEXT NOT NULL,
-      backup_json TEXT
-    );
-    CREATE TABLE IF NOT EXISTS merge_world_outbox (
-      receipt_id TEXT PRIMARY KEY NOT NULL,
-      receipt_kind TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      payload_json TEXT NOT NULL,
-      synced_at INTEGER
-    );
-  `);
-  return db;
+  if (!databasePromise) {
+    const opening = (async () => {
+      const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+      await db.execAsync(`
+        PRAGMA journal_mode = WAL;
+        CREATE TABLE IF NOT EXISTS merge_world_snapshot (
+          profile_id TEXT PRIMARY KEY NOT NULL,
+          schema_version INTEGER NOT NULL,
+          revision INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          state_json TEXT NOT NULL,
+          backup_json TEXT
+        );
+        CREATE TABLE IF NOT EXISTS merge_world_outbox (
+          receipt_id TEXT PRIMARY KEY NOT NULL,
+          receipt_kind TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          payload_json TEXT NOT NULL,
+          synced_at INTEGER
+        );
+      `);
+      return db;
+    })();
+    databasePromise = opening.catch((caught) => {
+      databasePromise = null;
+      throw caught;
+    });
+  }
+  return databasePromise;
 }
 
 export async function loadMergeWorldState(now = Date.now()): Promise<MergeWorldState> {
@@ -53,14 +61,13 @@ export async function loadMergeWorldState(now = Date.now()): Promise<MergeWorldS
   }
 }
 
-export async function saveMergeWorldState(state: MergeWorldState): Promise<void> {
+export async function saveMergeWorldState(state: MergeWorldState, receiptIds?: readonly string[]): Promise<void> {
   const db = await database();
   const serialized = JSON.stringify(state);
+  const selectedReceipts = receiptIds == null
+    ? state.externalRewardReceipts
+    : state.externalRewardReceipts.filter((receipt) => receiptIds.includes(receipt.id));
   await db.withTransactionAsync(async () => {
-    const previous = await db.getFirstAsync<{ state_json: string }>(
-      'SELECT state_json FROM merge_world_snapshot WHERE profile_id = ?',
-      [LOCAL_PROFILE_ID],
-    );
     await db.runAsync(
       `INSERT INTO merge_world_snapshot (profile_id, schema_version, revision, updated_at, state_json, backup_json)
        VALUES (?, ?, ?, ?, ?, ?)
@@ -70,9 +77,9 @@ export async function saveMergeWorldState(state: MergeWorldState): Promise<void>
          updated_at = excluded.updated_at,
          backup_json = merge_world_snapshot.state_json,
          state_json = excluded.state_json`,
-      [LOCAL_PROFILE_ID, state.version, state.revision, state.updatedAt, serialized, previous?.state_json ?? null],
+      [LOCAL_PROFILE_ID, state.version, state.revision, state.updatedAt, serialized, null],
     );
-    for (const receipt of state.externalRewardReceipts) {
+    for (const receipt of selectedReceipts) {
       await db.runAsync(
         `INSERT OR IGNORE INTO merge_world_outbox (receipt_id, receipt_kind, created_at, payload_json, synced_at)
          VALUES (?, ?, ?, ?, ?)`,

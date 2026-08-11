@@ -1,15 +1,20 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { scheduleOnUI } from 'react-native-worklets';
 import Animated, {
+  cancelAnimation,
   Easing,
   interpolate,
   runOnJS,
+  useAnimatedReaction,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withDelay,
   withSpring,
   withTiming,
   type SharedValue,
@@ -19,11 +24,11 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { FeastleMergeCelebration, FeastleMergeItemArt } from '@/components/katchadeck/world/quests/feastle-merge-primitives';
 import { FEASTLE_MERGE_ART } from '@/constants/feastle-merge-art';
-import { MERGE_GENERATORS_BY_ID, MERGE_ITEMS_BY_ID, MERGE_WORLD_COLUMNS, MERGE_WORLD_ROWS } from '@/constants/merge-world-catalog';
-import { useMergeMotionPerformanceProbe } from '@/hooks/use-merge-motion-performance-probe';
+import { mergeWorldItemArt } from '@/constants/merge-world-art';
+import { MERGE_GENERATORS_BY_ID, MERGE_HYBRID_RECIPES, MERGE_ITEMS_BY_ID, MERGE_WORLD_COLUMNS, MERGE_WORLD_ROWS } from '@/constants/merge-world-catalog';
+import { useMergeMotionPerformanceProbe, type MergeMotionPerformanceSample } from '@/hooks/use-merge-motion-performance-probe';
 import type { MergeBoardOccupant, MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, type MergeBoardGeometry } from '@/utils/merge-world/board-geometry';
-import { reduceMergeWorld } from '@/utils/merge-world/engine';
 
 type SpriteRecord = { occupant: MergeBoardOccupant; cell: number };
 type MotionKind = 'move' | 'swap' | 'return' | 'spawn' | 'merge-source' | 'merge-target' | 'merge-result';
@@ -45,6 +50,13 @@ type ActiveOperation = {
 const FOOD_ART = ['wheat', 'flour', 'dough', 'noodles', 'pasta', 'cake'];
 const MOVE_SPRING = { damping: 32, stiffness: 360, mass: 0.78, overshootClamping: true } as const;
 const SWAP_SPRING = { damping: 30, stiffness: 300, mass: 0.9, overshootClamping: true } as const;
+// A finger rarely lands and lifts on the exact same pixel. Keep visual movement
+// immediate, but classify short jitter as a tap so generators remain responsive.
+const BOARD_TAP_SLOP = 9;
+const MERGE_RESULT_BY_PAIR = Object.fromEntries([
+  ...[...MERGE_ITEMS_BY_ID.values()].filter((item) => item.nextItemId).map((item) => [[item.id, item.id].sort().join('+'), item.nextItemId!]),
+  ...MERGE_HYBRID_RECIPES.entries(),
+]);
 
 function spritesFromState(state: MergeWorldState): SpriteRecord[] {
   return state.board.flatMap((cell, index) => cell.occupant ? [{ occupant: cell.occupant, cell: index }] : []);
@@ -54,13 +66,29 @@ function spriteId(sprite: SpriteRecord) {
   return sprite.occupant.kind === 'item' ? sprite.occupant.instanceId : `generator:${sprite.occupant.generatorId}`;
 }
 
-export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand }: {
+function occupancyIdsFromState(state: MergeWorldState) {
+  return state.board.map((cell) => {
+    const occupant = cell.occupant;
+    return occupant?.kind === 'item' ? occupant.instanceId : occupant?.kind === 'generator' ? `generator:${occupant.generatorId}` : '';
+  });
+}
+
+function occupancyDefinitionsFromState(state: MergeWorldState) {
+  return state.board.map((cell) => cell.occupant?.kind === 'item' ? cell.occupant.definitionId : '');
+}
+
+function isInterruptibleMotion(motion?: SpriteMotion) {
+  return motion == null || motion.kind === 'move' || motion.kind === 'swap' || motion.kind === 'return' || motion.kind === 'spawn' || motion.kind === 'merge-result';
+}
+
+export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, effectsPaused: providedEffectsPaused }: {
   state: MergeWorldState;
   width: number;
   maxHeight?: number;
   selectedCell: number | null;
   onSelect: (cell: number | null) => void;
-  onCommand: (command: MergeWorldCommand) => Promise<MergeWorldCommandResult | null>;
+  onCommand: (command: MergeWorldCommand) => MergeWorldCommandResult | null;
+  effectsPaused?: SharedValue<number>;
 }) {
   const gap = width < 380 ? 3 : 4;
   const padding = width < 380 ? 5 : 7;
@@ -76,15 +104,41 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   const geometry = useMemo<MergeBoardGeometry>(() => ({ columns: MERGE_WORLD_COLUMNS, rows: MERGE_WORLD_ROWS, cellSize, gap, inset }), [cellSize, gap, inset]);
   const reduceMotion = useReducedMotion();
   const hoverCell = useSharedValue(-1);
+  const occupancyIds = useSharedValue(occupancyIdsFromState(state));
+  const occupancyDefinitions = useSharedValue(occupancyDefinitionsFromState(state));
+  const activeDragId = useSharedValue('');
+  const activeSourceCell = useSharedValue(-1);
+  const dragEpoch = useSharedValue(0);
+  const dragPhase = useSharedValue(0); // 0 idle, 1 dragging, 2 released/cancelled
+  const dragTranslationX = useSharedValue(0);
+  const dragTranslationY = useSharedValue(0);
+  const grabX = useSharedValue(0);
+  const grabY = useSharedValue(0);
+  const touchDownX = useSharedValue(0);
+  const touchDownY = useSharedValue(0);
+  const gestureFinished = useSharedValue(false);
+  const maxGestureDistance = useSharedValue(0);
   const motionActive = useSharedValue(0);
-  useMergeMotionPerformanceProbe(motionActive);
+  const localEffectsPaused = useSharedValue(0);
+  const effectsPaused = providedEffectsPaused ?? localEffectsPaused;
+  const slowOperationCount = useRef(0);
+  const [reducedFx, setReducedFx] = useState(false);
+  const recordMotionSample = useCallback((sample: MergeMotionPerformanceSample) => {
+    if (sample.longestFrameMs <= 34 || reducedFx) return;
+    slowOperationCount.current += 1;
+    if (slowOperationCount.current < 2) return;
+    setReducedFx(true);
+    cancelAnimation(effectsPaused);
+    effectsPaused.value = 1;
+  }, [effectsPaused, reducedFx]);
+  useMergeMotionPerformanceProbe(motionActive, recordMotionSample);
   const [presentation, setPresentation] = useState(state);
   const presentationRef = useRef(presentation);
   const [sprites, setSprites] = useState(() => spritesFromState(state));
   const spritesRef = useRef(sprites);
   const [motions, setMotions] = useState<Record<string, SpriteMotion>>({});
+  const motionsRef = useRef(motions);
   const [busy, setBusy] = useState(false);
-  const [blocking, setBlocking] = useState(false);
   const [invalidCell, setInvalidCell] = useState<number | null>(null);
   const [feedbackCell, setFeedbackCell] = useState<number | null>(null);
   const [spawnBursts, setSpawnBursts] = useState<{ id: number; cell: number }[]>([]);
@@ -93,38 +147,64 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   const burstSequence = useRef(0);
   const activeOperations = useRef(new Map<number, ActiveOperation>());
   const committedStateRef = useRef(state);
+  const onSelectRef = useRef(onSelect);
+  const selectedCellRef = useRef(selectedCell);
+  const launchGeneratorRef = useRef<(generatorId: string) => void>(() => undefined);
+  const dropRef = useRef<(instanceId: string, dx: number, dy: number) => void>(() => undefined);
+  const boardDropRef = useRef<(instanceId: string, worldX: number, worldY: number, epoch: number) => void>(() => undefined);
+  const boardTapRef = useRef<(instanceId: string, worldX: number, worldY: number, epoch: number) => void>(() => undefined);
+  const boardCancelRef = useRef<(instanceId: string, worldX: number, worldY: number, epoch: number) => void>(() => undefined);
 
   presentationRef.current = presentation;
   spritesRef.current = sprites;
+  motionsRef.current = motions;
+  onSelectRef.current = onSelect;
+  selectedCellRef.current = selectedCell;
 
   useEffect(() => {
+    if (state.revision < committedStateRef.current.revision) return;
     committedStateRef.current = state;
+    occupancyIds.value = occupancyIdsFromState(state);
+    occupancyDefinitions.value = occupancyDefinitionsFromState(state);
     if (activeOperations.current.size) return;
     presentationRef.current = state;
     setPresentation(state);
     const nextSprites = spritesFromState(state);
     spritesRef.current = nextSprites;
     setSprites(nextSprites);
-  }, [state]);
+  }, [occupancyDefinitions, occupancyIds, state]);
 
   const finishOperationIfReady = useCallback((operationId: number) => {
     const operation = activeOperations.current.get(operationId);
     if (!operation || operation.remaining.size || operation.finalState === undefined) return;
+    if (operation.finalState && operation.finalState.revision >= committedStateRef.current.revision) {
+      committedStateRef.current = operation.finalState;
+    }
     activeOperations.current.delete(operationId);
-    setMotions((current) => Object.fromEntries(Object.entries(current).filter(([, motion]) => motion.operationId !== operationId)));
-    const hasOperations = activeOperations.current.size > 0;
-    setBusy(hasOperations);
-    setBlocking([...activeOperations.current.values()].some((entry) => entry.kind === 'board'));
-    if (hasOperations) return;
-    const finalState = operation.finalState ?? committedStateRef.current;
-    committedStateRef.current = finalState;
+    const remainingMotions = Object.fromEntries(Object.entries(motionsRef.current).filter(([, motion]) => motion.operationId !== operationId));
+    motionsRef.current = remainingMotions;
+    setMotions(remainingMotions);
+    const finalState = committedStateRef.current;
+    const canonicalSprites = spritesFromState(finalState);
+    const canonicalIds = new Set(canonicalSprites.map(spriteId));
+    // A merge temporarily keeps its consumed sprites mounted so they can fade
+    // out. Remove those ghosts as soon as their own operation completes, while
+    // retaining ghosts that still belong to another concurrent animation.
+    const activeGhosts = spritesRef.current.filter((sprite) => {
+      const id = spriteId(sprite);
+      return !canonicalIds.has(id) && remainingMotions[id] !== undefined;
+    });
+    const reconciledSprites = [...canonicalSprites, ...activeGhosts];
     presentationRef.current = finalState;
     setPresentation(finalState);
-    const nextSprites = spritesFromState(finalState);
-    spritesRef.current = nextSprites;
-    setSprites(nextSprites);
+    spritesRef.current = reconciledSprites;
+    setSprites(reconciledSprites);
+    const hasOperations = activeOperations.current.size > 0;
+    setBusy(hasOperations);
+    if (hasOperations) return;
     motionActive.value = 0;
-  }, [motionActive]);
+    if (!reducedFx) effectsPaused.value = withDelay(500, withTiming(0, { duration: 1 }));
+  }, [effectsPaused, motionActive, reducedFx]);
 
   const completeMotion = useCallback((operationId: number, instanceId: string) => {
     const operation = activeOperations.current.get(operationId);
@@ -133,17 +213,25 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     finishOperationIfReady(operationId);
   }, [finishOperationIfReady]);
 
+  const detachMotion = useCallback((instanceId: string) => {
+    const motion = motionsRef.current[instanceId];
+    if (!motion || !isInterruptibleMotion(motion)) return null;
+    const operation = activeOperations.current.get(motion.operationId);
+    operation?.remaining.delete(instanceId);
+    const { [instanceId]: _detached, ...remainingMotions } = motionsRef.current;
+    motionsRef.current = remainingMotions;
+    return motion.operationId;
+  }, []);
+
   const beginOperation = useCallback(({
     nextState,
     nextSprites,
     nextMotions,
-    command,
     kind = 'board',
   }: {
     nextState: MergeWorldState;
     nextSprites: SpriteRecord[];
     nextMotions: Record<string, Omit<SpriteMotion, 'operationId' | 'token'>>;
-    command?: MergeWorldCommand;
     kind?: ActiveOperation['kind'];
   }) => {
     const operationId = ++operationSequence.current;
@@ -152,24 +240,22 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       operationId,
       token: ++motionSequence.current,
     }]));
-    activeOperations.current.set(operationId, { id: operationId, kind, remaining: new Set(Object.keys(boundMotions)), finalState: command ? undefined : nextState });
+    activeOperations.current.set(operationId, { id: operationId, kind, remaining: new Set(Object.keys(boundMotions)), finalState: nextState });
+    if (nextState.revision >= committedStateRef.current.revision) committedStateRef.current = nextState;
+    occupancyIds.value = occupancyIdsFromState(nextState);
+    occupancyDefinitions.value = occupancyDefinitionsFromState(nextState);
     presentationRef.current = nextState;
     setPresentation(nextState);
     spritesRef.current = nextSprites;
     setSprites(nextSprites);
-    setMotions((current) => ({ ...current, ...boundMotions }));
+    const combinedMotions = { ...motionsRef.current, ...boundMotions };
+    motionsRef.current = combinedMotions;
+    setMotions(combinedMotions);
     setBusy(true);
-    if (kind === 'board') setBlocking(true);
     motionActive.value = 1;
-    if (!command) return;
-    void onCommand(command).then((result) => {
-      const operation = activeOperations.current.get(operationId);
-      if (!operation) return;
-      operation.finalState = result?.state ?? null;
-      if (result?.state) committedStateRef.current = result.state;
-      finishOperationIfReady(operationId);
-    });
-  }, [finishOperationIfReady, motionActive, onCommand]);
+    cancelAnimation(effectsPaused);
+    effectsPaused.value = 1;
+  }, [effectsPaused, motionActive, occupancyDefinitions, occupancyIds]);
 
   const returnSpriteHome = useCallback((sprite: SpriteRecord, dx: number, dy: number, invalid?: number) => {
     if (invalid != null) {
@@ -180,40 +266,63 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     const origin = mergeCellOrigin(geometry, sprite.cell);
     beginOperation({
       nextState: presentationRef.current,
-      nextSprites: sprites,
+      nextSprites: spritesRef.current,
       nextMotions: { [spriteId(sprite)]: { kind: 'return', startX: origin.x + dx, startY: origin.y + dy } },
     });
-  }, [beginOperation, geometry, sprites]);
+  }, [beginOperation, geometry]);
 
   const drop = useCallback((instanceId: string, dx: number, dy: number) => {
-    if (activeOperations.current.size) return;
     const current = presentationRef.current;
     const currentSprites = spritesRef.current;
     const sprite = currentSprites.find((entry) => spriteId(entry) === instanceId);
     if (!sprite) return;
+    const activeMotion = motionsRef.current[instanceId];
+    if (!isInterruptibleMotion(activeMotion)) return;
+    const interruptedOperationIds = new Set<number>();
+    const interruptedOperationId = activeMotion ? detachMotion(instanceId) : null;
+    if (interruptedOperationId != null) interruptedOperationIds.add(interruptedOperationId);
+    const finishInterruptedOperation = () => {
+      interruptedOperationIds.forEach(finishOperationIfReady);
+    };
+    const returnHome = (invalid?: number) => {
+      returnSpriteHome(sprite, dx, dy, invalid);
+      finishInterruptedOperation();
+    };
     const sourceCenter = mergeCellCenter(geometry, sprite.cell);
     const to = mergeCellFromPoint(geometry, sourceCenter.x + dx, sourceCenter.y + dy);
     if (to == null || to === sprite.cell) {
-      returnSpriteHome(sprite, dx, dy);
+      returnHome();
       return;
     }
     const targetCell = current.board[to];
     if (!targetCell || targetCell.locked) {
-      returnSpriteHome(sprite, dx, dy, to);
+      returnHome(to);
       return;
+    }
+    const target = currentSprites.find((entry) => entry.cell === to);
+    if (target) {
+      const targetId = spriteId(target);
+      const targetMotion = motionsRef.current[targetId];
+      if (targetMotion && !isInterruptibleMotion(targetMotion)) {
+        returnHome();
+        return;
+      }
+      const targetOperationId = targetMotion ? detachMotion(targetId) : null;
+      if (targetOperationId != null) interruptedOperationIds.add(targetOperationId);
     }
 
     const command: MergeWorldCommand = { type: 'move', from: sprite.cell, to, now: Date.now() };
-    const predicted = reduceMergeWorld(current, command);
+    const predicted = onCommand(command);
+    if (!predicted) returnHome();
+    if (!predicted) return;
     if (!predicted.changed) {
-      returnSpriteHome(sprite, dx, dy, to);
+      returnHome(to);
       return;
     }
 
     const from = sprite.cell;
     const sourceOrigin = mergeCellOrigin(geometry, from);
     const targetOrigin = mergeCellOrigin(geometry, to);
-    const target = currentSprites.find((entry) => entry.cell === to);
     const resultingItem = predicted.state.board[to]?.occupant;
     const merging = sprite.occupant.kind === 'item'
       && target?.occupant.kind === 'item'
@@ -244,21 +353,22 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     hoverCell.value = -1;
     onSelect(null);
     if (merging && process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    beginOperation({ nextState: predicted.state, nextSprites, nextMotions, command });
-  }, [beginOperation, geometry, hoverCell, onSelect, returnSpriteHome]);
+    beginOperation({ nextState: predicted.state, nextSprites, nextMotions });
+    finishInterruptedOperation();
+  }, [beginOperation, detachMotion, finishOperationIfReady, geometry, hoverCell, onCommand, onSelect, returnSpriteHome]);
+  dropRef.current = drop;
 
   const launchGenerator = useCallback((generatorId: string) => {
-    if ([...activeOperations.current.values()].some((operation) => operation.kind === 'board')) return;
     const current = presentationRef.current;
     const currentSprites = spritesRef.current;
     const from = current.board.findIndex((cell) => cell.occupant?.kind === 'generator' && cell.occupant.generatorId === generatorId);
     const now = Date.now();
     const command: MergeWorldCommand = { type: 'tapGenerator', generatorId, now, seed: `${now}:${current.revision}:${generatorId}` };
-    const predicted = reduceMergeWorld(current, command);
+    const predicted = onCommand(command);
+    if (!predicted) return;
     const to = predicted.spawnedCell;
     const spawned = to == null ? null : predicted.state.board[to]?.occupant;
     if (!predicted.changed || from < 0 || to == null || spawned?.kind !== 'item') {
-      void onCommand(command);
       return;
     }
     const start = mergeCellOrigin(geometry, from);
@@ -267,47 +377,229 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     const nextSprite: SpriteRecord = { occupant: spawned, cell: to };
     if (!reduceMotion) {
       const burst = { id: ++burstSequence.current, cell: from };
-      setSpawnBursts((bursts) => [...bursts, burst]);
-      setTimeout(() => setSpawnBursts((bursts) => bursts.filter((entry) => entry.id !== burst.id)), 480);
+      const burstLimit = reducedFx ? 3 : 6;
+      setSpawnBursts((bursts) => [...bursts.slice(-(burstLimit - 1)), burst]);
+      setTimeout(() => setSpawnBursts((bursts) => bursts.some((entry) => entry.id === burst.id)
+        ? bursts.filter((entry) => entry.id !== burst.id)
+        : bursts), 480);
     }
     beginOperation({
       nextState: predicted.state,
       nextSprites: [...currentSprites, nextSprite],
       nextMotions: { [spawned.instanceId]: { kind: 'spawn', startX: start.x, startY: start.y, arcHeight: Math.max(cellSize * 1.15, Math.min(cellSize * 2.1, distance * 0.22)) } },
-      command,
       kind: 'spawn',
     });
     onSelect(null);
     if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, [beginOperation, cellSize, geometry, onCommand, onSelect, reduceMotion]);
+  }, [beginOperation, cellSize, geometry, onCommand, onSelect, reduceMotion, reducedFx]);
+  launchGeneratorRef.current = launchGenerator;
+
+  const pickSprite = useCallback((_instanceId: string) => {
+    if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+  }, []);
+
+  const tapSprite = useCallback((instanceId: string) => {
+    const sprite = spritesRef.current.find((entry) => spriteId(entry) === instanceId);
+    if (!sprite) return;
+    if (sprite.occupant.kind === 'generator') launchGeneratorRef.current(sprite.occupant.generatorId);
+    else onSelectRef.current(sprite.cell);
+  }, []);
+
+  const releaseBoardOwnership = useCallback((epoch: number) => {
+    scheduleOnUI(() => {
+      'worklet';
+      if (dragEpoch.value !== epoch) return;
+      activeDragId.value = '';
+      activeSourceCell.value = -1;
+      dragPhase.value = 0;
+      dragTranslationX.value = 0;
+      dragTranslationY.value = 0;
+    });
+  }, [activeDragId, activeSourceCell, dragEpoch, dragPhase, dragTranslationX, dragTranslationY]);
+
+  const dropFromBoard = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number) => {
+    const sprite = spritesRef.current.find((entry) => spriteId(entry) === instanceId);
+    if (sprite) {
+      const origin = mergeCellOrigin(geometry, sprite.cell);
+      dropRef.current(instanceId, worldX - origin.x, worldY - origin.y);
+    }
+    releaseBoardOwnership(epoch);
+  }, [geometry, releaseBoardOwnership]);
+
+  const settleInterruptedSprite = useCallback((instanceId: string, worldX: number, worldY: number, always: boolean) => {
+    const sprite = spritesRef.current.find((entry) => spriteId(entry) === instanceId);
+    if (!sprite) return;
+    const activeMotion = motionsRef.current[instanceId];
+    if (!activeMotion && !always) return;
+    const interruptedOperationId = activeMotion && isInterruptibleMotion(activeMotion) ? detachMotion(instanceId) : null;
+    const origin = mergeCellOrigin(geometry, sprite.cell);
+    returnSpriteHome(sprite, worldX - origin.x, worldY - origin.y);
+    if (interruptedOperationId != null) finishOperationIfReady(interruptedOperationId);
+  }, [detachMotion, finishOperationIfReady, geometry, returnSpriteHome]);
+
+  const tapFromBoard = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number) => {
+    settleInterruptedSprite(instanceId, worldX, worldY, false);
+    tapSprite(instanceId);
+    releaseBoardOwnership(epoch);
+  }, [releaseBoardOwnership, settleInterruptedSprite, tapSprite]);
+
+  const cancelFromBoard = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number) => {
+    settleInterruptedSprite(instanceId, worldX, worldY, true);
+    releaseBoardOwnership(epoch);
+  }, [releaseBoardOwnership, settleInterruptedSprite]);
+  boardDropRef.current = dropFromBoard;
+  boardTapRef.current = tapFromBoard;
+  boardCancelRef.current = cancelFromBoard;
+  const emitBoardDrop = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number) => boardDropRef.current(instanceId, worldX, worldY, epoch), []);
+  const emitBoardTap = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number) => boardTapRef.current(instanceId, worldX, worldY, epoch), []);
+  const emitBoardCancel = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number) => boardCancelRef.current(instanceId, worldX, worldY, epoch), []);
 
   const accessibleAction = useCallback((cell: number) => {
-    const occupant = presentation.board[cell]?.occupant;
-    if (busy && occupant?.kind !== 'generator') return;
+    const current = presentationRef.current;
+    const occupant = current.board[cell]?.occupant;
+    const occupantId = occupant?.kind === 'item' ? occupant.instanceId : occupant?.kind === 'generator' ? `generator:${occupant.generatorId}` : null;
+    if (occupantId && motionsRef.current[occupantId]) return;
     if (occupant?.kind === 'generator') {
-      launchGenerator(occupant.generatorId);
+      launchGeneratorRef.current(occupant.generatorId);
       return;
     }
+    const selectedCell = selectedCellRef.current;
     if (selectedCell == null) {
-      if (occupant?.kind === 'item') onSelect(cell);
+      if (occupant?.kind === 'item') onSelectRef.current(cell);
       return;
     }
-    if (selectedCell === cell) onSelect(null);
+    if (selectedCell === cell) onSelectRef.current(null);
     else {
-      const selected = sprites.find((entry) => entry.cell === selectedCell);
+      const selected = spritesRef.current.find((entry) => entry.cell === selectedCell);
       if (selected) {
         const from = mergeCellCenter(geometry, selected.cell);
         const to = mergeCellCenter(geometry, cell);
-        drop(spriteId(selected), to.x - from.x, to.y - from.y);
+        dropRef.current(spriteId(selected), to.x - from.x, to.y - from.y);
       }
     }
-  }, [busy, drop, geometry, launchGenerator, onSelect, presentation.board, selectedCell, sprites]);
+  }, [geometry]);
 
   const selectedDefinitionId = selectedCell == null || presentation.board[selectedCell]?.occupant?.kind !== 'item'
     ? null
     : presentation.board[selectedCell].occupant.definitionId;
 
-  return <View accessibilityLabel="Feastle merge board, seven columns by nine rows" style={[styles.board, busy && styles.boardAnimating, { height: boardHeight, padding, width: boardWidth }]}>
+  const boardGesture = useMemo(() => Gesture.Pan()
+    .maxPointers(1)
+    .minDistance(0)
+    .shouldCancelWhenOutside(false)
+    .onTouchesDown((event) => {
+      const touch = event.allTouches[0];
+      if (!touch) return;
+      const cell = mergeCellFromPointWorklet(touch.x, touch.y, geometry.cellSize, geometry.gap, geometry.inset, geometry.columns, geometry.rows);
+      const id = cell < 0 ? '' : occupancyIds.value[cell] ?? '';
+      touchDownX.value = touch.x;
+      touchDownY.value = touch.y;
+      activeDragId.value = id;
+      activeSourceCell.value = cell;
+      dragTranslationX.value = 0;
+      dragTranslationY.value = 0;
+      gestureFinished.value = false;
+      maxGestureDistance.value = 0;
+      if (!id) return;
+      const column = cell % geometry.columns;
+      const row = Math.floor(cell / geometry.columns);
+      const pitch = geometry.cellSize + geometry.gap;
+      grabX.value = geometry.inset + column * pitch;
+      grabY.value = geometry.inset + row * pitch;
+      dragEpoch.value += 1;
+      dragPhase.value = 1;
+      cancelAnimation(effectsPaused);
+      effectsPaused.value = 1;
+    })
+    .onStart(() => {
+      const id = activeDragId.value;
+      if (id) runOnJS(pickSprite)(id);
+    })
+    .onUpdate((event) => {
+      if (!activeDragId.value) return;
+      maxGestureDistance.value = Math.max(maxGestureDistance.value, Math.hypot(event.translationX, event.translationY));
+      dragTranslationX.value = event.translationX;
+      dragTranslationY.value = event.translationY;
+      hoverCell.value = mergeCellFromPointWorklet(
+        grabX.value + event.translationX + geometry.cellSize / 2,
+        grabY.value + event.translationY + geometry.cellSize / 2,
+        geometry.cellSize,
+        geometry.gap,
+        geometry.inset,
+        geometry.columns,
+        geometry.rows,
+      );
+    })
+    .onTouchesUp((event) => {
+      const id = activeDragId.value;
+      const touch = event.changedTouches[0];
+      if (!id || !touch || gestureFinished.value) return;
+      const dx = touch.x - touchDownX.value;
+      const dy = touch.y - touchDownY.value;
+      maxGestureDistance.value = Math.max(maxGestureDistance.value, Math.hypot(dx, dy));
+      if (maxGestureDistance.value > BOARD_TAP_SLOP) return;
+      // Pan may never become ACTIVE for a perfectly still press. Commit the tap
+      // from the raw touch-up lifecycle and guard onEnd so it cannot fire twice.
+      gestureFinished.value = true;
+      dragPhase.value = 2;
+      dragTranslationX.value = dx;
+      dragTranslationY.value = dy;
+      hoverCell.value = -1;
+      runOnJS(emitBoardTap)(id, grabX.value + dx, grabY.value + dy, dragEpoch.value);
+    })
+    .onEnd((event) => {
+      const id = activeDragId.value;
+      if (!id || gestureFinished.value) return;
+      gestureFinished.value = true;
+      dragPhase.value = 2;
+      dragTranslationX.value = event.translationX;
+      dragTranslationY.value = event.translationY;
+      hoverCell.value = -1;
+      const worldX = grabX.value + event.translationX;
+      const worldY = grabY.value + event.translationY;
+      const epoch = dragEpoch.value;
+      maxGestureDistance.value = Math.max(maxGestureDistance.value, Math.hypot(event.translationX, event.translationY));
+      if (maxGestureDistance.value <= BOARD_TAP_SLOP) {
+        runOnJS(emitBoardTap)(id, worldX, worldY, epoch);
+      } else {
+        const targetCell = mergeCellFromPointWorklet(worldX + geometry.cellSize / 2, worldY + geometry.cellSize / 2, geometry.cellSize, geometry.gap, geometry.inset, geometry.columns, geometry.rows);
+        const sourceCell = activeSourceCell.value;
+        if (sourceCell >= 0 && targetCell >= 0 && sourceCell !== targetCell) {
+          const ids = [...occupancyIds.value];
+          const definitions = [...occupancyDefinitions.value];
+          const targetId = ids[targetCell] ?? '';
+          const sourceDefinition = definitions[sourceCell] ?? '';
+          const targetDefinition = definitions[targetCell] ?? '';
+          const mergeKey = sourceDefinition && targetDefinition ? [sourceDefinition, targetDefinition].sort().join('+') : '';
+          if (!targetId) {
+            ids[sourceCell] = '';
+            ids[targetCell] = id;
+            definitions[sourceCell] = '';
+            definitions[targetCell] = sourceDefinition;
+          } else if (!MERGE_RESULT_BY_PAIR[mergeKey]) {
+            ids[sourceCell] = targetId;
+            ids[targetCell] = id;
+            definitions[sourceCell] = targetDefinition;
+            definitions[targetCell] = sourceDefinition;
+          }
+          occupancyIds.value = ids;
+          occupancyDefinitions.value = definitions;
+        }
+        runOnJS(emitBoardDrop)(id, worldX, worldY, epoch);
+      }
+    })
+    .onFinalize(() => {
+      hoverCell.value = -1;
+      const id = activeDragId.value;
+      if (id && !gestureFinished.value) {
+        dragPhase.value = 2;
+        runOnJS(emitBoardCancel)(id, grabX.value + dragTranslationX.value, grabY.value + dragTranslationY.value, dragEpoch.value);
+      }
+      if (!reducedFx) effectsPaused.value = withDelay(500, withTiming(0, { duration: 1 }));
+    }), [activeDragId, activeSourceCell, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, effectsPaused, emitBoardCancel, emitBoardDrop, emitBoardTap, geometry.cellSize, geometry.columns, geometry.gap, geometry.inset, geometry.rows, gestureFinished, grabX, grabY, hoverCell, maxGestureDistance, occupancyDefinitions, occupancyIds, pickSprite, reducedFx, touchDownX, touchDownY]);
+
+  return <GestureDetector gesture={boardGesture}><View accessibilityLabel="Feastle merge board, seven columns by nine rows" style={[styles.board, busy && styles.boardAnimating, { height: boardHeight, padding, width: boardWidth }]}>
+    <LinearGradient colors={['#34324F', '#1E1C34', '#11101F']} locations={[0, 0.48, 1]} pointerEvents="none" style={styles.boardGradient} />
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       {presentation.board.map((cell, index) => {
         const origin = mergeCellOrigin(geometry, index);
@@ -317,27 +609,28 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
         const definition = item ? MERGE_ITEMS_BY_ID.get(item.definitionId) : null;
         const compatible = Boolean(selectedDefinitionId && item && item.definitionId === selectedDefinitionId && selectedCell !== index);
         const label = generator ? `${generator.name}, ${presentation.generators[generator.id]?.charges ?? 0} charges. Tap to generate.` : definition ? `${definition.name}, tier ${definition.tier}` : cell.locked ? 'Blocked board space' : 'Empty board space';
-        return <AnimatedCell
+        return <BoardCell
+          accessibilityActionLabel={generator ? 'Generate item' : 'Select or move item'}
+          accessibilityLabel={label}
           blocked={cell.locked && !occupant}
           compatible={compatible}
+          feedback={!reduceMotion && feedbackCell === index}
           height={cellSize}
-          hoverCell={hoverCell}
           index={index}
           invalid={invalidCell === index}
           key={index}
+          leafSize={Math.max(15, cellSize * 0.38)}
           left={origin.x}
+          onActivate={accessibleAction}
           selected={selectedCell === index}
           top={origin.y}
-          width={cellSize}>
-          <Pressable accessible accessibilityActions={[{ name: 'activate', label: generator ? 'Generate item' : 'Select or move item' }]} accessibilityLabel={label} accessibilityRole="button" disabled={generator ? blocking : busy} onAccessibilityAction={() => accessibleAction(index)} onPress={generator ? () => launchGenerator(generator.id) : undefined} style={styles.cellPressable}>
-            {cell.locked && !occupant ? <IconSymbol color="rgba(255,241,218,0.22)" name="leaf.fill" size={Math.max(15, cellSize * 0.38)} /> : null}
-            {!reduceMotion && feedbackCell === index ? <FeastleMergeCelebration size={cellSize} /> : null}
-          </Pressable>
-        </AnimatedCell>;
+          width={cellSize}
+        />;
       })}
+      <HoverCellOverlay geometry={geometry} hoverCell={hoverCell} />
     </View>
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-      {spawnBursts.map((burst) => <SpawnParticleBurst key={burst.id} origin={mergeCellOrigin(geometry, burst.cell)} size={cellSize} />)}
+      {spawnBursts.map((burst) => <SpawnParticleBurst key={burst.id} origin={mergeCellOrigin(geometry, burst.cell)} reduced={reducedFx} size={cellSize} />)}
       {sprites.map((sprite) => {
         const origin = mergeCellOrigin(geometry, sprite.cell);
         const id = spriteId(sprite);
@@ -347,167 +640,226 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
           baseX={origin.x}
           baseY={origin.y}
           cellSize={cellSize}
-          enabled={!busy && !motions[id]}
-          geometry={geometry}
-          hoverCell={hoverCell}
+          activeDragId={activeDragId}
+          dragEpoch={dragEpoch}
+          dragPhase={dragPhase}
+          dragTranslationX={dragTranslationX}
+          dragTranslationY={dragTranslationY}
+          grabX={grabX}
+          grabY={grabY}
           instanceId={id}
           key={id}
           motion={motions[id]}
+          occupant={sprite.occupant}
           onComplete={completeMotion}
-          onDrop={drop}
-          onPick={() => { if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync(); }}
-          onTap={() => generatorId ? launchGenerator(generatorId) : onSelect(sprite.cell)}
           reduceMotion={reduceMotion}
-        >
-          {sprite.occupant.kind === 'generator'
-            ? <PersistentGeneratorArt charges={runtimeGenerator?.charges ?? 0} size={cellSize} />
-            : <PersistentMergeItemArt definitionId={sprite.occupant.definitionId} size={cellSize - 4} />}
-        </PersistentSprite>;
+          runtimeCharges={runtimeGenerator?.charges ?? 0}
+        />;
       })}
     </View>
-  </View>;
+  </View></GestureDetector>;
 }
 
-const AnimatedCell = memo(function AnimatedCell({ index, hoverCell, blocked, invalid, selected, compatible, left, top, width, height, children }: {
-  index: number;
-  hoverCell: SharedValue<number>;
+const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibilityLabel, blocked, invalid, selected, compatible, feedback, index, leafSize, left, top, width, height, onActivate }: {
+  accessibilityActionLabel: string;
+  accessibilityLabel: string;
   blocked: boolean;
   invalid: boolean;
   selected: boolean;
   compatible: boolean;
+  feedback: boolean;
+  index: number;
+  leafSize: number;
   left: number;
   top: number;
   width: number;
   height: number;
-  children: React.ReactNode;
+  onActivate: (cell: number) => void;
 }) {
-  const hoverStyle = useAnimatedStyle(() => ({
-    backgroundColor: hoverCell.value === index ? '#73615F' : blocked ? '#40333F' : compatible ? '#6A554C' : selected ? '#665465' : '#5A4656',
-    borderColor: hoverCell.value === index ? '#FFF0C3' : invalid ? '#F38A72' : compatible ? '#FFD681' : selected ? '#FFE09B' : blocked ? 'rgba(255,241,218,0.06)' : 'rgba(255,241,218,0.12)',
-  }), [blocked, compatible, index, invalid, selected]);
-  return <Animated.View style={[styles.cell, { height, left, top, width }, hoverStyle]}>{children}</Animated.View>;
+  return <View style={[styles.cell, {
+    backgroundColor: blocked ? '#171625' : compatible ? '#4D4A55' : selected ? '#4D4662' : '#29283F',
+    borderColor: invalid ? '#F38A72' : compatible ? '#FFD681' : selected ? '#FFE09B' : blocked ? 'rgba(255,241,218,0.045)' : 'rgba(235,226,255,0.11)',
+    height, left, top, width,
+  }]}>
+    <View
+      accessible
+      accessibilityActions={[{ name: 'activate', label: accessibilityActionLabel }]}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      onAccessibilityAction={() => onActivate(index)}
+      style={styles.cellPressable}>
+      {blocked ? <IconSymbol color="rgba(255,241,218,0.22)" name="leaf.fill" size={leafSize} /> : null}
+      {feedback ? <FeastleMergeCelebration size={height} /> : null}
+    </View>
+  </View>;
 });
 
-const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, baseY, cellSize, enabled, geometry, motion, hoverCell, reduceMotion, onDrop, onPick, onTap, onComplete, children }: {
+function HoverCellOverlay({ geometry, hoverCell }: { geometry: MergeBoardGeometry; hoverCell: SharedValue<number> }) {
+  const style = useAnimatedStyle(() => {
+    const index = hoverCell.value;
+    if (index < 0) return { opacity: 0, transform: [{ translateX: 0 }, { translateY: 0 }] };
+    const column = index % geometry.columns;
+    const row = Math.floor(index / geometry.columns);
+    const pitch = geometry.cellSize + geometry.gap;
+    return {
+      opacity: 1,
+      transform: [
+        { translateX: geometry.inset + column * pitch },
+        { translateY: geometry.inset + row * pitch },
+      ],
+    };
+  }, [geometry.cellSize, geometry.columns, geometry.gap, geometry.inset]);
+  return <Animated.View pointerEvents="none" style={[styles.hoverCell, { height: geometry.cellSize, width: geometry.cellSize }, style]} />;
+}
+
+const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, baseY, cellSize, activeDragId, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, grabX, grabY, motion, reduceMotion, onComplete, occupant, runtimeCharges }: {
   instanceId: string;
   baseX: number;
   baseY: number;
   cellSize: number;
-  enabled: boolean;
-  geometry: MergeBoardGeometry;
+  activeDragId: SharedValue<string>;
+  dragEpoch: SharedValue<number>;
+  dragPhase: SharedValue<number>;
+  dragTranslationX: SharedValue<number>;
+  dragTranslationY: SharedValue<number>;
+  grabX: SharedValue<number>;
+  grabY: SharedValue<number>;
   motion?: SpriteMotion;
-  hoverCell: SharedValue<number>;
   reduceMotion: boolean;
-  onDrop: (instanceId: string, dx: number, dy: number) => void;
-  onPick: () => void;
-  onTap: () => void;
   onComplete: (operationId: number, instanceId: string) => void;
-  children: React.ReactNode;
+  occupant: MergeBoardOccupant;
+  runtimeCharges: number;
 }) {
-  // World-space position is owned exclusively by Reanimated. React never
-  // changes the sprite's left/top anchor during a drop, so a native layout
-  // commit cannot race the release animation and expose a one-frame offset.
   const x = useSharedValue(baseX);
   const y = useSharedValue(baseY);
   const targetX = useSharedValue(baseX);
   const targetY = useSharedValue(baseY);
-  const dragStartX = useSharedValue(baseX);
-  const dragStartY = useSharedValue(baseY);
   const scale = useSharedValue(1);
+  const spriteOpacity = useSharedValue(1);
   const progress = useSharedValue(motion ? 0 : 1);
   const animating = useSharedValue(motion ? 1 : 0);
   const arcHeight = useSharedValue(0);
-  const gestureEnded = useSharedValue(false);
+  const activeMotionKind = useSharedValue<MotionKind | null>(motion?.kind ?? null);
+  const capturedDragEpoch = useSharedValue(-1);
   const previousMotionToken = useRef<number | null>(null);
+
+  useAnimatedReaction(
+    () => activeDragId.value === instanceId ? dragEpoch.value : -1,
+    (epoch) => {
+      if (epoch < 0 || capturedDragEpoch.value === epoch) return;
+      const p = progress.value;
+      const wasAnimating = animating.value === 1;
+      const kind = activeMotionKind.value;
+      const arc = wasAnimating && kind === 'spawn' ? -arcHeight.value * 4 * p * (1 - p) : 0;
+      const currentX = wasAnimating ? x.value + (targetX.value - x.value) * p : x.value;
+      const currentY = (wasAnimating ? y.value + (targetY.value - y.value) * p : y.value) + arc;
+      let currentOpacity = spriteOpacity.value;
+      let currentScale = scale.value;
+      if (wasAnimating && (kind === 'merge-result' || kind === 'spawn')) currentOpacity = p;
+      if (wasAnimating && kind === 'spawn') currentScale = interpolate(p, [0, 0.28, 0.76, 1], [0.52, 1.18, 1.04, 1]);
+      else if (wasAnimating && kind === 'merge-result') currentScale = 0.78 + p * 0.22;
+      cancelAnimation(progress);
+      x.value = currentX;
+      y.value = currentY;
+      animating.value = 0;
+      spriteOpacity.value = currentOpacity;
+      scale.value = currentScale;
+      grabX.value = currentX;
+      grabY.value = currentY;
+      capturedDragEpoch.value = epoch;
+      spriteOpacity.value = withTiming(1, { duration: 70 });
+      scale.value = withSpring(1.035, { damping: 34, stiffness: 420, mass: 0.7 });
+    },
+    [instanceId],
+  );
+
+  useAnimatedReaction(
+    () => activeDragId.value === instanceId ? dragPhase.value : 0,
+    (phase, previousPhase) => {
+      if (phase !== 2 || previousPhase === 2) return;
+      x.value = grabX.value + dragTranslationX.value;
+      y.value = grabY.value + dragTranslationY.value;
+      animating.value = 0;
+      scale.value = withTiming(1, { duration: 80 });
+    },
+    [instanceId],
+  );
 
   useLayoutEffect(() => {
     if (!motion || previousMotionToken.current === motion.token) return;
     previousMotionToken.current = motion.token;
-    x.value = motion.startX;
-    y.value = motion.startY;
-    targetX.value = baseX;
-    targetY.value = baseY;
-    arcHeight.value = motion.arcHeight ?? 0;
-    progress.value = 0;
-    animating.value = 1;
-    scale.value = 1;
-    const finish = () => {
+    scheduleOnUI(() => {
       'worklet';
-      x.value = targetX.value;
-      y.value = targetY.value;
-      animating.value = 0;
-      runOnJS(onComplete)(motion.operationId, instanceId);
-    };
-    if (reduceMotion) {
-      progress.value = withTiming(1, { duration: 1 }, finish);
-    } else if (motion.kind === 'spawn' || motion.kind.startsWith('merge-')) {
-      progress.value = withTiming(1, { duration: motion.kind === 'spawn' ? 280 : 220, easing: Easing.out(Easing.cubic) }, finish);
-    } else {
-      progress.value = withSpring(1, motion.kind === 'swap' ? SWAP_SPRING : MOVE_SPRING, finish);
-    }
-  }, [animating, arcHeight, baseX, baseY, instanceId, motion, onComplete, progress, reduceMotion, scale, targetX, targetY, x, y]);
+      // A newer finger always wins. A React commit from the previous drop may
+      // arrive after the next pan has already started; never let that stale
+      // settle setup overwrite coordinates currently owned by the gesture.
+      if (activeDragId.value === instanceId && dragPhase.value !== 0) return;
+      activeMotionKind.value = motion.kind;
+      x.value = motion.startX;
+      y.value = motion.startY;
+      targetX.value = baseX;
+      targetY.value = baseY;
+      arcHeight.value = motion.arcHeight ?? 0;
+      progress.value = 0;
+      animating.value = 1;
+      spriteOpacity.value = 1;
+      scale.value = 1;
+      const finish = (finished?: boolean) => {
+        'worklet';
+        if (!finished) return;
+        x.value = targetX.value;
+        y.value = targetY.value;
+        // Keep the terminal animated state until React removes the motion prop.
+        // In particular, merge sources must remain at opacity 0; clearing this
+        // flag here made the consumed artwork flash fully opaque for one frame.
+        runOnJS(onComplete)(motion.operationId, instanceId);
+      };
+      if (reduceMotion) {
+        progress.value = withTiming(1, { duration: 1 }, finish);
+      } else if (motion.kind === 'spawn' || motion.kind.startsWith('merge-')) {
+        progress.value = withTiming(1, { duration: motion.kind === 'spawn' ? 280 : 220, easing: Easing.out(Easing.cubic) }, finish);
+      } else {
+        progress.value = withSpring(1, motion.kind === 'swap' ? SWAP_SPRING : MOVE_SPRING, finish);
+      }
+    });
+  }, [activeDragId, activeMotionKind, animating, arcHeight, baseX, baseY, dragPhase, instanceId, motion, onComplete, progress, reduceMotion, scale, spriteOpacity, targetX, targetY, x, y]);
 
   useLayoutEffect(() => {
     if (motion) return;
-    x.value = baseX;
-    y.value = baseY;
-    targetX.value = baseX;
-    targetY.value = baseY;
-    animating.value = 0;
-  }, [animating, baseX, baseY, motion, targetX, targetY, x, y]);
-
-  const panGesture = useMemo(() => Gesture.Pan().enabled(enabled).minDistance(2).averageTouches(true)
-    .onBegin(() => {
-      gestureEnded.value = false;
-      progress.value = 1;
-      dragStartX.value = x.value;
-      dragStartY.value = y.value;
-      scale.value = withSpring(1.035, { damping: 34, stiffness: 420, mass: 0.7 });
-      runOnJS(onPick)();
-    })
-    .onUpdate((event) => {
-      x.value = dragStartX.value + event.translationX;
-      y.value = dragStartY.value + event.translationY;
-      const target = mergeCellFromPointWorklet(x.value + cellSize / 2, y.value + cellSize / 2, geometry.cellSize, geometry.gap, geometry.inset, geometry.columns, geometry.rows);
-      hoverCell.value = target;
-    })
-    .onEnd((event) => {
-      gestureEnded.value = true;
-      hoverCell.value = -1;
-      scale.value = withTiming(1, { duration: 80 });
-      runOnJS(onDrop)(instanceId, event.translationX, event.translationY);
-    })
-    .onFinalize(() => {
-      hoverCell.value = -1;
-      if (!gestureEnded.value) {
-        x.value = withSpring(dragStartX.value, MOVE_SPRING);
-        y.value = withSpring(dragStartY.value, MOVE_SPRING);
-        scale.value = withTiming(1, { duration: 80 });
-      }
-    }), [cellSize, dragStartX, dragStartY, enabled, geometry.cellSize, geometry.columns, geometry.gap, geometry.inset, geometry.rows, gestureEnded, hoverCell, instanceId, onDrop, onPick, progress, scale, x, y]);
-
-  const tapGesture = useMemo(() => Gesture.Tap().enabled(enabled).onEnd(() => runOnJS(onTap)()), [enabled, onTap]);
-  const gesture = useMemo(() => Gesture.Exclusive(panGesture, tapGesture), [panGesture, tapGesture]);
+    scheduleOnUI(() => {
+      'worklet';
+      if (activeDragId.value === instanceId && dragPhase.value !== 0) return;
+      activeMotionKind.value = null;
+      x.value = baseX;
+      y.value = baseY;
+      targetX.value = baseX;
+      targetY.value = baseY;
+      animating.value = 0;
+      spriteOpacity.value = 1;
+    });
+  }, [activeDragId, activeMotionKind, animating, baseX, baseY, dragPhase, instanceId, motion, spriteOpacity, targetX, targetY, x, y]);
 
   const animatedStyle = useAnimatedStyle(() => {
     const p = progress.value;
     const moving = animating.value === 1;
-    const arc = moving && motion?.kind === 'spawn' ? -arcHeight.value * 4 * p * (1 - p) : 0;
-    const mergeSource = motion?.kind === 'merge-source';
-    const mergeTarget = motion?.kind === 'merge-target';
-    const mergeResult = motion?.kind === 'merge-result';
-    const worldX = moving ? x.value + (targetX.value - x.value) * p : x.value;
-    const worldY = moving ? y.value + (targetY.value - y.value) * p : y.value;
-    let opacity = 1;
+    const dragging = activeDragId.value === instanceId && dragPhase.value !== 0;
+    const motionKind = activeMotionKind.value;
+    const arc = moving && motionKind === 'spawn' ? -arcHeight.value * 4 * p * (1 - p) : 0;
+    const mergeSource = motionKind === 'merge-source';
+    const mergeTarget = motionKind === 'merge-target';
+    const mergeResult = motionKind === 'merge-result';
+    const worldX = dragging ? grabX.value + dragTranslationX.value : moving ? x.value + (targetX.value - x.value) * p : x.value;
+    const worldY = dragging ? grabY.value + dragTranslationY.value : moving ? y.value + (targetY.value - y.value) * p : y.value;
+    let opacity = spriteOpacity.value;
     if (moving && (mergeSource || mergeTarget)) opacity = 1 - p;
-    else if (moving && (mergeResult || motion?.kind === 'spawn')) opacity = p;
+    else if (moving && (mergeResult || motionKind === 'spawn')) opacity = p;
     return {
       opacity,
-      zIndex: moving || scale.value > 1.001 ? 1000 : 10,
+      zIndex: dragging || moving || scale.value > 1.001 ? 1000 : 10,
       transform: [
         { translateX: worldX },
         { translateY: worldY + arc },
-        { scale: moving && motion?.kind === 'spawn'
+        { scale: moving && motionKind === 'spawn'
           ? interpolate(p, [0, 0.28, 0.76, 1], [0.52, 1.18, 1.04, 1])
           : moving && mergeSource ? 1 - p * 0.14
             : moving && mergeTarget ? 1 - p * 0.08
@@ -515,18 +867,18 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
                 : scale.value },
       ],
     };
-  }, [animating, motion?.kind, targetX, targetY]);
+  }, [activeDragId, activeMotionKind, animating, dragPhase, dragTranslationX, dragTranslationY, grabX, grabY, instanceId, spriteOpacity, targetX, targetY]);
 
-  return <GestureDetector gesture={gesture}>
-    <Animated.View pointerEvents={enabled ? 'auto' : 'none'} renderToHardwareTextureAndroid shouldRasterizeIOS style={[styles.sprite, { height: cellSize, left: 0, top: 0, width: cellSize }, animatedStyle]}>
-      {children}
-    </Animated.View>
-  </GestureDetector>;
+  return <Animated.View pointerEvents="none" style={[styles.sprite, { height: cellSize, left: 0, top: 0, width: cellSize }, animatedStyle]}>
+      {occupant.kind === 'generator'
+        ? <PersistentGeneratorArt charges={runtimeCharges} size={cellSize} />
+        : <PersistentMergeItemArt definitionId={occupant.definitionId} size={cellSize - 4} />}
+    </Animated.View>;
 });
 
 function PersistentGeneratorArt({ charges, size }: { charges: number; size: number }) {
   return <View style={[styles.generatorSprite, { height: size, width: size }]}>
-    <Image accessibilityIgnoresInvertColors contentFit="contain" source={FEASTLE_MERGE_ART.pantry} style={styles.generatorArt} />
+    <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey="merge-generator-pantry" source={FEASTLE_MERGE_ART.pantry} style={styles.generatorArt} transition={0} />
     <View style={styles.generatorCharge}>
       <IconSymbol color="#FFF4D5" name={charges ? 'bolt.fill' : 'clock'} size={9} />
       <ThemedText darkColor="#FFF4D5" style={styles.generatorChargeText}>{charges}</ThemedText>
@@ -534,7 +886,7 @@ function PersistentGeneratorArt({ charges, size }: { charges: number; size: numb
   </View>;
 }
 
-function SpawnParticleBurst({ origin, size }: { origin: { x: number; y: number }; size: number }) {
+function SpawnParticleBurst({ origin, reduced, size }: { origin: { x: number; y: number }; reduced: boolean; size: number }) {
   const progress = useSharedValue(0);
   useEffect(() => {
     progress.value = withTiming(1, { duration: 450, easing: Easing.out(Easing.cubic) });
@@ -545,7 +897,7 @@ function SpawnParticleBurst({ origin, size }: { origin: { x: number; y: number }
   }));
   return <View pointerEvents="none" style={[styles.spawnBurst, { height: size, left: origin.x, top: origin.y, width: size }]}>
     <Animated.View style={[styles.spawnHalo, { height: size * 0.78, width: size * 0.78 }, haloStyle]} />
-    {SPAWN_PARTICLES.map((particle, index) => <SpawnParticle index={index} key={index} particle={particle} progress={progress} size={size} />)}
+    {SPAWN_PARTICLES.slice(0, reduced ? 4 : 8).map((particle, index) => <SpawnParticle index={index} key={index} particle={particle} progress={progress} size={size} />)}
   </View>;
 }
 
@@ -595,18 +947,22 @@ export function PersistentMergeItemArt({ definitionId, size }: { definitionId: s
   if (!definition) return null;
   const artKey = definition.familyId === 'food' ? FOOD_ART[Math.min(definition.tier - 1, FOOD_ART.length - 1)] : null;
   if (artKey) return <FeastleMergeItemArt artKey={artKey} bare color={definition.color} size={size} tier={definition.tier} />;
+  const authoredArt = mergeWorldItemArt(definitionId);
+  if (authoredArt) return <View style={[styles.familyArt, { height: size, width: size }]}><Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={definitionId} source={authoredArt} style={{ height: size, width: size }} transition={0} /><View style={[styles.familyTier, { backgroundColor: definition.color }]}><ThemedText darkColor="#4A291B" style={styles.familyTierText}>{definition.tier}</ThemedText></View></View>;
   return <View style={[styles.familyArt, { height: size, width: size }]}><View style={[styles.familyDisc, { backgroundColor: definition.color }]}><IconSymbol color="#4A291B" name={definition.icon} size={Math.max(17, size * 0.48)} /></View><View style={[styles.familyTier, { backgroundColor: definition.color }]}><ThemedText darkColor="#4A291B" style={styles.familyTierText}>{definition.tier}</ThemedText></View></View>;
 }
 
 const styles = StyleSheet.create({
-  board: { alignSelf: 'center', backgroundColor: '#493747', borderColor: '#D79A4A', borderCurve: 'continuous', borderRadius: 26, borderWidth: 2, boxShadow: '0 14px 28px rgba(55,28,13,0.42), inset 0 2px 0 rgba(255,228,172,0.24), inset 0 -3px 0 rgba(47,28,42,0.48)', overflow: 'visible', position: 'relative' },
+  board: { alignSelf: 'center', backgroundColor: '#171625', borderColor: '#D9A85C', borderCurve: 'continuous', borderRadius: 25, borderWidth: 2, boxShadow: '0 14px 30px rgba(22,13,26,0.48), inset 0 2px 0 rgba(255,231,185,0.20)', overflow: 'visible', position: 'relative' },
+  boardGradient: { ...StyleSheet.absoluteFillObject, borderRadius: 23 },
   boardAnimating: { zIndex: 30 },
-  cell: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 11, borderWidth: 1, justifyContent: 'center', overflow: 'visible', position: 'absolute' },
+  cell: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 10, borderWidth: 1, justifyContent: 'center', overflow: 'visible', position: 'absolute' },
   cellPressable: { alignItems: 'center', height: '100%', justifyContent: 'center', width: '100%' },
+  hoverCell: { backgroundColor: 'rgba(111,104,139,0.72)', borderColor: '#FFF0C3', borderRadius: 10, borderWidth: 1.5, left: 0, position: 'absolute', top: 0, zIndex: 20 },
   sprite: { alignItems: 'center', justifyContent: 'center', position: 'absolute' },
   spawnBurst: { alignItems: 'center', justifyContent: 'center', position: 'absolute', zIndex: 900 },
   spawnHalo: { backgroundColor: 'rgba(255,205,112,0.24)', borderColor: 'rgba(255,239,190,0.72)', borderRadius: 999, borderWidth: 1.5, position: 'absolute' },
-  spawnParticle: { borderRadius: 999, boxShadow: '0 1px 5px rgba(255,188,83,0.5)', position: 'absolute' },
+  spawnParticle: { borderRadius: 999, position: 'absolute' },
   familyArt: { alignItems: 'center', justifyContent: 'center' },
   familyDisc: { alignItems: 'center', borderColor: 'rgba(255,244,213,0.65)', borderRadius: 16, borderWidth: 2, boxShadow: '0 3px 8px rgba(38,19,11,0.32)', height: '76%', justifyContent: 'center', width: '76%' },
   familyTier: { alignItems: 'center', borderColor: 'rgba(91,51,25,0.42)', borderRadius: 999, borderWidth: 1, bottom: 2, height: 18, justifyContent: 'center', position: 'absolute', right: 2, width: 18 },
