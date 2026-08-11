@@ -21,6 +21,7 @@ type WispContextValue = {
   progressFor: (id: WispId, days: readonly HomeDayRecord[]) => ReturnType<typeof wispProgress>;
   pendingDiscoveryId: WispId | null;
   dismissDiscovery: (id: WispId) => void;
+  grant: (id: WispId, receiptId: string, source?: WispGrantSource) => boolean;
 };
 
 const WispContext = createContext<WispContextValue | null>(null);
@@ -85,7 +86,37 @@ export function WispProvider({ children }: PropsWithChildren) {
       return record ? saveWispState({ ...current, unlocked: { ...current.unlocked, [id]: { ...record, seenReveal: true } } }) : current;
     });
   }, []);
-  const value = useMemo<WispContextValue>(() => ({ state, equippedWispId, isOwned, quantity, sources, isGiftable, equip, syncFromDays, progressFor, pendingDiscoveryId, dismissDiscovery }), [dismissDiscovery, equip, equippedWispId, isGiftable, isOwned, pendingDiscoveryId, progressFor, quantity, sources, state, syncFromDays]);
+  const grant = useCallback((id: WispId, receiptId: string, source: WispGrantSource = 'game') => {
+    if (!receiptId) return false;
+    let granted = false;
+    setState((current) => {
+      if ((current.appliedGrantReceiptIds ?? []).includes(receiptId)) return current;
+      granted = true;
+      const now = Date.now();
+      const existing = current.inventory[id];
+      const quantity = (existing?.quantity ?? 0) + 1;
+      return saveWispState({
+        ...current,
+        unlocked: {
+          ...current.unlocked,
+          [id]: current.unlocked[id] ?? { wispId: id, unlockedAt: now, sourceDayId: null, seenReveal: false },
+        },
+        inventory: {
+          ...current.inventory,
+          [id]: {
+            wispId: id,
+            quantity,
+            sources: [...new Set([...(existing?.sources ?? []), source])],
+            firstGrantedAt: existing?.firstGrantedAt ?? now,
+            giftableQuantity: Math.max(existing?.giftableQuantity ?? 0, quantity - 1),
+          },
+        },
+        appliedGrantReceiptIds: [...(current.appliedGrantReceiptIds ?? []), receiptId],
+      });
+    });
+    return granted;
+  }, []);
+  const value = useMemo<WispContextValue>(() => ({ state, equippedWispId, isOwned, quantity, sources, isGiftable, equip, syncFromDays, progressFor, pendingDiscoveryId, dismissDiscovery, grant }), [dismissDiscovery, equip, equippedWispId, grant, isGiftable, isOwned, pendingDiscoveryId, progressFor, quantity, sources, state, syncFromDays]);
   return <WispContext value={value}>{children}</WispContext>;
 }
 

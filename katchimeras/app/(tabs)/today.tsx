@@ -153,12 +153,11 @@ import {
 } from '@/utils/today-care-game-round';
 import { pendingGrowthAwards, TODAY_GROWTH_REWARDS, todayGrowthSummary } from '@/utils/today-growth';
 import { buildAboutTodayPrompt } from '@/utils/day-prompt-engine';
-import { selectTodayCareGame } from '@/utils/game-hub';
-import { loadGameHubItemsForDays } from '@/utils/game-hub-state';
 import { buildTodayPhotoRollSuggestion } from '@/utils/today-photo-roll-suggestion';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { resolveHatchHour } from '@/game/days/lifecycle';
 import type { CompanionQuickGoal, CompanionQuickGoalCompletion } from '@/utils/companion-quick-goals';
+import type { GameHubItem } from '@/utils/game-hub';
 import {
   activeSemanticQuestPrompt,
   cancelSemanticNoteQuestCapture,
@@ -380,23 +379,10 @@ function HomeScreen() {
   const formingDay = homeLoopPresentation.forming?.day ?? null;
   const formingPrompts = homeLoopPresentation.forming?.prompts ?? availableDayPrompts;
   const formingActivePrompt = homeLoopPresentation.forming?.activePrompt ?? null;
-  const todayCareGame = useMemo(() => {
-    if (!formingDay) return null;
-    const items = loadGameHubItemsForDays({
-      allKatchimerasAvailable,
-      dayId: formingDay.isoDate,
-      days: allDays,
-    });
-    const excludedQuestIds = new Set(
-      (formingDay.growth?.careActions ?? []).flatMap((action) => {
-        const prefix = 'mini_game_round:';
-        return action.definitionId.startsWith(prefix) && action.status !== 'active'
-          ? [action.definitionId.slice(prefix.length)]
-          : [];
-      }),
-    );
-    return selectTodayCareGame(items, formingDay.isoDate, excludedQuestIds);
-  }, [allDays, allKatchimerasAvailable, formingDay]);
+  // Signature mini-games are archived behind Merge World. Historical active
+  // actions remain completable, but Today no longer creates new mini-game
+  // recommendations in the primary care rotation.
+  const todayCareGame = useMemo<GameHubItem | null>(() => null, []);
   const quickGoalFamilyIds = useMemo(() => {
     if (allKatchimerasAvailable) {
       return katchimeraFamilies

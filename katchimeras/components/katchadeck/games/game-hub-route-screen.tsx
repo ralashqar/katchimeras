@@ -35,7 +35,7 @@ function loadPersistentState() {
   };
 }
 
-export function GameHubRouteScreen() {
+export function GameHubRouteScreen({ legacy = false }: { legacy?: boolean } = {}) {
   const router = useRouter();
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   const { days } = useAllDays({ refreshOnFocus: false });
@@ -123,6 +123,7 @@ export function GameHubRouteScreen() {
     <GameHubScreen
       backgroundKey={todayBackgroundKey}
       items={items}
+      onClose={legacy ? () => router.back() : undefined}
       onOpenGame={openGame}
       onViewKatchimeras={() => router.navigate('/katchimeras')}
     />

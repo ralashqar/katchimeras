@@ -22,7 +22,8 @@ export type CompanionBondEventKind =
   | 'check_in_completed'
   | 'insight_saved'
   | 'insight_engaged'
-  | 'conversation_completed';
+  | 'conversation_completed'
+  | 'merge_order_completed';
 
 export type CompanionBondEvent = {
   id: string;
@@ -82,7 +83,52 @@ export const COMPANION_BOND_REWARDS: Record<CompanionBondEventKind, number> = {
   insight_saved: 15,
   insight_engaged: 10,
   conversation_completed: 8,
+  merge_order_completed: 0,
 };
+
+export type CompanionFriendshipProgress = {
+  level: number;
+  totalPoints: number;
+  segmentPoints: number;
+  segmentTarget: number;
+  ratio: number;
+  nextLevel: number | null;
+  pointsRemaining: number;
+  mastery: number;
+};
+
+// Legacy Bond thresholds remain exact anchors at Friendship levels 1, 3, 6,
+// and 10, so no existing relationship ever appears to move backwards.
+export const COMPANION_FRIENDSHIP_THRESHOLDS = [
+  0, 20, 50, 80, 115, 150, 220, 300, 360, 400,
+  520, 650, 800, 980, 1_180, 1_400, 1_650, 1_950, 2_300, 2_700,
+] as const;
+
+export function companionFriendshipProgress(state: CompanionBondState, creatureId: string): CompanionFriendshipProgress {
+  const totalPoints = companionBondProgress(state, creatureId).totalPoints;
+  let level = 1;
+  for (let index = 0; index < COMPANION_FRIENDSHIP_THRESHOLDS.length; index += 1) {
+    if (totalPoints >= COMPANION_FRIENDSHIP_THRESHOLDS[index]) level = index + 1;
+  }
+  const maxThreshold = COMPANION_FRIENDSHIP_THRESHOLDS[COMPANION_FRIENDSHIP_THRESHOLDS.length - 1];
+  const mastery = totalPoints > maxThreshold ? Math.floor((totalPoints - maxThreshold) / 500) : 0;
+  const currentThreshold = COMPANION_FRIENDSHIP_THRESHOLDS[level - 1];
+  const nextThreshold = level < COMPANION_FRIENDSHIP_THRESHOLDS.length
+    ? COMPANION_FRIENDSHIP_THRESHOLDS[level]
+    : maxThreshold + (mastery + 1) * 500;
+  const segmentPoints = Math.max(0, totalPoints - (level === 20 ? maxThreshold + mastery * 500 : currentThreshold));
+  const segmentTarget = Math.max(1, nextThreshold - (level === 20 ? maxThreshold + mastery * 500 : currentThreshold));
+  return {
+    level,
+    totalPoints,
+    segmentPoints,
+    segmentTarget,
+    ratio: Math.min(1, segmentPoints / segmentTarget),
+    nextLevel: level < 20 ? level + 1 : null,
+    pointsRemaining: Math.max(0, segmentTarget - segmentPoints),
+    mastery,
+  };
+}
 
 export function questBondEventKind(
   definition: Pick<QuestDefinition, 'lane'> | null | undefined

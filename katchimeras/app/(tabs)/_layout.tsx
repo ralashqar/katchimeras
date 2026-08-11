@@ -79,8 +79,8 @@ export default function TabLayout() {
           name="games"
           options={{
             freezeOnBlur: true,
-            title: 'Games',
-            tabBarIcon: ({ color }) => <IconSymbol size={26} name="gamecontroller.fill" color={color} />,
+            title: 'Merge',
+            tabBarIcon: ({ color }) => <IconSymbol size={26} name="circle.grid.2x2.fill" color={color} />,
           }}
         />
         <Tabs.Screen

@@ -4,11 +4,8 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  FadeIn,
-  FadeOut,
   SlideInDown,
   Easing,
-  interpolate,
   runOnJS,
   useAnimatedStyle,
   useReducedMotion,
@@ -26,7 +23,6 @@ import { useDisposableTimers } from '@/hooks/use-disposable-timers';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchaSurfaceProvider } from '@/components/katchadeck/ui/katcha-surface';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Lantern } from '@/constants/theme';
 import { FEASTLE_MERGE_ART } from '@/constants/feastle-merge-art';
 import {
   canMergeItems,
@@ -48,6 +44,7 @@ import type { QuestResult } from '@/utils/quests/experiences/types';
 
 import { QuestExperiencePreview } from './quest-experience-ui';
 import { FeastleMergeFeastScreen } from './feastle-merge-feast-screen';
+import { FeastleMergeCelebration, FeastleMergeFlight, FeastleMergeItemArt } from './feastle-merge-primitives';
 
 type Props = {
   config: MergeRoundConfig;
@@ -600,7 +597,7 @@ const MergeCell = memo(function MergeCell({ item, index, cellSize, gap, boardIns
       reduceMotion={reduceMotion}
       spawned={spawned}
     /> : null}
-    {merged && !reduceMotion ? <MergeCelebration size={cellSize} /> : null}
+    {merged && !reduceMotion ? <FeastleMergeCelebration size={cellSize} /> : null}
   </View>;
 });
 
@@ -706,78 +703,15 @@ function MergeItem({ index, cellSize, gap, boardInset, boardX, boardY, boardWidt
 }
 
 function MergeFlightOverlay({ flight, cellSize, reduceMotion, onComplete }: { flight: MergeFlight; cellSize: number; reduceMotion: boolean; onComplete: (id: number, kind: MergeFlight['kind'], to: number | null) => void }) {
-  const progress = useSharedValue(0);
-  useEffect(() => {
-    progress.value = withTiming(1, {
-      duration: reduceMotion ? 1 : flight.kind === 'merge' ? 185 : 155,
-      easing: Easing.out(Easing.cubic),
-    }, (finished) => {
-      if (finished) runOnJS(onComplete)(flight.id, flight.kind, flight.to);
-    });
-  }, [flight.id, flight.kind, flight.to, onComplete, progress, reduceMotion]);
-  const style = useAnimatedStyle(() => ({
-    opacity: flight.kind === 'merge'
-      ? interpolate(progress.value, [0, 0.72, 1], [1, 1, 0])
-      : flight.kind === 'serve' ? interpolate(progress.value, [0, 1], [1, 0]) : 1,
-    transform: [
-      { translateX: interpolate(progress.value, [0, 1], [flight.startX, flight.endX]) },
-      { translateY: interpolate(progress.value, [0, 1], [flight.startY, flight.endY]) },
-      { scale: flight.kind === 'merge' ? interpolate(progress.value, [0, 0.72, 1], [1.035, 0.94, 0.42]) : 1 },
-    ],
-  }));
-  return <Animated.View pointerEvents="none" style={[styles.flight, { height: cellSize, width: cellSize }, style]}>
+  return <FeastleMergeFlight endX={flight.endX} endY={flight.endY} kind={flight.kind} onComplete={() => onComplete(flight.id, flight.kind, flight.to)} reduceMotion={reduceMotion} size={cellSize} startX={flight.startX} startY={flight.startY}>
     <FoodArt bare item={mergeItemDefinition(flight.item.definitionId)} size={cellSize - 4} />
-  </Animated.View>;
+  </FeastleMergeFlight>;
 }
 
 const FoodArt = memo(function FoodArt({ item, size, bare = false }: { item: ReturnType<typeof mergeItemDefinition>; size: number; bare?: boolean }) {
   const presentation = CHAIN_STYLE[item.chainId];
-  return <View style={[
-    styles.foodArt,
-    { height: size, width: size },
-    bare ? styles.foodArtBare : { backgroundColor: `${presentation.color}20`, borderColor: `${presentation.color}55` },
-  ]}>
-    <Image source={FEASTLE_MERGE_ART[item.artKey]} contentFit="contain" style={[styles.foodImage, bare && styles.foodImageBare]} />
-    <View style={[styles.tierBadge, { backgroundColor: presentation.color }]}><ThemedText style={styles.tierText} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>{item.tier}</ThemedText></View>
-  </View>;
+  return <FeastleMergeItemArt artKey={item.artKey} bare={bare} color={presentation.color} size={size} tier={item.tier} />;
 });
-
-function MergeCelebration({ size }: { size: number }) {
-  const progress = useSharedValue(0);
-  useEffect(() => {
-    progress.value = 0;
-    progress.value = withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) });
-  }, [progress]);
-  const haloStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0, 0.18, 0.72, 1], [0, 0.92, 0.38, 0]),
-    transform: [{ scale: interpolate(progress.value, [0, 1], [0.42, 1.48]) }],
-  }));
-  const ringStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0, 0.12, 0.8, 1], [0, 1, 0.45, 0]),
-    transform: [{ scale: interpolate(progress.value, [0, 0.35, 1], [0.55, 1.04, 1.34]) }],
-  }));
-  return <Animated.View pointerEvents="none" entering={FadeIn.duration(40)} exiting={FadeOut.duration(80)} style={styles.burst}>
-    <Animated.View style={[styles.mergeHalo, { height: size * 0.86, width: size * 0.86 }, haloStyle]} />
-    <Animated.View style={[styles.mergeRing, { height: size * 0.72, width: size * 0.72 }, ringStyle]} />
-    {[0, 1, 2, 3, 4, 5].map((index) => <MergeParticle index={index} key={index} progress={progress} />)}
-  </Animated.View>;
-}
-
-function MergeParticle({ index, progress }: { index: number; progress: SharedValue<number> }) {
-  const angle = (Math.PI * 2 * index) / 6;
-  const style = useAnimatedStyle(() => {
-    const travel = interpolate(progress.value, [0, 1], [4, 31]);
-    return {
-      opacity: interpolate(progress.value, [0, 0.22, 1], [0, 1, 0]),
-      transform: [
-        { translateX: Math.cos(angle) * travel },
-        { translateY: Math.sin(angle) * travel },
-        { scale: interpolate(progress.value, [0, 0.3, 1], [0.4, 1, 0.3]) },
-      ],
-    };
-  });
-  return <Animated.View style={[styles.crumb, style]} />;
-}
 
 const styles = StyleSheet.create({
   root: { flex: 1, gap: 8, justifyContent: 'space-between', minHeight: 0 },

@@ -78,6 +78,8 @@ export type WispCollectionState = {
   unlocked: Partial<Record<WispId, WispUnlockRecord>>;
   inventory: Partial<Record<WispId, WispInventoryRecord>>;
   baselinedCatalogVersion: number;
+  /** Stable cross-system receipts, used by Merge World and future reward sources. */
+  appliedGrantReceiptIds?: string[];
 };
 
 export type WispProgress = {

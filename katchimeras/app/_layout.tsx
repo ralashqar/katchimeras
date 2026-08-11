@@ -112,6 +112,7 @@ export default function RootLayout() {
           <Stack.Screen name="katchimera/[creatureId]/achievements" options={{ headerShown: false }} />
           <Stack.Screen name="katchimera/[creatureId]/quest/[questId]/game" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="game/[questId]" options={{ headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen name="legacy-games" options={{ headerShown: false, title: 'Legacy Games' }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Katchimeras Preview' }} />
             </Stack>
           </AppActivityProvider>

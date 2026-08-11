@@ -1,5 +1,5 @@
-import { GameHubRouteScreen } from '@/components/katchadeck/games/game-hub-route-screen';
+import { MergeWorldRouteScreen } from '@/components/katchadeck/games/merge-world-route-screen';
 
 export default function GamesScreen() {
-  return <GameHubRouteScreen />;
+  return <MergeWorldRouteScreen />;
 }

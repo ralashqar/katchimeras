@@ -44,11 +44,13 @@ const CATEGORY_FILTER_LABELS: Record<GameHubCategory, string> = {
 export function GameHubScreen({
   backgroundKey,
   items,
+  onClose,
   onOpenGame,
   onViewKatchimeras,
 }: {
   backgroundKey: TodayExplorationBackgroundKey;
   items: GameHubItem[];
+  onClose?: () => void;
   onOpenGame: (item: GameHubItem) => void;
   onViewKatchimeras: () => void;
 }) {
@@ -106,6 +108,17 @@ export function GameHubScreen({
         contentInsetAdjustmentBehavior="automatic"
         entering={reduceMotion ? undefined : FadeIn.duration(240)}
         showsVerticalScrollIndicator={false}>
+        {onClose ? (
+          <View style={styles.legacyHeader}>
+            <Pressable accessibilityLabel="Return to Merge World" accessibilityRole="button" onPress={onClose} style={styles.legacyBack}>
+              <IconSymbol color={Lantern.moon50} name="chevron.left" size={22} />
+            </Pressable>
+            <View style={styles.legacyHeaderCopy}>
+              <ThemedText darkColor={Lantern.moon50} lightColor={Lantern.moon50} style={styles.legacyTitle}>Legacy Games</ThemedText>
+              <ThemedText darkColor={Lantern.moon300} lightColor={Lantern.moon300} style={styles.legacySubtitle}>Your original Katchimera games, kept in the archive.</ThemedText>
+            </View>
+          </View>
+        ) : null}
         <GameFilterRail
           availableCategories={availableCategories}
           filter={filter}
@@ -356,6 +369,11 @@ function LockedGameSheet({ item, onClose, onViewKatchimeras }: { item: GameHubIt
 }
 
 const styles = StyleSheet.create({
+  legacyHeader: { alignItems: 'center', flexDirection: 'row', gap: 11 },
+  legacyBack: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 999, height: 44, justifyContent: 'center', width: 44 },
+  legacyHeaderCopy: { flex: 1 },
+  legacyTitle: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 24 },
+  legacySubtitle: { fontFamily: AppFontFamilies.manrope, fontSize: 11 },
   screen: { backgroundColor: '#101419', flex: 1 },
   ambientOne: { backgroundColor: 'rgba(210,165,96,0.08)', borderRadius: 999, height: 260, position: 'absolute', right: -110, top: -70, width: 260 },
   ambientTwo: { backgroundColor: 'rgba(105,126,101,0.09)', borderRadius: 999, height: 220, left: -100, position: 'absolute', top: 310, width: 220 },

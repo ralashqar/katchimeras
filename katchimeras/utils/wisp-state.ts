@@ -7,6 +7,7 @@ export const EMPTY_WISP_STATE: WispCollectionState = {
   unlocked: {},
   inventory: {},
   baselinedCatalogVersion: 0,
+  appliedGrantReceiptIds: [],
 };
 
 export function normalizeWispState(value: unknown): WispCollectionState {
@@ -51,5 +52,8 @@ export function normalizeWispState(value: unknown): WispCollectionState {
     unlocked,
     inventory,
     baselinedCatalogVersion: Math.max(0, Math.min(Number(candidate.baselinedCatalogVersion) || 0, WISP_CATALOG_VERSION)),
+    appliedGrantReceiptIds: Array.isArray(candidate.appliedGrantReceiptIds)
+      ? [...new Set(candidate.appliedGrantReceiptIds.filter((id): id is string => typeof id === 'string'))]
+      : [],
   };
 }
