@@ -118,8 +118,6 @@ import { CompanionSharedHistory } from './companion-shared-history';
 import { completedVisitCopy } from '@/utils/companion-visit';
 import { CompanionConversationScene, conversationSpeechLine } from './companion-conversation-scene';
 import { CompanionChatLobby, type CompanionChatStarter } from './companion-chat-lobby';
-import { CompanionConversationLab } from './companion-conversation-lab';
-import { companionConversationDefinitionsForFamily } from '@/constants/companion-conversations-v2';
 import { isConversationV2Family } from '@/types/companion-conversation';
 
 const LazyQuestExperienceHost = lazy(async () => {
@@ -754,20 +752,6 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     if (isConversationV2Family(props.familyId)) experience.showChatLobby();
     else experience.showVisit();
   };
-  const conversationLabDefinitions = isConversationV2Family(props.familyId)
-    ? companionConversationDefinitionsForFamily(props.familyId)
-    : [];
-  const conversationLab = typeof __DEV__ !== 'undefined' && __DEV__ && conversationLabDefinitions.length ? (
-    <CompanionConversationLab
-      currentSession={props.conversationSession}
-      definitions={conversationLabDefinitions}
-      onExitPreview={props.onExitConversationPreview}
-      onSelectDefinition={(definitionId) => {
-        props.onPreviewConversation(definitionId);
-        experience.showConversation();
-      }}
-    />
-  ) : null;
   const destinationHeroTitle = destination === 'quest'
     ? props.activeQuest
       ? 'Ready to keep going?'
@@ -905,7 +889,6 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         ) : route.kind === 'visit' || route.kind === 'conversation' ? (
           conversationExperience ? <CompanionConversationScene
             definition={conversationExperience.definition}
-            developerContent={conversationLab}
             hasActiveFocus={Boolean(activeJourneyFocus)}
             name={props.name}
             onAnswer={props.onAnswerConversation}
@@ -915,7 +898,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             onContinue={props.onContinueConversation}
             onEquipForm={conversationExperience.session.preview ? () => undefined : props.onEquipSkin}
             onGoalDecision={props.onGoalConversationDecision}
-            onInsightDecision={props.onInsightConversationDecision}
+            onInsightDecision={(accept, node) => {
+              props.onInsightConversationDecision(accept, node);
+              if (accept && !conversationExperience.session.preview) selectExperienceDestination('insight');
+            }}
             onKeepTalking={props.onKeepTalkingConversation}
             onDismissOutcome={props.onDismissConversationOutcome}
             onOpenOutcomeDestination={(outcomeDestination: ConversationOutcomeDestination) => {
@@ -928,7 +914,18 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             }}
             onQuickGoalDecision={props.onQuickGoalConversationDecision}
             onQuestHandoff={props.onQuestConversationHandoff}
-            onMemoryDecision={props.onMemoryConversationDecision}
+            onMemoryDecision={(remember, summary) => {
+              const currentNode = conversationExperience.definition.nodes.find(
+                (candidate) => candidate.id === conversationExperience.session.currentNodeId
+              );
+              props.onMemoryConversationDecision(remember, summary);
+              if (
+                remember
+                && !conversationExperience.session.preview
+                && currentNode?.kind === 'memory_proposal'
+                && currentNode.memoryKey.includes(':form-match')
+              ) selectExperienceDestination('insight');
+            }}
             memories={props.memories}
             onOpenMore={experience.showHome}
             onUpdateMemory={props.onUpdateMemory}
@@ -1138,7 +1135,6 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               ) : idealSkinOnboardingRequired ? null : route.kind === 'dashboard' ? (
                 <CompanionDashboard
                   companionName={props.name}
-                  developerContent={conversationLab}
                   onChat={openChat}
                   onSelect={selectDestination}
                   statuses={{

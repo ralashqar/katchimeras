@@ -437,11 +437,32 @@ function maximumQuestionCount(definition: ConversationDefinition): number {
     const node = conversationNode(definition, nodeId);
     if (!node) return 0;
     const nextSeen = new Set(seen).add(nodeId);
-    if (node.kind === 'profile_game' || node.kind === 'insight_game') return node.questions.length + visit(node.revealNodeId, nextSeen);
+    if (node.kind === 'profile_game') return maximumProfileQuestionCount(node) + visit(node.revealNodeId, nextSeen);
+    if (node.kind === 'insight_game') return node.questions.length + visit(node.revealNodeId, nextSeen);
     const own = node.kind === 'choice' || node.kind === 'poll' ? 1 : 0;
     return own + Math.max(0, ...referencedNodeIds(node).map((next) => next ? visit(next, nextSeen) : 0));
   };
   return visit(definition.entryNodeId, new Set());
+}
+
+function maximumProfileQuestionCount(node: Extract<ConversationNode, { kind: 'profile_game' }>): number {
+  const byId = new Map(node.questions.map((question, index) => [question.id, { question, index }]));
+  const entryId = node.entryQuestionId ?? node.questions[0]?.id;
+  if (!entryId) return 0;
+  const visit = (questionId: string, path: ReadonlySet<string>): number => {
+    if (path.has(questionId)) return 0;
+    const entry = byId.get(questionId);
+    if (!entry) return 0;
+    const nextPath = new Set(path).add(questionId);
+    const remaining = entry.question.options.map((option) => {
+      const nextId = option.nextQuestionId === undefined
+        ? node.questions[entry.index + 1]?.id ?? null
+        : option.nextQuestionId;
+      return nextId ? visit(nextId, nextPath) : 0;
+    });
+    return 1 + Math.max(0, ...remaining);
+  };
+  return visit(entryId, new Set());
 }
 
 export function validateProfileQuestionGraph(

@@ -1,5 +1,6 @@
 import type { JournalRecord, StoredHomeDayRecord } from '@/types/home';
 import { isConversationV2Family, type ConversationV2FamilyId, type QueuedConversationSignal } from '@/types/companion-conversation';
+import { authoredFamilyConversationManifests } from '@/constants/companion-conversation-authored-families';
 import {
   baselineConversationEvidence,
   enqueueConversationSignal,
@@ -9,23 +10,28 @@ import {
 
 const SIGNAL_LIFETIME_MS = 14 * 86_400_000;
 
-const ROUTE_FAMILY: Readonly<Record<string, ConversationV2FamilyId>> = {
-  'food.coffee': 'baristabbit',
-  'food.tea': 'baristabbit',
-  'food.drink': 'baristabbit',
-  'went_somewhere.cafe': 'baristabbit',
-  'movement.walk': 'steppling',
-  'movement.run': 'steppling',
-  'movement.hike': 'steppling',
-  'movement.errands': 'steppling',
-  'movement.commute': 'steppling',
-  'went_somewhere.forest': 'steppling',
-  'movement.workout': 'flexel',
-  'movement.sport': 'flexel',
-};
+const pilotRoutes: readonly (readonly [string, ConversationV2FamilyId])[] = [
+  ['food.coffee', 'baristabbit'], ['food.tea', 'baristabbit'], ['food.drink', 'baristabbit'],
+  ['went_somewhere.cafe', 'baristabbit'], ['movement.walk', 'steppling'], ['movement.run', 'steppling'],
+  ['movement.hike', 'steppling'], ['movement.errands', 'steppling'], ['movement.commute', 'steppling'],
+  ['went_somewhere.forest', 'steppling'], ['movement.workout', 'flexel'], ['movement.sport', 'flexel'],
+];
+
+const routeFamilies = new Map<string, ConversationV2FamilyId[]>();
+for (const [routeKey, familyId] of [
+  ...pilotRoutes,
+  ...authoredFamilyConversationManifests.flatMap((item) => item.journalRouteKeys.map((routeKey) => [routeKey, item.familyId] as const)),
+]) {
+  const families = routeFamilies.get(routeKey) ?? [];
+  if (!families.includes(familyId)) routeFamilies.set(routeKey, [...families, familyId]);
+}
+
+export function conversationFamiliesForJournalRoute(routeKey: string): readonly ConversationV2FamilyId[] {
+  return (routeFamilies.get(routeKey) ?? []).filter(isConversationV2Family);
+}
 
 export function conversationFamilyForJournalRoute(routeKey: string): ConversationV2FamilyId | null {
-  return ROUTE_FAMILY[routeKey] ?? null;
+  return conversationFamiliesForJournalRoute(routeKey)[0] ?? null;
 }
 
 export function reconcileConversationJournalSignals(
@@ -41,24 +47,24 @@ export function reconcileConversationJournalSignals(
   for (const { day, record } of records) {
     if (next.processedConversationEvidenceIds.includes(record.id)) continue;
     next = markConversationEvidenceProcessed(next, record.id);
-    const signal = signalForRecord(record, day.isoDate, now);
-    if (signal) next = enqueueConversationSignal(next, signal);
+    const signals = signalsForRecord(record, day.isoDate, now);
+    for (const signal of signals) next = enqueueConversationSignal(next, signal);
   }
   return next;
 }
 
-function signalForRecord(
+function signalsForRecord(
   record: JournalRecord,
   dayId: string,
   now: number
-): QueuedConversationSignal | null {
+): readonly QueuedConversationSignal[] {
   const origin = record.source.origin;
-  if (origin?.kind === 'companion_reflection') return null;
+  if (origin?.kind === 'companion_reflection') return [];
   const createdAt = Number.isFinite(Date.parse(record.createdAt)) ? Date.parse(record.createdAt) : now;
   const expiresAt = createdAt + SIGNAL_LIFETIME_MS;
-  if (expiresAt <= now) return null;
+  if (expiresAt <= now) return [];
   if (origin?.kind === 'quick_goal_completion' && isConversationV2Family(origin.familyId)) {
-    return {
+    return [{
       id: `conversation-signal:goal:${record.id}`,
       kind: 'goal_debrief',
       familyId: origin.familyId,
@@ -66,12 +72,12 @@ function signalForRecord(
       dayId,
       createdAt,
       expiresAt,
-    };
+    }];
   }
   if (origin?.kind === 'companion_quest') {
     const familyId = familyFromCreatureId(origin.creatureId);
     if (familyId) {
-      return {
+      return [{
         id: `conversation-signal:quest:${record.id}`,
         kind: 'quest_debrief',
         familyId,
@@ -79,15 +85,17 @@ function signalForRecord(
         dayId,
         createdAt,
         expiresAt,
-      };
+      }];
     }
   }
   const routeKey = `${record.flowId}.${record.categoryId}`;
-  const familyId = conversationFamilyForJournalRoute(routeKey);
-  if (!familyId) return null;
+  const familyIds = conversationFamiliesForJournalRoute(routeKey);
+  if (!familyIds.length) return [];
   const context = typeof record.fields.context === 'string' ? record.fields.context : null;
-  return {
-    id: `conversation-signal:journal:${record.id}`,
+  return familyIds.map((familyId) => ({
+    id: familyIds.length === 1
+      ? `conversation-signal:journal:${record.id}`
+      : `conversation-signal:journal:${familyId}:${record.id}`,
     kind: 'journal',
     familyId,
     sourceId: record.id,
@@ -97,7 +105,7 @@ function signalForRecord(
     context,
     createdAt,
     expiresAt,
-  };
+  }));
 }
 
 function familyFromCreatureId(creatureId: string): ConversationV2FamilyId | null {

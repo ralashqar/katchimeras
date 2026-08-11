@@ -130,6 +130,21 @@ export function applyWardrobeToCreature(
     skin.familyId !== familyId ||
     !visualKey
   ) {
+    const currentSkin = creature.skinId ? katchimeraSkinById.get(creature.skinId) : null;
+    if (creature.skinId && !currentSkin) {
+      const family = katchimeraFamilyById.get(familyId);
+      const anchor = family ? katchimeraSkinById.get(family.anchorSkinId) : null;
+      const anchorVisualKey = anchor ? selectableVisualKey(anchor) : null;
+      if (anchor && anchorVisualKey) {
+        return {
+          ...creature,
+          aspectId: anchor.aspectId,
+          familyId,
+          skinId: anchor.id,
+          visualKey: anchorVisualKey,
+        };
+      }
+    }
     return creature;
   }
 

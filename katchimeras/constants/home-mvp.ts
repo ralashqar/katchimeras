@@ -255,6 +255,34 @@ export const homeCreatureVisuals: Record<
     source: require('../assets/images/katchimeras/cutouts/steppling.png'),
     accentColor: '#92D7FF',
   },
+  promenip: {
+    source: require('../assets/images/katchimeras/cutouts/promenip.png'),
+    accentColor: '#D98778',
+  },
+  metrostep: {
+    source: require('../assets/images/katchimeras/cutouts/metrostep.png'),
+    accentColor: '#6489BA',
+  },
+  wanderling: {
+    source: require('../assets/images/katchimeras/cutouts/wanderling.png'),
+    accentColor: '#8FA64D',
+  },
+  dashkit: {
+    source: require('../assets/images/katchimeras/cutouts/dashkit.png'),
+    accentColor: '#398FE7',
+  },
+  enduroo: {
+    source: require('../assets/images/katchimeras/cutouts/enduroo.png'),
+    accentColor: '#279A91',
+  },
+  trekkin: {
+    source: require('../assets/images/katchimeras/cutouts/trekkin.png'),
+    accentColor: '#A87949',
+  },
+  treadlet: {
+    source: require('../assets/images/katchimeras/cutouts/treadlet.png'),
+    accentColor: '#67C7A9',
+  },
   errandimp: {
     source: require('../assets/images/katchimeras/cutouts/errandimp.webp'),
     accentColor: '#EF9F6E',
@@ -322,6 +350,34 @@ export const homeCreatureVisuals: Record<
   bobaloo: {
     source: require('../assets/images/katchimeras/cutouts/bobaloo.png'),
     accentColor: '#C9A06E',
+  },
+  dripkin: {
+    source: require('../assets/images/katchimeras/cutouts/dripkin.png'),
+    accentColor: '#B88354',
+  },
+  matchamallow: {
+    source: require('../assets/images/katchimeras/cutouts/matchamallow.png'),
+    accentColor: '#86B46A',
+  },
+  chaihare: {
+    source: require('../assets/images/katchimeras/cutouts/chaihare.png'),
+    accentColor: '#E08345',
+  },
+  cocoabun: {
+    source: require('../assets/images/katchimeras/cutouts/cocoabun.png'),
+    accentColor: '#8B5743',
+  },
+  frostaflop: {
+    source: require('../assets/images/katchimeras/cutouts/frostaflop.png'),
+    accentColor: '#9EDBE3',
+  },
+  infusprig: {
+    source: require('../assets/images/katchimeras/cutouts/infusprig.png'),
+    accentColor: '#A8C793',
+  },
+  zestlet: {
+    source: require('../assets/images/katchimeras/cutouts/zestlet.png'),
+    accentColor: '#F5A447',
   },
   pagelet: {
     source: require('../assets/images/katchimeras/cutouts/pagelet.webp'),
@@ -394,6 +450,42 @@ export const homeCreatureVisuals: Record<
   flexel: {
     source: require('../assets/images/katchimeras/cutouts/flexel.png'),
     accentColor: '#EE8A4A',
+  },
+  kickit: {
+    source: require('../assets/images/katchimeras/cutouts/kickit.png'),
+    accentColor: '#6E93D6',
+  },
+  sluggeroo: {
+    source: require('../assets/images/katchimeras/cutouts/sluggeroo.png'),
+    accentColor: '#6078A8',
+  },
+  scrumple: {
+    source: require('../assets/images/katchimeras/cutouts/scrumple.png'),
+    accentColor: '#A54E5F',
+  },
+  ironel: {
+    source: require('../assets/images/katchimeras/cutouts/ironel.png'),
+    accentColor: '#71808A',
+  },
+  tumblet: {
+    source: require('../assets/images/katchimeras/cutouts/tumblet.png'),
+    accentColor: '#D58AAA',
+  },
+  pedalop: {
+    source: require('../assets/images/katchimeras/cutouts/pedalop.png'),
+    accentColor: '#42B9BD',
+  },
+  dojoko: {
+    source: require('../assets/images/katchimeras/cutouts/dojoko.png'),
+    accentColor: '#D45D59',
+  },
+  volleyhop: {
+    source: require('../assets/images/katchimeras/cutouts/volleyhop.png'),
+    accentColor: '#F18A62',
+  },
+  flowlet: {
+    source: require('../assets/images/katchimeras/cutouts/flowlet.png'),
+    accentColor: '#B7A4D8',
   },
   // Wave D flagships (real renders).
   mendle: {

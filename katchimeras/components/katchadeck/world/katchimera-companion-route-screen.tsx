@@ -1,7 +1,6 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
-import { View } from 'react-native';
 
 import { KingdomCompanionScreen } from '@/components/katchadeck/world/kingdom-companion-screen';
 import { markFlowStart, reportFlowReady } from '@/utils/flow-performance';
@@ -14,8 +13,6 @@ export function KatchimeraCompanionRouteScreen({ creatureId }: { creatureId: str
     if (!isFocused) return;
     return reportFlowReady('katchimera-companion');
   }, [isFocused]);
-
-  if (!isFocused) return <View style={{ flex: 1, backgroundColor: '#11131B' }} />;
 
   return (
     <KingdomCompanionScreen

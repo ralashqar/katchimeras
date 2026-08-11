@@ -551,6 +551,12 @@ const PRIMARY_ROLE_SOURCE: Readonly<Record<string, string>> = {
   bedrotte: 'sleep-rest',
 };
 
+// Retired visual forms stay out of the skin catalogue, while their authored
+// quest ladders continue to belong to the canonical companion family.
+const RETIRED_ROLE_SOURCES: Readonly<Partial<Record<KatchimeraFamilyId, readonly string[]>>> = {
+  flexel: ['voltstep', 'pulsepounce'],
+};
+
 function authoredRoleForSource(sourceId: string): AuthoredRole | null {
   const foundation = FOUNDATION_ROLES[sourceId];
   if (foundation) return foundation;
@@ -576,6 +582,7 @@ export const katchimeraRoles: readonly KatchimeraRoleDefinition[] = katchimeraFa
     PRIMARY_ROLE_SOURCE[family.id] ?? family.id,
     family.id,
     ...family.skinIds,
+    ...(RETIRED_ROLE_SOURCES[family.id] ?? []),
   ])];
   const sources = sourceIds.flatMap((sourceId) => {
     const role = authoredRoleForSource(sourceId);

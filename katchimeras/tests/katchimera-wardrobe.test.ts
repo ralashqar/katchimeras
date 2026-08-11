@@ -102,3 +102,26 @@ test('invalid equipment cannot cross companion boundaries', () => {
     restCreature
   );
 });
+
+test('retired Flexel forms disappear from selection and migrate to the anchor form', () => {
+  assert.equal(
+    skinsForKingdomCompanion('flexel', new Set()).some(
+      (skin) => skin.id === 'voltstep' || skin.id === 'pulsepounce'
+    ),
+    false
+  );
+
+  const retiredCreature: KingdomCreature = {
+    ...restCreature,
+    creatureId: 'companion:flexel',
+    companionId: 'companion:flexel',
+    aspectId: 'movement-fitness',
+    familyId: 'flexel',
+    skinId: 'voltstep',
+    name: 'Flexel',
+    visualKey: 'voltstep',
+  };
+  const migrated = applyWardrobeToCreature(retiredCreature, EMPTY_KATCHIMERA_WARDROBE);
+  assert.equal(migrated.skinId, 'flexel');
+  assert.equal(migrated.visualKey, 'flexel');
+});

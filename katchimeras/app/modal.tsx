@@ -8,9 +8,9 @@ import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { Meadow } from '@/constants/meadow-theme';
 import { useEconomy } from '@/features/economy/economy-provider';
-import { safeGoBack } from '@/utils/safe-navigation';
+import { safeDismissModal } from '@/utils/safe-navigation';
 import { useDevSubscriptionSimulator } from '@/hooks/use-dev-subscription-simulator';
-import { katchimeraFamilyById, katchimeraSkinById } from '@/constants/katchimera-skins';
+import { companionIdForFamily, katchimeraFamilyById, katchimeraSkinById } from '@/constants/katchimera-skins';
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 
 export default function PlusScreen() {
@@ -23,6 +23,12 @@ export default function PlusScreen() {
   const skinOffer = params.source === 'katchimera-skin';
   const family = skinOffer ? katchimeraFamilyById.get(params.familyId as KatchimeraFamilyId) : null;
   const skin = skinOffer ? katchimeraSkinById.get(params.skinId as KatchimeraSkinId) : null;
+  const dismiss = () => safeDismissModal(
+    router,
+    family
+      ? { pathname: '/katchimera/[creatureId]', params: { creatureId: companionIdForFamily(family.id) } }
+      : '/(tabs)',
+  );
 
   useEffect(() => { void loadPackages(); }, [loadPackages]);
 
@@ -31,7 +37,7 @@ export default function PlusScreen() {
     const result = await economy.purchasePlus(packageId);
     setBusy(null);
     if (!result.ok) Alert.alert('Purchase not completed', 'Nothing was charged. Please try again or restore an existing purchase.');
-    else if (skinOffer) safeGoBack(router);
+    else if (skinOffer) dismiss();
   };
 
   const claim = async () => {
@@ -90,7 +96,7 @@ export default function PlusScreen() {
           </View>
         )}
         <ThemedText style={styles.terms} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>7-day trial where offered. Subscription renews unless cancelled through your App Store account. No hatch odds, acceleration or companions are sold.</ThemedText>
-        <KatchaButton fullWidth label="Not now" onPress={() => safeGoBack(router)} variant="tertiary" />
+        <KatchaButton fullWidth label="Not now" onPress={dismiss} variant="tertiary" />
       </ScrollView>
     </SafeAreaView>
   );

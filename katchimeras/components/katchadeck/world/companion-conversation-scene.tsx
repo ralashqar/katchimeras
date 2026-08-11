@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useEffect, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeInUp, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -530,18 +530,31 @@ function InsightReveal({ node, onDecision, preview, session }: {
   session: ConversationSession;
 }) {
   const result = session.insightResult;
+  const committedRef = useRef(false);
+  useEffect(() => {
+    if (preview || !result || committedRef.current) return;
+    committedRef.current = true;
+    onDecision(true, node);
+  }, [node, onDecision, preview, result]);
   if (!result) return <View style={{ gap: 10 }}>
     <ThemedText selectable style={{ fontSize: 14, lineHeight: 20, textAlign: 'center' }} lightColor="#64513B" darkColor="#64513B">I could not resolve this result yet. Try the conversation again.</ThemedText>
     <SecondaryAction label="Close" onPress={() => onDecision(false, node)} />
   </View>;
+  if (!preview) return <AutomaticInsightTransition label="Adding your insight…" />;
   return <Animated.View entering={FadeInUp.duration(260)} style={{ gap: 10 }}>
     <View style={{ backgroundColor: '#FFF6DA', borderColor: 'rgba(174,119,38,0.3)', borderCurve: 'continuous', borderRadius: 21, borderWidth: 1, gap: 6, paddingHorizontal: 16, paddingVertical: 15 }}>
       <ThemedText selectable style={{ fontSize: 22, fontWeight: '900', lineHeight: 26 }} lightColor="#38291D" darkColor="#38291D">{result.title}</ThemedText>
       <ThemedText selectable style={{ fontSize: 14, lineHeight: 20 }} lightColor="#4D3B2A" darkColor="#4D3B2A">{result.summary}</ThemedText>
     </View>
-    <PrimaryAction label={preview ? 'Preview this outcome' : 'Save this insight'} onPress={() => onDecision(true, node)} />
-    <SecondaryAction label={preview ? 'Continue preview' : 'Don’t save'} onPress={() => onDecision(false, node)} />
+    <PrimaryAction label="Continue preview" onPress={() => onDecision(false, node)} />
   </Animated.View>;
+}
+
+function AutomaticInsightTransition({ label }: { label: string }) {
+  return <View accessibilityLiveRegion="polite" style={{ alignItems: 'center', gap: 10, paddingVertical: 22 }}>
+    <ActivityIndicator color="#806126" size="small" />
+    <ThemedText selectable style={{ fontSize: 13, fontWeight: '800' }} lightColor="#64513B" darkColor="#64513B">{label}</ThemedText>
+  </View>;
 }
 
 function MemoryProposal({ node, onDecision, session }: {
@@ -554,9 +567,23 @@ function MemoryProposal({ node, onDecision, session }: {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(summary);
   const isFormInsight = node.memoryKey.includes(':form-match');
+  const committedRef = useRef(false);
+  useEffect(() => {
+    if (!isFormInsight || session.preview || committedRef.current) return;
+    committedRef.current = true;
+    onDecision(true, summary);
+  }, [isFormInsight, onDecision, session.preview, summary]);
+  if (isFormInsight && !session.preview) return <AutomaticInsightTransition label="Adding your form insight…" />;
+  if (isFormInsight && session.preview) return <View style={{ gap: 10 }}>
+    <View style={{ backgroundColor: 'rgba(255,255,255,0.5)', borderCurve: 'continuous', borderRadius: 18, gap: 5, padding: 13 }}>
+      <ThemedText selectable style={{ fontSize: 11, fontWeight: '900', letterSpacing: 1 }} lightColor="#806126" darkColor="#806126">YOUR FORM INSIGHT</ThemedText>
+      <ThemedText selectable style={{ fontSize: 14, lineHeight: 20 }} lightColor="#4A3725" darkColor="#4A3725">{summary}</ThemedText>
+    </View>
+    <PrimaryAction label="Continue preview" onPress={() => onDecision(false, summary)} />
+  </View>;
   return <View style={{ gap: 10 }}>
     <View style={{ backgroundColor: 'rgba(255,255,255,0.5)', borderCurve: 'continuous', borderRadius: 18, gap: 5, padding: 13 }}>
-      <ThemedText selectable style={{ fontSize: 11, fontWeight: '900', letterSpacing: 1 }} lightColor="#806126" darkColor="#806126">{isFormInsight ? 'YOUR FORM INSIGHT' : 'WHAT I WOULD REMEMBER'}</ThemedText>
+      <ThemedText selectable style={{ fontSize: 11, fontWeight: '900', letterSpacing: 1 }} lightColor="#806126" darkColor="#806126">WHAT I WOULD REMEMBER</ThemedText>
       {editing ? <TextInput
         accessibilityLabel="Edit what this Katchimera remembers"
         multiline
@@ -566,9 +593,9 @@ function MemoryProposal({ node, onDecision, session }: {
         value={draft}
       /> : <ThemedText selectable style={{ fontSize: 14, lineHeight: 20 }} lightColor="#4A3725" darkColor="#4A3725">{summary}</ThemedText>}
     </View>
-    <PrimaryAction label={isFormInsight ? 'Add to my insights' : editing ? 'Remember this version' : 'Yes, remember this'} onPress={() => onDecision(true, (editing ? draft : summary).trim() || summary)} />
+    <PrimaryAction label={editing ? 'Remember this version' : 'Yes, remember this'} onPress={() => onDecision(true, (editing ? draft : summary).trim() || summary)} />
     {!editing ? <SecondaryAction label="Change it" onPress={() => setEditing(true)} /> : null}
-    <SecondaryAction label={isFormInsight ? 'Keep it as a result only' : 'Not now'} onPress={() => onDecision(false, summary)} />
+    <SecondaryAction label="Not now" onPress={() => onDecision(false, summary)} />
   </View>;
 }
 

@@ -61,7 +61,7 @@ export function CompanionSkinsThread({
                 styles.card,
                 { backgroundColor: 'rgba(255,248,232,0.93)', borderColor: tokens.border, boxShadow: '0 8px 22px rgba(37,42,29,0.18), inset 0 1px 0 rgba(255,255,255,0.76)' },
                 selected && [styles.selectedCard, { backgroundColor: 'rgba(255,244,204,0.97)', borderColor: tokens.accentPressed }],
-                !available && styles.lockedCard,
+                !available && !selected && styles.lockedCard,
                 pressed && styles.pressedCard,
               ]}>
               <View style={[styles.artStage, { backgroundColor: `${visual.accentColor}28` }]}>
@@ -69,7 +69,7 @@ export function CompanionSkinsThread({
                   accessibilityLabel={skin.displayName}
                   contentFit="contain"
                   source={visual.source}
-                  style={styles.art}
+                  style={[styles.art, selected ? styles.selectedArt : styles.unselectedArt]}
                   transition={120}
                 />
                 {selected ? (
@@ -123,10 +123,12 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   selectedCard: { borderWidth: 2, padding: 7 },
-  lockedCard: { opacity: 0.48 },
-  pressedCard: { opacity: 0.82, transform: [{ scale: 0.985 }] },
+  lockedCard: { backgroundColor: 'rgba(248,242,226,0.9)', borderColor: 'rgba(95,83,61,0.22)' },
+  pressedCard: { opacity: 0.9, transform: [{ scale: 0.985 }] },
   artStage: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 13, height: 118, justifyContent: 'center', overflow: 'hidden' },
   art: { height: 112, width: '100%' },
+  selectedArt: { opacity: 1, transform: [{ scale: 1.02 }] },
+  unselectedArt: { opacity: 0.9 },
   check: {
     alignItems: 'center',
     backgroundColor: '#A77928',

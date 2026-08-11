@@ -6,6 +6,10 @@ import type {
 } from '@/types/companion-conversation';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import { companionInsightConversationDefinitions } from '@/constants/companion-insight-conversations';
+import {
+  authoredConversationTopics,
+  authoredFamilyConversationDefinitions,
+} from '@/constants/companion-conversation-authored-families';
 
 type JournalSeed = {
   id: string;
@@ -71,7 +75,7 @@ function profileGame(input: {
 }): ConversationDefinition {
   return {
     id: `${input.familyId}:game:form-finder`,
-    version: 3,
+    version: 4,
     familyId: input.familyId,
     title: input.title,
     trigger: 'signature_game',
@@ -89,7 +93,7 @@ function profileGame(input: {
   };
 }
 
-export const companionConversationTopics: Readonly<Record<ConversationV2FamilyId, readonly { id: string; label: string }[]>> = {
+const pilotConversationTopics = {
   baristabbit: [
     { id: 'ritual', label: 'Rituals' }, { id: 'comfort', label: 'Comfort' },
     { id: 'preferences', label: 'Drinks & favourites' }, { id: 'novelty', label: 'Try something new' },
@@ -108,7 +112,12 @@ export const companionConversationTopics: Readonly<Record<ConversationV2FamilyId
     { id: 'recovery', label: 'Recovery' }, { id: 'play', label: 'Quick game' },
     { id: 'goals', label: 'Goals & small steps' }, { id: 'memory', label: 'Shared memories' },
   ],
-};
+} as const;
+
+export const companionConversationTopics: Readonly<Record<ConversationV2FamilyId, readonly { id: string; label: string }[]>> = {
+  ...authoredConversationTopics,
+  ...pilotConversationTopics,
+} as Readonly<Record<ConversationV2FamilyId, readonly { id: string; label: string }[]>>;
 
 function openers(familyId: ConversationV2FamilyId): ConversationDefinition[] {
   const topics = companionConversationTopics[familyId];
@@ -156,7 +165,7 @@ const commonFollow: LegacyStorySeed['followOptions'] = [
   ['memory', 'What is worth remembering', 'The useful part is the specific detail you would want to recognise later.'],
 ];
 
-export const legacyStoryFollowOptions: Readonly<Record<ConversationV2FamilyId, Readonly<Record<string, LegacyStorySeed['followOptions']>>>> = {
+export const legacyStoryFollowOptions: Readonly<Partial<Record<ConversationV2FamilyId, Readonly<Record<string, LegacyStorySeed['followOptions']>>>>> = {
   baristabbit: {
     'first-sip': [['cue', 'The cue that I have begun', 'Your first sip works like an opening bell: small, familiar, and enough to point your attention forward.'], ['warmth', 'The pause around it', 'The drink matters because it briefly protects a pocket of unhurried time.'], ['flavour', 'The pleasure of the taste', 'For you, enjoyment does not need another justification; the flavour is the meaningful part.']],
     'usual-or-new': [['dependable', 'Knowing it will be right', 'Reliability lets the drink feel restorative instead of becoming another decision.'], ['mood', 'Matching the mood I am in', 'You choose with the present moment in mind rather than following one permanent rule.'], ['curiosity', 'Having a small surprise', 'A little novelty gives an ordinary pause a story and keeps the ritual awake.']],
@@ -443,7 +452,7 @@ type GoalDiscoveryConfig = {
   shapes: readonly GoalDiscoveryShape[];
 };
 
-const GOAL_DISCOVERY_CONFIGS: Readonly<Record<ConversationV2FamilyId, GoalDiscoveryConfig>> = {
+const GOAL_DISCOVERY_CONFIGS: Readonly<Partial<Record<ConversationV2FamilyId, GoalDiscoveryConfig>>> = {
   baristabbit: {
     title: 'Shape a drink ritual that fits your life',
     openingPrompt: 'What would you most like a drink ritual to give you lately?',
@@ -668,6 +677,7 @@ function uniqueGoalIds(...groups: readonly (readonly string[])[]): string[] {
 
 function goalStarter(familyId: ConversationV2FamilyId): ConversationDefinition {
   const config = GOAL_DISCOVERY_CONFIGS[familyId];
+  if (!config) throw new Error(`Missing pilot goal discovery config for ${familyId}`);
   return {
     id: `${familyId}:conversation:goal-discovery`,
     version: 3,
@@ -847,37 +857,40 @@ const profileOption = (
 const BARISTA_PROFILE = profileGame({
   familyId: 'baristabbit', title: 'Find your drink-side form', memoryKey: 'preference:baristabbit:form-match', entryQuestionId: 'drink-world',
   questions: [
-    { id: 'drink-world', prompt: 'Which drink world feels most like you?', options: [profileOption('coffee', 'Coffee and cafe craft', 'A classic counter-side path.', { baristabbit: 2, lattelet: 3 }, 'coffee-style'), profileOption('tea', 'Tea and warm rituals', 'A quieter leaf-shaped path.', { hearthsip: 4 }, 'tea-style'), profileOption('playful', 'Cold, sweet, or surprising', 'The menu opens into something playful.', { bobaloo: 4 }, 'playful-style')] },
-    { id: 'coffee-style', prompt: 'What matters most in a coffee moment?', options: [profileOption('coffee-bold', 'Bold flavour and clear craft', 'You like the drink to have a point of view.', { baristabbit: 3 }, 'ritual-purpose'), profileOption('coffee-soft', 'Soft flavour and an easy pause', 'The edges can stay gentle.', { lattelet: 3 }, 'ritual-purpose'), profileOption('coffee-place', 'The cafe atmosphere', 'The room is part of the cup.', { lattelet: 2, baristabbit: 1 }, 'ritual-purpose')] },
-    { id: 'tea-style', prompt: 'What kind of tea moment draws you in?', options: [profileOption('tea-home', 'A familiar cup at home', 'Your own small hearth.', { hearthsip: 4 }, 'ritual-purpose'), profileOption('tea-explore', 'Leaves, methods, and new flavours', 'Curiosity belongs in the ritual.', { baristabbit: 2, hearthsip: 1 }, 'ritual-purpose'), profileOption('tea-share', 'Tea with someone else', 'The cup holds a conversation open.', { hearthsip: 2, lattelet: 1 }, 'ritual-purpose')] },
-    { id: 'playful-style', prompt: 'Where does the fun come from?', options: [profileOption('playful-cold', 'Cold and bright', 'A quick, colourful reset.', { bobaloo: 3 }, 'ritual-purpose'), profileOption('playful-sweet', 'A proper treat', 'Then commit to the joy.', { bobaloo: 4 }, 'ritual-purpose'), profileOption('playful-social', 'Choosing it with friends', 'The drink joins the gathering.', { bobaloo: 3, lattelet: 1 }, 'ritual-purpose')] },
-    { id: 'ritual-purpose', prompt: 'What should the drink moment give you?', options: [profileOption('start', 'A clear beginning', 'A dependable opening cue.', { baristabbit: 3 }, null), profileOption('comfort', 'Comfort and softness', 'A familiar place to land.', { hearthsip: 3, lattelet: 1 }, null), profileOption('connect', 'A reason to connect', 'A shared pause matters most.', { bobaloo: 2, lattelet: 2 }, null)] },
+    { id: 'drink-world', prompt: 'Which drink world feels most like you?', options: [profileOption('coffee', 'Coffee', 'The beans get the first word.', { baristabbit: 1, lattelet: 1, dripkin: 1, frostaflop: 1 }, 'coffee-style'), profileOption('tea', 'Tea', 'Leaves, warmth, and a little room to breathe.', { hearthsip: 1, matchamallow: 1, chaihare: 1, infusprig: 1 }, 'tea-style'), profileOption('other', 'Something playful or fresh', 'The menu opens beyond coffee and tea.', { bobaloo: 1, cocoabun: 1, zestlet: 1 }, 'other-style')] },
+    { id: 'coffee-style', prompt: 'Which coffee moment would you choose?', options: [profileOption('coffee-bold', 'Short, bold, and crafted', 'A small cup with a clear point of view.', { baristabbit: 4 }, 'ritual-purpose'), profileOption('coffee-soft', 'Soft, milky, and easy', 'The edges can stay gentle.', { lattelet: 4 }, 'ritual-purpose'), profileOption('coffee-slow', 'Slow filter or pour-over', 'The making is part of the pause.', { dripkin: 4 }, 'ritual-purpose'), profileOption('coffee-cold', 'Iced or blended', 'Cool, bright, and a little indulgent.', { frostaflop: 4 }, 'ritual-purpose')] },
+    { id: 'tea-style', prompt: 'Which tea moment would you choose?', options: [profileOption('tea-classic', 'A familiar everyday tea', 'A dependable cup that feels like home.', { hearthsip: 4 }, 'ritual-purpose'), profileOption('tea-matcha', 'Matcha or green tea', 'A greener, more focused ritual.', { matchamallow: 4 }, 'ritual-purpose'), profileOption('tea-chai', 'Warm and spiced chai', 'The cup arrives with warmth and character.', { chaihare: 4 }, 'ritual-purpose'), profileOption('tea-herbal', 'Herbal or fruit infusion', 'Gentle flavour without needing a buzz.', { infusprig: 4 }, 'ritual-purpose')] },
+    { id: 'other-style', prompt: 'What sounds best?', options: [profileOption('other-bubble', 'Bubble tea', 'Texture, colour, and choosing something fun.', { bobaloo: 4 }, 'ritual-purpose'), profileOption('other-cocoa', 'Hot chocolate or cocoa', 'Comfort is allowed to be the whole point.', { cocoabun: 4 }, 'ritual-purpose'), profileOption('other-fresh', 'A smoothie or fresh juice', 'Something vivid and freshly made.', { zestlet: 4 }, 'ritual-purpose')] },
+    { id: 'ritual-purpose', prompt: 'What should the drink moment give you?', options: [profileOption('craft', 'A focused little ritual', 'Attention makes the cup feel complete.', { baristabbit: 1, dripkin: 2, matchamallow: 1 }, null), profileOption('comfort', 'Comfort and softness', 'A familiar place to land.', { lattelet: 1, hearthsip: 1, chaihare: 1, cocoabun: 2 }, null), profileOption('connect', 'Something enjoyable to share', 'The drink joins the gathering.', { bobaloo: 2, frostaflop: 1, zestlet: 1 }, null), profileOption('gentle', 'A gentle pause', 'Nothing needs to be pushed.', { infusprig: 2, hearthsip: 1, matchamallow: 1 }, null)] },
   ],
-  descriptions: { baristabbit: 'A dependable cafe-minded ritualist who likes a clear, satisfying pause.', lattelet: 'A softer coffee form drawn to gentle flavour and comfortable cafe time.', hearthsip: 'A warm home-ritual form drawn to tea, comfort, and unhurried cups.', bobaloo: 'A playful social form drawn to cold drinks, novelty, sweetness, and company.' },
+  descriptions: { baristabbit: 'An espresso-minded cafe craft form drawn to bold flavour and a clear ritual.', lattelet: 'A softer coffee form drawn to milky drinks, gentle flavour, and comfortable cafe time.', hearthsip: 'A classic tea form drawn to familiar warmth, home rituals, and unhurried cups.', bobaloo: 'A playful social form drawn to bubble tea, texture, novelty, and company.', dripkin: 'A patient coffee form drawn to filter brewing, pour-over craft, and slow preparation.', matchamallow: 'A focused green-tea form drawn to matcha, calm attention, and considered ritual.', chaihare: 'A warming tea form drawn to chai, spice, aroma, and cups with character.', cocoabun: 'A comfort-first form drawn to cocoa, sweetness, softness, and cosy pauses.', frostaflop: 'A bright cold-coffee form drawn to iced drinks, frappes, and easy refreshment.', infusprig: 'A gentle infusion form drawn to herbal leaves, fruit flavours, and caffeine-free pauses.', zestlet: 'A fresh drink form drawn to smoothies, juice, vivid colour, and lively flavour.' },
 });
 
 const STEPPLING_PROFILE = profileGame({
   familyId: 'steppling', title: 'Find your route-side form', memoryKey: 'preference:steppling:form-match', entryQuestionId: 'route-rhythm',
   questions: [
-    { id: 'route-rhythm', prompt: 'Which route rhythm feels most like you?', options: [profileOption('walk', 'An everyday walk', 'Room to notice nearby life.', { steppling: 4 }, 'everyday-route'), profileOption('run', 'A running rhythm', 'Momentum takes the lead.', { sprintail: 4 }, 'running-route'), profileOption('trail', 'A trail or climb', 'The ground gets a vote.', { peakle: 4 }, 'trail-route')] },
-    { id: 'everyday-route', prompt: 'What makes an everyday route worth taking?', options: [profileOption('useful', 'It gets me somewhere', 'Movement fits inside ordinary life.', { steppling: 3 }, 'route-purpose'), profileOption('notice', 'I notice something nearby', 'The familiar route stays alive.', { steppling: 3, peakle: 1 }, 'route-purpose'), profileOption('reset', 'It gives me breathing room', 'The route changes the room you return to.', { steppling: 3 }, 'route-purpose')] },
-    { id: 'running-route', prompt: 'What pulls you into a running rhythm?', options: [profileOption('flow', 'Finding a steady flow', 'The rhythm arrives and carries you.', { sprintail: 3 }, 'route-purpose'), profileOption('measure', 'Seeing pace or progress', 'The effort becomes visible.', { sprintail: 4 }, 'route-purpose'), profileOption('partner', 'Sharing the pace', 'Momentum can be company.', { sprintail: 3 }, 'route-purpose')] },
-    { id: 'trail-route', prompt: 'What should the trail give you?', options: [profileOption('texture', 'Hills and changing ground', 'A route with texture.', { peakle: 4 }, 'route-purpose'), profileOption('view', 'A view or destination', 'Arrival opens the world.', { peakle: 4 }, 'route-purpose'), profileOption('wander', 'Space to explore', 'The route should reveal something.', { peakle: 3, steppling: 1 }, 'route-purpose')] },
-    { id: 'route-purpose', prompt: 'Choose the best ending.', options: [profileOption('clearer', 'Coming back clearer', 'The route shifted your headspace.', { steppling: 3 }, null), profileOption('managed', 'Seeing what I managed', 'A clean moving challenge.', { sprintail: 3 }, null), profileOption('story', 'Returning with a story', 'The route revealed something.', { peakle: 3 }, null)] },
+    { id: 'route-rhythm', prompt: 'Which route rhythm feels most like you?', options: [profileOption('walk', 'An outdoor walk', 'The route can be useful, social, or surprising.', { steppling: 1, promenip: 1, metrostep: 1, wanderling: 1 }, 'everyday-route'), profileOption('run', 'A running rhythm', 'Momentum takes the lead.', { sprintail: 1, dashkit: 1, enduroo: 1 }, 'running-route'), profileOption('trail', 'A trail or trek', 'The ground gets a vote.', { peakle: 1, trekkin: 1, wanderling: 1 }, 'trail-route'), profileOption('indoor', 'A dependable indoor route', 'Weather does not get the final say.', { treadlet: 2 }, 'indoor-route')] },
+    { id: 'everyday-route', prompt: 'What makes an everyday walk worth taking?', options: [profileOption('useful', 'It gets me somewhere', 'Movement fits inside ordinary life.', { steppling: 4 }, 'route-purpose'), profileOption('social', 'I can share the stroll', 'The route leaves room for company.', { promenip: 4 }, 'route-purpose'), profileOption('city', 'The city changes around me', 'Pavement, people, and useful detours.', { metrostep: 4 }, 'route-purpose'), profileOption('wander', 'I can follow what catches my eye', 'The route should reveal something.', { wanderling: 4 }, 'route-purpose')] },
+    { id: 'running-route', prompt: 'What pulls you into a running rhythm?', options: [profileOption('flow', 'Finding a steady flow', 'The rhythm arrives and carries you.', { sprintail: 4 }, 'route-purpose'), profileOption('speed', 'Short speed and intervals', 'A quick effort with sharp edges.', { dashkit: 4 }, 'route-purpose'), profileOption('distance', 'Settling into a long run', 'Endurance grows one stretch at a time.', { enduroo: 4 }, 'route-purpose')] },
+    { id: 'trail-route', prompt: 'What should the trail give you?', options: [profileOption('day-hike', 'Hills and an earned view', 'A route with texture and a destination.', { peakle: 4 }, 'route-purpose'), profileOption('long-trek', 'A long, demanding journey', 'The route becomes the day.', { trekkin: 4 }, 'route-purpose'), profileOption('trail-wander', 'Space to explore without a plan', 'Curiosity chooses the next turn.', { wanderling: 4 }, 'route-purpose')] },
+    { id: 'indoor-route', prompt: 'What makes an indoor route work?', options: [profileOption('treadmill-steady', 'A steady treadmill rhythm', 'Simple, repeatable, and sheltered.', { treadlet: 4 }, 'route-purpose'), profileOption('treadmill-run', 'A controlled indoor run', 'Pace stays close and measurable.', { treadlet: 3, sprintail: 1 }, 'route-purpose'), profileOption('indoor-short', 'A short walk I can always access', 'Dependability matters more than scenery.', { treadlet: 3, steppling: 1 }, 'route-purpose')] },
+    { id: 'route-purpose', prompt: 'Choose the best ending.', options: [profileOption('clearer', 'Coming back clearer', 'The route shifted your headspace.', { steppling: 2, wanderling: 1 }, null), profileOption('together', 'Glad I shared it', 'Company gave the route its shape.', { promenip: 2, metrostep: 1 }, null), profileOption('managed', 'Seeing what I managed', 'The effort became visible.', { sprintail: 1, dashkit: 1, enduroo: 1 }, null), profileOption('story', 'Returning with a story', 'The route revealed something.', { peakle: 1, trekkin: 2, wanderling: 1 }, null), profileOption('repeatable', 'Ready to do it again', 'A dependable route earns its place.', { treadlet: 2, metrostep: 1 }, null)] },
   ],
-  descriptions: { steppling: 'An everyday route-maker who values useful walks, headspace, and noticing nearby life.', sprintail: 'A rhythm-seeking running form drawn to pace, flow, and visible progress.', peakle: 'A trail-minded form drawn to hills, longer routes, exploration, and earned views.' },
+  descriptions: { steppling: 'An everyday route-maker who values useful walks, headspace, and nearby life.', sprintail: 'A rhythm-seeking running form drawn to steady pace, flow, and regular practice.', peakle: 'A day-hiking form drawn to hills, changing ground, and earned views.', promenip: 'A relaxed walking form drawn to shared strolls, scenery, and unhurried company.', metrostep: 'An urban route form drawn to city walking, commuting, pavement, and useful detours.', wanderling: 'A curious route form drawn to unplanned turns, photo walks, and noticing what appears.', dashkit: 'A quick running form drawn to sprints, intervals, speed, and compact challenges.', enduroo: 'An endurance form drawn to distance, sustained rhythm, and the long-run mindset.', trekkin: 'A long-trail form drawn to demanding terrain, backpacking, and journeys that fill the day.', treadlet: 'A dependable indoor form drawn to treadmills, controlled conditions, and repeatable routes.' },
 });
 
 const FLEXEL_PROFILE = profileGame({
   familyId: 'flexel', title: 'Find your movement-side form', memoryKey: 'preference:flexel:form-match', entryQuestionId: 'movement-world',
   questions: [
-    { id: 'movement-world', prompt: 'Which movement world feels most like you?', options: [profileOption('strength', 'Gym, strength, or mobility', 'Control and useful power.', { flexel: 4 }, 'strength-style'), profileOption('court', 'A court sport', 'Skill inside play.', { hooplet: 2, serveling: 2 }, 'court-style'), profileOption('cardio', 'Cardio, class, or dance', 'Energy wants the room.', { voltstep: 2, pulsepounce: 3 }, 'cardio-style')] },
-    { id: 'strength-style', prompt: 'What feels most satisfying in that space?', options: [profileOption('strong', 'Controlled strength', 'Each repetition has a job.', { flexel: 4 }, 'movement-finish'), profileOption('technique', 'Cleaner technique', 'Useful form turns effort into skill.', { flexel: 4 }, 'movement-finish'), profileOption('conditioning', 'A steady conditioning rhythm', 'Settle into the work.', { voltstep: 3, flexel: 1 }, 'movement-finish')] },
-    { id: 'court-style', prompt: 'What kind of court play pulls you in?', options: [profileOption('team-ball', 'Team play, passing, and quick decisions', 'Shared decisions at speed.', { hooplet: 4 }, 'movement-finish'), profileOption('racket', 'Rallies, serves, and one-to-one play', 'Skill becomes a conversation.', { serveling: 4 }, 'movement-finish'), profileOption('court-solo', 'Repeating one court skill', 'One clean detail at a time.', { hooplet: 2, serveling: 2, flexel: 1 }, 'movement-finish')] },
-    { id: 'cardio-style', prompt: 'Which energy sounds best?', options: [profileOption('steady', 'Steady and rhythmic', 'Settle into the work.', { voltstep: 4 }, 'movement-finish'), profileOption('burst', 'Fast playful bursts', 'Energy with sharp edges.', { pulsepounce: 4 }, 'movement-finish'), profileOption('expressive', 'Expressive movement or dance', 'The movement can have a voice.', { pulsepounce: 4 }, 'movement-finish')] },
-    { id: 'movement-finish', prompt: 'How do you want to feel afterward?', options: [profileOption('capable', 'Capable and grounded', 'Useful strength stays with you.', { flexel: 3 }, null), profileOption('played', 'Like I genuinely played', 'Fun carried the effort.', { hooplet: 2, serveling: 2 }, null), profileOption('charged', 'Charged with energy', 'The session lit something up.', { voltstep: 2, pulsepounce: 3 }, null)] },
+    { id: 'movement-world', prompt: 'Which movement world feels most like you?', options: [profileOption('strength', 'Strength, lifting, or controlled movement', 'Power can be built in different ways.', { flexel: 1, ironel: 1, flowlet: 1 }, 'strength-style'), profileOption('team-ball', 'A team ball sport', 'Shared decisions at speed.', { kickit: 1, hooplet: 1, scrumple: 1, volleyhop: 1 }, 'team-ball-style'), profileOption('bat-racket', 'A bat or racket sport', 'Timing turns effort into skill.', { serveling: 1, sluggeroo: 1 }, 'bat-racket-style'), profileOption('body-skill', 'Body skill, combat, or control', 'Technique lives in the whole body.', { tumblet: 1, dojoko: 1, flowlet: 1 }, 'body-skill-style'), profileOption('cardio', 'Cardio or endurance', 'Energy finds a repeatable rhythm.', { pedalop: 2, flexel: 1 }, 'cardio-style')] },
+    { id: 'strength-style', prompt: 'What feels most satisfying in that space?', options: [profileOption('strong', 'Useful all-round strength', 'Each repetition has a job.', { flexel: 4 }, 'movement-finish'), profileOption('physique', 'Heavy lifting and building muscle', 'Visible power grows through patient work.', { ironel: 4 }, 'movement-finish'), profileOption('flow', 'Balance, mobility, and controlled flow', 'Precision can feel quiet and strong.', { flowlet: 4 }, 'movement-finish')] },
+    { id: 'team-ball-style', prompt: 'Which kind of team play pulls you in?', options: [profileOption('football', 'Football', 'Space opens, closes, and opens again.', { kickit: 4 }, 'movement-finish'), profileOption('basketball', 'Basketball', 'Passing and quick court decisions.', { hooplet: 4 }, 'movement-finish'), profileOption('rugby', 'Rugby', 'Contact, support, and committed field play.', { scrumple: 4 }, 'movement-finish'), profileOption('volleyball', 'Volleyball', 'Timing, rotation, and keeping the rally alive.', { volleyhop: 4 }, 'movement-finish')] },
+    { id: 'bat-racket-style', prompt: 'Which timing challenge sounds best?', options: [profileOption('racket', 'Rallies, serves, and racket play', 'Skill becomes a conversation.', { serveling: 4 }, 'movement-finish'), profileOption('baseball', 'Batting, throwing, and fielding', 'One clean moment can change the play.', { sluggeroo: 4 }, 'movement-finish')] },
+    { id: 'body-skill-style', prompt: 'Which kind of body skill draws you in?', options: [profileOption('gymnastics', 'Gymnastics or acrobatics', 'Balance and bravery meet in motion.', { tumblet: 4 }, 'movement-finish'), profileOption('combat', 'Martial arts or boxing', 'Discipline sharpens every movement.', { dojoko: 4 }, 'movement-finish'), profileOption('control', 'Yoga, Pilates, or mobility', 'Control can be quiet and exact.', { flowlet: 4 }, 'movement-finish')] },
+    { id: 'cardio-style', prompt: 'Which energy sounds best?', options: [profileOption('cycling', 'Cycling or spin', 'Cadence carries the effort forward.', { pedalop: 4 }, 'movement-finish'), profileOption('mixed', 'Mixed gym conditioning', 'Variety keeps the whole practice useful.', { flexel: 4 }, 'movement-finish'), profileOption('steady', 'A controlled, repeatable rhythm', 'Consistency matters more than spectacle.', { pedalop: 2, flexel: 2 }, 'movement-finish')] },
+    { id: 'movement-finish', prompt: 'How do you want to feel afterward?', options: [profileOption('capable', 'Capable and grounded', 'Useful strength stays with you.', { flexel: 2, ironel: 1, flowlet: 1 }, null), profileOption('team', 'Part of a team effort', 'Shared play carried the work.', { kickit: 1, hooplet: 1, scrumple: 1, volleyhop: 1 }, null), profileOption('skilled', 'More precise than before', 'One detail became cleaner.', { serveling: 1, sluggeroo: 1, tumblet: 1, dojoko: 1 }, null), profileOption('charged', 'Charged with energy', 'The session lit something up.', { pedalop: 2, flexel: 1 }, null)] },
   ],
-  descriptions: { flexel: 'A strong, adaptable practice form drawn to strength, mobility, and useful technique.', hooplet: 'A team-court form drawn to basketball, shared play, quick decisions, and passing.', serveling: 'A racket-sport form drawn to focused skill, rallies, serves, and one-to-one play.', voltstep: 'A rhythmic cardio form drawn to steady sessions, gym energy, and measurable work.', pulsepounce: 'An energetic play form drawn to intervals, dance, expressive movement, and quick bursts.' },
+  descriptions: { flexel: 'A strong, adaptable practice form drawn to useful strength and all-round technique.', hooplet: 'A basketball form drawn to shared court play, quick decisions, and passing.', serveling: 'A racket-sport form drawn to focused skill, rallies, serves, and one-to-one play.', kickit: 'A football form drawn to space, teamwork, passing, and continuous field play.', sluggeroo: 'A baseball and softball form drawn to timing, batting, throwing, and field awareness.', scrumple: 'A rugby form drawn to contact, support, resilience, and committed team play.', ironel: 'A heavy-strength form drawn to bodybuilding, powerlifting, muscle, and patient progression.', tumblet: 'A gymnastics form drawn to balance, tumbling, acrobatics, and precise body control.', pedalop: 'A cycling form drawn to cadence, endurance, outdoor rides, and spin sessions.', dojoko: 'A combat-practice form drawn to martial arts, boxing, discipline, and deliberate technique.', volleyhop: 'A volleyball form drawn to timing, rotation, teamwork, and keeping the rally alive.', flowlet: 'A controlled-movement form drawn to yoga, Pilates, balance, mobility, and steady breath.' },
 });
 
 function familyPack(
@@ -903,6 +916,7 @@ export const companionConversationDefinitionsV2: readonly ConversationDefinition
   ...familyPack('baristabbit', BARISTA_POLLS, BARISTA_PROFILE),
   ...familyPack('steppling', STEPPLING_POLLS, STEPPLING_PROFILE),
   ...familyPack('flexel', FLEXEL_POLLS, FLEXEL_PROFILE),
+  ...authoredFamilyConversationDefinitions,
 ];
 
 export const companionConversationDefinitionById = new Map(

@@ -199,7 +199,10 @@ test('conversation outcomes stay visible and provisional answers remain editable
   assert.match(scene, /Change answer/);
   assert.match(scene, /<ConversationOutcomeCard/);
   assert.doesNotMatch(scene, /CONVERSATION TAKEAWAY|Finish this thought|reflection_reveal/);
-  assert.match(scene, /Save this insight/);
+  assert.doesNotMatch(scene, /Save this insight|Don’t save|Add to my insights|Keep it as a result only/);
+  assert.match(scene, /AutomaticInsightTransition/);
+  assert.match(scene, /onDecision\(true, node\)/);
+  assert.match(scene, /onDecision\(true, summary\)/);
   assert.doesNotMatch(scene, /A SECONDARY THREAD|WHY THIS RESULT|REVIEW YOUR ANSWERS|Replay from the beginning/);
   assert.match(scene, /A QUEST PICKED FOR YOU/);
   assert.match(scene, /label="Take this quest"/);
@@ -412,6 +415,7 @@ test('ideal-skin onboarding gates launch companions and skin equipment opens a b
   const questHook = fs.readFileSync(path.join(process.cwd(), 'hooks', 'use-kingdom-quests.ts'), 'utf8');
   const paywall = fs.readFileSync(path.join(process.cwd(), 'app', 'modal.tsx'), 'utf8');
   const profile = fs.readFileSync(path.join(process.cwd(), 'app', '(tabs)', 'explore.tsx'), 'utf8');
+  const companionRoute = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'katchimera-companion-route-screen.tsx'), 'utf8');
 
   assert.match(questHook, /selectedIdealSkinOnboardingRequired/);
   assert.match(questHook, /session\.currentNodeId !== selectedIdealSkinDefinition\.entryNodeId/);
@@ -427,6 +431,9 @@ test('ideal-skin onboarding gates launch companions and skin equipment opens a b
   assert.match(kingdom, /economy\.snapshot\.activePlus \? applyWardrobeToKingdom/);
   assert.match(paywall, /Share every day card/);
   assert.match(paywall, /questionnaire match/);
+  assert.match(paywall, /safeDismissModal/);
+  assert.doesNotMatch(companionRoute, /if \(!isFocused\) return <View/);
+  assert.match(interaction, /selectExperienceDestination\('insight'\)/);
   assert.match(profile, /Reset Katchimera skin questionnaires/);
   assert.match(profile, /resetDevSubscriptionSimulator\(\)/);
   assert.match(profile, /resetKatchimeraWardrobeForDebug\(\)/);

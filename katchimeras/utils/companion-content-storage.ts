@@ -4,7 +4,7 @@ import {
   normaliseCompanionContentState,
   type CompanionContentState,
 } from '@/utils/companion-content';
-import { isConversationV2Family } from '@/types/companion-conversation';
+import { CONVERSATION_V2_IDEAL_SKIN_FAMILIES, isConversationV2IdealSkinFamily } from '@/types/companion-conversation';
 
 const STORAGE_KEY = 'katchadeck.companion-content-v1';
 const resetListeners = new Set<() => void>();
@@ -24,10 +24,10 @@ export function resetIdealSkinOnboardingForDebug(): void {
   const isIdealSkinDefinition = (definitionId: string) => definitionId.endsWith(':game:form-finder');
   saveCompanionContentState({
     ...state,
-    conversationSessions: state.conversationSessions.filter((session) => !isConversationV2Family(session.familyId)),
-    conversationSignals: state.conversationSignals.filter((signal) => !isConversationV2Family(signal.familyId)),
-    conversationTelemetry: state.conversationTelemetry.filter((event) => !isConversationV2Family(event.familyId)),
-    servedConversationDayKeys: state.servedConversationDayKeys.filter((key) => !['baristabbit:', 'steppling:', 'flexel:'].some((prefix) => key.startsWith(prefix))),
+    conversationSessions: state.conversationSessions.filter((session) => !isConversationV2IdealSkinFamily(session.familyId)),
+    conversationSignals: state.conversationSignals.filter((signal) => !isConversationV2IdealSkinFamily(signal.familyId)),
+    conversationTelemetry: state.conversationTelemetry.filter((event) => !isConversationV2IdealSkinFamily(event.familyId)),
+    servedConversationDayKeys: state.servedConversationDayKeys.filter((key) => !CONVERSATION_V2_IDEAL_SKIN_FAMILIES.some((familyId) => key.startsWith(`${familyId}:`))),
     insights: state.insights.filter((insight) => !isIdealSkinDefinition(insight.sourceDefinitionId)),
     memories: state.memories.filter((memory) => !memory.key.includes(':form-match')),
   });

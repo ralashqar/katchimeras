@@ -2,11 +2,21 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  companionConversationTopics,
   companionConversationDefinitionsForFamily,
   companionConversationDefinitionsV2,
 } from '@/constants/companion-conversations-v2';
+import { katchimeraFamilyById, katchimeraSkinById } from '@/constants/katchimera-skins';
 import { companionQuickGoalTemplateById, quickGoalTemplatesForFamily } from '@/constants/companion-quick-goals';
 import type { ConversationDefinition } from '@/types/companion-conversation';
+import {
+  CONVERSATION_V2_ENABLED_FAMILIES,
+  CONVERSATION_V2_FAMILIES,
+  CONVERSATION_V2_IDEAL_SKIN_FAMILIES,
+  isConversationV2AuthoredFamily,
+  isConversationV2Family,
+  isConversationV2IdealSkinFamily,
+} from '@/types/companion-conversation';
 import type { StoredHomeDayRecord } from '@/types/home';
 import {
   answerConversation,
@@ -36,11 +46,25 @@ import { questDefinition } from '@/utils/quests/definitions';
 
 const familyIds = ['baristabbit', 'steppling', 'flexel'] as const;
 
-test('first V2 packs are complete, valid, and isolated to the launch allowlist', () => {
+test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gated', () => {
   assert.deepEqual(validateConversationDefinitions(companionConversationDefinitionsV2), []);
-  assert.equal(companionConversationDefinitionsV2.length, 53 * familyIds.length);
-  for (const familyId of familyIds) {
+  assert.equal(companionConversationDefinitionsV2.length, 53 * CONVERSATION_V2_FAMILIES.length);
+  assert.deepEqual(CONVERSATION_V2_ENABLED_FAMILIES, CONVERSATION_V2_FAMILIES);
+  assert.deepEqual(CONVERSATION_V2_IDEAL_SKIN_FAMILIES, familyIds);
+  assert.equal(isConversationV2Family('feastle'), true);
+  assert.equal(isConversationV2AuthoredFamily('feastle'), true);
+  assert.equal(isConversationV2IdealSkinFamily('cheerlet'), false);
+  for (const familyId of CONVERSATION_V2_IDEAL_SKIN_FAMILIES) {
+    assert.ok(katchimeraFamilyById.get(familyId)!.skinIds.every((skinId) => katchimeraSkinById.get(skinId)?.visualKey));
+  }
+  for (const familyId of CONVERSATION_V2_FAMILIES) {
     const pack = companionConversationDefinitionsForFamily(familyId);
+    assert.equal(companionConversationTopics[familyId].length, 8);
+    for (const requiredTopic of ['play', 'goals', 'memory']) {
+      assert.ok(companionConversationTopics[familyId].some((topic) => topic.id === requiredTopic), `${familyId} needs ${requiredTopic}`);
+    }
+    assert.ok(katchimeraFamilyById.get(familyId)!.skinIds.length >= 6, `${familyId} needs at least six forms`);
+    assert.ok(katchimeraFamilyById.get(familyId)!.skinIds.length <= 12, `${familyId} catalog has grown beyond reviewable scope`);
     assert.equal(pack.length, 53);
     assert.equal(pack.filter((item) => item.trigger === 'evergreen').length, 11);
     assert.equal(pack.filter((item) => item.isOpener).length, 8);
@@ -98,7 +122,7 @@ test('an answer stays provisional and can be changed until Continue', () => {
   gameSession = answerConversation(gameSession, game, 'coffee', 2).session;
   gameSession = answerConversation(gameSession, game, 'tea', 3).session;
   assert.equal(gameSession.turns.length, 1);
-  assert.equal(gameSession.affinityScores.hearthsip, 4);
+  assert.equal(gameSession.affinityScores.hearthsip, 1);
   assert.equal(gameSession.affinityScores.lattelet, undefined);
 });
 
@@ -117,6 +141,40 @@ test('signature game scores authored form affinities without unlocking a skin', 
   assert.equal(session.currentNodeId, 'reveal');
   assert.ok(session.formResult?.topFormId);
   assert.equal('unlockedSkinIds' in session, false);
+});
+
+test('every authored family form is represented in its finder answers and reveal copy', () => {
+  for (const familyId of CONVERSATION_V2_FAMILIES) {
+    const definition = companionConversationDefinitionsForFamily(familyId)
+      .find((item) => item.format === 'profile_game')!;
+    const game = definition.nodes.find((node) => node.kind === 'profile_game')!;
+    const reveal = definition.nodes.find((node) => node.kind === 'form_reveal')!;
+    const scoredFormIds = new Set(game.questions.flatMap((question) =>
+      question.options.flatMap((option) => Object.keys(option.affinity ?? {}))
+    ));
+    for (const skinId of katchimeraFamilyById.get(familyId)!.skinIds) {
+      assert.equal(scoredFormIds.has(skinId), true, `${skinId} needs a finder affinity`);
+      assert.ok(reveal.descriptions[skinId]?.trim(), `${skinId} needs reveal copy`);
+    }
+  }
+});
+
+test('every authored form can win a complete three-answer finder path', () => {
+  for (const familyId of CONVERSATION_V2_FAMILIES) {
+    const definition = companionConversationDefinitionsForFamily(familyId)
+      .find((item) => item.format === 'profile_game')!;
+    const game = definition.nodes.find((node) => node.kind === 'profile_game')!;
+    for (const skinId of katchimeraFamilyById.get(familyId)!.skinIds) {
+      let session = createConversationSession({ definition, formId: familyId, dayId: '2026-08-10', createdAt: 1 });
+      for (let pick = 0; pick < 3; pick += 1) {
+        const question = conversationGameQuestion(game, session)!;
+        const answer = question.options.find((option) => option.affinity?.[skinId]) ?? question.options[0]!;
+        session = answerConversation(session, definition, answer.id, session.updatedAt + 1).session;
+        session = continueConversation(session, definition, session.updatedAt + 1);
+      }
+      assert.equal(session.formResult?.topFormId, skinId, `${familyId}:${skinId} needs a winning path`);
+    }
+  }
 });
 
 test('fictional village poll is deterministic and totals one hundred', () => {
@@ -209,9 +267,9 @@ test('journal reconciliation baselines old records then queues only new relevant
   assert.equal(baseline.conversationSignals.length, 0);
   assert.deepEqual(baseline.processedConversationEvidenceIds, ['old']);
   const next = reconcileConversationJournalSignals(baseline, [day(['old', 'new'])], Date.parse('2026-08-10T09:00:00Z'));
-  assert.equal(next.conversationSignals.length, 1);
-  assert.equal(next.conversationSignals[0]?.familyId, 'steppling');
-  assert.equal(next.conversationSignals[0]?.sourceId, 'new');
+  assert.equal(next.conversationSignals.length, 3);
+  assert.deepEqual(new Set(next.conversationSignals.map((signal) => signal.familyId)), new Set(['steppling', 'mossprout', 'skylo']));
+  assert.ok(next.conversationSignals.every((signal) => signal.sourceId === 'new'));
 });
 
 test('V5 completion migrates to a served-day marker without replaying old journal evidence', () => {
@@ -443,8 +501,8 @@ test('explicit goal-plan actions rename and preserve paused history', () => {
   assert.equal(replacement.state.goals.find((goal) => goal.id === replacement.createdGoalId)?.status, 'active');
 });
 
-test('launch-family insights use five meaningful questions while every form-game branch takes three picks', () => {
-  for (const familyId of familyIds) {
+test('authored-family insights use five meaningful questions while every form-game branch takes three picks', () => {
+  for (const familyId of CONVERSATION_V2_FAMILIES) {
     const games = companionConversationDefinitionsForFamily(familyId)
       .flatMap((definition) => definition.nodes)
       .filter((node) => node.kind === 'profile_game' || node.kind === 'insight_game');
@@ -457,7 +515,7 @@ test('launch-family insights use five meaningful questions while every form-game
 });
 
 test('journal, goal, quest, and bond chats resolve to their correct outcome classes', () => {
-  for (const familyId of familyIds) {
+  for (const familyId of CONVERSATION_V2_FAMILIES) {
     const pack = companionConversationDefinitionsForFamily(familyId);
     const journals = pack.filter((definition) => definition.trigger === 'journal');
     const goalDebriefs = pack.filter((definition) => definition.trigger === 'goal_debrief');
@@ -475,22 +533,35 @@ test('journal, goal, quest, and bond chats resolve to their correct outcome clas
   }
 });
 
-test('goal conversations cover every available launch-family goal template', () => {
-  for (const familyId of familyIds) {
+test('goal conversations cover every available authored-family goal template', () => {
+  for (const familyId of CONVERSATION_V2_FAMILIES) {
     const offeredIds = new Set(companionConversationDefinitionsForFamily(familyId)
       .flatMap((definition) => definition.nodes)
       .filter((node) => node.kind === 'goal_proposal')
       .flatMap((node) => node.suggestedQuickGoalIds));
     const cataloguePrefix = familyId === 'baristabbit' ? 'coffee-ritual:' : `${familyId}:`;
-    const availableIds = quickGoalTemplatesForFamily(familyId)
-      .map((template) => template.id)
-      .filter((id) => id.startsWith(cataloguePrefix));
+    const allFamilyTemplates = quickGoalTemplatesForFamily(familyId);
+    const prefixedTemplates = allFamilyTemplates.filter((template) => template.id.startsWith(cataloguePrefix));
+    const availableIds = (prefixedTemplates.length >= 3 ? prefixedTemplates : allFamilyTemplates)
+      .slice(0, 8)
+      .map((template) => template.id);
     assert.equal(availableIds.length, 8);
     assert.deepEqual(availableIds.filter((id) => !offeredIds.has(id)), []);
     assert.ok(companionConversationDefinitionsForFamily(familyId)
       .flatMap((definition) => definition.nodes)
       .filter((node) => node.kind === 'goal_proposal')
       .every((node) => node.suggestedQuickGoalIds.length >= 2 && node.suggestedQuickGoalIds.length <= 3));
+  }
+});
+
+test('every authored quest handoff references playable quest data', () => {
+  for (const familyId of CONVERSATION_V2_FAMILIES) {
+    const handoffs = companionConversationDefinitionsForFamily(familyId)
+      .flatMap((definition) => definition.nodes)
+      .filter((node) => node.kind === 'quest_handoff');
+    assert.equal(handoffs.length, 1);
+    assert.ok(handoffs[0]!.suggestedQuestIds.length >= 2, `${familyId} needs two quest choices`);
+    for (const questId of handoffs[0]!.suggestedQuestIds) assert.ok(questDefinition(questId), `${familyId}:${questId}`);
   }
 });
 

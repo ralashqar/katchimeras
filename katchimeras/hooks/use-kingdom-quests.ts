@@ -75,7 +75,7 @@ import {
 import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import { companionQuickGoalTemplateById } from '@/constants/companion-quick-goals';
 import type { ConversationDefinition, ConversationMode, ConversationNode, ConversationOutcomePresentation } from '@/types/companion-conversation';
-import { isConversationV2Family } from '@/types/companion-conversation';
+import { isConversationV2Family, isConversationV2IdealSkinFamily } from '@/types/companion-conversation';
 import {
   activeConversationForFamily,
   answerJourneyCheckIn,
@@ -941,7 +941,8 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   }, [companionContentState.conversationSessions, companionContentState.conversationSignals, selectedBondProgress.level, selectedEncounterId, selectedFamilyId, today?.isoDate]);
   const selectedConversationStarters = useMemo(() => {
     if (!selectedFamilyId || !selectedEncounterId || !isConversationV2Family(selectedFamilyId)) return [];
-    const definitions = companionConversationDefinitionsForFamily(selectedFamilyId);
+    const definitions = companionConversationDefinitionsForFamily(selectedFamilyId)
+      .filter((definition) => definition.format !== 'profile_game' || isConversationV2IdealSkinFamily(selectedFamilyId));
     return (['talk', 'play', 'discover', 'plan'] as const).flatMap((mode) => {
       const definition = selectConversationForMode({
         familyId: selectedFamilyId,
@@ -961,7 +962,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     });
   }, [companionContentState.conversationSessions, companionJourneyState, selectedActiveQuest, selectedEncounterId, selectedFamilyId]);
   const selectedIdealSkinDefinition = useMemo(() => {
-    if (!selectedFamilyId || !isConversationV2Family(selectedFamilyId)) return null;
+    if (!selectedFamilyId || !isConversationV2IdealSkinFamily(selectedFamilyId)) return null;
     return companionConversationDefinitionsForFamily(selectedFamilyId)
       .find((definition) => definition.format === 'profile_game') ?? null;
   }, [selectedFamilyId]);
@@ -1885,7 +1886,8 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     const occurredAt = Date.now();
     const conversationDayId = today?.isoDate ?? localDayId(new Date(occurredAt));
     setCompanionContentState((current) => {
-      const definitions = companionConversationDefinitionsForFamily(selectedFamilyId);
+      const definitions = companionConversationDefinitionsForFamily(selectedFamilyId)
+        .filter((definition) => definition.format !== 'profile_game' || isConversationV2IdealSkinFamily(selectedFamilyId));
       const recommendation = input.recommendation ? selectConversationDefinition({
         familyId: selectedFamilyId,
         dayId: conversationDayId,
@@ -1968,6 +1970,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     if (!selectedResident || !selectedFamilyId || !today?.isoDate || !isConversationV2Family(selectedFamilyId)) return;
     const definition = companionConversationDefinitionById.get(definitionId);
     if (!definition || definition.familyId !== selectedFamilyId || !['insight_game', 'profile_game'].includes(definition.format ?? '')) return;
+    if (definition.format === 'profile_game' && !isConversationV2IdealSkinFamily(selectedFamilyId)) return;
     const occurredAt = Date.now();
     setCompanionContentState((current) => {
       const session = createConversationSession({
