@@ -167,6 +167,9 @@ test('persistent merge input uses one static board recognizer and epoch-guarded 
   assert.doesNotMatch(source, /Gesture\.Exclusive/);
   assert.doesNotMatch(spriteSource, /GestureDetector|Gesture\.Pan|pointerEvents=\{enabled/);
   assert.doesNotMatch(screenSource, /styles\.bottomDock/);
+  assert.match(screenSource, /order-service-tray\.webp/);
+  assert.match(screenSource, /styles\.orderTrayArt/);
+  assert.doesNotMatch(screenSource, /AnimatedBorderHighlight/);
   assert.match(routeSource, /<TodayExplorationBackground backgroundKey="home"/);
   assert.doesNotMatch(routeSource, /CompanionGameBackdrop/);
   assert.doesNotMatch(routeSource, /verticalOffset=\{HOME_SCENE_Y_OFFSET\}/);

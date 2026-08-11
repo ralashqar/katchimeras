@@ -6,7 +6,6 @@ import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanim
 import type { SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AnimatedBorderHighlight } from '@/components/katchadeck/ui/animated-border-highlight';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
@@ -37,6 +36,8 @@ const MERGE_CURRENCY_ART = {
   coins: require('../../../assets/images/katchimeras/merge-world/ui/coin.webp'),
   level: require('../../../assets/images/katchimeras/merge-world/ui/merge-level.webp'),
 } as const;
+
+const MERGE_ORDER_TRAY_ART = require('../../../assets/images/katchimeras/merge-world/ui/order-service-tray.webp');
 
 export function MergeWorldScreen({ effectsPaused }: { effectsPaused?: SharedValue<number> } = {}) {
   const router = useRouter();
@@ -105,7 +106,6 @@ export function MergeWorldScreen({ effectsPaused }: { effectsPaused?: SharedValu
 
         <View accessibilityLabel="Katchimera orders" style={styles.orderRail}>
           {state.activeOrders.slice(0, 3).map((order) => <CompactOrder
-            effectsPaused={effectsPaused}
             friendshipLevel={friendshipLevels[order.characterId] ?? 1}
             key={order.id}
             onServe={() => dispatch({ type: 'serveOrder', orderId: order.id, now: Date.now() })}
@@ -148,7 +148,7 @@ function CurrencyHud({ art, label, progress, value, suffix }: { art: number; lab
   </View>;
 }
 
-function CompactOrder({ order, ready, onServe, friendshipLevel, effectsPaused }: { order: MergeOrder; ready: boolean; onServe: () => void; friendshipLevel: number; effectsPaused?: SharedValue<number> }) {
+function CompactOrder({ order, ready, onServe, friendshipLevel }: { order: MergeOrder; ready: boolean; onServe: () => void; friendshipLevel: number }) {
   const characterSource = resolveCreatureArtSource(CHARACTER_VISUALS[order.characterId], { lod: 'medium' });
   return <Pressable
     accessibilityLabel={`${MERGE_CHARACTER_NAMES[order.characterId]} order, ${order.title}${ready ? ', ready to serve' : ''}`}
@@ -157,17 +157,16 @@ function CompactOrder({ order, ready, onServe, friendshipLevel, effectsPaused }:
     disabled={!ready}
     onPress={onServe}
     style={({ pressed }) => [styles.orderSlot, ready && styles.orderSlotReady, pressed && styles.pressed]}>
-    {ready ? <AnimatedBorderHighlight borderRadius={15} inset={1} orbitDurationMs={2_100} pauseDurationMs={700} paused={effectsPaused} /> : null}
+    {ready ? <View pointerEvents="none" style={styles.orderReadyGlow} /> : null}
     <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={`merge-order-${order.characterId}`} source={characterSource} style={styles.orderCharacter} transition={0} />
-    <View style={styles.orderTray}>
-      <View style={styles.orderItems}>
-        {order.requirements.slice(0, 2).map((requirement) => <View key={requirement.definitionId} style={styles.orderItem}>
-          <PersistentMergeItemArt definitionId={requirement.definitionId} size={36} />
-          {requirement.quantity > 1 ? <View style={styles.quantityBadge}><ThemedText darkColor="#FFF" style={styles.quantityText}>×{requirement.quantity}</ThemedText></View> : null}
-        </View>)}
-      </View>
-      <View style={[styles.serveMark, ready && styles.serveMarkReady]}><IconSymbol color={ready ? '#FFF7D8' : '#8D6A51'} name={ready ? 'checkmark' : 'heart.fill'} size={11} /><ThemedText darkColor={ready ? '#FFF7D8' : '#8D6A51'} style={styles.friendshipLevel}>{friendshipLevel}</ThemedText></View>
+    <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" source={MERGE_ORDER_TRAY_ART} style={styles.orderTrayArt} transition={0} />
+    <View pointerEvents="none" style={styles.orderItems}>
+      {order.requirements.slice(0, 3).map((requirement) => <View key={requirement.definitionId} style={styles.orderItem}>
+        <PersistentMergeItemArt definitionId={requirement.definitionId} size={34} />
+        {requirement.quantity > 1 ? <View style={styles.quantityBadge}><ThemedText darkColor="#FFF" style={styles.quantityText}>×{requirement.quantity}</ThemedText></View> : null}
+      </View>)}
     </View>
+    <View pointerEvents="none" style={[styles.serveMark, ready && styles.serveMarkReady]}><IconSymbol color={ready ? '#FFF7D8' : '#F2D49A'} name={ready ? 'checkmark' : 'heart.fill'} size={10} /><ThemedText darkColor={ready ? '#FFF7D8' : '#F2D49A'} style={styles.friendshipLevel}>{friendshipLevel}</ThemedText></View>
   </Pressable>;
 }
 
@@ -184,16 +183,17 @@ const styles = StyleSheet.create({
   currencyTrack: { backgroundColor: 'rgba(255,255,255,0.08)', bottom: 0, height: 2.5, left: 10, overflow: 'hidden', position: 'absolute', right: 10 },
   currencyFill: { backgroundColor: '#EEC364', boxShadow: '0 0 5px rgba(238,195,100,0.72)', height: 2.5 },
   hudAction: { alignItems: 'center', backgroundColor: 'rgba(26,23,38,0.93)', borderColor: 'rgba(255,223,165,0.43)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, boxShadow: '0 5px 13px rgba(25,14,18,0.30), inset 0 1px 0 rgba(255,255,255,0.10)', height: 39, justifyContent: 'center', width: 42 },
-  orderRail: { flexDirection: 'row', gap: 7, height: 108, overflow: 'visible', paddingHorizontal: 2 },
-  orderSlot: { backgroundColor: 'rgba(45,36,41,0.88)', borderColor: 'rgba(255,226,174,0.46)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: '0 6px 15px rgba(32,19,19,0.28), inset 0 1px 0 rgba(255,255,255,0.10)', flex: 1, overflow: 'hidden', position: 'relative' },
-  orderSlotReady: { backgroundColor: 'rgba(66,65,39,0.94)', borderColor: '#F0C765', boxShadow: '0 7px 17px rgba(48,34,15,0.34), 0 0 12px rgba(240,199,101,0.15)' },
-  orderCharacter: { height: 87, left: '5%', position: 'absolute', top: -7, width: '90%' },
-  orderTray: { alignItems: 'center', backgroundColor: '#FFF2D5', borderColor: '#D6A75A', borderRadius: 14, borderWidth: 1, bottom: 3, boxShadow: '0 3px 8px rgba(71,42,22,0.22), inset 0 1px 0 rgba(255,255,255,0.80)', flexDirection: 'row', height: 43, justifyContent: 'space-between', left: 3, paddingHorizontal: 5, position: 'absolute', right: 3 },
-  orderItems: { alignItems: 'center', flexDirection: 'row', gap: 1 },
-  orderItem: { height: 37, position: 'relative', width: 37 },
-  quantityBadge: { alignItems: 'center', backgroundColor: '#A85C2A', borderColor: '#FFE8B6', borderRadius: 999, borderWidth: 1, bottom: 0, justifyContent: 'center', minWidth: 17, paddingHorizontal: 3, position: 'absolute', right: 0 },
+  orderRail: { flexDirection: 'row', gap: 3, height: 110, overflow: 'visible', paddingHorizontal: 1 },
+  orderSlot: { flex: 1, overflow: 'visible', position: 'relative' },
+  orderSlotReady: { transform: [{ translateY: -1 }] },
+  orderReadyGlow: { alignSelf: 'center', backgroundColor: 'rgba(247,215,123,0.23)', borderRadius: 999, boxShadow: '0 0 18px rgba(247,215,123,0.52)', height: 68, position: 'absolute', top: 5, width: 82 },
+  orderCharacter: { bottom: 25, height: 86, left: '7%', position: 'absolute', width: '86%', zIndex: 1 },
+  orderTrayArt: { bottom: 1, height: 47, left: 0, position: 'absolute', right: 0, width: '100%', zIndex: 2 },
+  orderItems: { alignItems: 'center', bottom: 12, flexDirection: 'row', gap: 0, justifyContent: 'center', left: 5, position: 'absolute', right: 5, zIndex: 3 },
+  orderItem: { height: 35, position: 'relative', width: 35 },
+  quantityBadge: { alignItems: 'center', backgroundColor: '#A85C2A', borderColor: '#FFE8B6', borderRadius: 999, borderWidth: 1, bottom: -1, justifyContent: 'center', minWidth: 17, paddingHorizontal: 3, position: 'absolute', right: -1 },
   quantityText: { fontFamily: AppFontFamilies.manrope, fontSize: 7, fontWeight: '900' },
-  serveMark: { alignItems: 'center', backgroundColor: 'rgba(116,83,60,0.11)', borderColor: 'rgba(127,91,57,0.16)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 2, height: 24, justifyContent: 'center', minWidth: 31, paddingHorizontal: 5 },
+  serveMark: { alignItems: 'center', backgroundColor: '#7A532E', borderColor: '#D6A15A', borderRadius: 999, borderWidth: 1, bottom: -2, boxShadow: '0 2px 5px rgba(52,29,14,0.38)', flexDirection: 'row', gap: 2, height: 22, justifyContent: 'center', minWidth: 29, paddingHorizontal: 5, position: 'absolute', right: 5, zIndex: 4 },
   serveMarkReady: { backgroundColor: '#64863B', borderColor: '#456727', boxShadow: '0 2px 5px rgba(65,91,31,0.32)' },
   friendshipLevel: { fontFamily: AppFontFamilies.manrope, fontSize: 7.5, fontWeight: '900' },
   boardStage: { alignItems: 'center', flex: 1, justifyContent: 'flex-start', minHeight: 0, paddingTop: 2, position: 'relative' },
