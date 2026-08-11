@@ -6,7 +6,7 @@ import test from 'node:test';
 import { MERGE_GENERATOR_COOLDOWN_MS, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import type { MergeBoardItem, MergeWorldState } from '@/types/merge-world';
 import { companionFriendshipProgress, emptyCompanionBondState } from '@/utils/companion-bond';
-import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin } from '@/utils/merge-world/board-geometry';
+import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection } from '@/utils/merge-world/board-geometry';
 import { mergeWorldPendingPersistence } from '@/utils/merge-world/persistence-buffer';
 import {
   createInitialMergeWorldState,
@@ -30,6 +30,16 @@ test('board geometry uses one exact coordinate system for rendering and hit test
   }
   assert.equal(mergeCellFromPoint(geometry, -100, -100), null);
   assert.equal(mergeCellFromPoint(geometry, 10_000, 10_000), null);
+});
+
+test('directional flicks resolve to the immediate orthogonal neighbour without wrapping rows', () => {
+  const geometry = { columns: 7, rows: 9 };
+  assert.equal(mergeNeighborCellInDirection(geometry, 31, 900, 120), 32);
+  assert.equal(mergeNeighborCellInDirection(geometry, 31, -900, 120), 30);
+  assert.equal(mergeNeighborCellInDirection(geometry, 31, 80, 900), 38);
+  assert.equal(mergeNeighborCellInDirection(geometry, 31, 80, -900), 24);
+  assert.equal(mergeNeighborCellInDirection(geometry, 28, -900, 0), null);
+  assert.equal(mergeNeighborCellInDirection(geometry, 6, 900, 0), null);
 });
 
 test('catalog is internally valid and starter world has 33 open cells', () => {
@@ -131,17 +141,35 @@ test('rapid sequential moves preserve the same item identity and latest destinat
 
 test('persistent merge input uses one static board recognizer and epoch-guarded ownership', () => {
   const source = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'feastle-persistent-merge-board.tsx'), 'utf8');
+  const screenSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-world-screen.tsx'), 'utf8');
+  const routeSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-world-route-screen.tsx'), 'utf8');
   const spriteSource = source.slice(source.indexOf('const PersistentSprite'), source.indexOf('function PersistentGeneratorArt'));
+  assert.match(source, /const gap = 1/);
+  assert.match(source, /const border = 0/);
+  assert.match(source, /const BOARD_FLICK_MIN_VELOCITY = 650/);
+  assert.match(source, /targetCell = mergeNeighborCellInDirection/);
+  assert.match(source, /if \(!id\) return;\s+runOnJS\(pickSprite\)\(id\)/);
+  assert.match(source, /Haptics\.ImpactFeedbackStyle\.Light/);
+  assert.match(source, /hasDragIntent && !dragHapticTriggered\.value/);
+  assert.match(source, /runOnJS\(dragSprite\)\(\)/);
+  assert.doesNotMatch(source, /\.onStart\(\(\) => \{\s+const id = activeDragId\.value/);
+  assert.match(source, /const alternate = \(column \+ row\) % 2 === 1/);
   assert.match(source, /const boardGesture = useMemo\(\(\) => Gesture\.Pan\(\)/);
   assert.match(source, /\.minDistance\(0\)/);
   assert.match(source, /const BOARD_TAP_SLOP = 9/);
   assert.match(source, /maxGestureDistance\.value <= BOARD_TAP_SLOP/);
   assert.match(source, /\.onTouchesUp\(\(event\) =>/);
   assert.match(source, /if \(!id \|\| gestureFinished\.value\) return/);
+  assert.match(source, /mergeBursts\.map\(\(burst\) => <MergeCelebrationOverlay/);
+  assert.match(source, /<InvalidCellFeedback cell=\{invalidFeedback\.cell\}/);
   assert.match(source, /if \(dragEpoch\.value !== epoch\) return/);
   assert.match(source, /occupancyIds\.value = ids/);
   assert.doesNotMatch(source, /Gesture\.Exclusive/);
   assert.doesNotMatch(spriteSource, /GestureDetector|Gesture\.Pan|pointerEvents=\{enabled/);
+  assert.doesNotMatch(screenSource, /styles\.bottomDock/);
+  assert.match(routeSource, /<TodayExplorationBackground backgroundKey="home"/);
+  assert.doesNotMatch(routeSource, /CompanionGameBackdrop/);
+  assert.doesNotMatch(routeSource, /verticalOffset=\{HOME_SCENE_Y_OFFSET\}/);
 });
 
 test('activity receipts are idempotent and Energy remains capped', () => {

@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedBorderHighlight } from '@/components/katchadeck/ui/animated-border-highlight';
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   MERGE_CHARACTER_NAMES,
   MERGE_ITEMS_BY_ID,
@@ -85,8 +85,6 @@ export function MergeWorldScreen({ effectsPaused }: { effectsPaused?: SharedValu
     return <View style={styles.loading}><ActivityIndicator color={Lantern.ember300} size="large" /><ThemedText darkColor="#FFF0CE">Opening the pantry…</ThemedText></View>;
   }
 
-  const selected = selectedCell == null ? null : state.board[selectedCell]?.occupant;
-  const selectedDefinition = selected?.kind === 'item' ? MERGE_ITEMS_BY_ID.get(selected.definitionId) : null;
   const nextThreshold = MERGE_LEVEL_THRESHOLDS[state.mergeLevel] ?? null;
   const currentThreshold = MERGE_LEVEL_THRESHOLDS[state.mergeLevel - 1] ?? 0;
   const levelRatio = nextThreshold == null ? 1 : Math.max(0, Math.min(1, (state.mergeXp - currentThreshold) / (nextThreshold - currentThreshold)));
@@ -99,11 +97,10 @@ export function MergeWorldScreen({ effectsPaused }: { effectsPaused?: SharedValu
         <View style={styles.hud}>
           <CurrencyHud art={MERGE_CURRENCY_ART.energy} label="Energy" value={`${state.energy.value}`} suffix={`/${state.energy.cap}`} />
           <CurrencyHud art={MERGE_CURRENCY_ART.coins} label="Coins" value={String(state.coins)} />
-          <CurrencyHud art={MERGE_CURRENCY_ART.level} label="Merge level" value={String(state.mergeLevel)} />
+          <CurrencyHud art={MERGE_CURRENCY_ART.level} label="Merge level" progress={levelRatio} value={String(state.mergeLevel)} />
           <Pressable accessibilityLabel="Open legacy games" accessibilityRole="button" onPress={() => router.push('/legacy-games')} style={({ pressed }) => [styles.hudAction, pressed && styles.pressed]}>
             <IconSymbol color="#F6D993" name="gamecontroller.fill" size={19} />
           </Pressable>
-          <View pointerEvents="none" style={styles.levelTrack}><View style={[styles.levelFill, { width: `${levelRatio * 100}%` }]} /></View>
         </View>
 
         <View accessibilityLabel="Katchimera orders" style={styles.orderRail}>
@@ -133,36 +130,6 @@ export function MergeWorldScreen({ effectsPaused }: { effectsPaused?: SharedValu
           </Pressable> : null}
         </View>
 
-        <View style={styles.bottomDock}>
-          <Pressable
-            accessibilityLabel={state.rewardInbox.length ? `Claim reward, ${state.rewardInbox.length} waiting` : `Storage, ${state.storage.length} of ${state.storageCapacity} slots used`}
-            accessibilityRole="button"
-            disabled={!state.rewardInbox.length}
-            onPress={() => state.rewardInbox[0] && dispatch({ type: 'claimInbox', entryId: state.rewardInbox[0].id, now: Date.now() })}
-            style={({ pressed }) => [styles.storageChest, pressed && styles.pressed]}>
-            <IconSymbol color="#FFF0CE" name={state.rewardInbox.length ? 'shippingbox.fill' : 'archivebox.fill'} size={23} />
-            <ThemedText darkColor="#FFF0CE" style={styles.storageCount}>{state.storage.length}/{state.storageCapacity}</ThemedText>
-            {state.rewardInbox.length ? <View style={styles.alertBadge}><ThemedText darkColor="#FFF" style={styles.alertText}>{state.rewardInbox.length}</ThemedText></View> : null}
-          </Pressable>
-
-          <View style={styles.dockContent}>
-            {selectedDefinition && selectedCell != null ? <>
-              <PersistentMergeItemArt definitionId={selectedDefinition.id} size={43} />
-              <View style={styles.itemCopy}>
-                <ThemedText darkColor="#4A291B" numberOfLines={1} style={styles.itemName}>{selectedDefinition.name}</ThemedText>
-                <ThemedText darkColor="#886044" numberOfLines={1} style={styles.itemMeta}>{selectedDefinition.familyId} · tier {selectedDefinition.tier}</ThemedText>
-              </View>
-              <DockAction icon="archivebox.fill" label="Store" onPress={() => { dispatch({ type: 'storeItem', cell: selectedCell, now: Date.now() }); setSelectedCell(null); }} />
-              <DockAction icon="trash.fill" label="Sell" onPress={() => { dispatch({ type: 'sellItem', cell: selectedCell, now: Date.now() }); setSelectedCell(null); }} />
-            </> : state.storage.length ? <>
-              <View style={styles.itemCopy}><ThemedText darkColor="#4A291B" style={styles.itemName}>Storage</ThemedText><ThemedText darkColor="#886044" style={styles.itemMeta}>Tap an item to return it</ThemedText></View>
-              {state.storage.slice(0, 4).map((item, index) => <Pressable accessibilityLabel={`Return ${MERGE_ITEMS_BY_ID.get(item.definitionId)?.name ?? 'item'} to board`} accessibilityRole="button" key={item.instanceId} onPress={() => dispatch({ type: 'restoreItem', storageIndex: index, now: Date.now() })} style={({ pressed }) => [styles.storedItem, pressed && styles.pressed]}><PersistentMergeItemArt definitionId={item.definitionId} size={39} /></Pressable>)}
-            </> : <>
-              <IconSymbol color="#B77943" name="hand.tap.fill" size={22} />
-              <ThemedText darkColor="#755039" numberOfLines={2} style={styles.dockHint}>Tap an item for details, or drag matching pieces together.</ThemedText>
-            </>}
-          </View>
-        </View>
       </View>
 
       {error ? <View style={[styles.errorBanner, { top: Math.max(insets.top + 56, 64) }]}><ThemedText darkColor="#FFE1D8" numberOfLines={2} style={styles.errorText}>{error}</ThemedText></View> : null}
@@ -172,10 +139,12 @@ export function MergeWorldScreen({ effectsPaused }: { effectsPaused?: SharedValu
   );
 }
 
-function CurrencyHud({ art, label, value, suffix }: { art: number; label: string; value: string; suffix?: string }) {
+function CurrencyHud({ art, label, progress, value, suffix }: { art: number; label: string; progress?: number; value: string; suffix?: string }) {
   return <View accessibilityLabel={`${label} ${value}${suffix ?? ''}`} style={styles.currency}>
+    <View pointerEvents="none" style={styles.currencySheen} />
     <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" source={art} style={styles.currencyArt} transition={0} />
     <ThemedText darkColor="#FFF4D7" style={styles.currencyValue}>{value}<ThemedText darkColor="#CDBAAB" style={styles.currencySuffix}>{suffix}</ThemedText></ThemedText>
+    {progress != null ? <View pointerEvents="none" style={styles.currencyTrack}><View style={[styles.currencyFill, { width: `${progress * 100}%` }]} /></View> : null}
   </View>;
 }
 
@@ -202,49 +171,34 @@ function CompactOrder({ order, ready, onServe, friendshipLevel, effectsPaused }:
   </Pressable>;
 }
 
-function DockAction({ icon, label, onPress }: { icon: IconSymbolName; label: string; onPress: () => void }) {
-  return <Pressable accessibilityLabel={label} accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.dockAction, pressed && styles.pressed]}><IconSymbol color="#6A426E" name={icon} size={17} /></Pressable>;
-}
-
 const styles = StyleSheet.create({
   screen: { alignItems: 'center', backgroundColor: 'transparent', flex: 1, overflow: 'hidden' },
-  game: { flex: 1, gap: 6, minHeight: 0 },
+  game: { flex: 1, gap: 7, minHeight: 0 },
   loading: { alignItems: 'center', backgroundColor: '#2B1B13', flex: 1, gap: 12, justifyContent: 'center' },
-  hud: { alignItems: 'center', backgroundColor: 'rgba(27,24,42,0.90)', borderColor: 'rgba(255,220,159,0.48)', borderCurve: 'continuous', borderRadius: 19, borderWidth: 1, boxShadow: '0 6px 16px rgba(24,14,24,0.30), inset 0 1px 0 rgba(255,255,255,0.10)', flexDirection: 'row', gap: 4, minHeight: 44, padding: 4, position: 'relative' },
-  currency: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,239,207,0.15)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, flex: 1, flexDirection: 'row', gap: 1, height: 34, minWidth: 0, paddingHorizontal: 3 },
-  currencyArt: { height: 34, width: 34 },
-  currencyValue: { flexShrink: 1, fontFamily: AppFontFamilies.fredokaBold, fontSize: 16, fontVariant: ['tabular-nums'], lineHeight: 20 },
+  hud: { alignItems: 'center', flexDirection: 'row', gap: 6, minHeight: 43, paddingHorizontal: 1 },
+  currency: { alignItems: 'center', backgroundColor: 'rgba(26,23,38,0.93)', borderColor: 'rgba(255,223,165,0.43)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, boxShadow: '0 5px 13px rgba(25,14,18,0.30), inset 0 1px 0 rgba(255,255,255,0.10)', flex: 1, flexDirection: 'row', gap: 1, height: 39, minWidth: 0, overflow: 'hidden', paddingHorizontal: 4, position: 'relative' },
+  currencySheen: { backgroundColor: 'rgba(255,255,255,0.045)', borderRadius: 999, height: 20, left: 7, position: 'absolute', right: 7, top: 2 },
+  currencyArt: { height: 35, width: 35 },
+  currencyValue: { flexShrink: 1, fontFamily: AppFontFamilies.fredokaBold, fontSize: 16.5, fontVariant: ['tabular-nums'], lineHeight: 21 },
   currencySuffix: { fontFamily: AppFontFamilies.manrope, fontSize: 7.5, fontWeight: '800' },
-  hudAction: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,220,159,0.28)', borderRadius: 13, borderWidth: 1, height: 34, justifyContent: 'center', width: 36 },
-  levelTrack: { backgroundColor: 'rgba(255,255,255,0.08)', bottom: 1, height: 2, left: 12, overflow: 'hidden', position: 'absolute', right: 48 },
-  levelFill: { backgroundColor: '#EEC364', boxShadow: '0 0 5px rgba(238,195,100,0.7)', height: 2 },
-  orderRail: { flexDirection: 'row', gap: 6, height: 106, overflow: 'visible', paddingHorizontal: 2 },
-  orderSlot: { backgroundColor: 'rgba(38,33,53,0.86)', borderColor: 'rgba(255,225,174,0.30)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: '0 4px 12px rgba(27,17,28,0.24), inset 0 1px 0 rgba(255,255,255,0.08)', flex: 1, overflow: 'hidden', position: 'relative' },
-  orderSlotReady: { backgroundColor: 'rgba(73,57,66,0.94)', borderColor: '#F1BA52', boxShadow: '0 5px 14px rgba(63,32,16,0.32)' },
-  orderCharacter: { height: 83, left: '8%', position: 'absolute', top: -5, width: '84%' },
-  orderTray: { alignItems: 'center', backgroundColor: 'rgba(255,241,211,0.98)', borderColor: 'rgba(196,129,56,0.64)', borderRadius: 13, borderWidth: 1, bottom: 3, boxShadow: '0 2px 7px rgba(46,25,20,0.20)', flexDirection: 'row', height: 42, justifyContent: 'space-between', left: 3, paddingHorizontal: 5, position: 'absolute', right: 3 },
+  currencyTrack: { backgroundColor: 'rgba(255,255,255,0.08)', bottom: 0, height: 2.5, left: 10, overflow: 'hidden', position: 'absolute', right: 10 },
+  currencyFill: { backgroundColor: '#EEC364', boxShadow: '0 0 5px rgba(238,195,100,0.72)', height: 2.5 },
+  hudAction: { alignItems: 'center', backgroundColor: 'rgba(26,23,38,0.93)', borderColor: 'rgba(255,223,165,0.43)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, boxShadow: '0 5px 13px rgba(25,14,18,0.30), inset 0 1px 0 rgba(255,255,255,0.10)', height: 39, justifyContent: 'center', width: 42 },
+  orderRail: { flexDirection: 'row', gap: 7, height: 108, overflow: 'visible', paddingHorizontal: 2 },
+  orderSlot: { backgroundColor: 'rgba(45,36,41,0.88)', borderColor: 'rgba(255,226,174,0.46)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: '0 6px 15px rgba(32,19,19,0.28), inset 0 1px 0 rgba(255,255,255,0.10)', flex: 1, overflow: 'hidden', position: 'relative' },
+  orderSlotReady: { backgroundColor: 'rgba(66,65,39,0.94)', borderColor: '#F0C765', boxShadow: '0 7px 17px rgba(48,34,15,0.34), 0 0 12px rgba(240,199,101,0.15)' },
+  orderCharacter: { height: 87, left: '5%', position: 'absolute', top: -7, width: '90%' },
+  orderTray: { alignItems: 'center', backgroundColor: '#FFF2D5', borderColor: '#D6A75A', borderRadius: 14, borderWidth: 1, bottom: 3, boxShadow: '0 3px 8px rgba(71,42,22,0.22), inset 0 1px 0 rgba(255,255,255,0.80)', flexDirection: 'row', height: 43, justifyContent: 'space-between', left: 3, paddingHorizontal: 5, position: 'absolute', right: 3 },
   orderItems: { alignItems: 'center', flexDirection: 'row', gap: 1 },
   orderItem: { height: 37, position: 'relative', width: 37 },
-  quantityBadge: { alignItems: 'center', backgroundColor: '#A9581D', borderRadius: 999, bottom: 0, justifyContent: 'center', minWidth: 16, paddingHorizontal: 3, position: 'absolute', right: 0 },
+  quantityBadge: { alignItems: 'center', backgroundColor: '#A85C2A', borderColor: '#FFE8B6', borderRadius: 999, borderWidth: 1, bottom: 0, justifyContent: 'center', minWidth: 17, paddingHorizontal: 3, position: 'absolute', right: 0 },
   quantityText: { fontFamily: AppFontFamilies.manrope, fontSize: 7, fontWeight: '900' },
-  serveMark: { alignItems: 'center', backgroundColor: 'rgba(116,83,60,0.12)', borderRadius: 999, flexDirection: 'row', gap: 2, height: 23, justifyContent: 'center', minWidth: 29, paddingHorizontal: 4 },
-  serveMarkReady: { backgroundColor: '#6F8B3D', boxShadow: '0 2px 5px rgba(65,91,31,0.32)' },
+  serveMark: { alignItems: 'center', backgroundColor: 'rgba(116,83,60,0.11)', borderColor: 'rgba(127,91,57,0.16)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 2, height: 24, justifyContent: 'center', minWidth: 31, paddingHorizontal: 5 },
+  serveMarkReady: { backgroundColor: '#64863B', borderColor: '#456727', boxShadow: '0 2px 5px rgba(65,91,31,0.32)' },
   friendshipLevel: { fontFamily: AppFontFamilies.manrope, fontSize: 7.5, fontWeight: '900' },
-  boardStage: { alignItems: 'center', flex: 1, justifyContent: 'center', minHeight: 0, paddingVertical: 1, position: 'relative' },
+  boardStage: { alignItems: 'center', flex: 1, justifyContent: 'flex-start', minHeight: 0, paddingTop: 2, position: 'relative' },
   expansionButton: { alignItems: 'center', backgroundColor: '#F5D488', borderColor: '#B8752C', borderRadius: 999, borderWidth: 1, boxShadow: '0 3px 8px rgba(55,28,13,0.3)', flexDirection: 'row', gap: 2, paddingHorizontal: 8, paddingVertical: 5, position: 'absolute', right: 5, top: 5, zIndex: 40 },
   expansionLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9, fontWeight: '900' },
-  bottomDock: { alignItems: 'center', flexDirection: 'row', gap: 6, height: 61 },
-  storageChest: { alignItems: 'center', backgroundColor: '#302A45', borderColor: '#D9A75E', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, boxShadow: '0 5px 12px rgba(27,17,28,0.32), inset 0 1px 0 rgba(255,255,255,0.10)', height: 57, justifyContent: 'center', position: 'relative', width: 60 },
-  storageCount: { bottom: 2, fontFamily: AppFontFamilies.manrope, fontSize: 7.5, fontVariant: ['tabular-nums'], fontWeight: '900', position: 'absolute' },
-  alertBadge: { alignItems: 'center', backgroundColor: '#C94F3C', borderColor: '#FFF0CE', borderRadius: 999, borderWidth: 1, height: 17, justifyContent: 'center', position: 'absolute', right: -3, top: -3, width: 17 },
-  alertText: { fontFamily: AppFontFamilies.manrope, fontSize: 7.5, fontWeight: '900' },
-  dockContent: { alignItems: 'center', backgroundColor: 'rgba(255,224,181,0.97)', borderColor: '#C8843E', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, boxShadow: '0 5px 12px rgba(39,22,24,0.28), inset 0 1px 0 rgba(255,250,235,0.78)', flex: 1, flexDirection: 'row', gap: 5, height: 57, minWidth: 0, paddingHorizontal: 9 },
-  dockHint: { flex: 1, fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '800', lineHeight: 14, textAlign: 'center' },
-  itemCopy: { flex: 1, minWidth: 0 },
-  itemName: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 13, lineHeight: 16 },
-  itemMeta: { fontFamily: AppFontFamilies.manrope, fontSize: 8.5, fontWeight: '700', textTransform: 'capitalize' },
-  dockAction: { alignItems: 'center', backgroundColor: 'rgba(106,66,110,0.10)', borderRadius: 10, height: 34, justifyContent: 'center', width: 34 },
-  storedItem: { alignItems: 'center', height: 42, justifyContent: 'center', width: 42 },
   errorBanner: { alignSelf: 'center', backgroundColor: 'rgba(121,38,31,0.92)', borderRadius: 12, maxWidth: 360, paddingHorizontal: 12, paddingVertical: 7, position: 'absolute', zIndex: 80 },
   errorText: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '700' },
   toast: { alignSelf: 'center', backgroundColor: '#FFF0CE', borderColor: '#C98435', borderRadius: 999, borderWidth: 1, boxShadow: '0 6px 16px rgba(55,28,13,0.34)', paddingHorizontal: 15, paddingVertical: 7, position: 'absolute', zIndex: 90 },

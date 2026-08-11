@@ -34,3 +34,16 @@ export function mergeCellFromPoint(geometry: MergeBoardGeometry, x: number, y: n
   if (Math.abs(x - center.x) > hitSlop || Math.abs(y - center.y) > hitSlop) return null;
   return index;
 }
+
+export function mergeNeighborCellInDirection(geometry: Pick<MergeBoardGeometry, 'columns' | 'rows'>, source: number, directionX: number, directionY: number) {
+  'worklet';
+  if (source < 0 || source >= geometry.columns * geometry.rows) return null;
+  const sourceColumn = source % geometry.columns;
+  const sourceRow = Math.floor(source / geometry.columns);
+  const horizontal = Math.abs(directionX) >= Math.abs(directionY);
+  const column = sourceColumn + (horizontal ? Math.sign(directionX) : 0);
+  const row = sourceRow + (horizontal ? 0 : Math.sign(directionY));
+  if (column < 0 || column >= geometry.columns || row < 0 || row >= geometry.rows) return null;
+  if (column === sourceColumn && row === sourceRow) return null;
+  return row * geometry.columns + column;
+}

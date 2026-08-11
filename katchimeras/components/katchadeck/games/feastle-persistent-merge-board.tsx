@@ -28,7 +28,7 @@ import { mergeWorldItemArt } from '@/constants/merge-world-art';
 import { MERGE_GENERATORS_BY_ID, MERGE_HYBRID_RECIPES, MERGE_ITEMS_BY_ID, MERGE_WORLD_COLUMNS, MERGE_WORLD_ROWS } from '@/constants/merge-world-catalog';
 import { useMergeMotionPerformanceProbe, type MergeMotionPerformanceSample } from '@/hooks/use-merge-motion-performance-probe';
 import type { MergeBoardOccupant, MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
-import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, type MergeBoardGeometry } from '@/utils/merge-world/board-geometry';
+import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection, type MergeBoardGeometry } from '@/utils/merge-world/board-geometry';
 
 type SpriteRecord = { occupant: MergeBoardOccupant; cell: number };
 type MotionKind = 'move' | 'swap' | 'return' | 'spawn' | 'merge-source' | 'merge-target' | 'merge-result';
@@ -53,6 +53,9 @@ const SWAP_SPRING = { damping: 30, stiffness: 300, mass: 0.9, overshootClamping:
 // A finger rarely lands and lifts on the exact same pixel. Keep visual movement
 // immediate, but classify short jitter as a tap so generators remain responsive.
 const BOARD_TAP_SLOP = 9;
+const BOARD_STATIONARY_TAP_SLOP = 2;
+const BOARD_FLICK_MIN_DISTANCE = 3;
+const BOARD_FLICK_MIN_VELOCITY = 650;
 const MERGE_RESULT_BY_PAIR = Object.fromEntries([
   ...[...MERGE_ITEMS_BY_ID.values()].filter((item) => item.nextItemId).map((item) => [[item.id, item.id].sort().join('+'), item.nextItemId!]),
   ...MERGE_HYBRID_RECIPES.entries(),
@@ -90,9 +93,9 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   onCommand: (command: MergeWorldCommand) => MergeWorldCommandResult | null;
   effectsPaused?: SharedValue<number>;
 }) {
-  const gap = width < 380 ? 3 : 4;
-  const padding = width < 380 ? 5 : 7;
-  const border = 2;
+  const gap = 1;
+  const padding = width < 380 ? 5 : 6;
+  const border = 0;
   const widthCellSize = (width - (padding + border) * 2 - gap * (MERGE_WORLD_COLUMNS - 1)) / MERGE_WORLD_COLUMNS;
   const heightCellSize = maxHeight == null
     ? widthCellSize
@@ -118,6 +121,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   const touchDownY = useSharedValue(0);
   const gestureFinished = useSharedValue(false);
   const maxGestureDistance = useSharedValue(0);
+  const dragHapticTriggered = useSharedValue(false);
   const motionActive = useSharedValue(0);
   const localEffectsPaused = useSharedValue(0);
   const effectsPaused = providedEffectsPaused ?? localEffectsPaused;
@@ -139,19 +143,21 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   const [motions, setMotions] = useState<Record<string, SpriteMotion>>({});
   const motionsRef = useRef(motions);
   const [busy, setBusy] = useState(false);
-  const [invalidCell, setInvalidCell] = useState<number | null>(null);
-  const [feedbackCell, setFeedbackCell] = useState<number | null>(null);
+  const [invalidFeedback, setInvalidFeedback] = useState<{ id: number; cell: number } | null>(null);
+  const [mergeBursts, setMergeBursts] = useState<{ id: number; cell: number }[]>([]);
   const [spawnBursts, setSpawnBursts] = useState<{ id: number; cell: number }[]>([]);
   const operationSequence = useRef(0);
   const motionSequence = useRef(0);
   const burstSequence = useRef(0);
+  const mergeBurstSequence = useRef(0);
+  const invalidFeedbackSequence = useRef(0);
   const activeOperations = useRef(new Map<number, ActiveOperation>());
   const committedStateRef = useRef(state);
   const onSelectRef = useRef(onSelect);
   const selectedCellRef = useRef(selectedCell);
   const launchGeneratorRef = useRef<(generatorId: string) => void>(() => undefined);
-  const dropRef = useRef<(instanceId: string, dx: number, dy: number) => void>(() => undefined);
-  const boardDropRef = useRef<(instanceId: string, worldX: number, worldY: number, epoch: number) => void>(() => undefined);
+  const dropRef = useRef<(instanceId: string, dx: number, dy: number, intendedTargetCell?: number | null) => void>(() => undefined);
+  const boardDropRef = useRef<(instanceId: string, worldX: number, worldY: number, epoch: number, intendedTargetCell: number | null) => void>(() => undefined);
   const boardTapRef = useRef<(instanceId: string, worldX: number, worldY: number, epoch: number) => void>(() => undefined);
   const boardCancelRef = useRef<(instanceId: string, worldX: number, worldY: number, epoch: number) => void>(() => undefined);
 
@@ -259,8 +265,9 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
 
   const returnSpriteHome = useCallback((sprite: SpriteRecord, dx: number, dy: number, invalid?: number) => {
     if (invalid != null) {
-      setInvalidCell(invalid);
-      setTimeout(() => setInvalidCell((current) => current === invalid ? null : current), 260);
+      const feedback = { id: ++invalidFeedbackSequence.current, cell: invalid };
+      setInvalidFeedback(feedback);
+      setTimeout(() => setInvalidFeedback((current) => current?.id === feedback.id ? null : current), 300);
       if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     }
     const origin = mergeCellOrigin(geometry, sprite.cell);
@@ -271,7 +278,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     });
   }, [beginOperation, geometry]);
 
-  const drop = useCallback((instanceId: string, dx: number, dy: number) => {
+  const drop = useCallback((instanceId: string, dx: number, dy: number, intendedTargetCell?: number | null) => {
     const current = presentationRef.current;
     const currentSprites = spritesRef.current;
     const sprite = currentSprites.find((entry) => spriteId(entry) === instanceId);
@@ -289,7 +296,9 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       finishInterruptedOperation();
     };
     const sourceCenter = mergeCellCenter(geometry, sprite.cell);
-    const to = mergeCellFromPoint(geometry, sourceCenter.x + dx, sourceCenter.y + dy);
+    const to = intendedTargetCell === undefined
+      ? mergeCellFromPoint(geometry, sourceCenter.x + dx, sourceCenter.y + dy)
+      : intendedTargetCell;
     if (to == null || to === sprite.cell) {
       returnHome();
       return;
@@ -337,8 +346,11 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       nextMotions[instanceId] = { kind: 'merge-source', startX: sourceOrigin.x + dx, startY: sourceOrigin.y + dy };
       nextMotions[spriteId(target)] = { kind: 'merge-target', startX: targetOrigin.x, startY: targetOrigin.y };
       nextMotions[spriteId(result)] = { kind: 'merge-result', startX: targetOrigin.x, startY: targetOrigin.y };
-      setFeedbackCell(to);
-      setTimeout(() => setFeedbackCell((cell) => cell === to ? null : cell), 430);
+      if (!reduceMotion) {
+        const burst = { id: ++mergeBurstSequence.current, cell: to };
+        setMergeBursts((bursts) => [...bursts, burst]);
+        setTimeout(() => setMergeBursts((bursts) => bursts.filter((entry) => entry.id !== burst.id)), 520);
+      }
     } else if (target) {
       nextSprites = currentSprites.map((entry) => spriteId(entry) === instanceId
         ? { ...entry, cell: to }
@@ -355,7 +367,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     if (merging && process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     beginOperation({ nextState: predicted.state, nextSprites, nextMotions });
     finishInterruptedOperation();
-  }, [beginOperation, detachMotion, finishOperationIfReady, geometry, hoverCell, onCommand, onSelect, returnSpriteHome]);
+  }, [beginOperation, detachMotion, finishOperationIfReady, geometry, hoverCell, onCommand, onSelect, reduceMotion, returnSpriteHome]);
   dropRef.current = drop;
 
   const launchGenerator = useCallback((generatorId: string) => {
@@ -390,12 +402,15 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       kind: 'spawn',
     });
     onSelect(null);
-    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, [beginOperation, cellSize, geometry, onCommand, onSelect, reduceMotion, reducedFx]);
   launchGeneratorRef.current = launchGenerator;
 
   const pickSprite = useCallback((_instanceId: string) => {
-    if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  const dragSprite = useCallback(() => {
+    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }, []);
 
   const tapSprite = useCallback((instanceId: string) => {
@@ -417,11 +432,11 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     });
   }, [activeDragId, activeSourceCell, dragEpoch, dragPhase, dragTranslationX, dragTranslationY]);
 
-  const dropFromBoard = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number) => {
+  const dropFromBoard = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number, intendedTargetCell: number | null) => {
     const sprite = spritesRef.current.find((entry) => spriteId(entry) === instanceId);
     if (sprite) {
       const origin = mergeCellOrigin(geometry, sprite.cell);
-      dropRef.current(instanceId, worldX - origin.x, worldY - origin.y);
+      dropRef.current(instanceId, worldX - origin.x, worldY - origin.y, intendedTargetCell);
     }
     releaseBoardOwnership(epoch);
   }, [geometry, releaseBoardOwnership]);
@@ -450,7 +465,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   boardDropRef.current = dropFromBoard;
   boardTapRef.current = tapFromBoard;
   boardCancelRef.current = cancelFromBoard;
-  const emitBoardDrop = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number) => boardDropRef.current(instanceId, worldX, worldY, epoch), []);
+  const emitBoardDrop = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number, intendedTargetCell: number | null) => boardDropRef.current(instanceId, worldX, worldY, epoch, intendedTargetCell), []);
   const emitBoardTap = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number) => boardTapRef.current(instanceId, worldX, worldY, epoch), []);
   const emitBoardCancel = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number) => boardCancelRef.current(instanceId, worldX, worldY, epoch), []);
 
@@ -500,7 +515,9 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       dragTranslationY.value = 0;
       gestureFinished.value = false;
       maxGestureDistance.value = 0;
+      dragHapticTriggered.value = false;
       if (!id) return;
+      runOnJS(pickSprite)(id);
       const column = cell % geometry.columns;
       const row = Math.floor(cell / geometry.columns);
       const pitch = geometry.cellSize + geometry.gap;
@@ -511,13 +528,17 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       cancelAnimation(effectsPaused);
       effectsPaused.value = 1;
     })
-    .onStart(() => {
-      const id = activeDragId.value;
-      if (id) runOnJS(pickSprite)(id);
-    })
     .onUpdate((event) => {
       if (!activeDragId.value) return;
-      maxGestureDistance.value = Math.max(maxGestureDistance.value, Math.hypot(event.translationX, event.translationY));
+      const distance = Math.hypot(event.translationX, event.translationY);
+      const speed = Math.hypot(event.velocityX, event.velocityY);
+      maxGestureDistance.value = Math.max(maxGestureDistance.value, distance);
+      const hasDragIntent = distance > BOARD_TAP_SLOP
+        || (distance >= BOARD_FLICK_MIN_DISTANCE && speed >= BOARD_FLICK_MIN_VELOCITY);
+      if (hasDragIntent && !dragHapticTriggered.value) {
+        dragHapticTriggered.value = true;
+        runOnJS(dragSprite)();
+      }
       dragTranslationX.value = event.translationX;
       dragTranslationY.value = event.translationY;
       hoverCell.value = mergeCellFromPointWorklet(
@@ -537,7 +558,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       const dx = touch.x - touchDownX.value;
       const dy = touch.y - touchDownY.value;
       maxGestureDistance.value = Math.max(maxGestureDistance.value, Math.hypot(dx, dy));
-      if (maxGestureDistance.value > BOARD_TAP_SLOP) return;
+      if (maxGestureDistance.value > BOARD_STATIONARY_TAP_SLOP) return;
       // Pan may never become ACTIVE for a perfectly still press. Commit the tap
       // from the raw touch-up lifecycle and guard onEnd so it cannot fire twice.
       gestureFinished.value = true;
@@ -559,11 +580,25 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       const worldY = grabY.value + event.translationY;
       const epoch = dragEpoch.value;
       maxGestureDistance.value = Math.max(maxGestureDistance.value, Math.hypot(event.translationX, event.translationY));
-      if (maxGestureDistance.value <= BOARD_TAP_SLOP) {
+      const speed = Math.hypot(event.velocityX, event.velocityY);
+      const isFlick = maxGestureDistance.value >= BOARD_FLICK_MIN_DISTANCE && speed >= BOARD_FLICK_MIN_VELOCITY;
+      if ((maxGestureDistance.value > BOARD_TAP_SLOP || isFlick) && !dragHapticTriggered.value) {
+        dragHapticTriggered.value = true;
+        runOnJS(dragSprite)();
+      }
+      if (maxGestureDistance.value <= BOARD_TAP_SLOP && !isFlick) {
         runOnJS(emitBoardTap)(id, worldX, worldY, epoch);
       } else {
-        const targetCell = mergeCellFromPointWorklet(worldX + geometry.cellSize / 2, worldY + geometry.cellSize / 2, geometry.cellSize, geometry.gap, geometry.inset, geometry.columns, geometry.rows);
         const sourceCell = activeSourceCell.value;
+        let targetCell = mergeCellFromPointWorklet(worldX + geometry.cellSize / 2, worldY + geometry.cellSize / 2, geometry.cellSize, geometry.gap, geometry.inset, geometry.columns, geometry.rows);
+        if (isFlick && targetCell === sourceCell) {
+          targetCell = mergeNeighborCellInDirection(
+            { columns: geometry.columns, rows: geometry.rows },
+            sourceCell,
+            event.velocityX || event.translationX,
+            event.velocityY || event.translationY,
+          ) ?? -1;
+        }
         if (sourceCell >= 0 && targetCell >= 0 && sourceCell !== targetCell) {
           const ids = [...occupancyIds.value];
           const definitions = [...occupancyDefinitions.value];
@@ -585,7 +620,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
           occupancyIds.value = ids;
           occupancyDefinitions.value = definitions;
         }
-        runOnJS(emitBoardDrop)(id, worldX, worldY, epoch);
+        runOnJS(emitBoardDrop)(id, worldX, worldY, epoch, targetCell < 0 ? null : targetCell);
       }
     })
     .onFinalize(() => {
@@ -596,10 +631,10 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
         runOnJS(emitBoardCancel)(id, grabX.value + dragTranslationX.value, grabY.value + dragTranslationY.value, dragEpoch.value);
       }
       if (!reducedFx) effectsPaused.value = withDelay(500, withTiming(0, { duration: 1 }));
-    }), [activeDragId, activeSourceCell, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, effectsPaused, emitBoardCancel, emitBoardDrop, emitBoardTap, geometry.cellSize, geometry.columns, geometry.gap, geometry.inset, geometry.rows, gestureFinished, grabX, grabY, hoverCell, maxGestureDistance, occupancyDefinitions, occupancyIds, pickSprite, reducedFx, touchDownX, touchDownY]);
+    }), [activeDragId, activeSourceCell, dragEpoch, dragHapticTriggered, dragPhase, dragSprite, dragTranslationX, dragTranslationY, effectsPaused, emitBoardCancel, emitBoardDrop, emitBoardTap, geometry.cellSize, geometry.columns, geometry.gap, geometry.inset, geometry.rows, gestureFinished, grabX, grabY, hoverCell, maxGestureDistance, occupancyDefinitions, occupancyIds, pickSprite, reducedFx, touchDownX, touchDownY]);
 
   return <GestureDetector gesture={boardGesture}><View accessibilityLabel="Feastle merge board, seven columns by nine rows" style={[styles.board, busy && styles.boardAnimating, { height: boardHeight, padding, width: boardWidth }]}>
-    <LinearGradient colors={['#34324F', '#1E1C34', '#11101F']} locations={[0, 0.48, 1]} pointerEvents="none" style={styles.boardGradient} />
+    <LinearGradient colors={['#788143', '#55602F', '#384321']} locations={[0, 0.52, 1]} pointerEvents="none" style={styles.boardGradient} />
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       {presentation.board.map((cell, index) => {
         const origin = mergeCellOrigin(geometry, index);
@@ -614,10 +649,9 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
           accessibilityLabel={label}
           blocked={cell.locked && !occupant}
           compatible={compatible}
-          feedback={!reduceMotion && feedbackCell === index}
           height={cellSize}
           index={index}
-          invalid={invalidCell === index}
+          invalid={invalidFeedback?.cell === index}
           key={index}
           leafSize={Math.max(15, cellSize * 0.38)}
           left={origin.x}
@@ -657,17 +691,20 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
         />;
       })}
     </View>
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.feedbackLayer]}>
+      {mergeBursts.map((burst) => <MergeCelebrationOverlay cell={burst.cell} geometry={geometry} key={burst.id} />)}
+      {invalidFeedback ? <InvalidCellFeedback cell={invalidFeedback.cell} geometry={geometry} key={invalidFeedback.id} /> : null}
+    </View>
   </View></GestureDetector>;
 }
 
-const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibilityLabel, blocked, invalid, selected, compatible, feedback, index, leafSize, left, top, width, height, onActivate }: {
+const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibilityLabel, blocked, invalid, selected, compatible, index, leafSize, left, top, width, height, onActivate }: {
   accessibilityActionLabel: string;
   accessibilityLabel: string;
   blocked: boolean;
   invalid: boolean;
   selected: boolean;
   compatible: boolean;
-  feedback: boolean;
   index: number;
   leafSize: number;
   left: number;
@@ -676,9 +713,19 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
   height: number;
   onActivate: (cell: number) => void;
 }) {
+  const column = index % MERGE_WORLD_COLUMNS;
+  const row = Math.floor(index / MERGE_WORLD_COLUMNS);
+  const alternate = (column + row) % 2 === 1;
   return <View style={[styles.cell, {
-    backgroundColor: blocked ? '#171625' : compatible ? '#4D4A55' : selected ? '#4D4662' : '#29283F',
-    borderColor: invalid ? '#F38A72' : compatible ? '#FFD681' : selected ? '#FFE09B' : blocked ? 'rgba(255,241,218,0.045)' : 'rgba(235,226,255,0.11)',
+    backgroundColor: blocked
+      ? alternate ? '#2D361F' : '#323D24'
+      : compatible ? '#F1D995'
+        : selected ? '#FFE9AD'
+          : alternate ? '#ECD4A7' : '#F2DFB8',
+    borderColor: invalid ? '#D95E4B' : compatible ? '#D19135' : selected ? '#C67E2C' : blocked ? 'rgba(225,214,167,0.14)' : 'rgba(150,104,51,0.34)',
+    boxShadow: blocked
+      ? 'inset 0 2px 2px rgba(218,222,170,0.07), inset 0 -3px 4px rgba(13,20,9,0.17)'
+      : 'inset 0 2px 2px rgba(255,251,226,0.34), inset 0 -3px 4px rgba(101,65,25,0.11)',
     height, left, top, width,
   }]}>
     <View
@@ -688,11 +735,36 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
       accessibilityRole="button"
       onAccessibilityAction={() => onActivate(index)}
       style={styles.cellPressable}>
-      {blocked ? <IconSymbol color="rgba(255,241,218,0.22)" name="leaf.fill" size={leafSize} /> : null}
-      {feedback ? <FeastleMergeCelebration size={height} /> : null}
+      {blocked ? <IconSymbol color="rgba(224,213,165,0.30)" name="leaf.fill" size={leafSize} /> : null}
     </View>
   </View>;
 });
+
+function MergeCelebrationOverlay({ cell, geometry }: { cell: number; geometry: MergeBoardGeometry }) {
+  const origin = mergeCellOrigin(geometry, cell);
+  return <View style={[styles.mergeCelebrationOverlay, { height: geometry.cellSize, left: origin.x, top: origin.y, width: geometry.cellSize }]}>
+    <FeastleMergeCelebration size={geometry.cellSize} />
+  </View>;
+}
+
+function InvalidCellFeedback({ cell, geometry }: { cell: number; geometry: MergeBoardGeometry }) {
+  const progress = useSharedValue(0);
+  const origin = mergeCellOrigin(geometry, cell);
+  useEffect(() => {
+    progress.value = 0;
+    progress.value = withTiming(1, { duration: 280, easing: Easing.out(Easing.quad) });
+  }, [progress]);
+  const style = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.12, 0.78, 1], [0.35, 1, 0.82, 0]),
+    transform: [
+      { translateX: interpolate(progress.value, [0, 0.15, 0.33, 0.52, 0.7, 1], [0, -5, 5, -4, 2.5, 0]) },
+      { scale: interpolate(progress.value, [0, 0.18, 0.72, 1], [1, 1.025, 1.01, 1]) },
+    ],
+  }));
+  return <Animated.View style={[styles.invalidCellFeedback, { height: geometry.cellSize, left: origin.x, top: origin.y, width: geometry.cellSize }, style]}>
+    <IconSymbol color="#FFE1B4" name="leaf.fill" size={Math.max(15, geometry.cellSize * 0.38)} />
+  </Animated.View>;
+}
 
 function HoverCellOverlay({ geometry, hoverCell }: { geometry: MergeBoardGeometry; hoverCell: SharedValue<number> }) {
   const style = useAnimatedStyle(() => {
@@ -953,12 +1025,15 @@ export function PersistentMergeItemArt({ definitionId, size }: { definitionId: s
 }
 
 const styles = StyleSheet.create({
-  board: { alignSelf: 'center', backgroundColor: '#171625', borderColor: '#D9A85C', borderCurve: 'continuous', borderRadius: 25, borderWidth: 2, boxShadow: '0 14px 30px rgba(22,13,26,0.48), inset 0 2px 0 rgba(255,231,185,0.20)', overflow: 'visible', position: 'relative' },
-  boardGradient: { ...StyleSheet.absoluteFillObject, borderRadius: 23 },
+  board: { alignSelf: 'center', backgroundColor: '#4D582B', borderRadius: 0, borderWidth: 0, boxShadow: '0 13px 24px rgba(39,31,16,0.38), 0 3px 5px rgba(39,31,16,0.22), inset 0 3px 2px rgba(255,242,193,0.24), inset 0 -4px 5px rgba(29,38,16,0.34)', overflow: 'visible', position: 'relative' },
+  boardGradient: { ...StyleSheet.absoluteFillObject, borderRadius: 0 },
   boardAnimating: { zIndex: 30 },
-  cell: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 10, borderWidth: 1, justifyContent: 'center', overflow: 'visible', position: 'absolute' },
+  cell: { alignItems: 'center', borderRadius: 0, borderWidth: 0.5, justifyContent: 'center', overflow: 'visible', position: 'absolute' },
   cellPressable: { alignItems: 'center', height: '100%', justifyContent: 'center', width: '100%' },
-  hoverCell: { backgroundColor: 'rgba(111,104,139,0.72)', borderColor: '#FFF0C3', borderRadius: 10, borderWidth: 1.5, left: 0, position: 'absolute', top: 0, zIndex: 20 },
+  hoverCell: { backgroundColor: 'rgba(244,204,110,0.34)', borderColor: '#E1A644', borderRadius: 0, borderWidth: 2, left: 0, position: 'absolute', top: 0, zIndex: 20 },
+  feedbackLayer: { zIndex: 2000 },
+  mergeCelebrationOverlay: { alignItems: 'center', justifyContent: 'center', position: 'absolute', zIndex: 1400 },
+  invalidCellFeedback: { alignItems: 'center', backgroundColor: 'rgba(205,76,56,0.38)', borderColor: '#F38A72', borderRadius: 0, borderWidth: 2, boxShadow: '0 0 12px rgba(225,91,67,0.42)', justifyContent: 'center', position: 'absolute', zIndex: 1450 },
   sprite: { alignItems: 'center', justifyContent: 'center', position: 'absolute' },
   spawnBurst: { alignItems: 'center', justifyContent: 'center', position: 'absolute', zIndex: 900 },
   spawnHalo: { backgroundColor: 'rgba(255,205,112,0.24)', borderColor: 'rgba(255,239,190,0.72)', borderRadius: 999, borderWidth: 1.5, position: 'absolute' },
@@ -969,6 +1044,6 @@ const styles = StyleSheet.create({
   familyTierText: { fontSize: 9, fontWeight: '900' },
   generatorArt: { height: '92%', width: '92%' },
   generatorSprite: { alignItems: 'center', justifyContent: 'center' },
-  generatorCharge: { alignItems: 'center', backgroundColor: '#6B4A76', borderColor: '#D6B8DB', borderRadius: 999, borderWidth: 1, bottom: 1, flexDirection: 'row', gap: 2, paddingHorizontal: 4, position: 'absolute', right: 1 },
+  generatorCharge: { alignItems: 'center', backgroundColor: '#68517A', borderColor: '#E2C9E7', borderRadius: 999, borderWidth: 1, bottom: 1, boxShadow: '0 2px 5px rgba(48,30,49,0.28)', flexDirection: 'row', gap: 2, paddingHorizontal: 4, position: 'absolute', right: 1 },
   generatorChargeText: { fontSize: 8, fontVariant: ['tabular-nums'], fontWeight: '900' },
 });
