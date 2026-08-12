@@ -1,8 +1,9 @@
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, cancelAnimation, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import type { SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,29 +11,21 @@ import { ThemedText } from '@/components/themed-text';
 import { RewardSplash, type RewardSplashItem } from '@/components/katchadeck/ui/reward-splash';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
-  MERGE_CHARACTER_NAMES,
   MERGE_GENERATORS_BY_ID,
   MERGE_LEVEL_THRESHOLDS,
 } from '@/constants/merge-world-catalog';
 import { mergeWorldGeneratorArt } from '@/constants/merge-world-art';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import { useMergeWorld } from '@/features/merge-world/merge-world-provider';
-import type { HomeVisualKey } from '@/types/home';
-import type { MergeCharacterId, MergeOrder, MergeWorldCommand } from '@/types/merge-world';
-import { resolveCreatureArtSource } from '@/utils/creature-art';
+import type { MergeOrder, MergeWorldCommand } from '@/types/merge-world';
 import { markFlowStart, reportFlowReady } from '@/utils/flow-performance';
-import { availableExpansion, readyMergeOrderIds } from '@/utils/merge-world/engine';
+import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
+import { availableExpansion, mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds } from '@/utils/merge-world/engine';
 import { beginFeastleReturn, loadFeastleStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
 
-import { FeastlePersistentMergeBoard, PersistentMergeItemArt } from './feastle-persistent-merge-board';
-
-const CHARACTER_VISUALS: Record<MergeCharacterId, HomeVisualKey> = {
-  feastle: 'feastle',
-  mossprout: 'mossprout',
-  steppling: 'steppling',
-  shellio: 'shellio',
-  voyagle: 'voyagle',
-};
+import { FeastlePersistentMergeBoard, type MergeBoardScreenMetrics } from './feastle-persistent-merge-board';
+import { MergeOrderRail, type MergeTrayEntry } from './merge-order-rail';
+import { MergeServeRewardOverlay, type MergeScreenPoint, type MergeServeRewardFlight } from './merge-serve-reward-overlay';
 
 const MERGE_CURRENCY_ART = {
   energy: require('../../../assets/images/katchimeras/merge-world/ui/energy.webp'),
@@ -40,22 +33,30 @@ const MERGE_CURRENCY_ART = {
   level: require('../../../assets/images/katchimeras/merge-world/ui/merge-level.webp'),
 } as const;
 
-const MERGE_ORDER_TRAY_ART = require('../../../assets/images/katchimeras/merge-world/ui/order-service-tray.webp');
-
 export function MergeWorldScreen({ active = true, effectsPaused }: { active?: boolean; effectsPaused?: SharedValue<number> } = {}) {
   const router = useRouter();
   const { focusOrderId } = useLocalSearchParams<{ focusOrderId?: string }>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { state, loading, error, lastResult, friendshipLevels, dispatch: send } = useMergeWorld();
+  const { state, loading, error, lastResult, dispatch: send } = useMergeWorld();
   const [selectedCell, setSelectedCell] = useState<number | null>(null);
   const [boardAreaHeight, setBoardAreaHeight] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [story, setStory] = useState(loadFeastleStory);
+  const [serveFlight, setServeFlight] = useState<MergeServeRewardFlight | null>(null);
+  const [presentedCoins, setPresentedCoins] = useState<number | null>(null);
+  const [coinPulseNonce, setCoinPulseNonce] = useState(0);
+  const screenRef = useRef<View>(null);
+  const coinHudRef = useRef<View>(null);
+  const boardMetricsRef = useRef<MergeBoardScreenMetrics | null>(null);
+  const activeServeRef = useRef(false);
+  const activeServeOrderRef = useRef<{ coinAmount: number; orderId: string } | null>(null);
+  const serveNonceRef = useRef(0);
   const storyNavigationPendingRef = useRef(false);
   const contentWidth = Math.min(width - 12, 600);
   const flowReady = !loading && state != null;
   const readyOrderIds = useMemo(() => state ? readyMergeOrderIds(state) : new Set<string>(), [state]);
+  const hiddenServingItemIds = useMemo(() => new Set(serveFlight?.phase === 'items' ? serveFlight.items.map((item) => item.instanceId) : []), [serveFlight]);
   const generatorUnlockRewards = useMemo(() => (state?.generatorUnlockReceipts ?? [])
     .filter((receipt) => receipt.seenAt == null)
     .flatMap((receipt): RewardSplashItem[] => {
@@ -115,6 +116,84 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
 
   const dispatch = useCallback((command: MergeWorldCommand) => send(command), [send]);
 
+  const trayEntries = useMemo<MergeTrayEntry[]>(() => state ? [
+    ...(story.status === 'return_available' ? [{
+      id: `chat-note:${story.id}:${story.targetLevel}`,
+      kind: 'chat_note' as const,
+      characterId: 'feastle' as const,
+      bondPoints: story.pendingBondPoints,
+    }] : []),
+    ...state.activeOrders.map((order) => ({
+      id: order.id,
+      kind: 'order' as const,
+      order,
+      itemReadiness: mergeOrderItemReadiness(state, order),
+      ready: readyOrderIds.has(order.id),
+    })),
+  ] : [], [readyOrderIds, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
+
+  const startServeAnimation = useCallback(async (order: MergeOrder, itemTargets: readonly MergeScreenPoint[]) => {
+    if (!state || activeServeRef.current) return false;
+    activeServeRef.current = true;
+    const boardMetrics = boardMetricsRef.current;
+    const servingItems = mergeOrderServingCells(state, order);
+    const [screenRect, coinRect] = await Promise.all([measureViewInWindow(screenRef), measureViewInWindow(coinHudRef)]);
+    if (!boardMetrics || !screenRect || !coinRect || servingItems.length !== itemTargets.length) {
+      activeServeRef.current = false;
+      return false;
+    }
+    const localTargets = itemTargets.map((point) => ({ x: point.x - screenRect.x, y: point.y - screenRect.y }));
+    const items = servingItems.map((item, index) => {
+      const center = mergeCellCenter(boardMetrics.geometry, item.cell);
+      return {
+        definitionId: item.definitionId,
+        from: { x: boardMetrics.x - screenRect.x + center.x, y: boardMetrics.y - screenRect.y + center.y },
+        instanceId: item.instanceId,
+        to: localTargets[index],
+      };
+    });
+    const coinFrom = localTargets.reduce((point, target) => ({ x: point.x + target.x / localTargets.length, y: point.y + target.y / localTargets.length }), { x: 0, y: 0 });
+    const coinTo = { x: coinRect.x - screenRect.x + coinRect.width / 2, y: coinRect.y - screenRect.y + coinRect.height / 2 };
+    serveNonceRef.current += 1;
+    activeServeOrderRef.current = { coinAmount: order.reward.coins, orderId: order.id };
+    setServeFlight({ coinAmount: order.reward.coins, coinFrom, coinTo, items, nonce: serveNonceRef.current, phase: 'items' });
+    return true;
+  }, [state]);
+
+  const handleServeItemsArrive = useCallback(() => {
+    const activeOrder = activeServeOrderRef.current;
+    if (!activeOrder) return;
+    const result = dispatch({ type: 'serveOrder', orderId: activeOrder.orderId, now: Date.now() });
+    if (!result?.changed) {
+      activeServeRef.current = false;
+      activeServeOrderRef.current = null;
+      setServeFlight(null);
+      return;
+    }
+    setPresentedCoins(result.state.coins - activeOrder.coinAmount);
+    setServeFlight((current) => current ? { ...current, phase: 'coins' } : null);
+    if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }, [dispatch]);
+
+  const handleCoinArrive = useCallback((amount: number) => {
+    setPresentedCoins((current) => current == null ? amount : current + amount);
+    setCoinPulseNonce((current) => current + 1);
+    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  const finishServeAnimation = useCallback(() => {
+    setPresentedCoins(null);
+    setServeFlight(null);
+    activeServeRef.current = false;
+    activeServeOrderRef.current = null;
+  }, []);
+  const handleBoardScreenMetrics = useCallback((metrics: MergeBoardScreenMetrics) => {
+    boardMetricsRef.current = metrics;
+  }, []);
+  const rerollOrder = useCallback((orderId: string) => {
+    dispatch({ type: 'rerollOrder', orderId, now: Date.now() });
+  }, [dispatch]);
+
   const measureBoardArea = useCallback((event: LayoutChangeEvent) => {
     const next = Math.floor(event.nativeEvent.layout.height);
     setBoardAreaHeight((current) => current === next ? current : next);
@@ -129,72 +208,53 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
   const levelRatio = nextThreshold == null ? 1 : Math.max(0, Math.min(1, (state.mergeXp - currentThreshold) / (nextThreshold - currentThreshold)));
   const expansion = availableExpansion(state);
   const expansionReady = Boolean(expansion && state.mergeLevel >= expansion.requiredLevel && state.coins >= expansion.coinCost);
-  const isFeastleThreeDishChapter = story.targetLevel === 4
-    && (story.status === 'order_active' || story.status === 'return_available');
-  const feastleChapterOrders = isFeastleThreeDishChapter
-    ? new Map(state.activeOrders
-        .filter((order) => order.characterId === 'feastle' && order.storyTargetLevel === 4)
-        .map((order) => [order.storyStep ?? 1, order]))
-    : null;
-
   return (
-    <View style={styles.screen}>
+    <View ref={screenRef} style={styles.screen}>
       <View style={[styles.game, { paddingTop: Math.max(insets.top + 3, 7), paddingBottom: Math.max(insets.bottom + 3, 7), width: contentWidth }]}>
         <View style={styles.hud}>
           <CurrencyHud art={MERGE_CURRENCY_ART.energy} label="Energy" value={`${state.energy.value}`} suffix={`/${state.energy.cap}`} />
-          <CurrencyHud art={MERGE_CURRENCY_ART.coins} label="Coins" value={String(state.coins)} />
+          <CurrencyHud art={MERGE_CURRENCY_ART.coins} label="Coins" pulseNonce={coinPulseNonce} targetRef={coinHudRef} value={String(presentedCoins ?? state.coins)} />
           <CurrencyHud art={MERGE_CURRENCY_ART.level} label="Merge level" progress={levelRatio} value={String(state.mergeLevel)} />
           <Pressable accessibilityLabel="Open legacy games" accessibilityRole="button" onPress={() => router.push('/legacy-games')} style={({ pressed }) => [styles.hudAction, pressed && styles.pressed]}>
             <IconSymbol color="#F6D993" name="gamecontroller.fill" size={19} />
           </Pressable>
         </View>
 
-        <View accessibilityLabel="Katchimera orders" style={styles.orderRail}>
-          {feastleChapterOrders ? [1, 2, 3].map((step) => {
-            const order = feastleChapterOrders.get(step);
-            if (order) return <CompactOrder
-              friendshipLevel={friendshipLevels[order.characterId] ?? 1}
-              focused={order.id === focusOrderId}
-              key={order.id}
-              onServe={() => dispatch({ type: 'serveOrder', orderId: order.id, now: Date.now() })}
-              onReroll={() => dispatch({ type: 'rerollOrder', orderId: order.id, now: Date.now() })}
-              order={order}
-              ready={readyOrderIds.has(order.id)}
-            />;
-            if (story.status === 'return_available' && step === 3) return <StoryReturnCard bondPoints={story.pendingBondPoints} key="feastle-chapter-return" onPress={openFeastleReturn} />;
-            return <CompletedOrderSlot key={`feastle-order-complete:${step}`} step={step} />;
-          }) : state.activeOrders.slice(0, story.status === 'return_available' ? 2 : 3).map((order) => <CompactOrder
-              friendshipLevel={friendshipLevels[order.characterId] ?? 1}
-              focused={order.id === focusOrderId}
-              key={order.id}
-              onServe={() => dispatch({ type: 'serveOrder', orderId: order.id, now: Date.now() })}
-              onReroll={() => dispatch({ type: 'rerollOrder', orderId: order.id, now: Date.now() })}
-              order={order}
-              ready={readyOrderIds.has(order.id)}
-            />)}
-          {!isFeastleThreeDishChapter && story.status === 'return_available' ? <StoryReturnCard bondPoints={story.pendingBondPoints} onPress={openFeastleReturn} /> : null}
-        </View>
+        <View style={styles.mergeArea}>
+          <MergeOrderRail
+            entries={trayEntries}
+            focusOrderId={focusOrderId}
+            onOpenChat={openFeastleReturn}
+            onReroll={(order) => rerollOrder(order.id)}
+            onServe={startServeAnimation}
+          />
 
-        <View onLayout={measureBoardArea} style={styles.boardStage}>
-          {active && boardAreaHeight > 0 ? <FeastlePersistentMergeBoard
-            effectsPaused={effectsPaused}
-            maxHeight={boardAreaHeight - 4}
-            onCommand={dispatch}
-            onSelect={setSelectedCell}
-            selectedCell={selectedCell}
-            state={state}
-            width={contentWidth}
-          /> : null}
-          {expansionReady && expansion ? <Pressable accessibilityLabel={`Clear blockers and unlock ${expansion.cells.length} spaces`} accessibilityRole="button" onPress={() => dispatch({ type: 'unlockExpansion', expansionId: expansion.id, now: Date.now() })} style={({ pressed }) => [styles.expansionButton, pressed && styles.pressed]}>
-            <IconSymbol color="#4A291B" name="leaf.fill" size={12} />
-            <ThemedText darkColor="#4A291B" style={styles.expansionLabel}>+{expansion.cells.length}</ThemedText>
-          </Pressable> : null}
+          <ServiceCounter viewportWidth={width} />
+
+          <View onLayout={measureBoardArea} style={styles.boardStage}>
+            {active && boardAreaHeight > 0 ? <FeastlePersistentMergeBoard
+              effectsPaused={effectsPaused}
+              hiddenItemInstanceIds={hiddenServingItemIds}
+              maxHeight={boardAreaHeight - 1}
+              onCommand={dispatch}
+              onSelect={setSelectedCell}
+              onScreenMetrics={handleBoardScreenMetrics}
+              selectedCell={selectedCell}
+              state={state}
+              width={contentWidth}
+            /> : null}
+            {expansionReady && expansion ? <Pressable accessibilityLabel={`Clear blockers and unlock ${expansion.cells.length} spaces`} accessibilityRole="button" onPress={() => dispatch({ type: 'unlockExpansion', expansionId: expansion.id, now: Date.now() })} style={({ pressed }) => [styles.expansionButton, pressed && styles.pressed]}>
+              <IconSymbol color="#4A291B" name="leaf.fill" size={12} />
+              <ThemedText darkColor="#4A291B" style={styles.expansionLabel}>+{expansion.cells.length}</ThemedText>
+            </Pressable> : null}
+          </View>
         </View>
 
       </View>
 
       {error ? <View style={[styles.errorBanner, { top: Math.max(insets.top + 56, 64) }]}><ThemedText darkColor="#FFE1D8" numberOfLines={2} style={styles.errorText}>{error}</ThemedText></View> : null}
       {message ? <Animated.View entering={FadeIn.duration(120)} exiting={FadeOut.duration(120)} pointerEvents="none" style={[styles.toast, { bottom: Math.max(insets.bottom + 76, 82) }]}><ThemedText darkColor="#4A291B" style={styles.toastText}>{message}</ThemedText></Animated.View> : null}
+      <MergeServeRewardOverlay flight={serveFlight} onCoinArrive={handleCoinArrive} onFinish={finishServeAnimation} onItemsArrive={handleServeItemsArrive} />
       {active && generatorUnlockRewards.length ? <RewardSplash
         items={generatorUnlockRewards}
         onItemSeen={(receiptId) => dispatch({ type: 'ackGeneratorUnlock', receiptId, now: Date.now() })}
@@ -203,54 +263,47 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
   );
 }
 
-function StoryReturnCard({ bondPoints, onPress }: { bondPoints: number; onPress: () => void }) {
-  return <Pressable accessibilityLabel="Feastle wants to continue the story" accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.returnCard, pressed && styles.pressed]}>
-    <View style={styles.returnIcon}><IconSymbol color="#FFF7DF" name="bubble.left.and.bubble.right.fill" size={22} /></View>
-    <ThemedText darkColor="#4A291B" numberOfLines={2} style={styles.returnTitle}>A note from Feastle</ThemedText>
-    <ThemedText darkColor="#7B5A34" numberOfLines={1} style={styles.returnAction}>{bondPoints > 0 ? `+${bondPoints} Bond · Read next scene` : 'Read next scene'}</ThemedText>
-  </Pressable>;
+function ServiceCounter({ viewportWidth }: { viewportWidth: number }) {
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      pointerEvents="none"
+      style={[styles.serviceCounter, { width: viewportWidth }]}>
+      <View style={styles.counterUpperLip} />
+      <View style={styles.counterInsetShade} />
+      <View style={styles.counterFaceEdge} />
+      <View style={styles.counterFace} />
+      <View style={styles.counterLowerEdge} />
+      <View style={styles.counterLowerFlat} />
+    </View>
+  );
 }
 
-function CompletedOrderSlot({ step }: { step: number }) {
-  return <Animated.View
-    accessibilityLabel={`Feastle order ${step} served`}
-    entering={FadeIn.duration(180)}
-    style={styles.completedOrderSlot}>
-    <View style={styles.completedOrderCheck}><IconSymbol color="#FFF7DF" name="checkmark" size={18} /></View>
-    <ThemedText darkColor="#5E4429" numberOfLines={1} style={styles.completedOrderTitle}>Served</ThemedText>
-  </Animated.View>;
-}
-
-function CurrencyHud({ art, label, progress, value, suffix }: { art: number; label: string; progress?: number; value: string; suffix?: string }) {
-  return <View accessibilityLabel={`${label} ${value}${suffix ?? ''}`} style={styles.currency}>
+function CurrencyHud({ art, label, progress, pulseNonce = 0, targetRef, value, suffix }: { art: number; label: string; progress?: number; pulseNonce?: number; targetRef?: RefObject<View | null>; value: string; suffix?: string }) {
+  const pulse = useSharedValue(0);
+  useEffect(() => {
+    if (pulseNonce < 1) return;
+    pulse.value = withSequence(withTiming(1, { duration: 90 }), withTiming(0, { duration: 150 }));
+    return () => cancelAnimation(pulse);
+  }, [pulse, pulseNonce]);
+  const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: 1 + pulse.value * 0.09 }] }), [pulse]);
+  return <Animated.View accessibilityLabel={`${label} ${value}${suffix ?? ''}`} ref={targetRef} style={[styles.currency, pulseStyle]}>
     <View pointerEvents="none" style={styles.currencySheen} />
     <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" source={art} style={styles.currencyArt} transition={0} />
     <ThemedText darkColor="#FFF4D7" style={styles.currencyValue}>{value}<ThemedText darkColor="#CDBAAB" style={styles.currencySuffix}>{suffix}</ThemedText></ThemedText>
     {progress != null ? <View pointerEvents="none" style={styles.currencyTrack}><View style={[styles.currencyFill, { width: `${progress * 100}%` }]} /></View> : null}
-  </View>;
+  </Animated.View>;
 }
 
-function CompactOrder({ order, ready, focused, onServe, onReroll, friendshipLevel }: { order: MergeOrder; ready: boolean; focused: boolean; onServe: () => void; onReroll: () => void; friendshipLevel: number }) {
-  const characterSource = resolveCreatureArtSource(CHARACTER_VISUALS[order.characterId], { lod: 'medium' });
-  return <Pressable
-    accessibilityLabel={`${MERGE_CHARACTER_NAMES[order.characterId]} order, ${order.title}${ready ? ', ready to serve' : ''}`}
-    accessibilityRole="button"
-    accessibilityState={{ disabled: !ready }}
-    onLongPress={onReroll}
-    onPress={ready ? onServe : undefined}
-    style={({ pressed }) => [styles.orderSlot, focused && styles.orderSlotFocused, ready && styles.orderSlotReady, pressed && styles.pressed]}>
-    {ready ? <View pointerEvents="none" style={styles.orderReadyGlow} /> : null}
-    {order.purpose === 'signature' ? <View pointerEvents="none" style={styles.chapterRibbon}><ThemedText darkColor="#4A291B" style={styles.chapterRibbonText}>CHAPTER</ThemedText></View> : null}
-    <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={`merge-order-${order.characterId}`} source={characterSource} style={styles.orderCharacter} transition={0} />
-    <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" source={MERGE_ORDER_TRAY_ART} style={styles.orderTrayArt} transition={0} />
-    <View pointerEvents="none" style={styles.orderItems}>
-      {order.requirements.slice(0, 3).map((requirement) => <View key={requirement.definitionId} style={styles.orderItem}>
-        <PersistentMergeItemArt definitionId={requirement.definitionId} size={34} />
-        {requirement.quantity > 1 ? <View style={styles.quantityBadge}><ThemedText darkColor="#FFF" style={styles.quantityText}>×{requirement.quantity}</ThemedText></View> : null}
-      </View>)}
-    </View>
-    <View pointerEvents="none" style={[styles.serveMark, ready && styles.serveMarkReady]}><IconSymbol color={ready ? '#FFF7D8' : '#F2D49A'} name={ready ? 'checkmark' : 'heart.fill'} size={10} /><ThemedText darkColor={ready ? '#FFF7D8' : '#F2D49A'} style={styles.friendshipLevel}>{friendshipLevel}</ThemedText></View>
-  </Pressable>;
+function measureViewInWindow(ref: RefObject<View | null>): Promise<{ height: number; width: number; x: number; y: number } | null> {
+  return new Promise((resolve) => {
+    if (!ref.current) {
+      resolve(null);
+      return;
+    }
+    ref.current.measureInWindow((x, y, width, height) => resolve({ height, width, x, y }));
+  });
 }
 
 const styles = StyleSheet.create({
@@ -266,30 +319,15 @@ const styles = StyleSheet.create({
   currencyTrack: { backgroundColor: 'rgba(255,255,255,0.08)', bottom: 0, height: 2.5, left: 10, overflow: 'hidden', position: 'absolute', right: 10 },
   currencyFill: { backgroundColor: '#EEC364', boxShadow: '0 0 5px rgba(238,195,100,0.72)', height: 2.5 },
   hudAction: { alignItems: 'center', backgroundColor: 'rgba(26,23,38,0.93)', borderColor: 'rgba(255,223,165,0.43)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, boxShadow: '0 5px 13px rgba(25,14,18,0.30), inset 0 1px 0 rgba(255,255,255,0.10)', height: 39, justifyContent: 'center', width: 42 },
-  orderRail: { flexDirection: 'row', gap: 3, height: 110, overflow: 'visible', paddingHorizontal: 1 },
-  orderSlot: { flex: 1, overflow: 'visible', position: 'relative' },
-  orderSlotFocused: { backgroundColor: 'rgba(255,240,206,0.18)', borderColor: 'rgba(255,224,159,0.7)', borderRadius: 18, borderWidth: 1 },
-  returnCard: { alignItems: 'center', backgroundColor: '#FFF0CE', borderColor: '#B8752C', borderCurve: 'continuous', borderRadius: 19, borderWidth: 1, flex: 1, gap: 3, justifyContent: 'center', padding: 8 },
-  returnIcon: { alignItems: 'center', backgroundColor: '#76501F', borderRadius: 14, height: 36, justifyContent: 'center', width: 36 },
-  returnTitle: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 12, lineHeight: 14, textAlign: 'center' },
-  returnAction: { fontFamily: AppFontFamilies.manrope, fontSize: 8, fontWeight: '900' },
-  completedOrderSlot: { alignItems: 'center', backgroundColor: 'rgba(255,240,206,0.48)', borderColor: 'rgba(184,117,44,0.42)', borderCurve: 'continuous', borderRadius: 19, borderStyle: 'dashed', borderWidth: 1, flex: 1, gap: 5, justifyContent: 'center', padding: 8 },
-  completedOrderCheck: { alignItems: 'center', backgroundColor: '#708D48', borderRadius: 14, height: 34, justifyContent: 'center', width: 34 },
-  completedOrderTitle: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 11.5 },
-  orderSlotReady: { transform: [{ translateY: -1 }] },
-  orderReadyGlow: { alignSelf: 'center', backgroundColor: 'rgba(247,215,123,0.23)', borderRadius: 999, boxShadow: '0 0 18px rgba(247,215,123,0.52)', height: 68, position: 'absolute', top: 5, width: 82 },
-  chapterRibbon: { backgroundColor: '#F4D082', borderColor: '#8D5928', borderRadius: 999, borderWidth: 1, left: 4, paddingHorizontal: 5, paddingVertical: 2, position: 'absolute', top: 1, zIndex: 5 },
-  chapterRibbonText: { fontFamily: AppFontFamilies.manrope, fontSize: 6.5, fontWeight: '900', letterSpacing: 0.5 },
-  orderCharacter: { bottom: 25, height: 86, left: '7%', position: 'absolute', width: '86%', zIndex: 1 },
-  orderTrayArt: { bottom: 1, height: 47, left: 0, position: 'absolute', right: 0, width: '100%', zIndex: 2 },
-  orderItems: { alignItems: 'center', bottom: 12, flexDirection: 'row', gap: 0, justifyContent: 'center', left: 5, position: 'absolute', right: 5, zIndex: 3 },
-  orderItem: { height: 35, position: 'relative', width: 35 },
-  quantityBadge: { alignItems: 'center', backgroundColor: '#A85C2A', borderColor: '#FFE8B6', borderRadius: 999, borderWidth: 1, bottom: -1, justifyContent: 'center', minWidth: 17, paddingHorizontal: 3, position: 'absolute', right: -1 },
-  quantityText: { fontFamily: AppFontFamilies.manrope, fontSize: 7, fontWeight: '900' },
-  serveMark: { alignItems: 'center', backgroundColor: '#7A532E', borderColor: '#D6A15A', borderRadius: 999, borderWidth: 1, bottom: -2, boxShadow: '0 2px 5px rgba(52,29,14,0.38)', flexDirection: 'row', gap: 2, height: 22, justifyContent: 'center', minWidth: 29, paddingHorizontal: 5, position: 'absolute', right: 5, zIndex: 4 },
-  serveMarkReady: { backgroundColor: '#64863B', borderColor: '#456727', boxShadow: '0 2px 5px rgba(65,91,31,0.32)' },
-  friendshipLevel: { fontFamily: AppFontFamilies.manrope, fontSize: 7.5, fontWeight: '900' },
-  boardStage: { alignItems: 'center', flex: 1, justifyContent: 'flex-start', minHeight: 0, paddingTop: 2, position: 'relative' },
+  mergeArea: { flex: 1, minHeight: 0 },
+  serviceCounter: { alignSelf: 'center', height: 32, marginTop: -29, position: 'relative', zIndex: 1 },
+  counterUpperLip: { backgroundColor: '#FFE876', height: 3, left: 0, position: 'absolute', right: 0, top: 0 },
+  counterInsetShade: { backgroundColor: '#A64F32', height: 5, left: 0, position: 'absolute', right: 0, top: 3 },
+  counterFaceEdge: { backgroundColor: '#FFE36A', height: 3, left: 0, position: 'absolute', right: 0, top: 8 },
+  counterFace: { backgroundColor: '#EEA621', bottom: 5, left: 0, position: 'absolute', right: 0, top: 11 },
+  counterLowerEdge: { backgroundColor: '#CB701D', bottom: 2, height: 3, left: 0, position: 'absolute', right: 0 },
+  counterLowerFlat: { backgroundColor: '#8F4932', bottom: 0, height: 2, left: 0, position: 'absolute', right: 0 },
+  boardStage: { alignItems: 'center', flex: 1, justifyContent: 'flex-start', minHeight: 0, position: 'relative' },
   expansionButton: { alignItems: 'center', backgroundColor: '#F5D488', borderColor: '#B8752C', borderRadius: 999, borderWidth: 1, boxShadow: '0 3px 8px rgba(55,28,13,0.3)', flexDirection: 'row', gap: 2, paddingHorizontal: 8, paddingVertical: 5, position: 'absolute', right: 5, top: 5, zIndex: 40 },
   expansionLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9, fontWeight: '900' },
   errorBanner: { alignSelf: 'center', backgroundColor: 'rgba(121,38,31,0.92)', borderRadius: 12, maxWidth: 360, paddingHorizontal: 12, paddingVertical: 7, position: 'absolute', zIndex: 80 },

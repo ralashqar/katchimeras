@@ -135,8 +135,35 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
 }
 
 export function mergeOrderReady(state: MergeWorldState, order: MergeOrder): boolean {
+  return mergeOrderRequirementReadiness(state, order).every(Boolean);
+}
+
+export function mergeOrderRequirementReadiness(state: MergeWorldState, order: MergeOrder): boolean[] {
   const counts = boardItemCounts(state);
-  return order.requirements.every((requirement) => (counts.get(requirement.definitionId) ?? 0) >= requirement.quantity);
+  return order.requirements.map((requirement) => (counts.get(requirement.definitionId) ?? 0) >= requirement.quantity);
+}
+
+export function mergeOrderItemReadiness(state: MergeWorldState, order: MergeOrder): boolean[] {
+  const counts = boardItemCounts(state);
+  return order.requirements.flatMap((requirement) => Array.from(
+    { length: requirement.quantity },
+    (_, index) => (counts.get(requirement.definitionId) ?? 0) > index,
+  ));
+}
+
+export function mergeOrderServingCells(state: MergeWorldState, order: MergeOrder): { cell: number; definitionId: string; instanceId: string }[] {
+  const available = new Map<string, { cell: number; instanceId: string }[]>();
+  state.board.forEach((cell, index) => {
+    const occupant = cell.occupant;
+    if (occupant?.kind !== 'item') return;
+    const cells = available.get(occupant.definitionId) ?? [];
+    cells.push({ cell: index, instanceId: occupant.instanceId });
+    available.set(occupant.definitionId, cells);
+  });
+  return order.requirements.flatMap((requirement) => {
+    const cells = available.get(requirement.definitionId) ?? [];
+    return cells.slice(0, requirement.quantity).map((item) => ({ ...item, definitionId: requirement.definitionId }));
+  });
 }
 
 export function readyMergeOrderIds(state: MergeWorldState): Set<string> {
@@ -185,7 +212,10 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     unlockedFamilies: uniqueStrings(source.unlockedFamilies).filter((id): id is MergeWorldState['unlockedFamilies'][number] => ['food', 'nature', 'adventure'].includes(id)),
     unlockedCharacters: uniqueStrings(source.unlockedCharacters).filter((id): id is MergeCharacterId => KNOWN_CHARACTERS.has(id as MergeCharacterId)),
     favouriteCharacterId: source.favouriteCharacterId && KNOWN_CHARACTERS.has(source.favouriteCharacterId) ? source.favouriteCharacterId : null,
-    activeOrders: Array.isArray(source.activeOrders) ? source.activeOrders.slice(0, 3).map(normalizeOrder) : [],
+    // Order capacity is a presentation concern: the horizontal rail can hold
+    // every authored request, so normalization must never silently discard
+    // off-screen orders.
+    activeOrders: Array.isArray(source.activeOrders) ? source.activeOrders.map(normalizeOrder) : [],
     completedOrderCount: Math.max(0, finite(source.completedOrderCount, 0)),
     recentOrderKeys: uniqueStrings(source.recentOrderKeys).slice(-RECENT_ORDER_LIMIT),
     expansions: uniqueStrings(source.expansions),
@@ -537,7 +567,7 @@ function reconcileStory(
   // Ownership unlocks a character, but only an authored story beat may create
   // an order. Generic legacy orders are removed during story reconciliation.
   const keepOrders = state.activeOrders.filter((order) => order.characterId !== 'feastle' && order.storyArcId);
-  const activeOrders = [...keepOrders, ...wanted.map((order) => feastleOrders.find((existing) => existing.id === order.id) ?? order)].slice(0, 3);
+  const activeOrders = [...keepOrders, ...wanted.map((order) => feastleOrders.find((existing) => existing.id === order.id) ?? order)];
   if (activeOrders.length !== state.activeOrders.length || activeOrders.some((order, index) => order.id !== state.activeOrders[index]?.id)) {
     next = { ...next, activeOrders };
   }

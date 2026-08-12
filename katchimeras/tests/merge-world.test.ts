@@ -3,14 +3,17 @@ import { readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
-import { MERGE_GENERATOR_COOLDOWN_MS, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
-import type { MergeBoardItem, MergeCharacterId, MergeWorldState } from '@/types/merge-world';
+import { MERGE_GENERATOR_COOLDOWN_MS, MERGE_ITEMS_BY_ID, MERGE_ORDER_TEMPLATES } from '@/constants/merge-world-catalog';
+import type { MergeBoardItem, MergeCharacterId, MergeOrder, MergeWorldState } from '@/types/merge-world';
 import { companionFriendshipProgress, emptyCompanionBondState } from '@/utils/companion-bond';
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection } from '@/utils/merge-world/board-geometry';
 import { mergeWorldPendingPersistence } from '@/utils/merge-world/persistence-buffer';
 import {
   createInitialMergeWorldState,
+  mergeOrderItemReadiness,
+  mergeOrderRequirementReadiness,
   mergeOrderReady,
+  mergeOrderServingCells,
   mergeWorldCatalogIssues,
   normalizeMergeWorldState,
   readyMergeOrderIds,
@@ -80,6 +83,18 @@ test('every story generator has bespoke optimized 256px art', () => {
     const asset = path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'merge-world', 'generators', file);
     assert.ok(statSync(asset).size <= 32_000, `${file} exceeds its runtime budget`);
   }
+});
+
+test('order tray currencies use optimized bespoke art and Feastle orders pay coins', () => {
+  const uiDirectory = path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'merge-world', 'ui');
+  for (const file of ['bond.webp', 'coin.webp', 'energy.webp', 'ready-tick.webp']) {
+    const size = statSync(path.join(uiDirectory, file)).size;
+    assert.ok(size > 0 && size < 64 * 1024, `${file} must remain an optimized runtime sprite`);
+  }
+  const feastleOrders = MERGE_ORDER_TEMPLATES.filter((template) => template.characterId === 'feastle');
+  assert.ok(feastleOrders.length > 0);
+  assert.ok(feastleOrders.every((template) => template.reward.coins > 0));
+  assert.ok(feastleOrders.every((template) => template.reward.friendshipXp > 0));
 });
 
 test('generator taps consume one Energy and charge and create a discoverable item', () => {
@@ -172,6 +187,8 @@ test('rapid sequential moves preserve the same item identity and latest destinat
 test('persistent merge input uses one static board recognizer and epoch-guarded ownership', () => {
   const source = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'feastle-persistent-merge-board.tsx'), 'utf8');
   const screenSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-world-screen.tsx'), 'utf8');
+  const railSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-order-rail.tsx'), 'utf8');
+  const serveOverlaySource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-serve-reward-overlay.tsx'), 'utf8');
   const routeSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-world-route-screen.tsx'), 'utf8');
   const spriteSource = source.slice(source.indexOf('const PersistentSprite'), source.indexOf('function PersistentGeneratorArt'));
   const boardCellSource = source.slice(source.indexOf('const BoardCell'), source.indexOf('function MergeCelebrationOverlay'));
@@ -190,12 +207,23 @@ test('persistent merge input uses one static board recognizer and epoch-guarded 
   assert.doesNotMatch(source, /lockedCellNeighborMask|blockedMask|LOCKED_CELL_WEB_OVERLAYS|lockedDecoration/);
   assert.doesNotMatch(boardCellSource, /#2D361F|#323D24|leafSize/);
   assert.match(source, /const boardGesture = useMemo\(\(\) => Gesture\.Pan\(\)/);
+  assert.match(source, /\.enabled\(entranceInteractive\)/);
+  assert.match(source, /const boardEntranceStyle = useAnimatedStyle/);
+  assert.match(source, /translateY: \(1 - progress\) \* 22/);
+  assert.doesNotMatch(source.slice(source.indexOf('const boardEntranceStyle'), source.indexOf('useEffect(() => {\n    const mountedOperations')), /rotate|translateX|scale:/);
+  assert.match(source, /introDelayForCell/);
+  assert.match(source, /const introSpriteDelays = useRef\(new Map\(/);
+  assert.match(source, /entranceDelay=\{introSpriteDelays\.current\.get\(id\) \?\? null\}/);
+  assert.doesNotMatch(source, /entranceDelay=\{introSpriteIds\.current\.has\(id\) \? introDelayForCell\(sprite\.cell\) : null\}/);
+  assert.match(spriteSource, /const entranceReduceMotion = useRef\(reduceMotion\)\.current/);
+  assert.match(source, /entranceProgress\.value = entranceReduceMotion/);
   assert.match(source, /\.minDistance\(0\)/);
   assert.match(source, /const BOARD_TAP_SLOP = 9/);
   assert.match(source, /maxGestureDistance\.value <= BOARD_TAP_SLOP/);
   assert.match(source, /\.onTouchesUp\(\(event\) =>/);
   assert.match(source, /if \(!id \|\| gestureFinished\.value\) return/);
   assert.match(source, /mergeBursts\.map\(\(burst\) => <MergeCelebrationOverlay/);
+  assert.match(source, /hiddenItemInstanceIds\?\.has\(sprite\.occupant\.instanceId\)/);
   assert.match(source, /<InvalidCellFeedback cell=\{invalidFeedback\.cell\}/);
   assert.match(source, /if \(dragEpoch\.value !== epoch\) return/);
   assert.match(source, /occupancyIds\.value = ids/);
@@ -206,8 +234,72 @@ test('persistent merge input uses one static board recognizer and epoch-guarded 
   assert.match(source, /style=\{styles\.generatorBolt\}/);
   assert.match(source, /name="bolt\.fill"/);
   assert.doesNotMatch(screenSource, /styles\.bottomDock/);
-  assert.match(screenSource, /order-service-tray\.webp/);
-  assert.match(screenSource, /styles\.orderTrayArt/);
+  assert.match(screenSource, /<MergeOrderRail/);
+  assert.match(railSource, /const TRAY_WIDTH = 120/);
+  assert.match(railSource, /const TRAY_GAP = 10/);
+  assert.match(railSource, /const TRAY_HEIGHT = 120/);
+  assert.match(screenSource, /<ServiceCounter viewportWidth=\{width\} \/>/);
+  assert.match(screenSource, /function ServiceCounter/);
+  assert.match(screenSource, /serviceCounter: \{ alignSelf: 'center', height: 32, marginTop: -29/);
+  assert.match(railSource, /trayArt: \{ bottom: 0, height: 58, left: -2/);
+  assert.match(railSource, /width: 124/);
+  assert.match(screenSource, /counterUpperLip: \{/);
+  assert.match(screenSource, /counterInsetShade: \{/);
+  assert.match(screenSource, /counterFaceEdge: \{/);
+  assert.match(screenSource, /counterFace: \{/);
+  assert.match(screenSource, /counterLowerEdge: \{/);
+  assert.match(screenSource, /counterLowerFlat: \{/);
+  assert.doesNotMatch(screenSource.slice(screenSource.indexOf('function ServiceCounter'), screenSource.indexOf('function CurrencyHud')), /LinearGradient/);
+  assert.match(railSource, /const TRAY_ITEM_SIZE = 34/);
+  assert.match(railSource, /size=\{TRAY_ITEM_SIZE\}/);
+  assert.doesNotMatch(screenSource, /itemSize=\{trayItemSize\}/);
+  assert.match(railSource, /horizontal/);
+  assert.match(railSource, /order-service-tray\.webp/);
+  assert.match(railSource, /kind: 'chat_note'/);
+  assert.match(railSource, /style=\{styles\.noteIconBadge\}/);
+  assert.match(railSource, /numberOfLines=\{2\} style=\{styles\.noteTitle\}/);
+  assert.match(railSource, /notePaper: \{[^\n]*height: 44[^\n]*left: 8[^\n]*width: 104/);
+  assert.match(railSource, /noteTitle: \{[^\n]*width: '100%'/);
+  assert.match(railSource, /noteIconBadge: \{[^\n]*right: -7, top: -9/);
+  assert.doesNotMatch(railSource, /style=\{styles\.notePaper\}>\s*<IconSymbol/);
+  assert.match(railSource, /TRAY_SERVE_EXIT/);
+  assert.match(railSource, /READY_TICK_IN/);
+  assert.match(railSource, /READY_GLOW_IN/);
+  assert.match(railSource, /serving && !reduceMotion \? <TrayServeConfetti/);
+  assert.match(railSource, /SERVE_CELEBRATION_MS = 250/);
+  assert.match(railSource, /RotatingRadialSunburst/);
+  assert.match(railSource, /baseOpacity=\{0\.72\}/);
+  assert.match(railSource, /rotationDurationMs=\{32_000\}/);
+  assert.doesNotMatch(railSource, /chapterRibbon|>CHAPTER</);
+  assert.match(railSource, /itemReadiness\[itemIndex\]/);
+  assert.match(railSource, /ORDER_REWARD_ART/);
+  assert.match(railSource, /order\.reward\.friendshipXp/);
+  assert.match(railSource, /order\.reward\.coins/);
+  assert.match(railSource, /order\.reward\.energy/);
+  assert.match(railSource, /characterLayer: \{ bottom: 14, height: 92, left: 14/);
+  assert.match(railSource, /readyRays: \{ height: 84, left: 18/);
+  assert.match(railSource, /rewardPanel: \{[^\n]*right: -10, top: 14, width: 52/);
+  assert.match(railSource, /rewardRow: \{[^\n]*gap: 2, height: 17/);
+  assert.match(railSource, /rewardIcon: \{ height: 16, width: 16 \}/);
+  assert.doesNotMatch(railSource, /items: \{[^\n]*gap:/);
+  assert.match(railSource, /ready-tick\.webp/);
+  assert.doesNotMatch(railSource, /quantityBadge|quantityText|requirement\.quantity > 1/);
+  assert.match(railSource, />SERVE<\/ThemedText>/);
+  assert.match(railSource, /serveButton: \{[^\n]*bottom: -8/);
+  assert.match(railSource, /measureViewCenter/);
+  assert.match(screenSource, /mergeOrderServingCells/);
+  assert.match(screenSource, /setPresentedCoins/);
+  assert.match(screenSource, /pulseNonce=\{coinPulseNonce\}/);
+  assert.match(serveOverlaySource, /function ServingItem/);
+  assert.match(serveOverlaySource, /PersistentMergeItemArt/);
+  assert.match(serveOverlaySource, /COIN_HOVER_MS = 150/);
+  assert.match(serveOverlaySource, /withRepeat\(withTiming\(1, \{ duration: 720/);
+  assert.match(serveOverlaySource, /pointerEvents="auto"/);
+  assert.doesNotMatch(railSource, /cardFocused/);
+  assert.doesNotMatch(railSource, /transform: \[\{ rotate: '-2deg' \}\]/);
+  assert.doesNotMatch(screenSource, /focused: order\.id === focusOrderId/);
+  assert.doesNotMatch(railSource, /flex: 1/);
+  assert.doesNotMatch(screenSource, /CompletedOrderSlot|activeOrders\.slice/);
   assert.doesNotMatch(screenSource, /AnimatedBorderHighlight/);
   assert.match(routeSource, /<TodayExplorationBackground backgroundKey="home"/);
   assert.doesNotMatch(routeSource, /CompanionGameBackdrop/);
@@ -307,6 +399,45 @@ test('ready order ids count the board once and identify every ready order', () =
   state.activeOrders.forEach((order) => assert.equal(ready.has(order.id), true));
 });
 
+test('requirement readiness follows each board item in both directions', () => {
+  const order: MergeOrder = {
+    id: 'readiness-order',
+    characterId: 'feastle',
+    title: 'A little table spread',
+    difficulty: 'small',
+    requirements: [
+      { definitionId: 'food:table:2', quantity: 1 },
+      { definitionId: 'food:table:3', quantity: 2 },
+    ],
+    reward: { coins: 1, energy: 0, friendshipXp: 1, mergeXp: 1 },
+    createdAt: NOW,
+    signature: false,
+    purpose: 'normal',
+  };
+  let state = createInitialMergeWorldState(NOW);
+  state = withItems(state, [
+    [29, item('ready-table', 'food:table:2')],
+    [30, item('ready-cozy-a', 'food:table:3')],
+  ]);
+  assert.deepEqual(mergeOrderRequirementReadiness(state, order), [true, false]);
+  assert.deepEqual(mergeOrderItemReadiness(state, order), [true, true, false]);
+  assert.deepEqual(mergeOrderServingCells(state, order), [
+    { cell: 29, definitionId: 'food:table:2', instanceId: 'ready-table' },
+    { cell: 30, definitionId: 'food:table:3', instanceId: 'ready-cozy-a' },
+  ]);
+  state = withItems(state, [[31, item('ready-cozy-b', 'food:table:3')]]);
+  assert.deepEqual(mergeOrderRequirementReadiness(state, order), [true, true]);
+  assert.deepEqual(mergeOrderItemReadiness(state, order), [true, true, true]);
+  assert.deepEqual(mergeOrderServingCells(state, order), [
+    { cell: 29, definitionId: 'food:table:2', instanceId: 'ready-table' },
+    { cell: 30, definitionId: 'food:table:3', instanceId: 'ready-cozy-a' },
+    { cell: 31, definitionId: 'food:table:3', instanceId: 'ready-cozy-b' },
+  ]);
+  state = { ...state, board: state.board.map((cell, index) => index === 29 ? { ...cell, occupant: null } : cell) };
+  assert.deepEqual(mergeOrderRequirementReadiness(state, order), [false, true]);
+  assert.deepEqual(mergeOrderItemReadiness(state, order), [false, true, true]);
+});
+
 test('depleted generators recover from timestamps without background timers', () => {
   const state = withStoryGenerator(createInitialMergeWorldState(NOW), 'feastle');
   const resting = {
@@ -347,9 +478,11 @@ test('serving consumes requirements and emits replay-safe Friendship receipt', (
   }
   state = withItems(state, placements);
   assert.equal(mergeOrderReady(state, order), true);
+  const coinsBeforeServing = state.coins;
   const result = reduceMergeWorld(state, { type: 'serveOrder', orderId: order.id, now: NOW + 1 });
   assert.equal(result.servedOrderId, order.id);
   assert.equal(result.state.completedOrderCount, 1);
+  assert.equal(result.state.coins, coinsBeforeServing + order.reward.coins);
   const friendshipReceipt = result.state.externalRewardReceipts.find((receipt) => receipt.id === `merge-friendship:${order.id}`);
   assert.ok(friendshipReceipt);
   assert.equal(friendshipReceipt.presentation, 'quiet_summary');
@@ -467,6 +600,24 @@ test('Chapter 4 shows and preserves three Feastle orders, completing only after 
   assert.ok(state.characterProgress.feastle?.completedChapterIds.includes('feastle-chapter-4'));
   assert.ok(state.externalRewardReceipts.some((receipt) => receipt.kind === 'conversation' && receipt.sourceId === 'feastle-chapter-4'));
   assert.equal(state.externalRewardReceipts.filter((receipt) => receipt.kind === 'story_order_served' && receipt.amount === 4).length, 3);
+});
+
+test('normalization and story reconciliation preserve orders beyond the visible rail', () => {
+  let state = createInitialMergeWorldState(NOW, ['feastle', 'mossprout']);
+  state = reduceMergeWorld(state, { type: 'reconcileStory', familyId: 'feastle', status: 'order_active', targetLevel: 4, starterParcelGranted: true, now: NOW + 1 }).state;
+  const supportingOrders = state.activeOrders.slice(0, 2).map((order, index) => ({
+    ...order,
+    id: `merge-story:mossprout:test-${index + 1}`,
+    characterId: 'mossprout' as const,
+    storyArcId: 'mossprout:test-story',
+  }));
+  state = normalizeMergeWorldState({ ...state, activeOrders: [...supportingOrders, ...state.activeOrders] }, NOW + 2);
+  assert.equal(state.activeOrders.length, 5);
+
+  state = reduceMergeWorld(state, { type: 'reconcileStory', familyId: 'feastle', status: 'order_active', targetLevel: 4, starterParcelGranted: true, now: NOW + 3 }).state;
+  assert.equal(state.activeOrders.length, 5);
+  assert.equal(state.activeOrders.filter((order) => order.characterId === 'feastle').length, 3);
+  assert.equal(state.activeOrders.filter((order) => order.characterId === 'mossprout').length, 2);
 });
 
 test('normalization recovers invalid snapshots and Friendship preserves legacy floors', () => {
