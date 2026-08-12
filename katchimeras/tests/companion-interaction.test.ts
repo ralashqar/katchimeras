@@ -181,7 +181,8 @@ test('Merge and Feastle story navigation replaces the prior story screen and pau
   assert.match(merge, /storyNavigationPendingRef/);
   assert.match(merge, /source: 'merge-world'/);
   assert.match(route, /source === 'merge-world' \? router\.dismissTo\('\/games'\) : router\.back\(\)/);
-  assert.match(route, /onOpenMerge=\{\(orderId\) => router\.dismissTo/);
+  assert.match(route, /onOpenMerge=\{\(orderId, selectedFamilyId\) => router\.dismissTo/);
+  assert.match(route, /familyId: selectedFamilyId \?\? familyId/);
   assert.match(interaction, /if \(!props\.active \|\| !receipt \|\| bondReward\) return/);
   assert.match(interaction, /if \(props\.active !== false\) return/);
 });
@@ -574,7 +575,7 @@ test('Feastle begins with authored choices before the first Merge order', () => 
   assert.match(interaction, /openedStoryConversationRef\.current !== definitionId/);
   assert.match(interaction, /openedStoryConversationRef\.current = definitionId;\s*showConversation\(\)/);
   assert.match(interaction, /openedStoryConversationRef\.current === story\.pendingConversationId/);
-  assert.match(interaction, /Feastle is finding the next page/);
+  assert.match(interaction, /\{props\.name\} is finding the next page/);
   assert.doesNotMatch(interaction, /startConversation\(\{ definitionId: story\.pendingConversationId \}\);\s*showConversation\(\)/);
 });
 
@@ -804,6 +805,22 @@ test('quest notes use the shared composer while guided entries retain the journa
     journal.indexOf('{questFocused ? (') < journal.indexOf("{(contextOptionsOverride ?? choice.detailChoices"),
     'the focused quest note belongs above secondary journal details',
   );
+});
+
+test('journal flows explain available and already-collected Merge Energy for the target Egg', () => {
+  const today = fs.readFileSync(
+    path.join(process.cwd(), 'app', '(tabs)', 'today.tsx'),
+    'utf8',
+  );
+  const journal = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'home', 'manual-journal-sheet.tsx'),
+    'utf8',
+  );
+  assert.match(today, /title: `Earn \+\$\{journalMergeReward\.totalEnergy\} Merge Energy`/);
+  assert.match(today, /title: 'Journal Energy already collected'/);
+  assert.match(today, /feastleJournalReward\.target === 'tomorrow' \? 'Tomorrow’s' : 'Today’s'/);
+  assert.match(journal, /rewardNotice\.status === 'available' \? 'bolt\.fill' : 'checkmark'/);
+  assert.match(journal, /accessibilityLabel=\{`\$\{rewardNotice\.title\}\. \$\{rewardNotice\.detail\}`\}/);
 });
 
 test('quest capture feedback is visible only to the quest and creature that started it', () => {

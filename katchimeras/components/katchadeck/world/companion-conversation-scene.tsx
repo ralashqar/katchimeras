@@ -84,6 +84,7 @@ export function CompanionConversationScene({
   session,
   skins,
   questOffer,
+  journalMergeEnergyPreview,
 }: {
   definition: ConversationDefinition;
   developerContent?: ReactNode;
@@ -111,6 +112,7 @@ export function CompanionConversationScene({
   session: ConversationSession;
   skins: readonly KingdomSkinOption[];
   questOffer: { id: string; title: string; hint: string } | null;
+  journalMergeEnergyPreview: number;
 }) {
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
@@ -280,7 +282,9 @@ export function CompanionConversationScene({
                   <ThemedText selectable style={{ fontSize: 11, fontWeight: '900' }} lightColor="#5B421D" darkColor="#5B421D">+{node.rewardGrowth} Egg Growth</ThemedText>
                 </View>
                 <View style={{ backgroundColor: '#F5D985', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 }}>
-                  <ThemedText selectable style={{ fontSize: 11, fontWeight: '900' }} lightColor="#5B421D" darkColor="#5B421D">Up to +{node.rewardMergeEnergy} Merge Energy</ThemedText>
+                  <ThemedText selectable style={{ fontSize: 11, fontWeight: '900' }} lightColor="#5B421D" darkColor="#5B421D">
+                    {journalMergeEnergyPreview > 0 ? `+${journalMergeEnergyPreview} Merge Energy today` : 'Daily Merge Energy already collected'}
+                  </ThemedText>
                 </View>
               </View>
             </View>

@@ -1,5 +1,5 @@
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
-import { accumulateQuietBond, nextFeastleBundleOrderId, selectFeastleActTwoOrderKeys } from '@/utils/companion-story';
+import { accumulateQuietBond, nextFeastleBundleOrderId, selectAuthoredCohortOrderKeys, selectFeastleActTwoOrderKeys, type AuthoredCohortFamilyId } from '@/utils/companion-story';
 
 export type FeastleActId = 'act-1' | 'act-2' | 'act-3' | 'act-4' | 'act-5';
 export type FeastleActPhase = 'opening' | 'regular_orders' | 'midpoint_return' | 'insight_return' | 'signature_order' | 'finale_return' | 'complete';
@@ -67,6 +67,37 @@ export function freshFeastleStory(now = Date.now()): CompanionStoryArc {
   };
 }
 
+export function freshBaristabbitStory(now = Date.now()): CompanionStoryArc {
+  return freshAuthoredCohortStory('baristabbit', now);
+}
+
+const AUTHORED_STORY_CONFIG = {
+  baristabbit: { id: 'baristabbit:pause-story', signatureKey: 'pause-table' },
+  steppling: { id: 'steppling:path-outside-story', signatureKey: 'path-outside' },
+  voyagle: { id: 'voyagle:blank-spaces-story', signatureKey: 'map-with-blank-spaces' },
+  flexel: { id: 'flexel:rhythm-that-holds-story', signatureKey: 'rhythm-that-holds' },
+  bedrotte: { id: 'bedrotte:room-that-asks-nothing-story', signatureKey: 'room-that-asks-nothing' },
+} as const;
+
+export function isAuthoredCohortFamily(familyId: string): familyId is AuthoredCohortFamilyId {
+  return familyId === 'baristabbit' || familyId === 'steppling' || familyId === 'voyagle'
+    || familyId === 'flexel' || familyId === 'bedrotte';
+}
+
+export function freshAuthoredCohortStory(familyId: AuthoredCohortFamilyId, now = Date.now()): CompanionStoryArc {
+  const config = AUTHORED_STORY_CONFIG[familyId];
+  return {
+    id: config.id, familyId, version: 3,
+    currentLevel: 1, targetLevel: 6, beatId: `${familyId}-story:first-meeting`,
+    status: 'intro_available', activeOrderId: null, pendingConversationId: null,
+    unreadReturn: false, completedBeatIds: [], completedOrderIds: [], pendingBondPoints: 0,
+    processedQuietBondReceiptIds: [], updatedAt: now,
+    journalFtueStatus: 'not_started', journalFtueRecordId: null,
+    currentActId: 'act-1', actPhase: 'opening', orderDeck: null,
+    storySignals: [], relevantJournalRecordIds: [], confirmedMemoryKeys: [], completedActIds: [],
+  };
+}
+
 function normalize(value: unknown): CompanionStoryState {
   if (!value || typeof value !== 'object') return { schemaVersion: 3, arcs: [] };
   const candidate = value as Partial<CompanionStoryState>;
@@ -83,7 +114,9 @@ function normalize(value: unknown): CompanionStoryState {
       version: 3,
       journalFtueStatus: arc.journalFtueStatus === 'saved' || arc.journalFtueStatus === 'skipped'
         ? arc.journalFtueStatus
-        : arc.currentLevel >= 3 || arc.completedBeatIds?.includes('feastle-story:level-2')
+        : isAuthoredCohortFamily(arc.familyId)
+          ? 'not_started'
+          : arc.currentLevel >= 3 || arc.completedBeatIds?.includes('feastle-story:level-2')
           ? 'skipped'
           : 'not_started',
       journalFtueRecordId: typeof arc.journalFtueRecordId === 'string' ? arc.journalFtueRecordId : null,
@@ -131,6 +164,147 @@ export function saveFeastleStory(arc: CompanionStoryArc): CompanionStoryArc {
   const state = loadCompanionStoryState();
   saveState({ ...state, arcs: [...state.arcs.filter((item) => item.familyId !== 'feastle'), arc] });
   return arc;
+}
+
+export function loadBaristabbitStory(): CompanionStoryArc {
+  return loadAuthoredCohortStory('baristabbit');
+}
+
+export function saveBaristabbitStory(arc: CompanionStoryArc): CompanionStoryArc {
+  return saveAuthoredCohortStory('baristabbit', arc);
+}
+
+export function loadAuthoredCohortStory(familyId: AuthoredCohortFamilyId): CompanionStoryArc {
+  return loadCompanionStoryState().arcs.find((arc) => arc.familyId === familyId) ?? freshAuthoredCohortStory(familyId);
+}
+
+export function saveAuthoredCohortStory(familyId: AuthoredCohortFamilyId, arc: CompanionStoryArc): CompanionStoryArc {
+  const state = loadCompanionStoryState();
+  saveState({ ...state, arcs: [...state.arcs.filter((item) => item.familyId !== familyId), arc] });
+  return arc;
+}
+
+export function beginBaristabbitStory(now = Date.now()): CompanionStoryArc {
+  return beginAuthoredCohortStory('baristabbit', now);
+}
+
+export function beginAuthoredCohortStory(familyId: AuthoredCohortFamilyId, now = Date.now()): CompanionStoryArc {
+  const current = loadAuthoredCohortStory(familyId);
+  if (current.status !== 'intro_available') return current;
+  const seed = `${familyId}:chapter-1:${now}`;
+  return saveAuthoredCohortStory(familyId, {
+    ...current,
+    currentLevel: 5, targetLevel: 6, beatId: `${familyId}-story:first-meeting`,
+    status: 'order_active', actPhase: 'regular_orders',
+    orderDeck: { actId: 'act-1', seed, requiredCount: 5, templateKeys: selectAuthoredCohortOrderKeys(familyId, seed), servedOrderIds: [] },
+    completedBeatIds: [...new Set([...current.completedBeatIds, `${familyId}-story:first-meeting`])],
+    updatedAt: now,
+  });
+}
+
+export function markBaristabbitJournalFtue(journalRecordId: string, now = Date.now()): CompanionStoryArc {
+  return markAuthoredCohortJournalFtue('baristabbit', journalRecordId, now);
+}
+
+export function markAuthoredCohortJournalFtue(familyId: AuthoredCohortFamilyId, journalRecordId: string, now = Date.now()): CompanionStoryArc {
+  const current = loadAuthoredCohortStory(familyId);
+  if (current.journalFtueStatus === 'saved' && current.journalFtueRecordId === journalRecordId) return current;
+  return saveAuthoredCohortStory(familyId, {
+    ...current,
+    journalFtueStatus: 'saved', journalFtueRecordId: journalRecordId,
+    relevantJournalRecordIds: [...new Set([...current.relevantJournalRecordIds, journalRecordId])],
+    updatedAt: now,
+  });
+}
+
+export function markBaristabbitOrderActive(orderId: string, now = Date.now()): CompanionStoryArc {
+  return markAuthoredCohortOrderActive('baristabbit', orderId, now);
+}
+
+export function markAuthoredCohortOrderActive(familyId: AuthoredCohortFamilyId, orderId: string, now = Date.now()): CompanionStoryArc {
+  const current = loadAuthoredCohortStory(familyId);
+  if (current.status !== 'order_active' || current.activeOrderId === orderId) return current;
+  return saveAuthoredCohortStory(familyId, { ...current, activeOrderId: orderId, updatedAt: now });
+}
+
+export function recordBaristabbitQuietBond(receiptId: string, points: number, now = Date.now()): CompanionStoryArc {
+  return recordAuthoredCohortQuietBond('baristabbit', receiptId, points, now);
+}
+
+export function recordAuthoredCohortQuietBond(familyId: AuthoredCohortFamilyId, receiptId: string, points: number, now = Date.now()): CompanionStoryArc {
+  const current = loadAuthoredCohortStory(familyId);
+  const accumulated = accumulateQuietBond(current.pendingBondPoints, current.processedQuietBondReceiptIds, receiptId, points);
+  if (!accumulated.changed) return current;
+  return saveAuthoredCohortStory(familyId, { ...current, pendingBondPoints: accumulated.points, processedQuietBondReceiptIds: accumulated.processedReceiptIds, updatedAt: now });
+}
+
+export function markBaristabbitOrderServed(orderId: string, now = Date.now()): CompanionStoryArc {
+  return markAuthoredCohortOrderServed('baristabbit', orderId, now);
+}
+
+export function markAuthoredCohortOrderServed(familyId: AuthoredCohortFamilyId, orderId: string, now = Date.now()): CompanionStoryArc {
+  const current = loadAuthoredCohortStory(familyId);
+  if (current.completedOrderIds.includes(orderId)) return current;
+  const completedOrderIds = [...current.completedOrderIds, orderId];
+  const orderDeck = current.orderDeck
+    ? { ...current.orderDeck, servedOrderIds: [...new Set([...current.orderDeck.servedOrderIds, orderId])] }
+    : null;
+  const prefix = `merge-story:${familyId}:chapter-1:`;
+  if (orderId === `${prefix}${AUTHORED_STORY_CONFIG[familyId].signatureKey}`) return saveAuthoredCohortStory(familyId, {
+    ...current, currentLevel: 8, targetLevel: 8, status: 'return_available', actPhase: 'finale_return',
+    activeOrderId: null, pendingConversationId: `${familyId}:story:8`, unreadReturn: true,
+    completedOrderIds, orderDeck, updatedAt: now,
+  });
+  const servedCount = orderDeck?.servedOrderIds.filter((id) => id.startsWith(prefix)).length ?? 0;
+  if (servedCount === 2 && current.currentLevel < 6) return saveAuthoredCohortStory(familyId, {
+    ...current, currentLevel: 6, targetLevel: 6, status: 'return_available', actPhase: 'midpoint_return',
+    activeOrderId: null, pendingConversationId: `${familyId}:story:6`, unreadReturn: true,
+    completedOrderIds, orderDeck, updatedAt: now,
+  });
+  if (servedCount >= 5) return saveAuthoredCohortStory(familyId, {
+    ...current, currentLevel: 7, targetLevel: 7, status: 'return_available', actPhase: 'insight_return',
+    activeOrderId: null, pendingConversationId: `${familyId}:story:7`, unreadReturn: true,
+    completedOrderIds, orderDeck, updatedAt: now,
+  });
+  return saveAuthoredCohortStory(familyId, { ...current, status: 'order_active', activeOrderId: null, completedOrderIds, orderDeck, updatedAt: now });
+}
+
+export function beginBaristabbitReturn(now = Date.now()): CompanionStoryArc {
+  return beginAuthoredCohortReturn('baristabbit', now);
+}
+
+export function beginAuthoredCohortReturn(familyId: AuthoredCohortFamilyId, now = Date.now()): CompanionStoryArc {
+  const current = loadAuthoredCohortStory(familyId);
+  if (current.status !== 'return_available') return current;
+  return saveAuthoredCohortStory(familyId, { ...current, status: 'conversation_active', unreadReturn: false, updatedAt: now });
+}
+
+export function completeBaristabbitConversation(level: number, now = Date.now()): CompanionStoryArc {
+  return completeAuthoredCohortConversation('baristabbit', level, now);
+}
+
+export function completeAuthoredCohortConversation(familyId: AuthoredCohortFamilyId, level: number, now = Date.now()): CompanionStoryArc {
+  const current = loadAuthoredCohortStory(familyId);
+  if (current.status !== 'conversation_active' || current.pendingConversationId !== `${familyId}:story:${level}`) return current;
+  const beatId = `${familyId}-story:level-${level}`;
+  if (current.completedBeatIds.includes(beatId)) return current;
+  if (level === 6) return saveAuthoredCohortStory(familyId, {
+    ...current, currentLevel: 6, targetLevel: 7, beatId, status: 'order_active', actPhase: 'regular_orders',
+    activeOrderId: null, pendingConversationId: null, unreadReturn: false, pendingBondPoints: 0,
+    journalFtueStatus: current.journalFtueStatus === 'not_started' ? 'skipped' : current.journalFtueStatus,
+    completedBeatIds: [...current.completedBeatIds, beatId], updatedAt: now,
+  });
+  if (level === 7) return saveAuthoredCohortStory(familyId, {
+    ...current, currentLevel: 7, targetLevel: 8, beatId, status: 'order_active', actPhase: 'signature_order',
+    activeOrderId: null, pendingConversationId: null, unreadReturn: false, pendingBondPoints: 0,
+    completedBeatIds: [...current.completedBeatIds, beatId], updatedAt: now,
+  });
+  return saveAuthoredCohortStory(familyId, {
+    ...current, currentLevel: 8, targetLevel: 8, beatId, status: 'chapter_complete', actPhase: 'complete',
+    activeOrderId: null, pendingConversationId: null, unreadReturn: false, pendingBondPoints: 0,
+    completedActIds: [...new Set([...current.completedActIds, 'act-1' as const])],
+    completedBeatIds: [...current.completedBeatIds, beatId], updatedAt: now,
+  });
 }
 
 export function beginFeastleStory(now = Date.now()): CompanionStoryArc {

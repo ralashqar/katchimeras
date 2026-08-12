@@ -1,8 +1,11 @@
 import { companionConversationDefinitionById } from '@/constants/companion-conversations-v2';
+import { MERGE_CHARACTER_NAMES } from '@/constants/merge-world-catalog';
 import type { ConversationNode, ConversationSession } from '@/types/companion-conversation';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
+import type { MergeCharacterId } from '@/types/merge-world';
 import { continueConversation, recordConversationOutcome } from '@/utils/companion-conversation';
 import { recordConversationTelemetry, upsertConversationSession, type CompanionContentState } from '@/utils/companion-content';
+import { companionJournalRouteForFamily } from '@/utils/quests/journal-templates';
 
 export type CompanionJournalHandoffStatus = 'pending' | 'saved' | 'cancelled';
 
@@ -23,8 +26,6 @@ export type CompanionJournalHandoff = {
   body: string;
   saveLabel: string;
   rewardGrowth: number;
-  rewardMergeEnergy: number;
-  rewardItemIds: string[];
   status: CompanionJournalHandoffStatus;
   journalRecordId: string | null;
   createdAt: number;
@@ -41,6 +42,10 @@ export function buildCompanionJournalHandoff(input: {
   now: number;
 }): CompanionJournalHandoff {
   const node = input.node ?? null;
+  const characterId = input.familyId as MergeCharacterId;
+  const route = companionJournalRouteForFamily(input.familyId);
+  const companionName = MERGE_CHARACTER_NAMES[characterId] ?? 'Your Katchimera';
+  const theme = 'notice one small part of today worth keeping';
   const id = input.mode === 'story' && input.session && node
     ? `companion-journal:${input.session.id}:${node.id}`
     : `companion-journal:${input.familyId}:optional:${input.now.toString(36)}`;
@@ -54,24 +59,26 @@ export function buildCompanionJournalHandoff(input: {
     nodeId: node?.id ?? null,
     answerIds: input.session?.turns.map((turn) => turn.optionId) ?? [],
     target: input.target,
-    flowId: node?.flowId ?? 'food',
-    allowedChoiceIds: [...(node?.allowedChoiceIds ?? ['meal', 'snack', 'dessert', 'coffee', 'tea', 'drink', 'cooking', 'other_food'])],
+    flowId: node?.flowId ?? route.flowId,
+    allowedChoiceIds: [...(node?.allowedChoiceIds ?? route.allowedChoiceIds ?? [route.initialChoiceId ?? 'ordinary'])],
     prompt: input.target === 'tomorrow'
-      ? 'Today’s Katchimera has already arrived. Tomorrow’s Egg can carry one food memory forward.'
-      : node?.prompt ?? 'Could we give today’s Egg one food moment to remember? Ordinary counts.',
-    title: node?.title ?? 'Today’s table',
+      ? `Today’s Katchimera has already arrived. Tomorrow’s Egg can carry one ${companionName} memory forward.`
+      : node?.prompt ?? `Could we give today’s Egg one moment that helps ${theme}? Ordinary counts.`,
+    title: node?.title ?? `${companionName}’s moment`,
     body: input.target === 'tomorrow'
-      ? 'Choose a food moment from today to carry into Tomorrow’s Egg. A meal, snack, drink, or something you made all count—and ordinary counts too.'
-      : node?.body ?? 'A meal, snack, drink, or something you made all count—and ordinary counts too.',
+      ? `Choose a small moment from today to carry into Tomorrow’s Egg. ${capitalize(theme)}.`
+      : node?.body ?? `Choose a small moment from today. ${capitalize(theme)}.`,
     saveLabel: node?.saveLabel ?? 'Add to the Egg',
     rewardGrowth: node?.rewardGrowth ?? 20,
-    rewardMergeEnergy: node?.rewardMergeEnergy ?? 8,
-    rewardItemIds: [...(node?.rewardItemIds ?? ['food:table:1', 'food:table:1'])],
     status: 'pending',
     journalRecordId: null,
     createdAt: input.now,
     updatedAt: input.now,
   };
+}
+
+function capitalize(value: string) {
+  return value ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
 }
 
 export function advanceConversationForJournalHandoff(

@@ -149,8 +149,7 @@ const chapterOneDefinitions: readonly ConversationDefinition[] = [
         body: 'Choose what found a place at your table. A meal, snack, drink, or something you made all count—and ordinary counts too.',
         flowId: 'food',
         allowedChoiceIds: ['meal', 'snack', 'dessert', 'coffee', 'tea', 'drink', 'cooking', 'other_food'],
-        saveLabel: 'Add to the Egg', rewardGrowth: 20, rewardMergeEnergy: 8,
-        rewardItemIds: ['food:table:1', 'food:table:1'],
+        saveLabel: 'Add to the Egg', rewardGrowth: 20,
         nextNodeId: 'busy-day',
       },
       { id: 'busy-day', kind: 'choice', phase: 'deepen', prompt: 'And when the day gets a bit wobbly, what helps food actually happen?', options: [
@@ -243,7 +242,7 @@ const actTwoDefinitions: readonly ConversationDefinition[] = [
       ] },
       { id: 'remember-easy', kind: 'memory_proposal', prompt: 'Keep this as a small clue?', summary: 'An easy food option helped today.', memoryKey: 'feastle:signal:ease', memoryKind: 'shared_moment', sensitivity: 'ordinary', nextNodeId: 'end' },
       { id: 'remember-comfort', kind: 'memory_proposal', prompt: 'Keep this as a small clue?', summary: 'A food moment brought some comfort today.', memoryKey: 'feastle:signal:comfort', memoryKind: 'shared_moment', sensitivity: 'ordinary', nextNodeId: 'end' },
-      { id: 'journal', kind: 'journal_handoff', prompt: 'Add only what feels worth keeping.', title: "Today's table", body: 'Choose the food moment that stood out. Ordinary meals, snacks, drinks, and cooking all count.', flowId: 'food', allowedChoiceIds: ['meal', 'snack', 'dessert', 'coffee', 'tea', 'drink', 'cooking', 'other_food'], saveLabel: 'Add to the Egg', rewardGrowth: 20, rewardMergeEnergy: 8, rewardItemIds: ['food:table:1', 'food:table:1'], nextNodeId: 'end' },
+      { id: 'journal', kind: 'journal_handoff', prompt: 'Add only what feels worth keeping.', title: "Today's table", body: 'Choose the food moment that stood out. Ordinary meals, snacks, drinks, and cooking all count.', flowId: 'food', allowedChoiceIds: ['meal', 'snack', 'dessert', 'coffee', 'tea', 'drink', 'cooking', 'other_food'], saveLabel: 'Add to the Egg', rewardGrowth: 20, nextNodeId: 'end' },
       { id: 'end', kind: 'end', message: 'The remaining requests are waiting, not rushing. Come back when the Pantry feels ready.' },
     ],
   },

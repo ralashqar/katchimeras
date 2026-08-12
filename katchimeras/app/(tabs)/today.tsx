@@ -77,6 +77,8 @@ import { hasQuickGoalTemplates } from '@/constants/companion-quick-goals';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import { GROWTH_ENERGY_ART } from '@/constants/today-care-art';
 import { HOME_SCENE_Y_OFFSET } from '@/constants/home-loop-layout';
+import { MERGE_CHARACTER_NAMES } from '@/constants/merge-world-catalog';
+import type { MergeCharacterId } from '@/types/merge-world';
 import todayScene from '@/data/today-scene.json';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { homeRepository } from '@/storage/repositories/home-repository';
@@ -166,6 +168,7 @@ import {
   loadPendingCompanionJournalHandoff,
 } from '@/utils/companion-journal-handoff';
 import { journalIdempotencyKey, journalRecordId } from '@/utils/journal-domain';
+import { mergeJournalRewardPreview, type MergeJournalRewardPreview } from '@/utils/merge-world/economy-policy';
 import {
   activeSemanticQuestPrompt,
   cancelSemanticNoteQuestCapture,
@@ -276,7 +279,7 @@ function HomeScreen() {
   const [manualJournalInitialContextId, setManualJournalInitialContextId] = useState<string | null>(null);
   const [manualJournalTarget, setManualJournalTarget] = useState<DayInputTarget | null>(null);
   const [companionJournalHandoff, setCompanionJournalHandoff] = useState<CompanionJournalHandoff | null>(null);
-  const [feastleJournalReward, setFeastleJournalReward] = useState<CompanionJournalHandoff | null>(null);
+  const [feastleJournalReward, setFeastleJournalReward] = useState<(CompanionJournalHandoff & { mergeReward: MergeJournalRewardPreview }) | null>(null);
   const handledCompanionJournalHandoffIdRef = useRef<string | null>(null);
   const deferredJournalCareCompletionRef = useRef<string | null>(null);
   const deferredJournalCareTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -388,6 +391,37 @@ function HomeScreen() {
   const isForming = homeLoopPresentation.forming !== null;
   const formingTarget = homeLoopPresentation.forming?.target ?? 'today';
   const formingDay = homeLoopPresentation.forming?.day ?? null;
+  const journalMergeReward = useMemo(() => {
+    if (!formingDay || manualJournalTarget === 'yesterday') return null;
+    const rewardDays = [...allDays.filter((day) => day.id !== formingDay.id), formingDay];
+    return mergeJournalRewardPreview(rewardDays, {
+      companion: companionJournalHandoff != null,
+      targetDayId: formingDay.isoDate,
+    });
+  }, [allDays, companionJournalHandoff, formingDay, manualJournalTarget]);
+  const journalMergeRewardNotice = useMemo(() => {
+    if (!journalMergeReward || !formingDay) return undefined;
+    const eggLabel = formingTarget === 'tomorrow' ? 'Tomorrow’s Egg' : 'Today’s Egg';
+    if (journalMergeReward.totalEnergy <= 0) return {
+      detail: `${eggLabel} has already granted its journal${companionJournalHandoff ? ' and companion' : ''} Energy for this date. Your entry still adds Growth.`,
+      status: 'collected' as const,
+      title: 'Journal Energy already collected',
+    };
+    const rewards = [
+      journalMergeReward.dailyJournalEnergy > 0 ? `Journal +${journalMergeReward.dailyJournalEnergy}` : null,
+      journalMergeReward.companionEnergy > 0 ? `Companion bonus +${journalMergeReward.companionEnergy}` : null,
+    ].filter(Boolean).join(' · ');
+    const collected = journalMergeReward.dailyJournalEnergy === 0
+      ? ' Daily journal Energy was already collected; this is the companion bonus.'
+      : journalMergeReward.companionEnergy === 0 && companionJournalHandoff
+        ? ' The companion bonus was already collected.'
+        : '';
+    return {
+      detail: `${rewards} Merge Energy when this entry is saved.${collected}`,
+      status: 'available' as const,
+      title: `Earn +${journalMergeReward.totalEnergy} Merge Energy`,
+    };
+  }, [companionJournalHandoff, formingDay, formingTarget, journalMergeReward]);
   const formingPrompts = homeLoopPresentation.forming?.prompts ?? availableDayPrompts;
   const formingActivePrompt = homeLoopPresentation.forming?.activePrompt ?? null;
   // Signature mini-games are archived behind Merge World. Historical active
@@ -2032,6 +2066,7 @@ function HomeScreen() {
             ? `${companionJournalHandoff.target === 'tomorrow' ? 'Tomorrow’s' : 'Today’s'} Egg · ${companionJournalHandoff.title}`
             : undefined}
           promptBody={companionJournalHandoff?.body}
+          rewardNotice={journalMergeRewardNotice}
           saveLabel={companionJournalHandoff?.saveLabel}
           journalSource={companionJournalHandoff ? {
             kind: 'manual',
@@ -2043,6 +2078,7 @@ function HomeScreen() {
               promptId: companionJournalHandoff.nodeId ?? 'feastle:optional-food-journal',
               promptText: companionJournalHandoff.prompt,
               answerIds: companionJournalHandoff.answerIds,
+              reflectionMode: companionJournalHandoff.mode,
             },
           } : undefined}
           hapticOnSave={!pendingCareIntent}
@@ -2071,6 +2107,7 @@ function HomeScreen() {
             router.navigate({ pathname: '/katchimera/[creatureId]', params: { creatureId } });
           }}
           onSave={(submission) => {
+            const mergeRewardPreview = companionJournalHandoff ? journalMergeReward : null;
             const completingCareAction = pendingCareIntent
               && journalFlowCompletesTodayCareAction(submission.flowId, pendingCareIntent.completionKey)
               ? pendingCareIntent
@@ -2088,7 +2125,12 @@ function HomeScreen() {
                 submission.sessionId ?? companionJournalHandoff.id,
               ));
               completeCompanionJournalHandoff(companionJournalHandoff.id, recordId);
-              setFeastleJournalReward({ ...companionJournalHandoff, journalRecordId: recordId, status: 'saved' });
+              setFeastleJournalReward({
+                ...companionJournalHandoff,
+                journalRecordId: recordId,
+                mergeReward: mergeRewardPreview ?? { dailyJournalEnergy: 0, companionEnergy: 0, totalEnergy: 0 },
+                status: 'saved',
+              });
             }
             closeManualJournal();
             const hasPhotoText = submission.sourceType === 'photo'
@@ -2296,11 +2338,16 @@ function HomeScreen() {
                 <ThemedText style={styles.feastleRewardEyebrow} lightColor="#8B672E" darkColor="#8B672E">
                   {feastleJournalReward.target === 'tomorrow' ? 'TOMORROW’S EGG' : 'TODAY’S EGG'}
                 </ThemedText>
-                <ThemedText style={styles.feastleRewardTitle} lightColor="#3B2C20" darkColor="#3B2C20">Your food moment is safe</ThemedText>
+                <ThemedText style={styles.feastleRewardTitle} lightColor="#3B2C20" darkColor="#3B2C20">Your moment is safe</ThemedText>
               </View>
             </View>
             <ThemedText style={styles.feastleRewardBody} lightColor="#64513B" darkColor="#64513B">
-              The Egg received +{feastleJournalReward.rewardGrowth} Growth. Feastle sent up to +{feastleJournalReward.rewardMergeEnergy} Energy and a two-ingredient Pantry Basket to Merge World.
+              The Egg received +{feastleJournalReward.rewardGrowth} Growth. {feastleJournalReward.mergeReward.totalEnergy > 0
+                ? `${MERGE_CHARACTER_NAMES[feastleJournalReward.familyId as MergeCharacterId] ?? 'Your Katchimera'} sent +${feastleJournalReward.mergeReward.totalEnergy} Energy to Merge World (${[
+                    feastleJournalReward.mergeReward.dailyJournalEnergy > 0 ? `Journal +${feastleJournalReward.mergeReward.dailyJournalEnergy}` : null,
+                    feastleJournalReward.mergeReward.companionEnergy > 0 ? `Companion +${feastleJournalReward.mergeReward.companionEnergy}` : null,
+                  ].filter(Boolean).join(', ')}).`
+                : `${feastleJournalReward.target === 'tomorrow' ? 'Tomorrow’s' : 'Today’s'} Egg had already granted its journal and companion Merge Energy for this date.`} {feastleJournalReward.mode === 'story' ? 'A first story reflection also sends two starter supplies.' : ''}
             </ThemedText>
             <Pressable
               accessibilityRole="button"
@@ -2310,7 +2357,7 @@ function HomeScreen() {
                 router.navigate({ pathname: '/katchimera/[creatureId]', params: { creatureId } });
               }}
               style={({ pressed }) => [styles.feastleRewardButton, pressed && { opacity: 0.82 }]}>
-              <ThemedText style={styles.feastleRewardButtonLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">Return to Feastle</ThemedText>
+              <ThemedText style={styles.feastleRewardButtonLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">Return to {MERGE_CHARACTER_NAMES[feastleJournalReward.familyId as MergeCharacterId] ?? 'Katchimera'}</ThemedText>
               <IconSymbol color="#FFF9E9" name="arrow.right" size={16} />
             </Pressable>
           </View>

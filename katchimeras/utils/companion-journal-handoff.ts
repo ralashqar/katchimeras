@@ -1,6 +1,6 @@
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { loadCompanionContentState, saveCompanionContentState } from '@/utils/companion-content-storage';
-import { markFeastleJournalFtue, recordFeastleJournalEvidence } from '@/utils/companion-story-storage';
+import { isAuthoredCohortFamily, markAuthoredCohortJournalFtue, markFeastleJournalFtue, recordFeastleJournalEvidence } from '@/utils/companion-story-storage';
 import type { ConversationNode, ConversationSession } from '@/types/companion-conversation';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import {
@@ -90,6 +90,8 @@ export function completeCompanionJournalHandoff(
     if (current.familyId === 'feastle') {
       markFeastleJournalFtue('saved', journalRecordId, now);
       recordFeastleJournalEvidence(journalRecordId, null, now);
+    } else if (isAuthoredCohortFamily(current.familyId)) {
+      markAuthoredCohortJournalFtue(current.familyId, journalRecordId, now);
     }
   }
 

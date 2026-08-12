@@ -1,5 +1,6 @@
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import type {
+  MergeChainId,
   MergeCharacterId,
   MergeFamilyId,
   MergeItemDefinition,
@@ -10,12 +11,7 @@ import type {
 export const MERGE_WORLD_COLUMNS = 7;
 export const MERGE_WORLD_ROWS = 9;
 export const MERGE_WORLD_SIZE = MERGE_WORLD_COLUMNS * MERGE_WORLD_ROWS;
-export const MERGE_ENERGY_CAP = 40;
-export const MERGE_INITIAL_ENERGY = 18;
-export const MERGE_ENERGY_REGEN_MS = 12 * 60_000;
 
-// A readable, contiguous 33-cell clearing. Expansion cells retain their authored
-// blockers, so unlocking space changes the scene instead of revealing padlocks.
 export const MERGE_STARTING_OPEN_CELLS = new Set([
   2, 3, 4,
   9, 10, 11,
@@ -28,32 +24,53 @@ export const MERGE_STARTING_OPEN_CELLS = new Set([
   59, 60,
 ]);
 
+export const MERGE_CHAIN_IDS: readonly MergeChainId[] = [
+  'food:table', 'food:dessert', 'drink:hot', 'drink:refresh',
+  'adventure:trail', 'adventure:travel', 'nature:garden', 'nature:waterside',
+  'comfort:rest', 'comfort:care', 'social:gathering', 'social:celebration',
+  'mind:work', 'mind:books', 'creative:art', 'creative:screen',
+];
+
 const chain = (
-  familyId: MergeFamilyId,
-  branchId: string,
+  chainId: MergeChainId,
   icon: MergeItemDefinition['icon'],
   color: string,
-  names: string[],
-) => names.map((name, index) => ({
-  id: `${familyId}:${branchId}:${index + 1}`,
-  familyId,
-  branchId,
-  tier: index + 1,
-  name,
-  icon,
-  color,
-  nextItemId: index + 1 < names.length ? `${familyId}:${branchId}:${index + 2}` : null,
-  sellValue: Math.max(1, 2 ** index),
-} satisfies MergeItemDefinition));
+  names: readonly string[],
+) => {
+  const [familyId, branchId] = chainId.split(':') as [MergeFamilyId, string];
+  return names.map((name, index) => ({
+    id: `${chainId}:${index + 1}`,
+    familyId,
+    chainId,
+    branchId,
+    tier: index + 1,
+    name,
+    icon,
+    color,
+    nextItemId: index + 1 < names.length ? `${chainId}:${index + 2}` : null,
+    sellValue: Math.max(1, 2 ** index),
+  } satisfies MergeItemDefinition));
+};
 
 export const MERGE_ITEM_CATALOG: readonly MergeItemDefinition[] = [
-  ...chain('food', 'table', 'fork.knife', '#F0B870', ['Ingredient', 'Snack', 'Dish', 'Meal', 'Feast', 'Banquet']),
-  ...chain('nature', 'garden', 'leaf.fill', '#82C891', ['Seed', 'Sprout', 'Plant', 'Flower', 'Rare Flower', 'Magical Plant', 'Ancient Tree']),
-  ...chain('nature', 'waterside', 'water.waves', '#77C8D0', ['Pebble', 'Shell', 'Tidepool', 'Water Lily', 'Moonlit Cove']),
-  ...chain('adventure', 'trail', 'figure.walk', '#D6A66D', ['Sock', 'Shoe', 'Boot', 'Hiking Gear', 'Adventure Pack', 'Expedition Kit']),
-  ...chain('adventure', 'travel', 'globe.americas.fill', '#A9A1E8', ['Ticket', 'Map', 'Travel Journal', 'Suitcase', 'Grand Journey']),
+  ...chain('food:table', 'fork.knife', '#F0B870', ['Ingredient', 'Snack', 'Dish', 'Meal', 'Feast', 'Banquet']),
+  ...chain('food:dessert', 'sparkles', '#F2A9B8', ['Flour Scoop', 'Cake Batter', 'Cupcake', 'Layer Cake', 'Celebration Cake', 'Dream Cake']),
+  ...chain('drink:hot', 'sparkles', '#C98A66', ['Tea Leaf', 'Tea Cup', 'Teapot', 'Cocoa Tray', 'Café Service', 'Hearth Ceremony']),
+  ...chain('drink:refresh', 'water.waves', '#70C9C6', ['Berry', 'Fruit Juice', 'Smoothie', 'Lemonade Pitcher', 'Garden Drinks Cart', 'Festival Fountain']),
+  ...chain('adventure:trail', 'figure.walk', '#D6A66D', ['Sock', 'Shoe', 'Boot', 'Hiking Gear', 'Adventure Pack', 'Expedition Kit']),
+  ...chain('adventure:travel', 'globe.americas.fill', '#A9A1E8', ['Ticket', 'Map', 'Travel Journal', 'Suitcase', 'Grand Journey', 'Memory Globe']),
+  ...chain('nature:garden', 'leaf.fill', '#82C891', ['Seed', 'Sprout', 'Plant', 'Flower', 'Rare Flower', 'Magical Plant', 'Ancient Tree']),
+  ...chain('nature:waterside', 'water.waves', '#77C8D0', ['Pebble', 'Shell', 'Tidepool', 'Water Lily', 'Moonlit Cove', 'Ocean Sanctuary']),
+  ...chain('comfort:rest', 'sparkles', '#B7A5D8', ['Pillow Feather', 'Cushion', 'Pillow', 'Blanket Nest', 'Cosy Bed', 'Dream Room']),
+  ...chain('comfort:care', 'sparkles', '#EEA49C', ['Bandage', 'Care Pouch', 'First Aid Kit', 'Comfort Basket', 'Healing Cabinet', 'Sanctuary Kit']),
+  ...chain('social:gathering', 'fork.knife', '#E9A86F', ['Place Card', 'Shared Plate', 'Picnic Cloth', 'Gathering Table', 'Community Supper', 'Village Festival']),
+  ...chain('social:celebration', 'sparkles', '#F2C85B', ['Ribbon', 'Wrapped Gift', 'Party Hat', 'Celebration Hamper', 'Joyful Parade', 'Grand Jubilee']),
+  ...chain('mind:work', 'sparkles', '#79A9C7', ['Sticky Note', 'Checklist', 'Planner', 'Tidy Desk', 'Project Station', 'Calm Command Centre']),
+  ...chain('mind:books', 'sparkles', '#9D7C69', ['Bookmark', 'Pocket Book', 'Story Stack', 'Reading Nook', 'Library Cart', 'Wonder Library']),
+  ...chain('creative:art', 'sparkles', '#D88CBC', ['Pencil', 'Sketchbook', 'Paint Set', 'Easel', 'Studio Corner', 'Gallery of Dreams']),
+  ...chain('creative:screen', 'sparkles', '#7E87D8', ['Game Token', 'Handheld Game', 'Console', 'Cosy Game Setup', 'Arcade Corner', 'Pixel Palace']),
   {
-    id: 'hybrid:picnic-pack', familyId: 'adventure', branchId: 'hybrid', tier: 1,
+    id: 'hybrid:picnic-pack', familyId: 'adventure', chainId: 'adventure:travel', branchId: 'hybrid', tier: 1,
     name: 'Picnic Pack', icon: 'sparkles', color: '#F4C982', nextItemId: null, sellValue: 48,
   },
 ];
@@ -61,41 +78,112 @@ export const MERGE_ITEM_CATALOG: readonly MergeItemDefinition[] = [
 export const MERGE_ITEMS_BY_ID = new Map(MERGE_ITEM_CATALOG.map((item) => [item.id, item]));
 
 export type FeastleStoryRequestPreview = { title: string; definitionId: string; quantity: number };
-
 export const FEASTLE_STORY_REQUESTS: Readonly<Record<number, readonly FeastleStoryRequestPreview[]>> = {
   2: [{ title: 'The First Snack', definitionId: 'food:table:2', quantity: 1 }],
   3: [{ title: 'A Pantry Pair', definitionId: 'food:table:2', quantity: 2 }],
   4: [
     { title: 'A Welcoming Dish', definitionId: 'food:table:3', quantity: 1 },
-    { title: 'Something for the Table', definitionId: 'food:table:3', quantity: 1 },
+    { title: 'A Sweet Finish', definitionId: 'food:dessert:3', quantity: 1 },
     { title: 'The Table Centrepiece', definitionId: 'food:table:4', quantity: 1 },
   ],
 };
 
 export type MergeGeneratorDefinition = {
   id: string;
-  familyId: MergeFamilyId;
   name: string;
   icon: IconSymbolName;
   color: string;
   initialCell: number;
-  baseBranches: string[];
+  chainIds: [MergeChainId, MergeChainId];
+  tierOneDropDefinitionIds: [string, string];
   unlockDescription: string;
 };
 
+const generator = (
+  id: string,
+  name: string,
+  icon: IconSymbolName,
+  color: string,
+  initialCell: number,
+  chainIds: [MergeChainId, MergeChainId],
+  unlockDescription: string,
+): MergeGeneratorDefinition => ({
+  id, name, icon, color, initialCell, chainIds,
+  tierOneDropDefinitionIds: [`${chainIds[0]}:1`, `${chainIds[1]}:1`],
+  unlockDescription,
+});
+
 export const MERGE_GENERATORS: readonly MergeGeneratorDefinition[] = [
-  { id: 'starter-pantry', familyId: 'food', name: 'Feastle’s Picnic Pantry', icon: 'fork.knife', color: '#C97847', initialCell: 31, baseBranches: ['table'], unlockDescription: 'Spend 1 Energy to unpack a cosy ingredient for Feastle’s table.' },
-  { id: 'nature-pot', familyId: 'nature', name: 'Mossprout’s Sprouting Pot', icon: 'leaf.fill', color: '#5E9E69', initialCell: 38, baseBranches: ['garden'], unlockDescription: 'A pocket garden of seeds and sprouts for Mossprout’s requests.' },
-  { id: 'waterside-pail', familyId: 'nature', name: 'Shellio’s Waterside Pail', icon: 'water.waves', color: '#4E9EAE', initialCell: 39, baseBranches: ['waterside'], unlockDescription: 'Tap it for pebbles, shells, and little waterside treasures.' },
-  { id: 'adventure-pack', familyId: 'adventure', name: 'Steppling’s Trail Satchel', icon: 'figure.walk', color: '#967044', initialCell: 32, baseBranches: ['trail'], unlockDescription: 'Trail basics for boots, packs, and bigger walking adventures.' },
-  { id: 'travel-trunk', familyId: 'adventure', name: 'Voyagle’s Travel Trunk', icon: 'globe.americas.fill', color: '#8172BD', initialCell: 33, baseBranches: ['travel'], unlockDescription: 'Maps, tickets, and travel keepsakes for Voyagle’s journeys.' },
+  generator('hearth-pantry', 'Hearth Pantry', 'fork.knife', '#C97847', 31, ['food:table', 'food:dessert'], 'Ingredients and baking basics for savoury tables and sweet finishes.'),
+  generator('ritual-bar', 'Ritual Bar', 'water.waves', '#A76E58', 32, ['drink:hot', 'drink:refresh'], 'Warm rituals and bright refreshments, chosen one small ingredient at a time.'),
+  generator('journey-locker', 'Journey Locker', 'figure.walk', '#967044', 33, ['adventure:trail', 'adventure:travel'], 'Walking gear and travel keepsakes for journeys near and far.'),
+  generator('wild-garden', 'Wild Garden', 'leaf.fill', '#5E9E69', 38, ['nature:garden', 'nature:waterside'], 'Seeds and waterside treasures from one shared patch of wildness.'),
+  generator('comfort-chest', 'Comfort Chest', 'sparkles', '#A889B8', 39, ['comfort:rest', 'comfort:care'], 'Restful comforts and practical care for difficult or tender days.'),
+  generator('community-cart', 'Community Cart', 'sparkles', '#D88762', 40, ['social:gathering', 'social:celebration'], 'Everything needed to welcome people and mark a joyful moment.'),
+  generator('study-desk', 'Study Desk', 'sparkles', '#668EAA', 46, ['mind:work', 'mind:books'], 'Small tools for focus, planning, stories, and thoughtful curiosity.'),
+  generator('creative-playroom', 'Creative Playroom', 'sparkles', '#9A72C4', 47, ['creative:art', 'creative:screen'], 'Art materials and playful screens for making and imagining.'),
 ];
 
 export const MERGE_GENERATORS_BY_ID = new Map(MERGE_GENERATORS.map((item) => [item.id, item]));
+export const MERGE_GENERATOR_MIGRATION_ALIASES: Readonly<Record<string, string>> = {
+  'starter-pantry': 'hearth-pantry',
+  'nature-pot': 'wild-garden',
+  'waterside-pail': 'wild-garden',
+  'adventure-pack': 'journey-locker',
+  'travel-trunk': 'journey-locker',
+};
 
 export const MERGE_CHARACTER_NAMES: Record<MergeCharacterId, string> = {
-  feastle: 'Feastle', mossprout: 'Mossprout', steppling: 'Steppling', shellio: 'Shellio', voyagle: 'Voyagle',
+  baristabbit: 'Baristabbit', feastle: 'Feastle', steppling: 'Steppling', flexel: 'Flexel', bedrotte: 'Bedrotte',
+  dawnle: 'Dawnle', mendle: 'Mendle', gatherglow: 'Gatherglow', heartmote: 'Heartmote', kindling: 'Kindling',
+  snuglet: 'Snuglet', waglet: 'Waglet', tasklet: 'Tasklet', errandimp: 'Errandimp', pagelet: 'Pagelet',
+  relicoon: 'Relicoon', museling: 'Museling', encora: 'Encora', flickerbun: 'Flickerbun', pixooka: 'Pixooka',
+  mossprout: 'Mossprout', shellio: 'Shellio', skylo: 'Skylo', voyagle: 'Voyagle', cheerlet: 'Cheerlet',
 };
+
+export type KatchimeraMergeProfile = {
+  characterId: MergeCharacterId;
+  coreChains: [MergeChainId, MergeChainId];
+  guestChains: readonly MergeChainId[];
+  narrativeTheme: string;
+};
+
+const profile = (
+  characterId: MergeCharacterId,
+  coreChains: [MergeChainId, MergeChainId],
+  guestChains: readonly MergeChainId[],
+  narrativeTheme: string,
+): KatchimeraMergeProfile => ({ characterId, coreChains, guestChains, narrativeTheme });
+
+export const KATCHIMERA_MERGE_PROFILES: Record<MergeCharacterId, KatchimeraMergeProfile> = {
+  baristabbit: profile('baristabbit', ['drink:hot', 'drink:refresh'], ['food:dessert', 'social:gathering'], 'notice the rituals that make a pause feel restorative'),
+  feastle: profile('feastle', ['food:table', 'food:dessert'], ['drink:hot', 'drink:refresh', 'social:gathering'], 'turn food memories into warmth, welcome, and shared tables'),
+  steppling: profile('steppling', ['adventure:trail', 'adventure:travel'], ['drink:refresh', 'nature:waterside'], 'honour small steps and the places they gradually open'),
+  flexel: profile('flexel', ['adventure:trail', 'comfort:care'], ['drink:refresh'], 'find a sustainable rhythm between movement and recovery'),
+  bedrotte: profile('bedrotte', ['comfort:rest', 'comfort:care'], ['drink:hot', 'mind:books'], 'remove shame from rest and listen for what the body needs'),
+  dawnle: profile('dawnle', ['comfort:rest', 'drink:hot'], ['food:table'], 'build a gentle beginning instead of a perfect morning'),
+  mendle: profile('mendle', ['comfort:care', 'comfort:rest'], ['nature:garden'], 'notice repair, tenderness, and the care already happening'),
+  gatherglow: profile('gatherglow', ['social:gathering', 'social:celebration'], ['drink:refresh', 'food:dessert'], 'remember the moments when belonging felt real'),
+  heartmote: profile('heartmote', ['social:gathering', 'comfort:care'], ['social:celebration', 'drink:hot'], 'name the ways connection and care showed up today'),
+  kindling: profile('kindling', ['social:celebration', 'social:gathering'], ['nature:garden', 'mind:work'], 'protect sparks of enthusiasm by sharing them'),
+  snuglet: profile('snuglet', ['comfort:care', 'comfort:rest'], ['food:table', 'mind:books'], 'collect tiny comforts without needing to earn them'),
+  waglet: profile('waglet', ['comfort:care', 'adventure:trail'], ['social:gathering', 'nature:garden'], 'follow curiosity while staying close to safety and care'),
+  tasklet: profile('tasklet', ['mind:work', 'mind:books'], ['drink:hot'], 'turn pressure into one visible, humane next step'),
+  errandimp: profile('errandimp', ['mind:work', 'adventure:travel'], ['comfort:care'], 'make everyday logistics feel lighter and more intentional'),
+  pagelet: profile('pagelet', ['mind:books', 'mind:work'], ['drink:hot'], 'save useful thoughts before they disappear'),
+  relicoon: profile('relicoon', ['mind:books', 'creative:art'], ['adventure:travel'], 'find meaning in objects, stories, and remembered details'),
+  museling: profile('museling', ['creative:art', 'mind:books'], ['drink:hot', 'drink:refresh'], 'follow inspiration without demanding an outcome'),
+  encora: profile('encora', ['creative:art', 'social:gathering'], ['creative:screen'], 'give unfinished ideas a welcoming audience'),
+  flickerbun: profile('flickerbun', ['creative:screen', 'mind:books'], ['drink:refresh'], 'notice which stories and play truly replenish attention'),
+  pixooka: profile('pixooka', ['creative:screen', 'mind:work'], ['social:gathering'], 'shape digital play into curiosity, craft, and momentum'),
+  mossprout: profile('mossprout', ['nature:garden', 'nature:waterside'], ['comfort:care'], 'notice slow growth and the conditions that support it'),
+  shellio: profile('shellio', ['nature:waterside', 'adventure:travel'], ['drink:refresh'], 'keep small discoveries from the edges of the day'),
+  skylo: profile('skylo', ['adventure:travel', 'mind:books'], ['drink:hot'], 'make room for perspective, wonder, and faraway possibilities'),
+  voyagle: profile('voyagle', ['adventure:travel', 'adventure:trail'], ['drink:refresh'], 'turn journeys into stories worth keeping'),
+  cheerlet: profile('cheerlet', ['social:celebration', 'social:gathering'], ['food:dessert', 'drink:refresh'], 'spot reasons for joy without forcing positivity'),
+};
+
+export const GENERATOR_BY_CHAIN = Object.fromEntries(MERGE_GENERATORS.flatMap((item) => item.chainIds.map((chainId) => [chainId, item.id]))) as Record<MergeChainId, string>;
 
 export type MergeOrderTemplate = {
   key: string;
@@ -107,23 +195,22 @@ export type MergeOrderTemplate = {
   signature?: boolean;
   chapterId?: string;
   minimumFriendshipLevel?: number;
+  maximumFriendshipLevel?: number;
 };
 
-export const MERGE_ORDER_TEMPLATES: readonly MergeOrderTemplate[] = [
-  { key: 'starter-snack', characterId: 'feastle', title: 'A little something', difficulty: 'small', requirements: [{ definitionId: 'food:table:2', quantity: 1 }], reward: { coins: 20, mergeXp: 18, friendshipXp: 12, energy: 2 } },
-  { key: 'warm-dish', characterId: 'feastle', title: 'Warm the table', difficulty: 'medium', requirements: [{ definitionId: 'food:table:3', quantity: 1 }], reward: { coins: 38, mergeXp: 32, friendshipXp: 20, energy: 4 } },
-  { key: 'table-for-two', characterId: 'feastle', title: 'Something for the Table', difficulty: 'major', requirements: [{ definitionId: 'food:table:4', quantity: 1 }], reward: { coins: 80, mergeXp: 64, friendshipXp: 70, energy: 5 }, signature: true, chapterId: 'feastle-chapter-4', minimumFriendshipLevel: 4 },
-  { key: 'first-feast', characterId: 'feastle', title: 'Feastle’s First Feast', difficulty: 'major', requirements: [{ definitionId: 'food:table:6', quantity: 1 }, { definitionId: 'food:table:3', quantity: 1 }], reward: { coins: 130, mergeXp: 110, friendshipXp: 76, energy: 5 }, signature: true, chapterId: 'feastle-chapter-8', minimumFriendshipLevel: 8 },
-  { key: 'village-table', characterId: 'feastle', title: 'The Village Table', difficulty: 'major', requirements: [{ definitionId: 'food:table:5', quantity: 1 }, { definitionId: 'food:table:4', quantity: 1 }], reward: { coins: 145, mergeXp: 124, friendshipXp: 80, energy: 5 }, signature: true, chapterId: 'feastle-chapter-12', minimumFriendshipLevel: 12 },
-  { key: 'celebration-spread', characterId: 'feastle', title: 'A Celebration Spread', difficulty: 'major', requirements: [{ definitionId: 'food:table:6', quantity: 1 }, { definitionId: 'food:table:4', quantity: 1 }], reward: { coins: 165, mergeXp: 138, friendshipXp: 85, energy: 5 }, signature: true, chapterId: 'feastle-chapter-16', minimumFriendshipLevel: 16 },
-  { key: 'grand-feast', characterId: 'feastle', title: 'The Grand Feast', difficulty: 'major', requirements: [{ definitionId: 'food:table:6', quantity: 2 }], reward: { coins: 180, mergeXp: 150, friendshipXp: 90, energy: 5, wispId: 'crumb' }, signature: true, chapterId: 'feastle-chapter-20', minimumFriendshipLevel: 20 },
-  { key: 'first-garden', characterId: 'mossprout', title: 'My First Garden', difficulty: 'medium', requirements: [{ definitionId: 'nature:garden:3', quantity: 1 }], reward: { coins: 45, mergeXp: 38, friendshipXp: 24, energy: 5 } },
-  { key: 'moonflower', characterId: 'mossprout', title: 'A flower after rain', difficulty: 'major', requirements: [{ definitionId: 'nature:garden:5', quantity: 1 }], reward: { coins: 150, mergeXp: 120, friendshipXp: 75, energy: 12, wispId: 'bloom' }, signature: true },
-  { key: 'trail-boots', characterId: 'steppling', title: 'Ready for the trail', difficulty: 'medium', requirements: [{ definitionId: 'adventure:trail:3', quantity: 1 }], reward: { coins: 45, mergeXp: 38, friendshipXp: 24, energy: 5 } },
-  { key: 'tidepool', characterId: 'shellio', title: 'A tiny tidepool', difficulty: 'medium', requirements: [{ definitionId: 'nature:waterside:3', quantity: 1 }], reward: { coins: 55, mergeXp: 44, friendshipXp: 26, energy: 5 } },
-  { key: 'travel-notes', characterId: 'voyagle', title: 'Notes from the road', difficulty: 'medium', requirements: [{ definitionId: 'adventure:travel:3', quantity: 1 }], reward: { coins: 55, mergeXp: 44, friendshipXp: 26, energy: 5 } },
-  { key: 'picnic-adventure', characterId: 'voyagle', title: 'Picnic Adventure', difficulty: 'major', requirements: [{ definitionId: 'hybrid:picnic-pack', quantity: 1 }], reward: { coins: 180, mergeXp: 140, friendshipXp: 85, energy: 15, wispId: 'wander' }, signature: true },
-];
+const familyOrderTemplates = (entry: KatchimeraMergeProfile): MergeOrderTemplate[] => {
+  const name = MERGE_CHARACTER_NAMES[entry.characterId];
+  const [first, second] = entry.coreChains;
+  return [
+    { key: `${entry.characterId}:first-step`, characterId: entry.characterId, title: `${name}'s first request`, difficulty: 'small', requirements: [{ definitionId: `${first}:2`, quantity: 1 }], reward: { coins: 20, mergeXp: 18, friendshipXp: 12, energy: 2 }, maximumFriendshipLevel: 2 },
+    { key: `${entry.characterId}:second-thread`, characterId: entry.characterId, title: 'A second thread', difficulty: 'small', requirements: [{ definitionId: `${second}:2`, quantity: 1 }], reward: { coins: 22, mergeXp: 18, friendshipXp: 12, energy: 2 }, maximumFriendshipLevel: 2 },
+    { key: `${entry.characterId}:two-parts`, characterId: entry.characterId, title: 'Two parts of today', difficulty: 'medium', requirements: [{ definitionId: `${first}:3`, quantity: 1 }, { definitionId: `${second}:2`, quantity: 1 }], reward: { coins: 48, mergeXp: 38, friendshipXp: 22, energy: 3 }, minimumFriendshipLevel: 3 },
+    { key: `${entry.characterId}:deeper-pattern`, characterId: entry.characterId, title: 'A pattern taking shape', difficulty: 'medium', requirements: [{ definitionId: `${second}:3`, quantity: 1 }, { definitionId: `${first}:2`, quantity: 1 }], reward: { coins: 52, mergeXp: 42, friendshipXp: 24, energy: 3 }, minimumFriendshipLevel: 4 },
+    { key: `${entry.characterId}:signature`, characterId: entry.characterId, title: `${name}'s signature moment`, difficulty: 'major', requirements: [{ definitionId: `${first}:4`, quantity: 1 }, { definitionId: `${second}:4`, quantity: 1 }], reward: { coins: 100, mergeXp: 80, friendshipXp: 50, energy: 5 }, signature: true, chapterId: `${entry.characterId}-merge-chapter-1`, minimumFriendshipLevel: 6 },
+  ];
+};
+
+export const MERGE_ORDER_TEMPLATES: readonly MergeOrderTemplate[] = Object.values(KATCHIMERA_MERGE_PROFILES).flatMap(familyOrderTemplates);
 
 export const MERGE_HYBRID_RECIPES = new Map([
   [['adventure:trail:5', 'food:table:4'].sort().join('+'), 'hybrid:picnic-pack'],

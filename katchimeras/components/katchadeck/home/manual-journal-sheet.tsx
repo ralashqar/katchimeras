@@ -84,6 +84,11 @@ export type JournalComposerProps = {
   contextTitleOverride?: string;
   promptBody?: string;
   promptTitle?: string;
+  rewardNotice?: {
+    detail: string;
+    status: 'available' | 'collected';
+    title: string;
+  };
   saveLabel?: string;
   hapticOnSave?: boolean;
   dateTarget?: 'today' | 'yesterday';
@@ -125,6 +130,7 @@ export function JournalComposer({
   contextTitleOverride,
   promptBody,
   promptTitle,
+  rewardNotice,
   saveLabel = 'Save memory',
   hapticOnSave = true,
   dateTarget,
@@ -537,6 +543,24 @@ export function JournalComposer({
           subtitle={stage === 'flow' ? undefined : subtitle}
           title={title}
         />
+        {rewardNotice ? (
+          <Animated.View
+            accessibilityLabel={`${rewardNotice.title}. ${rewardNotice.detail}`}
+            entering={reduceMotion ? undefined : FadeIn.duration(180)}
+            style={[styles.rewardNotice, rewardNotice.status === 'collected' && styles.rewardNoticeCollected]}>
+            <View style={[styles.rewardNoticeIcon, rewardNotice.status === 'collected' && styles.rewardNoticeIconCollected]}>
+              <IconSymbol
+                color={rewardNotice.status === 'available' ? '#FFF9E9' : Meadow.goldDeep}
+                name={rewardNotice.status === 'available' ? 'bolt.fill' : 'checkmark'}
+                size={15}
+              />
+            </View>
+            <View style={styles.rewardNoticeCopy}>
+              <ThemedText selectable style={styles.rewardNoticeTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{rewardNotice.title}</ThemedText>
+              <ThemedText selectable style={styles.rewardNoticeDetail} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{rewardNotice.detail}</ThemedText>
+            </View>
+          </Animated.View>
+        ) : null}
         {dateTarget && onDateTargetChange ? (
           <View accessibilityRole="radiogroup" style={styles.dateTargetRow}>
             {(['yesterday', 'today'] as const).map((target) => {
@@ -1037,6 +1061,13 @@ function successHaptic() {
 const styles = StyleSheet.create({
   composer: { flex: 1, minHeight: 0 },
   dateTargetRow: { flexDirection: 'row', gap: 8, paddingBottom: 7, paddingHorizontal: 2 },
+  rewardNotice: { alignItems: 'center', backgroundColor: '#FFF2C8', borderColor: 'rgba(174,119,34,0.28)', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
+  rewardNoticeCollected: { backgroundColor: '#F5F0E4', borderColor: 'rgba(111,91,57,0.18)' },
+  rewardNoticeIcon: { alignItems: 'center', backgroundColor: '#B06F21', borderRadius: 999, height: 30, justifyContent: 'center', width: 30 },
+  rewardNoticeIconCollected: { backgroundColor: '#E8DDC5' },
+  rewardNoticeCopy: { flex: 1, gap: 1 },
+  rewardNoticeTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '900', lineHeight: 17 },
+  rewardNoticeDetail: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '600', lineHeight: 16 },
   dateTargetChip: { alignItems: 'center', backgroundColor: 'rgba(70,54,37,0.07)', borderColor: 'rgba(70,54,37,0.16)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 6, paddingHorizontal: 11, paddingVertical: 8 },
   dateTargetChipSelected: { backgroundColor: Meadow.goldDeep, borderColor: Meadow.goldDeep },
   dateTargetLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '800' },

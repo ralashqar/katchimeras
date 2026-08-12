@@ -162,6 +162,13 @@ export function questJournalTemplate(input: QuestJournalTemplateInput): QuestJou
   };
 }
 
+export function companionJournalRouteForFamily(familyId: KatchimeraFamilyId): QuestJournalRoute {
+  const canonical = canonicalFamilyId(familyId);
+  return FAMILY_DEFAULTS[familyId]
+    ?? (canonical ? FAMILY_DEFAULTS[canonical] : null)
+    ?? { flowId: 'general', initialChoiceId: 'ordinary', allowedChoiceIds: ['ordinary'] };
+}
+
 function familyRoute(input: QuestJournalTemplateInput): QuestJournalRoute | null {
   const id = input.id.toLowerCase();
   if (id.includes('book') || id.includes('read')) return { flowId: 'studio', initialChoiceId: 'book', allowedChoiceIds: ['book'] };
@@ -170,10 +177,7 @@ function familyRoute(input: QuestJournalTemplateInput): QuestJournalRoute | null
   if (id.includes('walk')) return { flowId: 'movement', initialChoiceId: 'walk', allowedChoiceIds: ['walk'] };
   if (id.includes('rest') || id.includes('recovery') || id.includes('night')) return { flowId: 'general', initialChoiceId: 'rest', allowedChoiceIds: ['rest'] };
   if (id.includes('progress') || id.includes('finish')) return { flowId: 'work', initialChoiceId: 'progress', allowedChoiceIds: ['progress'] };
-  const canonical = canonicalFamilyId(input.familyId);
-  return input.familyId
-    ? FAMILY_DEFAULTS[input.familyId] ?? (canonical ? FAMILY_DEFAULTS[canonical] ?? null : null)
-    : null;
+  return input.familyId ? companionJournalRouteForFamily(input.familyId) : null;
 }
 
 function parseJournalRoutes(values?: readonly string[]): QuestJournalRoute | null {

@@ -7,6 +7,8 @@ import type {
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import { companionInsightConversationDefinitions } from '@/constants/companion-insight-conversations';
 import { feastleFirstMeetingConversationDefinition, feastleFriendshipConversationDefinitions } from '@/constants/feastle-friendship-conversations';
+import { baristabbitStoryConversationDefinitions } from '@/constants/baristabbit-story-conversations';
+import { journeyCohortStoryConversationDefinitions } from '@/constants/journey-cohort-story-conversations';
 import {
   authoredConversationTopics,
   authoredFamilyConversationDefinitions,
@@ -915,6 +917,8 @@ function familyPack(
 
 export const companionConversationDefinitionsV2: readonly ConversationDefinition[] = [
   ...familyPack('baristabbit', BARISTA_POLLS, BARISTA_PROFILE),
+  ...baristabbitStoryConversationDefinitions,
+  ...journeyCohortStoryConversationDefinitions,
   ...familyPack('steppling', STEPPLING_POLLS, STEPPLING_PROFILE),
   ...familyPack('flexel', FLEXEL_POLLS, FLEXEL_PROFILE),
   ...authoredFamilyConversationDefinitions,

@@ -1,13 +1,28 @@
 import type { WispId } from '@/types/wisp';
 
-export type MergeFamilyId = 'food' | 'nature' | 'adventure';
-export type MergeCharacterId = 'feastle' | 'mossprout' | 'steppling' | 'shellio' | 'voyagle';
+export type MergeFamilyId = 'food' | 'drink' | 'adventure' | 'nature' | 'comfort' | 'social' | 'mind' | 'creative';
+export type MergeChainId =
+  | 'food:table' | 'food:dessert'
+  | 'drink:hot' | 'drink:refresh'
+  | 'adventure:trail' | 'adventure:travel'
+  | 'nature:garden' | 'nature:waterside'
+  | 'comfort:rest' | 'comfort:care'
+  | 'social:gathering' | 'social:celebration'
+  | 'mind:work' | 'mind:books'
+  | 'creative:art' | 'creative:screen';
+export type MergeCharacterId =
+  | 'baristabbit' | 'feastle' | 'steppling' | 'flexel' | 'bedrotte'
+  | 'dawnle' | 'mendle' | 'gatherglow' | 'heartmote' | 'kindling'
+  | 'snuglet' | 'waglet' | 'tasklet' | 'errandimp' | 'pagelet'
+  | 'relicoon' | 'museling' | 'encora' | 'flickerbun' | 'pixooka'
+  | 'mossprout' | 'shellio' | 'skylo' | 'voyagle' | 'cheerlet';
 export type MergeOrderDifficulty = 'small' | 'medium' | 'major';
 export type MergeOrderPurpose = 'normal' | 'signature';
 
 export type MergeItemDefinition = {
   id: string;
   familyId: MergeFamilyId;
+  chainId: MergeChainId;
   branchId: string;
   tier: number;
   name: string;
@@ -38,10 +53,10 @@ export type MergeBoardCell = {
 
 export type MergeGeneratorState = {
   id: string;
-  familyId: MergeFamilyId;
   name: string;
   level: number;
-  enabledBranches: string[];
+  chainIds: [MergeChainId, MergeChainId];
+  tierOneDropDefinitionIds: [string, string];
 };
 
 export type MergeOrderRequirement = {
@@ -111,8 +126,23 @@ export type MergeExternalRewardReceipt = {
   appliedAt: number | null;
 };
 
+export type MergeActivityRewardKind =
+  | 'daily_journal_energy'
+  | 'daily_companion_energy'
+  | 'daily_quest_energy'
+  | 'companion_story_starter';
+
+export type MergeActivityReward = {
+  receiptId: string;
+  kind: MergeActivityRewardKind;
+  amount: number;
+  grantDayId: string;
+  label: string;
+  itemDefinitionIds?: string[];
+};
+
 export type MergeWorldState = {
-  version: 3;
+  version: 5;
   revision: number;
   createdAt: number;
   updatedAt: number;
@@ -123,12 +153,13 @@ export type MergeWorldState = {
   rewardInbox: MergeRewardInboxEntry[];
   generatorUnlockReceipts: MergeGeneratorUnlockReceipt[];
   generators: Record<string, MergeGeneratorState>;
-  energy: { value: number; cap: number; lastRegenAt: number };
+  energy: { value: number; regenCap: number; lastRegenAt: number };
   coins: number;
   mergeXp: number;
   mergeLevel: number;
   discoveries: string[];
   unlockedFamilies: MergeFamilyId[];
+  unlockedChains: MergeChainId[];
   unlockedCharacters: MergeCharacterId[];
   favouriteCharacterId: MergeCharacterId | null;
   activeOrders: MergeOrder[];
@@ -152,7 +183,8 @@ export type MergeWorldCommand =
   | { type: 'sellItem'; cell: number; now: number }
   | { type: 'claimInbox'; entryId: string; now: number }
   | { type: 'unlockExpansion'; expansionId: string; now: number }
-  | { type: 'grantActivityRewardsBatch'; rewards: Array<{ receiptId: string; amount: number; grantDayId: string; rewardClass: 'daily_journal' | 'daily_quest' | 'food_basket'; itemDefinitionIds?: string[] }>; now: number }
+  | { type: 'grantActivityRewardsBatch'; rewards: MergeActivityReward[]; now: number }
+  | { type: 'featureCharacter'; characterId: MergeCharacterId; now: number }
   | { type: 'ackGeneratorUnlock'; receiptId: string; now: number }
   | { type: 'rerollOrder'; orderId: string; now: number }
   | { type: 'reconcileCharacters'; characterIds: string[]; now: number }
@@ -168,4 +200,6 @@ export type MergeWorldCommandResult = {
   mergedCell?: number;
   spawnedCell?: number;
   servedOrderId?: string;
+  energyGranted?: number;
+  itemsQueued?: number;
 };

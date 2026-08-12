@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
-import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { type NativeScrollEvent, type NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -26,6 +26,7 @@ import { MERGE_CHARACTER_NAMES } from '@/constants/merge-world-catalog';
 import type { HomeVisualKey } from '@/types/home';
 import type { MergeCharacterId, MergeOrder } from '@/types/merge-world';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
+import { MAX_MOUNTED_ORDER_TRAYS, orderMountWindow } from '@/utils/merge-world/order-window';
 
 import { PersistentMergeItemArt } from './feastle-persistent-merge-board';
 import type { MergeScreenPoint } from './merge-serve-reward-overlay';
@@ -82,11 +83,11 @@ const SERVE_CONFETTI = [
 ] as const;
 
 const CHARACTER_VISUALS: Record<MergeCharacterId, HomeVisualKey> = {
-  feastle: 'feastle',
-  mossprout: 'mossprout',
-  steppling: 'steppling',
-  shellio: 'shellio',
-  voyagle: 'voyagle',
+  baristabbit: 'baristabbit', feastle: 'feastle', steppling: 'steppling', flexel: 'flexel', bedrotte: 'bedrotte',
+  dawnle: 'dawnle', mendle: 'mendle', gatherglow: 'gatherglow', heartmote: 'heartmote', kindling: 'kindling',
+  snuglet: 'snuglet', waglet: 'waglet', tasklet: 'tasklet', errandimp: 'errandimp', pagelet: 'pagelet',
+  relicoon: 'relicoon', museling: 'museling', encora: 'encora', flickerbun: 'flickerbun', pixooka: 'pixooka',
+  mossprout: 'mossprout', shellio: 'shellio', skylo: 'skylo', voyagle: 'voyagle', cheerlet: 'cheerlet',
 };
 
 export type MergeTrayEntry =
@@ -114,7 +115,32 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onReroll, on
   const reduceMotion = useReducedMotion();
   const scrollRef = useRef<ScrollView>(null);
   const lastAutoFocusKeyRef = useRef<string | null>(null);
+  const pendingWindowFrameRef = useRef<number | null>(null);
+  const [mountedWindow, setMountedWindow] = useState(() => orderMountWindow(0, entries.length));
   const firstEntryId = entries[0]?.id ?? null;
+
+  const moveMountedWindow = useCallback((centerIndex: number) => {
+    if (pendingWindowFrameRef.current != null) cancelAnimationFrame(pendingWindowFrameRef.current);
+    // Defer image/card mounting until after the scroll event is delivered. It
+    // keeps gestures responsive and coalesces several fast scroll events.
+    pendingWindowFrameRef.current = requestAnimationFrame(() => {
+      pendingWindowFrameRef.current = null;
+      const next = orderMountWindow(centerIndex, entries.length);
+      setMountedWindow((current) => current.start === next.start && current.end === next.end ? current : next);
+    });
+  }, [entries.length]);
+
+  useEffect(() => {
+    setMountedWindow((current) => {
+      const center = Math.min(Math.max(current.start + Math.floor(MAX_MOUNTED_ORDER_TRAYS / 2), 0), Math.max(0, entries.length - 1));
+      const next = orderMountWindow(center, entries.length);
+      return current.start === next.start && current.end === next.end ? current : next;
+    });
+  }, [entries.length]);
+
+  useEffect(() => () => {
+    if (pendingWindowFrameRef.current != null) cancelAnimationFrame(pendingWindowFrameRef.current);
+  }, []);
 
   useEffect(() => {
     const autoFocusKey = firstEntryId?.startsWith('chat-note:') ? firstEntryId : focusOrderId ?? null;
@@ -126,11 +152,21 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onReroll, on
         : -1;
     if (targetIndex < 0) return;
     lastAutoFocusKeyRef.current = autoFocusKey;
+    setMountedWindow(orderMountWindow(targetIndex, entries.length));
     const frame = requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({ x: targetIndex * (TRAY_WIDTH + TRAY_GAP), y: 0, animated: !reduceMotion });
     });
     return () => cancelAnimationFrame(frame);
   }, [entries, firstEntryId, focusOrderId, reduceMotion]);
+
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, layoutMeasurement } = event.nativeEvent;
+    const centerIndex = Math.max(0, Math.min(
+      entries.length - 1,
+      Math.floor((contentOffset.x + layoutMeasurement.width / 2) / (TRAY_WIDTH + TRAY_GAP)),
+    ));
+    moveMountedWindow(centerIndex);
+  }, [entries.length, moveMountedWindow]);
 
   if (!entries.length) return <View accessibilityLabel="No active Katchimera requests" style={styles.emptyRail} />;
 
@@ -141,12 +177,17 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onReroll, on
       decelerationRate="fast"
       disableIntervalMomentum
       horizontal
+      onScroll={handleScroll}
       ref={scrollRef}
+      scrollEventThrottle={16}
       showsHorizontalScrollIndicator={false}
       snapToAlignment="start"
       snapToInterval={TRAY_WIDTH + TRAY_GAP}
       style={styles.rail}>
-      {entries.map((entry, index) => (
+      {mountedWindow.start > 0 ? <View style={{ width: mountedWindow.start * (TRAY_WIDTH + TRAY_GAP) }} /> : null}
+      {entries.slice(mountedWindow.start, mountedWindow.end).map((entry, windowIndex) => {
+        const index = mountedWindow.start + windowIndex;
+        return (
         <Animated.View
           entering={reduceMotion
             ? FadeIn.duration(100)
@@ -167,7 +208,11 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onReroll, on
             <ChatNoteTrayCard entry={entry} onPress={onOpenChat} reduceMotion={reduceMotion} />
           )}
         </Animated.View>
-      ))}
+        );
+      })}
+      {mountedWindow.end < entries.length
+        ? <View style={{ width: (entries.length - mountedWindow.end) * (TRAY_WIDTH + TRAY_GAP) }} />
+        : null}
     </ScrollView>
   );
 }
@@ -381,9 +426,9 @@ function ChatNoteTrayCard({ entry, onPress, reduceMotion }: {
 
 const styles = StyleSheet.create({
   rail: { flexGrow: 0, height: TRAY_HEIGHT, overflow: 'visible', zIndex: 2 },
-  content: { gap: TRAY_GAP, paddingHorizontal: 3, paddingRight: 18 },
+  content: { paddingLeft: 3, paddingRight: 18 },
   emptyRail: { height: TRAY_HEIGHT },
-  entry: { height: TRAY_HEIGHT, width: TRAY_WIDTH },
+  entry: { height: TRAY_HEIGHT, marginRight: TRAY_GAP, width: TRAY_WIDTH },
   card: { height: TRAY_HEIGHT, overflow: 'visible', position: 'relative', width: TRAY_WIDTH },
   readyGlow: { backgroundColor: 'rgba(184,224,112,0.42)', borderRadius: 999, boxShadow: '0 0 22px rgba(174,220,95,0.72)', height: 70, left: 25, position: 'absolute', top: 11, width: 70, zIndex: 0 },
   readyRays: { height: 84, left: 18, position: 'absolute', top: 5, width: 84, zIndex: 0 },

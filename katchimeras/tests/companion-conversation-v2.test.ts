@@ -7,6 +7,7 @@ import {
   companionConversationDefinitionsV2,
 } from '@/constants/companion-conversations-v2';
 import { FEASTLE_FIRST_MEETING_DEFINITION_ID } from '@/constants/feastle-friendship-conversations';
+import { BARISTABBIT_FIRST_MEETING_DEFINITION_ID } from '@/constants/baristabbit-story-conversations';
 import { katchimeraFamilyById, katchimeraSkinById } from '@/constants/katchimera-skins';
 import { companionQuickGoalTemplateById, quickGoalTemplatesForFamily } from '@/constants/companion-quick-goals';
 import type { ConversationDefinition } from '@/types/companion-conversation';
@@ -46,10 +47,11 @@ import {
 import { questDefinition } from '@/utils/quests/definitions';
 
 const familyIds = ['baristabbit', 'steppling', 'flexel'] as const;
+const authoredStoryFamilies = new Set(['baristabbit', 'steppling', 'voyagle', 'flexel', 'bedrotte']);
 
 test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gated', () => {
   assert.deepEqual(validateConversationDefinitions(companionConversationDefinitionsV2), []);
-  assert.equal(companionConversationDefinitionsV2.length, 53 * CONVERSATION_V2_FAMILIES.length + 20);
+  assert.equal(companionConversationDefinitionsV2.length, 53 * CONVERSATION_V2_FAMILIES.length + 40);
   assert.deepEqual(CONVERSATION_V2_ENABLED_FAMILIES, CONVERSATION_V2_FAMILIES);
   assert.deepEqual(CONVERSATION_V2_IDEAL_SKIN_FAMILIES, familyIds);
   assert.equal(isConversationV2Family('feastle'), true);
@@ -66,16 +68,16 @@ test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gate
     }
     assert.ok(katchimeraFamilyById.get(familyId)!.skinIds.length >= 6, `${familyId} needs at least six forms`);
     assert.ok(katchimeraFamilyById.get(familyId)!.skinIds.length <= 12, `${familyId} catalog has grown beyond reviewable scope`);
-    assert.equal(pack.length, familyId === 'feastle' ? 73 : 53);
-    assert.equal(pack.filter((item) => item.trigger === 'evergreen').length, familyId === 'feastle' ? 12 : 11);
-    assert.equal(pack.filter((item) => item.isOpener).length, familyId === 'feastle' ? 9 : 8);
+    assert.equal(pack.length, familyId === 'feastle' ? 73 : authoredStoryFamilies.has(familyId) ? 57 : 53);
+    assert.equal(pack.filter((item) => item.trigger === 'evergreen').length, familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 12 : 11);
+    assert.equal(pack.filter((item) => item.isOpener).length, familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 9 : 8);
     assert.equal(pack.filter((item) => item.trigger === 'journal').length, 6);
     assert.equal(pack.filter((item) => item.trigger === 'goal_debrief').length, 2);
     assert.equal(pack.filter((item) => item.trigger === 'quest_debrief').length, 2);
-    assert.equal(pack.filter((item) => item.trigger === 'bond').length, familyId === 'feastle' ? 22 : 3);
+    assert.equal(pack.filter((item) => item.trigger === 'bond').length, familyId === 'feastle' ? 22 : authoredStoryFamilies.has(familyId) ? 6 : 3);
     assert.equal(pack.filter((item) => item.trigger === 'poll').length, 24);
     assert.equal(pack.filter((item) => item.trigger === 'signature_game').length, 5);
-    assert.equal(pack.filter((item) => item.format === 'insight_game').length, familyId === 'feastle' ? 5 : 4);
+    assert.equal(pack.filter((item) => item.format === 'insight_game').length, familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 5 : 4);
   }
 });
 
@@ -377,7 +379,7 @@ test('short takeaway stories are excluded in favour of deep assessments', () => 
     assert.equal(pack.some((definition) => definition.id.includes(':conversation:doorstep')), false);
     assert.equal(pack.some((definition) => definition.id.includes(':conversation:showing-up')), false);
     assert.equal(JSON.stringify(pack).includes('reflection_reveal'), false);
-    assert.equal(pack.filter((definition) => definition.format === 'insight_game').length, 4);
+    assert.equal(pack.filter((definition) => definition.format === 'insight_game').length, authoredStoryFamilies.has(familyId) ? 5 : 4);
   }
   const authored = JSON.stringify(companionConversationDefinitionsV2);
   assert.equal(authored.includes('Finish this thought'), false);
@@ -507,7 +509,7 @@ test('authored-family insights use five meaningful questions while every form-ga
     const games = companionConversationDefinitionsForFamily(familyId)
       .flatMap((definition) => definition.nodes)
       .filter((node) => node.kind === 'profile_game' || node.kind === 'insight_game');
-    assert.equal(games.length, familyId === 'feastle' ? 6 : 5);
+    assert.equal(games.length, familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 6 : 5);
     for (const game of games.filter((candidate) => candidate.kind === 'profile_game')) {
       assert.deepEqual(validateProfileQuestionGraph(`${familyId}:test`, game), []);
     }
@@ -612,8 +614,8 @@ test('Feastle introduces an optional journal handoff and resumes the chapter aft
   assert.equal(handoff.flowId, 'food');
   assert.equal(handoff.nextNodeId, 'busy-day');
   assert.equal(handoff.rewardGrowth, 20);
-  assert.equal(handoff.rewardMergeEnergy, 8);
-  assert.deepEqual(handoff.rewardItemIds, ['food:table:1', 'food:table:1']);
+  assert.equal('rewardMergeEnergy' in handoff, false);
+  assert.equal('rewardItemIds' in handoff, false);
 
   const started = createConversationSession({ definition, formId: 'feastle', dayId: '2026-08-12', createdAt: 1 });
   const answered = answerConversation(started, definition, 'easy', 2).session;
@@ -646,6 +648,26 @@ test('Feastle first meeting is a first-person story in the conversation engine',
   assert.match(spokenCopy, /I brought a basket/);
   assert.match(spokenCopy, /how would you like me beside you/);
   assert.doesNotMatch(spokenCopy, /should Feastle|Feastle says|Feastle (?:will|can|should)/);
+});
+
+test('Baristabbit owns a complete drink-ritual chapter with journal, insight, memory, and goal beats', () => {
+  const definitions = companionConversationDefinitionsForFamily('baristabbit');
+  const firstMeeting = definitions.find((item) => item.id === BARISTABBIT_FIRST_MEETING_DEFINITION_ID)!;
+  const midpoint = definitions.find((item) => item.id === 'baristabbit:story:6')!;
+  const insight = definitions.find((item) => item.id === 'baristabbit:story:7')!;
+  const finale = definitions.find((item) => item.id === 'baristabbit:story:8')!;
+  assert.equal(firstMeeting.format, 'opener');
+  assert.match(JSON.stringify(firstMeeting.nodes), /The menu is imaginary, but the pause can be real/);
+  const journal = midpoint.nodes.find((node) => node.kind === 'journal_handoff');
+  assert.ok(journal);
+  assert.equal('rewardMergeEnergy' in journal, false);
+  assert.equal('rewardItemIds' in journal, false);
+  const game = insight.nodes.find((node) => node.kind === 'insight_game');
+  const reveal = insight.nodes.find((node) => node.kind === 'insight_reveal');
+  assert.equal(game?.questions.length, 5);
+  assert.equal(reveal?.results.length, 4);
+  assert.ok(finale.nodes.some((node) => node.kind === 'memory_proposal'));
+  assert.ok(finale.nodes.some((node) => node.kind === 'goal_proposal' && node.goalTypeId === 'ritual'));
 });
 
 // Ensures the imported data remains statically typed as the engine contract.

@@ -171,8 +171,6 @@ export type ConversationNode =
       allowedChoiceIds: readonly string[];
       saveLabel: string;
       rewardGrowth: number;
-      rewardMergeEnergy: number;
-      rewardItemIds: readonly string[];
       nextNodeId: string | null;
     }
   | {

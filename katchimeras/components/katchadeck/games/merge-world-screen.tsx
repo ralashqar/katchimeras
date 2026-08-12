@@ -12,6 +12,7 @@ import { RewardSplash, type RewardSplashItem } from '@/components/katchadeck/ui/
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   MERGE_GENERATORS_BY_ID,
+  MERGE_CHARACTER_NAMES,
   MERGE_LEVEL_THRESHOLDS,
 } from '@/constants/merge-world-catalog';
 import { mergeWorldGeneratorArt } from '@/constants/merge-world-art';
@@ -21,7 +22,8 @@ import type { MergeOrder, MergeWorldCommand } from '@/types/merge-world';
 import { markFlowStart, reportFlowReady } from '@/utils/flow-performance';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
 import { availableExpansion, mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds } from '@/utils/merge-world/engine';
-import { beginFeastleReturn, loadFeastleStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
+import { MERGE_ENERGY_REGEN_MS } from '@/utils/merge-world/economy-policy';
+import { beginAuthoredCohortReturn, beginFeastleReturn, isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
 
 import { FeastlePersistentMergeBoard, type MergeBoardScreenMetrics } from './feastle-persistent-merge-board';
 import { MergeOrderRail, type MergeTrayEntry } from './merge-order-rail';
@@ -43,6 +45,14 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
   const [boardAreaHeight, setBoardAreaHeight] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [story, setStory] = useState(loadFeastleStory);
+  const [authoredStories, setAuthoredStories] = useState(() => ({
+    baristabbit: loadAuthoredCohortStory('baristabbit'),
+    steppling: loadAuthoredCohortStory('steppling'),
+    voyagle: loadAuthoredCohortStory('voyagle'),
+    flexel: loadAuthoredCohortStory('flexel'),
+    bedrotte: loadAuthoredCohortStory('bedrotte'),
+  }));
+  const [returnCharacterId, setReturnCharacterId] = useState<MergeOrder['characterId'] | null>(null);
   const [serveFlight, setServeFlight] = useState<MergeServeRewardFlight | null>(null);
   const [presentedCoins, setPresentedCoins] = useState<number | null>(null);
   const [coinPulseNonce, setCoinPulseNonce] = useState(0);
@@ -78,21 +88,33 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
       }];
     }), [state?.generatorUnlockReceipts]);
 
-  useEffect(() => subscribeCompanionStories(() => setStory(loadFeastleStory())), []);
+  useEffect(() => subscribeCompanionStories(() => {
+    setStory(loadFeastleStory());
+    setAuthoredStories({
+      baristabbit: loadAuthoredCohortStory('baristabbit'),
+      steppling: loadAuthoredCohortStory('steppling'),
+      voyagle: loadAuthoredCohortStory('voyagle'),
+      flexel: loadAuthoredCohortStory('flexel'),
+      bedrotte: loadAuthoredCohortStory('bedrotte'),
+    });
+  }), []);
 
   useEffect(() => {
     if (active) storyNavigationPendingRef.current = false;
   }, [active]);
 
-  const openFeastleReturn = useCallback(() => {
+  const openCharacterReturn = useCallback(() => {
     if (!active || storyNavigationPendingRef.current) return;
     storyNavigationPendingRef.current = true;
-    beginFeastleReturn();
+    const characterId = state?.favouriteCharacterId ?? 'feastle';
+    if (characterId === 'feastle') beginFeastleReturn();
+    else if (isAuthoredCohortFamily(characterId)) beginAuthoredCohortReturn(characterId);
+    else setReturnCharacterId(null);
     router.push({
       pathname: '/katchimera/[creatureId]',
-      params: { creatureId: 'companion:feastle', source: 'merge-world', story: 'return' },
+      params: { creatureId: `companion:${characterId}`, source: 'merge-world', story: 'return' },
     });
-  }, [active, router]);
+  }, [active, router, state?.favouriteCharacterId]);
 
   useEffect(() => {
     markFlowStart('merge-world');
@@ -116,21 +138,52 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
 
   const dispatch = useCallback((command: MergeWorldCommand) => send(command), [send]);
 
-  const trayEntries = useMemo<MergeTrayEntry[]>(() => state ? [
-    ...(story.status === 'return_available' ? [{
+  const trayEntries = useMemo<MergeTrayEntry[]>(() => {
+    if (!state) return [];
+    const featured = state.favouriteCharacterId;
+    const authoredStory = featured && isAuthoredCohortFamily(featured) ? authoredStories[featured] : null;
+    const returnEntry: MergeTrayEntry | null = story.status === 'return_available' && featured === 'feastle' ? {
       id: `chat-note:${story.id}:${story.targetLevel}`,
       kind: 'chat_note' as const,
       characterId: 'feastle' as const,
       bondPoints: story.pendingBondPoints,
-    }] : []),
-    ...state.activeOrders.map((order) => ({
+    } : authoredStory?.status === 'return_available' && featured && isAuthoredCohortFamily(featured) ? {
+      id: `chat-note:${authoredStory.id}:${authoredStory.targetLevel}`,
+      kind: 'chat_note' as const,
+      characterId: featured,
+      bondPoints: authoredStory.pendingBondPoints,
+    } : returnCharacterId && returnCharacterId === featured ? {
+      id: `chat-note:${returnCharacterId}:chapter-1`,
+      kind: 'chat_note' as const,
+      characterId: returnCharacterId,
+      bondPoints: 0,
+    } : null;
+    // A return note replaces the request rail so there is always one clear
+    // next action: finish the narrative beat with the featured companion.
+    if (returnEntry) return [returnEntry];
+    const focusCharacterId = focusOrderId
+      ? state.activeOrders.find((order) => order.id === focusOrderId)?.characterId ?? null
+      : null;
+    const prioritizedOrders = state.activeOrders
+      .map((order, sourceIndex) => ({ order, sourceIndex }))
+      .sort((left, right) => {
+        const priority = (order: MergeOrder) => {
+          if (focusOrderId && order.id === focusOrderId) return 0;
+          if (focusCharacterId && order.characterId === focusCharacterId) return 1;
+          if (featured && order.characterId === featured) return focusCharacterId ? 2 : 0;
+          return focusCharacterId ? 3 : 1;
+        };
+        return priority(left.order) - priority(right.order) || left.sourceIndex - right.sourceIndex;
+      })
+      .map(({ order }) => order);
+    return prioritizedOrders.map((order) => ({
       id: order.id,
       kind: 'order' as const,
       order,
       itemReadiness: mergeOrderItemReadiness(state, order),
       ready: readyOrderIds.has(order.id),
-    })),
-  ] : [], [readyOrderIds, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
+    }));
+  }, [authoredStories, focusOrderId, readyOrderIds, returnCharacterId, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
 
   const startServeAnimation = useCallback(async (order: MergeOrder, itemTargets: readonly MergeScreenPoint[]) => {
     if (!state || activeServeRef.current) return false;
@@ -170,10 +223,12 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
       setServeFlight(null);
       return;
     }
+    const servedOrder = state?.activeOrders.find((order) => order.id === activeOrder.orderId);
+    if (servedOrder?.signature && servedOrder.characterId !== 'feastle' && !isAuthoredCohortFamily(servedOrder.characterId)) setReturnCharacterId(servedOrder.characterId);
     setPresentedCoins(result.state.coins - activeOrder.coinAmount);
     setServeFlight((current) => current ? { ...current, phase: 'coins' } : null);
     if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [dispatch]);
+  }, [dispatch, state?.activeOrders]);
 
   const handleCoinArrive = useCallback((amount: number) => {
     setPresentedCoins((current) => current == null ? amount : current + amount);
@@ -209,14 +264,16 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
   const expansion = availableExpansion(state);
   const expansionReady = Boolean(expansion && state.mergeLevel >= expansion.requiredLevel && state.coins >= expansion.coinCost);
   const pendingBasket = state.rewardInbox.find((entry) => entry.source === 'activity') ?? null;
-  const nextEnergyMinutes = state.energy.value < state.energy.cap
-    ? Math.max(1, Math.ceil((state.energy.lastRegenAt + 12 * 60_000 - Date.now()) / 60_000))
+  const featuredName = state.favouriteCharacterId ? MERGE_CHARACTER_NAMES[state.favouriteCharacterId] : 'Katchimera';
+  const bonusEnergy = Math.max(0, state.energy.value - state.energy.regenCap);
+  const nextEnergyMinutes = state.energy.value < state.energy.regenCap
+    ? Math.max(1, Math.ceil((state.energy.lastRegenAt + MERGE_ENERGY_REGEN_MS - Date.now()) / 60_000))
     : null;
   return (
     <View ref={screenRef} style={styles.screen}>
       <View style={[styles.game, { paddingTop: Math.max(insets.top + 3, 7), paddingBottom: Math.max(insets.bottom + 3, 7), width: contentWidth }]}>
         <View style={styles.hud}>
-          <CurrencyHud art={MERGE_CURRENCY_ART.energy} label="Energy" value={`${state.energy.value}`} suffix={`/${state.energy.cap}`} />
+          <CurrencyHud art={MERGE_CURRENCY_ART.energy} label="Energy" value={`${state.energy.value}`} suffix={`/${state.energy.regenCap}`} />
           <CurrencyHud art={MERGE_CURRENCY_ART.coins} label="Coins" pulseNonce={coinPulseNonce} targetRef={coinHudRef} value={String(presentedCoins ?? state.coins)} />
           <CurrencyHud art={MERGE_CURRENCY_ART.level} label="Merge level" progress={levelRatio} value={String(state.mergeLevel)} />
           <Pressable accessibilityLabel="Open legacy games" accessibilityRole="button" onPress={() => router.push('/legacy-games')} style={({ pressed }) => [styles.hudAction, pressed && styles.pressed]}>
@@ -225,7 +282,9 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
         </View>
         <View style={styles.energyStatusRow}>
           <ThemedText darkColor="#F5DFC2" style={styles.energyStatusText}>
-            {nextEnergyMinutes ? `Next Energy in about ${nextEnergyMinutes} min` : 'Energy full'}
+            {bonusEnergy > 0
+              ? `${bonusEnergy} bonus Energy · regeneration resumes below ${state.energy.regenCap}`
+              : nextEnergyMinutes ? `Next Energy in about ${nextEnergyMinutes} min` : 'Energy full'}
           </ThemedText>
           {pendingBasket ? <Pressable
             accessibilityHint="Places both ingredients when two board spaces are free"
@@ -233,7 +292,7 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
             onPress={() => dispatch({ type: 'claimInbox', entryId: pendingBasket.id, now: Date.now() })}
             style={({ pressed }) => [styles.basketButton, pressed && styles.pressed]}>
             <IconSymbol color="#4A291B" name="shippingbox.fill" size={13} />
-            <ThemedText darkColor="#4A291B" style={styles.basketLabel}>Claim Pantry Basket</ThemedText>
+            <ThemedText darkColor="#4A291B" style={styles.basketLabel}>Claim {featuredName} supplies</ThemedText>
           </Pressable> : null}
         </View>
 
@@ -241,7 +300,7 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
           <MergeOrderRail
             entries={trayEntries}
             focusOrderId={focusOrderId}
-            onOpenChat={openFeastleReturn}
+            onOpenChat={openCharacterReturn}
             onReroll={(order) => rerollOrder(order.id)}
             onServe={startServeAnimation}
           />

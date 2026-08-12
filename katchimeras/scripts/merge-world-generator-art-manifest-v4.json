@@ -1,0 +1,23 @@
+{
+  "version": 4,
+  "styleReferences": ["artifacts/merge-world-existing-contact.png"],
+  "promptBrief": [
+    "Eight shared Merge World generators in the existing polished rounded 3D collectible style.",
+    "Each generator visibly combines its two chain families, isolated on flat #FF00FF with no text, floor, cast shadow, scenery, or fragments.",
+    "Four columns by two occupied rows with generous safe spacing; rows three and four remain empty when a square source is used."
+  ],
+  "output": { "size": 256, "subjectExtent": 220, "quality": 84, "hardFileLimitBytes": 51200, "keepLargestComponent": true, "gridRows": 2, "gridColumns": 4 },
+  "sheets": [{
+    "id": "generators",
+    "cells": [
+      { "row": 0, "column": 0, "definitionId": "hearth-pantry", "file": "hearth-pantry.webp" },
+      { "row": 0, "column": 1, "definitionId": "ritual-bar", "file": "ritual-bar.webp" },
+      { "row": 0, "column": 2, "definitionId": "journey-locker", "file": "journey-locker.webp" },
+      { "row": 0, "column": 3, "definitionId": "wild-garden", "file": "wild-garden.webp" },
+      { "row": 1, "column": 0, "definitionId": "comfort-chest", "file": "comfort-chest.webp" },
+      { "row": 1, "column": 1, "definitionId": "community-cart", "file": "community-cart.webp" },
+      { "row": 1, "column": 2, "definitionId": "study-desk", "file": "study-desk.webp" },
+      { "row": 1, "column": 3, "definitionId": "creative-playroom", "file": "creative-playroom.webp" }
+    ]
+  }]
+}

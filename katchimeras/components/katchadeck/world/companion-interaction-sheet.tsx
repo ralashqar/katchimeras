@@ -29,7 +29,7 @@ import type {
   CompanionConversationReceipt,
   QuestCaptureFeedback,
 } from '@/types/companion-interaction';
-import { getCreatureVisual } from '@/game/days';
+import { deriveTomorrowDayRecord, getCreatureVisual } from '@/game/days';
 import type { QuestSubmissionItem } from '@/utils/quests/report-back-evidence';
 import type { QuestRuntimeStatus } from '@/utils/quests/runtime';
 import type { QuestJournalCaptureMode } from '@/utils/quests/journal-templates';
@@ -115,13 +115,21 @@ import { CompanionTrophyRoomScreen } from './companion-trophy-room-screen';
 import { CompanionVisitScene } from './companion-visit-scene';
 import { CompanionDashboard } from './companion-dashboard';
 import { FeastleStoryStage } from './feastle-story-stage';
-import { beginFeastleStory, loadFeastleStory } from '@/utils/companion-story-storage';
+import { BaristabbitStoryStage } from './baristabbit-story-stage';
+import { beginAuthoredCohortStory, beginBaristabbitStory, beginFeastleStory, isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory } from '@/utils/companion-story-storage';
+import { JourneyCohortStoryStage } from './journey-cohort-story-stage';
 import { CompanionSharedHistory } from './companion-shared-history';
 import { completedVisitCopy } from '@/utils/companion-visit';
 import { CompanionConversationScene, conversationSpeechLine } from './companion-conversation-scene';
 import { CompanionChatLobby, type CompanionChatStarter } from './companion-chat-lobby';
 import { isConversationV2Family } from '@/types/companion-conversation';
 import { FEASTLE_FIRST_MEETING_DEFINITION_ID } from '@/constants/feastle-friendship-conversations';
+import { BARISTABBIT_FIRST_MEETING_DEFINITION_ID } from '@/constants/baristabbit-story-conversations';
+import { BEDROTTE_FIRST_MEETING_DEFINITION_ID, FLEXEL_FIRST_MEETING_DEFINITION_ID, STEPPLING_FIRST_MEETING_DEFINITION_ID, VOYAGLE_FIRST_MEETING_DEFINITION_ID } from '@/constants/journey-cohort-story-conversations';
+import { useAllDays } from '@/hooks/use-all-days';
+import { mergeJournalRewardPreview } from '@/utils/merge-world/economy-policy';
+import { homeRepository } from '@/storage/repositories/home-repository';
+import { loadOnboardingProfile } from '@/utils/onboarding-state';
 
 const LazyQuestExperienceHost = lazy(async () => {
   const module = await import('./quests/quest-experience-host');
@@ -148,7 +156,7 @@ export type CompanionInteractionSheetProps = {
   initialDestination?: CompanionDestination | null;
   onSelectDestination?: (destination: CompanionDestination | null) => void;
   onClose: () => void;
-  onOpenMerge?: (orderId?: string | null) => void;
+  onOpenMerge?: (orderId?: string | null, familyId?: KatchimeraFamilyId) => void;
   onJournalFood: () => void;
   onOpenTodayGoals: () => void;
   embedded?: boolean;
@@ -283,10 +291,28 @@ export type CompanionInteractionSheetProps = {
 };
 
 export function CompanionInteractionSheet(props: CompanionInteractionSheetProps) {
+  const { days: journalRewardDays } = useAllDays();
+  const journalMergeEnergyPreview = useMemo(() => {
+    const now = new Date();
+    const homeState = homeRepository.load();
+    const targetDay = homeState?.today.state === 'hatched'
+      ? deriveTomorrowDayRecord(homeState, loadOnboardingProfile(), now)
+      : null;
+    const rewardDays = targetDay
+      ? [...journalRewardDays.filter((day) => day.id !== targetDay.id), targetDay]
+      : journalRewardDays;
+    return mergeJournalRewardPreview(rewardDays, {
+      companion: true,
+      now,
+      targetDayId: targetDay?.isoDate ?? homeState?.today.isoDate,
+    }).totalEnergy;
+  }, [journalRewardDays]);
   const insets = useSafeAreaInsets();
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const onExperienceActiveChange = props.onExperienceActiveChange;
   const [showFeastleDashboard, setShowFeastleDashboard] = useState(false);
+  const [showBaristabbitDashboard, setShowBaristabbitDashboard] = useState(false);
+  const [showJourneyCohortDashboard, setShowJourneyCohortDashboard] = useState(false);
   const onBondCelebrationComplete = props.onBondCelebrationComplete;
   const creatureRewardTargetRef = useRef<ViewType | null>(null);
   const [bondReward, setBondReward] = useState<{
@@ -402,6 +428,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const pendingStoryConversationRef = useRef<string | null>(null);
   const openedStoryConversationRef = useRef<string | null>(null);
   const completedFeastleIntroductionRef = useRef<string | null>(null);
+  const completedBaristabbitIntroductionRef = useRef<string | null>(null);
   const {
     activeAttemptId,
     checkInOpen,
@@ -445,6 +472,17 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     openedStoryConversationRef.current = null;
     requestStoryConversation(FEASTLE_FIRST_MEETING_DEFINITION_ID);
   }, [requestStoryConversation]);
+  const beginBaristabbitIntroduction = useCallback(() => {
+    pendingStoryConversationRef.current = null;
+    openedStoryConversationRef.current = null;
+    requestStoryConversation(BARISTABBIT_FIRST_MEETING_DEFINITION_ID);
+  }, [requestStoryConversation]);
+  const beginJourneyCohortIntroduction = useCallback(() => {
+    if (!isAuthoredCohortFamily(props.familyId) || props.familyId === 'baristabbit') return;
+    pendingStoryConversationRef.current = null;
+    openedStoryConversationRef.current = null;
+    requestStoryConversation(`${props.familyId}:story:first-meeting`);
+  }, [props.familyId, requestStoryConversation]);
   useEffect(() => {
     const definitionId = pendingStoryConversationRef.current;
     if (
@@ -459,12 +497,40 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     showConversation();
   }, [props.conversationDefinition?.id, props.conversationSession?.definitionId, props.conversationSession?.status, showConversation]);
   useEffect(() => {
-    if (props.familyId !== 'feastle') return;
-    const story = loadFeastleStory();
+    if (props.familyId !== 'feastle' && !isAuthoredCohortFamily(props.familyId)) return;
+    const story = props.familyId === 'feastle' ? loadFeastleStory() : loadAuthoredCohortStory(props.familyId);
     if (story.status !== 'conversation_active' || !story.pendingConversationId) return;
     if (openedStoryConversationRef.current === story.pendingConversationId) return;
     requestStoryConversation(story.pendingConversationId);
   }, [props.familyId, requestStoryConversation]);
+  useEffect(() => {
+    const session = props.conversationSession;
+    if (
+      props.familyId !== 'baristabbit'
+      || !session
+      || session.preview
+      || session.definitionId !== BARISTABBIT_FIRST_MEETING_DEFINITION_ID
+      || session.status !== 'completed'
+      || completedBaristabbitIntroductionRef.current === session.id
+    ) return;
+    completedBaristabbitIntroductionRef.current = session.id;
+    beginBaristabbitStory(session.completedAt ?? Date.now());
+    showFeastleStoryHome();
+  }, [props.conversationSession, props.familyId, showFeastleStoryHome]);
+  useEffect(() => {
+    const session = props.conversationSession;
+    if (
+      (!isAuthoredCohortFamily(props.familyId) || props.familyId === 'baristabbit')
+      || !session
+      || session.preview
+      || session.definitionId !== `${props.familyId}:story:first-meeting`
+      || session.status !== 'completed'
+      || completedBaristabbitIntroductionRef.current === session.id
+    ) return;
+    completedBaristabbitIntroductionRef.current = session.id;
+    beginAuthoredCohortStory(props.familyId, session.completedAt ?? Date.now());
+    showFeastleStoryHome();
+  }, [props.conversationSession, props.familyId, showFeastleStoryHome]);
   useEffect(() => {
     const session = props.conversationSession;
     if (
@@ -791,15 +857,21 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     ? { session: props.conversationSession, definition: props.conversationDefinition }
     : null;
   const feastleFirstMeetingActive = conversationExperience?.definition.id === FEASTLE_FIRST_MEETING_DEFINITION_ID;
+  const baristabbitFirstMeetingActive = conversationExperience?.definition.id === BARISTABBIT_FIRST_MEETING_DEFINITION_ID;
+  const journeyCohortFirstMeetingActive = conversationExperience?.definition.id === STEPPLING_FIRST_MEETING_DEFINITION_ID
+    || conversationExperience?.definition.id === VOYAGLE_FIRST_MEETING_DEFINITION_ID
+    || conversationExperience?.definition.id === FLEXEL_FIRST_MEETING_DEFINITION_ID
+    || conversationExperience?.definition.id === BEDROTTE_FIRST_MEETING_DEFINITION_ID;
   const feastleMergeStoryDefinition = conversationExperience?.definition.id === FEASTLE_FIRST_MEETING_DEFINITION_ID
     || /^feastle:friendship:[234]$/.test(conversationExperience?.definition.id ?? '');
   const feastleStoryFlow = Boolean(
     conversationExperience
-    && props.familyId === 'feastle'
+    && (props.familyId === 'feastle' || isAuthoredCohortFamily(props.familyId))
     && !conversationExperience.session.preview
-    && feastleMergeStoryDefinition
+    && (feastleMergeStoryDefinition || /^(?:baristabbit|steppling|voyagle|flexel|bedrotte):story:(?:first-meeting|[678])$/.test(conversationExperience.definition.id))
   );
-  const feastleStoryFinale = conversationExperience?.definition.id === 'feastle:friendship:4';
+  const feastleStoryFinale = conversationExperience?.definition.id === 'feastle:friendship:4'
+    || /^(?:baristabbit|steppling|voyagle|flexel|bedrotte):story:8$/.test(conversationExperience?.definition.id ?? '');
   const idealSkinPreparing = idealSkinOnboardingRequired && !conversationExperience;
   const visitStageSpeech = idealSkinPreparing
     ? 'Let’s find the form that feels most like you.'
@@ -994,11 +1066,12 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           conversationExperience ? <CompanionConversationScene
             definition={conversationExperience.definition}
             hasActiveFocus={Boolean(activeJourneyFocus)}
+            journalMergeEnergyPreview={journalMergeEnergyPreview}
             name={props.name}
             onAnswer={props.onAnswerConversation}
             onClose={props.idealSkinOnboardingRequired
               ? props.onClose
-              : route.kind === 'conversation' && !feastleFirstMeetingActive && !feastleStoryFlow ? experience.showChatLobby : experience.showHome}
+              : route.kind === 'conversation' && !feastleFirstMeetingActive && !baristabbitFirstMeetingActive && !journeyCohortFirstMeetingActive && !feastleStoryFlow ? experience.showChatLobby : experience.showHome}
             onContinue={props.onContinueConversation}
             onEquipForm={conversationExperience.session.preview ? () => undefined : props.onEquipSkin}
             onGoalDecision={props.onGoalConversationDecision}
@@ -1057,20 +1130,20 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             plan={visitPlan}
           /> : <View accessibilityLiveRegion="polite" style={styles.conversationRecovery}>
             <ActivityIndicator color="#75450A" size="small" />
-            <ThemedText selectable style={styles.conversationRecoveryTitle} lightColor="#3B2C20" darkColor="#3B2C20">Feastle is finding the next page…</ThemedText>
+            <ThemedText selectable style={styles.conversationRecoveryTitle} lightColor="#3B2C20" darkColor="#3B2C20">{props.name} is finding the next page…</ThemedText>
             <ThemedText selectable style={styles.conversationRecoveryBody} lightColor="#64513B" darkColor="#64513B">Your served order is safe. If the story does not appear, try opening this part again.</ThemedText>
             <CompanionPrimaryAction
               icon="arrow.clockwise"
               label="Open the story again"
               onPress={() => {
-                const definitionId = loadFeastleStory().pendingConversationId;
+                const definitionId = isAuthoredCohortFamily(props.familyId) ? loadAuthoredCohortStory(props.familyId).pendingConversationId : loadFeastleStory().pendingConversationId;
                 if (!definitionId) { experience.showHome(); return; }
                 pendingStoryConversationRef.current = null;
                 openedStoryConversationRef.current = null;
                 requestStoryConversation(definitionId);
               }}
             />
-            <CompanionSecondaryAction icon="chevron.left" label="Back to Feastle" onPress={experience.showHome} />
+            <CompanionSecondaryAction icon="chevron.left" label={`Back to ${props.name}`} onPress={experience.showHome} />
           </View>)
         ) : (
           <>
@@ -1264,7 +1337,32 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   resultReady={Boolean(journeyQuestionnaireSessionId && !props.journeyConversation)}
                   visualKey={props.visualKey}
                 />
-              ) : idealSkinOnboardingRequired ? null : route.kind === 'dashboard' && props.familyId === 'feastle' && !showFeastleDashboard ? (
+              ) : idealSkinOnboardingRequired ? null : route.kind === 'dashboard' && (props.familyId === 'steppling' || props.familyId === 'voyagle' || props.familyId === 'flexel' || props.familyId === 'bedrotte') && !showJourneyCohortDashboard ? (
+                <JourneyCohortStoryStage
+                  familyId={props.familyId}
+                  onBegin={beginJourneyCohortIntroduction}
+                  onJournal={props.onJournalFood}
+                  onMore={() => setShowJourneyCohortDashboard(true)}
+                  onOpenConversation={(definitionId) => {
+                    pendingStoryConversationRef.current = null;
+                    openedStoryConversationRef.current = null;
+                    requestStoryConversation(definitionId);
+                  }}
+                  onOpenMerge={(orderId) => props.onOpenMerge?.(orderId, props.familyId)}
+                />
+              ) : route.kind === 'dashboard' && props.familyId === 'baristabbit' && !showBaristabbitDashboard ? (
+                <BaristabbitStoryStage
+                  onBegin={beginBaristabbitIntroduction}
+                  onJournal={props.onJournalFood}
+                  onMore={() => setShowBaristabbitDashboard(true)}
+                  onOpenConversation={(definitionId) => {
+                    pendingStoryConversationRef.current = null;
+                    openedStoryConversationRef.current = null;
+                    requestStoryConversation(definitionId);
+                  }}
+                  onOpenMerge={(orderId) => props.onOpenMerge?.(orderId, props.familyId)}
+                />
+              ) : route.kind === 'dashboard' && props.familyId === 'feastle' && !showFeastleDashboard ? (
                 <FeastleStoryStage
                   onBeginIntroduction={beginFeastleIntroduction}
                   onJournalFood={props.onJournalFood}
@@ -1274,12 +1372,14 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                     openedStoryConversationRef.current = null;
                     requestStoryConversation(definitionId);
                   }}
-                  onOpenMerge={(orderId) => props.onOpenMerge?.(orderId)}
+                  onOpenMerge={(orderId) => props.onOpenMerge?.(orderId, props.familyId)}
                 />
               ) : route.kind === 'dashboard' ? (
                 <CompanionDashboard
                   companionName={props.name}
                   onChat={openChat}
+                  onJournalMerge={props.onJournalFood}
+                  onOpenMerge={props.onOpenMerge ? () => props.onOpenMerge?.(undefined, props.familyId) : undefined}
                   onOpenHistory={openHistory}
                   onSelect={selectDestination}
                   statuses={{

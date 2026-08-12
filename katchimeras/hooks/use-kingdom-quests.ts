@@ -48,7 +48,7 @@ import {
   type CompanionBondEventKind,
 } from '@/utils/companion-bond';
 import { loadCompanionBondState, saveCompanionBondState, subscribeCompanionBondState } from '@/utils/companion-bond-storage';
-import { completeFeastleConversation, markFeastleJournalFtue, recordFeastleConfirmedMemory, recordFeastleStorySignal } from '@/utils/companion-story-storage';
+import { completeAuthoredCohortConversation, completeFeastleConversation, isAuthoredCohortFamily, markFeastleJournalFtue, recordFeastleConfirmedMemory, recordFeastleStorySignal } from '@/utils/companion-story-storage';
 import {
   answerCompanionDiscoveryPrompt,
   answersForCompanion,
@@ -894,6 +894,8 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     if (!selectedConversationSession || selectedConversationSession.preview || selectedConversationSession.status !== 'completed') return;
     const match = /^feastle:friendship:(\d+)$/.exec(selectedConversationSession.definitionId);
     if (match) completeFeastleConversation(Number(match[1]), selectedConversationSession.completedAt ?? Date.now());
+    const authoredMatch = /^(baristabbit|steppling|voyagle|flexel|bedrotte):story:(\d+)$/.exec(selectedConversationSession.definitionId);
+    if (authoredMatch && isAuthoredCohortFamily(authoredMatch[1])) completeAuthoredCohortConversation(authoredMatch[1], Number(authoredMatch[2]), selectedConversationSession.completedAt ?? Date.now());
   }, [selectedConversationSession]);
   const selectedConversationNode = selectedConversationDefinition?.nodes.find(
     (node) => node.id === selectedConversationSession?.currentNodeId
@@ -2471,6 +2473,8 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     });
     const feastleLevel = selectedConversationDefinition?.id.match(/^feastle:friendship:(\d+)$/)?.[1];
     if (feastleLevel) completeFeastleConversation(Number(feastleLevel));
+    const authoredMatch = selectedConversationDefinition?.id.match(/^(baristabbit|steppling|voyagle|flexel|bedrotte):story:(\d+)$/);
+    if (authoredMatch && isAuthoredCohortFamily(authoredMatch[1])) completeAuthoredCohortConversation(authoredMatch[1], Number(authoredMatch[2]));
   }, [selectedConversationDefinition?.id, selectedConversationSession]);
   const previewSelectedConversation = useCallback((definitionId: string) => {
     if (typeof __DEV__ === 'undefined' || !__DEV__ || !selectedResident || !selectedFamilyId || !today?.isoDate || !isConversationV2Family(selectedFamilyId)) return;

@@ -203,7 +203,7 @@ export function KingdomCompanionScreen({
   presentation?: KingdomCompanionPresentation;
   initialCreatureId?: string;
   onCloseCompanion?: () => void;
-  onOpenMerge?: (orderId?: string | null) => void;
+  onOpenMerge?: (orderId?: string | null, familyId?: KatchimeraFamilyId) => void;
   onOpenQuestGame?: (creatureId: string, questId: string) => void;
 }) {
   const isFocused = useIsFocused();
@@ -653,11 +653,11 @@ export function KingdomCompanionScreen({
             quests.decideSelectedConversationGoal(selectedTemplateIds, node, addedTemplateIds);
             if (addedTemplateIds.length && !quests.selectedConversationSession?.preview) quests.refreshQuestState();
           }}
-          onOpenMerge={(orderId) => onOpenMerge
-            ? onOpenMerge(orderId)
+          onOpenMerge={(orderId, familyId) => onOpenMerge
+            ? onOpenMerge(orderId, familyId)
             : router.navigate({
                 pathname: '/games',
-                params: { source: 'feastle-story', ...(orderId ? { focusOrderId: orderId } : {}) },
+                params: { familyId: familyId ?? quests.selectedResident?.creature.familyId ?? 'feastle', ...(orderId ? { focusOrderId: orderId } : {}) },
               })}
           onJournalFood={() => {
             const resident = quests.selectedResident;

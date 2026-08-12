@@ -2,9 +2,11 @@ import { createContext, type PropsWithChildren, use, useCallback, useEffect, use
 import { AppState } from 'react-native';
 
 import { companionIdForFamily } from '@/constants/katchimera-skins';
+import { KATCHIMERA_MERGE_PROFILES } from '@/constants/merge-world-catalog';
 import { useWisps } from '@/features/wisps/wisp-provider';
 import type { HomeDayRecord } from '@/types/home';
 import type { MergeCharacterId, MergeExternalRewardReceipt, MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
+import type { AuthoredCohortFamilyId } from '@/utils/companion-story';
 import { companionFriendshipProgress, recordCompanionBondEvent } from '@/utils/companion-bond';
 import { loadCompanionBondState, saveCompanionBondState, subscribeCompanionBondState } from '@/utils/companion-bond-storage';
 import { enqueueConversationSignal } from '@/utils/companion-content';
@@ -14,7 +16,7 @@ import { mergeActivityRewards, mergeQuestActivityRewards } from '@/utils/merge-w
 import { reduceMergeWorld } from '@/utils/merge-world/engine';
 import { mergeWorldPendingPersistence, type MergeWorldPendingPersistence } from '@/utils/merge-world/persistence-buffer';
 import { loadMergeWorldState, saveMergeWorldState, subscribeMergeWorldResets } from '@/utils/merge-world/repository';
-import { loadFeastleStory, markFeastleOrderActive, markFeastleOrderServed, recordFeastleQuietBond, subscribeCompanionStories } from '@/utils/companion-story-storage';
+import { isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, markAuthoredCohortOrderActive, markAuthoredCohortOrderServed, markFeastleOrderActive, markFeastleOrderServed, recordAuthoredCohortQuietBond, recordFeastleQuietBond, subscribeCompanionStories } from '@/utils/companion-story-storage';
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 
 type MergeWorldContextValue = {
@@ -31,6 +33,9 @@ const RETRY_DELAYS_MS = [250, 1_000, 4_000] as const;
 const MERGE_PERF_ENABLED = __DEV__ && process.env.EXPO_PUBLIC_MERGE_PERF === '1';
 const MergeWorldContext = createContext<MergeWorldContextValue | null>(null);
 const SIGNATURE_LEVELS = new Set([4, 8, 12, 16, 20]);
+const AUTHORED_COHORT_FAMILIES: readonly AuthoredCohortFamilyId[] = [
+  'baristabbit', 'steppling', 'voyagle', 'flexel', 'bedrotte',
+];
 
 function changedReceiptIds(before: MergeWorldState, after: MergeWorldState) {
   const previous = new Map(before.externalRewardReceipts.map((receipt) => [receipt.id, receipt.appliedAt]));
@@ -47,9 +52,10 @@ export function MergeWorldProvider({
   active = true,
   characterIds,
   days,
+  featuredCharacterId,
   questState,
   children,
-}: PropsWithChildren<{ active?: boolean; characterIds: string[]; days: readonly HomeDayRecord[]; questState: CompanionQuestState }>) {
+}: PropsWithChildren<{ active?: boolean; characterIds: string[]; days: readonly HomeDayRecord[]; featuredCharacterId?: MergeCharacterId | null; questState: CompanionQuestState }>) {
   const wisps = useWisps();
   const [state, setState] = useState<MergeWorldState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,7 +76,7 @@ export function MergeWorldProvider({
 
   const currentFriendshipLevels = useCallback(() => {
     const bond = loadCompanionBondState();
-    const ids: MergeCharacterId[] = ['feastle', 'mossprout', 'steppling', 'shellio', 'voyagle'];
+    const ids = Object.keys(KATCHIMERA_MERGE_PROFILES) as MergeCharacterId[];
     return Object.fromEntries(ids.map((id) => [id, companionFriendshipProgress(bond, companionIdForFamily(id)).level])) as Partial<Record<MergeCharacterId, number>>;
   }, []);
 
@@ -110,14 +116,23 @@ export function MergeWorldProvider({
 
   const applyReceiptSideEffect = useCallback((receipt: MergeExternalRewardReceipt) => {
     if (receipt.kind === 'story_order_served') {
-      guardStoryReceiptMutation(() => {
-        markFeastleOrderServed(
+      if (receipt.characterId === 'feastle') {
+        guardStoryReceiptMutation(() => {
+          markFeastleOrderServed(
+            receipt.id.replace('merge-story-served:', ''),
+            receipt.amount,
+            receipt.createdAt,
+            receipt.storyStepCount,
+          );
+        });
+      } else if (isAuthoredCohortFamily(receipt.characterId)) {
+        const familyId = receipt.characterId;
+        guardStoryReceiptMutation(() => markAuthoredCohortOrderServed(
+          familyId,
           receipt.id.replace('merge-story-served:', ''),
-          receipt.amount,
           receipt.createdAt,
-          receipt.storyStepCount,
-        );
-      });
+        ));
+      }
       return;
     }
     if (receipt.kind === 'friendship') {
@@ -134,6 +149,9 @@ export function MergeWorldProvider({
         saveCompanionBondState(awarded.state);
         if (receipt.presentation === 'quiet_summary' && receipt.characterId === 'feastle') {
           guardStoryReceiptMutation(() => recordFeastleQuietBond(receipt.id, receipt.amount, receipt.createdAt));
+        } else if (receipt.presentation === 'quiet_summary' && isAuthoredCohortFamily(receipt.characterId)) {
+          const familyId = receipt.characterId;
+          guardStoryReceiptMutation(() => recordAuthoredCohortQuietBond(familyId, receipt.id, receipt.amount, receipt.createdAt));
         }
         const afterLevel = companionFriendshipProgress(awarded.state, companionIdForFamily(receipt.characterId)).level;
         for (let level = beforeLevel + 1; level <= afterLevel; level += 1) {
@@ -164,20 +182,76 @@ export function MergeWorldProvider({
     return result.state;
   }, []);
 
+  const reconcileAuthoredCohortStory = useCallback((current: MergeWorldState, familyId: AuthoredCohortFamilyId, now = Date.now()) => {
+    const story = loadAuthoredCohortStory(familyId);
+    const result = reduceMergeWorld(current, {
+      type: 'reconcileStory', familyId, status: story.status,
+      targetLevel: story.targetLevel, actPhase: story.actPhase,
+      orderTemplateKeys: story.orderDeck?.templateKeys,
+      servedOrderIds: story.orderDeck?.servedOrderIds,
+      now,
+    });
+    const storyOrder = result.state.activeOrders.find((order) => order.storyArcId === story.id);
+    const activeStoryOrderStillExists = result.state.activeOrders.some((order) => order.id === story.activeOrderId);
+    if (storyOrder && !activeStoryOrderStillExists) markAuthoredCohortOrderActive(familyId, storyOrder.id, now);
+    return result.state;
+  }, []);
+
+  const resolveFeaturedCharacter = useCallback((current: MergeWorldState) => {
+    if (featuredCharacterId && current.unlockedCharacters.includes(featuredCharacterId)) return featuredCharacterId;
+    if (current.unlockedCharacters.includes('feastle')) return 'feastle';
+    return current.unlockedCharacters[0] ?? null;
+  }, [featuredCharacterId]);
+
+  const reconcileFeaturedStory = useCallback((current: MergeWorldState, characterId: MergeCharacterId, now = Date.now()) => {
+    if (characterId === 'feastle') return reconcileFeastleStory(current, now);
+    if (isAuthoredCohortFamily(characterId)) return reconcileAuthoredCohortStory(current, characterId, now);
+    const served = new Set(current.externalRewardReceipts
+      .filter((receipt) => receipt.kind === 'story_order_served' && receipt.characterId === characterId)
+      .map((receipt) => receipt.id.replace('merge-story-served:', '')));
+    const regularKeys = Array.from({ length: 5 }, (_, index) => `chapter-1-${index + 1}`);
+    const regularIds = regularKeys.map((key) => `merge-story:${characterId}:regular:${key}`);
+    const signatureId = `merge-story:${characterId}:level-8:signature`;
+    const command: Extract<MergeWorldCommand, { type: 'reconcileStory' }> = served.has(signatureId)
+      ? { type: 'reconcileStory', familyId: characterId, status: 'complete', targetLevel: 8, now }
+      : regularIds.every((id) => served.has(id))
+        ? { type: 'reconcileStory', familyId: characterId, status: 'order_active', targetLevel: 8, actPhase: 'signature_order', servedOrderIds: [...served], now }
+        : { type: 'reconcileStory', familyId: characterId, status: 'order_active', targetLevel: 6, actPhase: 'regular_orders', orderTemplateKeys: regularKeys, servedOrderIds: [...served], now };
+    return reduceMergeWorld(current, command).state;
+  }, [reconcileAuthoredCohortStory, reconcileFeastleStory]);
+
+  const featureAndReconcile = useCallback((current: MergeWorldState, now = Date.now()) => {
+    const characterId = resolveFeaturedCharacter(current);
+    if (!characterId) return current;
+    let next = reduceMergeWorld(current, { type: 'featureCharacter', characterId, now }).state;
+
+    // Rebuild every persisted authored slice, not only the deeplink target.
+    // This also repairs saves from older builds where featureCharacter removed
+    // the other companions' requests.
+    if (next.unlockedCharacters.includes('feastle')) next = reconcileFeastleStory(next, now);
+    for (const familyId of AUTHORED_COHORT_FAMILIES) {
+      if (next.unlockedCharacters.includes(familyId)) next = reconcileAuthoredCohortStory(next, familyId, now);
+    }
+    if (characterId !== 'feastle' && !isAuthoredCohortFamily(characterId)) {
+      next = reconcileFeaturedStory(next, characterId, now);
+    }
+    return next;
+  }, [reconcileAuthoredCohortStory, reconcileFeastleStory, reconcileFeaturedStory, resolveFeaturedCharacter]);
+
   useEffect(() => subscribeMergeWorldResets((freshState) => {
     persistenceGenerationRef.current += 1;
     externalGenerationRef.current += 1;
     pendingPersistenceRef.current = null;
     persistenceWorkerRef.current = null;
     externalWorkerRef.current = null;
-    const reconciledState = reconcileFeastleStory(freshState);
+    const reconciledState = featureAndReconcile(freshState);
     stateRef.current = reconciledState;
     setState(reconciledState);
     setLastResult(null);
     setError(null);
     setLoading(false);
     refreshFriendshipLevels();
-  }), [reconcileFeastleStory, refreshFriendshipLevels]);
+  }), [featureAndReconcile, refreshFriendshipLevels]);
 
   const drainPersistence = useCallback(async () => {
     const workerGeneration = persistenceGenerationRef.current;
@@ -251,12 +325,14 @@ export function MergeWorldProvider({
     if (applyingStoryReceiptDepthRef.current > 0) return;
     const current = stateRef.current;
     if (!current) return;
-    const next = reconcileFeastleStory(current);
+    const featured = current.favouriteCharacterId;
+    if (!featured || (featured !== 'feastle' && !isAuthoredCohortFamily(featured))) return;
+    const next = featured === 'feastle' ? reconcileFeastleStory(current) : reconcileAuthoredCohortStory(current, featured);
     if (next === current) return;
     stateRef.current = next;
     if (mountedRef.current) setState(next);
     enqueuePersistence(next);
-  }), [enqueuePersistence, reconcileFeastleStory]);
+  }), [enqueuePersistence, reconcileAuthoredCohortStory, reconcileFeastleStory]);
 
   const flush = useCallback(async () => {
     const worker = startPersistenceWorker();
@@ -321,7 +397,7 @@ export function MergeWorldProvider({
       try {
         let next = await loadMergeWorldState();
         next = reduceMergeWorld(next, { type: 'reconcileCharacters', characterIds, now: Date.now() }).state;
-        next = reconcileFeastleStory(next);
+        next = featureAndReconcile(next);
         const rewards = [...mergeActivityRewards(days), ...mergeQuestActivityRewards(questState)];
         const activityResult = reduceMergeWorld(next, { type: 'grantActivityRewardsBatch', rewards, now: Date.now() });
         next = activityResult.state;
@@ -368,10 +444,12 @@ export function MergeWorldProvider({
   }, [flush]);
 
   useEffect(() => {
+    if (loading) return;
     const current = stateRef.current;
     if (!current) return;
     const now = Date.now();
     let next = reduceMergeWorld(current, { type: 'reconcileCharacters', characterIds, now }).state;
+    next = featureAndReconcile(next, now);
     const rewards = [...mergeActivityRewards(days), ...mergeQuestActivityRewards(questState)];
     const activityResult = reduceMergeWorld(next, { type: 'grantActivityRewardsBatch', rewards, now });
     next = activityResult.state;
@@ -380,12 +458,29 @@ export function MergeWorldProvider({
     setState(next);
     if (activityResult.changed) setLastResult(activityResult);
     enqueuePersistence(next);
-  }, [characterIds, days, enqueuePersistence, questState]);
+  }, [characterIds, days, enqueuePersistence, featureAndReconcile, loading, questState]);
+
+  useEffect(() => {
+    const current = stateRef.current;
+    if (!current) return;
+    const next = featureAndReconcile(current);
+    if (next === current) return;
+    stateRef.current = next;
+    setState(next);
+    enqueuePersistence(next);
+  }, [enqueuePersistence, featureAndReconcile]);
 
   const dispatch = useCallback((command: MergeWorldCommand): MergeWorldCommandResult | null => {
     const current = stateRef.current;
     if (!current) return null;
-    const result = reduceMergeWorld(current, command);
+    const servedCharacterId = command.type === 'serveOrder'
+      ? current.activeOrders.find((order) => order.id === command.orderId)?.characterId ?? null
+      : null;
+    const reduced = reduceMergeWorld(current, command);
+    const nextState = reduced.changed && servedCharacterId
+      ? reconcileFeaturedStory(reduced.state, servedCharacterId, command.now)
+      : reduced.state;
+    const result = nextState === reduced.state ? reduced : { ...reduced, state: nextState };
     setLastResult(result);
     if (!result.changed) return result;
     const receiptIds = changedReceiptIds(current, result.state);
@@ -397,7 +492,7 @@ export function MergeWorldProvider({
       void applyPendingExternalRewards();
     }
     return result;
-  }, [applyPendingExternalRewards, enqueuePersistence]);
+  }, [applyPendingExternalRewards, enqueuePersistence, reconcileFeaturedStory]);
 
   const value = useMemo<MergeWorldContextValue>(() => ({ state, loading, error, lastResult, friendshipLevels, dispatch, flush }), [dispatch, error, flush, friendshipLevels, lastResult, loading, state]);
   return <MergeWorldContext value={value}>{children}</MergeWorldContext>;

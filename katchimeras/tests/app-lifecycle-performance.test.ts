@@ -78,6 +78,8 @@ test('game mode releases background UI work and avoids full Kingdom hydration', 
   assert.match(tabsSource, /name="today"[\s\S]*?freezeOnBlur: false/);
   assert.match(tabsSource, /name="games"[\s\S]*?freezeOnBlur: false/);
   assert.match(mergeRouteSource, /useIsFocused/);
+  assert.match(mergeRouteSource, /isFocused \? hydrateAllDays\(homeState, profile, now\) : days/);
+  assert.match(mergeRouteSource, /\[allKatchimerasAvailable, days, isFocused\]/);
   assert.match(mergeRouteSource, /\{isFocused \? <>/);
   assert.match(mergeRouteSource, /<MergeWorldProvider active=\{isFocused\}/);
   assert.match(mergeBoardSource, /useDisposableTimers\('merge-board-feedback'\)/);

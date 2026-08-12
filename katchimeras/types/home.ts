@@ -1408,6 +1408,7 @@ export type JournalSourceOrigin =
       goalId?: string | null;
       checkInId?: string;
       answerIds?: string[];
+      reflectionMode?: 'story' | 'optional' | 'organic';
     }
   | {
       kind: 'quick_goal_completion';

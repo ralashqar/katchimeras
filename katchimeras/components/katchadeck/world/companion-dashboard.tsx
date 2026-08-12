@@ -23,6 +23,8 @@ export function CompanionDashboard({
   companionName,
   developerContent,
   onChat,
+  onJournalMerge,
+  onOpenMerge,
   onOpenHistory,
   onSelect,
   statuses,
@@ -30,6 +32,8 @@ export function CompanionDashboard({
   companionName: string;
   developerContent?: ReactNode;
   onChat: () => void;
+  onJournalMerge?: () => void;
+  onOpenMerge?: () => void;
   onOpenHistory: () => void;
   onSelect: (destination: CompanionDestination) => void;
   statuses: Partial<Record<CompanionDestination, string>>;
@@ -56,6 +60,24 @@ export function CompanionDashboard({
           <IconSymbol color="#5A3D18" name="arrow.right" size={19} />
         </View>
       </Pressable>
+
+      {onOpenMerge ? <View style={styles.mergeCard}>
+        <View style={styles.mergeHeader}>
+          <View style={styles.mergeIcon}><IconSymbol color="#FFF8E7" name="square.grid.2x2.fill" size={21} /></View>
+          <View style={styles.copy}>
+            <ThemedText selectable style={styles.label} lightColor="#3F3022" darkColor="#3F3022">Merge chapter</ThemedText>
+            <ThemedText selectable numberOfLines={2} style={styles.description} lightColor="#74604B" darkColor="#74604B">Serve five requests, then make a signature memory.</ThemedText>
+          </View>
+        </View>
+        <View style={styles.mergeActions}>
+          <Pressable accessibilityRole="button" onPress={onOpenMerge} style={({ pressed }) => [styles.mergePrimary, pressed && styles.pressed]}>
+            <ThemedText style={styles.mergePrimaryLabel} lightColor="#FFF8E7" darkColor="#FFF8E7">Open board</ThemedText>
+          </Pressable>
+          {onJournalMerge ? <Pressable accessibilityRole="button" onPress={onJournalMerge} style={({ pressed }) => [styles.mergeSecondary, pressed && styles.pressed]}>
+            <ThemedText style={styles.mergeSecondaryLabel} lightColor="#5B4022" darkColor="#5B4022">Journal for supplies</ThemedText>
+          </Pressable> : null}
+        </View>
+      </View> : null}
 
       <Pressable accessibilityRole="button" onPress={onOpenHistory} style={({ pressed }) => [styles.historyCard, pressed && styles.pressed]}>
         <View style={styles.icon}><IconSymbol color="#74562F" name="book.closed.fill" size={20} /></View>
@@ -117,6 +139,14 @@ const styles = StyleSheet.create({
   chatDescription: { fontSize: 13, fontWeight: '700', lineHeight: 18 },
   chatArrow: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.34)', borderRadius: 17, height: 34, justifyContent: 'center', width: 34 },
   historyCard: { alignItems: 'center', backgroundColor: KatchaUI.companionPanel.background, borderColor: KatchaUI.companionPanel.border, borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, flexDirection: 'row', gap: 11, minHeight: 70, paddingHorizontal: 14, paddingVertical: 10 },
+  mergeCard: { backgroundColor: '#F7E6B9', borderColor: 'rgba(105,73,30,0.18)', borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, gap: 12, padding: 14 },
+  mergeHeader: { alignItems: 'center', flexDirection: 'row', gap: 11 },
+  mergeIcon: { alignItems: 'center', backgroundColor: '#9B6B2E', borderRadius: 15, height: 42, justifyContent: 'center', width: 42 },
+  mergeActions: { flexDirection: 'row', gap: 8 },
+  mergePrimary: { alignItems: 'center', backgroundColor: '#76501F', borderRadius: 15, flex: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 12 },
+  mergePrimaryLabel: { fontSize: 13, fontWeight: '900' },
+  mergeSecondary: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.58)', borderRadius: 15, flex: 1.25, justifyContent: 'center', minHeight: 44, paddingHorizontal: 10 },
+  mergeSecondaryLabel: { fontSize: 12, fontWeight: '900' },
   card: { backgroundColor: KatchaUI.companionPanel.background, borderColor: KatchaUI.companionPanel.border, borderCurve: 'continuous', borderRadius: 26, borderWidth: 1, boxShadow: KatchaUI.companionPanel.shadow, overflow: 'hidden', padding: 6 },
   row: { alignItems: 'center', borderRadius: 20, flexDirection: 'row', gap: 11, minHeight: 68, paddingHorizontal: 10, paddingVertical: 9 },
   icon: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.52)', borderRadius: 16, height: 42, justifyContent: 'center', width: 42 },
