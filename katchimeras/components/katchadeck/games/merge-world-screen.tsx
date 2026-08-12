@@ -208,6 +208,10 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
   const levelRatio = nextThreshold == null ? 1 : Math.max(0, Math.min(1, (state.mergeXp - currentThreshold) / (nextThreshold - currentThreshold)));
   const expansion = availableExpansion(state);
   const expansionReady = Boolean(expansion && state.mergeLevel >= expansion.requiredLevel && state.coins >= expansion.coinCost);
+  const pendingBasket = state.rewardInbox.find((entry) => entry.source === 'activity') ?? null;
+  const nextEnergyMinutes = state.energy.value < state.energy.cap
+    ? Math.max(1, Math.ceil((state.energy.lastRegenAt + 12 * 60_000 - Date.now()) / 60_000))
+    : null;
   return (
     <View ref={screenRef} style={styles.screen}>
       <View style={[styles.game, { paddingTop: Math.max(insets.top + 3, 7), paddingBottom: Math.max(insets.bottom + 3, 7), width: contentWidth }]}>
@@ -218,6 +222,19 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
           <Pressable accessibilityLabel="Open legacy games" accessibilityRole="button" onPress={() => router.push('/legacy-games')} style={({ pressed }) => [styles.hudAction, pressed && styles.pressed]}>
             <IconSymbol color="#F6D993" name="gamecontroller.fill" size={19} />
           </Pressable>
+        </View>
+        <View style={styles.energyStatusRow}>
+          <ThemedText darkColor="#F5DFC2" style={styles.energyStatusText}>
+            {nextEnergyMinutes ? `Next Energy in about ${nextEnergyMinutes} min` : 'Energy full'}
+          </ThemedText>
+          {pendingBasket ? <Pressable
+            accessibilityHint="Places both ingredients when two board spaces are free"
+            accessibilityRole="button"
+            onPress={() => dispatch({ type: 'claimInbox', entryId: pendingBasket.id, now: Date.now() })}
+            style={({ pressed }) => [styles.basketButton, pressed && styles.pressed]}>
+            <IconSymbol color="#4A291B" name="shippingbox.fill" size={13} />
+            <ThemedText darkColor="#4A291B" style={styles.basketLabel}>Claim Pantry Basket</ThemedText>
+          </Pressable> : null}
         </View>
 
         <View style={styles.mergeArea}>
@@ -311,6 +328,10 @@ const styles = StyleSheet.create({
   game: { flex: 1, gap: 7, minHeight: 0 },
   loading: { alignItems: 'center', backgroundColor: '#2B1B13', flex: 1, gap: 12, justifyContent: 'center' },
   hud: { alignItems: 'center', flexDirection: 'row', gap: 6, minHeight: 43, paddingHorizontal: 1 },
+  energyStatusRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 25, paddingHorizontal: 4 },
+  energyStatusText: { fontSize: 10.5, fontWeight: '800' },
+  basketButton: { alignItems: 'center', backgroundColor: '#F6D993', borderRadius: 999, flexDirection: 'row', gap: 5, minHeight: 25, paddingHorizontal: 9 },
+  basketLabel: { fontSize: 10, fontWeight: '900' },
   currency: { alignItems: 'center', backgroundColor: 'rgba(26,23,38,0.93)', borderColor: 'rgba(255,223,165,0.43)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, boxShadow: '0 5px 13px rgba(25,14,18,0.30), inset 0 1px 0 rgba(255,255,255,0.10)', flex: 1, flexDirection: 'row', gap: 1, height: 39, minWidth: 0, overflow: 'hidden', paddingHorizontal: 4, position: 'relative' },
   currencySheen: { backgroundColor: 'rgba(255,255,255,0.045)', borderRadius: 999, height: 20, left: 7, position: 'absolute', right: 7, top: 2 },
   currencyArt: { height: 35, width: 35 },

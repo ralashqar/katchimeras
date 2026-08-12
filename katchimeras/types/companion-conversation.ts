@@ -138,6 +138,7 @@ export type ConversationNode =
       prompt: string;
       summary: string;
       memoryKey: string;
+      memoryKind?: 'preference' | 'pattern' | 'shared_moment' | 'milestone';
       sensitivity: 'ordinary' | 'personal';
       nextNodeId: string | null;
     }
@@ -170,7 +171,8 @@ export type ConversationNode =
       allowedChoiceIds: readonly string[];
       saveLabel: string;
       rewardGrowth: number;
-      rewardPantryCharges: number;
+      rewardMergeEnergy: number;
+      rewardItemIds: readonly string[];
       nextNodeId: string | null;
     }
   | {

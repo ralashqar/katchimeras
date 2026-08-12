@@ -1094,7 +1094,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         {(route.kind === 'destination' || route.kind === 'dashboard' || route.kind === 'shared_history' || quickGoalPickerOpen) && !questGameVisible && !questionnaireExperience ? (
           <CompanionDestinationHeader
             backLabel={quickGoalPickerOpen ? 'Goals' : destination === 'quest' && canReturnToQuestList ? 'Quest list' : route.kind === 'dashboard' ? 'Kingdom' : 'Dashboard'}
-            label={route.kind === 'dashboard' ? 'Dashboard' : route.kind === 'shared_history' ? 'Shared history' : destinationLabel}
+            label={route.kind === 'dashboard' ? 'Dashboard' : route.kind === 'shared_history' ? props.familyId === 'feastle' ? 'Recipe Book' : 'Shared history' : destinationLabel}
             titleTone={destination === 'achievements' ? 'gold' : 'default'}
             onBack={
               quickGoalPickerOpen
@@ -1280,6 +1280,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                 <CompanionDashboard
                   companionName={props.name}
                   onChat={openChat}
+                  onOpenHistory={openHistory}
                   onSelect={selectDestination}
                   statuses={{
                     quest: questStatus,
@@ -1296,6 +1297,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   hasOlderHistory={props.hasOlderHistory}
                   activeQuestTitle={props.activeQuest?.title}
                   companionName={props.name}
+                  insights={props.insights}
                   memories={props.memories}
                   onUpdateMemory={props.onUpdateMemory}
                   onResetMemory={props.onResetMemory}

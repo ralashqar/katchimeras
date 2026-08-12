@@ -153,7 +153,10 @@ export function MergeWorldProvider({
     const story = loadFeastleStory();
     const result = reduceMergeWorld(current, {
       type: 'reconcileStory', familyId: 'feastle', status: story.status,
-      targetLevel: story.targetLevel, starterParcelGranted: story.starterParcelGranted, now,
+      targetLevel: story.targetLevel, actPhase: story.actPhase,
+      orderTemplateKeys: story.orderDeck?.templateKeys,
+      servedOrderIds: story.orderDeck?.servedOrderIds,
+      now,
     });
     const storyOrder = result.state.activeOrders.find((order) => order.storyArcId === story.id);
     const activeStoryOrderStillExists = result.state.activeOrders.some((order) => order.id === story.activeOrderId);
@@ -320,7 +323,7 @@ export function MergeWorldProvider({
         next = reduceMergeWorld(next, { type: 'reconcileCharacters', characterIds, now: Date.now() }).state;
         next = reconcileFeastleStory(next);
         const rewards = [...mergeActivityRewards(days), ...mergeQuestActivityRewards(questState)];
-        const activityResult = reduceMergeWorld(next, { type: 'grantActivityEnergyBatch', rewards, now: Date.now() });
+        const activityResult = reduceMergeWorld(next, { type: 'grantActivityRewardsBatch', rewards, now: Date.now() });
         next = activityResult.state;
         await saveMergeWorldState(next);
         const appliedIds: string[] = [];
@@ -370,7 +373,7 @@ export function MergeWorldProvider({
     const now = Date.now();
     let next = reduceMergeWorld(current, { type: 'reconcileCharacters', characterIds, now }).state;
     const rewards = [...mergeActivityRewards(days), ...mergeQuestActivityRewards(questState)];
-    const activityResult = reduceMergeWorld(next, { type: 'grantActivityEnergyBatch', rewards, now });
+    const activityResult = reduceMergeWorld(next, { type: 'grantActivityRewardsBatch', rewards, now });
     next = activityResult.state;
     if (next === current) return;
     stateRef.current = next;

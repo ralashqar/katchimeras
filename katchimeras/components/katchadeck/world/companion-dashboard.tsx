@@ -23,12 +23,14 @@ export function CompanionDashboard({
   companionName,
   developerContent,
   onChat,
+  onOpenHistory,
   onSelect,
   statuses,
 }: {
   companionName: string;
   developerContent?: ReactNode;
   onChat: () => void;
+  onOpenHistory: () => void;
   onSelect: (destination: CompanionDestination) => void;
   statuses: Partial<Record<CompanionDestination, string>>;
 }) {
@@ -53,6 +55,15 @@ export function CompanionDashboard({
         <View style={styles.chatArrow}>
           <IconSymbol color="#5A3D18" name="arrow.right" size={19} />
         </View>
+      </Pressable>
+
+      <Pressable accessibilityRole="button" onPress={onOpenHistory} style={({ pressed }) => [styles.historyCard, pressed && styles.pressed]}>
+        <View style={styles.icon}><IconSymbol color="#74562F" name="book.closed.fill" size={20} /></View>
+        <View style={styles.copy}>
+          <ThemedText selectable style={styles.label} lightColor="#3F3022" darkColor="#3F3022">{companionName === 'Feastle' ? 'Recipe Book' : 'Shared history'}</ThemedText>
+          <ThemedText selectable numberOfLines={2} style={styles.description} lightColor="#74604B" darkColor="#74604B">Saved preferences, insights, and moments you chose to keep.</ThemedText>
+        </View>
+        <IconSymbol color="#8B7255" name="chevron.right" size={15} />
       </Pressable>
 
       <View style={styles.card}>
@@ -105,6 +116,7 @@ const styles = StyleSheet.create({
   chatLabel: { fontSize: 21, fontWeight: '900', letterSpacing: -0.3 },
   chatDescription: { fontSize: 13, fontWeight: '700', lineHeight: 18 },
   chatArrow: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.34)', borderRadius: 17, height: 34, justifyContent: 'center', width: 34 },
+  historyCard: { alignItems: 'center', backgroundColor: KatchaUI.companionPanel.background, borderColor: KatchaUI.companionPanel.border, borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, flexDirection: 'row', gap: 11, minHeight: 70, paddingHorizontal: 14, paddingVertical: 10 },
   card: { backgroundColor: KatchaUI.companionPanel.background, borderColor: KatchaUI.companionPanel.border, borderCurve: 'continuous', borderRadius: 26, borderWidth: 1, boxShadow: KatchaUI.companionPanel.shadow, overflow: 'hidden', padding: 6 },
   row: { alignItems: 'center', borderRadius: 20, flexDirection: 'row', gap: 11, minHeight: 68, paddingHorizontal: 10, paddingVertical: 9 },
   icon: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.52)', borderRadius: 16, height: 42, justifyContent: 'center', width: 42 },

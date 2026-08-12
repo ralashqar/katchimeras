@@ -1,6 +1,6 @@
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { loadCompanionContentState, saveCompanionContentState } from '@/utils/companion-content-storage';
-import { markFeastleJournalFtue } from '@/utils/companion-story-storage';
+import { markFeastleJournalFtue, recordFeastleJournalEvidence } from '@/utils/companion-story-storage';
 import type { ConversationNode, ConversationSession } from '@/types/companion-conversation';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import {
@@ -87,7 +87,10 @@ export function completeCompanionJournalHandoff(
     const content = loadCompanionContentState();
     const result = advanceConversationForJournalHandoff(content, current, journalRecordId, now);
     if (result.advanced) saveCompanionContentState(result.content);
-    if (current.familyId === 'feastle') markFeastleJournalFtue('saved', journalRecordId, now);
+    if (current.familyId === 'feastle') {
+      markFeastleJournalFtue('saved', journalRecordId, now);
+      recordFeastleJournalEvidence(journalRecordId, null, now);
+    }
   }
 
   const next = { ...current, status: 'saved' as const, journalRecordId, updatedAt: now };

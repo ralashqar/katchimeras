@@ -10,11 +10,9 @@ import type {
 export const MERGE_WORLD_COLUMNS = 7;
 export const MERGE_WORLD_ROWS = 9;
 export const MERGE_WORLD_SIZE = MERGE_WORLD_COLUMNS * MERGE_WORLD_ROWS;
-export const MERGE_ENERGY_CAP = 100;
-export const MERGE_INITIAL_ENERGY = 8;
-export const MERGE_ENERGY_REGEN_MS = 120_000;
-export const MERGE_GENERATOR_CHARGES = 12;
-export const MERGE_GENERATOR_COOLDOWN_MS = 18 * 60_000;
+export const MERGE_ENERGY_CAP = 40;
+export const MERGE_INITIAL_ENERGY = 18;
+export const MERGE_ENERGY_REGEN_MS = 12 * 60_000;
 
 // A readable, contiguous 33-cell clearing. Expansion cells retain their authored
 // blockers, so unlocking space changes the scene instead of revealing padlocks.
@@ -68,9 +66,9 @@ export const FEASTLE_STORY_REQUESTS: Readonly<Record<number, readonly FeastleSto
   2: [{ title: 'The First Snack', definitionId: 'food:table:2', quantity: 1 }],
   3: [{ title: 'A Pantry Pair', definitionId: 'food:table:2', quantity: 2 }],
   4: [
-    { title: 'A Welcoming Snack', definitionId: 'food:table:2', quantity: 1 },
-    { title: 'Something Warm', definitionId: 'food:table:2', quantity: 1 },
-    { title: 'The Table Centrepiece', definitionId: 'food:table:3', quantity: 1 },
+    { title: 'A Welcoming Dish', definitionId: 'food:table:3', quantity: 1 },
+    { title: 'Something for the Table', definitionId: 'food:table:3', quantity: 1 },
+    { title: 'The Table Centrepiece', definitionId: 'food:table:4', quantity: 1 },
   ],
 };
 
@@ -82,12 +80,11 @@ export type MergeGeneratorDefinition = {
   color: string;
   initialCell: number;
   baseBranches: string[];
-  initialCharges?: number;
   unlockDescription: string;
 };
 
 export const MERGE_GENERATORS: readonly MergeGeneratorDefinition[] = [
-  { id: 'starter-pantry', familyId: 'food', name: 'Feastle’s Picnic Pantry', icon: 'fork.knife', color: '#C97847', initialCell: 31, baseBranches: ['table'], initialCharges: 8, unlockDescription: 'Tap it to unpack cosy ingredients for Feastle’s table.' },
+  { id: 'starter-pantry', familyId: 'food', name: 'Feastle’s Picnic Pantry', icon: 'fork.knife', color: '#C97847', initialCell: 31, baseBranches: ['table'], unlockDescription: 'Spend 1 Energy to unpack a cosy ingredient for Feastle’s table.' },
   { id: 'nature-pot', familyId: 'nature', name: 'Mossprout’s Sprouting Pot', icon: 'leaf.fill', color: '#5E9E69', initialCell: 38, baseBranches: ['garden'], unlockDescription: 'A pocket garden of seeds and sprouts for Mossprout’s requests.' },
   { id: 'waterside-pail', familyId: 'nature', name: 'Shellio’s Waterside Pail', icon: 'water.waves', color: '#4E9EAE', initialCell: 39, baseBranches: ['waterside'], unlockDescription: 'Tap it for pebbles, shells, and little waterside treasures.' },
   { id: 'adventure-pack', familyId: 'adventure', name: 'Steppling’s Trail Satchel', icon: 'figure.walk', color: '#967044', initialCell: 32, baseBranches: ['trail'], unlockDescription: 'Trail basics for boots, packs, and bigger walking adventures.' },
@@ -115,11 +112,11 @@ export type MergeOrderTemplate = {
 export const MERGE_ORDER_TEMPLATES: readonly MergeOrderTemplate[] = [
   { key: 'starter-snack', characterId: 'feastle', title: 'A little something', difficulty: 'small', requirements: [{ definitionId: 'food:table:2', quantity: 1 }], reward: { coins: 20, mergeXp: 18, friendshipXp: 12, energy: 2 } },
   { key: 'warm-dish', characterId: 'feastle', title: 'Warm the table', difficulty: 'medium', requirements: [{ definitionId: 'food:table:3', quantity: 1 }], reward: { coins: 38, mergeXp: 32, friendshipXp: 20, energy: 4 } },
-  { key: 'table-for-two', characterId: 'feastle', title: 'Something for the Table', difficulty: 'major', requirements: [{ definitionId: 'food:table:3', quantity: 1 }], reward: { coins: 80, mergeXp: 64, friendshipXp: 70, energy: 10 }, signature: true, chapterId: 'feastle-chapter-4', minimumFriendshipLevel: 4 },
-  { key: 'first-feast', characterId: 'feastle', title: 'Feastle’s First Feast', difficulty: 'major', requirements: [{ definitionId: 'food:table:5', quantity: 1 }], reward: { coins: 130, mergeXp: 110, friendshipXp: 76, energy: 12 }, signature: true, chapterId: 'feastle-chapter-8', minimumFriendshipLevel: 8 },
-  { key: 'village-table', characterId: 'feastle', title: 'The Village Table', difficulty: 'major', requirements: [{ definitionId: 'food:table:4', quantity: 1 }, { definitionId: 'food:table:3', quantity: 1 }], reward: { coins: 145, mergeXp: 124, friendshipXp: 80, energy: 13 }, signature: true, chapterId: 'feastle-chapter-12', minimumFriendshipLevel: 12 },
-  { key: 'celebration-spread', characterId: 'feastle', title: 'A Celebration Spread', difficulty: 'major', requirements: [{ definitionId: 'food:table:5', quantity: 1 }, { definitionId: 'food:table:3', quantity: 1 }], reward: { coins: 165, mergeXp: 138, friendshipXp: 85, energy: 14 }, signature: true, chapterId: 'feastle-chapter-16', minimumFriendshipLevel: 16 },
-  { key: 'grand-feast', characterId: 'feastle', title: 'The Grand Feast', difficulty: 'major', requirements: [{ definitionId: 'food:table:6', quantity: 1 }], reward: { coins: 180, mergeXp: 150, friendshipXp: 90, energy: 15, wispId: 'crumb' }, signature: true, chapterId: 'feastle-chapter-20', minimumFriendshipLevel: 20 },
+  { key: 'table-for-two', characterId: 'feastle', title: 'Something for the Table', difficulty: 'major', requirements: [{ definitionId: 'food:table:4', quantity: 1 }], reward: { coins: 80, mergeXp: 64, friendshipXp: 70, energy: 5 }, signature: true, chapterId: 'feastle-chapter-4', minimumFriendshipLevel: 4 },
+  { key: 'first-feast', characterId: 'feastle', title: 'Feastle’s First Feast', difficulty: 'major', requirements: [{ definitionId: 'food:table:6', quantity: 1 }, { definitionId: 'food:table:3', quantity: 1 }], reward: { coins: 130, mergeXp: 110, friendshipXp: 76, energy: 5 }, signature: true, chapterId: 'feastle-chapter-8', minimumFriendshipLevel: 8 },
+  { key: 'village-table', characterId: 'feastle', title: 'The Village Table', difficulty: 'major', requirements: [{ definitionId: 'food:table:5', quantity: 1 }, { definitionId: 'food:table:4', quantity: 1 }], reward: { coins: 145, mergeXp: 124, friendshipXp: 80, energy: 5 }, signature: true, chapterId: 'feastle-chapter-12', minimumFriendshipLevel: 12 },
+  { key: 'celebration-spread', characterId: 'feastle', title: 'A Celebration Spread', difficulty: 'major', requirements: [{ definitionId: 'food:table:6', quantity: 1 }, { definitionId: 'food:table:4', quantity: 1 }], reward: { coins: 165, mergeXp: 138, friendshipXp: 85, energy: 5 }, signature: true, chapterId: 'feastle-chapter-16', minimumFriendshipLevel: 16 },
+  { key: 'grand-feast', characterId: 'feastle', title: 'The Grand Feast', difficulty: 'major', requirements: [{ definitionId: 'food:table:6', quantity: 2 }], reward: { coins: 180, mergeXp: 150, friendshipXp: 90, energy: 5, wispId: 'crumb' }, signature: true, chapterId: 'feastle-chapter-20', minimumFriendshipLevel: 20 },
   { key: 'first-garden', characterId: 'mossprout', title: 'My First Garden', difficulty: 'medium', requirements: [{ definitionId: 'nature:garden:3', quantity: 1 }], reward: { coins: 45, mergeXp: 38, friendshipXp: 24, energy: 5 } },
   { key: 'moonflower', characterId: 'mossprout', title: 'A flower after rain', difficulty: 'major', requirements: [{ definitionId: 'nature:garden:5', quantity: 1 }], reward: { coins: 150, mergeXp: 120, friendshipXp: 75, energy: 12, wispId: 'bloom' }, signature: true },
   { key: 'trail-boots', characterId: 'steppling', title: 'Ready for the trail', difficulty: 'medium', requirements: [{ definitionId: 'adventure:trail:3', quantity: 1 }], reward: { coins: 45, mergeXp: 38, friendshipXp: 24, energy: 5 } },

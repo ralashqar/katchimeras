@@ -6,7 +6,8 @@ import { PersistentMergeItemArt } from '@/components/katchadeck/games/feastle-pe
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { FEASTLE_STORY_REQUESTS, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
-import { beginFeastleReturn, loadFeastleStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
+import { FEASTLE_ACT_TWO_ORDER_POOL } from '@/utils/companion-story';
+import { beginFeastleActTwo, beginFeastleReturn, loadFeastleStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
 
 export function FeastleStoryStage({ onBeginIntroduction, onJournalFood, onMore, onOpenConversation, onOpenMerge }: {
   onBeginIntroduction: () => void;
@@ -18,17 +19,31 @@ export function FeastleStoryStage({ onBeginIntroduction, onJournalFood, onMore, 
   const [story, setStory] = useState(loadFeastleStory);
   useEffect(() => subscribeCompanionStories(() => setStory(loadFeastleStory())), []);
   const returnReady = story.status === 'return_available' || story.status === 'conversation_active';
-  const complete = story.status === 'chapter_complete';
+  const actOneComplete = story.status === 'chapter_complete' && story.currentActId === 'act-1';
+  const complete = story.status === 'chapter_complete' && story.currentActId === 'act-2';
   const needsBeginning = story.status === 'intro_available';
   const canJournalFood = story.journalFtueStatus !== 'not_started' && (story.status === 'order_active' || complete);
+  const actTwoRequests = story.actPhase === 'signature_order'
+    ? [{ title: "Feastle's First Feast", description: 'A generous centrepiece made from everything the table has taught us.', definitionId: 'food:table:6', quantity: 1 }]
+    : story.actPhase === 'regular_orders' && story.orderDeck
+      ? story.orderDeck.templateKeys.flatMap((key) => {
+        const order = FEASTLE_ACT_TWO_ORDER_POOL.find((item) => item.key === key);
+        return order && !story.orderDeck?.servedOrderIds.includes(`merge-story:feastle:act-2:${key}`)
+          ? [{ title: order.title, description: order.description, definitionId: order.definitionId, quantity: 1 }]
+          : [];
+      }).slice(0, 3)
+      : [];
   const requests = story.status === 'order_active'
-    ? (FEASTLE_STORY_REQUESTS[story.targetLevel] ?? []).filter((_, index) => !story.completedOrderIds.includes(
+    ? actTwoRequests.length ? actTwoRequests : (FEASTLE_STORY_REQUESTS[story.targetLevel] ?? []).filter((_, index) => !story.completedOrderIds.includes(
         `merge-story:feastle:chapter-1:level-${story.targetLevel}:order-${index + 1}`
       ))
     : [];
-  const title = complete ? 'Our first table is set' : returnReady ? 'A note from Feastle' : needsBeginning ? 'Feastle is unpacking' : story.targetLevel === 4 ? 'Three places on the tray' : 'Your next request';
+  const regularProgress = story.orderDeck?.servedOrderIds.filter((id) => id.startsWith('merge-story:feastle:act-2:')).length ?? 0;
+  const title = complete ? 'Our first feast is remembered' : actOneComplete ? 'The village order bell' : returnReady ? 'A note from Feastle' : needsBeginning ? 'Feastle is unpacking' : story.actPhase === 'regular_orders' ? `${regularProgress} of 5 villagers served` : story.targetLevel === 4 ? 'Three places on the tray' : 'Your next request';
   const body = complete
-    ? 'Three small dishes, one suspicious jar, and the beginning of a very good friendship.'
+    ? 'Five village requests and one first feast now live in the Recipe Book.'
+    : actOneComplete
+      ? 'Our first table is set. Now the village has started sending real requests—and each one carries a little story.'
     : returnReady
       ? 'The plate is empty and Feastle has something to say. Return to the table for the next part.'
       : needsBeginning
@@ -56,18 +71,20 @@ export function FeastleStoryStage({ onBeginIntroduction, onJournalFood, onMore, 
         <View style={styles.requestArt}><PersistentMergeItemArt definitionId={request.definitionId} size={48} /></View>
         <View style={styles.requestCopy}>
           <ThemedText selectable style={styles.requestTitle} lightColor="#3B2C20" darkColor="#3B2C20">{request.title}</ThemedText>
+          {'description' in request && typeof request.description === 'string' ? <ThemedText selectable numberOfLines={2} style={styles.requestDescription} lightColor="#6B5943" darkColor="#6B5943">{request.description}</ThemedText> : null}
           <ThemedText selectable style={styles.requestItemName} lightColor="#745936" darkColor="#745936">{MERGE_ITEMS_BY_ID.get(request.definitionId)?.name ?? 'Merge item'}</ThemedText>
         </View>
         {request.quantity > 1 ? <View style={styles.quantity}><ThemedText selectable style={styles.quantityText} lightColor="#FFF9E9" darkColor="#FFF9E9">×{request.quantity}</ThemedText></View> : null}
       </View>)}
     </View> : null}
     {!complete ? <Pressable accessibilityRole="button" onPress={() => {
-      if (returnReady && story.pendingConversationId) { beginFeastleReturn(); onOpenConversation(story.pendingConversationId); }
+      if (actOneComplete) { const next = beginFeastleActTwo(); if (next.pendingConversationId) onOpenConversation(next.pendingConversationId); }
+      else if (returnReady && story.pendingConversationId) { beginFeastleReturn(); onOpenConversation(story.pendingConversationId); }
       else if (needsBeginning) onBeginIntroduction();
       else onOpenMerge(story.activeOrderId);
     }} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
       <IconSymbol color="#FFF9E9" name={returnReady ? 'bubble.left.and.bubble.right.fill' : 'fork.knife'} size={19} />
-      <ThemedText style={styles.primaryLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">{returnReady ? 'Read Feastle’s note' : needsBeginning ? 'Meet Feastle' : requests.length > 1 ? 'Open all orders' : 'Make the request'}</ThemedText><IconSymbol color="#FFF9E9" name="arrow.right" size={17} />
+      <ThemedText style={styles.primaryLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">{actOneComplete ? 'Open the village table' : returnReady ? 'Read Feastle’s note' : needsBeginning ? 'Meet Feastle' : requests.length > 1 ? 'Open all orders' : 'Make the request'}</ThemedText><IconSymbol color="#FFF9E9" name="arrow.right" size={17} />
     </Pressable> : null}
     {complete ? <Pressable accessibilityRole="button" onPress={onMore} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}><IconSymbol color="#FFF9E9" name="bubble.left.and.bubble.right.fill" size={19} /><ThemedText style={styles.primaryLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">More with Feastle</ThemedText><IconSymbol color="#FFF9E9" name="arrow.right" size={17} /></Pressable> : null}
     {canJournalFood ? <Pressable accessibilityRole="button" onPress={onJournalFood} style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
@@ -81,6 +98,6 @@ const styles = StyleSheet.create({
   heading: { alignItems: 'center', flexDirection: 'row', gap: 12 }, level: { alignItems: 'center', backgroundColor: '#83612F', borderRadius: 18, height: 48, justifyContent: 'center', width: 48 }, levelText: { fontSize: 20, fontWeight: '900', fontVariant: ['tabular-nums'] }, copy: { flex: 1, gap: 2 }, eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 }, title: { fontSize: 21, fontWeight: '900', letterSpacing: -0.35, lineHeight: 25 }, body: { fontSize: 13.5, lineHeight: 20 },
   requestTray: { backgroundColor: 'rgba(255,255,255,0.52)', borderColor: 'rgba(139,103,46,0.22)', borderCurve: 'continuous', borderRadius: 20, borderWidth: 1, gap: 8, padding: 11 }, requestHeading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 3 }, requestEyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 }, requestCount: { fontSize: 10.5, fontWeight: '800' },
   bondSummary: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: '#708D48', borderCurve: 'continuous', borderRadius: 999, flexDirection: 'row', gap: 7, minHeight: 34, paddingHorizontal: 12 }, bondSummaryText: { fontSize: 11.5, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  requestRow: { alignItems: 'center', backgroundColor: '#FFF8E8', borderCurve: 'continuous', borderRadius: 15, flexDirection: 'row', gap: 10, minHeight: 62, paddingHorizontal: 9, paddingVertical: 6 }, requestArt: { alignItems: 'center', height: 50, justifyContent: 'center', width: 50 }, requestCopy: { flex: 1, gap: 1 }, requestTitle: { fontSize: 13.5, fontWeight: '900', lineHeight: 18 }, requestItemName: { fontSize: 11.5, fontWeight: '700', lineHeight: 16 }, quantity: { alignItems: 'center', backgroundColor: '#76501F', borderRadius: 999, justifyContent: 'center', minWidth: 30, paddingHorizontal: 7, paddingVertical: 5 }, quantityText: { fontSize: 11, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  requestRow: { alignItems: 'center', backgroundColor: '#FFF8E8', borderCurve: 'continuous', borderRadius: 15, flexDirection: 'row', gap: 10, minHeight: 62, paddingHorizontal: 9, paddingVertical: 6 }, requestArt: { alignItems: 'center', height: 50, justifyContent: 'center', width: 50 }, requestCopy: { flex: 1, gap: 1 }, requestTitle: { fontSize: 13.5, fontWeight: '900', lineHeight: 18 }, requestDescription: { fontSize: 11, lineHeight: 15 }, requestItemName: { fontSize: 11.5, fontWeight: '700', lineHeight: 16 }, quantity: { alignItems: 'center', backgroundColor: '#76501F', borderRadius: 999, justifyContent: 'center', minWidth: 30, paddingHorizontal: 7, paddingVertical: 5 }, quantityText: { fontSize: 11, fontWeight: '900', fontVariant: ['tabular-nums'] },
   primary: { alignItems: 'center', backgroundColor: '#76501F', borderCurve: 'continuous', borderRadius: 19, flexDirection: 'row', gap: 10, minHeight: 54, paddingHorizontal: 15 }, primaryLabel: { flex: 1, fontSize: 15, fontWeight: '900' }, secondary: { alignItems: 'center', borderRadius: 17, flexDirection: 'row', justifyContent: 'space-between', minHeight: 46, paddingHorizontal: 13 }, secondaryLabel: { fontSize: 13, fontWeight: '900' }, pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
 });

@@ -48,7 +48,7 @@ import {
   type CompanionBondEventKind,
 } from '@/utils/companion-bond';
 import { loadCompanionBondState, saveCompanionBondState, subscribeCompanionBondState } from '@/utils/companion-bond-storage';
-import { completeFeastleConversation, markFeastleJournalFtue } from '@/utils/companion-story-storage';
+import { completeFeastleConversation, markFeastleJournalFtue, recordFeastleConfirmedMemory, recordFeastleStorySignal } from '@/utils/companion-story-storage';
 import {
   answerCompanionDiscoveryPrompt,
   answersForCompanion,
@@ -2060,7 +2060,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         id: `companion-memory:${selectedFamilyId}:${node.memoryKey}`,
         scope: 'family',
         familyId: selectedFamilyId,
-        kind: 'preference',
+        kind: node.memoryKind ?? 'preference',
         key: node.memoryKey,
         summary: summary.trim(),
         evidenceRefs: [
@@ -2115,6 +2115,13 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       saveCompanionContentState(next);
       return next;
     });
+    if (remember && !selectedConversationSession.preview && selectedFamilyId === 'feastle') {
+      recordFeastleConfirmedMemory(node.memoryKey, occurredAt);
+      const signal = node.memoryKey.match(/feastle:signal:(ease|comfort|connection|curiosity)/)?.[1];
+      if (signal === 'ease' || signal === 'comfort' || signal === 'connection' || signal === 'curiosity') {
+        recordFeastleStorySignal(`${selectedConversationSession.id}:${node.id}`, signal, occurredAt);
+      }
+    }
     if (!selectedConversationSession.preview && isFormInsight) {
       awardBond({
         id: `ideal-skin-questionnaire:${selectedResident.creature.creatureId}`,

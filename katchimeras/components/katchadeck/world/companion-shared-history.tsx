@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaUI } from '@/constants/katcha-ui';
-import type { CompanionMemory } from '@/utils/companion-content';
+import type { CompanionInsightRecord, CompanionMemory } from '@/utils/companion-content';
 
 export function CompanionSharedHistory({
   activeFocusTitle,
@@ -12,6 +12,7 @@ export function CompanionSharedHistory({
   activePlus,
   hasOlderHistory,
   companionName,
+  insights,
   memories,
   onResetMemory,
   onUpdateMemory,
@@ -21,11 +22,13 @@ export function CompanionSharedHistory({
   activePlus: boolean;
   hasOlderHistory: boolean;
   companionName: string;
+  insights: readonly CompanionInsightRecord[];
   memories: readonly CompanionMemory[];
   onResetMemory?: () => void;
   onUpdateMemory: (input: { memoryId: string; status: 'confirmed' | 'rejected' | 'forgotten'; summary?: string }) => void;
 }) {
   const patterns = memories.filter((memory) => memory.kind === 'pattern' && memory.status === 'confirmed');
+  const preferences = memories.filter((memory) => (memory.kind === 'preference' || memory.kind === 'confirmed_fact') && memory.status === 'confirmed');
   const moments = memories.filter((memory) => (memory.kind === 'shared_moment' || memory.kind === 'milestone') && memory.status === 'confirmed');
   const threads = memories.filter((memory) => memory.kind === 'open_thread' && memory.status === 'confirmed');
   const hasCurrentChapter = Boolean(activeFocusTitle || activeQuestTitle);
@@ -42,6 +45,22 @@ export function CompanionSharedHistory({
           </View>
         ) : <EmptyCopy text="Nothing is asking for your attention right now." />}
       </HistorySection>
+
+      {preferences.length ? (
+        <HistorySection icon="heart.fill" title={companionName === 'Feastle' ? 'Table preferences' : 'Preferences'}>
+          {preferences.map((memory) => <MemoryRow key={memory.id} memory={memory} onUpdate={onUpdateMemory} />)}
+        </HistorySection>
+      ) : null}
+
+      {insights.length ? (
+        <HistorySection icon="star.fill" title="Insights">
+          {insights.map((insight) => <View key={insight.id} style={styles.chapterRow}>
+            <ThemedText style={styles.rowEyebrow} lightColor="#8A6C44" darkColor="#8A6C44">{insight.category.toUpperCase()}</ThemedText>
+            <ThemedText selectable style={styles.chapterTitle} lightColor="#493727" darkColor="#493727">{insight.title}</ThemedText>
+            <ThemedText selectable style={styles.insightSummary} lightColor="#76624E" darkColor="#76624E">{insight.summary}</ThemedText>
+          </View>)}
+        </HistorySection>
+      ) : null}
 
       {patterns.length ? (
         <HistorySection icon="sparkles" title="Things noticed">
@@ -102,7 +121,7 @@ function HistoryIntro({ companionName }: { companionName: string }) {
   return (
     <View style={styles.intro}>
       <ThemedText selectable style={styles.introTitle} lightColor="#3D2D20" darkColor="#3D2D20">
-        What {companionName} remembers
+        {companionName === 'Feastle' ? "Feastle's Recipe Book" : `What ${companionName} remembers`}
       </ThemedText>
       <ThemedText selectable style={styles.introBody} lightColor="#6C5947" darkColor="#6C5947">
         Only moments you explicitly saved and patterns you confirmed appear here. Goal answers stay with their original conversation.
@@ -238,6 +257,7 @@ const styles = StyleSheet.create({
   chapterRow: { backgroundColor: 'rgba(255,255,255,0.42)', borderRadius: 16, gap: 3, padding: 11 },
   rowEyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 },
   chapterTitle: { fontSize: 14, fontWeight: '800', lineHeight: 19 },
+  insightSummary: { fontSize: 12, lineHeight: 17, marginTop: 3 },
   memoryRow: { backgroundColor: 'rgba(255,255,255,0.38)', borderRadius: 17, gap: 8, padding: 12 },
   memoryHeading: { alignItems: 'flex-start', flexDirection: 'row', gap: 9 },
   statusDot: { backgroundColor: '#6A9B78', borderRadius: 999, height: 8, marginTop: 6, width: 8 },

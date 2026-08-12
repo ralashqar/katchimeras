@@ -719,7 +719,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
         const generator = occupant?.kind === 'generator' ? MERGE_GENERATORS_BY_ID.get(occupant.generatorId) : null;
         const definition = item ? MERGE_ITEMS_BY_ID.get(item.definitionId) : null;
         const compatible = Boolean(selectedDefinitionId && item && item.definitionId === selectedDefinitionId && selectedCell !== index);
-        const label = generator ? `${generator.name}, ${presentation.generators[generator.id]?.charges ?? 0} charges. Tap to generate.` : definition ? `${definition.name}, tier ${definition.tier}` : cell.locked ? 'Blocked board space' : 'Empty board space';
+        const label = generator ? `${generator.name}. Tap to generate. Costs 1 Energy.` : definition ? `${definition.name}, tier ${definition.tier}` : cell.locked ? 'Blocked board space' : 'Empty board space';
         return <BoardCell
           accessibilityActionLabel={generator ? 'Generate item' : 'Select or move item'}
           accessibilityLabel={label}

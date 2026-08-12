@@ -23,7 +23,8 @@ export type CompanionJournalHandoff = {
   body: string;
   saveLabel: string;
   rewardGrowth: number;
-  rewardPantryCharges: number;
+  rewardMergeEnergy: number;
+  rewardItemIds: string[];
   status: CompanionJournalHandoffStatus;
   journalRecordId: string | null;
   createdAt: number;
@@ -64,7 +65,8 @@ export function buildCompanionJournalHandoff(input: {
       : node?.body ?? 'A meal, snack, drink, or something you made all count—and ordinary counts too.',
     saveLabel: node?.saveLabel ?? 'Add to the Egg',
     rewardGrowth: node?.rewardGrowth ?? 20,
-    rewardPantryCharges: node?.rewardPantryCharges ?? 6,
+    rewardMergeEnergy: node?.rewardMergeEnergy ?? 8,
+    rewardItemIds: [...(node?.rewardItemIds ?? ['food:table:1', 'food:table:1'])],
     status: 'pending',
     journalRecordId: null,
     createdAt: input.now,

@@ -2300,7 +2300,7 @@ function HomeScreen() {
               </View>
             </View>
             <ThemedText style={styles.feastleRewardBody} lightColor="#64513B" darkColor="#64513B">
-              The Egg received +{feastleJournalReward.rewardGrowth} Growth. Feastle packed up to +{feastleJournalReward.rewardPantryCharges} Pantry stock for the merge board.
+              The Egg received +{feastleJournalReward.rewardGrowth} Growth. Feastle sent up to +{feastleJournalReward.rewardMergeEnergy} Energy and a two-ingredient Pantry Basket to Merge World.
             </ThemedText>
             <Pressable
               accessibilityRole="button"

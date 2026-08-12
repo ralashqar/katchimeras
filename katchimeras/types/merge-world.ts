@@ -40,9 +40,6 @@ export type MergeGeneratorState = {
   id: string;
   familyId: MergeFamilyId;
   name: string;
-  charges: number;
-  maxCharges: number;
-  readyAt: number | null;
   level: number;
   enabledBranches: string[];
 };
@@ -64,6 +61,8 @@ export type MergeOrder = {
   id: string;
   characterId: MergeCharacterId;
   title: string;
+  description?: string;
+  narrativeSignal?: 'ease' | 'comfort' | 'connection' | 'curiosity';
   difficulty: MergeOrderDifficulty;
   requirements: MergeOrderRequirement[];
   reward: MergeReward;
@@ -95,7 +94,7 @@ export type MergeRewardInboxEntry = {
   id: string;
   createdAt: number;
   items: string[];
-  source: 'order' | 'discovery' | 'chest';
+  source: 'order' | 'discovery' | 'chest' | 'activity';
 };
 
 export type MergeExternalRewardReceipt = {
@@ -113,7 +112,7 @@ export type MergeExternalRewardReceipt = {
 };
 
 export type MergeWorldState = {
-  version: 2;
+  version: 3;
   revision: number;
   createdAt: number;
   updatedAt: number;
@@ -123,7 +122,6 @@ export type MergeWorldState = {
   storageCapacity: number;
   rewardInbox: MergeRewardInboxEntry[];
   generatorUnlockReceipts: MergeGeneratorUnlockReceipt[];
-  processedGeneratorChargeGrantIds: string[];
   generators: Record<string, MergeGeneratorState>;
   energy: { value: number; cap: number; lastRegenAt: number };
   coins: number;
@@ -154,13 +152,12 @@ export type MergeWorldCommand =
   | { type: 'sellItem'; cell: number; now: number }
   | { type: 'claimInbox'; entryId: string; now: number }
   | { type: 'unlockExpansion'; expansionId: string; now: number }
-  | { type: 'grantActivityEnergy'; receiptId: string; amount: number; now: number }
-  | { type: 'grantActivityEnergyBatch'; rewards: Array<{ receiptId: string; amount: number; dayId?: string; kind?: string; pantryCharges?: number; grantDayId?: string }>; now: number }
+  | { type: 'grantActivityRewardsBatch'; rewards: Array<{ receiptId: string; amount: number; grantDayId: string; rewardClass: 'daily_journal' | 'daily_quest' | 'food_basket'; itemDefinitionIds?: string[] }>; now: number }
   | { type: 'ackGeneratorUnlock'; receiptId: string; now: number }
   | { type: 'rerollOrder'; orderId: string; now: number }
   | { type: 'reconcileCharacters'; characterIds: string[]; now: number }
   | { type: 'reconcileFriendship'; levels: Partial<Record<MergeCharacterId, number>>; now: number }
-  | { type: 'reconcileStory'; familyId: MergeCharacterId; status: string; targetLevel: number; starterParcelGranted: boolean; now: number }
+  | { type: 'reconcileStory'; familyId: MergeCharacterId; status: string; targetLevel: number; actPhase?: string; orderTemplateKeys?: string[]; servedOrderIds?: string[]; now: number }
   | { type: 'ackExternalReward'; receiptId: string; now: number };
 
 export type MergeWorldCommandResult = {

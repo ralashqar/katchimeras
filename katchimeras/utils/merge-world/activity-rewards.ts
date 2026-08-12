@@ -6,70 +6,65 @@ export type MergeActivityReward = {
   receiptId: string;
   amount: number;
   label: string;
-  dayId?: string;
-  kind?: 'journal' | 'check_in' | 'photo' | 'meaning' | 'steps' | 'quest';
-  pantryCharges?: number;
-  grantDayId?: string;
+  grantDayId: string;
+  rewardClass: 'daily_journal' | 'daily_quest' | 'food_basket';
+  itemDefinitionIds?: string[];
 };
 
 /**
- * Projects already-persisted life activity into stable, replay-safe Merge
- * Energy or Pantry receipts. Journaling nourishes the Egg first; only food
- * journals echo into Merge World as Pantry stock. The engine owns de-duplication.
+ * Merge World only rewards activity saved on the current local day. This keeps
+ * reconciliation replay-safe without granting a backlog when an existing save
+ * first migrates to the consolidated Energy economy.
  */
-export function mergeActivityRewards(days: readonly HomeDayRecord[]): MergeActivityReward[] {
-  const rewards: MergeActivityReward[] = [];
-  for (const day of days) {
-    for (const answer of day.promptAnswers) {
-      if (answer.dismissed || (answer.kind !== 'feeling' && answer.kind !== 'inner_weather')) continue;
-      rewards.push({ receiptId: `activity:mood:${day.id}:${answer.id}`, amount: 5, label: 'Check-in', dayId: day.id, kind: 'check_in' });
-    }
-    for (const record of day.journalRecords ?? []) {
-      if (record.flowId !== 'food') continue;
-      rewards.push({
-        receiptId: `activity:journal:${day.id}:${record.id}`,
-        amount: 0,
-        label: 'Food journal',
-        dayId: day.id,
-        kind: 'journal',
-        pantryCharges: 6,
-        grantDayId: localDayIdForTimestamp(record.createdAt),
-      });
-    }
-    for (const moment of day.moments) {
-      if (moment.type !== 'photo') continue;
-      rewards.push({ receiptId: `activity:photo:${day.id}:${moment.id}`, amount: 5, label: 'Photo moment', dayId: day.id, kind: 'photo' });
-    }
-    for (const meaning of day.capturedMeanings ?? []) {
-      rewards.push({ receiptId: `activity:meaning:${day.id}:${meaning.sourceId ?? meaning.createdAt}`, amount: 5, label: 'Captured moment', dayId: day.id, kind: 'meaning' });
-    }
-    if (day.stepsCount >= 5_000) {
-      rewards.push({ receiptId: `activity:steps:${day.id}:5000`, amount: 10, label: 'Steps milestone', dayId: day.id, kind: 'steps' });
-    }
-  }
+export function mergeActivityRewards(days: readonly HomeDayRecord[], now = new Date()): MergeActivityReward[] {
+  const grantDayId = localDayId(now);
+  const records = days.flatMap((day) => (day.journalRecords ?? []).map((record) => ({ day, record })))
+    .filter(({ record }) => localDayIdForTimestamp(record.createdAt) === grantDayId)
+    .sort((left, right) => left.record.createdAt.localeCompare(right.record.createdAt));
+  if (!records.length) return [];
+  const rewards: MergeActivityReward[] = [{
+    receiptId: `activity:daily-journal:${grantDayId}`,
+    amount: 8,
+    label: 'Daily journal',
+    grantDayId,
+    rewardClass: 'daily_journal',
+  }];
+  const firstFood = records.find(({ record }) => record.flowId === 'food');
+  if (firstFood) rewards.push({
+    receiptId: `activity:food-basket:${grantDayId}`,
+    amount: 0,
+    label: 'Pantry Basket',
+    grantDayId,
+    rewardClass: 'food_basket',
+    itemDefinitionIds: ['food:table:1', 'food:table:1'],
+  });
   return rewards;
+}
+
+export function mergeQuestActivityRewards(questState: CompanionQuestState, now = new Date()): MergeActivityReward[] {
+  const grantDayId = localDayId(now);
+  const first = questState.quests
+    .filter((quest) => typeof quest.completedAt === 'number' && quest.completedDayId === grantDayId)
+    .filter((quest) => {
+      const definition = questDefinition(quest.questId);
+      return Boolean(definition && definition.lane !== 'mini_game');
+    })
+    .sort((left, right) => (left.completedAt ?? 0) - (right.completedAt ?? 0))[0];
+  return first ? [{
+    receiptId: `activity:daily-quest:${grantDayId}`,
+    amount: 4,
+    label: 'Daily real-life quest',
+    grantDayId,
+    rewardClass: 'daily_quest',
+  }] : [];
+}
+
+function localDayId(value: Date): string {
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
 }
 
 function localDayIdForTimestamp(value: string): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value.slice(0, 10);
-  const year = parsed.getFullYear();
-  const month = String(parsed.getMonth() + 1).padStart(2, '0');
-  const day = String(parsed.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-export function mergeQuestActivityRewards(questState: CompanionQuestState): MergeActivityReward[] {
-  return questState.quests.flatMap((quest) => {
-    if (typeof quest.completedAt !== 'number') return [];
-    const definition = questDefinition(quest.questId);
-    if (!definition || definition.lane === 'mini_game') return [];
-    return [{
-      receiptId: `activity:quest:${quest.questRunId ?? `${quest.creatureId}:${quest.questId}:${quest.acceptedAt}`}`,
-      amount: 15,
-      label: 'Daily quest',
-      dayId: quest.completedDayId,
-      kind: 'quest' as const,
-    }];
-  });
+  return localDayId(parsed);
 }

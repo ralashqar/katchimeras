@@ -75,7 +75,7 @@ test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gate
     assert.equal(pack.filter((item) => item.trigger === 'bond').length, familyId === 'feastle' ? 22 : 3);
     assert.equal(pack.filter((item) => item.trigger === 'poll').length, 24);
     assert.equal(pack.filter((item) => item.trigger === 'signature_game').length, 5);
-    assert.equal(pack.filter((item) => item.format === 'insight_game').length, 4);
+    assert.equal(pack.filter((item) => item.format === 'insight_game').length, familyId === 'feastle' ? 5 : 4);
   }
 });
 
@@ -507,7 +507,7 @@ test('authored-family insights use five meaningful questions while every form-ga
     const games = companionConversationDefinitionsForFamily(familyId)
       .flatMap((definition) => definition.nodes)
       .filter((node) => node.kind === 'profile_game' || node.kind === 'insight_game');
-    assert.equal(games.length, 5);
+    assert.equal(games.length, familyId === 'feastle' ? 6 : 5);
     for (const game of games.filter((candidate) => candidate.kind === 'profile_game')) {
       assert.deepEqual(validateProfileQuestionGraph(`${familyId}:test`, game), []);
     }
@@ -527,7 +527,7 @@ test('journal, goal, quest, and bond chats resolve to their correct outcome clas
     assert.ok(goalDebriefs.every((definition) => definition.nodes.some((node) => node.kind === 'goal_proposal')));
     assert.ok(questDebriefs.some((definition) => definition.nodes.some((node) => node.kind === 'memory_proposal')));
     assert.ok(questDebriefs.some((definition) => definition.nodes.some((node) => node.kind === 'goal_proposal')));
-    assert.ok(bondChats.every((definition) => definition.nodes.some((node) => node.kind === 'memory_proposal' || node.kind === 'poll')));
+    assert.ok(bondChats.every((definition) => definition.nodes.some((node) => node.kind === 'memory_proposal' || node.kind === 'poll' || node.kind === 'insight_reveal' || node.kind === 'journal_handoff')));
     assert.ok(pack
       .filter((definition) => definition.format !== 'insight_game')
       .every((definition) => definition.nodes.every((node) => node.kind !== 'insight_reveal')));
@@ -612,7 +612,8 @@ test('Feastle introduces an optional journal handoff and resumes the chapter aft
   assert.equal(handoff.flowId, 'food');
   assert.equal(handoff.nextNodeId, 'busy-day');
   assert.equal(handoff.rewardGrowth, 20);
-  assert.equal(handoff.rewardPantryCharges, 6);
+  assert.equal(handoff.rewardMergeEnergy, 8);
+  assert.deepEqual(handoff.rewardItemIds, ['food:table:1', 'food:table:1']);
 
   const started = createConversationSession({ definition, formId: 'feastle', dayId: '2026-08-12', createdAt: 1 });
   const answered = answerConversation(started, definition, 'easy', 2).session;

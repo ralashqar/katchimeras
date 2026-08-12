@@ -4,8 +4,6 @@ import {
   MERGE_INITIAL_ENERGY,
   MERGE_ENERGY_REGEN_MS,
   MERGE_EXPANSIONS,
-  MERGE_GENERATOR_CHARGES,
-  MERGE_GENERATOR_COOLDOWN_MS,
   MERGE_GENERATORS,
   MERGE_GENERATORS_BY_ID,
   MERGE_HYBRID_RECIPES,
@@ -16,6 +14,7 @@ import {
   MERGE_WORLD_SIZE,
   mergeLevelForXp,
 } from '@/constants/merge-world-catalog';
+import { FEASTLE_ACT_TWO_ORDER_POOL } from '@/utils/companion-story';
 import type {
   MergeBoardCell,
   MergeBoardItem,
@@ -45,7 +44,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     occupant: null,
   }));
   let state: MergeWorldState = {
-    version: 2,
+    version: 3,
     revision: 0,
     createdAt: now,
     updatedAt: now,
@@ -55,7 +54,6 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     storageCapacity: 5,
     rewardInbox: [],
     generatorUnlockReceipts: [],
-    processedGeneratorChargeGrantIds: [],
     generators: {},
     energy: { value: MERGE_INITIAL_ENERGY, cap: MERGE_ENERGY_CAP, lastRegenAt: now },
     coins: 100,
@@ -83,7 +81,7 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
   const current = refreshTime(state, command.now);
   switch (command.type) {
     case 'refreshTime':
-      return result(state, current, current === state ? undefined : 'Energy and generators refreshed.');
+      return result(state, current, current === state ? undefined : 'Energy refreshed.');
     case 'tapGenerator':
       return tapGenerator(current, command.generatorId, command.now, command.seed);
     case 'move':
@@ -100,10 +98,8 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
       return claimInbox(current, command.entryId, command.now);
     case 'unlockExpansion':
       return unlockExpansion(current, command.expansionId, command.now);
-    case 'grantActivityEnergy':
-      return grantActivityEnergy(current, command.receiptId, command.amount, command.now);
-    case 'grantActivityEnergyBatch':
-      return grantActivityEnergyBatch(current, command.rewards, command.now);
+    case 'grantActivityRewardsBatch':
+      return grantActivityRewardsBatch(current, command.rewards, command.now);
     case 'ackGeneratorUnlock': {
       const receipts = current.generatorUnlockReceipts.map((receipt) => receipt.id === command.receiptId && receipt.seenAt == null
         ? { ...receipt, seenAt: command.now }
@@ -182,14 +178,14 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   if (!value || typeof value !== 'object') return createInitialMergeWorldState(now);
   const rawVersion = (value as { version?: unknown }).version;
   const source = value as Partial<MergeWorldState>;
-  if ((rawVersion !== 1 && rawVersion !== 2) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
+  if ((rawVersion !== 1 && rawVersion !== 2 && rawVersion !== 3) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
     return createInitialMergeWorldState(now);
   }
   const fallback = createInitialMergeWorldState(now);
   let normalized: MergeWorldState = {
     ...fallback,
     ...source,
-    version: 2,
+    version: 3,
     revision: finite(source.revision, 0),
     createdAt: finite(source.createdAt, now),
     updatedAt: finite(source.updatedAt, now),
@@ -199,8 +195,9 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     storageCapacity: Math.max(5, finite(source.storageCapacity, 5)),
     rewardInbox: Array.isArray(source.rewardInbox) ? source.rewardInbox : [],
     generatorUnlockReceipts: uniqueGeneratorUnlockReceipts(source.generatorUnlockReceipts),
-    processedGeneratorChargeGrantIds: uniqueStrings(source.processedGeneratorChargeGrantIds),
-    generators: source.generators && typeof source.generators === 'object' ? source.generators : fallback.generators,
+    generators: source.generators && typeof source.generators === 'object'
+      ? Object.fromEntries(Object.entries(source.generators).map(([id, generator]) => [id, normalizeGenerator(generator, id)]))
+      : fallback.generators,
     energy: {
       value: Math.max(0, Math.min(MERGE_ENERGY_CAP, finite(source.energy?.value, MERGE_ENERGY_CAP))),
       cap: MERGE_ENERGY_CAP,
@@ -228,27 +225,8 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
       : fallback.characterProgress,
     externalRewardReceipts: Array.isArray(source.externalRewardReceipts) ? source.externalRewardReceipts : [],
   };
-  // One-time compatibility bridge: old unclaimed parcel saves become the
-  // direct generator charge they represented, then the receipt prevents a
-  // second grant on later hydrations.
-  const legacyParcels = (value as { journalParcels?: unknown }).journalParcels;
-  if (Array.isArray(legacyParcels)) {
-    for (const rawParcel of legacyParcels) {
-      if (!rawParcel || typeof rawParcel !== 'object') continue;
-      const parcel = rawParcel as { id?: unknown; generatorId?: unknown; chargeAmount?: unknown; claimedAt?: unknown };
-      if (typeof parcel.id !== 'string' || typeof parcel.generatorId !== 'string' || parcel.claimedAt != null) continue;
-      const grantId = `legacy-parcel:${parcel.id}`;
-      if (normalized.processedGeneratorChargeGrantIds.includes(grantId)) continue;
-      const chargeAmount = Math.max(0, Math.floor(finite(parcel.chargeAmount, 0)));
-      const generators = addGeneratorCharges(normalized.generators, parcel.generatorId, chargeAmount);
-      if (generators === normalized.generators) continue;
-      normalized = {
-        ...normalized,
-        generators,
-        processedGeneratorChargeGrantIds: [...normalized.processedGeneratorChargeGrantIds, grantId],
-      };
-    }
-  }
+  // Version 1/2 Pantry charges, cooldowns, and parcels intentionally disappear.
+  // Existing Energy is preserved only up to the new 40-point cap.
   return refreshTime(normalized, now);
 }
 
@@ -256,30 +234,20 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
   const generator = state.generators[generatorId];
   if (!generator) return unchanged(state, 'That generator is not unlocked.');
   if (state.energy.value < 1) return unchanged(state, 'You need more Merge Energy.');
-  if (generator.charges < 1) return unchanged(state, 'This generator is resting.');
   const cell = firstEmptyCell(state.board, hash(`${seed}:cell`));
   if (cell < 0) return unchanged(state, 'The board is full. Merge or store an item first.');
   const random = randomUnit(`${seed}:drop:${state.revision}`);
-  const tier = random < 0.7 ? 1 : random < 0.95 ? 2 : 3;
+  // Tier 2 is a lucky shortcut; tier 3 and above must come from merging.
+  const tier = random < 0.85 ? 1 : 2;
   const branch = generator.enabledBranches[Math.floor(randomUnit(`${seed}:branch`) * generator.enabledBranches.length)] ?? generator.enabledBranches[0];
   const definitionId = `${generator.familyId}:${branch}:${tier}`;
   if (!MERGE_ITEMS_BY_ID.has(definitionId)) return unchanged(state, 'This generator has no available drops.');
   const item: MergeBoardItem = { kind: 'item', instanceId: `merge-item:${state.nextInstance}`, definitionId };
   const board = [...state.board];
   board[cell] = { ...board[cell], occupant: item };
-  const charges = generator.charges - 1;
-  const generators = {
-    ...state.generators,
-    [generatorId]: {
-      ...generator,
-      charges,
-      readyAt: charges === 0 ? now + MERGE_GENERATOR_COOLDOWN_MS : generator.readyAt,
-    },
-  };
   let next = touch({
     ...state,
     board,
-    generators,
     nextInstance: state.nextInstance + 1,
     energy: { ...state.energy, value: state.energy.value - 1 },
   }, now);
@@ -406,7 +374,7 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
     mergeXp,
     mergeLevel: mergeLevelForXp(mergeXp),
     storageCapacity: storageCapacityForLevel(mergeLevelForXp(mergeXp)),
-    energy: { ...state.energy, value: Math.min(state.energy.cap, state.energy.value + order.reward.energy) },
+    energy: { ...state.energy, value: Math.min(state.energy.cap, state.energy.value + orderEnergyRefund(order)) },
     completedOrderCount,
     activeOrders: state.activeOrders.filter((item) => item.id !== orderId),
     recentOrderKeys: [...state.recentOrderKeys, templateKeyForOrder(order)].slice(-RECENT_ORDER_LIMIT),
@@ -470,50 +438,30 @@ function unlockExpansion(state: MergeWorldState, expansionId: string, now: numbe
   return changed(touch({ ...state, board, coins: state.coins - expansion.coinCost, expansions: [...state.expansions, expansion.id] }, now), 'New board spaces opened.');
 }
 
-function grantActivityEnergy(state: MergeWorldState, receiptId: string, amount: number, now: number): MergeWorldCommandResult {
-  if (!receiptId || state.processedActivityReceiptIds.includes(receiptId)) return unchanged(state);
-  const safeAmount = Math.max(0, Math.floor(amount));
-  return changed(touch({
-    ...state,
-    energy: { ...state.energy, value: Math.min(state.energy.cap, state.energy.value + safeAmount) },
-    processedActivityReceiptIds: [...state.processedActivityReceiptIds, receiptId],
-  }, now), `Real life added ${safeAmount} Merge Energy.`);
-}
-
-function grantActivityEnergyBatch(state: MergeWorldState, rewards: Array<{ receiptId: string; amount: number; dayId?: string; kind?: string; pantryCharges?: number; grantDayId?: string }>, now: number): MergeWorldCommandResult {
+function grantActivityRewardsBatch(
+  state: MergeWorldState,
+  rewards: Array<{ receiptId: string; amount: number; grantDayId: string; rewardClass: 'daily_journal' | 'daily_quest' | 'food_basket'; itemDefinitionIds?: string[] }>,
+  now: number,
+): MergeWorldCommandResult {
   if (!rewards.length) return unchanged(state);
   const processed = new Set(state.processedActivityReceiptIds);
   const activityEnergyByDay = { ...state.activityEnergyByDay };
-  const chargeGrantIds = new Set(state.processedGeneratorChargeGrantIds);
-  let generators = state.generators;
+  let rewardInbox = state.rewardInbox;
   let amount = 0;
   let changedState = false;
-  let pantryGrantProcessed = false;
-  let pantryStockAdded = false;
+  let basketAdded = false;
   for (const reward of rewards) {
-    if (!reward.receiptId) continue;
-    if (!processed.has(reward.receiptId)) {
-      processed.add(reward.receiptId);
-      const requested = Math.max(0, Math.floor(reward.amount));
-      const awarded = reward.dayId
-        ? Math.min(requested, Math.max(0, 40 - (activityEnergyByDay[reward.dayId] ?? 0)))
-        : requested;
-      amount += awarded;
-      if (reward.dayId) activityEnergyByDay[reward.dayId] = (activityEnergyByDay[reward.dayId] ?? 0) + awarded;
-      changedState = true;
-    }
-    const chargeGrantId = reward.grantDayId ? `journal-charge:${reward.grantDayId}:starter-pantry` : '';
-    if (reward.kind === 'journal'
-      && (reward.pantryCharges ?? 0) > 0
-      && Boolean(reward.grantDayId)
-      && Boolean(state.generators['starter-pantry'])
-      && !chargeGrantIds.has(chargeGrantId)) {
-      const previousCharges = generators['starter-pantry']?.charges ?? 0;
-      generators = addGeneratorCharges(generators, 'starter-pantry', reward.pantryCharges ?? 0);
-      pantryStockAdded ||= (generators['starter-pantry']?.charges ?? 0) > previousCharges;
-      pantryGrantProcessed = true;
-      chargeGrantIds.add(chargeGrantId);
-      changedState = true;
+    if (!reward.receiptId || processed.has(reward.receiptId)) continue;
+    processed.add(reward.receiptId);
+    changedState = true;
+    const requested = Math.max(0, Math.floor(reward.amount));
+    const awarded = Math.min(requested, Math.max(0, 12 - (activityEnergyByDay[reward.grantDayId] ?? 0)));
+    amount += awarded;
+    activityEnergyByDay[reward.grantDayId] = (activityEnergyByDay[reward.grantDayId] ?? 0) + awarded;
+    const validItems = (reward.itemDefinitionIds ?? []).filter((id) => MERGE_ITEMS_BY_ID.has(id));
+    if (reward.rewardClass === 'food_basket' && validItems.length && !rewardInbox.some((entry) => entry.id === reward.receiptId)) {
+      rewardInbox = [...rewardInbox, { id: reward.receiptId, createdAt: now, items: validItems, source: 'activity' }];
+      basketAdded = true;
     }
   }
   if (!changedState) return unchanged(state);
@@ -524,12 +472,10 @@ function grantActivityEnergyBatch(state: MergeWorldState, rewards: Array<{ recei
     energy: { ...state.energy, value: energyValue },
     processedActivityReceiptIds: [...processed],
     activityEnergyByDay,
-    generators,
-    processedGeneratorChargeGrantIds: [...chargeGrantIds],
+    rewardInbox,
   }, now), actualEnergyAward > 0
-    ? `Real life added ${actualEnergyAward} Merge Energy${pantryStockAdded ? ' and stocked the Pantry.' : '.'}`
-    : pantryStockAdded ? 'Your food journal stocked the Pantry.'
-      : pantryGrantProcessed ? 'Your Pantry is already full.' : undefined);
+    ? `Real life added ${actualEnergyAward} Merge Energy${basketAdded ? ' and a Pantry Basket.' : '.'}`
+    : basketAdded ? 'Your Pantry Basket is waiting in Merge World.' : undefined);
 }
 
 function rerollOrder(state: MergeWorldState, orderId: string, now: number): MergeWorldCommandResult {
@@ -576,8 +522,11 @@ function reconcileStory(
   const servedStoryOrderIds = new Set(state.externalRewardReceipts
     .filter((receipt) => receipt.kind === 'story_order_served')
     .map((receipt) => receipt.id.replace('merge-story-served:', '')));
+  for (const orderId of story.servedOrderIds ?? []) servedStoryOrderIds.add(orderId);
   const wanted = story.status === 'order_active'
-    ? feastleStoryOrders(story.targetLevel, now).filter((order) => !servedStoryOrderIds.has(order.id))
+    ? feastleStoryOrders(story.targetLevel, now, story.actPhase, story.orderTemplateKeys)
+        .filter((order) => !servedStoryOrderIds.has(order.id))
+        .slice(0, story.actPhase === 'regular_orders' ? 3 : undefined)
     : [];
   // Ownership unlocks a character, but only an authored story beat may create
   // an order. Generic legacy orders are removed during story reconciliation.
@@ -586,17 +535,61 @@ function reconcileStory(
   if (activeOrders.length !== state.activeOrders.length || activeOrders.some((order, index) => order.id !== state.activeOrders[index]?.id)) {
     next = { ...next, activeOrders };
   }
-  const starterChargeGrantId = 'story-charge:feastle:starter-pantry';
-  if (story.starterParcelGranted && !next.processedGeneratorChargeGrantIds.includes(starterChargeGrantId) && next.generators['starter-pantry']) {
-    next = {
-      ...next,
-      processedGeneratorChargeGrantIds: [...next.processedGeneratorChargeGrantIds, starterChargeGrantId],
-    };
-  }
   return next === state ? state : touch(next, now);
 }
 
-function feastleStoryOrders(targetLevel: number, now: number): MergeOrder[] {
+function feastleStoryOrders(targetLevel: number, now: number, actPhase?: string, orderTemplateKeys: string[] = []): MergeOrder[] {
+  if (actPhase === 'regular_orders') {
+    return orderTemplateKeys.flatMap((key, index) => {
+      const template = FEASTLE_ACT_TWO_ORDER_POOL.find((item) => item.key === key);
+      if (!template) return [];
+      const energy = template.difficulty === 'small' ? 2 : template.difficulty === 'medium' ? 3 : 5;
+      return [{
+        id: `merge-story:feastle:act-2:${template.key}`,
+        characterId: 'feastle' as const,
+        title: template.title,
+        description: template.description,
+        narrativeSignal: template.signal,
+        difficulty: template.difficulty,
+        requirements: [
+          { definitionId: template.definitionId, quantity: 1 },
+          ...('secondaryDefinitionId' in template
+            ? [{ definitionId: template.secondaryDefinitionId, quantity: 1 }]
+            : []),
+        ],
+        reward: { coins: 24 + index * 4, mergeXp: 18 + index * 3, friendshipXp: 8, energy },
+        createdAt: now,
+        signature: false,
+        purpose: 'normal' as const,
+        storyArcId: 'feastle:table-story',
+        storyBeatId: 'feastle:act-2:regular-orders',
+        storyTargetLevel: 7,
+        storyStep: index + 1,
+        storyStepCount: orderTemplateKeys.length,
+      }];
+    });
+  }
+  if (actPhase === 'signature_order') {
+    return [{
+      id: 'merge-story:feastle:act-2:first-feast',
+      characterId: 'feastle',
+      title: "Feastle's First Feast",
+      description: 'A generous centrepiece made from everything the table has taught us.',
+      narrativeSignal: 'connection',
+      difficulty: 'major',
+      requirements: [{ definitionId: 'food:table:6', quantity: 1 }, { definitionId: 'food:table:3', quantity: 1 }],
+      reward: { coins: 80, mergeXp: 60, friendshipXp: 30, energy: 5 },
+      createdAt: now,
+      signature: true,
+      purpose: 'signature',
+      chapterId: 'feastle-chapter-8',
+      storyArcId: 'feastle:table-story',
+      storyBeatId: 'feastle:act-2:signature',
+      storyTargetLevel: 8,
+      storyStep: 1,
+      storyStepCount: 1,
+    }];
+  }
   if (targetLevel === 4) {
     const dishes = FEASTLE_STORY_REQUESTS[4];
     return dishes.map((dish, index) => ({
@@ -611,7 +604,7 @@ function feastleStoryOrders(targetLevel: number, now: number): MergeOrder[] {
       storyTargetLevel: 4, storyStep: index + 1, storyStepCount: dishes.length,
     }));
   }
-  const request = FEASTLE_STORY_REQUESTS[targetLevel]?.[0] ?? FEASTLE_STORY_REQUESTS[2][0];
+  const request = FEASTLE_STORY_REQUESTS[targetLevel]?.[0] ?? scaledFeastleRequest(targetLevel);
   const spec = { ...request, friendshipXp: targetLevel === 2 ? 20 : 30 };
   return [{
     id: `merge-story:feastle:chapter-1:level-${targetLevel}`,
@@ -624,6 +617,11 @@ function feastleStoryOrders(targetLevel: number, now: number): MergeOrder[] {
     storyArcId: 'feastle:table-story', storyBeatId: `feastle-story:level-${targetLevel - 1}`,
     storyTargetLevel: targetLevel, storyStep: 1, storyStepCount: 1,
   }];
+}
+
+function scaledFeastleRequest(targetLevel: number) {
+  const tier = targetLevel >= 16 ? 6 : targetLevel >= 12 ? 5 : targetLevel >= 8 ? 4 : 3;
+  return { title: 'A village table request', definitionId: `food:table:${tier}`, quantity: targetLevel >= 16 ? 2 : 1 };
 }
 
 function ensureGenerator(state: MergeWorldState, generatorId: string, now: number): MergeWorldState {
@@ -670,7 +668,6 @@ function applyDiscovery(state: MergeWorldState, definitionId: string, now: numbe
       coins: state.coins + 5,
       mergeXp,
       mergeLevel: mergeLevelForXp(mergeXp),
-      energy: { ...state.energy, value: Math.min(state.energy.cap, state.energy.value + 1) },
     }, now),
     newDiscovery: true,
   };
@@ -690,14 +687,7 @@ function refreshTime(state: MergeWorldState, now: number): MergeWorldState {
     energy = { ...energy, lastRegenAt: now };
     changedState = true;
   }
-  const generators = { ...state.generators };
-  for (const generator of Object.values(generators)) {
-    if (generator.readyAt != null && now >= generator.readyAt) {
-      generators[generator.id] = { ...generator, charges: generator.maxCharges, readyAt: null };
-      changedState = true;
-    }
-  }
-  return changedState ? touch({ ...state, energy, generators }, now) : state;
+  return changedState ? touch({ ...state, energy }, now) : state;
 }
 
 function generatorState(id: string): MergeGeneratorState {
@@ -706,9 +696,6 @@ function generatorState(id: string): MergeGeneratorState {
     id: definition.id,
     familyId: definition.familyId,
     name: definition.name,
-    charges: Math.max(0, Math.min(MERGE_GENERATOR_CHARGES, definition.initialCharges ?? MERGE_GENERATOR_CHARGES)),
-    maxCharges: MERGE_GENERATOR_CHARGES,
-    readyAt: null,
     level: 1,
     enabledBranches: [...definition.baseBranches],
   };
@@ -810,23 +797,26 @@ function uniqueGeneratorUnlockReceipts(value: unknown): MergeWorldState['generat
   return [...byId.values()];
 }
 
-function addGeneratorCharges(
-  generators: MergeWorldState['generators'],
-  generatorId: string,
-  amount: number,
-): MergeWorldState['generators'] {
-  const generator = generators[generatorId];
-  if (!generator || amount <= 0) return generators;
-  const charges = Math.min(generator.maxCharges, generator.charges + amount);
-  if (charges === generator.charges && generator.readyAt == null) return generators;
+function normalizeGenerator(value: unknown, id: string): MergeGeneratorState {
+  const fallback = generatorState(id);
+  if (!value || typeof value !== 'object') return fallback;
+  const generator = value as Partial<MergeGeneratorState>;
   return {
-    ...generators,
-    [generatorId]: {
-      ...generator,
-      charges,
-      readyAt: null,
-    },
+    id: typeof generator.id === 'string' ? generator.id : fallback.id,
+    familyId: generator.familyId === 'food' || generator.familyId === 'nature' || generator.familyId === 'adventure'
+      ? generator.familyId
+      : fallback.familyId,
+    name: typeof generator.name === 'string' ? generator.name : fallback.name,
+    level: Math.max(1, Math.floor(finite(generator.level, 1))),
+    enabledBranches: uniqueStrings(generator.enabledBranches).length
+      ? uniqueStrings(generator.enabledBranches)
+      : fallback.enabledBranches,
   };
+}
+
+function orderEnergyRefund(order: MergeOrder): number {
+  if (order.signature || order.purpose === 'signature') return 5;
+  return order.difficulty === 'medium' ? 3 : order.difficulty === 'major' ? 5 : 2;
 }
 
 function normalizeOrder(value: MergeOrder): MergeOrder {

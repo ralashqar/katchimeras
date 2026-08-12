@@ -1,5 +1,17 @@
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
-import { accumulateQuietBond, nextFeastleBundleOrderId } from '@/utils/companion-story';
+import { accumulateQuietBond, nextFeastleBundleOrderId, selectFeastleActTwoOrderKeys } from '@/utils/companion-story';
+
+export type FeastleActId = 'act-1' | 'act-2' | 'act-3' | 'act-4' | 'act-5';
+export type FeastleActPhase = 'opening' | 'regular_orders' | 'midpoint_return' | 'insight_return' | 'signature_order' | 'finale_return' | 'complete';
+export type FeastleStorySignalValue = 'ease' | 'comfort' | 'connection' | 'curiosity';
+export type FeastleStorySignal = {
+  id: string;
+  sourceType: 'conversation' | 'journal' | 'order';
+  sourceId: string;
+  value: FeastleStorySignalValue;
+  recordedAt: number;
+};
+export type FeastleOrderDeck = { actId: FeastleActId; seed: string; requiredCount: number; templateKeys: string[]; servedOrderIds: string[] };
 
 export type CompanionStoryStatus =
   | 'intro_available'
@@ -20,38 +32,46 @@ export type CompanionStoryArc = {
   activeOrderId: string | null;
   pendingConversationId: string | null;
   unreadReturn: boolean;
-  starterParcelGranted: boolean;
   completedBeatIds: string[];
   completedOrderIds: string[];
   pendingBondPoints: number;
   processedQuietBondReceiptIds: string[];
   journalFtueStatus: 'not_started' | 'saved' | 'skipped';
   journalFtueRecordId: string | null;
+  currentActId: FeastleActId;
+  actPhase: FeastleActPhase;
+  orderDeck: FeastleOrderDeck | null;
+  storySignals: FeastleStorySignal[];
+  relevantJournalRecordIds: string[];
+  confirmedMemoryKeys: string[];
+  completedActIds: FeastleActId[];
   updatedAt: number;
 };
 
-type CompanionStoryState = { schemaVersion: 2; arcs: CompanionStoryArc[] };
+type CompanionStoryState = { schemaVersion: 3; arcs: CompanionStoryArc[] };
 
 const STORAGE_KEY = 'katchadeck.companion-stories-v1';
 const listeners = new Set<() => void>();
 
 export function freshFeastleStory(now = Date.now()): CompanionStoryArc {
   return {
-    id: 'feastle:table-story', familyId: 'feastle', version: 2,
+    id: 'feastle:table-story', familyId: 'feastle', version: 3,
     currentLevel: 1, targetLevel: 2, beatId: 'feastle-story:level-1',
     status: 'intro_available', activeOrderId: null, pendingConversationId: null,
-    unreadReturn: false, starterParcelGranted: false,
+    unreadReturn: false,
     completedBeatIds: [], completedOrderIds: [], pendingBondPoints: 0,
     processedQuietBondReceiptIds: [], updatedAt: now,
     journalFtueStatus: 'not_started', journalFtueRecordId: null,
+    currentActId: 'act-1', actPhase: 'opening', orderDeck: null,
+    storySignals: [], relevantJournalRecordIds: [], confirmedMemoryKeys: [], completedActIds: [],
   };
 }
 
 function normalize(value: unknown): CompanionStoryState {
-  if (!value || typeof value !== 'object') return { schemaVersion: 2, arcs: [] };
+  if (!value || typeof value !== 'object') return { schemaVersion: 3, arcs: [] };
   const candidate = value as Partial<CompanionStoryState>;
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     arcs: Array.isArray(candidate.arcs) ? candidate.arcs.filter((arc): arc is CompanionStoryArc => Boolean(
       arc && typeof arc.id === 'string' && typeof arc.familyId === 'string' && typeof arc.status === 'string'
     )).map((arc) => ({
@@ -60,13 +80,20 @@ function normalize(value: unknown): CompanionStoryState {
       processedQuietBondReceiptIds: Array.isArray(arc.processedQuietBondReceiptIds)
         ? [...new Set(arc.processedQuietBondReceiptIds.filter((id): id is string => typeof id === 'string'))]
         : [],
-      version: 2,
+      version: 3,
       journalFtueStatus: arc.journalFtueStatus === 'saved' || arc.journalFtueStatus === 'skipped'
         ? arc.journalFtueStatus
         : arc.currentLevel >= 3 || arc.completedBeatIds?.includes('feastle-story:level-2')
           ? 'skipped'
           : 'not_started',
       journalFtueRecordId: typeof arc.journalFtueRecordId === 'string' ? arc.journalFtueRecordId : null,
+      currentActId: isActId(arc.currentActId) ? arc.currentActId : arc.currentLevel >= 5 ? 'act-2' : 'act-1',
+      actPhase: isActPhase(arc.actPhase) ? arc.actPhase : arc.status === 'chapter_complete' ? 'complete' : 'opening',
+      orderDeck: normalizeOrderDeck(arc.orderDeck),
+      storySignals: Array.isArray(arc.storySignals) ? arc.storySignals.filter(isStorySignal) : [],
+      relevantJournalRecordIds: uniqueStrings(arc.relevantJournalRecordIds),
+      confirmedMemoryKeys: uniqueStrings(arc.confirmedMemoryKeys),
+      completedActIds: uniqueStrings(arc.completedActIds).filter(isActId),
     })) : [],
   };
 }
@@ -88,7 +115,7 @@ export function markFeastleJournalFtue(
 }
 
 export function loadCompanionStoryState(): CompanionStoryState {
-  return normalize(getStoredJson<CompanionStoryState>(STORAGE_KEY, { schemaVersion: 2, arcs: [] }));
+  return normalize(getStoredJson<CompanionStoryState>(STORAGE_KEY, { schemaVersion: 3, arcs: [] }));
 }
 
 function saveState(state: CompanionStoryState) {
@@ -110,9 +137,46 @@ export function beginFeastleStory(now = Date.now()): CompanionStoryArc {
   const current = loadFeastleStory();
   if (current.status !== 'intro_available') return current;
   return saveFeastleStory({
-    ...current, status: 'order_active', starterParcelGranted: true,
+    ...current, status: 'order_active',
     beatId: 'feastle-story:level-1', targetLevel: 2, updatedAt: now,
   });
+}
+
+export function beginFeastleActTwo(now = Date.now()): CompanionStoryArc {
+  const current = loadFeastleStory();
+  if (current.currentActId !== 'act-1' || current.status !== 'chapter_complete') return current;
+  return saveFeastleStory({
+    ...current,
+    currentActId: 'act-2', actPhase: 'opening', status: 'conversation_active',
+    targetLevel: 5, pendingConversationId: 'feastle:friendship:5', unreadReturn: false, updatedAt: now,
+  });
+}
+
+export function recordFeastleJournalEvidence(recordId: string, signal?: FeastleStorySignalValue | null, now = Date.now()): CompanionStoryArc {
+  const current = loadFeastleStory();
+  const relevantJournalRecordIds = [...new Set([...current.relevantJournalRecordIds, recordId])];
+  const storySignals = signal && !current.storySignals.some((item) => item.id === `journal:${recordId}`)
+    ? [...current.storySignals, { id: `journal:${recordId}`, sourceType: 'journal' as const, sourceId: recordId, value: signal, recordedAt: now }]
+    : current.storySignals;
+  if (relevantJournalRecordIds.length === current.relevantJournalRecordIds.length && storySignals === current.storySignals) return current;
+  return saveFeastleStory({ ...current, relevantJournalRecordIds, storySignals, updatedAt: now });
+}
+
+export function recordFeastleStorySignal(sourceId: string, value: FeastleStorySignalValue, now = Date.now()): CompanionStoryArc {
+  const current = loadFeastleStory();
+  const id = `conversation:${sourceId}`;
+  if (current.storySignals.some((signal) => signal.id === id)) return current;
+  return saveFeastleStory({
+    ...current,
+    storySignals: [...current.storySignals, { id, sourceType: 'conversation', sourceId, value, recordedAt: now }],
+    updatedAt: now,
+  });
+}
+
+export function recordFeastleConfirmedMemory(memoryKey: string, now = Date.now()): CompanionStoryArc {
+  const current = loadFeastleStory();
+  if (current.confirmedMemoryKeys.includes(memoryKey)) return current;
+  return saveFeastleStory({ ...current, confirmedMemoryKeys: [...current.confirmedMemoryKeys, memoryKey], updatedAt: now });
 }
 
 export function markFeastleOrderActive(orderId: string, now = Date.now()): CompanionStoryArc {
@@ -137,6 +201,27 @@ export function markFeastleOrderServed(orderId: string, targetLevel: number, now
   const current = loadFeastleStory();
   if (current.completedOrderIds.includes(orderId)) return current;
   const completedOrderIds = [...current.completedOrderIds, orderId];
+  if (current.currentActId === 'act-2' && current.orderDeck) {
+    const servedOrderIds = [...new Set([...current.orderDeck.servedOrderIds, orderId])];
+    const orderDeck = { ...current.orderDeck, servedOrderIds };
+    if (current.actPhase === 'signature_order' || targetLevel === 8) return saveFeastleStory({
+      ...current, currentLevel: 8, targetLevel: 8, status: 'return_available', actPhase: 'finale_return',
+      activeOrderId: null, pendingConversationId: 'feastle:friendship:8', unreadReturn: true,
+      completedOrderIds, orderDeck, updatedAt: now,
+    });
+    const regularServed = servedOrderIds.filter((id) => id.startsWith('merge-story:feastle:act-2:')).length;
+    if (regularServed === 2 && current.currentLevel < 6) return saveFeastleStory({
+      ...current, currentLevel: 6, targetLevel: 6, status: 'return_available', actPhase: 'midpoint_return',
+      activeOrderId: null, pendingConversationId: 'feastle:friendship:6', unreadReturn: true,
+      completedOrderIds, orderDeck, updatedAt: now,
+    });
+    if (regularServed >= current.orderDeck.requiredCount) return saveFeastleStory({
+      ...current, currentLevel: 7, targetLevel: 7, status: 'return_available', actPhase: 'insight_return',
+      activeOrderId: null, pendingConversationId: 'feastle:friendship:7', unreadReturn: true,
+      completedOrderIds, orderDeck, updatedAt: now,
+    });
+    return saveFeastleStory({ ...current, status: 'order_active', activeOrderId: null, completedOrderIds, orderDeck, updatedAt: now });
+  }
   const bundlePrefix = `merge-story:feastle:chapter-1:level-${targetLevel}:order-`;
   const completedBundleSteps = completedOrderIds.filter((id) => id.startsWith(bundlePrefix)).length;
   if (storyStepCount > 1 && completedBundleSteps < storyStepCount) {
@@ -176,9 +261,34 @@ export function completeFeastleConversation(level: number, now = Date.now()): Co
   const beatId = `feastle-story:level-${level}`;
   if (current.status !== 'conversation_active' || current.pendingConversationId !== `feastle:friendship:${level}`) return current;
   if (current.completedBeatIds.includes(beatId)) return current;
-  if (level >= 4) return saveFeastleStory({
+  if (level === 4) return saveFeastleStory({
     ...current, currentLevel: 4, targetLevel: 4, beatId,
-    status: 'chapter_complete', pendingConversationId: null, unreadReturn: false, pendingBondPoints: 0,
+    status: 'chapter_complete', actPhase: 'complete', pendingConversationId: null, unreadReturn: false, pendingBondPoints: 0,
+    completedActIds: [...new Set([...current.completedActIds, 'act-1' as const])], completedBeatIds: [...current.completedBeatIds, beatId], updatedAt: now,
+  });
+  if (level === 5) {
+    const seed = `feastle:act-2:${now}`;
+    return saveFeastleStory({
+      ...current, currentLevel: 5, targetLevel: 6, beatId, status: 'order_active', actPhase: 'regular_orders',
+      activeOrderId: null, pendingConversationId: null, unreadReturn: false, pendingBondPoints: 0,
+      orderDeck: { actId: 'act-2', seed, requiredCount: 5, templateKeys: selectFeastleActTwoOrderKeys(seed), servedOrderIds: [] },
+      completedBeatIds: [...current.completedBeatIds, beatId], updatedAt: now,
+    });
+  }
+  if (level === 6) return saveFeastleStory({
+    ...current, currentLevel: 6, targetLevel: 6, beatId, status: 'order_active', actPhase: 'regular_orders',
+    activeOrderId: null, pendingConversationId: null, unreadReturn: false, pendingBondPoints: 0,
+    completedBeatIds: [...current.completedBeatIds, beatId], updatedAt: now,
+  });
+  if (level === 7) return saveFeastleStory({
+    ...current, currentLevel: 7, targetLevel: 8, beatId, status: 'order_active', actPhase: 'signature_order',
+    activeOrderId: null, pendingConversationId: null, unreadReturn: false, pendingBondPoints: 0,
+    completedBeatIds: [...current.completedBeatIds, beatId], updatedAt: now,
+  });
+  if (level === 8) return saveFeastleStory({
+    ...current, currentLevel: 8, targetLevel: 8, beatId, status: 'chapter_complete', actPhase: 'complete',
+    activeOrderId: null, pendingConversationId: null, unreadReturn: false, pendingBondPoints: 0,
+    completedActIds: [...new Set([...current.completedActIds, 'act-2' as const])],
     completedBeatIds: [...current.completedBeatIds, beatId], updatedAt: now,
   });
   return saveFeastleStory({
@@ -190,7 +300,35 @@ export function completeFeastleConversation(level: number, now = Date.now()): Co
 }
 
 export function resetCompanionStoriesForDebug(): void {
-  saveState({ schemaVersion: 2, arcs: [] });
+  saveState({ schemaVersion: 3, arcs: [] });
+}
+
+function uniqueStrings(value: unknown): string[] {
+  return Array.isArray(value) ? [...new Set(value.filter((item): item is string => typeof item === 'string'))] : [];
+}
+
+function isActId(value: unknown): value is FeastleActId {
+  return value === 'act-1' || value === 'act-2' || value === 'act-3' || value === 'act-4' || value === 'act-5';
+}
+
+function isActPhase(value: unknown): value is FeastleActPhase {
+  return value === 'opening' || value === 'regular_orders' || value === 'midpoint_return' || value === 'insight_return' || value === 'signature_order' || value === 'finale_return' || value === 'complete';
+}
+
+function normalizeOrderDeck(value: unknown): FeastleOrderDeck | null {
+  if (!value || typeof value !== 'object') return null;
+  const deck = value as Partial<FeastleOrderDeck>;
+  if (!isActId(deck.actId) || typeof deck.seed !== 'string') return null;
+  return { actId: deck.actId, seed: deck.seed, requiredCount: Math.max(1, Math.floor(deck.requiredCount ?? 5)), templateKeys: uniqueStrings(deck.templateKeys), servedOrderIds: uniqueStrings(deck.servedOrderIds) };
+}
+
+function isStorySignal(value: unknown): value is FeastleStorySignal {
+  if (!value || typeof value !== 'object') return false;
+  const signal = value as Partial<FeastleStorySignal>;
+  return typeof signal.id === 'string' && typeof signal.sourceId === 'string'
+    && (signal.sourceType === 'conversation' || signal.sourceType === 'journal' || signal.sourceType === 'order')
+    && (signal.value === 'ease' || signal.value === 'comfort' || signal.value === 'connection' || signal.value === 'curiosity')
+    && typeof signal.recordedAt === 'number';
 }
 
 export function setFeastleStoryStateForDebug(status: CompanionStoryStatus, level: number, now = Date.now()): CompanionStoryArc {
@@ -199,7 +337,7 @@ export function setFeastleStoryStateForDebug(status: CompanionStoryStatus, level
     ...freshFeastleStory(now), currentLevel: level, targetLevel,
     beatId: `feastle-story:level-${Math.max(1, level)}`, status,
     pendingConversationId: status === 'return_available' ? `feastle:friendship:${level}` : null,
-    unreadReturn: status === 'return_available', starterParcelGranted: status !== 'intro_available', updatedAt: now,
+    unreadReturn: status === 'return_available', updatedAt: now,
   });
 }
 

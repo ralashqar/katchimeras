@@ -149,7 +149,8 @@ const chapterOneDefinitions: readonly ConversationDefinition[] = [
         body: 'Choose what found a place at your table. A meal, snack, drink, or something you made all count—and ordinary counts too.',
         flowId: 'food',
         allowedChoiceIds: ['meal', 'snack', 'dessert', 'coffee', 'tea', 'drink', 'cooking', 'other_food'],
-        saveLabel: 'Add to the Egg', rewardGrowth: 20, rewardPantryCharges: 6,
+        saveLabel: 'Add to the Egg', rewardGrowth: 20, rewardMergeEnergy: 8,
+        rewardItemIds: ['food:table:1', 'food:table:1'],
         nextNodeId: 'busy-day',
       },
       { id: 'busy-day', kind: 'choice', phase: 'deepen', prompt: 'And when the day gets a bit wobbly, what helps food actually happen?', options: [
@@ -209,7 +210,109 @@ const chapterOneDefinitions: readonly ConversationDefinition[] = [
   },
 ];
 
+const actTwoDefinitions: readonly ConversationDefinition[] = [
+  {
+    id: 'feastle:friendship:5', version: 2, familyId: 'feastle', title: 'The village order bell',
+    trigger: 'bond', triggerSourceIds: ['friendship-level:5'], minimumBondLevel: 1, minimumFriendshipLevel: 5,
+    cooldownDays: 3650, contextualOnly: true, format: 'narrative', tags: ['friendship', 'story', 'act-two'], entryNodeId: 'bell',
+    nodes: [
+      { id: 'bell', kind: 'choice', phase: 'explore', prompt: 'The village has discovered our table. Five requests just arrived. What should every order feel like?', options: [
+        { id: 'ease', label: 'Easy to receive', reply: 'Then no plate needs to prove anything. It only needs to meet the day.', nextNodeId: 'remember-ease' },
+        { id: 'comfort', label: 'Warm and familiar', reply: 'A little recognition can be part of the meal.', nextNodeId: 'remember-comfort' },
+        { id: 'connection', label: 'Made for sharing', reply: 'Good. We will count chairs before I promise them this time.', nextNodeId: 'remember-connection' },
+        { id: 'curiosity', label: 'A small surprise', reply: 'One adventurous spoonful. The rest can remain trustworthy.', nextNodeId: 'remember-curiosity' },
+      ] },
+      ...(['ease', 'comfort', 'connection', 'curiosity'] as const).map((signal) => ({
+        id: `remember-${signal}`, kind: 'memory_proposal' as const,
+        prompt: 'Shall I keep that as a preference for our table?',
+        summary: signal === 'ease' ? 'Food feels kinder when it is easy to receive.' : signal === 'comfort' ? 'Familiar food can create warmth and comfort.' : signal === 'connection' ? 'Shared food and company help a meal feel meaningful.' : 'A small, optional surprise can make food more interesting.',
+        memoryKey: `feastle:signal:${signal}`, memoryKind: 'preference' as const, sensitivity: 'ordinary' as const, nextNodeId: 'end',
+      })),
+      { id: 'end', kind: 'end', message: 'The order bell is open. Serve five villagers at your own pace; I will keep three requests on the table at a time.' },
+    ],
+  },
+  {
+    id: 'feastle:friendship:6', version: 2, familyId: 'feastle', title: 'Two plates in',
+    trigger: 'bond', triggerSourceIds: ['friendship-level:6'], minimumBondLevel: 1, minimumFriendshipLevel: 6,
+    cooldownDays: 3650, contextualOnly: true, format: 'narrative', tags: ['friendship', 'story', 'journal'], entryNodeId: 'pause',
+    nodes: [
+      { id: 'pause', kind: 'choice', phase: 'explore', prompt: 'Two villagers have eaten and the spoons are taking minutes. Has food felt notable in your own day?', options: [
+        { id: 'easy', label: 'Something was easy', reply: 'Ease is useful evidence, even when it looks ordinary.', nextNodeId: 'remember-easy' },
+        { id: 'comfort', label: 'Something was comforting', reply: 'Then the moment carried more than ingredients.', nextNodeId: 'remember-comfort' },
+        { id: 'journal', label: 'Open Today (optional)', reply: 'Let us give the Egg that little piece of the day—or leave the page quiet if you prefer.', nextNodeId: 'journal' },
+      ] },
+      { id: 'remember-easy', kind: 'memory_proposal', prompt: 'Keep this as a small clue?', summary: 'An easy food option helped today.', memoryKey: 'feastle:signal:ease', memoryKind: 'shared_moment', sensitivity: 'ordinary', nextNodeId: 'end' },
+      { id: 'remember-comfort', kind: 'memory_proposal', prompt: 'Keep this as a small clue?', summary: 'A food moment brought some comfort today.', memoryKey: 'feastle:signal:comfort', memoryKind: 'shared_moment', sensitivity: 'ordinary', nextNodeId: 'end' },
+      { id: 'journal', kind: 'journal_handoff', prompt: 'Add only what feels worth keeping.', title: "Today's table", body: 'Choose the food moment that stood out. Ordinary meals, snacks, drinks, and cooking all count.', flowId: 'food', allowedChoiceIds: ['meal', 'snack', 'dessert', 'coffee', 'tea', 'drink', 'cooking', 'other_food'], saveLabel: 'Add to the Egg', rewardGrowth: 20, rewardMergeEnergy: 8, rewardItemIds: ['food:table:1', 'food:table:1'], nextNodeId: 'end' },
+      { id: 'end', kind: 'end', message: 'The remaining requests are waiting, not rushing. Come back when the Pantry feels ready.' },
+    ],
+  },
+  {
+    id: 'feastle:friendship:7', version: 2, familyId: 'feastle', title: 'What your table needs',
+    trigger: 'bond', triggerSourceIds: ['friendship-level:7'], minimumBondLevel: 1, minimumFriendshipLevel: 7,
+    cooldownDays: 3650, contextualOnly: true, format: 'insight_game', tags: ['friendship', 'story', 'insight'], entryNodeId: 'game',
+    nodes: [
+      { id: 'game', kind: 'insight_game', title: 'What your table needs', revealNodeId: 'reveal', questions: [
+        { id: 'busy', prompt: 'On a crowded day, which plate helps most?', options: [
+          { id: 'ease-busy', label: 'The easiest available', reply: 'Less friction leaves room for the rest of the day.', nextNodeId: null },
+          { id: 'comfort-busy', label: 'Something I know well', reply: 'Familiarity can be a landing place.', nextNodeId: null },
+          { id: 'connection-busy', label: 'Whatever can be shared', reply: 'Company changes the shape of the task.', nextNodeId: null },
+          { id: 'curiosity-busy', label: 'One change from the usual', reply: 'A small surprise can wake up an ordinary day.', nextNodeId: null },
+        ] },
+        { id: 'memory', prompt: 'What usually makes a meal memorable?', options: [
+          { id: 'ease-memory', label: 'It arrived at the right time', reply: 'Timing can be its own kind of care.', nextNodeId: null },
+          { id: 'comfort-memory', label: 'The familiar taste', reply: 'Recognition lives in flavour.', nextNodeId: null },
+          { id: 'connection-memory', label: 'Who was there', reply: 'The people become part of the dish.', nextNodeId: null },
+          { id: 'curiosity-memory', label: 'Something unexpected', reply: 'The surprise gave the moment an outline.', nextNodeId: null },
+        ] },
+        { id: 'tomorrow', prompt: 'What would make tomorrow’s food feel kinder?', options: [
+          { id: 'ease-tomorrow', label: 'One fewer decision', reply: 'A small reduction can be real support.', nextNodeId: null },
+          { id: 'comfort-tomorrow', label: 'A dependable option', reply: 'Something known can hold its place for you.', nextNodeId: null },
+          { id: 'connection-tomorrow', label: 'Help or company', reply: 'A table need not be built alone.', nextNodeId: null },
+          { id: 'curiosity-tomorrow', label: 'A tiny experiment', reply: 'Curiosity works best without pressure.', nextNodeId: null },
+        ] },
+        { id: 'welcome', prompt: 'A guest arrives unexpectedly. What belongs on the table first?', options: [
+          { id: 'ease-welcome', label: 'Whatever is already available', reply: 'Welcome does not require a performance.', nextNodeId: null },
+          { id: 'comfort-welcome', label: 'A familiar favourite', reply: 'Recognition can help someone settle.', nextNodeId: null },
+          { id: 'connection-welcome', label: 'An extra chair', reply: 'Belonging begins before the food does.', nextNodeId: null },
+          { id: 'curiosity-welcome', label: 'Something to discover together', reply: 'A shared surprise can start the conversation.', nextNodeId: null },
+        ] },
+        { id: 'enough', prompt: 'How do you know a food moment has done enough?', options: [
+          { id: 'ease-enough', label: 'It made the next hour easier', reply: 'Practical support is a real outcome.', nextNodeId: null },
+          { id: 'comfort-enough', label: 'I feel a little more settled', reply: 'A softer landing is enough.', nextNodeId: null },
+          { id: 'connection-enough', label: 'Someone felt cared for', reply: 'Care can be the measure.', nextNodeId: null },
+          { id: 'curiosity-enough', label: 'I noticed something new', reply: 'Attention gave the moment value.', nextNodeId: null },
+        ] },
+      ] },
+      { id: 'reveal', kind: 'insight_reveal', title: 'What Feastle noticed', insightKey: 'table-needs', category: 'Food & nourishment', nextNodeId: 'end', results: [
+        { id: 'ease', title: 'A Low-Friction Table', reflection: 'Your best food support often removes a decision or makes the next step visible.', summary: 'Ease and access are meaningful parts of nourishment for you, especially when capacity is limited.', emblemId: 'feastle-table-ease', matchOptionIds: ['ease-busy', 'ease-memory', 'ease-tomorrow', 'ease-welcome', 'ease-enough'] },
+        { id: 'comfort', title: 'A Familiar Landing', reflection: 'Dependable food can make a demanding day feel more navigable.', summary: 'Familiar tastes and reliable options often bring comfort and steadiness to your table.', emblemId: 'feastle-table-comfort', matchOptionIds: ['comfort-busy', 'comfort-memory', 'comfort-tomorrow', 'comfort-welcome', 'comfort-enough'] },
+        { id: 'connection', title: 'A Shared Table', reflection: 'Food becomes more meaningful when care, help, or company is part of it.', summary: 'Connection is an important ingredient in how meals support you.', emblemId: 'feastle-table-connection', matchOptionIds: ['connection-busy', 'connection-memory', 'connection-tomorrow', 'connection-welcome', 'connection-enough'] },
+        { id: 'curiosity', title: 'A Curious Spoonful', reflection: 'Small surprises keep food interesting when they remain optional.', summary: 'You value low-pressure novelty: enough to invite curiosity without making food harder.', emblemId: 'feastle-table-curiosity', matchOptionIds: ['curiosity-busy', 'curiosity-memory', 'curiosity-tomorrow', 'curiosity-welcome', 'curiosity-enough'] },
+      ] },
+      { id: 'end', kind: 'end', message: 'I have one final request of my own now: let us make our first feast.' },
+    ],
+  },
+  {
+    id: 'feastle:friendship:8', version: 2, familyId: 'feastle', title: "Feastle's First Feast",
+    trigger: 'bond', triggerSourceIds: ['feastle-chapter-8'], minimumBondLevel: 1, minimumFriendshipLevel: 8,
+    cooldownDays: 3650, contextualOnly: true, format: 'narrative', tags: ['friendship', 'chapter', 'story'], entryNodeId: 'feast',
+    nodes: [
+      { id: 'feast', kind: 'choice', phase: 'resolve', prompt: 'The table is full. What made this feel like a feast rather than simply more food?', options: [
+        { id: 'care', label: 'The care behind it', reply: 'The effort became part of what was served.', nextNodeId: 'remember-care' },
+        { id: 'company', label: 'The company', reply: 'A table changes when people feel welcome at it.', nextNodeId: 'remember-company' },
+        { id: 'moment', label: 'Marking the moment', reply: 'Giving a moment a name can make it easier to remember.', nextNodeId: 'remember-moment' },
+      ] },
+      { id: 'remember-care', kind: 'memory_proposal', prompt: 'Keep this first feast in our Recipe Book?', summary: 'Our first feast mattered because of the care behind it.', memoryKey: 'feastle:first-feast:care', memoryKind: 'milestone', sensitivity: 'ordinary', nextNodeId: 'end' },
+      { id: 'remember-company', kind: 'memory_proposal', prompt: 'Keep this first feast in our Recipe Book?', summary: 'Our first feast became meaningful through company and welcome.', memoryKey: 'feastle:first-feast:company', memoryKind: 'milestone', sensitivity: 'ordinary', nextNodeId: 'end' },
+      { id: 'remember-moment', kind: 'memory_proposal', prompt: 'Keep this first feast in our Recipe Book?', summary: 'Our first feast gave an ordinary moment a name worth remembering.', memoryKey: 'feastle:first-feast:moment', memoryKind: 'milestone', sensitivity: 'ordinary', nextNodeId: 'end' },
+      { id: 'end', kind: 'end', message: 'I thought the feast would prove I could cook. It proved a table is something we make together.' },
+    ],
+  },
+];
+
 export const feastleFriendshipConversationDefinitions: readonly ConversationDefinition[] = [
   ...chapterOneDefinitions,
-  ...beats.map(definitionForBeat),
+  ...actTwoDefinitions,
+  ...beats.filter((beat) => beat.level > 8).map(definitionForBeat),
 ];
