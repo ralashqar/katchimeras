@@ -6,6 +6,7 @@ import {
   companionConversationDefinitionsForFamily,
   companionConversationDefinitionsV2,
 } from '@/constants/companion-conversations-v2';
+import { FEASTLE_FIRST_MEETING_DEFINITION_ID } from '@/constants/feastle-friendship-conversations';
 import { katchimeraFamilyById, katchimeraSkinById } from '@/constants/katchimera-skins';
 import { companionQuickGoalTemplateById, quickGoalTemplatesForFamily } from '@/constants/companion-quick-goals';
 import type { ConversationDefinition } from '@/types/companion-conversation';
@@ -48,7 +49,7 @@ const familyIds = ['baristabbit', 'steppling', 'flexel'] as const;
 
 test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gated', () => {
   assert.deepEqual(validateConversationDefinitions(companionConversationDefinitionsV2), []);
-  assert.equal(companionConversationDefinitionsV2.length, 53 * CONVERSATION_V2_FAMILIES.length);
+  assert.equal(companionConversationDefinitionsV2.length, 53 * CONVERSATION_V2_FAMILIES.length + 20);
   assert.deepEqual(CONVERSATION_V2_ENABLED_FAMILIES, CONVERSATION_V2_FAMILIES);
   assert.deepEqual(CONVERSATION_V2_IDEAL_SKIN_FAMILIES, familyIds);
   assert.equal(isConversationV2Family('feastle'), true);
@@ -65,13 +66,13 @@ test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gate
     }
     assert.ok(katchimeraFamilyById.get(familyId)!.skinIds.length >= 6, `${familyId} needs at least six forms`);
     assert.ok(katchimeraFamilyById.get(familyId)!.skinIds.length <= 12, `${familyId} catalog has grown beyond reviewable scope`);
-    assert.equal(pack.length, 53);
-    assert.equal(pack.filter((item) => item.trigger === 'evergreen').length, 11);
-    assert.equal(pack.filter((item) => item.isOpener).length, 8);
+    assert.equal(pack.length, familyId === 'feastle' ? 73 : 53);
+    assert.equal(pack.filter((item) => item.trigger === 'evergreen').length, familyId === 'feastle' ? 12 : 11);
+    assert.equal(pack.filter((item) => item.isOpener).length, familyId === 'feastle' ? 9 : 8);
     assert.equal(pack.filter((item) => item.trigger === 'journal').length, 6);
     assert.equal(pack.filter((item) => item.trigger === 'goal_debrief').length, 2);
     assert.equal(pack.filter((item) => item.trigger === 'quest_debrief').length, 2);
-    assert.equal(pack.filter((item) => item.trigger === 'bond').length, 3);
+    assert.equal(pack.filter((item) => item.trigger === 'bond').length, familyId === 'feastle' ? 22 : 3);
     assert.equal(pack.filter((item) => item.trigger === 'poll').length, 24);
     assert.equal(pack.filter((item) => item.trigger === 'signature_game').length, 5);
     assert.equal(pack.filter((item) => item.format === 'insight_game').length, 4);
@@ -526,7 +527,7 @@ test('journal, goal, quest, and bond chats resolve to their correct outcome clas
     assert.ok(goalDebriefs.every((definition) => definition.nodes.some((node) => node.kind === 'goal_proposal')));
     assert.ok(questDebriefs.some((definition) => definition.nodes.some((node) => node.kind === 'memory_proposal')));
     assert.ok(questDebriefs.some((definition) => definition.nodes.some((node) => node.kind === 'goal_proposal')));
-    assert.ok(bondChats.every((definition) => definition.nodes.some((node) => node.kind === 'memory_proposal')));
+    assert.ok(bondChats.every((definition) => definition.nodes.some((node) => node.kind === 'memory_proposal' || node.kind === 'poll')));
     assert.ok(pack
       .filter((definition) => definition.format !== 'insight_game')
       .every((definition) => definition.nodes.every((node) => node.kind !== 'insight_reveal')));
@@ -563,6 +564,56 @@ test('every authored quest handoff references playable quest data', () => {
     assert.ok(handoffs[0]!.suggestedQuestIds.length >= 2, `${familyId} needs two quest choices`);
     for (const questId of handoffs[0]!.suggestedQuestIds) assert.ok(questDefinition(questId), `${familyId}:${questId}`);
   }
+});
+
+test('Feastle Friendship invitations select the exact earned level and keep signature chapters gated', () => {
+  const definitions = companionConversationDefinitionsForFamily('feastle');
+  const friendship = definitions.filter((definition) => definition.id.startsWith('feastle:friendship:'));
+  assert.equal(friendship.length, 19);
+  assert.deepEqual(friendship.map((definition) => definition.minimumFriendshipLevel), Array.from({ length: 19 }, (_, index) => index + 2));
+  const selection = selectConversationDefinition({
+    familyId: 'feastle',
+    dayId: '2027-01-15',
+    definitions,
+    sessions: [],
+    signals: [{
+      id: 'signal:chapter-8', kind: 'bond', familyId: 'feastle', sourceId: 'feastle-chapter-8',
+      dayId: '2027-01-15', createdAt: Date.now(), expiresAt: Date.now() + 10_000,
+    }],
+    bondLevel: 4,
+    friendshipLevel: 8,
+  });
+  assert.equal(selection?.definition.id, 'feastle:friendship:8');
+});
+
+test('Feastle Chapter One uses distinct two-beat scenes instead of repeated questionnaire answers', () => {
+  const definitions = companionConversationDefinitionsForFamily('feastle');
+  for (const level of [2, 3, 4]) {
+    const definition = definitions.find((item) => item.id === `feastle:friendship:${level}`);
+    assert.ok(definition);
+    assert.equal(definition.version, 2);
+    const choices = definition.nodes.filter((node) => node.kind === 'choice' || node.kind === 'poll');
+    assert.equal(choices.length, 2);
+    for (const node of choices) {
+      assert.equal(node.options.length, 3);
+      assert.equal(new Set(node.options.map((option) => option.label)).size, 3);
+      assert.equal(new Set(node.options.map((option) => option.reply)).size, 3);
+    }
+  }
+  const playful = definitions.find((item) => item.id === 'feastle:friendship:3');
+  assert.equal(playful?.nodes.some((node) => node.kind === 'memory_proposal'), false);
+});
+
+test('Feastle first meeting is a first-person story in the conversation engine', () => {
+  const definition = companionConversationDefinitionsV2.find((item) => item.id === FEASTLE_FIRST_MEETING_DEFINITION_ID);
+  assert.ok(definition);
+  assert.equal(definition.format, 'opener');
+  assert.equal(definition.contextualOnly, true);
+  assert.equal(definition.entryNodeId, 'table');
+  const spokenCopy = JSON.stringify(definition.nodes);
+  assert.match(spokenCopy, /I brought a basket/);
+  assert.match(spokenCopy, /how would you like me beside you/);
+  assert.doesNotMatch(spokenCopy, /should Feastle|Feastle says|Feastle (?:will|can|should)/);
 });
 
 // Ensures the imported data remains statically typed as the engine contract.

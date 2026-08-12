@@ -41,12 +41,14 @@ import {
   acknowledgeCompanionBondCelebration,
   COMPANION_BOND_REWARDS,
   companionBondProgress,
+  companionFriendshipProgress,
   questBondEventKind,
   questBondEventId,
   recordCompanionBondEvent,
   type CompanionBondEventKind,
 } from '@/utils/companion-bond';
 import { loadCompanionBondState, saveCompanionBondState, subscribeCompanionBondState } from '@/utils/companion-bond-storage';
+import { completeFeastleConversation } from '@/utils/companion-story-storage';
 import {
   answerCompanionDiscoveryPrompt,
   answersForCompanion,
@@ -784,6 +786,10 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     && storedHomeState
     && storedHomeState.archivedDays.length + 1 > selectedHistoryDays.length
   );
+  const selectedFriendshipProgress = useMemo(
+    () => companionFriendshipProgress(companionBondState, selectedResident?.creature.creatureId ?? ''),
+    [companionBondState, selectedResident?.creature.creatureId]
+  );
   const selectedPendingBondCelebration = useMemo(
     () => selectedResident
       ? (companionBondState.pendingCelebrations ?? []).find(
@@ -884,6 +890,11 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   const selectedConversationDefinition = selectedConversationSession
     ? companionConversationDefinitionById.get(selectedConversationSession.definitionId) ?? null
     : null;
+  useEffect(() => {
+    if (!selectedConversationSession || selectedConversationSession.preview || selectedConversationSession.status !== 'completed') return;
+    const match = /^feastle:friendship:(\d+)$/.exec(selectedConversationSession.definitionId);
+    if (match) completeFeastleConversation(Number(match[1]), selectedConversationSession.completedAt ?? Date.now());
+  }, [selectedConversationSession]);
   const selectedConversationNode = selectedConversationDefinition?.nodes.find(
     (node) => node.id === selectedConversationSession?.currentNodeId
   ) ?? null;
@@ -935,10 +946,11 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       sessions: companionContentState.conversationSessions,
       signals: companionContentState.conversationSignals,
       bondLevel: selectedBondProgress.level,
+      friendshipLevel: selectedFriendshipProgress.level,
       selectionSeed: selectedEncounterId,
     });
     return selection?.signal ? { definitionId: selection.definition.id, sourceKind: selection.signal.kind } : null;
-  }, [companionContentState.conversationSessions, companionContentState.conversationSignals, selectedBondProgress.level, selectedEncounterId, selectedFamilyId, today?.isoDate]);
+  }, [companionContentState.conversationSessions, companionContentState.conversationSignals, selectedBondProgress.level, selectedEncounterId, selectedFamilyId, selectedFriendshipProgress.level, today?.isoDate]);
   const selectedConversationStarters = useMemo(() => {
     if (!selectedFamilyId || !selectedEncounterId || !isConversationV2Family(selectedFamilyId)) return [];
     const definitions = companionConversationDefinitionsForFamily(selectedFamilyId)
@@ -1895,6 +1907,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         sessions: current.conversationSessions,
         signals: current.conversationSignals,
         bondLevel: selectedBondProgress.level,
+        friendshipLevel: selectedFriendshipProgress.level,
         selectionSeed: selectedEncounterId ?? `encounter:${selectedResident.creature.creatureId}`,
       }) : null;
       const definition = input.definitionId
@@ -2397,7 +2410,9 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       saveCompanionContentState(next);
       return next;
     });
-  }, [selectedConversationSession]);
+    const feastleLevel = selectedConversationDefinition?.id.match(/^feastle:friendship:(\d+)$/)?.[1];
+    if (feastleLevel) completeFeastleConversation(Number(feastleLevel));
+  }, [selectedConversationDefinition?.id, selectedConversationSession]);
   const previewSelectedConversation = useCallback((definitionId: string) => {
     if (typeof __DEV__ === 'undefined' || !__DEV__ || !selectedResident || !selectedFamilyId || !today?.isoDate || !isConversationV2Family(selectedFamilyId)) return;
     const definition = companionConversationDefinitionById.get(definitionId);

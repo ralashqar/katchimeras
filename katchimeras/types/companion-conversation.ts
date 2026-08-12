@@ -182,6 +182,8 @@ export type ConversationDefinition = {
   trigger: ConversationTriggerKind;
   triggerRouteKeys?: readonly string[];
   minimumBondLevel: 1 | 2 | 3 | 4;
+  minimumFriendshipLevel?: number;
+  triggerSourceIds?: readonly string[];
   cooldownDays: number;
   entryNodeId: string;
   nodes: readonly ConversationNode[];

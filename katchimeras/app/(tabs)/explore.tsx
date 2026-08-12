@@ -47,10 +47,17 @@ import type { CompanionAchievementDef } from '@/types/companion-achievements';
 import type { StreakMilestone } from '@/types/streak';
 import { pickRandomAchievement } from '@/utils/achievement-celebration';
 import { STREAK_MILESTONE_REWARDS } from '@/utils/streak-engine';
-import { resetIdealSkinOnboardingForDebug } from '@/utils/companion-content-storage';
+import { resetAllKatchimeraContentForDebug } from '@/utils/companion-content-storage';
 import { resetDevSubscriptionSimulator } from '@/utils/dev-subscription-simulator';
 import { resetKatchimeraWardrobeForDebug } from '@/utils/katchimera-wardrobe-storage';
-import { resetLaunchCompanionBondsForDebug } from '@/utils/companion-bond-storage';
+import { resetAllKatchimeraBondsForDebug } from '@/utils/companion-bond-storage';
+import { resetMergeWorldStateForDebug } from '@/utils/merge-world/repository';
+import { resetCompanionAchievementsForDebug } from '@/utils/companion-achievements-storage';
+import { resetCompanionDiscoveryForDebug } from '@/utils/companion-discovery-storage';
+import { resetCompanionJourneysForDebug } from '@/utils/companion-journey-storage';
+import { resetAllCompanionQuickGoalsForDebug } from '@/utils/companion-quick-goal-storage';
+import { resetCompanionQuestsForDebug } from '@/utils/katchimera-quests';
+import { resetCompanionStoriesForDebug, setFeastleStoryStateForDebug } from '@/utils/companion-story-storage';
 
 export default function ExploreScreen() {
   const router = useRouter();
@@ -69,21 +76,34 @@ export default function ExploreScreen() {
   } | null>(null);
   const [backfilling, setBackfilling] = useState(false);
 
-  const handleResetIdealSkinOnboarding = () => {
+  const handleResetKatchimerasProgress = () => {
     Alert.alert(
-      'Reset skin questionnaires?',
-      'This clears applied skins, chat progress, and bond levels. Steppling, Baristabbit, and Flexel will restart at question one with 0 bond. Local Plus access will reset to Free.',
+      'Reset Katchimeras progress?',
+      'This clears every Katchimera skin and questionnaire, conversation and Friendship progress, plus the entire Merge World board, orders, currencies, discoveries, and upgrades. Your journal entries and hatched Katchimera collection stay safe. Local Plus access resets to Free.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Reset',
+          text: 'Reset progress',
           style: 'destructive',
-          onPress: () => {
-            resetIdealSkinOnboardingForDebug();
-            resetKatchimeraWardrobeForDebug();
-            resetLaunchCompanionBondsForDebug();
-            resetDevSubscriptionSimulator();
-            Alert.alert('Katchimeras reset', 'Skins, conversations, and bond are reset. Open a launch Katchimera to begin its questionnaire from question one.');
+          onPress: async () => {
+            try {
+              const resetAt = Date.now();
+              resetAllKatchimeraContentForDebug();
+              resetKatchimeraWardrobeForDebug();
+              resetAllKatchimeraBondsForDebug(resetAt);
+              resetCompanionQuestsForDebug();
+              resetCompanionJourneysForDebug();
+              resetCompanionDiscoveryForDebug();
+              resetAllCompanionQuickGoalsForDebug();
+              resetCompanionStoriesForDebug();
+              resetCompanionAchievementsForDebug();
+              resetDevSubscriptionSimulator();
+              setAllKatchimerasAvailableEnabled(false);
+              await resetMergeWorldStateForDebug(resetAt);
+              Alert.alert('Katchimeras progress reset', 'Katchimera questionnaires and Friendship now begin from question one and level one. Merge World has returned to its starting board.');
+            } catch (caught) {
+              Alert.alert('Reset did not finish', caught instanceof Error ? caught.message : 'Katchimeras progress could not be reset. Please try again.');
+            }
           },
         },
       ],
@@ -429,7 +449,10 @@ export default function ExploreScreen() {
                 </View>
                 <KatchaButton label="🔄 Reset to fresh profile (full first-run)" onPress={handleFreshProfile} variant="primary" />
                 <KatchaButton label="Reset today only" onPress={handleResetToday} variant="secondary" />
-                <KatchaButton label="Reset Katchimera skin questionnaires" onPress={handleResetIdealSkinOnboarding} variant="secondary" />
+                <KatchaButton label="Reset Katchimeras progress" onPress={handleResetKatchimerasProgress} variant="secondary" />
+                <KatchaButton label="Feastle story · Level 1 order" onPress={() => setFeastleStoryStateForDebug('order_active', 1)} variant="secondary" />
+                <KatchaButton label="Feastle story · Return at level 2" onPress={() => setFeastleStoryStateForDebug('return_available', 2)} variant="secondary" />
+                <KatchaButton label="Feastle story · Chapter 1 complete" onPress={() => setFeastleStoryStateForDebug('chapter_complete', 4)} variant="secondary" />
                 <KatchaButton
                   label="Unhatch egg · replay adaptive questions"
                   onPress={() => handlePrepareTodayRehatch('adaptive')}

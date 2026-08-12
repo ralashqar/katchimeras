@@ -1,4 +1,7 @@
+import { useEffect } from 'react';
 import { runOnJS, useFrameCallback, useSharedValue, type SharedValue } from 'react-native-reanimated';
+
+import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 
 const MERGE_PERF_ENABLED = __DEV__ && process.env.EXPO_PUBLIC_MERGE_PERF === '1';
 
@@ -14,6 +17,7 @@ export function useMergeMotionPerformanceProbe(active: SharedValue<number>, onSa
   const startedAt = useSharedValue(0);
   const slowFrames = useSharedValue(0);
   const longestFrameMs = useSharedValue(0);
+  useEffect(() => acquireLifecycleResource('frame_probe', 'merge-motion'), []);
 
   useFrameCallback((frame) => {
     if (active.value === 1) {

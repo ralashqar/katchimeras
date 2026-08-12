@@ -195,11 +195,13 @@ export function KingdomCompanionScreen({
   presentation = 'world',
   initialCreatureId,
   onCloseCompanion,
+  onOpenMerge,
   onOpenQuestGame,
 }: {
   presentation?: KingdomCompanionPresentation;
   initialCreatureId?: string;
   onCloseCompanion?: () => void;
+  onOpenMerge?: (orderId?: string | null) => void;
   onOpenQuestGame?: (creatureId: string, questId: string) => void;
 }) {
   const isFocused = useIsFocused();
@@ -498,6 +500,7 @@ export function KingdomCompanionScreen({
 
       {quests.selectedResident && !embeddedJournal && !questNoteCapture ? (
         <CompanionInteractionSheet
+          active={isFocused}
           key={`${quests.selectedResident.creature.creatureId}:${quests.questCaptureRestoreKey ?? 'standard'}`}
           onExperienceActiveChange={setQuestExperienceActive}
           embedded={presentation === 'companion'}
@@ -648,6 +651,12 @@ export function KingdomCompanionScreen({
             quests.decideSelectedConversationGoal(selectedTemplateIds, node, addedTemplateIds);
             if (addedTemplateIds.length && !quests.selectedConversationSession?.preview) quests.refreshQuestState();
           }}
+          onOpenMerge={(orderId) => onOpenMerge
+            ? onOpenMerge(orderId)
+            : router.navigate({
+                pathname: '/games',
+                params: { source: 'feastle-story', ...(orderId ? { focusOrderId: orderId } : {}) },
+              })}
           onInsightConversationDecision={quests.decideSelectedConversationInsight}
           onQuickGoalConversationDecision={(accept, node) => {
             const added = accept && !quests.selectedConversationSession?.preview

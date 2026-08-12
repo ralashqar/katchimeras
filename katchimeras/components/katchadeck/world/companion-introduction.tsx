@@ -25,6 +25,20 @@ export type CompanionIntroductionPreference = {
   label: string;
 };
 
+const FEASTLE_OPENING_OPTIONS: Readonly<Record<string, string>> = {
+  ease: 'Fewer decisions',
+  care: 'A little more care',
+  connection: 'More shared moments',
+  curiosity: 'Something new sometimes',
+};
+
+const FEASTLE_SUPPORT_OPTIONS: Readonly<Record<CompanionSupportStyle, { label: string; promise: string }>> = {
+  gentle: { label: 'Be kind when days are messy', promise: 'keep things kind and easy to change' },
+  practical: { label: 'Help me make it easier', promise: 'look for one small thing that makes food easier' },
+  patterns: { label: 'Notice what works for me', promise: 'notice what helps without turning it into a rule' },
+  on_demand: { label: 'Wait until I ask', promise: 'keep your place at the table until I call' },
+};
+
 export function CompanionIntroduction({
   accentColor,
   background,
@@ -36,6 +50,7 @@ export function CompanionIntroduction({
   onComplete,
   onDefer,
   onStartFocus,
+  storyMode = false,
   visualKey,
 }: {
   accentColor: string;
@@ -48,6 +63,7 @@ export function CompanionIntroduction({
   onComplete: (preference: CompanionIntroductionPreference, supportStyle: CompanionSupportStyle) => void;
   onDefer: (preference?: CompanionIntroductionPreference) => void;
   onStartFocus: (preference: CompanionIntroductionPreference, supportStyle: CompanionSupportStyle) => void;
+  storyMode?: boolean;
   visualKey: HomeVisualKey;
 }) {
   const [step, setStep] = useState<'preference' | 'support' | 'result'>('preference');
@@ -74,7 +90,9 @@ export function CompanionIntroduction({
         companionName={companionName}
         creature={creature}
         environmentKey={environmentKey}
-        helperText={introduction.greeting}
+        helperText={storyMode
+          ? 'I brought a picnic basket, one runaway spoon, and no dinner judgement whatsoever.'
+          : introduction.greeting}
         onBack={() => onDefer()}
         onSelect={(option) => {
           const choice = firstNode.options?.find((item) => item.id === option.id);
@@ -84,13 +102,13 @@ export function CompanionIntroduction({
         }}
         options={firstNode.options.map((option) => ({
           id: option.id,
-          label: option.label,
+          label: storyMode ? FEASTLE_OPENING_OPTIONS[option.id] ?? option.label : option.label,
           icon: companionQuestionnaireOptionIcon(option.id, option.label),
         }))}
         progress={1 / 3}
-        selectionActionLabel="Next"
-        stepLabel="A little about you · 1 of 3"
-        title={companionFirstPersonText(firstNode.prompt, companionName)}
+        selectionActionLabel={storyMode ? "Tell Feastle" : "Next"}
+        stepLabel={storyMode ? "A place at the table · 1 of 3" : "A little about you · 1 of 3"}
+        title={storyMode ? "Before I unpack… what should food feel more like?" : companionFirstPersonText(firstNode.prompt, companionName)}
         visualKey={visualKey}
       />
     );
@@ -104,7 +122,9 @@ export function CompanionIntroduction({
         companionName={companionName}
         creature={creature}
         environmentKey={environmentKey}
-        helperText="I’ll use this as guidance, not a rule. You can change it later."
+        helperText={storyMode
+          ? `“${FEASTLE_OPENING_OPTIONS[preference?.optionId ?? ''] ?? preference?.label ?? 'That'}.” I tie a tiny note to the basket. “Good. I know what to make room for.”`
+          : "I’ll use this as guidance, not a rule. You can change it later."}
         onBack={() => setStep('preference')}
         onSelect={(option) => {
           setSupportStyle(option.id as CompanionSupportStyle);
@@ -112,13 +132,13 @@ export function CompanionIntroduction({
         }}
         options={COMPANION_SUPPORT_STYLE_OPTIONS.map((option) => ({
           id: option.id,
-          label: option.label,
+          label: storyMode ? FEASTLE_SUPPORT_OPTIONS[option.id].label : option.label,
           icon: companionQuestionnaireOptionIcon(option.id, option.label),
         }))}
         progress={2 / 3}
-        selectionActionLabel="Remember this"
-        stepLabel="How I can help · 2 of 3"
-        title="How would you like me to help?"
+        selectionActionLabel={storyMode ? "Make a pact" : "Remember this"}
+        stepLabel={storyMode ? "How I can help · 2 of 3" : "How I can help · 2 of 3"}
+        title={storyMode ? "When the day gets messy, how would you like me beside you?" : "How would you like me to help?"}
         visualKey={visualKey}
       />
     );
@@ -126,6 +146,7 @@ export function CompanionIntroduction({
 
   const style = COMPANION_SUPPORT_STYLE_OPTIONS.find((option) => option.id === supportStyle);
   if (!preference || !supportStyle || !style) return null;
+  const feastleSupport = FEASTLE_SUPPORT_OPTIONS[supportStyle];
   return (
     <CompanionQuestionnaireScene
       accentColor={accentColor}
@@ -133,31 +154,33 @@ export function CompanionIntroduction({
       companionName={companionName}
       creature={creature}
       environmentKey={environmentKey}
-      helperText={`You chose “${preference.label}”. I’ll ${style.summary}.`}
+      helperText={storyMode
+        ? `I pat the basket. “Done. I’ll ${feastleSupport.promise}. No perfect plates required.”`
+        : `You chose “${preference.label}”. I’ll ${style.summary}.`}
       onBack={() => setStep('support')}
       progress={1}
       result
-      stepLabel="All set · 3 of 3"
-      title="I’ll remember that."
+      stepLabel={storyMode ? "A tiny pact · 3 of 3" : "All set · 3 of 3"}
+      title={storyMode ? "Then let’s make our first snack." : "I’ll remember that."}
       visualKey={visualKey}>
       <QuestionnaireResultNotice
-        body="That is enough for today. If you want, we can also turn it into a few optional goals."
+        body={storyMode ? "I packed the Pantry. You make one small snack, then bring it back to our table." : "That is enough for today. If you want, we can also turn it into a few optional goals."}
         tasks={[]}
-        title="We can begin gently"
+        title={storyMode ? "One small snack. No fuss." : "We can begin gently"}
       />
       <View style={styles.actions}>
         <CompanionPrimaryAction
-          icon="scope"
-          label="Choose a direction with me"
-          onPress={() => onStartFocus(preference, supportStyle)}
+          icon={storyMode ? "fork.knife" : "scope"}
+          label={storyMode ? "Open the Shared Pantry" : "Choose a direction with me"}
+          onPress={() => storyMode ? onComplete(preference, supportStyle) : onStartFocus(preference, supportStyle)}
         />
-        <CompanionSecondaryAction
+        {!storyMode ? <CompanionSecondaryAction
           icon="checkmark"
           label="That’s enough for now"
           onPress={() => onComplete(preference, supportStyle)}
-        />
+        /> : null}
         <ThemedText style={styles.note} lightColor="#D8C6A4" darkColor="#D8C6A4">
-          Nothing here locks you in. You can revisit your focus from You.
+          {storyMode ? 'Your answers guide the story. They never become rules.' : 'Nothing here locks you in. You can revisit your focus from You.'}
         </ThemedText>
       </View>
     </CompanionQuestionnaireScene>

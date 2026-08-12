@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
+  cancelAnimation,
   Easing,
   FadeIn,
   FadeInUp,
@@ -55,6 +56,7 @@ export function CompanionBondLevelUpCelebration({ onContinue, receipt }: {
   useEffect(() => {
     progress.value = withDelay(180, withTiming(1, { duration: reduceMotion ? 100 : 560, easing: Easing.out(Easing.cubic) }));
     if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    return () => cancelAnimation(progress);
   }, [progress, reduceMotion]);
 
   const oldStyle = useAnimatedStyle(() => ({
@@ -191,6 +193,7 @@ function RisingArrow({ index, width }: { index: number; width: number }) {
       withTiming(1, { duration: 1050, easing: Easing.out(Easing.cubic) }),
       withTiming(0, { duration: 0 }),
     ), -1));
+    return () => cancelAnimation(progress);
   }, [index, progress]);
   const style = useAnimatedStyle(() => ({
     left: (index + 0.6) * width / 11,

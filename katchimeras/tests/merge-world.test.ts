@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
 import { MERGE_GENERATOR_COOLDOWN_MS, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
-import type { MergeBoardItem, MergeWorldState } from '@/types/merge-world';
+import type { MergeBoardItem, MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import { companionFriendshipProgress, emptyCompanionBondState } from '@/utils/companion-bond';
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection } from '@/utils/merge-world/board-geometry';
 import { mergeWorldPendingPersistence } from '@/utils/merge-world/persistence-buffer';
@@ -42,18 +42,48 @@ test('directional flicks resolve to the immediate orthogonal neighbour without w
   assert.equal(mergeNeighborCellInDirection(geometry, 6, 900, 0), null);
 });
 
-test('catalog is internally valid and starter world has 33 open cells', () => {
+test('catalog is internally valid and the starter board is open but empty', () => {
   assert.deepEqual(mergeWorldCatalogIssues(), []);
   const state = createInitialMergeWorldState(NOW);
   assert.equal(state.board.length, 63);
   assert.equal(state.board.filter((cell) => !cell.locked).length, 33);
-  assert.equal(state.activeOrders.length, 3);
-  assert.equal(state.board[31].occupant?.kind, 'generator');
-  assert.deepEqual(state.unlockedFamilies, ['food']);
+  assert.equal(state.activeOrders.length, 0);
+  assert.equal(state.board.every((cell) => cell.occupant == null), true);
+  assert.deepEqual(state.generators, {});
+  assert.deepEqual(state.unlockedFamilies, []);
+});
+
+test('every Merge World item has one optimized authored sprite', () => {
+  const manifest = JSON.parse(readFileSync(path.join(process.cwd(), 'scripts', 'merge-world-item-art-manifest.json'), 'utf8')) as {
+    output: { hardFileLimitBytes: number };
+    sheets: Array<{ cells: Array<{ definitionId: string; file: string }> }>;
+  };
+  const cells = manifest.sheets.flatMap((sheet) => sheet.cells);
+  assert.equal(cells.length, 30);
+  assert.deepEqual(cells.map((cell) => cell.definitionId).sort(), [...MERGE_ITEMS_BY_ID.keys()].sort());
+  assert.equal(new Set(cells.map((cell) => cell.file)).size, 30);
+  for (const cell of cells) {
+    const asset = path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'merge-world', 'items', cell.file);
+    assert.ok(statSync(asset).size <= manifest.output.hardFileLimitBytes, `${cell.file} exceeds its runtime budget`);
+  }
+});
+
+test('every story generator has bespoke optimized 256px art', () => {
+  const files = [
+    'feastle-picnic-pantry.webp',
+    'mossprout-sprouting-pot.webp',
+    'shellio-waterside-pail.webp',
+    'steppling-trail-satchel.webp',
+    'voyagle-travel-trunk.webp',
+  ];
+  for (const file of files) {
+    const asset = path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'merge-world', 'generators', file);
+    assert.ok(statSync(asset).size <= 32_000, `${file} exceeds its runtime budget`);
+  }
 });
 
 test('generator taps consume one Energy and charge and create a discoverable item', () => {
-  const state = createInitialMergeWorldState(NOW);
+  const state = withStoryGenerator(createInitialMergeWorldState(NOW), 'feastle');
   const result = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: 'starter-pantry', now: NOW + 1, seed: 'first-drop' });
   assert.equal(result.changed, true);
   // Tap costs one; the first-discovery reward immediately returns one.
@@ -65,7 +95,7 @@ test('generator taps consume one Energy and charge and create a discoverable ite
 });
 
 test('a full board rejects generation without spending Energy or charges', () => {
-  const state = createInitialMergeWorldState(NOW);
+  const state = withStoryGenerator(createInitialMergeWorldState(NOW), 'feastle');
   const board = state.board.map((cell, index) => cell.locked || cell.occupant ? cell : {
     ...cell,
     occupant: item(`fill:${index}`, 'food:table:1'),
@@ -110,7 +140,7 @@ test('dropping onto a non-matching item swaps both board positions', () => {
 });
 
 test('generators can move to empty cells and swap with other occupants', () => {
-  let state = createInitialMergeWorldState(NOW);
+  let state = withStoryGenerator(createInitialMergeWorldState(NOW), 'feastle');
   let result = reduceMergeWorld(state, { type: 'move', from: 31, to: 29, now: NOW + 1 });
   assert.equal(result.changed, true);
   assert.equal(result.state.board[29].occupant?.kind, 'generator');
@@ -144,6 +174,7 @@ test('persistent merge input uses one static board recognizer and epoch-guarded 
   const screenSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-world-screen.tsx'), 'utf8');
   const routeSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-world-route-screen.tsx'), 'utf8');
   const spriteSource = source.slice(source.indexOf('const PersistentSprite'), source.indexOf('function PersistentGeneratorArt'));
+  const boardCellSource = source.slice(source.indexOf('const BoardCell'), source.indexOf('function MergeCelebrationOverlay'));
   assert.match(source, /const gap = 1/);
   assert.match(source, /const border = 0/);
   assert.match(source, /const BOARD_FLICK_MIN_VELOCITY = 650/);
@@ -154,6 +185,10 @@ test('persistent merge input uses one static board recognizer and epoch-guarded 
   assert.match(source, /runOnJS\(dragSprite\)\(\)/);
   assert.doesNotMatch(source, /\.onStart\(\(\) => \{\s+const id = activeDragId\.value/);
   assert.match(source, /const alternate = \(column \+ row\) % 2 === 1/);
+  assert.equal([...source.matchAll(/merge-world\/locked\/cloud-lock\.webp/g)].length, 1);
+  assert.match(boardCellSource, /source=\{LOCKED_CELL_OVERLAY\}/);
+  assert.doesNotMatch(source, /lockedCellNeighborMask|blockedMask|LOCKED_CELL_WEB_OVERLAYS|lockedDecoration/);
+  assert.doesNotMatch(boardCellSource, /#2D361F|#323D24|leafSize/);
   assert.match(source, /const boardGesture = useMemo\(\(\) => Gesture\.Pan\(\)/);
   assert.match(source, /\.minDistance\(0\)/);
   assert.match(source, /const BOARD_TAP_SLOP = 9/);
@@ -166,6 +201,10 @@ test('persistent merge input uses one static board recognizer and epoch-guarded 
   assert.match(source, /occupancyIds\.value = ids/);
   assert.doesNotMatch(source, /Gesture\.Exclusive/);
   assert.doesNotMatch(spriteSource, /GestureDetector|Gesture\.Pan|pointerEvents=\{enabled/);
+  assert.doesNotMatch(source, /const FOOD_ART|FeastleMergeItemArt/);
+  assert.doesNotMatch(source, /familyTier|familyTierText|generatorChargeText|runtimeCharges/);
+  assert.match(source, /style=\{styles\.generatorBolt\}/);
+  assert.match(source, /name="bolt\.fill"/);
   assert.doesNotMatch(screenSource, /styles\.bottomDock/);
   assert.match(screenSource, /order-service-tray\.webp/);
   assert.match(screenSource, /styles\.orderTrayArt/);
@@ -173,6 +212,30 @@ test('persistent merge input uses one static board recognizer and epoch-guarded 
   assert.match(routeSource, /<TodayExplorationBackground backgroundKey="home"/);
   assert.doesNotMatch(routeSource, /CompanionGameBackdrop/);
   assert.doesNotMatch(routeSource, /verticalOffset=\{HOME_SCENE_Y_OFFSET\}/);
+});
+
+test('debug reset invalidates stale saves and refreshes mounted Merge World state', () => {
+  const repository = readFileSync(path.join(process.cwd(), 'utils', 'merge-world', 'repository.ts'), 'utf8');
+  const provider = readFileSync(path.join(process.cwd(), 'features', 'merge-world', 'merge-world-provider.tsx'), 'utf8');
+  assert.match(repository, /resetGeneration \+= 1/);
+  assert.match(repository, /let resetInProgress = false/);
+  assert.match(repository, /if \(resetInProgress\) return/);
+  assert.match(repository, /resetInProgress = true/);
+  assert.match(repository, /finally \{\s*resetInProgress = false/);
+  assert.match(repository, /let writeQueue: Promise<void> = Promise\.resolve\(\)/);
+  assert.match(repository, /function serializeWrite<T>/);
+  assert.equal([...repository.matchAll(/await serializeWrite\(async \(\) =>/g)].length, 2);
+  assert.match(repository, /if \(generation !== resetGeneration\) return/);
+  assert.match(repository, /DELETE FROM merge_world_snapshot/);
+  assert.match(repository, /DELETE FROM merge_world_outbox/);
+  assert.match(repository, /resetListeners\.forEach\(\(listener\) => listener\(freshState\)\)/);
+  assert.match(provider, /subscribeMergeWorldResets\(\(freshState\) =>/);
+  assert.match(provider, /pendingPersistenceRef\.current = null/);
+  assert.match(provider, /persistenceGenerationRef\.current \+= 1/);
+  assert.match(provider, /externalGenerationRef\.current \+= 1/);
+  assert.match(provider, /workerGeneration !== persistenceGenerationRef\.current/);
+  assert.match(provider, /workerGeneration !== externalGenerationRef\.current/);
+  assert.match(provider, /stateRef\.current = reconciledState/);
 });
 
 test('activity receipts are idempotent and Energy remains capped', () => {
@@ -200,7 +263,7 @@ test('activity rewards reconcile in one idempotent batch', () => {
 });
 
 test('rapid generator taps remain deterministic without losing commands', () => {
-  let state = { ...createInitialMergeWorldState(NOW), energy: { value: 50, cap: 100, lastRegenAt: NOW } };
+  let state = { ...withStoryGenerator(createInitialMergeWorldState(NOW), 'feastle'), energy: { value: 50, cap: 100, lastRegenAt: NOW } };
   for (let index = 0; index < 12; index += 1) {
     const result = reduceMergeWorld(state, {
       type: 'tapGenerator',
@@ -245,7 +308,7 @@ test('ready order ids count the board once and identify every ready order', () =
 });
 
 test('depleted generators recover from timestamps without background timers', () => {
-  const state = createInitialMergeWorldState(NOW);
+  const state = withStoryGenerator(createInitialMergeWorldState(NOW), 'feastle');
   const resting = {
     ...state,
     energy: { ...state.energy, value: 50 },
@@ -261,18 +324,21 @@ test('depleted generators recover from timestamps without background timers', ()
   assert.equal(ready.state.generators['starter-pantry'].readyAt, null);
 });
 
-test('Shellio and Voyagle unlock canonical branches and generators', () => {
-  const state = createInitialMergeWorldState(NOW, ['shellio', 'voyagle']);
-  assert.ok(state.generators['nature-pot']);
-  assert.ok(state.generators['adventure-pack']);
-  assert.ok(state.generators['nature-pot'].enabledBranches.includes('waterside'));
-  assert.ok(state.generators['adventure-pack'].enabledBranches.includes('travel'));
+test('owning Katchimeras does not add generators before their stories request them', () => {
+  let state = createInitialMergeWorldState(NOW, ['shellio', 'voyagle']);
+  assert.deepEqual(state.generators, {});
   assert.ok(state.unlockedCharacters.includes('shellio'));
   assert.ok(state.unlockedCharacters.includes('voyagle'));
+  state = withStoryGenerator(state, 'shellio');
+  assert.deepEqual(state.generators['waterside-pail'].enabledBranches, ['waterside']);
+  assert.equal(state.generators['travel-trunk'], undefined);
+  state = withStoryGenerator(state, 'voyagle');
+  assert.deepEqual(state.generators['travel-trunk'].enabledBranches, ['travel']);
 });
 
 test('serving consumes requirements and emits replay-safe Friendship receipt', () => {
   let state = createInitialMergeWorldState(NOW, ['feastle']);
+  state = reduceMergeWorld(state, { type: 'reconcileStory', familyId: 'feastle', status: 'order_active', targetLevel: 2, starterParcelGranted: true, now: NOW + 1 }).state;
   const order = state.activeOrders[0];
   const placements: Array<[number, MergeBoardItem]> = [];
   let cell = 29;
@@ -284,8 +350,123 @@ test('serving consumes requirements and emits replay-safe Friendship receipt', (
   const result = reduceMergeWorld(state, { type: 'serveOrder', orderId: order.id, now: NOW + 1 });
   assert.equal(result.servedOrderId, order.id);
   assert.equal(result.state.completedOrderCount, 1);
-  assert.ok(result.state.externalRewardReceipts.some((receipt) => receipt.id === `merge-friendship:${order.id}`));
-  assert.equal(result.state.activeOrders.length, 3);
+  const friendshipReceipt = result.state.externalRewardReceipts.find((receipt) => receipt.id === `merge-friendship:${order.id}`);
+  assert.ok(friendshipReceipt);
+  assert.equal(friendshipReceipt.presentation, 'quiet_summary');
+  assert.equal(friendshipReceipt.sourceId, 'feastle:table-story');
+  assert.equal(result.state.activeOrders.length, 0);
+});
+
+test('unlocked Katchimeras receive no orders until their authored story requests one', () => {
+  let state = createInitialMergeWorldState(NOW, ['feastle', 'mossprout', 'steppling']);
+  state = reduceMergeWorld(state, { type: 'reconcileFriendship', levels: { feastle: 6 }, now: NOW + 1 }).state;
+  assert.equal(state.activeOrders.length, 0);
+  state = reduceMergeWorld(state, { type: 'reconcileStory', familyId: 'feastle', status: 'order_active', targetLevel: 2, starterParcelGranted: true, now: NOW + 2 }).state;
+  assert.equal(state.activeOrders.length, 1);
+  assert.equal(state.activeOrders[0].characterId, 'feastle');
+  assert.ok(state.activeOrders[0].storyArcId);
+});
+
+test('today’s first journal directly stocks the Pantry once without creating board items', () => {
+  const date = new Date(NOW + 1);
+  const today = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const world = withStoryGenerator(createInitialMergeWorldState(NOW, ['feastle']), 'feastle');
+  const initial = {
+    ...world,
+    energy: { value: 0, cap: 100, lastRegenAt: NOW },
+    generators: { ...world.generators, 'starter-pantry': { ...world.generators['starter-pantry'], charges: 4 } },
+  };
+  const rewards = [
+    { receiptId: 'journal:one', amount: 10, dayId: today, kind: 'journal' },
+    { receiptId: 'journal:two', amount: 5, dayId: today, kind: 'journal' },
+    { receiptId: 'quest:one', amount: 30, dayId: today, kind: 'quest' },
+    { receiptId: 'journal:historical', amount: 0, dayId: '2026-01-01', kind: 'journal' },
+  ];
+  const rewarded = reduceMergeWorld(initial, { type: 'grantActivityEnergyBatch', rewards, now: NOW + 1 });
+  assert.equal(rewarded.state.energy.value, 40);
+  assert.equal(rewarded.state.generators['starter-pantry'].charges, 10);
+  assert.ok(rewarded.state.processedGeneratorChargeGrantIds.includes(`journal-charge:${today}:starter-pantry`));
+  assert.equal(rewarded.state.board.filter((cell) => cell.occupant?.kind === 'item').length, 0);
+  const duplicate = reduceMergeWorld(rewarded.state, { type: 'grantActivityEnergyBatch', rewards, now: NOW + 2 });
+  assert.equal(duplicate.state.generators['starter-pantry'].charges, 10);
+});
+
+test('legacy unclaimed parcels migrate into direct generator charges once', () => {
+  const world = withStoryGenerator(createInitialMergeWorldState(NOW, ['feastle']), 'feastle');
+  const legacy = {
+    ...world,
+    generators: { ...world.generators, 'starter-pantry': { ...world.generators['starter-pantry'], charges: 4 } },
+    journalParcels: [{ id: 'starter-parcel:legacy', generatorId: 'starter-pantry', chargeAmount: 6, claimedAt: null }],
+  };
+  const migrated = normalizeMergeWorldState(legacy, NOW + 1);
+  assert.equal(migrated.generators['starter-pantry'].charges, 10);
+  assert.ok(migrated.processedGeneratorChargeGrantIds.includes('legacy-parcel:starter-parcel:legacy'));
+  const reloaded = normalizeMergeWorldState(migrated, NOW + 2);
+  assert.equal(reloaded.generators['starter-pantry'].charges, 10);
+});
+
+test('duplicate generator unlock receipts normalize to one acknowledged reward', () => {
+  const initial = createInitialMergeWorldState(NOW, ['feastle']);
+  const duplicateReceipt = {
+    id: 'generator-unlock:starter-pantry',
+    generatorId: 'starter-pantry',
+    createdAt: NOW,
+    seenAt: null,
+  };
+  const normalized = normalizeMergeWorldState({
+    ...initial,
+    generatorUnlockReceipts: [duplicateReceipt, { ...duplicateReceipt, seenAt: NOW + 1 }],
+  }, NOW + 2);
+  assert.equal(normalized.generatorUnlockReceipts.length, 1);
+  assert.equal(normalized.generatorUnlockReceipts[0].seenAt, NOW + 1);
+});
+
+test('Feastle story reconciliation owns one authored request and serving emits a durable return receipt', () => {
+  let state = createInitialMergeWorldState(NOW, ['feastle']);
+  state = reduceMergeWorld(state, { type: 'reconcileStory', familyId: 'feastle', status: 'order_active', targetLevel: 2, starterParcelGranted: true, now: NOW + 1 }).state;
+  assert.equal(state.activeOrders.length, 1);
+  const order = state.activeOrders[0];
+  assert.equal(order.id, 'merge-story:feastle:chapter-1:level-2');
+  assert.equal(order.requirements[0].definitionId, 'food:table:2');
+  assert.equal(state.generators['starter-pantry'].charges, 18);
+  assert.ok(state.processedGeneratorChargeGrantIds.includes('story-charge:feastle:starter-pantry'));
+  const unlock = state.generatorUnlockReceipts.find((receipt) => receipt.generatorId === 'starter-pantry');
+  assert.ok(unlock);
+  assert.equal(unlock.seenAt, null);
+  state = reduceMergeWorld(state, { type: 'ackGeneratorUnlock', receiptId: unlock.id, now: NOW + 2 }).state;
+  assert.equal(state.generatorUnlockReceipts.find((receipt) => receipt.id === unlock.id)?.seenAt, NOW + 2);
+  state = withItems(state, [[29, item('story-snack', 'food:table:2')]]);
+  const served = reduceMergeWorld(state, { type: 'serveOrder', orderId: order.id, now: NOW + 2 });
+  assert.equal(served.state.activeOrders.length, 0);
+  assert.ok(served.state.externalRewardReceipts.some((receipt) => receipt.kind === 'story_order_served' && receipt.amount === 2));
+});
+
+test('Chapter 4 shows and preserves three Feastle orders, completing only after the last dish', () => {
+  let state = createInitialMergeWorldState(NOW, ['feastle']);
+  state = reduceMergeWorld(state, { type: 'reconcileFriendship', levels: { feastle: 4 }, now: NOW + 1 }).state;
+  state = reduceMergeWorld(state, { type: 'reconcileStory', familyId: 'feastle', status: 'order_active', targetLevel: 4, starterParcelGranted: true, now: NOW + 2 }).state;
+  assert.equal(state.activeOrders.length, 3);
+  assert.deepEqual(state.activeOrders.map((order) => order.requirements[0].definitionId), [
+    'food:table:2', 'food:table:3', 'food:table:4',
+  ]);
+
+  const first = state.activeOrders[0];
+  state = withItems(state, [[29, item('chapter:first', first.requirements[0].definitionId)]]);
+  state = reduceMergeWorld(state, { type: 'serveOrder', orderId: first.id, now: NOW + 3 }).state;
+  assert.equal(state.activeOrders.length, 2);
+  assert.equal(state.characterProgress.feastle?.completedChapterIds.includes('feastle-chapter-4'), false);
+  assert.equal(state.externalRewardReceipts.some((receipt) => receipt.kind === 'conversation' && receipt.sourceId === 'feastle-chapter-4'), false);
+
+  state = reduceMergeWorld(state, { type: 'reconcileStory', familyId: 'feastle', status: 'order_active', targetLevel: 4, starterParcelGranted: true, now: NOW + 4 }).state;
+  assert.equal(state.activeOrders.length, 2);
+  for (const [index, order] of [...state.activeOrders].entries()) {
+    state = withItems(state, [[29, item(`chapter:${index + 2}`, order.requirements[0].definitionId)]]);
+    state = reduceMergeWorld(state, { type: 'serveOrder', orderId: order.id, now: NOW + 5 + index }).state;
+  }
+  assert.equal(state.activeOrders.length, 0);
+  assert.ok(state.characterProgress.feastle?.completedChapterIds.includes('feastle-chapter-4'));
+  assert.ok(state.externalRewardReceipts.some((receipt) => receipt.kind === 'conversation' && receipt.sourceId === 'feastle-chapter-4'));
+  assert.equal(state.externalRewardReceipts.filter((receipt) => receipt.kind === 'story_order_served' && receipt.amount === 4).length, 3);
 });
 
 test('normalization recovers invalid snapshots and Friendship preserves legacy floors', () => {
@@ -302,6 +483,13 @@ test('normalization recovers invalid snapshots and Friendship preserves legacy f
 function item(instanceId: string, definitionId: string): MergeBoardItem {
   assert.ok(MERGE_ITEMS_BY_ID.has(definitionId));
   return { kind: 'item', instanceId, definitionId };
+}
+
+function withStoryGenerator(state: MergeWorldState, familyId: MergeCharacterId): MergeWorldState {
+  return reduceMergeWorld(state, {
+    type: 'reconcileStory', familyId, status: 'order_active', targetLevel: 2,
+    starterParcelGranted: false, now: state.updatedAt + 1,
+  }).state;
 }
 
 function withItems(state: MergeWorldState, placements: Array<[number, MergeBoardItem]>): MergeWorldState {

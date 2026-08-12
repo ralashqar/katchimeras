@@ -17,6 +17,7 @@ import Animated, {
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppFontFamilies } from '@/constants/theme';
+import { useDisposableTimers } from '@/hooks/use-disposable-timers';
 import type { GoalTaskSourceRect } from './goal-task-row';
 
 export function BondRewardFlightOverlay({ from, onFinish, onTokenArrive, points, to }: {
@@ -27,6 +28,7 @@ export function BondRewardFlightOverlay({ from, onFinish, onTokenArrive, points,
   to: GoalTaskSourceRect;
 }) {
   const reduceMotion = useReducedMotion();
+  const timers = useDisposableTimers('bond-reward-flight');
   const count = reduceMotion ? 1 : Math.min(5, Math.max(1, points));
   const amounts = useMemo(() => Array.from({ length: count }, (_, index) =>
     Math.floor(points / count) + (index < points % count ? 1 : 0)
@@ -56,7 +58,7 @@ export function BondRewardFlightOverlay({ from, onFinish, onTokenArrive, points,
                 : index >= Math.ceil(count / 2)
                   ? Haptics.ImpactFeedbackStyle.Light
                   : Haptics.ImpactFeedbackStyle.Soft);
-              if (index === count - 1) setTimeout(() => void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft), 170);
+              if (index === count - 1) timers.schedule(() => void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft), 170);
             }
             if (index === count - 1) onFinish();
           }}

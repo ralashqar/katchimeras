@@ -7,6 +7,16 @@ const DATABASE_NAME = 'katchimeras-merge-world.db';
 const LOCAL_PROFILE_ID = 'local';
 
 let databasePromise: ReturnType<typeof SQLite.openDatabaseAsync> | null = null;
+let resetGeneration = 0;
+let resetInProgress = false;
+let writeQueue: Promise<void> = Promise.resolve();
+const resetListeners = new Set<(state: MergeWorldState) => void>();
+
+function serializeWrite<T>(task: () => Promise<T>): Promise<T> {
+  const result = writeQueue.then(task, task);
+  writeQueue = result.then(() => undefined, () => undefined);
+  return result;
+}
 
 async function database() {
   if (!databasePromise) {
@@ -62,40 +72,69 @@ export async function loadMergeWorldState(now = Date.now()): Promise<MergeWorldS
 }
 
 export async function saveMergeWorldState(state: MergeWorldState, receiptIds?: readonly string[]): Promise<void> {
-  const db = await database();
+  // Companion/story resets notify their subscribers asynchronously. Do not
+  // allow a subscriber holding the pre-reset board to queue it behind the
+  // destructive reset and restore generators after the database is cleared.
+  if (resetInProgress) return;
+  const generation = resetGeneration;
   const serialized = JSON.stringify(state);
   const selectedReceipts = receiptIds == null
     ? state.externalRewardReceipts
     : state.externalRewardReceipts.filter((receipt) => receiptIds.includes(receipt.id));
-  await db.withTransactionAsync(async () => {
-    await db.runAsync(
-      `INSERT INTO merge_world_snapshot (profile_id, schema_version, revision, updated_at, state_json, backup_json)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(profile_id) DO UPDATE SET
-         schema_version = excluded.schema_version,
-         revision = excluded.revision,
-         updated_at = excluded.updated_at,
-         backup_json = merge_world_snapshot.state_json,
-         state_json = excluded.state_json`,
-      [LOCAL_PROFILE_ID, state.version, state.revision, state.updatedAt, serialized, null],
-    );
-    for (const receipt of selectedReceipts) {
+
+  await serializeWrite(async () => {
+    if (generation !== resetGeneration) return;
+    if (resetInProgress) return;
+    const db = await database();
+    if (generation !== resetGeneration) return;
+    if (resetInProgress) return;
+    await db.withTransactionAsync(async () => {
+      if (generation !== resetGeneration) return;
+      if (resetInProgress) return;
       await db.runAsync(
-        `INSERT OR IGNORE INTO merge_world_outbox (receipt_id, receipt_kind, created_at, payload_json, synced_at)
-         VALUES (?, ?, ?, ?, ?)`,
-        [receipt.id, receipt.kind, receipt.createdAt, JSON.stringify(receipt), receipt.appliedAt],
+        `INSERT INTO merge_world_snapshot (profile_id, schema_version, revision, updated_at, state_json, backup_json)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(profile_id) DO UPDATE SET
+           schema_version = excluded.schema_version,
+           revision = excluded.revision,
+           updated_at = excluded.updated_at,
+           backup_json = merge_world_snapshot.state_json,
+           state_json = excluded.state_json`,
+        [LOCAL_PROFILE_ID, state.version, state.revision, state.updatedAt, serialized, null],
       );
-      if (receipt.appliedAt != null) {
-        await db.runAsync('UPDATE merge_world_outbox SET synced_at = ? WHERE receipt_id = ?', [receipt.appliedAt, receipt.id]);
+      for (const receipt of selectedReceipts) {
+        await db.runAsync(
+          `INSERT OR IGNORE INTO merge_world_outbox (receipt_id, receipt_kind, created_at, payload_json, synced_at)
+           VALUES (?, ?, ?, ?, ?)`,
+          [receipt.id, receipt.kind, receipt.createdAt, JSON.stringify(receipt), receipt.appliedAt],
+        );
+        if (receipt.appliedAt != null) {
+          await db.runAsync('UPDATE merge_world_outbox SET synced_at = ? WHERE receipt_id = ?', [receipt.appliedAt, receipt.id]);
+        }
       }
-    }
+    });
   });
 }
 
-export async function resetMergeWorldStateForDebug(): Promise<void> {
-  const db = await database();
-  await db.withTransactionAsync(async () => {
-    await db.runAsync('DELETE FROM merge_world_snapshot WHERE profile_id = ?', [LOCAL_PROFILE_ID]);
-    await db.runAsync('DELETE FROM merge_world_outbox');
-  });
+export async function resetMergeWorldStateForDebug(now = Date.now()): Promise<void> {
+  resetGeneration += 1;
+  resetInProgress = true;
+  try {
+    await serializeWrite(async () => {
+      const db = await database();
+      await db.withTransactionAsync(async () => {
+        await db.runAsync('DELETE FROM merge_world_snapshot WHERE profile_id = ?', [LOCAL_PROFILE_ID]);
+        await db.runAsync('DELETE FROM merge_world_outbox');
+      });
+    });
+    const freshState = createInitialMergeWorldState(now);
+    resetListeners.forEach((listener) => listener(freshState));
+  } finally {
+    resetInProgress = false;
+  }
+}
+
+export function subscribeMergeWorldResets(listener: (state: MergeWorldState) => void): () => void {
+  resetListeners.add(listener);
+  return () => resetListeners.delete(listener);
 }

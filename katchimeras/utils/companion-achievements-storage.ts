@@ -29,6 +29,10 @@ export function saveCompanionAchievementState(state: CompanionAchievementState):
   setStoredJson(STORAGE_KEY, state);
 }
 
+export function resetCompanionAchievementsForDebug(): void {
+  saveCompanionAchievementState(EMPTY);
+}
+
 export function recordCompanionAchievementUnlocks(
   state: CompanionAchievementState,
   records: CompanionAchievementRecord[]

@@ -16,3 +16,7 @@ export function loadCompanionDiscoveryState(): CompanionDiscoveryState {
 export function saveCompanionDiscoveryState(state: CompanionDiscoveryState): void {
   setStoredJson(STORAGE_KEY, normaliseCompanionDiscoveryState(state));
 }
+
+export function resetCompanionDiscoveryForDebug(): void {
+  saveCompanionDiscoveryState(emptyCompanionDiscoveryState());
+}

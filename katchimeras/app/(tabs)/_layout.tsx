@@ -1,5 +1,5 @@
 import { Redirect, Tabs } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { DayCaptureSession } from '@/components/katchadeck/home/day-capture-session';
 import { StreakBootstrap } from '@/components/katchadeck/streak/streak-bootstrap';
@@ -7,6 +7,7 @@ import { MeadowTabBar } from '@/components/katchadeck/ui/meadow-tab-bar';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
+import { loadFeastleStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
 
 // Today is the daily capture surface. The lightweight Katchimeras roster is
 // visible in navigation; the persistent world route remains registered but
@@ -17,6 +18,8 @@ export const unstable_settings = {
 
 export default function TabLayout() {
   const onboardingProfile = loadOnboardingProfile();
+  const [feastleStory, setFeastleStory] = useState(loadFeastleStory);
+  useEffect(() => subscribeCompanionStories(() => setFeastleStory(loadFeastleStory())), []);
 
   if (!onboardingProfile.completed) {
     return <Redirect href="/onboarding" />;
@@ -72,14 +75,19 @@ export default function TabLayout() {
           options={{
             freezeOnBlur: true,
             title: 'Katchimeras',
+            tabBarBadge: feastleStory.unreadReturn ? '' : undefined,
             tabBarIcon: ({ color }) => <IconSymbol size={26} name="pawprint.fill" color={color} />,
           }}
         />
         <Tabs.Screen
           name="games"
           options={{
-            freezeOnBlur: true,
+            // This route owns its own focus boundary. Let it observe blur so
+            // it can unmount the visual board/worklets while retaining the
+            // warm provider and its already-hydrated merge state.
+            freezeOnBlur: false,
             title: 'Merge',
+            tabBarBadge: feastleStory.status === 'order_active' ? '' : undefined,
             tabBarIcon: ({ color }) => <IconSymbol size={26} name="circle.grid.2x2.fill" color={color} />,
           }}
         />

@@ -29,6 +29,11 @@ export function resetStoredCompanionQuickGoalProgressForDay(dayId: string): void
   listeners.forEach((listener) => listener());
 }
 
+export function resetAllCompanionQuickGoalsForDebug(): void {
+  saveCompanionQuickGoalState(emptyCompanionQuickGoalState());
+  listeners.forEach((listener) => listener());
+}
+
 export function subscribeCompanionQuickGoalResets(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);

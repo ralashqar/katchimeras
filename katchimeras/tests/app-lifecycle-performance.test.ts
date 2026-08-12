@@ -17,7 +17,7 @@ import {
 
 test('only foreground mini-game routes enter game activity mode', () => {
   assert.equal(appSurfaceForPathname('/today'), 'standard');
-  assert.equal(appSurfaceForPathname('/games'), 'standard');
+  assert.equal(appSurfaceForPathname('/games'), 'game');
   assert.equal(appSurfaceForPathname('/game/quest-feastle-merge'), 'game');
   assert.equal(appSurfaceForPathname('/katchimera/companion:cheerlet/quest/quest-cheerlet-block-party/game'), 'game');
 });
@@ -70,10 +70,20 @@ test('passive capture is one-shot while live game watchers guard late async comp
 
 test('game mode releases background UI work and avoids full Kingdom hydration', () => {
   const tabsSource = readFileSync(path.join(process.cwd(), 'app', '(tabs)', '_layout.tsx'), 'utf8');
+  const mergeRouteSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-world-route-screen.tsx'), 'utf8');
+  const mergeBoardSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'feastle-persistent-merge-board.tsx'), 'utf8');
   const todaySource = readFileSync(path.join(process.cwd(), 'app', '(tabs)', 'today.tsx'), 'utf8');
   const captureSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'home', 'day-capture-session.tsx'), 'utf8');
   const gameSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'game-hub-game-route-screen.tsx'), 'utf8');
   assert.match(tabsSource, /name="today"[\s\S]*?freezeOnBlur: false/);
+  assert.match(tabsSource, /name="games"[\s\S]*?freezeOnBlur: false/);
+  assert.match(mergeRouteSource, /useIsFocused/);
+  assert.match(mergeRouteSource, /\{isFocused \? <>/);
+  assert.match(mergeRouteSource, /<MergeWorldProvider active=\{isFocused\}/);
+  assert.match(mergeBoardSource, /useDisposableTimers\('merge-board-feedback'\)/);
+  assert.match(mergeBoardSource, /acquireLifecycleResource\('merge_board'/);
+  assert.match(mergeBoardSource, /effectsPaused\.value = 0/);
+  assert.match(mergeBoardSource, /timers\.cancelAll\(\)/);
   assert.match(todaySource, /if \(!screenFocused\) return <View style=\{styles\.inactiveScreen\}/);
   assert.ok((captureSource.match(/enabled: captureGates\.captureEnabled/g) ?? []).length >= 3);
   assert.match(captureSource, /const captureActive = pathname === '\/today'/);

@@ -1,6 +1,9 @@
 export type LifecycleResourceKind =
   | 'audio_player'
   | 'game_route'
+  | 'merge_board'
+  | 'merge_provider'
+  | 'frame_probe'
   | 'location_watcher'
   | 'pedometer_watcher'
   | 'timer';
@@ -13,6 +16,9 @@ export type LifecycleResourceSnapshot = {
 const RESOURCE_KINDS: readonly LifecycleResourceKind[] = [
   'audio_player',
   'game_route',
+  'merge_board',
+  'merge_provider',
+  'frame_probe',
   'location_watcher',
   'pedometer_watcher',
   'timer',

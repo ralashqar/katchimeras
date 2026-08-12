@@ -163,6 +163,7 @@ test('bond rewards queue, fly into the creature, respect reduced motion, and gat
   assert.match(overlay, /onTokenArrive/);
   assert.match(overlay, /useReducedMotion/);
   assert.match(overlay, /Haptics\.impactAsync/);
+  assert.match(overlay, /useDisposableTimers\('bond-reward-flight'\)/);
   assert.match(stage, /rewardPulseKey/);
   assert.match(stage, /withSequence/);
   assert.match(interaction, /pendingBondCelebration/);
@@ -170,6 +171,19 @@ test('bond rewards queue, fly into the creature, respect reduced motion, and gat
   assert.match(levelUp, /Bond level up/);
   assert.match(levelUp, /RisingArrow/);
   assert.match(kingdom, /!bondLevelUp && !quests\.selectedPendingBondCelebration/);
+});
+
+test('Merge and Feastle story navigation replaces the prior story screen and pauses hidden rewards', () => {
+  const merge = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-world-screen.tsx'), 'utf8');
+  const route = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'katchimera-companion-route-screen.tsx'), 'utf8');
+  const interaction = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'), 'utf8');
+
+  assert.match(merge, /storyNavigationPendingRef/);
+  assert.match(merge, /source: 'merge-world'/);
+  assert.match(route, /source === 'merge-world' \? router\.dismissTo\('\/games'\) : router\.back\(\)/);
+  assert.match(route, /onOpenMerge=\{\(orderId\) => router\.dismissTo/);
+  assert.match(interaction, /if \(!props\.active \|\| !receipt \|\| bondReward\) return/);
+  assert.match(interaction, /if \(props\.active !== false\) return/);
 });
 
 test('every accepted conversation insight queues bond once per session, including updated insight slots', () => {
@@ -434,11 +448,18 @@ test('ideal-skin onboarding gates launch companions and skin equipment opens a b
   assert.match(paywall, /safeDismissModal/);
   assert.doesNotMatch(companionRoute, /if \(!isFocused\) return <View/);
   assert.match(interaction, /selectExperienceDestination\('insight'\)/);
-  assert.match(profile, /Reset Katchimera skin questionnaires/);
+  assert.match(profile, /Reset Katchimeras progress/);
   assert.match(profile, /resetDevSubscriptionSimulator\(\)/);
   assert.match(profile, /resetKatchimeraWardrobeForDebug\(\)/);
-  assert.match(profile, /resetLaunchCompanionBondsForDebug\(\)/);
-  assert.match(profile, /begin its questionnaire from question one/);
+  assert.match(profile, /resetAllKatchimeraContentForDebug\(\)/);
+  assert.match(profile, /resetAllKatchimeraBondsForDebug\(resetAt\)/);
+  assert.match(profile, /resetCompanionQuestsForDebug\(\)/);
+  assert.match(profile, /resetCompanionJourneysForDebug\(\)/);
+  assert.match(profile, /resetCompanionDiscoveryForDebug\(\)/);
+  assert.match(profile, /resetAllCompanionQuickGoalsForDebug\(\)/);
+  assert.match(profile, /resetCompanionAchievementsForDebug\(\)/);
+  assert.match(profile, /await resetMergeWorldStateForDebug\(resetAt\)/);
+  assert.match(profile, /questionnaires and Friendship now begin from question one and level one/);
   assert.match(questHook, /today\?\.isoDate \?\? localDayId\(new Date\(occurredAt\)\)/);
   assert.doesNotMatch(questHook, /if \(!selectedFamilyId \|\| !today\?\.isoDate \|\| !isConversationV2Family\(selectedFamilyId\)\) return null/);
   assert.doesNotMatch(interaction, /label="Start questionnaire"/);
@@ -530,6 +551,63 @@ test('goal picker returns to the dedicated goals destination', () => {
   assert.match(goalComposer, /keyboardVisible && styles\.keyboardFrameOpen/);
   assert.match(goalComposer, /keyboardVisible && styles\.contentKeyboard/);
   assert.match(goalComposer, /onSave\(trimmed, cadence\)/);
+});
+
+test('Feastle begins with authored choices before the first Merge order', () => {
+  const interaction = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'), 'utf8');
+  const stage = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'feastle-story-stage.tsx'), 'utf8');
+  const conversation = fs.readFileSync(path.join(process.cwd(), 'constants', 'feastle-friendship-conversations.ts'), 'utf8');
+  assert.match(interaction, /const beginFeastleIntroduction = useCallback/);
+  assert.match(interaction, /pendingStoryConversationRef\.current = null;\s*openedStoryConversationRef\.current = null;\s*requestStoryConversation\(FEASTLE_FIRST_MEETING_DEFINITION_ID\)/);
+  assert.match(interaction, /onBeginIntroduction=\{beginFeastleIntroduction\}/);
+  assert.match(stage, /if \(needsBeginning\) onBeginIntroduction\(\)/);
+  assert.doesNotMatch(stage, /if \(needsBeginning\) beginFeastleStory\(\)/);
+  assert.match(conversation, /id: FEASTLE_FIRST_MEETING_DEFINITION_ID/);
+  assert.match(conversation, /I brought a basket and one runaway spoon/);
+  assert.match(conversation, /how would you like me beside you/);
+  assert.doesNotMatch(conversation, /What kind of companion should Feastle be/);
+  assert.match(interaction, /completedFeastleIntroductionRef/);
+  assert.match(interaction, /beginFeastleStory\(\);\s*showFeastleStoryHome\(\)/);
+  assert.match(interaction, /pendingStoryConversationRef/);
+  assert.match(interaction, /openedStoryConversationRef/);
+  assert.match(interaction, /props\.conversationSession\.status === 'active'/);
+  assert.match(interaction, /openedStoryConversationRef\.current !== definitionId/);
+  assert.match(interaction, /openedStoryConversationRef\.current = definitionId;\s*showConversation\(\)/);
+  assert.match(interaction, /openedStoryConversationRef\.current === story\.pendingConversationId/);
+  assert.match(interaction, /Feastle is finding the next page/);
+  assert.doesNotMatch(interaction, /startConversation\(\{ definitionId: story\.pendingConversationId \}\);\s*showConversation\(\)/);
+});
+
+test('reward splash namespaces sibling keys independently from the reward receipt', () => {
+  const splash = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'reward-splash.tsx'), 'utf8');
+  assert.match(splash, /key=\{`reward-particles:\$\{item\.id\}`\}/);
+  assert.match(splash, /key=\{`reward-foreground:\$\{item\.id\}`\}/);
+  assert.doesNotMatch(splash, /key=\{item\.id\}/);
+  assert.doesNotMatch(splash, /<ScrollView/);
+  assert.match(splash, /function BreathingRewardHero/);
+  assert.match(splash, /withRepeat\(withTiming\(1\.055/);
+  assert.match(splash, /function RewardConfettiPiece/);
+  assert.match(splash, /withRepeat\(withSequence/);
+});
+
+test('Feastle story scenes return to the chapter surface instead of generic Keep talking', () => {
+  const interaction = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'), 'utf8');
+  const scene = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-conversation-scene.tsx'), 'utf8');
+  const stage = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'feastle-story-stage.tsx'), 'utf8');
+  assert.match(interaction, /const feastleStoryFlow = Boolean/);
+  assert.match(interaction, /\^feastle:friendship:\[234\]\$/);
+  assert.match(interaction, /storyFinale=\{feastleStoryFinale\}/);
+  assert.match(interaction, /storyFlow=\{feastleStoryFlow\}/);
+  assert.match(interaction, /onStoryComplete=\{experience\.showHome\}/);
+  assert.match(scene, /storyFlow \? <StoryConversationContinuation/);
+  assert.match(scene, /finale \? `Back to \$\{name\}` : 'See next chapter'/);
+  assert.match(scene, /the Pantry will wait until a new order is actually ready/);
+  assert.match(scene, /storyFlow \? 'See next chapter' : 'Keep talking'/);
+  assert.match(stage, /FEASTLE_STORY_REQUESTS\[story\.targetLevel\]/);
+  assert.match(stage, /PersistentMergeItemArt/);
+  assert.match(stage, /Open all orders/);
+  assert.match(stage, /\{!complete \? <Pressable/);
+  assert.match(stage, />More with Feastle</);
 });
 
 test('explicit launch intents can open a destination directly', () => {

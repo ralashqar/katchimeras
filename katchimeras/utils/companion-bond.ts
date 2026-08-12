@@ -373,7 +373,9 @@ export function normaliseCompanionBondState(value: CompanionBondState | Record<s
     : [];
   const eventIds = new Set(events.map((event) => event.id));
   const pendingCelebrations = Array.isArray(candidate.pendingCelebrations)
-    ? candidate.pendingCelebrations.filter((receipt) => receipt?.id && eventIds.has(receipt.eventId))
+    ? candidate.pendingCelebrations.filter((receipt) => receipt?.id
+      && eventIds.has(receipt.eventId)
+      && !receipt.eventId.startsWith('merge-friendship:merge-story:feastle:'))
     : [];
   const resetCutoffsByCreature = candidate.resetCutoffsByCreature && typeof candidate.resetCutoffsByCreature === 'object'
     ? Object.fromEntries(Object.entries(candidate.resetCutoffsByCreature).filter(([, cutoff]) => Number.isFinite(cutoff) && cutoff > 0))

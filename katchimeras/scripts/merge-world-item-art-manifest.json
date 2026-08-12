@@ -1,0 +1,60 @@
+{
+  "version": 2,
+  "styleReferences": [
+    "assets/images/katchimeras/baristabbit.png",
+    "assets/images/katchimeras/world/backgrounds/home/home-exploration-v1.png"
+  ],
+  "promptBrief": [
+    "Cozy low-detail stylized 3D mobile-game collectibles matching Baristabbit and the Today home environment.",
+    "Rounded toy-like forms, smooth clay/ceramic/painted wood/cloth, broad upper-left lighting, gentle ambient occlusion, and bold silhouettes readable at 34-50px.",
+    "Exact 4x4 grid on uniform #FF00FF; one centered object per occupied cell; 12% safe padding; no text, cast shadows, photorealism, micro-texture, or cell-boundary crossings."
+  ],
+  "output": {
+    "size": 256,
+    "subjectExtent": 210,
+    "quality": 84,
+    "hardFileLimitBytes": 51200
+  },
+  "sheets": [
+    {
+      "id": "sheet-a",
+      "cells": [
+        { "row": 0, "column": 0, "definitionId": "food:table:1", "file": "food-table-1-ingredient.webp" },
+        { "row": 0, "column": 1, "definitionId": "food:table:2", "file": "food-table-2-snack.webp" },
+        { "row": 0, "column": 2, "definitionId": "food:table:3", "file": "food-table-3-dish.webp" },
+        { "row": 0, "column": 3, "definitionId": "food:table:4", "file": "food-table-4-meal.webp" },
+        { "row": 1, "column": 0, "definitionId": "food:table:5", "file": "food-table-5-feast.webp" },
+        { "row": 1, "column": 1, "definitionId": "food:table:6", "file": "food-table-6-banquet.webp" },
+        { "row": 1, "column": 2, "definitionId": "nature:garden:1", "file": "nature-garden-1-seed.webp" },
+        { "row": 1, "column": 3, "definitionId": "nature:garden:2", "file": "nature-garden-2-sprout.webp" },
+        { "row": 2, "column": 0, "definitionId": "nature:garden:3", "file": "nature-garden-3-plant.webp" },
+        { "row": 2, "column": 1, "definitionId": "nature:garden:4", "file": "nature-garden-4-flower.webp" },
+        { "row": 2, "column": 2, "definitionId": "nature:garden:5", "file": "nature-garden-5-rare-flower.webp" },
+        { "row": 2, "column": 3, "definitionId": "nature:garden:6", "file": "nature-garden-6-magical-plant.webp" },
+        { "row": 3, "column": 0, "definitionId": "nature:garden:7", "file": "nature-garden-7-ancient-tree.webp" },
+        { "row": 3, "column": 1, "definitionId": "hybrid:picnic-pack", "file": "hybrid-picnic-pack.webp" }
+      ]
+    },
+    {
+      "id": "sheet-b",
+      "cells": [
+        { "row": 0, "column": 0, "definitionId": "nature:waterside:1", "file": "nature-waterside-1-pebble.webp" },
+        { "row": 0, "column": 1, "definitionId": "nature:waterside:2", "file": "nature-waterside-2-shell.webp" },
+        { "row": 0, "column": 2, "definitionId": "nature:waterside:3", "file": "nature-waterside-3-tidepool.webp" },
+        { "row": 0, "column": 3, "definitionId": "nature:waterside:4", "file": "nature-waterside-4-water-lily.webp" },
+        { "row": 1, "column": 0, "definitionId": "nature:waterside:5", "file": "nature-waterside-5-moonlit-cove.webp" },
+        { "row": 1, "column": 1, "definitionId": "adventure:trail:1", "file": "adventure-trail-1-sock.webp" },
+        { "row": 1, "column": 2, "definitionId": "adventure:trail:2", "file": "adventure-trail-2-shoe.webp" },
+        { "row": 1, "column": 3, "definitionId": "adventure:trail:3", "file": "adventure-trail-3-boot.webp" },
+        { "row": 2, "column": 0, "definitionId": "adventure:trail:4", "file": "adventure-trail-4-hiking-gear.webp" },
+        { "row": 2, "column": 1, "definitionId": "adventure:trail:5", "file": "adventure-trail-5-adventure-pack.webp" },
+        { "row": 2, "column": 2, "definitionId": "adventure:trail:6", "file": "adventure-trail-6-expedition-kit.webp" },
+        { "row": 2, "column": 3, "definitionId": "adventure:travel:1", "file": "adventure-travel-1-ticket.webp" },
+        { "row": 3, "column": 0, "definitionId": "adventure:travel:2", "file": "adventure-travel-2-map.webp" },
+        { "row": 3, "column": 1, "definitionId": "adventure:travel:3", "file": "adventure-travel-3-travel-journal.webp" },
+        { "row": 3, "column": 2, "definitionId": "adventure:travel:4", "file": "adventure-travel-4-suitcase.webp" },
+        { "row": 3, "column": 3, "definitionId": "adventure:travel:5", "file": "adventure-travel-5-grand-journey.webp" }
+      ]
+    }
+  ]
+}

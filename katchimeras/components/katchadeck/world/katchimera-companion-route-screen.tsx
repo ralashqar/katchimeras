@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 import { KingdomCompanionScreen } from '@/components/katchadeck/world/kingdom-companion-screen';
 import { markFlowStart, reportFlowReady } from '@/utils/flow-performance';
 
-export function KatchimeraCompanionRouteScreen({ creatureId }: { creatureId: string }) {
+export function KatchimeraCompanionRouteScreen({ creatureId, source }: { creatureId: string; source?: 'merge-world' }) {
   const isFocused = useIsFocused();
   const router = useRouter();
 
@@ -17,7 +17,11 @@ export function KatchimeraCompanionRouteScreen({ creatureId }: { creatureId: str
   return (
     <KingdomCompanionScreen
       initialCreatureId={creatureId}
-      onCloseCompanion={() => router.back()}
+      onCloseCompanion={() => source === 'merge-world' ? router.dismissTo('/games') : router.back()}
+      onOpenMerge={(orderId) => router.dismissTo({
+        pathname: '/games',
+        params: orderId ? { focusOrderId: orderId } : {},
+      })}
       onOpenQuestGame={(selectedCreatureId, questId) => {
         markFlowStart('katchimera-block-blast');
         router.push({

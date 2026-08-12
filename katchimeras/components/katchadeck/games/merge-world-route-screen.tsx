@@ -1,3 +1,4 @@
+import { useIsFocused } from '@react-navigation/native';
 import { useMemo } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
@@ -18,6 +19,7 @@ import { deriveKingdom } from '@/utils/kingdom-engine';
 import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability';
 
 export function MergeWorldRouteScreen() {
+  const isFocused = useIsFocused();
   const effectsPaused = useSharedValue(0);
   const { height, width } = useWindowDimensions();
   const { days } = useAllDays();
@@ -38,14 +40,16 @@ export function MergeWorldRouteScreen() {
   }, [allKatchimerasAvailable, days]);
 
   return (
-    <View style={styles.screen}>
-      <TodayExplorationBackground backgroundKey="home" imageSize={Math.max(height, width)} />
-      <View style={styles.world}>
-        <MergeWorldProvider characterIds={persistent.characterIds} days={days} questState={persistent.quests}>
-          <MergeWorldScreen effectsPaused={effectsPaused} />
-        </MergeWorldProvider>
+    <MergeWorldProvider active={isFocused} characterIds={persistent.characterIds} days={days} questState={persistent.quests}>
+      <View style={styles.screen}>
+        {isFocused ? <>
+          <TodayExplorationBackground backgroundKey="home" imageSize={Math.max(height, width)} />
+          <View style={styles.world}>
+            <MergeWorldScreen active={isFocused} effectsPaused={effectsPaused} />
+          </View>
+        </> : null}
       </View>
-    </View>
+    </MergeWorldProvider>
   );
 }
 

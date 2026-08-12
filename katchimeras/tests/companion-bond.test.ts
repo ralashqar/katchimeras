@@ -5,6 +5,7 @@ import {
   backfillQuestBondEvents,
   companionBondProgress,
   emptyCompanionBondState,
+  normaliseCompanionBondState,
   questBondEventId,
   recordCompanionBondEvent,
   resetCompanionBondForCreatures,
@@ -76,6 +77,29 @@ test('live awards queue a before/after receipt and reset removes it at true zero
     submissions: [], offerCycles: [], attempts: [],
   };
   assert.equal(companionBondProgress(backfillQuestBondEvents(reset, historicalQuestState), 'steppling').totalPoints, 0);
+});
+
+test('legacy Feastle merge flights are retired without removing earned bond', () => {
+  const eventId = 'merge-friendship:merge-story:feastle:chapter-1:level-4:order-1';
+  const normalized = normaliseCompanionBondState({
+    schemaVersion: 2,
+    events: [{ id: eventId, creatureId: 'companion:feastle', kind: 'merge_order_completed', points: 4, occurredAt: 100 }],
+    pendingCelebrations: [{
+      id: `bond-reward:${eventId}`,
+      eventId,
+      creatureId: 'companion:feastle',
+      kind: 'merge_order_completed',
+      points: 4,
+      occurredAt: 100,
+      beforeTotal: 0,
+      afterTotal: 4,
+      beforeLevel: 1,
+      afterLevel: 1,
+    }],
+  });
+  assert.equal(normalized.events.length, 1);
+  assert.equal(companionBondProgress(normalized, 'companion:feastle').totalPoints, 4);
+  assert.equal(normalized.pendingCelebrations?.length, 0);
 });
 
 test('quest migration deduplicates completed rows and applies the quest lane reward', () => {

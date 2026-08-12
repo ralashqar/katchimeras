@@ -3,6 +3,7 @@ import type { WispId } from '@/types/wisp';
 export type MergeFamilyId = 'food' | 'nature' | 'adventure';
 export type MergeCharacterId = 'feastle' | 'mossprout' | 'steppling' | 'shellio' | 'voyagle';
 export type MergeOrderDifficulty = 'small' | 'medium' | 'major';
+export type MergeOrderPurpose = 'normal' | 'signature';
 
 export type MergeItemDefinition = {
   id: string;
@@ -68,6 +69,26 @@ export type MergeOrder = {
   reward: MergeReward;
   createdAt: number;
   signature: boolean;
+  purpose: MergeOrderPurpose;
+  chapterId?: string;
+  rerollAvailableAt?: number;
+  storyArcId?: string;
+  storyBeatId?: string;
+  storyTargetLevel?: number;
+  storyStep?: number;
+  storyStepCount?: number;
+};
+
+export type MergeGeneratorUnlockReceipt = {
+  id: string;
+  generatorId: string;
+  createdAt: number;
+  seenAt: number | null;
+};
+
+export type MergeCharacterProgress = {
+  friendshipLevel: number;
+  completedChapterIds: string[];
 };
 
 export type MergeRewardInboxEntry = {
@@ -79,16 +100,20 @@ export type MergeRewardInboxEntry = {
 
 export type MergeExternalRewardReceipt = {
   id: string;
-  kind: 'friendship' | 'wisp';
+  kind: 'friendship' | 'wisp' | 'conversation' | 'story_order_served';
   characterId: MergeCharacterId;
   amount: number;
+  presentation?: 'celebration' | 'quiet_summary';
   wispId?: WispId;
+  sourceId?: string;
+  storyStep?: number;
+  storyStepCount?: number;
   createdAt: number;
   appliedAt: number | null;
 };
 
 export type MergeWorldState = {
-  version: 1;
+  version: 2;
   revision: number;
   createdAt: number;
   updatedAt: number;
@@ -97,6 +122,8 @@ export type MergeWorldState = {
   storage: MergeBoardItem[];
   storageCapacity: number;
   rewardInbox: MergeRewardInboxEntry[];
+  generatorUnlockReceipts: MergeGeneratorUnlockReceipt[];
+  processedGeneratorChargeGrantIds: string[];
   generators: Record<string, MergeGeneratorState>;
   energy: { value: number; cap: number; lastRegenAt: number };
   coins: number;
@@ -111,6 +138,9 @@ export type MergeWorldState = {
   recentOrderKeys: string[];
   expansions: string[];
   processedActivityReceiptIds: string[];
+  activityEnergyByDay: Record<string, number>;
+  lastFreeRerollDayId: string | null;
+  characterProgress: Partial<Record<MergeCharacterId, MergeCharacterProgress>>;
   externalRewardReceipts: MergeExternalRewardReceipt[];
 };
 
@@ -125,8 +155,12 @@ export type MergeWorldCommand =
   | { type: 'claimInbox'; entryId: string; now: number }
   | { type: 'unlockExpansion'; expansionId: string; now: number }
   | { type: 'grantActivityEnergy'; receiptId: string; amount: number; now: number }
-  | { type: 'grantActivityEnergyBatch'; rewards: Array<{ receiptId: string; amount: number }>; now: number }
+  | { type: 'grantActivityEnergyBatch'; rewards: Array<{ receiptId: string; amount: number; dayId?: string; kind?: string }>; now: number }
+  | { type: 'ackGeneratorUnlock'; receiptId: string; now: number }
+  | { type: 'rerollOrder'; orderId: string; now: number }
   | { type: 'reconcileCharacters'; characterIds: string[]; now: number }
+  | { type: 'reconcileFriendship'; levels: Partial<Record<MergeCharacterId, number>>; now: number }
+  | { type: 'reconcileStory'; familyId: MergeCharacterId; status: string; targetLevel: number; starterParcelGranted: boolean; now: number }
   | { type: 'ackExternalReward'; receiptId: string; now: number };
 
 export type MergeWorldCommandResult = {

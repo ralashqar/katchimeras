@@ -6,6 +6,7 @@ import type {
 } from '@/types/companion-conversation';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import { companionInsightConversationDefinitions } from '@/constants/companion-insight-conversations';
+import { feastleFirstMeetingConversationDefinition, feastleFriendshipConversationDefinitions } from '@/constants/feastle-friendship-conversations';
 import {
   authoredConversationTopics,
   authoredFamilyConversationDefinitions,
@@ -917,6 +918,8 @@ export const companionConversationDefinitionsV2: readonly ConversationDefinition
   ...familyPack('steppling', STEPPLING_POLLS, STEPPLING_PROFILE),
   ...familyPack('flexel', FLEXEL_POLLS, FLEXEL_PROFILE),
   ...authoredFamilyConversationDefinitions,
+  feastleFirstMeetingConversationDefinition,
+  ...feastleFriendshipConversationDefinitions,
 ];
 
 export const companionConversationDefinitionById = new Map(

@@ -8,7 +8,7 @@ import {
   resetCompanionBondForCreatures,
   type CompanionBondState,
 } from '@/utils/companion-bond';
-import { companionIdForFamily } from '@/constants/katchimera-skins';
+import { companionIdForFamily, katchimeraFamilies } from '@/constants/katchimera-skins';
 import type { CompanionQuestState } from '@/utils/katchimera-quests';
 import type { StoredHomeState } from '@/types/home';
 
@@ -45,6 +45,17 @@ export function resetLaunchCompanionBondsForDebug(resetAt = Date.now()): void {
   saveCompanionBondState(resetCompanionBondForCreatures(
     stored,
     ['steppling', 'baristabbit', 'flexel'].map(companionIdForFamily),
+    resetAt
+  ));
+}
+
+export function resetAllKatchimeraBondsForDebug(resetAt = Date.now()): void {
+  const stored = normaliseCompanionBondState(
+    getStoredJson<CompanionBondState>(STORAGE_KEY, emptyCompanionBondState())
+  );
+  saveCompanionBondState(resetCompanionBondForCreatures(
+    stored,
+    katchimeraFamilies.map((family) => companionIdForFamily(family.id)),
     resetAt
   ));
 }

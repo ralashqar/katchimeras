@@ -246,11 +246,13 @@ export function selectConversationDefinition(input: {
   sessions: readonly ConversationSession[];
   signals: readonly QueuedConversationSignal[];
   bondLevel: 1 | 2 | 3 | 4;
+  friendshipLevel?: number;
   selectionSeed?: string;
 }): { definition: ConversationDefinition; signal: QueuedConversationSignal | null } | null {
   const pool = input.definitions.filter((definition) =>
     definition.familyId === input.familyId
     && definition.minimumBondLevel <= input.bondLevel
+    && (definition.minimumFriendshipLevel ?? 1) <= (input.friendshipLevel ?? input.bondLevel)
   );
   if (!pool.length) return null;
   const signal = input.signals
@@ -269,8 +271,11 @@ export function selectConversationDefinition(input: {
     const contextual = trigger ? pool.filter((definition) =>
       definition.trigger === trigger
       && (trigger !== 'journal' || !definition.triggerRouteKeys?.length || (signal.routeKey && definition.triggerRouteKeys.includes(signal.routeKey)))
+      && (!definition.triggerSourceIds?.length || definition.triggerSourceIds.includes(signal.sourceId))
     ) : [];
-    if (contextual.length) return { definition: chooseStable(contextual, `${input.familyId}:${input.dayId}:${signal.id}`)!, signal };
+    const sourceMatched = contextual.filter((definition) => definition.triggerSourceIds?.includes(signal.sourceId));
+    const contextualPool = sourceMatched.length ? sourceMatched : contextual;
+    if (contextualPool.length) return { definition: chooseStable(contextualPool, `${input.familyId}:${input.dayId}:${signal.id}`)!, signal };
   }
   const openers = pool.filter((definition) => definition.isOpener && !definition.contextualOnly);
   const general = pool.filter((definition) => !definition.contextualOnly && !definition.isOpener);

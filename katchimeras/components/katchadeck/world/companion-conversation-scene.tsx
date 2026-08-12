@@ -77,6 +77,9 @@ export function CompanionConversationScene({
   memories,
   onUpdateMemory,
   onOpenMore,
+  onStoryComplete,
+  storyFlow = false,
+  storyFinale = false,
   session,
   skins,
   questOffer,
@@ -100,6 +103,9 @@ export function CompanionConversationScene({
   memories: readonly CompanionMemory[];
   onUpdateMemory: (input: { memoryId: string; status: 'confirmed' | 'rejected' | 'forgotten'; summary?: string }) => void;
   onOpenMore: () => void;
+  onStoryComplete?: () => void;
+  storyFlow?: boolean;
+  storyFinale?: boolean;
   session: ConversationSession;
   skins: readonly KingdomSkinOption[];
   questOffer: { id: string; title: string; hint: string } | null;
@@ -152,13 +158,13 @@ export function CompanionConversationScene({
           darkColor="#FFD36E">
           {name}
         </ThemedText>
-        <Pressable
+        {!storyFlow ? <Pressable
           accessibilityLabel="More companion activities"
           accessibilityRole="button"
           onPress={onOpenMore}
           style={({ pressed }) => ({ alignItems: 'center', height: 44, justifyContent: 'center', opacity: pressed ? 0.68 : 1, width: 44 })}>
           <IconSymbol color="#FFF4D1" name="ellipsis" size={21} weight="bold" />
-        </Pressable>
+        </Pressable> : <View style={{ height: 44, width: 44 }} />}
       </View>
 
       <View accessibilityElementsHidden pointerEvents="none" style={{ minHeight: companionHomeHeroSpacer(height) }} />
@@ -195,9 +201,11 @@ export function CompanionConversationScene({
             onClose={onClose}
             onKeepTalking={() => {
               onDismissOutcome();
-              onKeepTalking();
+              if (storyFlow) onStoryComplete?.();
+              else onKeepTalking();
             }}
             onOpenDestination={onOpenOutcomeDestination}
+            storyFlow={storyFlow}
           />
         ) : session.pendingReply !== undefined ? (
           <View style={{ gap: 12 }}>
@@ -221,7 +229,7 @@ export function CompanionConversationScene({
         ) : session.status === 'completed' || node?.kind === 'end' ? (
           session.preview ? <View style={{ alignItems: 'center', gap: 10, paddingVertical: 6 }}>
             <ThemedText selectable style={{ fontSize: 14, lineHeight: 20, textAlign: 'center' }} lightColor="#5D4B37" darkColor="#5D4B37">Preview complete. Choose another flow below or exit the preview.</ThemedText>
-          </View> : <ConversationContinuation
+          </View> : storyFlow ? <StoryConversationContinuation finale={storyFinale} name={name} onContinue={onStoryComplete ?? onClose} /> : <ConversationContinuation
             familyId={definition.familyId}
             initialMode={session.exitTransition?.kind === 'continuation' ? session.exitTransition.destination : undefined}
             memories={memories}
@@ -269,6 +277,16 @@ export function CompanionConversationScene({
       {developerContent}
     </ScrollView>
   );
+}
+
+function StoryConversationContinuation({ finale, name, onContinue }: { finale: boolean; name: string; onContinue: () => void }) {
+  return <View style={{ gap: 10 }}>
+    <ThemedText selectable style={{ fontSize: 18, fontWeight: '900', lineHeight: 24 }} lightColor="#3B2C20" darkColor="#3B2C20">{finale ? 'Our first table is set.' : 'The next page is ready.'}</ThemedText>
+    <ThemedText selectable style={{ fontSize: 14, lineHeight: 20 }} lightColor="#5D4B37" darkColor="#5D4B37">{finale
+      ? `Head back to ${name}. You can keep talking, and the Pantry will wait until a new order is actually ready.`
+      : `Head back to ${name} to see the next chapter and what belongs on the Merge tray.`}</ThemedText>
+    <PrimaryAction label={finale ? `Back to ${name}` : 'See next chapter'} onPress={onContinue} />
+  </View>;
 }
 
 function GoalBundleProposal({ hasActiveGoalPlan, node, onDecision }: {
@@ -452,11 +470,12 @@ function conversationPrompt(
   return prompt.replace('{answer}', answer ?? 'that');
 }
 
-function ConversationOutcomeCard({ outcome, onClose, onKeepTalking, onOpenDestination }: {
+function ConversationOutcomeCard({ outcome, onClose, onKeepTalking, onOpenDestination, storyFlow = false }: {
   outcome: ConversationOutcomePresentation;
   onClose: () => void;
   onKeepTalking: () => void;
   onOpenDestination: (destination: ConversationOutcomeDestination) => void;
+  storyFlow?: boolean;
 }) {
   return <Animated.View entering={FadeInUp.duration(240)} style={{ gap: 11 }}>
     <View style={{ backgroundColor: '#FFF5D8', borderColor: 'rgba(168,117,47,0.34)', borderCurve: 'continuous', borderRadius: 24, borderWidth: 1, boxShadow: '0 9px 24px rgba(112,76,30,0.13)', gap: 8, padding: 17 }}>
@@ -476,7 +495,7 @@ function ConversationOutcomeCard({ outcome, onClose, onKeepTalking, onOpenDestin
     {outcome.destination && outcome.destinationLabel ? (
       <PrimaryAction label={outcome.destinationLabel} onPress={() => onOpenDestination(outcome.destination!)} />
     ) : null}
-    <SecondaryAction label="Keep talking" onPress={onKeepTalking} />
+    <SecondaryAction label={storyFlow ? 'See next chapter' : 'Keep talking'} onPress={onKeepTalking} />
     <SecondaryAction label="See you later" onPress={onClose} />
   </Animated.View>;
 }

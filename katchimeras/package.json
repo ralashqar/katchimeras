@@ -44,6 +44,8 @@
     "art:evolution-grid": "python scripts/generate-evolution-grid.py",
     "art:today-scenes": "python scripts/generate-today-full-spread.py",
     "art:achievement-icons": "python scripts/process-achievement-icon-sheet.py",
+    "art:merge-items:audit": "python scripts/process-merge-world-item-sheets.py --audit-only",
+    "art:merge-locks:audit": "python scripts/process-merge-locked-cell-art.py --audit-only",
     "art:achievement-generate": "python scripts/generate-achievement-trophy-sheet.py",
     "art:egg-avatars": "python scripts/generate-egg-avatar-skins.py",
     "art:egg-avatars:validate": "python scripts/generate-egg-avatar-skins.py validate",

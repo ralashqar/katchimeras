@@ -43,7 +43,7 @@ import {
 import { CompanionCinematicStage } from './companion-cinematic-stage';
 import { CompanionGameBackdrop } from './companion-game-backdrop';
 import { CompanionInsightThread } from './companion-insight-thread';
-import { CompanionPrimaryAction } from './companion-interaction-primitives';
+import { CompanionPrimaryAction, CompanionSecondaryAction } from './companion-interaction-primitives';
 import {
   CompanionBackAction,
   CompanionDestinationHeader,
@@ -114,11 +114,14 @@ import { CompanionIntroduction } from './companion-introduction';
 import { CompanionTrophyRoomScreen } from './companion-trophy-room-screen';
 import { CompanionVisitScene } from './companion-visit-scene';
 import { CompanionDashboard } from './companion-dashboard';
+import { FeastleStoryStage } from './feastle-story-stage';
+import { beginFeastleStory, loadFeastleStory } from '@/utils/companion-story-storage';
 import { CompanionSharedHistory } from './companion-shared-history';
 import { completedVisitCopy } from '@/utils/companion-visit';
 import { CompanionConversationScene, conversationSpeechLine } from './companion-conversation-scene';
 import { CompanionChatLobby, type CompanionChatStarter } from './companion-chat-lobby';
 import { isConversationV2Family } from '@/types/companion-conversation';
+import { FEASTLE_FIRST_MEETING_DEFINITION_ID } from '@/constants/feastle-friendship-conversations';
 
 const LazyQuestExperienceHost = lazy(async () => {
   const module = await import('./quests/quest-experience-host');
@@ -134,6 +137,7 @@ type Criterion = {
 };
 
 export type CompanionInteractionSheetProps = {
+  active?: boolean;
   creatureId: string;
   name: string;
   visualKey: HomeVisualKey;
@@ -144,6 +148,7 @@ export type CompanionInteractionSheetProps = {
   initialDestination?: CompanionDestination | null;
   onSelectDestination?: (destination: CompanionDestination | null) => void;
   onClose: () => void;
+  onOpenMerge?: (orderId?: string | null) => void;
   embedded?: boolean;
   activeQuest: { questId: string; title: string; hint: string; semanticInput?: boolean; journalInput?: boolean; journalFallback?: boolean; assistedJournalInput?: boolean; execution?: InteractiveQuestExecution | null; resolvedConfig?: Record<string, unknown>; offerSeed?: string } | null;
   questComplete: boolean;
@@ -278,6 +283,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const insets = useSafeAreaInsets();
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const onExperienceActiveChange = props.onExperienceActiveChange;
+  const [showFeastleDashboard, setShowFeastleDashboard] = useState(false);
   const onBondCelebrationComplete = props.onBondCelebrationComplete;
   const creatureRewardTargetRef = useRef<ViewType | null>(null);
   const [bondReward, setBondReward] = useState<{
@@ -311,14 +317,14 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
 
   useEffect(() => {
     const receipt = props.pendingBondCelebration;
-    if (!receipt || bondReward) return;
+    if (!props.active || !receipt || bondReward) return;
     setDisplayedBondTotal(receipt.beforeTotal);
     let cancelled = false;
     const launch = (attempt = 0) => {
       if (cancelled) return;
       const targetView = creatureRewardTargetRef.current;
       if (!targetView) {
-        if (attempt < 120) {
+        if (attempt < 1) {
           rewardLaunchTimerRef.current = setTimeout(() => launch(attempt + 1), 50);
         } else {
           const target = { height: 160, width: 160, x: viewportWidth * 0.58, y: viewportHeight * 0.24 };
@@ -330,7 +336,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       }
       targetView.measureInWindow((x, y, width, height) => {
         if (cancelled) return;
-        if ((!width || !height) && attempt < 120) {
+        if ((!width || !height) && attempt < 1) {
           rewardLaunchTimerRef.current = setTimeout(() => launch(attempt + 1), 50);
           return;
         }
@@ -346,7 +352,17 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       if (rewardLaunchTimerRef.current) clearTimeout(rewardLaunchTimerRef.current);
       rewardLaunchTimerRef.current = null;
     };
-  }, [bondReward, props.pendingBondCelebration, viewportHeight, viewportWidth]);
+  }, [bondReward, props.active, props.pendingBondCelebration, viewportHeight, viewportWidth]);
+
+  useEffect(() => {
+    if (props.active !== false) return;
+    if (rewardLaunchTimerRef.current) clearTimeout(rewardLaunchTimerRef.current);
+    if (rewardFinishTimerRef.current) clearTimeout(rewardFinishTimerRef.current);
+    rewardLaunchTimerRef.current = null;
+    rewardFinishTimerRef.current = null;
+    setBondReward(null);
+    setDisplayedBondTotal(null);
+  }, [props.active]);
 
   useEffect(() => () => {
     if (rewardLaunchTimerRef.current) clearTimeout(rewardLaunchTimerRef.current);
@@ -379,6 +395,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const onboardingConversationStatus = props.conversationSession?.status;
   const startConversation = props.onStartConversation;
   const showConversation = experience.showConversation;
+  const showFeastleStoryHome = experience.showHome;
+  const pendingStoryConversationRef = useRef<string | null>(null);
+  const openedStoryConversationRef = useRef<string | null>(null);
+  const completedFeastleIntroductionRef = useRef<string | null>(null);
   const {
     activeAttemptId,
     checkInOpen,
@@ -399,6 +419,75 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     syncJourneySession,
     route,
   } = experience;
+  const requestStoryConversation = useCallback((definitionId: string) => {
+    if (
+      props.conversationSession?.definitionId === definitionId
+      && props.conversationSession.status === 'active'
+      && props.conversationDefinition?.id === definitionId
+    ) {
+      pendingStoryConversationRef.current = null;
+      if (openedStoryConversationRef.current !== definitionId) {
+        openedStoryConversationRef.current = definitionId;
+        showConversation();
+      }
+      return;
+    }
+    pendingStoryConversationRef.current = definitionId;
+    startConversation({ definitionId });
+  }, [props.conversationDefinition?.id, props.conversationSession?.definitionId, props.conversationSession?.status, showConversation, startConversation]);
+  const beginFeastleIntroduction = useCallback(() => {
+    // The card press is the launch authority. Clear any request left behind by
+    // a previous mount so a failed/pre-hydration attempt cannot swallow taps.
+    pendingStoryConversationRef.current = null;
+    openedStoryConversationRef.current = null;
+    requestStoryConversation(FEASTLE_FIRST_MEETING_DEFINITION_ID);
+  }, [requestStoryConversation]);
+  useEffect(() => {
+    const definitionId = pendingStoryConversationRef.current;
+    if (
+      !definitionId
+      || props.conversationSession?.definitionId !== definitionId
+      || props.conversationSession.status !== 'active'
+      || props.conversationDefinition?.id !== definitionId
+    ) return;
+    pendingStoryConversationRef.current = null;
+    if (openedStoryConversationRef.current === definitionId) return;
+    openedStoryConversationRef.current = definitionId;
+    showConversation();
+  }, [props.conversationDefinition?.id, props.conversationSession?.definitionId, props.conversationSession?.status, showConversation]);
+  useEffect(() => {
+    if (props.familyId !== 'feastle') return;
+    const story = loadFeastleStory();
+    if (story.status !== 'conversation_active' || !story.pendingConversationId) return;
+    if (openedStoryConversationRef.current === story.pendingConversationId) return;
+    requestStoryConversation(story.pendingConversationId);
+  }, [props.familyId, requestStoryConversation]);
+  useEffect(() => {
+    const session = props.conversationSession;
+    if (
+      props.familyId !== 'feastle'
+      || !session
+      || session.preview
+      || session.definitionId !== FEASTLE_FIRST_MEETING_DEFINITION_ID
+      || session.status !== 'completed'
+      || completedFeastleIntroductionRef.current === session.id
+      || !props.journeyDefinition
+    ) return;
+    const preferenceTurn = session.turns.find((turn) => turn.nodeId === 'table');
+    const supportTurn = session.turns.find((turn) => turn.nodeId === 'pact');
+    const firstNode = props.journeyDefinition.nodes.find((node) => node.id === props.journeyDefinition?.startNodeId);
+    const preferenceOption = firstNode?.options?.find((option) => option.id === preferenceTurn?.optionId);
+    const supportStyle = supportTurn?.optionId as CompanionSupportStyle | undefined;
+    if (!preferenceTurn || !preferenceOption || !supportStyle) return;
+    completedFeastleIntroductionRef.current = session.id;
+    props.onCompleteIntroduction({
+      nodeId: firstNode!.id,
+      optionId: preferenceOption.id,
+      label: preferenceOption.label,
+    }, supportStyle);
+    beginFeastleStory();
+    showFeastleStoryHome();
+  }, [props, showFeastleStoryHome]);
   const [endAttemptOpen, setEndAttemptOpen] = useState(false);
   const [leaveQuestOpen, setLeaveQuestOpen] = useState(false);
   const [activeCheckIn, setActiveCheckIn] = useState<CompanionJourneyCheckIn | null>(props.journeyCheckIn);
@@ -698,6 +787,16 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const conversationExperience = props.conversationSession && props.conversationDefinition
     ? { session: props.conversationSession, definition: props.conversationDefinition }
     : null;
+  const feastleFirstMeetingActive = conversationExperience?.definition.id === FEASTLE_FIRST_MEETING_DEFINITION_ID;
+  const feastleMergeStoryDefinition = conversationExperience?.definition.id === FEASTLE_FIRST_MEETING_DEFINITION_ID
+    || /^feastle:friendship:[234]$/.test(conversationExperience?.definition.id ?? '');
+  const feastleStoryFlow = Boolean(
+    conversationExperience
+    && props.familyId === 'feastle'
+    && !conversationExperience.session.preview
+    && feastleMergeStoryDefinition
+  );
+  const feastleStoryFinale = conversationExperience?.definition.id === 'feastle:friendship:4';
   const idealSkinPreparing = idealSkinOnboardingRequired && !conversationExperience;
   const visitStageSpeech = idealSkinPreparing
     ? 'Let’s find the form that feels most like you.'
@@ -725,7 +824,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     }
     if (response.action === 'open_focus') {
       if (props.introductionRecord?.status !== 'completed' && props.introductionDefinition) {
-        openIntroduction();
+        if (props.familyId === 'feastle') requestStoryConversation(FEASTLE_FIRST_MEETING_DEFINITION_ID);
+        else openIntroduction();
         return;
       }
       if (props.journeyDefinition) {
@@ -746,7 +846,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       && props.introductionDefinition
       && props.journeyDefinition
     ) {
-      openIntroduction();
+      if (props.familyId === 'feastle') requestStoryConversation(FEASTLE_FIRST_MEETING_DEFINITION_ID);
+      else openIntroduction();
       return;
     }
     if (isConversationV2Family(props.familyId)) experience.showChatLobby();
@@ -894,7 +995,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             onAnswer={props.onAnswerConversation}
             onClose={props.idealSkinOnboardingRequired
               ? props.onClose
-              : route.kind === 'conversation' ? experience.showChatLobby : experience.showHome}
+              : route.kind === 'conversation' && !feastleFirstMeetingActive && !feastleStoryFlow ? experience.showChatLobby : experience.showHome}
             onContinue={props.onContinueConversation}
             onEquipForm={conversationExperience.session.preview ? () => undefined : props.onEquipSkin}
             onGoalDecision={props.onGoalConversationDecision}
@@ -928,9 +1029,12 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             }}
             memories={props.memories}
             onOpenMore={experience.showHome}
+            onStoryComplete={experience.showHome}
             onUpdateMemory={props.onUpdateMemory}
             session={conversationExperience.session}
             skins={props.skins}
+            storyFlow={feastleStoryFlow}
+            storyFinale={feastleStoryFinale}
             questOffer={props.conversationQuestOffer}
           /> : idealSkinOnboardingRequired ? null : (route.kind === 'visit' ? <CompanionVisitScene
             bondProgress={displayedBondProgress}
@@ -943,7 +1047,23 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             onOpenMore={experience.showHome}
             onRespond={respondToVisit}
             plan={visitPlan}
-          /> : null)
+          /> : <View accessibilityLiveRegion="polite" style={styles.conversationRecovery}>
+            <ActivityIndicator color="#75450A" size="small" />
+            <ThemedText selectable style={styles.conversationRecoveryTitle} lightColor="#3B2C20" darkColor="#3B2C20">Feastle is finding the next page…</ThemedText>
+            <ThemedText selectable style={styles.conversationRecoveryBody} lightColor="#64513B" darkColor="#64513B">Your served order is safe. If the story does not appear, try opening this part again.</ThemedText>
+            <CompanionPrimaryAction
+              icon="arrow.clockwise"
+              label="Open the story again"
+              onPress={() => {
+                const definitionId = loadFeastleStory().pendingConversationId;
+                if (!definitionId) { experience.showHome(); return; }
+                pendingStoryConversationRef.current = null;
+                openedStoryConversationRef.current = null;
+                requestStoryConversation(definitionId);
+              }}
+            />
+            <CompanionSecondaryAction icon="chevron.left" label="Back to Feastle" onPress={experience.showHome} />
+          </View>)
         ) : (
           <>
         {questGameVisible && !questGameFullBleed ? (
@@ -1042,7 +1162,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   introduction={props.introductionDefinition}
                   onComplete={(preference, supportStyle) => {
                     props.onCompleteIntroduction(preference, supportStyle);
-                    experience.showHome();
+                    if (props.familyId === 'feastle') {
+                      beginFeastleStory();
+                      experience.showHome();
+                    } else experience.showHome();
                   }}
                   onDefer={(preference) => {
                     props.onDeferIntroduction(preference);
@@ -1058,6 +1181,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                       experience.openJourneyQuestionnaire(null);
                     }
                   }}
+                  storyMode={props.familyId === 'feastle'}
                   visualKey={props.visualKey}
                 />
               ) : checkInOpen && activeCheckIn ? (
@@ -1132,7 +1256,18 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   resultReady={Boolean(journeyQuestionnaireSessionId && !props.journeyConversation)}
                   visualKey={props.visualKey}
                 />
-              ) : idealSkinOnboardingRequired ? null : route.kind === 'dashboard' ? (
+              ) : idealSkinOnboardingRequired ? null : route.kind === 'dashboard' && props.familyId === 'feastle' && !showFeastleDashboard ? (
+                <FeastleStoryStage
+                  onBeginIntroduction={beginFeastleIntroduction}
+                  onMore={() => setShowFeastleDashboard(true)}
+                  onOpenConversation={(definitionId) => {
+                    pendingStoryConversationRef.current = null;
+                    openedStoryConversationRef.current = null;
+                    requestStoryConversation(definitionId);
+                  }}
+                  onOpenMerge={(orderId) => props.onOpenMerge?.(orderId)}
+                />
+              ) : route.kind === 'dashboard' ? (
                 <CompanionDashboard
                   companionName={props.name}
                   onChat={openChat}
@@ -1364,7 +1499,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           title="Leave this quest?"
           tone="destructive"
         />
-        {bondReward ? (
+        {props.active !== false && bondReward ? (
           <BondRewardFlightOverlay
             from={bondReward.from}
             onFinish={() => {
@@ -1425,6 +1560,22 @@ const styles = StyleSheet.create({
     zIndex: 92,
   },
   onboardingLoadingText: { fontFamily: 'Manrope', fontSize: 14, fontWeight: '800' },
+  conversationRecovery: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255,249,224,0.94)',
+    borderColor: 'rgba(139,96,29,0.24)',
+    borderCurve: 'continuous',
+    borderRadius: 24,
+    borderWidth: 1,
+    boxShadow: '0 10px 28px rgba(92,57,24,0.16)',
+    gap: 10,
+    maxWidth: 360,
+    padding: 18,
+    width: '92%',
+  },
+  conversationRecoveryTitle: { fontSize: 18, fontWeight: '900', lineHeight: 23, textAlign: 'center' },
+  conversationRecoveryBody: { fontSize: 13, lineHeight: 19, textAlign: 'center' },
   quickGoalStack: { gap: 8, marginBottom: 12 },
   youStack: {
     backgroundColor: KatchaUI.companionPanel.background,

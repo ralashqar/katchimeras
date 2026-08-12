@@ -6,6 +6,8 @@ export type MergeActivityReward = {
   receiptId: string;
   amount: number;
   label: string;
+  dayId?: string;
+  kind?: 'journal' | 'check_in' | 'photo' | 'meaning' | 'steps' | 'quest';
 };
 
 /**
@@ -18,20 +20,21 @@ export function mergeActivityRewards(days: readonly HomeDayRecord[]): MergeActiv
   for (const day of days) {
     for (const answer of day.promptAnswers) {
       if (answer.dismissed || (answer.kind !== 'feeling' && answer.kind !== 'inner_weather')) continue;
-      rewards.push({ receiptId: `activity:mood:${day.id}:${answer.id}`, amount: 5, label: 'Check-in' });
+      rewards.push({ receiptId: `activity:mood:${day.id}:${answer.id}`, amount: 5, label: 'Check-in', dayId: day.id, kind: 'check_in' });
     }
-    for (const record of day.journalRecords ?? []) {
-      rewards.push({ receiptId: `activity:journal:${day.id}:${record.id}`, amount: 10, label: 'Journal' });
+    for (const [index, record] of (day.journalRecords ?? []).entries()) {
+      const amount = index === 0 ? 10 : index < 3 ? 5 : 0;
+      rewards.push({ receiptId: `activity:journal:${day.id}:${record.id}`, amount, label: 'Journal', dayId: day.id, kind: 'journal' });
     }
     for (const moment of day.moments) {
       if (moment.type !== 'photo') continue;
-      rewards.push({ receiptId: `activity:photo:${day.id}:${moment.id}`, amount: 5, label: 'Photo moment' });
+      rewards.push({ receiptId: `activity:photo:${day.id}:${moment.id}`, amount: 5, label: 'Photo moment', dayId: day.id, kind: 'photo' });
     }
     for (const meaning of day.capturedMeanings ?? []) {
-      rewards.push({ receiptId: `activity:meaning:${day.id}:${meaning.sourceId ?? meaning.createdAt}`, amount: 5, label: 'Captured moment' });
+      rewards.push({ receiptId: `activity:meaning:${day.id}:${meaning.sourceId ?? meaning.createdAt}`, amount: 5, label: 'Captured moment', dayId: day.id, kind: 'meaning' });
     }
     if (day.stepsCount >= 5_000) {
-      rewards.push({ receiptId: `activity:steps:${day.id}:5000`, amount: 10, label: 'Steps milestone' });
+      rewards.push({ receiptId: `activity:steps:${day.id}:5000`, amount: 10, label: 'Steps milestone', dayId: day.id, kind: 'steps' });
     }
   }
   return rewards;
@@ -46,6 +49,8 @@ export function mergeQuestActivityRewards(questState: CompanionQuestState): Merg
       receiptId: `activity:quest:${quest.questRunId ?? `${quest.creatureId}:${quest.questId}:${quest.acceptedAt}`}`,
       amount: 15,
       label: 'Daily quest',
+      dayId: quest.completedDayId,
+      kind: 'quest' as const,
     }];
   });
 }

@@ -34,6 +34,11 @@ export function resetIdealSkinOnboardingForDebug(): void {
   resetListeners.forEach((listener) => listener());
 }
 
+export function resetAllKatchimeraContentForDebug(): void {
+  saveCompanionContentState(emptyCompanionContentState());
+  resetListeners.forEach((listener) => listener());
+}
+
 export function subscribeCompanionContentResets(listener: () => void): () => void {
   resetListeners.add(listener);
   return () => resetListeners.delete(listener);

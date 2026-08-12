@@ -86,6 +86,10 @@ export function saveCompanionQuests(state: CompanionQuestState) {
   setStoredJson(KEY, normaliseState(state));
 }
 
+export function resetCompanionQuestsForDebug(): void {
+  saveCompanionQuests(emptyCompanionQuestState());
+}
+
 export function emptyCompanionQuestState(): CompanionQuestState {
   return { schemaVersion: 4, quests: [], submissions: [], offerCycles: [], attempts: [] };
 }

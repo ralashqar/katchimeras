@@ -20,3 +20,7 @@ export function loadCompanionJourneyState(): CompanionJourneyState {
 export function saveCompanionJourneyState(state: CompanionJourneyState): void {
   setStoredJson(STORAGE_KEY, normaliseCompanionJourneyState(state));
 }
+
+export function resetCompanionJourneysForDebug(): void {
+  saveCompanionJourneyState(emptyCompanionJourneyState());
+}

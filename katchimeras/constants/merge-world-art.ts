@@ -1,4 +1,10 @@
 export const MERGE_WORLD_ITEM_ART = {
+  'food:table:1': require('../assets/images/katchimeras/merge-world/items/food-table-1-ingredient.webp'),
+  'food:table:2': require('../assets/images/katchimeras/merge-world/items/food-table-2-snack.webp'),
+  'food:table:3': require('../assets/images/katchimeras/merge-world/items/food-table-3-dish.webp'),
+  'food:table:4': require('../assets/images/katchimeras/merge-world/items/food-table-4-meal.webp'),
+  'food:table:5': require('../assets/images/katchimeras/merge-world/items/food-table-5-feast.webp'),
+  'food:table:6': require('../assets/images/katchimeras/merge-world/items/food-table-6-banquet.webp'),
   'nature:garden:1': require('../assets/images/katchimeras/merge-world/items/nature-garden-1-seed.webp'),
   'nature:garden:2': require('../assets/images/katchimeras/merge-world/items/nature-garden-2-sprout.webp'),
   'nature:garden:3': require('../assets/images/katchimeras/merge-world/items/nature-garden-3-plant.webp'),
@@ -27,6 +33,20 @@ export const MERGE_WORLD_ITEM_ART = {
 
 export type MergeWorldAuthoredItemId = keyof typeof MERGE_WORLD_ITEM_ART;
 
+export const MERGE_WORLD_GENERATOR_ART = {
+  'starter-pantry': require('../assets/images/katchimeras/merge-world/generators/feastle-picnic-pantry.webp'),
+  'nature-pot': require('../assets/images/katchimeras/merge-world/generators/mossprout-sprouting-pot.webp'),
+  'waterside-pail': require('../assets/images/katchimeras/merge-world/generators/shellio-waterside-pail.webp'),
+  'adventure-pack': require('../assets/images/katchimeras/merge-world/generators/steppling-trail-satchel.webp'),
+  'travel-trunk': require('../assets/images/katchimeras/merge-world/generators/voyagle-travel-trunk.webp'),
+} as const;
+
+export type MergeWorldAuthoredGeneratorId = keyof typeof MERGE_WORLD_GENERATOR_ART;
+
 export function mergeWorldItemArt(definitionId: string) {
   return MERGE_WORLD_ITEM_ART[definitionId as MergeWorldAuthoredItemId] ?? null;
+}
+
+export function mergeWorldGeneratorArt(generatorId: string) {
+  return MERGE_WORLD_GENERATOR_ART[generatorId as MergeWorldAuthoredGeneratorId] ?? null;
 }
