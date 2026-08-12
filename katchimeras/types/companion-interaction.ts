@@ -78,6 +78,8 @@ export type CompanionQuestOfferViewModel = {
 
 export type CompanionNavigationIntent =
   | { kind: 'journal_flow'; flowId: 'food' | 'studio' | 'went_somewhere' | 'movement' | 'big_event' | 'general' }
+  | { kind: 'journal_handoff'; handoffId: string }
+  | { kind: 'quick_goals' }
   | { kind: 'memory_vault'; tab: 'photos' | 'notes' }
   | { kind: 'places' }
   | { kind: 'movement' }

@@ -55,6 +55,8 @@ import { questDefinition } from '@/utils/quests/definitions';
 import type { QuestJournalCaptureMode, QuestJournalTemplate } from '@/utils/quests/journal-templates';
 import type { QuestSubmissionItem } from '@/utils/quests/report-back-evidence';
 import { journalIdempotencyKey, journalRecordId } from '@/utils/journal-domain';
+import { requestCompanionNavigationIntent } from '@/utils/companion-navigation-intent';
+import { createCompanionJournalHandoff } from '@/utils/companion-journal-handoff';
 import { noteEvidenceId } from '@/utils/intelligence/evidence';
 import { buildKatchimeraRoster } from '@/utils/katchimera-roster';
 import { beginQuestCapture, cancelQuestCapture } from '@/utils/quest-capture-session';
@@ -657,12 +659,52 @@ export function KingdomCompanionScreen({
                 pathname: '/games',
                 params: { source: 'feastle-story', ...(orderId ? { focusOrderId: orderId } : {}) },
               })}
+          onJournalFood={() => {
+            const resident = quests.selectedResident;
+            if (!resident) return;
+            const handoff = createCompanionJournalHandoff({
+              mode: 'optional',
+              familyId: resident.creature.familyId ?? 'feastle',
+              creatureId: resident.creature.creatureId,
+              target: today?.state === 'hatched' ? 'tomorrow' : 'today',
+            });
+            requestCompanionNavigationIntent({ kind: 'journal_handoff', handoffId: handoff.id });
+            router.navigate('/today');
+          }}
+          onOpenTodayGoals={() => {
+            requestCompanionNavigationIntent({ kind: 'quick_goals' });
+            router.navigate('/today');
+          }}
           onInsightConversationDecision={quests.decideSelectedConversationInsight}
           onQuickGoalConversationDecision={(accept, node) => {
             const added = accept && !quests.selectedConversationSession?.preview
               ? quickGoals.addTemplates([node.templateId]).includes(node.templateId)
               : false;
             quests.decideSelectedConversationQuickGoal(accept, added, node);
+          }}
+          onJournalConversationHandoff={(open, node) => {
+            if (!open) {
+              quests.decideSelectedConversationJournalHandoff(false, node);
+              return;
+            }
+            const session = quests.selectedConversationSession;
+            const resident = quests.selectedResident;
+            if (!session || !resident) return;
+            if (session.preview) {
+              quests.decideSelectedConversationJournalHandoff(true, node);
+              return;
+            }
+            quests.recordSelectedConversationJournalHandoffOpened(node);
+            const handoff = createCompanionJournalHandoff({
+              mode: 'story',
+              familyId: session.familyId,
+              creatureId: resident.creature.creatureId,
+              session,
+              node,
+              target: today?.state === 'hatched' ? 'tomorrow' : 'today',
+            });
+            requestCompanionNavigationIntent({ kind: 'journal_handoff', handoffId: handoff.id });
+            router.navigate('/today');
           }}
           onQuestConversationHandoff={(accept, node) => {
             const quest = quests.selectedConversationQuestOffer;
@@ -696,11 +738,17 @@ export function KingdomCompanionScreen({
           dayLocationPoints={today?.locations}
           initialFlowId={embeddedJournal.initialFlowId}
           initialChoiceId={'initialChoiceId' in embeddedJournal ? embeddedJournal.initialChoiceId : undefined}
-          allowedChoiceIds={embeddedJournal.origin === 'quest' ? embeddedJournal.template.allowedChoiceIds : undefined}
+          allowedChoiceIds={embeddedJournal.origin === 'quest'
+            ? embeddedJournal.template.allowedChoiceIds
+            : undefined}
           contextOptionsOverride={embeddedJournal.origin === 'quest' && embeddedJournal.inputMode === 'guided' ? embeddedJournal.template.contextOptions : undefined}
           contextTitleOverride={embeddedJournal.origin === 'quest' && embeddedJournal.inputMode === 'guided' ? embeddedJournal.template.contextTitle : undefined}
-          promptBody={embeddedJournal.origin === 'quest' ? embeddedJournal.template.promptBody : undefined}
-          promptTitle={embeddedJournal.origin === 'quest' ? embeddedJournal.template.promptTitle : undefined}
+          promptBody={embeddedJournal.origin === 'quest'
+            ? embeddedJournal.template.promptBody
+            : undefined}
+          promptTitle={embeddedJournal.origin === 'quest'
+            ? embeddedJournal.template.promptTitle
+            : undefined}
           saveLabel={embeddedJournal.origin === 'quest'
             ? embeddedJournal.inputMode === 'guided' ? 'Save and complete quest' : 'Check and submit'
             : undefined}

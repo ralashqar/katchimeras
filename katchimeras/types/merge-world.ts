@@ -155,7 +155,7 @@ export type MergeWorldCommand =
   | { type: 'claimInbox'; entryId: string; now: number }
   | { type: 'unlockExpansion'; expansionId: string; now: number }
   | { type: 'grantActivityEnergy'; receiptId: string; amount: number; now: number }
-  | { type: 'grantActivityEnergyBatch'; rewards: Array<{ receiptId: string; amount: number; dayId?: string; kind?: string }>; now: number }
+  | { type: 'grantActivityEnergyBatch'; rewards: Array<{ receiptId: string; amount: number; dayId?: string; kind?: string; pantryCharges?: number; grantDayId?: string }>; now: number }
   | { type: 'ackGeneratorUnlock'; receiptId: string; now: number }
   | { type: 'rerollOrder'; orderId: string; now: number }
   | { type: 'reconcileCharacters'; characterIds: string[]; now: number }

@@ -64,6 +64,7 @@ import { eggAvatarCustomizerCamera } from '@/utils/egg-avatar-customizer-camera'
 
 type TodayNurtureExperienceProps = {
   actionListLocked: boolean;
+  actionListHidden?: boolean;
   actionTransitionActive: boolean;
   actions: RankedTodayCareAction[];
   completionEvent: TodayCareCompletionEvent | null;
@@ -113,6 +114,7 @@ type CheckInSelection = {
 
 export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   actionListLocked,
+  actionListHidden = false,
   actionTransitionActive,
   actions,
   bottomInset,
@@ -423,6 +425,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
         style={[styles.timelineFixed, { top: topInset + 8 }]}>
         <LanternTimeline days={timelineDays} interactionLocked={false} onSelect={onSelectDay} selectedId={day.id} />
       </Animated.View>
+      {!actionListHidden ? (
       <View onLayout={handleFixedActionClusterLayout} style={[styles.fixedActionCluster, { top: fixedActionClusterTop }]}>
         {quietDayAvailable ? (
           <Pressable accessibilityHint="Opens a short note so this quiet day can hatch" accessibilityRole="button" onPress={onAddTextNote} style={({ pressed }) => [styles.quietDayAction, pressed && styles.actionPressed]}>
@@ -440,7 +443,9 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           />
         )}
       </View>
+      ) : null}
       <MicrocopyToast message={microcopy} placementStyle={{ top: nurtureToastTop }} />
+      {!actionListHidden ? (
       <GestureDetector gesture={actionScrollGesture}>
         <ScrollView
           contentContainerStyle={{ paddingBottom: tabBarHeight + HOME_ACTIONS_TAB_BAR_GAP, paddingTop: topInset + 8 }}
@@ -547,6 +552,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
         </Animated.View>
           </ScrollView>
       </GestureDetector>
+      ) : null}
       </View>
     </View>
   );

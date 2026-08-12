@@ -17,6 +17,8 @@ import { applyWardrobeToKingdom } from '@/utils/katchimera-wardrobe';
 import { loadKatchimeraWardrobe } from '@/utils/katchimera-wardrobe-storage';
 import { deriveKingdom } from '@/utils/kingdom-engine';
 import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability';
+import { deriveTomorrowDayRecord } from '@/game/days';
+import { loadOnboardingProfile } from '@/utils/onboarding-state';
 
 export function MergeWorldRouteScreen() {
   const isFocused = useIsFocused();
@@ -26,6 +28,9 @@ export function MergeWorldRouteScreen() {
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   const persistent = useMemo(() => {
     const homeState = homeRepository.load();
+    const activityDays = homeState?.tomorrow
+      ? [...days, deriveTomorrowDayRecord(homeState, loadOnboardingProfile(), new Date())]
+      : days;
     const resolveCompanionId = companionIdResolverForHomeState(homeState);
     const quests = loadCompanionQuests(resolveCompanionId);
     const bond = loadCompanionBondState(quests, resolveCompanionId, homeState);
@@ -35,12 +40,13 @@ export function MergeWorldRouteScreen() {
     );
     return {
       characterIds: buildOwnedGameCompanions(kingdom.creatures, bond).map((companion) => companion.familyId),
+      activityDays,
       quests,
     };
   }, [allKatchimerasAvailable, days]);
 
   return (
-    <MergeWorldProvider active={isFocused} characterIds={persistent.characterIds} days={days} questState={persistent.quests}>
+    <MergeWorldProvider active={isFocused} characterIds={persistent.characterIds} days={persistent.activityDays} questState={persistent.quests}>
       <View style={styles.screen}>
         {isFocused ? <>
           <TodayExplorationBackground backgroundKey="home" imageSize={Math.max(height, width)} />

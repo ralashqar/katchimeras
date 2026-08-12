@@ -186,7 +186,7 @@ export function continueConversation(
   }
   const node = conversationNode(definition, session.currentNodeId);
   if (!node) return session;
-  if (node.kind === 'form_reveal' || node.kind === 'insight_reveal' || node.kind === 'memory_proposal' || node.kind === 'goal_proposal' || node.kind === 'quick_goal_proposal' || node.kind === 'quest_handoff') {
+  if (node.kind === 'form_reveal' || node.kind === 'insight_reveal' || node.kind === 'memory_proposal' || node.kind === 'goal_proposal' || node.kind === 'quick_goal_proposal' || node.kind === 'journal_handoff' || node.kind === 'quest_handoff') {
     if (!node.nextNodeId) return completeSession(session, continuedAt);
     const next = conversationNode(definition, node.nextNodeId);
     return next ? enterNode({ ...session, currentNodeId: next.id, updatedAt: continuedAt }, next, continuedAt) : session;
@@ -512,7 +512,7 @@ export function validateProfileQuestionGraph(
 
 function hasOutcomeLessEnding(definition: ConversationDefinition): boolean {
   const outcomeKinds = new Set<ConversationNode['kind']>([
-    'poll', 'form_reveal', 'insight_reveal', 'memory_proposal', 'goal_proposal', 'quick_goal_proposal', 'quest_handoff',
+    'poll', 'form_reveal', 'insight_reveal', 'memory_proposal', 'goal_proposal', 'quick_goal_proposal', 'journal_handoff', 'quest_handoff',
   ]);
   const visit = (nodeId: string, hasOutcome: boolean, seen: ReadonlySet<string>): boolean => {
     if (seen.has(nodeId)) return false;
@@ -771,7 +771,7 @@ function referencedNodeIds(node: ConversationNode): (string | null)[] {
   if (node.kind === 'choice') return node.options.map((option) => option.nextNodeId);
   if (node.kind === 'profile_game' || node.kind === 'insight_game') return [node.revealNodeId, ...node.questions.flatMap((question) => question.options.map((option) => option.nextNodeId))];
   if (node.kind === 'quest_handoff') return [node.nextNodeId, node.fallbackNodeId];
-  if (node.kind === 'poll' || node.kind === 'form_reveal' || node.kind === 'insight_reveal' || node.kind === 'memory_proposal' || node.kind === 'goal_proposal' || node.kind === 'quick_goal_proposal') return [node.nextNodeId];
+  if (node.kind === 'poll' || node.kind === 'form_reveal' || node.kind === 'insight_reveal' || node.kind === 'memory_proposal' || node.kind === 'goal_proposal' || node.kind === 'quick_goal_proposal' || node.kind === 'journal_handoff') return [node.nextNodeId];
   return [];
 }
 

@@ -149,6 +149,8 @@ export type CompanionInteractionSheetProps = {
   onSelectDestination?: (destination: CompanionDestination | null) => void;
   onClose: () => void;
   onOpenMerge?: (orderId?: string | null) => void;
+  onJournalFood: () => void;
+  onOpenTodayGoals: () => void;
   embedded?: boolean;
   activeQuest: { questId: string; title: string; hint: string; semanticInput?: boolean; journalInput?: boolean; journalFallback?: boolean; assistedJournalInput?: boolean; execution?: InteractiveQuestExecution | null; resolvedConfig?: Record<string, unknown>; offerSeed?: string } | null;
   questComplete: boolean;
@@ -259,6 +261,7 @@ export type CompanionInteractionSheetProps = {
   onMemoryConversationDecision: (remember: boolean, summary: string) => void;
   onGoalConversationDecision: (selectedTemplateIds: readonly string[] | null, node: Extract<ConversationNode, { kind: 'goal_proposal' }>) => void;
   onQuickGoalConversationDecision: (accept: boolean, node: Extract<ConversationNode, { kind: 'quick_goal_proposal' }>) => void;
+  onJournalConversationHandoff: (open: boolean, node: Extract<ConversationNode, { kind: 'journal_handoff' }>) => void;
   onQuestConversationHandoff: (accept: boolean, node: Extract<ConversationNode, { kind: 'quest_handoff' }>) => void;
   onDismissConversationOutcome: () => void;
   onPreviewConversation: (definitionId: string) => void;
@@ -1007,6 +1010,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             onDismissOutcome={props.onDismissConversationOutcome}
             onOpenOutcomeDestination={(outcomeDestination: ConversationOutcomeDestination) => {
               props.onDismissConversationOutcome();
+              if (outcomeDestination === 'goals' && feastleStoryFlow) {
+                props.onOpenTodayGoals();
+                return;
+              }
               if (outcomeDestination === 'memory') {
                 openHistory();
                 return;
@@ -1014,6 +1021,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               selectExperienceDestination(outcomeDestination);
             }}
             onQuickGoalDecision={props.onQuickGoalConversationDecision}
+            onJournalHandoff={props.onJournalConversationHandoff}
             onQuestHandoff={props.onQuestConversationHandoff}
             onMemoryDecision={(remember, summary) => {
               const currentNode = conversationExperience.definition.nodes.find(
@@ -1259,6 +1267,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               ) : idealSkinOnboardingRequired ? null : route.kind === 'dashboard' && props.familyId === 'feastle' && !showFeastleDashboard ? (
                 <FeastleStoryStage
                   onBeginIntroduction={beginFeastleIntroduction}
+                  onJournalFood={props.onJournalFood}
                   onMore={() => setShowFeastleDashboard(true)}
                   onOpenConversation={(definitionId) => {
                     pendingStoryConversationRef.current = null;

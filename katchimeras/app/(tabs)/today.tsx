@@ -158,6 +158,14 @@ import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { resolveHatchHour } from '@/game/days/lifecycle';
 import type { CompanionQuickGoal, CompanionQuickGoalCompletion } from '@/utils/companion-quick-goals';
 import type { GameHubItem } from '@/utils/game-hub';
+import type { CompanionJournalHandoff } from '@/utils/companion-journal-handoff';
+import {
+  cancelCompanionJournalHandoff,
+  completeCompanionJournalHandoff,
+  loadCompanionJournalHandoff,
+  loadPendingCompanionJournalHandoff,
+} from '@/utils/companion-journal-handoff';
+import { journalIdempotencyKey, journalRecordId } from '@/utils/journal-domain';
 import {
   activeSemanticQuestPrompt,
   cancelSemanticNoteQuestCapture,
@@ -267,6 +275,9 @@ function HomeScreen() {
   const [manualJournalInitialChoiceId, setManualJournalInitialChoiceId] = useState<string | null>(null);
   const [manualJournalInitialContextId, setManualJournalInitialContextId] = useState<string | null>(null);
   const [manualJournalTarget, setManualJournalTarget] = useState<DayInputTarget | null>(null);
+  const [companionJournalHandoff, setCompanionJournalHandoff] = useState<CompanionJournalHandoff | null>(null);
+  const [feastleJournalReward, setFeastleJournalReward] = useState<CompanionJournalHandoff | null>(null);
+  const handledCompanionJournalHandoffIdRef = useRef<string | null>(null);
   const deferredJournalCareCompletionRef = useRef<string | null>(null);
   const deferredJournalCareTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openManualJournal = useCallback((flowId?: string, categoryId?: string, contextId?: string | null, target?: DayInputTarget) => {
@@ -1225,16 +1236,43 @@ function HomeScreen() {
         void handleQuestActionIntent(intent);
       }
       const companionIntent = consumeCompanionNavigationIntent();
+      const journalHandoff = companionIntent?.kind === 'journal_handoff'
+        ? loadCompanionJournalHandoff(companionIntent.handoffId)
+        : !companionIntent ? loadPendingCompanionJournalHandoff() : null;
+      if (journalHandoff?.status === 'pending') {
+        // useFocusEffect may re-subscribe while the screen remains focused when
+        // one of its dependencies changes. Loading persisted JSON returns a new
+        // object each time, so setting the same handoff again would otherwise
+        // create a render -> focus effect -> setState loop.
+        if (handledCompanionJournalHandoffIdRef.current !== journalHandoff.id) {
+          handledCompanionJournalHandoffIdRef.current = journalHandoff.id;
+          setCompanionJournalHandoff(journalHandoff);
+        }
+        const todayTimelineId = timelineDays.find((day) => day.kind === 'day' && day.isToday)?.id;
+        const targetTimelineId = journalHandoff.target === 'tomorrow' ? 'tomorrow' : todayTimelineId;
+        if (targetTimelineId && selectedDayId !== targetTimelineId) selectTimelineDay(targetTimelineId);
+        return;
+      }
       if (!companionIntent) return;
       if (companionIntent.kind === 'journal_flow') openManualJournal(companionIntent.flowId);
+      else if (companionIntent.kind === 'quick_goals') setQuickGoalsOpen(true);
       else if (companionIntent.kind === 'memory_vault') {
         setMemoryVaultTab(companionIntent.tab);
         setMemoryVaultOpen(true);
       } else if (companionIntent.kind === 'places') setPlacesVaultOpen(true);
       else if (companionIntent.kind === 'movement') setJourneySheetOpen(true);
       else if (companionIntent.kind === 'rest') setSleepSheetOpen(true);
-    }, [handleQuestActionIntent, openManualJournal, setJourneySheetOpen, setMemoryVaultOpen, setMemoryVaultTab, setPlacesVaultOpen, setSleepSheetOpen])
+    }, [handleQuestActionIntent, openManualJournal, selectTimelineDay, selectedDayId, setJourneySheetOpen, setMemoryVaultOpen, setMemoryVaultTab, setPlacesVaultOpen, setSleepSheetOpen, timelineDays])
   );
+
+  useEffect(() => {
+    if (!companionJournalHandoff || companionJournalHandoff.status !== 'pending' || manualJournalOpen) return;
+    const selectedTarget = companionJournalHandoff.target === 'tomorrow'
+      ? selectedDay?.kind === 'tomorrow'
+      : selectedDay?.kind === 'day' && selectedDay.isToday;
+    if (!selectedTarget) return;
+    openManualJournal(companionJournalHandoff.flowId, undefined, null, companionJournalHandoff.target);
+  }, [companionJournalHandoff, manualJournalOpen, openManualJournal, selectedDay]);
 
   const renderTimelineHero = useCallback((
     timelineDay: HomeTimelineDay,
@@ -1395,6 +1433,7 @@ function HomeScreen() {
     journeySheetOpen ||
     nameSheetOpen ||
     manualJournalOpen ||
+    feastleJournalReward !== null ||
     quickNoteOpen ||
     todayPhotoLibrarySheet !== null ||
     clarificationMemory !== null ||
@@ -1766,6 +1805,7 @@ function HomeScreen() {
             || energyLoopStatus === 'awaiting_completion'
             || energyLoopStatus === 'rewarding'
           }
+          actionListHidden={feastleJournalReward !== null}
           actionTransitionActive={
             energyLoopStatus === 'rewarding'
             || energyLoopStatus === 'entering'
@@ -1987,12 +2027,49 @@ function HomeScreen() {
           initialFlowId={manualJournalInitialFlowId}
           initialChoiceId={manualJournalInitialChoiceId}
           initialContext={manualJournalInitialContextId}
+          allowedChoiceIds={companionJournalHandoff?.allowedChoiceIds}
+          promptTitle={companionJournalHandoff
+            ? `${companionJournalHandoff.target === 'tomorrow' ? 'Tomorrow’s' : 'Today’s'} Egg · ${companionJournalHandoff.title}`
+            : undefined}
+          promptBody={companionJournalHandoff?.body}
+          saveLabel={companionJournalHandoff?.saveLabel}
+          journalSource={companionJournalHandoff ? {
+            kind: 'manual',
+            sourceId: companionJournalHandoff.id,
+            origin: {
+              kind: 'companion_reflection',
+              creatureId: companionJournalHandoff.creatureId,
+              familyId: companionJournalHandoff.familyId,
+              promptId: companionJournalHandoff.nodeId ?? 'feastle:optional-food-journal',
+              promptText: companionJournalHandoff.prompt,
+              answerIds: companionJournalHandoff.answerIds,
+            },
+          } : undefined}
           hapticOnSave={!pendingCareIntent}
-          dateTarget={manualJournalTarget === 'yesterday' || new Date().getHours() < 3
+          dateTarget={!companionJournalHandoff && (manualJournalTarget === 'yesterday' || new Date().getHours() < 3)
             ? (manualJournalTarget === 'yesterday' ? 'yesterday' : 'today')
             : undefined}
-          onDateTargetChange={(target) => setManualJournalTarget(target)}
-          onClose={closeManualJournal}
+          onDateTargetChange={companionJournalHandoff ? undefined : (target) => setManualJournalTarget(target)}
+          returnToOriginOnBack={Boolean(companionJournalHandoff)}
+          onBackFromInitial={() => {
+            if (!companionJournalHandoff) return;
+            cancelCompanionJournalHandoff(companionJournalHandoff.id);
+            const creatureId = companionJournalHandoff.creatureId;
+            setCompanionJournalHandoff(null);
+            closeManualJournal();
+            router.navigate({ pathname: '/katchimera/[creatureId]', params: { creatureId } });
+          }}
+          onClose={() => {
+            if (!companionJournalHandoff) {
+              closeManualJournal();
+              return;
+            }
+            cancelCompanionJournalHandoff(companionJournalHandoff.id);
+            const creatureId = companionJournalHandoff.creatureId;
+            setCompanionJournalHandoff(null);
+            closeManualJournal();
+            router.navigate({ pathname: '/katchimera/[creatureId]', params: { creatureId } });
+          }}
           onSave={(submission) => {
             const completingCareAction = pendingCareIntent
               && journalFlowCompletesTodayCareAction(submission.flowId, pendingCareIntent.completionKey)
@@ -2002,7 +2079,17 @@ function HomeScreen() {
             if (completingCareAction) {
               queueCareCompletionAfterJournalDismiss(completingCareAction);
             }
-            addManualJournalEntry(submission, manualJournalTarget ?? formingTarget);
+            const target = companionJournalHandoff?.target ?? manualJournalTarget ?? formingTarget;
+            addManualJournalEntry(submission, target);
+            if (companionJournalHandoff) {
+              const source = submission.journalSource ?? { kind: 'manual' as const, sourceId: companionJournalHandoff.id };
+              const recordId = journalRecordId(journalIdempotencyKey(
+                source,
+                submission.sessionId ?? companionJournalHandoff.id,
+              ));
+              completeCompanionJournalHandoff(companionJournalHandoff.id, recordId);
+              setFeastleJournalReward({ ...companionJournalHandoff, journalRecordId: recordId, status: 'saved' });
+            }
             closeManualJournal();
             const hasPhotoText = submission.sourceType === 'photo'
               && Boolean(submission.note?.trim() || Object.values(submission.fields).some((value) => Array.isArray(value) ? value.length > 0 : Boolean(value)));
@@ -2019,7 +2106,8 @@ function HomeScreen() {
                 tint: Lantern.ember300,
               }, () => {});
             }
-            setMicrocopy('Added to today');
+            setCompanionJournalHandoff(null);
+            setMicrocopy(target === 'tomorrow' ? 'Added to Tomorrow’s Egg' : 'Added to Today’s Egg');
           }}
         />
       ) : null}
@@ -2199,6 +2287,35 @@ function HomeScreen() {
         setDayName={setDayName}
       />
       <MicrocopyToast message={isForming && formingDay && nurtureGrowth && !isHatching ? null : microcopy} />
+      {feastleJournalReward ? (
+        <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(180)} style={styles.feastleRewardWrap}>
+          <View style={styles.feastleRewardCard}>
+            <View style={styles.feastleRewardHeading}>
+              <View style={styles.feastleRewardIcon}><IconSymbol color="#FFF7DF" name="sparkles" size={18} /></View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <ThemedText style={styles.feastleRewardEyebrow} lightColor="#8B672E" darkColor="#8B672E">
+                  {feastleJournalReward.target === 'tomorrow' ? 'TOMORROW’S EGG' : 'TODAY’S EGG'}
+                </ThemedText>
+                <ThemedText style={styles.feastleRewardTitle} lightColor="#3B2C20" darkColor="#3B2C20">Your food moment is safe</ThemedText>
+              </View>
+            </View>
+            <ThemedText style={styles.feastleRewardBody} lightColor="#64513B" darkColor="#64513B">
+              The Egg received +{feastleJournalReward.rewardGrowth} Growth. Feastle packed up to +{feastleJournalReward.rewardPantryCharges} Pantry stock for the merge board.
+            </ThemedText>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                const creatureId = feastleJournalReward.creatureId;
+                setFeastleJournalReward(null);
+                router.navigate({ pathname: '/katchimera/[creatureId]', params: { creatureId } });
+              }}
+              style={({ pressed }) => [styles.feastleRewardButton, pressed && { opacity: 0.82 }]}>
+              <ThemedText style={styles.feastleRewardButtonLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">Return to Feastle</ThemedText>
+              <IconSymbol color="#FFF9E9" name="arrow.right" size={16} />
+            </Pressable>
+          </View>
+        </Animated.View>
+      ) : null}
       {streak.celebration && !flowBusy ? (
         <DayCapturedCelebration
           days={streak.celebration.result.snapshot.currentStreak}
@@ -2327,6 +2444,30 @@ const styles = StyleSheet.create({
     // z-indices internal to the neighborhood.
     zIndex: 0,
   },
+  feastleRewardWrap: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(20,15,9,0.18)',
+    justifyContent: 'flex-end',
+    paddingBottom: 94,
+    paddingHorizontal: 18,
+    zIndex: 300,
+  },
+  feastleRewardCard: {
+    backgroundColor: '#FFF5D8',
+    borderColor: 'rgba(215,169,86,0.72)',
+    borderRadius: 24,
+    borderWidth: 1,
+    boxShadow: '0 14px 34px rgba(18,12,6,0.34)',
+    gap: 12,
+    padding: 16,
+  },
+  feastleRewardHeading: { alignItems: 'center', flexDirection: 'row', gap: 10 },
+  feastleRewardIcon: { alignItems: 'center', backgroundColor: '#806040', borderRadius: 999, height: 36, justifyContent: 'center', width: 36 },
+  feastleRewardEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.05 },
+  feastleRewardTitle: { fontSize: 19, fontWeight: '900', lineHeight: 24 },
+  feastleRewardBody: { fontSize: 13.5, lineHeight: 20 },
+  feastleRewardButton: { alignItems: 'center', backgroundColor: '#7A4C19', borderRadius: 16, flexDirection: 'row', justifyContent: 'center', gap: 8, minHeight: 48, paddingHorizontal: 16 },
+  feastleRewardButtonLabel: { fontSize: 14, fontWeight: '900' },
   timelineLayer: {
     position: 'relative',
     zIndex: 20,

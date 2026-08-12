@@ -8,8 +8,9 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { FEASTLE_STORY_REQUESTS, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import { beginFeastleReturn, loadFeastleStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
 
-export function FeastleStoryStage({ onBeginIntroduction, onMore, onOpenConversation, onOpenMerge }: {
+export function FeastleStoryStage({ onBeginIntroduction, onJournalFood, onMore, onOpenConversation, onOpenMerge }: {
   onBeginIntroduction: () => void;
+  onJournalFood: () => void;
   onMore: () => void;
   onOpenConversation: (definitionId: string) => void;
   onOpenMerge: (orderId?: string | null) => void;
@@ -19,6 +20,7 @@ export function FeastleStoryStage({ onBeginIntroduction, onMore, onOpenConversat
   const returnReady = story.status === 'return_available' || story.status === 'conversation_active';
   const complete = story.status === 'chapter_complete';
   const needsBeginning = story.status === 'intro_available';
+  const canJournalFood = story.journalFtueStatus !== 'not_started' && (story.status === 'order_active' || complete);
   const requests = story.status === 'order_active'
     ? (FEASTLE_STORY_REQUESTS[story.targetLevel] ?? []).filter((_, index) => !story.completedOrderIds.includes(
         `merge-story:feastle:chapter-1:level-${story.targetLevel}:order-${index + 1}`
@@ -68,6 +70,9 @@ export function FeastleStoryStage({ onBeginIntroduction, onMore, onOpenConversat
       <ThemedText style={styles.primaryLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">{returnReady ? 'Read Feastle’s note' : needsBeginning ? 'Meet Feastle' : requests.length > 1 ? 'Open all orders' : 'Make the request'}</ThemedText><IconSymbol color="#FFF9E9" name="arrow.right" size={17} />
     </Pressable> : null}
     {complete ? <Pressable accessibilityRole="button" onPress={onMore} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}><IconSymbol color="#FFF9E9" name="bubble.left.and.bubble.right.fill" size={19} /><ThemedText style={styles.primaryLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">More with Feastle</ThemedText><IconSymbol color="#FFF9E9" name="arrow.right" size={17} /></Pressable> : null}
+    {canJournalFood ? <Pressable accessibilityRole="button" onPress={onJournalFood} style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
+      <View style={{ alignItems: 'center', flexDirection: 'row', gap: 9 }}><IconSymbol color="#76501F" name="book.closed.fill" size={17} /><ThemedText style={styles.secondaryLabel} lightColor="#76501F" darkColor="#76501F">Journal a food moment</ThemedText></View><IconSymbol color="#76501F" name="arrow.right" size={15} />
+    </Pressable> : null}
   </Animated.View>;
 }
 

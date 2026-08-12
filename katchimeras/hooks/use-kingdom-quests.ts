@@ -48,7 +48,7 @@ import {
   type CompanionBondEventKind,
 } from '@/utils/companion-bond';
 import { loadCompanionBondState, saveCompanionBondState, subscribeCompanionBondState } from '@/utils/companion-bond-storage';
-import { completeFeastleConversation } from '@/utils/companion-story-storage';
+import { completeFeastleConversation, markFeastleJournalFtue } from '@/utils/companion-story-storage';
 import {
   answerCompanionDiscoveryPrompt,
   answersForCompanion,
@@ -2368,6 +2368,58 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       dayId: today?.isoDate,
     });
   }, [awardBond, selectedConversationDefinition, selectedConversationSession, selectedResident, today?.isoDate]);
+  const recordSelectedConversationJournalHandoffOpened = useCallback((node: Extract<ConversationNode, { kind: 'journal_handoff' }>) => {
+    if (!selectedConversationSession || selectedConversationSession.currentNodeId !== node.id || selectedConversationSession.preview) return;
+    const occurredAt = Date.now();
+    setCompanionContentState((current) => {
+      const next = recordConversationTelemetry(current, {
+        id: `${selectedConversationSession.id}:${node.id}:opened`,
+        familyId: selectedConversationSession.familyId,
+        sessionId: selectedConversationSession.id,
+        definitionId: selectedConversationSession.definitionId,
+        kind: 'journal_handoff_opened',
+        nodeId: node.id,
+        occurredAt,
+      });
+      if (next !== current) saveCompanionContentState(next);
+      return next;
+    });
+  }, [selectedConversationSession]);
+  const decideSelectedConversationJournalHandoff = useCallback((
+    saved: boolean,
+    node: Extract<ConversationNode, { kind: 'journal_handoff' }>,
+    journalRecordId: string | null = null,
+  ) => {
+    if (!selectedConversationSession || !selectedConversationDefinition || selectedConversationSession.currentNodeId !== node.id) return;
+    const occurredAt = Date.now();
+    let nextSession = recordConversationOutcome(
+      selectedConversationSession,
+      `journal-handoff:${saved ? 'saved' : 'skipped'}:${journalRecordId ?? node.id}`,
+      occurredAt,
+    );
+    nextSession = continueConversation(nextSession, selectedConversationDefinition, occurredAt);
+    setCompanionContentState((current) => {
+      let next = current;
+      if (!selectedConversationSession.preview) next = recordConversationTelemetry(next, {
+        id: `${selectedConversationSession.id}:${node.id}:${saved ? 'saved' : 'skipped'}`,
+        familyId: selectedConversationSession.familyId,
+        sessionId: selectedConversationSession.id,
+        definitionId: selectedConversationSession.definitionId,
+        kind: saved ? 'journal_handoff_saved' : 'journal_handoff_skipped',
+        nodeId: node.id,
+        occurredAt,
+      });
+      next = upsertConversationSession(next, nextSession);
+      saveCompanionContentState(next);
+      return next;
+    });
+    if (!selectedConversationSession.preview && selectedConversationSession.familyId === 'feastle') {
+      markFeastleJournalFtue(saved ? 'saved' : 'skipped', journalRecordId, occurredAt);
+    }
+    setMicrocopy(selectedConversationSession.preview
+      ? 'Preview only — journal was not changed'
+      : saved ? 'Saved to Today — the Pantry is restocking' : 'Nothing was saved');
+  }, [selectedConversationDefinition, selectedConversationSession]);
   const decideSelectedConversationQuestHandoff = useCallback((
     accept: boolean,
     accepted: boolean,
@@ -2699,6 +2751,8 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     decideSelectedConversationMemory,
     decideSelectedConversationGoal,
     decideSelectedConversationQuickGoal,
+    recordSelectedConversationJournalHandoffOpened,
+    decideSelectedConversationJournalHandoff,
     decideSelectedConversationQuestHandoff,
     dismissSelectedConversationOutcome,
     previewSelectedConversation,

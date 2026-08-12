@@ -162,6 +162,19 @@ export type ConversationNode =
     }
   | {
       id: string;
+      kind: 'journal_handoff';
+      prompt: string;
+      title: string;
+      body: string;
+      flowId: string;
+      allowedChoiceIds: readonly string[];
+      saveLabel: string;
+      rewardGrowth: number;
+      rewardPantryCharges: number;
+      nextNodeId: string | null;
+    }
+  | {
+      id: string;
       kind: 'quest_handoff';
       prompt: string;
       suggestedQuestIds: readonly string[];
@@ -295,6 +308,9 @@ export type ConversationTelemetryKind =
   | 'memory_rejected'
   | 'goal_proposed'
   | 'goal_accepted'
+  | 'journal_handoff_opened'
+  | 'journal_handoff_saved'
+  | 'journal_handoff_skipped'
   | 'insight_revealed'
   | 'insight_confirmed'
   | 'insight_adjusted'

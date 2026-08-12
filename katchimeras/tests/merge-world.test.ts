@@ -5,9 +5,11 @@ import test from 'node:test';
 
 import { MERGE_GENERATOR_COOLDOWN_MS, MERGE_ITEMS_BY_ID, MERGE_ORDER_TEMPLATES } from '@/constants/merge-world-catalog';
 import type { MergeBoardItem, MergeCharacterId, MergeOrder, MergeWorldState } from '@/types/merge-world';
+import type { HomeDayRecord } from '@/types/home';
 import { companionFriendshipProgress, emptyCompanionBondState } from '@/utils/companion-bond';
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection } from '@/utils/merge-world/board-geometry';
 import { mergeWorldPendingPersistence } from '@/utils/merge-world/persistence-buffer';
+import { mergeActivityRewards } from '@/utils/merge-world/activity-rewards';
 import {
   createInitialMergeWorldState,
   mergeOrderItemReadiness,
@@ -102,8 +104,8 @@ test('generator taps consume one Energy and charge and create a discoverable ite
   const result = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: 'starter-pantry', now: NOW + 1, seed: 'first-drop' });
   assert.equal(result.changed, true);
   // Tap costs one; the first-discovery reward immediately returns one.
-  assert.equal(result.state.energy.value, 100);
-  assert.equal(result.state.generators['starter-pantry'].charges, 11);
+  assert.equal(result.state.energy.value, 8);
+  assert.equal(result.state.generators['starter-pantry'].charges, 7);
   assert.ok(result.spawnedCell != null);
   assert.equal(result.state.board[result.spawnedCell!].occupant?.kind, 'item');
   assert.equal(result.state.discoveries.length, 1);
@@ -118,8 +120,8 @@ test('a full board rejects generation without spending Energy or charges', () =>
   const full = { ...state, board };
   const result = reduceMergeWorld(full, { type: 'tapGenerator', generatorId: 'starter-pantry', now: NOW + 1, seed: 'full' });
   assert.equal(result.changed, false);
-  assert.equal(result.state.energy.value, 100);
-  assert.equal(result.state.generators['starter-pantry'].charges, 12);
+  assert.equal(result.state.energy.value, 8);
+  assert.equal(result.state.generators['starter-pantry'].charges, 8);
 });
 
 test('identical items merge deterministically and hybrid recipe combines different families', () => {
@@ -354,8 +356,39 @@ test('activity rewards reconcile in one idempotent batch', () => {
   assert.equal(duplicate.changed, false);
 });
 
+test('a Tomorrow-targeted food memory keys Pantry refill to its save day and adds no Merge Energy', () => {
+  const day = {
+    id: 'day-2026-08-13',
+    isoDate: '2026-08-13',
+    promptAnswers: [],
+    journalRecords: [
+      { id: 'food-entry', flowId: 'food', createdAt: '2026-08-12T12:00:00.000' },
+      { id: 'general-entry', flowId: 'general', createdAt: '2026-08-12T13:00:00.000' },
+    ],
+    moments: [],
+    capturedMeanings: [],
+    stepsCount: 0,
+  } as unknown as HomeDayRecord;
+  const rewards = mergeActivityRewards([day]);
+  assert.equal(rewards.length, 1);
+  assert.deepEqual(rewards[0], {
+    receiptId: 'activity:journal:day-2026-08-13:food-entry',
+    amount: 0,
+    label: 'Food journal',
+    dayId: 'day-2026-08-13',
+    kind: 'journal',
+    pantryCharges: 6,
+    grantDayId: '2026-08-12',
+  });
+});
+
 test('rapid generator taps remain deterministic without losing commands', () => {
-  let state = { ...withStoryGenerator(createInitialMergeWorldState(NOW), 'feastle'), energy: { value: 50, cap: 100, lastRegenAt: NOW } };
+  const world = withStoryGenerator(createInitialMergeWorldState(NOW), 'feastle');
+  let state: MergeWorldState = {
+    ...world,
+    energy: { value: 50, cap: 100, lastRegenAt: NOW },
+    generators: { ...world.generators, 'starter-pantry': { ...world.generators['starter-pantry'], charges: 12 } },
+  };
   for (let index = 0; index < 12; index += 1) {
     const result = reduceMergeWorld(state, {
       type: 'tapGenerator',
@@ -500,7 +533,7 @@ test('unlocked Katchimeras receive no orders until their authored story requests
   assert.ok(state.activeOrders[0].storyArcId);
 });
 
-test('today’s first journal directly stocks the Pantry once without creating board items', () => {
+test('a local day’s first food journal stocks the Pantry without adding Merge Energy or board items', () => {
   const date = new Date(NOW + 1);
   const today = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   const world = withStoryGenerator(createInitialMergeWorldState(NOW, ['feastle']), 'feastle');
@@ -510,18 +543,55 @@ test('today’s first journal directly stocks the Pantry once without creating b
     generators: { ...world.generators, 'starter-pantry': { ...world.generators['starter-pantry'], charges: 4 } },
   };
   const rewards = [
-    { receiptId: 'journal:one', amount: 10, dayId: today, kind: 'journal' },
-    { receiptId: 'journal:two', amount: 5, dayId: today, kind: 'journal' },
+    { receiptId: 'journal:one', amount: 0, dayId: today, grantDayId: today, kind: 'journal', pantryCharges: 6 },
+    { receiptId: 'journal:two', amount: 0, dayId: today, grantDayId: today, kind: 'journal', pantryCharges: 6 },
     { receiptId: 'quest:one', amount: 30, dayId: today, kind: 'quest' },
-    { receiptId: 'journal:historical', amount: 0, dayId: '2026-01-01', kind: 'journal' },
   ];
   const rewarded = reduceMergeWorld(initial, { type: 'grantActivityEnergyBatch', rewards, now: NOW + 1 });
-  assert.equal(rewarded.state.energy.value, 40);
+  assert.equal(rewarded.state.energy.value, 30);
   assert.equal(rewarded.state.generators['starter-pantry'].charges, 10);
   assert.ok(rewarded.state.processedGeneratorChargeGrantIds.includes(`journal-charge:${today}:starter-pantry`));
   assert.equal(rewarded.state.board.filter((cell) => cell.occupant?.kind === 'item').length, 0);
   const duplicate = reduceMergeWorld(rewarded.state, { type: 'grantActivityEnergyBatch', rewards, now: NOW + 2 });
   assert.equal(duplicate.state.generators['starter-pantry'].charges, 10);
+});
+
+test('a processed journal receipt can stock the Pantry after Feastle unlocks it', () => {
+  const date = new Date(NOW + 1);
+  const today = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const reward = [{ receiptId: 'journal:before-pantry', amount: 0, dayId: today, grantDayId: today, kind: 'journal', pantryCharges: 6 }];
+  let state = reduceMergeWorld(createInitialMergeWorldState(NOW), {
+    type: 'grantActivityEnergyBatch', rewards: reward, now: NOW + 1,
+  }).state;
+  assert.ok(state.processedActivityReceiptIds.includes('journal:before-pantry'));
+  assert.equal(state.processedGeneratorChargeGrantIds.includes(`journal-charge:${today}:starter-pantry`), false);
+  state = reduceMergeWorld(state, {
+    type: 'reconcileStory', familyId: 'feastle', status: 'order_active', targetLevel: 2,
+    starterParcelGranted: true, now: NOW + 2,
+  }).state;
+  state = {
+    ...state,
+    generators: { ...state.generators, 'starter-pantry': { ...state.generators['starter-pantry'], charges: 2 } },
+  };
+  const restocked = reduceMergeWorld(state, { type: 'grantActivityEnergyBatch', rewards: reward, now: NOW + 3 });
+  assert.equal(restocked.state.generators['starter-pantry'].charges, 8);
+  assert.ok(restocked.state.processedGeneratorChargeGrantIds.includes(`journal-charge:${today}:starter-pantry`));
+});
+
+test('journal restocks never exceed the Pantry cap', () => {
+  const date = new Date(NOW + 1);
+  const today = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const world = withStoryGenerator(createInitialMergeWorldState(NOW), 'feastle');
+  const state = {
+    ...world,
+    generators: { ...world.generators, 'starter-pantry': { ...world.generators['starter-pantry'], charges: 10 } },
+  };
+  const result = reduceMergeWorld(state, {
+    type: 'grantActivityEnergyBatch',
+    rewards: [{ receiptId: 'journal:capped-pantry', amount: 0, dayId: today, grantDayId: today, kind: 'journal', pantryCharges: 6 }],
+    now: NOW + 1,
+  });
+  assert.equal(result.state.generators['starter-pantry'].charges, 12);
 });
 
 test('legacy unclaimed parcels migrate into direct generator charges once', () => {
@@ -561,7 +631,7 @@ test('Feastle story reconciliation owns one authored request and serving emits a
   const order = state.activeOrders[0];
   assert.equal(order.id, 'merge-story:feastle:chapter-1:level-2');
   assert.equal(order.requirements[0].definitionId, 'food:table:2');
-  assert.equal(state.generators['starter-pantry'].charges, 18);
+  assert.equal(state.generators['starter-pantry'].charges, 8);
   assert.ok(state.processedGeneratorChargeGrantIds.includes('story-charge:feastle:starter-pantry'));
   const unlock = state.generatorUnlockReceipts.find((receipt) => receipt.generatorId === 'starter-pantry');
   assert.ok(unlock);
@@ -580,7 +650,7 @@ test('Chapter 4 shows and preserves three Feastle orders, completing only after 
   state = reduceMergeWorld(state, { type: 'reconcileStory', familyId: 'feastle', status: 'order_active', targetLevel: 4, starterParcelGranted: true, now: NOW + 2 }).state;
   assert.equal(state.activeOrders.length, 3);
   assert.deepEqual(state.activeOrders.map((order) => order.requirements[0].definitionId), [
-    'food:table:2', 'food:table:3', 'food:table:4',
+    'food:table:2', 'food:table:2', 'food:table:3',
   ]);
 
   const first = state.activeOrders[0];

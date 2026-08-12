@@ -604,6 +604,37 @@ test('Feastle Chapter One uses distinct two-beat scenes instead of repeated ques
   assert.equal(playful?.nodes.some((node) => node.kind === 'memory_proposal'), false);
 });
 
+test('Feastle introduces an optional journal handoff and resumes the chapter after either decision', () => {
+  const definition = companionConversationDefinitionsForFamily('feastle')
+    .find((item) => item.id === 'feastle:friendship:2')!;
+  const handoff = definition.nodes.find((node) => node.kind === 'journal_handoff');
+  assert.ok(handoff);
+  assert.equal(handoff.flowId, 'food');
+  assert.equal(handoff.nextNodeId, 'busy-day');
+  assert.equal(handoff.rewardGrowth, 20);
+  assert.equal(handoff.rewardPantryCharges, 6);
+
+  const started = createConversationSession({ definition, formId: 'feastle', dayId: '2026-08-12', createdAt: 1 });
+  const answered = answerConversation(started, definition, 'easy', 2).session;
+  const atHandoff = continueConversation(answered, definition, 3);
+  assert.equal(atHandoff.currentNodeId, 'today-table');
+  const resumed = continueConversation(atHandoff, definition, 4);
+  assert.equal(resumed.currentNodeId, 'busy-day');
+});
+
+test('Feastle closes Chapter One with a remembered insight followed by a practical Today goal', () => {
+  const definition = companionConversationDefinitionsForFamily('feastle')
+    .find((item) => item.id === 'feastle:friendship:4')!;
+  const memories = definition.nodes.filter((node) => node.kind === 'memory_proposal');
+  const goals = definition.nodes.filter((node) => node.kind === 'goal_proposal');
+  assert.equal(memories.length, 3);
+  assert.equal(goals.length, 3);
+  for (const memory of memories) {
+    assert.ok(goals.some((goal) => goal.id === memory.nextNodeId));
+  }
+  assert.ok(goals.every((goal) => goal.suggestedQuickGoalIds.length === 3));
+});
+
 test('Feastle first meeting is a first-person story in the conversation engine', () => {
   const definition = companionConversationDefinitionsV2.find((item) => item.id === FEASTLE_FIRST_MEETING_DEFINITION_ID);
   assert.ok(definition);

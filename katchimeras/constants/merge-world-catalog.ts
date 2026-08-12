@@ -11,6 +11,7 @@ export const MERGE_WORLD_COLUMNS = 7;
 export const MERGE_WORLD_ROWS = 9;
 export const MERGE_WORLD_SIZE = MERGE_WORLD_COLUMNS * MERGE_WORLD_ROWS;
 export const MERGE_ENERGY_CAP = 100;
+export const MERGE_INITIAL_ENERGY = 8;
 export const MERGE_ENERGY_REGEN_MS = 120_000;
 export const MERGE_GENERATOR_CHARGES = 12;
 export const MERGE_GENERATOR_COOLDOWN_MS = 18 * 60_000;
@@ -68,8 +69,8 @@ export const FEASTLE_STORY_REQUESTS: Readonly<Record<number, readonly FeastleSto
   3: [{ title: 'A Pantry Pair', definitionId: 'food:table:2', quantity: 2 }],
   4: [
     { title: 'A Welcoming Snack', definitionId: 'food:table:2', quantity: 1 },
-    { title: 'Something Warm', definitionId: 'food:table:3', quantity: 1 },
-    { title: 'The Table Centrepiece', definitionId: 'food:table:4', quantity: 1 },
+    { title: 'Something Warm', definitionId: 'food:table:2', quantity: 1 },
+    { title: 'The Table Centrepiece', definitionId: 'food:table:3', quantity: 1 },
   ],
 };
 
@@ -81,11 +82,12 @@ export type MergeGeneratorDefinition = {
   color: string;
   initialCell: number;
   baseBranches: string[];
+  initialCharges?: number;
   unlockDescription: string;
 };
 
 export const MERGE_GENERATORS: readonly MergeGeneratorDefinition[] = [
-  { id: 'starter-pantry', familyId: 'food', name: 'Feastle’s Picnic Pantry', icon: 'fork.knife', color: '#C97847', initialCell: 31, baseBranches: ['table'], unlockDescription: 'Tap it to unpack cosy ingredients for Feastle’s table.' },
+  { id: 'starter-pantry', familyId: 'food', name: 'Feastle’s Picnic Pantry', icon: 'fork.knife', color: '#C97847', initialCell: 31, baseBranches: ['table'], initialCharges: 8, unlockDescription: 'Tap it to unpack cosy ingredients for Feastle’s table.' },
   { id: 'nature-pot', familyId: 'nature', name: 'Mossprout’s Sprouting Pot', icon: 'leaf.fill', color: '#5E9E69', initialCell: 38, baseBranches: ['garden'], unlockDescription: 'A pocket garden of seeds and sprouts for Mossprout’s requests.' },
   { id: 'waterside-pail', familyId: 'nature', name: 'Shellio’s Waterside Pail', icon: 'water.waves', color: '#4E9EAE', initialCell: 39, baseBranches: ['waterside'], unlockDescription: 'Tap it for pebbles, shells, and little waterside treasures.' },
   { id: 'adventure-pack', familyId: 'adventure', name: 'Steppling’s Trail Satchel', icon: 'figure.walk', color: '#967044', initialCell: 32, baseBranches: ['trail'], unlockDescription: 'Trail basics for boots, packs, and bigger walking adventures.' },

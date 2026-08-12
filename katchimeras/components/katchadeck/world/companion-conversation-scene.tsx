@@ -53,7 +53,7 @@ export function conversationSpeechLine(
     return `I think ${name} is your closest match right now.`;
   }
   if (node.kind === 'insight_reveal') return session.insightResult?.reflection ?? node.title;
-  if (node.kind === 'memory_proposal' || node.kind === 'goal_proposal' || node.kind === 'quick_goal_proposal' || node.kind === 'quest_handoff') return node.prompt;
+  if (node.kind === 'memory_proposal' || node.kind === 'goal_proposal' || node.kind === 'quick_goal_proposal' || node.kind === 'journal_handoff' || node.kind === 'quest_handoff') return node.prompt;
   return node.message;
 }
 
@@ -72,6 +72,7 @@ export function CompanionConversationScene({
   onDismissOutcome,
   onOpenOutcomeDestination,
   onQuickGoalDecision,
+  onJournalHandoff,
   onQuestHandoff,
   hasActiveFocus,
   memories,
@@ -98,6 +99,7 @@ export function CompanionConversationScene({
   onDismissOutcome: () => void;
   onOpenOutcomeDestination: (destination: ConversationOutcomeDestination) => void;
   onQuickGoalDecision: (accept: boolean, node: Extract<ConversationNode, { kind: 'quick_goal_proposal' }>) => void;
+  onJournalHandoff: (open: boolean, node: Extract<ConversationNode, { kind: 'journal_handoff' }>) => void;
   onQuestHandoff: (accept: boolean, node: Extract<ConversationNode, { kind: 'quest_handoff' }>) => void;
   hasActiveFocus: boolean;
   memories: readonly CompanionMemory[];
@@ -125,7 +127,7 @@ export function CompanionConversationScene({
   const progress = conversationProgress(definition, session);
   const showConversationProgress = !session.outcomePresentation
     && session.status !== 'completed'
-    && (node?.kind === 'choice' || node?.kind === 'poll' || node?.kind === 'profile_game' || node?.kind === 'insight_game');
+    && (node?.kind === 'choice' || node?.kind === 'poll' || node?.kind === 'profile_game' || node?.kind === 'insight_game' || node?.kind === 'journal_handoff');
 
   useEffect(() => {
     if (!session.outcomePresentation?.celebrate || process.env.EXPO_OS !== 'ios') return;
@@ -201,6 +203,7 @@ export function CompanionConversationScene({
             onClose={onClose}
             onKeepTalking={() => {
               onDismissOutcome();
+              if (session.status !== 'completed') return;
               if (storyFlow) onStoryComplete?.();
               else onKeepTalking();
             }}
@@ -258,6 +261,31 @@ export function CompanionConversationScene({
             <ThemedText selectable style={{ fontSize: 16, fontWeight: '900', lineHeight: 22 }} lightColor="#3B2C20" darkColor="#3B2C20">{node.title}</ThemedText>
             <PrimaryAction label="Add this small task" onPress={() => onQuickGoalDecision(true, node)} />
             <SecondaryAction label="Not now" onPress={() => onQuickGoalDecision(false, node)} />
+          </View>
+        ) : node?.kind === 'journal_handoff' ? (
+          <View style={{ gap: 11 }}>
+            <View style={{ backgroundColor: '#FFF5D8', borderColor: 'rgba(168,117,47,0.3)', borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, gap: 8, padding: 16 }}>
+              <View style={{ alignItems: 'center', flexDirection: 'row', gap: 9 }}>
+                <View style={{ alignItems: 'center', backgroundColor: '#806040', borderRadius: 999, height: 32, justifyContent: 'center', width: 32 }}>
+                  <IconSymbol color="#FFF8E7" name="book.closed.fill" size={16} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText selectable style={{ fontSize: 10, fontWeight: '900', letterSpacing: 1.1 }} lightColor="#8B672E" darkColor="#8B672E">A MOMENT WORTH KEEPING</ThemedText>
+                  <ThemedText selectable style={{ fontSize: 20, fontWeight: '900', lineHeight: 25 }} lightColor="#3B2C20" darkColor="#3B2C20">{node.title}</ThemedText>
+                </View>
+              </View>
+              <ThemedText selectable style={{ fontSize: 13.5, lineHeight: 20 }} lightColor="#64513B" darkColor="#64513B">{node.body}</ThemedText>
+              <View style={{ alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                <View style={{ backgroundColor: '#F5D985', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 }}>
+                  <ThemedText selectable style={{ fontSize: 11, fontWeight: '900' }} lightColor="#5B421D" darkColor="#5B421D">+{node.rewardGrowth} Egg Growth</ThemedText>
+                </View>
+                <View style={{ backgroundColor: '#F5D985', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 }}>
+                  <ThemedText selectable style={{ fontSize: 11, fontWeight: '900' }} lightColor="#5B421D" darkColor="#5B421D">Up to +{node.rewardPantryCharges} Pantry stock</ThemedText>
+                </View>
+              </View>
+            </View>
+            <PrimaryAction label="Take this to the Egg" onPress={() => onJournalHandoff(true, node)} />
+            <SecondaryAction label="Not today" onPress={() => onJournalHandoff(false, node)} />
           </View>
         ) : node?.kind === 'quest_handoff' ? (
           <View style={{ gap: 10 }}>

@@ -1,6 +1,7 @@
 import {
   FEASTLE_STORY_REQUESTS,
   MERGE_ENERGY_CAP,
+  MERGE_INITIAL_ENERGY,
   MERGE_ENERGY_REGEN_MS,
   MERGE_EXPANSIONS,
   MERGE_GENERATOR_CHARGES,
@@ -56,7 +57,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     generatorUnlockReceipts: [],
     processedGeneratorChargeGrantIds: [],
     generators: {},
-    energy: { value: MERGE_ENERGY_CAP, cap: MERGE_ENERGY_CAP, lastRegenAt: now },
+    energy: { value: MERGE_INITIAL_ENERGY, cap: MERGE_ENERGY_CAP, lastRegenAt: now },
     coins: 100,
     mergeXp: 0,
     mergeLevel: 1,
@@ -479,7 +480,7 @@ function grantActivityEnergy(state: MergeWorldState, receiptId: string, amount: 
   }, now), `Real life added ${safeAmount} Merge Energy.`);
 }
 
-function grantActivityEnergyBatch(state: MergeWorldState, rewards: Array<{ receiptId: string; amount: number; dayId?: string; kind?: string }>, now: number): MergeWorldCommandResult {
+function grantActivityEnergyBatch(state: MergeWorldState, rewards: Array<{ receiptId: string; amount: number; dayId?: string; kind?: string; pantryCharges?: number; grantDayId?: string }>, now: number): MergeWorldCommandResult {
   if (!rewards.length) return unchanged(state);
   const processed = new Set(state.processedActivityReceiptIds);
   const activityEnergyByDay = { ...state.activityEnergyByDay };
@@ -487,34 +488,48 @@ function grantActivityEnergyBatch(state: MergeWorldState, rewards: Array<{ recei
   let generators = state.generators;
   let amount = 0;
   let changedState = false;
+  let pantryGrantProcessed = false;
+  let pantryStockAdded = false;
   for (const reward of rewards) {
-    if (!reward.receiptId || processed.has(reward.receiptId)) continue;
-    processed.add(reward.receiptId);
-    const requested = Math.max(0, Math.floor(reward.amount));
-    const awarded = reward.dayId
-      ? Math.min(requested, Math.max(0, 40 - (activityEnergyByDay[reward.dayId] ?? 0)))
-      : requested;
-    amount += awarded;
-    if (reward.dayId) activityEnergyByDay[reward.dayId] = (activityEnergyByDay[reward.dayId] ?? 0) + awarded;
-    const chargeGrantId = reward.dayId ? `journal-charge:${reward.dayId}:starter-pantry` : '';
+    if (!reward.receiptId) continue;
+    if (!processed.has(reward.receiptId)) {
+      processed.add(reward.receiptId);
+      const requested = Math.max(0, Math.floor(reward.amount));
+      const awarded = reward.dayId
+        ? Math.min(requested, Math.max(0, 40 - (activityEnergyByDay[reward.dayId] ?? 0)))
+        : requested;
+      amount += awarded;
+      if (reward.dayId) activityEnergyByDay[reward.dayId] = (activityEnergyByDay[reward.dayId] ?? 0) + awarded;
+      changedState = true;
+    }
+    const chargeGrantId = reward.grantDayId ? `journal-charge:${reward.grantDayId}:starter-pantry` : '';
     if (reward.kind === 'journal'
-      && reward.dayId === localDayId(now)
+      && (reward.pantryCharges ?? 0) > 0
+      && Boolean(reward.grantDayId)
       && Boolean(state.generators['starter-pantry'])
       && !chargeGrantIds.has(chargeGrantId)) {
-      generators = addGeneratorCharges(generators, 'starter-pantry', 6);
+      const previousCharges = generators['starter-pantry']?.charges ?? 0;
+      generators = addGeneratorCharges(generators, 'starter-pantry', reward.pantryCharges ?? 0);
+      pantryStockAdded ||= (generators['starter-pantry']?.charges ?? 0) > previousCharges;
+      pantryGrantProcessed = true;
       chargeGrantIds.add(chargeGrantId);
+      changedState = true;
     }
-    changedState = true;
   }
   if (!changedState) return unchanged(state);
+  const energyValue = Math.min(state.energy.cap, state.energy.value + amount);
+  const actualEnergyAward = energyValue - state.energy.value;
   return changed(touch({
     ...state,
-    energy: { ...state.energy, value: Math.min(state.energy.cap, state.energy.value + amount) },
+    energy: { ...state.energy, value: energyValue },
     processedActivityReceiptIds: [...processed],
     activityEnergyByDay,
     generators,
     processedGeneratorChargeGrantIds: [...chargeGrantIds],
-  }, now), `Real life added ${amount} Merge Energy${generators === state.generators ? '.' : ' and stocked the Pantry.'}`);
+  }, now), actualEnergyAward > 0
+    ? `Real life added ${actualEnergyAward} Merge Energy${pantryStockAdded ? ' and stocked the Pantry.' : '.'}`
+    : pantryStockAdded ? 'Your food journal stocked the Pantry.'
+      : pantryGrantProcessed ? 'Your Pantry is already full.' : undefined);
 }
 
 function rerollOrder(state: MergeWorldState, orderId: string, now: number): MergeWorldCommandResult {
@@ -575,7 +590,6 @@ function reconcileStory(
   if (story.starterParcelGranted && !next.processedGeneratorChargeGrantIds.includes(starterChargeGrantId) && next.generators['starter-pantry']) {
     next = {
       ...next,
-      generators: addGeneratorCharges(next.generators, 'starter-pantry', 6),
       processedGeneratorChargeGrantIds: [...next.processedGeneratorChargeGrantIds, starterChargeGrantId],
     };
   }
@@ -692,7 +706,7 @@ function generatorState(id: string): MergeGeneratorState {
     id: definition.id,
     familyId: definition.familyId,
     name: definition.name,
-    charges: MERGE_GENERATOR_CHARGES,
+    charges: Math.max(0, Math.min(MERGE_GENERATOR_CHARGES, definition.initialCharges ?? MERGE_GENERATOR_CHARGES)),
     maxCharges: MERGE_GENERATOR_CHARGES,
     readyAt: null,
     level: 1,
@@ -803,11 +817,13 @@ function addGeneratorCharges(
 ): MergeWorldState['generators'] {
   const generator = generators[generatorId];
   if (!generator || amount <= 0) return generators;
+  const charges = Math.min(generator.maxCharges, generator.charges + amount);
+  if (charges === generator.charges && generator.readyAt == null) return generators;
   return {
     ...generators,
     [generatorId]: {
       ...generator,
-      charges: Math.min(generator.maxCharges + amount, generator.charges + amount),
+      charges,
       readyAt: null,
     },
   };

@@ -320,7 +320,8 @@ export function MergeWorldProvider({
         next = reduceMergeWorld(next, { type: 'reconcileCharacters', characterIds, now: Date.now() }).state;
         next = reconcileFeastleStory(next);
         const rewards = [...mergeActivityRewards(days), ...mergeQuestActivityRewards(questState)];
-        next = reduceMergeWorld(next, { type: 'grantActivityEnergyBatch', rewards, now: Date.now() }).state;
+        const activityResult = reduceMergeWorld(next, { type: 'grantActivityEnergyBatch', rewards, now: Date.now() });
+        next = activityResult.state;
         await saveMergeWorldState(next);
         const appliedIds: string[] = [];
         for (const receipt of next.externalRewardReceipts.filter((item) => item.appliedAt == null)) {
@@ -336,6 +337,7 @@ export function MergeWorldProvider({
           stateRef.current = next;
           setState(next);
           setFriendshipLevels(levels);
+          if (activityResult.changed) setLastResult({ ...activityResult, state: next });
           setLoading(false);
         }
       } catch (caught) {
@@ -368,10 +370,12 @@ export function MergeWorldProvider({
     const now = Date.now();
     let next = reduceMergeWorld(current, { type: 'reconcileCharacters', characterIds, now }).state;
     const rewards = [...mergeActivityRewards(days), ...mergeQuestActivityRewards(questState)];
-    next = reduceMergeWorld(next, { type: 'grantActivityEnergyBatch', rewards, now }).state;
+    const activityResult = reduceMergeWorld(next, { type: 'grantActivityEnergyBatch', rewards, now });
+    next = activityResult.state;
     if (next === current) return;
     stateRef.current = next;
     setState(next);
+    if (activityResult.changed) setLastResult(activityResult);
     enqueuePersistence(next);
   }, [characterIds, days, enqueuePersistence, questState]);
 

@@ -25,30 +25,33 @@ export type CompanionStoryArc = {
   completedOrderIds: string[];
   pendingBondPoints: number;
   processedQuietBondReceiptIds: string[];
+  journalFtueStatus: 'not_started' | 'saved' | 'skipped';
+  journalFtueRecordId: string | null;
   updatedAt: number;
 };
 
-type CompanionStoryState = { schemaVersion: 1; arcs: CompanionStoryArc[] };
+type CompanionStoryState = { schemaVersion: 2; arcs: CompanionStoryArc[] };
 
 const STORAGE_KEY = 'katchadeck.companion-stories-v1';
 const listeners = new Set<() => void>();
 
 export function freshFeastleStory(now = Date.now()): CompanionStoryArc {
   return {
-    id: 'feastle:table-story', familyId: 'feastle', version: 1,
+    id: 'feastle:table-story', familyId: 'feastle', version: 2,
     currentLevel: 1, targetLevel: 2, beatId: 'feastle-story:level-1',
     status: 'intro_available', activeOrderId: null, pendingConversationId: null,
     unreadReturn: false, starterParcelGranted: false,
     completedBeatIds: [], completedOrderIds: [], pendingBondPoints: 0,
     processedQuietBondReceiptIds: [], updatedAt: now,
+    journalFtueStatus: 'not_started', journalFtueRecordId: null,
   };
 }
 
 function normalize(value: unknown): CompanionStoryState {
-  if (!value || typeof value !== 'object') return { schemaVersion: 1, arcs: [] };
+  if (!value || typeof value !== 'object') return { schemaVersion: 2, arcs: [] };
   const candidate = value as Partial<CompanionStoryState>;
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     arcs: Array.isArray(candidate.arcs) ? candidate.arcs.filter((arc): arc is CompanionStoryArc => Boolean(
       arc && typeof arc.id === 'string' && typeof arc.familyId === 'string' && typeof arc.status === 'string'
     )).map((arc) => ({
@@ -57,12 +60,35 @@ function normalize(value: unknown): CompanionStoryState {
       processedQuietBondReceiptIds: Array.isArray(arc.processedQuietBondReceiptIds)
         ? [...new Set(arc.processedQuietBondReceiptIds.filter((id): id is string => typeof id === 'string'))]
         : [],
+      version: 2,
+      journalFtueStatus: arc.journalFtueStatus === 'saved' || arc.journalFtueStatus === 'skipped'
+        ? arc.journalFtueStatus
+        : arc.currentLevel >= 3 || arc.completedBeatIds?.includes('feastle-story:level-2')
+          ? 'skipped'
+          : 'not_started',
+      journalFtueRecordId: typeof arc.journalFtueRecordId === 'string' ? arc.journalFtueRecordId : null,
     })) : [],
   };
 }
 
+export function markFeastleJournalFtue(
+  status: 'saved' | 'skipped',
+  journalRecordId: string | null = null,
+  now = Date.now(),
+): CompanionStoryArc {
+  const current = loadFeastleStory();
+  if (current.journalFtueStatus === 'saved') return current;
+  if (current.journalFtueStatus === status && current.journalFtueRecordId === journalRecordId) return current;
+  return saveFeastleStory({
+    ...current,
+    journalFtueStatus: status,
+    journalFtueRecordId: status === 'saved' ? journalRecordId : null,
+    updatedAt: now,
+  });
+}
+
 export function loadCompanionStoryState(): CompanionStoryState {
-  return normalize(getStoredJson<CompanionStoryState>(STORAGE_KEY, { schemaVersion: 1, arcs: [] }));
+  return normalize(getStoredJson<CompanionStoryState>(STORAGE_KEY, { schemaVersion: 2, arcs: [] }));
 }
 
 function saveState(state: CompanionStoryState) {
@@ -164,7 +190,7 @@ export function completeFeastleConversation(level: number, now = Date.now()): Co
 }
 
 export function resetCompanionStoriesForDebug(): void {
-  saveState({ schemaVersion: 1, arcs: [] });
+  saveState({ schemaVersion: 2, arcs: [] });
 }
 
 export function setFeastleStoryStateForDebug(status: CompanionStoryStatus, level: number, now = Date.now()): CompanionStoryArc {

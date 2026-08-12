@@ -8,12 +8,14 @@ export type MergeActivityReward = {
   label: string;
   dayId?: string;
   kind?: 'journal' | 'check_in' | 'photo' | 'meaning' | 'steps' | 'quest';
+  pantryCharges?: number;
+  grantDayId?: string;
 };
 
 /**
  * Projects already-persisted life activity into stable, replay-safe Merge
- * Energy receipts. The engine owns de-duplication, so rebuilding this list on
- * every focus is intentional and safe.
+ * Energy or Pantry receipts. Journaling nourishes the Egg first; only food
+ * journals echo into Merge World as Pantry stock. The engine owns de-duplication.
  */
 export function mergeActivityRewards(days: readonly HomeDayRecord[]): MergeActivityReward[] {
   const rewards: MergeActivityReward[] = [];
@@ -22,9 +24,17 @@ export function mergeActivityRewards(days: readonly HomeDayRecord[]): MergeActiv
       if (answer.dismissed || (answer.kind !== 'feeling' && answer.kind !== 'inner_weather')) continue;
       rewards.push({ receiptId: `activity:mood:${day.id}:${answer.id}`, amount: 5, label: 'Check-in', dayId: day.id, kind: 'check_in' });
     }
-    for (const [index, record] of (day.journalRecords ?? []).entries()) {
-      const amount = index === 0 ? 10 : index < 3 ? 5 : 0;
-      rewards.push({ receiptId: `activity:journal:${day.id}:${record.id}`, amount, label: 'Journal', dayId: day.id, kind: 'journal' });
+    for (const record of day.journalRecords ?? []) {
+      if (record.flowId !== 'food') continue;
+      rewards.push({
+        receiptId: `activity:journal:${day.id}:${record.id}`,
+        amount: 0,
+        label: 'Food journal',
+        dayId: day.id,
+        kind: 'journal',
+        pantryCharges: 6,
+        grantDayId: localDayIdForTimestamp(record.createdAt),
+      });
     }
     for (const moment of day.moments) {
       if (moment.type !== 'photo') continue;
@@ -38,6 +48,15 @@ export function mergeActivityRewards(days: readonly HomeDayRecord[]): MergeActiv
     }
   }
   return rewards;
+}
+
+function localDayIdForTimestamp(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value.slice(0, 10);
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export function mergeQuestActivityRewards(questState: CompanionQuestState): MergeActivityReward[] {
