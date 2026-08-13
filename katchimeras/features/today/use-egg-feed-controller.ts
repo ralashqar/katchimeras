@@ -14,6 +14,7 @@ type EggFeedPayload = {
   framelessImage?: boolean;
   imageSource?: number;
   label?: string;
+  mergeEnergyAmount?: number;
   photoUri?: string;
   tint?: string;
 };
@@ -31,7 +32,9 @@ export function useEggFeedController() {
   const [eggFeed, setEggFeed] = useState<EggFeed | null>(null);
   const [eggFeedKey, setEggFeedKey] = useState(0);
   const [eggFeedRewardRequestKey, setEggFeedRewardRequestKey] = useState(0);
+  const [energyHudPulseNonce, setEnergyHudPulseNonce] = useState(0);
   const eggTargetRef = useRef<View | null>(null);
+  const energyHudTargetRef = useRef<View | null>(null);
   const heroStageRef = useRef<View | null>(null);
   const pendingFeedCommit = useRef<(() => void) | null>(null);
   const nextEnergyCurrencySourceRef = useRef<FeedSourceRect | null>(null);
@@ -79,7 +82,7 @@ export function useEggFeedController() {
     targetAttempt = 0,
   ) {
     launchPendingRef.current = true;
-    const launch = (toX: number, toY: number) => {
+    const launch = (toX: number, toY: number, energyToX?: number, energyToY?: number) => {
       launchPendingRef.current = false;
       launchRetryTimerRef.current = null;
       feedNonce.current += 1;
@@ -91,9 +94,12 @@ export function useEggFeedController() {
         currencyFromX: payload.currencyFrom ? payload.currencyFrom.x + payload.currencyFrom.w / 2 : undefined,
         currencyFromY: payload.currencyFrom ? payload.currencyFrom.y + payload.currencyFrom.h / 2 : undefined,
         energyAmount: payload.energyAmount,
+        energyToX,
+        energyToY,
         energyOnly: payload.energyOnly,
         framelessImage: payload.framelessImage,
         imageSource: payload.imageSource,
+        mergeEnergyAmount: payload.mergeEnergyAmount,
         toX,
         toY,
         label: payload.label,
@@ -115,7 +121,18 @@ export function useEggFeedController() {
       // The egg scales around its bottom edge. Aim below the layout centre so
       // rewards still disappear into the shell at its half-size starting state.
       const targetYRatio = eggDestination ? EGG_FEED_TARGET_Y_RATIO : 0.5;
-      destination.measureInWindow((x, y, w, h) => launch(x + w / 2, y + h * targetYRatio));
+      destination.measureInWindow((x, y, w, h) => {
+        const toX = x + w / 2;
+        const toY = y + h * targetYRatio;
+        const energyDestination = (payload.mergeEnergyAmount ?? 0) > 0 ? energyHudTargetRef.current : null;
+        if (!energyDestination) {
+          launch(toX, toY);
+          return;
+        }
+        energyDestination.measureInWindow((energyX, energyY, energyWidth, energyHeight) => {
+          launch(toX, toY, energyX + energyWidth / 2, energyY + energyHeight / 2);
+        });
+      });
       return;
     }
 
@@ -209,15 +226,22 @@ export function useEggFeedController() {
     }
   }, []);
 
+  const handleMergeEnergyTokenArrive = useCallback(() => {
+    setEnergyHudPulseNonce((nonce) => nonce + 1);
+  }, []);
+
   return {
     eggFeed,
     eggFeedKey,
     eggFeedRewardRequestKey,
+    energyHudPulseNonce,
+    energyHudTargetRef,
     eggTargetRef,
     heroStageRef,
     startEggFeed,
     handleEggFeedArrive,
     handleEnergyTokenArrive,
+    handleMergeEnergyTokenArrive,
     pulseEgg,
     setNextEnergyCurrencySource,
   };

@@ -350,6 +350,10 @@ test('Merge page keeps a stable parcel stack first in the tray and the board att
   assert.match(parcel, /countBadge: \{[^}]*alignItems: 'center'[^}]*justifyContent: 'center'/);
   assert.match(parcel, /opacity: interpolate\(value, \[0, 0\.08, 1\], \[0, 1, 1\]\)/);
   assert.doesNotMatch(parcel, /\[0, 1, 1, 0\.18\]/);
+  assert.match(screen, /destinationSize: boardMetrics\.geometry\.cellSize - 4/);
+  assert.match(parcel, /FLIGHT_ITEM_SIZE \/ item\.destinationSize/);
+  assert.match(parcel, /<PersistentMergeItemArt definitionId=\{item\.definitionId\} size=\{item\.destinationSize\}/);
+  assert.doesNotMatch(parcel, /\[0\.6, 1\.1, 1, 0\.92\]/);
   assert.match(rail, /entry\.kind === 'parcel' \? PARCEL_STACK_EXIT : TRAY_SERVE_EXIT/);
   assert.match(rail, /layout=\{reduceMotion \? undefined : LinearTransition/);
   assert.match(screen, /arrival\.kind !== 'memory_arrival'/);

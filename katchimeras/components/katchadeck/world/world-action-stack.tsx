@@ -25,6 +25,7 @@ type WorldActionStackProps = {
   // new photos waiting to be read / a detected place waiting to be named.
   cameraBadge?: number;
   placeBadge?: number;
+  showLabels?: boolean;
 };
 
 // The floating vertical controls on the right: capture a photo, add a note (tap)
@@ -43,11 +44,12 @@ export function WorldActionStack({
   orientation = 'vertical',
   cameraBadge,
   placeBadge,
+  showLabels = false,
 }: WorldActionStackProps) {
   if (orientation === 'horizontal' && onNote) {
     return (
       <View style={styles.rootRow}>
-        <Animated.View entering={popEnter(140)}>
+        <Animated.View entering={popEnter(140)} style={styles.labelledAction}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Write a note"
@@ -55,8 +57,9 @@ export function WorldActionStack({
             style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
             <IconSymbol name="square.and.pencil" size={22} color={Lantern.moon50} />
           </Pressable>
+          {showLabels ? <Text style={styles.secondaryLabel}>Write</Text> : null}
         </Animated.View>
-        <Animated.View entering={popEnter(100)}>
+        <Animated.View entering={popEnter(100)} style={styles.labelledAction}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Add a memory"
@@ -64,8 +67,9 @@ export function WorldActionStack({
             style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
             <IconSymbol name="plus" size={34} color={Meadow.ink} />
           </Pressable>
+          {showLabels ? <Text style={styles.primaryLabel}>Add</Text> : null}
         </Animated.View>
-        <Animated.View entering={popEnter(180)}>
+        <Animated.View entering={popEnter(180)} style={styles.labelledAction}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Capture a moment with the camera${cameraBadge ? ` (${cameraBadge} new photos to review)` : ''}`}
@@ -74,6 +78,7 @@ export function WorldActionStack({
             <IconSymbol name="camera.fill" size={22} color={Lantern.moon50} />
             <ActionBadge count={cameraBadge} />
           </Pressable>
+          {showLabels ? <Text style={styles.secondaryLabel}>Photo</Text> : null}
         </Animated.View>
       </View>
     );
@@ -147,6 +152,9 @@ function ActionBadge({ count }: { count?: number }) {
 const styles = StyleSheet.create({
   root: { alignItems: 'center', gap: 12 },
   rootRow: { alignItems: 'center', flexDirection: 'row', gap: 18, justifyContent: 'center' },
+  labelledAction: { alignItems: 'center', gap: 3 },
+  secondaryLabel: { color: '#FFF8E8', fontSize: 10.5, fontWeight: '800', lineHeight: 13, textShadowColor: 'rgba(28,18,7,0.7)', textShadowOffset: { height: 1, width: 0 }, textShadowRadius: 3 },
+  primaryLabel: { color: '#49351F', fontSize: 10.5, fontWeight: '900', lineHeight: 13, textShadowColor: 'rgba(255,249,226,0.7)', textShadowOffset: { height: 1, width: 0 }, textShadowRadius: 1 },
   badge: {
     alignItems: 'center',
     backgroundColor: Meadow.gold,

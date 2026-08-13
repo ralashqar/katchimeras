@@ -1,14 +1,16 @@
 import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
-import Animated, { FadeIn, FadeOut, cancelAnimation, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import type { SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { RewardSplash, type RewardSplashItem } from '@/components/katchadeck/ui/reward-splash';
+import { GameCurrencyHud } from '@/components/katchadeck/ui/game-currency-hud';
+import { GameHudBar, GameHudControl, GameHudItem } from '@/components/katchadeck/ui/game-primitives';
+import { KatchaInlineNotice } from '@/components/katchadeck/ui/katcha-inline-notice';
+import { KatchaSurfaceProvider } from '@/components/katchadeck/ui/katcha-surface';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   MERGE_GENERATORS_BY_ID,
@@ -17,6 +19,10 @@ import {
 import { mergeWorldGeneratorArt } from '@/constants/merge-world-art';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import { useMergeWorld } from '@/features/merge-world/merge-world-provider';
+import { useGameFeedback } from '@/features/ui/game-feedback-provider';
+import { useGameWallet } from '@/features/ui/game-wallet-provider';
+import { GameUI } from '@/constants/game-ui';
+import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import type { MergeOrder, MergeWorldCommand } from '@/types/merge-world';
 import { markFlowStart, reportFlowReady } from '@/utils/flow-performance';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
@@ -29,12 +35,6 @@ import { MergeParcelFlightOverlay, type MergeParcelFlight } from './merge-parcel
 import { MergeOrderRail, type MergeTrayEntry } from './merge-order-rail';
 import { MergeServeRewardOverlay, type MergeScreenPoint, type MergeServeRewardFlight } from './merge-serve-reward-overlay';
 
-const MERGE_CURRENCY_ART = {
-  energy: require('../../../assets/images/katchimeras/merge-world/ui/energy.webp'),
-  coins: require('../../../assets/images/katchimeras/merge-world/ui/coin.webp'),
-  level: require('../../../assets/images/katchimeras/merge-world/ui/merge-level.webp'),
-} as const;
-
 export function MergeWorldScreen({ active = true, effectsPaused }: { active?: boolean; effectsPaused?: SharedValue<number> } = {}) {
   const router = useRouter();
   const { focusOrderId } = useLocalSearchParams<{ focusOrderId?: string }>();
@@ -43,7 +43,8 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
   const { state, loading, error, lastResult, dispatch: send } = useMergeWorld();
   const [selectedCell, setSelectedCell] = useState<number | null>(null);
   const [boardAreaHeight, setBoardAreaHeight] = useState(0);
-  const [message, setMessage] = useState<string | null>(null);
+  const feedback = useGameFeedback();
+  const wallet = useGameWallet();
   const [story, setStory] = useState(loadFeastleStory);
   const [authoredStories, setAuthoredStories] = useState(() => ({
     baristabbit: loadAuthoredCohortStory('baristabbit'),
@@ -144,13 +145,8 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
   useEffect(() => {
     if (!lastResult) return;
     const message = lastResult.spawnedCell != null ? null : lastResult.message ?? null;
-    setMessage(message);
-    if (!message) return;
-    const timer = setTimeout(() => {
-      setMessage(null);
-    }, 1_450);
-    return () => clearTimeout(timer);
-  }, [lastResult]);
+    if (message) feedback.show({ id: `merge:${lastResult.state.revision}:${message}`, message });
+  }, [feedback, lastResult]);
 
   const dispatch = useCallback((command: MergeWorldCommand) => send(command), [send]);
   const pendingParcels = useMemo(() => state?.arrivals.filter((arrival) => (
@@ -339,6 +335,7 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
       return {
         instanceId: item.instanceId,
         definitionId: item.definitionId,
+        destinationSize: boardMetrics.geometry.cellSize - 4,
         to: {
           x: boardMetrics.x - screenRect.x + center.x,
           y: boardMetrics.y - screenRect.y + center.y,
@@ -392,14 +389,25 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
   return (
     <View ref={screenRef} style={styles.screen}>
       <View style={[styles.game, { paddingTop: Math.max(insets.top + 3, 7), paddingBottom: Math.max(insets.bottom + 3, 7), width: contentWidth }]}>
-        <View style={styles.hud}>
-          <CurrencyHud art={MERGE_CURRENCY_ART.energy} label="Energy" pulseNonce={energyPulseNonce} targetRef={energyHudRef} value={`${presentedEnergy ?? state.energy.value}`} suffix={`/${state.energy.regenCap}`} />
-          <CurrencyHud art={MERGE_CURRENCY_ART.coins} label="Coins" pulseNonce={coinPulseNonce} targetRef={coinHudRef} value={String(presentedCoins ?? state.coins)} />
-          <CurrencyHud art={MERGE_CURRENCY_ART.level} label="Merge level" progress={levelRatio} value={String(state.mergeLevel)} />
-          <Pressable accessibilityLabel="Open legacy games" accessibilityRole="button" onPress={() => router.push('/legacy-games')} style={({ pressed }) => [styles.hudAction, pressed && styles.pressed]}>
-            <IconSymbol color="#F6D993" name="gamecontroller.fill" size={19} />
-          </Pressable>
-        </View>
+        <GameHudBar
+          content={<GameCurrencyHud balances={[
+            { art: GAME_CURRENCY_ART.energy, id: 'energy', pulseNonce: energyPulseNonce, suffix: `/${state.energy.regenCap}`, targetRef: energyHudRef, value: presentedEnergy ?? state.energy.value },
+            { art: GAME_CURRENCY_ART.coins, id: 'coins', pulseNonce: coinPulseNonce, targetRef: coinHudRef, value: presentedCoins ?? state.coins },
+            { id: 'gems', value: wallet.gems },
+          ]} style={styles.currencyHud} tone="glass" />}
+          density="compact"
+          tone="glass"
+          trailing={<>
+            <GameHudItem accessibilityLabel={`Merge level ${state.mergeLevel}`} style={styles.levelPill} tone="glass">
+              <IconSymbol color={GameUI.color.goldStrong} name="star.fill" size={14} />
+              <ThemedText selectable style={styles.levelValue} lightColor={GameUI.color.ink} darkColor={GameUI.color.ink}>{state.mergeLevel}</ThemedText>
+              <View pointerEvents="none" style={styles.levelTrack}><View style={[styles.levelFill, { width: `${levelRatio * 100}%` }]} /></View>
+            </GameHudItem>
+            <GameHudControl accessibilityLabel="Open legacy games" onPress={() => router.push('/legacy-games')} style={styles.hudAction} tone="glass">
+              <IconSymbol color={GameUI.color.ink} name="gamecontroller.fill" size={18} />
+            </GameHudControl>
+          </>}
+        />
         <View style={styles.energyStatusRow}>
           <ThemedText darkColor="#F5DFC2" numberOfLines={1} style={styles.energyStatusText}>
             {bonusEnergy > 0
@@ -457,8 +465,7 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
 
       </View>
 
-      {error ? <View style={[styles.errorBanner, { top: Math.max(insets.top + 56, 64) }]}><ThemedText darkColor="#FFE1D8" numberOfLines={2} style={styles.errorText}>{error}</ThemedText></View> : null}
-      {message ? <Animated.View entering={FadeIn.duration(120)} exiting={FadeOut.duration(120)} pointerEvents="none" style={[styles.toast, { bottom: Math.max(insets.bottom + 76, 82) }]}><ThemedText darkColor="#4A291B" style={styles.toastText}>{message}</ThemedText></Animated.View> : null}
+      {error ? <KatchaSurfaceProvider surface="parchment"><View style={[styles.errorBanner, { top: Math.max(insets.top + 56, 64) }]}><KatchaInlineNotice body={error} title="Merge paused" tone="danger" /></View></KatchaSurfaceProvider> : null}
       <MergeServeRewardOverlay flight={serveFlight} onCoinArrive={handleCoinArrive} onEnergyArrive={handleEnergyArrive} onFinish={finishServeAnimation} onItemsArrive={handleServeItemsArrive} />
       <MergeParcelFlightOverlay flight={parcelFlight} onFinish={finishParcelFlight} onItemArrive={handleParcelItemArrive} />
       {active && generatorUnlockRewards.length ? <RewardSplash
@@ -486,22 +493,6 @@ function ServiceCounter({ viewportWidth }: { viewportWidth: number }) {
   );
 }
 
-function CurrencyHud({ art, label, progress, pulseNonce = 0, targetRef, value, suffix }: { art: number; label: string; progress?: number; pulseNonce?: number; targetRef?: RefObject<View | null>; value: string; suffix?: string }) {
-  const pulse = useSharedValue(0);
-  useEffect(() => {
-    if (pulseNonce < 1) return;
-    pulse.value = withSequence(withTiming(1, { duration: 90 }), withTiming(0, { duration: 150 }));
-    return () => cancelAnimation(pulse);
-  }, [pulse, pulseNonce]);
-  const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: 1 + pulse.value * 0.09 }] }), [pulse]);
-  return <Animated.View accessibilityLabel={`${label} ${value}${suffix ?? ''}`} ref={targetRef} style={[styles.currency, pulseStyle]}>
-    <View pointerEvents="none" style={styles.currencySheen} />
-    <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" source={art} style={styles.currencyArt} transition={0} />
-    <ThemedText darkColor="#FFF4D7" style={styles.currencyValue}>{value}<ThemedText darkColor="#CDBAAB" style={styles.currencySuffix}>{suffix}</ThemedText></ThemedText>
-    {progress != null ? <View pointerEvents="none" style={styles.currencyTrack}><View style={[styles.currencyFill, { width: `${progress * 100}%` }]} /></View> : null}
-  </Animated.View>;
-}
-
 function measureViewInWindow(ref: RefObject<View | null>): Promise<{ height: number; width: number; x: number; y: number } | null> {
   return new Promise((resolve) => {
     if (!ref.current) {
@@ -516,20 +507,17 @@ const styles = StyleSheet.create({
   screen: { alignItems: 'center', backgroundColor: 'transparent', flex: 1, overflow: 'hidden' },
   game: { flex: 1, gap: 7, minHeight: 0 },
   loading: { alignItems: 'center', backgroundColor: '#2B1B13', flex: 1, gap: 12, justifyContent: 'center' },
-  hud: { alignItems: 'center', flexDirection: 'row', gap: 6, minHeight: 43, paddingHorizontal: 1 },
   energyStatusRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 25, paddingHorizontal: 4 },
   energyStatusText: { flex: 1, fontSize: 10.5, fontWeight: '800' },
   generatorUpgrade: { alignItems: 'center', borderColor: 'rgba(245,223,194,0.3)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 3, paddingHorizontal: 7, paddingVertical: 4 },
   generatorUpgradeReady: { backgroundColor: '#F5D488', borderColor: '#B8752C' },
   generatorUpgradeLabel: { fontSize: 9.5, fontVariant: ['tabular-nums'], fontWeight: '900' },
-  currency: { alignItems: 'center', backgroundColor: 'rgba(26,23,38,0.93)', borderColor: 'rgba(255,223,165,0.43)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, boxShadow: '0 5px 13px rgba(25,14,18,0.30), inset 0 1px 0 rgba(255,255,255,0.10)', flex: 1, flexDirection: 'row', gap: 1, height: 39, minWidth: 0, overflow: 'hidden', paddingHorizontal: 4, position: 'relative' },
-  currencySheen: { backgroundColor: 'rgba(255,255,255,0.045)', borderRadius: 999, height: 20, left: 7, position: 'absolute', right: 7, top: 2 },
-  currencyArt: { height: 35, width: 35 },
-  currencyValue: { flexShrink: 1, fontFamily: AppFontFamilies.fredokaBold, fontSize: 16.5, fontVariant: ['tabular-nums'], lineHeight: 21 },
-  currencySuffix: { fontFamily: AppFontFamilies.manrope, fontSize: 7.5, fontWeight: '800' },
-  currencyTrack: { backgroundColor: 'rgba(255,255,255,0.08)', bottom: 0, height: 2.5, left: 10, overflow: 'hidden', position: 'absolute', right: 10 },
-  currencyFill: { backgroundColor: '#EEC364', boxShadow: '0 0 5px rgba(238,195,100,0.72)', height: 2.5 },
-  hudAction: { alignItems: 'center', backgroundColor: 'rgba(26,23,38,0.93)', borderColor: 'rgba(255,223,165,0.43)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, boxShadow: '0 5px 13px rgba(25,14,18,0.30), inset 0 1px 0 rgba(255,255,255,0.10)', height: 39, justifyContent: 'center', width: 42 },
+  currencyHud: { flex: 1 },
+  levelPill: { gap: 3, minWidth: 48, overflow: 'hidden', paddingHorizontal: 7 },
+  levelValue: { ...GameUI.type.numeric, fontSize: 13 },
+  levelTrack: { backgroundColor: 'rgba(68,51,31,0.12)', bottom: 0, height: 2.5, left: 8, overflow: 'hidden', position: 'absolute', right: 8 },
+  levelFill: { backgroundColor: GameUI.color.gold, height: 2.5 },
+  hudAction: { paddingHorizontal: 0, width: 38 },
   mergeArea: { flex: 1, minHeight: 0, position: 'relative' },
   serviceCounter: { alignSelf: 'center', height: 32, marginTop: -29, position: 'relative', zIndex: 1 },
   counterUpperLip: { backgroundColor: '#FFE876', height: 3, left: 0, position: 'absolute', right: 0, top: 0 },
@@ -542,9 +530,6 @@ const styles = StyleSheet.create({
   boardInteractionShield: { ...StyleSheet.absoluteFillObject, zIndex: 50 },
   expansionButton: { alignItems: 'center', backgroundColor: '#F5D488', borderColor: '#B8752C', borderRadius: 999, borderWidth: 1, boxShadow: '0 3px 8px rgba(55,28,13,0.3)', flexDirection: 'row', gap: 2, paddingHorizontal: 8, paddingVertical: 5, position: 'absolute', right: 5, top: 5, zIndex: 40 },
   expansionLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9, fontWeight: '900' },
-  errorBanner: { alignSelf: 'center', backgroundColor: 'rgba(121,38,31,0.92)', borderRadius: 12, maxWidth: 360, paddingHorizontal: 12, paddingVertical: 7, position: 'absolute', zIndex: 80 },
-  errorText: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '700' },
-  toast: { alignSelf: 'center', backgroundColor: '#FFF0CE', borderColor: '#C98435', borderRadius: 999, borderWidth: 1, boxShadow: '0 6px 16px rgba(55,28,13,0.34)', paddingHorizontal: 15, paddingVertical: 7, position: 'absolute', zIndex: 90 },
-  toastText: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '900' },
+  errorBanner: { alignSelf: 'center', maxWidth: 360, position: 'absolute', width: '92%', zIndex: GameUI.layer.notice },
   pressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
 });

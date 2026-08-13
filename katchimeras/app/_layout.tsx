@@ -14,6 +14,9 @@ import { WispProvider } from '@/features/wisps/wisp-provider';
 import { EconomyProvider } from '@/features/economy/economy-provider';
 import { AvatarAccessReconciler } from '@/features/economy/avatar-access-reconciler';
 import { AppActivityProvider } from '@/features/performance/app-activity';
+import { GameUIProvider } from '@/components/katchadeck/ui/game-ui-provider';
+import { GameFeedbackProvider } from '@/features/ui/game-feedback-provider';
+import { GameWalletProvider } from '@/features/ui/game-wallet-provider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import '@/utils/travel-memory-task';
 
@@ -80,12 +83,15 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={navigationTheme}>
-        <EconomyProvider>
-        <EggAvatarProvider>
-          <AvatarAccessReconciler />
-          <WispProvider>
-          <AppActivityProvider>
-            <Stack>
+        <GameUIProvider>
+          <EconomyProvider>
+            <GameWalletProvider>
+              <GameFeedbackProvider>
+                <EggAvatarProvider>
+                  <AvatarAccessReconciler />
+                  <WispProvider>
+                    <AppActivityProvider>
+                      <Stack>
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="art-lab" options={{ title: 'Katchimera Art Lab' }} />
@@ -95,6 +101,7 @@ export default function RootLayout() {
           <Stack.Screen name="dev-katchimera-tile-lab" options={{ title: 'Katchimera Tile Lab' }} />
           <Stack.Screen name="dev-photo-place-lab" options={{ title: 'Photo Place Lab' }} />
           <Stack.Screen name="dev-subscription-lab" options={{ title: 'Subscription Simulator' }} />
+          <Stack.Screen name="dev-ui-gallery" options={{ title: 'Game UI Gallery' }} />
           <Stack.Screen name="intelligence-lab" options={{ title: 'Intelligence Lab' }} />
           <Stack.Screen name="moment-capture" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="note-capture" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
@@ -114,11 +121,14 @@ export default function RootLayout() {
           <Stack.Screen name="game/[questId]" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="legacy-games" options={{ headerShown: false, title: 'Legacy Games' }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Katchimeras Preview' }} />
-            </Stack>
-          </AppActivityProvider>
-          </WispProvider>
-        </EggAvatarProvider>
-        </EconomyProvider>
+                      </Stack>
+                    </AppActivityProvider>
+                  </WispProvider>
+                </EggAvatarProvider>
+              </GameFeedbackProvider>
+            </GameWalletProvider>
+          </EconomyProvider>
+        </GameUIProvider>
         <StatusBar style={colorScheme === 'light' ? 'dark' : 'light'} />
       </ThemeProvider>
     </GestureHandlerRootView>

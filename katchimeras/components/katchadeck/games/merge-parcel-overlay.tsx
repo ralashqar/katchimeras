@@ -27,11 +27,13 @@ const PARCEL_TRAY_ART = require('../../../assets/images/katchimeras/merge-world/
 const PARCEL_SIZE = 64;
 const PARCEL_TRAY_SIZE = 120;
 const FLIGHT_ITEM_SIZE = 42;
+const HANDOFF_HOLD_MS = 48;
+const HANDOFF_FADE_MS = 120;
 
 export type MergeParcelFlight = {
   nonce: number;
   from: MergeScreenPoint;
-  items: { instanceId: string; definitionId: string; to: MergeScreenPoint }[];
+  items: { instanceId: string; definitionId: string; destinationSize: number; to: MergeScreenPoint }[];
 };
 
 export const MergeParcelTrayCard = forwardRef<NativeView, {
@@ -134,22 +136,39 @@ function ParcelFlyingItem({ count, flightNonce, from, index, item, onFinish, onI
   onItemArrive: (instanceId: string) => void;
 }) {
   const progress = useSharedValue(0);
+  const handoff = useSharedValue(0);
   const reduceMotion = useReducedMotion();
 
   useEffect(() => {
+    handoff.value = 0;
     progress.value = withDelay(reduceMotion ? index * 28 : 95 + index * 72, withTiming(1, {
       duration: reduceMotion ? 170 : 430,
       easing: Easing.inOut(Easing.cubic),
     }, (finished) => {
       if (!finished) return;
+      // Reveal the persistent board sprite while this flight sprite is still
+      // held at the exact same world-space centre and scale. The brief hold
+      // gives React a frame to commit the board copy before we cross-fade it.
       runOnJS(onItemArrive)(item.instanceId);
-      if (index === count - 1) runOnJS(onFinish)();
+      handoff.value = withDelay(
+        reduceMotion ? 24 : HANDOFF_HOLD_MS,
+        withTiming(1, {
+          duration: reduceMotion ? 70 : HANDOFF_FADE_MS,
+          easing: Easing.out(Easing.cubic),
+        }, (handoffFinished) => {
+          if (handoffFinished && index === count - 1) runOnJS(onFinish)();
+        }),
+      );
     }));
-    return () => cancelAnimation(progress);
-  }, [count, flightNonce, index, item.instanceId, onFinish, onItemArrive, progress, reduceMotion]);
+    return () => {
+      cancelAnimation(handoff);
+      cancelAnimation(progress);
+    };
+  }, [count, flightNonce, handoff, index, item.instanceId, onFinish, onItemArrive, progress, reduceMotion]);
 
   const style = useAnimatedStyle(() => {
     const value = progress.value;
+    const flightScale = FLIGHT_ITEM_SIZE / item.destinationSize;
     const inverse = 1 - value;
     const midpointX = (from.x + item.to.x) / 2;
     const curveX = midpointX + (index % 2 === 0 ? -34 : 34);
@@ -157,28 +176,30 @@ function ParcelFlyingItem({ count, flightNonce, from, index, item, onFinish, onI
     const x = inverse * inverse * from.x + 2 * inverse * value * curveX + value * value * item.to.x;
     const y = inverse * inverse * from.y + 2 * inverse * value * curveY + value * value * item.to.y;
     return {
-      // Keep the flight copy opaque at the destination. onItemArrive reveals
-      // the already-committed board sprite underneath it, and the overlay is
-      // then removed. Fading the flight copy before that handoff looked like
-      // the board item was playing a second entrance animation.
-      opacity: interpolate(value, [0, 0.08, 1], [0, 1, 1]),
+      // The flight reaches the board fully opaque and at scale 1. Only after
+      // the persistent sprite is mounted underneath does handoff fade this
+      // copy, avoiding a one-frame position/scale discontinuity.
+      opacity: interpolate(value, [0, 0.08, 1], [0, 1, 1]) * (1 - handoff.value),
       transform: [
-        { translateX: x - FLIGHT_ITEM_SIZE / 2 },
-        { translateY: y - FLIGHT_ITEM_SIZE / 2 },
+        { translateX: x - item.destinationSize / 2 },
+        { translateY: y - item.destinationSize / 2 },
         { rotateZ: `${interpolate(value, [0, 1], [index % 2 === 0 ? -8 : 8, 0])}deg` },
-        { scale: interpolate(value, [0, 0.18, 0.86, 1], [0.6, 1.1, 1, 0.92]) },
+        // Render at the board's exact responsive size, then use scale only to
+        // establish the smaller in-flight silhouette. Ending at 1 makes the
+        // overlay and committed board art pixel-aligned at handoff.
+        { scale: interpolate(value, [0, 0.18, 0.78, 1], [flightScale * 0.62, flightScale * 1.12, 0.96, 1]) },
       ],
     };
-  }, [from.x, from.y, index, item.to.x, item.to.y]);
+  }, [from.x, from.y, handoff, index, item.destinationSize, item.to.x, item.to.y]);
 
   const landingStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.value, [0, 0.82, 0.92, 1], [0, 0, 0.78, 0]),
     transform: [{ scale: interpolate(progress.value, [0.82, 1], [0.5, 1.45]) }],
   }));
 
-  return <Animated.View style={[styles.flyingItem, { left: 0, top: 0 }, style]}>
-    <Animated.View style={[styles.landingGlow, landingStyle]} />
-    <PersistentMergeItemArt definitionId={item.definitionId} size={FLIGHT_ITEM_SIZE} />
+  return <Animated.View style={[styles.flyingItem, { height: item.destinationSize, left: 0, top: 0, width: item.destinationSize }, style]}>
+    <Animated.View style={[styles.landingGlow, { height: item.destinationSize + 6, width: item.destinationSize + 6 }, landingStyle]} />
+    <PersistentMergeItemArt definitionId={item.definitionId} size={item.destinationSize} />
   </Animated.View>;
 }
 
@@ -196,6 +217,6 @@ const styles = StyleSheet.create({
   openingCrate: { height: PARCEL_SIZE, left: 0, position: 'absolute', top: 0, width: PARCEL_SIZE },
   openingGlow: { backgroundColor: 'rgba(255,222,132,0.38)', borderRadius: 999, height: 48, left: 4, position: 'absolute', top: 4, width: 48 },
   openingArt: { height: PARCEL_SIZE, position: 'absolute', width: PARCEL_SIZE },
-  flyingItem: { height: FLIGHT_ITEM_SIZE, position: 'absolute', width: FLIGHT_ITEM_SIZE },
-  landingGlow: { backgroundColor: 'rgba(255,225,139,0.42)', borderColor: 'rgba(255,246,208,0.82)', borderRadius: 999, borderWidth: 1.5, height: FLIGHT_ITEM_SIZE + 6, left: -3, position: 'absolute', top: -3, width: FLIGHT_ITEM_SIZE + 6 },
+  flyingItem: { position: 'absolute' },
+  landingGlow: { backgroundColor: 'rgba(255,225,139,0.42)', borderColor: 'rgba(255,246,208,0.82)', borderRadius: 999, borderWidth: 1.5, left: -3, position: 'absolute', top: -3 },
 });

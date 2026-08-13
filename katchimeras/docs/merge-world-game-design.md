@@ -93,7 +93,9 @@ updates the same badge in place; only the final claim removes the stack, with a
 smooth outro while the remaining trays slide left. Pressing claims atomically,
 opens a visual copy of the crate, and flies the granted items to their actual
 board cells. The flight copy stays opaque through landing while the committed
-board sprite is revealed underneath, so delivery has one continuous entrance
+board sprite is revealed underneath. Its destination center and responsive
+art size come from the board's measured cell geometry, and the flight ends at
+exactly scale one, so delivery has one continuous entrance
 rather than a flight followed by a second fade. A full board leaves the parcel unclaimed and uses recoverable
 feedback. Legacy activity parcels are converted once to the same typed,
 companion-owned model; their former random contents are discarded.

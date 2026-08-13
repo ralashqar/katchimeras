@@ -14,13 +14,15 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
-import { GROWTH_ENERGY_ART } from '@/constants/today-care-art';
+import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import { Lantern } from '@/constants/theme';
 import { splitEnergyAcrossTokens } from '@/utils/energy-payout';
 
 export type EggFeed = {
   energyAmount?: number;
   energyOnly?: boolean;
+  energyToX?: number;
+  energyToY?: number;
   framelessImage?: boolean;
   nonce: number;
   fromX: number;
@@ -31,6 +33,7 @@ export type EggFeed = {
   toX: number;
   toY: number;
   label?: string;
+  mergeEnergyAmount?: number;
   photoUri?: string;
   tint: string;
 };
@@ -39,6 +42,7 @@ type EggFeedOverlayProps = {
   feed: EggFeed | null;
   onArrive: (feedNonce: number) => void;
   onEnergyTokenArrive?: (amount: number, index: number, count: number) => void;
+  onMergeEnergyTokenArrive?: (amount: number, index: number, count: number) => void;
 };
 
 const SOURCE_FLIGHT_MS = 460;
@@ -57,7 +61,7 @@ const BURST_VECTORS = [
   { x: 31, y: -48, rotation: 12 },
 ] as const;
 
-export function EggFeedOverlay({ feed, onArrive, onEnergyTokenArrive }: EggFeedOverlayProps) {
+export function EggFeedOverlay({ feed, onArrive, onEnergyTokenArrive, onMergeEnergyTokenArrive }: EggFeedOverlayProps) {
   if (!feed) return null;
   return (
     <FeedPayout
@@ -65,27 +69,33 @@ export function EggFeedOverlay({ feed, onArrive, onEnergyTokenArrive }: EggFeedO
       key={feed.nonce}
       onArrive={() => onArrive(feed.nonce)}
       onEnergyTokenArrive={onEnergyTokenArrive}
+      onMergeEnergyTokenArrive={onMergeEnergyTokenArrive}
     />
   );
 }
 
-function FeedPayout({ feed, onArrive, onEnergyTokenArrive }: {
+function FeedPayout({ feed, onArrive, onEnergyTokenArrive, onMergeEnergyTokenArrive }: {
   feed: EggFeed;
   onArrive: () => void;
   onEnergyTokenArrive?: (amount: number, index: number, count: number) => void;
+  onMergeEnergyTokenArrive?: (amount: number, index: number, count: number) => void;
 }) {
   const tokenAmounts = splitEnergyAcrossTokens(feed.energyAmount ?? 0, TOKEN_COUNT);
+  const mergeTokenAmounts = splitEnergyAcrossTokens(feed.mergeEnergyAmount ?? 0, TOKEN_COUNT);
   const hasEnergyPayout = tokenAmounts.length > 0;
+  const hasMergeEnergyPayout = mergeTokenAmounts.length > 0 && feed.energyToX != null && feed.energyToY != null;
 
   return (
     <View pointerEvents="none" style={styles.overlay}>
       {!feed.energyOnly ? (
-        <SourceMote feed={feed} completesFeed={!hasEnergyPayout} onArrive={onArrive} />
+        <SourceMote feed={feed} completesFeed={!hasEnergyPayout && !hasMergeEnergyPayout} onArrive={onArrive} />
       ) : null}
       {tokenAmounts.map((amount, index) => (
         <EnergyToken
           amount={amount}
+          completesFeed={!hasMergeEnergyPayout && index === tokenAmounts.length - 1}
           count={tokenAmounts.length}
+          destination="egg"
           feed={feed}
           index={index}
           key={`${feed.nonce}:energy:${index}`}
@@ -93,7 +103,18 @@ function FeedPayout({ feed, onArrive, onEnergyTokenArrive }: {
           onEnergyTokenArrive={onEnergyTokenArrive}
         />
       ))}
-      {feed.energyOnly && !hasEnergyPayout ? <ImmediateArrival onArrive={onArrive} /> : null}
+      {hasMergeEnergyPayout ? mergeTokenAmounts.map((amount, index) => <EnergyToken
+        amount={amount}
+        completesFeed={index === mergeTokenAmounts.length - 1}
+        count={mergeTokenAmounts.length}
+        destination="currency"
+        feed={feed}
+        index={index}
+        key={`${feed.nonce}:merge-energy:${index}`}
+        onArrive={onArrive}
+        onEnergyTokenArrive={onMergeEnergyTokenArrive}
+      />) : null}
+      {feed.energyOnly && !hasEnergyPayout && !hasMergeEnergyPayout ? <ImmediateArrival onArrive={onArrive} /> : null}
     </View>
   );
 }
@@ -167,12 +188,14 @@ function SourceMote({ feed, completesFeed, onArrive }: {
   );
 }
 
-function EnergyToken({ amount, count, feed, index, onArrive, onEnergyTokenArrive }: {
+function EnergyToken({ amount, completesFeed = false, count, destination, feed, index, onArrive, onEnergyTokenArrive }: {
   amount: number;
+  completesFeed?: boolean;
   count: number;
+  destination: 'currency' | 'egg';
   feed: EggFeed;
   index: number;
-  onArrive: () => void;
+  onArrive?: () => void;
   onEnergyTokenArrive?: (amount: number, index: number, count: number) => void;
 }) {
   const riseProgress = useSharedValue(0);
@@ -205,14 +228,14 @@ function EnergyToken({ amount, count, feed, index, onArrive, onEnergyTokenArrive
     }, (finished) => {
       if (!finished) return;
       if (onEnergyTokenArrive) runOnJS(onEnergyTokenArrive)(amount, index, count);
-      if (index === count - 1) runOnJS(onArrive)();
+      if (completesFeed && onArrive) runOnJS(onArrive)();
     }));
     return () => {
       cancelAnimation(flightProgress);
       cancelAnimation(hoverPhase);
       cancelAnimation(riseProgress);
     };
-  }, [amount, count, flightProgress, hoverPhase, index, onArrive, onEnergyTokenArrive, reduceMotion, riseProgress]);
+  }, [amount, completesFeed, count, destination, flightProgress, hoverPhase, index, onArrive, onEnergyTokenArrive, reduceMotion, riseProgress]);
 
   const animatedStyle = useAnimatedStyle(() => {
     const startX = feed.currencyFromX ?? feed.fromX;
@@ -222,16 +245,18 @@ function EnergyToken({ amount, count, feed, index, onArrive, onEnergyTokenArrive
     const burstX = startX + vector.x;
     const burstY = startY + vector.y;
     const inverse = 1 - q;
-    const controlX = (burstX + feed.toX) / 2 + (index % 2 === 0 ? -24 : 24);
-    const controlY = Math.min(burstY, feed.toY) - 82 - index * 3;
+    const targetX = destination === 'currency' ? (feed.energyToX ?? feed.toX) : feed.toX;
+    const targetY = destination === 'currency' ? (feed.energyToY ?? feed.toY) : feed.toY;
+    const controlX = (burstX + targetX) / 2 + (index % 2 === 0 ? -24 : 24);
+    const controlY = Math.min(burstY, targetY) - 82 - index * 3;
     const stagedX = startX + vector.x * rise;
     const stagedY = startY + vector.y * rise;
     const baseX = q === 0
       ? stagedX
-      : inverse * inverse * burstX + 2 * inverse * q * controlX + q * q * feed.toX;
+      : inverse * inverse * burstX + 2 * inverse * q * controlX + q * q * targetX;
     const baseY = q === 0
       ? stagedY
-      : inverse * inverse * burstY + 2 * inverse * q * controlY + q * q * feed.toY;
+      : inverse * inverse * burstY + 2 * inverse * q * controlY + q * q * targetY;
     const hoverEnvelope = rise * inverse;
     const phase = hoverPhase.value * Math.PI * 2 + index * 0.92;
     const hoverStrength = reduceMotion ? 0.5 : 1;
@@ -257,7 +282,7 @@ function EnergyToken({ amount, count, feed, index, onArrive, onEnergyTokenArrive
 
   return (
     <Animated.View style={[styles.energyToken, animatedStyle]}>
-      <Image contentFit="contain" source={GROWTH_ENERGY_ART} style={styles.energyTokenArt} transition={0} />
+      <Image contentFit="contain" source={GAME_CURRENCY_ART.energy} style={styles.energyTokenArt} transition={0} />
     </Animated.View>
   );
 }

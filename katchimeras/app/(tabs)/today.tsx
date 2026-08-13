@@ -75,7 +75,7 @@ import { presenceEnter } from '@/components/katchadeck/motion';
 import { ThemedText } from '@/components/themed-text';
 import { hasQuickGoalTemplates } from '@/constants/companion-quick-goals';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
-import { GROWTH_ENERGY_ART } from '@/constants/today-care-art';
+import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import { HOME_SCENE_Y_OFFSET } from '@/constants/home-loop-layout';
 import { MERGE_CHARACTER_NAMES } from '@/constants/merge-world-catalog';
 import type { MergeCharacterId } from '@/types/merge-world';
@@ -476,14 +476,18 @@ function HomeScreen() {
     eggFeed,
     eggFeedKey,
     eggFeedRewardRequestKey,
+    energyHudPulseNonce,
+    energyHudTargetRef,
     eggTargetRef,
     heroStageRef,
     startEggFeed,
     handleEggFeedArrive,
     handleEnergyTokenArrive,
+    handleMergeEnergyTokenArrive,
     pulseEgg,
     setNextEnergyCurrencySource,
   } = useEggFeedController();
+  const deferredCareMergeEnergyRef = useRef(0);
   useEffect(() => {
     if (!pendingCareIntent) setNextEnergyCurrencySource(null);
   }, [pendingCareIntent, setNextEnergyCurrencySource]);
@@ -493,11 +497,14 @@ function HomeScreen() {
     onArrive: () => void,
   ) => {
     markCareRewardLaunch();
+    const mergeEnergyAmount = deferredCareMergeEnergyRef.current;
+    deferredCareMergeEnergyRef.current = 0;
     startEggFeed(from, {
       currencyFrom: from,
       energyAmount: action.growthReward,
       energyOnly: true,
-      imageSource: GROWTH_ENERGY_ART,
+      imageSource: GAME_CURRENCY_ART.energy,
+      mergeEnergyAmount,
       tint: Lantern.ember300,
     }, onArrive);
   }, [markCareRewardLaunch, startEggFeed]);
@@ -1735,6 +1742,8 @@ function HomeScreen() {
           style={[styles.topHudLayer, goalsChromeStyle]}>
           <TodayTopHud
             days={timelineDays}
+            energyPulseNonce={energyHudPulseNonce}
+            energyTargetRef={energyHudTargetRef}
             interactionLocked={isHatching}
             onSelectDay={navigateToDay}
             selectedId={selectedDayId}
@@ -1868,6 +1877,8 @@ function HomeScreen() {
           companionWispId={activeWispId}
           day={formingDay}
           eggTargetRef={eggTargetRef}
+          energyHudPulseNonce={energyHudPulseNonce}
+          energyHudTargetRef={energyHudTargetRef}
           feedbackKey={eggFeedKey}
           focusMode={false}
           growth={nurtureGrowth}
@@ -1983,6 +1994,7 @@ function HomeScreen() {
         feed={eggFeed}
         onArrive={handleEggFeedArrive}
         onEnergyTokenArrive={handleEnergyArrival}
+        onMergeEnergyTokenArrive={handleMergeEnergyTokenArrive}
       />
 
       {/* The cinematic background is the only environment renderer. Atmosphere
@@ -2132,6 +2144,7 @@ function HomeScreen() {
               : null;
             const deferRewardToCareRow = completingCareAction != null;
             if (completingCareAction) {
+              deferredCareMergeEnergyRef.current = journalMergeReward?.totalEnergy ?? 0;
               queueCareCompletionAfterJournalDismiss(completingCareAction);
             }
             const target = companionJournalHandoff?.target ?? manualJournalTarget ?? formingTarget;
@@ -2162,7 +2175,8 @@ function HomeScreen() {
               startEggFeed({ h: 54, w: 54, x: windowWidth / 2 - 27, y: windowHeight - 190 }, {
                 energyAmount,
                 energyOnly: true,
-                imageSource: GROWTH_ENERGY_ART,
+                imageSource: GAME_CURRENCY_ART.energy,
+                mergeEnergyAmount: journalMergeReward?.totalEnergy ?? 0,
                 tint: Lantern.ember300,
               }, () => {});
             }

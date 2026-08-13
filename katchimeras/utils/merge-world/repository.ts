@@ -11,6 +11,11 @@ let resetGeneration = 0;
 let resetInProgress = false;
 let writeQueue: Promise<void> = Promise.resolve();
 const resetListeners = new Set<(state: MergeWorldState) => void>();
+const snapshotListeners = new Set<(state: MergeWorldState) => void>();
+
+function publishSnapshot(state: MergeWorldState) {
+  snapshotListeners.forEach((listener) => listener(state));
+}
 
 function serializeWrite<T>(task: () => Promise<T>): Promise<T> {
   const result = writeQueue.then(task, task);
@@ -114,6 +119,7 @@ export async function saveMergeWorldState(state: MergeWorldState, receiptIds?: r
       }
     });
   });
+  if (generation === resetGeneration && !resetInProgress) publishSnapshot(state);
 }
 
 export async function resetMergeWorldStateForDebug(now = Date.now()): Promise<void> {
@@ -129,6 +135,7 @@ export async function resetMergeWorldStateForDebug(now = Date.now()): Promise<vo
     });
     const freshState = createInitialMergeWorldState(now);
     resetListeners.forEach((listener) => listener(freshState));
+    publishSnapshot(freshState);
   } finally {
     resetInProgress = false;
   }
@@ -181,9 +188,15 @@ export async function resetMergeWorldActivityForDayForDebug(dayId: string, now =
     resetInProgress = false;
   }
   if (resetState) resetListeners.forEach((listener) => listener(resetState!));
+  if (resetState) publishSnapshot(resetState);
 }
 
 export function subscribeMergeWorldResets(listener: (state: MergeWorldState) => void): () => void {
   resetListeners.add(listener);
   return () => resetListeners.delete(listener);
+}
+
+export function subscribeMergeWorldSnapshots(listener: (state: MergeWorldState) => void): () => void {
+  snapshotListeners.add(listener);
+  return () => snapshotListeners.delete(listener);
 }

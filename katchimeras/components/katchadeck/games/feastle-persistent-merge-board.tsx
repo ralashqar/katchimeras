@@ -439,7 +439,11 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
 
     hoverCell.value = -1;
     onSelect(null);
-    if (merging && process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (process.env.EXPO_OS === 'ios') {
+      void Haptics.impactAsync(merging
+        ? Haptics.ImpactFeedbackStyle.Medium
+        : Haptics.ImpactFeedbackStyle.Light);
+    }
     beginOperation({ nextState: predicted.state, nextSprites, nextMotions });
     finishInterruptedOperation();
   }, [beginOperation, detachMotion, finishOperationIfReady, geometry, hoverCell, onCommand, onSelect, reduceMotion, returnSpriteHome, timers]);
@@ -709,7 +713,11 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       if (!reducedFx) effectsPaused.value = withDelay(500, withTiming(0, { duration: 1 }));
     }), [activeDragId, activeSourceCell, dragEpoch, dragHapticTriggered, dragPhase, dragSprite, dragTranslationX, dragTranslationY, effectsPaused, emitBoardCancel, emitBoardDrop, emitBoardTap, entranceInteractive, geometry.cellSize, geometry.columns, geometry.gap, geometry.inset, geometry.rows, gestureFinished, grabX, grabY, hoverCell, maxGestureDistance, occupancyDefinitions, occupancyIds, pickSprite, reducedFx, touchDownX, touchDownY]);
 
-  return <GestureDetector gesture={boardGesture}><Animated.View accessibilityLabel="Feastle merge board, seven columns by nine rows" onLayout={reportScreenMetrics} ref={boardRef} style={[styles.board, busy && styles.boardAnimating, { height: boardHeight, padding, width: boardWidth }, boardEntranceStyle]}>
+  // Measure a stable, untransformed frame. The visual board enters with a
+  // translateY animation; measuring that Animated.View cached a temporary
+  // screen Y and caused parcel flights to land below their eventual cells.
+  return <View onLayout={reportScreenMetrics} ref={boardRef} style={[styles.boardFrame, { height: boardHeight, width: boardWidth }]}>
+    <GestureDetector gesture={boardGesture}><Animated.View accessibilityLabel="Feastle merge board, seven columns by nine rows" style={[styles.board, busy && styles.boardAnimating, { height: boardHeight, padding, width: boardWidth }, boardEntranceStyle]}>
     <LinearGradient colors={['#788143', '#55602F', '#384321']} locations={[0, 0.52, 1]} pointerEvents="none" style={styles.boardGradient} />
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       {presentation.board.map((cell, index) => {
@@ -768,7 +776,8 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       {mergeBursts.map((burst) => <MergeCelebrationOverlay cell={burst.cell} geometry={geometry} key={burst.id} />)}
       {invalidFeedback ? <InvalidCellFeedback cell={invalidFeedback.cell} geometry={geometry} key={invalidFeedback.id} /> : null}
     </View>
-  </Animated.View></GestureDetector>;
+    </Animated.View></GestureDetector>
+  </View>;
 }
 
 const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibilityLabel, blocked, invalid, selected, compatible, index, left, top, width, height, onActivate }: {
@@ -1116,6 +1125,7 @@ export function PersistentMergeItemArt({ definitionId, size }: { definitionId: s
 }
 
 const styles = StyleSheet.create({
+  boardFrame: { alignSelf: 'center', overflow: 'visible', position: 'relative' },
   board: { alignSelf: 'center', backgroundColor: '#4D582B', borderRadius: 0, borderWidth: 0, boxShadow: '0 13px 24px rgba(39,31,16,0.38), 0 3px 5px rgba(39,31,16,0.22), inset 0 3px 2px rgba(255,242,193,0.24), inset 0 -4px 5px rgba(29,38,16,0.34)', overflow: 'visible', position: 'relative' },
   boardGradient: { ...StyleSheet.absoluteFillObject, borderRadius: 0 },
   boardAnimating: { zIndex: 30 },

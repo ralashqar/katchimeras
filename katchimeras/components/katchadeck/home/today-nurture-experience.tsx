@@ -44,7 +44,8 @@ import {
   HOME_SCENE_Y_OFFSET,
 } from '@/constants/home-loop-layout';
 import { Meadow } from '@/constants/meadow-theme';
-import { GROWTH_ENERGY_ART, todayCareArt } from '@/constants/today-care-art';
+import { todayCareArt } from '@/constants/today-care-art';
+import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import type { HomeDayRecord, HomeTimelineDay, SleepQuality } from '@/types/home';
 import type { HomeArchetypeId } from '@/types/world-identity';
 import type { WispId } from '@/types/wisp';
@@ -95,6 +96,8 @@ type TodayNurtureExperienceProps = {
   bottomInset: number;
   timelineDays: HomeTimelineDay[];
   eggTargetRef: RefObject<View | null>;
+  energyHudPulseNonce?: number;
+  energyHudTargetRef?: RefObject<View | null>;
 };
 
 export type TodayCareCompletionEvent = {
@@ -122,6 +125,8 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   companionWispId,
   day,
   eggTargetRef,
+  energyHudPulseNonce,
+  energyHudTargetRef,
   feedbackKey,
   focusMode = false,
   growth,
@@ -249,6 +254,10 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
     windowHeight,
     stageTop,
   );
+  const eggVisualTop = stageTop + sceneLift + explorationEggFrame.top;
+  // The compact cluster is 63px tall at full size; this leaves an 18px
+  // world-space buffer before the egg's measured visual top.
+  const growthMeterTop = eggVisualTop - 81;
   const scenePinchFocusY = stageTop + sceneLift + explorationEggFrame.centerY;
   const customizerCamera = useMemo(() => eggAvatarCustomizerCamera({
     bottomInset,
@@ -417,13 +426,13 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
         />
       ) : null}
       <View pointerEvents="none" style={styles.environmentFade} />
-      <View pointerEvents="none" style={[styles.meterAnchor, { top: stageTop - 8 }]}>
+      <View pointerEvents="none" style={[styles.meterAnchor, { top: growthMeterTop }]}>
         <GrowthMeter growth={growth} />
       </View>
       <Animated.View
         entering={reduceMotion ? FadeIn.duration(80) : FadeIn.duration(220)}
         style={[styles.topHudFixed, { top: topInset + 8 }]}>
-        <TodayTopHud days={timelineDays} interactionLocked={false} onSelectDay={onSelectDay} selectedId={day.id} />
+        <TodayTopHud days={timelineDays} energyPulseNonce={energyHudPulseNonce} energyTargetRef={energyHudTargetRef} interactionLocked={false} onSelectDay={onSelectDay} selectedId={day.id} />
       </Animated.View>
       {!actionListHidden ? (
       <View onLayout={handleFixedActionClusterLayout} style={[styles.fixedActionCluster, { top: fixedActionClusterTop }]}>
@@ -573,6 +582,7 @@ function FormingActionCluster({ onAdd, onCamera, onNote }: {
         onMicTap={onNote}
         onNote={onNote}
         orientation="horizontal"
+        showLabels
       />
     </View>
   );
@@ -1269,7 +1279,7 @@ function CareRow({ action, entryDelayMs, onNotToday, onStart, reduceMotion, swip
               <CareActionArt action={action} />
             )}
             <View style={styles.flexCopy}>
-              <ThemedText selectable style={styles.rowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{action.title}</ThemedText>
+              <ThemedText numberOfLines={2} selectable style={styles.rowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{action.title}</ThemedText>
             </View>
             <View collapsable={false} ref={rewardRef}>
               <Reward amount={action.growthReward} />
@@ -1469,7 +1479,7 @@ function CareSwipeShell({ children, disabled = false, externalGesture, label, on
 function Reward({ amount }: { amount: number }) {
   return (
     <View style={styles.reward}>
-      <Image contentFit="contain" source={GROWTH_ENERGY_ART} style={styles.rewardEnergyIcon} transition={0} />
+      <Image contentFit="contain" source={GAME_CURRENCY_ART.energy} style={styles.rewardEnergyIcon} transition={0} />
       <ThemedText style={styles.rewardText} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>+{amount}</ThemedText>
     </View>
   );
@@ -1478,6 +1488,8 @@ function Reward({ amount }: { amount: number }) {
 function GrowthMeter({ growth }: { growth: TodayGrowthSummary }) {
   const feedback = useTodayEnergyFeedback();
   const reduceMotion = useReducedMotion();
+  const { height: windowHeight } = useWindowDimensions();
+  const compact = windowHeight < 720;
   const [meterTargetEnergy, setMeterTargetEnergy] = useState(growth.activeEnergy);
   const displayedEnergy = meterTargetEnergy;
   const previousEnergyRef = useRef(growth.activeEnergy);
@@ -1549,23 +1561,28 @@ function GrowthMeter({ growth }: { growth: TodayGrowthSummary }) {
     <View
       accessibilityLabel={`${displayedEnergy} of ${growth.energyTarget} Growth Energy. ${status}`}
       accessibilityRole="progressbar"
-      style={styles.meterCard}>
-      <View style={styles.trackContainer}>
-        <View style={styles.track}>
-          <Animated.View style={[styles.fill, fillStyle]} />
-          <Animated.View pointerEvents="none" style={[styles.energyTargetGlow, targetGlowStyle]} />
-          <View style={styles.trackShine} />
-        </View>
-        <View pointerEvents="none" style={styles.energyValue}>
-          <Animated.View style={[styles.energyMeterIconFrame, iconPulseStyle]}>
-            <Image contentFit="contain" source={GROWTH_ENERGY_ART} style={styles.energyMeterIcon} transition={0} />
+      style={[styles.meterCard, compact && styles.meterCardCompact]}>
+      <View style={[styles.growthProgressCard, compact && styles.growthProgressCardCompact]}>
+        <View style={[styles.energyMedallion, compact && styles.energyMedallionCompact]}>
+          <Animated.View style={[styles.energyMeterIconFrame, compact && styles.energyMeterIconFrameCompact, iconPulseStyle]}>
+            <Image contentFit="contain" source={GAME_CURRENCY_ART.energy} style={styles.energyMeterIcon} transition={0} />
           </Animated.View>
-          <ThemedText selectable style={styles.meterPercent} lightColor="#FFFBE9" darkColor="#FFFBE9">
-            {displayedEnergy} / {growth.energyTarget}
-          </ThemedText>
         </View>
+        <View style={styles.trackContainer}>
+          <View style={styles.track}>
+            <Animated.View style={[styles.fill, fillStyle]} />
+            <Animated.View pointerEvents="none" style={[styles.energyTargetGlow, targetGlowStyle]} />
+            <View style={styles.trackShine} />
+          </View>
+          <View pointerEvents="none" style={styles.energyValue}>
+            <ThemedText selectable style={[styles.meterPercent, compact && styles.meterPercentCompact]} lightColor="#FFFBE9" darkColor="#FFFBE9">
+              {displayedEnergy} / {growth.energyTarget}
+            </ThemedText>
+          </View>
+        </View>
+        <IconSymbol color="#8F7041" name={growth.isActivated ? 'leaf.fill' : 'sparkles'} size={compact ? 14 : 17} />
       </View>
-      <View style={styles.countdownPill}>
+      <View style={[styles.countdownPill, compact && styles.countdownPillCompact]}>
         <IconSymbol color="#F3D37B" name={growth.isActivated ? 'timer' : 'sparkles'} size={13} />
         <ThemedText selectable style={styles.countdown} lightColor="#F6EACB" darkColor="#F6EACB">
           {status}
@@ -1598,24 +1615,32 @@ const styles = StyleSheet.create({
   eggStage: { alignItems: 'center', height: TODAY_KINGDOM_STAGE_HEIGHT, justifyContent: 'center', left: 0, overflow: 'visible', position: 'absolute', right: 0, zIndex: 2 },
   environmentFade: { bottom: 0, experimental_backgroundImage: 'linear-gradient(to bottom, rgba(247,241,226,0) 0%, rgba(247,241,226,0.72) 62%, #F7F1E2 100%)', height: 150, left: 0, position: 'absolute', right: 0, zIndex: 1 },
   meterAnchor: { left: 0, position: 'absolute', right: 0, zIndex: 4 },
-  meterCard: { alignItems: 'center', alignSelf: 'center', gap: 8, width: '78%' },
-  meterPercent: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontVariant: ['tabular-nums'], fontWeight: '900' },
+  meterCard: { alignItems: 'center', alignSelf: 'center', gap: 4, width: '72%' },
+  meterCardCompact: { gap: 3, width: '68%' },
+  growthProgressCard: { alignItems: 'center', backgroundColor: 'rgba(246,243,224,0.78)', borderColor: 'rgba(255,255,246,0.66)', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, boxShadow: '0 5px 14px rgba(35,65,54,0.18), inset 0 1px 0 rgba(255,255,255,0.76)', flexDirection: 'row', gap: 7, height: 36, paddingLeft: 31, paddingRight: 10, width: '100%' },
+  growthProgressCardCompact: { borderRadius: 14, height: 32, paddingLeft: 27, paddingRight: 8 },
+  energyMedallion: { alignItems: 'center', backgroundColor: 'rgba(250,244,218,0.96)', borderColor: 'rgba(255,255,249,0.92)', borderRadius: 999, borderWidth: 1.5, boxShadow: '0 4px 10px rgba(69,53,23,0.22), inset 0 1px 0 rgba(255,255,255,0.92)', height: 44, justifyContent: 'center', left: -9, position: 'absolute', width: 44, zIndex: 2 },
+  energyMedallionCompact: { height: 38, left: -8, width: 38 },
+  meterPercent: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontVariant: ['tabular-nums'], fontWeight: '900' },
+  meterPercentCompact: { fontSize: 9.5 },
   energyValue: { alignItems: 'center', ...StyleSheet.absoluteFillObject, flexDirection: 'row', gap: 4, justifyContent: 'center', overflow: 'visible', zIndex: 1 },
-  energyMeterIconFrame: { height: 24, width: 24 },
+  energyMeterIconFrame: { height: 29, width: 29 },
+  energyMeterIconFrameCompact: { height: 25, width: 25 },
   energyMeterIcon: { height: '100%', width: '100%' },
   energyTargetGlow: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,235,154,0.34)', borderRadius: 999, boxShadow: '0 0 16px rgba(255,225,116,0.72)' },
-  countdown: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontVariant: ['tabular-nums'], fontWeight: '800' },
-  countdownPill: { alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(31,27,19,0.76)', borderColor: 'rgba(255,239,196,0.18)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 5, minHeight: 28, paddingHorizontal: 11 },
-  trackContainer: { height: 23, overflow: 'visible', position: 'relative', width: '100%' },
+  countdown: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontVariant: ['tabular-nums'], fontWeight: '800' },
+  countdownPill: { alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(31,36,30,0.8)', borderColor: 'rgba(255,247,214,0.22)', borderRadius: 999, borderWidth: 1, boxShadow: '0 3px 9px rgba(20,31,25,0.16)', flexDirection: 'row', gap: 4, minHeight: 23, paddingHorizontal: 10 },
+  countdownPillCompact: { minHeight: 21, paddingHorizontal: 8 },
+  trackContainer: { flex: 1, height: 17, overflow: 'visible', position: 'relative' },
   track: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(31,27,19,0.72)', borderColor: 'rgba(255,239,196,0.32)', borderRadius: 999, borderWidth: 2, boxShadow: '0 5px 14px rgba(20,16,9,0.32), inset 0 1px 3px rgba(0,0,0,0.30)', overflow: 'hidden' },
   fill: { ...StyleSheet.absoluteFillObject, backgroundColor: '#82B94D', borderRadius: 999, transformOrigin: 'left' },
   trackShine: { backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 999, height: 4, left: 7, position: 'absolute', right: 7, top: 3 },
   addMemoryCluster: { alignItems: 'center', minHeight: 67, paddingBottom: 5 },
   hatchRevealCluster: { alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'center', minHeight: 72, paddingBottom: 5 },
-  doorIcon: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.54)', borderColor: 'rgba(255,248,230,0.56)', borderCurve: 'continuous', borderRadius: 11, borderWidth: 1, height: 36, justifyContent: 'center', width: 36 },
-  doorIconArt: { height: 32, width: 32 },
-  rowPressed: { backgroundColor: 'rgba(255,244,204,0.55)', transform: [{ scale: 0.988 }] },
-  careSection: { gap: 5, paddingHorizontal: Meadow.space.page, paddingTop: 14 },
+  doorIcon: { alignItems: 'center', backgroundColor: 'rgba(244,231,193,0.68)', borderColor: 'rgba(255,252,235,0.82)', borderCurve: 'continuous', borderRadius: 12, borderWidth: 1, height: 38, justifyContent: 'center', width: 38 },
+  doorIconArt: { height: 34, width: 34 },
+  rowPressed: { backgroundColor: 'rgba(255,244,204,0.72)', transform: [{ translateY: 1 }, { scale: 0.985 }] },
+  careSection: { gap: 6, paddingHorizontal: Meadow.space.page, paddingTop: 12 },
   checkInGroup: { gap: 6 },
   inlineCard: { backgroundColor: 'rgba(246,237,214,0.96)', borderColor: 'rgba(122,84,44,0.20)', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, boxShadow: '0 4px 10px rgba(34,24,12,0.22), inset 0 1px 0 rgba(255,252,238,0.72)', gap: 8, overflow: 'hidden', padding: 9, position: 'relative' },
   inlineSelectionPulse: { ...StyleSheet.absoluteFillObject, borderRadius: 16 },
@@ -1626,9 +1651,9 @@ const styles = StyleSheet.create({
   inlineSkipPressed: { backgroundColor: 'rgba(122,84,44,0.16)', transform: [{ scale: 0.96 }] },
   inlineSkipLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '800' },
   inlineReward: { position: 'absolute', right: 0, top: 1, zIndex: 2 },
-  flexCopy: { flex: 1, gap: 2 },
-  rowTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '800', lineHeight: 17 },
-  rowBody: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '600', lineHeight: 14 },
+  flexCopy: { flex: 1, minWidth: 0 },
+  rowTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '900', lineHeight: 17 },
+  rowBody: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '600', lineHeight: 14.5 },
   moodGrid: { flexDirection: 'row', gap: 5 },
   sleepGrid: { flexDirection: 'row', gap: 7 },
   moodChoiceCell: { flex: 1 },
@@ -1638,16 +1663,16 @@ const styles = StyleSheet.create({
   choicePressed: { backgroundColor: 'rgba(255,244,204,0.58)', transform: [{ translateY: 1 }, { scale: 0.98 }] },
   quickChoiceArt: { height: 27, width: 31 },
   quickChoiceLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '800', textAlign: 'center' },
-  careSwipeContainer: { backgroundColor: 'transparent', borderCurve: 'continuous', borderRadius: 15, overflow: 'hidden', position: 'relative' },
-  careDoor: { alignItems: 'center', backgroundColor: 'rgba(246,237,214,0.98)', borderColor: 'rgba(122,84,44,0.20)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, boxShadow: '0 4px 10px rgba(34,24,12,0.22), inset 0 1px 0 rgba(255,252,238,0.72)', flexDirection: 'row', gap: 8, minHeight: 56, paddingHorizontal: 9, paddingVertical: 6 },
+  careSwipeContainer: { backgroundColor: 'transparent', borderCurve: 'continuous', borderRadius: 20, overflow: 'hidden', position: 'relative' },
+  careDoor: { alignItems: 'center', backgroundColor: 'rgba(255,248,228,0.96)', borderColor: 'rgba(255,255,244,0.78)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: '0 6px 15px rgba(50,43,25,0.18), inset 0 1px 0 rgba(255,255,255,0.88)', flexDirection: 'row', gap: 9, minHeight: 58, paddingHorizontal: 10, paddingVertical: 7 },
   careDoorComplete: { backgroundColor: 'rgba(242,245,220,0.98)', borderColor: 'rgba(78,112,72,0.28)', boxShadow: '0 5px 12px rgba(48,72,38,0.18), inset 0 1px 0 rgba(255,255,244,0.82)' },
   completionChargeGlow: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,225,126,0.18)', borderColor: 'rgba(255,229,137,0.82)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1.5, boxShadow: '0 0 22px rgba(255,210,91,0.64), inset 0 0 15px rgba(255,244,190,0.36)' },
   completedIcon: { backgroundColor: 'rgba(123,166,91,0.16)', borderColor: 'rgba(78,112,72,0.24)' },
   completedBody: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '700', lineHeight: 14 },
   completedTick: { alignItems: 'center', backgroundColor: '#527A49', borderColor: 'rgba(255,248,218,0.9)', borderRadius: 999, borderWidth: 1.5, boxShadow: '0 3px 8px rgba(49,79,42,0.24), inset 0 1px 0 rgba(255,255,255,0.2)', height: 34, justifyContent: 'center', width: 34 },
-  reward: { alignItems: 'center', backgroundColor: 'rgba(229,190,106,0.22)', borderRadius: 10, flexDirection: 'row', gap: 2, paddingHorizontal: 6, paddingVertical: 4 },
-  rewardEnergyIcon: { height: 22, transform: [{ scale: 1.5 }], width: 22 },
-  rewardText: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontVariant: ['tabular-nums'], fontWeight: '900' },
+  reward: { alignItems: 'center', backgroundColor: 'rgba(246,222,157,0.44)', borderColor: 'rgba(255,250,223,0.72)', borderRadius: 13, borderWidth: 1, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.62)', flexDirection: 'row', gap: 1, minHeight: 36, paddingHorizontal: 8, paddingVertical: 5 },
+  rewardEnergyIcon: { height: 25, transform: [{ scale: 1.42 }], width: 25 },
+  rewardText: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 12.5, fontVariant: ['tabular-nums'], fontWeight: '700' },
   notTodayActionFrame: { backgroundColor: '#8F6046', bottom: 0, left: 0, position: 'absolute', top: 0, width: CARE_REVEAL_WIDTH + CARE_UNDERLAY_OVERLAP },
   notTodayAction: { alignItems: 'center', flexDirection: 'row', gap: 5, height: '100%', justifyContent: 'center', paddingHorizontal: 10, width: CARE_REVEAL_WIDTH },
   notTodayPressed: { backgroundColor: '#744A35' },
