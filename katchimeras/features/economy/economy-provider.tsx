@@ -51,8 +51,12 @@ export function EconomyProvider({ children }: PropsWithChildren) {
     const userId = await ensureStreakIdentity();
     if (!userId) { setSnapshot(emptyEconomySnapshot(essence.balance)); return; }
     await subscriptionApi.configure(userId);
-    const sdkPlus = await subscriptionApi.isEntitled(serverConfig.plus.entitlementId);
-    const { data, error } = await supabase.rpc('get_economy_snapshot_v1');
+    const [sdkPlus, economyResponse, gemsResponse] = await Promise.all([
+      subscriptionApi.isEntitled(serverConfig.plus.entitlementId),
+      supabase.rpc('get_economy_snapshot_v1'),
+      supabase.rpc('get_gem_balance_v1'),
+    ]);
+    const { data, error } = economyResponse;
     if (error || !data || typeof data !== 'object') {
       setSnapshot(withDevSubscriptionSnapshot({ ...emptyEconomySnapshot(essence.balance), activePlus: sdkPlus }));
       return;
@@ -61,7 +65,13 @@ export function EconomyProvider({ children }: PropsWithChildren) {
     const nextConfig = normalizeEconomyConfig(payload.config);
     setServerConfig(nextConfig);
     const activePlus = isSubscriptionSimulatorEnabled() ? sdkPlus : Boolean(payload.snapshot?.activePlus || sdkPlus);
-    setSnapshot(withDevSubscriptionSnapshot({ ...emptyEconomySnapshot(essence.balance), ...payload.snapshot, activePlus, synced: true }));
+    setSnapshot(withDevSubscriptionSnapshot({
+      ...emptyEconomySnapshot(essence.balance),
+      ...payload.snapshot,
+      gemsBalance: gemsResponse.error ? 0 : Number(gemsResponse.data) || 0,
+      activePlus,
+      synced: true,
+    }));
   }, [essence.balance, serverConfig.plus.entitlementId]);
 
   useEffect(() => { void refresh(); }, [refresh, simulator.revision]);

@@ -12,9 +12,13 @@ import { presenceEnter } from '@/components/katchadeck/motion';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { SegmentedControl } from '@/components/katchadeck/ui/segmented-control';
+import { WispArtwork } from '@/components/katchadeck/wisps/wisp-artwork';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
+import { WISP_COLLECTIONS } from '@/constants/wisp-collections';
+import { wispDefinition } from '@/constants/wisps';
+import { useWisps } from '@/features/wisps/wisp-provider';
 import { getCreatureVisual, hydrateHomeState } from '@/game/days';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useDiscoveries } from '@/hooks/use-discoveries';
@@ -29,16 +33,18 @@ import { loadCompanionQuests } from '@/utils/katchimera-quests';
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { requestSelectedDay } from '@/utils/selected-day-signal';
+import { wispCollectionProgress, wispEvolutionTier } from '@/utils/wisp-collections';
 import { dayState, localDateId } from '@/utils/streak-engine';
 import { streakRepository } from '@/storage/repositories/streak-repository';
 
-type CollectionView = 'cards' | 'calendar' | 'species';
+type CollectionView = 'cards' | 'calendar' | 'species' | 'wisps';
 type CardFilters = { year: string; species: string; rarity: string; trait: string };
 
 const collectionViewOptions = [
   { value: 'cards', label: 'Cards' },
   { value: 'calendar', label: 'Calendar' },
   { value: 'species', label: 'Companions' },
+  { value: 'wisps', label: 'Wisps' },
 ] as const;
 
 const EMPTY_FILTERS: CardFilters = { year: 'all', species: 'all', rarity: 'all', trait: 'all' };
@@ -61,6 +67,7 @@ export default function CollectionScreen() {
   const [filters, setFilters] = useState<CardFilters>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const { days } = useAllDays();
+  const wisps = useWisps();
   const { unlockedCount: discoveriesUnlocked, totalCount: discoveriesTotal } = useDiscoveries();
   useStreak();
   const storedStreak = streakRepository.load();
@@ -115,13 +122,17 @@ export default function CollectionScreen() {
       <ScrollView contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic" showsVerticalScrollIndicator={false}>
         <Animated.View entering={presenceEnter(20)}>
           <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-            {view === 'species' ? 'The life companions you have met' : 'Your life deck'}
+            {view === 'species' ? 'The life companions you have met' : view === 'wisps' ? 'Memory motes gathered from your days' : 'Your life deck'}
           </ThemedText>
           <ThemedText type="display" style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            {view === 'cards' ? 'Your life, in cards.' : view === 'calendar' ? 'Every day became something.' : 'Every kind of day.'}
+            {view === 'cards' ? 'Your life, in cards.' : view === 'calendar' ? 'Every day became something.' : view === 'wisps' ? 'Small memories, still glowing.' : 'Every kind of day.'}
           </ThemedText>
           <ThemedText style={styles.subtitle} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-            {view === 'species' && dex ? `${dex.collected} of ${dex.total} met · ${completion}% complete` : `${cards.length} ${cards.length === 1 ? 'card' : 'cards'} collected`}
+            {view === 'species' && dex
+              ? `${dex.collected} of ${dex.total} met · ${completion}% complete`
+              : view === 'wisps'
+                ? `${Object.values(wisps.state.inventory).filter(Boolean).length} Wisps discovered`
+                : `${cards.length} ${cards.length === 1 ? 'card' : 'cards'} collected`}
           </ThemedText>
         </Animated.View>
 
@@ -165,6 +176,38 @@ export default function CollectionScreen() {
             />
           </>
         ) : null}
+
+        {view === 'wisps' ? WISP_COLLECTIONS.map((collection) => {
+          const progress = wispCollectionProgress(collection, wisps.state);
+          return (
+            <View key={collection.id} style={styles.albumCard}>
+              <View style={styles.albumHeader}>
+                <View style={styles.albumCopy}>
+                  <ThemedText selectable type="subtitle" lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{collection.name}</ThemedText>
+                  <ThemedText selectable style={styles.albumDescription} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{collection.description}</ThemedText>
+                </View>
+                <ThemedText selectable style={styles.albumCount} lightColor={progress.complete ? Lantern.ember300 : Lantern.moon300} darkColor={progress.complete ? Lantern.ember300 : Lantern.moon300}>{progress.owned}/{progress.total}</ThemedText>
+              </View>
+              <View style={styles.wispGrid}>
+                {collection.wispIds.map((id) => {
+                  const quantity = wisps.quantity(id);
+                  const definition = wispDefinition(id);
+                  return (
+                    <Pressable key={id} accessibilityRole="button" onPress={() => router.push({ pathname: '/wisp/[wispId]', params: { wispId: id } })} style={({ pressed }) => [styles.wispCell, pressed && styles.wispCellPressed]}>
+                      <WispArtwork id={id} silhouette={!quantity} size={48} thumbnail />
+                      <ThemedText numberOfLines={1} style={styles.wispName} lightColor={quantity ? Lantern.moon50 : Lantern.moon500} darkColor={quantity ? Lantern.moon50 : Lantern.moon500}>{quantity ? definition.name : '???'}</ThemedText>
+                      <ThemedText style={styles.wispTier} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{quantity ? `${wispEvolutionTier(quantity)} · ×${quantity}` : 'Not found'}</ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <View style={styles.albumReward}>
+                <IconSymbol color={progress.complete ? Lantern.ember300 : Lantern.moon500} name={progress.complete ? 'checkmark' : 'gift.fill'} size={14} />
+                <ThemedText selectable style={styles.albumRewardText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{collection.rewardLabel}</ThemedText>
+              </View>
+            </View>
+          );
+        }) : null}
 
         {view === 'species' ? dex?.categories.map((category) => {
           const entries = dex.entries.filter((entry) => entry.category === category.category);
@@ -274,4 +317,16 @@ const styles = StyleSheet.create({
   filterChip: { backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.12)', borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
   filterChipSelected: { backgroundColor: Lantern.ember300, borderColor: Lantern.ember300 },
   filterChipText: { fontSize: 12, fontWeight: '700' },
+  albumCard: { backgroundColor: 'rgba(255,255,255,0.055)', borderColor: 'rgba(255,255,255,0.1)', borderCurve: 'continuous', borderRadius: 24, borderWidth: 1, gap: 16, padding: 16 },
+  albumHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
+  albumCopy: { flex: 1, gap: 4 },
+  albumDescription: { fontSize: 12, lineHeight: 17 },
+  albumCount: { fontSize: 13, fontVariant: ['tabular-nums'], fontWeight: '900' },
+  wispGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  wispCell: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.04)', borderCurve: 'continuous', borderRadius: 16, gap: 2, paddingBottom: 8, paddingHorizontal: 4, paddingTop: 5, width: '23%' },
+  wispCellPressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
+  wispName: { fontSize: 10.5, fontWeight: '800', maxWidth: '100%' },
+  wispTier: { fontSize: 8.5, fontWeight: '700', textTransform: 'capitalize' },
+  albumReward: { alignItems: 'center', borderTopColor: 'rgba(255,255,255,0.08)', borderTopWidth: 1, flexDirection: 'row', gap: 8, paddingTop: 12 },
+  albumRewardText: { flex: 1, fontSize: 11.5, fontWeight: '700' },
 });

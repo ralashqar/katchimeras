@@ -20,7 +20,7 @@ import { useMergeWorld } from '@/features/merge-world/merge-world-provider';
 import type { MergeOrder, MergeWorldCommand } from '@/types/merge-world';
 import { markFlowStart, reportFlowReady } from '@/utils/flow-performance';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
-import { availableExpansion, mergeOrderEnergyRefund, mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds } from '@/utils/merge-world/engine';
+import { availableExpansion, mergeGeneratorUpgradeCost, mergeOrderEnergyRefund, mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds } from '@/utils/merge-world/engine';
 import { MERGE_ENERGY_REGEN_MS } from '@/utils/merge-world/economy-policy';
 import { beginAuthoredCohortReturn, beginFeastleReturn, isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
 
@@ -384,6 +384,11 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
   const nextEnergyMinutes = state.energy.value < state.energy.regenCap
     ? Math.max(1, Math.ceil((state.energy.lastRegenAt + MERGE_ENERGY_REGEN_MS - Date.now()) / 60_000))
     : null;
+  const upgradeGenerator = Object.values(state.generators)
+    .filter((generator) => mergeGeneratorUpgradeCost(generator.level) != null)
+    .sort((left, right) => right.upgradeFragments - left.upgradeFragments || left.name.localeCompare(right.name))[0] ?? null;
+  const upgradeCost = upgradeGenerator ? mergeGeneratorUpgradeCost(upgradeGenerator.level) : null;
+  const upgradeReady = Boolean(upgradeGenerator && upgradeCost != null && upgradeGenerator.upgradeFragments >= upgradeCost);
   return (
     <View ref={screenRef} style={styles.screen}>
       <View style={[styles.game, { paddingTop: Math.max(insets.top + 3, 7), paddingBottom: Math.max(insets.bottom + 3, 7), width: contentWidth }]}>
@@ -396,11 +401,25 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
           </Pressable>
         </View>
         <View style={styles.energyStatusRow}>
-          <ThemedText darkColor="#F5DFC2" style={styles.energyStatusText}>
+          <ThemedText darkColor="#F5DFC2" numberOfLines={1} style={styles.energyStatusText}>
             {bonusEnergy > 0
               ? `${bonusEnergy} bonus Energy · regeneration resumes below ${state.energy.regenCap}`
               : nextEnergyMinutes ? `Next Energy in about ${nextEnergyMinutes} min` : 'Energy full'}
           </ThemedText>
+          {upgradeGenerator && upgradeCost != null ? (
+            <Pressable
+              accessibilityLabel={`${upgradeGenerator.name}, level ${upgradeGenerator.level}, ${upgradeGenerator.upgradeFragments} of ${upgradeCost} fragments${upgradeReady ? ', upgrade available' : ''}`}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !upgradeReady }}
+              disabled={!upgradeReady}
+              onPress={() => dispatch({ type: 'upgradeGenerator', generatorId: upgradeGenerator.id, now: Date.now() })}
+              style={({ pressed }) => [styles.generatorUpgrade, upgradeReady && styles.generatorUpgradeReady, pressed && styles.pressed]}>
+              <IconSymbol color={upgradeReady ? '#4A291B' : '#E8D5B9'} name="sparkles" size={11} />
+              <ThemedText darkColor={upgradeReady ? '#4A291B' : '#E8D5B9'} style={styles.generatorUpgradeLabel}>
+                L{upgradeGenerator.level} · {upgradeGenerator.upgradeFragments}/{upgradeCost}
+              </ThemedText>
+            </Pressable>
+          ) : null}
         </View>
 
         <View style={styles.mergeArea}>
@@ -499,7 +518,10 @@ const styles = StyleSheet.create({
   loading: { alignItems: 'center', backgroundColor: '#2B1B13', flex: 1, gap: 12, justifyContent: 'center' },
   hud: { alignItems: 'center', flexDirection: 'row', gap: 6, minHeight: 43, paddingHorizontal: 1 },
   energyStatusRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 25, paddingHorizontal: 4 },
-  energyStatusText: { fontSize: 10.5, fontWeight: '800' },
+  energyStatusText: { flex: 1, fontSize: 10.5, fontWeight: '800' },
+  generatorUpgrade: { alignItems: 'center', borderColor: 'rgba(245,223,194,0.3)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 3, paddingHorizontal: 7, paddingVertical: 4 },
+  generatorUpgradeReady: { backgroundColor: '#F5D488', borderColor: '#B8752C' },
+  generatorUpgradeLabel: { fontSize: 9.5, fontVariant: ['tabular-nums'], fontWeight: '900' },
   currency: { alignItems: 'center', backgroundColor: 'rgba(26,23,38,0.93)', borderColor: 'rgba(255,223,165,0.43)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, boxShadow: '0 5px 13px rgba(25,14,18,0.30), inset 0 1px 0 rgba(255,255,255,0.10)', flex: 1, flexDirection: 'row', gap: 1, height: 39, minWidth: 0, overflow: 'hidden', paddingHorizontal: 4, position: 'relative' },
   currencySheen: { backgroundColor: 'rgba(255,255,255,0.045)', borderRadius: 999, height: 20, left: 7, position: 'absolute', right: 7, top: 2 },
   currencyArt: { height: 35, width: 35 },

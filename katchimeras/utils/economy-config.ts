@@ -29,7 +29,7 @@ export function normalizeEconomyConfig(value: unknown): EconomyConfig {
 }
 
 export function emptyEconomySnapshot(localEssenceBalance = 0): EconomySnapshot {
-  return { configVersion: FALLBACK_ECONOMY_CONFIG.version, serverTime: null, essenceBalance: localEssenceBalance, activePlus: false, inventory: [], activeCampaignIds: [], shopOfferIds: [], visitorOffer: null, monthlyPlusClaimed: false, synced: false };
+  return { configVersion: FALLBACK_ECONOMY_CONFIG.version, serverTime: null, essenceBalance: localEssenceBalance, gemsBalance: 0, activePlus: false, inventory: [], activeCampaignIds: [], shopOfferIds: [], visitorOffer: null, monthlyPlusClaimed: false, synced: false };
 }
 
 const AVATAR_PRICE: Record<EggAvatarCategory, Record<EggAvatarRarity, number>> = {

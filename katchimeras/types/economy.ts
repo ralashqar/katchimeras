@@ -91,6 +91,7 @@ export type EconomySnapshot = {
   configVersion: number;
   serverTime: string | null;
   essenceBalance: number;
+  gemsBalance: number;
   activePlus: boolean;
   inventory: EconomyInventoryGrant[];
   activeCampaignIds: string[];

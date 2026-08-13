@@ -36,7 +36,8 @@ test('board geometry renders and hit-tests with one coordinate system', () => {
 test('a new Merge World uses the consolidated Energy economy', () => {
   const state = createInitialMergeWorldState(NOW);
   assert.deepEqual(mergeWorldCatalogIssues(), []);
-  assert.equal(state.version, 7);
+  assert.equal(state.version, 8);
+  assert.equal(state.storageCapacity, 8);
   assert.equal(state.energy.regenCap, MERGE_ENERGY_REGEN_CAP);
   assert.equal(state.energy.value, MERGE_INITIAL_ENERGY);
   assert.equal(state.energy.regenCap, 50);
@@ -71,6 +72,24 @@ test('every Pantry tap is tier one and chooses both chains', () => {
   })).flatMap((result) => result.spawnedCell == null ? [] : [result.state.board[result.spawnedCell].occupant]).filter((occupant): occupant is MergeBoardItem => occupant?.kind === 'item');
   assert.deepEqual([...new Set(drops.map((drop) => drop.definitionId))].sort(), ['food:dessert:1', 'food:table:1']);
   assert.ok(Math.abs(drops.filter((drop) => drop.definitionId === 'food:table:1').length - 100) < 25);
+});
+
+test('generator fragments upgrade drops without changing chain ownership', () => {
+  const base = storyWorld();
+  const pantry = base.generators['hearth-pantry'];
+  const ready = {
+    ...base,
+    generators: { ...base.generators, 'hearth-pantry': { ...pantry, upgradeFragments: 3 } },
+  };
+  const upgraded = reduceMergeWorld(ready, { type: 'upgradeGenerator', generatorId: 'hearth-pantry', now: NOW + 1 });
+  assert.equal(upgraded.changed, true);
+  assert.equal(upgraded.state.generators['hearth-pantry'].level, 2);
+  assert.equal(upgraded.state.generators['hearth-pantry'].upgradeFragments, 0);
+  assert.deepEqual(upgraded.state.generators['hearth-pantry'].chainIds, pantry.chainIds);
+  const drops = Array.from({ length: 120 }, (_, index) => reduceMergeWorld(upgraded.state, {
+    type: 'tapGenerator', generatorId: 'hearth-pantry', now: NOW + index + 2, seed: `upgraded:${index}`,
+  })).flatMap((result) => result.spawnedCell == null ? [] : [result.state.board[result.spawnedCell].occupant]);
+  assert.ok(drops.some((drop) => drop?.kind === 'item' && drop.definitionId.endsWith(':2')));
 });
 
 test('a full board rejects a Pantry tap without spending Energy', () => {
@@ -495,10 +514,10 @@ test('legacy snapshots migrate into version seven without discarding earned over
     energy: { value: 99, cap: 100, lastRegenAt: NOW },
     generators: { 'starter-pantry': { id: 'starter-pantry', familyId: 'food', name: 'Picnic Pantry', level: 1, enabledBranches: ['table'], charges: 9, maxCharges: 12, readyAt: NOW + 1000 } },
   }, NOW + 1);
-  assert.equal(normalized.version, 7);
+  assert.equal(normalized.version, 8);
   assert.equal(normalized.energy.regenCap, 50);
   assert.equal(normalized.energy.value, 99);
-  assert.deepEqual(Object.keys(normalized.generators['hearth-pantry']).sort(), ['chainIds', 'id', 'level', 'name', 'tierOneDropDefinitionIds']);
+  assert.deepEqual(Object.keys(normalized.generators['hearth-pantry']).sort(), ['chainIds', 'id', 'level', 'name', 'tierOneDropDefinitionIds', 'upgradeFragments']);
   assert.deepEqual(normalized.generators['hearth-pantry'].chainIds, ['food:table', 'food:dessert']);
   assert.deepEqual(normalized.unlockedChains.sort(), ['food:dessert', 'food:table']);
 });

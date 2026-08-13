@@ -5,6 +5,7 @@ import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
+  ScrollView,
   StyleSheet,
   useWindowDimensions,
   View,
@@ -32,10 +33,10 @@ import {
 
 type RosterListItem =
   | { type: 'hero'; id: 'hero' }
+  | { type: 'calling'; id: 'calling'; items: KatchimeraRosterItem[] }
   | { type: 'filters'; id: 'filters' }
   | { type: 'card'; id: string; item: KatchimeraRosterItem };
 
-const ROSTER_STICKY_HEADER_INDICES = [1];
 const ROSTER_MAINTAIN_VISIBLE_POSITION = { disabled: true } as const;
 
 function rosterListKey(item: RosterListItem): string {
@@ -86,15 +87,21 @@ function KatchimeraRosterScreenComponent({
     () => filterAndSortKatchimeraRoster(items, selectedAspect, sort),
     [items, selectedAspect, sort],
   );
+  const callingItems = useMemo(
+    () => items.filter((item) => item.kind === 'owned' && item.status).slice(0, 6),
+    [items],
+  );
   const listItems = useMemo<RosterListItem[]>(() => [
     { type: 'hero', id: 'hero' },
+    ...(callingItems.length ? [{ type: 'calling' as const, id: 'calling' as const, items: callingItems }] : []),
     { type: 'filters', id: 'filters' },
     ...visibleItems.map((item) => ({
       type: 'card' as const,
       id: katchimeraRosterItemId(item),
       item,
     })),
-  ], [visibleItems]);
+  ], [callingItems, visibleItems]);
+  const stickyHeaderIndices = useMemo(() => [callingItems.length ? 2 : 1], [callingItems.length]);
 
   const contentContainerStyle = useMemo(() => ({
     paddingBottom: insets.bottom + 112,
@@ -160,6 +167,15 @@ function KatchimeraRosterScreenComponent({
         </View>
       );
     }
+    if (item.type === 'calling') {
+      return (
+        <CallingYouRow
+          items={item.items}
+          onSelectCreature={selectCreature}
+          renderArtwork={renderArtwork}
+        />
+      );
+    }
     return (
       <View style={styles.cardCell}>
         <KatchimeraRosterCard
@@ -221,7 +237,7 @@ function KatchimeraRosterScreenComponent({
           ref={listRef}
           renderItem={renderItem}
           style={styles.list}
-          stickyHeaderIndices={ROSTER_STICKY_HEADER_INDICES}
+          stickyHeaderIndices={stickyHeaderIndices}
           showsVerticalScrollIndicator={false}
         />
       </Animated.View>
@@ -230,6 +246,42 @@ function KatchimeraRosterScreenComponent({
 }
 
 export const KatchimeraRosterScreen = memo(KatchimeraRosterScreenComponent);
+
+function CallingYouRow({ items, onSelectCreature, renderArtwork }: {
+  items: KatchimeraRosterItem[];
+  onSelectCreature: (creatureId: string) => void;
+  renderArtwork: boolean;
+}) {
+  return (
+    <View style={styles.callingSection}>
+      <View style={styles.callingHeading}>
+        <ThemedText selectable style={styles.callingTitle} lightColor="#FFF7DF" darkColor="#FFF7DF">Calling You</ThemedText>
+        <ThemedText selectable style={styles.callingHint} lightColor="#CFC4A8" darkColor="#CFC4A8">Something meaningful is waiting</ThemedText>
+      </View>
+      <ScrollView contentContainerStyle={styles.callingContent} horizontal showsHorizontalScrollIndicator={false}>
+        {items.map((item) => item.kind === 'owned' ? (
+          <Pressable
+            accessibilityLabel={`${item.name} has something waiting`}
+            accessibilityRole="button"
+            key={item.creatureId}
+            onPress={() => onSelectCreature(item.creatureId)}
+            style={({ pressed }) => [styles.callingCard, pressed && styles.callingCardPressed]}>
+            <View style={styles.callingArt}>
+              {renderArtwork ? <Image cachePolicy="memory-disk" contentFit="contain" source={resolveCreatureArtSource(item.visualKey, { lod: 'thumb' })} style={StyleSheet.absoluteFill} transition={0} /> : null}
+            </View>
+            <View style={styles.callingCopy}>
+              <ThemedText numberOfLines={1} style={styles.callingName} lightColor="#FFF7DF" darkColor="#FFF7DF">{item.name}</ThemedText>
+              <ThemedText numberOfLines={1} style={styles.callingStatus} lightColor="#E9C965" darkColor="#E9C965">
+                {item.status === 'ready' ? 'A request is ready' : item.status === 'offer' ? 'Has something to ask' : 'Wants to see you'}
+              </ThemedText>
+            </View>
+            <IconSymbol color="#E9C965" name="chevron.right" size={13} />
+          </Pressable>
+        ) : null)}
+      </ScrollView>
+    </View>
+  );
+}
 
 function RosterHero({
   featured,
@@ -246,7 +298,7 @@ function RosterHero({
     <View style={[styles.hero, { paddingTop: safeTop + 20 }]}>
       <View style={styles.heroCopy}>
         <ThemedText selectable style={styles.heroEyebrow} lightColor="#F0D67A" darkColor="#F0D67A">
-          YOUR
+          WITH YOU TODAY
         </ThemedText>
         <ThemedText
           adjustsFontSizeToFit
@@ -385,6 +437,17 @@ const styles = StyleSheet.create({
     minHeight: 38,
     paddingHorizontal: 13,
   },
+  callingSection: { gap: 10, paddingBottom: 16, paddingTop: 4 },
+  callingHeading: { gap: 2, paddingHorizontal: 4 },
+  callingTitle: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 20 },
+  callingHint: { fontFamily: AppFontFamilies.manrope, fontSize: 11, fontWeight: '700' },
+  callingContent: { gap: 9, paddingHorizontal: 2 },
+  callingCard: { alignItems: 'center', backgroundColor: 'rgba(28,27,20,0.86)', borderColor: 'rgba(239,203,103,0.24)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 8, minHeight: 70, paddingHorizontal: 10, width: 210 },
+  callingCardPressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
+  callingArt: { height: 54, width: 54 },
+  callingCopy: { flex: 1, gap: 2 },
+  callingName: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 14 },
+  callingStatus: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '800' },
   emptyCtaText: {
     fontFamily: AppFontFamilies.manrope,
     fontSize: 11,

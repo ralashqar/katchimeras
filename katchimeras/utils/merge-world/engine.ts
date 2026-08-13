@@ -48,14 +48,14 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     occupant: null,
   }));
   let state: MergeWorldState = {
-    version: 7,
+    version: 8,
     revision: 0,
     createdAt: now,
     updatedAt: now,
     nextInstance: 1,
     board,
     storage: [],
-    storageCapacity: 5,
+    storageCapacity: 8,
     rewardInbox: [],
     arrivals: [],
     landmarks: [],
@@ -91,6 +91,8 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
       return result(state, current, current === state ? undefined : 'Energy refreshed.');
     case 'tapGenerator':
       return tapGenerator(current, command.generatorId, command.now, command.seed);
+    case 'upgradeGenerator':
+      return upgradeGenerator(current, command.generatorId, command.now);
     case 'move':
       return moveItem(current, command.from, command.to, command.now);
     case 'serveOrder':
@@ -216,21 +218,21 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   if (!value || typeof value !== 'object') return createInitialMergeWorldState(now);
   const rawVersion = (value as { version?: unknown }).version;
   const source = value as Partial<MergeWorldState>;
-  if ((rawVersion !== 1 && rawVersion !== 2 && rawVersion !== 3 && rawVersion !== 4 && rawVersion !== 5 && rawVersion !== 6 && rawVersion !== 7) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
+  if ((rawVersion !== 1 && rawVersion !== 2 && rawVersion !== 3 && rawVersion !== 4 && rawVersion !== 5 && rawVersion !== 6 && rawVersion !== 7 && rawVersion !== 8) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
     return createInitialMergeWorldState(now);
   }
   const fallback = createInitialMergeWorldState(now);
   let normalized: MergeWorldState = {
     ...fallback,
     ...source,
-    version: 7,
+    version: 8,
     revision: finite(source.revision, 0),
     createdAt: finite(source.createdAt, now),
     updatedAt: finite(source.updatedAt, now),
     nextInstance: Math.max(1, finite(source.nextInstance, 1)),
     board: dedupeMigratedGenerators(source.board.map((cell, index) => normalizeCell(cell, fallback.board[index]))),
     storage: Array.isArray(source.storage) ? source.storage.filter(validBoardItem) : [],
-    storageCapacity: Math.max(5, finite(source.storageCapacity, 5)),
+    storageCapacity: Math.max(8, finite(source.storageCapacity, 8)),
     rewardInbox: Array.isArray(source.rewardInbox) ? source.rewardInbox : [],
     arrivals: normalizeArrivals(source.arrivals),
     landmarks: normalizeLandmarks(source.landmarks),
@@ -279,10 +281,15 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
   if (state.energy.value < 1) return unchanged(state, 'You need more Merge Energy.');
   const cell = firstEmptyCell(state.board, hash(`${seed}:cell`));
   if (cell < 0) return unchanged(state, 'The board is full. Merge or store an item first.');
-  // Every tap starts a merge: generators never skip to tier 2 or tier 3.
-  // The two authored chains are chosen evenly and independently of board position.
+  // Level one always starts at tier one. Upgrades add a bounded chance of a
+  // better seed without changing which authored chains the generator owns.
   const dropIndex = randomUnit(`${seed}:chain:${state.revision}`) < 0.5 ? 0 : 1;
-  const definitionId = generator.tierOneDropDefinitionIds[dropIndex];
+  const baseDefinitionId = generator.tierOneDropDefinitionIds[dropIndex];
+  const betterDropRoll = randomUnit(`${seed}:upgrade:${state.revision}`);
+  const bonusTier = generator.level >= 4 && betterDropRoll < 0.05
+    ? 2
+    : betterDropRoll < Math.max(0, generator.level - 1) * 0.1 ? 1 : 0;
+  const definitionId = bonusTier ? baseDefinitionId.replace(/:1$/, `:${1 + bonusTier}`) : baseDefinitionId;
   if (!MERGE_ITEMS_BY_ID.has(definitionId)) return unchanged(state, 'This generator has no available drops.');
   const item: MergeBoardItem = { kind: 'item', instanceId: `merge-item:${state.nextInstance}`, definitionId };
   const board = [...state.board];
@@ -296,6 +303,20 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
   const discovery = applyDiscovery(next, definitionId, now);
   next = discovery.state;
   return { state: next, changed: true, spawnedCell: cell, discoveryId: discovery.newDiscovery ? definitionId : undefined, message: `${MERGE_ITEMS_BY_ID.get(definitionId)?.name ?? 'Item'} added.` };
+}
+
+export function mergeGeneratorUpgradeCost(level: number): number | null {
+  return level >= 4 ? null : [0, 3, 6, 10][Math.max(1, level)] ?? null;
+}
+
+function upgradeGenerator(state: MergeWorldState, generatorId: string, now: number): MergeWorldCommandResult {
+  const generator = state.generators[generatorId];
+  if (!generator) return unchanged(state, 'That generator is not unlocked.');
+  const cost = mergeGeneratorUpgradeCost(generator.level);
+  if (cost == null) return unchanged(state, 'This generator is fully upgraded.');
+  if (generator.upgradeFragments < cost) return unchanged(state, `Find ${cost - generator.upgradeFragments} more generator fragments.`);
+  const upgraded = { ...generator, level: generator.level + 1, upgradeFragments: generator.upgradeFragments - cost };
+  return changed(touch({ ...state, generators: { ...state.generators, [generatorId]: upgraded } }, now), `${generator.name} reached level ${upgraded.level}.`);
 }
 
 function moveItem(state: MergeWorldState, from: number, to: number, now: number): MergeWorldCommandResult {
@@ -414,6 +435,15 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
     ? [...state.landmarks, { id: landmarkDefinition.id, characterId: order.characterId, chapterId: order.chapterId ?? `${order.characterId}-chapter-1`, unlockedAt: now }]
     : state.landmarks;
   const energyRefund = mergeOrderEnergyRefund(order);
+  const fragmentGeneratorId = GENERATOR_BY_CHAIN[KATCHIMERA_MERGE_PROFILES[order.characterId].coreChains[0]];
+  const fragmentGenerator = state.generators[fragmentGeneratorId];
+  const generators = fragmentGenerator ? {
+    ...state.generators,
+    [fragmentGeneratorId]: {
+      ...fragmentGenerator,
+      upgradeFragments: fragmentGenerator.upgradeFragments + (order.signature || order.storyArcId ? 2 : 1),
+    },
+  } : state.generators;
   let next: MergeWorldState = {
     ...state,
     board,
@@ -428,6 +458,7 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
     externalRewardReceipts,
     characterProgress,
     landmarks,
+    generators,
   };
   next = touch(next, now);
   return { state: next, changed: true, servedOrderId: order.id, energyGranted: energyRefund, message: `${order.title} served.` };
@@ -1007,6 +1038,7 @@ function generatorState(id: string): MergeGeneratorState {
     id: definition.id,
     name: definition.name,
     level: 1,
+    upgradeFragments: 0,
     chainIds: [...definition.chainIds],
     tierOneDropDefinitionIds: [...definition.tierOneDropDefinitionIds],
   };
@@ -1030,11 +1062,11 @@ function firstEmptyCell(board: MergeBoardCell[], offset: number) {
 }
 
 function storageCapacityForLevel(level: number) {
-  if (level >= 15) return 20;
-  if (level >= 11) return 16;
+  if (level >= 15) return 16;
+  if (level >= 11) return 14;
   if (level >= 7) return 12;
-  if (level >= 3) return 8;
-  return 5;
+  if (level >= 3) return 10;
+  return 8;
 }
 
 function touch(state: MergeWorldState, now: number): MergeWorldState {
@@ -1229,6 +1261,7 @@ function normalizeGenerator(value: unknown, id: string): MergeGeneratorState {
     id: fallback.id,
     name: typeof generator.name === 'string' ? generator.name : fallback.name,
     level: Math.max(1, Math.floor(finite(generator.level, 1))),
+    upgradeFragments: Math.max(0, Math.floor(finite(generator.upgradeFragments, 0))),
     chainIds: [...fallback.chainIds],
     tierOneDropDefinitionIds: [...fallback.tierOneDropDefinitionIds],
   };

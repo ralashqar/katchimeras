@@ -228,6 +228,10 @@ export const MERGE_HYBRID_RECIPES = new Map([
 export const MERGE_EXPANSIONS = [
   { id: 'clearing-east', title: 'Clear the eastern vines', cells: [26, 27, 34, 41], requiredLevel: 3, coinCost: 120 },
   { id: 'clearing-west', title: 'Move the old stones', cells: [14, 21, 28, 35], requiredLevel: 6, coinCost: 300 },
+  { id: 'clearing-north-heart', title: 'Part the northern mist', cells: [7, 8, 12, 13], requiredLevel: 9, coinCost: 520 },
+  { id: 'clearing-north-rim', title: 'Unseal the high clearing', cells: [0, 1, 5, 6, 19, 20], requiredLevel: 12, coinCost: 820 },
+  { id: 'clearing-south-garden', title: 'Wake the forgotten garden', cells: [42, 43, 48, 49, 50], requiredLevel: 15, coinCost: 1_200 },
+  { id: 'clearing-south-rim', title: 'Dissolve the last dream mist', cells: [54, 55, 56, 57, 58, 61, 62], requiredLevel: 18, coinCost: 1_800 },
 ] as const;
 
 export const MERGE_LEVEL_THRESHOLDS = [0, 40, 100, 190, 310, 470, 680, 950, 1_280, 1_680, 2_160, 2_730, 3_400, 4_180, 5_080, 6_100, 7_250, 8_540, 9_980, 11_580] as const;

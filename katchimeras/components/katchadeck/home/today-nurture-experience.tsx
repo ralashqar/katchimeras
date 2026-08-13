@@ -20,7 +20,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
-import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
+import { TodayTopHud } from '@/components/katchadeck/home/today-top-hud';
 import { MicrocopyToast } from '@/components/katchadeck/home/microcopy-toast';
 import { TodayExplorationBackground } from '@/components/katchadeck/home/today-exploration-background';
 import { TodayDormantEggIndicator, TodayKingdomEggHero } from '@/components/katchadeck/home/today-kingdom-egg-hero';
@@ -422,8 +422,8 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
       </View>
       <Animated.View
         entering={reduceMotion ? FadeIn.duration(80) : FadeIn.duration(220)}
-        style={[styles.timelineFixed, { top: topInset + 8 }]}>
-        <LanternTimeline days={timelineDays} interactionLocked={false} onSelect={onSelectDay} selectedId={day.id} />
+        style={[styles.topHudFixed, { top: topInset + 8 }]}>
+        <TodayTopHud days={timelineDays} interactionLocked={false} onSelectDay={onSelectDay} selectedId={day.id} />
       </Animated.View>
       {!actionListHidden ? (
       <View onLayout={handleFixedActionClusterLayout} style={[styles.fixedActionCluster, { top: fixedActionClusterTop }]}>
@@ -1590,7 +1590,7 @@ const styles = StyleSheet.create({
   chrome: { ...StyleSheet.absoluteFillObject },
   chromeHidden: { opacity: 0 },
   contentScroll: { position: 'relative', zIndex: 6 },
-  timelineFixed: { left: 0, paddingHorizontal: 2, position: 'absolute', right: 0, zIndex: 20 },
+  topHudFixed: { left: 0, paddingHorizontal: 14, position: 'absolute', right: 0, zIndex: 20 },
   fixedActionCluster: { alignItems: 'center', gap: 6, left: 0, position: 'absolute', right: 0, zIndex: 12 },
   quietDayAction: { alignItems: 'center', backgroundColor: 'rgba(255,247,225,0.94)', borderColor: 'rgba(139,101,37,0.24)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 6, minHeight: 34, paddingHorizontal: 13 },
   quietDayLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '900' },

@@ -62,20 +62,60 @@ export function WispProvider({ children }: PropsWithChildren) {
   const syncFromDays = useCallback((days: readonly HomeDayRecord[]) => {
     const achievementIds = new Set(Object.keys(loadCompanionAchievementState().unlocked));
     const earned = earnedWispIds(days, { unlockedAchievementIds: achievementIds });
-    const newIds = earned.filter((id) => !state.inventory[id]?.quantity);
-    if (!newIds.length && state.baselinedCatalogVersion === WISP_CATALOG_VERSION) return [];
-    const baselining = state.baselinedCatalogVersion === 0;
-    const sourceDayId = days[days.length - 1]?.id ?? null;
-    const now = Date.now();
-    const unlocked = { ...state.unlocked };
-    const inventory = { ...state.inventory };
-    for (const id of newIds) {
-      unlocked[id] = { wispId: id, unlockedAt: now, sourceDayId, seenReveal: baselining };
-      inventory[id] = { wispId: id, quantity: 1, sources: [localGrantSource(id)], firstGrantedAt: now, giftableQuantity: 0 };
-    }
-    setState(saveWispState({ ...state, unlocked, inventory, baselinedCatalogVersion: WISP_CATALOG_VERSION }));
-    return baselining ? [] : newIds;
-  }, [state]);
+    const hatchGrants = days.flatMap((day) => day.state === 'hatched'
+      ? (day.card?.featuredWisps ?? []).map((featured) => ({
+          dayId: day.id,
+          id: featured.wispId,
+          receiptId: `daily-hatch:${day.id}:${featured.wispId}`,
+        }))
+      : []);
+    setState((current) => {
+      const baselining = current.baselinedCatalogVersion === 0;
+      const sourceDayId = days[days.length - 1]?.id ?? null;
+      const now = Date.now();
+      const unlocked = { ...current.unlocked };
+      const inventory = { ...current.inventory };
+      const applied = new Set(current.appliedGrantReceiptIds ?? []);
+      for (const id of earned) {
+        if (inventory[id]?.quantity) continue;
+        unlocked[id] = { wispId: id, unlockedAt: now, sourceDayId, seenReveal: baselining };
+        inventory[id] = { wispId: id, quantity: 1, sources: [localGrantSource(id)], firstGrantedAt: now, giftableQuantity: 0 };
+      }
+      for (const grant of hatchGrants) {
+        if (applied.has(grant.receiptId)) continue;
+        applied.add(grant.receiptId);
+        const existing = inventory[grant.id];
+        const quantity = (existing?.quantity ?? 0) + 1;
+        unlocked[grant.id] = unlocked[grant.id] ?? {
+          wispId: grant.id,
+          unlockedAt: now,
+          sourceDayId: grant.dayId,
+          seenReveal: baselining,
+        };
+        inventory[grant.id] = {
+          wispId: grant.id,
+          quantity,
+          sources: [...new Set([...(existing?.sources ?? []), 'experience' as const])],
+          firstGrantedAt: existing?.firstGrantedAt ?? now,
+          giftableQuantity: Math.max(existing?.giftableQuantity ?? 0, quantity - 1),
+        };
+      }
+      const unchanged = Object.keys(inventory).length === Object.keys(current.inventory).length
+        && applied.size === (current.appliedGrantReceiptIds ?? []).length
+        && current.baselinedCatalogVersion === WISP_CATALOG_VERSION;
+      return unchanged ? current : saveWispState({
+        ...current,
+        unlocked,
+        inventory,
+        baselinedCatalogVersion: WISP_CATALOG_VERSION,
+        appliedGrantReceiptIds: [...applied],
+      });
+    });
+    // Discovery presentation is read from the persisted pending record. The
+    // return value remains for legacy callers and is intentionally not used as
+    // a second state channel.
+    return [];
+  }, []);
   const progressFor = useCallback((id: WispId, days: readonly HomeDayRecord[]) => wispProgress(id, days, {
     unlockedAchievementIds: new Set(Object.keys(loadCompanionAchievementState().unlocked)),
   }), []);

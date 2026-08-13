@@ -32,7 +32,7 @@ import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
 import { HatchCheckInSheet } from '@/components/katchadeck/home/hatch-check-in-sheet';
 import { HatchCountdown } from '@/components/katchadeck/home/hatch-countdown';
-import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
+import { TodayTopHud } from '@/components/katchadeck/home/today-top-hud';
 import {
   TodayKingdomEggAboveOverlay,
   TodayKingdomEggHero,
@@ -589,8 +589,8 @@ function HomeScreen() {
     ? 'home'
     : selectedKatchimeraExplorationKey ?? 'home';
   const explorationBackgroundActive = !isHatching;
-  // LanternTimeline's visual row is ~85dp tall. This estimate gives the egg a
-  // correct first frame; onLayout replaces it with the measured stage y.
+  // The compact HUD provides the first layout estimate; onLayout replaces it
+  // with the measured stage y.
   const resolvedHeroStageTop =
     heroStageTop
     ?? insets.top + TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA;
@@ -1732,12 +1732,11 @@ function HomeScreen() {
         <Animated.View
           entering={presenceEnter(20)}
           pointerEvents={quickGoalsOpen ? 'none' : 'auto'}
-          style={[styles.timelineLayer, goalsChromeStyle]}>
-          <LanternTimeline
+          style={[styles.topHudLayer, goalsChromeStyle]}>
+          <TodayTopHud
             days={timelineDays}
-            hatchPresentation={hatchPresentation}
             interactionLocked={isHatching}
-            onSelect={navigateToDay}
+            onSelectDay={navigateToDay}
             selectedId={selectedDayId}
           />
         </Animated.View>
@@ -2535,7 +2534,7 @@ const styles = StyleSheet.create({
   feastleRewardBody: { fontSize: 13.5, lineHeight: 20 },
   feastleRewardButton: { alignItems: 'center', backgroundColor: '#7A4C19', borderRadius: 16, flexDirection: 'row', justifyContent: 'center', gap: 8, minHeight: 48, paddingHorizontal: 16 },
   feastleRewardButtonLabel: { fontSize: 14, fontWeight: '900' },
-  timelineLayer: {
+  topHudLayer: {
     position: 'relative',
     zIndex: 20,
   },
