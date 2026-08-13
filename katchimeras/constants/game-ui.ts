@@ -46,7 +46,17 @@ export const GameUI = {
   layout: { phoneGutter: 14, tabletGutter: 24, readableWidth: 600, touchTarget: 44 },
   motion: { press: 140, chrome: 220, reveal: 360 },
   layer: { scene: 0, content: 10, chrome: 20, dock: 40, notice: 60, toast: 80, modal: 100, reward: 120 },
+  surface: {
+    cream: { top: '#FFF9E9', bottom: '#F1DBB4', rim: '#C99D61', highlight: 'rgba(255,255,255,0.88)', ink: '#3A2517', shadow: 'rgba(75,48,20,0.28)' },
+    gold: { top: '#FFEFA7', bottom: '#E9B84F', rim: '#A96C22', highlight: 'rgba(255,255,236,0.86)', ink: '#4A291B', shadow: 'rgba(105,65,17,0.32)' },
+    teal: { top: '#D8F4EF', bottom: '#9ED9D1', rim: '#4B9D9A', highlight: 'rgba(255,255,255,0.78)', ink: '#244C4A', shadow: 'rgba(27,78,77,0.26)' },
+    sage: { top: '#E8F0D5', bottom: '#B9CE91', rim: '#6F9258', highlight: 'rgba(255,255,244,0.82)', ink: '#36502E', shadow: 'rgba(45,76,38,0.26)' },
+    rose: { top: '#FBE3E3', bottom: '#E9B5B2', rim: '#AD6865', highlight: 'rgba(255,255,255,0.78)', ink: '#663C3B', shadow: 'rgba(105,50,49,0.24)' },
+    dark: { top: '#54483B', bottom: '#30271F', rim: '#1E1813', highlight: 'rgba(255,248,230,0.2)', ink: '#FFF8E7', shadow: 'rgba(25,16,9,0.38)' },
+  },
 } as const;
+
+export type GameSurfaceTone = keyof typeof GameUI.surface;
 
 export type GameCurrencyId = 'energy' | 'coins' | 'gems';
 

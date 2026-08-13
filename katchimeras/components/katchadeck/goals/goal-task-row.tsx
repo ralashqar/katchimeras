@@ -19,9 +19,9 @@ import Animated, {
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { GameSurface } from '@/components/katchadeck/ui/game-surface';
 import { katchimeraFamilyById } from '@/constants/katchimera-skins';
 import { Meadow } from '@/constants/meadow-theme';
-import { KatchaUI } from '@/constants/katcha-ui';
 import { AppFontFamilies } from '@/constants/theme';
 import type { CompanionQuickGoalCompletionReceipt } from '@/hooks/use-companion-quick-goals';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
@@ -179,13 +179,8 @@ export function GoalTaskRow({
   };
 
   const content = (
-    <Animated.View
-      style={[
-        styles.row,
-        complete && styles.rowComplete,
-        celebrating && styles.rowCelebrating,
-        rowAnimatedStyle,
-      ]}>
+    <Animated.View style={rowAnimatedStyle}>
+      <GameSurface contentStyle={styles.rowContent} style={styles.row} tone={complete ? 'sage' : celebrating ? 'gold' : 'cream'}>
       {showCompanion ? (
         <Animated.View style={[styles.portraitRewardWrap, portraitAnimatedStyle]}>
           <CompanionGoalPortrait familyId={item.goal.familyId} />
@@ -256,6 +251,7 @@ export function GoalTaskRow({
       {celebrating ? (
         <GoalCompletionCelebration reducedMotion={reduceMotion} source={celebrationSource} />
       ) : null}
+      </GameSurface>
     </Animated.View>
   );
 
@@ -314,19 +310,9 @@ export function CompanionGoalPortrait({
 const styles = StyleSheet.create({
   swipeContainer: { borderCurve: 'continuous', borderRadius: 19, overflow: 'hidden' },
   row: {
-    alignItems: 'center', backgroundColor: KatchaUI.companionPanel.cardBackground, borderColor: KatchaUI.companionPanel.cardBorder,
-    borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: KatchaUI.companionPanel.cardShadow, flexDirection: 'row', gap: 8,
-    minHeight: 74, paddingHorizontal: 8, paddingVertical: 7,
+    minHeight: 74,
   },
-  rowComplete: { backgroundColor: KatchaUI.companionPanel.cardComplete, borderColor: 'rgba(78,112,72,0.28)' },
-  rowCelebrating: {
-    backgroundColor: '#FFF5CC',
-    borderColor: 'rgba(201, 151, 42, 0.62)',
-    shadowColor: '#D5A733',
-    shadowOffset: { height: 4, width: 0 },
-    shadowOpacity: 0.22,
-    shadowRadius: 10,
-  },
+  rowContent: { alignItems: 'center', flexDirection: 'row', gap: 8, minHeight: 71, paddingHorizontal: 8, paddingVertical: 6 },
   body: { flex: 1, justifyContent: 'center', minHeight: 58, minWidth: 0, paddingHorizontal: 4 },
   title: { fontFamily: AppFontFamilies.manrope, fontSize: 13.5, fontWeight: '900', lineHeight: 18 },
   titleComplete: { opacity: 0.62, textDecorationLine: 'line-through' },

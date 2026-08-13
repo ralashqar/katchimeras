@@ -46,6 +46,7 @@ import {
 import { Meadow } from '@/constants/meadow-theme';
 import { todayCareArt } from '@/constants/today-care-art';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
+import { GameRewardChip, GameSurface } from '@/components/katchadeck/ui/game-surface';
 import type { HomeDayRecord, HomeTimelineDay, SleepQuality } from '@/types/home';
 import type { HomeArchetypeId } from '@/types/world-identity';
 import type { WispId } from '@/types/wisp';
@@ -802,7 +803,8 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
         label={action.title}
         onDismiss={onSkip}
         reduceMotion={reduceMotion}>
-        <Animated.View style={[styles.inlineCard, panelStyle]}>
+        <Animated.View style={panelStyle}>
+          <GameSurface contentStyle={styles.inlineCardContent} style={styles.inlineCard} tone="cream">
           <Animated.View
             pointerEvents="none"
             style={[styles.inlineSelectionPulse, { backgroundColor: selection?.accent ?? 'transparent' }, pulseStyle]}
@@ -838,6 +840,7 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
               />
             ))}
           </View>
+          </GameSurface>
         </Animated.View>
       </CareSwipeShell>
     </Animated.View>
@@ -1061,7 +1064,8 @@ function CompletedCareRow({ event, onFinished, onRewardFlight, reduceMotion }: {
 
   return (
     <Animated.View layout={rowLayout}>
-      <Animated.View style={[styles.careDoor, styles.careDoorComplete, rowStyle]}>
+      <Animated.View style={rowStyle}>
+        <GameSurface contentStyle={styles.careDoorContent} style={styles.careDoor} tone="cream">
         <Animated.View pointerEvents="none" style={[styles.completionChargeGlow, chargeGlowStyle]} />
         <Animated.View style={artStyle}>
           {event.action.category === 'play' && event.action.familyId ? (
@@ -1082,6 +1086,7 @@ function CompletedCareRow({ event, onFinished, onRewardFlight, reduceMotion }: {
         <Animated.View style={tickStyle}>
           <View style={styles.completedTick}><IconSymbol color="#FFF9E9" name="checkmark" size={17} /></View>
         </Animated.View>
+        </GameSurface>
       </Animated.View>
     </Animated.View>
   );
@@ -1208,7 +1213,8 @@ function TodayCareGoalRow({ action, entryDelayMs, familyId, goalId, onCompleteQu
             accessibilityRole="button"
             disabled={celebrating}
             onPress={() => onOpenQuickGoal(goalId, handleComplete)}
-            style={({ pressed }) => [styles.careDoor, celebrating && styles.careDoorComplete, pressed && styles.rowPressed]}>
+            style={({ pressed }) => [styles.careDoorPressable, pressed && styles.rowPressed]}>
+            <GameSurface contentStyle={styles.careDoorContent} style={styles.careDoor} tone="cream">
             {celebrating ? (
               <Animated.View pointerEvents="none" style={[styles.completionChargeGlow, chargeGlowStyle]} />
             ) : null}
@@ -1233,6 +1239,7 @@ function TodayCareGoalRow({ action, entryDelayMs, familyId, goalId, onCompleteQu
                 } : null}
               />
             ) : null}
+            </GameSurface>
           </Pressable>
         </Animated.View>
       </CareSwipeShell>
@@ -1269,10 +1276,11 @@ function CareRow({ action, entryDelayMs, onNotToday, onStart, reduceMotion, swip
           onDismiss={onNotToday}
           reduceMotion={reduceMotion}>
           <Pressable
-            accessibilityHint="Double tap to start. Swipe right to reveal Skip, then swipe right again to dismiss."
+            accessibilityHint="Double tap to start. Swipe right to reveal Skip, or swipe left to close it."
             accessibilityRole="button"
             onPress={handleStart}
-            style={({ pressed }) => [styles.careDoor, pressed && styles.rowPressed]}>
+            style={({ pressed }) => [styles.careDoorPressable, pressed && styles.rowPressed]}>
+            <GameSurface contentStyle={styles.careDoorContent} style={styles.careDoor} tone="cream">
             {action.category === 'play' && action.familyId ? (
               <CompanionGoalPortrait familyId={action.familyId} size={38} />
             ) : (
@@ -1285,6 +1293,7 @@ function CareRow({ action, entryDelayMs, onNotToday, onStart, reduceMotion, swip
               <Reward amount={action.growthReward} />
             </View>
             <IconSymbol color={Meadow.inkSoft} name="chevron.right" size={16} />
+            </GameSurface>
           </Pressable>
         </CareSwipeShell>
       </Animated.View>
@@ -1299,7 +1308,7 @@ function CareActionArt({ action, completed = false }: { action: RankedTodayCareA
       {art ? (
         <Image contentFit="contain" source={art} style={styles.doorIconArt} transition={0} />
       ) : (
-        <IconSymbol color={completed ? Meadow.leafDeep : Meadow.goldDeep} name={action.icon} size={20} />
+        <IconSymbol color={completed ? Meadow.leafDeep : Meadow.goldDeep} name={action.icon} size={25} />
       )}
     </View>
   );
@@ -1309,6 +1318,7 @@ const CARE_REVEAL_WIDTH = 96;
 const CARE_UNDERLAY_OVERLAP = 36;
 const CARE_SWIPE_ACTIVATION_DISTANCE = 6;
 const CARE_SECOND_SWIPE_DISMISS_DISTANCE = 22;
+const CARE_SWIPE_CLOSE_DISTANCE = 22;
 
 function CareSwipeShell({ children, disabled = false, externalGesture, label, onDismiss, reduceMotion }: {
   children: ReactNode;
@@ -1359,10 +1369,9 @@ function CareSwipeShell({ children, disabled = false, externalGesture, label, on
   const gesture = useMemo(() => Gesture.Pan()
     .enabled(!disabled)
     .maxPointers(1)
-    // Rows only own a deliberate right swipe. A left swipe fails this child
-    // recognizer immediately so the parent day-page gesture remains available.
-    .activeOffsetX(CARE_SWIPE_ACTIVATION_DISTANCE)
-    .failOffsetX(-CARE_SWIPE_ACTIVATION_DISTANCE)
+    // Both directions are intentional: right reveals Skip and, once revealed,
+    // left closes it again without requiring the action to be taken.
+    .activeOffsetX([-CARE_SWIPE_ACTIVATION_DISTANCE, CARE_SWIPE_ACTIVATION_DISTANCE])
     .failOffsetY([-14, 14])
     .blocksExternalGesture(externalGesture)
     .onBegin(() => {
@@ -1403,6 +1412,15 @@ function CareSwipeShell({ children, disabled = false, externalGesture, label, on
             if (finished) runOnJS(finishDismiss)();
           },
         );
+        return;
+      }
+      if (gestureStartedOpen.value > 0) {
+        const shouldClose = event.translationX <= -CARE_SWIPE_CLOSE_DISTANCE || event.velocityX <= -360;
+        revealed.value = shouldClose ? 0 : 1;
+        translateX.value = withTiming(shouldClose ? 0 : CARE_REVEAL_WIDTH, {
+          duration: settleDuration,
+          easing: Easing.out(Easing.cubic),
+        });
         return;
       }
       const shouldReveal = translateX.value >= CARE_REVEAL_WIDTH * 0.32 || event.velocityX >= 360;
@@ -1477,12 +1495,7 @@ function CareSwipeShell({ children, disabled = false, externalGesture, label, on
 }
 
 function Reward({ amount }: { amount: number }) {
-  return (
-    <View style={styles.reward}>
-      <Image contentFit="contain" source={GAME_CURRENCY_ART.energy} style={styles.rewardEnergyIcon} transition={0} />
-      <ThemedText style={styles.rewardText} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>+{amount}</ThemedText>
-    </View>
-  );
+  return <GameRewardChip amount={amount} art={GAME_CURRENCY_ART.energy} />;
 }
 
 function GrowthMeter({ growth }: { growth: TodayGrowthSummary }) {
@@ -1637,12 +1650,13 @@ const styles = StyleSheet.create({
   trackShine: { backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 999, height: 4, left: 7, position: 'absolute', right: 7, top: 3 },
   addMemoryCluster: { alignItems: 'center', minHeight: 67, paddingBottom: 5 },
   hatchRevealCluster: { alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'center', minHeight: 72, paddingBottom: 5 },
-  doorIcon: { alignItems: 'center', backgroundColor: 'rgba(244,231,193,0.68)', borderColor: 'rgba(255,252,235,0.82)', borderCurve: 'continuous', borderRadius: 12, borderWidth: 1, height: 38, justifyContent: 'center', width: 38 },
-  doorIconArt: { height: 34, width: 34 },
+  doorIcon: { alignItems: 'center', height: 48, justifyContent: 'center', marginLeft: -3, width: 48 },
+  doorIconArt: { height: 46, width: 46 },
   rowPressed: { backgroundColor: 'rgba(255,244,204,0.72)', transform: [{ translateY: 1 }, { scale: 0.985 }] },
   careSection: { gap: 6, paddingHorizontal: Meadow.space.page, paddingTop: 12 },
   checkInGroup: { gap: 6 },
-  inlineCard: { backgroundColor: 'rgba(246,237,214,0.96)', borderColor: 'rgba(122,84,44,0.20)', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, boxShadow: '0 4px 10px rgba(34,24,12,0.22), inset 0 1px 0 rgba(255,252,238,0.72)', gap: 8, overflow: 'hidden', padding: 9, position: 'relative' },
+  inlineCard: { overflow: 'hidden' },
+  inlineCardContent: { gap: 8, padding: 9 },
   inlineSelectionPulse: { ...StyleSheet.absoluteFillObject, borderRadius: 16 },
   inlineHeading: { alignItems: 'center', justifyContent: 'center', minHeight: 30, position: 'relative' },
   inlineQuestion: { paddingHorizontal: 66, textAlign: 'center', width: '100%' },
@@ -1664,15 +1678,13 @@ const styles = StyleSheet.create({
   quickChoiceArt: { height: 27, width: 31 },
   quickChoiceLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '800', textAlign: 'center' },
   careSwipeContainer: { backgroundColor: 'transparent', borderCurve: 'continuous', borderRadius: 20, overflow: 'hidden', position: 'relative' },
-  careDoor: { alignItems: 'center', backgroundColor: 'rgba(255,248,228,0.96)', borderColor: 'rgba(255,255,244,0.78)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: '0 6px 15px rgba(50,43,25,0.18), inset 0 1px 0 rgba(255,255,255,0.88)', flexDirection: 'row', gap: 9, minHeight: 58, paddingHorizontal: 10, paddingVertical: 7 },
-  careDoorComplete: { backgroundColor: 'rgba(242,245,220,0.98)', borderColor: 'rgba(78,112,72,0.28)', boxShadow: '0 5px 12px rgba(48,72,38,0.18), inset 0 1px 0 rgba(255,255,244,0.82)' },
+  careDoorPressable: { borderRadius: 18 },
+  careDoor: { minHeight: 58 },
+  careDoorContent: { alignItems: 'center', flexDirection: 'row', gap: 9, minHeight: 55, paddingHorizontal: 10, paddingVertical: 6 },
   completionChargeGlow: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,225,126,0.18)', borderColor: 'rgba(255,229,137,0.82)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1.5, boxShadow: '0 0 22px rgba(255,210,91,0.64), inset 0 0 15px rgba(255,244,190,0.36)' },
-  completedIcon: { backgroundColor: 'rgba(123,166,91,0.16)', borderColor: 'rgba(78,112,72,0.24)' },
+  completedIcon: { opacity: 0.92 },
   completedBody: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '700', lineHeight: 14 },
   completedTick: { alignItems: 'center', backgroundColor: '#527A49', borderColor: 'rgba(255,248,218,0.9)', borderRadius: 999, borderWidth: 1.5, boxShadow: '0 3px 8px rgba(49,79,42,0.24), inset 0 1px 0 rgba(255,255,255,0.2)', height: 34, justifyContent: 'center', width: 34 },
-  reward: { alignItems: 'center', backgroundColor: 'rgba(246,222,157,0.44)', borderColor: 'rgba(255,250,223,0.72)', borderRadius: 13, borderWidth: 1, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.62)', flexDirection: 'row', gap: 1, minHeight: 36, paddingHorizontal: 8, paddingVertical: 5 },
-  rewardEnergyIcon: { height: 25, transform: [{ scale: 1.42 }], width: 25 },
-  rewardText: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 12.5, fontVariant: ['tabular-nums'], fontWeight: '700' },
   notTodayActionFrame: { backgroundColor: '#8F6046', bottom: 0, left: 0, position: 'absolute', top: 0, width: CARE_REVEAL_WIDTH + CARE_UNDERLAY_OVERLAP },
   notTodayAction: { alignItems: 'center', flexDirection: 'row', gap: 5, height: '100%', justifyContent: 'center', paddingHorizontal: 10, width: CARE_REVEAL_WIDTH },
   notTodayPressed: { backgroundColor: '#744A35' },

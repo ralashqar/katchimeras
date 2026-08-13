@@ -8,7 +8,7 @@ import type { MergeBoardItem, MergeWorldState } from '@/types/merge-world';
 import { BARISTABBIT_CHAPTER_ONE_ORDER_POOL, FEASTLE_ACT_TWO_ORDER_POOL, selectAuthoredCohortOrderKeys, selectFeastleActTwoOrderKeys } from '@/utils/companion-story';
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection } from '@/utils/merge-world/board-geometry';
 import { mergeActivityRewards } from '@/utils/merge-world/activity-rewards';
-import { MERGE_ENERGY_REGEN_CAP, MERGE_INITIAL_ENERGY, mergeJournalRewardPreview } from '@/utils/merge-world/economy-policy';
+import { MERGE_ENERGY_REGEN_CAP, MERGE_ENERGY_REGEN_MS, MERGE_INITIAL_ENERGY, mergeJournalRewardPreview } from '@/utils/merge-world/economy-policy';
 import {
   createInitialMergeWorldState,
   mergeOrderReady,
@@ -113,11 +113,14 @@ test('identical items merge and preserve deterministic item progression', () => 
   assert.equal(result.discoveryId, 'food:table:2');
 });
 
-test('Energy regenerates every twenty minutes and stops at the natural capacity', () => {
+test('Energy regenerates every three minutes and stops at the natural capacity', () => {
   const state = { ...createInitialMergeWorldState(NOW), energy: { value: 48, regenCap: 50, lastRegenAt: NOW } };
-  const early = reduceMergeWorld(state, { type: 'refreshTime', now: NOW + 19 * 60_000 });
+  assert.equal(MERGE_ENERGY_REGEN_MS, 3 * 60_000);
+  const early = reduceMergeWorld(state, { type: 'refreshTime', now: NOW + MERGE_ENERGY_REGEN_MS - 1 });
   assert.equal(early.state.energy.value, 48);
-  const regenerated = reduceMergeWorld(early.state, { type: 'refreshTime', now: NOW + 40 * 60_000 });
+  const firstTick = reduceMergeWorld(early.state, { type: 'refreshTime', now: NOW + MERGE_ENERGY_REGEN_MS });
+  assert.equal(firstTick.state.energy.value, 49);
+  const regenerated = reduceMergeWorld(firstTick.state, { type: 'refreshTime', now: NOW + MERGE_ENERGY_REGEN_MS * 2 });
   assert.equal(regenerated.state.energy.value, 50);
 });
 
@@ -340,14 +343,17 @@ test('item parcels reject a full board without consuming the arrival', () => {
 test('Merge page keeps a stable parcel stack first in the tray and the board attached to its separator', () => {
   const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   const parcel = readFileSync('components/katchadeck/games/merge-parcel-overlay.tsx', 'utf8');
+  const gameSurface = readFileSync('components/katchadeck/ui/game-surface.tsx', 'utf8');
   const rail = readFileSync('components/katchadeck/games/merge-order-rail.tsx', 'utf8');
   assert.doesNotMatch(screen, /arrivalDock|Memory Shelf|worldChangeRow|basketButton/);
   assert.match(screen, /return \[\.\.\.parcelEntries, \.\.\.returnEntries, \.\.\.orderEntries\]/);
   assert.match(screen, /id: 'parcel-stack'/);
   assert.doesNotMatch(screen, /<MergeParcelButton/);
   assert.match(screen, /boardStage: \{[^}]*justifyContent: 'flex-start'/);
-  assert.match(parcel, /countText: \{[^}]*fontFamily: AppFontFamilies\.fredokaBold/);
-  assert.match(parcel, /countBadge: \{[^}]*alignItems: 'center'[^}]*justifyContent: 'center'/);
+  assert.match(screen, /mergeArea: \{[^}]*marginTop: 18/);
+  assert.match(parcel, /<GameBadge label=\{count\} style=\{styles\.countBadge\} tone="gold"/);
+  assert.match(gameSurface, /badgeText: \{[^}]*fontFamily: GameUI\.type\.title\.fontFamily/);
+  assert.match(gameSurface, /badge: \{[^}]*alignItems: 'center'[^}]*justifyContent: 'center'/);
   assert.match(parcel, /opacity: interpolate\(value, \[0, 0\.08, 1\], \[0, 1, 1\]\)/);
   assert.doesNotMatch(parcel, /\[0, 1, 1, 0\.18\]/);
   assert.match(screen, /destinationSize: boardMetrics\.geometry\.cellSize - 4/);

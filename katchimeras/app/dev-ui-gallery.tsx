@@ -7,6 +7,7 @@ import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchaInlineNotice } from '@/components/katchadeck/ui/katcha-inline-notice';
 import { KatchaSectionHeading, KatchaSurfaceCard } from '@/components/katchadeck/ui/katcha-sheet-primitives';
 import { KatchaSurfaceProvider, useKatchaSurface } from '@/components/katchadeck/ui/katcha-surface';
+import { GameBadge, GameIconWell, GameRewardChip, GameSurface } from '@/components/katchadeck/ui/game-surface';
 import { CompanionThreadSwitcher } from '@/components/katchadeck/world/companion-thread-switcher';
 import {
   CompanionCard,
@@ -15,6 +16,9 @@ import {
   CompanionStatusBadge,
 } from '@/components/katchadeck/world/companion-ui-primitives';
 import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
+import { GameUI, type GameSurfaceTone } from '@/constants/game-ui';
 import { KatchaUI, type KatchaSurface } from '@/constants/katcha-ui';
 import type { CompanionThread } from '@/types/companion-interaction';
 
@@ -79,11 +83,32 @@ function CompanionGallery() {
   );
 }
 
+const PLAYFUL_TONES: GameSurfaceTone[] = ['cream', 'gold', 'teal', 'sage', 'rose', 'dark'];
+
+function PlayfulGameGallery() {
+  return <View style={styles.gameGallery}>
+    <ThemedText style={styles.eyebrow} lightColor={GameUI.color.creamMuted} darkColor={GameUI.color.creamMuted}>Procedural game surfaces</ThemedText>
+    <View style={styles.gameSurfaceGrid}>
+      {PLAYFUL_TONES.map((tone) => <GameSurface contentStyle={styles.gameSurfaceContent} key={tone} tone={tone}>
+        <GameIconWell size={38} tone={tone}><IconSymbol color={GameUI.surface[tone].ink} name="sparkles" size={18} /></GameIconWell>
+        <ThemedText style={styles.gameSurfaceLabel} lightColor={GameUI.surface[tone].ink} darkColor={GameUI.surface[tone].ink}>{tone}</ThemedText>
+        <GameBadge label="3" tone={tone} />
+      </GameSurface>)}
+    </View>
+    <View style={styles.row}>
+      <GameRewardChip amount={10} art={GAME_CURRENCY_ART.energy} />
+      <GameRewardChip amount={25} art={GAME_CURRENCY_ART.coins} tone="cream" />
+      <GameBadge icon="checkmark" label="Done" tone="sage" />
+    </View>
+  </View>;
+}
+
 export default function DevUiGalleryScreen() {
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
         <ThemedText style={styles.pageTitle} lightColor="#F8F2E7" darkColor="#F8F2E7">Katcha UI gallery</ThemedText>
+        <PlayfulGameGallery />
         <KatchaSurfaceProvider surface="parchment"><CompanionGallery /></KatchaSurfaceProvider>
         <KatchaSurfaceProvider surface="parchment"><SurfaceGallery surface="parchment" /></KatchaSurfaceProvider>
         <KatchaSurfaceProvider surface="night"><SurfaceGallery surface="night" /></KatchaSurfaceProvider>
@@ -104,4 +129,8 @@ const styles = StyleSheet.create({
   row: { alignItems: 'stretch', flexDirection: 'row', gap: 10 },
   statusRow: { alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'space-between' },
   cardText: KatchaUI.type.body,
+  gameGallery: { backgroundColor: GameUI.color.canvas, borderRadius: 24, gap: 14, padding: 16 },
+  gameSurfaceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  gameSurfaceContent: { alignItems: 'center', flexDirection: 'row', gap: 7, minWidth: 146, padding: 8 },
+  gameSurfaceLabel: { fontFamily: GameUI.type.title.fontFamily, fontSize: 14, textTransform: 'capitalize' },
 });

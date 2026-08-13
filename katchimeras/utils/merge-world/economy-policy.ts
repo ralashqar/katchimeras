@@ -2,7 +2,7 @@ import type { HomeDayRecord, JournalRecord } from '@/types/home';
 
 export const MERGE_ENERGY_REGEN_CAP = 50;
 export const MERGE_INITIAL_ENERGY = 20;
-export const MERGE_ENERGY_REGEN_MS = 20 * 60_000;
+export const MERGE_ENERGY_REGEN_MS = 3 * 60_000;
 export const MERGE_DAILY_ACTIVITY_ENERGY_LIMIT = 20;
 export const MERGE_DAILY_JOURNAL_ENERGY = 10;
 export const MERGE_DAILY_COMPANION_ENERGY = 5;

@@ -103,7 +103,7 @@ function longDate(isoDate: string): string { const parts = dateParts(isoDate); r
 const styles = StyleSheet.create({
   hud: { alignSelf: 'center', maxWidth: 430, width: '100%' },
   dayButton: { flexShrink: 0, gap: 4, minWidth: 70, paddingHorizontal: 10 },
-  currencyHud: { flex: 1, gap: 5 },
+  currencyHud: { flex: 1 },
   dateLabel: { ...GameUI.type.label, flexShrink: 1, fontSize: 12, letterSpacing: 0 },
   historyList: { gap: 8, paddingBottom: 18 },
   historyRow: { alignItems: 'center', backgroundColor: GameUI.color.parchmentSoft, borderColor: GameUI.color.line, borderCurve: 'continuous', borderRadius: GameUI.radius.control, borderWidth: 1, flexDirection: 'row', gap: 12, justifyContent: 'space-between', minHeight: 62, paddingHorizontal: 14, paddingVertical: 10 },

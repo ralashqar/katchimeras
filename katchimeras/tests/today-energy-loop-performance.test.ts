@@ -153,7 +153,8 @@ test('forming nurture presentation does not mount the legacy Today scene underne
   assert.match(nurtureSource, /actionStackOpacity\.value = withTiming\(1,[\s\S]*?duration: reduceMotion \? 100 : 360/);
   assert.match(nurtureSource, /pointerEvents=\{actionStackInteractive \? 'auto' : 'none'\}/);
   assert.match(nurtureSource, /Gesture\.Native\(\)\.simultaneousWithExternalGesture\([\s\S]*?careSwipeExternalGesture,[\s\S]*?environmentGesture/);
-  assert.match(nurtureSource, /\.activeOffsetX\(CARE_SWIPE_ACTIVATION_DISTANCE\)[\s\S]*?\.failOffsetX\(-CARE_SWIPE_ACTIVATION_DISTANCE\)/);
+  assert.match(nurtureSource, /\.activeOffsetX\(\[-CARE_SWIPE_ACTIVATION_DISTANCE, CARE_SWIPE_ACTIVATION_DISTANCE\]\)/);
+  assert.match(nurtureSource, /shouldClose = event\.translationX <= -CARE_SWIPE_CLOSE_DISTANCE \|\| event\.velocityX <= -360/);
   assert.match(nurtureSource, /<HatchRevealAction onAdd=\{onAddJournal\}/);
   assert.match(nurtureSource, /fixedActionClusterTop \+ fixedActionClusterHeight \+ 8/);
   assert.match(

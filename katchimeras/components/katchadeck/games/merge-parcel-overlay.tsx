@@ -14,9 +14,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { AppFontFamilies } from '@/constants/theme';
+import { GameBadge } from '@/components/katchadeck/ui/game-surface';
 import type { MergeWorldArrival } from '@/types/merge-world';
 
 import { PersistentMergeItemArt } from './feastle-persistent-merge-board';
@@ -70,10 +68,8 @@ export const MergeParcelTrayCard = forwardRef<NativeView, {
       <Animated.View ref={ref} style={[styles.parcelCrate, shakeStyle]}>
         <View pointerEvents="none" style={styles.parcelGlow} />
         <Image accessibilityIgnoresInvertColors contentFit="contain" source={PARCEL_ART} style={styles.parcelArt} transition={0} />
-        {arrival.kind === 'goal_chest' ? <View pointerEvents="none" style={styles.goalBadge}><IconSymbol color="#FFF5D8" name="star.fill" size={10} /></View> : null}
-        <View accessibilityElementsHidden pointerEvents="none" style={styles.countBadge}>
-          <ThemedText darkColor="#4A291B" lightColor="#4A291B" style={styles.countText}>{count}</ThemedText>
-        </View>
+        {arrival.kind === 'goal_chest' ? <GameBadge icon="star.fill" style={styles.goalBadge} tone="gold" /> : null}
+        <GameBadge label={count} style={styles.countBadge} tone="gold" />
       </Animated.View>
       <Image accessibilityIgnoresInvertColors contentFit="contain" pointerEvents="none" source={PARCEL_TRAY_ART} style={styles.parcelTrayArt} transition={0} />
     </Pressable>
@@ -210,9 +206,8 @@ const styles = StyleSheet.create({
   parcelGlow: { backgroundColor: 'rgba(255,218,121,0.25)', borderRadius: 999, boxShadow: '0 0 18px rgba(255,202,91,0.55)', height: 48, position: 'absolute', width: 48 },
   parcelArt: { height: PARCEL_SIZE, width: PARCEL_SIZE },
   parcelTrayArt: { bottom: 0, height: 58, left: -2, position: 'absolute', width: 124, zIndex: 2 },
-  countBadge: { alignItems: 'center', backgroundColor: '#F6D993', borderColor: '#6A4123', borderRadius: 999, borderWidth: 1.5, height: 22, justifyContent: 'center', position: 'absolute', right: -1, top: 0, width: 22, zIndex: 5 },
-  countText: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 11, fontVariant: ['tabular-nums'], includeFontPadding: false, lineHeight: 14, minWidth: 18, textAlign: 'center', textAlignVertical: 'center', transform: [{ translateY: -0.5 }] },
-  goalBadge: { alignItems: 'center', backgroundColor: '#8A5A38', borderColor: '#FFE1A2', borderRadius: 999, borderWidth: 1, bottom: 1, height: 20, justifyContent: 'center', position: 'absolute', left: 1, width: 20 },
+  countBadge: { height: 22, minWidth: 22, position: 'absolute', right: -1, top: 0, zIndex: 5 },
+  goalBadge: { bottom: 1, height: 20, left: 1, minWidth: 20, paddingHorizontal: 0, position: 'absolute' },
   flightOverlay: { ...StyleSheet.absoluteFillObject, overflow: 'visible', zIndex: 115 },
   openingCrate: { height: PARCEL_SIZE, left: 0, position: 'absolute', top: 0, width: PARCEL_SIZE },
   openingGlow: { backgroundColor: 'rgba(255,222,132,0.38)', borderRadius: 999, height: 48, left: 4, position: 'absolute', top: 4, width: 48 },

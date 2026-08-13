@@ -26,7 +26,7 @@ import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import type { MergeOrder, MergeWorldCommand } from '@/types/merge-world';
 import { markFlowStart, reportFlowReady } from '@/utils/flow-performance';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
-import { availableExpansion, mergeGeneratorUpgradeCost, mergeOrderEnergyRefund, mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds } from '@/utils/merge-world/engine';
+import { availableExpansion, mergeOrderEnergyRefund, mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds } from '@/utils/merge-world/engine';
 import { MERGE_ENERGY_REGEN_MS } from '@/utils/merge-world/economy-policy';
 import { beginAuthoredCohortReturn, beginFeastleReturn, isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
 
@@ -62,6 +62,7 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
   const [presentedCoins, setPresentedCoins] = useState<number | null>(null);
   const [energyPulseNonce, setEnergyPulseNonce] = useState(0);
   const [coinPulseNonce, setCoinPulseNonce] = useState(0);
+  const [energyClockNow, setEnergyClockNow] = useState(Date.now);
   const screenRef = useRef<View>(null);
   const energyHudRef = useRef<View>(null);
   const coinHudRef = useRef<View>(null);
@@ -75,6 +76,7 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
   const storyNavigationPendingRef = useRef(false);
   const contentWidth = Math.min(width - 12, 600);
   const flowReady = !loading && state != null;
+  const shouldTickEnergyClock = active && state != null && state.energy.value < state.energy.regenCap;
   const readyOrderIds = useMemo(() => state ? readyMergeOrderIds(state) : new Set<string>(), [state]);
   const hiddenAnimatedItemIds = useMemo(() => new Set([
     ...(serveFlight?.items.map((item) => item.instanceId) ?? []),
@@ -111,6 +113,13 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
       bedrotte: loadAuthoredCohortStory('bedrotte'),
     });
   }), []);
+
+  useEffect(() => {
+    if (!shouldTickEnergyClock) return;
+    setEnergyClockNow(Date.now());
+    const timer = setInterval(() => setEnergyClockNow(Date.now()), 1_000);
+    return () => clearInterval(timer);
+  }, [shouldTickEnergyClock]);
 
   useEffect(() => {
     if (active) storyNavigationPendingRef.current = false;
@@ -377,21 +386,15 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
   const levelRatio = nextThreshold == null ? 1 : Math.max(0, Math.min(1, (state.mergeXp - currentThreshold) / (nextThreshold - currentThreshold)));
   const expansion = availableExpansion(state);
   const expansionReady = Boolean(expansion && state.mergeLevel >= expansion.requiredLevel && state.coins >= expansion.coinCost);
-  const bonusEnergy = Math.max(0, state.energy.value - state.energy.regenCap);
-  const nextEnergyMinutes = state.energy.value < state.energy.regenCap
-    ? Math.max(1, Math.ceil((state.energy.lastRegenAt + MERGE_ENERGY_REGEN_MS - Date.now()) / 60_000))
+  const energyCountdownSeconds = state.energy.value < state.energy.regenCap
+    ? Math.max(1, Math.ceil((MERGE_ENERGY_REGEN_MS - ((energyClockNow - state.energy.lastRegenAt) % MERGE_ENERGY_REGEN_MS)) / 1_000))
     : null;
-  const upgradeGenerator = Object.values(state.generators)
-    .filter((generator) => mergeGeneratorUpgradeCost(generator.level) != null)
-    .sort((left, right) => right.upgradeFragments - left.upgradeFragments || left.name.localeCompare(right.name))[0] ?? null;
-  const upgradeCost = upgradeGenerator ? mergeGeneratorUpgradeCost(upgradeGenerator.level) : null;
-  const upgradeReady = Boolean(upgradeGenerator && upgradeCost != null && upgradeGenerator.upgradeFragments >= upgradeCost);
   return (
     <View ref={screenRef} style={styles.screen}>
       <View style={[styles.game, { paddingTop: Math.max(insets.top + 3, 7), paddingBottom: Math.max(insets.bottom + 3, 7), width: contentWidth }]}>
         <GameHudBar
           content={<GameCurrencyHud balances={[
-            { art: GAME_CURRENCY_ART.energy, id: 'energy', pulseNonce: energyPulseNonce, suffix: `/${state.energy.regenCap}`, targetRef: energyHudRef, value: presentedEnergy ?? state.energy.value },
+            { art: GAME_CURRENCY_ART.energy, countdownSeconds: energyCountdownSeconds ?? undefined, id: 'energy', pulseNonce: energyPulseNonce, suffix: `/${state.energy.regenCap}`, targetRef: energyHudRef, value: presentedEnergy ?? state.energy.value },
             { art: GAME_CURRENCY_ART.coins, id: 'coins', pulseNonce: coinPulseNonce, targetRef: coinHudRef, value: presentedCoins ?? state.coins },
             { id: 'gems', value: wallet.gems },
           ]} style={styles.currencyHud} tone="glass" />}
@@ -408,28 +411,6 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
             </GameHudControl>
           </>}
         />
-        <View style={styles.energyStatusRow}>
-          <ThemedText darkColor="#F5DFC2" numberOfLines={1} style={styles.energyStatusText}>
-            {bonusEnergy > 0
-              ? `${bonusEnergy} bonus Energy · regeneration resumes below ${state.energy.regenCap}`
-              : nextEnergyMinutes ? `Next Energy in about ${nextEnergyMinutes} min` : 'Energy full'}
-          </ThemedText>
-          {upgradeGenerator && upgradeCost != null ? (
-            <Pressable
-              accessibilityLabel={`${upgradeGenerator.name}, level ${upgradeGenerator.level}, ${upgradeGenerator.upgradeFragments} of ${upgradeCost} fragments${upgradeReady ? ', upgrade available' : ''}`}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: !upgradeReady }}
-              disabled={!upgradeReady}
-              onPress={() => dispatch({ type: 'upgradeGenerator', generatorId: upgradeGenerator.id, now: Date.now() })}
-              style={({ pressed }) => [styles.generatorUpgrade, upgradeReady && styles.generatorUpgradeReady, pressed && styles.pressed]}>
-              <IconSymbol color={upgradeReady ? '#4A291B' : '#E8D5B9'} name="sparkles" size={11} />
-              <ThemedText darkColor={upgradeReady ? '#4A291B' : '#E8D5B9'} style={styles.generatorUpgradeLabel}>
-                L{upgradeGenerator.level} · {upgradeGenerator.upgradeFragments}/{upgradeCost}
-              </ThemedText>
-            </Pressable>
-          ) : null}
-        </View>
-
         <View style={styles.mergeArea}>
           <MergeOrderRail
             entries={trayEntries}
@@ -507,18 +488,13 @@ const styles = StyleSheet.create({
   screen: { alignItems: 'center', backgroundColor: 'transparent', flex: 1, overflow: 'hidden' },
   game: { flex: 1, gap: 7, minHeight: 0 },
   loading: { alignItems: 'center', backgroundColor: '#2B1B13', flex: 1, gap: 12, justifyContent: 'center' },
-  energyStatusRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 25, paddingHorizontal: 4 },
-  energyStatusText: { flex: 1, fontSize: 10.5, fontWeight: '800' },
-  generatorUpgrade: { alignItems: 'center', borderColor: 'rgba(245,223,194,0.3)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 3, paddingHorizontal: 7, paddingVertical: 4 },
-  generatorUpgradeReady: { backgroundColor: '#F5D488', borderColor: '#B8752C' },
-  generatorUpgradeLabel: { fontSize: 9.5, fontVariant: ['tabular-nums'], fontWeight: '900' },
   currencyHud: { flex: 1 },
   levelPill: { gap: 3, minWidth: 48, overflow: 'hidden', paddingHorizontal: 7 },
   levelValue: { ...GameUI.type.numeric, fontSize: 13 },
   levelTrack: { backgroundColor: 'rgba(68,51,31,0.12)', bottom: 0, height: 2.5, left: 8, overflow: 'hidden', position: 'absolute', right: 8 },
   levelFill: { backgroundColor: GameUI.color.gold, height: 2.5 },
   hudAction: { paddingHorizontal: 0, width: 38 },
-  mergeArea: { flex: 1, minHeight: 0, position: 'relative' },
+  mergeArea: { flex: 1, marginTop: 18, minHeight: 0, position: 'relative' },
   serviceCounter: { alignSelf: 'center', height: 32, marginTop: -29, position: 'relative', zIndex: 1 },
   counterUpperLip: { backgroundColor: '#FFE876', height: 3, left: 0, position: 'absolute', right: 0, top: 0 },
   counterInsetShade: { backgroundColor: '#A64F32', height: 5, left: 0, position: 'absolute', right: 0, top: 3 },
