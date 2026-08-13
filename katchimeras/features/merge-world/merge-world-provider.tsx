@@ -65,6 +65,7 @@ export function MergeWorldProvider({
   const [friendshipLevels, setFriendshipLevels] = useState<Partial<Record<MergeCharacterId, number>>>({});
   const [quickGoalRevision, setQuickGoalRevision] = useState(0);
   const stateRef = useRef(state);
+  const activeRef = useRef(active);
   const mountedRef = useRef(true);
   const pendingPersistenceRef = useRef<MergeWorldPendingPersistence | null>(null);
   const persistenceWorkerRef = useRef<Promise<void> | null>(null);
@@ -73,9 +74,20 @@ export function MergeWorldProvider({
   const externalGenerationRef = useRef(0);
   const applyingStoryReceiptDepthRef = useRef(0);
   stateRef.current = state;
+  activeRef.current = active;
 
   useEffect(() => acquireLifecycleResource('merge_provider', 'merge-world-provider'), []);
-  useEffect(() => subscribeCompanionQuickGoals(() => setQuickGoalRevision((value) => value + 1)), []);
+  useEffect(() => {
+    if (!active) return;
+    const release = acquireLifecycleResource('store_subscription', 'merge:quick-goals');
+    const unsubscribe = subscribeCompanionQuickGoals(() => {
+      if (activeRef.current) setQuickGoalRevision((value) => value + 1);
+    });
+    return () => {
+      unsubscribe();
+      release();
+    };
+  }, [active]);
 
   const currentFriendshipLevels = useCallback(() => {
     const bond = loadCompanionBondState();
@@ -241,20 +253,29 @@ export function MergeWorldProvider({
     return next;
   }, [reconcileAuthoredCohortStory, reconcileFeastleStory, reconcileFeaturedStory, resolveFeaturedCharacter]);
 
-  useEffect(() => subscribeMergeWorldResets((freshState) => {
-    persistenceGenerationRef.current += 1;
-    externalGenerationRef.current += 1;
-    pendingPersistenceRef.current = null;
-    persistenceWorkerRef.current = null;
-    externalWorkerRef.current = null;
-    const reconciledState = featureAndReconcile(freshState);
-    stateRef.current = reconciledState;
-    setState(reconciledState);
-    setLastResult(null);
-    setError(null);
-    setLoading(false);
-    refreshFriendshipLevels();
-  }), [featureAndReconcile, refreshFriendshipLevels]);
+  useEffect(() => {
+    if (!active) return;
+    const release = acquireLifecycleResource('store_subscription', 'merge:world-resets');
+    const unsubscribe = subscribeMergeWorldResets((freshState) => {
+      if (!activeRef.current) return;
+      persistenceGenerationRef.current += 1;
+      externalGenerationRef.current += 1;
+      pendingPersistenceRef.current = null;
+      persistenceWorkerRef.current = null;
+      externalWorkerRef.current = null;
+      const reconciledState = featureAndReconcile(freshState);
+      stateRef.current = reconciledState;
+      setState(reconciledState);
+      setLastResult(null);
+      setError(null);
+      setLoading(false);
+      refreshFriendshipLevels();
+    });
+    return () => {
+      unsubscribe();
+      release();
+    };
+  }, [active, featureAndReconcile, refreshFriendshipLevels]);
 
   const drainPersistence = useCallback(async () => {
     const workerGeneration = persistenceGenerationRef.current;
@@ -299,9 +320,11 @@ export function MergeWorldProvider({
 
   const startPersistenceWorker = useCallback(() => {
     if (!persistenceWorkerRef.current) {
+      const release = acquireLifecycleResource('repository_worker', 'merge:persistence');
       const worker = drainPersistence();
       persistenceWorkerRef.current = worker;
       void worker.finally(() => {
+        release();
         if (persistenceWorkerRef.current === worker) persistenceWorkerRef.current = null;
       });
     }
@@ -313,29 +336,46 @@ export function MergeWorldProvider({
     void startPersistenceWorker();
   }, [startPersistenceWorker]);
 
-  useEffect(() => subscribeCompanionBondState(() => {
-    const current = stateRef.current;
-    if (!current) return;
-    const levels = refreshFriendshipLevels();
-    const result = reduceMergeWorld(current, { type: 'reconcileFriendship', levels, now: Date.now() });
-    if (!result.changed) return;
-    stateRef.current = result.state;
-    if (mountedRef.current) setState(result.state);
-    enqueuePersistence(result.state);
-  }), [enqueuePersistence, refreshFriendshipLevels]);
+  useEffect(() => {
+    if (!active) return;
+    const release = acquireLifecycleResource('store_subscription', 'merge:companion-bond');
+    const unsubscribe = subscribeCompanionBondState(() => {
+      if (!activeRef.current) return;
+      const current = stateRef.current;
+      if (!current) return;
+      const levels = refreshFriendshipLevels();
+      const result = reduceMergeWorld(current, { type: 'reconcileFriendship', levels, now: Date.now() });
+      if (!result.changed) return;
+      stateRef.current = result.state;
+      if (mountedRef.current) setState(result.state);
+      enqueuePersistence(result.state);
+    });
+    return () => {
+      unsubscribe();
+      release();
+    };
+  }, [active, enqueuePersistence, refreshFriendshipLevels]);
 
-  useEffect(() => subscribeCompanionStories(() => {
-    if (applyingStoryReceiptDepthRef.current > 0) return;
-    const current = stateRef.current;
-    if (!current) return;
-    const featured = current.favouriteCharacterId;
-    if (!featured || (featured !== 'feastle' && !isAuthoredCohortFamily(featured))) return;
-    const next = featured === 'feastle' ? reconcileFeastleStory(current) : reconcileAuthoredCohortStory(current, featured);
-    if (next === current) return;
-    stateRef.current = next;
-    if (mountedRef.current) setState(next);
-    enqueuePersistence(next);
-  }), [enqueuePersistence, reconcileAuthoredCohortStory, reconcileFeastleStory]);
+  useEffect(() => {
+    if (!active) return;
+    const release = acquireLifecycleResource('store_subscription', 'merge:companion-stories');
+    const unsubscribe = subscribeCompanionStories(() => {
+      if (!activeRef.current || applyingStoryReceiptDepthRef.current > 0) return;
+      const current = stateRef.current;
+      if (!current) return;
+      const featured = current.favouriteCharacterId;
+      if (!featured || (featured !== 'feastle' && !isAuthoredCohortFamily(featured))) return;
+      const next = featured === 'feastle' ? reconcileFeastleStory(current) : reconcileAuthoredCohortStory(current, featured);
+      if (next === current) return;
+      stateRef.current = next;
+      if (mountedRef.current) setState(next);
+      enqueuePersistence(next);
+    });
+    return () => {
+      unsubscribe();
+      release();
+    };
+  }, [active, enqueuePersistence, reconcileAuthoredCohortStory, reconcileFeastleStory]);
 
   const flush = useCallback(async () => {
     const worker = startPersistenceWorker();
@@ -343,7 +383,11 @@ export function MergeWorldProvider({
   }, [startPersistenceWorker]);
 
   useEffect(() => {
-    if (!active) void flush();
+    if (active) return;
+    // Stop reward-side-effect work immediately. Persistence is allowed to
+    // finish the current coalesced flush, then the retained provider is inert.
+    externalGenerationRef.current += 1;
+    void flush();
   }, [active, flush]);
 
   const applyPendingExternalRewards = useCallback(() => {
@@ -388,10 +432,12 @@ export function MergeWorldProvider({
         }
       }
     })().catch((caught) => {
-      if (mountedRef.current) setError(caught instanceof Error ? caught.message : 'Merge rewards could not be applied.');
+      if (mountedRef.current && activeRef.current) setError(caught instanceof Error ? caught.message : 'Merge rewards could not be applied.');
     });
+    const release = acquireLifecycleResource('repository_worker', 'merge:external-rewards');
     externalWorkerRef.current = worker;
     void worker.finally(() => {
+      release();
       if (externalWorkerRef.current === worker) externalWorkerRef.current = null;
     });
     return worker;
@@ -399,16 +445,27 @@ export function MergeWorldProvider({
 
   useEffect(() => {
     mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      void flush();
+    };
+  }, [flush]);
+
+  useEffect(() => {
+    if (!active || stateRef.current) return;
     let cancelled = false;
-    void (async () => {
+    const release = acquireLifecycleResource('repository_worker', 'merge:initial-hydration');
+    const worker = (async () => {
       try {
         let next = await loadMergeWorldState();
+        if (cancelled || !activeRef.current) return;
         next = reduceMergeWorld(next, { type: 'reconcileCharacters', characterIds, now: Date.now() }).state;
         next = featureAndReconcile(next);
         const rewards = [...mergeActivityRewards(days, new Date(), { state: next, quickGoals: loadCompanionQuickGoalState() }), ...mergeQuestActivityRewards(questState)];
         const activityResult = reduceMergeWorld(next, { type: 'grantActivityRewardsBatch', rewards, now: Date.now() });
         next = activityResult.state;
         await saveMergeWorldState(next);
+        if (cancelled || !activeRef.current) return;
         const appliedIds: string[] = [];
         for (const receipt of next.externalRewardReceipts.filter((item) => item.appliedAt == null)) {
           applyReceiptSideEffect(receipt);
@@ -422,7 +479,7 @@ export function MergeWorldProvider({
         // a midpoint return. Repair the Merge projection before first paint.
         next = featureAndReconcile(next);
         if (appliedIds.length || next !== beforeFriendshipReconcile) await saveMergeWorldState(next, appliedIds);
-        if (!cancelled) {
+        if (!cancelled && activeRef.current) {
           stateRef.current = next;
           setState(next);
           setFriendshipLevels(levels);
@@ -430,35 +487,41 @@ export function MergeWorldProvider({
           setLoading(false);
         }
       } catch (caught) {
-        if (!cancelled) {
+        if (!cancelled && activeRef.current) {
           setError(caught instanceof Error ? caught.message : 'Merge World could not be loaded.');
           setLoading(false);
         }
       }
     })();
+    void worker.finally(release);
     return () => {
       cancelled = true;
-      mountedRef.current = false;
-      void flush();
     };
     // Initial hydration owns the full activity projection. Later changes use
     // the lightweight batch reconciliation effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [active]);
 
   useEffect(() => {
+    if (!active) return;
+    const release = acquireLifecycleResource('app_state_listener', 'merge:app-state');
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState !== 'active') void flush();
     });
-    return () => subscription.remove();
-  }, [flush]);
+    return () => {
+      subscription.remove();
+      release();
+    };
+  }, [active, flush]);
 
   useEffect(() => {
-    if (loading) return;
+    if (!active || loading) return;
     const current = stateRef.current;
     if (!current) return;
     const now = Date.now();
     let next = reduceMergeWorld(current, { type: 'reconcileCharacters', characterIds, now }).state;
+    const levels = refreshFriendshipLevels();
+    next = reduceMergeWorld(next, { type: 'reconcileFriendship', levels, now }).state;
     next = featureAndReconcile(next, now);
     const rewards = [...mergeActivityRewards(days, new Date(now), { state: next, quickGoals: loadCompanionQuickGoalState() }), ...mergeQuestActivityRewards(questState)];
     const activityResult = reduceMergeWorld(next, { type: 'grantActivityRewardsBatch', rewards, now });
@@ -468,19 +531,10 @@ export function MergeWorldProvider({
     setState(next);
     if (activityResult.changed) setLastResult(activityResult);
     enqueuePersistence(next);
-  }, [characterIds, days, enqueuePersistence, featureAndReconcile, loading, questState, quickGoalRevision]);
-
-  useEffect(() => {
-    const current = stateRef.current;
-    if (!current) return;
-    const next = featureAndReconcile(current);
-    if (next === current) return;
-    stateRef.current = next;
-    setState(next);
-    enqueuePersistence(next);
-  }, [enqueuePersistence, featureAndReconcile]);
+  }, [active, characterIds, days, enqueuePersistence, featureAndReconcile, loading, questState, quickGoalRevision, refreshFriendshipLevels]);
 
   const dispatch = useCallback((command: MergeWorldCommand): MergeWorldCommandResult | null => {
+    if (!activeRef.current) return null;
     const current = stateRef.current;
     if (!current) return null;
     const servedCharacterId = command.type === 'serveOrder'

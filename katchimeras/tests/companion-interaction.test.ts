@@ -447,7 +447,8 @@ test('ideal-skin onboarding gates launch companions and skin equipment opens a b
   assert.match(paywall, /Share every day card/);
   assert.match(paywall, /questionnaire match/);
   assert.match(paywall, /safeDismissModal/);
-  assert.doesNotMatch(companionRoute, /if \(!isFocused\) return <View/);
+  assert.match(companionRoute, /if \(!isFocused\) return <View style=\{styles\.inactiveScreen\} \/>;/);
+  assert.match(interaction, /if \(!props\.active \|\| !idealSkinOnboardingRequired/);
   assert.match(interaction, /selectExperienceDestination\('insight'\)/);
   assert.match(profile, /Reset Katchimeras progress/);
   assert.match(profile, /resetDevSubscriptionSimulator\(\)/);

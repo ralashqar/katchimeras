@@ -54,6 +54,7 @@ import {
 import { CompanionQuestChoices, CompanionQuestThread } from './companion-quest-thread';
 import type { InteractiveQuestExecution, QuestResult } from '@/utils/quests/experiences/types';
 import { companionBondProgressForTotal, type CompanionBondAwardReceipt, type CompanionBondProgress } from '@/utils/companion-bond';
+import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 import type {
   CompanionIntroductionAnswer,
   CompanionIntroductionRecord,
@@ -291,6 +292,10 @@ export type CompanionInteractionSheetProps = {
 };
 
 export function CompanionInteractionSheet(props: CompanionInteractionSheetProps) {
+  useEffect(() => {
+    if (!props.active) return;
+    return acquireLifecycleResource('companion_sheet', `companion-sheet:${props.creatureId}`);
+  }, [props.active, props.creatureId]);
   const { days: journalRewardDays } = useAllDays();
   const journalMergeEnergyPreview = useMemo(() => {
     const now = new Date();
@@ -675,7 +680,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   // hydrated. Keep ensuring until the matching active session is observable;
   // the idempotency guard prevents duplicate sessions between retries.
   useEffect(() => {
-    if (!idealSkinOnboardingRequired || !idealSkinDefinitionId || hasActiveIdealSkinQuestionnaire) return;
+    if (!props.active || !idealSkinOnboardingRequired || !idealSkinDefinitionId || hasActiveIdealSkinQuestionnaire) return;
     const retry = setInterval(() => {
       startConversation({ definitionId: idealSkinDefinitionId });
     }, 250);
@@ -685,6 +690,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     idealSkinDefinitionId,
     idealSkinOnboardingRequired,
     onboardingCreatureId,
+    props.active,
     startConversation,
   ]);
 

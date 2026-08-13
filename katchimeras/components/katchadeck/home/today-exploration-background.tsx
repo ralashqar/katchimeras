@@ -301,7 +301,7 @@ export function TodayExplorationBackground({
         ]}>
         <Image
           allowDownscaling
-          cachePolicy="memory-disk"
+          cachePolicy="disk"
           contentFit="fill"
           pointerEvents="none"
           priority="high"

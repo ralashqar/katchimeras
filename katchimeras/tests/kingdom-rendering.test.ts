@@ -163,7 +163,7 @@ test('Kingdom uses the resolved Today sky plate without legacy clouds or atmosph
   assert.match(worldSource, /todayAtmosphereBackgroundForDay\(today, days\)/);
   assert.match(worldSource, /background=\{kingdomBackground\}/);
   assert.match(canvasSource, /source=\{background\.source\}/);
-  assert.match(canvasSource, /cachePolicy="memory-disk"/);
+  assert.match(canvasSource, /cachePolicy="disk"/);
   assert.doesNotMatch(canvasSource, /KingdomSkyBackground|DevAtmosphereLayer/);
   assert.doesNotMatch(cameraSource, /skyCamera|skyOrigin/);
 });

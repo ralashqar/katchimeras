@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { memo, useEffect, type RefObject } from 'react';
 import { StyleSheet, useWindowDimensions, View, type View as ViewType } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { cancelAnimation, Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
 import { TodayExplorationBackground } from '@/components/katchadeck/home/today-exploration-background';
@@ -53,6 +53,12 @@ export const CompanionHomeEnvironmentStage = memo(
         withTiming(-0.55, { duration: 62 }),
         withTiming(0, { duration: 75 })
       );
+      return () => {
+        cancelAnimation(feedback);
+        cancelAnimation(shake);
+        feedback.value = 0;
+        shake.value = 0;
+      };
     }, [feedback, reduceMotion, rewardPulseKey, shake]);
     const creatureFeedbackStyle = useAnimatedStyle(() => ({
       transform: [

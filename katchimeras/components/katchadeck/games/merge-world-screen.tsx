@@ -35,7 +35,7 @@ import { MergeParcelFlightOverlay, type MergeParcelFlight } from './merge-parcel
 import { MergeOrderRail, type MergeTrayEntry } from './merge-order-rail';
 import { MergeServeRewardOverlay, type MergeScreenPoint, type MergeServeRewardFlight } from './merge-serve-reward-overlay';
 
-export function MergeWorldScreen({ active = true, effectsPaused }: { active?: boolean; effectsPaused?: SharedValue<number> } = {}) {
+export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntrance = true }: { active?: boolean; effectsPaused?: SharedValue<number>; playBoardEntrance?: boolean } = {}) {
   const router = useRouter();
   const { focusOrderId } = useLocalSearchParams<{ focusOrderId?: string }>();
   const insets = useSafeAreaInsets();
@@ -426,6 +426,7 @@ export function MergeWorldScreen({ active = true, effectsPaused }: { active?: bo
 
           <View onLayout={measureBoardArea} style={styles.boardStage}>
             {active && boardAreaHeight > 0 ? <FeastlePersistentMergeBoard
+              animateEntrance={playBoardEntrance}
               effectsPaused={effectsPaused}
               hiddenItemInstanceIds={hiddenAnimatedItemIds}
               maxHeight={boardAreaHeight - 1}

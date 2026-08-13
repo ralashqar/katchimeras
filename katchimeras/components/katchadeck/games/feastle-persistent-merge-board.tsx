@@ -95,9 +95,10 @@ function isInterruptibleMotion(motion?: SpriteMotion) {
   return motion == null || motion.kind === 'move' || motion.kind === 'swap' || motion.kind === 'return' || motion.kind === 'spawn' || motion.kind === 'merge-result';
 }
 
-export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onScreenMetrics, hiddenItemInstanceIds, effectsPaused: providedEffectsPaused }: {
+export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onScreenMetrics, hiddenItemInstanceIds, effectsPaused: providedEffectsPaused, animateEntrance = true }: {
   state: MergeWorldState;
   width: number;
+  animateEntrance?: boolean;
   maxHeight?: number;
   selectedCell: number | null;
   onSelect: (cell: number | null) => void;
@@ -128,8 +129,8 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   useEffect(reportScreenMetrics, [reportScreenMetrics]);
   const reduceMotion = useReducedMotion();
   const timers = useDisposableTimers('merge-board-feedback');
-  const boardEntrance = useSharedValue(0);
-  const [entranceInteractive, setEntranceInteractive] = useState(Boolean(reduceMotion));
+  const boardEntrance = useSharedValue(animateEntrance ? 0 : 1);
+  const [entranceInteractive, setEntranceInteractive] = useState(Boolean(reduceMotion || !animateEntrance));
   useEffect(() => acquireLifecycleResource('merge_board', 'feastle-merge-board'), []);
   const hoverCell = useSharedValue(-1);
   const occupancyIds = useSharedValue(occupancyIdsFromState(state));
@@ -165,7 +166,9 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   const presentationRef = useRef(presentation);
   const [sprites, setSprites] = useState(() => spritesFromState(state));
   const introSpriteDelays = useRef(new Map(
-    spritesFromState(state).map((sprite) => [spriteId(sprite), introDelayForCell(sprite.cell)]),
+    animateEntrance
+      ? spritesFromState(state).map((sprite) => [spriteId(sprite), introDelayForCell(sprite.cell)])
+      : [],
   ));
   const spritesRef = useRef(sprites);
   const [motions, setMotions] = useState<Record<string, SpriteMotion>>({});
@@ -197,6 +200,11 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
 
   useEffect(() => {
     cancelAnimation(boardEntrance);
+    if (!animateEntrance) {
+      boardEntrance.value = 1;
+      setEntranceInteractive(true);
+      return () => cancelAnimation(boardEntrance);
+    }
     boardEntrance.value = 0;
     if (reduceMotion) {
       boardEntrance.value = withTiming(1, { duration: 100, easing: Easing.out(Easing.cubic) });
@@ -210,7 +218,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       timers.cancel(interactiveTimer);
       cancelAnimation(boardEntrance);
     };
-  }, [boardEntrance, reduceMotion, timers]);
+  }, [animateEntrance, boardEntrance, reduceMotion, timers]);
 
   const boardEntranceStyle = useAnimatedStyle(() => {
     const progress = Math.max(0, Math.min(1, boardEntrance.value));

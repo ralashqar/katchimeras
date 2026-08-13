@@ -279,7 +279,7 @@ function CloudImage({
         },
       ]}>
       <Image
-        cachePolicy="memory-disk"
+        cachePolicy="disk"
         contentFit="contain"
         pointerEvents="none"
         source={spec.source}

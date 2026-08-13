@@ -114,6 +114,7 @@ import { TodayEnergyProfiler } from '@/features/today/today-energy-profiler';
 import { useAppActivity } from '@/features/performance/app-activity';
 import { useWisps } from '@/features/wisps/wisp-provider';
 import { resolveHomeLoopPresentation } from '@/features/today/home-loop-presentation';
+import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
 import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
 import { MemoryClarificationSheet } from '@/components/katchadeck/world/memory-clarification-sheet';
 import type { ClassifiedMemory, DayInputTarget, HomeDayRecord, HomeTimelineDay, MemoryDomain } from '@/types/home';
@@ -210,6 +211,11 @@ const QUICK_PROMPT_CATEGORIES: {
 
 export default function TodayRouteScreen() {
   const screenFocused = useIsFocused();
+  useEffect(() => {
+    if (!screenFocused) return;
+    scheduleForegroundLifecycleAudit('today');
+    return acquireLifecycleResource('today_scene', 'today-home-screen');
+  }, [screenFocused]);
   if (!screenFocused) return <View style={styles.inactiveScreen} />;
   return <HomeScreen />;
 }
@@ -2123,7 +2129,7 @@ function HomeScreen() {
             const creatureId = companionJournalHandoff.creatureId;
             setCompanionJournalHandoff(null);
             closeManualJournal();
-            router.navigate({ pathname: '/katchimera/[creatureId]', params: { creatureId } });
+            router.push({ pathname: '/katchimera/[creatureId]', params: { creatureId } });
           }}
           onClose={() => {
             if (!companionJournalHandoff) {
@@ -2134,7 +2140,7 @@ function HomeScreen() {
             const creatureId = companionJournalHandoff.creatureId;
             setCompanionJournalHandoff(null);
             closeManualJournal();
-            router.navigate({ pathname: '/katchimera/[creatureId]', params: { creatureId } });
+            router.push({ pathname: '/katchimera/[creatureId]', params: { creatureId } });
           }}
           onSave={(submission) => {
             const mergeRewardPreview = companionJournalHandoff ? journalMergeReward : null;

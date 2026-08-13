@@ -11,6 +11,7 @@ import {
 } from '@/utils/critical-interaction';
 import {
   acquireLifecycleResource,
+  foregroundLifecycleViolations,
   lifecycleResourceSnapshot,
   resetLifecycleResourcesForTests,
 } from '@/utils/lifecycle-performance';
@@ -34,6 +35,46 @@ test('repeated game resources return to a zero baseline', () => {
     releases.forEach((release) => release());
     assert.equal(lifecycleResourceSnapshot().total, 0);
   }
+});
+
+test('thirty foreground cycles retain only the active heavy surface', () => {
+  resetLifecycleResourcesForTests();
+  const releaseProvider = acquireLifecycleResource('merge_provider', 'retained-merge-state');
+  for (let index = 0; index < 30; index += 1) {
+    const releaseToday = acquireLifecycleResource('today_scene', `today-${index}`);
+    assert.deepEqual(foregroundLifecycleViolations('today'), []);
+    releaseToday();
+
+    const releaseCompanion = acquireLifecycleResource('companion_scene', `companion-${index}`);
+    const releaseSheet = acquireLifecycleResource('companion_sheet', `sheet-${index}`);
+    assert.deepEqual(foregroundLifecycleViolations('companion'), []);
+    releaseSheet();
+    releaseCompanion();
+
+    const releaseBoard = acquireLifecycleResource('merge_board', `board-${index}`);
+    const releaseSubscription = acquireLifecycleResource('store_subscription', `subscription-${index}`);
+    const releaseAppState = acquireLifecycleResource('app_state_listener', `app-state-${index}`);
+    assert.deepEqual(foregroundLifecycleViolations('merge'), []);
+    releaseAppState();
+    releaseSubscription();
+    releaseBoard();
+  }
+  releaseProvider();
+  assert.equal(lifecycleResourceSnapshot().total, 0);
+});
+
+test('foreground isolation reports retained hidden work', () => {
+  resetLifecycleResourcesForTests();
+  const releases = [
+    acquireLifecycleResource('today_scene', 'hidden-today'),
+    acquireLifecycleResource('companion_scene', 'visible-companion'),
+    acquireLifecycleResource('store_subscription', 'hidden-merge-subscription'),
+  ];
+  assert.deepEqual(foregroundLifecycleViolations('companion'), [
+    'today_scene:1>0',
+    'store_subscription:1>0',
+  ]);
+  releases.forEach((release) => release());
 });
 
 test('nested critical interactions release deferred work only after the final lease', async () => {
@@ -72,6 +113,9 @@ test('game mode releases background UI work and avoids full Kingdom hydration', 
   const tabsSource = readFileSync(path.join(process.cwd(), 'app', '(tabs)', '_layout.tsx'), 'utf8');
   const mergeRouteSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-world-route-screen.tsx'), 'utf8');
   const mergeBoardSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'feastle-persistent-merge-board.tsx'), 'utf8');
+  const mergeProviderSource = readFileSync(path.join(process.cwd(), 'features', 'merge-world', 'merge-world-provider.tsx'), 'utf8');
+  const companionRouteSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'katchimera-companion-route-screen.tsx'), 'utf8');
+  const companionSheetSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'), 'utf8');
   const todaySource = readFileSync(path.join(process.cwd(), 'app', '(tabs)', 'today.tsx'), 'utf8');
   const captureSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'home', 'day-capture-session.tsx'), 'utf8');
   const gameSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'game-hub-game-route-screen.tsx'), 'utf8');
@@ -86,6 +130,12 @@ test('game mode releases background UI work and avoids full Kingdom hydration', 
   assert.match(mergeBoardSource, /acquireLifecycleResource\('merge_board'/);
   assert.match(mergeBoardSource, /effectsPaused\.value = 0/);
   assert.match(mergeBoardSource, /timers\.cancelAll\(\)/);
+  assert.match(mergeBoardSource, /animateEntrance[\s\S]*?\? spritesFromState/);
+  assert.match(mergeProviderSource, /if \(!active\) return;[\s\S]*?subscribeCompanionQuickGoals/);
+  assert.match(mergeProviderSource, /if \(!active \|\| loading\) return;/);
+  assert.match(mergeProviderSource, /if \(!activeRef\.current\) return null;/);
+  assert.match(companionRouteSource, /if \(!isFocused\) return <View style=\{styles\.inactiveScreen\} \/>;/);
+  assert.match(companionSheetSource, /if \(!props\.active \|\| !idealSkinOnboardingRequired/);
   assert.match(todaySource, /if \(!screenFocused\) return <View style=\{styles\.inactiveScreen\}/);
   assert.ok((captureSource.match(/enabled: captureGates\.captureEnabled/g) ?? []).length >= 3);
   assert.match(captureSource, /const captureActive = pathname === '\/today'/);

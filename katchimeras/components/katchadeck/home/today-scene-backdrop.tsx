@@ -36,7 +36,7 @@ export function TodaySceneBackdrop({
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <Image
-        cachePolicy="memory-disk"
+        cachePolicy="disk"
         contentFit="cover"
         contentPosition={splash ? "bottom" : "center"}
         pointerEvents="none"
@@ -52,7 +52,7 @@ export function TodaySceneBackdrop({
           exiting={FadeOut.duration(200)}
           style={StyleSheet.absoluteFill}>
           <Image
-            cachePolicy="memory-disk"
+            cachePolicy="disk"
             contentFit="cover"
             pointerEvents="none"
             source={scene.source}

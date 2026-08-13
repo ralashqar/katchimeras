@@ -243,7 +243,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   return (
     <View style={styles.root} onLayout={onLayout}>
       <Image
-        cachePolicy="memory-disk"
+        cachePolicy="disk"
         contentFit="cover"
         pointerEvents="none"
         recyclingKey={background.id}

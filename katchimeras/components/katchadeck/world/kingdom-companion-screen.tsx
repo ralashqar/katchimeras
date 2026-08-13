@@ -492,7 +492,7 @@ export function KingdomCompanionScreen({
         <KatchimeraRosterScreen
           background={kingdomBackground}
           items={rosterItems}
-          onGoToday={() => router.navigate('/today')}
+          onGoToday={() => router.dismissTo('/today')}
           onSelectCreature={quests.selectResident}
         />
       ) : <View style={styles.companionRouteStage} />}
@@ -669,11 +669,11 @@ export function KingdomCompanionScreen({
               target: today?.state === 'hatched' ? 'tomorrow' : 'today',
             });
             requestCompanionNavigationIntent({ kind: 'journal_handoff', handoffId: handoff.id });
-            router.navigate('/today');
+            router.dismissTo('/today');
           }}
           onOpenTodayGoals={() => {
             requestCompanionNavigationIntent({ kind: 'quick_goals' });
-            router.navigate('/today');
+            router.dismissTo('/today');
           }}
           onInsightConversationDecision={quests.decideSelectedConversationInsight}
           onQuickGoalConversationDecision={(accept, node) => {
@@ -704,7 +704,7 @@ export function KingdomCompanionScreen({
               target: today?.state === 'hatched' ? 'tomorrow' : 'today',
             });
             requestCompanionNavigationIntent({ kind: 'journal_handoff', handoffId: handoff.id });
-            router.navigate('/today');
+            router.dismissTo('/today');
           }}
           onQuestConversationHandoff={(accept, node) => {
             const quest = quests.selectedConversationQuestOffer;
