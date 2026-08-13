@@ -115,6 +115,7 @@ const ITEMS: MergeItemDefinition[] = [
 export const FEASTLE_MERGE_ITEMS = ITEMS;
 const BY_ID = new Map(ITEMS.map((item) => [item.id, item]));
 const CHAINS: MergeChainId[] = ['pasta', 'stew', 'dessert'];
+const SAVOURY_CHAINS: MergeChainId[] = ['pasta', 'stew'];
 
 export function mergeItemDefinition(id: string): MergeItemDefinition {
   const item = BY_ID.get(id);
@@ -154,8 +155,11 @@ export function createMergeRound(
   recentOrderIds: string[] = [],
 ): MergeRoundState {
   const recent = new Set(recentOrderIds);
-  const chainOrder = seededShuffle(CHAINS, `${seed}:chains`);
-  const pairs = chainOrder.flatMap((first) => chainOrder.filter((second) => second !== first).map((second) => [first, second] as const));
+  const savouryOrder = seededShuffle(SAVOURY_CHAINS, `${seed}:savoury`);
+  const pairs = savouryOrder.flatMap((savoury) => [
+    [savoury, 'dessert'] as const,
+    ['dessert', savoury] as const,
+  ]);
   const chains = pairs.sort((left, right) => {
     const leftRecent = Number(recent.has(`${left[0]}:${config.targetTiers[0]}`)) + Number(recent.has(`${left[1]}:${config.targetTiers[1]}`));
     const rightRecent = Number(recent.has(`${right[0]}:${config.targetTiers[0]}`)) + Number(recent.has(`${right[1]}:${config.targetTiers[1]}`));

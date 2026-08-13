@@ -165,21 +165,21 @@ const chapterOneDefinitions: readonly ConversationDefinition[] = [
   },
   {
     id: 'feastle:friendship:3', version: 2, familyId: 'feastle',
-    title: 'The suspicious jar', trigger: 'bond', triggerSourceIds: ['friendship-level:3'],
+    title: 'The first bake', trigger: 'bond', triggerSourceIds: ['friendship-level:3'],
     minimumBondLevel: 1, minimumFriendshipLevel: 3, cooldownDays: 3650,
     contextualOnly: true, format: 'narrative', tags: ['friendship', 'story'], entryNodeId: 'jar',
     nodes: [
-      { id: 'jar', kind: 'choice', phase: 'explore', prompt: 'Small problem. A jar appeared in the Pantry with no label and far too much confidence. What is inside?', options: [
-        { id: 'jam', label: 'Very dramatic jam', reply: 'I knew it. That jar is practically wearing a cape.', nextNodeId: 'plan' },
-        { id: 'spice', label: 'A suspicious spice mix', reply: 'One sniff and the spoons have started gossiping.', nextNodeId: 'plan' },
-        { id: 'empty', label: 'Absolutely nothing', reply: 'Of course. It has already promoted itself to Pantry Manager.', nextNodeId: 'plan' },
+      { id: 'jar', kind: 'choice', phase: 'explore', prompt: 'The baking shelf is open, and the first little cake is taking this responsibility very seriously. What should it be?', options: [
+        { id: 'jam', label: 'Bright and jammy', reply: 'A cake with a colourful middle. It has excellent dramatic timing.', nextNodeId: 'plan' },
+        { id: 'spice', label: 'Warm and spiced', reply: 'The whole Pantry suddenly smells like a very small celebration.', nextNodeId: 'plan' },
+        { id: 'empty', label: 'Simple and familiar', reply: 'A dependable little cake. No fireworks required.', nextNodeId: 'plan' },
       ] },
-      { id: 'plan', kind: 'poll', prompt: 'The jar rattles. Quickly—what is our official plan?', helperText: 'The village has opinions. None are especially sensible.', nextNodeId: 'end', options: [
-        { id: 'taste', label: 'Taste it very carefully', reply: 'A brave plan. I will stand behind the largest spoon.', nextNodeId: 'end', villageWeight: 31 },
-        { id: 'label', label: 'Give it a new label', reply: '“Probably Fine.” Clear, honest, and legally adventurous.', nextNodeId: 'end', villageWeight: 45 },
-        { id: 'shelf', label: 'Put it on the highest shelf', reply: 'Excellent. A problem for taller Feastle.', nextNodeId: 'end', villageWeight: 24 },
+      { id: 'plan', kind: 'poll', prompt: 'The cake is ready. What occasion are we claiming?', helperText: 'The village insists that "Tuesday" is a perfectly valid occasion.', nextNodeId: 'end', options: [
+        { id: 'taste', label: 'Finishing our first bake', reply: 'A historic achievement, measured mostly in crumbs.', nextNodeId: 'end', villageWeight: 31 },
+        { id: 'label', label: 'An ordinary day', reply: 'Exactly. Ordinary days are allowed icing.', nextNodeId: 'end', villageWeight: 45 },
+        { id: 'shelf', label: 'Saving some to share', reply: 'Then the cake becomes an invitation as well as a treat.', nextNodeId: 'end', villageWeight: 24 },
       ] },
-      { id: 'end', kind: 'end', message: 'Crisis contained. The village record will be extremely vague about this.' },
+      { id: 'end', kind: 'end', message: 'First bake complete. The Pantry has two paths now: everyday plates and reasons to celebrate.' },
     ],
   },
   {
@@ -188,7 +188,7 @@ const chapterOneDefinitions: readonly ConversationDefinition[] = [
     minimumBondLevel: 1, minimumFriendshipLevel: 4, cooldownDays: 3650,
     contextualOnly: true, format: 'narrative', tags: ['friendship', 'chapter', 'story'], entryNodeId: 'dish',
     nodes: [
-      { id: 'dish', kind: 'choice', phase: 'explore', prompt: 'Look at that dish! The table feels real now. On an ordinary day, what makes food feel manageable?', options: [
+      { id: 'dish', kind: 'choice', phase: 'explore', prompt: 'Look at that spread—a welcoming dish, a sweet finish, and a centrepiece! On an ordinary day, what makes food feel manageable?', options: [
         { id: 'simple', label: 'Keeping it simple', reply: 'Simple is good food meeting the day exactly where it is.', nextNodeId: 'tomorrow' },
         { id: 'ready', label: 'Having something ready', reply: 'A little preparation can feel like a note from past-you: “I’ve got you.”', nextNodeId: 'tomorrow' },
         { id: 'shared', label: 'Sharing the work', reply: 'Yes. A lighter plate sometimes begins with lighter work.', nextNodeId: 'tomorrow' },
@@ -215,7 +215,7 @@ const actTwoDefinitions: readonly ConversationDefinition[] = [
     trigger: 'bond', triggerSourceIds: ['friendship-level:5'], minimumBondLevel: 1, minimumFriendshipLevel: 5,
     cooldownDays: 3650, contextualOnly: true, format: 'narrative', tags: ['friendship', 'story', 'act-two'], entryNodeId: 'bell',
     nodes: [
-      { id: 'bell', kind: 'choice', phase: 'explore', prompt: 'The village has discovered our table. Five requests just arrived. What should every order feel like?', options: [
+      { id: 'bell', kind: 'choice', phase: 'explore', prompt: 'The village has discovered our table and baking shelf. Five requests just arrived—warm plates, sweet bakes, and pairings of both. What should every order feel like?', options: [
         { id: 'ease', label: 'Easy to receive', reply: 'Then no plate needs to prove anything. It only needs to meet the day.', nextNodeId: 'remember-ease' },
         { id: 'comfort', label: 'Warm and familiar', reply: 'A little recognition can be part of the meal.', nextNodeId: 'remember-comfort' },
         { id: 'connection', label: 'Made for sharing', reply: 'Good. We will count chairs before I promise them this time.', nextNodeId: 'remember-connection' },
@@ -227,7 +227,7 @@ const actTwoDefinitions: readonly ConversationDefinition[] = [
         summary: signal === 'ease' ? 'Food feels kinder when it is easy to receive.' : signal === 'comfort' ? 'Familiar food can create warmth and comfort.' : signal === 'connection' ? 'Shared food and company help a meal feel meaningful.' : 'A small, optional surprise can make food more interesting.',
         memoryKey: `feastle:signal:${signal}`, memoryKind: 'preference' as const, sensitivity: 'ordinary' as const, nextNodeId: 'end',
       })),
-      { id: 'end', kind: 'end', message: 'The order bell is open. Serve five villagers at your own pace; I will keep three requests on the table at a time.' },
+      { id: 'end', kind: 'end', message: 'The order bell is open. Serve five villagers across the table and cake paths at your own pace; I will keep three requests visible at a time.' },
     ],
   },
   {
@@ -235,14 +235,14 @@ const actTwoDefinitions: readonly ConversationDefinition[] = [
     trigger: 'bond', triggerSourceIds: ['friendship-level:6'], minimumBondLevel: 1, minimumFriendshipLevel: 6,
     cooldownDays: 3650, contextualOnly: true, format: 'narrative', tags: ['friendship', 'story', 'journal'], entryNodeId: 'pause',
     nodes: [
-      { id: 'pause', kind: 'choice', phase: 'explore', prompt: 'Two villagers have eaten and the spoons are taking minutes. Has food felt notable in your own day?', options: [
+      { id: 'pause', kind: 'choice', phase: 'explore', prompt: 'Two orders—one warm plate and one sweet bake—have left the Pantry. Has any food or baking moment felt notable in your own day?', options: [
         { id: 'easy', label: 'Something was easy', reply: 'Ease is useful evidence, even when it looks ordinary.', nextNodeId: 'remember-easy' },
         { id: 'comfort', label: 'Something was comforting', reply: 'Then the moment carried more than ingredients.', nextNodeId: 'remember-comfort' },
         { id: 'journal', label: 'Open Today (optional)', reply: 'Let us give the Egg that little piece of the day—or leave the page quiet if you prefer.', nextNodeId: 'journal' },
       ] },
       { id: 'remember-easy', kind: 'memory_proposal', prompt: 'Keep this as a small clue?', summary: 'An easy food option helped today.', memoryKey: 'feastle:signal:ease', memoryKind: 'shared_moment', sensitivity: 'ordinary', nextNodeId: 'end' },
       { id: 'remember-comfort', kind: 'memory_proposal', prompt: 'Keep this as a small clue?', summary: 'A food moment brought some comfort today.', memoryKey: 'feastle:signal:comfort', memoryKind: 'shared_moment', sensitivity: 'ordinary', nextNodeId: 'end' },
-      { id: 'journal', kind: 'journal_handoff', prompt: 'Add only what feels worth keeping.', title: "Today's table", body: 'Choose the food moment that stood out. Ordinary meals, snacks, drinks, and cooking all count.', flowId: 'food', allowedChoiceIds: ['meal', 'snack', 'dessert', 'coffee', 'tea', 'drink', 'cooking', 'other_food'], saveLabel: 'Add to the Egg', rewardGrowth: 20, nextNodeId: 'end' },
+      { id: 'journal', kind: 'journal_handoff', prompt: 'Add only what feels worth keeping.', title: "Today's table", body: 'Choose the food moment that stood out. Ordinary meals, snacks, drinks, desserts, and cooking or baking all count.', flowId: 'food', allowedChoiceIds: ['meal', 'snack', 'dessert', 'coffee', 'tea', 'drink', 'cooking', 'other_food'], saveLabel: 'Add to the Egg', rewardGrowth: 20, nextNodeId: 'end' },
       { id: 'end', kind: 'end', message: 'The remaining requests are waiting, not rushing. Come back when the Pantry feels ready.' },
     ],
   },
@@ -289,7 +289,7 @@ const actTwoDefinitions: readonly ConversationDefinition[] = [
         { id: 'connection', title: 'A Shared Table', reflection: 'Food becomes more meaningful when care, help, or company is part of it.', summary: 'Connection is an important ingredient in how meals support you.', emblemId: 'feastle-table-connection', matchOptionIds: ['connection-busy', 'connection-memory', 'connection-tomorrow', 'connection-welcome', 'connection-enough'] },
         { id: 'curiosity', title: 'A Curious Spoonful', reflection: 'Small surprises keep food interesting when they remain optional.', summary: 'You value low-pressure novelty: enough to invite curiosity without making food harder.', emblemId: 'feastle-table-curiosity', matchOptionIds: ['curiosity-busy', 'curiosity-memory', 'curiosity-tomorrow', 'curiosity-welcome', 'curiosity-enough'] },
       ] },
-      { id: 'end', kind: 'end', message: 'I have one final request of my own now: let us make our first feast.' },
+      { id: 'end', kind: 'end', message: 'I have one final request of my own now: let us make our first feast, centrepiece and cake together.' },
     ],
   },
   {
@@ -297,7 +297,7 @@ const actTwoDefinitions: readonly ConversationDefinition[] = [
     trigger: 'bond', triggerSourceIds: ['feastle-chapter-8'], minimumBondLevel: 1, minimumFriendshipLevel: 8,
     cooldownDays: 3650, contextualOnly: true, format: 'narrative', tags: ['friendship', 'chapter', 'story'], entryNodeId: 'feast',
     nodes: [
-      { id: 'feast', kind: 'choice', phase: 'resolve', prompt: 'The table is full. What made this feel like a feast rather than simply more food?', options: [
+      { id: 'feast', kind: 'choice', phase: 'resolve', prompt: 'The centrepiece and celebration cake are served. What made this feel like a feast rather than simply more food?', options: [
         { id: 'care', label: 'The care behind it', reply: 'The effort became part of what was served.', nextNodeId: 'remember-care' },
         { id: 'company', label: 'The company', reply: 'A table changes when people feel welcome at it.', nextNodeId: 'remember-company' },
         { id: 'moment', label: 'Marking the moment', reply: 'Giving a moment a name can make it easier to remember.', nextNodeId: 'remember-moment' },

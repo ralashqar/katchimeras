@@ -18,6 +18,7 @@ import { mergeWorldPendingPersistence, type MergeWorldPendingPersistence } from 
 import { loadMergeWorldState, saveMergeWorldState, subscribeMergeWorldResets } from '@/utils/merge-world/repository';
 import { isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, markAuthoredCohortOrderActive, markAuthoredCohortOrderServed, markFeastleOrderActive, markFeastleOrderServed, recordAuthoredCohortQuietBond, recordFeastleQuietBond, subscribeCompanionStories } from '@/utils/companion-story-storage';
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
+import { loadCompanionQuickGoalState, subscribeCompanionQuickGoals } from '@/utils/companion-quick-goal-storage';
 
 type MergeWorldContextValue = {
   state: MergeWorldState | null;
@@ -62,6 +63,7 @@ export function MergeWorldProvider({
   const [error, setError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<MergeWorldCommandResult | null>(null);
   const [friendshipLevels, setFriendshipLevels] = useState<Partial<Record<MergeCharacterId, number>>>({});
+  const [quickGoalRevision, setQuickGoalRevision] = useState(0);
   const stateRef = useRef(state);
   const mountedRef = useRef(true);
   const pendingPersistenceRef = useRef<MergeWorldPendingPersistence | null>(null);
@@ -73,6 +75,7 @@ export function MergeWorldProvider({
   stateRef.current = state;
 
   useEffect(() => acquireLifecycleResource('merge_provider', 'merge-world-provider'), []);
+  useEffect(() => subscribeCompanionQuickGoals(() => setQuickGoalRevision((value) => value + 1)), []);
 
   const currentFriendshipLevels = useCallback(() => {
     const bond = loadCompanionBondState();
@@ -372,11 +375,15 @@ export function MergeWorldProvider({
         const levels = refreshFriendshipLevels();
         const current = stateRef.current;
         if (current) {
-          const reconciled = reduceMergeWorld(current, { type: 'reconcileFriendship', levels, now: Date.now() });
-          if (reconciled.changed) {
-            stateRef.current = reconciled.state;
-            if (mountedRef.current) setState(reconciled.state);
-            enqueuePersistence(reconciled.state);
+          const friendshipState = reduceMergeWorld(current, { type: 'reconcileFriendship', levels, now: Date.now() }).state;
+          // Story storage notifications are guarded while receipt side effects
+          // are applied. Reconcile explicitly after the whole batch so a
+          // midpoint note and every unserved request appear atomically.
+          const reconciled = featureAndReconcile(friendshipState);
+          if (reconciled !== current) {
+            stateRef.current = reconciled;
+            if (mountedRef.current) setState(reconciled);
+            enqueuePersistence(reconciled);
           }
         }
       }
@@ -388,7 +395,7 @@ export function MergeWorldProvider({
       if (externalWorkerRef.current === worker) externalWorkerRef.current = null;
     });
     return worker;
-  }, [applyReceiptSideEffect, enqueuePersistence, flush, refreshFriendshipLevels]);
+  }, [applyReceiptSideEffect, enqueuePersistence, featureAndReconcile, flush, refreshFriendshipLevels]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -398,7 +405,7 @@ export function MergeWorldProvider({
         let next = await loadMergeWorldState();
         next = reduceMergeWorld(next, { type: 'reconcileCharacters', characterIds, now: Date.now() }).state;
         next = featureAndReconcile(next);
-        const rewards = [...mergeActivityRewards(days), ...mergeQuestActivityRewards(questState)];
+        const rewards = [...mergeActivityRewards(days, new Date(), { state: next, quickGoals: loadCompanionQuickGoalState() }), ...mergeQuestActivityRewards(questState)];
         const activityResult = reduceMergeWorld(next, { type: 'grantActivityRewardsBatch', rewards, now: Date.now() });
         next = activityResult.state;
         await saveMergeWorldState(next);
@@ -411,6 +418,9 @@ export function MergeWorldProvider({
         const levels = currentFriendshipLevels();
         const beforeFriendshipReconcile = next;
         next = reduceMergeWorld(next, { type: 'reconcileFriendship', levels, now: Date.now() }).state;
+        // Applying a pending served-order receipt may have advanced Feastle to
+        // a midpoint return. Repair the Merge projection before first paint.
+        next = featureAndReconcile(next);
         if (appliedIds.length || next !== beforeFriendshipReconcile) await saveMergeWorldState(next, appliedIds);
         if (!cancelled) {
           stateRef.current = next;
@@ -450,7 +460,7 @@ export function MergeWorldProvider({
     const now = Date.now();
     let next = reduceMergeWorld(current, { type: 'reconcileCharacters', characterIds, now }).state;
     next = featureAndReconcile(next, now);
-    const rewards = [...mergeActivityRewards(days), ...mergeQuestActivityRewards(questState)];
+    const rewards = [...mergeActivityRewards(days, new Date(now), { state: next, quickGoals: loadCompanionQuickGoalState() }), ...mergeQuestActivityRewards(questState)];
     const activityResult = reduceMergeWorld(next, { type: 'grantActivityRewardsBatch', rewards, now });
     next = activityResult.state;
     if (next === current) return;
@@ -458,7 +468,7 @@ export function MergeWorldProvider({
     setState(next);
     if (activityResult.changed) setLastResult(activityResult);
     enqueuePersistence(next);
-  }, [characterIds, days, enqueuePersistence, featureAndReconcile, loading, questState]);
+  }, [characterIds, days, enqueuePersistence, featureAndReconcile, loading, questState, quickGoalRevision]);
 
   useEffect(() => {
     const current = stateRef.current;

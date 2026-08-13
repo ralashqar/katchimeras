@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
@@ -19,8 +19,9 @@ import { splitEnergyAcrossTokens } from '@/utils/energy-payout';
 import { PersistentMergeItemArt } from './feastle-persistent-merge-board';
 
 const COIN_ART = require('../../../assets/images/katchimeras/merge-world/ui/coin.webp');
+const ENERGY_ART = require('../../../assets/images/katchimeras/merge-world/ui/energy.webp');
 const ITEM_SIZE = 38;
-const COIN_SIZE = 35;
+const REWARD_TOKEN_SIZE = 35;
 const ITEM_FLIGHT_MS = 390;
 const ITEM_STAGGER_MS = 55;
 const COIN_RISE_MS = 140;
@@ -47,14 +48,17 @@ export type MergeServeRewardFlight = {
   coinAmount: number;
   coinFrom: MergeScreenPoint;
   coinTo: MergeScreenPoint;
+  energyAmount: number;
+  energyTo: MergeScreenPoint;
   items: readonly MergeServeItemFlight[];
   nonce: number;
-  phase: 'items' | 'coins';
+  phase: 'items' | 'rewards';
 };
 
-export function MergeServeRewardOverlay({ flight, onCoinArrive, onFinish, onItemsArrive }: {
+export function MergeServeRewardOverlay({ flight, onCoinArrive, onEnergyArrive, onFinish, onItemsArrive }: {
   flight: MergeServeRewardFlight | null;
   onCoinArrive: (amount: number) => void;
+  onEnergyArrive: (amount: number) => void;
   onFinish: () => void;
   onItemsArrive: () => void;
 }) {
@@ -70,14 +74,12 @@ export function MergeServeRewardOverlay({ flight, onCoinArrive, onFinish, onItem
           onItemsArrive={onItemsArrive}
         />
       )) : null}
-      {flight.phase === 'coins' ? (
-        <CoinPayout
-          amount={flight.coinAmount}
-          from={flight.coinFrom}
-          nonce={flight.nonce}
-          onArrive={onCoinArrive}
+      {flight.phase === 'rewards' ? (
+        <ParallelRewardPayout
+          flight={flight}
+          onCoinArrive={onCoinArrive}
+          onEnergyArrive={onEnergyArrive}
           onFinish={onFinish}
-          to={flight.coinTo}
         />
       ) : null}
     </View>
@@ -129,13 +131,58 @@ function ServingItem({ count, index, item, onItemsArrive }: {
   );
 }
 
-function CoinPayout({ amount, from, nonce, onArrive, onFinish, to }: {
+function ParallelRewardPayout({ flight, onCoinArrive, onEnergyArrive, onFinish }: {
+  flight: MergeServeRewardFlight;
+  onCoinArrive: (amount: number) => void;
+  onEnergyArrive: (amount: number) => void;
+  onFinish: () => void;
+}) {
+  const requiredGroups = Number(flight.coinAmount > 0) + Number(flight.energyAmount > 0);
+  const completedGroupsRef = useRef(0);
+  const finishGroup = useCallback(() => {
+    completedGroupsRef.current += 1;
+    if (completedGroupsRef.current >= requiredGroups) onFinish();
+  }, [onFinish, requiredGroups]);
+
+  useEffect(() => {
+    if (requiredGroups > 0) return;
+    const frame = requestAnimationFrame(onFinish);
+    return () => cancelAnimationFrame(frame);
+  }, [onFinish, requiredGroups]);
+
+  return <>
+    {flight.coinAmount > 0 ? <RewardPayout
+      amount={flight.coinAmount}
+      art={COIN_ART}
+      from={flight.coinFrom}
+      nonce={`${flight.nonce}:coin`}
+      onArrive={onCoinArrive}
+      onFinish={finishGroup}
+      to={flight.coinTo}
+      variant="coin"
+    /> : null}
+    {flight.energyAmount > 0 ? <RewardPayout
+      amount={flight.energyAmount}
+      art={ENERGY_ART}
+      from={flight.coinFrom}
+      nonce={`${flight.nonce}:energy`}
+      onArrive={onEnergyArrive}
+      onFinish={finishGroup}
+      to={flight.energyTo}
+      variant="energy"
+    /> : null}
+  </>;
+}
+
+function RewardPayout({ amount, art, from, nonce, onArrive, onFinish, to, variant }: {
   amount: number;
+  art: number;
   from: MergeScreenPoint;
-  nonce: number;
+  nonce: string;
   onArrive: (amount: number) => void;
   onFinish: () => void;
   to: MergeScreenPoint;
+  variant: 'coin' | 'energy';
 }) {
   const tokenAmounts = splitEnergyAcrossTokens(amount, 5);
 
@@ -146,8 +193,9 @@ function CoinPayout({ amount, from, nonce, onArrive, onFinish, to }: {
   }, [onFinish, tokenAmounts.length]);
 
   return tokenAmounts.map((tokenAmount, index) => (
-    <CoinToken
+    <RewardToken
       amount={tokenAmount}
+      art={art}
       count={tokenAmounts.length}
       from={from}
       index={index}
@@ -155,29 +203,36 @@ function CoinPayout({ amount, from, nonce, onArrive, onFinish, to }: {
       onArrive={onArrive}
       onFinish={onFinish}
       to={to}
+      variant={variant}
     />
   ));
 }
 
-function CoinToken({ amount, count, from, index, onArrive, onFinish, to }: {
+function RewardToken({ amount, art, count, from, index, onArrive, onFinish, to, variant }: {
   amount: number;
+  art: number;
   count: number;
   from: MergeScreenPoint;
   index: number;
   onArrive: (amount: number) => void;
   onFinish: () => void;
   to: MergeScreenPoint;
+  variant: 'coin' | 'energy';
 }) {
   const rise = useSharedValue(0);
   const flight = useSharedValue(0);
   const hover = useSharedValue(0);
   const reduceMotion = useReducedMotion();
-  const vector = COIN_BURST[index] ?? COIN_BURST[COIN_BURST.length - 1];
+  const baseVector = COIN_BURST[index] ?? COIN_BURST[COIN_BURST.length - 1];
+  const vector = variant === 'energy'
+    ? { ...baseVector, rotation: -baseVector.rotation, x: baseVector.x + 8, y: baseVector.y + 5 }
+    : baseVector;
 
   useEffect(() => {
     const riseMs = reduceMotion ? 90 : COIN_RISE_MS;
     const hoverMs = reduceMotion ? 70 : COIN_HOVER_MS;
-    const stagger = reduceMotion ? index * 25 : index * COIN_STAGGER_MS;
+    const staggerOffset = variant === 'energy' ? 28 : 0;
+    const stagger = (reduceMotion ? index * 25 : index * COIN_STAGGER_MS) + staggerOffset;
     rise.value = withTiming(1, { duration: riseMs, easing: Easing.out(Easing.cubic) });
     hover.value = reduceMotion
       ? withTiming(1, { duration: 450, easing: Easing.linear })
@@ -195,7 +250,7 @@ function CoinToken({ amount, count, from, index, onArrive, onFinish, to }: {
       cancelAnimation(hover);
       cancelAnimation(rise);
     };
-  }, [amount, count, flight, hover, index, onArrive, onFinish, reduceMotion, rise]);
+  }, [amount, count, flight, hover, index, onArrive, onFinish, reduceMotion, rise, variant]);
 
   const motionStyle = useAnimatedStyle(() => {
     const stagedX = from.x + vector.x * rise.value;
@@ -213,20 +268,20 @@ function CoinToken({ amount, count, from, index, onArrive, onFinish, to }: {
     return {
       opacity: value < 0.9 ? rise.value : Math.max(0, (1 - value) / 0.1),
       transform: [
-        { translateX: x - COIN_SIZE / 2 },
-        { translateY: y - COIN_SIZE / 2 },
+        { translateX: x - REWARD_TOKEN_SIZE / 2 },
+        { translateY: y - REWARD_TOKEN_SIZE / 2 },
         { rotateZ: `${vector.rotation * inverse}deg` },
         { scale: (0.58 + rise.value * 0.48) * (1 - value * 0.72) },
       ],
     };
   }, [from.x, from.y, index, reduceMotion, to.x, to.y]);
 
-  return <Animated.View style={[styles.coin, motionStyle]}><Image accessibilityIgnoresInvertColors contentFit="contain" source={COIN_ART} style={styles.coinArt} transition={0} /></Animated.View>;
+  return <Animated.View style={[styles.rewardToken, motionStyle]}><Image accessibilityIgnoresInvertColors contentFit="contain" source={art} style={styles.rewardTokenArt} transition={0} /></Animated.View>;
 }
 
 const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, overflow: 'visible', zIndex: 120 },
   servingItem: { height: ITEM_SIZE, left: 0, position: 'absolute', top: 0, width: ITEM_SIZE },
-  coin: { height: COIN_SIZE, left: 0, position: 'absolute', top: 0, width: COIN_SIZE },
-  coinArt: { height: '100%', width: '100%' },
+  rewardToken: { height: REWARD_TOKEN_SIZE, left: 0, position: 'absolute', top: 0, width: REWARD_TOKEN_SIZE },
+  rewardTokenArt: { height: '100%', width: '100%' },
 });

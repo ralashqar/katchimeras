@@ -77,14 +77,14 @@ export const MERGE_ITEM_CATALOG: readonly MergeItemDefinition[] = [
 
 export const MERGE_ITEMS_BY_ID = new Map(MERGE_ITEM_CATALOG.map((item) => [item.id, item]));
 
-export type FeastleStoryRequestPreview = { title: string; definitionId: string; quantity: number };
+export type FeastleStoryRequestPreview = { title: string; definitionId: string; quantity: number; secondaryDefinitionId?: string };
 export const FEASTLE_STORY_REQUESTS: Readonly<Record<number, readonly FeastleStoryRequestPreview[]>> = {
   2: [{ title: 'The First Snack', definitionId: 'food:table:2', quantity: 1 }],
-  3: [{ title: 'A Pantry Pair', definitionId: 'food:table:2', quantity: 2 }],
+  3: [{ title: 'The First Bake', definitionId: 'food:dessert:2', quantity: 2 }],
   4: [
     { title: 'A Welcoming Dish', definitionId: 'food:table:3', quantity: 1 },
     { title: 'A Sweet Finish', definitionId: 'food:dessert:3', quantity: 1 },
-    { title: 'The Table Centrepiece', definitionId: 'food:table:4', quantity: 1 },
+    { title: 'The Table Centrepiece', definitionId: 'food:table:4', quantity: 1, secondaryDefinitionId: 'food:dessert:3' },
   ],
 };
 
@@ -139,6 +139,15 @@ export const MERGE_CHARACTER_NAMES: Record<MergeCharacterId, string> = {
   snuglet: 'Snuglet', waglet: 'Waglet', tasklet: 'Tasklet', errandimp: 'Errandimp', pagelet: 'Pagelet',
   relicoon: 'Relicoon', museling: 'Museling', encora: 'Encora', flickerbun: 'Flickerbun', pixooka: 'Pixooka',
   mossprout: 'Mossprout', shellio: 'Shellio', skylo: 'Skylo', voyagle: 'Voyagle', cheerlet: 'Cheerlet',
+};
+
+export const MERGE_CHAPTER_LANDMARKS: Partial<Record<MergeCharacterId, { id: string; title: string }>> = {
+  feastle: { id: 'feastle-first-table', title: "Feastle's First Table" },
+  baristabbit: { id: 'baristabbit-pause-table', title: "Baristabbit's Pause Table" },
+  steppling: { id: 'steppling-path-outside', title: "Steppling's Path Outside" },
+  voyagle: { id: 'voyagle-blank-map', title: "Voyagle's Map with Blank Spaces" },
+  flexel: { id: 'flexel-rhythm-garden', title: "Flexel's Rhythm That Holds" },
+  bedrotte: { id: 'bedrotte-quiet-room', title: "Bedrotte's Room That Asks Nothing" },
 };
 
 export type KatchimeraMergeProfile = {

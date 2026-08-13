@@ -188,8 +188,8 @@ export default function ExploreScreen() {
         {
           text: 'Reset today',
           style: 'destructive',
-          onPress: () => {
-            resetTodayForDebug();
+          onPress: async () => {
+            await resetTodayForDebug();
             router.replace('/(tabs)');
           },
         },

@@ -130,7 +130,38 @@ export type MergeActivityRewardKind =
   | 'daily_journal_energy'
   | 'daily_companion_energy'
   | 'daily_quest_energy'
-  | 'companion_story_starter';
+  | 'companion_story_starter'
+  | 'contextual_parcel'
+  | 'memory_arrival'
+  | 'goal_chest';
+
+export type MergeLifeTheme =
+  | 'food' | 'ritual' | 'movement' | 'travel' | 'nature' | 'rest'
+  | 'connection' | 'celebration' | 'focus' | 'learning' | 'creativity' | 'play' | 'memory';
+
+export type MergeWorldArrival = {
+  id: string;
+  kind: 'contextual_parcel' | 'memory_arrival' | 'goal_chest';
+  createdAt: number;
+  dayId: string;
+  label: string;
+  theme: MergeLifeTheme;
+  familyId: MergeFamilyId;
+  chainId: MergeChainId;
+  characterId?: MergeCharacterId;
+  source: 'journal' | 'companion_story' | 'goal' | 'legacy';
+  itemDefinitionIds: string[];
+  memoryRef?: { dayId: string; journalRecordId: string; sourceKind: 'manual' | 'photo' | 'text_note' | 'voice_note' };
+  claimedAt: number | null;
+  seenAt: number | null;
+};
+
+export type MergeWorldLandmark = {
+  id: string;
+  characterId: MergeCharacterId;
+  chapterId: string;
+  unlockedAt: number;
+};
 
 export type MergeActivityReward = {
   receiptId: string;
@@ -139,10 +170,11 @@ export type MergeActivityReward = {
   grantDayId: string;
   label: string;
   itemDefinitionIds?: string[];
+  arrival?: Omit<MergeWorldArrival, 'createdAt' | 'claimedAt' | 'seenAt'>;
 };
 
 export type MergeWorldState = {
-  version: 5;
+  version: 7;
   revision: number;
   createdAt: number;
   updatedAt: number;
@@ -151,6 +183,8 @@ export type MergeWorldState = {
   storage: MergeBoardItem[];
   storageCapacity: number;
   rewardInbox: MergeRewardInboxEntry[];
+  arrivals: MergeWorldArrival[];
+  landmarks: MergeWorldLandmark[];
   generatorUnlockReceipts: MergeGeneratorUnlockReceipt[];
   generators: Record<string, MergeGeneratorState>;
   energy: { value: number; regenCap: number; lastRegenAt: number };
@@ -182,6 +216,8 @@ export type MergeWorldCommand =
   | { type: 'restoreItem'; storageIndex: number; cell?: number; now: number }
   | { type: 'sellItem'; cell: number; now: number }
   | { type: 'claimInbox'; entryId: string; now: number }
+  | { type: 'claimArrival'; arrivalId: string; now: number }
+  | { type: 'viewMemoryArrival'; arrivalId: string; now: number }
   | { type: 'unlockExpansion'; expansionId: string; now: number }
   | { type: 'grantActivityRewardsBatch'; rewards: MergeActivityReward[]; now: number }
   | { type: 'featureCharacter'; characterId: MergeCharacterId; now: number }
@@ -199,6 +235,7 @@ export type MergeWorldCommandResult = {
   discoveryId?: string;
   mergedCell?: number;
   spawnedCell?: number;
+  spawnedItems?: { instanceId: string; definitionId: string; cell: number }[];
   servedOrderId?: string;
   energyGranted?: number;
   itemsQueued?: number;

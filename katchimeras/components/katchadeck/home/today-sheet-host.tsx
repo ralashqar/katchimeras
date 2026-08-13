@@ -21,6 +21,7 @@ import type { Observation } from '@/utils/observations-engine';
 type TodaySheetHostProps = {
   viewedDay: HomeDayRecord | null;
   viewedIsForming: boolean;
+  focusedMemoryId?: string;
   formingTarget: DayInputTarget;
   sheets: TodaySheetController;
   observatoryOpen: boolean;
@@ -57,6 +58,7 @@ type TodaySheetHostProps = {
 export function TodaySheetHost({
   viewedDay,
   viewedIsForming,
+  focusedMemoryId,
   formingTarget,
   sheets,
   observatoryOpen,
@@ -146,6 +148,7 @@ export function TodaySheetHost({
       {memoryVaultOpen ? (
         <MemoryVaultSheet
           day={viewedDay}
+          initialMemoryId={focusedMemoryId}
           initialTab={memoryVaultTab}
           onAddPhoto={
             viewedIsForming

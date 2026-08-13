@@ -26,10 +26,12 @@ export const FEASTLE_ACT_TWO_ORDER_POOL = [
   { key: 'traveller-snack', title: 'A familiar bite', description: 'A traveller misses the snack and little cake they know by heart.', definitionId: 'food:table:3', secondaryDefinitionId: 'food:dessert:3', difficulty: 'small', signal: 'comfort' },
   { key: 'crumb-note', title: 'Written entirely in crumbs', description: 'The request is mysterious, but apparently urgent.', definitionId: 'food:dessert:3', secondaryDefinitionId: 'food:table:3', difficulty: 'small', signal: 'curiosity' },
   { key: 'quiet-company', title: 'A table for quiet company', description: 'Two villagers would like supper and cake without making a fuss.', definitionId: 'food:table:4', secondaryDefinitionId: 'food:dessert:3', difficulty: 'medium', signal: 'connection' },
+  { key: 'cake-for-no-reason', title: 'Cake for no particular reason', description: 'A cheerful little cake beside a simple plate, because ordinary days can have icing too.', definitionId: 'food:dessert:4', secondaryDefinitionId: 'food:table:3', difficulty: 'medium', signal: 'curiosity' },
   { key: 'late-shift', title: 'After the late shift', description: 'A dependable dish for someone whose day ran long.', definitionId: 'food:table:4', guestDefinitionId: 'drink:hot:3', guestGeneratorId: 'ritual-bar', difficulty: 'medium', signal: 'ease' },
   { key: 'new-neighbour', title: 'Welcome, new neighbour', description: 'A warm dish can make an unfamiliar table easier.', definitionId: 'food:table:4', secondaryDefinitionId: 'food:table:3', difficulty: 'medium', signal: 'connection' },
   { key: 'suspicious-spice', title: 'The suspicious spice club', description: 'Three brave villagers want to try something different.', definitionId: 'food:table:4', secondaryDefinitionId: 'food:dessert:3', difficulty: 'medium', signal: 'curiosity' },
   { key: 'long-table', title: 'Room at the long table', description: 'A generous meal and cake for a table that keeps adding chairs.', definitionId: 'food:table:5', secondaryDefinitionId: 'food:dessert:4', difficulty: 'major', signal: 'connection' },
+  { key: 'celebration-leftovers', title: 'The leftovers celebration', description: 'A proper cake and a warm shared dish to turn an ordinary ending into an occasion.', definitionId: 'food:dessert:5', secondaryDefinitionId: 'food:table:4', difficulty: 'major', signal: 'connection' },
   { key: 'market-surprise', title: 'The market surprise', description: 'Make a meal from the village’s most unexpected basket.', definitionId: 'food:table:5', guestDefinitionId: 'drink:refresh:3', guestGeneratorId: 'ritual-bar', difficulty: 'major', signal: 'curiosity' },
 ] as const;
 
@@ -138,15 +140,14 @@ export function selectAuthoredCohortOrderKeys(familyId: AuthoredCohortFamilyId, 
 export type FeastleActTwoOrderTemplate = (typeof FEASTLE_ACT_TWO_ORDER_POOL)[number];
 
 export function selectFeastleActTwoOrderKeys(seed: string): string[] {
-  const groups: FeastleActTwoOrderTemplate[][] = [
-    FEASTLE_ACT_TWO_ORDER_POOL.filter((item) => item.difficulty === 'small'),
-    FEASTLE_ACT_TWO_ORDER_POOL.filter((item) => item.difficulty === 'medium'),
-    FEASTLE_ACT_TWO_ORDER_POOL.filter((item) => item.difficulty === 'major'),
-  ];
+  const small = FEASTLE_ACT_TWO_ORDER_POOL.filter((item) => item.difficulty === 'small' && item.key !== 'crumb-note');
+  const medium = FEASTLE_ACT_TWO_ORDER_POOL.filter((item) => item.difficulty === 'medium' && item.key !== 'cake-for-no-reason');
   return [
-    ...pickStable(groups[0], 2, `${seed}:small`),
-    ...pickStable(groups[1], 2, `${seed}:medium`),
-    ...pickStable(groups[2], 1, `${seed}:major`),
+    FEASTLE_ACT_TWO_ORDER_POOL.find((item) => item.key === 'crumb-note')!,
+    ...pickStable(small, 1, `${seed}:small`),
+    FEASTLE_ACT_TWO_ORDER_POOL.find((item) => item.key === 'cake-for-no-reason')!,
+    ...pickStable(medium, 1, `${seed}:medium`),
+    FEASTLE_ACT_TWO_ORDER_POOL.find((item) => item.key === 'celebration-leftovers')!,
   ].map((item) => item.key);
 }
 

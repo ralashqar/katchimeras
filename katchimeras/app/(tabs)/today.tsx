@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import {
   ActivityIndicator,
@@ -216,6 +216,11 @@ export default function TodayRouteScreen() {
 
 function HomeScreen() {
   const router = useRouter();
+  const { memoryDayId, memoryRecordId, memorySourceKind } = useLocalSearchParams<{
+    memoryDayId?: string;
+    memoryRecordId?: string;
+    memorySourceKind?: string;
+  }>();
   const { beginCriticalInteraction, criticalInteractionActive } = useAppActivity();
   const screenFocused = useIsFocused();
   const [growthNow, setGrowthNow] = useState(() => new Date());
@@ -281,6 +286,7 @@ function HomeScreen() {
   const [companionJournalHandoff, setCompanionJournalHandoff] = useState<CompanionJournalHandoff | null>(null);
   const [feastleJournalReward, setFeastleJournalReward] = useState<(CompanionJournalHandoff & { mergeReward: MergeJournalRewardPreview }) | null>(null);
   const handledCompanionJournalHandoffIdRef = useRef<string | null>(null);
+  const handledMergeMemoryIdRef = useRef<string | null>(null);
   const deferredJournalCareCompletionRef = useRef<string | null>(null);
   const deferredJournalCareTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openManualJournal = useCallback((flowId?: string, categoryId?: string, contextId?: string | null, target?: DayInputTarget) => {
@@ -771,6 +777,19 @@ function HomeScreen() {
     setJourneySheetOpen,
     nameSheetOpen,
   } = sheets;
+
+  useEffect(() => {
+    if (!memoryDayId || !memoryRecordId || handledMergeMemoryIdRef.current === memoryRecordId) return;
+    const target = timelineDays.find((day) => day.kind === 'day' && day.isoDate === memoryDayId);
+    if (target && selectedDayId !== target.id) {
+      selectTimelineDay(target.id);
+      return;
+    }
+    if (selectedDay?.kind !== 'day' || selectedDay.isoDate !== memoryDayId) return;
+    handledMergeMemoryIdRef.current = memoryRecordId;
+    setMemoryVaultTab(memorySourceKind === 'photo' ? 'photos' : memorySourceKind === 'voice_note' ? 'voice' : 'notes');
+    setMemoryVaultOpen(true);
+  }, [memoryDayId, memoryRecordId, memorySourceKind, selectTimelineDay, selectedDay, selectedDayId, setMemoryVaultOpen, setMemoryVaultTab, timelineDays]);
 
   const pendingCaptureNavigationRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => {
@@ -2296,6 +2315,7 @@ function HomeScreen() {
       <TodaySheetHost
         viewedDay={viewedDay}
         viewedIsForming={viewedIsForming}
+        focusedMemoryId={handledMergeMemoryIdRef.current === memoryRecordId ? memoryRecordId : undefined}
         formingTarget={formingTarget}
         sheets={sheets}
         observatoryOpen={observatoryOpen}
@@ -2347,17 +2367,17 @@ function HomeScreen() {
                     feastleJournalReward.mergeReward.dailyJournalEnergy > 0 ? `Journal +${feastleJournalReward.mergeReward.dailyJournalEnergy}` : null,
                     feastleJournalReward.mergeReward.companionEnergy > 0 ? `Companion +${feastleJournalReward.mergeReward.companionEnergy}` : null,
                   ].filter(Boolean).join(', ')}).`
-                : `${feastleJournalReward.target === 'tomorrow' ? 'Tomorrow’s' : 'Today’s'} Egg had already granted its journal and companion Merge Energy for this date.`} {feastleJournalReward.mode === 'story' ? 'A first story reflection also sends two starter supplies.' : ''}
+                : `${feastleJournalReward.target === 'tomorrow' ? 'Tomorrow’s' : 'Today’s'} Egg had already granted its journal and companion Merge Energy for this date.`} Your reflection also sends a companion-matched Life Parcel to Merge World. Its memory stays safely in your journal. {feastleJournalReward.mode === 'story' ? 'A first story reflection sends starter supplies too.' : ''}
             </ThemedText>
             <Pressable
               accessibilityRole="button"
               onPress={() => {
-                const creatureId = feastleJournalReward.creatureId;
+                const familyId = feastleJournalReward.familyId;
                 setFeastleJournalReward(null);
-                router.navigate({ pathname: '/katchimera/[creatureId]', params: { creatureId } });
+                router.navigate({ pathname: '/games', params: { familyId } });
               }}
               style={({ pressed }) => [styles.feastleRewardButton, pressed && { opacity: 0.82 }]}>
-              <ThemedText style={styles.feastleRewardButtonLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">Return to {MERGE_CHARACTER_NAMES[feastleJournalReward.familyId as MergeCharacterId] ?? 'Katchimera'}</ThemedText>
+              <ThemedText style={styles.feastleRewardButtonLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">Take it to Merge</ThemedText>
               <IconSymbol color="#FFF9E9" name="arrow.right" size={16} />
             </Pressable>
           </View>

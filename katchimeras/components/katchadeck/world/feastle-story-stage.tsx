@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
@@ -8,6 +9,9 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { FEASTLE_STORY_REQUESTS, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import { FEASTLE_ACT_TWO_ORDER_POOL } from '@/utils/companion-story';
 import { beginFeastleActTwo, beginFeastleReturn, loadFeastleStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
+
+const FEASTLE_TABLE_ART = require('../../../assets/images/katchimeras/environments/feastle_hearth/props/feast_table_l1.webp');
+const JOURNEY_STEPS = ['Meet', 'Make', 'Serve', 'Return'] as const;
 
 export function FeastleStoryStage({ onBeginIntroduction, onJournalFood, onMore, onOpenConversation, onOpenMerge }: {
   onBeginIntroduction: () => void;
@@ -24,12 +28,12 @@ export function FeastleStoryStage({ onBeginIntroduction, onJournalFood, onMore, 
   const needsBeginning = story.status === 'intro_available';
   const canJournalFood = story.journalFtueStatus !== 'not_started' && (story.status === 'order_active' || complete);
   const actTwoRequests = story.actPhase === 'signature_order'
-    ? [{ title: "Feastle's First Feast", description: 'A generous centrepiece made from everything the table has taught us.', definitionId: 'food:table:6', quantity: 1 }]
+    ? [{ title: "Feastle's First Feast", description: 'A generous shared table and celebration cake made from everything the Pantry has taught us.', definitionId: 'food:table:5', secondaryDefinitionId: 'food:dessert:5', quantity: 1 }]
     : story.actPhase === 'regular_orders' && story.orderDeck
       ? story.orderDeck.templateKeys.flatMap((key) => {
         const order = FEASTLE_ACT_TWO_ORDER_POOL.find((item) => item.key === key);
         return order && !story.orderDeck?.servedOrderIds.includes(`merge-story:feastle:act-2:${key}`)
-          ? [{ title: order.title, description: order.description, definitionId: order.definitionId, quantity: 1 }]
+          ? [{ title: order.title, description: order.description, definitionId: order.definitionId, secondaryDefinitionId: 'secondaryDefinitionId' in order ? order.secondaryDefinitionId : undefined, quantity: 1 }]
           : [];
       }).slice(0, 3)
       : [];
@@ -51,6 +55,15 @@ export function FeastleStoryStage({ onBeginIntroduction, onJournalFood, onMore, 
         : story.targetLevel === 4
           ? 'Feastle is setting the whole table this time. Each dish has its own tray, and you can serve them one by one.'
           : 'Here is exactly what Feastle needs next. Make it in the Pantry, then serve it from the tray.';
+  const journeyStep = complete || actOneComplete
+    ? 4
+    : returnReady
+      ? 3
+      : story.status === 'order_active'
+        ? 1
+        : needsBeginning
+          ? 0
+          : 1;
 
   return <Animated.View entering={FadeInUp.duration(220)} style={styles.stage}>
     <View style={styles.heading}>
@@ -58,6 +71,22 @@ export function FeastleStoryStage({ onBeginIntroduction, onJournalFood, onMore, 
       <View style={styles.copy}><ThemedText selectable style={styles.eyebrow} lightColor="#8B672E" darkColor="#8B672E">A PLACE AT THE TABLE</ThemedText><ThemedText selectable style={styles.title} lightColor="#3B2C20" darkColor="#3B2C20">{title}</ThemedText></View>
     </View>
     <ThemedText selectable style={styles.body} lightColor="#66513A" darkColor="#66513A">{body}</ThemedText>
+    <View accessibilityLabel={`Feastle journey. ${JOURNEY_STEPS.map((step, index) => `${step} ${index < journeyStep ? 'complete' : index === journeyStep ? 'next' : 'not started'}`).join(', ')}`} style={styles.journey}>
+      {JOURNEY_STEPS.map((step, index) => {
+        const done = index < journeyStep;
+        const active = index === journeyStep;
+        return <View key={step} style={styles.journeyStep}>
+          <View style={[styles.journeyDot, done && styles.journeyDotDone, active && styles.journeyDotActive]}>{done ? <IconSymbol color="#FFF9E9" name="checkmark" size={9} /> : null}</View>
+          <ThemedText style={[styles.journeyLabel, (done || active) && styles.journeyLabelCurrent]} lightColor="#9B846A" darkColor="#9B846A">{step}</ThemedText>
+          {index < JOURNEY_STEPS.length - 1 ? <View style={[styles.journeyLine, done && styles.journeyLineDone]} /> : null}
+        </View>;
+      })}
+    </View>
+    {complete || actOneComplete ? <View accessibilityLabel={"Feastle's First Table landmark unlocked"} style={styles.landmark}>
+      <View pointerEvents="none" style={styles.landmarkGlow} />
+      <Image accessibilityIgnoresInvertColors contentFit="contain" source={FEASTLE_TABLE_ART} style={styles.landmarkArt} transition={0} />
+      <View style={styles.landmarkCopy}><ThemedText style={styles.landmarkEyebrow} lightColor="#8B672E" darkColor="#8B672E">LANDMARK UNLOCKED</ThemedText><ThemedText selectable style={styles.landmarkTitle} lightColor="#3B2C20" darkColor="#3B2C20">{'Feastle\'s First Table'}</ThemedText><ThemedText selectable style={styles.landmarkBody} lightColor="#6B5943" darkColor="#6B5943">A piece of your shared story now lives in the world.</ThemedText></View>
+    </View> : null}
     {returnReady && story.pendingBondPoints > 0 ? <View accessibilityLabel={`${story.pendingBondPoints} Bond earned from this chapter`} style={styles.bondSummary}>
       <IconSymbol color="#FFF9E9" name="heart.fill" size={15} />
       <ThemedText selectable style={styles.bondSummaryText} lightColor="#FFF9E9" darkColor="#FFF9E9">+{story.pendingBondPoints} Bond from the tray</ThemedText>
@@ -68,11 +97,11 @@ export function FeastleStoryStage({ onBeginIntroduction, onJournalFood, onMore, 
         <ThemedText selectable style={styles.requestCount} lightColor="#6A5030" darkColor="#6A5030">{requests.length} {requests.length === 1 ? 'order' : 'orders'}</ThemedText>
       </View>
       {requests.map((request) => <View key={`${story.targetLevel}:${request.definitionId}:${request.title}`} style={styles.requestRow}>
-        <View style={styles.requestArt}><PersistentMergeItemArt definitionId={request.definitionId} size={48} /></View>
+        <View style={styles.requestArt}>{[request.definitionId, 'secondaryDefinitionId' in request ? request.secondaryDefinitionId : undefined].filter((id): id is string => Boolean(id)).map((id) => <PersistentMergeItemArt definitionId={id} key={id} size={40} />)}</View>
         <View style={styles.requestCopy}>
           <ThemedText selectable style={styles.requestTitle} lightColor="#3B2C20" darkColor="#3B2C20">{request.title}</ThemedText>
           {'description' in request && typeof request.description === 'string' ? <ThemedText selectable numberOfLines={2} style={styles.requestDescription} lightColor="#6B5943" darkColor="#6B5943">{request.description}</ThemedText> : null}
-          <ThemedText selectable style={styles.requestItemName} lightColor="#745936" darkColor="#745936">{MERGE_ITEMS_BY_ID.get(request.definitionId)?.name ?? 'Merge item'}</ThemedText>
+          <ThemedText selectable style={styles.requestItemName} lightColor="#745936" darkColor="#745936">{[request.definitionId, 'secondaryDefinitionId' in request ? request.secondaryDefinitionId : undefined].filter((id): id is string => Boolean(id)).map((id) => MERGE_ITEMS_BY_ID.get(id)?.name ?? 'Merge item').join(' + ')}</ThemedText>
         </View>
         {request.quantity > 1 ? <View style={styles.quantity}><ThemedText selectable style={styles.quantityText} lightColor="#FFF9E9" darkColor="#FFF9E9">×{request.quantity}</ThemedText></View> : null}
       </View>)}
@@ -96,8 +125,24 @@ export function FeastleStoryStage({ onBeginIntroduction, onJournalFood, onMore, 
 const styles = StyleSheet.create({
   stage: { backgroundColor: '#FFF4D8', borderColor: 'rgba(139,103,46,0.3)', borderCurve: 'continuous', borderRadius: 28, borderWidth: 1, boxShadow: '0 12px 28px rgba(88,57,24,0.16)', gap: 14, padding: 18 },
   heading: { alignItems: 'center', flexDirection: 'row', gap: 12 }, level: { alignItems: 'center', backgroundColor: '#83612F', borderRadius: 18, height: 48, justifyContent: 'center', width: 48 }, levelText: { fontSize: 20, fontWeight: '900', fontVariant: ['tabular-nums'] }, copy: { flex: 1, gap: 2 }, eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 }, title: { fontSize: 21, fontWeight: '900', letterSpacing: -0.35, lineHeight: 25 }, body: { fontSize: 13.5, lineHeight: 20 },
+  journey: { alignItems: 'flex-start', flexDirection: 'row', paddingHorizontal: 3, paddingVertical: 3 },
+  journeyStep: { alignItems: 'center', flex: 1, gap: 4, position: 'relative' },
+  journeyDot: { alignItems: 'center', backgroundColor: '#E6D7BA', borderColor: '#C9B58F', borderRadius: 999, borderWidth: 1, height: 18, justifyContent: 'center', width: 18, zIndex: 2 },
+  journeyDotDone: { backgroundColor: '#708D48', borderColor: '#708D48' },
+  journeyDotActive: { backgroundColor: '#FFF8E8', borderColor: '#8B672E', borderWidth: 3, boxShadow: '0 0 0 3px rgba(139,103,46,0.13)' },
+  journeyLabel: { fontSize: 9, fontWeight: '700', lineHeight: 12 },
+  journeyLabelCurrent: { color: '#5D452A', fontWeight: '900' },
+  journeyLine: { backgroundColor: '#DFCFB0', height: 2, left: '62%', position: 'absolute', right: '-38%', top: 8, zIndex: 1 },
+  journeyLineDone: { backgroundColor: '#8BA760' },
+  landmark: { alignItems: 'center', backgroundColor: '#FFF8E8', borderColor: 'rgba(139,103,46,0.26)', borderCurve: 'continuous', borderRadius: 20, borderWidth: 1, flexDirection: 'row', gap: 9, minHeight: 88, overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 8, position: 'relative' },
+  landmarkGlow: { backgroundColor: 'rgba(243,200,103,0.18)', borderRadius: 999, height: 110, left: -30, position: 'absolute', top: -28, width: 150 },
+  landmarkArt: { height: 72, width: 96 },
+  landmarkCopy: { flex: 1, gap: 1 },
+  landmarkEyebrow: { fontSize: 8, fontWeight: '900', letterSpacing: 0.9, lineHeight: 11 },
+  landmarkTitle: { fontSize: 16, fontWeight: '900', letterSpacing: -0.2, lineHeight: 20 },
+  landmarkBody: { fontSize: 10.5, lineHeight: 14 },
   requestTray: { backgroundColor: 'rgba(255,255,255,0.52)', borderColor: 'rgba(139,103,46,0.22)', borderCurve: 'continuous', borderRadius: 20, borderWidth: 1, gap: 8, padding: 11 }, requestHeading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 3 }, requestEyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 }, requestCount: { fontSize: 10.5, fontWeight: '800' },
   bondSummary: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: '#708D48', borderCurve: 'continuous', borderRadius: 999, flexDirection: 'row', gap: 7, minHeight: 34, paddingHorizontal: 12 }, bondSummaryText: { fontSize: 11.5, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  requestRow: { alignItems: 'center', backgroundColor: '#FFF8E8', borderCurve: 'continuous', borderRadius: 15, flexDirection: 'row', gap: 10, minHeight: 62, paddingHorizontal: 9, paddingVertical: 6 }, requestArt: { alignItems: 'center', height: 50, justifyContent: 'center', width: 50 }, requestCopy: { flex: 1, gap: 1 }, requestTitle: { fontSize: 13.5, fontWeight: '900', lineHeight: 18 }, requestDescription: { fontSize: 11, lineHeight: 15 }, requestItemName: { fontSize: 11.5, fontWeight: '700', lineHeight: 16 }, quantity: { alignItems: 'center', backgroundColor: '#76501F', borderRadius: 999, justifyContent: 'center', minWidth: 30, paddingHorizontal: 7, paddingVertical: 5 }, quantityText: { fontSize: 11, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  requestRow: { alignItems: 'center', backgroundColor: '#FFF8E8', borderCurve: 'continuous', borderRadius: 15, flexDirection: 'row', gap: 10, minHeight: 62, paddingHorizontal: 9, paddingVertical: 6 }, requestArt: { alignItems: 'center', flexDirection: 'row', height: 50, justifyContent: 'center', width: 72 }, requestCopy: { flex: 1, gap: 1 }, requestTitle: { fontSize: 13.5, fontWeight: '900', lineHeight: 18 }, requestDescription: { fontSize: 11, lineHeight: 15 }, requestItemName: { fontSize: 11.5, fontWeight: '700', lineHeight: 16 }, quantity: { alignItems: 'center', backgroundColor: '#76501F', borderRadius: 999, justifyContent: 'center', minWidth: 30, paddingHorizontal: 7, paddingVertical: 5 }, quantityText: { fontSize: 11, fontWeight: '900', fontVariant: ['tabular-nums'] },
   primary: { alignItems: 'center', backgroundColor: '#76501F', borderCurve: 'continuous', borderRadius: 19, flexDirection: 'row', gap: 10, minHeight: 54, paddingHorizontal: 15 }, primaryLabel: { flex: 1, fontSize: 15, fontWeight: '900' }, secondary: { alignItems: 'center', borderRadius: 17, flexDirection: 'row', justifyContent: 'space-between', minHeight: 46, paddingHorizontal: 13 }, secondaryLabel: { fontSize: 13, fontWeight: '900' }, pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
 });

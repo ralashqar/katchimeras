@@ -18,12 +18,16 @@ export function loadCompanionQuickGoalState(): CompanionQuickGoalState {
 
 export function saveCompanionQuickGoalState(state: CompanionQuickGoalState): void {
   setStoredJson(STORAGE_KEY, normaliseCompanionQuickGoalState(state));
+  listeners.forEach((listener) => listener());
 }
 
 export function resetStoredCompanionQuickGoalProgressForDay(dayId: string): void {
   const current = loadCompanionQuickGoalState();
   const next = resetCompanionQuickGoalProgressForDay(current, dayId);
-  if (next !== current) saveCompanionQuickGoalState(next);
+  if (next !== current) {
+    saveCompanionQuickGoalState(next);
+    return;
+  }
   // Mounted Today tabs keep their own hook state. Refresh them before the Home
   // record is replaced so stale completion receipts cannot be re-awarded.
   listeners.forEach((listener) => listener());
@@ -31,10 +35,11 @@ export function resetStoredCompanionQuickGoalProgressForDay(dayId: string): void
 
 export function resetAllCompanionQuickGoalsForDebug(): void {
   saveCompanionQuickGoalState(emptyCompanionQuickGoalState());
-  listeners.forEach((listener) => listener());
 }
 
 export function subscribeCompanionQuickGoalResets(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
+
+export const subscribeCompanionQuickGoals = subscribeCompanionQuickGoalResets;

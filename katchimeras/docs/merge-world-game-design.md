@@ -57,10 +57,50 @@ characters, enabled generator branches, and Merge Level. Major/signature orders
 begin at Level 10. Recent-order suppression and favourite weighting keep the
 rotation fair.
 
+Authored five-request bundles keep all five requests as durable entries in the
+horizontal rail. They may add a companion note after the second delivery. This
+is a midpoint interlude, not a new order set: the note appears before the three
+unserved requests, which remain present while the note is waiting and while its
+conversation is open. Only requests actually served may rotate out.
+
 Serving consumes every requirement atomically, applies Merge-local rewards, and
 creates idempotent receipts for Friendship and Wisps. Friendship uses the
 existing Bond event ledger with a 20-level presentation. Old Bond levels 1–4
 anchor to Friendship levels 1, 3, 6, and 10, so existing progress cannot fall.
+
+## Life arrivals and chapter landmarks
+
+The first meaningful journal capture for a local day may create one contextual
+Life Parcel and one Memory Arrival in addition to the daily Energy grant. The
+parcel belongs to the active Katchimera (favourite first, then active story
+request, then the first unlocked companion) and contains only tier-one items
+from that companion's unlocked core chains. A confirmed journal route may pick
+between those core chains; an unrelated route falls back to the companion's
+active order or primary core chain rather than introducing off-theme items.
+
+Memory Arrivals contain only a stable local journal reference and safe route
+label. Raw text, photo URIs, place names, and coordinates never enter Merge
+state. Opening one returns to the source day's Memory Vault; it never occupies
+a board cell. Memory Arrivals remain hidden from the Merge screen until their
+permanent collection presentation is ready. One completed optional real-life
+goal per day may also create a themed three-item chest. Every delivery is
+receipt-idempotent.
+
+The Merge screen presents the oldest claimable parcel as one compact gift crate
+with a queue-count badge. The stable parcel stack is always the first item in
+the horizontally scrolling request rail. Claiming from a multi-parcel queue
+updates the same badge in place; only the final claim removes the stack, with a
+smooth outro while the remaining trays slide left. Pressing claims atomically,
+opens a visual copy of the crate, and flies the granted items to their actual
+board cells. The flight copy stays opaque through landing while the committed
+board sprite is revealed underneath, so delivery has one continuous entrance
+rather than a flight followed by a second fade. A full board leaves the parcel unclaimed and uses recoverable
+feedback. Legacy activity parcels are converted once to the same typed,
+companion-owned model; their former random contents are discarded.
+
+Serving an authored signature order for Feastle, Baristabbit, Steppling,
+Voyagle, Flexel, or Bedrotte permanently records that chapter's shared-world
+landmark. Landmarks decorate progression outside the 63 inventory cells.
 
 ## Interaction and accessibility
 
@@ -68,6 +108,8 @@ anchor to Friendship levels 1, 3, 6, and 10, so existing progress cannot fall.
 - Drag an item to move, merge, or combine it; tap-select then tap-destination is equivalent.
 - Select an item to inspect, store, or sell it.
 - Ready request cards expose a Serve action.
+- The Merge board's top edge stays attached directly beneath the tray separator; optional overlays never change that baseline.
+- Parcel and order-serving flights cannot mutate the board at the same time.
 - Every cell, item, generator, and action has an accessibility role and label.
 - Reduced Motion removes drag and reveal motion without changing game state.
 

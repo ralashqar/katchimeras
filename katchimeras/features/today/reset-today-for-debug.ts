@@ -2,6 +2,7 @@ import { resetTodayInState } from '@/game/days/actions';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import type { StoredHomeState } from '@/types/home';
 import { resetStoredCompanionQuickGoalProgressForDay } from '@/utils/companion-quick-goal-storage';
+import { resetMergeWorldActivityForDayForDebug } from '@/utils/merge-world/repository';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { cancelTodayCareGameRound } from '@/utils/today-care-game-round';
 import { clearTodayEnergyTraces } from '@/utils/today-energy-loop-performance';
@@ -15,7 +16,7 @@ import { clearTodayEnergyFeedback } from './today-energy-feedback';
  * receipts are invalidated before publishing the blank Home record so mounted
  * tabs cannot reconcile an old completion into the new egg.
  */
-export function resetTodayForDebug(now = new Date()): StoredHomeState | null {
+export async function resetTodayForDebug(now = new Date()): Promise<StoredHomeState | null> {
   const state = homeRepository.load();
   if (!state) return null;
 
@@ -25,6 +26,10 @@ export function resetTodayForDebug(now = new Date()): StoredHomeState | null {
   clearTodayEnergyTraces();
   clearTodayPatch();
   clearBaseCustomisation();
+
+  // Clear Merge's deterministic daily receipts before publishing the blank
+  // Today record, preventing mounted tabs from restoring the old daily cap.
+  await resetMergeWorldActivityForDayForDebug(state.today.isoDate, now.getTime());
 
   const next = resetTodayInState(state, loadOnboardingProfile(), now);
   homeRepository.save(next, { allowHatchDowngrade: true, allowTodayReset: true });

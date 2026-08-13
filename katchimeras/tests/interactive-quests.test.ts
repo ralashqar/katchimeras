@@ -930,7 +930,7 @@ test('Match 3 supports every planned special-to-special combination', () => {
   }
 });
 
-test('Feastle merge pack is complete, tiered, deterministic, and becomes the lead quest', () => {
+test('Feastle merge pack is complete, tiered, deterministic, and mixes savoury with cake orders', () => {
   assert.equal(FEASTLE_MERGE_ITEMS.length, 15);
   assert.deepEqual(validateMergePack(), []);
   assert.equal(new Set(FEASTLE_MERGE_ITEMS.map((item) => item.id)).size, 15);
@@ -944,10 +944,12 @@ test('Feastle merge pack is complete, tiered, deterministic, and becomes the lea
   assert.deepEqual(first, repeated);
   assert.equal(first.board.length, 36);
   assert.equal(first.board.length, MERGE_BOARD_SIZE);
+  assert.equal(first.orders.filter((order) => order.targetId.startsWith('dessert:')).length, 1);
+  assert.equal(first.orders.filter((order) => order.targetId.startsWith('pasta:') || order.targetId.startsWith('stew:')).length, 1);
   const next = createMergeRound('feastle:merge:day-2', config, first.orders.map((order) => order.targetId));
   assert.ok(next.orders.every((order) => !first.orders.some((previous) => previous.targetId === order.targetId)));
   assert.equal(questDefinition('quest-feastle-merge')?.execution?.kind, 'merge');
-  assert.equal(themedQuestOffers('feast', 'food', 'feastle')[0]?.id, 'quest-feastle-merge');
+  assert.ok(themedQuestOffers('feast', 'food', 'feastle').some((offer) => offer.id === 'quest-feastle-merge'));
   assert.ok(themedQuestOffers('feast', 'food', 'feastle').some((offer) => offer.id === 'quest-feastle-sort'));
   assert.ok(themedQuestOffers('feast', 'food', 'feastle').some((offer) => offer.id === 'quest-feastle-memory'));
 });

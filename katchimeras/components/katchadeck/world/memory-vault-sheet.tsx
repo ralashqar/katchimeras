@@ -30,6 +30,7 @@ function formatDuration(ms: number | null | undefined): string | null {
 export function MemoryVaultSheet({
   day,
   initialTab = 'featured',
+  initialMemoryId,
   onChangeFeatured,
   onAddPhoto,
   onRecordVoice,
@@ -38,6 +39,7 @@ export function MemoryVaultSheet({
 }: {
   day: HomeDayRecord;
   initialTab?: MemoryVaultTab;
+  initialMemoryId?: string;
   onChangeFeatured?: () => void;
   onAddPhoto?: () => void;
   onRecordVoice?: () => void;
@@ -116,7 +118,7 @@ export function MemoryVaultSheet({
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
                 {memories.photos.map((photo) => (
-                  <Image key={photo.id} source={{ uri: photo.thumbnailUri }} style={styles.stripPhoto} contentFit="cover" transition={120} />
+                  <Image accessibilityLabel={photo.id === initialMemoryId ? 'Memory opened from Merge World' : undefined} key={photo.id} source={{ uri: photo.thumbnailUri }} style={[styles.stripPhoto, photo.id === initialMemoryId && styles.focusedMemory]} contentFit="cover" transition={120} />
                 ))}
               </ScrollView>
             )
@@ -134,7 +136,7 @@ export function MemoryVaultSheet({
               </View>
             ) : (
               memories.voice.map((note) => (
-                <View key={note.id} style={styles.row}>
+                <View accessibilityLabel={note.id === initialMemoryId ? 'Memory opened from Merge World' : undefined} key={note.id} style={[styles.row, note.id === initialMemoryId && styles.focusedMemory]}>
                   <ThemedText style={styles.rowEmoji}>🎤</ThemedText>
                   <View style={styles.rowText}>
                     <ThemedText style={styles.rowLabel} numberOfLines={2} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
@@ -161,7 +163,7 @@ export function MemoryVaultSheet({
               </View>
             ) : (
               memories.notes.map((note) => (
-                <View key={note.id} style={styles.row}>
+                <View accessibilityLabel={note.id === initialMemoryId ? 'Memory opened from Merge World' : undefined} key={note.id} style={[styles.row, note.id === initialMemoryId && styles.focusedMemory]}>
                   <ThemedText style={styles.rowEmoji}>📝</ThemedText>
                   <ThemedText style={styles.rowLabel} numberOfLines={3} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
                     {note.text || note.label}
@@ -214,6 +216,7 @@ const styles = StyleSheet.create({
   // Fixed-size horizontal strip (robust — no %-width/aspectRatio zero-height issue).
   strip: { gap: GAP, paddingVertical: 2, paddingRight: 8 },
   stripPhoto: { width: 104, height: 104, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)' },
+  focusedMemory: { borderColor: '#F6D993', borderWidth: 2, boxShadow: '0 0 14px rgba(246,217,147,0.5)' },
   album: { gap: 8 },
   albumName: { fontSize: 13.5, fontWeight: '800' },
   row: {

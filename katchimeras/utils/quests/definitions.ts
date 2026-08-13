@@ -1462,7 +1462,7 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
   },
   'quest-feastle-merge': {
     id: 'quest-feastle-merge', familyId: 'feastle', family: 'food', title: 'Feastle’s Merge Feast',
-    hint: 'Merge matching ingredients into bigger dishes and serve two hungry orders.', criteria: [],
+    hint: 'Merge matching ingredients into one savoury dish and one sweet bake.', criteria: [],
     execution: { kind: 'merge', packId: 'feastle-kitchen', difficultyCurveId: 'feastle-merge-v1' }, requiresCapabilities: [], submissionMode: 'auto',
     eligibility: { creatureKeys: ['feastle'], cooldownDays: 1, weight: 4 },
   },

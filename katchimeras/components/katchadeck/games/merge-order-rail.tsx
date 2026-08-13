@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { type NativeScrollEvent, type NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
@@ -24,11 +24,12 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppFontFamilies } from '@/constants/theme';
 import { MERGE_CHARACTER_NAMES } from '@/constants/merge-world-catalog';
 import type { HomeVisualKey } from '@/types/home';
-import type { MergeCharacterId, MergeOrder } from '@/types/merge-world';
+import type { MergeCharacterId, MergeOrder, MergeWorldArrival } from '@/types/merge-world';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
 import { MAX_MOUNTED_ORDER_TRAYS, orderMountWindow } from '@/utils/merge-world/order-window';
 
 import { PersistentMergeItemArt } from './feastle-persistent-merge-board';
+import { MergeParcelTrayCard } from './merge-parcel-overlay';
 import type { MergeScreenPoint } from './merge-serve-reward-overlay';
 
 const TRAY_WIDTH = 120;
@@ -44,12 +45,19 @@ const ORDER_REWARD_ART = {
 } as const;
 const CONTROLLED_EASE = Easing.bezier(0.22, 1, 0.36, 1);
 const SERVE_CELEBRATION_MS = 250;
+const ORDER_RAIL_Z_INDEX = 50;
+const SERVE_CONTROL_Z_INDEX = 80;
 const TRAY_SERVE_EXIT = new Keyframe({
   0: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }] },
   34: { opacity: 1, transform: [{ translateY: 2 }, { scale: 0.965 }] },
   58: { opacity: 1, transform: [{ translateY: -5 }, { scale: 1.025 }] },
   100: { opacity: 0, transform: [{ translateY: -28 }, { scale: 0.94 }] },
 }).duration(260);
+const PARCEL_STACK_EXIT = new Keyframe({
+  0: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }] },
+  45: { opacity: 1, transform: [{ translateY: -2 }, { scale: 1.03 }] },
+  100: { opacity: 0, transform: [{ translateY: -14 }, { scale: 0.9 }] },
+}).duration(220);
 const READY_GLOW_IN = new Keyframe({
   0: { opacity: 0, transform: [{ scale: 0.72 }] },
   38: { opacity: 0.7, transform: [{ scale: 1.02 }] },
@@ -66,10 +74,17 @@ const ITEM_TICK_OUT = new Keyframe({
   100: { opacity: 0, transform: [{ scale: 0.45 }] },
 }).duration(150);
 const SERVE_BUTTON_IN = new Keyframe({
-  0: { opacity: 0, transform: [{ translateY: 7 }, { scale: 0.82 }] },
-  62: { opacity: 1, transform: [{ translateY: -1 }, { scale: 1.05 }] },
-  100: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }] },
+  // Keep the final stacking depth in every keyframe. On native, animating an
+  // element from opacity zero can create a temporary compositing layer; if
+  // zIndex is absent from that layer it may be drawn below the merge board.
+  0: { opacity: 0, transform: [{ translateY: 7 }, { scale: 0.82 }], zIndex: SERVE_CONTROL_Z_INDEX },
+  62: { opacity: 1, transform: [{ translateY: -1 }, { scale: 1.05 }], zIndex: SERVE_CONTROL_Z_INDEX },
+  100: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }], zIndex: SERVE_CONTROL_Z_INDEX },
 }).duration(230);
+const REWARD_POPUP_OUT = new Keyframe({
+  0: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }] },
+  100: { opacity: 0, transform: [{ translateY: -4 }, { scale: 0.96 }] },
+}).duration(180);
 
 const SERVE_CONFETTI = [
   { color: '#FFD86E', dx: -53, fall: 17, lift: 47, rotate: -180, round: false },
@@ -92,6 +107,14 @@ const CHARACTER_VISUALS: Record<MergeCharacterId, HomeVisualKey> = {
 
 export type MergeTrayEntry =
   | {
+      id: 'parcel-stack';
+      kind: 'parcel';
+      arrival: MergeWorldArrival;
+      count: number;
+      disabled: boolean;
+      shakeNonce: number;
+    }
+  | {
       id: string;
       kind: 'order';
       order: MergeOrder;
@@ -105,12 +128,14 @@ export type MergeTrayEntry =
       bondPoints: number;
     };
 
-export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onReroll, onServe }: {
+export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel, onReroll, onServe, parcelTargetRef }: {
   entries: readonly MergeTrayEntry[];
   focusOrderId?: string;
-  onOpenChat: () => void;
+  onOpenChat: (characterId: MergeCharacterId) => void;
+  onOpenParcel: (arrivalId: string) => void;
   onReroll: (order: MergeOrder) => void;
   onServe: (order: MergeOrder, itemTargets: readonly MergeScreenPoint[]) => boolean | Promise<boolean>;
+  parcelTargetRef: RefObject<View | null>;
 }) {
   const reduceMotion = useReducedMotion();
   const scrollRef = useRef<ScrollView>(null);
@@ -172,7 +197,7 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onReroll, on
 
   return (
     <ScrollView
-      accessibilityLabel="Katchimera orders"
+      accessibilityLabel="Katchimera parcels and orders"
       contentContainerStyle={styles.content}
       decelerationRate="fast"
       disableIntervalMomentum
@@ -192,11 +217,20 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onReroll, on
           entering={reduceMotion
             ? FadeIn.duration(100)
             : FadeInUp.delay(Math.min(index, 5) * 42).duration(260).easing(CONTROLLED_EASE)}
-          exiting={reduceMotion ? FadeOut.duration(90) : TRAY_SERVE_EXIT}
+          exiting={reduceMotion ? FadeOut.duration(90) : entry.kind === 'parcel' ? PARCEL_STACK_EXIT : TRAY_SERVE_EXIT}
           key={entry.id}
           layout={reduceMotion ? undefined : LinearTransition.duration(220).easing(CONTROLLED_EASE)}
           style={styles.entry}>
-          {entry.kind === 'order' ? (
+          {entry.kind === 'parcel' ? (
+            <MergeParcelTrayCard
+              arrival={entry.arrival}
+              count={entry.count}
+              disabled={entry.disabled}
+              onPress={() => onOpenParcel(entry.arrival.id)}
+              ref={parcelTargetRef}
+              shakeNonce={entry.shakeNonce}
+            />
+          ) : entry.kind === 'order' ? (
             <OrderTrayCard
               entry={entry}
               index={index}
@@ -205,7 +239,7 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onReroll, on
               reduceMotion={reduceMotion}
             />
           ) : (
-            <ChatNoteTrayCard entry={entry} onPress={onOpenChat} reduceMotion={reduceMotion} />
+            <ChatNoteTrayCard entry={entry} onPress={() => onOpenChat(entry.characterId)} reduceMotion={reduceMotion} />
           )}
         </Animated.View>
         );
@@ -225,6 +259,7 @@ function OrderTrayCard({ entry, index, onReroll, onServe, reduceMotion }: {
   reduceMotion: boolean;
 }) {
   const { itemReadiness, order, ready } = entry;
+  const [rewardOpen, setRewardOpen] = useState(false);
   const [serving, setServing] = useState(false);
   const servingRef = useRef(false);
   const itemRefs = useRef<(View | null)[]>([]);
@@ -233,8 +268,15 @@ function OrderTrayCard({ entry, index, onReroll, onServe, reduceMotion }: {
     .flatMap((requirement) => Array.from({ length: requirement.quantity }, () => requirement.definitionId))
     .slice(0, 3);
   const itemDelay = Math.min(index, 5) * 42 + 115;
+  useEffect(() => {
+    if (!rewardOpen) return;
+    const timer = setTimeout(() => setRewardOpen(false), 3_200);
+    return () => clearTimeout(timer);
+  }, [rewardOpen]);
+
   const beginServe = async () => {
     if (!ready || servingRef.current) return;
+    setRewardOpen(false);
     servingRef.current = true;
     setServing(true);
     const targets = await Promise.all(requestedItems.map((_, itemIndex) => measureViewCenter(itemRefs.current[itemIndex])));
@@ -273,9 +315,19 @@ function OrderTrayCard({ entry, index, onReroll, onServe, reduceMotion }: {
       ) : null}
       {serving && !reduceMotion ? <TrayServeConfetti /> : null}
       <Animated.View entering={reduceMotion ? FadeIn.duration(100) : FadeInUp.delay(Math.min(index, 5) * 42 + 45).duration(230)} style={styles.characterLayer}>
-        <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={`merge-order-${order.characterId}`} source={characterSource} style={styles.character} transition={0} />
+        <Pressable
+          accessibilityHint="Shows the rewards for this request"
+          accessibilityLabel={`${MERGE_CHARACTER_NAMES[order.characterId]} reward details`}
+          accessibilityRole="button"
+          onPress={(event) => {
+            event.stopPropagation();
+            setRewardOpen((current) => !current);
+          }}
+          style={({ pressed }) => [styles.characterButton, pressed && styles.characterPressed]}>
+          <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={`merge-order-${order.characterId}`} source={characterSource} style={styles.character} transition={0} />
+        </Pressable>
       </Animated.View>
-      <OrderRewardPanel index={index} order={order} reduceMotion={reduceMotion} />
+      {rewardOpen ? <OrderRewardPopup order={order} reduceMotion={reduceMotion} /> : null}
       <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" source={TRAY_ART} style={styles.trayArt} transition={0} />
       <Animated.View pointerEvents="none" style={styles.items}>
         {requestedItems.map((definitionId, itemIndex) => (
@@ -321,8 +373,7 @@ function measureViewCenter(view: View | null): Promise<MergeScreenPoint | null> 
   });
 }
 
-function OrderRewardPanel({ index, order, reduceMotion }: {
-  index: number;
+function OrderRewardPopup({ order, reduceMotion }: {
   order: MergeOrder;
   reduceMotion: boolean;
 }) {
@@ -334,9 +385,11 @@ function OrderRewardPanel({ index, order, reduceMotion }: {
 
   return (
     <Animated.View
-      entering={reduceMotion ? FadeIn.duration(90) : FadeInUp.delay(Math.min(index, 5) * 42 + 95).duration(230).easing(CONTROLLED_EASE)}
+      accessibilityLabel={rows.map((row) => `${row.amount} ${row.label}`).join(', ')}
+      entering={reduceMotion ? FadeIn.duration(90) : ZoomIn.duration(180).easing(CONTROLLED_EASE)}
+      exiting={reduceMotion ? FadeOut.duration(90) : REWARD_POPUP_OUT}
       pointerEvents="none"
-      style={styles.rewardPanel}>
+      style={styles.rewardPopup}>
       {rows.map((row) => (
         <View accessibilityLabel={`Reward ${row.amount} ${row.label}`} key={row.id} style={styles.rewardRow}>
           <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" source={row.art} style={styles.rewardIcon} transition={0} />
@@ -425,16 +478,18 @@ function ChatNoteTrayCard({ entry, onPress, reduceMotion }: {
 }
 
 const styles = StyleSheet.create({
-  rail: { flexGrow: 0, height: TRAY_HEIGHT, overflow: 'visible', zIndex: 2 },
-  content: { paddingLeft: 3, paddingRight: 18 },
+  rail: { elevation: ORDER_RAIL_Z_INDEX, flexGrow: 0, height: TRAY_HEIGHT, overflow: 'visible', position: 'relative', zIndex: ORDER_RAIL_Z_INDEX },
+  content: { paddingLeft: 3, paddingRight: 18, position: 'relative', zIndex: ORDER_RAIL_Z_INDEX },
   emptyRail: { height: TRAY_HEIGHT },
-  entry: { height: TRAY_HEIGHT, marginRight: TRAY_GAP, width: TRAY_WIDTH },
-  card: { height: TRAY_HEIGHT, overflow: 'visible', position: 'relative', width: TRAY_WIDTH },
+  entry: { height: TRAY_HEIGHT, marginRight: TRAY_GAP, position: 'relative', zIndex: ORDER_RAIL_Z_INDEX, width: TRAY_WIDTH },
+  card: { height: TRAY_HEIGHT, overflow: 'visible', position: 'relative', zIndex: ORDER_RAIL_Z_INDEX, width: TRAY_WIDTH },
   readyGlow: { backgroundColor: 'rgba(184,224,112,0.42)', borderRadius: 999, boxShadow: '0 0 22px rgba(174,220,95,0.72)', height: 70, left: 25, position: 'absolute', top: 11, width: 70, zIndex: 0 },
   readyRays: { height: 84, left: 18, position: 'absolute', top: 5, width: 84, zIndex: 0 },
-  characterLayer: { bottom: 14, height: 92, left: 14, position: 'absolute', width: 92, zIndex: 1 },
+  characterLayer: { bottom: 23.2, height: 110.4, left: 4.8, position: 'absolute', width: 110.4, zIndex: 1 },
+  characterButton: { height: '100%', width: '100%' },
+  characterPressed: { transform: [{ scale: 0.96 }] },
   character: { height: '100%', width: '100%' },
-  rewardPanel: { backgroundColor: 'rgba(66,45,30,0.82)', borderColor: 'rgba(255,225,164,0.82)', borderCurve: 'continuous', borderRadius: 8, borderWidth: 1, boxShadow: '0 3px 8px rgba(41,24,14,0.3)', paddingHorizontal: 4, paddingVertical: 3, position: 'absolute', right: -10, top: 14, width: 52, zIndex: 6 },
+  rewardPopup: { backgroundColor: 'rgba(66,45,30,0.94)', borderColor: 'rgba(255,225,164,0.92)', borderCurve: 'continuous', borderRadius: 9, borderWidth: 1, boxShadow: '0 5px 12px rgba(41,24,14,0.38)', paddingHorizontal: 5, paddingVertical: 4, position: 'absolute', right: -5, top: 5, width: 56, zIndex: 12 },
   rewardRow: { alignItems: 'center', flexDirection: 'row', gap: 2, height: 17 },
   rewardIcon: { height: 16, width: 16 },
   rewardAmount: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 10.5, fontVariant: ['tabular-nums'], lineHeight: 14, textShadowColor: 'rgba(48,25,11,0.72)', textShadowOffset: { height: 1, width: 0 }, textShadowRadius: 1 },
@@ -446,7 +501,7 @@ const styles = StyleSheet.create({
   item: { height: TRAY_ITEM_SIZE, position: 'relative', width: TRAY_ITEM_SIZE },
   itemReadyTick: { bottom: -6, height: 19, position: 'absolute', right: -4, width: 19, zIndex: 5 },
   itemReadyTickArt: { height: '100%', width: '100%' },
-  serveButton: { alignItems: 'center', backgroundColor: '#58A83D', borderColor: '#DDF5A9', borderCurve: 'continuous', borderRadius: 7, borderWidth: 1.5, bottom: -8, boxShadow: '0 3px 7px rgba(42,83,25,0.45)', height: 23, justifyContent: 'center', left: 30, overflow: 'hidden', position: 'absolute', width: 60, zIndex: 8 },
+  serveButton: { alignItems: 'center', backgroundColor: '#58A83D', borderColor: '#DDF5A9', borderCurve: 'continuous', borderRadius: 7, borderWidth: 1.5, bottom: -8, boxShadow: '0 3px 7px rgba(42,83,25,0.45)', elevation: SERVE_CONTROL_Z_INDEX, height: 23, justifyContent: 'center', left: 30, overflow: 'hidden', position: 'absolute', width: 60, zIndex: SERVE_CONTROL_Z_INDEX },
   serveButtonShine: { backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 4, height: 7, left: 3, position: 'absolute', right: 3, top: 2 },
   serveButtonText: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 10, letterSpacing: 0.4, lineHeight: 13 },
   noteCard: { backgroundColor: 'transparent' },

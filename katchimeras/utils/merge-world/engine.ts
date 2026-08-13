@@ -10,6 +10,8 @@ import {
   MERGE_ITEMS_BY_ID,
   MERGE_ORDER_TEMPLATES,
   MERGE_CHAIN_IDS,
+  MERGE_CHAPTER_LANDMARKS,
+  MERGE_CHARACTER_NAMES,
   KATCHIMERA_MERGE_PROFILES,
   MERGE_STARTING_OPEN_CELLS,
   MERGE_WORLD_SIZE,
@@ -29,6 +31,8 @@ import type {
   MergeExternalRewardReceipt,
   MergeGeneratorState,
   MergeOrder,
+  MergeWorldArrival,
+  MergeWorldLandmark,
   MergeWorldCommand,
   MergeWorldCommandResult,
   MergeWorldState,
@@ -44,7 +48,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     occupant: null,
   }));
   let state: MergeWorldState = {
-    version: 5,
+    version: 7,
     revision: 0,
     createdAt: now,
     updatedAt: now,
@@ -53,6 +57,8 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     storage: [],
     storageCapacity: 5,
     rewardInbox: [],
+    arrivals: [],
+    landmarks: [],
     generatorUnlockReceipts: [],
     generators: {},
     energy: { value: MERGE_INITIAL_ENERGY, regenCap: MERGE_ENERGY_REGEN_CAP, lastRegenAt: now },
@@ -97,6 +103,10 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
       return sellItem(current, command.cell, command.now);
     case 'claimInbox':
       return claimInbox(current, command.entryId, command.now);
+    case 'claimArrival':
+      return claimArrival(current, command.arrivalId, command.now);
+    case 'viewMemoryArrival':
+      return viewMemoryArrival(current, command.arrivalId, command.now);
     case 'unlockExpansion':
       return unlockExpansion(current, command.expansionId, command.now);
     case 'grantActivityRewardsBatch':
@@ -179,6 +189,25 @@ export function readyMergeOrderIds(state: MergeWorldState): Set<string> {
     .map((order) => order.id));
 }
 
+/** Clears only the idempotency records that cap real-life Energy for one day. */
+export function resetMergeActivityForDay(state: MergeWorldState, dayId: string, now = Date.now()): MergeWorldState {
+  const receiptIds = new Set([
+    `activity:egg-journal:${dayId}`,
+    `activity:egg-companion:${dayId}`,
+    `activity:daily-quest:${dayId}`,
+    `activity:contextual-parcel:${dayId}`,
+    `activity:memory-arrival:${dayId}`,
+  ]);
+  const processedActivityReceiptIds = state.processedActivityReceiptIds.filter((id) => !receiptIds.has(id)
+    && !(id.startsWith('activity:goal-chest:') && id.endsWith(`:${dayId}`)));
+  const arrivals = state.arrivals.filter((arrival) => arrival.dayId !== dayId);
+  const activityEnergyByDay = { ...state.activityEnergyByDay };
+  const hadDailyTotal = Object.prototype.hasOwnProperty.call(activityEnergyByDay, dayId);
+  delete activityEnergyByDay[dayId];
+  if (!hadDailyTotal && processedActivityReceiptIds.length === state.processedActivityReceiptIds.length && arrivals.length === state.arrivals.length) return state;
+  return touch({ ...state, processedActivityReceiptIds, activityEnergyByDay, arrivals }, now);
+}
+
 export function availableExpansion(state: MergeWorldState) {
   return MERGE_EXPANSIONS.find((expansion) => !state.expansions.includes(expansion.id)) ?? null;
 }
@@ -187,14 +216,14 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   if (!value || typeof value !== 'object') return createInitialMergeWorldState(now);
   const rawVersion = (value as { version?: unknown }).version;
   const source = value as Partial<MergeWorldState>;
-  if ((rawVersion !== 1 && rawVersion !== 2 && rawVersion !== 3 && rawVersion !== 4 && rawVersion !== 5) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
+  if ((rawVersion !== 1 && rawVersion !== 2 && rawVersion !== 3 && rawVersion !== 4 && rawVersion !== 5 && rawVersion !== 6 && rawVersion !== 7) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
     return createInitialMergeWorldState(now);
   }
   const fallback = createInitialMergeWorldState(now);
   let normalized: MergeWorldState = {
     ...fallback,
     ...source,
-    version: 5,
+    version: 7,
     revision: finite(source.revision, 0),
     createdAt: finite(source.createdAt, now),
     updatedAt: finite(source.updatedAt, now),
@@ -203,6 +232,8 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     storage: Array.isArray(source.storage) ? source.storage.filter(validBoardItem) : [],
     storageCapacity: Math.max(5, finite(source.storageCapacity, 5)),
     rewardInbox: Array.isArray(source.rewardInbox) ? source.rewardInbox : [],
+    arrivals: normalizeArrivals(source.arrivals),
+    landmarks: normalizeLandmarks(source.landmarks),
     generatorUnlockReceipts: uniqueGeneratorUnlockReceipts(source.generatorUnlockReceipts),
     generators: source.generators && typeof source.generators === 'object'
       ? normalizeGenerators(source.generators)
@@ -236,6 +267,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     externalRewardReceipts: Array.isArray(source.externalRewardReceipts) ? source.externalRewardReceipts : [],
   };
   normalized = reconcileUnlockedCatalog(normalized);
+  normalized = migrateActivityInbox(normalized);
   // Version 1/2 Pantry charges, cooldowns, and parcels intentionally disappear.
   // Version 3's five single-chain generators migrate into the shared eight.
   return refreshTime(normalized, now);
@@ -377,7 +409,11 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
         },
       }
     : state.characterProgress;
-  const energyRefund = orderEnergyRefund(order);
+  const landmarkDefinition = order.signature ? MERGE_CHAPTER_LANDMARKS[order.characterId] : null;
+  const landmarks = landmarkDefinition && !state.landmarks.some((landmark) => landmark.id === landmarkDefinition.id)
+    ? [...state.landmarks, { id: landmarkDefinition.id, characterId: order.characterId, chapterId: order.chapterId ?? `${order.characterId}-chapter-1`, unlockedAt: now }]
+    : state.landmarks;
+  const energyRefund = mergeOrderEnergyRefund(order);
   let next: MergeWorldState = {
     ...state,
     board,
@@ -391,6 +427,7 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
     recentOrderKeys: [...state.recentOrderKeys, templateKeyForOrder(order)].slice(-RECENT_ORDER_LIMIT),
     externalRewardReceipts,
     characterProgress,
+    landmarks,
   };
   next = touch(next, now);
   return { state: next, changed: true, servedOrderId: order.id, energyGranted: energyRefund, message: `${order.title} served.` };
@@ -439,6 +476,46 @@ function claimInbox(state: MergeWorldState, entryId: string, now: number): Merge
   return changed(touch({ ...state, board, nextInstance, rewardInbox: state.rewardInbox.filter((item) => item.id !== entryId) }, now), 'Rewards placed on the board.');
 }
 
+function claimArrival(state: MergeWorldState, arrivalId: string, now: number): MergeWorldCommandResult {
+  const arrival = state.arrivals.find((item) => item.id === arrivalId);
+  if (!arrival || arrival.claimedAt != null) return unchanged(state);
+  if (arrival.kind === 'memory_arrival') {
+    return changed(touch({
+      ...state,
+      arrivals: state.arrivals.map((item) => item.id === arrivalId ? { ...item, claimedAt: now, seenAt: item.seenAt ?? now } : item),
+    }, now), 'Memory saved to the shelf.');
+  }
+  const openCells = state.board.flatMap((cell, index) => !cell.locked && !cell.occupant ? [index] : []);
+  if (openCells.length < arrival.itemDefinitionIds.length) return unchanged(state, `Make ${arrival.itemDefinitionIds.length - openCells.length} more board spaces first.`);
+  const board = [...state.board];
+  let nextInstance = state.nextInstance;
+  const spawnedItems: NonNullable<MergeWorldCommandResult['spawnedItems']> = [];
+  arrival.itemDefinitionIds.forEach((definitionId, index) => {
+    const instanceId = `merge-item:${nextInstance++}`;
+    const cell = openCells[index];
+    board[cell] = { ...board[cell], occupant: { kind: 'item', instanceId, definitionId } };
+    spawnedItems.push({ instanceId, definitionId, cell });
+  });
+  return {
+    ...changed(touch({
+    ...state,
+    board,
+    nextInstance,
+    arrivals: state.arrivals.map((item) => item.id === arrivalId ? { ...item, claimedAt: now, seenAt: item.seenAt ?? now } : item),
+    }, now), `${arrival.label} placed on the board.`),
+    spawnedItems,
+  };
+}
+
+function viewMemoryArrival(state: MergeWorldState, arrivalId: string, now: number): MergeWorldCommandResult {
+  const arrival = state.arrivals.find((item) => item.id === arrivalId && item.kind === 'memory_arrival');
+  if (!arrival || arrival.seenAt != null) return unchanged(state);
+  return changed(touch({
+    ...state,
+    arrivals: state.arrivals.map((item) => item.id === arrivalId ? { ...item, seenAt: now } : item),
+  }, now));
+}
+
 function unlockExpansion(state: MergeWorldState, expansionId: string, now: number): MergeWorldCommandResult {
   const expansion = MERGE_EXPANSIONS.find((item) => item.id === expansionId);
   if (!expansion || state.expansions.includes(expansion.id)) return unchanged(state);
@@ -457,7 +534,7 @@ function grantActivityRewardsBatch(
   if (!rewards.length) return unchanged(state);
   const processed = new Set(state.processedActivityReceiptIds);
   const activityEnergyByDay = { ...state.activityEnergyByDay };
-  let rewardInbox = state.rewardInbox;
+  let arrivals = state.arrivals;
   let amount = 0;
   let changedState = false;
   let queuedItemCount = 0;
@@ -469,10 +546,10 @@ function grantActivityRewardsBatch(
     const awarded = Math.min(requested, Math.max(0, MERGE_DAILY_ACTIVITY_ENERGY_LIMIT - (activityEnergyByDay[reward.grantDayId] ?? 0)));
     amount += awarded;
     activityEnergyByDay[reward.grantDayId] = (activityEnergyByDay[reward.grantDayId] ?? 0) + awarded;
-    const validItems = (reward.itemDefinitionIds ?? []).filter((id) => MERGE_ITEMS_BY_ID.has(id));
-    if (reward.kind === 'companion_story_starter' && validItems.length && !rewardInbox.some((entry) => entry.id === reward.receiptId)) {
-      rewardInbox = [...rewardInbox, { id: reward.receiptId, createdAt: now, items: validItems, source: 'activity' }];
-      queuedItemCount += validItems.length;
+    if (reward.arrival && !arrivals.some((arrival) => arrival.id === reward.arrival!.id)) {
+      const itemDefinitionIds = reward.arrival.itemDefinitionIds.filter((id) => MERGE_ITEMS_BY_ID.has(id));
+      arrivals = [...arrivals, { ...reward.arrival, itemDefinitionIds, createdAt: now, claimedAt: null, seenAt: null }];
+      queuedItemCount += itemDefinitionIds.length;
     }
   }
   if (!changedState) return unchanged(state);
@@ -483,7 +560,8 @@ function grantActivityRewardsBatch(
     energy: { ...state.energy, value: energyValue },
     processedActivityReceiptIds: [...processed],
     activityEnergyByDay,
-    rewardInbox,
+    rewardInbox: state.rewardInbox,
+    arrivals,
   }, now);
   return { state: next, changed: true, energyGranted: actualEnergyAward, itemsQueued: queuedItemCount, message: actualEnergyAward > 0
     ? `Real life added ${actualEnergyAward} Merge Energy${queuedItemCount ? ' and companion starter supplies.' : '.'}`
@@ -509,7 +587,7 @@ function reconcileCharacters(state: MergeWorldState, ids: string[], now: number)
 function reconcileFriendship(state: MergeWorldState, levels: Partial<Record<MergeCharacterId, number>>, now: number): MergeWorldState {
   let changedState = false;
   const characterProgress = { ...state.characterProgress };
-  for (const [characterId, rawLevel] of Object.entries(levels) as Array<[MergeCharacterId, number | undefined]>) {
+  for (const [characterId, rawLevel] of Object.entries(levels) as [MergeCharacterId, number | undefined][]) {
     if (!KNOWN_CHARACTERS.has(characterId) || !Number.isFinite(rawLevel)) continue;
     const current = characterProgress[characterId] ?? { friendshipLevel: 1, completedChapterIds: [] };
     const friendshipLevel = Math.max(1, Math.min(20, Math.floor(rawLevel ?? 1)));
@@ -526,7 +604,14 @@ function reconcileStory(
   story: Extract<MergeWorldCommand, { type: 'reconcileStory' }>,
   now: number,
 ): MergeWorldState {
-  let next = story.status === 'order_active'
+  // A midpoint return is an interlude inside the five-order bundle, not the
+  // end of it. Keep the unserved requests on the rail while the companion's
+  // note is waiting or open; only the served IDs should rotate out.
+  const keepsMidpointOrders = story.actPhase === 'midpoint_return'
+    && (story.status === 'return_available' || story.status === 'conversation_active');
+  const showsStoryOrders = story.status === 'order_active' || keepsMidpointOrders;
+  const effectiveActPhase = keepsMidpointOrders ? 'regular_orders' : story.actPhase;
+  let next = showsStoryOrders
     ? ensureCharacterGenerators(state, story.familyId, now)
     : state;
   if (story.familyId !== 'feastle') {
@@ -537,12 +622,12 @@ function reconcileStory(
         .map((receipt) => receipt.id.replace('merge-story-served:', '')),
       ...(story.servedOrderIds ?? []),
     ]);
-    const wanted = story.status === 'order_active'
+    const wanted = showsStoryOrders
       ? (story.familyId === 'baristabbit' || story.familyId === 'steppling' || story.familyId === 'voyagle' || story.familyId === 'flexel' || story.familyId === 'bedrotte'
-          ? authoredCohortStoryOrders(next, story.familyId, now, story.actPhase, story.orderTemplateKeys)
-          : genericFamilyStoryOrders(next, story.familyId, story.targetLevel, now, story.actPhase, story.orderTemplateKeys))
+          ? authoredCohortStoryOrders(next, story.familyId, now, effectiveActPhase, story.orderTemplateKeys)
+          : genericFamilyStoryOrders(next, story.familyId, story.targetLevel, now, effectiveActPhase, story.orderTemplateKeys))
           .filter((order) => !servedIds.has(order.id))
-          .slice(0, story.actPhase === 'regular_orders' ? 3 : undefined)
+          .slice(0, effectiveActPhase === 'regular_orders' ? 3 : undefined)
       : [];
     const keep = next.activeOrders.filter((order) => order.characterId !== story.familyId);
     const activeOrders = [...keep, ...wanted.map((order) => existing.find((item) => item.id === order.id
@@ -557,10 +642,9 @@ function reconcileStory(
     .filter((receipt) => receipt.kind === 'story_order_served')
     .map((receipt) => receipt.id.replace('merge-story-served:', '')));
   for (const orderId of story.servedOrderIds ?? []) servedStoryOrderIds.add(orderId);
-  const wanted = story.status === 'order_active'
-    ? feastleStoryOrders(next, story.targetLevel, now, story.actPhase, story.orderTemplateKeys)
+  const wanted = showsStoryOrders
+    ? feastleStoryOrders(next, story.targetLevel, now, effectiveActPhase, story.orderTemplateKeys)
         .filter((order) => !servedStoryOrderIds.has(order.id))
-        .slice(0, story.actPhase === 'regular_orders' ? 3 : undefined)
     : [];
   // Ownership unlocks a character, but only an authored story beat may create
   // an order. Generic legacy orders are removed during story reconciliation.
@@ -787,10 +871,10 @@ function feastleStoryOrders(state: MergeWorldState, targetLevel: number, now: nu
       id: 'merge-story:feastle:act-2:first-feast',
       characterId: 'feastle',
       title: "Feastle's First Feast",
-      description: 'A generous centrepiece made from everything the table has taught us.',
+      description: 'A generous shared table and celebration cake made from everything the Pantry has taught us.',
       narrativeSignal: 'connection',
       difficulty: 'major',
-      requirements: [{ definitionId: 'food:table:6', quantity: 1 }, { definitionId: 'food:dessert:4', quantity: 1 }],
+      requirements: [{ definitionId: 'food:table:5', quantity: 1 }, { definitionId: 'food:dessert:5', quantity: 1 }],
       reward: { coins: 80, mergeXp: 60, friendshipXp: 30, energy: 5 },
       createdAt: now,
       signature: true,
@@ -810,7 +894,10 @@ function feastleStoryOrders(state: MergeWorldState, targetLevel: number, now: nu
       characterId: 'feastle',
       title: dish.title,
       difficulty: index === 2 ? 'major' : index === 1 ? 'medium' : 'small',
-      requirements: [{ definitionId: dish.definitionId, quantity: 1 }],
+      requirements: [
+        { definitionId: dish.definitionId, quantity: dish.quantity },
+        ...(dish.secondaryDefinitionId ? [{ definitionId: dish.secondaryDefinitionId, quantity: 1 }] : []),
+      ],
       reward: { coins: 20, mergeXp: 16, friendshipXp: 10, energy: 2 },
       createdAt: now, signature: true, purpose: 'signature', chapterId: 'feastle-chapter-4',
       storyArcId: 'feastle:table-story', storyBeatId: 'feastle-story:level-3',
@@ -834,7 +921,12 @@ function feastleStoryOrders(state: MergeWorldState, targetLevel: number, now: nu
 
 function scaledFeastleRequest(targetLevel: number) {
   const tier = targetLevel >= 16 ? 6 : targetLevel >= 12 ? 5 : targetLevel >= 8 ? 4 : 3;
-  return { title: 'A village table request', definitionId: `food:table:${tier}`, quantity: targetLevel >= 16 ? 2 : 1 };
+  const isCakeRequest = targetLevel % 2 === 1;
+  return {
+    title: isCakeRequest ? 'A village cake request' : 'A village table request',
+    definitionId: `food:${isCakeRequest ? 'dessert' : 'table'}:${tier}`,
+    quantity: targetLevel >= 16 ? 2 : 1,
+  };
 }
 
 function ensureGenerator(state: MergeWorldState, generatorId: string, now: number): MergeWorldState {
@@ -973,6 +1065,102 @@ function uniqueStrings(value: unknown): string[] {
   return Array.isArray(value) ? [...new Set(value.filter((item): item is string => typeof item === 'string'))] : [];
 }
 
+function normalizeArrivals(value: unknown): MergeWorldArrival[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((candidate): MergeWorldArrival[] => {
+    if (!candidate || typeof candidate !== 'object') return [];
+    const arrival = candidate as Partial<MergeWorldArrival>;
+    if (typeof arrival.id !== 'string'
+      || (arrival.kind !== 'contextual_parcel' && arrival.kind !== 'memory_arrival' && arrival.kind !== 'goal_chest')
+      || typeof arrival.dayId !== 'string'
+      || typeof arrival.label !== 'string'
+      || !MERGE_CHAIN_IDS.includes(arrival.chainId as MergeWorldArrival['chainId'])) return [];
+    const item = MERGE_ITEMS_BY_ID.get(`${arrival.chainId}:1`);
+    if (!item) return [];
+    const memoryRef = arrival.memoryRef && typeof arrival.memoryRef.dayId === 'string' && typeof arrival.memoryRef.journalRecordId === 'string'
+      && (arrival.memoryRef.sourceKind === 'manual' || arrival.memoryRef.sourceKind === 'photo' || arrival.memoryRef.sourceKind === 'text_note' || arrival.memoryRef.sourceKind === 'voice_note')
+      ? arrival.memoryRef
+      : undefined;
+    return [{
+      id: arrival.id,
+      kind: arrival.kind,
+      createdAt: finite(arrival.createdAt, 0),
+      dayId: arrival.dayId,
+      label: arrival.label,
+      theme: arrival.theme ?? 'memory',
+      familyId: item.familyId,
+      chainId: arrival.chainId as MergeWorldArrival['chainId'],
+      characterId: arrival.characterId && KNOWN_CHARACTERS.has(arrival.characterId) ? arrival.characterId : undefined,
+      source: arrival.source === 'journal' || arrival.source === 'companion_story' || arrival.source === 'goal' || arrival.source === 'legacy'
+        ? arrival.source
+        : arrival.kind === 'goal_chest'
+          ? 'goal'
+          : arrival.id.includes('companion-story-starter') ? 'companion_story' : arrival.kind === 'memory_arrival' ? 'journal' : 'legacy',
+      itemDefinitionIds: uniqueStrings(arrival.itemDefinitionIds).filter((id) => MERGE_ITEMS_BY_ID.has(id)),
+      memoryRef,
+      claimedAt: arrival.claimedAt == null ? null : finite(arrival.claimedAt, 0),
+      seenAt: arrival.seenAt == null ? null : finite(arrival.seenAt, 0),
+    }];
+  }).slice(-40);
+}
+
+function migrateActivityInbox(state: MergeWorldState): MergeWorldState {
+  const activityEntries = state.rewardInbox.filter((entry) => entry.source === 'activity');
+  if (!activityEntries.length) return state;
+  const fallbackCharacterId = state.favouriteCharacterId
+    ?? (state.unlockedCharacters.includes('feastle') ? 'feastle' : state.unlockedCharacters[0])
+    ?? 'feastle';
+  let arrivals = state.arrivals;
+  for (const entry of activityEntries) {
+    const encodedFamilyId = entry.id.match(/^activity:companion-story-starter:([^:]+)$/)?.[1] as MergeCharacterId | undefined;
+    const hasKnownEncodedFamily = Boolean(encodedFamilyId && KNOWN_CHARACTERS.has(encodedFamilyId));
+    const characterId = hasKnownEncodedFamily ? encodedFamilyId : fallbackCharacterId;
+    const profile = characterId ? KATCHIMERA_MERGE_PROFILES[characterId] : null;
+    if (!characterId || !profile) continue;
+    const itemDefinitionIds = profile.coreChains.map((chainId) => `${chainId}:1`).filter((id) => MERGE_ITEMS_BY_ID.has(id));
+    const chainId = profile.coreChains[0];
+    const primaryItem = MERGE_ITEMS_BY_ID.get(`${chainId}:1`);
+    const arrivalId = `arrival:migrated:${entry.id}`;
+    if (!primaryItem || arrivals.some((arrival) => arrival.id === arrivalId)) continue;
+    arrivals = [...arrivals, {
+      id: arrivalId,
+      kind: 'contextual_parcel',
+      createdAt: entry.createdAt,
+      dayId: localDayId(entry.createdAt),
+      label: `${MERGE_CHARACTER_NAMES[characterId]}'s parcel`,
+      theme: primaryItem.familyId === 'food' ? 'food'
+        : primaryItem.familyId === 'drink' ? 'ritual'
+          : primaryItem.familyId === 'adventure' ? 'movement'
+            : primaryItem.familyId === 'nature' ? 'nature'
+              : primaryItem.familyId === 'comfort' ? 'rest'
+                : primaryItem.familyId === 'social' ? 'connection'
+                  : primaryItem.familyId === 'mind' ? 'focus' : 'creativity',
+      familyId: primaryItem.familyId,
+      chainId,
+      characterId,
+      source: hasKnownEncodedFamily ? 'companion_story' : 'legacy',
+      itemDefinitionIds,
+      claimedAt: null,
+      seenAt: null,
+    }];
+  }
+  return { ...state, arrivals, rewardInbox: state.rewardInbox.filter((entry) => entry.source !== 'activity') };
+}
+
+function normalizeLandmarks(value: unknown): MergeWorldLandmark[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  return value.flatMap((candidate): MergeWorldLandmark[] => {
+    if (!candidate || typeof candidate !== 'object') return [];
+    const landmark = candidate as Partial<MergeWorldLandmark>;
+    if (typeof landmark.id !== 'string' || seen.has(landmark.id)
+      || !landmark.characterId || !KNOWN_CHARACTERS.has(landmark.characterId)
+      || typeof landmark.chapterId !== 'string') return [];
+    seen.add(landmark.id);
+    return [{ id: landmark.id, characterId: landmark.characterId, chapterId: landmark.chapterId, unlockedAt: finite(landmark.unlockedAt, 0) }];
+  });
+}
+
 function normalizeCell(value: unknown, fallback: MergeBoardCell): MergeBoardCell {
   if (!value || typeof value !== 'object') return fallback;
   const cell = value as Partial<MergeBoardCell>;
@@ -1072,7 +1260,7 @@ function reconcileUnlockedCatalog(state: MergeWorldState): MergeWorldState {
     : { ...state, unlockedChains, unlockedFamilies };
 }
 
-function orderEnergyRefund(order: MergeOrder): number {
+export function mergeOrderEnergyRefund(order: MergeOrder): number {
   if (order.signature || order.purpose === 'signature') return 5;
   return order.difficulty === 'medium' ? 3 : order.difficulty === 'major' ? 5 : 2;
 }
