@@ -37,6 +37,7 @@ import type {
   MergeWorldCommandResult,
   MergeWorldState,
 } from '@/types/merge-world';
+import { advanceMossproutChapterZero } from '@/utils/merge-world/chapter-zero-policy';
 
 const KNOWN_CHARACTERS = new Set<MergeCharacterId>(Object.keys(KATCHIMERA_MERGE_PROFILES) as MergeCharacterId[]);
 const RECENT_ORDER_LIMIT = 8;
@@ -460,6 +461,7 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
     landmarks,
     generators,
   };
+  next = advanceMossproutChapterZero(next, order.id, now);
   next = touch(next, now);
   return { state: next, changed: true, servedOrderId: order.id, energyGranted: energyRefund, message: `${order.title} served.` };
 }

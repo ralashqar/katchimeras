@@ -774,6 +774,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
           instanceId={id}
           key={id}
           motion={motions[id]}
+          mossproutOnboarding={presentation.activeOrders.some((order) => order.id.startsWith('mossprout:chapter-0:'))}
           occupant={sprite.occupant}
           onComplete={completeMotion}
           reduceMotion={reduceMotion}
@@ -870,7 +871,7 @@ function HoverCellOverlay({ geometry, hoverCell }: { geometry: MergeBoardGeometr
   return <Animated.View pointerEvents="none" style={[styles.hoverCell, { height: geometry.cellSize, width: geometry.cellSize }, style]} />;
 }
 
-const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, baseY, cellSize, activeDragId, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, entranceDelay, grabX, grabY, motion, reduceMotion, onComplete, occupant }: {
+const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, baseY, cellSize, activeDragId, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, entranceDelay, grabX, grabY, motion, mossproutOnboarding, reduceMotion, onComplete, occupant }: {
   instanceId: string;
   baseX: number;
   baseY: number;
@@ -884,6 +885,7 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   grabX: SharedValue<number>;
   grabY: SharedValue<number>;
   motion?: SpriteMotion;
+  mossproutOnboarding: boolean;
   reduceMotion: boolean;
   onComplete: (operationId: number, instanceId: string) => void;
   occupant: MergeBoardOccupant;
@@ -1052,13 +1054,13 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
 
   return <Animated.View pointerEvents="none" style={[styles.sprite, { height: cellSize, left: 0, top: 0, width: cellSize }, animatedStyle]}>
       {occupant.kind === 'generator'
-        ? <PersistentGeneratorArt generatorId={occupant.generatorId} size={cellSize} />
+        ? <PersistentGeneratorArt generatorId={occupant.generatorId} mossproutOnboarding={mossproutOnboarding} size={cellSize} />
         : <PersistentMergeItemArt definitionId={occupant.definitionId} size={cellSize - 4} />}
     </Animated.View>;
 });
 
-function PersistentGeneratorArt({ generatorId, size }: { generatorId: string; size: number }) {
-  const art = mergeWorldGeneratorArt(generatorId);
+function PersistentGeneratorArt({ generatorId, mossproutOnboarding, size }: { generatorId: string; mossproutOnboarding: boolean; size: number }) {
+  const art = mergeWorldGeneratorArt(generatorId, { mossproutOnboarding });
   return <View style={[styles.generatorSprite, { height: size, width: size }]}>
     {art ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={`merge-generator-${generatorId}`} source={art} style={styles.generatorArt} transition={0} /> : null}
     <View style={styles.generatorBolt}>

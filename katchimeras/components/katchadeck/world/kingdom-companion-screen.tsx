@@ -199,12 +199,16 @@ export function KingdomCompanionScreen({
   onCloseCompanion,
   onOpenMerge,
   onOpenQuestGame,
+  ftueConversationDefinitionId,
+  onFtueConversationComplete,
 }: {
   presentation?: KingdomCompanionPresentation;
   initialCreatureId?: string;
   onCloseCompanion?: () => void;
   onOpenMerge?: (orderId?: string | null, familyId?: KatchimeraFamilyId) => void;
   onOpenQuestGame?: (creatureId: string, questId: string) => void;
+  ftueConversationDefinitionId?: string;
+  onFtueConversationComplete?: () => void;
 }) {
   const isFocused = useIsFocused();
   const router = useRouter();
@@ -212,10 +216,25 @@ export function KingdomCompanionScreen({
   const archive = useAllDays();
   const { days } = archive;
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
-  const kingdom = useMemo(
-    () => withDevAvailableKatchimeras(deriveKingdom(days), allKatchimerasAvailable),
-    [allKatchimerasAvailable, days],
-  );
+  const kingdom = useMemo(() => {
+    const derived = withDevAvailableKatchimeras(deriveKingdom(days), allKatchimerasAvailable);
+    if (!ftueConversationDefinitionId || derived.creatures.some((creature) => creature.creatureId === 'companion:mossprout')) return derived;
+    const mossprout: KingdomCreature = {
+      dayId: 'ftue-discovery',
+      isoDate: new Date().toISOString().slice(0, 10),
+      creatureId: 'companion:mossprout',
+      sourceCreatureId: 'ftue-discovery-mossprout',
+      companionId: 'companion:mossprout',
+      aspectId: 'nature-outdoors',
+      familyId: 'mossprout',
+      skinId: 'mossprout',
+      name: 'Mossprout',
+      visualKey: 'mossprout',
+      rarity: 'common',
+      accentColor: '#8FBE67',
+    };
+    return { ...derived, creatures: [mossprout, ...derived.creatures] };
+  }, [allKatchimerasAvailable, days, ftueConversationDefinitionId]);
 
   const [identity, setIdentity] = useState<WorldIdentityState>(loadWorldIdentity);
   const [wardrobe, setWardrobe] = useState<KatchimeraWardrobeState>(loadKatchimeraWardrobe);
@@ -514,6 +533,8 @@ export function KingdomCompanionScreen({
           homeEnvironmentKey={selectedHomeEnvironmentKey}
           houseLevel={quests.selectedResident.resident.houseLevel}
           initialDestination={quests.selectedResident.destination}
+          initialConversationDefinitionId={ftueConversationDefinitionId}
+          onInitialConversationComplete={onFtueConversationComplete}
           onSelectDestination={quests.selectDestination}
           onClose={() => {
             quests.closeSelectedResident();

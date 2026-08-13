@@ -12,13 +12,16 @@ import type { InteractiveQuestExecution } from '@/utils/quests/experiences/types
 
 export function createCompanionInteractionState(input: {
   initialDestination?: CompanionDestination | null;
+  initialConversation?: boolean;
 }): CompanionInteractionState {
   const destination = input.initialDestination ?? null;
   return {
     destination,
     direction: 1,
     reviewItemId: null,
-    route: destination ? { kind: 'destination', destination } : { kind: 'dashboard' },
+    route: input.initialConversation
+      ? { kind: 'conversation' }
+      : destination ? { kind: 'destination', destination } : { kind: 'dashboard' },
     experienceInstance: 0,
   };
 }
@@ -153,7 +156,7 @@ export function companionInteractionReducer(
           }
         : state;
     case 'reset_companion':
-      return createCompanionInteractionState({ initialDestination: action.initialDestination });
+      return createCompanionInteractionState({ initialDestination: action.initialDestination, initialConversation: action.initialConversation });
   }
 }
 

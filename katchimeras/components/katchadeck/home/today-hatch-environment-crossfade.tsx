@@ -10,7 +10,7 @@ import Animated, {
 
 import { TodayExplorationBackground } from '@/components/katchadeck/home/today-exploration-background';
 import { HOME_SCENE_Y_OFFSET } from '@/constants/home-loop-layout';
-import type { TodayHatchPhase, TodayHatchPresentation } from '@/utils/today-hatch-presentation';
+import { todayHatchCreature, type TodayHatchPhase, type TodayHatchPresentation } from '@/utils/today-hatch-presentation';
 import { todayKatchimeraExplorationBackgroundKeyForPresentation } from '@/utils/today-exploration-backgrounds';
 
 export function TodayHatchEnvironmentCrossfade({
@@ -24,7 +24,7 @@ export function TodayHatchEnvironmentCrossfade({
 }) {
   const reduceMotion = useReducedMotion();
   const progress = useSharedValue(0);
-  const creature = presentation.committedDay?.creature ?? null;
+  const creature = todayHatchCreature(presentation);
   const destinationKey = todayKatchimeraExplorationBackgroundKeyForPresentation({
     creature,
     environmentVisualKey: presentation.committedDay?.card?.scene?.environment?.visualKey,
@@ -70,11 +70,14 @@ function phaseAtLeast(phase: TodayHatchPhase, target: TodayHatchPhase) {
   const order: TodayHatchPhase[] = [
     'idle',
     'preparing',
+    'shaking',
     'cracking',
-    'revealing',
+    'crossfading_subject',
+    'subject_settling',
+    'awaiting_interaction',
     'world_shift',
-    'settling',
-    'tomorrow_arrival',
+    'dashboard_settling',
+    'complete',
   ];
   return order.indexOf(phase) >= order.indexOf(target);
 }

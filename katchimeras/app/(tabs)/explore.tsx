@@ -38,6 +38,9 @@ import { encounterLiveCast } from '@/constants/encounter-cast';
 import { katchimeraEncounterProfiles } from '@/constants/katchimera-encounter-profiles';
 import { getCreatureVisual, prepareTodayForDevRehatch, type DevRehatchMode } from '@/game/days';
 import { resetTodayForDebug } from '@/features/today/reset-today-for-debug';
+import { beginFirstSession } from '@/features/onboarding/first-session';
+import { useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { retryFtueSync } from '@/features/onboarding/ftue-sync';
 import { clearTodayPatch } from '@/utils/today-patch-storage';
 import { clearBaseCustomisation } from '@/utils/world-base-customisation';
 import { resetWorldIdentityOnboarding } from '@/utils/world-identity';
@@ -61,6 +64,7 @@ import { resetCompanionStoriesForDebug, setFeastleStoryStateForDebug } from '@/u
 
 export default function ExploreScreen() {
   const router = useRouter();
+  const ftueRun = useFtueRun();
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   const [profile, setProfile] = useState(loadOnboardingProfile());
   const [storedState, setStoredState] = useState(homeRepository.load());
@@ -194,6 +198,29 @@ export default function ExploreScreen() {
           },
         },
       ]
+    );
+  }
+
+  function handleRestartFirstSession() {
+    Alert.alert(
+      'Restart first-session onboarding?',
+      'Keeps your profile, personality, zodiac, settings, and past days. It resets Today and the real Merge board, then restarts the scripted Mossprout flow.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Restart flow',
+          onPress: async () => {
+            try {
+              await resetTodayForDebug();
+              await resetMergeWorldStateForDebug();
+              beginFirstSession({ restart: true });
+              router.replace('/(tabs)/today');
+            } catch (caught) {
+              Alert.alert('Restart did not finish', caught instanceof Error ? caught.message : 'The first-session flow could not be restarted.');
+            }
+          },
+        },
+      ],
     );
   }
 
@@ -449,6 +476,14 @@ export default function ExploreScreen() {
                 </View>
                 <KatchaButton label="🔄 Reset to fresh profile (full first-run)" onPress={handleFreshProfile} variant="primary" />
                 <KatchaButton label="Reset today only" onPress={handleResetToday} variant="secondary" />
+                <KatchaButton label="Restart first-session onboarding · keep profile" onPress={handleRestartFirstSession} variant="primary" />
+                {ftueRun ? <View style={styles.devToggleCopy}>
+                  <ThemedText selectable style={styles.devToggleTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">FTUE: {ftueRun.stepId}</ThemedText>
+                  <ThemedText selectable style={styles.devToggleBody} lightColor="#C4D8FF" darkColor="#C4D8FF">
+                    {ftueRun.receipts.filter((receipt) => receipt.status !== 'pending').length} committed · {ftueRun.receipts.filter((receipt) => !receipt.syncedAt && receipt.status !== 'pending').length} waiting to sync
+                  </ThemedText>
+                </View> : null}
+                <KatchaButton label="FTUE retry receipt sync" onPress={() => void retryFtueSync()} variant="secondary" />
                 <KatchaButton label="Reset Katchimeras progress" onPress={handleResetKatchimerasProgress} variant="secondary" />
                 <KatchaButton label="Feastle story · Level 1 order" onPress={() => setFeastleStoryStateForDebug('order_active', 1)} variant="secondary" />
                 <KatchaButton label="Feastle story · Return at level 2" onPress={() => setFeastleStoryStateForDebug('return_available', 2)} variant="secondary" />
@@ -491,7 +526,7 @@ export default function ExploreScreen() {
                 <KatchaButton label="Preview Hatch Your Past" onPress={() => router.push('/hatch-your-past')} variant="secondary" />
                 <KatchaButton label="Reset home loop" onPress={handleResetHomeLoop} variant="secondary" />
                 <KatchaButton label="Replay personality + zodiac" onPress={handleReplayWorldIdentity} variant="secondary" />
-                <KatchaButton label="Restart onboarding" onPress={handleReset} variant="secondary" />
+                <KatchaButton label="Reset onboarding profile" onPress={handleReset} variant="secondary" />
                 <KatchaButton
                   label={backfilling ? 'Backfilling…' : 'Backfill real history (pins + hatch + LLM)'}
                   loading={backfilling}
@@ -645,8 +680,8 @@ export default function ExploreScreen() {
 
         <Animated.View entering={presenceEnter(460)}>
           <KatchaButton
-            label={DEV_DEBUG_NAV_ENABLED ? 'Open onboarding reset' : 'Restart onboarding'}
-            onPress={handleReset}
+            label={DEV_DEBUG_NAV_ENABLED ? 'Restart first-session onboarding' : 'Restart onboarding'}
+            onPress={DEV_DEBUG_NAV_ENABLED ? handleRestartFirstSession : handleReset}
             variant="secondary"
           />
         </Animated.View>

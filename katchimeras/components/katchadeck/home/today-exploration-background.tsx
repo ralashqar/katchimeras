@@ -33,6 +33,7 @@ type TodayExplorationBackgroundMotionOptions = {
   canSwipeNext?: boolean;
   canSwipePrevious?: boolean;
   enabled: boolean;
+  frozen?: boolean;
   onQuickSwipe: (direction: TodayExplorationSwipeDirection) => void;
   onTransitionStart?: (direction: TodayExplorationSwipeDirection) => void;
   pageTransitionEnabled?: boolean;
@@ -43,6 +44,7 @@ export function useTodayExplorationBackgroundMotion({
   canSwipeNext = true,
   canSwipePrevious = true,
   enabled,
+  frozen = false,
   onQuickSwipe,
   onTransitionStart,
   pageTransitionEnabled = false,
@@ -106,6 +108,15 @@ export function useTodayExplorationBackgroundMotion({
   ]);
 
   useEffect(() => {
+    if (frozen) {
+      cancelAnimation(translateX);
+      cancelAnimation(transitionProgress);
+      transitionActive.value = 0;
+      transitionDirection.value = 0;
+      transitionProgress.value = 0;
+      transitionStartX.value = translateX.value;
+      return;
+    }
     if (enabled) return;
     cancelAnimation(translateX);
     cancelAnimation(transitionProgress);
@@ -118,6 +129,7 @@ export function useTodayExplorationBackgroundMotion({
       : withSpring(0, spring);
   }, [
     enabled,
+    frozen,
     reduceMotion,
     spring,
     transitionActive,
@@ -129,7 +141,7 @@ export function useTodayExplorationBackgroundMotion({
 
   const gesture = useMemo(() => {
     return Gesture.Pan()
-      .enabled(enabled && maxPan > 0)
+      .enabled(enabled && !frozen && maxPan > 0)
       .maxPointers(1)
       .activeOffsetX([-1, 1])
       .failOffsetY([-20, 20])
@@ -238,6 +250,7 @@ export function useTodayExplorationBackgroundMotion({
       canSwipeNext,
       canSwipePrevious,
       enabled,
+      frozen,
       gestureEnded,
       gestureIgnored,
       gestureStartX,

@@ -73,9 +73,12 @@ import { InlineVoiceNote } from '@/components/katchadeck/world/inline-voice-note
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { presenceEnter } from '@/components/katchadeck/motion';
 import { ThemedText } from '@/components/themed-text';
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { hasQuickGoalTemplates } from '@/constants/companion-quick-goals';
-import { AppFontFamilies, Lantern } from '@/constants/theme';
+import { AppFontFamilies, KatchaDeckUI, Lantern } from '@/constants/theme';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
+import { dayPromptRegistry } from '@/constants/day-prompts';
 import { HOME_SCENE_Y_OFFSET } from '@/constants/home-loop-layout';
 import { MERGE_CHARACTER_NAMES } from '@/constants/merge-world-catalog';
 import type { MergeCharacterId } from '@/types/merge-world';
@@ -112,6 +115,10 @@ import { useTodayEnergyLoop } from '@/features/today/use-today-energy-loop';
 import { useTodayEnergyFrameProbe } from '@/features/today/use-today-energy-frame-probe';
 import { TodayEnergyProfiler } from '@/features/today/today-energy-profiler';
 import { useAppActivity } from '@/features/performance/app-activity';
+import { beginFtueAction, commitFtueAction, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { FTUE_MOSSPROUT_CREATURE } from '@/features/onboarding/mossprout-ftue-creature';
+import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
+import type { FtueActionDefinition, FtueChoiceOption } from '@/features/onboarding/ftue-types';
 import { useWisps } from '@/features/wisps/wisp-provider';
 import { resolveHomeLoopPresentation } from '@/features/today/home-loop-presentation';
 import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
@@ -136,7 +143,7 @@ import {
   TODAY_KINGDOM_STAGE_HEIGHT,
 } from '@/utils/today-kingdom-hero-layout';
 import { atmosphereSettingsForPlan, resolveDayAtmosphere } from '@/utils/day-atmosphere';
-import { todayHatchShowsResident } from '@/utils/today-hatch-presentation';
+import { todayHatchOwnsSurface, todayHatchRunsInPlace, todayHatchShowsDashboard, todayHatchShowsResident, todayHatchShowsWorldShift } from '@/utils/today-hatch-presentation';
 import { identityForCreature } from '@/utils/katchimera-identity';
 import {
   todayKatchimeraExplorationBackgroundKeyForPresentation,
@@ -222,10 +229,16 @@ export default function TodayRouteScreen() {
 
 function HomeScreen() {
   const router = useRouter();
-  const { memoryDayId, memoryRecordId, memorySourceKind } = useLocalSearchParams<{
+  const ftueRun = useFtueRun();
+  const ftueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
+  const ftueTodayStep = ftueStep?.surface === 'today' ? ftueStep : null;
+  const ftueOpeningFocus = Boolean(ftueRun?.status === 'active' && ftueRun.stepId.startsWith('egg.'));
+  const discoveryHatchActive = Boolean(ftueRun?.status === 'active' && (ftueRun.stepId.startsWith('egg.') || ftueRun.stepId === 'hatch.reveal'));
+  const { memoryDayId, memoryRecordId, memorySourceKind, onboardingCapture } = useLocalSearchParams<{
     memoryDayId?: string;
     memoryRecordId?: string;
     memorySourceKind?: string;
+    onboardingCapture?: string;
   }>();
   const { beginCriticalInteraction, criticalInteractionActive } = useAppActivity();
   const screenFocused = useIsFocused();
@@ -246,6 +259,12 @@ function HomeScreen() {
   const [homeArchetypeId, setHomeArchetypeId] = useState(() => loadWorldIdentity().selectedHomeArchetypeId);
   const [heroStageTop, setHeroStageTop] = useState<number | null>(null);
   const [manualJournalOpen, setManualJournalOpen] = useState(false);
+  const [ftueActionBusy, setFtueActionBusy] = useState(false);
+  const [onboardingEnergyReady, setOnboardingEnergyReady] = useState<number | null>(null);
+  const openedOnboardingCaptureRef = useRef(false);
+  useEffect(() => {
+    setFtueActionBusy(false);
+  }, [ftueRun?.runId, ftueRun?.stepId]);
   const [quickGoalsOpen, setQuickGoalsOpen] = useState(false);
   const [quickGoalSheetMode, setQuickGoalSheetMode] = useState<'add' | 'manage' | null>(null);
   const [selectedCareGoalId, setSelectedCareGoalId] = useState<string | null>(null);
@@ -310,6 +329,10 @@ function HomeScreen() {
     setManualJournalInitialContextId(null);
     setManualJournalTarget(null);
   }, []);
+  useEffect(() => {
+    if (onboardingCapture !== '1' || ftueRun?.stepId !== 'energy.capture' || openedOnboardingCaptureRef.current) return;
+    openedOnboardingCaptureRef.current = true;
+  }, [ftueRun?.stepId, onboardingCapture]);
   const queueCareCompletionAfterJournalDismiss = useCallback((action: RankedTodayCareAction) => {
     if (deferredJournalCareTimerRef.current) clearTimeout(deferredJournalCareTimerRef.current);
     deferredJournalCareCompletionRef.current = action.instanceId;
@@ -363,26 +386,78 @@ function HomeScreen() {
     completeEnergyAction,
     completeInlineEnergyAction,
     updateCareAction,
-  } = useHomeScreenState({ pauseInteractiveServices: criticalInteractionActive });
+  } = useHomeScreenState({
+    pauseInteractiveServices: criticalInteractionActive,
+  });
   const {
     isHatching,
     presentation: hatchPresentation,
     handleHatchEnvironmentReady,
+    handleHatchSubjectError,
     handleHatchSubjectReady,
     handleReveal,
+    handleDiscoveryReveal,
+    restoreDiscoveryReveal,
   } = useTodayHatchRevealController({
     selectedDay,
     triggerHatchIfReady,
     acceleratedReadyRef: acceleratedHatchReadyRef,
+    allowDailyHatch: !discoveryHatchActive,
+    onDiscoveryAnimationComplete: () => {
+      commitFtueAction({ actionId: 'egg.hatch', evidenceRef: 'discovery-hatch:mossprout' });
+    },
   });
+  const dailyHatchActive = todayHatchOwnsSurface(hatchPresentation);
+  const discoveryHatchInPlace = todayHatchRunsInPlace(hatchPresentation);
   const { days: allDays } = useAllDays();
+  const legacyDiscoveryPersonalLine = useMemo(() => {
+    const today = allDays.find((day) => day.isToday);
+    const activity = today?.promptAnswers.find((answer) => answer.kind === 'activity' && !answer.dismissed)?.labels[0];
+    const mood = today?.promptAnswers.find((answer) => answer.kind === 'feeling' && !answer.dismissed)?.labels[0];
+    if (activity === 'Outdoors') return 'You were outside today? I think we’re going to get along.';
+    if (activity === 'Family') return 'You spent time with your people today? I like that.';
+    if (activity === 'Friends') return 'Friends were part of today? That sounds like a day worth keeping.';
+    if (activity === 'Resting') return 'A quieter day can still grow something. We can start small.';
+    if (activity === 'Work') return 'You had work on your mind today. Let’s make a small place to breathe.';
+    if (mood === 'Drained' || mood === 'Low') return 'Sounds like today took something out of you. We can start small.';
+    return mood ? `You felt ${mood.toLowerCase()} today. Thank you for letting me know.` : 'I felt those little pieces of your day reach me.';
+  }, [allDays]);
   const { equippedWispId: activeWispId, syncFromDays: syncWispsFromDays, pendingDiscoveryId, dismissDiscovery } = useWisps();
   useEffect(() => { syncWispsFromDays(allDays); }, [allDays, syncWispsFromDays]);
   const isDay = selectedDay?.kind === 'day';
+  useEffect(() => {
+    if (ftueRun?.stepId !== 'hatch.reveal' || hatchPresentation.phase !== 'idle') return;
+    restoreDiscoveryReveal(FTUE_MOSSPROUT_CREATURE);
+  }, [ftueRun?.stepId, hatchPresentation.phase, restoreDiscoveryReveal]);
+  const talkToMossprout = useCallback(() => {
+    commitFtueAction({ actionId: 'hatch.talk_to_mossprout' });
+    router.push({
+      pathname: '/katchimera/[creatureId]',
+      params: { creatureId: 'companion:mossprout', ftue: '1' },
+    });
+  }, [router]);
+  const companionResumeStartedRef = useRef(false);
+  useEffect(() => {
+    if (ftueRun?.stepId !== 'companion.first_meeting') {
+      companionResumeStartedRef.current = false;
+      return;
+    }
+    if (!screenFocused || companionResumeStartedRef.current) return;
+    companionResumeStartedRef.current = true;
+    router.push({
+      pathname: '/katchimera/[creatureId]',
+      params: { creatureId: 'companion:mossprout', ftue: '1' },
+    });
+  }, [ftueRun?.stepId, router, screenFocused]);
+  const returnToMossprout = useCallback(() => {
+    setOnboardingEnergyReady(null);
+    commitFtueAction({ actionId: 'energy.return' });
+    router.push({ pathname: '/(tabs)/games', params: { familyId: 'mossprout' } });
+  }, [router]);
   const homeLoopPresentation = useMemo(() => resolveHomeLoopPresentation({
     activeDayPrompt,
     availableDayPrompts,
-    isHatching,
+    hatchOwnership: dailyHatchActive ? 'daily_surface' : discoveryHatchInPlace ? 'discovery_in_place' : 'none',
     isTodayHatched,
     selectedDay,
     tomorrowActivePrompt,
@@ -391,7 +466,8 @@ function HomeScreen() {
   }), [
     activeDayPrompt,
     availableDayPrompts,
-    isHatching,
+    dailyHatchActive,
+    discoveryHatchInPlace,
     isTodayHatched,
     selectedDay,
     tomorrowActivePrompt,
@@ -434,6 +510,23 @@ function HomeScreen() {
       title: `Earn +${journalMergeReward.totalEnergy} Merge Energy`,
     };
   }, [companionJournalHandoff, formingDay, formingTarget, journalMergeReward]);
+  useEffect(() => {
+    if (ftueRun?.stepId === 'energy.awarded') setOnboardingEnergyReady(ftueRun.awardedMergeEnergy ?? 10);
+  }, [ftueRun?.awardedMergeEnergy, ftueRun?.stepId]);
+  useEffect(() => {
+    if (ftueRun?.stepId !== 'energy.capture' || !formingDay) return;
+    const pending = ftueRun.receipts.find((receipt) => receipt.stepId === 'energy.capture' && receipt.status === 'pending');
+    if (!pending) return;
+    if (pending.actionId !== 'energy.photo') return;
+    const sources = new Set(['photo']);
+    const evidence = [...(formingDay.growth?.events ?? [])]
+      .reverse()
+      .find((event) => sources.has(event.source) && event.awardedAt >= pending.startedAt);
+    if (!evidence) return;
+    const amount = ftueRun.awardedMergeEnergy ?? (pending.actionId === 'energy.photo' ? 20 : 10);
+    commitFtueAction({ actionId: pending.actionId, evidenceRef: evidence.sourceId });
+    setOnboardingEnergyReady(amount);
+  }, [formingDay, ftueRun]);
   const formingPrompts = homeLoopPresentation.forming?.prompts ?? availableDayPrompts;
   const formingActivePrompt = homeLoopPresentation.forming?.activePrompt ?? null;
   // Signature mini-games are archived behind Merge World. Historical active
@@ -559,26 +652,39 @@ function HomeScreen() {
   }, [backfillStatus.completedVersion, refreshState]);
 
   const handleRevealPress = useCallback(() => {
+    if (discoveryHatchActive) {
+      if (ftueRun?.stepId === 'egg.ready') {
+        beginFtueAction('egg.hatch');
+        handleDiscoveryReveal(FTUE_MOSSPROUT_CREATURE);
+      }
+      // Discovery onboarding owns Hatch completely. Earlier Egg steps must
+      // never fall through to the normal daily hatch and select another pet.
+      return;
+    }
     if (
       selectedDay?.kind !== 'day'
       || (!selectedDay.canHatch && !acceleratedHatchReadyRef.current)
     ) return;
-    const reason = hatchCheckInEligibility(selectedDay);
+    const reason = discoveryHatchActive ? null : hatchCheckInEligibility(selectedDay);
     if (reason) {
       if (!selectedDay.hatchCheckIn) startHatchCheckIn(selectedDay.id, reason);
       setHatchCheckInOpen(true);
       return;
     }
     void handleReveal();
-  }, [handleReveal, selectedDay, startHatchCheckIn]);
+  }, [discoveryHatchActive, ftueRun?.stepId, handleDiscoveryReveal, handleReveal, selectedDay, startHatchCheckIn]);
 
   useEffect(() => {
     if (!hatchAfterCheckIn || selectedDay?.kind !== 'day') return;
+    if (discoveryHatchActive) {
+      setHatchAfterCheckIn(false);
+      return;
+    }
     const status = selectedDay.hatchCheckIn?.status;
     if (!status || status === 'in_progress') return;
     setHatchAfterCheckIn(false);
     void handleReveal();
-  }, [handleReveal, hatchAfterCheckIn, selectedDay]);
+  }, [discoveryHatchActive, handleReveal, hatchAfterCheckIn, selectedDay]);
 
   function handleOpenDayMap(dayId: string) {
     router.push({
@@ -601,7 +707,7 @@ function HomeScreen() {
   const explorationBackgroundKey: TodayExplorationBackgroundKey = isForming
     ? 'home'
     : selectedKatchimeraExplorationKey ?? 'home';
-  const explorationBackgroundActive = !isHatching;
+  const explorationBackgroundActive = !dailyHatchActive || todayHatchShowsWorldShift(hatchPresentation);
   // The compact HUD provides the first layout estimate; onLayout replaces it
   // with the measured stage y.
   const resolvedHeroStageTop =
@@ -638,6 +744,7 @@ function HomeScreen() {
   const viewedDay: HomeDayRecord | null = isDay ? selectedDay : onTomorrowForming ? (tomorrowDay ?? null) : null;
   const viewedIsForming = isForming;
   const hatchShowsResident = todayHatchShowsResident(hatchPresentation.phase);
+  const hatchShowsDashboard = todayHatchShowsDashboard(hatchPresentation);
   const atmosphereDay = isHatching && !hatchShowsResident
     ? hatchPresentation.daySnapshot
     : viewedDay;
@@ -1004,7 +1111,7 @@ function HomeScreen() {
   );
   const nurtureGrowth = useMemo(() => {
     if (!formingDay) return null;
-    return todayGrowthSummary(
+    const natural = todayGrowthSummary(
       formingDay,
       resolveHatchHour(loadOnboardingProfile()),
       growthNow,
@@ -1012,7 +1119,11 @@ function HomeScreen() {
         ? { incubationNotBefore: new Date(`${formingDay.isoDate}T00:00:00`) }
         : undefined,
     );
-  }, [formingDay, growthNow, onTomorrowForming]);
+    if (discoveryHatchActive && formingTarget === 'today' && natural.qualifyingActionCount >= 3) {
+      return { ...natural, effectiveHatchAt: growthNow, isReady: true, progress: 100 as const };
+    }
+    return natural;
+  }, [discoveryHatchActive, formingDay, formingTarget, growthNow, onTomorrowForming]);
   useEffect(() => {
     setGrowthNow(new Date());
   }, [formingDay]);
@@ -1091,6 +1202,74 @@ function HomeScreen() {
       now: new Date(),
     });
   }, [careContextualCategories, formingDay, formingPrompts, memoryQuests, quickGoals.goalsForToday, todayCareGame, todayPhotoRollSuggestion]);
+  const onboardingMoodAnswered = Boolean(formingDay?.promptAnswers.some((answer) => answer.kind === 'feeling' && !answer.dismissed));
+  const ftueMoodCareAction = useMemo(() => {
+    const mood = [...nurtureCare.active, ...nurtureCare.completed].find((action) => action.id === 'mood');
+    return mood ?? null;
+  }, [nurtureCare.active, nurtureCare.completed]);
+  const onboardingActivityAnswered = Boolean(formingDay?.promptAnswers.some((answer) => answer.kind === 'activity' && !answer.dismissed));
+  const onboardingActivityAnswer = formingDay?.promptAnswers.find((answer) => answer.kind === 'activity' && !answer.dismissed) ?? null;
+  const onboardingActivityAction = useMemo<RankedTodayCareAction | null>(() => formingDay ? ({
+    id: 'onboarding:activity',
+    instanceId: `${formingDay.isoDate}:onboarding:activity`,
+    title: 'What was part of today?',
+    description: 'Work, family, friends, outside, resting — choose what fits.',
+    icon: 'leaf.fill',
+    artKey: 'reflection',
+    category: 'memory',
+    completionKey: 'reflection:activity',
+    completionMode: 'artifact',
+    destination: { kind: 'reflection', promptId: 'activity' },
+    growthSource: 'reflection',
+    growthReward: TODAY_GROWTH_REWARDS.reflection,
+    priority: 100,
+    eligibleTimeOfDay: ['morning', 'midday', 'afternoon', 'evening'],
+    journalFocused: true,
+    canReplaceSkipped: false,
+    aiGenerated: false,
+    source: 'system',
+    completed: onboardingActivityAnswered,
+    completedAt: onboardingActivityAnswer?.createdAt ?? null,
+  }) : null, [formingDay, onboardingActivityAnswer?.createdAt, onboardingActivityAnswered]);
+  const ftuePanelCareAction = ftueMoodCareAction ?? onboardingActivityAction;
+  const nurtureCompletedActions = useMemo(() => (
+    discoveryHatchActive && onboardingActivityAction?.completed
+      ? [...nurtureCare.completed, onboardingActivityAction]
+      : nurtureCare.completed
+  ), [discoveryHatchActive, nurtureCare.completed, onboardingActivityAction]);
+  const presentedNurtureActions = useMemo(() => {
+    if (ftueRun?.status === 'active') return [];
+    if (!discoveryHatchActive || !formingDay) return nurtureCare.active;
+    if (!onboardingMoodAnswered) {
+      const mood = nurtureCare.active.find((action) => action.id === 'mood');
+      return mood ? [{ ...mood, title: 'How are you feeling?', description: 'Choose one answer. The Egg is listening.' }] : [];
+    }
+    if (!onboardingActivityAnswered) {
+      return onboardingActivityAction ? [onboardingActivityAction] : [];
+    }
+    return [];
+  }, [discoveryHatchActive, formingDay, ftueRun?.status, nurtureCare.active, onboardingActivityAction, onboardingActivityAnswered, onboardingMoodAnswered]);
+  const legacyOnboardingGuide = useMemo(() => {
+    if (!discoveryHatchActive) return null;
+    if (!onboardingMoodAnswered) return {
+      eyebrow: 'A tiny spark',
+      title: 'Something is waiting.',
+      body: 'Share one piece of today.',
+    };
+    if (!onboardingActivityAnswered) return {
+      eyebrow: 'It felt that',
+      title: 'The Egg is stirring.',
+      body: 'Give it one more piece.',
+    };
+    return {
+      eyebrow: 'A new beginning',
+      title: "It's ready to meet you.",
+      body: 'Your day woke the Egg.',
+    };
+  }, [discoveryHatchActive, onboardingActivityAnswered, onboardingMoodAnswered]);
+  void legacyOnboardingGuide;
+  void legacyDiscoveryPersonalLine;
+  const onboardingGuide = ftueTodayStep?.guide ?? null;
   const selectedCareGoal = selectedCareGoalId
     ? quickGoals.goalsForToday.find((item) => item.goal.id === selectedCareGoalId) ?? null
     : null;
@@ -1127,6 +1306,9 @@ function HomeScreen() {
       case 'reflection': {
         const reflection = action.destination.promptId
           ? buildAboutTodayPrompt(action.destination.promptId)
+            ?? (action.id === 'onboarding:activity'
+              ? { ...dayPromptRegistry.activity, title: 'What has been part of your day?', photoCandidates: [] }
+              : null)
           : formingPrompts.find((prompt) =>
               ['gratitude', 'highlight', 'meaning', 'day_word', 'inner_weather'].includes(prompt.id)
             );
@@ -1166,6 +1348,75 @@ function HomeScreen() {
         return;
     }
   }, [clearCareIntent, eggFeedRewardRequestKey, formingPrompts, handleQuest, handleQuickCategory, markCareDestinationOpen, openManualJournal, openPromptSheet, photoPrompt, router, setNextEnergyCurrencySource, startCareIntent]);
+  const handleFtueChoice = useCallback((
+    action: FtueActionDefinition,
+    option: FtueChoiceOption,
+    from: Parameters<typeof startEggFeed>[0],
+  ) => {
+    if (ftueActionBusy || !action.promptKind || !action.growthSource) return;
+    const receipt = beginFtueAction(action.id);
+    if (!receipt || receipt.status !== 'pending') return;
+    setFtueActionBusy(true);
+    const reward = action.growthReward ?? TODAY_GROWTH_REWARDS.reflection;
+    const sourceId = option.private ? receipt.clientEventId : option.domainChoiceId ?? option.id;
+    startEggFeed(from, {
+      currencyFrom: from,
+      energyAmount: reward,
+      energyOnly: true,
+      imageSource: GAME_CURRENCY_ART.energy,
+      label: option.private ? 'Kept private' : option.label,
+      tint: option.private ? Lantern.dusk700 : Lantern.ember300,
+    }, () => {
+      try {
+        const completedAt = new Date().toISOString();
+        completeInlineEnergyAction({
+          artifact: option.private
+            ? { kind: 'private' }
+            : { kind: 'prompt', promptKind: action.promptKind!, choiceId: option.domainChoiceId ?? option.id },
+          completion: {
+            growth: { actionId: action.id, amount: reward, source: action.growthSource!, sourceId },
+            careAction: {
+              instanceId: `${formingDay?.isoDate ?? 'today'}:${action.id}`,
+              definitionId: action.id,
+              sourceId,
+              deferredUntil: null,
+              completedAt,
+              dismissedAt: null,
+            },
+          },
+        }, formingTarget);
+        commitFtueAction({
+          actionId: action.id,
+          optionId: option.id,
+          optionLabel: option.label,
+          private: option.private,
+          evidenceRef: sourceId,
+        });
+        setMicrocopy(option.private ? 'The Egg felt the moment, without saving an answer.' : `${option.label} reached the Egg`);
+      } catch (error) {
+        console.error('[ftue] Could not commit scripted Egg answer', error);
+      } finally {
+        setFtueActionBusy(false);
+      }
+    });
+  }, [completeInlineEnergyAction, formingDay?.isoDate, formingTarget, ftueActionBusy, setMicrocopy, startEggFeed]);
+
+  const handleFtueAction = useCallback((action: FtueActionDefinition) => {
+    if (ftueActionBusy) return;
+    if (action.handlerId === 'discovery_hatch') {
+      handleRevealPress();
+      return;
+    }
+    if (!action.handlerId.startsWith('journal_')) return;
+    const receipt = beginFtueAction(action.id);
+    if (!receipt || receipt.status !== 'pending') return;
+    updateFtueRun({ awardedMergeEnergy: action.handlerId === 'journal_photo' ? 20 : journalMergeReward?.totalEnergy ?? 10 });
+    if (action.handlerId === 'journal_photo') openMomentCapture();
+    else if (action.handlerId === 'journal_people') openManualJournal(undefined, 'people', null, 'today');
+    else if (action.handlerId === 'journal_place') openManualJournal(undefined, 'place', null, 'today');
+    else openManualJournal(undefined, undefined, null, 'today');
+  }, [ftueActionBusy, handleRevealPress, journalMergeReward?.totalEnergy, openManualJournal, openMomentCapture]);
+
   const handleNurtureMood = useCallback((
     choiceId: Parameters<typeof handleConfirmMood>[0],
     label: string,
@@ -1515,21 +1766,25 @@ function HomeScreen() {
         ) ?? null
       : null;
     const completed = Boolean(completedPhotoAssetId)
-      || nurtureCare.completed.some((action) => action.instanceId === pendingCareIntent.instanceId);
+      || nurtureCompletedActions.some((action) => action.instanceId === pendingCareIntent.instanceId);
     if (!completed) return;
-    if (completedPhotoAssetId) {
+    const completedOnboardingActivity = pendingCareIntent.id === 'onboarding:activity'
+      ? onboardingActivityAnswer
+      : null;
+    if (completedPhotoAssetId || completedOnboardingActivity) {
       const completedAt = new Date().toISOString();
+      const sourceId = completedPhotoAssetId ?? completedOnboardingActivity?.choiceIds[0] ?? 'activity';
       completeEnergyAction({
         growth: {
           actionId: pendingCareIntent.id,
           source: pendingCareIntent.growthSource,
-          sourceId: completedPhotoAssetId,
+          sourceId,
           amount: pendingCareIntent.growthReward,
         },
         careAction: {
           instanceId: pendingCareIntent.instanceId,
           definitionId: pendingCareIntent.id,
-          sourceId: completedPhotoAssetId,
+          sourceId,
           deferredUntil: null,
           completedAt,
           dismissedAt: null,
@@ -1541,7 +1796,7 @@ function HomeScreen() {
       pendingCareIntent,
       careRewardAlreadyAnimated(eggFeedRewardRequestKey),
     );
-  }, [careRewardAlreadyAnimated, completeEnergyAction, eggFeedRewardRequestKey, formingDay, formingTarget, markCareDomainCommit, nurtureCare.completed, pendingCareIntent, queueCareCompletion]);
+  }, [careRewardAlreadyAnimated, completeEnergyAction, eggFeedRewardRequestKey, formingDay, formingTarget, markCareDomainCommit, nurtureCompletedActions, onboardingActivityAnswer, pendingCareIntent, queueCareCompletion]);
   useEffect(() => {
     if (!pendingCareIntent) {
       return;
@@ -1552,17 +1807,18 @@ function HomeScreen() {
     }
     if (!careFlowWasBusyRef.current) return;
     const timer = setTimeout(() => {
-      const completed = nurtureCare.completed.some((action) => action.instanceId === pendingCareIntent.instanceId);
+      const completed = nurtureCompletedActions.some((action) => action.instanceId === pendingCareIntent.instanceId);
       if (!completed) clearCareIntent('flow_closed_without_completion');
       careFlowWasBusyRef.current = false;
     }, 240);
     return () => clearTimeout(timer);
-  }, [careFlowWasBusyRef, clearCareIntent, flowBusy, noteCareFlowBusy, nurtureCare.completed, pendingCareIntent]);
+  }, [careFlowWasBusyRef, clearCareIntent, flowBusy, noteCareFlowBusy, nurtureCompletedActions, pendingCareIntent]);
   const explorationMotion = useTodayExplorationBackgroundMotion({
     activeKey: selectedDayId,
     canSwipeNext: explorationTransitionPages.next != null,
     canSwipePrevious: explorationTransitionPages.previous != null,
     enabled: explorationBackgroundActive && !flowBusy,
+    frozen: discoveryHatchInPlace,
     onQuickSwipe: commitExplorationTransition,
     onTransitionStart: beginExplorationTransition,
     pageTransitionEnabled: true,
@@ -1603,6 +1859,7 @@ function HomeScreen() {
   ]);
   const { environmentGesture, environmentMotion } = useTodayEnvironmentMotion({
     enabled: !flowBusy,
+    frozen: discoveryHatchInPlace,
     hoverEnabled: !explorationPresentationActive,
     maxPinchScale: explorationPresentationActive
       ? todayScene.homeEnvironment.motion.explorationMaxPinchScale
@@ -1661,7 +1918,7 @@ function HomeScreen() {
       {!isForming ? (
       <>
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, goalsSceneLiftStyle]}>
-      {isHatching ? (
+      {dailyHatchActive ? (
         <TodayHatchEnvironmentCrossfade
           imageSize={Math.max(windowHeight, windowWidth)}
           onDestinationReady={handleHatchEnvironmentReady}
@@ -1864,20 +2121,21 @@ function HomeScreen() {
       </>
       ) : null}
 
-      {isForming && formingDay && nurtureGrowth && !isHatching ? (
+      {isForming && formingDay && nurtureGrowth && (!isHatching || hatchPresentation.policy === 'ftue_discovery') ? (
         <TodayEnergyProfiler>
           <TodayNurtureExperience
           actionListLocked={
-            energyLoopStatus === 'launching'
+            ftueActionBusy
+            || energyLoopStatus === 'launching'
             || energyLoopStatus === 'awaiting_completion'
             || energyLoopStatus === 'rewarding'
           }
-          actionListHidden={feastleJournalReward !== null}
+          actionListHidden={feastleJournalReward !== null || (isHatching && hatchPresentation.policy === 'ftue_discovery')}
           actionTransitionActive={
             energyLoopStatus === 'rewarding'
             || energyLoopStatus === 'entering'
           }
-          actions={nurtureCare.active}
+          actions={presentedNurtureActions}
           bottomInset={insets.bottom}
           completionEvent={queuedCareCompletion?.action.category === 'check_in' ? queuedCareCompletion : flowBusy ? null : queuedCareCompletion}
           companionWispId={activeWispId}
@@ -1888,8 +2146,15 @@ function HomeScreen() {
           feedbackKey={eggFeedKey}
           focusMode={false}
           growth={nurtureGrowth}
+          hatchPresentation={isHatching && hatchPresentation.policy === 'ftue_discovery' ? hatchPresentation : null}
           homeArchetypeId={homeArchetypeId}
           microcopy={microcopy}
+          onboardingGuide={onboardingGuide}
+          onboardingFocus={ftueOpeningFocus || (isHatching && hatchPresentation.policy === 'ftue_discovery')}
+          scriptedActions={ftueTodayStep?.actions.filter((action) => action.presentation === 'inline_choice' || action.presentation === 'route_action' || action.presentation === 'cta_action') ?? []}
+          scriptedPanelCareAction={ftuePanelCareAction}
+          onScriptedAction={handleFtueAction}
+          onScriptedChoice={handleFtueChoice}
           onAddJournal={handleNurtureAddJournal}
           onAddTextNote={handleNurtureAddTextNote}
           onAddPhoto={openMomentCapture}
@@ -1898,6 +2163,8 @@ function HomeScreen() {
           onCompleteQuickGoal={handleNurtureCompleteGoal}
           onCompletionAnimationEnd={finishCareCompletion}
           onOpenQuickGoal={handleNurtureOpenGoal}
+          onHatchAssetsReady={handleHatchSubjectReady}
+          onHatchAssetsError={handleHatchSubjectError}
           onChooseMood={handleNurtureMood}
           onChooseSleep={handleNurtureSleep}
           onReveal={handleRevealPress}
@@ -1952,7 +2219,7 @@ function HomeScreen() {
           state={quickGoals.state}
         />
       ) : null}
-      {!isForming && (!isHatching || hatchShowsResident) && !hasVisibleLegacyPrompt && !quickGoalsOpen ? (
+      {!isForming && (!isHatching || hatchShowsDashboard) && !hasVisibleLegacyPrompt && !quickGoalsOpen ? (
         <TodayBottomDock
           canHatch={isDay ? selectedDay.canHatch : false}
           isForming={isForming}
@@ -2184,7 +2451,15 @@ function HomeScreen() {
                 imageSource: GAME_CURRENCY_ART.energy,
                 mergeEnergyAmount: journalMergeReward?.totalEnergy ?? 0,
                 tint: Lantern.ember300,
-              }, () => {});
+              }, () => {
+                const pendingFtueCapture = ftueRun?.stepId === 'energy.capture'
+                  ? ftueRun.receipts.find((receipt) => receipt.stepId === 'energy.capture' && receipt.status === 'pending')
+                  : null;
+                if (!pendingFtueCapture) return;
+                const amount = ftueRun?.awardedMergeEnergy ?? journalMergeReward?.totalEnergy ?? 10;
+                commitFtueAction({ actionId: pendingFtueCapture.actionId, evidenceRef: submission.sessionId ?? `journal:${formingDay?.isoDate ?? 'today'}` });
+                setOnboardingEnergyReady(amount);
+              });
             }
             setCompanionJournalHandoff(null);
             setMicrocopy(target === 'tomorrow' ? 'Added to Tomorrow’s Egg' : 'Added to Today’s Egg');
@@ -2477,6 +2752,32 @@ function HomeScreen() {
         onShare={handleShareGeneratedComic}
       />
       {pendingDiscoveryId && !isHatching ? <WispDiscoveryReveal id={pendingDiscoveryId} onDismiss={() => dismissDiscovery(pendingDiscoveryId)} /> : null}
+      {hatchPresentation.policy === 'ftue_discovery' && hatchPresentation.phase === 'awaiting_interaction' ? (
+        <Animated.View entering={presenceEnter(120)} style={[styles.discoveryInteractionCta, { bottom: insets.bottom + 34 }]}>
+          <ThemedText selectable style={styles.discoveryInteractionHint} lightColor="#FFF6DE" darkColor="#FFF6DE">
+            Mossprout is waiting for you.
+          </ThemedText>
+          <KatchaButton
+            fullWidth
+            glow
+            label="Talk to Mossprout"
+            labelStyle={KatchaDeckUI.typography.ftuePanelTitle}
+            onPress={talkToMossprout}
+          />
+        </Animated.View>
+      ) : null}
+      <KatchaSheet
+        footer={<KatchaButton fullWidth glow label="Help Mossprout" onPress={returnToMossprout} />}
+        header={{ eyebrow: 'Your memory became Energy', title: `+${onboardingEnergyReady ?? 0} Merge Energy` }}
+        onRequestClose={() => {}}
+        open={onboardingEnergyReady != null}
+        showClose={false}
+        surface="parchment">
+        <View style={styles.discoveryIntroBody}>
+          <ThemedText style={styles.discoveryIntroQuote} lightColor={Lantern.ink900} darkColor={Lantern.ink900}>Your life just gave you more ways to play.</ThemedText>
+          <ThemedText style={styles.discoveryIntroProblem} lightColor={Lantern.dusk700} darkColor={Lantern.dusk700}>The Energy has been added to the real Merge board. Spend it now to finish Mossprout’s home.</ThemedText>
+        </View>
+      </KatchaSheet>
     </View>
     </GestureDetector>
     </TodayEnvironmentMotionProvider>
@@ -2624,5 +2925,40 @@ const styles = StyleSheet.create({
   backfillTagLabel: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  discoveryIntroBody: {
+    gap: 14,
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+  },
+  discoveryIntroQuote: {
+    fontFamily: AppFontFamilies.instrumentSerif,
+    fontSize: 23,
+    lineHeight: 29,
+  },
+  discoveryIntroProblem: {
+    fontFamily: AppFontFamilies.manrope,
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 21,
+  },
+  discoveryInteractionCta: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(28, 31, 24, 0.9)',
+    borderColor: 'rgba(255, 241, 198, 0.36)',
+    borderCurve: 'continuous',
+    borderRadius: 24,
+    borderWidth: 1,
+    boxShadow: '0 12px 32px rgba(7, 10, 8, 0.35)',
+    gap: 10,
+    left: 24,
+    padding: 14,
+    position: 'absolute',
+    right: 24,
+    zIndex: 90,
+  },
+  discoveryInteractionHint: {
+    ...KatchaDeckUI.typography.ftuePanelBody,
+    textAlign: 'center',
   },
 });

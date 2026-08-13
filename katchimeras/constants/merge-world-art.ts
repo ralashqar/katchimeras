@@ -111,6 +111,7 @@ export const MERGE_WORLD_GENERATOR_ART = {
   'study-desk': require('../assets/images/katchimeras/merge-world/generators/study-desk.webp'),
   'creative-playroom': require('../assets/images/katchimeras/merge-world/generators/creative-playroom.webp'),
 } as const;
+export const MOSSPROUT_SPROUTING_POT_ART = require('../assets/images/katchimeras/merge-world/generators/mossprout-sprouting-pot.webp');
 
 export type MergeWorldAuthoredGeneratorId = keyof typeof MERGE_WORLD_GENERATOR_ART;
 
@@ -118,6 +119,7 @@ export function mergeWorldItemArt(definitionId: string) {
   return MERGE_WORLD_ITEM_ART[definitionId as MergeWorldAuthoredItemId] ?? null;
 }
 
-export function mergeWorldGeneratorArt(generatorId: string) {
+export function mergeWorldGeneratorArt(generatorId: string, options?: { mossproutOnboarding?: boolean }) {
+  if (generatorId === 'wild-garden' && options?.mossproutOnboarding) return MOSSPROUT_SPROUTING_POT_ART;
   return MERGE_WORLD_GENERATOR_ART[generatorId as MergeWorldAuthoredGeneratorId] ?? null;
 }

@@ -313,6 +313,12 @@ test('ordinary companion visits open on the dashboard route', () => {
   assert.equal(companionRouteBackAction(initial), 'close_experience');
 });
 
+test('FTUE companion launch starts on conversation without a dashboard frame', () => {
+  const state = createCompanionInteractionState({ initialConversation: true });
+  assert.equal(state.route.kind, 'conversation');
+  assert.equal(state.destination, null);
+});
+
 test('the first-meeting introduction is a focused route that returns to the dashboard', () => {
   const initial = createCompanionInteractionState({});
   const introduction = companionInteractionReducer(initial, { type: 'open_introduction' });

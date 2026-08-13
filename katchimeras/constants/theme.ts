@@ -111,6 +111,15 @@ export type AppColorName = keyof typeof Colors.light & keyof typeof Colors.dark;
 
 export const KatchaDeckUI = {
   palette,
+  ftue: {
+    gold: '#F6C653',
+    goldDeep: '#75450A',
+    ink: '#173D57',
+    metaSurface: 'rgba(255,247,218,0.92)',
+    contentSurface: 'rgba(39,31,27,0.82)',
+    contentText: '#FFF8E7',
+    surfaceBorder: 'rgba(255,255,255,0.88)',
+  },
   radii: {
     xs: 14,
     sm: 18,
@@ -142,6 +151,44 @@ export const KatchaDeckUI = {
     premium: '0 22px 56px rgba(227, 160, 110, 0.26)',
   },
   typography: {
+    ftueEyebrow: {
+      fontFamily: AppFontFamilies.manrope,
+      fontSize: 10.5,
+      lineHeight: 14,
+      fontWeight: '900',
+      letterSpacing: 1.25,
+      textTransform: 'uppercase',
+    } satisfies TextStyle,
+    ftueHeroTitle: {
+      fontFamily: AppFontFamilies.fredokaBold,
+      fontSize: 27,
+      lineHeight: 31,
+      letterSpacing: -0.45,
+    } satisfies TextStyle,
+    ftueBody: {
+      fontFamily: AppFontFamilies.manrope,
+      fontSize: 13.5,
+      lineHeight: 19,
+      fontWeight: '700',
+    } satisfies TextStyle,
+    ftuePanelTitle: {
+      fontFamily: AppFontFamilies.fredokaBold,
+      fontSize: 15.5,
+      lineHeight: 19,
+      letterSpacing: -0.15,
+    } satisfies TextStyle,
+    ftuePanelBody: {
+      fontFamily: AppFontFamilies.manrope,
+      fontSize: 11,
+      lineHeight: 15,
+      fontWeight: '600',
+    } satisfies TextStyle,
+    ftueChipLabel: {
+      fontFamily: AppFontFamilies.manrope,
+      fontSize: 12,
+      lineHeight: 15,
+      fontWeight: '800',
+    } satisfies TextStyle,
     kingdomDisplay: {
       fontFamily: AppFontFamilies.fredokaBold,
       fontSize: 28,

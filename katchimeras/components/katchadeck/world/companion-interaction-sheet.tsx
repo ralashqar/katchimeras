@@ -155,6 +155,8 @@ export type CompanionInteractionSheetProps = {
   homeEnvironmentKey?: TodayExplorationBackgroundKey | null;
   houseLevel?: number;
   initialDestination?: CompanionDestination | null;
+  initialConversationDefinitionId?: string;
+  onInitialConversationComplete?: () => void;
   onSelectDestination?: (destination: CompanionDestination | null) => void;
   onClose: () => void;
   onOpenMerge?: (orderId?: string | null, familyId?: KatchimeraFamilyId) => void;
@@ -315,6 +317,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const insets = useSafeAreaInsets();
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const onExperienceActiveChange = props.onExperienceActiveChange;
+  const onInitialConversationComplete = props.onInitialConversationComplete;
   const [showFeastleDashboard, setShowFeastleDashboard] = useState(false);
   const [showBaristabbitDashboard, setShowBaristabbitDashboard] = useState(false);
   const [showJourneyCohortDashboard, setShowJourneyCohortDashboard] = useState(false);
@@ -419,6 +422,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const experience = useCompanionExperienceController({
     creatureId: props.creatureId,
     initialDestination: props.initialDestination,
+    initialConversation: Boolean(props.initialConversationDefinitionId),
     onClose: props.onClose,
     onSelectDestination: props.onSelectDestination,
   });
@@ -432,6 +436,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const showFeastleStoryHome = experience.showHome;
   const pendingStoryConversationRef = useRef<string | null>(null);
   const openedStoryConversationRef = useRef<string | null>(null);
+  const completedInitialConversationRef = useRef<string | null>(null);
+  const initialConversationObservedActiveRef = useRef(false);
   const completedFeastleIntroductionRef = useRef<string | null>(null);
   const completedBaristabbitIntroductionRef = useRef<string | null>(null);
   const {
@@ -470,6 +476,32 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     pendingStoryConversationRef.current = definitionId;
     startConversation({ definitionId });
   }, [props.conversationDefinition?.id, props.conversationSession?.definitionId, props.conversationSession?.status, showConversation, startConversation]);
+  useEffect(() => {
+    if (!props.active || !props.initialConversationDefinitionId) return;
+    if (
+      props.conversationSession?.definitionId === props.initialConversationDefinitionId
+      && props.conversationSession.status === 'active'
+    ) {
+      initialConversationObservedActiveRef.current = true;
+      return;
+    }
+    if (
+      props.conversationSession?.definitionId === props.initialConversationDefinitionId
+      && props.conversationSession.status === 'completed'
+    ) {
+      if (initialConversationObservedActiveRef.current) return;
+      completedInitialConversationRef.current = props.conversationSession.id;
+    }
+    requestStoryConversation(props.initialConversationDefinitionId);
+  }, [props.active, props.conversationSession?.definitionId, props.conversationSession?.id, props.conversationSession?.status, props.initialConversationDefinitionId, requestStoryConversation]);
+  useEffect(() => {
+    const definitionId = props.initialConversationDefinitionId;
+    const session = props.conversationSession;
+    if (!definitionId || !session || session.definitionId !== definitionId || session.status !== 'completed') return;
+    if (completedInitialConversationRef.current === session.id) return;
+    completedInitialConversationRef.current = session.id;
+    onInitialConversationComplete?.();
+  }, [onInitialConversationComplete, props.conversationSession, props.initialConversationDefinitionId]);
   const beginFeastleIntroduction = useCallback(() => {
     // The card press is the launch authority. Clear any request left behind by
     // a previous mount so a failed/pre-hydration attempt cannot swallow taps.

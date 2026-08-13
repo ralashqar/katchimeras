@@ -10,6 +10,7 @@ import {
   usePathValue,
   vec,
 } from '@shopify/react-native-skia';
+import { Image } from 'expo-image';
 import { memo, type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
@@ -29,9 +30,12 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { KatchaDeckUI } from '@/constants/theme';
+import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
 import type { HomeArchetypeId } from '@/types/world-identity';
 import {
   todayEggShoulderWispFrame,
+  todayExplorationCreatureStageFrame,
   todayExplorationEggStageFrame,
   TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA,
   TODAY_KINGDOM_STAGE_HEIGHT,
@@ -44,9 +48,23 @@ import {
 } from '@/features/today/today-energy-feedback';
 import { useTodayEnvironmentMotionValues } from '@/components/katchadeck/home/today-environment-motion';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
-import { EggAvatarArtwork } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
+import { EggAvatarArtwork, eggAvatarBodyPresentationStyle } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
+import type { EggExpressionCue } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
 import { WispCompanion } from '@/components/katchadeck/wisps/wisp-companion';
 import type { WispId } from '@/types/wisp';
+import { resolveCreatureArtSource } from '@/utils/creature-art';
+import { todayHatchCreature, type TodayHatchPhase, type TodayHatchPresentation } from '@/utils/today-hatch-presentation';
+
+const AnimatedImage = Animated.createAnimatedComponent(Image);
+const DISCOVERY_SOFT_GLOW = require('../../../assets/images/katchimeras/soft-glow.png');
+const DISCOVERY_CRACK_ONE = require('../../../assets/images/katchimeras/egg-avatars/effects/crack-1.png');
+const DISCOVERY_CRACK_TWO = require('../../../assets/images/katchimeras/egg-avatars/effects/crack-2.png');
+const DISCOVERY_EXPRESSIONS: readonly EggExpressionCue[] = [
+  { faceId: 'curious', atMs: 180, durationMs: 150 },
+  { faceId: 'little-worried', atMs: 430, durationMs: 150 },
+  { faceId: 'big-surprise', atMs: 700, durationMs: 150 },
+  { faceId: 'happy-squint', atMs: 920, durationMs: 140 },
+];
 
 type TodayKingdomEggHeroProps = {
   accentColor?: string;
@@ -61,6 +79,9 @@ type TodayKingdomEggHeroProps = {
   growthStage?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   growthProgress?: number;
   deferGrowthUntilEnergyArrival?: boolean;
+  discoveryHatch?: TodayHatchPresentation | null;
+  onDiscoveryCreatureError?: () => void;
+  onDiscoveryCreatureReady?: () => void;
   onEggPress?: () => void;
   pinchStrength?: number;
   showDormantIndicator?: boolean;
@@ -108,6 +129,9 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   growthStage = 0,
   growthProgress,
   deferGrowthUntilEnergyArrival = false,
+  discoveryHatch = null,
+  onDiscoveryCreatureError,
+  onDiscoveryCreatureReady,
   onEggPress,
   showDormantIndicator = true,
   targetRef,
@@ -146,8 +170,79 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   const ripple = useSharedValue(1);
   const rippleEcho = useSharedValue(1);
   const readyShake = useSharedValue(0);
+  const discoveryPhase = discoveryHatch?.phase ?? 'idle';
+  const discoveryCreature = discoveryHatch ? todayHatchCreature(discoveryHatch) : null;
+  const discoveryCreatureSource = discoveryCreature
+    ? resolveCreatureArtSource(discoveryCreature.visualKey, { variantCell: discoveryCreature.variantCell })
+    : null;
+  const discoveryInitiallyRevealed = discoveryPhaseAtLeast(discoveryPhase, 'crossfading_subject');
+  const discoveryShake = useSharedValue(0);
+  const discoveryEggExit = useSharedValue(discoveryInitiallyRevealed ? 1 : 0);
+  const discoveryCreatureEntry = useSharedValue(discoveryInitiallyRevealed ? 1 : 0);
+  const discoveryCrackOne = useSharedValue(discoveryPhaseAtLeast(discoveryPhase, 'cracking') ? 1 : 0);
+  const discoveryCrackTwo = useSharedValue(discoveryPhaseAtLeast(discoveryPhase, 'cracking') ? 1 : 0);
+  const discoveryPulse = useSharedValue(0);
   const [transientEffectsMounted, setTransientEffectsMounted] = useState(false);
   const transientEffectsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const active = discoveryHatch?.policy === 'ftue_discovery' && discoveryPhase !== 'idle';
+    if (!active) {
+      cancelAnimation(discoveryShake);
+      cancelAnimation(discoveryPulse);
+      discoveryShake.value = withTiming(0, { duration: 90 });
+      discoveryEggExit.value = withTiming(0, { duration: 1 });
+      discoveryCreatureEntry.value = withTiming(0, { duration: 1 });
+      discoveryCrackOne.value = withTiming(0, { duration: 1 });
+      discoveryCrackTwo.value = withTiming(0, { duration: 1 });
+      return;
+    }
+    const quick = reduceMotion;
+    if (discoveryPhase === 'preparing' || discoveryPhase === 'shaking' || discoveryPhase === 'cracking') {
+      cancelAnimation(discoveryShake);
+      discoveryShake.value = quick ? 0 : withRepeat(
+        withSequence(
+          withTiming(1, { duration: 62, easing: Easing.linear }),
+          withTiming(-1, { duration: 62, easing: Easing.linear }),
+        ),
+        -1,
+        true,
+      );
+      cancelAnimation(discoveryPulse);
+      discoveryPulse.value = withRepeat(
+        withTiming(1, { duration: quick ? 240 : 720, easing: Easing.out(Easing.cubic) }),
+        -1,
+        false,
+      );
+    }
+    discoveryCrackOne.value = withTiming(discoveryPhaseAtLeast(discoveryPhase, 'cracking') ? 1 : 0, { duration: quick ? 80 : 260 });
+    discoveryCrackTwo.value = discoveryPhaseAtLeast(discoveryPhase, 'cracking')
+      ? withDelay(quick ? 50 : 300, withTiming(1, { duration: quick ? 80 : 180 }))
+      : withTiming(0, { duration: 80 });
+    if (discoveryPhaseAtLeast(discoveryPhase, 'crossfading_subject')) {
+      cancelAnimation(discoveryShake);
+      discoveryShake.value = withTiming(0, { duration: quick ? 1 : 90 });
+      discoveryEggExit.value = withTiming(1, { duration: quick ? 180 : 500, easing: Easing.out(Easing.cubic) });
+      discoveryCreatureEntry.value = withTiming(1, {
+        duration: quick ? 180 : 500,
+        easing: quick ? Easing.out(Easing.cubic) : Easing.out(Easing.back(1.35)),
+      });
+    }
+    return () => {
+      cancelAnimation(discoveryShake);
+      cancelAnimation(discoveryPulse);
+    };
+  }, [
+    discoveryCrackOne,
+    discoveryCrackTwo,
+    discoveryCreatureEntry,
+    discoveryEggExit,
+    discoveryHatch?.policy,
+    discoveryPhase,
+    discoveryPulse,
+    discoveryShake,
+    reduceMotion,
+  ]);
   const mountTransientEffects = useCallback(() => {
     if (transientEffectsTimerRef.current) clearTimeout(transientEffectsTimerRef.current);
     setTransientEffectsMounted(true);
@@ -355,15 +450,43 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   }, [isReady, readyShake, reduceMotion]);
 
   const eggMotionStyle = useAnimatedStyle(() => {
-    const shake = feedbackShake.value + readyShake.value;
+    const shake = feedbackShake.value + readyShake.value + discoveryShake.value * 2;
     return {
+      opacity: 1 - discoveryEggExit.value,
       transform: [
         { rotateZ: `${shake * 2.8}deg` },
+        { translateX: discoveryShake.value * 7 },
         { translateY: -activationPulse.value * (reduceMotion ? 2 : 7) },
         { scale: (0.5 + visualGrowth.value * 0.5) * (1 + feedbackPulse.value * 0.045 + activationPulse.value * (reduceMotion ? 0.035 : 0.075)) },
       ],
     };
   });
+  const discoveryCrackOneStyle = useAnimatedStyle(() => ({ opacity: discoveryCrackOne.value * (1 - discoveryCrackTwo.value * 0.65) }));
+  const discoveryCrackTwoStyle = useAnimatedStyle(() => ({ opacity: discoveryCrackTwo.value }));
+  const discoveryPulseOneStyle = useAnimatedStyle(() => ({
+    opacity: (1 - discoveryPulse.value) * 0.36 * (1 - discoveryEggExit.value),
+    transform: [{ scale: 0.62 + discoveryPulse.value * 0.72 }],
+  }));
+  const discoveryPulseTwoStyle = useAnimatedStyle(() => ({
+    opacity: (1 - discoveryPulse.value) * 0.22 * (1 - discoveryEggExit.value),
+    transform: [{ scale: 0.86 + discoveryPulse.value * 0.72 }],
+  }));
+  const discoveryCreatureStyle = useAnimatedStyle(() => ({
+    opacity: discoveryCreatureEntry.value,
+    transform: [
+      { translateY: 18 - discoveryCreatureEntry.value * 18 },
+      { scale: 0.6 + discoveryCreatureEntry.value * 0.4 },
+    ],
+  }));
+  const discoveryGlowStyle = useAnimatedStyle(() => ({
+    opacity: discoveryCreatureEntry.value * 0.72,
+    transform: [{ scale: 0.75 + discoveryCreatureEntry.value * 0.3 }],
+  }));
+  const discoveryTitleVisible = discoveryPhaseAtLeast(discoveryPhase, 'subject_settling');
+  const discoveryTitleStyle = useAnimatedStyle(() => ({
+    opacity: discoveryTitleVisible ? discoveryCreatureEntry.value : 0,
+    transform: [{ translateY: 8 - discoveryCreatureEntry.value * 8 }],
+  }));
   const companionAnchorStyle = useAnimatedStyle(() => {
     const eggGrowthScale = 0.5 + visualGrowth.value * 0.5;
     return {
@@ -374,9 +497,22 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
       ],
     };
   });
+  const discoveryCreatureFrame = discoveryCreature
+    ? todayExplorationCreatureStageFrame(
+        windowWidth,
+        windowHeight,
+        explorationStageTop ?? TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA,
+        discoveryCreature.visualKey,
+      )
+    : null;
+  const discoveryEggWidth = 200 * eggStageScale;
 
   return (
     <View pointerEvents="box-none" style={styles.stage}>
+      {discoveryHatch ? <>
+        <Animated.View style={[styles.discoveryPulseRing, { height: discoveryEggWidth * 1.05, marginLeft: -discoveryEggWidth * 0.525, top: eggFrame.top + eggFrame.height * 0.08, width: discoveryEggWidth * 1.05 }, discoveryPulseOneStyle]} />
+        <Animated.View style={[styles.discoveryPulseRing, { height: discoveryEggWidth * 1.05, marginLeft: -discoveryEggWidth * 0.525, top: eggFrame.top + eggFrame.height * 0.08, width: discoveryEggWidth * 1.05 }, discoveryPulseTwoStyle]} />
+      </> : null}
       <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
         <View
           pointerEvents="box-none"
@@ -429,6 +565,8 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
               style={styles.eggImageFrame}>
               <EggAvatarArtwork
                 allowDownscaling={false}
+                expressionSequence={discoveryHatch && !discoveryPhaseAtLeast(discoveryPhase, 'crossfading_subject') ? DISCOVERY_EXPRESSIONS : undefined}
+                expressionSequenceKey={discoveryHatch ? `${discoveryHatch.dayId}:discovery` : undefined}
                 faceId={equippedFaceId}
                 priority="high"
                 resolution="high"
@@ -436,6 +574,26 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
                 style={StyleSheet.absoluteFill}
                 transition={0}
               />
+              {discoveryHatch ? <>
+                <AnimatedImage
+                  allowDownscaling={false}
+                  cachePolicy="memory-disk"
+                  contentFit="contain"
+                  priority="high"
+                  source={DISCOVERY_CRACK_ONE}
+                  style={[StyleSheet.absoluteFill, eggAvatarBodyPresentationStyle(equippedSkinId), discoveryCrackOneStyle]}
+                  transition={0}
+                />
+                <AnimatedImage
+                  allowDownscaling={false}
+                  cachePolicy="memory-disk"
+                  contentFit="contain"
+                  priority="high"
+                  source={DISCOVERY_CRACK_TWO}
+                  style={[StyleSheet.absoluteFill, eggAvatarBodyPresentationStyle(equippedSkinId), discoveryCrackTwoStyle]}
+                  transition={0}
+                />
+              </> : null}
             </Pressable>
           </Animated.View>
           {companionWispId ? (
@@ -457,9 +615,76 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
           {!isActivated && showDormantIndicator ? <DormantEggZzz growth={visualGrowth} reduceMotion={reduceMotion} stageScale={eggStageScale} /> : null}
         </View>
       </View>
+      {discoveryCreature && discoveryCreatureSource && discoveryCreatureFrame ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.discoveryCreature,
+            {
+              height: discoveryCreatureFrame.size,
+              marginLeft: -discoveryCreatureFrame.size / 2,
+              top: discoveryCreatureFrame.top,
+              width: discoveryCreatureFrame.size,
+            },
+            discoveryCreatureStyle,
+          ]}>
+          <CreatureGroundShadow frameSize={discoveryCreatureFrame.size} visualKey={discoveryCreature.visualKey} />
+          <AnimatedImage
+            contentFit="contain"
+            source={DISCOVERY_SOFT_GLOW}
+            style={[styles.discoveryGlow, discoveryGlowStyle]}
+            tintColor={discoveryCreature.accentColor}
+            transition={0}
+          />
+          <Image
+            allowDownscaling={false}
+            cachePolicy="memory-disk"
+            contentFit="contain"
+            onError={onDiscoveryCreatureError}
+            onLoad={onDiscoveryCreatureReady}
+            pointerEvents="none"
+            priority="high"
+            source={discoveryCreatureSource}
+            style={StyleSheet.absoluteFill}
+            transition={0}
+          />
+        </Animated.View>
+      ) : null}
+      {discoveryCreature && discoveryCreatureFrame ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.discoveryNameCard,
+            { top: eggFrame.top + eggFrame.height + 8 },
+            discoveryTitleStyle,
+          ]}>
+          <ThemedText
+            style={styles.discoveryName}
+            lightColor={KatchaDeckUI.ftue.gold}
+            darkColor={KatchaDeckUI.ftue.gold}>
+            {discoveryCreature.name}
+          </ThemedText>
+        </Animated.View>
+      ) : null}
     </View>
   );
 });
+
+function discoveryPhaseAtLeast(phase: TodayHatchPhase, target: TodayHatchPhase) {
+  const order: TodayHatchPhase[] = [
+    'idle',
+    'preparing',
+    'shaking',
+    'cracking',
+    'crossfading_subject',
+    'subject_settling',
+    'awaiting_interaction',
+    'world_shift',
+    'dashboard_settling',
+    'complete',
+  ];
+  return order.indexOf(phase) >= order.indexOf(target);
+}
 
 export function TodayDormantEggIndicator({ energyRatio, focusX, focusY, left, sceneTranslateX, stageScale, top }: {
   energyRatio: number;
@@ -891,6 +1116,43 @@ const styles = StyleSheet.create({
     top: '50%',
     zIndex: 8,
   },
+  discoveryCreature: {
+    left: '50%',
+    position: 'absolute',
+    zIndex: 7,
+  },
+  discoveryGlow: {
+    bottom: '-20%',
+    left: '-20%',
+    position: 'absolute',
+    right: '-20%',
+    top: '-20%',
+  },
+  discoveryPulseRing: {
+    backgroundColor: 'rgba(250,218,125,0.12)',
+    borderColor: 'rgba(255,236,174,0.55)',
+    borderRadius: 999,
+    borderWidth: 2,
+    left: '50%',
+    position: 'absolute',
+    zIndex: 2,
+  },
+  discoveryNameCard: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(31,27,22,0.82)',
+    borderColor: 'rgba(255,245,220,0.38)',
+    borderCurve: 'continuous',
+    borderRadius: 18,
+    borderWidth: 1.2,
+    boxShadow: '0 5px 16px rgba(13,12,15,0.28), inset 0 1px 0 rgba(255,248,230,0.22)',
+    minWidth: 174,
+    paddingHorizontal: 20,
+    paddingVertical: 7,
+    position: 'absolute',
+    zIndex: 10,
+  },
+  discoveryName: { ...KatchaDeckUI.typography.ftueHeroTitle, fontSize: 25, lineHeight: 29, textAlign: 'center' },
   activationCelebration: {
     alignItems: 'center',
     alignSelf: 'center',

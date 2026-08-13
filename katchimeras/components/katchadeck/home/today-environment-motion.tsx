@@ -25,6 +25,7 @@ type TodayEnvironmentMotion = {
 
 type MotionControllerOptions = {
   enabled: boolean;
+  frozen?: boolean;
   hoverEnabled?: boolean;
   maxPinchScale?: number;
   pinchSoftLimitRange?: number;
@@ -34,6 +35,7 @@ const MotionContext = createContext<TodayEnvironmentMotion | null>(null);
 
 export function useTodayEnvironmentMotion({
   enabled,
+  frozen = false,
   hoverEnabled = enabled,
   maxPinchScale,
   pinchSoftLimitRange = 0,
@@ -55,6 +57,7 @@ export function useTodayEnvironmentMotion({
 
   useEffect(() => {
     cancelAnimation(hoverY);
+    if (frozen) return;
     if (!enabled || !hoverEnabled || !isFocused || reduceMotion || !motion.hoverEnabled) {
       hoverY.value = withTiming(0, { duration: 180 });
       return;
@@ -75,17 +78,21 @@ export function useTodayEnvironmentMotion({
       false,
     );
     return () => cancelAnimation(hoverY);
-  }, [enabled, hoverEnabled, hoverY, isFocused, motion.hoverDistance, motion.hoverEnabled, motion.hoverHalfCycleMs, reduceMotion]);
+  }, [enabled, frozen, hoverEnabled, hoverY, isFocused, motion.hoverDistance, motion.hoverEnabled, motion.hoverHalfCycleMs, reduceMotion]);
 
   useEffect(() => {
+    if (frozen) {
+      cancelAnimation(pinchScale);
+      return;
+    }
     if (enabled) return;
     cancelAnimation(pinchScale);
     pinchScale.value = withSpring(1, motion.resetSpring);
-  }, [enabled, motion.resetSpring, pinchScale]);
+  }, [enabled, frozen, motion.resetSpring, pinchScale]);
 
   const pinchGesture = useMemo(
     () => Gesture.Pinch()
-      .enabled(enabled)
+      .enabled(enabled && !frozen)
       .onBegin(() => {
         cancelAnimation(pinchScale);
         pinchStartScale.value = pinchScale.value;
@@ -115,6 +122,7 @@ export function useTodayEnvironmentMotion({
       }),
     [
       enabled,
+      frozen,
       motion.resetSpring,
       pinchScale,
       pinchStartScale,

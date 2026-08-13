@@ -179,4 +179,4 @@ export type CompanionInteractionAction =
   | { type: 'set_quest_attempt'; attemptId: string | null }
   | { type: 'return_to_destination' }
   | { type: 'reset_quest_experience' }
-  | { type: 'reset_companion'; initialDestination?: CompanionDestination | null };
+  | { type: 'reset_companion'; initialDestination?: CompanionDestination | null; initialConversation?: boolean };

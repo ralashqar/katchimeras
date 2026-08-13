@@ -7,6 +7,7 @@ import { MeadowTabBar } from '@/components/katchadeck/ui/meadow-tab-bar';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
+import { useFirstSession } from '@/features/onboarding/first-session';
 import { loadFeastleStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
 
 // Today is the daily capture surface. The lightweight Katchimeras roster is
@@ -18,6 +19,8 @@ export const unstable_settings = {
 
 export default function TabLayout() {
   const onboardingProfile = loadOnboardingProfile();
+  const firstSession = useFirstSession();
+  const guidedSession = firstSession != null && firstSession.stage !== 'complete';
   const [feastleStory, setFeastleStory] = useState(loadFeastleStory);
   useEffect(() => subscribeCompanionStories(() => setFeastleStory(loadFeastleStory())), []);
 
@@ -74,6 +77,7 @@ export default function TabLayout() {
           name="katchimeras"
           options={{
             freezeOnBlur: true,
+            href: guidedSession ? null : undefined,
             title: 'Katchimeras',
             tabBarBadge: feastleStory.unreadReturn ? '' : undefined,
             tabBarIcon: ({ color }) => <IconSymbol size={26} name="pawprint.fill" color={color} />,
@@ -86,6 +90,7 @@ export default function TabLayout() {
             // it can unmount the visual board/worklets while retaining the
             // warm provider and its already-hydrated merge state.
             freezeOnBlur: false,
+            href: guidedSession && firstSession?.stage === 'today' ? null : undefined,
             title: 'Merge',
             tabBarBadge: feastleStory.status === 'order_active' ? '' : undefined,
             tabBarIcon: ({ color }) => <IconSymbol size={26} name="circle.grid.2x2.fill" color={color} />,
@@ -95,6 +100,7 @@ export default function TabLayout() {
           name="collection"
           options={{
             freezeOnBlur: true,
+            href: guidedSession ? null : undefined,
             title: 'Deck',
             tabBarIcon: ({ color }) => <IconSymbol size={26} name="sparkles" color={color} />,
           }}

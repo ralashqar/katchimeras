@@ -5,6 +5,8 @@ import type { HomeDayRecord, StoredHomeDayRecord } from '../types/home';
 import {
   IDLE_TODAY_HATCH_PRESENTATION,
   todayHatchPresentationReducer,
+  todayHatchOwnsSurface,
+  todayHatchRunsInPlace,
   todayHatchShowsResident,
   todayHatchShowsTomorrow,
 } from '../utils/today-hatch-presentation';
@@ -40,16 +42,16 @@ test('hatch presentation advances monotonically and reveals Tomorrow last', () =
   assert.equal(state.egg, egg);
 
   state = todayHatchPresentationReducer(state, { type: 'committed', day: committedDay });
-  assert.equal(state.phase, 'cracking');
+  assert.equal(state.phase, 'shaking');
   assert.equal(todayHatchShowsResident(state.phase), false);
 
-  state = todayHatchPresentationReducer(state, { type: 'advance', phase: 'revealing' });
+  state = todayHatchPresentationReducer(state, { type: 'advance', phase: 'crossfading_subject' });
   state = todayHatchPresentationReducer(state, { type: 'advance', phase: 'world_shift' });
-  state = todayHatchPresentationReducer(state, { type: 'advance', phase: 'settling' });
+  state = todayHatchPresentationReducer(state, { type: 'advance', phase: 'dashboard_settling' });
   assert.equal(todayHatchShowsResident(state.phase), true);
   assert.equal(todayHatchShowsTomorrow(state.phase), false);
 
-  state = todayHatchPresentationReducer(state, { type: 'advance', phase: 'tomorrow_arrival' });
+  state = todayHatchPresentationReducer(state, { type: 'advance', phase: 'complete' });
   assert.equal(todayHatchShowsTomorrow(state.phase), true);
 });
 
@@ -57,7 +59,7 @@ test('late or out-of-order actions cannot rewind or replace the active hatch', (
   let state = todayHatchPresentationReducer(IDLE_TODAY_HATCH_PRESENTATION, { type: 'begin', day });
   state = todayHatchPresentationReducer(state, { type: 'committed', day: committedDay });
   state = todayHatchPresentationReducer(state, { type: 'advance', phase: 'world_shift' });
-  const rewound = todayHatchPresentationReducer(state, { type: 'advance', phase: 'revealing' });
+  const rewound = todayHatchPresentationReducer(state, { type: 'advance', phase: 'crossfading_subject' });
   assert.equal(rewound.phase, 'world_shift');
 
   const otherDay = { ...committedDay, id: 'different-day' };
@@ -79,4 +81,25 @@ test('failure and completion restore an idle, retryable presentation', () => {
     todayHatchPresentationReducer(retried, { type: 'reset' }),
     IDLE_TODAY_HATCH_PRESENTATION,
   );
+});
+
+test('Discovery Hatch holds the revealed companion in Home until interaction', () => {
+  const creature = { id: 'ftue-discovery-mossprout', name: 'Mossprout' } as NonNullable<StoredHomeDayRecord['creature']>;
+  let state = todayHatchPresentationReducer(IDLE_TODAY_HATCH_PRESENTATION, {
+    type: 'begin_discovery', day, creature,
+  });
+  state = todayHatchPresentationReducer(state, { type: 'advance', phase: 'awaiting_interaction' });
+  assert.equal(state.policy, 'ftue_discovery');
+  assert.equal(state.phase, 'awaiting_interaction');
+  assert.equal(state.creatureOverride?.name, 'Mossprout');
+  assert.equal(todayHatchShowsTomorrow(state.phase), false);
+  assert.equal(todayHatchRunsInPlace(state), true);
+  assert.equal(todayHatchOwnsSurface(state), false);
+});
+
+test('only Daily Hatch owns the full Home surface', () => {
+  const daily = todayHatchPresentationReducer(IDLE_TODAY_HATCH_PRESENTATION, { type: 'begin', day });
+  assert.equal(todayHatchOwnsSurface(daily), true);
+  assert.equal(todayHatchRunsInPlace(daily), false);
+  assert.equal(todayHatchOwnsSurface(IDLE_TODAY_HATCH_PRESENTATION), false);
 });

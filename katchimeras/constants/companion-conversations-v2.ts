@@ -9,6 +9,7 @@ import { companionInsightConversationDefinitions } from '@/constants/companion-i
 import { feastleFirstMeetingConversationDefinition, feastleFriendshipConversationDefinitions } from '@/constants/feastle-friendship-conversations';
 import { baristabbitStoryConversationDefinitions } from '@/constants/baristabbit-story-conversations';
 import { journeyCohortStoryConversationDefinitions } from '@/constants/journey-cohort-story-conversations';
+import { mossproutFtueConversationDefinitions } from '@/constants/mossprout-ftue-conversations';
 import {
   authoredConversationTopics,
   authoredFamilyConversationDefinitions,
@@ -916,6 +917,7 @@ function familyPack(
 }
 
 export const companionConversationDefinitionsV2: readonly ConversationDefinition[] = [
+  ...mossproutFtueConversationDefinitions,
   ...familyPack('baristabbit', BARISTA_POLLS, BARISTA_PROFILE),
   ...baristabbitStoryConversationDefinitions,
   ...journeyCohortStoryConversationDefinitions,

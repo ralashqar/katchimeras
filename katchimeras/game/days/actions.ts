@@ -345,7 +345,9 @@ export function completeTodayEnergyAction(
 
 export type InlineTodayEnergyArtifact =
   | { kind: 'mood'; choiceId: string }
-  | { kind: 'sleep'; sleep: DaySleep };
+  | { kind: 'sleep'; sleep: DaySleep }
+  | { kind: 'prompt'; promptKind: DayPromptKind; choiceId: string }
+  | { kind: 'private' };
 
 /** Applies the inline artifact, Growth receipt, and care completion in one commit. */
 export function completeInlineTodayEnergyAction(
@@ -370,9 +372,18 @@ export function completeInlineTodayEnergyAction(
       day = withPromptAnswer(day, answer);
       artifactSourceId = answer.id;
     }
-  } else {
+  } else if (input.artifact.kind === 'sleep') {
     day = withSleep(day, input.artifact.sleep, now);
     artifactSourceId = day.sleep?.recordedAt ?? `${day.isoDate}:sleep`;
+  } else if (input.artifact.kind === 'prompt') {
+    const answer = createDayPromptAnswer({
+      kind: input.artifact.promptKind,
+      choiceIds: [input.artifact.choiceId],
+    }, now);
+    if (answer) {
+      day = withPromptAnswer(day, answer);
+      artifactSourceId = answer.id;
+    }
   }
   const completed = completeEnergyAction(day, {
     growth: { ...input.completion.growth, sourceId: artifactSourceId },

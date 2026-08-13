@@ -9,6 +9,8 @@ export type HomeLoopMode =
   | 'historical'
   | 'locked-tomorrow';
 
+export type HomeHatchOwnership = 'none' | 'daily_surface' | 'discovery_in_place';
+
 export type HomeFormingContext = {
   activePrompt: ActiveDayPrompt | null;
   day: HomeDayRecord;
@@ -20,14 +22,14 @@ export type HomeFormingContext = {
 export function resolveHomeLoopPresentation(input: {
   activeDayPrompt: ActiveDayPrompt | null;
   availableDayPrompts: ActiveDayPrompt[];
-  isHatching: boolean;
+  hatchOwnership: HomeHatchOwnership;
   isTodayHatched: boolean;
   selectedDay: HomeTimelineDay | null;
   tomorrowActivePrompt: ActiveDayPrompt | null;
   tomorrowAvailablePrompts: ActiveDayPrompt[];
   tomorrowDay: HomeDayRecord;
 }): { forming: HomeFormingContext | null; mode: HomeLoopMode } {
-  if (input.isHatching) return { forming: null, mode: 'hatching' };
+  if (input.hatchOwnership === 'daily_surface') return { forming: null, mode: 'hatching' };
 
   const selected = input.selectedDay;
   if (selected?.kind === 'day' && selected.isToday) {
@@ -60,4 +62,3 @@ export function resolveHomeLoopPresentation(input: {
 
   return { forming: null, mode: 'historical' };
 }
-

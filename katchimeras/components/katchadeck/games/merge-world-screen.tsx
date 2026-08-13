@@ -10,6 +10,8 @@ import { RewardSplash, type RewardSplashItem } from '@/components/katchadeck/ui/
 import { GameCurrencyHud } from '@/components/katchadeck/ui/game-currency-hud';
 import { GameHudBar, GameHudControl, GameHudItem } from '@/components/katchadeck/ui/game-primitives';
 import { KatchaInlineNotice } from '@/components/katchadeck/ui/katcha-inline-notice';
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { KatchaSurfaceProvider } from '@/components/katchadeck/ui/katcha-surface';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
@@ -19,6 +21,9 @@ import {
 import { mergeWorldGeneratorArt } from '@/constants/merge-world-art';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import { useMergeWorld } from '@/features/merge-world/merge-world-provider';
+import { commitFtueAction, ftueWispForRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
+import { WISPS_BY_ID } from '@/constants/wisps';
 import { useGameFeedback } from '@/features/ui/game-feedback-provider';
 import { useGameWallet } from '@/features/ui/game-wallet-provider';
 import { GameUI } from '@/constants/game-ui';
@@ -41,6 +46,8 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { state, loading, error, lastResult, dispatch: send } = useMergeWorld();
+  const ftueRun = useFtueRun();
+  const ftueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
   const [selectedCell, setSelectedCell] = useState<number | null>(null);
   const [boardAreaHeight, setBoardAreaHeight] = useState(0);
   const feedback = useGameFeedback();
@@ -63,6 +70,7 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
   const [energyPulseNonce, setEnergyPulseNonce] = useState(0);
   const [coinPulseNonce, setCoinPulseNonce] = useState(0);
   const [energyClockNow, setEnergyClockNow] = useState(Date.now);
+  const [chapterCompleteOpen, setChapterCompleteOpen] = useState(false);
   const screenRef = useRef<View>(null);
   const energyHudRef = useRef<View>(null);
   const coinHudRef = useRef<View>(null);
@@ -157,6 +165,21 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
     if (message) feedback.show({ id: `merge:${lastResult.state.revision}:${message}`, message });
   }, [feedback, lastResult]);
 
+  useEffect(() => {
+    if (!active || !state || !ftueStep) return;
+    const hasOrder = (suffix: string) => state.activeOrders.some((order) => order.id === `mossprout:chapter-0:${suffix}`);
+    if (ftueRun?.stepId === 'merge.first' && !hasOrder('first-sprout')) {
+      commitFtueAction({ actionId: 'merge.serve_sprout', evidenceRef: `merge-revision:${state.revision}` });
+      setChapterCompleteOpen(true);
+      return;
+    }
+  }, [active, ftueRun?.stepId, ftueStep, state]);
+
+  const finishChapterZero = useCallback(() => {
+    setChapterCompleteOpen(false);
+    commitFtueAction({ actionId: 'chapter.finish', evidenceRef: 'chapter-sheet-acknowledged' });
+  }, []);
+
   const dispatch = useCallback((command: MergeWorldCommand) => send(command), [send]);
   const pendingParcels = useMemo(() => state?.arrivals.filter((arrival) => (
     arrival.claimedAt == null
@@ -168,7 +191,9 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
   const trayEntries = useMemo<MergeTrayEntry[]>(() => {
     if (!state) return [];
     const featured = state.favouriteCharacterId;
-    const returnEntries: MergeTrayEntry[] = [
+    const chapterZeroOrders = state.activeOrders.filter((order) => order.id.startsWith('mossprout:chapter-0:'));
+    const chapterZeroActive = chapterZeroOrders.length > 0;
+    const returnEntries: MergeTrayEntry[] = chapterZeroActive ? [] : [
       ...(story.status === 'return_available' ? [{
         id: `chat-note:${story.id}:${story.targetLevel}`,
         kind: 'chat_note' as const,
@@ -194,7 +219,8 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
     const focusCharacterId = focusOrderId
       ? state.activeOrders.find((order) => order.id === focusOrderId)?.characterId ?? null
       : null;
-    const prioritizedOrders = state.activeOrders
+    const visibleOrders = chapterZeroActive ? chapterZeroOrders.slice(0, 1) : state.activeOrders;
+    const prioritizedOrders = visibleOrders
       .map((order, sourceIndex) => ({ order, sourceIndex }))
       .sort((left, right) => {
         const priority = (order: MergeOrder) => {
@@ -213,7 +239,7 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
       itemReadiness: mergeOrderItemReadiness(state, order),
       ready: readyOrderIds.has(order.id),
     }));
-    const parcelEntries: MergeTrayEntry[] = pendingParcel ? [{
+    const parcelEntries: MergeTrayEntry[] = !chapterZeroActive && pendingParcel ? [{
       id: 'parcel-stack',
       kind: 'parcel',
       arrival: pendingParcel,
@@ -389,6 +415,23 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
   const energyCountdownSeconds = state.energy.value < state.energy.regenCap
     ? Math.max(1, Math.ceil((MERGE_ENERGY_REGEN_MS - ((energyClockNow - state.energy.lastRegenAt) % MERGE_ENERGY_REGEN_MS)) / 1_000))
     : null;
+  const chapterZeroOrder = state.activeOrders.find((order) => order.id.startsWith('mossprout:chapter-0:'));
+  const firstSproutDiscovered = state.discoveries.includes('nature:garden:2');
+  const legacyChapterGuide = chapterZeroOrder
+    ? chapterZeroOrder.id.endsWith('first-sprout')
+      ? firstSproutDiscovered
+        ? { title: 'That’s exactly what we need', body: 'The Sprout is ready. Give it to Mossprout’s request above the counter.' }
+        : { title: 'A little place to begin', body: 'Drag the two matching Seeds together. Your first Sprout is waiting inside them.' }
+      : chapterZeroOrder.id.endsWith('little-plant')
+        ? { title: 'Make it feel alive', body: 'Tap the Wild Garden to grow Seeds, then merge them into the Plant Mossprout needs.' }
+        : { title: 'One last thing for home', body: 'Grow and merge one Flower. This final request completes Mossprout’s little place.' }
+    : null;
+  void legacyChapterGuide;
+  const chapterGuide = ftueStep?.surface === 'merge' ? {
+    title: ftueStep.id === 'merge.first' && firstSproutDiscovered ? 'That is exactly what we need' : ftueStep.guide.title,
+    body: ftueStep.id === 'merge.first' && firstSproutDiscovered ? 'The Sprout is ready. Give it to Mossprout above the counter.' : ftueStep.guide.body,
+  } : null;
+  const firstWisp = WISPS_BY_ID.get(ftueWispForRun(ftueRun));
   return (
     <View ref={screenRef} style={styles.screen}>
       <View style={[styles.game, { paddingTop: Math.max(insets.top + 3, 7), paddingBottom: Math.max(insets.bottom + 3, 7), width: contentWidth }]}>
@@ -411,6 +454,11 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
             </GameHudControl>
           </>}
         />
+        {chapterGuide ? (
+          <KatchaSurfaceProvider surface="parchment">
+            <KatchaInlineNotice body={chapterGuide.body} title={chapterGuide.title} tone="neutral" />
+          </KatchaSurfaceProvider>
+        ) : null}
         <View style={styles.mergeArea}>
           <MergeOrderRail
             entries={trayEntries}
@@ -454,6 +502,19 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
         items={generatorUnlockRewards}
         onItemSeen={(receiptId) => dispatch({ type: 'ackGeneratorUnlock', receiptId, now: Date.now() })}
       /> : null}
+      <KatchaSheet
+        footer={<KatchaButton fullWidth glow label="See what comes next" onPress={finishChapterZero} />}
+        header={{ eyebrow: 'Chapter complete', title: 'A Little Place to Begin', subtitle: 'Mossprout has somewhere to grow.' }}
+        onRequestClose={() => {}}
+        open={chapterCompleteOpen}
+        showClose={false}
+        surface="parchment">
+        <View style={styles.scriptedSheetBody}>
+          <ThemedText style={styles.scriptedSheetCopy} lightColor={GameUI.color.ink} darkColor={GameUI.color.ink}>“There. A little place to begin.”</ThemedText>
+          <ThemedText style={styles.scriptedSheetDetail} lightColor={GameUI.color.ink} darkColor={GameUI.color.ink}>You found your first Wisp{firstWisp ? `: ${firstWisp.name}` : ''} - a little piece of your story.</ThemedText>
+          <ThemedText style={styles.scriptedSheetMystery} lightColor={GameUI.color.ink} darkColor={GameUI.color.ink}>Fresh footprints cross the Dream Mist. Mossprout looks toward them. “Those aren’t mine.”</ThemedText>
+        </View>
+      </KatchaSheet>
     </View>
   );
 }
@@ -509,4 +570,8 @@ const styles = StyleSheet.create({
   expansionLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9, fontWeight: '900' },
   errorBanner: { alignSelf: 'center', maxWidth: 360, position: 'absolute', width: '92%', zIndex: GameUI.layer.notice },
   pressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
+  scriptedSheetBody: { gap: 12, paddingVertical: 6 },
+  scriptedSheetCopy: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 22, lineHeight: 28 },
+  scriptedSheetDetail: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '700', lineHeight: 19 },
+  scriptedSheetMystery: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '600', lineHeight: 19, opacity: 0.82 },
 });

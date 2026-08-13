@@ -15,6 +15,8 @@ import type { CompanionQuestState } from '@/utils/katchimera-quests';
 import { mergeActivityRewards, mergeQuestActivityRewards } from '@/utils/merge-world/activity-rewards';
 import { reduceMergeWorld } from '@/utils/merge-world/engine';
 import { mergeWorldPendingPersistence, type MergeWorldPendingPersistence } from '@/utils/merge-world/persistence-buffer';
+import { loadFirstSession } from '@/features/onboarding/first-session';
+import { isMossproutChapterZeroActive } from '@/utils/merge-world/chapter-zero-policy';
 import { loadMergeWorldState, saveMergeWorldState, subscribeMergeWorldResets } from '@/utils/merge-world/repository';
 import { isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, markAuthoredCohortOrderActive, markAuthoredCohortOrderServed, markFeastleOrderActive, markFeastleOrderServed, recordAuthoredCohortQuietBond, recordFeastleQuietBond, subscribeCompanionStories } from '@/utils/companion-story-storage';
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
@@ -219,6 +221,12 @@ export function MergeWorldProvider({
   }, [featuredCharacterId]);
 
   const reconcileFeaturedStory = useCallback((current: MergeWorldState, characterId: MergeCharacterId, now = Date.now()) => {
+    if (
+      characterId === 'mossprout'
+      && loadFirstSession()?.stage !== 'complete'
+      && (isMossproutChapterZeroActive(current)
+        || current.characterProgress.mossprout?.completedChapterIds.includes('mossprout-chapter-0'))
+    ) return current;
     if (characterId === 'feastle') return reconcileFeastleStory(current, now);
     if (isAuthoredCohortFamily(characterId)) return reconcileAuthoredCohortStory(current, characterId, now);
     const served = new Set(current.externalRewardReceipts
@@ -236,6 +244,13 @@ export function MergeWorldProvider({
   }, [reconcileAuthoredCohortStory, reconcileFeastleStory]);
 
   const featureAndReconcile = useCallback((current: MergeWorldState, now = Date.now()) => {
+    if (loadFirstSession()?.stage !== 'complete' && isMossproutChapterZeroActive(current)) {
+      const featured = reduceMergeWorld(current, { type: 'featureCharacter', characterId: 'mossprout', now }).state;
+      const chapterZeroOrders = featured.activeOrders.filter((order) => order.id.startsWith('mossprout:chapter-0:'));
+      return chapterZeroOrders.length === featured.activeOrders.length
+        ? featured
+        : { ...featured, activeOrders: chapterZeroOrders };
+    }
     const characterId = resolveFeaturedCharacter(current);
     if (!characterId) return current;
     let next = reduceMergeWorld(current, { type: 'featureCharacter', characterId, now }).state;

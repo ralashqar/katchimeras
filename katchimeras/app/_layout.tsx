@@ -14,6 +14,7 @@ import { WispProvider } from '@/features/wisps/wisp-provider';
 import { EconomyProvider } from '@/features/economy/economy-provider';
 import { AvatarAccessReconciler } from '@/features/economy/avatar-access-reconciler';
 import { AppActivityProvider } from '@/features/performance/app-activity';
+import { FtueProvider } from '@/features/onboarding/ftue-provider';
 import { GameUIProvider } from '@/components/katchadeck/ui/game-ui-provider';
 import { GameFeedbackProvider } from '@/features/ui/game-feedback-provider';
 import { GameWalletProvider } from '@/features/ui/game-wallet-provider';
@@ -90,6 +91,7 @@ export default function RootLayout() {
                 <EggAvatarProvider>
                   <AvatarAccessReconciler />
                   <WispProvider>
+                    <FtueProvider>
                     <AppActivityProvider>
                       <Stack>
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
@@ -123,6 +125,7 @@ export default function RootLayout() {
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Katchimeras Preview' }} />
                       </Stack>
                     </AppActivityProvider>
+                    </FtueProvider>
                   </WispProvider>
                 </EggAvatarProvider>
               </GameFeedbackProvider>

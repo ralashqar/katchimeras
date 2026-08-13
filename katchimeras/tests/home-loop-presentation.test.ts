@@ -27,7 +27,7 @@ function resolve(overrides: Partial<Parameters<typeof resolveHomeLoopPresentatio
   return resolveHomeLoopPresentation({
     activeDayPrompt: null,
     availableDayPrompts: [],
-    isHatching: false,
+    hatchOwnership: 'none',
     isTodayHatched: false,
     selectedDay: today,
     tomorrowActivePrompt: null,
@@ -50,14 +50,15 @@ test('Today and unlocked Tomorrow resolve to one target-aware forming contract',
   assert.equal(next.forming?.isTomorrow, true);
 });
 
-test('Tomorrow stays locked before hatch and hatch presentation owns the surface', () => {
+test('Tomorrow stays locked and only Daily Hatch owns the whole surface', () => {
   assert.deepEqual(resolve({ selectedDay: tomorrow }), {
     forming: null,
     mode: 'locked-tomorrow',
   });
-  assert.deepEqual(resolve({ isHatching: true }), {
+  assert.deepEqual(resolve({ hatchOwnership: 'daily_surface' }), {
     forming: null,
     mode: 'hatching',
   });
+  assert.equal(resolve({ hatchOwnership: 'discovery_in_place' }).mode, 'forming-today');
+  assert.equal(resolve({ hatchOwnership: 'discovery_in_place' }).forming?.day.id, today.id);
 });
-

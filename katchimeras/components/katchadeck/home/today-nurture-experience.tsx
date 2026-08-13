@@ -34,8 +34,8 @@ import {
 } from '@/components/katchadeck/world/mood-monument-sheet';
 import { SLEEP_ART, SLEEP_OPTIONS } from '@/components/katchadeck/world/sleep-sheet';
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { AppFontFamilies } from '@/constants/theme';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { AppFontFamilies, KatchaDeckUI } from '@/constants/theme';
 import {
   homeTabBarHeight,
   HOME_ACTIONS_TAB_BAR_GAP,
@@ -63,6 +63,10 @@ import {
 } from '@/utils/today-kingdom-hero-layout';
 import { useTodayEnergyFeedback } from '@/features/today/today-energy-feedback';
 import { eggAvatarCustomizerCamera } from '@/utils/egg-avatar-customizer-camera';
+import { ScriptedActionList } from '@/components/katchadeck/onboarding/scripted-action-list';
+import { FtueGuideCopy } from '@/components/katchadeck/onboarding/ftue-guide-copy';
+import type { FtueActionDefinition, FtueChoiceOption } from '@/features/onboarding/ftue-types';
+import type { TodayHatchPresentation } from '@/utils/today-hatch-presentation';
 
 type TodayNurtureExperienceProps = {
   actionListLocked: boolean;
@@ -99,6 +103,19 @@ type TodayNurtureExperienceProps = {
   eggTargetRef: RefObject<View | null>;
   energyHudPulseNonce?: number;
   energyHudTargetRef?: RefObject<View | null>;
+  onboardingGuide?: {
+    eyebrow: string;
+    title: string;
+    body: string;
+  } | null;
+  onboardingFocus?: boolean;
+  hatchPresentation?: TodayHatchPresentation | null;
+  onHatchAssetsReady?: () => void;
+  onHatchAssetsError?: () => void;
+  scriptedActions?: readonly FtueActionDefinition[];
+  scriptedPanelCareAction?: RankedTodayCareAction | null;
+  onScriptedAction?: (action: FtueActionDefinition, from: FeedSourceRect) => void;
+  onScriptedChoice?: (action: FtueActionDefinition, option: FtueChoiceOption, from: FeedSourceRect) => void;
 };
 
 export type TodayCareCompletionEvent = {
@@ -112,7 +129,7 @@ type CheckInSelection = {
   action: RankedTodayCareAction;
   id: string;
   image: number;
-  kind: 'mood' | 'sleep';
+  kind: 'mood' | 'scripted' | 'sleep';
   label: string;
 };
 
@@ -146,6 +163,15 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   onReveal,
   onRewardFlight,
   onSelectDay,
+  onboardingGuide = null,
+  onboardingFocus = false,
+  hatchPresentation = null,
+  onHatchAssetsReady,
+  onHatchAssetsError,
+  scriptedActions = [],
+  scriptedPanelCareAction = null,
+  onScriptedAction,
+  onScriptedChoice,
   careSwipeExternalGesture,
   environmentGesture,
   sceneTranslateX,
@@ -154,6 +180,11 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
 }: TodayNurtureExperienceProps) {
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const [actionContentHeight, setActionContentHeight] = useState(0);
+  const [scriptedMoodSelection, setScriptedMoodSelection] = useState<CheckInSelection | null>(null);
+  const [scriptedMoodCompletion, setScriptedMoodCompletion] = useState<TodayCareCompletionEvent | null>(null);
+  const [scriptedTextSelection, setScriptedTextSelection] = useState<CheckInSelection | null>(null);
+  const [scriptedTextCompletion, setScriptedTextCompletion] = useState<TodayCareCompletionEvent | null>(null);
+  const scriptedMoodSourceRef = useRef<ViewType | null>(null);
   const pendingActionContentHeightRef = useRef(0);
   const actionStackRevealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const actionStackRevealFrameRef = useRef<number | null>(null);
@@ -169,8 +200,34 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   const focusProgress = useSharedValue(focusMode ? 1 : 0);
   const ready = growth.isActivated && (day.canHatch || growth.isReady);
   const quietDayAvailable = !growth.isActivated && Date.now() >= growth.scheduledHatchAt.getTime();
+  const scriptedMoodAction = scriptedActions.length === 1 && scriptedActions[0]?.promptKind === 'feeling'
+    ? scriptedActions[0]
+    : null;
+  const scriptedTextChoiceAction = scriptedActions.length === 1
+    && scriptedActions[0]?.presentation === 'inline_choice'
+    && scriptedActions[0]?.promptKind !== 'feeling'
+      ? scriptedActions[0]
+      : null;
+  const scriptedTextActionInstanceId = scriptedTextChoiceAction
+    ? `${day.isoDate}:${scriptedTextChoiceAction.id}`
+    : null;
+  const currentScriptedTextSelection = scriptedTextSelection?.action.instanceId === scriptedTextActionInstanceId
+    ? scriptedTextSelection
+    : null;
+  const currentScriptedTextCompletion = scriptedTextCompletion?.action.instanceId === scriptedTextActionInstanceId
+    ? scriptedTextCompletion
+    : null;
+  const scriptedRowActions = scriptedActions.filter((action) => action.presentation !== 'inline_choice');
   const moodAction = actions.find((action) => action.id === 'mood');
   const sleepAction = actions.find((action) => action.id === 'sleep');
+  useEffect(() => {
+    setScriptedMoodSelection(null);
+    setScriptedMoodCompletion(null);
+  }, [scriptedMoodAction?.id]);
+  useEffect(() => {
+    setScriptedTextSelection(null);
+    setScriptedTextCompletion(null);
+  }, [scriptedTextChoiceAction?.id]);
   useEffect(() => {
     let active = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -394,9 +451,10 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
         <Animated.View pointerEvents="none" style={[styles.eggStage, { top: stageTop + sceneLift }, eggPanStyle]}>
           <TodayKingdomEggHero
             accentColor={day.egg.accentColor}
-            companionWispId={companionWispId}
+            companionWispId={hatchPresentation ? null : companionWispId}
             coreColor={day.egg.coreColor}
             deferGrowthUntilEnergyArrival
+            discoveryHatch={hatchPresentation}
             explorationStageTop={stageTop}
             feedbackKey={feedbackKey}
             growthProgress={growth.energyRatio}
@@ -404,7 +462,9 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
             hideKingdomEnvironmentArt
             homeArchetypeId={homeArchetypeId}
             isActivated={growth.isActivated}
-            isReady={ready}
+            isReady={hatchPresentation ? false : ready}
+            onDiscoveryCreatureError={onHatchAssetsError}
+            onDiscoveryCreatureReady={onHatchAssetsReady}
             pinchStrength={0}
             showDormantIndicator={false}
             targetRef={eggTargetRef}
@@ -415,7 +475,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
       <View
         pointerEvents={focusMode ? 'none' : 'box-none'}
         style={[styles.chrome, focusMode && styles.chromeHidden]}>
-      {!growth.isActivated ? (
+      {!onboardingFocus && !growth.isActivated ? (
         <TodayDormantEggIndicator
           energyRatio={growth.energyRatio}
           focusX={windowWidth / 2}
@@ -427,15 +487,15 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
         />
       ) : null}
       <View pointerEvents="none" style={styles.environmentFade} />
-      <View pointerEvents="none" style={[styles.meterAnchor, { top: growthMeterTop }]}>
+      {!onboardingFocus ? <View pointerEvents="none" style={[styles.meterAnchor, { top: growthMeterTop }]}>
         <GrowthMeter growth={growth} />
-      </View>
-      <Animated.View
+      </View> : null}
+      {!onboardingFocus ? <Animated.View
         entering={reduceMotion ? FadeIn.duration(80) : FadeIn.duration(220)}
         style={[styles.topHudFixed, { top: topInset + 8 }]}>
         <TodayTopHud days={timelineDays} energyPulseNonce={energyHudPulseNonce} energyTargetRef={energyHudTargetRef} interactionLocked={false} onSelectDay={onSelectDay} selectedId={day.id} />
-      </Animated.View>
-      {!actionListHidden ? (
+      </Animated.View> : null}
+      {!actionListHidden && !onboardingFocus ? (
       <View onLayout={handleFixedActionClusterLayout} style={[styles.fixedActionCluster, { top: fixedActionClusterTop }]}>
         {quietDayAvailable ? (
           <Pressable accessibilityHint="Opens a short note so this quiet day can hatch" accessibilityRole="button" onPress={onAddTextNote} style={({ pressed }) => [styles.quietDayAction, pressed && styles.actionPressed]}>
@@ -454,8 +514,113 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
         )}
       </View>
       ) : null}
-      <MicrocopyToast message={microcopy} placementStyle={{ top: nurtureToastTop }} />
-      {!actionListHidden ? (
+      {!onboardingFocus ? <MicrocopyToast message={microcopy} placementStyle={{ top: nurtureToastTop }} /> : null}
+      {onboardingFocus && onboardingGuide && !actionListHidden ? (
+        <>
+          <Animated.View
+            entering={FadeInUp.duration(260)}
+            key={`focus:${onboardingGuide.title}`}
+            pointerEvents="none"
+            style={[styles.onboardingHeroGuide, { top: topInset + 22 }]}>
+            <FtueGuideCopy guide={onboardingGuide} hero />
+          </Animated.View>
+          {scriptedMoodAction && scriptedPanelCareAction && onScriptedChoice ? (
+            <View collapsable={false} ref={scriptedMoodSourceRef} style={[styles.onboardingActionStage, { bottom: tabBarHeight + HOME_ACTIONS_TAB_BAR_GAP }]}>
+              <InlineMood
+                action={{ ...scriptedPanelCareAction, title: scriptedMoodAction.title, growthReward: scriptedMoodAction.growthReward ?? scriptedPanelCareAction.growthReward }}
+                allowSkip={false}
+                completionEvent={scriptedMoodCompletion}
+                interactionLocked={actionListLocked}
+                onChoose={(selection, from) => {
+                  const option = scriptedMoodAction.options?.find((candidate) => candidate.domainChoiceId === selection.id);
+                  if (!option) return;
+                  const careAction = { ...scriptedPanelCareAction, title: scriptedMoodAction.title, growthReward: scriptedMoodAction.growthReward ?? scriptedPanelCareAction.growthReward };
+                  setScriptedMoodSelection({ ...selection, action: careAction, kind: 'mood' });
+                  setScriptedMoodCompletion({ action: careAction, id: `ftue:${scriptedMoodAction.id}:${selection.id}` });
+                  onScriptedChoice(scriptedMoodAction, option, from);
+                }}
+                onFinished={() => {}}
+                onSkip={() => scriptedMoodSourceRef.current?.measureInWindow((x, y, w, h) => {
+                  const option = scriptedMoodAction.options?.find((candidate) => candidate.private);
+                  if (!option) return;
+                  const careAction = { ...scriptedPanelCareAction, title: scriptedMoodAction.title, growthReward: scriptedMoodAction.growthReward ?? scriptedPanelCareAction.growthReward };
+                  setScriptedMoodCompletion({ action: careAction, id: `ftue:${scriptedMoodAction.id}:private` });
+                  onScriptedChoice(scriptedMoodAction, option, { x, y, w, h });
+                })}
+                key={scriptedMoodAction.id}
+                reduceMotion={reduceMotion}
+                selection={scriptedMoodSelection}
+                swipeExternalGesture={careSwipeExternalGesture}
+              />
+            </View>
+          ) : scriptedTextChoiceAction && scriptedPanelCareAction && onScriptedChoice ? (
+            <View style={[styles.onboardingActionStage, { bottom: tabBarHeight + HOME_ACTIONS_TAB_BAR_GAP }]}>
+              <InlineScriptedChoice
+                action={{
+                  ...scriptedPanelCareAction,
+                  id: scriptedTextChoiceAction.id,
+                  instanceId: `${day.isoDate}:${scriptedTextChoiceAction.id}`,
+                  title: scriptedTextChoiceAction.title,
+                  description: scriptedTextChoiceAction.description,
+                  growthReward: scriptedTextChoiceAction.growthReward ?? scriptedPanelCareAction.growthReward,
+                }}
+                completionEvent={currentScriptedTextCompletion}
+                interactionLocked={actionListLocked}
+                key={scriptedTextChoiceAction.id}
+                onChoose={(option, from) => {
+                  const careAction = {
+                    ...scriptedPanelCareAction,
+                    id: scriptedTextChoiceAction.id,
+                    instanceId: `${day.isoDate}:${scriptedTextChoiceAction.id}`,
+                    title: scriptedTextChoiceAction.title,
+                    description: scriptedTextChoiceAction.description,
+                    growthReward: scriptedTextChoiceAction.growthReward ?? scriptedPanelCareAction.growthReward,
+                  };
+                  setScriptedTextSelection({
+                    accent: Meadow.gold,
+                    action: careAction,
+                    id: option.id,
+                    image: GAME_CURRENCY_ART.energy,
+                    kind: 'scripted',
+                    label: option.label,
+                  });
+                  setScriptedTextCompletion({ action: careAction, id: `ftue:${scriptedTextChoiceAction.id}:${option.id}` });
+                  onScriptedChoice(scriptedTextChoiceAction, option, from);
+                }}
+                onSkip={(from) => {
+                  const option = scriptedTextChoiceAction.options?.find((candidate) => candidate.private);
+                  if (!option) return;
+                  const careAction = {
+                    ...scriptedPanelCareAction,
+                    id: scriptedTextChoiceAction.id,
+                    instanceId: `${day.isoDate}:${scriptedTextChoiceAction.id}`,
+                    title: scriptedTextChoiceAction.title,
+                    description: scriptedTextChoiceAction.description,
+                    growthReward: scriptedTextChoiceAction.growthReward ?? scriptedPanelCareAction.growthReward,
+                  };
+                  setScriptedTextCompletion({ action: careAction, id: `ftue:${scriptedTextChoiceAction.id}:private` });
+                  onScriptedChoice(scriptedTextChoiceAction, option, from);
+                }}
+                options={scriptedTextChoiceAction.options?.filter((option) => !option.private) ?? []}
+                reduceMotion={reduceMotion}
+                selection={currentScriptedTextSelection}
+                swipeExternalGesture={careSwipeExternalGesture}
+              />
+            </View>
+          ) : scriptedRowActions.length && onScriptedAction ? (
+            <Animated.View
+              entering={FadeInUp.delay(100).duration(260)}
+              style={[styles.onboardingActionStage, { bottom: tabBarHeight + HOME_ACTIONS_TAB_BAR_GAP }]}>
+              <ScriptedActionList
+                actions={scriptedRowActions}
+                locked={actionListLocked}
+                onAction={onScriptedAction}
+              />
+            </Animated.View>
+          ) : null}
+        </>
+      ) : null}
+      {!actionListHidden && !onboardingFocus ? (
       <GestureDetector gesture={actionScrollGesture}>
         <ScrollView
           contentContainerStyle={{ paddingBottom: tabBarHeight + HOME_ACTIONS_TAB_BAR_GAP, paddingTop: topInset + 8 }}
@@ -474,6 +639,19 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           pointerEvents={actionStackInteractive ? 'auto' : 'none'}
           style={actionStackRevealStyle}>
           <Animated.View style={styles.careSection}>
+          {onboardingGuide ? (
+            <Animated.View entering={FadeInUp.duration(260)} key={onboardingGuide.title} style={styles.onboardingGuide}>
+              <FtueGuideCopy guide={onboardingGuide} />
+            </Animated.View>
+          ) : null}
+          {scriptedRowActions.length && onScriptedAction ? (
+            <ScriptedActionList
+              actions={scriptedRowActions}
+              locked={actionListLocked}
+              onAction={onScriptedAction}
+            />
+          ) : null}
+          {!scriptedActions.length ? <>
           {displayedMoodAction || displayedSleepAction ? (
             <Animated.View layout={actionHandoffLayout} style={styles.checkInGroup}>
               {displayedMoodAction ? (
@@ -558,6 +736,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
               </View>
             </Animated.View>
           ) : null}
+          </> : null}
           </Animated.View>
         </Animated.View>
           </ScrollView>
@@ -639,7 +818,8 @@ type InlineChoice = {
   accent: string;
   feedImage: number;
   id: string;
-  image: number | ImageRef;
+  icon?: IconSymbolName;
+  image?: number | ImageRef;
   label: string;
 };
 
@@ -648,8 +828,9 @@ const ACTION_BATCH_LAYOUT_SETTLE_MS = 680;
 const NURTURE_ACTION_CLUSTER_FALLBACK_HEIGHT = 67;
 const NURTURE_TOAST_TOP_GAP = 6;
 
-function InlineMood({ action, completionEvent, interactionLocked, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture }: {
+function InlineMood({ action, allowSkip = true, completionEvent, interactionLocked, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture }: {
   action: RankedTodayCareAction;
+  allowSkip?: boolean;
   completionEvent: TodayCareCompletionEvent | null;
   interactionLocked: boolean;
   onChoose: (selection: Omit<CheckInSelection, 'action' | 'kind'>, from: FeedSourceRect, currencyFrom: FeedSourceRect) => void;
@@ -662,6 +843,7 @@ function InlineMood({ action, completionEvent, interactionLocked, onChoose, onFi
   return (
     <InlineCheckInPanel
       action={action}
+      allowSkip={allowSkip}
       choices={MOOD_CHOICES.map((choice) => ({
         accent: choice.accent,
         feedImage: MOOD_ART[choice.state],
@@ -716,8 +898,9 @@ function InlineSleep({ action, completionEvent, interactionLocked, onChoose, onF
   );
 }
 
-function InlineCheckInPanel({ action, choices, completionEvent, interactionLocked, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture, wide = false }: {
+function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent, interactionLocked, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture, textChoices = false, wide = false }: {
   action: RankedTodayCareAction;
+  allowSkip?: boolean;
   choices: InlineChoice[];
   completionEvent: TodayCareCompletionEvent | null;
   interactionLocked: boolean;
@@ -727,6 +910,7 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
   reduceMotion: boolean;
   selection: CheckInSelection | null;
   swipeExternalGesture: GestureType;
+  textChoices?: boolean;
   wide?: boolean;
 }) {
   const { width: windowWidth } = useWindowDimensions();
@@ -736,9 +920,14 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
   const panelOpacity = useSharedValue(1);
   const rewardRef = useRef<ViewType | null>(null);
   const completedEventRef = useRef<string | null>(null);
+  // Sequential panels share parent state during the render that hands one
+  // action to the next. Only state created by this exact action instance may
+  // pulse or dismiss it; stale state is ignored before effects can run.
+  const ownedSelection = selection?.action.instanceId === action.instanceId ? selection : null;
+  const ownedCompletionEvent = completionEvent?.action.instanceId === action.instanceId ? completionEvent : null;
 
   useEffect(() => {
-    if (!selection) return;
+    if (!ownedSelection) return;
     if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (reduceMotion) {
       panelPulse.value = withTiming(0.55, { duration: 100 });
@@ -752,11 +941,11 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
       withTiming(1.024, { duration: 115, easing: Easing.out(Easing.cubic) }),
       withTiming(1.012, { duration: 180, easing: Easing.out(Easing.cubic) }),
     );
-  }, [panelPulse, panelScale, reduceMotion, selection]);
+  }, [ownedSelection, panelPulse, panelScale, reduceMotion]);
 
   useEffect(() => {
-    if (!completionEvent || completedEventRef.current === completionEvent.id) return;
-    completedEventRef.current = completionEvent.id;
+    if (!ownedCompletionEvent || completedEventRef.current === ownedCompletionEvent.id) return;
+    completedEventRef.current = ownedCompletionEvent.id;
     const exitDelay = reduceMotion ? 40 : 220;
     if (!reduceMotion) {
       panelPulse.value = withSequence(
@@ -774,7 +963,7 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
         duration: reduceMotion ? 100 : 330,
         easing: Easing.in(Easing.cubic),
       }, (finished) => {
-        if (finished) runOnJS(onFinished)(completionEvent.id);
+        if (finished) runOnJS(onFinished)(ownedCompletionEvent.id);
       }),
     );
     panelOpacity.value = withDelay(
@@ -784,7 +973,7 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
         easing: Easing.in(Easing.quad),
       }),
     );
-  }, [completionEvent, onFinished, panelOpacity, panelPulse, panelScale, panelX, reduceMotion, windowWidth]);
+  }, [onFinished, ownedCompletionEvent, panelOpacity, panelPulse, panelScale, panelX, reduceMotion, windowWidth]);
 
   const panelStyle = useAnimatedStyle(() => ({
     opacity: panelOpacity.value,
@@ -798,7 +987,7 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
         ? FadeIn.duration(70)
         : FadeInUp.delay(55).duration(320).easing(Easing.out(Easing.cubic))}>
       <CareSwipeShell
-        disabled={interactionLocked}
+        disabled={interactionLocked || !allowSkip}
         externalGesture={swipeExternalGesture}
         label={action.title}
         onDismiss={onSkip}
@@ -807,16 +996,41 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
           <GameSurface contentStyle={styles.inlineCardContent} style={styles.inlineCard} tone="cream">
           <Animated.View
             pointerEvents="none"
-            style={[styles.inlineSelectionPulse, { backgroundColor: selection?.accent ?? 'transparent' }, pulseStyle]}
+            style={[styles.inlineSelectionPulse, { backgroundColor: ownedSelection?.accent ?? 'transparent' }, pulseStyle]}
           />
-          <InlineHeading action={action} disabled={interactionLocked} onSkip={onSkip} rewardRef={rewardRef} />
-          <View style={wide ? styles.sleepGrid : styles.moodGrid}>
-            {choices.map((choice) => (
+          <InlineHeading action={action} allowSkip={allowSkip} disabled={interactionLocked} onSkip={onSkip} rewardRef={rewardRef} />
+          <View style={textChoices ? styles.textChoiceGrid : wide ? styles.sleepGrid : styles.moodGrid}>
+            {choices.map((choice) => textChoices ? (
+              <MeasuredTextChoice
+                accent={choice.accent}
+                disabled={interactionLocked}
+                dimmed={ownedSelection != null && ownedSelection.id !== choice.id}
+                icon={choice.icon ?? 'sparkles'}
+                key={choice.id}
+                label={choice.label}
+                onPress={(from) => {
+                  const selectedChoice = {
+                    accent: choice.accent,
+                    id: choice.id,
+                    image: choice.feedImage,
+                    label: choice.label,
+                  };
+                  if (rewardRef.current) {
+                    rewardRef.current.measureInWindow((x, y, width, height) => {
+                      onChoose(selectedChoice, from, { h: height, w: width, x, y });
+                    });
+                  } else {
+                    onChoose(selectedChoice, from, from);
+                  }
+                }}
+                selected={ownedSelection?.id === choice.id}
+              />
+            ) : (
               <MeasuredChoice
                 accent={choice.accent}
                 disabled={interactionLocked}
-                dimmed={selection != null && selection.id !== choice.id}
-                image={choice.image}
+                dimmed={ownedSelection != null && ownedSelection.id !== choice.id}
+                image={choice.image!}
                 key={choice.id}
                 label={choice.label}
                 onPress={(from) => {
@@ -835,7 +1049,7 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
                   }
                 }}
                 reduceMotion={reduceMotion}
-                selected={selection?.id === choice.id}
+                selected={ownedSelection?.id === choice.id}
                 wide={wide}
               />
             ))}
@@ -847,8 +1061,9 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
   );
 }
 
-function InlineHeading({ action, disabled, onSkip, rewardRef }: {
+function InlineHeading({ action, allowSkip, disabled, onSkip, rewardRef }: {
   action: RankedTodayCareAction;
+  allowSkip: boolean;
   disabled: boolean;
   onSkip: () => void;
   rewardRef: RefObject<ViewType | null>;
@@ -859,22 +1074,60 @@ function InlineHeading({ action, disabled, onSkip, rewardRef }: {
   };
   return (
     <View style={styles.inlineHeading}>
-      <Pressable
-        accessibilityLabel={`Skip ${action.title} for today`}
-        accessibilityRole="button"
-        disabled={disabled}
-        hitSlop={8}
-        onPress={handleSkip}
-        style={({ pressed }) => [styles.inlineSkip, disabled && styles.inlineSkipDisabled, pressed && styles.inlineSkipPressed]}>
-        <ThemedText style={styles.inlineSkipLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Skip</ThemedText>
-      </Pressable>
-      <ThemedText numberOfLines={1} style={[styles.rowTitle, styles.inlineQuestion]} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+      {allowSkip ? (
+        <Pressable
+          accessibilityLabel={`Skip ${action.title} for today`}
+          accessibilityRole="button"
+          disabled={disabled}
+          hitSlop={8}
+          onPress={handleSkip}
+          style={({ pressed }) => [styles.inlineSkip, disabled && styles.inlineSkipDisabled, pressed && styles.inlineSkipPressed]}>
+          <ThemedText style={styles.inlineSkipLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Skip</ThemedText>
+        </Pressable>
+      ) : null}
+      <ThemedText
+        numberOfLines={2}
+        style={[styles.inlineQuestion, allowSkip ? styles.inlineQuestionSkippable : styles.inlineQuestionRequired]}
+        lightColor={allowSkip ? Meadow.ink : KatchaDeckUI.ftue.goldDeep}
+        darkColor={allowSkip ? Meadow.ink : KatchaDeckUI.ftue.goldDeep}>
         {action.title}
       </ThemedText>
       <View collapsable={false} ref={rewardRef} style={styles.inlineReward}>
         <Reward amount={action.growthReward} />
       </View>
     </View>
+  );
+}
+
+function MeasuredTextChoice({ accent, disabled, dimmed, icon, label, onPress, selected }: {
+  accent: string;
+  disabled: boolean;
+  dimmed: boolean;
+  icon: IconSymbolName;
+  label: string;
+  onPress: (from: FeedSourceRect) => void;
+  selected: boolean;
+}) {
+  const chipRef = useRef<ViewType | null>(null);
+  const handlePress = () => chipRef.current?.measureInWindow((x, y, w, h) => onPress({ x, y, w, h }));
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      accessibilityState={{ disabled, selected }}
+      disabled={disabled}
+      onPress={handlePress}
+      ref={chipRef}
+      style={({ pressed }) => [
+        styles.textChoice,
+        { borderColor: selected ? accent : `${accent}66` },
+        selected && { backgroundColor: `${accent}2E`, borderWidth: 1.5 },
+        dimmed && styles.choiceDimmed,
+        pressed && styles.choicePressed,
+      ]}>
+      <IconSymbol color={Meadow.ink} name={icon} size={16} />
+      <ThemedText numberOfLines={1} style={styles.textChoiceLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>{label}</ThemedText>
+    </Pressable>
   );
 }
 
@@ -1314,6 +1567,47 @@ function CareActionArt({ action, completed = false }: { action: RankedTodayCareA
   );
 }
 
+function InlineScriptedChoice({ action, completionEvent, interactionLocked, onChoose, onSkip, options, reduceMotion, selection, swipeExternalGesture }: {
+  action: RankedTodayCareAction;
+  completionEvent: TodayCareCompletionEvent | null;
+  interactionLocked: boolean;
+  onChoose: (option: FtueChoiceOption, from: FeedSourceRect) => void;
+  onSkip: (from: FeedSourceRect) => void;
+  options: readonly FtueChoiceOption[];
+  reduceMotion: boolean;
+  selection: CheckInSelection | null;
+  swipeExternalGesture: GestureType;
+}) {
+  const sourceRef = useRef<ViewType | null>(null);
+  return (
+    <View collapsable={false} ref={sourceRef}>
+      <InlineCheckInPanel
+        action={action}
+        allowSkip={false}
+        choices={options.map((option) => ({
+          accent: Meadow.gold,
+          feedImage: GAME_CURRENCY_ART.energy,
+          icon: option.icon,
+          id: option.id,
+          label: option.label,
+        }))}
+        completionEvent={completionEvent}
+        interactionLocked={interactionLocked}
+        onChoose={(choice, from) => {
+          const option = options.find((candidate) => candidate.id === choice.id);
+          if (option) onChoose(option, from);
+        }}
+        onFinished={() => {}}
+        onSkip={() => sourceRef.current?.measureInWindow((x, y, w, h) => onSkip({ x, y, w, h }))}
+        reduceMotion={reduceMotion}
+        selection={selection}
+        swipeExternalGesture={swipeExternalGesture}
+        textChoices
+      />
+    </View>
+  );
+}
+
 const CARE_REVEAL_WIDTH = 96;
 const CARE_UNDERLAY_OVERLAP = 36;
 const CARE_SWIPE_ACTIVATION_DISTANCE = 6;
@@ -1654,12 +1948,17 @@ const styles = StyleSheet.create({
   doorIconArt: { height: 46, width: 46 },
   rowPressed: { backgroundColor: 'rgba(255,244,204,0.72)', transform: [{ translateY: 1 }, { scale: 0.985 }] },
   careSection: { gap: 6, paddingHorizontal: Meadow.space.page, paddingTop: 12 },
+  onboardingGuide: { alignItems: 'center', paddingBottom: 12, paddingHorizontal: 12 },
+  onboardingHeroGuide: { alignItems: 'center', gap: 4, left: Meadow.space.page, position: 'absolute', right: Meadow.space.page, zIndex: 18 },
+  onboardingActionStage: { left: Meadow.space.page, position: 'absolute', right: Meadow.space.page, zIndex: 19 },
   checkInGroup: { gap: 6 },
   inlineCard: { overflow: 'hidden' },
   inlineCardContent: { gap: 8, padding: 9 },
   inlineSelectionPulse: { ...StyleSheet.absoluteFillObject, borderRadius: 16 },
-  inlineHeading: { alignItems: 'center', justifyContent: 'center', minHeight: 30, position: 'relative' },
-  inlineQuestion: { paddingHorizontal: 66, textAlign: 'center', width: '100%' },
+  inlineHeading: { alignItems: 'center', justifyContent: 'center', minHeight: 38, position: 'relative' },
+  inlineQuestion: { ...KatchaDeckUI.typography.ftuePanelTitle, textAlign: 'center', width: '100%' },
+  inlineQuestionRequired: { paddingLeft: 8, paddingRight: 68 },
+  inlineQuestionSkippable: { paddingHorizontal: 66 },
   inlineSkip: { alignItems: 'center', backgroundColor: 'rgba(122,84,44,0.08)', borderCurve: 'continuous', borderRadius: 999, justifyContent: 'center', left: 0, minHeight: 28, paddingHorizontal: 9, position: 'absolute', top: 1, zIndex: 2 },
   inlineSkipDisabled: { opacity: 0.42 },
   inlineSkipPressed: { backgroundColor: 'rgba(122,84,44,0.16)', transform: [{ scale: 0.96 }] },
@@ -1670,6 +1969,9 @@ const styles = StyleSheet.create({
   rowBody: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '600', lineHeight: 14.5 },
   moodGrid: { flexDirection: 'row', gap: 5 },
   sleepGrid: { flexDirection: 'row', gap: 7 },
+  textChoiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
+  textChoice: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.48)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 5, minHeight: 34, paddingHorizontal: 12, paddingVertical: 5 },
+  textChoiceLabel: KatchaDeckUI.typography.ftueChipLabel,
   moodChoiceCell: { flex: 1 },
   sleepChoiceCell: { flex: 1 },
   quickChoice: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.48)', borderCurve: 'continuous', borderRadius: 12, borderWidth: 1, gap: 1, minHeight: 55, paddingHorizontal: 3, paddingVertical: 5 },

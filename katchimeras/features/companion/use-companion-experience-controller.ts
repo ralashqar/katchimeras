@@ -10,22 +10,24 @@ import {
 export function useCompanionExperienceController({
   creatureId,
   initialDestination,
+  initialConversation = false,
   onClose,
   onSelectDestination,
 }: {
   creatureId: string;
   initialDestination?: CompanionDestination | null;
+  initialConversation?: boolean;
   onClose: () => void;
   onSelectDestination?: (destination: CompanionDestination | null) => void;
 }) {
   const [state, dispatch] = useReducer(
     companionInteractionReducer,
-    { initialDestination },
+    { initialDestination, initialConversation },
     createCompanionInteractionState
   );
 
   useEffect(() => {
-    dispatch({ type: 'reset_companion', initialDestination });
+    dispatch({ type: 'reset_companion', initialDestination, initialConversation });
     // The opening destination is a launch intent. Destination changes are
     // mirrored outside this controller only so temporary journal routes can
     // restore the page; they must not reset the live navigation stack.

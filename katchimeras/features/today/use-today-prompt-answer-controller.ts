@@ -6,6 +6,7 @@ import type { ActiveDayPrompt, DayPromptPhotoCandidate } from '@/utils/day-promp
 import { photoPromptSignature } from '@/utils/today-categories';
 import type { DayInputTarget, DayPromptKind, HomeDayRecord } from '@/types/home';
 import { runAfterNativeModalDismiss } from '@/utils/native-modal-navigation';
+import { dayPromptRegistry } from '@/constants/day-prompts';
 
 type PromptAnswerInput = {
   kind: DayPromptKind;
@@ -60,7 +61,8 @@ export function useTodayPromptAnswerController({
       const sourcePrompts = [formingActivePrompt, ...formingPrompts].filter(Boolean);
       const label = sourcePrompts
         .find((prompt) => prompt?.id === kind)
-        ?.options.find((option) => option.id === choiceIds[0])?.label;
+        ?.options.find((option) => option.id === choiceIds[0])?.label
+        ?? dayPromptRegistry[kind]?.options.find((option) => option.id === choiceIds[0])?.label;
 
       const commit = () => {
         if (isPhotoMeaning) {

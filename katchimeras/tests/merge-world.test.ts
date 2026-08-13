@@ -8,6 +8,7 @@ import type { MergeBoardItem, MergeWorldState } from '@/types/merge-world';
 import { BARISTABBIT_CHAPTER_ONE_ORDER_POOL, FEASTLE_ACT_TWO_ORDER_POOL, selectAuthoredCohortOrderKeys, selectFeastleActTwoOrderKeys } from '@/utils/companion-story';
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection } from '@/utils/merge-world/board-geometry';
 import { mergeActivityRewards } from '@/utils/merge-world/activity-rewards';
+import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
 import { MERGE_ENERGY_REGEN_CAP, MERGE_ENERGY_REGEN_MS, MERGE_INITIAL_ENERGY, mergeJournalRewardPreview } from '@/utils/merge-world/economy-policy';
 import {
   createInitialMergeWorldState,
@@ -44,6 +45,25 @@ test('a new Merge World uses the consolidated Energy economy', () => {
   assert.equal(state.energy.value, 20);
   assert.equal(state.board.filter((cell) => !cell.locked).length, 33);
   assert.deepEqual(state.generators, {});
+});
+
+test('Mossprout Chapter 0 starts at 50 Energy and completes from one one-merge order', () => {
+  let state = createMossproutChapterZeroState(NOW, 'heartlet');
+  assert.equal(state.board.filter((cell) => !cell.locked).length, 18);
+  assert.equal(state.energy.value, 50);
+  assert.deepEqual(state.activeOrders.map((order) => order.id), ['mossprout:chapter-0:first-sprout']);
+  assert.deepEqual(state.activeOrders[0].requirements, [{ definitionId: 'nature:garden:2', quantity: 1 }]);
+
+  const seedCells = state.board.flatMap((cell, index) => cell.occupant?.kind === 'item' ? [index] : []);
+  assert.equal(seedCells.length, 2);
+  assert.ok(seedCells.every((cell) => state.board[cell].occupant?.kind === 'item' && state.board[cell].occupant.definitionId === 'nature:garden:1'));
+  state = reduceMergeWorld(state, { type: 'move', from: seedCells[0], to: seedCells[1], now: NOW + 1 }).state;
+  state = reduceMergeWorld(state, { type: 'serveOrder', orderId: 'mossprout:chapter-0:first-sprout', now: NOW + 2 }).state;
+  assert.equal(state.board.filter((cell) => !cell.locked).length, 22);
+  assert.deepEqual(state.activeOrders, []);
+  assert.equal(state.energy.value, 52);
+  assert.ok(state.characterProgress.mossprout?.completedChapterIds.includes('mossprout-chapter-0'));
+  assert.ok(state.externalRewardReceipts.some((receipt) => receipt.kind === 'wisp' && receipt.wispId === 'heartlet'));
 });
 
 test('story unlock adds the Pantry and each tap costs exactly one Energy', () => {

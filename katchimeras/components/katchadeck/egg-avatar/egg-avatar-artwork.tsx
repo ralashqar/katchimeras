@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { eggAvatarFace } from '@/constants/egg-avatar-faces';
@@ -20,6 +21,14 @@ type EggAvatarArtworkProps = {
   skinId: EggAvatarSkinId;
   style?: StyleProp<ViewStyle>;
   transition?: number;
+  expressionSequence?: readonly EggExpressionCue[];
+  expressionSequenceKey?: string | number;
+};
+
+export type EggExpressionCue = {
+  faceId: EggAvatarFaceId;
+  atMs: number;
+  durationMs: number;
 };
 
 function centeredLayerStyle(scale: number, offsetX = 0, offsetY = 0) {
@@ -57,10 +66,26 @@ export function EggAvatarArtwork({
   skinId,
   style,
   transition = 0,
+  expressionSequence,
+  expressionSequenceKey,
 }: EggAvatarArtworkProps) {
   const { equippedHatId, equippedHeldAccessoryId } = useEggAvatar();
   const skin = eggAvatarSkin(skinId);
-  const face = eggAvatarFace(faceId);
+  const [displayedFaceId, setDisplayedFaceId] = useState(faceId);
+  const [faceTransitionDuration, setFaceTransitionDuration] = useState(transition);
+  useEffect(() => {
+    setDisplayedFaceId(faceId);
+    setFaceTransitionDuration(transition);
+  }, [expressionSequenceKey, faceId, transition]);
+  useEffect(() => {
+    if (!expressionSequence?.length) return;
+    const timers = expressionSequence.map((cue) => setTimeout(() => {
+      setFaceTransitionDuration(cue.durationMs);
+      setDisplayedFaceId(cue.faceId);
+    }, cue.atMs));
+    return () => timers.forEach(clearTimeout);
+  }, [expressionSequence, expressionSequenceKey]);
+  const face = eggAvatarFace(displayedFaceId);
   const hat = eggAvatarHat(hatId === undefined ? equippedHatId : hatId);
   const heldAccessory = eggAvatarHeldAccessory(
     heldAccessoryId === undefined ? equippedHeldAccessoryId : heldAccessoryId,
@@ -99,7 +124,7 @@ export function EggAvatarArtwork({
         priority={priority}
         source={faceSource}
         style={centeredLayerStyle(EGG_AVATAR_FACE_PRESENTATION_SCALE)}
-        transition={transition}
+        transition={faceTransitionDuration}
       />
       {hat ? (
         <Image
