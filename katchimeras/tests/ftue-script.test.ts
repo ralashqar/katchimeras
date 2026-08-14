@@ -170,6 +170,14 @@ test('Merge FTUE spotlight is an absolute non-layout overlay with transparent ta
   assert.match(merge, /spotlight=\{active && !serveFlight \? ftueStep\?\.spotlight \?\? null : null\}/);
 });
 
+test('each Merge FTUE finger guide starts a fresh source-to-target timeline', () => {
+  const overlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
+  assert.match(overlay, /const presentationKey = `\$\{targetRevision\}\|\$\{configKey\}/);
+  assert.match(overlay, /currentLayout\.targetRevision === targetRevision/);
+  assert.match(overlay, /resetKey=\{currentLayout\.presentationKey\}/);
+  assert.match(overlay, /cancelAnimation\(progress\);\s*progress\.value = 0;[\s\S]*?resetKey/);
+});
+
 test('the active FTUE hides the bottom bar only on the tab presenting its current step', () => {
   const tabLayout = readFileSync('app/(tabs)/_layout.tsx', 'utf8');
   const devTools = readFileSync('app/(tabs)/explore.tsx', 'utf8');

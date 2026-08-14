@@ -35,6 +35,7 @@ type CuePoints = { from: Point; to: Point };
 type OverlayLayout = {
   configKey: string;
   presentationKey: string;
+  targetRevision: number;
   cue: FtueCueDefinition | null;
   cuePoints: CuePoints | null;
   screen: { height: number; width: number };
@@ -119,10 +120,14 @@ export function MergeFtueOverlay({
       if ((cue && !cuePoints) || (spotlight && spotlightFrames.length === 0)) return;
 
       if (!cancelled) {
-        const presentationKey = `${configKey}|${spotlightFrames.map(frameSignature).join('|')}|${cuePoints ? `${pointSignature(cuePoints.from)}>${pointSignature(cuePoints.to)}` : 'no-cue'}`;
+        // The same source/target pair can appear in consecutive FTUE nodes.
+        // Include the node/target revision so its guide always gets a fresh
+        // animation timeline instead of inheriting the previous loop's time.
+        const presentationKey = `${targetRevision}|${configKey}|${spotlightFrames.map(frameSignature).join('|')}|${cuePoints ? `${pointSignature(cuePoints.from)}>${pointSignature(cuePoints.to)}` : 'no-cue'}`;
         setLayout({
           configKey,
           presentationKey,
+          targetRevision,
           cue,
           cuePoints,
           screen: { height: screen.height, width: screen.width },
@@ -153,7 +158,14 @@ export function MergeFtueOverlay({
 
   const currentLayout = layout;
   const showSpotlight = Boolean(currentLayout?.spotlightFrames.length);
-  const showCue = Boolean(currentLayout?.cue && currentLayout.cuePoints);
+  // Do not leave the previous node's moving hand visible while the new
+  // source and target are being measured. The new keyed cue mounts at time 0.
+  const showCue = Boolean(
+    currentLayout?.configKey === configKey
+      && currentLayout.targetRevision === targetRevision
+      && currentLayout.cue
+      && currentLayout.cuePoints,
+  );
   if (!currentLayout || (!showSpotlight && !showCue)) return null;
 
   return (
@@ -172,7 +184,13 @@ export function MergeFtueOverlay({
         />
       ) : null}
       {showCue && currentLayout.cue && currentLayout.cuePoints ? (
-        <FtueFingerCue blockedPulseNonce={blockedPulseNonce} cue={currentLayout.cue} key={`cue:${currentLayout.presentationKey}`} points={currentLayout.cuePoints} />
+        <FtueFingerCue
+          blockedPulseNonce={blockedPulseNonce}
+          cue={currentLayout.cue}
+          key={`cue:${currentLayout.presentationKey}`}
+          points={currentLayout.cuePoints}
+          resetKey={currentLayout.presentationKey}
+        />
       ) : null}
     </View>
   );
@@ -222,10 +240,11 @@ function FtueSpotlight({ frames, opacity, radius, screen }: {
   );
 }
 
-function FtueFingerCue({ blockedPulseNonce, cue, points }: {
+function FtueFingerCue({ blockedPulseNonce, cue, points, resetKey }: {
   blockedPulseNonce: number;
   cue: FtueCueDefinition;
   points: CuePoints;
+  resetKey: string;
 }) {
   const reduceMotion = useReducedMotion();
   const progress = useSharedValue(0);
@@ -239,8 +258,11 @@ function FtueFingerCue({ blockedPulseNonce, cue, points }: {
       duration: cue.kind === 'drag' ? 1_650 : 1_180,
       easing: Easing.inOut(Easing.cubic),
     }), -1, false));
-    return () => cancelAnimation(progress);
-  }, [cue.kind, progress, reduceMotion]);
+    return () => {
+      cancelAnimation(progress);
+      progress.value = 0;
+    };
+  }, [cue.kind, progress, reduceMotion, resetKey]);
 
   useEffect(() => {
     if (!blockedPulseNonce) return;

@@ -1,8 +1,8 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { AccessibilityInfo, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -39,6 +39,7 @@ export function CompanionBondLevelUpCelebration({ onContinue, receipt }: {
   receipt: CompanionBondAwardReceipt;
 }) {
   const reduceMotion = useReducedMotion();
+  const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
   const progress = useSharedValue(reduceMotion ? 1 : 0);
@@ -58,6 +59,24 @@ export function CompanionBondLevelUpCelebration({ onContinue, receipt }: {
     if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     return () => cancelAnimation(progress);
   }, [progress, reduceMotion]);
+
+  useEffect(() => {
+    let mounted = true;
+    void AccessibilityInfo.isScreenReaderEnabled().then((enabled) => {
+      if (mounted) setScreenReaderEnabled(enabled);
+    });
+    const subscription = AccessibilityInfo.addEventListener('screenReaderChanged', setScreenReaderEnabled);
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (screenReaderEnabled) return;
+    const timer = setTimeout(onContinue, reduceMotion ? 700 : 2800);
+    return () => clearTimeout(timer);
+  }, [onContinue, reduceMotion, screenReaderEnabled]);
 
   const oldStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.value, [0, 0.62, 1], [1, 0, 0]),
@@ -160,7 +179,7 @@ export function CompanionBondLevelUpCelebration({ onContinue, receipt }: {
             accessibilityRole="button"
             onPress={onContinue}
             style={({ pressed }) => [styles.continueButton, pressed && styles.pressed]}>
-            <ThemedText style={styles.continueLabel} lightColor="#FFF9EC" darkColor="#FFF9EC">Continue</ThemedText>
+            <ThemedText style={styles.continueLabel} lightColor="#FFF9EC" darkColor="#FFF9EC">{screenReaderEnabled ? 'Return to story' : 'Return now'}</ThemedText>
           </Pressable>
         </View>
       </View>

@@ -2,13 +2,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { KATCHIMERA_MERGE_PROFILES, MERGE_GENERATORS, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
+import { KATCHIMERA_MERGE_PROFILES, MERGE_GENERATORS, MERGE_ITEMS_BY_ID, MERGE_LOCKED_TIER_ONE_ECHOES } from '@/constants/merge-world-catalog';
 import type { HomeDayRecord } from '@/types/home';
 import type { MergeBoardItem, MergeWorldState } from '@/types/merge-world';
 import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import { BARISTABBIT_CHAPTER_ONE_ORDER_POOL, FEASTLE_ACT_TWO_ORDER_POOL, selectAuthoredCohortOrderKeys, selectFeastleActTwoOrderKeys } from '@/utils/companion-story';
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection } from '@/utils/merge-world/board-geometry';
+import { mergeCellFeedbackForFailure } from '@/utils/merge-board-feedback';
+import { MERGE_MORPH_DURATION_MS, mergeSpriteMotionFrame } from '@/utils/merge-board-motion';
 import { mergeActivityRewards } from '@/utils/merge-world/activity-rewards';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
 import { MERGE_ENERGY_REGEN_CAP, MERGE_ENERGY_REGEN_MS, MERGE_INITIAL_ENERGY, MOSSPROUT_FTUE_JOURNAL_ENERGY, STEPS_PER_MERGE_ENERGY, mergeJournalRewardPreview } from '@/utils/merge-world/economy-policy';
@@ -59,6 +61,7 @@ test('Dream Echoes accept only their match and emit persistent FTUE evidence', (
   }, { type: 'move', from: wrongCell, to: 34, now: NOW + 1 });
   assert.equal(wrong.changed, false);
   assert.equal(wrong.message, 'Find its match.');
+  assert.equal(wrong.failureReason, 'wrong_echo_match');
 
   state = reduceMergeWorld(state, { type: 'move', from: wrongCell, to: 34, now: NOW + 2 }).state;
   const receipt = state.boardAwakeningReceipts.find((entry) => entry.id === 'dream-echo:mossprout-seed-echo');
@@ -163,7 +166,7 @@ test('Mossprout Chapter 0 wakes Dream Echoes and expands from 17 to 28 cells', (
   assert.equal(state.generators['wild-garden'].forcedDropDefinitionId, 'nature:garden:1');
   assert.deepEqual(state.activeOrders.map((order) => order.id), ['mossprout:chapter-0:first-sprout']);
   assert.deepEqual(state.activeOrders[0].requirements, [{ definitionId: 'nature:garden:2', quantity: 1 }]);
-  assert.deepEqual(state.board.flatMap((cell, index) => cell.mist?.kind === 'echo' ? [[index, cell.mist.definitionId]] : []), [
+  assert.deepEqual(state.board.flatMap((cell, index) => cell.mist?.kind === 'echo' && cell.mist.ownerCharacterId === 'mossprout' ? [[index, cell.mist.definitionId]] : []), [
     [24, 'nature:garden:2'], [34, 'nature:garden:1'], [41, 'nature:garden:3'], [44, 'nature:garden:4'], [54, 'nature:garden:5'],
   ]);
 
@@ -263,6 +266,72 @@ test('Mossprout Chapter 0 wakes Dream Echoes and expands from 17 to 28 cells', (
   assert.equal(state.generators['wild-garden'].forcedDropDefinitionId, null);
   assert.ok(state.characterProgress.mossprout?.completedChapterIds.includes('mossprout-chapter-0'));
   assert.ok(state.externalRewardReceipts.some((receipt) => receipt.kind === 'wisp' && receipt.wispId === 'heartlet'));
+});
+
+test('generic tier-one Dream Echoes cover every spawner without duplicating Mossprout Seed', () => {
+  const initial = createMossproutChapterZeroState(NOW);
+  const sharedEchoes = initial.board.flatMap((cell, index) => cell.mist?.kind === 'echo' && cell.mist.ownerCharacterId == null
+    ? [{ cell: index, definitionId: cell.mist.definitionId, generatorId: cell.mist.generatorId }]
+    : []);
+  const tierOneDrops = MERGE_GENERATORS.flatMap((generator) => generator.tierOneDropDefinitionIds);
+  const tierOneEchoes = initial.board.flatMap((cell, index) => cell.mist?.kind === 'echo' && MERGE_ITEMS_BY_ID.get(cell.mist.definitionId)?.tier === 1
+    ? [{ cell: index, definitionId: cell.mist.definitionId, id: cell.mist.id }]
+    : []);
+
+  assert.equal(sharedEchoes.length, 15);
+  assert.equal(MERGE_LOCKED_TIER_ONE_ECHOES.length, 15);
+  assert.equal(new Set(sharedEchoes.map((echo) => echo.cell)).size, sharedEchoes.length);
+  assert.ok(sharedEchoes.every((echo) => initial.board[echo.cell].locked));
+  assert.ok(sharedEchoes.every((echo) => MERGE_ITEMS_BY_ID.get(echo.definitionId)?.tier === 1));
+  assert.ok(sharedEchoes.every((echo) => MERGE_GENERATORS.some((generator) => generator.id === echo.generatorId
+    && generator.tierOneDropDefinitionIds.includes(echo.definitionId))));
+  assert.equal(sharedEchoes.some((echo) => echo.definitionId === 'nature:garden:1'), false);
+  assert.equal(tierOneEchoes.filter((echo) => echo.definitionId === 'nature:garden:1').length, 1);
+  assert.equal(tierOneEchoes.find((echo) => echo.definitionId === 'nature:garden:1')?.id, 'mossprout-seed-echo');
+  assert.deepEqual(new Set(tierOneEchoes.map((echo) => echo.definitionId)), new Set(tierOneDrops));
+  assert.equal(initial.board.some((cell) => (cell.mist as { kind?: string } | null)?.kind === 'katchimera'), false);
+
+  const genericState = createInitialMergeWorldState(NOW);
+  const echoCell = genericState.board.findIndex((cell) => cell.mist?.kind === 'echo' && cell.mist.definitionId === 'food:table:1');
+  const echo = genericState.board[echoCell].mist;
+  assert.ok(echo?.kind === 'echo');
+  const source = genericState.board.findIndex((cell) => !cell.locked && !cell.occupant);
+  const board = [...genericState.board];
+  board[source] = { ...board[source], occupant: { kind: 'item', instanceId: 'generic-echo-match', definitionId: echo.definitionId } };
+  const ready = { ...genericState, board };
+  assert.equal(ready.unlockedRegions.includes(ready.board[echoCell].regionId), false);
+
+  const wrongBoard = [...genericState.board];
+  wrongBoard[source] = { ...wrongBoard[source], occupant: { kind: 'item', instanceId: 'generic-echo-wrong-match', definitionId: 'nature:garden:1' } };
+  const wrong = reduceMergeWorld({ ...genericState, board: wrongBoard }, { type: 'move', from: source, to: echoCell, now: NOW + 1 });
+  assert.equal(wrong.changed, false);
+  assert.equal(wrong.failureReason, 'wrong_echo_match');
+
+  const merged = reduceMergeWorld(ready, { type: 'move', from: source, to: echoCell, now: NOW + 2 });
+  assert.equal(merged.changed, true);
+  assert.equal(merged.dreamEchoClearedId, 'shared-echo:food:table:1');
+  assert.equal(merged.state.board[echoCell].locked, false);
+  assert.equal(merged.state.board[echoCell].mist, null);
+  assert.deepEqual(merged.state.board[echoCell].occupant, {
+    kind: 'item', instanceId: 'merge-item:1', definitionId: 'food:table:2',
+  });
+  assert.equal(merged.state.board[source].occupant, null);
+});
+
+test('normalization removes legacy moon and walking mysteries from saved boards', () => {
+  const legacy = structuredClone(createMossproutChapterZeroState(NOW)) as unknown as { board: { mist: unknown }[] };
+  legacy.board[8].mist = { kind: 'katchimera', id: 'future-moon', mysteryId: 'moon', ownerCharacterId: null };
+  legacy.board[57].mist = { kind: 'katchimera', id: 'future-trail', mysteryId: 'trail', ownerCharacterId: 'steppling' };
+
+  const normalized = normalizeMergeWorldState(legacy, NOW + 1);
+  assert.deepEqual(normalized.board[8].mist, {
+    kind: 'echo',
+    id: 'shared-echo:adventure:travel:1',
+    definitionId: 'adventure:travel:1',
+    generatorId: 'journey-locker',
+    ownerCharacterId: null,
+  });
+  assert.deepEqual(normalized.board[57].mist, { kind: 'dormant' });
 });
 
 test('step Energy checkpoints cumulative pedometer totals without paying the same steps twice', () => {
@@ -408,6 +477,43 @@ test('a full board rejects a Pantry tap without spending Energy', () => {
   const result = reduceMergeWorld({ ...state, board }, { type: 'tapGenerator', generatorId: 'hearth-pantry', now: NOW + 2, seed: 'full' });
   assert.equal(result.changed, false);
   assert.equal(result.state.energy.value, state.energy.value);
+  assert.equal(result.failureReason, 'board_full');
+});
+
+test('Merge board failures map to concise anchored callouts', () => {
+  assert.deepEqual(mergeCellFeedbackForFailure('locked_cell'), { message: 'LOCKED', tone: 'blocked' });
+  assert.deepEqual(mergeCellFeedbackForFailure('no_energy'), { message: 'NO ENERGY', tone: 'warning' });
+  assert.deepEqual(mergeCellFeedbackForFailure('board_full'), { message: 'BOARD FULL', tone: 'warning' });
+  assert.deepEqual(mergeCellFeedbackForFailure('wrong_echo_match'), { message: 'FIND ITS MATCH', tone: 'hint' });
+  assert.deepEqual(mergeCellFeedbackForFailure('sealed_mist'), { message: 'SEALED', tone: 'blocked' });
+  assert.equal(mergeCellFeedbackForFailure(), null);
+
+  const chapterZero = createMossproutChapterZeroState(NOW);
+  const sourceCell = chapterZero.board.findIndex((cell) => cell.occupant?.kind === 'item');
+  const lockedCell = chapterZero.board.findIndex((cell) => cell.locked && cell.mist?.kind === 'dormant');
+  const locked = reduceMergeWorld(chapterZero, { type: 'move', from: sourceCell, to: lockedCell, now: NOW + 1 });
+  assert.equal(locked.changed, false);
+  assert.equal(locked.failureReason, 'locked_cell');
+  const noEnergy = reduceMergeWorld({ ...chapterZero, energy: { ...chapterZero.energy, value: 0 } }, {
+    type: 'tapGenerator', generatorId: 'wild-garden', now: NOW + 2, seed: 'empty-energy',
+  });
+  assert.equal(noEnergy.changed, false);
+  assert.equal(noEnergy.failureReason, 'no_energy');
+});
+
+test('Merge motion contracts old art before the new item overshoots into place', () => {
+  assert.equal(MERGE_MORPH_DURATION_MS, 460);
+  assert.deepEqual(mergeSpriteMotionFrame('merge-source', 0), { opacity: 1, scale: 1 });
+  assert.deepEqual(mergeSpriteMotionFrame('merge-source', 0.12), { opacity: 1, scale: 1 });
+  assert.ok(mergeSpriteMotionFrame('merge-source', 0.58).scale <= 0.1);
+  assert.equal(mergeSpriteMotionFrame('merge-source', 0.58).opacity, 0);
+  assert.equal(mergeSpriteMotionFrame('merge-result', 0.22).opacity, 0);
+  assert.equal(mergeSpriteMotionFrame('merge-result', 0.22).scale, 0.06);
+  assert.ok(mergeSpriteMotionFrame('merge-source', 0.4).scale > 0.4);
+  assert.ok(mergeSpriteMotionFrame('merge-result', 0.4).scale > 0.3);
+  assert.ok(mergeSpriteMotionFrame('merge-result', 0.78).scale > 1);
+  assert.deepEqual(mergeSpriteMotionFrame('merge-result', 1), { opacity: 1, scale: 1 });
+  assert.deepEqual(mergeSpriteMotionFrame('merge-result', 0.5, true), { opacity: 0.5, scale: 1 });
 });
 
 test('identical items merge and preserve deterministic item progression', () => {
@@ -672,6 +778,17 @@ test('Merge page keeps a stable parcel stack first in the tray and the board att
   assert.match(screen, /arrival\.kind !== 'memory_arrival'/);
 });
 
+test('served item sprites stay suppressed until the board confirms they are retired', () => {
+  const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
+  const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
+  assert.match(screen, /const \[serveHiddenItemIds, setServeHiddenItemIds\] = useState/);
+  assert.match(screen, /setServeHiddenItemIds\(new Set\(items\.map\(\(item\) => item\.instanceId\)\)\);[\s\S]*?setServeFlight\(/);
+  assert.match(screen, /if \(!result\?\.changed\) setServeHiddenItemIds\(new Set\(\)\);[\s\S]*?setServeFlight\(null\);/);
+  assert.match(screen, /onHiddenItemsRetired=\{handleHiddenItemsRetired\}/);
+  assert.match(board, /const retiredIds = \[\.\.\.hiddenItemInstanceIds\]\.filter\(\(instanceId\) => !mountedItemIds\.has\(instanceId\)\);/);
+  assert.match(board, /if \(retiredIds\.length\) onHiddenItemsRetired\(retiredIds\);/);
+});
+
 test('Merge board retains destination selection and decorates generators with ambient motion', () => {
   const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
   assert.match(board, /onSelect\(to\);/);
@@ -681,6 +798,11 @@ test('Merge board retains destination selection and decorates generators with am
   assert.match(board, /GeneratorSparkles[\s\S]*?GENERATOR_SPARKLE_LANES[\s\S]*?GeneratorSparkle/);
   assert.match(board, /GENERATOR_SPARKLE_CYCLE_MS = 700/);
   assert.match(board, /translateY: interpolate\(p, \[0, 1\], \[size \* 0\.24, -size \* 0\.62\]\)/);
+  assert.match(board, /DreamEchoItemArt compatible=\{compatible\}/);
+  assert.match(board, /size=\{Math\.min\(width, height\) - 4\}/);
+  assert.match(board, /DreamMistDissipation/);
+  assert.match(board, /emitEmptyCellTap/);
+  assert.match(board, /MergeCellCallout/);
 });
 
 test('a companion journal grants the featured family’s two starter chains once', () => {

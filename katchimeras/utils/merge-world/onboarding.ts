@@ -2,6 +2,7 @@ import { MERGE_GENERATORS_BY_ID, MERGE_WORLD_SIZE, MOSSPROUT_DREAM_ECHOES, MOSSP
 import type { MergeBoardCell, MergeWorldState } from '@/types/merge-world';
 import type { WispId } from '@/types/wisp';
 import { createInitialMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
+import { placeLockedTierOneEchoes } from '@/utils/merge-world/locked-tier-one-echoes';
 import { mossproutChapterZeroOrder } from '@/utils/merge-world/chapter-zero-policy';
 
 export function createMossproutChapterZeroState(now = Date.now(), rewardWispId: WispId = 'sprout'): MergeWorldState {
@@ -24,11 +25,9 @@ export function createMossproutChapterZeroState(now = Date.now(), rewardWispId: 
       mist: { kind: 'echo', id: echo.id, definitionId: echo.definitionId, ownerCharacterId: 'mossprout' },
     };
   }
-  board[8] = { ...board[8], regionId: 'deep-mist', mist: { kind: 'katchimera', id: 'future-moon', mysteryId: 'moon', ownerCharacterId: null } };
-  board[57] = { ...board[57], regionId: 'ancient-dream', mist: { kind: 'katchimera', id: 'future-trail', mysteryId: 'trail', ownerCharacterId: 'steppling' } };
   return {
     ...state,
-    board,
+    board: placeLockedTierOneEchoes(board),
     generators: { [garden.id]: { id: garden.id, name: garden.name, level: 1, upgradeFragments: 0, chainIds: garden.chainIds, tierOneDropDefinitionIds: [...garden.tierOneDropDefinitionIds], forcedDropDefinitionId: 'nature:garden:1' } },
     energy: { value: 4, regenCap: 50, lastRegenAt: now, regenPaused: true },
     coins: 100,

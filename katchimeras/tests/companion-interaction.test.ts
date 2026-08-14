@@ -69,7 +69,7 @@ test('Today and companion goals share deliberate task-row interactions', () => {
   assert.doesNotMatch(goalModal, /Nicely done · \+5 bond/);
 });
 
-test('You questionnaires require answer confirmation and task consent', () => {
+test('You questionnaires advance on selection while consequential tasks retain consent', () => {
   const questionnaireScene = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-questionnaire-scene.tsx'),
     'utf8',
@@ -103,9 +103,8 @@ test('You questionnaires require answer confirmation and task consent', () => {
     'utf8',
   );
 
-  assert.match(questionnaireScene, /options\?\.length && selectedId/);
-  assert.doesNotMatch(questionnaireScene, /disabled=\{!selectedId\}/);
-  assert.match(questionnaireScene, /onPress=\{confirmSelection\}/);
+  assert.match(questionnaireScene, /onSelect\(option\)/);
+  assert.doesNotMatch(questionnaireScene, /confirmSelection|selectionFooter/);
   assert.doesNotMatch(questionnaireScene, /setTimeout/);
   assert.match(questionnaireScene, /<CompanionCinematicStage/);
   assert.match(questionnaireScene, /bubbleVariant="questionnaire"/);
@@ -169,6 +168,8 @@ test('bond rewards queue, fly into the creature, respect reduced motion, and gat
   assert.match(interaction, /pendingBondCelebration/);
   assert.match(interaction, /2_800/);
   assert.match(levelUp, /Bond level up/);
+  assert.match(levelUp, /setTimeout\(onContinue/);
+  assert.match(levelUp, /screenReaderEnabled \? 'Return to story' : 'Return now'/);
   assert.match(levelUp, /RisingArrow/);
   assert.match(kingdom, /!bondLevelUp && !quests\.selectedPendingBondCelebration/);
 });
@@ -180,8 +181,9 @@ test('Merge and Feastle story navigation replaces the prior story screen and pau
 
   assert.match(merge, /storyNavigationPendingRef/);
   assert.match(merge, /source: 'merge-world'/);
-  assert.match(route, /source === 'merge-world' \? router\.dismissTo\('\/games'\) : router\.back\(\)/);
-  assert.match(route, /onOpenMerge=\{\(orderId, selectedFamilyId\) => router\.dismissTo/);
+  assert.match(route, /source === 'merge-world' \? transitionTo\(\{/);
+  assert.match(route, /navigate: \(\) => router\.dismissTo\('\/games'\)/);
+  assert.match(route, /onOpenMerge=\{\(orderId, selectedFamilyId\) => transitionTo/);
   assert.match(route, /familyId: selectedFamilyId \?\? familyId/);
   assert.match(interaction, /if \(!props\.active \|\| !receipt \|\| bondReward\) return/);
   assert.match(interaction, /if \(props\.active !== false\) return/);
@@ -194,7 +196,7 @@ test('every accepted conversation insight queues bond once per session, includin
   assert.doesNotMatch(questHook, /if \(accept && isNewInsight/);
 });
 
-test('conversation outcomes stay visible and provisional answers remain editable', () => {
+test('conversation replies, memories, and outcomes advance without redundant confirmation', () => {
   const scene = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-conversation-scene.tsx'),
     'utf8',
@@ -211,13 +213,19 @@ test('conversation outcomes stay visible and provisional answers remain editable
     path.join(process.cwd(), 'hooks', 'use-kingdom-quests.ts'),
     'utf8',
   );
-  assert.match(scene, /Change answer/);
+  const flow = fs.readFileSync(
+    path.join(process.cwd(), 'features', 'companion', 'use-companion-conversation-flow.ts'),
+    'utf8',
+  );
+  assert.doesNotMatch(scene, /Change answer|Yes, remember this/);
   assert.match(scene, /<ConversationOutcomeCard/);
   assert.doesNotMatch(scene, /CONVERSATION TAKEAWAY|Finish this thought|reflection_reveal/);
   assert.doesNotMatch(scene, /Save this insight|Don’t save|Add to my insights|Keep it as a result only/);
   assert.match(scene, /AutomaticInsightTransition/);
-  assert.match(scene, /onDecision\(true, node\)/);
-  assert.match(scene, /onDecision\(true, summary\)/);
+  assert.match(flow, /onCommitInsight\(node\)/);
+  assert.match(flow, /onCommitMemory\(node\.summary\.replace/);
+  assert.match(flow, /conversationReplyDelayMs/);
+  assert.match(flow, /screenReaderEnabled/);
   assert.doesNotMatch(scene, /A SECONDARY THREAD|WHY THIS RESULT|REVIEW YOUR ANSWERS|Replay from the beginning/);
   assert.match(scene, /A QUEST PICKED FOR YOU/);
   assert.match(scene, /label="Take this quest"/);
@@ -600,7 +608,7 @@ test('reward splash namespaces sibling keys independently from the reward receip
   assert.match(splash, /withRepeat\(withSequence/);
 });
 
-test('Feastle story scenes return to the chapter surface instead of generic Keep talking', () => {
+test('Feastle story scenes advance contextually without a completion menu', () => {
   const interaction = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'), 'utf8');
   const scene = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-conversation-scene.tsx'), 'utf8');
   const stage = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'feastle-story-stage.tsx'), 'utf8');
@@ -610,10 +618,9 @@ test('Feastle story scenes return to the chapter surface instead of generic Keep
   assert.match(interaction, /storyFinale=\{feastleStoryFinale\}/);
   assert.match(interaction, /storyFlow=\{feastleStoryFlow\}/);
   assert.match(interaction, /onStoryComplete=\{experience\.showHome\}/);
-  assert.match(scene, /storyFlow \? <StoryConversationContinuation/);
-  assert.match(scene, /finale \? `Back to \$\{name\}` : 'See next chapter'/);
-  assert.match(scene, /the Pantry will wait until a new order is actually ready/);
-  assert.match(scene, /storyFlow \? 'See next chapter' : 'Keep talking'/);
+  assert.match(scene, /storyFlow && !storyFinale \? 'Opening the next chapter…'/);
+  assert.doesNotMatch(scene, /StoryConversationContinuation/);
+  assert.match(interaction, /onComplete: showFeastleStoryHome/);
   assert.match(stage, /FEASTLE_STORY_REQUESTS\[story\.targetLevel\]/);
   assert.match(stage, /CompanionMergeRequestTray/);
   assert.match(requestTray, /PersistentMergeItemArt/);

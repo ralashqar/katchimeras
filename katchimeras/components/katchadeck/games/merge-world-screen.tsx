@@ -65,6 +65,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, effect
   }));
   const [returnCharacterId, setReturnCharacterId] = useState<MergeOrder['characterId'] | null>(null);
   const [serveFlight, setServeFlight] = useState<MergeServeRewardFlight | null>(null);
+  const [serveHiddenItemIds, setServeHiddenItemIds] = useState<Set<string>>(() => new Set());
   const [parcelFlight, setParcelFlight] = useState<MergeParcelFlight | null>(null);
   const [parcelHiddenItemIds, setParcelHiddenItemIds] = useState<Set<string>>(() => new Set());
   const [parcelShakeNonce, setParcelShakeNonce] = useState(0);
@@ -104,9 +105,9 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, effect
   const ftueBoardGate = useMemo(() => state ? mergeFtueBoardGate(ftueStep, state) : { kind: 'open' as const }, [ftueStep, state]);
   const ftueRailGate = useMemo(() => mergeFtueRailGate(ftueStep), [ftueStep]);
   const hiddenAnimatedItemIds = useMemo(() => new Set([
-    ...(serveFlight?.items.map((item) => item.instanceId) ?? []),
+    ...serveHiddenItemIds,
     ...parcelHiddenItemIds,
-  ]), [parcelHiddenItemIds, serveFlight]);
+  ]), [parcelHiddenItemIds, serveHiddenItemIds]);
   const generatorUnlockRewards = useMemo(() => (state?.generatorUnlockReceipts ?? [])
     .filter((receipt) => receipt.seenAt == null)
     .flatMap((receipt): RewardSplashItem[] => {
@@ -209,6 +210,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, effect
 
   useEffect(() => {
     if (!lastResult) return;
+    if (lastResult.failureReason) return;
     const message = lastResult.spawnedCell != null ? null : lastResult.message ?? null;
     if (message) feedback.show({ id: `merge:${lastResult.state.revision}:${message}`, message });
   }, [feedback, lastResult]);
@@ -380,6 +382,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, effect
       energyAmount: mergeOrderEnergyRefund(order),
       orderId: order.id,
     };
+    setServeHiddenItemIds(new Set(items.map((item) => item.instanceId)));
     setServeFlight({ coinAmount: order.reward.coins, coinFrom, coinTo, energyAmount: 0, energyTo, items, nonce: serveNonceRef.current, phase: 'items' });
     return true;
   }, [parcelFlight, state]);
@@ -391,6 +394,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, effect
     if (!activeOrder || !state || !orderStillReady) {
       activeServeRef.current = false;
       activeServeOrderRef.current = null;
+      setServeHiddenItemIds(new Set());
       setServeFlight(null);
       return;
     }
@@ -425,10 +429,19 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, effect
     }
     setPresentedEnergy(null);
     setPresentedCoins(null);
+    if (!result?.changed) setServeHiddenItemIds(new Set());
     setServeFlight(null);
     activeServeRef.current = false;
     activeServeOrderRef.current = null;
   }, [dispatch, state?.activeOrders]);
+  const handleHiddenItemsRetired = useCallback((instanceIds: readonly string[]) => {
+    setServeHiddenItemIds((current) => {
+      if (!instanceIds.some((instanceId) => current.has(instanceId))) return current;
+      const next = new Set(current);
+      instanceIds.forEach((instanceId) => next.delete(instanceId));
+      return next;
+    });
+  }, []);
   const handleBoardScreenMetrics = useCallback((metrics: MergeBoardScreenMetrics) => {
     boardMetricsRef.current = metrics;
     setBoardMetrics(metrics);
@@ -567,6 +580,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, effect
               maxHeight={boardAreaHeight - 1}
               onBlockedInteraction={handleBlockedFtueInteraction}
               onCommand={dispatch}
+              onHiddenItemsRetired={handleHiddenItemsRetired}
               onSelect={setSelectedCell}
               onScreenMetrics={handleBoardScreenMetrics}
               selectedCell={selectedCell}

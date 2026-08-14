@@ -18,6 +18,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import { KatchaUI } from '@/constants/katcha-ui';
 import { useCompanionExperienceController } from '@/features/companion/use-companion-experience-controller';
+import { useCompanionConversationFlow } from '@/features/companion/use-companion-conversation-flow';
 import type { HomeVisualKey, MemoryQualityScore } from '@/types/home';
 import type {
   CompanionDestination,
@@ -929,6 +930,24 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   );
   const feastleStoryFinale = conversationExperience?.definition.id === 'feastle:friendship:4'
     || /^(?:baristabbit|steppling|voyagle|flexel|bedrotte):story:8$/.test(conversationExperience?.definition.id ?? '');
+  const onMemoryConversationDecision = props.onMemoryConversationDecision;
+  const onInsightConversationDecision = props.onInsightConversationDecision;
+  const commitConversationMemory = useCallback((summary: string) => {
+    onMemoryConversationDecision(true, summary);
+  }, [onMemoryConversationDecision]);
+  const commitConversationInsight = useCallback((node: Extract<ConversationNode, { kind: 'insight_reveal' }>) => {
+    onInsightConversationDecision(true, node);
+  }, [onInsightConversationDecision]);
+  const conversationFlow = useCompanionConversationFlow({
+    definition: conversationExperience?.definition ?? null,
+    onCommitInsight: commitConversationInsight,
+    onCommitMemory: commitConversationMemory,
+    onComplete: showFeastleStoryHome,
+    onContinue: props.onContinueConversation,
+    onDismissOutcome: props.onDismissConversationOutcome,
+    reduceMotion,
+    session: conversationExperience?.session ?? null,
+  });
   const idealSkinPreparing = idealSkinOnboardingRequired && !conversationExperience;
   const visitStageSpeech = idealSkinPreparing
     ? 'Let’s find the form that feels most like you.'
@@ -1086,6 +1105,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             onBackgroundReady={() => setTransitionBackgroundReady(true)}
             onCreatureReady={() => setTransitionCreatureReady(true)}
             rewardPulseKey={rewardPulseKey}
+            onSpeechBubblePress={conversationExperience && conversationFlow.phase !== 'awaiting_choice' && conversationFlow.phase !== 'committing'
+              ? conversationFlow.advance
+              : undefined}
             showSpeechBubble
             title={quickGoalPickerOpen
               ? 'Which small step feels right?'
@@ -1123,10 +1145,13 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           />
         ) : route.kind === 'visit' || route.kind === 'conversation' ? (
           conversationExperience ? <CompanionConversationScene
+            bondProgress={displayedBondProgress}
             definition={conversationExperience.definition}
             hasActiveFocus={Boolean(activeJourneyFocus)}
             journalMergeEnergyPreview={journalMergeEnergyPreview}
             name={props.name}
+            flowPhase={conversationFlow.phase}
+            onAdvance={conversationFlow.advance}
             onAnswer={props.onAnswerConversation}
             onClose={props.idealSkinOnboardingRequired
               ? props.onClose
@@ -1176,6 +1201,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             storyFlow={feastleStoryFlow}
             storyFinale={feastleStoryFinale}
             questOffer={props.conversationQuestOffer}
+            requiresManualAdvance={conversationFlow.requiresManualAdvance}
           /> : idealSkinOnboardingRequired ? null : (route.kind === 'visit' ? <CompanionVisitScene
             bondProgress={displayedBondProgress}
             completed={Boolean(props.visitReceipt)}

@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useState, type RefObject } from 'react';
-import { type LayoutChangeEvent, type StyleProp, StyleSheet, type TextStyle, useWindowDimensions, View, type View as ViewType } from 'react-native';
+import { type LayoutChangeEvent, Pressable, type StyleProp, StyleSheet, type TextStyle, useWindowDimensions, View, type View as ViewType } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -42,6 +42,7 @@ export function CompanionCinematicStage({
   onSpeechBubbleHeightChange,
   onBackgroundReady,
   onCreatureReady,
+  onSpeechBubblePress,
   showSpeechBubble = true,
   title,
   visualKey,
@@ -59,6 +60,7 @@ export function CompanionCinematicStage({
   onSpeechBubbleHeightChange?: (height: number) => void;
   onBackgroundReady?: () => void;
   onCreatureReady?: () => void;
+  onSpeechBubblePress?: () => void;
   showSpeechBubble?: boolean;
   title: string;
   visualKey: HomeVisualKey;
@@ -127,23 +129,25 @@ export function CompanionCinematicStage({
         style={[StyleSheet.absoluteFill, styles.parchmentBlend]}
       />
 
-      <Animated.View pointerEvents="none" style={[styles.foregroundPlane, liftStyle]}>
+      <Animated.View pointerEvents={onSpeechBubblePress ? 'box-none' : 'none'} style={[styles.foregroundPlane, liftStyle]}>
         {showSpeechBubble ? (
           <Animated.View
             accessibilityLabel={`${name} says: ${title}`}
             entering={questionnaireBubble && !reduceMotion ? FadeIn.duration(180) : undefined}
             key={questionnaireBubble ? `question:${title}` : 'destination-speech'}
             onLayout={(event: LayoutChangeEvent) => onSpeechBubbleHeightChange?.(event.nativeEvent.layout.height)}
-            style={[
-              styles.speechBubble,
-              questionnaireBubble && styles.speechBubbleQuestionnaire,
-              {
-                left: horizontalGutter,
-                top: speechBubbleTop,
-                width: bubbleWidth,
-              },
-            ]}>
-            <View style={styles.speechTail} />
+            style={{ left: horizontalGutter, position: 'absolute', top: speechBubbleTop, width: bubbleWidth, zIndex: 1 }}>
+            <Pressable
+              accessibilityHint={onSpeechBubblePress ? 'Advances to the next part of the conversation' : undefined}
+              accessibilityRole={onSpeechBubblePress ? 'button' : undefined}
+              disabled={!onSpeechBubblePress}
+              onPress={onSpeechBubblePress}
+              style={({ pressed }) => [
+                styles.speechBubble,
+                questionnaireBubble && styles.speechBubbleQuestionnaire,
+                pressed && onSpeechBubblePress && styles.speechBubblePressed,
+              ]}>
+              <View style={styles.speechTail} />
             <TypewriterText
               durationMs={560}
               key={`speech-title:${title}`}
@@ -172,6 +176,7 @@ export function CompanionCinematicStage({
                 darkColor="#6B5544"
               />
             ) : null}
+            </Pressable>
           </Animated.View>
         ) : null}
 
@@ -302,9 +307,9 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 17,
     paddingVertical: 16,
-    position: 'absolute',
-    zIndex: 1,
+    width: '100%',
   },
+  speechBubblePressed: { opacity: 0.9, transform: [{ scale: 0.985 }] },
   speechBubbleQuestionnaire: {
     minHeight: 146,
     paddingBottom: 20,

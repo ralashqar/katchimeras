@@ -147,6 +147,30 @@ export const MERGE_GENERATORS: readonly MergeGeneratorDefinition[] = [
 ];
 
 export const MERGE_GENERATORS_BY_ID = new Map(MERGE_GENERATORS.map((item) => [item.id, item]));
+
+// One authored Dream Echo for every shared generator tier-one drop. The Seed
+// is deliberately omitted because Mossprout's FTUE already authors and clears
+// that Echo. Cells avoid all FTUE Echoes and Chapter 0 story-clearing clusters.
+const MERGE_LOCKED_TIER_ONE_ECHO_CELLS = [
+  0, 1,   // Hearth Pantry
+  5, 6,   // Ritual Bar
+  7, 8,   // Journey Locker
+  12, 13, // Wild Garden
+  14, 21, // Comfort Chest
+  28, 35, // Community Cart
+  42, 43, // Study Desk
+  49, 50, // Creative Playroom
+] as const;
+
+export const MERGE_LOCKED_TIER_ONE_ECHOES = MERGE_GENERATORS.flatMap((generator, generatorIndex) => (
+  generator.tierOneDropDefinitionIds.map((definitionId, branchIndex) => ({
+    cell: MERGE_LOCKED_TIER_ONE_ECHO_CELLS[generatorIndex * 2 + branchIndex],
+    definitionId,
+    generatorId: generator.id,
+    id: `shared-echo:${definitionId}`,
+  }))
+)).filter((echo) => echo.definitionId !== 'nature:garden:1');
+
 export const MERGE_GENERATOR_MIGRATION_ALIASES: Readonly<Record<string, string>> = {
   'starter-pantry': 'hearth-pantry',
   'nature-pot': 'wild-garden',
@@ -222,7 +246,7 @@ export type MergeOrderTemplate = {
   characterId: MergeCharacterId;
   title: string;
   difficulty: MergeOrderDifficulty;
-  requirements: Array<{ definitionId: string; quantity: number }>;
+  requirements: { definitionId: string; quantity: number }[];
   reward: MergeReward;
   signature?: boolean;
   chapterId?: string;

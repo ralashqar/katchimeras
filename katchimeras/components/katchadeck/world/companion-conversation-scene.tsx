@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
+import { useEffect, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeInUp, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,7 +9,6 @@ import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaUI } from '@/constants/katcha-ui';
-import { companionConversationTopics } from '@/constants/companion-conversations-v2';
 import { companionQuickGoalTemplateById } from '@/constants/companion-quick-goals';
 import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import type {
@@ -25,6 +24,8 @@ import { getCreatureVisual } from '@/game/days';
 import { companionHomeHeroSpacer } from '@/utils/companion-home-layout';
 import type { KingdomSkinOption } from '@/utils/katchimera-wardrobe';
 import type { CompanionMemory } from '@/utils/companion-content';
+import type { CompanionBondProgress } from '@/utils/companion-bond';
+import type { CompanionConversationPresentationPhase } from '@/features/companion/use-companion-conversation-flow';
 
 export function conversationSpeechLine(
   session: ConversationSession,
@@ -58,37 +59,36 @@ export function conversationSpeechLine(
 }
 
 export function CompanionConversationScene({
+  bondProgress,
   definition,
   developerContent,
+  flowPhase,
   name,
+  onAdvance,
   onAnswer,
   onClose,
-  onContinue,
-  onEquipForm,
   onMemoryDecision,
   onGoalDecision,
   onInsightDecision,
-  onKeepTalking,
-  onDismissOutcome,
-  onOpenOutcomeDestination,
   onQuickGoalDecision,
   onJournalHandoff,
   onQuestHandoff,
   hasActiveFocus,
-  memories,
-  onUpdateMemory,
   onOpenMore,
-  onStoryComplete,
   storyFlow = false,
   storyFinale = false,
   session,
   skins,
   questOffer,
+  requiresManualAdvance,
   journalMergeEnergyPreview,
 }: {
+  bondProgress: CompanionBondProgress;
   definition: ConversationDefinition;
   developerContent?: ReactNode;
+  flowPhase: CompanionConversationPresentationPhase;
   name: string;
+  onAdvance: () => void;
   onAnswer: (optionId: string) => void;
   onClose: () => void;
   onContinue: () => void;
@@ -112,20 +112,19 @@ export function CompanionConversationScene({
   session: ConversationSession;
   skins: readonly KingdomSkinOption[];
   questOffer: { id: string; title: string; hint: string } | null;
+  requiresManualAdvance: boolean;
   journalMergeEnergyPreview: number;
 }) {
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
-  const [changingPendingAnswer, setChangingPendingAnswer] = useState(false);
   const node = conversationNode(definition, session.currentNodeId);
-  const lastTurn = session.turns.at(-1);
-  const lastLabel = optionLabel(definition, session, lastTurn?.optionId ?? null);
+  const headerSkin = skins.find((skin) => skin.id === session.formId) ?? skins[0] ?? null;
+  const headerVisual = headerSkin ? getCreatureVisual(headerSkin.visualKey) : null;
   const haptic = () => {
     if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
   };
-  const answer = (optionId: string) => { haptic(); setChangingPendingAnswer(false); onAnswer(optionId); };
-  const next = () => { haptic(); onContinue(); };
+  const answer = (optionId: string) => { haptic(); onAnswer(optionId); };
   const progress = conversationProgress(definition, session);
   const showConversationProgress = !session.outcomePresentation
     && session.status !== 'completed'
@@ -152,28 +151,44 @@ export function CompanionConversationScene({
       showsVerticalScrollIndicator={false}>
       <View style={{ alignItems: 'center', flexDirection: 'row', minHeight: 48, zIndex: 4 }}>
         <KatchimeraBackButton accessibilityLabel="Back to Katchimeras" onPress={onClose} />
-        <ThemedText
-          adjustsFontSizeToFit
-          minimumFontScale={0.72}
-          numberOfLines={1}
-          selectable
-          style={{ ...KatchaUI.type.companionName, flex: 1, paddingHorizontal: 12, textAlign: 'center' }}
-          lightColor="#FFD36E"
-          darkColor="#FFD36E">
-          {name}
-        </ThemedText>
-        {!storyFlow ? <Pressable
-          accessibilityLabel="More companion activities"
+        <View style={{ alignItems: 'center', flex: 1, flexDirection: 'row', gap: 9, paddingHorizontal: 10 }}>
+          <View style={{ alignItems: 'center', backgroundColor: 'rgba(255,247,220,0.92)', borderColor: 'rgba(255,225,158,0.7)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, height: 46, justifyContent: 'center', overflow: 'hidden', width: 46 }}>
+            {headerVisual ? <Image accessibilityLabel={`${name} portrait`} contentFit="contain" source={headerVisual.source} style={{ height: 44, width: 44 }} /> : null}
+          </View>
+          <View style={{ flex: 1, gap: 3 }}>
+            <ThemedText
+              adjustsFontSizeToFit
+              minimumFontScale={0.72}
+              numberOfLines={1}
+              selectable
+              style={{ ...KatchaUI.type.companionName, fontSize: 22, lineHeight: 25 }}
+              lightColor="#FFD36E"
+              darkColor="#FFD36E">
+              {name}
+            </ThemedText>
+            <View accessibilityLabel={`Bond level ${bondProgress.level}, ${Math.round(bondProgress.ratio * 100)} percent to the next level`} style={{ alignItems: 'center', flexDirection: 'row', gap: 6 }}>
+              <IconSymbol color="#F07C78" name="heart.fill" size={11} />
+              <ThemedText selectable style={{ fontSize: 9.5, fontVariant: ['tabular-nums'], fontWeight: '900' }} lightColor="#FFF1CC" darkColor="#FFF1CC">Bond {bondProgress.level}</ThemedText>
+              <View style={{ backgroundColor: 'rgba(255,244,213,0.25)', borderRadius: 999, flex: 1, height: 5, overflow: 'hidden' }}>
+                <View style={{ backgroundColor: '#E8B547', borderRadius: 999, height: '100%', width: `${Math.max(bondProgress.totalPoints ? 5 : 0, bondProgress.ratio * 100)}%` }} />
+              </View>
+            </View>
+          </View>
+        </View>
+        <Pressable
+          accessibilityLabel="Open companion story dashboard"
           accessibilityRole="button"
           onPress={onOpenMore}
-          style={({ pressed }) => ({ alignItems: 'center', height: 44, justifyContent: 'center', opacity: pressed ? 0.68 : 1, width: 44 })}>
-          <IconSymbol color="#FFF4D1" name="ellipsis" size={21} weight="bold" />
-        </Pressable> : <View style={{ height: 44, width: 44 }} />}
+          style={({ pressed }) => ({ alignItems: 'center', backgroundColor: 'rgba(255,248,225,0.94)', borderCurve: 'continuous', borderRadius: 14, gap: 1, minHeight: 44, justifyContent: 'center', opacity: pressed ? 0.68 : 1, paddingHorizontal: 10 })}>
+          <IconSymbol color="#6B4A24" name="book.closed.fill" size={17} weight="bold" />
+          <ThemedText selectable style={{ fontSize: 8.5, fontWeight: '900' }} lightColor="#6B4A24" darkColor="#6B4A24">Story</ThemedText>
+        </Pressable>
       </View>
 
       <View accessibilityElementsHidden pointerEvents="none" style={{ minHeight: companionHomeHeroSpacer(height) }} />
 
       <Animated.View
+        accessibilityLabel={`Conversation ${flowPhase.replace('_', ' ')}`}
         entering={reduceMotion ? undefined : FadeInUp.duration(220)}
         style={{
           backgroundColor: KatchaUI.companionPanel.background,
@@ -202,47 +217,25 @@ export function CompanionConversationScene({
         {session.outcomePresentation ? (
           <ConversationOutcomeCard
             outcome={session.outcomePresentation}
-            onClose={onClose}
-            onKeepTalking={() => {
-              onDismissOutcome();
-              if (session.status !== 'completed') return;
-              if (storyFlow) onStoryComplete?.();
-              else onKeepTalking();
-            }}
-            onOpenDestination={onOpenOutcomeDestination}
-            storyFlow={storyFlow}
+            onAdvance={onAdvance}
+            requiresManualAdvance={requiresManualAdvance}
           />
         ) : session.pendingReply !== undefined ? (
           <View style={{ gap: 12 }}>
-            {changingPendingAnswer ? <ChoiceOptions
-              onAnswer={answer}
-              options={answeredOptions(definition, session)}
-              selectedOptionId={lastTurn?.optionId ?? null}
-            /> : <View style={{ alignItems: 'center', backgroundColor: '#F5D985', borderColor: 'rgba(139,96,29,0.36)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 10, paddingHorizontal: 14, paddingVertical: 11 }}>
-              <View style={{ alignItems: 'center', backgroundColor: '#806040', borderRadius: 999, height: 26, justifyContent: 'center', width: 26 }}>
-                <IconSymbol color="#FFF8E7" name="checkmark" size={13} weight="bold" />
-              </View>
-              <View style={{ flex: 1, gap: 2 }}>
-                <ThemedText selectable style={{ fontSize: 9.5, fontWeight: '900', letterSpacing: 0.9 }} lightColor="#806126" darkColor="#806126">YOUR ANSWER</ThemedText>
-                <ThemedText selectable style={{ fontSize: 14, fontWeight: '900', lineHeight: 19 }} lightColor="#3B2C20" darkColor="#3B2C20">{lastLabel}</ThemedText>
-              </View>
-            </View>}
             {session.pollResult ? <PollResult session={session} definition={definition} /> : null}
-            <PrimaryAction label={session.pollResult ? 'See the result' : 'Continue'} onPress={next} />
-            <SecondaryAction label={changingPendingAnswer ? 'Keep this answer' : 'Change answer'} onPress={() => setChangingPendingAnswer((current) => !current)} />
+            <NarrativeTransition
+              label={session.pollResult ? 'The village answered too…' : `${name} is following your answer…`}
+              onAdvance={onAdvance}
+              requiresManualAdvance={requiresManualAdvance}
+            />
           </View>
         ) : session.status === 'completed' || node?.kind === 'end' ? (
           session.preview ? <View style={{ alignItems: 'center', gap: 10, paddingVertical: 6 }}>
             <ThemedText selectable style={{ fontSize: 14, lineHeight: 20, textAlign: 'center' }} lightColor="#5D4B37" darkColor="#5D4B37">Preview complete. Choose another flow below or exit the preview.</ThemedText>
-          </View> : storyFlow ? <StoryConversationContinuation finale={storyFinale} name={name} onContinue={onStoryComplete ?? onClose} /> : <ConversationContinuation
-            familyId={definition.familyId}
-            initialMode={session.exitTransition?.kind === 'continuation' ? session.exitTransition.destination : undefined}
-            memories={memories}
-            name={name}
-            onClose={onClose}
-            onKeepTalking={onKeepTalking}
-            onOpenMore={onOpenMore}
-            onUpdateMemory={onUpdateMemory}
+          </View> : <NarrativeTransition
+            label={storyFlow && !storyFinale ? 'Opening the next chapter…' : `Returning to ${name}…`}
+            onAdvance={onAdvance}
+            requiresManualAdvance={requiresManualAdvance}
           />
         ) : node?.kind === 'choice' ? (
           <ChoiceOptions options={node.options} onAnswer={answer} />
@@ -251,7 +244,7 @@ export function CompanionConversationScene({
         ) : node?.kind === 'profile_game' || node?.kind === 'insight_game' ? (
           <ChoiceOptions options={conversationGameQuestion(node, session)?.options ?? []} onAnswer={answer} />
         ) : node?.kind === 'form_reveal' ? (
-          <FormReveal definition={definition} node={node} onContinue={next} onEquip={onEquipForm} preview={Boolean(session.preview)} session={session} skins={skins} />
+          <FormReveal definition={definition} node={node} onAdvance={onAdvance} preview={Boolean(session.preview)} session={session} skins={skins} />
         ) : node?.kind === 'insight_reveal' ? (
           <InsightReveal node={node} onDecision={onInsightDecision} preview={Boolean(session.preview)} session={session} />
         ) : node?.kind === 'memory_proposal' ? (
@@ -262,7 +255,7 @@ export function CompanionConversationScene({
           <View style={{ gap: 10 }}>
             <ThemedText selectable style={{ fontSize: 16, fontWeight: '900', lineHeight: 22 }} lightColor="#3B2C20" darkColor="#3B2C20">{node.title}</ThemedText>
             <PrimaryAction label="Add this small task" onPress={() => onQuickGoalDecision(true, node)} />
-            <SecondaryAction label="Not now" onPress={() => onQuickGoalDecision(false, node)} />
+            <SecondaryAction label="Skip" onPress={() => onQuickGoalDecision(false, node)} />
           </View>
         ) : node?.kind === 'journal_handoff' ? (
           <View style={{ gap: 11 }}>
@@ -289,7 +282,7 @@ export function CompanionConversationScene({
               </View>
             </View>
             <PrimaryAction label="Take this to the Egg" onPress={() => onJournalHandoff(true, node)} />
-            <SecondaryAction label="Not today" onPress={() => onJournalHandoff(false, node)} />
+            <SecondaryAction label="Skip" onPress={() => onJournalHandoff(false, node)} />
           </View>
         ) : node?.kind === 'quest_handoff' ? (
           <View style={{ gap: 10 }}>
@@ -302,23 +295,13 @@ export function CompanionConversationScene({
               <ThemedText selectable style={{ fontSize: 14, lineHeight: 20, textAlign: 'center' }} lightColor="#64513B" darkColor="#64513B">Bringing your answers together…</ThemedText>
             </View>}
             {questOffer ? <PrimaryAction label="Take this quest" onPress={() => onQuestHandoff(true, node)} /> : null}
-            {questOffer ? <SecondaryAction label="Not now" onPress={() => onQuestHandoff(false, node)} /> : null}
+            {questOffer ? <SecondaryAction label="Skip" onPress={() => onQuestHandoff(false, node)} /> : null}
           </View>
         ) : null}
       </Animated.View>
       {developerContent}
     </ScrollView>
   );
-}
-
-function StoryConversationContinuation({ finale, name, onContinue }: { finale: boolean; name: string; onContinue: () => void }) {
-  return <View style={{ gap: 10 }}>
-    <ThemedText selectable style={{ fontSize: 18, fontWeight: '900', lineHeight: 24 }} lightColor="#3B2C20" darkColor="#3B2C20">{finale ? 'Our first table is set.' : 'The next page is ready.'}</ThemedText>
-    <ThemedText selectable style={{ fontSize: 14, lineHeight: 20 }} lightColor="#5D4B37" darkColor="#5D4B37">{finale
-      ? `Head back to ${name}. You can keep talking, and the Pantry will wait until a new order is actually ready.`
-      : `Head back to ${name} to see the next chapter and what belongs on the Merge tray.`}</ThemedText>
-    <PrimaryAction label={finale ? `Back to ${name}` : 'See next chapter'} onPress={onContinue} />
-  </View>;
 }
 
 function GoalBundleProposal({ hasActiveGoalPlan, node, onDecision }: {
@@ -361,77 +344,7 @@ function GoalBundleProposal({ hasActiveGoalPlan, node, onDecision }: {
       </Pressable>;
     })}
     <PrimaryAction disabled={!selectedIds.length} label={selectedIds.length > 1 ? `Add ${selectedIds.length} goals` : 'Add selected goal'} onPress={() => onDecision(selectedIds, node)} />
-    <SecondaryAction label="Not now" onPress={() => onDecision(null, node)} />
-  </View>;
-}
-
-function ConversationContinuation({ familyId, initialMode, memories, name, onClose, onKeepTalking, onOpenMore, onUpdateMemory }: {
-  familyId: ConversationDefinition['familyId'];
-  initialMode?: 'menu' | 'memory';
-  memories: readonly CompanionMemory[];
-  name: string;
-  onClose: () => void;
-  onKeepTalking: (poolId?: string) => void;
-  onOpenMore: () => void;
-  onUpdateMemory: (input: { memoryId: string; status: 'confirmed' | 'rejected' | 'forgotten'; summary?: string }) => void;
-}) {
-  const [mode, setMode] = useState<'menu' | 'topics' | 'memory'>(initialMode ?? 'menu');
-  const [memoryIndex, setMemoryIndex] = useState(0);
-  const [editing, setEditing] = useState(false);
-  const memory = memories[memoryIndex % Math.max(1, memories.length)] ?? null;
-  const [draft, setDraft] = useState(memory?.summary ?? '');
-  const selectMemory = (nextIndex: number) => {
-    const bounded = (nextIndex + memories.length) % Math.max(1, memories.length);
-    setMemoryIndex(bounded);
-    setDraft(memories[bounded]?.summary ?? '');
-    setEditing(false);
-  };
-  if (mode === 'topics') return <View style={{ gap: 9 }}>
-    <ThemedText selectable style={{ fontSize: 15, fontWeight: '900', lineHeight: 20 }} lightColor="#3B2C20" darkColor="#3B2C20">What should we talk about?</ThemedText>
-    {companionConversationTopics[familyId].map((topic) => <Pressable
-      accessibilityRole="button"
-      key={topic.id}
-      onPress={() => topic.id === 'memory' ? setMode('memory') : onKeepTalking(topic.id)}
-      style={({ pressed }) => ({ alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.54)', borderRadius: 16, flexDirection: 'row', minHeight: 48, opacity: pressed ? 0.68 : 1, paddingHorizontal: 14 })}>
-      <ThemedText selectable style={{ flex: 1, fontSize: 14, fontWeight: '800' }} lightColor="#4A3725" darkColor="#4A3725">{topic.label}</ThemedText>
-      <IconSymbol color="#806040" name="chevron.right" size={14} />
-    </Pressable>)}
-    <SecondaryAction label="Back" onPress={() => setMode('menu')} />
-  </View>;
-  if (mode === 'memory') return <View style={{ gap: 10 }}>
-    <ThemedText selectable style={{ fontSize: 15, fontWeight: '900', lineHeight: 21 }} lightColor="#3B2C20" darkColor="#3B2C20">
-      {memory ? `${name} remembers…` : `${name} does not have a shared memory yet.`}
-    </ThemedText>
-    {memory ? <View style={{ backgroundColor: '#FFF5D8', borderRadius: 18, gap: 8, padding: 14 }}>
-      {editing ? <TextInput
-        accessibilityLabel="Edit shared memory"
-        multiline
-        onChangeText={setDraft}
-        style={{ backgroundColor: '#FFFDF7', borderColor: 'rgba(109,78,43,0.2)', borderRadius: 14, borderWidth: 1, color: '#4A3725', fontSize: 14, lineHeight: 20, minHeight: 76, padding: 11, textAlignVertical: 'top' }}
-        value={draft}
-      /> : <ThemedText selectable style={{ fontSize: 15, fontWeight: '800', lineHeight: 21 }} lightColor="#4A3725" darkColor="#4A3725">“{memory.summary}”</ThemedText>}
-      <ThemedText selectable style={{ fontSize: 11, lineHeight: 16 }} lightColor="#806126" darkColor="#806126">
-        {memory.evidenceRefs.length ? `From ${memory.evidenceRefs.length} shared moment${memory.evidenceRefs.length === 1 ? '' : 's'}.` : 'From our conversations together.'}
-      </ThemedText>
-    </View> : null}
-    {memory ? editing
-      ? <PrimaryAction label="Remember it this way" onPress={() => { onUpdateMemory({ memoryId: memory.id, status: 'confirmed', summary: draft.trim() || memory.summary }); setEditing(false); }} />
-      : <>
-          {memory.status === 'provisional' ? <PrimaryAction label="That’s right" onPress={() => onUpdateMemory({ memoryId: memory.id, status: 'confirmed' })} /> : null}
-          <SecondaryAction label="Change what you remember" onPress={() => { setDraft(memory.summary); setEditing(true); }} />
-          <SecondaryAction label="Forget this" onPress={() => onUpdateMemory({ memoryId: memory.id, status: memory.status === 'provisional' ? 'rejected' : 'forgotten' })} />
-          {memories.length > 1 ? <SecondaryAction label="Another memory" onPress={() => selectMemory(memoryIndex + 1)} /> : null}
-        </>
-      : null}
-    <SecondaryAction label="Back to our conversation" onPress={() => setMode('menu')} />
-  </View>;
-  return <View style={{ gap: 6 }}>
-    <ThemedText selectable style={{ fontSize: 16, fontWeight: '900', lineHeight: 21, paddingBottom: 3 }} lightColor="#3B2C20" darkColor="#3B2C20">Want another question from {name}?</ThemedText>
-    <PrimaryAction label="Keep talking" onPress={() => onKeepTalking()} />
-    <SecondaryAction label="Choose a topic" onPress={() => setMode('topics')} />
-    <SecondaryAction label="What do you remember about me?" onPress={() => setMode('memory')} />
-    <SecondaryAction label="Goals, tasks & more" onPress={onOpenMore} />
-    <SecondaryAction label="See you later" onPress={onClose} />
+    <SecondaryAction label="Skip" onPress={() => onDecision(null, node)} />
   </View>;
 }
 
@@ -441,7 +354,9 @@ function ChoiceOptions({ disabled = false, options, onAnswer, selectedOptionId =
   onAnswer: (id: string) => void;
   selectedOptionId?: string | null;
 }) {
-  return <View accessibilityRole="radiogroup" style={{ gap: 9 }}>
+  const { width } = useWindowDimensions();
+  const useGrid = width >= 360 && options.length >= 4;
+  return <View accessibilityRole="radiogroup" style={{ flexDirection: useGrid ? 'row' : 'column', flexWrap: useGrid ? 'wrap' : 'nowrap', gap: 9 }}>
     {options.map((option, index) => {
       const selected = option.id === selectedOptionId;
       return (
@@ -466,6 +381,7 @@ function ChoiceOptions({ disabled = false, options, onAnswer, selectedOptionId =
           paddingHorizontal: 15,
           paddingVertical: 10,
           transform: [{ scale: pressed ? 0.985 : 1 }],
+          width: useGrid ? '48%' : '100%',
         })}>
         <ThemedText selectable style={{ flex: 1, fontSize: 15, fontWeight: '800', lineHeight: 20 }} lightColor="#3B2C20" darkColor="#3B2C20">{option.label}</ThemedText>
         {selected ? <IconSymbol color="#806040" name="checkmark" size={15} weight="bold" />
@@ -479,20 +395,6 @@ function ChoiceOptions({ disabled = false, options, onAnswer, selectedOptionId =
 
 type ConversationOptionLike = { id: string; label: string };
 
-function answeredOptions(
-  definition: ConversationDefinition,
-  session: ConversationSession
-): readonly ConversationOptionLike[] {
-  const turn = session.turns.at(-1);
-  if (!turn) return [];
-  const answeredNode = conversationNode(definition, turn.nodeId);
-  if (answeredNode?.kind === 'choice' || answeredNode?.kind === 'poll') return answeredNode.options;
-  if (answeredNode?.kind === 'profile_game' || answeredNode?.kind === 'insight_game') {
-    return answeredNode.questions.find((question) => question.id === turn.questionId)?.options ?? [];
-  }
-  return [];
-}
-
 function conversationPrompt(
   prompt: string,
   definition: ConversationDefinition,
@@ -502,12 +404,10 @@ function conversationPrompt(
   return prompt.replace('{answer}', answer ?? 'that');
 }
 
-function ConversationOutcomeCard({ outcome, onClose, onKeepTalking, onOpenDestination, storyFlow = false }: {
+function ConversationOutcomeCard({ outcome, onAdvance, requiresManualAdvance }: {
   outcome: ConversationOutcomePresentation;
-  onClose: () => void;
-  onKeepTalking: () => void;
-  onOpenDestination: (destination: ConversationOutcomeDestination) => void;
-  storyFlow?: boolean;
+  onAdvance: () => void;
+  requiresManualAdvance: boolean;
 }) {
   return <Animated.View entering={FadeInUp.duration(240)} style={{ gap: 11 }}>
     <View style={{ backgroundColor: '#FFF5D8', borderColor: 'rgba(168,117,47,0.34)', borderCurve: 'continuous', borderRadius: 24, borderWidth: 1, boxShadow: '0 9px 24px rgba(112,76,30,0.13)', gap: 8, padding: 17 }}>
@@ -524,19 +424,14 @@ function ConversationOutcomeCard({ outcome, onClose, onKeepTalking, onOpenDestin
         <ThemedText selectable style={{ flex: 1, fontSize: 13, fontWeight: '800', lineHeight: 18 }} lightColor="#3B2C20" darkColor="#3B2C20">{item}</ThemedText>
       </View>)}
     </View>
-    {outcome.destination && outcome.destinationLabel ? (
-      <PrimaryAction label={outcome.destinationLabel} onPress={() => onOpenDestination(outcome.destination!)} />
-    ) : null}
-    <SecondaryAction label={storyFlow ? 'See next chapter' : 'Keep talking'} onPress={onKeepTalking} />
-    <SecondaryAction label="See you later" onPress={onClose} />
+    <NarrativeTransition label="Saved — returning to your story…" onAdvance={onAdvance} requiresManualAdvance={requiresManualAdvance} />
   </Animated.View>;
 }
 
-function FormReveal({ definition, node, onContinue, onEquip, preview, session, skins }: {
+function FormReveal({ definition, node, onAdvance, preview, session, skins }: {
   definition: ConversationDefinition;
   node: Extract<ConversationNode, { kind: 'form_reveal' }>;
-  onContinue: () => void;
-  onEquip: (id: KatchimeraSkinId) => void;
+  onAdvance: () => void;
   preview: boolean;
   session: ConversationSession;
   skins: readonly KingdomSkinOption[];
@@ -569,8 +464,7 @@ function FormReveal({ definition, node, onContinue, onEquip, preview, session, s
       {runnerName ? <ThemedText selectable style={{ fontSize: 12, fontWeight: '800' }} lightColor="#806126" darkColor="#806126">Runner-up: {runnerName}</ThemedText> : null}
       {!top?.unlocked ? <ThemedText selectable style={{ fontSize: 12, lineHeight: 17 }} lightColor="#806126" darkColor="#806126">Not discovered yet. Its hatch cues will stay visible in your collection.</ThemedText> : null}
     </View>
-    {top && top.id !== session.formId && !preview ? <PrimaryAction label={`Equip ${topName}`} onPress={() => onEquip(top.id)} /> : null}
-    <SecondaryAction label="Continue" onPress={onContinue} />
+    <NarrativeTransition label={preview ? 'Preview ready' : 'Saving this match to your insights…'} onAdvance={onAdvance} requiresManualAdvance={preview} />
   </View>;
 }
 
@@ -581,12 +475,6 @@ function InsightReveal({ node, onDecision, preview, session }: {
   session: ConversationSession;
 }) {
   const result = session.insightResult;
-  const committedRef = useRef(false);
-  useEffect(() => {
-    if (preview || !result || committedRef.current) return;
-    committedRef.current = true;
-    onDecision(true, node);
-  }, [node, onDecision, preview, result]);
   if (!result) return <View style={{ gap: 10 }}>
     <ThemedText selectable style={{ fontSize: 14, lineHeight: 20, textAlign: 'center' }} lightColor="#64513B" darkColor="#64513B">I could not resolve this result yet. Try the conversation again.</ThemedText>
     <SecondaryAction label="Close" onPress={() => onDecision(false, node)} />
@@ -615,39 +503,58 @@ function MemoryProposal({ node, onDecision, session }: {
 }) {
   const topName = katchimeraSkinById.get(session.formResult?.topFormId ?? session.formId)?.displayName ?? 'this form';
   const summary = node.summary.replace('{topForm}', topName);
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(summary);
   const isFormInsight = node.memoryKey.includes(':form-match');
-  const committedRef = useRef(false);
-  useEffect(() => {
-    if (!isFormInsight || session.preview || committedRef.current) return;
-    committedRef.current = true;
-    onDecision(true, summary);
-  }, [isFormInsight, onDecision, session.preview, summary]);
-  if (isFormInsight && !session.preview) return <AutomaticInsightTransition label="Adding your form insight…" />;
+  if (!session.preview) return <AutomaticInsightTransition label={isFormInsight ? 'Saving your form insight…' : 'Tucking this into shared memory…'} />;
   if (isFormInsight && session.preview) return <View style={{ gap: 10 }}>
     <View style={{ backgroundColor: 'rgba(255,255,255,0.5)', borderCurve: 'continuous', borderRadius: 18, gap: 5, padding: 13 }}>
       <ThemedText selectable style={{ fontSize: 11, fontWeight: '900', letterSpacing: 1 }} lightColor="#806126" darkColor="#806126">YOUR FORM INSIGHT</ThemedText>
       <ThemedText selectable style={{ fontSize: 14, lineHeight: 20 }} lightColor="#4A3725" darkColor="#4A3725">{summary}</ThemedText>
     </View>
-    <PrimaryAction label="Continue preview" onPress={() => onDecision(false, summary)} />
+    <PrimaryAction label="Finish preview" onPress={() => onDecision(false, summary)} />
   </View>;
   return <View style={{ gap: 10 }}>
     <View style={{ backgroundColor: 'rgba(255,255,255,0.5)', borderCurve: 'continuous', borderRadius: 18, gap: 5, padding: 13 }}>
-      <ThemedText selectable style={{ fontSize: 11, fontWeight: '900', letterSpacing: 1 }} lightColor="#806126" darkColor="#806126">WHAT I WOULD REMEMBER</ThemedText>
-      {editing ? <TextInput
-        accessibilityLabel="Edit what this Katchimera remembers"
-        multiline
-        onChangeText={setDraft}
-        placeholder="What should I remember?"
-        style={{ backgroundColor: '#FFFDF7', borderColor: 'rgba(109,78,43,0.2)', borderRadius: 14, borderWidth: 1, color: '#4A3725', fontSize: 14, lineHeight: 20, minHeight: 82, padding: 12, textAlignVertical: 'top' }}
-        value={draft}
-      /> : <ThemedText selectable style={{ fontSize: 14, lineHeight: 20 }} lightColor="#4A3725" darkColor="#4A3725">{summary}</ThemedText>}
+      <ThemedText selectable style={{ fontSize: 11, fontWeight: '900', letterSpacing: 1 }} lightColor="#806126" darkColor="#806126">SHARED MEMORY PREVIEW</ThemedText>
+      <ThemedText selectable style={{ fontSize: 14, lineHeight: 20 }} lightColor="#4A3725" darkColor="#4A3725">{summary}</ThemedText>
     </View>
-    <PrimaryAction label={editing ? 'Remember this version' : 'Yes, remember this'} onPress={() => onDecision(true, (editing ? draft : summary).trim() || summary)} />
-    {!editing ? <SecondaryAction label="Change it" onPress={() => setEditing(true)} /> : null}
-    <SecondaryAction label="Not now" onPress={() => onDecision(false, summary)} />
+    <PrimaryAction label="Finish preview" onPress={() => onDecision(false, summary)} />
   </View>;
+}
+
+function NarrativeTransition({ label, onAdvance, requiresManualAdvance = false }: {
+  label: string;
+  onAdvance?: () => void;
+  requiresManualAdvance?: boolean;
+}) {
+  return <Pressable
+    accessibilityHint={onAdvance ? 'Advances to the next part of the conversation' : undefined}
+    accessibilityLiveRegion="polite"
+    accessibilityRole={onAdvance ? 'button' : undefined}
+    disabled={!onAdvance}
+    onPress={onAdvance}
+    style={({ pressed }) => ({
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,250,236,0.52)',
+      borderColor: 'rgba(139,96,29,0.18)',
+      borderCurve: 'continuous',
+      borderRadius: 18,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 11,
+      minHeight: 58,
+      opacity: pressed ? 0.76 : 1,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+      transform: [{ scale: pressed ? 0.985 : 1 }],
+    })}>
+    {!requiresManualAdvance ? <ActivityIndicator color="#806126" size="small" /> : <IconSymbol color="#806126" name="arrow.right" size={17} />}
+    <View style={{ flex: 1, gap: 2 }}>
+      <ThemedText selectable style={{ fontSize: 13.5, fontWeight: '900', lineHeight: 18 }} lightColor="#4A3725" darkColor="#4A3725">{label}</ThemedText>
+      <ThemedText selectable style={{ fontSize: 10.5, fontWeight: '700', lineHeight: 15 }} lightColor="#806126" darkColor="#806126">
+        {requiresManualAdvance ? 'Double-tap for the next line' : 'Tap to move on sooner'}
+      </ThemedText>
+    </View>
+  </Pressable>;
 }
 
 function PollResult({ session, definition }: { session: ConversationSession; definition: ConversationDefinition }) {

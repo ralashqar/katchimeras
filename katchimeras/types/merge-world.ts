@@ -49,8 +49,7 @@ export type MergeBoardRegionId = 'central-clearing' | 'inner-mist' | 'mid-mist' 
 
 export type MergeDreamMist =
   | { kind: 'dormant' }
-  | { kind: 'echo'; id: string; definitionId: string; ownerCharacterId: MergeCharacterId }
-  | { kind: 'katchimera'; id: string; mysteryId: 'moon' | 'trail'; ownerCharacterId: MergeCharacterId | null };
+  | { kind: 'echo'; id: string; definitionId: string; ownerCharacterId: MergeCharacterId | null; generatorId?: string };
 
 export type MergeBoardCell = {
   /** Compatibility projection. In v10 this is true whenever `mist` is present. */
@@ -263,10 +262,18 @@ export type MergeWorldCommand =
   | { type: 'reconcileStory'; familyId: MergeCharacterId; status: string; targetLevel: number; actPhase?: string; orderTemplateKeys?: string[]; servedOrderIds?: string[]; now: number }
   | { type: 'ackExternalReward'; receiptId: string; now: number };
 
+export type MergeWorldFailureReason =
+  | 'locked_cell'
+  | 'no_energy'
+  | 'board_full'
+  | 'wrong_echo_match'
+  | 'sealed_mist';
+
 export type MergeWorldCommandResult = {
   state: MergeWorldState;
   changed: boolean;
   message?: string;
+  failureReason?: MergeWorldFailureReason;
   discoveryId?: string;
   mergedCell?: number;
   dreamEchoClearedId?: string;

@@ -53,7 +53,7 @@ export function CompanionQuestionnaireScene({
   options,
   progress,
   result = false,
-  selectionActionLabel = 'Continue',
+  selectionActionLabel: _selectionActionLabel = 'Next',
   stepLabel,
   title,
   visualKey,
@@ -110,10 +110,7 @@ export function CompanionQuestionnaireScene({
     if (!onSelect) return;
     setSelection({ optionId: option.id, question: title });
     if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
-  };
-  const confirmSelection = () => {
-    const selected = options?.find((option) => option.id === selectedId);
-    if (selected && onSelect) onSelect(selected);
+    onSelect(option);
   };
 
   return (
@@ -231,25 +228,6 @@ export function CompanionQuestionnaireScene({
 
             {result ? <View style={styles.resultContent}>{children}</View> : children}
           </ScrollView>
-          {options?.length && selectedId ? (
-            <Animated.View
-              entering={reduceMotion ? FadeIn.duration(80) : FadeInUp.duration(180)}
-              style={[styles.selectionFooter, { paddingBottom: insets.bottom + 12 }]}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={confirmSelection}
-                style={({ pressed }) => [
-                  styles.selectionAction,
-                  { backgroundColor: accentColor },
-                  pressed && styles.selectionActionPressed,
-                ]}>
-                <ThemedText style={styles.selectionActionLabel} lightColor="#2B2018" darkColor="#2B2018">
-                  {selectionActionLabel}
-                </ThemedText>
-                <IconSymbol color="#2B2018" name="arrow.right" size={18} />
-              </Pressable>
-            </Animated.View>
-          ) : null}
         </View>
       </View>
     </View>
@@ -287,9 +265,5 @@ const styles = StyleSheet.create({
   optionIcon: { alignItems: 'center', borderRadius: 999, height: 40, justifyContent: 'center', width: 40 },
   optionLabel: { ...KatchaUI.type.companionAction, flex: 1 },
   resultContent: { gap: 12 },
-  selectionFooter: { backgroundColor: '#211A13', borderTopColor: 'rgba(248,220,165,0.14)', borderTopWidth: 1, paddingHorizontal: 14, paddingTop: 10 },
-  selectionAction: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 17, boxShadow: '0 8px 24px rgba(45,31,16,0.25)', flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 52, paddingHorizontal: 18 },
-  selectionActionPressed: { opacity: 0.88, transform: [{ scale: 0.985 }] },
-  selectionActionLabel: { ...KatchaUI.type.companionAction, fontWeight: '900' },
   pressed: { opacity: 0.76, transform: [{ scale: 0.97 }] },
 });

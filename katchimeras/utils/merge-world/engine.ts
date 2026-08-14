@@ -40,18 +40,19 @@ import type {
   MergeWorldState,
 } from '@/types/merge-world';
 import { advanceMossproutChapterZero, enforceMossproutChapterZeroDropOverride } from '@/utils/merge-world/chapter-zero-policy';
+import { placeLockedTierOneEchoes } from '@/utils/merge-world/locked-tier-one-echoes';
 
 const KNOWN_CHARACTERS = new Set<MergeCharacterId>(Object.keys(KATCHIMERA_MERGE_PROFILES) as MergeCharacterId[]);
 const RECENT_ORDER_LIMIT = 8;
 
 export function createInitialMergeWorldState(now = Date.now(), characterIds: string[] = []): MergeWorldState {
-  const board: MergeBoardCell[] = Array.from({ length: MERGE_WORLD_SIZE }, (_, index) => ({
+  const board = placeLockedTierOneEchoes(Array.from({ length: MERGE_WORLD_SIZE }, (_, index) => ({
     locked: !MERGE_STARTING_OPEN_CELLS.has(index),
     blocker: MERGE_STARTING_OPEN_CELLS.has(index) ? null : index % 3 === 0 ? 'rocks' : index % 3 === 1 ? 'clouds' : 'vines',
     regionId: regionForCell(index),
     mist: MERGE_STARTING_OPEN_CELLS.has(index) ? null : { kind: 'dormant' },
     occupant: null,
-  }));
+  })));
   let state: MergeWorldState = {
     version: 10,
     revision: 0,
@@ -243,7 +244,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     createdAt: finite(source.createdAt, now),
     updatedAt: finite(source.updatedAt, now),
     nextInstance: Math.max(1, finite(source.nextInstance, 1)),
-    board: dedupeMigratedGenerators(source.board.map((cell, index) => normalizeCell(cell, fallback.board[index]))),
+    board: placeLockedTierOneEchoes(dedupeMigratedGenerators(source.board.map((cell, index) => normalizeCell(cell, fallback.board[index])))),
     storage: Array.isArray(source.storage) ? source.storage.filter(validBoardItem) : [],
     storageCapacity: Math.max(8, finite(source.storageCapacity, 8)),
     rewardInbox: Array.isArray(source.rewardInbox) ? source.rewardInbox : [],
@@ -302,9 +303,9 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
 function tapGenerator(state: MergeWorldState, generatorId: string, now: number, seed: string): MergeWorldCommandResult {
   const generator = state.generators[generatorId];
   if (!generator) return unchanged(state, 'That generator is not unlocked.');
-  if (state.energy.value < 1) return unchanged(state, 'You need more Merge Energy.');
+  if (state.energy.value < 1) return unchanged(state, 'You need more Merge Energy.', 'no_energy');
   const cell = firstEmptyCell(state.board, hash(`${seed}:cell`));
-  if (cell < 0) return unchanged(state, 'The board is full. Merge or store an item first.');
+  if (cell < 0) return unchanged(state, 'The board is full. Merge or store an item first.', 'board_full');
   // Level one always starts at tier one. Upgrades add a bounded chance of a
   // better seed without changing which authored chains the generator owns.
   const dropIndex = randomUnit(`${seed}:chain:${state.revision}`) < 0.5 ? 0 : 1;
@@ -361,8 +362,7 @@ function moveItem(state: MergeWorldState, from: number, to: number, now: number)
   if (!source) return unchanged(state);
   const echo = state.board[to].mist?.kind === 'echo' ? state.board[to].mist : null;
   if (echo) {
-    if (!state.unlockedRegions.includes(state.board[to].regionId)) return unchanged(state, 'Something deeper in the Dream Mist is still sealed.');
-    if (source.kind !== 'item' || source.definitionId !== echo.definitionId) return unchanged(state, 'Find its match.');
+    if (source.kind !== 'item' || source.definitionId !== echo.definitionId) return unchanged(state, 'Find its match.', 'wrong_echo_match');
     const resultId = MERGE_ITEMS_BY_ID.get(echo.definitionId)?.nextItemId ?? null;
     if (!resultId) return unchanged(state, 'This Dream Echo cannot grow any further.');
     const board = [...state.board];
@@ -395,7 +395,7 @@ function moveItem(state: MergeWorldState, from: number, to: number, now: number)
       message: `${MERGE_ITEMS_BY_ID.get(resultId)?.name ?? 'New item'} woke from the Dream Mist.`,
     };
   }
-  if (state.board[to].locked) return unchanged(state, 'Choose an open board space.');
+  if (state.board[to].locked) return unchanged(state, 'Choose an open board space.', 'locked_cell');
   const board = [...state.board];
   if (!target) {
     board[from] = { ...board[from], occupant: null };
@@ -1262,8 +1262,8 @@ function changed(state: MergeWorldState, message?: string): MergeWorldCommandRes
   return { state, changed: true, message };
 }
 
-function unchanged(state: MergeWorldState, message?: string): MergeWorldCommandResult {
-  return { state, changed: false, message };
+function unchanged(state: MergeWorldState, message?: string, failureReason?: MergeWorldCommandResult['failureReason']): MergeWorldCommandResult {
+  return { state, changed: false, message, failureReason };
 }
 
 function validCell(index: number) {
@@ -1406,21 +1406,16 @@ function normalizeCell(value: unknown, fallback: MergeBoardCell): MergeBoardCell
 
 function normalizeDreamMist(value: unknown, legacyLocked: boolean): MergeBoardCell['mist'] {
   if (!value || typeof value !== 'object') return legacyLocked ? { kind: 'dormant' } : null;
-  const mist = value as Partial<NonNullable<MergeBoardCell['mist']>> & { definitionId?: unknown; ownerCharacterId?: unknown; mysteryId?: unknown };
+  const mist = value as { kind?: unknown; id?: unknown; definitionId?: unknown; generatorId?: unknown; ownerCharacterId?: unknown };
   if (mist.kind === 'dormant') return { kind: 'dormant' };
-  if (mist.kind === 'echo' && typeof mist.id === 'string' && typeof mist.definitionId === 'string' && MERGE_ITEMS_BY_ID.has(mist.definitionId)
-    && typeof mist.ownerCharacterId === 'string' && KNOWN_CHARACTERS.has(mist.ownerCharacterId as MergeCharacterId)) {
-    return { kind: 'echo', id: mist.id, definitionId: mist.definitionId, ownerCharacterId: mist.ownerCharacterId as MergeCharacterId };
-  }
-  if (mist.kind === 'katchimera' && typeof mist.id === 'string' && (mist.mysteryId === 'moon' || mist.mysteryId === 'trail')) {
-    return {
-      kind: 'katchimera',
-      id: mist.id,
-      mysteryId: mist.mysteryId,
-      ownerCharacterId: typeof mist.ownerCharacterId === 'string' && KNOWN_CHARACTERS.has(mist.ownerCharacterId as MergeCharacterId)
-        ? mist.ownerCharacterId as MergeCharacterId
-        : null,
-    };
+  if (mist.kind === 'echo' && typeof mist.id === 'string' && typeof mist.definitionId === 'string' && MERGE_ITEMS_BY_ID.has(mist.definitionId)) {
+    const ownerCharacterId = typeof mist.ownerCharacterId === 'string' && KNOWN_CHARACTERS.has(mist.ownerCharacterId as MergeCharacterId)
+      ? mist.ownerCharacterId as MergeCharacterId
+      : null;
+    const generatorId = typeof mist.generatorId === 'string' && MERGE_GENERATORS_BY_ID.has(mist.generatorId)
+      ? mist.generatorId
+      : undefined;
+    if (ownerCharacterId || generatorId) return { kind: 'echo', id: mist.id, definitionId: mist.definitionId, ownerCharacterId, ...(generatorId ? { generatorId } : {}) };
   }
   return legacyLocked ? { kind: 'dormant' } : null;
 }
