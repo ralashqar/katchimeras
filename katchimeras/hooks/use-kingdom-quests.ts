@@ -48,7 +48,7 @@ import {
   type CompanionBondEventKind,
 } from '@/utils/companion-bond';
 import { loadCompanionBondState, saveCompanionBondState, subscribeCompanionBondState } from '@/utils/companion-bond-storage';
-import { completeAuthoredCohortConversation, completeFeastleConversation, isAuthoredCohortFamily, markFeastleJournalFtue, recordFeastleConfirmedMemory, recordFeastleStorySignal } from '@/utils/companion-story-storage';
+import { completeAuthoredCohortConversation, completeFeastleConversation, completeMossproutConversation, isAuthoredCohortFamily, markFeastleJournalFtue, recordFeastleConfirmedMemory, recordFeastleStorySignal } from '@/utils/companion-story-storage';
 import {
   answerCompanionDiscoveryPrompt,
   answersForCompanion,
@@ -894,6 +894,8 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     if (!selectedConversationSession || selectedConversationSession.preview || selectedConversationSession.status !== 'completed') return;
     const match = /^feastle:friendship:(\d+)$/.exec(selectedConversationSession.definitionId);
     if (match) completeFeastleConversation(Number(match[1]), selectedConversationSession.completedAt ?? Date.now());
+    const mossproutMatch = /^mossprout:story:(\d+)$/.exec(selectedConversationSession.definitionId);
+    if (mossproutMatch) completeMossproutConversation(Number(mossproutMatch[1]), selectedConversationSession.completedAt ?? Date.now());
     const authoredMatch = /^(baristabbit|steppling|voyagle|flexel|bedrotte):story:(\d+)$/.exec(selectedConversationSession.definitionId);
     if (authoredMatch && isAuthoredCohortFamily(authoredMatch[1])) completeAuthoredCohortConversation(authoredMatch[1], Number(authoredMatch[2]), selectedConversationSession.completedAt ?? Date.now());
   }, [selectedConversationSession]);
@@ -2473,6 +2475,8 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     });
     const feastleLevel = selectedConversationDefinition?.id.match(/^feastle:friendship:(\d+)$/)?.[1];
     if (feastleLevel) completeFeastleConversation(Number(feastleLevel));
+    const mossproutLevel = selectedConversationDefinition?.id.match(/^mossprout:story:(\d+)$/)?.[1];
+    if (mossproutLevel) completeMossproutConversation(Number(mossproutLevel));
     const authoredMatch = selectedConversationDefinition?.id.match(/^(baristabbit|steppling|voyagle|flexel|bedrotte):story:(\d+)$/);
     if (authoredMatch && isAuthoredCohortFamily(authoredMatch[1])) completeAuthoredCohortConversation(authoredMatch[1], Number(authoredMatch[2]));
   }, [selectedConversationDefinition?.id, selectedConversationSession]);

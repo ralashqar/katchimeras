@@ -10,6 +10,7 @@ import { feastleFirstMeetingConversationDefinition, feastleFriendshipConversatio
 import { baristabbitStoryConversationDefinitions } from '@/constants/baristabbit-story-conversations';
 import { journeyCohortStoryConversationDefinitions } from '@/constants/journey-cohort-story-conversations';
 import { mossproutFtueConversationDefinitions } from '@/constants/mossprout-ftue-conversations';
+import { mossproutStoryConversationDefinitions } from '@/constants/mossprout-story-conversations';
 import {
   authoredConversationTopics,
   authoredFamilyConversationDefinitions,
@@ -918,6 +919,7 @@ function familyPack(
 
 export const companionConversationDefinitionsV2: readonly ConversationDefinition[] = [
   ...mossproutFtueConversationDefinitions,
+  ...mossproutStoryConversationDefinitions,
   ...familyPack('baristabbit', BARISTA_POLLS, BARISTA_PROFILE),
   ...baristabbitStoryConversationDefinitions,
   ...journeyCohortStoryConversationDefinitions,

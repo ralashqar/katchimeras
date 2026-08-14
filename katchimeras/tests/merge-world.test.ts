@@ -5,7 +5,7 @@ import test from 'node:test';
 import { KATCHIMERA_MERGE_PROFILES, MERGE_GENERATORS, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import type { HomeDayRecord } from '@/types/home';
 import type { MergeBoardItem, MergeWorldState } from '@/types/merge-world';
-import { mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
+import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import { BARISTABBIT_CHAPTER_ONE_ORDER_POOL, FEASTLE_ACT_TWO_ORDER_POOL, selectAuthoredCohortOrderKeys, selectFeastleActTwoOrderKeys } from '@/utils/companion-story';
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection } from '@/utils/merge-world/board-geometry';
@@ -62,6 +62,32 @@ test('Merge FTUE locks the board for Serve and advances only for its exact order
   assert.deepEqual(mergeFtueEventForCommand(merged, command, result), { type: 'order_served', orderId, revision: result.state.revision });
   assert.equal(recoverMergeFtueEvent('merge.serve_sprout', result.state)?.type, 'order_served');
   assert.deepEqual(result.state.activeOrders.map((order) => order.id), ['mossprout:chapter-0:home-plant']);
+});
+
+test('Merge FTUE exposes only Mossprout’s highlighted return note after Chapter 0', () => {
+  const step = mossproutFtueStep('merge.return_note');
+  assert.deepEqual(mergeFtueRailGate(step), { kind: 'chat_note', noteId: 'mossprout:chapter-0:return-note' });
+  assert.equal(mergeFtueAllowsChatNote(step, 'mossprout:chapter-0:return-note'), true);
+  assert.equal(mergeFtueAllowsChatNote(step, 'chat-note:someone-else'), false);
+});
+
+test('Mossprout Chapter One reconciles its three authored rain-garden requests', () => {
+  let state = reduceMergeWorld(createInitialMergeWorldState(NOW), { type: 'reconcileCharacters', characterIds: ['mossprout'], now: NOW }).state;
+  const expected = [
+    { level: 2, title: 'A Place for Rain', requirements: ['nature:waterside:2'] },
+    { level: 3, title: 'A Bank That Holds', requirements: ['nature:garden:3', 'nature:waterside:2'] },
+    { level: 4, title: 'The Little Rain Garden', requirements: ['nature:garden:4', 'nature:waterside:3'] },
+  ];
+  for (const item of expected) {
+    state = reduceMergeWorld(state, {
+      type: 'reconcileStory', familyId: 'mossprout', status: 'order_active',
+      targetLevel: item.level, actPhase: item.level === 4 ? 'signature_order' : 'regular_orders', now: NOW + item.level,
+    }).state;
+    const order = state.activeOrders.find((candidate) => candidate.characterId === 'mossprout');
+    assert.equal(order?.title, item.title);
+    assert.deepEqual(order?.requirements.map((requirement) => requirement.definitionId), item.requirements);
+    assert.equal(order?.signature, item.level === 4);
+  }
 });
 
 test('Merge FTUE permits only the highlighted generator and emits spawn evidence', () => {
@@ -653,6 +679,18 @@ test('Merge provider reconciles story projection after guarded receipt applicati
   const provider = readFileSync('features/merge-world/merge-world-provider.tsx', 'utf8');
   assert.match(provider, /const reconciled = featureAndReconcile\(friendshipState\)/);
   assert.match(provider, /next = featureAndReconcile\(next\)/);
+});
+
+test('a retained hidden Merge provider receives debug resets before Games is reopened', () => {
+  const provider = readFileSync('features/merge-world/merge-world-provider.tsx', 'utf8');
+  const subscriptionStart = provider.indexOf("acquireLifecycleResource('store_subscription', 'merge:world-resets')");
+  const subscriptionEnd = provider.indexOf('const drainPersistence', subscriptionStart);
+  assert.ok(subscriptionStart >= 0 && subscriptionEnd > subscriptionStart);
+  const subscription = provider.slice(subscriptionStart, subscriptionEnd);
+  assert.match(subscription, /subscribeMergeWorldResets\(\(freshState\) =>/);
+  assert.match(subscription, /if \(!mountedRef\.current\) return;/);
+  assert.doesNotMatch(subscription, /if \(!active/);
+  assert.doesNotMatch(subscription, /if \(!activeRef\.current\)/);
 });
 
 test('serving a story order consumes its item, refunds Energy, and emits a durable receipt', () => {

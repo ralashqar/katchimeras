@@ -12,7 +12,8 @@ export type MergeBoardInteractionGate =
 export type MergeRailInteractionGate =
   | { kind: 'open' }
   | { kind: 'locked' }
-  | { kind: 'serve'; orderId: string };
+  | { kind: 'serve'; orderId: string }
+  | { kind: 'chat_note'; noteId: string };
 
 export function resolveFtueBoardCell(state: MergeWorldState, target: FtueTarget) {
   if (target.kind === 'board_cell') return target.cell;
@@ -53,8 +54,19 @@ export function mergeFtueBoardGate(step: FtueStepDefinition | null, state: Merge
 export function mergeFtueRailGate(step: FtueStepDefinition | null): MergeRailInteractionGate {
   const policy = step?.surface === 'merge' ? step.interaction : null;
   if (!policy || policy.mode === 'none') return { kind: 'open' };
+  if (policy.allowed.kind === 'chat_note_tap' && policy.allowed.target.kind === 'tray_chat_note') {
+    return { kind: 'chat_note', noteId: policy.allowed.target.noteId };
+  }
   if (policy.allowed.kind !== 'order_serve' || policy.allowed.target.kind !== 'order_serve') return { kind: 'locked' };
   return { kind: 'serve', orderId: policy.allowed.target.orderId };
+}
+
+export function mergeFtueAllowsChatNote(step: FtueStepDefinition | null, noteId: string) {
+  const policy = step?.surface === 'merge' ? step.interaction : null;
+  if (!policy || policy.mode === 'none') return true;
+  return policy.allowed.kind === 'chat_note_tap'
+    && policy.allowed.target.kind === 'tray_chat_note'
+    && policy.allowed.target.noteId === noteId;
 }
 
 export function mergeFtueAllowsCommand(step: FtueStepDefinition | null, state: MergeWorldState, command: MergeWorldCommand) {
@@ -70,6 +82,7 @@ export function mergeFtueAllowsCommand(step: FtueStepDefinition | null, state: M
       && command.type === 'tapGenerator'
       && command.generatorId === policy.allowed.target.generatorId;
   }
+  if (policy.allowed.kind === 'chat_note_tap') return false;
   return policy.allowed.target.kind === 'order_serve'
     && command.type === 'serveOrder'
     && command.orderId === policy.allowed.target.orderId;

@@ -128,6 +128,7 @@ import type { FtueActionDefinition, FtueChoiceOption } from '@/features/onboardi
 import { useWisps } from '@/features/wisps/wisp-provider';
 import { resolveHomeLoopPresentation } from '@/features/today/home-loop-presentation';
 import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
+import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
 import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
 import { MemoryClarificationSheet } from '@/components/katchadeck/world/memory-clarification-sheet';
 import type { ClassifiedMemory, DayInputTarget, HomeDayRecord, HomeTimelineDay, MemoryDomain } from '@/types/home';
@@ -235,6 +236,7 @@ export default function TodayRouteScreen() {
 
 function HomeScreen() {
   const router = useRouter();
+  const { transitionTo } = useGameScreenTransition();
   const ftueRun = useFtueRun();
   const ftueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
   const ftueTodayStep = ftueStep?.surface === 'today' ? ftueStep : null;
@@ -265,6 +267,7 @@ function HomeScreen() {
     : null;
   const [homeArchetypeId, setHomeArchetypeId] = useState(() => loadWorldIdentity().selectedHomeArchetypeId);
   const [heroStageTop, setHeroStageTop] = useState<number | null>(null);
+  const [transitionLayoutReady, setTransitionLayoutReady] = useState(false);
   const [manualJournalOpen, setManualJournalOpen] = useState(false);
   const [ftueActionBusy, setFtueActionBusy] = useState(false);
   const [ftueOpeningUiVisible, setFtueOpeningUiVisible] = useState(ftueRun?.stepId !== 'egg.opening');
@@ -448,11 +451,15 @@ function HomeScreen() {
   }, [ftueRun?.stepId, hatchPresentation.phase, restoreDiscoveryReveal]);
   const talkToMossprout = useCallback(() => {
     commitFtueAction({ actionId: 'hatch.talk_to_mossprout' });
-    router.push({
-      pathname: '/katchimera/[creatureId]',
-      params: { creatureId: 'companion:mossprout', ftue: '1' },
+    transitionTo({
+      announcement: 'Opening Mossprout',
+      target: 'companion',
+      navigate: () => router.push({
+        pathname: '/katchimera/[creatureId]',
+        params: { creatureId: 'companion:mossprout', ftue: '1' },
+      }),
     });
-  }, [router]);
+  }, [router, transitionTo]);
   const companionResumeStartedRef = useRef(false);
   useEffect(() => {
     if (ftueRun?.stepId !== 'companion.first_meeting') {
@@ -461,16 +468,24 @@ function HomeScreen() {
     }
     if (!screenFocused || companionResumeStartedRef.current) return;
     companionResumeStartedRef.current = true;
-    router.push({
-      pathname: '/katchimera/[creatureId]',
-      params: { creatureId: 'companion:mossprout', ftue: '1' },
+    transitionTo({
+      announcement: 'Opening Mossprout',
+      target: 'companion',
+      navigate: () => router.push({
+        pathname: '/katchimera/[creatureId]',
+        params: { creatureId: 'companion:mossprout', ftue: '1' },
+      }),
     });
-  }, [ftueRun?.stepId, router, screenFocused]);
+  }, [ftueRun?.stepId, router, screenFocused, transitionTo]);
   const returnToMossprout = useCallback(() => {
     setOnboardingEnergyReady(null);
     commitFtueAction({ actionId: 'energy.return' });
-    router.push({ pathname: '/(tabs)/games', params: { familyId: 'mossprout' } });
-  }, [router]);
+    transitionTo({
+      announcement: 'Opening Merge',
+      target: 'merge',
+      navigate: () => router.push({ pathname: '/(tabs)/games', params: { familyId: 'mossprout' } }),
+    });
+  }, [router, transitionTo]);
   const homeLoopPresentation = useMemo(() => resolveHomeLoopPresentation({
     activeDayPrompt,
     availableDayPrompts,
@@ -865,6 +880,14 @@ function HomeScreen() {
   );
   const explorationPresentationActive =
     explorationBackgroundActive || explorationTransitionSnapshot != null;
+  useGameSurfaceReadiness('today', {
+    // The large atmosphere image is decorative and may finish decoding after
+    // the useful Today UI is already on screen. Do not hold the curtain for it.
+    background: true,
+    data: selectedDay != null || formingDay != null,
+    foreground: transitionLayoutReady && (heroStageTop != null || isForming),
+    layout: transitionLayoutReady,
+  }, screenFocused);
   const goalRingItems = useMemo<TodayCategoryRingItem[]>(() => {
     if (!isDay || !selectedDay.isToday || !quickGoalFamilyIds.length) return [];
     const goalCount = quickGoals.goalsForToday.length;
@@ -1361,13 +1384,17 @@ function HomeScreen() {
       }
       case 'mini_game':
         requestTodayCareGameRound(action);
-        router.navigate('/games');
+        transitionTo({
+          announcement: 'Opening Merge',
+          target: 'merge',
+          navigate: () => router.navigate('/games'),
+        });
         return;
       case 'inline_mood':
       case 'inline_sleep':
         return;
     }
-  }, [clearCareIntent, eggFeedRewardRequestKey, formingPrompts, handleQuest, handleQuickCategory, markCareDestinationOpen, openManualJournal, openPromptSheet, photoPrompt, router, setNextEnergyCurrencySource, startCareIntent]);
+  }, [clearCareIntent, eggFeedRewardRequestKey, formingPrompts, handleQuest, handleQuickCategory, markCareDestinationOpen, openManualJournal, openPromptSheet, photoPrompt, router, setNextEnergyCurrencySource, startCareIntent, transitionTo]);
   const handleFtueChoice = useCallback((
     action: FtueActionDefinition,
     option: FtueChoiceOption,
@@ -1940,7 +1967,7 @@ function HomeScreen() {
   return (
     <TodayEnvironmentMotionProvider motion={environmentMotion}>
     <GestureDetector gesture={pageGesture}>
-    <View style={styles.screen}>
+    <View onLayout={() => setTransitionLayoutReady(true)} style={styles.screen}>
       {!isForming ? (
       <>
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, goalsSceneLiftStyle]}>
@@ -2424,7 +2451,11 @@ function HomeScreen() {
             const creatureId = companionJournalHandoff.creatureId;
             setCompanionJournalHandoff(null);
             closeManualJournal();
-            router.push({ pathname: '/katchimera/[creatureId]', params: { creatureId } });
+            transitionTo({
+              announcement: 'Returning to your Katchimera',
+              target: 'companion',
+              navigate: () => router.push({ pathname: '/katchimera/[creatureId]', params: { creatureId } }),
+            });
           }}
           onClose={() => {
             if (!companionJournalHandoff) {
@@ -2435,7 +2466,11 @@ function HomeScreen() {
             const creatureId = companionJournalHandoff.creatureId;
             setCompanionJournalHandoff(null);
             closeManualJournal();
-            router.push({ pathname: '/katchimera/[creatureId]', params: { creatureId } });
+            transitionTo({
+              announcement: 'Returning to your Katchimera',
+              target: 'companion',
+              navigate: () => router.push({ pathname: '/katchimera/[creatureId]', params: { creatureId } }),
+            });
           }}
           onSave={(submission) => {
             const mergeRewardPreview = companionJournalHandoff ? journalMergeReward : null;
@@ -2696,7 +2731,11 @@ function HomeScreen() {
               onPress={() => {
                 const familyId = feastleJournalReward.familyId;
                 setFeastleJournalReward(null);
-                router.navigate({ pathname: '/games', params: { familyId } });
+                transitionTo({
+                  announcement: 'Opening Merge',
+                  target: 'merge',
+                  navigate: () => router.navigate({ pathname: '/games', params: { familyId } }),
+                });
               }}
               style={({ pressed }) => [styles.feastleRewardButton, pressed && { opacity: 0.82 }]}>
               <ThemedText style={styles.feastleRewardButtonLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">Take it to Merge</ThemedText>

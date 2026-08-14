@@ -10,6 +10,7 @@ import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { homeTabBarHeight, HOME_TAB_BAR_MIN_BOTTOM_PADDING } from '@/constants/home-loop-layout';
 import { Lantern } from '@/constants/theme';
 import { Meadow } from '@/constants/meadow-theme';
+import { type GameSurfaceId, useGameScreenTransition } from '@/features/navigation/game-screen-transition';
 
 // The Meadow tab bar (mockup v2): a dark charcoal pill floating over the
 // parchment, the ACTIVE tab wrapped in a warm gold capsule, and a big raised
@@ -20,10 +21,16 @@ import { Meadow } from '@/constants/meadow-theme';
 const HIDDEN_ROUTES = new Set(['index', 'world', 'you']);
 
 const INACTIVE = 'rgba(226, 221, 238, 0.72)';
+const TRANSITION_SURFACES: Partial<Record<string, GameSurfaceId>> = {
+  games: 'merge',
+  katchimeras: 'katchimeras',
+  today: 'today',
+};
 
 export function MeadowTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { equippedFaceId, equippedSkinId } = useEggAvatar();
+  const { active: transitionActive, transitionTo } = useGameScreenTransition();
   const youFocused = state.routes[state.index]?.name === 'you';
   const bottomPadding = Math.max(insets.bottom, HOME_TAB_BAR_MIN_BOTTOM_PADDING);
   const items = state.routes.filter((route) => {
@@ -51,7 +58,16 @@ export function MeadowTabBar({ state, descriptors, navigation }: BottomTabBarPro
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
           if (!routeFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
+            const target = TRANSITION_SURFACES[route.name];
+            if (target) {
+              transitionTo({
+                announcement: `Opening ${options.title ?? route.name}`,
+                navigate: () => navigation.navigate(route.name),
+                target,
+              });
+            } else {
+              navigation.navigate(route.name);
+            }
           }
         };
         return (
@@ -60,6 +76,7 @@ export function MeadowTabBar({ state, descriptors, navigation }: BottomTabBarPro
               accessibilityRole="button"
               accessibilityState={focused ? { selected: true } : {}}
               accessibilityLabel={options.tabBarAccessibilityLabel ?? options.title}
+              disabled={transitionActive}
               onPress={onPress}
               style={[styles.item, focused ? styles.itemActive : null]}>
               <View>

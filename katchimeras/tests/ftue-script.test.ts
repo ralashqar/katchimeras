@@ -53,7 +53,7 @@ test('backend catalog contains only allowlisted privacy-safe action ids', () => 
 });
 
 test('Supabase receipt allowlist matches every backend FTUE action', () => {
-  const migration = readFileSync('supabase/migrations/20260814100304_register_mossprout_ftue_v7.sql', 'utf8');
+  const migration = readFileSync('supabase/migrations/20260814104455_register_mossprout_ftue_v8.sql', 'utf8');
   for (const item of FTUE_ACTION_CATALOG.filter((entry) => entry.backendEvent)) {
     assert.match(migration, new RegExp(`'${item.stepId}',\\s*'${item.actionId}'`));
   }
@@ -71,7 +71,10 @@ test('Chapter 0 previews two requests and scripts spawn, repeated merge, and ser
   assert.equal(serveStep?.edges?.[0]?.nextStepId, 'merge.plant.spawn');
   assert.equal(spawnStep?.edges?.[0]?.requiredCount, 4);
   assert.equal(pairStep?.edges?.[0]?.requiredCount, 2);
-  assert.equal(finalServeStep?.edges?.[0]?.nextStepId, 'chapter.complete');
+  assert.equal(finalServeStep?.edges?.[0]?.nextStepId, 'merge.return_note');
+  const returnNote = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.return_note');
+  assert.equal(returnNote?.interaction?.mode, 'exclusive');
+  assert.deepEqual(returnNote?.spotlight?.targets, [{ kind: 'tray_chat_note', noteId: 'mossprout:chapter-0:return-note' }]);
   assert.equal(mergeStep?.interaction?.mode, 'exclusive');
   assert.equal(serveStep?.interaction?.mode, 'exclusive');
   assert.deepEqual(mergeStep?.spotlight?.targets, [
@@ -87,8 +90,9 @@ test('Chapter 0 previews two requests and scripts spawn, repeated merge, and ser
 });
 
 test('Mossprout remembers the day, branches playfully, then reveals the shared two-order preview', () => {
-  assert.ok(mossproutFtueConversationDefinitions.every((definition) => definition.version === 2));
-  for (const definition of mossproutFtueConversationDefinitions) {
+  const firstMeetings = mossproutFtueConversationDefinitions.filter((definition) => definition.id.startsWith('mossprout:ftue:first-meeting:'));
+  assert.ok(firstMeetings.every((definition) => definition.version === 2));
+  for (const definition of firstMeetings) {
     const arrived = definition.nodes.find((node) => node.id === 'arrived');
     assert.equal(arrived?.kind, 'choice');
     if (arrived?.kind === 'choice') assert.equal(arrived.options.length, 2);

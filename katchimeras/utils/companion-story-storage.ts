@@ -67,6 +67,19 @@ export function freshFeastleStory(now = Date.now()): CompanionStoryArc {
   };
 }
 
+export function freshMossproutStory(now = Date.now()): CompanionStoryArc {
+  return {
+    id: 'mossprout:where-water-goes', familyId: 'mossprout', version: 3,
+    currentLevel: 1, targetLevel: 2, beatId: 'mossprout-story:level-1',
+    status: 'intro_available', activeOrderId: null, pendingConversationId: null,
+    unreadReturn: false, completedBeatIds: [], completedOrderIds: [], pendingBondPoints: 0,
+    processedQuietBondReceiptIds: [], updatedAt: now,
+    journalFtueStatus: 'skipped', journalFtueRecordId: null,
+    currentActId: 'act-1', actPhase: 'opening', orderDeck: null,
+    storySignals: [], relevantJournalRecordIds: [], confirmedMemoryKeys: [], completedActIds: [],
+  };
+}
+
 export function freshBaristabbitStory(now = Date.now()): CompanionStoryArc {
   return freshAuthoredCohortStory('baristabbit', now);
 }
@@ -158,6 +171,74 @@ function saveState(state: CompanionStoryState) {
 
 export function loadFeastleStory(): CompanionStoryArc {
   return loadCompanionStoryState().arcs.find((arc) => arc.familyId === 'feastle') ?? freshFeastleStory();
+}
+
+export function loadMossproutStory(): CompanionStoryArc {
+  return loadCompanionStoryState().arcs.find((arc) => arc.familyId === 'mossprout') ?? freshMossproutStory();
+}
+
+export function saveMossproutStory(arc: CompanionStoryArc): CompanionStoryArc {
+  const state = loadCompanionStoryState();
+  saveState({ ...state, arcs: [...state.arcs.filter((item) => item.familyId !== 'mossprout'), arc] });
+  return arc;
+}
+
+export function beginMossproutChapterOne(now = Date.now()): CompanionStoryArc {
+  const current = loadMossproutStory();
+  if (current.status !== 'intro_available') return current;
+  return saveMossproutStory({
+    ...current, status: 'order_active', actPhase: 'regular_orders', targetLevel: 2,
+    beatId: 'mossprout-story:level-1', completedBeatIds: [...new Set([...current.completedBeatIds, 'mossprout-story:level-1'])], updatedAt: now,
+  });
+}
+
+export function markMossproutOrderActive(orderId: string, now = Date.now()): CompanionStoryArc {
+  const current = loadMossproutStory();
+  if (current.status !== 'order_active' || current.activeOrderId === orderId) return current;
+  return saveMossproutStory({ ...current, activeOrderId: orderId, updatedAt: now });
+}
+
+export function markMossproutOrderServed(orderId: string, targetLevel: number, now = Date.now()): CompanionStoryArc {
+  const current = loadMossproutStory();
+  if (current.completedOrderIds.includes(orderId)) return current;
+  const level = Math.max(2, Math.min(4, targetLevel));
+  return saveMossproutStory({
+    ...current, currentLevel: level, targetLevel: level, status: 'return_available',
+    actPhase: level === 4 ? 'finale_return' : 'midpoint_return', activeOrderId: null,
+    pendingConversationId: `mossprout:story:${level}`, unreadReturn: true,
+    completedOrderIds: [...current.completedOrderIds, orderId], updatedAt: now,
+  });
+}
+
+export function beginMossproutReturn(now = Date.now()): CompanionStoryArc {
+  const current = loadMossproutStory();
+  if (current.status !== 'return_available') return current;
+  return saveMossproutStory({ ...current, status: 'conversation_active', unreadReturn: false, updatedAt: now });
+}
+
+export function completeMossproutConversation(level: number, now = Date.now()): CompanionStoryArc {
+  const current = loadMossproutStory();
+  if (current.status !== 'conversation_active' || current.pendingConversationId !== `mossprout:story:${level}`) return current;
+  const beatId = `mossprout-story:level-${level}`;
+  if (level >= 4) return saveMossproutStory({
+    ...current, currentLevel: 4, targetLevel: 4, beatId, status: 'chapter_complete', actPhase: 'complete',
+    activeOrderId: null, pendingConversationId: null, unreadReturn: false, pendingBondPoints: 0,
+    completedActIds: [...new Set([...current.completedActIds, 'act-1' as const])],
+    completedBeatIds: [...new Set([...current.completedBeatIds, beatId])], updatedAt: now,
+  });
+  return saveMossproutStory({
+    ...current, currentLevel: level, targetLevel: level + 1, beatId, status: 'order_active',
+    actPhase: level === 3 ? 'signature_order' : 'regular_orders', activeOrderId: null,
+    pendingConversationId: null, unreadReturn: false, pendingBondPoints: 0,
+    completedBeatIds: [...new Set([...current.completedBeatIds, beatId])], updatedAt: now,
+  });
+}
+
+export function recordMossproutQuietBond(receiptId: string, points: number, now = Date.now()): CompanionStoryArc {
+  const current = loadMossproutStory();
+  const accumulated = accumulateQuietBond(current.pendingBondPoints, current.processedQuietBondReceiptIds, receiptId, points);
+  if (!accumulated.changed) return current;
+  return saveMossproutStory({ ...current, pendingBondPoints: accumulated.points, processedQuietBondReceiptIds: accumulated.processedReceiptIds, updatedAt: now });
 }
 
 export function saveFeastleStory(arc: CompanionStoryArc): CompanionStoryArc {

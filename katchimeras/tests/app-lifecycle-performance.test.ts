@@ -182,3 +182,19 @@ test('Today remounts from current home state before a cancelled capture can show
   assert.match(mutationSource, /const current = homeRepository\.load\(\) \?\? storedStateRef\?\.current \?\? null/);
   assert.match(todaySource, /homeRepository\.flush\(\)\.then\(\(\) => \{\s*router\.push\(\{ pathname: '\/moment-capture'/);
 });
+
+test('heavy game surfaces navigate only under the shared readiness curtain', () => {
+  const rootSource = readFileSync(path.join(process.cwd(), 'app', '_layout.tsx'), 'utf8');
+  const transitionSource = readFileSync(path.join(process.cwd(), 'features', 'navigation', 'game-screen-transition.tsx'), 'utf8');
+  const tabBarSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'meadow-tab-bar.tsx'), 'utf8');
+  const mergeSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-world-screen.tsx'), 'utf8');
+  const companionSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'), 'utf8');
+
+  assert.match(rootSource, /<GameScreenTransitionProvider>[\s\S]*?<Stack>/);
+  assert.match(transitionSource, /setPhase\('covering'\)[\s\S]*?current\.navigate\(\)[\s\S]*?setPhase\('waiting_ready'\)/);
+  assert.match(transitionSource, /READINESS_TIMEOUT_MS = 8_000/);
+  assert.match(transitionSource, /useReducedMotion\(\)/);
+  assert.match(tabBarSource, /games: 'merge'[\s\S]*?today: 'today'/);
+  assert.match(mergeSource, /useGameSurfaceReadiness\('merge',[\s\S]*?foreground: boardMetrics != null/);
+  assert.match(companionSource, /useGameSurfaceReadiness\('companion',[\s\S]*?transitionCreatureReady/);
+});

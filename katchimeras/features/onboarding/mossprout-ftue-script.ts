@@ -7,6 +7,7 @@ const privateChoice = { id: 'private', label: 'Prefer not to say', icon: 'lock.f
 // its physical growth by the same amount, regardless of the normal daily
 // reward assigned to that answer's semantic source.
 export const FTUE_EGG_ANSWER_GROWTH_REWARD = TODAY_GROWTH_REWARDS.reflection;
+export const MOSSPROUT_FTUE_RETURN_NOTE_ID = 'mossprout:chapter-0:return-note';
 
 const openingActions: readonly FtueActionDefinition[] = [
   {
@@ -26,7 +27,7 @@ const openingActions: readonly FtueActionDefinition[] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 7,
+  version: 8,
   entryStepId: 'egg.opening',
   terminalStepId: 'complete',
   steps: [
@@ -189,12 +190,21 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       interaction: { mode: 'exclusive', allowed: { kind: 'order_serve', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:home-plant' } } },
       cue: { kind: 'tap', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:home-plant' } },
       spotlight: { targets: [{ kind: 'order_requirement_item', orderId: 'mossprout:chapter-0:home-plant', requirementIndex: 0 }, { kind: 'order_serve', orderId: 'mossprout:chapter-0:home-plant' }], grouping: 'individual', padding: 7, radius: 14, dimOpacity: 0.64 },
-      edges: [{ event: { type: 'order_served', orderId: 'mossprout:chapter-0:home-plant' }, commitActionId: 'merge.serve_home_plant', nextStepId: 'chapter.complete' }],
+      edges: [{ event: { type: 'order_served', orderId: 'mossprout:chapter-0:home-plant' }, commitActionId: 'merge.serve_home_plant', nextStepId: 'merge.return_note' }],
     },
     {
-      id: 'chapter.complete', surface: 'merge',
-      guide: { eyebrow: 'Chapter complete', title: 'A little place to begin', body: 'Mossprout has somewhere to grow.' },
-      actions: [{ id: 'chapter.finish', title: 'Follow the footprints', description: 'See what comes next.', icon: 'pawprint.fill', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'complete', backendEvent: true }],
+      id: 'merge.return_note', surface: 'merge',
+      guide: { eyebrow: 'A note from Mossprout', title: 'The garden is ready.', body: 'Read what Mossprout left for you.' },
+      actions: [{ id: 'merge.open_mossprout_note', title: 'Read Mossprout’s note', description: 'Return to Mossprout.', icon: 'envelope.fill', presentation: 'observed_game_action', handlerId: 'merge_chat_note_opened', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'chat_note_tap', target: { kind: 'tray_chat_note', noteId: MOSSPROUT_FTUE_RETURN_NOTE_ID } } },
+      cue: { kind: 'tap', target: { kind: 'tray_chat_note', noteId: MOSSPROUT_FTUE_RETURN_NOTE_ID } },
+      spotlight: { targets: [{ kind: 'tray_chat_note', noteId: MOSSPROUT_FTUE_RETURN_NOTE_ID }], padding: 7, radius: 14, dimOpacity: 0.64 },
+      edges: [{ event: { type: 'chat_note_opened', noteId: MOSSPROUT_FTUE_RETURN_NOTE_ID }, commitActionId: 'merge.open_mossprout_note', nextStepId: 'companion.chapter_zero_return' }],
+    },
+    {
+      id: 'companion.chapter_zero_return', surface: 'companion',
+      guide: { eyebrow: 'A little place to begin', title: 'Mossprout has something to show you.', body: 'Finish your first chapter together.' },
+      actions: [{ id: 'companion.complete_chapter_zero_return', title: 'Begin the next chapter', description: 'See Mossprout’s next request.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'complete', backendEvent: true }],
       blockingBeat: 'chapter_complete',
     },
     { id: 'complete', surface: 'today', guide: { eyebrow: '', title: '', body: '' }, actions: [] },

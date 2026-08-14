@@ -18,7 +18,7 @@ import { mergeWorldPendingPersistence, type MergeWorldPendingPersistence } from 
 import { loadFirstSession } from '@/features/onboarding/first-session';
 import { isMossproutChapterZeroActive } from '@/utils/merge-world/chapter-zero-policy';
 import { loadMergeWorldState, saveMergeWorldState, subscribeMergeWorldResets } from '@/utils/merge-world/repository';
-import { isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, markAuthoredCohortOrderActive, markAuthoredCohortOrderServed, markFeastleOrderActive, markFeastleOrderServed, recordAuthoredCohortQuietBond, recordFeastleQuietBond, subscribeCompanionStories } from '@/utils/companion-story-storage';
+import { isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, loadMossproutStory, markAuthoredCohortOrderActive, markAuthoredCohortOrderServed, markFeastleOrderActive, markFeastleOrderServed, markMossproutOrderActive, markMossproutOrderServed, recordAuthoredCohortQuietBond, recordFeastleQuietBond, recordMossproutQuietBond, subscribeCompanionStories } from '@/utils/companion-story-storage';
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 import { loadCompanionQuickGoalState, subscribeCompanionQuickGoals } from '@/utils/companion-quick-goal-storage';
 
@@ -142,6 +142,10 @@ export function MergeWorldProvider({
             receipt.storyStepCount,
           );
         });
+      } else if (receipt.characterId === 'mossprout') {
+        guardStoryReceiptMutation(() => markMossproutOrderServed(
+          receipt.id.replace('merge-story-served:', ''), receipt.amount, receipt.createdAt,
+        ));
       } else if (isAuthoredCohortFamily(receipt.characterId)) {
         const familyId = receipt.characterId;
         guardStoryReceiptMutation(() => markAuthoredCohortOrderServed(
@@ -166,6 +170,8 @@ export function MergeWorldProvider({
         saveCompanionBondState(awarded.state);
         if (receipt.presentation === 'quiet_summary' && receipt.characterId === 'feastle') {
           guardStoryReceiptMutation(() => recordFeastleQuietBond(receipt.id, receipt.amount, receipt.createdAt));
+        } else if (receipt.presentation === 'quiet_summary' && receipt.characterId === 'mossprout') {
+          guardStoryReceiptMutation(() => recordMossproutQuietBond(receipt.id, receipt.amount, receipt.createdAt));
         } else if (receipt.presentation === 'quiet_summary' && isAuthoredCohortFamily(receipt.characterId)) {
           const familyId = receipt.characterId;
           guardStoryReceiptMutation(() => recordAuthoredCohortQuietBond(familyId, receipt.id, receipt.amount, receipt.createdAt));
@@ -199,6 +205,18 @@ export function MergeWorldProvider({
     return result.state;
   }, []);
 
+  const reconcileMossproutStory = useCallback((current: MergeWorldState, now = Date.now()) => {
+    const story = loadMossproutStory();
+    const result = reduceMergeWorld(current, {
+      type: 'reconcileStory', familyId: 'mossprout', status: story.status,
+      targetLevel: story.targetLevel, actPhase: story.actPhase, now,
+    });
+    const storyOrder = result.state.activeOrders.find((order) => order.storyArcId === 'mossprout:merge-story');
+    const activeStoryOrderStillExists = result.state.activeOrders.some((order) => order.id === story.activeOrderId);
+    if (storyOrder && !activeStoryOrderStillExists) markMossproutOrderActive(storyOrder.id, now);
+    return result.state;
+  }, []);
+
   const reconcileAuthoredCohortStory = useCallback((current: MergeWorldState, familyId: AuthoredCohortFamilyId, now = Date.now()) => {
     const story = loadAuthoredCohortStory(familyId);
     const result = reduceMergeWorld(current, {
@@ -228,6 +246,7 @@ export function MergeWorldProvider({
         || current.characterProgress.mossprout?.completedChapterIds.includes('mossprout-chapter-0'))
     ) return current;
     if (characterId === 'feastle') return reconcileFeastleStory(current, now);
+    if (characterId === 'mossprout') return reconcileMossproutStory(current, now);
     if (isAuthoredCohortFamily(characterId)) return reconcileAuthoredCohortStory(current, characterId, now);
     const served = new Set(current.externalRewardReceipts
       .filter((receipt) => receipt.kind === 'story_order_served' && receipt.characterId === characterId)
@@ -241,7 +260,7 @@ export function MergeWorldProvider({
         ? { type: 'reconcileStory', familyId: characterId, status: 'order_active', targetLevel: 8, actPhase: 'signature_order', servedOrderIds: [...served], now }
         : { type: 'reconcileStory', familyId: characterId, status: 'order_active', targetLevel: 6, actPhase: 'regular_orders', orderTemplateKeys: regularKeys, servedOrderIds: [...served], now };
     return reduceMergeWorld(current, command).state;
-  }, [reconcileAuthoredCohortStory, reconcileFeastleStory]);
+  }, [reconcileAuthoredCohortStory, reconcileFeastleStory, reconcileMossproutStory]);
 
   const featureAndReconcile = useCallback((current: MergeWorldState, now = Date.now()) => {
     if (loadFirstSession()?.stage !== 'complete' && isMossproutChapterZeroActive(current)) {
@@ -259,20 +278,24 @@ export function MergeWorldProvider({
     // This also repairs saves from older builds where featureCharacter removed
     // the other companions' requests.
     if (next.unlockedCharacters.includes('feastle')) next = reconcileFeastleStory(next, now);
+    if (next.unlockedCharacters.includes('mossprout')) next = reconcileMossproutStory(next, now);
     for (const familyId of AUTHORED_COHORT_FAMILIES) {
       if (next.unlockedCharacters.includes(familyId)) next = reconcileAuthoredCohortStory(next, familyId, now);
     }
-    if (characterId !== 'feastle' && !isAuthoredCohortFamily(characterId)) {
+    if (characterId !== 'feastle' && characterId !== 'mossprout' && !isAuthoredCohortFamily(characterId)) {
       next = reconcileFeaturedStory(next, characterId, now);
     }
     return next;
-  }, [reconcileAuthoredCohortStory, reconcileFeastleStory, reconcileFeaturedStory, resolveFeaturedCharacter]);
+  }, [reconcileAuthoredCohortStory, reconcileFeastleStory, reconcileFeaturedStory, reconcileMossproutStory, resolveFeaturedCharacter]);
 
   useEffect(() => {
-    if (!active) return;
+    // Tab routes are retained while unfocused. Keep this authoritative reset
+    // subscription alive for the lifetime of the provider so a debug reset or
+    // FTUE board install cannot be missed while Games is hidden. Otherwise the
+    // retained stateRef prevents initial hydration when the tab is reopened.
     const release = acquireLifecycleResource('store_subscription', 'merge:world-resets');
     const unsubscribe = subscribeMergeWorldResets((freshState) => {
-      if (!activeRef.current) return;
+      if (!mountedRef.current) return;
       persistenceGenerationRef.current += 1;
       externalGenerationRef.current += 1;
       pendingPersistenceRef.current = null;
@@ -290,7 +313,7 @@ export function MergeWorldProvider({
       unsubscribe();
       release();
     };
-  }, [active, featureAndReconcile, refreshFriendshipLevels]);
+  }, [featureAndReconcile, refreshFriendshipLevels]);
 
   const drainPersistence = useCallback(async () => {
     const workerGeneration = persistenceGenerationRef.current;
@@ -379,8 +402,12 @@ export function MergeWorldProvider({
       const current = stateRef.current;
       if (!current) return;
       const featured = current.favouriteCharacterId;
-      if (!featured || (featured !== 'feastle' && !isAuthoredCohortFamily(featured))) return;
-      const next = featured === 'feastle' ? reconcileFeastleStory(current) : reconcileAuthoredCohortStory(current, featured);
+      if (!featured || (featured !== 'feastle' && featured !== 'mossprout' && !isAuthoredCohortFamily(featured))) return;
+      const next = featured === 'feastle'
+        ? reconcileFeastleStory(current)
+        : featured === 'mossprout'
+          ? reconcileMossproutStory(current)
+          : reconcileAuthoredCohortStory(current, featured);
       if (next === current) return;
       stateRef.current = next;
       if (mountedRef.current) setState(next);
@@ -390,7 +417,7 @@ export function MergeWorldProvider({
       unsubscribe();
       release();
     };
-  }, [active, enqueuePersistence, reconcileAuthoredCohortStory, reconcileFeastleStory]);
+  }, [active, enqueuePersistence, reconcileAuthoredCohortStory, reconcileFeastleStory, reconcileMossproutStory]);
 
   const flush = useCallback(async () => {
     const worker = startPersistenceWorker();

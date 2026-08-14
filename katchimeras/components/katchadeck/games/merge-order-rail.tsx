@@ -129,15 +129,15 @@ export type MergeTrayEntry =
       bondPoints: number;
     };
 
-export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel, onReroll, onServe, onBlockedInteraction, onServeTargetRef, interactionGate = { kind: 'open' }, parcelTargetRef }: {
+export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel, onReroll, onServe, onBlockedInteraction, onRailTargetRef, interactionGate = { kind: 'open' }, parcelTargetRef }: {
   entries: readonly MergeTrayEntry[];
   focusOrderId?: string;
-  onOpenChat: (characterId: MergeCharacterId) => void;
+  onOpenChat: (characterId: MergeCharacterId, noteId: string) => void;
   onOpenParcel: (arrivalId: string) => void;
   onReroll: (order: MergeOrder) => void;
   onServe: (order: MergeOrder, itemTargets: readonly MergeScreenPoint[]) => boolean | Promise<boolean>;
   onBlockedInteraction?: () => void;
-  onServeTargetRef?: (orderId: string, view: View | null) => void;
+  onRailTargetRef?: (targetKey: string, view: View | null) => void;
   interactionGate?: MergeRailInteractionGate;
   parcelTargetRef: RefObject<View | null>;
 }) {
@@ -244,11 +244,18 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel
               onBlockedInteraction={onBlockedInteraction}
               onReroll={() => onReroll(entry.order)}
               onServe={(itemTargets) => onServe(entry.order, itemTargets)}
-              onServeTargetRef={onServeTargetRef}
+              onServeTargetRef={(orderId, view) => onRailTargetRef?.(`order-serve:${orderId}`, view)}
               reduceMotion={reduceMotion}
             />
           ) : (
-            <ChatNoteTrayCard entry={entry} onPress={() => interactionGate.kind === 'open' ? onOpenChat(entry.characterId) : onBlockedInteraction?.()} reduceMotion={reduceMotion} />
+            <ChatNoteTrayCard
+              entry={entry}
+              onPress={() => interactionGate.kind === 'open' || (interactionGate.kind === 'chat_note' && interactionGate.noteId === entry.id)
+                ? onOpenChat(entry.characterId, entry.id)
+                : onBlockedInteraction?.()}
+              reduceMotion={reduceMotion}
+              targetRef={(view) => onRailTargetRef?.(`chat-note:${entry.id}`, view)}
+            />
           )}
         </Animated.View>
         );
@@ -481,10 +488,11 @@ function ServeConfettiParticle({ index, particle, progress }: {
   );
 }
 
-function ChatNoteTrayCard({ entry, onPress, reduceMotion }: {
+function ChatNoteTrayCard({ entry, onPress, reduceMotion, targetRef }: {
   entry: Extract<MergeTrayEntry, { kind: 'chat_note' }>;
   onPress: () => void;
   reduceMotion: boolean;
+  targetRef?: (view: View | null) => void;
 }) {
   const characterSource = resolveCreatureArtSource(CHARACTER_VISUALS[entry.characterId], { lod: 'medium' });
   const subtitle = entry.bondPoints > 0 ? `+${entry.bondPoints} Bond · Read` : 'Read next scene';
@@ -493,6 +501,7 @@ function ChatNoteTrayCard({ entry, onPress, reduceMotion }: {
       accessibilityLabel={`${MERGE_CHARACTER_NAMES[entry.characterId]} left a note. ${subtitle}`}
       accessibilityRole="button"
       onPress={onPress}
+      ref={targetRef}
       style={({ pressed }) => [styles.card, styles.noteCard, pressed && styles.pressed]}>
       <Animated.View entering={reduceMotion ? FadeIn.duration(100) : FadeInUp.delay(45).duration(230)} style={styles.characterLayer}>
         <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={`merge-note-${entry.characterId}`} source={characterSource} style={styles.character} transition={0} />

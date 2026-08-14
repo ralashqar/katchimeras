@@ -16,6 +16,7 @@ export type FtueHandlerId =
   | 'merge_item_created'
   | 'merge_generator_spawned'
   | 'merge_order_served'
+  | 'merge_chat_note_opened'
   | 'merge_energy_depleted'
   | 'acknowledgement';
 
@@ -50,7 +51,8 @@ export type FtueTarget =
   | { kind: 'board_generator'; generatorId: string }
   | { kind: 'order_requirement_item'; orderId: string; requirementIndex: number; occurrence?: number }
   | { kind: 'board_cell'; cell: number }
-  | { kind: 'order_serve'; orderId: string };
+  | { kind: 'order_serve'; orderId: string }
+  | { kind: 'tray_chat_note'; noteId: string };
 
 export type FtueCueDefinition =
   | { kind: 'drag'; from: FtueTarget; to: FtueTarget }
@@ -68,7 +70,8 @@ export type FtueInteractionPolicy =
   | { mode: 'none' }
   | { mode: 'exclusive'; allowed: { kind: 'board_drag'; from: FtueTarget; to: FtueTarget } }
   | { mode: 'exclusive'; allowed: { kind: 'generator_tap'; target: FtueTarget } }
-  | { mode: 'exclusive'; allowed: { kind: 'order_serve'; target: FtueTarget } };
+  | { mode: 'exclusive'; allowed: { kind: 'order_serve'; target: FtueTarget } }
+  | { mode: 'exclusive'; allowed: { kind: 'chat_note_tap'; target: FtueTarget } };
 
 export type FtueEvent =
   | {
@@ -87,7 +90,8 @@ export type FtueEvent =
       resultCell: number;
       revision: number;
     }
-  | { type: 'order_served'; orderId: string; revision: number };
+  | { type: 'order_served'; orderId: string; revision: number }
+  | { type: 'chat_note_opened'; noteId: string; revision: number };
 
 export type FtueEventMatcher =
   | {
@@ -97,7 +101,8 @@ export type FtueEventMatcher =
       resultDefinitionId?: string;
     }
   | { type: 'item_spawned'; generatorId?: string; definitionId?: string }
-  | { type: 'order_served'; orderId?: string };
+  | { type: 'order_served'; orderId?: string }
+  | { type: 'chat_note_opened'; noteId?: string };
 
 export type FtueGraphEdge = {
   event: FtueEventMatcher;

@@ -65,6 +65,9 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
   if (run.schemaVersion === 5 && run.scriptVersion === MOSSPROUT_FTUE_SCRIPT.version && !needsThirdEggAnswer) return run;
   const now = new Date().toISOString();
   const removedMergeSteps = new Set(['merge.first', 'merge.flower', 'energy.capture', 'energy.awarded', 'merge.flower_return', 'merge.final']);
+  const migratedStepId = run.status === 'active' && run.stepId === 'chapter.complete'
+    ? 'merge.return_note'
+    : run.stepId;
   return {
     ...run,
     schemaVersion: 5,
@@ -73,7 +76,7 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
       ? 'egg.mind'
       : restartingLegacyMerge
         ? 'companion.order_preview'
-        : removedMergeSteps.has(run.stepId) ? 'merge.seed_drag' : run.stepId,
+        : removedMergeSteps.has(migratedStepId) ? 'merge.seed_drag' : migratedStepId,
     updatedAt: now,
     objectiveProgress: restartingLegacyMerge ? {} : run.objectiveProgress ?? {},
     mergeInstalled: restartingLegacyMerge ? false : run.mergeInstalled,
@@ -192,6 +195,9 @@ function ftueEventMatches(matcher: FtueEventMatcher, event: FtueEvent) {
   if (matcher.type === 'item_spawned' && event.type === 'item_spawned') {
     return (matcher.generatorId == null || matcher.generatorId === event.generatorId)
       && (matcher.definitionId == null || matcher.definitionId === event.definitionId);
+  }
+  if (matcher.type === 'chat_note_opened' && event.type === 'chat_note_opened') {
+    return matcher.noteId == null || matcher.noteId === event.noteId;
   }
   return matcher.type === 'order_served'
     && event.type === 'order_served'

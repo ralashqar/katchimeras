@@ -49,7 +49,7 @@ export function MergeFtueOverlay({
   cue,
   layoutNonce,
   screenRef,
-  serveTargetRefs,
+  railTargetRefs,
   spotlight,
   state,
   targetRevision,
@@ -59,7 +59,7 @@ export function MergeFtueOverlay({
   cue: FtueCueDefinition | null;
   layoutNonce: number;
   screenRef: RefObject<View | null>;
-  serveTargetRefs: RefObject<Map<string, View>>;
+  railTargetRefs: RefObject<Map<string, View>>;
   spotlight: FtueSpotlightDefinition | null;
   state: MergeWorldState;
   targetRevision: number;
@@ -82,7 +82,7 @@ export function MergeFtueOverlay({
         target,
         state,
         boardMetrics,
-        serveTargetRefs.current,
+        railTargetRefs.current,
         screen,
       );
 
@@ -143,7 +143,7 @@ export function MergeFtueOverlay({
     configKey,
     layoutNonce,
     screenRef,
-    serveTargetRefs,
+    railTargetRefs,
     spotlight,
     spotlightKey,
     state,
@@ -304,11 +304,14 @@ async function resolveTargetFrame(
   target: FtueTarget,
   state: MergeWorldState,
   boardMetrics: MergeBoardScreenMetrics | null,
-  serveTargetRefs: Map<string, View>,
+  railTargetRefs: Map<string, View>,
   screen: Frame,
 ): Promise<Frame | null> {
-  if (target.kind === 'order_serve') {
-    const measured = await measureView(serveTargetRefs.get(target.orderId) ?? null);
+  if (target.kind === 'order_serve' || target.kind === 'tray_chat_note') {
+    const targetKey = target.kind === 'order_serve'
+      ? `order-serve:${target.orderId}`
+      : `chat-note:${target.noteId}`;
+    const measured = await measureView(railTargetRefs.get(targetKey) ?? null);
     return measured ? {
       height: measured.height,
       width: measured.width,

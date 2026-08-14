@@ -51,7 +51,7 @@ const authoredStoryFamilies = new Set(['baristabbit', 'steppling', 'voyagle', 'f
 
 test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gated', () => {
   assert.deepEqual(validateConversationDefinitions(companionConversationDefinitionsV2), []);
-  assert.equal(companionConversationDefinitionsV2.length, 53 * CONVERSATION_V2_FAMILIES.length + 49);
+  assert.equal(companionConversationDefinitionsV2.length, 53 * CONVERSATION_V2_FAMILIES.length + 53);
   assert.deepEqual(CONVERSATION_V2_ENABLED_FAMILIES, CONVERSATION_V2_FAMILIES);
   assert.deepEqual(CONVERSATION_V2_IDEAL_SKIN_FAMILIES, familyIds);
   assert.equal(isConversationV2Family('feastle'), true);
@@ -68,9 +68,9 @@ test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gate
     }
     assert.ok(katchimeraFamilyById.get(familyId)!.skinIds.length >= 6, `${familyId} needs at least six forms`);
     assert.ok(katchimeraFamilyById.get(familyId)!.skinIds.length <= 12, `${familyId} catalog has grown beyond reviewable scope`);
-    assert.equal(pack.length, familyId === 'feastle' ? 73 : familyId === 'mossprout' ? 62 : authoredStoryFamilies.has(familyId) ? 57 : 53);
-    assert.equal(pack.filter((item) => item.trigger === 'evergreen').length, familyId === 'mossprout' ? 20 : familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 12 : 11);
-    assert.equal(pack.filter((item) => item.isOpener).length, familyId === 'mossprout' ? 17 : familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 9 : 8);
+    assert.equal(pack.length, familyId === 'feastle' ? 73 : familyId === 'mossprout' ? 66 : authoredStoryFamilies.has(familyId) ? 57 : 53);
+    assert.equal(pack.filter((item) => item.trigger === 'evergreen').length, familyId === 'mossprout' ? 24 : familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 12 : 11);
+    assert.equal(pack.filter((item) => item.isOpener).length, familyId === 'mossprout' ? 21 : familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 9 : 8);
     assert.equal(pack.filter((item) => item.trigger === 'journal').length, 6);
     assert.equal(pack.filter((item) => item.trigger === 'goal_debrief').length, 2);
     assert.equal(pack.filter((item) => item.trigger === 'quest_debrief').length, 2);

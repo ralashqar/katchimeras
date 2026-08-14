@@ -17,6 +17,8 @@ export const CompanionHomeEnvironmentStage = memo(
     creatureTargetRef,
     layer = 'both',
     name,
+    onBackgroundReady,
+    onCreatureReady,
     rewardPulseKey = 0,
     visualKey,
   }: {
@@ -25,6 +27,8 @@ export const CompanionHomeEnvironmentStage = memo(
     creatureTargetRef?: RefObject<ViewType | null>;
     layer?: 'background' | 'creature' | 'both';
     name: string;
+    onBackgroundReady?: () => void;
+    onCreatureReady?: () => void;
     rewardPulseKey?: number;
     visualKey: HomeVisualKey;
   }) {
@@ -84,6 +88,7 @@ export const CompanionHomeEnvironmentStage = memo(
             <TodayExplorationBackground
               backgroundKey={backgroundKey}
               imageSize={layout.backgroundImageSize}
+              onLoad={onBackgroundReady}
             />
           </View>
         ) : null}
@@ -111,6 +116,7 @@ export const CompanionHomeEnvironmentStage = memo(
               cachePolicy="memory-disk"
               contentFit="contain"
               priority="high"
+              onLoad={onCreatureReady}
               source={creature}
               style={StyleSheet.absoluteFill}
               transition={0}

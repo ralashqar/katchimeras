@@ -8,12 +8,14 @@ import type { TodayFullSpreadScene } from '@/utils/today-full-spread-scenes';
 
 type TodaySceneBackdropProps = {
   background: TodayAtmosphereBackground;
+  onLoad?: () => void;
   scene: TodayFullSpreadScene | null;
   variant?: 'default' | 'splash';
 };
 
 export function TodaySceneBackdrop({
   background,
+  onLoad,
   scene,
   variant = 'default',
 }: TodaySceneBackdropProps) {
@@ -40,6 +42,7 @@ export function TodaySceneBackdrop({
         contentFit="cover"
         contentPosition={splash ? "bottom" : "center"}
         pointerEvents="none"
+        onLoad={onLoad}
         recyclingKey={background.id}
         source={background.source}
         style={StyleSheet.absoluteFill}

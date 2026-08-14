@@ -118,7 +118,8 @@ import { CompanionDashboard } from './companion-dashboard';
 import { FeastleStoryStage } from './feastle-story-stage';
 import { BaristabbitStoryStage } from './baristabbit-story-stage';
 import { MossproutFtueStoryStage } from './mossprout-ftue-story-stage';
-import { beginAuthoredCohortStory, beginBaristabbitStory, beginFeastleStory, isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory } from '@/utils/companion-story-storage';
+import { beginAuthoredCohortStory, beginBaristabbitStory, beginFeastleStory, isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, loadMossproutStory } from '@/utils/companion-story-storage';
+import { MossproutStoryStage } from './mossprout-story-stage';
 import { JourneyCohortStoryStage } from './journey-cohort-story-stage';
 import { CompanionSharedHistory } from './companion-shared-history';
 import { completedVisitCopy } from '@/utils/companion-visit';
@@ -132,6 +133,7 @@ import { useAllDays } from '@/hooks/use-all-days';
 import { mergeJournalRewardPreview } from '@/utils/merge-world/economy-policy';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
+import { useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
 
 const LazyQuestExperienceHost = lazy(async () => {
   const module = await import('./quests/quest-experience-host');
@@ -297,6 +299,14 @@ export type CompanionInteractionSheetProps = {
 };
 
 export function CompanionInteractionSheet(props: CompanionInteractionSheetProps) {
+  const [transitionBackgroundReady, setTransitionBackgroundReady] = useState(false);
+  const [transitionCreatureReady, setTransitionCreatureReady] = useState(false);
+  useGameSurfaceReadiness('companion', {
+    background: transitionBackgroundReady,
+    data: true,
+    foreground: transitionCreatureReady,
+    layout: transitionBackgroundReady && transitionCreatureReady,
+  }, props.active !== false);
   useEffect(() => {
     if (!props.active) return;
     return acquireLifecycleResource('companion_sheet', `companion-sheet:${props.creatureId}`);
@@ -322,6 +332,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const onExperienceActiveChange = props.onExperienceActiveChange;
   const onInitialConversationComplete = props.onInitialConversationComplete;
   const [showFeastleDashboard, setShowFeastleDashboard] = useState(false);
+  const [showMossproutDashboard, setShowMossproutDashboard] = useState(false);
   const [showBaristabbitDashboard, setShowBaristabbitDashboard] = useState(false);
   const [showJourneyCohortDashboard, setShowJourneyCohortDashboard] = useState(false);
   const onBondCelebrationComplete = props.onBondCelebrationComplete;
@@ -538,8 +549,12 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     showConversation();
   }, [props.conversationDefinition?.id, props.conversationSession?.definitionId, props.conversationSession?.status, showConversation]);
   useEffect(() => {
-    if (props.familyId !== 'feastle' && !isAuthoredCohortFamily(props.familyId)) return;
-    const story = props.familyId === 'feastle' ? loadFeastleStory() : loadAuthoredCohortStory(props.familyId);
+    if (props.familyId !== 'feastle' && props.familyId !== 'mossprout' && !isAuthoredCohortFamily(props.familyId)) return;
+    const story = props.familyId === 'feastle'
+      ? loadFeastleStory()
+      : props.familyId === 'mossprout'
+        ? loadMossproutStory()
+        : loadAuthoredCohortStory(props.familyId);
     if (story.status !== 'conversation_active' || !story.pendingConversationId) return;
     if (openedStoryConversationRef.current === story.pendingConversationId) return;
     requestStoryConversation(story.pendingConversationId);
@@ -1068,6 +1083,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             environmentKey={props.homeEnvironmentKey ?? null}
             lifted
             name={props.name}
+            onBackgroundReady={() => setTransitionBackgroundReady(true)}
+            onCreatureReady={() => setTransitionCreatureReady(true)}
             rewardPulseKey={rewardPulseKey}
             showSpeechBubble
             title={quickGoalPickerOpen
@@ -1178,7 +1195,11 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               icon="arrow.clockwise"
               label="Open the story again"
               onPress={() => {
-                const definitionId = isAuthoredCohortFamily(props.familyId) ? loadAuthoredCohortStory(props.familyId).pendingConversationId : loadFeastleStory().pendingConversationId;
+                const definitionId = isAuthoredCohortFamily(props.familyId)
+                  ? loadAuthoredCohortStory(props.familyId).pendingConversationId
+                  : props.familyId === 'mossprout'
+                    ? loadMossproutStory().pendingConversationId
+                    : loadFeastleStory().pendingConversationId;
                 if (!definitionId) { experience.showHome(); return; }
                 pendingStoryConversationRef.current = null;
                 openedStoryConversationRef.current = null;
@@ -1394,6 +1415,16 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                 />
               ) : route.kind === 'dashboard' && props.familyId === 'mossprout' && props.ftueOrderPreviewActive && props.onFtueOpenMerge ? (
                 <MossproutFtueStoryStage onOpenMerge={props.onFtueOpenMerge} />
+              ) : route.kind === 'dashboard' && props.familyId === 'mossprout' && !showMossproutDashboard ? (
+                <MossproutStoryStage
+                  onMore={() => setShowMossproutDashboard(true)}
+                  onOpenConversation={(definitionId) => {
+                    pendingStoryConversationRef.current = null;
+                    openedStoryConversationRef.current = null;
+                    requestStoryConversation(definitionId);
+                  }}
+                  onOpenMerge={(orderId) => props.onOpenMerge?.(orderId, props.familyId)}
+                />
               ) : route.kind === 'dashboard' && props.familyId === 'baristabbit' && !showBaristabbitDashboard ? (
                 <BaristabbitStoryStage
                   onBegin={beginBaristabbitIntroduction}

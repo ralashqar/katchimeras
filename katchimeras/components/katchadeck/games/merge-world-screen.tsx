@@ -10,8 +10,6 @@ import { RewardSplash, type RewardSplashItem } from '@/components/katchadeck/ui/
 import { GameCurrencyHud } from '@/components/katchadeck/ui/game-currency-hud';
 import { GameHudBar, GameHudControl, GameHudItem } from '@/components/katchadeck/ui/game-primitives';
 import { KatchaInlineNotice } from '@/components/katchadeck/ui/katcha-inline-notice';
-import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
-import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { KatchaSurfaceProvider } from '@/components/katchadeck/ui/katcha-surface';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
@@ -21,10 +19,9 @@ import {
 import { mergeWorldGeneratorArt } from '@/constants/merge-world-art';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import { useMergeWorld } from '@/features/merge-world/merge-world-provider';
-import { commitFtueAction, dispatchFtueEvent, ftueWispForRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
-import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
-import { mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
-import { WISPS_BY_ID } from '@/constants/wisps';
+import { dispatchFtueEvent, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { MOSSPROUT_FTUE_RETURN_NOTE_ID, mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
+import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
 import { useGameFeedback } from '@/features/ui/game-feedback-provider';
 import { useGameWallet } from '@/features/ui/game-wallet-provider';
 import { GameUI } from '@/constants/game-ui';
@@ -34,7 +31,8 @@ import { markFlowStart, reportFlowReady } from '@/utils/flow-performance';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
 import { availableExpansion, mergeOrderEnergyRefund, mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds } from '@/utils/merge-world/engine';
 import { MERGE_ENERGY_REGEN_MS } from '@/utils/merge-world/economy-policy';
-import { beginAuthoredCohortReturn, beginFeastleReturn, isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
+import { beginAuthoredCohortReturn, beginFeastleReturn, beginMossproutReturn, isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, loadMossproutStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
+import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
 
 import { FeastlePersistentMergeBoard, type MergeBoardScreenMetrics } from './feastle-persistent-merge-board';
 import { MergeParcelFlightOverlay, type MergeParcelFlight } from './merge-parcel-overlay';
@@ -42,8 +40,9 @@ import { MergeOrderRail, type MergeTrayEntry } from './merge-order-rail';
 import { MergeServeRewardOverlay, type MergeScreenPoint, type MergeServeRewardFlight } from './merge-serve-reward-overlay';
 import { MergeFtueOverlay } from './merge-ftue-overlay';
 
-export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntrance = true }: { active?: boolean; effectsPaused?: SharedValue<number>; playBoardEntrance?: boolean } = {}) {
+export function MergeWorldScreen({ active = true, backgroundReady = true, effectsPaused, playBoardEntrance = true }: { active?: boolean; backgroundReady?: boolean; effectsPaused?: SharedValue<number>; playBoardEntrance?: boolean } = {}) {
   const router = useRouter();
+  const { transitionTo } = useGameScreenTransition();
   const { focusOrderId } = useLocalSearchParams<{ focusOrderId?: string }>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -55,6 +54,7 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
   const feedback = useGameFeedback();
   const wallet = useGameWallet();
   const [story, setStory] = useState(loadFeastleStory);
+  const [mossproutStory, setMossproutStory] = useState(loadMossproutStory);
   const [authoredStories, setAuthoredStories] = useState(() => ({
     baristabbit: loadAuthoredCohortStory('baristabbit'),
     steppling: loadAuthoredCohortStory('steppling'),
@@ -72,7 +72,6 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
   const [energyPulseNonce, setEnergyPulseNonce] = useState(0);
   const [coinPulseNonce, setCoinPulseNonce] = useState(0);
   const [energyClockNow, setEnergyClockNow] = useState(Date.now);
-  const [chapterCompleteOpen, setChapterCompleteOpen] = useState(false);
   const [blockedFtuePulseNonce, setBlockedFtuePulseNonce] = useState(0);
   const [boardMetrics, setBoardMetrics] = useState<MergeBoardScreenMetrics | null>(null);
   const [ftueTargetRevision, setFtueTargetRevision] = useState(0);
@@ -81,7 +80,7 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
   const energyHudRef = useRef<View>(null);
   const coinHudRef = useRef<View>(null);
   const boardMetricsRef = useRef<MergeBoardScreenMetrics | null>(null);
-  const serveTargetRefs = useRef(new Map<string, View>());
+  const railTargetRefs = useRef(new Map<string, View>());
   const parcelRef = useRef<View>(null);
   const activeServeRef = useRef(false);
   const activeParcelRef = useRef(false);
@@ -92,6 +91,12 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
   const ftuePreviewNavigationPendingRef = useRef(false);
   const contentWidth = Math.min(width - 12, 600);
   const flowReady = !loading && state != null;
+  useGameSurfaceReadiness('merge', {
+    background: backgroundReady,
+    data: flowReady,
+    foreground: boardMetrics != null,
+    layout: screenLayoutNonce > 0 && boardAreaHeight > 0,
+  }, active);
   const ftueExclusive = ftueStep?.surface === 'merge' && ftueStep.interaction?.mode === 'exclusive';
   const shouldTickEnergyClock = active && state != null && state.energy.value < state.energy.regenCap;
   const readyOrderIds = useMemo(() => state ? readyMergeOrderIds(state) : new Set<string>(), [state]);
@@ -124,6 +129,7 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
 
   useEffect(() => subscribeCompanionStories(() => {
     setStory(loadFeastleStory());
+    setMossproutStory(loadMossproutStory());
     setAuthoredStories({
       baristabbit: loadAuthoredCohortStory('baristabbit'),
       steppling: loadAuthoredCohortStory('steppling'),
@@ -149,17 +155,41 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
     }
   }, [active]);
 
-  const openCharacterReturn = useCallback((characterId: MergeOrder['characterId']) => {
+  const openCharacterReturn = useCallback((characterId: MergeOrder['characterId'], noteId: string) => {
     if (!active || storyNavigationPendingRef.current) return;
+    if (noteId === MOSSPROUT_FTUE_RETURN_NOTE_ID) {
+      if (!mergeFtueAllowsChatNote(ftueStep, noteId)) {
+        setBlockedFtuePulseNonce((current) => current + 1);
+        if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        return;
+      }
+      const nextRun = dispatchFtueEvent({ type: 'chat_note_opened', noteId, revision: state?.revision ?? 0 });
+      if (nextRun?.stepId !== 'companion.chapter_zero_return') return;
+      storyNavigationPendingRef.current = true;
+      transitionTo({
+        announcement: 'Opening Mossprout',
+        target: 'companion',
+        navigate: () => router.push({
+          pathname: '/katchimera/[creatureId]',
+          params: { creatureId: 'companion:mossprout', ftue: 'chapter-zero-return', source: 'merge-world' },
+        }),
+      });
+      return;
+    }
     storyNavigationPendingRef.current = true;
     if (characterId === 'feastle') beginFeastleReturn();
+    else if (characterId === 'mossprout') beginMossproutReturn();
     else if (isAuthoredCohortFamily(characterId)) beginAuthoredCohortReturn(characterId);
     else setReturnCharacterId((current) => current === characterId ? null : current);
-    router.push({
-      pathname: '/katchimera/[creatureId]',
-      params: { creatureId: `companion:${characterId}`, source: 'merge-world', story: 'return' },
+    transitionTo({
+      announcement: 'Opening your Katchimera',
+      target: 'companion',
+      navigate: () => router.push({
+        pathname: '/katchimera/[creatureId]',
+        params: { creatureId: `companion:${characterId}`, source: 'merge-world', story: 'return' },
+      }),
     });
-  }, [active, router]);
+  }, [active, ftueStep, router, state?.revision, transitionTo]);
 
   useEffect(() => {
     markFlowStart('merge-world');
@@ -186,14 +216,8 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
     if (!active || !state || !ftueStep || !ftueRun) return;
     const recovered = recoverMergeFtueEvent(ftueStep, state, ftueRun.objectiveProgress);
     if (!recovered) return;
-    const nextRun = dispatchFtueEvent(recovered, `merge-recovery:${state.revision}`);
-    if (nextRun?.stepId === 'chapter.complete') setChapterCompleteOpen(true);
+    dispatchFtueEvent(recovered, `merge-recovery:${state.revision}`);
   }, [active, ftueRun, ftueStep, state]);
-
-  const finishChapterZero = useCallback(() => {
-    setChapterCompleteOpen(false);
-    commitFtueAction({ actionId: 'chapter.finish', evidenceRef: 'chapter-sheet-acknowledged' });
-  }, []);
 
   const handleBlockedFtueInteraction = useCallback(() => {
     setBlockedFtuePulseNonce((current) => current + 1);
@@ -208,10 +232,7 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
     }
     const result = send(command);
     const event = mergeFtueEventForCommand(state, command, result);
-    if (event) {
-      const nextRun = dispatchFtueEvent(event);
-      if (nextRun?.stepId === 'chapter.complete') setChapterCompleteOpen(true);
-    }
+    if (event) dispatchFtueEvent(event);
     return result;
   }, [ftueStep, handleBlockedFtueInteraction, send, state]);
   const pendingParcels = useMemo(() => state?.arrivals.filter((arrival) => (
@@ -227,11 +248,23 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
     const chapterZeroOrders = state.activeOrders.filter((order) => order.id.startsWith('mossprout:chapter-0:'));
     const chapterZeroActive = chapterZeroOrders.length > 0;
     const returnEntries: MergeTrayEntry[] = chapterZeroActive ? [] : [
+      ...(ftueStep?.id === 'merge.return_note' ? [{
+        id: MOSSPROUT_FTUE_RETURN_NOTE_ID,
+        kind: 'chat_note' as const,
+        characterId: 'mossprout' as const,
+        bondPoints: 0,
+      }] : []),
       ...(story.status === 'return_available' ? [{
         id: `chat-note:${story.id}:${story.targetLevel}`,
         kind: 'chat_note' as const,
         characterId: 'feastle' as const,
         bondPoints: story.pendingBondPoints,
+      }] : []),
+      ...(mossproutStory.status === 'return_available' ? [{
+        id: `chat-note:${mossproutStory.id}:${mossproutStory.targetLevel}`,
+        kind: 'chat_note' as const,
+        characterId: 'mossprout' as const,
+        bondPoints: mossproutStory.pendingBondPoints,
       }] : []),
       ...Object.values(authoredStories).flatMap((authoredStory): MergeTrayEntry[] => {
         if (authoredStory.status !== 'return_available' || !isAuthoredCohortFamily(authoredStory.familyId)) return [];
@@ -283,7 +316,7 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
     // Midpoint notes sit before the remaining requests so the story beat is
     // immediately visible without replacing or hiding any unserved order.
     return [...parcelEntries, ...returnEntries, ...orderEntries];
-  }, [active, authoredStories, focusOrderId, parcelFlight, parcelShakeNonce, pendingParcel, pendingParcels.length, readyOrderIds, returnCharacterId, serveFlight, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
+  }, [active, authoredStories, focusOrderId, ftueStep?.id, mossproutStory.id, mossproutStory.pendingBondPoints, mossproutStory.status, mossproutStory.targetLevel, parcelFlight, parcelShakeNonce, pendingParcel, pendingParcels.length, readyOrderIds, returnCharacterId, serveFlight, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
 
   const startServeAnimation = useCallback(async (order: MergeOrder, itemTargets: readonly MergeScreenPoint[]) => {
     if (!state || activeServeRef.current || activeParcelRef.current || parcelFlight) return false;
@@ -358,7 +391,7 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
     if (!activeOrder) return;
     const servedOrder = state?.activeOrders.find((order) => order.id === activeOrder.orderId);
     const result = dispatch({ type: 'serveOrder', orderId: activeOrder.orderId, now: Date.now() });
-    if (result?.changed && servedOrder?.signature && servedOrder.characterId !== 'feastle' && !isAuthoredCohortFamily(servedOrder.characterId)) {
+    if (result?.changed && servedOrder?.signature && servedOrder.characterId !== 'feastle' && servedOrder.characterId !== 'mossprout' && !isAuthoredCohortFamily(servedOrder.characterId)) {
       setReturnCharacterId(servedOrder.characterId);
     }
     setPresentedEnergy(null);
@@ -371,11 +404,11 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
     boardMetricsRef.current = metrics;
     setBoardMetrics(metrics);
   }, []);
-  const handleServeTargetRef = useCallback((orderId: string, view: View | null) => {
-    const current = serveTargetRefs.current.get(orderId) ?? null;
+  const handleRailTargetRef = useCallback((targetKey: string, view: View | null) => {
+    const current = railTargetRefs.current.get(targetKey) ?? null;
     if (current === view) return;
-    if (view) serveTargetRefs.current.set(orderId, view);
-    else serveTargetRefs.current.delete(orderId);
+    if (view) railTargetRefs.current.set(targetKey, view);
+    else railTargetRefs.current.delete(targetKey);
     setFtueTargetRevision((revision) => revision + 1);
   }, []);
   const rerollOrder = useCallback((orderId: string) => {
@@ -456,7 +489,6 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
   const energyCountdownSeconds = state.energy.value < state.energy.regenCap
     ? Math.max(1, Math.ceil((MERGE_ENERGY_REGEN_MS - ((energyClockNow - state.energy.lastRegenAt) % MERGE_ENERGY_REGEN_MS)) / 1_000))
     : null;
-  const firstWisp = WISPS_BY_ID.get(ftueWispForRun(ftueRun));
   return (
     <View onLayout={() => setScreenLayoutNonce((nonce) => nonce + 1)} ref={screenRef} style={styles.screen}>
       <View style={[styles.game, { paddingTop: Math.max(insets.top + 3, 7), paddingBottom: Math.max(insets.bottom + 3, 7), width: contentWidth }]}>
@@ -491,7 +523,7 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
             onReroll={(order) => rerollOrder(order.id)}
             onServe={startServeAnimation}
             onBlockedInteraction={handleBlockedFtueInteraction}
-            onServeTargetRef={handleServeTargetRef}
+            onRailTargetRef={handleRailTargetRef}
             interactionGate={ftueRailGate}
             parcelTargetRef={parcelRef}
           />
@@ -529,7 +561,7 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
         cue={active && !serveFlight ? ftueStep?.cue ?? null : null}
         layoutNonce={screenLayoutNonce}
         screenRef={screenRef}
-        serveTargetRefs={serveTargetRefs}
+        railTargetRefs={railTargetRefs}
         state={state}
         spotlight={active && !serveFlight ? ftueStep?.spotlight ?? null : null}
         targetRevision={ftueTargetRevision}
@@ -542,19 +574,6 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
         items={generatorUnlockRewards}
         onItemSeen={(receiptId) => dispatch({ type: 'ackGeneratorUnlock', receiptId, now: Date.now() })}
       /> : null}
-      <KatchaSheet
-        footer={<KatchaButton fullWidth glow label="See what comes next" onPress={finishChapterZero} />}
-        header={{ eyebrow: 'Chapter complete', title: 'A Little Place to Begin', subtitle: 'Mossprout has somewhere to grow.' }}
-        onRequestClose={() => {}}
-        open={chapterCompleteOpen}
-        showClose={false}
-        surface="parchment">
-        <View style={styles.scriptedSheetBody}>
-          <ThemedText style={styles.scriptedSheetCopy} lightColor={GameUI.color.ink} darkColor={GameUI.color.ink}>“There. A little place to begin.”</ThemedText>
-          <ThemedText style={styles.scriptedSheetDetail} lightColor={GameUI.color.ink} darkColor={GameUI.color.ink}>You found your first Wisp{firstWisp ? `: ${firstWisp.name}` : ''} - a little piece of your story.</ThemedText>
-          <ThemedText style={styles.scriptedSheetMystery} lightColor={GameUI.color.ink} darkColor={GameUI.color.ink}>Fresh footprints cross the Dream Mist. Mossprout looks toward them. “Those aren’t mine.”</ThemedText>
-        </View>
-      </KatchaSheet>
     </View>
   );
 }
@@ -610,8 +629,4 @@ const styles = StyleSheet.create({
   expansionLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9, fontWeight: '900' },
   errorBanner: { alignSelf: 'center', maxWidth: 360, position: 'absolute', width: '92%', zIndex: GameUI.layer.notice },
   pressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
-  scriptedSheetBody: { gap: 12, paddingVertical: 6 },
-  scriptedSheetCopy: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 22, lineHeight: 28 },
-  scriptedSheetDetail: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '700', lineHeight: 19 },
-  scriptedSheetMystery: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '600', lineHeight: 19, opacity: 0.82 },
 });

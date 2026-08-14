@@ -52,11 +52,15 @@ function KatchimeraRosterScreenComponent({
   background,
   items,
   onGoToday,
+  onBackgroundReady,
+  onContentReady,
   onSelectCreature,
 }: {
   background: TodayAtmosphereBackground;
   items: KatchimeraRosterItem[];
   onGoToday: () => void;
+  onBackgroundReady?: () => void;
+  onContentReady?: () => void;
   onSelectCreature: (creatureId: string) => void;
 }) {
   const insets = useSafeAreaInsets();
@@ -207,8 +211,8 @@ function KatchimeraRosterScreenComponent({
   }, [columnCount]);
 
   return (
-    <View style={styles.screen}>
-      <TodaySceneBackdrop background={background} scene={null} variant="splash" />
+    <View onLayout={onContentReady} style={styles.screen}>
+      <TodaySceneBackdrop background={background} onLoad={onBackgroundReady} scene={null} variant="splash" />
       <LinearGradient
         colors={[
           'rgba(14,20,11,0.38)',

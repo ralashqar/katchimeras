@@ -40,6 +40,8 @@ export function CompanionCinematicStage({
   name,
   rewardPulseKey = 0,
   onSpeechBubbleHeightChange,
+  onBackgroundReady,
+  onCreatureReady,
   showSpeechBubble = true,
   title,
   visualKey,
@@ -55,6 +57,8 @@ export function CompanionCinematicStage({
   name: string;
   rewardPulseKey?: number;
   onSpeechBubbleHeightChange?: (height: number) => void;
+  onBackgroundReady?: () => void;
+  onCreatureReady?: () => void;
   showSpeechBubble?: boolean;
   title: string;
   visualKey: HomeVisualKey;
@@ -105,6 +109,7 @@ export function CompanionCinematicStage({
           creature={creature}
           layer="background"
           name={name}
+          onBackgroundReady={onBackgroundReady}
           visualKey={visualKey}
         />
       </Animated.View>
@@ -184,6 +189,7 @@ export function CompanionCinematicStage({
           creatureTargetRef={creatureTargetRef}
           layer="creature"
           name={name}
+          onCreatureReady={onCreatureReady}
           rewardPulseKey={rewardPulseKey}
           visualKey={visualKey}
         />

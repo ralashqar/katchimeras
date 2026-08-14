@@ -23,6 +23,7 @@ import { loadKatchimeraWardrobe } from '@/utils/katchimera-wardrobe-storage';
 import { deriveKingdom } from '@/utils/kingdom-engine';
 import { deriveResidents, type HatchRecord } from '@/utils/kingdom-residents';
 import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability';
+import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
 
 function hatchTimestamp(creature: KingdomCreature, index: number): number {
   const time = Date.parse(`${creature.isoDate}T00:00:00`);
@@ -72,12 +73,15 @@ export function KatchimeraRosterRouteScreen() {
 
 function FocusedKatchimeraRoster() {
   const router = useRouter();
+  const { transitionTo } = useGameScreenTransition();
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   // This component is created fresh for every focus session, so its lazy
   // initializer already reads the latest persisted days. Refreshing on that
   // same initial focus would rebuild the just-mounted grid a second time.
   const { days } = useAllDays({ refreshOnFocus: false });
   const [persistentSnapshot, setPersistentSnapshot] = useState(loadRosterPersistentSnapshot);
+  const [backgroundReady, setBackgroundReady] = useState(false);
+  const [contentReady, setContentReady] = useState(false);
   const hasCompletedInitialFocus = useRef(false);
   const previousItems = useRef<readonly KatchimeraRosterItem[]>([]);
   const persistent = persistentSnapshot.state;
@@ -137,16 +141,32 @@ function FocusedKatchimeraRoster() {
     previousItems.current = reconciled;
     return reconciled;
   }, [bondForCreature, kingdom.creatures, residents, statusByCreatureId]);
+  useGameSurfaceReadiness('katchimeras', {
+    background: backgroundReady,
+    data: true,
+    foreground: contentReady,
+    layout: contentReady,
+  });
   const openCreature = useCallback((creatureId: string) => {
     markFlowStart('katchimera-companion');
-    router.push({ pathname: '/katchimera/[creatureId]', params: { creatureId } });
-  }, [router]);
-  const goToday = useCallback(() => router.navigate('/today'), [router]);
+    transitionTo({
+      announcement: 'Opening your Katchimera',
+      target: 'companion',
+      navigate: () => router.push({ pathname: '/katchimera/[creatureId]', params: { creatureId } }),
+    });
+  }, [router, transitionTo]);
+  const goToday = useCallback(() => transitionTo({
+    announcement: 'Opening Today',
+    target: 'today',
+    navigate: () => router.navigate('/today'),
+  }), [router, transitionTo]);
 
   return (
     <KatchimeraRosterScreen
       background={background}
       items={items}
+      onBackgroundReady={() => setBackgroundReady(true)}
+      onContentReady={() => setContentReady(true)}
       onGoToday={goToday}
       onSelectCreature={openCreature}
     />

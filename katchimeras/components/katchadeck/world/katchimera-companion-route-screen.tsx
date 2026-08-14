@@ -9,17 +9,26 @@ import { familyIdFromCompanionId } from '@/constants/katchimera-skins';
 import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
 import { commitFtueAction, ftueWispForRun, loadFtueRun, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { installMossproutOnboardingMergeWorld } from '@/utils/merge-world/repository';
+import { useGameScreenTransition } from '@/features/navigation/game-screen-transition';
+import { beginMossproutChapterOne } from '@/utils/companion-story-storage';
 
 export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConversationDefinitionId }: { creatureId: string; source?: 'merge-world'; ftueConversationDefinitionId?: string }) {
   const isFocused = useIsFocused();
   const router = useRouter();
+  const { transitionTo } = useGameScreenTransition();
   const familyId = familyIdFromCompanionId(creatureId);
   const ftueHandoffRef = useRef(false);
   const ftueRun = useFtueRun();
   const completeFtueConversation = useCallback(() => {
     const run = loadFtueRun();
-    if (run?.stepId !== 'companion.first_meeting') return;
-    commitFtueAction({ actionId: 'companion.complete_first_meeting', evidenceRef: ftueConversationDefinitionId ?? 'mossprout-ftue' });
+    if (run?.stepId === 'companion.first_meeting') {
+      commitFtueAction({ actionId: 'companion.complete_first_meeting', evidenceRef: ftueConversationDefinitionId ?? 'mossprout-ftue' });
+      return;
+    }
+    if (run?.stepId === 'companion.chapter_zero_return') {
+      beginMossproutChapterOne();
+      commitFtueAction({ actionId: 'companion.complete_chapter_zero_return', evidenceRef: ftueConversationDefinitionId ?? 'mossprout-chapter-zero-return' });
+    }
   }, [ftueConversationDefinitionId]);
   const openFtueGarden = useCallback(() => {
     if (ftueHandoffRef.current) return;
@@ -29,13 +38,17 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConvers
       .then(() => {
         updateFtueRun({ mergeInstalled: true });
         commitFtueAction({ actionId: 'companion.open_garden', evidenceRef: 'mossprout-order-preview' });
-        router.dismissTo({ pathname: '/games', params: { familyId: 'mossprout' } });
+        transitionTo({
+          announcement: 'Opening Merge',
+          target: 'merge',
+          navigate: () => router.dismissTo({ pathname: '/games', params: { familyId: 'mossprout' } }),
+        });
       })
       .catch((error) => {
         ftueHandoffRef.current = false;
         console.warn('Could not prepare Mossprout Chapter 0', error);
       });
-  }, [router]);
+  }, [router, transitionTo]);
 
   useEffect(() => {
     if (!isFocused) return;
@@ -61,10 +74,18 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConvers
       ftueOrderPreviewActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.order_preview'}
       onFtueOpenMerge={openFtueGarden}
       initialCreatureId={creatureId}
-      onCloseCompanion={() => source === 'merge-world' ? router.dismissTo('/games') : router.back()}
-      onOpenMerge={(orderId, selectedFamilyId) => router.dismissTo({
-        pathname: '/games',
-        params: { ...(selectedFamilyId ?? familyId ? { familyId: selectedFamilyId ?? familyId ?? undefined } : {}), ...(orderId ? { focusOrderId: orderId } : {}) },
+      onCloseCompanion={() => source === 'merge-world' ? transitionTo({
+        announcement: 'Returning to Merge',
+        target: 'merge',
+        navigate: () => router.dismissTo('/games'),
+      }) : router.back()}
+      onOpenMerge={(orderId, selectedFamilyId) => transitionTo({
+        announcement: 'Opening Merge',
+        target: 'merge',
+        navigate: () => router.dismissTo({
+          pathname: '/games',
+          params: { ...(selectedFamilyId ?? familyId ? { familyId: selectedFamilyId ?? familyId ?? undefined } : {}), ...(orderId ? { focusOrderId: orderId } : {}) },
+        }),
       })}
       onOpenQuestGame={(selectedCreatureId, questId) => {
         markFlowStart('katchimera-block-blast');

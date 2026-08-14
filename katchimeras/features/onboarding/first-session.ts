@@ -13,7 +13,7 @@ export function loadFirstSession(): FirstSessionState | null {
   const run = loadFtueRun();
   if (!run) return null;
   const stage: FirstSessionStage = run.status === 'complete' ? 'complete'
-    : run.stepId.startsWith('merge.') || run.stepId === 'chapter.complete' ? 'merge'
+    : run.stepId.startsWith('merge.') ? 'merge'
       : 'today';
   return { version: 3, stage, startedAt: run.startedAt, mergeInstalled: run.mergeInstalled };
 }
@@ -32,9 +32,7 @@ export function updateFirstSession(patch: Partial<Pick<FirstSessionState, 'stage
 }
 
 export function completeFirstSession() {
-  const run = loadFtueRun();
-  if (run?.stepId === 'chapter.complete') commitFtueAction({ actionId: 'chapter.finish' });
-  else updateFtueRun({ stepId: 'complete', status: 'complete', completedAt: new Date().toISOString() });
+  updateFtueRun({ stepId: 'complete', status: 'complete', completedAt: new Date().toISOString() });
   return loadFirstSession();
 }
 

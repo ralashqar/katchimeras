@@ -142,6 +142,7 @@ export const MERGE_CHARACTER_NAMES: Record<MergeCharacterId, string> = {
 };
 
 export const MERGE_CHAPTER_LANDMARKS: Partial<Record<MergeCharacterId, { id: string; title: string }>> = {
+  mossprout: { id: 'mossprout-little-rain-garden', title: "Mossprout's Little Rain Garden" },
   feastle: { id: 'feastle-first-table', title: "Feastle's First Table" },
   baristabbit: { id: 'baristabbit-pause-table', title: "Baristabbit's Pause Table" },
   steppling: { id: 'steppling-path-outside', title: "Steppling's Path Outside" },

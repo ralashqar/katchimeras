@@ -853,6 +853,20 @@ function genericFamilyStoryOrders(
     storyStepCount: count,
   });
 
+  if (characterId === 'mossprout') {
+    if (targetLevel <= 2) return [order('level-2', 'A Place for Rain', [
+      { definitionId: 'nature:waterside:2', quantity: 1 },
+    ], 1, 1)];
+    if (targetLevel === 3) return [order('level-3', 'A Bank That Holds', [
+      { definitionId: 'nature:garden:3', quantity: 1 },
+      { definitionId: 'nature:waterside:2', quantity: 1 },
+    ], 1, 1)];
+    return [order('level-4:signature', 'The Little Rain Garden', [
+      { definitionId: 'nature:garden:4', quantity: 1 },
+      { definitionId: 'nature:waterside:3', quantity: 1 },
+    ], 1, 1, true)];
+  }
+
   if (actPhase === 'regular_orders') {
     const keys = requestedTemplateKeys.length ? requestedTemplateKeys.slice(0, 5) : Array.from({ length: 5 }, (_, index) => `regular-${index + 1}`);
     return keys.map((key, index) => {

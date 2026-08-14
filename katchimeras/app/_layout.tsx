@@ -3,7 +3,6 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
@@ -14,6 +13,7 @@ import { WispProvider } from '@/features/wisps/wisp-provider';
 import { EconomyProvider } from '@/features/economy/economy-provider';
 import { AvatarAccessReconciler } from '@/features/economy/avatar-access-reconciler';
 import { AppActivityProvider } from '@/features/performance/app-activity';
+import { GameScreenTransitionProvider, TransitionAwareStatusBar } from '@/features/navigation/game-screen-transition';
 import { FtueProvider } from '@/features/onboarding/ftue-provider';
 import { GameUIProvider } from '@/components/katchadeck/ui/game-ui-provider';
 import { GameFeedbackProvider } from '@/features/ui/game-feedback-provider';
@@ -93,6 +93,7 @@ export default function RootLayout() {
                   <WispProvider>
                     <FtueProvider>
                     <AppActivityProvider>
+                      <GameScreenTransitionProvider>
                       <Stack>
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -116,14 +117,16 @@ export default function RootLayout() {
           <Stack.Screen name="streak" options={{ animation: 'fade', headerShown: false, title: 'Streak Story' }} />
           <Stack.Screen name="location-privacy" options={{ title: 'Photo places' }} />
           <Stack.Screen name="hatch-your-past" options={{ headerShown: false, gestureEnabled: false, title: 'Hatch your past' }} />
-          <Stack.Screen name="katchimera/[creatureId]" options={{ headerShown: false }} />
+          <Stack.Screen name="katchimera/[creatureId]" options={{ animation: 'none', headerShown: false }} />
           <Stack.Screen name="wisp/[wispId]" options={{ headerShown: false }} />
           <Stack.Screen name="katchimera/[creatureId]/achievements" options={{ headerShown: false }} />
-          <Stack.Screen name="katchimera/[creatureId]/quest/[questId]/game" options={{ headerShown: false, gestureEnabled: false }} />
-          <Stack.Screen name="game/[questId]" options={{ headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen name="katchimera/[creatureId]/quest/[questId]/game" options={{ animation: 'none', headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen name="game/[questId]" options={{ animation: 'none', headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="legacy-games" options={{ headerShown: false, title: 'Legacy Games' }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Katchimeras Preview' }} />
                       </Stack>
+                      <TransitionAwareStatusBar defaultStyle={colorScheme === 'light' ? 'dark' : 'light'} />
+                      </GameScreenTransitionProvider>
                     </AppActivityProvider>
                     </FtueProvider>
                   </WispProvider>
@@ -132,7 +135,6 @@ export default function RootLayout() {
             </GameWalletProvider>
           </EconomyProvider>
         </GameUIProvider>
-        <StatusBar style={colorScheme === 'light' ? 'dark' : 'light'} />
       </ThemeProvider>
     </GestureHandlerRootView>
   );
