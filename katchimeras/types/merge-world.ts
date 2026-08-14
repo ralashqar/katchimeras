@@ -58,6 +58,7 @@ export type MergeGeneratorState = {
   upgradeFragments: number;
   chainIds: [MergeChainId, MergeChainId];
   tierOneDropDefinitionIds: [string, string];
+  forcedDropDefinitionId: string | null;
 };
 
 export type MergeOrderRequirement = {
@@ -175,7 +176,7 @@ export type MergeActivityReward = {
 };
 
 export type MergeWorldState = {
-  version: 8;
+  version: 9;
   revision: number;
   createdAt: number;
   updatedAt: number;
@@ -211,6 +212,7 @@ export type MergeWorldState = {
 export type MergeWorldCommand =
   | { type: 'refreshTime'; now: number }
   | { type: 'tapGenerator'; generatorId: string; now: number; seed: string }
+  | { type: 'setGeneratorForcedDrop'; generatorId: string; definitionId: string | null; now: number }
   | { type: 'upgradeGenerator'; generatorId: string; now: number }
   | { type: 'move'; from: number; to: number; now: number }
   | { type: 'serveOrder'; orderId: string; now: number }

@@ -604,6 +604,7 @@ test('Feastle story scenes return to the chapter surface instead of generic Keep
   const interaction = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'), 'utf8');
   const scene = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-conversation-scene.tsx'), 'utf8');
   const stage = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'feastle-story-stage.tsx'), 'utf8');
+  const requestTray = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-merge-request-tray.tsx'), 'utf8');
   assert.match(interaction, /const feastleStoryFlow = Boolean/);
   assert.match(interaction, /\^feastle:friendship:\[234\]\$/);
   assert.match(interaction, /storyFinale=\{feastleStoryFinale\}/);
@@ -614,7 +615,8 @@ test('Feastle story scenes return to the chapter surface instead of generic Keep
   assert.match(scene, /the Pantry will wait until a new order is actually ready/);
   assert.match(scene, /storyFlow \? 'See next chapter' : 'Keep talking'/);
   assert.match(stage, /FEASTLE_STORY_REQUESTS\[story\.targetLevel\]/);
-  assert.match(stage, /PersistentMergeItemArt/);
+  assert.match(stage, /CompanionMergeRequestTray/);
+  assert.match(requestTray, /PersistentMergeItemArt/);
   assert.match(stage, /Open all orders/);
   assert.match(stage, /\{!complete \? <Pressable/);
   assert.match(stage, />More with Feastle</);

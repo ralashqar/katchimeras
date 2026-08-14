@@ -37,7 +37,7 @@ import type {
   MergeWorldCommandResult,
   MergeWorldState,
 } from '@/types/merge-world';
-import { advanceMossproutChapterZero } from '@/utils/merge-world/chapter-zero-policy';
+import { advanceMossproutChapterZero, enforceMossproutChapterZeroDropOverride } from '@/utils/merge-world/chapter-zero-policy';
 
 const KNOWN_CHARACTERS = new Set<MergeCharacterId>(Object.keys(KATCHIMERA_MERGE_PROFILES) as MergeCharacterId[]);
 const RECENT_ORDER_LIMIT = 8;
@@ -49,7 +49,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     occupant: null,
   }));
   let state: MergeWorldState = {
-    version: 8,
+    version: 9,
     revision: 0,
     createdAt: now,
     updatedAt: now,
@@ -92,6 +92,8 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
       return result(state, current, current === state ? undefined : 'Energy refreshed.');
     case 'tapGenerator':
       return tapGenerator(current, command.generatorId, command.now, command.seed);
+    case 'setGeneratorForcedDrop':
+      return setGeneratorForcedDrop(current, command.generatorId, command.definitionId, command.now);
     case 'upgradeGenerator':
       return upgradeGenerator(current, command.generatorId, command.now);
     case 'move':
@@ -219,14 +221,14 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   if (!value || typeof value !== 'object') return createInitialMergeWorldState(now);
   const rawVersion = (value as { version?: unknown }).version;
   const source = value as Partial<MergeWorldState>;
-  if ((rawVersion !== 1 && rawVersion !== 2 && rawVersion !== 3 && rawVersion !== 4 && rawVersion !== 5 && rawVersion !== 6 && rawVersion !== 7 && rawVersion !== 8) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
+  if ((rawVersion !== 1 && rawVersion !== 2 && rawVersion !== 3 && rawVersion !== 4 && rawVersion !== 5 && rawVersion !== 6 && rawVersion !== 7 && rawVersion !== 8 && rawVersion !== 9) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
     return createInitialMergeWorldState(now);
   }
   const fallback = createInitialMergeWorldState(now);
   let normalized: MergeWorldState = {
     ...fallback,
     ...source,
-    version: 8,
+    version: 9,
     revision: finite(source.revision, 0),
     createdAt: finite(source.createdAt, now),
     updatedAt: finite(source.updatedAt, now),
@@ -270,6 +272,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     externalRewardReceipts: Array.isArray(source.externalRewardReceipts) ? source.externalRewardReceipts : [],
   };
   normalized = reconcileUnlockedCatalog(normalized);
+  normalized = enforceMossproutChapterZeroDropOverride(normalized);
   normalized = migrateActivityInbox(normalized);
   // Version 1/2 Pantry charges, cooldowns, and parcels intentionally disappear.
   // Version 3's five single-chain generators migrate into the shared eight.
@@ -285,9 +288,9 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
   // Level one always starts at tier one. Upgrades add a bounded chance of a
   // better seed without changing which authored chains the generator owns.
   const dropIndex = randomUnit(`${seed}:chain:${state.revision}`) < 0.5 ? 0 : 1;
-  const baseDefinitionId = generator.tierOneDropDefinitionIds[dropIndex];
+  const baseDefinitionId = generator.forcedDropDefinitionId ?? generator.tierOneDropDefinitionIds[dropIndex];
   const betterDropRoll = randomUnit(`${seed}:upgrade:${state.revision}`);
-  const bonusTier = generator.level >= 4 && betterDropRoll < 0.05
+  const bonusTier = generator.forcedDropDefinitionId ? 0 : generator.level >= 4 && betterDropRoll < 0.05
     ? 2
     : betterDropRoll < Math.max(0, generator.level - 1) * 0.1 ? 1 : 0;
   const definitionId = bonusTier ? baseDefinitionId.replace(/:1$/, `:${1 + bonusTier}`) : baseDefinitionId;
@@ -304,6 +307,17 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
   const discovery = applyDiscovery(next, definitionId, now);
   next = discovery.state;
   return { state: next, changed: true, spawnedCell: cell, discoveryId: discovery.newDiscovery ? definitionId : undefined, message: `${MERGE_ITEMS_BY_ID.get(definitionId)?.name ?? 'Item'} added.` };
+}
+
+function setGeneratorForcedDrop(state: MergeWorldState, generatorId: string, definitionId: string | null, now: number): MergeWorldCommandResult {
+  const generator = state.generators[generatorId];
+  if (!generator) return unchanged(state, 'That generator is not unlocked.');
+  if (definitionId != null && !generator.tierOneDropDefinitionIds.includes(definitionId)) {
+    return unchanged(state, 'That item does not belong to this generator.');
+  }
+  if (generator.forcedDropDefinitionId === definitionId) return unchanged(state);
+  const nextGenerator = { ...generator, forcedDropDefinitionId: definitionId };
+  return changed(touch({ ...state, generators: { ...state.generators, [generatorId]: nextGenerator } }, now));
 }
 
 export function mergeGeneratorUpgradeCost(level: number): number | null {
@@ -1043,6 +1057,7 @@ function generatorState(id: string): MergeGeneratorState {
     upgradeFragments: 0,
     chainIds: [...definition.chainIds],
     tierOneDropDefinitionIds: [...definition.tierOneDropDefinitionIds],
+    forcedDropDefinitionId: null,
   };
 }
 
@@ -1266,6 +1281,10 @@ function normalizeGenerator(value: unknown, id: string): MergeGeneratorState {
     upgradeFragments: Math.max(0, Math.floor(finite(generator.upgradeFragments, 0))),
     chainIds: [...fallback.chainIds],
     tierOneDropDefinitionIds: [...fallback.tierOneDropDefinitionIds],
+    forcedDropDefinitionId: typeof generator.forcedDropDefinitionId === 'string'
+      && fallback.tierOneDropDefinitionIds.includes(generator.forcedDropDefinitionId)
+      ? generator.forcedDropDefinitionId
+      : null,
   };
 }
 

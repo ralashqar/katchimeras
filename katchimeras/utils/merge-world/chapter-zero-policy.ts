@@ -2,6 +2,8 @@ import type { MergeOrder, MergeWorldState } from '@/types/merge-world';
 import type { WispId } from '@/types/wisp';
 
 const ORDER_PREFIX = 'mossprout:chapter-0:';
+const FTUE_GARDEN_GENERATOR_ID = 'wild-garden';
+const FTUE_SEED_DEFINITION_ID = 'nature:garden:1';
 
 export const MOSSPROUT_CHAPTER_ZERO_REQUESTS = [
   {
@@ -54,6 +56,17 @@ export function mossproutChapterZeroHomePlantOrder(now: number, rewardWispId: Wi
 }
 
 export function advanceMossproutChapterZero(state: MergeWorldState, servedOrderId: string, now: number): MergeWorldState {
+  if (servedOrderId === MOSSPROUT_CHAPTER_ZERO_REQUESTS[1].id) {
+    const garden = state.generators[FTUE_GARDEN_GENERATOR_ID];
+    if (!garden?.forcedDropDefinitionId) return state;
+    return {
+      ...state,
+      generators: {
+        ...state.generators,
+        [FTUE_GARDEN_GENERATOR_ID]: { ...garden, forcedDropDefinitionId: null },
+      },
+    };
+  }
   if (servedOrderId !== MOSSPROUT_CHAPTER_ZERO_REQUESTS[0].id) return state;
   let remaining = 4;
   const board = state.board.map((cell) => {
@@ -68,6 +81,21 @@ export function advanceMossproutChapterZero(state: MergeWorldState, servedOrderI
       ...state.activeOrders,
       mossproutChapterZeroHomePlantOrder(now, mossproutChapterZeroRewardWisp(state)),
     ],
+  };
+}
+
+/** Repairs persisted mid-tutorial boards so the authored Seed-only drop remains enforced. */
+export function enforceMossproutChapterZeroDropOverride(state: MergeWorldState): MergeWorldState {
+  if (!isMossproutChapterZeroActive(state)) return state;
+  const garden = state.generators[FTUE_GARDEN_GENERATOR_ID];
+  if (!garden || garden.forcedDropDefinitionId === FTUE_SEED_DEFINITION_ID) return state;
+  if (!garden.tierOneDropDefinitionIds.includes(FTUE_SEED_DEFINITION_ID)) return state;
+  return {
+    ...state,
+    generators: {
+      ...state.generators,
+      [FTUE_GARDEN_GENERATOR_ID]: { ...garden, forcedDropDefinitionId: FTUE_SEED_DEFINITION_ID },
+    },
   };
 }
 

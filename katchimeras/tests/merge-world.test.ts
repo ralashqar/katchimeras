@@ -60,8 +60,22 @@ test('Merge FTUE locks the board for Serve and advances only for its exact order
   const command = { type: 'serveOrder' as const, orderId, now: NOW + 2 };
   const result = reduceMergeWorld(merged, command);
   assert.deepEqual(mergeFtueEventForCommand(merged, command, result), { type: 'order_served', orderId, revision: result.state.revision });
-  assert.equal(recoverMergeFtueEvent('merge.seed_drag', result.state)?.type, 'merge_completed');
   assert.equal(recoverMergeFtueEvent('merge.serve_sprout', result.state)?.type, 'order_served');
+  assert.deepEqual(result.state.activeOrders.map((order) => order.id), ['mossprout:chapter-0:home-plant']);
+});
+
+test('Merge FTUE permits only the highlighted generator and emits spawn evidence', () => {
+  let state = createMossproutChapterZeroState(NOW);
+  const seedCells = state.board.flatMap((cell, index) => cell.occupant?.kind === 'item' ? [index] : []);
+  state = reduceMergeWorld(state, { type: 'move', from: seedCells[0], to: seedCells[1], now: NOW + 1 }).state;
+  state = reduceMergeWorld(state, { type: 'serveOrder', orderId: 'mossprout:chapter-0:first-sprout', now: NOW + 2 }).state;
+  const step = mossproutFtueStep('merge.plant.spawn');
+  const generatorCell = state.board.findIndex((cell) => cell.occupant?.kind === 'generator' && cell.occupant.generatorId === 'wild-garden');
+  assert.deepEqual(mergeFtueBoardGate(step, state), { kind: 'generator', cell: generatorCell, generatorId: 'wild-garden' });
+  const command = { type: 'tapGenerator' as const, generatorId: 'wild-garden', now: NOW + 3, seed: 'ftue-spawn' };
+  assert.equal(mergeFtueAllowsCommand(step, state, command), true);
+  const result = reduceMergeWorld(state, command);
+  assert.equal(mergeFtueEventForCommand(state, command, result)?.type, 'item_spawned');
 });
 
 test('board geometry renders and hit-tests with one coordinate system', () => {
@@ -80,7 +94,7 @@ test('board geometry renders and hit-tests with one coordinate system', () => {
 test('a new Merge World uses the consolidated Energy economy', () => {
   const state = createInitialMergeWorldState(NOW);
   assert.deepEqual(mergeWorldCatalogIssues(), []);
-  assert.equal(state.version, 8);
+  assert.equal(state.version, 9);
   assert.equal(state.storageCapacity, 8);
   assert.equal(state.energy.regenCap, MERGE_ENERGY_REGEN_CAP);
   assert.equal(state.energy.value, MERGE_INITIAL_ENERGY);
@@ -90,10 +104,12 @@ test('a new Merge World uses the consolidated Energy economy', () => {
   assert.deepEqual(state.generators, {});
 });
 
-test('Mossprout Chapter 0 starts at 50 Energy and completes from one one-merge order', () => {
+test('Mossprout Chapter 0 starts at 50 Energy and completes two sequential orders', () => {
   let state = createMossproutChapterZeroState(NOW, 'heartlet');
   assert.equal(state.board.filter((cell) => !cell.locked).length, 18);
   assert.equal(state.energy.value, 50);
+  assert.deepEqual(state.generators['wild-garden'].tierOneDropDefinitionIds, ['nature:garden:1', 'nature:waterside:1']);
+  assert.equal(state.generators['wild-garden'].forcedDropDefinitionId, 'nature:garden:1');
   assert.deepEqual(state.activeOrders.map((order) => order.id), ['mossprout:chapter-0:first-sprout']);
   assert.deepEqual(state.activeOrders[0].requirements, [{ definitionId: 'nature:garden:2', quantity: 1 }]);
 
@@ -103,10 +119,79 @@ test('Mossprout Chapter 0 starts at 50 Energy and completes from one one-merge o
   state = reduceMergeWorld(state, { type: 'move', from: seedCells[0], to: seedCells[1], now: NOW + 1 }).state;
   state = reduceMergeWorld(state, { type: 'serveOrder', orderId: 'mossprout:chapter-0:first-sprout', now: NOW + 2 }).state;
   assert.equal(state.board.filter((cell) => !cell.locked).length, 22);
-  assert.deepEqual(state.activeOrders, []);
+  assert.deepEqual(state.activeOrders.map((order) => order.id), ['mossprout:chapter-0:home-plant']);
   assert.equal(state.energy.value, 52);
+  assert.equal(Boolean(state.characterProgress.mossprout?.completedChapterIds.includes('mossprout-chapter-0')), false);
+  assert.equal(state.externalRewardReceipts.some((receipt) => receipt.kind === 'wisp'), false);
+
+  for (let index = 0; index < 4; index += 1) {
+    state = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: 'wild-garden', now: NOW + 3 + index, seed: `plant-seed:${index}` }).state;
+  }
+  const mergePair = (definitionId: string, at: number) => {
+    const cells = state.board.flatMap((cell, index) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === definitionId ? [index] : []);
+    assert.ok(cells.length >= 2);
+    state = reduceMergeWorld(state, { type: 'move', from: cells[0], to: cells[1], now: at }).state;
+  };
+  mergePair('nature:garden:1', NOW + 7);
+  mergePair('nature:garden:1', NOW + 8);
+  mergePair('nature:garden:2', NOW + 9);
+  state = reduceMergeWorld(state, { type: 'serveOrder', orderId: 'mossprout:chapter-0:home-plant', now: NOW + 10 }).state;
+  assert.deepEqual(state.activeOrders, []);
+  assert.equal(state.generators['wild-garden'].forcedDropDefinitionId, null);
   assert.ok(state.characterProgress.mossprout?.completedChapterIds.includes('mossprout-chapter-0'));
   assert.ok(state.externalRewardReceipts.some((receipt) => receipt.kind === 'wisp' && receipt.wispId === 'heartlet'));
+});
+
+test('generator forced-drop mode validates, emits the exact item, and can be cleared', () => {
+  let state = createMossproutChapterZeroState(NOW);
+  state = {
+    ...state,
+    generators: {
+      ...state.generators,
+      'wild-garden': { ...state.generators['wild-garden'], level: 4, forcedDropDefinitionId: null },
+    },
+  };
+
+  const rejected = reduceMergeWorld(state, {
+    type: 'setGeneratorForcedDrop', generatorId: 'wild-garden', definitionId: 'food:table:1', now: NOW + 1,
+  });
+  assert.equal(rejected.changed, false);
+  assert.equal(rejected.state.generators['wild-garden'].forcedDropDefinitionId, null);
+
+  state = reduceMergeWorld(state, {
+    type: 'setGeneratorForcedDrop', generatorId: 'wild-garden', definitionId: 'nature:garden:1', now: NOW + 2,
+  }).state;
+  assert.equal(state.generators['wild-garden'].forcedDropDefinitionId, 'nature:garden:1');
+
+  for (let index = 0; index < 8; index += 1) {
+    const result = reduceMergeWorld(state, {
+      type: 'tapGenerator', generatorId: 'wild-garden', now: NOW + 3 + index, seed: `forced-drop:${index}`,
+    });
+    assert.equal(result.changed, true);
+    assert.ok(result.spawnedCell != null);
+    const occupant = result.state.board[result.spawnedCell!].occupant;
+    assert.equal(occupant?.kind === 'item' ? occupant.definitionId : null, 'nature:garden:1');
+    state = result.state;
+  }
+
+  state = reduceMergeWorld(state, {
+    type: 'setGeneratorForcedDrop', generatorId: 'wild-garden', definitionId: null, now: NOW + 20,
+  }).state;
+  assert.equal(state.generators['wild-garden'].forcedDropDefinitionId, null);
+});
+
+test('normalization repairs the Seed override on a persisted active Mossprout tutorial', () => {
+  const active = createMossproutChapterZeroState(NOW);
+  const stale = {
+    ...active,
+    version: 8,
+    generators: {
+      ...active.generators,
+      'wild-garden': { ...active.generators['wild-garden'], forcedDropDefinitionId: null },
+    },
+  };
+  const normalized = normalizeMergeWorldState(stale, NOW + 1);
+  assert.equal(normalized.generators['wild-garden'].forcedDropDefinitionId, 'nature:garden:1');
 });
 
 test('story unlock adds the Pantry and each tap costs exactly one Energy', () => {
@@ -581,16 +666,17 @@ test('serving a story order consumes its item, refunds Energy, and emits a durab
   assert.ok(result.state.externalRewardReceipts.some((receipt) => receipt.kind === 'story_order_served'));
 });
 
-test('legacy snapshots migrate into version seven without discarding earned overflow Energy', () => {
+test('legacy snapshots migrate into the current version without discarding earned overflow Energy', () => {
   const normalized = normalizeMergeWorldState({
     ...createInitialMergeWorldState(NOW), version: 2,
     energy: { value: 99, cap: 100, lastRegenAt: NOW },
     generators: { 'starter-pantry': { id: 'starter-pantry', familyId: 'food', name: 'Picnic Pantry', level: 1, enabledBranches: ['table'], charges: 9, maxCharges: 12, readyAt: NOW + 1000 } },
   }, NOW + 1);
-  assert.equal(normalized.version, 8);
+  assert.equal(normalized.version, 9);
   assert.equal(normalized.energy.regenCap, 50);
   assert.equal(normalized.energy.value, 99);
-  assert.deepEqual(Object.keys(normalized.generators['hearth-pantry']).sort(), ['chainIds', 'id', 'level', 'name', 'tierOneDropDefinitionIds', 'upgradeFragments']);
+  assert.deepEqual(Object.keys(normalized.generators['hearth-pantry']).sort(), ['chainIds', 'forcedDropDefinitionId', 'id', 'level', 'name', 'tierOneDropDefinitionIds', 'upgradeFragments']);
+  assert.equal(normalized.generators['hearth-pantry'].forcedDropDefinitionId, null);
   assert.deepEqual(normalized.generators['hearth-pantry'].chainIds, ['food:table', 'food:dessert']);
   assert.deepEqual(normalized.unlockedChains.sort(), ['food:dessert', 'food:table']);
 });

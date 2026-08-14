@@ -5,6 +5,7 @@ import test from 'node:test';
 import { FTUE_ACTION_CATALOG, FTUE_HANDLER_REGISTRY } from '@/features/onboarding/ftue-action-registry';
 import { ftueHidesBottomBar, ftueOwnsOpeningHome } from '@/features/onboarding/ftue-navigation-policy';
 import { MOSSPROUT_FTUE_SCRIPT, mossproutFtueAction, validateMossproutFtueScript } from '@/features/onboarding/mossprout-ftue-script';
+import { mossproutFtueConversationDefinitions } from '@/constants/mossprout-ftue-conversations';
 
 test('Mossprout FTUE script has valid transitions and registered handlers', () => {
   assert.deepEqual(validateMossproutFtueScript(), []);
@@ -83,6 +84,25 @@ test('Chapter 0 previews two requests and scripts spawn, repeated merge, and ser
     { kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' },
   ]);
   assert.ok(mossproutFtueAction('companion.order_preview', 'companion.open_garden'));
+});
+
+test('Mossprout remembers the day, branches playfully, then reveals the shared two-order preview', () => {
+  assert.ok(mossproutFtueConversationDefinitions.every((definition) => definition.version === 2));
+  for (const definition of mossproutFtueConversationDefinitions) {
+    const arrived = definition.nodes.find((node) => node.id === 'arrived');
+    assert.equal(arrived?.kind, 'choice');
+    if (arrived?.kind === 'choice') assert.equal(arrived.options.length, 2);
+    assert.ok(definition.nodes.some((node) => node.id === 'plan'));
+  }
+  const interaction = readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
+  const mossproutStage = readFileSync('components/katchadeck/world/mossprout-ftue-story-stage.tsx', 'utf8');
+  const feastleStage = readFileSync('components/katchadeck/world/feastle-story-stage.tsx', 'utf8');
+  const baristabbitStage = readFileSync('components/katchadeck/world/baristabbit-story-stage.tsx', 'utf8');
+  assert.match(interaction, /MossproutFtueStoryStage/);
+  assert.match(mossproutStage, /CompanionMergeRequestTray/);
+  assert.match(mossproutStage, /MOSSPROUT_CHAPTER_ZERO_REQUESTS/);
+  assert.match(feastleStage, /CompanionMergeRequestTray/);
+  assert.match(baristabbitStage, /CompanionMergeRequestTray/);
 });
 
 test('Merge FTUE never inserts guide panels into the fixed board layout', () => {

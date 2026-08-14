@@ -119,8 +119,11 @@ export function recoverMergeFtueEvent(stepOrId: FtueStepDefinition | string | nu
   if (!step || !edge) return null;
   const progress = objectiveProgress[`${step.id}:${edge.commitActionId}`] ?? 0;
   const event = edge.event;
-  if (event.type === 'order_served' && event.orderId && !state.activeOrders.some((order) => order.id === event.orderId)) {
-    return { type: 'order_served', orderId: event.orderId, revision: state.revision };
+  if (event.type === 'order_served' && event.orderId) {
+    const orderId = event.orderId;
+    const alreadyServed = !state.activeOrders.some((order) => order.id === orderId)
+      && state.externalRewardReceipts.some((receipt) => receipt.id.includes(orderId));
+    if (alreadyServed) return { type: 'order_served', orderId, revision: state.revision };
   }
   if (event.type === 'item_spawned' && event.generatorId && event.definitionId) {
     const definitionId = event.definitionId;

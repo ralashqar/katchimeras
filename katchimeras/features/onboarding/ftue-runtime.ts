@@ -56,6 +56,9 @@ function publish(next: FtueRunState | null) {
 }
 
 function migrateCurrentScript(run: FtueRunState): FtueRunState {
+  const restartingLegacyMerge = run.status === 'active'
+    && run.scriptVersion < 7
+    && run.stepId.startsWith('merge.');
   const needsThirdEggAnswer = run.status === 'active'
     && run.stepId === 'egg.ready'
     && run.answers['egg.mind.focus'] == null;
@@ -66,9 +69,14 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
     ...run,
     schemaVersion: 5,
     scriptVersion: MOSSPROUT_FTUE_SCRIPT.version,
-    stepId: needsThirdEggAnswer ? 'egg.mind' : removedMergeSteps.has(run.stepId) ? 'merge.seed_drag' : run.stepId,
+    stepId: needsThirdEggAnswer
+      ? 'egg.mind'
+      : restartingLegacyMerge
+        ? 'companion.order_preview'
+        : removedMergeSteps.has(run.stepId) ? 'merge.seed_drag' : run.stepId,
     updatedAt: now,
-    objectiveProgress: run.objectiveProgress ?? {},
+    objectiveProgress: restartingLegacyMerge ? {} : run.objectiveProgress ?? {},
+    mergeInstalled: restartingLegacyMerge ? false : run.mergeInstalled,
   };
 }
 

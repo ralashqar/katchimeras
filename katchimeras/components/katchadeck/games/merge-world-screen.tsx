@@ -89,6 +89,7 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
   const serveNonceRef = useRef(0);
   const parcelNonceRef = useRef(0);
   const storyNavigationPendingRef = useRef(false);
+  const ftuePreviewNavigationPendingRef = useRef(false);
   const contentWidth = Math.min(width - 12, 600);
   const flowReady = !loading && state != null;
   const ftueExclusive = ftueStep?.surface === 'merge' && ftueStep.interaction?.mode === 'exclusive';
@@ -163,6 +164,12 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
   useEffect(() => {
     markFlowStart('merge-world');
   }, []);
+
+  useEffect(() => {
+    if (!active || ftueRun?.status !== 'active' || ftueRun.stepId !== 'companion.order_preview' || ftuePreviewNavigationPendingRef.current) return;
+    ftuePreviewNavigationPendingRef.current = true;
+    router.push({ pathname: '/katchimera/[creatureId]', params: { creatureId: 'companion:mossprout' } });
+  }, [active, ftueRun?.status, ftueRun?.stepId, router]);
 
   useEffect(() => {
     if (!flowReady) return;
