@@ -21,6 +21,10 @@ export function resolveFtueBoardCell(state: MergeWorldState, target: FtueTarget)
     const cell = state.board.findIndex((entry) => entry.occupant?.kind === 'generator' && entry.occupant.generatorId === target.generatorId);
     return cell >= 0 ? cell : null;
   }
+  if (target.kind === 'board_dream_echo') {
+    const cell = state.board.findIndex((entry) => entry.mist?.kind === 'echo' && entry.mist.id === target.echoId);
+    return cell >= 0 ? cell : null;
+  }
   if (target.kind === 'order_requirement_item') {
     const requirement = state.activeOrders.find((order) => order.id === target.orderId)?.requirements[target.requirementIndex];
     if (!requirement) return null;
@@ -98,7 +102,15 @@ export function mergeFtueEventForCommand(
     const source = before.board[command.from]?.occupant;
     const target = before.board[command.to]?.occupant;
     const merged = result.state.board[result.mergedCell]?.occupant;
-    if (source?.kind !== 'item' || target?.kind !== 'item' || merged?.kind !== 'item') return null;
+    if (source?.kind !== 'item' || merged?.kind !== 'item') return null;
+    if (result.dreamEchoClearedId) return {
+      type: 'dream_echo_cleared',
+      echoId: result.dreamEchoClearedId,
+      resultDefinitionId: merged.definitionId,
+      resultCell: result.mergedCell,
+      revision: result.state.revision,
+    };
+    if (target?.kind !== 'item') return null;
     return {
       type: 'merge_completed',
       fromInstanceId: source.instanceId,
@@ -137,6 +149,9 @@ function matchingEvidenceCount(step: FtueStepDefinition, state: MergeWorldState)
   if ((event.type === 'item_spawned' && event.definitionId) || (event.type === 'merge_completed' && event.resultDefinitionId)) {
     const definitionId = event.type === 'item_spawned' ? event.definitionId : event.resultDefinitionId;
     return state.board.reduce((count, cell) => count + Number(cell.occupant?.kind === 'item' && cell.occupant.definitionId === definitionId), 0);
+  }
+  if (event.type === 'dream_echo_cleared' && event.echoId) {
+    return state.boardAwakeningReceipts.some((receipt) => receipt.id === `dream-echo:${event.echoId}`) ? 1 : 0;
   }
   if (event.type === 'order_served' && event.orderId) {
     return state.activeOrders.some((order) => order.id === event.orderId) ? 0 : 1;
@@ -200,6 +215,18 @@ export function recoverMergeFtueEvent(stepOrId: FtueStepDefinition | string | nu
     const matches = state.board.flatMap((cell, resultCell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === definitionId ? [{ occupant: cell.occupant, resultCell }] : []);
     const found = matches[baseline + progress];
     if (found) return { type: 'merge_completed', fromInstanceId: 'recovered-source', targetInstanceId: 'recovered-target', resultDefinitionId: found.occupant.definitionId, resultCell: found.resultCell, revision: state.revision };
+  }
+  if (event.type === 'dream_echo_cleared' && event.echoId) {
+    const receipt = state.boardAwakeningReceipts.find((entry) => entry.id === `dream-echo:${event.echoId}`);
+    const resultCell = receipt?.clearedCells[0];
+    const occupant = resultCell == null ? null : state.board[resultCell]?.occupant;
+    if (receipt && occupant?.kind === 'item' && 1 - baseline > progress) return {
+      type: 'dream_echo_cleared',
+      echoId: event.echoId,
+      resultDefinitionId: occupant.definitionId,
+      resultCell: resultCell!,
+      revision: state.revision,
+    };
   }
   return null;
 }

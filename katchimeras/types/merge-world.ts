@@ -45,10 +45,27 @@ export type MergeBoardGenerator = {
 
 export type MergeBoardOccupant = MergeBoardItem | MergeBoardGenerator;
 
+export type MergeBoardRegionId = 'central-clearing' | 'inner-mist' | 'mid-mist' | 'deep-mist' | 'ancient-dream';
+
+export type MergeDreamMist =
+  | { kind: 'dormant' }
+  | { kind: 'echo'; id: string; definitionId: string; ownerCharacterId: MergeCharacterId }
+  | { kind: 'katchimera'; id: string; mysteryId: 'moon' | 'trail'; ownerCharacterId: MergeCharacterId | null };
+
 export type MergeBoardCell = {
+  /** Compatibility projection. In v10 this is true whenever `mist` is present. */
   locked: boolean;
   blocker: 'vines' | 'rocks' | 'clouds' | null;
+  regionId: MergeBoardRegionId;
+  mist: MergeDreamMist | null;
   occupant: MergeBoardOccupant | null;
+};
+
+export type MergeBoardAwakeningReceipt = {
+  id: string;
+  source: 'dream_echo' | 'story';
+  clearedCells: number[];
+  createdAt: number;
 };
 
 export type MergeGeneratorState = {
@@ -186,7 +203,7 @@ export type MergeStepEnergyDay = {
 };
 
 export type MergeWorldState = {
-  version: 9;
+  version: 10;
   revision: number;
   createdAt: number;
   updatedAt: number;
@@ -212,6 +229,8 @@ export type MergeWorldState = {
   completedOrderCount: number;
   recentOrderKeys: string[];
   expansions: string[];
+  unlockedRegions: MergeBoardRegionId[];
+  boardAwakeningReceipts: MergeBoardAwakeningReceipt[];
   processedActivityReceiptIds: string[];
   activityEnergyByDay: Record<string, number>;
   stepEnergyByDay: Record<string, MergeStepEnergyDay>;
@@ -233,7 +252,6 @@ export type MergeWorldCommand =
   | { type: 'claimInbox'; entryId: string; now: number }
   | { type: 'claimArrival'; arrivalId: string; now: number }
   | { type: 'viewMemoryArrival'; arrivalId: string; now: number }
-  | { type: 'unlockExpansion'; expansionId: string; now: number }
   | { type: 'grantActivityRewardsBatch'; rewards: MergeActivityReward[]; now: number }
   | { type: 'claimStepEnergy'; dayId: string; observedSteps: number; observedAt: string; allowBootstrap: boolean; receiptId: string; now: number }
   | { type: 'setEnergyRegenPaused'; paused: boolean; now: number }
@@ -251,6 +269,8 @@ export type MergeWorldCommandResult = {
   message?: string;
   discoveryId?: string;
   mergedCell?: number;
+  dreamEchoClearedId?: string;
+  clearedMistCells?: number[];
   spawnedCell?: number;
   spawnedItems?: { instanceId: string; definitionId: string; cell: number }[];
   servedOrderId?: string;

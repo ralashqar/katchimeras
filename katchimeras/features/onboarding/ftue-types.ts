@@ -51,6 +51,7 @@ export type FtueTarget =
   | { kind: 'board_item'; instanceId: string }
   | { kind: 'board_items'; definitionId: string; occurrence: number }
   | { kind: 'board_generator'; generatorId: string }
+  | { kind: 'board_dream_echo'; echoId: string }
   | { kind: 'order_requirement_item'; orderId: string; requirementIndex: number; occurrence?: number }
   | { kind: 'board_cell'; cell: number }
   | { kind: 'order_serve'; orderId: string }
@@ -84,6 +85,7 @@ export type FtueEvent =
       resultCell: number;
       revision: number;
     }
+  | { type: 'dream_echo_cleared'; echoId: string; resultDefinitionId: string; resultCell: number; revision: number }
   | {
       type: 'item_spawned';
       generatorId: string;
@@ -102,6 +104,7 @@ export type FtueEventMatcher =
       targetInstanceId?: string;
       resultDefinitionId?: string;
     }
+  | { type: 'dream_echo_cleared'; echoId?: string; resultDefinitionId?: string }
   | { type: 'item_spawned'; generatorId?: string; definitionId?: string }
   | { type: 'order_served'; orderId?: string }
   | { type: 'chat_note_opened'; noteId?: string };
@@ -162,7 +165,7 @@ export type FtueCommitReceipt = {
 export type FtueRunStatus = 'active' | 'complete';
 
 export type FtueRunState = {
-  schemaVersion: 5;
+  schemaVersion: 6;
   runId: string;
   scriptId: string;
   scriptVersion: number;

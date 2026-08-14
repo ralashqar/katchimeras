@@ -1,6 +1,5 @@
 import {
   FEASTLE_STORY_REQUESTS,
-  MERGE_EXPANSIONS,
   GENERATOR_BY_CHAIN,
   MERGE_GENERATORS,
   MERGE_GENERATORS_BY_ID,
@@ -14,6 +13,7 @@ import {
   MERGE_CHARACTER_NAMES,
   KATCHIMERA_MERGE_PROFILES,
   MERGE_STARTING_OPEN_CELLS,
+  MOSSPROUT_STORY_AWAKENINGS,
   MERGE_WORLD_SIZE,
   mergeLevelForXp,
 } from '@/constants/merge-world-catalog';
@@ -48,10 +48,12 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
   const board: MergeBoardCell[] = Array.from({ length: MERGE_WORLD_SIZE }, (_, index) => ({
     locked: !MERGE_STARTING_OPEN_CELLS.has(index),
     blocker: MERGE_STARTING_OPEN_CELLS.has(index) ? null : index % 3 === 0 ? 'rocks' : index % 3 === 1 ? 'clouds' : 'vines',
+    regionId: regionForCell(index),
+    mist: MERGE_STARTING_OPEN_CELLS.has(index) ? null : { kind: 'dormant' },
     occupant: null,
   }));
   let state: MergeWorldState = {
-    version: 9,
+    version: 10,
     revision: 0,
     createdAt: now,
     updatedAt: now,
@@ -77,6 +79,8 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     completedOrderCount: 0,
     recentOrderKeys: [],
     expansions: [],
+    unlockedRegions: ['central-clearing', 'inner-mist'],
+    boardAwakeningReceipts: [],
     processedActivityReceiptIds: [],
     activityEnergyByDay: {},
     stepEnergyByDay: {},
@@ -115,8 +119,6 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
       return claimArrival(current, command.arrivalId, command.now);
     case 'viewMemoryArrival':
       return viewMemoryArrival(current, command.arrivalId, command.now);
-    case 'unlockExpansion':
-      return unlockExpansion(current, command.expansionId, command.now);
     case 'grantActivityRewardsBatch':
       return grantActivityRewardsBatch(current, command.rewards, command.now);
     case 'claimStepEnergy':
@@ -225,22 +227,18 @@ export function resetMergeActivityForDay(state: MergeWorldState, dayId: string, 
   return touch({ ...state, processedActivityReceiptIds, activityEnergyByDay, arrivals }, now);
 }
 
-export function availableExpansion(state: MergeWorldState) {
-  return MERGE_EXPANSIONS.find((expansion) => !state.expansions.includes(expansion.id)) ?? null;
-}
-
 export function normalizeMergeWorldState(value: unknown, now = Date.now()): MergeWorldState {
   if (!value || typeof value !== 'object') return createInitialMergeWorldState(now);
   const rawVersion = (value as { version?: unknown }).version;
   const source = value as Partial<MergeWorldState>;
-  if ((rawVersion !== 1 && rawVersion !== 2 && rawVersion !== 3 && rawVersion !== 4 && rawVersion !== 5 && rawVersion !== 6 && rawVersion !== 7 && rawVersion !== 8 && rawVersion !== 9) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
+  if ((rawVersion !== 1 && rawVersion !== 2 && rawVersion !== 3 && rawVersion !== 4 && rawVersion !== 5 && rawVersion !== 6 && rawVersion !== 7 && rawVersion !== 8 && rawVersion !== 9 && rawVersion !== 10) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
     return createInitialMergeWorldState(now);
   }
   const fallback = createInitialMergeWorldState(now);
   let normalized: MergeWorldState = {
     ...fallback,
     ...source,
-    version: 9,
+    version: 10,
     revision: finite(source.revision, 0),
     createdAt: finite(source.createdAt, now),
     updatedAt: finite(source.updatedAt, now),
@@ -276,6 +274,10 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     completedOrderCount: Math.max(0, finite(source.completedOrderCount, 0)),
     recentOrderKeys: uniqueStrings(source.recentOrderKeys).slice(-RECENT_ORDER_LIMIT),
     expansions: uniqueStrings(source.expansions),
+    unlockedRegions: uniqueStrings(source.unlockedRegions).filter((id): id is MergeWorldState['unlockedRegions'][number] => (
+      ['central-clearing', 'inner-mist', 'mid-mist', 'deep-mist', 'ancient-dream'] as const
+    ).includes(id as MergeWorldState['unlockedRegions'][number])),
+    boardAwakeningReceipts: normalizeBoardAwakeningReceipts(source.boardAwakeningReceipts),
     processedActivityReceiptIds: uniqueStrings(source.processedActivityReceiptIds),
     activityEnergyByDay: source.activityEnergyByDay && typeof source.activityEnergyByDay === 'object' ? source.activityEnergyByDay : {},
     stepEnergyByDay: normalizeStepEnergyByDay(source.stepEnergyByDay),
@@ -286,6 +288,10 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     externalRewardReceipts: Array.isArray(source.externalRewardReceipts) ? source.externalRewardReceipts : [],
   };
   normalized = reconcileUnlockedCatalog(normalized);
+  normalized = {
+    ...normalized,
+    unlockedRegions: [...new Set(['central-clearing', 'inner-mist', ...normalized.unlockedRegions])] as MergeWorldState['unlockedRegions'],
+  };
   normalized = enforceMossproutChapterZeroDropOverride(normalized);
   normalized = migrateActivityInbox(normalized);
   // Version 1/2 Pantry charges, cooldowns, and parcels intentionally disappear.
@@ -349,10 +355,47 @@ function upgradeGenerator(state: MergeWorldState, generatorId: string, now: numb
 }
 
 function moveItem(state: MergeWorldState, from: number, to: number, now: number): MergeWorldCommandResult {
-  if (!validCell(from) || !validCell(to) || from === to || state.board[to].locked) return unchanged(state, 'Choose an open board space.');
+  if (!validCell(from) || !validCell(to) || from === to) return unchanged(state, 'Choose an open board space.');
   const source = state.board[from].occupant;
   const target = state.board[to].occupant;
   if (!source) return unchanged(state);
+  const echo = state.board[to].mist?.kind === 'echo' ? state.board[to].mist : null;
+  if (echo) {
+    if (!state.unlockedRegions.includes(state.board[to].regionId)) return unchanged(state, 'Something deeper in the Dream Mist is still sealed.');
+    if (source.kind !== 'item' || source.definitionId !== echo.definitionId) return unchanged(state, 'Find its match.');
+    const resultId = MERGE_ITEMS_BY_ID.get(echo.definitionId)?.nextItemId ?? null;
+    if (!resultId) return unchanged(state, 'This Dream Echo cannot grow any further.');
+    const board = [...state.board];
+    board[from] = { ...board[from], occupant: null };
+    board[to] = {
+      ...board[to],
+      locked: false,
+      blocker: null,
+      mist: null,
+      occupant: { kind: 'item', instanceId: `merge-item:${state.nextInstance}`, definitionId: resultId },
+    };
+    const receipt = { id: `dream-echo:${echo.id}`, source: 'dream_echo' as const, clearedCells: [to], createdAt: now };
+    let next = touch({
+      ...state,
+      board,
+      boardAwakeningReceipts: state.boardAwakeningReceipts.some((entry) => entry.id === receipt.id)
+        ? state.boardAwakeningReceipts
+        : [...state.boardAwakeningReceipts, receipt],
+      nextInstance: state.nextInstance + 1,
+    }, now);
+    const discovery = applyDiscovery(next, resultId, now);
+    next = discovery.state;
+    return {
+      state: next,
+      changed: true,
+      mergedCell: to,
+      dreamEchoClearedId: echo.id,
+      clearedMistCells: [to],
+      discoveryId: discovery.newDiscovery ? resultId : undefined,
+      message: `${MERGE_ITEMS_BY_ID.get(resultId)?.name ?? 'New item'} woke from the Dream Mist.`,
+    };
+  }
+  if (state.board[to].locked) return unchanged(state, 'Choose an open board space.');
   const board = [...state.board];
   if (!target) {
     board[from] = { ...board[from], occupant: null };
@@ -490,8 +533,28 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
     generators,
   };
   next = advanceMossproutChapterZero(next, order.id, now);
+  const awakening = MOSSPROUT_STORY_AWAKENINGS[order.id as keyof typeof MOSSPROUT_STORY_AWAKENINGS];
+  let clearedMistCells: number[] | undefined;
+  if (awakening && !next.boardAwakeningReceipts.some((receipt) => receipt.id === awakening.id)) {
+    clearedMistCells = awakening.cells.filter((cell) => next.board[cell]?.mist != null && next.board[cell]?.mist?.kind !== 'echo');
+    if (clearedMistCells.length) {
+      const cells = new Set(clearedMistCells);
+      next = touch({
+        ...next,
+        board: next.board.map((cell, index) => cells.has(index)
+          ? { ...cell, locked: false, blocker: null, mist: null }
+          : cell),
+        boardAwakeningReceipts: [...next.boardAwakeningReceipts, {
+          id: awakening.id,
+          source: 'story',
+          clearedCells: clearedMistCells,
+          createdAt: now,
+        }],
+      }, now);
+    }
+  }
   next = touch(next, now);
-  return { state: next, changed: true, servedOrderId: order.id, energyGranted: energyRefund, message: `${order.title} served.` };
+  return { state: next, changed: true, servedOrderId: order.id, energyGranted: energyRefund, clearedMistCells, message: `${order.title} served.` };
 }
 
 function storeItem(state: MergeWorldState, cell: number, now: number): MergeWorldCommandResult {
@@ -575,16 +638,6 @@ function viewMemoryArrival(state: MergeWorldState, arrivalId: string, now: numbe
     ...state,
     arrivals: state.arrivals.map((item) => item.id === arrivalId ? { ...item, seenAt: now } : item),
   }, now));
-}
-
-function unlockExpansion(state: MergeWorldState, expansionId: string, now: number): MergeWorldCommandResult {
-  const expansion = MERGE_EXPANSIONS.find((item) => item.id === expansionId);
-  if (!expansion || state.expansions.includes(expansion.id)) return unchanged(state);
-  if (state.mergeLevel < expansion.requiredLevel) return unchanged(state, `Reach Merge Level ${expansion.requiredLevel} first.`);
-  if (state.coins < expansion.coinCost) return unchanged(state, `You need ${expansion.coinCost} Coins.`);
-  const cells = new Set<number>(expansion.cells);
-  const board = state.board.map((cell, index) => cells.has(index) ? { ...cell, locked: false, blocker: null } : cell);
-  return changed(touch({ ...state, board, coins: state.coins - expansion.coinCost, expansions: [...state.expansions, expansion.id] }, now), 'New board spaces opened.');
 }
 
 function grantActivityRewardsBatch(
@@ -1217,6 +1270,17 @@ function validCell(index: number) {
   return Number.isInteger(index) && index >= 0 && index < MERGE_WORLD_SIZE;
 }
 
+function regionForCell(index: number): MergeBoardCell['regionId'] {
+  const row = Math.floor(index / 7);
+  const column = index % 7;
+  const distance = Math.max(Math.abs(row - 4), Math.abs(column - 3));
+  if (distance <= 1) return 'central-clearing';
+  if (distance <= 2) return 'inner-mist';
+  if (distance <= 3) return 'mid-mist';
+  if (row === 0 || row === 8) return 'ancient-dream';
+  return 'deep-mist';
+}
+
 function finite(value: unknown, fallback: number) {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
@@ -1328,12 +1392,54 @@ function normalizeCell(value: unknown, fallback: MergeBoardCell): MergeBoardCell
   return {
     locked: Boolean(cell.locked),
     blocker: cell.blocker === 'vines' || cell.blocker === 'rocks' || cell.blocker === 'clouds' ? cell.blocker : null,
+    regionId: cell.regionId === 'central-clearing' || cell.regionId === 'inner-mist' || cell.regionId === 'mid-mist' || cell.regionId === 'deep-mist' || cell.regionId === 'ancient-dream'
+      ? cell.regionId
+      : fallback.regionId,
+    mist: normalizeDreamMist(cell.mist, Boolean(cell.locked)),
     occupant: occupant?.kind === 'item' && validBoardItem(occupant)
       ? occupant
       : occupant?.kind === 'generator' && typeof occupant.generatorId === 'string'
         ? { kind: 'generator', generatorId: migrateGeneratorId(occupant.generatorId) }
         : null,
   };
+}
+
+function normalizeDreamMist(value: unknown, legacyLocked: boolean): MergeBoardCell['mist'] {
+  if (!value || typeof value !== 'object') return legacyLocked ? { kind: 'dormant' } : null;
+  const mist = value as Partial<NonNullable<MergeBoardCell['mist']>> & { definitionId?: unknown; ownerCharacterId?: unknown; mysteryId?: unknown };
+  if (mist.kind === 'dormant') return { kind: 'dormant' };
+  if (mist.kind === 'echo' && typeof mist.id === 'string' && typeof mist.definitionId === 'string' && MERGE_ITEMS_BY_ID.has(mist.definitionId)
+    && typeof mist.ownerCharacterId === 'string' && KNOWN_CHARACTERS.has(mist.ownerCharacterId as MergeCharacterId)) {
+    return { kind: 'echo', id: mist.id, definitionId: mist.definitionId, ownerCharacterId: mist.ownerCharacterId as MergeCharacterId };
+  }
+  if (mist.kind === 'katchimera' && typeof mist.id === 'string' && (mist.mysteryId === 'moon' || mist.mysteryId === 'trail')) {
+    return {
+      kind: 'katchimera',
+      id: mist.id,
+      mysteryId: mist.mysteryId,
+      ownerCharacterId: typeof mist.ownerCharacterId === 'string' && KNOWN_CHARACTERS.has(mist.ownerCharacterId as MergeCharacterId)
+        ? mist.ownerCharacterId as MergeCharacterId
+        : null,
+    };
+  }
+  return legacyLocked ? { kind: 'dormant' } : null;
+}
+
+function normalizeBoardAwakeningReceipts(value: unknown): MergeWorldState['boardAwakeningReceipts'] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  return value.flatMap((candidate): MergeWorldState['boardAwakeningReceipts'] => {
+    if (!candidate || typeof candidate !== 'object') return [];
+    const receipt = candidate as Partial<MergeWorldState['boardAwakeningReceipts'][number]>;
+    if (typeof receipt.id !== 'string' || seen.has(receipt.id) || (receipt.source !== 'dream_echo' && receipt.source !== 'story')) return [];
+    seen.add(receipt.id);
+    return [{
+      id: receipt.id,
+      source: receipt.source,
+      clearedCells: Array.isArray(receipt.clearedCells) ? receipt.clearedCells.filter((cell) => typeof cell === 'number' && validCell(cell)) : [],
+      createdAt: finite(receipt.createdAt, 0),
+    }];
+  });
 }
 
 function dedupeMigratedGenerators(board: MergeBoardCell[]): MergeBoardCell[] {

@@ -17,15 +17,15 @@ export const MOSSPROUT_CHAPTER_ZERO_REQUESTS = [
     id: `${ORDER_PREFIX}home-plant`,
     badge: 'THEN',
     title: 'A Patch of Home',
-    description: 'Grow fresh Seeds, make two Sprouts, then merge them.',
+    description: 'Merge the Sprout from the mist into its Dream Echo.',
     definitionId: 'nature:garden:3',
   },
   {
     id: `${ORDER_PREFIX}energy-plant`,
     badge: 'ONE MORE',
-    title: 'One More Plant',
+    title: 'A Dream Flower',
     description: 'Grow one more Plant for Mossproutâ€™s new home.',
-    definitionId: 'nature:garden:3',
+    definitionId: 'nature:garden:4',
   },
 ] as const;
 
@@ -50,7 +50,7 @@ export function mossproutChapterZeroHomePlantOrder(now: number): MergeOrder {
     id: MOSSPROUT_CHAPTER_ZERO_REQUESTS[1].id,
     characterId: 'mossprout',
     title: 'A Patch of Home',
-    description: 'Merge two Sprouts into a Plant.',
+    description: 'Wake the Sprout Echo to make a Plant.',
     difficulty: 'small',
     requirements: [{ definitionId: 'nature:garden:3', quantity: 1 }],
     reward: { coins: 30, mergeXp: 25, friendshipXp: 10, energy: 0 },
@@ -65,10 +65,10 @@ export function mossproutChapterZeroEnergyPlantOrder(now: number, rewardWispId: 
   return {
     id: MOSSPROUT_CHAPTER_ZERO_REQUESTS[2].id,
     characterId: 'mossprout',
-    title: 'One More Plant',
+    title: 'A Dream Flower',
     description: 'Grow one last Plant for Mossproutâ€™s home.',
     difficulty: 'small',
-    requirements: [{ definitionId: 'nature:garden:3', quantity: 1 }],
+    requirements: [{ definitionId: 'nature:garden:4', quantity: 1 }],
     reward: { coins: 40, mergeXp: 30, friendshipXp: 16, energy: 0, wispId: rewardWispId },
     createdAt: now,
     signature: false,
@@ -100,15 +100,8 @@ export function advanceMossproutChapterZero(state: MergeWorldState, servedOrderI
     };
   }
   if (servedOrderId !== MOSSPROUT_CHAPTER_ZERO_REQUESTS[0].id) return state;
-  let remaining = 4;
-  const board = state.board.map((cell) => {
-    if (!cell.locked || remaining <= 0) return cell;
-    remaining -= 1;
-    return { ...cell, blocker: null, locked: false };
-  });
   return {
     ...state,
-    board,
     activeOrders: [
       ...state.activeOrders,
       mossproutChapterZeroHomePlantOrder(now),

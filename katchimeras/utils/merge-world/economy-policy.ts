@@ -17,6 +17,11 @@ export type MergeJournalRewardPreview = {
   totalEnergy: number;
 };
 
+export function mergeStepEnergyPreview(observedSteps: number): number {
+  const safeSteps = Number.isFinite(observedSteps) ? Math.max(0, Math.floor(observedSteps)) : 0;
+  return Math.min(MERGE_DAILY_STEP_ENERGY_LIMIT, Math.floor(safeSteps / STEPS_PER_MERGE_ENERGY));
+}
+
 export function mergeJournalRewardPreview(
   days: readonly HomeDayRecord[],
   options: { companion: boolean; now?: Date; targetDayId?: string },

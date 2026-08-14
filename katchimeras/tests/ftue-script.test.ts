@@ -6,6 +6,7 @@ import { FTUE_ACTION_CATALOG, FTUE_HANDLER_REGISTRY } from '@/features/onboardin
 import { ftueHidesBottomBar, ftueOwnsOpeningHome } from '@/features/onboarding/ftue-navigation-policy';
 import { MOSSPROUT_FTUE_SCRIPT, mossproutFtueAction, validateMossproutFtueScript } from '@/features/onboarding/mossprout-ftue-script';
 import { mossproutFtueConversationDefinitions } from '@/constants/mossprout-ftue-conversations';
+import { mergeStepEnergyPreview } from '@/utils/merge-world/economy-policy';
 
 test('Mossprout FTUE script has valid transitions and registered handlers', () => {
   assert.deepEqual(validateMossproutFtueScript(), []);
@@ -53,7 +54,7 @@ test('backend catalog contains only allowlisted privacy-safe action ids', () => 
 });
 
 test('Supabase receipt allowlist matches every backend FTUE action', () => {
-  const migration = readFileSync('supabase/migrations/20260814113342_register_mossprout_ftue_v9.sql', 'utf8');
+  const migration = readFileSync('supabase/migrations/20260814160810_register_mossprout_ftue_v10.sql', 'utf8');
   for (const item of FTUE_ACTION_CATALOG.filter((entry) => entry.backendEvent)) {
     assert.match(migration, new RegExp(`'${item.stepId}',\\s*'${item.actionId}'`));
   }
@@ -67,18 +68,19 @@ test('Chapter 0 previews its requests and scripts spawn, merge, Energy recovery,
   const pairStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.plant.seed_pairs');
   const finalServeStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.serve_plant');
   assert.equal(mossproutFtueAction('merge.seed_drag', 'merge.create_sprout')?.handlerId, 'merge_item_created');
-  assert.equal(mergeStep?.edges?.[0]?.nextStepId, 'merge.serve_sprout');
-  assert.equal(serveStep?.edges?.[0]?.nextStepId, 'merge.plant.spawn');
-  assert.equal(spawnStep?.edges?.[0]?.requiredCount, 4);
-  assert.equal(pairStep?.edges?.[0]?.requiredCount, 2);
+  assert.equal(mergeStep?.edges?.[0]?.nextStepId, 'merge.plant.spawn');
+  assert.equal(spawnStep?.edges?.[0]?.requiredCount, undefined);
+  assert.equal(pairStep?.edges?.[0]?.event.type, 'dream_echo_cleared');
+  assert.equal(pairStep?.edges?.[0]?.nextStepId, 'merge.serve_sprout');
+  assert.equal(serveStep?.edges?.[0]?.nextStepId, 'merge.plant.sprout_pair');
   assert.equal(finalServeStep?.edges?.[0]?.nextStepId, 'merge.energy.spawn_pair');
   assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.energy.last_seed')?.edges?.[0]?.nextStepId, 'merge.energy_exhausted');
   assert.equal(mossproutFtueAction('merge.energy_exhausted', 'merge.tell_me_more')?.nextStepId, 'energy.capture');
-  assert.equal(mossproutFtueAction('energy.journal_reward', 'energy.see_steps')?.nextStepId, 'energy.steps_permission');
-  assert.equal(mossproutFtueAction('energy.steps_permission', 'energy.connect_steps')?.handlerId, 'pedometer_steps');
-  assert.equal(mossproutFtueAction('energy.steps_permission', 'energy.connect_steps')?.nextStepId, 'energy.steps_context');
-  assert.equal(mossproutFtueAction('energy.steps_context', 'energy.steps_context')?.nextStepId, 'energy.steps_reward');
+  assert.equal(mossproutFtueAction('energy.journal_reward', 'energy.check_steps')?.handlerId, 'pedometer_steps');
+  assert.equal(mossproutFtueAction('energy.steps_offer', 'energy.convert_steps')?.nextStepId, 'energy.steps_reward');
   assert.equal(mossproutFtueAction('energy.steps_reward', 'energy.return')?.nextStepId, 'merge.energy.finish_seed');
+  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.some((step) => step.id === 'energy.steps_permission'), false);
+  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.energy.clear_plant_echo')?.edges?.[0]?.event.type, 'dream_echo_cleared');
   assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.energy.serve_plant')?.edges?.[0]?.nextStepId, 'merge.return_note');
   const returnNote = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.return_note');
   assert.equal(returnNote?.interaction?.mode, 'exclusive');
@@ -97,26 +99,34 @@ test('Chapter 0 previews its requests and scripts spawn, merge, Energy recovery,
   assert.ok(mossproutFtueAction('companion.order_preview', 'companion.open_garden'));
 });
 
-test('FTUE movement energy reuses Home panels, yesterday pedometer data, and the shared HUD flight', () => {
+test('FTUE step energy checks yesterday, skips below 300, and always exposes the return action', () => {
   const today = readFileSync('app/(tabs)/today.tsx', 'utf8');
   const pedometer = readFileSync('utils/pedometer-steps.ts', 'utf8');
   const nurture = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
+  const scriptedActions = readFileSync('components/katchadeck/onboarding/scripted-action-list.tsx', 'utf8');
   const feed = readFileSync('features/today/use-egg-feed-controller.ts', 'utf8');
   assert.match(pedometer, /import\('expo-sensors'\)/);
   assert.match(pedometer, /Pedometer/);
   assert.match(pedometer, /getStepCountAsync\(start, end\)/);
   assert.match(today, /getPedometerAccess/);
-  assert.match(today, /requestPedometerAccess/);
-  assert.match(today, /ftueStepDays\.at\(-2\) \?\? ftueStepDays\.at\(-1\)/);
-  assert.match(today, /setFtueDisplayedSteps\(Math\.max\(0, Math\.round\(observedSteps/);
+  assert.doesNotMatch(today, /requestPedometerAccess/);
+  assert.match(today, /ftueStepDays\.at\(-2\)/);
+  assert.match(today, /nextStepId: energy > 0 \? 'energy\.steps_offer' : 'energy\.steps_reward'/);
+  assert.match(today, /setFtueDisplayedSteps\(Math\.max\(remainingSteps/);
   assert.match(today, /mergeEnergyAmount: energy/);
   assert.match(today, /onMergeEnergyTokenArrive/);
   assert.doesNotMatch(today, /<FtueLifeEnergyOverlay/);
-  assert.match(nurture, /function InlineRouteActionChoice/);
-  assert.match(nurture, /DASHBOARD_STAT_ART\.steps/);
-  assert.match(nurture, /metricRef\.current \?\? rewardRef\.current/);
+  assert.match(nurture, /scriptedStepEnergy/);
   assert.match(nurture, /onboardingTopHudVisible/);
+  assert.match(scriptedActions, /DASHBOARD_STAT_ART\.steps/);
+  assert.match(scriptedActions, /name="arrow\.right"/);
+  assert.match(scriptedActions, /GAME_CURRENCY_ART\.energy/);
+  assert.match(scriptedActions, /energy\.convert_steps/);
   assert.match(feed, /pendingMergeEnergyTokenArriveRef/);
+  assert.equal(mergeStepEnergyPreview(299), 0);
+  assert.equal(mergeStepEnergyPreview(300), 1);
+  assert.equal(mergeStepEnergyPreview(6_300), 20);
+  assert.equal(mossproutFtueAction('energy.steps_reward', 'energy.return')?.title, 'Back to Mossprout');
 });
 
 test('Mossprout remembers the day, branches playfully, then reveals the shared two-order preview', () => {
@@ -237,7 +247,7 @@ test('the opening camera slowly pinches in before revealing UI and retreats acro
   assert.ok(Math.abs(openingScale / contextScale - contextScale / mindScale) < 1e-9);
   assert.ok(Math.abs(contextScale / mindScale - mindScale / readyScale) < 1e-9);
   assert.equal(ftueHomeCameraPinchTarget('egg.ready', 2), 1);
-  assert.equal(ftueHomeCameraPinchTarget('energy.steps_context', 2), 1);
+  assert.equal(ftueHomeCameraPinchTarget('energy.steps_offer', 2), 1);
   assert.equal(ftueHomeCameraPinchTarget('companion.first_meeting', 2), null);
   assert.ok(FTUE_OPENING_UI_DELAY_MS >= FTUE_OPENING_CAMERA_DURATION_MS);
   assert.match(route, /setTimeout\(\(\) => setFtueOpeningUiVisible\(true\), FTUE_OPENING_UI_DELAY_MS\)/);

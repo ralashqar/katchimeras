@@ -16,7 +16,7 @@ type LegacyFirstSession = { stage?: 'today' | 'merge' | 'journal_for_energy' | '
 
 function freshRun(now = new Date()): FtueRunState {
   return {
-    schemaVersion: 5,
+    schemaVersion: 6,
     runId: createClientId('ftue'),
     scriptId: MOSSPROUT_FTUE_SCRIPT.id,
     scriptVersion: MOSSPROUT_FTUE_SCRIPT.version,
@@ -56,21 +56,37 @@ function publish(next: FtueRunState | null) {
 }
 
 function migrateCurrentScript(run: FtueRunState): FtueRunState {
+  const replayDreamMistChapter = run.scriptVersion < 10;
   const restartingLegacyMerge = run.status === 'active'
     && run.scriptVersion < 7
     && run.stepId.startsWith('merge.');
   const needsThirdEggAnswer = run.status === 'active'
     && run.stepId === 'egg.ready'
     && run.answers['egg.mind.focus'] == null;
-  if (run.schemaVersion === 5 && run.scriptVersion === MOSSPROUT_FTUE_SCRIPT.version && !needsThirdEggAnswer) return run;
+  if (run.schemaVersion === 6 && run.scriptVersion === MOSSPROUT_FTUE_SCRIPT.version && !needsThirdEggAnswer) return run;
   const now = new Date().toISOString();
+  if (replayDreamMistChapter) return {
+    ...run,
+    schemaVersion: 6,
+    runId: createClientId('ftue'),
+    scriptVersion: MOSSPROUT_FTUE_SCRIPT.version,
+    stepId: 'companion.order_preview',
+    status: 'active',
+    startedAt: now,
+    updatedAt: now,
+    completedAt: null,
+    receipts: [],
+    mergeInstalled: false,
+    awardedMergeEnergy: null,
+    objectiveProgress: {},
+  };
   const removedMergeSteps = new Set(['merge.first', 'merge.flower', 'energy.capture', 'energy.awarded', 'merge.flower_return', 'merge.final']);
   const migratedStepId = run.status === 'active' && run.stepId === 'chapter.complete'
     ? 'merge.return_note'
     : run.stepId;
   return {
     ...run,
-    schemaVersion: 5,
+    schemaVersion: 6,
     scriptVersion: MOSSPROUT_FTUE_SCRIPT.version,
     stepId: needsThirdEggAnswer
       ? 'egg.mind'
@@ -229,6 +245,10 @@ function ftueEventMatches(matcher: FtueEventMatcher, event: FtueEvent) {
   if (matcher.type === 'item_spawned' && event.type === 'item_spawned') {
     return (matcher.generatorId == null || matcher.generatorId === event.generatorId)
       && (matcher.definitionId == null || matcher.definitionId === event.definitionId);
+  }
+  if (matcher.type === 'dream_echo_cleared' && event.type === 'dream_echo_cleared') {
+    return (matcher.echoId == null || matcher.echoId === event.echoId)
+      && (matcher.resultDefinitionId == null || matcher.resultDefinitionId === event.resultDefinitionId);
   }
   if (matcher.type === 'chat_note_opened' && event.type === 'chat_note_opened') {
     return matcher.noteId == null || matcher.noteId === event.noteId;

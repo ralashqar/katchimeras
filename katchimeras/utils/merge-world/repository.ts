@@ -248,18 +248,21 @@ export async function prepareMossproutMergeFtueForDebug(step: MossproutMergeFtue
   let prepared = await installMossproutOnboardingMergeWorld(now);
   if (step === 'merge.seed_drag') return prepared;
   prepared = mergeFirstPair(prepared, 'nature:garden:1', now + 1);
-  if (step === 'merge.serve_sprout') return persistPreparedFtueState(prepared);
-  prepared = reduceMergeWorld(prepared, { type: 'serveOrder', orderId: 'mossprout:chapter-0:first-sprout', now: now + 2 }).state;
   if (step === 'merge.plant.spawn') return persistPreparedFtueState(prepared);
-  for (let index = 0; index < 4; index += 1) {
-    prepared = reduceMergeWorld(prepared, { type: 'tapGenerator', generatorId: 'wild-garden', now: now + 3 + index, seed: `ftue-debug:${index}` }).state;
-  }
+  prepared = reduceMergeWorld(prepared, { type: 'tapGenerator', generatorId: 'wild-garden', now: now + 2, seed: 'ftue-debug:echo-seed' }).state;
   if (step === 'merge.plant.seed_pairs') return persistPreparedFtueState(prepared);
-  prepared = mergeFirstPair(prepared, 'nature:garden:1', now + 8);
-  prepared = mergeFirstPair(prepared, 'nature:garden:1', now + 9);
+  prepared = mergeDefinitionIntoEcho(prepared, 'nature:garden:1', 'mossprout-seed-echo', now + 3);
+  if (step === 'merge.serve_sprout') return persistPreparedFtueState(prepared);
+  prepared = reduceMergeWorld(prepared, { type: 'serveOrder', orderId: 'mossprout:chapter-0:first-sprout', now: now + 4 }).state;
   if (step === 'merge.plant.sprout_pair') return persistPreparedFtueState(prepared);
-  prepared = mergeFirstPair(prepared, 'nature:garden:2', now + 10);
+  prepared = mergeDefinitionIntoEcho(prepared, 'nature:garden:2', 'mossprout-sprout-echo', now + 5);
   return persistPreparedFtueState(prepared);
+}
+
+function mergeDefinitionIntoEcho(state: MergeWorldState, definitionId: string, echoId: string, now: number) {
+  const from = state.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === definitionId);
+  const to = state.board.findIndex((cell) => cell.mist?.kind === 'echo' && cell.mist.id === echoId);
+  return from < 0 || to < 0 ? state : reduceMergeWorld(state, { type: 'move', from, to, now }).state;
 }
 
 function mergeFirstPair(state: MergeWorldState, definitionId: string, now: number) {

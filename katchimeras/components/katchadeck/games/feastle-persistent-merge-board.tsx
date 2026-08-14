@@ -30,7 +30,7 @@ import type { MergeBoardInteractionGate } from '@/features/onboarding/merge-ftue
 import { useMergeMotionPerformanceProbe, type MergeMotionPerformanceSample } from '@/hooks/use-merge-motion-performance-probe';
 import { useDisposableTimers } from '@/hooks/use-disposable-timers';
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
-import type { MergeBoardOccupant, MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
+import type { MergeBoardOccupant, MergeDreamMist, MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection, type MergeBoardGeometry } from '@/utils/merge-world/board-geometry';
 
 export type MergeBoardScreenMetrics = { geometry: MergeBoardGeometry; x: number; y: number };
@@ -413,7 +413,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       return;
     }
     const targetCell = current.board[to];
-    if (!targetCell || targetCell.locked) {
+    if (!targetCell || (targetCell.locked && targetCell.mist?.kind !== 'echo')) {
       returnHome(to);
       return;
     }
@@ -449,7 +449,17 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     const nextMotions: Record<string, Omit<SpriteMotion, 'operationId' | 'token'>> = {};
     let nextSprites: SpriteRecord[];
 
-    if (merging && target && resultingItem?.kind === 'item') {
+    const echoMerging = Boolean(predicted.dreamEchoClearedId && resultingItem?.kind === 'item');
+    if (echoMerging && resultingItem?.kind === 'item') {
+      const result: SpriteRecord = { occupant: resultingItem, cell: to };
+      nextSprites = currentSprites.filter((entry) => spriteId(entry) !== instanceId).concat(result);
+      nextMotions[spriteId(result)] = { kind: 'merge-result', startX: targetOrigin.x, startY: targetOrigin.y };
+      if (!reduceMotion) {
+        const burst = { id: ++mergeBurstSequence.current, cell: to };
+        setMergeBursts((bursts) => [...bursts, burst]);
+        timers.schedule(() => setMergeBursts((bursts) => bursts.filter((entry) => entry.id !== burst.id)), 520);
+      }
+    } else if (merging && target && resultingItem?.kind === 'item') {
       const result: SpriteRecord = { occupant: resultingItem, cell: to };
       nextSprites = currentSprites.map((entry) => spriteId(entry) === instanceId ? { ...entry, cell: to } : entry).concat(result);
       nextMotions[instanceId] = { kind: 'merge-source', startX: sourceOrigin.x + dx, startY: sourceOrigin.y + dy };
@@ -474,7 +484,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     hoverCell.value = -1;
     onSelect(to);
     if (process.env.EXPO_OS === 'ios') {
-      void Haptics.impactAsync(merging
+      void Haptics.impactAsync(merging || echoMerging
         ? Haptics.ImpactFeedbackStyle.Medium
         : Haptics.ImpactFeedbackStyle.Light);
     }
@@ -804,8 +814,15 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
         const item = occupant?.kind === 'item' ? occupant : null;
         const generator = occupant?.kind === 'generator' ? MERGE_GENERATORS_BY_ID.get(occupant.generatorId) : null;
         const definition = item ? MERGE_ITEMS_BY_ID.get(item.definitionId) : null;
-        const compatible = Boolean(selectedDefinitionId && item && item.definitionId === selectedDefinitionId && selectedCell !== index);
-        const label = generator ? `${generator.name}. Tap to generate. Costs 1 Energy.` : definition ? `${definition.name}, tier ${definition.tier}` : cell.locked ? 'Blocked board space' : 'Empty board space';
+        const echoDefinition = cell.mist?.kind === 'echo' ? MERGE_ITEMS_BY_ID.get(cell.mist.definitionId) : null;
+        const compatible = Boolean(selectedDefinitionId && selectedCell !== index && (
+          (item && item.definitionId === selectedDefinitionId) || echoDefinition?.id === selectedDefinitionId
+        ));
+        const label = generator ? `${generator.name}. Tap to generate. Costs 1 Energy.`
+          : definition ? `${definition.name}, tier ${definition.tier}`
+            : echoDefinition ? `Dream Echo: ${echoDefinition.name}. Find its matching item to wake this cell.`
+              : cell.mist?.kind === 'katchimera' ? 'A mysterious object is hidden in the Dream Mist.'
+                : cell.mist ? 'Something is hidden in the Dream Mist.' : 'Empty board space';
         return <BoardCell
           accessibilityActionLabel={gateKind === 'drag' && index === gateFromCell ? 'Merge with highlighted item' : generator ? 'Generate item' : 'Select or move item'}
           accessibilityDisabled={gateKind === 'locked' || (gateKind === 'drag' && index !== gateFromCell) || (gateKind === 'generator' && index !== gateGeneratorCell)}
@@ -819,6 +836,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
           left={origin.x}
           onActivate={accessibleAction}
           selected={selectedCell === index}
+          mist={cell.mist}
           top={origin.y}
           width={cellSize}
         />;
@@ -863,7 +881,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   </View>;
 }
 
-const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibilityDisabled, accessibilityLabel, blocked, invalid, selected, compatible, index, left, top, width, height, onActivate }: {
+const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibilityDisabled, accessibilityLabel, blocked, invalid, selected, compatible, index, left, top, width, height, mist, onActivate }: {
   accessibilityActionLabel: string;
   accessibilityDisabled: boolean;
   accessibilityLabel: string;
@@ -876,6 +894,7 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
   top: number;
   width: number;
   height: number;
+  mist: MergeDreamMist | null;
   onActivate: (cell: number) => void;
 }) {
   const column = index % MERGE_WORLD_COLUMNS;
@@ -897,7 +916,9 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
       accessibilityState={{ disabled: accessibilityDisabled }}
       onAccessibilityAction={() => onActivate(index)}
       style={styles.cellPressable}>
-      {blocked ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" recyclingKey="merge-locked-cloud" source={LOCKED_CELL_OVERLAY} style={styles.lockedOverlay} transition={0} /> : null}
+      {blocked ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" recyclingKey="merge-locked-cloud" source={LOCKED_CELL_OVERLAY} style={[styles.lockedOverlay, mist?.kind === 'echo' && styles.echoMist]} transition={0} /> : null}
+      {mist?.kind === 'echo' ? <View pointerEvents="none" style={[styles.echoItem, compatible && styles.echoItemCompatible]}><PersistentMergeItemArt definitionId={mist.definitionId} size={Math.min(width, height) * 0.72} /></View> : null}
+      {mist?.kind === 'katchimera' ? <View pointerEvents="none" style={styles.mysteryItem}><IconSymbol color="#EAF8FF" name={mist.mysteryId === 'moon' ? 'moon.stars.fill' : 'figure.walk'} size={Math.min(width, height) * 0.42} /></View> : null}
     </View>
   </View>;
 });
@@ -1315,6 +1336,10 @@ const styles = StyleSheet.create({
   cell: { alignItems: 'center', borderRadius: 0, borderWidth: 0.5, justifyContent: 'center', overflow: 'visible', position: 'absolute' },
   cellPressable: { alignItems: 'center', height: '100%', justifyContent: 'center', width: '100%' },
   lockedOverlay: { ...StyleSheet.absoluteFillObject, height: '100%', width: '100%' },
+  echoMist: { opacity: 0.78 },
+  echoItem: { alignItems: 'center', justifyContent: 'center', opacity: 0.62, position: 'absolute', zIndex: 2 },
+  echoItemCompatible: { backgroundColor: 'rgba(205, 249, 255, 0.2)', borderColor: 'rgba(209, 252, 255, 0.9)', borderRadius: 999, borderWidth: 1.5, boxShadow: '0 0 12px rgba(133, 237, 255, 0.92)', opacity: 0.9, transform: [{ scale: 1.08 }] },
+  mysteryItem: { alignItems: 'center', backgroundColor: 'rgba(92, 91, 151, 0.34)', borderRadius: 999, height: '58%', justifyContent: 'center', opacity: 0.72, position: 'absolute', width: '58%', zIndex: 2 },
   hoverCell: { backgroundColor: 'rgba(244,204,110,0.34)', borderColor: '#E1A644', borderRadius: 0, borderWidth: 2, left: 0, position: 'absolute', top: 0, zIndex: 20 },
   feedbackLayer: { zIndex: 2000 },
   mergeCelebrationOverlay: { alignItems: 'center', justifyContent: 'center', position: 'absolute', zIndex: 1400 },

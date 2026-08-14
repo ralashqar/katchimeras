@@ -19,10 +19,15 @@ language while dispatching durable commands instead of round commands.
 
 ## State and commands
 
-`MergeWorldState` v7 is a schema-versioned snapshot containing the 63 cells,
+`MergeWorldState` v10 is a schema-versioned snapshot containing the 63 cells,
 storage, generator charge state, Energy, Coins, XP, discoveries, active orders,
 unlock state, reward inbox, typed life arrivals, chapter landmarks, activity
 receipts, and external reward receipts.
+
+Each v10 cell carries a board region and an optional Dream Mist descriptor.
+Dream Echoes identify their trapped item and stable receipt ID. Successful
+Echo merges and authored story clears write idempotent board-awakening receipts
+so an interrupted FTUE can recover after the resulting item has moved or been served.
 
 Typed arrivals carry an explicit `journal`, `companion_story`, `goal`, or
 `legacy` source. Loading v1-v6 snapshots migrates activity-sourced inbox rewards
@@ -31,7 +36,7 @@ chains, and removes the obsolete activity inbox entries. The migration is
 idempotent. Non-activity inbox entries remain readable for compatibility.
 
 Commands are `refreshTime`, `tapGenerator`, `move`, `serveOrder`, `storeItem`,
-`restoreItem`, `sellItem`, `claimInbox`, `unlockExpansion`,
+`restoreItem`, `sellItem`, `claimInbox`,
 `grantActivityRewardsBatch`, `claimArrival`, `viewMemoryArrival`,
 `reconcileCharacters`, and `ackExternalReward`.
 

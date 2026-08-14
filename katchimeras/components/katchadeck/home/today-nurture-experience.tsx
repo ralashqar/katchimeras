@@ -127,6 +127,7 @@ type TodayNurtureExperienceProps = {
   onScriptedChoice?: (action: FtueActionDefinition, option: FtueChoiceOption, from: FeedSourceRect, currencyFrom?: FeedSourceRect) => void;
   scriptedChoiceCompletionNonce?: number;
   scriptedStepCount?: number | null;
+  scriptedStepEnergy?: number | null;
   onScriptedChoiceFinished?: () => void;
 };
 
@@ -189,6 +190,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   onScriptedChoice,
   scriptedChoiceCompletionNonce = 0,
   scriptedStepCount = null,
+  scriptedStepEnergy = null,
   onScriptedChoiceFinished,
   careSwipeExternalGesture,
   environmentGesture,
@@ -776,6 +778,8 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
                 actions={scriptedRowActions}
                 locked={actionListLocked}
                 onAction={onScriptedAction}
+                stepCount={scriptedStepCount}
+                stepEnergy={scriptedStepEnergy}
               />
             </Animated.View>
           ) : null}

@@ -1,28 +1,36 @@
-import { MERGE_GENERATORS_BY_ID, MERGE_STARTING_OPEN_CELLS, MERGE_WORLD_SIZE } from '@/constants/merge-world-catalog';
+import { MERGE_GENERATORS_BY_ID, MERGE_WORLD_SIZE, MOSSPROUT_DREAM_ECHOES, MOSSPROUT_FTUE_OPEN_CELLS } from '@/constants/merge-world-catalog';
 import type { MergeBoardCell, MergeWorldState } from '@/types/merge-world';
 import type { WispId } from '@/types/wisp';
 import { createInitialMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 import { mossproutChapterZeroOrder } from '@/utils/merge-world/chapter-zero-policy';
 
-const TUTORIAL_OPEN_CELLS = new Set([...MERGE_STARTING_OPEN_CELLS].slice(0, 18));
-
 export function createMossproutChapterZeroState(now = Date.now(), rewardWispId: WispId = 'sprout'): MergeWorldState {
   let state = reduceMergeWorld(createInitialMergeWorldState(now), { type: 'reconcileCharacters', characterIds: ['mossprout'], now }).state;
   const garden = MERGE_GENERATORS_BY_ID.get('wild-garden')!;
   const board: MergeBoardCell[] = Array.from({ length: MERGE_WORLD_SIZE }, (_, index) => ({
-    locked: !TUTORIAL_OPEN_CELLS.has(index),
-    blocker: TUTORIAL_OPEN_CELLS.has(index) ? null : 'clouds',
+    locked: !MOSSPROUT_FTUE_OPEN_CELLS.has(index),
+    blocker: MOSSPROUT_FTUE_OPEN_CELLS.has(index) ? null : 'clouds',
+    regionId: MOSSPROUT_FTUE_OPEN_CELLS.has(index) ? 'central-clearing' : 'inner-mist',
+    mist: MOSSPROUT_FTUE_OPEN_CELLS.has(index) ? null : { kind: 'dormant' },
     occupant: null,
   }));
-  const open = [...TUTORIAL_OPEN_CELLS];
-  board[open[0]].occupant = { kind: 'generator', generatorId: garden.id };
-  board[open[1]].occupant = { kind: 'item', instanceId: 'onboarding-seed-a', definitionId: 'nature:garden:1' };
-  board[open[2]].occupant = { kind: 'item', instanceId: 'onboarding-seed-b', definitionId: 'nature:garden:1' };
+  board[31].occupant = { kind: 'generator', generatorId: garden.id };
+  board[30].occupant = { kind: 'item', instanceId: 'onboarding-seed-a', definitionId: 'nature:garden:1' };
+  board[32].occupant = { kind: 'item', instanceId: 'onboarding-seed-b', definitionId: 'nature:garden:1' };
+  for (const echo of MOSSPROUT_DREAM_ECHOES) {
+    board[echo.cell] = {
+      ...board[echo.cell],
+      regionId: echo.cell === 54 ? 'mid-mist' : 'inner-mist',
+      mist: { kind: 'echo', id: echo.id, definitionId: echo.definitionId, ownerCharacterId: 'mossprout' },
+    };
+  }
+  board[8] = { ...board[8], regionId: 'deep-mist', mist: { kind: 'katchimera', id: 'future-moon', mysteryId: 'moon', ownerCharacterId: null } };
+  board[57] = { ...board[57], regionId: 'ancient-dream', mist: { kind: 'katchimera', id: 'future-trail', mysteryId: 'trail', ownerCharacterId: 'steppling' } };
   return {
     ...state,
     board,
     generators: { [garden.id]: { id: garden.id, name: garden.name, level: 1, upgradeFragments: 0, chainIds: garden.chainIds, tierOneDropDefinitionIds: [...garden.tierOneDropDefinitionIds], forcedDropDefinitionId: 'nature:garden:1' } },
-    energy: { value: 10, regenCap: 50, lastRegenAt: now, regenPaused: true },
+    energy: { value: 4, regenCap: 50, lastRegenAt: now, regenPaused: true },
     coins: 100,
     discoveries: ['nature:garden:1'],
     unlockedFamilies: ['nature'],
@@ -33,6 +41,8 @@ export function createMossproutChapterZeroState(now = Date.now(), rewardWispId: 
     completedOrderCount: 0,
     recentOrderKeys: [`ftue-wisp:${rewardWispId}`],
     expansions: [],
+    unlockedRegions: ['central-clearing', 'inner-mist'],
+    boardAwakeningReceipts: [],
     processedActivityReceiptIds: [],
     activityEnergyByDay: {},
   };

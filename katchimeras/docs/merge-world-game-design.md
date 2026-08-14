@@ -39,7 +39,9 @@ personalises and upgrades that generator.
 
 ## Board and economy
 
-- Board: 63 cells; 33 open initially; blockers use vines, rocks, and clouds.
+- Board: 63 cells. Mossprout Chapter 0 begins with a deterministic 17-cell central clearing and ends with 28 open cells.
+- Dream Mist overlays normal tiles. Matching items merge into Dream Echoes, create the next tier on the reclaimed cell, and permanently remove its Mist.
+- Mossprout orders clear small authored Mist clusters; there is no Mist-clearing currency.
 - Storage: 5 slots, growing at Merge Levels 3, 7, 11, and 15.
 - Merge Energy: 100 cap, one point every two minutes, one point per generator tap.
 - Generator: 12 charges and an 18-minute rest after depletion.
