@@ -52,31 +52,37 @@ test('backend catalog contains only allowlisted privacy-safe action ids', () => 
 });
 
 test('Supabase receipt allowlist matches every backend FTUE action', () => {
-  const migration = readFileSync('supabase/migrations/20260814095000_register_mossprout_ftue_v6.sql', 'utf8');
+  const migration = readFileSync('supabase/migrations/20260814100304_register_mossprout_ftue_v7.sql', 'utf8');
   for (const item of FTUE_ACTION_CATALOG.filter((entry) => entry.backendEvent)) {
     assert.match(migration, new RegExp(`'${item.stepId}',\\s*'${item.actionId}'`));
   }
   assert.doesNotMatch(migration, /option_id|option_label|answer_text/);
 });
 
-test('Chapter 0 exposes one one-merge order and then completes', () => {
+test('Chapter 0 previews two requests and scripts spawn, repeated merge, and serve objectives', () => {
   const mergeStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.seed_drag');
   const serveStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.serve_sprout');
+  const spawnStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.plant.spawn');
+  const pairStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.plant.seed_pairs');
+  const finalServeStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.serve_plant');
   assert.equal(mossproutFtueAction('merge.seed_drag', 'merge.create_sprout')?.handlerId, 'merge_item_created');
   assert.equal(mergeStep?.edges?.[0]?.nextStepId, 'merge.serve_sprout');
-  assert.equal(serveStep?.edges?.[0]?.nextStepId, 'chapter.complete');
+  assert.equal(serveStep?.edges?.[0]?.nextStepId, 'merge.plant.spawn');
+  assert.equal(spawnStep?.edges?.[0]?.requiredCount, 4);
+  assert.equal(pairStep?.edges?.[0]?.requiredCount, 2);
+  assert.equal(finalServeStep?.edges?.[0]?.nextStepId, 'chapter.complete');
   assert.equal(mergeStep?.interaction?.mode, 'exclusive');
   assert.equal(serveStep?.interaction?.mode, 'exclusive');
   assert.deepEqual(mergeStep?.spotlight?.targets, [
-    { kind: 'board_item', instanceId: 'onboarding-seed-a' },
-    { kind: 'board_item', instanceId: 'onboarding-seed-b' },
+    { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 },
+    { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 1 },
   ]);
   assert.equal(mergeStep?.spotlight?.grouping, 'bounding_rect');
   assert.deepEqual(serveStep?.spotlight?.targets, [
+    { kind: 'order_requirement_item', orderId: 'mossprout:chapter-0:first-sprout', requirementIndex: 0 },
     { kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' },
   ]);
-  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.some((step) => step.id === 'merge.flower'), false);
-  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.some((step) => step.id === 'merge.final'), false);
+  assert.ok(mossproutFtueAction('companion.order_preview', 'companion.open_garden'));
 });
 
 test('Merge FTUE never inserts guide panels into the fixed board layout', () => {

@@ -3,21 +3,21 @@ import type { ConversationDefinition } from '@/types/companion-conversation';
 export const MOSSPROUT_FTUE_CONVERSATION_PREFIX = 'mossprout:ftue:first-meeting';
 
 const openingLines: Record<string, string> = {
-  outside: 'You were outside today? I think we are going to get along.',
-  family: 'You spent time with your people today? I like that.',
-  friends: 'Friends were part of today? That sounds like good growing weather.',
-  relaxing: 'A quiet day can still grow into something lovely.',
-  work: 'You have already been working today. Let us make something small together.',
-  tired: 'Sounds like today took a bit out of you. We can start small.',
-  rough: 'That sounds like a hard day. We can start gently.',
-  home: 'Home sounds like a good place for us to begin.',
-  default: 'I felt those little pieces of your day. I think this is a good place to begin.',
+  outside: 'You brought the outside with you. I could feel the air tapping on my shell.',
+  family: 'There were people close to you today. Their warmth reached all the way into my shell.',
+  friends: 'Your friends made today feel busy-bright. It rattled the leaves I do not have yet.',
+  relaxing: 'Your quiet found me in there. It felt like moss after rain.',
+  work: 'You carried a lot today. I felt it humming through the shell.',
+  tired: 'You are tired. I felt the day land heavily. We will grow something small.',
+  rough: 'That day had thorns. Thank you for giving me a piece of it anyway.',
+  home: 'Home reached me first. That seems like a good place to start.',
+  default: 'Those pieces of your day found me in the dark. That is how I knew where to hatch.',
 };
 
 function definition(key: string, opening: string): ConversationDefinition {
   return {
     id: `${MOSSPROUT_FTUE_CONVERSATION_PREFIX}:${key}`,
-    version: 1,
+    version: 2,
     familyId: 'mossprout',
     title: 'A little place to begin',
     trigger: 'evergreen',
@@ -29,10 +29,24 @@ function definition(key: string, opening: string): ConversationDefinition {
     tags: ['ftue', 'story', 'first-meeting'],
     entryNodeId: 'remembered',
     nodes: [
-      { id: 'remembered', kind: 'choice', phase: 'opening', prompt: opening, options: [{ id: 'hello', label: 'Hello, Mossprout', reply: 'Hello. I am glad you found me.', nextNodeId: 'arrived' }] },
-      { id: 'arrived', kind: 'choice', phase: 'explore', prompt: 'I came through with almost nothing…', options: [{ id: 'ask', label: 'What do you need?', reply: 'Maybe just one small thing to start.', nextNodeId: 'plant' }] },
-      { id: 'plant', kind: 'choice', phase: 'resolve', prompt: 'Think we could find something to plant?', options: [{ id: 'merge', label: 'Let’s look', reply: 'A little place to begin. That is all we need.', nextNodeId: 'end' }] },
-      { id: 'end', kind: 'end', message: 'I will meet you at the garden.' },
+      {
+        id: 'remembered', kind: 'choice', phase: 'opening', prompt: opening,
+        options: [{ id: 'felt-that', label: 'You felt that?', reply: 'Every bit. Days seem to turn into something alive around you.', nextNodeId: 'arrived' }],
+      },
+      {
+        id: 'arrived', kind: 'choice', phase: 'explore',
+        prompt: 'I meant to arrive with a garden. The doorway disagreed. I have two Seeds and a very empty patch.',
+        options: [
+          { id: 'small-start', label: 'We can start with two Seeds.', reply: 'Exactly. Small beginnings are still beginnings.', nextNodeId: 'plan' },
+          { id: 'not-much', label: 'That is not much of a garden.', reply: "Not yet. 'Not yet' is one of my favourite kinds of magic.", nextNodeId: 'plan' },
+        ],
+      },
+      {
+        id: 'plan', kind: 'choice', phase: 'resolve',
+        prompt: 'First, a Sprout. Then a Plant tall enough to make this place feel like ours.',
+        options: [{ id: 'grow', label: 'Let’s grow them.', reply: 'I will keep both requests where we can see them.', nextNodeId: 'end' }],
+      },
+      { id: 'end', kind: 'end', message: 'Two little requests. One garden waiting.' },
     ],
   };
 }

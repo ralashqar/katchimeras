@@ -1,11 +1,13 @@
 import type { MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
 
 import type { FtueEvent, FtueStepDefinition, FtueTarget } from './ftue-types';
+import { mossproutFtueStep } from './mossprout-ftue-script';
 
 export type MergeBoardInteractionGate =
   | { kind: 'open' }
   | { kind: 'locked' }
-  | { kind: 'drag'; fromCell: number; toCell: number };
+  | { kind: 'drag'; fromCell: number; toCell: number }
+  | { kind: 'generator'; cell: number; generatorId: string };
 
 export type MergeRailInteractionGate =
   | { kind: 'open' }
@@ -14,16 +16,34 @@ export type MergeRailInteractionGate =
 
 export function resolveFtueBoardCell(state: MergeWorldState, target: FtueTarget) {
   if (target.kind === 'board_cell') return target.cell;
+  if (target.kind === 'board_generator') {
+    const cell = state.board.findIndex((entry) => entry.occupant?.kind === 'generator' && entry.occupant.generatorId === target.generatorId);
+    return cell >= 0 ? cell : null;
+  }
+  if (target.kind === 'order_requirement_item') {
+    const requirement = state.activeOrders.find((order) => order.id === target.orderId)?.requirements[target.requirementIndex];
+    if (!requirement) return null;
+    return nthDefinitionCell(state, requirement.definitionId, target.occurrence ?? 0);
+  }
+  if (target.kind === 'board_items') return nthDefinitionCell(state, target.definitionId, target.occurrence);
   if (target.kind !== 'board_item') return null;
-  const cell = state.board.findIndex((entry) => (
-    entry.occupant?.kind === 'item' && entry.occupant.instanceId === target.instanceId
-  ));
+  const cell = state.board.findIndex((entry) => entry.occupant?.kind === 'item' && entry.occupant.instanceId === target.instanceId);
   return cell >= 0 ? cell : null;
+}
+
+function nthDefinitionCell(state: MergeWorldState, definitionId: string, occurrence: number) {
+  const cells = state.board.flatMap((entry, cell) => entry.occupant?.kind === 'item' && entry.occupant.definitionId === definitionId ? [cell] : []);
+  return cells[occurrence] ?? null;
 }
 
 export function mergeFtueBoardGate(step: FtueStepDefinition | null, state: MergeWorldState): MergeBoardInteractionGate {
   const policy = step?.surface === 'merge' ? step.interaction : null;
   if (!policy || policy.mode === 'none') return { kind: 'open' };
+  if (policy.allowed.kind === 'generator_tap') {
+    const cell = resolveFtueBoardCell(state, policy.allowed.target);
+    if (cell == null || policy.allowed.target.kind !== 'board_generator') return { kind: 'locked' };
+    return { kind: 'generator', cell, generatorId: policy.allowed.target.generatorId };
+  }
   if (policy.allowed.kind !== 'board_drag') return { kind: 'locked' };
   const fromCell = resolveFtueBoardCell(state, policy.allowed.from);
   const toCell = resolveFtueBoardCell(state, policy.allowed.to);
@@ -44,6 +64,11 @@ export function mergeFtueAllowsCommand(step: FtueStepDefinition | null, state: M
     const from = resolveFtueBoardCell(state, policy.allowed.from);
     const to = resolveFtueBoardCell(state, policy.allowed.to);
     return command.type === 'move' && from != null && to != null && command.from === from && command.to === to;
+  }
+  if (policy.allowed.kind === 'generator_tap') {
+    return policy.allowed.target.kind === 'board_generator'
+      && command.type === 'tapGenerator'
+      && command.generatorId === policy.allowed.target.generatorId;
   }
   return policy.allowed.target.kind === 'order_serve'
     && command.type === 'serveOrder'
@@ -70,34 +95,44 @@ export function mergeFtueEventForCommand(
       revision: result.state.revision,
     };
   }
+  if (command.type === 'tapGenerator' && result.spawnedCell != null) {
+    const spawned = result.state.board[result.spawnedCell]?.occupant;
+    if (spawned?.kind !== 'item') return null;
+    return {
+      type: 'item_spawned',
+      generatorId: command.generatorId,
+      instanceId: spawned.instanceId,
+      definitionId: spawned.definitionId,
+      resultCell: result.spawnedCell,
+      revision: result.state.revision,
+    };
+  }
   if (command.type === 'serveOrder' && result.servedOrderId) {
     return { type: 'order_served', orderId: result.servedOrderId, revision: result.state.revision };
   }
   return null;
 }
 
-export function recoverMergeFtueEvent(stepId: string, state: MergeWorldState): FtueEvent | null {
-  if (stepId === 'merge.seed_drag') {
-    const hasSeedA = state.board.some((cell) => cell.occupant?.kind === 'item' && cell.occupant.instanceId === 'onboarding-seed-a');
-    const hasSeedB = state.board.some((cell) => cell.occupant?.kind === 'item' && cell.occupant.instanceId === 'onboarding-seed-b');
-    const resultCell = state.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:2');
-    const chapterComplete = state.characterProgress.mossprout?.completedChapterIds.includes('mossprout-chapter-0');
-    if (!hasSeedA && !hasSeedB && (resultCell >= 0 || chapterComplete)) {
-      return {
-        type: 'merge_completed',
-        fromInstanceId: 'onboarding-seed-a',
-        targetInstanceId: 'onboarding-seed-b',
-        resultDefinitionId: 'nature:garden:2',
-        resultCell,
-        revision: state.revision,
-      };
-    }
+export function recoverMergeFtueEvent(stepOrId: FtueStepDefinition | string | null, state: MergeWorldState, objectiveProgress: Record<string, number> = {}): FtueEvent | null {
+  const step = typeof stepOrId === 'string' ? mossproutFtueStep(stepOrId) : stepOrId;
+  const edge = step?.edges?.[0];
+  if (!step || !edge) return null;
+  const progress = objectiveProgress[`${step.id}:${edge.commitActionId}`] ?? 0;
+  const event = edge.event;
+  if (event.type === 'order_served' && event.orderId && !state.activeOrders.some((order) => order.id === event.orderId)) {
+    return { type: 'order_served', orderId: event.orderId, revision: state.revision };
   }
-  if (stepId === 'merge.serve_sprout') {
-    const orderId = 'mossprout:chapter-0:first-sprout';
-    const orderActive = state.activeOrders.some((order) => order.id === orderId);
-    const chapterComplete = state.characterProgress.mossprout?.completedChapterIds.includes('mossprout-chapter-0');
-    if (!orderActive && chapterComplete) return { type: 'order_served', orderId, revision: state.revision };
+  if (event.type === 'item_spawned' && event.generatorId && event.definitionId) {
+    const definitionId = event.definitionId;
+    const matches = state.board.flatMap((cell, resultCell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === definitionId ? [{ occupant: cell.occupant, resultCell }] : []);
+    const found = matches[progress];
+    if (found) return { type: 'item_spawned', generatorId: event.generatorId, instanceId: found.occupant.instanceId, definitionId: found.occupant.definitionId, resultCell: found.resultCell, revision: state.revision };
+  }
+  if (event.type === 'merge_completed' && event.resultDefinitionId) {
+    const definitionId = event.resultDefinitionId;
+    const matches = state.board.flatMap((cell, resultCell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === definitionId ? [{ occupant: cell.occupant, resultCell }] : []);
+    const found = matches[progress];
+    if (found) return { type: 'merge_completed', fromInstanceId: 'recovered-source', targetInstanceId: 'recovered-target', resultDefinitionId: found.occupant.definitionId, resultCell: found.resultCell, revision: state.revision };
   }
   return null;
 }

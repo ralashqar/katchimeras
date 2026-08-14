@@ -201,6 +201,8 @@ export function KingdomCompanionScreen({
   onOpenQuestGame,
   ftueConversationDefinitionId,
   onFtueConversationComplete,
+  ftueOrderPreviewActive = false,
+  onFtueOpenMerge,
 }: {
   presentation?: KingdomCompanionPresentation;
   initialCreatureId?: string;
@@ -209,6 +211,8 @@ export function KingdomCompanionScreen({
   onOpenQuestGame?: (creatureId: string, questId: string) => void;
   ftueConversationDefinitionId?: string;
   onFtueConversationComplete?: () => void;
+  ftueOrderPreviewActive?: boolean;
+  onFtueOpenMerge?: () => void;
 }) {
   const isFocused = useIsFocused();
   const router = useRouter();
@@ -535,6 +539,8 @@ export function KingdomCompanionScreen({
           initialDestination={quests.selectedResident.destination}
           initialConversationDefinitionId={ftueConversationDefinitionId}
           onInitialConversationComplete={onFtueConversationComplete}
+          ftueOrderPreviewActive={ftueOrderPreviewActive}
+          onFtueOpenMerge={onFtueOpenMerge}
           onSelectDestination={quests.selectDestination}
           onClose={() => {
             quests.closeSelectedResident();

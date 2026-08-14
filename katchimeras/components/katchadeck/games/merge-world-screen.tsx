@@ -177,10 +177,10 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
 
   useEffect(() => {
     if (!active || !state || !ftueStep || !ftueRun) return;
-    const recovered = recoverMergeFtueEvent(ftueRun.stepId, state);
+    const recovered = recoverMergeFtueEvent(ftueStep, state, ftueRun.objectiveProgress);
     if (!recovered) return;
-    dispatchFtueEvent(recovered, `merge-recovery:${state.revision}`);
-    if (recovered.type === 'order_served') setChapterCompleteOpen(true);
+    const nextRun = dispatchFtueEvent(recovered, `merge-recovery:${state.revision}`);
+    if (nextRun?.stepId === 'chapter.complete') setChapterCompleteOpen(true);
   }, [active, ftueRun, ftueStep, state]);
 
   const finishChapterZero = useCallback(() => {
@@ -202,8 +202,8 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
     const result = send(command);
     const event = mergeFtueEventForCommand(state, command, result);
     if (event) {
-      dispatchFtueEvent(event);
-      if (event.type === 'order_served') setChapterCompleteOpen(true);
+      const nextRun = dispatchFtueEvent(event);
+      if (nextRun?.stepId === 'chapter.complete') setChapterCompleteOpen(true);
     }
     return result;
   }, [ftueStep, handleBlockedFtueInteraction, send, state]);

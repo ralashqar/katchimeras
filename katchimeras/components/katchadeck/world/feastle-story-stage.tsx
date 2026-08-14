@@ -3,10 +3,10 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 
-import { PersistentMergeItemArt } from '@/components/katchadeck/games/feastle-persistent-merge-board';
+import { CompanionMergeRequestTray } from '@/components/katchadeck/world/companion-merge-request-tray';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { FEASTLE_STORY_REQUESTS, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
+import { FEASTLE_STORY_REQUESTS } from '@/constants/merge-world-catalog';
 import { FEASTLE_ACT_TWO_ORDER_POOL } from '@/utils/companion-story';
 import { beginFeastleActTwo, beginFeastleReturn, loadFeastleStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
 
@@ -91,21 +91,18 @@ export function FeastleStoryStage({ onBeginIntroduction, onJournalFood, onMore, 
       <IconSymbol color="#FFF9E9" name="heart.fill" size={15} />
       <ThemedText selectable style={styles.bondSummaryText} lightColor="#FFF9E9" darkColor="#FFF9E9">+{story.pendingBondPoints} Bond from the tray</ThemedText>
     </View> : null}
-    {requests.length ? <View accessibilityLabel="Feastle's requested merge items" style={styles.requestTray}>
-      <View style={styles.requestHeading}>
-        <ThemedText selectable style={styles.requestEyebrow} lightColor="#8B672E" darkColor="#8B672E">NEXT REQUEST</ThemedText>
-        <ThemedText selectable style={styles.requestCount} lightColor="#6A5030" darkColor="#6A5030">{requests.length} {requests.length === 1 ? 'order' : 'orders'}</ThemedText>
-      </View>
-      {requests.map((request) => <View key={`${story.targetLevel}:${request.definitionId}:${request.title}`} style={styles.requestRow}>
-        <View style={styles.requestArt}>{[request.definitionId, 'secondaryDefinitionId' in request ? request.secondaryDefinitionId : undefined].filter((id): id is string => Boolean(id)).map((id) => <PersistentMergeItemArt definitionId={id} key={id} size={40} />)}</View>
-        <View style={styles.requestCopy}>
-          <ThemedText selectable style={styles.requestTitle} lightColor="#3B2C20" darkColor="#3B2C20">{request.title}</ThemedText>
-          {'description' in request && typeof request.description === 'string' ? <ThemedText selectable numberOfLines={2} style={styles.requestDescription} lightColor="#6B5943" darkColor="#6B5943">{request.description}</ThemedText> : null}
-          <ThemedText selectable style={styles.requestItemName} lightColor="#745936" darkColor="#745936">{[request.definitionId, 'secondaryDefinitionId' in request ? request.secondaryDefinitionId : undefined].filter((id): id is string => Boolean(id)).map((id) => MERGE_ITEMS_BY_ID.get(id)?.name ?? 'Merge item').join(' + ')}</ThemedText>
-        </View>
-        {request.quantity > 1 ? <View style={styles.quantity}><ThemedText selectable style={styles.quantityText} lightColor="#FFF9E9" darkColor="#FFF9E9">×{request.quantity}</ThemedText></View> : null}
-      </View>)}
-    </View> : null}
+    <CompanionMergeRequestTray
+      accessibilityLabel="Feastle's requested merge items"
+      eyebrow="NEXT REQUEST"
+      palette={{ trayBackground: 'rgba(255,255,255,0.52)', trayBorder: 'rgba(139,103,46,0.22)', rowBackground: '#FFF8E8', eyebrow: '#8B672E', count: '#6A5030', title: '#3B2C20', description: '#6B5943', item: '#745936', badgeBackground: '#76501F', badgeText: '#FFF9E9' }}
+      requests={requests.map((request) => ({
+        id: `${story.targetLevel}:${request.definitionId}:${request.title}`,
+        title: request.title,
+        description: 'description' in request && typeof request.description === 'string' ? request.description : undefined,
+        definitionIds: [request.definitionId, 'secondaryDefinitionId' in request ? request.secondaryDefinitionId : undefined].filter((id): id is string => Boolean(id)),
+        quantity: request.quantity,
+      }))}
+    />
     {!complete ? <Pressable accessibilityRole="button" onPress={() => {
       if (actOneComplete) { const next = beginFeastleActTwo(); if (next.pendingConversationId) onOpenConversation(next.pendingConversationId); }
       else if (returnReady && story.pendingConversationId) { beginFeastleReturn(); onOpenConversation(story.pendingConversationId); }
@@ -141,8 +138,6 @@ const styles = StyleSheet.create({
   landmarkEyebrow: { fontSize: 8, fontWeight: '900', letterSpacing: 0.9, lineHeight: 11 },
   landmarkTitle: { fontSize: 16, fontWeight: '900', letterSpacing: -0.2, lineHeight: 20 },
   landmarkBody: { fontSize: 10.5, lineHeight: 14 },
-  requestTray: { backgroundColor: 'rgba(255,255,255,0.52)', borderColor: 'rgba(139,103,46,0.22)', borderCurve: 'continuous', borderRadius: 20, borderWidth: 1, gap: 8, padding: 11 }, requestHeading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 3 }, requestEyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 }, requestCount: { fontSize: 10.5, fontWeight: '800' },
   bondSummary: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: '#708D48', borderCurve: 'continuous', borderRadius: 999, flexDirection: 'row', gap: 7, minHeight: 34, paddingHorizontal: 12 }, bondSummaryText: { fontSize: 11.5, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  requestRow: { alignItems: 'center', backgroundColor: '#FFF8E8', borderCurve: 'continuous', borderRadius: 15, flexDirection: 'row', gap: 10, minHeight: 62, paddingHorizontal: 9, paddingVertical: 6 }, requestArt: { alignItems: 'center', flexDirection: 'row', height: 50, justifyContent: 'center', width: 72 }, requestCopy: { flex: 1, gap: 1 }, requestTitle: { fontSize: 13.5, fontWeight: '900', lineHeight: 18 }, requestDescription: { fontSize: 11, lineHeight: 15 }, requestItemName: { fontSize: 11.5, fontWeight: '700', lineHeight: 16 }, quantity: { alignItems: 'center', backgroundColor: '#76501F', borderRadius: 999, justifyContent: 'center', minWidth: 30, paddingHorizontal: 7, paddingVertical: 5 }, quantityText: { fontSize: 11, fontWeight: '900', fontVariant: ['tabular-nums'] },
   primary: { alignItems: 'center', backgroundColor: '#76501F', borderCurve: 'continuous', borderRadius: 19, flexDirection: 'row', gap: 10, minHeight: 54, paddingHorizontal: 15 }, primaryLabel: { flex: 1, fontSize: 15, fontWeight: '900' }, secondary: { alignItems: 'center', borderRadius: 17, flexDirection: 'row', justifyContent: 'space-between', minHeight: 46, paddingHorizontal: 13 }, secondaryLabel: { fontSize: 13, fontWeight: '900' }, pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
 });

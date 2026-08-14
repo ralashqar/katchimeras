@@ -50,7 +50,7 @@ import type { CompanionAchievementDef } from '@/types/companion-achievements';
 import type { StreakMilestone } from '@/types/streak';
 import { pickRandomAchievement } from '@/utils/achievement-celebration';
 import { STREAK_MILESTONE_REWARDS } from '@/utils/streak-engine';
-import { prepareMossproutMergeFtueForDebug } from '@/utils/merge-world/repository';
+import { prepareMossproutMergeFtueForDebug, type MossproutMergeFtueStepId } from '@/utils/merge-world/repository';
 import { resetKatchimeraProgressForDebug } from '@/utils/reset-katchimera-progress-for-debug';
 import { setFeastleStoryStateForDebug } from '@/utils/companion-story-storage';
 
@@ -206,7 +206,7 @@ export default function ExploreScreen() {
     );
   }
 
-  async function handlePrepareMergeFtue(step: 'merge.seed_drag' | 'merge.serve_sprout') {
+  async function handlePrepareMergeFtue(step: MossproutMergeFtueStepId) {
     try {
       beginFirstSession({ restart: true });
       await prepareMossproutMergeFtueForDebug(step);
@@ -479,6 +479,10 @@ export default function ExploreScreen() {
                 <KatchaButton label="FTUE retry receipt sync" onPress={() => void retryFtueSync()} variant="secondary" />
                 <KatchaButton label="FTUE Merge · Seed swipe" onPress={() => void handlePrepareMergeFtue('merge.seed_drag')} variant="secondary" />
                 <KatchaButton label="FTUE Merge · Serve Sprout" onPress={() => void handlePrepareMergeFtue('merge.serve_sprout')} variant="secondary" />
+                <KatchaButton label="FTUE Merge · Spawn Seeds" onPress={() => void handlePrepareMergeFtue('merge.plant.spawn')} variant="secondary" />
+                <KatchaButton label="FTUE Merge · Merge Seed pairs" onPress={() => void handlePrepareMergeFtue('merge.plant.seed_pairs')} variant="secondary" />
+                <KatchaButton label="FTUE Merge · Merge Sprouts" onPress={() => void handlePrepareMergeFtue('merge.plant.sprout_pair')} variant="secondary" />
+                <KatchaButton label="FTUE Merge · Serve Plant" onPress={() => void handlePrepareMergeFtue('merge.serve_plant')} variant="secondary" />
                 <KatchaButton label="Reset Katchimeras progress" onPress={handleResetKatchimerasProgress} variant="secondary" />
                 <KatchaButton label="Feastle story · Level 1 order" onPress={() => setFeastleStoryStateForDebug('order_active', 1)} variant="secondary" />
                 <KatchaButton label="Feastle story · Return at level 2" onPress={() => setFeastleStoryStateForDebug('return_available', 2)} variant="secondary" />

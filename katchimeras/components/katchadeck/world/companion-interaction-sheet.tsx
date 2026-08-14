@@ -117,6 +117,7 @@ import { CompanionVisitScene } from './companion-visit-scene';
 import { CompanionDashboard } from './companion-dashboard';
 import { FeastleStoryStage } from './feastle-story-stage';
 import { BaristabbitStoryStage } from './baristabbit-story-stage';
+import { MossproutFtueStoryStage } from './mossprout-ftue-story-stage';
 import { beginAuthoredCohortStory, beginBaristabbitStory, beginFeastleStory, isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory } from '@/utils/companion-story-storage';
 import { JourneyCohortStoryStage } from './journey-cohort-story-stage';
 import { CompanionSharedHistory } from './companion-shared-history';
@@ -157,6 +158,8 @@ export type CompanionInteractionSheetProps = {
   initialDestination?: CompanionDestination | null;
   initialConversationDefinitionId?: string;
   onInitialConversationComplete?: () => void;
+  ftueOrderPreviewActive?: boolean;
+  onFtueOpenMerge?: () => void;
   onSelectDestination?: (destination: CompanionDestination | null) => void;
   onClose: () => void;
   onOpenMerge?: (orderId?: string | null, familyId?: KatchimeraFamilyId) => void;
@@ -501,7 +504,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     if (completedInitialConversationRef.current === session.id) return;
     completedInitialConversationRef.current = session.id;
     onInitialConversationComplete?.();
-  }, [onInitialConversationComplete, props.conversationSession, props.initialConversationDefinitionId]);
+    experience.showHome();
+  }, [experience, onInitialConversationComplete, props.conversationSession, props.initialConversationDefinitionId]);
   const beginFeastleIntroduction = useCallback(() => {
     // The card press is the launch authority. Clear any request left behind by
     // a previous mount so a failed/pre-hydration attempt cannot swallow taps.
@@ -1388,6 +1392,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   }}
                   onOpenMerge={(orderId) => props.onOpenMerge?.(orderId, props.familyId)}
                 />
+              ) : route.kind === 'dashboard' && props.familyId === 'mossprout' && props.ftueOrderPreviewActive && props.onFtueOpenMerge ? (
+                <MossproutFtueStoryStage onOpenMerge={props.onFtueOpenMerge} />
               ) : route.kind === 'dashboard' && props.familyId === 'baristabbit' && !showBaristabbitDashboard ? (
                 <BaristabbitStoryStage
                   onBegin={beginBaristabbitIntroduction}

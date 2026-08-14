@@ -3,14 +3,47 @@ import type { WispId } from '@/types/wisp';
 
 const ORDER_PREFIX = 'mossprout:chapter-0:';
 
+export const MOSSPROUT_CHAPTER_ZERO_REQUESTS = [
+  {
+    id: `${ORDER_PREFIX}first-sprout`,
+    badge: 'FIRST',
+    title: 'A First Sprout',
+    description: 'Merge the two Seeds Mossprout brought.',
+    definitionId: 'nature:garden:2',
+  },
+  {
+    id: `${ORDER_PREFIX}home-plant`,
+    badge: 'THEN',
+    title: 'A Patch of Home',
+    description: 'Grow fresh Seeds, make two Sprouts, then merge them.',
+    definitionId: 'nature:garden:3',
+  },
+] as const;
+
 export function mossproutChapterZeroOrder(now: number, rewardWispId: WispId = 'sprout'): MergeOrder {
   return {
-    id: `${ORDER_PREFIX}first-sprout`,
+    id: MOSSPROUT_CHAPTER_ZERO_REQUESTS[0].id,
     characterId: 'mossprout',
     title: 'Something to plant',
     description: 'Drag the two matching Seeds together.',
     difficulty: 'small',
     requirements: [{ definitionId: 'nature:garden:2', quantity: 1 }],
+    reward: { coins: 20, mergeXp: 15, friendshipXp: 8, energy: 0 },
+    createdAt: now,
+    signature: false,
+    purpose: 'normal',
+    storyArcId: 'mossprout-chapter-0',
+  };
+}
+
+export function mossproutChapterZeroHomePlantOrder(now: number, rewardWispId: WispId = 'sprout'): MergeOrder {
+  return {
+    id: MOSSPROUT_CHAPTER_ZERO_REQUESTS[1].id,
+    characterId: 'mossprout',
+    title: 'A Patch of Home',
+    description: 'Merge two Sprouts into a Plant.',
+    difficulty: 'small',
+    requirements: [{ definitionId: 'nature:garden:3', quantity: 1 }],
     reward: { coins: 40, mergeXp: 30, friendshipXp: 16, energy: 0, wispId: rewardWispId },
     createdAt: now,
     signature: false,
@@ -20,8 +53,8 @@ export function mossproutChapterZeroOrder(now: number, rewardWispId: WispId = 's
   };
 }
 
-export function advanceMossproutChapterZero(state: MergeWorldState, servedOrderId: string, _now: number): MergeWorldState {
-  if (servedOrderId !== `${ORDER_PREFIX}first-sprout`) return state;
+export function advanceMossproutChapterZero(state: MergeWorldState, servedOrderId: string, now: number): MergeWorldState {
+  if (servedOrderId !== MOSSPROUT_CHAPTER_ZERO_REQUESTS[0].id) return state;
   let remaining = 4;
   const board = state.board.map((cell) => {
     if (!cell.locked || remaining <= 0) return cell;
@@ -31,8 +64,16 @@ export function advanceMossproutChapterZero(state: MergeWorldState, servedOrderI
   return {
     ...state,
     board,
-    activeOrders: state.activeOrders,
+    activeOrders: [
+      ...state.activeOrders,
+      mossproutChapterZeroHomePlantOrder(now, mossproutChapterZeroRewardWisp(state)),
+    ],
   };
+}
+
+function mossproutChapterZeroRewardWisp(state: MergeWorldState): WispId {
+  const receipt = state.recentOrderKeys.find((key) => key.startsWith('ftue-wisp:'));
+  return (receipt?.slice('ftue-wisp:'.length) || 'sprout') as WispId;
 }
 
 export function isMossproutChapterZeroActive(state: MergeWorldState) {

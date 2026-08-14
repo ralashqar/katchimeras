@@ -2,10 +2,9 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 
-import { PersistentMergeItemArt } from '@/components/katchadeck/games/feastle-persistent-merge-board';
+import { CompanionMergeRequestTray } from '@/components/katchadeck/world/companion-merge-request-tray';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import { BARISTABBIT_CHAPTER_ONE_ORDER_POOL } from '@/utils/companion-story';
 import { beginBaristabbitReturn, loadBaristabbitStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
 
@@ -64,20 +63,12 @@ export function BaristabbitStoryStage({ onBegin, onJournal, onMore, onOpenConver
       <IconSymbol color="#FFF9E9" name="heart.fill" size={15} />
       <ThemedText selectable style={styles.bondSummaryText} lightColor="#FFF9E9" darkColor="#FFF9E9">+{story.pendingBondPoints} Bond from the counter</ThemedText>
     </View> : null}
-    {requests.length ? <View accessibilityLabel="Baristabbit's requested merge items" style={styles.requestTray}>
-      <View style={styles.requestHeading}>
-        <ThemedText selectable style={styles.requestEyebrow} lightColor="#805637" darkColor="#805637">ON THE COUNTER</ThemedText>
-        <ThemedText selectable style={styles.requestCount} lightColor="#6A503F" darkColor="#6A503F">{requests.length} {requests.length === 1 ? 'order' : 'orders'}</ThemedText>
-      </View>
-      {requests.map((request) => <View key={request.title} style={styles.requestRow}>
-        <View style={styles.requestArt}><PersistentMergeItemArt definitionId={request.definitionId} size={48} /></View>
-        <View style={styles.requestCopy}>
-          <ThemedText selectable style={styles.requestTitle} lightColor="#35271F" darkColor="#35271F">{request.title}</ThemedText>
-          <ThemedText selectable numberOfLines={2} style={styles.requestDescription} lightColor="#6B594D" darkColor="#6B594D">{request.description}</ThemedText>
-          <ThemedText selectable style={styles.requestItemName} lightColor="#745947" darkColor="#745947">{MERGE_ITEMS_BY_ID.get(request.definitionId)?.name ?? 'Merge item'}</ThemedText>
-        </View>
-      </View>)}
-    </View> : null}
+    <CompanionMergeRequestTray
+      accessibilityLabel="Baristabbit's requested merge items"
+      eyebrow="ON THE COUNTER"
+      palette={{ trayBackground: 'rgba(255,255,255,0.55)', trayBorder: 'rgba(119,76,46,0.2)', rowBackground: '#FFF9EF', eyebrow: '#805637', count: '#6A503F', title: '#35271F', description: '#6B594D', item: '#745947', badgeBackground: '#70482E', badgeText: '#FFF9E9' }}
+      requests={requests.map((request) => ({ id: request.title, title: request.title, description: request.description, definitionIds: [request.definitionId] }))}
+    />
     {!complete ? <Pressable accessibilityRole="button" onPress={() => {
       if (returnReady && story.pendingConversationId) { beginBaristabbitReturn(); onOpenConversation(story.pendingConversationId); }
       else if (needsBeginning) onBegin();
@@ -107,11 +98,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 21, fontWeight: '900', letterSpacing: -0.35, lineHeight: 25 }, body: { fontSize: 13.5, lineHeight: 20 },
   bondSummary: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: '#718C58', borderCurve: 'continuous', borderRadius: 999, flexDirection: 'row', gap: 7, minHeight: 34, paddingHorizontal: 12 },
   bondSummaryText: { fontSize: 11.5, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  requestTray: { backgroundColor: 'rgba(255,255,255,0.55)', borderColor: 'rgba(119,76,46,0.2)', borderCurve: 'continuous', borderRadius: 20, borderWidth: 1, gap: 8, padding: 11 },
-  requestHeading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 3 }, requestEyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 }, requestCount: { fontSize: 10.5, fontWeight: '800' },
-  requestRow: { alignItems: 'center', backgroundColor: '#FFF9EF', borderCurve: 'continuous', borderRadius: 15, flexDirection: 'row', gap: 10, minHeight: 68, paddingHorizontal: 9, paddingVertical: 6 },
-  requestArt: { alignItems: 'center', height: 50, justifyContent: 'center', width: 50 }, requestCopy: { flex: 1, gap: 1 },
-  requestTitle: { fontSize: 13.5, fontWeight: '900', lineHeight: 18 }, requestDescription: { fontSize: 11, lineHeight: 15 }, requestItemName: { fontSize: 11.5, fontWeight: '700', lineHeight: 16 },
   primary: { alignItems: 'center', backgroundColor: '#70482E', borderCurve: 'continuous', borderRadius: 19, flexDirection: 'row', gap: 10, minHeight: 54, paddingHorizontal: 15 }, primaryLabel: { flex: 1, fontSize: 15, fontWeight: '900' },
   secondary: { alignItems: 'center', borderRadius: 17, flexDirection: 'row', justifyContent: 'space-between', minHeight: 46, paddingHorizontal: 13 }, secondaryCopy: { alignItems: 'center', flexDirection: 'row', gap: 9 }, secondaryLabel: { fontSize: 13, fontWeight: '900' }, pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
 });

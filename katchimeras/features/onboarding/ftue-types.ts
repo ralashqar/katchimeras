@@ -12,7 +12,9 @@ export type FtueHandlerId =
   | 'journal_place'
   | 'discovery_hatch'
   | 'companion_conversation'
+  | 'companion_order_preview'
   | 'merge_item_created'
+  | 'merge_generator_spawned'
   | 'merge_order_served'
   | 'merge_energy_depleted'
   | 'acknowledgement';
@@ -44,6 +46,9 @@ export type FtueGuide = { eyebrow: string; title: string; body: string };
 
 export type FtueTarget =
   | { kind: 'board_item'; instanceId: string }
+  | { kind: 'board_items'; definitionId: string; occurrence: number }
+  | { kind: 'board_generator'; generatorId: string }
+  | { kind: 'order_requirement_item'; orderId: string; requirementIndex: number; occurrence?: number }
   | { kind: 'board_cell'; cell: number }
   | { kind: 'order_serve'; orderId: string };
 
@@ -62,6 +67,7 @@ export type FtueSpotlightDefinition = {
 export type FtueInteractionPolicy =
   | { mode: 'none' }
   | { mode: 'exclusive'; allowed: { kind: 'board_drag'; from: FtueTarget; to: FtueTarget } }
+  | { mode: 'exclusive'; allowed: { kind: 'generator_tap'; target: FtueTarget } }
   | { mode: 'exclusive'; allowed: { kind: 'order_serve'; target: FtueTarget } };
 
 export type FtueEvent =
@@ -70,6 +76,14 @@ export type FtueEvent =
       fromInstanceId: string;
       targetInstanceId: string;
       resultDefinitionId: string;
+      resultCell: number;
+      revision: number;
+    }
+  | {
+      type: 'item_spawned';
+      generatorId: string;
+      instanceId: string;
+      definitionId: string;
       resultCell: number;
       revision: number;
     }
@@ -82,12 +96,14 @@ export type FtueEventMatcher =
       targetInstanceId?: string;
       resultDefinitionId?: string;
     }
+  | { type: 'item_spawned'; generatorId?: string; definitionId?: string }
   | { type: 'order_served'; orderId?: string };
 
 export type FtueGraphEdge = {
   event: FtueEventMatcher;
   commitActionId: string;
   nextStepId: string;
+  requiredCount?: number;
 };
 
 export type FtueStepDefinition = {
@@ -139,7 +155,7 @@ export type FtueCommitReceipt = {
 export type FtueRunStatus = 'active' | 'complete';
 
 export type FtueRunState = {
-  schemaVersion: 4;
+  schemaVersion: 5;
   runId: string;
   scriptId: string;
   scriptVersion: number;
@@ -152,6 +168,7 @@ export type FtueRunState = {
   receipts: FtueCommitReceipt[];
   mergeInstalled: boolean;
   awardedMergeEnergy: number | null;
+  objectiveProgress: Record<string, number>;
 };
 
 export type FtueSurfaceViewModel = {

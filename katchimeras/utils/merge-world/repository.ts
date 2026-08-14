@@ -169,17 +169,42 @@ export async function installMossproutOnboardingMergeWorld(now = Date.now(), rew
   return freshState;
 }
 
-export async function prepareMossproutMergeFtueForDebug(step: 'merge.seed_drag' | 'merge.serve_sprout', now = Date.now()) {
-  const installed = await installMossproutOnboardingMergeWorld(now);
-  if (step === 'merge.seed_drag') return installed;
-  const from = installed.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.instanceId === 'onboarding-seed-a');
-  const to = installed.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.instanceId === 'onboarding-seed-b');
-  if (from < 0 || to < 0) return installed;
-  const merged = reduceMergeWorld(installed, { type: 'move', from, to, now: now + 1 }).state;
-  await saveMergeWorldState(merged);
-  resetListeners.forEach((listener) => listener(merged));
-  publishSnapshot(merged);
-  return merged;
+export type MossproutMergeFtueStepId =
+  | 'merge.seed_drag'
+  | 'merge.serve_sprout'
+  | 'merge.plant.spawn'
+  | 'merge.plant.seed_pairs'
+  | 'merge.plant.sprout_pair'
+  | 'merge.serve_plant';
+
+export async function prepareMossproutMergeFtueForDebug(step: MossproutMergeFtueStepId, now = Date.now()) {
+  let prepared = await installMossproutOnboardingMergeWorld(now);
+  if (step === 'merge.seed_drag') return prepared;
+  prepared = mergeFirstPair(prepared, 'nature:garden:1', now + 1);
+  if (step === 'merge.serve_sprout') return persistPreparedFtueState(prepared);
+  prepared = reduceMergeWorld(prepared, { type: 'serveOrder', orderId: 'mossprout:chapter-0:first-sprout', now: now + 2 }).state;
+  if (step === 'merge.plant.spawn') return persistPreparedFtueState(prepared);
+  for (let index = 0; index < 4; index += 1) {
+    prepared = reduceMergeWorld(prepared, { type: 'tapGenerator', generatorId: 'wild-garden', now: now + 3 + index, seed: `ftue-debug:${index}` }).state;
+  }
+  if (step === 'merge.plant.seed_pairs') return persistPreparedFtueState(prepared);
+  prepared = mergeFirstPair(prepared, 'nature:garden:1', now + 8);
+  prepared = mergeFirstPair(prepared, 'nature:garden:1', now + 9);
+  if (step === 'merge.plant.sprout_pair') return persistPreparedFtueState(prepared);
+  prepared = mergeFirstPair(prepared, 'nature:garden:2', now + 10);
+  return persistPreparedFtueState(prepared);
+}
+
+function mergeFirstPair(state: MergeWorldState, definitionId: string, now: number) {
+  const cells = state.board.flatMap((cell, index) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === definitionId ? [index] : []);
+  return cells.length < 2 ? state : reduceMergeWorld(state, { type: 'move', from: cells[0], to: cells[1], now }).state;
+}
+
+async function persistPreparedFtueState(state: MergeWorldState) {
+  await saveMergeWorldState(state);
+  resetListeners.forEach((listener) => listener(state));
+  publishSnapshot(state);
+  return state;
 }
 
 /** Makes one day eligible for real-life Merge Energy without resetting board progress. */

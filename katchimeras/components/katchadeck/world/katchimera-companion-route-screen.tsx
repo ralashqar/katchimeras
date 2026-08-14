@@ -7,7 +7,7 @@ import { KingdomCompanionScreen } from '@/components/katchadeck/world/kingdom-co
 import { markFlowStart, reportFlowReady } from '@/utils/flow-performance';
 import { familyIdFromCompanionId } from '@/constants/katchimera-skins';
 import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
-import { commitFtueAction, ftueWispForRun, loadFtueRun, updateFtueRun } from '@/features/onboarding/ftue-runtime';
+import { commitFtueAction, ftueWispForRun, loadFtueRun, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { installMossproutOnboardingMergeWorld } from '@/utils/merge-world/repository';
 
 export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConversationDefinitionId }: { creatureId: string; source?: 'merge-world'; ftueConversationDefinitionId?: string }) {
@@ -15,21 +15,27 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConvers
   const router = useRouter();
   const familyId = familyIdFromCompanionId(creatureId);
   const ftueHandoffRef = useRef(false);
+  const ftueRun = useFtueRun();
   const completeFtueConversation = useCallback(() => {
+    const run = loadFtueRun();
+    if (run?.stepId !== 'companion.first_meeting') return;
+    commitFtueAction({ actionId: 'companion.complete_first_meeting', evidenceRef: ftueConversationDefinitionId ?? 'mossprout-ftue' });
+  }, [ftueConversationDefinitionId]);
+  const openFtueGarden = useCallback(() => {
     if (ftueHandoffRef.current) return;
     ftueHandoffRef.current = true;
     const run = loadFtueRun();
     void installMossproutOnboardingMergeWorld(Date.now(), ftueWispForRun(run))
       .then(() => {
         updateFtueRun({ mergeInstalled: true });
-        commitFtueAction({ actionId: 'companion.complete_first_meeting', evidenceRef: ftueConversationDefinitionId ?? 'mossprout-ftue' });
+        commitFtueAction({ actionId: 'companion.open_garden', evidenceRef: 'mossprout-order-preview' });
         router.dismissTo({ pathname: '/games', params: { familyId: 'mossprout' } });
       })
       .catch((error) => {
         ftueHandoffRef.current = false;
         console.warn('Could not prepare Mossprout Chapter 0', error);
       });
-  }, [ftueConversationDefinitionId, router]);
+  }, [router]);
 
   useEffect(() => {
     if (!isFocused) return;
@@ -52,6 +58,8 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConvers
     <KingdomCompanionScreen
       ftueConversationDefinitionId={ftueConversationDefinitionId}
       onFtueConversationComplete={ftueConversationDefinitionId ? completeFtueConversation : undefined}
+      ftueOrderPreviewActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.order_preview'}
+      onFtueOpenMerge={openFtueGarden}
       initialCreatureId={creatureId}
       onCloseCompanion={() => source === 'merge-world' ? router.dismissTo('/games') : router.back()}
       onOpenMerge={(orderId, selectedFamilyId) => router.dismissTo({

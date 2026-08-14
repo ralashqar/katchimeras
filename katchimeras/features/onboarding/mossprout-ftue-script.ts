@@ -26,7 +26,7 @@ const openingActions: readonly FtueActionDefinition[] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 6,
+  version: 7,
   entryStepId: 'egg.opening',
   terminalStepId: 'complete',
   steps: [
@@ -85,7 +85,13 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'companion.first_meeting', surface: 'companion',
       guide: { eyebrow: 'Say hello', title: 'Meet Mossprout.', body: 'It remembers what you shared.' },
-      actions: [{ id: 'companion.complete_first_meeting', title: 'Let’s look', description: 'Open Mossprout’s real Merge board.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'merge.seed_drag', backendEvent: true }],
+      actions: [{ id: 'companion.complete_first_meeting', title: 'See the requests', description: 'Plan Mossprout’s first garden.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'companion.order_preview', backendEvent: true }],
+      blockingBeat: 'mossprout_intro',
+    },
+    {
+      id: 'companion.order_preview', surface: 'companion',
+      guide: { eyebrow: 'A little place to begin', title: 'Two things to grow.', body: 'Start small, then grow something taller.' },
+      actions: [{ id: 'companion.open_garden', title: 'Open the garden', description: 'Begin Mossprout’s requests.', icon: 'leaf.fill', presentation: 'cta_action', handlerId: 'companion_order_preview', nextStepId: 'merge.seed_drag', backendEvent: true }],
       blockingBeat: 'mossprout_intro',
     },
     {
@@ -96,19 +102,19 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
         mode: 'exclusive',
         allowed: {
           kind: 'board_drag',
-          from: { kind: 'board_item', instanceId: 'onboarding-seed-a' },
-          to: { kind: 'board_item', instanceId: 'onboarding-seed-b' },
+          from: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 },
+          to: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 1 },
         },
       },
       cue: {
         kind: 'drag',
-        from: { kind: 'board_item', instanceId: 'onboarding-seed-a' },
-        to: { kind: 'board_item', instanceId: 'onboarding-seed-b' },
+        from: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 },
+        to: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 1 },
       },
       spotlight: {
         targets: [
-          { kind: 'board_item', instanceId: 'onboarding-seed-a' },
-          { kind: 'board_item', instanceId: 'onboarding-seed-b' },
+          { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 },
+          { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 1 },
         ],
         grouping: 'bounding_rect',
         padding: 3,
@@ -118,8 +124,6 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       edges: [{
         event: {
           type: 'merge_completed',
-          fromInstanceId: 'onboarding-seed-a',
-          targetInstanceId: 'onboarding-seed-b',
           resultDefinitionId: 'nature:garden:2',
         },
         commitActionId: 'merge.create_sprout',
@@ -136,7 +140,11 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       },
       cue: { kind: 'tap', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' } },
       spotlight: {
-        targets: [{ kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' }],
+        targets: [
+          { kind: 'order_requirement_item', orderId: 'mossprout:chapter-0:first-sprout', requirementIndex: 0 },
+          { kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' },
+        ],
+        grouping: 'individual',
         padding: 7,
         radius: 14,
         dimOpacity: 0.64,
@@ -144,8 +152,44 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       edges: [{
         event: { type: 'order_served', orderId: 'mossprout:chapter-0:first-sprout' },
         commitActionId: 'merge.serve_sprout',
-        nextStepId: 'chapter.complete',
+        nextStepId: 'merge.plant.spawn',
       }],
+    },
+    {
+      id: 'merge.plant.spawn', surface: 'merge',
+      guide: { eyebrow: 'Second request', title: 'Grow four Seeds.', body: 'Tap the Wild Garden.' },
+      actions: [{ id: 'merge.spawn_plant_seeds', title: 'Grow four Seeds', description: 'Tap the Wild Garden four times.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_generator_spawned', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'generator_tap', target: { kind: 'board_generator', generatorId: 'wild-garden' } } },
+      cue: { kind: 'tap', target: { kind: 'board_generator', generatorId: 'wild-garden' } },
+      spotlight: { targets: [{ kind: 'board_generator', generatorId: 'wild-garden' }], padding: 5, radius: 12, dimOpacity: 0.64 },
+      edges: [{ event: { type: 'item_spawned', generatorId: 'wild-garden', definitionId: 'nature:garden:1' }, requiredCount: 4, commitActionId: 'merge.spawn_plant_seeds', nextStepId: 'merge.plant.seed_pairs' }],
+    },
+    {
+      id: 'merge.plant.seed_pairs', surface: 'merge',
+      guide: { eyebrow: 'Second request', title: 'Make two Sprouts.', body: 'Merge the Seeds in pairs.' },
+      actions: [{ id: 'merge.create_two_sprouts', title: 'Make two Sprouts', description: 'Merge both pairs of Seeds.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 }, to: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 1 } } },
+      cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 }, to: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 1 } },
+      spotlight: { targets: [{ kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 }, { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 1 }], grouping: 'bounding_rect', padding: 3, radius: 11, dimOpacity: 0.64 },
+      edges: [{ event: { type: 'merge_completed', resultDefinitionId: 'nature:garden:2' }, requiredCount: 2, commitActionId: 'merge.create_two_sprouts', nextStepId: 'merge.plant.sprout_pair' }],
+    },
+    {
+      id: 'merge.plant.sprout_pair', surface: 'merge',
+      guide: { eyebrow: 'Second request', title: 'Make a Plant.', body: 'Merge the two Sprouts.' },
+      actions: [{ id: 'merge.create_home_plant', title: 'Make a Plant', description: 'Merge the two Sprouts.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from: { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 0 }, to: { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 1 } } },
+      cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 0 }, to: { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 1 } },
+      spotlight: { targets: [{ kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 0 }, { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 1 }], grouping: 'bounding_rect', padding: 3, radius: 11, dimOpacity: 0.64 },
+      edges: [{ event: { type: 'merge_completed', resultDefinitionId: 'nature:garden:3' }, commitActionId: 'merge.create_home_plant', nextStepId: 'merge.serve_plant' }],
+    },
+    {
+      id: 'merge.serve_plant', surface: 'merge',
+      guide: { eyebrow: 'Second request', title: 'Bring it home.', body: 'Serve the Plant.' },
+      actions: [{ id: 'merge.serve_home_plant', title: 'Serve the Plant', description: 'Give Mossprout its new Plant.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_order_served', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'order_serve', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:home-plant' } } },
+      cue: { kind: 'tap', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:home-plant' } },
+      spotlight: { targets: [{ kind: 'order_requirement_item', orderId: 'mossprout:chapter-0:home-plant', requirementIndex: 0 }, { kind: 'order_serve', orderId: 'mossprout:chapter-0:home-plant' }], grouping: 'individual', padding: 7, radius: 14, dimOpacity: 0.64 },
+      edges: [{ event: { type: 'order_served', orderId: 'mossprout:chapter-0:home-plant' }, commitActionId: 'merge.serve_home_plant', nextStepId: 'chapter.complete' }],
     },
     {
       id: 'chapter.complete', surface: 'merge',

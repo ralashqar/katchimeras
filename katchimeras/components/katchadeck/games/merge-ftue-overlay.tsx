@@ -34,9 +34,13 @@ type Frame = Point & { height: number; width: number };
 type CuePoints = { from: Point; to: Point };
 type OverlayLayout = {
   configKey: string;
+  presentationKey: string;
+  cue: FtueCueDefinition | null;
   cuePoints: CuePoints | null;
   screen: { height: number; width: number };
   spotlightFrames: Frame[];
+  spotlightOpacity: number;
+  spotlightRadius: number;
 };
 
 export function MergeFtueOverlay({
@@ -109,12 +113,22 @@ export function MergeFtueOverlay({
         }
       }
 
+      // Keep the last valid presentation mounted while newly declared targets
+      // are entering or their native refs are being measured. This lets its
+      // keyed exit animation finish instead of flashing the undimmed board.
+      if ((cue && !cuePoints) || (spotlight && spotlightFrames.length === 0)) return;
+
       if (!cancelled) {
+        const presentationKey = `${configKey}|${spotlightFrames.map(frameSignature).join('|')}|${cuePoints ? `${pointSignature(cuePoints.from)}>${pointSignature(cuePoints.to)}` : 'no-cue'}`;
         setLayout({
           configKey,
+          presentationKey,
+          cue,
           cuePoints,
           screen: { height: screen.height, width: screen.width },
           spotlightFrames,
+          spotlightOpacity: spotlight?.dimOpacity ?? 0.64,
+          spotlightRadius: spotlight?.radius ?? 12,
         });
       }
     });
@@ -137,9 +151,9 @@ export function MergeFtueOverlay({
     targetRevision,
   ]);
 
-  const currentLayout = layout?.configKey === configKey ? layout : null;
-  const showSpotlight = Boolean(spotlight && currentLayout?.spotlightFrames.length);
-  const showCue = Boolean(cue && currentLayout?.cuePoints);
+  const currentLayout = layout;
+  const showSpotlight = Boolean(currentLayout?.spotlightFrames.length);
+  const showCue = Boolean(currentLayout?.cue && currentLayout.cuePoints);
   if (!currentLayout || (!showSpotlight && !showCue)) return null;
 
   return (
@@ -151,14 +165,14 @@ export function MergeFtueOverlay({
       {showSpotlight ? (
         <FtueSpotlight
           frames={currentLayout.spotlightFrames}
-          key={spotlightKey}
-          opacity={spotlight?.dimOpacity ?? 0.64}
-          radius={spotlight?.radius ?? 12}
+          key={`spotlight:${currentLayout.presentationKey}`}
+          opacity={currentLayout.spotlightOpacity}
+          radius={currentLayout.spotlightRadius}
           screen={currentLayout.screen}
         />
       ) : null}
-      {showCue && cue && currentLayout.cuePoints ? (
-        <FtueFingerCue blockedPulseNonce={blockedPulseNonce} cue={cue} key={cueKey} points={currentLayout.cuePoints} />
+      {showCue && currentLayout.cue && currentLayout.cuePoints ? (
+        <FtueFingerCue blockedPulseNonce={blockedPulseNonce} cue={currentLayout.cue} key={`cue:${currentLayout.presentationKey}`} points={currentLayout.cuePoints} />
       ) : null}
     </View>
   );
@@ -257,7 +271,7 @@ function FtueFingerCue({ blockedPulseNonce, cue, points }: {
   }, [cue.kind, reduceMotion, travelX, travelY]);
 
   return (
-    <Animated.View style={[
+    <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(140)} style={[
       styles.hand,
       {
         left: points.from.x - HAND_SIZE * HAND_TIP_X,
@@ -276,6 +290,14 @@ function FtueFingerCue({ blockedPulseNonce, cue, points }: {
       />
     </Animated.View>
   );
+}
+
+function frameSignature(frame: Frame) {
+  return `${Math.round(frame.x)}:${Math.round(frame.y)}:${Math.round(frame.width)}:${Math.round(frame.height)}`;
+}
+
+function pointSignature(point: Point) {
+  return `${Math.round(point.x)}:${Math.round(point.y)}`;
 }
 
 async function resolveTargetFrame(
