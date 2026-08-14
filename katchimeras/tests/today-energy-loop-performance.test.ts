@@ -133,14 +133,14 @@ test('forming nurture presentation does not mount the legacy Today scene underne
   assert.match(todaySource, /energyLoopStatus === 'rewarding'[\s\S]*?\|\| energyLoopStatus === 'entering'/);
   assert.match(todaySource, /actionListLocked=\{[\s\S]*?energyLoopStatus === 'launching'[\s\S]*?energyLoopStatus === 'awaiting_completion'[\s\S]*?energyLoopStatus === 'rewarding'/);
   assert.doesNotMatch(heroSource, /kingdom-surface-tiles|world-visuals|TodayFallbackCloudScene/);
-  assert.match(heroSource, /transientEffectsMounted \? \(/);
+  assert.match(heroSource, /transientEffectsMounted \? <>/);
   assert.match(heroSource, /setTransientEffectsMounted\(false\)/);
   assert.match(heroSource, /useEggAvatar\(\)/);
   assert.match(heroSource, /<EggAvatarArtwork/);
   assert.match(heroSource, /skinId=\{equippedSkinId\}/);
-  assert.match(heroSource, /faceId=\{equippedFaceId\}/);
+  assert.match(heroSource, /faceId=\{forceSleeping \? 'sleepy' : equippedFaceId\}/);
   assert.doesNotMatch(heroSource, /cutouts\/egg-base/);
-  assert.match(nurtureSource, /FadeInUp\.delay\(55\)\.duration\(320\)/);
+  assert.match(nurtureSource, /\(enterFromBottom \? FadeInDown : FadeInUp\)\.delay\(55\)\.duration\(320\)/);
   assert.match(nurtureSource, /function useActionRowLayout[\s\S]*?LinearTransition\.duration\(300\)/);
   assert.ok((nurtureSource.match(/<Animated\.View layout=\{rowLayout\}>/g) ?? []).length >= 3);
   assert.match(nurtureSource, /<Animated\.View layout=\{actionHandoffLayout\} style=\{styles\.checkInGroup\}>/);

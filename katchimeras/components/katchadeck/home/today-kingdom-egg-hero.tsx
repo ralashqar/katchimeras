@@ -11,7 +11,7 @@ import {
   vec,
 } from '@shopify/react-native-skia';
 import { Image } from 'expo-image';
-import { memo, type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -31,6 +31,8 @@ import Animated, {
 
 import { ThemedText } from '@/components/themed-text';
 import { KatchaDeckUI } from '@/constants/theme';
+import { HOME_FTUE_CAMERA_SCALE } from '@/constants/home-loop-layout';
+import todayScene from '@/data/today-scene.json';
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
 import type { HomeArchetypeId } from '@/types/world-identity';
 import {
@@ -65,12 +67,28 @@ const DISCOVERY_EXPRESSIONS: readonly EggExpressionCue[] = [
   { faceId: 'big-surprise', atMs: 700, durationMs: 150 },
   { faceId: 'happy-squint', atMs: 920, durationMs: 140 },
 ];
+const FEED_HAPPY_EXPRESSION_IDS = ['big-grin', 'happy-squint'] as const;
+const SMALL_EGG_PLATFORM_LIFT = 18;
+export const TODAY_DORMANT_ZZZ_TOP_OFFSET = 92;
+// The native Egg surface is laid out once for the largest supported composed
+// presentation: full growth, maximum Home pinch, FTUE close-up and the largest
+// reaction pulse. Every live presentation therefore samples this surface at
+// 1x or below instead of magnifying a smaller intermediate layer.
+// Feedback (4.5%) and activation (7.5%) may overlap, so budget their full
+// 12% combined peak plus a small interpolation margin.
+const MAX_EGG_REACTION_SCALE = 1.13;
+export const TODAY_EGG_NATIVE_SURFACE_SCALE =
+  todayScene.homeEnvironment.motion.maxPinchScale
+  * HOME_FTUE_CAMERA_SCALE
+  * MAX_EGG_REACTION_SCALE;
 
 type TodayKingdomEggHeroProps = {
   accentColor?: string;
   coreColor?: string;
   companionWispId?: WispId | null;
   feedbackKey?: number;
+  feedExpressionKey?: number;
+  forceSleeping?: boolean;
   explorationStageTop?: number;
   homeArchetypeId?: HomeArchetypeId | null;
   hideKingdomEnvironmentArt?: boolean;
@@ -84,7 +102,9 @@ type TodayKingdomEggHeroProps = {
   onDiscoveryCreatureReady?: () => void;
   onEggPress?: () => void;
   pinchStrength?: number;
+  projectedCameraScale?: SharedValue<number>;
   showDormantIndicator?: boolean;
+  showForcedSleepIndicator?: boolean;
   targetRef?: RefObject<View | null>;
 };
 
@@ -123,6 +143,8 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   coreColor = '#FFF1B8',
   companionWispId,
   feedbackKey = 0,
+  feedExpressionKey = 0,
+  forceSleeping = false,
   explorationStageTop,
   isActivated = true,
   isReady = false,
@@ -133,7 +155,9 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   onDiscoveryCreatureError,
   onDiscoveryCreatureReady,
   onEggPress,
+  projectedCameraScale,
   showDormantIndicator = true,
+  showForcedSleepIndicator = true,
   targetRef,
 }: TodayKingdomEggHeroProps) {
   const { equippedFaceId, equippedSkinId } = useEggAvatar();
@@ -175,6 +199,11 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   const discoveryCreatureSource = discoveryCreature
     ? resolveCreatureArtSource(discoveryCreature.visualKey, { variantCell: discoveryCreature.variantCell })
     : null;
+  const feedExpressionSequence = useMemo<readonly EggExpressionCue[]>(() => [
+    { faceId: FEED_HAPPY_EXPRESSION_IDS[0], atMs: 80, durationMs: 180 },
+    { faceId: FEED_HAPPY_EXPRESSION_IDS[1], atMs: 430, durationMs: 190 },
+    { faceId: equippedFaceId, atMs: 900, durationMs: 240 },
+  ], [equippedFaceId]);
   const discoveryInitiallyRevealed = discoveryPhaseAtLeast(discoveryPhase, 'crossfading_subject');
   const discoveryShake = useSharedValue(0);
   const discoveryEggExit = useSharedValue(discoveryInitiallyRevealed ? 1 : 0);
@@ -451,31 +480,73 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
 
   const eggMotionStyle = useAnimatedStyle(() => {
     const shake = feedbackShake.value + readyShake.value + discoveryShake.value * 2;
+    const platformLift = (1 - visualGrowth.value)
+      * SMALL_EGG_PLATFORM_LIFT
+      * eggStageScale
+      * (projectedCameraScale?.value ?? 1);
     return {
       opacity: 1 - discoveryEggExit.value,
       transform: [
         { rotateZ: `${shake * 2.8}deg` },
         { translateX: discoveryShake.value * 7 },
-        { translateY: -activationPulse.value * (reduceMotion ? 2 : 7) },
-        { scale: (0.5 + visualGrowth.value * 0.5) * (1 + feedbackPulse.value * 0.045 + activationPulse.value * (reduceMotion ? 0.035 : 0.075)) },
+        { translateY: -platformLift - activationPulse.value * (reduceMotion ? 2 : 7) },
       ],
+    };
+  });
+  const eggNativeSurfaceStyle = useAnimatedStyle(() => {
+    const growthScale = 0.5 + visualGrowth.value * 0.5;
+    const reactionScale = 1
+      + feedbackPulse.value * 0.045
+      + activationPulse.value * (reduceMotion ? 0.035 : 0.075);
+    return {
+      // Camera, growth and reaction are composed into this one downscale. The
+      // Home hero is projected outside the environment camera subtree, so no
+      // intermediate small layer is enlarged again by a parent transform.
+      transform: [{
+        scale: growthScale
+          * reactionScale
+          * (projectedCameraScale?.value ?? 1)
+          / TODAY_EGG_NATIVE_SURFACE_SCALE,
+      }],
     };
   });
   const discoveryCrackOneStyle = useAnimatedStyle(() => ({ opacity: discoveryCrackOne.value * (1 - discoveryCrackTwo.value * 0.65) }));
   const discoveryCrackTwoStyle = useAnimatedStyle(() => ({ opacity: discoveryCrackTwo.value }));
+  const projectedEffectCameraStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: projectedCameraScale?.value ?? 1 }],
+  }));
   const discoveryPulseOneStyle = useAnimatedStyle(() => ({
     opacity: (1 - discoveryPulse.value) * 0.36 * (1 - discoveryEggExit.value),
-    transform: [{ scale: 0.62 + discoveryPulse.value * 0.72 }],
+    transform: [{
+      scale: (0.62 + discoveryPulse.value * 0.72) * (projectedCameraScale?.value ?? 1),
+    }],
   }));
   const discoveryPulseTwoStyle = useAnimatedStyle(() => ({
     opacity: (1 - discoveryPulse.value) * 0.22 * (1 - discoveryEggExit.value),
-    transform: [{ scale: 0.86 + discoveryPulse.value * 0.72 }],
+    transform: [{
+      scale: (0.86 + discoveryPulse.value * 0.72) * (projectedCameraScale?.value ?? 1),
+    }],
   }));
+  const discoveryCreatureFrame = discoveryCreature
+    ? todayExplorationCreatureStageFrame(
+        windowWidth,
+        windowHeight,
+        explorationStageTop ?? TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA,
+        discoveryCreature.visualKey,
+      )
+    : null;
   const discoveryCreatureStyle = useAnimatedStyle(() => ({
     opacity: discoveryCreatureEntry.value,
     transform: [
-      { translateY: 18 - discoveryCreatureEntry.value * 18 },
-      { scale: 0.6 + discoveryCreatureEntry.value * 0.4 },
+      {
+        translateY: 18 - discoveryCreatureEntry.value * 18
+          + ((projectedCameraScale?.value ?? 1) - 1)
+            * ((discoveryCreatureFrame?.centerY ?? eggFrame.centerY) - eggFrame.centerY),
+      },
+      {
+        scale: (0.6 + discoveryCreatureEntry.value * 0.4)
+          * (projectedCameraScale?.value ?? 1),
+      },
     ],
   }));
   const discoveryGlowStyle = useAnimatedStyle(() => ({
@@ -489,22 +560,15 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   }));
   const companionAnchorStyle = useAnimatedStyle(() => {
     const eggGrowthScale = 0.5 + visualGrowth.value * 0.5;
+    const cameraScale = projectedCameraScale?.value ?? 1;
     return {
       transform: [
-        { translateX: companionFrame.translateX * eggGrowthScale },
-        { translateY: companionFrame.translateY * eggGrowthScale },
-        { scale: eggGrowthScale },
+        { translateX: companionFrame.translateX * eggGrowthScale * cameraScale },
+        { translateY: companionFrame.translateY * eggGrowthScale * cameraScale },
+        { scale: eggGrowthScale * cameraScale },
       ],
     };
   });
-  const discoveryCreatureFrame = discoveryCreature
-    ? todayExplorationCreatureStageFrame(
-        windowWidth,
-        windowHeight,
-        explorationStageTop ?? TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA,
-        discoveryCreature.visualKey,
-      )
-    : null;
   const discoveryEggWidth = 200 * eggStageScale;
 
   return (
@@ -524,17 +588,19 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
               top: eggFrame.top,
             },
           ]}>
-          <EggRadiance
-            accentColor={accentColor}
-            coreColor={coreColor}
-            flare={radianceFlare}
-            growth={visualGrowth}
-            growthIntensity={growthIntensity}
-            stageHeight={eggFrame.height}
-            stageScale={eggStageScale}
-          />
-          {transientEffectsMounted ? (
-            <>
+          <Animated.View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, projectedEffectCameraStyle]}>
+            <EggRadiance
+              accentColor={accentColor}
+              coreColor={coreColor}
+              flare={radianceFlare}
+              growth={visualGrowth}
+              growthIntensity={growthIntensity}
+              stageHeight={eggFrame.height}
+              stageScale={eggStageScale}
+            />
+            {transientEffectsMounted ? <>
               <EggActivationCelebration
                 progress={activationCelebration}
                 reduceMotion={reduceMotion}
@@ -549,52 +615,78 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
                 stageHeight={eggFrame.height}
                 stageScale={eggStageScale}
               />
-            </>
-          ) : null}
+            </> : null}
+          </Animated.View>
           <Animated.View
+            renderToHardwareTextureAndroid={false}
+            shouldRasterizeIOS={false}
             style={[
               styles.eggMotionFrame,
+              {
+                height: eggFrame.height,
+                transformOrigin: 'center bottom',
+                width: 200 * eggStageScale,
+              },
               eggMotionStyle,
-              { width: 200 * eggStageScale },
             ]}>
-            <Pressable
-              accessibilityLabel="Today egg"
-              accessibilityRole="button"
-              disabled={!onEggPress}
-              onPress={onEggPress}
-              style={styles.eggImageFrame}>
-              <EggAvatarArtwork
-                allowDownscaling={false}
-                expressionSequence={discoveryHatch && !discoveryPhaseAtLeast(discoveryPhase, 'crossfading_subject') ? DISCOVERY_EXPRESSIONS : undefined}
-                expressionSequenceKey={discoveryHatch ? `${discoveryHatch.dayId}:discovery` : undefined}
-                faceId={equippedFaceId}
-                priority="high"
-                resolution="high"
-                skinId={equippedSkinId}
-                style={StyleSheet.absoluteFill}
-                transition={0}
-              />
-              {discoveryHatch ? <>
-                <AnimatedImage
+            <Animated.View
+              renderToHardwareTextureAndroid={false}
+              shouldRasterizeIOS={false}
+              style={[
+                styles.eggNativeSurface,
+                {
+                  height: eggFrame.height * TODAY_EGG_NATIVE_SURFACE_SCALE,
+                  marginLeft: -100 * eggStageScale * TODAY_EGG_NATIVE_SURFACE_SCALE,
+                  transformOrigin: 'center bottom',
+                  width: 200 * eggStageScale * TODAY_EGG_NATIVE_SURFACE_SCALE,
+                },
+                eggNativeSurfaceStyle,
+              ]}>
+              <Pressable
+                accessibilityLabel="Today egg"
+                accessibilityRole="button"
+                disabled={!onEggPress}
+                onPress={onEggPress}
+                style={styles.eggImageFrame}>
+                <EggAvatarArtwork
                   allowDownscaling={false}
-                  cachePolicy="memory-disk"
-                  contentFit="contain"
+                  expressionSequence={
+                    discoveryHatch && !discoveryPhaseAtLeast(discoveryPhase, 'crossfading_subject')
+                      ? DISCOVERY_EXPRESSIONS
+                      : feedExpressionKey > 0
+                        ? feedExpressionSequence
+                        : undefined
+                  }
+                  expressionSequenceKey={discoveryHatch ? `${discoveryHatch.dayId}:discovery` : feedExpressionKey > 0 ? `feed:${feedExpressionKey}` : 'idle'}
+                  faceId={forceSleeping ? 'sleepy' : equippedFaceId}
                   priority="high"
-                  source={DISCOVERY_CRACK_ONE}
-                  style={[StyleSheet.absoluteFill, eggAvatarBodyPresentationStyle(equippedSkinId), discoveryCrackOneStyle]}
+                  resolution="high"
+                  skinId={equippedSkinId}
+                  style={StyleSheet.absoluteFill}
                   transition={0}
                 />
-                <AnimatedImage
-                  allowDownscaling={false}
-                  cachePolicy="memory-disk"
-                  contentFit="contain"
-                  priority="high"
-                  source={DISCOVERY_CRACK_TWO}
-                  style={[StyleSheet.absoluteFill, eggAvatarBodyPresentationStyle(equippedSkinId), discoveryCrackTwoStyle]}
-                  transition={0}
-                />
-              </> : null}
-            </Pressable>
+                {discoveryHatch ? <>
+                  <AnimatedImage
+                    allowDownscaling={false}
+                    cachePolicy="memory-disk"
+                    contentFit="contain"
+                    priority="high"
+                    source={DISCOVERY_CRACK_ONE}
+                    style={[StyleSheet.absoluteFill, eggAvatarBodyPresentationStyle(equippedSkinId), discoveryCrackOneStyle]}
+                    transition={0}
+                  />
+                  <AnimatedImage
+                    allowDownscaling={false}
+                    cachePolicy="memory-disk"
+                    contentFit="contain"
+                    priority="high"
+                    source={DISCOVERY_CRACK_TWO}
+                    style={[StyleSheet.absoluteFill, eggAvatarBodyPresentationStyle(equippedSkinId), discoveryCrackTwoStyle]}
+                    transition={0}
+                  />
+                </> : null}
+              </Pressable>
+            </Animated.View>
           </Animated.View>
           {companionWispId ? (
             <Animated.View
@@ -612,7 +704,13 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
               <WispCompanion id={companionWispId} size={companionFrame.size} />
             </Animated.View>
           ) : null}
-          {!isActivated && showDormantIndicator ? <DormantEggZzz growth={visualGrowth} reduceMotion={reduceMotion} stageScale={eggStageScale} /> : null}
+          {forceSleeping
+            ? showForcedSleepIndicator
+              ? <DormantEggZzz growth={visualGrowth} reduceMotion={reduceMotion} stageScale={eggStageScale} />
+              : null
+            : !isActivated && showDormantIndicator
+              ? <DormantEggZzz growth={visualGrowth} reduceMotion={reduceMotion} stageScale={eggStageScale} />
+              : null}
         </View>
       </View>
       {discoveryCreature && discoveryCreatureSource && discoveryCreatureFrame ? (
@@ -740,9 +838,10 @@ function DormantEggZzz({ growth, reduceMotion, screenAnchor, stageScale }: {
   const animatedStyle = useAnimatedStyle(() => {
     const parentZoom = Math.max(1, environmentMotion?.pinchScale.value ?? 1);
     const growthLift = growth.value * 34 * stageScale;
+    const platformLift = (1 - growth.value) * SMALL_EGG_PLATFORM_LIFT * stageScale;
     if (screenAnchor) {
       return {
-        opacity: 0.62 + drift.value * 0.28,
+        opacity: 0.82 + drift.value * 0.16,
         transform: [
           {
             translateX: screenAnchor.sceneTranslateX.value * parentZoom
@@ -751,7 +850,8 @@ function DormantEggZzz({ growth, reduceMotion, screenAnchor, stageScale }: {
           {
             translateY: (parentZoom - 1) * (screenAnchor.top - screenAnchor.focusY)
               - drift.value * 5
-              - growthLift,
+              - growthLift
+              - platformLift,
           },
           { rotate: `${-3 + drift.value * 5}deg` },
           { scale: 0.96 + drift.value * 0.05 },
@@ -759,9 +859,9 @@ function DormantEggZzz({ growth, reduceMotion, screenAnchor, stageScale }: {
       };
     }
     return {
-      opacity: 0.62 + drift.value * 0.28,
+      opacity: 0.82 + drift.value * 0.16,
       transform: [
-        { translateY: -drift.value * 5 - growthLift },
+        { translateY: -drift.value * 5 - growthLift - platformLift },
         { rotate: `${-3 + drift.value * 5}deg` },
         // The egg/environment retain their shared pinch transform, while the
         // sleep indicator stays a sharp screen-space overlay instead of a
@@ -775,16 +875,18 @@ function DormantEggZzz({ growth, reduceMotion, screenAnchor, stageScale }: {
       entering={FadeIn.duration(reduceMotion ? 80 : 220)}
       exiting={FadeOut.duration(reduceMotion ? 80 : 180)}
       pointerEvents="none"
+      renderToHardwareTextureAndroid={false}
+      shouldRasterizeIOS={false}
       style={[
         styles.zzz,
         screenAnchor
           ? { left: screenAnchor.left, top: screenAnchor.top }
-          : { marginLeft: 92 * stageScale, top: 62 * stageScale },
+          : { marginLeft: 92 * stageScale, top: TODAY_DORMANT_ZZZ_TOP_OFFSET * stageScale },
         animatedStyle,
       ]}>
-      <ThemedText style={[styles.zzzSmall, { transform: [{ translateY: 10 * stageScale }] }]} lightColor="#FFF4C7" darkColor="#FFF4C7">z</ThemedText>
-      <ThemedText style={styles.zzzMedium} lightColor="#FFE69A" darkColor="#FFE69A">z</ThemedText>
-      <ThemedText style={styles.zzzLarge} lightColor="#FFD46F" darkColor="#FFD46F">Z</ThemedText>
+      <ThemedText style={[styles.zzzSmall, { transform: [{ translateY: 10 * stageScale }] }]} lightColor="#5B3A70" darkColor="#5B3A70">z</ThemedText>
+      <ThemedText style={styles.zzzMedium} lightColor="#4A2B61" darkColor="#4A2B61">z</ThemedText>
+      <ThemedText style={styles.zzzLarge} lightColor="#351943" darkColor="#351943">Z</ThemedText>
     </Animated.View>
   );
 }
@@ -1095,7 +1197,7 @@ const styles = StyleSheet.create({
   },
   egg: {
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     left: 0,
     overflow: 'visible',
     position: 'absolute',
@@ -1106,9 +1208,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   eggMotionFrame: {
-    height: '100%',
     transformOrigin: 'center bottom',
     zIndex: 3,
+  },
+  eggNativeSurface: {
+    bottom: 0,
+    left: '50%',
+    position: 'absolute',
+    transformOrigin: 'center bottom',
   },
   eggShoulderWisp: {
     left: '50%',
@@ -1180,9 +1287,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     zIndex: 5,
   },
-  zzzSmall: { fontSize: 15, fontWeight: '900', textShadowColor: 'rgba(77,45,15,0.42)', textShadowOffset: { height: 1, width: 0 }, textShadowRadius: 2 },
-  zzzMedium: { fontSize: 21, fontWeight: '900', textShadowColor: 'rgba(77,45,15,0.42)', textShadowOffset: { height: 1, width: 0 }, textShadowRadius: 2 },
-  zzzLarge: { fontSize: 29, fontWeight: '900', lineHeight: 38, marginLeft: -7, minWidth: 36, paddingHorizontal: 3, textAlign: 'center', textShadowColor: 'rgba(77,45,15,0.46)', textShadowOffset: { height: 1, width: 0 }, textShadowRadius: 3 },
+  zzzSmall: { fontSize: 15, fontWeight: '900', textShadowColor: 'rgba(255,246,220,0.92)', textShadowOffset: { height: 0, width: 0 }, textShadowRadius: 3 },
+  zzzMedium: { fontSize: 21, fontWeight: '900', textShadowColor: 'rgba(255,246,220,0.94)', textShadowOffset: { height: 0, width: 0 }, textShadowRadius: 3.5 },
+  zzzLarge: { fontSize: 29, fontWeight: '900', lineHeight: 38, marginLeft: -7, minWidth: 36, paddingHorizontal: 3, textAlign: 'center', textShadowColor: 'rgba(255,246,220,0.96)', textShadowOffset: { height: 0, width: 0 }, textShadowRadius: 4 },
   belowEgg: {
     alignItems: 'center',
     left: 0,

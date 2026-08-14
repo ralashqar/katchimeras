@@ -116,6 +116,12 @@ import { useTodayEnergyFrameProbe } from '@/features/today/use-today-energy-fram
 import { TodayEnergyProfiler } from '@/features/today/today-energy-profiler';
 import { useAppActivity } from '@/features/performance/app-activity';
 import { beginFtueAction, commitFtueAction, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { ftueOwnsOpeningHome } from '@/features/onboarding/ftue-navigation-policy';
+import {
+  FTUE_OPENING_UI_DELAY_MS,
+  ftueHomeCameraDuration,
+  ftueHomeCameraPinchTarget,
+} from '@/features/onboarding/ftue-home-camera';
 import { FTUE_MOSSPROUT_CREATURE } from '@/features/onboarding/mossprout-ftue-creature';
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import type { FtueActionDefinition, FtueChoiceOption } from '@/features/onboarding/ftue-types';
@@ -232,8 +238,9 @@ function HomeScreen() {
   const ftueRun = useFtueRun();
   const ftueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
   const ftueTodayStep = ftueStep?.surface === 'today' ? ftueStep : null;
+  const ftueOpeningOwnsHome = ftueOwnsOpeningHome(ftueRun);
   const ftueOpeningFocus = Boolean(ftueRun?.status === 'active' && ftueRun.stepId.startsWith('egg.'));
-  const discoveryHatchActive = Boolean(ftueRun?.status === 'active' && (ftueRun.stepId.startsWith('egg.') || ftueRun.stepId === 'hatch.reveal'));
+  const discoveryHatchActive = ftueOpeningOwnsHome;
   const { memoryDayId, memoryRecordId, memorySourceKind, onboardingCapture } = useLocalSearchParams<{
     memoryDayId?: string;
     memoryRecordId?: string;
@@ -260,11 +267,21 @@ function HomeScreen() {
   const [heroStageTop, setHeroStageTop] = useState<number | null>(null);
   const [manualJournalOpen, setManualJournalOpen] = useState(false);
   const [ftueActionBusy, setFtueActionBusy] = useState(false);
+  const [ftueOpeningUiVisible, setFtueOpeningUiVisible] = useState(ftueRun?.stepId !== 'egg.opening');
   const [onboardingEnergyReady, setOnboardingEnergyReady] = useState<number | null>(null);
   const openedOnboardingCaptureRef = useRef(false);
   useEffect(() => {
     setFtueActionBusy(false);
   }, [ftueRun?.runId, ftueRun?.stepId]);
+  useEffect(() => {
+    if (ftueRun?.status !== 'active' || ftueRun.stepId !== 'egg.opening') {
+      setFtueOpeningUiVisible(true);
+      return;
+    }
+    setFtueOpeningUiVisible(false);
+    const timer = setTimeout(() => setFtueOpeningUiVisible(true), FTUE_OPENING_UI_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [ftueRun?.runId, ftueRun?.status, ftueRun?.stepId]);
   const [quickGoalsOpen, setQuickGoalsOpen] = useState(false);
   const [quickGoalSheetMode, setQuickGoalSheetMode] = useState<'add' | 'manage' | null>(null);
   const [selectedCareGoalId, setSelectedCareGoalId] = useState<string | null>(null);
@@ -574,6 +591,7 @@ function HomeScreen() {
   const {
     eggFeed,
     eggFeedKey,
+    eggFeedLaunchKey,
     eggFeedRewardRequestKey,
     energyHudPulseNonce,
     energyHudTargetRef,
@@ -1238,8 +1256,10 @@ function HomeScreen() {
       : nurtureCare.completed
   ), [discoveryHatchActive, nurtureCare.completed, onboardingActivityAction]);
   const presentedNurtureActions = useMemo(() => {
-    if (ftueRun?.status === 'active') return [];
-    if (!discoveryHatchActive || !formingDay) return nurtureCare.active;
+    // The scripted list replaces normal care only while the Egg/hatch opening
+    // visibly owns Home. Companion and Merge FTUE continue elsewhere, so a
+    // return to Today (including Reset Today) resumes the normal care rotation.
+    if (!ftueOpeningOwnsHome || !formingDay) return nurtureCare.active;
     if (!onboardingMoodAnswered) {
       const mood = nurtureCare.active.find((action) => action.id === 'mood');
       return mood ? [{ ...mood, title: 'How are you feeling?', description: 'Choose one answer. The Egg is listening.' }] : [];
@@ -1248,7 +1268,7 @@ function HomeScreen() {
       return onboardingActivityAction ? [onboardingActivityAction] : [];
     }
     return [];
-  }, [discoveryHatchActive, formingDay, ftueRun?.status, nurtureCare.active, onboardingActivityAction, onboardingActivityAnswered, onboardingMoodAnswered]);
+  }, [formingDay, ftueOpeningOwnsHome, nurtureCare.active, onboardingActivityAction, onboardingActivityAnswered, onboardingMoodAnswered]);
   const legacyOnboardingGuide = useMemo(() => {
     if (!discoveryHatchActive) return null;
     if (!onboardingMoodAnswered) return {
@@ -1857,6 +1877,10 @@ function HomeScreen() {
     resetExplorationAfterCommit,
     selectedDayId,
   ]);
+  const ftueCameraPinchTarget = ftueHomeCameraPinchTarget(
+    ftueRun?.status === 'active' ? ftueRun.stepId : null,
+    todayScene.homeEnvironment.motion.maxPinchScale,
+  );
   const { environmentGesture, environmentMotion } = useTodayEnvironmentMotion({
     enabled: !flowBusy,
     frozen: discoveryHatchInPlace,
@@ -1867,6 +1891,8 @@ function HomeScreen() {
     pinchSoftLimitRange: explorationPresentationActive
       ? todayScene.homeEnvironment.motion.explorationPinchSoftLimitRange
       : 0,
+    scriptedPinchDurationMs: ftueHomeCameraDuration(ftueRun?.stepId),
+    scriptedPinchScale: ftueCameraPinchTarget,
   });
   const pageGesture = useMemo(
     () => explorationPresentationActive
@@ -2144,6 +2170,7 @@ function HomeScreen() {
           energyHudPulseNonce={energyHudPulseNonce}
           energyHudTargetRef={energyHudTargetRef}
           feedbackKey={eggFeedKey}
+          feedExpressionKey={eggFeedLaunchKey}
           focusMode={false}
           growth={nurtureGrowth}
           hatchPresentation={isHatching && hatchPresentation.policy === 'ftue_discovery' ? hatchPresentation : null}
@@ -2151,6 +2178,7 @@ function HomeScreen() {
           microcopy={microcopy}
           onboardingGuide={onboardingGuide}
           onboardingFocus={ftueOpeningFocus || (isHatching && hatchPresentation.policy === 'ftue_discovery')}
+          onboardingUiVisible={ftueOpeningUiVisible}
           scriptedActions={ftueTodayStep?.actions.filter((action) => action.presentation === 'inline_choice' || action.presentation === 'route_action' || action.presentation === 'cta_action') ?? []}
           scriptedPanelCareAction={ftuePanelCareAction}
           onScriptedAction={handleFtueAction}

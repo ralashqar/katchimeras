@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { FTUE_ACTION_CATALOG, FTUE_HANDLER_REGISTRY } from '@/features/onboarding/ftue-action-registry';
+import { ftueHidesBottomBar, ftueOwnsOpeningHome } from '@/features/onboarding/ftue-navigation-policy';
 import { MOSSPROUT_FTUE_SCRIPT, mossproutFtueAction, validateMossproutFtueScript } from '@/features/onboarding/mossprout-ftue-script';
 
 test('Mossprout FTUE script has valid transitions and registered handlers', () => {
@@ -64,19 +65,140 @@ test('Chapter 0 exposes one one-merge order and then completes', () => {
   assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.some((step) => step.id === 'merge.final'), false);
 });
 
-test('an active FTUE keeps the bottom bar and profile-preserving reset reachable', () => {
+test('Merge FTUE never inserts guide panels into the fixed board layout', () => {
+  const merge = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
+  const invariant = merge.indexOf('{/* Static game geometry');
+  const mergeArea = merge.indexOf('<View style={styles.mergeArea}>');
+  assert.ok(invariant >= 0 && mergeArea > invariant);
+  assert.doesNotMatch(merge.slice(invariant, mergeArea), /chapterGuide|ftueStep\.guide|KatchaInlineNotice|ThemedText/);
+  assert.doesNotMatch(merge, /const chapterGuide|const legacyChapterGuide/);
+  assert.match(merge, /Future guidance belongs in an absolute world-space[\s\S]*?tray, counter, and board retain identical frames/);
+});
+
+test('the opening FTUE hides the bottom bar until Talk to Mossprout, while reset remains reachable', () => {
   const tabLayout = readFileSync('app/(tabs)/_layout.tsx', 'utf8');
   const devTools = readFileSync('app/(tabs)/explore.tsx', 'utf8');
-  assert.match(tabLayout, /tabBar=\{\(props\) => <MeadowTabBar \{\.\.\.props\} \/>\}/);
+  const policy = readFileSync('features/onboarding/ftue-navigation-policy.ts', 'utf8');
+  assert.match(tabLayout, /tabBar=\{\(props\) => bottomBarHidden \? null : <MeadowTabBar \{\.\.\.props\} \/>\}/);
+  assert.match(policy, /'egg\.opening'/);
+  assert.match(policy, /'hatch\.reveal'/);
+  assert.doesNotMatch(policy, /'companion\.first_meeting'/);
+  assert.equal(ftueHidesBottomBar({ status: 'active', stepId: 'egg.opening' }), true);
+  assert.equal(ftueHidesBottomBar({ status: 'active', stepId: 'hatch.reveal' }), true);
+  assert.equal(ftueHidesBottomBar({ status: 'active', stepId: 'companion.first_meeting' }), false);
+  assert.equal(ftueHidesBottomBar({ status: 'complete', stepId: 'complete' }), false);
+  assert.equal(ftueOwnsOpeningHome({ status: 'active', stepId: 'hatch.reveal' }), true);
+  assert.equal(ftueOwnsOpeningHome({ status: 'active', stepId: 'companion.first_meeting' }), false);
   assert.doesNotMatch(tabLayout, /ftueLocked\s*\?\s*null/);
   assert.match(devTools, /Restart first-session onboarding · keep profile/);
   assert.match(devTools, /beginFirstSession\(\{ restart: true \}\)/);
 });
 
+test('companion and Merge FTUE steps never suppress the normal Today action rotation', () => {
+  const route = readFileSync('app/(tabs)/today.tsx', 'utf8');
+  assert.match(route, /const ftueOpeningOwnsHome = ftueOwnsOpeningHome\(ftueRun\)/);
+  assert.match(route, /if \(!ftueOpeningOwnsHome \|\| !formingDay\) return nurtureCare\.active/);
+  assert.doesNotMatch(route, /if \(ftueRun\?\.status === 'active'\) return \[\]/);
+});
+
+test('the tabless opening uses a centered full-bleed Home camera without scaling its UI', () => {
+  const home = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
+  const layout = readFileSync('constants/home-loop-layout.ts', 'utf8');
+  assert.match(layout, /HOME_FTUE_CAMERA_SCALE = 1\.16/);
+  assert.match(layout, /HOME_FTUE_CAMERA_Y_OFFSET = -24/);
+  assert.match(home, /sceneLift = onboardingFocus \? HOME_SCENE_Y_OFFSET : -100 \+ sceneVerticalNudge/);
+  assert.match(home, /HOME_FTUE_CAMERA_SCALE - 1\) \* onboardingCameraProgress\.value/);
+  assert.match(home, /<Animated\.View pointerEvents="none" style=\{\[styles\.focusScene, focusSceneStyle\]\}>[\s\S]*?<TodayEnvironmentViewportMotionLayer/);
+  assert.match(home, /<\/TodayEnvironmentViewportMotionLayer>[\s\S]*?<\/Animated\.View>[\s\S]*?<Animated\.View[\s\S]*?projectedEggStageStyle[\s\S]*?<TodayKingdomEggHero/);
+  assert.match(home, /projectedCameraScale=\{projectedEggCameraScale\}/);
+  assert.match(home, /<\/Animated\.View>[\s\S]*?<View[\s\S]*style=\{\[styles\.chrome/);
+});
+
+test('the opening camera slowly pinches in before revealing UI and retreats across three questions', async () => {
+  const {
+    FTUE_OPENING_CAMERA_DURATION_MS,
+    FTUE_OPENING_UI_DELAY_MS,
+    ftueHomeCameraPinchTarget,
+  } = await import('../features/onboarding/ftue-home-camera');
+  const route = readFileSync('app/(tabs)/today.tsx', 'utf8');
+  const nurture = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
+  const motion = readFileSync('components/katchadeck/home/today-environment-motion.tsx', 'utf8');
+
+  assert.equal(ftueHomeCameraPinchTarget('egg.opening', 2), 2);
+  const openingScale = ftueHomeCameraPinchTarget('egg.opening', 2)!;
+  const contextScale = ftueHomeCameraPinchTarget('egg.context', 2)!;
+  const mindScale = ftueHomeCameraPinchTarget('egg.mind', 2)!;
+  const readyScale = ftueHomeCameraPinchTarget('egg.ready', 2)!;
+  assert.ok(Math.abs(openingScale / contextScale - contextScale / mindScale) < 1e-9);
+  assert.ok(Math.abs(contextScale / mindScale - mindScale / readyScale) < 1e-9);
+  assert.equal(ftueHomeCameraPinchTarget('egg.ready', 2), 1);
+  assert.equal(ftueHomeCameraPinchTarget('companion.first_meeting', 2), null);
+  assert.ok(FTUE_OPENING_UI_DELAY_MS >= FTUE_OPENING_CAMERA_DURATION_MS);
+  assert.match(route, /setTimeout\(\(\) => setFtueOpeningUiVisible\(true\), FTUE_OPENING_UI_DELAY_MS\)/);
+  assert.match(route, /scriptedPinchScale: ftueCameraPinchTarget/);
+  assert.match(route, /onboardingUiVisible=\{ftueOpeningUiVisible\}/);
+  assert.match(nurture, /onboardingFocus && onboardingUiVisible && onboardingGuide/);
+  assert.match(motion, /withTiming\(resolvedScriptedPinchScale/);
+  assert.match(motion, /enabled\(enabled && !frozen && resolvedScriptedPinchScale == null\)/);
+});
+
+test('each Discovery Egg answer grants the same visual Growth', async () => {
+  const { FTUE_EGG_ANSWER_GROWTH_REWARD, MOSSPROUT_FTUE_SCRIPT } = await import('../features/onboarding/mossprout-ftue-script');
+  const questionSteps = MOSSPROUT_FTUE_SCRIPT.steps.filter((step) =>
+    ['egg.opening', 'egg.context', 'egg.mind'].includes(step.id)
+  );
+  assert.equal(questionSteps.length, 3);
+  assert.deepEqual(
+    questionSteps.map((step) => step.actions[0]?.growthReward),
+    [FTUE_EGG_ANSWER_GROWTH_REWARD, FTUE_EGG_ANSWER_GROWTH_REWARD, FTUE_EGG_ANSWER_GROWTH_REWARD],
+  );
+});
+
 test('scripted Egg faces use the stable image transition instead of animated-style cleanup', () => {
   const artwork = readFileSync('components/katchadeck/egg-avatar/egg-avatar-artwork.tsx', 'utf8');
+  const player = readFileSync('components/katchadeck/egg-avatar/use-egg-expression-player.ts', 'utf8');
   assert.match(artwork, /transition=\{faceTransitionDuration\}/);
+  assert.match(artwork, /useEggExpressionPlayer/);
   assert.doesNotMatch(artwork, /useAnimatedStyle|useSharedValue/);
+  assert.match(player, /if \(!sequence\?\.length\)/);
+  assert.match(player, /const timers = sequence\.map/);
+  assert.doesNotMatch(player, /setPresentation\([^)]*baseFaceId[^)]*\)[\s\S]*const timers/);
+});
+
+test('the first FTUE prompt sleeps, feeds through happy faces, and lifts a small Egg onto its platform', () => {
+  const home = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
+  const egg = readFileSync('components/katchadeck/home/today-kingdom-egg-hero.tsx', 'utf8');
+  const feed = readFileSync('features/today/use-egg-feed-controller.ts', 'utf8');
+  assert.match(home, /onboardingEggSleeping = Boolean\(onboardingFocus && scriptedMoodAction && !scriptedMoodSelection\)/);
+  assert.match(home, /forceSleeping=\{onboardingEggSleeping\}/);
+  assert.match(egg, /faceId=\{forceSleeping \? 'sleepy' : equippedFaceId\}/);
+  assert.match(egg, /forceSleeping[\s\S]*?showForcedSleepIndicator[\s\S]*?!isActivated && showDormantIndicator/);
+  assert.match(egg, /TODAY_DORMANT_ZZZ_TOP_OFFSET = 92/);
+  assert.match(egg, /lightColor="#5B3A70"/);
+  assert.match(egg, /textShadowColor: 'rgba\(255,246,220,0\.96\)'/);
+  assert.match(home, /showForcedSleepIndicator=\{false\}/);
+  assert.match(home, /stageScale=\{explorationEggFrame\.scale \* HOME_FTUE_CAMERA_SCALE\}/);
+  assert.match(egg, /shouldRasterizeIOS=\{false\}/);
+  assert.match(egg, /FEED_HAPPY_EXPRESSION_IDS = \['big-grin', 'happy-squint'\]/);
+  assert.match(egg, /\{ faceId: equippedFaceId, atMs: 900/);
+  assert.match(egg, /expressionSequenceKey=\{discoveryHatch \? `[\s\S]*?`feed:\$\{feedExpressionKey\}`/);
+  assert.match(feed, /setEggFeedLaunchKey\(\(key\) => key \+ 1\)/);
+  assert.match(egg, /platformLift = \(1 - visualGrowth\.value\)[\s\S]*?\* SMALL_EGG_PLATFORM_LIFT[\s\S]*?\* eggStageScale[\s\S]*?\* \(projectedCameraScale\?\.value \?\? 1\)/);
+  assert.match(home, /baseEggBottomY = stageTop[\s\S]*?explorationEggFrame\.top[\s\S]*?explorationEggFrame\.height/);
+  assert.match(home, /pinchedEggBottomY = scenePinchFocusY[\s\S]*?baseEggBottomY - scenePinchFocusY\) \* pinchScale/);
+  assert.match(home, /translateY: projectedEggBottomY - baseEggBottomY/);
+  assert.match(egg, /transformOrigin: 'center bottom'/);
+  assert.match(egg, /translateY: -platformLift - activationPulse\.value/);
+  assert.match(egg, /TODAY_EGG_NATIVE_SURFACE_SCALE =/);
+  assert.match(egg, /height: eggFrame\.height \* TODAY_EGG_NATIVE_SURFACE_SCALE/);
+  assert.match(egg, /width: 200 \* eggStageScale \* TODAY_EGG_NATIVE_SURFACE_SCALE/);
+  assert.match(egg, /const growthScale = 0\.5 \+ visualGrowth\.value \* 0\.5/);
+  assert.match(egg, /scale: growthScale[\s\S]*?\* reactionScale[\s\S]*?\* \(projectedCameraScale\?\.value \?\? 1\)[\s\S]*?\/ TODAY_EGG_NATIVE_SURFACE_SCALE/);
+  assert.match(egg, /Camera, growth and reaction are composed into this one downscale/);
+  assert.doesNotMatch(egg, /eggMotionStyle[\s\S]*?scale: 1\s*\+ feedbackPulse/);
+  assert.doesNotMatch(egg, /height: eggFrame\.height \* growthScale/);
+  assert.match(egg, /shouldRasterizeIOS=\{false\}/);
+  assert.match(egg, /platformLift = \(1 - growth\.value\) \* SMALL_EGG_PLATFORM_LIFT \* stageScale/);
 });
 
 test('scripted actions reuse the regular cream action surface and staged row motion', () => {
@@ -87,6 +209,22 @@ test('scripted actions reuse the regular cream action surface and staged row mot
   assert.match(actions, /action\.presentation !== 'inline_choice'/);
   assert.doesNotMatch(actions, /ChoiceChip|expandedId|departingId/);
   assert.doesNotMatch(actions, /tone=\{expanded \? 'gold'/);
+});
+
+test('FTUE CTA actions use the same glowing primary button as Talk to Mossprout', () => {
+  const actions = readFileSync('components/katchadeck/onboarding/scripted-action-list.tsx', 'utf8');
+  const route = readFileSync('app/(tabs)/today.tsx', 'utf8');
+  assert.match(actions, /action\.presentation === 'cta_action'/);
+  assert.match(actions, /<KatchaButton[\s\S]*?fullWidth[\s\S]*?glow[\s\S]*?label=\{action\.title\}[\s\S]*?labelStyle=\{KatchaDeckUI\.typography\.ftuePanelTitle\}/);
+  assert.match(route, /<KatchaButton[\s\S]*?fullWidth[\s\S]*?glow[\s\S]*?label="Talk to Mossprout"[\s\S]*?labelStyle=\{KatchaDeckUI\.typography\.ftuePanelTitle\}/);
+});
+
+test('opening FTUE removes the white environment fade and introduces UI from below', () => {
+  const home = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
+  assert.match(home, /!onboardingFocus \? <View pointerEvents="none" style=\{styles\.environmentFade\} \/> : null/);
+  assert.match(home, /entering=\{FadeInDown\.duration\(260\)\.easing\(Easing\.out\(Easing\.cubic\)\)\}/);
+  assert.match(home, /enterFromBottom \? FadeInDown : FadeInUp/);
+  assert.ok((home.match(/enterFromBottom/g) ?? []).length >= 8);
 });
 
 test('the first FTUE feeling beat uses the real Home mood action', () => {
@@ -180,7 +318,7 @@ test('Discovery Hatch remains inside the forming Home Egg stage', () => {
   const egg = readFileSync('components/katchadeck/home/today-kingdom-egg-hero.tsx', 'utf8');
   const route = readFileSync('app/(tabs)/today.tsx', 'utf8');
   assert.match(home, /discoveryHatch=\{hatchPresentation\}/);
-  assert.match(egg, /expressionSequence=\{discoveryHatch/);
+  assert.match(egg, /expressionSequence=\{[\s\S]*?discoveryHatch && !discoveryPhaseAtLeast/);
   assert.match(egg, /DISCOVERY_CRACK_ONE/);
   assert.doesNotMatch(home, /<TodayTileHatchReveal/);
   assert.match(route, /hatchOwnership: dailyHatchActive \? 'daily_surface' : discoveryHatchInPlace \? 'discovery_in_place'/);

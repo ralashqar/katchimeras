@@ -7,11 +7,13 @@ import Animated, {
   cancelAnimation,
   Easing,
   FadeIn,
+  FadeInDown,
   FadeInUp,
   LinearTransition,
   runOnJS,
   type SharedValue,
   useAnimatedStyle,
+  useDerivedValue,
   useReducedMotion,
   useSharedValue,
   withDelay,
@@ -23,7 +25,7 @@ import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-str
 import { TodayTopHud } from '@/components/katchadeck/home/today-top-hud';
 import { MicrocopyToast } from '@/components/katchadeck/home/microcopy-toast';
 import { TodayExplorationBackground } from '@/components/katchadeck/home/today-exploration-background';
-import { TodayDormantEggIndicator, TodayKingdomEggHero } from '@/components/katchadeck/home/today-kingdom-egg-hero';
+import { TODAY_DORMANT_ZZZ_TOP_OFFSET, TodayDormantEggIndicator, TodayKingdomEggHero } from '@/components/katchadeck/home/today-kingdom-egg-hero';
 import { WorldActionStack } from '@/components/katchadeck/world/world-action-stack';
 import { CompanionGoalPortrait } from '@/components/katchadeck/goals/goal-task-row';
 import { GoalCompletionCelebration } from '@/components/katchadeck/goals/goal-completion-celebration';
@@ -41,6 +43,8 @@ import {
   HOME_ACTIONS_TAB_BAR_GAP,
   HOME_ACTIONS_Y_OFFSET,
   HOME_EGG_ACTIONS_GAP,
+  HOME_FTUE_CAMERA_SCALE,
+  HOME_FTUE_CAMERA_Y_OFFSET,
   HOME_SCENE_Y_OFFSET,
 } from '@/constants/home-loop-layout';
 import { Meadow } from '@/constants/meadow-theme';
@@ -55,6 +59,7 @@ import type { TodayGrowthSummary } from '@/utils/today-growth';
 import type { CompanionQuickGoalCompletionReceipt } from '@/hooks/use-companion-quick-goals';
 import {
   TodayEnvironmentViewportMotionLayer,
+  useTodayEnvironmentMotionValues,
 } from '@/components/katchadeck/home/today-environment-motion';
 import {
   todayExplorationEggStageFrame,
@@ -77,6 +82,7 @@ type TodayNurtureExperienceProps = {
   day: HomeDayRecord;
   companionWispId?: WispId | null;
   feedbackKey: number;
+  feedExpressionKey?: number;
   focusMode?: boolean;
   growth: TodayGrowthSummary;
   homeArchetypeId?: HomeArchetypeId | null;
@@ -109,6 +115,7 @@ type TodayNurtureExperienceProps = {
     body: string;
   } | null;
   onboardingFocus?: boolean;
+  onboardingUiVisible?: boolean;
   hatchPresentation?: TodayHatchPresentation | null;
   onHatchAssetsReady?: () => void;
   onHatchAssetsError?: () => void;
@@ -146,6 +153,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   energyHudPulseNonce,
   energyHudTargetRef,
   feedbackKey,
+  feedExpressionKey,
   focusMode = false,
   growth,
   homeArchetypeId,
@@ -165,6 +173,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   onSelectDay,
   onboardingGuide = null,
   onboardingFocus = false,
+  onboardingUiVisible = true,
   hatchPresentation = null,
   onHatchAssetsReady,
   onHatchAssetsError,
@@ -198,6 +207,8 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   const actionStackOpacity = useSharedValue(0);
   const actionStackTranslateY = useSharedValue(reduceMotion ? 0 : 22);
   const focusProgress = useSharedValue(focusMode ? 1 : 0);
+  const onboardingCameraProgress = useSharedValue(onboardingFocus ? 1 : 0);
+  const environmentMotion = useTodayEnvironmentMotionValues();
   const ready = growth.isActivated && (day.canHatch || growth.isReady);
   const quietDayAvailable = !growth.isActivated && Date.now() >= growth.scheduledHatchAt.getTime();
   const scriptedMoodAction = scriptedActions.length === 1 && scriptedActions[0]?.promptKind === 'feeling'
@@ -304,8 +315,14 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   const stageTop = topInset + TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA;
   const sceneVerticalNudge = HOME_SCENE_Y_OFFSET;
   const contentVerticalNudge = HOME_ACTIONS_Y_OFFSET;
-  const sceneLift = -100 + sceneVerticalNudge;
+  // With its tab bar hidden, the authored opening can use the same centered
+  // vertical composition as a settled hatched day. The normal forming camera
+  // stays lifted to reserve room for its persistent action/navigation dock.
+  const sceneLift = onboardingFocus ? HOME_SCENE_Y_OFFSET : -100 + sceneVerticalNudge;
   const tabBarHeight = homeTabBarHeight(bottomInset);
+  const actionDockBottom = onboardingFocus
+    ? bottomInset + HOME_ACTIONS_TAB_BAR_GAP
+    : tabBarHeight + HOME_ACTIONS_TAB_BAR_GAP;
   const tabBarTop = windowHeight - tabBarHeight;
   const explorationEggFrame = todayExplorationEggStageFrame(
     windowWidth,
@@ -317,6 +334,16 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   // world-space buffer before the egg's measured visual top.
   const growthMeterTop = eggVisualTop - 81;
   const scenePinchFocusY = stageTop + sceneLift + explorationEggFrame.centerY;
+  const onboardingEggSleeping = Boolean(onboardingFocus && scriptedMoodAction && !scriptedMoodSelection);
+  const onboardingZzzTopBeforeCamera = stageTop
+    + sceneLift
+    + explorationEggFrame.top
+    + TODAY_DORMANT_ZZZ_TOP_OFFSET * explorationEggFrame.scale;
+  // The FTUE sleep marker lives outside the zoomed scene so native text stays
+  // sharp. Map only its anchor into the camera's final screen coordinates.
+  const onboardingZzzTop = windowHeight / 2
+    + (onboardingZzzTopBeforeCamera - windowHeight / 2) * HOME_FTUE_CAMERA_SCALE
+    + HOME_FTUE_CAMERA_Y_OFFSET;
   const customizerCamera = useMemo(() => eggAvatarCustomizerCamera({
     bottomInset,
     subjectCenterY: scenePinchFocusY,
@@ -349,9 +376,6 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
     ),
     [careSwipeExternalGesture, environmentGesture],
   );
-  const eggPanStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: sceneTranslateX.value }],
-  }));
   useEffect(() => {
     focusProgress.value = reduceMotion
       ? focusMode ? 1 : 0
@@ -360,12 +384,61 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           easing: Easing.inOut(Easing.cubic),
         });
   }, [focusMode, focusProgress, reduceMotion]);
+  useEffect(() => {
+    onboardingCameraProgress.value = reduceMotion
+      ? onboardingFocus ? 1 : 0
+      : withTiming(onboardingFocus ? 1 : 0, {
+          duration: 360,
+          easing: Easing.inOut(Easing.cubic),
+        });
+  }, [onboardingCameraProgress, onboardingFocus, reduceMotion]);
   const focusSceneStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateY: customizerCamera.translateY * focusProgress.value },
-      { scale: 1 + (customizerCamera.scale - 1) * focusProgress.value },
+      {
+        translateY: customizerCamera.translateY * focusProgress.value
+          + HOME_FTUE_CAMERA_Y_OFFSET * onboardingCameraProgress.value,
+      },
+      {
+        scale: (1 + (customizerCamera.scale - 1) * focusProgress.value)
+          * (1 + (HOME_FTUE_CAMERA_SCALE - 1) * onboardingCameraProgress.value),
+      },
     ],
   }));
+  const projectedEggCameraScale = useDerivedValue(() => {
+    const focusScale = 1 + (customizerCamera.scale - 1) * focusProgress.value;
+    const onboardingScale = 1 + (HOME_FTUE_CAMERA_SCALE - 1) * onboardingCameraProgress.value;
+    return (environmentMotion?.pinchScale.value ?? 1) * focusScale * onboardingScale;
+  });
+  const projectedEggStageStyle = useAnimatedStyle(() => {
+    const focusScale = 1 + (customizerCamera.scale - 1) * focusProgress.value;
+    const onboardingScale = 1 + (HOME_FTUE_CAMERA_SCALE - 1) * onboardingCameraProgress.value;
+    const outerScale = focusScale * onboardingScale;
+    const pinchScale = environmentMotion?.pinchScale.value ?? 1;
+    const outerTranslateY = customizerCamera.translateY * focusProgress.value
+      + HOME_FTUE_CAMERA_Y_OFFSET * onboardingCameraProgress.value;
+    // Project the bottom-centre of the Egg image through the exact same camera
+    // transforms as the environment. The detached high-resolution plane stays
+    // crisp while this world anchor remains planted during every zoom level.
+    const baseEggBottomY = stageTop
+      + sceneLift
+      + explorationEggFrame.top
+      + explorationEggFrame.height;
+    const pinchedEggBottomY = scenePinchFocusY
+      + (baseEggBottomY - scenePinchFocusY) * pinchScale;
+    const projectedEggBottomY = windowHeight / 2
+      + (pinchedEggBottomY - windowHeight / 2) * outerScale
+      + outerTranslateY;
+    return {
+      transform: [
+        {
+          translateX: sceneTranslateX.value
+            * pinchScale
+            * outerScale,
+        },
+        { translateY: projectedEggBottomY - baseEggBottomY },
+      ],
+    };
+  });
   const actionStackRevealStyle = useAnimatedStyle(() => ({
     opacity: actionStackOpacity.value,
     transform: [{ translateY: actionStackTranslateY.value }],
@@ -448,30 +521,47 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           translateX={sceneTranslateX}
           verticalOffset={sceneLift}
         />
-        <Animated.View pointerEvents="none" style={[styles.eggStage, { top: stageTop + sceneLift }, eggPanStyle]}>
-          <TodayKingdomEggHero
-            accentColor={day.egg.accentColor}
-            companionWispId={hatchPresentation ? null : companionWispId}
-            coreColor={day.egg.coreColor}
-            deferGrowthUntilEnergyArrival
-            discoveryHatch={hatchPresentation}
-            explorationStageTop={stageTop}
-            feedbackKey={feedbackKey}
-            growthProgress={growth.energyRatio}
-            growthStage={growth.stage}
-            hideKingdomEnvironmentArt
-            homeArchetypeId={homeArchetypeId}
-            isActivated={growth.isActivated}
-            isReady={hatchPresentation ? false : ready}
-            onDiscoveryCreatureError={onHatchAssetsError}
-            onDiscoveryCreatureReady={onHatchAssetsReady}
-            pinchStrength={0}
-            showDormantIndicator={false}
-            targetRef={eggTargetRef}
-          />
-        </Animated.View>
       </TodayEnvironmentViewportMotionLayer>
       </Animated.View>
+      <Animated.View
+        pointerEvents="box-none"
+        style={[styles.eggStage, { top: stageTop + sceneLift }, projectedEggStageStyle]}>
+        <TodayKingdomEggHero
+          accentColor={day.egg.accentColor}
+          companionWispId={hatchPresentation ? null : companionWispId}
+          coreColor={day.egg.coreColor}
+          deferGrowthUntilEnergyArrival
+          discoveryHatch={hatchPresentation}
+          explorationStageTop={stageTop}
+          feedbackKey={feedbackKey}
+          feedExpressionKey={feedExpressionKey}
+          forceSleeping={onboardingEggSleeping}
+          growthProgress={growth.energyRatio}
+          growthStage={growth.stage}
+          hideKingdomEnvironmentArt
+          homeArchetypeId={homeArchetypeId}
+          isActivated={growth.isActivated}
+          isReady={hatchPresentation ? false : ready}
+          onDiscoveryCreatureError={onHatchAssetsError}
+          onDiscoveryCreatureReady={onHatchAssetsReady}
+          pinchStrength={0}
+          projectedCameraScale={projectedEggCameraScale}
+          showDormantIndicator={false}
+          showForcedSleepIndicator={false}
+          targetRef={eggTargetRef}
+        />
+      </Animated.View>
+      {onboardingEggSleeping ? (
+        <TodayDormantEggIndicator
+          energyRatio={growth.energyRatio}
+          focusX={windowWidth / 2}
+          focusY={windowHeight / 2 + (scenePinchFocusY - windowHeight / 2) * HOME_FTUE_CAMERA_SCALE + HOME_FTUE_CAMERA_Y_OFFSET}
+          left={windowWidth / 2 + 4 * explorationEggFrame.scale * HOME_FTUE_CAMERA_SCALE}
+          sceneTranslateX={sceneTranslateX}
+          stageScale={explorationEggFrame.scale * HOME_FTUE_CAMERA_SCALE}
+          top={onboardingZzzTop}
+        />
+      ) : null}
       <View
         pointerEvents={focusMode ? 'none' : 'box-none'}
         style={[styles.chrome, focusMode && styles.chromeHidden]}>
@@ -483,10 +573,10 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           left={windowWidth / 2 + 4 * explorationEggFrame.scale}
           sceneTranslateX={sceneTranslateX}
           stageScale={explorationEggFrame.scale}
-          top={stageTop + sceneLift + explorationEggFrame.top + 62 * explorationEggFrame.scale}
+          top={stageTop + sceneLift + explorationEggFrame.top + TODAY_DORMANT_ZZZ_TOP_OFFSET * explorationEggFrame.scale}
         />
       ) : null}
-      <View pointerEvents="none" style={styles.environmentFade} />
+      {!onboardingFocus ? <View pointerEvents="none" style={styles.environmentFade} /> : null}
       {!onboardingFocus ? <View pointerEvents="none" style={[styles.meterAnchor, { top: growthMeterTop }]}>
         <GrowthMeter growth={growth} />
       </View> : null}
@@ -515,21 +605,22 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
       </View>
       ) : null}
       {!onboardingFocus ? <MicrocopyToast message={microcopy} placementStyle={{ top: nurtureToastTop }} /> : null}
-      {onboardingFocus && onboardingGuide && !actionListHidden ? (
+      {onboardingFocus && onboardingUiVisible && onboardingGuide && !actionListHidden ? (
         <>
           <Animated.View
-            entering={FadeInUp.duration(260)}
+            entering={FadeInDown.duration(260).easing(Easing.out(Easing.cubic))}
             key={`focus:${onboardingGuide.title}`}
             pointerEvents="none"
             style={[styles.onboardingHeroGuide, { top: topInset + 22 }]}>
             <FtueGuideCopy guide={onboardingGuide} hero />
           </Animated.View>
           {scriptedMoodAction && scriptedPanelCareAction && onScriptedChoice ? (
-            <View collapsable={false} ref={scriptedMoodSourceRef} style={[styles.onboardingActionStage, { bottom: tabBarHeight + HOME_ACTIONS_TAB_BAR_GAP }]}>
+            <View collapsable={false} ref={scriptedMoodSourceRef} style={[styles.onboardingActionStage, { bottom: actionDockBottom }]}>
               <InlineMood
                 action={{ ...scriptedPanelCareAction, title: scriptedMoodAction.title, growthReward: scriptedMoodAction.growthReward ?? scriptedPanelCareAction.growthReward }}
                 allowSkip={false}
                 completionEvent={scriptedMoodCompletion}
+                enterFromBottom
                 interactionLocked={actionListLocked}
                 onChoose={(selection, from) => {
                   const option = scriptedMoodAction.options?.find((candidate) => candidate.domainChoiceId === selection.id);
@@ -554,7 +645,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
               />
             </View>
           ) : scriptedTextChoiceAction && scriptedPanelCareAction && onScriptedChoice ? (
-            <View style={[styles.onboardingActionStage, { bottom: tabBarHeight + HOME_ACTIONS_TAB_BAR_GAP }]}>
+            <View style={[styles.onboardingActionStage, { bottom: actionDockBottom }]}>
               <InlineScriptedChoice
                 action={{
                   ...scriptedPanelCareAction,
@@ -565,6 +656,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
                   growthReward: scriptedTextChoiceAction.growthReward ?? scriptedPanelCareAction.growthReward,
                 }}
                 completionEvent={currentScriptedTextCompletion}
+                enterFromBottom
                 interactionLocked={actionListLocked}
                 key={scriptedTextChoiceAction.id}
                 onChoose={(option, from) => {
@@ -609,8 +701,8 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
             </View>
           ) : scriptedRowActions.length && onScriptedAction ? (
             <Animated.View
-              entering={FadeInUp.delay(100).duration(260)}
-              style={[styles.onboardingActionStage, { bottom: tabBarHeight + HOME_ACTIONS_TAB_BAR_GAP }]}>
+              entering={FadeInDown.delay(100).duration(260).easing(Easing.out(Easing.cubic))}
+              style={[styles.onboardingActionStage, { bottom: actionDockBottom }]}>
               <ScriptedActionList
                 actions={scriptedRowActions}
                 locked={actionListLocked}
@@ -828,10 +920,11 @@ const ACTION_BATCH_LAYOUT_SETTLE_MS = 680;
 const NURTURE_ACTION_CLUSTER_FALLBACK_HEIGHT = 67;
 const NURTURE_TOAST_TOP_GAP = 6;
 
-function InlineMood({ action, allowSkip = true, completionEvent, interactionLocked, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture }: {
+function InlineMood({ action, allowSkip = true, completionEvent, enterFromBottom = false, interactionLocked, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture }: {
   action: RankedTodayCareAction;
   allowSkip?: boolean;
   completionEvent: TodayCareCompletionEvent | null;
+  enterFromBottom?: boolean;
   interactionLocked: boolean;
   onChoose: (selection: Omit<CheckInSelection, 'action' | 'kind'>, from: FeedSourceRect, currencyFrom: FeedSourceRect) => void;
   onFinished: (eventId: string) => void;
@@ -852,6 +945,7 @@ function InlineMood({ action, allowSkip = true, completionEvent, interactionLock
         label: choice.label,
       }))}
       completionEvent={completionEvent}
+      enterFromBottom={enterFromBottom}
       interactionLocked={interactionLocked}
       onChoose={onChoose}
       onFinished={onFinished}
@@ -898,11 +992,12 @@ function InlineSleep({ action, completionEvent, interactionLocked, onChoose, onF
   );
 }
 
-function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent, interactionLocked, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture, textChoices = false, wide = false }: {
+function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent, enterFromBottom = false, interactionLocked, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture, textChoices = false, wide = false }: {
   action: RankedTodayCareAction;
   allowSkip?: boolean;
   choices: InlineChoice[];
   completionEvent: TodayCareCompletionEvent | null;
+  enterFromBottom?: boolean;
   interactionLocked: boolean;
   onChoose: (selection: Omit<CheckInSelection, 'action' | 'kind'>, from: FeedSourceRect, currencyFrom: FeedSourceRect) => void;
   onFinished: (eventId: string) => void;
@@ -985,7 +1080,7 @@ function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent
     <Animated.View
       entering={reduceMotion
         ? FadeIn.duration(70)
-        : FadeInUp.delay(55).duration(320).easing(Easing.out(Easing.cubic))}>
+        : (enterFromBottom ? FadeInDown : FadeInUp).delay(55).duration(320).easing(Easing.out(Easing.cubic))}>
       <CareSwipeShell
         disabled={interactionLocked || !allowSkip}
         externalGesture={swipeExternalGesture}
@@ -1567,9 +1662,10 @@ function CareActionArt({ action, completed = false }: { action: RankedTodayCareA
   );
 }
 
-function InlineScriptedChoice({ action, completionEvent, interactionLocked, onChoose, onSkip, options, reduceMotion, selection, swipeExternalGesture }: {
+function InlineScriptedChoice({ action, completionEvent, enterFromBottom = false, interactionLocked, onChoose, onSkip, options, reduceMotion, selection, swipeExternalGesture }: {
   action: RankedTodayCareAction;
   completionEvent: TodayCareCompletionEvent | null;
+  enterFromBottom?: boolean;
   interactionLocked: boolean;
   onChoose: (option: FtueChoiceOption, from: FeedSourceRect) => void;
   onSkip: (from: FeedSourceRect) => void;
@@ -1592,6 +1688,7 @@ function InlineScriptedChoice({ action, completionEvent, interactionLocked, onCh
           label: option.label,
         }))}
         completionEvent={completionEvent}
+        enterFromBottom={enterFromBottom}
         interactionLocked={interactionLocked}
         onChoose={(choice, from) => {
           const option = options.find((candidate) => candidate.id === choice.id);

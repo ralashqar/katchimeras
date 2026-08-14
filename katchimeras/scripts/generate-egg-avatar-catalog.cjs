@@ -133,7 +133,7 @@ function assetMap(catalogs) {
       .filter((item) => item.availability === 'ready')
       .map((item) => {
         const refs = item.assetRefs;
-        return `    ${quote(item.id)}: {\n      fullSource: require(${quote(`../${refs.app}`)}),\n      thumbnailSource: require(${quote(`../${refs.thumbnail}`)}),\n    },`;
+        return `    ${quote(item.id)}: {\n      fullSource: require(${quote(`../${refs.app}`)}),\n      highSource: require(${quote(`../${refs.high}`)}),\n      thumbnailSource: require(${quote(`../${refs.thumbnail}`)}),\n    },`;
       });
     return `  ${category}: {\n${entries.join('\n')}\n  },`;
   });

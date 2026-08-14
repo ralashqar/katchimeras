@@ -29,6 +29,8 @@ type MotionControllerOptions = {
   hoverEnabled?: boolean;
   maxPinchScale?: number;
   pinchSoftLimitRange?: number;
+  scriptedPinchDurationMs?: number;
+  scriptedPinchScale?: number | null;
 };
 
 const MotionContext = createContext<TodayEnvironmentMotion | null>(null);
@@ -39,6 +41,8 @@ export function useTodayEnvironmentMotion({
   hoverEnabled = enabled,
   maxPinchScale,
   pinchSoftLimitRange = 0,
+  scriptedPinchDurationMs = 800,
+  scriptedPinchScale = null,
 }: MotionControllerOptions) {
   const isFocused = useIsFocused();
   const reduceMotion = useReducedMotion();
@@ -54,6 +58,9 @@ export function useTodayEnvironmentMotion({
     0,
     Math.min(pinchSoftLimitRange, resolvedMaxPinchScale - 1),
   );
+  const resolvedScriptedPinchScale = scriptedPinchScale == null
+    ? null
+    : Math.max(1, Math.min(scriptedPinchScale, resolvedMaxPinchScale));
 
   useEffect(() => {
     cancelAnimation(hoverY);
@@ -85,14 +92,32 @@ export function useTodayEnvironmentMotion({
       cancelAnimation(pinchScale);
       return;
     }
+    if (resolvedScriptedPinchScale != null) return;
     if (enabled) return;
     cancelAnimation(pinchScale);
     pinchScale.value = withSpring(1, motion.resetSpring);
-  }, [enabled, frozen, motion.resetSpring, pinchScale]);
+  }, [enabled, frozen, motion.resetSpring, pinchScale, resolvedScriptedPinchScale]);
+
+  useEffect(() => {
+    if (frozen || resolvedScriptedPinchScale == null) return;
+    cancelAnimation(pinchScale);
+    pinchScale.value = reduceMotion
+      ? resolvedScriptedPinchScale
+      : withTiming(resolvedScriptedPinchScale, {
+          duration: scriptedPinchDurationMs,
+          easing: Easing.inOut(Easing.cubic),
+        });
+  }, [
+    frozen,
+    pinchScale,
+    reduceMotion,
+    resolvedScriptedPinchScale,
+    scriptedPinchDurationMs,
+  ]);
 
   const pinchGesture = useMemo(
     () => Gesture.Pinch()
-      .enabled(enabled && !frozen)
+      .enabled(enabled && !frozen && resolvedScriptedPinchScale == null)
       .onBegin(() => {
         cancelAnimation(pinchScale);
         pinchStartScale.value = pinchScale.value;
@@ -127,6 +152,7 @@ export function useTodayEnvironmentMotion({
       pinchScale,
       pinchStartScale,
       resolvedMaxPinchScale,
+      resolvedScriptedPinchScale,
       resolvedSoftLimitRange,
     ],
   );

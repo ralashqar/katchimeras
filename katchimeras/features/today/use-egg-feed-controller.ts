@@ -31,6 +31,7 @@ const FEED_ARRIVAL_WATCHDOG_MS = 2_500;
 export function useEggFeedController() {
   const [eggFeed, setEggFeed] = useState<EggFeed | null>(null);
   const [eggFeedKey, setEggFeedKey] = useState(0);
+  const [eggFeedLaunchKey, setEggFeedLaunchKey] = useState(0);
   const [eggFeedRewardRequestKey, setEggFeedRewardRequestKey] = useState(0);
   const [energyHudPulseNonce, setEnergyHudPulseNonce] = useState(0);
   const eggTargetRef = useRef<View | null>(null);
@@ -108,6 +109,12 @@ export function useEggFeedController() {
       };
       eggFeedRef.current = nextFeed;
       setEggFeed(nextFeed);
+      if ((nextFeed.energyAmount ?? 0) > 0) {
+        // Drive the Egg's expression timeline from the real compositor launch,
+        // not from enqueue or persistence. Queued rewards therefore react only
+        // while their own currency is visibly travelling toward the Egg.
+        setEggFeedLaunchKey((key) => key + 1);
+      }
       if (feedArrivalWatchdogRef.current) clearTimeout(feedArrivalWatchdogRef.current);
       feedArrivalWatchdogRef.current = setTimeout(() => {
         feedArrivalWatchdogRef.current = null;
@@ -233,6 +240,7 @@ export function useEggFeedController() {
   return {
     eggFeed,
     eggFeedKey,
+    eggFeedLaunchKey,
     eggFeedRewardRequestKey,
     energyHudPulseNonce,
     energyHudTargetRef,

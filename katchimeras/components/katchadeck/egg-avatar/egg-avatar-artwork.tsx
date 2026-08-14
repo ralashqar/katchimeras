@@ -1,5 +1,4 @@
 import { Image } from 'expo-image';
-import { useEffect, useState } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { eggAvatarFace } from '@/constants/egg-avatar-faces';
@@ -7,7 +6,13 @@ import { eggAvatarHat } from '@/constants/egg-avatar-hats';
 import { eggAvatarHeldAccessory } from '@/constants/egg-avatar-held-accessories';
 import { eggAvatarSkin } from '@/constants/egg-avatar-skins';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
+import {
+  useEggExpressionPlayer,
+  type EggExpressionCue,
+} from '@/components/katchadeck/egg-avatar/use-egg-expression-player';
 import type { EggAvatarFaceId, EggAvatarHatId, EggAvatarHeldAccessoryId, EggAvatarSkinId } from '@/types/egg-avatar';
+
+export type { EggExpressionCue } from '@/components/katchadeck/egg-avatar/use-egg-expression-player';
 
 export const EGG_AVATAR_FACE_PRESENTATION_SCALE = 0.92;
 
@@ -23,12 +28,6 @@ type EggAvatarArtworkProps = {
   transition?: number;
   expressionSequence?: readonly EggExpressionCue[];
   expressionSequenceKey?: string | number;
-};
-
-export type EggExpressionCue = {
-  faceId: EggAvatarFaceId;
-  atMs: number;
-  durationMs: number;
 };
 
 function centeredLayerStyle(scale: number, offsetX = 0, offsetY = 0) {
@@ -71,36 +70,30 @@ export function EggAvatarArtwork({
 }: EggAvatarArtworkProps) {
   const { equippedHatId, equippedHeldAccessoryId } = useEggAvatar();
   const skin = eggAvatarSkin(skinId);
-  const [displayedFaceId, setDisplayedFaceId] = useState(faceId);
-  const [faceTransitionDuration, setFaceTransitionDuration] = useState(transition);
-  useEffect(() => {
-    setDisplayedFaceId(faceId);
-    setFaceTransitionDuration(transition);
-  }, [expressionSequenceKey, faceId, transition]);
-  useEffect(() => {
-    if (!expressionSequence?.length) return;
-    const timers = expressionSequence.map((cue) => setTimeout(() => {
-      setFaceTransitionDuration(cue.durationMs);
-      setDisplayedFaceId(cue.faceId);
-    }, cue.atMs));
-    return () => timers.forEach(clearTimeout);
-  }, [expressionSequence, expressionSequenceKey]);
+  const {
+    faceId: displayedFaceId,
+    transitionMs: faceTransitionDuration,
+  } = useEggExpressionPlayer({
+    baseFaceId: faceId,
+    sequence: expressionSequence,
+    sequenceKey: expressionSequenceKey,
+  });
   const face = eggAvatarFace(displayedFaceId);
   const hat = eggAvatarHat(hatId === undefined ? equippedHatId : hatId);
   const heldAccessory = eggAvatarHeldAccessory(
     heldAccessoryId === undefined ? equippedHeldAccessoryId : heldAccessoryId,
   );
-  const bodySource = resolution === 'thumbnail'
-    ? skin.thumbnailSource
-    : skin.fullSource;
-  const faceSource = resolution === 'thumbnail'
-    ? face.thumbnailSource
-    : face.fullSource;
-  const accessorySource = <T extends { thumbnailSource: number; fullSource: number }>(item: T) => (
-    resolution === 'thumbnail'
-      ? item.thumbnailSource
-      : item.fullSource
-  );
+  const sourceForResolution = <T extends {
+    fullSource: number;
+    highSource: number;
+    thumbnailSource: number;
+  }>(item: T) => {
+    if (resolution === 'thumbnail') return item.thumbnailSource;
+    if (resolution === 'high') return item.highSource;
+    return item.fullSource;
+  };
+  const bodySource = sourceForResolution(skin);
+  const faceSource = sourceForResolution(face);
 
   return (
     <View pointerEvents="none" style={[styles.container, style]}>
@@ -132,7 +125,7 @@ export function EggAvatarArtwork({
           cachePolicy="memory-disk"
           contentFit="contain"
           priority={priority}
-          source={accessorySource(hat)}
+          source={sourceForResolution(hat)}
           style={eggAvatarHatPresentationStyle(skinId, hat.presentation)}
           transition={transition}
         />
@@ -143,7 +136,7 @@ export function EggAvatarArtwork({
           cachePolicy="memory-disk"
           contentFit="contain"
           priority={priority}
-          source={accessorySource(heldAccessory)}
+          source={sourceForResolution(heldAccessory)}
           style={centeredLayerStyle(
             heldAccessory.presentation?.scale ?? 1,
             heldAccessory.presentation?.offsetX ?? 0,

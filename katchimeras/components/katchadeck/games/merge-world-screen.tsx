@@ -415,22 +415,6 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
   const energyCountdownSeconds = state.energy.value < state.energy.regenCap
     ? Math.max(1, Math.ceil((MERGE_ENERGY_REGEN_MS - ((energyClockNow - state.energy.lastRegenAt) % MERGE_ENERGY_REGEN_MS)) / 1_000))
     : null;
-  const chapterZeroOrder = state.activeOrders.find((order) => order.id.startsWith('mossprout:chapter-0:'));
-  const firstSproutDiscovered = state.discoveries.includes('nature:garden:2');
-  const legacyChapterGuide = chapterZeroOrder
-    ? chapterZeroOrder.id.endsWith('first-sprout')
-      ? firstSproutDiscovered
-        ? { title: 'That’s exactly what we need', body: 'The Sprout is ready. Give it to Mossprout’s request above the counter.' }
-        : { title: 'A little place to begin', body: 'Drag the two matching Seeds together. Your first Sprout is waiting inside them.' }
-      : chapterZeroOrder.id.endsWith('little-plant')
-        ? { title: 'Make it feel alive', body: 'Tap the Wild Garden to grow Seeds, then merge them into the Plant Mossprout needs.' }
-        : { title: 'One last thing for home', body: 'Grow and merge one Flower. This final request completes Mossprout’s little place.' }
-    : null;
-  void legacyChapterGuide;
-  const chapterGuide = ftueStep?.surface === 'merge' ? {
-    title: ftueStep.id === 'merge.first' && firstSproutDiscovered ? 'That is exactly what we need' : ftueStep.guide.title,
-    body: ftueStep.id === 'merge.first' && firstSproutDiscovered ? 'The Sprout is ready. Give it to Mossprout above the counter.' : ftueStep.guide.body,
-  } : null;
   const firstWisp = WISPS_BY_ID.get(ftueWispForRun(ftueRun));
   return (
     <View ref={screenRef} style={styles.screen}>
@@ -454,11 +438,9 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
             </GameHudControl>
           </>}
         />
-        {chapterGuide ? (
-          <KatchaSurfaceProvider surface="parchment">
-            <KatchaInlineNotice body={chapterGuide.body} title={chapterGuide.title} tone="neutral" />
-          </KatchaSurfaceProvider>
-        ) : null}
+        {/* Static game geometry: onboarding guidance must never be inserted in
+            this flex column. Future guidance belongs in an absolute world-space
+            overlay so the tray, counter, and board retain identical frames. */}
         <View style={styles.mergeArea}>
           <MergeOrderRail
             entries={trayEntries}

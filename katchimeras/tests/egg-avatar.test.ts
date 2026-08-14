@@ -99,6 +99,26 @@ test('ready catalog has stable unique ids and Classic is first', () => {
   assert.equal(new Set(EGG_AVATAR_HELD_ACCESSORY_IDS).size, EGG_AVATAR_HELD_ACCESSORY_IDS.length);
 });
 
+test('hero-resolution avatar art has a distinct high-resolution source', () => {
+  const generatedAssets = readFileSync(
+    path.join(root, 'constants', 'egg-avatar-assets.generated.ts'),
+    'utf8',
+  );
+  assert.match(generatedAssets, /fullSource: require\('\.\.\/assets\/images\/katchimeras\/egg-avatars\/bases\/classic\.webp'\),/);
+  assert.match(generatedAssets, /highSource: require\('\.\.\/assets\/images\/katchimeras\/egg-avatars\/bases\/classic\.png'\),/);
+  assert.match(generatedAssets, /highSource: require\('\.\.\/assets\/images\/katchimeras\/egg-avatars\/faces\/classic-smile\.png'\),/);
+
+  for (const category of ['body', 'face', 'hat', 'held'] as const) {
+    for (const item of availableEggAvatarItems(category)) {
+      const highPath = path.join(root, item.assetRefs!.high);
+      const png = readFileSync(highPath);
+      assert.equal(png.subarray(1, 4).toString('ascii'), 'PNG', `${item.id} high source must be PNG`);
+      assert.ok(png.readUInt32BE(16) >= 2048, `${item.id} high source width`);
+      assert.ok(png.readUInt32BE(20) >= 2048, `${item.id} high source height`);
+    }
+  }
+});
+
 test('the complete avatar roadmap is data driven while artless entries stay unavailable', () => {
   const expectedCounts = { body: 50, face: 30, hat: 40, held: 20 } as const;
   const expectedReadyCounts = {
@@ -391,8 +411,8 @@ test('Today egg uses the shared calibrated body and face compositor', () => {
   assert.match(compositor, /EGG_AVATAR_FACE_PRESENTATION_SCALE = 0\.92/);
   const bodyLayer = compositor.indexOf('source={bodySource}');
   const faceLayer = compositor.indexOf('source={faceSource}');
-  const hatLayer = compositor.indexOf('source={accessorySource(hat)}');
-  const heldLayer = compositor.indexOf('source={accessorySource(heldAccessory)}');
+  const hatLayer = compositor.indexOf('source={sourceForResolution(hat)}');
+  const heldLayer = compositor.indexOf('source={sourceForResolution(heldAccessory)}');
   assert.ok(bodyLayer >= 0 && bodyLayer < faceLayer, 'body renders before face');
   assert.ok(faceLayer < hatLayer, 'face renders before hat');
   assert.ok(hatLayer < heldLayer, 'hat renders before held prop');

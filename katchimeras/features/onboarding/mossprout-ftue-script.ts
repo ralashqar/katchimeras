@@ -3,11 +3,15 @@ import { TODAY_GROWTH_REWARDS } from '@/utils/today-growth';
 import type { FtueActionDefinition, FtueScriptDefinition } from './ftue-types';
 
 const privateChoice = { id: 'private', label: 'Prefer not to say', icon: 'lock.fill', private: true } as const;
+// The Discovery Egg is an authored three-beat sequence. Each answer must move
+// its physical growth by the same amount, regardless of the normal daily
+// reward assigned to that answer's semantic source.
+export const FTUE_EGG_ANSWER_GROWTH_REWARD = TODAY_GROWTH_REWARDS.reflection;
 
 const openingActions: readonly FtueActionDefinition[] = [
   {
     id: 'egg.feeling', title: 'How do you feel?', description: 'Pick one.', icon: 'face.smiling',
-    presentation: 'inline_choice', handlerId: 'day_prompt', promptKind: 'feeling', growthSource: 'mood', growthReward: TODAY_GROWTH_REWARDS.mood,
+    presentation: 'inline_choice', handlerId: 'day_prompt', promptKind: 'feeling', growthSource: 'mood', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
     nextStepId: 'egg.context', backendEvent: true,
     options: [
       { id: 'great', label: 'Great', icon: 'face.very_happy', domainChoiceId: 'energized' },
@@ -36,7 +40,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       guide: { eyebrow: 'It felt that', title: 'The Egg is stirring.', body: 'Give it one more piece.' },
       actions: [{
         id: 'egg.context.activity', title: 'What was part of today?', description: 'Pick one.', icon: 'leaf.fill',
-        presentation: 'inline_choice', handlerId: 'day_prompt', promptKind: 'activity', growthSource: 'reflection', growthReward: TODAY_GROWTH_REWARDS.reflection,
+        presentation: 'inline_choice', handlerId: 'day_prompt', promptKind: 'activity', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
         nextStepId: 'egg.mind', backendEvent: true,
         options: [
           { id: 'work', label: 'Work', icon: 'briefcase.fill', domainChoiceId: 'work' },
@@ -54,7 +58,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       guide: { eyebrow: 'Almost awake', title: 'One last thing.', body: 'What has your attention?' },
       actions: [{
         id: 'egg.mind.focus', title: "What's on your mind?", description: 'Pick one.', icon: 'sparkles',
-        presentation: 'inline_choice', handlerId: 'day_prompt', promptKind: 'day_focus', growthSource: 'reflection', growthReward: TODAY_GROWTH_REWARDS.reflection,
+        presentation: 'inline_choice', handlerId: 'day_prompt', promptKind: 'day_focus', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
         nextStepId: 'egg.ready', backendEvent: true,
         options: [
           { id: 'people', label: 'People', icon: 'person.2.fill', domainChoiceId: 'people' },

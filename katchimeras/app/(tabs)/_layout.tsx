@@ -8,6 +8,8 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { useFirstSession } from '@/features/onboarding/first-session';
+import { ftueHidesBottomBar } from '@/features/onboarding/ftue-navigation-policy';
+import { useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { loadFeastleStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
 
 // Today is the daily capture surface. The lightweight Katchimeras roster is
@@ -20,7 +22,9 @@ export const unstable_settings = {
 export default function TabLayout() {
   const onboardingProfile = loadOnboardingProfile();
   const firstSession = useFirstSession();
+  const ftueRun = useFtueRun();
   const guidedSession = firstSession != null && firstSession.stage !== 'complete';
+  const bottomBarHidden = ftueHidesBottomBar(ftueRun);
   const [feastleStory, setFeastleStory] = useState(loadFeastleStory);
   useEffect(() => subscribeCompanionStories(() => setFeastleStory(loadFeastleStory())), []);
 
@@ -35,7 +39,7 @@ export default function TabLayout() {
       <Tabs
         // The carved-wood Meadow bar (generated art + centre capture button)
         // replaces the stock bar entirely.
-        tabBar={(props) => <MeadowTabBar {...props} />}
+        tabBar={(props) => bottomBarHidden ? null : <MeadowTabBar {...props} />}
         screenOptions={{
           headerShown: false,
           tabBarHideOnKeyboard: true,

@@ -4,6 +4,7 @@ import Animated, { Easing, FadeIn, FadeInUp, FadeOutUp, LinearTransition, useRed
 
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import { GameSurface } from '@/components/katchadeck/ui/game-surface';
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Meadow } from '@/constants/meadow-theme';
@@ -39,6 +40,23 @@ function ScriptedActionCard({ action, locked, reduceMotion, onAction }: {
   const invoke = (callback: (rect: FeedSourceRect) => void) => {
     cardRef.current?.measureInWindow((x, y, w, h) => callback({ x, y, w, h }));
   };
+  if (action.presentation === 'cta_action') {
+    return <Animated.View
+      entering={reduceMotion ? FadeIn.duration(80) : FadeInUp.duration(300).easing(Easing.out(Easing.cubic))}
+      exiting={reduceMotion ? FadeOutUp.duration(80) : FadeOutUp.duration(230).easing(Easing.in(Easing.cubic))}
+      layout={LinearTransition.duration(220)}
+      ref={cardRef}>
+      <KatchaButton
+        disabled={locked}
+        fullWidth
+        glow
+        icon={action.icon}
+        label={action.title}
+        labelStyle={KatchaDeckUI.typography.ftuePanelTitle}
+        onPress={() => invoke((rect) => onAction(action, rect))}
+      />
+    </Animated.View>;
+  }
   return <Animated.View
     entering={reduceMotion ? FadeIn.duration(80) : FadeInUp.duration(300).easing(Easing.out(Easing.cubic))}
     exiting={reduceMotion ? FadeOutUp.duration(80) : FadeOutUp.duration(230).easing(Easing.in(Easing.cubic))}

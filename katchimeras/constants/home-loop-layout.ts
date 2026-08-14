@@ -2,6 +2,9 @@
 export const HOME_SCENE_Y_OFFSET = 22;
 export const HOME_ACTIONS_Y_OFFSET = 36;
 export const HOME_EGG_ACTIONS_GAP = 12;
+/** Full-screen opening camera used while the FTUE owns Home without a tab bar. */
+export const HOME_FTUE_CAMERA_SCALE = 1.16;
+export const HOME_FTUE_CAMERA_Y_OFFSET = -24;
 
 /** Keep the forming action stack visually attached to the floating tab bar. */
 export const HOME_ACTIONS_TAB_BAR_GAP = 20;
