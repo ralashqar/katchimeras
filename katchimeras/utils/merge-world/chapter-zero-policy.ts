@@ -20,6 +20,13 @@ export const MOSSPROUT_CHAPTER_ZERO_REQUESTS = [
     description: 'Grow fresh Seeds, make two Sprouts, then merge them.',
     definitionId: 'nature:garden:3',
   },
+  {
+    id: `${ORDER_PREFIX}energy-plant`,
+    badge: 'ONE MORE',
+    title: 'One More Plant',
+    description: 'Grow one more Plant for Mossproutâ€™s new home.',
+    definitionId: 'nature:garden:3',
+  },
 ] as const;
 
 export function mossproutChapterZeroOrder(now: number, rewardWispId: WispId = 'sprout'): MergeOrder {
@@ -38,12 +45,28 @@ export function mossproutChapterZeroOrder(now: number, rewardWispId: WispId = 's
   };
 }
 
-export function mossproutChapterZeroHomePlantOrder(now: number, rewardWispId: WispId = 'sprout'): MergeOrder {
+export function mossproutChapterZeroHomePlantOrder(now: number): MergeOrder {
   return {
     id: MOSSPROUT_CHAPTER_ZERO_REQUESTS[1].id,
     characterId: 'mossprout',
     title: 'A Patch of Home',
     description: 'Merge two Sprouts into a Plant.',
+    difficulty: 'small',
+    requirements: [{ definitionId: 'nature:garden:3', quantity: 1 }],
+    reward: { coins: 30, mergeXp: 25, friendshipXp: 10, energy: 0 },
+    createdAt: now,
+    signature: false,
+    purpose: 'normal',
+    storyArcId: 'mossprout-chapter-0',
+  };
+}
+
+export function mossproutChapterZeroEnergyPlantOrder(now: number, rewardWispId: WispId = 'sprout'): MergeOrder {
+  return {
+    id: MOSSPROUT_CHAPTER_ZERO_REQUESTS[2].id,
+    characterId: 'mossprout',
+    title: 'One More Plant',
+    description: 'Grow one last Plant for Mossproutâ€™s home.',
     difficulty: 'small',
     requirements: [{ definitionId: 'nature:garden:3', quantity: 1 }],
     reward: { coins: 40, mergeXp: 30, friendshipXp: 16, energy: 0, wispId: rewardWispId },
@@ -56,15 +79,24 @@ export function mossproutChapterZeroHomePlantOrder(now: number, rewardWispId: Wi
 }
 
 export function advanceMossproutChapterZero(state: MergeWorldState, servedOrderId: string, now: number): MergeWorldState {
-  if (servedOrderId === MOSSPROUT_CHAPTER_ZERO_REQUESTS[1].id) {
+  if (servedOrderId === MOSSPROUT_CHAPTER_ZERO_REQUESTS[2].id) {
     const garden = state.generators[FTUE_GARDEN_GENERATOR_ID];
-    if (!garden?.forcedDropDefinitionId) return state;
     return {
       ...state,
+      energy: { ...state.energy, regenPaused: false, lastRegenAt: now },
       generators: {
         ...state.generators,
-        [FTUE_GARDEN_GENERATOR_ID]: { ...garden, forcedDropDefinitionId: null },
+        ...(garden ? { [FTUE_GARDEN_GENERATOR_ID]: { ...garden, forcedDropDefinitionId: null } } : {}),
       },
+    };
+  }
+  if (servedOrderId === MOSSPROUT_CHAPTER_ZERO_REQUESTS[1].id) {
+    return {
+      ...state,
+      activeOrders: [
+        ...state.activeOrders,
+        mossproutChapterZeroEnergyPlantOrder(now, mossproutChapterZeroRewardWisp(state)),
+      ],
     };
   }
   if (servedOrderId !== MOSSPROUT_CHAPTER_ZERO_REQUESTS[0].id) return state;
@@ -79,7 +111,7 @@ export function advanceMossproutChapterZero(state: MergeWorldState, servedOrderI
     board,
     activeOrders: [
       ...state.activeOrders,
-      mossproutChapterZeroHomePlantOrder(now, mossproutChapterZeroRewardWisp(state)),
+      mossproutChapterZeroHomePlantOrder(now),
     ],
   };
 }

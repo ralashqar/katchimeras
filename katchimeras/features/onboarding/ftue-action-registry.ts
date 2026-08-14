@@ -16,6 +16,8 @@ export const FTUE_HANDLER_REGISTRY: Record<FtueHandlerId, { commitOwner: 'fronte
   merge_order_served: { commitOwner: 'domain-observer', privacy: 'no-answer' },
   merge_chat_note_opened: { commitOwner: 'frontend', privacy: 'no-answer' },
   merge_energy_depleted: { commitOwner: 'domain-observer', privacy: 'no-answer' },
+  pedometer_steps: { commitOwner: 'frontend', privacy: 'no-answer' },
+  movement_context: { commitOwner: 'frontend', privacy: 'answer-id-only' },
   acknowledgement: { commitOwner: 'frontend', privacy: 'no-answer' },
 };
 

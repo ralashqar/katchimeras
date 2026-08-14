@@ -53,14 +53,14 @@ test('backend catalog contains only allowlisted privacy-safe action ids', () => 
 });
 
 test('Supabase receipt allowlist matches every backend FTUE action', () => {
-  const migration = readFileSync('supabase/migrations/20260814104455_register_mossprout_ftue_v8.sql', 'utf8');
+  const migration = readFileSync('supabase/migrations/20260814113342_register_mossprout_ftue_v9.sql', 'utf8');
   for (const item of FTUE_ACTION_CATALOG.filter((entry) => entry.backendEvent)) {
     assert.match(migration, new RegExp(`'${item.stepId}',\\s*'${item.actionId}'`));
   }
   assert.doesNotMatch(migration, /option_id|option_label|answer_text/);
 });
 
-test('Chapter 0 previews two requests and scripts spawn, repeated merge, and serve objectives', () => {
+test('Chapter 0 previews its requests and scripts spawn, merge, Energy recovery, and serve objectives', () => {
   const mergeStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.seed_drag');
   const serveStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.serve_sprout');
   const spawnStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.plant.spawn');
@@ -71,7 +71,15 @@ test('Chapter 0 previews two requests and scripts spawn, repeated merge, and ser
   assert.equal(serveStep?.edges?.[0]?.nextStepId, 'merge.plant.spawn');
   assert.equal(spawnStep?.edges?.[0]?.requiredCount, 4);
   assert.equal(pairStep?.edges?.[0]?.requiredCount, 2);
-  assert.equal(finalServeStep?.edges?.[0]?.nextStepId, 'merge.return_note');
+  assert.equal(finalServeStep?.edges?.[0]?.nextStepId, 'merge.energy.spawn_pair');
+  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.energy.last_seed')?.edges?.[0]?.nextStepId, 'merge.energy_exhausted');
+  assert.equal(mossproutFtueAction('merge.energy_exhausted', 'merge.tell_me_more')?.nextStepId, 'energy.capture');
+  assert.equal(mossproutFtueAction('energy.journal_reward', 'energy.see_steps')?.nextStepId, 'energy.steps_permission');
+  assert.equal(mossproutFtueAction('energy.steps_permission', 'energy.connect_steps')?.handlerId, 'pedometer_steps');
+  assert.equal(mossproutFtueAction('energy.steps_permission', 'energy.connect_steps')?.nextStepId, 'energy.steps_context');
+  assert.equal(mossproutFtueAction('energy.steps_context', 'energy.steps_context')?.nextStepId, 'energy.steps_reward');
+  assert.equal(mossproutFtueAction('energy.steps_reward', 'energy.return')?.nextStepId, 'merge.energy.finish_seed');
+  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.energy.serve_plant')?.edges?.[0]?.nextStepId, 'merge.return_note');
   const returnNote = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.return_note');
   assert.equal(returnNote?.interaction?.mode, 'exclusive');
   assert.deepEqual(returnNote?.spotlight?.targets, [{ kind: 'tray_chat_note', noteId: 'mossprout:chapter-0:return-note' }]);
@@ -87,6 +95,28 @@ test('Chapter 0 previews two requests and scripts spawn, repeated merge, and ser
     { kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' },
   ]);
   assert.ok(mossproutFtueAction('companion.order_preview', 'companion.open_garden'));
+});
+
+test('FTUE movement energy reuses Home panels, yesterday pedometer data, and the shared HUD flight', () => {
+  const today = readFileSync('app/(tabs)/today.tsx', 'utf8');
+  const pedometer = readFileSync('utils/pedometer-steps.ts', 'utf8');
+  const nurture = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
+  const feed = readFileSync('features/today/use-egg-feed-controller.ts', 'utf8');
+  assert.match(pedometer, /import\('expo-sensors'\)/);
+  assert.match(pedometer, /Pedometer/);
+  assert.match(pedometer, /getStepCountAsync\(start, end\)/);
+  assert.match(today, /getPedometerAccess/);
+  assert.match(today, /requestPedometerAccess/);
+  assert.match(today, /ftueStepDays\.at\(-2\) \?\? ftueStepDays\.at\(-1\)/);
+  assert.match(today, /setFtueDisplayedSteps\(Math\.max\(0, Math\.round\(observedSteps/);
+  assert.match(today, /mergeEnergyAmount: energy/);
+  assert.match(today, /onMergeEnergyTokenArrive/);
+  assert.doesNotMatch(today, /<FtueLifeEnergyOverlay/);
+  assert.match(nurture, /function InlineRouteActionChoice/);
+  assert.match(nurture, /DASHBOARD_STAT_ART\.steps/);
+  assert.match(nurture, /metricRef\.current \?\? rewardRef\.current/);
+  assert.match(nurture, /onboardingTopHudVisible/);
+  assert.match(feed, /pendingMergeEnergyTokenArriveRef/);
 });
 
 test('Mossprout remembers the day, branches playfully, then reveals the shared two-order preview', () => {
@@ -130,18 +160,24 @@ test('Merge FTUE spotlight is an absolute non-layout overlay with transparent ta
   assert.match(merge, /spotlight=\{active && !serveFlight \? ftueStep\?\.spotlight \?\? null : null\}/);
 });
 
-test('the opening FTUE hides the bottom bar until Talk to Mossprout, while reset remains reachable', () => {
+test('the active FTUE hides the bottom bar only on the tab presenting its current step', () => {
   const tabLayout = readFileSync('app/(tabs)/_layout.tsx', 'utf8');
   const devTools = readFileSync('app/(tabs)/explore.tsx', 'utf8');
   const policy = readFileSync('features/onboarding/ftue-navigation-policy.ts', 'utf8');
-  assert.match(tabLayout, /tabBar=\{\(props\) => bottomBarHidden \? null : <MeadowTabBar \{\.\.\.props\} \/>\}/);
   assert.match(policy, /'egg\.opening'/);
   assert.match(policy, /'hatch\.reveal'/);
   assert.doesNotMatch(policy, /'companion\.first_meeting'/);
-  assert.equal(ftueHidesBottomBar({ status: 'active', stepId: 'egg.opening' }), true);
-  assert.equal(ftueHidesBottomBar({ status: 'active', stepId: 'hatch.reveal' }), true);
-  assert.equal(ftueHidesBottomBar({ status: 'active', stepId: 'companion.first_meeting' }), false);
-  assert.equal(ftueHidesBottomBar({ status: 'complete', stepId: 'complete' }), false);
+  assert.match(tabLayout, /const activeRoute = props\.state\.routes\[props\.state\.index\]\?\.name/);
+  assert.match(tabLayout, /ftueHidesBottomBar\(ftueRun, activeRoute\)/);
+  assert.equal(ftueHidesBottomBar({ status: 'active', stepId: 'egg.opening' }, 'today'), true);
+  assert.equal(ftueHidesBottomBar({ status: 'active', stepId: 'hatch.reveal' }, 'today'), true);
+  assert.equal(ftueHidesBottomBar({ status: 'active', stepId: 'companion.first_meeting' }, 'today'), false);
+  assert.equal(ftueHidesBottomBar({ status: 'active', stepId: 'merge.energy_exhausted' }, 'games'), true);
+  assert.equal(ftueHidesBottomBar({ status: 'active', stepId: 'merge.energy_exhausted' }, 'today'), false);
+  assert.equal(ftueHidesBottomBar({ status: 'active', stepId: 'energy.capture' }, 'today'), true);
+  assert.equal(ftueHidesBottomBar({ status: 'active', stepId: 'energy.capture' }, 'games'), false);
+  assert.equal(ftueHidesBottomBar({ status: 'active', stepId: 'merge.energy.finish_seed' }, 'games'), true);
+  assert.equal(ftueHidesBottomBar({ status: 'complete', stepId: 'complete' }, 'today'), false);
   assert.equal(ftueOwnsOpeningHome({ status: 'active', stepId: 'hatch.reveal' }), true);
   assert.equal(ftueOwnsOpeningHome({ status: 'active', stepId: 'companion.first_meeting' }), false);
   assert.doesNotMatch(tabLayout, /ftueLocked\s*\?\s*null/);
@@ -149,6 +185,18 @@ test('the opening FTUE hides the bottom bar until Talk to Mossprout, while reset
   assert.match(devTools, /beginFirstSession\(\{ restart: true \}\)/);
   assert.match(devTools, /await resetTodayForDebug\(\);[\s\S]*?beginFirstSession\(\{ restart: true \}\);[\s\S]*?await resetKatchimeraProgressForDebug\(\{ resetAt \}\)/);
   assert.match(devTools, /It resets Today, Katchimera progress, and the Merge board/);
+});
+
+test('FTUE cross-surface CTAs navigate between sibling tabs under the shared curtain', () => {
+  const today = readFileSync('app/(tabs)/today.tsx', 'utf8');
+  const merge = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
+  const transition = readFileSync('features/navigation/game-screen-transition.tsx', 'utf8');
+  assert.match(merge, /router\.navigate\(\{ pathname: '\/today', params: \{ onboardingCapture: '1' \} \}\)/);
+  assert.doesNotMatch(merge, /router\.dismissTo\(\{ pathname: '\/today'/);
+  assert.match(today, /router\.navigate\(\{ pathname: '\/games', params: \{ familyId: 'mossprout' \} \}\)/);
+  assert.doesNotMatch(today, /router\.push\(\{ pathname: '\/\(tabs\)\/games'/);
+  assert.match(transition, /const commitPhase = useCallback[\s\S]*?phaseRef\.current = next;[\s\S]*?setPhase\(next\);/);
+  assert.match(transition, /commitPhase\('covered'\)[\s\S]*?current\.navigate\(\)[\s\S]*?commitPhase\('waiting_ready'\)/);
 });
 
 test('companion and Merge FTUE steps never suppress the normal Today action rotation', () => {
@@ -189,11 +237,12 @@ test('the opening camera slowly pinches in before revealing UI and retreats acro
   assert.ok(Math.abs(openingScale / contextScale - contextScale / mindScale) < 1e-9);
   assert.ok(Math.abs(contextScale / mindScale - mindScale / readyScale) < 1e-9);
   assert.equal(ftueHomeCameraPinchTarget('egg.ready', 2), 1);
+  assert.equal(ftueHomeCameraPinchTarget('energy.steps_context', 2), 1);
   assert.equal(ftueHomeCameraPinchTarget('companion.first_meeting', 2), null);
   assert.ok(FTUE_OPENING_UI_DELAY_MS >= FTUE_OPENING_CAMERA_DURATION_MS);
   assert.match(route, /setTimeout\(\(\) => setFtueOpeningUiVisible\(true\), FTUE_OPENING_UI_DELAY_MS\)/);
   assert.match(route, /scriptedPinchScale: ftueCameraPinchTarget/);
-  assert.match(route, /onboardingUiVisible=\{ftueOpeningUiVisible\}/);
+  assert.match(route, /onboardingUiVisible=\{ftueOpeningUiVisible && !ftueEnergyBridgeStep\}/);
   assert.match(nurture, /onboardingFocus && onboardingUiVisible && onboardingGuide/);
   assert.match(motion, /withTiming\(resolvedScriptedPinchScale/);
   assert.match(motion, /enabled\(enabled && !frozen && resolvedScriptedPinchScale == null\)/);
@@ -300,7 +349,7 @@ test('later FTUE choice beats specialize the same inline check-in panel lifecycl
   assert.match(home, /textChoices \? styles\.textChoiceGrid/);
   assert.match(home, /setScriptedTextCompletion/);
   assert.match(home, /key=\{scriptedTextChoiceAction\.id\}/);
-  assert.match(home, /scriptedRowActions = scriptedActions\.filter\(\(action\) => action\.presentation !== 'inline_choice'\)/);
+  assert.match(home, /scriptedRowActions = scriptedActions\.filter\(\(action\) => action\.presentation !== 'inline_choice' && action\.presentation !== 'route_action'\)/);
 });
 
 test('sequential FTUE choice panels cannot consume the previous question completion', () => {

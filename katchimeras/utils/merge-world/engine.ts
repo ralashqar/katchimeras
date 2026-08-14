@@ -19,9 +19,11 @@ import {
 } from '@/constants/merge-world-catalog';
 import {
   MERGE_DAILY_ACTIVITY_ENERGY_LIMIT,
+  MERGE_DAILY_STEP_ENERGY_LIMIT,
   MERGE_ENERGY_REGEN_CAP,
   MERGE_ENERGY_REGEN_MS,
   MERGE_INITIAL_ENERGY,
+  STEPS_PER_MERGE_ENERGY,
 } from '@/utils/merge-world/economy-policy';
 import { AUTHORED_COHORT_ORDER_POOLS, BARISTABBIT_CHAPTER_ONE_ORDER_POOL, FEASTLE_ACT_TWO_ORDER_POOL, type AuthoredCohortFamilyId } from '@/utils/companion-story';
 import type {
@@ -62,7 +64,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     landmarks: [],
     generatorUnlockReceipts: [],
     generators: {},
-    energy: { value: MERGE_INITIAL_ENERGY, regenCap: MERGE_ENERGY_REGEN_CAP, lastRegenAt: now },
+    energy: { value: MERGE_INITIAL_ENERGY, regenCap: MERGE_ENERGY_REGEN_CAP, lastRegenAt: now, regenPaused: false },
     coins: 100,
     mergeXp: 0,
     mergeLevel: 1,
@@ -77,6 +79,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     expansions: [],
     processedActivityReceiptIds: [],
     activityEnergyByDay: {},
+    stepEnergyByDay: {},
     lastFreeRerollDayId: null,
     characterProgress: { feastle: { friendshipLevel: 1, completedChapterIds: [] } },
     externalRewardReceipts: [],
@@ -116,6 +119,15 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
       return unlockExpansion(current, command.expansionId, command.now);
     case 'grantActivityRewardsBatch':
       return grantActivityRewardsBatch(current, command.rewards, command.now);
+    case 'claimStepEnergy':
+      return claimStepEnergy(current, command, command.now);
+    case 'setEnergyRegenPaused': {
+      if (Boolean(current.energy.regenPaused) === command.paused) return unchanged(current);
+      return changed(touch({
+        ...current,
+        energy: { ...current.energy, regenPaused: command.paused, lastRegenAt: command.now },
+      }, command.now));
+    }
     case 'featureCharacter': {
       if (!current.unlockedCharacters.includes(command.characterId)) return unchanged(current);
       // Featuring controls presentation order and the companion return route.
@@ -247,6 +259,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
       value: Math.max(0, finite(source.energy?.value, MERGE_INITIAL_ENERGY)),
       regenCap: MERGE_ENERGY_REGEN_CAP,
       lastRegenAt: finite(source.energy?.lastRegenAt, now),
+      regenPaused: Boolean(source.energy?.regenPaused),
     },
     coins: Math.max(0, finite(source.coins, 0)),
     mergeXp: Math.max(0, finite(source.mergeXp, 0)),
@@ -265,6 +278,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     expansions: uniqueStrings(source.expansions),
     processedActivityReceiptIds: uniqueStrings(source.processedActivityReceiptIds),
     activityEnergyByDay: source.activityEnergyByDay && typeof source.activityEnergyByDay === 'object' ? source.activityEnergyByDay : {},
+    stepEnergyByDay: normalizeStepEnergyByDay(source.stepEnergyByDay),
     lastFreeRerollDayId: typeof source.lastFreeRerollDayId === 'string' ? source.lastFreeRerollDayId : null,
     characterProgress: source.characterProgress && typeof source.characterProgress === 'object'
       ? source.characterProgress
@@ -613,6 +627,66 @@ function grantActivityRewardsBatch(
   return { state: next, changed: true, energyGranted: actualEnergyAward, itemsQueued: queuedItemCount, message: actualEnergyAward > 0
     ? `Real life added ${actualEnergyAward} Merge Energy${queuedItemCount ? ' and companion starter supplies.' : '.'}`
     : queuedItemCount ? 'Your companion starter supplies are waiting in Merge World.' : undefined };
+}
+
+function claimStepEnergy(
+  state: MergeWorldState,
+  command: Extract<MergeWorldCommand, { type: 'claimStepEnergy' }>,
+  now: number,
+): MergeWorldCommandResult {
+  const observedSteps = Math.max(0, Math.floor(command.observedSteps));
+  const existing = state.stepEnergyByDay[command.dayId];
+  if (existing?.receiptIds.includes(command.receiptId)) {
+    return {
+      state,
+      changed: false,
+      energyGranted: 0,
+      stepEnergyClaim: {
+        consumedSteps: 0,
+        remainingClaimableSteps: existing.remainderSteps,
+        beforeEnergy: state.energy.value,
+        afterEnergy: state.energy.value,
+        status: 'duplicate',
+      },
+    };
+  }
+  const bootstrap = !existing && command.allowBootstrap;
+  const highestObservedSteps = Math.max(existing?.highestObservedSteps ?? 0, observedSteps);
+  const newSteps = bootstrap
+    ? observedSteps
+    : Math.max(0, observedSteps - (existing?.accountedSteps ?? observedSteps));
+  const availableSteps = (existing?.remainderSteps ?? 0) + newSteps;
+  const remainingEnergy = Math.max(0, MERGE_DAILY_STEP_ENERGY_LIMIT - (existing?.energyAwarded ?? 0));
+  const energyGranted = Math.min(Math.floor(availableSteps / STEPS_PER_MERGE_ENERGY), remainingEnergy);
+  const consumedSteps = energyGranted * STEPS_PER_MERGE_ENERGY;
+  const remainderSteps = remainingEnergy === 0 ? 0 : Math.max(0, availableSteps - consumedSteps);
+  const nextDay = {
+    highestObservedSteps,
+    accountedSteps: highestObservedSteps,
+    remainderSteps,
+    energyAwarded: (existing?.energyAwarded ?? 0) + energyGranted,
+    bootstrapClaimed: Boolean(existing?.bootstrapClaimed || bootstrap),
+    lastObservedAt: command.observedAt,
+    receiptIds: [...(existing?.receiptIds ?? []), command.receiptId],
+  };
+  const beforeEnergy = state.energy.value;
+  const next = touch({
+    ...state,
+    energy: { ...state.energy, value: beforeEnergy + energyGranted },
+    stepEnergyByDay: { ...state.stepEnergyByDay, [command.dayId]: nextDay },
+  }, now);
+  return {
+    state: next,
+    changed: true,
+    energyGranted,
+    stepEnergyClaim: {
+      consumedSteps,
+      remainingClaimableSteps: remainderSteps,
+      beforeEnergy,
+      afterEnergy: beforeEnergy + energyGranted,
+      status: energyGranted > 0 ? 'awarded' : remainingEnergy === 0 ? 'daily_cap' : 'below_threshold',
+    },
+  };
 }
 
 function rerollOrder(state: MergeWorldState, orderId: string, now: number): MergeWorldCommandResult {
@@ -1048,6 +1122,7 @@ function applyDiscovery(state: MergeWorldState, definitionId: string, now: numbe
 function refreshTime(state: MergeWorldState, now: number): MergeWorldState {
   let changedState = false;
   let energy = state.energy;
+  if (energy.regenPaused) return state;
   if (energy.value < energy.regenCap && now > energy.lastRegenAt) {
     const ticks = Math.floor((now - energy.lastRegenAt) / MERGE_ENERGY_REGEN_MS);
     if (ticks > 0) {
@@ -1060,6 +1135,28 @@ function refreshTime(state: MergeWorldState, now: number): MergeWorldState {
     changedState = true;
   }
   return changedState ? touch({ ...state, energy }, now) : state;
+}
+
+function normalizeStepEnergyByDay(value: unknown): MergeWorldState['stepEnergyByDay'] {
+  if (!value || typeof value !== 'object') return {};
+  const normalized: MergeWorldState['stepEnergyByDay'] = {};
+  for (const [dayId, raw] of Object.entries(value)) {
+    if (!raw || typeof raw !== 'object') continue;
+    const source = raw as Partial<MergeWorldState['stepEnergyByDay'][string]>;
+    const energyAwarded = Math.min(MERGE_DAILY_STEP_ENERGY_LIMIT, Math.max(0, Math.floor(finite(source.energyAwarded, 0))));
+    normalized[dayId] = {
+      highestObservedSteps: Math.max(0, Math.floor(finite(source.highestObservedSteps, 0))),
+      accountedSteps: Math.max(0, Math.floor(finite(source.accountedSteps, 0))),
+      remainderSteps: energyAwarded >= MERGE_DAILY_STEP_ENERGY_LIMIT
+        ? 0
+        : Math.max(0, Math.floor(finite(source.remainderSteps, 0))) % STEPS_PER_MERGE_ENERGY,
+      energyAwarded,
+      bootstrapClaimed: Boolean(source.bootstrapClaimed),
+      lastObservedAt: typeof source.lastObservedAt === 'string' ? source.lastObservedAt : '',
+      receiptIds: uniqueStrings(source.receiptIds),
+    };
+  }
+  return normalized;
 }
 
 function generatorState(id: string): MergeGeneratorState {
@@ -1329,6 +1426,9 @@ function reconcileUnlockedCatalog(state: MergeWorldState): MergeWorldState {
 }
 
 export function mergeOrderEnergyRefund(order: MergeOrder): number {
+  // Chapter 0 deliberately pays no Energy so its journal shortage lands on
+  // the scripted value. Preserve the established economy for all other orders.
+  if (order.id.startsWith('mossprout:chapter-0:')) return Math.max(0, Math.floor(order.reward.energy));
   if (order.signature || order.purpose === 'signature') return 5;
   return order.difficulty === 'medium' ? 3 : order.difficulty === 'major' ? 5 : 2;
 }

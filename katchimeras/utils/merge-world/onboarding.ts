@@ -22,7 +22,7 @@ export function createMossproutChapterZeroState(now = Date.now(), rewardWispId: 
     ...state,
     board,
     generators: { [garden.id]: { id: garden.id, name: garden.name, level: 1, upgradeFragments: 0, chainIds: garden.chainIds, tierOneDropDefinitionIds: [...garden.tierOneDropDefinitionIds], forcedDropDefinitionId: 'nature:garden:1' } },
-    energy: { value: 50, regenCap: 50, lastRegenAt: now },
+    energy: { value: 10, regenCap: 50, lastRegenAt: now, regenPaused: true },
     coins: 100,
     discoveries: ['nature:garden:1'],
     unlockedFamilies: ['nature'],

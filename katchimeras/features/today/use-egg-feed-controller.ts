@@ -15,6 +15,7 @@ type EggFeedPayload = {
   imageSource?: number;
   label?: string;
   mergeEnergyAmount?: number;
+  onMergeEnergyTokenArrive?: (amount: number, index: number, count: number) => void;
   photoUri?: string;
   tint?: string;
 };
@@ -49,6 +50,7 @@ export function useEggFeedController() {
   const growthHapticTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finalEnergyFeedbackFrameRef = useRef<number | null>(null);
   const pendingFinalEnergyFeedbackRef = useRef<{ amount: number; count: number; index: number } | null>(null);
+  const pendingMergeEnergyTokenArriveRef = useRef<EggFeedPayload['onMergeEnergyTokenArrive']>(undefined);
 
   useEffect(() => () => {
     if (launchRetryTimerRef.current) clearTimeout(launchRetryTimerRef.current);
@@ -60,6 +62,7 @@ export function useEggFeedController() {
     growthHapticTimerRef.current = null;
     finalEnergyFeedbackFrameRef.current = null;
     pendingFinalEnergyFeedbackRef.current = null;
+    pendingMergeEnergyTokenArriveRef.current = undefined;
     launchPendingRef.current = false;
     queuedFeedsRef.current = [];
     pendingFeedCommit.current = null;
@@ -88,6 +91,7 @@ export function useEggFeedController() {
       launchRetryTimerRef.current = null;
       feedNonce.current += 1;
       pendingFeedCommit.current = commit;
+      pendingMergeEnergyTokenArriveRef.current = payload.onMergeEnergyTokenArrive;
       const nextFeed: EggFeed = {
         nonce: feedNonce.current,
         fromX: from.x + from.w / 2,
@@ -188,6 +192,7 @@ export function useEggFeedController() {
     // pulsing at its old size and falling back to a delayed reconciliation.
     pendingFeedCommit.current?.();
     pendingFeedCommit.current = null;
+    pendingMergeEnergyTokenArriveRef.current = undefined;
     if (pendingFinalEnergyFeedbackRef.current) {
       if (finalEnergyFeedbackFrameRef.current != null) {
         cancelAnimationFrame(finalEnergyFeedbackFrameRef.current);
@@ -233,7 +238,8 @@ export function useEggFeedController() {
     }
   }, []);
 
-  const handleMergeEnergyTokenArrive = useCallback(() => {
+  const handleMergeEnergyTokenArrive = useCallback((amount: number, index: number, count: number) => {
+    pendingMergeEnergyTokenArriveRef.current?.(amount, index, count);
     setEnergyHudPulseNonce((nonce) => nonce + 1);
   }, []);
 

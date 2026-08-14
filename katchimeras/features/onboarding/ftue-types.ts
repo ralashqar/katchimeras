@@ -18,6 +18,8 @@ export type FtueHandlerId =
   | 'merge_order_served'
   | 'merge_chat_note_opened'
   | 'merge_energy_depleted'
+  | 'pedometer_steps'
+  | 'movement_context'
   | 'acknowledgement';
 
 export type FtueChoiceOption = {

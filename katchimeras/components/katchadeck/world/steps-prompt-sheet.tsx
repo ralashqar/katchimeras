@@ -4,6 +4,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
+import { MovementChoiceChips, type MovementChoiceOption } from '@/components/katchadeck/world/movement-choice-chips';
 import { KatchaSurfacePalette } from '@/constants/katcha-ui';
 import type { DayMovementKind } from '@/types/home';
 
@@ -11,7 +12,7 @@ import type { DayMovementKind } from '@/types/home';
 // what it WAS. One tap, multiple choice. The answer becomes one canonical
 // movement memory and can corroborate—but never replace—the measured steps.
 
-type MovementOption = { movement: DayMovementKind; label: string; emoji: string; tint: string };
+type MovementOption = MovementChoiceOption;
 const MOVEMENTS: MovementOption[] = [
   { movement: 'hike', label: 'A hike', emoji: '🥾', tint: '#7DE8CD' },
   { movement: 'walk', label: 'A long walk', emoji: '🚶', tint: '#9AE6B4' },
@@ -79,20 +80,20 @@ export function StepsPromptSheet({
               : 'Your steps stood out. Choose what they came from to keep one movement memory for today.'}
           </ThemedText>
         ) : null}
-        <Animated.View entering={FadeInDown.duration(220)} style={styles.grid}>
-          {(subtypes ?? orderedMovements).map((option) => (
+        {!selected ? (
+          <Animated.View entering={FadeInDown.duration(220)}>
+            <MovementChoiceChips options={orderedMovements} onChoose={chooseMovement} />
+          </Animated.View>
+        ) : (
+          <Animated.View entering={FadeInDown.duration(220)} style={styles.grid}>
+          {(subtypes ?? []).map((option) => (
             <Pressable
-              key={'movement' in option ? option.movement : option.id}
+              key={option.id}
               onPress={() => {
-                if (selected && !('movement' in option)) {
-                  onConfirm({ movement: selected.movement, label: selected.label, emoji: selected.emoji, subtype: option.id });
-                } else {
-                  chooseMovement(option as MovementOption);
-                }
+                onConfirm({ movement: selected.movement, label: selected.label, emoji: selected.emoji, subtype: option.id });
               }}
               style={({ pressed }) => [
                 styles.chip,
-                'tint' in option ? { borderColor: `${option.tint}66` } : null,
                 pressed && styles.chipPressed,
               ]}>
               <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
@@ -101,7 +102,8 @@ export function StepsPromptSheet({
               </ThemedText>
             </Pressable>
           ))}
-        </Animated.View>
+          </Animated.View>
+        )}
         {selected ? (
           <View style={styles.backRow}>
             <Pressable onPress={() => setSelected(null)}>

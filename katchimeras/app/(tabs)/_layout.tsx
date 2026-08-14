@@ -24,7 +24,6 @@ export default function TabLayout() {
   const firstSession = useFirstSession();
   const ftueRun = useFtueRun();
   const guidedSession = firstSession != null && firstSession.stage !== 'complete';
-  const bottomBarHidden = ftueHidesBottomBar(ftueRun);
   const [feastleStory, setFeastleStory] = useState(loadFeastleStory);
   useEffect(() => subscribeCompanionStories(() => setFeastleStory(loadFeastleStory())), []);
 
@@ -39,7 +38,10 @@ export default function TabLayout() {
       <Tabs
         // The carved-wood Meadow bar (generated art + centre capture button)
         // replaces the stock bar entirely.
-        tabBar={(props) => bottomBarHidden ? null : <MeadowTabBar {...props} />}
+        tabBar={(props) => {
+          const activeRoute = props.state.routes[props.state.index]?.name ?? '';
+          return ftueHidesBottomBar(ftueRun, activeRoute) ? null : <MeadowTabBar {...props} />;
+        }}
         screenOptions={{
           headerShown: false,
           tabBarHideOnKeyboard: true,

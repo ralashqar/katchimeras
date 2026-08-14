@@ -17,7 +17,7 @@ import { reduceMergeWorld } from '@/utils/merge-world/engine';
 import { mergeWorldPendingPersistence, type MergeWorldPendingPersistence } from '@/utils/merge-world/persistence-buffer';
 import { loadFirstSession } from '@/features/onboarding/first-session';
 import { isMossproutChapterZeroActive } from '@/utils/merge-world/chapter-zero-policy';
-import { loadMergeWorldState, saveMergeWorldState, subscribeMergeWorldResets } from '@/utils/merge-world/repository';
+import { loadMergeWorldState, saveMergeWorldState, subscribeMergeWorldResets, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
 import { isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, loadMossproutStory, markAuthoredCohortOrderActive, markAuthoredCohortOrderServed, markFeastleOrderActive, markFeastleOrderServed, markMossproutOrderActive, markMossproutOrderServed, recordAuthoredCohortQuietBond, recordFeastleQuietBond, recordMossproutQuietBond, subscribeCompanionStories } from '@/utils/companion-story-storage';
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 import { loadCompanionQuickGoalState, subscribeCompanionQuickGoals } from '@/utils/companion-quick-goal-storage';
@@ -314,6 +314,28 @@ export function MergeWorldProvider({
       release();
     };
   }, [featureAndReconcile, refreshFriendshipLevels]);
+
+  useEffect(() => {
+    // Today can award Merge Energy while this retained tab is unfocused. Adopt
+    // newer repository snapshots immediately and invalidate any stale buffered
+    // write so reopening Games cannot overwrite or hide that reward.
+    const release = acquireLifecycleResource('store_subscription', 'merge:world-snapshots');
+    const unsubscribe = subscribeMergeWorldSnapshots((freshState) => {
+      if (!mountedRef.current || freshState.revision <= (stateRef.current?.revision ?? -1)) return;
+      persistenceGenerationRef.current += 1;
+      pendingPersistenceRef.current = null;
+      persistenceWorkerRef.current = null;
+      stateRef.current = freshState;
+      setState(freshState);
+      setLastResult(null);
+      setError(null);
+      setLoading(false);
+    });
+    return () => {
+      unsubscribe();
+      release();
+    };
+  }, []);
 
   const drainPersistence = useCallback(async () => {
     const workerGeneration = persistenceGenerationRef.current;

@@ -1,8 +1,9 @@
 import * as SQLite from 'expo-sqlite';
 
-import type { MergeWorldState } from '@/types/merge-world';
+import type { MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld, resetMergeActivityForDay } from '@/utils/merge-world/engine';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
+import { MOSSPROUT_FTUE_JOURNAL_ENERGY } from '@/utils/merge-world/economy-policy';
 
 const DATABASE_NAME = 'katchimeras-merge-world.db';
 const LOCAL_PROFILE_ID = 'local';
@@ -121,6 +122,72 @@ export async function saveMergeWorldState(state: MergeWorldState, receiptIds?: r
     });
   });
   if (generation === resetGeneration && !resetInProgress) publishSnapshot(state);
+}
+
+async function reduceStoredMergeWorld(
+  reduce: (state: MergeWorldState) => MergeWorldCommandResult,
+  now = Date.now(),
+): Promise<MergeWorldCommandResult> {
+  const generation = resetGeneration;
+  const result = await serializeWrite(async () => {
+    const db = await database();
+    const row = await db.getFirstAsync<{ state_json: string; backup_json: string | null }>(
+      'SELECT state_json, backup_json FROM merge_world_snapshot WHERE profile_id = ?',
+      [LOCAL_PROFILE_ID],
+    );
+    let current = createInitialMergeWorldState(now);
+    if (row) {
+      try {
+        current = normalizeMergeWorldState(JSON.parse(row.state_json), now);
+      } catch {
+        if (row.backup_json) {
+          try { current = normalizeMergeWorldState(JSON.parse(row.backup_json), now); } catch {}
+        }
+      }
+    }
+    const reduced = reduce(current);
+    if (!reduced.changed || generation !== resetGeneration || resetInProgress) return reduced;
+    await db.runAsync(
+      `INSERT INTO merge_world_snapshot (profile_id, schema_version, revision, updated_at, state_json, backup_json)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(profile_id) DO UPDATE SET schema_version = excluded.schema_version, revision = excluded.revision,
+       updated_at = excluded.updated_at, backup_json = merge_world_snapshot.state_json, state_json = excluded.state_json`,
+      [LOCAL_PROFILE_ID, reduced.state.version, reduced.state.revision, reduced.state.updatedAt, JSON.stringify(reduced.state), row?.state_json ?? null],
+    );
+    return reduced;
+  });
+  if (result.changed && generation === resetGeneration && !resetInProgress) publishSnapshot(result.state);
+  return result;
+}
+
+/** Pays the authored journal reward through the normal daily journal receipt. */
+export function grantMossproutFtueJournalEnergy(dayId: string, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'grantActivityRewardsBatch',
+    rewards: [{
+      receiptId: `activity:egg-journal:${dayId}`,
+      kind: 'daily_journal_energy',
+      amount: MOSSPROUT_FTUE_JOURNAL_ENERGY,
+      label: 'Mossprout memory',
+      grantDayId: dayId,
+    }],
+    now,
+  }), now);
+}
+
+/** Atomically checkpoints the device pedometer total and grants only unclaimed steps. */
+export function claimMossproutFtueStepEnergy(input: {
+  dayId: string;
+  observedSteps: number;
+  observedAt: string;
+  allowBootstrap: boolean;
+  receiptId: string;
+}, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'claimStepEnergy',
+    ...input,
+    now,
+  }), now);
 }
 
 export async function resetMergeWorldStateForDebug(now = Date.now()): Promise<void> {

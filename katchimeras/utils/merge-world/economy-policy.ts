@@ -7,6 +7,9 @@ export const MERGE_DAILY_ACTIVITY_ENERGY_LIMIT = 20;
 export const MERGE_DAILY_JOURNAL_ENERGY = 10;
 export const MERGE_DAILY_COMPANION_ENERGY = 5;
 export const MERGE_DAILY_QUEST_ENERGY = 5;
+export const STEPS_PER_MERGE_ENERGY = 300;
+export const MERGE_DAILY_STEP_ENERGY_LIMIT = 20;
+export const MOSSPROUT_FTUE_JOURNAL_ENERGY = 20;
 
 export type MergeJournalRewardPreview = {
   dailyJournalEnergy: number;

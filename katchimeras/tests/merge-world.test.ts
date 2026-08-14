@@ -5,13 +5,13 @@ import test from 'node:test';
 import { KATCHIMERA_MERGE_PROFILES, MERGE_GENERATORS, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import type { HomeDayRecord } from '@/types/home';
 import type { MergeBoardItem, MergeWorldState } from '@/types/merge-world';
-import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
+import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import { BARISTABBIT_CHAPTER_ONE_ORDER_POOL, FEASTLE_ACT_TWO_ORDER_POOL, selectAuthoredCohortOrderKeys, selectFeastleActTwoOrderKeys } from '@/utils/companion-story';
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection } from '@/utils/merge-world/board-geometry';
 import { mergeActivityRewards } from '@/utils/merge-world/activity-rewards';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
-import { MERGE_ENERGY_REGEN_CAP, MERGE_ENERGY_REGEN_MS, MERGE_INITIAL_ENERGY, mergeJournalRewardPreview } from '@/utils/merge-world/economy-policy';
+import { MERGE_ENERGY_REGEN_CAP, MERGE_ENERGY_REGEN_MS, MERGE_INITIAL_ENERGY, MOSSPROUT_FTUE_JOURNAL_ENERGY, STEPS_PER_MERGE_ENERGY, mergeJournalRewardPreview } from '@/utils/merge-world/economy-policy';
 import {
   createInitialMergeWorldState,
   mergeOrderReady,
@@ -43,7 +43,9 @@ test('Merge FTUE gates the exact authored seed drag and emits a verified merge e
     resultCell: to,
     revision: result.state.revision,
   });
-  assert.equal(recoverMergeFtueEvent('merge.seed_drag', result.state)?.type, 'merge_completed');
+  assert.equal(recoverMergeFtueEvent('merge.seed_drag', result.state, {
+    'baseline:merge.seed_drag:merge.create_sprout': 0,
+  })?.type, 'merge_completed');
 });
 
 test('Merge FTUE locks the board for Serve and advances only for its exact order', () => {
@@ -60,7 +62,9 @@ test('Merge FTUE locks the board for Serve and advances only for its exact order
   const command = { type: 'serveOrder' as const, orderId, now: NOW + 2 };
   const result = reduceMergeWorld(merged, command);
   assert.deepEqual(mergeFtueEventForCommand(merged, command, result), { type: 'order_served', orderId, revision: result.state.revision });
-  assert.equal(recoverMergeFtueEvent('merge.serve_sprout', result.state)?.type, 'order_served');
+  assert.equal(recoverMergeFtueEvent('merge.serve_sprout', result.state, {
+    'baseline:merge.serve_sprout:merge.serve_sprout': 0,
+  })?.type, 'order_served');
   assert.deepEqual(result.state.activeOrders.map((order) => order.id), ['mossprout:chapter-0:home-plant']);
 });
 
@@ -130,10 +134,11 @@ test('a new Merge World uses the consolidated Energy economy', () => {
   assert.deepEqual(state.generators, {});
 });
 
-test('Mossprout Chapter 0 starts at 50 Energy and completes two sequential orders', () => {
+test('Mossprout Chapter 0 scripts an exact 3-Energy shortage before its final order', () => {
   let state = createMossproutChapterZeroState(NOW, 'heartlet');
   assert.equal(state.board.filter((cell) => !cell.locked).length, 18);
-  assert.equal(state.energy.value, 50);
+  assert.equal(state.energy.value, 10);
+  assert.equal(state.energy.regenPaused, true);
   assert.deepEqual(state.generators['wild-garden'].tierOneDropDefinitionIds, ['nature:garden:1', 'nature:waterside:1']);
   assert.equal(state.generators['wild-garden'].forcedDropDefinitionId, 'nature:garden:1');
   assert.deepEqual(state.activeOrders.map((order) => order.id), ['mossprout:chapter-0:first-sprout']);
@@ -146,7 +151,7 @@ test('Mossprout Chapter 0 starts at 50 Energy and completes two sequential order
   state = reduceMergeWorld(state, { type: 'serveOrder', orderId: 'mossprout:chapter-0:first-sprout', now: NOW + 2 }).state;
   assert.equal(state.board.filter((cell) => !cell.locked).length, 22);
   assert.deepEqual(state.activeOrders.map((order) => order.id), ['mossprout:chapter-0:home-plant']);
-  assert.equal(state.energy.value, 52);
+  assert.equal(state.energy.value, 10);
   assert.equal(Boolean(state.characterProgress.mossprout?.completedChapterIds.includes('mossprout-chapter-0')), false);
   assert.equal(state.externalRewardReceipts.some((receipt) => receipt.kind === 'wisp'), false);
 
@@ -162,10 +167,100 @@ test('Mossprout Chapter 0 starts at 50 Energy and completes two sequential order
   mergePair('nature:garden:1', NOW + 8);
   mergePair('nature:garden:2', NOW + 9);
   state = reduceMergeWorld(state, { type: 'serveOrder', orderId: 'mossprout:chapter-0:home-plant', now: NOW + 10 }).state;
+  assert.deepEqual(state.activeOrders.map((order) => order.id), ['mossprout:chapter-0:energy-plant']);
+  assert.equal(state.energy.value, 6);
+
+  for (let index = 0; index < 2; index += 1) {
+    state = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: 'wild-garden', now: NOW + 11 + index, seed: `energy-pair:${index}` }).state;
+  }
+  mergePair('nature:garden:1', NOW + 13);
+  state = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: 'wild-garden', now: NOW + 14, seed: 'energy-last-seed' }).state;
+  assert.equal(state.energy.value, 3);
+  assert.equal(reduceMergeWorld(state, { type: 'refreshTime', now: NOW + 86_400_000 }).state.energy.value, 3);
+
+  const journal = reduceMergeWorld(state, {
+    type: 'grantActivityRewardsBatch',
+    rewards: [{ receiptId: 'activity:egg-journal:2026-08-12', kind: 'daily_journal_energy', amount: MOSSPROUT_FTUE_JOURNAL_ENERGY, label: 'Mossprout memory', grantDayId: '2026-08-12' }],
+    now: NOW + 15,
+  });
+  assert.equal(journal.energyGranted, 20);
+  assert.equal(journal.state.energy.value, 23);
+  const duplicateJournal = reduceMergeWorld(journal.state, {
+    type: 'grantActivityRewardsBatch',
+    rewards: [{ receiptId: 'activity:egg-journal:2026-08-12', kind: 'daily_journal_energy', amount: MOSSPROUT_FTUE_JOURNAL_ENERGY, label: 'Mossprout memory', grantDayId: '2026-08-12' }],
+    now: NOW + 16,
+  });
+  assert.equal(duplicateJournal.changed, false);
+
+  const returnStep = mossproutFtueStep('merge.energy.finish_seed');
+  const generatorCell = journal.state.board.findIndex((cell) => cell.occupant?.kind === 'generator' && cell.occupant.generatorId === 'wild-garden');
+  const finalSeedCommand = { type: 'tapGenerator' as const, generatorId: 'wild-garden', now: NOW + 17, seed: 'energy-final-seed' };
+  assert.deepEqual(mergeFtueBoardGate(returnStep, journal.state), { kind: 'generator', cell: generatorCell, generatorId: 'wild-garden' });
+  assert.equal(mergeFtueAllowsCommand(returnStep, journal.state, finalSeedCommand), true);
+  state = reduceMergeWorld(journal.state, finalSeedCommand).state;
+  const finishSproutStep = mossproutFtueStep('merge.energy.finish_sprout');
+  const finishSproutBaseline = mergeFtueStepEntryBaseline(finishSproutStep, state);
+  assert.deepEqual(finishSproutBaseline, {
+    actionId: 'merge.energy.finish_sprout',
+    stepId: 'merge.energy.finish_sprout',
+    value: 1,
+  });
+  assert.equal(
+    recoverMergeFtueEvent(finishSproutStep, state, {
+      'baseline:merge.energy.finish_sprout:merge.energy.finish_sprout': finishSproutBaseline!.value,
+    }),
+    null,
+    'the Sprout carried through Today must not auto-complete the post-return Seed merge',
+  );
+  assert.equal(mergeFtueBoardGate(finishSproutStep, state).kind, 'drag');
+  assert.equal(mergeFtueRepairTarget(mossproutFtueStep('merge.energy.finish_plant'), state), 'merge.energy.finish_sprout');
+  mergePair('nature:garden:1', NOW + 18);
+  assert.equal(recoverMergeFtueEvent(finishSproutStep, state, {
+    'baseline:merge.energy.finish_sprout:merge.energy.finish_sprout': finishSproutBaseline!.value,
+  })?.type, 'merge_completed');
+  assert.equal(mergeFtueRepairTarget(mossproutFtueStep('merge.energy.finish_plant'), state), null);
+  mergePair('nature:garden:2', NOW + 19);
+  state = reduceMergeWorld(state, { type: 'serveOrder', orderId: 'mossprout:chapter-0:energy-plant', now: NOW + 20 }).state;
   assert.deepEqual(state.activeOrders, []);
+  assert.equal(state.energy.regenPaused, false);
   assert.equal(state.generators['wild-garden'].forcedDropDefinitionId, null);
   assert.ok(state.characterProgress.mossprout?.completedChapterIds.includes('mossprout-chapter-0'));
   assert.ok(state.externalRewardReceipts.some((receipt) => receipt.kind === 'wisp' && receipt.wispId === 'heartlet'));
+});
+
+test('step Energy checkpoints cumulative pedometer totals without paying the same steps twice', () => {
+  const initial = createMossproutChapterZeroState(NOW);
+  const first = reduceMergeWorld(initial, {
+    type: 'claimStepEnergy', dayId: '2026-08-12', observedSteps: 6_000,
+    observedAt: new Date(NOW).toISOString(), allowBootstrap: true, receiptId: 'steps:first', now: NOW + 1,
+  });
+  assert.equal(first.energyGranted, 20);
+  assert.equal(first.stepEnergyClaim?.consumedSteps, 20 * STEPS_PER_MERGE_ENERGY);
+  assert.equal(first.state.energy.value, 30);
+  const duplicate = reduceMergeWorld(first.state, {
+    type: 'claimStepEnergy', dayId: '2026-08-12', observedSteps: 6_000,
+    observedAt: new Date(NOW + 2).toISOString(), allowBootstrap: true, receiptId: 'steps:first', now: NOW + 2,
+  });
+  assert.equal(duplicate.changed, false);
+  assert.equal(duplicate.stepEnergyClaim?.status, 'duplicate');
+  const correctedDown = reduceMergeWorld(first.state, {
+    type: 'claimStepEnergy', dayId: '2026-08-12', observedSteps: 5_500,
+    observedAt: new Date(NOW + 3).toISOString(), allowBootstrap: false, receiptId: 'steps:correction', now: NOW + 3,
+  });
+  assert.equal(correctedDown.energyGranted, 0);
+  assert.equal(correctedDown.state.energy.value, 30);
+
+  const remainderStart = reduceMergeWorld(createMossproutChapterZeroState(NOW), {
+    type: 'claimStepEnergy', dayId: '2026-08-13', observedSteps: 299,
+    observedAt: new Date(NOW).toISOString(), allowBootstrap: true, receiptId: 'steps:299', now: NOW + 4,
+  });
+  assert.equal(remainderStart.energyGranted, 0);
+  const threshold = reduceMergeWorld(remainderStart.state, {
+    type: 'claimStepEnergy', dayId: '2026-08-13', observedSteps: 300,
+    observedAt: new Date(NOW + 5).toISOString(), allowBootstrap: false, receiptId: 'steps:300', now: NOW + 5,
+  });
+  assert.equal(threshold.energyGranted, 1);
+  assert.equal(threshold.stepEnergyClaim?.consumedSteps, STEPS_PER_MERGE_ENERGY);
 });
 
 test('generator forced-drop mode validates, emits the exact item, and can be cleared', () => {
@@ -539,6 +634,17 @@ test('Merge page keeps a stable parcel stack first in the tray and the board att
   assert.match(screen, /arrival\.kind !== 'memory_arrival'/);
 });
 
+test('Merge board retains destination selection and decorates generators with ambient motion', () => {
+  const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
+  assert.match(board, /onSelect\(to\);/);
+  assert.match(board, /onSelect\(sprite\.cell\);/);
+  assert.match(board, /SelectedCellCorners[\s\S]*?selectionCornerTopLeft[\s\S]*?selectionCornerBottomRight/);
+  assert.match(board, /withRepeat\(withSequence\([\s\S]*?withTiming\(1[\s\S]*?withTiming\(0/);
+  assert.match(board, /GeneratorSparkles[\s\S]*?GENERATOR_SPARKLE_LANES[\s\S]*?GeneratorSparkle/);
+  assert.match(board, /GENERATOR_SPARKLE_CYCLE_MS = 700/);
+  assert.match(board, /translateY: interpolate\(p, \[0, 1\], \[size \* 0\.24, -size \* 0\.62\]\)/);
+});
+
 test('a companion journal grants the featured family’s two starter chains once', () => {
   const day = {
     id: 'day-2026-08-12', isoDate: '2026-08-12', promptAnswers: [], moments: [], capturedMeanings: [], stepsCount: 0,
@@ -691,6 +797,14 @@ test('a retained hidden Merge provider receives debug resets before Games is reo
   assert.match(subscription, /if \(!mountedRef\.current\) return;/);
   assert.doesNotMatch(subscription, /if \(!active/);
   assert.doesNotMatch(subscription, /if \(!activeRef\.current\)/);
+});
+
+test('a retained hidden Merge provider adopts repository Energy rewards before Games is reopened', () => {
+  const provider = readFileSync('features/merge-world/merge-world-provider.tsx', 'utf8');
+  assert.match(provider, /subscribeMergeWorldSnapshots\(\(freshState\) =>/);
+  assert.match(provider, /freshState\.revision <= \(stateRef\.current\?\.revision \?\? -1\)/);
+  assert.match(provider, /persistenceGenerationRef\.current \+= 1;[\s\S]*?pendingPersistenceRef\.current = null;/);
+  assert.match(provider, /stateRef\.current = freshState;[\s\S]*?setState\(freshState\);/);
 });
 
 test('serving a story order consumes its item, refunds Energy, and emits a durable receipt', () => {

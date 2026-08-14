@@ -97,6 +97,14 @@ export function GameScreenTransitionProvider({ children }: PropsWithChildren) {
 
   useEffect(() => clearTimers, [clearTimers]);
 
+  const commitPhase = useCallback((next: TransitionPhase) => {
+    // Readiness can arrive in the same frame as sibling-tab navigation. Keep
+    // the imperative guard in lockstep with React state so that report is not
+    // discarded while a render still says `covering`.
+    phaseRef.current = next;
+    setPhase(next);
+  }, []);
+
   const transitionTo = useCallback((next: Omit<TransitionRequest, 'id'>) => {
     if (phaseRef.current !== 'idle') return false;
     clearTimers();
@@ -105,10 +113,10 @@ export function GameScreenTransitionProvider({ children }: PropsWithChildren) {
     readinessRef.current = NOT_READY;
     setRequest(created);
     setReadiness(NOT_READY);
-    setPhase('covering');
+    commitPhase('covering');
     void AccessibilityInfo.announceForAccessibility(next.announcement);
     return true;
-  }, [clearTimers]);
+  }, [clearTimers, commitPhase]);
 
   const beginReveal = useCallback(() => {
     if (phaseRef.current !== 'waiting_ready' && phaseRef.current !== 'covered') return;
@@ -118,9 +126,9 @@ export function GameScreenTransitionProvider({ children }: PropsWithChildren) {
     if (revealTimerRef.current !== null) clearTimeout(revealTimerRef.current);
     revealTimerRef.current = setTimeout(() => {
       revealTimerRef.current = null;
-      setPhase('revealing');
+      commitPhase('revealing');
     }, remaining);
-  }, []);
+  }, [commitPhase]);
 
   const reportReadiness = useCallback((surface: GameSurfaceId, next: GameSurfaceReadiness) => {
     const currentRequest = requestRef.current;
@@ -142,7 +150,7 @@ export function GameScreenTransitionProvider({ children }: PropsWithChildren) {
     const current = requestRef.current;
     if (!current || phaseRef.current !== 'covering') return;
     coveredAtRef.current = Date.now();
-    setPhase('covered');
+    commitPhase('covered');
     navigationFrameRef.current = requestAnimationFrame(() => {
       navigationFrameRef.current = null;
       try {
@@ -152,7 +160,7 @@ export function GameScreenTransitionProvider({ children }: PropsWithChildren) {
         readinessRef.current = READY;
         setReadiness(READY);
       }
-      setPhase('waiting_ready');
+      commitPhase('waiting_ready');
       timeoutRef.current = setTimeout(() => {
         const activeRequest = requestRef.current;
         if (!activeRequest || activeRequest.id !== current.id) return;
@@ -164,7 +172,7 @@ export function GameScreenTransitionProvider({ children }: PropsWithChildren) {
       }, READINESS_TIMEOUT_MS);
       if (readinessComplete(readinessRef.current)) beginReveal();
     });
-  }, [beginReveal]);
+  }, [beginReveal, commitPhase]);
 
   const handleRevealed = useCallback(() => {
     clearTimers();
@@ -172,8 +180,8 @@ export function GameScreenTransitionProvider({ children }: PropsWithChildren) {
     readinessRef.current = READY;
     setRequest(null);
     setReadiness(READY);
-    setPhase('idle');
-  }, [clearTimers]);
+    commitPhase('idle');
+  }, [clearTimers, commitPhase]);
 
   const value = useMemo<TransitionContextValue>(() => ({
     active: phase !== 'idle',

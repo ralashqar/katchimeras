@@ -114,6 +114,40 @@ export function updateFtueRun(patch: Partial<Pick<FtueRunState, 'stepId' | 'stat
   return publish({ ...current, ...patch, updatedAt: new Date().toISOString() });
 }
 
+/**
+ * Records the amount of matching board evidence that already existed when an
+ * observed FTUE node became active. Recovery may only count evidence created
+ * after this point. This prevents an item carried between tutorial beats from
+ * satisfying the next beat merely because the Merge screen remounted.
+ */
+export function registerFtueObjectiveBaseline(stepId: string, actionId: string, value: number) {
+  const current = loadFtueRun();
+  if (!current || current.status !== 'active' || current.stepId !== stepId) return current;
+  const key = `baseline:${stepId}:${actionId}`;
+  if (current.objectiveProgress[key] != null) return current;
+  return publish({
+    ...current,
+    objectiveProgress: { ...current.objectiveProgress, [key]: Math.max(0, Math.floor(value)) },
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+/** Rewinds a known-invalid authored transition while preserving the run. */
+export function repairFtueStep(expectedStepId: string, targetStepId: string) {
+  const current = loadFtueRun();
+  if (!current || current.status !== 'active' || current.stepId !== expectedStepId || !mossproutFtueStep(targetStepId)) return current;
+  const receipts = current.receipts.filter((receipt) => receipt.stepId !== targetStepId);
+  const objectiveProgress = Object.fromEntries(Object.entries(current.objectiveProgress)
+    .filter(([key]) => !key.includes(`${targetStepId}:`)));
+  return publish({
+    ...current,
+    stepId: targetStepId,
+    receipts,
+    objectiveProgress,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
 export function beginFtueAction(actionId: string): FtueCommitReceipt | null {
   const current = loadFtueRun();
   if (!current || current.status === 'complete') return null;

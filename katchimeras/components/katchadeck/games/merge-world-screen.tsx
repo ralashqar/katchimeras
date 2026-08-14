@@ -10,6 +10,7 @@ import { RewardSplash, type RewardSplashItem } from '@/components/katchadeck/ui/
 import { GameCurrencyHud } from '@/components/katchadeck/ui/game-currency-hud';
 import { GameHudBar, GameHudControl, GameHudItem } from '@/components/katchadeck/ui/game-primitives';
 import { KatchaInlineNotice } from '@/components/katchadeck/ui/katcha-inline-notice';
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchaSurfaceProvider } from '@/components/katchadeck/ui/katcha-surface';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
@@ -19,9 +20,9 @@ import {
 import { mergeWorldGeneratorArt } from '@/constants/merge-world-art';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import { useMergeWorld } from '@/features/merge-world/merge-world-provider';
-import { dispatchFtueEvent, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { commitFtueAction, dispatchFtueEvent, registerFtueObjectiveBaseline, repairFtueStep, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { MOSSPROUT_FTUE_RETURN_NOTE_ID, mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
-import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
+import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
 import { useGameFeedback } from '@/features/ui/game-feedback-provider';
 import { useGameWallet } from '@/features/ui/game-wallet-provider';
 import { GameUI } from '@/constants/game-ui';
@@ -98,7 +99,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, effect
     layout: screenLayoutNonce > 0 && boardAreaHeight > 0,
   }, active);
   const ftueExclusive = ftueStep?.surface === 'merge' && ftueStep.interaction?.mode === 'exclusive';
-  const shouldTickEnergyClock = active && state != null && state.energy.value < state.energy.regenCap;
+  const shouldTickEnergyClock = active && state != null && !state.energy.regenPaused && state.energy.value < state.energy.regenCap;
   const readyOrderIds = useMemo(() => state ? readyMergeOrderIds(state) : new Set<string>(), [state]);
   const ftueBoardGate = useMemo(() => state ? mergeFtueBoardGate(ftueStep, state) : { kind: 'open' as const }, [ftueStep, state]);
   const ftueRailGate = useMemo(() => mergeFtueRailGate(ftueStep), [ftueStep]);
@@ -214,15 +215,43 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, effect
 
   useEffect(() => {
     if (!active || !state || !ftueStep || !ftueRun) return;
+    const repairTarget = mergeFtueRepairTarget(ftueStep, state);
+    if (repairTarget) repairFtueStep(ftueStep.id, repairTarget);
+  }, [active, ftueRun, ftueStep, state]);
+
+  useEffect(() => {
+    if (!active || !state || !ftueStep || !ftueRun) return;
+    const baseline = mergeFtueStepEntryBaseline(ftueStep, state);
+    if (baseline) registerFtueObjectiveBaseline(baseline.stepId, baseline.actionId, baseline.value);
+  }, [active, ftueRun, ftueStep, state]);
+
+  useEffect(() => {
+    if (!active || !state || !ftueStep || !ftueRun) return;
     const recovered = recoverMergeFtueEvent(ftueStep, state, ftueRun.objectiveProgress);
     if (!recovered) return;
     dispatchFtueEvent(recovered, `merge-recovery:${state.revision}`);
   }, [active, ftueRun, ftueStep, state]);
 
+  useEffect(() => {
+    if (!active) return;
+    setSelectedCell(null);
+    setFtueTargetRevision((revision) => revision + 1);
+  }, [active, ftueRun?.runId, ftueStep?.id]);
+
   const handleBlockedFtueInteraction = useCallback(() => {
     setBlockedFtuePulseNonce((current) => current + 1);
     if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, []);
+
+  const openFtueEnergyCapture = useCallback(() => {
+    const next = commitFtueAction({ actionId: 'merge.tell_me_more' });
+    if (next?.stepId !== 'energy.capture') return;
+    transitionTo({
+      announcement: 'Returning to Today',
+      target: 'today',
+      navigate: () => router.navigate({ pathname: '/today', params: { onboardingCapture: '1' } }),
+    });
+  }, [router, transitionTo]);
 
   const dispatch = useCallback((command: MergeWorldCommand) => {
     if (!state) return null;
@@ -486,7 +515,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, effect
   const levelRatio = nextThreshold == null ? 1 : Math.max(0, Math.min(1, (state.mergeXp - currentThreshold) / (nextThreshold - currentThreshold)));
   const expansion = availableExpansion(state);
   const expansionReady = Boolean(expansion && state.mergeLevel >= expansion.requiredLevel && state.coins >= expansion.coinCost);
-  const energyCountdownSeconds = state.energy.value < state.energy.regenCap
+  const energyCountdownSeconds = !state.energy.regenPaused && state.energy.value < state.energy.regenCap
     ? Math.max(1, Math.ceil((MERGE_ENERGY_REGEN_MS - ((energyClockNow - state.energy.lastRegenAt) % MERGE_ENERGY_REGEN_MS)) / 1_000))
     : null;
   return (
@@ -536,6 +565,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, effect
               effectsPaused={effectsPaused}
               hiddenItemInstanceIds={hiddenAnimatedItemIds}
               interactionGate={ftueBoardGate}
+              interactionSessionKey={`${ftueRun?.runId ?? 'free'}:${ftueStep?.id ?? 'open'}:${active ? 'active' : 'inactive'}`}
               maxHeight={boardAreaHeight - 1}
               onBlockedInteraction={handleBlockedFtueInteraction}
               onCommand={dispatch}
@@ -566,6 +596,15 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, effect
         spotlight={active && !serveFlight ? ftueStep?.spotlight ?? null : null}
         targetRevision={ftueTargetRevision}
       />
+
+      {active && ftueStep?.id === 'merge.energy_exhausted' ? (
+        <View style={[styles.energyConnectionOverlay, { bottom: Math.max(insets.bottom + 20, 28) }]}>
+          <ThemedText style={styles.energyConnectionEyebrow} lightColor="#FFD36A" darkColor="#FFD36A">MOSSPROUT NOTICED</ThemedText>
+          <ThemedText selectable style={styles.energyConnectionTitle} lightColor="#FFF8E8" darkColor="#FFF8E8">“Oh… we’re running out of that strange energy.”</ThemedText>
+          <ThemedText selectable style={styles.energyConnectionBody} lightColor="rgba(255,248,232,0.82)" darkColor="rgba(255,248,232,0.82)">“Wait. It got stronger when you told me about your day.”</ThemedText>
+          <KatchaButton fullWidth glow label="Tell me something else" onPress={openFtueEnergyCapture} />
+        </View>
+      ) : null}
 
       {error ? <KatchaSurfaceProvider surface="parchment"><View style={[styles.errorBanner, { top: Math.max(insets.top + 56, 64) }]}><KatchaInlineNotice body={error} title="Merge paused" tone="danger" /></View></KatchaSurfaceProvider> : null}
       <MergeServeRewardOverlay flight={serveFlight} onCoinArrive={handleCoinArrive} onEnergyArrive={handleEnergyArrive} onFinish={finishServeAnimation} onItemsArrive={handleServeItemsArrive} />
@@ -628,5 +667,9 @@ const styles = StyleSheet.create({
   expansionButton: { alignItems: 'center', backgroundColor: '#F5D488', borderColor: '#B8752C', borderRadius: 999, borderWidth: 1, boxShadow: '0 3px 8px rgba(55,28,13,0.3)', flexDirection: 'row', gap: 2, paddingHorizontal: 8, paddingVertical: 5, position: 'absolute', right: 5, top: 5, zIndex: 40 },
   expansionLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9, fontWeight: '900' },
   errorBanner: { alignSelf: 'center', maxWidth: 360, position: 'absolute', width: '92%', zIndex: GameUI.layer.notice },
+  energyConnectionOverlay: { alignSelf: 'center', backgroundColor: 'rgba(31,24,45,0.9)', borderColor: 'rgba(255,226,151,0.5)', borderCurve: 'continuous', borderRadius: 24, borderWidth: 1, boxShadow: '0 12px 30px rgba(24,14,34,0.42)', gap: 8, left: 18, maxWidth: 430, padding: 18, position: 'absolute', right: 18, zIndex: GameUI.layer.modal },
+  energyConnectionEyebrow: { ...GameUI.type.label, fontSize: 11, letterSpacing: 1.4, textAlign: 'center' },
+  energyConnectionTitle: { ...GameUI.type.title, fontSize: 19, lineHeight: 24, textAlign: 'center' },
+  energyConnectionBody: { ...GameUI.type.body, fontSize: 14, lineHeight: 20, paddingBottom: 4, textAlign: 'center' },
   pressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
 });

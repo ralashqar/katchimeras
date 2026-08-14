@@ -126,28 +126,79 @@ export function mergeFtueEventForCommand(
   return null;
 }
 
+function objectiveBaselineKey(step: FtueStepDefinition, actionId: string) {
+  return `baseline:${step.id}:${actionId}`;
+}
+
+function matchingEvidenceCount(step: FtueStepDefinition, state: MergeWorldState) {
+  const edge = step.edges?.[0];
+  if (!edge) return null;
+  const event = edge.event;
+  if ((event.type === 'item_spawned' && event.definitionId) || (event.type === 'merge_completed' && event.resultDefinitionId)) {
+    const definitionId = event.type === 'item_spawned' ? event.definitionId : event.resultDefinitionId;
+    return state.board.reduce((count, cell) => count + Number(cell.occupant?.kind === 'item' && cell.occupant.definitionId === definitionId), 0);
+  }
+  if (event.type === 'order_served' && event.orderId) {
+    return state.activeOrders.some((order) => order.id === event.orderId) ? 0 : 1;
+  }
+  return null;
+}
+
+/** Register the canonical board state on node entry before recovery runs. */
+export function mergeFtueStepEntryBaseline(step: FtueStepDefinition | null, state: MergeWorldState) {
+  const edge = step?.surface === 'merge' ? step.edges?.[0] : null;
+  if (!step || !edge) return null;
+  const count = matchingEvidenceCount(step, state);
+  if (count == null) return null;
+  return { actionId: edge.commitActionId, stepId: step.id, value: count };
+}
+
+/**
+ * Repairs runs persisted by the old recovery bug. The only legitimate entry
+ * to finish_plant has two Sprouts and no Seed pair; one Sprout plus two Seeds
+ * means finish_sprout was skipped before the player performed it.
+ */
+export function mergeFtueRepairTarget(step: FtueStepDefinition | null, state: MergeWorldState) {
+  if (step?.id !== 'merge.energy.finish_plant') return null;
+  const count = (definitionId: string) => state.board.reduce((total, cell) => (
+    total + Number(cell.occupant?.kind === 'item' && cell.occupant.definitionId === definitionId)
+  ), 0);
+  return count('nature:garden:1') >= 2 && count('nature:garden:2') === 1 && count('nature:garden:3') === 0
+    ? 'merge.energy.finish_sprout'
+    : null;
+}
+
 export function recoverMergeFtueEvent(stepOrId: FtueStepDefinition | string | null, state: MergeWorldState, objectiveProgress: Record<string, number> = {}): FtueEvent | null {
   const step = typeof stepOrId === 'string' ? mossproutFtueStep(stepOrId) : stepOrId;
+  // The unfinished Energy lesson intentionally carries one old Seed across
+  // the Today detour. It is not evidence that the post-return generator tap
+  // happened, so this node must advance only from its real command event.
+  if (step?.id === 'merge.energy.finish_seed') return null;
   const edge = step?.edges?.[0];
   if (!step || !edge) return null;
   const progress = objectiveProgress[`${step.id}:${edge.commitActionId}`] ?? 0;
+  const baseline = objectiveProgress[objectiveBaselineKey(step, edge.commitActionId)];
+  // A screen/node entry must be registered before board contents can be used
+  // as recovery evidence. Without this guard, pre-existing carried items can
+  // auto-skip a freshly entered tutorial node.
+  if (baseline == null) return null;
   const event = edge.event;
   if (event.type === 'order_served' && event.orderId) {
     const orderId = event.orderId;
     const alreadyServed = !state.activeOrders.some((order) => order.id === orderId)
       && state.externalRewardReceipts.some((receipt) => receipt.id.includes(orderId));
-    if (alreadyServed) return { type: 'order_served', orderId, revision: state.revision };
+    if (alreadyServed && 1 - baseline > progress) return { type: 'order_served', orderId, revision: state.revision };
   }
   if (event.type === 'item_spawned' && event.generatorId && event.definitionId) {
     const definitionId = event.definitionId;
     const matches = state.board.flatMap((cell, resultCell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === definitionId ? [{ occupant: cell.occupant, resultCell }] : []);
-    const found = matches[progress];
+    const found = matches[baseline + progress];
     if (found) return { type: 'item_spawned', generatorId: event.generatorId, instanceId: found.occupant.instanceId, definitionId: found.occupant.definitionId, resultCell: found.resultCell, revision: state.revision };
   }
   if (event.type === 'merge_completed' && event.resultDefinitionId) {
     const definitionId = event.resultDefinitionId;
     const matches = state.board.flatMap((cell, resultCell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === definitionId ? [{ occupant: cell.occupant, resultCell }] : []);
-    const found = matches[progress];
+    const found = matches[baseline + progress];
     if (found) return { type: 'merge_completed', fromInstanceId: 'recovered-source', targetInstanceId: 'recovered-target', resultDefinitionId: found.occupant.definitionId, resultCell: found.resultCell, revision: state.revision };
   }
   return null;

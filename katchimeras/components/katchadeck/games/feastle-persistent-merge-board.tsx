@@ -15,6 +15,8 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
   withDelay,
+  withRepeat,
+  withSequence,
   withSpring,
   withTiming,
   type SharedValue,
@@ -96,7 +98,7 @@ function isInterruptibleMotion(motion?: SpriteMotion) {
   return motion == null || motion.kind === 'move' || motion.kind === 'swap' || motion.kind === 'return' || motion.kind === 'spawn' || motion.kind === 'merge-result';
 }
 
-export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onScreenMetrics, onBlockedInteraction, interactionGate = { kind: 'open' }, hiddenItemInstanceIds, effectsPaused: providedEffectsPaused, animateEntrance = true }: {
+export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onScreenMetrics, onBlockedInteraction, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', hiddenItemInstanceIds, effectsPaused: providedEffectsPaused, animateEntrance = true }: {
   state: MergeWorldState;
   width: number;
   animateEntrance?: boolean;
@@ -107,6 +109,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   onScreenMetrics?: (metrics: MergeBoardScreenMetrics) => void;
   onBlockedInteraction?: () => void;
   interactionGate?: MergeBoardInteractionGate;
+  interactionSessionKey?: string;
   hiddenItemInstanceIds?: ReadonlySet<string>;
   effectsPaused?: SharedValue<number>;
 }) {
@@ -259,6 +262,20 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   }, [activeDragId, activeSourceCell, dragPhase, effectsPaused, hoverCell, motionActive, timers]);
 
   useEffect(() => {
+    // A retained tab can return with worklet gesture ownership from the prior
+    // FTUE node. Start every authored node with neutral touch/selection state;
+    // board animations remain intact and continue reconciling normally.
+    activeDragId.value = '';
+    activeSourceCell.value = -1;
+    dragPhase.value = 0;
+    dragTranslationX.value = 0;
+    dragTranslationY.value = 0;
+    hoverCell.value = -1;
+    gestureFinished.value = true;
+    onSelectRef.current(null);
+  }, [activeDragId, activeSourceCell, dragPhase, dragTranslationX, dragTranslationY, gestureFinished, hoverCell, interactionSessionKey]);
+
+  useEffect(() => {
     if (state.revision < committedStateRef.current.revision) return;
     committedStateRef.current = state;
     occupancyIds.value = occupancyIdsFromState(state);
@@ -384,6 +401,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     };
     const returnHome = (invalid?: number) => {
       returnSpriteHome(sprite, dx, dy, invalid);
+      onSelect(sprite.cell);
       finishInterruptedOperation();
     };
     const sourceCenter = mergeCellCenter(geometry, sprite.cell);
@@ -454,7 +472,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     }
 
     hoverCell.value = -1;
-    onSelect(null);
+    onSelect(to);
     if (process.env.EXPO_OS === 'ios') {
       void Haptics.impactAsync(merging
         ? Haptics.ImpactFeedbackStyle.Medium
@@ -473,6 +491,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     const command: MergeWorldCommand = { type: 'tapGenerator', generatorId, now, seed: `${now}:${current.revision}:${generatorId}` };
     const predicted = onCommand(command);
     if (!predicted) return;
+    if (from >= 0) onSelect(from);
     const to = predicted.spawnedCell;
     const spawned = to == null ? null : predicted.state.board[to]?.occupant;
     if (!predicted.changed || from < 0 || to == null || spawned?.kind !== 'item') {
@@ -496,7 +515,6 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       nextMotions: { [spawned.instanceId]: { kind: 'spawn', startX: start.x, startY: start.y, arcHeight: Math.max(cellSize * 1.15, Math.min(cellSize * 2.1, distance * 0.22)) } },
       kind: 'spawn',
     });
-    onSelect(null);
   }, [beginOperation, cellSize, geometry, onCommand, onSelect, reduceMotion, reducedFx, timers]);
   launchGeneratorRef.current = launchGenerator;
 
@@ -834,6 +852,9 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
         />;
       })}
     </View>
+    {selectedCell != null && presentation.board[selectedCell]?.occupant
+      ? <SelectedCellCorners cell={selectedCell} geometry={geometry} reduceMotion={reduceMotion} />
+      : null}
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.feedbackLayer]}>
       {mergeBursts.map((burst) => <MergeCelebrationOverlay cell={burst.cell} geometry={geometry} key={burst.id} />)}
       {invalidFeedback ? <InvalidCellFeedback cell={invalidFeedback.cell} geometry={geometry} key={invalidFeedback.id} /> : null}
@@ -1117,11 +1138,108 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
 function PersistentGeneratorArt({ generatorId, mossproutOnboarding, size }: { generatorId: string; mossproutOnboarding: boolean; size: number }) {
   const art = mergeWorldGeneratorArt(generatorId, { mossproutOnboarding });
   return <View style={[styles.generatorSprite, { height: size, width: size }]}>
+    <GeneratorSparkles size={size} />
     {art ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={`merge-generator-${generatorId}`} source={art} style={styles.generatorArt} transition={0} /> : null}
     <View style={styles.generatorBolt}>
       <IconSymbol color="#FFD45F" name="bolt.fill" size={13} />
     </View>
   </View>;
+}
+
+function SelectedCellCorners({ cell, geometry, reduceMotion }: { cell: number; geometry: MergeBoardGeometry; reduceMotion: boolean }) {
+  const pulse = useSharedValue(0);
+  const origin = mergeCellOrigin(geometry, cell);
+  useEffect(() => {
+    pulse.value = reduceMotion
+      ? 0
+      : withRepeat(withSequence(
+          withTiming(1, { duration: 720, easing: Easing.inOut(Easing.quad) }),
+          withTiming(0, { duration: 720, easing: Easing.inOut(Easing.quad) }),
+        ), -1, false);
+    return () => cancelAnimation(pulse);
+  }, [pulse, reduceMotion]);
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(pulse.value, [0, 1], [0.84, 1]),
+    transform: [{ scale: interpolate(pulse.value, [0, 1], [0.96, 1.035]) }],
+  }));
+  const cornerSize = Math.max(14, geometry.cellSize * 0.29);
+  const arm = Math.max(4, geometry.cellSize * 0.075);
+  return <Animated.View
+    accessibilityElementsHidden
+    importantForAccessibility="no-hide-descendants"
+    pointerEvents="none"
+    style={[
+      styles.selectedCorners,
+      { height: geometry.cellSize, left: origin.x, top: origin.y, width: geometry.cellSize },
+      animatedStyle,
+    ]}>
+    {(['topLeft', 'topRight', 'bottomLeft', 'bottomRight'] as const).map((position) => <View
+      key={position}
+      style={[
+        styles.selectionCorner,
+        { height: cornerSize, width: cornerSize },
+        position === 'topLeft' && styles.selectionCornerTopLeft,
+        position === 'topRight' && styles.selectionCornerTopRight,
+        position === 'bottomLeft' && styles.selectionCornerBottomLeft,
+        position === 'bottomRight' && styles.selectionCornerBottomRight,
+      ]}>
+      <View style={[styles.selectionCornerHorizontal, { height: arm }]} />
+      <View style={[styles.selectionCornerVertical, { width: arm }]} />
+    </View>)}
+  </Animated.View>;
+}
+
+// One continuous sparkle cycles through deliberately irregular launch lanes.
+// Keeping a single particle in flight avoids the synchronized three-star
+// "burst, pause, burst" rhythm while still making the generator feel alive.
+const GENERATOR_SPARKLE_LANES = [0.12, 0.68, 0.35, 0.79, 0.22, 0.55, 0.43, 0.72] as const;
+const GENERATOR_SPARKLE_CYCLE_MS = 700;
+
+function GeneratorSparkles({ size }: { size: number }) {
+  const reduceMotion = useReducedMotion();
+  return <View pointerEvents="none" style={[styles.generatorSparkles, { height: size * 0.82, width: size * 0.88 }]}>
+    <GeneratorSparkle reduceMotion={reduceMotion} size={size} />
+  </View>;
+}
+
+function GeneratorSparkle({ reduceMotion, size }: {
+  reduceMotion: boolean;
+  size: number;
+}) {
+  const progress = useSharedValue(0);
+  useEffect(() => {
+    progress.value = reduceMotion
+      ? 0.46
+      : withRepeat(
+          withTiming(GENERATOR_SPARKLE_LANES.length, {
+            duration: GENERATOR_SPARKLE_CYCLE_MS * GENERATOR_SPARKLE_LANES.length,
+            easing: Easing.linear,
+          }),
+          -1,
+          false,
+        );
+    return () => cancelAnimation(progress);
+  }, [progress, reduceMotion]);
+  const sparkleStyle = useAnimatedStyle(() => {
+    const wholeCycle = Math.floor(progress.value);
+    const cycle = Math.min(GENERATOR_SPARKLE_LANES.length - 1, wholeCycle % GENERATOR_SPARKLE_LANES.length);
+    const p = reduceMotion ? 0.46 : progress.value - wholeCycle;
+    const lane = GENERATOR_SPARKLE_LANES[cycle] ?? 0.5;
+    const nextLane = GENERATOR_SPARKLE_LANES[(cycle + 1) % GENERATOR_SPARKLE_LANES.length] ?? 0.5;
+    return {
+      opacity: reduceMotion ? 0.72 : interpolate(p, [0, 0.05, 0.82, 1], [0, 1, 0.8, 0]),
+      transform: [
+        { translateX: size * lane + interpolate(p, [0, 1], [0, size * (nextLane - lane) * 0.1]) },
+        { translateY: interpolate(p, [0, 1], [size * 0.24, -size * 0.62]) },
+        { rotate: `${interpolate(p, [0, 1], [-10, 34])}deg` },
+        { scale: interpolate(p, [0, 0.14, 0.8, 1], [0.38, 1, 0.86, 0.42]) },
+      ],
+    };
+  }, [reduceMotion, size]);
+  const sparkleSize = Math.max(11, size * 0.18);
+  return <Animated.View style={[styles.generatorSparkle, { height: sparkleSize, width: sparkleSize }, sparkleStyle]}>
+    <IconSymbol color="#FFF5B8" name="sparkles" size={sparkleSize} />
+  </Animated.View>;
 }
 
 function SpawnParticleBurst({ origin, reduced, size }: { origin: { x: number; y: number }; reduced: boolean; size: number }) {
@@ -1202,12 +1320,22 @@ const styles = StyleSheet.create({
   mergeCelebrationOverlay: { alignItems: 'center', justifyContent: 'center', position: 'absolute', zIndex: 1400 },
   invalidCellFeedback: { alignItems: 'center', backgroundColor: 'rgba(205,76,56,0.38)', borderColor: '#F38A72', borderRadius: 0, borderWidth: 2, boxShadow: '0 0 12px rgba(225,91,67,0.42)', justifyContent: 'center', position: 'absolute', zIndex: 1450 },
   sprite: { alignItems: 'center', justifyContent: 'center', position: 'absolute' },
+  selectedCorners: { position: 'absolute', zIndex: 1300 },
+  selectionCorner: { position: 'absolute' },
+  selectionCornerTopLeft: { left: -2, top: -2 },
+  selectionCornerTopRight: { right: -2, top: -2, transform: [{ rotate: '90deg' }] },
+  selectionCornerBottomLeft: { bottom: -2, left: -2, transform: [{ rotate: '-90deg' }] },
+  selectionCornerBottomRight: { bottom: -2, right: -2, transform: [{ rotate: '180deg' }] },
+  selectionCornerHorizontal: { backgroundColor: '#147F91', borderColor: '#C8FCFF', borderRadius: 3, borderWidth: 1.5, boxShadow: '0 1px 0 rgba(3,54,69,0.95), 0 0 7px rgba(57,218,231,0.96)', left: 0, position: 'absolute', right: 0, top: 0 },
+  selectionCornerVertical: { backgroundColor: '#147F91', borderColor: '#C8FCFF', borderRadius: 3, borderWidth: 1.5, bottom: 0, boxShadow: '1px 0 0 rgba(3,54,69,0.95), 0 0 7px rgba(57,218,231,0.96)', left: 0, position: 'absolute', top: 0 },
   spawnBurst: { alignItems: 'center', justifyContent: 'center', position: 'absolute', zIndex: 900 },
   spawnHalo: { backgroundColor: 'rgba(255,205,112,0.24)', borderColor: 'rgba(255,239,190,0.72)', borderRadius: 999, borderWidth: 1.5, position: 'absolute' },
   spawnParticle: { borderRadius: 999, position: 'absolute' },
   familyArt: { alignItems: 'center', justifyContent: 'center' },
   familyDisc: { alignItems: 'center', borderColor: 'rgba(255,244,213,0.65)', borderRadius: 16, borderWidth: 2, boxShadow: '0 3px 8px rgba(38,19,11,0.32)', height: '76%', justifyContent: 'center', width: '76%' },
   generatorArt: { height: '92%', width: '92%' },
-  generatorSprite: { alignItems: 'center', justifyContent: 'center' },
+  generatorSprite: { alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
+  generatorSparkles: { left: '6%', overflow: 'visible', position: 'absolute', top: '-28%', zIndex: 4 },
+  generatorSparkle: { alignItems: 'center', justifyContent: 'center', left: 0, position: 'absolute', top: '42%' },
   generatorBolt: { alignItems: 'center', backgroundColor: '#68517A', borderColor: '#E2C9E7', borderRadius: 999, borderWidth: 1, bottom: 1, boxShadow: '0 2px 5px rgba(48,30,49,0.28)', height: 20, justifyContent: 'center', position: 'absolute', right: 1, width: 20 },
 });

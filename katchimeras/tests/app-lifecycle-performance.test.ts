@@ -191,7 +191,7 @@ test('heavy game surfaces navigate only under the shared readiness curtain', () 
   const companionSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'), 'utf8');
 
   assert.match(rootSource, /<GameScreenTransitionProvider>[\s\S]*?<Stack>/);
-  assert.match(transitionSource, /setPhase\('covering'\)[\s\S]*?current\.navigate\(\)[\s\S]*?setPhase\('waiting_ready'\)/);
+  assert.match(transitionSource, /commitPhase\('covering'\)[\s\S]*?current\.navigate\(\)[\s\S]*?commitPhase\('waiting_ready'\)/);
   assert.match(transitionSource, /READINESS_TIMEOUT_MS = 8_000/);
   assert.match(transitionSource, /useReducedMotion\(\)/);
   assert.match(tabBarSource, /games: 'merge'[\s\S]*?today: 'today'/);

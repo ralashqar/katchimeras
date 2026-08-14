@@ -36,7 +36,7 @@ export function MossproutFtueStoryStage({ onOpenMerge }: { onOpenMerge: () => vo
         accessibilityLabel="Mossprout's first two requests"
         eyebrow="GARDEN REQUESTS"
         palette={palette}
-        requests={MOSSPROUT_CHAPTER_ZERO_REQUESTS.map((request) => ({
+        requests={MOSSPROUT_CHAPTER_ZERO_REQUESTS.slice(0, 2).map((request) => ({
           id: request.id,
           badge: request.badge,
           title: request.title,

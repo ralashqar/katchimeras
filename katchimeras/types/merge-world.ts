@@ -175,6 +175,16 @@ export type MergeActivityReward = {
   arrival?: Omit<MergeWorldArrival, 'createdAt' | 'claimedAt' | 'seenAt'>;
 };
 
+export type MergeStepEnergyDay = {
+  highestObservedSteps: number;
+  accountedSteps: number;
+  remainderSteps: number;
+  energyAwarded: number;
+  bootstrapClaimed: boolean;
+  lastObservedAt: string;
+  receiptIds: string[];
+};
+
 export type MergeWorldState = {
   version: 9;
   revision: number;
@@ -189,7 +199,7 @@ export type MergeWorldState = {
   landmarks: MergeWorldLandmark[];
   generatorUnlockReceipts: MergeGeneratorUnlockReceipt[];
   generators: Record<string, MergeGeneratorState>;
-  energy: { value: number; regenCap: number; lastRegenAt: number };
+  energy: { value: number; regenCap: number; lastRegenAt: number; regenPaused?: boolean };
   coins: number;
   mergeXp: number;
   mergeLevel: number;
@@ -204,6 +214,7 @@ export type MergeWorldState = {
   expansions: string[];
   processedActivityReceiptIds: string[];
   activityEnergyByDay: Record<string, number>;
+  stepEnergyByDay: Record<string, MergeStepEnergyDay>;
   lastFreeRerollDayId: string | null;
   characterProgress: Partial<Record<MergeCharacterId, MergeCharacterProgress>>;
   externalRewardReceipts: MergeExternalRewardReceipt[];
@@ -224,6 +235,8 @@ export type MergeWorldCommand =
   | { type: 'viewMemoryArrival'; arrivalId: string; now: number }
   | { type: 'unlockExpansion'; expansionId: string; now: number }
   | { type: 'grantActivityRewardsBatch'; rewards: MergeActivityReward[]; now: number }
+  | { type: 'claimStepEnergy'; dayId: string; observedSteps: number; observedAt: string; allowBootstrap: boolean; receiptId: string; now: number }
+  | { type: 'setEnergyRegenPaused'; paused: boolean; now: number }
   | { type: 'featureCharacter'; characterId: MergeCharacterId; now: number }
   | { type: 'ackGeneratorUnlock'; receiptId: string; now: number }
   | { type: 'rerollOrder'; orderId: string; now: number }
@@ -242,5 +255,6 @@ export type MergeWorldCommandResult = {
   spawnedItems?: { instanceId: string; definitionId: string; cell: number }[];
   servedOrderId?: string;
   energyGranted?: number;
+  stepEnergyClaim?: { consumedSteps: number; remainingClaimableSteps: number; beforeEnergy: number; afterEnergy: number; status: 'awarded' | 'below_threshold' | 'daily_cap' | 'duplicate' };
   itemsQueued?: number;
 };

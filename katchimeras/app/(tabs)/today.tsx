@@ -74,7 +74,7 @@ import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { presenceEnter } from '@/components/katchadeck/motion';
 import { ThemedText } from '@/components/themed-text';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
-import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
+import { FTUE_MOVEMENT_CHOICES, type MovementChoiceOption } from '@/components/katchadeck/world/movement-choice-chips';
 import { hasQuickGoalTemplates } from '@/constants/companion-quick-goals';
 import { AppFontFamilies, KatchaDeckUI, Lantern } from '@/constants/theme';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
@@ -183,7 +183,9 @@ import {
   loadPendingCompanionJournalHandoff,
 } from '@/utils/companion-journal-handoff';
 import { journalIdempotencyKey, journalRecordId } from '@/utils/journal-domain';
-import { mergeJournalRewardPreview, type MergeJournalRewardPreview } from '@/utils/merge-world/economy-policy';
+import { mergeJournalRewardPreview, MOSSPROUT_FTUE_JOURNAL_ENERGY, type MergeJournalRewardPreview } from '@/utils/merge-world/economy-policy';
+import { claimMossproutFtueStepEnergy, grantMossproutFtueJournalEnergy } from '@/utils/merge-world/repository';
+import { getPedometerAccess, readRecentPedometerStepDays, requestPedometerAccess, type PedometerStepDay } from '@/utils/pedometer-steps';
 import {
   activeSemanticQuestPrompt,
   cancelSemanticNoteQuestCapture,
@@ -242,6 +244,8 @@ function HomeScreen() {
   const ftueTodayStep = ftueStep?.surface === 'today' ? ftueStep : null;
   const ftueOpeningOwnsHome = ftueOwnsOpeningHome(ftueRun);
   const ftueOpeningFocus = Boolean(ftueRun?.status === 'active' && ftueRun.stepId.startsWith('egg.'));
+  const ftueEnergyFocus = Boolean(ftueRun?.status === 'active' && ftueRun.stepId.startsWith('energy.'));
+  const ftueEnergyBridgeStep = ftueRun?.stepId === 'energy.journal_reward' || ftueRun?.stepId === 'energy.steps_permission';
   const discoveryHatchActive = ftueOpeningOwnsHome;
   const { memoryDayId, memoryRecordId, memorySourceKind, onboardingCapture } = useLocalSearchParams<{
     memoryDayId?: string;
@@ -272,6 +276,12 @@ function HomeScreen() {
   const [ftueActionBusy, setFtueActionBusy] = useState(false);
   const [ftueOpeningUiVisible, setFtueOpeningUiVisible] = useState(ftueRun?.stepId !== 'egg.opening');
   const [onboardingEnergyReady, setOnboardingEnergyReady] = useState<number | null>(null);
+  const [ftueStepDays, setFtueStepDays] = useState<PedometerStepDay[]>([]);
+  const [ftueDisplayedSteps, setFtueDisplayedSteps] = useState<number | null>(null);
+  const [ftueStepsCompletionNonce, setFtueStepsCompletionNonce] = useState(0);
+  const [ftueLifeEnergyBusy, setFtueLifeEnergyBusy] = useState(false);
+  const ftueMovementChoiceRef = useRef<MovementChoiceOption | null>(null);
+  const ftuePhotoEvidenceRef = useRef<string | null>(null);
   const openedOnboardingCaptureRef = useRef(false);
   useEffect(() => {
     setFtueActionBusy(false);
@@ -483,7 +493,7 @@ function HomeScreen() {
     transitionTo({
       announcement: 'Opening Merge',
       target: 'merge',
-      navigate: () => router.push({ pathname: '/(tabs)/games', params: { familyId: 'mossprout' } }),
+      navigate: () => router.navigate({ pathname: '/games', params: { familyId: 'mossprout' } }),
     });
   }, [router, transitionTo]);
   const homeLoopPresentation = useMemo(() => resolveHomeLoopPresentation({
@@ -511,6 +521,72 @@ function HomeScreen() {
   const isForming = homeLoopPresentation.forming !== null;
   const formingTarget = homeLoopPresentation.forming?.target ?? 'today';
   const formingDay = homeLoopPresentation.forming?.day ?? null;
+  const completeFtueJournalCapture = useCallback(async (actionId: string, evidenceRef: string) => {
+    if (!formingDay) return;
+    const reward = await grantMossproutFtueJournalEnergy(formingDay.isoDate);
+    const amount = reward.energyGranted && reward.energyGranted > 0 ? reward.energyGranted : MOSSPROUT_FTUE_JOURNAL_ENERGY;
+    updateFtueRun({ awardedMergeEnergy: amount });
+    commitFtueAction({ actionId, evidenceRef });
+    setOnboardingEnergyReady(amount);
+  }, [formingDay]);
+
+  const seeFtueSteps = useCallback(() => {
+    commitFtueAction({ actionId: 'energy.see_steps' });
+  }, []);
+
+  const connectFtueSteps = useCallback(async () => {
+    if (ftueLifeEnergyBusy) return;
+    setFtueLifeEnergyBusy(true);
+    try {
+      const access = await getPedometerAccess();
+      if (access === 'unsupported' || access === 'denied') {
+        commitFtueAction({ actionId: 'energy.connect_steps', evidenceRef: `pedometer:${access}`, nextStepId: 'energy.steps_reward' });
+        requestAnimationFrame(returnToMossprout);
+        return;
+      }
+      if (access === 'should_request' && !(await requestPedometerAccess())) {
+        commitFtueAction({ actionId: 'energy.connect_steps', evidenceRef: 'pedometer:denied', nextStepId: 'energy.steps_reward' });
+        requestAnimationFrame(returnToMossprout);
+        return;
+      }
+      const days = await readRecentPedometerStepDays();
+      setFtueStepDays(days);
+      const previousDay = days.at(-2) ?? days.at(-1);
+      const previousSteps = previousDay?.totalSteps ?? 0;
+      setFtueDisplayedSteps(previousSteps);
+      commitFtueAction({
+        actionId: 'energy.connect_steps',
+        evidenceRef: previousSteps > 0 ? 'pedometer:data' : 'pedometer:no-data',
+        nextStepId: previousSteps > 0 ? 'energy.steps_context' : 'energy.steps_reward',
+      });
+      if (previousSteps <= 0) requestAnimationFrame(returnToMossprout);
+    } finally {
+      setFtueLifeEnergyBusy(false);
+    }
+  }, [ftueLifeEnergyBusy, returnToMossprout]);
+
+  useEffect(() => {
+    if (ftueRun?.stepId !== 'energy.journal_reward' || onboardingEnergyReady == null) return;
+    const timer = setTimeout(() => commitFtueAction({ actionId: 'energy.see_steps' }), 360);
+    return () => clearTimeout(timer);
+  }, [ftueRun?.stepId, onboardingEnergyReady]);
+
+  useEffect(() => {
+    if (ftueRun?.stepId !== 'energy.steps_permission' || ftueLifeEnergyBusy) return;
+    void connectFtueSteps();
+  }, [connectFtueSteps, ftueLifeEnergyBusy, ftueRun?.stepId]);
+
+  useEffect(() => {
+    if (ftueRun?.stepId !== 'energy.steps_context' || ftueStepDays.length > 0) return;
+    let active = true;
+    void readRecentPedometerStepDays().then((days) => {
+      if (!active) return;
+      setFtueStepDays(days);
+      setFtueDisplayedSteps((days.at(-2) ?? days.at(-1))?.totalSteps ?? 0);
+    });
+    return () => { active = false; };
+  }, [ftueRun?.stepId, ftueStepDays.length]);
+
   const journalMergeReward = useMemo(() => {
     if (!formingDay || manualJournalTarget === 'yesterday') return null;
     const rewardDays = [...allDays.filter((day) => day.id !== formingDay.id), formingDay];
@@ -543,22 +619,8 @@ function HomeScreen() {
     };
   }, [companionJournalHandoff, formingDay, formingTarget, journalMergeReward]);
   useEffect(() => {
-    if (ftueRun?.stepId === 'energy.awarded') setOnboardingEnergyReady(ftueRun.awardedMergeEnergy ?? 10);
+    if (ftueRun?.stepId === 'energy.journal_reward') setOnboardingEnergyReady(ftueRun.awardedMergeEnergy ?? MOSSPROUT_FTUE_JOURNAL_ENERGY);
   }, [ftueRun?.awardedMergeEnergy, ftueRun?.stepId]);
-  useEffect(() => {
-    if (ftueRun?.stepId !== 'energy.capture' || !formingDay) return;
-    const pending = ftueRun.receipts.find((receipt) => receipt.stepId === 'energy.capture' && receipt.status === 'pending');
-    if (!pending) return;
-    if (pending.actionId !== 'energy.photo') return;
-    const sources = new Set(['photo']);
-    const evidence = [...(formingDay.growth?.events ?? [])]
-      .reverse()
-      .find((event) => sources.has(event.source) && event.awardedAt >= pending.startedAt);
-    if (!evidence) return;
-    const amount = ftueRun.awardedMergeEnergy ?? (pending.actionId === 'energy.photo' ? 20 : 10);
-    commitFtueAction({ actionId: pending.actionId, evidenceRef: evidence.sourceId });
-    setOnboardingEnergyReady(amount);
-  }, [formingDay, ftueRun]);
   const formingPrompts = homeLoopPresentation.forming?.prompts ?? availableDayPrompts;
   const formingActivePrompt = homeLoopPresentation.forming?.activePrompt ?? null;
   // Signature mini-games are archived behind Merge World. Historical active
@@ -619,6 +681,73 @@ function HomeScreen() {
     pulseEgg,
     setNextEnergyCurrencySource,
   } = useEggFeedController();
+  useEffect(() => {
+    if (ftueRun?.stepId !== 'energy.capture' || !formingDay) return;
+    const pending = ftueRun.receipts.find((receipt) => receipt.stepId === 'energy.capture' && receipt.status === 'pending');
+    if (!pending || pending.actionId !== 'energy.photo') return;
+    const evidence = [...(formingDay.growth?.events ?? [])]
+      .reverse()
+      .find((event) => event.source === 'photo' && event.awardedAt >= pending.startedAt);
+    if (!evidence || ftuePhotoEvidenceRef.current === evidence.sourceId) return;
+    ftuePhotoEvidenceRef.current = evidence.sourceId;
+    const source = { h: 54, w: 54, x: windowWidth / 2 - 27, y: windowHeight - 190 };
+    startEggFeed(source, {
+      currencyFrom: source,
+      energyOnly: true,
+      imageSource: GAME_CURRENCY_ART.energy,
+      mergeEnergyAmount: MOSSPROUT_FTUE_JOURNAL_ENERGY,
+      tint: Lantern.ember300,
+    }, () => void completeFtueJournalCapture(pending.actionId, evidence.sourceId));
+  }, [completeFtueJournalCapture, formingDay, ftueRun, startEggFeed, windowHeight, windowWidth]);
+  const chooseFtueMovement = useCallback(async (option: MovementChoiceOption, currencyFrom: Parameters<typeof startEggFeed>[0]) => {
+    if (ftueLifeEnergyBusy || !formingDay) return;
+    setFtueLifeEnergyBusy(true);
+    ftueMovementChoiceRef.current = option;
+    try {
+      const previousDay = ftueStepDays.at(-2) ?? ftueStepDays.at(-1);
+      const observedSteps = previousDay?.totalSteps ?? 0;
+      setFtueDisplayedSteps(observedSteps);
+      setStepsInterpretation({ movement: option.movement, label: option.label, emoji: option.emoji }, previousDay === ftueStepDays.at(-2) ? 'yesterday' : 'today');
+      const claimDayId = previousDay?.dayId ?? formingDay.isoDate;
+      const claim = await claimMossproutFtueStepEnergy({
+        dayId: claimDayId,
+        observedSteps,
+        observedAt: previousDay?.observedAt ?? new Date().toISOString(),
+        allowBootstrap: true,
+        receiptId: `${ftueRun?.runId ?? 'ftue'}:steps:${claimDayId}`,
+      });
+      const energy = claim.energyGranted ?? 0;
+      startEggFeed(currencyFrom, {
+        currencyFrom,
+        energyOnly: true,
+        imageSource: GAME_CURRENCY_ART.energy,
+        mergeEnergyAmount: energy,
+        onMergeEnergyTokenArrive: (_amount, index, count) => {
+          setFtueDisplayedSteps(Math.max(0, Math.round(observedSteps * ((count - index - 1) / count))));
+        },
+      }, () => {
+        setFtueDisplayedSteps(0);
+        setFtueStepsCompletionNonce((nonce) => nonce + 1);
+      });
+    } catch (error) {
+      console.error('[ftue] Could not turn steps into Energy', error);
+      setFtueLifeEnergyBusy(false);
+    }
+  }, [formingDay, ftueLifeEnergyBusy, ftueRun?.runId, ftueStepDays, setStepsInterpretation, startEggFeed]);
+  const finishFtueStepsPanel = useCallback(() => {
+    const option = ftueMovementChoiceRef.current;
+    if (!option || ftueRun?.stepId !== 'energy.steps_context') return;
+    ftueMovementChoiceRef.current = null;
+    setFtueLifeEnergyBusy(false);
+    commitFtueAction({
+      actionId: 'energy.steps_context',
+      optionId: option.movement,
+      optionLabel: option.label,
+      evidenceRef: `movement:${option.movement}`,
+      nextStepId: 'energy.steps_reward',
+    });
+    requestAnimationFrame(returnToMossprout);
+  }, [ftueRun?.stepId, returnToMossprout]);
   const deferredCareMergeEnergyRef = useRef(0);
   useEffect(() => {
     if (!pendingCareIntent) setNextEnergyCurrencySource(null);
@@ -1399,7 +1528,13 @@ function HomeScreen() {
     action: FtueActionDefinition,
     option: FtueChoiceOption,
     from: Parameters<typeof startEggFeed>[0],
+    currencyFrom?: Parameters<typeof startEggFeed>[0],
   ) => {
+    if (action.handlerId === 'movement_context') {
+      const movement = FTUE_MOVEMENT_CHOICES.find((candidate) => candidate.movement === option.id);
+      if (movement) void chooseFtueMovement(movement, currencyFrom ?? from);
+      return;
+    }
     if (ftueActionBusy || !action.promptKind || !action.growthSource) return;
     const receipt = beginFtueAction(action.id);
     if (!receipt || receipt.status !== 'pending') return;
@@ -1446,7 +1581,7 @@ function HomeScreen() {
         setFtueActionBusy(false);
       }
     });
-  }, [completeInlineEnergyAction, formingDay?.isoDate, formingTarget, ftueActionBusy, setMicrocopy, startEggFeed]);
+  }, [chooseFtueMovement, completeInlineEnergyAction, formingDay?.isoDate, formingTarget, ftueActionBusy, setMicrocopy, startEggFeed]);
 
   const handleFtueAction = useCallback((action: FtueActionDefinition) => {
     if (ftueActionBusy) return;
@@ -1454,15 +1589,27 @@ function HomeScreen() {
       handleRevealPress();
       return;
     }
+    if (action.id === 'energy.return') {
+      returnToMossprout();
+      return;
+    }
+    if (action.id === 'energy.see_steps') {
+      seeFtueSteps();
+      return;
+    }
+    if (action.id === 'energy.connect_steps') {
+      void connectFtueSteps();
+      return;
+    }
     if (!action.handlerId.startsWith('journal_')) return;
     const receipt = beginFtueAction(action.id);
     if (!receipt || receipt.status !== 'pending') return;
-    updateFtueRun({ awardedMergeEnergy: action.handlerId === 'journal_photo' ? 20 : journalMergeReward?.totalEnergy ?? 10 });
+    updateFtueRun({ awardedMergeEnergy: MOSSPROUT_FTUE_JOURNAL_ENERGY });
     if (action.handlerId === 'journal_photo') openMomentCapture();
     else if (action.handlerId === 'journal_people') openManualJournal(undefined, 'people', null, 'today');
     else if (action.handlerId === 'journal_place') openManualJournal(undefined, 'place', null, 'today');
     else openManualJournal(undefined, undefined, null, 'today');
-  }, [ftueActionBusy, handleRevealPress, journalMergeReward?.totalEnergy, openManualJournal, openMomentCapture]);
+  }, [connectFtueSteps, ftueActionBusy, handleRevealPress, openManualJournal, openMomentCapture, returnToMossprout, seeFtueSteps]);
 
   const handleNurtureMood = useCallback((
     choiceId: Parameters<typeof handleConfirmMood>[0],
@@ -2204,12 +2351,16 @@ function HomeScreen() {
           homeArchetypeId={homeArchetypeId}
           microcopy={microcopy}
           onboardingGuide={onboardingGuide}
-          onboardingFocus={ftueOpeningFocus || (isHatching && hatchPresentation.policy === 'ftue_discovery')}
-          onboardingUiVisible={ftueOpeningUiVisible}
+          onboardingFocus={ftueOpeningFocus || ftueEnergyFocus || (isHatching && hatchPresentation.policy === 'ftue_discovery')}
+          onboardingTopHudVisible={ftueEnergyFocus}
+          onboardingUiVisible={ftueOpeningUiVisible && !ftueEnergyBridgeStep}
           scriptedActions={ftueTodayStep?.actions.filter((action) => action.presentation === 'inline_choice' || action.presentation === 'route_action' || action.presentation === 'cta_action') ?? []}
           scriptedPanelCareAction={ftuePanelCareAction}
           onScriptedAction={handleFtueAction}
           onScriptedChoice={handleFtueChoice}
+          onScriptedChoiceFinished={finishFtueStepsPanel}
+          scriptedChoiceCompletionNonce={ftueStepsCompletionNonce}
+          scriptedStepCount={ftueRun?.stepId === 'energy.steps_context' ? ftueDisplayedSteps : null}
           onAddJournal={handleNurtureAddJournal}
           onAddTextNote={handleNurtureAddTextNote}
           onAddPhoto={openMomentCapture}
@@ -2507,21 +2658,20 @@ function HomeScreen() {
               : submission.linkedNote?.kind === 'voice'
                 ? TODAY_GROWTH_REWARDS.voice_note
                 : TODAY_GROWTH_REWARDS.journal;
+            const pendingFtueCapture = ftueRun?.stepId === 'energy.capture'
+              ? ftueRun.receipts.find((receipt) => receipt.stepId === 'energy.capture' && receipt.status === 'pending')
+              : null;
             if (!deferRewardToCareRow) {
               startEggFeed({ h: 54, w: 54, x: windowWidth / 2 - 27, y: windowHeight - 190 }, {
                 energyAmount,
                 energyOnly: true,
                 imageSource: GAME_CURRENCY_ART.energy,
                 mergeEnergyAmount: journalMergeReward?.totalEnergy ?? 0,
+                ...(pendingFtueCapture ? { mergeEnergyAmount: MOSSPROUT_FTUE_JOURNAL_ENERGY } : {}),
                 tint: Lantern.ember300,
               }, () => {
-                const pendingFtueCapture = ftueRun?.stepId === 'energy.capture'
-                  ? ftueRun.receipts.find((receipt) => receipt.stepId === 'energy.capture' && receipt.status === 'pending')
-                  : null;
                 if (!pendingFtueCapture) return;
-                const amount = ftueRun?.awardedMergeEnergy ?? journalMergeReward?.totalEnergy ?? 10;
-                commitFtueAction({ actionId: pendingFtueCapture.actionId, evidenceRef: submission.sessionId ?? `journal:${formingDay?.isoDate ?? 'today'}` });
-                setOnboardingEnergyReady(amount);
+                void completeFtueJournalCapture(pendingFtueCapture.actionId, submission.sessionId ?? `journal:${formingDay?.isoDate ?? 'today'}`);
               });
             }
             setCompanionJournalHandoff(null);
@@ -2833,18 +2983,6 @@ function HomeScreen() {
           />
         </Animated.View>
       ) : null}
-      <KatchaSheet
-        footer={<KatchaButton fullWidth glow label="Help Mossprout" onPress={returnToMossprout} />}
-        header={{ eyebrow: 'Your memory became Energy', title: `+${onboardingEnergyReady ?? 0} Merge Energy` }}
-        onRequestClose={() => {}}
-        open={onboardingEnergyReady != null}
-        showClose={false}
-        surface="parchment">
-        <View style={styles.discoveryIntroBody}>
-          <ThemedText style={styles.discoveryIntroQuote} lightColor={Lantern.ink900} darkColor={Lantern.ink900}>Your life just gave you more ways to play.</ThemedText>
-          <ThemedText style={styles.discoveryIntroProblem} lightColor={Lantern.dusk700} darkColor={Lantern.dusk700}>The Energy has been added to the real Merge board. Spend it now to finish Mossprout’s home.</ThemedText>
-        </View>
-      </KatchaSheet>
     </View>
     </GestureDetector>
     </TodayEnvironmentMotionProvider>
@@ -2992,22 +3130,6 @@ const styles = StyleSheet.create({
   backfillTagLabel: {
     fontSize: 12,
     fontWeight: '700',
-  },
-  discoveryIntroBody: {
-    gap: 14,
-    paddingHorizontal: 4,
-    paddingVertical: 8,
-  },
-  discoveryIntroQuote: {
-    fontFamily: AppFontFamilies.instrumentSerif,
-    fontSize: 23,
-    lineHeight: 29,
-  },
-  discoveryIntroProblem: {
-    fontFamily: AppFontFamilies.manrope,
-    fontSize: 14,
-    fontWeight: '600',
-    lineHeight: 21,
   },
   discoveryInteractionCta: {
     alignSelf: 'center',

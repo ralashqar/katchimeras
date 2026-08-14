@@ -27,7 +27,9 @@ export function ftueHomeCameraPinchTarget(
     case 'egg.ready':
       return 1;
     default:
-      return null;
+      // The life-to-Energy chapter returns to the identical authored Home
+      // camera, settled at the opening sequence's fully zoomed-out endpoint.
+      return stepId?.startsWith('energy.') ? 1 : null;
   }
 }
 
