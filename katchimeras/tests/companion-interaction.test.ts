@@ -436,6 +436,7 @@ test('ideal-skin onboarding gates launch companions and skin equipment opens a b
   const questHook = fs.readFileSync(path.join(process.cwd(), 'hooks', 'use-kingdom-quests.ts'), 'utf8');
   const paywall = fs.readFileSync(path.join(process.cwd(), 'app', 'modal.tsx'), 'utf8');
   const profile = fs.readFileSync(path.join(process.cwd(), 'app', '(tabs)', 'explore.tsx'), 'utf8');
+  const progressReset = fs.readFileSync(path.join(process.cwd(), 'utils', 'reset-katchimera-progress-for-debug.ts'), 'utf8');
   const companionRoute = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'katchimera-companion-route-screen.tsx'), 'utf8');
 
   assert.match(questHook, /selectedIdealSkinOnboardingRequired/);
@@ -457,16 +458,17 @@ test('ideal-skin onboarding gates launch companions and skin equipment opens a b
   assert.match(interaction, /if \(!props\.active \|\| !idealSkinOnboardingRequired/);
   assert.match(interaction, /selectExperienceDestination\('insight'\)/);
   assert.match(profile, /Reset Katchimeras progress/);
-  assert.match(profile, /resetDevSubscriptionSimulator\(\)/);
-  assert.match(profile, /resetKatchimeraWardrobeForDebug\(\)/);
-  assert.match(profile, /resetAllKatchimeraContentForDebug\(\)/);
-  assert.match(profile, /resetAllKatchimeraBondsForDebug\(resetAt\)/);
-  assert.match(profile, /resetCompanionQuestsForDebug\(\)/);
-  assert.match(profile, /resetCompanionJourneysForDebug\(\)/);
-  assert.match(profile, /resetCompanionDiscoveryForDebug\(\)/);
-  assert.match(profile, /resetAllCompanionQuickGoalsForDebug\(\)/);
-  assert.match(profile, /resetCompanionAchievementsForDebug\(\)/);
-  assert.match(profile, /await resetMergeWorldStateForDebug\(resetAt\)/);
+  assert.match(profile, /resetKatchimeraProgressForDebug\(\{ resetAt, resetDevAccess: true \}\)/);
+  assert.match(progressReset, /resetDevSubscriptionSimulator\(\)/);
+  assert.match(progressReset, /resetKatchimeraWardrobeForDebug\(\)/);
+  assert.match(progressReset, /resetAllKatchimeraContentForDebug\(\)/);
+  assert.match(progressReset, /resetAllKatchimeraBondsForDebug\(resetAt\)/);
+  assert.match(progressReset, /resetCompanionQuestsForDebug\(\)/);
+  assert.match(progressReset, /resetCompanionJourneysForDebug\(\)/);
+  assert.match(progressReset, /resetCompanionDiscoveryForDebug\(\)/);
+  assert.match(progressReset, /resetAllCompanionQuickGoalsForDebug\(\)/);
+  assert.match(progressReset, /resetCompanionAchievementsForDebug\(\)/);
+  assert.match(progressReset, /await resetMergeWorldStateForDebug\(resetAt\)/);
   assert.match(profile, /questionnaires and Friendship now begin from question one and level one/);
   assert.match(questHook, /today\?\.isoDate \?\? localDayId\(new Date\(occurredAt\)\)/);
   assert.doesNotMatch(questHook, /if \(!selectedFamilyId \|\| !today\?\.isoDate \|\| !isConversationV2Family\(selectedFamilyId\)\) return null/);

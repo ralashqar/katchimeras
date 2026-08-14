@@ -4,7 +4,7 @@ import { createClientId } from '@/utils/client-id';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 
 import { MOSSPROUT_FTUE_SCRIPT, mossproutFtueAction, mossproutFtueStep } from './mossprout-ftue-script';
-import type { FtueAnswer, FtueCommitReceipt, FtueRunState, FtueSurface, FtueSurfaceViewModel } from './ftue-types';
+import type { FtueAnswer, FtueCommitReceipt, FtueEvent, FtueEventMatcher, FtueRunState, FtueSurface, FtueSurfaceViewModel } from './ftue-types';
 
 const STORAGE_KEY = 'katchimeras.ftue-run.v4';
 const LEGACY_STORAGE_KEY = 'katchimeras.first-session.v3';
@@ -37,8 +37,8 @@ function migrateLegacy(): FtueRunState | null {
   if (!legacy) return null;
   const run = freshRun(new Date(legacy.startedAt ?? Date.now()));
   run.mergeInstalled = Boolean(legacy.mergeInstalled);
-  if (legacy.stage === 'merge') run.stepId = 'merge.first';
-  if (legacy.stage === 'journal_for_energy') run.stepId = 'merge.first';
+  if (legacy.stage === 'merge') run.stepId = 'merge.seed_drag';
+  if (legacy.stage === 'journal_for_energy') run.stepId = 'merge.seed_drag';
   if (legacy.stage === 'complete') {
     run.stepId = 'complete';
     run.status = 'complete';
@@ -60,11 +60,11 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
     && run.answers['egg.mind.focus'] == null;
   if (run.scriptVersion === MOSSPROUT_FTUE_SCRIPT.version && !needsThirdEggAnswer) return run;
   const now = new Date().toISOString();
-  const removedMergeSteps = new Set(['merge.flower', 'energy.capture', 'energy.awarded', 'merge.flower_return', 'merge.final']);
+  const removedMergeSteps = new Set(['merge.first', 'merge.flower', 'energy.capture', 'energy.awarded', 'merge.flower_return', 'merge.final']);
   return {
     ...run,
     scriptVersion: MOSSPROUT_FTUE_SCRIPT.version,
-    stepId: needsThirdEggAnswer ? 'egg.mind' : removedMergeSteps.has(run.stepId) ? 'merge.first' : run.stepId,
+    stepId: needsThirdEggAnswer ? 'egg.mind' : removedMergeSteps.has(run.stepId) ? 'merge.seed_drag' : run.stepId,
     updatedAt: now,
   };
 }
@@ -169,6 +169,31 @@ export function commitFtueAction(input: {
   });
   void import('./ftue-sync').then(({ flushFtueReceipts }) => flushFtueReceipts()).catch(() => {});
   return next;
+}
+
+function ftueEventMatches(matcher: FtueEventMatcher, event: FtueEvent) {
+  if (matcher.type !== event.type) return false;
+  if (matcher.type === 'merge_completed' && event.type === 'merge_completed') {
+    return (matcher.fromInstanceId == null || matcher.fromInstanceId === event.fromInstanceId)
+      && (matcher.targetInstanceId == null || matcher.targetInstanceId === event.targetInstanceId)
+      && (matcher.resultDefinitionId == null || matcher.resultDefinitionId === event.resultDefinitionId);
+  }
+  return matcher.type === 'order_served'
+    && event.type === 'order_served'
+    && (matcher.orderId == null || matcher.orderId === event.orderId);
+}
+
+export function dispatchFtueEvent(event: FtueEvent, evidenceRef?: string) {
+  const current = loadFtueRun();
+  if (!current || current.status !== 'active') return current;
+  const step = mossproutFtueStep(current.stepId);
+  const edge = step?.edges?.find((candidate) => ftueEventMatches(candidate.event, event));
+  if (!edge) return current;
+  return commitFtueAction({
+    actionId: edge.commitActionId,
+    evidenceRef: evidenceRef ?? `merge-revision:${event.revision}`,
+    nextStepId: edge.nextStepId,
+  });
 }
 
 export function markFtueReceiptPresented(actionId: string) {

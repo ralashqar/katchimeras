@@ -52,7 +52,7 @@ test('backend catalog contains only allowlisted privacy-safe action ids', () => 
 });
 
 test('Supabase receipt allowlist matches every backend FTUE action', () => {
-  const migration = readFileSync('supabase/migrations/20260813215553_register_mossprout_ftue_v5.sql', 'utf8');
+  const migration = readFileSync('supabase/migrations/20260814095000_register_mossprout_ftue_v6.sql', 'utf8');
   for (const item of FTUE_ACTION_CATALOG.filter((entry) => entry.backendEvent)) {
     assert.match(migration, new RegExp(`'${item.stepId}',\\s*'${item.actionId}'`));
   }
@@ -60,7 +60,21 @@ test('Supabase receipt allowlist matches every backend FTUE action', () => {
 });
 
 test('Chapter 0 exposes one one-merge order and then completes', () => {
-  assert.equal(mossproutFtueAction('merge.first', 'merge.serve_sprout')?.nextStepId, 'chapter.complete');
+  const mergeStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.seed_drag');
+  const serveStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.serve_sprout');
+  assert.equal(mossproutFtueAction('merge.seed_drag', 'merge.create_sprout')?.handlerId, 'merge_item_created');
+  assert.equal(mergeStep?.edges?.[0]?.nextStepId, 'merge.serve_sprout');
+  assert.equal(serveStep?.edges?.[0]?.nextStepId, 'chapter.complete');
+  assert.equal(mergeStep?.interaction?.mode, 'exclusive');
+  assert.equal(serveStep?.interaction?.mode, 'exclusive');
+  assert.deepEqual(mergeStep?.spotlight?.targets, [
+    { kind: 'board_item', instanceId: 'onboarding-seed-a' },
+    { kind: 'board_item', instanceId: 'onboarding-seed-b' },
+  ]);
+  assert.equal(mergeStep?.spotlight?.grouping, 'bounding_rect');
+  assert.deepEqual(serveStep?.spotlight?.targets, [
+    { kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' },
+  ]);
   assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.some((step) => step.id === 'merge.flower'), false);
   assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.some((step) => step.id === 'merge.final'), false);
 });
@@ -73,6 +87,17 @@ test('Merge FTUE never inserts guide panels into the fixed board layout', () => 
   assert.doesNotMatch(merge.slice(invariant, mergeArea), /chapterGuide|ftueStep\.guide|KatchaInlineNotice|ThemedText/);
   assert.doesNotMatch(merge, /const chapterGuide|const legacyChapterGuide/);
   assert.match(merge, /Future guidance belongs in an absolute world-space[\s\S]*?tray, counter, and board retain identical frames/);
+});
+
+test('Merge FTUE spotlight is an absolute non-layout overlay with transparent target cutouts', () => {
+  const overlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
+  const merge = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
+  assert.match(overlay, /StyleSheet\.absoluteFillObject/);
+  assert.match(overlay, /pointerEvents="none"/);
+  assert.match(overlay, /FillType\.EvenOdd/);
+  assert.match(overlay, /spotlight\.targets/);
+  assert.match(overlay, /spotlight\.grouping === 'bounding_rect'[\s\S]*?boundingFrame\(resolved\)/);
+  assert.match(merge, /spotlight=\{active && !serveFlight \? ftueStep\?\.spotlight \?\? null : null\}/);
 });
 
 test('the opening FTUE hides the bottom bar until Talk to Mossprout, while reset remains reachable', () => {
@@ -92,6 +117,8 @@ test('the opening FTUE hides the bottom bar until Talk to Mossprout, while reset
   assert.doesNotMatch(tabLayout, /ftueLocked\s*\?\s*null/);
   assert.match(devTools, /Restart first-session onboarding · keep profile/);
   assert.match(devTools, /beginFirstSession\(\{ restart: true \}\)/);
+  assert.match(devTools, /await resetTodayForDebug\(\);[\s\S]*?beginFirstSession\(\{ restart: true \}\);[\s\S]*?await resetKatchimeraProgressForDebug\(\{ resetAt \}\)/);
+  assert.match(devTools, /It resets Today, Katchimera progress, and the Merge board/);
 });
 
 test('companion and Merge FTUE steps never suppress the normal Today action rotation', () => {

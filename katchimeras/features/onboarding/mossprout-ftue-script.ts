@@ -26,7 +26,7 @@ const openingActions: readonly FtueActionDefinition[] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 5,
+  version: 6,
   entryStepId: 'egg.opening',
   terminalStepId: 'complete',
   steps: [
@@ -85,13 +85,67 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'companion.first_meeting', surface: 'companion',
       guide: { eyebrow: 'Say hello', title: 'Meet Mossprout.', body: 'It remembers what you shared.' },
-      actions: [{ id: 'companion.complete_first_meeting', title: 'Let’s look', description: 'Open Mossprout’s real Merge board.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'merge.first', backendEvent: true }],
+      actions: [{ id: 'companion.complete_first_meeting', title: 'Let’s look', description: 'Open Mossprout’s real Merge board.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'merge.seed_drag', backendEvent: true }],
       blockingBeat: 'mossprout_intro',
     },
     {
-      id: 'merge.first', surface: 'merge',
+      id: 'merge.seed_drag', surface: 'merge',
       guide: { eyebrow: 'First request', title: 'Make a Sprout.', body: 'Merge the two Seeds.' },
-      actions: [{ id: 'merge.serve_sprout', title: 'Something to plant', description: 'Serve the Sprout.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_order_served', nextStepId: 'chapter.complete', backendEvent: true }],
+      actions: [{ id: 'merge.create_sprout', title: 'Make a Sprout', description: 'Swipe one Seed into the other.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
+      interaction: {
+        mode: 'exclusive',
+        allowed: {
+          kind: 'board_drag',
+          from: { kind: 'board_item', instanceId: 'onboarding-seed-a' },
+          to: { kind: 'board_item', instanceId: 'onboarding-seed-b' },
+        },
+      },
+      cue: {
+        kind: 'drag',
+        from: { kind: 'board_item', instanceId: 'onboarding-seed-a' },
+        to: { kind: 'board_item', instanceId: 'onboarding-seed-b' },
+      },
+      spotlight: {
+        targets: [
+          { kind: 'board_item', instanceId: 'onboarding-seed-a' },
+          { kind: 'board_item', instanceId: 'onboarding-seed-b' },
+        ],
+        grouping: 'bounding_rect',
+        padding: 3,
+        radius: 11,
+        dimOpacity: 0.64,
+      },
+      edges: [{
+        event: {
+          type: 'merge_completed',
+          fromInstanceId: 'onboarding-seed-a',
+          targetInstanceId: 'onboarding-seed-b',
+          resultDefinitionId: 'nature:garden:2',
+        },
+        commitActionId: 'merge.create_sprout',
+        nextStepId: 'merge.serve_sprout',
+      }],
+    },
+    {
+      id: 'merge.serve_sprout', surface: 'merge',
+      guide: { eyebrow: 'First request', title: 'Help Mossprout.', body: 'Serve the Sprout.' },
+      actions: [{ id: 'merge.serve_sprout', title: 'Serve the Sprout', description: 'Give Mossprout what it needs.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_order_served', backendEvent: true }],
+      interaction: {
+        mode: 'exclusive',
+        allowed: { kind: 'order_serve', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' } },
+      },
+      cue: { kind: 'tap', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' } },
+      spotlight: {
+        targets: [{ kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' }],
+        padding: 7,
+        radius: 14,
+        dimOpacity: 0.64,
+      },
+      edges: [{
+        event: { type: 'order_served', orderId: 'mossprout:chapter-0:first-sprout' },
+        commitActionId: 'merge.serve_sprout',
+        nextStepId: 'chapter.complete',
+      }],
     },
     {
       id: 'chapter.complete', surface: 'merge',
@@ -125,6 +179,11 @@ export function validateMossproutFtueScript(): string[] {
         optionIds.add(option.id);
       }
     }
+    for (const edge of step.edges ?? []) {
+      if (!actionIds.has(edge.commitActionId)) errors.push(`Missing edge action in ${step.id}: ${edge.commitActionId}`);
+      if (!MOSSPROUT_FTUE_SCRIPT.steps.some((candidate) => candidate.id === edge.nextStepId)) errors.push(`Missing edge step ${edge.nextStepId}`);
+    }
+    if (step.spotlight && step.spotlight.targets.length === 0) errors.push(`Spotlight has no targets: ${step.id}`);
   }
   if (!ids.has(MOSSPROUT_FTUE_SCRIPT.entryStepId)) errors.push('Missing entry step');
   if (!ids.has(MOSSPROUT_FTUE_SCRIPT.terminalStepId)) errors.push('Missing terminal step');
@@ -134,7 +193,9 @@ export function validateMossproutFtueScript(): string[] {
     const stepId = pending.pop()!;
     if (reachable.has(stepId)) continue;
     reachable.add(stepId);
-    mossproutFtueStep(stepId)?.actions.forEach((action) => { if (action.nextStepId) pending.push(action.nextStepId); });
+    const step = mossproutFtueStep(stepId);
+    step?.actions.forEach((action) => { if (action.nextStepId) pending.push(action.nextStepId); });
+    step?.edges?.forEach((edge) => pending.push(edge.nextStepId));
   }
   for (const step of MOSSPROUT_FTUE_SCRIPT.steps) if (!reachable.has(step.id)) errors.push(`Unreachable step: ${step.id}`);
   return errors;

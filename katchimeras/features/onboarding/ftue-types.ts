@@ -12,6 +12,7 @@ export type FtueHandlerId =
   | 'journal_place'
   | 'discovery_hatch'
   | 'companion_conversation'
+  | 'merge_item_created'
   | 'merge_order_served'
   | 'merge_energy_depleted'
   | 'acknowledgement';
@@ -41,11 +42,63 @@ export type FtueActionDefinition = {
 
 export type FtueGuide = { eyebrow: string; title: string; body: string };
 
+export type FtueTarget =
+  | { kind: 'board_item'; instanceId: string }
+  | { kind: 'board_cell'; cell: number }
+  | { kind: 'order_serve'; orderId: string };
+
+export type FtueCueDefinition =
+  | { kind: 'drag'; from: FtueTarget; to: FtueTarget }
+  | { kind: 'tap'; target: FtueTarget };
+
+export type FtueSpotlightDefinition = {
+  targets: readonly FtueTarget[];
+  grouping?: 'individual' | 'bounding_rect';
+  padding?: number;
+  radius?: number;
+  dimOpacity?: number;
+};
+
+export type FtueInteractionPolicy =
+  | { mode: 'none' }
+  | { mode: 'exclusive'; allowed: { kind: 'board_drag'; from: FtueTarget; to: FtueTarget } }
+  | { mode: 'exclusive'; allowed: { kind: 'order_serve'; target: FtueTarget } };
+
+export type FtueEvent =
+  | {
+      type: 'merge_completed';
+      fromInstanceId: string;
+      targetInstanceId: string;
+      resultDefinitionId: string;
+      resultCell: number;
+      revision: number;
+    }
+  | { type: 'order_served'; orderId: string; revision: number };
+
+export type FtueEventMatcher =
+  | {
+      type: 'merge_completed';
+      fromInstanceId?: string;
+      targetInstanceId?: string;
+      resultDefinitionId?: string;
+    }
+  | { type: 'order_served'; orderId?: string };
+
+export type FtueGraphEdge = {
+  event: FtueEventMatcher;
+  commitActionId: string;
+  nextStepId: string;
+};
+
 export type FtueStepDefinition = {
   id: string;
   surface: FtueSurface;
   guide: FtueGuide;
   actions: readonly FtueActionDefinition[];
+  interaction?: FtueInteractionPolicy;
+  cue?: FtueCueDefinition;
+  spotlight?: FtueSpotlightDefinition;
+  edges?: readonly FtueGraphEdge[];
   blockingBeat?: 'mossprout_intro' | 'energy_connection' | 'energy_awarded' | 'chapter_complete';
 };
 

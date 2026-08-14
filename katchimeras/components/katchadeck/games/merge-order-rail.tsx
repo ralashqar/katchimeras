@@ -23,6 +23,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppFontFamilies } from '@/constants/theme';
 import { MERGE_CHARACTER_NAMES } from '@/constants/merge-world-catalog';
+import type { MergeRailInteractionGate } from '@/features/onboarding/merge-ftue';
 import type { HomeVisualKey } from '@/types/home';
 import type { MergeCharacterId, MergeOrder, MergeWorldArrival } from '@/types/merge-world';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
@@ -128,13 +129,16 @@ export type MergeTrayEntry =
       bondPoints: number;
     };
 
-export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel, onReroll, onServe, parcelTargetRef }: {
+export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel, onReroll, onServe, onBlockedInteraction, onServeTargetRef, interactionGate = { kind: 'open' }, parcelTargetRef }: {
   entries: readonly MergeTrayEntry[];
   focusOrderId?: string;
   onOpenChat: (characterId: MergeCharacterId) => void;
   onOpenParcel: (arrivalId: string) => void;
   onReroll: (order: MergeOrder) => void;
   onServe: (order: MergeOrder, itemTargets: readonly MergeScreenPoint[]) => boolean | Promise<boolean>;
+  onBlockedInteraction?: () => void;
+  onServeTargetRef?: (orderId: string, view: View | null) => void;
+  interactionGate?: MergeRailInteractionGate;
   parcelTargetRef: RefObject<View | null>;
 }) {
   const reduceMotion = useReducedMotion();
@@ -202,6 +206,7 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel
       decelerationRate="fast"
       disableIntervalMomentum
       horizontal
+      scrollEnabled={interactionGate.kind === 'open'}
       onScroll={handleScroll}
       ref={scrollRef}
       scrollEventThrottle={16}
@@ -225,8 +230,8 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel
             <MergeParcelTrayCard
               arrival={entry.arrival}
               count={entry.count}
-              disabled={entry.disabled}
-              onPress={() => onOpenParcel(entry.arrival.id)}
+              disabled={entry.disabled || interactionGate.kind !== 'open'}
+              onPress={() => interactionGate.kind === 'open' ? onOpenParcel(entry.arrival.id) : onBlockedInteraction?.()}
               ref={parcelTargetRef}
               shakeNonce={entry.shakeNonce}
             />
@@ -234,12 +239,16 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel
             <OrderTrayCard
               entry={entry}
               index={index}
+              interactionAllowed={interactionGate.kind === 'open' || (interactionGate.kind === 'serve' && interactionGate.orderId === entry.order.id)}
+              interactionLocked={interactionGate.kind !== 'open'}
+              onBlockedInteraction={onBlockedInteraction}
               onReroll={() => onReroll(entry.order)}
               onServe={(itemTargets) => onServe(entry.order, itemTargets)}
+              onServeTargetRef={onServeTargetRef}
               reduceMotion={reduceMotion}
             />
           ) : (
-            <ChatNoteTrayCard entry={entry} onPress={() => onOpenChat(entry.characterId)} reduceMotion={reduceMotion} />
+            <ChatNoteTrayCard entry={entry} onPress={() => interactionGate.kind === 'open' ? onOpenChat(entry.characterId) : onBlockedInteraction?.()} reduceMotion={reduceMotion} />
           )}
         </Animated.View>
         );
@@ -251,11 +260,15 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel
   );
 }
 
-function OrderTrayCard({ entry, index, onReroll, onServe, reduceMotion }: {
+function OrderTrayCard({ entry, index, interactionAllowed, interactionLocked, onBlockedInteraction, onReroll, onServe, onServeTargetRef, reduceMotion }: {
   entry: Extract<MergeTrayEntry, { kind: 'order' }>;
   index: number;
+  interactionAllowed: boolean;
+  interactionLocked: boolean;
+  onBlockedInteraction?: () => void;
   onReroll: () => void;
   onServe: (itemTargets: readonly MergeScreenPoint[]) => boolean | Promise<boolean>;
+  onServeTargetRef?: (orderId: string, view: View | null) => void;
   reduceMotion: boolean;
 }) {
   const { itemReadiness, order, ready } = entry;
@@ -264,6 +277,7 @@ function OrderTrayCard({ entry, index, onReroll, onServe, reduceMotion }: {
   const servingRef = useRef(false);
   const itemRefs = useRef<(View | null)[]>([]);
   const characterSource = resolveCreatureArtSource(CHARACTER_VISUALS[order.characterId], { lod: 'medium' });
+  const setServeTargetRef = useCallback((view: View | null) => onServeTargetRef?.(order.id, view), [onServeTargetRef, order.id]);
   const requestedItems = order.requirements
     .flatMap((requirement) => Array.from({ length: requirement.quantity }, () => requirement.definitionId))
     .slice(0, 3);
@@ -275,6 +289,10 @@ function OrderTrayCard({ entry, index, onReroll, onServe, reduceMotion }: {
   }, [rewardOpen]);
 
   const beginServe = async () => {
+    if (!interactionAllowed) {
+      onBlockedInteraction?.();
+      return;
+    }
     if (!ready || servingRef.current) return;
     setRewardOpen(false);
     servingRef.current = true;
@@ -293,11 +311,11 @@ function OrderTrayCard({ entry, index, onReroll, onServe, reduceMotion }: {
 
   return (
     <Pressable
+      accessible={!interactionLocked}
       accessibilityLabel={`${MERGE_CHARACTER_NAMES[order.characterId]} order, ${order.title}${ready ? ', ready to serve' : ''}`}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: !ready }}
-      onLongPress={onReroll}
-      onPress={ready ? beginServe : undefined}
+      accessibilityState={{ disabled: interactionLocked && !interactionAllowed }}
+      onLongPress={interactionLocked ? onBlockedInteraction : onReroll}
+      onPress={interactionLocked ? onBlockedInteraction : ready ? beginServe : undefined}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       {ready ? (
         <Animated.View
@@ -316,11 +334,16 @@ function OrderTrayCard({ entry, index, onReroll, onServe, reduceMotion }: {
       {serving && !reduceMotion ? <TrayServeConfetti /> : null}
       <Animated.View entering={reduceMotion ? FadeIn.duration(100) : FadeInUp.delay(Math.min(index, 5) * 42 + 45).duration(230)} style={styles.characterLayer}>
         <Pressable
+          accessible={!interactionLocked}
           accessibilityHint="Shows the rewards for this request"
           accessibilityLabel={`${MERGE_CHARACTER_NAMES[order.characterId]} reward details`}
           accessibilityRole="button"
           onPress={(event) => {
             event.stopPropagation();
+            if (interactionLocked) {
+              onBlockedInteraction?.();
+              return;
+            }
             setRewardOpen((current) => !current);
           }}
           style={({ pressed }) => [styles.characterButton, pressed && styles.characterPressed]}>
@@ -353,10 +376,21 @@ function OrderTrayCard({ entry, index, onReroll, onServe, reduceMotion }: {
         <Animated.View
           entering={reduceMotion ? FadeIn.duration(70) : SERVE_BUTTON_IN}
           exiting={FadeOut.duration(reduceMotion ? 70 : 150)}
-          pointerEvents="none"
           style={styles.serveButton}>
-          <View style={styles.serveButtonShine} />
-          <ThemedText style={styles.serveButtonText} lightColor="#FFFDE8" darkColor="#FFFDE8">SERVE</ThemedText>
+          <Pressable
+            accessibilityHint="Serves the completed request"
+            accessibilityLabel={`Serve ${order.title}`}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !interactionAllowed }}
+            onPress={(event) => {
+              event.stopPropagation();
+              void beginServe();
+            }}
+            ref={setServeTargetRef}
+            style={({ pressed }) => [styles.serveButtonHit, pressed && styles.serveButtonPressed]}>
+            <View pointerEvents="none" style={styles.serveButtonShine} />
+            <ThemedText style={styles.serveButtonText} lightColor="#FFFDE8" darkColor="#FFFDE8">SERVE</ThemedText>
+          </Pressable>
         </Animated.View>
       ) : null}
     </Pressable>
@@ -502,6 +536,8 @@ const styles = StyleSheet.create({
   itemReadyTick: { bottom: -6, height: 19, position: 'absolute', right: -4, width: 19, zIndex: 5 },
   itemReadyTickArt: { height: '100%', width: '100%' },
   serveButton: { alignItems: 'center', backgroundColor: '#58A83D', borderColor: '#DDF5A9', borderCurve: 'continuous', borderRadius: 7, borderWidth: 1.5, bottom: -8, boxShadow: '0 3px 7px rgba(42,83,25,0.45)', elevation: SERVE_CONTROL_Z_INDEX, height: 23, justifyContent: 'center', left: 30, overflow: 'hidden', position: 'absolute', width: 60, zIndex: SERVE_CONTROL_Z_INDEX },
+  serveButtonHit: { alignItems: 'center', height: '100%', justifyContent: 'center', width: '100%' },
+  serveButtonPressed: { opacity: 0.82, transform: [{ scale: 0.96 }] },
   serveButtonShine: { backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 4, height: 7, left: 3, position: 'absolute', right: 3, top: 2 },
   serveButtonText: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 10, letterSpacing: 0.4, lineHeight: 13 },
   noteCard: { backgroundColor: 'transparent' },

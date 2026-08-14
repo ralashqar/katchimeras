@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 import type { MergeWorldState } from '@/types/merge-world';
-import { createInitialMergeWorldState, normalizeMergeWorldState, resetMergeActivityForDay } from '@/utils/merge-world/engine';
+import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld, resetMergeActivityForDay } from '@/utils/merge-world/engine';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
 
 const DATABASE_NAME = 'katchimeras-merge-world.db';
@@ -167,6 +167,19 @@ export async function installMossproutOnboardingMergeWorld(now = Date.now(), rew
   resetListeners.forEach((listener) => listener(freshState));
   publishSnapshot(freshState);
   return freshState;
+}
+
+export async function prepareMossproutMergeFtueForDebug(step: 'merge.seed_drag' | 'merge.serve_sprout', now = Date.now()) {
+  const installed = await installMossproutOnboardingMergeWorld(now);
+  if (step === 'merge.seed_drag') return installed;
+  const from = installed.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.instanceId === 'onboarding-seed-a');
+  const to = installed.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.instanceId === 'onboarding-seed-b');
+  if (from < 0 || to < 0) return installed;
+  const merged = reduceMergeWorld(installed, { type: 'move', from, to, now: now + 1 }).state;
+  await saveMergeWorldState(merged);
+  resetListeners.forEach((listener) => listener(merged));
+  publishSnapshot(merged);
+  return merged;
 }
 
 /** Makes one day eligible for real-life Merge Energy without resetting board progress. */

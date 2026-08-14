@@ -5,6 +5,8 @@ import test from 'node:test';
 import { KATCHIMERA_MERGE_PROFILES, MERGE_GENERATORS, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import type { HomeDayRecord } from '@/types/home';
 import type { MergeBoardItem, MergeWorldState } from '@/types/merge-world';
+import { mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
+import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import { BARISTABBIT_CHAPTER_ONE_ORDER_POOL, FEASTLE_ACT_TWO_ORDER_POOL, selectAuthoredCohortOrderKeys, selectFeastleActTwoOrderKeys } from '@/utils/companion-story';
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection } from '@/utils/merge-world/board-geometry';
 import { mergeActivityRewards } from '@/utils/merge-world/activity-rewards';
@@ -20,6 +22,47 @@ import {
 } from '@/utils/merge-world/engine';
 
 const NOW = new Date('2026-08-12T12:00:00.000Z').getTime();
+
+test('Merge FTUE gates the exact authored seed drag and emits a verified merge event', () => {
+  const state = createMossproutChapterZeroState(NOW);
+  const step = mossproutFtueStep('merge.seed_drag');
+  const from = state.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.instanceId === 'onboarding-seed-a');
+  const to = state.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.instanceId === 'onboarding-seed-b');
+  assert.deepEqual(mergeFtueBoardGate(step, state), { kind: 'drag', fromCell: from, toCell: to });
+  assert.deepEqual(mergeFtueRailGate(step), { kind: 'locked' });
+  assert.equal(mergeFtueAllowsCommand(step, state, { type: 'move', from, to, now: NOW + 1 }), true);
+  assert.equal(mergeFtueAllowsCommand(step, state, { type: 'move', from: to, to: from, now: NOW + 1 }), false);
+  assert.equal(mergeFtueAllowsCommand(step, state, { type: 'tapGenerator', generatorId: 'wild-garden', seed: 'blocked', now: NOW + 1 }), false);
+  const command = { type: 'move' as const, from, to, now: NOW + 1 };
+  const result = reduceMergeWorld(state, command);
+  assert.deepEqual(mergeFtueEventForCommand(state, command, result), {
+    type: 'merge_completed',
+    fromInstanceId: 'onboarding-seed-a',
+    targetInstanceId: 'onboarding-seed-b',
+    resultDefinitionId: 'nature:garden:2',
+    resultCell: to,
+    revision: result.state.revision,
+  });
+  assert.equal(recoverMergeFtueEvent('merge.seed_drag', result.state)?.type, 'merge_completed');
+});
+
+test('Merge FTUE locks the board for Serve and advances only for its exact order', () => {
+  const initial = createMossproutChapterZeroState(NOW);
+  const from = initial.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.instanceId === 'onboarding-seed-a');
+  const to = initial.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.instanceId === 'onboarding-seed-b');
+  const merged = reduceMergeWorld(initial, { type: 'move', from, to, now: NOW + 1 }).state;
+  const step = mossproutFtueStep('merge.serve_sprout');
+  const orderId = 'mossprout:chapter-0:first-sprout';
+  assert.deepEqual(mergeFtueBoardGate(step, merged), { kind: 'locked' });
+  assert.deepEqual(mergeFtueRailGate(step), { kind: 'serve', orderId });
+  assert.equal(mergeFtueAllowsCommand(step, merged, { type: 'serveOrder', orderId, now: NOW + 2 }), true);
+  assert.equal(mergeFtueAllowsCommand(step, merged, { type: 'serveOrder', orderId: 'wrong', now: NOW + 2 }), false);
+  const command = { type: 'serveOrder' as const, orderId, now: NOW + 2 };
+  const result = reduceMergeWorld(merged, command);
+  assert.deepEqual(mergeFtueEventForCommand(merged, command, result), { type: 'order_served', orderId, revision: result.state.revision });
+  assert.equal(recoverMergeFtueEvent('merge.seed_drag', result.state)?.type, 'merge_completed');
+  assert.equal(recoverMergeFtueEvent('merge.serve_sprout', result.state)?.type, 'order_served');
+});
 
 test('board geometry renders and hit-tests with one coordinate system', () => {
   const geometry = { columns: 7, rows: 9, cellSize: 43, gap: 4, inset: 9 };

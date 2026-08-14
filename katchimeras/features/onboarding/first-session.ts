@@ -26,7 +26,7 @@ export function beginFirstSession(options: { restart?: boolean } = {}): FirstSes
 export function updateFirstSession(patch: Partial<Pick<FirstSessionState, 'stage' | 'mergeInstalled'>>) {
   const run = loadFtueRun();
   if (!run || run.status === 'complete') return loadFirstSession();
-  const stepId = patch.stage === 'merge' ? 'merge.first' : patch.stage === 'complete' ? 'complete' : undefined;
+  const stepId = patch.stage === 'merge' ? 'merge.seed_drag' : patch.stage === 'complete' ? 'complete' : undefined;
   updateFtueRun({ ...(stepId ? { stepId } : {}), ...(patch.mergeInstalled == null ? {} : { mergeInstalled: patch.mergeInstalled }) });
   return loadFirstSession();
 }

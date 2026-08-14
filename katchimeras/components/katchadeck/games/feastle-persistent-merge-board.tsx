@@ -24,6 +24,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { FeastleMergeCelebration } from '@/components/katchadeck/world/quests/feastle-merge-primitives';
 import { mergeWorldGeneratorArt, mergeWorldItemArt } from '@/constants/merge-world-art';
 import { MERGE_GENERATORS_BY_ID, MERGE_HYBRID_RECIPES, MERGE_ITEMS_BY_ID, MERGE_WORLD_COLUMNS, MERGE_WORLD_ROWS } from '@/constants/merge-world-catalog';
+import type { MergeBoardInteractionGate } from '@/features/onboarding/merge-ftue';
 import { useMergeMotionPerformanceProbe, type MergeMotionPerformanceSample } from '@/hooks/use-merge-motion-performance-probe';
 import { useDisposableTimers } from '@/hooks/use-disposable-timers';
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
@@ -95,7 +96,7 @@ function isInterruptibleMotion(motion?: SpriteMotion) {
   return motion == null || motion.kind === 'move' || motion.kind === 'swap' || motion.kind === 'return' || motion.kind === 'spawn' || motion.kind === 'merge-result';
 }
 
-export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onScreenMetrics, hiddenItemInstanceIds, effectsPaused: providedEffectsPaused, animateEntrance = true }: {
+export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onScreenMetrics, onBlockedInteraction, interactionGate = { kind: 'open' }, hiddenItemInstanceIds, effectsPaused: providedEffectsPaused, animateEntrance = true }: {
   state: MergeWorldState;
   width: number;
   animateEntrance?: boolean;
@@ -104,6 +105,8 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   onSelect: (cell: number | null) => void;
   onCommand: (command: MergeWorldCommand) => MergeWorldCommandResult | null;
   onScreenMetrics?: (metrics: MergeBoardScreenMetrics) => void;
+  onBlockedInteraction?: () => void;
+  interactionGate?: MergeBoardInteractionGate;
   hiddenItemInstanceIds?: ReadonlySet<string>;
   effectsPaused?: SharedValue<number>;
 }) {
@@ -191,6 +194,10 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   const boardDropRef = useRef<(instanceId: string, worldX: number, worldY: number, epoch: number, intendedTargetCell: number | null) => void>(() => undefined);
   const boardTapRef = useRef<(instanceId: string, worldX: number, worldY: number, epoch: number) => void>(() => undefined);
   const boardCancelRef = useRef<(instanceId: string, worldX: number, worldY: number, epoch: number) => void>(() => undefined);
+  const blockInteraction = useCallback(() => onBlockedInteraction?.(), [onBlockedInteraction]);
+  const gateKind = interactionGate.kind;
+  const gateFromCell = interactionGate.kind === 'drag' ? interactionGate.fromCell : -1;
+  const gateToCell = interactionGate.kind === 'drag' ? interactionGate.toCell : -1;
 
   presentationRef.current = presentation;
   spritesRef.current = sprites;
@@ -557,6 +564,22 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   const emitBoardCancel = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number) => boardCancelRef.current(instanceId, worldX, worldY, epoch), []);
 
   const accessibleAction = useCallback((cell: number) => {
+    if (gateKind === 'locked') {
+      blockInteraction();
+      return;
+    }
+    if (gateKind === 'drag') {
+      if (cell !== gateFromCell) {
+        blockInteraction();
+        return;
+      }
+      const source = spritesRef.current.find((entry) => entry.cell === gateFromCell);
+      if (!source) return;
+      const from = mergeCellCenter(geometry, gateFromCell);
+      const to = mergeCellCenter(geometry, gateToCell);
+      dropRef.current(spriteId(source), to.x - from.x, to.y - from.y, gateToCell);
+      return;
+    }
     const current = presentationRef.current;
     const occupant = current.board[cell]?.occupant;
     const occupantId = occupant?.kind === 'item' ? occupant.instanceId : occupant?.kind === 'generator' ? `generator:${occupant.generatorId}` : null;
@@ -579,7 +602,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
         dropRef.current(spriteId(selected), to.x - from.x, to.y - from.y);
       }
     }
-  }, [geometry]);
+  }, [blockInteraction, gateFromCell, gateKind, gateToCell, geometry]);
 
   const selectedDefinitionId = selectedCell == null || presentation.board[selectedCell]?.occupant?.kind !== 'item'
     ? null
@@ -594,6 +617,12 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       const touch = event.allTouches[0];
       if (!touch) return;
       const cell = mergeCellFromPointWorklet(touch.x, touch.y, geometry.cellSize, geometry.gap, geometry.inset, geometry.columns, geometry.rows);
+      if (gateKind === 'locked' || (gateKind === 'drag' && cell !== gateFromCell)) {
+        activeDragId.value = '';
+        activeSourceCell.value = -1;
+        runOnJS(blockInteraction)();
+        return;
+      }
       const id = cell < 0 ? '' : occupancyIds.value[cell] ?? '';
       touchDownX.value = touch.x;
       touchDownY.value = touch.y;
@@ -654,6 +683,11 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       dragTranslationX.value = dx;
       dragTranslationY.value = dy;
       hoverCell.value = -1;
+      if (gateKind === 'drag') {
+        runOnJS(blockInteraction)();
+        runOnJS(emitBoardCancel)(id, grabX.value + dx, grabY.value + dy, dragEpoch.value);
+        return;
+      }
       runOnJS(emitBoardTap)(id, grabX.value + dx, grabY.value + dy, dragEpoch.value);
     })
     .onEnd((event) => {
@@ -675,7 +709,10 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
         runOnJS(dragSprite)();
       }
       if (maxGestureDistance.value <= BOARD_TAP_SLOP && !isFlick) {
-        runOnJS(emitBoardTap)(id, worldX, worldY, epoch);
+        if (gateKind === 'drag') {
+          runOnJS(blockInteraction)();
+          runOnJS(emitBoardCancel)(id, worldX, worldY, epoch);
+        } else runOnJS(emitBoardTap)(id, worldX, worldY, epoch);
       } else {
         const sourceCell = activeSourceCell.value;
         let targetCell = mergeCellFromPointWorklet(worldX + geometry.cellSize / 2, worldY + geometry.cellSize / 2, geometry.cellSize, geometry.gap, geometry.inset, geometry.columns, geometry.rows);
@@ -686,6 +723,11 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
             event.velocityX || event.translationX,
             event.velocityY || event.translationY,
           ) ?? -1;
+        }
+        if (gateKind === 'drag' && (sourceCell !== gateFromCell || targetCell !== gateToCell)) {
+          runOnJS(blockInteraction)();
+          runOnJS(emitBoardCancel)(id, worldX, worldY, epoch);
+          return;
         }
         if (sourceCell >= 0 && targetCell >= 0 && sourceCell !== targetCell) {
           const ids = [...occupancyIds.value];
@@ -719,7 +761,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
         runOnJS(emitBoardCancel)(id, grabX.value + dragTranslationX.value, grabY.value + dragTranslationY.value, dragEpoch.value);
       }
       if (!reducedFx) effectsPaused.value = withDelay(500, withTiming(0, { duration: 1 }));
-    }), [activeDragId, activeSourceCell, dragEpoch, dragHapticTriggered, dragPhase, dragSprite, dragTranslationX, dragTranslationY, effectsPaused, emitBoardCancel, emitBoardDrop, emitBoardTap, entranceInteractive, geometry.cellSize, geometry.columns, geometry.gap, geometry.inset, geometry.rows, gestureFinished, grabX, grabY, hoverCell, maxGestureDistance, occupancyDefinitions, occupancyIds, pickSprite, reducedFx, touchDownX, touchDownY]);
+    }), [activeDragId, activeSourceCell, blockInteraction, dragEpoch, dragHapticTriggered, dragPhase, dragSprite, dragTranslationX, dragTranslationY, effectsPaused, emitBoardCancel, emitBoardDrop, emitBoardTap, entranceInteractive, gateFromCell, gateKind, gateToCell, geometry.cellSize, geometry.columns, geometry.gap, geometry.inset, geometry.rows, gestureFinished, grabX, grabY, hoverCell, maxGestureDistance, occupancyDefinitions, occupancyIds, pickSprite, reducedFx, touchDownX, touchDownY]);
 
   // Measure a stable, untransformed frame. The visual board enters with a
   // translateY animation; measuring that Animated.View cached a temporary
@@ -737,7 +779,8 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
         const compatible = Boolean(selectedDefinitionId && item && item.definitionId === selectedDefinitionId && selectedCell !== index);
         const label = generator ? `${generator.name}. Tap to generate. Costs 1 Energy.` : definition ? `${definition.name}, tier ${definition.tier}` : cell.locked ? 'Blocked board space' : 'Empty board space';
         return <BoardCell
-          accessibilityActionLabel={generator ? 'Generate item' : 'Select or move item'}
+          accessibilityActionLabel={gateKind === 'drag' && index === gateFromCell ? 'Merge with highlighted Seed' : generator ? 'Generate item' : 'Select or move item'}
+          accessibilityDisabled={gateKind === 'locked' || (gateKind === 'drag' && index !== gateFromCell)}
           accessibilityLabel={label}
           blocked={cell.locked && !occupant}
           compatible={compatible}
@@ -789,8 +832,9 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   </View>;
 }
 
-const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibilityLabel, blocked, invalid, selected, compatible, index, left, top, width, height, onActivate }: {
+const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibilityDisabled, accessibilityLabel, blocked, invalid, selected, compatible, index, left, top, width, height, onActivate }: {
   accessibilityActionLabel: string;
+  accessibilityDisabled: boolean;
   accessibilityLabel: string;
   blocked: boolean;
   invalid: boolean;
@@ -819,6 +863,7 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
       accessibilityActions={[{ name: 'activate', label: accessibilityActionLabel }]}
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
+      accessibilityState={{ disabled: accessibilityDisabled }}
       onAccessibilityAction={() => onActivate(index)}
       style={styles.cellPressable}>
       {blocked ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" recyclingKey="merge-locked-cloud" source={LOCKED_CELL_OVERLAY} style={styles.lockedOverlay} transition={0} /> : null}

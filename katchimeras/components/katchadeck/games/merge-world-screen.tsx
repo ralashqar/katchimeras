@@ -21,8 +21,9 @@ import {
 import { mergeWorldGeneratorArt } from '@/constants/merge-world-art';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import { useMergeWorld } from '@/features/merge-world/merge-world-provider';
-import { commitFtueAction, ftueWispForRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { commitFtueAction, dispatchFtueEvent, ftueWispForRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
+import { mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
 import { WISPS_BY_ID } from '@/constants/wisps';
 import { useGameFeedback } from '@/features/ui/game-feedback-provider';
 import { useGameWallet } from '@/features/ui/game-wallet-provider';
@@ -39,6 +40,7 @@ import { FeastlePersistentMergeBoard, type MergeBoardScreenMetrics } from './fea
 import { MergeParcelFlightOverlay, type MergeParcelFlight } from './merge-parcel-overlay';
 import { MergeOrderRail, type MergeTrayEntry } from './merge-order-rail';
 import { MergeServeRewardOverlay, type MergeScreenPoint, type MergeServeRewardFlight } from './merge-serve-reward-overlay';
+import { MergeFtueOverlay } from './merge-ftue-overlay';
 
 export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntrance = true }: { active?: boolean; effectsPaused?: SharedValue<number>; playBoardEntrance?: boolean } = {}) {
   const router = useRouter();
@@ -71,10 +73,15 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
   const [coinPulseNonce, setCoinPulseNonce] = useState(0);
   const [energyClockNow, setEnergyClockNow] = useState(Date.now);
   const [chapterCompleteOpen, setChapterCompleteOpen] = useState(false);
+  const [blockedFtuePulseNonce, setBlockedFtuePulseNonce] = useState(0);
+  const [boardMetrics, setBoardMetrics] = useState<MergeBoardScreenMetrics | null>(null);
+  const [ftueTargetRevision, setFtueTargetRevision] = useState(0);
+  const [screenLayoutNonce, setScreenLayoutNonce] = useState(0);
   const screenRef = useRef<View>(null);
   const energyHudRef = useRef<View>(null);
   const coinHudRef = useRef<View>(null);
   const boardMetricsRef = useRef<MergeBoardScreenMetrics | null>(null);
+  const serveTargetRefs = useRef(new Map<string, View>());
   const parcelRef = useRef<View>(null);
   const activeServeRef = useRef(false);
   const activeParcelRef = useRef(false);
@@ -84,8 +91,11 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
   const storyNavigationPendingRef = useRef(false);
   const contentWidth = Math.min(width - 12, 600);
   const flowReady = !loading && state != null;
+  const ftueExclusive = ftueStep?.surface === 'merge' && ftueStep.interaction?.mode === 'exclusive';
   const shouldTickEnergyClock = active && state != null && state.energy.value < state.energy.regenCap;
   const readyOrderIds = useMemo(() => state ? readyMergeOrderIds(state) : new Set<string>(), [state]);
+  const ftueBoardGate = useMemo(() => state ? mergeFtueBoardGate(ftueStep, state) : { kind: 'open' as const }, [ftueStep, state]);
+  const ftueRailGate = useMemo(() => mergeFtueRailGate(ftueStep), [ftueStep]);
   const hiddenAnimatedItemIds = useMemo(() => new Set([
     ...(serveFlight?.items.map((item) => item.instanceId) ?? []),
     ...parcelHiddenItemIds,
@@ -166,21 +176,37 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
   }, [feedback, lastResult]);
 
   useEffect(() => {
-    if (!active || !state || !ftueStep) return;
-    const hasOrder = (suffix: string) => state.activeOrders.some((order) => order.id === `mossprout:chapter-0:${suffix}`);
-    if (ftueRun?.stepId === 'merge.first' && !hasOrder('first-sprout')) {
-      commitFtueAction({ actionId: 'merge.serve_sprout', evidenceRef: `merge-revision:${state.revision}` });
-      setChapterCompleteOpen(true);
-      return;
-    }
-  }, [active, ftueRun?.stepId, ftueStep, state]);
+    if (!active || !state || !ftueStep || !ftueRun) return;
+    const recovered = recoverMergeFtueEvent(ftueRun.stepId, state);
+    if (!recovered) return;
+    dispatchFtueEvent(recovered, `merge-recovery:${state.revision}`);
+    if (recovered.type === 'order_served') setChapterCompleteOpen(true);
+  }, [active, ftueRun, ftueStep, state]);
 
   const finishChapterZero = useCallback(() => {
     setChapterCompleteOpen(false);
     commitFtueAction({ actionId: 'chapter.finish', evidenceRef: 'chapter-sheet-acknowledged' });
   }, []);
 
-  const dispatch = useCallback((command: MergeWorldCommand) => send(command), [send]);
+  const handleBlockedFtueInteraction = useCallback(() => {
+    setBlockedFtuePulseNonce((current) => current + 1);
+    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  const dispatch = useCallback((command: MergeWorldCommand) => {
+    if (!state) return null;
+    if (!mergeFtueAllowsCommand(ftueStep, state, command)) {
+      handleBlockedFtueInteraction();
+      return null;
+    }
+    const result = send(command);
+    const event = mergeFtueEventForCommand(state, command, result);
+    if (event) {
+      dispatchFtueEvent(event);
+      if (event.type === 'order_served') setChapterCompleteOpen(true);
+    }
+    return result;
+  }, [ftueStep, handleBlockedFtueInteraction, send, state]);
   const pendingParcels = useMemo(() => state?.arrivals.filter((arrival) => (
     arrival.claimedAt == null
     && arrival.kind !== 'memory_arrival'
@@ -336,6 +362,14 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
   }, [dispatch, state?.activeOrders]);
   const handleBoardScreenMetrics = useCallback((metrics: MergeBoardScreenMetrics) => {
     boardMetricsRef.current = metrics;
+    setBoardMetrics(metrics);
+  }, []);
+  const handleServeTargetRef = useCallback((orderId: string, view: View | null) => {
+    const current = serveTargetRefs.current.get(orderId) ?? null;
+    if (current === view) return;
+    if (view) serveTargetRefs.current.set(orderId, view);
+    else serveTargetRefs.current.delete(orderId);
+    setFtueTargetRevision((revision) => revision + 1);
   }, []);
   const rerollOrder = useCallback((orderId: string) => {
     dispatch({ type: 'rerollOrder', orderId, now: Date.now() });
@@ -417,7 +451,7 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
     : null;
   const firstWisp = WISPS_BY_ID.get(ftueWispForRun(ftueRun));
   return (
-    <View ref={screenRef} style={styles.screen}>
+    <View onLayout={() => setScreenLayoutNonce((nonce) => nonce + 1)} ref={screenRef} style={styles.screen}>
       <View style={[styles.game, { paddingTop: Math.max(insets.top + 3, 7), paddingBottom: Math.max(insets.bottom + 3, 7), width: contentWidth }]}>
         <GameHudBar
           content={<GameCurrencyHud balances={[
@@ -433,7 +467,7 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
               <ThemedText selectable style={styles.levelValue} lightColor={GameUI.color.ink} darkColor={GameUI.color.ink}>{state.mergeLevel}</ThemedText>
               <View pointerEvents="none" style={styles.levelTrack}><View style={[styles.levelFill, { width: `${levelRatio * 100}%` }]} /></View>
             </GameHudItem>
-            <GameHudControl accessibilityLabel="Open legacy games" onPress={() => router.push('/legacy-games')} style={styles.hudAction} tone="glass">
+            <GameHudControl accessibilityLabel="Open legacy games" onPress={() => ftueExclusive ? handleBlockedFtueInteraction() : router.push('/legacy-games')} style={styles.hudAction} tone="glass">
               <IconSymbol color={GameUI.color.ink} name="gamecontroller.fill" size={18} />
             </GameHudControl>
           </>}
@@ -449,6 +483,9 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
             onOpenParcel={(arrivalId) => void openParcel(arrivalId)}
             onReroll={(order) => rerollOrder(order.id)}
             onServe={startServeAnimation}
+            onBlockedInteraction={handleBlockedFtueInteraction}
+            onServeTargetRef={handleServeTargetRef}
+            interactionGate={ftueRailGate}
             parcelTargetRef={parcelRef}
           />
 
@@ -459,7 +496,9 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
               animateEntrance={playBoardEntrance}
               effectsPaused={effectsPaused}
               hiddenItemInstanceIds={hiddenAnimatedItemIds}
+              interactionGate={ftueBoardGate}
               maxHeight={boardAreaHeight - 1}
+              onBlockedInteraction={handleBlockedFtueInteraction}
               onCommand={dispatch}
               onSelect={setSelectedCell}
               onScreenMetrics={handleBoardScreenMetrics}
@@ -476,6 +515,18 @@ export function MergeWorldScreen({ active = true, effectsPaused, playBoardEntran
         </View>
 
       </View>
+
+      <MergeFtueOverlay
+        blockedPulseNonce={blockedFtuePulseNonce}
+        boardMetrics={boardMetrics}
+        cue={active && !serveFlight ? ftueStep?.cue ?? null : null}
+        layoutNonce={screenLayoutNonce}
+        screenRef={screenRef}
+        serveTargetRefs={serveTargetRefs}
+        state={state}
+        spotlight={active && !serveFlight ? ftueStep?.spotlight ?? null : null}
+        targetRevision={ftueTargetRevision}
+      />
 
       {error ? <KatchaSurfaceProvider surface="parchment"><View style={[styles.errorBanner, { top: Math.max(insets.top + 56, 64) }]}><KatchaInlineNotice body={error} title="Merge paused" tone="danger" /></View></KatchaSurfaceProvider> : null}
       <MergeServeRewardOverlay flight={serveFlight} onCoinArrive={handleCoinArrive} onEnergyArrive={handleEnergyArrive} onFinish={finishServeAnimation} onItemsArrive={handleServeItemsArrive} />

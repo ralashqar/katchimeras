@@ -10,6 +10,7 @@ export const FTUE_HANDLER_REGISTRY: Record<FtueHandlerId, { commitOwner: 'fronte
   journal_place: { commitOwner: 'domain-observer', privacy: 'no-answer' },
   discovery_hatch: { commitOwner: 'frontend', privacy: 'no-answer' },
   companion_conversation: { commitOwner: 'domain-observer', privacy: 'no-answer' },
+  merge_item_created: { commitOwner: 'domain-observer', privacy: 'no-answer' },
   merge_order_served: { commitOwner: 'domain-observer', privacy: 'no-answer' },
   merge_energy_depleted: { commitOwner: 'domain-observer', privacy: 'no-answer' },
   acknowledgement: { commitOwner: 'frontend', privacy: 'no-answer' },

@@ -39,7 +39,7 @@ import { katchimeraEncounterProfiles } from '@/constants/katchimera-encounter-pr
 import { getCreatureVisual, prepareTodayForDevRehatch, type DevRehatchMode } from '@/game/days';
 import { resetTodayForDebug } from '@/features/today/reset-today-for-debug';
 import { beginFirstSession } from '@/features/onboarding/first-session';
-import { useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { jumpFtueToStep, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { retryFtueSync } from '@/features/onboarding/ftue-sync';
 import { clearTodayPatch } from '@/utils/today-patch-storage';
 import { clearBaseCustomisation } from '@/utils/world-base-customisation';
@@ -50,17 +50,9 @@ import type { CompanionAchievementDef } from '@/types/companion-achievements';
 import type { StreakMilestone } from '@/types/streak';
 import { pickRandomAchievement } from '@/utils/achievement-celebration';
 import { STREAK_MILESTONE_REWARDS } from '@/utils/streak-engine';
-import { resetAllKatchimeraContentForDebug } from '@/utils/companion-content-storage';
-import { resetDevSubscriptionSimulator } from '@/utils/dev-subscription-simulator';
-import { resetKatchimeraWardrobeForDebug } from '@/utils/katchimera-wardrobe-storage';
-import { resetAllKatchimeraBondsForDebug } from '@/utils/companion-bond-storage';
-import { resetMergeWorldStateForDebug } from '@/utils/merge-world/repository';
-import { resetCompanionAchievementsForDebug } from '@/utils/companion-achievements-storage';
-import { resetCompanionDiscoveryForDebug } from '@/utils/companion-discovery-storage';
-import { resetCompanionJourneysForDebug } from '@/utils/companion-journey-storage';
-import { resetAllCompanionQuickGoalsForDebug } from '@/utils/companion-quick-goal-storage';
-import { resetCompanionQuestsForDebug } from '@/utils/katchimera-quests';
-import { resetCompanionStoriesForDebug, setFeastleStoryStateForDebug } from '@/utils/companion-story-storage';
+import { prepareMossproutMergeFtueForDebug } from '@/utils/merge-world/repository';
+import { resetKatchimeraProgressForDebug } from '@/utils/reset-katchimera-progress-for-debug';
+import { setFeastleStoryStateForDebug } from '@/utils/companion-story-storage';
 
 export default function ExploreScreen() {
   const router = useRouter();
@@ -92,18 +84,7 @@ export default function ExploreScreen() {
           onPress: async () => {
             try {
               const resetAt = Date.now();
-              resetAllKatchimeraContentForDebug();
-              resetKatchimeraWardrobeForDebug();
-              resetAllKatchimeraBondsForDebug(resetAt);
-              resetCompanionQuestsForDebug();
-              resetCompanionJourneysForDebug();
-              resetCompanionDiscoveryForDebug();
-              resetAllCompanionQuickGoalsForDebug();
-              resetCompanionStoriesForDebug();
-              resetCompanionAchievementsForDebug();
-              resetDevSubscriptionSimulator();
-              setAllKatchimerasAvailableEnabled(false);
-              await resetMergeWorldStateForDebug(resetAt);
+              await resetKatchimeraProgressForDebug({ resetAt, resetDevAccess: true });
               Alert.alert('Katchimeras progress reset', 'Katchimera questionnaires and Friendship now begin from question one and level one. Merge World has returned to its starting board.');
             } catch (caught) {
               Alert.alert('Reset did not finish', caught instanceof Error ? caught.message : 'Katchimeras progress could not be reset. Please try again.');
@@ -204,16 +185,17 @@ export default function ExploreScreen() {
   function handleRestartFirstSession() {
     Alert.alert(
       'Restart first-session onboarding?',
-      'Keeps your profile, personality, zodiac, settings, and past days. It resets Today and the real Merge board, then restarts the scripted Mossprout flow.',
+      'Keeps your profile, personality, zodiac, settings, and past days. It resets Today, Katchimera progress, and the Merge board, then restarts the scripted Mossprout flow.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Restart flow',
           onPress: async () => {
             try {
+              const resetAt = Date.now();
               await resetTodayForDebug();
-              await resetMergeWorldStateForDebug();
               beginFirstSession({ restart: true });
+              await resetKatchimeraProgressForDebug({ resetAt });
               router.replace('/(tabs)/today');
             } catch (caught) {
               Alert.alert('Restart did not finish', caught instanceof Error ? caught.message : 'The first-session flow could not be restarted.');
@@ -222,6 +204,17 @@ export default function ExploreScreen() {
         },
       ],
     );
+  }
+
+  async function handlePrepareMergeFtue(step: 'merge.seed_drag' | 'merge.serve_sprout') {
+    try {
+      beginFirstSession({ restart: true });
+      await prepareMossproutMergeFtueForDebug(step);
+      jumpFtueToStep(step);
+      router.replace('/(tabs)/games');
+    } catch (caught) {
+      Alert.alert('Merge FTUE setup failed', caught instanceof Error ? caught.message : 'The Merge tutorial could not be prepared.');
+    }
   }
 
   function handlePrepareTodayRehatch(mode: DevRehatchMode) {
@@ -484,6 +477,8 @@ export default function ExploreScreen() {
                   </ThemedText>
                 </View> : null}
                 <KatchaButton label="FTUE retry receipt sync" onPress={() => void retryFtueSync()} variant="secondary" />
+                <KatchaButton label="FTUE Merge · Seed swipe" onPress={() => void handlePrepareMergeFtue('merge.seed_drag')} variant="secondary" />
+                <KatchaButton label="FTUE Merge · Serve Sprout" onPress={() => void handlePrepareMergeFtue('merge.serve_sprout')} variant="secondary" />
                 <KatchaButton label="Reset Katchimeras progress" onPress={handleResetKatchimerasProgress} variant="secondary" />
                 <KatchaButton label="Feastle story · Level 1 order" onPress={() => setFeastleStoryStateForDebug('order_active', 1)} variant="secondary" />
                 <KatchaButton label="Feastle story · Return at level 2" onPress={() => setFeastleStoryStateForDebug('return_available', 2)} variant="secondary" />
