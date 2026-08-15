@@ -5,15 +5,12 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { KatchaSurfacePalette } from '@/constants/katcha-ui';
+import { SLEEP_ART } from '@/constants/wellbeing-selection-art';
 import type { DaySleep, SleepQuality } from '@/types/home';
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 
 // Generated 3D sleep-quality icons (FAL row, style-anchored to the sleep moon).
-export const SLEEP_ART: Record<string, number> = {
-  good: require('@/assets/images/katchimeras/today-icons/sleep/good.webp'),
-  normal: require('@/assets/images/katchimeras/today-icons/sleep/normal.webp'),
-  low: require('@/assets/images/katchimeras/today-icons/sleep/low.webp'),
-};
+export { SLEEP_ART };
 const PARCHMENT = KatchaSurfacePalette.parchment;
 
 // Sleep — how the day began. Never a score or a failure; low sleep is just a

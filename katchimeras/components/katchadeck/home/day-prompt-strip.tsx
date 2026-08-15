@@ -13,6 +13,7 @@ import Animated, {
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { isReflectiveDayPromptKind } from '@/constants/day-prompts';
 import { Meadow } from '@/constants/meadow-theme';
 import { KatchaSurfacePalette, resolveParchmentAccent } from '@/constants/katcha-ui';
 import type { DayPromptKind } from '@/types/home';
@@ -62,6 +63,7 @@ export function DayPromptStrip({
   const options = prompt.options ?? [];
   const maxOptions = Number.isFinite(prompt.maxOptions) ? prompt.maxOptions : options.length;
   const photoCandidates = prompt.photoCandidates ?? [];
+  const useChoiceRows = isReflectiveDayPromptKind(prompt.id);
 
   return (
     <Animated.View
@@ -107,6 +109,20 @@ export function DayPromptStrip({
             />
           ))}
         </ScrollView>
+      ) : useChoiceRows ? (
+        <View style={styles.choiceList}>
+          {options.slice(0, maxOptions).map((option, index) => (
+            <PromptChoiceRow
+              key={option.id}
+              index={index}
+              label={option.label}
+              icon={option.icon}
+              accent={CHIP_ACCENTS[index % CHIP_ACCENTS.length]}
+              presentation={presentation}
+              onPick={(from) => onAnswer(prompt.id, [option.id], from)}
+            />
+          ))}
+        </View>
       ) : (
         <View style={styles.chipRow}>
           {options.slice(0, maxOptions).map((option, index) => (
@@ -122,6 +138,68 @@ export function DayPromptStrip({
           ))}
         </View>
       )}
+    </Animated.View>
+  );
+}
+
+function PromptChoiceRow({
+  label,
+  icon,
+  accent,
+  index,
+  onPick,
+  presentation,
+}: {
+  label: string;
+  icon: IconSymbolName;
+  accent: string;
+  index: number;
+  onPick: (from: FeedSourceRect) => void;
+  presentation: 'night' | 'parchment';
+}) {
+  const ref = useRef<View | null>(null);
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const resolvedAccent = presentation === 'parchment' ? resolveParchmentAccent(accent).foreground : accent;
+
+  const pick = () => {
+    ref.current?.measureInWindow((x, y, w, h) => onPick({ x, y, w, h }));
+  };
+
+  return (
+    <Animated.View entering={FadeInDown.delay(70 + index * 42).duration(300).easing(motionEasing)}>
+      <AnimatedPressable
+        ref={ref}
+        accessibilityLabel={label}
+        accessibilityRole="button"
+        onPressIn={() => {
+          scale.value = withSpring(0.985, { damping: 16, stiffness: 320 });
+        }}
+        onPressOut={() => {
+          scale.value = withSpring(1, { damping: 14, stiffness: 240 });
+        }}
+        onPress={pick}
+        style={[
+          styles.choiceRow,
+          presentation === 'parchment' && styles.choiceRowParchment,
+          animatedStyle,
+        ]}>
+        <View style={[styles.choiceIcon, presentation === 'parchment' && styles.choiceIconParchment]}>
+          <IconSymbol color={resolvedAccent} name={icon} size={20} />
+        </View>
+        <ThemedText
+          numberOfLines={2}
+          style={styles.choiceLabel}
+          lightColor={presentation === 'parchment' ? PARCHMENT.text : Meadow.chipLabel}
+          darkColor={presentation === 'parchment' ? PARCHMENT.text : Meadow.chipLabel}>
+          {label}
+        </ThemedText>
+        <IconSymbol
+          color={presentation === 'parchment' ? PARCHMENT.textTertiary : CREAM_SOFT}
+          name="chevron.right"
+          size={16}
+        />
+      </AnimatedPressable>
     </Animated.View>
   );
 }
@@ -286,6 +364,46 @@ const styles = StyleSheet.create({
     gap: 8,
     justifyContent: 'center',
     paddingVertical: 2,
+  },
+  choiceList: {
+    gap: 8,
+    paddingVertical: 2,
+  },
+  choiceRow: {
+    alignItems: 'center',
+    backgroundColor: Meadow.chip,
+    borderColor: Meadow.chipBorder,
+    borderCurve: 'continuous',
+    borderRadius: 17,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 11,
+    minHeight: 58,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+  },
+  choiceRowParchment: {
+    backgroundColor: 'rgba(255,255,255,0.54)',
+    borderColor: 'rgba(122,84,44,0.1)',
+    boxShadow: '-1px 2px 6px rgba(58,38,18,0.09), inset 0 1px 0 rgba(255,252,234,0.65)',
+  },
+  choiceIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderCurve: 'continuous',
+    borderRadius: 12,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  choiceIconParchment: {
+    backgroundColor: 'rgba(229,190,106,0.16)',
+  },
+  choiceLabel: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 20,
   },
   chip: {
     alignItems: 'center',

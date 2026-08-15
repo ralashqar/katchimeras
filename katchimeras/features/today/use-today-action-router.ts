@@ -20,6 +20,7 @@ type UseTodayActionRouterParams = {
   openQuickNote: (input?: 'text' | 'voice') => void;
   openObservatory: () => void;
   openManualJournal: (flowId?: string, categoryId?: string, contextId?: string | null) => void;
+  openGuidedCapture: (categoryId: string, entryPoint?: 'plus' | 'quest' | 'vault') => boolean;
   requestMicrophonePermission?: () => Promise<{ granted?: boolean } | null>;
 };
 
@@ -35,6 +36,7 @@ export function useTodayActionRouter({
   openQuickNote,
   openObservatory,
   openManualJournal,
+  openGuidedCapture,
   requestMicrophonePermission,
 }: UseTodayActionRouterParams) {
   const panelCategories = useMemo(() => {
@@ -73,27 +75,27 @@ export function useTodayActionRouter({
             ['feeling', 'inner_weather', 'day_word', 'meaning', 'gratitude', 'highlight'].includes(prompt.id)
           );
           if (reflectionPrompt) openPromptSheet(reflectionPrompt);
-          else openManualJournal();
+          else openGuidedCapture('reflection', 'quest');
           break;
         }
         case 'markPlace':
-          openManualJournal('went_somewhere');
+          openGuidedCapture('place', 'quest');
           break;
         case 'markBigMoment':
-          openManualJournal('big_event');
+          openGuidedCapture('life_event', 'quest');
           break;
         case 'saveFoodMemory':
-          openManualJournal('food');
+          openGuidedCapture('food', 'quest');
           break;
         case 'saveStudioMemory':
-          openManualJournal('studio');
+          openGuidedCapture('studio', 'quest');
           break;
         case 'namePatch':
           sheets.setNameSheetOpen(true);
           break;
       }
     },
-    [formingPrompts, openCapture, openManualJournal, openPromptSheet, openQuickNote, requestMicrophonePermission, sheets]
+    [formingPrompts, openCapture, openGuidedCapture, openPromptSheet, openQuickNote, requestMicrophonePermission, sheets]
   );
 
   const handleStatPress = useCallback(
@@ -186,11 +188,11 @@ export function useTodayActionRouter({
           break;
         case 'places':
           if (category.hasContent) sheets.setPlacesVaultOpen(true);
-          else openManualJournal('went_somewhere');
+          else openGuidedCapture('place', 'vault');
           break;
         case 'journey':
           if (category.hasContent) sheets.setStepsSheetOpen(true);
-          else openManualJournal('movement');
+          else openGuidedCapture('movement', 'vault');
           break;
         case 'reflection':
           if (category.needsAttention) sheets.setMoodSheetOpen(true);
@@ -198,11 +200,11 @@ export function useTodayActionRouter({
           break;
         case 'food':
           if (category.hasContent) sheets.setFoodVaultOpen(true);
-          else openManualJournal('food');
+          else openGuidedCapture('food', 'vault');
           break;
         case 'studio':
           if (category.hasContent) sheets.setStudioVaultOpen(true);
-          else openManualJournal('studio');
+          else openGuidedCapture('studio', 'vault');
           break;
         case 'sleep':
           sheets.setSleepSheetOpen(true);
@@ -217,7 +219,7 @@ export function useTodayActionRouter({
     },
     [
       openMemoryVault,
-      openManualJournal,
+      openGuidedCapture,
       openPromptSheet,
       photoPrompt,
       sheets,
@@ -237,6 +239,7 @@ export function useTodayActionRouter({
     async (id: string) => {
       closePromptSheet();
       sheets.closeAllSheets();
+      if (openGuidedCapture(id, 'plus')) return;
       if (id === 'photo') openCapture();
       else if (id === 'voice_note') {
         if (requestMicrophonePermission) {
@@ -246,22 +249,14 @@ export function useTodayActionRouter({
         openQuickNote('voice');
       }
       else if (id === 'written_note' || id === 'note') openQuickNote('text');
-      else if (id === 'place') openManualJournal('went_somewhere');
-      else if (id === 'food') openManualJournal('food');
-      else if (id === 'studio') openManualJournal('studio');
-      else if (id === 'movement') openManualJournal('movement');
-      else if (id === 'people') openManualJournal('people');
-      else if (id === 'work') openManualJournal('work');
       else if (id === 'sleep') sheets.setSleepSheetOpen(true);
       else if (id === 'mood') sheets.setMoodSheetOpen(true);
-      else if (id === 'life_event') openManualJournal('big_event');
-      else if (id === 'manual_journal') openManualJournal();
     },
     [
       closePromptSheet,
       openCapture,
+      openGuidedCapture,
       openQuickNote,
-      openManualJournal,
       requestMicrophonePermission,
       sheets,
     ]
@@ -296,11 +291,17 @@ export function useTodayActionRouter({
           break;
         case 'add_note':
           if (intent.journalRoute) {
-            openManualJournal(
-              intent.journalRoute.flowId,
-              intent.journalRoute.categoryId,
-              intent.journalRoute.contextId
-            );
+            const categoryId = ({
+              people: 'people', food: 'food', went_somewhere: 'place', movement: 'movement',
+              studio: 'studio', work: 'work', big_event: 'life_event', general: 'reflection',
+            } as Record<string, string>)[intent.journalRoute.flowId];
+            if (!categoryId || !openGuidedCapture(categoryId, 'quest')) {
+              openManualJournal(
+                intent.journalRoute.flowId,
+                intent.journalRoute.categoryId,
+                intent.journalRoute.contextId
+              );
+            }
           } else {
             openQuickNote('text');
           }
@@ -315,6 +316,7 @@ export function useTodayActionRouter({
     [
       closePromptSheet,
       openCapture,
+      openGuidedCapture,
       openMemoryVault,
       openManualJournal,
       openObservatory,

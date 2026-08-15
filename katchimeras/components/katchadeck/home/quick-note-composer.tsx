@@ -21,6 +21,9 @@ type QuickNoteComposerProps = {
   voicePhase: InlineVoiceNotePhase;
   contextTitle?: string | null;
   contextBody?: string | null;
+  contextKicker?: string;
+  placeholder?: string;
+  showVoiceOption?: boolean;
 };
 
 export function QuickNoteComposer({
@@ -34,6 +37,9 @@ export function QuickNoteComposer({
   voicePhase,
   contextTitle,
   contextBody,
+  contextKicker = 'QUEST NOTE',
+  placeholder = 'What happened?',
+  showVoiceOption = true,
 }: QuickNoteComposerProps) {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
@@ -85,7 +91,7 @@ export function QuickNoteComposer({
         style={[styles.card, { top: insets.top + 96 }]}>
         {contextTitle && !voiceActive && !reading ? (
           <View style={styles.questContext}>
-            <ThemedText style={styles.questKicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>QUEST NOTE</ThemedText>
+            <ThemedText style={styles.questKicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>{contextKicker}</ThemedText>
             <ThemedText style={styles.questTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{contextTitle}</ThemedText>
             {contextBody ? <ThemedText style={styles.questBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{contextBody}</ThemedText> : null}
           </View>
@@ -107,7 +113,7 @@ export function QuickNoteComposer({
               autoFocus={initialMode === 'text'}
               onChangeText={setText}
               onSubmitEditing={submit}
-              placeholder="What happened?"
+              placeholder={placeholder}
               placeholderTextColor="rgba(251, 243, 228, 0.45)"
               returnKeyType="send"
               selectionColor={Lantern.ember300}
@@ -121,7 +127,7 @@ export function QuickNoteComposer({
         )}
       </Animated.View>
 
-      {!reading && voicePhase !== 'analyzing' ? (
+      {showVoiceOption && !reading && voicePhase !== 'analyzing' ? (
         <Animated.View
           entering={FadeInDown.delay(70).duration(220)}
           exiting={FadeOut.duration(140)}

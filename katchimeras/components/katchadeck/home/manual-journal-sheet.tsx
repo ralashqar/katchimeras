@@ -41,18 +41,10 @@ import {
   type ManualJournalChoice,
   type ManualJournalFlowDefinition,
   type ManualJournalOption,
-  type ManualJournalSection,
 } from '@/utils/manual-journal-registry';
 
 type Stage = 'flow' | 'category' | 'details';
 
-const SECTION_ORDER: ManualJournalSection[] = ['everyday', 'culture', 'milestone', 'other'];
-const SECTION_LABELS: Record<ManualJournalSection, string> = {
-  everyday: 'Everyday',
-  culture: 'Culture & progress',
-  milestone: 'Milestones',
-  other: 'Other',
-};
 const FLOW_ORDER = ['people', 'food', 'went_somewhere', 'movement', 'studio', 'work', 'big_event', 'general'];
 
 export type JournalComposerProps = {
@@ -72,6 +64,7 @@ export type JournalComposerProps = {
   liveSpecific?: string | null;
   liveSpecificLoading?: boolean;
   suggestedRoutes?: JournalRouteProposal[];
+  classificationReview?: boolean;
   suggestedFlowId?: string | null;
   suggestedChoiceId?: string | null;
   sourceType?: 'manual' | 'photo';
@@ -96,7 +89,14 @@ export type JournalComposerProps = {
   initialInputMode?: QuestJournalCaptureMode;
   onBackFromInitial?: () => void;
   returnToOriginOnBack?: boolean;
+  /**
+   * Lets a low-friction entry point keep this polished category browser while
+   * replacing the legacy form-heavy category pages with another capture flow.
+   * Return true when the selection was handled externally.
+   */
+  onFlowSelect?: (flowId: string) => boolean;
   onRouteResolved?: (flowId: string, categoryId: string) => void;
+  onKeepAsNote?: () => void;
   onClose: () => void;
   onSave: (submission: ManualJournalSubmission) => void;
 };
@@ -118,6 +118,7 @@ export function JournalComposer({
   liveSpecific,
   liveSpecificLoading = false,
   suggestedRoutes = [],
+  classificationReview = false,
   suggestedFlowId,
   suggestedChoiceId,
   sourceType = 'manual',
@@ -138,7 +139,9 @@ export function JournalComposer({
   initialInputMode = 'guided',
   onBackFromInitial,
   returnToOriginOnBack = false,
+  onFlowSelect,
   onRouteResolved,
+  onKeepAsNote,
   onClose,
   onSave,
 }: JournalComposerProps) {
@@ -165,9 +168,9 @@ export function JournalComposer({
   const [voiceRoutes, setVoiceRoutes] = useState<JournalRouteProposal[]>([]);
   const [voiceRouting, setVoiceRouting] = useState(false);
   const [noteSpecificLoading, setNoteSpecificLoading] = useState(false);
-  const [activeSection, setActiveSection] = useState<ManualJournalSection>('everyday');
   const [discardOpen, setDiscardOpen] = useState(false);
   const [makeKeyMoment, setMakeKeyMoment] = useState(false);
+  const [showAllCategories, setShowAllCategories] = useState(false);
   const specificEditedRef = useRef(false);
   const longPressRef = useRef(false);
   const redoLongPressRef = useRef(false);
@@ -175,7 +178,6 @@ export function JournalComposer({
   const initialVoiceStartedRef = useRef(false);
   const noteSpecificRequestRef = useRef<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
-  const sectionOffsets = useRef<Partial<Record<ManualJournalSection, number>>>({});
   const reduceMotion = useReducedMotion();
   const player = useAudioPlayer();
   const playerStatus = useAudioPlayerStatus(player);
@@ -281,10 +283,12 @@ export function JournalComposer({
   const dirty = !!choice || !!specific.trim() || !!context || !!feeling || !!note.trim() || !!linkedNote || !!location;
   const requiredContextMissing = Boolean(contextOptionsOverride?.length && !context);
   const title = stage === 'flow'
-    ? 'What would you like to keep?'
+    ? classificationReview ? 'What was this mainly about?' : 'What would you like to keep?'
     : stage === 'category'
       ? promptTitle ?? flow?.shortTitle ?? flow?.title ?? 'Choose a moment'
-      : promptTitle ?? 'Make it yours';
+      : promptTitle ?? (classificationReview
+        ? choice?.specificFieldLabel ?? flow?.specificFieldLabel ?? 'Add one detail'
+        : 'Make it yours');
   const subtitle = stage === 'flow'
     ? 'Choose a part of your day.'
     : stage === 'category'
@@ -293,12 +297,8 @@ export function JournalComposer({
   const locationSearchQuery = flow?.id === 'went_somewhere' && choice
     ? journalPlaceSearchQuery(specific, noteSpecificLoading ? '' : choice.id)
     : '';
-  const groupedFlows = useMemo(() => SECTION_ORDER.map((section) => ({
-    section,
-    flows: MANUAL_JOURNAL_FLOWS
-      .filter((item) => (item.section ?? 'other') === section)
-      .sort((left, right) => FLOW_ORDER.indexOf(left.id) - FLOW_ORDER.indexOf(right.id)),
-  })).filter((group) => group.flows.length > 0), []);
+  const orderedFlows = useMemo(() => [...MANUAL_JOURNAL_FLOWS]
+    .sort((left, right) => FLOW_ORDER.indexOf(left.id) - FLOW_ORDER.indexOf(right.id)), []);
   const suggestions = useMemo(() => [...voiceRoutes, ...suggestedRoutes]
     .filter((route, index, routes) => routes.findIndex((candidate) => candidate.id === route.id) === index)
     .slice(0, 3).flatMap((route) => {
@@ -313,6 +313,7 @@ export function JournalComposer({
   };
   const selectFlow = (item: ManualJournalFlowDefinition) => {
     selectionHaptic();
+    if (onFlowSelect?.(item.id)) return;
     setFlow(item);
     setChoice(null);
     if (item.id !== 'went_somewhere') setLocation(null);
@@ -372,6 +373,10 @@ export function JournalComposer({
   };
   const requestClose = () => {
     if (voice.phase === 'recording') void voice.stop();
+    if (classificationReview && onKeepAsNote) {
+      onKeepAsNote();
+      return;
+    }
     if (dirty) setDiscardOpen(true);
     else onClose();
   };
@@ -441,11 +446,6 @@ export function JournalComposer({
     quickVoiceRef.current = true;
     impactHaptic();
     void voice.start();
-  };
-  const jumpToSection = (section: ManualJournalSection) => {
-    selectionHaptic();
-    setActiveSection(section);
-    scrollRef.current?.scrollTo({ y: Math.max(0, (sectionOffsets.current[section] ?? 0) - 8), animated: !reduceMotion });
   };
   const stageEntering = reduceMotion
     ? FadeIn.duration(100)
@@ -537,13 +537,13 @@ export function JournalComposer({
         <JournalHeader
           canGoBack={stage !== 'flow' || !!onBackFromInitial}
           compact={stage === 'flow'}
-          kicker={sourceType === 'photo' ? 'Review photo memory' : questFocused ? 'Quest journal' : 'Log something'}
+          kicker={sourceType === 'photo' ? 'Review photo memory' : questFocused ? 'Quest journal' : undefined}
           onBack={back}
           step={step}
-          subtitle={stage === 'flow' ? undefined : subtitle}
+          subtitle={stage === 'flow' || (classificationReview && stage === 'details') ? undefined : subtitle}
           title={title}
         />
-        {rewardNotice ? (
+        {stage !== 'flow' && rewardNotice ? (
           <Animated.View
             accessibilityLabel={`${rewardNotice.title}. ${rewardNotice.detail}`}
             entering={reduceMotion ? undefined : FadeIn.duration(180)}
@@ -561,7 +561,7 @@ export function JournalComposer({
             </View>
           </Animated.View>
         ) : null}
-        {dateTarget && onDateTargetChange ? (
+        {stage !== 'flow' && dateTarget && onDateTargetChange ? (
           <View accessibilityRole="radiogroup" style={styles.dateTargetRow}>
             {(['yesterday', 'today'] as const).map((target) => {
               const selected = dateTarget === target;
@@ -594,29 +594,47 @@ export function JournalComposer({
             <Animated.View entering={stageEntering}>
             {stage === 'flow' ? (
               <View style={styles.sections}>
-                <ScrollView
-                  horizontal
-                  contentContainerStyle={styles.sectionTabs}
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.sectionTabsFrame}>
-                  {SECTION_ORDER.map((section) => {
-                    const selected = activeSection === section;
-                    return (
-                      <Pressable
-                        key={section}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected }}
-                        onPress={() => jumpToSection(section)}
-                        style={({ pressed }) => [styles.sectionTab, selected && styles.sectionTabSelected, pressed && styles.pressed]}>
-                        {selected ? <IconSymbol name="checkmark" size={12} color={Meadow.ink} /> : null}
-                        <ThemedText style={styles.sectionTabText} lightColor={selected ? Meadow.ink : Meadow.inkSoft} darkColor={selected ? Meadow.ink : Meadow.inkSoft}>
-                          {SECTION_LABELS[section]}
-                        </ThemedText>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-                {suggestions.length ? (
+                {classificationReview ? (
+                  <View style={styles.reviewSection}>
+                    {suggestions.length ? (
+                      <View style={styles.reviewCandidates}>
+                        {suggestions.map((suggestion, index) => (
+                          <RouteSuggestionCard
+                            choice={suggestion.choice}
+                            confidence={suggestion.route.confidence}
+                            flow={suggestion.flow}
+                            key={suggestion.route.id}
+                            onPress={() => selectSuggestion(suggestion)}
+                            primary={index === 0}
+                          />
+                        ))}
+                      </View>
+                    ) : null}
+                    <View style={styles.reviewActions}>
+                      {onKeepAsNote ? (
+                        <Pressable
+                          accessibilityLabel="Keep as a general note"
+                          accessibilityRole="button"
+                          onPress={onKeepAsNote}
+                          style={({ pressed }) => [styles.reviewAction, pressed && styles.pressed]}>
+                          <IconSymbol name="square.and.pencil" size={18} color={Meadow.goldDeep} />
+                          <ThemedText style={styles.reviewActionText} lightColor={Meadow.ink} darkColor={Meadow.ink}>Keep as a general note</ThemedText>
+                        </Pressable>
+                      ) : null}
+                      {!!suggestions.length && !showAllCategories ? (
+                        <Pressable
+                          accessibilityLabel="Choose another category"
+                          accessibilityRole="button"
+                          onPress={() => setShowAllCategories(true)}
+                          style={({ pressed }) => [styles.reviewAction, pressed && styles.pressed]}>
+                          <IconSymbol name="circle.grid.2x2.fill" size={18} color={Meadow.goldDeep} />
+                          <ThemedText style={styles.reviewActionText} lightColor={Meadow.ink} darkColor={Meadow.ink}>None of these</ThemedText>
+                          <IconSymbol name="chevron.down" size={15} color={Meadow.inkSoft} />
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  </View>
+                ) : suggestions.length ? (
                   <View style={styles.section}>
                     <SectionLabel>Suggested for this note</SectionLabel>
                     <View style={styles.categoryGrid}>
@@ -628,21 +646,18 @@ export function JournalComposer({
                     </View>
                   </View>
                 ) : null}
-                {groupedFlows.map((group) => (
-                  <View
-                    key={group.section}
-                    onLayout={(event) => { sectionOffsets.current[group.section] = event.nativeEvent.layout.y; }}
-                    style={styles.section}>
-                    <SectionLabel>{SECTION_LABELS[group.section]}</SectionLabel>
-                    <View style={styles.flowList}>
-                      {group.flows.map((item, index) => (
-                        <Animated.View key={item.id} entering={reduceMotion ? undefined : FadeInRight.delay(Math.min(index * 28, 150)).duration(190)}>
-                          <FlowRow flow={item} onPress={() => selectFlow(item)} suggested={item.id === suggestedFlowId} />
-                        </Animated.View>
-                      ))}
-                    </View>
+                {(!classificationReview || !suggestions.length || showAllCategories) ? (
+                  <View style={styles.flowGrid}>
+                    {orderedFlows.map((item, index) => (
+                      <Animated.View
+                        key={item.id}
+                        entering={reduceMotion ? undefined : FadeInRight.delay(Math.min(index * 28, 150)).duration(190)}
+                        style={styles.flowTileWrap}>
+                        <FlowTile flow={item} onPress={() => selectFlow(item)} suggested={item.id === suggestedFlowId} />
+                      </Animated.View>
+                    ))}
                   </View>
-                ))}
+                ) : null}
               </View>
             ) : null}
 
@@ -871,7 +886,7 @@ export function ManualJournalSheet(props: JournalComposerProps) {
 function JournalHeader({ canGoBack, compact, kicker, onBack, step, subtitle, title }: {
   canGoBack: boolean;
   compact: boolean;
-  kicker: string;
+  kicker?: string;
   onBack: () => void;
   step: number;
   subtitle?: string;
@@ -895,7 +910,7 @@ function JournalHeader({ canGoBack, compact, kicker, onBack, step, subtitle, tit
             </View>
           ))}
         </View>
-        <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>{kicker}</ThemedText>
+        {kicker ? <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>{kicker}</ThemedText> : null}
         <ThemedText
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.35}
@@ -912,7 +927,7 @@ function JournalHeader({ canGoBack, compact, kicker, onBack, step, subtitle, tit
   );
 }
 
-function FlowRow({ flow, onPress, suggested = false }: { flow: ManualJournalFlowDefinition; onPress: () => void; suggested?: boolean }) {
+function FlowTile({ flow, onPress, suggested = false }: { flow: ManualJournalFlowDefinition; onPress: () => void; suggested?: boolean }) {
   const art = manualJournalArt(flow.id);
   return (
     <Pressable
@@ -920,12 +935,45 @@ function FlowRow({ flow, onPress, suggested = false }: { flow: ManualJournalFlow
       accessibilityLabel={flow.shortTitle ?? flow.title}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.flowRow, suggested && styles.suggestedTile, pressed && styles.rowPressed]}>
+      style={({ pressed }) => [styles.flowTile, suggested && styles.suggestedTile, pressed && styles.flowTilePressed]}>
       <View style={styles.flowIcon}>{art ? <Image source={art} style={styles.flowArt} contentFit="contain" /> : <IconSymbol name={flow.icon} size={24} color={Meadow.goldDeep} />}</View>
       <View style={styles.flowCopy}>
-        <ThemedText maxFontSizeMultiplier={1.4} style={styles.flowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{flow.shortTitle ?? flow.title}</ThemedText>
+        <ThemedText maxFontSizeMultiplier={1.4} numberOfLines={2} style={styles.flowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{flow.shortTitle ?? flow.title}</ThemedText>
         {suggested ? <ThemedText style={styles.suggestedLabel} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>AI suggestion · tap to confirm</ThemedText> : null}
-        {flow.description ? <ThemedText maxFontSizeMultiplier={1.35} style={styles.flowDescription} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{flow.description}</ThemedText> : null}
+        {flow.description ? <ThemedText maxFontSizeMultiplier={1.35} numberOfLines={2} style={styles.flowDescription} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{flow.description}</ThemedText> : null}
+      </View>
+      <View style={styles.flowChevron}><IconSymbol name="chevron.right" size={16} color={Meadow.inkSoft} /></View>
+    </Pressable>
+  );
+}
+
+function RouteSuggestionCard({ choice, confidence, flow, onPress, primary }: {
+  choice: ManualJournalChoice;
+  confidence: number;
+  flow: ManualJournalFlowDefinition;
+  onPress: () => void;
+  primary: boolean;
+}) {
+  const art = manualJournalArt(flow.id);
+  const confidenceLabel = primary
+    ? confidence >= 0.82 ? 'Best match' : 'Likely match'
+    : confidence >= 0.72 ? 'Strong alternative' : 'Possible match';
+  return (
+    <Pressable
+      accessibilityHint={`${confidenceLabel}. Opens the ${choice.label} details.`}
+      accessibilityLabel={`${flow.shortTitle ?? flow.title}, ${choice.label}`}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.routeSuggestion, primary && styles.routeSuggestionPrimary, pressed && styles.tilePressed]}>
+      <View style={[styles.routeSuggestionIcon, primary && styles.routeSuggestionIconPrimary]}>
+        {art
+          ? <Image contentFit="contain" source={art} style={primary ? styles.routeSuggestionArtPrimary : styles.routeSuggestionArt} />
+          : <IconSymbol name={choice.icon} size={primary ? 30 : 24} color={Meadow.goldDeep} />}
+      </View>
+      <View style={styles.routeSuggestionCopy}>
+        <ThemedText style={[styles.routeSuggestionConfidence, primary && styles.routeSuggestionConfidencePrimary]} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>{confidenceLabel}</ThemedText>
+        <ThemedText numberOfLines={2} style={[styles.routeSuggestionTitle, primary && styles.routeSuggestionTitlePrimary]} lightColor={Meadow.ink} darkColor={Meadow.ink}>{choice.label}</ThemedText>
+        <ThemedText style={styles.routeSuggestionPath} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{flow.shortTitle ?? flow.title}</ThemedText>
       </View>
       <IconSymbol name="chevron.right" size={18} color={Meadow.inkSoft} />
     </Pressable>
@@ -1090,21 +1138,35 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 30, paddingHorizontal: 4 },
   scrollContentFlow: { paddingHorizontal: 12 },
   sections: { gap: 22 },
-  sectionTabsFrame: { marginHorizontal: -4 },
-  sectionTabs: { gap: 8, paddingHorizontal: 4, paddingBottom: 1 },
-  sectionTab: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.32)', borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 5, minHeight: 40, paddingHorizontal: 13 },
-  sectionTabSelected: { backgroundColor: '#F1D69B', borderColor: Meadow.goldDeep, boxShadow: '-2px 3px 7px rgba(92,57,20,0.18), inset 0 1px 0 rgba(255,252,234,0.72)' },
-  sectionTabText: { fontFamily: AppFontFamilies.manrope, fontSize: 12, fontWeight: '800' },
   section: { gap: 9 },
+  reviewSection: { gap: 14 },
+  reviewCandidates: { gap: 9 },
+  routeSuggestion: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.38)', borderColor: 'rgba(122,84,44,0.16)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: '-2px 3px 7px rgba(58,38,18,0.13), inset 0 1px 0 rgba(255,248,230,0.56)', flexDirection: 'row', gap: 12, minHeight: 84, padding: 11 },
+  routeSuggestionPrimary: { backgroundColor: 'rgba(255,244,204,0.58)', borderColor: Meadow.goldDeep, borderWidth: 2, boxShadow: '-3px 5px 12px rgba(92,57,20,0.18), inset 0 1px 0 rgba(255,252,234,0.72)', minHeight: 112, padding: 13 },
+  routeSuggestionIcon: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.62)', borderColor: 'rgba(255,248,230,0.66)', borderCurve: 'continuous', borderRadius: 13, borderWidth: 1, height: 58, justifyContent: 'center', overflow: 'hidden', width: 58 },
+  routeSuggestionIconPrimary: { borderRadius: 16, height: 78, width: 78 },
+  routeSuggestionArt: { height: 54, width: 54 },
+  routeSuggestionArtPrimary: { height: 74, width: 74 },
+  routeSuggestionCopy: { flex: 1, gap: 1 },
+  routeSuggestionConfidence: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '900', letterSpacing: 0.55, textTransform: 'uppercase' },
+  routeSuggestionConfidencePrimary: { fontSize: 11 },
+  routeSuggestionTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 15, fontWeight: '800', lineHeight: 20 },
+  routeSuggestionTitlePrimary: { fontSize: 18, lineHeight: 23 },
+  routeSuggestionPath: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '600', lineHeight: 16 },
+  reviewActions: { borderColor: 'rgba(122,84,44,0.15)', borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
+  reviewAction: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.24)', borderBottomColor: 'rgba(122,84,44,0.12)', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 10, minHeight: 52, paddingHorizontal: 14 },
+  reviewActionText: { flex: 1, fontFamily: AppFontFamilies.manrope, fontSize: 13.5, fontWeight: '800', lineHeight: 18 },
   sectionLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 12, fontWeight: '800', letterSpacing: 0.2, lineHeight: 18 },
-  flowList: { gap: 7 },
-  flowRow: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.38)', borderColor: 'rgba(122,84,44,0.16)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: '-3px 4px 8px rgba(58,38,18,0.16), inset 0 1px 0 rgba(255,248,230,0.58)', flexDirection: 'row', gap: 12, minHeight: 76, paddingHorizontal: 11, paddingVertical: 9 },
-  rowPressed: { backgroundColor: 'rgba(255,244,204,0.55)', transform: [{ scale: 0.988 }] },
-  flowIcon: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.54)', borderColor: 'rgba(255,248,230,0.56)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, height: 56, justifyContent: 'center', overflow: 'hidden', width: 56 },
-  flowArt: { height: 52, width: 52 },
-  flowCopy: { flex: 1, gap: 2 },
-  flowTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 15, fontWeight: '800', lineHeight: 20 },
-  flowDescription: { fontFamily: AppFontFamilies.manrope, fontSize: 11.75, fontWeight: '600', lineHeight: 16 },
+  flowGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+  flowTileWrap: { width: '48.5%' },
+  flowTile: { alignItems: 'flex-start', backgroundColor: 'rgba(255,248,232,0.38)', borderColor: 'rgba(122,84,44,0.16)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: '-3px 4px 8px rgba(58,38,18,0.16), inset 0 1px 0 rgba(255,248,230,0.58)', flex: 1, gap: 5, minHeight: 132, padding: 10 },
+  flowTilePressed: { backgroundColor: 'rgba(255,244,204,0.55)', transform: [{ scale: 0.975 }] },
+  flowIcon: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.54)', borderColor: 'rgba(255,248,230,0.56)', borderCurve: 'continuous', borderRadius: 12, borderWidth: 1, height: 50, justifyContent: 'center', overflow: 'hidden', width: 50 },
+  flowArt: { height: 47, width: 47 },
+  flowCopy: { flex: 1, gap: 1, width: '100%' },
+  flowTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '800', lineHeight: 17 },
+  flowDescription: { fontFamily: AppFontFamilies.manrope, fontSize: 10.75, fontWeight: '600', lineHeight: 14 },
+  flowChevron: { alignItems: 'center', justifyContent: 'center', position: 'absolute', right: 8, top: 8 },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
   halfTile: { width: '48.5%' },
   fullTile: { width: '100%' },

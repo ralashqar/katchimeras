@@ -1396,6 +1396,15 @@ export type JournalSource =
 
 export type JournalSourceOrigin =
   | {
+      /** A low-friction Today conversation. Later answers upsert the same record. */
+      kind: 'guided_capture';
+      sessionId: string;
+      promptId: string;
+      answerIds: string[];
+      entryPoint?: 'today_suggestion' | 'plus' | 'vault' | 'quest' | 'egg' | 'companion' | 'photo_review' | 'note_review';
+      captureMode?: 'choice' | 'photo' | 'voice' | 'text';
+    }
+  | {
       /** A Today steps clarification promoted into the canonical journal. */
       kind: 'steps_interpretation';
     }

@@ -825,20 +825,22 @@ test('quest notes use the shared composer while guided entries retain the journa
   );
 });
 
-test('journal flows explain available and already-collected Merge Energy for the target Egg', () => {
+test('journal flows reveal Merge Energy after capture without advertising a zero reward', () => {
   const today = fs.readFileSync(
     path.join(process.cwd(), 'app', '(tabs)', 'today.tsx'),
     'utf8',
   );
-  const journal = fs.readFileSync(
-    path.join(process.cwd(), 'components', 'katchadeck', 'home', 'manual-journal-sheet.tsx'),
+  const guided = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'home', 'guided-capture-sheet.tsx'),
     'utf8',
   );
-  assert.match(today, /title: `Earn \+\$\{journalMergeReward\.totalEnergy\} Merge Energy`/);
-  assert.match(today, /title: 'Journal Energy already collected'/);
+  assert.match(today, /if \(journalMergeReward\.totalEnergy <= 0\) return undefined/);
+  assert.match(today, /title: 'Capture this'/);
+  assert.match(today, /Any Merge Energy appears after it is saved/);
+  assert.match(today, /const mergeEnergyAmount = !guidedCapture\.committed[\s\S]*guidedCapture\.handoff[\s\S]*journalMergeReward\?\.dailyJournalEnergy \?\? 0/);
+  assert.match(today, /launchJournalRewardFromBottomAfterDismiss\(\{[\s\S]*mergeEnergyAmount: guidedCapture\.mergeEnergyAmount \?\? 0/);
   assert.match(today, /feastleJournalReward\.target === 'tomorrow' \? 'Tomorrow’s' : 'Today’s'/);
-  assert.match(journal, /rewardNotice\.status === 'available' \? 'bolt\.fill' : 'checkmark'/);
-  assert.match(journal, /accessibilityLabel=\{`\$\{rewardNotice\.title\}\. \$\{rewardNotice\.detail\}`\}/);
+  assert.doesNotMatch(guided, /\+0/);
 });
 
 test('quest capture feedback is visible only to the quest and creature that started it', () => {

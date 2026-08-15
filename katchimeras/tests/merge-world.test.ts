@@ -13,7 +13,7 @@ import { mergeCellFeedbackForFailure } from '@/utils/merge-board-feedback';
 import { MERGE_MORPH_DURATION_MS, mergeSpriteMotionFrame } from '@/utils/merge-board-motion';
 import { mergeActivityRewards } from '@/utils/merge-world/activity-rewards';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
-import { MERGE_ENERGY_REGEN_CAP, MERGE_ENERGY_REGEN_MS, MERGE_INITIAL_ENERGY, MOSSPROUT_FTUE_JOURNAL_ENERGY, STEPS_PER_MERGE_ENERGY, mergeJournalRewardPreview } from '@/utils/merge-world/economy-policy';
+import { MERGE_ENERGY_REGEN_CAP, MERGE_ENERGY_REGEN_MS, MERGE_INITIAL_ENERGY, MOSSPROUT_FTUE_JOURNAL_ENERGY, STEPS_PER_MERGE_ENERGY, mergeJournalRewardPreview, mergeYesterdayStepEnergyPreview } from '@/utils/merge-world/economy-policy';
 import {
   createInitialMergeWorldState,
   mergeOrderReady,
@@ -349,6 +349,14 @@ test('step Energy checkpoints cumulative pedometer totals without paying the sam
   });
   assert.equal(duplicate.changed, false);
   assert.equal(duplicate.stepEnergyClaim?.status, 'duplicate');
+  const secondDailyConversion = reduceMergeWorld(first.state, {
+    type: 'claimStepEnergy', dayId: '2026-08-12', observedSteps: 6_300,
+    observedAt: new Date(NOW + 3).toISOString(), allowBootstrap: true, receiptId: 'steps:second-bootstrap', now: NOW + 3,
+  });
+  assert.equal(secondDailyConversion.changed, false);
+  assert.equal(secondDailyConversion.energyGranted, 0);
+  assert.equal(secondDailyConversion.stepEnergyClaim?.status, 'duplicate');
+  assert.equal(mergeYesterdayStepEnergyPreview(6_300, first.state.stepEnergyByDay['2026-08-12']), 0);
   const correctedDown = reduceMergeWorld(first.state, {
     type: 'claimStepEnergy', dayId: '2026-08-12', observedSteps: 5_500,
     observedAt: new Date(NOW + 3).toISOString(), allowBootstrap: false, receiptId: 'steps:correction', now: NOW + 3,
@@ -577,6 +585,33 @@ test('debug Today reset restores journal Energy eligibility without removing ear
   assert.equal(journalAgain.state.energy.value, energyBeforeReset + 10);
 });
 
+test('debug Today reset reopens only yesterday step conversion without taking back earned Energy', () => {
+  const initial = createInitialMergeWorldState(NOW);
+  const yesterday = reduceMergeWorld(initial, {
+    type: 'claimStepEnergy', dayId: '2026-08-11', observedSteps: 3_000,
+    observedAt: new Date(NOW - 86_400_000).toISOString(), allowBootstrap: true, receiptId: 'steps:yesterday', now: NOW + 1,
+  });
+  const older = reduceMergeWorld(yesterday.state, {
+    type: 'claimStepEnergy', dayId: '2026-08-10', observedSteps: 1_500,
+    observedAt: new Date(NOW - 2 * 86_400_000).toISOString(), allowBootstrap: true, receiptId: 'steps:older', now: NOW + 2,
+  });
+  const energyBeforeReset = older.state.energy.value;
+
+  const reset = resetMergeActivityForDay(older.state, '2026-08-12', NOW + 3, '2026-08-11');
+
+  assert.equal(reset.energy.value, energyBeforeReset);
+  assert.equal(reset.stepEnergyByDay['2026-08-11'], undefined);
+  assert.ok(reset.stepEnergyByDay['2026-08-10']);
+  assert.equal(mergeYesterdayStepEnergyPreview(3_000, reset.stepEnergyByDay['2026-08-11']), 10);
+
+  const claimedAgain = reduceMergeWorld(reset, {
+    type: 'claimStepEnergy', dayId: '2026-08-11', observedSteps: 3_000,
+    observedAt: new Date(NOW - 86_400_000).toISOString(), allowBootstrap: true, receiptId: 'steps:yesterday:dev-reset', now: NOW + 4,
+  });
+  assert.equal(claimedAgain.energyGranted, 10);
+  assert.equal(claimedAgain.state.energy.value, energyBeforeReset + 10);
+});
+
 test('earned Energy crosses the natural capacity without losing any journal reward', () => {
   const state = { ...createInitialMergeWorldState(NOW), energy: { value: 48, regenCap: 50, lastRegenAt: NOW } };
   const result = reduceMergeWorld(state, {
@@ -590,14 +625,25 @@ test('earned Energy crosses the natural capacity without losing any journal rewa
   assert.equal(later.state.energy.value, 58);
 });
 
-test('journal reward preview reports fifteen, ten, five, then zero from the same policy', () => {
+test('journal reward preview follows the diminishing capture curve with a separate companion bonus', () => {
   const ordinary = { id: 'ordinary', flowId: 'general', createdAt: '2026-08-12T09:00:00.000Z', source: { kind: 'manual', sourceId: 'ordinary' } };
+  const second = { ...ordinary, id: 'second', createdAt: '2026-08-12T09:30:00.000Z', source: { kind: 'manual', sourceId: 'second' } };
+  const third = { ...ordinary, id: 'third', createdAt: '2026-08-12T09:45:00.000Z', source: { kind: 'manual', sourceId: 'third' } };
+  const fourth = { ...ordinary, id: 'fourth', createdAt: '2026-08-12T09:50:00.000Z', source: { kind: 'manual', sourceId: 'fourth' } };
   const companion = { id: 'companion', flowId: 'general', createdAt: '2026-08-12T10:00:00.000Z', source: { kind: 'manual', sourceId: 'companion', origin: { kind: 'companion_reflection', creatureId: 'c', promptId: 'p', promptText: 'p' } } };
   const day = (journalRecords: unknown[]) => ({ id: 'day', isoDate: '2026-08-12', journalRecords }) as unknown as HomeDayRecord;
   assert.equal(mergeJournalRewardPreview([], { companion: true, now: new Date(NOW) }).totalEnergy, 15);
   assert.equal(mergeJournalRewardPreview([], { companion: false, now: new Date(NOW) }).totalEnergy, 10);
-  assert.equal(mergeJournalRewardPreview([day([ordinary])], { companion: true, now: new Date(NOW) }).totalEnergy, 5);
-  assert.equal(mergeJournalRewardPreview([day([ordinary, companion])], { companion: true, now: new Date(NOW) }).totalEnergy, 0);
+  assert.equal(mergeJournalRewardPreview([day([ordinary])], { companion: true, now: new Date(NOW) }).totalEnergy, 11);
+  assert.equal(mergeJournalRewardPreview([day([ordinary, companion])], { companion: true, now: new Date(NOW) }).totalEnergy, 3);
+  assert.equal(mergeJournalRewardPreview([day([ordinary, second, third])], { companion: false, now: new Date(NOW) }).totalEnergy, 1);
+  assert.equal(mergeJournalRewardPreview([day([ordinary, second, third, fourth])], { companion: false, now: new Date(NOW) }).totalEnergy, 0);
+  assert.deepEqual(
+    mergeActivityRewards([day([ordinary, second, third, fourth])], new Date(NOW))
+      .filter((reward) => reward.kind === 'daily_journal_energy')
+      .map((reward) => reward.amount),
+    [10, 6, 3, 1],
+  );
 });
 
 test('a Tomorrow Egg companion journal earns its own fifteen Energy immediately', () => {

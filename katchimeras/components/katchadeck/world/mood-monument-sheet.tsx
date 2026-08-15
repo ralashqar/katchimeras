@@ -7,17 +7,12 @@ import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { KatchaSurfacePalette } from '@/constants/katcha-ui';
 import { Meadow } from '@/constants/meadow-theme';
+import { MOOD_ART } from '@/constants/wellbeing-selection-art';
 import type { HomeDayRecord } from '@/types/home';
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 
 // Generated 3D mood faces (FAL grid, style-anchored to the mood chip smiley).
-export const MOOD_ART: Record<string, number> = {
-  radiant: require('@/assets/images/katchimeras/today-icons/moods/radiant.webp'),
-  light: require('@/assets/images/katchimeras/today-icons/moods/light.webp'),
-  meh: require('@/assets/images/katchimeras/today-icons/moods/meh.webp'),
-  heavy: require('@/assets/images/katchimeras/today-icons/moods/heavy.webp'),
-  stormy: require('@/assets/images/katchimeras/today-icons/moods/stormy.webp'),
-};
+export { MOOD_ART };
 const PARCHMENT = KatchaSurfacePalette.parchment;
 
 export type MoodMonumentChoiceId = 'energized' | 'good' | 'meh' | 'drained' | 'stressed';

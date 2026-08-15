@@ -209,8 +209,17 @@ export function readyMergeOrderIds(state: MergeWorldState): Set<string> {
     .map((order) => order.id));
 }
 
-/** Clears only the idempotency records that cap real-life Energy for one day. */
-export function resetMergeActivityForDay(state: MergeWorldState, dayId: string, now = Date.now()): MergeWorldState {
+/**
+ * Clears only the idempotency records that cap real-life Energy for one day.
+ * Debug Today reset may also reopen the preceding source day's one-time Steps
+ * conversion without taking back Energy that was already awarded.
+ */
+export function resetMergeActivityForDay(
+  state: MergeWorldState,
+  dayId: string,
+  now = Date.now(),
+  stepEnergyDayId?: string,
+): MergeWorldState {
   const receiptIds = new Set([
     `activity:egg-journal:${dayId}`,
     `activity:egg-companion:${dayId}`,
@@ -224,8 +233,11 @@ export function resetMergeActivityForDay(state: MergeWorldState, dayId: string, 
   const activityEnergyByDay = { ...state.activityEnergyByDay };
   const hadDailyTotal = Object.prototype.hasOwnProperty.call(activityEnergyByDay, dayId);
   delete activityEnergyByDay[dayId];
-  if (!hadDailyTotal && processedActivityReceiptIds.length === state.processedActivityReceiptIds.length && arrivals.length === state.arrivals.length) return state;
-  return touch({ ...state, processedActivityReceiptIds, activityEnergyByDay, arrivals }, now);
+  const stepEnergyByDay = { ...state.stepEnergyByDay };
+  const hadStepClaim = Boolean(stepEnergyDayId && Object.prototype.hasOwnProperty.call(stepEnergyByDay, stepEnergyDayId));
+  if (stepEnergyDayId) delete stepEnergyByDay[stepEnergyDayId];
+  if (!hadDailyTotal && !hadStepClaim && processedActivityReceiptIds.length === state.processedActivityReceiptIds.length && arrivals.length === state.arrivals.length) return state;
+  return touch({ ...state, processedActivityReceiptIds, activityEnergyByDay, stepEnergyByDay, arrivals }, now);
 }
 
 export function normalizeMergeWorldState(value: unknown, now = Date.now()): MergeWorldState {
@@ -689,7 +701,7 @@ function claimStepEnergy(
 ): MergeWorldCommandResult {
   const observedSteps = Math.max(0, Math.floor(command.observedSteps));
   const existing = state.stepEnergyByDay[command.dayId];
-  if (existing?.receiptIds.includes(command.receiptId)) {
+  if (existing?.receiptIds.includes(command.receiptId) || (existing?.bootstrapClaimed && command.allowBootstrap)) {
     return {
       state,
       changed: false,

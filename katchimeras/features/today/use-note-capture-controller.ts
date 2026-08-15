@@ -17,6 +17,7 @@ type UseNoteCaptureControllerParams = {
   startEggFeed: (from: FeedSourceRect, payload: { label?: string; photoUri?: string }, commit: () => void) => void;
   pulseEgg: () => void;
   setMicrocopy: (message: string | null) => void;
+  requiresJournalReview?: boolean;
 };
 
 export function useNoteCaptureController({
@@ -28,6 +29,7 @@ export function useNoteCaptureController({
   pulseEgg,
   setMicrocopy,
   allowRemote = false,
+  requiresJournalReview = false,
 }: UseNoteCaptureControllerParams) {
   const [quickNoteOpen, setQuickNoteOpen] = useState(false);
   const [pendingJournalNote, setPendingJournalNote] = useState<(NoteInput & { captureId: string }) | null>(null);
@@ -36,41 +38,58 @@ export function useNoteCaptureController({
     async (text: string) => {
       const interpreted = await interpretNote({ text }, { allowRemote });
       setQuickNoteOpen(false);
-      setPendingJournalNote({
-            captureId: `note-${Date.now().toString(36)}`,
-            kind: 'text',
-            text: interpreted.transcript || text,
-            audioUri: null,
-            durationMs: null,
-            archetype: interpreted.archetype,
-            label: interpreted.label,
-            bigMoment: interpreted.bigMoment,
-            media: interpreted.media,
-            food: interpreted.food,
-            llmClassified: interpreted.llmClassified,
-            intelligenceProvider: interpreted.intelligenceProvider,
-            journalClassification: interpreted.journalClassification,
-            journalRoutes: interpreted.journalRoutes,
-            suggestedJournalFlowId: interpreted.suggestedJournalFlowId,
-            topLevelConfidence: interpreted.topLevelConfidence,
-            subcategoryConfidence: interpreted.subcategoryConfidence,
+      const note = {
+        captureId: `note-${Date.now().toString(36)}`,
+        kind: 'text' as const,
+        text: interpreted.transcript || text,
+        audioUri: null,
+        durationMs: null,
+        archetype: interpreted.archetype,
+        label: interpreted.label,
+        bigMoment: interpreted.bigMoment,
+        media: interpreted.media,
+        food: interpreted.food,
+        llmClassified: interpreted.llmClassified,
+        intelligenceProvider: interpreted.intelligenceProvider,
+        journalClassification: interpreted.journalClassification,
+        journalRoutes: interpreted.journalRoutes,
+        suggestedJournalFlowId: interpreted.suggestedJournalFlowId,
+        topLevelConfidence: interpreted.topLevelConfidence,
+        subcategoryConfidence: interpreted.subcategoryConfidence,
+      };
+      if (requiresJournalReview || needsFoundationRouteReview(note)) {
+        setPendingJournalNote(note);
+        return;
+      }
+      const from: FeedSourceRect = { x: windowWidth / 2 - 27, y: windowHeight - 190, w: 54, h: 54 };
+      startEggFeed(from, { label: interpreted.label }, () => {
+        addNote(note, formingTarget);
+        pulseEgg();
+        setMicrocopy('The Egg kept your note');
       });
     },
-    [addNote, allowRemote, formingTarget, pulseEgg, setMicrocopy, startEggFeed, windowHeight, windowWidth]
+    [addNote, allowRemote, formingTarget, pulseEgg, requiresJournalReview, setMicrocopy, startEggFeed, windowHeight, windowWidth]
   );
 
   const voiceNote = useInlineVoiceNote({
     allowRemote,
     saveNote: (note) => {
       setQuickNoteOpen(false);
-      setPendingJournalNote({ ...note, captureId: `note-${Date.now().toString(36)}` });
+      const captured = { ...note, captureId: `note-${Date.now().toString(36)}` };
+      if (requiresJournalReview || needsFoundationRouteReview(captured)) setPendingJournalNote(captured);
+      else {
+        addNote(captured, formingTarget);
+        pulseEgg();
+      }
     },
     onAnalyzing: () => {
       const from: FeedSourceRect = { x: windowWidth / 2 + 40, y: windowHeight - 260, w: 60, h: 60 };
       startEggFeed(from, { label: 'mic' }, () => {});
     },
     onSaved: (interpreted) => {
-      setMicrocopy(`${interpreted.label} is ready to review`);
+      setMicrocopy(requiresJournalReview || needsFoundationRouteReview(interpreted)
+        ? `${interpreted.label} is ready to review`
+        : 'The Egg kept your voice note');
     },
   });
 
@@ -82,4 +101,14 @@ export function useNoteCaptureController({
     pendingJournalNote,
     clearPendingJournalNote: () => setPendingJournalNote(null),
   };
+}
+
+function needsFoundationRouteReview(note: {
+  intelligenceProvider?: unknown;
+  journalRoutes?: unknown;
+  suggestedJournalFlowId?: unknown;
+}): boolean {
+  return note.intelligenceProvider === 'appleFoundation'
+    && ((Array.isArray(note.journalRoutes) && note.journalRoutes.length > 0)
+      || typeof note.suggestedJournalFlowId === 'string');
 }

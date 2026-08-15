@@ -4,7 +4,7 @@ import { interpretNoteText, type NoteArchetype } from '@/utils/note-meaning';
 import type { JournalNoteClassification, JournalRouteProposal, StudioMediaType } from '@/types/home';
 import {
   classificationForResolvedRoute,
-  journalRouteForKey,
+  foundationAtomicRoutes,
   type FoundationAtomicRouteRead,
 } from '@/utils/journal-routing';
 import {
@@ -135,13 +135,10 @@ export async function interpretNoteOnDevice(transcript: string): Promise<OnDevic
     const retryRaw = routeRun.raw;
     const retryDurationMs = routeRun.durationMs;
     const retryFailure = routeRun.failure;
-    const journalRoutes = retryRaw?.routeKey
-      ? [journalRouteForKey(
-          String(retryRaw.routeKey),
-          confidenceValue(routeRun.subcategoryConfidence),
-          `Apple Foundation selected this category with ${routeRun.subcategoryConfidence ?? 'unknown'} confidence`
-        )].filter((route): route is JournalRouteProposal => !!route)
-      : [];
+    const journalRoutes = foundationAtomicRoutes(
+      retryRaw,
+      'Apple Foundation ranked this category for review'
+    );
     const selected = routeRun.subcategoryConfidence === 'high' ? journalRoutes[0] ?? null : null;
 
     // Enrichment cannot independently turn a note into media or food. Only
@@ -229,12 +226,6 @@ export async function interpretNoteOnDevice(transcript: string): Promise<OnDevic
 async function classifyNoteRouteOnDevice(transcript: string, timeoutMs: number): Promise<FoundationRouteRun> {
   if (!nativeFoundation?.generateStructuredAsync) return emptyFoundationRouteRun(0, 'error');
   return runAtomicFoundationRoute(transcript, timeoutMs, runStructuredNoteTask);
-}
-
-function confidenceValue(value: FoundationConfidenceLevel | null): number {
-  if (value === 'high') return 0.95;
-  if (value === 'medium') return 0.6;
-  return 0.35;
 }
 
 async function runStructuredNoteTask(

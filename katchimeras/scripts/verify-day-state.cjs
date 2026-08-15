@@ -24,7 +24,7 @@ function check(label, condition, detail) {
 const HATCH_HOUR = 21;
 function todayState(over = {}) {
   return resolveDayLifecycleState({
-    hasCreature: false, storedState: 'forming', hasShape: true,
+    hasCreature: false, storedState: 'forming',
     isSameDay: true, hour: 12, hatchHour: HATCH_HOUR, ...over,
   });
 }
@@ -43,19 +43,18 @@ check('today honors a ready flag once the hatch hour passes',
   todayState({ storedState: 'ready_to_hatch', hour: 22 }) === 'ready_to_hatch');
 
 // === Past days stay hatchable on demand =====================================
-check('a past day with shape is ready', resolveDayLifecycleState({ hasCreature: false, storedState: 'forming', hasShape: true, isSameDay: false, hour: 9, hatchHour: HATCH_HOUR }) === 'ready_to_hatch');
-check('a past day stored ready stays ready (any hour)', resolveDayLifecycleState({ hasCreature: false, storedState: 'ready_to_hatch', hasShape: true, isSameDay: false, hour: 3, hatchHour: HATCH_HOUR }) === 'ready_to_hatch');
+check('a past day is ready even with low context', resolveDayLifecycleState({ hasCreature: false, storedState: 'forming', isSameDay: false, hour: 9, hatchHour: HATCH_HOUR }) === 'ready_to_hatch');
+check('a past day stored ready stays ready (any hour)', resolveDayLifecycleState({ hasCreature: false, storedState: 'ready_to_hatch', isSameDay: false, hour: 3, hatchHour: HATCH_HOUR }) === 'ready_to_hatch');
 
 // === Other invariants =======================================================
-check('a hatched day is hatched', resolveDayLifecycleState({ hasCreature: true, storedState: 'hatched', hasShape: true, isSameDay: true, hour: 23, hatchHour: HATCH_HOUR }) === 'hatched');
-check('an empty today (no shape) is forming', todayState({ hasShape: false, hour: 23 }) === 'forming', todayState({ hasShape: false, hour: 23 }));
-check('an empty past day (no shape) is forming', resolveDayLifecycleState({ hasCreature: false, storedState: 'forming', hasShape: false, isSameDay: false, hour: 23, hatchHour: HATCH_HOUR }) === 'forming');
+check('a hatched day is hatched', resolveDayLifecycleState({ hasCreature: true, storedState: 'hatched', isSameDay: true, hour: 23, hatchHour: HATCH_HOUR }) === 'hatched');
+check('a zero-context today still becomes ready at hatch time', todayState({ hour: 23 }) === 'ready_to_hatch', todayState({ hour: 23 }));
 
 // === Cross-midnight scenario (the open-app case) ============================
 // At 00:30 the calendar has advanced: yesterday (now a past day) stored ready
 // stays ready; a freshly-created today with no shape is forming.
-check('cross-midnight: yesterday stays ready', resolveDayLifecycleState({ hasCreature: false, storedState: 'ready_to_hatch', hasShape: true, isSameDay: false, hour: 0, hatchHour: HATCH_HOUR }) === 'ready_to_hatch');
-check('cross-midnight: new today is forming', todayState({ hasShape: false, hour: 0 }) === 'forming');
+check('cross-midnight: yesterday stays ready', resolveDayLifecycleState({ hasCreature: false, storedState: 'ready_to_hatch', isSameDay: false, hour: 0, hatchHour: HATCH_HOUR }) === 'ready_to_hatch');
+check('cross-midnight: new today is forming', todayState({ hour: 0 }) === 'forming');
 
 console.log(failures === 0 ? '\nAll day-state checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

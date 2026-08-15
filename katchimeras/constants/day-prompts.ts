@@ -83,6 +83,7 @@ export const dayPromptRegistry: Record<DayPromptKind, DayPromptDefinition> = {
     dayparts: ['midday', 'evening'],
     maxOptions: 10,
     launchEnabled: true,
+    aboutTodayEnabled: true,
     options: [
       {
         id: 'family',
@@ -120,6 +121,7 @@ export const dayPromptRegistry: Record<DayPromptKind, DayPromptDefinition> = {
     dayparts: ['midday', 'evening'],
     maxOptions: 7,
     launchEnabled: true,
+    aboutTodayEnabled: true,
     options: [
       { id: 'movie', label: 'Movie / TV', emoji: 'Movie', icon: 'film.fill', semanticTags: ['hobby:movie'], scoreBias: { calm: 0.12, social: 0.06 }, encounterSeedBias: [{ seedId: 'cinema', intensity: 0.42 }] },
       { id: 'reading', label: 'Reading', emoji: 'Reading', icon: 'book.fill', semanticTags: ['hobby:reading'], scoreBias: { calm: 0.16, focus: 0.1 }, encounterSeedBias: [{ seedId: 'bookstore', intensity: 0.36 }] },
@@ -137,6 +139,7 @@ export const dayPromptRegistry: Record<DayPromptKind, DayPromptDefinition> = {
     dayparts: ['midday', 'evening'],
     maxOptions: 6,
     launchEnabled: true,
+    aboutTodayEnabled: true,
     options: [
       { id: 'just_me', label: 'Just me', emoji: 'Solo', icon: 'moon.stars.fill', semanticTags: ['people:solo'], scoreBias: { calm: 0.12, focus: 0.06 } },
       {
@@ -316,10 +319,13 @@ export const dayPromptRegistry: Record<DayPromptKind, DayPromptDefinition> = {
   ] },
 };
 
-export const ABOUT_TODAY_MAX_PER_DAY = 2;
 export const aboutTodayPromptKinds = Object.values(dayPromptRegistry)
   .filter((prompt) => prompt.aboutTodayEnabled)
   .map((prompt) => prompt.id);
+// These are optional rotating conversation starters, not a quota. Keeping the
+// full distinct pool available lets each completed or skipped card reveal a
+// fresh one instead of making the action list finish after two answers.
+export const ABOUT_TODAY_MAX_PER_DAY = aboutTodayPromptKinds.length;
 const ABOUT_TODAY_KIND_SET = new Set<DayPromptKind>(aboutTodayPromptKinds);
 const REFLECTIVE_KIND_SET = new Set<DayPromptKind>([
   'feeling', 'inner_weather', 'meaning', 'gratitude', 'highlight', 'intention', ...aboutTodayPromptKinds,

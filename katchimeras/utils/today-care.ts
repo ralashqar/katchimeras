@@ -94,8 +94,7 @@ export type TodayCarePhotoRollSuggestion = {
 };
 
 const ALL_DAY: TodayCareTimeBucket[] = ['morning', 'midday', 'afternoon', 'evening'];
-const AFTER_MORNING: TodayCareTimeBucket[] = ['midday', 'afternoon', 'evening'];
-const CATEGORY_SPECIFIC_COMPLETION_KEYS = new Set(['place', 'movement', 'food', 'studio', 'people', 'work']);
+const CATEGORY_SPECIFIC_COMPLETION_KEYS = new Set(['place', 'movement', 'food', 'studio', 'people', 'work', 'event']);
 
 const CARE_CATALOG: TodayCareActionDefinition[] = [
   action({
@@ -109,7 +108,7 @@ const CARE_CATALOG: TodayCareActionDefinition[] = [
     destination: { kind: 'inline_sleep' }, growthSource: 'sleep', priority: 98, eligibleTimeOfDay: ALL_DAY,
   }),
   action({
-    id: 'journal', title: "Write in today's journal", description: 'Write a full journal entry in your own words.',
+    id: 'journal', title: 'What stood out today?', description: 'Choose one little piece of your day.',
     icon: 'square.and.pencil', artKey: 'journal', category: 'memory', completionKey: 'journal', completionMode: 'artifact',
     destination: { kind: 'quick_category', category: 'manual_journal' }, growthSource: 'journal', priority: 94,
     eligibleTimeOfDay: ALL_DAY, journalFocused: true,
@@ -127,25 +126,25 @@ const CARE_CATALOG: TodayCareActionDefinition[] = [
     eligibleTimeOfDay: ALL_DAY, journalFocused: true,
   }),
   action({
-    id: 'place', title: 'Add a place you visited', description: 'Journal where you went and what happened.',
+    id: 'place', title: 'Mark a place from today', description: 'Choose where today took you.',
     icon: 'mappin.and.ellipse', artKey: 'place', category: 'memory', completionKey: 'place', completionMode: 'artifact',
     destination: { kind: 'quick_category', category: 'place' }, growthSource: 'place', priority: 76,
-    eligibleTimeOfDay: AFTER_MORNING, journalFocused: true,
+    eligibleTimeOfDay: ALL_DAY, journalFocused: true,
   }),
   action({
-    id: 'movement', title: 'Journal how you moved', description: 'Record a walk, workout, or journey.',
+    id: 'movement', title: 'What was all that movement?', description: 'Give the Egg the story behind your steps.',
     icon: 'figure.walk', artKey: 'movement', category: 'memory', completionKey: 'movement', completionMode: 'artifact',
     destination: { kind: 'quick_category', category: 'movement' }, growthSource: 'movement', priority: 76,
-    eligibleTimeOfDay: AFTER_MORNING, journalFocused: true,
+    eligibleTimeOfDay: ALL_DAY, journalFocused: true,
   }),
   action({
-    id: 'food', title: 'Journal a meal or drink', description: 'Record something you ate or drank today.',
+    id: 'food', title: 'What was worth remembering?', description: 'Choose a meal, snack, treat, drink, or something you made.',
     icon: 'fork.knife', artKey: 'food', category: 'memory', completionKey: 'food', completionMode: 'artifact',
     destination: { kind: 'quick_category', category: 'food' }, growthSource: 'journal', priority: 76,
-    eligibleTimeOfDay: ['midday', 'evening'], journalFocused: true,
+    eligibleTimeOfDay: ALL_DAY, journalFocused: true,
   }),
   action({
-    id: 'studio', title: 'Keep something that inspired you', description: 'Record something you watched, read, played, or made.',
+    id: 'studio', title: 'What stayed with you today?', description: 'A book, film, song, game, artwork, or idea.',
     icon: 'books.vertical.fill', artKey: 'studio', category: 'memory', completionKey: 'studio', completionMode: 'artifact',
     destination: { kind: 'quick_category', category: 'studio' }, growthSource: 'journal', priority: 76,
     eligibleTimeOfDay: ALL_DAY, journalFocused: true,
@@ -157,9 +156,15 @@ const CARE_CATALOG: TodayCareActionDefinition[] = [
     eligibleTimeOfDay: ALL_DAY, journalFocused: true,
   }),
   action({
-    id: 'work', title: 'Record what you worked on', description: 'Keep a piece of progress, effort, study, or making.',
+    id: 'work', title: 'What kind of progress happened?', description: 'Work, learning, making, or life stuff all count.',
     icon: 'briefcase.fill', artKey: 'work', category: 'memory', completionKey: 'work', completionMode: 'artifact',
     destination: { kind: 'quick_category', category: 'work' }, growthSource: 'journal', priority: 76,
+    eligibleTimeOfDay: ALL_DAY, journalFocused: true,
+  }),
+  action({
+    id: 'big_event', title: 'Did today hold a bigger moment?', description: 'Keep a celebration, first, achievement, trip, or change.',
+    icon: 'star.fill', artKey: 'event', category: 'memory', completionKey: 'event', completionMode: 'artifact',
+    destination: { kind: 'quick_category', category: 'life_event' }, growthSource: 'journal', priority: 72,
     eligibleTimeOfDay: ALL_DAY, journalFocused: true,
   }),
 ];
@@ -205,7 +210,7 @@ export function rankTodayCareActions(input: {
       destination: { kind: 'reflection', promptId: kind },
       growthSource: 'reflection',
       priority: 96,
-      eligibleTimeOfDay: AFTER_MORNING,
+      eligibleTimeOfDay: ALL_DAY,
       journalFocused: true,
     });
     candidates.push(ranked(definition, input.day.isoDate, 'system', isDefinitionAlreadySatisfied(definition.id, input.day)));
@@ -492,6 +497,10 @@ function isDefinitionAlreadySatisfied(id: string, day: StoredHomeDayRecord): boo
   if (id === 'place') return Boolean(day.confirmedPlaces?.length || hasJournalFlow(day, 'went_somewhere'));
   if (id === 'movement') return Boolean(day.stepsInterpretation || day.stepsCount >= 1000 || hasJournalFlow(day, 'movement'));
   if (id === 'food') return Boolean(day.foodMoments?.length || hasJournalFlow(day, 'food'));
+  if (id === 'studio') return hasJournalFlow(day, 'studio');
+  if (id === 'people') return hasJournalFlow(day, 'people');
+  if (id === 'work') return hasJournalFlow(day, 'work');
+  if (id === 'big_event') return hasJournalFlow(day, 'big_event');
   if (id.startsWith('about_today:')) {
     const kind = id.slice('about_today:'.length) as DayPromptKind;
     return day.promptAnswers.some((answer) => answer.kind === kind && !answer.dismissed);

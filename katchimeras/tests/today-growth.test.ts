@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { StoredHomeDayRecord } from '../types/home';
-import { dayPromptRegistry } from '../constants/day-prompts';
+import { aboutTodayPromptKinds, dayPromptRegistry } from '../constants/day-prompts';
 import {
   activeGrowthEnergy,
   awardGrowth,
@@ -50,18 +50,30 @@ function day(overrides: Partial<StoredHomeDayRecord> = {}): StoredHomeDayRecord 
   };
 }
 
-test('accelerated hatch readiness respects seconds instead of waiting for the next minute', () => {
+test('hatch readiness follows the exact chosen ritual time', () => {
   assert.equal(resolveDayLifecycleState({
-    earlyHatchMinutes: 29.5,
     hasCreature: false,
-    hasShape: true,
     hatchHour: 18,
-    hour: 17,
+    hour: 18,
     isSameDay: true,
-    minute: 30,
-    second: 31,
+    minute: 0,
+    second: 0,
     storedState: 'forming',
   }), 'ready_to_hatch');
+});
+
+test('a day with no captured context still becomes hatchable at the chosen ritual time', () => {
+  const base = {
+    hasCreature: false,
+    hatchHour: 20,
+    isSameDay: true,
+    minute: 0,
+    second: 0,
+    storedState: 'forming' as const,
+  };
+  assert.equal(resolveDayLifecycleState({ ...base, hour: 19 }), 'forming');
+  assert.equal(resolveDayLifecycleState({ ...base, hour: 20 }), 'ready_to_hatch');
+  assert.equal(resolveDayLifecycleState({ ...base, hour: 8, isSameDay: false }), 'ready_to_hatch');
 });
 
 function afterCareCheckIns(record: StoredHomeDayRecord = day()): StoredHomeDayRecord {
@@ -178,7 +190,7 @@ test('One meaningful memory activates incubation even after the scheduled hatch 
   assert.equal(activated.isReady, true);
 });
 
-test('Daily seed Energy does not satisfy the action activation gate', () => {
+test('A low-context day still reaches its scheduled hatch without satisfying the action activation gate', () => {
   let seeded = awardGrowth(day(), {
     source: 'daily_seed', sourceId: 'seed', awardedAt: new Date(2026, 7, 5, 7, 0),
   }).day;
@@ -189,10 +201,12 @@ test('Daily seed Energy does not satisfy the action activation gate', () => {
   assert.equal(summary.activeEnergy, 10);
   assert.equal(summary.qualifyingActionCount, 1);
   assert.equal(summary.isActivated, false);
-  assert.equal(summary.isReady, false);
+  assert.equal(summary.isReady, true);
+  assert.equal(summary.contextState, 'stirring');
+  assert.equal(summary.contextBand, 'low');
 });
 
-test('One hundred Energy preserves a seventy-percent time floor', () => {
+test('A full-context Egg preserves the scheduled hatch ritual', () => {
   let growingDay = awardGrowth(day(), {
     source: 'journal', sourceId: 'entry-1', amount: 40, awardedAt: new Date(2026, 7, 5, 8, 0),
   }).day;
@@ -203,11 +217,14 @@ test('One hundred Energy preserves a seventy-percent time floor', () => {
   const normalDuration = new Date(2026, 7, 5, 20, 0).getTime() - new Date(2026, 7, 5, 8, 0).getTime();
   const effectiveDuration = summary.effectiveHatchAt.getTime() - summary.incubationStartedAt!.getTime();
   assert.equal(summary.activeEnergy, TODAY_ENERGY_TARGET);
-  assert.ok(Math.abs(effectiveDuration - normalDuration * 0.7) < 1);
-  assert.ok(Math.abs(summary.savedMinutes - normalDuration * 0.3 / 60_000) < 0.001);
+  assert.equal(effectiveDuration, normalDuration);
+  assert.equal(summary.savedMinutes, 0);
+  assert.equal(summary.contextState, 'ready');
+  assert.equal(summary.contextBand, 'full');
+  assert.equal(summary.isContextFull, true);
 });
 
-test('Energy accelerates incubation linearly and caps timing at the target', () => {
+test('Egg context changes richness without changing the scheduled hatch time', () => {
   const makeGrowthDay = (energy: number) => day({
     growth: {
       schemaVersion: 1,
@@ -221,11 +238,13 @@ test('Energy accelerates incubation linearly and caps timing at the target', () 
   const fifty = todayGrowthSummary(makeGrowthDay(50), 20, new Date(2026, 7, 5, 12, 0));
   const hundred = todayGrowthSummary(makeGrowthDay(100), 20, new Date(2026, 7, 5, 12, 0));
   const overflow = todayGrowthSummary(makeGrowthDay(140), 20, new Date(2026, 7, 5, 12, 0));
-  assert.ok(hundred.effectiveHatchAt.getTime() < fifty.effectiveHatchAt.getTime());
+  assert.equal(hundred.effectiveHatchAt.getTime(), fifty.effectiveHatchAt.getTime());
   assert.equal(overflow.activeEnergy, 140);
   assert.equal(overflow.energyRatio, 1);
   assert.equal(overflow.effectiveHatchAt.getTime(), hundred.effectiveHatchAt.getTime());
-  assert.ok(hundred.progress > fifty.progress);
+  assert.equal(fifty.contextBand, 'medium');
+  assert.equal(hundred.contextBand, 'full');
+  assert.equal(overflow.contextBand, 'full');
 });
 
 test('Tomorrow can grow before rollover without starting its incubation clock early', () => {
@@ -803,7 +822,7 @@ test('Two supported lightweight actions activate incubation', () => {
   assert.equal(summary.incubationStartedAt?.getTime(), new Date(2026, 7, 5, 8, 5).getTime());
 });
 
-test('About Today rotates one stable prompt at a time and stops after two answers', () => {
+test('About Today rotates one stable one-tap prompt at a time through the full pool', () => {
   const base = afterCareCheckIns();
   const now = new Date(2026, 7, 5, 13, 0);
   const first = rankTodayCareActions({ day: base, now });
@@ -836,7 +855,70 @@ test('About Today rotates one stable prompt at a time and stops after two answer
     }],
   };
   const finished = rankTodayCareActions({ day: afterSecond, now });
-  assert.equal(finished.active.some((action) => action.id.startsWith('about_today:')), false);
+  assert.equal(finished.active.filter((action) => action.id.startsWith('about_today:')).length, 1);
+
+  const allAnswered = {
+    ...base,
+    promptAnswers: [
+      ...base.promptAnswers,
+      ...aboutTodayPromptKinds.map((kind, index) => {
+        const option = dayPromptRegistry[kind].options[0]!;
+        return {
+          id: `about-all-${index}`,
+          kind,
+          choiceIds: [option.id],
+          labels: [option.label],
+          createdAt: `2026-08-05T13:${String(index).padStart(2, '0')}:00.000Z`,
+          source: 'prompt_chip' as const,
+          semanticTags: option.semanticTags,
+          scoreBias: option.scoreBias,
+          encounterSeedBias: option.encounterSeedBias,
+        };
+      }),
+    ],
+  };
+  const exhausted = rankTodayCareActions({ day: allAnswered, now });
+  assert.equal(exhausted.active.some((action) => action.id.startsWith('about_today:')), false);
+});
+
+test('cycling the late-night action list reaches every journal category and every bespoke prompt', () => {
+  let current = afterCareCheckIns();
+  const categories = new Set<string>();
+  const bespokePrompts = new Set<string>();
+
+  for (let cycle = 0; cycle < 12; cycle += 1) {
+    const ranked = rankTodayCareActions({ day: current, now: new Date(2026, 7, 6, 1, cycle), rotatingLimit: 3 });
+    const actions = ranked.active.filter((action) => action.category !== 'check_in');
+    if (!actions.length) break;
+    for (const action of actions) {
+      if (['place', 'movement', 'food', 'studio', 'people', 'work', 'event'].includes(action.completionKey)) {
+        categories.add(action.completionKey);
+      }
+      if (action.id.startsWith('about_today:')) bespokePrompts.add(action.id.slice('about_today:'.length));
+    }
+    const timestamp = `2026-08-06T01:${String(cycle).padStart(2, '0')}:00.000Z`;
+    current = {
+      ...current,
+      growth: {
+        schemaVersion: 1,
+        events: current.growth?.events ?? [],
+        careActions: [
+          ...(current.growth?.careActions ?? []),
+          ...actions.map((action) => ({
+            instanceId: action.instanceId,
+            definitionId: action.id,
+            sourceId: action.sourceId ?? null,
+            status: 'not_today' as const,
+            dismissedAt: timestamp,
+            updatedAt: timestamp,
+          })),
+        ],
+      },
+    };
+  }
+
+  assert.deepEqual(categories, new Set(['place', 'movement', 'food', 'studio', 'people', 'work', 'event']));
+  assert.deepEqual(bespokePrompts, new Set(aboutTodayPromptKinds));
 });
 
 test('About Today options carry hatch trait signal and produce distinct reflection rewards', () => {

@@ -18,7 +18,9 @@ export function withManualJournalEntry(day: StoredHomeDayRecord, submission: Man
 export function commitJournalRecord(day: StoredHomeDayRecord, command: JournalCommitCommand, now: Date): StoredHomeDayRecord {
   const existing = day.journalRecords?.find((item) => item.idempotencyKey === command.idempotencyKey) ?? null;
   const origin = command.draft.source.origin ?? null;
-  const replaceable = origin?.kind === 'companion_reflection' || origin?.kind === 'steps_interpretation';
+  const replaceable = origin?.kind === 'companion_reflection'
+    || origin?.kind === 'steps_interpretation'
+    || origin?.kind === 'guided_capture';
   if (existing && !replaceable) return day;
   const record = commandToJournalRecord(command, now);
   if (!record) return day;

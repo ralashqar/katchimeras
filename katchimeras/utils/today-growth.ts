@@ -1,5 +1,6 @@
 import type {
   DayGrowthState,
+  JournalRecord,
   StoredHomeDayRecord,
   TodayCareActionState,
   TodayGrowthEvent,
@@ -63,6 +64,9 @@ export type TodayGrowthSummary = {
   progress: number;
   stage: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   isReady: boolean;
+  contextState: 'fresh' | 'stirring' | 'taking_shape' | 'full_of_memories' | 'ready';
+  contextBand: 'low' | 'medium' | 'full';
+  isContextFull: boolean;
 };
 
 export type PendingGrowthAward = {
@@ -104,13 +108,22 @@ export function awardGrowth(
   const growth = normalizeDayGrowthState(day.growth);
   const id = growthEventId(input.source, input.sourceId);
   const existing = growth.events.find((event) => event.id === id);
-  if (existing) return { day, event: existing, awarded: false };
+  const requestedAmount = Math.max(0, Math.round(input.amount ?? TODAY_GROWTH_REWARDS[input.source]));
+  if (existing) {
+    if (requestedAmount <= existing.amount) return { day, event: existing, awarded: false };
+    const event = { ...existing, amount: requestedAmount, awardedAt: (input.awardedAt ?? new Date()).toISOString() };
+    return {
+      day: { ...day, growth: { ...growth, events: growth.events.map((item) => item.id === id ? event : item) } },
+      event,
+      awarded: true,
+    };
+  }
   const event: TodayGrowthEvent = {
     id,
     source: input.source,
     sourceId: input.sourceId,
     actionId: input.actionId ?? null,
-    amount: Math.max(0, Math.round(input.amount ?? TODAY_GROWTH_REWARDS[input.source])),
+    amount: requestedAmount,
     awardedAt: (input.awardedAt ?? new Date()).toISOString(),
   };
   return {
@@ -196,11 +209,12 @@ export function todayGrowthActivation(day: Pick<StoredHomeDayRecord, 'growth'>):
 /** Reconciles successful day artifacts into reward receipts without coupling every capture sheet to Growth. */
 export function pendingGrowthAwards(day: StoredHomeDayRecord): PendingGrowthAward[] {
   const awards: PendingGrowthAward[] = [];
-  const seen = new Set(normalizeDayGrowthState(day.growth).events.map((event) => event.id));
+  const existingAmounts = new Map(normalizeDayGrowthState(day.growth).events.map((event) => [event.id, event.amount]));
   const push = (award: PendingGrowthAward) => {
     const id = growthEventId(award.source, award.sourceId);
-    if (seen.has(id)) return;
-    seen.add(id);
+    const desiredAmount = award.amount ?? TODAY_GROWTH_REWARDS[award.source];
+    if ((existingAmounts.get(id) ?? -1) >= desiredAmount) return;
+    existingAmounts.set(id, desiredAmount);
     awards.push(award);
   };
   for (const answer of day.promptAnswers) {
@@ -235,7 +249,12 @@ export function pendingGrowthAwards(day: StoredHomeDayRecord): PendingGrowthAwar
     } else if (record.source.kind === 'voice_note') {
       push({ source: 'voice_note', sourceId: record.source.sourceId, actionId: 'voice' });
     } else {
-      push({ source: 'journal', sourceId: record.id, actionId: 'journal' });
+      push({
+        source: 'journal',
+        sourceId: record.id,
+        actionId: record.source.origin?.kind === 'guided_capture' ? `guided:${record.source.origin.promptId}` : 'journal',
+        amount: record.source.origin?.kind === 'guided_capture' ? guidedJournalContextPoints(record) : undefined,
+      });
     }
   }
   return awards;
@@ -260,13 +279,12 @@ export function todayGrowthSummary(
   const scheduledAt = scheduledHatchAt.getTime();
   const startedAt = incubationStartedAt?.getTime() ?? scheduledAt;
   const normalIncubationDuration = Math.max(0, scheduledAt - startedAt);
-  const savedMilliseconds = normalIncubationDuration * TODAY_MAX_ACCELERATION_RATIO * energyRatio;
-  const effectiveHatchAt = incubationStartedAt
-    ? new Date(Math.max(startedAt, scheduledAt - savedMilliseconds))
-    : scheduledHatchAt;
+  // Context enriches the hatch but no longer moves the player's chosen ritual time.
+  const savedMilliseconds = 0;
+  const effectiveHatchAt = scheduledHatchAt;
   const effectiveDuration = Math.max(0, effectiveHatchAt.getTime() - startedAt);
   const elapsed = incubationStartedAt ? Math.max(0, now.getTime() - startedAt) : 0;
-  const isReady = activation.isActivated && now.getTime() >= effectiveHatchAt.getTime();
+  const isReady = now.getTime() >= effectiveHatchAt.getTime();
   const progress = !activation.isActivated
     ? 0
     : isReady
@@ -293,7 +311,24 @@ export function todayGrowthSummary(
     // plant-growth artwork while the page is open.
     stage: growthStageForEnergy(activeEnergy),
     isReady,
+    contextState: eggContextState(activeEnergy),
+    contextBand: activeEnergy < 35 ? 'low' : activeEnergy < 80 ? 'medium' : 'full',
+    isContextFull: activeEnergy >= TODAY_ENERGY_TARGET,
   };
+}
+
+export function eggContextState(points: number): TodayGrowthSummary['contextState'] {
+  if (points >= TODAY_ENERGY_TARGET) return 'ready';
+  if (points >= 60) return 'full_of_memories';
+  if (points >= 25) return 'taking_shape';
+  if (points > 0) return 'stirring';
+  return 'fresh';
+}
+
+function guidedJournalContextPoints(record: JournalRecord): number {
+  const answerCount = Array.isArray(record.fields.guided_answers) ? record.fields.guided_answers.length : 1;
+  const hasRichDetail = Boolean(record.note?.trim() || record.fields.specific || record.attachments.length || record.location);
+  return Math.min(25, 10 + (answerCount > 1 ? 5 : 0) + (hasRichDetail ? 5 : 0));
 }
 
 export function growthStageForProgress(progress: number): TodayGrowthSummary['stage'] {

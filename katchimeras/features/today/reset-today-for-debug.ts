@@ -1,4 +1,5 @@
 import { resetTodayInState } from '@/game/days/actions';
+import { shiftLocalDate, toLocalDateId } from '@/game/days/date';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import type { StoredHomeState } from '@/types/home';
 import { resetStoredCompanionQuickGoalProgressForDay } from '@/utils/companion-quick-goal-storage';
@@ -29,7 +30,10 @@ export async function resetTodayForDebug(now = new Date()): Promise<StoredHomeSt
 
   // Clear Merge's deterministic daily receipts before publishing the blank
   // Today record, preventing mounted tabs from restoring the old daily cap.
-  await resetMergeWorldActivityForDayForDebug(state.today.isoDate, now.getTime());
+  const stateToday = new Date(`${state.today.isoDate}T12:00:00`);
+  const resetDay = Number.isNaN(stateToday.getTime()) ? now : stateToday;
+  const yesterdayDayId = toLocalDateId(shiftLocalDate(resetDay, -1));
+  await resetMergeWorldActivityForDayForDebug(state.today.isoDate, now.getTime(), yesterdayDayId);
 
   const next = resetTodayInState(state, loadOnboardingProfile(), now);
   homeRepository.save(next, { allowHatchDowngrade: true, allowTodayReset: true });

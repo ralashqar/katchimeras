@@ -9,6 +9,7 @@ import Animated, {
   FadeIn,
   FadeInDown,
   FadeInUp,
+  FadeOutUp,
   LinearTransition,
   runOnJS,
   type SharedValue,
@@ -73,6 +74,7 @@ import { ScriptedActionList } from '@/components/katchadeck/onboarding/scripted-
 import { FtueGuideCopy } from '@/components/katchadeck/onboarding/ftue-guide-copy';
 import type { FtueActionDefinition, FtueChoiceOption } from '@/features/onboarding/ftue-types';
 import type { TodayHatchPresentation } from '@/utils/today-hatch-presentation';
+import type { YesterdayStepEnergyOffer } from '@/utils/merge-world/economy-policy';
 
 type TodayNurtureExperienceProps = {
   actionListLocked: boolean;
@@ -110,6 +112,7 @@ type TodayNurtureExperienceProps = {
   eggTargetRef: RefObject<View | null>;
   energyHudPulseNonce?: number;
   energyHudTargetRef?: RefObject<View | null>;
+  energyHudValueOverride?: number | null;
   onboardingGuide?: {
     eyebrow: string;
     title: string;
@@ -129,6 +132,10 @@ type TodayNurtureExperienceProps = {
   scriptedStepCount?: number | null;
   scriptedStepEnergy?: number | null;
   onScriptedChoiceFinished?: () => void;
+  yesterdayStepEnergyOffer?: YesterdayStepEnergyOffer | null;
+  yesterdayStepEnergyBusy?: boolean;
+  yesterdayStepEnergyDisplayedSteps?: number | null;
+  onConvertYesterdaySteps?: (from: FeedSourceRect) => void;
 };
 
 export type TodayCareCompletionEvent = {
@@ -158,6 +165,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   eggTargetRef,
   energyHudPulseNonce,
   energyHudTargetRef,
+  energyHudValueOverride = null,
   feedbackKey,
   feedExpressionKey,
   focusMode = false,
@@ -192,6 +200,10 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   scriptedStepCount = null,
   scriptedStepEnergy = null,
   onScriptedChoiceFinished,
+  yesterdayStepEnergyOffer = null,
+  yesterdayStepEnergyBusy = false,
+  yesterdayStepEnergyDisplayedSteps = null,
+  onConvertYesterdaySteps,
   careSwipeExternalGesture,
   environmentGesture,
   sceneTranslateX,
@@ -221,8 +233,8 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   const focusProgress = useSharedValue(focusMode ? 1 : 0);
   const onboardingCameraProgress = useSharedValue(onboardingFocus ? 1 : 0);
   const environmentMotion = useTodayEnvironmentMotionValues();
-  const ready = growth.isActivated && (day.canHatch || growth.isReady);
-  const quietDayAvailable = !growth.isActivated && Date.now() >= growth.scheduledHatchAt.getTime();
+  const ready = day.canHatch || growth.isReady;
+  const quietDayAvailable = false;
   const scriptedMoodAction = scriptedActions.length === 1 && scriptedActions[0]?.promptKind === 'feeling'
     ? scriptedActions[0]
     : null;
@@ -609,7 +621,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
       {(!onboardingFocus || onboardingTopHudVisible) ? <Animated.View
         entering={reduceMotion ? FadeIn.duration(80) : FadeIn.duration(220)}
         style={[styles.topHudFixed, { top: topInset + 8 }]}>
-        <TodayTopHud days={timelineDays} energyPulseNonce={energyHudPulseNonce} energyTargetRef={energyHudTargetRef} interactionLocked={false} onSelectDay={onSelectDay} selectedId={day.id} />
+        <TodayTopHud days={timelineDays} energyPulseNonce={energyHudPulseNonce} energyTargetRef={energyHudTargetRef} energyValueOverride={energyHudValueOverride} interactionLocked={false} onSelectDay={onSelectDay} selectedId={day.id} />
       </Animated.View> : null}
       {!actionListHidden && !onboardingFocus ? (
       <View onLayout={handleFixedActionClusterLayout} style={[styles.fixedActionCluster, { top: fixedActionClusterTop }]}>
@@ -817,6 +829,15 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
             />
           ) : null}
           {!scriptedActions.length ? <>
+          {yesterdayStepEnergyOffer && onConvertYesterdaySteps ? (
+            <YesterdayStepEnergyRow
+              busy={yesterdayStepEnergyBusy}
+              displayedSteps={yesterdayStepEnergyDisplayedSteps ?? yesterdayStepEnergyOffer.observedSteps}
+              energy={yesterdayStepEnergyOffer.energy}
+              onConvert={onConvertYesterdaySteps}
+              reduceMotion={reduceMotion}
+            />
+          ) : null}
           {displayedMoodAction || displayedSleepAction ? (
             <Animated.View layout={actionHandoffLayout} style={styles.checkInGroup}>
               {displayedMoodAction ? (
@@ -894,7 +915,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
 
           {!actions.length && !checkInSelection && !completionIsStandard ? (
             <Animated.View entering={FadeIn.duration(180)} style={styles.thriving}>
-              <View style={styles.smallIconWell}><IconSymbol color={Meadow.leafDeep} name="leaf.fill" size={20} /></View>
+              <View style={styles.smallIconWell}><Image contentFit="contain" source={GAME_CURRENCY_ART.energy} style={styles.smallEnergyArt} transition={0} /></View>
               <View style={styles.flexCopy}>
                 <ThemedText style={styles.rowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>Your egg is thriving</ThemedText>
                 <ThemedText style={styles.rowBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Add another memory whenever it feels right.</ThemedText>
@@ -927,7 +948,6 @@ function FormingActionCluster({ onAdd, onCamera, onNote }: {
         onMicTap={onNote}
         onNote={onNote}
         orientation="horizontal"
-        showLabels
       />
     </View>
   );
@@ -1271,16 +1291,20 @@ function InlineHeading({ action, allowSkip, disabled, hideReward = false, onSkip
           <ThemedText style={styles.inlineSkipLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Skip</ThemedText>
         </Pressable>
       ) : null}
-      <ThemedText
-        numberOfLines={2}
-        style={[styles.inlineQuestion, allowSkip ? styles.inlineQuestionSkippable : hideReward ? styles.inlineQuestionCentered : styles.inlineQuestionRequired]}
-        lightColor={allowSkip ? Meadow.ink : KatchaDeckUI.ftue.goldDeep}
-        darkColor={allowSkip ? Meadow.ink : KatchaDeckUI.ftue.goldDeep}>
-        {action.title}
-      </ThemedText>
-      {!hideReward ? <View collapsable={false} ref={rewardRef} style={styles.inlineReward}>
-        <Reward amount={action.growthReward} />
-      </View> : null}
+      <View style={styles.inlineQuestionAnchor}>
+        <ThemedText
+          numberOfLines={2}
+          style={[styles.inlineQuestion, allowSkip ? styles.inlineQuestionSkippable : hideReward ? styles.inlineQuestionCentered : styles.inlineQuestionRequired]}
+          lightColor={allowSkip ? Meadow.ink : KatchaDeckUI.ftue.goldDeep}
+          darkColor={allowSkip ? Meadow.ink : KatchaDeckUI.ftue.goldDeep}>
+          {action.title}
+        </ThemedText>
+      </View>
+      {!hideReward ? (
+        <View collapsable={false} ref={rewardRef} style={styles.inlineReward}>
+          <Reward amount={action.growthReward} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1683,6 +1707,52 @@ function TodayCareGoalRow({ action, entryDelayMs, familyId, goalId, onCompleteQu
         </Animated.View>
       </CareSwipeShell>
       </Animated.View>
+    </Animated.View>
+  );
+}
+
+function YesterdayStepEnergyRow({ busy, displayedSteps, energy, onConvert, reduceMotion }: {
+  busy: boolean;
+  displayedSteps: number;
+  energy: number;
+  onConvert: (from: FeedSourceRect) => void;
+  reduceMotion: boolean;
+}) {
+  const rewardRef = useRef<ViewType | null>(null);
+  const handlePress = () => {
+    if (busy) return;
+    rewardRef.current?.measureInWindow((x, y, width, height) => onConvert({ h: height, w: width, x, y }));
+  };
+  return (
+    <Animated.View
+      entering={reduceMotion ? FadeIn.duration(80) : FadeInUp.duration(300).easing(Easing.out(Easing.cubic))}
+      exiting={reduceMotion ? FadeOutUp.duration(80) : FadeOutUp.duration(240).easing(Easing.in(Easing.cubic))}
+      layout={LinearTransition.duration(240)}>
+      <Pressable
+        accessibilityHint="Converts yesterday's steps once. This action cannot be skipped."
+        accessibilityLabel={`Turn ${displayedSteps.toLocaleString()} yesterday steps into ${energy} Energy`}
+        accessibilityRole="button"
+        accessibilityState={{ busy, disabled: busy }}
+        disabled={busy}
+        onPress={handlePress}
+        style={({ pressed }) => [styles.careDoorPressable, pressed && styles.rowPressed]}>
+        <GameSurface contentStyle={styles.stepEnergyContent} style={styles.careDoor} tone="cream">
+          <View style={styles.stepEnergyMetric}>
+            <Image contentFit="contain" source={DASHBOARD_STAT_ART.steps} style={styles.stepEnergyStepsArt} transition={0} />
+            <View style={styles.stepEnergyCopy}>
+              <ThemedText selectable style={styles.stepEnergyValue} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>
+                {displayedSteps.toLocaleString()}
+              </ThemedText>
+              <ThemedText style={styles.stepEnergyLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>steps yesterday</ThemedText>
+            </View>
+          </View>
+          <IconSymbol color={Meadow.inkFaint} name="arrow.right" size={20} />
+          <View collapsable={false} ref={rewardRef} style={styles.stepEnergyReward}>
+            <Image contentFit="contain" source={GAME_CURRENCY_ART.energy} style={styles.stepEnergyArt} transition={0} />
+            <ThemedText selectable style={styles.stepEnergyRewardValue} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>+{energy}</ThemedText>
+          </View>
+        </GameSurface>
+      </Pressable>
     </Animated.View>
   );
 }
@@ -2090,15 +2160,17 @@ function GrowthMeter({ growth }: { growth: TodayGrowthSummary }) {
   }, [displayedEnergy, growth.energyTarget, targetGlow]);
   const targetGlowStyle = useAnimatedStyle(() => ({ opacity: targetGlow.value }));
   const countdown = useMemo(() => formatCountdown(growth.effectiveHatchAt), [growth.effectiveHatchAt]);
-  const actionsRemaining = Math.max(0, growth.activationActionTarget - growth.qualifyingActionCount);
-  const status = growth.isActivated
-    ? `${countdown}${growth.savedMinutes >= 1 ? ` · ${Math.round(growth.savedMinutes)} min closer` : ''}`
-    : actionsRemaining === 1
-      ? 'Complete 1 more action to wake the egg'
-      : `Complete ${actionsRemaining} actions to wake the egg`;
+  const stateLabel = ({
+    fresh: 'Fresh',
+    stirring: 'Stirring',
+    taking_shape: 'Taking shape',
+    full_of_memories: 'Full of memories',
+    ready: 'Ready for tonight',
+  } as const)[growth.contextState];
+  const status = `${stateLabel} · ${countdown}`;
   return (
     <View
-      accessibilityLabel={`${displayedEnergy} of ${growth.energyTarget} Growth Energy. ${status}`}
+      accessibilityLabel={`${displayedEnergy} of ${growth.energyTarget} Egg context. ${status}`}
       accessibilityRole="progressbar"
       style={[styles.meterCard, compact && styles.meterCardCompact]}>
       <View style={[styles.growthProgressCard, compact && styles.growthProgressCardCompact]}>
@@ -2115,14 +2187,14 @@ function GrowthMeter({ growth }: { growth: TodayGrowthSummary }) {
           </View>
           <View pointerEvents="none" style={styles.energyValue}>
             <ThemedText selectable style={[styles.meterPercent, compact && styles.meterPercentCompact]} lightColor="#FFFBE9" darkColor="#FFFBE9">
-              {displayedEnergy} / {growth.energyTarget}
+              {stateLabel}
             </ThemedText>
           </View>
         </View>
-        <IconSymbol color="#8F7041" name={growth.isActivated ? 'leaf.fill' : 'sparkles'} size={compact ? 14 : 17} />
+        <Image contentFit="contain" source={GAME_CURRENCY_ART.energy} style={[styles.energyTailArt, compact && styles.energyTailArtCompact]} transition={0} />
       </View>
       <View style={[styles.countdownPill, compact && styles.countdownPillCompact]}>
-        <IconSymbol color="#F3D37B" name={growth.isActivated ? 'timer' : 'sparkles'} size={13} />
+        <IconSymbol color="#F3D37B" name="timer" size={13} />
         <ThemedText selectable style={styles.countdown} lightColor="#F6EACB" darkColor="#F6EACB">
           {status}
         </ThemedText>
@@ -2166,6 +2238,8 @@ const styles = StyleSheet.create({
   energyMeterIconFrame: { height: 29, width: 29 },
   energyMeterIconFrameCompact: { height: 25, width: 25 },
   energyMeterIcon: { height: '100%', width: '100%' },
+  energyTailArt: { height: 20, width: 20 },
+  energyTailArtCompact: { height: 17, width: 17 },
   energyTargetGlow: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,235,154,0.34)', borderRadius: 999, boxShadow: '0 0 16px rgba(255,225,116,0.72)' },
   countdown: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontVariant: ['tabular-nums'], fontWeight: '800' },
   countdownPill: { alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(31,36,30,0.8)', borderColor: 'rgba(255,247,214,0.22)', borderRadius: 999, borderWidth: 1, boxShadow: '0 3px 9px rgba(20,31,25,0.16)', flexDirection: 'row', gap: 4, minHeight: 23, paddingHorizontal: 10 },
@@ -2188,6 +2262,7 @@ const styles = StyleSheet.create({
   inlineCardContent: { gap: 8, padding: 9 },
   inlineSelectionPulse: { ...StyleSheet.absoluteFillObject, borderRadius: 16 },
   inlineHeading: { alignItems: 'center', justifyContent: 'center', minHeight: 38, position: 'relative' },
+  inlineQuestionAnchor: { width: '100%' },
   inlineQuestion: { ...KatchaDeckUI.typography.ftuePanelTitle, textAlign: 'center', width: '100%' },
   inlineQuestionRequired: { paddingLeft: 8, paddingRight: 68 },
   inlineQuestionCentered: { paddingHorizontal: 8 },
@@ -2221,6 +2296,15 @@ const styles = StyleSheet.create({
   careDoorPressable: { borderRadius: 18 },
   careDoor: { minHeight: 58 },
   careDoorContent: { alignItems: 'center', flexDirection: 'row', gap: 9, minHeight: 55, paddingHorizontal: 10, paddingVertical: 6 },
+  stepEnergyContent: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 62, paddingHorizontal: 14, paddingVertical: 8 },
+  stepEnergyMetric: { alignItems: 'center', flexDirection: 'row', gap: 9 },
+  stepEnergyStepsArt: { height: 44, width: 44 },
+  stepEnergyCopy: { gap: 0 },
+  stepEnergyValue: { fontFamily: AppFontFamilies.manrope, fontSize: 15, fontVariant: ['tabular-nums'], fontWeight: '900', lineHeight: 19 },
+  stepEnergyLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 10, fontWeight: '700', lineHeight: 13 },
+  stepEnergyReward: { alignItems: 'center', flexDirection: 'row', gap: 4, justifyContent: 'flex-end', minWidth: 72 },
+  stepEnergyArt: { height: 34, width: 34 },
+  stepEnergyRewardValue: { fontFamily: AppFontFamilies.manrope, fontSize: 15, fontVariant: ['tabular-nums'], fontWeight: '900' },
   completionChargeGlow: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,225,126,0.18)', borderColor: 'rgba(255,229,137,0.82)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1.5, boxShadow: '0 0 22px rgba(255,210,91,0.64), inset 0 0 15px rgba(255,244,190,0.36)' },
   completedIcon: { opacity: 0.92 },
   completedBody: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '700', lineHeight: 14 },
@@ -2231,6 +2315,7 @@ const styles = StyleSheet.create({
   notTodayLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '900' },
   thriving: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.38)', borderColor: Meadow.cardBorder, borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 11, minHeight: 76, padding: 11 },
   smallIconWell: { alignItems: 'center', backgroundColor: 'rgba(229,190,106,0.18)', borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
+  smallEnergyArt: { height: 34, width: 34 },
   reveal: { alignItems: 'center', backgroundColor: Meadow.gold, borderColor: 'rgba(255,244,204,0.72)', borderRadius: 999, borderWidth: 1, boxShadow: '-3px 6px 16px rgba(92,57,20,0.25), inset 0 1px 0 rgba(255,252,234,0.78)', flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 56, paddingHorizontal: 20 },
   revealLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '900' },
   readyAdd: { alignItems: 'center', backgroundColor: Meadow.gold, borderColor: 'rgba(255,244,204,0.72)', borderRadius: 999, borderWidth: 1, boxShadow: '-3px 6px 16px rgba(92,57,20,0.25), inset 0 1px 0 rgba(255,252,234,0.78)', height: 56, justifyContent: 'center', width: 56 },

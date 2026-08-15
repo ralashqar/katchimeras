@@ -103,20 +103,21 @@ const AREA_RULES = [
 ].join(' ');
 
 const CATEGORY_RULES = [
-  'Choose the single best journal category for a short personal note.',
+  'Rank the best journal categories for a short personal note.',
   'Classify the lived memory, not just a recognised noun or brand.',
   'Time or play with a named relationship usually belongs to that people category.',
   'Use media.game only for an explicit video, computer or console game, not toys, building sets or board games.',
-  'Use high confidence only when one category clearly fits.',
+  'The first category is required. Give a second or third category only when each is genuinely plausible, otherwise use none.',
+  'Every returned category must be different. Use high confidence only when that category clearly fits.',
 ].join(' ');
 
 // Stable reference material belongs in Instructions and only the note in the
 // Prompt, matching Apple's guidance and this app's photo path.
 const AREA_INSTRUCTIONS = `${AREA_RULES}\n\nAreas:\n${AREA_CATALOG}`;
 
-function confidenceField(subject: string) {
+function confidenceField(subject: string, name = 'confidence') {
   return {
-    name: 'confidence',
+    name,
     description: `Confidence in this ${subject} choice`,
     kind: 'enum' as const,
     values: [...FOUNDATION_CONFIDENCE_LEVELS],
@@ -180,17 +181,30 @@ export async function classifyNoteRouteWithRunner(
     };
   }
 
+  const alternativeChoice = categoryRun.response ? modelRoute(cleanString(categoryRun.response.alternativeRouteKey)) : null;
+  const thirdChoice = categoryRun.response ? modelRoute(cleanString(categoryRun.response.thirdRouteKey)) : null;
+  const rankedAlternatives = [
+    routeCandidate(alternativeChoice, categoryRun.response?.alternativeConfidence, chosen, areas),
+    routeCandidate(thirdChoice, categoryRun.response?.thirdConfidence, chosen, areas),
+  ].filter((candidate): candidate is { route: ModelRoute; confidence: FoundationConfidenceLevel } => !!candidate)
+    .filter((candidate, index, candidates) => candidates.findIndex((item) => item.route.key === candidate.route.key) === index);
   const correctedArea = chosen.areaId !== area;
+  const resolvedCategoryConfidence = correctedArea ? weakestConfidence(categoryConfidence, 'medium') : categoryConfidence;
   return {
     raw: {
       routeKey: chosen.entry.routeKey,
+      routeConfidence: confidenceScore(resolvedCategoryConfidence),
+      alternativeRouteKey: rankedAlternatives[0]?.route.entry.routeKey,
+      alternativeRouteConfidence: rankedAlternatives[0] ? confidenceScore(rankedAlternatives[0].confidence) : undefined,
+      thirdRouteKey: rankedAlternatives[1]?.route.entry.routeKey,
+      thirdRouteConfidence: rankedAlternatives[1] ? confidenceScore(rankedAlternatives[1].confidence) : undefined,
       routeStrategy: correctedArea ? 'two_stage_alternative_area_v1' : 'two_stage_v1',
     },
     suggestedFlowId: chosen.entry.flowId,
     topLevelConfidence: areaConfidence,
     // Picking from the alternative means the first pass was wrong, so the result
     // is never trusted enough to file without review.
-    subcategoryConfidence: correctedArea ? weakestConfidence(categoryConfidence, 'medium') : categoryConfidence,
+    subcategoryConfidence: resolvedCategoryConfidence,
     topLevelResponse: { flowId: chosen.areaId, confidence: areaConfidence, derivedFrom: 'note_area_stage' },
     subcategoryResponse: {
       ...categoryRun.response,
@@ -215,12 +229,16 @@ async function classifyCategoryWithinAreas(
     ? `The note belongs to ${areas[0]} or ${areas[1]}. Choose one category from either area.`
     : `The note belongs to ${areas[0]}. Choose one category from that area.`;
   return runner({
-    taskId: 'note.category.v1',
+    taskId: 'note.category.v2',
     instructions: `${CATEGORY_RULES}\n\n${scope}\n\nCategories:\n${areas.map(areaSection).join('\n\n')}`,
     prompt: notePrompt(transcript),
     fields: [
       { name: 'routeKey', description: 'Best category ID from the listed areas', kind: 'enum', values: routes.map((route) => route.key) },
       confidenceField('category'),
+      { name: 'alternativeRouteKey', description: 'Second plausible category ID, or none', kind: 'enum', values: [NO_ALTERNATIVE, ...routes.map((route) => route.key)] },
+      confidenceField('alternative category', 'alternativeConfidence'),
+      { name: 'thirdRouteKey', description: 'Third plausible category ID, or none', kind: 'enum', values: [NO_ALTERNATIVE, ...routes.map((route) => route.key)] },
+      confidenceField('third category', 'thirdConfidence'),
     ],
     sampling: 'greedy',
   }, timeoutMs);
@@ -244,6 +262,24 @@ export function emptyFoundationRouteRun(
 
 function modelRoute(key: string | null): ModelRoute | null {
   return key ? MODEL_ROUTES.find((route) => route.key === key) ?? null : null;
+}
+
+function routeCandidate(
+  route: ModelRoute | null,
+  confidence: unknown,
+  primary: ModelRoute,
+  allowedAreas: string[]
+): { route: ModelRoute; confidence: FoundationConfidenceLevel } | null {
+  const level = confidenceLevel(confidence);
+  return route && route.key !== primary.key && allowedAreas.includes(route.areaId) && level
+    ? { route, confidence: level }
+    : null;
+}
+
+function confidenceScore(value: FoundationConfidenceLevel): number {
+  if (value === 'high') return 0.95;
+  if (value === 'medium') return 0.68;
+  return 0.42;
 }
 
 function areaValue(value: unknown): string | null {

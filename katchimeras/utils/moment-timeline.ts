@@ -14,6 +14,7 @@ export type MomentTimelineEntry = {
   id: string;
   createdAt: string;
   time: number;
+  categoryFlowId: MomentCategoryFlowId;
   icon: IconSymbolName;
   accent: string;
   label: string;
@@ -22,6 +23,29 @@ export type MomentTimelineEntry = {
   thumbnailUri?: string | null;
   audioUri?: string | null;
   keyMoment?: boolean;
+  selectedState?: MomentSelectedState | null;
+};
+
+export type MomentCategoryFlowId = 'went_somewhere' | 'food' | 'studio' | 'movement' | 'people' | 'work' | 'big_event' | 'general';
+export type MomentSelectedState =
+  | { kind: 'mood'; state: 'radiant' | 'light' | 'meh' | 'heavy' | 'stormy' }
+  | { kind: 'sleep'; state: 'good' | 'normal' | 'low' };
+
+const MOMENT_CATEGORY_FLOW_IDS = new Set<MomentCategoryFlowId>([
+  'went_somewhere',
+  'food',
+  'studio',
+  'movement',
+  'people',
+  'work',
+  'big_event',
+  'general',
+]);
+
+const PROMPT_CATEGORY_FLOW: Record<string, MomentCategoryFlowId> = {
+  activity: 'movement',
+  hobby: 'studio',
+  people: 'people',
 };
 
 const MEANING_META: Record<string, { icon: IconSymbolName; accent: string }> = {
@@ -76,6 +100,7 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
     push({
       id: `legacy:${moment.id}`,
       createdAt: moment.createdAt,
+      categoryFlowId: 'general',
       icon: moment.icon,
       accent: moment.accentColor,
       label: moment.label,
@@ -92,14 +117,22 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
     const option = prompt?.options.find((candidate) => answer.choiceIds.includes(candidate.id));
     const meaning = answer.kind === 'meaning' ? MEANING_META[answer.choiceIds[0]] : null;
     const photoIcon = answer.relatedAssetId ? photoSubjectIcon(day, answer.relatedAssetId) : null;
+    const photoFlowId = answer.relatedAssetId ? photoSubjectFlowId(day, answer.relatedAssetId) : null;
+    const selectedState = answer.kind === 'feeling'
+      ? moodSelectedState(answer.choiceIds[0])
+      : answer.kind === 'sleep'
+        ? sleepSelectedState(answer.choiceIds[0])
+        : null;
     push({
       id: `prompt:${answer.id}`,
       createdAt: answer.createdAt,
+      categoryFlowId: photoFlowId ?? PROMPT_CATEGORY_FLOW[answer.kind] ?? 'general',
       icon: photoIcon ?? meaning?.icon ?? option?.icon ?? prompt?.categoryIcon ?? 'sparkles',
       accent: meaning?.accent ?? PROMPT_ACCENTS[answer.kind] ?? '#C9C2E8',
       label: answer.labels.join(' · '),
       category: PROMPT_CATEGORY[answer.kind] ?? prompt?.title.replace(/[?]$/, ''),
       noteText: answer.noteText,
+      selectedState,
     });
   }
 
@@ -114,6 +147,7 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
     push({
       id: `hatch-check-in:${day.id}`,
       createdAt: checkIn.completedAt ?? checkIn.updatedAt,
+      categoryFlowId: toMomentCategoryFlowId(checkIn.flowId),
       icon: flow?.icon ?? 'sparkles',
       accent: flow?.accent ?? '#FFC36B',
       label: checkInLabels.join(' · '),
@@ -128,6 +162,7 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
       push({
         id: `hero:${hero.assetId}:${index}`,
         createdAt: hero.selectedAt,
+        categoryFlowId: photoSubjectFlowId(day, hero.assetId) ?? 'general',
         icon: photoSubjectIcon(day, hero.assetId) ?? meta.icon,
         accent: meta.accent,
         label,
@@ -144,6 +179,7 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
     push({
       id: `capture:${captured.sourceId ?? `${captured.createdAt}:${index}`}`,
       createdAt: captured.createdAt,
+      categoryFlowId: photoSubjectFlowId(day, captured.sourceId) ?? 'general',
       icon: photoSubjectIcon(day, captured.sourceId) ?? meta.icon,
       accent: meta.accent,
       label: captured.label,
@@ -160,6 +196,7 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
     push({
       id: `note:${note.id}`,
       createdAt: note.createdAt,
+      categoryFlowId: 'general',
       icon: note.kind === 'voice' ? 'mic.fill' : 'square.and.pencil',
       accent: meta.accent,
       label: note.label,
@@ -179,6 +216,7 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
     push({
       id: `manual:${entry.id}`,
       createdAt: entry.createdAt,
+      categoryFlowId: toMomentCategoryFlowId(entry.flowId),
       icon: keyMoment ? 'star.fill' : choice?.icon ?? flow?.icon ?? 'plus.circle.fill',
       accent: '#FFC36B',
       label: specific || choice?.label || flow?.title || 'Journal entry',
@@ -196,6 +234,7 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
     push({
       id: `food:${food.id}`,
       createdAt: food.createdAt,
+      categoryFlowId: 'food',
       icon: 'fork.knife',
       accent: foodMeaningAccent(food.meaning ?? 'discovery'),
       label: display.label,
@@ -211,6 +250,7 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
     push({
       id: `studio:${studio.id}`,
       createdAt: studio.createdAt,
+      categoryFlowId: 'studio',
       icon: studioMediaIcon(studio.mediaType),
       accent: studioRatingAccent(studio.rating ?? 'liked'),
       label: display.label,
@@ -227,6 +267,7 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
     push({
       id: `place:${place.id}`,
       createdAt: place.confirmedAt,
+      categoryFlowId: 'went_somewhere',
       icon: 'mappin.and.ellipse',
       accent: '#F49AC1',
       label: place.meaningLabel ? `${place.label} · ${place.meaningLabel}` : place.label,
@@ -239,6 +280,7 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
     push({
       id: `movement:${day.isoDate}`,
       createdAt: day.stepsInterpretation.createdAt,
+      categoryFlowId: 'movement',
       icon: 'figure.walk',
       accent: '#A8C99A',
       label: display.label,
@@ -252,6 +294,7 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
     push({
       id: `life-event:${moment.id}`,
       createdAt: moment.createdAt,
+      categoryFlowId: 'big_event',
       icon: 'sparkles',
       accent: '#D5B8FF',
       label: display.label,
@@ -263,10 +306,12 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
     push({
       id: `sleep:${day.isoDate}`,
       createdAt: day.sleep.recordedAt ?? localDayTime(day.isoDate, 8),
+      categoryFlowId: 'general',
       icon: 'bed.double.fill',
       accent: '#AAB2FF',
       label: SLEEP_LABEL[day.sleep.quality] ?? 'Sleep noted',
       category: 'Sleep',
+      selectedState: sleepSelectedState(day.sleep.quality),
     });
   }
 
@@ -308,6 +353,52 @@ function studioMediaIcon(mediaType: string): IconSymbolName {
  * supplies its accent. Capture review already commits the same flow/category
  * chosen by manual journaling, so use that canonical choice icon first.
  */
+function photoSubjectFlowId(day: HomeDayRecord, sourceId?: string | null): MomentCategoryFlowId | null {
+  if (!sourceId) return null;
+
+  const compatibilityEntry = (day.manualJournalEntries ?? []).find(
+    (entry) => entry.sourceType === 'photo' && entry.sourceId === sourceId
+  );
+  if (compatibilityEntry) return toMomentCategoryFlowId(compatibilityEntry.flowId);
+
+  const record = (day.journalRecords ?? []).find(
+    (entry) => entry.source.kind === 'photo' && entry.source.sourceId === sourceId
+  );
+  if (record) return toMomentCategoryFlowId(record.flowId);
+
+  const studio = (day.studioMoments ?? []).find((entry) => entry.source === 'photo' && entry.sourceId === sourceId);
+  if (studio) return 'studio';
+
+  const memory = (day.classifiedMemories ?? []).find(
+    (entry) => entry.sourceType === 'photo' && entry.sourceId === sourceId
+  );
+  if (!memory) return null;
+  const facets = [...memory.facets].sort(
+    (left, right) => Number(!!right.confirmed) - Number(!!left.confirmed) || right.confidence - left.confidence
+  );
+  for (const facet of facets) {
+    const selection = journalSelectionForFacet(facet.key, facet.value);
+    if (selection) return toMomentCategoryFlowId(selection.flowId);
+  }
+  return null;
+}
+
+function moodSelectedState(choiceId: string | null | undefined): MomentSelectedState | null {
+  if (choiceId === 'energized') return { kind: 'mood', state: 'radiant' };
+  if (choiceId === 'good' || choiceId === 'calm' || choiceId === 'loved') return { kind: 'mood', state: 'light' };
+  if (choiceId === 'meh') return { kind: 'mood', state: 'meh' };
+  if (choiceId === 'drained' || choiceId === 'low') return { kind: 'mood', state: 'heavy' };
+  if (choiceId === 'stressed') return { kind: 'mood', state: 'stormy' };
+  return null;
+}
+
+function sleepSelectedState(choiceId: string | null | undefined): MomentSelectedState | null {
+  if (choiceId === 'great' || choiceId === 'good') return { kind: 'sleep', state: 'good' };
+  if (choiceId === 'ok' || choiceId === 'normal') return { kind: 'sleep', state: 'normal' };
+  if (choiceId === 'poor' || choiceId === 'barely' || choiceId === 'low') return { kind: 'sleep', state: 'low' };
+  return null;
+}
+
 function photoSubjectIcon(day: HomeDayRecord, sourceId?: string | null): IconSymbolName | null {
   if (!sourceId) return null;
 
@@ -347,6 +438,12 @@ function photoSubjectIcon(day: HomeDayRecord, sourceId?: string | null): IconSym
 function journalChoiceIcon(flowId: string, categoryId: string): IconSymbolName | null {
   const flow = manualJournalFlow(flowId);
   return flow?.choices.find((choice) => choice.id === categoryId)?.icon ?? flow?.icon ?? null;
+}
+
+function toMomentCategoryFlowId(flowId: string | null | undefined): MomentCategoryFlowId {
+  return MOMENT_CATEGORY_FLOW_IDS.has(flowId as MomentCategoryFlowId)
+    ? flowId as MomentCategoryFlowId
+    : 'general';
 }
 
 function journalSelectionForFacet(key: string, value: string): { flowId: string; categoryId: string } | null {

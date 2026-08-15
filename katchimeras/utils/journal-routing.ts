@@ -6,8 +6,10 @@ import { detectStudioInText } from '@/utils/studio-detect';
 export type FoundationAtomicRouteRead = {
   routeKey?: unknown;
   alternativeRouteKey?: unknown;
+  thirdRouteKey?: unknown;
   routeConfidence?: unknown;
   alternativeRouteConfidence?: unknown;
+  thirdRouteConfidence?: unknown;
   specific?: unknown;
   context?: unknown;
   journalFeeling?: unknown;
@@ -46,13 +48,17 @@ export function foundationAtomicRoutes(raw: FoundationAtomicRouteRead | null | u
   if (!raw) return [];
   const primaryKey = cleanId(raw.routeKey);
   const alternativeKey = cleanId(raw.alternativeRouteKey);
+  const thirdKey = cleanId(raw.thirdRouteKey);
   const primary = primaryKey && primaryKey !== 'ambiguous'
     ? journalRouteForKey(primaryKey, primaryKey === 'general.other' ? Math.min(0.68, confidence(raw.routeConfidence, 0.6)) : confidence(raw.routeConfidence, 0.5), reason)
     : null;
   const alternative = alternativeKey && alternativeKey !== 'ambiguous' && alternativeKey !== primaryKey
     ? journalRouteForKey(alternativeKey, confidence(raw.alternativeRouteConfidence, 0), `${reason} as an alternative`)
     : null;
-  return rankJournalRoutes([primary, alternative]);
+  const third = thirdKey && thirdKey !== 'ambiguous' && thirdKey !== primaryKey && thirdKey !== alternativeKey
+    ? journalRouteForKey(thirdKey, confidence(raw.thirdRouteConfidence, 0), `${reason} as another possibility`)
+    : null;
+  return rankJournalRoutes([primary, alternative, third]);
 }
 
 export function registryJournalRoutes(transcript: string): JournalRouteProposal[] {

@@ -8,6 +8,8 @@ import { SheetEmptyState } from '@/components/katchadeck/ui/sheet-empty-state';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { KatchaSurfacePalette, KatchaUI, resolveParchmentAccent, type KatchaAccessibleAccent } from '@/constants/katcha-ui';
+import { manualJournalArt } from '@/constants/manual-journal-art';
+import { MOOD_ART, SLEEP_ART } from '@/constants/wellbeing-selection-art';
 import type { MomentTimelineEntry } from '@/utils/moment-timeline';
 
 type CompactMomentListProps = {
@@ -52,6 +54,12 @@ export function CompactMomentList({
       {entries.map((item, index) => {
         const expanded = expandedId === item.id;
         const accent = resolveParchmentAccent(item.accent);
+        const selectedStateArt = item.selectedState?.kind === 'mood'
+          ? MOOD_ART[item.selectedState.state]
+          : item.selectedState?.kind === 'sleep'
+            ? SLEEP_ART[item.selectedState.state]
+            : null;
+        const categoryArt = selectedStateArt ?? manualJournalArt(item.categoryFlowId);
         return (
           <View key={item.id} style={[styles.timelineRow, compact && styles.compactTimelineRow]}>
             <View style={[styles.railCell, compact && styles.compactRailCell]}>
@@ -72,7 +80,16 @@ export function CompactMomentList({
 
             <KatchaBeveledCard style={[styles.card, compact && styles.compactCard]}>
               <View style={[styles.cardIcon, compact && styles.compactCardIcon, { backgroundColor: accent.tint, borderColor: accent.border }]}>
-                <IconSymbol name={item.icon} size={compact ? 17 : 22} color={accent.foreground} />
+                {categoryArt ? (
+                  <Image
+                    contentFit="contain"
+                    source={categoryArt}
+                    style={[styles.cardCategoryArt, compact && styles.compactCardCategoryArt]}
+                    transition={0}
+                  />
+                ) : (
+                  <IconSymbol name={item.icon} size={compact ? 17 : 22} color={accent.foreground} />
+                )}
               </View>
               <View style={styles.cardBody}>
                 <View style={styles.cardMain}>
@@ -200,6 +217,8 @@ const styles = StyleSheet.create({
   compactCard: { borderRadius: 13, gap: 8, minHeight: 68, paddingHorizontal: 8, paddingVertical: 8 },
   cardIcon: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.58)', height: 48, justifyContent: 'center', width: 48 },
   compactCardIcon: { borderRadius: 11, height: 36, width: 36 },
+  cardCategoryArt: { height: 44, width: 44 },
+  compactCardCategoryArt: { height: 33, width: 33 },
   cardBody: { flex: 1, gap: 7 },
   cardMain: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   cardText: { flex: 1, gap: 1 },

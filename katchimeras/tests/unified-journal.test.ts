@@ -317,6 +317,18 @@ test('note routing still asks for confirmation when confidence or candidate lead
   assert.equal(journalNoteRouteNeedsConfirmation(closeCandidates), true);
 });
 
+test('Foundation atomic routing preserves a third ranked suggestion', () => {
+  const routes = foundationAtomicRoutes({
+    routeKey: 'people.partner',
+    routeConfidence: 0.95,
+    alternativeRouteKey: 'food.meal',
+    alternativeRouteConfidence: 0.68,
+    thirdRouteKey: 'went_somewhere.cafe',
+    thirdRouteConfidence: 0.42,
+  });
+  assert.deepEqual(routes.map((route) => route.id), ['people.partner', 'food.meal', 'went_somewhere.cafe']);
+});
+
 test('shared route resolver uses registry aliases and confidence boundaries', () => {
   const meal = journalRouteForAlias('meal', 0.9, 'test');
   const book = journalRouteForAlias('book', 0.8, 'test');

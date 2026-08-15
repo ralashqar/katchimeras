@@ -155,8 +155,8 @@ check('focused route returns the generated journal field text',
     && swift.includes('"specific": response.content.specific'));
 check('note routing runs an area pass then a category pass',
   foundationNoteRouting.includes("taskId: 'note.area.v1'")
-    && foundationNoteRouting.includes("taskId: 'note.category.v1'")
-    && foundationNoteRouting.indexOf("taskId: 'note.area.v1'") < foundationNoteRouting.indexOf("taskId: 'note.category.v1'")
+    && foundationNoteRouting.includes("taskId: 'note.category.v2'")
+    && foundationNoteRouting.indexOf("taskId: 'note.area.v1'") < foundationNoteRouting.indexOf("taskId: 'note.category.v2'")
     && !foundationNoteRouting.includes("taskId: 'note.flow.v2'")
     && !foundationNoteRouting.includes("taskId: 'note.child-route.v1'"));
 check('note routing returns internal ids to the app and model ids to the model',

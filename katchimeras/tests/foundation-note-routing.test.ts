@@ -29,7 +29,7 @@ function scriptedRunner(
 function areaThenCategory(area: string, alternativeArea: string, routeKey: string, confidence = 'high') {
   return {
     'note.area.v1': { area, alternativeArea, confidence },
-    'note.category.v1': { routeKey, confidence },
+    'note.category.v2': { routeKey, confidence, alternativeRouteKey: 'none', alternativeConfidence: 'low', thirdRouteKey: 'none', thirdConfidence: 'low' },
   };
 }
 
@@ -41,7 +41,7 @@ test('a note is routed by area first, then by category inside that area', async 
     scriptedRunner(areaThenCategory('work', 'none', 'work.learning'), calls)
   );
 
-  assert.deepEqual(calls.map((call) => call.taskId), ['note.area.v1', 'note.category.v1']);
+  assert.deepEqual(calls.map((call) => call.taskId), ['note.area.v1', 'note.category.v2']);
   assert.ok(calls.every((call) => call.sampling === 'greedy'));
   assert.equal(result.raw?.routeKey, 'work.learning');
   assert.equal(result.raw?.routeStrategy, 'two_stage_v1');
@@ -117,6 +117,34 @@ test('the second pass can recover a wrong area from the alternative', async () =
   assert.equal(result.suggestedFlowId, 'work');
   // Stage 1 was wrong, so the result is a suggestion rather than a filing.
   assert.equal(result.subcategoryConfidence, 'medium');
+});
+
+test('the category pass returns three distinct ranked canonical candidates for review', async () => {
+  const calls: StructuredNoteTask[] = [];
+  const result = await classifyNoteRouteWithRunner(
+    'I had lunch with my partner at a cafe',
+    9000,
+    scriptedRunner({
+      'note.area.v1': { area: 'people', alternativeArea: 'food', confidence: 'medium' },
+      'note.category.v2': {
+        routeKey: 'people.partner',
+        confidence: 'high',
+        alternativeRouteKey: 'food.meal',
+        alternativeConfidence: 'medium',
+        thirdRouteKey: 'food.coffee',
+        thirdConfidence: 'low',
+      },
+    }, calls)
+  );
+
+  assert.equal(result.raw?.routeKey, 'people.partner');
+  assert.equal(result.raw?.alternativeRouteKey, 'food.meal');
+  assert.equal(result.raw?.thirdRouteKey, 'food.coffee');
+  assert.ok(Number(result.raw?.routeConfidence) > Number(result.raw?.alternativeRouteConfidence));
+  assert.ok(Number(result.raw?.alternativeRouteConfidence) > Number(result.raw?.thirdRouteConfidence));
+  assert.deepEqual(calls[1]?.fields.map((field) => field.name), [
+    'routeKey', 'confidence', 'alternativeRouteKey', 'alternativeConfidence', 'thirdRouteKey', 'thirdConfidence',
+  ]);
 });
 
 test('without an alternative the second pass sees only the chosen area', async () => {

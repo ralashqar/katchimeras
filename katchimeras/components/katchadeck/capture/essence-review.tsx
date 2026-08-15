@@ -35,6 +35,7 @@ import { possiblePhotoAchievementMatches, type PhotoAchievementMatch } from '@/u
 import { sceneFromPhotoSemanticFrame } from '@/utils/scene-classify';
 import type { PhotoSemanticFrame } from '@/utils/photo-semantic-frame';
 import { journalRouteForIds } from '@/utils/journal-routing';
+import { manualJournalFlow } from '@/utils/manual-journal-registry';
 import { saveDevLastPhotoAnalysis } from '@/utils/dev-photo-analysis';
 
 // The shared "read the moment" experience: a photo's on-device essence animates
@@ -277,6 +278,7 @@ export function EssenceReview({ photoUri, questId, analyze, sourceId, observedAt
   };
 
   const handleJournalCandidate = (candidate: PhotoJournalCandidate) => {
+    if (journalInteractionLockedRef.current) return;
     journalInteractionLockedRef.current = true;
     if (candidate.route) {
       const confirmed = journalAnalysis ? {
@@ -291,7 +293,8 @@ export function EssenceReview({ photoUri, questId, analyze, sourceId, observedAt
         navigationAction: 'open_details' as const,
       } : null;
       if (confirmed) setJournalAnalysis(confirmed);
-      openJournalRoute(candidate.route, confirmed);
+      const submission = quickPhotoSubmission(candidate.route);
+      if (submission) handleJournalSave(submission, candidate.route);
       return;
     }
     setJournalFlowId(candidate.flowId);
@@ -310,8 +313,33 @@ export function EssenceReview({ photoUri, questId, analyze, sourceId, observedAt
   };
 
   const handleOrdinaryMoment = () => {
+    if (journalInteractionLockedRef.current) return;
+    journalInteractionLockedRef.current = true;
     const route = journalRouteForIds('general', 'ordinary', 1, 'User chose an ordinary moment after automatic classification was unavailable');
-    if (route) openJournalRoute(route);
+    const submission = route ? quickPhotoSubmission(route) : null;
+    if (route && submission) handleJournalSave(submission, route);
+  };
+
+  const quickPhotoSubmission = (route: JournalRouteProposal): ManualJournalSubmission | null => {
+    const flow = manualJournalFlow(route.flowId);
+    const choice = flow?.choices.find((item) => item.id === route.choiceId);
+    if (!flow || !choice) return null;
+    const photoSourceId = sourceId ?? photoUri ?? `photo-${Date.now().toString(36)}`;
+    return {
+      sessionId: photoSourceId,
+      flowId: flow.id,
+      path: [flow.id, choice.id],
+      categoryId: choice.id,
+      canonicalQualityIds: choice.qualityIds ?? [],
+      fields: { specific: route.prefilledSpecific?.trim() || null, context: null },
+      feeling: null,
+      note: null,
+      sourceType: 'photo',
+      sourceId: photoSourceId,
+      thumbnailUri: photoUri ?? undefined,
+      journalSource: { kind: 'photo', sourceId: photoSourceId },
+      confirmedFacets: route.confirmedFacets,
+    };
   };
 
   const handleJournalRouteResolved = (flowId: string, categoryId: string) => {
@@ -339,11 +367,11 @@ export function EssenceReview({ photoUri, questId, analyze, sourceId, observedAt
     startRouteEnrichment(route);
   };
 
-  const handleJournalSave = (submission: ManualJournalSubmission) => {
+  const handleJournalSave = (submission: ManualJournalSubmission, routeOverride = journalRoute) => {
     const memory = clarificationRef.current;
     if (!memory || state !== 'essence') return;
     const createdAt = new Date().toISOString();
-    const reviewedSubmission = reviewPhotoJournalSubmission({ memory, route: journalRoute, submission, createdAt });
+    const reviewedSubmission = reviewPhotoJournalSubmission({ memory, route: routeOverride, submission, createdAt });
     if (!reviewedSubmission) return;
     const { memory: confirmed, specific, choiceLabel, mediaType, reactionLabel } = reviewedSubmission;
     clarificationRef.current = confirmed;
@@ -454,7 +482,7 @@ export function EssenceReview({ photoUri, questId, analyze, sourceId, observedAt
                     </Pressable>
                   </Animated.View>
                 ))}
-                {journalAnalysisState === 'failed' ? <Pressable onPress={handleOrdinaryMoment} style={styles.meaningChip} accessibilityRole="button"><IconSymbol name="circle.fill" size={18} color={Lantern.moon50} /><ThemedText style={styles.meaningLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Something ordinary</ThemedText></Pressable> : null}
+                {journalAnalysisState !== 'classifying' && journalAnalysisState !== 'refining' && journalAnalysisState !== 'waiting' ? <Pressable onPress={handleOrdinaryMoment} style={styles.meaningChip} accessibilityRole="button"><IconSymbol name="checkmark.circle.fill" size={18} color={Lantern.moon50} /><ThemedText style={styles.meaningLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Just keep it</ThemedText></Pressable> : null}
                 {journalAnalysis ? <Pressable onPress={() => { journalInteractionLockedRef.current = true; setJournalFlowId(journalAnalysis.flowId); setJournalPickerOpen(true); }} style={styles.meaningChip} accessibilityRole="button"><IconSymbol name={journalAnalysisState === 'failed' ? 'square.and.pencil' : 'plus'} size={18} color={Lantern.moon50} /><ThemedText style={styles.meaningLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{journalAnalysisState === 'failed' ? 'Classify manually' : 'Something else'}</ThemedText></Pressable> : null}
               </View>
             </Animated.View>

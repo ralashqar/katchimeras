@@ -478,7 +478,12 @@ check('manual journal supports opening directly at a requested flow', manualJour
 check('manual journal can prefill an editable media title', manualJournalSource.includes('initialChoiceId') && manualJournalSource.includes("useState(initialSpecific ?? '')"));
 check('manual journal uses the adaptive tall sheet', manualJournalSource.includes('size="tall"'));
 check('tall sheets stay between the device safe-area insets', katchaSheetSource.includes('useSafeAreaInsets') && katchaSheetSource.includes('insets.top + 8') && katchaSheetSource.includes('availableTallHeight'));
-check('manual journal groups top-level destinations', manualJournalSource.includes('SECTION_ORDER') && manualJournalSource.includes('Culture & progress'));
+check('manual journal uses one compact two-column top-level grid',
+  manualJournalSource.includes('orderedFlows.map')
+    && manualJournalSource.includes("flowTileWrap: { width: '48.5%' }")
+    && manualJournalSource.includes('minHeight: 132')
+    && !manualJournalSource.includes('SECTION_ORDER')
+    && !manualJournalSource.includes('Culture & progress'));
 check('manual journal has a persistent three-step header', manualJournalSource.includes('Step ${step + 1} of 3') && manualJournalSource.includes('progressStepActive'));
 check('manual journal keeps Save memory outside the scrolling content', manualJournalSource.indexOf('</ScrollView>') < manualJournalSource.indexOf('style={styles.footer}') && manualJournalSource.includes('Save memory'));
 check('manual journal keeps notes inline', !manualJournalSource.includes("type Stage = 'flow' | 'category' | 'details' | 'note'") && manualJournalSource.includes('noteExpanded'));

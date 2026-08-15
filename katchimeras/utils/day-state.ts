@@ -11,16 +11,14 @@ import type { HomeDayState } from '@/types/home';
 export function resolveDayLifecycleState(input: {
   hasCreature: boolean;
   storedState: HomeDayState;
-  hasShape: boolean;
   isSameDay: boolean;
   hour: number;
   hatchHour: number;
   minute?: number;
   second?: number;
   millisecond?: number;
-  earlyHatchMinutes?: number;
 }): HomeDayState {
-  const { hasCreature, storedState, hasShape, isSameDay, hour, hatchHour } = input;
+  const { hasCreature, storedState, isSameDay, hour, hatchHour } = input;
 
   if (hasCreature) {
     return 'hatched';
@@ -31,20 +29,16 @@ export function resolveDayLifecycleState(input: {
     return 'ready_to_hatch';
   }
 
-  if (!hasShape) {
-    return 'forming';
-  }
-
   // Today: ready only once the live clock has reached the hatch hour.
   if (isSameDay) {
     const currentMinutes = hour * 60
       + (input.minute ?? 0)
       + (input.second ?? 0) / 60
       + (input.millisecond ?? 0) / 60_000;
-    const readyMinutes = hatchHour * 60 - Math.max(0, input.earlyHatchMinutes ?? 0);
+    const readyMinutes = hatchHour * 60;
     return currentMinutes >= readyMinutes ? 'ready_to_hatch' : 'forming';
   }
 
-  // A past day with shape is always available to hatch.
+  // Every past day is available to hatch; sparse days use the simple fallback.
   return 'ready_to_hatch';
 }

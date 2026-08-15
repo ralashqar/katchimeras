@@ -27,7 +27,7 @@ const openingActions: readonly FtueActionDefinition[] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 10,
+  version: 11,
   entryStepId: 'egg.opening',
   terminalStepId: 'complete',
   steps: [
@@ -228,12 +228,18 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'energy.capture', surface: 'today',
-      guide: { eyebrow: 'A little more of today', title: 'What would you like to keep?', body: 'Choose one.' },
-      actions: [
-        { id: 'energy.photo', title: 'Add a photo', description: 'Keep something you saw.', icon: 'camera.fill', presentation: 'route_action', handlerId: 'journal_photo', nextStepId: 'energy.journal_reward', backendEvent: true },
-        { id: 'energy.people', title: 'Remember someone', description: 'Who was part of today?', icon: 'person.2.fill', presentation: 'route_action', handlerId: 'journal_people', nextStepId: 'energy.journal_reward', backendEvent: true },
-        { id: 'energy.write', title: 'Write a little moment', description: 'A few words is enough.', icon: 'square.and.pencil', presentation: 'route_action', handlerId: 'journal_text', nextStepId: 'energy.journal_reward', backendEvent: true },
-      ],
+      guide: { eyebrow: 'A little more of today', title: 'Share one quick reflection.', body: 'One answer is enough.' },
+      actions: [{
+        id: 'energy.reflect', title: 'What kind of day has it been?', description: 'Choose the closest fit.', icon: 'sparkles',
+        presentation: 'inline_choice', handlerId: 'day_prompt', promptKind: 'day_word', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
+        nextStepId: 'energy.journal_reward', backendEvent: true,
+        options: [
+          { id: 'good', label: 'Pretty good', icon: 'heart.fill', domainChoiceId: 'lovely' },
+          { id: 'quiet', label: 'Quiet', icon: 'cloud.fill', domainChoiceId: 'quiet' },
+          { id: 'busy', label: 'Busy', icon: 'sun.max.fill', domainChoiceId: 'full' },
+          { id: 'rough', label: 'A bit rough', icon: 'cloud.rain.fill', domainChoiceId: 'hard' },
+        ],
+      }],
       blockingBeat: 'energy_connection',
     },
     {

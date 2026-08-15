@@ -7,10 +7,10 @@ import type { CompanionQuestState } from '@/utils/katchimera-quests';
 import {
   journalRecordsForEggDay,
   MERGE_DAILY_COMPANION_ENERGY,
-  MERGE_DAILY_JOURNAL_ENERGY,
   MERGE_DAILY_QUEST_ENERGY,
   mergeLocalDayId,
   mergeTomorrowDayId,
+  mergeJournalEnergyForCapture,
 } from '@/utils/merge-world/economy-policy';
 import { questDefinition } from '@/utils/quests/definitions';
 
@@ -57,13 +57,16 @@ export function mergeActivityRewards(days: readonly HomeDayRecord[], now = new D
   for (const eggDayId of eligibleEggDayIds) {
     const records = journalRecordsForEggDay(days, eggDayId);
     if (!records.length) continue;
-    rewards.push({
-      receiptId: `activity:egg-journal:${eggDayId}`,
+    const legacyReceipt = `activity:egg-journal:${eggDayId}`;
+    const legacyAlreadyPaid = context.state?.processedActivityReceiptIds.includes(legacyReceipt) ?? false;
+    records.forEach((record, index) => rewards.push({
+      receiptId: `activity:egg-journal:${eggDayId}:${record.id}`,
       kind: 'daily_journal_energy',
-      amount: MERGE_DAILY_JOURNAL_ENERGY,
-      label: eggDayId === grantDayId ? 'Today journal' : 'Tomorrow Egg journal',
+      // A pre-curve client may already have paid the first capture for this day.
+      amount: legacyAlreadyPaid && index === 0 ? 0 : mergeJournalEnergyForCapture(index),
+      label: eggDayId === grantDayId ? 'Today memory' : 'Tomorrow Egg memory',
       grantDayId: eggDayId,
-    });
+    }));
     const companionRecord = records.find((record) => record.source?.origin?.kind === 'companion_reflection');
     if (companionRecord?.source.origin?.kind === 'companion_reflection') {
       const familyId = companionRecord.source.origin.familyId as MergeCharacterId | undefined;

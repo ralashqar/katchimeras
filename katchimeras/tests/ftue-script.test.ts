@@ -6,7 +6,7 @@ import { FTUE_ACTION_CATALOG, FTUE_HANDLER_REGISTRY } from '@/features/onboardin
 import { ftueHidesBottomBar, ftueOwnsOpeningHome } from '@/features/onboarding/ftue-navigation-policy';
 import { MOSSPROUT_FTUE_SCRIPT, mossproutFtueAction, validateMossproutFtueScript } from '@/features/onboarding/mossprout-ftue-script';
 import { mossproutFtueConversationDefinitions } from '@/constants/mossprout-ftue-conversations';
-import { mergeStepEnergyPreview } from '@/utils/merge-world/economy-policy';
+import { buildYesterdayStepEnergyOffer, mergeStepEnergyPreview } from '@/utils/merge-world/economy-policy';
 
 test('Mossprout FTUE script has valid transitions and registered handlers', () => {
   assert.deepEqual(validateMossproutFtueScript(), []);
@@ -54,7 +54,7 @@ test('backend catalog contains only allowlisted privacy-safe action ids', () => 
 });
 
 test('Supabase receipt allowlist matches every backend FTUE action', () => {
-  const migration = readFileSync('supabase/migrations/20260814160810_register_mossprout_ftue_v10.sql', 'utf8');
+  const migration = readFileSync('supabase/migrations/20260815143000_register_mossprout_ftue_v11.sql', 'utf8');
   for (const item of FTUE_ACTION_CATALOG.filter((entry) => entry.backendEvent)) {
     assert.match(migration, new RegExp(`'${item.stepId}',\\s*'${item.actionId}'`));
   }
@@ -126,7 +126,30 @@ test('FTUE step energy checks yesterday, skips below 300, and always exposes the
   assert.equal(mergeStepEnergyPreview(299), 0);
   assert.equal(mergeStepEnergyPreview(300), 1);
   assert.equal(mergeStepEnergyPreview(6_300), 20);
+  assert.equal(buildYesterdayStepEnergyOffer({ dayId: '2026-08-14', observedAt: '2026-08-14T23:59:00.000Z', observedSteps: 299 }), null);
+  assert.deepEqual(
+    buildYesterdayStepEnergyOffer({ dayId: '2026-08-14', observedAt: '2026-08-14T23:59:00.000Z', observedSteps: 300 }),
+    { dayId: '2026-08-14', energy: 1, observedAt: '2026-08-14T23:59:00.000Z', observedSteps: 300 },
+  );
   assert.equal(mossproutFtueAction('energy.steps_reward', 'energy.return')?.title, 'Back to Mossprout');
+});
+
+test('FTUE Energy recovery uses one general reflection with no journal hierarchy', () => {
+  const capture = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'energy.capture');
+  const reflection = capture?.actions[0];
+  const today = readFileSync('app/(tabs)/today.tsx', 'utf8');
+
+  assert.equal(capture?.actions.length, 1);
+  assert.equal(reflection?.id, 'energy.reflect');
+  assert.equal(reflection?.presentation, 'inline_choice');
+  assert.equal(reflection?.promptKind, 'day_word');
+  assert.equal(reflection?.nextStepId, 'energy.journal_reward');
+  assert.deepEqual(reflection?.options?.map((option) => option.domainChoiceId), ['lovely', 'quiet', 'full', 'hard']);
+  assert.ok(reflection?.options?.every((option) => !option.private));
+  assert.match(today, /const completesEnergyCapture = action\.id === 'energy\.reflect'/);
+  assert.match(today, /completesEnergyCapture \? \{ mergeEnergyAmount: MOSSPROUT_FTUE_JOURNAL_ENERGY \} : \{\}/);
+  assert.match(today, /await completeFtueJournalCapture\(action\.id, sourceId, \{ id: option\.id, label: option\.label \}\)/);
+  assert.doesNotMatch(today, /pendingFtueJournalCapture|completingFtueCapture|ftuePhotoEvidenceRef/);
 });
 
 test('Mossprout remembers the day, branches playfully, then reveals the shared two-order preview', () => {

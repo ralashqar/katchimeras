@@ -35,7 +35,7 @@ export function selectAboutTodayPrompt(
   day: StoredHomeDayRecord,
   now: Date = new Date(),
 ): ActiveDayPrompt | null {
-  if (day.state === 'hatched' || now.getHours() < 11) return null;
+  if (day.state === 'hatched') return null;
   const answered = new Set(
     (day.promptAnswers ?? [])
       .filter((answer) => !answer.dismissed && isAboutTodayPromptKind(answer.kind))

@@ -29,6 +29,7 @@ import {
   type TodayPhotoLibrarySheetContent,
 } from '@/components/katchadeck/home/today-photo-library-sheet';
 import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-sheet';
+import { GuidedCaptureSheet, type GuidedTextDetailDraft } from '@/components/katchadeck/home/guided-capture-sheet';
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
 import { HatchCheckInSheet } from '@/components/katchadeck/home/hatch-check-in-sheet';
 import { HatchCountdown } from '@/components/katchadeck/home/hatch-countdown';
@@ -125,12 +126,13 @@ import { FTUE_MOSSPROUT_CREATURE } from '@/features/onboarding/mossprout-ftue-cr
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import type { FtueActionDefinition, FtueChoiceOption } from '@/features/onboarding/ftue-types';
 import { useWisps } from '@/features/wisps/wisp-provider';
+import { useGameWallet } from '@/features/ui/game-wallet-provider';
 import { resolveHomeLoopPresentation } from '@/features/today/home-loop-presentation';
 import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
 import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
 import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
 import { MemoryClarificationSheet } from '@/components/katchadeck/world/memory-clarification-sheet';
-import type { ClassifiedMemory, DayInputTarget, HomeDayRecord, HomeTimelineDay, MemoryDomain } from '@/types/home';
+import type { ClassifiedMemory, DayInputTarget, HomeDayRecord, HomeTimelineDay, JournalSource, ManualJournalSubmission, MemoryDomain } from '@/types/home';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import { consumeQuestActionIntent } from '@/utils/quest-action-signal';
 import { consumeCompanionNavigationIntent } from '@/utils/companion-navigation-intent';
@@ -183,13 +185,24 @@ import {
 } from '@/utils/companion-journal-handoff';
 import { journalIdempotencyKey, journalRecordId } from '@/utils/journal-domain';
 import {
+  eggReactionTint,
+  guidedCaptureFlowForCareAction,
+  guidedCaptureFlowForManualFlowId,
+  guidedCaptureFlowForQuickCategory,
+  type GuidedCaptureEntryPoint,
+  type GuidedCaptureFlow,
+  type GuidedCaptureOption,
+} from '@/utils/guided-capture';
+import {
+  buildYesterdayStepEnergyOffer,
   mergeJournalRewardPreview,
   mergeStepEnergyPreview,
   MOSSPROUT_FTUE_JOURNAL_ENERGY,
   STEPS_PER_MERGE_ENERGY,
   type MergeJournalRewardPreview,
+  type YesterdayStepEnergyOffer,
 } from '@/utils/merge-world/economy-policy';
-import { claimMossproutFtueStepEnergy, grantMossproutFtueJournalEnergy } from '@/utils/merge-world/repository';
+import { claimDailyStepEnergy, claimMossproutFtueStepEnergy, grantMossproutFtueJournalEnergy, loadMergeWorldState } from '@/utils/merge-world/repository';
 import { getPedometerAccess, readRecentPedometerStepDays, type PedometerStepDay } from '@/utils/pedometer-steps';
 import {
   activeSemanticQuestPrompt,
@@ -225,7 +238,15 @@ const QUICK_PROMPT_CATEGORIES: {
   { id: 'photo', title: 'Photo', icon: 'camera.fill', accent: '#92D7FF', section: 'capture' },
   { id: 'voice_note', title: 'Voice note', icon: 'mic.fill', accent: '#7DE8CD', section: 'capture' },
   { id: 'written_note', title: 'Written note', icon: 'square.and.pencil', accent: '#9DDCB8', section: 'capture' },
-  { id: 'manual_journal', title: 'Log something', icon: 'plus.circle.fill', accent: '#FFC36B', section: 'context' },
+  { id: 'manual_journal', title: 'What stood out?', icon: 'sparkles', accent: '#E8C36F', section: 'context' },
+  { id: 'people', title: 'People', icon: 'person.2.fill', accent: '#E8AAA6', section: 'context' },
+  { id: 'place', title: 'Place', icon: 'mappin.and.ellipse', accent: '#9DC9A8', section: 'context' },
+  { id: 'movement', title: 'Movement', icon: 'figure.walk', accent: '#E7B071', section: 'context' },
+  { id: 'food', title: 'Food or drink', icon: 'fork.knife', accent: '#E9B792', section: 'context' },
+  { id: 'studio', title: 'Inspiration', icon: 'books.vertical.fill', accent: '#B8A7CD', section: 'context' },
+  { id: 'work', title: 'Work or making', icon: 'briefcase.fill', accent: '#A9BE9D', section: 'context' },
+  { id: 'life_event', title: 'A bigger moment', icon: 'star.fill', accent: '#E7C478', section: 'context' },
+  { id: 'reflection', title: 'Reflection', icon: 'ellipsis.bubble.fill', accent: '#B8B1CA', section: 'more' },
   { id: 'mood', title: 'Mood', icon: 'face.smiling', accent: '#F5AFC6', section: 'more' },
   { id: 'sleep', title: 'Sleep', icon: 'bed.double.fill', accent: '#AAB2FF', section: 'more' },
 ];
@@ -244,6 +265,8 @@ export default function TodayRouteScreen() {
 function HomeScreen() {
   const router = useRouter();
   const { transitionTo } = useGameScreenTransition();
+  const wallet = useGameWallet();
+  const { microcopy, setMicrocopy } = useMicrocopy();
   const ftueRun = useFtueRun();
   const ftueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
   const ftueTodayStep = ftueStep?.surface === 'today' ? ftueStep : null;
@@ -285,8 +308,11 @@ function HomeScreen() {
   const [ftueDisplayedSteps, setFtueDisplayedSteps] = useState<number | null>(null);
   const [ftueStepEnergy, setFtueStepEnergy] = useState<number | null>(null);
   const [ftueLifeEnergyBusy, setFtueLifeEnergyBusy] = useState(false);
+  const [yesterdayStepEnergyOffer, setYesterdayStepEnergyOffer] = useState<YesterdayStepEnergyOffer | null>(null);
+  const [yesterdayStepEnergyDisplayedSteps, setYesterdayStepEnergyDisplayedSteps] = useState<number | null>(null);
+  const [yesterdayStepEnergyBusy, setYesterdayStepEnergyBusy] = useState(false);
+  const [energyHudValueOverride, setEnergyHudValueOverride] = useState<number | null>(null);
   const ftueStepCheckRef = useRef<string | null>(null);
-  const ftuePhotoEvidenceRef = useRef<string | null>(null);
   const openedOnboardingCaptureRef = useRef(false);
   useEffect(() => {
     setFtueActionBusy(false);
@@ -305,6 +331,17 @@ function HomeScreen() {
   const [selectedCareGoalId, setSelectedCareGoalId] = useState<string | null>(null);
   const selectedCareGoalCompletionRef = useRef<(() => void) | null>(null);
   const [todayPhotoLibrarySheet, setTodayPhotoLibrarySheet] = useState<TodayPhotoLibrarySheetContent | null>(null);
+  const [guidedCapture, setGuidedCapture] = useState<{
+    action: RankedTodayCareAction | null;
+    committed: boolean;
+    entryPoint: GuidedCaptureEntryPoint;
+    flow: GuidedCaptureFlow;
+    handoff: CompanionJournalHandoff | null;
+    journalSource?: JournalSource;
+    mergeEnergyAmount: number | null;
+    target: DayInputTarget;
+  } | null>(null);
+  const [guidedTextDetail, setGuidedTextDetail] = useState<(GuidedTextDetailDraft & { target: DayInputTarget }) | null>(null);
   const incubationActivatedRef = useRef<boolean | null>(null);
   const acceleratedHatchReadyRef = useRef(false);
   const {
@@ -368,13 +405,16 @@ function HomeScreen() {
     if (onboardingCapture !== '1' || ftueRun?.stepId !== 'energy.capture' || openedOnboardingCaptureRef.current) return;
     openedOnboardingCaptureRef.current = true;
   }, [ftueRun?.stepId, onboardingCapture]);
-  const queueCareCompletionAfterJournalDismiss = useCallback((action: RankedTodayCareAction) => {
+  const queueCareCompletionAfterJournalDismiss = useCallback((
+    action: RankedTodayCareAction,
+    rewardAlreadyAnimated = false,
+  ) => {
     if (deferredJournalCareTimerRef.current) clearTimeout(deferredJournalCareTimerRef.current);
     deferredJournalCareCompletionRef.current = action.instanceId;
     deferredJournalCareTimerRef.current = runAfterNativeModalDismiss(() => {
       deferredJournalCareTimerRef.current = null;
       deferredJournalCareCompletionRef.current = null;
-      queueCareCompletion(action, false);
+      queueCareCompletion(action, rewardAlreadyAnimated);
     });
   }, [queueCareCompletion]);
   useEffect(() => () => {
@@ -526,12 +566,57 @@ function HomeScreen() {
   const isForming = homeLoopPresentation.forming !== null;
   const formingTarget = homeLoopPresentation.forming?.target ?? 'today';
   const formingDay = homeLoopPresentation.forming?.day ?? null;
-  const completeFtueJournalCapture = useCallback(async (actionId: string, evidenceRef: string) => {
+  useEffect(() => {
+    if (!screenFocused || !isFormingToday || !formingDay || ftueRun?.status === 'active') {
+      if (!yesterdayStepEnergyBusy) {
+        setYesterdayStepEnergyOffer(null);
+        setYesterdayStepEnergyDisplayedSteps(null);
+      }
+      return;
+    }
+    let active = true;
+    void (async () => {
+      const access = await getPedometerAccess();
+      if (access !== 'available') return null;
+      const [stepDays, mergeState] = await Promise.all([
+        readRecentPedometerStepDays(),
+        loadMergeWorldState(),
+      ]);
+      const yesterday = stepDays.at(-2);
+      if (!yesterday) return null;
+      return buildYesterdayStepEnergyOffer({
+        dayId: yesterday.dayId,
+        existing: mergeState.stepEnergyByDay[yesterday.dayId],
+        observedAt: yesterday.observedAt,
+        observedSteps: yesterday.totalSteps,
+      });
+    })().then((offer) => {
+      if (!active || yesterdayStepEnergyBusy) return;
+      setYesterdayStepEnergyOffer(offer);
+      setYesterdayStepEnergyDisplayedSteps(offer?.observedSteps ?? null);
+    }).catch((error) => {
+      console.error('[today] Could not check yesterday\'s step Energy', error);
+      if (!active || yesterdayStepEnergyBusy) return;
+      setYesterdayStepEnergyOffer(null);
+      setYesterdayStepEnergyDisplayedSteps(null);
+    });
+    return () => { active = false; };
+  }, [formingDay, ftueRun?.status, isFormingToday, screenFocused, yesterdayStepEnergyBusy]);
+  const completeFtueJournalCapture = useCallback(async (
+    actionId: string,
+    evidenceRef: string,
+    answer?: { id: string; label: string },
+  ) => {
     if (!formingDay) return;
     const reward = await grantMossproutFtueJournalEnergy(formingDay.isoDate);
     const amount = reward.energyGranted && reward.energyGranted > 0 ? reward.energyGranted : MOSSPROUT_FTUE_JOURNAL_ENERGY;
     updateFtueRun({ awardedMergeEnergy: amount });
-    commitFtueAction({ actionId, evidenceRef });
+    commitFtueAction({
+      actionId,
+      evidenceRef,
+      optionId: answer?.id,
+      optionLabel: answer?.label,
+    });
     setOnboardingEnergyReady(amount);
   }, [formingDay]);
 
@@ -605,27 +690,13 @@ function HomeScreen() {
   }, [allDays, companionJournalHandoff, formingDay, manualJournalTarget]);
   const journalMergeRewardNotice = useMemo(() => {
     if (!journalMergeReward || !formingDay) return undefined;
-    const eggLabel = formingTarget === 'tomorrow' ? 'Tomorrow’s Egg' : 'Today’s Egg';
-    if (journalMergeReward.totalEnergy <= 0) return {
-      detail: `${eggLabel} has already granted its journal${companionJournalHandoff ? ' and companion' : ''} Energy for this date. Your entry still adds Growth.`,
-      status: 'collected' as const,
-      title: 'Journal Energy already collected',
-    };
-    const rewards = [
-      journalMergeReward.dailyJournalEnergy > 0 ? `Journal +${journalMergeReward.dailyJournalEnergy}` : null,
-      journalMergeReward.companionEnergy > 0 ? `Companion bonus +${journalMergeReward.companionEnergy}` : null,
-    ].filter(Boolean).join(' · ');
-    const collected = journalMergeReward.dailyJournalEnergy === 0
-      ? ' Daily journal Energy was already collected; this is the companion bonus.'
-      : journalMergeReward.companionEnergy === 0 && companionJournalHandoff
-        ? ' The companion bonus was already collected.'
-        : '';
+    if (journalMergeReward.totalEnergy <= 0) return undefined;
     return {
-      detail: `${rewards} Merge Energy when this entry is saved.${collected}`,
+      detail: 'Feed this memory to the Egg. Any Merge Energy appears after it is saved.',
       status: 'available' as const,
-      title: `Earn +${journalMergeReward.totalEnergy} Merge Energy`,
+      title: 'Capture this',
     };
-  }, [companionJournalHandoff, formingDay, formingTarget, journalMergeReward]);
+  }, [formingDay, journalMergeReward]);
   useEffect(() => {
     if (ftueRun?.stepId === 'energy.journal_reward') setOnboardingEnergyReady(ftueRun.awardedMergeEnergy ?? MOSSPROUT_FTUE_JOURNAL_ENERGY);
   }, [ftueRun?.awardedMergeEnergy, ftueRun?.stepId]);
@@ -689,24 +760,6 @@ function HomeScreen() {
     pulseEgg,
     setNextEnergyCurrencySource,
   } = useEggFeedController();
-  useEffect(() => {
-    if (ftueRun?.stepId !== 'energy.capture' || !formingDay) return;
-    const pending = ftueRun.receipts.find((receipt) => receipt.stepId === 'energy.capture' && receipt.status === 'pending');
-    if (!pending || pending.actionId !== 'energy.photo') return;
-    const evidence = [...(formingDay.growth?.events ?? [])]
-      .reverse()
-      .find((event) => event.source === 'photo' && event.awardedAt >= pending.startedAt);
-    if (!evidence || ftuePhotoEvidenceRef.current === evidence.sourceId) return;
-    ftuePhotoEvidenceRef.current = evidence.sourceId;
-    const source = { h: 54, w: 54, x: windowWidth / 2 - 27, y: windowHeight - 190 };
-    startEggFeed(source, {
-      currencyFrom: source,
-      energyOnly: true,
-      imageSource: GAME_CURRENCY_ART.energy,
-      mergeEnergyAmount: MOSSPROUT_FTUE_JOURNAL_ENERGY,
-      tint: Lantern.ember300,
-    }, () => void completeFtueJournalCapture(pending.actionId, evidence.sourceId));
-  }, [completeFtueJournalCapture, formingDay, ftueRun, startEggFeed, windowHeight, windowWidth]);
   const convertFtueSteps = useCallback(async (currencyFrom: Parameters<typeof startEggFeed>[0]) => {
     if (ftueLifeEnergyBusy || !formingDay) return;
     setFtueLifeEnergyBusy(true);
@@ -750,7 +803,94 @@ function HomeScreen() {
       commitFtueAction({ actionId: 'energy.convert_steps', evidenceRef: 'pedometer:error', nextStepId: 'energy.steps_reward' });
     }
   }, [formingDay, ftueLifeEnergyBusy, ftueRun?.runId, ftueStepDays, startEggFeed]);
+  const convertYesterdaySteps = useCallback(async (currencyFrom: Parameters<typeof startEggFeed>[0]) => {
+    const offer = yesterdayStepEnergyOffer;
+    if (!offer || yesterdayStepEnergyBusy) return;
+    setYesterdayStepEnergyBusy(true);
+    // The repository publishes the awarded balance immediately. Hold the HUD
+    // at its pre-claim value so the visible number advances only as each token
+    // actually reaches the Energy pill.
+    setEnergyHudValueOverride(wallet.energy);
+    setYesterdayStepEnergyDisplayedSteps(offer.observedSteps);
+    try {
+      const claim = await claimDailyStepEnergy({
+        allowBootstrap: true,
+        dayId: offer.dayId,
+        observedAt: offer.observedAt,
+        observedSteps: offer.observedSteps,
+        receiptId: `daily-steps:${formingDay?.isoDate ?? 'today'}:${offer.dayId}`,
+      });
+      const energy = claim.energyGranted ?? 0;
+      const consumedSteps = claim.stepEnergyClaim?.consumedSteps ?? energy * STEPS_PER_MERGE_ENERGY;
+      const remainingSteps = Math.max(0, offer.observedSteps - consumedSteps);
+      const beforeEnergy = claim.stepEnergyClaim?.beforeEnergy ?? wallet.energy;
+      if (energy <= 0) {
+        setYesterdayStepEnergyOffer(null);
+        setYesterdayStepEnergyDisplayedSteps(null);
+        setEnergyHudValueOverride(null);
+        setYesterdayStepEnergyBusy(false);
+        return;
+      }
+      setEnergyHudValueOverride(beforeEnergy);
+      let arrivedEnergy = 0;
+      startEggFeed(currencyFrom, {
+        currencyFrom,
+        energyOnly: true,
+        imageSource: GAME_CURRENCY_ART.energy,
+        mergeEnergyAmount: energy,
+        onMergeEnergyTokenArrive: (amount) => {
+          arrivedEnergy = Math.min(energy, arrivedEnergy + amount);
+          setEnergyHudValueOverride(beforeEnergy + arrivedEnergy);
+          setYesterdayStepEnergyDisplayedSteps(Math.max(
+            remainingSteps,
+            offer.observedSteps - arrivedEnergy * STEPS_PER_MERGE_ENERGY,
+          ));
+        },
+      }, () => {
+        setYesterdayStepEnergyDisplayedSteps(remainingSteps);
+        setYesterdayStepEnergyOffer(null);
+        setYesterdayStepEnergyBusy(false);
+        setEnergyHudValueOverride(null);
+      });
+    } catch (error) {
+      console.error('[today] Could not turn yesterday\'s steps into Energy', error);
+      setEnergyHudValueOverride(null);
+      setYesterdayStepEnergyBusy(false);
+      setMicrocopy('Could not convert those steps yet');
+    }
+  }, [formingDay?.isoDate, setMicrocopy, startEggFeed, wallet.energy, yesterdayStepEnergyBusy, yesterdayStepEnergyOffer]);
   const deferredCareMergeEnergyRef = useRef(0);
+  const deferredJournalRewardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const launchJournalRewardFromBottomAfterDismiss = useCallback(({
+    energyAmount = 0,
+    mergeEnergyAmount,
+    onArrive,
+  }: {
+    energyAmount?: number;
+    mergeEnergyAmount: number;
+    onArrive?: () => void;
+  }) => {
+    if (deferredJournalRewardTimerRef.current) clearTimeout(deferredJournalRewardTimerRef.current);
+    deferredJournalRewardTimerRef.current = runAfterNativeModalDismiss(() => {
+      deferredJournalRewardTimerRef.current = null;
+      if (energyAmount <= 0 && mergeEnergyAmount <= 0) {
+        onArrive?.();
+        return;
+      }
+      const from = { h: 54, w: 54, x: windowWidth / 2 - 27, y: windowHeight - 190 };
+      startEggFeed(from, {
+        currencyFrom: from,
+        energyAmount,
+        energyOnly: true,
+        imageSource: GAME_CURRENCY_ART.energy,
+        mergeEnergyAmount,
+        tint: Lantern.ember300,
+      }, onArrive ?? (() => {}));
+    });
+  }, [startEggFeed, windowHeight, windowWidth]);
+  useEffect(() => () => {
+    if (deferredJournalRewardTimerRef.current) clearTimeout(deferredJournalRewardTimerRef.current);
+  }, []);
   useEffect(() => {
     if (!pendingCareIntent) setNextEnergyCurrencySource(null);
   }, [pendingCareIntent, setNextEnergyCurrencySource]);
@@ -1037,7 +1177,6 @@ function HomeScreen() {
   // --- Today-as-daily-hub: category ring, sheets, capture actions ---
   // (the same daily intelligence the World patch had, orbiting the egg instead)
 
-  const { microcopy, setMicrocopy } = useMicrocopy();
   useEffect(() => {
     if (hatchPresentation.error) setMicrocopy(hatchPresentation.error);
   }, [hatchPresentation.error, setMicrocopy]);
@@ -1069,6 +1208,40 @@ function HomeScreen() {
     setJourneySheetOpen,
     nameSheetOpen,
   } = sheets;
+
+  const openGuidedCapture = useCallback((
+    flow: GuidedCaptureFlow,
+    entryPoint: GuidedCaptureEntryPoint,
+    options: {
+      action?: RankedTodayCareAction | null;
+      handoff?: CompanionJournalHandoff | null;
+      journalSource?: JournalSource;
+      target?: DayInputTarget;
+    } = {},
+  ) => {
+    setGuidedCapture({
+      action: options.action ?? null,
+      committed: false,
+      entryPoint,
+      flow,
+      handoff: options.handoff ?? null,
+      journalSource: options.journalSource,
+      mergeEnergyAmount: null,
+      target: options.target ?? formingTarget,
+    });
+  }, [formingTarget]);
+  const openGuidedCaptureForQuickCategory = useCallback((categoryId: string, entryPoint: GuidedCaptureEntryPoint = 'plus') => {
+    const flow = guidedCaptureFlowForQuickCategory(categoryId);
+    if (!flow) return false;
+    openGuidedCapture(flow, entryPoint);
+    return true;
+  }, [openGuidedCapture]);
+  const openGuidedCaptureForManualFlow = useCallback((flowId?: string | null, entryPoint: GuidedCaptureEntryPoint = 'vault') => {
+    const flow = guidedCaptureFlowForManualFlowId(flowId);
+    if (!flow) return false;
+    openGuidedCapture(flow, entryPoint);
+    return true;
+  }, [openGuidedCapture]);
 
   useEffect(() => {
     if (!memoryDayId || !memoryRecordId || handledMergeMemoryIdRef.current === memoryRecordId) return;
@@ -1103,6 +1276,19 @@ function HomeScreen() {
     navigate();
   }, [closePromptSheet, promptSheetOpen, sheets]);
 
+  const openGuidedCaptureFromJournalBrowser = useCallback((flowId: string) => {
+    const flow = guidedCaptureFlowForManualFlowId(flowId);
+    if (!flow) return false;
+    const target = manualJournalTarget ?? formingTarget;
+    closeManualJournal();
+    if (pendingCaptureNavigationRef.current) clearTimeout(pendingCaptureNavigationRef.current);
+    pendingCaptureNavigationRef.current = runAfterNativeModalDismiss(() => {
+      pendingCaptureNavigationRef.current = null;
+      openGuidedCapture(flow, 'plus', { target });
+    });
+    return true;
+  }, [closeManualJournal, formingTarget, manualJournalTarget, openGuidedCapture]);
+
   const openMomentCapture = useCallback((questId?: string | null) => {
     navigateAfterTodayModalCloses(() => {
       // Today is intentionally unmounted behind the full-screen camera. Make
@@ -1116,6 +1302,7 @@ function HomeScreen() {
   }, [formingTarget, navigateAfterTodayModalCloses, router]);
   // Quick TEXT note (tap the mic): an inline text box over the page — enter
   // interprets on-device and commits straight away, no full-screen flow.
+  const semanticNoteQuestActive = activeSemanticQuestPrompt() != null;
   const { quickNoteOpen, setQuickNoteOpen, handleQuickNoteSubmit, voiceNote, pendingJournalNote, clearPendingJournalNote } = useNoteCaptureController({
     allowRemote: cloudIntelligenceEnabled,
     formingTarget,
@@ -1124,6 +1311,7 @@ function HomeScreen() {
     addNote,
     startEggFeed,
     pulseEgg,
+    requiresJournalReview: semanticNoteQuestActive,
     setMicrocopy,
   });
   const [quickNoteInitialMode, setQuickNoteInitialMode] = useState<'text' | 'voice'>('text');
@@ -1131,6 +1319,19 @@ function HomeScreen() {
     setQuickNoteInitialMode(input);
     navigateAfterTodayModalCloses(() => setQuickNoteOpen(true));
   }, [navigateAfterTodayModalCloses, setQuickNoteOpen]);
+  const handleGuidedTextDetailSubmit = useCallback(async (text: string) => {
+    if (!guidedTextDetail) return;
+    addManualJournalEntry({
+      ...guidedTextDetail.submission,
+      fields: {
+        ...guidedTextDetail.submission.fields,
+        specific: guidedTextDetail.field === 'specific' ? text : guidedTextDetail.submission.fields.specific,
+      },
+      note: guidedTextDetail.field === 'note' ? text : guidedTextDetail.submission.note,
+    }, guidedTextDetail.target);
+    setGuidedTextDetail(null);
+    setMicrocopy('Detail added to the memory');
+  }, [addManualJournalEntry, guidedTextDetail, setMicrocopy]);
 
   const {
     photoPrompt,
@@ -1157,7 +1358,43 @@ function HomeScreen() {
   }, [formingDay, photoPrompt]);
   const semanticQuestPrompt = quickNoteOpen ? activeSemanticQuestPrompt() : null;
   const pendingNoteRoutes = useMemo(() => pendingJournalNote ? noteRoutesForSignals(pendingJournalNote) : [], [pendingJournalNote]);
-  const pendingNoteRoute = journalNoteRouteNeedsConfirmation(pendingNoteRoutes) ? null : pendingNoteRoutes[0] ?? null;
+  const pendingFoundationReview = pendingJournalNote?.intelligenceProvider === 'appleFoundation';
+  const pendingNoteRoute = pendingFoundationReview || journalNoteRouteNeedsConfirmation(pendingNoteRoutes) ? null : pendingNoteRoutes[0] ?? null;
+  const keepPendingJournalNoteAsGeneral = useCallback(() => {
+    if (!pendingJournalNote) return;
+    const journalSource: JournalSource = pendingJournalNote.kind === 'voice'
+      ? { kind: 'voice_note', sourceId: pendingJournalNote.captureId, audioUri: pendingJournalNote.audioUri ?? null, durationMs: pendingJournalNote.durationMs ?? null }
+      : { kind: 'text_note', sourceId: pendingJournalNote.captureId };
+    const submission: ManualJournalSubmission = {
+      sessionId: pendingJournalNote.captureId,
+      flowId: 'general',
+      path: ['general', 'other'],
+      categoryId: 'other',
+      canonicalQualityIds: [],
+      fields: { specific: null, context: null },
+      feeling: null,
+      note: pendingJournalNote.text,
+      sourceType: 'manual',
+      sourceId: pendingJournalNote.captureId,
+      linkedNote: {
+        kind: pendingJournalNote.kind,
+        text: pendingJournalNote.text,
+        audioUri: pendingJournalNote.audioUri ?? null,
+        durationMs: pendingJournalNote.durationMs ?? null,
+      },
+      journalSource,
+      confirmedFacets: [],
+    };
+    addManualJournalEntry(submission, formingTarget);
+    cancelSemanticNoteQuestCapture();
+    clearPendingJournalNote();
+    pulseEgg();
+    launchJournalRewardFromBottomAfterDismiss({
+      energyAmount: pendingJournalNote.kind === 'voice' ? TODAY_GROWTH_REWARDS.voice_note : TODAY_GROWTH_REWARDS.journal,
+      mergeEnergyAmount: journalMergeReward?.totalEnergy ?? 0,
+    });
+    setMicrocopy('Kept as a general note');
+  }, [addManualJournalEntry, clearPendingJournalNote, formingTarget, journalMergeReward?.totalEnergy, launchJournalRewardFromBottomAfterDismiss, pendingJournalNote, pulseEgg, setMicrocopy]);
   const { recentAvgSteps, memoryQuests, categories, categoriesLoading } = useTodayCategoryModel({
     allDays,
     formingDay,
@@ -1236,6 +1473,7 @@ function HomeScreen() {
     openQuickNote: openQuickNoteOverlay,
     openObservatory: () => setObservatoryOpen(true),
     openManualJournal,
+    openGuidedCapture: openGuidedCaptureForQuickCategory,
     requestMicrophonePermission,
   });
   const suggestedPromptActions = useMemo(
@@ -1386,7 +1624,7 @@ function HomeScreen() {
     instanceId: `${formingDay.isoDate}:onboarding:activity`,
     title: 'What was part of today?',
     description: 'Work, family, friends, outside, resting — choose what fits.',
-    icon: 'leaf.fill',
+    icon: 'bolt.fill',
     artKey: 'reflection',
     category: 'memory',
     completionKey: 'reflection:activity',
@@ -1465,6 +1703,17 @@ function HomeScreen() {
     setMicrocopy('Set aside for today');
   }, [clearCareIntent, formingTarget, pendingCareIntent, quickGoals, setMicrocopy, updateCareAction]);
   const handleCareStart = useCallback((action: RankedTodayCareAction, rewardFrom: Parameters<typeof startEggFeed>[0]) => {
+    const guidedFlow = guidedCaptureFlowForCareAction(action.id);
+    if (guidedFlow) {
+      // Guided capture is still an action-list flow. Register its intent before
+      // opening the sheet so completion can animate out and publish the next
+      // ranked action instead of leaving the list locked in awaiting_completion.
+      startCareIntent(action, eggFeedRewardRequestKey);
+      setNextEnergyCurrencySource(rewardFrom);
+      markCareDestinationOpen();
+      openGuidedCapture(guidedFlow, 'today_suggestion', { action });
+      return;
+    }
     if (action.completionMode === 'artifact' || action.completionMode === 'external_activity') {
       startCareIntent(action, eggFeedRewardRequestKey);
       setNextEnergyCurrencySource(rewardFrom);
@@ -1525,7 +1774,7 @@ function HomeScreen() {
       case 'inline_sleep':
         return;
     }
-  }, [clearCareIntent, eggFeedRewardRequestKey, formingPrompts, handleQuest, handleQuickCategory, markCareDestinationOpen, openManualJournal, openPromptSheet, photoPrompt, router, setNextEnergyCurrencySource, startCareIntent, transitionTo]);
+  }, [clearCareIntent, eggFeedRewardRequestKey, formingPrompts, handleQuest, handleQuickCategory, markCareDestinationOpen, openGuidedCapture, openManualJournal, openPromptSheet, photoPrompt, router, setNextEnergyCurrencySource, startCareIntent, transitionTo]);
   const handleFtueChoice = useCallback((
     action: FtueActionDefinition,
     option: FtueChoiceOption,
@@ -1538,47 +1787,55 @@ function HomeScreen() {
     setFtueActionBusy(true);
     const reward = action.growthReward ?? TODAY_GROWTH_REWARDS.reflection;
     const sourceId = option.private ? receipt.clientEventId : option.domainChoiceId ?? option.id;
+    const completesEnergyCapture = action.id === 'energy.reflect';
     startEggFeed(from, {
-      currencyFrom: from,
+      currencyFrom: currencyFrom ?? from,
       energyAmount: reward,
       energyOnly: true,
       imageSource: GAME_CURRENCY_ART.energy,
       label: option.private ? 'Kept private' : option.label,
+      ...(completesEnergyCapture ? { mergeEnergyAmount: MOSSPROUT_FTUE_JOURNAL_ENERGY } : {}),
       tint: option.private ? Lantern.dusk700 : Lantern.ember300,
     }, () => {
-      try {
-        const completedAt = new Date().toISOString();
-        completeInlineEnergyAction({
-          artifact: option.private
-            ? { kind: 'private' }
-            : { kind: 'prompt', promptKind: action.promptKind!, choiceId: option.domainChoiceId ?? option.id },
-          completion: {
-            growth: { actionId: action.id, amount: reward, source: action.growthSource!, sourceId },
-            careAction: {
-              instanceId: `${formingDay?.isoDate ?? 'today'}:${action.id}`,
-              definitionId: action.id,
-              sourceId,
-              deferredUntil: null,
-              completedAt,
-              dismissedAt: null,
+      void (async () => {
+        try {
+          const completedAt = new Date().toISOString();
+          completeInlineEnergyAction({
+            artifact: option.private
+              ? { kind: 'private' }
+              : { kind: 'prompt', promptKind: action.promptKind!, choiceId: option.domainChoiceId ?? option.id },
+            completion: {
+              growth: { actionId: action.id, amount: reward, source: action.growthSource!, sourceId },
+              careAction: {
+                instanceId: `${formingDay?.isoDate ?? 'today'}:${action.id}`,
+                definitionId: action.id,
+                sourceId,
+                deferredUntil: null,
+                completedAt,
+                dismissedAt: null,
+              },
             },
-          },
-        }, formingTarget);
-        commitFtueAction({
-          actionId: action.id,
-          optionId: option.id,
-          optionLabel: option.label,
-          private: option.private,
-          evidenceRef: sourceId,
-        });
-        setMicrocopy(option.private ? 'The Egg felt the moment, without saving an answer.' : `${option.label} reached the Egg`);
-      } catch (error) {
-        console.error('[ftue] Could not commit scripted Egg answer', error);
-      } finally {
-        setFtueActionBusy(false);
-      }
+          }, formingTarget);
+          if (completesEnergyCapture) {
+            await completeFtueJournalCapture(action.id, sourceId, { id: option.id, label: option.label });
+          } else {
+            commitFtueAction({
+              actionId: action.id,
+              optionId: option.id,
+              optionLabel: option.label,
+              private: option.private,
+              evidenceRef: sourceId,
+            });
+          }
+          setMicrocopy(option.private ? 'The Egg felt the moment, without saving an answer.' : `${option.label} reached the Egg`);
+        } catch (error) {
+          console.error('[ftue] Could not commit scripted Egg answer', error);
+        } finally {
+          setFtueActionBusy(false);
+        }
+      })();
     });
-  }, [completeInlineEnergyAction, formingDay?.isoDate, formingTarget, ftueActionBusy, setMicrocopy, startEggFeed]);
+  }, [completeFtueJournalCapture, completeInlineEnergyAction, formingDay?.isoDate, formingTarget, ftueActionBusy, setMicrocopy, startEggFeed]);
 
   const handleFtueAction = useCallback((action: FtueActionDefinition, from: Parameters<typeof startEggFeed>[0]) => {
     if (ftueActionBusy) return;
@@ -1599,10 +1856,14 @@ function HomeScreen() {
     if (!receipt || receipt.status !== 'pending') return;
     updateFtueRun({ awardedMergeEnergy: MOSSPROUT_FTUE_JOURNAL_ENERGY });
     if (action.handlerId === 'journal_photo') openMomentCapture();
-    else if (action.handlerId === 'journal_people') openManualJournal(undefined, 'people', null, 'today');
-    else if (action.handlerId === 'journal_place') openManualJournal(undefined, 'place', null, 'today');
-    else openManualJournal(undefined, undefined, null, 'today');
-  }, [convertFtueSteps, ftueActionBusy, handleRevealPress, openManualJournal, openMomentCapture, returnToMossprout]);
+    else if (action.handlerId === 'journal_people') {
+      const flow = guidedCaptureFlowForManualFlowId('people');
+      if (flow) openGuidedCapture(flow, 'quest', { target: 'today' });
+    } else if (action.handlerId === 'journal_place') {
+      const flow = guidedCaptureFlowForManualFlowId('went_somewhere');
+      if (flow) openGuidedCapture(flow, 'quest', { target: 'today' });
+    } else openManualJournal(undefined, undefined, null, 'today');
+  }, [convertFtueSteps, ftueActionBusy, handleRevealPress, openGuidedCapture, openManualJournal, openMomentCapture, returnToMossprout]);
 
   const handleNurtureMood = useCallback((
     choiceId: Parameters<typeof handleConfirmMood>[0],
@@ -1758,7 +2019,7 @@ function HomeScreen() {
         return;
       }
       if (!companionIntent) return;
-      if (companionIntent.kind === 'journal_flow') openManualJournal(companionIntent.flowId);
+      if (companionIntent.kind === 'journal_flow') openGuidedCaptureForManualFlow(companionIntent.flowId, 'companion');
       else if (companionIntent.kind === 'quick_goals') setQuickGoalsOpen(true);
       else if (companionIntent.kind === 'memory_vault') {
         setMemoryVaultTab(companionIntent.tab);
@@ -1766,17 +2027,46 @@ function HomeScreen() {
       } else if (companionIntent.kind === 'places') setPlacesVaultOpen(true);
       else if (companionIntent.kind === 'movement') setJourneySheetOpen(true);
       else if (companionIntent.kind === 'rest') setSleepSheetOpen(true);
-    }, [handleQuestActionIntent, openManualJournal, selectTimelineDay, selectedDayId, setJourneySheetOpen, setMemoryVaultOpen, setMemoryVaultTab, setPlacesVaultOpen, setSleepSheetOpen, timelineDays])
+    }, [handleQuestActionIntent, openGuidedCaptureForManualFlow, selectTimelineDay, selectedDayId, setJourneySheetOpen, setMemoryVaultOpen, setMemoryVaultTab, setPlacesVaultOpen, setSleepSheetOpen, timelineDays])
   );
 
   useEffect(() => {
-    if (!companionJournalHandoff || companionJournalHandoff.status !== 'pending' || manualJournalOpen) return;
+    if (!companionJournalHandoff || companionJournalHandoff.status !== 'pending' || manualJournalOpen || guidedCapture) return;
     const selectedTarget = companionJournalHandoff.target === 'tomorrow'
       ? selectedDay?.kind === 'tomorrow'
       : selectedDay?.kind === 'day' && selectedDay.isToday;
     if (!selectedTarget) return;
-    openManualJournal(companionJournalHandoff.flowId, undefined, null, companionJournalHandoff.target);
-  }, [companionJournalHandoff, manualJournalOpen, openManualJournal, selectedDay]);
+    const baseFlow = guidedCaptureFlowForManualFlowId(companionJournalHandoff.flowId);
+    if (!baseFlow) return;
+    const allowed = new Set(companionJournalHandoff.allowedChoiceIds ?? []);
+    const allowedOptions = allowed.size
+      ? baseFlow.options.filter((option) => allowed.has(option.categoryId))
+      : baseFlow.options;
+    const flow = {
+      ...baseFlow,
+      title: companionJournalHandoff.title,
+      body: companionJournalHandoff.body,
+      options: allowedOptions.length ? allowedOptions : baseFlow.options,
+    };
+    const journalSource: JournalSource = {
+      kind: 'manual',
+      sourceId: companionJournalHandoff.id,
+      origin: {
+        kind: 'companion_reflection',
+        creatureId: companionJournalHandoff.creatureId,
+        familyId: companionJournalHandoff.familyId,
+        promptId: companionJournalHandoff.nodeId ?? 'companion:optional-journal',
+        promptText: companionJournalHandoff.prompt,
+        answerIds: companionJournalHandoff.answerIds,
+        reflectionMode: companionJournalHandoff.mode,
+      },
+    };
+    openGuidedCapture(flow, 'companion', {
+      handoff: companionJournalHandoff,
+      journalSource,
+      target: companionJournalHandoff.target,
+    });
+  }, [companionJournalHandoff, guidedCapture, manualJournalOpen, openGuidedCapture, selectedDay]);
 
   const renderTimelineHero = useCallback((
     timelineDay: HomeTimelineDay,
@@ -1940,6 +2230,7 @@ function HomeScreen() {
     feastleJournalReward !== null ||
     quickNoteOpen ||
     todayPhotoLibrarySheet !== null ||
+    guidedCapture !== null ||
     clarificationMemory !== null ||
     !!comicGen ||
     voiceNote.phase !== 'idle';
@@ -2320,6 +2611,7 @@ function HomeScreen() {
           actionListLocked={
             ftueActionBusy
             || ftueLifeEnergyBusy
+            || yesterdayStepEnergyBusy
             || energyLoopStatus === 'launching'
             || energyLoopStatus === 'awaiting_completion'
             || energyLoopStatus === 'rewarding'
@@ -2337,6 +2629,7 @@ function HomeScreen() {
           eggTargetRef={eggTargetRef}
           energyHudPulseNonce={energyHudPulseNonce}
           energyHudTargetRef={energyHudTargetRef}
+          energyHudValueOverride={energyHudValueOverride}
           feedbackKey={eggFeedKey}
           feedExpressionKey={eggFeedLaunchKey}
           focusMode={false}
@@ -2354,6 +2647,10 @@ function HomeScreen() {
           onScriptedChoice={handleFtueChoice}
           scriptedStepCount={ftueRun?.stepId === 'energy.steps_offer' ? ftueDisplayedSteps : null}
           scriptedStepEnergy={ftueRun?.stepId === 'energy.steps_offer' ? ftueStepEnergy : null}
+          yesterdayStepEnergyBusy={yesterdayStepEnergyBusy}
+          yesterdayStepEnergyDisplayedSteps={yesterdayStepEnergyDisplayedSteps}
+          yesterdayStepEnergyOffer={yesterdayStepEnergyOffer}
+          onConvertYesterdaySteps={convertYesterdaySteps}
           onAddJournal={handleNurtureAddJournal}
           onAddTextNote={handleNurtureAddTextNote}
           onAddPhoto={openMomentCapture}
@@ -2504,20 +2801,27 @@ function HomeScreen() {
       {quickNoteOpen ? (
         <QuickNoteComposer
           initialMode={quickNoteInitialMode}
-          onClose={() => setQuickNoteOpen(false)}
-          onCancel={() => {
-            cancelSemanticNoteQuestCapture();
+          onClose={() => {
+            setGuidedTextDetail(null);
             setQuickNoteOpen(false);
           }}
-          onSubmit={handleQuickNoteSubmit}
+          onCancel={() => {
+            if (!guidedTextDetail) cancelSemanticNoteQuestCapture();
+            setGuidedTextDetail(null);
+            setQuickNoteOpen(false);
+          }}
+          onSubmit={guidedTextDetail ? handleGuidedTextDetailSubmit : handleQuickNoteSubmit}
           onVoiceStart={voiceNote.start}
           onVoiceStop={() => {
             void voiceNote.stop();
           }}
           voiceElapsed={voiceNote.elapsed}
           voicePhase={voiceNote.phase}
-          contextTitle={semanticQuestPrompt?.title}
-          contextBody={semanticQuestPrompt?.request}
+          contextKicker={guidedTextDetail ? 'ADD A DETAIL' : undefined}
+          contextTitle={guidedTextDetail?.title ?? semanticQuestPrompt?.title}
+          contextBody={guidedTextDetail?.body ?? semanticQuestPrompt?.request}
+          placeholder={guidedTextDetail?.placeholder}
+          showVoiceOption={!guidedTextDetail}
         />
       ) : null}
 
@@ -2556,6 +2860,103 @@ function HomeScreen() {
           }}
         />
       ) : null}
+      {guidedCapture ? (
+        <GuidedCaptureSheet
+          entryPoint={guidedCapture.entryPoint}
+          flow={guidedCapture.flow}
+          journalSource={guidedCapture.journalSource}
+          targetLabel={guidedCapture.target}
+          onAddPlace={() => setPlacesVaultOpen(true)}
+          onAddPhoto={openMomentCapture}
+          onAddText={(draft) => {
+            setGuidedTextDetail({ ...draft, target: guidedCapture.target });
+            setQuickNoteInitialMode('text');
+            setQuickNoteOpen(true);
+          }}
+          onAddVoice={() => openQuickNoteOverlay('voice')}
+          onClose={() => {
+            if (guidedCapture.committed && guidedCapture.action) {
+              // The first answer already persisted the exact originating action.
+              // Keep both its completion and currency flight deferred until this
+              // sheet is gone. The restored action-row reward chip is the source.
+              deferredCareMergeEnergyRef.current = guidedCapture.mergeEnergyAmount ?? 0;
+              queueCareCompletionAfterJournalDismiss(guidedCapture.action);
+            } else if (guidedCapture.action && pendingCareIntent?.instanceId === guidedCapture.action.instanceId) {
+              deferredJournalCareCompletionRef.current = null;
+              clearCareIntent('guided_capture_closed_without_answer');
+            } else if (guidedCapture.committed) {
+              // Plus/manual guided captures have no action-row origin. Restore the
+              // original journal animation from the bottom after the sheet exits.
+              launchJournalRewardFromBottomAfterDismiss({
+                mergeEnergyAmount: guidedCapture.mergeEnergyAmount ?? 0,
+              });
+            }
+            if (guidedCapture.committed) setMicrocopy(nurtureGrowth?.isContextFull ? 'Added to today’s memories' : 'The Egg remembers');
+            if (guidedCapture.handoff) {
+              if (!guidedCapture.committed) cancelCompanionJournalHandoff(guidedCapture.handoff.id);
+              const creatureId = guidedCapture.handoff.creatureId;
+              setCompanionJournalHandoff(null);
+              if (!guidedCapture.committed) {
+                transitionTo({
+                  announcement: 'Returning to your Katchimera',
+                  target: 'companion',
+                  navigate: () => router.push({ pathname: '/katchimera/[creatureId]', params: { creatureId } }),
+                });
+              }
+            }
+            setGuidedCapture(null);
+          }}
+          onCommit={(submission) => {
+            const mergeEnergyAmount = !guidedCapture.committed
+              ? guidedCapture.handoff
+                ? journalMergeReward?.totalEnergy ?? 0
+                : journalMergeReward?.dailyJournalEnergy ?? 0
+              : guidedCapture.mergeEnergyAmount;
+            if (!guidedCapture.committed && guidedCapture.action) {
+              const completedAt = new Date().toISOString();
+              // A guided answer can project to a different journal category
+              // than the row that launched it (for example, "What stood out?"
+              // -> People). Persist the originating row explicitly instead of
+              // trying to infer completion from the resulting journal flow.
+              deferredJournalCareCompletionRef.current = guidedCapture.action.instanceId;
+              updateCareAction({
+                instanceId: guidedCapture.action.instanceId,
+                definitionId: guidedCapture.action.id,
+                sourceId: guidedCapture.action.sourceId ?? null,
+                status: 'completed',
+                deferredUntil: null,
+                completedAt,
+                dismissedAt: null,
+              }, guidedCapture.target);
+              markCareDomainCommit();
+            }
+            addManualJournalEntry(submission, guidedCapture.target);
+            if (!guidedCapture.committed && guidedCapture.handoff) {
+              const source = submission.journalSource ?? guidedCapture.journalSource ?? { kind: 'manual' as const, sourceId: guidedCapture.handoff.id };
+              const recordId = journalRecordId(journalIdempotencyKey(source, submission.sessionId ?? guidedCapture.handoff.id));
+              completeCompanionJournalHandoff(guidedCapture.handoff.id, recordId);
+              setFeastleJournalReward({
+                ...guidedCapture.handoff,
+                journalRecordId: recordId,
+                mergeReward: journalMergeReward ?? { dailyJournalEnergy: 0, companionEnergy: 0, totalEnergy: 0 },
+                status: 'saved',
+              });
+              setCompanionJournalHandoff(null);
+            }
+            setGuidedCapture((current) => current ? {
+              ...current,
+              committed: true,
+              mergeEnergyAmount: current.mergeEnergyAmount ?? mergeEnergyAmount,
+            } : current);
+          }}
+          onFeed={(option: GuidedCaptureOption, from) => {
+            startEggFeed(from, {
+              label: `${option.emoji} ${option.label}`,
+              tint: eggReactionTint(option.reaction),
+            }, () => {});
+          }}
+        />
+      ) : null}
       {manualJournalOpen ? (
         <ManualJournalSheet
           allowRemoteIntelligence={cloudIntelligenceEnabled}
@@ -2563,6 +2964,7 @@ function HomeScreen() {
           initialFlowId={manualJournalInitialFlowId}
           initialChoiceId={manualJournalInitialChoiceId}
           initialContext={manualJournalInitialContextId}
+          onFlowSelect={!manualJournalInitialFlowId ? openGuidedCaptureFromJournalBrowser : undefined}
           allowedChoiceIds={companionJournalHandoff?.allowedChoiceIds}
           promptTitle={companionJournalHandoff
             ? `${companionJournalHandoff.target === 'tomorrow' ? 'Tomorrow’s' : 'Today’s'} Egg · ${companionJournalHandoff.title}`
@@ -2651,20 +3053,10 @@ function HomeScreen() {
               : submission.linkedNote?.kind === 'voice'
                 ? TODAY_GROWTH_REWARDS.voice_note
                 : TODAY_GROWTH_REWARDS.journal;
-            const pendingFtueCapture = ftueRun?.stepId === 'energy.capture'
-              ? ftueRun.receipts.find((receipt) => receipt.stepId === 'energy.capture' && receipt.status === 'pending')
-              : null;
             if (!deferRewardToCareRow) {
-              startEggFeed({ h: 54, w: 54, x: windowWidth / 2 - 27, y: windowHeight - 190 }, {
+              launchJournalRewardFromBottomAfterDismiss({
                 energyAmount,
-                energyOnly: true,
-                imageSource: GAME_CURRENCY_ART.energy,
                 mergeEnergyAmount: journalMergeReward?.totalEnergy ?? 0,
-                ...(pendingFtueCapture ? { mergeEnergyAmount: MOSSPROUT_FTUE_JOURNAL_ENERGY } : {}),
-                tint: Lantern.ember300,
-              }, () => {
-                if (!pendingFtueCapture) return;
-                void completeFtueJournalCapture(pendingFtueCapture.actionId, submission.sessionId ?? `journal:${formingDay?.isoDate ?? 'today'}`);
               });
             }
             setCompanionJournalHandoff(null);
@@ -2753,15 +3145,16 @@ function HomeScreen() {
       {pendingJournalNote ? (
         <ManualJournalSheet
           allowRemoteIntelligence={cloudIntelligenceEnabled}
+          classificationReview={pendingFoundationReview}
           dayLocationPoints={formingDay?.locations}
-          initialFlowId={pendingNoteRoute?.flowId ?? (
+          initialFlowId={pendingFoundationReview ? undefined : pendingNoteRoute?.flowId ?? (
             pendingJournalNote.topLevelConfidence === 'high' && pendingJournalNote.subcategoryConfidence !== 'high'
               ? pendingJournalNote.suggestedJournalFlowId
               : undefined
           )}
-          initialChoiceId={pendingNoteRoute?.choiceId}
-          suggestedFlowId={pendingJournalNote.topLevelConfidence !== 'high' ? pendingJournalNote.suggestedJournalFlowId : null}
-          suggestedChoiceId={pendingJournalNote.topLevelConfidence === 'high' && pendingJournalNote.subcategoryConfidence !== 'high'
+          initialChoiceId={pendingFoundationReview ? undefined : pendingNoteRoute?.choiceId}
+          suggestedFlowId={!pendingFoundationReview && pendingJournalNote.topLevelConfidence !== 'high' ? pendingJournalNote.suggestedJournalFlowId : null}
+          suggestedChoiceId={!pendingFoundationReview && pendingJournalNote.topLevelConfidence === 'high' && pendingJournalNote.subcategoryConfidence !== 'high'
             ? pendingNoteRoutes[0]?.choiceId
             : null}
           initialSpecific={pendingNoteRoute && (
@@ -2776,24 +3169,29 @@ function HomeScreen() {
           initialNote={pendingJournalNote.text}
           initialLinkedNote={{ kind: pendingJournalNote.kind, text: pendingJournalNote.text, audioUri: pendingJournalNote.audioUri ?? null, durationMs: pendingJournalNote.durationMs ?? null }}
           initialConfirmedFacets={pendingNoteRoute?.confirmedFacets}
-          suggestedRoutes={pendingNoteRoute ? undefined : pendingNoteRoutes}
+          suggestedRoutes={pendingFoundationReview || !pendingNoteRoute ? pendingNoteRoutes : undefined}
           journalSource={pendingJournalNote.kind === 'voice'
             ? { kind: 'voice_note', sourceId: pendingJournalNote.captureId, audioUri: pendingJournalNote.audioUri ?? null, durationMs: pendingJournalNote.durationMs ?? null }
             : { kind: 'text_note', sourceId: pendingJournalNote.captureId }}
-          onClose={() => {
+          onKeepAsNote={pendingFoundationReview ? keepPendingJournalNoteAsGeneral : undefined}
+          onClose={pendingFoundationReview ? keepPendingJournalNoteAsGeneral : () => {
             cancelSemanticNoteQuestCapture();
             clearPendingJournalNote();
           }}
           onSave={async (submission) => {
             addManualJournalEntry(submission, formingTarget);
+            clearPendingJournalNote();
+            pulseEgg();
+            launchJournalRewardFromBottomAfterDismiss({
+              energyAmount: pendingJournalNote.kind === 'voice' ? TODAY_GROWTH_REWARDS.voice_note : TODAY_GROWTH_REWARDS.journal,
+              mergeEnergyAmount: journalMergeReward?.totalEnergy ?? 0,
+            });
             const result = await completeSemanticNoteQuestCapture({
               sourceId: pendingJournalNote.captureId,
               sourceType: pendingJournalNote.kind === 'voice' ? 'voice_note' : 'text_note',
               text: pendingJournalNote.text,
               target: formingTarget,
             });
-            clearPendingJournalNote();
-            pulseEgg();
             if (result.handled) {
               refreshState();
               setMicrocopy(result.message ?? 'Added to today');
@@ -2830,7 +3228,7 @@ function HomeScreen() {
         onCapturePhoto={openMomentCapture}
         onCaptureNote={openQuickNoteOverlay}
         openPromptSheet={openPromptSheet}
-        openManualJournal={openManualJournal}
+        openJournalCapture={(flowId) => { void openGuidedCaptureForManualFlow(flowId, 'vault'); }}
         handleOpenDayMap={handleOpenDayMap}
         handleAddFood={handleAddFood}
         handleAddStudio={handleAddStudio}
@@ -2862,7 +3260,7 @@ function HomeScreen() {
               </View>
             </View>
             <ThemedText style={styles.feastleRewardBody} lightColor="#64513B" darkColor="#64513B">
-              The Egg received +{feastleJournalReward.rewardGrowth} Growth. {feastleJournalReward.mergeReward.totalEnergy > 0
+              The Egg kept your reflection. {feastleJournalReward.mergeReward.totalEnergy > 0
                 ? `${MERGE_CHARACTER_NAMES[feastleJournalReward.familyId as MergeCharacterId] ?? 'Your Katchimera'} sent +${feastleJournalReward.mergeReward.totalEnergy} Energy to Merge World (${[
                     feastleJournalReward.mergeReward.dailyJournalEnergy > 0 ? `Journal +${feastleJournalReward.mergeReward.dailyJournalEnergy}` : null,
                     feastleJournalReward.mergeReward.companionEnergy > 0 ? `Companion +${feastleJournalReward.mergeReward.companionEnergy}` : null,

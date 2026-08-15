@@ -175,8 +175,8 @@ export function grantMossproutFtueJournalEnergy(dayId: string, now = Date.now())
   }), now);
 }
 
-/** Atomically checkpoints the device pedometer total and grants only unclaimed steps. */
-export function claimMossproutFtueStepEnergy(input: {
+/** Atomically checkpoints yesterday's pedometer total for its one daily conversion. */
+export function claimDailyStepEnergy(input: {
   dayId: string;
   observedSteps: number;
   observedAt: string;
@@ -189,6 +189,9 @@ export function claimMossproutFtueStepEnergy(input: {
     now,
   }), now);
 }
+
+/** Backwards-compatible name for the authored onboarding call site. */
+export const claimMossproutFtueStepEnergy = claimDailyStepEnergy;
 
 export async function resetMergeWorldStateForDebug(now = Date.now()): Promise<void> {
   resetGeneration += 1;
@@ -278,7 +281,11 @@ async function persistPreparedFtueState(state: MergeWorldState) {
 }
 
 /** Makes one day eligible for real-life Merge Energy without resetting board progress. */
-export async function resetMergeWorldActivityForDayForDebug(dayId: string, now = Date.now()): Promise<void> {
+export async function resetMergeWorldActivityForDayForDebug(
+  dayId: string,
+  now = Date.now(),
+  stepEnergyDayId?: string,
+): Promise<void> {
   // Preserve a board command that was queued immediately before Reset Today.
   // Once drained, resetInProgress rejects any stale writes until the scoped
   // snapshot and its mounted-provider notification are complete.
@@ -307,7 +314,7 @@ export async function resetMergeWorldActivityForDayForDebug(dayId: string, now =
           }
         }
       }
-      resetState = resetMergeActivityForDay(current, dayId, now);
+      resetState = resetMergeActivityForDay(current, dayId, now, stepEnergyDayId);
       await db.runAsync(
         `INSERT INTO merge_world_snapshot (profile_id, schema_version, revision, updated_at, state_json, backup_json)
          VALUES (?, ?, ?, ?, ?, ?)

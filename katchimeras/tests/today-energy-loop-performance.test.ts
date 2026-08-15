@@ -96,9 +96,44 @@ test('manual journal action feedback waits until its native sheet is dismissed',
     'utf8',
   );
   assert.match(todaySource, /queueCareCompletionAfterJournalDismiss\(completingCareAction\)/);
-  assert.match(todaySource, /runAfterNativeModalDismiss\(\(\) => \{[\s\S]*?queueCareCompletion\(action, false\)/);
+  assert.match(todaySource, /rewardAlreadyAnimated = false/);
+  assert.match(todaySource, /runAfterNativeModalDismiss\(\(\) => \{[\s\S]*?queueCareCompletion\(action, rewardAlreadyAnimated\)/);
+  assert.match(todaySource, /deferredCareMergeEnergyRef\.current = guidedCapture\.mergeEnergyAmount \?\? 0;[\s\S]*queueCareCompletionAfterJournalDismiss\(guidedCapture\.action\)/);
+  assert.match(todaySource, /launchJournalRewardFromBottomAfterDismiss\(\{[\s\S]*mergeEnergyAmount: journalMergeReward\?\.totalEnergy \?\? 0/);
+  assert.match(todaySource, /runAfterNativeModalDismiss\(\(\) => \{[\s\S]*currencyFrom: from,[\s\S]*imageSource: GAME_CURRENCY_ART\.energy/);
   assert.match(todaySource, /hapticOnSave=\{!pendingCareIntent\}/);
   assert.match(journalSource, /if \(hapticOnSave\) successHaptic\(\)/);
+});
+
+test('yesterday step Energy is a required top action with synchronized counters', () => {
+  const todaySource = readFileSync(path.join(process.cwd(), 'app', '(tabs)', 'today.tsx'), 'utf8');
+  const nurtureSource = readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'home', 'today-nurture-experience.tsx'),
+    'utf8',
+  );
+  const stepRowIndex = nurtureSource.indexOf('<YesterdayStepEnergyRow');
+  const moodRowIndex = nurtureSource.indexOf('{displayedMoodAction || displayedSleepAction');
+  assert.ok(stepRowIndex >= 0 && stepRowIndex < moodRowIndex);
+  assert.match(nurtureSource, /This action cannot be skipped/);
+  assert.match(todaySource, /buildYesterdayStepEnergyOffer\(\{[\s\S]*?existing: mergeState\.stepEnergyByDay\[yesterday\.dayId\]/);
+  assert.match(todaySource, /setEnergyHudValueOverride\(wallet\.energy\)[\s\S]*?claimDailyStepEnergy/);
+  assert.match(todaySource, /onMergeEnergyTokenArrive: \(amount\) => \{[\s\S]*?setEnergyHudValueOverride\(beforeEnergy \+ arrivedEnergy\)[\s\S]*?offer\.observedSteps - arrivedEnergy \* STEPS_PER_MERGE_ENERGY/);
+  assert.match(todaySource, /receiptId: `daily-steps:\$\{formingDay\?\.isoDate \?\? 'today'\}:\$\{offer\.dayId\}`/);
+});
+
+test('developer Reset Today makes yesterday step Energy claimable again', () => {
+  const resetSource = readFileSync(
+    path.join(process.cwd(), 'features', 'today', 'reset-today-for-debug.ts'),
+    'utf8',
+  );
+  const engineSource = readFileSync(
+    path.join(process.cwd(), 'utils', 'merge-world', 'engine.ts'),
+    'utf8',
+  );
+
+  assert.match(resetSource, /toLocalDateId\(shiftLocalDate\(resetDay, -1\)\)/);
+  assert.match(resetSource, /resetMergeWorldActivityForDayForDebug\(state\.today\.isoDate, now\.getTime\(\), yesterdayDayId\)/);
+  assert.match(engineSource, /if \(stepEnergyDayId\) delete stepEnergyByDay\[stepEnergyDayId\]/);
 });
 
 test('inline completion uses one active-day normalization for artifact, Growth, and care', () => {
@@ -167,4 +202,7 @@ test('forming nurture presentation does not mount the legacy Today scene underne
   assert.match(feedSource, /const TOKEN_HOVER_MS = 150/);
   assert.match(feedSource, /const TOKEN_FLIGHT_MS = 380/);
   assert.match(feedSource, /const TOKEN_STAGGER_MS = 65/);
+  assert.match(feedSource, /<Image contentFit="contain" source=\{GAME_CURRENCY_ART\.energy\} style=\{styles\.energyTokenArt\}/);
+  assert.doesNotMatch(feedSource, /contextMote/);
+  assert.doesNotMatch(nurtureSource, /leaf\.fill/);
 });

@@ -13,6 +13,7 @@ import type { HomeDayRecord, HomeTimelineDay } from '@/types/home';
 
 type TodayTopHudProps = {
   days: HomeTimelineDay[];
+  energyValueOverride?: number | null;
   energyPulseNonce?: number;
   energyTargetRef?: RefObject<View | null>;
   interactionLocked?: boolean;
@@ -20,7 +21,7 @@ type TodayTopHudProps = {
   selectedId: string;
 };
 
-export const TodayTopHud = memo(function TodayTopHud({ days, energyPulseNonce = 0, energyTargetRef, interactionLocked = false, onSelectDay, selectedId }: TodayTopHudProps) {
+export const TodayTopHud = memo(function TodayTopHud({ days, energyValueOverride = null, energyPulseNonce = 0, energyTargetRef, interactionLocked = false, onSelectDay, selectedId }: TodayTopHudProps) {
   const wallet = useGameWallet();
   const [historyOpen, setHistoryOpen] = useState(false);
   const selectedDay = days.find((day) => day.id === selectedId) ?? null;
@@ -32,7 +33,7 @@ export const TodayTopHud = memo(function TodayTopHud({ days, energyPulseNonce = 
   return <>
     <GameHudBar
       content={<GameCurrencyHud balances={[
-        { art: GAME_CURRENCY_ART.energy, id: 'energy', pulseNonce: energyPulseNonce, suffix: wallet.energyCap > 0 ? `/${wallet.energyCap}` : undefined, targetRef: energyTargetRef, value: wallet.energy },
+        { art: GAME_CURRENCY_ART.energy, id: 'energy', pulseNonce: energyPulseNonce, suffix: wallet.energyCap > 0 ? `/${wallet.energyCap}` : undefined, targetRef: energyTargetRef, value: energyValueOverride ?? wallet.energy },
         { art: GAME_CURRENCY_ART.coins, id: 'coins', value: wallet.coins },
         { id: 'gems', value: wallet.gems },
       ]} style={styles.currencyHud} tone="glass" />}

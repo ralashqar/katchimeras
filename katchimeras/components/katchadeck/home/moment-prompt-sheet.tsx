@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { DayPromptStrip, type FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
@@ -89,7 +89,7 @@ export function MomentPromptSheet({
       header={selected ? undefined : { title: 'Add to today' }}
       maxHeight={selected ? '88%' : '74%'}
       onRequestClose={() => onClose()}
-      scroll={selected != null}
+      scroll
       surface="parchment">
       {selected ? (
         <DayPromptStrip
@@ -158,13 +158,10 @@ export function MomentPromptSheet({
 
           {prompts.length === 0 && quickCategories.length === 0 ? (
             <ThemedText style={styles.empty} lightColor={PARCHMENT.textTertiary} darkColor={PARCHMENT.textTertiary}>
-              {"You've answered everything for now — the egg has what it needs today."}
+              Nothing is waiting for you. Add another piece whenever you like.
             </ThemedText>
           ) : (
-            <ScrollView
-              contentContainerStyle={styles.menuSections}
-              showsVerticalScrollIndicator={false}
-              style={styles.categoryScroll}>
+            <View style={styles.menuSections}>
               {MENU_SECTIONS.map((section) => {
                 const sectionCategories = quickCategories.filter((category) => category.section === section.id);
                 const sectionPrompts = prompts.filter((prompt) => sectionForPrompt(prompt) === section.id);
@@ -213,7 +210,7 @@ export function MomentPromptSheet({
                   </View>
                 );
               })}
-            </ScrollView>
+            </View>
           )}
         </>
       )}
@@ -291,9 +288,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     textAlign: 'center',
   },
-  categoryScroll: {
-    maxHeight: 390,
-  },
   menuSections: { gap: 16, paddingVertical: 4 },
   menuSection: { gap: 8 },
   menuHeading: {
@@ -310,8 +304,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   categoryCell: {
-    // Three across, centered — wraps to as many rows as needed (6 categories =
-    // a clean 3×2 grid).
+    // Preserve the original compact three-across + menu. Categories launch
+    // the conversational capture flow instead of becoming larger form cards.
     width: '30%',
   },
   suggestionSection: { gap: 8 },

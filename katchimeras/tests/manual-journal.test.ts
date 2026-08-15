@@ -49,6 +49,7 @@ test('a place journal owns one specific Moments row while retaining its place pr
   const timeline = buildMomentTimeline(result as unknown as HomeDayRecord);
   assert.equal(timeline.length, 1);
   assert.equal(timeline[0]?.category, 'Museum or gallery');
+  assert.equal(timeline[0]?.categoryFlowId, 'went_somewhere');
   assert.equal(timeline[0]?.label, 'London');
   assert.equal(timeline[0]?.noteText, 'I went to the Natural History Museum in London');
 });
@@ -57,7 +58,9 @@ test('film title saves to Studio while rating remains genuinely absent', () => {
   const result = withManualJournalEntry(day(), submission('studio', 'film', ['media.film'], 'Dune: Part Two'), new Date('2026-07-12T13:00:00Z'));
   assert.equal(result.studioMoments?.[0].label, 'Dune: Part Two');
   assert.equal(result.studioMoments?.[0].rating, null);
-  assert.equal(buildMomentTimeline(result as unknown as HomeDayRecord).filter((entry) => /Dune/.test(entry.label)).length, 1);
+  const timeline = buildMomentTimeline(result as unknown as HomeDayRecord).filter((entry) => /Dune/.test(entry.label));
+  assert.equal(timeline.length, 1);
+  assert.equal(timeline[0]?.categoryFlowId, 'studio');
 });
 
 test('food can save without fabricated meaning', () => {
