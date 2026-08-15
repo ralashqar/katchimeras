@@ -254,8 +254,10 @@ test('the tabless opening uses a centered full-bleed Home camera without scaling
   assert.match(layout, /HOME_FTUE_CAMERA_Y_OFFSET = -24/);
   assert.match(home, /sceneLift = onboardingFocus \? HOME_SCENE_Y_OFFSET : -100 \+ sceneVerticalNudge/);
   assert.match(home, /HOME_FTUE_CAMERA_SCALE - 1\) \* onboardingCameraProgress\.value/);
-  assert.match(home, /<Animated\.View pointerEvents="none" style=\{\[styles\.focusScene, focusSceneStyle\]\}>[\s\S]*?<TodayEnvironmentViewportMotionLayer/);
-  assert.match(home, /<\/TodayEnvironmentViewportMotionLayer>[\s\S]*?<\/Animated\.View>[\s\S]*?<Animated\.View[\s\S]*?projectedEggStageStyle[\s\S]*?<TodayKingdomEggHero/);
+  assert.match(home, /<View pointerEvents="none" style=\{styles\.focusSceneViewport\}>[\s\S]*?<Animated\.View style=\{\[styles\.focusSceneCamera, focusSceneStyle\]\}>[\s\S]*?<TodayEnvironmentViewportMotionLayer/);
+  assert.match(home, /<\/TodayEnvironmentViewportMotionLayer>[\s\S]*?<\/Animated\.View>[\s\S]*?<\/View>[\s\S]*?<Animated\.View[\s\S]*?projectedEggStageStyle[\s\S]*?<TodayKingdomEggHero/);
+  assert.match(home, /focusSceneViewport: \{ \.\.\.StyleSheet\.absoluteFillObject, overflow: 'hidden' \}/);
+  assert.match(home, /focusSceneCamera: \{ \.\.\.StyleSheet\.absoluteFillObject \}/);
   assert.match(home, /projectedCameraScale=\{projectedEggCameraScale\}/);
   assert.match(home, /<\/Animated\.View>[\s\S]*?<View[\s\S]*style=\{\[styles\.chrome/);
 });
@@ -264,6 +266,9 @@ test('the opening camera slowly pinches in before revealing UI and retreats acro
   const {
     FTUE_OPENING_CAMERA_DURATION_MS,
     FTUE_OPENING_UI_DELAY_MS,
+    FTUE_OPENING_CAMERA_PAN_Y,
+    clampFtueCameraPanToCoverage,
+    ftueHomeCameraPanTarget,
     ftueHomeCameraPinchTarget,
   } = await import('../features/onboarding/ftue-home-camera');
   const route = readFileSync('app/(tabs)/today.tsx', 'utf8');
@@ -280,13 +285,49 @@ test('the opening camera slowly pinches in before revealing UI and retreats acro
   assert.equal(ftueHomeCameraPinchTarget('egg.ready', 2), 1);
   assert.equal(ftueHomeCameraPinchTarget('energy.steps_offer', 2), 1);
   assert.equal(ftueHomeCameraPinchTarget('companion.first_meeting', 2), null);
+  assert.equal(ftueHomeCameraPanTarget('egg.opening'), FTUE_OPENING_CAMERA_PAN_Y);
+  assert.equal(ftueHomeCameraPanTarget('egg.context'), FTUE_OPENING_CAMERA_PAN_Y * (2 / 3));
+  assert.equal(ftueHomeCameraPanTarget('egg.mind'), FTUE_OPENING_CAMERA_PAN_Y * (1 / 3));
+  assert.equal(ftueHomeCameraPanTarget('egg.ready'), 0);
+  assert.equal(ftueHomeCameraPanTarget('energy.capture'), 0);
+  assert.equal(clampFtueCameraPanToCoverage({
+    projectedBottom: 840,
+    projectedTop: -100,
+    requestedPanY: -72,
+    viewportHeight: 800,
+  }), -40);
+  assert.equal(clampFtueCameraPanToCoverage({
+    projectedBottom: 920,
+    projectedTop: -100,
+    requestedPanY: -72,
+    viewportHeight: 800,
+  }), -72);
+  assert.equal(clampFtueCameraPanToCoverage({
+    projectedBottom: 920,
+    projectedTop: -30,
+    requestedPanY: 50,
+    viewportHeight: 800,
+  }), 30);
+  assert.equal(clampFtueCameraPanToCoverage({
+    edgeBleed: 2,
+    projectedBottom: 840,
+    projectedTop: -100,
+    requestedPanY: -72,
+    viewportHeight: 800,
+  }), -38);
   assert.ok(FTUE_OPENING_UI_DELAY_MS >= FTUE_OPENING_CAMERA_DURATION_MS);
   assert.match(route, /setTimeout\(\(\) => setFtueOpeningUiVisible\(true\), FTUE_OPENING_UI_DELAY_MS\)/);
   assert.match(route, /scriptedPinchScale: ftueCameraPinchTarget/);
+  assert.match(route, /onboardingCameraPanY=\{ftueHomeCameraPanTarget/);
+  assert.match(route, /onboardingCameraDurationMs=\{ftueHomeCameraDuration/);
   assert.match(route, /onboardingUiVisible=\{ftueOpeningUiVisible && !ftueEnergyBridgeStep\}/);
   assert.match(nurture, /onboardingFocus && onboardingUiVisible && onboardingGuide/);
   assert.match(motion, /withTiming\(resolvedScriptedPinchScale/);
   assert.match(motion, /enabled\(enabled && !frozen && resolvedScriptedPinchScale == null\)/);
+  assert.match(nurture, /onboardingCameraPanTranslateY\.value = reduceMotion[\s\S]*?withTiming\(onboardingCameraPanY/);
+  assert.match(nurture, /clampedOnboardingCameraPanY = useDerivedValue/);
+  assert.match(nurture, /clampFtueCameraPanToCoverage\(\{[\s\S]*?edgeBleed: FTUE_CAMERA_COVERAGE_BLEED,[\s\S]*?projectedBottom,[\s\S]*?projectedTop,[\s\S]*?requestedPanY: onboardingCameraPanTranslateY\.value/);
+  assert.match(nurture, /HOME_FTUE_CAMERA_Y_OFFSET \* onboardingCameraProgress\.value[\s\S]*?clampedOnboardingCameraPanY\.value/);
 });
 
 test('each Discovery Egg answer grants the same visual Growth', async () => {
@@ -379,15 +420,32 @@ test('the first FTUE feeling beat uses the real Home mood action', () => {
   const route = readFileSync('app/(tabs)/today.tsx', 'utf8');
   assert.match(home, /scriptedMoodAction && scriptedPanelCareAction/);
   assert.match(home, /<InlineMood/);
+  assert.match(home, /function InlineMood[\s\S]*?<InlineCheckInPanel[\s\S]*?illustratedChoices/);
   assert.match(home, /candidate\.domainChoiceId === selection\.id/);
   assert.match(route, /scriptedPanelCareAction=\{ftuePanelCareAction\}/);
+});
+
+test('mood and sleep reuse the compact illustrated answer-card treatment', () => {
+  const home = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
+  assert.match(home, /function InlineMood[\s\S]*?surface: FTUE_CHOICE_TONES\[index % FTUE_CHOICE_TONES\.length\]\.surface[\s\S]*?illustratedChoices/);
+  assert.match(home, /function InlineSleep[\s\S]*?surface: FTUE_CHOICE_TONES\[index % FTUE_CHOICE_TONES\.length\]\.surface[\s\S]*?illustratedChoices/);
+  assert.match(home, /illustrated && allowSkip && styles\.illustratedQuestionAnchorSkippable/);
 });
 
 test('later FTUE choice beats specialize the same inline check-in panel lifecycle', () => {
   const home = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
   assert.match(home, /function InlineScriptedChoice/);
-  assert.match(home, /<InlineCheckInPanel[\s\S]*?textChoices/);
-  assert.match(home, /textChoices \? styles\.textChoiceGrid/);
+  assert.match(home, /function InlineScriptedChoice[\s\S]*?<InlineCheckInPanel[\s\S]*?illustratedChoices/);
+  assert.match(home, /illustratedChoices \? styles\.illustratedChoiceGrid/);
+  assert.match(home, /function MeasuredIllustratedChoice/);
+  assert.match(home, /getFtueChoiceArt\(option\)/);
+  assert.match(home, /<FtueEnergyBadge amount=\{action\.growthReward\}/);
+  assert.match(home, /illustratedAvailableWidth = illustratedGridWidth \|\| illustratedFallbackWidth/);
+  assert.match(home, /function getFtueChoiceColumnCount\(choiceCount: number\)/);
+  assert.match(home, /if \(choiceCount <= 3\) return Math\.max\(1, choiceCount\)/);
+  assert.match(home, /if \(choiceCount === 4\) return 2/);
+  assert.match(home, /illustratedColumnCount = getFtueChoiceColumnCount\(choices\.length\)/);
+  assert.match(home, /setIllustratedGridWidth\(\(current\) => current === measuredWidth \? current : measuredWidth\)/);
   assert.match(home, /setScriptedTextCompletion/);
   assert.match(home, /key=\{scriptedTextChoiceAction\.id\}/);
   assert.match(home, /scriptedRowActions = scriptedActions\.filter\(\(action\) => action\.presentation !== 'inline_choice' && action\.presentation !== 'route_action'\)/);
@@ -411,7 +469,8 @@ test('FTUE inline questions wrap cleanly and do not expose daily-action skip con
   assert.match(home, /disabled=\{interactionLocked \|\| !allowSkip\}/);
   assert.match(home, /\{allowSkip \? \([\s\S]*?accessibilityLabel=\{`Skip \$\{action\.title\} for today`\}/);
   assert.match(home, /numberOfLines=\{2\}[\s\S]*?inlineQuestionRequired/);
-  assert.match(home, /textChoice:[^\n]*minHeight: 34[^\n]*paddingVertical: 5/);
+  assert.match(home, /illustratedChoice:[^\n]*minHeight: 88[^\n]*paddingTop: 4/);
+  assert.match(home, /illustratedChoiceThreeColumn:[^\n]*minHeight: 82/);
 });
 
 test('FTUE copy uses the shared cozy-game type hierarchy and stays concise', () => {

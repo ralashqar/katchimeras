@@ -224,8 +224,13 @@ test('conversation replies, memories, and outcomes advance without redundant con
   assert.match(scene, /AutomaticInsightTransition/);
   assert.match(flow, /onCommitInsight\(node\)/);
   assert.match(flow, /onCommitMemory\(node\.summary\.replace/);
+  assert.match(flow, /useLayoutEffect\(\(\) => \{[\s\S]*?session\.pendingReply === undefined[\s\S]*?onContinue\(\)/);
   assert.match(flow, /conversationReplyDelayMs/);
   assert.match(flow, /screenReaderEnabled/);
+  assert.doesNotMatch(scene, /is following your answer|Tap to move on sooner|Double-tap for the next line/);
+  assert.match(scene, /<PrimaryAction label="Continue" onPress=\{onAdvance\}/);
+  assert.match(stage, /Shows the full message/);
+  assert.match(stage, /revealAll=\{revealAllSpeech\}/);
   assert.doesNotMatch(scene, /A SECONDARY THREAD|WHY THIS RESULT|REVIEW YOUR ANSWERS|Replay from the beginning/);
   assert.match(scene, /A QUEST PICKED FOR YOU/);
   assert.match(scene, /label="Take this quest"/);

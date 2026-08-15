@@ -71,6 +71,24 @@ export function CompanionCinematicStage({
   const compact = height < 735;
   const questionnaireBubble = bubbleVariant === 'questionnaire';
   const defaultTitleTier = companionSpeechTitleTier(title);
+  const speechKey = `${title}\u0000${questionnaireBubble ? bubbleBody ?? '' : ''}`;
+  const hasSpeechBody = Boolean(questionnaireBubble && bubbleBody);
+  const [revealAllSpeechKey, setRevealAllSpeechKey] = useState<string | null>(reduceMotion ? speechKey : null);
+  const [revealedTitleKey, setRevealedTitleKey] = useState<string | null>(reduceMotion ? speechKey : null);
+  const [revealedBodyKey, setRevealedBodyKey] = useState<string | null>(reduceMotion || !hasSpeechBody ? speechKey : null);
+  const revealAllSpeech = reduceMotion || revealAllSpeechKey === speechKey;
+  const speechFullyRevealed = revealAllSpeech || (
+    revealedTitleKey === speechKey
+    && (!hasSpeechBody || revealedBodyKey === speechKey)
+  );
+  const speechBubblePressable = !speechFullyRevealed || Boolean(onSpeechBubblePress);
+  const handleSpeechBubblePress = () => {
+    if (!speechFullyRevealed) {
+      setRevealAllSpeechKey(speechKey);
+      return;
+    }
+    onSpeechBubblePress?.();
+  };
   const liftProgress = useSharedValue(enterFromLifted ? 1 : 0);
   const tabletGutter = Math.max(28, (width - 720) / 2);
   const horizontalGutter = width >= 700 ? tabletGutter : 20;
@@ -129,7 +147,7 @@ export function CompanionCinematicStage({
         style={[StyleSheet.absoluteFill, styles.parchmentBlend]}
       />
 
-      <Animated.View pointerEvents={onSpeechBubblePress ? 'box-none' : 'none'} style={[styles.foregroundPlane, liftStyle]}>
+      <Animated.View pointerEvents={speechBubblePressable ? 'box-none' : 'none'} style={[styles.foregroundPlane, liftStyle]}>
         {showSpeechBubble ? (
           <Animated.View
             accessibilityLabel={`${name} says: ${title}`}
@@ -138,20 +156,22 @@ export function CompanionCinematicStage({
             onLayout={(event: LayoutChangeEvent) => onSpeechBubbleHeightChange?.(event.nativeEvent.layout.height)}
             style={{ left: horizontalGutter, position: 'absolute', top: speechBubbleTop, width: bubbleWidth, zIndex: 1 }}>
             <Pressable
-              accessibilityHint={onSpeechBubblePress ? 'Advances to the next part of the conversation' : undefined}
-              accessibilityRole={onSpeechBubblePress ? 'button' : undefined}
-              disabled={!onSpeechBubblePress}
-              onPress={onSpeechBubblePress}
+              accessibilityHint={!speechFullyRevealed ? 'Shows the full message' : onSpeechBubblePress ? 'Advances to the next part of the conversation' : undefined}
+              accessibilityRole={speechBubblePressable ? 'button' : undefined}
+              disabled={!speechBubblePressable}
+              onPress={handleSpeechBubblePress}
               style={({ pressed }) => [
                 styles.speechBubble,
                 questionnaireBubble && styles.speechBubbleQuestionnaire,
-                pressed && onSpeechBubblePress && styles.speechBubblePressed,
+                pressed && speechBubblePressable && styles.speechBubblePressed,
               ]}>
               <View style={styles.speechTail} />
             <TypewriterText
               durationMs={560}
               key={`speech-title:${title}`}
+              onComplete={() => setRevealedTitleKey(speechKey)}
               reduceMotion={reduceMotion}
+              revealAll={revealAllSpeech}
               style={[
                 styles.title,
                 compact && styles.titleCompact,
@@ -169,7 +189,9 @@ export function CompanionCinematicStage({
                 delayMs={170}
                 durationMs={640}
                 key={`speech-body:${bubbleBody}`}
+                onComplete={() => setRevealedBodyKey(speechKey)}
                 reduceMotion={reduceMotion}
+                revealAll={revealAllSpeech}
                 style={styles.questionBody}
                 text={bubbleBody}
                 lightColor="#6B5544"
@@ -208,7 +230,9 @@ function TypewriterText({
   delayMs = 0,
   durationMs,
   lightColor,
+  onComplete,
   reduceMotion,
+  revealAll = false,
   style,
   text,
 }: {
@@ -216,7 +240,9 @@ function TypewriterText({
   delayMs?: number;
   durationMs: number;
   lightColor: string;
+  onComplete?: () => void;
   reduceMotion: boolean;
+  revealAll?: boolean;
   style: StyleProp<TextStyle>;
   text: string;
 }) {
@@ -224,7 +250,7 @@ function TypewriterText({
   const [visibleCount, setVisibleCount] = useState(() => reduceMotion ? characters.length : 0);
 
   useEffect(() => {
-    if (reduceMotion) {
+    if (reduceMotion || revealAll) {
       setVisibleCount(characters.length);
       return;
     }
@@ -246,9 +272,12 @@ function TypewriterText({
     return () => {
       if (frame !== null) cancelAnimationFrame(frame);
     };
-  }, [characters, delayMs, durationMs, reduceMotion]);
+  }, [characters, delayMs, durationMs, reduceMotion, revealAll]);
 
   const complete = visibleCount >= characters.length;
+  useEffect(() => {
+    if (complete) onComplete?.();
+  }, [complete, onComplete]);
   return (
     <View style={styles.typewriterFrame}>
       <ThemedText

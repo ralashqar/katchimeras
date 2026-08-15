@@ -98,8 +98,9 @@ export function answerConversation(
   if (node.kind === 'choice') {
     const option = node.options.find((candidate) => candidate.id === optionId);
     if (!option) return { session, completedGame: false };
+    const answered = withAnsweredOption(workingSession, node.id, option, answeredAt, option.nextNodeId);
     return {
-      session: withAnsweredOption(workingSession, node.id, option, answeredAt, option.nextNodeId),
+      session: advancePastReplyBeforeNextQuestion(answered, definition, answeredAt),
       completedGame: false,
     };
   }
@@ -107,11 +108,12 @@ export function answerConversation(
     const option = node.options.find((candidate) => candidate.id === optionId);
     if (!option) return { session, completedGame: false };
     const pollResult = buildVillagePollResult(node.options, optionId, `${workingSession.id}:${node.id}`);
+    const answered = {
+      ...withAnsweredOption(workingSession, node.id, option, answeredAt, node.nextNodeId),
+      pollResult,
+    };
     return {
-      session: {
-        ...withAnsweredOption(workingSession, node.id, option, answeredAt, node.nextNodeId),
-        pollResult,
-      },
+      session: advancePastReplyBeforeNextQuestion(answered, definition, answeredAt),
       completedGame: true,
     };
   }
@@ -142,23 +144,24 @@ export function answerConversation(
   const insightResult = reveal?.kind === 'insight_reveal'
     ? resolveInsightResult(definition, reveal, turns)
     : undefined;
+  const answered = {
+    ...workingSession,
+    gameQuestionIndex: node.kind === 'profile_game'
+      ? Math.max(0, node.questions.findIndex((candidate) => candidate.id === nextQuestionId))
+      : workingSession.gameQuestionIndex + 1,
+    ...(node.kind === 'profile_game' && nextQuestionId ? { gameQuestionId: nextQuestionId } : {}),
+    pendingReply: option.reply,
+    pendingNextNodeId: completedGame ? node.revealNodeId : node.id,
+    turns,
+    affinityScores,
+    encounterTurns: (workingSession.encounterTurns ?? 0) + 1,
+    ...(formResult ? { formResult } : {}),
+    ...(insightResult ? { insightResult } : {}),
+    updatedAt: answeredAt,
+  };
   return {
     completedGame,
-    session: {
-      ...workingSession,
-      gameQuestionIndex: node.kind === 'profile_game'
-        ? Math.max(0, node.questions.findIndex((candidate) => candidate.id === nextQuestionId))
-        : workingSession.gameQuestionIndex + 1,
-      ...(node.kind === 'profile_game' && nextQuestionId ? { gameQuestionId: nextQuestionId } : {}),
-      pendingReply: option.reply,
-      pendingNextNodeId: completedGame ? node.revealNodeId : node.id,
-      turns,
-      affinityScores,
-      encounterTurns: (workingSession.encounterTurns ?? 0) + 1,
-      ...(formResult ? { formResult } : {}),
-      ...(insightResult ? { insightResult } : {}),
-      updatedAt: answeredAt,
-    },
+    session: advancePastReplyBeforeNextQuestion(answered, definition, answeredAt),
   };
 }
 
@@ -530,6 +533,23 @@ function hasOutcomeLessEnding(definition: ConversationDefinition): boolean {
 function enterNode(session: ConversationSession, node: ConversationNode, occurredAt: number): ConversationSession {
   if (node.kind === 'end') return completeSession(session, occurredAt);
   return session;
+}
+
+function advancePastReplyBeforeNextQuestion(
+  session: ConversationSession,
+  definition: ConversationDefinition,
+  occurredAt: number,
+): ConversationSession {
+  if (session.pendingReply === undefined || !session.pendingNextNodeId) return session;
+  const next = conversationNode(definition, session.pendingNextNodeId);
+  if (!next || !['choice', 'poll', 'profile_game', 'insight_game'].includes(next.kind)) return session;
+  return enterNode({
+    ...session,
+    currentNodeId: next.id,
+    pendingReply: undefined,
+    pendingNextNodeId: undefined,
+    updatedAt: occurredAt,
+  }, next, occurredAt);
 }
 
 function completeSession(session: ConversationSession, completedAt: number): ConversationSession {

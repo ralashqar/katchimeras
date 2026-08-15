@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AccessibilityInfo } from 'react-native';
 
 import type {
@@ -68,17 +68,18 @@ export function useCompanionConversationFlow({
             ? 'revealing'
             : 'awaiting_choice';
 
+  // Answer replies are authored context, not a separate interaction. Resolve
+  // them before paint so both fresh and persisted sessions enter their next
+  // question or outcome without mounting a waiting screen.
+  useLayoutEffect(() => {
+    if (!session || !definition || session.pendingReply === undefined) return;
+    onContinue();
+  }, [definition, onContinue, session]);
+
   useEffect(() => {
     if (!session || !definition || session.preview) return;
 
-    if (session.pendingReply !== undefined) {
-      if (screenReaderEnabled) return;
-      const timer = setTimeout(
-        onContinue,
-        conversationReplyDelayMs(session.pendingReply, reduceMotion),
-      );
-      return () => clearTimeout(timer);
-    }
+    if (session.pendingReply !== undefined) return;
 
     if (node?.kind === 'memory_proposal') {
       const key = `${session.id}:${node.id}:memory`;

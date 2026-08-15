@@ -81,18 +81,20 @@ test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gate
   }
 });
 
-test('a conversation resumes from persisted reply state and reaches its authored result', () => {
+test('a conversation resumes on the next question and reaches its authored result', () => {
   const definition = companionConversationDefinitionsForFamily('steppling')
     .find((item) => item.id === 'steppling:insight:outside-conditions')!;
   const game = definition.nodes.find((node) => node.kind === 'insight_game')!;
   const started = createConversationSession({ definition, formId: 'steppling', dayId: '2026-08-10', createdAt: 1 });
   const first = answerConversation(started, definition, game.questions[0]!.options[0]!.id, 2).session;
-  assert.ok(first.pendingReply);
+  assert.equal(first.pendingReply, undefined);
+  assert.equal(first.gameQuestionIndex, 1);
 
   const persisted = normaliseCompanionContentState(upsertConversationSession(emptyCompanionContentState(), first));
   const resumed = persisted.conversationSessions[0]!;
-  assert.equal(resumed.pendingReply, first.pendingReply);
-  let revealed = continueConversation(resumed, definition, 3);
+  assert.equal(resumed.pendingReply, undefined);
+  assert.equal(resumed.gameQuestionIndex, 1);
+  let revealed = resumed;
   for (let index = 1; index < game.questions.length; index += 1) {
     revealed = answerConversation(revealed, definition, game.questions[index]!.options[0]!.id, revealed.updatedAt + 1).session;
     revealed = continueConversation(revealed, definition, revealed.updatedAt + 1);
@@ -106,7 +108,7 @@ test('a conversation resumes from persisted reply state and reaches its authored
   assert.equal(continueConversation(completed, definition, 7), completed);
 });
 
-test('an answer stays provisional and can be changed until Continue', () => {
+test('a final answer stays provisional while consecutive questions advance immediately', () => {
   const definition = companionConversationDefinitionsForFamily('baristabbit')
     .find((item) => item.isOpener)!;
   const node = definition.nodes.find((item) => item.kind === 'choice')!;
@@ -123,10 +125,29 @@ test('an answer stays provisional and can be changed until Continue', () => {
     .find((item) => item.format === 'profile_game')!;
   let gameSession = createConversationSession({ definition: game, formId: 'baristabbit', dayId: '2026-08-10', createdAt: 1 });
   gameSession = answerConversation(gameSession, game, 'coffee', 2).session;
-  gameSession = answerConversation(gameSession, game, 'tea', 3).session;
-  assert.equal(gameSession.turns.length, 1);
-  assert.equal(gameSession.affinityScores.hearthsip, 1);
-  assert.equal(gameSession.affinityScores.lattelet, undefined);
+  assert.equal(gameSession.pendingReply, undefined);
+  assert.equal(gameSession.gameQuestionIndex, 1);
+  const profileGame = game.nodes.find((node) => node.kind === 'profile_game')!;
+  const secondQuestion = conversationGameQuestion(profileGame, gameSession)!;
+  const secondOption = secondQuestion.options[0]!;
+  gameSession = answerConversation(gameSession, game, secondOption.id, 3).session;
+  assert.equal(gameSession.pendingReply, undefined);
+  assert.notEqual(gameSession.gameQuestionId, secondQuestion.id);
+  assert.deepEqual(gameSession.turns.map((turn) => turn.optionId), ['coffee', secondOption.id]);
+});
+
+test('answering one choice question enters the next choice without a reply beat', () => {
+  const definition = companionConversationDefinitionsForFamily('steppling')
+    .find((item) => item.id === 'steppling:conversation:goal-discovery')!;
+  const first = definition.nodes.find((node) => node.kind === 'choice' && node.id === definition.entryNodeId);
+  if (!first || first.kind !== 'choice') throw new Error('Goal discovery needs an opening choice');
+  const option = first.options[0]!;
+  const started = createConversationSession({ definition, formId: 'steppling', dayId: '2026-08-10', createdAt: 1 });
+  const answered = answerConversation(started, definition, option.id, 2).session;
+
+  assert.equal(answered.currentNodeId, option.nextNodeId);
+  assert.equal(answered.pendingReply, undefined);
+  assert.equal(answered.turns.at(-1)?.optionId, option.id);
 });
 
 test('signature game scores authored form affinities without unlocking a skin', () => {

@@ -51,7 +51,7 @@ import {
 import { Meadow } from '@/constants/meadow-theme';
 import { todayCareArt } from '@/constants/today-care-art';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
-import { DASHBOARD_STAT_ART } from '@/constants/journal-art-sources';
+import { DASHBOARD_STAT_ART, MANUAL_JOURNAL_ART } from '@/constants/journal-art-sources';
 import { GameRewardChip, GameSurface } from '@/components/katchadeck/ui/game-surface';
 import type { HomeDayRecord, HomeTimelineDay, SleepQuality } from '@/types/home';
 import type { HomeArchetypeId } from '@/types/world-identity';
@@ -73,6 +73,7 @@ import { eggAvatarCustomizerCamera } from '@/utils/egg-avatar-customizer-camera'
 import { ScriptedActionList } from '@/components/katchadeck/onboarding/scripted-action-list';
 import { FtueGuideCopy } from '@/components/katchadeck/onboarding/ftue-guide-copy';
 import type { FtueActionDefinition, FtueChoiceOption } from '@/features/onboarding/ftue-types';
+import { clampFtueCameraPanToCoverage } from '@/features/onboarding/ftue-home-camera';
 import type { TodayHatchPresentation } from '@/utils/today-hatch-presentation';
 import type { YesterdayStepEnergyOffer } from '@/utils/merge-world/economy-policy';
 
@@ -118,6 +119,8 @@ type TodayNurtureExperienceProps = {
     title: string;
     body: string;
   } | null;
+  onboardingCameraDurationMs?: number;
+  onboardingCameraPanY?: number;
   onboardingFocus?: boolean;
   onboardingTopHudVisible?: boolean;
   onboardingUiVisible?: boolean;
@@ -185,6 +188,8 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   onReveal,
   onRewardFlight,
   onSelectDay,
+  onboardingCameraDurationMs = 360,
+  onboardingCameraPanY = 0,
   onboardingGuide = null,
   onboardingFocus = false,
   onboardingTopHudVisible = false,
@@ -232,6 +237,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   const actionStackTranslateY = useSharedValue(reduceMotion ? 0 : 22);
   const focusProgress = useSharedValue(focusMode ? 1 : 0);
   const onboardingCameraProgress = useSharedValue(onboardingFocus ? 1 : 0);
+  const onboardingCameraPanTranslateY = useSharedValue(0);
   const environmentMotion = useTodayEnvironmentMotionValues();
   const ready = day.canHatch || growth.isReady;
   const quietDayAvailable = false;
@@ -367,6 +373,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
     windowHeight,
     stageTop,
   );
+  const sceneImageSize = Math.max(windowHeight, windowWidth);
   const eggVisualTop = stageTop + sceneLift + explorationEggFrame.top;
   // The compact cluster is 63px tall at full size; this leaves an 18px
   // world-space buffer before the egg's measured visual top.
@@ -381,7 +388,8 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   // sharp. Map only its anchor into the camera's final screen coordinates.
   const onboardingZzzTop = windowHeight / 2
     + (onboardingZzzTopBeforeCamera - windowHeight / 2) * HOME_FTUE_CAMERA_SCALE
-    + HOME_FTUE_CAMERA_Y_OFFSET;
+    + HOME_FTUE_CAMERA_Y_OFFSET
+    + onboardingCameraPanY;
   const customizerCamera = useMemo(() => eggAvatarCustomizerCamera({
     bottomInset,
     subjectCenterY: scenePinchFocusY,
@@ -430,11 +438,46 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           easing: Easing.inOut(Easing.cubic),
         });
   }, [onboardingCameraProgress, onboardingFocus, reduceMotion]);
+  useEffect(() => {
+    cancelAnimation(onboardingCameraPanTranslateY);
+    onboardingCameraPanTranslateY.value = reduceMotion
+      ? onboardingCameraPanY
+      : withTiming(onboardingCameraPanY, {
+          duration: onboardingCameraDurationMs,
+          easing: Easing.inOut(Easing.cubic),
+        });
+  }, [onboardingCameraDurationMs, onboardingCameraPanTranslateY, onboardingCameraPanY, reduceMotion]);
+  const clampedOnboardingCameraPanY = useDerivedValue(() => {
+    const pinchScale = environmentMotion?.pinchScale.value ?? 1;
+    const focusScale = 1 + (customizerCamera.scale - 1) * focusProgress.value;
+    const onboardingScale = 1 + (HOME_FTUE_CAMERA_SCALE - 1) * onboardingCameraProgress.value;
+    const outerScale = focusScale * onboardingScale;
+    const outerTranslateY = customizerCamera.translateY * focusProgress.value
+      + HOME_FTUE_CAMERA_Y_OFFSET * onboardingCameraProgress.value;
+    const imageTop = (windowHeight - sceneImageSize) / 2 + sceneLift;
+    const imageBottom = imageTop + sceneImageSize;
+    const pinchedTop = scenePinchFocusY + (imageTop - scenePinchFocusY) * pinchScale;
+    const pinchedBottom = scenePinchFocusY + (imageBottom - scenePinchFocusY) * pinchScale;
+    const projectedTop = windowHeight / 2
+      + (pinchedTop - windowHeight / 2) * outerScale
+      + outerTranslateY;
+    const projectedBottom = windowHeight / 2
+      + (pinchedBottom - windowHeight / 2) * outerScale
+      + outerTranslateY;
+    return clampFtueCameraPanToCoverage({
+      edgeBleed: FTUE_CAMERA_COVERAGE_BLEED,
+      projectedBottom,
+      projectedTop,
+      requestedPanY: onboardingCameraPanTranslateY.value,
+      viewportHeight: windowHeight,
+    });
+  });
   const focusSceneStyle = useAnimatedStyle(() => ({
     transform: [
       {
         translateY: customizerCamera.translateY * focusProgress.value
-          + HOME_FTUE_CAMERA_Y_OFFSET * onboardingCameraProgress.value,
+          + HOME_FTUE_CAMERA_Y_OFFSET * onboardingCameraProgress.value
+          + clampedOnboardingCameraPanY.value,
       },
       {
         scale: (1 + (customizerCamera.scale - 1) * focusProgress.value)
@@ -453,7 +496,8 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
     const outerScale = focusScale * onboardingScale;
     const pinchScale = environmentMotion?.pinchScale.value ?? 1;
     const outerTranslateY = customizerCamera.translateY * focusProgress.value
-      + HOME_FTUE_CAMERA_Y_OFFSET * onboardingCameraProgress.value;
+      + HOME_FTUE_CAMERA_Y_OFFSET * onboardingCameraProgress.value
+      + clampedOnboardingCameraPanY.value;
     // Project the bottom-centre of the Egg image through the exact same camera
     // transforms as the environment. The detached high-resolution plane stays
     // crisp while this world anchor remains planted during every zoom level.
@@ -549,18 +593,20 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
 
   return (
     <View style={styles.root}>
-      <Animated.View pointerEvents="none" style={[styles.focusScene, focusSceneStyle]}>
-      <TodayEnvironmentViewportMotionLayer
-        focusY={scenePinchFocusY}
-        viewportHeight={windowHeight}>
-        <TodayExplorationBackground
-          backgroundKey="home"
-          imageSize={Math.max(windowHeight, windowWidth)}
-          translateX={sceneTranslateX}
-          verticalOffset={sceneLift}
-        />
-      </TodayEnvironmentViewportMotionLayer>
-      </Animated.View>
+      <View pointerEvents="none" style={styles.focusSceneViewport}>
+        <Animated.View style={[styles.focusSceneCamera, focusSceneStyle]}>
+          <TodayEnvironmentViewportMotionLayer
+            focusY={scenePinchFocusY}
+            viewportHeight={windowHeight}>
+            <TodayExplorationBackground
+              backgroundKey="home"
+              imageSize={sceneImageSize}
+              translateX={sceneTranslateX}
+              verticalOffset={sceneLift}
+            />
+          </TodayEnvironmentViewportMotionLayer>
+        </Animated.View>
+      </View>
       <Animated.View
         pointerEvents="box-none"
         style={[styles.eggStage, { top: stageTop + sceneLift }, projectedEggStageStyle]}>
@@ -593,7 +639,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
         <TodayDormantEggIndicator
           energyRatio={growth.energyRatio}
           focusX={windowWidth / 2}
-          focusY={windowHeight / 2 + (scenePinchFocusY - windowHeight / 2) * HOME_FTUE_CAMERA_SCALE + HOME_FTUE_CAMERA_Y_OFFSET}
+          focusY={windowHeight / 2 + (scenePinchFocusY - windowHeight / 2) * HOME_FTUE_CAMERA_SCALE + HOME_FTUE_CAMERA_Y_OFFSET + onboardingCameraPanY}
           left={windowWidth / 2 + 4 * explorationEggFrame.scale * HOME_FTUE_CAMERA_SCALE}
           sceneTranslateX={sceneTranslateX}
           stageScale={explorationEggFrame.scale * HOME_FTUE_CAMERA_SCALE}
@@ -1004,11 +1050,59 @@ type InlineChoice = {
   feedImage: number;
   id: string;
   icon?: IconSymbolName;
-  image?: number | ImageRef;
+  image?: ImageSourcePropType | ImageRef;
   label: string;
+  surface?: string;
 };
 
+const FTUE_CHOICE_TONES = [
+  { accent: '#78A952', surface: '#F0F5D9' },
+  { accent: '#D5A32C', surface: '#FFF1CE' },
+  { accent: '#57AAA6', surface: '#E1F2EE' },
+  { accent: '#D887AF', surface: '#F8E3ED' },
+  { accent: '#8D79C7', surface: '#EEE7F8' },
+  { accent: '#6F98B5', surface: '#E8F0F4' },
+] as const;
+
+function getFtueChoiceArt(option: FtueChoiceOption): ImageSourcePropType {
+  switch (option.domainChoiceId ?? option.id) {
+    case 'work':
+    case 'progress':
+      return MANUAL_JOURNAL_ART.work;
+    case 'family':
+    case 'friends':
+    case 'people':
+      return MANUAL_JOURNAL_ART.people;
+    case 'outdoors':
+    case 'places':
+      return MANUAL_JOURNAL_ART.place;
+    case 'resting':
+    case 'rest':
+    case 'quiet':
+      return SLEEP_ART.good;
+    case 'new':
+    case 'fun':
+      return MANUAL_JOURNAL_ART.event;
+    case 'full':
+      return MANUAL_JOURNAL_ART.movement;
+    case 'lovely':
+      return MOOD_ART.radiant;
+    case 'getting_through':
+    case 'hard':
+      return MOOD_ART.stormy;
+    default:
+      return MANUAL_JOURNAL_ART.general;
+  }
+}
+
+function getFtueChoiceColumnCount(choiceCount: number): number {
+  if (choiceCount <= 3) return Math.max(1, choiceCount);
+  if (choiceCount === 4) return 2;
+  return 3;
+}
+
 const INITIAL_ACTION_STACK_SETTLE_MS = 560;
+const FTUE_CAMERA_COVERAGE_BLEED = 2;
 const ACTION_BATCH_LAYOUT_SETTLE_MS = 680;
 const NURTURE_ACTION_CLUSTER_FALLBACK_HEIGHT = 67;
 const NURTURE_TOAST_TOP_GAP = 6;
@@ -1030,15 +1124,17 @@ function InlineMood({ action, allowSkip = true, completionEvent, enterFromBottom
     <InlineCheckInPanel
       action={action}
       allowSkip={allowSkip}
-      choices={MOOD_CHOICES.map((choice) => ({
+      choices={MOOD_CHOICES.map((choice, index) => ({
         accent: choice.accent,
         feedImage: MOOD_ART[choice.state],
         id: choice.id,
         image: MOOD_ART[choice.state],
         label: choice.label,
+        surface: FTUE_CHOICE_TONES[index % FTUE_CHOICE_TONES.length].surface,
       }))}
       completionEvent={completionEvent}
       enterFromBottom={enterFromBottom}
+      illustratedChoices
       interactionLocked={interactionLocked}
       onChoose={onChoose}
       onFinished={onFinished}
@@ -1065,14 +1161,16 @@ function InlineSleep({ action, completionEvent, interactionLocked, onChoose, onF
   return (
     <InlineCheckInPanel
       action={action}
-      choices={SLEEP_OPTIONS.map((option) => ({
+      choices={SLEEP_OPTIONS.map((option, index) => ({
         accent: option.accent,
         feedImage: SLEEP_ART[option.quality],
         id: option.quality,
         image: preloadedArt[option.quality] ?? SLEEP_ART[option.quality],
         label: option.label,
+        surface: FTUE_CHOICE_TONES[index % FTUE_CHOICE_TONES.length].surface,
       }))}
       completionEvent={completionEvent}
+      illustratedChoices
       interactionLocked={interactionLocked}
       onChoose={onChoose}
       onFinished={onFinished}
@@ -1080,17 +1178,17 @@ function InlineSleep({ action, completionEvent, interactionLocked, onChoose, onF
       reduceMotion={reduceMotion}
       selection={selection}
       swipeExternalGesture={swipeExternalGesture}
-      wide
     />
   );
 }
 
-function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent, enterFromBottom = false, interactionLocked, metric, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture, textChoices = false, wide = false }: {
+function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent, enterFromBottom = false, illustratedChoices = false, interactionLocked, metric, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture, textChoices = false, wide = false }: {
   action: RankedTodayCareAction;
   allowSkip?: boolean;
   choices: InlineChoice[];
   completionEvent: TodayCareCompletionEvent | null;
   enterFromBottom?: boolean;
+  illustratedChoices?: boolean;
   interactionLocked: boolean;
   metric?: InlineMetric;
   onChoose: (selection: Omit<CheckInSelection, 'action' | 'kind'>, from: FeedSourceRect, currencyFrom: FeedSourceRect) => void;
@@ -1103,6 +1201,13 @@ function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent
   wide?: boolean;
 }) {
   const { width: windowWidth } = useWindowDimensions();
+  const [illustratedGridWidth, setIllustratedGridWidth] = useState(0);
+  const illustratedFallbackWidth = Math.min(windowWidth - Meadow.space.page * 2, 980) - 28;
+  const illustratedAvailableWidth = illustratedGridWidth || illustratedFallbackWidth;
+  const illustratedColumnCount = getFtueChoiceColumnCount(choices.length);
+  const illustratedTileWidth = Math.floor(
+    (illustratedAvailableWidth - (illustratedColumnCount - 1) * 6) / illustratedColumnCount,
+  );
   const panelPulse = useSharedValue(0);
   const panelScale = useSharedValue(1);
   const panelX = useSharedValue(0);
@@ -1183,12 +1288,15 @@ function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent
         onDismiss={onSkip}
         reduceMotion={reduceMotion}>
         <Animated.View style={panelStyle}>
-          <GameSurface contentStyle={styles.inlineCardContent} style={styles.inlineCard} tone="cream">
+          <GameSurface
+            contentStyle={[styles.inlineCardContent, illustratedChoices && styles.illustratedCardContent]}
+            style={[styles.inlineCard, illustratedChoices && styles.illustratedCard]}
+            tone="cream">
           <Animated.View
             pointerEvents="none"
             style={[styles.inlineSelectionPulse, { backgroundColor: ownedSelection?.accent ?? 'transparent' }, pulseStyle]}
           />
-          <InlineHeading action={action} allowSkip={allowSkip} disabled={interactionLocked} hideReward={metric != null} onSkip={onSkip} rewardRef={rewardRef} />
+          <InlineHeading action={action} allowSkip={allowSkip} disabled={interactionLocked} hideReward={metric != null} illustrated={illustratedChoices} onSkip={onSkip} rewardRef={rewardRef} />
           {metric ? (
             <View collapsable={false} ref={metricRef} style={styles.inlineMetric}>
               <Image contentFit="contain" source={metric.art} style={styles.inlineMetricArt} transition={0} />
@@ -1202,8 +1310,44 @@ function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent
               </View>
             </View>
           ) : null}
-          <View style={textChoices ? styles.textChoiceGrid : wide ? styles.sleepGrid : styles.moodGrid}>
-            {choices.map((choice) => textChoices ? (
+          <View
+            onLayout={illustratedChoices ? (event) => {
+              const measuredWidth = Math.floor(event.nativeEvent.layout.width);
+              setIllustratedGridWidth((current) => current === measuredWidth ? current : measuredWidth);
+            } : undefined}
+            style={illustratedChoices ? styles.illustratedChoiceGrid : textChoices ? styles.textChoiceGrid : wide ? styles.sleepGrid : styles.moodGrid}>
+            {choices.map((choice) => illustratedChoices ? (
+              <MeasuredIllustratedChoice
+                accent={choice.accent}
+                disabled={interactionLocked}
+                dimmed={ownedSelection != null && ownedSelection.id !== choice.id}
+                icon={choice.icon ?? 'sparkles'}
+                image={choice.image}
+                key={choice.id}
+                label={choice.label}
+                onPress={(from) => {
+                  const selectedChoice = {
+                    accent: choice.accent,
+                    id: choice.id,
+                    image: choice.feedImage,
+                    label: choice.label,
+                  };
+                  const currencySource = metricRef.current ?? rewardRef.current;
+                  if (currencySource) {
+                    currencySource.measureInWindow((x, y, width, height) => {
+                      onChoose(selectedChoice, from, { h: height, w: width, x, y });
+                    });
+                  } else {
+                    onChoose(selectedChoice, from, from);
+                  }
+                }}
+                reduceMotion={reduceMotion}
+                selected={ownedSelection?.id === choice.id}
+                surface={choice.surface ?? '#FFF7E8'}
+                threeColumn={illustratedColumnCount === 3}
+                width={illustratedTileWidth}
+              />
+            ) : textChoices ? (
               <MeasuredTextChoice
                 accent={choice.accent}
                 disabled={interactionLocked}
@@ -1266,20 +1410,23 @@ function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent
   );
 }
 
-function InlineHeading({ action, allowSkip, disabled, hideReward = false, onSkip, rewardRef }: {
+function InlineHeading({ action, allowSkip, disabled, hideReward = false, illustrated = false, onSkip, rewardRef }: {
   action: RankedTodayCareAction;
   allowSkip: boolean;
   disabled: boolean;
   hideReward?: boolean;
+  illustrated?: boolean;
   onSkip: () => void;
   rewardRef: RefObject<ViewType | null>;
 }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const wideIllustrated = illustrated && windowWidth >= 700;
   const handleSkip = () => {
     if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
     onSkip();
   };
   return (
-    <View style={styles.inlineHeading}>
+    <View style={[styles.inlineHeading, illustrated && styles.illustratedHeading, wideIllustrated && styles.illustratedHeadingWide]}>
       {allowSkip ? (
         <Pressable
           accessibilityLabel={`Skip ${action.title} for today`}
@@ -1291,21 +1438,117 @@ function InlineHeading({ action, allowSkip, disabled, hideReward = false, onSkip
           <ThemedText style={styles.inlineSkipLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Skip</ThemedText>
         </Pressable>
       ) : null}
-      <View style={styles.inlineQuestionAnchor}>
+      <View style={[
+        styles.inlineQuestionAnchor,
+        illustrated && styles.illustratedQuestionAnchor,
+        illustrated && allowSkip && styles.illustratedQuestionAnchorSkippable,
+        wideIllustrated && styles.illustratedQuestionAnchorWide,
+      ]}>
         <ThemedText
           numberOfLines={2}
-          style={[styles.inlineQuestion, allowSkip ? styles.inlineQuestionSkippable : hideReward ? styles.inlineQuestionCentered : styles.inlineQuestionRequired]}
+          style={[
+            styles.inlineQuestion,
+            allowSkip ? styles.inlineQuestionSkippable : hideReward ? styles.inlineQuestionCentered : styles.inlineQuestionRequired,
+            illustrated && styles.illustratedQuestion,
+            wideIllustrated && styles.illustratedQuestionWide,
+          ]}
           lightColor={allowSkip ? Meadow.ink : KatchaDeckUI.ftue.goldDeep}
           darkColor={allowSkip ? Meadow.ink : KatchaDeckUI.ftue.goldDeep}>
           {action.title}
         </ThemedText>
+        {illustrated ? (
+          <ThemedText
+            numberOfLines={2}
+            style={[styles.illustratedQuestionBody, wideIllustrated && styles.illustratedQuestionBodyWide]}
+            lightColor={Meadow.inkSoft}
+            darkColor={Meadow.inkSoft}>
+            {action.description}
+          </ThemedText>
+        ) : null}
       </View>
       {!hideReward ? (
         <View collapsable={false} ref={rewardRef} style={styles.inlineReward}>
-          <Reward amount={action.growthReward} />
+          {illustrated ? <FtueEnergyBadge amount={action.growthReward} wide={wideIllustrated} /> : <Reward amount={action.growthReward} />}
         </View>
       ) : null}
     </View>
+  );
+}
+
+function FtueEnergyBadge({ amount, wide }: { amount: number; wide: boolean }) {
+  return (
+    <View accessibilityLabel={`Plus ${amount} Energy`} style={[styles.ftueEnergyBadge, wide && styles.ftueEnergyBadgeWide]}>
+      <Image contentFit="contain" source={GAME_CURRENCY_ART.energy} style={[styles.ftueEnergyBadgeArt, wide && styles.ftueEnergyBadgeArtWide]} transition={0} />
+      <View style={styles.ftueEnergyBadgeCopy}>
+        <ThemedText style={[styles.ftueEnergyBadgeAmount, wide && styles.ftueEnergyBadgeAmountWide]} lightColor={KatchaDeckUI.ftue.goldDeep} darkColor={KatchaDeckUI.ftue.goldDeep}>
+          +{amount}
+        </ThemedText>
+        <ThemedText style={styles.ftueEnergyBadgeLabel} lightColor={KatchaDeckUI.ftue.goldDeep} darkColor={KatchaDeckUI.ftue.goldDeep}>
+          Energy
+        </ThemedText>
+      </View>
+    </View>
+  );
+}
+
+function MeasuredIllustratedChoice({ accent, disabled, dimmed, icon, image, label, onPress, reduceMotion, selected, surface, threeColumn, width }: {
+  accent: string;
+  disabled: boolean;
+  dimmed: boolean;
+  icon: IconSymbolName;
+  image?: ImageSourcePropType | ImageRef;
+  label: string;
+  onPress: (from: FeedSourceRect) => void;
+  reduceMotion: boolean;
+  selected: boolean;
+  surface: string;
+  threeColumn: boolean;
+  width: number;
+}) {
+  const tileRef = useRef<ViewType | null>(null);
+  const artScale = useSharedValue(1);
+  useEffect(() => {
+    if (!selected) return;
+    artScale.value = reduceMotion
+      ? withTiming(1.04, { duration: 90 })
+      : withSequence(
+        withTiming(1.12, { duration: 115, easing: Easing.out(Easing.cubic) }),
+        withTiming(1.04, { duration: 170, easing: Easing.out(Easing.cubic) }),
+      );
+  }, [artScale, reduceMotion, selected]);
+  const artStyle = useAnimatedStyle(() => ({ transform: [{ scale: artScale.value }] }));
+  const handlePress = () => tileRef.current?.measureInWindow((x, y, w, h) => onPress({ x, y, w, h }));
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      accessibilityState={{ disabled, selected }}
+      disabled={disabled}
+      onPress={handlePress}
+      ref={tileRef}
+      style={({ pressed }) => [
+        styles.illustratedChoice,
+        threeColumn && styles.illustratedChoiceThreeColumn,
+        { backgroundColor: surface, borderColor: selected ? accent : `${accent}82`, width },
+        selected && styles.illustratedChoiceSelected,
+        dimmed && styles.choiceDimmed,
+        pressed && styles.illustratedChoicePressed,
+      ]}>
+      <View pointerEvents="none" style={[styles.illustratedChoiceHighlight, threeColumn && styles.illustratedChoiceHighlightThreeColumn]} />
+      <Animated.View style={[styles.illustratedChoiceArtFrame, threeColumn && styles.illustratedChoiceArtFrameThreeColumn, artStyle]}>
+        {image ? (
+          <Image contentFit="contain" source={image} style={[styles.illustratedChoiceArt, threeColumn && styles.illustratedChoiceArtThreeColumn]} transition={0} />
+        ) : (
+          <IconSymbol color={accent} name={icon} size={38} />
+        )}
+      </Animated.View>
+      <ThemedText numberOfLines={2} style={[styles.illustratedChoiceLabel, threeColumn && styles.illustratedChoiceLabelThreeColumn]} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+        {label}
+      </ThemedText>
+      <View style={[styles.illustratedChoiceGlint, { backgroundColor: accent }]}>
+        <IconSymbol color="#FFFDF4" name={selected ? 'checkmark' : 'sparkles'} size={selected ? 12 : 10} />
+      </View>
+    </Pressable>
   );
 }
 
@@ -1345,7 +1588,7 @@ function MeasuredChoice({ accent, disabled, dimmed, image, label, onPress, reduc
   accent: string;
   disabled: boolean;
   dimmed: boolean;
-  image: number | ImageRef;
+  image: ImageSourcePropType | ImageRef;
   label: string;
   onPress: (from: FeedSourceRect) => void;
   reduceMotion: boolean;
@@ -1884,15 +2127,18 @@ function InlineScriptedChoice({ action, completionEvent, enterFromBottom = false
       <InlineCheckInPanel
         action={action}
         allowSkip={false}
-        choices={options.map((option) => ({
-          accent: Meadow.gold,
+        choices={options.map((option, index) => ({
+          accent: FTUE_CHOICE_TONES[index % FTUE_CHOICE_TONES.length].accent,
           feedImage: GAME_CURRENCY_ART.energy,
           icon: option.icon,
           id: option.id,
+          image: getFtueChoiceArt(option),
           label: option.label,
+          surface: FTUE_CHOICE_TONES[index % FTUE_CHOICE_TONES.length].surface,
         }))}
         completionEvent={completionEvent}
         enterFromBottom={enterFromBottom}
+        illustratedChoices
         interactionLocked={interactionLocked}
         metric={metric}
         onChoose={(choice, from, currencyFrom) => {
@@ -1904,7 +2150,6 @@ function InlineScriptedChoice({ action, completionEvent, enterFromBottom = false
         reduceMotion={reduceMotion}
         selection={selection}
         swipeExternalGesture={swipeExternalGesture}
-        textChoices
       />
     </View>
   );
@@ -2214,7 +2459,10 @@ function formatCountdown(target: Date): string {
 
 const styles = StyleSheet.create({
   root: { ...StyleSheet.absoluteFillObject, backgroundColor: '#F7F1E2', zIndex: 40 },
-  focusScene: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
+  // The viewport remains fixed while the camera plane moves within it. Moving
+  // the clipping view itself exposes the page colour along the opposite edge.
+  focusSceneViewport: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
+  focusSceneCamera: { ...StyleSheet.absoluteFillObject },
   chrome: { ...StyleSheet.absoluteFillObject },
   chromeHidden: { opacity: 0 },
   contentScroll: { position: 'relative', zIndex: 6 },
@@ -2260,10 +2508,21 @@ const styles = StyleSheet.create({
   checkInGroup: { gap: 6 },
   inlineCard: { overflow: 'hidden' },
   inlineCardContent: { gap: 8, padding: 9 },
+  illustratedCard: { alignSelf: 'center', maxWidth: 980, width: '100%' },
+  illustratedCardContent: { gap: 8, padding: 10 },
   inlineSelectionPulse: { ...StyleSheet.absoluteFillObject, borderRadius: 16 },
   inlineHeading: { alignItems: 'center', justifyContent: 'center', minHeight: 38, position: 'relative' },
+  illustratedHeading: { alignItems: 'flex-start', justifyContent: 'flex-start', minHeight: 62 },
+  illustratedHeadingWide: { minHeight: 76 },
   inlineQuestionAnchor: { width: '100%' },
+  illustratedQuestionAnchor: { paddingLeft: 5, paddingRight: 92 },
+  illustratedQuestionAnchorSkippable: { paddingLeft: 52 },
+  illustratedQuestionAnchorWide: { paddingLeft: 10, paddingRight: 148 },
   inlineQuestion: { ...KatchaDeckUI.typography.ftuePanelTitle, textAlign: 'center', width: '100%' },
+  illustratedQuestion: { fontSize: 20, letterSpacing: -0.35, lineHeight: 22, paddingHorizontal: 0, textAlign: 'left' },
+  illustratedQuestionWide: { fontSize: 27, letterSpacing: -0.55, lineHeight: 30 },
+  illustratedQuestionBody: { ...KatchaDeckUI.typography.ftuePanelBody, fontSize: 10.75, lineHeight: 14, marginTop: 1 },
+  illustratedQuestionBodyWide: { fontSize: 13.5, lineHeight: 18, marginTop: 3 },
   inlineQuestionRequired: { paddingLeft: 8, paddingRight: 68 },
   inlineQuestionCentered: { paddingHorizontal: 8 },
   inlineQuestionSkippable: { paddingHorizontal: 66 },
@@ -2272,6 +2531,14 @@ const styles = StyleSheet.create({
   inlineSkipPressed: { backgroundColor: 'rgba(122,84,44,0.16)', transform: [{ scale: 0.96 }] },
   inlineSkipLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '800' },
   inlineReward: { position: 'absolute', right: 0, top: 1, zIndex: 2 },
+  ftueEnergyBadge: { alignItems: 'center', backgroundColor: '#FFF4C7', borderColor: 'rgba(213,163,44,0.62)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1.5, boxShadow: '0 5px 12px rgba(134,91,19,0.20), inset 0 1px 0 rgba(255,255,255,0.92)', flexDirection: 'row', gap: 2, height: 52, justifyContent: 'center', paddingHorizontal: 6, width: 84 },
+  ftueEnergyBadgeWide: { borderRadius: 22, gap: 4, height: 66, paddingHorizontal: 10, width: 118 },
+  ftueEnergyBadgeArt: { height: 32, width: 28 },
+  ftueEnergyBadgeArtWide: { height: 43, width: 38 },
+  ftueEnergyBadgeCopy: { alignItems: 'flex-start', gap: 0 },
+  ftueEnergyBadgeAmount: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 16, lineHeight: 18 },
+  ftueEnergyBadgeAmountWide: { fontSize: 20, lineHeight: 22 },
+  ftueEnergyBadgeLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 8.5, fontWeight: '900', lineHeight: 10 },
   inlineMetric: { alignItems: 'center', alignSelf: 'center', flexDirection: 'row', gap: 9, justifyContent: 'center', minHeight: 62, paddingHorizontal: 12 },
   inlineMetricArt: { height: 54, width: 54 },
   inlineMetricCopy: { alignItems: 'flex-start', gap: 0 },
@@ -2285,6 +2552,20 @@ const styles = StyleSheet.create({
   textChoiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
   textChoice: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.48)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 5, minHeight: 34, paddingHorizontal: 12, paddingVertical: 5 },
   textChoiceLabel: KatchaDeckUI.typography.ftueChipLabel,
+  illustratedChoiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
+  illustratedChoice: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1.25, boxShadow: '0 3px 8px rgba(86,66,34,0.13), inset 0 1px 0 rgba(255,255,255,0.82)', gap: 1, justifyContent: 'flex-end', minHeight: 88, overflow: 'hidden', paddingBottom: 6, paddingHorizontal: 4, paddingTop: 4, position: 'relative' },
+  illustratedChoiceThreeColumn: { minHeight: 82, paddingBottom: 5, paddingTop: 3 },
+  illustratedChoiceSelected: { borderWidth: 2, boxShadow: '0 5px 13px rgba(86,66,34,0.20), inset 0 1px 0 rgba(255,255,255,0.9)' },
+  illustratedChoicePressed: { opacity: 0.92, transform: [{ translateY: 1 }, { scale: 0.985 }] },
+  illustratedChoiceHighlight: { backgroundColor: 'rgba(255,255,255,0.28)', borderRadius: 999, height: 34, left: 7, position: 'absolute', right: 7, top: 4 },
+  illustratedChoiceHighlightThreeColumn: { height: 29, left: 5, right: 5, top: 3 },
+  illustratedChoiceArtFrame: { alignItems: 'center', height: 49, justifyContent: 'center', width: '100%' },
+  illustratedChoiceArtFrameThreeColumn: { height: 44 },
+  illustratedChoiceArt: { height: 48, width: 56 },
+  illustratedChoiceArtThreeColumn: { height: 43, width: 50 },
+  illustratedChoiceLabel: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 11, letterSpacing: -0.15, lineHeight: 13, minHeight: 26, textAlign: 'center', textAlignVertical: 'center', width: '100%' },
+  illustratedChoiceLabelThreeColumn: { fontSize: 10, lineHeight: 11.5, minHeight: 23 },
+  illustratedChoiceGlint: { alignItems: 'center', borderColor: 'rgba(255,255,255,0.74)', borderRadius: 999, borderWidth: 1, bottom: 4, height: 17, justifyContent: 'center', position: 'absolute', right: 4, width: 17 },
   moodChoiceCell: { flex: 1 },
   sleepChoiceCell: { flex: 1 },
   quickChoice: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.48)', borderCurve: 'continuous', borderRadius: 12, borderWidth: 1, gap: 1, minHeight: 55, paddingHorizontal: 3, paddingVertical: 5 },

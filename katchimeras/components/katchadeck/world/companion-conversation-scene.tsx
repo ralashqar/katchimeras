@@ -39,7 +39,6 @@ export function conversationSpeechLine(
     if (outcome.kind === 'insight') return `I’ve added ${outcome.title} to what I know about you.`;
     return `I’ll remember: ${outcome.title}`;
   }
-  if (session.pendingReply) return session.pendingReply;
   if (session.status === 'completed' && session.lastReply) return session.lastReply;
   const node = conversationNode(definition, session.currentNodeId);
   if (!node) return 'We can stay here quietly for a moment.';
@@ -220,16 +219,7 @@ export function CompanionConversationScene({
             onAdvance={onAdvance}
             requiresManualAdvance={requiresManualAdvance}
           />
-        ) : session.pendingReply !== undefined ? (
-          <View style={{ gap: 12 }}>
-            {session.pollResult ? <PollResult session={session} definition={definition} /> : null}
-            <NarrativeTransition
-              label={session.pollResult ? 'The village answered too…' : `${name} is following your answer…`}
-              onAdvance={onAdvance}
-              requiresManualAdvance={requiresManualAdvance}
-            />
-          </View>
-        ) : session.status === 'completed' || node?.kind === 'end' ? (
+        ) : session.pendingReply !== undefined ? null : session.status === 'completed' || node?.kind === 'end' ? (
           session.preview ? <View style={{ alignItems: 'center', gap: 10, paddingVertical: 6 }}>
             <ThemedText selectable style={{ fontSize: 14, lineHeight: 20, textAlign: 'center' }} lightColor="#5D4B37" darkColor="#5D4B37">Preview complete. Choose another flow below or exit the preview.</ThemedText>
           </View> : <NarrativeTransition
@@ -521,51 +511,14 @@ function MemoryProposal({ node, onDecision, session }: {
   </View>;
 }
 
-function NarrativeTransition({ label, onAdvance, requiresManualAdvance = false }: {
+function NarrativeTransition({ label, onAdvance }: {
   label: string;
   onAdvance?: () => void;
   requiresManualAdvance?: boolean;
 }) {
-  return <Pressable
-    accessibilityHint={onAdvance ? 'Advances to the next part of the conversation' : undefined}
-    accessibilityLiveRegion="polite"
-    accessibilityRole={onAdvance ? 'button' : undefined}
-    disabled={!onAdvance}
-    onPress={onAdvance}
-    style={({ pressed }) => ({
-      alignItems: 'center',
-      backgroundColor: 'rgba(255,250,236,0.52)',
-      borderColor: 'rgba(139,96,29,0.18)',
-      borderCurve: 'continuous',
-      borderRadius: 18,
-      borderWidth: 1,
-      flexDirection: 'row',
-      gap: 11,
-      minHeight: 58,
-      opacity: pressed ? 0.76 : 1,
-      paddingHorizontal: 14,
-      paddingVertical: 11,
-      transform: [{ scale: pressed ? 0.985 : 1 }],
-    })}>
-    {!requiresManualAdvance ? <ActivityIndicator color="#806126" size="small" /> : <IconSymbol color="#806126" name="arrow.right" size={17} />}
-    <View style={{ flex: 1, gap: 2 }}>
-      <ThemedText selectable style={{ fontSize: 13.5, fontWeight: '900', lineHeight: 18 }} lightColor="#4A3725" darkColor="#4A3725">{label}</ThemedText>
-      <ThemedText selectable style={{ fontSize: 10.5, fontWeight: '700', lineHeight: 15 }} lightColor="#806126" darkColor="#806126">
-        {requiresManualAdvance ? 'Double-tap for the next line' : 'Tap to move on sooner'}
-      </ThemedText>
-    </View>
-  </Pressable>;
-}
-
-function PollResult({ session, definition }: { session: ConversationSession; definition: ConversationDefinition }) {
-  const node = conversationNode(definition, session.currentNodeId);
-  if (node?.kind !== 'poll' || !session.pollResult) return null;
-  return <View style={{ backgroundColor: '#FFF5D8', borderCurve: 'continuous', borderRadius: 20, gap: 9, padding: 14 }}>
-    <ThemedText selectable style={{ fontSize: 10, fontWeight: '900', letterSpacing: 0.9 }} lightColor="#8B672E" darkColor="#8B672E">KATCHIMERA VILLAGE POLL • FICTIONAL</ThemedText>
-    {node.options.map((option) => <View key={option.id} style={{ alignItems: 'center', flexDirection: 'row', gap: 8 }}>
-      <ThemedText selectable style={{ flex: 1, fontSize: 13, fontWeight: option.id === session.pollResult?.selectedOptionId ? '900' : '700' }} lightColor="#4A3725" darkColor="#4A3725">{option.label}</ThemedText>
-      <ThemedText selectable style={{ fontSize: 13, fontVariant: ['tabular-nums'], fontWeight: '900' }} lightColor="#806126" darkColor="#806126">{session.pollResult?.percentages[option.id] ?? 0}%</ThemedText>
-    </View>)}
+  return <View accessibilityLiveRegion="polite" style={{ gap: 9 }}>
+    <ThemedText selectable style={{ fontSize: 13.5, fontWeight: '900', lineHeight: 18, textAlign: 'center' }} lightColor="#4A3725" darkColor="#4A3725">{label}</ThemedText>
+    {onAdvance ? <PrimaryAction label="Continue" onPress={onAdvance} /> : null}
   </View>;
 }
 

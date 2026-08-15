@@ -120,6 +120,7 @@ import { ftueOwnsOpeningHome } from '@/features/onboarding/ftue-navigation-polic
 import {
   FTUE_OPENING_UI_DELAY_MS,
   ftueHomeCameraDuration,
+  ftueHomeCameraPanTarget,
   ftueHomeCameraPinchTarget,
 } from '@/features/onboarding/ftue-home-camera';
 import { FTUE_MOSSPROUT_CREATURE } from '@/features/onboarding/mossprout-ftue-creature';
@@ -2638,6 +2639,8 @@ function HomeScreen() {
           homeArchetypeId={homeArchetypeId}
           microcopy={microcopy}
           onboardingGuide={onboardingGuide}
+          onboardingCameraDurationMs={ftueHomeCameraDuration(ftueRun?.stepId)}
+          onboardingCameraPanY={ftueHomeCameraPanTarget(ftueRun?.status === 'active' ? ftueRun.stepId : null)}
           onboardingFocus={ftueOpeningFocus || ftueEnergyFocus || (isHatching && hatchPresentation.policy === 'ftue_discovery')}
           onboardingTopHudVisible={ftueEnergyFocus}
           onboardingUiVisible={ftueOpeningUiVisible && !ftueEnergyBridgeStep}

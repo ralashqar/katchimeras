@@ -40,7 +40,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       id: 'egg.context', surface: 'today',
       guide: { eyebrow: 'It felt that', title: 'The Egg is stirring.', body: 'Give it one more piece.' },
       actions: [{
-        id: 'egg.context.activity', title: 'What was part of today?', description: 'Pick one.', icon: 'leaf.fill',
+        id: 'egg.context.activity', title: 'What was part of today?', description: 'Choose the little piece that feels closest.', icon: 'leaf.fill',
         presentation: 'inline_choice', handlerId: 'day_prompt', promptKind: 'activity', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
         nextStepId: 'egg.mind', backendEvent: true,
         options: [
@@ -58,7 +58,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       id: 'egg.mind', surface: 'today',
       guide: { eyebrow: 'Almost awake', title: 'One last thing.', body: 'What has your attention?' },
       actions: [{
-        id: 'egg.mind.focus', title: "What's on your mind?", description: 'Pick one.', icon: 'sparkles',
+        id: 'egg.mind.focus', title: "What's on your mind?", description: 'Share a bit with me and turn it into Energy.', icon: 'sparkles',
         presentation: 'inline_choice', handlerId: 'day_prompt', promptKind: 'day_focus', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
         nextStepId: 'egg.ready', backendEvent: true,
         options: [
@@ -230,7 +230,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       id: 'energy.capture', surface: 'today',
       guide: { eyebrow: 'A little more of today', title: 'Share one quick reflection.', body: 'One answer is enough.' },
       actions: [{
-        id: 'energy.reflect', title: 'What kind of day has it been?', description: 'Choose the closest fit.', icon: 'sparkles',
+        id: 'energy.reflect', title: 'What kind of day has it been?', description: 'One quick answer is enough.', icon: 'sparkles',
         presentation: 'inline_choice', handlerId: 'day_prompt', promptKind: 'day_word', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
         nextStepId: 'energy.journal_reward', backendEvent: true,
         options: [
