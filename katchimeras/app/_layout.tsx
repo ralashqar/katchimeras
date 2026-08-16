@@ -3,6 +3,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { Stack } from 'expo-router';
+import * as Sentry from '@sentry/react-native';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
@@ -20,12 +21,14 @@ import { GameFeedbackProvider } from '@/features/ui/game-feedback-provider';
 import { GameWalletProvider } from '@/features/ui/game-wallet-provider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import '@/utils/travel-memory-task';
+import { initializeCrashReporting } from '@/utils/crash-reporting';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
 SplashScreen.preventAutoHideAsync();
+initializeCrashReporting();
 
 // DEV: apply any saved Asset Lab overrides at launch so draft world art
 // renders in the Kingdom without opening the lab first (no-op in production).
@@ -33,7 +36,7 @@ if (__DEV__) {
   void import('@/utils/asset-lab').then((lab) => lab.loadAssetLabManifest()).catch(() => {});
 }
 
-export default function RootLayout() {
+function RootLayout() {
   const colorScheme = useColorScheme();
   const themeColors = Colors[colorScheme === 'light' ? 'light' : 'dark'];
   const [fontsLoaded] = useFonts({
@@ -139,3 +142,5 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+export default Sentry.wrap(RootLayout);

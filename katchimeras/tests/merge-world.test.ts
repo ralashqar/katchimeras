@@ -855,6 +855,15 @@ test('Merge page keeps a stable parcel stack first in the tray and the board att
   assert.match(screen, /arrival\.kind !== 'memory_arrival'/);
 });
 
+test('rail FTUE target refs keep stable callback identities across target revision renders', () => {
+  const rail = readFileSync('components/katchadeck/games/merge-order-rail.tsx', 'utf8');
+  assert.match(rail, /onRailTargetRef=\{onRailTargetRef\}/);
+  assert.match(rail, /const setServeTargetRef = useCallback\(/);
+  assert.match(rail, /const setTargetRef = useCallback\(/);
+  assert.doesNotMatch(rail, /onServeTargetRef=\{\(orderId, view\)/);
+  assert.doesNotMatch(rail, /targetRef=\{\(view\) => onRailTargetRef/);
+});
+
 test('served item sprites stay suppressed until the board confirms they are retired', () => {
   const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
@@ -885,21 +894,25 @@ test('Merge board retains destination selection and decorates generators with am
   assert.match(board, /Dream Echoes on the same Expo Image decode\/cache path/);
 });
 
-test('Merge FTUE leases one command and advances only after native board motion settles', () => {
+test('Merge FTUE uses session receipts and unlocks only after the replacement gate commits', () => {
   const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
   const overlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
   const route = readFileSync('components/katchadeck/games/merge-world-route-screen.tsx', 'utf8');
-  assert.match(screen, /if \(ftueCommandLeaseRef\.current\) return null;/);
-  assert.match(screen, /if \(shouldLeaseAnimatedCommand\) ftueCommandLeaseRef\.current = true;\s*const result = send\(command\)/);
-  assert.match(screen, /pendingAnimatedFtueEventsRef\.current\.set\(event\.revision, event\)/);
-  assert.doesNotMatch(screen, /const nextRun = dispatchFtueEvent\(event, `merge-revision/);
+  assert.match(screen, /ftueCoordinator\.begin\(ftueStep\?\.id \?\? 'unknown', state\.revision\)/);
+  assert.match(screen, /ftueCoordinator\.settle\(receipt\)/);
+  assert.match(screen, /ftueCoordinator\.awaitGate/);
+  assert.match(screen, /ftueCoordinator\.acknowledgeGate\(receipt\)/);
   assert.match(screen, /onCommandSettled=\{handleBoardCommandSettled\}/);
-  assert.match(screen, /requestAnimationFrame\(\(\) => \{[\s\S]*?requestAnimationFrame\(\(\) => \{[\s\S]*?dispatchFtueEvent\(pendingEvent, `merge-animation-settled/);
-  assert.match(screen, /dispatchFtueEvent\(pendingEvent[\s\S]*?requestAnimationFrame\(\(\) => \{[\s\S]*?ftueCommandLeaseRef\.current = false/);
+  assert.match(screen, /onInteractionGateCommitted=\{handleInteractionGateCommitted\}/);
+  assert.doesNotMatch(screen, /ftueAdvanceFrameRef|pendingAnimatedFtueEventsRef|requestAnimationFrame\(\(\) => \{\s*requestAnimationFrame/);
   assert.match(board, /settledRevision: predicted\.state\.revision/);
-  assert.match(board, /onCommandSettledRef\.current\?\.\(operation\.settledRevision\)/);
+  assert.match(board, /onCommandSettledRef\.current\?\.\(\{ operationId: operation\.id, revision: operation\.settledRevision, sessionId \}\)/);
+  assert.match(board, /useLayoutEffect\(\(\) => \{[\s\S]*?onInteractionGateCommittedRef\.current\?\.\(\{ interactionKey: interactionSessionKey, sessionId \}\)/);
   assert.doesNotMatch(overlay, /return \(\) => \{\s*cancelAnimation\(progress\);\s*progress\.value = 0;/);
+  assert.doesNotMatch(overlay, /key=\{`(?:spotlight|cue):|entering=|exiting=/);
+  assert.match(overlay, /measurementGenerationRef/);
+  assert.match(overlay, /stateRef\.current/);
   assert.doesNotMatch(route, /useSharedValue|effectsPaused/);
   assert.doesNotMatch(board, /providedEffectsPaused|effectsPaused\?:/);
   assert.match(board, /const effectsPaused = useSharedValue\(0\)/);

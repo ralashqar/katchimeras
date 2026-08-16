@@ -104,7 +104,8 @@
         {
           "microphonePermission": "Katchimeras uses the microphone so you can record a short voice note about your day and fold it into today's world."
         }
-      ]
+      ],
+      "@sentry/react-native"
     ],
     "experiments": {
       "typedRoutes": true,

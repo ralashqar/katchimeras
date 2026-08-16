@@ -53,6 +53,7 @@ import { STREAK_MILESTONE_REWARDS } from '@/utils/streak-engine';
 import { prepareMossproutMergeFtueForDebug, type MossproutMergeFtueStepId } from '@/utils/merge-world/repository';
 import { resetKatchimeraProgressForDebug } from '@/utils/reset-katchimera-progress-for-debug';
 import { setFeastleStoryStateForDebug } from '@/utils/companion-story-storage';
+import { triggerNativeCrashForDiagnostics } from '@/utils/crash-reporting';
 
 export default function ExploreScreen() {
   const router = useRouter();
@@ -91,6 +92,20 @@ export default function ExploreScreen() {
             }
           },
         },
+      ],
+    );
+  };
+  const handleTestNativeCrashReporting = () => {
+    if (!process.env.EXPO_PUBLIC_SENTRY_DSN) {
+      Alert.alert('Sentry is not configured', 'Add EXPO_PUBLIC_SENTRY_DSN to the development environment and rebuild the native client first.');
+      return;
+    }
+    Alert.alert(
+      'Test native crash reporting?',
+      'This intentionally terminates the development app. Reopen it, then confirm the symbolicated crash appears in Sentry.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Crash app', style: 'destructive', onPress: triggerNativeCrashForDiagnostics },
       ],
     );
   };
@@ -477,6 +492,7 @@ export default function ExploreScreen() {
                   </ThemedText>
                 </View> : null}
                 <KatchaButton label="FTUE retry receipt sync" onPress={() => void retryFtueSync()} variant="secondary" />
+                <KatchaButton label="Test native crash reporting" onPress={handleTestNativeCrashReporting} variant="secondary" />
                 <KatchaButton label="FTUE Merge · Seed swipe" onPress={() => void handlePrepareMergeFtue('merge.seed_drag')} variant="secondary" />
                 <KatchaButton label="FTUE Merge · Serve Sprout" onPress={() => void handlePrepareMergeFtue('merge.serve_sprout')} variant="secondary" />
                 <KatchaButton label="FTUE Merge · Spawn Seeds" onPress={() => void handlePrepareMergeFtue('merge.plant.spawn')} variant="secondary" />

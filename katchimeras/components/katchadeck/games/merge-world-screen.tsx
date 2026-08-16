@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ActivityIndicator, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -26,7 +26,14 @@ import { useGameFeedback } from '@/features/ui/game-feedback-provider';
 import { useGameWallet } from '@/features/ui/game-wallet-provider';
 import { GameUI } from '@/constants/game-ui';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
-import type { FtueEvent } from '@/features/onboarding/ftue-types';
+import {
+  createMergeBoardSession,
+  mergeFtueInteractionKey,
+  MergeFtueInteractionCoordinator,
+  type MergeBoardOperationReceipt,
+  type MergeInteractionGateReceipt,
+} from '@/features/onboarding/merge-ftue-interaction-coordinator';
+import { addMergeFtueBreadcrumb, setMergeFtueDiagnosticContext } from '@/utils/crash-reporting';
 import type { MergeOrder, MergeWorldCommand } from '@/types/merge-world';
 import { markFlowStart, reportFlowReady } from '@/utils/flow-performance';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
@@ -50,6 +57,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const { state, loading, error, lastResult, dispatch: send } = useMergeWorld();
   const ftueRun = useFtueRun();
   const ftueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
+  const initialFtueStepIdRef = useRef(ftueStep?.id);
   const [selectedCell, setSelectedCell] = useState<number | null>(null);
   const [boardAreaHeight, setBoardAreaHeight] = useState(0);
   const feedback = useGameFeedback();
@@ -91,9 +99,14 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const parcelNonceRef = useRef(0);
   const storyNavigationPendingRef = useRef(false);
   const ftuePreviewNavigationPendingRef = useRef(false);
-  const pendingAnimatedFtueEventsRef = useRef(new Map<number, FtueEvent>());
-  const ftueCommandLeaseRef = useRef(false);
-  const ftueAdvanceFrameRef = useRef<number | null>(null);
+  const mergeSessionRef = useRef<ReturnType<typeof createMergeBoardSession> | null>(null);
+  if (!mergeSessionRef.current) mergeSessionRef.current = createMergeBoardSession();
+  const mergeSession = mergeSessionRef.current;
+  const mergeSessionId = mergeSession.id;
+  const ftueCoordinatorRef = useRef<MergeFtueInteractionCoordinator | null>(null);
+  if (!ftueCoordinatorRef.current) ftueCoordinatorRef.current = new MergeFtueInteractionCoordinator(mergeSessionId);
+  const ftueCoordinator = ftueCoordinatorRef.current;
+  const interactionSessionKey = mergeFtueInteractionKey(ftueRun, active);
   const contentWidth = Math.min(width - 12, 600);
   const flowReady = !loading && state != null;
   useGameSurfaceReadiness('merge', {
@@ -200,12 +213,27 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     markFlowStart('merge-world');
   }, []);
 
-  useEffect(() => () => {
-    if (ftueAdvanceFrameRef.current != null) cancelAnimationFrame(ftueAdvanceFrameRef.current);
-    ftueAdvanceFrameRef.current = null;
-    pendingAnimatedFtueEventsRef.current.clear();
-    ftueCommandLeaseRef.current = false;
-  }, []);
+  useLayoutEffect(() => {
+    addMergeFtueBreadcrumb('session_entered', {
+      mountOrdinal: mergeSession.mountOrdinal,
+      sessionId: mergeSessionId,
+      stepId: initialFtueStepIdRef.current,
+    });
+    setMergeFtueDiagnosticContext({
+      mountOrdinal: mergeSession.mountOrdinal,
+      phase: ftueCoordinator.phase,
+      sessionId: mergeSessionId,
+      stepId: initialFtueStepIdRef.current,
+    });
+    return () => {
+      addMergeFtueBreadcrumb('session_disposed', {
+        phase: ftueCoordinator.phase,
+        sessionId: mergeSessionId,
+      });
+      ftueCoordinator.dispose();
+      setMergeFtueDiagnosticContext(null);
+    };
+  }, [ftueCoordinator, mergeSession.mountOrdinal, mergeSessionId]);
 
   useEffect(() => {
     if (!active || ftueRun?.status !== 'active' || ftueRun.stepId !== 'companion.order_preview' || ftuePreviewNavigationPendingRef.current) return;
@@ -239,11 +267,11 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
 
   useEffect(() => {
     if (!active || !state || !ftueStep || !ftueRun) return;
-    if (pendingAnimatedFtueEventsRef.current.has(state.revision)) return;
+    if (ftueCoordinator.hasPendingRevision(state.revision)) return;
     const recovered = recoverMergeFtueEvent(ftueStep, state, ftueRun.objectiveProgress);
     if (!recovered) return;
     dispatchFtueEvent(recovered, `merge-recovery:${state.revision}`);
-  }, [active, ftueRun, ftueStep, state]);
+  }, [active, ftueCoordinator, ftueRun, ftueStep, state]);
 
   useEffect(() => {
     if (!active) return;
@@ -268,7 +296,14 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
 
   const dispatch = useCallback((command: MergeWorldCommand) => {
     if (!state) return null;
-    if (ftueCommandLeaseRef.current) return null;
+    if (ftueCoordinator.leased) {
+      addMergeFtueBreadcrumb('command_rejected_while_leased', {
+        command: command.type,
+        phase: ftueCoordinator.phase,
+        sessionId: mergeSessionId,
+      });
+      return null;
+    }
     if (!mergeFtueAllowsCommand(ftueStep, state, command)) {
       handleBlockedFtueInteraction();
       return null;
@@ -279,41 +314,77 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     // Claim the lease before entering the provider. This closes the small
     // runOnJS re-entry window where several queued taps could all observe the
     // same pre-command FTUE step.
-    if (shouldLeaseAnimatedCommand) ftueCommandLeaseRef.current = true;
+    const commandToken = shouldLeaseAnimatedCommand
+      ? ftueCoordinator.begin(ftueStep?.id ?? 'unknown', state.revision)
+      : null;
+    if (shouldLeaseAnimatedCommand && !commandToken) return null;
+    if (commandToken) addMergeFtueBreadcrumb('command_leased', {
+      command: command.type,
+      commandId: commandToken.commandId,
+      revision: state.revision,
+      sessionId: mergeSessionId,
+      stepId: commandToken.stepId,
+    });
     const result = send(command);
     const event = mergeFtueEventForCommand(state, command, result);
-    if (event && shouldLeaseAnimatedCommand) {
-      pendingAnimatedFtueEventsRef.current.set(event.revision, event);
-    } else if (event) dispatchFtueEvent(event);
-    else if (shouldLeaseAnimatedCommand) ftueCommandLeaseRef.current = false;
-    return result;
-  }, [ftueRun?.status, ftueStep, handleBlockedFtueInteraction, send, state]);
-  const handleBoardCommandSettled = useCallback((revision: number) => {
-    const event = pendingAnimatedFtueEventsRef.current.get(revision);
-    if (!event) return;
-    if (ftueAdvanceFrameRef.current != null) cancelAnimationFrame(ftueAdvanceFrameRef.current);
-    // The board worklet has finished, but its completion still needs to commit
-    // before replacing the keyed FTUE cue/spotlight native tree.
-    ftueAdvanceFrameRef.current = requestAnimationFrame(() => {
-      ftueAdvanceFrameRef.current = requestAnimationFrame(() => {
-        const pendingEvent = pendingAnimatedFtueEventsRef.current.get(revision);
-        if (!pendingEvent) {
-          ftueAdvanceFrameRef.current = null;
-          ftueCommandLeaseRef.current = false;
-          return;
-        }
-        pendingAnimatedFtueEventsRef.current.delete(revision);
-        dispatchFtueEvent(pendingEvent, `merge-animation-settled:${revision}`);
-        // The logical step is now updated, but retain the lease through the
-        // following paint so the replacement interaction gate is mounted
-        // before another native gesture can reach the board.
-        ftueAdvanceFrameRef.current = requestAnimationFrame(() => {
-          ftueAdvanceFrameRef.current = null;
-          ftueCommandLeaseRef.current = false;
-        });
+    if (event && commandToken) ftueCoordinator.recordEvent(commandToken, event);
+    else if (event) dispatchFtueEvent(event);
+    else if (commandToken) {
+      ftueCoordinator.abort(commandToken);
+      addMergeFtueBreadcrumb('command_aborted', {
+        commandId: commandToken.commandId,
+        sessionId: mergeSessionId,
       });
+    }
+    return result;
+  }, [ftueCoordinator, ftueRun?.status, ftueStep, handleBlockedFtueInteraction, mergeSessionId, send, state]);
+  const handleBoardCommandSettled = useCallback((receipt: MergeBoardOperationReceipt) => {
+    const transaction = ftueCoordinator.settle(receipt);
+    if (!transaction) {
+      addMergeFtueBreadcrumb('stale_operation_ignored', {
+        operationId: receipt.operationId,
+        revision: receipt.revision,
+        sessionId: receipt.sessionId,
+      });
+      return;
+    }
+    addMergeFtueBreadcrumb('operation_settled', {
+      commandId: transaction.token.commandId,
+      operationId: receipt.operationId,
+      revision: receipt.revision,
+      sessionId: receipt.sessionId,
     });
-  }, []);
+    const nextRun = dispatchFtueEvent(transaction.event, `merge-operation-settled:${receipt.sessionId}:${receipt.operationId}`);
+    if (!nextRun || nextRun.status !== 'active') {
+      ftueCoordinator.abort(transaction.token);
+      return;
+    }
+    ftueCoordinator.awaitGate(
+      transaction.token,
+      mergeFtueInteractionKey(nextRun, true),
+    );
+    setMergeFtueDiagnosticContext({
+      commandId: transaction.token.commandId,
+      mountOrdinal: mergeSession.mountOrdinal,
+      phase: ftueCoordinator.phase,
+      revision: receipt.revision,
+      sessionId: mergeSessionId,
+      stepId: nextRun.stepId,
+    });
+  }, [ftueCoordinator, mergeSession.mountOrdinal, mergeSessionId]);
+  const handleInteractionGateCommitted = useCallback((receipt: MergeInteractionGateReceipt) => {
+    if (!ftueCoordinator.acknowledgeGate(receipt)) return;
+    addMergeFtueBreadcrumb('gate_committed', {
+      interactionKey: receipt.interactionKey,
+      sessionId: receipt.sessionId,
+    });
+    setMergeFtueDiagnosticContext({
+      mountOrdinal: mergeSession.mountOrdinal,
+      phase: ftueCoordinator.phase,
+      sessionId: mergeSessionId,
+      stepId: ftueStep?.id,
+    });
+  }, [ftueCoordinator, ftueStep?.id, mergeSession.mountOrdinal, mergeSessionId]);
   const pendingParcels = useMemo(() => state?.arrivals.filter((arrival) => (
     arrival.claimedAt == null
     && arrival.kind !== 'memory_arrival'
@@ -623,16 +694,18 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
               animateEntrance={playBoardEntrance}
               hiddenItemInstanceIds={hiddenAnimatedItemIds}
               interactionGate={ftueBoardGate}
-              interactionSessionKey={`${ftueRun?.runId ?? 'free'}:${ftueStep?.id ?? 'open'}:${active ? 'active' : 'inactive'}`}
+              interactionSessionKey={interactionSessionKey}
               maxHeight={boardAreaHeight - 1}
               onBlockedInteraction={handleBlockedFtueInteraction}
               onCommand={dispatch}
               onCommandSettled={handleBoardCommandSettled}
+              onInteractionGateCommitted={handleInteractionGateCommitted}
               onHiddenItemsRetired={handleHiddenItemsRetired}
               onSelect={setSelectedCell}
               onScreenMetrics={handleBoardScreenMetrics}
               selectedCell={selectedCell}
               state={state}
+              sessionId={mergeSessionId}
               width={contentWidth}
             /> : null}
             {parcelFlight ? <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.boardInteractionShield} /> : null}

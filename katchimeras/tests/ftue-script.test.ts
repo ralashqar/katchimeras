@@ -193,12 +193,16 @@ test('Merge FTUE spotlight is an absolute non-layout overlay with transparent ta
   assert.match(merge, /spotlight=\{active && !serveFlight \? ftueStep\?\.spotlight \?\? null : null\}/);
 });
 
-test('each Merge FTUE finger guide starts a fresh source-to-target timeline', () => {
+test('Merge FTUE updates one persistent finger and spotlight tree for each measured target', () => {
   const overlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
-  assert.match(overlay, /const presentationKey = `\$\{targetRevision\}\|\$\{configKey\}/);
+  assert.doesNotMatch(overlay, /presentationKey|entering=|exiting=/);
+  assert.doesNotMatch(overlay, /key=\{`spotlight:|key=\{`cue:/);
+  assert.match(overlay, /measurementGenerationRef/);
+  assert.match(overlay, /stateRef\.current/);
   assert.match(overlay, /currentLayout\.targetRevision === targetRevision/);
-  assert.match(overlay, /resetKey=\{currentLayout\.presentationKey\}/);
-  assert.match(overlay, /cancelAnimation\(progress\);\s*progress\.value = 0;[\s\S]*?resetKey/);
+  assert.match(overlay, /resetKey=\{`\$\{currentLayout\?\.targetRevision/);
+  assert.match(overlay, /cancelAnimation\(progress\);[\s\S]*?progress\.value = 0;[\s\S]*?resetKey/);
+  assert.doesNotMatch(overlay, /return \(\) => \{\s*cancelAnimation\(progress\);\s*progress\.value = 0/);
 });
 
 test('the active FTUE hides the bottom bar only on the tab presenting its current step', () => {

@@ -242,9 +242,9 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel
               interactionAllowed={interactionGate.kind === 'open' || (interactionGate.kind === 'serve' && interactionGate.orderId === entry.order.id)}
               interactionLocked={interactionGate.kind !== 'open'}
               onBlockedInteraction={onBlockedInteraction}
+              onRailTargetRef={onRailTargetRef}
               onReroll={() => onReroll(entry.order)}
               onServe={(itemTargets) => onServe(entry.order, itemTargets)}
-              onServeTargetRef={(orderId, view) => onRailTargetRef?.(`order-serve:${orderId}`, view)}
               reduceMotion={reduceMotion}
             />
           ) : (
@@ -253,8 +253,8 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel
               onPress={() => interactionGate.kind === 'open' || (interactionGate.kind === 'chat_note' && interactionGate.noteId === entry.id)
                 ? onOpenChat(entry.characterId, entry.id)
                 : onBlockedInteraction?.()}
+              onRailTargetRef={onRailTargetRef}
               reduceMotion={reduceMotion}
-              targetRef={(view) => onRailTargetRef?.(`chat-note:${entry.id}`, view)}
             />
           )}
         </Animated.View>
@@ -267,15 +267,15 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel
   );
 }
 
-function OrderTrayCard({ entry, index, interactionAllowed, interactionLocked, onBlockedInteraction, onReroll, onServe, onServeTargetRef, reduceMotion }: {
+function OrderTrayCard({ entry, index, interactionAllowed, interactionLocked, onBlockedInteraction, onRailTargetRef, onReroll, onServe, reduceMotion }: {
   entry: Extract<MergeTrayEntry, { kind: 'order' }>;
   index: number;
   interactionAllowed: boolean;
   interactionLocked: boolean;
   onBlockedInteraction?: () => void;
+  onRailTargetRef?: (targetKey: string, view: View | null) => void;
   onReroll: () => void;
   onServe: (itemTargets: readonly MergeScreenPoint[]) => boolean | Promise<boolean>;
-  onServeTargetRef?: (orderId: string, view: View | null) => void;
   reduceMotion: boolean;
 }) {
   const { itemReadiness, order, ready } = entry;
@@ -284,7 +284,11 @@ function OrderTrayCard({ entry, index, interactionAllowed, interactionLocked, on
   const servingRef = useRef(false);
   const itemRefs = useRef<(View | null)[]>([]);
   const characterSource = resolveCreatureArtSource(CHARACTER_VISUALS[order.characterId], { lod: 'medium' });
-  const setServeTargetRef = useCallback((view: View | null) => onServeTargetRef?.(order.id, view), [onServeTargetRef, order.id]);
+  const serveTargetKey = `order-serve:${order.id}`;
+  const setServeTargetRef = useCallback(
+    (view: View | null) => onRailTargetRef?.(serveTargetKey, view),
+    [onRailTargetRef, serveTargetKey],
+  );
   const requestedItems = order.requirements
     .flatMap((requirement) => Array.from({ length: requirement.quantity }, () => requirement.definitionId))
     .slice(0, 3);
@@ -488,20 +492,25 @@ function ServeConfettiParticle({ index, particle, progress }: {
   );
 }
 
-function ChatNoteTrayCard({ entry, onPress, reduceMotion, targetRef }: {
+function ChatNoteTrayCard({ entry, onPress, onRailTargetRef, reduceMotion }: {
   entry: Extract<MergeTrayEntry, { kind: 'chat_note' }>;
   onPress: () => void;
+  onRailTargetRef?: (targetKey: string, view: View | null) => void;
   reduceMotion: boolean;
-  targetRef?: (view: View | null) => void;
 }) {
   const characterSource = resolveCreatureArtSource(CHARACTER_VISUALS[entry.characterId], { lod: 'medium' });
+  const targetKey = `chat-note:${entry.id}`;
+  const setTargetRef = useCallback(
+    (view: View | null) => onRailTargetRef?.(targetKey, view),
+    [onRailTargetRef, targetKey],
+  );
   const subtitle = entry.bondPoints > 0 ? `+${entry.bondPoints} Bond · Read` : 'Read next scene';
   return (
     <Pressable
       accessibilityLabel={`${MERGE_CHARACTER_NAMES[entry.characterId]} left a note. ${subtitle}`}
       accessibilityRole="button"
       onPress={onPress}
-      ref={targetRef}
+      ref={setTargetRef}
       style={({ pressed }) => [styles.card, styles.noteCard, pressed && styles.pressed]}>
       <Animated.View entering={reduceMotion ? FadeIn.duration(100) : FadeInUp.delay(45).duration(230)} style={styles.characterLayer}>
         <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={`merge-note-${entry.characterId}`} source={characterSource} style={styles.character} transition={0} />

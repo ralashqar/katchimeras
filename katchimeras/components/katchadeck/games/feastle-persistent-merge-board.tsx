@@ -28,6 +28,7 @@ import { FeastleMergeCelebration } from '@/components/katchadeck/world/quests/fe
 import { mergeWorldGeneratorArt, mergeWorldItemArt } from '@/constants/merge-world-art';
 import { MERGE_GENERATORS_BY_ID, MERGE_HYBRID_RECIPES, MERGE_ITEMS_BY_ID, MERGE_WORLD_COLUMNS, MERGE_WORLD_ROWS } from '@/constants/merge-world-catalog';
 import type { MergeBoardInteractionGate } from '@/features/onboarding/merge-ftue';
+import type { MergeBoardOperationReceipt, MergeBoardSessionId, MergeInteractionGateReceipt } from '@/features/onboarding/merge-ftue-interaction-coordinator';
 import { useMergeMotionPerformanceProbe, type MergeMotionPerformanceSample } from '@/hooks/use-merge-motion-performance-probe';
 import { useDisposableTimers } from '@/hooks/use-disposable-timers';
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
@@ -103,7 +104,7 @@ function isInterruptibleMotion(motion?: SpriteMotion) {
   return motion == null || motion.kind === 'move' || motion.kind === 'swap' || motion.kind === 'return' || motion.kind === 'spawn' || motion.kind === 'merge-result';
 }
 
-export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onCommandSettled, onScreenMetrics, onBlockedInteraction, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', hiddenItemInstanceIds, animateEntrance = true }: {
+export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onCommandSettled, onInteractionGateCommitted, onScreenMetrics, onBlockedInteraction, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', sessionId, hiddenItemInstanceIds, animateEntrance = true }: {
   state: MergeWorldState;
   width: number;
   animateEntrance?: boolean;
@@ -111,12 +112,14 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   selectedCell: number | null;
   onSelect: (cell: number | null) => void;
   onCommand: (command: MergeWorldCommand) => MergeWorldCommandResult | null;
-  onCommandSettled?: (revision: number) => void;
+  onCommandSettled?: (receipt: MergeBoardOperationReceipt) => void;
+  onInteractionGateCommitted?: (receipt: MergeInteractionGateReceipt) => void;
   onScreenMetrics?: (metrics: MergeBoardScreenMetrics) => void;
   onBlockedInteraction?: () => void;
   onHiddenItemsRetired?: (instanceIds: readonly string[]) => void;
   interactionGate?: MergeBoardInteractionGate;
   interactionSessionKey?: string;
+  sessionId: MergeBoardSessionId;
   hiddenItemInstanceIds?: ReadonlySet<string>;
 }) {
   const gap = 1;
@@ -201,6 +204,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   const committedStateRef = useRef(state);
   const onSelectRef = useRef(onSelect);
   const onCommandSettledRef = useRef(onCommandSettled);
+  const onInteractionGateCommittedRef = useRef(onInteractionGateCommitted);
   const selectedCellRef = useRef(selectedCell);
   const launchGeneratorRef = useRef<(generatorId: string) => void>(() => undefined);
   const dropRef = useRef<(instanceId: string, dx: number, dy: number, intendedTargetCell?: number | null) => void>(() => undefined);
@@ -219,6 +223,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   motionsRef.current = motions;
   onSelectRef.current = onSelect;
   onCommandSettledRef.current = onCommandSettled;
+  onInteractionGateCommittedRef.current = onInteractionGateCommitted;
   selectedCellRef.current = selectedCell;
 
   const showCellFeedback = useCallback((cell: number, reason: MergeWorldFailureReason) => {
@@ -279,7 +284,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     };
   }, [effectsPaused, motionActive, timers]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     // A retained tab can return with worklet gesture ownership from the prior
     // FTUE node. Start every authored node with neutral touch/selection state;
     // board animations remain intact and continue reconciling normally.
@@ -291,7 +296,8 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     hoverCell.value = -1;
     gestureFinished.value = true;
     onSelectRef.current(null);
-  }, [activeDragId, activeSourceCell, dragPhase, dragTranslationX, dragTranslationY, gestureFinished, hoverCell, interactionSessionKey]);
+    onInteractionGateCommittedRef.current?.({ interactionKey: interactionSessionKey, sessionId });
+  }, [activeDragId, activeSourceCell, dragPhase, dragTranslationX, dragTranslationY, gestureFinished, hoverCell, interactionSessionKey, sessionId]);
 
   useEffect(() => {
     if (state.revision < committedStateRef.current.revision) return;
@@ -346,8 +352,10 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       motionActive.value = 0;
       if (!reducedFx) effectsPaused.value = withDelay(500, withTiming(0, { duration: 1 }));
     }
-    if (operation.settledRevision != null) onCommandSettledRef.current?.(operation.settledRevision);
-  }, [effectsPaused, motionActive, reducedFx]);
+    if (operation.settledRevision != null) {
+      onCommandSettledRef.current?.({ operationId: operation.id, revision: operation.settledRevision, sessionId });
+    }
+  }, [effectsPaused, motionActive, reducedFx, sessionId]);
 
   const completeMotion = useCallback((operationId: number, instanceId: string) => {
     const operation = activeOperations.current.get(operationId);

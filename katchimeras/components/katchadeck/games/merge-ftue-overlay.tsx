@@ -1,12 +1,10 @@
 import { Canvas, FillType, Path, Skia } from '@shopify/react-native-skia';
 import { Image } from 'expo-image';
-import { useEffect, useMemo, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
-  FadeIn,
-  FadeOut,
   interpolate,
   useAnimatedStyle,
   useReducedMotion,
@@ -20,21 +18,41 @@ import Animated, {
 import type { FtueCueDefinition, FtueSpotlightDefinition, FtueTarget } from '@/features/onboarding/ftue-types';
 import { resolveFtueBoardCell } from '@/features/onboarding/merge-ftue';
 import type { MergeWorldState } from '@/types/merge-world';
+import { addMergeFtueBreadcrumb } from '@/utils/crash-reporting';
 import { mergeCellOrigin } from '@/utils/merge-world/board-geometry';
 
 import type { MergeBoardScreenMetrics } from './feastle-persistent-merge-board';
 
 const HAND_ART = require('../../../assets/images/katchimeras/merge-world/ui/ftue-hand.webp');
-const HAND_SIZE = 112;
 const HAND_TIP_X = 0.28;
 const HAND_TIP_Y = 0.2;
+const SPOTLIGHT_RING_SLOTS = [0, 1, 2, 3] as const;
+
+export type MergeFtueVisualTheme = {
+  dimColor: string;
+  dragDurationMs: number;
+  fingerDelayMs: number;
+  fingerSize: number;
+  focusRingColor: string;
+  focusRingShadowColor: string;
+  tapDurationMs: number;
+};
+
+export const DEFAULT_MERGE_FTUE_VISUAL_THEME: MergeFtueVisualTheme = {
+  dimColor: '11, 9, 24',
+  dragDurationMs: 1_650,
+  fingerDelayMs: 260,
+  fingerSize: 112,
+  focusRingColor: 'rgba(196, 250, 255, 0.96)',
+  focusRingShadowColor: '#82EDFF',
+  tapDurationMs: 1_180,
+};
 
 type Point = { x: number; y: number };
 type Frame = Point & { height: number; width: number };
 type CuePoints = { from: Point; to: Point };
 type OverlayLayout = {
   configKey: string;
-  presentationKey: string;
   targetRevision: number;
   cue: FtueCueDefinition | null;
   cuePoints: CuePoints | null;
@@ -54,6 +72,7 @@ export function MergeFtueOverlay({
   spotlight,
   state,
   targetRevision,
+  visualTheme,
 }: {
   blockedPulseNonce: number;
   boardMetrics: MergeBoardScreenMetrics | null;
@@ -64,24 +83,30 @@ export function MergeFtueOverlay({
   spotlight: FtueSpotlightDefinition | null;
   state: MergeWorldState;
   targetRevision: number;
+  visualTheme?: Partial<MergeFtueVisualTheme>;
 }) {
   const [layout, setLayout] = useState<OverlayLayout | null>(null);
+  const stateRef = useRef(state);
+  const measurementGenerationRef = useRef(0);
+  stateRef.current = state;
+  const theme = useMemo(() => ({ ...DEFAULT_MERGE_FTUE_VISUAL_THEME, ...visualTheme }), [visualTheme]);
   const cueKey = useMemo(() => cue ? JSON.stringify(cue) : 'none', [cue]);
   const spotlightKey = useMemo(() => spotlight ? JSON.stringify(spotlight) : 'none', [spotlight]);
   const configKey = `${cueKey}|${spotlightKey}`;
 
   useEffect(() => {
+    const generation = ++measurementGenerationRef.current;
     let cancelled = false;
     const frame = requestAnimationFrame(async () => {
       const screen = await measureView(screenRef.current);
       if (!screen || (!cue && !spotlight)) {
-        if (!cancelled) setLayout(null);
+        if (!cancelled && generation === measurementGenerationRef.current) setLayout(null);
         return;
       }
 
       const resolve = (target: FtueTarget) => resolveTargetFrame(
         target,
-        state,
+        stateRef.current,
         boardMetrics,
         railTargetRefs.current,
         screen,
@@ -114,19 +139,20 @@ export function MergeFtueOverlay({
         }
       }
 
-      // Keep the last valid presentation mounted while newly declared targets
-      // are entering or their native refs are being measured. This lets its
-      // keyed exit animation finish instead of flashing the undimmed board.
+      // Keep the last valid presentation while newly declared native targets
+      // are being measured. The persistent renderer updates only when the next
+      // complete presentation is ready.
       if ((cue && !cuePoints) || (spotlight && spotlightFrames.length === 0)) return;
 
-      if (!cancelled) {
-        // The same source/target pair can appear in consecutive FTUE nodes.
-        // Include the node/target revision so its guide always gets a fresh
-        // animation timeline instead of inheriting the previous loop's time.
-        const presentationKey = `${targetRevision}|${configKey}|${spotlightFrames.map(frameSignature).join('|')}|${cuePoints ? `${pointSignature(cuePoints.from)}>${pointSignature(cuePoints.to)}` : 'no-cue'}`;
+      if (!cancelled && generation === measurementGenerationRef.current) {
+        addMergeFtueBreadcrumb('presentation_applied', {
+          cue: cue?.kind ?? 'none',
+          generation,
+          spotlightTargets: spotlightFrames.length,
+          targetRevision,
+        });
         setLayout({
           configKey,
-          presentationKey,
           targetRevision,
           cue,
           cuePoints,
@@ -151,56 +177,49 @@ export function MergeFtueOverlay({
     railTargetRefs,
     spotlight,
     spotlightKey,
-    state,
-    state.revision,
     targetRevision,
   ]);
 
   const currentLayout = layout;
   const showSpotlight = Boolean(currentLayout?.spotlightFrames.length);
-  // Do not leave the previous node's moving hand visible while the new
-  // source and target are being measured. The new keyed cue mounts at time 0.
+  // Hide the previous moving hand while its replacement target is measured;
+  // the same native finger view is reused for the next presentation.
   const showCue = Boolean(
     currentLayout?.configKey === configKey
       && currentLayout.targetRevision === targetRevision
       && currentLayout.cue
       && currentLayout.cuePoints,
   );
-  if (!currentLayout || (!showSpotlight && !showCue)) return null;
-
   return (
     <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       pointerEvents="none"
       style={styles.overlay}>
-      {showSpotlight ? (
-        <FtueSpotlight
-          frames={currentLayout.spotlightFrames}
-          key={`spotlight:${currentLayout.presentationKey}`}
-          opacity={currentLayout.spotlightOpacity}
-          radius={currentLayout.spotlightRadius}
-          screen={currentLayout.screen}
-        />
-      ) : null}
-      {showCue && currentLayout.cue && currentLayout.cuePoints ? (
-        <FtueFingerCue
-          blockedPulseNonce={blockedPulseNonce}
-          cue={currentLayout.cue}
-          key={`cue:${currentLayout.presentationKey}`}
-          points={currentLayout.cuePoints}
-          resetKey={currentLayout.presentationKey}
-        />
-      ) : null}
+      <FtueSpotlight
+        frames={showSpotlight ? currentLayout?.spotlightFrames ?? [] : []}
+        opacity={showSpotlight ? currentLayout?.spotlightOpacity ?? 0 : 0}
+        radius={currentLayout?.spotlightRadius ?? 12}
+        screen={currentLayout?.screen ?? { height: 0, width: 0 }}
+        theme={theme}
+      />
+      <FtueFingerCue
+        blockedPulseNonce={blockedPulseNonce}
+        cue={showCue ? currentLayout?.cue ?? null : null}
+        points={showCue ? currentLayout?.cuePoints ?? null : null}
+        resetKey={`${currentLayout?.targetRevision ?? 0}|${currentLayout?.configKey ?? 'none'}`}
+        theme={theme}
+      />
     </View>
   );
 }
 
-function FtueSpotlight({ frames, opacity, radius, screen }: {
+function FtueSpotlight({ frames, opacity, radius, screen, theme }: {
   frames: Frame[];
   opacity: number;
   radius: number;
   screen: { height: number; width: number };
+  theme: MergeFtueVisualTheme;
 }) {
   const path = useMemo(() => {
     const mask = Skia.Path.Make();
@@ -214,37 +233,41 @@ function FtueSpotlight({ frames, opacity, radius, screen }: {
   }, [frames, radius, screen.height, screen.width]);
 
   return (
-    <Animated.View
-      entering={FadeIn.duration(180)}
-      exiting={FadeOut.duration(140)}
-      style={StyleSheet.absoluteFill}>
+    <View style={StyleSheet.absoluteFill}>
       <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}>
-        <Path color={`rgba(11, 9, 24, ${opacity})`} path={path} />
+        <Path color={`rgba(${theme.dimColor}, ${opacity})`} path={path} />
       </Canvas>
-      {frames.map((frame, index) => (
+      {SPOTLIGHT_RING_SLOTS.map((index) => {
+        const frame = frames[index];
+        return (
         <View
-          key={`${index}:${frame.x}:${frame.y}`}
+          key={`spotlight-ring-${index}`}
           style={[
             styles.focusRing,
             {
-              borderRadius: Math.min(radius, frame.height / 2, frame.width / 2),
-              height: frame.height,
-              left: frame.x,
-              top: frame.y,
-              width: frame.width,
+              borderColor: theme.focusRingColor,
+              borderRadius: frame ? Math.min(radius, frame.height / 2, frame.width / 2) : 0,
+              height: frame?.height ?? 0,
+              left: frame?.x ?? 0,
+              opacity: frame ? 1 : 0,
+              top: frame?.y ?? 0,
+              width: frame?.width ?? 0,
+              shadowColor: theme.focusRingShadowColor,
             },
           ]}
         />
-      ))}
-    </Animated.View>
+        );
+      })}
+    </View>
   );
 }
 
-function FtueFingerCue({ blockedPulseNonce, cue, points, resetKey }: {
+function FtueFingerCue({ blockedPulseNonce, cue, points, resetKey, theme }: {
   blockedPulseNonce: number;
-  cue: FtueCueDefinition;
-  points: CuePoints;
+  cue: FtueCueDefinition | null;
+  points: CuePoints | null;
   resetKey: string;
+  theme: MergeFtueVisualTheme;
 }) {
   const reduceMotion = useReducedMotion();
   const progress = useSharedValue(0);
@@ -252,14 +275,15 @@ function FtueFingerCue({ blockedPulseNonce, cue, points, resetKey }: {
 
   useEffect(() => {
     cancelAnimation(progress);
+    if (!cue || !points) return;
     progress.value = 0;
     if (reduceMotion) return;
-    progress.value = withDelay(260, withRepeat(withTiming(1, {
-      duration: cue.kind === 'drag' ? 1_650 : 1_180,
+    progress.value = withDelay(theme.fingerDelayMs, withRepeat(withTiming(1, {
+      duration: cue.kind === 'drag' ? theme.dragDurationMs : theme.tapDurationMs,
       easing: Easing.inOut(Easing.cubic),
     }), -1, false));
     return () => cancelAnimation(progress);
-  }, [cue.kind, progress, reduceMotion, resetKey]);
+  }, [cue, points, progress, reduceMotion, resetKey, theme.dragDurationMs, theme.fingerDelayMs, theme.tapDurationMs]);
 
   useEffect(() => {
     if (!blockedPulseNonce) return;
@@ -271,14 +295,16 @@ function FtueFingerCue({ blockedPulseNonce, cue, points, resetKey }: {
     return () => cancelAnimation(correction);
   }, [blockedPulseNonce, correction]);
 
-  const travelX = points.to.x - points.from.x;
-  const travelY = points.to.y - points.from.y;
+  const travelX = points ? points.to.x - points.from.x : 0;
+  const travelY = points ? points.to.y - points.from.y : 0;
+  const cueKind = cue?.kind ?? 'tap';
+  const visible = Boolean(cue && points);
   const animatedStyle = useAnimatedStyle(() => {
     const value = progress.value;
-    const drag = cue.kind === 'drag';
+    const drag = cueKind === 'drag';
     const motion = reduceMotion ? 0 : value;
     return {
-      opacity: reduceMotion ? 1 : drag
+      opacity: !visible ? 0 : reduceMotion ? 1 : drag
         ? interpolate(value, [0, 0.08, 0.72, 0.86, 1], [0, 1, 1, 0, 0])
         : interpolate(value, [0, 0.12, 0.72, 1], [0.82, 1, 1, 0.82]),
       transform: [
@@ -287,14 +313,16 @@ function FtueFingerCue({ blockedPulseNonce, cue, points, resetKey }: {
         { scale: 1 + correction.value * 0.13 },
       ],
     };
-  }, [cue.kind, reduceMotion, travelX, travelY]);
+  }, [cueKind, reduceMotion, travelX, travelY, visible]);
 
   return (
-    <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(140)} style={[
+    <Animated.View style={[
       styles.hand,
       {
-        left: points.from.x - HAND_SIZE * HAND_TIP_X,
-        top: points.from.y - HAND_SIZE * HAND_TIP_Y,
+        height: theme.fingerSize,
+        left: (points?.from.x ?? 0) - theme.fingerSize * HAND_TIP_X,
+        top: (points?.from.y ?? 0) - theme.fingerSize * HAND_TIP_Y,
+        width: theme.fingerSize,
       },
       animatedStyle,
     ]}>
@@ -309,14 +337,6 @@ function FtueFingerCue({ blockedPulseNonce, cue, points, resetKey }: {
       />
     </Animated.View>
   );
-}
-
-function frameSignature(frame: Frame) {
-  return `${Math.round(frame.x)}:${Math.round(frame.y)}:${Math.round(frame.width)}:${Math.round(frame.height)}`;
-}
-
-function pointSignature(point: Point) {
-  return `${Math.round(point.x)}:${Math.round(point.y)}`;
 }
 
 async function resolveTargetFrame(
@@ -386,14 +406,12 @@ function measureView(view: View | null): Promise<Frame | null> {
 const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, zIndex: 250 },
   focusRing: {
-    borderColor: 'rgba(196, 250, 255, 0.96)',
     borderWidth: 2,
     position: 'absolute',
-    shadowColor: '#82EDFF',
     shadowOffset: { height: 0, width: 0 },
     shadowOpacity: 0.9,
     shadowRadius: 7,
   },
-  hand: { height: HAND_SIZE, position: 'absolute', width: HAND_SIZE },
+  hand: { position: 'absolute' },
   handArt: { height: '100%', width: '100%' },
 });
