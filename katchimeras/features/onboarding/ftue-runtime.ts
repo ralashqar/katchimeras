@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 import { createClientId } from '@/utils/client-id';
-import { getStoredJson, setStoredJson } from '@/utils/app-storage';
+import { getStoredJson, setStoredJsonAsync } from '@/utils/app-storage';
 
 import { MOSSPROUT_FTUE_SCRIPT, mossproutFtueAction, mossproutFtueStep } from './mossprout-ftue-script';
 import type { FtueAnswer, FtueCommitReceipt, FtueEvent, FtueEventMatcher, FtueRunState, FtueSurface, FtueSurfaceViewModel } from './ftue-types';
@@ -11,6 +11,8 @@ const LEGACY_STORAGE_KEY = 'katchimeras.first-session.v3';
 const listeners = new Set<() => void>();
 let snapshot: FtueRunState | null | undefined;
 let migrationNotificationQueued = false;
+let pendingPersistence: FtueRunState | null | undefined;
+let persistenceWorker: Promise<void> | null = null;
 
 type LegacyFirstSession = { stage?: 'today' | 'merge' | 'journal_for_energy' | 'complete'; startedAt?: string; mergeInstalled?: boolean };
 
@@ -48,11 +50,40 @@ function migrateLegacy(): FtueRunState | null {
   return run;
 }
 
+function enqueuePersistence(next: FtueRunState | null) {
+  pendingPersistence = next;
+  if (persistenceWorker) return;
+  persistenceWorker = (async () => {
+    while (pendingPersistence !== undefined) {
+      const value = pendingPersistence;
+      pendingPersistence = undefined;
+      await setStoredJsonAsync(STORAGE_KEY, value);
+    }
+  })().catch(() => {
+    // The in-memory run remains authoritative for this session. Merge-domain
+    // recovery reconstructs missed observed events after an interrupted write.
+  }).finally(() => {
+    persistenceWorker = null;
+    if (pendingPersistence !== undefined) enqueuePersistence(pendingPersistence);
+  });
+}
+
+export async function flushFtuePersistence() {
+  while (persistenceWorker || pendingPersistence !== undefined) {
+    if (!persistenceWorker && pendingPersistence !== undefined) enqueuePersistence(pendingPersistence);
+    await persistenceWorker;
+  }
+}
+
 function publish(next: FtueRunState | null) {
   snapshot = next;
-  setStoredJson(STORAGE_KEY, next);
+  enqueuePersistence(next);
   listeners.forEach((listener) => listener());
   return next;
+}
+
+function scheduleReceiptSync() {
+  void import('./ftue-sync').then(({ scheduleFtueReceiptSync }) => scheduleFtueReceiptSync()).catch(() => {});
 }
 
 function migrateCurrentScript(run: FtueRunState): FtueRunState {
@@ -105,7 +136,7 @@ export function loadFtueRun(): FtueRunState | null {
     const migrated = migrateCurrentScript(snapshot);
     if (migrated !== snapshot) {
       snapshot = migrated;
-      setStoredJson(STORAGE_KEY, migrated);
+      enqueuePersistence(migrated);
       if (!migrationNotificationQueued) {
         migrationNotificationQueued = true;
         queueMicrotask(() => {
@@ -231,7 +262,7 @@ export function commitFtueAction(input: {
     receipts,
     updatedAt: now,
   });
-  void import('./ftue-sync').then(({ flushFtueReceipts }) => flushFtueReceipts()).catch(() => {});
+  scheduleReceiptSync();
   return next;
 }
 
@@ -267,17 +298,49 @@ export function dispatchFtueEvent(event: FtueEvent, evidenceRef?: string) {
   const progressKey = `${current.stepId}:${edge.commitActionId}`;
   const nextCount = (current.objectiveProgress[progressKey] ?? 0) + 1;
   const requiredCount = Math.max(1, edge.requiredCount ?? 1);
-  const progressed = publish({
-    ...current,
-    objectiveProgress: { ...current.objectiveProgress, [progressKey]: Math.min(nextCount, requiredCount) },
-    updatedAt: new Date().toISOString(),
-  });
-  if (nextCount < requiredCount) return progressed;
-  return commitFtueAction({
+  const now = new Date().toISOString();
+  const objectiveProgress = {
+    ...current.objectiveProgress,
+    [progressKey]: Math.min(nextCount, requiredCount),
+  };
+  if (nextCount < requiredCount) {
+    return publish({ ...current, objectiveProgress, updatedAt: now });
+  }
+
+  const action = mossproutFtueAction(current.stepId, edge.commitActionId);
+  if (!action) return current;
+  const existing = current.receipts.find((receipt) => (
+    receipt.actionId === edge.commitActionId && receipt.stepId === current.stepId
+  ));
+  if (existing) return current;
+  const receipt: FtueCommitReceipt = {
+    clientEventId: `${current.runId}:${edge.commitActionId}`,
     actionId: edge.commitActionId,
+    stepId: current.stepId,
+    scriptId: current.scriptId,
+    scriptVersion: current.scriptVersion,
+    surface: step!.surface,
+    status: 'committed',
+    startedAt: now,
+    committedAt: now,
+    presentedAt: null,
     evidenceRef: evidenceRef ?? `merge-revision:${event.revision}`,
-    nextStepId: edge.nextStepId,
+    syncAttempts: 0,
+    syncedAt: null,
+  };
+  const nextStepId = edge.nextStepId ?? action.nextStepId ?? current.stepId;
+  const complete = nextStepId === MOSSPROUT_FTUE_SCRIPT.terminalStepId;
+  const next = publish({
+    ...current,
+    stepId: nextStepId,
+    status: complete ? 'complete' : current.status,
+    completedAt: complete ? now : current.completedAt,
+    objectiveProgress,
+    receipts: [...current.receipts, receipt],
+    updatedAt: now,
   });
+  scheduleReceiptSync();
+  return next;
 }
 
 export function markFtueReceiptPresented(actionId: string) {

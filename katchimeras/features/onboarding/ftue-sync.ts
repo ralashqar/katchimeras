@@ -1,17 +1,33 @@
 import { ensureStreakIdentity } from '@/utils/streak-sync';
 import { supabase } from '@/utils/supabase';
+import { waitForCriticalInteractionIdle } from '@/utils/critical-interaction';
 
 import { loadFtueRun, markFtueReceiptSynced, noteFtueSyncAttempt } from './ftue-runtime';
 import { mossproutFtueAction } from './mossprout-ftue-script';
 
 let flushing: Promise<void> | null = null;
+let scheduledFlush: ReturnType<typeof setTimeout> | null = null;
+const RECEIPT_SYNC_QUIET_MS = 1_500;
+
+export function scheduleFtueReceiptSync() {
+  if (scheduledFlush) clearTimeout(scheduledFlush);
+  scheduledFlush = setTimeout(() => {
+    scheduledFlush = null;
+    void flushFtueReceipts();
+  }, RECEIPT_SYNC_QUIET_MS);
+}
 
 export function flushFtueReceipts() {
+  if (scheduledFlush) {
+    clearTimeout(scheduledFlush);
+    scheduledFlush = null;
+  }
   if (flushing) return flushing;
   flushing = (async () => {
-    if (!await ensureStreakIdentity()) return;
+    await waitForCriticalInteractionIdle();
     const run = loadFtueRun();
     if (!run) return;
+    if (!await ensureStreakIdentity()) return;
     for (const receipt of run.receipts.filter((item) => item.status !== 'pending' && !item.syncedAt && mossproutFtueAction(item.stepId, item.actionId)?.backendEvent)) {
       noteFtueSyncAttempt(receipt.clientEventId);
       const { error } = await supabase.rpc('register_ftue_action_v1', {

@@ -956,18 +956,20 @@ test('Merge board retains destination selection and decorates generators with am
   assert.match(board, /Dream Echoes on the same Expo Image decode\/cache path/);
 });
 
-test('Merge FTUE uses session receipts and unlocks only after the replacement gate commits', () => {
+test('Merge FTUE commits before visual settlement and preserves all native animation paths', () => {
   const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
   const overlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
   const route = readFileSync('components/katchadeck/games/merge-world-route-screen.tsx', 'utf8');
   const crashReporting = readFileSync('utils/crash-reporting.ts', 'utf8');
-  assert.match(screen, /ftueCoordinator\.begin\(ftueStep\?\.id \?\? 'unknown', state\.revision\)/);
-  assert.match(screen, /ftueCoordinator\.settle\(receipt\)/);
-  assert.match(screen, /ftueCoordinator\.awaitGate/);
-  assert.match(screen, /ftueCoordinator\.acknowledgeGate\(receipt\)/);
-  assert.match(screen, /onCommandSettled=\{handleBoardCommandSettled\}/);
-  assert.match(screen, /onInteractionGateCommitted=\{handleInteractionGateCommitted\}/);
+  const runtime = readFileSync('features/onboarding/ftue-runtime.ts', 'utf8');
+  const sync = readFileSync('features/onboarding/ftue-sync.ts', 'utf8');
+  const artCache = readFileSync('hooks/use-merge-art-cache.ts', 'utf8');
+  assert.match(screen, /ftueCoordinator\.begin\(currentStep\?\.id \?\? 'unknown', currentState\.revision\)/);
+  assert.match(screen, /const nextRun = dispatchFtueEvent\(/);
+  assert.match(screen, /ftueCoordinator\.complete\(commandToken\)/);
+  assert.doesNotMatch(screen, /ftueCoordinator\.settle|ftueCoordinator\.awaitGate|ftueCoordinator\.acknowledgeGate/);
+  assert.doesNotMatch(screen, /onCommandSettled=|onInteractionGateCommitted=/);
   assert.doesNotMatch(screen, /ftueAdvanceFrameRef|pendingAnimatedFtueEventsRef|requestAnimationFrame\(\(\) => \{\s*requestAnimationFrame/);
   assert.match(board, /settledRevision: predicted\.state\.revision/);
   assert.match(board, /onCommandSettledRef\.current\?\.\(\{ operationId: operation\.id, revision: operation\.settledRevision, sessionId \}\)/);
@@ -976,6 +978,7 @@ test('Merge FTUE uses session receipts and unlocks only after the replacement ga
   assert.doesNotMatch(overlay, /key=\{`(?:spotlight|cue):|entering=|exiting=/);
   assert.match(overlay, /measurementGenerationRef/);
   assert.match(overlay, /stateRef\.current/);
+  assert.doesNotMatch(overlay, /requestAnimationFrame/);
   assert.match(overlay, /spotlightTransitionDurationMs: 420/);
   assert.match(overlay, /const ringPath = usePathValue/);
   assert.match(overlay, /<BlurMask blur=\{6\} style="solid"/);
@@ -985,6 +988,12 @@ test('Merge FTUE uses session receipts and unlocks only after the replacement ga
   assert.doesNotMatch(screen, /addMergeFtueBreadcrumb|setMergeFtueDiagnosticContext|markFlowStart|reportFlowReady/);
   assert.doesNotMatch(overlay, /addMergeFtueBreadcrumb/);
   assert.doesNotMatch(crashReporting, /tracesSampleRate|tracesSampler|enableTracing/);
+  assert.match(runtime, /setStoredJsonAsync/);
+  assert.match(runtime, /objectiveProgress,[\s\S]*?receipts: \[\.\.\.current\.receipts, receipt\]/);
+  assert.match(sync, /RECEIPT_SYNC_QUIET_MS = 1_500/);
+  assert.match(sync, /waitForCriticalInteractionIdle/);
+  assert.match(artCache, /workerCount = Math\.min\(1, missing\.length\)/);
+  assert.match(artCache, /await waitForCriticalInteractionIdle\(\)/);
   const spawnEffects = readFileSync('components/katchadeck/games/merge-spawn-effects-layer.tsx', 'utf8');
   assert.match(spawnEffects, /GPU_SPAWN_PARTICLES\.map/);
   assert.match(board, /DREAM_MIST_PARTICLES\.map/);

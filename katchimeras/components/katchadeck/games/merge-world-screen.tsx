@@ -30,8 +30,6 @@ import {
   createMergeBoardSession,
   mergeFtueInteractionKey,
   MergeFtueInteractionCoordinator,
-  type MergeBoardOperationReceipt,
-  type MergeInteractionGateReceipt,
 } from '@/features/onboarding/merge-ftue-interaction-coordinator';
 import type { MergeOrder, MergeWorldCommand } from '@/types/merge-world';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
@@ -39,6 +37,7 @@ import { mergeOrderEnergyRefund, mergeOrderItemReadiness, mergeOrderServingCells
 import { MERGE_ENERGY_REGEN_MS } from '@/utils/merge-world/economy-policy';
 import { beginAuthoredCohortReturn, beginFeastleReturn, beginMossproutReturn, isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, loadMossproutStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
 import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
+import { beginCriticalInteractionWork } from '@/utils/critical-interaction';
 
 import { FeastlePersistentMergeBoard, type MergeBoardScreenMetrics } from './feastle-persistent-merge-board';
 import { MergeParcelFlightOverlay, type MergeParcelFlight } from './merge-parcel-overlay';
@@ -103,6 +102,12 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const ftueCoordinatorRef = useRef<MergeFtueInteractionCoordinator | null>(null);
   if (!ftueCoordinatorRef.current) ftueCoordinatorRef.current = new MergeFtueInteractionCoordinator(mergeSessionId);
   const ftueCoordinator = ftueCoordinatorRef.current;
+  const stateRef = useRef(state);
+  const ftueRunRef = useRef(ftueRun);
+  const ftueStepRef = useRef(ftueStep);
+  stateRef.current = state;
+  ftueRunRef.current = ftueRun;
+  ftueStepRef.current = ftueStep;
   const interactionSessionKey = mergeFtueInteractionKey(ftueRun, active);
   const contentWidth = Math.min(width - 12, 600);
   const flowReady = !loading && state != null;
@@ -258,45 +263,48 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   }, [router, transitionTo]);
 
   const dispatch = useCallback((command: MergeWorldCommand) => {
-    if (!state) return null;
+    const releaseCriticalInteraction = beginCriticalInteractionWork();
+    setTimeout(releaseCriticalInteraction, 180);
+    const currentState = stateRef.current;
+    const currentRun = ftueRunRef.current;
+    const currentStep = ftueStepRef.current;
+    if (!currentState) return null;
     if (ftueCoordinator.leased) return null;
-    if (!mergeFtueAllowsCommand(ftueStep, state, command)) {
+    if (!mergeFtueAllowsCommand(currentStep, currentState, command)) {
       handleBlockedFtueInteraction();
       return null;
     }
-    const shouldLeaseAnimatedCommand = ftueRun?.status === 'active'
-      && ftueStep?.surface === 'merge'
+    const shouldGuardFtueCommand = currentRun?.status === 'active'
+      && currentStep?.surface === 'merge'
       && (command.type === 'tapGenerator' || command.type === 'move');
-    // Claim the lease before entering the provider. This closes the small
-    // runOnJS re-entry window where several queued taps could all observe the
-    // same pre-command FTUE step.
-    const commandToken = shouldLeaseAnimatedCommand
-      ? ftueCoordinator.begin(ftueStep?.id ?? 'unknown', state.revision)
+    // This guard covers only the synchronous reducer + narrative commit. The
+    // visual operation deliberately outlives it, so a valid second tap can be
+    // accepted while the first spawn is still animating.
+    const commandToken = shouldGuardFtueCommand
+      ? ftueCoordinator.begin(currentStep?.id ?? 'unknown', currentState.revision)
       : null;
-    if (shouldLeaseAnimatedCommand && !commandToken) return null;
-    const result = send(command);
-    const event = mergeFtueEventForCommand(state, command, result);
-    if (event && commandToken) ftueCoordinator.recordEvent(commandToken, event);
-    else if (event) dispatchFtueEvent(event);
-    else if (commandToken) ftueCoordinator.abort(commandToken);
-    return result;
-  }, [ftueCoordinator, ftueRun?.status, ftueStep, handleBlockedFtueInteraction, send, state]);
-  const handleBoardCommandSettled = useCallback((receipt: MergeBoardOperationReceipt) => {
-    const transaction = ftueCoordinator.settle(receipt);
-    if (!transaction) return;
-    const nextRun = dispatchFtueEvent(transaction.event, `merge-operation-settled:${receipt.sessionId}:${receipt.operationId}`);
-    if (!nextRun || nextRun.status !== 'active') {
-      ftueCoordinator.abort(transaction.token);
-      return;
+    if (shouldGuardFtueCommand && !commandToken) return null;
+    try {
+      const result = send(command);
+      if (result) stateRef.current = result.state;
+      const event = mergeFtueEventForCommand(currentState, command, result);
+      if (event) {
+        const nextRun = dispatchFtueEvent(
+          event,
+          `merge-command:${mergeSessionId}:${event.revision}`,
+        );
+        ftueRunRef.current = nextRun;
+        ftueStepRef.current = nextRun?.status === 'active'
+          ? mossproutFtueStep(nextRun.stepId)
+          : null;
+      }
+      if (commandToken) ftueCoordinator.complete(commandToken);
+      return result;
+    } catch (error) {
+      if (commandToken) ftueCoordinator.abort(commandToken);
+      throw error;
     }
-    ftueCoordinator.awaitGate(
-      transaction.token,
-      mergeFtueInteractionKey(nextRun, true),
-    );
-  }, [ftueCoordinator]);
-  const handleInteractionGateCommitted = useCallback((receipt: MergeInteractionGateReceipt) => {
-    ftueCoordinator.acknowledgeGate(receipt);
-  }, [ftueCoordinator]);
+  }, [ftueCoordinator, handleBlockedFtueInteraction, mergeSessionId, send]);
   const pendingParcels = useMemo(() => state?.arrivals.filter((arrival) => (
     arrival.claimedAt == null
     && arrival.kind !== 'memory_arrival'
@@ -611,8 +619,6 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
               maxHeight={boardAreaHeight - 1}
               onBlockedInteraction={handleBlockedFtueInteraction}
               onCommand={dispatch}
-              onCommandSettled={handleBoardCommandSettled}
-              onInteractionGateCommitted={handleInteractionGateCommitted}
               onHiddenItemsRetired={handleHiddenItemsRetired}
               onSelect={setSelectedCell}
               onScreenMetrics={handleBoardScreenMetrics}

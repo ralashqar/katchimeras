@@ -90,6 +90,8 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
   const [layout, setLayout] = useState<OverlayLayout | null>(null);
   const stateRef = useRef(state);
   const measurementGenerationRef = useRef(0);
+  const screenFrameRef = useRef<Frame | null>(null);
+  const measuredLayoutNonceRef = useRef(-1);
   stateRef.current = state;
   const theme = useMemo(() => ({ ...DEFAULT_MERGE_FTUE_VISUAL_THEME, ...visualTheme }), [visualTheme]);
   const cueKey = useMemo(() => cue ? JSON.stringify(cue) : 'none', [cue]);
@@ -99,8 +101,15 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
   useEffect(() => {
     const generation = ++measurementGenerationRef.current;
     let cancelled = false;
-    const frame = requestAnimationFrame(async () => {
-      const screen = await measureView(screenRef.current);
+    void (async () => {
+      const mustRefreshScreenFrame = measuredLayoutNonceRef.current !== layoutNonce;
+      const screen = !mustRefreshScreenFrame && screenFrameRef.current
+        ? screenFrameRef.current
+        : await measureView(screenRef.current);
+      if (screen) {
+        screenFrameRef.current = screen;
+        measuredLayoutNonceRef.current = layoutNonce;
+      }
       if (!screen || (!cue && !spotlight)) {
         if (!cancelled && generation === measurementGenerationRef.current) setLayout(null);
         return;
@@ -158,10 +167,9 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
           spotlightRadius: spotlight?.radius ?? 12,
         });
       }
-    });
+    })();
     return () => {
       cancelled = true;
-      cancelAnimationFrame(frame);
     };
   }, [
     boardMetrics,

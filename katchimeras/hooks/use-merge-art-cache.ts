@@ -5,6 +5,7 @@ import { InteractionManager } from 'react-native';
 import { mergeWorldGeneratorArt, mergeWorldItemArt } from '@/constants/merge-world-art';
 import type { MergeWorldState } from '@/types/merge-world';
 import { mergeArtWarmupPlan } from '@/utils/merge-world/art-warmup';
+import { waitForCriticalInteractionIdle } from '@/utils/critical-interaction';
 
 export type MergeArtCache = ReadonlyMap<string, ImageRef>;
 
@@ -48,6 +49,7 @@ export function useMergeArtCache(state: MergeWorldState, mossproutOnboarding: bo
       let cursor = 0;
       const loadWorker = async () => {
         while (cursor < missing.length) {
+          await waitForCriticalInteractionIdle();
           const [key, source] = missing[cursor++];
           try {
             const imageRef = await Image.loadAsync(source, { maxHeight: 96, maxWidth: 96 });
@@ -61,7 +63,9 @@ export function useMergeArtCache(state: MergeWorldState, mossproutOnboarding: bo
           }
         }
       };
-      const workerCount = Math.min(3, missing.length);
+      // Decode serially after interactions. Parallel image decoding competes
+      // with the JS/native input pipeline during the first FTUE tap burst.
+      const workerCount = Math.min(1, missing.length);
       void Promise.all(Array.from({ length: workerCount }, loadWorker)).then(() => {
         if (!cancelled && generation === generationRef.current) setCache(new Map(retainedRef.current));
       });
