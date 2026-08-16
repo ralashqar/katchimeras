@@ -34,7 +34,7 @@ import { useDisposableTimers } from '@/hooks/use-disposable-timers';
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 import type { MergeBoardOccupant, MergeDreamMist, MergeWorldCommand, MergeWorldCommandResult, MergeWorldFailureReason, MergeWorldState } from '@/types/merge-world';
 import { mergeCellFeedbackForFailure, type MergeCellFeedbackTone } from '@/utils/merge-board-feedback';
-import { MERGE_MORPH_DURATION_MS, MERGE_MORPH_REDUCED_MOTION_DURATION_MS, mergeMotionPiecewise, mergeSpriteMotionFrame, type MergeBoardMotionKind } from '@/utils/merge-board-motion';
+import { MERGE_MORPH_DURATION_MS, MERGE_MORPH_REDUCED_MOTION_DURATION_MS, SPAWN_MOTION_DURATION_MS, mergeMotionPiecewise, mergeSpriteMotionFrame, spawnSpriteMotionFrame, type MergeBoardMotionKind } from '@/utils/merge-board-motion';
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection, type MergeBoardGeometry } from '@/utils/merge-world/board-geometry';
 
 export type MergeBoardScreenMetrics = { geometry: MergeBoardGeometry; x: number; y: number };
@@ -570,12 +570,12 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       setSpawnBursts((bursts) => [...bursts.slice(-(burstLimit - 1)), burst]);
       timers.schedule(() => setSpawnBursts((bursts) => bursts.some((entry) => entry.id === burst.id)
         ? bursts.filter((entry) => entry.id !== burst.id)
-        : bursts), 480);
+        : bursts), 620);
     }
     beginOperation({
       nextState: predicted.state,
       nextSprites: [...currentSprites, nextSprite],
-      nextMotions: { [spawned.instanceId]: { kind: 'spawn', startX: start.x, startY: start.y, arcHeight: Math.max(cellSize * 1.15, Math.min(cellSize * 2.1, distance * 0.22)) } },
+      nextMotions: { [spawned.instanceId]: { kind: 'spawn', startX: start.x, startY: start.y, arcHeight: Math.max(cellSize * 1.45, Math.min(cellSize * 2.35, distance * 0.42)) } },
       kind: 'spawn',
       settledRevision: predicted.state.revision,
     });
@@ -1189,17 +1189,21 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
       const p = progress.value;
       const wasAnimating = animating.value === 1;
       const kind = activeMotionKind.value;
-      const arc = wasAnimating && kind === 'spawn' ? -arcHeight.value * 4 * p * (1 - p) : 0;
-      const currentX = wasAnimating ? x.value + (targetX.value - x.value) * p : x.value;
-      const currentY = (wasAnimating ? y.value + (targetY.value - y.value) * p : y.value) + arc;
+      const spawnFrame = wasAnimating && kind === 'spawn' ? spawnSpriteMotionFrame(p, reduceMotion) : null;
+      const travel = spawnFrame?.travel ?? p;
+      const currentX = wasAnimating ? x.value + (targetX.value - x.value) * travel : x.value;
+      const currentY = (wasAnimating ? y.value + (targetY.value - y.value) * travel : y.value)
+        + (spawnFrame ? arcHeight.value * spawnFrame.arc + cellSize * spawnFrame.settleY : 0);
       let currentOpacity = spriteOpacity.value;
       let currentScale = scale.value;
       if (wasAnimating && kind?.startsWith('merge-')) {
         const frame = mergeSpriteMotionFrame(kind, p, reduceMotion);
         currentOpacity = frame.opacity;
         currentScale = frame.scale;
-      } else if (wasAnimating && kind === 'spawn') currentOpacity = p;
-      if (wasAnimating && kind === 'spawn') currentScale = interpolate(p, [0, 0.28, 0.76, 1], [0.52, 1.18, 1.04, 1]);
+      } else if (spawnFrame) {
+        currentOpacity = spawnFrame.opacity;
+        currentScale = spawnFrame.scale;
+      }
       cancelAnimation(progress);
       x.value = currentX;
       y.value = currentY;
@@ -1212,7 +1216,7 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
       spriteOpacity.value = withTiming(1, { duration: 70 });
       scale.value = withSpring(1.035, { damping: 34, stiffness: 420, mass: 0.7 });
     },
-    [instanceId, reduceMotion],
+    [cellSize, instanceId, reduceMotion],
   );
 
   useAnimatedReaction(
@@ -1260,11 +1264,11 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
         progress.value = withTiming(1, { duration: motion.kind.startsWith('merge-') ? MERGE_MORPH_REDUCED_MOTION_DURATION_MS : 1 }, finish);
       } else if (motion.kind === 'spawn' || motion.kind.startsWith('merge-')) {
         progress.value = withTiming(1, {
-          duration: motion.kind === 'spawn' ? 280 : MERGE_MORPH_DURATION_MS,
-          // The merge frame function already authors its own hold, crossfade,
-          // growth, overshoot, and settle phases. Linear time preserves those
-          // durations instead of an ease-out rushing through the scale-up.
-          easing: motion.kind === 'spawn' ? Easing.out(Easing.cubic) : Easing.linear,
+          duration: motion.kind === 'spawn' ? SPAWN_MOTION_DURATION_MS : MERGE_MORPH_DURATION_MS,
+          // Both authored frame functions own their phase timing. Linear time
+          // preserves the spawn's pop, arc, landing, and grounded slide instead
+          // of an outer ease-out rushing through most of the flight.
+          easing: Easing.linear,
         }, finish);
       } else {
         progress.value = withSpring(1, motion.kind === 'swap' ? SWAP_SPRING : MOVE_SPRING, finish);
@@ -1301,32 +1305,31 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
     const moving = animating.value === 1;
     const dragging = activeDragId.value === instanceId && dragPhase.value !== 0;
     const motionKind = activeMotionKind.value;
-    const arc = moving && motionKind === 'spawn' ? -arcHeight.value * 4 * p * (1 - p) : 0;
+    const spawnFrame = moving && motionKind === 'spawn' ? spawnSpriteMotionFrame(p, reduceMotion) : null;
+    const travel = spawnFrame?.travel ?? p;
     const mergeSource = motionKind === 'merge-source';
     const mergeTarget = motionKind === 'merge-target';
     const mergeResult = motionKind === 'merge-result';
-    const worldX = dragging ? grabX.value + dragTranslationX.value : moving ? x.value + (targetX.value - x.value) * p : x.value;
-    const worldY = dragging ? grabY.value + dragTranslationY.value : moving ? y.value + (targetY.value - y.value) * p : y.value;
+    const worldX = dragging ? grabX.value + dragTranslationX.value : moving ? x.value + (targetX.value - x.value) * travel : x.value;
+    const worldY = dragging ? grabY.value + dragTranslationY.value : moving ? y.value + (targetY.value - y.value) * travel : y.value;
     const mergeFrame = moving && (mergeSource || mergeTarget || mergeResult) && motionKind
       ? mergeSpriteMotionFrame(motionKind, p, reduceMotion)
       : null;
     let opacity = mergeFrame?.opacity ?? spriteOpacity.value;
-    if (moving && motionKind === 'spawn') opacity = p;
+    if (spawnFrame) opacity = spawnFrame.opacity;
     const intro = Math.max(0, Math.min(1, entranceProgress.value));
-    const motionScale = moving && motionKind === 'spawn'
-      ? interpolate(p, [0, 0.28, 0.76, 1], [0.52, 1.18, 1.04, 1])
-      : mergeFrame?.scale ?? scale.value;
+    const motionScale = spawnFrame?.scale ?? mergeFrame?.scale ?? scale.value;
     return {
       opacity: opacity * intro,
       zIndex: dragging || moving || scale.value > 1.001 ? 1000 : 10,
       transform: [
         { translateX: worldX },
-        { translateY: worldY + arc },
+        { translateY: worldY + (spawnFrame ? arcHeight.value * spawnFrame.arc + cellSize * spawnFrame.settleY : 0) },
         { translateY: (1 - intro) * 8 },
         { scale: motionScale * interpolate(intro, [0, 0.68, 1], [0.72, 1.08, 1]) },
       ],
     };
-  }, [activeDragId, activeMotionKind, animating, dragPhase, dragTranslationX, dragTranslationY, entranceProgress, grabX, grabY, instanceId, reduceMotion, spriteOpacity, targetX, targetY]);
+  }, [activeDragId, activeMotionKind, animating, arcHeight, cellSize, dragPhase, dragTranslationX, dragTranslationY, entranceProgress, grabX, grabY, instanceId, reduceMotion, spriteOpacity, targetX, targetY]);
 
   return <Animated.View pointerEvents="none" style={[styles.sprite, { height: cellSize, left: 0, top: 0, width: cellSize }, animatedStyle]}>
       {occupant.kind === 'generator'

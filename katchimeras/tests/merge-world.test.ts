@@ -10,7 +10,7 @@ import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import { BARISTABBIT_CHAPTER_ONE_ORDER_POOL, FEASTLE_ACT_TWO_ORDER_POOL, selectAuthoredCohortOrderKeys, selectFeastleActTwoOrderKeys } from '@/utils/companion-story';
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection } from '@/utils/merge-world/board-geometry';
 import { mergeCellFeedbackForFailure } from '@/utils/merge-board-feedback';
-import { MERGE_MORPH_DURATION_MS, mergeSpriteMotionFrame } from '@/utils/merge-board-motion';
+import { MERGE_MORPH_DURATION_MS, SPAWN_MOTION_DURATION_MS, mergeSpriteMotionFrame, spawnSpriteMotionFrame } from '@/utils/merge-board-motion';
 import { mergeActivityRewards } from '@/utils/merge-world/activity-rewards';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
 import { MERGE_ENERGY_REGEN_CAP, MERGE_ENERGY_REGEN_MS, MERGE_INITIAL_ENERGY, MOSSPROUT_FTUE_JOURNAL_ENERGY, STEPS_PER_MERGE_ENERGY, mergeJournalRewardPreview, mergeYesterdayStepEnergyPreview } from '@/utils/merge-world/economy-policy';
@@ -553,6 +553,28 @@ test('Merge motion contracts old art before the new item overshoots into place',
   assert.ok(mergeSpriteMotionFrame('merge-result', 0.78).scale > 1);
   assert.deepEqual(mergeSpriteMotionFrame('merge-result', 1), { opacity: 1, scale: 1 });
   assert.deepEqual(mergeSpriteMotionFrame('merge-result', 0.5, true), { opacity: 0.5, scale: 1 });
+});
+
+test('generator spawn pops from its source, arcs short, then slides into the destination', () => {
+  const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
+  assert.equal(SPAWN_MOTION_DURATION_MS, 760);
+  const pop = spawnSpriteMotionFrame(0.18);
+  const apex = spawnSpriteMotionFrame(0.39);
+  const landing = spawnSpriteMotionFrame(0.78);
+  const slide = spawnSpriteMotionFrame(0.9);
+  assert.ok(pop.scale > 1.1);
+  assert.ok(pop.travel < 0.15);
+  assert.ok(apex.arc < -0.95);
+  assert.ok(landing.travel > 0.8 && landing.travel < 0.9);
+  assert.ok(Math.abs(landing.arc) < 0.0001);
+  assert.ok(landing.scale < 1);
+  assert.ok(slide.travel > landing.travel && slide.travel < 1);
+  assert.ok(slide.settleY < 0.04);
+  assert.deepEqual(spawnSpriteMotionFrame(1), { arc: 0, opacity: 1, scale: 1, settleY: 0, travel: 1 });
+  assert.match(board, /const start = mergeCellOrigin\(geometry, from\)/);
+  assert.match(board, /startX: start\.x, startY: start\.y/);
+  assert.match(board, /duration: motion\.kind === 'spawn' \? SPAWN_MOTION_DURATION_MS/);
+  assert.match(board, /spawnFrame \? arcHeight\.value \* spawnFrame\.arc \+ cellSize \* spawnFrame\.settleY/);
 });
 
 test('identical items merge and preserve deterministic item progression', () => {
