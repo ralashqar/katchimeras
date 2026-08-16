@@ -92,6 +92,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const storyNavigationPendingRef = useRef(false);
   const ftuePreviewNavigationPendingRef = useRef(false);
   const pendingAnimatedFtueEventsRef = useRef(new Map<number, FtueEvent>());
+  const ftueCommandLeaseRef = useRef(false);
   const ftueAdvanceFrameRef = useRef<number | null>(null);
   const contentWidth = Math.min(width - 12, 600);
   const flowReady = !loading && state != null;
@@ -202,6 +203,8 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   useEffect(() => () => {
     if (ftueAdvanceFrameRef.current != null) cancelAnimationFrame(ftueAdvanceFrameRef.current);
     ftueAdvanceFrameRef.current = null;
+    pendingAnimatedFtueEventsRef.current.clear();
+    ftueCommandLeaseRef.current = false;
   }, []);
 
   useEffect(() => {
@@ -265,17 +268,26 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
 
   const dispatch = useCallback((command: MergeWorldCommand) => {
     if (!state) return null;
+    if (ftueCommandLeaseRef.current) return null;
     if (!mergeFtueAllowsCommand(ftueStep, state, command)) {
       handleBlockedFtueInteraction();
       return null;
     }
+    const shouldLeaseAnimatedCommand = ftueRun?.status === 'active'
+      && ftueStep?.surface === 'merge'
+      && (command.type === 'tapGenerator' || command.type === 'move');
+    // Claim the lease before entering the provider. This closes the small
+    // runOnJS re-entry window where several queued taps could all observe the
+    // same pre-command FTUE step.
+    if (shouldLeaseAnimatedCommand) ftueCommandLeaseRef.current = true;
     const result = send(command);
     const event = mergeFtueEventForCommand(state, command, result);
-    if (event && (command.type === 'tapGenerator' || command.type === 'move')) {
+    if (event && shouldLeaseAnimatedCommand) {
       pendingAnimatedFtueEventsRef.current.set(event.revision, event);
     } else if (event) dispatchFtueEvent(event);
+    else if (shouldLeaseAnimatedCommand) ftueCommandLeaseRef.current = false;
     return result;
-  }, [ftueStep, handleBlockedFtueInteraction, send, state]);
+  }, [ftueRun?.status, ftueStep, handleBlockedFtueInteraction, send, state]);
   const handleBoardCommandSettled = useCallback((revision: number) => {
     const event = pendingAnimatedFtueEventsRef.current.get(revision);
     if (!event) return;
@@ -284,11 +296,21 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     // before replacing the keyed FTUE cue/spotlight native tree.
     ftueAdvanceFrameRef.current = requestAnimationFrame(() => {
       ftueAdvanceFrameRef.current = requestAnimationFrame(() => {
-        ftueAdvanceFrameRef.current = null;
         const pendingEvent = pendingAnimatedFtueEventsRef.current.get(revision);
-        if (!pendingEvent) return;
+        if (!pendingEvent) {
+          ftueAdvanceFrameRef.current = null;
+          ftueCommandLeaseRef.current = false;
+          return;
+        }
         pendingAnimatedFtueEventsRef.current.delete(revision);
         dispatchFtueEvent(pendingEvent, `merge-animation-settled:${revision}`);
+        // The logical step is now updated, but retain the lease through the
+        // following paint so the replacement interaction gate is mounted
+        // before another native gesture can reach the board.
+        ftueAdvanceFrameRef.current = requestAnimationFrame(() => {
+          ftueAdvanceFrameRef.current = null;
+          ftueCommandLeaseRef.current = false;
+        });
       });
     });
   }, []);

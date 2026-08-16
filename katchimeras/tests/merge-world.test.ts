@@ -885,15 +885,18 @@ test('Merge board retains destination selection and decorates generators with am
   assert.match(board, /Dream Echoes on the same Expo Image decode\/cache path/);
 });
 
-test('Merge return isolates native state and advances FTUE after board motion settles', () => {
+test('Merge FTUE leases one command and advances only after native board motion settles', () => {
   const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
   const overlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
   const route = readFileSync('components/katchadeck/games/merge-world-route-screen.tsx', 'utf8');
+  assert.match(screen, /if \(ftueCommandLeaseRef\.current\) return null;/);
+  assert.match(screen, /if \(shouldLeaseAnimatedCommand\) ftueCommandLeaseRef\.current = true;\s*const result = send\(command\)/);
   assert.match(screen, /pendingAnimatedFtueEventsRef\.current\.set\(event\.revision, event\)/);
-  assert.match(screen, /pendingAnimatedFtueEventsRef\.current\.has\(state\.revision\)/);
+  assert.doesNotMatch(screen, /const nextRun = dispatchFtueEvent\(event, `merge-revision/);
   assert.match(screen, /onCommandSettled=\{handleBoardCommandSettled\}/);
-  assert.match(screen, /requestAnimationFrame\(\(\) => \{[\s\S]*?requestAnimationFrame\(\(\) => \{[\s\S]*?dispatchFtueEvent\(pendingEvent/);
+  assert.match(screen, /requestAnimationFrame\(\(\) => \{[\s\S]*?requestAnimationFrame\(\(\) => \{[\s\S]*?dispatchFtueEvent\(pendingEvent, `merge-animation-settled/);
+  assert.match(screen, /dispatchFtueEvent\(pendingEvent[\s\S]*?requestAnimationFrame\(\(\) => \{[\s\S]*?ftueCommandLeaseRef\.current = false/);
   assert.match(board, /settledRevision: predicted\.state\.revision/);
   assert.match(board, /onCommandSettledRef\.current\?\.\(operation\.settledRevision\)/);
   assert.doesNotMatch(overlay, /return \(\) => \{\s*cancelAnimation\(progress\);\s*progress\.value = 0;/);
