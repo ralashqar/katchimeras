@@ -33,7 +33,6 @@ type MergeWorldContextValue = {
 };
 
 const RETRY_DELAYS_MS = [250, 1_000, 4_000] as const;
-const MERGE_PERF_ENABLED = __DEV__ && process.env.EXPO_PUBLIC_MERGE_PERF === '1';
 const MergeWorldContext = createContext<MergeWorldContextValue | null>(null);
 const SIGNATURE_LEVELS = new Set([4, 8, 12, 16, 20]);
 const AUTHORED_COHORT_FAMILIES: readonly AuthoredCohortFamilyId[] = [
@@ -348,15 +347,8 @@ export function MergeWorldProvider({
       for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
         if (workerGeneration !== persistenceGenerationRef.current) return;
         try {
-          const startedAt = MERGE_PERF_ENABLED ? performance.now() : 0;
           await saveMergeWorldState(pending.state, [...pending.receiptIds]);
           if (workerGeneration !== persistenceGenerationRef.current) return;
-          if (MERGE_PERF_ENABLED) console.info('[merge-persistence]', {
-            coalescedCommands: pending.coalescedCommands,
-            durationMs: Math.round((performance.now() - startedAt) * 10) / 10,
-            receiptCount: pending.receiptIds.size,
-            revision: pending.state.revision,
-          });
           saved = true;
           break;
         } catch (caught) {

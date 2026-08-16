@@ -1,3 +1,4 @@
+import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 import type { DevSubscriptionSimulatorState, SubscriptionClient, SubscriptionOperation } from '@/types/subscription';
 import { getStoredJson, getStoredRaw, setStoredJson } from '@/utils/app-storage';
 import {
@@ -15,7 +16,7 @@ let cachedState: DevSubscriptionSimulatorState | null = null;
 let cachedRaw: string | null | undefined;
 
 function isDevBuild() {
-  return typeof __DEV__ !== 'undefined' && __DEV__;
+  return DEV_TOOLS_ENABLED;
 }
 
 function normalizeState(value: unknown): DevSubscriptionSimulatorState {

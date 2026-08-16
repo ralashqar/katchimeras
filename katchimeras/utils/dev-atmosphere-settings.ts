@@ -1,3 +1,4 @@
+import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 import {
   clampAtmosphereUnit,
   clampAtmosphereWind,
@@ -40,7 +41,7 @@ const listeners = new Set<() => void>();
 let snapshot = readStoredState();
 
 function devBuild(): boolean {
-  return typeof __DEV__ !== 'undefined' && __DEV__;
+  return DEV_TOOLS_ENABLED;
 }
 
 function readStoredState(): DevAtmosphereState {

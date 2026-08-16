@@ -29,7 +29,6 @@ import { mergeWorldGeneratorArt, mergeWorldItemArt } from '@/constants/merge-wor
 import { MERGE_GENERATORS_BY_ID, MERGE_HYBRID_RECIPES, MERGE_ITEMS_BY_ID, MERGE_WORLD_COLUMNS, MERGE_WORLD_ROWS } from '@/constants/merge-world-catalog';
 import type { MergeBoardInteractionGate } from '@/features/onboarding/merge-ftue';
 import type { MergeBoardOperationReceipt, MergeBoardSessionId, MergeInteractionGateReceipt } from '@/features/onboarding/merge-ftue-interaction-coordinator';
-import { useMergeMotionPerformanceProbe, type MergeMotionPerformanceSample } from '@/hooks/use-merge-motion-performance-probe';
 import { useDisposableTimers } from '@/hooks/use-disposable-timers';
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 import type { MergeBoardOccupant, MergeDreamMist, MergeWorldCommand, MergeWorldCommandResult, MergeWorldFailureReason, MergeWorldState } from '@/types/merge-world';
@@ -163,19 +162,6 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   const gestureFinished = useSharedValue(false);
   const maxGestureDistance = useSharedValue(0);
   const dragHapticTriggered = useSharedValue(false);
-  const motionActive = useSharedValue(0);
-  const effectsPaused = useSharedValue(0);
-  const slowOperationCount = useRef(0);
-  const [reducedFx, setReducedFx] = useState(false);
-  const recordMotionSample = useCallback((sample: MergeMotionPerformanceSample) => {
-    if (sample.longestFrameMs <= 34 || reducedFx) return;
-    slowOperationCount.current += 1;
-    if (slowOperationCount.current < 2) return;
-    setReducedFx(true);
-    cancelAnimation(effectsPaused);
-    effectsPaused.value = 1;
-  }, [effectsPaused, reducedFx]);
-  useMergeMotionPerformanceProbe(motionActive, recordMotionSample);
   const [presentation, setPresentation] = useState(state);
   const presentationRef = useRef(presentation);
   const [sprites, setSprites] = useState(() => spritesFromState(state));
@@ -270,19 +256,14 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
 
   useEffect(() => {
     const mountedOperations = activeOperations.current;
-    // This value is deliberately board-local. A retained tab must never let a
-    // worklet from its previous focus session share native state with the new
+    // A retained tab must not carry pending operation bookkeeping into a new
     // GestureDetector tree.
-    cancelAnimation(effectsPaused);
-    effectsPaused.value = 0;
     return () => {
       timers.cancelAll();
-      cancelAnimation(effectsPaused);
-      cancelAnimation(motionActive);
       mountedOperations.clear();
       motionsRef.current = {};
     };
-  }, [effectsPaused, motionActive, timers]);
+  }, [timers]);
 
   useLayoutEffect(() => {
     // A retained tab can return with worklet gesture ownership from the prior
@@ -348,14 +329,10 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     setSprites(reconciledSprites);
     const hasOperations = activeOperations.current.size > 0;
     setBusy(hasOperations);
-    if (!hasOperations) {
-      motionActive.value = 0;
-      if (!reducedFx) effectsPaused.value = withDelay(500, withTiming(0, { duration: 1 }));
-    }
     if (operation.settledRevision != null) {
       onCommandSettledRef.current?.({ operationId: operation.id, revision: operation.settledRevision, sessionId });
     }
-  }, [effectsPaused, motionActive, reducedFx, sessionId]);
+  }, [sessionId]);
 
   const completeMotion = useCallback((operationId: number, instanceId: string) => {
     const operation = activeOperations.current.get(operationId);
@@ -405,10 +382,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     motionsRef.current = combinedMotions;
     setMotions(combinedMotions);
     setBusy(true);
-    motionActive.value = 1;
-    cancelAnimation(effectsPaused);
-    effectsPaused.value = 1;
-  }, [effectsPaused, motionActive, occupancyDefinitions, occupancyIds]);
+  }, [occupancyDefinitions, occupancyIds]);
 
   const returnSpriteHome = useCallback((sprite: SpriteRecord, dx: number, dy: number, invalid?: number) => {
     if (invalid != null) {
@@ -566,7 +540,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     const nextSprite: SpriteRecord = { occupant: spawned, cell: to };
     if (!reduceMotion) {
       const burst = { id: ++burstSequence.current, cell: from };
-      const burstLimit = reducedFx ? 3 : 6;
+      const burstLimit = 6;
       setSpawnBursts((bursts) => [...bursts.slice(-(burstLimit - 1)), burst]);
       timers.schedule(() => setSpawnBursts((bursts) => bursts.some((entry) => entry.id === burst.id)
         ? bursts.filter((entry) => entry.id !== burst.id)
@@ -579,7 +553,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       kind: 'spawn',
       settledRevision: predicted.state.revision,
     });
-  }, [beginOperation, cellSize, geometry, onCommand, onSelect, reduceMotion, reducedFx, showCellFeedback, timers]);
+  }, [beginOperation, cellSize, geometry, onCommand, onSelect, reduceMotion, showCellFeedback, timers]);
   launchGeneratorRef.current = launchGenerator;
 
   const pickSprite = useCallback((_instanceId: string) => {
@@ -739,8 +713,6 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       grabY.value = geometry.inset + row * pitch;
       dragEpoch.value += 1;
       dragPhase.value = 1;
-      cancelAnimation(effectsPaused);
-      effectsPaused.value = 1;
     })
     .onUpdate((event) => {
       if (!activeDragId.value) return;
@@ -869,8 +841,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
         dragPhase.value = 2;
         runOnJS(emitBoardCancel)(id, grabX.value + dragTranslationX.value, grabY.value + dragTranslationY.value, dragEpoch.value);
       }
-      if (!reducedFx) effectsPaused.value = withDelay(500, withTiming(0, { duration: 1 }));
-    }), [activeDragId, activeSourceCell, blockInteraction, dragEpoch, dragHapticTriggered, dragPhase, dragSprite, dragTranslationX, dragTranslationY, effectsPaused, emitBoardCancel, emitBoardDrop, emitBoardTap, emitEmptyCellTap, entranceInteractive, gateFromCell, gateGeneratorCell, gateKind, gateToCell, geometry.cellSize, geometry.columns, geometry.gap, geometry.inset, geometry.rows, gestureFinished, grabX, grabY, hoverCell, maxGestureDistance, occupancyDefinitions, occupancyIds, pickSprite, reducedFx, touchDownX, touchDownY]);
+    }), [activeDragId, activeSourceCell, blockInteraction, dragEpoch, dragHapticTriggered, dragPhase, dragSprite, dragTranslationX, dragTranslationY, emitBoardCancel, emitBoardDrop, emitBoardTap, emitEmptyCellTap, entranceInteractive, gateFromCell, gateGeneratorCell, gateKind, gateToCell, geometry.cellSize, geometry.columns, geometry.gap, geometry.inset, geometry.rows, gestureFinished, grabX, grabY, hoverCell, maxGestureDistance, occupancyDefinitions, occupancyIds, pickSprite, touchDownX, touchDownY]);
 
   // Measure a stable, untransformed frame. The visual board enters with a
   // translateY animation; measuring that Animated.View cached a temporary
@@ -915,7 +886,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       <HoverCellOverlay geometry={geometry} hoverCell={hoverCell} />
     </View>
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-      {spawnBursts.map((burst) => <SpawnParticleBurst key={burst.id} origin={mergeCellOrigin(geometry, burst.cell)} reduced={reducedFx} size={cellSize} />)}
+      {spawnBursts.map((burst) => <SpawnParticleBurst key={burst.id} origin={mergeCellOrigin(geometry, burst.cell)} size={cellSize} />)}
       {sprites.filter((sprite) => sprite.occupant.kind !== 'item' || !hiddenItemInstanceIds?.has(sprite.occupant.instanceId)).map((sprite) => {
         const origin = mergeCellOrigin(geometry, sprite.cell);
         const id = spriteId(sprite);
@@ -945,7 +916,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       ? <SelectedCellCorners cell={selectedCell} geometry={geometry} reduceMotion={reduceMotion} />
       : null}
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.feedbackLayer]}>
-      {mistDissipations.map((dissipation) => <DreamMistDissipation effect={dissipation} geometry={geometry} key={dissipation.id} reduced={reducedFx} reduceMotion={reduceMotion} />)}
+      {mistDissipations.map((dissipation) => <DreamMistDissipation effect={dissipation} geometry={geometry} key={dissipation.id} reduceMotion={reduceMotion} />)}
       {mergeBursts.map((burst) => <MergeCelebrationOverlay cell={burst.cell} geometry={geometry} key={burst.id} />)}
       {invalidFeedback ? <InvalidCellFeedback cell={invalidFeedback.cell} geometry={geometry} key={invalidFeedback.id} /> : null}
       {cellFeedback.map((feedback) => <MergeCellCallout feedback={feedback} geometry={geometry} key={feedback.id} reduceMotion={reduceMotion} />)}
@@ -1067,10 +1038,9 @@ const DREAM_MIST_PARTICLES = [
   { angle: 2.38, distance: 0.7, color: '#E4F5FF', height: 8, width: 14 },
 ] as const;
 
-function DreamMistDissipation({ effect, geometry, reduced, reduceMotion }: {
+function DreamMistDissipation({ effect, geometry, reduceMotion }: {
   effect: DreamMistDissipationRecord;
   geometry: MergeBoardGeometry;
-  reduced: boolean;
   reduceMotion: boolean;
 }) {
   const progress = useSharedValue(0);
@@ -1096,7 +1066,7 @@ function DreamMistDissipation({ effect, geometry, reduced, reduceMotion }: {
     <Animated.View style={[styles.mistEchoGhost, { height: size - 4, width: size - 4 }, echoStyle]}>
       <DreamEchoItemArt compatible={false} definitionId={effect.definitionId} size={size - 4} />
     </Animated.View>
-    {!reduceMotion ? DREAM_MIST_PARTICLES.slice(0, reduced ? 4 : 8).map((particle, index) => <DreamMistParticle index={index} key={index} particle={particle} progress={progress} size={size} />) : null}
+    {!reduceMotion ? DREAM_MIST_PARTICLES.map((particle, index) => <DreamMistParticle index={index} key={index} particle={particle} progress={progress} size={size} />) : null}
   </View>;
 }
 
@@ -1445,7 +1415,7 @@ function GeneratorSparkle({ reduceMotion, size }: {
   </Animated.View>;
 }
 
-function SpawnParticleBurst({ origin, reduced, size }: { origin: { x: number; y: number }; reduced: boolean; size: number }) {
+function SpawnParticleBurst({ origin, size }: { origin: { x: number; y: number }; size: number }) {
   const progress = useSharedValue(0);
   useEffect(() => {
     progress.value = withTiming(1, { duration: 450, easing: Easing.out(Easing.cubic) });
@@ -1457,7 +1427,7 @@ function SpawnParticleBurst({ origin, reduced, size }: { origin: { x: number; y:
   }));
   return <View pointerEvents="none" style={[styles.spawnBurst, { height: size, left: origin.x, top: origin.y, width: size }]}>
     <Animated.View style={[styles.spawnHalo, { height: size * 0.78, width: size * 0.78 }, haloStyle]} />
-    {SPAWN_PARTICLES.slice(0, reduced ? 4 : 8).map((particle, index) => <SpawnParticle index={index} key={index} particle={particle} progress={progress} size={size} />)}
+    {SPAWN_PARTICLES.map((particle, index) => <SpawnParticle index={index} key={index} particle={particle} progress={progress} size={size} />)}
   </View>;
 }
 

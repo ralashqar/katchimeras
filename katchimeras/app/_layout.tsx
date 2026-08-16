@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { Colors } from '@/constants/theme';
+import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 import { EggAvatarProvider } from '@/features/egg-avatar/egg-avatar-provider';
 import { WispProvider } from '@/features/wisps/wisp-provider';
 import { EconomyProvider } from '@/features/economy/economy-provider';
@@ -32,7 +33,7 @@ initializeCrashReporting();
 
 // DEV: apply any saved Asset Lab overrides at launch so draft world art
 // renders in the Kingdom without opening the lab first (no-op in production).
-if (__DEV__) {
+if (DEV_TOOLS_ENABLED) {
   void import('@/utils/asset-lab').then((lab) => lab.loadAssetLabManifest()).catch(() => {});
 }
 

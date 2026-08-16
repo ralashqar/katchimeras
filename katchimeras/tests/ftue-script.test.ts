@@ -188,6 +188,10 @@ test('Merge FTUE spotlight is an absolute non-layout overlay with transparent ta
   assert.match(overlay, /StyleSheet\.absoluteFillObject/);
   assert.match(overlay, /pointerEvents="none"/);
   assert.match(overlay, /FillType\.EvenOdd/);
+  assert.match(overlay, /usePathValue/);
+  assert.match(overlay, /spotlightTransitionDurationMs: 420/);
+  assert.match(overlay, /withTiming\(frame\.x, timing\)/);
+  assert.match(overlay, /<Animated\.View[\s\S]*?slot\.ringStyle/);
   assert.match(overlay, /spotlight\.targets/);
   assert.match(overlay, /spotlight\.grouping === 'bounding_rect'[\s\S]*?boundingFrame\(resolved\)/);
   assert.match(merge, /spotlight=\{active && !serveFlight \? ftueStep\?\.spotlight \?\? null : null\}/);

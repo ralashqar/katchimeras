@@ -128,7 +128,7 @@ test('game mode releases background UI work and avoids full Kingdom hydration', 
   assert.match(mergeRouteSource, /<MergeWorldProvider active=\{isFocused\}/);
   assert.match(mergeBoardSource, /useDisposableTimers\('merge-board-feedback'\)/);
   assert.match(mergeBoardSource, /acquireLifecycleResource\('merge_board'/);
-  assert.match(mergeBoardSource, /effectsPaused\.value = 0/);
+  assert.doesNotMatch(mergeBoardSource, /useMergeMotionPerformanceProbe|useFrameCallback|effectsPaused|motionActive|reducedFx/);
   assert.match(mergeBoardSource, /timers\.cancelAll\(\)/);
   assert.match(mergeBoardSource, /animateEntrance[\s\S]*?\? spritesFromState/);
   assert.match(mergeProviderSource, /if \(!active\) return;[\s\S]*?subscribeCompanionQuickGoals/);

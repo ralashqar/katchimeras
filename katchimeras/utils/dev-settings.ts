@@ -1,3 +1,4 @@
+import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 
 const QUEST_LOOP_KEY = 'katchadeck.dev.quest-loop-after-complete-v1';
@@ -35,5 +36,5 @@ export function setFoundationOnlyPhotoInterpretationEnabled(enabled: boolean): v
 }
 
 function isDevBuild(): boolean {
-  return typeof __DEV__ !== 'undefined' && __DEV__;
+  return DEV_TOOLS_ENABLED;
 }

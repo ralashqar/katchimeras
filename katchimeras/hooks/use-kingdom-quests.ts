@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 import { useQuestCapabilities } from '@/hooks/use-quest-capabilities';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import type { HomeDayRecord, MemoryQualityScore, StoredHomeDayRecord } from '@/types/home';
@@ -877,7 +878,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     : null;
   const selectedConversationSession = useMemo(() => {
     if (!selectedFamilyId || !isConversationV2Family(selectedFamilyId)) return null;
-    const preview = typeof __DEV__ !== 'undefined' && __DEV__
+    const preview = DEV_TOOLS_ENABLED
       ? previewConversationSessionForFamily(companionContentState, selectedFamilyId)
       : null;
     return preview
@@ -2481,7 +2482,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     if (authoredMatch && isAuthoredCohortFamily(authoredMatch[1])) completeAuthoredCohortConversation(authoredMatch[1], Number(authoredMatch[2]));
   }, [selectedConversationDefinition?.id, selectedConversationSession]);
   const previewSelectedConversation = useCallback((definitionId: string) => {
-    if (typeof __DEV__ === 'undefined' || !__DEV__ || !selectedResident || !selectedFamilyId || !today?.isoDate || !isConversationV2Family(selectedFamilyId)) return;
+    if (!DEV_TOOLS_ENABLED || !selectedResident || !selectedFamilyId || !today?.isoDate || !isConversationV2Family(selectedFamilyId)) return;
     const definition = companionConversationDefinitionById.get(definitionId);
     if (!definition || definition.familyId !== selectedFamilyId) return;
     const occurredAt = Date.now();
@@ -2506,7 +2507,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     setMicrocopy(`Previewing ${definition.title}`);
   }, [selectedFamilyId, selectedResident, today?.isoDate]);
   const exitSelectedConversationPreview = useCallback(() => {
-    if (typeof __DEV__ === 'undefined' || !__DEV__ || !selectedFamilyId) return;
+    if (!DEV_TOOLS_ENABLED || !selectedFamilyId) return;
     setCompanionContentState((current) => {
       const conversationSessions = current.conversationSessions.filter((session) => !(session.familyId === selectedFamilyId && session.preview));
       if (conversationSessions.length === current.conversationSessions.length) return current;

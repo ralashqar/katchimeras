@@ -1,5 +1,6 @@
 import type { ImageSourcePropType } from 'react-native';
 
+import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import type { KingdomHexVerticalAlignmentMode } from '@/utils/kingdom-tile-alignment';
 
@@ -11,11 +12,12 @@ import type { KingdomHexVerticalAlignmentMode } from '@/utils/kingdom-tile-align
 let overrides: Record<string, string> = {};
 
 export function setDevAssetOverridesMap(next: Record<string, string>): void {
+  if (!DEV_TOOLS_ENABLED) return;
   overrides = { ...next };
 }
 
 export function getDevAssetOverrideUri(assetKey: string): string | null {
-  if (!__DEV__) return null;
+  if (!DEV_TOOLS_ENABLED) return null;
   return overrides[assetKey] ?? null;
 }
 
@@ -33,7 +35,7 @@ const DEV_BASE_KEY = 'katchadeck.dev-kingdom-base-v2';
 let devKingdomBaseId: string | null | undefined;
 
 export function getDevKingdomBaseId(): string | null {
-  if (!__DEV__) return null;
+  if (!DEV_TOOLS_ENABLED) return null;
   if (devKingdomBaseId === undefined) {
     devKingdomBaseId = getStoredJson<string | null>(DEV_BASE_KEY, null);
   }
@@ -41,6 +43,7 @@ export function getDevKingdomBaseId(): string | null {
 }
 
 export function setDevKingdomBaseId(baseId: string | null): void {
+  if (!DEV_TOOLS_ENABLED) return;
   devKingdomBaseId = baseId;
   setStoredJson(DEV_BASE_KEY, baseId);
 }
@@ -61,7 +64,7 @@ const RETIRED_FLOATING_NEIGHBORHOOD_V2_PROOF_IDS = new Set([
 let devKingdomHexArtDirectionSetId: string | null | undefined;
 
 export function getDevKingdomHexArtDirectionSetId(): string | null {
-  if (!__DEV__) return null;
+  if (!DEV_TOOLS_ENABLED) return null;
   if (devKingdomHexArtDirectionSetId === undefined) {
     devKingdomHexArtDirectionSetId = getStoredJson<string | null>(DEV_HEX_ART_DIRECTION_SET_KEY, null);
   }
@@ -76,7 +79,7 @@ export function getDevKingdomHexArtDirectionSetId(): string | null {
 }
 
 export function setDevKingdomHexArtDirectionSetId(setId: string | null): void {
-  if (!__DEV__) return;
+  if (!DEV_TOOLS_ENABLED) return;
   devKingdomHexArtDirectionSetId = setId;
   setStoredJson(DEV_HEX_ART_DIRECTION_SET_KEY, setId);
 }
@@ -90,7 +93,7 @@ export function setDevKingdomHexTileSetId(tileSetId: string | null): void {
 }
 
 export function getDevKingdomHexCenterTileId(): string | null {
-  if (!__DEV__) return null;
+  if (!DEV_TOOLS_ENABLED) return null;
   if (devKingdomHexCenterTileId === undefined) {
     devKingdomHexCenterTileId = getStoredJson<string | null>(DEV_HEX_CENTER_TILE_KEY, null);
     if (devKingdomHexCenterTileId === null) {
@@ -104,12 +107,13 @@ export function getDevKingdomHexCenterTileId(): string | null {
 }
 
 export function setDevKingdomHexCenterTileId(tileId: string | null): void {
+  if (!DEV_TOOLS_ENABLED) return;
   devKingdomHexCenterTileId = tileId;
   setStoredJson(DEV_HEX_CENTER_TILE_KEY, tileId);
 }
 
 export function getDevKingdomHexBaseTileId(): string | null {
-  if (!__DEV__) return null;
+  if (!DEV_TOOLS_ENABLED) return null;
   if (devKingdomHexBaseTileId === undefined) {
     devKingdomHexBaseTileId = getStoredJson<string | null>(DEV_HEX_BASE_TILE_KEY, null);
     if (devKingdomHexBaseTileId === null) {
@@ -125,6 +129,7 @@ export function getDevKingdomHexBaseTileId(): string | null {
 }
 
 export function setDevKingdomHexBaseTileId(tileId: string | null): void {
+  if (!DEV_TOOLS_ENABLED) return;
   devKingdomHexBaseTileId = tileId;
   setStoredJson(DEV_HEX_BASE_TILE_KEY, tileId);
 }
@@ -136,7 +141,7 @@ const DEV_HEX_VERTICAL_ALIGNMENT_KEY = 'katchadeck.dev-kingdom-hex-vertical-alig
 let devKingdomHexVerticalAlignmentMode: KingdomHexVerticalAlignmentMode | undefined;
 
 export function getDevKingdomHexVerticalAlignmentMode(): KingdomHexVerticalAlignmentMode {
-  if (!__DEV__) return 'ground-bottom';
+  if (!DEV_TOOLS_ENABLED) return 'ground-bottom';
   if (devKingdomHexVerticalAlignmentMode === undefined) {
     const stored = getStoredJson<unknown>(DEV_HEX_VERTICAL_ALIGNMENT_KEY, 'ground-bottom');
     devKingdomHexVerticalAlignmentMode = stored === 'silhouette-center' ? 'silhouette-center' : 'ground-bottom';
@@ -145,7 +150,7 @@ export function getDevKingdomHexVerticalAlignmentMode(): KingdomHexVerticalAlign
 }
 
 export function setDevKingdomHexVerticalAlignmentMode(mode: KingdomHexVerticalAlignmentMode): void {
-  if (!__DEV__) return;
+  if (!DEV_TOOLS_ENABLED) return;
   const next = mode === 'ground-bottom' ? 'ground-bottom' : 'silhouette-center';
   devKingdomHexVerticalAlignmentMode = next;
   setStoredJson(DEV_HEX_VERTICAL_ALIGNMENT_KEY, next);

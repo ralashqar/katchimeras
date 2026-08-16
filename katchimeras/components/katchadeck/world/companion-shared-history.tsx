@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 import { KatchaUI } from '@/constants/katcha-ui';
 import type { CompanionInsightRecord, CompanionMemory } from '@/utils/companion-content';
 
@@ -105,7 +106,7 @@ export function CompanionSharedHistory({
         </View>
       ) : null}
 
-      {typeof __DEV__ !== 'undefined' && __DEV__ && onResetMemory ? (
+      {DEV_TOOLS_ENABLED && onResetMemory ? (
         <Pressable accessibilityRole="button" onPress={onResetMemory} style={({ pressed }) => [styles.devReset, pressed && styles.pressed]}>
           <IconSymbol color="#8A554A" name="arrow.counterclockwise" size={15} />
           <ThemedText style={styles.devResetLabel} lightColor="#8A554A" darkColor="#8A554A">

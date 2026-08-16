@@ -1,3 +1,4 @@
+import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 import type { DayEvidence, DayVisionSummary, PhotoVisionResult, UserConfirmation } from '@/types/home';
 import type { SceneRead } from '@/utils/scene-classify';
 import { foundationSceneAvailability, type FoundationPhotoPasses } from '@/utils/foundation-scene';
@@ -78,7 +79,7 @@ export function saveDevLastPhotoAnalysis(input: {
   questId?: string | null;
   creatureId?: string | null;
 }): void {
-  if (!__DEV__) return;
+  if (!DEV_TOOLS_ENABLED) return;
   // This trace can be large. Persist after the capture transition so a dev-only
   // JSON write never blocks the user's final answer or navigation.
   setTimeout(() => {
@@ -173,7 +174,7 @@ function finiteNumber(value: unknown): number | null {
 }
 
 export function loadDevLastPhotoAnalysis(): DevLastPhotoAnalysis | null {
-  if (!__DEV__) return null;
+  if (!DEV_TOOLS_ENABLED) return null;
   return getStoredJson<DevLastPhotoAnalysis | null>(STORAGE_KEY, null);
 }
 

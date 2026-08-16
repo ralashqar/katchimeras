@@ -1,3 +1,4 @@
+import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 import type { JournalNoteClassification, JournalRouteProposal, StudioMediaType } from '@/types/home';
 import type { FoundationConfidenceLevel } from '@/utils/foundation-note-routing';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
@@ -40,11 +41,11 @@ export type DevLastNoteAnalysis = {
 };
 
 export function saveDevLastNoteAnalysis(input: Omit<DevLastNoteAnalysis, 'schemaVersion' | 'capturedAt'>): void {
-  if (!__DEV__) return;
+  if (!DEV_TOOLS_ENABLED) return;
   setStoredJson(STORAGE_KEY, { schemaVersion: 3, capturedAt: new Date().toISOString(), ...input } satisfies DevLastNoteAnalysis);
 }
 
 export function loadDevLastNoteAnalysis(): DevLastNoteAnalysis | null {
-  if (!__DEV__) return null;
+  if (!DEV_TOOLS_ENABLED) return null;
   return getStoredJson<DevLastNoteAnalysis | null>(STORAGE_KEY, null);
 }

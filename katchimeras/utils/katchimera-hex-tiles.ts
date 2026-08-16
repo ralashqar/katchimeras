@@ -1,5 +1,6 @@
 import type { ImageSourcePropType } from 'react-native';
 
+import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 import { KATCHIMERA_HEX_TILE_CATALOG, KATCHIMERA_HEX_TILE_SOURCES } from '@/constants/katchimera-hex-tile-sources.gen';
 import type { HomeVisualKey } from '@/types/home';
 import type { KingdomCreature } from '@/types/kingdom';
@@ -32,7 +33,7 @@ const OVERRIDE_KEY = 'katchadeck.dev-katchimera-hex-tile-overrides-v1';
 let overrideManifest: KatchimeraHexTileOverrideManifest | undefined;
 
 function manifest(): KatchimeraHexTileOverrideManifest {
-  if (!__DEV__) return EMPTY_MANIFEST;
+  if (!DEV_TOOLS_ENABLED) return EMPTY_MANIFEST;
   if (!overrideManifest) {
     overrideManifest = getStoredJson<KatchimeraHexTileOverrideManifest>(OVERRIDE_KEY, EMPTY_MANIFEST);
   }
@@ -44,6 +45,7 @@ export function loadKatchimeraHexTileOverrides(): KatchimeraHexTileOverrideManif
 }
 
 export function saveKatchimeraHexTileOverrides(next: KatchimeraHexTileOverrideManifest): void {
+  if (!DEV_TOOLS_ENABLED) return;
   overrideManifest = {
     byCreatureId: { ...next.byCreatureId },
     byVisualKey: { ...next.byVisualKey },
@@ -57,6 +59,7 @@ export function setKatchimeraHexTileOverride(
   scope: { creatureId?: string | null; visualKey: HomeVisualKey },
   override: KatchimeraHexTileOverride | null
 ): KatchimeraHexTileOverrideManifest {
+  if (!DEV_TOOLS_ENABLED) return EMPTY_MANIFEST;
   const current = manifest();
   const next: KatchimeraHexTileOverrideManifest = {
     byCreatureId: { ...current.byCreatureId },
@@ -80,6 +83,7 @@ export function setKatchimeraHexTileVariantSelection(
   visualKey: HomeVisualKey,
   variantId: string | null
 ): KatchimeraHexTileOverrideManifest {
+  if (!DEV_TOOLS_ENABLED) return EMPTY_MANIFEST;
   const current = manifest();
   const next: KatchimeraHexTileOverrideManifest = {
     byCreatureId: { ...current.byCreatureId },

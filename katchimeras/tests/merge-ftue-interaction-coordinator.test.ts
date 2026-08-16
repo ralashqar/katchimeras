@@ -80,3 +80,23 @@ test('multi-count progress creates a new interaction gate without changing FTUE 
     }, true),
   );
 });
+
+test('a replacement gate committed during synchronous FTUE publication is consumed after advancement', () => {
+  const coordinator = new MergeFtueInteractionCoordinator('session-a');
+  const token = coordinator.begin('merge.energy.spawn_pair', 11);
+  assert.ok(token);
+  assert.equal(coordinator.recordEvent(token, EVENT), true);
+  assert.ok(coordinator.settle({ operationId: 3, revision: 12, sessionId: 'session-a' }));
+
+  // useSyncExternalStore can synchronously commit the next board props before
+  // dispatchFtueEvent returns and awaitGate has installed its expected key.
+  assert.equal(coordinator.acknowledgeGate({
+    interactionKey: 'run-a:merge.energy.first_sprout:complete:active',
+    sessionId: 'session-a',
+  }), false);
+  assert.equal(coordinator.phase, 'advancing');
+
+  assert.equal(coordinator.awaitGate(token, 'run-a:merge.energy.first_sprout:complete:active'), true);
+  assert.equal(coordinator.phase, 'ready');
+  assert.equal(coordinator.leased, false);
+});

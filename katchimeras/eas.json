@@ -20,6 +20,7 @@
       "distribution": "internal",
       "channel": "preview",
       "env": {
+        "EXPO_PUBLIC_ENABLE_DEV_TOOLS": "true",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },

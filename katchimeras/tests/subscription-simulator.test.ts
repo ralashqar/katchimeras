@@ -56,8 +56,8 @@ test('expiry, refund and reset revoke simulated access', () => {
   }
 });
 
-test('the persisted simulator is guarded by the development build flag', () => {
+test('the persisted simulator is guarded by the shared internal-tools flag', () => {
   const source = readFileSync(resolve(process.cwd(), 'utils/dev-subscription-simulator.ts'), 'utf8');
-  assert.match(source, /typeof __DEV__ !== 'undefined' && __DEV__/u);
+  assert.match(source, /DEV_TOOLS_ENABLED/u);
   assert.match(source, /if \(!isDevBuild\(\)\) return DEFAULT_DEV_SUBSCRIPTION_STATE/u);
 });

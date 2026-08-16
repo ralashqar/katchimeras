@@ -921,6 +921,7 @@ test('Merge FTUE uses session receipts and unlocks only after the replacement ga
   const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
   const overlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
   const route = readFileSync('components/katchadeck/games/merge-world-route-screen.tsx', 'utf8');
+  const crashReporting = readFileSync('utils/crash-reporting.ts', 'utf8');
   assert.match(screen, /ftueCoordinator\.begin\(ftueStep\?\.id \?\? 'unknown', state\.revision\)/);
   assert.match(screen, /ftueCoordinator\.settle\(receipt\)/);
   assert.match(screen, /ftueCoordinator\.awaitGate/);
@@ -936,9 +937,12 @@ test('Merge FTUE uses session receipts and unlocks only after the replacement ga
   assert.match(overlay, /measurementGenerationRef/);
   assert.match(overlay, /stateRef\.current/);
   assert.doesNotMatch(route, /useSharedValue|effectsPaused/);
-  assert.doesNotMatch(board, /providedEffectsPaused|effectsPaused\?:/);
-  assert.match(board, /const effectsPaused = useSharedValue\(0\)/);
-  assert.match(board, /cancelAnimation\(effectsPaused\);\s*cancelAnimation\(motionActive\);/);
+  assert.doesNotMatch(board, /useMergeMotionPerformanceProbe|effectsPaused|motionActive|reducedFx/);
+  assert.doesNotMatch(screen, /addMergeFtueBreadcrumb|setMergeFtueDiagnosticContext|markFlowStart|reportFlowReady/);
+  assert.doesNotMatch(overlay, /addMergeFtueBreadcrumb/);
+  assert.doesNotMatch(crashReporting, /tracesSampleRate|tracesSampler|enableTracing/);
+  assert.match(board, /SPAWN_PARTICLES\.map/);
+  assert.match(board, /DREAM_MIST_PARTICLES\.map/);
 });
 
 test('a companion journal grants the featured family’s two starter chains once', () => {

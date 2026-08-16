@@ -1,4 +1,4 @@
-import { Canvas, FillType, Path, Skia } from '@shopify/react-native-skia';
+import { Canvas, FillType, Path, usePathValue } from '@shopify/react-native-skia';
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -18,7 +18,6 @@ import Animated, {
 import type { FtueCueDefinition, FtueSpotlightDefinition, FtueTarget } from '@/features/onboarding/ftue-types';
 import { resolveFtueBoardCell } from '@/features/onboarding/merge-ftue';
 import type { MergeWorldState } from '@/types/merge-world';
-import { addMergeFtueBreadcrumb } from '@/utils/crash-reporting';
 import { mergeCellOrigin } from '@/utils/merge-world/board-geometry';
 
 import type { MergeBoardScreenMetrics } from './feastle-persistent-merge-board';
@@ -35,6 +34,7 @@ export type MergeFtueVisualTheme = {
   fingerSize: number;
   focusRingColor: string;
   focusRingShadowColor: string;
+  spotlightTransitionDurationMs: number;
   tapDurationMs: number;
 };
 
@@ -45,6 +45,7 @@ export const DEFAULT_MERGE_FTUE_VISUAL_THEME: MergeFtueVisualTheme = {
   fingerSize: 112,
   focusRingColor: 'rgba(196, 250, 255, 0.96)',
   focusRingShadowColor: '#82EDFF',
+  spotlightTransitionDurationMs: 420,
   tapDurationMs: 1_180,
 };
 
@@ -145,12 +146,6 @@ export function MergeFtueOverlay({
       if ((cue && !cuePoints) || (spotlight && spotlightFrames.length === 0)) return;
 
       if (!cancelled && generation === measurementGenerationRef.current) {
-        addMergeFtueBreadcrumb('presentation_applied', {
-          cue: cue?.kind ?? 'none',
-          generation,
-          spotlightTargets: spotlightFrames.length,
-          targetRevision,
-        });
         setLayout({
           configKey,
           targetRevision,
@@ -221,45 +216,150 @@ function FtueSpotlight({ frames, opacity, radius, screen, theme }: {
   screen: { height: number; width: number };
   theme: MergeFtueVisualTheme;
 }) {
-  const path = useMemo(() => {
-    const mask = Skia.Path.Make();
+  const reduceMotion = useReducedMotion();
+  const dimOpacity = useSharedValue(0);
+  const slot0 = useAnimatedSpotlightSlot(frames[0] ?? null, radius, theme.spotlightTransitionDurationMs, reduceMotion);
+  const slot1 = useAnimatedSpotlightSlot(frames[1] ?? null, radius, theme.spotlightTransitionDurationMs, reduceMotion);
+  const slot2 = useAnimatedSpotlightSlot(frames[2] ?? null, radius, theme.spotlightTransitionDurationMs, reduceMotion);
+  const slot3 = useAnimatedSpotlightSlot(frames[3] ?? null, radius, theme.spotlightTransitionDurationMs, reduceMotion);
+  const slots = [slot0, slot1, slot2, slot3] as const;
+
+  useEffect(() => {
+    dimOpacity.value = reduceMotion
+      ? opacity
+      : withTiming(opacity, {
+        duration: opacity > 0 ? 180 : 140,
+        easing: Easing.out(Easing.cubic),
+      });
+  }, [dimOpacity, opacity, reduceMotion]);
+
+  const path = usePathValue((mask) => {
+    'worklet';
     mask.addRect({ x: 0, y: 0, width: screen.width, height: screen.height });
-    for (const frame of frames) {
-      const corner = Math.min(radius, frame.height / 2, frame.width / 2);
-      mask.addRRect({ rect: frame, rx: corner, ry: corner });
-    }
+
+    const appendSlot = (
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+      corner: number,
+    ) => {
+      'worklet';
+      if (width <= 0.5 || height <= 0.5) return;
+      mask.addRRect({
+        rect: { x, y, width, height },
+        rx: Math.min(corner, height / 2, width / 2),
+        ry: Math.min(corner, height / 2, width / 2),
+      });
+    };
+
+    appendSlot(slot0.x.value, slot0.y.value, slot0.width.value, slot0.height.value, slot0.corner.value);
+    appendSlot(slot1.x.value, slot1.y.value, slot1.width.value, slot1.height.value, slot1.corner.value);
+    appendSlot(slot2.x.value, slot2.y.value, slot2.width.value, slot2.height.value, slot2.corner.value);
+    appendSlot(slot3.x.value, slot3.y.value, slot3.width.value, slot3.height.value, slot3.corner.value);
     mask.setFillType(FillType.EvenOdd);
-    return mask;
-  }, [frames, radius, screen.height, screen.width]);
+  });
 
   return (
     <View style={StyleSheet.absoluteFill}>
       <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}>
-        <Path color={`rgba(${theme.dimColor}, ${opacity})`} path={path} />
+        <Path color={`rgb(${theme.dimColor})`} opacity={dimOpacity} path={path} />
       </Canvas>
       {SPOTLIGHT_RING_SLOTS.map((index) => {
-        const frame = frames[index];
+        const slot = slots[index];
         return (
-        <View
-          key={`spotlight-ring-${index}`}
-          style={[
-            styles.focusRing,
-            {
-              borderColor: theme.focusRingColor,
-              borderRadius: frame ? Math.min(radius, frame.height / 2, frame.width / 2) : 0,
-              height: frame?.height ?? 0,
-              left: frame?.x ?? 0,
-              opacity: frame ? 1 : 0,
-              top: frame?.y ?? 0,
-              width: frame?.width ?? 0,
-              shadowColor: theme.focusRingShadowColor,
-            },
-          ]}
-        />
+          <Animated.View
+            key={`spotlight-ring-${index}`}
+            style={[
+              styles.focusRing,
+              {
+                borderColor: theme.focusRingColor,
+                shadowColor: theme.focusRingShadowColor,
+              },
+              slot.ringStyle,
+            ]}
+          />
         );
       })}
     </View>
   );
+}
+
+function useAnimatedSpotlightSlot(
+  frame: Frame | null,
+  radius: number,
+  durationMs: number,
+  reduceMotion: boolean,
+) {
+  const x = useSharedValue(frame?.x ?? 0);
+  const y = useSharedValue(frame?.y ?? 0);
+  const width = useSharedValue(frame?.width ?? 0);
+  const height = useSharedValue(frame?.height ?? 0);
+  const corner = useSharedValue(frame ? Math.min(radius, frame.height / 2, frame.width / 2) : 0);
+  const visibility = useSharedValue(frame ? 1 : 0);
+  const previousFrameRef = useRef<Frame | null>(frame);
+
+  useEffect(() => {
+    const previousFrame = previousFrameRef.current;
+    const timing = {
+      duration: durationMs,
+      easing: Easing.inOut(Easing.cubic),
+    };
+
+    if (!frame) {
+      if (previousFrame) {
+        const centerX = previousFrame.x + previousFrame.width / 2;
+        const centerY = previousFrame.y + previousFrame.height / 2;
+        x.value = reduceMotion ? centerX : withTiming(centerX, timing);
+        y.value = reduceMotion ? centerY : withTiming(centerY, timing);
+        width.value = reduceMotion ? 0 : withTiming(0, timing);
+        height.value = reduceMotion ? 0 : withTiming(0, timing);
+        corner.value = reduceMotion ? 0 : withTiming(0, timing);
+      }
+      visibility.value = reduceMotion ? 0 : withTiming(0, { duration: Math.min(180, durationMs) });
+      previousFrameRef.current = null;
+      return;
+    }
+
+    const nextCorner = Math.min(radius, frame.height / 2, frame.width / 2);
+    if (!previousFrame || reduceMotion) {
+      x.value = frame.x;
+      y.value = frame.y;
+      width.value = frame.width;
+      height.value = frame.height;
+      corner.value = nextCorner;
+    } else {
+      x.value = withTiming(frame.x, timing);
+      y.value = withTiming(frame.y, timing);
+      width.value = withTiming(frame.width, timing);
+      height.value = withTiming(frame.height, timing);
+      corner.value = withTiming(nextCorner, timing);
+    }
+    visibility.value = reduceMotion ? 1 : withTiming(1, { duration: Math.min(180, durationMs) });
+    previousFrameRef.current = frame;
+  }, [
+    corner,
+    durationMs,
+    frame,
+    height,
+    radius,
+    reduceMotion,
+    visibility,
+    width,
+    x,
+    y,
+  ]);
+
+  const ringStyle = useAnimatedStyle(() => ({
+    borderRadius: corner.value,
+    height: height.value,
+    left: x.value,
+    opacity: visibility.value,
+    top: y.value,
+    width: width.value,
+  }));
+
+  return { corner, height, ringStyle, width, x, y };
 }
 
 function FtueFingerCue({ blockedPulseNonce, cue, points, resetKey, theme }: {

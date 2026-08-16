@@ -57,6 +57,7 @@ export class MergeFtueInteractionCoordinator {
   private active: ActiveCommand | null = null;
   private commandSequence = 0;
   private currentPhase: MergeFtueInteractionPhase = 'ready';
+  private readonly committedInteractionKeys = new Set<string>();
 
   constructor(readonly sessionId: MergeBoardSessionId) {}
 
@@ -77,6 +78,7 @@ export class MergeFtueInteractionCoordinator {
       stepId,
     };
     this.active = { event: null, expectedInteractionKey: null, token };
+    this.committedInteractionKeys.clear();
     this.currentPhase = 'command_running';
     return token;
   }
@@ -98,13 +100,21 @@ export class MergeFtueInteractionCoordinator {
     if (!this.matches(token) || this.currentPhase !== 'advancing') return false;
     this.active!.expectedInteractionKey = interactionKey;
     this.currentPhase = 'awaiting_gate';
+    if (this.committedInteractionKeys.has(interactionKey)) {
+      this.active = null;
+      this.committedInteractionKeys.clear();
+      this.currentPhase = 'ready';
+    }
     return true;
   }
 
   acknowledgeGate(receipt: MergeInteractionGateReceipt): boolean {
-    if (this.currentPhase !== 'awaiting_gate' || !this.active) return false;
-    if (receipt.sessionId !== this.sessionId || receipt.interactionKey !== this.active.expectedInteractionKey) return false;
+    if (receipt.sessionId !== this.sessionId || !this.active || this.currentPhase === 'disposed') return false;
+    this.committedInteractionKeys.add(receipt.interactionKey);
+    if (this.currentPhase !== 'awaiting_gate') return false;
+    if (receipt.interactionKey !== this.active.expectedInteractionKey) return false;
     this.active = null;
+    this.committedInteractionKeys.clear();
     this.currentPhase = 'ready';
     return true;
   }
@@ -113,6 +123,7 @@ export class MergeFtueInteractionCoordinator {
     if (this.currentPhase === 'disposed') return false;
     if (token && !this.matches(token)) return false;
     this.active = null;
+    this.committedInteractionKeys.clear();
     this.currentPhase = 'ready';
     return true;
   }
@@ -123,6 +134,7 @@ export class MergeFtueInteractionCoordinator {
 
   dispose() {
     this.active = null;
+    this.committedInteractionKeys.clear();
     this.currentPhase = 'disposed';
   }
 
