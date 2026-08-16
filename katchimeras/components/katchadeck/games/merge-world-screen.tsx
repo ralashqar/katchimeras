@@ -2,7 +2,6 @@ import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ActivityIndicator, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
-import type { SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -27,6 +26,7 @@ import { useGameFeedback } from '@/features/ui/game-feedback-provider';
 import { useGameWallet } from '@/features/ui/game-wallet-provider';
 import { GameUI } from '@/constants/game-ui';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
+import type { FtueEvent } from '@/features/onboarding/ftue-types';
 import type { MergeOrder, MergeWorldCommand } from '@/types/merge-world';
 import { markFlowStart, reportFlowReady } from '@/utils/flow-performance';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
@@ -41,7 +41,7 @@ import { MergeOrderRail, type MergeTrayEntry } from './merge-order-rail';
 import { MergeServeRewardOverlay, type MergeScreenPoint, type MergeServeRewardFlight } from './merge-serve-reward-overlay';
 import { MergeFtueOverlay } from './merge-ftue-overlay';
 
-export function MergeWorldScreen({ active = true, backgroundReady = true, effectsPaused, playBoardEntrance = true }: { active?: boolean; backgroundReady?: boolean; effectsPaused?: SharedValue<number>; playBoardEntrance?: boolean } = {}) {
+export function MergeWorldScreen({ active = true, backgroundReady = true, playBoardEntrance = true }: { active?: boolean; backgroundReady?: boolean; playBoardEntrance?: boolean } = {}) {
   const router = useRouter();
   const { transitionTo } = useGameScreenTransition();
   const { focusOrderId } = useLocalSearchParams<{ focusOrderId?: string }>();
@@ -91,6 +91,8 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, effect
   const parcelNonceRef = useRef(0);
   const storyNavigationPendingRef = useRef(false);
   const ftuePreviewNavigationPendingRef = useRef(false);
+  const pendingAnimatedFtueEventsRef = useRef(new Map<number, FtueEvent>());
+  const ftueAdvanceFrameRef = useRef<number | null>(null);
   const contentWidth = Math.min(width - 12, 600);
   const flowReady = !loading && state != null;
   useGameSurfaceReadiness('merge', {
@@ -197,6 +199,11 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, effect
     markFlowStart('merge-world');
   }, []);
 
+  useEffect(() => () => {
+    if (ftueAdvanceFrameRef.current != null) cancelAnimationFrame(ftueAdvanceFrameRef.current);
+    ftueAdvanceFrameRef.current = null;
+  }, []);
+
   useEffect(() => {
     if (!active || ftueRun?.status !== 'active' || ftueRun.stepId !== 'companion.order_preview' || ftuePreviewNavigationPendingRef.current) return;
     ftuePreviewNavigationPendingRef.current = true;
@@ -229,6 +236,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, effect
 
   useEffect(() => {
     if (!active || !state || !ftueStep || !ftueRun) return;
+    if (pendingAnimatedFtueEventsRef.current.has(state.revision)) return;
     const recovered = recoverMergeFtueEvent(ftueStep, state, ftueRun.objectiveProgress);
     if (!recovered) return;
     dispatchFtueEvent(recovered, `merge-recovery:${state.revision}`);
@@ -263,9 +271,27 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, effect
     }
     const result = send(command);
     const event = mergeFtueEventForCommand(state, command, result);
-    if (event) dispatchFtueEvent(event);
+    if (event && (command.type === 'tapGenerator' || command.type === 'move')) {
+      pendingAnimatedFtueEventsRef.current.set(event.revision, event);
+    } else if (event) dispatchFtueEvent(event);
     return result;
   }, [ftueStep, handleBlockedFtueInteraction, send, state]);
+  const handleBoardCommandSettled = useCallback((revision: number) => {
+    const event = pendingAnimatedFtueEventsRef.current.get(revision);
+    if (!event) return;
+    if (ftueAdvanceFrameRef.current != null) cancelAnimationFrame(ftueAdvanceFrameRef.current);
+    // The board worklet has finished, but its completion still needs to commit
+    // before replacing the keyed FTUE cue/spotlight native tree.
+    ftueAdvanceFrameRef.current = requestAnimationFrame(() => {
+      ftueAdvanceFrameRef.current = requestAnimationFrame(() => {
+        ftueAdvanceFrameRef.current = null;
+        const pendingEvent = pendingAnimatedFtueEventsRef.current.get(revision);
+        if (!pendingEvent) return;
+        pendingAnimatedFtueEventsRef.current.delete(revision);
+        dispatchFtueEvent(pendingEvent, `merge-animation-settled:${revision}`);
+      });
+    });
+  }, []);
   const pendingParcels = useMemo(() => state?.arrivals.filter((arrival) => (
     arrival.claimedAt == null
     && arrival.kind !== 'memory_arrival'
@@ -573,13 +599,13 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, effect
           <View onLayout={measureBoardArea} style={styles.boardStage}>
             {active && boardAreaHeight > 0 ? <FeastlePersistentMergeBoard
               animateEntrance={playBoardEntrance}
-              effectsPaused={effectsPaused}
               hiddenItemInstanceIds={hiddenAnimatedItemIds}
               interactionGate={ftueBoardGate}
               interactionSessionKey={`${ftueRun?.runId ?? 'free'}:${ftueStep?.id ?? 'open'}:${active ? 'active' : 'inactive'}`}
               maxHeight={boardAreaHeight - 1}
               onBlockedInteraction={handleBlockedFtueInteraction}
               onCommand={dispatch}
+              onCommandSettled={handleBoardCommandSettled}
               onHiddenItemsRetired={handleHiddenItemsRetired}
               onSelect={setSelectedCell}
               onScreenMetrics={handleBoardScreenMetrics}

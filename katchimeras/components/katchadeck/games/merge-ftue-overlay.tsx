@@ -258,10 +258,7 @@ function FtueFingerCue({ blockedPulseNonce, cue, points, resetKey }: {
       duration: cue.kind === 'drag' ? 1_650 : 1_180,
       easing: Easing.inOut(Easing.cubic),
     }), -1, false));
-    return () => {
-      cancelAnimation(progress);
-      progress.value = 0;
-    };
+    return () => cancelAnimation(progress);
   }, [cue.kind, progress, reduceMotion, resetKey]);
 
   useEffect(() => {

@@ -1,7 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Canvas, ColorMatrix, Image as SkiaImage, useImage } from '@shopify/react-native-skia';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -53,6 +52,7 @@ type ActiveOperation = {
   kind: 'board' | 'spawn';
   remaining: Set<string>;
   finalState: MergeWorldState | null | undefined;
+  settledRevision: number | null;
 };
 type MergeCellFeedback = { id: number; cell: number; message: string; tone: MergeCellFeedbackTone };
 type DreamMistDissipationRecord = { id: number; cell: number; definitionId: string };
@@ -71,22 +71,6 @@ const MERGE_RESULT_BY_PAIR = Object.fromEntries([
 ]);
 
 const LOCKED_CELL_OVERLAY = require('../../../assets/images/katchimeras/merge-world/locked/cloud-lock.webp');
-
-function saturationMatrix(saturation: number) {
-  const inverse = 1 - saturation;
-  const red = 0.213 * inverse;
-  const green = 0.715 * inverse;
-  const blue = 0.072 * inverse;
-  return [
-    red + saturation, green, blue, 0, 0,
-    red, green + saturation, blue, 0, 0,
-    red, green, blue + saturation, 0, 0,
-    0, 0, 0, 1, 0,
-  ];
-}
-
-const DREAM_ECHO_COLOR_MATRIX = saturationMatrix(0.3);
-const DREAM_ECHO_COMPATIBLE_COLOR_MATRIX = saturationMatrix(0.68);
 
 function spritesFromState(state: MergeWorldState): SpriteRecord[] {
   return state.board.flatMap((cell, index) => cell.occupant ? [{ occupant: cell.occupant, cell: index }] : []);
@@ -119,7 +103,7 @@ function isInterruptibleMotion(motion?: SpriteMotion) {
   return motion == null || motion.kind === 'move' || motion.kind === 'swap' || motion.kind === 'return' || motion.kind === 'spawn' || motion.kind === 'merge-result';
 }
 
-export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onScreenMetrics, onBlockedInteraction, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', hiddenItemInstanceIds, effectsPaused: providedEffectsPaused, animateEntrance = true }: {
+export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onCommandSettled, onScreenMetrics, onBlockedInteraction, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', hiddenItemInstanceIds, animateEntrance = true }: {
   state: MergeWorldState;
   width: number;
   animateEntrance?: boolean;
@@ -127,13 +111,13 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   selectedCell: number | null;
   onSelect: (cell: number | null) => void;
   onCommand: (command: MergeWorldCommand) => MergeWorldCommandResult | null;
+  onCommandSettled?: (revision: number) => void;
   onScreenMetrics?: (metrics: MergeBoardScreenMetrics) => void;
   onBlockedInteraction?: () => void;
   onHiddenItemsRetired?: (instanceIds: readonly string[]) => void;
   interactionGate?: MergeBoardInteractionGate;
   interactionSessionKey?: string;
   hiddenItemInstanceIds?: ReadonlySet<string>;
-  effectsPaused?: SharedValue<number>;
 }) {
   const gap = 1;
   const padding = width < 380 ? 5 : 6;
@@ -177,8 +161,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   const maxGestureDistance = useSharedValue(0);
   const dragHapticTriggered = useSharedValue(false);
   const motionActive = useSharedValue(0);
-  const localEffectsPaused = useSharedValue(0);
-  const effectsPaused = providedEffectsPaused ?? localEffectsPaused;
+  const effectsPaused = useSharedValue(0);
   const slowOperationCount = useRef(0);
   const [reducedFx, setReducedFx] = useState(false);
   const recordMotionSample = useCallback((sample: MergeMotionPerformanceSample) => {
@@ -217,6 +200,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   const activeOperations = useRef(new Map<number, ActiveOperation>());
   const committedStateRef = useRef(state);
   const onSelectRef = useRef(onSelect);
+  const onCommandSettledRef = useRef(onCommandSettled);
   const selectedCellRef = useRef(selectedCell);
   const launchGeneratorRef = useRef<(generatorId: string) => void>(() => undefined);
   const dropRef = useRef<(instanceId: string, dx: number, dy: number, intendedTargetCell?: number | null) => void>(() => undefined);
@@ -234,6 +218,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   spritesRef.current = sprites;
   motionsRef.current = motions;
   onSelectRef.current = onSelect;
+  onCommandSettledRef.current = onCommandSettled;
   selectedCellRef.current = selectedCell;
 
   const showCellFeedback = useCallback((cell: number, reason: MergeWorldFailureReason) => {
@@ -280,23 +265,19 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
 
   useEffect(() => {
     const mountedOperations = activeOperations.current;
-    // The route-level focus boundary reuses this shared value. Restore the
-    // board's idle effect state after remounting from a Feastle scene.
+    // This value is deliberately board-local. A retained tab must never let a
+    // worklet from its previous focus session share native state with the new
+    // GestureDetector tree.
     cancelAnimation(effectsPaused);
     effectsPaused.value = 0;
     return () => {
       timers.cancelAll();
       cancelAnimation(effectsPaused);
-      effectsPaused.value = 1;
-      motionActive.value = 0;
+      cancelAnimation(motionActive);
       mountedOperations.clear();
       motionsRef.current = {};
-      hoverCell.value = -1;
-      activeDragId.value = '';
-      activeSourceCell.value = -1;
-      dragPhase.value = 0;
     };
-  }, [activeDragId, activeSourceCell, dragPhase, effectsPaused, hoverCell, motionActive, timers]);
+  }, [effectsPaused, motionActive, timers]);
 
   useEffect(() => {
     // A retained tab can return with worklet gesture ownership from the prior
@@ -361,9 +342,11 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     setSprites(reconciledSprites);
     const hasOperations = activeOperations.current.size > 0;
     setBusy(hasOperations);
-    if (hasOperations) return;
-    motionActive.value = 0;
-    if (!reducedFx) effectsPaused.value = withDelay(500, withTiming(0, { duration: 1 }));
+    if (!hasOperations) {
+      motionActive.value = 0;
+      if (!reducedFx) effectsPaused.value = withDelay(500, withTiming(0, { duration: 1 }));
+    }
+    if (operation.settledRevision != null) onCommandSettledRef.current?.(operation.settledRevision);
   }, [effectsPaused, motionActive, reducedFx]);
 
   const completeMotion = useCallback((operationId: number, instanceId: string) => {
@@ -388,11 +371,13 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     nextSprites,
     nextMotions,
     kind = 'board',
+    settledRevision = null,
   }: {
     nextState: MergeWorldState;
     nextSprites: SpriteRecord[];
     nextMotions: Record<string, Omit<SpriteMotion, 'operationId' | 'token'>>;
     kind?: ActiveOperation['kind'];
+    settledRevision?: number | null;
   }) => {
     const operationId = ++operationSequence.current;
     const boundMotions = Object.fromEntries(Object.entries(nextMotions).map(([instanceId, motion]) => [instanceId, {
@@ -400,7 +385,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       operationId,
       token: ++motionSequence.current,
     }]));
-    activeOperations.current.set(operationId, { id: operationId, kind, remaining: new Set(Object.keys(boundMotions)), finalState: nextState });
+    activeOperations.current.set(operationId, { id: operationId, kind, remaining: new Set(Object.keys(boundMotions)), finalState: nextState, settledRevision });
     if (nextState.revision >= committedStateRef.current.revision) committedStateRef.current = nextState;
     occupancyIds.value = occupancyIdsFromState(nextState);
     occupancyDefinitions.value = occupancyDefinitionsFromState(nextState);
@@ -547,7 +532,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
         ? Haptics.ImpactFeedbackStyle.Medium
         : Haptics.ImpactFeedbackStyle.Light);
     }
-    beginOperation({ nextState: predicted.state, nextSprites, nextMotions });
+    beginOperation({ nextState: predicted.state, nextSprites, nextMotions, settledRevision: predicted.state.revision });
     finishInterruptedOperation();
   }, [beginOperation, detachMotion, finishOperationIfReady, geometry, hoverCell, onCommand, onSelect, reduceMotion, returnSpriteHome, showCellFeedback, timers]);
   dropRef.current = drop;
@@ -584,6 +569,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       nextSprites: [...currentSprites, nextSprite],
       nextMotions: { [spawned.instanceId]: { kind: 'spawn', startX: start.x, startY: start.y, arcHeight: Math.max(cellSize * 1.15, Math.min(cellSize * 2.1, distance * 0.22)) } },
       kind: 'spawn',
+      settledRevision: predicted.state.revision,
     });
   }, [beginOperation, cellSize, geometry, onCommand, onSelect, reduceMotion, reducedFx, showCellFeedback, timers]);
   launchGeneratorRef.current = launchGenerator;
@@ -708,9 +694,8 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     }
   }, [blockInteraction, gateFromCell, gateGeneratorCell, gateKind, gateToCell, geometry, showCellFeedback]);
 
-  const selectedDefinitionId = selectedCell == null || presentation.board[selectedCell]?.occupant?.kind !== 'item'
-    ? null
-    : presentation.board[selectedCell].occupant.definitionId;
+  const selectedOccupant = selectedCell == null ? null : presentation.board[selectedCell]?.occupant;
+  const selectedDefinitionId = selectedOccupant?.kind === 'item' ? selectedOccupant.definitionId : null;
 
   const boardGesture = useMemo(() => Gesture.Pan()
     .enabled(entranceInteractive)
@@ -1516,17 +1501,19 @@ export function PersistentMergeItemArt({ definitionId, size }: { definitionId: s
 
 function DreamEchoItemArt({ compatible, definitionId, size }: { compatible: boolean; definitionId: string; size: number }) {
   const definition = MERGE_ITEMS_BY_ID.get(definitionId);
-  const authoredArt = mergeWorldItemArt(definitionId);
-  const image = useImage(authoredArt ?? null);
   if (!definition) return null;
-  if (authoredArt && image) return <Canvas pointerEvents="none" style={{ height: size, width: size }}>
-    <SkiaImage fit="contain" height={size} image={image} width={size} x={0} y={0}>
-      <ColorMatrix matrix={compatible ? DREAM_ECHO_COMPATIBLE_COLOR_MATRIX : DREAM_ECHO_COLOR_MATRIX} />
-    </SkiaImage>
-  </Canvas>;
-  return <View style={[styles.dreamFallbackArt, { height: size, width: size }]}>
+  // Keep Dream Echoes on the same Expo Image decode/cache path as ordinary
+  // merge sprites. A newly unlocked generator can put the same cold WebP into
+  // its spawned sprite, merge result, and dissolving Echo in one frame. Having
+  // Skia decode that source while Expo Image mounted the other two could crash
+  // the native renderer after the reducer had already persisted the merge.
+  return <View style={[
+    styles.dreamEchoArt,
+    compatible ? styles.dreamEchoArtCompatible : styles.dreamEchoArtDormant,
+    { height: size, width: size },
+  ]}>
     <PersistentMergeItemArt definitionId={definitionId} size={size} />
-    <View pointerEvents="none" style={styles.dreamFallbackWash} />
+    <View pointerEvents="none" style={[styles.dreamEchoWash, compatible && styles.dreamEchoWashCompatible]} />
   </View>;
 }
 
@@ -1567,8 +1554,11 @@ const styles = StyleSheet.create({
   spawnParticle: { borderRadius: 999, position: 'absolute' },
   familyArt: { alignItems: 'center', justifyContent: 'center' },
   familyDisc: { alignItems: 'center', borderColor: 'rgba(255,244,213,0.65)', borderRadius: 16, borderWidth: 2, boxShadow: '0 3px 8px rgba(38,19,11,0.32)', height: '76%', justifyContent: 'center', width: '76%' },
-  dreamFallbackArt: { alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  dreamFallbackWash: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(190,200,216,0.3)', borderRadius: 16 },
+  dreamEchoArt: { alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  dreamEchoArtDormant: { opacity: 0.64 },
+  dreamEchoArtCompatible: { opacity: 0.9 },
+  dreamEchoWash: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(177,190,213,0.34)', borderRadius: 16 },
+  dreamEchoWashCompatible: { backgroundColor: 'rgba(183,242,249,0.14)' },
   generatorArt: { height: '92%', width: '92%' },
   generatorSprite: { alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
   generatorSparkles: { left: '6%', overflow: 'visible', position: 'absolute', top: '-28%', zIndex: 4 },

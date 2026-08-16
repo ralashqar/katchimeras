@@ -2,7 +2,6 @@ import { useIsFocused } from '@react-navigation/native';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
-import { useSharedValue } from 'react-native-reanimated';
 
 import { MergeWorldScreen } from '@/components/katchadeck/games/merge-world-screen';
 import { TodayExplorationBackground } from '@/components/katchadeck/home/today-exploration-background';
@@ -28,7 +27,6 @@ import { useGameScreenTransition } from '@/features/navigation/game-screen-trans
 export function MergeWorldRouteScreen() {
   const isFocused = useIsFocused();
   const { familyId } = useLocalSearchParams<{ familyId?: string }>();
-  const effectsPaused = useSharedValue(0);
   const hasPresentedBoard = useRef(false);
   const [backgroundReady, setBackgroundReady] = useState(false);
   const { suppressEntranceMotion, target } = useGameScreenTransition();
@@ -80,7 +78,7 @@ export function MergeWorldRouteScreen() {
         {isFocused ? <>
           <TodayExplorationBackground backgroundKey="home" imageSize={Math.max(height, width)} onLoad={() => setBackgroundReady(true)} />
           <View style={styles.world}>
-            <MergeWorldScreen active={isFocused} backgroundReady={backgroundReady} effectsPaused={effectsPaused} playBoardEntrance={playBoardEntrance} />
+            <MergeWorldScreen active={isFocused} backgroundReady={backgroundReady} playBoardEntrance={playBoardEntrance} />
           </View>
         </> : null}
       </View>

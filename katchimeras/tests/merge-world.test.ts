@@ -318,6 +318,37 @@ test('generic tier-one Dream Echoes cover every spawner without duplicating Moss
   assert.equal(merged.state.board[source].occupant, null);
 });
 
+test('every newly unlocked non-Mossprout generator can clear either cold tier-one Dream Echo in one session', () => {
+  for (const generator of MERGE_GENERATORS.filter((entry) => entry.id !== 'wild-garden')) {
+    const profile = Object.values(KATCHIMERA_MERGE_PROFILES).find((entry) => entry.coreChains.some((chainId) => generator.chainIds.includes(chainId)));
+    assert.ok(profile, `${generator.id} should belong to a companion's core chains`);
+    for (const [dropIndex, definitionId] of generator.tierOneDropDefinitionIds.entries()) {
+      let state: MergeWorldState = reduceMergeWorld(createInitialMergeWorldState(NOW, [profile.characterId]), {
+        type: 'reconcileStory', familyId: profile.characterId, status: 'order_active', targetLevel: 2, now: NOW + 1,
+      }).state;
+      assert.ok(state.generators[generator.id]);
+      assert.ok(state.generatorUnlockReceipts.some((receipt) => receipt.generatorId === generator.id));
+      state = reduceMergeWorld(state, {
+        type: 'setGeneratorForcedDrop', generatorId: generator.id, definitionId, now: NOW + 2,
+      }).state;
+      const spawned = reduceMergeWorld(state, {
+        type: 'tapGenerator', generatorId: generator.id, now: NOW + 3, seed: `cold-first-spawn:${generator.id}:${dropIndex}`,
+      });
+      assert.ok(spawned.spawnedCell != null);
+      state = spawned.state;
+      const spawnedItem: MergeWorldState['board'][number]['occupant'] = state.board[spawned.spawnedCell!].occupant;
+      assert.equal(spawnedItem?.kind === 'item' ? spawnedItem.definitionId : null, definitionId);
+      assert.ok(spawnedItem?.kind === 'item');
+      const echoCell: number = state.board.findIndex((cell) => cell.mist?.kind === 'echo' && cell.mist.definitionId === definitionId);
+      assert.ok(echoCell >= 0, `${definitionId} should have a Dream Echo`);
+      const merged = reduceMergeWorld(state, { type: 'move', from: spawned.spawnedCell!, to: echoCell, now: NOW + 4 });
+      assert.equal(merged.dreamEchoClearedId, `shared-echo:${definitionId}`);
+      assert.equal(merged.state.board[echoCell].mist, null);
+      assert.equal(merged.state.board[spawned.spawnedCell!].occupant, null);
+    }
+  }
+});
+
 test('normalization removes legacy moon and walking mysteries from saved boards', () => {
   const legacy = structuredClone(createMossproutChapterZeroState(NOW)) as unknown as { board: { mist: unknown }[] };
   legacy.board[8].mist = { kind: 'katchimera', id: 'future-moon', mysteryId: 'moon', ownerCharacterId: null };
@@ -849,6 +880,27 @@ test('Merge board retains destination selection and decorates generators with am
   assert.match(board, /DreamMistDissipation/);
   assert.match(board, /emitEmptyCellTap/);
   assert.match(board, /MergeCellCallout/);
+  assert.doesNotMatch(board, /from '@shopify\/react-native-skia'/);
+  assert.doesNotMatch(board, /useImage\(/);
+  assert.match(board, /Dream Echoes on the same Expo Image decode\/cache path/);
+});
+
+test('Merge return isolates native state and advances FTUE after board motion settles', () => {
+  const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
+  const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
+  const overlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
+  const route = readFileSync('components/katchadeck/games/merge-world-route-screen.tsx', 'utf8');
+  assert.match(screen, /pendingAnimatedFtueEventsRef\.current\.set\(event\.revision, event\)/);
+  assert.match(screen, /pendingAnimatedFtueEventsRef\.current\.has\(state\.revision\)/);
+  assert.match(screen, /onCommandSettled=\{handleBoardCommandSettled\}/);
+  assert.match(screen, /requestAnimationFrame\(\(\) => \{[\s\S]*?requestAnimationFrame\(\(\) => \{[\s\S]*?dispatchFtueEvent\(pendingEvent/);
+  assert.match(board, /settledRevision: predicted\.state\.revision/);
+  assert.match(board, /onCommandSettledRef\.current\?\.\(operation\.settledRevision\)/);
+  assert.doesNotMatch(overlay, /return \(\) => \{\s*cancelAnimation\(progress\);\s*progress\.value = 0;/);
+  assert.doesNotMatch(route, /useSharedValue|effectsPaused/);
+  assert.doesNotMatch(board, /providedEffectsPaused|effectsPaused\?:/);
+  assert.match(board, /const effectsPaused = useSharedValue\(0\)/);
+  assert.match(board, /cancelAnimation\(effectsPaused\);\s*cancelAnimation\(motionActive\);/);
 });
 
 test('a companion journal grants the featured family’s two starter chains once', () => {
