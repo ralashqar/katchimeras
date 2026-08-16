@@ -31,9 +31,14 @@ type MergeWorldContextValue = {
   dispatch: (command: MergeWorldCommand) => MergeWorldCommandResult | null;
   flush: () => Promise<void>;
 };
+type MergeWorldStateContextValue = Pick<MergeWorldContextValue, 'state' | 'loading' | 'error'>;
+type MergeWorldActionsContextValue = Pick<MergeWorldContextValue, 'dispatch' | 'flush'>;
 
 const RETRY_DELAYS_MS = [250, 1_000, 4_000] as const;
 const MergeWorldContext = createContext<MergeWorldContextValue | null>(null);
+const MergeWorldStateContext = createContext<MergeWorldStateContextValue | null>(null);
+const MergeWorldActionsContext = createContext<MergeWorldActionsContextValue | null>(null);
+const MergeWorldLastResultContext = createContext<MergeWorldCommandResult | null | undefined>(undefined);
 const SIGNATURE_LEVELS = new Set([4, 8, 12, 16, 20]);
 const AUTHORED_COHORT_FAMILIES: readonly AuthoredCohortFamilyId[] = [
   'baristabbit', 'steppling', 'voyagle', 'flexel', 'bedrotte',
@@ -615,11 +620,37 @@ export function MergeWorldProvider({
   }, [applyPendingExternalRewards, enqueuePersistence, reconcileFeaturedStory]);
 
   const value = useMemo<MergeWorldContextValue>(() => ({ state, loading, error, lastResult, friendshipLevels, dispatch, flush }), [dispatch, error, flush, friendshipLevels, lastResult, loading, state]);
-  return <MergeWorldContext value={value}>{children}</MergeWorldContext>;
+  const stateValue = useMemo<MergeWorldStateContextValue>(() => ({ state, loading, error }), [error, loading, state]);
+  const actionsValue = useMemo<MergeWorldActionsContextValue>(() => ({ dispatch, flush }), [dispatch, flush]);
+  return <MergeWorldContext value={value}>
+    <MergeWorldStateContext value={stateValue}>
+      <MergeWorldActionsContext value={actionsValue}>
+        <MergeWorldLastResultContext value={lastResult}>{children}</MergeWorldLastResultContext>
+      </MergeWorldActionsContext>
+    </MergeWorldStateContext>
+  </MergeWorldContext>;
 }
 
 export function useMergeWorld() {
   const value = use(MergeWorldContext);
   if (!value) throw new Error('useMergeWorld must be used inside MergeWorldProvider.');
+  return value;
+}
+
+export function useMergeWorldState() {
+  const value = use(MergeWorldStateContext);
+  if (!value) throw new Error('useMergeWorldState must be used inside MergeWorldProvider.');
+  return value;
+}
+
+export function useMergeWorldActions() {
+  const value = use(MergeWorldActionsContext);
+  if (!value) throw new Error('useMergeWorldActions must be used inside MergeWorldProvider.');
+  return value;
+}
+
+export function useMergeWorldLastResult() {
+  const value = use(MergeWorldLastResultContext);
+  if (value === undefined) throw new Error('useMergeWorldLastResult must be used inside MergeWorldProvider.');
   return value;
 }

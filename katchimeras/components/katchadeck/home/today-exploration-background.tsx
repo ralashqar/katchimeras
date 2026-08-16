@@ -282,12 +282,14 @@ export function useTodayExplorationBackgroundMotion({
 
 export function TodayExplorationBackground({
   backgroundKey,
+  contentFit = 'fill',
   imageSize,
   onLoad,
   translateX,
   verticalOffset = 0,
 }: {
   backgroundKey: TodayExplorationBackgroundKey;
+  contentFit?: 'cover' | 'fill';
   imageSize: number;
   onLoad?: () => void;
   translateX?: SharedValue<number>;
@@ -315,7 +317,8 @@ export function TodayExplorationBackground({
         <Image
           allowDownscaling
           cachePolicy="disk"
-          contentFit="fill"
+          contentFit={contentFit}
+          enforceEarlyResizing
           pointerEvents="none"
           priority="high"
           onLoad={onLoad}

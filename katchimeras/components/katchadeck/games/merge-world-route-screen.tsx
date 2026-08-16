@@ -76,7 +76,7 @@ export function MergeWorldRouteScreen() {
     <MergeWorldProvider active={isFocused} characterIds={persistent.characterIds} days={persistent.activityDays} featuredCharacterId={featuredCharacterId} questState={persistent.quests}>
       <View style={styles.screen}>
         {isFocused ? <>
-          <TodayExplorationBackground backgroundKey="home" imageSize={Math.max(height, width)} onLoad={() => setBackgroundReady(true)} />
+          <TodayExplorationBackground backgroundKey="home" contentFit="cover" imageSize={Math.max(height, width)} onLoad={() => setBackgroundReady(true)} />
           <View style={styles.world}>
             <MergeWorldScreen active={isFocused} backgroundReady={backgroundReady} playBoardEntrance={playBoardEntrance} />
           </View>

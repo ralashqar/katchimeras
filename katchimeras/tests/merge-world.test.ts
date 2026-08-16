@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { KATCHIMERA_MERGE_PROFILES, MERGE_GENERATORS, MERGE_ITEMS_BY_ID, MERGE_LOCKED_TIER_ONE_ECHOES } from '@/constants/merge-world-catalog';
+import { KATCHIMERA_MERGE_PROFILES, MERGE_GENERATORS, MERGE_ITEMS_BY_ID, MERGE_LOCKED_TIER_ONE_ECHOES, MOSSPROUT_DREAM_ECHOES } from '@/constants/merge-world-catalog';
 import type { HomeDayRecord } from '@/types/home';
 import type { MergeBoardItem, MergeWorldState } from '@/types/merge-world';
 import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
@@ -11,6 +11,7 @@ import { BARISTABBIT_CHAPTER_ONE_ORDER_POOL, FEASTLE_ACT_TWO_ORDER_POOL, selectA
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection } from '@/utils/merge-world/board-geometry';
 import { mergeCellFeedbackForFailure } from '@/utils/merge-board-feedback';
 import { MERGE_MORPH_DURATION_MS, SPAWN_MOTION_DURATION_MS, mergeSpriteMotionFrame, spawnSpriteMotionFrame } from '@/utils/merge-board-motion';
+import { mergeArtWarmupPlan } from '@/utils/merge-world/art-warmup';
 import { mergeActivityRewards } from '@/utils/merge-world/activity-rewards';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
 import { MERGE_ENERGY_REGEN_CAP, MERGE_ENERGY_REGEN_MS, MERGE_INITIAL_ENERGY, MOSSPROUT_FTUE_JOURNAL_ENERGY, STEPS_PER_MERGE_ENERGY, mergeJournalRewardPreview, mergeYesterdayStepEnergyPreview } from '@/utils/merge-world/economy-policy';
@@ -128,6 +129,38 @@ test('Merge FTUE permits only the highlighted generator and emits spawn evidence
   assert.equal(mergeFtueAllowsCommand(step, state, command), true);
   const result = reduceMergeWorld(state, command);
   assert.equal(mergeFtueEventForCommand(state, command, result)?.type, 'item_spawned');
+});
+
+test('Merge art warm-up stays bounded to visible and immediately reachable artwork', () => {
+  const state = createMossproutChapterZeroState(NOW);
+  const plan = mergeArtWarmupPlan(state);
+  assert.deepEqual(plan.generatorIds, ['wild-garden']);
+  assert.ok(plan.itemDefinitionIds.includes('nature:garden:1'));
+  assert.equal(plan.itemDefinitionIds.includes('nature:garden:2'), false);
+  assert.equal(new Set(plan.itemDefinitionIds).size, plan.itemDefinitionIds.length);
+  assert.equal(plan.itemDefinitionIds.includes('food:table:6'), false);
+});
+
+test('Merge board atlas covers the catalog and keeps static board work on one GPU surface', () => {
+  const manifest = readFileSync('constants/merge-board-atlas.generated.ts', 'utf8');
+  const staticLayer = readFileSync('components/katchadeck/games/merge-board-static-layer.tsx', 'utf8');
+  const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
+  const packageJson = readFileSync('package.json', 'utf8');
+  const staticDefinitionIds = new Set([
+    ...MERGE_LOCKED_TIER_ONE_ECHOES.map((echo) => echo.definitionId),
+    ...MOSSPROUT_DREAM_ECHOES.map((echo) => echo.definitionId),
+  ]);
+  for (const definitionId of staticDefinitionIds) {
+    assert.match(manifest, new RegExp(`'${definitionId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}':`));
+  }
+  assert.doesNotMatch(manifest, /'food:table:6'/);
+  assert.match(manifest, /'__cell\.invalid'/);
+  assert.match(staticLayer, /<Atlas image=\{image\} sprites=\{batches\.cells\.sprites\}/);
+  assert.match(staticLayer, /dormantEchoes/);
+  assert.match(staticLayer, /compatibleEchoes/);
+  assert.match(board, /<MergeBoardStaticLayer/);
+  assert.match(board, /gpuVisuals=\{gpuStaticLayerReady\}/);
+  assert.match(packageJson, /art:merge-board-atlas:check/);
 });
 
 test('board geometry renders and hit-tests with one coordinate system', () => {
@@ -575,6 +608,13 @@ test('generator spawn pops from its source, arcs short, then slides into the des
   assert.match(board, /startX: start\.x, startY: start\.y/);
   assert.match(board, /duration: motion\.kind === 'spawn' \? SPAWN_MOTION_DURATION_MS/);
   assert.match(board, /spawnFrame \? arcHeight\.value \* spawnFrame\.arc \+ cellSize \* spawnFrame\.settleY/);
+  const spawnEffects = readFileSync('components/katchadeck/games/merge-spawn-effects-layer.tsx', 'utf8');
+  assert.match(board, /<MergeSpawnEffectsLayer bursts=\{spawnBursts\}/);
+  assert.match(spawnEffects, /GPU_SPAWN_BURST_SLOT_IDS = \[0, 1, 2, 3, 4, 5\]/);
+  assert.match(spawnEffects, /GPU_SPAWN_PARTICLES\.map/);
+  assert.match(spawnEffects, /<Canvas pointerEvents="none"/);
+  assert.match(board, /useReducer\(mergeBoardVisualReducer/);
+  assert.doesNotMatch(board, /setPresentation|setSprites|setMotions|setBusy/);
 });
 
 test('identical items merge and preserve deterministic item progression', () => {
@@ -936,12 +976,17 @@ test('Merge FTUE uses session receipts and unlocks only after the replacement ga
   assert.doesNotMatch(overlay, /key=\{`(?:spotlight|cue):|entering=|exiting=/);
   assert.match(overlay, /measurementGenerationRef/);
   assert.match(overlay, /stateRef\.current/);
+  assert.match(overlay, /spotlightTransitionDurationMs: 420/);
+  assert.match(overlay, /const ringPath = usePathValue/);
+  assert.match(overlay, /<BlurMask blur=\{6\} style="solid"/);
+  assert.doesNotMatch(overlay, /SPOTLIGHT_RING_SLOTS|ringStyle|styles\.focusRing/);
   assert.doesNotMatch(route, /useSharedValue|effectsPaused/);
   assert.doesNotMatch(board, /useMergeMotionPerformanceProbe|effectsPaused|motionActive|reducedFx/);
   assert.doesNotMatch(screen, /addMergeFtueBreadcrumb|setMergeFtueDiagnosticContext|markFlowStart|reportFlowReady/);
   assert.doesNotMatch(overlay, /addMergeFtueBreadcrumb/);
   assert.doesNotMatch(crashReporting, /tracesSampleRate|tracesSampler|enableTracing/);
-  assert.match(board, /SPAWN_PARTICLES\.map/);
+  const spawnEffects = readFileSync('components/katchadeck/games/merge-spawn-effects-layer.tsx', 'utf8');
+  assert.match(spawnEffects, /GPU_SPAWN_PARTICLES\.map/);
   assert.match(board, /DREAM_MIST_PARTICLES\.map/);
 });
 

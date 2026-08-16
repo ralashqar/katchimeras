@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { scheduleOnUI } from 'react-native-worklets';
@@ -25,11 +25,14 @@ import Animated, {
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
 import { FeastleMergeCelebration } from '@/components/katchadeck/world/quests/feastle-merge-primitives';
+import { MergeBoardStaticLayer } from '@/components/katchadeck/games/merge-board-static-layer';
+import { MergeSpawnEffectsLayer } from '@/components/katchadeck/games/merge-spawn-effects-layer';
 import { mergeWorldGeneratorArt, mergeWorldItemArt } from '@/constants/merge-world-art';
 import { MERGE_GENERATORS_BY_ID, MERGE_HYBRID_RECIPES, MERGE_ITEMS_BY_ID, MERGE_WORLD_COLUMNS, MERGE_WORLD_ROWS } from '@/constants/merge-world-catalog';
 import type { MergeBoardInteractionGate } from '@/features/onboarding/merge-ftue';
 import type { MergeBoardOperationReceipt, MergeBoardSessionId, MergeInteractionGateReceipt } from '@/features/onboarding/merge-ftue-interaction-coordinator';
 import { useDisposableTimers } from '@/hooks/use-disposable-timers';
+import { mergeGeneratorArtCacheKey, mergeItemArtCacheKey, useMergeArtCache, type MergeArtCache } from '@/hooks/use-merge-art-cache';
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 import type { MergeBoardOccupant, MergeDreamMist, MergeWorldCommand, MergeWorldCommandResult, MergeWorldFailureReason, MergeWorldState } from '@/types/merge-world';
 import { mergeCellFeedbackForFailure, type MergeCellFeedbackTone } from '@/utils/merge-board-feedback';
@@ -56,6 +59,16 @@ type ActiveOperation = {
 };
 type MergeCellFeedback = { id: number; cell: number; message: string; tone: MergeCellFeedbackTone };
 type DreamMistDissipationRecord = { id: number; cell: number; definitionId: string };
+type MergeBoardVisualState = {
+  busy: boolean;
+  motions: Record<string, SpriteMotion>;
+  presentation: MergeWorldState;
+  sprites: SpriteRecord[];
+};
+type MergeBoardVisualAction =
+  | { type: 'begin'; motions: Record<string, SpriteMotion>; presentation: MergeWorldState; sprites: SpriteRecord[] }
+  | { type: 'reconcile'; busy: boolean; motions: Record<string, SpriteMotion>; presentation: MergeWorldState; sprites: SpriteRecord[] }
+  | { type: 'sync'; presentation: MergeWorldState; sprites: SpriteRecord[] };
 
 const MOVE_SPRING = { damping: 32, stiffness: 360, mass: 0.78, overshootClamping: true } as const;
 const SWAP_SPRING = { damping: 30, stiffness: 300, mass: 0.9, overshootClamping: true } as const;
@@ -71,6 +84,17 @@ const MERGE_RESULT_BY_PAIR = Object.fromEntries([
 ]);
 
 const LOCKED_CELL_OVERLAY = require('../../../assets/images/katchimeras/merge-world/locked/cloud-lock.webp');
+
+function mergeBoardVisualReducer(state: MergeBoardVisualState, action: MergeBoardVisualAction): MergeBoardVisualState {
+  switch (action.type) {
+    case 'begin':
+      return { busy: true, motions: action.motions, presentation: action.presentation, sprites: action.sprites };
+    case 'reconcile':
+      return { busy: action.busy, motions: action.motions, presentation: action.presentation, sprites: action.sprites };
+    case 'sync':
+      return { ...state, presentation: action.presentation, sprites: action.sprites };
+  }
+}
 
 function spritesFromState(state: MergeWorldState): SpriteRecord[] {
   return state.board.flatMap((cell, index) => cell.occupant ? [{ occupant: cell.occupant, cell: index }] : []);
@@ -103,7 +127,7 @@ function isInterruptibleMotion(motion?: SpriteMotion) {
   return motion == null || motion.kind === 'move' || motion.kind === 'swap' || motion.kind === 'return' || motion.kind === 'spawn' || motion.kind === 'merge-result';
 }
 
-export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onCommandSettled, onInteractionGateCommitted, onScreenMetrics, onBlockedInteraction, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', sessionId, hiddenItemInstanceIds, animateEntrance = true }: {
+export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onCommandSettled, onInteractionGateCommitted, onScreenMetrics, onBlockedInteraction, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', sessionId, hiddenItemInstanceIds, animateEntrance = true }: {
   state: MergeWorldState;
   width: number;
   animateEntrance?: boolean;
@@ -133,6 +157,10 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   const boardWidth = cellSize * MERGE_WORLD_COLUMNS + gap * (MERGE_WORLD_COLUMNS - 1) + inset * 2;
   const boardHeight = cellSize * MERGE_WORLD_ROWS + gap * (MERGE_WORLD_ROWS - 1) + inset * 2;
   const geometry = useMemo<MergeBoardGeometry>(() => ({ columns: MERGE_WORLD_COLUMNS, rows: MERGE_WORLD_ROWS, cellSize, gap, inset }), [cellSize, gap, inset]);
+  const cellOrigins = useMemo(
+    () => Array.from({ length: MERGE_WORLD_COLUMNS * MERGE_WORLD_ROWS }, (_, index) => mergeCellOrigin(geometry, index)),
+    [geometry],
+  );
   const boardRef = useRef<View>(null);
   const reportScreenMetrics = useCallback(() => {
     const frame = requestAnimationFrame(() => {
@@ -162,23 +190,28 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   const gestureFinished = useSharedValue(false);
   const maxGestureDistance = useSharedValue(0);
   const dragHapticTriggered = useSharedValue(false);
-  const [presentation, setPresentation] = useState(state);
+  const [visualState, dispatchVisual] = useReducer(mergeBoardVisualReducer, state, (initialState): MergeBoardVisualState => ({
+    busy: false,
+    motions: {},
+    presentation: initialState,
+    sprites: spritesFromState(initialState),
+  }));
+  const { busy, motions, presentation, sprites } = visualState;
   const presentationRef = useRef(presentation);
-  const [sprites, setSprites] = useState(() => spritesFromState(state));
   const introSpriteDelays = useRef(new Map(
     animateEntrance
       ? spritesFromState(state).map((sprite) => [spriteId(sprite), introDelayForCell(sprite.cell)])
       : [],
   ));
   const spritesRef = useRef(sprites);
-  const [motions, setMotions] = useState<Record<string, SpriteMotion>>({});
   const motionsRef = useRef(motions);
-  const [busy, setBusy] = useState(false);
   const [invalidFeedback, setInvalidFeedback] = useState<{ id: number; cell: number } | null>(null);
   const [mergeBursts, setMergeBursts] = useState<{ id: number; cell: number }[]>([]);
   const [spawnBursts, setSpawnBursts] = useState<{ id: number; cell: number }[]>([]);
   const [cellFeedback, setCellFeedback] = useState<MergeCellFeedback[]>([]);
   const [mistDissipations, setMistDissipations] = useState<DreamMistDissipationRecord[]>([]);
+  const [gpuStaticLayerReady, setGpuStaticLayerReady] = useState(false);
+  const markGpuStaticLayerReady = useCallback(() => setGpuStaticLayerReady(true), []);
   const operationSequence = useRef(0);
   const motionSequence = useRef(0);
   const burstSequence = useRef(0);
@@ -203,6 +236,8 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   const gateFromCell = interactionGate.kind === 'drag' ? interactionGate.fromCell : -1;
   const gateToCell = interactionGate.kind === 'drag' ? interactionGate.toCell : -1;
   const gateGeneratorCell = interactionGate.kind === 'generator' ? interactionGate.cell : -1;
+  const mossproutOnboarding = presentation.activeOrders.some((order) => order.id.startsWith('mossprout:chapter-0:'));
+  const artCache = useMergeArtCache(presentation, mossproutOnboarding);
 
   presentationRef.current = presentation;
   spritesRef.current = sprites;
@@ -287,10 +322,9 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     occupancyDefinitions.value = occupancyDefinitionsFromState(state);
     if (activeOperations.current.size) return;
     presentationRef.current = state;
-    setPresentation(state);
     const nextSprites = spritesFromState(state);
     spritesRef.current = nextSprites;
-    setSprites(nextSprites);
+    dispatchVisual({ type: 'sync', presentation: state, sprites: nextSprites });
   }, [occupancyDefinitions, occupancyIds, state]);
 
   useEffect(() => {
@@ -311,7 +345,6 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     activeOperations.current.delete(operationId);
     const remainingMotions = Object.fromEntries(Object.entries(motionsRef.current).filter(([, motion]) => motion.operationId !== operationId));
     motionsRef.current = remainingMotions;
-    setMotions(remainingMotions);
     const finalState = committedStateRef.current;
     const canonicalSprites = spritesFromState(finalState);
     const canonicalIds = new Set(canonicalSprites.map(spriteId));
@@ -324,11 +357,15 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     });
     const reconciledSprites = [...canonicalSprites, ...activeGhosts];
     presentationRef.current = finalState;
-    setPresentation(finalState);
     spritesRef.current = reconciledSprites;
-    setSprites(reconciledSprites);
     const hasOperations = activeOperations.current.size > 0;
-    setBusy(hasOperations);
+    dispatchVisual({
+      type: 'reconcile',
+      busy: hasOperations,
+      motions: remainingMotions,
+      presentation: finalState,
+      sprites: reconciledSprites,
+    });
     if (operation.settledRevision != null) {
       onCommandSettledRef.current?.({ operationId: operation.id, revision: operation.settledRevision, sessionId });
     }
@@ -375,13 +412,10 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     occupancyIds.value = occupancyIdsFromState(nextState);
     occupancyDefinitions.value = occupancyDefinitionsFromState(nextState);
     presentationRef.current = nextState;
-    setPresentation(nextState);
     spritesRef.current = nextSprites;
-    setSprites(nextSprites);
     const combinedMotions = { ...motionsRef.current, ...boundMotions };
     motionsRef.current = combinedMotions;
-    setMotions(combinedMotions);
-    setBusy(true);
+    dispatchVisual({ type: 'begin', motions: combinedMotions, presentation: nextState, sprites: nextSprites });
   }, [occupancyDefinitions, occupancyIds]);
 
   const returnSpriteHome = useCallback((sprite: SpriteRecord, dx: number, dy: number, invalid?: number) => {
@@ -849,9 +883,17 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
   return <View onLayout={reportScreenMetrics} ref={boardRef} style={[styles.boardFrame, { height: boardHeight, width: boardWidth }]}>
     <GestureDetector gesture={boardGesture}><Animated.View accessibilityLabel="Feastle merge board, seven columns by nine rows" style={[styles.board, busy && styles.boardAnimating, { height: boardHeight, padding, width: boardWidth }, boardEntranceStyle]}>
     <LinearGradient colors={['#788143', '#55602F', '#384321']} locations={[0, 0.52, 1]} pointerEvents="none" style={styles.boardGradient} />
+    <MergeBoardStaticLayer
+      geometry={geometry}
+      invalidCell={invalidFeedback?.cell ?? null}
+      onReady={markGpuStaticLayerReady}
+      selectedCell={selectedCell}
+      selectedDefinitionId={selectedDefinitionId}
+      state={presentation}
+    />
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       {presentation.board.map((cell, index) => {
-        const origin = mergeCellOrigin(geometry, index);
+        const origin = cellOrigins[index];
         const occupant = cell.occupant;
         const item = occupant?.kind === 'item' ? occupant : null;
         const generator = occupant?.kind === 'generator' ? MERGE_GENERATORS_BY_ID.get(occupant.generatorId) : null;
@@ -872,6 +914,7 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
           blocked={cell.locked && !occupant}
           compatible={compatible}
           height={cellSize}
+          gpuVisuals={gpuStaticLayerReady}
           index={index}
           invalid={invalidFeedback?.cell === index}
           key={index}
@@ -886,9 +929,9 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
       <HoverCellOverlay geometry={geometry} hoverCell={hoverCell} />
     </View>
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-      {spawnBursts.map((burst) => <SpawnParticleBurst key={burst.id} origin={mergeCellOrigin(geometry, burst.cell)} size={cellSize} />)}
+      <MergeSpawnEffectsLayer bursts={spawnBursts} geometry={geometry} size={cellSize} />
       {sprites.filter((sprite) => sprite.occupant.kind !== 'item' || !hiddenItemInstanceIds?.has(sprite.occupant.instanceId)).map((sprite) => {
-        const origin = mergeCellOrigin(geometry, sprite.cell);
+        const origin = cellOrigins[sprite.cell];
         const id = spriteId(sprite);
         return <PersistentSprite
           baseX={origin.x}
@@ -905,7 +948,8 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
           instanceId={id}
           key={id}
           motion={motions[id]}
-          mossproutOnboarding={presentation.activeOrders.some((order) => order.id.startsWith('mossprout:chapter-0:'))}
+          artCache={artCache}
+          mossproutOnboarding={mossproutOnboarding}
           occupant={sprite.occupant}
           onComplete={completeMotion}
           reduceMotion={reduceMotion}
@@ -923,9 +967,9 @@ export function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedC
     </View>
     </Animated.View></GestureDetector>
   </View>;
-}
+});
 
-const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibilityDisabled, accessibilityLabel, blocked, invalid, selected, compatible, index, left, top, width, height, mist, onActivate }: {
+const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibilityDisabled, accessibilityLabel, blocked, invalid, selected, compatible, gpuVisuals, index, left, top, width, height, mist, onActivate }: {
   accessibilityActionLabel: string;
   accessibilityDisabled: boolean;
   accessibilityLabel: string;
@@ -933,6 +977,7 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
   invalid: boolean;
   selected: boolean;
   compatible: boolean;
+  gpuVisuals: boolean;
   index: number;
   left: number;
   top: number;
@@ -945,11 +990,11 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
   const row = Math.floor(index / MERGE_WORLD_COLUMNS);
   const alternate = (column + row) % 2 === 1;
   return <View style={[styles.cell, {
-    backgroundColor: compatible ? '#F1D995'
+    backgroundColor: gpuVisuals ? 'transparent' : compatible ? '#F1D995'
       : selected ? '#FFE9AD'
         : alternate ? '#ECD4A7' : '#F2DFB8',
-    borderColor: invalid ? '#D95E4B' : compatible ? '#D19135' : selected ? '#C67E2C' : 'rgba(150,104,51,0.34)',
-    boxShadow: 'inset 0 2px 2px rgba(255,251,226,0.34), inset 0 -3px 4px rgba(101,65,25,0.11)',
+    borderColor: gpuVisuals ? 'transparent' : invalid ? '#D95E4B' : compatible ? '#D19135' : selected ? '#C67E2C' : 'rgba(150,104,51,0.34)',
+    boxShadow: gpuVisuals ? 'none' : 'inset 0 2px 2px rgba(255,251,226,0.34), inset 0 -3px 4px rgba(101,65,25,0.11)',
     height, left, top, width,
   }]}>
     <View
@@ -960,8 +1005,8 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
       accessibilityState={{ disabled: accessibilityDisabled }}
       onAccessibilityAction={() => onActivate(index)}
       style={styles.cellPressable}>
-      {blocked ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" recyclingKey="merge-locked-cloud" source={LOCKED_CELL_OVERLAY} style={[styles.lockedOverlay, mist?.kind === 'echo' && styles.echoMist]} transition={0} /> : null}
-      {mist?.kind === 'echo' ? <View pointerEvents="none" style={[styles.echoItem, compatible && styles.echoItemCompatible]}><DreamEchoItemArt compatible={compatible} definitionId={mist.definitionId} size={Math.min(width, height) - 4} /></View> : null}
+      {!gpuVisuals && blocked ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" recyclingKey="merge-locked-cloud" source={LOCKED_CELL_OVERLAY} style={[styles.lockedOverlay, mist?.kind === 'echo' && styles.echoMist]} transition={0} /> : null}
+      {!gpuVisuals && mist?.kind === 'echo' ? <View pointerEvents="none" style={[styles.echoItem, compatible && styles.echoItemCompatible]}><DreamEchoItemArt compatible={compatible} definitionId={mist.definitionId} size={Math.min(width, height) - 4} /></View> : null}
     </View>
   </View>;
 });
@@ -1061,7 +1106,7 @@ function DreamMistDissipation({ effect, geometry, reduceMotion }: {
   }));
   return <View pointerEvents="none" style={[styles.mistDissipation, { height: size, left: origin.x, top: origin.y, width: size }]}>
     <Animated.View style={[StyleSheet.absoluteFill, cloudStyle]}>
-      <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" recyclingKey="merge-dissipating-cloud" source={LOCKED_CELL_OVERLAY} style={styles.lockedOverlay} transition={0} />
+      <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" enforceEarlyResizing recyclingKey="merge-dissipating-cloud" source={LOCKED_CELL_OVERLAY} style={styles.lockedOverlay} transition={0} />
     </Animated.View>
     <Animated.View style={[styles.mistEchoGhost, { height: size - 4, width: size - 4 }, echoStyle]}>
       <DreamEchoItemArt compatible={false} definitionId={effect.definitionId} size={size - 4} />
@@ -1109,7 +1154,7 @@ function HoverCellOverlay({ geometry, hoverCell }: { geometry: MergeBoardGeometr
   return <Animated.View pointerEvents="none" style={[styles.hoverCell, { height: geometry.cellSize, width: geometry.cellSize }, style]} />;
 }
 
-const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, baseY, cellSize, activeDragId, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, entranceDelay, grabX, grabY, motion, mossproutOnboarding, reduceMotion, onComplete, occupant }: {
+const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, baseY, cellSize, activeDragId, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, entranceDelay, grabX, grabY, motion, artCache, mossproutOnboarding, reduceMotion, onComplete, occupant }: {
   instanceId: string;
   baseX: number;
   baseY: number;
@@ -1123,6 +1168,7 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   grabX: SharedValue<number>;
   grabY: SharedValue<number>;
   motion?: SpriteMotion;
+  artCache: MergeArtCache;
   mossproutOnboarding: boolean;
   reduceMotion: boolean;
   onComplete: (operationId: number, instanceId: string) => void;
@@ -1303,16 +1349,17 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
 
   return <Animated.View pointerEvents="none" style={[styles.sprite, { height: cellSize, left: 0, top: 0, width: cellSize }, animatedStyle]}>
       {occupant.kind === 'generator'
-        ? <PersistentGeneratorArt generatorId={occupant.generatorId} mossproutOnboarding={mossproutOnboarding} size={cellSize} />
-        : <PersistentMergeItemArt definitionId={occupant.definitionId} size={cellSize - 4} />}
+        ? <PersistentGeneratorArt artCache={artCache} generatorId={occupant.generatorId} mossproutOnboarding={mossproutOnboarding} size={cellSize} />
+        : <PersistentMergeItemArt artCache={artCache} definitionId={occupant.definitionId} size={cellSize - 4} />}
     </Animated.View>;
 });
 
-function PersistentGeneratorArt({ generatorId, mossproutOnboarding, size }: { generatorId: string; mossproutOnboarding: boolean; size: number }) {
+function PersistentGeneratorArt({ artCache, generatorId, mossproutOnboarding, size }: { artCache: MergeArtCache; generatorId: string; mossproutOnboarding: boolean; size: number }) {
   const art = mergeWorldGeneratorArt(generatorId, { mossproutOnboarding });
+  const source = artCache.get(mergeGeneratorArtCacheKey(generatorId, mossproutOnboarding)) ?? art;
   return <View style={[styles.generatorSprite, { height: size, width: size }]}>
     <GeneratorSparkles size={size} />
-    {art ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={`merge-generator-${generatorId}`} source={art} style={styles.generatorArt} transition={0} /> : null}
+    {source ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={`merge-generator-${generatorId}`} source={source} style={styles.generatorArt} transition={0} /> : null}
     <View style={styles.generatorBolt}>
       <IconSymbol color="#FFD45F" name="bolt.fill" size={13} />
     </View>
@@ -1415,55 +1462,6 @@ function GeneratorSparkle({ reduceMotion, size }: {
   </Animated.View>;
 }
 
-function SpawnParticleBurst({ origin, size }: { origin: { x: number; y: number }; size: number }) {
-  const progress = useSharedValue(0);
-  useEffect(() => {
-    progress.value = withTiming(1, { duration: 450, easing: Easing.out(Easing.cubic) });
-    return () => cancelAnimation(progress);
-  }, [progress]);
-  const haloStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0, 0.14, 0.7, 1], [0, 0.72, 0.22, 0]),
-    transform: [{ scale: interpolate(progress.value, [0, 1], [0.35, 1.55]) }],
-  }));
-  return <View pointerEvents="none" style={[styles.spawnBurst, { height: size, left: origin.x, top: origin.y, width: size }]}>
-    <Animated.View style={[styles.spawnHalo, { height: size * 0.78, width: size * 0.78 }, haloStyle]} />
-    {SPAWN_PARTICLES.map((particle, index) => <SpawnParticle index={index} key={index} particle={particle} progress={progress} size={size} />)}
-  </View>;
-}
-
-const SPAWN_PARTICLES = [
-  { angle: -2.74, distance: 0.64, color: '#FFE7A5', size: 5 },
-  { angle: -2.05, distance: 0.78, color: '#FFBF68', size: 4 },
-  { angle: -1.46, distance: 0.86, color: '#FFF2C6', size: 6 },
-  { angle: -0.82, distance: 0.76, color: '#FFCF74', size: 4 },
-  { angle: -0.18, distance: 0.68, color: '#FFE9AE', size: 5 },
-  { angle: 0.58, distance: 0.58, color: '#F8B95E', size: 4 },
-  { angle: 1.34, distance: 0.52, color: '#FFF0BE', size: 5 },
-  { angle: 2.36, distance: 0.6, color: '#FFD47D', size: 4 },
-] as const;
-
-function SpawnParticle({ index, particle, progress, size }: {
-  index: number;
-  particle: (typeof SPAWN_PARTICLES)[number];
-  progress: SharedValue<number>;
-  size: number;
-}) {
-  const style = useAnimatedStyle(() => {
-    const p = progress.value;
-    const delayed = Math.max(0, Math.min(1, (p - index * 0.018) / (1 - index * 0.018)));
-    const travel = interpolate(delayed, [0, 1], [size * 0.08, size * particle.distance]);
-    return {
-      opacity: interpolate(delayed, [0, 0.16, 0.72, 1], [0, 1, 0.72, 0]),
-      transform: [
-        { translateX: Math.cos(particle.angle) * travel },
-        { translateY: Math.sin(particle.angle) * travel + delayed * delayed * size * 0.12 },
-        { scale: interpolate(delayed, [0, 0.24, 1], [0.3, 1.1, 0.25]) },
-      ],
-    };
-  }, [index, particle.angle, particle.distance, size]);
-  return <Animated.View style={[styles.spawnParticle, { backgroundColor: particle.color, height: particle.size, width: particle.size }, style]} />;
-}
-
 function mergeCellFromPointWorklet(x: number, y: number, cellSize: number, gap: number, inset: number, columns: number, rows: number) {
   'worklet';
   const pitch = cellSize + gap;
@@ -1472,11 +1470,12 @@ function mergeCellFromPointWorklet(x: number, y: number, cellSize: number, gap: 
   return column < 0 || column >= columns || row < 0 || row >= rows ? -1 : row * columns + column;
 }
 
-export function PersistentMergeItemArt({ definitionId, size }: { definitionId: string; size: number }) {
+export function PersistentMergeItemArt({ artCache, definitionId, size }: { artCache?: MergeArtCache; definitionId: string; size: number }) {
   const definition = MERGE_ITEMS_BY_ID.get(definitionId);
   if (!definition) return null;
   const authoredArt = mergeWorldItemArt(definitionId);
-  if (authoredArt) return <View style={[styles.familyArt, { height: size, width: size }]}><Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={definitionId} source={authoredArt} style={{ height: size, width: size }} transition={0} /></View>;
+  const source = artCache?.get(mergeItemArtCacheKey(definitionId)) ?? authoredArt;
+  if (source) return <View style={[styles.familyArt, { height: size, width: size }]}><Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={definitionId} source={source} style={{ height: size, width: size }} transition={0} /></View>;
   return <View style={[styles.familyArt, { height: size, width: size }]}><View style={[styles.familyDisc, { backgroundColor: definition.color }]}><IconSymbol color="#4A291B" name={definition.icon} size={Math.max(17, size * 0.48)} /></View></View>;
 }
 
@@ -1530,9 +1529,6 @@ const styles = StyleSheet.create({
   selectionCornerBottomRight: { bottom: -2, right: -2, transform: [{ rotate: '180deg' }] },
   selectionCornerHorizontal: { backgroundColor: '#147F91', borderColor: '#C8FCFF', borderRadius: 3, borderWidth: 1.5, boxShadow: '0 1px 0 rgba(3,54,69,0.95), 0 0 7px rgba(57,218,231,0.96)', left: 0, position: 'absolute', right: 0, top: 0 },
   selectionCornerVertical: { backgroundColor: '#147F91', borderColor: '#C8FCFF', borderRadius: 3, borderWidth: 1.5, bottom: 0, boxShadow: '1px 0 0 rgba(3,54,69,0.95), 0 0 7px rgba(57,218,231,0.96)', left: 0, position: 'absolute', top: 0 },
-  spawnBurst: { alignItems: 'center', justifyContent: 'center', position: 'absolute', zIndex: 900 },
-  spawnHalo: { backgroundColor: 'rgba(255,205,112,0.24)', borderColor: 'rgba(255,239,190,0.72)', borderRadius: 999, borderWidth: 1.5, position: 'absolute' },
-  spawnParticle: { borderRadius: 999, position: 'absolute' },
   familyArt: { alignItems: 'center', justifyContent: 'center' },
   familyDisc: { alignItems: 'center', borderColor: 'rgba(255,244,213,0.65)', borderRadius: 16, borderWidth: 2, boxShadow: '0 3px 8px rgba(38,19,11,0.32)', height: '76%', justifyContent: 'center', width: '76%' },
   dreamEchoArt: { alignItems: 'center', justifyContent: 'center', position: 'relative' },

@@ -1,6 +1,6 @@
-import { Canvas, FillType, Path, usePathValue } from '@shopify/react-native-skia';
+import { BlurMask, Canvas, FillType, Path, usePathValue } from '@shopify/react-native-skia';
 import { Image } from 'expo-image';
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -25,7 +25,6 @@ import type { MergeBoardScreenMetrics } from './feastle-persistent-merge-board';
 const HAND_ART = require('../../../assets/images/katchimeras/merge-world/ui/ftue-hand.webp');
 const HAND_TIP_X = 0.28;
 const HAND_TIP_Y = 0.2;
-const SPOTLIGHT_RING_SLOTS = [0, 1, 2, 3] as const;
 
 export type MergeFtueVisualTheme = {
   dimColor: string;
@@ -63,18 +62,7 @@ type OverlayLayout = {
   spotlightRadius: number;
 };
 
-export function MergeFtueOverlay({
-  blockedPulseNonce,
-  boardMetrics,
-  cue,
-  layoutNonce,
-  screenRef,
-  railTargetRefs,
-  spotlight,
-  state,
-  targetRevision,
-  visualTheme,
-}: {
+type MergeFtueOverlayProps = {
   blockedPulseNonce: number;
   boardMetrics: MergeBoardScreenMetrics | null;
   cue: FtueCueDefinition | null;
@@ -85,7 +73,20 @@ export function MergeFtueOverlay({
   state: MergeWorldState;
   targetRevision: number;
   visualTheme?: Partial<MergeFtueVisualTheme>;
-}) {
+};
+
+export const MergeFtueOverlay = memo(function MergeFtueOverlay({
+  blockedPulseNonce,
+  boardMetrics,
+  cue,
+  layoutNonce,
+  screenRef,
+  railTargetRefs,
+  spotlight,
+  state,
+  targetRevision,
+  visualTheme,
+}: MergeFtueOverlayProps) {
   const [layout, setLayout] = useState<OverlayLayout | null>(null);
   const stateRef = useRef(state);
   const measurementGenerationRef = useRef(0);
@@ -207,7 +208,7 @@ export function MergeFtueOverlay({
       />
     </View>
   );
-}
+}, mergeFtueOverlayPropsEqual);
 
 function FtueSpotlight({ frames, opacity, radius, screen, theme }: {
   frames: Frame[];
@@ -222,7 +223,6 @@ function FtueSpotlight({ frames, opacity, radius, screen, theme }: {
   const slot1 = useAnimatedSpotlightSlot(frames[1] ?? null, radius, theme.spotlightTransitionDurationMs, reduceMotion);
   const slot2 = useAnimatedSpotlightSlot(frames[2] ?? null, radius, theme.spotlightTransitionDurationMs, reduceMotion);
   const slot3 = useAnimatedSpotlightSlot(frames[3] ?? null, radius, theme.spotlightTransitionDurationMs, reduceMotion);
-  const slots = [slot0, slot1, slot2, slot3] as const;
 
   useEffect(() => {
     dimOpacity.value = reduceMotion
@@ -260,29 +260,62 @@ function FtueSpotlight({ frames, opacity, radius, screen, theme }: {
     mask.setFillType(FillType.EvenOdd);
   });
 
+  const ringPath = usePathValue((ring) => {
+    'worklet';
+    const appendSlot = (
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+      corner: number,
+    ) => {
+      'worklet';
+      if (width <= 0.5 || height <= 0.5) return;
+      ring.addRRect({
+        rect: { x, y, width, height },
+        rx: Math.min(corner, height / 2, width / 2),
+        ry: Math.min(corner, height / 2, width / 2),
+      });
+    };
+
+    appendSlot(slot0.x.value, slot0.y.value, slot0.width.value, slot0.height.value, slot0.corner.value);
+    appendSlot(slot1.x.value, slot1.y.value, slot1.width.value, slot1.height.value, slot1.corner.value);
+    appendSlot(slot2.x.value, slot2.y.value, slot2.width.value, slot2.height.value, slot2.corner.value);
+    appendSlot(slot3.x.value, slot3.y.value, slot3.width.value, slot3.height.value, slot3.corner.value);
+  });
+
   return (
-    <View style={StyleSheet.absoluteFill}>
-      <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}>
-        <Path color={`rgb(${theme.dimColor})`} opacity={dimOpacity} path={path} />
-      </Canvas>
-      {SPOTLIGHT_RING_SLOTS.map((index) => {
-        const slot = slots[index];
-        return (
-          <Animated.View
-            key={`spotlight-ring-${index}`}
-            style={[
-              styles.focusRing,
-              {
-                borderColor: theme.focusRingColor,
-                shadowColor: theme.focusRingShadowColor,
-              },
-              slot.ringStyle,
-            ]}
-          />
-        );
-      })}
-    </View>
+    <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Path color={`rgb(${theme.dimColor})`} opacity={dimOpacity} path={path} />
+      <Path color={theme.focusRingShadowColor} path={ringPath} style="stroke" strokeWidth={5}>
+        <BlurMask blur={6} style="solid" />
+      </Path>
+      <Path color={theme.focusRingColor} path={ringPath} style="stroke" strokeWidth={2} />
+    </Canvas>
   );
+}
+
+function mergeFtueOverlayPropsEqual(previous: MergeFtueOverlayProps, next: MergeFtueOverlayProps) {
+  if (
+    previous.blockedPulseNonce !== next.blockedPulseNonce
+    || previous.boardMetrics !== next.boardMetrics
+    || previous.cue !== next.cue
+    || previous.layoutNonce !== next.layoutNonce
+    || previous.railTargetRefs !== next.railTargetRefs
+    || previous.screenRef !== next.screenRef
+    || previous.spotlight !== next.spotlight
+    || previous.targetRevision !== next.targetRevision
+    || previous.visualTheme !== next.visualTheme
+  ) return false;
+  return ftueResolvedBoardTargetKey(previous) === ftueResolvedBoardTargetKey(next);
+}
+
+function ftueResolvedBoardTargetKey({ cue, spotlight, state }: MergeFtueOverlayProps) {
+  const targets: FtueTarget[] = [];
+  if (cue?.kind === 'drag') targets.push(cue.from, cue.to);
+  else if (cue) targets.push(cue.target);
+  if (spotlight) targets.push(...spotlight.targets);
+  return targets.map((target) => `${JSON.stringify(target)}:${resolveFtueBoardCell(state, target) ?? 'none'}`).join('|');
 }
 
 function useAnimatedSpotlightSlot(
@@ -296,7 +329,6 @@ function useAnimatedSpotlightSlot(
   const width = useSharedValue(frame?.width ?? 0);
   const height = useSharedValue(frame?.height ?? 0);
   const corner = useSharedValue(frame ? Math.min(radius, frame.height / 2, frame.width / 2) : 0);
-  const visibility = useSharedValue(frame ? 1 : 0);
   const previousFrameRef = useRef<Frame | null>(frame);
 
   useEffect(() => {
@@ -316,7 +348,6 @@ function useAnimatedSpotlightSlot(
         height.value = reduceMotion ? 0 : withTiming(0, timing);
         corner.value = reduceMotion ? 0 : withTiming(0, timing);
       }
-      visibility.value = reduceMotion ? 0 : withTiming(0, { duration: Math.min(180, durationMs) });
       previousFrameRef.current = null;
       return;
     }
@@ -335,7 +366,6 @@ function useAnimatedSpotlightSlot(
       height.value = withTiming(frame.height, timing);
       corner.value = withTiming(nextCorner, timing);
     }
-    visibility.value = reduceMotion ? 1 : withTiming(1, { duration: Math.min(180, durationMs) });
     previousFrameRef.current = frame;
   }, [
     corner,
@@ -344,22 +374,12 @@ function useAnimatedSpotlightSlot(
     height,
     radius,
     reduceMotion,
-    visibility,
     width,
     x,
     y,
   ]);
 
-  const ringStyle = useAnimatedStyle(() => ({
-    borderRadius: corner.value,
-    height: height.value,
-    left: x.value,
-    opacity: visibility.value,
-    top: y.value,
-    width: width.value,
-  }));
-
-  return { corner, height, ringStyle, width, x, y };
+  return { corner, height, width, x, y };
 }
 
 function FtueFingerCue({ blockedPulseNonce, cue, points, resetKey, theme }: {
@@ -505,13 +525,6 @@ function measureView(view: View | null): Promise<Frame | null> {
 
 const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, zIndex: 250 },
-  focusRing: {
-    borderWidth: 2,
-    position: 'absolute',
-    shadowOffset: { height: 0, width: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 7,
-  },
   hand: { position: 'absolute' },
   handArt: { height: '100%', width: '100%' },
 });

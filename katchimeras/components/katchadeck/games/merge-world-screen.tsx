@@ -18,7 +18,7 @@ import {
 } from '@/constants/merge-world-catalog';
 import { mergeWorldGeneratorArt } from '@/constants/merge-world-art';
 import { Lantern } from '@/constants/theme';
-import { useMergeWorld } from '@/features/merge-world/merge-world-provider';
+import { useMergeWorldActions, useMergeWorldLastResult, useMergeWorldState } from '@/features/merge-world/merge-world-provider';
 import { commitFtueAction, dispatchFtueEvent, registerFtueObjectiveBaseline, repairFtueStep, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { MOSSPROUT_FTUE_RETURN_NOTE_ID, mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
@@ -52,12 +52,12 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const { focusOrderId } = useLocalSearchParams<{ focusOrderId?: string }>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { state, loading, error, lastResult, dispatch: send } = useMergeWorld();
+  const { state, loading, error } = useMergeWorldState();
+  const { dispatch: send } = useMergeWorldActions();
   const ftueRun = useFtueRun();
   const ftueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
   const [selectedCell, setSelectedCell] = useState<number | null>(null);
   const [boardAreaHeight, setBoardAreaHeight] = useState(0);
-  const feedback = useGameFeedback();
   const wallet = useGameWallet();
   const [story, setStory] = useState(loadFeastleStory);
   const [mossproutStory, setMossproutStory] = useState(loadMossproutStory);
@@ -215,13 +215,6 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     ftuePreviewNavigationPendingRef.current = true;
     router.push({ pathname: '/katchimera/[creatureId]', params: { creatureId: 'companion:mossprout' } });
   }, [active, ftueRun?.status, ftueRun?.stepId, router]);
-
-  useEffect(() => {
-    if (!lastResult) return;
-    if (lastResult.failureReason) return;
-    const message = lastResult.spawnedCell != null ? null : lastResult.message ?? null;
-    if (message) feedback.show({ id: `merge:${lastResult.state.revision}:${message}`, message });
-  }, [feedback, lastResult]);
 
   useEffect(() => {
     if (!active || !state || !ftueStep || !ftueRun) return;
@@ -569,6 +562,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     : null;
   return (
     <View onLayout={() => setScreenLayoutNonce((nonce) => nonce + 1)} ref={screenRef} style={styles.screen}>
+      <MergeCommandFeedback />
       <View style={[styles.game, { paddingTop: Math.max(insets.top + 3, 7), paddingBottom: Math.max(insets.bottom + 3, 7), width: contentWidth }]}>
         <GameHudBar
           content={<GameCurrencyHud balances={[
@@ -663,6 +657,17 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       /> : null}
     </View>
   );
+}
+
+function MergeCommandFeedback() {
+  const lastResult = useMergeWorldLastResult();
+  const feedback = useGameFeedback();
+  useEffect(() => {
+    if (!lastResult || lastResult.failureReason) return;
+    const message = lastResult.spawnedCell != null ? null : lastResult.message ?? null;
+    if (message) feedback.show({ id: `merge:${lastResult.state.revision}:${message}`, message });
+  }, [feedback, lastResult]);
+  return null;
 }
 
 function ServiceCounter({ viewportWidth }: { viewportWidth: number }) {
