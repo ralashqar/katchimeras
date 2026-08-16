@@ -105,16 +105,22 @@ test('hero-resolution avatar art has a distinct high-resolution source', () => {
     'utf8',
   );
   assert.match(generatedAssets, /fullSource: require\('\.\.\/assets\/images\/katchimeras\/egg-avatars\/bases\/classic\.webp'\),/);
-  assert.match(generatedAssets, /highSource: require\('\.\.\/assets\/images\/katchimeras\/egg-avatars\/bases\/classic\.png'\),/);
-  assert.match(generatedAssets, /highSource: require\('\.\.\/assets\/images\/katchimeras\/egg-avatars\/faces\/classic-smile\.png'\),/);
+  assert.match(generatedAssets, /highSource: require\('\.\.\/assets\/images\/katchimeras\/egg-avatars\/bases\/high\/classic\.webp'\),/);
+  assert.match(generatedAssets, /highSource: require\('\.\.\/assets\/images\/katchimeras\/egg-avatars\/faces\/high\/classic-smile\.webp'\),/);
+  assert.doesNotMatch(generatedAssets, /require\([^\n]+\.png'\)/, 'runtime avatar registry must not import source PNGs');
 
   for (const category of ['body', 'face', 'hat', 'held'] as const) {
     for (const item of availableEggAvatarItems(category)) {
-      const highPath = path.join(root, item.assetRefs!.high);
-      const png = readFileSync(highPath);
-      assert.equal(png.subarray(1, 4).toString('ascii'), 'PNG', `${item.id} high source must be PNG`);
-      assert.ok(png.readUInt32BE(16) >= 2048, `${item.id} high source width`);
-      assert.ok(png.readUInt32BE(20) >= 2048, `${item.id} high source height`);
+      const sourcePath = path.join(root, item.assetRefs!.high);
+      const sourcePng = readFileSync(sourcePath);
+      assert.equal(sourcePng.subarray(1, 4).toString('ascii'), 'PNG', `${item.id} source master must be PNG`);
+      assert.ok(sourcePng.readUInt32BE(16) >= 2048, `${item.id} source master width`);
+      assert.ok(sourcePng.readUInt32BE(20) >= 2048, `${item.id} source master height`);
+
+      const runtimeHighPath = sourcePath.replace(/([\\/])([^\\/]+)\.png$/, '$1high$1$2.webp');
+      const runtimeWebp = readFileSync(runtimeHighPath);
+      assert.equal(runtimeWebp.subarray(0, 4).toString('ascii'), 'RIFF', `${item.id} runtime high RIFF header`);
+      assert.equal(runtimeWebp.subarray(8, 12).toString('ascii'), 'WEBP', `${item.id} runtime high WebP header`);
     }
   }
 });

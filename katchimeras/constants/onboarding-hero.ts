@@ -4,11 +4,11 @@ export const heroOrbitAssets = {
   hoodedKatcher: require('../assets/images/onboarding-hero/hooded-katcher.webp'),
   mossprout: require('../assets/images/onboarding-hero/mossprout.webp'),
   lattelet: require('../assets/images/onboarding-hero/lattelet.webp'),
-  sprintail: require('../assets/images/onboarding-hero/sprintail.png'),
-  neonpoko: require('../assets/images/onboarding-hero/neonpoko.png'),
+  sprintail: require('../assets/images/katchimeras/cutouts_lod/sprintail_256.webp'),
+  neonpoko: require('../assets/images/katchimeras/cutouts_lod/neonpoko_256.webp'),
   crumbun: require('../assets/images/onboarding-hero/crumbun.webp'),
   hayhorn: require('../assets/images/onboarding-hero/hayhorn.webp'),
-  ironette: require('../assets/images/onboarding-hero/ironette.png'),
+  ironette: require('../assets/images/katchimeras/cutouts_lod/ironette_256.webp'),
 } as const satisfies Record<string, ImageSourcePropType>;
 
 export type HeroOrbitAssetKey = keyof typeof heroOrbitAssets;

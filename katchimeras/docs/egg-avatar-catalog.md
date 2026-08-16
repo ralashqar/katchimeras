@@ -36,6 +36,8 @@ This validates the JSON and writes two files: `constants/egg-avatar-catalog.gene
 
 `constants/egg-avatar-catalog.ts` exposes the full roadmap, ready-only lists, item lookup, and access resolution. The existing `egg-avatar-skins`, `egg-avatar-faces`, `egg-avatar-hats`, and `egg-avatar-held-accessories` modules are thin runtime adapters, so existing renderers consume the new data without changing their public APIs.
 
+The catalogue's `assetRefs.high` path is the 2048px PNG source master used by art tooling only. Runtime high-resolution surfaces use a generated 1536px WebP in the adjacent `high/` directory. The generated Expo registry may import `app`, `high`, and `thumbnail` WebPs, but it must never import the PNG master.
+
 ## Adding a planned design
 
 1. Add the metadata entry to the appropriate JSON file with a globally unique permanent ID.
@@ -48,9 +50,10 @@ The entry is now documented and typed, but cannot appear in the game.
 ## Promoting art to production
 
 1. Generate and approve the art using the relevant egg-avatar art pipeline and review gates.
-2. Place the high-resolution PNG, app WebP, and thumbnail WebP at stable paths below `assets/images/katchimeras/egg-avatars/`.
+2. Place the high-resolution PNG source master, app WebP, and thumbnail WebP at stable paths below `assets/images/katchimeras/egg-avatars/`.
 3. Fill all three `assetRefs`, set `availability` to `ready`, and increment `version` when replacing existing art.
-4. Add a body accent when promoting a body. Record a restrained `presentation` override only when compositing review proves it is needed.
-5. Run the generator, avatar tests, art validation, typecheck, lint, and an Expo export.
+4. Run `npm run avatar:runtime-assets:generate` to rebuild the optimized runtime WebPs, including the 1536px hero derivative.
+5. Add a body accent when promoting a body. Record a restrained `presentation` override only when compositing review proves it is needed.
+6. Run the catalog generator, avatar tests, art validation, typecheck, lint, and an Expo export.
 
 The catalog validator deliberately rejects missing files, planned entries with art references, ready entries without art, duplicate IDs, inconsistent access pricing, and stale generated output. Availability and ownership are separate: generated art may be `ready` while its `free`, `premium`, or `essence` access metadata determines the intended unlock rule.

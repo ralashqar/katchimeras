@@ -15,6 +15,8 @@ Katchimeras uses `@sentry/react-native` for native iOS/Android crashes and JavaS
 
 EAS Build uploads native symbols through the Sentry config plugin. The repository's `update:*` scripts upload the generated EAS Update source maps after publishing.
 
+Development and preview builds set `SENTRY_DISABLE_AUTO_UPLOAD=true` in `eas.json` so missing Sentry credentials never block internal testing. Production keeps automatic uploads strict and requires the organization, project, and auth-token values above.
+
 ## Merge FTUE diagnostics
 
 Merge FTUE reports only operational identifiers: focus-session ID, mount ordinal, FTUE step, coordinator phase, board revision, command ID, operation ID, and interaction-gate acknowledgement. Journal content and other personal data are never attached.

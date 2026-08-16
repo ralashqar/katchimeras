@@ -57,7 +57,6 @@ __pycache__/
 /katchimeras/docs/
 /katchimeras/tests/
 /katchimeras/tools/
-/katchimeras/storage/
 
 # BEGIN GENERATED UNUSED ASSETS
 # Generated from the union of iOS/Android Metro assets plus native config assets.
@@ -70,8 +69,6 @@ __pycache__/
 /katchimeras/assets/images/katchimeras/bedrotte.png
 /katchimeras/assets/images/katchimeras/cards/daily-card-frame-black.png
 /katchimeras/assets/images/katchimeras/cards/daily-card-frame-compact-black.png
-/katchimeras/assets/images/katchimeras/cutouts_lod/pulsepounce_256.webp
-/katchimeras/assets/images/katchimeras/cutouts_lod/pulsepounce_512.webp
 /katchimeras/assets/images/katchimeras/cutouts/_egg_backup/egg-base.png
 /katchimeras/assets/images/katchimeras/cutouts/_egg_backup/egg-crack-1.png
 /katchimeras/assets/images/katchimeras/cutouts/_egg_backup/egg-crack-2.png
@@ -421,7 +418,6 @@ __pycache__/
 /katchimeras/assets/images/katchimeras/environments/feastle_hearth/props/dessert_case_l3.png
 /katchimeras/assets/images/katchimeras/environments/feastle_hearth/props/dessert_case_l3.webp
 /katchimeras/assets/images/katchimeras/environments/feastle_hearth/props/feast_table_l1.png
-/katchimeras/assets/images/katchimeras/environments/feastle_hearth/props/feast_table_l1.webp
 /katchimeras/assets/images/katchimeras/environments/feastle_hearth/props/feast_table_l2.png
 /katchimeras/assets/images/katchimeras/environments/feastle_hearth/props/feast_table_l2.webp
 /katchimeras/assets/images/katchimeras/environments/feastle_hearth/props/feast_table_l3.png
@@ -793,6 +789,11 @@ __pycache__/
 /katchimeras/assets/images/katchimeras/gatherglow.png
 /katchimeras/assets/images/katchimeras/hatchlings/base-hatchling.png
 /katchimeras/assets/images/katchimeras/hatchlings/pagelet-hatchling-v1.png
+/katchimeras/assets/images/katchimeras/merge-world/generators/feastle-picnic-pantry.webp
+/katchimeras/assets/images/katchimeras/merge-world/generators/shellio-waterside-pail.webp
+/katchimeras/assets/images/katchimeras/merge-world/generators/steppling-trail-satchel.webp
+/katchimeras/assets/images/katchimeras/merge-world/generators/voyagle-travel-trunk.webp
+/katchimeras/assets/images/katchimeras/merge-world/ui/merge-level.webp
 /katchimeras/assets/images/katchimeras/quests/feastle-merge/berries.png
 /katchimeras/assets/images/katchimeras/quests/feastle-merge/berry-tart.png
 /katchimeras/assets/images/katchimeras/quests/feastle-merge/broth.png
@@ -939,6 +940,7 @@ __pycache__/
 /katchimeras/assets/images/katchimeras/world/backgrounds/feastle-exploration-v2.png
 /katchimeras/assets/images/katchimeras/world/backgrounds/feastle-exploration-v3.png
 /katchimeras/assets/images/katchimeras/world/backgrounds/feastle-exploration-v4.png
+/katchimeras/assets/images/katchimeras/world/backgrounds/feastle-exploration-v5.png
 /katchimeras/assets/images/katchimeras/world/backgrounds/relicoon-exploration-v1.png
 /katchimeras/assets/images/katchimeras/world/backgrounds/relicoon-exploration-v2.png
 /katchimeras/assets/images/katchimeras/world/backgrounds/steppling-exploration-v1.png

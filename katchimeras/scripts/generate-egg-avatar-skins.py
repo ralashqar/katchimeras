@@ -44,6 +44,9 @@ BODY_CATALOG_PATH = ROOT / "data" / "egg-avatar" / "bodies.json"
 FACE_CATALOG_PATH = ROOT / "data" / "egg-avatar" / "faces.json"
 HAT_CATALOG_PATH = ROOT / "data" / "egg-avatar" / "hats.json"
 HELD_CATALOG_PATH = ROOT / "data" / "egg-avatar" / "held.json"
+AVATAR_APP_SIZE = 512
+AVATAR_HIGH_SIZE = 1536
+AVATAR_THUMBNAIL_SIZE = 256
 CURRENT_EGG = ROOT / "assets" / "images" / "katchimeras" / "cutouts" / "egg-base.png"
 BARISTABBIT = ROOT / "assets" / "images" / "katchimeras" / "cutouts" / "baristabbit.png"
 CLASSIC_APPROVED = OUTPUT_DIR / "classic.png"
@@ -2311,16 +2314,36 @@ def matte_layered_sources(source_dir: Path) -> None:
 def save_layer_asset(image: Image.Image, directory: Path, thumbnails: Path, asset_id: str) -> dict[str, Any]:
     directory.mkdir(parents=True, exist_ok=True)
     thumbnails.mkdir(parents=True, exist_ok=True)
+    high_directory = directory / "high"
+    high_directory.mkdir(parents=True, exist_ok=True)
     png_path = directory / f"{asset_id}.png"
+    high_path = high_directory / f"{asset_id}.webp"
     webp_path = directory / f"{asset_id}.webp"
     thumb_path = thumbnails / f"{asset_id}.webp"
     image.save(png_path, optimize=True)
-    image.resize((1024, 1024), Image.Resampling.LANCZOS).save(webp_path, format="WEBP", quality=92, method=6)
-    image.resize((256, 256), Image.Resampling.LANCZOS).save(thumb_path, format="WEBP", quality=88, method=6)
+    image.resize((AVATAR_HIGH_SIZE, AVATAR_HIGH_SIZE), Image.Resampling.LANCZOS).save(
+        high_path,
+        format="WEBP",
+        quality=92,
+        method=6,
+    )
+    image.resize((AVATAR_APP_SIZE, AVATAR_APP_SIZE), Image.Resampling.LANCZOS).save(
+        webp_path,
+        format="WEBP",
+        quality=88,
+        method=6,
+    )
+    image.resize((AVATAR_THUMBNAIL_SIZE, AVATAR_THUMBNAIL_SIZE), Image.Resampling.LANCZOS).save(
+        thumb_path,
+        format="WEBP",
+        quality=88,
+        method=6,
+    )
     return {
         "png": {"path": str(png_path.relative_to(ROOT)).replace("\\", "/"), "width": 2048, "height": 2048, "sha256": sha256(png_path)},
-        "webp": {"path": str(webp_path.relative_to(ROOT)).replace("\\", "/"), "width": 1024, "height": 1024, "sha256": sha256(webp_path)},
-        "thumbnail": {"path": str(thumb_path.relative_to(ROOT)).replace("\\", "/"), "width": 256, "height": 256, "sha256": sha256(thumb_path)},
+        "highWebp": {"path": str(high_path.relative_to(ROOT)).replace("\\", "/"), "width": AVATAR_HIGH_SIZE, "height": AVATAR_HIGH_SIZE, "sha256": sha256(high_path)},
+        "webp": {"path": str(webp_path.relative_to(ROOT)).replace("\\", "/"), "width": AVATAR_APP_SIZE, "height": AVATAR_APP_SIZE, "sha256": sha256(webp_path)},
+        "thumbnail": {"path": str(thumb_path.relative_to(ROOT)).replace("\\", "/"), "width": AVATAR_THUMBNAIL_SIZE, "height": AVATAR_THUMBNAIL_SIZE, "sha256": sha256(thumb_path)},
     }
 
 

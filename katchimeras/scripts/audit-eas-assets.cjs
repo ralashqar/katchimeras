@@ -2,6 +2,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 
 const projectRoot = path.resolve(__dirname, '..');
@@ -109,6 +110,92 @@ function collectTargetAssetReferences(required, reasons) {
   }
 }
 
+function collectStaticAssetReferences(filename, required, reasons) {
+  if (!fs.existsSync(filename)) return;
+  const text = fs.readFileSync(filename, 'utf8');
+  const pattern = /require\(\s*["']([^"']+\.(?:png|jpe?g|webp|gif|svg|ttf|otf|riv))["']\s*\)/gi;
+  for (const match of text.matchAll(pattern)) {
+    const absolute = path.resolve(path.dirname(filename), match[1]);
+    const relative = projectRelative(absolute);
+    if (!relative.startsWith('../') && relative.startsWith('assets/')) {
+      if (relative.startsWith('assets/images/katchimeras/egg-avatars/') && path.extname(relative) === '.png') {
+        throw new Error(`Runtime egg-avatar registry imports source master: ${relative}`);
+      }
+      required.add(relative);
+      if (!reasons.has(relative)) reasons.set(relative, new Set());
+      reasons.get(relative).add(projectRelative(filename));
+    }
+  }
+}
+
+function collectDeduplicatedAssetAliases(required, reasons) {
+  const skippedDirectories = new Set([
+    '.expo',
+    '.git',
+    '.tmp',
+    'artifacts',
+    'assets',
+    'design',
+    'dist',
+    'docs',
+    'node_modules',
+    'output',
+    'scripts',
+    'supabase',
+    'tests',
+    'tmp',
+    'tools',
+  ]);
+  const sourceFiles = [];
+  const walkSourceFiles = (directory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const absolute = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        if (!skippedDirectories.has(entry.name)) walkSourceFiles(absolute);
+      } else if (entry.isFile() && /\.[cm]?[jt]sx?$/i.test(entry.name)) {
+        sourceFiles.push(absolute);
+      }
+    }
+  };
+  const hashFile = (filename) => crypto.createHash('sha256').update(fs.readFileSync(filename)).digest('hex');
+  const requiredHashes = new Set(
+    [...required]
+      .map((relative) => path.join(projectRoot, relative))
+      .filter((filename) => fs.existsSync(filename))
+      .map(hashFile),
+  );
+
+  walkSourceFiles(projectRoot);
+  for (const filename of sourceFiles) {
+    const text = fs.readFileSync(filename, 'utf8');
+    const pattern = /require\(\s*["']([^"']+\.(?:png|jpe?g|webp|gif|svg|ttf|otf|riv))["']\s*\)/gi;
+    for (const match of text.matchAll(pattern)) {
+      const absolute = path.resolve(path.dirname(filename), match[1]);
+      const relative = projectRelative(absolute);
+      if (
+        required.has(relative) ||
+        relative.startsWith('../') ||
+        !relative.startsWith('assets/') ||
+        !fs.existsSync(absolute) ||
+        !requiredHashes.has(hashFile(absolute))
+      ) {
+        continue;
+      }
+      required.add(relative);
+      if (!reasons.has(relative)) reasons.set(relative, new Set());
+      reasons.get(relative).add(`content alias in ${projectRelative(filename)}`);
+    }
+  }
+}
+
+function collectGeneratedAssetRegistryReferences(required, reasons) {
+  const constantsRoot = path.join(projectRoot, 'constants');
+  const generatedRegistryPattern = /\.(?:gen|generated)\.[cm]?[jt]sx?$/i;
+  for (const filename of walkFiles(constantsRoot).filter((file) => generatedRegistryPattern.test(file))) {
+    collectStaticAssetReferences(filename, required, reasons);
+  }
+}
+
 function groupFor(relative) {
   const parts = relative.split('/');
   if (parts[0] === 'assets' && parts[1] === 'images' && parts[2] === 'katchimeras') {
@@ -176,6 +263,15 @@ function main() {
   const appConfig = JSON.parse(fs.readFileSync(path.join(projectRoot, 'app.json'), 'utf8'));
   collectJsonAssetReferences(appConfig, 'app.json', required, reasons);
   collectTargetAssetReferences(required, reasons);
+  // Metro's asset map deduplicates byte-identical files. The JS resolver still
+  // needs every literal filename while creating an EAS bundle, so generated
+  // registries are also scanned directly to retain aliases such as two
+  // creatures that currently share the same LOD artwork.
+  collectGeneratedAssetRegistryReferences(required, reasons);
+  // Metro's dumped asset map also collapses byte-identical assets referenced
+  // from ordinary source modules. Preserve every literal production alias so
+  // EAS's filtered checkout can still resolve the JavaScript import path.
+  collectDeduplicatedAssetAliases(required, reasons);
 
   const missing = [...required].filter((relative) => !fs.existsSync(path.join(projectRoot, relative)));
   if (missing.length) {
