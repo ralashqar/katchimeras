@@ -198,3 +198,13 @@ test('heavy game surfaces navigate only under the shared readiness curtain', () 
   assert.match(mergeSource, /useGameSurfaceReadiness\('merge',[\s\S]*?foreground: boardMetrics != null/);
   assert.match(companionSource, /useGameSurfaceReadiness\('companion',[\s\S]*?transitionCreatureReady/);
 });
+
+test('repeat entries to You never latch the curtain to image or layout callbacks', () => {
+  const youSource = readFileSync(path.join(process.cwd(), 'app', '(tabs)', 'you.tsx'), 'utf8');
+
+  assert.match(
+    youSource,
+    /useGameSurfaceReadiness\('you', \{\s*background: true,\s*data: true,\s*foreground: true,\s*layout: true,\s*\}, focused\)/,
+  );
+  assert.doesNotMatch(youSource, /backgroundReady|layoutReady/);
+});

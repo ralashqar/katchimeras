@@ -33,8 +33,8 @@ export function deriveHomeDayRecord(
     egg,
     insightLine,
     pathOptions,
-    canAddMoments: isToday && state !== 'hatched',
-    canHatch: state === 'ready_to_hatch',
+    canAddMoments: isToday,
+    canHatch: state === 'ready_to_hatch' || state === 'sealed',
     highlight,
     dayMap,
   };

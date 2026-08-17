@@ -12,7 +12,6 @@ import type { HomeDayRecord } from '@/types/home';
 const COMIC_PHOTO_CONSENT_KEY = 'comic_photo_consent_v1';
 
 type ShareableDay = HomeDayRecord & {
-  creature: NonNullable<HomeDayRecord['creature']>;
   card: NonNullable<HomeDayRecord['card']>;
 };
 
@@ -57,10 +56,15 @@ export function useTodayShareComicController({ shareableDay }: UseTodayShareComi
   }, [shareableDay]);
 
   const generateComic = useCallback(async (day: ShareableDay) => {
+    if (!day.creature) {
+      setComicGen({ dayId: day.id, status: 'error', error: 'Comics are currently available for Katchimera memories.' });
+      return;
+    }
     setComicGen({ dayId: day.id, status: 'generating' });
     try {
-      const vision = await ensureDayVision(day);
-      const dayForComic = vision ? { ...day, vision } : day;
+      const creatureDay = day as ShareableDay & { creature: NonNullable<HomeDayRecord['creature']> };
+      const vision = await ensureDayVision(creatureDay);
+      const dayForComic = vision ? { ...creatureDay, vision } : creatureDay;
       const result = await renderDayComic(dayForComic, loadOnboardingProfile());
       if ('imageUrl' in result) {
         setComicGen({ dayId: day.id, status: 'done', imageUrl: result.imageUrl });
@@ -107,7 +111,7 @@ export function useTodayShareComicController({ shareableDay }: UseTodayShareComi
     if (comicGen?.status !== 'done' || !comicGen.imageUrl) {
       return;
     }
-    const message = `${shareableDay?.creature.name ?? 'My'} day - a Katchimeras comic.`;
+    const message = `${shareableDay?.card.creatureName ?? 'My'} day - a Katchimeras comic.`;
     try {
       let url = comicGen.imageUrl;
       if (comicShotRef.current) {

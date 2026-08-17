@@ -24,6 +24,8 @@ type TodayEnvironmentMotion = {
 };
 
 type MotionControllerOptions = {
+  allowGestureAtScriptedRest?: boolean;
+  deferScriptedChangesWhileDisabled?: boolean;
   enabled: boolean;
   frozen?: boolean;
   hoverEnabled?: boolean;
@@ -36,6 +38,8 @@ type MotionControllerOptions = {
 const MotionContext = createContext<TodayEnvironmentMotion | null>(null);
 
 export function useTodayEnvironmentMotion({
+  allowGestureAtScriptedRest = false,
+  deferScriptedChangesWhileDisabled = false,
   enabled,
   frozen = false,
   hoverEnabled = enabled,
@@ -61,6 +65,8 @@ export function useTodayEnvironmentMotion({
   const resolvedScriptedPinchScale = scriptedPinchScale == null
     ? null
     : Math.max(1, Math.min(scriptedPinchScale, resolvedMaxPinchScale));
+  const scriptedGestureLocked = resolvedScriptedPinchScale != null
+    && !(allowGestureAtScriptedRest && resolvedScriptedPinchScale === 1);
 
   useEffect(() => {
     cancelAnimation(hoverY);
@@ -99,7 +105,11 @@ export function useTodayEnvironmentMotion({
   }, [enabled, frozen, motion.resetSpring, pinchScale, resolvedScriptedPinchScale]);
 
   useEffect(() => {
-    if (frozen || resolvedScriptedPinchScale == null) return;
+    if (
+      frozen
+      || resolvedScriptedPinchScale == null
+      || (deferScriptedChangesWhileDisabled && !enabled)
+    ) return;
     cancelAnimation(pinchScale);
     pinchScale.value = reduceMotion
       ? resolvedScriptedPinchScale
@@ -108,6 +118,8 @@ export function useTodayEnvironmentMotion({
           easing: Easing.inOut(Easing.cubic),
         });
   }, [
+    deferScriptedChangesWhileDisabled,
+    enabled,
     frozen,
     pinchScale,
     reduceMotion,
@@ -117,7 +129,7 @@ export function useTodayEnvironmentMotion({
 
   const pinchGesture = useMemo(
     () => Gesture.Pinch()
-      .enabled(enabled && !frozen && resolvedScriptedPinchScale == null)
+      .enabled(enabled && !frozen && !scriptedGestureLocked)
       .onBegin(() => {
         cancelAnimation(pinchScale);
         pinchStartScale.value = pinchScale.value;
@@ -152,8 +164,8 @@ export function useTodayEnvironmentMotion({
       pinchScale,
       pinchStartScale,
       resolvedMaxPinchScale,
-      resolvedScriptedPinchScale,
       resolvedSoftLimitRange,
+      scriptedGestureLocked,
     ],
   );
 

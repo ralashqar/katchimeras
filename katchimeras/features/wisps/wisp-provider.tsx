@@ -14,6 +14,7 @@ type WispContextValue = {
   equippedWispId: WispId | null;
   isOwned: (id: WispId) => boolean;
   quantity: (id: WispId) => number;
+  resonance: (id: WispId) => number;
   sources: (id: WispId) => readonly WispGrantSource[];
   isGiftable: (id: WispId) => boolean;
   equip: (id: WispId | null) => void;
@@ -21,6 +22,8 @@ type WispContextValue = {
   progressFor: (id: WispId, days: readonly HomeDayRecord[]) => ReturnType<typeof wispProgress>;
   pendingDiscoveryId: WispId | null;
   dismissDiscovery: (id: WispId) => void;
+  pendingResonance: NonNullable<WispCollectionState['pendingResonance']> | null;
+  dismissResonance: () => void;
   grant: (id: WispId, receiptId: string, source?: WispGrantSource) => boolean;
 };
 
@@ -61,13 +64,15 @@ export function WispProvider({ children }: PropsWithChildren) {
     && ((state.inventory[id]?.giftableQuantity ?? 0) > 0 || ((state.inventory[id]?.quantity ?? 0) + serverQuantity(economy.snapshot.inventory, id)) > 1), [economy.config.flags.gifting, economy.snapshot.inventory, state.inventory]);
   const syncFromDays = useCallback((days: readonly HomeDayRecord[]) => {
     const achievementIds = new Set(Object.keys(loadCompanionAchievementState().unlocked));
-    const earned = earnedWispIds(days, { unlockedAchievementIds: achievementIds });
-    const hatchGrants = days.flatMap((day) => day.state === 'hatched'
-      ? (day.card?.featuredWisps ?? []).map((featured) => ({
+    const earned = earnedWispIds(days, { unlockedAchievementIds: achievementIds })
+      .filter((id) => wispDefinition(id).primaryAcquisition !== 'experience');
+    const hatchGrants = days.flatMap((day) => day.dailyHatch?.revealedAt
+      ? [{
           dayId: day.id,
-          id: featured.wispId,
-          receiptId: `daily-hatch:${day.id}:${featured.wispId}`,
-        }))
+          id: day.dailyHatch.primaryWispId,
+          receiptId: `daily-hatch:${day.id}:${day.dailyHatch.primaryWispId}`,
+          seenReveal: day.dailyHatch.provenance === 'legacy_conversion',
+        }]
       : []);
     setState((current) => {
       const baselining = current.baselinedCatalogVersion === 0;
@@ -76,6 +81,8 @@ export function WispProvider({ children }: PropsWithChildren) {
       const unlocked = { ...current.unlocked };
       const inventory = { ...current.inventory };
       const applied = new Set(current.appliedGrantReceiptIds ?? []);
+      const resonanceCounts = { ...(current.resonanceCounts ?? {}) };
+      let pendingResonance = current.pendingResonance ?? null;
       for (const id of earned) {
         if (inventory[id]?.quantity) continue;
         unlocked[id] = { wispId: id, unlockedAt: now, sourceDayId, seenReveal: baselining };
@@ -90,7 +97,7 @@ export function WispProvider({ children }: PropsWithChildren) {
           wispId: grant.id,
           unlockedAt: now,
           sourceDayId: grant.dayId,
-          seenReveal: baselining,
+          seenReveal: baselining || grant.seenReveal,
         };
         inventory[grant.id] = {
           wispId: grant.id,
@@ -99,6 +106,11 @@ export function WispProvider({ children }: PropsWithChildren) {
           firstGrantedAt: existing?.firstGrantedAt ?? now,
           giftableQuantity: Math.max(existing?.giftableQuantity ?? 0, quantity - 1),
         };
+        const previousCount = resonanceCounts[grant.id] ?? 0;
+        resonanceCounts[grant.id] = previousCount + 1;
+        if (!grant.seenReveal && previousCount > 0) {
+          pendingResonance = { wispId: grant.id, previousCount, nextCount: previousCount + 1 };
+        }
       }
       const unchanged = Object.keys(inventory).length === Object.keys(current.inventory).length
         && applied.size === (current.appliedGrantReceiptIds ?? []).length
@@ -109,6 +121,8 @@ export function WispProvider({ children }: PropsWithChildren) {
         inventory,
         baselinedCatalogVersion: WISP_CATALOG_VERSION,
         appliedGrantReceiptIds: [...applied],
+        resonanceCounts,
+        pendingResonance,
       });
     });
     // Discovery presentation is read from the persisted pending record. The
@@ -119,12 +133,18 @@ export function WispProvider({ children }: PropsWithChildren) {
   const progressFor = useCallback((id: WispId, days: readonly HomeDayRecord[]) => wispProgress(id, days, {
     unlockedAchievementIds: new Set(Object.keys(loadCompanionAchievementState().unlocked)),
   }), []);
+  const resonance = useCallback((id: WispId) => state.resonanceCounts?.[id] ?? 0, [state.resonanceCounts]);
   const pendingDiscoveryId = (Object.values(state.unlocked).find((record) => record && !record.seenReveal)?.wispId ?? null) as WispId | null;
   const dismissDiscovery = useCallback((id: WispId) => {
     setState((current) => {
       const record = current.unlocked[id];
       return record ? saveWispState({ ...current, unlocked: { ...current.unlocked, [id]: { ...record, seenReveal: true } } }) : current;
     });
+  }, []);
+  const dismissResonance = useCallback(() => {
+    setState((current) => current.pendingResonance
+      ? saveWispState({ ...current, pendingResonance: null })
+      : current);
   }, []);
   const grant = useCallback((id: WispId, receiptId: string, source: WispGrantSource = 'game') => {
     if (!receiptId) return false;
@@ -156,7 +176,7 @@ export function WispProvider({ children }: PropsWithChildren) {
     });
     return granted;
   }, []);
-  const value = useMemo<WispContextValue>(() => ({ state, equippedWispId, isOwned, quantity, sources, isGiftable, equip, syncFromDays, progressFor, pendingDiscoveryId, dismissDiscovery, grant }), [dismissDiscovery, equip, equippedWispId, grant, isGiftable, isOwned, pendingDiscoveryId, progressFor, quantity, sources, state, syncFromDays]);
+  const value = useMemo<WispContextValue>(() => ({ state, equippedWispId, isOwned, quantity, resonance, sources, isGiftable, equip, syncFromDays, progressFor, pendingDiscoveryId, dismissDiscovery, pendingResonance: state.pendingResonance ?? null, dismissResonance, grant }), [dismissDiscovery, dismissResonance, equip, equippedWispId, grant, isGiftable, isOwned, pendingDiscoveryId, progressFor, quantity, resonance, sources, state, syncFromDays]);
   return <WispContext value={value}>{children}</WispContext>;
 }
 

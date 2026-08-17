@@ -9,6 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { TodayExplorationBackground } from '@/components/katchadeck/home/today-exploration-background';
+import { useScenes } from '@/features/scenes/scene-provider';
 import { HOME_SCENE_Y_OFFSET } from '@/constants/home-loop-layout';
 import { todayHatchCreature, type TodayHatchPhase, type TodayHatchPresentation } from '@/utils/today-hatch-presentation';
 import { todayKatchimeraExplorationBackgroundKeyForPresentation } from '@/utils/today-exploration-backgrounds';
@@ -23,6 +24,7 @@ export function TodayHatchEnvironmentCrossfade({
   presentation: TodayHatchPresentation;
 }) {
   const reduceMotion = useReducedMotion();
+  const { equippedSceneId } = useScenes();
   const progress = useSharedValue(0);
   const creature = todayHatchCreature(presentation);
   const destinationKey = todayKatchimeraExplorationBackgroundKeyForPresentation({
@@ -47,7 +49,7 @@ export function TodayHatchEnvironmentCrossfade({
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <Animated.View style={[StyleSheet.absoluteFill, homeStyle]}>
         <TodayExplorationBackground
-          backgroundKey="home"
+          backgroundKey={equippedSceneId}
           imageSize={imageSize}
           verticalOffset={HOME_SCENE_Y_OFFSET}
         />

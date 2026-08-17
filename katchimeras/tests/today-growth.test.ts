@@ -18,6 +18,7 @@ import { journalFlowCompletesTodayCareAction, rankTodayCareActions } from '../ut
 import { buildTodayPhotoRollSuggestion } from '../utils/today-photo-roll-suggestion';
 import { splitEnergyAcrossTokens } from '../utils/energy-payout';
 import { resolveDayLifecycleState } from '../utils/day-state';
+import { regularTodayCameraPinchTarget } from '../features/today/regular-today-camera';
 import {
   cancelTodayCareGameRound,
   completeTodayCareGameRound,
@@ -49,6 +50,17 @@ function day(overrides: Partial<StoredHomeDayRecord> = {}): StoredHomeDayRecord 
     ...overrides,
   };
 }
+
+test('the first three normal Today actions retreat the camera in equal logarithmic steps', () => {
+  const maximum = 2;
+  const targets = [0, 1, 2, 3, 4].map((count) => regularTodayCameraPinchTarget(count, maximum));
+
+  assert.equal(targets[0], maximum);
+  assert.ok(Math.abs(targets[0] / targets[1] - targets[1] / targets[2]) < 1e-9);
+  assert.ok(Math.abs(targets[1] / targets[2] - targets[2] / targets[3]) < 1e-9);
+  assert.equal(targets[3], 1);
+  assert.equal(targets[4], 1);
+});
 
 test('hatch readiness follows the exact chosen ritual time', () => {
   assert.equal(resolveDayLifecycleState({

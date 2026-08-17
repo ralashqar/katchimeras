@@ -222,9 +222,14 @@ export function upgradeDailyCreatureCard(
 export function updateCardMemorySpark(
   card: DailyCreatureCard,
   day: StoredHomeDayRecord,
-  creature: LocalCreatureRecord
+  creature?: LocalCreatureRecord | null
 ): DailyCreatureCard {
-  return { ...card, memorySpark: resolveMemorySpark(day, creature) };
+  const narrator = creature ?? {
+    highlight: card.dayLine ?? card.storyLine ?? card.memorySpark?.caption ?? '',
+    reflection: card.dayLine ?? card.storyLine ?? '',
+    highlightMomentId: null,
+  };
+  return { ...card, memorySpark: resolveMemorySpark(day, narrator) };
 }
 
 function resolveCardState(day: StoredHomeDayRecord, mood: string, energy: number): CardState {
@@ -448,7 +453,10 @@ function resolveEpithet(traits: CardTrait[], creature: LocalCreatureRecord): str
   return fallback[creature.primaryTrait];
 }
 
-function resolveMemorySpark(day: StoredHomeDayRecord, creature: LocalCreatureRecord): CardMemorySpark | null {
+function resolveMemorySpark(
+  day: StoredHomeDayRecord,
+  creature: Pick<LocalCreatureRecord, 'highlight' | 'reflection' | 'highlightMomentId'>,
+): CardMemorySpark | null {
   const selectedPhoto = resolveDayPhoto(day);
   if (day.featuredMemory) {
     return {

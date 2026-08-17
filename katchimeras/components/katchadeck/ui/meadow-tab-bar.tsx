@@ -25,6 +25,7 @@ const TRANSITION_SURFACES: Partial<Record<string, GameSurfaceId>> = {
   games: 'merge',
   katchimeras: 'katchimeras',
   today: 'today',
+  you: 'you',
 };
 
 export function MeadowTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
@@ -32,6 +33,7 @@ export function MeadowTabBar({ state, descriptors, navigation }: BottomTabBarPro
   const { equippedFaceId, equippedSkinId } = useEggAvatar();
   const { active: transitionActive, transitionTo } = useGameScreenTransition();
   const youFocused = state.routes[state.index]?.name === 'you';
+  const youRoute = state.routes.find((route) => route.name === 'you');
   const bottomPadding = Math.max(insets.bottom, HOME_TAB_BAR_MIN_BOTTOM_PADDING);
   const items = state.routes.filter((route) => {
     if (HIDDEN_ROUTES.has(route.name)) return false;
@@ -94,9 +96,17 @@ export function MeadowTabBar({ state, descriptors, navigation }: BottomTabBarPro
         accessibilityHint="Choose your egg avatar skin"
         accessibilityLabel="Profile and egg skins"
         accessibilityRole="button"
+        disabled={transitionActive}
         onPress={() => {
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          navigation.navigate('you');
+          if (!youRoute) return;
+          const event = navigation.emit({ type: 'tabPress', target: youRoute.key, canPreventDefault: true });
+          if (youFocused || event.defaultPrevented) return;
+          transitionTo({
+            announcement: 'Opening You',
+            navigate: () => navigation.navigate('you'),
+            target: 'you',
+          });
         }}
         style={({ pressed }) => [styles.item, youFocused && styles.itemActive, pressed && styles.itemPressed]}
       >

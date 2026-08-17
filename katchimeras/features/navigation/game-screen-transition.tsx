@@ -21,7 +21,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-export type GameSurfaceId = 'today' | 'merge' | 'katchimeras' | 'companion' | 'quest-game';
+export type GameSurfaceId = 'today' | 'you' | 'merge' | 'katchimeras' | 'companion' | 'quest-game';
 
 export type GameSurfaceReadiness = {
   data: boolean;

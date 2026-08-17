@@ -17,8 +17,11 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
 import { WISP_COLLECTIONS } from '@/constants/wisp-collections';
+import { SCENE_CATALOG } from '@/constants/scenes';
+import { TODAY_EXPLORATION_BACKGROUND_SOURCES } from '@/constants/today-exploration-background-sources.gen';
 import { wispDefinition } from '@/constants/wisps';
 import { useWisps } from '@/features/wisps/wisp-provider';
+import { useScenes } from '@/features/scenes/scene-provider';
 import { getCreatureVisual, hydrateHomeState } from '@/game/days';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useDiscoveries } from '@/hooks/use-discoveries';
@@ -37,7 +40,7 @@ import { wispCollectionProgress, wispEvolutionTier } from '@/utils/wisp-collecti
 import { dayState, localDateId } from '@/utils/streak-engine';
 import { streakRepository } from '@/storage/repositories/streak-repository';
 
-type CollectionView = 'cards' | 'calendar' | 'species' | 'wisps';
+type CollectionView = 'cards' | 'calendar' | 'species' | 'wisps' | 'scenes';
 type CardFilters = { year: string; species: string; rarity: string; trait: string };
 
 const collectionViewOptions = [
@@ -45,6 +48,7 @@ const collectionViewOptions = [
   { value: 'calendar', label: 'Calendar' },
   { value: 'species', label: 'Companions' },
   { value: 'wisps', label: 'Wisps' },
+  { value: 'scenes', label: 'Scenes' },
 ] as const;
 
 const EMPTY_FILTERS: CardFilters = { year: 'all', species: 'all', rarity: 'all', trait: 'all' };
@@ -68,6 +72,7 @@ export default function CollectionScreen() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const { days } = useAllDays();
   const wisps = useWisps();
+  const scenes = useScenes();
   const { unlockedCount: discoveriesUnlocked, totalCount: discoveriesTotal } = useDiscoveries();
   useStreak();
   const storedStreak = streakRepository.load();
@@ -95,7 +100,7 @@ export default function CollectionScreen() {
   }, [allKatchimerasAvailable, bondState, state]);
 
   const cards = useMemo(
-    () => days.flatMap((day) => day.card ? [{ card: day.card, dayId: day.id }] : []).sort((left, right) => right.card.isoDate.localeCompare(left.card.isoDate)),
+    () => days.flatMap((day) => day.state === 'hatched' && day.card ? [{ card: day.card, dayId: day.id }] : []).sort((left, right) => right.card.isoDate.localeCompare(left.card.isoDate)),
     [days]
   );
   const filterOptions = useMemo(() => buildFilterOptions(cards.map((entry) => entry.card)), [cards]);
@@ -122,16 +127,18 @@ export default function CollectionScreen() {
       <ScrollView contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic" showsVerticalScrollIndicator={false}>
         <Animated.View entering={presenceEnter(20)}>
           <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-            {view === 'species' ? 'The life companions you have met' : view === 'wisps' ? 'Memory motes gathered from your days' : 'Your life deck'}
+            {view === 'species' ? 'The life companions you have met' : view === 'wisps' ? 'Wisps collected from your days' : view === 'scenes' ? 'Places your days discovered' : 'Your life deck'}
           </ThemedText>
           <ThemedText type="display" style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            {view === 'cards' ? 'Your life, in cards.' : view === 'calendar' ? 'Every day became something.' : view === 'wisps' ? 'Small memories, still glowing.' : 'Every kind of day.'}
+            {view === 'cards' ? 'Your life, in cards.' : view === 'calendar' ? 'Every day became something.' : view === 'wisps' ? 'Small memories, still glowing.' : view === 'scenes' ? 'Make Today feel like yours.' : 'Every kind of day.'}
           </ThemedText>
           <ThemedText style={styles.subtitle} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
             {view === 'species' && dex
               ? `${dex.collected} of ${dex.total} met · ${completion}% complete`
               : view === 'wisps'
                 ? `${Object.values(wisps.state.inventory).filter(Boolean).length} Wisps discovered`
+                : view === 'scenes'
+                  ? `${Object.values(scenes.state.unlocked).filter(Boolean).length} Scenes discovered`
                 : `${cards.length} ${cards.length === 1 ? 'card' : 'cards'} collected`}
           </ThemedText>
         </Animated.View>
@@ -170,6 +177,11 @@ export default function CollectionScreen() {
               days={days}
               streakStateForDate={(isoDate) => dayState(storedStreak, isoDate, localDateId(new Date()))}
               onSelectDay={(dayId) => {
+                const day = days.find((candidate) => candidate.id === dayId);
+                if (day?.state === 'hatched' && day.card) {
+                  router.push({ pathname: '/card/[cardId]', params: { cardId: day.card.id } });
+                  return;
+                }
                 requestSelectedDay(dayId);
                 router.replace('/today');
               }}
@@ -196,7 +208,7 @@ export default function CollectionScreen() {
                     <Pressable key={id} accessibilityRole="button" onPress={() => router.push({ pathname: '/wisp/[wispId]', params: { wispId: id } })} style={({ pressed }) => [styles.wispCell, pressed && styles.wispCellPressed]}>
                       <WispArtwork id={id} silhouette={!quantity} size={48} thumbnail />
                       <ThemedText numberOfLines={1} style={styles.wispName} lightColor={quantity ? Lantern.moon50 : Lantern.moon500} darkColor={quantity ? Lantern.moon50 : Lantern.moon500}>{quantity ? definition.name : '???'}</ThemedText>
-                      <ThemedText style={styles.wispTier} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{quantity ? `${wispEvolutionTier(quantity)} · ×${quantity}` : 'Not found'}</ThemedText>
+                      <ThemedText style={styles.wispTier} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{quantity ? `Resonance ${wispEvolutionTier(Math.max(1, wisps.resonance(id)))} · ${wisps.resonance(id)} days` : 'Not found'}</ThemedText>
                     </Pressable>
                   );
                 })}
@@ -208,6 +220,29 @@ export default function CollectionScreen() {
             </View>
           );
         }) : null}
+
+        {view === 'scenes' ? (
+          <View style={styles.sceneGrid}>
+            {SCENE_CATALOG.map((scene) => {
+              const owned = scenes.isOwned(scene.id);
+              const equipped = scenes.equippedSceneId === scene.id;
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={!owned}
+                  key={scene.id}
+                  onPress={() => scenes.equip(scene.id)}
+                  style={({ pressed }) => [styles.sceneCell, !owned && styles.sceneLocked, pressed && { opacity: 0.82 }]}>
+                  <Image contentFit="cover" source={TODAY_EXPLORATION_BACKGROUND_SOURCES[scene.id].source} style={styles.scenePreview} transition={0} />
+                  <View style={styles.sceneCellCopy}>
+                    <ThemedText numberOfLines={1} style={styles.wispName} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{owned ? scene.name : 'Undiscovered Scene'}</ThemedText>
+                    <ThemedText style={styles.wispTier} lightColor={equipped ? Lantern.ember300 : Lantern.moon500} darkColor={equipped ? Lantern.ember300 : Lantern.moon500}>{equipped ? 'Equipped on Today' : owned ? 'Tap to equip' : 'Hatch a matching day'}</ThemedText>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
 
         {view === 'species' ? dex?.categories.map((category) => {
           const entries = dex.entries.filter((entry) => entry.category === category.category);
@@ -327,6 +362,11 @@ const styles = StyleSheet.create({
   wispCellPressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
   wispName: { fontSize: 10.5, fontWeight: '800', maxWidth: '100%' },
   wispTier: { fontSize: 8.5, fontWeight: '700', textTransform: 'capitalize' },
+  sceneGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  sceneCell: { backgroundColor: 'rgba(255,255,255,0.055)', borderColor: 'rgba(255,255,255,0.1)', borderCurve: 'continuous', borderRadius: 20, borderWidth: 1, overflow: 'hidden', width: '48%' },
+  sceneLocked: { opacity: 0.38 },
+  scenePreview: { aspectRatio: 1.28, width: '100%' },
+  sceneCellCopy: { gap: 4, padding: 10 },
   albumReward: { alignItems: 'center', borderTopColor: 'rgba(255,255,255,0.08)', borderTopWidth: 1, flexDirection: 'row', gap: 8, paddingTop: 12 },
   albumRewardText: { flex: 1, fontSize: 11.5, fontWeight: '700' },
 });

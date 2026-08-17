@@ -8,6 +8,8 @@ export const EMPTY_WISP_STATE: WispCollectionState = {
   inventory: {},
   baselinedCatalogVersion: 0,
   appliedGrantReceiptIds: [],
+  resonanceCounts: {},
+  pendingResonance: null,
 };
 
 export function normalizeWispState(value: unknown): WispCollectionState {
@@ -55,5 +57,18 @@ export function normalizeWispState(value: unknown): WispCollectionState {
     appliedGrantReceiptIds: Array.isArray(candidate.appliedGrantReceiptIds)
       ? [...new Set(candidate.appliedGrantReceiptIds.filter((id): id is string => typeof id === 'string'))]
       : [],
+    resonanceCounts: Object.fromEntries(Object.entries(candidate.resonanceCounts ?? {})
+      .filter(([id, count]) => WISPS_BY_ID.has(id as WispId) && Number.isFinite(count))
+      .map(([id, count]) => [id, Math.max(0, Math.floor(Number(count)))])),
+    pendingResonance: candidate.pendingResonance
+      && WISPS_BY_ID.has(candidate.pendingResonance.wispId)
+      && Number.isFinite(candidate.pendingResonance.previousCount)
+      && Number.isFinite(candidate.pendingResonance.nextCount)
+      ? {
+          wispId: candidate.pendingResonance.wispId,
+          previousCount: Math.max(1, Math.floor(candidate.pendingResonance.previousCount)),
+          nextCount: Math.max(2, Math.floor(candidate.pendingResonance.nextCount)),
+        }
+      : null,
   };
 }

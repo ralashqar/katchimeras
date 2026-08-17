@@ -12,6 +12,8 @@ import { QUESTION_PLANNER_VERSION, questionIdForGraphNode } from '@/utils/intell
 import { buildDailyCreatureCard, upgradeDailyCreatureCard } from '@/utils/daily-card';
 import { reconcileDaySkySnapshot } from '@/utils/day-sky';
 import { withKatchimeraIdentity } from '@/utils/katchimera-identity';
+import { finalizeDailyWispHatch } from '@/utils/daily-wisp-hatch';
+import { normalizeSceneVariantId } from '@/constants/scenes';
 import { createFallbackLocationsForStoredDay } from './locations';
 
 type LegacyStoredHomeDayRecord = Omit<
@@ -116,6 +118,7 @@ type Version16StoredHomeState = Omit<StoredHomeState, 'version'> & { version: 16
 type Version17StoredHomeState = Omit<StoredHomeState, 'version'> & { version: 17 };
 type Version18StoredHomeState = Omit<StoredHomeState, 'version'> & { version: 18 };
 type Version19StoredHomeState = Omit<StoredHomeState, 'version'> & { version: 19 };
+type Version20StoredHomeState = Omit<StoredHomeState, 'version'> & { version: 20 };
 type Version7StoredHomeState = Omit<Version8StoredHomeState, 'version' | 'personalEntities' | 'cloudIntelligenceEnabled'> & {
   version: 7;
 };
@@ -123,6 +126,7 @@ type Version6StoredHomeState = Omit<Version7StoredHomeState, 'version'> & { vers
 
 export type UpgradeableStoredHomeState =
   | StoredHomeState
+  | Version20StoredHomeState
   | Version19StoredHomeState
   | Version18StoredHomeState
   | Version17StoredHomeState
@@ -144,7 +148,7 @@ export type UpgradeableStoredHomeState =
   | LegacyStoredHomeState;
 
 export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredHomeState {
-  if ('version' in inputState && inputState.version === 20) {
+  if ('version' in inputState && inputState.version === 21) {
     return {
       ...inputState,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
@@ -153,10 +157,14 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
     };
   }
 
+  if ('version' in inputState && inputState.version === 20) {
+    return upgradeVersion20(inputState);
+  }
+
   if ('version' in inputState && inputState.version === 19) {
     return {
       ...inputState,
-      version: 20,
+      version: 21,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -166,7 +174,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 18) {
     return {
       ...inputState,
-      version: 20,
+      version: 21,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -176,7 +184,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 17) {
     return {
       ...inputState,
-      version: 20,
+      version: 21,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -186,7 +194,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 16) {
     return {
       ...inputState,
-      version: 20,
+      version: 21,
       aspectHistory: inputState.aspectHistory ?? {},
       skinHistory: inputState.skinHistory ?? {},
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
@@ -198,7 +206,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 15) {
     return {
       ...inputState,
-      version: 20,
+      version: 21,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -208,7 +216,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 14) {
     return {
       ...inputState,
-      version: 20,
+      version: 21,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -218,7 +226,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 13) {
     return {
       ...inputState,
-      version: 20,
+      version: 21,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -228,7 +236,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 12) {
     return {
       ...inputState,
-      version: 20,
+      version: 21,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -238,7 +246,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 11) {
     return {
       ...inputState,
-      version: 20,
+      version: 21,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -248,7 +256,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 10) {
     return {
       ...inputState,
-      version: 20,
+      version: 21,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -258,7 +266,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 9) {
     return {
       ...inputState,
-      version: 20,
+      version: 21,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -268,7 +276,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 8) {
     return {
       ...inputState,
-      version: 20,
+      version: 21,
       personalEntities: inputState.personalEntities ?? [],
       cloudIntelligenceEnabled: inputState.cloudIntelligenceEnabled === true,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
@@ -280,7 +288,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && (inputState.version === 7 || inputState.version === 6)) {
     return {
       ...inputState,
-      version: 20,
+      version: 21,
       encounterHistory: inputState.encounterHistory ?? {},
       personalEntities: [],
       cloudIntelligenceEnabled: false,
@@ -293,7 +301,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 5) {
     return {
       ...inputState,
-      version: 20,
+      version: 21,
       encounterHistory: inputState.encounterHistory ?? {},
       personalEntities: [],
       cloudIntelligenceEnabled: false,
@@ -305,7 +313,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 4) {
     return {
       ...inputState,
-      version: 20,
+      version: 21,
       encounterHistory: {},
       personalEntities: [],
       cloudIntelligenceEnabled: false,
@@ -316,7 +324,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
 
   if ('version' in inputState && inputState.version === 3) {
     return {
-      version: 20,
+      version: 21,
       locationPermission: inputState.locationPermission,
       activityPermission: 'unknown',
       healthPermission: inputState.healthPermission,
@@ -330,7 +338,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
 
   if ('version' in inputState && inputState.version === 2) {
     return {
-      version: 20,
+      version: 21,
       locationPermission: inputState.locationPermission,
       activityPermission: 'unknown',
       healthPermission: 'unknown',
@@ -345,7 +353,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   const legacy = inputState as LegacyStoredHomeState;
 
   return {
-    version: 20,
+    version: 21,
     locationPermission: 'unknown',
     activityPermission: 'unknown',
     healthPermission: 'unknown',
@@ -354,6 +362,16 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
     cloudIntelligenceEnabled: false,
     archivedDays: legacy.archivedDays.map(ensureStoredDayFields),
     today: ensureStoredDayFields(legacy.today),
+  };
+}
+
+function upgradeVersion20(inputState: Version20StoredHomeState): StoredHomeState {
+  return {
+    ...inputState,
+    version: 21,
+    archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
+    today: ensureStoredDayFields(inputState.today),
+    tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
   };
 }
 
@@ -429,6 +447,10 @@ function ensureStoredDayFields(
     exactRouteSegments: 'exactRouteSegments' in day ? day.exactRouteSegments ?? [] : [],
     promptAnswers: 'promptAnswers' in day && Array.isArray(day.promptAnswers) ? day.promptAnswers : [],
     heroPhoto: 'heroPhoto' in day ? day.heroPhoto ?? null : null,
+    dailyHatch: 'dailyHatch' in day && day.dailyHatch
+      ? { ...day.dailyHatch, sceneVariantId: normalizeSceneVariantId(day.dailyHatch.sceneVariantId) }
+      : null,
+    legacyEncounter: 'legacyEncounter' in day ? day.legacyEncounter ?? null : null,
     classifiedMemories,
     creature: day.creature
       ? withKatchimeraIdentity({
@@ -437,7 +459,9 @@ function ensureStoredDayFields(
           repeatDepth: day.creature.repeatDepth ?? 0,
         })
       : null,
-    card: 'card' in day ? day.card ?? null : null,
+    card: 'card' in day && day.card
+      ? { ...day.card, sceneVariantId: day.card.sceneVariantId ? normalizeSceneVariantId(day.card.sceneVariantId) : undefined }
+      : null,
   };
   if (!normalized.creature) {
     return normalized;
@@ -454,7 +478,24 @@ function ensureStoredDayFields(
           sealedAt: normalized.shareReadyAt ?? new Date(`${normalized.isoDate}T21:00:00`).toISOString(),
         }),
       };
-  return reconcileDaySkySnapshot(withCard);
+  const reconciled = reconcileDaySkySnapshot(withCard);
+  if (reconciled.dailyHatch || !reconciled.creature || reconciled.state !== 'hatched') {
+    return reconciled;
+  }
+  const converted = finalizeDailyWispHatch({
+    day: reconciled,
+    now: new Date(reconciled.shareReadyAt ?? `${reconciled.isoDate}T21:00:00`),
+    pastDays: [],
+    preferredWispId: reconciled.card?.featuredWisps?.[0]?.wispId ?? null,
+    provenance: 'legacy_conversion',
+    revealed: true,
+  });
+  return {
+    ...reconciled,
+    dailyHatch: converted.hatch,
+    legacyEncounter: reconciled.legacyEncounter ?? reconciled.creature,
+    card: converted.card,
+  };
 }
 
 function normalizeDayGrowthState(value: unknown): DayGrowthState {

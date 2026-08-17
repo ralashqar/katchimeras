@@ -12,6 +12,7 @@ import { Colors } from '@/constants/theme';
 import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 import { EggAvatarProvider } from '@/features/egg-avatar/egg-avatar-provider';
 import { WispProvider } from '@/features/wisps/wisp-provider';
+import { SceneProvider } from '@/features/scenes/scene-provider';
 import { EconomyProvider } from '@/features/economy/economy-provider';
 import { AvatarAccessReconciler } from '@/features/economy/avatar-access-reconciler';
 import { AppActivityProvider } from '@/features/performance/app-activity';
@@ -95,6 +96,7 @@ function RootLayout() {
                 <EggAvatarProvider>
                   <AvatarAccessReconciler />
                   <WispProvider>
+                    <SceneProvider>
                     <FtueProvider>
                     <AppActivityProvider>
                       <GameScreenTransitionProvider>
@@ -133,6 +135,7 @@ function RootLayout() {
                       </GameScreenTransitionProvider>
                     </AppActivityProvider>
                     </FtueProvider>
+                    </SceneProvider>
                   </WispProvider>
                 </EggAvatarProvider>
               </GameFeedbackProvider>

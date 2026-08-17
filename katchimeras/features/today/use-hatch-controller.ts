@@ -155,7 +155,7 @@ export function useHatchController({
 
       const hatchedState = triggerHatchForDay(baseState, selectedDay.id, profile, now);
       const hatchedDay = findDay(hatchedState, selectedDay.id);
-      if (!hatchedDay?.creature || hatchedDay.state !== 'hatched') {
+      if (!hatchedDay?.dailyHatch || hatchedDay.state !== 'hatched') {
         return { status: 'not_ready' };
       }
 
@@ -165,8 +165,7 @@ export function useHatchController({
       storedStateRef.current = hatchedState;
       homeRepository.save(hatchedState, { notify: false });
       setStoredState(hatchedState);
-      markArrivalPending();
-      void enhanceDayReflection(hatchedState, selectedDay.id);
+      // Standard daily hatches no longer create a Katchimera resident arrival.
       void (async () => {
         const permission = await getHatchNotificationPermission();
         if (permission === 'undetermined') {

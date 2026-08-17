@@ -834,15 +834,13 @@ export function applyCapturedMomentForToday(
 ): StoredHomeState {
   const base = readInputDay(state, target, profile, now);
   const evidenceOnly = capture.captureMode === 'evidence_only';
-  if (base.state === 'hatched' && !evidenceOnly) {
-    return state;
-  }
+  const postHatch = base.state === 'hatched';
   const applied = applyCaptureToDayRecord(
     state,
     base,
     capture,
     now,
-    evidenceOnly ? { allowHatched: true, journalOnly: true } : undefined
+    evidenceOnly || postHatch ? { allowHatched: true, journalOnly: true } : undefined
   );
   return normalizeStoredHomeState(
     { ...writeInputDay(state, target, applied.day), personalEntities: applied.personalEntities },

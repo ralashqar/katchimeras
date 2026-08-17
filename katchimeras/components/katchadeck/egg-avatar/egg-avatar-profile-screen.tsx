@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -17,20 +18,24 @@ import { EGG_AVATAR_SKINS } from '@/constants/egg-avatar-skins';
 import { homeTabBarHeight } from '@/constants/home-loop-layout';
 import { Meadow } from '@/constants/meadow-theme';
 import { READY_WISPS } from '@/constants/wisps';
+import { SCENE_CATALOG } from '@/constants/scenes';
+import { TODAY_EXPLORATION_BACKGROUND_SOURCES } from '@/constants/today-exploration-background-sources.gen';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { useWisps } from '@/features/wisps/wisp-provider';
+import { useScenes } from '@/features/scenes/scene-provider';
 import { useEconomy } from '@/features/economy/economy-provider';
 import type { HomeDayRecord } from '@/types/home';
 import type { EggAvatarFaceId, EggAvatarHatId, EggAvatarHeldAccessoryId, EggAvatarSkinId } from '@/types/egg-avatar';
 import { eggAvatarCustomizerPanelHeight } from '@/utils/egg-avatar-customizer-camera';
 
 type Category = 'body' | 'face' | 'hat' | 'held';
-type YouMode = 'egg' | 'wisps';
+type YouMode = 'egg' | 'wisps' | 'scenes';
 type WispFilter = 'all' | 'life' | 'achieve' | 'special';
 type Option = { id: string | null; name: string };
 type GridItem =
   | { key: string; kind: 'egg'; option: Option }
-  | { key: string; kind: 'wisp'; wisp: (typeof READY_WISPS)[number] };
+  | { key: string; kind: 'wisp'; wisp: (typeof READY_WISPS)[number] }
+  | { key: string; kind: 'scene'; scene: (typeof SCENE_CATALOG)[number] };
 
 const CATEGORIES: readonly { id: Category; label: string }[] = [
   { id: 'body', label: 'Body' }, { id: 'face', label: 'Face' }, { id: 'hat', label: 'Hats' }, { id: 'held', label: 'Held' },
@@ -48,12 +53,15 @@ export function EggAvatarProfileScreen({ bottomInset = 0, days }: { bottomInset?
   const { height, width } = useWindowDimensions();
   const avatar = useEggAvatar();
   const wisps = useWisps();
+  const scenes = useScenes();
   const economy = useEconomy();
   const [mode, setMode] = useState<YouMode>('egg');
   const [category, setCategory] = useState<Category>('body');
   const [wispFilter, setWispFilter] = useState<WispFilter>('all');
   const syncWispsFromDays = wisps.syncFromDays;
+  const syncScenesFromDays = scenes.syncFromDays;
   useEffect(() => { syncWispsFromDays(days); }, [days, syncWispsFromDays]);
+  useEffect(() => { syncScenesFromDays(days); }, [days, syncScenesFromDays]);
   const tabBarHeight = homeTabBarHeight(bottomInset);
   const panelHeight = eggAvatarCustomizerPanelHeight(height);
   const cellWidth = (width - PANEL_HORIZONTAL_BORDER - GRID_HORIZONTAL_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
@@ -68,7 +76,9 @@ export function EggAvatarProfileScreen({ bottomInset = 0, days }: { bottomInset?
     || (wispFilter === 'special' && !['experience', 'achievement'].includes(item.acquisition))), [wispFilter]);
   const gridItems = useMemo<readonly GridItem[]>(() => mode === 'egg'
     ? options.map((option) => ({ key: `egg:${option.id ?? 'none'}`, kind: 'egg' as const, option }))
-    : visibleWisps.map((wisp) => ({ key: `wisp:${wisp.id}`, kind: 'wisp' as const, wisp })),
+    : mode === 'wisps'
+      ? visibleWisps.map((wisp) => ({ key: `wisp:${wisp.id}`, kind: 'wisp' as const, wisp }))
+      : SCENE_CATALOG.map((scene) => ({ key: `scene:${scene.id}`, kind: 'scene' as const, scene })),
   [mode, options, visibleWisps]);
 
   const equipEgg = (id: string | null) => {
@@ -113,22 +123,22 @@ export function EggAvatarProfileScreen({ bottomInset = 0, days }: { bottomInset?
         </View>
 
         <View accessibilityRole="tablist" style={styles.modeTabs}>
-          {(['egg', 'wisps'] as const).map((item) => {
+          {(['egg', 'wisps', 'scenes'] as const).map((item) => {
             const active = mode === item;
             return <Pressable accessibilityRole="tab" accessibilityState={{ selected: active }} key={item} onPress={() => setMode(item)} style={[styles.modeTab, active && styles.modeTabActive]}>
-              <ThemedText style={[styles.modeTabLabel, active && styles.modeTabLabelActive]} lightColor={active ? Meadow.ink : '#FFF1D7'} darkColor={active ? Meadow.ink : '#FFF1D7'}>{item === 'egg' ? 'Egg' : 'Wisps'}</ThemedText>
+              <ThemedText style={[styles.modeTabLabel, active && styles.modeTabLabelActive]} lightColor={active ? Meadow.ink : '#FFF1D7'} darkColor={active ? Meadow.ink : '#FFF1D7'}>{item === 'egg' ? 'Egg' : item === 'wisps' ? 'Wisps' : 'Scenes'}</ThemedText>
             </Pressable>;
           })}
         </View>
 
-        <View accessibilityRole="tablist" style={styles.tabs}>
+        {mode !== 'scenes' ? <View accessibilityRole="tablist" style={styles.tabs}>
           {(mode === 'egg' ? CATEGORIES : WISP_FILTERS).map((item) => {
             const active = mode === 'egg' ? category === item.id : wispFilter === item.id;
             return <Pressable accessibilityRole="tab" accessibilityState={{ selected: active }} key={item.id} onPress={() => mode === 'egg' ? setCategory(item.id as Category) : setWispFilter(item.id as WispFilter)} style={[styles.tab, active && styles.tabActive]}>
               <ThemedText style={[styles.tabLabel, active && styles.tabLabelActive]} lightColor={Meadow.ink} darkColor={Meadow.ink}>{item.label}</ThemedText>
             </Pressable>;
           })}
-        </View>
+        </View> : <View style={styles.sceneHint}><ThemedText selectable style={styles.sceneHintText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Choose an unlocked cinematic environment for Today.</ThemedText></View>}
 
         {mode === 'wisps' ? <VisitorChoiceCard /> : null}
 
@@ -154,6 +164,27 @@ export function EggAvatarProfileScreen({ bottomInset = 0, days }: { bottomInset?
               </View>
               <ThemedText selectable numberOfLines={1} style={styles.itemLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>{option.name}</ThemedText>
             </Pressable>;
+            }
+            if (item.kind === 'scene') {
+              const owned = scenes.isOwned(item.scene.id);
+              const equipped = scenes.equippedSceneId === item.scene.id;
+              return <Pressable
+                accessibilityLabel={`${item.scene.name}${owned ? ', discovered' : ', undiscovered'}${equipped ? ', equipped' : ''}`}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !owned, selected: equipped }}
+                disabled={!owned}
+                onPress={() => {
+                  if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+                  scenes.equip(item.scene.id);
+                }}
+                style={({ pressed }) => [styles.item, styles.sceneItem, { width: cellWidth }, !owned && styles.itemLocked, equipped && styles.sceneEquipped, pressed && styles.itemPressed]}>
+                <View style={[styles.itemPreview, styles.scenePreview, { height: cellWidth - 12 }]}>
+                  <Image contentFit="cover" source={TODAY_EXPLORATION_BACKGROUND_SOURCES[item.scene.id].source} style={StyleSheet.absoluteFill} transition={0} />
+                  {equipped ? <View style={[styles.check, { backgroundColor: avatar.equippedSkin.accent }]}><IconSymbol color="#FFF9EC" name="checkmark" size={11} /></View> : null}
+                  {!owned ? <View style={styles.lock}><IconSymbol color="#FFF9EC" name="lock.fill" size={10} /></View> : null}
+                </View>
+                <ThemedText selectable numberOfLines={1} style={styles.itemLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>{owned ? item.scene.name : 'Undiscovered'}</ThemedText>
+              </Pressable>;
             }
             const owned = wisps.isOwned(item.wisp.id);
             const equipped = wisps.equippedWispId === item.wisp.id;
@@ -191,7 +222,7 @@ const styles = StyleSheet.create({
   plusPill: { backgroundColor: '#5C4633', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
   plusPillActive: { backgroundColor: '#667A4D' },
   plusLabel: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.7 },
-  modeTabs: { alignSelf: 'center', backgroundColor: 'rgba(70,49,30,0.9)', borderRadius: 14, flexDirection: 'row', padding: 2, width: 196 },
+  modeTabs: { alignSelf: 'center', backgroundColor: 'rgba(70,49,30,0.9)', borderRadius: 14, flexDirection: 'row', padding: 2, width: 286 },
   modeTab: { alignItems: 'center', borderRadius: 12, flex: 1, justifyContent: 'center', minHeight: 34, paddingVertical: 5 },
   modeTabActive: { backgroundColor: '#FFF1D7' },
   modeTabLabel: { fontSize: 13, fontWeight: '800', opacity: 0.78 },
@@ -201,6 +232,8 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: '#FFF5E2', boxShadow: '0 2px 8px rgba(71,45,21,0.13)' },
   tabLabel: { fontSize: 11.5, fontWeight: '800', opacity: 0.58 },
   tabLabelActive: { opacity: 1 },
+  sceneHint: { alignItems: 'center', minHeight: 36, paddingHorizontal: 18, paddingVertical: 8 },
+  sceneHintText: { fontSize: 11.5, textAlign: 'center' },
   gridScroll: { flex: 1, minHeight: 0 },
   grid: { paddingBottom: 20, paddingHorizontal: GRID_HORIZONTAL_PADDING },
   item: { backgroundColor: 'rgba(232,207,171,0.76)', borderColor: 'rgba(120,78,38,0.14)', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, gap: 3, marginBottom: GRID_GAP, overflow: 'hidden', padding: 5 },
@@ -208,6 +241,9 @@ const styles = StyleSheet.create({
   itemLocked: { opacity: 0.58 },
   lock: { alignItems: 'center', backgroundColor: 'rgba(49,36,27,0.76)', borderRadius: 999, height: 21, justifyContent: 'center', position: 'absolute', right: 4, top: 4, width: 21 },
   wispEquipped: { backgroundColor: 'rgba(255,244,218,0.96)', borderColor: 'rgba(89,123,78,0.58)', borderWidth: 2 },
+  sceneItem: { backgroundColor: 'rgba(224,199,163,0.86)' },
+  sceneEquipped: { backgroundColor: 'rgba(255,244,218,0.96)', borderColor: 'rgba(89,123,78,0.72)', borderWidth: 2 },
+  scenePreview: { backgroundColor: '#6F8063' },
   itemPreview: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 12, justifyContent: 'center', overflow: 'hidden' },
   itemLabel: { fontSize: 10.5, fontWeight: '800', paddingBottom: 3, paddingHorizontal: 2, textAlign: 'center' },
   check: { alignItems: 'center', borderColor: 'rgba(255,255,255,0.72)', borderRadius: 999, borderWidth: 1, height: 21, justifyContent: 'center', position: 'absolute', right: 4, top: 4, width: 21 },

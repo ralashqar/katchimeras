@@ -40,6 +40,7 @@ type TodayBottomDockProps = {
   onMicPressOut: () => void;
   onAdd: () => void;
   onOpenMap: () => void;
+  onOpenCard: () => void;
   onShareDay: () => void;
   onMakeComic: () => void;
   onStatPress: (key: DayStatKey) => void;
@@ -79,6 +80,7 @@ export function TodayBottomDock({
   onMicPressOut,
   onAdd,
   onOpenMap,
+  onOpenCard,
   onShareDay,
   onStatPress,
   onCategoryPress,
@@ -183,14 +185,19 @@ export function TodayBottomDock({
               cameraBadge={cameraBadge}
             />
           </View>
-        ) : isHatched && showCompanionInvitation && onOpenCompanion ? (
-          <KatchaButton
-            fullWidth
-            icon="heart.fill"
-            label={`Spend a moment with ${companionName ?? 'your Katchimera'}`}
-            onPress={onOpenCompanion}
-            variant="secondary"
-          />
+        ) : isHatched ? (
+          <View style={styles.addRow}>
+            <WorldActionStack
+              orientation="horizontal"
+              onCamera={onCamera}
+              onMicTap={onMicTap}
+              onMicPressIn={onMicPressIn}
+              onMicPressOut={onMicPressOut}
+              onAdd={onAdd}
+              recording={recording}
+              cameraBadge={cameraBadge}
+            />
+          </View>
         ) : null}
       </Animated.View>
 
@@ -200,9 +207,18 @@ export function TodayBottomDock({
             <IconAction icon="mappin.and.ellipse" label="Map" onPress={onOpenMap} />
           </Animated.View>
           <Animated.View entering={popEnter(185)}>
-            <IconAction icon="paperplane.fill" label="Card" busy={sharingBusy} onPress={onShareDay} />
+            <IconAction icon="book.closed.fill" label="View Card" onPress={onOpenCard} />
           </Animated.View>
         </View>
+      ) : null}
+      {isHatched && showCompanionInvitation && onOpenCompanion ? (
+        <KatchaButton
+          fullWidth
+          icon="heart.fill"
+          label={`Spend a moment with ${companionName ?? 'your Katchimera'}`}
+          onPress={onOpenCompanion}
+          variant="secondary"
+        />
       ) : null}
       {isHatched && showHatchedReflectionCard && viewedDay?.creature ? <ReflectionCard creature={viewedDay.creature} /> : null}
       {DECK_PERF_ENABLED

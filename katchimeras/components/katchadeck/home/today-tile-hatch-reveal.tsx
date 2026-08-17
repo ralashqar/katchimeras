@@ -14,6 +14,9 @@ import Animated, {
 import { useEffect, useState } from 'react';
 
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
+import { DailyCard } from '@/components/katchadeck/cards/daily-card';
+import { WispArtwork } from '@/components/katchadeck/wisps/wisp-artwork';
+import { wispDefinition } from '@/constants/wisps';
 import { hatchNoveltyLabel } from '@/components/katchadeck/home/creature-hero';
 import { ThemedText } from '@/components/themed-text';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
@@ -27,6 +30,7 @@ import {
   kingdomSurfaceTileAlignment,
 } from '@/utils/kingdom-surface-tiles';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
+import { resolveCompactDailyCardSizeForWidth } from '@/utils/daily-card-layout';
 import {
   TODAY_KINGDOM_STAGE_HEIGHT,
   todayEggStageFrame,
@@ -45,6 +49,7 @@ const HATCH_EXPRESSIONS: readonly EggExpressionCue[] = [
   { faceId: 'big-surprise', atMs: 820, durationMs: 150 },
   { faceId: 'happy-squint', atMs: 970, durationMs: 130 },
 ];
+const REVEAL_CARD_SIZE = resolveCompactDailyCardSizeForWidth(250);
 
 type TodayTileHatchRevealProps = {
   eggVisualScale?: number;
@@ -66,6 +71,8 @@ export function TodayTileHatchReveal({
   const reduceMotion = useReducedMotion();
   const homeTile = kingdomHomeTileForIdentity(homeArchetypeId);
   const creature = todayHatchCreature(presentation);
+  const wispId = presentation.policy === 'daily' ? presentation.committedDay?.dailyHatch?.primaryWispId ?? null : null;
+  const wisp = wispId ? wispDefinition(wispId) : null;
   const environmentVisualKey = presentation.committedDay?.card?.scene?.environment?.visualKey;
   const residentTile = creature
     ? kingdomResidentTileForIdentity({ visualKey: environmentVisualKey ?? creature.visualKey })
@@ -89,6 +96,10 @@ export function TodayTileHatchReveal({
   useEffect(() => {
     if (creature && creatureReady) onAssetsReady?.();
   }, [creature, creatureReady, onAssetsReady]);
+
+  useEffect(() => {
+    if (wispId) onAssetsReady?.();
+  }, [onAssetsReady, wispId]);
 
   const eggExit = useSharedValue(0);
   const creatureEntry = useSharedValue(0);
@@ -240,6 +251,18 @@ export function TodayTileHatchReveal({
           ) : null}
         </Animated.View>
 
+        {wispId && presentation.committedDay?.card && phaseAtLeast(presentation.phase, 'subject_settling') ? (
+          <Animated.View style={[styles.revealCard, titleStyle]}>
+            <DailyCard
+              card={presentation.committedDay.card}
+              compact
+              frameSize={REVEAL_CARD_SIZE}
+              renderTier="focused"
+              sceneArt="kingdom"
+            />
+          </Animated.View>
+        ) : null}
+
         {creature && creatureSource ? (
           <Animated.View
             style={[
@@ -275,10 +298,31 @@ export function TodayTileHatchReveal({
               transition={0}
             />
           </Animated.View>
+        ) : wispId ? (
+          <Animated.View
+            style={[
+              styles.creature,
+              {
+                height: Math.min(210, creatureSize * 0.72),
+                marginLeft: -Math.min(210, creatureSize * 0.72) / 2,
+                top: creatureTop + 18,
+                width: Math.min(210, creatureSize * 0.72),
+              },
+              creatureStyle,
+            ]}>
+            <AnimatedImage
+              contentFit="contain"
+              source={softGlow}
+              style={[styles.glow, glowStyle]}
+              tintColor={wisp?.palette[0] ?? '#F2D48A'}
+              transition={0}
+            />
+            <WispArtwork id={wispId} size={Math.min(210, creatureSize * 0.72)} />
+          </Animated.View>
         ) : null}
       </View>
 
-      {creature ? (
+      {creature || wisp ? (
         <Animated.View
           style={[
             styles.nameCard,
@@ -291,10 +335,10 @@ export function TodayTileHatchReveal({
             titleStyle,
           ]}>
           <ThemedText selectable type="onboardingLabel" style={styles.kicker} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
-            {hatchNoveltyLabel(creature)}
+            {creature ? hatchNoveltyLabel(creature) : 'TODAY BECAME A WISP'}
           </ThemedText>
           <ThemedText selectable type="display" style={styles.name} lightColor="#F2D48A" darkColor="#F2D48A">
-            {creature.name}
+            {creature?.name ?? wisp?.name}
           </ThemedText>
         </Animated.View>
       ) : null}
@@ -367,6 +411,15 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     position: 'absolute',
     zIndex: 10,
+  },
+  revealCard: {
+    left: '50%',
+    marginLeft: -125,
+    opacity: 0.72,
+    position: 'absolute',
+    top: 18,
+    transform: [{ rotate: '-3deg' }, { scale: 0.9 }],
+    zIndex: 2,
   },
   pulseRing: {
     backgroundColor: 'rgba(250,218,125,0.12)',

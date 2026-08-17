@@ -80,6 +80,9 @@ export type WispCollectionState = {
   baselinedCatalogVersion: number;
   /** Stable cross-system receipts, used by Merge World and future reward sources. */
   appliedGrantReceiptIds?: string[];
+  /** Daily encounters only. Shop, gifting and achievement ownership do not grow Resonance. */
+  resonanceCounts?: Partial<Record<WispId, number>>;
+  pendingResonance?: { wispId: WispId; previousCount: number; nextCount: number } | null;
 };
 
 export type WispProgress = {

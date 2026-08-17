@@ -248,7 +248,7 @@ test('a journaled photo becomes the card featured image without explicit selecti
   assert.equal(card.memorySpark?.photoUri, 'file:///cinema.jpg');
 });
 
-test('v12 migration backfills one stable card without rerolling creature or rarity', () => {
+test('v12 migration deterministically converts a legacy hatch into a Wisp Day Card', () => {
   const legacyDay = makeDay();
   const { card: _card, ...dayWithoutCard } = legacyDay;
   const legacyState = {
@@ -267,15 +267,16 @@ test('v12 migration backfills one stable card without rerolling creature or rari
   const migratedAgain = upgradeStoredHomeState(migrated);
   const card = migrated.archivedDays[0].card;
 
-  assert.equal(migrated.version, 20);
-  assert.equal(card?.provenance, 'legacy_backfill');
-  assert.equal(card?.creatureId, creature.id);
-  assert.equal(card?.rarity, 'rare');
+  assert.equal(migrated.version, 21);
+  assert.equal(migrated.archivedDays[0].legacyEncounter?.id, creature.id);
+  assert.ok(migrated.archivedDays[0].dailyHatch?.primaryWispId);
+  assert.equal(card?.primaryWispId, migrated.archivedDays[0].dailyHatch?.primaryWispId);
+  assert.equal(card?.sceneVariantId, migrated.archivedDays[0].dailyHatch?.sceneVariantId);
   assert.equal(card?.schemaVersion, 5);
   assert.deepEqual(migratedAgain.archivedDays[0].card, card);
 });
 
-test('v13 migration enriches a v1 card without changing its collectible identity', () => {
+test('v13 migration preserves the legacy encounter while creating the revised Day Card identity', () => {
   const day = makeDay();
   const built = buildDailyCreatureCard(day, creature, {
     mode: 'live_hatch',
@@ -297,12 +298,11 @@ test('v13 migration enriches a v1 card without changing its collectible identity
 
   const migrated = upgradeStoredHomeState(v13State);
   const card = migrated.archivedDays[0].card;
-  assert.equal(migrated.version, 20);
+  assert.equal(migrated.version, 21);
   assert.equal(card?.schemaVersion, 5);
-  assert.equal(card?.id, built.id);
-  assert.equal(card?.creatureId, built.creatureId);
-  assert.equal(card?.rarity, built.rarity);
-  assert.deepEqual(card?.traits, built.traits);
+  assert.equal(migrated.archivedDays[0].legacyEncounter?.id, creature.id);
+  assert.equal(card?.primaryWispId, migrated.archivedDays[0].dailyHatch?.primaryWispId);
+  assert.equal(card?.sceneVariantId, migrated.archivedDays[0].dailyHatch?.sceneVariantId);
   assert.ok(card?.facets && card.dayFacts && card.dayGlyphs && card.scene && card.storyLine);
 });
 

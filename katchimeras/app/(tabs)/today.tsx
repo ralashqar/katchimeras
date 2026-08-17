@@ -57,6 +57,8 @@ import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
 import { DayPromptStrip } from '@/components/katchadeck/home/day-prompt-strip';
 import { EggFeedOverlay } from '@/components/katchadeck/home/egg-feed-overlay';
 import { WispDiscoveryReveal } from '@/components/katchadeck/wisps/wisp-discovery-reveal';
+import { WispResonanceReveal } from '@/components/katchadeck/wisps/wisp-resonance-reveal';
+import { SceneDiscoveryReveal } from '@/components/katchadeck/scenes/scene-discovery-reveal';
 import { TodayCategoryRing, type TodayCategoryRingItem } from '@/components/katchadeck/home/today-category-ring';
 import { TodayBottomDock } from '@/components/katchadeck/home/today-bottom-dock';
 import {
@@ -127,8 +129,10 @@ import { FTUE_MOSSPROUT_CREATURE } from '@/features/onboarding/mossprout-ftue-cr
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import type { FtueActionDefinition, FtueChoiceOption } from '@/features/onboarding/ftue-types';
 import { useWisps } from '@/features/wisps/wisp-provider';
+import { useScenes } from '@/features/scenes/scene-provider';
 import { useGameWallet } from '@/features/ui/game-wallet-provider';
 import { resolveHomeLoopPresentation } from '@/features/today/home-loop-presentation';
+import { regularTodayCameraPinchTarget } from '@/features/today/regular-today-camera';
 import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
 import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
 import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
@@ -498,8 +502,17 @@ function HomeScreen() {
     if (mood === 'Drained' || mood === 'Low') return 'Sounds like today took something out of you. We can start small.';
     return mood ? `You felt ${mood.toLowerCase()} today. Thank you for letting me know.` : 'I felt those little pieces of your day reach me.';
   }, [allDays]);
-  const { equippedWispId: activeWispId, syncFromDays: syncWispsFromDays, pendingDiscoveryId, dismissDiscovery } = useWisps();
-  useEffect(() => { syncWispsFromDays(allDays); }, [allDays, syncWispsFromDays]);
+  const { equippedWispId: activeWispId, syncFromDays: syncWispsFromDays, pendingDiscoveryId, dismissDiscovery, equip: equipWisp, pendingResonance, dismissResonance } = useWisps();
+  const { equippedSceneId, syncFromDays: syncScenesFromDays, pendingDiscoveryId: pendingSceneDiscoveryId, dismissDiscovery: dismissSceneDiscovery, equip: equipScene } = useScenes();
+  const collectibleDays = useMemo(() => {
+    const byId = new Map(allDays.map((day) => [day.id, day]));
+    for (const day of timelineDays) {
+      if (day.kind === 'day') byId.set(day.id, day);
+    }
+    return [...byId.values()];
+  }, [allDays, timelineDays]);
+  useEffect(() => { syncWispsFromDays(collectibleDays); }, [collectibleDays, syncWispsFromDays]);
+  useEffect(() => { syncScenesFromDays(collectibleDays); }, [collectibleDays, syncScenesFromDays]);
   const isDay = selectedDay?.kind === 'day';
   useEffect(() => {
     if (ftueRun?.stepId !== 'hatch.reveal' || hatchPresentation.phase !== 'idle') return;
@@ -925,9 +938,8 @@ function HomeScreen() {
   );
 
   const shareableDay =
-    selectedDay?.kind === 'day' && selectedDay.state === 'hatched' && selectedDay.creature && selectedDay.card
+    selectedDay?.kind === 'day' && selectedDay.state === 'hatched' && (selectedDay.dailyHatch || selectedDay.creature) && selectedDay.card
       ? (selectedDay as HomeDayRecord & {
-          creature: NonNullable<HomeDayRecord['creature']>;
           card: NonNullable<HomeDayRecord['card']>;
         })
       : null;
@@ -998,12 +1010,16 @@ function HomeScreen() {
     });
   }
 
-  const isHatched = isDay && selectedDay.state === 'hatched' && selectedDay.creature;
-  const selectedHatchedCompanionId = isDay && selectedDay.state === 'hatched' && selectedDay.creature
+  function handleOpenDayCard(cardId: string) {
+    router.push({ pathname: '/card/[cardId]', params: { cardId } });
+  }
+
+  const isHatched = Boolean(isDay && selectedDay.state === 'hatched' && (selectedDay.dailyHatch || selectedDay.creature));
+  const selectedHatchedCompanionId = isDay && selectedDay.state === 'hatched' && !selectedDay.dailyHatch && selectedDay.creature
     ? identityForCreature(selectedDay.creature)?.companionId ?? null
     : null;
   const selectedKatchimeraExplorationKey =
-    isDay && selectedDay.state === 'hatched' && selectedDay.creature
+    isDay && selectedDay.state === 'hatched' && !selectedDay.dailyHatch && selectedDay.creature
       ? todayKatchimeraExplorationBackgroundKeyForPresentation({
           creature: selectedDay.creature,
           environmentVisualKey: selectedDay.card?.scene?.environment?.visualKey,
@@ -2082,6 +2098,9 @@ function HomeScreen() {
     const ownsEggRewardTarget = active
       && !isForming
       && timelineDay.id === selectedDayId;
+    const ownsPageEggPresentation = ownsEggRewardTarget
+      && timelineDay.kind === 'day'
+      && timelineDay.isToday;
     const pageUsesExplorationFraming =
       explorationFramingOverride
       ?? (active && explorationBackgroundActive);
@@ -2095,7 +2114,7 @@ function HomeScreen() {
       );
     }
     const day = timelineDay.kind === 'day' ? timelineDay : tomorrowDay;
-    if (day?.state === 'hatched' && day.creature) {
+    if (day?.state === 'hatched' && day.creature && !day.dailyHatch) {
       const usesExplorationFraming = pageUsesExplorationFraming;
       return (
         <CreatureHero
@@ -2124,6 +2143,8 @@ function HomeScreen() {
           ? resolvedHeroStageTop
           : undefined}
         feedbackKey={active ? eggFeedKey : 0}
+        growthProgress={ownsPageEggPresentation ? 1 : undefined}
+        growthStage={ownsPageEggPresentation ? 6 : undefined}
         hideKingdomEnvironmentArt={pageUsesExplorationFraming}
         homeArchetypeId={homeArchetypeId}
         isReady={active && day?.state === 'ready_to_hatch'}
@@ -2340,7 +2361,16 @@ function HomeScreen() {
     ftueRun?.status === 'active' ? ftueRun.stepId : null,
     todayScene.homeEnvironment.motion.maxPinchScale,
   );
+  const regularCameraPinchTarget = isFormingToday && ftueRun?.status !== 'active' && nurtureGrowth
+    ? regularTodayCameraPinchTarget(
+        nurtureGrowth.qualifyingActionCount,
+        todayScene.homeEnvironment.motion.explorationMaxPinchScale,
+      )
+    : null;
+  const scriptedCameraPinchTarget = ftueCameraPinchTarget ?? regularCameraPinchTarget;
   const { environmentGesture, environmentMotion } = useTodayEnvironmentMotion({
+    allowGestureAtScriptedRest: ftueCameraPinchTarget == null && regularCameraPinchTarget === 1,
+    deferScriptedChangesWhileDisabled: ftueCameraPinchTarget == null && regularCameraPinchTarget != null,
     enabled: !flowBusy,
     frozen: discoveryHatchInPlace,
     hoverEnabled: !explorationPresentationActive,
@@ -2351,7 +2381,7 @@ function HomeScreen() {
       ? todayScene.homeEnvironment.motion.explorationPinchSoftLimitRange
       : 0,
     scriptedPinchDurationMs: ftueHomeCameraDuration(ftueRun?.stepId),
-    scriptedPinchScale: ftueCameraPinchTarget,
+    scriptedPinchScale: scriptedCameraPinchTarget,
   });
   const pageGesture = useMemo(
     () => explorationPresentationActive
@@ -2443,7 +2473,7 @@ function HomeScreen() {
               transitionRole="current"
               translateX={explorationMotion.translateX}>
               <TodayExplorationBackground
-                backgroundKey={displayedExplorationCurrent.backgroundKey}
+                backgroundKey={equippedSceneId}
                 imageSize={explorationMotion.imageSize}
                 verticalOffset={HOME_SCENE_Y_OFFSET}
               />
@@ -2672,6 +2702,7 @@ function HomeScreen() {
           careSwipeExternalGesture={explorationMotion.gesture}
           environmentGesture={environmentGesture}
           sceneTranslateX={explorationMotion.translateX}
+          sceneId={equippedSceneId}
           timelineDays={timelineDays}
           topInset={insets.top}
           />
@@ -2727,7 +2758,7 @@ function HomeScreen() {
           showHatchedActionDock={SHOW_HATCHED_ACTION_DOCK && Boolean(isDay && selectedDay.isToday)}
           showHatchedReflectionCard={SHOW_HATCHED_REFLECTION_CARD}
           showCompanionInvitation={Boolean(isDay && selectedDay.isToday && selectedHatchedCompanionId)}
-          companionName={isHatched ? selectedDay.creature?.name : undefined}
+          companionName={isDay && selectedDay.creature ? selectedDay.creature.name : undefined}
           onOpenCompanion={selectedHatchedCompanionId ? () => {
             router.push({
               pathname: '/katchimera/[creatureId]',
@@ -2754,6 +2785,9 @@ function HomeScreen() {
           onAdd={() => openManualJournal()}
           onOpenMap={() => {
             if (isDay) handleOpenDayMap(selectedDay.id);
+          }}
+          onOpenCard={() => {
+            if (isDay && selectedDay.card) handleOpenDayCard(selectedDay.card.id);
           }}
           onShareDay={handleShareDay}
           onMakeComic={handleMakeComic}
@@ -3362,7 +3396,34 @@ function HomeScreen() {
         onRetry={handleRetryComic}
         onShare={handleShareGeneratedComic}
       />
-      {pendingDiscoveryId && !isHatching ? <WispDiscoveryReveal id={pendingDiscoveryId} onDismiss={() => dismissDiscovery(pendingDiscoveryId)} /> : null}
+      {pendingDiscoveryId && !isHatching ? (
+        <WispDiscoveryReveal
+          id={pendingDiscoveryId}
+          onDismiss={() => dismissDiscovery(pendingDiscoveryId)}
+          onEquip={() => {
+            equipWisp(pendingDiscoveryId);
+            dismissDiscovery(pendingDiscoveryId);
+          }}
+        />
+      ) : null}
+      {!pendingDiscoveryId && pendingResonance && !isHatching ? (
+        <WispResonanceReveal
+          id={pendingResonance.wispId}
+          previousCount={pendingResonance.previousCount}
+          nextCount={pendingResonance.nextCount}
+          onDismiss={dismissResonance}
+        />
+      ) : null}
+      {!pendingDiscoveryId && !pendingResonance && pendingSceneDiscoveryId && !isHatching ? (
+        <SceneDiscoveryReveal
+          id={pendingSceneDiscoveryId}
+          onDismiss={() => dismissSceneDiscovery(pendingSceneDiscoveryId)}
+          onEquip={() => {
+            equipScene(pendingSceneDiscoveryId);
+            dismissSceneDiscovery(pendingSceneDiscoveryId);
+          }}
+        />
+      ) : null}
       {hatchPresentation.policy === 'ftue_discovery' && hatchPresentation.phase === 'awaiting_interaction' ? (
         <Animated.View entering={presenceEnter(120)} style={[styles.discoveryInteractionCta, { bottom: insets.bottom + 34 }]}>
           <ThemedText selectable style={styles.discoveryInteractionHint} lightColor="#FFF6DE" darkColor="#FFF6DE">

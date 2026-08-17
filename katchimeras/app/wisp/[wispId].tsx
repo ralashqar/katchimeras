@@ -11,7 +11,6 @@ import { WISPS_BY_ID } from '@/constants/wisps';
 import { useWisps } from '@/features/wisps/wisp-provider';
 import { useAllDays } from '@/hooks/use-all-days';
 import type { WispId } from '@/types/wisp';
-import { resolveWispCandidates } from '@/utils/wisp-engine';
 import { useEconomy } from '@/features/economy/economy-provider';
 import { historyDaysForAccess } from '@/utils/history-access';
 
@@ -27,7 +26,8 @@ export default function WispDetailScreen() {
   const owned = wisps.isOwned(definition.id);
   const equipped = wisps.equippedWispId === definition.id;
   const progress = wisps.progressFor(definition.id, days);
-  const matchingDays = days.filter((day, index) => resolveWispCandidates(day, days.slice(0, index)).some((item) => item.wispId === definition.id));
+  const matchingDays = days.filter((day) => day.state === 'hatched' && day.dailyHatch?.primaryWispId === definition.id);
+  const resonance = wisps.resonance(definition.id);
   const visibleMatchingDays = historyDaysForAccess(matchingDays, economy.snapshot.activePlus);
   const unlock = wisps.state.unlocked[definition.id];
   const shopOffer = economy.config.shop.offers.find((offer) => offer.enabled && offer.collectibleType === 'wisp' && offer.collectibleId === definition.id && offer.currency === 'essence');
@@ -48,11 +48,11 @@ export default function WispDetailScreen() {
 
         <View style={styles.progressCard}>
           <View style={styles.progressHeading}>
-            <ThemedText style={styles.cardLabel} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>{owned ? 'DISCOVERED' : 'DISCOVERY PROGRESS'}</ThemedText>
-            <ThemedText style={styles.progressNumber} lightColor={Meadow.ink} darkColor={Meadow.ink}>{owned ? 'Complete' : `${progress.current} / ${progress.target}`}</ThemedText>
+            <ThemedText style={styles.cardLabel} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>{owned ? 'RESONANCE' : 'DISCOVERY PROGRESS'}</ThemedText>
+            <ThemedText style={styles.progressNumber} lightColor={Meadow.ink} darkColor={Meadow.ink}>{owned ? `${resonance} ${resonance === 1 ? 'day' : 'days'}` : `${progress.current} / ${progress.target}`}</ThemedText>
           </View>
           <View style={styles.track}><View style={[styles.fill, { width: `${Math.min(100, progress.current / progress.target * 100)}%` }]} /></View>
-          <ThemedText style={styles.rule} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{owned ? definition.description : `Keep going: ${progress.unit}.`}</ThemedText>
+          <ThemedText style={styles.rule} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{owned ? 'Each day this Wisp returns, its Resonance grows.' : `Keep going: ${progress.unit}.`}</ThemedText>
         </View>
 
         {owned ? <Pressable accessibilityRole="button" onPress={() => wisps.equip(equipped ? null : definition.id)} style={({ pressed }) => [styles.equip, pressed && styles.pressed]}>

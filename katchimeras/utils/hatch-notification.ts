@@ -167,7 +167,7 @@ async function syncHatchNotificationNow(
     const identifier = await Notifications.scheduleNotificationAsync({
       content: {
         title: HATCH_NOTIFICATION_TITLE,
-        body: "Tonight's katchimera is waiting to be revealed.",
+        body: "Today's Wisp is waiting to be revealed.",
         data: {
           destination: 'today',
           kind: HATCH_NOTIFICATION_KIND,

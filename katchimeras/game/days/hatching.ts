@@ -26,6 +26,7 @@ import { computeDayScores, parsePathId, resolveRarity } from './scoring';
 import { dayInputSignature } from './shape';
 import { scoreOrder } from './scores';
 import { normalizeStoredHomeState } from './state-normalization';
+import { finalizeDailyWispHatch } from '@/utils/daily-wisp-hatch';
 
 export function finalizeDayHatch(
   day: StoredHomeDayRecord,
@@ -34,51 +35,25 @@ export function finalizeDayHatch(
   encounterHistory: EncounterHistoryMap,
   pastDays: readonly StoredHomeDayRecord[] = []
 ): StoredHomeDayRecord {
-  const hatchInputDay = dayForDevHatchSelection(day);
-  const scores = computeDayScores(hatchInputDay);
-  const sortedTraits = [...scoreOrder].sort((left, right) => scores[right] - scores[left]);
-  const primaryTrait = sortedTraits[0] ?? 'calm';
-  const secondaryTrait = sortedTraits[1] ?? 'focus';
-
-  const yesterdayProfileId = resolveYesterdayProfileId(day, pastDays);
-  const seed = `${day.isoDate}|${dayInputSignature(hatchInputDay)}|${day.storedNonce ?? ''}`;
-  const selection = selectHatch({
-    day: hatchInputDay,
-    history: encounterHistory,
-    yesterdayProfileId,
-    rng: makeSeededRng(seed),
-    primaryTrait,
-    secondaryTrait,
+  const daily = finalizeDailyWispHatch({
+    day,
+    now,
+    pastDays,
+    provenance: 'live',
+    revealed: true,
   });
-  if (selection) {
-    const encounterCreature = selection.creature;
-    const context = buildReflectionContext({ ...day, creature: encounterCreature }, pastDays);
-    const sealedAt = day.shareReadyAt ?? now.toISOString();
-    const creature = {
-      ...encounterCreature,
-      mood: context.mood,
-      bondDepth: context.bondDepth,
-      variantCell: resolveVariantCellId(context.mood, context.bondDepth) ?? undefined,
-    };
-    return {
-      ...day,
-      state: 'hatched',
-      devForceReadyToHatch: undefined,
-      devHatchReflectionMode: undefined,
-      shareReadyAt: sealedAt,
-      sky: deriveDaySkySnapshot(day),
-      skyPolicy: 'live_frozen',
-      creature,
-      card: buildDailyCreatureCard({ ...day, creature }, creature, {
-        mode: 'live_hatch',
-        sealedAt,
-        pastDays,
-        scores,
-      }),
-    };
-  }
-
-  return finalizeFallbackHatch(day, profile, now, scores, primaryTrait, secondaryTrait, pastDays, hatchInputDay);
+  return {
+    ...day,
+    state: 'hatched',
+    devForceReadyToHatch: undefined,
+    devHatchReflectionMode: undefined,
+    shareReadyAt: daily.hatch.sealedAt,
+    sky: deriveDaySkySnapshot(day),
+    skyPolicy: 'live_frozen',
+    creature: null,
+    dailyHatch: daily.hatch,
+    card: daily.card,
+  };
 }
 
 export function triggerHatchForDay(
@@ -88,6 +63,10 @@ export function triggerHatchForDay(
   now: Date
 ): StoredHomeState {
   if (state.today.id === dayId) {
+    if (state.today.dailyHatch && state.today.state === 'sealed') {
+      const revealedToday = revealSealedDay(state.today, now);
+      return normalizeStoredHomeState({ ...state, today: revealedToday }, profile, now);
+    }
     const todayState = resolveDayState(state.today, now, resolveHatchHour(profile));
     if (todayState !== 'ready_to_hatch') {
       return state;
@@ -120,6 +99,11 @@ export function triggerHatchForDay(
   }
 
   const target = state.archivedDays[archivedIndex];
+  if (target.dailyHatch && target.state === 'sealed') {
+    const nextArchived = [...state.archivedDays];
+    nextArchived[archivedIndex] = revealSealedDay(target, now);
+    return normalizeStoredHomeState({ ...state, archivedDays: nextArchived }, profile, now);
+  }
   if (resolveDayState(target, now, resolveHatchHour(profile)) !== 'ready_to_hatch') {
     return state;
   }
@@ -146,6 +130,15 @@ export function triggerHatchForDay(
     profile,
     now
   );
+}
+
+function revealSealedDay(day: StoredHomeDayRecord, now: Date): StoredHomeDayRecord {
+  if (!day.dailyHatch) return day;
+  return {
+    ...day,
+    state: 'hatched',
+    dailyHatch: { ...day.dailyHatch, revealedAt: now.toISOString() },
+  };
 }
 
 function recordHatchedEncounter(history: EncounterHistoryMap, day: StoredHomeDayRecord) {

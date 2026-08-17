@@ -10,7 +10,7 @@ import type {
  * Home state is intentionally updated by several asynchronous enrichers. Those
  * jobs may finish with a snapshot captured before a hatch. A hatch is a terminal
  * user-visible event, so a normal writer may enrich that day but can never
- * remove its creature. The only supported reverse transition is the explicit
+ * remove its Wisp result (or a legacy Katchimera). The only supported reverse transition is the explicit
  * developer rehatch command, which bypasses this reconciliation at save time.
  */
 export function preserveFinalizedHatches(
@@ -23,13 +23,17 @@ export function preserveFinalizedHatches(
   let repaired = false;
   const protect = (day: StoredHomeDayRecord): StoredHomeDayRecord => {
     const finalized = currentDays.get(day.id);
-    if (!finalized?.creature) return day;
-    if (day.creature && (!finalized.card || day.card)) return day;
+    if (!finalized || (!finalized.dailyHatch && !finalized.creature)) return day;
+    const keepsDailyHatch = !finalized.dailyHatch || Boolean(day.dailyHatch);
+    const keepsLegacyCreature = !finalized.creature || Boolean(day.creature);
+    if (keepsDailyHatch && keepsLegacyCreature && (!finalized.card || day.card)) return day;
     repaired = true;
     return {
       ...day,
-      state: 'hatched',
+      state: finalized.state,
+      dailyHatch: day.dailyHatch ?? finalized.dailyHatch,
       creature: day.creature ?? finalized.creature,
+      legacyEncounter: day.legacyEncounter ?? finalized.legacyEncounter,
       card: day.card ?? finalized.card,
       shareReadyAt: day.shareReadyAt ?? finalized.shareReadyAt,
       hatchCheckIn: day.hatchCheckIn ?? finalized.hatchCheckIn,

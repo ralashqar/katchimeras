@@ -6,9 +6,9 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { HomeDayRecord } from '@/types/home';
 import { formatMeetingLabel } from '@/utils/daily-card';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
+import { WispArtwork } from '@/components/katchadeck/wisps/wisp-artwork';
 
 type ShareableCardDay = HomeDayRecord & {
-  creature: NonNullable<HomeDayRecord['creature']>;
   card: NonNullable<HomeDayRecord['card']>;
 };
 
@@ -19,7 +19,7 @@ const CARD_HEIGHT = 1536;
 
 export const MemoryPostcard = forwardRef<View, MemoryPostcardProps>(function MemoryPostcard({ day }, ref) {
   const { card } = day;
-  const source = resolveCreatureArtSource(card.visualKey, { variantCell: card.variantCell });
+  const source = card.primaryWispId ? null : resolveCreatureArtSource(card.visualKey, { variantCell: card.variantCell });
   const facets = card.facets ? ['mood', 'energy', 'sleep', 'place', 'social'].map((key) => card.facets![key as keyof typeof card.facets]) : [
     { label: 'Mood', value: card.state.tone },
     { label: 'Energy', value: card.state.vitality },
@@ -52,7 +52,9 @@ export const MemoryPostcard = forwardRef<View, MemoryPostcardProps>(function Mem
 
         <View style={[styles.artWindow, { backgroundColor: `${card.accentColor}22` }]}>
           <View style={[styles.halo, { backgroundColor: `${card.accentColor}30` }]} />
-          <Image contentFit="contain" source={source} style={styles.creature} transition={0} />
+          {card.primaryWispId
+            ? <WispArtwork id={card.primaryWispId} size={420} />
+            : source ? <Image contentFit="contain" source={source} style={styles.creature} transition={0} /> : null}
         </View>
 
         <Text numberOfLines={2} style={styles.story}>✦ {card.storyLine ?? card.state.label} ✦</Text>

@@ -22,6 +22,8 @@ export function createEmptyStoredDay(now: Date, _profile: OnboardingProfile): St
     promptAnswers: [],
     heroPhoto: null,
     creature: null,
+    dailyHatch: null,
+    legacyEncounter: null,
     card: null,
     growth: { schemaVersion: 1, events: [], careActions: [] },
     storedNonce: makeStoredNonce(now),
@@ -77,9 +79,5 @@ export function writeInputDay(
 
 export function resolveInputTarget(state: StoredHomeState, target: DayInputTarget): DayInputTarget {
   if (target === 'yesterday') return target;
-  if (state.today.state === 'hatched') {
-    return 'tomorrow';
-  }
-
   return target;
 }

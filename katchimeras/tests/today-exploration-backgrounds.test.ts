@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 
 import todayScene from '../data/today-scene.json';
@@ -147,4 +149,28 @@ test('cinematic creature framing places visible Feastle feet on the platform con
       frame.top + frame.size * visibleAlphaBottom - frame.stageContactY,
     ) < 0.0001,
   );
+});
+
+test('the equipped Scene keeps the original interactive Today environment composition', () => {
+  const nurtureSource = fs.readFileSync(
+    path.join(process.cwd(), 'components/katchadeck/home/today-nurture-experience.tsx'),
+    'utf8',
+  );
+  const todaySource = fs.readFileSync(
+    path.join(process.cwd(), 'app/(tabs)/today.tsx'),
+    'utf8',
+  );
+  assert.match(nurtureSource, /<TodayExplorationBackground\s+[\s\S]*?backgroundKey=\{sceneId\}[\s\S]*?translateX=\{sceneTranslateX\}[\s\S]*?verticalOffset=\{sceneLift\}/u);
+  assert.match(todaySource, /<TodayExplorationBackground\s+[\s\S]*?backgroundKey=\{equippedSceneId\}[\s\S]*?verticalOffset=\{HOME_SCENE_Y_OFFSET\}/u);
+});
+
+test('You projects the Egg separately from its scaled scene so high-resolution layers stay crisp', () => {
+  const youSource = fs.readFileSync(
+    path.join(process.cwd(), 'app/(tabs)/you.tsx'),
+    'utf8',
+  );
+
+  assert.match(youSource, /projectedEggBottomY = height \/ 2[\s\S]*?\* camera\.scale[\s\S]*?\+ camera\.translateY/u);
+  assert.match(youSource, /verticalOffset=\{HOME_SCENE_Y_OFFSET\}\s*\/>\s*<\/View>[\s\S]*?<TodayKingdomEggHero/u);
+  assert.match(youSource, /projectedCameraScale=\{projectedCameraScale\}/u);
 });

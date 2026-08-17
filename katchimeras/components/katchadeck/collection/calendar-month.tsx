@@ -4,6 +4,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { WispArtwork } from '@/components/katchadeck/wisps/wisp-artwork';
+import { sceneDefinition } from '@/constants/scenes';
 import { Lantern } from '@/constants/theme';
 import { getCreatureVisual } from '@/game/days';
 import type { HomeDayRecord } from '@/types/home';
@@ -101,7 +103,7 @@ export function CalendarMonth({
     cells.push({ iso: `${viewYear}-${pad2(viewMonth + 1)}-${pad2(day)}`, day });
   }
 
-  const hatchedThisMonth = cells.filter((cell) => cell && byIso.get(cell.iso)?.creature).length;
+  const hatchedThisMonth = cells.filter((cell) => cell && byIso.get(cell.iso)?.card).length;
   const canGoPrev = clampedIndex > minMonthIndex;
   const canGoNext = clampedIndex < maxMonthIndex;
 
@@ -167,7 +169,7 @@ export function CalendarMonth({
         <View style={styles.legendItem}>
           <View style={[styles.legendOrb, { borderColor: 'rgba(255,255,255,0.4)' }]} />
           <ThemedText style={styles.legendLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-            katchimera
+            Day Card
           </ThemedText>
         </View>
         <View style={styles.legendItem}>
@@ -195,6 +197,9 @@ function DayCell({
   streakState?: StreakDayState;
 }) {
   const creature = record?.creature ?? null;
+  const wispId = record?.state === 'hatched'
+    ? record.dailyHatch?.primaryWispId ?? record.card?.primaryWispId ?? null
+    : null;
   const visual = creature ? getCreatureVisual(creature.visualKey).source : null;
   const ring = creature ? RARITY_RING[creature.rarity] ?? RARITY_RING.common : RARITY_RING.common;
   const accent = creature?.accentColor ?? Lantern.moon500;
@@ -204,7 +209,16 @@ function DayCell({
       disabled={!onPress}
       onPress={onPress}
       style={({ pressed }) => [styles.cell, pressed && onPress ? styles.cellPressed : null]}>
-      {creature && visual ? (
+      {wispId ? (
+        <View
+          style={[
+            styles.orb,
+            { borderColor: isToday ? Lantern.ember300 : 'rgba(255,255,255,0.34)', backgroundColor: record?.dailyHatch?.sceneVariantId ? `${sceneAccent(record.dailyHatch.sceneVariantId)}33` : 'rgba(255,255,255,0.08)' },
+            isToday ? styles.todayOrb : null,
+          ]}>
+          <WispArtwork id={wispId} size={42} thumbnail />
+        </View>
+      ) : creature && visual ? (
         <View
           style={[
             styles.orb,
@@ -232,6 +246,16 @@ function DayCell({
       ) : streakState === 'missed' ? <View style={styles.streakMissed} /> : null}
     </Pressable>
   );
+}
+
+function sceneAccent(id: NonNullable<HomeDayRecord['dailyHatch']>['sceneVariantId']) {
+  const family = sceneDefinition(id).family;
+  if (family === 'woodland') return '#8FB879';
+  if (family === 'home') return '#D3A36F';
+  if (family === 'city') return '#A894C7';
+  if (family === 'night') return '#777CC1';
+  if (family === 'weather') return '#91AEB9';
+  return '#E4C67E';
 }
 
 const styles = StyleSheet.create({

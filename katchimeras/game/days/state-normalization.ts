@@ -78,7 +78,7 @@ export function normalizeStoredHomeState(
   );
 
   return {
-    version: 20,
+    version: 21,
     locationPermission: upgradedState.locationPermission,
     activityPermission: upgradedState.activityPermission,
     healthPermission: upgradedState.healthPermission,
@@ -181,7 +181,7 @@ function updateStoredDayDerivedFields(
     emojiNormalizedDay
   );
   const repairedDay = repairGeneratedHatchCheckInAnchor(prunedDay);
-  const dayWithCard = repairedDay.card && repairedDay.creature
+  const dayWithCard = repairedDay.card
     ? { ...repairedDay, card: updateCardMemorySpark(repairedDay.card, repairedDay, repairedDay.creature) }
     : repairedDay;
   const day = reconcileDaySkySnapshot(dayWithCard);
@@ -197,7 +197,7 @@ function updateStoredDayDerivedFields(
   const newPlaceCount = countNewPlacesForDay(dayMap, priorDays);
   const shareReadyAt =
     day.shareReadyAt ??
-    (day.creature ? new Date(`${day.isoDate}T21:00:00`).toISOString() : null);
+    (day.creature || day.dailyHatch ? new Date(`${day.isoDate}T21:00:00`).toISOString() : null);
 
   return {
     ...day,

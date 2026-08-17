@@ -1,6 +1,7 @@
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import type { PhotoPlaceResolution } from '@/types/photo-place';
-import type { FeaturedWisp } from '@/types/wisp';
+import type { FeaturedWisp, WispId } from '@/types/wisp';
+import type { SceneVariantId } from '@/types/scene';
 import type {
   KatchimeraCompanionId,
   KatchimeraFamilyId,
@@ -20,7 +21,7 @@ export type HomeMomentType =
   | 'focus';
 export type HomeQuickMomentType = Exclude<HomeMomentType, 'photo' | 'inspiration'>;
 export type HomeMomentSource = 'quick_tag' | 'photo_library' | 'inspiration_library';
-export type HomeDayState = 'forming' | 'ready_to_hatch' | 'hatched';
+export type HomeDayState = 'forming' | 'ready_to_hatch' | 'sealed' | 'hatched';
 export type HomeScoreKey = 'energy' | 'calm' | 'social' | 'exploration' | 'focus';
 export type HomeRarityTier = 'common' | 'rare' | 'epic' | 'legendary';
 export type HomeLocationType = 'home' | 'cafe' | 'park' | 'unknown';
@@ -1181,8 +1182,46 @@ export type DailyCreatureCard = {
   dayGlyphs?: CardDayGlyph[];
   scene?: CardScene;
   featuredWisps?: FeaturedWisp[];
+  /** Primary collectible identity for revised daily cards. */
+  primaryWispId?: WispId;
+  sceneVariantId?: SceneVariantId;
+  dayLine?: string;
   sealedInputSignature: string;
   sealedAt: string;
+};
+
+export type DayThemeId =
+  | 'nature'
+  | 'social'
+  | 'adventure'
+  | 'cozy'
+  | 'creativity'
+  | 'achievement'
+  | 'reflection'
+  | 'exploration'
+  | 'rest'
+  | 'celebration'
+  | 'focus'
+  | 'movement';
+
+export type DailyHatchEvidence = {
+  source: string;
+  label: string;
+  weight: number;
+};
+
+export type DailyWispHatch = {
+  schemaVersion: 1;
+  primaryWispId: WispId;
+  sceneVariantId: SceneVariantId;
+  primaryTheme: DayThemeId;
+  secondaryTheme: DayThemeId | null;
+  traits: CardTrait[];
+  evidence: DailyHatchEvidence[];
+  sealedInputSignature: string;
+  sealedAt: string;
+  revealedAt: string | null;
+  provenance: 'live' | 'rollover' | 'legacy_conversion';
 };
 
 // A meaning the user chose for a captured / essence photo. `archetype` is the
@@ -1623,6 +1662,10 @@ export type StoredHomeDayRecord = {
   exactRouteSegments: StoredExactRouteSegment[];
   selectedPathId: string | null;
   creature: LocalCreatureRecord | null;
+  /** Revised daily output. New standard days use this instead of `creature`. */
+  dailyHatch?: DailyWispHatch | null;
+  /** Historical Katchimera provenance retained by the v21 conversion. */
+  legacyEncounter?: LocalCreatureRecord | null;
   card: DailyCreatureCard | null;
   promptAnswers: DayPromptAnswer[];
   hatchCheckIn?: HatchCheckIn;
@@ -1709,7 +1752,7 @@ export type StoredHomeDayRecord = {
 };
 
 export type StoredHomeState = {
-  version: 20;
+  version: 21;
   locationPermission: LocationPermissionState;
   activityPermission: ActivityPermissionState;
   healthPermission: HealthPermissionState;

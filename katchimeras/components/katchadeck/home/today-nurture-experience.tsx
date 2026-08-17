@@ -54,6 +54,7 @@ import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import { DASHBOARD_STAT_ART, MANUAL_JOURNAL_ART } from '@/constants/journal-art-sources';
 import { GameRewardChip, GameSurface } from '@/components/katchadeck/ui/game-surface';
 import type { HomeDayRecord, HomeTimelineDay, SleepQuality } from '@/types/home';
+import type { SceneVariantId } from '@/types/scene';
 import type { HomeArchetypeId } from '@/types/world-identity';
 import type { WispId } from '@/types/wisp';
 import type { RankedTodayCareAction } from '@/utils/today-care';
@@ -107,6 +108,7 @@ type TodayNurtureExperienceProps = {
   careSwipeExternalGesture: GestureType;
   environmentGesture: GestureType;
   sceneTranslateX: SharedValue<number>;
+  sceneId: SceneVariantId;
   topInset: number;
   bottomInset: number;
   timelineDays: HomeTimelineDay[];
@@ -212,6 +214,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   careSwipeExternalGesture,
   environmentGesture,
   sceneTranslateX,
+  sceneId,
   timelineDays,
   topInset,
 }: TodayNurtureExperienceProps) {
@@ -448,6 +451,10 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
         });
   }, [onboardingCameraDurationMs, onboardingCameraPanTranslateY, onboardingCameraPanY, reduceMotion]);
   const clampedOnboardingCameraPanY = useDerivedValue(() => {
+    // Coverage correction belongs exclusively to the authored FTUE camera.
+    // Applying it to a player pinch makes the lifted normal scene jump
+    // vertically until its bottom edge happens to cover the viewport.
+    if (onboardingCameraProgress.value <= 0) return 0;
     const pinchScale = environmentMotion?.pinchScale.value ?? 1;
     const focusScale = 1 + (customizerCamera.scale - 1) * focusProgress.value;
     const onboardingScale = 1 + (HOME_FTUE_CAMERA_SCALE - 1) * onboardingCameraProgress.value;
@@ -599,7 +606,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
             focusY={scenePinchFocusY}
             viewportHeight={windowHeight}>
             <TodayExplorationBackground
-              backgroundKey="home"
+              backgroundKey={sceneId}
               imageSize={sceneImageSize}
               translateX={sceneTranslateX}
               verticalOffset={sceneLift}
@@ -2421,7 +2428,7 @@ function GrowthMeter({ growth }: { growth: TodayGrowthSummary }) {
       <View style={[styles.growthProgressCard, compact && styles.growthProgressCardCompact]}>
         <View style={[styles.energyMedallion, compact && styles.energyMedallionCompact]}>
           <Animated.View style={[styles.energyMeterIconFrame, compact && styles.energyMeterIconFrameCompact, iconPulseStyle]}>
-            <Image contentFit="contain" source={GAME_CURRENCY_ART.energy} style={styles.energyMeterIcon} transition={0} />
+            <IconSymbol color="#F3D37B" name="sparkles" size={compact ? 18 : 22} />
           </Animated.View>
         </View>
         <View style={styles.trackContainer}>
@@ -2436,7 +2443,9 @@ function GrowthMeter({ growth }: { growth: TodayGrowthSummary }) {
             </ThemedText>
           </View>
         </View>
-        <Image contentFit="contain" source={GAME_CURRENCY_ART.energy} style={[styles.energyTailArt, compact && styles.energyTailArtCompact]} transition={0} />
+        <View style={[styles.energyTailArt, compact && styles.energyTailArtCompact]}>
+          <IconSymbol color="#F3D37B" name="sparkles" size={compact ? 17 : 21} />
+        </View>
       </View>
       <View style={[styles.countdownPill, compact && styles.countdownPillCompact]}>
         <IconSymbol color="#F3D37B" name="timer" size={13} />

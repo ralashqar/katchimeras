@@ -18,7 +18,9 @@ import { WispArtwork } from '@/components/katchadeck/wisps/wisp-artwork';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { TODAY_ATMOSPHERE_BACKGROUND_SOURCES } from '@/constants/today-atmosphere-background-sources.gen';
+import { TODAY_EXPLORATION_BACKGROUND_SOURCES } from '@/constants/today-exploration-background-sources.gen';
 import { AppFontFamilies } from '@/constants/theme';
+import { sceneDefinition } from '@/constants/scenes';
 import type {
   CardDayGlyph,
   CardDayGlyphKey,
@@ -67,6 +69,9 @@ type DailyCardProps = {
 };
 
 export { COMPACT_DAILY_CARD_HORIZONTAL_GUTTER, COMPACT_DAILY_CARD_MAX_HEIGHT, COMPACT_DAILY_CARD_MAX_WIDTH };
+
+const DAY_CARD_WISP_SCALE = 1.35;
+const DAY_CARD_WISP_LIFT_RATIO = 0.4;
 
 const CompactDailyCardSizeContext = createContext<DailyCardSize | null>(null);
 
@@ -277,7 +282,7 @@ function CardHeader({ card, compact, scale }: { card: DailyCreatureCard; compact
           style={[styles.centered, styles.rarity, scaledText(scale, compact ? 29 : 27, compact ? 35 : 32)]}
           lightColor="#FFF0C7"
           darkColor="#FFF0C7">
-          {card.rarity.toUpperCase()}
+          {card.primaryWispId ? 'DAY WISP' : card.rarity.toUpperCase()}
         </ThemedText>
       </View>
       <View style={[nameRect, styles.centerBox]}>
@@ -320,7 +325,7 @@ function CardHeader({ card, compact, scale }: { card: DailyCreatureCard; compact
           style={[styles.centered, styles.dayTagText, scaledText(scale, compact ? 27 : 25, compact ? 32 : 28)]}
           lightColor="#FFF0C7"
           darkColor="#FFF0C7">
-          {sceneLabel(backdrop)}
+          {card.sceneVariantId ? sceneDefinition(card.sceneVariantId).name : sceneLabel(backdrop)}
         </ThemedText>
       </View>
     </>
@@ -333,7 +338,7 @@ function Scene({ card, compact, renderTier, scale, sceneArt }: { card: DailyCrea
   // thumbnail that was decoded for a smaller slot.
   const imageLod = compact && renderTier === 'buffer' ? 'medium' : 'full';
   const imagePriority = renderTier === 'focused' ? 'high' : renderTier === 'neighbor' ? 'normal' : 'low';
-  const source = resolveCreatureArtSource(card.visualKey, {
+  const source = card.primaryWispId ? null : resolveCreatureArtSource(card.visualKey, {
     lod: imageLod,
     variantCell: card.variantCell,
   });
@@ -346,7 +351,7 @@ function Scene({ card, compact, renderTier, scale, sceneArt }: { card: DailyCrea
   const weatherStrength = weatherModifier?.strength ?? 0;
   const sceneSource = backdrop === 'cafe' || backdrop === 'home' || backdrop === 'city' ? cafeScene : meadowScene;
   const environmentVisualKey = card.scene?.environment?.visualKey ?? card.visualKey;
-  const kingdomTile = sceneArt === 'kingdom'
+  const kingdomTile = sceneArt === 'kingdom' && !card.primaryWispId
     ? kingdomResidentTileForIdentity({ visualKey: environmentVisualKey })
     : null;
   const kingdomSource = kingdomTile
@@ -355,24 +360,28 @@ function Scene({ card, compact, renderTier, scale, sceneArt }: { card: DailyCrea
   const skySource = TODAY_ATMOSPHERE_BACKGROUND_SOURCES[
     resolveDailyCardSkySceneId(card)
   ].source;
+  const cinematicSceneSource = card.primaryWispId && card.sceneVariantId
+    ? TODAY_EXPLORATION_BACKGROUND_SOURCES[card.sceneVariantId].source
+    : null;
   const kingdomEnvironmentSize = (compact ? 785 : 763) * scale;
   const kingdomEnvironmentBottom = (compact ? 0 : 5) * scale;
   const kingdomCreatureFrameSize = Math.min(
     835 * 0.389,
     (compact ? COMPACT_CARD_SCENE_HEIGHT : FULL_CARD_SCENE_HEIGHT) * 0.3651,
   ) * scale;
+  const primaryWispSize = (compact ? 300 : 270) * scale * DAY_CARD_WISP_SCALE;
   return (
     <LinearGradient
       colors={colors}
       style={[frameRect(scale, 53, compact ? COMPACT_CARD_SCENE_TOP : CARD_SCENE_TOP, 835, compact ? COMPACT_CARD_SCENE_HEIGHT : FULL_CARD_SCENE_HEIGHT), styles.scene, { borderRadius: 22 * scale }]}>
-        {kingdomSource ? (
+        {kingdomSource || cinematicSceneSource ? (
           <Image
             allowDownscaling={false}
             cachePolicy="memory-disk"
             contentFit="cover"
             pointerEvents="none"
             priority={imagePriority}
-            source={skySource}
+            source={cinematicSceneSource ?? skySource}
             style={styles.cardSkyImage}
             transition={0}
           />
@@ -396,7 +405,7 @@ function Scene({ card, compact, renderTier, scale, sceneArt }: { card: DailyCrea
             ]}
             transition={0}
           />
-        ) : (
+        ) : cinematicSceneSource ? null : (
           <Image allowDownscaling={false} cachePolicy="memory-disk" contentFit="cover" priority={imagePriority} source={sceneSource} style={styles.sceneImage} transition={0} />
         )}
         <LinearGradient
@@ -406,7 +415,7 @@ function Scene({ card, compact, renderTier, scale, sceneArt }: { card: DailyCrea
         {weatherModifier ? <WeatherTint condition={weatherModifier.condition} strength={weatherStrength} /> : null}
         {renderTier !== 'buffer' && (weather === 'rain' || weather === 'storm') ? <RainOverlay scale={scale} strength={weatherStrength || 1} /> : null}
         {renderTier !== 'buffer' && weather === 'snow' ? <SnowOverlay scale={scale} strength={weatherStrength || 1} /> : null}
-        {kingdomSource ? (
+        {kingdomSource && source ? (
           <View
             pointerEvents="none"
             style={[
@@ -432,7 +441,7 @@ function Scene({ card, compact, renderTier, scale, sceneArt }: { card: DailyCrea
               transition={0}
             />
           </View>
-        ) : (
+        ) : source ? (
           <Image
             allowDownscaling={false}
             cachePolicy="memory-disk"
@@ -442,8 +451,21 @@ function Scene({ card, compact, renderTier, scale, sceneArt }: { card: DailyCrea
             style={[styles.creature, compact ? styles.compactCreature : null]}
             transition={0}
           />
-        )}
-      {(card.featuredWisps ?? []).slice(0, 2).map((featured, index) => (
+        ) : card.primaryWispId ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.primaryWisp,
+              { transform: [{ translateY: -primaryWispSize * DAY_CARD_WISP_LIFT_RATIO }] },
+            ]}>
+            <WispArtwork
+              id={card.primaryWispId}
+              size={primaryWispSize}
+              thumbnail={compact}
+            />
+          </View>
+        ) : null}
+      {!card.primaryWispId && (card.featuredWisps ?? []).slice(0, 2).map((featured, index) => (
         <WispArtwork
           id={featured.wispId}
           key={featured.wispId}
@@ -744,6 +766,7 @@ const styles = StyleSheet.create({
   sceneImage: { ...StyleSheet.absoluteFillObject, opacity: 0.82 },
   kingdomSceneImage: { left: '50%', position: 'absolute', zIndex: 1 },
   creature: { bottom: '1%', height: '83%', position: 'absolute', width: '85%', zIndex: 2 },
+  primaryWisp: { alignItems: 'center', bottom: '19%', justifyContent: 'center', position: 'absolute', zIndex: 4 },
   featuredWisp: { position: 'absolute', zIndex: 4 },
   featuredWispLeft: { left: '7%' },
   featuredWispRight: { right: '7%' },

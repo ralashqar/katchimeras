@@ -6,6 +6,7 @@ import test from 'node:test';
 import type { HomeDayRecord } from '@/types/home';
 import { earnedWispIds, selectFeaturedWisps, wispProgress } from '@/utils/wisp-engine';
 import { normalizeWispState } from '@/utils/wisp-state';
+import { normalizeSceneState } from '@/utils/scene-state';
 import { todayEggShoulderWispFrame } from '@/utils/today-kingdom-hero-layout';
 
 function day(id: string, overrides: Partial<HomeDayRecord> = {}): HomeDayRecord {
@@ -122,6 +123,48 @@ test('legacy Wisp unlocks migrate into quantity-based inventory', () => {
   assert.equal(state.version, 2);
   assert.deepEqual(state.inventory.sprout, { wispId: 'sprout', quantity: 1, sources: ['migration'], firstGrantedAt: 123, giftableQuantity: 0 });
   assert.equal(state.equippedWispId, 'sprout');
+});
+
+test('daily Wisp Resonance and its pending return reveal survive normalization', () => {
+  const state = normalizeWispState({
+    version: 2,
+    unlocked: { sprout: { wispId: 'sprout', unlockedAt: 123, sourceDayId: 'day', seenReveal: true } },
+    inventory: { sprout: { wispId: 'sprout', quantity: 3, sources: ['experience'], firstGrantedAt: 123, giftableQuantity: 2 } },
+    resonanceCounts: { sprout: 3 },
+    pendingResonance: { wispId: 'sprout', previousCount: 2, nextCount: 3 },
+  });
+  assert.equal(state.resonanceCounts?.sprout, 3);
+  assert.deepEqual(state.pendingResonance, { wispId: 'sprout', previousCount: 2, nextCount: 3 });
+});
+
+test('Scene state keeps only owned catalog Scenes equipped', () => {
+  const state = normalizeSceneState({
+    equippedSceneId: 'flickerbun',
+    unlocked: {
+      flickerbun: { sceneId: 'flickerbun', unlockedAt: 456, sourceDayId: 'day', seenReveal: false },
+      imaginary: { sceneId: 'imaginary', unlockedAt: 1, sourceDayId: null, seenReveal: false },
+    },
+    appliedReceiptIds: ['daily-scene:day:flickerbun'],
+  });
+  assert.equal(state.equippedSceneId, 'flickerbun');
+  assert.ok(state.unlocked.home);
+  assert.ok(state.unlocked.flickerbun);
+  assert.equal('imaginary' in state.unlocked, false);
+});
+
+test('legacy sky Scene ownership migrates to the matching cinematic environment', () => {
+  const state = normalizeSceneState({
+    version: 1,
+    equippedSceneId: 'rain_overcast',
+    unlocked: {
+      rain_overcast: { sceneId: 'rain_overcast', unlockedAt: 456, sourceDayId: 'day', seenReveal: true },
+    },
+  });
+
+  assert.equal(state.version, 2);
+  assert.equal(state.equippedSceneId, 'flickerbun');
+  assert.ok(state.unlocked.home);
+  assert.equal(state.unlocked.flickerbun?.sourceDayId, 'day');
 });
 
 test('family signature progress counts distinct achievement sections', () => {

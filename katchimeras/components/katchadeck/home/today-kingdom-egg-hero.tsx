@@ -182,6 +182,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   const visualEnergyRatioRef = useRef(energyRatio);
   const growthFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   sourceEnergyRatioRef.current = energyRatio;
+
   const feedbackShake = useSharedValue(0);
   const feedbackPulse = useSharedValue(0);
   const activationPulse = useSharedValue(0);
