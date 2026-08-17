@@ -52,15 +52,15 @@ test('Today and unlocked Tomorrow resolve to one target-aware forming contract',
   assert.equal(next.forming?.isTomorrow, true);
 });
 
-test('Tomorrow stays locked and only Daily Hatch owns the whole surface', () => {
+test('Tomorrow stays locked while Daily Hatch retains the mounted Today context', () => {
   assert.deepEqual(resolve({ selectedDay: tomorrow }), {
     forming: null,
     mode: 'locked-tomorrow',
   });
-  assert.deepEqual(resolve({ hatchOwnership: 'daily_surface' }), {
-    forming: null,
-    mode: 'hatching',
-  });
+  const daily = resolve({ hatchOwnership: 'daily_in_place' });
+  assert.equal(daily.mode, 'hatching');
+  assert.equal(daily.forming?.day.id, today.id);
+  assert.equal(daily.forming?.target, 'today');
   assert.equal(resolve({ hatchOwnership: 'discovery_in_place' }).mode, 'forming-today');
   assert.equal(resolve({ hatchOwnership: 'discovery_in_place' }).forming?.day.id, today.id);
 });

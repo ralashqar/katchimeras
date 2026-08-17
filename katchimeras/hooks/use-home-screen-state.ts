@@ -16,6 +16,8 @@ import type {
   TodayCareActionState,
   TodayGrowthSource,
   TodayEnergyActionCompletion,
+  HomeTimelineDay,
+  HomeDayRecord,
 } from '@/types/home';
 import {
   addMomentToDay,
@@ -94,12 +96,14 @@ type HomeScreenStateOptions = {
   persistHydrationRepairs?: boolean;
   /** Temporarily yield native media discovery while a visible interaction runs. */
   pauseInteractiveServices?: boolean;
+  recoveryHatchDayId?: string | null;
 };
 
 export function useHomeScreenState({
   enableInteractiveServices = true,
   persistHydrationRepairs = true,
   pauseInteractiveServices = false,
+  recoveryHatchDayId = null,
 }: HomeScreenStateOptions = {}) {
   // Today is intentionally unmounted while full-screen routes (notably the
   // camera) are active. Seed a remount from the repository's in-memory state
@@ -240,11 +244,33 @@ export function useHomeScreenState({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDayId, selectedInTimeline === null, storedState]);
   const selectedDay =
-    selectedInTimeline ??
-    selectedInArchive ??
     timelineDays.find((day) => day.kind === 'day' && day.isToday) ??
     timelineDays[0] ??
     null;
+  const yesterdayIsoDate = useMemo(() => {
+    const [year, month, day] = viewModel.state.today.isoDate.split('-').map(Number);
+    const value = new Date(year, Math.max(0, month - 1), day, 12, 0, 0, 0);
+    value.setDate(value.getDate() - 1);
+    const yyyy = value.getFullYear();
+    const mm = String(value.getMonth() + 1).padStart(2, '0');
+    const dd = String(value.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }, [viewModel.state.today.isoDate]);
+  const pendingHatchDay = timelineDays.find((candidate): candidate is HomeDayRecord => (
+    candidate.kind === 'day'
+    && candidate.isoDate === yesterdayIsoDate
+    && candidate.state === 'sealed'
+    && Boolean(candidate.dailyHatch)
+    && !candidate.dailyHatch?.claimedAt
+  )) ?? (recoveryHatchDayId
+    ? hydrateAllDays(viewModel.state, loadOnboardingProfile(), new Date()).find((candidate) => (
+        candidate.kind === 'day'
+        && candidate.id === recoveryHatchDayId
+        && candidate.state === 'sealed'
+        && Boolean(candidate.dailyHatch)
+        && !candidate.dailyHatch?.claimedAt
+      )) ?? null
+    : null);
   // Photo suggestions belong to the actual current day, not whichever card is
   // being viewed. The selected id is only an idle signal so carousel activity
   // cancels/postpones scanning without clearing already-curated candidates.
@@ -260,8 +286,8 @@ export function useHomeScreenState({
     interactionKey: selectedDayId,
     paused: pauseInteractiveServices,
   });
-  const { triggerHatchIfReady } = useHatchController({
-    selectedDay,
+  const { claimHatch, triggerHatchIfReady } = useHatchController({
+    selectedDay: pendingHatchDay,
     state: viewModel.state,
     storedStateRef,
     setStoredState,
@@ -564,7 +590,8 @@ export function useHomeScreenState({
   }, [mutateHomeState]);
 
   const selectTimelineDay = useCallback((dayId: string) => {
-    setSelectedDayId(dayId);
+    const todayId = storedStateRef.current?.today.id;
+    if (dayId === 'today' || dayId === todayId) setSelectedDayId(todayId ?? 'today');
   }, []);
 
   const selectPath = useCallback((pathId: string) => {
@@ -649,8 +676,9 @@ export function useHomeScreenState({
 
   return {
     timelineDays,
-    selectedDayId: selectedDay?.id ?? viewModel.todayId,
+    selectedDayId: viewModel.todayId,
     selectedDay,
+    pendingHatchDay,
     activeDayPrompt,
     availableDayPrompts,
     applyCapturedMoment,
@@ -709,6 +737,7 @@ export function useHomeScreenState({
     selectTimelineDay,
     selectPath,
     triggerHatchIfReady,
+    claimHatch,
     refreshState,
     resetHomeState,
   };

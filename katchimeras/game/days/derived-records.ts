@@ -2,7 +2,7 @@ import type { HomeDayRecord, StoredHomeState, StoredHomeDayRecord, WeekProfile }
 import type { OnboardingProfile } from '@/utils/onboarding-state';
 import { deriveDayMapSummary } from '@/utils/day-map-engine';
 import { formatDateLabel, getDayLabel, tomorrowDateId } from './date';
-import { resolveDayState, resolveHatchHour } from './lifecycle';
+import { resolveDayState } from './lifecycle';
 import { createEmptyStoredDay } from './records';
 import { buildInsightLine, buildPathOptions, computeDayScores, computeWeekProfile } from './scoring';
 import { buildUnhatchedHighlight, deriveEggVisualState } from './visuals';
@@ -14,7 +14,7 @@ export function deriveHomeDayRecord(
   weekProfile: WeekProfile,
   now: Date
 ): HomeDayRecord {
-  const state = resolveDayState(storedDay, now, resolveHatchHour(profile));
+  const state = resolveDayState(storedDay, now);
   const scores = computeDayScores(storedDay);
   const insightLine = buildInsightLine(weekProfile, profile);
   const pathOptions = buildPathOptions(weekProfile);

@@ -182,16 +182,17 @@ test('Merge FTUE never inserts guide panels into the fixed board layout', () => 
   assert.match(merge, /Future guidance belongs in an absolute world-space[\s\S]*?tray, counter, and board retain identical frames/);
 });
 
-test('Merge FTUE spotlight is an absolute non-layout overlay with transparent target cutouts', () => {
+test('Merge FTUE spotlight is an absolute native-view overlay with transparent target cutouts', () => {
   const overlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
   const merge = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   assert.match(overlay, /StyleSheet\.absoluteFillObject/);
   assert.match(overlay, /pointerEvents="none"/);
-  assert.match(overlay, /FillType\.EvenOdd/);
-  assert.match(overlay, /usePathValue/);
+  assert.match(overlay, /<SpotlightDimPanels/);
+  assert.match(overlay, /<NativeSpotlightRing slot=\{slot0\}/);
+  assert.doesNotMatch(overlay, /@shopify\/react-native-skia|<Canvas|FillType|usePathValue/);
   assert.match(overlay, /spotlightTransitionDurationMs: 420/);
   assert.match(overlay, /withTiming\(frame\.x, timing\)/);
-  assert.match(overlay, /const ringPath = usePathValue[\s\S]*?<Path color=\{theme\.focusRingColor\}/);
+  assert.match(overlay, /borderColor: theme\.focusRingColor/);
   assert.match(overlay, /spotlight\.targets/);
   assert.match(overlay, /spotlight\.grouping === 'bounding_rect'[\s\S]*?boundingFrame\(resolved\)/);
   assert.match(merge, /spotlight=\{active && !serveFlight \? ftueStep\?\.spotlight \?\? null : null\}/);
@@ -537,8 +538,8 @@ test('Discovery Hatch remains inside the forming Home Egg stage', () => {
   assert.match(egg, /expressionSequence=\{[\s\S]*?discoveryHatch && !discoveryPhaseAtLeast/);
   assert.match(egg, /DISCOVERY_CRACK_ONE/);
   assert.doesNotMatch(home, /<TodayTileHatchReveal/);
-  assert.match(route, /hatchOwnership: dailyHatchActive \? 'daily_surface' : discoveryHatchInPlace \? 'discovery_in_place'/);
-  assert.match(route, /hatchPresentation=\{isHatching && hatchPresentation\.policy === 'ftue_discovery'/);
+  assert.match(route, /hatchOwnership: dailyHatchActive \? 'daily_in_place' : discoveryHatchInPlace \? 'discovery_in_place'/);
+  assert.match(route, /hatchPresentation=\{isHatching \? hatchPresentation : null\}/);
 });
 
 test('Discovery Hatch waits for creature art and fails back to a retryable Egg', () => {
@@ -556,6 +557,6 @@ test('Discovery Hatch freezes Home motion without resetting its camera values', 
   const route = readFileSync('app/(tabs)/today.tsx', 'utf8');
   assert.match(environment, /if \(frozen\) \{[\s\S]*?cancelAnimation\(pinchScale\);[\s\S]*?return;/);
   assert.match(exploration, /if \(frozen\) \{[\s\S]*?cancelAnimation\(translateX\);/);
-  assert.match(route, /frozen: discoveryHatchInPlace/);
-  assert.match(route, /const explorationBackgroundActive = !dailyHatchActive/);
+  assert.match(route, /frozen: dailyHatchActive \|\| discoveryHatchInPlace/);
+  assert.match(route, /const explorationBackgroundActive = isForming[\s\S]*?\|\| !dailyHatchActive/);
 });

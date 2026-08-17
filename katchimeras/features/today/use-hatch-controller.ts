@@ -1,29 +1,27 @@
 import { useCallback, useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 
 import {
-  applyGeneratedReflection,
+  claimDailyHatchForDay,
   hydrateHomeState,
   setDayWeatherForDay,
   setPlaceCategorySeedsForDay,
   triggerHatchForDay,
 } from '@/game/days';
 import type { HomeTimelineDay, StoredHomeDayRecord, StoredHomeState } from '@/types/home';
-import { requestDayReflection } from '@/utils/day-reflection';
 import { ensureDayWeather } from '@/utils/day-weather';
-import {
-  getHatchNotificationPermission,
-  requestHatchNotificationPermission,
-  syncHatchNotification,
-} from '@/utils/hatch-notification';
+import { syncHatchNotification } from '@/utils/hatch-notification';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
-import { ensureDayVision } from '@/utils/photo-vision';
 import { resolvePlaceSeedsForDay } from '@/utils/place-categories';
 import { syncWidgetState } from '@/utils/widget-state';
 import { homeRepository } from '@/storage/repositories/home-repository';
-import { markArrivalPending } from '@/utils/kingdom-arrival';
 
 export type HatchCommitResult =
   | { status: 'hatched'; day: StoredHomeDayRecord }
+  | { status: 'not_ready' }
+  | { status: 'failed'; reason: string };
+
+export type HatchClaimResult =
+  | { status: 'claimed'; day: StoredHomeDayRecord }
   | { status: 'not_ready' }
   | { status: 'failed'; reason: string };
 
@@ -78,32 +76,6 @@ export function useHatchController({
     })();
   }, [setStoredState, state]);
 
-  const enhanceDayReflection = useCallback(async (hatchedState: StoredHomeState, dayId: string) => {
-    const profile = loadOnboardingProfile();
-    const day =
-      hatchedState.today.id === dayId
-        ? hatchedState.today
-        : hatchedState.archivedDays.find((candidate) => candidate.id === dayId) ?? null;
-
-    if (!day?.creature || day.creature.reflectionSource === 'generated') {
-      return;
-    }
-
-    const vision = await ensureDayVision(day);
-    const dayForReflection = vision ? { ...day, vision } : day;
-    const pastDays = hatchedState.archivedDays.filter((candidate) => candidate.id !== dayId);
-    const generated = await requestDayReflection(dayForReflection, profile, pastDays);
-    if (!generated) {
-      return;
-    }
-
-    const now = new Date();
-    setStoredState((currentState) => {
-      const hydrated = hydrateHomeState(currentState, profile, now);
-      return applyGeneratedReflection(hydrated.state, dayId, generated, profile, now);
-    });
-  }, [setStoredState]);
-
   const triggerHatchIfReady = useCallback(async (): Promise<HatchCommitResult> => {
     if (!selectedDay || selectedDay.kind !== 'day') {
       return { status: 'not_ready' };
@@ -119,7 +91,7 @@ export function useHatchController({
       let baseState = hydrated.state;
 
       const targetDay = findDay(baseState, selectedDay.id);
-      if (!targetDay) return { status: 'not_ready' };
+      if (!targetDay?.dailyHatch || targetDay.state !== 'sealed') return { status: 'not_ready' };
 
       // Both enrichments read the same immutable day snapshot. Resolve them in
       // parallel so the anticipation phase is bounded by one timeout rather
@@ -155,7 +127,7 @@ export function useHatchController({
 
       const hatchedState = triggerHatchForDay(baseState, selectedDay.id, profile, now);
       const hatchedDay = findDay(hatchedState, selectedDay.id);
-      if (!hatchedDay?.dailyHatch || hatchedDay.state !== 'hatched') {
+      if (!hatchedDay?.dailyHatch?.revealedAt) {
         return { status: 'not_ready' };
       }
 
@@ -166,13 +138,7 @@ export function useHatchController({
       homeRepository.save(hatchedState, { notify: false });
       setStoredState(hatchedState);
       // Standard daily hatches no longer create a Katchimera resident arrival.
-      void (async () => {
-        const permission = await getHatchNotificationPermission();
-        if (permission === 'undetermined') {
-          await requestHatchNotificationPermission();
-        }
-        await syncHatchNotification(hatchedState, profile);
-      })();
+      void syncHatchNotification(hatchedState, profile);
       return { status: 'hatched', day: hatchedDay };
     } catch (error) {
       console.warn('Hatch finalization failed', error);
@@ -181,9 +147,31 @@ export function useHatchController({
         reason: error instanceof Error ? error.message : 'The hatch could not be completed.',
       };
     }
-  }, [enhanceDayReflection, selectedDay, setStoredState, storedStateRef]);
+  }, [selectedDay, setStoredState, storedStateRef]);
 
-  return { triggerHatchIfReady };
+  const claimHatch = useCallback(async (): Promise<HatchClaimResult> => {
+    if (!selectedDay || selectedDay.kind !== 'day') return { status: 'not_ready' };
+    try {
+      const now = new Date();
+      const profile = loadOnboardingProfile();
+      const hydrated = hydrateHomeState(storedStateRef.current ?? homeRepository.load(), profile, now);
+      const claimedState = claimDailyHatchForDay(hydrated.state, selectedDay.id, now);
+      const claimedDay = findDay(claimedState, selectedDay.id);
+      if (!claimedDay?.dailyHatch?.claimedAt) return { status: 'not_ready' };
+      storedStateRef.current = claimedState;
+      homeRepository.save(claimedState, { notify: false });
+      setStoredState(claimedState);
+      void syncWidgetState(claimedState, profile).catch((error) => {
+        console.warn('Claimed hatch widget sync failed', error);
+      });
+      return { status: 'claimed', day: claimedDay };
+    } catch (error) {
+      console.warn('Hatch claim failed', error);
+      return { status: 'failed', reason: error instanceof Error ? error.message : 'The card could not be claimed.' };
+    }
+  }, [selectedDay, setStoredState, storedStateRef]);
+
+  return { claimHatch, triggerHatchIfReady };
 }
 
 function findDay(state: StoredHomeState, dayId: string): StoredHomeDayRecord | null {

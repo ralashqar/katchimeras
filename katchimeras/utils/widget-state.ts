@@ -2,7 +2,6 @@ import { Platform } from 'react-native';
 
 import type { StoredHomeState } from '@/types/home';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
-import { resolveHatchHour } from '@/game/days';
 import { WISPS_BY_ID } from '@/constants/wisps';
 
 const APP_GROUP = 'group.com.daruk.katchimeras';
@@ -21,8 +20,6 @@ export async function syncWidgetState(state: StoredHomeState, profile: Onboardin
     const today = state.today;
     const creature = today.creature;
     const wisp = today.dailyHatch ? WISPS_BY_ID.get(today.dailyHatch.primaryWispId) : null;
-    const hatchHour = resolveHatchHour(profile);
-    const hourLabel = hatchHour > 12 ? `${hatchHour - 12} PM` : `${hatchHour} AM`;
 
     if (wisp) {
       storage.set('kw_status', 'hatched');
@@ -34,15 +31,10 @@ export async function syncWidgetState(state: StoredHomeState, profile: Onboardin
       storage.set('kw_title', creature.name);
       storage.set('kw_subtitle', creature.motifTags[0] ?? 'Today became someone');
       storage.set('kw_image', creature.visualKey);
-    } else if (today.state === 'ready_to_hatch') {
-      storage.set('kw_status', 'ready');
-      storage.set('kw_title', 'Ready to hatch');
-      storage.set('kw_subtitle', 'Tonight is waiting for you');
-      storage.set('kw_image', 'egg');
     } else {
       storage.set('kw_status', 'forming');
-      storage.set('kw_title', 'Gathering shape');
-      storage.set('kw_subtitle', `Hatches at ${hourLabel}`);
+      storage.set('kw_title', 'Today is taking shape');
+      storage.set('kw_subtitle', 'Add moments for tomorrow\'s Wisp');
       storage.set('kw_image', 'egg');
     }
 

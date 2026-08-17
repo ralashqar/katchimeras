@@ -35,7 +35,6 @@ import { loadCompanionBondState } from '@/utils/companion-bond-storage';
 import { loadCompanionQuests } from '@/utils/katchimera-quests';
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
-import { requestSelectedDay } from '@/utils/selected-day-signal';
 import { wispCollectionProgress, wispEvolutionTier } from '@/utils/wisp-collections';
 import { dayState, localDateId } from '@/utils/streak-engine';
 import { streakRepository } from '@/storage/repositories/streak-repository';
@@ -100,7 +99,7 @@ export default function CollectionScreen() {
   }, [allKatchimerasAvailable, bondState, state]);
 
   const cards = useMemo(
-    () => days.flatMap((day) => day.state === 'hatched' && day.card ? [{ card: day.card, dayId: day.id }] : []).sort((left, right) => right.card.isoDate.localeCompare(left.card.isoDate)),
+    () => days.flatMap((day) => (day.state === 'hatched' || day.state === 'sealed') && day.card ? [{ card: day.card, dayId: day.id, sealed: day.state === 'sealed' }] : []).sort((left, right) => right.card.isoDate.localeCompare(left.card.isoDate)),
     [days]
   );
   const filterOptions = useMemo(() => buildFilterOptions(cards.map((entry) => entry.card)), [cards]);
@@ -116,6 +115,8 @@ export default function CollectionScreen() {
   const activeFilterCount = Object.values(filters).filter((value) => value !== 'all').length;
   const completion = dex && dex.total > 0 ? Math.round((dex.collected / dex.total) * 100) : 0;
   const carouselCards = useMemo(() => filteredCards.map(({ card }) => card), [filteredCards]);
+  const sealedCardIds = useMemo(() => new Set(cards.filter((entry) => entry.sealed).map((entry) => entry.card.id)), [cards]);
+  const collectedCardCount = cards.length - sealedCardIds.size;
 
   return (
     <View style={styles.screen}>
@@ -139,7 +140,7 @@ export default function CollectionScreen() {
                 ? `${Object.values(wisps.state.inventory).filter(Boolean).length} Wisps discovered`
                 : view === 'scenes'
                   ? `${Object.values(scenes.state.unlocked).filter(Boolean).length} Scenes discovered`
-                : `${cards.length} ${cards.length === 1 ? 'card' : 'cards'} collected`}
+                : `${collectedCardCount} ${collectedCardCount === 1 ? 'card' : 'cards'} collected`}
           </ThemedText>
         </Animated.View>
 
@@ -154,7 +155,15 @@ export default function CollectionScreen() {
               <View style={styles.carouselBleed}>
                 <CardDeckCarousel
                   cards={carouselCards}
-                  onOpenCard={(cardId) => router.push({ pathname: '/card/[cardId]', params: { cardId } })}
+                  sealedCardIds={sealedCardIds}
+                  onOpenCard={(cardId) => {
+                    const entry = cards.find((candidate) => candidate.card.id === cardId);
+                    if (entry?.sealed) {
+                      router.replace({ pathname: '/today', params: { recoveryHatchDayId: entry.dayId } });
+                      return;
+                    }
+                    router.push({ pathname: '/card/[cardId]', params: { cardId } });
+                  }}
                 />
               </View>
             ) : (
@@ -182,8 +191,9 @@ export default function CollectionScreen() {
                   router.push({ pathname: '/card/[cardId]', params: { cardId: day.card.id } });
                   return;
                 }
-                requestSelectedDay(dayId);
-                router.replace('/today');
+                if (day?.state === 'sealed') {
+                  router.replace({ pathname: '/today', params: { recoveryHatchDayId: day.id } });
+                }
               }}
             />
           </>

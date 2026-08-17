@@ -30,6 +30,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
 import { KatchaDeckUI } from '@/constants/theme';
 import { HOME_FTUE_CAMERA_SCALE } from '@/constants/home-loop-layout';
 import todayScene from '@/data/today-scene.json';
@@ -53,6 +54,8 @@ import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { EggAvatarArtwork, eggAvatarBodyPresentationStyle } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
 import type { EggExpressionCue } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
 import { WispCompanion } from '@/components/katchadeck/wisps/wisp-companion';
+import { WispArtwork } from '@/components/katchadeck/wisps/wisp-artwork';
+import { wispDefinition } from '@/constants/wisps';
 import type { WispId } from '@/types/wisp';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
 import { todayHatchCreature, type TodayHatchPhase, type TodayHatchPresentation } from '@/utils/today-hatch-presentation';
@@ -137,7 +140,6 @@ const ACTIVATION_CONFETTI = Array.from({ length: 18 }, (_, index) => ({
 const ACTIVATION_CONFETTI_BY_COLOR = ACTIVATION_CONFETTI_COLORS.map((_, colorIndex) =>
   ACTIVATION_CONFETTI.filter((particle) => particle.colorIndex === colorIndex)
 );
-
 export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   accentColor = '#F4CE7A',
   coreColor = '#FFF1B8',
@@ -195,8 +197,15 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   const ripple = useSharedValue(1);
   const rippleEcho = useSharedValue(1);
   const readyShake = useSharedValue(0);
+  const readyRipple = useSharedValue(1);
   const discoveryPhase = discoveryHatch?.phase ?? 'idle';
   const discoveryCreature = discoveryHatch ? todayHatchCreature(discoveryHatch) : null;
+  const discoveryWispId = discoveryHatch?.policy === 'daily'
+    ? discoveryHatch.committedDay?.dailyHatch?.primaryWispId ?? null
+    : null;
+  const discoveryWisp = discoveryWispId ? wispDefinition(discoveryWispId) : null;
+  const returningFromDailyHatch = discoveryHatch?.policy === 'daily'
+    && (discoveryPhase === 'new_day_intro' || discoveryPhase === 'restoring_today');
   const discoveryCreatureSource = discoveryCreature
     ? resolveCreatureArtSource(discoveryCreature.visualKey, { variantCell: discoveryCreature.variantCell })
     : null;
@@ -216,7 +225,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   const transientEffectsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const active = discoveryHatch?.policy === 'ftue_discovery' && discoveryPhase !== 'idle';
+    const active = Boolean(discoveryHatch && discoveryPhase !== 'idle');
     if (!active) {
       cancelAnimation(discoveryShake);
       cancelAnimation(discoveryPulse);
@@ -228,6 +237,39 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
       return;
     }
     const quick = reduceMotion;
+    if (discoveryPhase === 'preparing') {
+      // A dev replay may target the same day and reuse this mounted component.
+      // Reset every transient explicitly so no prior run can leave the Egg
+      // transparent, cracked, or with its Wisp already settled.
+      cancelAnimation(discoveryShake);
+      cancelAnimation(discoveryPulse);
+      discoveryShake.value = 0;
+      discoveryPulse.value = 0;
+      discoveryEggExit.value = 0;
+      discoveryCreatureEntry.value = 0;
+      discoveryCrackOne.value = 0;
+      discoveryCrackTwo.value = 0;
+    }
+    if (returningFromDailyHatch) {
+      // Claim is the handoff between yesterday's collectible and today's Egg.
+      // Keep the Egg absent throughout the deck/claim state, remove the revealed
+      // Wisp here, then let the outer new-day stage animate the Egg back in.
+      cancelAnimation(discoveryShake);
+      cancelAnimation(discoveryPulse);
+      discoveryShake.value = withTiming(0, { duration: reduceMotion ? 1 : 90 });
+      discoveryPulse.value = 0;
+      discoveryCrackOne.value = withTiming(0, { duration: reduceMotion ? 1 : 120 });
+      discoveryCrackTwo.value = withTiming(0, { duration: reduceMotion ? 1 : 120 });
+      discoveryCreatureEntry.value = withTiming(0, {
+        duration: reduceMotion ? 80 : 260,
+        easing: Easing.in(Easing.cubic),
+      });
+      // The parent new-day entry is the sole owner of the returning Egg's
+      // fade/scale. Reset this inner hatch layer while the parent is hidden so
+      // two nested scale animations cannot fight each other.
+      discoveryEggExit.value = 0;
+      return;
+    }
     if (discoveryPhase === 'preparing' || discoveryPhase === 'shaking' || discoveryPhase === 'cracking') {
       cancelAnimation(discoveryShake);
       discoveryShake.value = quick ? 0 : withRepeat(
@@ -267,11 +309,14 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
     discoveryCrackTwo,
     discoveryCreatureEntry,
     discoveryEggExit,
+    discoveryHatch,
+    discoveryHatch?.animationKey,
     discoveryHatch?.policy,
     discoveryPhase,
     discoveryPulse,
     discoveryShake,
     reduceMotion,
+    returningFromDailyHatch,
   ]);
   const mountTransientEffects = useCallback(() => {
     if (transientEffectsTimerRef.current) clearTimeout(transientEffectsTimerRef.current);
@@ -460,10 +505,14 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
 
   useEffect(() => {
     cancelAnimation(readyShake);
+    cancelAnimation(readyRipple);
     if (!isReady || reduceMotion) {
       readyShake.value = withTiming(0, { duration: 120 });
+      readyRipple.value = 1;
       return;
     }
+    // The rattle and ripple share a 3.06 second cycle, so each ready reminder
+    // launches the same quick one-shot ripple used by an Energy arrival.
     readyShake.value = withRepeat(
       withSequence(
         withTiming(1, { duration: 75, easing: Easing.linear }),
@@ -476,8 +525,25 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
       -1,
       false,
     );
-    return () => cancelAnimation(readyShake);
-  }, [isReady, readyShake, reduceMotion]);
+    readyRipple.value = 0;
+    readyRipple.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) }),
+        withDelay(2_639, withTiming(0, { duration: 1 })),
+      ),
+      -1,
+      false,
+    );
+    return () => {
+      cancelAnimation(readyShake);
+      cancelAnimation(readyRipple);
+    };
+  }, [
+    isReady,
+    readyRipple,
+    readyShake,
+    reduceMotion,
+  ]);
 
   const eggMotionStyle = useAnimatedStyle(() => {
     const shake = feedbackShake.value + readyShake.value + discoveryShake.value * 2;
@@ -486,11 +552,14 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
       * eggStageScale
       * (projectedCameraScale?.value ?? 1);
     return {
+      // This remains the one persistent player Egg; it scales away in place as
+      // the revealed subject grows, without swapping surfaces or camera frames.
       opacity: 1 - discoveryEggExit.value,
       transform: [
         { rotateZ: `${shake * 2.8}deg` },
         { translateX: discoveryShake.value * 7 },
         { translateY: -platformLift - activationPulse.value * (reduceMotion ? 2 : 7) },
+        { scale: 1 - discoveryEggExit.value * 0.82 },
       ],
     };
   });
@@ -511,8 +580,15 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
       }],
     };
   });
-  const discoveryCrackOneStyle = useAnimatedStyle(() => ({ opacity: discoveryCrackOne.value * (1 - discoveryCrackTwo.value * 0.65) }));
-  const discoveryCrackTwoStyle = useAnimatedStyle(() => ({ opacity: discoveryCrackTwo.value }));
+  const discoveryCrackOneStyle = useAnimatedStyle(() => ({
+    opacity: discoveryCrackOne.value
+      * (1 - discoveryCrackTwo.value * 0.65)
+      * (discoveryHatch?.policy === 'daily' ? 1 - discoveryCreatureEntry.value : 1),
+  }));
+  const discoveryCrackTwoStyle = useAnimatedStyle(() => ({
+    opacity: discoveryCrackTwo.value
+      * (discoveryHatch?.policy === 'daily' ? 1 - discoveryCreatureEntry.value : 1),
+  }));
   const projectedEffectCameraStyle = useAnimatedStyle(() => ({
     transform: [{ scale: projectedCameraScale?.value ?? 1 }],
   }));
@@ -536,6 +612,12 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
         discoveryCreature.visualKey,
       )
     : null;
+  const discoveryWispSize = Math.min(210, eggFrame.height * 0.92);
+  // The Wisp begins at the Egg and settles above it, leaving the persistent Egg
+  // readable instead of stacking two full-size subjects in the same frame.
+  const discoveryWispTop = discoveryHatch?.policy === 'daily'
+    ? eggFrame.top - discoveryWispSize * 0.34
+    : eggFrame.top + (eggFrame.height - discoveryWispSize) / 2;
   const discoveryCreatureStyle = useAnimatedStyle(() => ({
     opacity: discoveryCreatureEntry.value,
     transform: [
@@ -574,7 +656,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
 
   return (
     <View pointerEvents="box-none" style={styles.stage}>
-      {discoveryHatch ? <>
+      {discoveryHatch && !returningFromDailyHatch ? <>
         <Animated.View style={[styles.discoveryPulseRing, { height: discoveryEggWidth * 1.05, marginLeft: -discoveryEggWidth * 0.525, top: eggFrame.top + eggFrame.height * 0.08, width: discoveryEggWidth * 1.05 }, discoveryPulseOneStyle]} />
         <Animated.View style={[styles.discoveryPulseRing, { height: discoveryEggWidth * 1.05, marginLeft: -discoveryEggWidth * 0.525, top: eggFrame.top + eggFrame.height * 0.08, width: discoveryEggWidth * 1.05 }, discoveryPulseTwoStyle]} />
       </> : null}
@@ -592,6 +674,24 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
           <Animated.View
             pointerEvents="none"
             style={[StyleSheet.absoluteFill, projectedEffectCameraStyle]}>
+            {isReady ? <>
+              <RotatingRadialSunburst
+                baseOpacity={0.9}
+                size={440 * eggStageScale}
+                style={{
+                  left: '50%',
+                  marginLeft: -220 * eggStageScale,
+                  top: (eggFrame.height - 440 * eggStageScale) / 2,
+                }}
+              />
+              <EggRippleField
+                accentColor={accentColor}
+                coreColor={coreColor}
+                primary={readyRipple}
+                stageHeight={eggFrame.height}
+                stageScale={eggStageScale}
+              />
+            </> : null}
             <EggRadiance
               accentColor={accentColor}
               coreColor={coreColor}
@@ -658,7 +758,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
                         ? feedExpressionSequence
                         : undefined
                   }
-                  expressionSequenceKey={discoveryHatch ? `${discoveryHatch.dayId}:discovery` : feedExpressionKey > 0 ? `feed:${feedExpressionKey}` : 'idle'}
+                  expressionSequenceKey={discoveryHatch ? `${discoveryHatch.dayId}:${discoveryHatch.animationKey}:discovery` : feedExpressionKey > 0 ? `feed:${feedExpressionKey}` : 'idle'}
                   faceId={forceSleeping ? 'sleepy' : equippedFaceId}
                   priority="high"
                   resolution="high"
@@ -749,7 +849,35 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
           />
         </Animated.View>
       ) : null}
-      {discoveryCreature && discoveryCreatureFrame ? (
+      {discoveryWispId ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.discoveryCreature,
+            {
+              height: discoveryWispSize,
+              marginLeft: -discoveryWispSize / 2,
+              top: discoveryWispTop,
+              width: discoveryWispSize,
+            },
+            discoveryCreatureStyle,
+          ]}>
+          <AnimatedImage
+            contentFit="contain"
+            source={DISCOVERY_SOFT_GLOW}
+            style={[styles.discoveryGlow, discoveryGlowStyle]}
+            tintColor={discoveryWisp?.palette[0] ?? KatchaDeckUI.ftue.gold}
+            transition={0}
+          />
+          <WispArtwork
+            id={discoveryWispId}
+            onError={onDiscoveryCreatureError}
+            onLoad={onDiscoveryCreatureReady}
+            size={discoveryWispSize}
+          />
+        </Animated.View>
+      ) : null}
+      {(discoveryCreature && discoveryCreatureFrame) || discoveryWisp ? (
         <Animated.View
           pointerEvents="none"
           style={[
@@ -761,7 +889,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
             style={styles.discoveryName}
             lightColor={KatchaDeckUI.ftue.gold}
             darkColor={KatchaDeckUI.ftue.gold}>
-            {discoveryCreature.name}
+            {discoveryCreature?.name ?? discoveryWisp?.name}
           </ThemedText>
         </Animated.View>
       ) : null}
@@ -777,6 +905,12 @@ function discoveryPhaseAtLeast(phase: TodayHatchPhase, target: TodayHatchPhase) 
     'cracking',
     'crossfading_subject',
     'subject_settling',
+    'forming_card',
+    'assembling_deck',
+    'awaiting_claim',
+    'claiming',
+    'new_day_intro',
+    'restoring_today',
     'awaiting_interaction',
     'world_shift',
     'dashboard_settling',
@@ -931,7 +1065,7 @@ function EggRippleField({ accentColor, coreColor, primary, secondary, stageHeigh
   accentColor: string;
   coreColor: string;
   primary: SharedValue<number>;
-  secondary: SharedValue<number>;
+  secondary?: SharedValue<number>;
   stageHeight: number;
   stageScale: number;
 }) {
@@ -941,9 +1075,9 @@ function EggRippleField({ accentColor, coreColor, primary, secondary, stageHeigh
   const primarySize = 304 * stageScale;
   const secondarySize = 342 * stageScale;
   const primaryOpacity = useDerivedValue(() => (1 - primary.value) * 0.9);
-  const secondaryOpacity = useDerivedValue(() => (1 - secondary.value) * 0.58);
+  const secondaryOpacity = useDerivedValue(() => (1 - (secondary?.value ?? 1)) * 0.58);
   const primaryTransform = useDerivedValue(() => [{ scale: 0.42 + primary.value * 1.02 }]);
-  const secondaryTransform = useDerivedValue(() => [{ scale: 0.36 + secondary.value * 1.16 }]);
+  const secondaryTransform = useDerivedValue(() => [{ scale: 0.36 + (secondary?.value ?? 1) * 1.16 }]);
 
   if (!ringImage) return null;
   return (
@@ -964,17 +1098,19 @@ function EggRippleField({ accentColor, coreColor, primary, secondary, stageHeigh
           <BlendColor color={accentColor} mode="srcIn" />
         </SkiaImage>
       </Group>
-      <Group opacity={secondaryOpacity} origin={vec(center, center)} transform={secondaryTransform}>
-        <SkiaImage
-          fit="contain"
-          height={secondarySize}
-          image={ringImage}
-          width={secondarySize}
-          x={(canvasSize - secondarySize) / 2}
-          y={(canvasSize - secondarySize) / 2}>
-          <BlendColor color={coreColor} mode="srcIn" />
-        </SkiaImage>
-      </Group>
+      {secondary ? (
+        <Group opacity={secondaryOpacity} origin={vec(center, center)} transform={secondaryTransform}>
+          <SkiaImage
+            fit="contain"
+            height={secondarySize}
+            image={ringImage}
+            width={secondarySize}
+            x={(canvasSize - secondarySize) / 2}
+            y={(canvasSize - secondarySize) / 2}>
+            <BlendColor color={coreColor} mode="srcIn" />
+          </SkiaImage>
+        </Group>
+      ) : null}
     </Canvas>
   );
 }

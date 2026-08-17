@@ -62,7 +62,50 @@ test('the first three normal Today actions retreat the camera in equal logarithm
   assert.equal(targets[4], 1);
 });
 
-test('hatch readiness follows the exact chosen ritual time', () => {
+test('claiming yesterday starts Today care from Mood and ignores pre-cycle artifacts', () => {
+  const cycleStartedAt = '2026-08-05T09:00:00.000Z';
+  const oldMood = {
+    id: 'old-mood',
+    kind: 'feeling' as const,
+    choiceIds: ['good'],
+    labels: ['Good'],
+    createdAt: '2026-08-05T08:00:00.000Z',
+    source: 'prompt_chip' as const,
+    semanticTags: ['feeling:good'],
+    scoreBias: {},
+  };
+  const freshCycle = day({
+    growth: { schemaVersion: 1, cycleStartedAt, events: [], careActions: [] },
+    promptAnswers: [oldMood],
+    sleep: { quality: 'good', source: 'manual', recordedAt: '2026-08-05T08:10:00.000Z' },
+    stepsCount: 8_000,
+    stepsUpdatedAt: '2026-08-05T08:20:00.000Z',
+  });
+
+  const first = rankTodayCareActions({ day: freshCycle, now: new Date('2026-08-05T09:05:00.000Z') });
+  assert.deepEqual(first.active.map((action) => action.id), ['mood']);
+
+  const afterMood = {
+    ...freshCycle,
+    promptAnswers: [{ ...oldMood, id: 'new-mood', createdAt: '2026-08-05T09:06:00.000Z' }],
+  };
+  const second = rankTodayCareActions({ day: afterMood, now: new Date('2026-08-05T09:07:00.000Z') });
+  assert.deepEqual(second.active.map((action) => action.id), ['sleep']);
+
+  const afterSleep = {
+    ...afterMood,
+    sleep: { quality: 'good' as const, source: 'manual' as const, recordedAt: '2026-08-05T09:08:00.000Z' },
+  };
+  const rotating = rankTodayCareActions({
+    day: afterSleep,
+    now: new Date('2026-08-05T09:09:00.000Z'),
+    rotatingLimit: 10,
+  });
+  assert.ok(rotating.active.some((action) => action.id === 'movement'));
+  assert.ok(!rotating.completed.some((action) => action.id === 'movement'));
+});
+
+test('the current day never becomes hatchable from the clock', () => {
   assert.equal(resolveDayLifecycleState({
     hasCreature: false,
     hatchHour: 18,
@@ -71,10 +114,10 @@ test('hatch readiness follows the exact chosen ritual time', () => {
     minute: 0,
     second: 0,
     storedState: 'forming',
-  }), 'ready_to_hatch');
+  }), 'forming');
 });
 
-test('a day with no captured context still becomes hatchable at the chosen ritual time', () => {
+test('past dates cannot bypass Daily Wisp finalization', () => {
   const base = {
     hasCreature: false,
     hatchHour: 20,
@@ -84,8 +127,8 @@ test('a day with no captured context still becomes hatchable at the chosen ritua
     storedState: 'forming' as const,
   };
   assert.equal(resolveDayLifecycleState({ ...base, hour: 19 }), 'forming');
-  assert.equal(resolveDayLifecycleState({ ...base, hour: 20 }), 'ready_to_hatch');
-  assert.equal(resolveDayLifecycleState({ ...base, hour: 8, isSameDay: false }), 'ready_to_hatch');
+  assert.equal(resolveDayLifecycleState({ ...base, hour: 20 }), 'forming');
+  assert.equal(resolveDayLifecycleState({ ...base, hour: 8, isSameDay: false }), 'forming');
 });
 
 function afterCareCheckIns(record: StoredHomeDayRecord = day()): StoredHomeDayRecord {
@@ -165,7 +208,7 @@ test('Egg art stages advance directly at Energy thresholds', () => {
   );
 });
 
-test('Waiting changes incubation progress without changing an Energy-driven egg stage', () => {
+test('Waiting does not change context progress or the Energy-driven egg stage', () => {
   let growingDay = awardGrowth(day(), {
     source: 'journal', sourceId: 'entry-1', awardedAt: new Date(2026, 7, 5, 8, 0),
   }).day;
@@ -174,13 +217,13 @@ test('Waiting changes incubation progress without changing an Energy-driven egg 
   }).day;
   const morning = todayGrowthSummary(growingDay, 20, new Date(2026, 7, 5, 9, 0));
   const evening = todayGrowthSummary(growingDay, 20, new Date(2026, 7, 5, 19, 0));
-  assert.ok(evening.progress > morning.progress);
+  assert.equal(evening.progress, morning.progress);
   assert.equal(morning.activeEnergy, 28);
   assert.equal(morning.stage, 1);
   assert.equal(evening.stage, morning.stage);
 });
 
-test('One meaningful memory activates incubation even after the scheduled hatch time', () => {
+test('Meaningful memories activate context but never a same-day hatch', () => {
   const first = awardGrowth(day(), {
     source: 'journal',
     sourceId: 'entry-1',
@@ -189,7 +232,7 @@ test('One meaningful memory activates incubation even after the scheduled hatch 
   const dormant = todayGrowthSummary(first, 20, new Date(2026, 7, 5, 21, 0));
   assert.equal(dormant.isActivated, true);
   assert.equal(dormant.qualifyingActionCount, 1);
-  assert.equal(dormant.isReady, true);
+  assert.equal(dormant.isReady, false);
 
   const second = awardGrowth(first, {
     source: 'sleep',
@@ -199,10 +242,10 @@ test('One meaningful memory activates incubation even after the scheduled hatch 
   const activated = todayGrowthSummary(second, 20, new Date(2026, 7, 5, 21, 1));
   assert.equal(activated.isActivated, true);
   assert.equal(activated.incubationStartedAt?.getTime(), new Date(2026, 7, 5, 8, 0).getTime());
-  assert.equal(activated.isReady, true);
+  assert.equal(activated.isReady, false);
 });
 
-test('A low-context day still reaches its scheduled hatch without satisfying the action activation gate', () => {
+test('A low-context day remains forming regardless of clock time', () => {
   let seeded = awardGrowth(day(), {
     source: 'daily_seed', sourceId: 'seed', awardedAt: new Date(2026, 7, 5, 7, 0),
   }).day;
@@ -213,12 +256,12 @@ test('A low-context day still reaches its scheduled hatch without satisfying the
   assert.equal(summary.activeEnergy, 10);
   assert.equal(summary.qualifyingActionCount, 1);
   assert.equal(summary.isActivated, false);
-  assert.equal(summary.isReady, true);
+  assert.equal(summary.isReady, false);
   assert.equal(summary.contextState, 'stirring');
   assert.equal(summary.contextBand, 'low');
 });
 
-test('A full-context Egg preserves the scheduled hatch ritual', () => {
+test('A full-context Egg waits for rollover rather than an evening deadline', () => {
   let growingDay = awardGrowth(day(), {
     source: 'journal', sourceId: 'entry-1', amount: 40, awardedAt: new Date(2026, 7, 5, 8, 0),
   }).day;
@@ -226,14 +269,13 @@ test('A full-context Egg preserves the scheduled hatch ritual', () => {
     source: 'sleep', sourceId: 'sleep-1', amount: 60, awardedAt: new Date(2026, 7, 5, 8, 0),
   }).day;
   const summary = todayGrowthSummary(growingDay, 20, new Date(2026, 7, 5, 12, 0));
-  const normalDuration = new Date(2026, 7, 5, 20, 0).getTime() - new Date(2026, 7, 5, 8, 0).getTime();
-  const effectiveDuration = summary.effectiveHatchAt.getTime() - summary.incubationStartedAt!.getTime();
   assert.equal(summary.activeEnergy, TODAY_ENERGY_TARGET);
-  assert.equal(effectiveDuration, normalDuration);
+  assert.equal(summary.effectiveHatchAt.getTime(), new Date(2026, 7, 6, 0, 0).getTime());
   assert.equal(summary.savedMinutes, 0);
-  assert.equal(summary.contextState, 'ready');
+  assert.equal(summary.contextState, 'full_of_memories');
   assert.equal(summary.contextBand, 'full');
   assert.equal(summary.isContextFull, true);
+  assert.equal(summary.isReady, false);
 });
 
 test('Egg context changes richness without changing the scheduled hatch time', () => {
@@ -259,7 +301,7 @@ test('Egg context changes richness without changing the scheduled hatch time', (
   assert.equal(overflow.contextBand, 'full');
 });
 
-test('Tomorrow can grow before rollover without starting its incubation clock early', () => {
+test('Tomorrow context can grow before rollover without becoming hatchable', () => {
   let tomorrow = awardGrowth(day({ isoDate: '2026-08-06', id: 'day-2026-08-06' }), {
     source: 'journal', sourceId: 'entry-1', awardedAt: new Date(2026, 7, 5, 21, 0),
   }).day;
@@ -278,7 +320,7 @@ test('Tomorrow can grow before rollover without starting its incubation clock ea
   assert.equal(preview.stage, 2);
   assert.equal(preview.isActivated, true);
   assert.equal(preview.incubationStartedAt?.getTime(), dayStart.getTime());
-  assert.equal(preview.progress, 0);
+  assert.equal(preview.progress, 35);
   assert.equal(preview.isReady, false);
 });
 

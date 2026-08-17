@@ -1,4 +1,3 @@
-import { BlurMask, Canvas, FillType, Path, usePathValue } from '@shopify/react-native-skia';
 import { Image } from 'expo-image';
 import { memo, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -13,6 +12,7 @@ import Animated, {
   withRepeat,
   withSequence,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
 
 import type { FtueCueDefinition, FtueSpotlightDefinition, FtueTarget } from '@/features/onboarding/ftue-types';
@@ -227,6 +227,12 @@ function FtueSpotlight({ frames, opacity, radius, screen, theme }: {
 }) {
   const reduceMotion = useReducedMotion();
   const dimOpacity = useSharedValue(0);
+  const boundingSlot = useAnimatedSpotlightSlot(
+    frames.length ? boundingFrame(frames) : null,
+    radius,
+    theme.spotlightTransitionDurationMs,
+    reduceMotion,
+  );
   const slot0 = useAnimatedSpotlightSlot(frames[0] ?? null, radius, theme.spotlightTransitionDurationMs, reduceMotion);
   const slot1 = useAnimatedSpotlightSlot(frames[1] ?? null, radius, theme.spotlightTransitionDurationMs, reduceMotion);
   const slot2 = useAnimatedSpotlightSlot(frames[2] ?? null, radius, theme.spotlightTransitionDurationMs, reduceMotion);
@@ -241,66 +247,83 @@ function FtueSpotlight({ frames, opacity, radius, screen, theme }: {
       });
   }, [dimOpacity, opacity, reduceMotion]);
 
-  const path = usePathValue((mask) => {
-    'worklet';
-    mask.addRect({ x: 0, y: 0, width: screen.width, height: screen.height });
-
-    const appendSlot = (
-      x: number,
-      y: number,
-      width: number,
-      height: number,
-      corner: number,
-    ) => {
-      'worklet';
-      if (width <= 0.5 || height <= 0.5) return;
-      mask.addRRect({
-        rect: { x, y, width, height },
-        rx: Math.min(corner, height / 2, width / 2),
-        ry: Math.min(corner, height / 2, width / 2),
-      });
-    };
-
-    appendSlot(slot0.x.value, slot0.y.value, slot0.width.value, slot0.height.value, slot0.corner.value);
-    appendSlot(slot1.x.value, slot1.y.value, slot1.width.value, slot1.height.value, slot1.corner.value);
-    appendSlot(slot2.x.value, slot2.y.value, slot2.width.value, slot2.height.value, slot2.corner.value);
-    appendSlot(slot3.x.value, slot3.y.value, slot3.width.value, slot3.height.value, slot3.corner.value);
-    mask.setFillType(FillType.EvenOdd);
-  });
-
-  const ringPath = usePathValue((ring) => {
-    'worklet';
-    const appendSlot = (
-      x: number,
-      y: number,
-      width: number,
-      height: number,
-      corner: number,
-    ) => {
-      'worklet';
-      if (width <= 0.5 || height <= 0.5) return;
-      ring.addRRect({
-        rect: { x, y, width, height },
-        rx: Math.min(corner, height / 2, width / 2),
-        ry: Math.min(corner, height / 2, width / 2),
-      });
-    };
-
-    appendSlot(slot0.x.value, slot0.y.value, slot0.width.value, slot0.height.value, slot0.corner.value);
-    appendSlot(slot1.x.value, slot1.y.value, slot1.width.value, slot1.height.value, slot1.corner.value);
-    appendSlot(slot2.x.value, slot2.y.value, slot2.width.value, slot2.height.value, slot2.corner.value);
-    appendSlot(slot3.x.value, slot3.y.value, slot3.width.value, slot3.height.value, slot3.corner.value);
-  });
-
   return (
-    <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <Path color={`rgb(${theme.dimColor})`} opacity={dimOpacity} path={path} />
-      <Path color={theme.focusRingShadowColor} path={ringPath} style="stroke" strokeWidth={5}>
-        <BlurMask blur={6} style="solid" />
-      </Path>
-      <Path color={theme.focusRingColor} path={ringPath} style="stroke" strokeWidth={2} />
-    </Canvas>
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <SpotlightDimPanels
+        color={`rgb(${theme.dimColor})`}
+        opacity={dimOpacity}
+        screen={screen}
+        slot={boundingSlot}
+      />
+      <NativeSpotlightRing slot={slot0} theme={theme} />
+      <NativeSpotlightRing slot={slot1} theme={theme} />
+      <NativeSpotlightRing slot={slot2} theme={theme} />
+      <NativeSpotlightRing slot={slot3} theme={theme} />
+    </View>
   );
+}
+
+type AnimatedSpotlightSlot = ReturnType<typeof useAnimatedSpotlightSlot>;
+
+function SpotlightDimPanels({ color, opacity, screen, slot }: {
+  color: string;
+  opacity: SharedValue<number>;
+  screen: { height: number; width: number };
+  slot: AnimatedSpotlightSlot;
+}) {
+  const topStyle = useAnimatedStyle(() => ({
+    height: Math.max(0, slot.y.value),
+    opacity: opacity.value,
+    width: screen.width,
+  }), [screen.width]);
+  const bottomStyle = useAnimatedStyle(() => ({
+    height: Math.max(0, screen.height - slot.y.value - slot.height.value),
+    opacity: opacity.value,
+    top: Math.max(0, slot.y.value + slot.height.value),
+    width: screen.width,
+  }), [screen.height, screen.width]);
+  const leftStyle = useAnimatedStyle(() => ({
+    height: Math.max(0, slot.height.value),
+    opacity: opacity.value,
+    top: Math.max(0, slot.y.value),
+    width: Math.max(0, slot.x.value),
+  }));
+  const rightStyle = useAnimatedStyle(() => ({
+    height: Math.max(0, slot.height.value),
+    left: Math.max(0, slot.x.value + slot.width.value),
+    opacity: opacity.value,
+    top: Math.max(0, slot.y.value),
+    width: Math.max(0, screen.width - slot.x.value - slot.width.value),
+  }), [screen.width]);
+  const panelStyle = { backgroundColor: color, position: 'absolute' as const };
+  return <>
+    <Animated.View style={[panelStyle, { left: 0, top: 0 }, topStyle]} />
+    <Animated.View style={[panelStyle, { left: 0 }, bottomStyle]} />
+    <Animated.View style={[panelStyle, { left: 0 }, leftStyle]} />
+    <Animated.View style={[panelStyle, rightStyle]} />
+  </>;
+}
+
+function NativeSpotlightRing({ slot, theme }: {
+  slot: AnimatedSpotlightSlot;
+  theme: MergeFtueVisualTheme;
+}) {
+  const style = useAnimatedStyle(() => ({
+    borderRadius: slot.corner.value,
+    height: Math.max(0, slot.height.value),
+    left: slot.x.value,
+    opacity: slot.width.value > 0.5 && slot.height.value > 0.5 ? 1 : 0,
+    top: slot.y.value,
+    width: Math.max(0, slot.width.value),
+  }));
+  return <Animated.View style={[
+    styles.nativeSpotlightRing,
+    {
+      borderColor: theme.focusRingColor,
+      boxShadow: `0 0 9px ${theme.focusRingShadowColor}`,
+    },
+    style,
+  ]} />;
 }
 
 function mergeFtueOverlayPropsEqual(previous: MergeFtueOverlayProps, next: MergeFtueOverlayProps) {
@@ -535,4 +558,8 @@ const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, zIndex: 250 },
   hand: { position: 'absolute' },
   handArt: { height: '100%', width: '100%' },
+  nativeSpotlightRing: {
+    borderWidth: 2,
+    position: 'absolute',
+  },
 });

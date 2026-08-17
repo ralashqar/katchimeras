@@ -12,7 +12,6 @@ import type {
 // float over the ambient gradients instead of reading as photos in circles.
 // Originals with baked backgrounds remain in onboarding-hero / showcase sets.
 
-export { HOME_HATCH_HOUR } from '@/constants/hatch';
 export const HOME_STORAGE_KEY = 'katchadeck.home-v1';
 export const homeRadialActionOrder: readonly HomeMomentType[] = [
   'photo',

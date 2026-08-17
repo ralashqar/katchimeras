@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { KATCHIMERA_MERGE_PROFILES, MERGE_GENERATORS, MERGE_ITEMS_BY_ID, MERGE_LOCKED_TIER_ONE_ECHOES, MOSSPROUT_DREAM_ECHOES } from '@/constants/merge-world-catalog';
+import { KATCHIMERA_MERGE_PROFILES, MERGE_GENERATORS, MERGE_ITEMS_BY_ID, MERGE_LOCKED_TIER_ONE_ECHOES } from '@/constants/merge-world-catalog';
 import type { HomeDayRecord } from '@/types/home';
 import type { MergeBoardItem, MergeWorldState } from '@/types/merge-world';
 import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
@@ -141,26 +141,17 @@ test('Merge art warm-up stays bounded to visible and immediately reachable artwo
   assert.equal(plan.itemDefinitionIds.includes('food:table:6'), false);
 });
 
-test('Merge board atlas covers the catalog and keeps static board work on one GPU surface', () => {
-  const manifest = readFileSync('constants/merge-board-atlas.generated.ts', 'utf8');
-  const staticLayer = readFileSync('components/katchadeck/games/merge-board-static-layer.tsx', 'utf8');
+test('Merge board uses its existing native cells without a Skia surface', () => {
   const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
-  const packageJson = readFileSync('package.json', 'utf8');
-  const staticDefinitionIds = new Set([
-    ...MERGE_LOCKED_TIER_ONE_ECHOES.map((echo) => echo.definitionId),
-    ...MOSSPROUT_DREAM_ECHOES.map((echo) => echo.definitionId),
-  ]);
-  for (const definitionId of staticDefinitionIds) {
-    assert.match(manifest, new RegExp(`'${definitionId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}':`));
-  }
-  assert.doesNotMatch(manifest, /'food:table:6'/);
-  assert.match(manifest, /'__cell\.invalid'/);
-  assert.match(staticLayer, /<Atlas image=\{image\} sprites=\{batches\.cells\.sprites\}/);
-  assert.match(staticLayer, /dormantEchoes/);
-  assert.match(staticLayer, /compatibleEchoes/);
-  assert.match(board, /<MergeBoardStaticLayer/);
-  assert.match(board, /gpuVisuals=\{gpuStaticLayerReady\}/);
-  assert.match(packageJson, /art:merge-board-atlas:check/);
+  const spawnEffects = readFileSync('components/katchadeck/games/merge-spawn-effects-layer.tsx', 'utf8');
+  const ftueOverlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
+  assert.doesNotMatch(board, /MergeBoardStaticLayer|gpuStaticLayerReady|gpuVisuals/);
+  assert.match(board, /backgroundColor: compatible \? '#F1D995'/);
+  assert.match(board, /\{blocked \? <Image[\s\S]*?source=\{LOCKED_CELL_OVERLAY\}/);
+  assert.match(board, /\{mist\?\.kind === 'echo' \? <View/);
+  assert.doesNotMatch(board, /@shopify\/react-native-skia|<Canvas/);
+  assert.doesNotMatch(spawnEffects, /@shopify\/react-native-skia|<Canvas/);
+  assert.doesNotMatch(ftueOverlay, /@shopify\/react-native-skia|<Canvas/);
 });
 
 test('board geometry renders and hit-tests with one coordinate system', () => {
@@ -610,9 +601,10 @@ test('generator spawn pops from its source, arcs short, then slides into the des
   assert.match(board, /spawnFrame \? arcHeight\.value \* spawnFrame\.arc \+ cellSize \* spawnFrame\.settleY/);
   const spawnEffects = readFileSync('components/katchadeck/games/merge-spawn-effects-layer.tsx', 'utf8');
   assert.match(board, /<MergeSpawnEffectsLayer bursts=\{spawnBursts\}/);
-  assert.match(spawnEffects, /GPU_SPAWN_BURST_SLOT_IDS = \[0, 1, 2, 3, 4, 5\]/);
-  assert.match(spawnEffects, /GPU_SPAWN_PARTICLES\.map/);
-  assert.match(spawnEffects, /<Canvas pointerEvents="none"/);
+  assert.match(spawnEffects, /NATIVE_SPAWN_BURST_SLOT_IDS = \[0, 1, 2, 3, 4, 5\]/);
+  assert.match(spawnEffects, /NATIVE_SPAWN_PARTICLES\.map/);
+  assert.match(spawnEffects, /<View pointerEvents="none" style=\{StyleSheet\.absoluteFill\}>/);
+  assert.doesNotMatch(spawnEffects, /@shopify\/react-native-skia|<Canvas|usePathValue/);
   assert.match(board, /useReducer\(mergeBoardVisualReducer/);
   assert.doesNotMatch(board, /setPresentation|setSprites|setMotions|setBusy/);
 });
@@ -980,9 +972,9 @@ test('Merge FTUE commits before visual settlement and preserves all native anima
   assert.match(overlay, /stateRef\.current/);
   assert.doesNotMatch(overlay, /requestAnimationFrame/);
   assert.match(overlay, /spotlightTransitionDurationMs: 420/);
-  assert.match(overlay, /const ringPath = usePathValue/);
-  assert.match(overlay, /<BlurMask blur=\{6\} style="solid"/);
-  assert.doesNotMatch(overlay, /SPOTLIGHT_RING_SLOTS|ringStyle|styles\.focusRing/);
+  assert.match(overlay, /<SpotlightDimPanels/);
+  assert.match(overlay, /<NativeSpotlightRing slot=\{slot0\}/);
+  assert.doesNotMatch(overlay, /@shopify\/react-native-skia|<Canvas|usePathValue|BlurMask/);
   assert.doesNotMatch(route, /useSharedValue|effectsPaused/);
   assert.doesNotMatch(board, /useMergeMotionPerformanceProbe|effectsPaused|motionActive|reducedFx/);
   assert.doesNotMatch(screen, /addMergeFtueBreadcrumb|setMergeFtueDiagnosticContext|markFlowStart|reportFlowReady/);
@@ -995,7 +987,8 @@ test('Merge FTUE commits before visual settlement and preserves all native anima
   assert.match(artCache, /workerCount = Math\.min\(1, missing\.length\)/);
   assert.match(artCache, /await waitForCriticalInteractionIdle\(\)/);
   const spawnEffects = readFileSync('components/katchadeck/games/merge-spawn-effects-layer.tsx', 'utf8');
-  assert.match(spawnEffects, /GPU_SPAWN_PARTICLES\.map/);
+  assert.match(spawnEffects, /NATIVE_SPAWN_PARTICLES\.map/);
+  assert.doesNotMatch(spawnEffects, /@shopify\/react-native-skia|<Canvas/);
   assert.match(board, /DREAM_MIST_PARTICLES\.map/);
 });
 

@@ -31,7 +31,7 @@ export function SceneProvider({ children }: PropsWithChildren) {
       let changed = false;
       for (const day of days) {
         const sceneId = day.dailyHatch?.sceneVariantId;
-        if (!sceneId || !day.dailyHatch?.revealedAt) continue;
+        if (!sceneId || !day.dailyHatch?.claimedAt) continue;
         const receiptId = `daily-scene:${day.id}:${sceneId}`;
         if (applied.has(receiptId)) continue;
         applied.add(receiptId);

@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo, useState } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useReducedMotion, ZoomInDown } from 'react-native-reanimated';
 
@@ -23,6 +23,10 @@ import { resolveCollectionDeckWindow } from '@/utils/collection-deck';
 type CardDeckCarouselProps = {
   cards: readonly DailyCreatureCard[];
   onOpenCard: (cardId: string) => void;
+  interactive?: boolean;
+  initialCardId?: string;
+  showCaption?: boolean;
+  sealedCardIds?: ReadonlySet<string>;
 };
 
 const MAX_STAGE_CARD_HEIGHT = 480;
@@ -31,10 +35,12 @@ const WINDOW_RADIUS = 3;
 const COMPACT_DECK_OFFSET_X = -10;
 const COMPACT_DECK_OFFSET_Y = -8;
 
-export function CardDeckCarousel({ cards, onOpenCard }: CardDeckCarouselProps) {
+export function CardDeckCarousel({ cards, initialCardId, interactive = true, onOpenCard, sealedCardIds, showCaption = true }: CardDeckCarouselProps) {
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
-  const [requestedCardId, setRequestedCardId] = useState(cards[0]?.id ?? '');
+  const [requestedCardId, setRequestedCardId] = useState(
+    cards.some((card) => card.id === initialCardId) ? initialCardId! : cards[0]?.id ?? '',
+  );
   const selectedCardId = cards.some((card) => card.id === requestedCardId)
     ? requestedCardId
     : cards[0]?.id ?? '';
@@ -54,7 +60,7 @@ export function CardDeckCarousel({ cards, onOpenCard }: CardDeckCarouselProps) {
     swipeGesture,
   } = useDeckController({
     days: cards,
-    disabled: cards.length < 2,
+    disabled: !interactive || cards.length < 2,
     maxNavigableIndex: Math.max(0, cards.length - 1),
     onSelect: setRequestedCardId,
     selectedId: selectedCardId,
@@ -97,7 +103,8 @@ export function CardDeckCarousel({ cards, onOpenCard }: CardDeckCarouselProps) {
                     active={active}
                     card={card}
                     cardSize={cardSize}
-                    onOpenCard={onOpenCard}
+                  onOpenCard={interactive ? onOpenCard : undefined}
+                  sealed={sealedCardIds?.has(card.id) ?? false}
                   />
                 </Animated.View>
               </DeckVisualSlot>
@@ -107,7 +114,7 @@ export function CardDeckCarousel({ cards, onOpenCard }: CardDeckCarouselProps) {
           <View pointerEvents="box-none" style={deckSlotStyles.hitLayer}>
             {deckIndices.map((cardIndex) => {
               const card = cards[cardIndex];
-              if (!card || card.id === selectedCardId) return null;
+              if (!interactive || !card || card.id === selectedCardId) return null;
               return (
                 <DeckCardHitTarget
                   accessibilityLabel={`Center ${card.creatureName}'s card from ${card.isoDate}`}
@@ -124,7 +131,7 @@ export function CardDeckCarousel({ cards, onOpenCard }: CardDeckCarouselProps) {
         </View>
       </GestureDetector>
 
-      <View style={styles.caption}>
+      {showCaption ? <View style={styles.caption}>
         <ThemedText
           style={styles.counter}
           lightColor={Lantern.ember300}
@@ -144,7 +151,7 @@ export function CardDeckCarousel({ cards, onOpenCard }: CardDeckCarouselProps) {
           darkColor={Lantern.moon500}>
           Swipe through your deck · Tap the centred card to open
         </ThemedText>
-      </View>
+      </View> : null}
     </View>
   );
 }
@@ -154,13 +161,30 @@ const CollectionDeckCard = memo(function CollectionDeckCard({
   card,
   cardSize,
   onOpenCard,
+  sealed,
 }: {
   active: boolean;
   card: DailyCreatureCard;
   cardSize: DailyCardSize;
-  onOpenCard: (cardId: string) => void;
+  onOpenCard?: (cardId: string) => void;
+  sealed: boolean;
 }) {
-  const handleOpen = useCallback(() => onOpenCard(card.id), [card.id, onOpenCard]);
+  const handleOpen = useCallback(() => onOpenCard?.(card.id), [card.id, onOpenCard]);
+  if (sealed) {
+    return (
+      <Pressable
+        accessibilityLabel={`Reveal sealed day from ${card.isoDate}`}
+        accessibilityRole="button"
+        disabled={!active}
+        onPress={active ? handleOpen : undefined}
+        style={[styles.sealedCard, { height: cardSize.height, width: cardSize.width }]}>
+        <ThemedText style={styles.sealedKicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>SEALED DAY</ThemedText>
+        <ThemedText type="display" style={styles.sealedEgg} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>🥚</ThemedText>
+        <ThemedText style={styles.sealedDate} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{card.isoDate}</ThemedText>
+        <ThemedText style={styles.sealedHint} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>Tap to reveal what this day became</ThemedText>
+      </Pressable>
+    );
+  }
   return (
     <DailyCard
       card={card}
@@ -185,6 +209,23 @@ const styles = StyleSheet.create({
     ],
   },
   cardEntrance: { alignItems: 'center', justifyContent: 'center' },
+  sealedCard: {
+    alignItems: 'center',
+    backgroundColor: '#242334',
+    borderColor: 'rgba(242,212,138,0.48)',
+    borderCurve: 'continuous',
+    borderRadius: 22,
+    borderWidth: 1.5,
+    boxShadow: '0 14px 32px rgba(7,8,15,0.42), inset 0 1px 0 rgba(255,255,255,0.1)',
+    gap: 10,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    padding: 22,
+  },
+  sealedKicker: { fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
+  sealedEgg: { fontSize: 58, lineHeight: 66 },
+  sealedDate: { fontSize: 16, fontWeight: '900' },
+  sealedHint: { fontSize: 12, lineHeight: 17, maxWidth: 190, textAlign: 'center' },
   caption: { alignItems: 'center', gap: 3, paddingHorizontal: 24 },
   counter: {
     fontSize: 11,

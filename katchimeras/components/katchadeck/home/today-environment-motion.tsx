@@ -32,6 +32,7 @@ type MotionControllerOptions = {
   maxPinchScale?: number;
   pinchSoftLimitRange?: number;
   scriptedPinchDurationMs?: number;
+  scriptedPinchStartScale?: number | null;
   scriptedPinchScale?: number | null;
 };
 
@@ -46,6 +47,7 @@ export function useTodayEnvironmentMotion({
   maxPinchScale,
   pinchSoftLimitRange = 0,
   scriptedPinchDurationMs = 800,
+  scriptedPinchStartScale = null,
   scriptedPinchScale = null,
 }: MotionControllerOptions) {
   const isFocused = useIsFocused();
@@ -111,6 +113,9 @@ export function useTodayEnvironmentMotion({
       || (deferScriptedChangesWhileDisabled && !enabled)
     ) return;
     cancelAnimation(pinchScale);
+    if (scriptedPinchStartScale != null) {
+      pinchScale.value = Math.max(1, Math.min(scriptedPinchStartScale, resolvedMaxPinchScale));
+    }
     pinchScale.value = reduceMotion
       ? resolvedScriptedPinchScale
       : withTiming(resolvedScriptedPinchScale, {
@@ -123,8 +128,10 @@ export function useTodayEnvironmentMotion({
     frozen,
     pinchScale,
     reduceMotion,
+    resolvedMaxPinchScale,
     resolvedScriptedPinchScale,
     scriptedPinchDurationMs,
+    scriptedPinchStartScale,
   ]);
 
   const pinchGesture = useMemo(

@@ -1,16 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { prepareTodayForDevRehatch } from '@/game/days/dev';
-import { withStartedHatchCheckIn } from '@/game/days/mutations/day-fields';
+import { prepareLatestDailyHatchForDevReplay } from '@/game/days/dev';
 import { preserveVisibleHatchForMap } from '@/game/days/map-hatch-invariant';
 import {
   preserveActiveTodayFromEmptyDowngrade,
   preserveFinalizedHatches,
 } from '@/game/days/state-integrity';
 import type { HomeDayRecord, StoredHomeState } from '@/types/home';
-import { buildHatchCheckInPlan, currentHatchCheckInQuestion, hatchCheckInEligibility, hatchReflectionMoments } from '@/utils/hatch-check-in';
-import { dayForDevHatchSelection } from '@/utils/forced-low-signal-hatch';
+import { todayGrowthSummary } from '@/utils/today-growth';
 
 function state(): StoredHomeState {
   return {
@@ -34,68 +32,40 @@ function state(): StoredHomeState {
   } as unknown as StoredHomeState;
 }
 
-test('adaptive replay unhatches while preserving the day evidence', () => {
-  const next = prepareTodayForDevRehatch(state(), 'adaptive');
-  assert.equal(next.today.state, 'ready_to_hatch');
-  assert.equal(next.today.creature, null);
-  assert.equal(next.today.card, null);
-  assert.equal(next.today.hatchCheckIn, undefined);
-  assert.equal(next.today.stepsCount, 8200);
-  assert.equal(next.today.journalRecords?.[0]?.fields.specific, 'A Brief History of Time');
-  assert.equal(next.today.devHatchReflectionMode, undefined);
-  assert.equal(hatchCheckInEligibility(next.today), 'regular');
-  const started = withStartedHatchCheckIn(next.today, 'regular', new Date('2026-07-20T21:01:00.000Z'));
-  assert.equal(currentHatchCheckInQuestion(started)?.kind, 'meaning');
-  assert.match(currentHatchCheckInQuestion(started)?.title ?? '', /Brief History of Time/);
+test('daily replay re-seals the latest collectible day for the full cinematic', () => {
+  const source = state();
+  source.archivedDays = [{
+    ...source.today,
+    id: 'yesterday',
+    isoDate: '2026-07-19',
+    state: 'hatched',
+    card: { id: 'card-yesterday', isoDate: '2026-07-19' } as never,
+    dailyHatch: {
+      schemaVersion: 1,
+      primaryWispId: 'sunbeam',
+      sceneVariantId: 'home',
+      primaryTheme: 'reflection',
+      secondaryTheme: null,
+      traits: [],
+      evidence: [],
+      sealedInputSignature: 'signature',
+      sealedAt: '2026-07-19T21:00:00.000Z',
+      revealedAt: '2026-07-20T09:00:00.000Z',
+      claimedAt: '2026-07-20T09:01:00.000Z',
+      provenance: 'rollover',
+    },
+  } as never];
+
+  const replay = prepareLatestDailyHatchForDevReplay(source);
+  assert.equal(replay?.dayId, 'yesterday');
+  assert.equal(replay?.state.archivedDays[0]?.state, 'sealed');
+  assert.equal(replay?.state.archivedDays[0]?.dailyHatch?.revealedAt, null);
+  assert.equal(replay?.state.archivedDays[0]?.dailyHatch?.claimedAt, null);
+  assert.equal(replay?.state.archivedDays[0]?.card?.id, 'card-yesterday');
+  assert.equal(replay?.state.archivedDays[0]?.devForceReadyToHatch, undefined);
 });
 
-test('forced low-signal replay bypasses the clock and chooses the hierarchy', () => {
-  const next = prepareTodayForDevRehatch(state(), 'force_low_signal');
-  assert.equal(next.today.devHatchReflectionMode, 'force_low_signal');
-  assert.equal(next.today.devForceReadyToHatch, true);
-  assert.equal(hatchCheckInEligibility(next.today), 'empty');
-  assert.deepEqual(buildHatchCheckInPlan(next.today, 'empty').questionPlan, [
-    'reconstruct.focus',
-    'reconstruct.category',
-    'reflection.meaning',
-  ]);
-  assert.deepEqual(hatchReflectionMoments(next.today), []);
-  const started = withStartedHatchCheckIn(next.today, 'empty', new Date('2026-07-20T21:01:00.000Z'));
-  const question = currentHatchCheckInQuestion(started);
-  assert.equal(question?.kind, 'flow');
-  assert.equal(question?.suggestedId, null);
-  assert.equal(question?.subtitle, undefined);
-  assert.equal(question?.choices[0]?.id, 'people');
-  assert.doesNotMatch(question?.title ?? '', /Brief History|8,200|steps/i);
-});
-
-test('forced low-signal hatch input retains only its questionnaire evidence', () => {
-  const forced = prepareTodayForDevRehatch(state(), 'force_low_signal').today;
-  forced.promptAnswers = [{ id: 'old-prompt' }] as never;
-  forced.placeCategorySeeds = ['museum'];
-  forced.weather = { condition: 'storm', source: 'vision' };
-  forced.hatchCheckIn = {
-    status: 'completed', eligibilityReason: 'empty', flowId: 'food', flowLabel: 'Food & drink',
-    categoryId: 'meal', categoryLabel: 'A meal', moodId: null, moodLabel: null,
-    anchorId: 'reconstructed:food:meal', anchorLabel: 'A meal', meaningId: 'comfort', meaningLabel: 'Comfort',
-    answeredQuestionIds: ['reconstruct.focus', 'reconstruct.category', 'reflection.meaning'],
-    semanticTags: ['activity:food'], scoreBias: { calm: 0.32 },
-    encounterSeedBias: [{ seedId: 'feast', intensity: 0.58 }],
-    startedAt: '2026-07-20T21:00:00.000Z', updatedAt: '2026-07-20T21:01:00.000Z', completedAt: '2026-07-20T21:01:00.000Z',
-  };
-
-  const input = dayForDevHatchSelection(forced);
-  assert.equal(input.stepsCount, 0);
-  assert.deepEqual(input.journalRecords, []);
-  assert.deepEqual(input.promptAnswers, []);
-  assert.deepEqual(input.placeCategorySeeds, []);
-  assert.equal(input.weather, undefined);
-  assert.deepEqual(input.hatchCheckIn?.encounterSeedBias, [{ seedId: 'feast', intensity: 0.58 }]);
-  assert.equal(forced.stepsCount, 8200);
-  assert.equal(forced.journalRecords?.[0]?.categoryId, 'book');
-});
-
-test('map refresh repairs a stale egg snapshot but respects an intentional dev unhatch', () => {
+test('map refresh repairs a stale egg snapshot', () => {
   const hatched = state();
   const visible = { ...hatched.today, kind: 'day' } as unknown as HomeDayRecord;
   const stale = {
@@ -105,11 +75,6 @@ test('map refresh repairs a stale egg snapshot but respects an intentional dev u
   const repaired = preserveVisibleHatchForMap(stale, visible);
   assert.equal(repaired.today.state, 'hatched');
   assert.equal(repaired.today.creature?.id, 'creature');
-
-  const intentional = prepareTodayForDevRehatch(hatched, 'adaptive');
-  const untouched = preserveVisibleHatchForMap(intentional, visible);
-  assert.equal(untouched.today.creature, null);
-  assert.equal(untouched.today.devForceReadyToHatch, true);
 });
 
 test('a delayed pre-hatch full-state writer cannot remove a finalized hatch', () => {
@@ -187,4 +152,45 @@ test('a stale camera-route writer cannot replace Today progress with an empty da
   const reconciled = preserveActiveTodayFromEmptyDowngrade(current, stale);
   assert.equal(reconciled.today.growth?.events[0]?.id, 'mood-reward');
   assert.equal(reconciled.today.promptAnswers[0]?.id, 'mood-answer');
+});
+
+test('a stale writer cannot restore the completed Egg cycle after a hatch claim', () => {
+  const current = state();
+  current.today.state = 'forming';
+  current.today.creature = null;
+  current.today.card = null;
+  current.today.growth = {
+    schemaVersion: 1,
+    cycleStartedAt: '2026-07-20T09:30:00.000Z',
+    events: [{
+      id: 'growth:journal:before-claim',
+      source: 'journal',
+      sourceId: 'before-claim',
+      amount: 100,
+      awardedAt: '2026-07-20T08:00:00.000Z',
+    }],
+    careActions: [],
+  };
+  const stale = {
+    ...current,
+    today: {
+      ...current.today,
+      growth: {
+        schemaVersion: 1 as const,
+        events: current.today.growth.events,
+        careActions: [{
+          instanceId: 'care:stale',
+          definitionId: 'journal',
+          status: 'completed' as const,
+          completedAt: '2026-07-20T08:00:00.000Z',
+          updatedAt: '2026-07-20T08:00:00.000Z',
+        }],
+      },
+    },
+  };
+
+  const reconciled = preserveActiveTodayFromEmptyDowngrade(current, stale);
+  assert.equal(reconciled.today.growth?.cycleStartedAt, '2026-07-20T09:30:00.000Z');
+  assert.equal(reconciled.today.growth?.careActions.length, 0);
+  assert.equal(todayGrowthSummary(reconciled.today, 0).contextState, 'fresh');
 });

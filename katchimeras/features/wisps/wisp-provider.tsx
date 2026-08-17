@@ -66,7 +66,7 @@ export function WispProvider({ children }: PropsWithChildren) {
     const achievementIds = new Set(Object.keys(loadCompanionAchievementState().unlocked));
     const earned = earnedWispIds(days, { unlockedAchievementIds: achievementIds })
       .filter((id) => wispDefinition(id).primaryAcquisition !== 'experience');
-    const hatchGrants = days.flatMap((day) => day.dailyHatch?.revealedAt
+    const hatchGrants = days.flatMap((day) => day.dailyHatch?.claimedAt
       ? [{
           dayId: day.id,
           id: day.dailyHatch.primaryWispId,

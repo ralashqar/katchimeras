@@ -485,32 +485,58 @@ function memoryQuestRoute(type: MemoryQuestType): {
 }
 
 function isDefinitionAlreadySatisfied(id: string, day: StoredHomeDayRecord): boolean {
-  if (id === 'mood') return day.promptAnswers.some((answer) => answer.kind === 'feeling' && !answer.dismissed);
-  if (id === 'sleep') return Boolean(day.sleep);
-  if (id === 'photo') return Boolean(day.heroPhoto || day.classifiedMemories?.some((memory) => memory.sourceType === 'photo'));
-  if (id === 'voice') return Boolean(day.notes?.some((note) => note.kind === 'voice'));
+  const promptAnswers = day.promptAnswers.filter((answer) => artifactBelongsToActiveCycle(day, answer.createdAt));
+  const journalRecords = (day.journalRecords ?? []).filter((record) => artifactBelongsToActiveCycle(day, record.createdAt));
+  const notes = (day.notes ?? []).filter((note) => artifactBelongsToActiveCycle(day, note.createdAt));
+  if (id === 'mood') return promptAnswers.some((answer) => answer.kind === 'feeling' && !answer.dismissed);
+  if (id === 'sleep') return Boolean(day.sleep && artifactBelongsToActiveCycle(day, day.sleep.recordedAt));
+  if (id === 'photo') return Boolean(
+    (day.heroPhoto && artifactBelongsToActiveCycle(day, day.heroPhoto.selectedAt))
+    || day.classifiedMemories?.some((memory) => memory.sourceType === 'photo' && artifactBelongsToActiveCycle(day, memory.createdAt))
+  );
+  if (id === 'voice') return notes.some((note) => note.kind === 'voice');
   if (id === 'journal') {
-    const records = day.journalRecords ?? [];
-    return records.some((record) => record.flowId === 'general')
-      || (!records.length && Boolean(day.notes?.some((note) => note.kind !== 'voice')));
+    return journalRecords.some((record) => record.flowId === 'general')
+      || (!journalRecords.length && notes.some((note) => note.kind !== 'voice'));
   }
-  if (id === 'place') return Boolean(day.confirmedPlaces?.length || hasJournalFlow(day, 'went_somewhere'));
-  if (id === 'movement') return Boolean(day.stepsInterpretation || day.stepsCount >= 1000 || hasJournalFlow(day, 'movement'));
-  if (id === 'food') return Boolean(day.foodMoments?.length || hasJournalFlow(day, 'food'));
+  if (id === 'place') return Boolean(
+    day.confirmedPlaces?.some((place) => artifactBelongsToActiveCycle(day, place.confirmedAt))
+    || hasJournalFlow(day, 'went_somewhere')
+  );
+  if (id === 'movement') return Boolean(
+    (day.stepsInterpretation && artifactBelongsToActiveCycle(day, day.stepsInterpretation.createdAt))
+    || (day.stepsCount >= 1000 && artifactBelongsToActiveCycle(day, day.stepsUpdatedAt))
+    || hasJournalFlow(day, 'movement')
+  );
+  if (id === 'food') return Boolean(
+    day.foodMoments?.some((moment) => artifactBelongsToActiveCycle(day, moment.createdAt))
+    || hasJournalFlow(day, 'food')
+  );
   if (id === 'studio') return hasJournalFlow(day, 'studio');
   if (id === 'people') return hasJournalFlow(day, 'people');
   if (id === 'work') return hasJournalFlow(day, 'work');
   if (id === 'big_event') return hasJournalFlow(day, 'big_event');
   if (id.startsWith('about_today:')) {
     const kind = id.slice('about_today:'.length) as DayPromptKind;
-    return day.promptAnswers.some((answer) => answer.kind === kind && !answer.dismissed);
+    return promptAnswers.some((answer) => answer.kind === kind && !answer.dismissed);
   }
-  if (id === 'reflection') return day.promptAnswers.some((answer) => isRewardedReflectionPromptKind(answer.kind) && !answer.dismissed);
+  if (id === 'reflection') return promptAnswers.some((answer) => isRewardedReflectionPromptKind(answer.kind) && !answer.dismissed);
   return false;
 }
 
 function hasJournalFlow(day: StoredHomeDayRecord, flowId: string): boolean {
-  return day.journalRecords?.some((record) => record.flowId === flowId) ?? false;
+  return day.journalRecords?.some((record) => (
+    record.flowId === flowId && artifactBelongsToActiveCycle(day, record.createdAt)
+  )) ?? false;
+}
+
+function artifactBelongsToActiveCycle(day: StoredHomeDayRecord, createdAt?: string | null): boolean {
+  const cycleStartedAt = day.growth?.cycleStartedAt;
+  if (!cycleStartedAt) return true;
+  if (!createdAt) return false;
+  const cycleTime = new Date(cycleStartedAt).getTime();
+  const artifactTime = new Date(createdAt).getTime();
+  return !Number.isNaN(cycleTime) && !Number.isNaN(artifactTime) && artifactTime >= cycleTime;
 }
 
 const CARE_COMPLETION_KEY_BY_JOURNAL_FLOW: Readonly<Record<string, string>> = {
@@ -530,19 +556,26 @@ export function journalFlowCompletesTodayCareAction(flowId: string, completionKe
 
 function artifactCompletionKeys(day: StoredHomeDayRecord): Set<string> {
   const keys = new Set<string>();
-  if (day.promptAnswers.some((answer) => answer.kind === 'feeling' && !answer.dismissed)) keys.add('mood');
-  if (day.sleep) keys.add('sleep');
-  if (day.heroPhoto || day.classifiedMemories?.some((memory) => memory.sourceType === 'photo')) keys.add('photo');
-  if (day.notes?.some((note) => note.kind === 'voice')) keys.add('voice');
-  if (day.confirmedPlaces?.length) keys.add('place');
-  if (day.stepsInterpretation || day.stepsCount >= 1000) keys.add('movement');
-  if (day.foodMoments?.length) keys.add('food');
+  if (day.promptAnswers.some((answer) => artifactBelongsToActiveCycle(day, answer.createdAt) && answer.kind === 'feeling' && !answer.dismissed)) keys.add('mood');
+  if (day.sleep && artifactBelongsToActiveCycle(day, day.sleep.recordedAt)) keys.add('sleep');
+  if (
+    (day.heroPhoto && artifactBelongsToActiveCycle(day, day.heroPhoto.selectedAt))
+    || day.classifiedMemories?.some((memory) => memory.sourceType === 'photo' && artifactBelongsToActiveCycle(day, memory.createdAt))
+  ) keys.add('photo');
+  if (day.notes?.some((note) => note.kind === 'voice' && artifactBelongsToActiveCycle(day, note.createdAt))) keys.add('voice');
+  if (day.confirmedPlaces?.some((place) => artifactBelongsToActiveCycle(day, place.confirmedAt))) keys.add('place');
+  if (
+    (day.stepsInterpretation && artifactBelongsToActiveCycle(day, day.stepsInterpretation.createdAt))
+    || (day.stepsCount >= 1000 && artifactBelongsToActiveCycle(day, day.stepsUpdatedAt))
+  ) keys.add('movement');
+  if (day.foodMoments?.some((moment) => artifactBelongsToActiveCycle(day, moment.createdAt))) keys.add('food');
   for (const answer of day.promptAnswers) {
-    if (answer.dismissed || !isRewardedReflectionPromptKind(answer.kind)) continue;
+    if (!artifactBelongsToActiveCycle(day, answer.createdAt) || answer.dismissed || !isRewardedReflectionPromptKind(answer.kind)) continue;
     keys.add('reflection');
     keys.add(`reflection:${answer.kind}`);
   }
   for (const record of day.journalRecords ?? []) {
+    if (!artifactBelongsToActiveCycle(day, record.createdAt)) continue;
     if (record.source.kind === 'photo') keys.add('photo');
     if (record.source.kind === 'voice_note') keys.add('voice');
     if (record.flowId === 'went_somewhere') keys.add('place');

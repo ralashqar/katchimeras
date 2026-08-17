@@ -125,6 +125,15 @@ async function syncHatchNotificationNow(
       removeStoredValue(LEGACY_HATCH_NOTIFICATION_ID_KEY);
     }
 
+    if (!plan) {
+      await cancelHatchRequests(Notifications, hatchRequests);
+      if (record?.identifier) {
+        await Notifications.cancelScheduledNotificationAsync(record.identifier).catch(() => {});
+      }
+      removeStoredValue(HATCH_NOTIFICATION_RECORD_KEY);
+      return;
+    }
+
     const targetAt = plan.targetAt.getTime();
     const matchingIdentifier = record?.dayId === plan.dayId && record.targetAt === targetAt
       ? record.identifier

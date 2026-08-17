@@ -30,6 +30,7 @@ import { TODAY_DORMANT_ZZZ_TOP_OFFSET, TodayDormantEggIndicator, TodayKingdomEgg
 import { WorldActionStack } from '@/components/katchadeck/world/world-action-stack';
 import { CompanionGoalPortrait } from '@/components/katchadeck/goals/goal-task-row';
 import { GoalCompletionCelebration } from '@/components/katchadeck/goals/goal-completion-celebration';
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import {
   MOOD_ART,
   MOOD_CHOICES,
@@ -89,6 +90,8 @@ type TodayNurtureExperienceProps = {
   feedbackKey: number;
   feedExpressionKey?: number;
   focusMode?: boolean;
+  hatchReadyFocus?: boolean;
+  hatchReadyLabel?: string;
   growth: TodayGrowthSummary;
   homeArchetypeId?: HomeArchetypeId | null;
   microcopy: string | null;
@@ -124,6 +127,7 @@ type TodayNurtureExperienceProps = {
   onboardingCameraDurationMs?: number;
   onboardingCameraPanY?: number;
   onboardingFocus?: boolean;
+  newDayIntro?: boolean;
   onboardingTopHudVisible?: boolean;
   onboardingUiVisible?: boolean;
   hatchPresentation?: TodayHatchPresentation | null;
@@ -174,6 +178,8 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   feedbackKey,
   feedExpressionKey,
   focusMode = false,
+  hatchReadyFocus = false,
+  hatchReadyLabel = 'Reveal Yesterday',
   growth,
   homeArchetypeId,
   microcopy,
@@ -194,6 +200,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   onboardingCameraPanY = 0,
   onboardingGuide = null,
   onboardingFocus = false,
+  newDayIntro = false,
   onboardingTopHudVisible = false,
   onboardingUiVisible = true,
   hatchPresentation = null,
@@ -240,6 +247,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   const actionStackTranslateY = useSharedValue(reduceMotion ? 0 : 22);
   const focusProgress = useSharedValue(focusMode ? 1 : 0);
   const onboardingCameraProgress = useSharedValue(onboardingFocus ? 1 : 0);
+  const newDayEggEntry = useSharedValue(newDayIntro ? 0 : 1);
   const onboardingCameraPanTranslateY = useSharedValue(0);
   const environmentMotion = useTodayEnvironmentMotionValues();
   const ready = day.canHatch || growth.isReady;
@@ -433,6 +441,18 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           easing: Easing.inOut(Easing.cubic),
         });
   }, [focusMode, focusProgress, reduceMotion]);
+  useLayoutEffect(() => {
+    cancelAnimation(newDayEggEntry);
+    if (!newDayIntro) {
+      newDayEggEntry.value = 1;
+      return;
+    }
+    newDayEggEntry.value = 0;
+    newDayEggEntry.value = withDelay(
+      reduceMotion ? 1 : 90,
+      withTiming(1, { duration: reduceMotion ? 120 : 820, easing: Easing.out(Easing.cubic) }),
+    );
+  }, [newDayEggEntry, newDayIntro, reduceMotion]);
   useEffect(() => {
     onboardingCameraProgress.value = reduceMotion
       ? onboardingFocus ? 1 : 0
@@ -518,6 +538,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
       + (pinchedEggBottomY - windowHeight / 2) * outerScale
       + outerTranslateY;
     return {
+      opacity: newDayEggEntry.value,
       transform: [
         {
           translateX: sceneTranslateX.value
@@ -525,6 +546,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
             * outerScale,
         },
         { translateY: projectedEggBottomY - baseEggBottomY },
+        { scale: 0.72 + newDayEggEntry.value * 0.28 },
       ],
     };
   });
@@ -632,7 +654,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           hideKingdomEnvironmentArt
           homeArchetypeId={homeArchetypeId}
           isActivated={growth.isActivated}
-          isReady={hatchPresentation ? false : ready}
+          isReady={hatchPresentation ? false : hatchReadyFocus || ready}
           onDiscoveryCreatureError={onHatchAssetsError}
           onDiscoveryCreatureReady={onHatchAssetsReady}
           pinchStrength={0}
@@ -656,7 +678,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
       <View
         pointerEvents={focusMode ? 'none' : 'box-none'}
         style={[styles.chrome, focusMode && styles.chromeHidden]}>
-      {!onboardingFocus && !growth.isActivated ? (
+      {!hatchReadyFocus && !onboardingFocus && !growth.isActivated ? (
         <TodayDormantEggIndicator
           energyRatio={growth.energyRatio}
           focusX={windowWidth / 2}
@@ -668,15 +690,15 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
         />
       ) : null}
       {!onboardingFocus ? <View pointerEvents="none" style={styles.environmentFade} /> : null}
-      {!onboardingFocus ? <View pointerEvents="none" style={[styles.meterAnchor, { top: growthMeterTop }]}>
+      {!hatchReadyFocus && !onboardingFocus ? <View pointerEvents="none" style={[styles.meterAnchor, { top: growthMeterTop }]}>
         <GrowthMeter growth={growth} />
       </View> : null}
-      {(!onboardingFocus || onboardingTopHudVisible) ? <Animated.View
+      {!hatchReadyFocus && (!onboardingFocus || onboardingTopHudVisible) ? <Animated.View
         entering={reduceMotion ? FadeIn.duration(80) : FadeIn.duration(220)}
         style={[styles.topHudFixed, { top: topInset + 8 }]}>
         <TodayTopHud days={timelineDays} energyPulseNonce={energyHudPulseNonce} energyTargetRef={energyHudTargetRef} energyValueOverride={energyHudValueOverride} interactionLocked={false} onSelectDay={onSelectDay} selectedId={day.id} />
       </Animated.View> : null}
-      {!actionListHidden && !onboardingFocus ? (
+      {!hatchReadyFocus && !actionListHidden && !onboardingFocus ? (
       <View onLayout={handleFixedActionClusterLayout} style={[styles.fixedActionCluster, { top: fixedActionClusterTop }]}>
         {quietDayAvailable ? (
           <Pressable accessibilityHint="Opens a short note so this quiet day can hatch" accessibilityRole="button" onPress={onAddTextNote} style={({ pressed }) => [styles.quietDayAction, pressed && styles.actionPressed]}>
@@ -695,7 +717,22 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
         )}
       </View>
       ) : null}
-      {!onboardingFocus ? <MicrocopyToast message={microcopy} placementStyle={{ top: nurtureToastTop }} /> : null}
+      {hatchReadyFocus && !hatchPresentation && !onboardingFocus ? (
+        <Animated.View
+          entering={reduceMotion ? FadeIn.duration(80) : FadeInDown.duration(260).easing(Easing.out(Easing.cubic))}
+          style={[styles.hatchReadyAction, { top: fixedActionClusterTop }]}>
+          <KatchaButton
+            fullWidth
+            glow
+            icon="sparkles"
+            label={hatchReadyLabel.toUpperCase()}
+            labelStyle={styles.hatchReadyActionLabel}
+            onPress={onReveal}
+            variant="primary"
+          />
+        </Animated.View>
+      ) : null}
+      {!hatchReadyFocus && !onboardingFocus ? <MicrocopyToast message={microcopy} placementStyle={{ top: nurtureToastTop }} /> : null}
       {onboardingFocus && onboardingUiVisible && onboardingGuide && !actionListHidden ? (
         <>
           <Animated.View
@@ -850,7 +887,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           ) : null}
         </>
       ) : null}
-      {!actionListHidden && !onboardingFocus ? (
+      {!hatchReadyFocus && !actionListHidden && !onboardingFocus ? (
       <GestureDetector gesture={actionScrollGesture}>
         <ScrollView
           contentContainerStyle={{ paddingBottom: tabBarHeight + HOME_ACTIONS_TAB_BAR_GAP, paddingTop: topInset + 8 }}
@@ -2411,15 +2448,14 @@ function GrowthMeter({ growth }: { growth: TodayGrowthSummary }) {
     targetReachedRef.current = reached;
   }, [displayedEnergy, growth.energyTarget, targetGlow]);
   const targetGlowStyle = useAnimatedStyle(() => ({ opacity: targetGlow.value }));
-  const countdown = useMemo(() => formatCountdown(growth.effectiveHatchAt), [growth.effectiveHatchAt]);
   const stateLabel = ({
     fresh: 'Fresh',
     stirring: 'Stirring',
     taking_shape: 'Taking shape',
     full_of_memories: 'Full of memories',
-    ready: 'Ready for tonight',
+    ready: 'Full of memories',
   } as const)[growth.contextState];
-  const status = `${stateLabel} · ${countdown}`;
+  const status = `${stateLabel} · ${Math.round(Math.min(100, growth.energyRatio * 100))}% context`;
   return (
     <View
       accessibilityLabel={`${displayedEnergy} of ${growth.energyTarget} Egg context. ${status}`}
@@ -2448,22 +2484,13 @@ function GrowthMeter({ growth }: { growth: TodayGrowthSummary }) {
         </View>
       </View>
       <View style={[styles.countdownPill, compact && styles.countdownPillCompact]}>
-        <IconSymbol color="#F3D37B" name="timer" size={13} />
+        <IconSymbol color="#F3D37B" name="sparkles" size={13} />
         <ThemedText selectable style={styles.countdown} lightColor="#F6EACB" darkColor="#F6EACB">
           {status}
         </ThemedText>
       </View>
     </View>
   );
-}
-
-function formatCountdown(target: Date): string {
-  const milliseconds = Math.max(0, target.getTime() - Date.now());
-  if (milliseconds <= 0) return 'Ready to hatch';
-  const totalMinutes = Math.ceil(milliseconds / 60_000);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return hours > 0 ? `Hatches in ${hours}h ${minutes}m` : `Hatches in ${minutes}m`;
 }
 
 const styles = StyleSheet.create({
@@ -2477,6 +2504,8 @@ const styles = StyleSheet.create({
   contentScroll: { position: 'relative', zIndex: 6 },
   topHudFixed: { left: 0, paddingHorizontal: 14, position: 'absolute', right: 0, zIndex: 20 },
   fixedActionCluster: { alignItems: 'center', gap: 6, left: 0, position: 'absolute', right: 0, zIndex: 12 },
+  hatchReadyAction: { alignSelf: 'center', left: 30, position: 'absolute', right: 30, zIndex: 12 },
+  hatchReadyActionLabel: { ...KatchaDeckUI.typography.kingdomDisplay, fontSize: 18, letterSpacing: 0.8, lineHeight: 22, textTransform: 'uppercase' },
   quietDayAction: { alignItems: 'center', backgroundColor: 'rgba(255,247,225,0.94)', borderColor: 'rgba(139,101,37,0.24)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 6, minHeight: 34, paddingHorizontal: 13 },
   quietDayLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '900' },
   actionPressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },

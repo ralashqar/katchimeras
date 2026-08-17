@@ -11,7 +11,7 @@ import { deriveIdentityHistories } from '@/utils/katchimera-identity';
 
 import { tomorrowDateId, toLocalDateId } from './date';
 import { getDistanceMeters } from './geo';
-import { resolveDayState, resolveHatchHour, resolveRolledPastDay } from './lifecycle';
+import { resolveDayState, resolveRolledPastDay } from './lifecycle';
 import { upgradeStoredHomeState, type UpgradeableStoredHomeState } from './migrations';
 import { createEmptyStoredDay } from './records';
 import { dayHasShape, dayInputSignature } from './shape';
@@ -27,7 +27,6 @@ export function normalizeStoredHomeState(
   const upgradedState = upgradeStoredHomeState(inputState);
   const todayDateId = toLocalDateId(now);
   const tomorrowDate = tomorrowDateId(now);
-  const hatchHour = resolveHatchHour(profile);
   let archivedDays: StoredHomeDayRecord[] = [...upgradedState.archivedDays];
   let today: StoredHomeDayRecord = { ...upgradedState.today };
   let tomorrow: StoredHomeDayRecord | undefined = upgradedState.tomorrow
@@ -46,21 +45,21 @@ export function normalizeStoredHomeState(
 
   today = {
     ...today,
-    state: resolveDayState(today, now, hatchHour),
+    state: resolveDayState(today, now),
   };
 
   archivedDays = archivedDays
     .map((day): StoredHomeDayRecord => ({
       ...day,
-      state: resolveDayState(day, now, hatchHour),
+      state: resolveDayState(day, now),
     }))
     .slice(-MAX_ARCHIVED_DAYS);
 
   const normalizedArchived: StoredHomeDayRecord[] = [];
   archivedDays.forEach((day) => {
-    normalizedArchived.push(updateStoredDayDerivedFields(day, normalizedArchived, now, hatchHour, false));
+    normalizedArchived.push(updateStoredDayDerivedFields(day, normalizedArchived, now, false));
   });
-  const normalizedToday = updateStoredDayDerivedFields(today, normalizedArchived, now, hatchHour, true);
+  const normalizedToday = updateStoredDayDerivedFields(today, normalizedArchived, now, true);
 
   const normalizedTomorrow =
     tomorrow && dayHasShape(tomorrow)
@@ -68,7 +67,6 @@ export function normalizeStoredHomeState(
           { ...tomorrow, state: 'forming' },
           [...normalizedArchived, normalizedToday],
           now,
-          hatchHour,
           false
         )
       : undefined;
@@ -78,7 +76,7 @@ export function normalizeStoredHomeState(
   );
 
   return {
-    version: 21,
+    version: 22,
     locationPermission: upgradedState.locationPermission,
     activityPermission: upgradedState.activityPermission,
     healthPermission: upgradedState.healthPermission,
@@ -118,12 +116,10 @@ export function normalizeActiveHomeState(
     return normalizeStoredHomeState(state, profile, now);
   }
 
-  const hatchHour = resolveHatchHour(profile);
   const today = updateStoredDayDerivedFields(
     state.today,
     state.archivedDays,
     now,
-    hatchHour,
     true,
   );
   const tomorrow = state.tomorrow && dayHasShape(state.tomorrow)
@@ -131,7 +127,6 @@ export function normalizeActiveHomeState(
         { ...state.tomorrow, state: 'forming' },
         [...state.archivedDays, today],
         now,
-        hatchHour,
         true,
       )
     : undefined;
@@ -165,7 +160,6 @@ function updateStoredDayDerivedFields(
   inputDay: StoredHomeDayRecord,
   priorDays: StoredHomeDayRecord[],
   now: Date,
-  hatchHour: number,
   force: boolean
 ): StoredHomeDayRecord {
   const emojiNormalizedDay: StoredHomeDayRecord = {
@@ -188,7 +182,7 @@ function updateStoredDayDerivedFields(
   const signature = dayInputSignature(day);
 
   if (!force && day.derivedSignature === signature) {
-    return { ...day, state: resolveDayState(day, now, hatchHour) };
+    return { ...day, state: resolveDayState(day, now) };
   }
 
   const dayMap = deriveDayMapSummary(day.locations, day.moments);
@@ -201,7 +195,7 @@ function updateStoredDayDerivedFields(
 
   return {
     ...day,
-    state: resolveDayState(day, now, hatchHour),
+    state: resolveDayState(day, now),
     visitedPlaceCount,
     newPlaceCount,
     locationSampleCount,

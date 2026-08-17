@@ -36,7 +36,7 @@ import { aggregatePhotoVision, buildVisionSignals } from '@/utils/vision-signals
 import { requestComicBeats } from '@/utils/day-reflection';
 import { encounterLiveCast } from '@/constants/encounter-cast';
 import { katchimeraEncounterProfiles } from '@/constants/katchimera-encounter-profiles';
-import { getCreatureVisual, prepareTodayForDevRehatch, type DevRehatchMode } from '@/game/days';
+import { getCreatureVisual, prepareLatestDailyHatchForDevReplay } from '@/game/days';
 import { resetTodayForDebug } from '@/features/today/reset-today-for-debug';
 import { beginFirstSession } from '@/features/onboarding/first-session';
 import { jumpFtueToStep, useFtueRun } from '@/features/onboarding/ftue-runtime';
@@ -232,28 +232,33 @@ export default function ExploreScreen() {
     }
   }
 
-  function handlePrepareTodayRehatch(mode: DevRehatchMode) {
-    const forceLowSignal = mode === 'force_low_signal';
+  function handlePrepareTodayRehatch() {
     Alert.alert(
-      forceLowSignal ? 'Force the low-signal hatch flow?' : 'Replay today’s adaptive hatch flow?',
-      forceLowSignal
-        ? 'Keeps today’s data intact, but temporarily hides it from the questionnaire so you can test the true zero-evidence highlight → detail → meaning flow.'
-        : 'Keeps today’s journal and passive data, unhatches the egg, and lets the adaptive planner choose the questions again.',
+      'Replay the latest Daily Wisp hatch?',
+      'Re-seals the newest completed day and replays the previous-day reveal and claim flow used in the app.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: forceLowSignal ? 'Force low signal' : 'Unhatch egg',
+          text: 'Unhatch egg',
           onPress: () => {
             const state = homeRepository.load();
             if (!state) {
               Alert.alert('No day available', 'Open Today once, then try this tool again.');
               return;
             }
-            const next = prepareTodayForDevRehatch(state, mode);
+            const dailyReplay = prepareLatestDailyHatchForDevReplay(state);
+            if (!dailyReplay) {
+              Alert.alert('No Daily Wisp available', 'Capture a day and let it roll over before replaying its hatch.');
+              return;
+            }
+            const next = dailyReplay.state;
             homeRepository.save(next, { allowHatchDowngrade: true });
             setStoredState(next);
             clearTodayPatch();
-            router.replace('/(tabs)');
+            router.replace({
+              pathname: '/(tabs)/today',
+              params: { recoveryHatchDayId: dailyReplay.dayId },
+            });
           },
         },
       ]
@@ -504,13 +509,8 @@ export default function ExploreScreen() {
                 <KatchaButton label="Feastle story · Return at level 2" onPress={() => setFeastleStoryStateForDebug('return_available', 2)} variant="secondary" />
                 <KatchaButton label="Feastle story · Chapter 1 complete" onPress={() => setFeastleStoryStateForDebug('chapter_complete', 4)} variant="secondary" />
                 <KatchaButton
-                  label="Unhatch egg · replay adaptive questions"
-                  onPress={() => handlePrepareTodayRehatch('adaptive')}
-                  variant="secondary"
-                />
-                <KatchaButton
-                  label="Unhatch egg · test true low-signal flow"
-                  onPress={() => handlePrepareTodayRehatch('force_low_signal')}
+                  label="Unhatch egg · replay Daily Wisp"
+                  onPress={handlePrepareTodayRehatch}
                   variant="secondary"
                 />
                 <KatchaButton label="Open art lab" onPress={() => router.push('/art-lab')} variant="secondary" />

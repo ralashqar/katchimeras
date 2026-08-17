@@ -69,8 +69,44 @@ export function preserveActiveTodayFromEmptyDowngrade(
 ): StoredHomeState {
   if (!current) return incoming;
   if (current.today.id !== incoming.today.id || current.today.isoDate !== incoming.today.isoDate) return incoming;
-  if (!hasNurtureProgress(current.today) || hasNurtureProgress(incoming.today)) return incoming;
-  return { ...incoming, today: current.today };
+  const cycleProtected = preserveNewestEggCycle(current, incoming);
+  if (!hasNurtureProgress(current.today) || hasNurtureProgress(cycleProtected.today)) return cycleProtected;
+  return { ...cycleProtected, today: current.today };
+}
+
+function preserveNewestEggCycle(current: StoredHomeState, incoming: StoredHomeState): StoredHomeState {
+  const currentCycle = validTimestamp(current.today.growth?.cycleStartedAt);
+  const incomingCycle = validTimestamp(incoming.today.growth?.cycleStartedAt);
+  if (currentCycle == null || (incomingCycle != null && incomingCycle >= currentCycle)) return incoming;
+
+  const eventMap = new Map((current.today.growth?.events ?? []).map((event) => [event.id, event]));
+  for (const event of incoming.today.growth?.events ?? []) eventMap.set(event.id, event);
+  const careMap = new Map((current.today.growth?.careActions ?? [])
+    .filter((action) => validTimestamp(action.updatedAt) != null && validTimestamp(action.updatedAt)! >= currentCycle)
+    .map((action) => [action.instanceId, action]));
+  for (const action of incoming.today.growth?.careActions ?? []) {
+    if (validTimestamp(action.updatedAt) != null && validTimestamp(action.updatedAt)! >= currentCycle) {
+      careMap.set(action.instanceId, action);
+    }
+  }
+  return {
+    ...incoming,
+    today: {
+      ...incoming.today,
+      growth: {
+        schemaVersion: 1,
+        cycleStartedAt: current.today.growth?.cycleStartedAt,
+        events: [...eventMap.values()],
+        careActions: [...careMap.values()],
+      },
+    },
+  };
+}
+
+function validTimestamp(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? null : timestamp;
 }
 
 function hasNurtureProgress(day: StoredHomeDayRecord): boolean {

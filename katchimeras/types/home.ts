@@ -1221,6 +1221,7 @@ export type DailyWispHatch = {
   sealedInputSignature: string;
   sealedAt: string;
   revealedAt: string | null;
+  claimedAt: string | null;
   provenance: 'live' | 'rollover' | 'legacy_conversion';
 };
 
@@ -1639,6 +1640,11 @@ export type TodayEnergyActionCompletion = {
 
 export type DayGrowthState = {
   schemaVersion: 1;
+  /**
+   * Growth receipts before this instant remain stored for exact-once history,
+   * but belong to the Egg cycle that has already hatched.
+   */
+  cycleStartedAt?: string | null;
   events: TodayGrowthEvent[];
   careActions: TodayCareActionState[];
 };
@@ -1752,7 +1758,7 @@ export type StoredHomeDayRecord = {
 };
 
 export type StoredHomeState = {
-  version: 21;
+  version: 22;
   locationPermission: LocationPermissionState;
   activityPermission: ActivityPermissionState;
   healthPermission: HealthPermissionState;

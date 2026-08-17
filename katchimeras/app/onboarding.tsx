@@ -19,7 +19,6 @@ export default function OnboardingRoute() {
         ...current,
         completed: true,
         completedAt: current.completedAt ?? new Date().toISOString(),
-        hatchHour: current.hatchHour ?? 20,
         preferenceIds: current.preferenceIds.length ? current.preferenceIds : ['cozy'],
       });
     }

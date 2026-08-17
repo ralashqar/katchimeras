@@ -83,6 +83,7 @@ export function finalizeDailyWispHatch(input: {
     sealedInputSignature: dayInputSignature(day),
     sealedAt,
     revealedAt: input.revealed === false ? null : sealedAt,
+    claimedAt: input.revealed === false ? null : sealedAt,
     provenance,
   };
   const creature = cardAdapterCreature(day, primaryWispId, primaryTheme, secondaryTheme);

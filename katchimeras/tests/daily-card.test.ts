@@ -267,9 +267,10 @@ test('v12 migration deterministically converts a legacy hatch into a Wisp Day Ca
   const migratedAgain = upgradeStoredHomeState(migrated);
   const card = migrated.archivedDays[0].card;
 
-  assert.equal(migrated.version, 21);
+  assert.equal(migrated.version, 22);
   assert.equal(migrated.archivedDays[0].legacyEncounter?.id, creature.id);
   assert.ok(migrated.archivedDays[0].dailyHatch?.primaryWispId);
+  assert.equal(migrated.archivedDays[0].dailyHatch?.claimedAt, migrated.archivedDays[0].dailyHatch?.revealedAt);
   assert.equal(card?.primaryWispId, migrated.archivedDays[0].dailyHatch?.primaryWispId);
   assert.equal(card?.sceneVariantId, migrated.archivedDays[0].dailyHatch?.sceneVariantId);
   assert.equal(card?.schemaVersion, 5);
@@ -298,7 +299,7 @@ test('v13 migration preserves the legacy encounter while creating the revised Da
 
   const migrated = upgradeStoredHomeState(v13State);
   const card = migrated.archivedDays[0].card;
-  assert.equal(migrated.version, 21);
+  assert.equal(migrated.version, 22);
   assert.equal(card?.schemaVersion, 5);
   assert.equal(migrated.archivedDays[0].legacyEncounter?.id, creature.id);
   assert.equal(card?.primaryWispId, migrated.archivedDays[0].dailyHatch?.primaryWispId);

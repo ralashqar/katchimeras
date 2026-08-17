@@ -9,7 +9,7 @@ export type HomeLoopMode =
   | 'historical'
   | 'locked-tomorrow';
 
-export type HomeHatchOwnership = 'none' | 'daily_surface' | 'discovery_in_place';
+export type HomeHatchOwnership = 'none' | 'daily_in_place' | 'discovery_in_place';
 
 export type HomeFormingContext = {
   activePrompt: ActiveDayPrompt | null;
@@ -29,8 +29,6 @@ export function resolveHomeLoopPresentation(input: {
   tomorrowAvailablePrompts: ActiveDayPrompt[];
   tomorrowDay: HomeDayRecord;
 }): { forming: HomeFormingContext | null; mode: HomeLoopMode } {
-  if (input.hatchOwnership === 'daily_surface') return { forming: null, mode: 'hatching' };
-
   const selected = input.selectedDay;
   if (selected?.kind === 'day' && selected.isToday) {
     if (selected.state === 'hatched') return { forming: null, mode: 'hatched-today' };
@@ -42,7 +40,10 @@ export function resolveHomeLoopPresentation(input: {
         prompts: input.availableDayPrompts,
         target: 'today',
       },
-      mode: 'forming-today',
+      // Daily Hatch is an animation state of the current Today room, not a
+      // replacement screen. Keeping this context non-null preserves the exact
+      // Egg instance, layout measurements and camera shared values.
+      mode: input.hatchOwnership === 'daily_in_place' ? 'hatching' : 'forming-today',
     };
   }
 

@@ -32,12 +32,10 @@ import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-
 import { GuidedCaptureSheet, type GuidedTextDetailDraft } from '@/components/katchadeck/home/guided-capture-sheet';
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
 import { HatchCheckInSheet } from '@/components/katchadeck/home/hatch-check-in-sheet';
-import { HatchCountdown } from '@/components/katchadeck/home/hatch-countdown';
 import { TodayTopHud } from '@/components/katchadeck/home/today-top-hud';
 import {
   TodayKingdomEggAboveOverlay,
   TodayKingdomEggHero,
-  TodayKingdomEggOverlay,
 } from '@/components/katchadeck/home/today-kingdom-egg-hero';
 import {
   TodayExplorationBackground,
@@ -45,7 +43,6 @@ import {
   TodayExplorationSceneLayer,
   useTodayExplorationBackgroundMotion,
 } from '@/components/katchadeck/home/today-exploration-background';
-import { TodayTileHatchReveal } from '@/components/katchadeck/home/today-tile-hatch-reveal';
 import { TodayHatchEnvironmentCrossfade } from '@/components/katchadeck/home/today-hatch-environment-crossfade';
 import { ResolvedAtmosphereLayer } from '@/components/katchadeck/world/atmosphere-layer';
 import {
@@ -61,6 +58,7 @@ import { WispResonanceReveal } from '@/components/katchadeck/wisps/wisp-resonanc
 import { SceneDiscoveryReveal } from '@/components/katchadeck/scenes/scene-discovery-reveal';
 import { TodayCategoryRing, type TodayCategoryRingItem } from '@/components/katchadeck/home/today-category-ring';
 import { TodayBottomDock } from '@/components/katchadeck/home/today-bottom-dock';
+import { CardDeckCarousel } from '@/components/katchadeck/collection/card-deck-carousel';
 import {
   TodayNurtureExperience,
 } from '@/components/katchadeck/home/today-nurture-experience';
@@ -147,7 +145,6 @@ import { journalNoteRouteNeedsConfirmation } from '@/utils/journal-routing';
 import { runAfterNativeModalDismiss } from '@/utils/native-modal-navigation';
 import { trackStreakEvent } from '@/utils/streak-sync';
 import { defaultStreakCaptureTarget } from '@/utils/streak-engine';
-import { hatchCheckInEligibility } from '@/utils/hatch-check-in';
 import { loadWorldIdentity } from '@/utils/world-identity';
 import {
   todayExplorationCreatureStageFrame,
@@ -156,7 +153,7 @@ import {
   TODAY_KINGDOM_STAGE_HEIGHT,
 } from '@/utils/today-kingdom-hero-layout';
 import { atmosphereSettingsForPlan, resolveDayAtmosphere } from '@/utils/day-atmosphere';
-import { todayHatchOwnsSurface, todayHatchRunsInPlace, todayHatchShowsDashboard, todayHatchShowsResident, todayHatchShowsWorldShift } from '@/utils/today-hatch-presentation';
+import { todayDailyHatchActive, todayHatchRunsInPlace, todayHatchShowsDashboard, todayHatchShowsResident, todayHatchShowsWorldShift } from '@/utils/today-hatch-presentation';
 import { identityForCreature } from '@/utils/katchimera-identity';
 import {
   todayKatchimeraExplorationBackgroundKeyForPresentation,
@@ -177,8 +174,6 @@ import {
 import { pendingGrowthAwards, TODAY_GROWTH_REWARDS, todayGrowthSummary } from '@/utils/today-growth';
 import { buildAboutTodayPrompt } from '@/utils/day-prompt-engine';
 import { buildTodayPhotoRollSuggestion } from '@/utils/today-photo-roll-suggestion';
-import { loadOnboardingProfile } from '@/utils/onboarding-state';
-import { resolveHatchHour } from '@/game/days/lifecycle';
 import type { CompanionQuickGoal, CompanionQuickGoalCompletion } from '@/utils/companion-quick-goals';
 import type { GameHubItem } from '@/utils/game-hub';
 import type { CompanionJournalHandoff } from '@/utils/companion-journal-handoff';
@@ -280,11 +275,12 @@ function HomeScreen() {
   const ftueEnergyFocus = Boolean(ftueRun?.status === 'active' && ftueRun.stepId.startsWith('energy.'));
   const ftueEnergyBridgeStep = ftueRun?.stepId === 'energy.journal_reward';
   const discoveryHatchActive = ftueOpeningOwnsHome;
-  const { memoryDayId, memoryRecordId, memorySourceKind, onboardingCapture } = useLocalSearchParams<{
+  const { memoryDayId, memoryRecordId, memorySourceKind, onboardingCapture, recoveryHatchDayId } = useLocalSearchParams<{
     memoryDayId?: string;
     memoryRecordId?: string;
     memorySourceKind?: string;
     onboardingCapture?: string;
+    recoveryHatchDayId?: string;
   }>();
   const { beginCriticalInteraction, criticalInteractionActive } = useAppActivity();
   const screenFocused = useIsFocused();
@@ -429,7 +425,6 @@ function HomeScreen() {
     activeDayPrompt,
     availableDayPrompts,
     answerDayPrompt,
-    startHatchCheckIn,
     answerHatchCheckIn,
     finishHatchCheckIn,
     answerPhotoMeaning,
@@ -451,10 +446,12 @@ function HomeScreen() {
     tomorrowActivePrompt,
     tomorrowAvailablePrompts,
     selectedDay,
+    pendingHatchDay,
     selectedDayId,
     selectTimelineDay,
     timelineDays,
     triggerHatchIfReady,
+    claimHatch,
     refreshState,
     requestMicrophonePermission,
     cloudIntelligenceEnabled,
@@ -468,26 +465,29 @@ function HomeScreen() {
     updateCareAction,
   } = useHomeScreenState({
     pauseInteractiveServices: criticalInteractionActive,
+    recoveryHatchDayId: recoveryHatchDayId ?? null,
   });
   const {
     isHatching,
     presentation: hatchPresentation,
     handleHatchEnvironmentReady,
-    handleHatchSubjectError,
     handleHatchSubjectReady,
+    handleHatchSubjectError,
     handleReveal,
+    handleClaim,
     handleDiscoveryReveal,
     restoreDiscoveryReveal,
   } = useTodayHatchRevealController({
-    selectedDay,
+    selectedDay: pendingHatchDay ?? selectedDay,
     triggerHatchIfReady,
+    claimHatch,
     acceleratedReadyRef: acceleratedHatchReadyRef,
     allowDailyHatch: !discoveryHatchActive,
     onDiscoveryAnimationComplete: () => {
       commitFtueAction({ actionId: 'egg.hatch', evidenceRef: 'discovery-hatch:mossprout' });
     },
   });
-  const dailyHatchActive = todayHatchOwnsSurface(hatchPresentation);
+  const dailyHatchActive = todayDailyHatchActive(hatchPresentation);
   const discoveryHatchInPlace = todayHatchRunsInPlace(hatchPresentation);
   const { days: allDays } = useAllDays();
   const legacyDiscoveryPersonalLine = useMemo(() => {
@@ -502,8 +502,8 @@ function HomeScreen() {
     if (mood === 'Drained' || mood === 'Low') return 'Sounds like today took something out of you. We can start small.';
     return mood ? `You felt ${mood.toLowerCase()} today. Thank you for letting me know.` : 'I felt those little pieces of your day reach me.';
   }, [allDays]);
-  const { equippedWispId: activeWispId, syncFromDays: syncWispsFromDays, pendingDiscoveryId, dismissDiscovery, equip: equipWisp, pendingResonance, dismissResonance } = useWisps();
-  const { equippedSceneId, syncFromDays: syncScenesFromDays, pendingDiscoveryId: pendingSceneDiscoveryId, dismissDiscovery: dismissSceneDiscovery, equip: equipScene } = useScenes();
+  const { equippedWispId: activeWispId, syncFromDays: syncWispsFromDays, pendingDiscoveryId, dismissDiscovery, equip: equipWisp, pendingResonance, dismissResonance, isOwned: isWispOwned, resonance: wispResonance } = useWisps();
+  const { equippedSceneId, syncFromDays: syncScenesFromDays, pendingDiscoveryId: pendingSceneDiscoveryId, dismissDiscovery: dismissSceneDiscovery, equip: equipScene, isOwned: isSceneOwned } = useScenes();
   const collectibleDays = useMemo(() => {
     const byId = new Map(allDays.map((day) => [day.id, day]));
     for (const day of timelineDays) {
@@ -511,6 +511,22 @@ function HomeScreen() {
     }
     return [...byId.values()];
   }, [allDays, timelineDays]);
+  const hatchDeckCards = useMemo(() => {
+    const lead = hatchPresentation.committedDay?.card ?? null;
+    if (!lead) return [];
+    return [
+      ...collectibleDays
+      .filter((day) => day.card && day.dailyHatch?.claimedAt && day.card.id !== lead.id)
+      .map((day) => day.card!),
+      lead,
+    ].sort((left, right) => left.isoDate.localeCompare(right.isoDate));
+  }, [collectibleDays, hatchPresentation.committedDay]);
+  const hatchLeadCard = hatchPresentation.committedDay?.card ?? null;
+  const hatchWispId = hatchPresentation.committedDay?.dailyHatch?.primaryWispId ?? null;
+  const hatchSceneId = hatchPresentation.committedDay?.dailyHatch?.sceneVariantId ?? null;
+  const hatchWispWasOwned = hatchWispId ? isWispOwned(hatchWispId) : false;
+  const hatchResonanceBeforeClaim = hatchWispId ? wispResonance(hatchWispId) : 0;
+  const hatchSceneWasOwned = hatchSceneId ? isSceneOwned(hatchSceneId) : false;
   useEffect(() => { syncWispsFromDays(collectibleDays); }, [collectibleDays, syncWispsFromDays]);
   useEffect(() => { syncScenesFromDays(collectibleDays); }, [collectibleDays, syncScenesFromDays]);
   const isDay = selectedDay?.kind === 'day';
@@ -558,7 +574,7 @@ function HomeScreen() {
   const homeLoopPresentation = useMemo(() => resolveHomeLoopPresentation({
     activeDayPrompt,
     availableDayPrompts,
-    hatchOwnership: dailyHatchActive ? 'daily_surface' : discoveryHatchInPlace ? 'discovery_in_place' : 'none',
+    hatchOwnership: dailyHatchActive ? 'daily_in_place' : discoveryHatchInPlace ? 'discovery_in_place' : 'none',
     isTodayHatched,
     selectedDay,
     tomorrowActivePrompt,
@@ -979,17 +995,11 @@ function HomeScreen() {
       return;
     }
     if (
-      selectedDay?.kind !== 'day'
-      || (!selectedDay.canHatch && !acceleratedHatchReadyRef.current)
+      !pendingHatchDay
+      || (!pendingHatchDay.canHatch && !acceleratedHatchReadyRef.current)
     ) return;
-    const reason = discoveryHatchActive ? null : hatchCheckInEligibility(selectedDay);
-    if (reason) {
-      if (!selectedDay.hatchCheckIn) startHatchCheckIn(selectedDay.id, reason);
-      setHatchCheckInOpen(true);
-      return;
-    }
     void handleReveal();
-  }, [discoveryHatchActive, ftueRun?.stepId, handleDiscoveryReveal, handleReveal, selectedDay, startHatchCheckIn]);
+  }, [discoveryHatchActive, ftueRun?.stepId, handleDiscoveryReveal, handleReveal, pendingHatchDay]);
 
   useEffect(() => {
     if (!hatchAfterCheckIn || selectedDay?.kind !== 'day') return;
@@ -1028,7 +1038,11 @@ function HomeScreen() {
   const explorationBackgroundKey: TodayExplorationBackgroundKey = isForming
     ? 'home'
     : selectedKatchimeraExplorationKey ?? 'home';
-  const explorationBackgroundActive = !dailyHatchActive || todayHatchShowsWorldShift(hatchPresentation);
+  // The mounted forming room keeps its authored camera geometry during Daily
+  // Hatch. Only legacy non-forming presentations may swap scenic framing.
+  const explorationBackgroundActive = isForming
+    || !dailyHatchActive
+    || todayHatchShowsWorldShift(hatchPresentation);
   // The compact HUD provides the first layout estimate; onLayout replaces it
   // with the measured stage y.
   const resolvedHeroStageTop =
@@ -1066,7 +1080,15 @@ function HomeScreen() {
   const viewedIsForming = isForming;
   const hatchShowsResident = todayHatchShowsResident(hatchPresentation.phase);
   const hatchShowsDashboard = todayHatchShowsDashboard(hatchPresentation);
-  const atmosphereDay = isHatching && !hatchShowsResident
+  const dailyNewDayIntro = hatchPresentation.policy === 'daily'
+    && (hatchPresentation.phase === 'new_day_intro' || hatchPresentation.phase === 'restoring_today');
+  useEffect(() => {
+    if (!dailyNewDayIntro) return;
+    if (hatchWispId && pendingDiscoveryId === hatchWispId) dismissDiscovery(hatchWispId);
+    if (hatchWispId && pendingResonance?.wispId === hatchWispId) dismissResonance();
+    if (hatchSceneId && pendingSceneDiscoveryId === hatchSceneId) dismissSceneDiscovery(hatchSceneId);
+  }, [dailyNewDayIntro, dismissDiscovery, dismissResonance, dismissSceneDiscovery, hatchSceneId, hatchWispId, pendingDiscoveryId, pendingResonance?.wispId, pendingSceneDiscoveryId]);
+  const atmosphereDay = !dailyNewDayIntro && isHatching && !hatchShowsResident
     ? hatchPresentation.daySnapshot
     : viewedDay;
   const dayAtmosphere = useMemo(() => resolveDayAtmosphere(atmosphereDay), [atmosphereDay]);
@@ -1074,53 +1096,6 @@ function HomeScreen() {
     () => atmosphereSettingsForPlan(dayAtmosphere),
     [dayAtmosphere],
   );
-  const explorationTransitionPages = useMemo(() => {
-    const selectedIndex = timelineDays.findIndex(
-      (day) => day.id === selectedDayId,
-    );
-    const pageAt = (direction: -1 | 1) => {
-      if (selectedIndex < 0) return null;
-      const target = timelineDays[selectedIndex + direction];
-      if (!target) return null;
-      if (target.kind === 'tomorrow' && !isTodayHatched) return null;
-
-      const resolvedDay = target.kind === 'day' ? target : tomorrowDay;
-      let backgroundKey: TodayExplorationBackgroundKey = 'home';
-      if (target.kind === 'tomorrow') {
-        backgroundKey = 'home';
-      } else if (
-        resolvedDay?.isToday
-        && resolvedDay.state !== 'hatched'
-      ) {
-        backgroundKey = 'home';
-      } else if (
-        resolvedDay?.state === 'hatched'
-        && resolvedDay.creature
-      ) {
-        backgroundKey =
-          todayKatchimeraExplorationBackgroundKeyForPresentation({
-            creature: resolvedDay.creature,
-            environmentVisualKey:
-              resolvedDay.card?.scene?.environment?.visualKey,
-          }) ?? 'home';
-      }
-
-      return {
-        backgroundKey,
-        timelineDay: target,
-      };
-    };
-
-    return {
-      next: pageAt(1),
-      previous: pageAt(-1),
-    };
-  }, [
-    isTodayHatched,
-    selectedDayId,
-    timelineDays,
-    tomorrowDay,
-  ]);
   const currentExplorationPage = useMemo<TodayExplorationPageDescriptor | null>(
     () => selectedDay
       ? {
@@ -1138,18 +1113,6 @@ function HomeScreen() {
     setExplorationTransitionSnapshot,
   ] = useState<TodayExplorationTransitionSnapshot | null>(null);
   const explorationTransitionTargetIdRef = useRef<string | null>(null);
-  const beginExplorationTransition = useCallback((direction: -1 | 1) => {
-    const target = direction === -1
-      ? explorationTransitionPages.previous
-      : explorationTransitionPages.next;
-    if (!currentExplorationPage || !target) return;
-    explorationTransitionTargetIdRef.current = target.timelineDay.id;
-    setExplorationTransitionSnapshot({
-      direction,
-      source: currentExplorationPage,
-      target,
-    });
-  }, [currentExplorationPage, explorationTransitionPages]);
   const displayedExplorationCurrent =
     explorationTransitionSnapshot?.source ?? currentExplorationPage;
   const displayedExplorationPrevious = explorationTransitionSnapshot
@@ -1540,7 +1503,7 @@ function HomeScreen() {
     if (!formingDay) return null;
     const natural = todayGrowthSummary(
       formingDay,
-      resolveHatchHour(loadOnboardingProfile()),
+      0,
       growthNow,
       onTomorrowForming
         ? { incubationNotBefore: new Date(`${formingDay.isoDate}T00:00:00`) }
@@ -2104,15 +2067,6 @@ function HomeScreen() {
     const pageUsesExplorationFraming =
       explorationFramingOverride
       ?? (active && explorationBackgroundActive);
-    if (active && isHatching && hatchPresentation.dayId === timelineDay.id) {
-      return (
-        <TodayTileHatchReveal
-          homeArchetypeId={homeArchetypeId}
-          onAssetsReady={handleHatchSubjectReady}
-          presentation={hatchPresentation}
-        />
-      );
-    }
     const day = timelineDay.kind === 'day' ? timelineDay : tomorrowDay;
     if (day?.state === 'hatched' && day.creature && !day.dailyHatch) {
       const usesExplorationFraming = pageUsesExplorationFraming;
@@ -2158,8 +2112,6 @@ function HomeScreen() {
     eggTargetRef,
     activeWispId,
     explorationBackgroundActive,
-    handleHatchSubjectReady,
-    hatchPresentation,
     homeArchetypeId,
     isHatching,
     isForming,
@@ -2169,36 +2121,9 @@ function HomeScreen() {
     tomorrowDay,
   ]);
 
-  const renderTimelineOverlay = useCallback((timelineDay: HomeTimelineDay, active: boolean) => {
-    if (
-      !active ||
-      isHatching ||
-      quickGoalsOpen ||
-      timelineDay.kind !== 'day' ||
-      !timelineDay.isToday ||
-      timelineDay.state === 'hatched'
-    ) {
-      return null;
-    }
-    const countdown = <HatchCountdown isReady={timelineDay.state === 'ready_to_hatch'} />;
-    return explorationBackgroundActive ? (
-      <TodayKingdomEggAboveOverlay
-        aboveEggClearance={52}
-        explorationStageTop={resolvedHeroStageTop}
-        homeArchetypeId={homeArchetypeId}>
-        {countdown}
-      </TodayKingdomEggAboveOverlay>
-    ) : (
-      <TodayKingdomEggOverlay homeArchetypeId={homeArchetypeId}>
-        {countdown}
-      </TodayKingdomEggOverlay>
-    );
-  }, [explorationBackgroundActive, homeArchetypeId, isHatching, quickGoalsOpen, resolvedHeroStageTop]);
-
   const {
     goToAdjacentDay,
     navigateToDay,
-    swipeGesture,
   } = useTodayNavigationController({
     windowWidth,
     windowHeight,
@@ -2315,13 +2240,15 @@ function HomeScreen() {
   }, [careFlowWasBusyRef, clearCareIntent, flowBusy, noteCareFlowBusy, nurtureCompletedActions, pendingCareIntent]);
   const explorationMotion = useTodayExplorationBackgroundMotion({
     activeKey: selectedDayId,
-    canSwipeNext: explorationTransitionPages.next != null,
-    canSwipePrevious: explorationTransitionPages.previous != null,
-    enabled: explorationBackgroundActive && !flowBusy,
-    frozen: discoveryHatchInPlace,
+    canSwipeNext: false,
+    canSwipePrevious: false,
+    // A Daily Hatch must inherit the exact camera framing in which the player
+    // pressed Reveal. Freezing retains the current pan; disabling this
+    // controller springs translateX back to zero and visibly detaches the Egg.
+    enabled: !flowBusy,
+    frozen: dailyHatchActive || discoveryHatchInPlace,
     onQuickSwipe: commitExplorationTransition,
-    onTransitionStart: beginExplorationTransition,
-    pageTransitionEnabled: true,
+    pageTransitionEnabled: false,
   });
   const resetExplorationAfterCommit = explorationMotion.resetAfterCommit;
   useEffect(() => {
@@ -2372,7 +2299,9 @@ function HomeScreen() {
     allowGestureAtScriptedRest: ftueCameraPinchTarget == null && regularCameraPinchTarget === 1,
     deferScriptedChangesWhileDisabled: ftueCameraPinchTarget == null && regularCameraPinchTarget != null,
     enabled: !flowBusy,
-    frozen: discoveryHatchInPlace,
+    // Pinch, hover and the detached high-resolution Egg all read these shared
+    // values. Freeze them together so Reveal begins on the exact current frame.
+    frozen: dailyHatchActive || discoveryHatchInPlace,
     hoverEnabled: !explorationPresentationActive,
     maxPinchScale: explorationPresentationActive
       ? todayScene.homeEnvironment.motion.explorationMaxPinchScale
@@ -2384,10 +2313,8 @@ function HomeScreen() {
     scriptedPinchScale: scriptedCameraPinchTarget,
   });
   const pageGesture = useMemo(
-    () => explorationPresentationActive
-      ? Gesture.Simultaneous(explorationMotion.gesture, environmentGesture)
-      : Gesture.Simultaneous(swipeGesture, environmentGesture),
-    [environmentGesture, explorationMotion.gesture, explorationPresentationActive, swipeGesture],
+    () => Gesture.Simultaneous(explorationMotion.gesture, environmentGesture),
+    [environmentGesture, explorationMotion.gesture],
   );
   const handleHeroStageLayout = useCallback((event: LayoutChangeEvent) => {
     const nextTop = event.nativeEvent.layout.y;
@@ -2519,12 +2446,9 @@ function HomeScreen() {
           pointerEvents={quickGoalsOpen ? 'none' : 'auto'}
           style={[styles.topHudLayer, goalsChromeStyle]}>
           <TodayTopHud
-            days={timelineDays}
             energyPulseNonce={energyHudPulseNonce}
             energyTargetRef={energyHudTargetRef}
             interactionLocked={isHatching}
-            onSelectDay={navigateToDay}
-            selectedId={selectedDayId}
           />
         </Animated.View>
 
@@ -2567,7 +2491,6 @@ function HomeScreen() {
                   'active',
                   displayedExplorationCurrent?.backgroundKey != null,
                 )}
-                {renderTimelineOverlay(selectedDay, true)}
                 {voiceNote.phase !== 'idle' && !quickNoteOpen ? (
                   <TodayKingdomEggAboveOverlay
                     explorationStageTop={resolvedHeroStageTop}
@@ -2636,9 +2559,10 @@ function HomeScreen() {
       </>
       ) : null}
 
-      {isForming && formingDay && nurtureGrowth && (!isHatching || hatchPresentation.policy === 'ftue_discovery') ? (
+      {isForming && formingDay && nurtureGrowth ? (
         <TodayEnergyProfiler>
           <TodayNurtureExperience
+          key={`today-nurture:${formingDay.id}:${formingDay.growth?.cycleStartedAt ?? 'initial'}`}
           actionListLocked={
             ftueActionBusy
             || ftueLifeEnergyBusy
@@ -2647,7 +2571,7 @@ function HomeScreen() {
             || energyLoopStatus === 'awaiting_completion'
             || energyLoopStatus === 'rewarding'
           }
-          actionListHidden={feastleJournalReward !== null || (isHatching && hatchPresentation.policy === 'ftue_discovery')}
+          actionListHidden={isHatching || Boolean(pendingHatchDay?.canHatch) || feastleJournalReward !== null || dailyNewDayIntro}
           actionTransitionActive={
             energyLoopStatus === 'rewarding'
             || energyLoopStatus === 'entering'
@@ -2665,9 +2589,12 @@ function HomeScreen() {
           feedExpressionKey={eggFeedLaunchKey}
           focusMode={false}
           growth={nurtureGrowth}
-          hatchPresentation={isHatching && hatchPresentation.policy === 'ftue_discovery' ? hatchPresentation : null}
+          hatchPresentation={isHatching ? hatchPresentation : null}
+          hatchReadyFocus={dailyHatchActive || Boolean(pendingHatchDay?.canHatch)}
+          hatchReadyLabel={pendingHatchDay ? `Reveal ${formatHatchWeekday(pendingHatchDay.isoDate)}` : undefined}
           homeArchetypeId={homeArchetypeId}
           microcopy={microcopy}
+          newDayIntro={dailyNewDayIntro}
           onboardingGuide={onboardingGuide}
           onboardingCameraDurationMs={ftueHomeCameraDuration(ftueRun?.stepId)}
           onboardingCameraPanY={ftueHomeCameraPanTarget(ftueRun?.status === 'active' ? ftueRun.stepId : null)}
@@ -2698,12 +2625,12 @@ function HomeScreen() {
           onChooseSleep={handleNurtureSleep}
           onReveal={handleRevealPress}
           onRewardFlight={handleCareRewardFlight}
-          onSelectDay={navigateToDay}
-          careSwipeExternalGesture={explorationMotion.gesture}
+          onSelectDay={() => {}}
+          careSwipeExternalGesture={environmentGesture}
           environmentGesture={environmentGesture}
           sceneTranslateX={explorationMotion.translateX}
           sceneId={equippedSceneId}
-          timelineDays={timelineDays}
+          timelineDays={timelineDays.filter((day) => day.kind === 'day' && day.isToday)}
           topInset={insets.top}
           />
         </TodayEnergyProfiler>
@@ -2749,9 +2676,10 @@ function HomeScreen() {
           state={quickGoals.state}
         />
       ) : null}
-      {!isForming && (!isHatching || hatchShowsDashboard) && !hasVisibleLegacyPrompt && !quickGoalsOpen ? (
+      {(!isForming || pendingHatchDay) && !pendingHatchDay?.canHatch && (!isHatching || hatchShowsDashboard) && !hasVisibleLegacyPrompt && !quickGoalsOpen ? (
         <TodayBottomDock
-          canHatch={isDay ? selectedDay.canHatch : false}
+          canHatch={Boolean(pendingHatchDay?.canHatch)}
+          hatchLabel={pendingHatchDay ? `Reveal ${pendingHatchDay.dayLabel}` : undefined}
           isForming={isForming}
           isHatched={Boolean(isHatched)}
           viewedDay={viewedDay}
@@ -3396,6 +3324,51 @@ function HomeScreen() {
         onRetry={handleRetryComic}
         onShare={handleShareGeneratedComic}
       />
+      {hatchPresentation.policy === 'daily'
+        && ['assembling_deck', 'awaiting_claim', 'claiming'].includes(hatchPresentation.phase)
+        && hatchDeckCards.length > 0 ? (
+        <Animated.View entering={FadeIn.duration(reduceMotion ? 80 : 420)} style={styles.hatchDeckOverlay}>
+          <View style={styles.hatchDeckTitle}>
+            <ThemedText selectable style={styles.hatchDeckEyebrow} lightColor="#F2D48A" darkColor="#F2D48A">
+              {hatchWispWasOwned ? `WISP RETURNS · RESONANCE ${hatchResonanceBeforeClaim + 1}` : 'NEW WISP'}
+            </ThemedText>
+            <ThemedText selectable type="display" style={styles.hatchDeckName} lightColor="#FFF6DE" darkColor="#FFF6DE">
+              {hatchLeadCard?.creatureName}
+            </ThemedText>
+          </View>
+          {!hatchSceneWasOwned ? (
+            <ThemedText selectable style={styles.hatchSceneUnlock} lightColor="#D9E7C0" darkColor="#D9E7C0">NEW SCENE · ADDED ON CLAIM</ThemedText>
+          ) : null}
+          <CardDeckCarousel
+            cards={hatchDeckCards}
+            initialCardId={hatchLeadCard?.id}
+            interactive
+            onOpenCard={() => {}}
+            showCaption={false}
+          />
+          {hatchPresentation.phase === 'awaiting_claim' ? (
+            <Animated.View entering={presenceEnter(120)} style={styles.hatchClaimCta}>
+              <KatchaButton
+                fullWidth
+                glow
+                icon="sparkles"
+                label="Claim Day Card"
+                onPress={() => void handleClaim()}
+              />
+            </Animated.View>
+          ) : hatchPresentation.phase === 'claiming' ? (
+            <ActivityIndicator color="#F2D48A" size="large" />
+          ) : null}
+        </Animated.View>
+      ) : null}
+      {dailyNewDayIntro ? (
+        <Animated.View entering={FadeIn.duration(reduceMotion ? 80 : 360)} exiting={FadeOut.duration(300)} pointerEvents="none" style={[styles.newDayHero, { top: insets.top + 126 }]}>
+          <ThemedText selectable style={styles.newDayEyebrow} lightColor="#F2D48A" darkColor="#F2D48A">NEW DAY</ThemedText>
+          <ThemedText selectable type="display" style={styles.newDayDate} lightColor="#FFF6DE" darkColor="#FFF6DE">
+            {formatNewDayDate(formingDay?.isoDate ?? selectedDay?.isoDate)}
+          </ThemedText>
+        </Animated.View>
+      ) : null}
       {pendingDiscoveryId && !isHatching ? (
         <WispDiscoveryReveal
           id={pendingDiscoveryId}
@@ -3444,6 +3417,20 @@ function HomeScreen() {
   );
 }
 
+function formatNewDayDate(isoDate: string | undefined): string {
+  if (!isoDate) return 'Today';
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(new Date(`${isoDate}T12:00:00`));
+}
+
+function formatHatchWeekday(isoDate: string | undefined): string {
+  if (!isoDate) return 'Today';
+  return new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(new Date(`${isoDate}T12:00:00`));
+}
+
 const styles = StyleSheet.create({
   inactiveScreen: { backgroundColor: '#11131B', flex: 1 },
   screen: {
@@ -3478,6 +3465,22 @@ const styles = StyleSheet.create({
   explorationAtmosphere: {
     zIndex: 55,
   },
+  hatchDeckOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    backgroundColor: 'rgba(15,16,24,0.78)',
+    justifyContent: 'center',
+    paddingBottom: 24,
+    zIndex: 180,
+  },
+  hatchDeckTitle: { alignItems: 'center', gap: 2, paddingBottom: 10 },
+  hatchDeckEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.3 },
+  hatchDeckName: { fontSize: 28, lineHeight: 34 },
+  hatchSceneUnlock: { fontSize: 11, fontWeight: '900', letterSpacing: 1, paddingBottom: 4 },
+  hatchClaimCta: { marginTop: -8, paddingHorizontal: 24, width: '100%' },
+  newDayHero: { alignItems: 'center', left: 24, position: 'absolute', right: 24, zIndex: 190 },
+  newDayEyebrow: { fontSize: 12, fontWeight: '900', letterSpacing: 1.8 },
+  newDayDate: { fontSize: 27, lineHeight: 34, textAlign: 'center' },
   heroStage: {
     alignItems: 'center',
     height: TODAY_KINGDOM_STAGE_HEIGHT,

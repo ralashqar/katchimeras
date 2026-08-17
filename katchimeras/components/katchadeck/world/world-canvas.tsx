@@ -33,7 +33,6 @@ import { ARCHETYPE_THEME } from '@/constants/world';
 import { Lantern } from '@/constants/theme';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
-import { HatchCountdown } from '@/components/katchadeck/home/hatch-countdown';
 import { HatchReveal } from '@/components/katchadeck/home/hatch-reveal';
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
 import type { EggVisualState, HomeVisualKey, LocalCreatureRecord } from '@/types/home';
@@ -621,7 +620,6 @@ export function WorldCanvas({
   // The egg/creature centre tile — its default, or where the user dragged it.
   const eggDefaultCell = useMemo(() => defaultEggCell(), []);
   const eggScale = useMemo(() => defaultEggScale(), []);
-  const countdownDrop = EGG_STAGE_HEIGHT * eggScale * 0.34;
   const eggCell = useMemo(() => custom.egg ?? eggDefaultCell, [custom, eggDefaultCell]);
 
   // Live drag: convert a sprite's accumulated screen translation into a cell, then
@@ -2215,16 +2213,6 @@ export function WorldCanvas({
             </MotiView>
           ) : null}
 
-          {/* Hatch countdown, glued just below the egg's tile (pans/zooms with
-              the world). */}
-          {eggPoint && eggVisual && !hatching ? (
-            <View
-              pointerEvents="none"
-              style={[styles.countdownLayer, { left: eggPoint.x - 110, top: eggPoint.y + countdownDrop, width: 220 }]}>
-              <HatchCountdown isReady={eggReady} compact />
-            </View>
-          ) : null}
-
           {/* Golden "!" hovering over the photos cell — the phone has photos to
               add. Tap is handled by the tile hit-test (onPressMemoryAlert). */}
           {memoryPoint ? (
@@ -2710,7 +2698,6 @@ const styles = StyleSheet.create({
   ghostEmoji: { fontSize: 17, opacity: 0.85 },
   eggLayer: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   artefactLayer: { position: 'absolute', alignItems: 'center', justifyContent: 'center', opacity: 0.96 },
-  countdownLayer: { position: 'absolute', alignItems: 'center' },
   spriteImage: { width: '100%', height: '100%' },
   placeholder: {
     width: '78%',

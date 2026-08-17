@@ -3,9 +3,12 @@ import test from 'node:test';
 
 import { SCENES_BY_ID } from '@/constants/scenes';
 import { resolveRolledPastDay } from '@/game/days/lifecycle';
+import { claimDailyHatchForDay } from '@/game/days/claiming';
 import { createEmptyStoredDay } from '@/game/days/records';
+import type { StoredHomeState } from '@/types/home';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
 import { finalizeDailyWispHatch } from '@/utils/daily-wisp-hatch';
+import { todayGrowthSummary } from '@/utils/today-growth';
 
 const profile = { hatchHour: 21 } as OnboardingProfile;
 
@@ -65,6 +68,7 @@ test('rollover seals a legitimate missed day for retrospective reveal', () => {
 
   assert.equal(sealed.state, 'sealed');
   assert.equal(sealed.dailyHatch?.revealedAt, null);
+  assert.equal(sealed.dailyHatch?.claimedAt, null);
   assert.ok(sealed.card?.primaryWispId);
   assert.equal(sealed.creature, null);
 });
@@ -76,4 +80,48 @@ test('rollover does not invent a collectible for an empty day', () => {
   assert.equal(rolled.state, 'forming');
   assert.equal(rolled.dailyHatch, null);
   assert.equal(rolled.card, null);
+});
+
+test('a revealed hatch remains sealed until an idempotent claim', () => {
+  const sealed = resolveRolledPastDay(contextualDay('2026-08-15'), profile, new Date('2026-08-16T09:00:00'));
+  const revealed = {
+    ...sealed,
+    dailyHatch: sealed.dailyHatch ? { ...sealed.dailyHatch, revealedAt: '2026-08-16T09:05:00.000Z' } : null,
+  };
+  const state = {
+    version: 22,
+    archivedDays: [revealed],
+    today: createEmptyStoredDay(new Date('2026-08-16T12:00:00'), profile),
+  } as StoredHomeState;
+  state.today.growth = {
+    schemaVersion: 1,
+    events: [{
+      id: 'growth:journal:pre-claim',
+      source: 'journal',
+      sourceId: 'pre-claim',
+      amount: 100,
+      awardedAt: '2026-08-16T08:00:00.000Z',
+    }],
+    careActions: [{
+      instanceId: 'care:pre-claim',
+      definitionId: 'journal',
+      status: 'completed',
+      completedAt: '2026-08-16T08:00:00.000Z',
+      updatedAt: '2026-08-16T08:00:00.000Z',
+    }],
+  };
+  const claimed = claimDailyHatchForDay(state, revealed.id, new Date('2026-08-16T09:06:00.000Z'));
+  const claimedDay = claimed.archivedDays[0];
+  assert.equal(claimedDay.state, 'hatched');
+  assert.equal(claimedDay.dailyHatch?.claimedAt, '2026-08-16T09:06:00.000Z');
+  assert.equal(claimed.today.growth?.cycleStartedAt, '2026-08-16T09:06:00.000Z');
+  assert.equal(claimed.today.growth?.events.length, 1, 'historical receipts remain preserved');
+  assert.equal(claimed.today.growth?.careActions.length, 0, 'the new Egg gets fresh care actions');
+  const freshEgg = todayGrowthSummary(claimed.today, 0, new Date('2026-08-16T09:06:00.000Z'));
+  assert.equal(freshEgg.activeEnergy, 0);
+  assert.equal(freshEgg.energyRatio, 0);
+  assert.equal(freshEgg.stage, 0);
+  assert.equal(freshEgg.contextState, 'fresh');
+  const claimedAgain = claimDailyHatchForDay(claimed, revealed.id, new Date('2026-08-16T09:07:00.000Z'));
+  assert.equal(claimedAgain.archivedDays[0].dailyHatch?.claimedAt, '2026-08-16T09:06:00.000Z');
 });

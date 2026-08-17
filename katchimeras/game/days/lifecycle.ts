@@ -1,33 +1,14 @@
-import { HOME_HATCH_HOUR } from '@/constants/hatch';
 import type { HomeDayState, StoredHomeDayRecord } from '@/types/home';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
-import { resolveDayLifecycleState } from '@/utils/day-state';
-import { toLocalDateId } from './date';
 import { todayGrowthActivation } from '@/utils/today-growth';
 import { finalizeDailyWispHatch } from '@/utils/daily-wisp-hatch';
 
-export function resolveHatchHour(profile: OnboardingProfile) {
-  const hour = profile.hatchHour ?? HOME_HATCH_HOUR;
-  return Math.min(Math.max(Math.round(hour), 17), 23);
-}
-
-export function resolveDayState(day: StoredHomeDayRecord, now: Date, hatchHour: number): HomeDayState {
-  if (day.dailyHatch) return day.dailyHatch.revealedAt ? 'hatched' : 'sealed';
-  if (day.devForceReadyToHatch && !day.creature) return 'ready_to_hatch';
-  const isToday = day.isoDate === toLocalDateId(now);
-  const resolved = resolveDayLifecycleState({
-    hasCreature: Boolean(day.creature),
-    storedState: day.state,
-    isSameDay: isToday,
-    hour: now.getHours(),
-    minute: now.getMinutes(),
-    second: now.getSeconds(),
-    millisecond: now.getMilliseconds(),
-    hatchHour,
-  });
-  return resolved === 'ready_to_hatch' && !todayGrowthActivation(day).isActivated
-    ? 'forming'
-    : resolved;
+export function resolveDayState(day: StoredHomeDayRecord, _now: Date): HomeDayState {
+  if (day.dailyHatch) return day.dailyHatch.claimedAt ? 'hatched' : 'sealed';
+  if (day.creature) return 'hatched';
+  // Today only gathers context. Its Wisp is finalized on rollover and revealed
+  // from the archive the next time the player visits; no clock can hatch it.
+  return 'forming';
 }
 
 export function resolveRolledPastDay(

@@ -25,7 +25,6 @@ import Animated, {
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
 import { FeastleMergeCelebration } from '@/components/katchadeck/world/quests/feastle-merge-primitives';
-import { MergeBoardStaticLayer } from '@/components/katchadeck/games/merge-board-static-layer';
 import { MergeSpawnEffectsLayer } from '@/components/katchadeck/games/merge-spawn-effects-layer';
 import { mergeWorldGeneratorArt, mergeWorldItemArt } from '@/constants/merge-world-art';
 import { MERGE_GENERATORS_BY_ID, MERGE_HYBRID_RECIPES, MERGE_ITEMS_BY_ID, MERGE_WORLD_COLUMNS, MERGE_WORLD_ROWS } from '@/constants/merge-world-catalog';
@@ -210,8 +209,6 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   const [spawnBursts, setSpawnBursts] = useState<{ id: number; cell: number }[]>([]);
   const [cellFeedback, setCellFeedback] = useState<MergeCellFeedback[]>([]);
   const [mistDissipations, setMistDissipations] = useState<DreamMistDissipationRecord[]>([]);
-  const [gpuStaticLayerReady, setGpuStaticLayerReady] = useState(false);
-  const markGpuStaticLayerReady = useCallback(() => setGpuStaticLayerReady(true), []);
   const operationSequence = useRef(0);
   const motionSequence = useRef(0);
   const burstSequence = useRef(0);
@@ -883,14 +880,6 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   return <View onLayout={reportScreenMetrics} ref={boardRef} style={[styles.boardFrame, { height: boardHeight, width: boardWidth }]}>
     <GestureDetector gesture={boardGesture}><Animated.View accessibilityLabel="Feastle merge board, seven columns by nine rows" style={[styles.board, busy && styles.boardAnimating, { height: boardHeight, padding, width: boardWidth }, boardEntranceStyle]}>
     <LinearGradient colors={['#788143', '#55602F', '#384321']} locations={[0, 0.52, 1]} pointerEvents="none" style={styles.boardGradient} />
-    <MergeBoardStaticLayer
-      geometry={geometry}
-      invalidCell={invalidFeedback?.cell ?? null}
-      onReady={markGpuStaticLayerReady}
-      selectedCell={selectedCell}
-      selectedDefinitionId={selectedDefinitionId}
-      state={presentation}
-    />
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       {presentation.board.map((cell, index) => {
         const origin = cellOrigins[index];
@@ -914,7 +903,6 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
           blocked={cell.locked && !occupant}
           compatible={compatible}
           height={cellSize}
-          gpuVisuals={gpuStaticLayerReady}
           index={index}
           invalid={invalidFeedback?.cell === index}
           key={index}
@@ -969,7 +957,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   </View>;
 });
 
-const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibilityDisabled, accessibilityLabel, blocked, invalid, selected, compatible, gpuVisuals, index, left, top, width, height, mist, onActivate }: {
+const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibilityDisabled, accessibilityLabel, blocked, invalid, selected, compatible, index, left, top, width, height, mist, onActivate }: {
   accessibilityActionLabel: string;
   accessibilityDisabled: boolean;
   accessibilityLabel: string;
@@ -977,7 +965,6 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
   invalid: boolean;
   selected: boolean;
   compatible: boolean;
-  gpuVisuals: boolean;
   index: number;
   left: number;
   top: number;
@@ -990,11 +977,11 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
   const row = Math.floor(index / MERGE_WORLD_COLUMNS);
   const alternate = (column + row) % 2 === 1;
   return <View style={[styles.cell, {
-    backgroundColor: gpuVisuals ? 'transparent' : compatible ? '#F1D995'
+    backgroundColor: compatible ? '#F1D995'
       : selected ? '#FFE9AD'
         : alternate ? '#ECD4A7' : '#F2DFB8',
-    borderColor: gpuVisuals ? 'transparent' : invalid ? '#D95E4B' : compatible ? '#D19135' : selected ? '#C67E2C' : 'rgba(150,104,51,0.34)',
-    boxShadow: gpuVisuals ? 'none' : 'inset 0 2px 2px rgba(255,251,226,0.34), inset 0 -3px 4px rgba(101,65,25,0.11)',
+    borderColor: invalid ? '#D95E4B' : compatible ? '#D19135' : selected ? '#C67E2C' : 'rgba(150,104,51,0.34)',
+    boxShadow: 'inset 0 2px 2px rgba(255,251,226,0.34), inset 0 -3px 4px rgba(101,65,25,0.11)',
     height, left, top, width,
   }]}>
     <View
@@ -1005,8 +992,8 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
       accessibilityState={{ disabled: accessibilityDisabled }}
       onAccessibilityAction={() => onActivate(index)}
       style={styles.cellPressable}>
-      {!gpuVisuals && blocked ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" recyclingKey="merge-locked-cloud" source={LOCKED_CELL_OVERLAY} style={[styles.lockedOverlay, mist?.kind === 'echo' && styles.echoMist]} transition={0} /> : null}
-      {!gpuVisuals && mist?.kind === 'echo' ? <View pointerEvents="none" style={[styles.echoItem, compatible && styles.echoItemCompatible]}><DreamEchoItemArt compatible={compatible} definitionId={mist.definitionId} size={Math.min(width, height) - 4} /></View> : null}
+      {blocked ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" recyclingKey="merge-locked-cloud" source={LOCKED_CELL_OVERLAY} style={[styles.lockedOverlay, mist?.kind === 'echo' && styles.echoMist]} transition={0} /> : null}
+      {mist?.kind === 'echo' ? <View pointerEvents="none" style={[styles.echoItem, compatible && styles.echoItemCompatible]}><DreamEchoItemArt compatible={compatible} definitionId={mist.definitionId} size={Math.min(width, height) - 4} /></View> : null}
     </View>
   </View>;
 });

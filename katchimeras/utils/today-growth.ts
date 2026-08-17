@@ -92,7 +92,30 @@ export function normalizeDayGrowthState(value: unknown): DayGrowthState {
   const careActions = Array.isArray(candidate.careActions)
     ? uniqueByInstanceId(candidate.careActions.filter(isCareActionState))
     : [];
-  return { schemaVersion: 1, events, careActions };
+  const cycleStartedAt = typeof candidate.cycleStartedAt === 'string'
+    && !Number.isNaN(new Date(candidate.cycleStartedAt).getTime())
+      ? candidate.cycleStartedAt
+      : null;
+  return { schemaVersion: 1, cycleStartedAt, events, careActions };
+}
+
+/**
+ * Starts the current-day Egg at zero without deleting journal receipts. Old
+ * receipts remain present so artifact reconciliation cannot award them twice.
+ */
+export function beginFreshEggCycle(
+  day: StoredHomeDayRecord,
+  startedAt = new Date(),
+): StoredHomeDayRecord {
+  const growth = normalizeDayGrowthState(day.growth);
+  return {
+    ...day,
+    growth: {
+      ...growth,
+      cycleStartedAt: startedAt.toISOString(),
+      careActions: [],
+    },
+  };
 }
 
 export function awardGrowth(
@@ -181,7 +204,8 @@ export function completeEnergyAction(
 }
 
 export function activeGrowthEnergy(day: Pick<StoredHomeDayRecord, 'growth'>): number {
-  return normalizeDayGrowthState(day.growth).events.reduce((sum, event) => sum + event.amount, 0);
+  const growth = normalizeDayGrowthState(day.growth);
+  return activeCycleGrowthEvents(growth).reduce((sum, event) => sum + event.amount, 0);
 }
 
 export function todayGrowthActivation(day: Pick<StoredHomeDayRecord, 'growth'>): {
@@ -189,7 +213,7 @@ export function todayGrowthActivation(day: Pick<StoredHomeDayRecord, 'growth'>):
   incubationStartedAt: Date | null;
   isActivated: boolean;
 } {
-  const qualifyingEvents = normalizeDayGrowthState(day.growth).events
+  const qualifyingEvents = activeCycleGrowthEvents(normalizeDayGrowthState(day.growth))
     .filter((event) => event.source !== 'daily_seed' && event.amount > 0)
     .map((event) => ({ event, awardedAt: new Date(event.awardedAt) }))
     .filter((item) => !Number.isNaN(item.awardedAt.getTime()))
@@ -262,11 +286,13 @@ export function pendingGrowthAwards(day: StoredHomeDayRecord): PendingGrowthAwar
 
 export function todayGrowthSummary(
   day: Pick<StoredHomeDayRecord, 'isoDate' | 'growth'>,
-  hatchHour: number,
+  _hatchHour: number,
   now = new Date(),
   options: { incubationNotBefore?: Date | null } = {},
 ): TodayGrowthSummary {
-  const scheduledHatchAt = localDateAt(day.isoDate, hatchHour, 0);
+  // Kept in the return shape for stored/UI compatibility, but midnight rollover
+  // now owns finalization. There is deliberately no same-day hatch deadline.
+  const scheduledHatchAt = localDateAt(day.isoDate, 24, 0);
   const activeEnergy = activeGrowthEnergy(day);
   const energyRatio = Math.min(1, Math.max(0, activeEnergy) / TODAY_ENERGY_TARGET);
   const activation = todayGrowthActivation(day);
@@ -276,22 +302,10 @@ export function todayGrowthSummary(
         options.incubationNotBefore?.getTime() ?? Number.NEGATIVE_INFINITY,
       ))
     : null;
-  const scheduledAt = scheduledHatchAt.getTime();
-  const startedAt = incubationStartedAt?.getTime() ?? scheduledAt;
-  const normalIncubationDuration = Math.max(0, scheduledAt - startedAt);
-  // Context enriches the hatch but no longer moves the player's chosen ritual time.
   const savedMilliseconds = 0;
   const effectiveHatchAt = scheduledHatchAt;
-  const effectiveDuration = Math.max(0, effectiveHatchAt.getTime() - startedAt);
-  const elapsed = incubationStartedAt ? Math.max(0, now.getTime() - startedAt) : 0;
-  const isReady = now.getTime() >= effectiveHatchAt.getTime();
-  const progress = !activation.isActivated
-    ? 0
-    : isReady
-      ? 100
-      : effectiveDuration <= 0
-        ? 99
-        : Math.min(99, Math.max(0, elapsed / effectiveDuration * 100));
+  const isReady = false;
+  const progress = energyRatio * 100;
   const savedMinutes = savedMilliseconds / 60_000;
   return {
     activeEnergy,
@@ -306,9 +320,7 @@ export function todayGrowthSummary(
     effectiveHatchAt,
     scheduledHatchAt,
     progress,
-    // Visual growth is an immediate reflection of earned Energy. Time still
-    // controls hatch readiness, but waiting alone must not silently swap the
-    // plant-growth artwork while the page is open.
+    // Visual growth is an immediate reflection of captured context only.
     stage: growthStageForEnergy(activeEnergy),
     isReady,
     contextState: eggContextState(activeEnergy),
@@ -317,8 +329,18 @@ export function todayGrowthSummary(
   };
 }
 
+function activeCycleGrowthEvents(growth: DayGrowthState): TodayGrowthEvent[] {
+  const cycleStartedAt = growth.cycleStartedAt
+    ? new Date(growth.cycleStartedAt).getTime()
+    : Number.NEGATIVE_INFINITY;
+  return growth.events.filter((event) => {
+    const awardedAt = new Date(event.awardedAt).getTime();
+    return !Number.isNaN(awardedAt) && awardedAt >= cycleStartedAt;
+  });
+}
+
 export function eggContextState(points: number): TodayGrowthSummary['contextState'] {
-  if (points >= TODAY_ENERGY_TARGET) return 'ready';
+  if (points >= TODAY_ENERGY_TARGET) return 'full_of_memories';
   if (points >= 60) return 'full_of_memories';
   if (points >= 25) return 'taking_shape';
   if (points > 0) return 'stirring';

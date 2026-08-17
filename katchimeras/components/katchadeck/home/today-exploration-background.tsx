@@ -165,8 +165,12 @@ export function useTodayExplorationBackgroundMotion({
         translateX.value = resolveTodayExplorationDragTranslation({
           gestureStartX: gestureStartX.value,
           maxPan,
-          overscrollResistance:
-            todayScene.homeExplorationBackground.overscrollResistance,
+          // Overscroll was useful when a flick could transition to another
+          // day. In camera-pan-only mode it can expose the edge of the square
+          // cinematic environment, so stop exactly at the coverage boundary.
+          overscrollResistance: pageTransitionEnabled
+            ? todayScene.homeExplorationBackground.overscrollResistance
+            : 0,
           translationX: event.translationX,
         });
       })

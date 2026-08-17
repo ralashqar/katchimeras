@@ -70,6 +70,21 @@ test('the environment follows the finger beyond its authored pan range with resi
   }), -220);
 });
 
+test('camera-only panning hard clamps at the environment coverage boundary', () => {
+  assert.equal(resolveTodayExplorationDragTranslation({
+    gestureStartX: 0,
+    maxPan: 200,
+    overscrollResistance: 0,
+    translationX: -300,
+  }), -200);
+  assert.equal(resolveTodayExplorationDragTranslation({
+    gestureStartX: 80,
+    maxPan: 200,
+    overscrollResistance: 0,
+    translationX: 300,
+  }), 200);
+});
+
 test('transition settling gets shorter when the drag already approached its target', () => {
   assert.equal(resolveTodayExplorationTransitionDuration({
     currentX: 0,

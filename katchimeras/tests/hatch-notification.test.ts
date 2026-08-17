@@ -47,37 +47,32 @@ const profile: OnboardingProfile = {
   hatchHour: 20,
 };
 
-test('hatch notification plan keeps one future alert for the current day', () => {
+test('daily Wisp flow does not schedule a same-day clock hatch', () => {
   const plan = resolveHatchNotificationPlan(
     state(day('2026-08-07')),
     profile,
     new Date(2026, 7, 7, 19, 0, 0),
   );
 
-  assert.equal(plan.dayId, '2026-08-07');
-  assert.equal(plan.isReady, false);
-  assert.equal(plan.targetAt.getTime(), new Date(2026, 7, 7, 20, 0, 0).getTime());
+  assert.equal(plan, null);
 });
 
-test('a ready but unhatched day is not replaced with another scheduled alert', () => {
+test('legacy ready state does not restore a timed notification', () => {
   const plan = resolveHatchNotificationPlan(
     state(day('2026-08-07', 'ready_to_hatch')),
     profile,
     new Date(2026, 7, 7, 20, 1, 0),
   );
 
-  assert.equal(plan.dayId, '2026-08-07');
-  assert.equal(plan.isReady, true);
+  assert.equal(plan, null);
 });
 
-test('only a completed hatch advances notification planning to tomorrow', () => {
+test('a completed hatch does not schedule tomorrow at the old hatch hour', () => {
   const plan = resolveHatchNotificationPlan(
     state(day('2026-08-07', 'hatched'), day('2026-08-08')),
     profile,
     new Date(2026, 7, 7, 20, 1, 0),
   );
 
-  assert.equal(plan.dayId, '2026-08-08');
-  assert.equal(plan.isReady, false);
-  assert.equal(plan.targetAt.getTime(), new Date(2026, 7, 8, 20, 0, 0).getTime());
+  assert.equal(plan, null);
 });

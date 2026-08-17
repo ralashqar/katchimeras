@@ -4,7 +4,7 @@ import { AppState } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
 import type { HomeDayRecord, HomeTimelineDay, LocalCreatureRecord } from '@/types/home';
-import type { HatchCommitResult } from '@/features/today/use-hatch-controller';
+import type { HatchClaimResult, HatchCommitResult } from '@/features/today/use-hatch-controller';
 import {
   IDLE_TODAY_HATCH_PRESENTATION,
   todayHatchPresentationReducer,
@@ -13,6 +13,7 @@ import {
 type UseTodayHatchRevealControllerParams = {
   selectedDay: HomeTimelineDay | null;
   triggerHatchIfReady: () => Promise<HatchCommitResult>;
+  claimHatch?: () => Promise<HatchClaimResult>;
   acceleratedReadyRef?: RefObject<boolean>;
   allowDailyHatch?: boolean;
   onDiscoveryAnimationComplete?: () => void;
@@ -26,7 +27,9 @@ const PHASE_DELAYS_MS = {
   crossfadingSubject: 1_050,
   subjectSettling: 1_550,
   postReveal: 1_750,
-  complete: 2_450,
+  formCard: 2_050,
+  assembleDeck: 2_650,
+  awaitClaim: 3_300,
 } as const;
 const REDUCED_PHASE_DELAYS_MS = {
   shaking: 20,
@@ -34,12 +37,15 @@ const REDUCED_PHASE_DELAYS_MS = {
   crossfadingSubject: 150,
   subjectSettling: 360,
   postReveal: 500,
-  complete: 760,
+  formCard: 580,
+  assembleDeck: 680,
+  awaitClaim: 760,
 } as const;
 
 export function useTodayHatchRevealController({
   selectedDay,
   triggerHatchIfReady,
+  claimHatch,
   acceleratedReadyRef,
   allowDailyHatch = true,
   onDiscoveryAnimationComplete,
@@ -57,6 +63,8 @@ export function useTodayHatchRevealController({
   const presentationScheduledRef = useRef(false);
   const assetsReadyRef = useRef({ environment: false, subject: false });
   const discoveryMinimumReadyRef = useRef(false);
+  const presentationPolicyRef = useRef<'daily' | 'ftue_discovery'>('daily');
+  const restoreSuppressedDayIdRef = useRef<string | null>(null);
   const appIsActiveRef = useRef(AppState.currentState === 'active');
 
   const clearTimers = useCallback(() => {
@@ -89,8 +97,11 @@ export function useTodayHatchRevealController({
     return () => subscription.remove();
   }, [handleHatchComplete]);
 
-  const failDiscoveryReveal = useCallback((reason: string) => {
-    if (!hatchingActiveRef.current || presentationPolicyRef.current !== 'ftue_discovery') return;
+  const failHatchReveal = useCallback((reason: string, suppressAutomaticRestore = false) => {
+    if (!hatchingActiveRef.current) return;
+    if (suppressAutomaticRestore && presentationPolicyRef.current === 'daily') {
+      restoreSuppressedDayIdRef.current = selectedDay?.id ?? null;
+    }
     hatchingActiveRef.current = false;
     committedRunIdRef.current = 0;
     presentationScheduledRef.current = false;
@@ -98,7 +109,7 @@ export function useTodayHatchRevealController({
     discoveryMinimumReadyRef.current = false;
     clearTimers();
     dispatch({ type: 'failed', reason });
-  }, [clearTimers]);
+  }, [clearTimers, selectedDay?.id]);
 
   const scheduleDiscoveryReveal = useCallback((runId: number) => {
     if (
@@ -131,8 +142,16 @@ export function useTodayHatchRevealController({
   }, [clearTimers, onDiscoveryAnimationComplete, reduceMotion]);
 
   const schedulePresentation = useCallback((runId: number) => {
-    if (presentationScheduledRef.current || committedRunIdRef.current !== runId) return;
+    if (
+      presentationScheduledRef.current
+      || committedRunIdRef.current !== runId
+      || !assetsReadyRef.current.subject
+    ) return;
     presentationScheduledRef.current = true;
+    if (watchdogRef.current !== null) {
+      clearTimeout(watchdogRef.current);
+      watchdogRef.current = null;
+    }
     const schedule = (delay: number, callback: () => void) => {
       phaseTimersRef.current.push(setTimeout(() => {
         if (runIdRef.current === runId && hatchingActiveRef.current) callback();
@@ -149,10 +168,14 @@ export function useTodayHatchRevealController({
       dispatch({ type: 'advance', phase: 'subject_settling' });
       if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     });
-    schedule(phaseDelays.postReveal, () => dispatch({ type: 'advance', phase: 'world_shift' }));
-    schedule(phaseDelays.complete - 250, () => dispatch({ type: 'advance', phase: 'dashboard_settling' }));
-    schedule(phaseDelays.complete, handleHatchComplete);
-  }, [handleHatchComplete, reduceMotion]);
+    schedule(phaseDelays.formCard, () => dispatch({ type: 'advance', phase: 'forming_card' }));
+    schedule(phaseDelays.assembleDeck, () => dispatch({ type: 'advance', phase: 'assembling_deck' }));
+    schedule(phaseDelays.awaitClaim, () => {
+      dispatch({ type: 'advance', phase: 'awaiting_claim' });
+      hatchingActiveRef.current = false;
+      clearTimers();
+    });
+  }, [clearTimers, reduceMotion]);
 
   const markHatchAssetReady = useCallback((kind: 'environment' | 'subject') => {
     const runId = committedRunIdRef.current;
@@ -174,8 +197,13 @@ export function useTodayHatchRevealController({
     [markHatchAssetReady],
   );
   const handleHatchSubjectError = useCallback(
-    () => failDiscoveryReveal('Mossprout could not appear. Tap Hatch to try again.'),
-    [failDiscoveryReveal],
+    () => failHatchReveal(
+      presentationPolicyRef.current === 'daily'
+        ? 'Today’s Wisp could not appear. Tap Reveal to try again.'
+        : 'Mossprout could not appear. Tap Hatch to try again.',
+      presentationPolicyRef.current === 'daily',
+    ),
+    [failHatchReveal],
   );
 
   const handleReveal = useCallback(async () => {
@@ -195,15 +223,13 @@ export function useTodayHatchRevealController({
     committedRunIdRef.current = 0;
     presentationScheduledRef.current = false;
     assetsReadyRef.current = { environment: false, subject: false };
+    restoreSuppressedDayIdRef.current = null;
     hatchingActiveRef.current = true;
     presentationPolicyRef.current = 'daily';
-    dispatch({ type: 'begin', day: daySnapshot });
+    dispatch({ type: 'begin', animationKey: runId, day: daySnapshot });
     watchdogRef.current = setTimeout(() => {
       if (runIdRef.current !== runId) return;
-      hatchingActiveRef.current = false;
-      committedRunIdRef.current = 0;
-      presentationScheduledRef.current = false;
-      dispatch({ type: 'failed', reason: 'The hatch took too long. Please try again.' });
+      failHatchReveal('The hatch took too long. Tap Reveal to try again.', committedRunIdRef.current === runId);
     }, HATCH_REVEAL_WATCHDOG_MS);
 
     const result = await triggerHatchIfReady();
@@ -218,22 +244,13 @@ export function useTodayHatchRevealController({
       });
       return;
     }
-    if (watchdogRef.current !== null) {
-      clearTimeout(watchdogRef.current);
-      watchdogRef.current = null;
-    }
     dispatch({ type: 'committed', day: result.day });
     committedRunIdRef.current = runId;
     if (!appIsActiveRef.current) {
       handleHatchComplete();
       return;
     }
-    // Bundled art normally decodes while the crack stage is appearing. The
-    // fallback prevents a malformed asset from holding interaction forever.
-    phaseTimersRef.current.push(setTimeout(() => schedulePresentation(runId), 1_200));
-  }, [acceleratedReadyRef, allowDailyHatch, clearTimers, handleHatchComplete, schedulePresentation, selectedDay, triggerHatchIfReady]);
-
-  const presentationPolicyRef = useRef<'daily' | 'ftue_discovery'>('daily');
+  }, [acceleratedReadyRef, allowDailyHatch, clearTimers, failHatchReveal, handleHatchComplete, selectedDay, triggerHatchIfReady]);
 
   const handleDiscoveryReveal = useCallback((creature: LocalCreatureRecord) => {
     if (hatchingActiveRef.current || selectedDay?.kind !== 'day') return;
@@ -246,7 +263,7 @@ export function useTodayHatchRevealController({
     assetsReadyRef.current = { environment: true, subject: false };
     presentationPolicyRef.current = 'ftue_discovery';
     hatchingActiveRef.current = true;
-    dispatch({ type: 'begin_discovery', day: daySnapshot, creature });
+    dispatch({ type: 'begin_discovery', animationKey: runId, day: daySnapshot, creature });
     const phaseDelays = reduceMotion ? REDUCED_PHASE_DELAYS_MS : PHASE_DELAYS_MS;
     phaseTimersRef.current.push(setTimeout(() => {
       if (runIdRef.current === runId && hatchingActiveRef.current) dispatch({ type: 'advance', phase: 'shaking' });
@@ -260,17 +277,48 @@ export function useTodayHatchRevealController({
       scheduleDiscoveryReveal(runId);
     }, phaseDelays.crossfadingSubject));
     watchdogRef.current = setTimeout(() => {
-      if (runIdRef.current === runId) failDiscoveryReveal('Mossprout could not appear. Tap Hatch to try again.');
+      if (runIdRef.current === runId) failHatchReveal('Mossprout could not appear. Tap Hatch to try again.');
     }, DISCOVERY_ASSET_WATCHDOG_MS);
-  }, [failDiscoveryReveal, reduceMotion, scheduleDiscoveryReveal, selectedDay]);
+  }, [failHatchReveal, reduceMotion, scheduleDiscoveryReveal, selectedDay]);
 
   const restoreDiscoveryReveal = useCallback((creature: LocalCreatureRecord) => {
     if (selectedDay?.kind !== 'day') return;
     presentationPolicyRef.current = 'ftue_discovery';
+    const animationKey = runIdRef.current + 1;
+    runIdRef.current = animationKey;
     hatchingActiveRef.current = false;
     clearTimers();
-    dispatch({ type: 'restore_discovery', day: selectedDay as HomeDayRecord, creature });
+    dispatch({ type: 'restore_discovery', animationKey, day: selectedDay as HomeDayRecord, creature });
   }, [clearTimers, selectedDay]);
+
+  useEffect(() => {
+    if (
+      presentation.phase === 'idle'
+      && selectedDay?.kind === 'day'
+      && selectedDay.dailyHatch?.revealedAt
+      && !selectedDay.dailyHatch.claimedAt
+      && restoreSuppressedDayIdRef.current !== selectedDay.id
+    ) {
+      const animationKey = runIdRef.current + 1;
+      runIdRef.current = animationKey;
+      dispatch({ type: 'restore_daily', animationKey, day: selectedDay });
+    }
+  }, [presentation.phase, selectedDay]);
+
+  const handleClaim = useCallback(async () => {
+    if (presentation.phase !== 'awaiting_claim' || !claimHatch) return;
+    hatchingActiveRef.current = true;
+    dispatch({ type: 'advance', phase: 'claiming' });
+    const result = await claimHatch();
+    if (result.status !== 'claimed') {
+      dispatch({ type: 'failed', reason: result.status === 'failed' ? result.reason : 'This card is not ready to claim.' });
+      return;
+    }
+    dispatch({ type: 'advance', phase: 'new_day_intro' });
+    const restoreDelay = reduceMotion ? 900 : 3_000;
+    phaseTimersRef.current.push(setTimeout(() => dispatch({ type: 'advance', phase: 'restoring_today' }), restoreDelay));
+    phaseTimersRef.current.push(setTimeout(handleHatchComplete, restoreDelay + (reduceMotion ? 180 : 380)));
+  }, [claimHatch, handleHatchComplete, presentation.phase, reduceMotion]);
 
   return {
     isHatching: presentation.phase !== 'idle',
@@ -279,6 +327,7 @@ export function useTodayHatchRevealController({
     handleHatchSubjectReady,
     handleHatchSubjectError,
     handleReveal,
+    handleClaim,
     handleDiscoveryReveal,
     restoreDiscoveryReveal,
     handleHatchComplete,

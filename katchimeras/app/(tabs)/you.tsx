@@ -13,8 +13,6 @@ import { useScenes } from '@/features/scenes/scene-provider';
 import { useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
 import { useAllDays } from '@/hooks/use-all-days';
 import { eggAvatarCustomizerCamera } from '@/utils/egg-avatar-customizer-camera';
-import { resolveHatchHour } from '@/game/days/lifecycle';
-import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import {
   todayExplorationEggStageFrame,
   TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA,
@@ -34,7 +32,7 @@ export default function YouScreen() {
 
   const today = useMemo(() => days.find((day) => day.isToday) ?? null, [days]);
   const growth = useMemo(() => today && today.state !== 'hatched'
-    ? todayGrowthSummary(today, resolveHatchHour(loadOnboardingProfile()))
+    ? todayGrowthSummary(today, 0)
     : null, [today]);
   const imageSize = Math.max(height, width);
   // This is the measured resting position from Today: safe-area content inset,

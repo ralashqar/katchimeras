@@ -16,6 +16,7 @@ import { ThemedText } from '@/components/themed-text';
 
 type TodayBottomDockProps = {
   canHatch: boolean;
+  hatchLabel?: string;
   isForming: boolean;
   isHatched: boolean;
   viewedDay: HomeDayRecord | null;
@@ -57,6 +58,7 @@ const reportDockCommit: ProfilerOnRenderCallback = (_id, phase, actualDuration) 
 
 export function TodayBottomDock({
   canHatch,
+  hatchLabel = 'Reveal Yesterday',
   isForming,
   isHatched,
   viewedDay,
@@ -168,7 +170,7 @@ export function TodayBottomDock({
             fullWidth
             glow
             icon="sparkles"
-            label="Reveal the hatch"
+            label={hatchLabel}
             onPress={onReveal}
             variant="primary"
           />
