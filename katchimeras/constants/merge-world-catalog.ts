@@ -13,37 +13,33 @@ export const MERGE_WORLD_ROWS = 9;
 export const MERGE_WORLD_SIZE = MERGE_WORLD_COLUMNS * MERGE_WORLD_ROWS;
 
 export const MOSSPROUT_FTUE_OPEN_CELLS = new Set([
-  16, 17, 18,
-  22, 23, 25, 26,
+  17,
+  23, 24, 25,
   29, 30, 31, 32, 33,
-  36, 37, 38, 39,
+  37, 38, 39,
   45,
 ]);
 
 export const MOSSPROUT_DREAM_ECHOES = [
-  { cell: 34, id: 'mossprout-seed-echo', definitionId: 'nature:garden:1' },
-  { cell: 24, id: 'mossprout-sprout-echo', definitionId: 'nature:garden:2' },
-  { cell: 41, id: 'mossprout-plant-echo', definitionId: 'nature:garden:3' },
-  { cell: 44, id: 'mossprout-flower-echo', definitionId: 'nature:garden:4' },
-  { cell: 54, id: 'mossprout-garden-echo', definitionId: 'nature:garden:5' },
+  { cell: 23, id: 'mossprout-seed-echo', definitionId: 'nature:garden:1' },
+  { cell: 25, id: 'mossprout-sprout-echo', definitionId: 'nature:garden:2' },
+  { cell: 37, id: 'mossprout-plant-echo', definitionId: 'nature:garden:3' },
+  { cell: 39, id: 'mossprout-flower-echo', definitionId: 'nature:garden:4' },
+  { cell: 45, id: 'mossprout-garden-echo', definitionId: 'nature:garden:5' },
 ] as const;
 
 export const MOSSPROUT_STORY_AWAKENINGS = {
-  'mossprout:chapter-0:first-sprout': { id: 'mossprout-first-order-clear', cells: [15, 19] },
-  'mossprout:chapter-0:home-plant': { id: 'mossprout-second-order-clear', cells: [27, 40, 46] },
-  'mossprout:chapter-0:energy-plant': { id: 'mossprout-final-order-clear', cells: [20, 47, 48] },
+  'mossprout:chapter-0:first-sprout': { id: 'mossprout-first-order-clear', cells: [] },
+  'mossprout:chapter-0:home-plant': { id: 'mossprout-second-order-clear', cells: [] },
+  'mossprout:chapter-0:energy-plant': { id: 'mossprout-final-order-clear', cells: [] },
 } as const;
 
 export const MERGE_STARTING_OPEN_CELLS = new Set([
-  2, 3, 4,
-  9, 10, 11,
-  15, 16, 17, 18,
-  22, 23, 24, 25,
+  17,
+  23, 24, 25,
   29, 30, 31, 32, 33,
-  36, 37, 38, 39, 40,
-  44, 45, 46, 47,
-  51, 52, 53,
-  59, 60,
+  37, 38, 39,
+  45,
 ]);
 
 export const MERGE_CHAIN_IDS: readonly MergeChainId[] = [

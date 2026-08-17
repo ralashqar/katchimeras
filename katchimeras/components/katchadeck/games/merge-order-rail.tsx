@@ -147,6 +147,11 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel
   const pendingWindowFrameRef = useRef<number | null>(null);
   const [mountedWindow, setMountedWindow] = useState(() => orderMountWindow(0, entries.length));
   const firstEntryId = entries[0]?.id ?? null;
+  const parcelArrivalId = entries.find((entry) => entry.kind === 'parcel')?.arrival.id ?? null;
+  const handleParcelTargetRef = useCallback((view: View | null) => {
+    parcelTargetRef.current = view;
+    if (parcelArrivalId) onRailTargetRef?.(`tray-parcel:${parcelArrivalId}`, view);
+  }, [onRailTargetRef, parcelArrivalId, parcelTargetRef]);
 
   const moveMountedWindow = useCallback((centerIndex: number) => {
     if (pendingWindowFrameRef.current != null) cancelAnimationFrame(pendingWindowFrameRef.current);
@@ -230,9 +235,9 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel
             <MergeParcelTrayCard
               arrival={entry.arrival}
               count={entry.count}
-              disabled={entry.disabled || interactionGate.kind !== 'open'}
-              onPress={() => interactionGate.kind === 'open' ? onOpenParcel(entry.arrival.id) : onBlockedInteraction?.()}
-              ref={parcelTargetRef}
+              disabled={entry.disabled || (interactionGate.kind !== 'open' && !(interactionGate.kind === 'parcel' && interactionGate.arrivalId === entry.arrival.id))}
+              onPress={() => interactionGate.kind === 'open' || (interactionGate.kind === 'parcel' && interactionGate.arrivalId === entry.arrival.id) ? onOpenParcel(entry.arrival.id) : onBlockedInteraction?.()}
+              ref={handleParcelTargetRef}
               shakeNonce={entry.shakeNonce}
             />
           ) : entry.kind === 'order' ? (

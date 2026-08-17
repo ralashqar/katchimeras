@@ -77,9 +77,10 @@ export function buildDex(
   history: EncounterHistoryMap,
   hatchedDays: StoredHomeDayRecord[],
   bondState?: CompanionBondState,
-  options: { unlockAll?: boolean } = {},
+  options: { unlockAll?: boolean; discoveredFamilyIds?: readonly KatchimeraFamilyId[] } = {},
 ): Dex {
   const seen = aggregateSeen(hatchedDays);
+  const discovered = new Set(options.discoveredFamilyIds ?? []);
   const entries: DexEntry[] = katchimeraFamilies
     .filter((family): family is typeof family & { anchorVisualKey: HomeVisualKey } => family.anchorVisualKey !== null)
     .map((family) => {
@@ -100,7 +101,7 @@ export function buildDex(
             skinId: skin.id,
             name: skin.displayName,
             visualKey: skin.visualKey ?? skin.placeholderVisualKey ?? null,
-            unlocked: options.unlockAll || Boolean(form),
+            unlocked: options.unlockAll || discovered.has(family.id) && skin.id === family.anchorSkinId || Boolean(form),
             totalHatches: form?.totalHatches ?? 0,
             firstHatchedDate: form?.firstHatchedDate ?? null,
             lastSeenDate: form?.lastSeenDate ?? null,
@@ -114,7 +115,7 @@ export function buildDex(
         label: aspect.label,
         visualKey: aggregate?.latestVisualKey ?? family.anchorVisualKey,
         category: aspect.category,
-        locked: options.unlockAll ? false : totalHatches === 0,
+        locked: options.unlockAll ? false : !discovered.has(family.id),
         totalHatches,
         bondStage: progression ? (progression.level - 1) as BondStage : legacyBondStage,
         bondVisitCount: totalHatches,

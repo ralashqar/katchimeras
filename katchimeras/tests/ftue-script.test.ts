@@ -54,7 +54,7 @@ test('backend catalog contains only allowlisted privacy-safe action ids', () => 
 });
 
 test('Supabase receipt allowlist matches every backend FTUE action', () => {
-  const migration = readFileSync('supabase/migrations/20260815143000_register_mossprout_ftue_v11.sql', 'utf8');
+  const migration = readFileSync('supabase/migrations/20260817153000_register_mossprout_ftue_v13.sql', 'utf8');
   for (const item of FTUE_ACTION_CATALOG.filter((entry) => entry.backendEvent)) {
     assert.match(migration, new RegExp(`'${item.stepId}',\\s*'${item.actionId}'`));
   }
@@ -479,6 +479,15 @@ test('sequential FTUE choice panels cannot consume the previous question complet
   assert.match(home, /ownedCompletionEvent = completionEvent\?\.action\.instanceId === action\.instanceId/);
   assert.match(home, /completionKey: ownedCompletionEvent\?\.id/);
   assert.match(home, /if \(!completionKey \|\| completedKeyRef\.current === completionKey\) return/);
+});
+
+test('Steppling discovery spotlights the exact parcel before any board merge', () => {
+  const parcelStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'discovery.steppling.parcel');
+  const target = { kind: 'tray_parcel', arrivalId: 'arrival:discovery:discovery:ftue-steppling' } as const;
+  assert.deepEqual(parcelStep?.interaction, { mode: 'exclusive', allowed: { kind: 'parcel_tap', target } });
+  assert.deepEqual(parcelStep?.cue, { kind: 'tap', target });
+  assert.deepEqual(parcelStep?.spotlight?.targets, [target]);
+  assert.equal(parcelStep?.edges?.[0]?.event.type, 'arrival_claimed');
 });
 
 test('FTUE inline questions wrap cleanly and do not expose daily-action skip controls', () => {

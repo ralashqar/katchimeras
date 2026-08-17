@@ -13,6 +13,7 @@ import { enqueueConversationSignal } from '@/utils/companion-content';
 import { loadCompanionContentState, saveCompanionContentState } from '@/utils/companion-content-storage';
 import type { CompanionQuestState } from '@/utils/katchimera-quests';
 import { mergeActivityRewards, mergeQuestActivityRewards } from '@/utils/merge-world/activity-rewards';
+import { buildCompanionAffinityProfile, nextEligibleCompanionGate, recommendCompanionPath } from '@/utils/merge-world/companion-discovery-progression';
 import { reduceMergeWorld } from '@/utils/merge-world/engine';
 import { mergeWorldPendingPersistence, type MergeWorldPendingPersistence } from '@/utils/merge-world/persistence-buffer';
 import { loadFirstSession } from '@/features/onboarding/first-session';
@@ -587,6 +588,18 @@ export function MergeWorldProvider({
     const rewards = [...mergeActivityRewards(days, new Date(now), { state: next, quickGoals: loadCompanionQuickGoalState() }), ...mergeQuestActivityRewards(questState)];
     const activityResult = reduceMergeWorld(next, { type: 'grantActivityRewardsBatch', rewards, now });
     next = activityResult.state;
+    const meaningfulDayCount = days.filter((day) => Boolean(day.journalRecords?.length || day.moments?.length || day.dailyHatch || day.card)).length;
+    const gate = nextEligibleCompanionGate(next, meaningfulDayCount);
+    if (gate) {
+      const recommendation = recommendCompanionPath(gate.candidateIds, buildCompanionAffinityProfile(days));
+      next = reduceMergeWorld(next, {
+        type: 'openCompanionDiscoveryGate',
+        gateId: gate.gateId,
+        candidateIds: gate.candidateIds,
+        recommendedCharacterId: recommendation.strength === 'strong' ? recommendation.characterId : null,
+        now,
+      }).state;
+    }
     if (next === current) return;
     stateRef.current = next;
     setState(next);

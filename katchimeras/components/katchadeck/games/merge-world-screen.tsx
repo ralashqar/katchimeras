@@ -14,9 +14,12 @@ import { KatchaSurfaceProvider } from '@/components/katchadeck/ui/katcha-surface
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   MERGE_GENERATORS_BY_ID,
+  MERGE_CHARACTER_NAMES,
   MERGE_LEVEL_THRESHOLDS,
 } from '@/constants/merge-world-catalog';
 import { mergeWorldGeneratorArt } from '@/constants/merge-world-art';
+import { CREATURE_HATCHLING_SOURCES } from '@/constants/creature-hatchling-sources.gen';
+import { COMPANION_DISCOVERY_CATALOG } from '@/constants/companion-discovery-catalog';
 import { Lantern } from '@/constants/theme';
 import { useMergeWorldActions, useMergeWorldLastResult, useMergeWorldState } from '@/features/merge-world/merge-world-provider';
 import { commitFtueAction, dispatchFtueEvent, registerFtueObjectiveBaseline, repairFtueStep, useFtueRun } from '@/features/onboarding/ftue-runtime';
@@ -146,6 +149,31 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
         tier: 2,
       }];
     }), [state?.generatorUnlockReceipts]);
+  const companionDiscoveryRewards = useMemo<RewardSplashItem[]>(() => (state?.companionDiscovery.records ?? [])
+    .filter((record) => record.source === 'board_discovery' && record.revealSeenAt == null)
+    .flatMap((record) => {
+      const image = CREATURE_HATCHLING_SOURCES.full[record.characterId];
+      if (!image) return [];
+      return [{
+        id: `companion-discovery:${record.characterId}`,
+        eyebrow: 'New Katchimera',
+        title: `${MERGE_CHARACTER_NAMES[record.characterId]} discovered`,
+        description: record.characterId === 'steppling' ? 'Every path starts somewhere.' : 'A new companion found its way through the Dream Mist.',
+        image,
+        imageAccessibilityLabel: record.characterId,
+        detail: 'Found on the Merge board',
+        rewardTitle: 'Meet them',
+        rewardBody: record.characterId === 'steppling' ? 'The Strange Pack became a Journey Locker.' : 'Their discovery changed the board permanently.',
+        tint: '#D7A956',
+        tier: 3,
+        nextLabel: 'See what changed',
+      }];
+    }), [state?.companionDiscovery.records]);
+  const mergeCelebrationRewards = useMemo(() => [...companionDiscoveryRewards, ...generatorUnlockRewards], [companionDiscoveryRewards, generatorUnlockRewards]);
+  const discoveryFork = state?.companionDiscovery.active?.selectedCharacterId == null
+    && state?.companionDiscovery.active?.discoveryId.startsWith('fork:')
+      ? state.companionDiscovery.active
+      : null;
 
   useEffect(() => subscribeCompanionStories(() => {
     setStory(loadFeastleStory());
@@ -307,9 +335,9 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   }, [ftueCoordinator, handleBlockedFtueInteraction, mergeSessionId, send]);
   const pendingParcels = useMemo(() => state?.arrivals.filter((arrival) => (
     arrival.claimedAt == null
-    && arrival.kind !== 'memory_arrival'
+    && arrival.kind === 'discovery_parcel'
     && arrival.itemDefinitionIds.length > 0
-  )) ?? [], [state?.arrivals]);
+  )).sort((left, right) => left.createdAt - right.createdAt) ?? [], [state?.arrivals]);
   const pendingParcel = pendingParcels[0] ?? null;
 
   const trayEntries = useMemo<MergeTrayEntry[]>(() => {
@@ -654,12 +682,28 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
         </View>
       ) : null}
 
+      {active && discoveryFork ? <View style={[styles.discoveryForkOverlay, { bottom: Math.max(insets.bottom + 18, 26) }]}>
+        <ThemedText style={styles.energyConnectionEyebrow} lightColor="#FFD36A" darkColor="#FFD36A">THE MIST IS LISTENING</ThemedText>
+        <ThemedText selectable style={styles.discoveryForkTitle} lightColor="#FFF8E8" darkColor="#FFF8E8">Which path should we follow?</ThemedText>
+        <ThemedText selectable style={styles.discoveryForkBody} lightColor="rgba(255,248,232,0.82)" darkColor="rgba(255,248,232,0.82)">The others will return another time.</ThemedText>
+        <View style={styles.discoveryForkActions}>{discoveryFork.candidateIds.map((characterId) => <KatchaButton
+          fullWidth
+          glow={discoveryFork.recommendedCharacterId === characterId}
+          key={characterId}
+          label={`${COMPANION_DISCOVERY_CATALOG.find((definition) => definition.characterId === characterId)?.pathName ?? 'Mysterious Path'}${discoveryFork.recommendedCharacterId === characterId ? ' · This feels familiar' : ''}`}
+          onPress={() => dispatch({ type: 'selectCompanionDiscoveryPath', characterId, now: Date.now() })}
+          variant={discoveryFork.recommendedCharacterId === characterId ? 'primary' : 'secondary'}
+        />)}</View>
+      </View> : null}
+
       {error ? <KatchaSurfaceProvider surface="parchment"><View style={[styles.errorBanner, { top: Math.max(insets.top + 56, 64) }]}><KatchaInlineNotice body={error} title="Merge paused" tone="danger" /></View></KatchaSurfaceProvider> : null}
       <MergeServeRewardOverlay flight={serveFlight} onCoinArrive={handleCoinArrive} onEnergyArrive={handleEnergyArrive} onFinish={finishServeAnimation} onItemsArrive={handleServeItemsArrive} />
       <MergeParcelFlightOverlay flight={parcelFlight} onFinish={finishParcelFlight} onItemArrive={handleParcelItemArrive} />
-      {active && generatorUnlockRewards.length ? <RewardSplash
-        items={generatorUnlockRewards}
-        onItemSeen={(receiptId) => dispatch({ type: 'ackGeneratorUnlock', receiptId, now: Date.now() })}
+      {active && mergeCelebrationRewards.length ? <RewardSplash
+        items={mergeCelebrationRewards}
+        onItemSeen={(receiptId) => receiptId.startsWith('companion-discovery:')
+          ? dispatch({ type: 'ackCompanionDiscoveryReveal', characterId: receiptId.slice('companion-discovery:'.length) as MergeOrder['characterId'], now: Date.now() })
+          : dispatch({ type: 'ackGeneratorUnlock', receiptId, now: Date.now() })}
       /> : null}
     </View>
   );
@@ -728,5 +772,9 @@ const styles = StyleSheet.create({
   energyConnectionEyebrow: { ...GameUI.type.label, fontSize: 11, letterSpacing: 1.4, textAlign: 'center' },
   energyConnectionTitle: { ...GameUI.type.title, fontSize: 19, lineHeight: 24, textAlign: 'center' },
   energyConnectionBody: { ...GameUI.type.body, fontSize: 14, lineHeight: 20, paddingBottom: 4, textAlign: 'center' },
+  discoveryForkOverlay: { alignSelf: 'center', backgroundColor: 'rgba(31,24,45,0.94)', borderColor: 'rgba(255,226,151,0.55)', borderCurve: 'continuous', borderRadius: 24, borderWidth: 1, boxShadow: '0 12px 30px rgba(24,14,34,0.48)', gap: 8, left: 18, maxWidth: 430, padding: 18, position: 'absolute', right: 18, zIndex: GameUI.layer.modal },
+  discoveryForkTitle: { ...GameUI.type.title, fontSize: 20, lineHeight: 25, textAlign: 'center' },
+  discoveryForkBody: { ...GameUI.type.body, fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  discoveryForkActions: { gap: 8, paddingTop: 6 },
   pressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
 });

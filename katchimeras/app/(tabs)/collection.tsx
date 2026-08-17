@@ -38,6 +38,8 @@ import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { wispCollectionProgress, wispEvolutionTier } from '@/utils/wisp-collections';
 import { dayState, localDateId } from '@/utils/streak-engine';
 import { streakRepository } from '@/storage/repositories/streak-repository';
+import { loadMergeWorldState } from '@/utils/merge-world/repository';
+import type { KatchimeraFamilyId } from '@/types/katchimera';
 
 type CollectionView = 'cards' | 'calendar' | 'species' | 'wisps' | 'scenes';
 type CardFilters = { year: string; species: string; rarity: string; trait: string };
@@ -66,6 +68,7 @@ export default function CollectionScreen() {
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   const [state, setState] = useState<StoredHomeState | null>(null);
   const [bondState, setBondState] = useState<CompanionBondState>(emptyCompanionBondState);
+  const [discoveredFamilyIds, setDiscoveredFamilyIds] = useState<KatchimeraFamilyId[]>([]);
   const [view, setView] = useState<CollectionView>('cards');
   const [filters, setFilters] = useState<CardFilters>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -84,6 +87,9 @@ export default function CollectionScreen() {
       const resolveCompanionId = companionIdResolverForHomeState(hydrated.state);
       const quests = loadCompanionQuests(resolveCompanionId);
       setBondState(loadCompanionBondState(quests, resolveCompanionId, hydrated.state));
+      void loadMergeWorldState().then((mergeState) => setDiscoveredFamilyIds(
+        mergeState.companionDiscovery.records.map((record) => record.characterId as KatchimeraFamilyId),
+      ));
     }, [])
   );
 
@@ -94,9 +100,9 @@ export default function CollectionScreen() {
       state.aspectHistory ?? state.encounterHistory,
       hatchedDays,
       bondState,
-      { unlockAll: allKatchimerasAvailable },
+      { unlockAll: allKatchimerasAvailable, discoveredFamilyIds },
     );
-  }, [allKatchimerasAvailable, bondState, state]);
+  }, [allKatchimerasAvailable, bondState, discoveredFamilyIds, state]);
 
   const cards = useMemo(
     () => days.flatMap((day) => (day.state === 'hatched' || day.state === 'sealed') && day.card ? [{ card: day.card, dayId: day.id, sealed: day.state === 'sealed' }] : []).sort((left, right) => right.card.isoDate.localeCompare(left.card.isoDate)),

@@ -112,6 +112,7 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
     objectiveProgress: {},
   };
   const removedMergeSteps = new Set(['merge.first', 'merge.flower', 'energy.capture', 'energy.awarded', 'merge.flower_return', 'merge.final']);
+  const replacedDiscoverySteps = new Set(['discovery.steppling.seed', 'discovery.steppling.sprout', 'discovery.steppling.plant']);
   const migratedStepId = run.status === 'active' && run.stepId === 'chapter.complete'
     ? 'merge.return_note'
     : run.stepId;
@@ -123,7 +124,9 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
       ? 'egg.mind'
       : restartingLegacyMerge
         ? 'companion.order_preview'
-        : removedMergeSteps.has(migratedStepId) ? 'merge.seed_drag' : migratedStepId,
+        : replacedDiscoverySteps.has(migratedStepId)
+          ? 'discovery.steppling.parcel'
+          : removedMergeSteps.has(migratedStepId) ? 'merge.seed_drag' : migratedStepId,
     updatedAt: now,
     objectiveProgress: restartingLegacyMerge ? {} : run.objectiveProgress ?? {},
     mergeInstalled: restartingLegacyMerge ? false : run.mergeInstalled,
@@ -283,6 +286,14 @@ function ftueEventMatches(matcher: FtueEventMatcher, event: FtueEvent) {
   }
   if (matcher.type === 'chat_note_opened' && event.type === 'chat_note_opened') {
     return matcher.noteId == null || matcher.noteId === event.noteId;
+  }
+  if (matcher.type === 'arrival_claimed' && event.type === 'arrival_claimed') {
+    return matcher.arrivalId == null || matcher.arrivalId === event.arrivalId;
+  }
+  if (matcher.type === 'companion_discovery_advanced' && event.type === 'companion_discovery_advanced') {
+    return (matcher.discoveryId == null || matcher.discoveryId === event.discoveryId)
+      && (matcher.stage == null || matcher.stage === event.stage)
+      && (matcher.completedCharacterId == null || matcher.completedCharacterId === event.completedCharacterId);
   }
   return matcher.type === 'order_served'
     && event.type === 'order_served'

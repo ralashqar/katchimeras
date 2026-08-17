@@ -8,7 +8,7 @@ import { markFlowStart, reportFlowReady } from '@/utils/flow-performance';
 import { familyIdFromCompanionId } from '@/constants/katchimera-skins';
 import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
 import { commitFtueAction, ftueWispForRun, loadFtueRun, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
-import { installMossproutOnboardingMergeWorld } from '@/utils/merge-world/repository';
+import { installMossproutOnboardingMergeWorld, installStepplingFtueDiscovery } from '@/utils/merge-world/repository';
 import { useGameScreenTransition } from '@/features/navigation/game-screen-transition';
 import { beginMossproutChapterOne } from '@/utils/companion-story-storage';
 
@@ -26,10 +26,26 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConvers
       return;
     }
     if (run?.stepId === 'companion.chapter_zero_return') {
-      beginMossproutChapterOne();
-      commitFtueAction({ actionId: 'companion.complete_chapter_zero_return', evidenceRef: ftueConversationDefinitionId ?? 'mossprout-chapter-zero-return' });
+      if (ftueHandoffRef.current) return;
+      ftueHandoffRef.current = true;
+      void installStepplingFtueDiscovery().then((result) => {
+        if (!result.changed && !result.state.companionDiscovery.active) {
+          ftueHandoffRef.current = false;
+          return;
+        }
+        beginMossproutChapterOne();
+        commitFtueAction({ actionId: 'companion.complete_chapter_zero_return', evidenceRef: ftueConversationDefinitionId ?? 'mossprout-chapter-zero-return' });
+        transitionTo({
+          announcement: 'Something moved in the Dream Mist',
+          target: 'merge',
+          navigate: () => router.dismissTo({ pathname: '/games', params: { familyId: 'mossprout' } }),
+        });
+      }).catch((error) => {
+        ftueHandoffRef.current = false;
+        console.warn('Could not prepare Steppling discovery', error);
+      });
     }
-  }, [ftueConversationDefinitionId]);
+  }, [ftueConversationDefinitionId, router, transitionTo]);
   const openFtueGarden = useCallback(() => {
     if (ftueHandoffRef.current) return;
     ftueHandoffRef.current = true;

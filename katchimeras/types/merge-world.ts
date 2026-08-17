@@ -49,7 +49,9 @@ export type MergeBoardRegionId = 'central-clearing' | 'inner-mist' | 'mid-mist' 
 
 export type MergeDreamMist =
   | { kind: 'dormant' }
-  | { kind: 'echo'; id: string; definitionId: string; ownerCharacterId: MergeCharacterId | null; generatorId?: string };
+  | { kind: 'echo'; id: string; definitionId: string; ownerCharacterId: MergeCharacterId | null; generatorId?: string }
+  | { kind: 'discovery_fork'; gateId: string; candidateIds: MergeCharacterId[]; recommendedCharacterId: MergeCharacterId | null }
+  | { kind: 'dreambound_item'; discoveryId: string; gateId: string; pathId: string; sequenceIndex: number; boundDefinitionId: string; active: boolean };
 
 export type MergeBoardCell = {
   /** Compatibility projection. In v10 this is true whenever `mist` is present. */
@@ -123,6 +125,40 @@ export type MergeCharacterProgress = {
   completedChapterIds: string[];
 };
 
+export type CompanionDiscoverySource = 'ftue_hatch' | 'board_discovery' | 'legacy_grandfather';
+
+export type CompanionDiscoveryRecord = {
+  characterId: MergeCharacterId;
+  source: CompanionDiscoverySource;
+  gateId: string;
+  pathId: string | null;
+  discoveredAt: number;
+  revealSeenAt: number | null;
+  permanentFeatureId: string | null;
+};
+
+export type ActiveCompanionDiscovery = {
+  discoveryId: string;
+  gateId: string;
+  anchorCell: number;
+  pathCells: number[];
+  candidateIds: MergeCharacterId[];
+  recommendedCharacterId: MergeCharacterId | null;
+  selectedCharacterId: MergeCharacterId | null;
+  pathId: string | null;
+  stage: number;
+  startedAt: number;
+};
+
+export type CompanionDiscoveryProgress = {
+  records: CompanionDiscoveryRecord[];
+  openedGateIds: string[];
+  completedGateIds: string[];
+  queuedGateIds: string[];
+  active: ActiveCompanionDiscovery | null;
+  lastStartedDayId: string | null;
+};
+
 export type MergeRewardInboxEntry = {
   id: string;
   createdAt: number;
@@ -159,7 +195,7 @@ export type MergeLifeTheme =
 
 export type MergeWorldArrival = {
   id: string;
-  kind: 'contextual_parcel' | 'memory_arrival' | 'goal_chest';
+  kind: 'contextual_parcel' | 'memory_arrival' | 'goal_chest' | 'discovery_parcel';
   createdAt: number;
   dayId: string;
   label: string;
@@ -167,7 +203,8 @@ export type MergeWorldArrival = {
   familyId: MergeFamilyId;
   chainId: MergeChainId;
   characterId?: MergeCharacterId;
-  source: 'journal' | 'companion_story' | 'goal' | 'legacy';
+  source: 'journal' | 'companion_story' | 'goal' | 'legacy' | 'discovery';
+  discoveryId?: string;
   itemDefinitionIds: string[];
   memoryRef?: { dayId: string; journalRecordId: string; sourceKind: 'manual' | 'photo' | 'text_note' | 'voice_note' };
   claimedAt: number | null;
@@ -202,7 +239,7 @@ export type MergeStepEnergyDay = {
 };
 
 export type MergeWorldState = {
-  version: 10;
+  version: 12;
   revision: number;
   createdAt: number;
   updatedAt: number;
@@ -236,6 +273,7 @@ export type MergeWorldState = {
   lastFreeRerollDayId: string | null;
   characterProgress: Partial<Record<MergeCharacterId, MergeCharacterProgress>>;
   externalRewardReceipts: MergeExternalRewardReceipt[];
+  companionDiscovery: CompanionDiscoveryProgress;
 };
 
 export type MergeWorldCommand =
@@ -257,6 +295,10 @@ export type MergeWorldCommand =
   | { type: 'featureCharacter'; characterId: MergeCharacterId; now: number }
   | { type: 'ackGeneratorUnlock'; receiptId: string; now: number }
   | { type: 'rerollOrder'; orderId: string; now: number }
+  | { type: 'startStepplingDiscovery'; now: number }
+  | { type: 'openCompanionDiscoveryGate'; gateId: string; candidateIds: MergeCharacterId[]; recommendedCharacterId: MergeCharacterId | null; now: number }
+  | { type: 'selectCompanionDiscoveryPath'; characterId: MergeCharacterId; now: number }
+  | { type: 'ackCompanionDiscoveryReveal'; characterId: MergeCharacterId; now: number }
   | { type: 'reconcileCharacters'; characterIds: string[]; now: number }
   | { type: 'reconcileFriendship'; levels: Partial<Record<MergeCharacterId, number>>; now: number }
   | { type: 'reconcileStory'; familyId: MergeCharacterId; status: string; targetLevel: number; actPhase?: string; orderTemplateKeys?: string[]; servedOrderIds?: string[]; now: number }
@@ -277,6 +319,7 @@ export type MergeWorldCommandResult = {
   discoveryId?: string;
   mergedCell?: number;
   dreamEchoClearedId?: string;
+  companionDiscoveryAdvanced?: { discoveryId: string; stage: number; completedCharacterId?: MergeCharacterId };
   clearedMistCells?: number[];
   spawnedCell?: number;
   spawnedItems?: { instanceId: string; definitionId: string; cell: number }[];

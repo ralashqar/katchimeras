@@ -28,6 +28,7 @@ import { FeastleMergeCelebration } from '@/components/katchadeck/world/quests/fe
 import { MergeSpawnEffectsLayer } from '@/components/katchadeck/games/merge-spawn-effects-layer';
 import { mergeWorldGeneratorArt, mergeWorldItemArt } from '@/constants/merge-world-art';
 import { MERGE_GENERATORS_BY_ID, MERGE_HYBRID_RECIPES, MERGE_ITEMS_BY_ID, MERGE_WORLD_COLUMNS, MERGE_WORLD_ROWS } from '@/constants/merge-world-catalog';
+import { COMPANION_DISCOVERIES_BY_ID } from '@/constants/companion-discovery-catalog';
 import type { MergeBoardInteractionGate } from '@/features/onboarding/merge-ftue';
 import type { MergeBoardOperationReceipt, MergeBoardSessionId, MergeInteractionGateReceipt } from '@/features/onboarding/merge-ftue-interaction-coordinator';
 import { useDisposableTimers } from '@/hooks/use-disposable-timers';
@@ -457,7 +458,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       return;
     }
     const targetCell = current.board[to];
-    if (!targetCell || (targetCell.locked && targetCell.mist?.kind !== 'echo')) {
+    if (!targetCell || (targetCell.locked && targetCell.mist?.kind !== 'echo' && targetCell.mist?.kind !== 'dreambound_item')) {
       if (targetCell?.locked) {
         showCellFeedback(to, 'locked_cell');
         returnHome();
@@ -680,7 +681,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     }
     const current = presentationRef.current;
     const boardCell = current.board[cell];
-    if (boardCell?.locked && (boardCell.mist?.kind !== 'echo' || selectedCellRef.current == null)) {
+    if (boardCell?.locked && ((boardCell.mist?.kind !== 'echo' && boardCell.mist?.kind !== 'dreambound_item') || selectedCellRef.current == null)) {
       showCellFeedback(cell, 'locked_cell');
       return;
     }
@@ -889,12 +890,18 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
         const definition = item ? MERGE_ITEMS_BY_ID.get(item.definitionId) : null;
         const echoDefinition = cell.mist?.kind === 'echo' ? MERGE_ITEMS_BY_ID.get(cell.mist.definitionId) : null;
         const echoGenerator = cell.mist?.kind === 'echo' && cell.mist.generatorId ? MERGE_GENERATORS_BY_ID.get(cell.mist.generatorId) : null;
+        const companionDiscovery = cell.mist?.kind === 'dreambound_item' ? COMPANION_DISCOVERIES_BY_ID.get(cell.mist.discoveryId) : null;
+        const discoveryStage = companionDiscovery && cell.mist?.kind === 'dreambound_item' ? companionDiscovery.stages[cell.mist.sequenceIndex] : null;
         const compatible = Boolean(selectedDefinitionId && selectedCell !== index && (
-          (item && item.definitionId === selectedDefinitionId) || echoDefinition?.id === selectedDefinitionId
+          (item && item.definitionId === selectedDefinitionId)
+          || echoDefinition?.id === selectedDefinitionId
+          || (cell.mist?.kind === 'dreambound_item' && cell.mist.active && cell.mist.boundDefinitionId === selectedDefinitionId)
         ));
         const label = generator ? `${generator.name}. Tap to generate. Costs 1 Energy.`
           : definition ? `${definition.name}, tier ${definition.tier}`
             : echoDefinition ? `Dream Echo: ${echoDefinition.name}${echoGenerator ? ` from the ${echoGenerator.name}` : ''}. Find its matching item to wake this cell.`
+              : discoveryStage ? `${discoveryStage.clue}. ${cell.mist?.kind === 'dreambound_item' && cell.mist.active ? `Bring another ${MERGE_ITEMS_BY_ID.get(cell.mist.boundDefinitionId)?.name ?? 'matching item'} here.` : 'Follow the trail to wake this item.'}`
+                : cell.mist?.kind === 'discovery_fork' ? 'Several paths are moving beneath the Dream Mist. Choose one to investigate.'
                 : cell.mist ? 'Something is hidden in the Dream Mist.' : 'Empty board space';
         return <BoardCell
           accessibilityActionLabel={gateKind === 'drag' && index === gateFromCell ? 'Merge with highlighted item' : generator ? 'Generate item' : 'Select or move item'}
@@ -992,8 +999,16 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
       accessibilityState={{ disabled: accessibilityDisabled }}
       onAccessibilityAction={() => onActivate(index)}
       style={styles.cellPressable}>
-      {blocked ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" recyclingKey="merge-locked-cloud" source={LOCKED_CELL_OVERLAY} style={[styles.lockedOverlay, mist?.kind === 'echo' && styles.echoMist]} transition={0} /> : null}
+      {blocked ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" recyclingKey="merge-locked-cloud" source={LOCKED_CELL_OVERLAY} style={[styles.lockedOverlay, mist?.kind === 'echo' && styles.echoMist, (mist?.kind === 'dreambound_item' || mist?.kind === 'discovery_fork') && styles.discoveryMist]} transition={0} /> : null}
       {mist?.kind === 'echo' ? <View pointerEvents="none" style={[styles.echoItem, compatible && styles.echoItemCompatible]}><DreamEchoItemArt compatible={compatible} definitionId={mist.definitionId} size={Math.min(width, height) - 4} /></View> : null}
+      {mist?.kind === 'dreambound_item' ? <View pointerEvents="none" style={[styles.discoveryClue, compatible && styles.echoItemCompatible, !mist.active && styles.dreamboundSealed]}>
+        <DreamEchoItemArt compatible={compatible} definitionId={mist.boundDefinitionId} size={Math.min(width, height) - 8} />
+        <View style={styles.discoveryStageDots}>{[0, 1, 2].map((stage) => <View key={stage} style={[styles.discoveryStageDot, stage <= mist.sequenceIndex && styles.discoveryStageDotActive]} />)}</View>
+      </View> : null}
+      {mist?.kind === 'discovery_fork' ? <View pointerEvents="none" style={styles.discoveryClue}>
+        <IconSymbol color="#F4D795" name="sparkles" size={Math.max(18, Math.min(width, height) * 0.44)} />
+        <View style={styles.discoveryStageDots}>{mist.candidateIds.map((id) => <View key={id} style={[styles.discoveryStageDot, styles.discoveryStageDotActive]} />)}</View>
+      </View> : null}
     </View>
   </View>;
 });
@@ -1493,6 +1508,12 @@ const styles = StyleSheet.create({
   cellPressable: { alignItems: 'center', height: '100%', justifyContent: 'center', width: '100%' },
   lockedOverlay: { ...StyleSheet.absoluteFillObject, height: '100%', width: '100%' },
   echoMist: { opacity: 0.78 },
+  discoveryMist: { opacity: 0.92 },
+  discoveryClue: { alignItems: 'center', backgroundColor: 'rgba(72,57,88,0.56)', borderColor: 'rgba(244,215,149,0.72)', borderRadius: 999, borderWidth: 1, height: '76%', justifyContent: 'center', position: 'absolute', width: '76%', zIndex: 3 },
+  dreamboundSealed: { opacity: 0.46 },
+  discoveryStageDots: { bottom: 5, flexDirection: 'row', gap: 3, position: 'absolute' },
+  discoveryStageDot: { backgroundColor: 'rgba(255,255,255,0.28)', borderRadius: 3, height: 4, width: 4 },
+  discoveryStageDotActive: { backgroundColor: '#F4D795' },
   echoItem: { alignItems: 'center', justifyContent: 'center', opacity: 0.84, position: 'absolute', zIndex: 2 },
   echoItemCompatible: { backgroundColor: 'rgba(205, 249, 255, 0.2)', borderColor: 'rgba(209, 252, 255,0.9)', borderRadius: 999, borderWidth: 1.5, boxShadow: '0 0 12px rgba(133, 237, 255, 0.92)', opacity: 1, transform: [{ scale: 1.06 }] },
   hoverCell: { backgroundColor: 'rgba(244,204,110,0.34)', borderColor: '#E1A644', borderRadius: 0, borderWidth: 2, left: 0, position: 'absolute', top: 0, zIndex: 20 },

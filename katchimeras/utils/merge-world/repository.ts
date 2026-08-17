@@ -193,6 +193,11 @@ export function claimDailyStepEnergy(input: {
 /** Backwards-compatible name for the authored onboarding call site. */
 export const claimMossproutFtueStepEnergy = claimDailyStepEnergy;
 
+/** Opens the fixed first board discovery after Mossprout's Chapter 0 return. */
+export function installStepplingFtueDiscovery(now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'startStepplingDiscovery', now }), now);
+}
+
 export async function resetMergeWorldStateForDebug(now = Date.now()): Promise<void> {
   resetGeneration += 1;
   resetInProgress = true;

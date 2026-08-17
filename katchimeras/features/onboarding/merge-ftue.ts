@@ -12,6 +12,7 @@ export type MergeBoardInteractionGate =
 export type MergeRailInteractionGate =
   | { kind: 'open' }
   | { kind: 'locked' }
+  | { kind: 'parcel'; arrivalId: string }
   | { kind: 'serve'; orderId: string }
   | { kind: 'chat_note'; noteId: string };
 
@@ -23,6 +24,10 @@ export function resolveFtueBoardCell(state: MergeWorldState, target: FtueTarget)
   }
   if (target.kind === 'board_dream_echo') {
     const cell = state.board.findIndex((entry) => entry.mist?.kind === 'echo' && entry.mist.id === target.echoId);
+    return cell >= 0 ? cell : null;
+  }
+  if (target.kind === 'board_companion_discovery') {
+    const cell = state.board.findIndex((entry) => entry.mist?.kind === 'dreambound_item' && entry.mist.discoveryId === target.discoveryId && entry.mist.active);
     return cell >= 0 ? cell : null;
   }
   if (target.kind === 'order_requirement_item') {
@@ -61,6 +66,9 @@ export function mergeFtueRailGate(step: FtueStepDefinition | null): MergeRailInt
   if (policy.allowed.kind === 'chat_note_tap' && policy.allowed.target.kind === 'tray_chat_note') {
     return { kind: 'chat_note', noteId: policy.allowed.target.noteId };
   }
+  if (policy.allowed.kind === 'parcel_tap' && policy.allowed.target.kind === 'tray_parcel') {
+    return { kind: 'parcel', arrivalId: policy.allowed.target.arrivalId };
+  }
   if (policy.allowed.kind !== 'order_serve' || policy.allowed.target.kind !== 'order_serve') return { kind: 'locked' };
   return { kind: 'serve', orderId: policy.allowed.target.orderId };
 }
@@ -87,6 +95,9 @@ export function mergeFtueAllowsCommand(step: FtueStepDefinition | null, state: M
       && command.generatorId === policy.allowed.target.generatorId;
   }
   if (policy.allowed.kind === 'chat_note_tap') return false;
+  if (policy.allowed.kind === 'parcel_tap') return policy.allowed.target.kind === 'tray_parcel'
+    && command.type === 'claimArrival'
+    && command.arrivalId === policy.allowed.target.arrivalId;
   return policy.allowed.target.kind === 'order_serve'
     && command.type === 'serveOrder'
     && command.orderId === policy.allowed.target.orderId;
@@ -99,6 +110,13 @@ export function mergeFtueEventForCommand(
 ): FtueEvent | null {
   if (!result?.changed) return null;
   if (command.type === 'move' && result.mergedCell != null) {
+    if (result.companionDiscoveryAdvanced) return {
+      type: 'companion_discovery_advanced',
+      discoveryId: result.companionDiscoveryAdvanced.discoveryId,
+      stage: result.companionDiscoveryAdvanced.stage,
+      completedCharacterId: result.companionDiscoveryAdvanced.completedCharacterId,
+      revision: result.state.revision,
+    };
     const source = before.board[command.from]?.occupant;
     const target = before.board[command.to]?.occupant;
     const merged = result.state.board[result.mergedCell]?.occupant;
@@ -135,6 +153,9 @@ export function mergeFtueEventForCommand(
   if (command.type === 'serveOrder' && result.servedOrderId) {
     return { type: 'order_served', orderId: result.servedOrderId, revision: result.state.revision };
   }
+  if (command.type === 'claimArrival') {
+    return { type: 'arrival_claimed', arrivalId: command.arrivalId, revision: result.state.revision };
+  }
   return null;
 }
 
@@ -155,6 +176,15 @@ function matchingEvidenceCount(step: FtueStepDefinition, state: MergeWorldState)
   }
   if (event.type === 'order_served' && event.orderId) {
     return state.activeOrders.some((order) => order.id === event.orderId) ? 0 : 1;
+  }
+  if (event.type === 'arrival_claimed' && event.arrivalId) {
+    return state.arrivals.some((arrival) => arrival.id === event.arrivalId && arrival.claimedAt != null) ? 1 : 0;
+  }
+  if (event.type === 'companion_discovery_advanced' && event.discoveryId) {
+    const activeStage = state.companionDiscovery.active?.discoveryId === event.discoveryId
+      ? state.companionDiscovery.active.stage
+      : state.companionDiscovery.records.some((record) => record.characterId === event.completedCharacterId) ? event.stage ?? 0 : 0;
+    return activeStage;
   }
   return null;
 }
@@ -225,6 +255,23 @@ export function recoverMergeFtueEvent(stepOrId: FtueStepDefinition | string | nu
       echoId: event.echoId,
       resultDefinitionId: occupant.definitionId,
       resultCell: resultCell!,
+      revision: state.revision,
+    };
+  }
+  if (event.type === 'arrival_claimed' && event.arrivalId) {
+    if (state.arrivals.some((arrival) => arrival.id === event.arrivalId && arrival.claimedAt != null) && 1 - baseline > progress) {
+      return { type: 'arrival_claimed', arrivalId: event.arrivalId, revision: state.revision };
+    }
+  }
+  if (event.type === 'companion_discovery_advanced' && event.discoveryId && event.stage != null) {
+    const activeStage = state.companionDiscovery.active?.discoveryId === event.discoveryId
+      ? state.companionDiscovery.active.stage
+      : state.companionDiscovery.records.some((record) => record.characterId === event.completedCharacterId) ? event.stage : 0;
+    if (activeStage - baseline > progress) return {
+      type: 'companion_discovery_advanced',
+      discoveryId: event.discoveryId,
+      stage: activeStage,
+      completedCharacterId: event.completedCharacterId,
       revision: state.revision,
     };
   }

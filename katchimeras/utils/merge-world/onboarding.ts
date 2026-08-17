@@ -2,7 +2,6 @@ import { MERGE_GENERATORS_BY_ID, MERGE_WORLD_SIZE, MOSSPROUT_DREAM_ECHOES, MOSSP
 import type { MergeBoardCell, MergeWorldState } from '@/types/merge-world';
 import type { WispId } from '@/types/wisp';
 import { createInitialMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
-import { placeLockedTierOneEchoes } from '@/utils/merge-world/locked-tier-one-echoes';
 import { mossproutChapterZeroOrder } from '@/utils/merge-world/chapter-zero-policy';
 
 export function createMossproutChapterZeroState(now = Date.now(), rewardWispId: WispId = 'sprout'): MergeWorldState {
@@ -21,13 +20,13 @@ export function createMossproutChapterZeroState(now = Date.now(), rewardWispId: 
   for (const echo of MOSSPROUT_DREAM_ECHOES) {
     board[echo.cell] = {
       ...board[echo.cell],
-      regionId: echo.cell === 54 ? 'mid-mist' : 'inner-mist',
+      regionId: 'inner-mist',
       mist: { kind: 'echo', id: echo.id, definitionId: echo.definitionId, ownerCharacterId: 'mossprout' },
     };
   }
   return {
     ...state,
-    board: placeLockedTierOneEchoes(board),
+    board,
     generators: { [garden.id]: { id: garden.id, name: garden.name, level: 1, upgradeFragments: 0, chainIds: garden.chainIds, tierOneDropDefinitionIds: [...garden.tierOneDropDefinitionIds], forcedDropDefinitionId: 'nature:garden:1' } },
     energy: { value: 4, regenCap: 50, lastRegenAt: now, regenPaused: true },
     coins: 100,
@@ -35,6 +34,17 @@ export function createMossproutChapterZeroState(now = Date.now(), rewardWispId: 
     unlockedFamilies: ['nature'],
     unlockedChains: ['nature:garden'],
     unlockedCharacters: ['mossprout'],
+    companionDiscovery: {
+      records: [{
+        characterId: 'mossprout', source: 'ftue_hatch', gateId: 'gate-1-mossprout', pathId: null,
+        discoveredAt: now, revealSeenAt: now, permanentFeatureId: 'wild-garden',
+      }],
+      openedGateIds: ['gate-1-mossprout'],
+      completedGateIds: ['gate-1-mossprout'],
+      queuedGateIds: [],
+      active: null,
+      lastStartedDayId: null,
+    },
     favouriteCharacterId: 'mossprout',
     activeOrders: [mossproutChapterZeroOrder(now, rewardWispId)],
     completedOrderCount: 0,

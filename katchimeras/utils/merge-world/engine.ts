@@ -40,21 +40,28 @@ import type {
   MergeWorldState,
 } from '@/types/merge-world';
 import { advanceMossproutChapterZero, enforceMossproutChapterZeroDropOverride } from '@/utils/merge-world/chapter-zero-policy';
-import { placeLockedTierOneEchoes } from '@/utils/merge-world/locked-tier-one-echoes';
+import {
+  COMPANION_DISCOVERIES_BY_ID,
+  DISCOVERY_FORK_ANCHOR_CELL,
+  STEPPLING_DISCOVERY_ANCHOR_CELL,
+  STEPPLING_DISCOVERY_GATE_ID,
+  STEPPLING_DISCOVERY_ID,
+} from '@/constants/companion-discovery-catalog';
+import type { CompanionDiscoveryDefinition } from '@/constants/companion-discovery-catalog';
 
 const KNOWN_CHARACTERS = new Set<MergeCharacterId>(Object.keys(KATCHIMERA_MERGE_PROFILES) as MergeCharacterId[]);
 const RECENT_ORDER_LIMIT = 8;
 
 export function createInitialMergeWorldState(now = Date.now(), characterIds: string[] = []): MergeWorldState {
-  const board = placeLockedTierOneEchoes(Array.from({ length: MERGE_WORLD_SIZE }, (_, index) => ({
+  const board: MergeBoardCell[] = Array.from({ length: MERGE_WORLD_SIZE }, (_, index) => ({
     locked: !MERGE_STARTING_OPEN_CELLS.has(index),
     blocker: MERGE_STARTING_OPEN_CELLS.has(index) ? null : index % 3 === 0 ? 'rocks' : index % 3 === 1 ? 'clouds' : 'vines',
     regionId: regionForCell(index),
     mist: MERGE_STARTING_OPEN_CELLS.has(index) ? null : { kind: 'dormant' },
     occupant: null,
-  })));
+  }));
   let state: MergeWorldState = {
-    version: 10,
+    version: 12,
     revision: 0,
     createdAt: now,
     updatedAt: now,
@@ -88,6 +95,9 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     lastFreeRerollDayId: null,
     characterProgress: { feastle: { friendshipLevel: 1, completedChapterIds: [] } },
     externalRewardReceipts: [],
+    companionDiscovery: {
+      records: [], openedGateIds: [], completedGateIds: [], queuedGateIds: [], active: null, lastStartedDayId: null,
+    },
   };
   state = reconcileCharacters(state, characterIds, now);
   return state;
@@ -148,6 +158,24 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
     }
     case 'rerollOrder':
       return rerollOrder(current, command.orderId, command.now);
+    case 'startStepplingDiscovery':
+      return startStepplingDiscovery(current, command.now);
+    case 'openCompanionDiscoveryGate':
+      return openCompanionDiscoveryGate(current, command.gateId, command.candidateIds, command.recommendedCharacterId, command.now);
+    case 'selectCompanionDiscoveryPath':
+      return selectCompanionDiscoveryPath(current, command.characterId, command.now);
+    case 'ackCompanionDiscoveryReveal': {
+      let updated = false;
+      const records = current.companionDiscovery.records.map((record) => {
+        if (record.characterId !== command.characterId || record.revealSeenAt != null) return record;
+        updated = true;
+        return { ...record, revealSeenAt: command.now };
+      });
+      return updated ? changed(touch({
+        ...current,
+        companionDiscovery: { ...current.companionDiscovery, records },
+      }, command.now)) : unchanged(current);
+    }
     case 'reconcileCharacters': {
       const next = reconcileCharacters(current, command.characterIds, command.now);
       return result(state, next, next === current ? undefined : 'Merge World welcomed new visitors.');
@@ -244,19 +272,19 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   if (!value || typeof value !== 'object') return createInitialMergeWorldState(now);
   const rawVersion = (value as { version?: unknown }).version;
   const source = value as Partial<MergeWorldState>;
-  if ((rawVersion !== 1 && rawVersion !== 2 && rawVersion !== 3 && rawVersion !== 4 && rawVersion !== 5 && rawVersion !== 6 && rawVersion !== 7 && rawVersion !== 8 && rawVersion !== 9 && rawVersion !== 10) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
+  if ((rawVersion !== 1 && rawVersion !== 2 && rawVersion !== 3 && rawVersion !== 4 && rawVersion !== 5 && rawVersion !== 6 && rawVersion !== 7 && rawVersion !== 8 && rawVersion !== 9 && rawVersion !== 10 && rawVersion !== 11 && rawVersion !== 12) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
     return createInitialMergeWorldState(now);
   }
   const fallback = createInitialMergeWorldState(now);
   let normalized: MergeWorldState = {
     ...fallback,
     ...source,
-    version: 10,
+    version: 12,
     revision: finite(source.revision, 0),
     createdAt: finite(source.createdAt, now),
     updatedAt: finite(source.updatedAt, now),
     nextInstance: Math.max(1, finite(source.nextInstance, 1)),
-    board: placeLockedTierOneEchoes(dedupeMigratedGenerators(source.board.map((cell, index) => normalizeCell(cell, fallback.board[index])))),
+    board: dedupeMigratedGenerators(source.board.map((cell, index) => normalizeCell(cell, fallback.board[index]))),
     storage: Array.isArray(source.storage) ? source.storage.filter(validBoardItem) : [],
     storageCapacity: Math.max(8, finite(source.storageCapacity, 8)),
     rewardInbox: Array.isArray(source.rewardInbox) ? source.rewardInbox : [],
@@ -299,7 +327,13 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
       ? source.characterProgress
       : fallback.characterProgress,
     externalRewardReceipts: Array.isArray(source.externalRewardReceipts) ? source.externalRewardReceipts : [],
+    companionDiscovery: normalizeCompanionDiscovery(source.companionDiscovery, source.unlockedCharacters, rawVersion, now),
   };
+  normalized = {
+    ...normalized,
+    unlockedCharacters: [...new Set(normalized.companionDiscovery.records.map((record) => record.characterId))],
+  };
+  normalized = restoreActiveDreamboundDiscovery(normalized, rawVersion, now);
   normalized = reconcileUnlockedCatalog(normalized);
   normalized = {
     ...normalized,
@@ -367,11 +401,253 @@ function upgradeGenerator(state: MergeWorldState, generatorId: string, now: numb
   return changed(touch({ ...state, generators: { ...state.generators, [generatorId]: upgraded } }, now), `${generator.name} reached level ${upgraded.level}.`);
 }
 
+function openCompanionDiscoveryGate(
+  state: MergeWorldState,
+  gateId: string,
+  requestedCandidates: MergeCharacterId[],
+  recommendedCharacterId: MergeCharacterId | null,
+  now: number,
+): MergeWorldCommandResult {
+  if (state.companionDiscovery.active || state.companionDiscovery.completedGateIds.includes(gateId)) return unchanged(state);
+  if (state.companionDiscovery.lastStartedDayId === localDayId(now)) return unchanged(state, 'The Dream Mist needs a little time before another mystery appears.');
+  const candidateIds = [...new Set(requestedCandidates)].filter((characterId) => (
+    KNOWN_CHARACTERS.has(characterId)
+    && !state.unlockedCharacters.includes(characterId)
+    && [...COMPANION_DISCOVERIES_BY_ID.values()].some((definition) => definition.characterId === characterId)
+  )).slice(0, 3);
+  if (!candidateIds.length) return unchanged(state);
+  const anchorCell = DISCOVERY_FORK_ANCHOR_CELL;
+  const board = [...state.board];
+  board[anchorCell] = {
+    ...board[anchorCell], locked: true, blocker: 'clouds', occupant: null,
+    mist: { kind: 'discovery_fork', gateId, candidateIds, recommendedCharacterId: candidateIds.includes(recommendedCharacterId!) ? recommendedCharacterId : null },
+  };
+  const recommendation = candidateIds.includes(recommendedCharacterId!) ? recommendedCharacterId : null;
+  return changed(touch({
+    ...state,
+    board,
+    companionDiscovery: {
+      ...state.companionDiscovery,
+      openedGateIds: [...new Set([...state.companionDiscovery.openedGateIds, gateId])],
+      queuedGateIds: state.companionDiscovery.queuedGateIds.filter((id) => id !== gateId),
+      active: {
+        discoveryId: `fork:${gateId}`, gateId, anchorCell, pathCells: [], candidateIds,
+        recommendedCharacterId: recommendation, selectedCharacterId: null, pathId: null, stage: 0, startedAt: now,
+      },
+      lastStartedDayId: localDayId(now),
+    },
+  }, now), 'The Dream Mist is pointing in several directions.');
+}
+
+function selectCompanionDiscoveryPath(state: MergeWorldState, characterId: MergeCharacterId, now: number): MergeWorldCommandResult {
+  const active = state.companionDiscovery.active;
+  if (!active || active.selectedCharacterId || !active.candidateIds.includes(characterId)) return unchanged(state);
+  const definition = [...COMPANION_DISCOVERIES_BY_ID.values()].find((candidate) => candidate.characterId === characterId);
+  if (!definition) return unchanged(state);
+  const board = [...state.board];
+  board[active.anchorCell] = { ...board[active.anchorCell], locked: true, blocker: 'clouds', occupant: null, mist: { kind: 'dormant' } };
+  installDreamboundPath(board, definition, active.gateId);
+  const arrival = discoveryArrival(definition, now);
+  return changed(touch({
+    ...state,
+    board,
+    arrivals: state.arrivals.some((candidate) => candidate.id === arrival.id) ? state.arrivals : [arrival, ...state.arrivals],
+    companionDiscovery: {
+      ...state.companionDiscovery,
+      active: {
+        ...active, discoveryId: definition.id, anchorCell: definition.pathCells.at(-1)!, pathCells: [...definition.pathCells],
+        selectedCharacterId: characterId, pathId: definition.pathId, stage: 0,
+      },
+    },
+  }, now), `We’ll follow the ${definition.pathName} first.`);
+}
+
+function startStepplingDiscovery(state: MergeWorldState, now: number): MergeWorldCommandResult {
+  if (state.unlockedCharacters.includes('steppling')) return unchanged(state, 'Steppling has already been discovered.');
+  if (state.companionDiscovery.active) return unchanged(state, 'Another mystery is already active.');
+  if (!state.characterProgress.mossprout?.completedChapterIds.includes('mossprout-chapter-0')) {
+    return unchanged(state, 'Finish Mossprout\'s garden first.');
+  }
+  const definition = COMPANION_DISCOVERIES_BY_ID.get(STEPPLING_DISCOVERY_ID);
+  const garden = state.generators['wild-garden'];
+  if (!definition || !garden) return unchanged(state, 'Finish Mossprout\'s garden first.');
+  const anchorCell = STEPPLING_DISCOVERY_ANCHOR_CELL;
+  const board = [...state.board];
+  installDreamboundPath(board, definition, definition.gateId);
+  const arrival = discoveryArrival(definition, now);
+  return changed(touch({
+    ...state,
+    board,
+    arrivals: state.arrivals.some((candidate) => candidate.id === arrival.id) ? state.arrivals : [arrival, ...state.arrivals],
+    companionDiscovery: {
+      ...state.companionDiscovery,
+      openedGateIds: [...new Set([...state.companionDiscovery.openedGateIds, STEPPLING_DISCOVERY_GATE_ID])],
+      active: {
+        discoveryId: definition.id,
+        gateId: definition.gateId,
+        anchorCell,
+        pathCells: [...definition.pathCells],
+        candidateIds: ['steppling'],
+        recommendedCharacterId: 'steppling',
+        selectedCharacterId: 'steppling',
+        pathId: definition.pathId,
+        stage: 0,
+        startedAt: now,
+      },
+      lastStartedDayId: localDayId(now),
+    },
+  }, now), 'Something moved in the Dream Mist.');
+}
+
+function advanceCompanionDiscovery(state: MergeWorldState, from: number, to: number, now: number): MergeWorldCommandResult | null {
+  const mist = state.board[to].mist;
+  if (mist?.kind !== 'dreambound_item') return null;
+  const active = state.companionDiscovery.active;
+  const source = state.board[from].occupant;
+  const definition = COMPANION_DISCOVERIES_BY_ID.get(mist.discoveryId);
+  if (!active || !definition || active.discoveryId !== mist.discoveryId || source?.kind !== 'item') {
+    return unchanged(state, 'This mystery is not ready yet.', 'sealed_mist');
+  }
+  if (!mist.active) return unchanged(state, 'The trail has not reached this item yet.', 'sealed_mist');
+  if (source.definitionId !== mist.boundDefinitionId) {
+    return unchanged(state, 'Find the matching item.', 'wrong_echo_match');
+  }
+  const nextStage = mist.sequenceIndex + 1;
+  const completesDiscovery = nextStage >= definition.stages.length;
+  const upgradedDefinitionId = MERGE_ITEMS_BY_ID.get(source.definitionId)?.nextItemId;
+  if (!upgradedDefinitionId) return unchanged(state, 'This item cannot merge any further.');
+  const board = [...state.board];
+  board[from] = { ...board[from], occupant: null };
+  if (!completesDiscovery) {
+    const nextCell = definition.pathCells[nextStage];
+    board[to] = { ...board[to], locked: false, blocker: null, mist: null, occupant: { kind: 'item', instanceId: `merge-item:${state.nextInstance}`, definitionId: upgradedDefinitionId } };
+    const nextMist = board[nextCell].mist;
+    if (nextMist?.kind === 'dreambound_item') board[nextCell] = { ...board[nextCell], mist: { ...nextMist, active: true } };
+    return {
+      state: touch({
+        ...state,
+        board,
+        nextInstance: state.nextInstance + 1,
+        companionDiscovery: { ...state.companionDiscovery, active: { ...active, stage: nextStage } },
+      }, now),
+      changed: true,
+      mergedCell: to,
+      companionDiscoveryAdvanced: { discoveryId: definition.id, stage: nextStage },
+      message: `${definition.stages[nextStage].clue} stirred in the Mist.`,
+    };
+  }
+
+  const generator = definition.permanentGeneratorId ? MERGE_GENERATORS_BY_ID.get(definition.permanentGeneratorId) : null;
+  if (!generator) return unchanged(state, 'The trail cannot open yet.');
+  board[to] = { ...board[to], locked: false, blocker: null, mist: null, occupant: { kind: 'generator', generatorId: generator.id } };
+  const record = {
+    characterId: definition.characterId,
+    source: 'board_discovery' as const,
+    gateId: active.gateId,
+    pathId: definition.pathId,
+    discoveredAt: now,
+    revealSeenAt: null,
+    permanentFeatureId: generator.id,
+  };
+  const primaryChain = KATCHIMERA_MERGE_PROFILES[definition.characterId].coreChains[0];
+  const primaryTierOne = `${primaryChain}:1`;
+  const primaryTierTwo = `${primaryChain}:2`;
+  const firstOrderId = definition.characterId === 'steppling' ? 'steppling:discovery:first-trail' : `${definition.characterId}:discovery:first-order`;
+  const firstOrder: MergeOrder = {
+    id: firstOrderId,
+    characterId: definition.characterId,
+    title: definition.characterId === 'steppling' ? 'Something for the trail' : `${MERGE_CHARACTER_NAMES[definition.characterId]}'s first request`,
+    description: `Make ${MERGE_ITEMS_BY_ID.get(primaryTierTwo)?.name ?? 'something new'} from the ${generator.name}.`,
+    difficulty: 'small',
+    requirements: [{ definitionId: primaryTierTwo, quantity: 1 }],
+    reward: { coins: 20, mergeXp: 18, friendshipXp: 12, energy: 2 },
+    createdAt: now,
+    signature: false,
+    purpose: 'normal',
+    storyArcId: `${definition.characterId}:discovery`,
+  };
+  const garden = state.generators['wild-garden'];
+  const receiptId = `generator-unlock:${generator.id}`;
+  return {
+    state: touch({
+      ...state,
+      board,
+      generators: {
+        ...state.generators,
+        ...(garden ? { 'wild-garden': { ...garden, forcedDropDefinitionId: null } } : {}),
+        [generator.id]: { ...generatorState(generator.id), forcedDropDefinitionId: primaryTierOne },
+      },
+      generatorUnlockReceipts: state.generatorUnlockReceipts.some((receipt) => receipt.id === receiptId)
+        ? state.generatorUnlockReceipts
+        : [...state.generatorUnlockReceipts, { id: receiptId, generatorId: generator.id, createdAt: now, seenAt: null }],
+      unlockedFamilies: [...new Set([...state.unlockedFamilies, MERGE_ITEMS_BY_ID.get(primaryTierOne)!.familyId])],
+      unlockedChains: [...new Set([...state.unlockedChains, primaryChain])],
+      unlockedCharacters: [...new Set([...state.unlockedCharacters, definition.characterId])],
+      favouriteCharacterId: definition.characterId,
+      activeOrders: [...state.activeOrders, firstOrder],
+      characterProgress: {
+        ...state.characterProgress,
+        [definition.characterId]: state.characterProgress[definition.characterId] ?? { friendshipLevel: 1, completedChapterIds: [] },
+      },
+      companionDiscovery: {
+        ...state.companionDiscovery,
+        records: [...state.companionDiscovery.records.filter((candidate) => candidate.characterId !== definition.characterId), record],
+        completedGateIds: [...new Set([...state.companionDiscovery.completedGateIds, active.gateId])],
+        queuedGateIds: state.companionDiscovery.queuedGateIds.filter((id) => id !== active.gateId),
+        active: null,
+      },
+    }, now),
+    changed: true,
+    mergedCell: to,
+    companionDiscoveryAdvanced: { discoveryId: definition.id, stage: nextStage, completedCharacterId: definition.characterId },
+    message: `${MERGE_CHARACTER_NAMES[definition.characterId]} found a way through the Dream Mist.`,
+  };
+}
+
+function installDreamboundPath(board: MergeBoardCell[], definition: CompanionDiscoveryDefinition, gateId: string) {
+  definition.pathCells.forEach((cell, sequenceIndex) => {
+    const stage = definition.stages[sequenceIndex];
+    board[cell] = {
+      ...board[cell], locked: true, blocker: 'clouds', occupant: null,
+      mist: {
+        kind: 'dreambound_item', discoveryId: definition.id, gateId, pathId: definition.pathId,
+        sequenceIndex, boundDefinitionId: stage.boundDefinitionId, active: sequenceIndex === 0,
+      },
+    };
+  });
+}
+
+function companionDefinition(discoveryId: string) {
+  return COMPANION_DISCOVERIES_BY_ID.get(discoveryId);
+}
+
+function themeForFamily(familyId: MergeWorldArrival['familyId']): MergeWorldArrival['theme'] {
+  if (familyId === 'drink') return 'ritual';
+  if (familyId === 'adventure') return 'movement';
+  if (familyId === 'comfort') return 'rest';
+  if (familyId === 'social') return 'connection';
+  if (familyId === 'mind') return 'focus';
+  if (familyId === 'creative') return 'creativity';
+  return familyId;
+}
+
+function discoveryArrival(definition: NonNullable<ReturnType<typeof companionDefinition>>, now: number): MergeWorldArrival {
+  const item = MERGE_ITEMS_BY_ID.get(definition.entryDefinitionId)!;
+  return {
+    id: `arrival:discovery:${definition.id}`, kind: 'discovery_parcel', createdAt: now,
+    dayId: localDayId(now), label: `${definition.pathName} parcel`, theme: themeForFamily(item.familyId),
+    familyId: item.familyId, chainId: item.chainId, characterId: definition.characterId, source: 'discovery',
+    discoveryId: definition.id, itemDefinitionIds: [definition.entryDefinitionId], claimedAt: null, seenAt: null,
+  };
+}
+
 function moveItem(state: MergeWorldState, from: number, to: number, now: number): MergeWorldCommandResult {
   if (!validCell(from) || !validCell(to) || from === to) return unchanged(state, 'Choose an open board space.');
   const source = state.board[from].occupant;
   const target = state.board[to].occupant;
   if (!source) return unchanged(state);
+  const companionDiscoveryResult = advanceCompanionDiscovery(state, from, to, now);
+  if (companionDiscoveryResult) return companionDiscoveryResult;
   const echo = state.board[to].mist?.kind === 'echo' ? state.board[to].mist : null;
   if (echo) {
     if (source.kind !== 'item' || source.definitionId !== echo.definitionId) return unchanged(state, 'Find its match.', 'wrong_echo_match');
@@ -545,6 +821,23 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
     generators,
   };
   next = advanceMossproutChapterZero(next, order.id, now);
+  if (order.id === 'steppling:discovery:first-trail' && next.generators['journey-locker']) {
+    next = {
+      ...next,
+      generators: {
+        ...next.generators,
+        'journey-locker': { ...next.generators['journey-locker'], forcedDropDefinitionId: null },
+      },
+    };
+  }
+  if (order.id.endsWith(':discovery:first-order')) {
+    const generatorId = GENERATOR_BY_CHAIN[KATCHIMERA_MERGE_PROFILES[order.characterId].coreChains[0]];
+    const discoveryGenerator = next.generators[generatorId];
+    if (discoveryGenerator) next = {
+      ...next,
+      generators: { ...next.generators, [generatorId]: { ...discoveryGenerator, forcedDropDefinitionId: null } },
+    };
+  }
   const awakening = MOSSPROUT_STORY_AWAKENINGS[order.id as keyof typeof MOSSPROUT_STORY_AWAKENINGS];
   let clearedMistCells: number[] | undefined;
   if (awakening && !next.boardAwakeningReceipts.some((receipt) => receipt.id === awakening.id)) {
@@ -602,7 +895,7 @@ function sellItem(state: MergeWorldState, cell: number, now: number): MergeWorld
 function claimInbox(state: MergeWorldState, entryId: string, now: number): MergeWorldCommandResult {
   const entry = state.rewardInbox.find((item) => item.id === entryId);
   if (!entry) return unchanged(state);
-  const openCells = state.board.flatMap((cell, index) => !cell.locked && !cell.occupant ? [index] : []);
+  const openCells = state.board.flatMap((cell, index) => !cell.locked && !cell.mist && !cell.occupant ? [index] : []);
   if (openCells.length < entry.items.length) return unchanged(state, `Make ${entry.items.length - openCells.length} more board spaces first.`);
   const board = [...state.board];
   let nextInstance = state.nextInstance;
@@ -621,7 +914,7 @@ function claimArrival(state: MergeWorldState, arrivalId: string, now: number): M
       arrivals: state.arrivals.map((item) => item.id === arrivalId ? { ...item, claimedAt: now, seenAt: item.seenAt ?? now } : item),
     }, now), 'Memory saved to the shelf.');
   }
-  const openCells = state.board.flatMap((cell, index) => !cell.locked && !cell.occupant ? [index] : []);
+  const openCells = state.board.flatMap((cell, index) => !cell.locked && !cell.mist && !cell.occupant ? [index] : []);
   if (openCells.length < arrival.itemDefinitionIds.length) return unchanged(state, `Make ${arrival.itemDefinitionIds.length - openCells.length} more board spaces first.`);
   const board = [...state.board];
   let nextInstance = state.nextInstance;
@@ -672,7 +965,9 @@ function grantActivityRewardsBatch(
     const awarded = Math.min(requested, Math.max(0, MERGE_DAILY_ACTIVITY_ENERGY_LIMIT - (activityEnergyByDay[reward.grantDayId] ?? 0)));
     amount += awarded;
     activityEnergyByDay[reward.grantDayId] = (activityEnergyByDay[reward.grantDayId] ?? 0) + awarded;
-    if (reward.arrival && !arrivals.some((arrival) => arrival.id === reward.arrival!.id)) {
+    // Activity rewards may retain non-item memory markers, but item-bearing
+    // parcels are now authored exclusively by companion discovery gates.
+    if (reward.arrival?.kind === 'memory_arrival' && !arrivals.some((arrival) => arrival.id === reward.arrival!.id)) {
       const itemDefinitionIds = reward.arrival.itemDefinitionIds.filter((id) => MERGE_ITEMS_BY_ID.has(id));
       arrivals = [...arrivals, { ...reward.arrival, itemDefinitionIds, createdAt: now, claimedAt: null, seenAt: null }];
       queuedItemCount += itemDefinitionIds.length;
@@ -767,7 +1062,25 @@ function rerollOrder(state: MergeWorldState, orderId: string, now: number): Merg
 function reconcileCharacters(state: MergeWorldState, ids: string[], now: number): MergeWorldState {
   const additions = ids.filter((id): id is MergeCharacterId => KNOWN_CHARACTERS.has(id as MergeCharacterId) && !state.unlockedCharacters.includes(id as MergeCharacterId));
   if (!additions.length) return state;
-  return touch({ ...state, unlockedCharacters: [...state.unlockedCharacters, ...additions] }, now);
+  return touch({
+    ...state,
+    unlockedCharacters: [...state.unlockedCharacters, ...additions],
+    companionDiscovery: {
+      ...state.companionDiscovery,
+      records: [
+        ...state.companionDiscovery.records,
+        ...additions.map((characterId) => ({
+          characterId,
+          source: 'legacy_grandfather' as const,
+          gateId: `legacy:${characterId}`,
+          pathId: null,
+          discoveredAt: now,
+          revealSeenAt: now,
+          permanentFeatureId: null,
+        })),
+      ],
+    },
+  }, now);
 }
 
 function reconcileFriendship(state: MergeWorldState, levels: Partial<Record<MergeCharacterId, number>>, now: number): MergeWorldState {
@@ -1135,7 +1448,7 @@ function ensureGenerator(state: MergeWorldState, generatorId: string, now: numbe
   if (!definition) return state;
   const board = [...state.board];
   const preferred = definition.initialCell;
-  const cell = !board[preferred].locked && !board[preferred].occupant ? preferred : firstEmptyCell(board, preferred);
+  const cell = !board[preferred].locked && !board[preferred].mist && !board[preferred].occupant ? preferred : firstEmptyCell(board, preferred);
   if (cell < 0) return {
     ...state,
     rewardInbox: [...state.rewardInbox, { id: `generator:${generatorId}`, createdAt: state.updatedAt, items: [], source: 'chest' }],
@@ -1249,7 +1562,7 @@ function boardItemCounts(state: MergeWorldState) {
 function firstEmptyCell(board: MergeBoardCell[], offset: number) {
   for (let step = 0; step < board.length; step += 1) {
     const index = (Math.abs(offset) + step) % board.length;
-    if (!board[index].locked && !board[index].occupant) return index;
+    if (!board[index].locked && !board[index].mist && !board[index].occupant) return index;
   }
   return -1;
 }
@@ -1307,7 +1620,7 @@ function normalizeArrivals(value: unknown): MergeWorldArrival[] {
     if (!candidate || typeof candidate !== 'object') return [];
     const arrival = candidate as Partial<MergeWorldArrival>;
     if (typeof arrival.id !== 'string'
-      || (arrival.kind !== 'contextual_parcel' && arrival.kind !== 'memory_arrival' && arrival.kind !== 'goal_chest')
+      || (arrival.kind !== 'contextual_parcel' && arrival.kind !== 'memory_arrival' && arrival.kind !== 'goal_chest' && arrival.kind !== 'discovery_parcel')
       || typeof arrival.dayId !== 'string'
       || typeof arrival.label !== 'string'
       || !MERGE_CHAIN_IDS.includes(arrival.chainId as MergeWorldArrival['chainId'])) return [];
@@ -1327,12 +1640,13 @@ function normalizeArrivals(value: unknown): MergeWorldArrival[] {
       familyId: item.familyId,
       chainId: arrival.chainId as MergeWorldArrival['chainId'],
       characterId: arrival.characterId && KNOWN_CHARACTERS.has(arrival.characterId) ? arrival.characterId : undefined,
-      source: arrival.source === 'journal' || arrival.source === 'companion_story' || arrival.source === 'goal' || arrival.source === 'legacy'
+      source: arrival.source === 'journal' || arrival.source === 'companion_story' || arrival.source === 'goal' || arrival.source === 'legacy' || arrival.source === 'discovery'
         ? arrival.source
         : arrival.kind === 'goal_chest'
           ? 'goal'
           : arrival.id.includes('companion-story-starter') ? 'companion_story' : arrival.kind === 'memory_arrival' ? 'journal' : 'legacy',
       itemDefinitionIds: uniqueStrings(arrival.itemDefinitionIds).filter((id) => MERGE_ITEMS_BY_ID.has(id)),
+      discoveryId: typeof arrival.discoveryId === 'string' ? arrival.discoveryId : undefined,
       memoryRef,
       claimedAt: arrival.claimedAt == null ? null : finite(arrival.claimedAt, 0),
       seenAt: arrival.seenAt == null ? null : finite(arrival.seenAt, 0),
@@ -1418,18 +1732,121 @@ function normalizeCell(value: unknown, fallback: MergeBoardCell): MergeBoardCell
 
 function normalizeDreamMist(value: unknown, legacyLocked: boolean): MergeBoardCell['mist'] {
   if (!value || typeof value !== 'object') return legacyLocked ? { kind: 'dormant' } : null;
-  const mist = value as { kind?: unknown; id?: unknown; definitionId?: unknown; generatorId?: unknown; ownerCharacterId?: unknown };
+  const mist = value as { kind?: unknown; id?: unknown; definitionId?: unknown; generatorId?: unknown; ownerCharacterId?: unknown; discoveryId?: unknown; gateId?: unknown; pathId?: unknown; sequenceIndex?: unknown; boundDefinitionId?: unknown; active?: unknown; candidateIds?: unknown; recommendedCharacterId?: unknown };
   if (mist.kind === 'dormant') return { kind: 'dormant' };
   if (mist.kind === 'echo' && typeof mist.id === 'string' && typeof mist.definitionId === 'string' && MERGE_ITEMS_BY_ID.has(mist.definitionId)) {
     const ownerCharacterId = typeof mist.ownerCharacterId === 'string' && KNOWN_CHARACTERS.has(mist.ownerCharacterId as MergeCharacterId)
       ? mist.ownerCharacterId as MergeCharacterId
       : null;
-    const generatorId = typeof mist.generatorId === 'string' && MERGE_GENERATORS_BY_ID.has(mist.generatorId)
-      ? mist.generatorId
-      : undefined;
-    if (ownerCharacterId || generatorId) return { kind: 'echo', id: mist.id, definitionId: mist.definitionId, ownerCharacterId, ...(generatorId ? { generatorId } : {}) };
+    if (ownerCharacterId) return { kind: 'echo', id: mist.id, definitionId: mist.definitionId, ownerCharacterId };
+  }
+  if (mist.kind === 'dreambound_item' && typeof mist.discoveryId === 'string' && COMPANION_DISCOVERIES_BY_ID.has(mist.discoveryId)) {
+    const definition = COMPANION_DISCOVERIES_BY_ID.get(mist.discoveryId)!;
+    const sequenceIndex = Math.max(0, Math.min(definition.stages.length - 1, Math.floor(finite(mist.sequenceIndex, 0))));
+    return {
+      kind: 'dreambound_item',
+      discoveryId: definition.id,
+      gateId: typeof mist.gateId === 'string' ? mist.gateId : definition.gateId,
+      pathId: definition.pathId,
+      sequenceIndex,
+      boundDefinitionId: definition.stages[sequenceIndex].boundDefinitionId,
+      active: Boolean(mist.active),
+    };
+  }
+  if (mist.kind === 'discovery_fork' && typeof mist.gateId === 'string' && Array.isArray(mist.candidateIds)) {
+    const candidateIds = uniqueStrings(mist.candidateIds).filter((id): id is MergeCharacterId => KNOWN_CHARACTERS.has(id as MergeCharacterId)).slice(0, 3);
+    const recommendedCharacterId = typeof mist.recommendedCharacterId === 'string' && candidateIds.includes(mist.recommendedCharacterId as MergeCharacterId)
+      ? mist.recommendedCharacterId as MergeCharacterId
+      : null;
+    if (candidateIds.length) return { kind: 'discovery_fork', gateId: mist.gateId, candidateIds, recommendedCharacterId };
   }
   return legacyLocked ? { kind: 'dormant' } : null;
+}
+
+function normalizeCompanionDiscovery(
+  value: unknown,
+  legacyUnlockedCharacters: unknown,
+  rawVersion: unknown,
+  now: number,
+): MergeWorldState['companionDiscovery'] {
+  const candidate = value && typeof value === 'object' ? value as Partial<MergeWorldState['companionDiscovery']> : null;
+  const legacyCharacters = uniqueStrings(legacyUnlockedCharacters).filter((id): id is MergeCharacterId => KNOWN_CHARACTERS.has(id as MergeCharacterId));
+  const records = Array.isArray(candidate?.records)
+    ? candidate.records.flatMap((record): MergeWorldState['companionDiscovery']['records'] => {
+        if (!record || typeof record !== 'object' || !KNOWN_CHARACTERS.has(record.characterId)) return [];
+        const source = record.source === 'ftue_hatch' || record.source === 'board_discovery' || record.source === 'legacy_grandfather'
+          ? record.source
+          : 'legacy_grandfather';
+        return [{
+          characterId: record.characterId,
+          source,
+          gateId: typeof record.gateId === 'string' ? record.gateId : `legacy:${record.characterId}`,
+          pathId: typeof record.pathId === 'string' ? record.pathId : null,
+          discoveredAt: finite(record.discoveredAt, now),
+          revealSeenAt: record.revealSeenAt == null ? null : finite(record.revealSeenAt, now),
+          permanentFeatureId: typeof record.permanentFeatureId === 'string' ? record.permanentFeatureId : null,
+        }];
+      })
+    : legacyCharacters.map((characterId) => ({
+        characterId,
+        source: 'legacy_grandfather' as const,
+        gateId: `legacy:${characterId}`,
+        pathId: null,
+        discoveredAt: now,
+        revealSeenAt: now,
+        permanentFeatureId: null,
+      }));
+  const byCharacter = new Map(records.map((record) => [record.characterId, record]));
+  if (rawVersion !== 12) {
+    for (const characterId of legacyCharacters) if (!byCharacter.has(characterId)) byCharacter.set(characterId, {
+      characterId, source: 'legacy_grandfather', gateId: `legacy:${characterId}`, pathId: null,
+      discoveredAt: now, revealSeenAt: now, permanentFeatureId: null,
+    });
+  }
+  const rawActive = candidate?.active && typeof candidate.active === 'object'
+    && typeof candidate.active.discoveryId === 'string'
+    && (COMPANION_DISCOVERIES_BY_ID.has(candidate.active.discoveryId) || candidate.active.discoveryId.startsWith('fork:'))
+      ? candidate.active
+      : null;
+  const activeDefinition = rawActive && COMPANION_DISCOVERIES_BY_ID.get(rawActive.discoveryId);
+  const active = rawActive ? {
+    ...rawActive,
+    pathCells: Array.isArray(rawActive.pathCells)
+      ? rawActive.pathCells.filter(validCell)
+      : activeDefinition ? [...activeDefinition.pathCells] : [],
+  } : null;
+  return {
+    records: [...byCharacter.values()],
+    openedGateIds: uniqueStrings(candidate?.openedGateIds),
+    completedGateIds: uniqueStrings(candidate?.completedGateIds),
+    queuedGateIds: uniqueStrings(candidate?.queuedGateIds),
+    active,
+    lastStartedDayId: typeof candidate?.lastStartedDayId === 'string' ? candidate.lastStartedDayId : null,
+  };
+}
+
+function restoreActiveDreamboundDiscovery(state: MergeWorldState, rawVersion: unknown, now: number): MergeWorldState {
+  const active = state.companionDiscovery.active;
+  if (!active || active.discoveryId.startsWith('fork:')) return state;
+  const definition = COMPANION_DISCOVERIES_BY_ID.get(active.discoveryId);
+  if (!definition) return state;
+  const hasPath = state.board.some((cell) => cell.mist?.kind === 'dreambound_item' && cell.mist.discoveryId === definition.id);
+  if (hasPath) return state;
+  const board = [...state.board];
+  installDreamboundPath(board, definition, active.gateId);
+  const arrival = discoveryArrival(definition, now);
+  return {
+    ...state,
+    board,
+    arrivals: state.arrivals.some((candidate) => candidate.id === arrival.id) ? state.arrivals : [arrival, ...state.arrivals],
+    companionDiscovery: {
+      ...state.companionDiscovery,
+      active: {
+        ...active, anchorCell: definition.pathCells.at(-1)!, pathCells: [...definition.pathCells],
+        stage: rawVersion === 12 ? active.stage : 0,
+      },
+    },
+  };
 }
 
 function normalizeBoardAwakeningReceipts(value: unknown): MergeWorldState['boardAwakeningReceipts'] {

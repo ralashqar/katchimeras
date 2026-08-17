@@ -1,6 +1,7 @@
 import { TODAY_GROWTH_REWARDS } from '@/utils/today-growth';
 
 import type { FtueActionDefinition, FtueScriptDefinition } from './ftue-types';
+import { STEPPLING_DISCOVERY_ID } from '@/constants/companion-discovery-catalog';
 
 const privateChoice = { id: 'private', label: 'Prefer not to say', icon: 'lock.fill', private: true } as const;
 // The Discovery Egg is an authored three-beat sequence. Each answer must move
@@ -27,7 +28,7 @@ const openingActions: readonly FtueActionDefinition[] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 11,
+  version: 13,
   entryStepId: 'egg.opening',
   terminalStepId: 'complete',
   steps: [
@@ -317,8 +318,71 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'companion.chapter_zero_return', surface: 'companion',
       guide: { eyebrow: 'A little place to begin', title: 'Mossprout has something to show you.', body: 'Finish your first chapter together.' },
-      actions: [{ id: 'companion.complete_chapter_zero_return', title: 'Begin the next chapter', description: 'See Mossprout’s next request.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'complete', backendEvent: true }],
+      actions: [{ id: 'companion.complete_chapter_zero_return', title: 'Follow the tracks', description: 'See what moved in the Dream Mist.', icon: 'figure.walk', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'discovery.steppling.parcel', backendEvent: true }],
       blockingBeat: 'chapter_complete',
+    },
+    {
+      id: 'discovery.steppling.parcel', surface: 'merge',
+      guide: { eyebrow: 'A delivery from the Mist', title: 'Open the Trail-Worn Parcel.', body: 'Something inside matches the object beneath the clouds.' },
+      actions: [{ id: 'discovery.steppling.parcel', title: 'Open the parcel', description: 'Place its item on the board.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'merge_parcel_claimed', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'parcel_tap', target: { kind: 'tray_parcel', arrivalId: `arrival:discovery:${STEPPLING_DISCOVERY_ID}` } } },
+      cue: { kind: 'tap', target: { kind: 'tray_parcel', arrivalId: `arrival:discovery:${STEPPLING_DISCOVERY_ID}` } },
+      spotlight: { targets: [{ kind: 'tray_parcel', arrivalId: `arrival:discovery:${STEPPLING_DISCOVERY_ID}` }], padding: 7, radius: 14, dimOpacity: 0.64 },
+      edges: [{ event: { type: 'arrival_claimed', arrivalId: `arrival:discovery:${STEPPLING_DISCOVERY_ID}` }, commitActionId: 'discovery.steppling.parcel', nextStepId: 'discovery.steppling.sock' }],
+    },
+    {
+      id: 'discovery.steppling.sock', surface: 'merge',
+      guide: { eyebrow: 'A half-finished trail', title: 'The Sock has a match in the Mist.', body: 'Complete the merge that was already waiting here.' },
+      actions: [{ id: 'discovery.steppling.sock', title: 'Make a Shoe', description: 'Drag the Sock onto the Dreambound Sock.', icon: 'figure.walk', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from: { kind: 'board_items', definitionId: 'adventure:trail:1', occurrence: 0 }, to: { kind: 'board_companion_discovery', discoveryId: STEPPLING_DISCOVERY_ID } } },
+      cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'adventure:trail:1', occurrence: 0 }, to: { kind: 'board_companion_discovery', discoveryId: STEPPLING_DISCOVERY_ID } },
+      spotlight: { targets: [{ kind: 'board_items', definitionId: 'adventure:trail:1', occurrence: 0 }, { kind: 'board_companion_discovery', discoveryId: STEPPLING_DISCOVERY_ID }], grouping: 'bounding_rect', padding: 4, radius: 12, dimOpacity: 0.62 },
+      edges: [{ event: { type: 'companion_discovery_advanced', discoveryId: STEPPLING_DISCOVERY_ID, stage: 1 }, commitActionId: 'discovery.steppling.sock', nextStepId: 'discovery.steppling.shoe' }],
+    },
+    {
+      id: 'discovery.steppling.shoe', surface: 'merge',
+      guide: { eyebrow: 'The tracks continue', title: 'The Shoe matches the next shadow.', body: 'Carry the result forward.' },
+      actions: [{ id: 'discovery.steppling.shoe', title: 'Make a Boot', description: 'Drag the Shoe onto the Dreambound Shoe.', icon: 'figure.walk', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from: { kind: 'board_items', definitionId: 'adventure:trail:2', occurrence: 0 }, to: { kind: 'board_companion_discovery', discoveryId: STEPPLING_DISCOVERY_ID } } },
+      cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'adventure:trail:2', occurrence: 0 }, to: { kind: 'board_companion_discovery', discoveryId: STEPPLING_DISCOVERY_ID } },
+      spotlight: { targets: [{ kind: 'board_items', definitionId: 'adventure:trail:2', occurrence: 0 }, { kind: 'board_companion_discovery', discoveryId: STEPPLING_DISCOVERY_ID }], grouping: 'bounding_rect', padding: 4, radius: 12, dimOpacity: 0.62 },
+      edges: [{ event: { type: 'companion_discovery_advanced', discoveryId: STEPPLING_DISCOVERY_ID, stage: 2 }, commitActionId: 'discovery.steppling.shoe', nextStepId: 'discovery.steppling.boot' }],
+    },
+    {
+      id: 'discovery.steppling.boot', surface: 'merge',
+      guide: { eyebrow: 'Someone is close', title: 'One last match is hidden ahead.', body: 'Bring the Boot to the final Dreambound object.' },
+      actions: [{ id: 'discovery.steppling.boot', title: 'Open the trail', description: 'Drag the Boot onto the Dreambound Boot.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from: { kind: 'board_items', definitionId: 'adventure:trail:3', occurrence: 0 }, to: { kind: 'board_companion_discovery', discoveryId: STEPPLING_DISCOVERY_ID } } },
+      cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'adventure:trail:3', occurrence: 0 }, to: { kind: 'board_companion_discovery', discoveryId: STEPPLING_DISCOVERY_ID } },
+      spotlight: { targets: [{ kind: 'board_items', definitionId: 'adventure:trail:3', occurrence: 0 }, { kind: 'board_companion_discovery', discoveryId: STEPPLING_DISCOVERY_ID }], grouping: 'bounding_rect', padding: 4, radius: 12, dimOpacity: 0.62 },
+      edges: [{ event: { type: 'companion_discovery_advanced', discoveryId: STEPPLING_DISCOVERY_ID, stage: 3, completedCharacterId: 'steppling' }, commitActionId: 'discovery.steppling.boot', nextStepId: 'discovery.steppling.spawn' }],
+    },
+    {
+      id: 'discovery.steppling.spawn', surface: 'merge',
+      guide: { eyebrow: 'Steppling found', title: 'Try the Journey Locker.', body: 'Tap it twice to make trail supplies.' },
+      actions: [{ id: 'discovery.steppling.spawn', title: 'Make two Socks', description: 'Tap the Journey Locker twice.', icon: 'figure.walk', presentation: 'observed_game_action', handlerId: 'merge_generator_spawned', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'generator_tap', target: { kind: 'board_generator', generatorId: 'journey-locker' } } },
+      cue: { kind: 'tap', target: { kind: 'board_generator', generatorId: 'journey-locker' } },
+      spotlight: { targets: [{ kind: 'board_generator', generatorId: 'journey-locker' }], padding: 5, radius: 12, dimOpacity: 0.62 },
+      edges: [{ event: { type: 'item_spawned', generatorId: 'journey-locker', definitionId: 'adventure:trail:1' }, requiredCount: 2, commitActionId: 'discovery.steppling.spawn', nextStepId: 'discovery.steppling.merge' }],
+    },
+    {
+      id: 'discovery.steppling.merge', surface: 'merge',
+      guide: { eyebrow: 'First trail gear', title: 'Merge the two Socks.', body: 'Steppling needs something sturdier.' },
+      actions: [{ id: 'discovery.steppling.merge', title: 'Make a Shoe', description: 'Drag the Socks together.', icon: 'figure.walk', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from: { kind: 'board_items', definitionId: 'adventure:trail:1', occurrence: 0 }, to: { kind: 'board_items', definitionId: 'adventure:trail:1', occurrence: 1 } } },
+      cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'adventure:trail:1', occurrence: 0 }, to: { kind: 'board_items', definitionId: 'adventure:trail:1', occurrence: 1 } },
+      spotlight: { targets: [{ kind: 'board_items', definitionId: 'adventure:trail:1', occurrence: 0 }, { kind: 'board_items', definitionId: 'adventure:trail:1', occurrence: 1 }], grouping: 'bounding_rect', padding: 4, radius: 12, dimOpacity: 0.62 },
+      edges: [{ event: { type: 'merge_completed', resultDefinitionId: 'adventure:trail:2' }, commitActionId: 'discovery.steppling.merge', nextStepId: 'discovery.steppling.serve' }],
+    },
+    {
+      id: 'discovery.steppling.serve', surface: 'merge',
+      guide: { eyebrow: 'A new companion', title: 'Help Steppling set out.', body: 'Serve the Shoe to finish your first discovery.' },
+      actions: [{ id: 'discovery.steppling.serve', title: 'Serve the Shoe', description: 'Complete Steppling’s first request.', icon: 'figure.walk', presentation: 'observed_game_action', handlerId: 'merge_order_served', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'order_serve', target: { kind: 'order_serve', orderId: 'steppling:discovery:first-trail' } } },
+      cue: { kind: 'tap', target: { kind: 'order_serve', orderId: 'steppling:discovery:first-trail' } },
+      spotlight: { targets: [{ kind: 'order_requirement_item', orderId: 'steppling:discovery:first-trail', requirementIndex: 0 }, { kind: 'order_serve', orderId: 'steppling:discovery:first-trail' }], grouping: 'individual', padding: 7, radius: 14, dimOpacity: 0.62 },
+      edges: [{ event: { type: 'order_served', orderId: 'steppling:discovery:first-trail' }, commitActionId: 'discovery.steppling.serve', nextStepId: 'complete' }],
     },
     { id: 'complete', surface: 'today', guide: { eyebrow: '', title: '', body: '' }, actions: [] },
   ],

@@ -66,7 +66,12 @@ export function MergeWorldRouteScreen() {
       loadKatchimeraWardrobe(),
     );
     return {
-      characterIds: buildOwnedGameCompanions(kingdom.creatures, bond).map((companion) => companion.familyId),
+      // Companion ownership is canonical in Merge World v11. Historical day
+      // creatures are Wisps/legacy memories and must not unlock new board
+      // companions. The dev availability switch remains an explicit override.
+      characterIds: allKatchimerasAvailable
+        ? buildOwnedGameCompanions(kingdom.creatures, bond).map((companion) => companion.familyId)
+        : [],
       activityDays,
       quests,
     };

@@ -14,6 +14,7 @@ export type FtueHandlerId =
   | 'companion_conversation'
   | 'companion_order_preview'
   | 'merge_item_created'
+  | 'merge_parcel_claimed'
   | 'merge_generator_spawned'
   | 'merge_order_served'
   | 'merge_chat_note_opened'
@@ -52,10 +53,12 @@ export type FtueTarget =
   | { kind: 'board_items'; definitionId: string; occurrence: number }
   | { kind: 'board_generator'; generatorId: string }
   | { kind: 'board_dream_echo'; echoId: string }
+  | { kind: 'board_companion_discovery'; discoveryId: string }
   | { kind: 'order_requirement_item'; orderId: string; requirementIndex: number; occurrence?: number }
   | { kind: 'board_cell'; cell: number }
   | { kind: 'order_serve'; orderId: string }
-  | { kind: 'tray_chat_note'; noteId: string };
+  | { kind: 'tray_chat_note'; noteId: string }
+  | { kind: 'tray_parcel'; arrivalId: string };
 
 export type FtueCueDefinition =
   | { kind: 'drag'; from: FtueTarget; to: FtueTarget }
@@ -74,7 +77,8 @@ export type FtueInteractionPolicy =
   | { mode: 'exclusive'; allowed: { kind: 'board_drag'; from: FtueTarget; to: FtueTarget } }
   | { mode: 'exclusive'; allowed: { kind: 'generator_tap'; target: FtueTarget } }
   | { mode: 'exclusive'; allowed: { kind: 'order_serve'; target: FtueTarget } }
-  | { mode: 'exclusive'; allowed: { kind: 'chat_note_tap'; target: FtueTarget } };
+  | { mode: 'exclusive'; allowed: { kind: 'chat_note_tap'; target: FtueTarget } }
+  | { mode: 'exclusive'; allowed: { kind: 'parcel_tap'; target: FtueTarget } };
 
 export type FtueEvent =
   | {
@@ -95,7 +99,9 @@ export type FtueEvent =
       revision: number;
     }
   | { type: 'order_served'; orderId: string; revision: number }
-  | { type: 'chat_note_opened'; noteId: string; revision: number };
+  | { type: 'chat_note_opened'; noteId: string; revision: number }
+  | { type: 'arrival_claimed'; arrivalId: string; revision: number }
+  | { type: 'companion_discovery_advanced'; discoveryId: string; stage: number; completedCharacterId?: string; revision: number };
 
 export type FtueEventMatcher =
   | {
@@ -107,7 +113,9 @@ export type FtueEventMatcher =
   | { type: 'dream_echo_cleared'; echoId?: string; resultDefinitionId?: string }
   | { type: 'item_spawned'; generatorId?: string; definitionId?: string }
   | { type: 'order_served'; orderId?: string }
-  | { type: 'chat_note_opened'; noteId?: string };
+  | { type: 'chat_note_opened'; noteId?: string }
+  | { type: 'arrival_claimed'; arrivalId?: string }
+  | { type: 'companion_discovery_advanced'; discoveryId?: string; stage?: number; completedCharacterId?: string };
 
 export type FtueGraphEdge = {
   event: FtueEventMatcher;

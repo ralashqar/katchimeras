@@ -562,10 +562,12 @@ async function resolveTargetFrame(
   railTargetRefs: Map<string, View>,
   screen: Frame,
 ): Promise<Frame | null> {
-  if (target.kind === 'order_serve' || target.kind === 'tray_chat_note') {
+  if (target.kind === 'order_serve' || target.kind === 'tray_chat_note' || target.kind === 'tray_parcel') {
     const targetKey = target.kind === 'order_serve'
       ? `order-serve:${target.orderId}`
-      : `chat-note:${target.noteId}`;
+      : target.kind === 'tray_chat_note'
+        ? `chat-note:${target.noteId}`
+        : `tray-parcel:${target.arrivalId}`;
     const measured = await measureView(railTargetRefs.get(targetKey) ?? null);
     return measured ? {
       height: measured.height,
