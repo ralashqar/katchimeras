@@ -58,7 +58,8 @@ import { WispResonanceReveal } from '@/components/katchadeck/wisps/wisp-resonanc
 import { SceneDiscoveryReveal } from '@/components/katchadeck/scenes/scene-discovery-reveal';
 import { TodayCategoryRing, type TodayCategoryRingItem } from '@/components/katchadeck/home/today-category-ring';
 import { TodayBottomDock } from '@/components/katchadeck/home/today-bottom-dock';
-import { CardDeckCarousel } from '@/components/katchadeck/collection/card-deck-carousel';
+import { DailyCardClaimSplash } from '@/components/katchadeck/cards/daily-card-claim-splash';
+import { FtueGuideCopy } from '@/components/katchadeck/onboarding/ftue-guide-copy';
 import {
   TodayNurtureExperience,
 } from '@/components/katchadeck/home/today-nurture-experience';
@@ -502,8 +503,8 @@ function HomeScreen() {
     if (mood === 'Drained' || mood === 'Low') return 'Sounds like today took something out of you. We can start small.';
     return mood ? `You felt ${mood.toLowerCase()} today. Thank you for letting me know.` : 'I felt those little pieces of your day reach me.';
   }, [allDays]);
-  const { equippedWispId: activeWispId, syncFromDays: syncWispsFromDays, pendingDiscoveryId, dismissDiscovery, equip: equipWisp, pendingResonance, dismissResonance, isOwned: isWispOwned, resonance: wispResonance } = useWisps();
-  const { equippedSceneId, syncFromDays: syncScenesFromDays, pendingDiscoveryId: pendingSceneDiscoveryId, dismissDiscovery: dismissSceneDiscovery, equip: equipScene, isOwned: isSceneOwned } = useScenes();
+  const { equippedWispId: activeWispId, syncFromDays: syncWispsFromDays, pendingDiscoveryId, dismissDiscovery, equip: equipWisp, pendingResonance, dismissResonance } = useWisps();
+  const { equippedSceneId, syncFromDays: syncScenesFromDays, pendingDiscoveryId: pendingSceneDiscoveryId, dismissDiscovery: dismissSceneDiscovery, equip: equipScene } = useScenes();
   const collectibleDays = useMemo(() => {
     const byId = new Map(allDays.map((day) => [day.id, day]));
     for (const day of timelineDays) {
@@ -511,22 +512,16 @@ function HomeScreen() {
     }
     return [...byId.values()];
   }, [allDays, timelineDays]);
-  const hatchDeckCards = useMemo(() => {
-    const lead = hatchPresentation.committedDay?.card ?? null;
-    if (!lead) return [];
-    return [
-      ...collectibleDays
-      .filter((day) => day.card && day.dailyHatch?.claimedAt && day.card.id !== lead.id)
-      .map((day) => day.card!),
-      lead,
-    ].sort((left, right) => left.isoDate.localeCompare(right.isoDate));
-  }, [collectibleDays, hatchPresentation.committedDay]);
   const hatchLeadCard = hatchPresentation.committedDay?.card ?? null;
   const hatchWispId = hatchPresentation.committedDay?.dailyHatch?.primaryWispId ?? null;
   const hatchSceneId = hatchPresentation.committedDay?.dailyHatch?.sceneVariantId ?? null;
-  const hatchWispWasOwned = hatchWispId ? isWispOwned(hatchWispId) : false;
-  const hatchResonanceBeforeClaim = hatchWispId ? wispResonance(hatchWispId) : 0;
-  const hatchSceneWasOwned = hatchSceneId ? isSceneOwned(hatchSceneId) : false;
+  const hatchCardDay = useMemo(() => {
+    const committed = hatchPresentation.committedDay;
+    if (!committed) return null;
+    const hydrated = collectibleDays.find((day) => day.id === committed.id)
+      ?? hatchPresentation.daySnapshot;
+    return hydrated ? { ...hydrated, ...committed } : null;
+  }, [collectibleDays, hatchPresentation.committedDay, hatchPresentation.daySnapshot]);
   useEffect(() => { syncWispsFromDays(collectibleDays); }, [collectibleDays, syncWispsFromDays]);
   useEffect(() => { syncScenesFromDays(collectibleDays); }, [collectibleDays, syncScenesFromDays]);
   const isDay = selectedDay?.kind === 'day';
@@ -2291,25 +2286,34 @@ function HomeScreen() {
   const regularCameraPinchTarget = isFormingToday && ftueRun?.status !== 'active' && nurtureGrowth
     ? regularTodayCameraPinchTarget(
         nurtureGrowth.qualifyingActionCount,
-        todayScene.homeEnvironment.motion.explorationMaxPinchScale,
+        todayScene.homeEnvironment.motion.maxPinchScale,
       )
     : null;
   const scriptedCameraPinchTarget = ftueCameraPinchTarget ?? regularCameraPinchTarget;
+  const regularCameraStartsAtTarget = regularCameraPinchTarget != null
+    && nurtureGrowth?.qualifyingActionCount === 0;
+  const scriptedCameraOwnsFullZoom = ftueCameraPinchTarget != null
+    || (regularCameraPinchTarget != null && regularCameraPinchTarget > 1);
   const { environmentGesture, environmentMotion } = useTodayEnvironmentMotion({
     allowGestureAtScriptedRest: ftueCameraPinchTarget == null && regularCameraPinchTarget === 1,
-    deferScriptedChangesWhileDisabled: ftueCameraPinchTarget == null && regularCameraPinchTarget != null,
+    deferScriptedChangesWhileDisabled: ftueCameraPinchTarget == null
+      && regularCameraPinchTarget != null
+      && !dailyNewDayIntro,
     enabled: !flowBusy,
     // Pinch, hover and the detached high-resolution Egg all read these shared
     // values. Freeze them together so Reveal begins on the exact current frame.
     frozen: dailyHatchActive || discoveryHatchInPlace,
     hoverEnabled: !explorationPresentationActive,
-    maxPinchScale: explorationPresentationActive
+    maxPinchScale: scriptedCameraOwnsFullZoom
+      ? todayScene.homeEnvironment.motion.maxPinchScale
+      : explorationPresentationActive
       ? todayScene.homeEnvironment.motion.explorationMaxPinchScale
       : todayScene.homeEnvironment.motion.maxPinchScale,
-    pinchSoftLimitRange: explorationPresentationActive
+    pinchSoftLimitRange: !scriptedCameraOwnsFullZoom && explorationPresentationActive
       ? todayScene.homeEnvironment.motion.explorationPinchSoftLimitRange
       : 0,
     scriptedPinchDurationMs: ftueHomeCameraDuration(ftueRun?.stepId),
+    scriptedPinchStartScale: regularCameraStartsAtTarget ? regularCameraPinchTarget : null,
     scriptedPinchScale: scriptedCameraPinchTarget,
   });
   const pageGesture = useMemo(
@@ -3326,47 +3330,26 @@ function HomeScreen() {
       />
       {hatchPresentation.policy === 'daily'
         && ['assembling_deck', 'awaiting_claim', 'claiming'].includes(hatchPresentation.phase)
-        && hatchDeckCards.length > 0 ? (
-        <Animated.View entering={FadeIn.duration(reduceMotion ? 80 : 420)} style={styles.hatchDeckOverlay}>
-          <View style={styles.hatchDeckTitle}>
-            <ThemedText selectable style={styles.hatchDeckEyebrow} lightColor="#F2D48A" darkColor="#F2D48A">
-              {hatchWispWasOwned ? `WISP RETURNS · RESONANCE ${hatchResonanceBeforeClaim + 1}` : 'NEW WISP'}
-            </ThemedText>
-            <ThemedText selectable type="display" style={styles.hatchDeckName} lightColor="#FFF6DE" darkColor="#FFF6DE">
-              {hatchLeadCard?.creatureName}
-            </ThemedText>
-          </View>
-          {!hatchSceneWasOwned ? (
-            <ThemedText selectable style={styles.hatchSceneUnlock} lightColor="#D9E7C0" darkColor="#D9E7C0">NEW SCENE · ADDED ON CLAIM</ThemedText>
-          ) : null}
-          <CardDeckCarousel
-            cards={hatchDeckCards}
-            initialCardId={hatchLeadCard?.id}
-            interactive
-            onOpenCard={() => {}}
-            showCaption={false}
-          />
-          {hatchPresentation.phase === 'awaiting_claim' ? (
-            <Animated.View entering={presenceEnter(120)} style={styles.hatchClaimCta}>
-              <KatchaButton
-                fullWidth
-                glow
-                icon="sparkles"
-                label="Claim Day Card"
-                onPress={() => void handleClaim()}
-              />
-            </Animated.View>
-          ) : hatchPresentation.phase === 'claiming' ? (
-            <ActivityIndicator color="#F2D48A" size="large" />
-          ) : null}
-        </Animated.View>
+        && hatchLeadCard
+        && hatchCardDay ? (
+        <DailyCardClaimSplash
+          card={hatchLeadCard}
+          claimAvailable={hatchPresentation.phase === 'awaiting_claim'}
+          claiming={hatchPresentation.phase === 'claiming'}
+          day={hatchCardDay}
+          onClaim={() => void handleClaim()}
+        />
       ) : null}
       {dailyNewDayIntro ? (
-        <Animated.View entering={FadeIn.duration(reduceMotion ? 80 : 360)} exiting={FadeOut.duration(300)} pointerEvents="none" style={[styles.newDayHero, { top: insets.top + 126 }]}>
-          <ThemedText selectable style={styles.newDayEyebrow} lightColor="#F2D48A" darkColor="#F2D48A">NEW DAY</ThemedText>
-          <ThemedText selectable type="display" style={styles.newDayDate} lightColor="#FFF6DE" darkColor="#FFF6DE">
-            {formatNewDayDate(formingDay?.isoDate ?? selectedDay?.isoDate)}
-          </ThemedText>
+        <Animated.View entering={FadeIn.duration(reduceMotion ? 80 : 360)} exiting={FadeOut.duration(300)} pointerEvents="none" style={[styles.newDayHero, { top: insets.top + 22 }]}>
+          <FtueGuideCopy
+            guide={{
+              body: '',
+              eyebrow: 'New day',
+              title: formatNewDayDate(formingDay?.isoDate ?? selectedDay?.isoDate),
+            }}
+            hero
+          />
         </Animated.View>
       ) : null}
       {pendingDiscoveryId && !isHatching ? (
@@ -3465,22 +3448,7 @@ const styles = StyleSheet.create({
   explorationAtmosphere: {
     zIndex: 55,
   },
-  hatchDeckOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    backgroundColor: 'rgba(15,16,24,0.78)',
-    justifyContent: 'center',
-    paddingBottom: 24,
-    zIndex: 180,
-  },
-  hatchDeckTitle: { alignItems: 'center', gap: 2, paddingBottom: 10 },
-  hatchDeckEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.3 },
-  hatchDeckName: { fontSize: 28, lineHeight: 34 },
-  hatchSceneUnlock: { fontSize: 11, fontWeight: '900', letterSpacing: 1, paddingBottom: 4 },
-  hatchClaimCta: { marginTop: -8, paddingHorizontal: 24, width: '100%' },
   newDayHero: { alignItems: 'center', left: 24, position: 'absolute', right: 24, zIndex: 190 },
-  newDayEyebrow: { fontSize: 12, fontWeight: '900', letterSpacing: 1.8 },
-  newDayDate: { fontSize: 27, lineHeight: 34, textAlign: 'center' },
   heroStage: {
     alignItems: 'center',
     height: TODAY_KINGDOM_STAGE_HEIGHT,

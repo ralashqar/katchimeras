@@ -613,11 +613,10 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
       )
     : null;
   const discoveryWispSize = Math.min(210, eggFrame.height * 0.92);
-  // The Wisp begins at the Egg and settles above it, leaving the persistent Egg
-  // readable instead of stacking two full-size subjects in the same frame.
-  const discoveryWispTop = discoveryHatch?.policy === 'daily'
-    ? eggFrame.top - discoveryWispSize * 0.34
-    : eggFrame.top + (eggFrame.height - discoveryWispSize) / 2;
+  // The daily Egg scales away as the Wisp appears, so keep both subjects on the
+  // same visual anchor. This makes the Wisp emerge from the Egg instead of
+  // materialising above it.
+  const discoveryWispTop = eggFrame.top + (eggFrame.height - discoveryWispSize) / 2;
   const discoveryCreatureStyle = useAnimatedStyle(() => ({
     opacity: discoveryCreatureEntry.value,
     transform: [

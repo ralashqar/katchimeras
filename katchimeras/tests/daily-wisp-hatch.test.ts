@@ -125,3 +125,39 @@ test('a revealed hatch remains sealed until an idempotent claim', () => {
   const claimedAgain = claimDailyHatchForDay(claimed, revealed.id, new Date('2026-08-16T09:07:00.000Z'));
   assert.equal(claimedAgain.archivedDays[0].dailyHatch?.claimedAt, '2026-08-16T09:06:00.000Z');
 });
+
+test('claiming a recovery replay also starts a completely fresh Today Egg', () => {
+  const sealed = resolveRolledPastDay(
+    contextualDay('2026-08-14'),
+    profile,
+    new Date('2026-08-16T09:00:00'),
+  );
+  const revealed = {
+    ...sealed,
+    dailyHatch: sealed.dailyHatch
+      ? { ...sealed.dailyHatch, revealedAt: '2026-08-16T09:05:00.000Z' }
+      : null,
+  };
+  const today = createEmptyStoredDay(new Date('2026-08-16T12:00:00'), profile);
+  today.growth = {
+    schemaVersion: 1,
+    events: [{
+      amount: 65,
+      awardedAt: '2026-08-16T08:00:00.000Z',
+      id: 'growth:journal:before-recovery-claim',
+      source: 'journal',
+      sourceId: 'before-recovery-claim',
+    }],
+    careActions: [],
+  };
+  const state = { version: 22, archivedDays: [revealed], today } as StoredHomeState;
+
+  const claimed = claimDailyHatchForDay(state, revealed.id, new Date('2026-08-16T09:06:00.000Z'));
+  const summary = todayGrowthSummary(claimed.today, 0, new Date('2026-08-16T09:06:00.000Z'));
+
+  assert.equal(claimed.today.growth?.cycleStartedAt, '2026-08-16T09:06:00.000Z');
+  assert.equal(summary.activeEnergy, 0);
+  assert.equal(summary.energyRatio, 0);
+  assert.equal(summary.stage, 0);
+  assert.equal(summary.contextState, 'fresh');
+});

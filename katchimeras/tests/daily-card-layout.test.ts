@@ -31,6 +31,12 @@ test('detail cards retain the frame ratio at their maximum width', () => {
   assert.equal(size.width / size.height, FULL_CARD_ASPECT_RATIO);
 });
 
+test('full reveal cards shrink uniformly to the available splash height', () => {
+  const size = resolveDetailDailyCardSize(430, 500);
+  assert.ok(Math.abs(size.height - 500) < 0.001);
+  assert.equal(size.width / size.height, FULL_CARD_ASPECT_RATIO);
+});
+
 test('Today card is shorter than the detail card at the same width', () => {
   const compact = resolveCompactDailyCardSize(364, 1000);
   const detail = resolveDetailDailyCardSize(compact.width + 32);

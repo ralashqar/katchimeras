@@ -53,9 +53,12 @@ export function useTodayEnvironmentMotion({
   const isFocused = useIsFocused();
   const reduceMotion = useReducedMotion();
   const hoverY = useSharedValue(0);
-  const pinchScale = useSharedValue(1);
-  const pinchStartScale = useSharedValue(1);
   const motion = todayScene.homeEnvironment.motion;
+  // An explicitly authored starting scale must exist on the very first native
+  // frame. Applying it only from an effect briefly exposes the default camera
+  // before a fresh Egg snaps or animates into its close-up.
+  const pinchScale = useSharedValue(scriptedPinchStartScale ?? 1);
+  const pinchStartScale = useSharedValue(scriptedPinchStartScale ?? 1);
   const resolvedMaxPinchScale = Math.max(
     1,
     Math.min(maxPinchScale ?? motion.maxPinchScale, motion.maxPinchScale),
@@ -262,10 +265,12 @@ export function TodayEnvironmentMotionLayer({
 /** Applies the shared pinch to a full-screen environment plane. Its vertical
  * pivot matches the resident's global centre while Today chrome stays fixed. */
 export function TodayEnvironmentViewportMotionLayer({
+  additionalScale,
   children,
   focusY,
   viewportHeight,
 }: {
+  additionalScale?: SharedValue<number>;
   children: ReactNode;
   focusY: number;
   viewportHeight: number;
@@ -273,14 +278,14 @@ export function TodayEnvironmentViewportMotionLayer({
   const motion = use(MotionContext);
   const pivotOffsetY = focusY - viewportHeight / 2;
   const anchorStyle = useAnimatedStyle(() => {
-    const scale = motion?.pinchScale.value ?? 1;
+    const scale = (motion?.pinchScale.value ?? 1) * (additionalScale?.value ?? 1);
     return {
       transform: [{ translateY: (1 - scale) * pivotOffsetY }],
     };
-  }, [pivotOffsetY]);
+  }, [additionalScale, pivotOffsetY]);
   const scaleStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: motion?.pinchScale.value ?? 1 }],
-  }));
+    transform: [{ scale: (motion?.pinchScale.value ?? 1) * (additionalScale?.value ?? 1) }],
+  }), [additionalScale]);
 
   return (
     <Animated.View

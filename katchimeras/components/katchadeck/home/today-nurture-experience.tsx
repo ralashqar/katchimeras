@@ -37,6 +37,7 @@ import {
   type MoodMonumentChoiceId,
 } from '@/components/katchadeck/world/mood-monument-sheet';
 import { SLEEP_ART, SLEEP_OPTIONS } from '@/components/katchadeck/world/sleep-sheet';
+import { CelebrationParticles } from '@/components/katchadeck/world/companion-achievement-celebration';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { AppFontFamilies, KatchaDeckUI } from '@/constants/theme';
@@ -162,6 +163,9 @@ type CheckInSelection = {
   label: string;
 };
 
+const DAILY_HATCH_SHAKE_CAMERA_SCALE = 1.04;
+const DAILY_HATCH_REVEAL_CAMERA_SCALE = 1.085;
+
 export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   actionListLocked,
   actionListHidden = false,
@@ -240,6 +244,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   const [actionStackInteractive, setActionStackInteractive] = useState(false);
   const [fixedActionClusterHeight, setFixedActionClusterHeight] = useState(0);
   const [checkInSelection, setCheckInSelection] = useState<CheckInSelection | null>(null);
+  const [checkInSlotHeight, setCheckInSlotHeight] = useState(0);
   const [preloadedSleepArt, setPreloadedSleepArt] = useState<Partial<Record<SleepQuality, ImageRef>>>({});
   const checkInSelectionRef = useRef<CheckInSelection | null>(null);
   const reduceMotion = useReducedMotion();
@@ -248,8 +253,10 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   const focusProgress = useSharedValue(focusMode ? 1 : 0);
   const onboardingCameraProgress = useSharedValue(onboardingFocus ? 1 : 0);
   const newDayEggEntry = useSharedValue(newDayIntro ? 0 : 1);
+  const hatchCameraScale = useSharedValue(1);
   const onboardingCameraPanTranslateY = useSharedValue(0);
   const environmentMotion = useTodayEnvironmentMotionValues();
+  const dailyHatchPhase = hatchPresentation?.policy === 'daily' ? hatchPresentation.phase : 'idle';
   const ready = day.canHatch || growth.isReady;
   const quietDayAvailable = false;
   const scriptedMoodAction = scriptedActions.length === 1 && scriptedActions[0]?.promptKind === 'feeling'
@@ -391,6 +398,12 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   const growthMeterTop = eggVisualTop - 81;
   const scenePinchFocusY = stageTop + sceneLift + explorationEggFrame.centerY;
   const onboardingEggSleeping = Boolean(onboardingFocus && scriptedMoodAction && !scriptedMoodSelection);
+  // A fresh regular Today Egg begins in the same dormant visual state as the
+  // Discovery Egg. The first real-life action owns the wake-up: its feed
+  // expression plays immediately, then its persisted Growth receipt keeps the
+  // equipped face active across remounts.
+  const regularEggSleeping = Boolean(!onboardingFocus && growth.energyRatio <= 0);
+  const eggSleeping = onboardingEggSleeping || regularEggSleeping;
   const onboardingZzzTopBeforeCamera = stageTop
     + sceneLift
     + explorationEggFrame.top
@@ -454,6 +467,38 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
     );
   }, [newDayEggEntry, newDayIntro, reduceMotion]);
   useEffect(() => {
+    cancelAnimation(hatchCameraScale);
+    if (reduceMotion) {
+      hatchCameraScale.value = 1;
+      return;
+    }
+    if (dailyHatchPhase === 'shaking') {
+      hatchCameraScale.value = withTiming(DAILY_HATCH_SHAKE_CAMERA_SCALE, {
+        duration: 460,
+        easing: Easing.inOut(Easing.cubic),
+      });
+      return;
+    }
+    if (dailyHatchPhase === 'cracking') {
+      hatchCameraScale.value = withTiming(DAILY_HATCH_REVEAL_CAMERA_SCALE, {
+        duration: 550,
+        easing: Easing.inOut(Easing.cubic),
+      });
+      return;
+    }
+    if (dailyHatchPhase === 'crossfading_subject' || dailyHatchPhase === 'subject_settling') {
+      hatchCameraScale.value = withTiming(DAILY_HATCH_REVEAL_CAMERA_SCALE, {
+        duration: 100,
+        easing: Easing.out(Easing.cubic),
+      });
+      return;
+    }
+    hatchCameraScale.value = withTiming(1, {
+      duration: dailyHatchPhase === 'forming_card' ? 420 : 180,
+      easing: Easing.inOut(Easing.cubic),
+    });
+  }, [dailyHatchPhase, hatchCameraScale, reduceMotion]);
+  useEffect(() => {
     onboardingCameraProgress.value = reduceMotion
       ? onboardingFocus ? 1 : 0
       : withTiming(onboardingFocus ? 1 : 0, {
@@ -475,7 +520,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
     // Applying it to a player pinch makes the lifted normal scene jump
     // vertically until its bottom edge happens to cover the viewport.
     if (onboardingCameraProgress.value <= 0) return 0;
-    const pinchScale = environmentMotion?.pinchScale.value ?? 1;
+    const pinchScale = (environmentMotion?.pinchScale.value ?? 1) * hatchCameraScale.value;
     const focusScale = 1 + (customizerCamera.scale - 1) * focusProgress.value;
     const onboardingScale = 1 + (HOME_FTUE_CAMERA_SCALE - 1) * onboardingCameraProgress.value;
     const outerScale = focusScale * onboardingScale;
@@ -515,13 +560,16 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   const projectedEggCameraScale = useDerivedValue(() => {
     const focusScale = 1 + (customizerCamera.scale - 1) * focusProgress.value;
     const onboardingScale = 1 + (HOME_FTUE_CAMERA_SCALE - 1) * onboardingCameraProgress.value;
-    return (environmentMotion?.pinchScale.value ?? 1) * focusScale * onboardingScale;
+    return (environmentMotion?.pinchScale.value ?? 1)
+      * hatchCameraScale.value
+      * focusScale
+      * onboardingScale;
   });
   const projectedEggStageStyle = useAnimatedStyle(() => {
     const focusScale = 1 + (customizerCamera.scale - 1) * focusProgress.value;
     const onboardingScale = 1 + (HOME_FTUE_CAMERA_SCALE - 1) * onboardingCameraProgress.value;
     const outerScale = focusScale * onboardingScale;
-    const pinchScale = environmentMotion?.pinchScale.value ?? 1;
+    const pinchScale = (environmentMotion?.pinchScale.value ?? 1) * hatchCameraScale.value;
     const outerTranslateY = customizerCamera.translateY * focusProgress.value
       + HOME_FTUE_CAMERA_Y_OFFSET * onboardingCameraProgress.value
       + clampedOnboardingCameraPanY.value;
@@ -546,7 +594,6 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
             * outerScale,
         },
         { translateY: projectedEggBottomY - baseEggBottomY },
-        { scale: 0.72 + newDayEggEntry.value * 0.28 },
       ],
     };
   });
@@ -619,12 +666,24 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
       setCheckInSelection(null);
     });
   }, [onCompletionAnimationEnd]);
+  const handleCheckInGroupLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextHeight = event.nativeEvent.layout.height;
+    // Mood uses two rows while Sleep uses one. Retain the largest live slot for
+    // the sequential check-in so the incoming card can anchor to the same
+    // bottom edge instead of inheriting a one-frame parent reflow.
+    setCheckInSlotHeight((current) => nextHeight > current + 0.5 ? nextHeight : current);
+  }, []);
+  useEffect(() => {
+    if (displayedMoodAction || displayedSleepAction || checkInTransitionActive) return;
+    setCheckInSlotHeight(0);
+  }, [checkInTransitionActive, displayedMoodAction, displayedSleepAction]);
 
   return (
     <View style={styles.root}>
       <View pointerEvents="none" style={styles.focusSceneViewport}>
         <Animated.View style={[styles.focusSceneCamera, focusSceneStyle]}>
           <TodayEnvironmentViewportMotionLayer
+            additionalScale={hatchCameraScale}
             focusY={scenePinchFocusY}
             viewportHeight={windowHeight}>
             <TodayExplorationBackground
@@ -639,6 +698,13 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
       <Animated.View
         pointerEvents="box-none"
         style={[styles.eggStage, { top: stageTop + sceneLift }, projectedEggStageStyle]}>
+        {newDayIntro ? (
+          <CelebrationParticles
+            layerStyle={[styles.newDayConfetti, { top: explorationEggFrame.centerY }]}
+            tier={2}
+            tint="#E4B34B"
+          />
+        ) : null}
         <TodayKingdomEggHero
           accentColor={day.egg.accentColor}
           companionWispId={hatchPresentation ? null : companionWispId}
@@ -648,7 +714,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           explorationStageTop={stageTop}
           feedbackKey={feedbackKey}
           feedExpressionKey={feedExpressionKey}
-          forceSleeping={onboardingEggSleeping}
+          forceSleeping={eggSleeping}
           growthProgress={growth.energyRatio}
           growthStage={growth.stage}
           hideKingdomEnvironmentArt
@@ -678,7 +744,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
       <View
         pointerEvents={focusMode ? 'none' : 'box-none'}
         style={[styles.chrome, focusMode && styles.chromeHidden]}>
-      {!hatchReadyFocus && !onboardingFocus && !growth.isActivated ? (
+      {!hatchReadyFocus && regularEggSleeping ? (
         <TodayDormantEggIndicator
           energyRatio={growth.energyRatio}
           focusX={windowWidth / 2}
@@ -690,10 +756,13 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
         />
       ) : null}
       {!onboardingFocus ? <View pointerEvents="none" style={styles.environmentFade} /> : null}
-      {!hatchReadyFocus && !onboardingFocus ? <View pointerEvents="none" style={[styles.meterAnchor, { top: growthMeterTop }]}>
+      {!hatchReadyFocus && !onboardingFocus && !newDayIntro ? <Animated.View
+        entering={FadeIn.duration(reduceMotion ? 100 : 320)}
+        pointerEvents="none"
+        style={[styles.meterAnchor, { top: growthMeterTop }]}>
         <GrowthMeter growth={growth} />
-      </View> : null}
-      {!hatchReadyFocus && (!onboardingFocus || onboardingTopHudVisible) ? <Animated.View
+      </Animated.View> : null}
+      {!hatchReadyFocus && !newDayIntro && (!onboardingFocus || onboardingTopHudVisible) ? <Animated.View
         entering={reduceMotion ? FadeIn.duration(80) : FadeIn.duration(220)}
         style={[styles.topHudFixed, { top: topInset + 8 }]}>
         <TodayTopHud days={timelineDays} energyPulseNonce={energyHudPulseNonce} energyTargetRef={energyHudTargetRef} energyValueOverride={energyHudValueOverride} interactionLocked={false} onSelectDay={onSelectDay} selectedId={day.id} />
@@ -929,7 +998,10 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
             />
           ) : null}
           {displayedMoodAction || displayedSleepAction ? (
-            <Animated.View layout={actionHandoffLayout} style={styles.checkInGroup}>
+            <Animated.View
+              layout={actionHandoffLayout}
+              onLayout={handleCheckInGroupLayout}
+              style={[styles.checkInGroup, checkInSlotHeight > 0 && { minHeight: checkInSlotHeight }]}>
               {displayedMoodAction ? (
                 <InlineMood
                   action={displayedMoodAction}
@@ -938,6 +1010,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
                   onChoose={(selection, from, currencyFrom) => beginCheckInSelection({ ...selection, action: displayedMoodAction, kind: 'mood' }, from, currencyFrom)}
                   onFinished={finishCheckInSelection}
                   onSkip={() => onCareNotToday(displayedMoodAction)}
+                  key={displayedMoodAction.instanceId}
                   reduceMotion={reduceMotion}
                   selection={checkInSelection?.kind === 'mood' ? checkInSelection : null}
                   swipeExternalGesture={careSwipeExternalGesture}
@@ -951,6 +1024,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
                   onChoose={(selection, from, currencyFrom) => beginCheckInSelection({ ...selection, action: displayedSleepAction, kind: 'sleep' }, from, currencyFrom)}
                   onFinished={finishCheckInSelection}
                   onSkip={() => onCareNotToday(displayedSleepAction)}
+                  key={displayedSleepAction.instanceId}
                   preloadedArt={preloadedSleepArt}
                   reduceMotion={reduceMotion}
                   selection={checkInSelection?.kind === 'sleep' ? checkInSelection : null}
@@ -1583,7 +1657,7 @@ function MeasuredIllustratedChoice({ accent, disabled, dimmed, icon, image, labe
         {image ? (
           <Image contentFit="contain" source={image} style={[styles.illustratedChoiceArt, threeColumn && styles.illustratedChoiceArtThreeColumn]} transition={0} />
         ) : (
-          <IconSymbol color={accent} name={icon} size={38} />
+          <IconSymbol color={accent} name={icon} size={threeColumn ? 30 : 32} />
         )}
       </Animated.View>
       <ThemedText numberOfLines={2} style={[styles.illustratedChoiceLabel, threeColumn && styles.illustratedChoiceLabelThreeColumn]} lightColor={Meadow.ink} darkColor={Meadow.ink}>
@@ -2510,6 +2584,7 @@ const styles = StyleSheet.create({
   quietDayLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '900' },
   actionPressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
   eggStage: { alignItems: 'center', height: TODAY_KINGDOM_STAGE_HEIGHT, justifyContent: 'center', left: 0, overflow: 'visible', position: 'absolute', right: 0, zIndex: 2 },
+  newDayConfetti: { left: '50%', zIndex: 0 },
   environmentFade: { bottom: 0, experimental_backgroundImage: 'linear-gradient(to bottom, rgba(247,241,226,0) 0%, rgba(247,241,226,0.72) 62%, #F7F1E2 100%)', height: 150, left: 0, position: 'absolute', right: 0, zIndex: 1 },
   meterAnchor: { left: 0, position: 'absolute', right: 0, zIndex: 4 },
   meterCard: { alignItems: 'center', alignSelf: 'center', gap: 4, width: '72%' },
@@ -2543,24 +2618,24 @@ const styles = StyleSheet.create({
   onboardingGuide: { alignItems: 'center', paddingBottom: 12, paddingHorizontal: 12 },
   onboardingHeroGuide: { alignItems: 'center', gap: 4, left: Meadow.space.page, position: 'absolute', right: Meadow.space.page, zIndex: 18 },
   onboardingActionStage: { left: Meadow.space.page, position: 'absolute', right: Meadow.space.page, zIndex: 19 },
-  checkInGroup: { gap: 6 },
+  checkInGroup: { gap: 6, justifyContent: 'flex-end' },
   inlineCard: { overflow: 'hidden' },
   inlineCardContent: { gap: 8, padding: 9 },
   illustratedCard: { alignSelf: 'center', maxWidth: 980, width: '100%' },
-  illustratedCardContent: { gap: 8, padding: 10 },
+  illustratedCardContent: { gap: 5, paddingHorizontal: 8, paddingVertical: 7 },
   inlineSelectionPulse: { ...StyleSheet.absoluteFillObject, borderRadius: 16 },
   inlineHeading: { alignItems: 'center', justifyContent: 'center', minHeight: 38, position: 'relative' },
-  illustratedHeading: { alignItems: 'flex-start', justifyContent: 'flex-start', minHeight: 62 },
-  illustratedHeadingWide: { minHeight: 76 },
+  illustratedHeading: { alignItems: 'flex-start', justifyContent: 'flex-start', minHeight: 48 },
+  illustratedHeadingWide: { minHeight: 64 },
   inlineQuestionAnchor: { width: '100%' },
-  illustratedQuestionAnchor: { paddingLeft: 5, paddingRight: 92 },
+  illustratedQuestionAnchor: { paddingLeft: 5, paddingRight: 84 },
   illustratedQuestionAnchorSkippable: { paddingLeft: 52 },
-  illustratedQuestionAnchorWide: { paddingLeft: 10, paddingRight: 148 },
+  illustratedQuestionAnchorWide: { paddingLeft: 10, paddingRight: 132 },
   inlineQuestion: { ...KatchaDeckUI.typography.ftuePanelTitle, textAlign: 'center', width: '100%' },
-  illustratedQuestion: { fontSize: 20, letterSpacing: -0.35, lineHeight: 22, paddingHorizontal: 0, textAlign: 'left' },
-  illustratedQuestionWide: { fontSize: 27, letterSpacing: -0.55, lineHeight: 30 },
-  illustratedQuestionBody: { ...KatchaDeckUI.typography.ftuePanelBody, fontSize: 10.75, lineHeight: 14, marginTop: 1 },
-  illustratedQuestionBodyWide: { fontSize: 13.5, lineHeight: 18, marginTop: 3 },
+  illustratedQuestion: { fontSize: 18, letterSpacing: -0.3, lineHeight: 20, paddingHorizontal: 0, textAlign: 'left' },
+  illustratedQuestionWide: { fontSize: 24, letterSpacing: -0.48, lineHeight: 27 },
+  illustratedQuestionBody: { ...KatchaDeckUI.typography.ftuePanelBody, fontSize: 10, lineHeight: 12, marginTop: 0 },
+  illustratedQuestionBodyWide: { fontSize: 12.5, lineHeight: 16, marginTop: 2 },
   inlineQuestionRequired: { paddingLeft: 8, paddingRight: 68 },
   inlineQuestionCentered: { paddingHorizontal: 8 },
   inlineQuestionSkippable: { paddingHorizontal: 66 },
@@ -2569,14 +2644,14 @@ const styles = StyleSheet.create({
   inlineSkipPressed: { backgroundColor: 'rgba(122,84,44,0.16)', transform: [{ scale: 0.96 }] },
   inlineSkipLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '800' },
   inlineReward: { position: 'absolute', right: 0, top: 1, zIndex: 2 },
-  ftueEnergyBadge: { alignItems: 'center', backgroundColor: '#FFF4C7', borderColor: 'rgba(213,163,44,0.62)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1.5, boxShadow: '0 5px 12px rgba(134,91,19,0.20), inset 0 1px 0 rgba(255,255,255,0.92)', flexDirection: 'row', gap: 2, height: 52, justifyContent: 'center', paddingHorizontal: 6, width: 84 },
-  ftueEnergyBadgeWide: { borderRadius: 22, gap: 4, height: 66, paddingHorizontal: 10, width: 118 },
-  ftueEnergyBadgeArt: { height: 32, width: 28 },
-  ftueEnergyBadgeArtWide: { height: 43, width: 38 },
+  ftueEnergyBadge: { alignItems: 'center', backgroundColor: '#FFF4C7', borderColor: 'rgba(213,163,44,0.62)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1.5, boxShadow: '0 4px 10px rgba(134,91,19,0.18), inset 0 1px 0 rgba(255,255,255,0.92)', flexDirection: 'row', gap: 2, height: 44, justifyContent: 'center', paddingHorizontal: 5, width: 76 },
+  ftueEnergyBadgeWide: { borderRadius: 19, gap: 3, height: 56, paddingHorizontal: 8, width: 104 },
+  ftueEnergyBadgeArt: { height: 27, width: 24 },
+  ftueEnergyBadgeArtWide: { height: 37, width: 33 },
   ftueEnergyBadgeCopy: { alignItems: 'flex-start', gap: 0 },
-  ftueEnergyBadgeAmount: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 16, lineHeight: 18 },
-  ftueEnergyBadgeAmountWide: { fontSize: 20, lineHeight: 22 },
-  ftueEnergyBadgeLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 8.5, fontWeight: '900', lineHeight: 10 },
+  ftueEnergyBadgeAmount: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 15, lineHeight: 17 },
+  ftueEnergyBadgeAmountWide: { fontSize: 18, lineHeight: 20 },
+  ftueEnergyBadgeLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 8, fontWeight: '900', lineHeight: 9 },
   inlineMetric: { alignItems: 'center', alignSelf: 'center', flexDirection: 'row', gap: 9, justifyContent: 'center', minHeight: 62, paddingHorizontal: 12 },
   inlineMetricArt: { height: 54, width: 54 },
   inlineMetricCopy: { alignItems: 'flex-start', gap: 0 },
@@ -2590,20 +2665,20 @@ const styles = StyleSheet.create({
   textChoiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
   textChoice: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.48)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 5, minHeight: 34, paddingHorizontal: 12, paddingVertical: 5 },
   textChoiceLabel: KatchaDeckUI.typography.ftueChipLabel,
-  illustratedChoiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
-  illustratedChoice: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1.25, boxShadow: '0 3px 8px rgba(86,66,34,0.13), inset 0 1px 0 rgba(255,255,255,0.82)', gap: 1, justifyContent: 'flex-end', minHeight: 88, overflow: 'hidden', paddingBottom: 6, paddingHorizontal: 4, paddingTop: 4, position: 'relative' },
-  illustratedChoiceThreeColumn: { minHeight: 82, paddingBottom: 5, paddingTop: 3 },
+  illustratedChoiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, justifyContent: 'center' },
+  illustratedChoice: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1.25, boxShadow: '0 3px 8px rgba(86,66,34,0.13), inset 0 1px 0 rgba(255,255,255,0.82)', gap: 0, justifyContent: 'flex-end', minHeight: 70, overflow: 'hidden', paddingBottom: 4, paddingHorizontal: 4, paddingTop: 2, position: 'relative' },
+  illustratedChoiceThreeColumn: { minHeight: 66, paddingBottom: 3, paddingTop: 2 },
   illustratedChoiceSelected: { borderWidth: 2, boxShadow: '0 5px 13px rgba(86,66,34,0.20), inset 0 1px 0 rgba(255,255,255,0.9)' },
   illustratedChoicePressed: { opacity: 0.92, transform: [{ translateY: 1 }, { scale: 0.985 }] },
-  illustratedChoiceHighlight: { backgroundColor: 'rgba(255,255,255,0.28)', borderRadius: 999, height: 34, left: 7, position: 'absolute', right: 7, top: 4 },
-  illustratedChoiceHighlightThreeColumn: { height: 29, left: 5, right: 5, top: 3 },
-  illustratedChoiceArtFrame: { alignItems: 'center', height: 49, justifyContent: 'center', width: '100%' },
-  illustratedChoiceArtFrameThreeColumn: { height: 44 },
-  illustratedChoiceArt: { height: 48, width: 56 },
-  illustratedChoiceArtThreeColumn: { height: 43, width: 50 },
-  illustratedChoiceLabel: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 11, letterSpacing: -0.15, lineHeight: 13, minHeight: 26, textAlign: 'center', textAlignVertical: 'center', width: '100%' },
-  illustratedChoiceLabelThreeColumn: { fontSize: 10, lineHeight: 11.5, minHeight: 23 },
-  illustratedChoiceGlint: { alignItems: 'center', borderColor: 'rgba(255,255,255,0.74)', borderRadius: 999, borderWidth: 1, bottom: 4, height: 17, justifyContent: 'center', position: 'absolute', right: 4, width: 17 },
+  illustratedChoiceHighlight: { backgroundColor: 'rgba(255,255,255,0.28)', borderRadius: 999, height: 27, left: 7, position: 'absolute', right: 7, top: 3 },
+  illustratedChoiceHighlightThreeColumn: { height: 24, left: 5, right: 5, top: 2 },
+  illustratedChoiceArtFrame: { alignItems: 'center', height: 39, justifyContent: 'center', width: '100%' },
+  illustratedChoiceArtFrameThreeColumn: { height: 36 },
+  illustratedChoiceArt: { height: 40, width: 46 },
+  illustratedChoiceArtThreeColumn: { height: 37, width: 43 },
+  illustratedChoiceLabel: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 10.5, letterSpacing: -0.15, lineHeight: 11.5, minHeight: 20, textAlign: 'center', textAlignVertical: 'center', width: '100%' },
+  illustratedChoiceLabelThreeColumn: { fontSize: 9.5, lineHeight: 10.5, minHeight: 19 },
+  illustratedChoiceGlint: { alignItems: 'center', borderColor: 'rgba(255,255,255,0.74)', borderRadius: 999, borderWidth: 1, bottom: 3, height: 15, justifyContent: 'center', position: 'absolute', right: 3, width: 15 },
   moodChoiceCell: { flex: 1 },
   sleepChoiceCell: { flex: 1 },
   quickChoice: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.48)', borderCurve: 'continuous', borderRadius: 12, borderWidth: 1, gap: 1, minHeight: 55, paddingHorizontal: 3, paddingVertical: 5 },

@@ -301,6 +301,71 @@ function SpotlightDimPanels({ color, opacity, screen, slot }: {
     <Animated.View style={[panelStyle, { left: 0 }, bottomStyle]} />
     <Animated.View style={[panelStyle, { left: 0 }, leftStyle]} />
     <Animated.View style={[panelStyle, rightStyle]} />
+    <SpotlightCornerFillers color={color} opacity={opacity} slot={slot} />
+  </>;
+}
+
+/**
+ * The four dim panels leave a rectangular opening. These corner pieces fill the
+ * parts outside the spotlight's quarter-circle arcs, turning that opening into
+ * a true rounded rectangle without bringing a Skia surface back onto the board.
+ */
+function SpotlightCornerFillers({ color, opacity, slot }: {
+  color: string;
+  opacity: SharedValue<number>;
+  slot: AnimatedSpotlightSlot;
+}) {
+  const topLeftStyle = useAnimatedStyle(() => {
+    const corner = Math.max(0, Math.min(slot.corner.value, slot.width.value / 2, slot.height.value / 2));
+    return {
+      borderBottomRightRadius: corner,
+      height: corner,
+      left: slot.x.value,
+      opacity: corner > 0.5 ? opacity.value : 0,
+      top: slot.y.value,
+      width: corner,
+    };
+  });
+  const topRightStyle = useAnimatedStyle(() => {
+    const corner = Math.max(0, Math.min(slot.corner.value, slot.width.value / 2, slot.height.value / 2));
+    return {
+      borderBottomLeftRadius: corner,
+      height: corner,
+      left: slot.x.value + slot.width.value - corner,
+      opacity: corner > 0.5 ? opacity.value : 0,
+      top: slot.y.value,
+      width: corner,
+    };
+  });
+  const bottomLeftStyle = useAnimatedStyle(() => {
+    const corner = Math.max(0, Math.min(slot.corner.value, slot.width.value / 2, slot.height.value / 2));
+    return {
+      borderTopRightRadius: corner,
+      height: corner,
+      left: slot.x.value,
+      opacity: corner > 0.5 ? opacity.value : 0,
+      top: slot.y.value + slot.height.value - corner,
+      width: corner,
+    };
+  });
+  const bottomRightStyle = useAnimatedStyle(() => {
+    const corner = Math.max(0, Math.min(slot.corner.value, slot.width.value / 2, slot.height.value / 2));
+    return {
+      borderTopLeftRadius: corner,
+      height: corner,
+      left: slot.x.value + slot.width.value - corner,
+      opacity: corner > 0.5 ? opacity.value : 0,
+      top: slot.y.value + slot.height.value - corner,
+      width: corner,
+    };
+  });
+  const fillerStyle = [styles.spotlightCornerFiller, { backgroundColor: color }];
+
+  return <>
+    <Animated.View style={[fillerStyle, topLeftStyle]} />
+    <Animated.View style={[fillerStyle, topRightStyle]} />
+    <Animated.View style={[fillerStyle, bottomLeftStyle]} />
+    <Animated.View style={[fillerStyle, bottomRightStyle]} />
   </>;
 }
 
@@ -560,6 +625,9 @@ const styles = StyleSheet.create({
   handArt: { height: '100%', width: '100%' },
   nativeSpotlightRing: {
     borderWidth: 2,
+    position: 'absolute',
+  },
+  spotlightCornerFiller: {
     position: 'absolute',
   },
 });

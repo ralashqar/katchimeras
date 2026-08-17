@@ -62,7 +62,7 @@ export function resolveCompactDailyCardSize(
   return resolveCompactDailyCardSizeForWidth(width);
 }
 
-export function resolveDetailDailyCardSize(viewportWidth: number): DailyCardSize {
-  const width = Math.min(390, viewportWidth - 32);
+export function resolveDetailDailyCardSize(viewportWidth: number, maxHeight = Number.POSITIVE_INFINITY): DailyCardSize {
+  const width = Math.min(390, viewportWidth - 32, maxHeight * FULL_CARD_ASPECT_RATIO);
   return { height: width / FULL_CARD_ASPECT_RATIO, scale: width / CARD_DESIGN_WIDTH, width };
 }

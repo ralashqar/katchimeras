@@ -188,6 +188,11 @@ test('Merge FTUE spotlight is an absolute native-view overlay with transparent t
   assert.match(overlay, /StyleSheet\.absoluteFillObject/);
   assert.match(overlay, /pointerEvents="none"/);
   assert.match(overlay, /<SpotlightDimPanels/);
+  assert.match(overlay, /<SpotlightCornerFillers/);
+  assert.match(overlay, /borderBottomRightRadius: corner/);
+  assert.match(overlay, /borderBottomLeftRadius: corner/);
+  assert.match(overlay, /borderTopRightRadius: corner/);
+  assert.match(overlay, /borderTopLeftRadius: corner/);
   assert.match(overlay, /<NativeSpotlightRing slot=\{slot0\}/);
   assert.doesNotMatch(overlay, /@shopify\/react-native-skia|<Canvas|FillType|usePathValue/);
   assert.match(overlay, /spotlightTransitionDurationMs: 420/);
@@ -369,7 +374,9 @@ test('the first FTUE prompt sleeps, feeds through happy faces, and lifts a small
   const egg = readFileSync('components/katchadeck/home/today-kingdom-egg-hero.tsx', 'utf8');
   const feed = readFileSync('features/today/use-egg-feed-controller.ts', 'utf8');
   assert.match(home, /onboardingEggSleeping = Boolean\(onboardingFocus && scriptedMoodAction && !scriptedMoodSelection\)/);
-  assert.match(home, /forceSleeping=\{onboardingEggSleeping\}/);
+  assert.match(home, /regularEggSleeping = Boolean\(!onboardingFocus && growth\.energyRatio <= 0\)/);
+  assert.match(home, /eggSleeping = onboardingEggSleeping \|\| regularEggSleeping/);
+  assert.match(home, /forceSleeping=\{eggSleeping\}/);
   assert.match(egg, /faceId=\{forceSleeping \? 'sleepy' : equippedFaceId\}/);
   assert.match(egg, /forceSleeping[\s\S]*?showForcedSleepIndicator[\s\S]*?!isActivated && showDormantIndicator/);
   assert.match(egg, /TODAY_DORMANT_ZZZ_TOP_OFFSET = 92/);
@@ -480,8 +487,10 @@ test('FTUE inline questions wrap cleanly and do not expose daily-action skip con
   assert.match(home, /disabled=\{interactionLocked \|\| !allowSkip\}/);
   assert.match(home, /\{allowSkip \? \([\s\S]*?accessibilityLabel=\{`Skip \$\{action\.title\} for today`\}/);
   assert.match(home, /numberOfLines=\{2\}[\s\S]*?inlineQuestionRequired/);
-  assert.match(home, /illustratedChoice:[^\n]*minHeight: 88[^\n]*paddingTop: 4/);
-  assert.match(home, /illustratedChoiceThreeColumn:[^\n]*minHeight: 82/);
+  assert.match(home, /illustratedCardContent:[^\n]*gap: 5[^\n]*paddingVertical: 7/);
+  assert.match(home, /illustratedHeading:[^\n]*minHeight: 48/);
+  assert.match(home, /illustratedChoice:[^\n]*minHeight: 70[^\n]*paddingTop: 2/);
+  assert.match(home, /illustratedChoiceThreeColumn:[^\n]*minHeight: 66/);
 });
 
 test('FTUE copy uses the shared cozy-game type hierarchy and stays concise', () => {

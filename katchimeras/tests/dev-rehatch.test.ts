@@ -55,6 +55,12 @@ test('daily replay re-seals the latest collectible day for the full cinematic', 
       provenance: 'rollover',
     },
   } as never];
+  source.today.card = { id: 'card-today', isoDate: '2026-07-20' } as never;
+  source.today.dailyHatch = {
+    ...source.archivedDays[0].dailyHatch!,
+    sealedInputSignature: 'today-signature',
+    sealedAt: '2026-07-20T21:00:00.000Z',
+  };
 
   const replay = prepareLatestDailyHatchForDevReplay(source);
   assert.equal(replay?.dayId, 'yesterday');

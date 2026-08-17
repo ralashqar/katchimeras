@@ -7,7 +7,10 @@ export type DevDailyHatchReplay = {
 
 /** Re-seals the newest collectible day so the complete reveal/claim ritual can be replayed. */
 export function prepareLatestDailyHatchForDevReplay(state: StoredHomeState): DevDailyHatchReplay | null {
-  const candidates = [state.today, ...(state.tomorrow ? [state.tomorrow] : []), ...state.archivedDays]
+  // Daily Hatch reveals a past day. Never select the live Today record here:
+  // replaying a legacy/current-day card bypasses the archived-claim reset path
+  // and can leave the visible Egg at its previous full growth.
+  const candidates = [...state.archivedDays]
     .filter((day) => Boolean(day.dailyHatch && day.card))
     .sort((left, right) => right.isoDate.localeCompare(left.isoDate));
   const target = candidates[0];

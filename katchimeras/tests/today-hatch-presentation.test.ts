@@ -112,13 +112,15 @@ test('Daily Hatch is active without replacing the mounted Today room', () => {
 test('Daily Hatch preserves the live Today Egg and camera framing', () => {
   const today = readFileSync(path.join(process.cwd(), 'app/(tabs)/today.tsx'), 'utf8');
   const egg = readFileSync(path.join(process.cwd(), 'components/katchadeck/home/today-kingdom-egg-hero.tsx'), 'utf8');
+  const nurture = readFileSync(path.join(process.cwd(), 'components/katchadeck/home/today-nurture-experience.tsx'), 'utf8');
+  const motion = readFileSync(path.join(process.cwd(), 'components/katchadeck/home/today-environment-motion.tsx'), 'utf8');
 
   assert.match(today, /frozen: dailyHatchActive \|\| discoveryHatchInPlace/);
   assert.equal((today.match(/frozen: dailyHatchActive \|\| discoveryHatchInPlace/g) ?? []).length, 2);
   assert.match(egg, /opacity: 1 - discoveryEggExit\.value/);
   assert.match(egg, /scale: 1 - discoveryEggExit\.value \* 0\.82/);
   assert.match(egg, /discoveryPhase === 'new_day_intro' \|\| discoveryPhase === 'restoring_today'/);
-  assert.match(egg, /discoveryHatch\?\.policy === 'daily'\s*\? eggFrame\.top - discoveryWispSize \* 0\.34/);
+  assert.match(egg, /const discoveryWispTop = eggFrame\.top \+ \(eggFrame\.height - discoveryWispSize\) \/ 2/);
   assert.match(egg, /discoveryHatch\.dayId}:\$\{discoveryHatch\.animationKey}:discovery/);
   assert.match(egg, /discoveryHatch && !returningFromDailyHatch/);
   assert.match(egg, /discoveryEggExit\.value = 0/);
@@ -126,14 +128,44 @@ test('Daily Hatch preserves the live Today Egg and camera framing', () => {
   assert.doesNotMatch(today, /scriptedPinchStartScale=\{dailyNewDayIntro/);
   assert.match(today, /key=\{`today-nurture:\$\{formingDay\.id}:\$\{formingDay\.growth\?\.cycleStartedAt \?\? 'initial'}`\}/);
   assert.doesNotMatch(today, /TodayTileHatchReveal/);
+  assert.match(nurture, /dailyHatchPhase === 'shaking'[\s\S]*?DAILY_HATCH_SHAKE_CAMERA_SCALE[\s\S]*?duration: 460/);
+  assert.match(nurture, /dailyHatchPhase === 'cracking'[\s\S]*?DAILY_HATCH_REVEAL_CAMERA_SCALE[\s\S]*?duration: 550/);
+  assert.match(nurture, /dailyHatchPhase === 'crossfading_subject' \|\| dailyHatchPhase === 'subject_settling'/);
+  assert.match(nurture, /additionalScale=\{hatchCameraScale\}/);
+  assert.ok((nurture.match(/\(environmentMotion\?\.pinchScale\.value \?\? 1\) \* hatchCameraScale\.value/g) ?? []).length >= 2);
+  assert.match(motion, /additionalScale\?: SharedValue<number>/);
+  assert.match(motion, /\(motion\?\.pinchScale\.value \?\? 1\) \* \(additionalScale\?\.value \?\? 1\)/);
 });
 
-test('Daily Hatch claim action stays directly beneath the deck', () => {
+test('the new Today Egg fades in at its reset size before progress returns', () => {
   const today = readFileSync(path.join(process.cwd(), 'app/(tabs)/today.tsx'), 'utf8');
+  const nurture = readFileSync(path.join(process.cwd(), 'components/katchadeck/home/today-nurture-experience.tsx'), 'utf8');
+  const hatchController = readFileSync(path.join(process.cwd(), 'features/today/use-hatch-controller.ts'), 'utf8');
 
-  assert.match(today, /<CardDeckCarousel[\s\S]*style=\{styles\.hatchClaimCta\}/);
-  assert.match(today, /hatchClaimCta: \{ marginTop: -8, paddingHorizontal: 24, width: '100%' \}/);
-  assert.doesNotMatch(today, /styles\.hatchClaimCta, \{ bottom:/);
+  assert.match(nurture, /opacity: newDayEggEntry\.value/);
+  assert.doesNotMatch(nurture, /scale: 0\.72 \+ newDayEggEntry\.value \* 0\.28/);
+  assert.match(nurture, /style=\{\[styles\.eggStage[\s\S]*?newDayIntro \? \([\s\S]*?<CelebrationParticles[\s\S]*?top: explorationEggFrame\.centerY[\s\S]*?tier=\{2\}[\s\S]*?tint="#E4B34B"[\s\S]*?<TodayKingdomEggHero/);
+  assert.match(nurture, /newDayConfetti: \{ left: '50%', zIndex: 0 \}/);
+  assert.match(nurture, /!hatchReadyFocus && !newDayIntro && \(!onboardingFocus \|\| onboardingTopHudVisible\) \? <Animated\.View[\s\S]*?FadeIn\.duration\(220\)[\s\S]*?<TodayTopHud/);
+  assert.match(nurture, /!hatchReadyFocus && !onboardingFocus && !newDayIntro \? <Animated\.View[\s\S]*?FadeIn\.duration\(reduceMotion \? 100 : 320\)[\s\S]*?<GrowthMeter/);
+  assert.match(today, /<FtueGuideCopy[\s\S]*?eyebrow: 'New day'[\s\S]*?formatNewDayDate[\s\S]*?hero/);
+  assert.doesNotMatch(today, /styles\.newDayEyebrow|styles\.newDayDate/);
+  assert.match(hatchController, /homeRepository\.save\(claimedState, \{ allowTodayReset: true, notify: false \}\)/);
+});
+
+test('Daily Hatch reveals one full, flippable card in a claim splash', () => {
+  const today = readFileSync(path.join(process.cwd(), 'app/(tabs)/today.tsx'), 'utf8');
+  const splash = readFileSync(path.join(process.cwd(), 'components/katchadeck/cards/daily-card-claim-splash.tsx'), 'utf8');
+  const viewer = readFileSync(path.join(process.cwd(), 'components/katchadeck/cards/daily-card-viewer.tsx'), 'utf8');
+
+  assert.match(today, /<DailyCardClaimSplash[\s\S]*?card=\{hatchLeadCard\}[\s\S]*?day=\{hatchCardDay\}/);
+  assert.doesNotMatch(today, /CardDeckCarousel|hatchDeckCards|hatchDeckContent/);
+  assert.match(splash, /<DailyCardViewer[\s\S]*?showFaceControls=\{false\}/);
+  assert.match(splash, /<RotatingRadialSunburst/);
+  assert.match(splash, /<Modal[\s\S]*?presentationStyle="fullScreen"/);
+  assert.match(splash, /label="Claim Day Card"/);
+  assert.doesNotMatch(splash, /NEW WISP|NEW SCENE|Show moments/);
+  assert.doesNotMatch(viewer, /\.enabled\(!reduceMotion && face === 'front'\)/);
 });
 
 test('the retrospective hatch-ready Egg uses the Achievement rays and Energy ripple', () => {

@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 
 import type { StoredHomeDayRecord } from '../types/home';
@@ -60,6 +62,20 @@ test('the first three normal Today actions retreat the camera in equal logarithm
   assert.ok(Math.abs(targets[1] / targets[2] - targets[2] / targets[3]) < 1e-9);
   assert.equal(targets[3], 1);
   assert.equal(targets[4], 1);
+});
+
+test('regular Today wires a fresh sleeping Egg to the full authored camera journey', () => {
+  const route = readFileSync(path.join(process.cwd(), 'app/(tabs)/today.tsx'), 'utf8');
+  const nurture = readFileSync(path.join(process.cwd(), 'components/katchadeck/home/today-nurture-experience.tsx'), 'utf8');
+  const motion = readFileSync(path.join(process.cwd(), 'components/katchadeck/home/today-environment-motion.tsx'), 'utf8');
+
+  assert.match(route, /regularTodayCameraPinchTarget\([\s\S]*?nurtureGrowth\.qualifyingActionCount,[\s\S]*?motion\.maxPinchScale/);
+  assert.match(route, /scriptedPinchStartScale: regularCameraStartsAtTarget \? regularCameraPinchTarget : null/);
+  assert.match(route, /scriptedCameraOwnsFullZoom[\s\S]*?maxPinchScale: scriptedCameraOwnsFullZoom/);
+  assert.match(nurture, /regularEggSleeping = Boolean\(!onboardingFocus && growth\.energyRatio <= 0\)/);
+  assert.match(nurture, /forceSleeping=\{eggSleeping\}/);
+  assert.match(nurture, /!hatchReadyFocus && regularEggSleeping/);
+  assert.match(motion, /useSharedValue\(scriptedPinchStartScale \?\? 1\)/);
 });
 
 test('claiming yesterday starts Today care from Mood and ignores pre-cycle artifacts', () => {

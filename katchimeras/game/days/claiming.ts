@@ -27,20 +27,10 @@ export function claimDailyHatchForDay(
   return {
     ...state,
     archivedDays,
-    // Claiming yesterday closes its full Egg cycle and begins today's at zero.
-    // Keep all receipts and journal artifacts, but do not let yesterday-era
-    // Growth continue driving the returning Egg's size or progress label.
-    today: isImmediatelyPreviousDay(claimed.isoDate, state.today.isoDate)
-      ? beginFreshEggCycle(state.today, now)
-      : state.today,
+    // A past-day claim is the explicit handoff to the new Today Egg. Always
+    // begin that Egg at zero, including developer/recovery replays whose target
+    // may be older than yesterday. Receipts stay stored, but the new cycle
+    // boundary prevents them driving its size or progress label.
+    today: beginFreshEggCycle(state.today, now),
   };
-}
-
-function isImmediatelyPreviousDay(candidateIsoDate: string, currentIsoDate: string): boolean {
-  const [year, month, day] = currentIsoDate.split('-').map(Number);
-  const previous = new Date(year, Math.max(0, month - 1), day - 1, 12, 0, 0, 0);
-  const yyyy = previous.getFullYear();
-  const mm = String(previous.getMonth() + 1).padStart(2, '0');
-  const dd = String(previous.getDate()).padStart(2, '0');
-  return candidateIsoDate === `${yyyy}-${mm}-${dd}`;
 }

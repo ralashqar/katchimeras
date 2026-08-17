@@ -178,7 +178,11 @@ test('forming nurture presentation does not mount the legacy Today scene underne
   assert.match(nurtureSource, /\(enterFromBottom \? FadeInDown : FadeInUp\)\.delay\(55\)\.duration\(320\)/);
   assert.match(nurtureSource, /function useActionRowLayout[\s\S]*?LinearTransition\.duration\(300\)/);
   assert.ok((nurtureSource.match(/<Animated\.View layout=\{rowLayout\}>/g) ?? []).length >= 3);
-  assert.match(nurtureSource, /<Animated\.View layout=\{actionHandoffLayout\} style=\{styles\.checkInGroup\}>/);
+    assert.match(nurtureSource, /<Animated\.View[\s\S]*?layout=\{actionHandoffLayout\}[\s\S]*?onLayout=\{handleCheckInGroupLayout\}[\s\S]*?minHeight: checkInSlotHeight/);
+    assert.match(nurtureSource, /setCheckInSlotHeight\(\(current\) => nextHeight > current \+ 0\.5 \? nextHeight : current\)/);
+    assert.match(nurtureSource, /checkInGroup: \{ gap: 6, justifyContent: 'flex-end' \}/);
+    assert.match(nurtureSource, /<InlineMood[\s\S]*?key=\{displayedMoodAction\.instanceId\}/);
+    assert.match(nurtureSource, /<InlineSleep[\s\S]*?key=\{displayedSleepAction\.instanceId\}/);
   assert.match(nurtureSource, /const INITIAL_ACTION_STACK_SETTLE_MS = 560/);
   assert.match(nurtureSource, /const ACTION_BATCH_LAYOUT_SETTLE_MS = 680/);
   assert.match(nurtureSource, /newlyIntroducedRemainingActionIds\.has\(action\.instanceId\)[\s\S]*?ACTION_BATCH_LAYOUT_SETTLE_MS \+ index \* 55/);

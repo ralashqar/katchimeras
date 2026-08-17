@@ -32,14 +32,22 @@ import { resolveDailyCardFlipTarget, type DailyCardFace } from '@/utils/daily-ca
 type DailyCardViewerProps = {
   card: DailyCreatureCard;
   day: HomeDayRecord;
+  maxCardHeight?: number;
   onFaceChange?: (face: DailyCardFace) => void;
+  showFaceControls?: boolean;
 };
 
 const PARCHMENT = KatchaSurfacePalette.parchment;
 
-export function DailyCardViewer({ card, day, onFaceChange }: DailyCardViewerProps) {
+export function DailyCardViewer({
+  card,
+  day,
+  maxCardHeight,
+  onFaceChange,
+  showFaceControls = true,
+}: DailyCardViewerProps) {
   const window = useWindowDimensions();
-  const size = resolveDetailDailyCardSize(window.width);
+  const size = resolveDetailDailyCardSize(window.width, maxCardHeight);
   const moments = useMemo(() => buildMomentTimeline(day), [day]);
   const reduceMotion = useReducedMotion();
   const [face, setFace] = useState<DailyCardFace>('front');
@@ -104,7 +112,6 @@ export function DailyCardViewer({ card, day, onFaceChange }: DailyCardViewerProp
 
   const pan = useMemo(
     () => Gesture.Pan()
-      .enabled(!reduceMotion && face === 'front')
       .activeOffsetX([-18, 18])
       .failOffsetY([-14, 14])
       .onStart(() => {
@@ -128,7 +135,7 @@ export function DailyCardViewer({ card, day, onFaceChange }: DailyCardViewerProp
           }
         );
       }),
-    [commitFace, dragStart, face, flip, interacting, reduceMotion, size.width]
+    [commitFace, dragStart, flip, interacting, size.width]
   );
 
   const hoverStyle = useAnimatedStyle(() => {
@@ -187,7 +194,7 @@ export function DailyCardViewer({ card, day, onFaceChange }: DailyCardViewerProp
         </Animated.View>
       </GestureDetector>
 
-      <View style={styles.control}>
+      {showFaceControls ? <View style={styles.control}>
         <KatchaButton
           accessibilityHint={reduceMotion ? undefined : 'You can also swipe horizontally across the card.'}
           icon="rectangle.portrait.and.arrow.right"
@@ -201,7 +208,7 @@ export function DailyCardViewer({ card, day, onFaceChange }: DailyCardViewerProp
             {showBack ? 'Scroll moments · Use the button to turn back' : 'Swipe the card to turn it'}
           </ThemedText>
         ) : null}
-      </View>
+      </View> : null}
     </View>
   );
 }

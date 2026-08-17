@@ -159,7 +159,10 @@ export function useHatchController({
       const claimedDay = findDay(claimedState, selectedDay.id);
       if (!claimedDay?.dailyHatch?.claimedAt) return { status: 'not_ready' };
       storedStateRef.current = claimedState;
-      homeRepository.save(claimedState, { notify: false });
+      // Claim deliberately starts a new Today Egg cycle. Tell storage this is
+      // an authoritative reset so its stale-writer guard cannot retain the
+      // previous cycle's visual progress.
+      homeRepository.save(claimedState, { allowTodayReset: true, notify: false });
       setStoredState(claimedState);
       void syncWidgetState(claimedState, profile).catch((error) => {
         console.warn('Claimed hatch widget sync failed', error);
