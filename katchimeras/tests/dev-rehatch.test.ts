@@ -64,6 +64,7 @@ test('daily replay re-seals the latest collectible day for the full cinematic', 
 
   const replay = prepareLatestDailyHatchForDevReplay(source);
   assert.equal(replay?.dayId, 'yesterday');
+  assert.equal(replay?.stepEnergyDayId, '2026-07-19');
   assert.equal(replay?.state.archivedDays[0]?.state, 'sealed');
   assert.equal(replay?.state.archivedDays[0]?.dailyHatch?.revealedAt, null);
   assert.equal(replay?.state.archivedDays[0]?.dailyHatch?.claimedAt, null);

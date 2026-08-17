@@ -9,7 +9,6 @@ import Animated, {
   FadeIn,
   FadeInDown,
   FadeInUp,
-  FadeOutUp,
   LinearTransition,
   runOnJS,
   type SharedValue,
@@ -23,6 +22,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
+import { EGG_FEED_PAYOUT_DURATION_MS } from '@/components/katchadeck/home/egg-feed-overlay';
 import { TodayTopHud } from '@/components/katchadeck/home/today-top-hud';
 import { MicrocopyToast } from '@/components/katchadeck/home/microcopy-toast';
 import { TodayExplorationBackground } from '@/components/katchadeck/home/today-exploration-background';
@@ -31,6 +31,7 @@ import { WorldActionStack } from '@/components/katchadeck/world/world-action-sta
 import { CompanionGoalPortrait } from '@/components/katchadeck/goals/goal-task-row';
 import { GoalCompletionCelebration } from '@/components/katchadeck/goals/goal-completion-celebration';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
+import { AnimatedIntegerText } from '@/components/katchadeck/ui/animated-integer-text';
 import {
   MOOD_ART,
   MOOD_CHOICES,
@@ -144,8 +145,10 @@ type TodayNurtureExperienceProps = {
   onScriptedChoiceFinished?: () => void;
   yesterdayStepEnergyOffer?: YesterdayStepEnergyOffer | null;
   yesterdayStepEnergyBusy?: boolean;
+  yesterdayStepEnergyCompletionKey?: string | null;
   yesterdayStepEnergyDisplayedSteps?: number | null;
   onConvertYesterdaySteps?: (from: FeedSourceRect) => void;
+  onYesterdayStepEnergyPanelFinished: (completionKey: string) => void;
 };
 
 export type TodayCareCompletionEvent = {
@@ -220,8 +223,10 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   onScriptedChoiceFinished,
   yesterdayStepEnergyOffer = null,
   yesterdayStepEnergyBusy = false,
+  yesterdayStepEnergyCompletionKey = null,
   yesterdayStepEnergyDisplayedSteps = null,
   onConvertYesterdaySteps,
+  onYesterdayStepEnergyPanelFinished,
   careSwipeExternalGesture,
   environmentGesture,
   sceneTranslateX,
@@ -348,6 +353,10 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   const displayedSleepAction = checkInSelection
     ? checkInSelection.kind === 'sleep' ? checkInSelection.action : undefined
     : sleepAction;
+  const stepEnergyGateActive = Boolean(yesterdayStepEnergyOffer && onConvertYesterdaySteps);
+  const primaryActionGateActive = stepEnergyGateActive
+    || displayedMoodAction != null
+    || displayedSleepAction != null;
   const remainingActions = actions.filter((action) => action.id !== 'mood' && action.id !== 'sleep');
   const completionIsCheckIn = completionEvent?.action.category === 'check_in';
   const completionIsStandard = completionEvent != null
@@ -767,7 +776,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
         style={[styles.topHudFixed, { top: topInset + 8 }]}>
         <TodayTopHud days={timelineDays} energyPulseNonce={energyHudPulseNonce} energyTargetRef={energyHudTargetRef} energyValueOverride={energyHudValueOverride} interactionLocked={false} onSelectDay={onSelectDay} selectedId={day.id} />
       </Animated.View> : null}
-      {!hatchReadyFocus && !actionListHidden && !onboardingFocus ? (
+      {!hatchReadyFocus && !actionListHidden && !onboardingFocus && !primaryActionGateActive ? (
       <View onLayout={handleFixedActionClusterLayout} style={[styles.fixedActionCluster, { top: fixedActionClusterTop }]}>
         {quietDayAvailable ? (
           <Pressable accessibilityHint="Opens a short note so this quiet day can hatch" accessibilityRole="button" onPress={onAddTextNote} style={({ pressed }) => [styles.quietDayAction, pressed && styles.actionPressed]}>
@@ -988,15 +997,17 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
             />
           ) : null}
           {!scriptedActions.length ? <>
-          {yesterdayStepEnergyOffer && onConvertYesterdaySteps ? (
+          {stepEnergyGateActive && yesterdayStepEnergyOffer && onConvertYesterdaySteps ? (
             <YesterdayStepEnergyRow
               busy={yesterdayStepEnergyBusy}
+              completionKey={yesterdayStepEnergyCompletionKey}
               displayedSteps={yesterdayStepEnergyDisplayedSteps ?? yesterdayStepEnergyOffer.observedSteps}
               energy={yesterdayStepEnergyOffer.energy}
               onConvert={onConvertYesterdaySteps}
+              onFinished={onYesterdayStepEnergyPanelFinished}
               reduceMotion={reduceMotion}
             />
-          ) : null}
+          ) : <>
           {displayedMoodAction || displayedSleepAction ? (
             <Animated.View
               layout={actionHandoffLayout}
@@ -1086,6 +1097,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
               </View>
             </Animated.View>
           ) : null}
+          </>}
           </> : null}
           </Animated.View>
         </Animated.View>
@@ -1225,6 +1237,100 @@ const ACTION_BATCH_LAYOUT_SETTLE_MS = 680;
 const NURTURE_ACTION_CLUSTER_FALLBACK_HEIGHT = 67;
 const NURTURE_TOAST_TOP_GAP = 6;
 
+/**
+ * One lifecycle for every specialized Today action panel. Content can vary,
+ * but selection feedback, entry, and the completion handoff must not.
+ */
+function useSharedActionPanelLifecycle({
+  completionKey,
+  enterFromBottom = false,
+  onFinished,
+  reduceMotion,
+  selectionActive,
+}: {
+  completionKey?: string | null;
+  enterFromBottom?: boolean;
+  onFinished: (completionKey: string) => void;
+  reduceMotion: boolean;
+  selectionActive: boolean;
+}) {
+  const { width: windowWidth } = useWindowDimensions();
+  const panelPulse = useSharedValue(0);
+  const panelScale = useSharedValue(1);
+  const panelX = useSharedValue(0);
+  const panelOpacity = useSharedValue(1);
+  const completedKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!selectionActive) {
+      if (!completionKey) {
+        panelPulse.value = withTiming(0, { duration: reduceMotion ? 60 : 140 });
+        panelScale.value = withTiming(1, { duration: reduceMotion ? 60 : 180 });
+      }
+      return;
+    }
+    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (reduceMotion) {
+      panelPulse.value = withTiming(0.55, { duration: 100 });
+      return;
+    }
+    panelPulse.value = withSequence(
+      withTiming(1, { duration: 120, easing: Easing.out(Easing.cubic) }),
+      withTiming(0.62, { duration: 240, easing: Easing.out(Easing.cubic) }),
+    );
+    panelScale.value = withSequence(
+      withTiming(1.024, { duration: 115, easing: Easing.out(Easing.cubic) }),
+      withTiming(1.012, { duration: 180, easing: Easing.out(Easing.cubic) }),
+    );
+  }, [completionKey, panelPulse, panelScale, reduceMotion, selectionActive]);
+
+  useEffect(() => {
+    if (!completionKey || completedKeyRef.current === completionKey) return;
+    completedKeyRef.current = completionKey;
+    const exitDelay = reduceMotion ? 40 : 220;
+    if (!reduceMotion) {
+      panelPulse.value = withSequence(
+        withTiming(1, { duration: 90, easing: Easing.out(Easing.cubic) }),
+        withDelay(70, withTiming(0, { duration: 280, easing: Easing.out(Easing.cubic) })),
+      );
+      panelScale.value = withSequence(
+        withTiming(1.032, { duration: 105, easing: Easing.out(Easing.cubic) }),
+        withDelay(45, withTiming(0.99, { duration: 280, easing: Easing.in(Easing.cubic) })),
+      );
+    }
+    panelX.value = withDelay(
+      exitDelay,
+      withTiming(windowWidth + 24, {
+        duration: reduceMotion ? 100 : 330,
+        easing: Easing.in(Easing.cubic),
+      }, (finished) => {
+        if (finished) runOnJS(onFinished)(completionKey);
+      }),
+    );
+    panelOpacity.value = withDelay(
+      exitDelay + (reduceMotion ? 20 : 105),
+      withTiming(0, {
+        duration: reduceMotion ? 80 : 190,
+        easing: Easing.in(Easing.quad),
+      }),
+    );
+  }, [completionKey, onFinished, panelOpacity, panelPulse, panelScale, panelX, reduceMotion, windowWidth]);
+
+  const entering = useMemo(
+    () => reduceMotion
+      ? FadeIn.duration(70)
+      : (enterFromBottom ? FadeInDown : FadeInUp).delay(55).duration(320).easing(Easing.out(Easing.cubic)),
+    [enterFromBottom, reduceMotion],
+  );
+  const panelStyle = useAnimatedStyle(() => ({
+    opacity: panelOpacity.value,
+    transform: [{ translateX: panelX.value }, { scale: panelScale.value }],
+  }));
+  const pulseStyle = useAnimatedStyle(() => ({ opacity: panelPulse.value * 0.28 }));
+
+  return { entering, panelStyle, pulseStyle };
+}
+
 function InlineMood({ action, allowSkip = true, completionEvent, enterFromBottom = false, interactionLocked, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture }: {
   action: RankedTodayCareAction;
   allowSkip?: boolean;
@@ -1326,79 +1432,24 @@ function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent
   const illustratedTileWidth = Math.floor(
     (illustratedAvailableWidth - (illustratedColumnCount - 1) * 6) / illustratedColumnCount,
   );
-  const panelPulse = useSharedValue(0);
-  const panelScale = useSharedValue(1);
-  const panelX = useSharedValue(0);
-  const panelOpacity = useSharedValue(1);
   const rewardRef = useRef<ViewType | null>(null);
   const metricRef = useRef<ViewType | null>(null);
-  const completedEventRef = useRef<string | null>(null);
   // Sequential panels share parent state during the render that hands one
   // action to the next. Only state created by this exact action instance may
   // pulse or dismiss it; stale state is ignored before effects can run.
   const ownedSelection = selection?.action.instanceId === action.instanceId ? selection : null;
   const ownedCompletionEvent = completionEvent?.action.instanceId === action.instanceId ? completionEvent : null;
-
-  useEffect(() => {
-    if (!ownedSelection) return;
-    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (reduceMotion) {
-      panelPulse.value = withTiming(0.55, { duration: 100 });
-      return;
-    }
-    panelPulse.value = withSequence(
-      withTiming(1, { duration: 120, easing: Easing.out(Easing.cubic) }),
-      withTiming(0.62, { duration: 240, easing: Easing.out(Easing.cubic) }),
-    );
-    panelScale.value = withSequence(
-      withTiming(1.024, { duration: 115, easing: Easing.out(Easing.cubic) }),
-      withTiming(1.012, { duration: 180, easing: Easing.out(Easing.cubic) }),
-    );
-  }, [ownedSelection, panelPulse, panelScale, reduceMotion]);
-
-  useEffect(() => {
-    if (!ownedCompletionEvent || completedEventRef.current === ownedCompletionEvent.id) return;
-    completedEventRef.current = ownedCompletionEvent.id;
-    const exitDelay = reduceMotion ? 40 : 220;
-    if (!reduceMotion) {
-      panelPulse.value = withSequence(
-        withTiming(1, { duration: 90, easing: Easing.out(Easing.cubic) }),
-        withDelay(70, withTiming(0, { duration: 280, easing: Easing.out(Easing.cubic) })),
-      );
-      panelScale.value = withSequence(
-        withTiming(1.032, { duration: 105, easing: Easing.out(Easing.cubic) }),
-        withDelay(45, withTiming(0.99, { duration: 280, easing: Easing.in(Easing.cubic) })),
-      );
-    }
-    panelX.value = withDelay(
-      exitDelay,
-      withTiming(windowWidth + 24, {
-        duration: reduceMotion ? 100 : 330,
-        easing: Easing.in(Easing.cubic),
-      }, (finished) => {
-        if (finished) runOnJS(onFinished)(ownedCompletionEvent.id);
-      }),
-    );
-    panelOpacity.value = withDelay(
-      exitDelay + (reduceMotion ? 20 : 105),
-      withTiming(0, {
-        duration: reduceMotion ? 80 : 190,
-        easing: Easing.in(Easing.quad),
-      }),
-    );
-  }, [onFinished, ownedCompletionEvent, panelOpacity, panelPulse, panelScale, panelX, reduceMotion, windowWidth]);
-
-  const panelStyle = useAnimatedStyle(() => ({
-    opacity: panelOpacity.value,
-    transform: [{ translateX: panelX.value }, { scale: panelScale.value }],
-  }));
-  const pulseStyle = useAnimatedStyle(() => ({ opacity: panelPulse.value * 0.28 }));
+  const { entering, panelStyle, pulseStyle } = useSharedActionPanelLifecycle({
+    completionKey: ownedCompletionEvent?.id,
+    enterFromBottom,
+    onFinished,
+    reduceMotion,
+    selectionActive: ownedSelection != null,
+  });
 
   return (
     <Animated.View
-      entering={reduceMotion
-        ? FadeIn.duration(70)
-        : (enterFromBottom ? FadeInDown : FadeInUp).delay(55).duration(320).easing(Easing.out(Easing.cubic))}>
+      entering={entering}>
       <CareSwipeShell
         disabled={interactionLocked || !allowSkip}
         externalGesture={swipeExternalGesture}
@@ -2072,48 +2123,67 @@ function TodayCareGoalRow({ action, entryDelayMs, familyId, goalId, onCompleteQu
   );
 }
 
-function YesterdayStepEnergyRow({ busy, displayedSteps, energy, onConvert, reduceMotion }: {
+function YesterdayStepEnergyRow({ busy, completionKey, displayedSteps, energy, onConvert, onFinished, reduceMotion }: {
   busy: boolean;
+  completionKey: string | null;
   displayedSteps: number;
   energy: number;
   onConvert: (from: FeedSourceRect) => void;
+  onFinished: (completionKey: string) => void;
   reduceMotion: boolean;
 }) {
   const rewardRef = useRef<ViewType | null>(null);
+  const { entering, panelStyle, pulseStyle } = useSharedActionPanelLifecycle({
+    completionKey,
+    onFinished,
+    reduceMotion,
+    selectionActive: busy,
+  });
   const handlePress = () => {
     if (busy) return;
     rewardRef.current?.measureInWindow((x, y, width, height) => onConvert({ h: height, w: width, x, y }));
   };
   return (
     <Animated.View
-      entering={reduceMotion ? FadeIn.duration(80) : FadeInUp.duration(300).easing(Easing.out(Easing.cubic))}
-      exiting={reduceMotion ? FadeOutUp.duration(80) : FadeOutUp.duration(240).easing(Easing.in(Easing.cubic))}
+      entering={entering}
       layout={LinearTransition.duration(240)}>
-      <Pressable
-        accessibilityHint="Converts yesterday's steps once. This action cannot be skipped."
-        accessibilityLabel={`Turn ${displayedSteps.toLocaleString()} yesterday steps into ${energy} Energy`}
-        accessibilityRole="button"
-        accessibilityState={{ busy, disabled: busy }}
-        disabled={busy}
-        onPress={handlePress}
-        style={({ pressed }) => [styles.careDoorPressable, pressed && styles.rowPressed]}>
-        <GameSurface contentStyle={styles.stepEnergyContent} style={styles.careDoor} tone="cream">
-          <View style={styles.stepEnergyMetric}>
-            <Image contentFit="contain" source={DASHBOARD_STAT_ART.steps} style={styles.stepEnergyStepsArt} transition={0} />
-            <View style={styles.stepEnergyCopy}>
-              <ThemedText selectable style={styles.stepEnergyValue} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>
-                {displayedSteps.toLocaleString()}
-              </ThemedText>
-              <ThemedText style={styles.stepEnergyLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>steps yesterday</ThemedText>
+      <Animated.View style={panelStyle}>
+        <Pressable
+          accessibilityHint="Converts yesterday's steps once. This action cannot be skipped."
+          accessibilityLabel={`Turn ${displayedSteps.toLocaleString()} yesterday steps into ${energy} Energy`}
+          accessibilityRole="button"
+          accessibilityState={{ busy, disabled: busy }}
+          disabled={busy}
+          onPress={handlePress}
+          style={({ pressed }) => [styles.careDoorPressable, pressed && styles.rowPressed]}>
+          <GameSurface contentStyle={styles.stepEnergyContent} style={styles.careDoor} tone="cream">
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.inlineSelectionPulse, styles.stepEnergyPulse, pulseStyle]}
+            />
+            <View style={styles.stepEnergyMetric}>
+              <Image contentFit="contain" source={DASHBOARD_STAT_ART.steps} style={styles.stepEnergyStepsArt} transition={0} />
+              <View style={styles.stepEnergyCopy}>
+                <AnimatedIntegerText
+                  durationMs={EGG_FEED_PAYOUT_DURATION_MS}
+                  easing="linear"
+                  selectable
+                  style={styles.stepEnergyValue}
+                  lightColor={Meadow.goldDeep}
+                  darkColor={Meadow.goldDeep}
+                  value={displayedSteps}
+                />
+                <ThemedText style={styles.stepEnergyLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>steps yesterday</ThemedText>
+              </View>
             </View>
-          </View>
-          <IconSymbol color={Meadow.inkFaint} name="arrow.right" size={20} />
-          <View collapsable={false} ref={rewardRef} style={styles.stepEnergyReward}>
-            <Image contentFit="contain" source={GAME_CURRENCY_ART.energy} style={styles.stepEnergyArt} transition={0} />
-            <ThemedText selectable style={styles.stepEnergyRewardValue} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>+{energy}</ThemedText>
-          </View>
-        </GameSurface>
-      </Pressable>
+            <IconSymbol color={Meadow.inkFaint} name="arrow.right" size={20} />
+            <View collapsable={false} ref={rewardRef} style={styles.stepEnergyReward}>
+              <Image contentFit="contain" source={GAME_CURRENCY_ART.energy} style={styles.stepEnergyArt} transition={0} />
+              <ThemedText selectable style={styles.stepEnergyRewardValue} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>+{energy}</ThemedText>
+            </View>
+          </GameSurface>
+        </Pressable>
+      </Animated.View>
     </Animated.View>
   );
 }
@@ -2691,6 +2761,7 @@ const styles = StyleSheet.create({
   careDoor: { minHeight: 58 },
   careDoorContent: { alignItems: 'center', flexDirection: 'row', gap: 9, minHeight: 55, paddingHorizontal: 10, paddingVertical: 6 },
   stepEnergyContent: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 62, paddingHorizontal: 14, paddingVertical: 8 },
+  stepEnergyPulse: { backgroundColor: Meadow.gold },
   stepEnergyMetric: { alignItems: 'center', flexDirection: 'row', gap: 9 },
   stepEnergyStepsArt: { height: 44, width: 44 },
   stepEnergyCopy: { gap: 0 },

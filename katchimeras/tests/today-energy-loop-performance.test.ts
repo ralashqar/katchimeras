@@ -84,6 +84,7 @@ test('the final feed token publishes only after its Energy commit can render', (
   assert.match(controllerSource, /Haptics\.ImpactFeedbackStyle\.Soft/);
   assert.match(controllerSource, /Haptics\.ImpactFeedbackStyle\.Light/);
   assert.match(controllerSource, /Haptics\.ImpactFeedbackStyle\.Medium/);
+  assert.match(controllerSource, /process\.env\.EXPO_OS !== 'web'/);
   assert.match(controllerSource, /growthHapticTimerRef\.current = setTimeout\([\s\S]*?170/);
   assert.match(controllerSource, /const FEED_ARRIVAL_WATCHDOG_MS = 2_500/);
   assert.match(controllerSource, /feedArrivalWatchdogRef\.current = setTimeout\([\s\S]*?settleActiveFeedRef\.current\(nextFeed\.nonce\)/);
@@ -107,18 +108,53 @@ test('manual journal action feedback waits until its native sheet is dismissed',
 
 test('yesterday step Energy is a required top action with synchronized counters', () => {
   const todaySource = readFileSync(path.join(process.cwd(), 'app', '(tabs)', 'today.tsx'), 'utf8');
+  const stepConversionSource = todaySource.match(
+    /const convertYesterdaySteps = useCallback[\s\S]*?\n  }, \[[^\n]+\]\);/,
+  )?.[0] ?? '';
   const nurtureSource = readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'home', 'today-nurture-experience.tsx'),
     'utf8',
   );
+  const topHudSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'home', 'today-top-hud.tsx'), 'utf8');
+  const currencyHudSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'game-currency-hud.tsx'), 'utf8');
+  const animatedIntegerSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'animated-integer-text.tsx'), 'utf8');
+  const feedOverlaySource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'home', 'egg-feed-overlay.tsx'), 'utf8');
   const stepRowIndex = nurtureSource.indexOf('<YesterdayStepEnergyRow');
   const moodRowIndex = nurtureSource.indexOf('{displayedMoodAction || displayedSleepAction');
   assert.ok(stepRowIndex >= 0 && stepRowIndex < moodRowIndex);
+  assert.match(nurtureSource, /stepEnergyGateActive && yesterdayStepEnergyOffer && onConvertYesterdaySteps \? \([\s\S]*?<YesterdayStepEnergyRow[\s\S]*?\) : <>[\s\S]*?\{displayedMoodAction \|\| displayedSleepAction/);
+  assert.match(nurtureSource, /primaryActionGateActive = stepEnergyGateActive[\s\S]*?displayedMoodAction != null[\s\S]*?displayedSleepAction != null/);
+  assert.match(nurtureSource, /!actionListHidden && !onboardingFocus && !primaryActionGateActive \? \([\s\S]*?<FormingActionCluster/);
   assert.match(nurtureSource, /This action cannot be skipped/);
-  assert.match(todaySource, /buildYesterdayStepEnergyOffer\(\{[\s\S]*?existing: mergeState\.stepEnergyByDay\[yesterday\.dayId\]/);
-  assert.match(todaySource, /setEnergyHudValueOverride\(wallet\.energy\)[\s\S]*?claimDailyStepEnergy/);
-  assert.match(todaySource, /onMergeEnergyTokenArrive: \(amount\) => \{[\s\S]*?setEnergyHudValueOverride\(beforeEnergy \+ arrivedEnergy\)[\s\S]*?offer\.observedSteps - arrivedEnergy \* STEPS_PER_MERGE_ENERGY/);
-  assert.match(todaySource, /receiptId: `daily-steps:\$\{formingDay\?\.isoDate \?\? 'today'\}:\$\{offer\.dayId\}`/);
+  assert.match(todaySource, /!screenFocused \|\| !isFormingToday \|\| !formingDay \|\| ftueTodayStep/);
+  assert.doesNotMatch(todaySource, /!isFormingToday \|\| !formingDay \|\| ftueRun\?\.status === 'active'/);
+  assert.match(todaySource, /buildYesterdayStepEnergyOffer\(\{[\s\S]*?dayId: yesterdayDayId,[\s\S]*?existing: mergeState\.stepEnergyByDay\[yesterdayDayId\]/);
+  assert.match(stepConversionSource, /setEnergyHudValueOverride\(wallet\.energy\)[\s\S]*?claimDailyStepEnergy/);
+  assert.match(stepConversionSource, /awardTodayGrowth\(\{[\s\S]*?amount: TODAY_GROWTH_REWARDS\.movement,[\s\S]*?source: 'movement',[\s\S]*?sourceId: `yesterday-steps:\$\{offer\.dayId\}`/);
+  assert.match(stepConversionSource, /startEggFeed\(currencyFrom, \{[\s\S]*?energyAmount: TODAY_GROWTH_REWARDS\.movement,[\s\S]*?mergeEnergyAmount: energy/);
+  assert.doesNotMatch(stepConversionSource, /if \(energy <= 0\)/);
+  assert.match(stepConversionSource, /setYesterdayStepEnergyDisplayedSteps\(0\)[\s\S]*?startEggFeed\(currencyFrom/);
+  assert.match(stepConversionSource, /onMergeEnergyTokenArrive: \(amount\) => \{[\s\S]*?setEnergyHudValueOverride\(beforeEnergy \+ arrivedEnergy\)/);
+  assert.doesNotMatch(stepConversionSource, /offer\.observedSteps - arrivedEnergy/);
+  assert.match(nurtureSource, /<AnimatedIntegerText[\s\S]*?durationMs=\{EGG_FEED_PAYOUT_DURATION_MS\}[\s\S]*?easing="linear"[\s\S]*?value=\{displayedSteps\}/);
+  assert.match(feedOverlaySource, /export const EGG_FEED_PAYOUT_DURATION_MS = TOKEN_RISE_MS[\s\S]*?TOKEN_FLIGHT_MS/);
+  assert.match(topHudSource, /animateValue: true,[\s\S]*?id: 'energy'/);
+  assert.match(currencyHudSource, /<AnimatedIntegerText[\s\S]*?durationMs=\{animateValue \? 220 : 0\}/);
+  assert.match(animatedIntegerSource, /requestAnimationFrame\(tick\)/);
+  assert.match(stepConversionSource, /receiptId: `daily-steps:\$\{formingDay\?\.isoDate \?\? 'today'\}:\$\{offer\.dayId\}`/);
+  assert.match(stepConversionSource, /setYesterdayStepEnergyCompletionKey\(offer\.dayId\)/);
+  assert.doesNotMatch(stepConversionSource, /setYesterdayStepEnergyOffer\(null\)/);
+  assert.match(todaySource, /const finishYesterdayStepEnergyPanel = useCallback[\s\S]*?setYesterdayStepEnergyOffer[\s\S]*?setYesterdayStepEnergyBusy\(false\)/);
+  assert.match(nurtureSource, /function useSharedActionPanelLifecycle/);
+  assert.match(nurtureSource, /function InlineCheckInPanel[\s\S]*?useSharedActionPanelLifecycle\(\{/);
+  assert.match(nurtureSource, /function YesterdayStepEnergyRow[\s\S]*?useSharedActionPanelLifecycle\(\{/);
+});
+
+test('action feedback remains visual when the wallet reward is capped', () => {
+  const todaySource = readFileSync(path.join(process.cwd(), 'app', '(tabs)', 'today.tsx'), 'utf8');
+  assert.match(todaySource, /energyAmount = TODAY_GROWTH_REWARDS\.journal/);
+  assert.doesNotMatch(todaySource, /if \(energyAmount <= 0 && mergeEnergyAmount <= 0\)/);
+  assert.match(todaySource, /const handleCareRewardFlight[\s\S]*?energyAmount: action\.growthReward,[\s\S]*?mergeEnergyAmount/);
 });
 
 test('developer Reset Today makes yesterday step Energy claimable again', () => {
@@ -134,6 +170,19 @@ test('developer Reset Today makes yesterday step Energy claimable again', () => 
   assert.match(resetSource, /toLocalDateId\(shiftLocalDate\(resetDay, -1\)\)/);
   assert.match(resetSource, /resetMergeWorldActivityForDayForDebug\(state\.today\.isoDate, now\.getTime\(\), yesterdayDayId\)/);
   assert.match(engineSource, /if \(stepEnergyDayId\) delete stepEnergyByDay\[stepEnergyDayId\]/);
+});
+
+test('developer Daily Wisp replay resets its step receipt and Today trusts the persisted Day Card reading', () => {
+  const devSource = readFileSync(path.join(process.cwd(), 'app', '(tabs)', 'explore.tsx'), 'utf8');
+  const replaySource = readFileSync(path.join(process.cwd(), 'game', 'days', 'dev.ts'), 'utf8');
+  const todaySource = readFileSync(path.join(process.cwd(), 'app', '(tabs)', 'today.tsx'), 'utf8');
+
+  assert.match(replaySource, /stepEnergyDayId: target\.isoDate/);
+  assert.match(devSource, /await resetMergeWorldActivityForDayForDebug\([\s\S]*?state\.today\.isoDate,[\s\S]*?dailyReplay\.stepEnergyDayId/);
+  assert.match(todaySource, /const sensorYesterday = stepDays\.find\(\(day\) => day\.dayId === yesterdayDayId\)/);
+  assert.match(todaySource, /const storedYesterday = allDays\.find\(\(day\) => day\.isoDate === yesterdayDayId\)/);
+  assert.match(todaySource, /Math\.max\(sensorYesterday\?\.totalSteps \?\? 0, storedYesterday\?\.stepsCount \?\? 0\)/);
+  assert.doesNotMatch(todaySource, /if \(access !== 'available'\) return null/);
 });
 
 test('inline completion uses one active-day normalization for artifact, Growth, and care', () => {
@@ -192,6 +241,8 @@ test('forming nurture presentation does not mount the legacy Today scene underne
   assert.match(nurtureSource, /actionStackOpacity\.value = withTiming\(1,[\s\S]*?duration: reduceMotion \? 100 : 360/);
   assert.match(nurtureSource, /pointerEvents=\{actionStackInteractive \? 'auto' : 'none'\}/);
   assert.match(nurtureSource, /Gesture\.Native\(\)\.simultaneousWithExternalGesture\([\s\S]*?careSwipeExternalGesture,[\s\S]*?environmentGesture/);
+  assert.match(todaySource, /careSwipeExternalGesture=\{explorationMotion\.gesture\}/);
+  assert.match(nurtureSource, /\.blocksExternalGesture\(externalGesture\)/);
   assert.match(nurtureSource, /\.activeOffsetX\(\[-CARE_SWIPE_ACTIVATION_DISTANCE, CARE_SWIPE_ACTIVATION_DISTANCE\]\)/);
   assert.match(nurtureSource, /shouldClose = event\.translationX <= -CARE_SWIPE_CLOSE_DISTANCE \|\| event\.velocityX <= -360/);
   assert.match(nurtureSource, /<HatchRevealAction onAdd=\{onAddJournal\}/);

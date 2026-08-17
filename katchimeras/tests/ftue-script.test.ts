@@ -477,7 +477,8 @@ test('sequential FTUE choice panels cannot consume the previous question complet
   assert.match(home, /completionEvent=\{currentScriptedTextCompletion\}/);
   assert.match(home, /ownedSelection = selection\?\.action\.instanceId === action\.instanceId/);
   assert.match(home, /ownedCompletionEvent = completionEvent\?\.action\.instanceId === action\.instanceId/);
-  assert.match(home, /if \(!ownedCompletionEvent \|\| completedEventRef\.current === ownedCompletionEvent\.id\) return/);
+  assert.match(home, /completionKey: ownedCompletionEvent\?\.id/);
+  assert.match(home, /if \(!completionKey \|\| completedKeyRef\.current === completionKey\) return/);
 });
 
 test('FTUE inline questions wrap cleanly and do not expose daily-action skip controls', () => {

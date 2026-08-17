@@ -7,11 +7,13 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { GAME_CURRENCY_CATALOG, GameUI, formatGameCurrency, type GameCurrencyId } from '@/constants/game-ui';
 import { GameSurface } from '@/components/katchadeck/ui/game-surface';
+import { AnimatedIntegerText } from '@/components/katchadeck/ui/animated-integer-text';
 
 const CURRENCY_VALUE_COLOR = 'rgb(68, 51, 31)';
 const CURRENCY_SUFFIX_COLOR = 'rgb(126, 106, 77)';
 
 export type GameCurrencyBalance = {
+  animateValue?: boolean;
   art?: ImageSource | number;
   countdownSeconds?: number;
   id: GameCurrencyId;
@@ -32,7 +34,7 @@ export const GameCurrencyHud = memo(function GameCurrencyHud({ balances, compact
   </View>;
 });
 
-const GameCurrencyPill = memo(function GameCurrencyPill({ art, compact, countdownSeconds, id, pulseNonce = 0, suffix, targetRef, tone, value }: GameCurrencyBalance & { compact: boolean; tone: 'default' | 'glass' }) {
+const GameCurrencyPill = memo(function GameCurrencyPill({ animateValue = false, art, compact, countdownSeconds, id, pulseNonce = 0, suffix, targetRef, tone, value }: GameCurrencyBalance & { compact: boolean; tone: 'default' | 'glass' }) {
   const definition = GAME_CURRENCY_CATALOG[id];
   const pulse = useSharedValue(0);
   useEffect(() => {
@@ -48,9 +50,16 @@ const GameCurrencyPill = memo(function GameCurrencyPill({ art, compact, countdow
       <View style={[styles.currencyIcon, compact && styles.currencyIconCompact, glass && styles.currencyIconGlass]}>
         {art ? <Image accessibilityIgnoresInvertColors contentFit="contain" source={art} style={[styles.art, compact && styles.artCompact, glass && styles.artGlass]} transition={0} /> : <IconSymbol color={definition.tint} name={definition.icon} size={compact ? 21 : glass ? 33 : 30} />}
       </View>
-      <ThemedText selectable style={[styles.value, compact && styles.valueCompact, glass && styles.valueGlass]} lightColor={CURRENCY_VALUE_COLOR} darkColor={CURRENCY_VALUE_COLOR}>
-        {formatGameCurrency(value)}{suffix ? <ThemedText style={[styles.suffix, glass && styles.suffixGlass]} lightColor={CURRENCY_SUFFIX_COLOR} darkColor={CURRENCY_SUFFIX_COLOR}>{suffix}</ThemedText> : null}
-      </ThemedText>
+      <AnimatedIntegerText
+        durationMs={animateValue ? 220 : 0}
+        formatValue={formatGameCurrency}
+        selectable
+        style={[styles.value, compact && styles.valueCompact, glass && styles.valueGlass]}
+        lightColor={CURRENCY_VALUE_COLOR}
+        darkColor={CURRENCY_VALUE_COLOR}
+        suffix={suffix ? <ThemedText style={[styles.suffix, glass && styles.suffixGlass]} lightColor={CURRENCY_SUFFIX_COLOR} darkColor={CURRENCY_SUFFIX_COLOR}>{suffix}</ThemedText> : null}
+        value={value}
+      />
       {countdown ? <View pointerEvents="none" style={styles.countdownBanner}>
         <ThemedText style={styles.countdownText} lightColor={GameUI.color.cream} darkColor={GameUI.color.cream}>{countdown}</ThemedText>
       </View> : null}

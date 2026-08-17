@@ -220,7 +220,11 @@ export function useEggFeedController() {
     // channel. The forming egg subscribes directly, so the final token no
     // longer forces the entire Today route through a React render merely to
     // start a UI-thread pulse.
-    if (process.env.EXPO_OS === 'ios') {
+    // Reward landings are tactile on every native build. This is deliberately
+    // tied to the visual token arrival rather than the persisted award, so a
+    // completed action still feels responsive when a daily reward cap means
+    // the wallet itself cannot increase.
+    if (process.env.EXPO_OS !== 'web') {
       const finalToken = index === count - 1;
       const style = finalToken
         ? Haptics.ImpactFeedbackStyle.Medium

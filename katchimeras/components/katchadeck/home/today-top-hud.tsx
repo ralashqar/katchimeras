@@ -27,6 +27,7 @@ export const TodayTopHud = memo(function TodayTopHud({
     <GameHudBar
       content={<GameCurrencyHud balances={[
         {
+          animateValue: true,
           art: GAME_CURRENCY_ART.energy,
           id: 'energy',
           pulseNonce: energyPulseNonce,

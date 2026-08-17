@@ -147,6 +147,7 @@ import { runAfterNativeModalDismiss } from '@/utils/native-modal-navigation';
 import { trackStreakEvent } from '@/utils/streak-sync';
 import { defaultStreakCaptureTarget } from '@/utils/streak-engine';
 import { loadWorldIdentity } from '@/utils/world-identity';
+import { shiftLocalDate, toLocalDateId } from '@/game/days/date';
 import {
   todayExplorationCreatureStageFrame,
   todayExplorationEggStageFrame,
@@ -313,6 +314,7 @@ function HomeScreen() {
   const [yesterdayStepEnergyOffer, setYesterdayStepEnergyOffer] = useState<YesterdayStepEnergyOffer | null>(null);
   const [yesterdayStepEnergyDisplayedSteps, setYesterdayStepEnergyDisplayedSteps] = useState<number | null>(null);
   const [yesterdayStepEnergyBusy, setYesterdayStepEnergyBusy] = useState(false);
+  const [yesterdayStepEnergyCompletionKey, setYesterdayStepEnergyCompletionKey] = useState<string | null>(null);
   const [energyHudValueOverride, setEnergyHudValueOverride] = useState<number | null>(null);
   const ftueStepCheckRef = useRef<string | null>(null);
   const openedOnboardingCaptureRef = useRef(false);
@@ -592,41 +594,55 @@ function HomeScreen() {
   const formingTarget = homeLoopPresentation.forming?.target ?? 'today';
   const formingDay = homeLoopPresentation.forming?.day ?? null;
   useEffect(() => {
-    if (!screenFocused || !isFormingToday || !formingDay || ftueRun?.status === 'active') {
+    if (!screenFocused || !isFormingToday || !formingDay || ftueTodayStep) {
       if (!yesterdayStepEnergyBusy) {
         setYesterdayStepEnergyOffer(null);
         setYesterdayStepEnergyDisplayedSteps(null);
+        setYesterdayStepEnergyCompletionKey(null);
       }
       return;
     }
     let active = true;
     void (async () => {
       const access = await getPedometerAccess();
-      if (access !== 'available') return null;
       const [stepDays, mergeState] = await Promise.all([
-        readRecentPedometerStepDays(),
+        access === 'available' ? readRecentPedometerStepDays() : Promise.resolve([]),
         loadMergeWorldState(),
       ]);
-      const yesterday = stepDays.at(-2);
-      if (!yesterday) return null;
+      const formingDate = new Date(`${formingDay.isoDate}T12:00:00`);
+      const yesterdayDayId = toLocalDateId(shiftLocalDate(
+        Number.isNaN(formingDate.getTime()) ? new Date() : formingDate,
+        -1,
+      ));
+      const sensorYesterday = stepDays.find((day) => day.dayId === yesterdayDayId);
+      const storedYesterday = allDays.find((day) => day.isoDate === yesterdayDayId);
+      // The hatched Day Card is the durable record. Prefer whichever source has
+      // the larger reading so a delayed/unsupported historical sensor query
+      // cannot hide Steps that are already visibly recorded on yesterday.
+      const observedSteps = Math.max(sensorYesterday?.totalSteps ?? 0, storedYesterday?.stepsCount ?? 0);
+      const observedAt = sensorYesterday?.observedAt
+        ?? storedYesterday?.stepsUpdatedAt
+        ?? new Date().toISOString();
       return buildYesterdayStepEnergyOffer({
-        dayId: yesterday.dayId,
-        existing: mergeState.stepEnergyByDay[yesterday.dayId],
-        observedAt: yesterday.observedAt,
-        observedSteps: yesterday.totalSteps,
+        dayId: yesterdayDayId,
+        existing: mergeState.stepEnergyByDay[yesterdayDayId],
+        observedAt,
+        observedSteps,
       });
     })().then((offer) => {
       if (!active || yesterdayStepEnergyBusy) return;
       setYesterdayStepEnergyOffer(offer);
       setYesterdayStepEnergyDisplayedSteps(offer?.observedSteps ?? null);
+      setYesterdayStepEnergyCompletionKey(null);
     }).catch((error) => {
       console.error('[today] Could not check yesterday\'s step Energy', error);
       if (!active || yesterdayStepEnergyBusy) return;
       setYesterdayStepEnergyOffer(null);
       setYesterdayStepEnergyDisplayedSteps(null);
+      setYesterdayStepEnergyCompletionKey(null);
     });
     return () => { active = false; };
-  }, [formingDay, ftueRun?.status, isFormingToday, screenFocused, yesterdayStepEnergyBusy]);
+  }, [allDays, formingDay, ftueTodayStep, isFormingToday, screenFocused, yesterdayStepEnergyBusy]);
   const completeFtueJournalCapture = useCallback(async (
     actionId: string,
     evidenceRef: string,
@@ -832,6 +848,7 @@ function HomeScreen() {
     const offer = yesterdayStepEnergyOffer;
     if (!offer || yesterdayStepEnergyBusy) return;
     setYesterdayStepEnergyBusy(true);
+    setYesterdayStepEnergyCompletionKey(null);
     // The repository publishes the awarded balance immediately. Hold the HUD
     // at its pre-claim value so the visible number advances only as each token
     // actually reaches the Energy pill.
@@ -846,35 +863,36 @@ function HomeScreen() {
         receiptId: `daily-steps:${formingDay?.isoDate ?? 'today'}:${offer.dayId}`,
       });
       const energy = claim.energyGranted ?? 0;
-      const consumedSteps = claim.stepEnergyClaim?.consumedSteps ?? energy * STEPS_PER_MERGE_ENERGY;
-      const remainingSteps = Math.max(0, offer.observedSteps - consumedSteps);
       const beforeEnergy = claim.stepEnergyClaim?.beforeEnergy ?? wallet.energy;
-      if (energy <= 0) {
-        setYesterdayStepEnergyOffer(null);
-        setYesterdayStepEnergyDisplayedSteps(null);
-        setEnergyHudValueOverride(null);
-        setYesterdayStepEnergyBusy(false);
-        return;
-      }
+      // Yesterday's movement is still meaningful context for the fresh Egg,
+      // independently of Merge Energy's daily allowance. Record one movement
+      // action and always show its Egg payout; `mergeEnergyAmount` remains the
+      // actual (possibly zero) wallet grant from the claim.
+      awardTodayGrowth({
+        actionId: 'steps',
+        amount: TODAY_GROWTH_REWARDS.movement,
+        source: 'movement',
+        sourceId: `yesterday-steps:${offer.dayId}`,
+      }, formingTarget);
       setEnergyHudValueOverride(beforeEnergy);
+      // The visual card represents the one-shot conversion being consumed.
+      // Start one continuous countdown with the payout itself rather than
+      // stepping the label only when individual HUD coins land.
+      setYesterdayStepEnergyDisplayedSteps(0);
       let arrivedEnergy = 0;
       startEggFeed(currencyFrom, {
         currencyFrom,
+        energyAmount: TODAY_GROWTH_REWARDS.movement,
         energyOnly: true,
         imageSource: GAME_CURRENCY_ART.energy,
         mergeEnergyAmount: energy,
         onMergeEnergyTokenArrive: (amount) => {
           arrivedEnergy = Math.min(energy, arrivedEnergy + amount);
           setEnergyHudValueOverride(beforeEnergy + arrivedEnergy);
-          setYesterdayStepEnergyDisplayedSteps(Math.max(
-            remainingSteps,
-            offer.observedSteps - arrivedEnergy * STEPS_PER_MERGE_ENERGY,
-          ));
         },
       }, () => {
-        setYesterdayStepEnergyDisplayedSteps(remainingSteps);
-        setYesterdayStepEnergyOffer(null);
-        setYesterdayStepEnergyBusy(false);
+        setYesterdayStepEnergyDisplayedSteps(0);
+        setYesterdayStepEnergyCompletionKey(offer.dayId);
         setEnergyHudValueOverride(null);
       });
     } catch (error) {
@@ -883,11 +901,18 @@ function HomeScreen() {
       setYesterdayStepEnergyBusy(false);
       setMicrocopy('Could not convert those steps yet');
     }
-  }, [formingDay?.isoDate, setMicrocopy, startEggFeed, wallet.energy, yesterdayStepEnergyBusy, yesterdayStepEnergyOffer]);
+  }, [awardTodayGrowth, formingDay?.isoDate, formingTarget, setMicrocopy, startEggFeed, wallet.energy, yesterdayStepEnergyBusy, yesterdayStepEnergyOffer]);
+  const finishYesterdayStepEnergyPanel = useCallback((completionKey: string) => {
+    if (completionKey !== yesterdayStepEnergyCompletionKey) return;
+    setYesterdayStepEnergyOffer((current) => current?.dayId === completionKey ? null : current);
+    setYesterdayStepEnergyDisplayedSteps(null);
+    setYesterdayStepEnergyBusy(false);
+    setYesterdayStepEnergyCompletionKey(null);
+  }, [yesterdayStepEnergyCompletionKey]);
   const deferredCareMergeEnergyRef = useRef(0);
   const deferredJournalRewardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const launchJournalRewardFromBottomAfterDismiss = useCallback(({
-    energyAmount = 0,
+    energyAmount = TODAY_GROWTH_REWARDS.journal,
     mergeEnergyAmount,
     onArrive,
   }: {
@@ -898,10 +923,6 @@ function HomeScreen() {
     if (deferredJournalRewardTimerRef.current) clearTimeout(deferredJournalRewardTimerRef.current);
     deferredJournalRewardTimerRef.current = runAfterNativeModalDismiss(() => {
       deferredJournalRewardTimerRef.current = null;
-      if (energyAmount <= 0 && mergeEnergyAmount <= 0) {
-        onArrive?.();
-        return;
-      }
       const from = { h: 54, w: 54, x: windowWidth / 2 - 27, y: windowHeight - 190 };
       startEggFeed(from, {
         currencyFrom: from,
@@ -2612,9 +2633,11 @@ function HomeScreen() {
           scriptedStepCount={ftueRun?.stepId === 'energy.steps_offer' ? ftueDisplayedSteps : null}
           scriptedStepEnergy={ftueRun?.stepId === 'energy.steps_offer' ? ftueStepEnergy : null}
           yesterdayStepEnergyBusy={yesterdayStepEnergyBusy}
+          yesterdayStepEnergyCompletionKey={yesterdayStepEnergyCompletionKey}
           yesterdayStepEnergyDisplayedSteps={yesterdayStepEnergyDisplayedSteps}
           yesterdayStepEnergyOffer={yesterdayStepEnergyOffer}
           onConvertYesterdaySteps={convertYesterdaySteps}
+          onYesterdayStepEnergyPanelFinished={finishYesterdayStepEnergyPanel}
           onAddJournal={handleNurtureAddJournal}
           onAddTextNote={handleNurtureAddTextNote}
           onAddPhoto={openMomentCapture}
@@ -2630,7 +2653,7 @@ function HomeScreen() {
           onReveal={handleRevealPress}
           onRewardFlight={handleCareRewardFlight}
           onSelectDay={() => {}}
-          careSwipeExternalGesture={environmentGesture}
+          careSwipeExternalGesture={explorationMotion.gesture}
           environmentGesture={environmentGesture}
           sceneTranslateX={explorationMotion.translateX}
           sceneId={equippedSceneId}

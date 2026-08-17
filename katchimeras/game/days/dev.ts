@@ -2,6 +2,7 @@ import type { StoredHomeState } from '@/types/home';
 
 export type DevDailyHatchReplay = {
   dayId: string;
+  stepEnergyDayId: string;
   state: StoredHomeState;
 };
 
@@ -30,6 +31,7 @@ export function prepareLatestDailyHatchForDevReplay(state: StoredHomeState): Dev
 
   return {
     dayId: target.id,
+    stepEnergyDayId: target.isoDate,
     state: {
       ...state,
       today: reseal(state.today),

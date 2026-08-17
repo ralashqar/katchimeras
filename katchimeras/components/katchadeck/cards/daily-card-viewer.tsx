@@ -3,17 +3,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  Easing,
   cancelAnimation,
-  interpolate,
   runOnJS,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
-  withRepeat,
-  withSequence,
   withSpring,
-  withTiming,
 } from 'react-native-reanimated';
 
 import { DailyCardBackFrame } from '@/components/katchadeck/cards/daily-card-back-frame';
@@ -27,7 +22,12 @@ import { Lantern } from '@/constants/theme';
 import type { DailyCreatureCard, HomeDayRecord } from '@/types/home';
 import { buildMomentTimeline } from '@/utils/moment-timeline';
 import { DAILY_CARD_BACK_RECTS, resolveDetailDailyCardSize } from '@/utils/daily-card-layout';
-import { resolveDailyCardFlipTarget, type DailyCardFace } from '@/utils/daily-card-flip';
+import {
+  canonicalDailyCardRotation,
+  dailyCardFaceForRotation,
+  resolveDirectionalDailyCardFlipTarget,
+  type DailyCardFace,
+} from '@/utils/daily-card-flip';
 
 type DailyCardViewerProps = {
   card: DailyCreatureCard;
@@ -35,6 +35,7 @@ type DailyCardViewerProps = {
   maxCardHeight?: number;
   onFaceChange?: (face: DailyCardFace) => void;
   showFaceControls?: boolean;
+  transparentSurround?: boolean;
 };
 
 const PARCHMENT = KatchaSurfacePalette.parchment;
@@ -45,6 +46,7 @@ export function DailyCardViewer({
   maxCardHeight,
   onFaceChange,
   showFaceControls = true,
+  transparentSurround = false,
 }: DailyCardViewerProps) {
   const window = useWindowDimensions();
   const size = resolveDetailDailyCardSize(window.width, maxCardHeight);
@@ -54,8 +56,7 @@ export function DailyCardViewer({
   const faceRef = useRef<DailyCardFace>('front');
   const flip = useSharedValue(0);
   const dragStart = useSharedValue(0);
-  const interacting = useSharedValue(0);
-  const hover = useSharedValue(0);
+  const turning = useSharedValue(0);
 
   const commitFace = useCallback((nextFace: DailyCardFace) => {
     if (faceRef.current === nextFace) return;
@@ -68,47 +69,36 @@ export function DailyCardViewer({
     );
   }, [onFaceChange]);
 
-  const settleTo = useCallback((target: 0 | 180) => {
+  const turnByHalf = useCallback(() => {
+    const target = Math.round(flip.value / 180) * 180 + 180;
+    const targetFace = dailyCardFaceForRotation(target);
+    const settledRotation = canonicalDailyCardRotation(target);
     if (reduceMotion) {
-      flip.value = target;
-      commitFace(target === 180 ? 'back' : 'front');
+      flip.value = settledRotation;
+      turning.value = 0;
+      commitFace(targetFace);
       return;
     }
-    interacting.value = 1;
+    turning.value = 1;
     flip.value = withSpring(
       target,
       { damping: 18, mass: 0.82, stiffness: 170, velocity: 0 },
       (finished) => {
         if (!finished) return;
-        interacting.value = 0;
-        runOnJS(commitFace)(target === 180 ? 'back' : 'front');
+        flip.value = settledRotation;
+        turning.value = 0;
+        runOnJS(commitFace)(targetFace);
       }
     );
-  }, [commitFace, flip, interacting, reduceMotion]);
+  }, [commitFace, flip, reduceMotion, turning]);
 
   useEffect(() => {
     faceRef.current = 'front';
     setFace('front');
     flip.value = 0;
+    turning.value = 0;
     onFaceChange?.('front');
-  }, [card.id, flip, onFaceChange]);
-
-  useEffect(() => {
-    cancelAnimation(hover);
-    if (reduceMotion) {
-      hover.value = 0;
-      return;
-    }
-    hover.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 2400, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0, { duration: 2700, easing: Easing.inOut(Easing.sin) })
-      ),
-      -1,
-      false
-    );
-    return () => cancelAnimation(hover);
-  }, [hover, reduceMotion]);
+  }, [card.id, flip, onFaceChange, turning]);
 
   const pan = useMemo(
     () => Gesture.Pan()
@@ -117,53 +107,68 @@ export function DailyCardViewer({
       .onStart(() => {
         cancelAnimation(flip);
         dragStart.value = flip.value;
-        interacting.value = 1;
+        turning.value = 1;
       })
       .onUpdate((event) => {
-        const next = dragStart.value - (event.translationX / size.width) * 180;
-        flip.value = Math.max(0, Math.min(180, next));
+        const rotationDelta = Math.max(
+          -180,
+          Math.min(180, -(event.translationX / size.width) * 180),
+        );
+        flip.value = dragStart.value + rotationDelta;
       })
       .onEnd((event) => {
-        const target = resolveDailyCardFlipTarget(flip.value, event.velocityX);
+        const target = resolveDirectionalDailyCardFlipTarget(
+          dragStart.value,
+          flip.value,
+          event.velocityX,
+        );
+        const targetFace = dailyCardFaceForRotation(target);
+        const settledRotation = canonicalDailyCardRotation(target);
+        if (reduceMotion) {
+          flip.value = settledRotation;
+          turning.value = 0;
+          runOnJS(commitFace)(targetFace);
+          return;
+        }
         flip.value = withSpring(
           target,
           { damping: 18, mass: 0.82, stiffness: 170, velocity: -(event.velocityX / size.width) * 180 },
           (finished) => {
             if (!finished) return;
-            interacting.value = 0;
-            runOnJS(commitFace)(target === 180 ? 'back' : 'front');
+            flip.value = settledRotation;
+            turning.value = 0;
+            runOnJS(commitFace)(targetFace);
           }
         );
       }),
-    [commitFace, dragStart, flip, interacting, size.width]
+    [commitFace, dragStart, flip, reduceMotion, size.width, turning]
   );
 
-  const hoverStyle = useAnimatedStyle(() => {
-    const activeAmount = 1 - interacting.value;
+  const frontStyle = useAnimatedStyle(() => {
+    const normalizedRotation = ((flip.value % 360) + 360) % 360;
+    const opacity = normalizedRotation < 90 || normalizedRotation >= 270 ? 1 : 0;
+    if (turning.value === 0) return { opacity, transform: [] };
     return {
+      opacity,
       transform: [
-        { translateY: interpolate(hover.value, [0, 1], [2, -5]) * activeAmount },
-        { rotateX: `${interpolate(hover.value, [0, 1], [-0.8, 1.1]) * activeAmount}deg` },
-        { rotateZ: `${interpolate(hover.value, [0, 1], [-0.45, 0.55]) * activeAmount}deg` },
+        { perspective: 1100 },
+        { rotateY: `${flip.value}deg` },
       ],
     };
   });
 
-  const frontStyle = useAnimatedStyle(() => ({
-    opacity: flip.value < 90 ? 1 : 0,
-    transform: [
-      { perspective: 1100 },
-      { rotateY: `${flip.value}deg` },
-    ],
-  }));
-
-  const backStyle = useAnimatedStyle(() => ({
-    opacity: flip.value >= 90 ? 1 : 0,
-    transform: [
-      { perspective: 1100 },
-      { rotateY: `${flip.value - 180}deg` },
-    ],
-  }));
+  const backStyle = useAnimatedStyle(() => {
+    const normalizedRotation = ((flip.value % 360) + 360) % 360;
+    const opacity = normalizedRotation >= 90 && normalizedRotation < 270 ? 1 : 0;
+    if (turning.value === 0) return { opacity, transform: [] };
+    return {
+      opacity,
+      transform: [
+        { perspective: 1100 },
+        { rotateY: `${flip.value - 180}deg` },
+      ],
+    };
+  });
 
   const showBack = face === 'back';
 
@@ -173,8 +178,8 @@ export function DailyCardViewer({
         <Animated.View
           style={[
             styles.hoverShell,
+            !transparentSurround && styles.hoverShellShadow,
             { height: size.height, width: size.width },
-            hoverStyle,
           ]}>
           <Animated.View
             accessibilityElementsHidden={showBack}
@@ -199,7 +204,7 @@ export function DailyCardViewer({
           accessibilityHint={reduceMotion ? undefined : 'You can also swipe horizontally across the card.'}
           icon="rectangle.portrait.and.arrow.right"
           label={showBack ? 'Show card front' : 'Show moments'}
-          onPress={() => settleTo(showBack ? 0 : 180)}
+          onPress={turnByHalf}
           size="compact"
           variant="secondary"
         />
@@ -295,8 +300,11 @@ function DailyCardBack({
 const styles = StyleSheet.create({
   viewer: { alignItems: 'center', gap: 15, width: '100%' },
   hoverShell: {
-    boxShadow: '0 28px 52px rgba(0,0,0,0.48), 0 8px 18px rgba(0,0,0,0.34)',
+    backgroundColor: 'transparent',
     position: 'relative',
+  },
+  hoverShellShadow: {
+    boxShadow: '0 28px 52px rgba(0,0,0,0.48), 0 8px 18px rgba(0,0,0,0.34)',
   },
   face: {
     ...StyleSheet.absoluteFillObject,

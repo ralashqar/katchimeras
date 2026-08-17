@@ -1,12 +1,15 @@
-import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Modal, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { Easing, FadeIn, FadeInUp, useReducedMotion } from 'react-native-reanimated';
 
 import { DailyCardViewer } from '@/components/katchadeck/cards/daily-card-viewer';
+import { AnimatedBorderHighlight } from '@/components/katchadeck/ui/animated-border-highlight';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
+import { KatchaUI } from '@/constants/katcha-ui';
+import { TODAY_ATMOSPHERE_BACKGROUND_SOURCES } from '@/constants/today-atmosphere-background-sources.gen';
 import type { DailyCreatureCard, HomeDayRecord } from '@/types/home';
 
 type DailyCardClaimSplashProps = {
@@ -39,16 +42,16 @@ export function DailyCardClaimSplash({ card, claimAvailable, claiming, day, onCl
       statusBarTranslucent
       transparent={false}
       visible>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <Animated.View
         accessibilityViewIsModal
         entering={FadeIn.duration(reduceMotion ? 80 : 320)}
         style={styles.screen}>
-        <LinearGradient
-          colors={['#263243', '#17202D', '#0E111A']}
-          end={{ x: 0.72, y: 1 }}
-          start={{ x: 0.22, y: 0 }}
+        <Image
+          contentFit="cover"
+          source={TODAY_ATMOSPHERE_BACKGROUND_SOURCES.clear_day.source}
           style={StyleSheet.absoluteFill}
+          transition={0}
         />
         <View
           style={[
@@ -71,6 +74,7 @@ export function DailyCardClaimSplash({ card, claimAvailable, claiming, day, onCl
                 day={day}
                 maxCardHeight={maxCardHeight}
                 showFaceControls={false}
+                transparentSurround
               />
             </Animated.View>
           </View>
@@ -86,6 +90,12 @@ export function DailyCardClaimSplash({ card, claimAvailable, claiming, day, onCl
                   icon="sparkles"
                   label="Claim Day Card"
                   onPress={onClaim}
+                />
+                <AnimatedBorderHighlight
+                  borderRadius={KatchaUI.radius.pill}
+                  inset={1}
+                  orbitDurationMs={2200}
+                  pauseDurationMs={700}
                 />
               </Animated.View>
             ) : null}
@@ -104,12 +114,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     width: '100%',
   },
-  action: { width: '100%' },
+  action: {
+    backgroundColor: 'transparent',
+    borderRadius: KatchaUI.radius.pill,
+    position: 'relative',
+    width: '100%',
+  },
   card: { alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   layout: { flex: 1, gap: 18 },
   rays: { alignSelf: 'center', position: 'absolute' },
   screen: {
-    backgroundColor: '#0E111A',
+    backgroundColor: '#B7DDE9',
     flex: 1,
   },
   stage: { alignItems: 'center', flex: 1, justifyContent: 'center' },

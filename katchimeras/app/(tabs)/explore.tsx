@@ -50,7 +50,11 @@ import type { CompanionAchievementDef } from '@/types/companion-achievements';
 import type { StreakMilestone } from '@/types/streak';
 import { pickRandomAchievement } from '@/utils/achievement-celebration';
 import { STREAK_MILESTONE_REWARDS } from '@/utils/streak-engine';
-import { prepareMossproutMergeFtueForDebug, type MossproutMergeFtueStepId } from '@/utils/merge-world/repository';
+import {
+  prepareMossproutMergeFtueForDebug,
+  resetMergeWorldActivityForDayForDebug,
+  type MossproutMergeFtueStepId,
+} from '@/utils/merge-world/repository';
 import { resetKatchimeraProgressForDebug } from '@/utils/reset-katchimera-progress-for-debug';
 import { setFeastleStoryStateForDebug } from '@/utils/companion-story-storage';
 import { triggerNativeCrashForDiagnostics } from '@/utils/crash-reporting';
@@ -240,25 +244,37 @@ export default function ExploreScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Unhatch egg',
-          onPress: () => {
-            const state = homeRepository.load();
-            if (!state) {
-              Alert.alert('No day available', 'Open Today once, then try this tool again.');
-              return;
+          onPress: async () => {
+            try {
+              const state = homeRepository.load();
+              if (!state) {
+                Alert.alert('No day available', 'Open Today once, then try this tool again.');
+                return;
+              }
+              const dailyReplay = prepareLatestDailyHatchForDevReplay(state);
+              if (!dailyReplay) {
+                Alert.alert('No Daily Wisp available', 'Capture a day and let it roll over before replaying its hatch.');
+                return;
+              }
+              // Replaying the hatch also replays its next-morning setup. Clear
+              // both today's activity allowance and the re-sealed source day's
+              // one-time Steps receipt before navigating back to Today.
+              await resetMergeWorldActivityForDayForDebug(
+                state.today.isoDate,
+                Date.now(),
+                dailyReplay.stepEnergyDayId,
+              );
+              const next = dailyReplay.state;
+              homeRepository.save(next, { allowHatchDowngrade: true });
+              setStoredState(next);
+              clearTodayPatch();
+              router.replace({
+                pathname: '/(tabs)/today',
+                params: { recoveryHatchDayId: dailyReplay.dayId },
+              });
+            } catch (caught) {
+              Alert.alert('Could not replay hatch', caught instanceof Error ? caught.message : 'The Daily Wisp replay could not be prepared.');
             }
-            const dailyReplay = prepareLatestDailyHatchForDevReplay(state);
-            if (!dailyReplay) {
-              Alert.alert('No Daily Wisp available', 'Capture a day and let it roll over before replaying its hatch.');
-              return;
-            }
-            const next = dailyReplay.state;
-            homeRepository.save(next, { allowHatchDowngrade: true });
-            setStoredState(next);
-            clearTodayPatch();
-            router.replace({
-              pathname: '/(tabs)/today',
-              params: { recoveryHatchDayId: dailyReplay.dayId },
-            });
           },
         },
       ]

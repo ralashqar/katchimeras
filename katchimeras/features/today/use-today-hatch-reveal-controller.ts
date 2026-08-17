@@ -31,6 +31,20 @@ const PHASE_DELAYS_MS = {
   assembleDeck: 2_650,
   awaitClaim: 3_300,
 } as const;
+const DAILY_CRACKED_SHAKE_HOLD_MS = 1_000;
+// The second crack finishes drawing at roughly 980 ms. Daily Hatch used to
+// crossfade the Egg at 1,050 ms, leaving the completed cracks readable for only
+// a single frame or two. Shift the reveal and every dependent phase together
+// so the fully cracked Egg keeps shaking for one deliberate extra second.
+const DAILY_PHASE_DELAYS_MS = {
+  ...PHASE_DELAYS_MS,
+  crossfadingSubject: PHASE_DELAYS_MS.crossfadingSubject + DAILY_CRACKED_SHAKE_HOLD_MS,
+  subjectSettling: PHASE_DELAYS_MS.subjectSettling + DAILY_CRACKED_SHAKE_HOLD_MS,
+  postReveal: PHASE_DELAYS_MS.postReveal + DAILY_CRACKED_SHAKE_HOLD_MS,
+  formCard: PHASE_DELAYS_MS.formCard + DAILY_CRACKED_SHAKE_HOLD_MS,
+  assembleDeck: PHASE_DELAYS_MS.assembleDeck + DAILY_CRACKED_SHAKE_HOLD_MS,
+  awaitClaim: PHASE_DELAYS_MS.awaitClaim + DAILY_CRACKED_SHAKE_HOLD_MS,
+} as const;
 const REDUCED_PHASE_DELAYS_MS = {
   shaking: 20,
   cracking: 70,
@@ -157,7 +171,7 @@ export function useTodayHatchRevealController({
         if (runIdRef.current === runId && hatchingActiveRef.current) callback();
       }, delay));
     };
-    const phaseDelays = reduceMotion ? REDUCED_PHASE_DELAYS_MS : PHASE_DELAYS_MS;
+    const phaseDelays = reduceMotion ? REDUCED_PHASE_DELAYS_MS : DAILY_PHASE_DELAYS_MS;
     schedule(phaseDelays.shaking, () => dispatch({ type: 'advance', phase: 'shaking' }));
     schedule(phaseDelays.cracking, () => dispatch({ type: 'advance', phase: 'cracking' }));
     schedule(phaseDelays.crossfadingSubject, () => {

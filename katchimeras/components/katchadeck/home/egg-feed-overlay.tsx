@@ -53,6 +53,12 @@ const TOKEN_FLIGHT_MS = 380;
 const TOKEN_STAGGER_MS = 65;
 const TOKEN_SIZE = 46;
 
+/** Full five-token payout, from burst start through the final landing. */
+export const EGG_FEED_PAYOUT_DURATION_MS = TOKEN_RISE_MS
+  + TOKEN_HOVER_MS
+  + (TOKEN_COUNT - 1) * TOKEN_STAGGER_MS
+  + TOKEN_FLIGHT_MS;
+
 const BURST_VECTORS = [
   { x: -31, y: -48, rotation: -12 },
   { x: -16, y: -57, rotation: -6 },

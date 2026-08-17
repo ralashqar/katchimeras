@@ -114,6 +114,7 @@ test('Daily Hatch preserves the live Today Egg and camera framing', () => {
   const egg = readFileSync(path.join(process.cwd(), 'components/katchadeck/home/today-kingdom-egg-hero.tsx'), 'utf8');
   const nurture = readFileSync(path.join(process.cwd(), 'components/katchadeck/home/today-nurture-experience.tsx'), 'utf8');
   const motion = readFileSync(path.join(process.cwd(), 'components/katchadeck/home/today-environment-motion.tsx'), 'utf8');
+  const hatchReveal = readFileSync(path.join(process.cwd(), 'features/today/use-today-hatch-reveal-controller.ts'), 'utf8');
 
   assert.match(today, /frozen: dailyHatchActive \|\| discoveryHatchInPlace/);
   assert.equal((today.match(/frozen: dailyHatchActive \|\| discoveryHatchInPlace/g) ?? []).length, 2);
@@ -135,6 +136,9 @@ test('Daily Hatch preserves the live Today Egg and camera framing', () => {
   assert.ok((nurture.match(/\(environmentMotion\?\.pinchScale\.value \?\? 1\) \* hatchCameraScale\.value/g) ?? []).length >= 2);
   assert.match(motion, /additionalScale\?: SharedValue<number>/);
   assert.match(motion, /\(motion\?\.pinchScale\.value \?\? 1\) \* \(additionalScale\?\.value \?\? 1\)/);
+  assert.match(hatchReveal, /const DAILY_CRACKED_SHAKE_HOLD_MS = 1_000/);
+  assert.match(hatchReveal, /crossfadingSubject: PHASE_DELAYS_MS\.crossfadingSubject \+ DAILY_CRACKED_SHAKE_HOLD_MS/);
+  assert.match(hatchReveal, /const phaseDelays = reduceMotion \? REDUCED_PHASE_DELAYS_MS : DAILY_PHASE_DELAYS_MS/);
 });
 
 test('the new Today Egg fades in at its reset size before progress returns', () => {
@@ -161,11 +165,19 @@ test('Daily Hatch reveals one full, flippable card in a claim splash', () => {
   assert.match(today, /<DailyCardClaimSplash[\s\S]*?card=\{hatchLeadCard\}[\s\S]*?day=\{hatchCardDay\}/);
   assert.doesNotMatch(today, /CardDeckCarousel|hatchDeckCards|hatchDeckContent/);
   assert.match(splash, /<DailyCardViewer[\s\S]*?showFaceControls=\{false\}/);
+  assert.match(splash, /TODAY_ATMOSPHERE_BACKGROUND_SOURCES\.clear_day\.source/);
+  assert.match(splash, /<DailyCardViewer[\s\S]*?transparentSurround/);
+  assert.match(splash, /<AnimatedBorderHighlight[\s\S]*?borderRadius=\{KatchaUI\.radius\.pill\}/);
   assert.match(splash, /<RotatingRadialSunburst/);
   assert.match(splash, /<Modal[\s\S]*?presentationStyle="fullScreen"/);
   assert.match(splash, /label="Claim Day Card"/);
   assert.doesNotMatch(splash, /NEW WISP|NEW SCENE|Show moments/);
   assert.doesNotMatch(viewer, /\.enabled\(!reduceMotion && face === 'front'\)/);
+  assert.match(viewer, /resolveDirectionalDailyCardFlipTarget/);
+  assert.match(viewer, /dragStart\.value \+ rotationDelta/);
+  assert.match(viewer, /canonicalDailyCardRotation/);
+  assert.match(viewer, /if \(turning\.value === 0\) return \{ opacity, transform: \[\] \}/);
+  assert.doesNotMatch(viewer, /withRepeat|rotateX|rotateZ/);
 });
 
 test('the retrospective hatch-ready Egg uses the Achievement rays and Energy ripple', () => {
