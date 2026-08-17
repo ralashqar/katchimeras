@@ -200,7 +200,8 @@ test('Merge FTUE spotlight is an absolute native-view overlay with transparent t
   assert.match(overlay, /borderColor: theme\.focusRingColor/);
   assert.match(overlay, /spotlight\.targets/);
   assert.match(overlay, /spotlight\.grouping === 'bounding_rect'[\s\S]*?boundingFrame\(resolved\)/);
-  assert.match(merge, /spotlight=\{active && !serveFlight \? ftueStep\?\.spotlight \?\? null : null\}/);
+  assert.match(merge, /spotlight=\{active && !serveFlight \? mergeGuidanceSpotlight : null\}/);
+  assert.match(merge, /const mergeGuidanceSpotlight = ftueStep\?\.spotlight \?\? postFtueDiscoveryGuidance\.spotlight/);
 });
 
 test('Merge FTUE updates one persistent finger and spotlight tree for each measured target', () => {

@@ -30,6 +30,10 @@ export function resolveFtueBoardCell(state: MergeWorldState, target: FtueTarget)
     const cell = state.board.findIndex((entry) => entry.mist?.kind === 'dreambound_item' && entry.mist.discoveryId === target.discoveryId && entry.mist.active);
     return cell >= 0 ? cell : null;
   }
+  if (target.kind === 'board_discovery_fork') {
+    const cell = state.board.findIndex((entry) => entry.mist?.kind === 'discovery_fork' && entry.mist.gateId === target.gateId);
+    return cell >= 0 ? cell : null;
+  }
   if (target.kind === 'order_requirement_item') {
     const requirement = state.activeOrders.find((order) => order.id === target.orderId)?.requirements[target.requirementIndex];
     if (!requirement) return null;

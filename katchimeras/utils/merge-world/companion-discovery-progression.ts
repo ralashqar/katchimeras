@@ -3,6 +3,40 @@ import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import type { CompanionDiscoveryAffinity } from '@/constants/companion-discovery-catalog';
 import { EARLY_COMPANION_DISCOVERY_POOLS } from '@/constants/companion-discovery-catalog';
 
+export type CompanionDiscoveryGateDefinition = {
+  gateId: string;
+  prerequisiteGateId: string;
+  minimumMergeLevel: number;
+  minimumCompletedOrders: number;
+  minimumExpansions: number;
+  minimumMeaningfulDays: number;
+  candidatePolicy: 'early_remaining';
+  choiceMode: 'fork' | 'single';
+  maximumCandidates: number;
+};
+
+export const COMPANION_DISCOVERY_GATE_CATALOG: readonly CompanionDiscoveryGateDefinition[] = [
+  {
+    gateId: 'gate-3-first-choice', prerequisiteGateId: 'gate-2-steppling',
+    minimumMergeLevel: 3, minimumCompletedOrders: 6, minimumExpansions: 0, minimumMeaningfulDays: 1,
+    candidatePolicy: 'early_remaining', choiceMode: 'fork', maximumCandidates: 3,
+  },
+  {
+    gateId: 'gate-4-expanding-world', prerequisiteGateId: 'gate-3-first-choice',
+    minimumMergeLevel: 5, minimumCompletedOrders: 15, minimumExpansions: 1, minimumMeaningfulDays: 2,
+    candidatePolicy: 'early_remaining', choiceMode: 'fork', maximumCandidates: 2,
+  },
+  {
+    gateId: 'gate-5-complete-foundations', prerequisiteGateId: 'gate-4-expanding-world',
+    minimumMergeLevel: 7, minimumCompletedOrders: 28, minimumExpansions: 2, minimumMeaningfulDays: 3,
+    candidatePolicy: 'early_remaining', choiceMode: 'single', maximumCandidates: 1,
+  },
+] as const;
+
+export function companionDiscoveryGate(gateId: string) {
+  return COMPANION_DISCOVERY_GATE_CATALOG.find((gate) => gate.gateId === gateId) ?? null;
+}
+
 export type CompanionAffinityProfile = Record<CompanionDiscoveryAffinity, number>;
 
 const EMPTY_AFFINITY: CompanionAffinityProfile = {
@@ -67,22 +101,21 @@ export function nextEligibleCompanionGate(
   state: MergeWorldState,
   meaningfulDayCount: number,
 ): { gateId: string; candidateIds: MergeCharacterId[] } | null {
-  if (!state.unlockedCharacters.includes('steppling') || state.activeOrders.some((order) => order.id === 'steppling:discovery:first-trail')) return null;
-  if (!state.companionDiscovery.completedGateIds.includes('gate-3-first-choice')
-    && state.mergeLevel >= 3 && state.completedOrderCount >= 6 && meaningfulDayCount >= 1) {
-    return {
-      gateId: 'gate-3-first-choice',
-      candidateIds: EARLY_COMPANION_DISCOVERY_POOLS['gate-3-first-choice'].filter((id) => !state.unlockedCharacters.includes(id)),
-    };
-  }
-  if (!state.companionDiscovery.completedGateIds.includes('gate-4-expanding-world')
-    && state.companionDiscovery.completedGateIds.includes('gate-3-first-choice')
-    && state.mergeLevel >= 5 && state.completedOrderCount >= 15 && state.expansions.length >= 1 && meaningfulDayCount >= 2) {
-    return {
-      gateId: 'gate-4-expanding-world',
-      candidateIds: EARLY_COMPANION_DISCOVERY_POOLS['gate-4-expanding-world'].filter((id) => !state.unlockedCharacters.includes(id)).slice(0, 3),
-    };
+  if (state.companionDiscovery.active || state.arrivals.some((arrival) => arrival.kind === 'discovery_parcel' && arrival.claimedAt == null)) return null;
+  for (const gate of COMPANION_DISCOVERY_GATE_CATALOG) {
+    if (state.companionDiscovery.completedGateIds.includes(gate.gateId)) continue;
+    const prerequisiteRecord = state.companionDiscovery.records.find((record) => record.gateId === gate.prerequisiteGateId);
+    if (!prerequisiteRecord?.firstOrderCompletedAt) return null;
+    if (state.mergeLevel < gate.minimumMergeLevel
+      || state.completedOrderCount < gate.minimumCompletedOrders
+      || state.expansions.length < gate.minimumExpansions
+      || meaningfulDayCount < gate.minimumMeaningfulDays) return null;
+    const sourcePool = EARLY_COMPANION_DISCOVERY_POOLS[gate.gateId] ?? EARLY_COMPANION_DISCOVERY_POOLS['gate-3-first-choice'];
+    const candidateIds = sourcePool
+      .filter((id) => !state.unlockedCharacters.includes(id))
+      .slice(0, gate.maximumCandidates);
+    if (!candidateIds.length) continue;
+    return { gateId: gate.gateId, candidateIds };
   }
   return null;
 }
-

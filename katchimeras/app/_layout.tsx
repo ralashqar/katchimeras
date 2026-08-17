@@ -20,6 +20,7 @@ import { GameScreenTransitionProvider, TransitionAwareStatusBar } from '@/featur
 import { FtueProvider } from '@/features/onboarding/ftue-provider';
 import { GameUIProvider } from '@/components/katchadeck/ui/game-ui-provider';
 import { GameFeedbackProvider } from '@/features/ui/game-feedback-provider';
+import { DevProfileLaunchReconciler } from '@/features/dev-profile-launch-reconciler';
 import { GameWalletProvider } from '@/features/ui/game-wallet-provider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import '@/utils/travel-memory-task';
@@ -99,6 +100,7 @@ function RootLayout() {
                     <SceneProvider>
                     <FtueProvider>
                     <AppActivityProvider>
+                      <DevProfileLaunchReconciler />
                       <GameScreenTransitionProvider>
                       <Stack>
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
@@ -111,6 +113,8 @@ function RootLayout() {
           <Stack.Screen name="dev-photo-place-lab" options={{ title: 'Photo Place Lab' }} />
           <Stack.Screen name="dev-subscription-lab" options={{ title: 'Subscription Simulator' }} />
           <Stack.Screen name="dev-ui-gallery" options={{ title: 'Game UI Gallery' }} />
+          <Stack.Screen name="dev-profile-snapshots" options={{ title: 'Profile Snapshots' }} />
+          <Stack.Screen name="dev-profile-snapshot-capture" options={{ contentStyle: { backgroundColor: 'transparent' }, presentation: 'formSheet', sheetAllowedDetents: [0.5, 1], sheetGrabberVisible: true, title: 'Capture Profile' }} />
           <Stack.Screen name="intelligence-lab" options={{ title: 'Intelligence Lab' }} />
           <Stack.Screen name="moment-capture" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="note-capture" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />

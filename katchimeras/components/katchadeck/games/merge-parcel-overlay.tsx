@@ -69,6 +69,7 @@ export const MergeParcelTrayCard = forwardRef<NativeView, {
         <View pointerEvents="none" style={styles.parcelGlow} />
         <Image accessibilityIgnoresInvertColors contentFit="contain" source={PARCEL_ART} style={styles.parcelArt} transition={0} />
         {arrival.kind === 'goal_chest' ? <GameBadge icon="star.fill" style={styles.goalBadge} tone="gold" /> : null}
+        {arrival.kind === 'discovery_parcel' ? <GameBadge icon="sparkles" style={styles.discoveryBadge} tone="dark" /> : null}
         <GameBadge label={count} style={styles.countBadge} tone="gold" />
       </Animated.View>
       <Image accessibilityIgnoresInvertColors contentFit="contain" pointerEvents="none" source={PARCEL_TRAY_ART} style={styles.parcelTrayArt} transition={0} />
@@ -207,6 +208,7 @@ const styles = StyleSheet.create({
   parcelArt: { height: PARCEL_SIZE, width: PARCEL_SIZE },
   parcelTrayArt: { bottom: 0, height: 58, left: -2, position: 'absolute', width: 124, zIndex: 2 },
   countBadge: { height: 22, minWidth: 22, position: 'absolute', right: -1, top: 0, zIndex: 5 },
+  discoveryBadge: { bottom: 1, height: 20, left: 1, minWidth: 20, paddingHorizontal: 0, position: 'absolute', zIndex: 5 },
   goalBadge: { bottom: 1, height: 20, left: 1, minWidth: 20, paddingHorizontal: 0, position: 'absolute' },
   flightOverlay: { ...StyleSheet.absoluteFillObject, overflow: 'visible', zIndex: 115 },
   openingCrate: { height: PARCEL_SIZE, left: 0, position: 'absolute', top: 0, width: PARCEL_SIZE },

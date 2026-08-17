@@ -120,4 +120,5 @@ export const COMPANION_DISCOVERIES_BY_ID = new Map(COMPANION_DISCOVERY_CATALOG.m
 export const EARLY_COMPANION_DISCOVERY_POOLS: Readonly<Record<string, readonly MergeCharacterId[]>> = {
   'gate-3-first-choice': ['feastle', 'baristabbit', 'bedrotte'],
   'gate-4-expanding-world': ['feastle', 'baristabbit', 'bedrotte'],
+  'gate-5-complete-foundations': ['feastle', 'baristabbit', 'bedrotte'],
 };

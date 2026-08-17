@@ -25,6 +25,7 @@ import { useMergeWorldActions, useMergeWorldLastResult, useMergeWorldState } fro
 import { commitFtueAction, dispatchFtueEvent, registerFtueObjectiveBaseline, repairFtueStep, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { MOSSPROUT_FTUE_RETURN_NOTE_ID, mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
+import type { FtueCueDefinition, FtueSpotlightDefinition } from '@/features/onboarding/ftue-types';
 import { useGameFeedback } from '@/features/ui/game-feedback-provider';
 import { useGameWallet } from '@/features/ui/game-wallet-provider';
 import { GameUI } from '@/constants/game-ui';
@@ -34,7 +35,7 @@ import {
   mergeFtueInteractionKey,
   MergeFtueInteractionCoordinator,
 } from '@/features/onboarding/merge-ftue-interaction-coordinator';
-import type { MergeOrder, MergeWorldCommand } from '@/types/merge-world';
+import type { MergeCharacterId, MergeOrder, MergeWorldCommand } from '@/types/merge-world';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
 import { mergeOrderEnergyRefund, mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds } from '@/utils/merge-world/engine';
 import { MERGE_ENERGY_REGEN_MS } from '@/utils/merge-world/economy-policy';
@@ -47,6 +48,13 @@ import { MergeParcelFlightOverlay, type MergeParcelFlight } from './merge-parcel
 import { MergeOrderRail, type MergeTrayEntry } from './merge-order-rail';
 import { MergeServeRewardOverlay, type MergeScreenPoint, type MergeServeRewardFlight } from './merge-serve-reward-overlay';
 import { MergeFtueOverlay } from './merge-ftue-overlay';
+
+const EARLY_DISCOVERY_REVEAL_COPY: Partial<Record<MergeCharacterId, { description: string; rewardBody: string }>> = {
+  steppling: { description: 'Every path starts somewhere.', rewardBody: 'The final trail marker became a Journey Locker.' },
+  feastle: { description: 'A warm table was waiting beneath the Mist.', rewardBody: 'The Dreambound Dish became a Hearth Pantry.' },
+  baristabbit: { description: 'A familiar warmth followed the light home.', rewardBody: 'The Dreambound Teapot became a Ritual Bar.' },
+  bedrotte: { description: 'The quiet hollow finally felt safe enough to open.', rewardBody: 'The Dreambound Pillow became a Comfort Chest.' },
+};
 
 export function MergeWorldScreen({ active = true, backgroundReady = true, playBoardEntrance = true }: { active?: boolean; backgroundReady?: boolean; playBoardEntrance?: boolean } = {}) {
   const router = useRouter();
@@ -154,16 +162,17 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     .flatMap((record) => {
       const image = CREATURE_HATCHLING_SOURCES.full[record.characterId];
       if (!image) return [];
+      const revealCopy = EARLY_DISCOVERY_REVEAL_COPY[record.characterId];
       return [{
         id: `companion-discovery:${record.characterId}`,
         eyebrow: 'New Katchimera',
         title: `${MERGE_CHARACTER_NAMES[record.characterId]} discovered`,
-        description: record.characterId === 'steppling' ? 'Every path starts somewhere.' : 'A new companion found its way through the Dream Mist.',
+        description: revealCopy?.description ?? 'A new companion found its way through the Dream Mist.',
         image,
         imageAccessibilityLabel: record.characterId,
         detail: 'Found on the Merge board',
         rewardTitle: 'Meet them',
-        rewardBody: record.characterId === 'steppling' ? 'The Strange Pack became a Journey Locker.' : 'Their discovery changed the board permanently.',
+        rewardBody: revealCopy?.rewardBody ?? 'Their discovery changed the board permanently.',
         tint: '#D7A956',
         tier: 3,
         nextLabel: 'See what changed',
@@ -174,6 +183,27 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     && state?.companionDiscovery.active?.discoveryId.startsWith('fork:')
       ? state.companionDiscovery.active
       : null;
+  const postFtueDiscoveryGuidance = useMemo<{
+    cue: FtueCueDefinition | null;
+    spotlight: FtueSpotlightDefinition | null;
+  }>(() => {
+    if (ftueStep || !state || state.companionDiscovery.active?.gateId !== 'gate-3-first-choice') return { cue: null, spotlight: null };
+    const discovery = state.companionDiscovery.active;
+    if (!discovery.selectedCharacterId) {
+      const target = { kind: 'board_discovery_fork' as const, gateId: discovery.gateId };
+      return { cue: null, spotlight: { targets: [target], padding: 6, radius: 14, dimOpacity: 0.46 } };
+    }
+    const parcel = state.arrivals.find((arrival) => arrival.kind === 'discovery_parcel'
+      && arrival.discoveryId === discovery.discoveryId && arrival.claimedAt == null);
+    if (!parcel) return { cue: null, spotlight: null };
+    const target = { kind: 'tray_parcel' as const, arrivalId: parcel.id };
+    return {
+      cue: { kind: 'tap', target },
+      spotlight: { targets: [target], padding: 7, radius: 14, dimOpacity: 0.52 },
+    };
+  }, [ftueStep, state]);
+  const mergeGuidanceCue = ftueStep?.cue ?? postFtueDiscoveryGuidance.cue;
+  const mergeGuidanceSpotlight = ftueStep?.spotlight ?? postFtueDiscoveryGuidance.spotlight;
 
   useEffect(() => subscribeCompanionStories(() => {
     setStory(loadFeastleStory());
@@ -664,12 +694,12 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       <MergeFtueOverlay
         blockedPulseNonce={blockedFtuePulseNonce}
         boardMetrics={boardMetrics}
-        cue={active && !serveFlight ? ftueStep?.cue ?? null : null}
+        cue={active && !serveFlight ? mergeGuidanceCue : null}
         layoutNonce={screenLayoutNonce}
         screenRef={screenRef}
         railTargetRefs={railTargetRefs}
         state={state}
-        spotlight={active && !serveFlight ? ftueStep?.spotlight ?? null : null}
+        spotlight={active && !serveFlight ? mergeGuidanceSpotlight : null}
         targetRevision={ftueTargetRevision}
       />
 
@@ -684,13 +714,13 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
 
       {active && discoveryFork ? <View style={[styles.discoveryForkOverlay, { bottom: Math.max(insets.bottom + 18, 26) }]}>
         <ThemedText style={styles.energyConnectionEyebrow} lightColor="#FFD36A" darkColor="#FFD36A">THE MIST IS LISTENING</ThemedText>
-        <ThemedText selectable style={styles.discoveryForkTitle} lightColor="#FFF8E8" darkColor="#FFF8E8">Which path should we follow?</ThemedText>
-        <ThemedText selectable style={styles.discoveryForkBody} lightColor="rgba(255,248,232,0.82)" darkColor="rgba(255,248,232,0.82)">The others will return another time.</ThemedText>
+        <ThemedText selectable style={styles.discoveryForkTitle} lightColor="#FFF8E8" darkColor="#FFF8E8">{discoveryFork.candidateIds.length === 1 ? 'One path remains.' : 'Which path should we follow?'}</ThemedText>
+        <ThemedText selectable style={styles.discoveryForkBody} lightColor="rgba(255,248,232,0.82)" darkColor="rgba(255,248,232,0.82)">{discoveryFork.candidateIds.length === 1 ? 'Follow it to complete this circle of companions.' : 'The others will return another time.'}</ThemedText>
         <View style={styles.discoveryForkActions}>{discoveryFork.candidateIds.map((characterId) => <KatchaButton
           fullWidth
           glow={discoveryFork.recommendedCharacterId === characterId}
           key={characterId}
-          label={`${COMPANION_DISCOVERY_CATALOG.find((definition) => definition.characterId === characterId)?.pathName ?? 'Mysterious Path'}${discoveryFork.recommendedCharacterId === characterId ? ' · This feels familiar' : ''}`}
+          label={`${discoveryFork.candidateIds.length === 1 ? 'Follow ' : ''}${COMPANION_DISCOVERY_CATALOG.find((definition) => definition.characterId === characterId)?.pathName ?? 'Mysterious Path'}${discoveryFork.recommendedCharacterId === characterId ? ' · This feels familiar' : ''}`}
           onPress={() => dispatch({ type: 'selectCompanionDiscoveryPath', characterId, now: Date.now() })}
           variant={discoveryFork.recommendedCharacterId === characterId ? 'primary' : 'secondary'}
         />)}</View>

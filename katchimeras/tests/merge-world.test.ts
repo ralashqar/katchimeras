@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { KATCHIMERA_MERGE_PROFILES, MERGE_GENERATORS, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
-import { COMPANION_BOARD_ALLOCATIONS, COMPANION_BOARD_RESERVE_CELLS, MERGE_STARTING_DIAMOND_CELLS } from '@/constants/companion-discovery-catalog';
+import { COMPANION_BOARD_ALLOCATIONS, COMPANION_BOARD_RESERVE_CELLS, COMPANION_DISCOVERY_CATALOG, MERGE_STARTING_DIAMOND_CELLS } from '@/constants/companion-discovery-catalog';
 import type { HomeDayRecord } from '@/types/home';
 import type { MergeBoardItem, MergeWorldState } from '@/types/merge-world';
 import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
@@ -172,7 +172,7 @@ test('board geometry renders and hit-tests with one coordinate system', () => {
 test('a new Merge World uses the consolidated Energy economy', () => {
   const state = createInitialMergeWorldState(NOW);
   assert.deepEqual(mergeWorldCatalogIssues(), []);
-  assert.equal(state.version, 12);
+  assert.equal(state.version, 13);
   assert.equal(state.storageCapacity, 8);
   assert.equal(state.energy.regenCap, MERGE_ENERGY_REGEN_CAP);
   assert.equal(state.energy.value, MERGE_INITIAL_ENERGY);
@@ -912,6 +912,7 @@ test('Merge page keeps a stable parcel stack first in the tray and the board att
   assert.match(screen, /boardStage: \{[^}]*justifyContent: 'flex-start'/);
   assert.match(screen, /mergeArea: \{[^}]*marginTop: 18/);
   assert.match(parcel, /<GameBadge label=\{count\} style=\{styles\.countBadge\} tone="gold"/);
+  assert.match(parcel, /arrival\.kind === 'discovery_parcel'[\s\S]*?<GameBadge icon="sparkles"/);
   assert.match(gameSurface, /badgeText: \{[^}]*fontFamily: GameUI\.type\.title\.fontFamily/);
   assert.match(gameSurface, /badge: \{[^}]*alignItems: 'center'[^}]*justifyContent: 'center'/);
   assert.match(parcel, /opacity: interpolate\(value, \[0, 0\.08, 1\], \[0, 1, 1\]\)/);
@@ -923,6 +924,8 @@ test('Merge page keeps a stable parcel stack first in the tray and the board att
   assert.match(rail, /entry\.kind === 'parcel' \? PARCEL_STACK_EXIT : TRAY_SERVE_EXIT/);
   assert.match(rail, /layout=\{reduceMotion \? undefined : LinearTransition/);
   assert.match(screen, /arrival\.kind === 'discovery_parcel'/);
+  assert.match(screen, /postFtueDiscoveryGuidance/);
+  assert.match(screen, /kind: 'board_discovery_fork'/);
 });
 
 test('rail FTUE target refs keep stable callback identities across target revision renders', () => {
@@ -1185,7 +1188,7 @@ test('legacy snapshots migrate into the current version without discarding earne
     energy: { value: 99, cap: 100, lastRegenAt: NOW },
     generators: { 'starter-pantry': { id: 'starter-pantry', familyId: 'food', name: 'Picnic Pantry', level: 1, enabledBranches: ['table'], charges: 9, maxCharges: 12, readyAt: NOW + 1000 } },
   }, NOW + 1);
-  assert.equal(normalized.version, 12);
+  assert.equal(normalized.version, 13);
   assert.equal(normalized.energy.regenCap, 50);
   assert.equal(normalized.energy.value, 99);
   assert.deepEqual(Object.keys(normalized.generators['hearth-pantry']).sort(), ['chainIds', 'forcedDropDefinitionId', 'id', 'level', 'name', 'tierOneDropDefinitionIds', 'upgradeFragments']);
@@ -1337,6 +1340,10 @@ test('Steppling FTUE parcel completes three Dreambound merges into the Journey L
   state = reduceMergeWorld(state, { type: 'serveOrder', orderId: 'steppling:discovery:first-trail', now: NOW + 13 }).state;
   assert.equal(state.generators['journey-locker'].forcedDropDefinitionId, null);
   assert.equal(state.activeOrders.some((order) => order.id === 'steppling:discovery:first-trail'), false);
+  assert.equal(state.companionDiscovery.records.find((record) => record.characterId === 'steppling')?.firstOrderCompletedAt, NOW + 13);
+  assert.deepEqual(new Set(state.companionDiscovery.events.map((event) => event.kind)), new Set([
+    'gate_eligible', 'gate_activated', 'path_chosen', 'parcel_claimed', 'stage_advanced', 'character_revealed', 'first_order_completed',
+  ]));
   assert.equal(state.board.filter((cell) => !cell.locked).length, 16);
 });
 
@@ -1345,9 +1352,47 @@ test('v10 companion ownership migrates into seen grandfathered discovery records
   const legacy = { ...current, version: 10 } as unknown as Record<string, unknown>;
   delete legacy.companionDiscovery;
   const migrated = normalizeMergeWorldState(legacy, NOW + 1);
-  assert.equal(migrated.version, 12);
+  assert.equal(migrated.version, 13);
   assert.deepEqual(new Set(migrated.unlockedCharacters), new Set(['feastle', 'bedrotte']));
   assert.ok(migrated.companionDiscovery.records.every((record) => record.source === 'legacy_grandfather' && record.revealSeenAt != null));
+});
+
+test('v12 discovery records infer introduction completion without skipping an active first order', () => {
+  const base = createInitialMergeWorldState(NOW, ['steppling']);
+  const record = {
+    characterId: 'steppling', source: 'board_discovery' as const, gateId: 'gate-2-steppling', pathId: 'overgrown-trail',
+    discoveredAt: NOW, revealSeenAt: NOW, permanentFeatureId: 'journey-locker',
+  };
+  const completed = normalizeMergeWorldState({
+    ...base, version: 12,
+    companionDiscovery: { ...base.companionDiscovery, records: [record] },
+  }, NOW + 1);
+  assert.equal(completed.companionDiscovery.records[0].firstOrderCompletedAt, NOW + 1);
+
+  const pending = normalizeMergeWorldState({
+    ...base, version: 12,
+    activeOrders: [{
+      id: 'steppling:discovery:first-trail', characterId: 'steppling', title: 'Trail', description: 'Trail', difficulty: 'small',
+      requirements: [{ definitionId: 'adventure:trail:2', quantity: 1 }],
+      reward: { coins: 1, mergeXp: 1, friendshipXp: 1, energy: 0 }, createdAt: NOW,
+      signature: false, purpose: 'normal', storyArcId: 'steppling:discovery',
+    }],
+    companionDiscovery: { ...base.companionDiscovery, records: [record] },
+  }, NOW + 1);
+  assert.equal(pending.companionDiscovery.records[0].firstOrderCompletedAt, null);
+});
+
+test('normalization restores a missing deterministic parcel for an untouched active path', () => {
+  let state = createMossproutChapterZeroState(NOW);
+  state = {
+    ...state,
+    activeOrders: [],
+    characterProgress: { ...state.characterProgress, mossprout: { friendshipLevel: 1, completedChapterIds: ['mossprout-chapter-0'] } },
+  };
+  state = reduceMergeWorld(state, { type: 'startStepplingDiscovery', now: NOW + 1 }).state;
+  const repaired = normalizeMergeWorldState({ ...state, arrivals: [] }, NOW + 2);
+  assert.equal(repaired.arrivals.filter((arrival) => arrival.id === 'arrival:discovery:discovery:ftue-steppling').length, 1);
+  assert.deepEqual(repaired.arrivals[0].itemDefinitionIds, ['adventure:trail:1']);
 });
 
 test('life affinity recommends but never removes an early discovery choice', () => {
@@ -1370,13 +1415,92 @@ test('Gate 3 waits for Steppling first order and returns the complete non-missab
     completedOrderCount: 6,
     companionDiscovery: {
       ...state.companionDiscovery,
+      records: [
+        ...state.companionDiscovery.records.filter((record) => record.characterId !== 'steppling'),
+        {
+          characterId: 'steppling', source: 'board_discovery', gateId: 'gate-2-steppling', pathId: 'overgrown-trail',
+          discoveredAt: NOW, revealSeenAt: NOW, firstOrderCompletedAt: null, permanentFeatureId: 'journey-locker',
+        },
+      ],
       completedGateIds: ['gate-1-mossprout', 'gate-2-steppling'],
+    },
+  };
+  assert.equal(nextEligibleCompanionGate(state, 1), null);
+  state = {
+    ...state,
+    companionDiscovery: {
+      ...state.companionDiscovery,
+      records: state.companionDiscovery.records.map((record) => record.characterId === 'steppling'
+        ? { ...record, firstOrderCompletedAt: NOW + 1 }
+        : record),
     },
   };
   assert.deepEqual(nextEligibleCompanionGate(state, 1), {
     gateId: 'gate-3-first-choice',
     candidateIds: ['feastle', 'baristabbit', 'bedrotte'],
   });
+});
+
+test('Gate 4 offers the remaining two paths and Gate 5 guarantees the final early foundation', () => {
+  const discoveryRecord = (characterId: 'steppling' | 'feastle' | 'baristabbit', gateId: string) => ({
+    characterId, source: 'board_discovery' as const, gateId, pathId: 'path', discoveredAt: NOW,
+    revealSeenAt: NOW, firstOrderCompletedAt: NOW, permanentFeatureId: 'feature',
+  });
+  let state = createInitialMergeWorldState(NOW, ['mossprout', 'steppling', 'feastle']);
+  state = {
+    ...state,
+    mergeLevel: 5,
+    completedOrderCount: 15,
+    expansions: ['expansion:1'],
+    companionDiscovery: {
+      ...state.companionDiscovery,
+      records: [
+        ...state.companionDiscovery.records.filter((record) => !['steppling', 'feastle'].includes(record.characterId)),
+        discoveryRecord('steppling', 'gate-2-steppling'), discoveryRecord('feastle', 'gate-3-first-choice'),
+      ],
+      completedGateIds: ['gate-1-mossprout', 'gate-2-steppling', 'gate-3-first-choice'],
+    },
+  };
+  assert.deepEqual(nextEligibleCompanionGate(state, 2), {
+    gateId: 'gate-4-expanding-world', candidateIds: ['baristabbit', 'bedrotte'],
+  });
+
+  state = {
+    ...state,
+    unlockedCharacters: [...state.unlockedCharacters, 'baristabbit'],
+    mergeLevel: 7,
+    completedOrderCount: 28,
+    expansions: ['expansion:1', 'expansion:2'],
+    companionDiscovery: {
+      ...state.companionDiscovery,
+      records: [...state.companionDiscovery.records, discoveryRecord('baristabbit', 'gate-4-expanding-world')],
+      completedGateIds: [...state.companionDiscovery.completedGateIds, 'gate-4-expanding-world'],
+    },
+  };
+  assert.deepEqual(nextEligibleCompanionGate(state, 3), {
+    gateId: 'gate-5-complete-foundations', candidateIds: ['bedrotte'],
+  });
+});
+
+test('an earned gate queues behind the one-discovery-per-day safeguard and opens later', () => {
+  let state = createInitialMergeWorldState(NOW, ['mossprout', 'steppling']);
+  state = {
+    ...state,
+    companionDiscovery: { ...state.companionDiscovery, lastStartedDayId: '2026-08-12' },
+  };
+  let result = reduceMergeWorld(state, {
+    type: 'openCompanionDiscoveryGate', gateId: 'gate-3-first-choice',
+    candidateIds: ['feastle', 'baristabbit', 'bedrotte'], recommendedCharacterId: null, now: NOW,
+  });
+  assert.equal(result.changed, true);
+  assert.deepEqual(result.state.companionDiscovery.queuedGateIds, ['gate-3-first-choice']);
+  assert.equal(result.state.companionDiscovery.active, null);
+  result = reduceMergeWorld(result.state, {
+    type: 'openCompanionDiscoveryGate', gateId: 'gate-3-first-choice',
+    candidateIds: ['feastle', 'baristabbit', 'bedrotte'], recommendedCharacterId: null, now: NOW + 86_400_000,
+  });
+  assert.equal(result.state.companionDiscovery.active?.gateId, 'gate-3-first-choice');
+  assert.deepEqual(result.state.companionDiscovery.queuedGateIds, []);
 });
 
 test('Gate 3 choice hides no candidate permanently and turns the selected mystery into its generator', () => {
@@ -1406,6 +1530,32 @@ test('Gate 3 choice hides no candidate permanently and turns the selected myster
   assert.ok(state.companionDiscovery.completedGateIds.includes('gate-3-first-choice'));
   assert.equal(state.unlockedCharacters.includes('baristabbit'), false);
   assert.equal(state.unlockedCharacters.includes('bedrotte'), false);
+});
+
+test('every early path creates its authored generator, first order, and durable introduction completion', () => {
+  for (const definition of COMPANION_DISCOVERY_CATALOG.filter((candidate) => ['feastle', 'baristabbit', 'bedrotte'].includes(candidate.characterId))) {
+    let state = createInitialMergeWorldState(NOW - 86_400_000, ['mossprout', 'steppling']);
+    state = reduceMergeWorld(state, {
+      type: 'openCompanionDiscoveryGate', gateId: 'gate-3-first-choice',
+      candidateIds: [definition.characterId], recommendedCharacterId: null, now: NOW,
+    }).state;
+    state = reduceMergeWorld(state, { type: 'selectCompanionDiscoveryPath', characterId: definition.characterId, now: NOW + 1 }).state;
+    state = reduceMergeWorld(state, { type: 'claimArrival', arrivalId: `arrival:discovery:${definition.id}`, now: NOW + 2 }).state;
+    for (const stage of definition.stages) {
+      const from = state.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === stage.boundDefinitionId);
+      const to = state.board.findIndex((cell) => cell.mist?.kind === 'dreambound_item' && cell.mist.discoveryId === definition.id && cell.mist.active);
+      state = reduceMergeWorld(state, { type: 'move', from, to, now: state.updatedAt + 1 }).state;
+    }
+    assert.ok(definition.permanentGeneratorId);
+    assert.ok(Object.values(state.generators).some((generator) => generator.id === definition.permanentGeneratorId));
+    const firstOrder = state.activeOrders.find((order) => order.storyArcId === `${definition.characterId}:discovery`);
+    assert.ok(firstOrder);
+    assert.equal(state.companionDiscovery.records.find((record) => record.characterId === definition.characterId)?.firstOrderCompletedAt, null);
+    const openCell = state.board.findIndex((cell) => !cell.locked && cell.mist == null && cell.occupant == null);
+    state = withItems(state, [[openCell, item(`first-order:${definition.characterId}`, firstOrder.requirements[0].definitionId)]]);
+    state = reduceMergeWorld(state, { type: 'serveOrder', orderId: firstOrder.id, now: state.updatedAt + 1 }).state;
+    assert.ok(state.companionDiscovery.records.find((record) => record.characterId === definition.characterId)?.firstOrderCompletedAt);
+  }
 });
 
 function storyWorld(): MergeWorldState {

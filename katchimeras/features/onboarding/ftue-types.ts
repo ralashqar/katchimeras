@@ -54,6 +54,7 @@ export type FtueTarget =
   | { kind: 'board_generator'; generatorId: string }
   | { kind: 'board_dream_echo'; echoId: string }
   | { kind: 'board_companion_discovery'; discoveryId: string }
+  | { kind: 'board_discovery_fork'; gateId: string }
   | { kind: 'order_requirement_item'; orderId: string; requirementIndex: number; occurrence?: number }
   | { kind: 'board_cell'; cell: number }
   | { kind: 'order_serve'; orderId: string }

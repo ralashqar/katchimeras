@@ -588,22 +588,25 @@ export function MergeWorldProvider({
     const rewards = [...mergeActivityRewards(days, new Date(now), { state: next, quickGoals: loadCompanionQuickGoalState() }), ...mergeQuestActivityRewards(questState)];
     const activityResult = reduceMergeWorld(next, { type: 'grantActivityRewardsBatch', rewards, now });
     next = activityResult.state;
+    let discoveryGateResult: MergeWorldCommandResult | null = null;
     const meaningfulDayCount = days.filter((day) => Boolean(day.journalRecords?.length || day.moments?.length || day.dailyHatch || day.card)).length;
     const gate = nextEligibleCompanionGate(next, meaningfulDayCount);
     if (gate) {
       const recommendation = recommendCompanionPath(gate.candidateIds, buildCompanionAffinityProfile(days));
-      next = reduceMergeWorld(next, {
+      discoveryGateResult = reduceMergeWorld(next, {
         type: 'openCompanionDiscoveryGate',
         gateId: gate.gateId,
         candidateIds: gate.candidateIds,
         recommendedCharacterId: recommendation.strength === 'strong' ? recommendation.characterId : null,
         now,
-      }).state;
+      });
+      next = discoveryGateResult.state;
     }
     if (next === current) return;
     stateRef.current = next;
     setState(next);
-    if (activityResult.changed) setLastResult(activityResult);
+    if (discoveryGateResult?.changed) setLastResult(discoveryGateResult);
+    else if (activityResult.changed) setLastResult(activityResult);
     enqueuePersistence(next);
   }, [active, characterIds, days, enqueuePersistence, featureAndReconcile, loading, questState, quickGoalRevision, refreshFriendshipLevels]);
 

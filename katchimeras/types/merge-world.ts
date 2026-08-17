@@ -134,6 +134,7 @@ export type CompanionDiscoveryRecord = {
   pathId: string | null;
   discoveredAt: number;
   revealSeenAt: number | null;
+  firstOrderCompletedAt: number | null;
   permanentFeatureId: string | null;
 };
 
@@ -150,6 +151,16 @@ export type ActiveCompanionDiscovery = {
   startedAt: number;
 };
 
+export type CompanionDiscoveryTelemetryEvent = {
+  id: string;
+  kind: 'gate_eligible' | 'gate_activated' | 'path_chosen' | 'parcel_claimed' | 'stage_advanced' | 'character_revealed' | 'first_order_completed';
+  gateId: string;
+  discoveryId?: string;
+  characterId?: MergeCharacterId;
+  stage?: number;
+  createdAt: number;
+};
+
 export type CompanionDiscoveryProgress = {
   records: CompanionDiscoveryRecord[];
   openedGateIds: string[];
@@ -157,6 +168,7 @@ export type CompanionDiscoveryProgress = {
   queuedGateIds: string[];
   active: ActiveCompanionDiscovery | null;
   lastStartedDayId: string | null;
+  events: CompanionDiscoveryTelemetryEvent[];
 };
 
 export type MergeRewardInboxEntry = {
@@ -239,7 +251,7 @@ export type MergeStepEnergyDay = {
 };
 
 export type MergeWorldState = {
-  version: 12;
+  version: 13;
   revision: number;
   createdAt: number;
   updatedAt: number;

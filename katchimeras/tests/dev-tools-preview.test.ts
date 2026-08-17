@@ -28,6 +28,9 @@ test('developer navigation and tool implementations share the preview-safe gate'
     'utils/dev-photo-analysis.ts',
     'utils/dev-asset-overrides.ts',
     'utils/katchimera-hex-tiles.ts',
+    'utils/dev-profile-sandbox.ts',
+    'utils/dev-profile-snapshot-storage.ts',
+    'utils/player-profile-snapshots.ts',
   ]) {
     const implementation = read(relative);
     assert.match(implementation, /DEV_TOOLS_ENABLED/, `${relative} must use the shared gate`);

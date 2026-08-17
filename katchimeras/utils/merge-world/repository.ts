@@ -217,6 +217,42 @@ export async function resetMergeWorldStateForDebug(now = Date.now()): Promise<vo
   }
 }
 
+/** Atomically installs an authored/captured developer profile board. */
+export async function installMergeWorldStateForDebug(input: unknown, now = Date.now()): Promise<MergeWorldState> {
+  const installed = normalizeMergeWorldState(input, now);
+  await serializeWrite(async () => undefined);
+  resetGeneration += 1;
+  resetInProgress = true;
+  try {
+    await serializeWrite(async () => {
+      const db = await database();
+      const existing = await db.getFirstAsync<{ state_json: string }>(
+        'SELECT state_json FROM merge_world_snapshot WHERE profile_id = ?',
+        [LOCAL_PROFILE_ID],
+      );
+      await db.withTransactionAsync(async () => {
+        await db.runAsync(
+          `INSERT INTO merge_world_snapshot (profile_id, schema_version, revision, updated_at, state_json, backup_json)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(profile_id) DO UPDATE SET
+             schema_version = excluded.schema_version,
+             revision = excluded.revision,
+             updated_at = excluded.updated_at,
+             backup_json = merge_world_snapshot.state_json,
+             state_json = excluded.state_json`,
+          [LOCAL_PROFILE_ID, installed.version, installed.revision, installed.updatedAt, JSON.stringify(installed), existing?.state_json ?? null],
+        );
+        await db.runAsync('DELETE FROM merge_world_outbox');
+      });
+    });
+  } finally {
+    resetInProgress = false;
+  }
+  resetListeners.forEach((listener) => listener(installed));
+  publishSnapshot(installed);
+  return installed;
+}
+
 /** One-time product migration: archives the old snapshot as backup and installs Chapter 0. */
 export async function installMossproutOnboardingMergeWorld(now = Date.now(), rewardWispId: import('@/types/wisp').WispId = 'sprout'): Promise<MergeWorldState> {
   await serializeWrite(async () => undefined);

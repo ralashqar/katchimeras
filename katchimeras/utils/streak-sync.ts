@@ -6,11 +6,13 @@ import type { StoredStreakState, StreakCaptureIntent } from '@/types/streak';
 import { supabase } from '@/utils/supabase';
 import { historicalQualifyingCaptureIntents } from '@/utils/streak-qualification';
 import { registerStreakCapture } from '@/utils/streak-engine';
+import { isDevProfileSandboxActive } from '@/utils/dev-profile-sandbox';
 
 let syncing: Promise<void> | null = null;
 let bootstrapping: Promise<void> | null = null;
 
 export async function ensureStreakIdentity(): Promise<string | null> {
+  if (isDevProfileSandboxActive()) return null;
   const existing = await supabase.auth.getSession();
   if (existing.data.session?.user.id) return existing.data.session.user.id;
   const signedIn = await supabase.auth.signInAnonymously();
@@ -19,6 +21,7 @@ export async function ensureStreakIdentity(): Promise<string | null> {
 }
 
 export function bootstrapStreakSystem(homeState: StoredHomeState | null): Promise<void> {
+  if (isDevProfileSandboxActive()) return Promise.resolve();
   if (bootstrapping) return bootstrapping;
   bootstrapping = (async () => {
     if (homeState) migrateExistingHistory(homeState);
@@ -74,6 +77,7 @@ export function enqueueStreakCaptures(intents: StreakCaptureIntent[]): void {
 }
 
 export function flushStreakOutbox(): Promise<void> {
+  if (isDevProfileSandboxActive()) return Promise.resolve();
   if (syncing) return syncing;
   syncing = (async () => {
     const userId = await ensureStreakIdentity();
@@ -120,6 +124,7 @@ export function flushStreakOutbox(): Promise<void> {
 }
 
 export async function pullStreakSnapshot(): Promise<void> {
+  if (isDevProfileSandboxActive()) return;
   const { data, error } = await supabase.rpc('get_streak_snapshot_v1', { history_days: 366 });
   if (error || !data || typeof data !== 'object') return;
   const remote = data as {
@@ -175,12 +180,14 @@ export async function pullStreakSnapshot(): Promise<void> {
 }
 
 export async function syncRepair(localDate: string): Promise<void> {
+  if (isDevProfileSandboxActive()) return;
   await ensureStreakIdentity();
   const { error } = await supabase.rpc('use_streak_repair_v1', { target_local_date: localDate });
   if (error) markSyncError(error.message);
 }
 
 export async function syncRepairDecline(localDate: string): Promise<void> {
+  if (isDevProfileSandboxActive()) return;
   await ensureStreakIdentity();
   const { error } = await supabase.rpc('decline_streak_repair_v1', { target_local_date: localDate });
   if (error) markSyncError(error.message);
@@ -190,6 +197,7 @@ export async function trackStreakEvent(
   eventName: string,
   properties: Record<string, string | number | boolean | null> = {},
 ): Promise<void> {
+  if (isDevProfileSandboxActive()) return;
   const userId = await ensureStreakIdentity();
   if (!userId) return;
   await supabase.from('streak_analytics_events').insert({

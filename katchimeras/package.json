@@ -16,7 +16,7 @@
     "verify:game-ui": "node ./scripts/verify-game-ui-system.cjs && npm run test:game-ui",
     "test:kingdom": "tsx --test tests/kingdom-rendering.test.ts tests/katchimera-roster.test.ts",
     "test:game-hub": "tsx --test tests/game-hub.test.ts && node scripts/verify-companion-quest-repair.cjs",
-    "test:merge-world": "tsx --test tests/merge-world.test.ts tests/merge-ftue-interaction-coordinator.test.ts",
+    "test:merge-world": "tsx --test tests/merge-world.test.ts tests/merge-ftue-interaction-coordinator.test.ts tests/player-profile-snapshots.test.ts",
     "test:meta": "tsx --test tests/daily-journey.test.ts tests/wisp-collections.test.ts tests/season-engine.test.ts",
     "test:game-ui": "tsx --test tests/game-ui.test.ts",
     "test:lifecycle": "tsx --test tests/app-lifecycle-performance.test.ts",

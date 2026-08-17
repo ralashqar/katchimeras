@@ -14,6 +14,7 @@ import { useAllDays } from '@/hooks/use-all-days';
 import { syncEconomyEvents } from '@/utils/economy-sync';
 import { useDevSubscriptionSimulator } from '@/hooks/use-dev-subscription-simulator';
 import { claimDevMonthlyWisp, getDevSubscriptionSimulatorState, isDevSubscriptionActive } from '@/utils/dev-subscription-simulator';
+import { isDevProfileSandboxActive } from '@/utils/dev-profile-sandbox';
 
 type EconomyContextValue = {
   config: EconomyConfig;
@@ -48,6 +49,10 @@ export function EconomyProvider({ children }: PropsWithChildren) {
   );
 
   const refresh = useCallback(async () => {
+    if (isDevProfileSandboxActive()) {
+      setSnapshot(withDevSubscriptionSnapshot(emptyEconomySnapshot(essence.balance)));
+      return;
+    }
     const userId = await ensureStreakIdentity();
     if (!userId) { setSnapshot(emptyEconomySnapshot(essence.balance)); return; }
     await subscriptionApi.configure(userId);
@@ -76,6 +81,7 @@ export function EconomyProvider({ children }: PropsWithChildren) {
 
   useEffect(() => { void refresh(); }, [refresh, simulator.revision]);
   useEffect(() => {
+    if (isDevProfileSandboxActive()) return;
     let cancelled = false;
     let unsubscribe = () => {};
     void subscriptionApi.addEntitlementListener(config.plus.entitlementId, (activePlus) => {
@@ -91,12 +97,12 @@ export function EconomyProvider({ children }: PropsWithChildren) {
     };
   }, [config.plus.entitlementId, refresh, simulator.enabled]);
   useEffect(() => {
-    if (!config.flags.legacyMigration || legacyMigrationAttempted) return;
+    if (isDevProfileSandboxActive() || !config.flags.legacyMigration || legacyMigrationAttempted) return;
     setLegacyMigrationAttempted(true);
     void migrateLegacyEconomy(essence.balance, essence.purchases).then((migrated) => { if (migrated) void refresh(); });
   }, [config.flags.legacyMigration, essence.balance, essence.purchases, legacyMigrationAttempted, refresh]);
   useEffect(() => {
-    if (!config.flags.economySync) return;
+    if (isDevProfileSandboxActive() || !config.flags.economySync) return;
     let cancelled = false;
     void ensureStreakIdentity().then(async (userId) => {
       if (!userId || cancelled) return;
@@ -107,6 +113,7 @@ export function EconomyProvider({ children }: PropsWithChildren) {
   }, [config.flags.economySync, days, refresh]);
 
   const mutate = useCallback(async (rpc: string, payload: Record<string, unknown>): Promise<EconomyMutationResult> => {
+    if (isDevProfileSandboxActive()) return { ok: false, reason: 'disabled' };
     const { error } = await supabase.rpc(rpc, payload);
     if (error) return { ok: false, reason: /insufficient/i.test(error.message) ? 'insufficient_essence' : 'server_error' };
     await refresh();
@@ -129,6 +136,7 @@ export function EconomyProvider({ children }: PropsWithChildren) {
     return mutate('claim_monthly_plus_wisp_v1', {});
   }, [config.flags.plus, mutate, refresh]);
   const reconcilePurchases = useCallback(async (restore = false): Promise<EconomyMutationResult> => {
+    if (isDevProfileSandboxActive()) return { ok: false, reason: 'disabled' };
     if (!config.flags.plus) return { ok: false, reason: 'disabled' };
     try {
       if (restore) await subscriptionApi.restore(config.plus.entitlementId);
@@ -144,8 +152,11 @@ export function EconomyProvider({ children }: PropsWithChildren) {
     await refresh();
     return { ok: true };
   }, [config.flags.plus, config.plus.entitlementId, refresh]);
-  const loadPackages = useCallback(async () => setPackages(config.flags.plus ? await subscriptionApi.getPackages(config.plus.offeringId) : []), [config.flags.plus, config.plus.offeringId]);
+  const loadPackages = useCallback(async () => setPackages(
+    !isDevProfileSandboxActive() && config.flags.plus ? await subscriptionApi.getPackages(config.plus.offeringId) : [],
+  ), [config.flags.plus, config.plus.offeringId]);
   const purchasePlus = useCallback(async (packageId: string): Promise<EconomyMutationResult> => {
+    if (isDevProfileSandboxActive()) return { ok: false, reason: 'disabled' };
     if (!config.flags.plus) return { ok: false, reason: 'disabled' };
     try {
       if (!await subscriptionApi.purchasePackage(packageId, config.plus.entitlementId)) return { ok: false, reason: 'server_error' };

@@ -1,6 +1,7 @@
 import { ensureStreakIdentity } from '@/utils/streak-sync';
 import { supabase } from '@/utils/supabase';
 import { waitForCriticalInteractionIdle } from '@/utils/critical-interaction';
+import { isDevProfileSandboxActive } from '@/utils/dev-profile-sandbox';
 
 import { loadFtueRun, markFtueReceiptSynced, noteFtueSyncAttempt } from './ftue-runtime';
 import { mossproutFtueAction } from './mossprout-ftue-script';
@@ -10,6 +11,7 @@ let scheduledFlush: ReturnType<typeof setTimeout> | null = null;
 const RECEIPT_SYNC_QUIET_MS = 1_500;
 
 export function scheduleFtueReceiptSync() {
+  if (isDevProfileSandboxActive()) return;
   if (scheduledFlush) clearTimeout(scheduledFlush);
   scheduledFlush = setTimeout(() => {
     scheduledFlush = null;
@@ -18,6 +20,7 @@ export function scheduleFtueReceiptSync() {
 }
 
 export function flushFtueReceipts() {
+  if (isDevProfileSandboxActive()) return Promise.resolve();
   if (scheduledFlush) {
     clearTimeout(scheduledFlush);
     scheduledFlush = null;

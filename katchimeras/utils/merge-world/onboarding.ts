@@ -37,13 +37,14 @@ export function createMossproutChapterZeroState(now = Date.now(), rewardWispId: 
     companionDiscovery: {
       records: [{
         characterId: 'mossprout', source: 'ftue_hatch', gateId: 'gate-1-mossprout', pathId: null,
-        discoveredAt: now, revealSeenAt: now, permanentFeatureId: 'wild-garden',
+        discoveredAt: now, revealSeenAt: now, firstOrderCompletedAt: now, permanentFeatureId: 'wild-garden',
       }],
       openedGateIds: ['gate-1-mossprout'],
       completedGateIds: ['gate-1-mossprout'],
       queuedGateIds: [],
       active: null,
       lastStartedDayId: null,
+      events: [],
     },
     favouriteCharacterId: 'mossprout',
     activeOrders: [mossproutChapterZeroOrder(now, rewardWispId)],

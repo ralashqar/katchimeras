@@ -69,6 +69,21 @@ export function removeStoredValue(key: string) {
   storage.removeItem(key);
 }
 
+export function getStoredKeys(): string[] {
+  const storage = getStorage();
+  if (!storage) return [];
+  const keys: string[] = [];
+  try {
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index);
+      if (key) keys.push(key);
+    }
+  } catch {
+    return [];
+  }
+  return keys;
+}
+
 // Wipes ALL locally-stored app data in one shot — onboarding profile, home/day
 // state, dev overrides, consent + backfill flags, etc. Used by the dev "full
 // reset" to return to a genuinely fresh first-run. Does not touch native OS
