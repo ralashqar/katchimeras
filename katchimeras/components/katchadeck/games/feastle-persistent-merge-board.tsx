@@ -36,7 +36,7 @@ import { mergeGeneratorArtCacheKey, mergeItemArtCacheKey, useMergeArtCache, type
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 import type { MergeBoardOccupant, MergeDreamMist, MergeWorldCommand, MergeWorldCommandResult, MergeWorldFailureReason, MergeWorldState } from '@/types/merge-world';
 import { mergeCellFeedbackForFailure, type MergeCellFeedbackTone } from '@/utils/merge-board-feedback';
-import { MERGE_MORPH_DURATION_MS, MERGE_MORPH_REDUCED_MOTION_DURATION_MS, SPAWN_MOTION_DURATION_MS, mergeMotionPiecewise, mergeSpriteMotionFrame, spawnSpriteMotionFrame, type MergeBoardMotionKind } from '@/utils/merge-board-motion';
+import { MERGE_MORPH_DURATION_MS, MERGE_MORPH_REDUCED_MOTION_DURATION_MS, SPAWN_MOTION_DURATION_MS, isMistMergeTransition, mergeMotionPiecewise, mergeSpriteMotionFrame, spawnSpriteMotionFrame, type MergeBoardMotionKind } from '@/utils/merge-board-motion';
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection, type MergeBoardGeometry } from '@/utils/merge-world/board-geometry';
 
 export type MergeBoardScreenMetrics = { geometry: MergeBoardGeometry; x: number; y: number };
@@ -58,7 +58,7 @@ type ActiveOperation = {
   settledRevision: number | null;
 };
 type MergeCellFeedback = { id: number; cell: number; message: string; tone: MergeCellFeedbackTone };
-type DreamMistDissipationRecord = { id: number; cell: number; definitionId: string };
+type DreamMistDissipationRecord = { id: number; cell: number; definitionId: string; sequenceIndex: number | null };
 type MergeBoardVisualState = {
   busy: boolean;
   motions: Record<string, SpriteMotion>;
@@ -492,23 +492,30 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     const from = sprite.cell;
     const sourceOrigin = mergeCellOrigin(geometry, from);
     const targetOrigin = mergeCellOrigin(geometry, to);
-    const resultingItem = predicted.state.board[to]?.occupant;
+    const resultingOccupant = predicted.state.board[to]?.occupant;
     const merging = sprite.occupant.kind === 'item'
       && target?.occupant.kind === 'item'
-      && resultingItem?.kind === 'item'
-      && resultingItem.instanceId !== sprite.occupant.instanceId;
+      && resultingOccupant?.kind === 'item'
+      && resultingOccupant.instanceId !== sprite.occupant.instanceId;
     const nextMotions: Record<string, Omit<SpriteMotion, 'operationId' | 'token'>> = {};
     let nextSprites: SpriteRecord[];
 
-    const echoMerging = Boolean(predicted.dreamEchoClearedId && resultingItem?.kind === 'item');
-    if (echoMerging && resultingItem?.kind === 'item') {
-      const result: SpriteRecord = { occupant: resultingItem, cell: to };
+    const mistMerging = !target && isMistMergeTransition(targetCell.mist?.kind, predicted.mergedCell, to, Boolean(resultingOccupant));
+    if (mistMerging && resultingOccupant) {
+      const result: SpriteRecord = { occupant: resultingOccupant, cell: to };
       nextSprites = currentSprites.map((entry) => spriteId(entry) === instanceId ? { ...entry, cell: to } : entry).concat(result);
       nextMotions[instanceId] = { kind: 'merge-source', startX: sourceOrigin.x + dx, startY: sourceOrigin.y + dy };
       nextMotions[spriteId(result)] = { kind: 'merge-result', startX: targetOrigin.x, startY: targetOrigin.y };
-      const echoDefinitionId = targetCell.mist?.kind === 'echo' ? targetCell.mist.definitionId : null;
-      if (echoDefinitionId) {
-        const dissipation = { id: ++mistDissipationSequence.current, cell: to, definitionId: echoDefinitionId };
+      const mistDefinitionId = targetCell.mist?.kind === 'echo'
+        ? targetCell.mist.definitionId
+        : targetCell.mist?.kind === 'dreambound_item' ? targetCell.mist.boundDefinitionId : null;
+      if (mistDefinitionId) {
+        const dissipation: DreamMistDissipationRecord = {
+          id: ++mistDissipationSequence.current,
+          cell: to,
+          definitionId: mistDefinitionId,
+          sequenceIndex: targetCell.mist?.kind === 'dreambound_item' ? targetCell.mist.sequenceIndex : null,
+        };
         setMistDissipations((current) => [...current.slice(-2), dissipation]);
         timers.schedule(() => setMistDissipations((current) => current.filter((entry) => entry.id !== dissipation.id)), reduceMotion ? 220 : 560);
       }
@@ -517,8 +524,8 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
         setMergeBursts((bursts) => [...bursts, burst]);
         timers.schedule(() => setMergeBursts((bursts) => bursts.filter((entry) => entry.id !== burst.id)), 520);
       }
-    } else if (merging && target && resultingItem?.kind === 'item') {
-      const result: SpriteRecord = { occupant: resultingItem, cell: to };
+    } else if (merging && target && resultingOccupant?.kind === 'item') {
+      const result: SpriteRecord = { occupant: resultingOccupant, cell: to };
       nextSprites = currentSprites.map((entry) => spriteId(entry) === instanceId ? { ...entry, cell: to } : entry).concat(result);
       nextMotions[instanceId] = { kind: 'merge-source', startX: sourceOrigin.x + dx, startY: sourceOrigin.y + dy };
       nextMotions[spriteId(target)] = { kind: 'merge-target', startX: targetOrigin.x, startY: targetOrigin.y };
@@ -542,7 +549,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     hoverCell.value = -1;
     onSelect(to);
     if (process.env.EXPO_OS === 'ios') {
-      void Haptics.impactAsync(merging || echoMerging
+      void Haptics.impactAsync(merging || mistMerging
         ? Haptics.ImpactFeedbackStyle.Medium
         : Haptics.ImpactFeedbackStyle.Light);
     }
@@ -1095,23 +1102,29 @@ function DreamMistDissipation({ effect, geometry, reduceMotion }: {
   const size = geometry.cellSize;
   useEffect(() => {
     progress.value = 0;
-    progress.value = withTiming(1, { duration: reduceMotion ? 170 : 500, easing: Easing.out(Easing.cubic) });
+    progress.value = withTiming(1, {
+      duration: reduceMotion ? MERGE_MORPH_REDUCED_MOTION_DURATION_MS : MERGE_MORPH_DURATION_MS,
+      easing: Easing.linear,
+    });
     return () => cancelAnimation(progress);
   }, [progress, reduceMotion]);
   const cloudStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.value, [0, 0.16, 0.72, 1], [0.9, 0.82, 0.16, 0]),
     transform: [{ scale: reduceMotion ? 1 : interpolate(progress.value, [0, 1], [1, 1.24]) }],
   }));
-  const echoStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0, 0.12, 0.58, 1], [0.84, 0.84, 0, 0]),
-    transform: [{ scale: reduceMotion ? 1 : interpolate(progress.value, [0, 0.18, 0.6, 1], [1, 0.94, 0.12, 0.08]) }],
-  }));
+  const echoStyle = useAnimatedStyle(() => {
+    const frame = mergeSpriteMotionFrame('merge-target', progress.value, reduceMotion);
+    return { opacity: frame.opacity, transform: [{ scale: frame.scale }] };
+  });
   return <View pointerEvents="none" style={[styles.mistDissipation, { height: size, left: origin.x, top: origin.y, width: size }]}>
     <Animated.View style={[StyleSheet.absoluteFill, cloudStyle]}>
       <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" enforceEarlyResizing recyclingKey="merge-dissipating-cloud" source={LOCKED_CELL_OVERLAY} style={styles.lockedOverlay} transition={0} />
     </Animated.View>
     <Animated.View style={[styles.mistEchoGhost, { height: size - 4, width: size - 4 }, echoStyle]}>
-      <DreamEchoItemArt compatible={false} definitionId={effect.definitionId} size={size - 4} />
+      <DreamEchoItemArt compatible={false} definitionId={effect.definitionId} size={effect.sequenceIndex == null ? size - 4 : size - 8} />
+      {effect.sequenceIndex == null ? null : <View style={styles.discoveryStageDots}>
+        {[0, 1, 2].map((stage) => <View key={stage} style={[styles.discoveryStageDot, stage <= effect.sequenceIndex! && styles.discoveryStageDotActive]} />)}
+      </View>}
     </Animated.View>
     {!reduceMotion ? DREAM_MIST_PARTICLES.map((particle, index) => <DreamMistParticle index={index} key={index} particle={particle} progress={progress} size={size} />) : null}
   </View>;

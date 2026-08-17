@@ -5,9 +5,11 @@ import test from 'node:test';
 
 import type { CompanionBondProgress } from '@/utils/companion-bond';
 import type { KingdomCreature } from '@/types/kingdom';
+import type { CompanionDiscoveryRecord } from '@/types/merge-world';
 import type { KingdomResident } from '@/utils/kingdom-residents';
 import { katchimeraFamilies } from '@/constants/katchimera-skins';
 import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability';
+import { withDiscoveredKatchimeras } from '@/utils/discovered-katchimera-availability';
 import { deriveKingdom } from '@/utils/kingdom-engine';
 import {
   buildKatchimeraRoster,
@@ -116,6 +118,77 @@ test('the dev availability layer adds every renderable family without changing r
   assert.equal(enabled.creatures.every((creature) => creature.creatureId === `companion:${creature.familyId}`), true);
 });
 
+test('FTUE and board discovery records unlock Mossprout and Steppling across the roster read model', () => {
+  const records: CompanionDiscoveryRecord[] = [
+    {
+      characterId: 'mossprout',
+      source: 'ftue_hatch',
+      gateId: 'ftue:mossprout',
+      pathId: null,
+      discoveredAt: Date.parse('2026-07-20T12:00:00Z'),
+      revealSeenAt: Date.parse('2026-07-20T12:00:00Z'),
+      firstOrderCompletedAt: null,
+      permanentFeatureId: 'generator:nature',
+    },
+    {
+      characterId: 'steppling',
+      source: 'board_discovery',
+      gateId: 'discovery:steppling',
+      pathId: 'overgrown-trail',
+      discoveredAt: Date.parse('2026-07-21T12:00:00Z'),
+      revealSeenAt: Date.parse('2026-07-21T12:00:00Z'),
+      firstOrderCompletedAt: null,
+      permanentFeatureId: 'generator:adventure',
+    },
+  ];
+  const kingdom = withDiscoveredKatchimeras(deriveKingdom([]), records);
+  const discoveryResidents: KingdomResident[] = kingdom.creatures.map((creature, index) => ({
+    creatureId: creature.creatureId,
+    arrivalIndex: index,
+    tileIndex: index,
+    quad: 0,
+    cell: { col: 1.5, row: 1.5 },
+    hatchCount: 1,
+    houseLevel: 1,
+  }));
+  const discoveryRoster = buildKatchimeraRoster({
+    creatures: kingdom.creatures,
+    residents: discoveryResidents,
+    bondForCreature: () => bond(0),
+    statusByCreatureId: {},
+  });
+
+  assert.deepEqual(
+    kingdom.creatures.map((creature) => creature.familyId).sort(),
+    ['mossprout', 'steppling'],
+  );
+  assert.equal(kingdom.totals.daysHatched, 0);
+  assert.equal(kingdom.builtFromDayCount, 0);
+  assert.equal(discoveryRoster.find((item) => item.familyId === 'mossprout')?.kind, 'owned');
+  assert.equal(discoveryRoster.find((item) => item.familyId === 'steppling')?.kind, 'owned');
+});
+
+test('a historical companion creature wins over its discovery projection', () => {
+  const existing = deriveKingdom([]);
+  const realSteppling = creatures.find((creature) => creature.familyId === 'steppling');
+  assert.ok(realSteppling);
+  const kingdom = { ...existing, creatures: [realSteppling] };
+  const projected = withDiscoveredKatchimeras(kingdom, [{
+    characterId: 'steppling',
+    source: 'board_discovery',
+    gateId: 'discovery:steppling',
+    pathId: 'overgrown-trail',
+    discoveredAt: Date.now(),
+    revealSeenAt: Date.now(),
+    firstOrderCompletedAt: null,
+    permanentFeatureId: 'generator:adventure',
+  }]);
+
+  assert.equal(projected, kingdom);
+  assert.equal(projected.creatures[0], realSteppling);
+  assert.equal(projected.creatures[0].rarity, 'epic');
+});
+
 test('the roster contains one owned card per logical companion and uses its latest skin', () => {
   const owned = roster.filter(
     (item): item is KatchimeraOwnedRosterItem => item.kind === 'owned',
@@ -205,6 +278,21 @@ test('the dev toggle exposes virtual companions across roster, companion, games,
   assert.match(gamesRoute, /withDevAvailableKatchimeras/);
   assert.match(today, /allKatchimerasAvailable[\s\S]*katchimeraFamilies/);
   assert.match(collection, /unlockAll: allKatchimerasAvailable/);
+});
+
+test('production companion surfaces consume Merge World discovery ownership', () => {
+  const read = (...segments: string[]) => fs.readFileSync(path.join(process.cwd(), ...segments), 'utf8');
+  const rosterRoute = read('components', 'katchadeck', 'roster', 'katchimera-roster-route-screen.tsx');
+  const companionRoute = read('components', 'katchadeck', 'world', 'katchimera-companion-route-screen.tsx');
+  const companionScreen = read('components', 'katchadeck', 'world', 'kingdom-companion-screen.tsx');
+  const gamesRoute = read('components', 'katchadeck', 'games', 'game-hub-route-screen.tsx');
+
+  assert.match(rosterRoute, /useCompanionDiscoveryRecords/);
+  assert.match(rosterRoute, /withDiscoveredKatchimeras/);
+  assert.match(companionRoute, /discoveryRecords=\{discovery\.records\}/);
+  assert.match(companionScreen, /withDiscoveredKatchimeras/);
+  assert.match(gamesRoute, /useCompanionDiscoveryRecords/);
+  assert.match(gamesRoute, /withDiscoveredKatchimeras/);
 });
 
 test('the roster, companion, and Block Blast use isolated route boundaries', () => {

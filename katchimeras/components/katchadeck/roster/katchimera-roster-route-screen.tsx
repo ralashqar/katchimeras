@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { KatchimeraRosterScreen } from '@/components/katchadeck/roster/katchimera-roster-screen';
 import { useAllDays } from '@/hooks/use-all-days';
+import { useCompanionDiscoveryRecords } from '@/hooks/use-companion-discovery-records';
 import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import type { KingdomCreature } from '@/types/kingdom';
@@ -23,6 +24,7 @@ import { loadKatchimeraWardrobe } from '@/utils/katchimera-wardrobe-storage';
 import { deriveKingdom } from '@/utils/kingdom-engine';
 import { deriveResidents, type HatchRecord } from '@/utils/kingdom-residents';
 import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability';
+import { withDiscoveredKatchimeras } from '@/utils/discovered-katchimera-availability';
 import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
 
 function hatchTimestamp(creature: KingdomCreature, index: number): number {
@@ -75,6 +77,7 @@ function FocusedKatchimeraRoster() {
   const router = useRouter();
   const { transitionTo } = useGameScreenTransition();
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
+  const discovery = useCompanionDiscoveryRecords();
   // This component is created fresh for every focus session, so its lazy
   // initializer already reads the latest persisted days. Refreshing on that
   // same initial focus would rebuild the just-mounted grid a second time.
@@ -101,10 +104,13 @@ function FocusedKatchimeraRoster() {
 
   const kingdom = useMemo(
     () => applyWardrobeToKingdom(
-      withDevAvailableKatchimeras(deriveKingdom(days), allKatchimerasAvailable),
+      withDevAvailableKatchimeras(
+        withDiscoveredKatchimeras(deriveKingdom(days), discovery.records),
+        allKatchimerasAvailable,
+      ),
       persistent.wardrobe,
     ),
-    [allKatchimerasAvailable, days, persistent.wardrobe],
+    [allKatchimerasAvailable, days, discovery.records, persistent.wardrobe],
   );
   const hatches = useMemo<HatchRecord[]>(
     () => kingdom.creatures.map((creature, index) => ({
@@ -143,7 +149,7 @@ function FocusedKatchimeraRoster() {
   }, [bondForCreature, kingdom.creatures, residents, statusByCreatureId]);
   useGameSurfaceReadiness('katchimeras', {
     background: backgroundReady,
-    data: true,
+    data: discovery.ready,
     foreground: contentReady,
     layout: contentReady,
   });
@@ -161,7 +167,7 @@ function FocusedKatchimeraRoster() {
     navigate: () => router.navigate('/today'),
   }), [router, transitionTo]);
 
-  return (
+  return discovery.ready ? (
     <KatchimeraRosterScreen
       background={background}
       items={items}
@@ -170,5 +176,5 @@ function FocusedKatchimeraRoster() {
       onGoToday={goToday}
       onSelectCreature={openCreature}
     />
-  );
+  ) : null;
 }

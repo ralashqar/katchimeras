@@ -11,7 +11,7 @@ import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import { BARISTABBIT_CHAPTER_ONE_ORDER_POOL, FEASTLE_ACT_TWO_ORDER_POOL, selectAuthoredCohortOrderKeys, selectFeastleActTwoOrderKeys } from '@/utils/companion-story';
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection } from '@/utils/merge-world/board-geometry';
 import { mergeCellFeedbackForFailure } from '@/utils/merge-board-feedback';
-import { MERGE_MORPH_DURATION_MS, SPAWN_MOTION_DURATION_MS, mergeSpriteMotionFrame, spawnSpriteMotionFrame } from '@/utils/merge-board-motion';
+import { MERGE_MORPH_DURATION_MS, SPAWN_MOTION_DURATION_MS, isMistMergeTransition, mergeSpriteMotionFrame, spawnSpriteMotionFrame } from '@/utils/merge-board-motion';
 import { mergeArtWarmupPlan } from '@/utils/merge-world/art-warmup';
 import { mergeActivityRewards } from '@/utils/merge-world/activity-rewards';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
@@ -811,6 +811,14 @@ test('the first meaningful daily capture creates Energy and a safe non-item memo
 
 });
 
+test('Dream Echo and Dreambound locked cells use the regular merge morph transaction', () => {
+  assert.equal(isMistMergeTransition('echo', 18, 18, true), true);
+  assert.equal(isMistMergeTransition('dreambound_item', 18, 18, true), true);
+  assert.equal(isMistMergeTransition('dormant', 18, 18, true), false);
+  assert.equal(isMistMergeTransition('dreambound_item', 19, 18, true), false);
+  assert.equal(isMistMergeTransition('dreambound_item', 18, 18, false), false);
+});
+
 test('a featured companion does not turn journal activity into item parcels', () => {
   const day = {
     id: 'day-2026-08-12', isoDate: '2026-08-12',
@@ -1319,6 +1327,7 @@ test('Steppling FTUE parcel completes three Dreambound merges into the Journey L
     const from = state.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === definitionId);
     const to = state.board.findIndex((cell) => cell.mist?.kind === 'dreambound_item' && cell.mist.discoveryId === 'discovery:ftue-steppling' && cell.mist.active);
     result = reduceMergeWorld(state, { type: 'move', from, to, now: NOW + 2 + expectedStage });
+    assert.equal(result.mergedCell, to);
     assert.deepEqual(result.companionDiscoveryAdvanced, {
       discoveryId: 'discovery:ftue-steppling',
       stage: expectedStage,

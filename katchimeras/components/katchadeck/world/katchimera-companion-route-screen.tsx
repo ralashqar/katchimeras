@@ -11,6 +11,7 @@ import { commitFtueAction, ftueWispForRun, loadFtueRun, updateFtueRun, useFtueRu
 import { installMossproutOnboardingMergeWorld, installStepplingFtueDiscovery } from '@/utils/merge-world/repository';
 import { useGameScreenTransition } from '@/features/navigation/game-screen-transition';
 import { beginMossproutChapterOne } from '@/utils/companion-story-storage';
+import { useCompanionDiscoveryRecords } from '@/hooks/use-companion-discovery-records';
 
 export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConversationDefinitionId }: { creatureId: string; source?: 'merge-world'; ftueConversationDefinitionId?: string }) {
   const isFocused = useIsFocused();
@@ -19,6 +20,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConvers
   const familyId = familyIdFromCompanionId(creatureId);
   const ftueHandoffRef = useRef(false);
   const ftueRun = useFtueRun();
+  const discovery = useCompanionDiscoveryRecords();
   const completeFtueConversation = useCallback(() => {
     const run = loadFtueRun();
     if (run?.stepId === 'companion.first_meeting') {
@@ -81,11 +83,12 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConvers
   // retain the kingdom, interaction sheet, image stage, subscriptions, or
   // animation worklets behind Today, Merge, or a quest. All durable companion
   // progress already lives in the repositories and is rehydrated on focus.
-  if (!isFocused) return <View style={styles.inactiveScreen} />;
+  if (!isFocused || !discovery.ready) return <View style={styles.inactiveScreen} />;
 
   return (
     <KingdomCompanionScreen
       ftueConversationDefinitionId={ftueConversationDefinitionId}
+      discoveryRecords={discovery.records}
       onFtueConversationComplete={ftueConversationDefinitionId ? completeFtueConversation : undefined}
       ftueOrderPreviewActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.order_preview'}
       onFtueOpenMerge={openFtueGarden}

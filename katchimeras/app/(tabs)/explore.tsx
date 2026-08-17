@@ -506,6 +506,7 @@ export default function ExploreScreen() {
                 <KatchaButton label="🔄 Reset to fresh profile (full first-run)" onPress={handleFreshProfile} variant="primary" />
                 <KatchaButton label="Reset today only" onPress={handleResetToday} variant="secondary" />
                 <KatchaButton label="Restart first-session onboarding · keep profile" onPress={handleRestartFirstSession} variant="primary" />
+                <KatchaButton label="Profile Snapshots" onPress={() => router.push('/dev-profile-snapshots' as Href)} variant="primary" />
                 {ftueRun ? <View style={styles.devToggleCopy}>
                   <ThemedText selectable style={styles.devToggleTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">FTUE: {ftueRun.stepId}</ThemedText>
                   <ThemedText selectable style={styles.devToggleBody} lightColor="#C4D8FF" darkColor="#C4D8FF">
@@ -537,7 +538,6 @@ export default function ExploreScreen() {
                 <KatchaButton label="Atmosphere Lab" onPress={() => router.push('/dev-atmosphere-lab')} variant="secondary" />
                 <KatchaButton label="Photo Place Lab" onPress={() => router.push('/dev-photo-place-lab')} variant="secondary" />
                 <KatchaButton label="Subscription Simulator" onPress={() => router.push('/dev-subscription-lab' as Href)} variant="secondary" />
-                <KatchaButton label="Profile Snapshots" onPress={() => router.push('/dev-profile-snapshots' as Href)} variant="primary" />
                 <KatchaButton label="🧩 Tile Layout Lab (iso adjacency)" onPress={() => router.push('/dev-tile-lab')} variant="secondary" />
                 <KatchaButton label="Analyze a photo (vision)" onPress={handleAnalyzePickedPhoto} variant="secondary" />
                 <KatchaButton label="Last photo intelligence (JSON)" onPress={() => router.push('/intelligence-lab')} variant="secondary" />

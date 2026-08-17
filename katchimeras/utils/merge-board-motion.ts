@@ -4,6 +4,17 @@ export const MERGE_MORPH_DURATION_MS = 460;
 export const MERGE_MORPH_REDUCED_MOTION_DURATION_MS = 100;
 export const SPAWN_MOTION_DURATION_MS = 760;
 
+export function isMistMergeTransition(
+  targetMistKind: string | null | undefined,
+  mergedCell: number | undefined,
+  targetCell: number,
+  hasResultOccupant: boolean,
+) {
+  return hasResultOccupant
+    && mergedCell === targetCell
+    && (targetMistKind === 'echo' || targetMistKind === 'dreambound_item');
+}
+
 export function mergeMotionPiecewise(progress: number, stops: readonly number[], values: readonly number[]) {
   'worklet';
   const p = Math.max(stops[0] ?? 0, Math.min(stops[stops.length - 1] ?? 1, progress));

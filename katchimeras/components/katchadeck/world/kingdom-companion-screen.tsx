@@ -19,6 +19,7 @@ import { hasQuickGoalTemplates } from '@/constants/companion-quick-goals';
 import { AppFontFamilies, KatchaDeckUI } from '@/constants/theme';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
+import type { CompanionDiscoveryRecord } from '@/types/merge-world';
 import { useKingdomQuests } from '@/hooks/use-kingdom-quests';
 import { useCompanionQuickGoals } from '@/hooks/use-companion-quick-goals';
 import { useCompanionAchievements } from '@/hooks/use-companion-achievements';
@@ -63,6 +64,7 @@ import { beginQuestCapture, cancelQuestCapture } from '@/utils/quest-capture-ses
 import { completeSemanticNoteQuestCapture } from '@/utils/quests/semantic-note-capture';
 import { manualJournalFlow } from '@/utils/manual-journal-registry';
 import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability';
+import { withDiscoveredKatchimeras } from '@/utils/discovered-katchimera-availability';
 import { useEconomy } from '@/features/economy/economy-provider';
 
 type QuestJournalReviewContext = {
@@ -203,6 +205,7 @@ export function KingdomCompanionScreen({
   onFtueConversationComplete,
   ftueOrderPreviewActive = false,
   onFtueOpenMerge,
+  discoveryRecords = [],
 }: {
   presentation?: KingdomCompanionPresentation;
   initialCreatureId?: string;
@@ -213,6 +216,7 @@ export function KingdomCompanionScreen({
   onFtueConversationComplete?: () => void;
   ftueOrderPreviewActive?: boolean;
   onFtueOpenMerge?: () => void;
+  discoveryRecords?: readonly CompanionDiscoveryRecord[];
 }) {
   const isFocused = useIsFocused();
   const router = useRouter();
@@ -221,7 +225,10 @@ export function KingdomCompanionScreen({
   const { days } = archive;
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   const kingdom = useMemo(() => {
-    const derived = withDevAvailableKatchimeras(deriveKingdom(days), allKatchimerasAvailable);
+    const derived = withDevAvailableKatchimeras(
+      withDiscoveredKatchimeras(deriveKingdom(days), discoveryRecords),
+      allKatchimerasAvailable,
+    );
     if (!ftueConversationDefinitionId || derived.creatures.some((creature) => creature.creatureId === 'companion:mossprout')) return derived;
     const mossprout: KingdomCreature = {
       dayId: 'ftue-discovery',
@@ -238,7 +245,7 @@ export function KingdomCompanionScreen({
       accentColor: '#8FBE67',
     };
     return { ...derived, creatures: [mossprout, ...derived.creatures] };
-  }, [allKatchimerasAvailable, days, ftueConversationDefinitionId]);
+  }, [allKatchimerasAvailable, days, discoveryRecords, ftueConversationDefinitionId]);
 
   const [identity, setIdentity] = useState<WorldIdentityState>(loadWorldIdentity);
   const [wardrobe, setWardrobe] = useState<KatchimeraWardrobeState>(loadKatchimeraWardrobe);

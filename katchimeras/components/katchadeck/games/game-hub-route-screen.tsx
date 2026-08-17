@@ -5,6 +5,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { GameHubScreen } from '@/components/katchadeck/games/game-hub-screen';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
+import { useCompanionDiscoveryRecords } from '@/hooks/use-companion-discovery-records';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import { loadCompanionBondState } from '@/utils/companion-bond-storage';
 import { buildGameHubItems, buildOwnedGameCompanions, selectTodayCareGame, type GameHubItem } from '@/utils/game-hub';
@@ -17,6 +18,7 @@ import { resolveInteractiveQuestConfig } from '@/utils/quests/interactive-sessio
 import { todayKatchimeraExplorationBackgroundKeyForPresentation } from '@/utils/today-exploration-backgrounds';
 import { localDayId } from '@/utils/world-identity-rules';
 import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability';
+import { withDiscoveredKatchimeras } from '@/utils/discovered-katchimera-availability';
 import { markFlowStart } from '@/utils/flow-performance';
 import {
   cancelTodayCareGameRound,
@@ -38,6 +40,7 @@ function loadPersistentState() {
 export function GameHubRouteScreen({ legacy = false }: { legacy?: boolean } = {}) {
   const router = useRouter();
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
+  const discovery = useCompanionDiscoveryRecords();
   const { days } = useAllDays({ refreshOnFocus: false });
   const [persistent, setPersistent] = useState(loadPersistentState);
   const hasFocused = useRef(false);
@@ -52,10 +55,13 @@ export function GameHubRouteScreen({ legacy = false }: { legacy?: boolean } = {}
 
   const kingdom = useMemo(
     () => applyWardrobeToKingdom(
-      withDevAvailableKatchimeras(deriveKingdom(days), allKatchimerasAvailable),
+      withDevAvailableKatchimeras(
+        withDiscoveredKatchimeras(deriveKingdom(days), discovery.records),
+        allKatchimerasAvailable,
+      ),
       persistent.wardrobe,
     ),
-    [allKatchimerasAvailable, days, persistent.wardrobe]
+    [allKatchimerasAvailable, days, discovery.records, persistent.wardrobe]
   );
   const companions = useMemo(
     () => buildOwnedGameCompanions(kingdom.creatures, persistent.bond),
