@@ -298,7 +298,7 @@ export function CompanionGoalPortrait({
       {visualKey ? (
         <Image
           contentFit="contain"
-          source={resolveCreatureArtSource(visualKey, { lod: 'thumb', stage: 'hatchling' })}
+          source={resolveCreatureArtSource(visualKey, { lod: 'thumb' })}
           style={{ height: size * 1.38, width: size * 1.38 }}
           transition={100}
         />

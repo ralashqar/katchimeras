@@ -263,7 +263,7 @@ export function QuickGoalActionModal({
                 {visualKey ? (
                   <Image
                     contentFit="contain"
-                    source={resolveCreatureArtSource(visualKey, { lod: 'thumb', stage: 'hatchling' })}
+                    source={resolveCreatureArtSource(visualKey, { lod: 'thumb' })}
                     style={styles.creatureArt}
                     transition={0}
                   />

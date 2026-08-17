@@ -59,15 +59,15 @@ export function hasCreatureHatchlingArt(visualKey: HomeVisualKey): boolean {
 }
 
 /**
- * Runtime source of truth for creature age art. Newly hatched creatures prefer
- * their species hatchling; a missing hatchling safely uses the existing regular
- * cutout. Passing `stage: 'grown'` explicitly reveals the reserved mature art.
+ * Runtime source of truth for creature art. Persistent companions use their
+ * original Katchimera cutout by default. Hatchling art remains available only
+ * to a caller that explicitly owns a hatch-specific presentation.
  */
 export function resolveCreatureArtSource(
   visualKey: HomeVisualKey,
   {
     lod = 'full',
-    stage = 'hatchling',
+    stage = 'grown',
     variantCell = null,
   }: CreatureArtOptions = {},
 ): ImageSourcePropType {
@@ -77,4 +77,3 @@ export function resolveCreatureArtSource(
   }
   return grownSource(visualKey, lod, variantCell);
 }
-

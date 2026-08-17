@@ -123,15 +123,35 @@ def main() -> None:
     parser.add_argument("--medium", type=int, default=512, help="Maximum medium LOD dimension.")
     parser.add_argument("--thumb", type=int, default=256, help="Maximum thumb LOD dimension.")
     parser.add_argument("--quality", type=int, default=88, help="WebP quality for generated LOD files.")
+    parser.add_argument(
+        "--only",
+        action="append",
+        default=[],
+        metavar="CREATURE_KEY",
+        help="Generate only this mapped creature without clearing the shared LOD directory or rewriting the manifest. Repeatable.",
+    )
     parser.add_argument("--report-only", action="store_true", help="Only print mapped assets; do not write files.")
     args = parser.parse_args()
 
-    assets = mapped_creature_assets()
+    mapped_assets = mapped_creature_assets()
+    requested = set(args.only)
+    known_keys = {asset.key for asset in mapped_assets}
+    unknown = sorted(requested - known_keys)
+    if unknown:
+        parser.error(f"Unknown creature key(s): {', '.join(unknown)}")
+    assets = [asset for asset in mapped_assets if not requested or asset.key in requested]
     print(f"Mapped creature assets: {len(assets)}")
     for asset in assets:
         print(f"{asset.bytes / 1024:8.1f} KB  {asset.width:4}x{asset.height:<4}  {asset.key:<16} {asset.rel_asset.as_posix()}")
 
     if args.report_only:
+        return
+
+    if requested:
+        for asset in assets:
+            generate_lod(asset, "medium", args.medium, args.quality)
+            generate_lod(asset, "thumb", args.thumb, args.quality)
+        print(f"Wrote targeted LODs: {', '.join(sorted(requested))}")
         return
 
     if LOD_ROOT.exists():

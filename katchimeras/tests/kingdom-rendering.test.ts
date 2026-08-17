@@ -44,6 +44,7 @@ import {
   EMPTY_KINGDOM_TILE_SCHEDULER,
   kingdomTileSchedulerReducer,
 } from '../utils/kingdom-tile-scheduler';
+
 import {
   activeKingdomTileLod,
   EMPTY_KINGDOM_LOD_SCHEDULER,
@@ -56,6 +57,22 @@ import {
   kingdomSkyMotionEnabled,
   wrapKingdomCloudX,
 } from '../utils/kingdom-sky';
+
+test('persistent Katchimera surfaces use original cutouts instead of hatchlings', () => {
+  const read = (...segments: string[]) => fs.readFileSync(path.join(process.cwd(), ...segments), 'utf8');
+  const resolver = read('utils', 'creature-art.ts');
+  const merge = read('components', 'katchadeck', 'games', 'merge-world-screen.tsx');
+  const goalSurfaces = [
+    read('components', 'katchadeck', 'goals', 'companion-quick-goals.tsx'),
+    read('components', 'katchadeck', 'goals', 'goal-task-row.tsx'),
+    read('components', 'katchadeck', 'goals', 'quick-goal-action-modal.tsx'),
+  ].join('\n');
+
+  assert.match(resolver, /stage = 'grown'/);
+  assert.match(merge, /resolveCreatureArtSource\(record\.characterId, \{ stage: 'grown' \}\)/);
+  assert.doesNotMatch(merge, /CREATURE_HATCHLING_SOURCES/);
+  assert.doesNotMatch(goalSurfaces, /stage: 'hatchling'/);
+});
 
 const TILE_TARGET = { left: -245, top: -148, right: 245, bottom: 196 };
 const BASE_BOUNDS = { left: 14, top: 147, right: 1010, bottom: 876 };

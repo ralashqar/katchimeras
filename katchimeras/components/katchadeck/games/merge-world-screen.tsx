@@ -18,7 +18,6 @@ import {
   MERGE_LEVEL_THRESHOLDS,
 } from '@/constants/merge-world-catalog';
 import { mergeWorldGeneratorArt } from '@/constants/merge-world-art';
-import { CREATURE_HATCHLING_SOURCES } from '@/constants/creature-hatchling-sources.gen';
 import { COMPANION_DISCOVERY_CATALOG } from '@/constants/companion-discovery-catalog';
 import { Lantern } from '@/constants/theme';
 import { useMergeWorldActions, useMergeWorldLastResult, useMergeWorldState } from '@/features/merge-world/merge-world-provider';
@@ -42,6 +41,7 @@ import { MERGE_ENERGY_REGEN_MS } from '@/utils/merge-world/economy-policy';
 import { beginAuthoredCohortReturn, beginFeastleReturn, beginMossproutReturn, isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, loadMossproutStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
 import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
 import { beginCriticalInteractionWork } from '@/utils/critical-interaction';
+import { resolveCreatureArtSource } from '@/utils/creature-art';
 
 import { FeastlePersistentMergeBoard, type MergeBoardScreenMetrics } from './feastle-persistent-merge-board';
 import { MergeParcelFlightOverlay, type MergeParcelFlight } from './merge-parcel-overlay';
@@ -160,8 +160,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const companionDiscoveryRewards = useMemo<RewardSplashItem[]>(() => (state?.companionDiscovery.records ?? [])
     .filter((record) => record.source === 'board_discovery' && record.revealSeenAt == null)
     .flatMap((record) => {
-      const image = CREATURE_HATCHLING_SOURCES.full[record.characterId];
-      if (!image) return [];
+      const image = resolveCreatureArtSource(record.characterId, { stage: 'grown' });
       const revealCopy = EARLY_DISCOVERY_REVEAL_COPY[record.characterId];
       return [{
         id: `companion-discovery:${record.characterId}`,
