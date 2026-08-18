@@ -18,6 +18,7 @@ export type CompanionStoryStatus =
   | 'conversation_active'
   | 'order_active'
   | 'return_available'
+  | 'haven_upgrade_available'
   | 'chapter_complete'
   | 'arc_complete';
 
@@ -31,6 +32,7 @@ export type CompanionStoryArc = {
   status: CompanionStoryStatus;
   activeOrderId: string | null;
   pendingConversationId: string | null;
+  pendingHavenStage?: number | null;
   unreadReturn: boolean;
   completedBeatIds: string[];
   completedOrderIds: string[];
@@ -140,6 +142,7 @@ function normalize(value: unknown): CompanionStoryState {
       relevantJournalRecordIds: uniqueStrings(arc.relevantJournalRecordIds),
       confirmedMemoryKeys: uniqueStrings(arc.confirmedMemoryKeys),
       completedActIds: uniqueStrings(arc.completedActIds).filter(isActId),
+      pendingHavenStage: Number.isInteger(arc.pendingHavenStage) ? Math.max(1, Math.min(4, Number(arc.pendingHavenStage))) : null,
     })) : [],
   };
 }
@@ -220,17 +223,35 @@ export function completeMossproutConversation(level: number, now = Date.now()): 
   const current = loadMossproutStory();
   if (current.status !== 'conversation_active' || current.pendingConversationId !== `mossprout:story:${level}`) return current;
   const beatId = `mossprout-story:level-${level}`;
-  if (level >= 4) return saveMossproutStory({
-    ...current, currentLevel: 4, targetLevel: 4, beatId, status: 'chapter_complete', actPhase: 'complete',
-    activeOrderId: null, pendingConversationId: null, unreadReturn: false, pendingBondPoints: 0,
-    completedActIds: [...new Set([...current.completedActIds, 'act-1' as const])],
+  return saveMossproutStory({
+    ...current, currentLevel: level, targetLevel: level, beatId, status: 'haven_upgrade_available',
+    actPhase: level >= 4 ? 'finale_return' : level === 3 ? 'signature_order' : 'regular_orders', activeOrderId: null,
+    pendingConversationId: null, unreadReturn: false, pendingBondPoints: 0,
+    pendingHavenStage: level,
     completedBeatIds: [...new Set([...current.completedBeatIds, beatId])], updatedAt: now,
   });
+}
+
+export function completeMossproutHavenUpgrade(stage: number, now = Date.now()): CompanionStoryArc {
+  const current = loadMossproutStory();
+  if (current.status !== 'haven_upgrade_available' || current.pendingHavenStage !== stage) return current;
+  if (stage >= 4) return saveMossproutStory({
+    ...current,
+    currentLevel: 4,
+    targetLevel: 4,
+    status: 'chapter_complete',
+    actPhase: 'complete',
+    pendingHavenStage: null,
+    completedActIds: [...new Set([...current.completedActIds, 'act-1' as const])],
+    updatedAt: now,
+  });
   return saveMossproutStory({
-    ...current, currentLevel: level, targetLevel: level + 1, beatId, status: 'order_active',
-    actPhase: level === 3 ? 'signature_order' : 'regular_orders', activeOrderId: null,
-    pendingConversationId: null, unreadReturn: false, pendingBondPoints: 0,
-    completedBeatIds: [...new Set([...current.completedBeatIds, beatId])], updatedAt: now,
+    ...current,
+    targetLevel: stage + 1,
+    status: 'order_active',
+    actPhase: stage === 3 ? 'signature_order' : 'regular_orders',
+    pendingHavenStage: null,
+    updatedAt: now,
   });
 }
 

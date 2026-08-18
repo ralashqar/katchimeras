@@ -1,8 +1,19 @@
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { KatchimeraKingdomScreen } from '@/components/katchadeck/roster/katchimera-kingdom-screen';
 import { KatchimeraRosterScreen } from '@/components/katchadeck/roster/katchimera-roster-screen';
+import {
+  type KingdomResidentStatusGlyph,
+} from '@/components/katchadeck/world/kingdom-hex-canvas';
+import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { homeTabBarHeight } from '@/constants/home-loop-layout';
+import { AppFontFamilies } from '@/constants/theme';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useCompanionDiscoveryRecords } from '@/hooks/use-companion-discovery-records';
 import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
@@ -25,7 +36,17 @@ import { deriveKingdom } from '@/utils/kingdom-engine';
 import { deriveResidents, type HatchRecord } from '@/utils/kingdom-residents';
 import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability';
 import { withDiscoveredKatchimeras } from '@/utils/discovered-katchimera-availability';
+import { kingdomCompanionHexSlots } from '@/utils/katchimera-kingdom-slots';
 import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
+import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
+import type { KatchimeraFamilyId } from '@/types/katchimera';
+import { HAVEN_ENVIRONMENTS, havenStoryGateSatisfied } from '@/constants/haven-catalog';
+import { loadMergeWorldState, revealStoredHaven, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
+import { commitFtueAction, dispatchFtueEvent, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
+import { beginMossproutChapterOne } from '@/utils/companion-story-storage';
+
+type KatchimeraViewMode = 'grid' | 'haven';
 
 function hatchTimestamp(creature: KingdomCreature, index: number): number {
   const time = Date.parse(`${creature.isoDate}T00:00:00`);
@@ -66,15 +87,31 @@ function loadRosterPersistentSnapshot() {
  */
 export function KatchimeraRosterRouteScreen() {
   const isFocused = useIsFocused();
+  const ftueRun = useFtueRun();
+  const [viewMode, setViewMode] = useState<KatchimeraViewMode>('grid');
+  useEffect(() => {
+    if (ftueRun?.status === 'active' && mossproutFtueStep(ftueRun.stepId)?.surface === 'haven') setViewMode('haven');
+  }, [ftueRun?.status, ftueRun?.stepId]);
+  const toggleViewMode = useCallback(() => {
+    setViewMode((current) => current === 'grid' ? 'haven' : 'grid');
+  }, []);
 
-  // Release the FlashList cell pool and its animated/image views while a
-  // companion or mini-game owns the screen. A fresh mount gives every return
-  // one clean entrance animation without keeping the roster alive underneath.
-  return isFocused ? <FocusedKatchimeraRoster /> : null;
+  // Release the active grid or Kingdom canvas while a companion or mini-game
+  // owns the screen. The view-mode state remains here so Back restores the
+  // surface the player came from without retaining its heavy render tree.
+  return isFocused ? <FocusedKatchimeraRoster onToggleViewMode={toggleViewMode} viewMode={viewMode} /> : null;
 }
 
-function FocusedKatchimeraRoster() {
+function FocusedKatchimeraRoster({
+  onToggleViewMode,
+  viewMode,
+}: {
+  onToggleViewMode: () => void;
+  viewMode: KatchimeraViewMode;
+}) {
   const router = useRouter();
+  const ftueRun = useFtueRun();
+  const insets = useSafeAreaInsets();
   const { transitionTo } = useGameScreenTransition();
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   const discovery = useCompanionDiscoveryRecords();
@@ -85,9 +122,17 @@ function FocusedKatchimeraRoster() {
   const [persistentSnapshot, setPersistentSnapshot] = useState(loadRosterPersistentSnapshot);
   const [backgroundReady, setBackgroundReady] = useState(false);
   const [contentReady, setContentReady] = useState(false);
+  const [mergeWorld, setMergeWorld] = useState<MergeWorldState | null>(null);
   const hasCompletedInitialFocus = useRef(false);
   const previousItems = useRef<readonly KatchimeraRosterItem[]>([]);
   const persistent = persistentSnapshot.state;
+
+  useEffect(() => {
+    let active = true;
+    void loadMergeWorldState().then((state) => { if (active) setMergeWorld(state); });
+    const unsubscribe = subscribeMergeWorldSnapshots((state) => { if (active) setMergeWorld(state); });
+    return () => { active = false; unsubscribe(); };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -120,18 +165,30 @@ function FocusedKatchimeraRoster() {
     [kingdom.creatures],
   );
   const residents = useMemo(() => deriveResidents(hatches), [hatches]);
+  const companionSlots = useMemo(
+    () => kingdomCompanionHexSlots(residents, kingdom.creatures, (mergeWorld?.haven.tileStages ?? {}) as Partial<Record<KatchimeraFamilyId, 0 | 1 | 2 | 3 | 4>>),
+    [kingdom.creatures, mergeWorld?.haven.tileStages, residents],
+  );
+  const eggVisual = useMemo(
+    () => days.find((day) => day.isToday)?.egg ?? days[days.length - 1]?.egg ?? null,
+    [days],
+  );
   const today = useMemo(() => days.find((day) => day.isToday) ?? null, [days]);
   const background = useMemo(
     () => todayAtmosphereBackgroundForDay(today, days),
     [days, today],
   );
   const statusByCreatureId = useMemo(() => {
-    const statuses: Partial<Record<string, 'active'>> = {};
+    const statuses: Partial<Record<string, KingdomResidentStatusGlyph>> = {};
     for (const creature of kingdom.creatures) {
       if (questFor(persistent.quests, creature.creatureId)) statuses[creature.creatureId] = 'active';
+      const characterId = creature.familyId as MergeCharacterId | undefined;
+      const stage = characterId ? mergeWorld?.haven.tileStages[characterId] ?? 0 : 0;
+      const next = characterId ? HAVEN_ENVIRONMENTS[characterId]?.stages[stage + 1] : null;
+      if (next && mergeWorld && havenStoryGateSatisfied(mergeWorld, next.storyGate)) statuses[creature.creatureId] = 'ready';
     }
     return statuses;
-  }, [kingdom.creatures, persistent.quests]);
+  }, [kingdom.creatures, mergeWorld, persistent.quests]);
   const bondForCreature = useCallback(
     (creatureId: string) => companionBondProgress(persistent.bond, creatureId),
     [persistent.bond],
@@ -148,7 +205,7 @@ function FocusedKatchimeraRoster() {
     return reconciled;
   }, [bondForCreature, kingdom.creatures, residents, statusByCreatureId]);
   useGameSurfaceReadiness('katchimeras', {
-    background: backgroundReady,
+    background: viewMode === 'haven' || backgroundReady,
     data: discovery.ready,
     foreground: contentReady,
     layout: contentReady,
@@ -167,14 +224,99 @@ function FocusedKatchimeraRoster() {
     navigate: () => router.navigate('/today'),
   }), [router, transitionTo]);
 
-  return discovery.ready ? (
-    <KatchimeraRosterScreen
-      background={background}
-      items={items}
-      onBackgroundReady={() => setBackgroundReady(true)}
-      onContentReady={() => setContentReady(true)}
-      onGoToday={goToday}
-      onSelectCreature={openCreature}
-    />
+  const toggleView = useCallback(() => {
+    if (process.env.EXPO_OS === 'ios') {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    onToggleViewMode();
+  }, [onToggleViewMode]);
+
+  return discovery.ready && mergeWorld ? (
+    <View style={styles.screen}>
+      {viewMode === 'grid' ? (
+        <KatchimeraRosterScreen
+          background={background}
+          items={items}
+          onBackgroundReady={() => setBackgroundReady(true)}
+          onContentReady={() => setContentReady(true)}
+          onGoToday={goToday}
+          onSelectCreature={openCreature}
+        />
+      ) : (
+        <KatchimeraKingdomScreen
+          background={background}
+          daysHatched={kingdom.totals.daysHatched}
+          eggVisual={eggVisual}
+          onContentReady={() => setContentReady(true)}
+          onSelectCreature={openCreature}
+          residentStatusGlyphs={statusByCreatureId}
+          companionSlots={companionSlots}
+          mergeWorld={mergeWorld}
+          ftueStepId={ftueRun?.status === 'active' ? ftueRun.stepId : undefined}
+          onFtueRestore={() => {
+            beginMossproutChapterOne();
+            dispatchFtueEvent({
+              type: 'haven_upgrade_completed',
+              characterId: 'mossprout',
+              stage: 1,
+              revision: mergeWorld.revision,
+            }, 'haven:mossprout:stage-1');
+          }}
+          onFtueReveal={() => {
+            void revealStoredHaven().then(() => {
+              commitFtueAction({ actionId: 'haven.reveal_world', evidenceRef: 'haven:revealed' });
+              transitionTo({ announcement: 'Back to the trail', target: 'merge', navigate: () => router.navigate({ pathname: '/games', params: { familyId: 'mossprout' } }) });
+            });
+          }}
+        />
+      )}
+      <Pressable
+        accessibilityHint={`Switch to the ${viewMode === 'grid' ? 'Haven' : 'grid'} view`}
+        accessibilityLabel={viewMode === 'grid' ? 'Show Haven view' : 'Show Katchimera grid'}
+        accessibilityRole="button"
+        accessibilityState={{ selected: viewMode === 'haven' }}
+        onPress={toggleView}
+        style={({ pressed }) => [
+          styles.viewToggle,
+          { bottom: homeTabBarHeight(insets.bottom) + 14 },
+          pressed && styles.viewTogglePressed,
+        ]}>
+        <IconSymbol
+          color="#FFF6DC"
+          name={viewMode === 'grid' ? 'map.fill' : 'circle.grid.2x2.fill'}
+          size={20}
+        />
+        <ThemedText style={styles.viewToggleLabel} lightColor="#FFF6DC" darkColor="#FFF6DC">
+          {viewMode === 'grid' ? 'Haven' : 'Grid'}
+        </ThemedText>
+      </Pressable>
+    </View>
   ) : null;
 }
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  viewToggle: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(24,22,31,0.92)',
+    borderColor: 'rgba(255,246,220,0.2)',
+    borderCurve: 'continuous',
+    borderRadius: 999,
+    borderWidth: 1,
+    boxShadow: '0 7px 18px rgba(13,10,21,0.32)',
+    flexDirection: 'row',
+    gap: 7,
+    height: 48,
+    paddingHorizontal: 15,
+    position: 'absolute',
+    right: 16,
+    zIndex: 50,
+  },
+  viewTogglePressed: { opacity: 0.82, transform: [{ scale: 0.97 }] },
+  viewToggleLabel: {
+    fontFamily: AppFontFamilies.manrope,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.25,
+  },
+});

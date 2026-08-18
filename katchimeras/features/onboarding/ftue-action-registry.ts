@@ -19,6 +19,8 @@ export const FTUE_HANDLER_REGISTRY: Record<FtueHandlerId, { commitOwner: 'fronte
   merge_energy_depleted: { commitOwner: 'domain-observer', privacy: 'no-answer' },
   pedometer_steps: { commitOwner: 'frontend', privacy: 'no-answer' },
   movement_context: { commitOwner: 'frontend', privacy: 'answer-id-only' },
+  haven_upgrade: { commitOwner: 'domain-observer', privacy: 'no-answer' },
+  haven_reveal: { commitOwner: 'frontend', privacy: 'no-answer' },
   acknowledgement: { commitOwner: 'frontend', privacy: 'no-answer' },
 };
 

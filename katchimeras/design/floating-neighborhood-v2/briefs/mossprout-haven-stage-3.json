@@ -1,0 +1,14 @@
+{
+  "key": "mossprout_haven_stage_3",
+  "kind": "resident",
+  "concept": "Flourishing Woodland: the clearing and its rain garden are now richly established.",
+  "floor": "Rich continuous forest moss with a clean open character clearing at front-center.",
+  "main_structure": "One broad leafy alcove at rear-left balanced by a smooth oval rain pond at rear-right.",
+  "rear_props": ["three large moss boulders", "oversized fern silhouettes"],
+  "side_props": ["one chunky stump bench", "two warm garden lanterns"],
+  "perimeter": { "material": "layered deep-green moss", "palette": ["emerald", "olive", "pale lime"], "emblems": "broad leaf forms" },
+  "cliff": { "materials": ["warm sandstone"], "palette": ["warm ochre", "soft umber"] },
+  "lighting": "filtered woodland daylight, cool pond light, warm lanterns",
+  "must_keep": ["canonical geometry", "open front-center", "readable pond and woodland silhouette"],
+  "must_exclude": ["creature", "giant tree", "house", "path", "stepping stones", "tiny clutter"]
+}

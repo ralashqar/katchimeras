@@ -1,7 +1,7 @@
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import type { DayPromptKind, TodayGrowthSource } from '@/types/home';
 
-export type FtueSurface = 'today' | 'hatch' | 'companion' | 'merge';
+export type FtueSurface = 'today' | 'hatch' | 'companion' | 'merge' | 'haven';
 export type FtuePresentation = 'inline_choice' | 'route_action' | 'cta_action' | 'observed_game_action' | 'acknowledgement';
 export type FtueHandlerId =
   | 'day_prompt'
@@ -21,6 +21,8 @@ export type FtueHandlerId =
   | 'merge_energy_depleted'
   | 'pedometer_steps'
   | 'movement_context'
+  | 'haven_upgrade'
+  | 'haven_reveal'
   | 'acknowledgement';
 
 export type FtueChoiceOption = {
@@ -59,7 +61,11 @@ export type FtueTarget =
   | { kind: 'board_cell'; cell: number }
   | { kind: 'order_serve'; orderId: string }
   | { kind: 'tray_chat_note'; noteId: string }
-  | { kind: 'tray_parcel'; arrivalId: string };
+  | { kind: 'tray_parcel'; arrivalId: string }
+  | { kind: 'haven_tile'; characterId: string }
+  | { kind: 'haven_tile_hud'; characterId: string }
+  | { kind: 'haven_upgrade_button'; characterId: string }
+  | { kind: 'haven_world' };
 
 export type FtueCueDefinition =
   | { kind: 'drag'; from: FtueTarget; to: FtueTarget }
@@ -75,6 +81,7 @@ export type FtueSpotlightDefinition = {
 
 export type FtueInteractionPolicy =
   | { mode: 'none' }
+  | { mode: 'exclusive'; allowed: { kind: 'target_tap'; target: FtueTarget } }
   | { mode: 'exclusive'; allowed: { kind: 'board_drag'; from: FtueTarget; to: FtueTarget } }
   | { mode: 'exclusive'; allowed: { kind: 'generator_tap'; target: FtueTarget } }
   | { mode: 'exclusive'; allowed: { kind: 'order_serve'; target: FtueTarget } }
@@ -102,7 +109,9 @@ export type FtueEvent =
   | { type: 'order_served'; orderId: string; revision: number }
   | { type: 'chat_note_opened'; noteId: string; revision: number }
   | { type: 'arrival_claimed'; arrivalId: string; revision: number }
-  | { type: 'companion_discovery_advanced'; discoveryId: string; stage: number; completedCharacterId?: string; revision: number };
+  | { type: 'companion_discovery_advanced'; discoveryId: string; stage: number; completedCharacterId?: string; revision: number }
+  | { type: 'ui_target_pressed'; target: FtueTarget; revision: number }
+  | { type: 'haven_upgrade_completed'; characterId: string; stage: number; revision: number };
 
 export type FtueEventMatcher =
   | {
@@ -116,7 +125,13 @@ export type FtueEventMatcher =
   | { type: 'order_served'; orderId?: string }
   | { type: 'chat_note_opened'; noteId?: string }
   | { type: 'arrival_claimed'; arrivalId?: string }
-  | { type: 'companion_discovery_advanced'; discoveryId?: string; stage?: number; completedCharacterId?: string };
+  | { type: 'companion_discovery_advanced'; discoveryId?: string; stage?: number; completedCharacterId?: string }
+  | { type: 'ui_target_pressed'; target?: FtueTarget }
+  | { type: 'haven_upgrade_completed'; characterId?: string; stage?: number };
+
+export type FtueCameraDirective =
+  | { kind: 'focus_target'; target: FtueTarget; zoom?: number; anchorY?: number; durationMs?: number }
+  | { kind: 'fit_targets'; targets: readonly FtueTarget[]; padding?: number; durationMs?: number };
 
 export type FtueGraphEdge = {
   event: FtueEventMatcher;
@@ -133,6 +148,7 @@ export type FtueStepDefinition = {
   interaction?: FtueInteractionPolicy;
   cue?: FtueCueDefinition;
   spotlight?: FtueSpotlightDefinition;
+  camera?: FtueCameraDirective;
   edges?: readonly FtueGraphEdge[];
   blockingBeat?: 'mossprout_intro' | 'energy_connection' | 'energy_awarded' | 'chapter_complete';
 };

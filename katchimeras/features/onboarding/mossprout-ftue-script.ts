@@ -28,7 +28,7 @@ const openingActions: readonly FtueActionDefinition[] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 13,
+  version: 16,
   entryStepId: 'egg.opening',
   terminalStepId: 'complete',
   steps: [
@@ -318,7 +318,27 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'companion.chapter_zero_return', surface: 'companion',
       guide: { eyebrow: 'A little place to begin', title: 'Mossprout has something to show you.', body: 'Finish your first chapter together.' },
-      actions: [{ id: 'companion.complete_chapter_zero_return', title: 'Follow the tracks', description: 'See what moved in the Dream Mist.', icon: 'figure.walk', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'discovery.steppling.parcel', backendEvent: true }],
+      actions: [{ id: 'companion.complete_chapter_zero_return', title: 'Fix up the clearing', description: 'Give Mossprout somewhere to call home.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'haven.mossprout.focus', backendEvent: true }],
+      blockingBeat: 'chapter_complete',
+    },
+    {
+      id: 'haven.mossprout.focus', surface: 'haven',
+      guide: { eyebrow: 'A little place to begin', title: 'Mossprout has a home here.', body: 'Tap the garden marker to see what your Coins can restore.' },
+      actions: [{ id: 'haven.open_mossprout_upgrade', title: 'Open Mossprout’s Haven', description: 'See the first permanent garden upgrade.', icon: 'leaf.fill', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'haven.mossprout.restore' }],
+      camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: 1.35, anchorY: 0.46, durationMs: 420 },
+      interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_tile_hud', characterId: 'mossprout' } } },
+      cue: { kind: 'tap', target: { kind: 'haven_tile_hud', characterId: 'mossprout' } },
+      spotlight: { targets: [{ kind: 'haven_tile_hud', characterId: 'mossprout' }], padding: 7, radius: 18, dimOpacity: 0.62 },
+      blockingBeat: 'chapter_complete',
+    },
+    {
+      id: 'haven.mossprout.restore', surface: 'haven',
+      guide: { eyebrow: 'A little place to begin', title: 'Restore the Little Garden', body: 'Coins earned through Merge can permanently change this place.' },
+      actions: [{ id: 'haven.restore_mossprout', title: 'Restore · 150 Coins', description: 'Turn the forgotten clearing into Mossprout’s first garden.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'haven_upgrade', nextStepId: 'haven.reveal', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } } },
+      cue: { kind: 'tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } },
+      spotlight: { targets: [{ kind: 'haven_upgrade_button', characterId: 'mossprout' }], padding: 6, radius: 16, dimOpacity: 0.62 },
+      edges: [{ event: { type: 'haven_upgrade_completed', characterId: 'mossprout', stage: 1 }, commitActionId: 'haven.restore_mossprout', nextStepId: 'haven.reveal' }],
       blockingBeat: 'chapter_complete',
     },
     {
@@ -329,6 +349,13 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       cue: { kind: 'tap', target: { kind: 'tray_parcel', arrivalId: `arrival:discovery:${STEPPLING_DISCOVERY_ID}` } },
       spotlight: { targets: [{ kind: 'tray_parcel', arrivalId: `arrival:discovery:${STEPPLING_DISCOVERY_ID}` }], padding: 7, radius: 14, dimOpacity: 0.64 },
       edges: [{ event: { type: 'arrival_claimed', arrivalId: `arrival:discovery:${STEPPLING_DISCOVERY_ID}` }, commitActionId: 'discovery.steppling.parcel', nextStepId: 'discovery.steppling.sock' }],
+    },
+    {
+      id: 'haven.reveal', surface: 'haven',
+      guide: { eyebrow: 'The world opens', title: 'THE HAVEN', body: 'Every friend you meet brings another part of the Haven to life.' },
+      actions: [{ id: 'haven.reveal_world', title: 'Continue to Merge', description: 'Return to the Merge board and follow the new trail.', icon: 'arrow.right', presentation: 'acknowledgement', handlerId: 'haven_reveal', nextStepId: 'discovery.steppling.parcel', backendEvent: true }],
+      camera: { kind: 'fit_targets', targets: [{ kind: 'haven_world' }], padding: 28, durationMs: 680 },
+      blockingBeat: 'chapter_complete',
     },
     {
       id: 'discovery.steppling.sock', surface: 'merge',

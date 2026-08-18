@@ -7,6 +7,11 @@ import { KINGDOM_RENDERING } from '../constants/kingdom-rendering';
 import kingdomWorldViewConfig from '../constants/kingdom-world-view.json';
 import todayScene from '../data/today-scene.json';
 import { visiblePixelBoundsFromRgba } from '../utils/alpha-bounds';
+import { katchimeraFamilies } from '../constants/katchimera-skins';
+import {
+  KINGDOM_ZODIAC_RESERVED_COORD,
+  kingdomCompanionHexSlots,
+} from '../utils/katchimera-kingdom-slots';
 import {
   cameraTranslationBounds,
   frameToRect,
@@ -89,6 +94,55 @@ function renderedAssetY(frame: { top: number; height: number }, assetY: number):
 function renderedAssetX(frame: { left: number; width: number }, assetX: number): number {
   return frame.left + (assetX / 1024) * frame.width;
 }
+
+test('Kingdom reserves one permanent catalog slot for every Katchimera family', () => {
+  const locked = kingdomCompanionHexSlots([], []);
+  assert.equal(locked.length, 25);
+  assert.deepEqual(locked.map((slot) => slot.familyId), katchimeraFamilies.map((family) => family.id));
+  assert.equal(new Set(locked.map((slot) => slot.id)).size, locked.length);
+  assert.equal(new Set(locked.map((slot) => `${slot.coord.q}:${slot.coord.r}`)).size, locked.length);
+  assert.ok(locked.every((slot) => slot.kind === 'locked'));
+  assert.ok(locked.every((slot) => (
+    slot.coord.q !== KINGDOM_ZODIAC_RESERVED_COORD.q
+    || slot.coord.r !== KINGDOM_ZODIAC_RESERVED_COORD.r
+  )));
+});
+
+test('discovering a Katchimera transforms its existing Kingdom slot without moving it', () => {
+  const before = kingdomCompanionHexSlots([], []);
+  const family = katchimeraFamilies[0];
+  const creature = {
+    accentColor: '#D6B36A',
+    aspectId: family.aspectId,
+    creatureId: 'test-owned-companion',
+    dayId: 'test-day',
+    familyId: family.id,
+    isoDate: '2026-08-18',
+    name: family.displayName,
+    rarity: 'common' as const,
+    visualKey: family.anchorVisualKey!,
+  };
+  const resident = {
+    arrivalIndex: 0,
+    cell: { col: 1.5, row: 1.5 },
+    creatureId: creature.creatureId,
+    hatchCount: 1,
+    houseLevel: 1,
+    quad: 0 as const,
+    tileIndex: 0,
+  };
+  const after = kingdomCompanionHexSlots([resident], [creature]);
+  const lockedSlot = before.find((slot) => slot.familyId === family.id)!;
+  const ownedSlot = after.find((slot) => slot.familyId === family.id)!;
+
+  assert.equal(ownedSlot.kind, 'owned');
+  assert.equal(ownedSlot.id, lockedSlot.id);
+  assert.deepEqual(ownedSlot.coord, lockedSlot.coord);
+  assert.deepEqual(
+    after.filter((slot) => slot.familyId !== family.id).map((slot) => slot.coord),
+    before.filter((slot) => slot.familyId !== family.id).map((slot) => slot.coord),
+  );
+});
 
 test('Today day tiles retain a stable alternating row while the camera recenters selection', () => {
   const viewportWidth = 400;

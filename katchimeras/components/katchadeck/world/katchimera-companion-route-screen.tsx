@@ -10,7 +10,6 @@ import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/ut
 import { commitFtueAction, ftueWispForRun, loadFtueRun, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { installMossproutOnboardingMergeWorld, installStepplingFtueDiscovery } from '@/utils/merge-world/repository';
 import { useGameScreenTransition } from '@/features/navigation/game-screen-transition';
-import { beginMossproutChapterOne } from '@/utils/companion-story-storage';
 import { useCompanionDiscoveryRecords } from '@/hooks/use-companion-discovery-records';
 
 export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConversationDefinitionId }: { creatureId: string; source?: 'merge-world'; ftueConversationDefinitionId?: string }) {
@@ -35,12 +34,11 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConvers
           ftueHandoffRef.current = false;
           return;
         }
-        beginMossproutChapterOne();
         commitFtueAction({ actionId: 'companion.complete_chapter_zero_return', evidenceRef: ftueConversationDefinitionId ?? 'mossprout-chapter-zero-return' });
         transitionTo({
-          announcement: 'Something moved in the Dream Mist',
-          target: 'merge',
-          navigate: () => router.dismissTo({ pathname: '/games', params: { familyId: 'mossprout' } }),
+          announcement: 'Opening Mossprout’s clearing',
+          target: 'katchimeras',
+          navigate: () => router.dismissTo('/katchimeras'),
         });
       }).catch((error) => {
         ftueHandoffRef.current = false;

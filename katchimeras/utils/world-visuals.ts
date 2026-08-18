@@ -466,7 +466,9 @@ export type KingdomHexTileSelection = {
   default: KingdomHexTileSpec;
   homes: Record<HomeArchetypeId, KingdomHexTileSpec>;
   layoutProfile: KingdomHexLayoutProfileId;
+  locked: KingdomHexTileSpec;
   residentTiles?: Partial<Record<HomeVisualKey, KingdomHexTileSpec>>;
+  havenResidentTiles?: Partial<Record<string, Partial<Record<number, KingdomHexTileSpec>>>>;
   useCustomResidentTiles: boolean;
   zodiacs: Record<ZodiacSignId, KingdomHexTileSpec>;
 };
@@ -486,6 +488,7 @@ export function kingdomHexTileSourceForLod(
 }
 
 export const KINGDOM_DEFAULT_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/default_hex_tile.webp');
+export const KINGDOM_DREAM_MIST_LOCKED_HEX_TILE_V1: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/dream_mist_locked_hex_tile_v1.webp');
 export const KINGDOM_EGG_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/egg_hex_tile.webp');
 export const KINGDOM_EGG_HEX_TILE_V2: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/egg_hex_tile_v2.webp');
 export const KINGDOM_EGG_HOME_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/egg_home_hex_tile.webp');
@@ -514,6 +517,11 @@ export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_SKYLO_HEX_TILE: ImageSourcePropTyp
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_PAGELET_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_pagelet_hex_tile.webp');
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_STEPPLING_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_steppling_hex_tile.webp');
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HAVEN_STAGE_0_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_0_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HAVEN_STAGE_1_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_1_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HAVEN_STAGE_2_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_2_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HAVEN_STAGE_3_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_3_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HAVEN_STAGE_4_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_4_hex_tile.webp');
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_FLICKERBUN_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_flickerbun_hex_tile.webp');
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_RELICOON_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_relicoon_hex_tile.webp');
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_BEDROTTE_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_bedrotte_hex_tile.webp');
@@ -537,6 +545,16 @@ const KINGDOM_DEFAULT_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
   thumb: require('../assets/images/katchimeras/world/hex/default_hex_tile_256.webp'),
   medium: require('../assets/images/katchimeras/world/hex/default_hex_tile_512.webp'),
   full: KINGDOM_DEFAULT_HEX_TILE,
+};
+const KINGDOM_DREAM_MIST_LOCKED_HEX_TILE_V1_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/dream_mist_locked_hex_tile_v1_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/dream_mist_locked_hex_tile_v1_512.webp'),
+  full: KINGDOM_DREAM_MIST_LOCKED_HEX_TILE_V1,
+};
+const KINGDOM_DREAM_MIST_LOCKED_TILE_V1: KingdomHexTileSpec = {
+  source: KINGDOM_DREAM_MIST_LOCKED_HEX_TILE_V1,
+  sources: KINGDOM_DREAM_MIST_LOCKED_HEX_TILE_V1_SOURCES,
+  alphaBounds: hexTileAlphaBounds('dream_mist_locked_hex_tile_v1.webp'),
 };
 const KINGDOM_EGG_HEX_TILE_V2_SOURCES: KingdomHexTileLodSources = {
   thumb: require('../assets/images/katchimeras/world/hex/egg_hex_tile_v2_256.webp'),
@@ -673,6 +691,27 @@ const KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HEX_TILE_SOURCES: KingdomHexTil
   medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_hex_tile_512.webp'),
   full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HEX_TILE,
 };
+const mossproutHavenSources = (stage: 0 | 1 | 2 | 3 | 4, full: ImageSourcePropType): KingdomHexTileLodSources => ({
+  thumb: stage === 0
+    ? require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_0_hex_tile_256.webp')
+    : stage === 1
+      ? require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_1_hex_tile_256.webp')
+      : stage === 2
+        ? require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_2_hex_tile_256.webp')
+        : stage === 3
+          ? require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_3_hex_tile_256.webp')
+          : require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_4_hex_tile_256.webp'),
+  medium: stage === 0
+    ? require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_0_hex_tile_512.webp')
+    : stage === 1
+      ? require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_1_hex_tile_512.webp')
+      : stage === 2
+        ? require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_2_hex_tile_512.webp')
+        : stage === 3
+          ? require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_3_hex_tile_512.webp')
+          : require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_4_hex_tile_512.webp'),
+  full,
+});
 const KINGDOM_FLOATING_NEIGHBORHOOD_V2_FLICKERBUN_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
   thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_flickerbun_hex_tile_256.webp'),
   medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_flickerbun_hex_tile_512.webp'),
@@ -1122,6 +1161,25 @@ const FLOATING_NEIGHBORHOOD_V2_ZODIAC_TILES: Record<ZodiacSignId, KingdomHexTile
   pisces: floatingNeighborhoodV2ZodiacTile('pisces'),
 };
 
+const mossproutHavenTile = (stage: 0 | 1 | 2 | 3 | 4, source: ImageSourcePropType): KingdomHexTileSpec => ({
+  source,
+  sources: mossproutHavenSources(stage, source),
+  alphaBounds: hexTileAlphaBounds(`floating_neighborhood_v2_mossprout_haven_stage_${stage}_hex_tile.webp`),
+  faceBounds: FLOATING_NEIGHBORHOOD_V2_FACE_BOUNDS,
+});
+
+const MOSSPROUT_HAVEN_TILES: Partial<Record<number, KingdomHexTileSpec>> = {
+  0: mossproutHavenTile(0, KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HAVEN_STAGE_0_HEX_TILE),
+  1: mossproutHavenTile(1, KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HAVEN_STAGE_1_HEX_TILE),
+  2: mossproutHavenTile(2, KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HAVEN_STAGE_2_HEX_TILE),
+  3: mossproutHavenTile(3, KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HAVEN_STAGE_3_HEX_TILE),
+  4: mossproutHavenTile(4, KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HAVEN_STAGE_4_HEX_TILE),
+};
+
+export function havenHexTileSpec(characterId: string, stage: number): KingdomHexTileSpec | null {
+  return characterId === 'mossprout' ? MOSSPROUT_HAVEN_TILES[stage] ?? null : null;
+}
+
 export const KINGDOM_HEX_ART_DIRECTION_SETS: KingdomHexArtDirectionSet[] = [
   {
     id: 'connected_floating_v1',
@@ -1132,6 +1190,7 @@ export const KINGDOM_HEX_ART_DIRECTION_SETS: KingdomHexArtDirectionSet[] = [
       default: FLOATING_EMPTY_TILE_V1,
       homes: FLOATING_HOME_TILES_V1,
       layoutProfile: 'connected-floating-v1',
+      locked: KINGDOM_DREAM_MIST_LOCKED_TILE_V1,
       residentTiles: FLOATING_RESIDENT_TILES_V1,
       useCustomResidentTiles: false,
       zodiacs: FLOATING_ZODIAC_TILES_V1,
@@ -1146,7 +1205,9 @@ export const KINGDOM_HEX_ART_DIRECTION_SETS: KingdomHexArtDirectionSet[] = [
       default: FLOATING_NEIGHBORHOOD_V2_NEUTRAL_TILE,
       homes: FLOATING_NEIGHBORHOOD_V2_HOME_TILES,
       layoutProfile: 'floating-neighborhood-v2',
+      locked: KINGDOM_DREAM_MIST_LOCKED_TILE_V1,
       residentTiles: FLOATING_NEIGHBORHOOD_V2_RESIDENT_TILES,
+      havenResidentTiles: { mossprout: MOSSPROUT_HAVEN_TILES },
       useCustomResidentTiles: false,
       zodiacs: FLOATING_NEIGHBORHOOD_V2_ZODIAC_TILES,
     },
@@ -1262,6 +1323,7 @@ export function kingdomHexTileSet(): KingdomHexTileSelection {
     default: base.tile,
     homes: KINGDOM_HOME_HEX_TILES,
     layoutProfile: 'separated-v1',
+    locked: KINGDOM_DREAM_MIST_LOCKED_TILE_V1,
     useCustomResidentTiles: true,
     zodiacs: KINGDOM_ZODIAC_HEX_TILES,
   };

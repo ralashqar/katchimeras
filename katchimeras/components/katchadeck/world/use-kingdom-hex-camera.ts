@@ -20,6 +20,7 @@ import {
   type KingdomSize,
 } from '@/utils/kingdom-rendering';
 import type { KingdomHexTileLod } from '@/utils/world-visuals';
+import { HAVEN_UPGRADE_REDUCED_TIMING, HAVEN_UPGRADE_TIMING } from '@/utils/haven-upgrade-presentation';
 
 type CameraRenderState = {
   isMoving: boolean;
@@ -30,6 +31,7 @@ type CameraRenderState = {
 
 type UseKingdomHexCameraArgs = {
   center: { x: number; y: number };
+  interactionEnabled?: boolean;
   residentWorldSize: number;
   scene: KingdomSize;
   tileWorldWidth: number;
@@ -51,6 +53,7 @@ function workletClamp(value: number, bounds: [number, number]): number {
 
 export function useKingdomHexCamera({
   center,
+  interactionEnabled = true,
   residentWorldSize,
   scene,
   tileWorldWidth,
@@ -156,6 +159,7 @@ export function useKingdomHexCamera({
   const pan = useMemo(
     () =>
       Gesture.Pan()
+        .enabled(interactionEnabled)
         .maxPointers(1)
         .activeOffsetX([-6, 6])
         .activeOffsetY([-6, 6])
@@ -187,12 +191,13 @@ export function useKingdomHexCamera({
           tx.value = withDecay({ velocity: event.velocityX, deceleration: 0.996, clamp: xBounds }, completeDecay);
           ty.value = withDecay({ velocity: event.velocityY, deceleration: 0.996, clamp: yBounds }, completeDecay);
         }),
-    [beginMotion, commitSnapshot, decayCompletions, panStartTx, panStartTy, scale, scene.height, scene.width, tx, ty, viewport.height, viewport.width]
+    [beginMotion, commitSnapshot, decayCompletions, interactionEnabled, panStartTx, panStartTy, scale, scene.height, scene.width, tx, ty, viewport.height, viewport.width]
   );
 
   const pinch = useMemo(
     () =>
       Gesture.Pinch()
+        .enabled(interactionEnabled)
         .onBegin((event) => {
           cancelAnimation(tx);
           cancelAnimation(ty);
@@ -224,6 +229,7 @@ export function useKingdomHexCamera({
     [
       beginMotion,
       commitSnapshot,
+      interactionEnabled,
       pinchFocalX,
       pinchFocalY,
       pinchStartScale,
@@ -245,8 +251,11 @@ export function useKingdomHexCamera({
   }));
 
   const animateTo = useCallback(
-    (x: number, y: number, zoom: number, screenY: number, duration: number) => {
-      if (!viewport.width || !viewport.height) return;
+    (x: number, y: number, zoom: number, screenY: number, duration: number, onComplete?: () => void) => {
+      if (!viewport.width || !viewport.height) {
+        onComplete?.();
+        return;
+      }
       cancelAnimation(tx);
       cancelAnimation(ty);
       cancelAnimation(scale);
@@ -258,7 +267,10 @@ export function useKingdomHexCamera({
       tx.value = withTiming(clamped.tx, timing);
       ty.value = withTiming(clamped.ty, timing);
       scale.value = withTiming(zoom, timing, (finished) => {
-        if (finished) runOnJS(commitSnapshot)(clamped.tx, clamped.ty, zoom, false);
+        if (finished) {
+          runOnJS(commitSnapshot)(clamped.tx, clamped.ty, zoom, false);
+          if (onComplete) runOnJS(onComplete)();
+        }
       });
       pinchStartScale.value = zoom;
     },
@@ -270,15 +282,58 @@ export function useKingdomHexCamera({
   }, [animateTo, baseScale, center.x, center.y, viewport.height]);
 
   const focusResident = useCallback(
-    (x: number, y: number) => {
-      const zoom = Math.min(maxScale, Math.max(scale.value, 1.35));
-      animateTo(x, y, zoom, viewport.height * 0.42, 420);
+    (x: number, y: number, options?: { anchorY?: number; durationMs?: number; onComplete?: () => void; zoom?: number }) => {
+      const zoom = Math.min(maxScale, Math.max(scale.value, options?.zoom ?? 1.35));
+      const anchorY = options?.anchorY ?? 0.42;
+      animateTo(x, y, zoom, viewport.height * anchorY, options?.durationMs ?? 420, options?.onComplete);
     },
     [animateTo, scale, viewport.height]
   );
 
+  const fitWorld = useCallback((durationMs = 680, onComplete?: () => void) => {
+    const fitScale = viewport.width && viewport.height
+      ? Math.max(minScale, Math.min(baseScale * 0.78, viewport.width / scene.width, viewport.height / scene.height))
+      : minScale;
+    animateTo(scene.width / 2, scene.height / 2, fitScale, viewport.height / 2, durationMs, onComplete);
+  }, [animateTo, baseScale, scene.height, scene.width, viewport.height, viewport.width]);
+
+  const focusUpgrade = useCallback(
+    (x: number, y: number, reducedMotion: boolean, onComplete: () => void) => {
+      if (!viewport.width || !viewport.height) {
+        onComplete();
+        return;
+      }
+      cancelAnimation(tx);
+      cancelAnimation(ty);
+      cancelAnimation(scale);
+      beginMotion();
+      const zoom = 1.45;
+      const screenY = viewport.height * 0.46;
+      const nextTx = viewport.width / 2 - scene.width / 2 - (x - scene.width / 2) * zoom;
+      const nextTy = screenY - scene.height / 2 - (y - scene.height / 2) * zoom;
+      const clamped = clampCameraTranslation({ tx: nextTx, ty: nextTy }, viewport, scene, zoom);
+      const timing = {
+        duration: reducedMotion ? HAVEN_UPGRADE_REDUCED_TIMING.cameraMs : HAVEN_UPGRADE_TIMING.cameraMs,
+        easing: Easing.out(Easing.cubic),
+      };
+      const finish = () => {
+        commitSnapshot(clamped.tx, clamped.ty, zoom, false);
+        onComplete();
+      };
+      tx.value = withTiming(clamped.tx, timing);
+      ty.value = withTiming(clamped.ty, timing);
+      scale.value = withTiming(zoom, timing, (finished) => {
+        if (finished) runOnJS(finish)();
+      });
+      pinchStartScale.value = zoom;
+    },
+    [beginMotion, commitSnapshot, pinchStartScale, scale, scene, tx, ty, viewport]
+  );
+
   return {
+    fitWorld,
     focusResident,
+    focusUpgrade,
     gesture,
     isMoving: renderState.isMoving,
     ready,

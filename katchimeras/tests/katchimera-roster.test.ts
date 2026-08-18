@@ -262,6 +262,23 @@ test('the bottom bar exposes Katchimeras while the retired world route redirects
   assert.doesNotMatch(worldRoute, /KingdomCompanionScreen|KingdomHexCanvas/);
 });
 
+test('the Katchimeras tab toggles between grid and Haven while companion Back returns to that tab state', () => {
+  const read = (...segments: string[]) => fs.readFileSync(path.join(process.cwd(), ...segments), 'utf8');
+  const rosterRoute = read('components', 'katchadeck', 'roster', 'katchimera-roster-route-screen.tsx');
+  const kingdomScreen = read('components', 'katchadeck', 'roster', 'katchimera-kingdom-screen.tsx');
+  const companionRoute = read('components', 'katchadeck', 'world', 'katchimera-companion-route-screen.tsx');
+
+  assert.match(rosterRoute, /useState<KatchimeraViewMode>\('grid'\)/);
+  assert.match(rosterRoute, /current === 'grid' \? 'haven' : 'grid'/);
+  assert.match(rosterRoute, /<KatchimeraRosterScreen[\s\S]*?<KatchimeraKingdomScreen/);
+  assert.match(rosterRoute, /router\.push\(\{ pathname: '\/katchimera\/\[creatureId\]'/);
+  assert.match(kingdomScreen, /<KingdomHexCanvas[\s\S]*?onSelectResident=\{selectResident\}/);
+  assert.match(kingdomScreen, /<HavenTileHudLayer[\s\S]*?onOpen=\{openHavenDetail\}/);
+  assert.match(kingdomScreen, /Hidden in the Dream Mist/);
+  assert.match(kingdomScreen, /Keep progressing on the Merge board/);
+  assert.match(companionRoute, /onCloseCompanion=\{\(\) =>[\s\S]*?: router\.back\(\)\}/);
+});
+
 test('the dev toggle exposes virtual companions across roster, companion, games, goals, and Dex surfaces', () => {
   const read = (...segments: string[]) => fs.readFileSync(path.join(process.cwd(), ...segments), 'utf8');
   const devTab = read('app', '(tabs)', 'explore.tsx');
@@ -337,7 +354,7 @@ test('the roster, companion, and Block Blast use isolated route boundaries', () 
   assert.doesNotMatch(rosterCard, /FadeInUp|entering=|translateY/);
   assert.match(rosterRoute, /hasCompletedInitialFocus/);
   assert.match(rosterRoute, /useIsFocused/);
-  assert.match(rosterRoute, /isFocused \? <FocusedKatchimeraRoster \/> : null/);
+  assert.match(rosterRoute, /isFocused \? <FocusedKatchimeraRoster[\s\S]*?\/> : null/);
   assert.match(gameRoute, /BlockBlastQuest/);
   assert.match(gameRoute, /BlockBlastGameShell/);
   assert.match(gameShell, /cheerlet-exploration-v1\.png/);

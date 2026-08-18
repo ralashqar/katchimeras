@@ -1,15 +1,16 @@
 import type { ImageSourcePropType } from 'react-native';
 
-import type { KingdomCreature } from '@/types/kingdom';
 import { lifeAspectById } from '@/constants/life-aspects';
 import { katchimeraFamilyById } from '@/constants/katchimera-skins';
 import type { WorldIdentityState } from '@/types/world-identity';
 import { katchimeraHexTileForCreature } from '@/utils/katchimera-hex-tiles';
-import type { KingdomResident } from '@/utils/kingdom-residents';
+import {
+  KINGDOM_ZODIAC_RESERVED_COORD,
+  type KingdomHexCompanionSlot,
+} from '@/utils/katchimera-kingdom-slots';
 import {
   HEX_TILE_LIP,
   hexDrawDepth,
-  hexSpiral,
   hexTileTopPoints,
   hexToWorld,
   type HexCoord,
@@ -24,24 +25,18 @@ import type {
   KingdomHexTileSelection,
 } from '@/utils/world-visuals';
 
-export type KingdomHexResidentTile = {
-  id: string;
-  resident: KingdomResident;
-  creature: KingdomCreature;
-  coord: HexCoord;
-};
-
 export type KingdomTileRender = {
   id: string;
-  kind: 'home' | 'zodiac' | 'resident';
+  kind: 'home' | 'zodiac' | 'companion';
   coord: HexCoord;
   cx: number;
   cy: number;
   depth: number;
-  resident?: KingdomHexResidentTile;
+  companion?: KingdomHexCompanionSlot;
 };
 
 export type KingdomTileArtLayer = {
+  alphaBounds: { left: number; top: number; right: number; bottom: number };
   id: string;
   coord: HexCoord;
   custom: boolean;
@@ -64,7 +59,7 @@ export type KingdomHexScene = {
 
 const CENTER_ID = 'kingdom';
 export const ZODIAC_TILE_ID = 'zodiac';
-export const ZODIAC_HEX_COORD: HexCoord = { q: -1, r: 1 };
+export const ZODIAC_HEX_COORD: HexCoord = KINGDOM_ZODIAC_RESERVED_COORD;
 const FULL_IMAGE_BOUNDS = { left: 0, top: 0, right: 1024, bottom: 1024 };
 const warnedMissingBounds = new Set<string>();
 
@@ -93,10 +88,6 @@ function tileAlphaBoundsOrBase(
   return baseBounds;
 }
 
-export function residentTileId(creatureId: string): string {
-  return `resident:${creatureId}`;
-}
-
 export function tileVisibleBounds(cx: number, cy: number) {
   const topPoints = hexTileTopPoints(cx, cy);
   let left = Number.POSITIVE_INFINITY;
@@ -120,24 +111,25 @@ function artLayerFor(
   verticalAlignmentMode: KingdomHexVerticalAlignmentMode
 ): KingdomTileArtLayer {
   const familyAnchor =
-    tile.kind === 'resident' && tile.resident?.creature.familyId
-      ? katchimeraFamilyById.get(tile.resident.creature.familyId)?.anchorVisualKey ?? null
+    tile.kind === 'companion' && tile.companion?.kind === 'owned' && tile.companion.creature.familyId
+      ? katchimeraFamilyById.get(tile.companion.creature.familyId)?.anchorVisualKey ?? null
       : null;
   const aspectAnchor =
-    familyAnchor ?? (tile.kind === 'resident' && tile.resident?.creature.aspectId
-      ? lifeAspectById.get(tile.resident.creature.aspectId)?.anchorVisualKey ?? null
+    familyAnchor ?? (tile.kind === 'companion' && tile.companion?.kind === 'owned' && tile.companion.creature.aspectId
+      ? lifeAspectById.get(tile.companion.creature.aspectId)?.anchorVisualKey ?? null
       : null);
   const themedResidentTile =
-    tile.kind === 'resident' && tile.resident
-      ? hexTiles.residentTiles?.[tile.resident.creature.visualKey]
+    tile.kind === 'companion' && tile.companion?.kind === 'owned'
+      ? hexTiles.havenResidentTiles?.[tile.companion.familyId]?.[tile.companion.havenStage]
+        ?? hexTiles.residentTiles?.[tile.companion.creature.visualKey]
         ?? (aspectAnchor ? hexTiles.residentTiles?.[aspectAnchor] : null)
         ?? null
       : null;
   const customResidentTile =
-    !themedResidentTile && hexTiles.useCustomResidentTiles && tile.kind === 'resident' && tile.resident
-      ? katchimeraHexTileForCreature(tile.resident.creature)
+    !themedResidentTile && hexTiles.useCustomResidentTiles && tile.kind === 'companion' && tile.companion?.kind === 'owned'
+      ? katchimeraHexTileForCreature(tile.companion.creature)
         ?? (aspectAnchor
-          ? katchimeraHexTileForCreature({ ...tile.resident.creature, visualKey: aspectAnchor })
+          ? katchimeraHexTileForCreature({ ...tile.companion.creature, visualKey: aspectAnchor })
           : null)
       : null;
   const homeTile = identity?.selectedHomeArchetypeId
@@ -145,17 +137,21 @@ function artLayerFor(
     : hexTiles.center;
   const zodiacTile = identity?.zodiacSignId ? hexTiles.zodiacs[identity.zodiacSignId] : hexTiles.default;
   const residentTile = themedResidentTile ?? customResidentTile;
-  const selected = residentTile ?? (tile.kind === 'home' ? homeTile : tile.kind === 'zodiac' ? zodiacTile : hexTiles.default);
+  const locked = tile.kind === 'companion' && tile.companion?.kind === 'locked';
+  const selected = locked
+    ? hexTiles.locked
+    : residentTile ?? (tile.kind === 'home' ? homeTile : tile.kind === 'zodiac' ? zodiacTile : hexTiles.default);
   const baseBounds = tileAlphaBoundsOrBase('selected-base', hexTiles.default.alphaBounds, FULL_IMAGE_BOUNDS);
   const selectedBounds = tileAlphaBoundsOrBase(tile.id, selected.alphaBounds, baseBounds);
 
   return {
+    alphaBounds: selectedBounds,
     id: tile.id,
     coord: tile.coord,
     custom: Boolean(residentTile),
     depth: tile.depth,
-    fallbackSource: residentTile ? hexTiles.default.source : null,
-    fallbackSources: residentTile ? hexTiles.default.sources : undefined,
+    fallbackSource: residentTile || locked ? hexTiles.default.source : null,
+    fallbackSources: residentTile || locked ? hexTiles.default.sources : undefined,
     frame: kingdomTileArtFrame({
       alignmentMode: verticalAlignmentMode,
       assetBounds: selectedBounds,
@@ -169,25 +165,25 @@ function artLayerFor(
 }
 
 export function buildKingdomHexScene(
-  residents: KingdomHexResidentTile[],
+  companionSlots: KingdomHexCompanionSlot[],
   hexTiles: KingdomHexTileSelection,
   identity?: Pick<WorldIdentityState, 'selectedHomeArchetypeId' | 'zodiacSignId'> | null,
   verticalAlignmentMode: KingdomHexVerticalAlignmentMode = 'ground-bottom'
 ): KingdomHexScene {
   const hasZodiac = Boolean(identity?.zodiacSignId);
   const metrics = kingdomSceneMetrics(
-    residents.length + (hasZodiac ? 1 : 0),
+    companionSlots.length + 1,
     hexTiles.layoutProfile
   );
   const { width, height } = metrics;
   const rawTiles: Omit<KingdomTileRender, 'cx' | 'cy' | 'depth'>[] = [
     { id: CENTER_ID, kind: 'home', coord: { q: 0, r: 0 } },
     ...(hasZodiac ? [{ id: ZODIAC_TILE_ID, kind: 'zodiac' as const, coord: ZODIAC_HEX_COORD }] : []),
-    ...residents.map((resident) => ({
-      id: resident.id,
-      kind: 'resident' as const,
-      coord: resident.coord,
-      resident,
+    ...companionSlots.map((companion) => ({
+      id: companion.id,
+      kind: 'companion' as const,
+      coord: companion.coord,
+      companion,
     })),
   ];
 
@@ -210,32 +206,4 @@ export function buildKingdomHexScene(
     tiles,
     width,
   };
-}
-
-export function kingdomResidentHexTiles(
-  residents: KingdomResident[],
-  creatures: KingdomCreature[]
-): KingdomHexResidentTile[] {
-  const coordByIndex = hexSpiral(residents.length + 1, false).filter(
-    (coord) => coord.q !== ZODIAC_HEX_COORD.q || coord.r !== ZODIAC_HEX_COORD.r
-  );
-  // deriveKingdom sorts newest first. Keep the first row for each logical
-  // companion so the resident wears its most recently encountered skin.
-  const meta = new Map<string, KingdomCreature>();
-  for (const creature of creatures) {
-    if (!meta.has(creature.creatureId)) meta.set(creature.creatureId, creature);
-  }
-
-  return residents
-    .map((resident, index) => {
-      const creature = meta.get(resident.creatureId);
-      if (!creature) return null;
-      return {
-        id: residentTileId(resident.creatureId),
-        resident,
-        creature,
-        coord: coordByIndex[index],
-      };
-    })
-    .filter((tile): tile is KingdomHexResidentTile => Boolean(tile));
 }

@@ -278,6 +278,16 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     router.push({ pathname: '/katchimera/[creatureId]', params: { creatureId: 'companion:mossprout' } });
   }, [active, ftueRun?.status, ftueRun?.stepId, router]);
 
+  const openFtueHavenReveal = useCallback(() => {
+    if (!active || ftueRun?.status !== 'active' || ftueRun.stepId !== 'haven.reveal' || storyNavigationPendingRef.current) return;
+    storyNavigationPendingRef.current = true;
+    transitionTo({
+      announcement: 'The Haven is opening',
+      target: 'katchimeras',
+      navigate: () => router.push('/katchimeras'),
+    });
+  }, [active, ftueRun?.status, ftueRun?.stepId, router, transitionTo]);
+
   useEffect(() => {
     if (!active || !state || !ftueStep || !ftueRun) return;
     const repairTarget = mergeFtueRepairTarget(ftueStep, state);
@@ -708,6 +718,15 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
           <ThemedText selectable style={styles.energyConnectionTitle} lightColor="#FFF8E8" darkColor="#FFF8E8">“Oh… we’re running out of that strange energy.”</ThemedText>
           <ThemedText selectable style={styles.energyConnectionBody} lightColor="rgba(255,248,232,0.82)" darkColor="rgba(255,248,232,0.82)">“Wait. It got stronger when you told me about your day.”</ThemedText>
           <KatchaButton fullWidth glow label="Tell me something else" onPress={openFtueEnergyCapture} />
+        </View>
+      ) : null}
+
+      {active && ftueStep?.id === 'haven.reveal' ? (
+        <View style={[styles.energyConnectionOverlay, { bottom: Math.max(insets.bottom + 20, 28) }]}>
+          <ThemedText style={styles.energyConnectionEyebrow} lightColor="#FFD36A" darkColor="#FFD36A">A WIDER WORLD IS WAITING</ThemedText>
+          <ThemedText selectable style={styles.energyConnectionTitle} lightColor="#FFF8E8" darkColor="#FFF8E8">Mossprout’s garden is only the beginning.</ThemedText>
+          <ThemedText selectable style={styles.energyConnectionBody} lightColor="rgba(255,248,232,0.82)" darkColor="rgba(255,248,232,0.82)">Return to the restored clearing and look beyond the Dream Mist.</ThemedText>
+          <KatchaButton fullWidth glow label="Visit Haven" onPress={openFtueHavenReveal} />
         </View>
       ) : null}
 

@@ -25,5 +25,6 @@ export function ftueHidesBottomBar(
   // otherwise the player must retain a route to Dev reset and recovery.
   if (activeTabRoute === 'today') return surface === 'today' || surface === 'hatch';
   if (activeTabRoute === 'games') return surface === 'merge';
+  if (activeTabRoute === 'katchimeras') return surface === 'haven';
   return false;
 }

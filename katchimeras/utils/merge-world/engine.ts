@@ -40,6 +40,7 @@ import type {
   MergeWorldState,
 } from '@/types/merge-world';
 import { advanceMossproutChapterZero, enforceMossproutChapterZeroDropOverride } from '@/utils/merge-world/chapter-zero-policy';
+import { havenStageDefinition, havenStoryGateSatisfied, type HavenStage } from '@/constants/haven-catalog';
 import {
   COMPANION_DISCOVERIES_BY_ID,
   DISCOVERY_FORK_ANCHOR_CELL,
@@ -76,7 +77,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     occupant: null,
   }));
   let state: MergeWorldState = {
-    version: 13,
+    version: 14,
     revision: 0,
     createdAt: now,
     updatedAt: now,
@@ -113,6 +114,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     companionDiscovery: {
       records: [], openedGateIds: [], completedGateIds: [], queuedGateIds: [], active: null, lastStartedDayId: null, events: [],
     },
+    haven: { tileStages: {}, revealState: 'hidden', mossproutStoryLevel: 0, nextProceduralOrder: 1 },
   };
   state = reconcileCharacters(state, characterIds, now);
   return state;
@@ -203,6 +205,19 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
       const next = reconcileStory(current, command, command.now);
       return result(state, next, next === current ? undefined : 'Story request refreshed.');
     }
+    case 'reconcileHavenStory': {
+      if (command.characterId !== 'mossprout' || command.storyLevel <= current.haven.mossproutStoryLevel) return unchanged(current);
+      return changed(touch({
+        ...current,
+        haven: { ...current.haven, mossproutStoryLevel: Math.max(0, Math.floor(command.storyLevel)) },
+      }, command.now));
+    }
+    case 'upgradeHavenTile':
+      return upgradeHavenTile(current, command.characterId, command.stage, command.now);
+    case 'revealHaven': {
+      if (current.haven.revealState === 'revealed') return unchanged(current);
+      return changed(touch({ ...current, haven: { ...current.haven, revealState: 'revealed' } }, command.now), 'The Haven awakens.');
+    }
     case 'ackExternalReward': {
       const receipts = current.externalRewardReceipts.map((receipt) => receipt.id === command.receiptId && receipt.appliedAt == null
         ? { ...receipt, appliedAt: command.now }
@@ -287,14 +302,14 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   if (!value || typeof value !== 'object') return createInitialMergeWorldState(now);
   const rawVersion = (value as { version?: unknown }).version;
   const source = value as Partial<MergeWorldState>;
-  if ((rawVersion !== 1 && rawVersion !== 2 && rawVersion !== 3 && rawVersion !== 4 && rawVersion !== 5 && rawVersion !== 6 && rawVersion !== 7 && rawVersion !== 8 && rawVersion !== 9 && rawVersion !== 10 && rawVersion !== 11 && rawVersion !== 12 && rawVersion !== 13) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
+  if ((rawVersion !== 1 && rawVersion !== 2 && rawVersion !== 3 && rawVersion !== 4 && rawVersion !== 5 && rawVersion !== 6 && rawVersion !== 7 && rawVersion !== 8 && rawVersion !== 9 && rawVersion !== 10 && rawVersion !== 11 && rawVersion !== 12 && rawVersion !== 13 && rawVersion !== 14) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
     return createInitialMergeWorldState(now);
   }
   const fallback = createInitialMergeWorldState(now);
   let normalized: MergeWorldState = {
     ...fallback,
     ...source,
-    version: 13,
+    version: 14,
     revision: finite(source.revision, 0),
     createdAt: finite(source.createdAt, now),
     updatedAt: finite(source.updatedAt, now),
@@ -343,6 +358,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
       : fallback.characterProgress,
     externalRewardReceipts: Array.isArray(source.externalRewardReceipts) ? source.externalRewardReceipts : [],
     companionDiscovery: normalizeCompanionDiscovery(source.companionDiscovery, source.unlockedCharacters, source.activeOrders, rawVersion, now),
+    haven: normalizeHaven(source.haven, source, rawVersion),
   };
   normalized = {
     ...normalized,
@@ -358,7 +374,56 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   normalized = migrateActivityInbox(normalized);
   // Version 1/2 Pantry charges, cooldowns, and parcels intentionally disappear.
   // Version 3's five single-chain generators migrate into the shared eight.
+  normalized = ensureProceduralOrders(normalized, now);
   return refreshTime(normalized, now);
+}
+
+function upgradeHavenTile(state: MergeWorldState, characterId: MergeCharacterId, requestedStage: HavenStage, now: number): MergeWorldCommandResult {
+  if (!state.unlockedCharacters.includes(characterId)) return unchanged(state, 'Discover this Katchimera first.');
+  const currentStage = state.haven.tileStages[characterId] ?? 0;
+  if (requestedStage !== currentStage + 1) return unchanged(state, 'Haven environments grow one stage at a time.');
+  const definition = havenStageDefinition(characterId, requestedStage);
+  if (!definition) return unchanged(state, 'This environment is not ready yet.');
+  if (!havenStoryGateSatisfied(state, definition.storyGate)) return unchanged(state, 'Continue this Katchimera’s story first.');
+  if (state.coins < definition.coinCost) return unchanged(state, 'Earn a few more Coins through Merge orders.');
+  const revealState = characterId === 'mossprout' && requestedStage === 1 && state.haven.revealState === 'hidden'
+    ? 'first_restore_complete' as const
+    : state.haven.revealState;
+  const next = touch({
+    ...state,
+    coins: state.coins - definition.coinCost,
+    haven: {
+      ...state.haven,
+      tileStages: { ...state.haven.tileStages, [characterId]: requestedStage },
+      revealState,
+    },
+  }, now);
+  return { state: next, changed: true, havenUpgrade: { characterId, stage: requestedStage, coinCost: definition.coinCost }, message: `${definition.name} restored.` };
+}
+
+function normalizeHaven(value: unknown, source: Partial<MergeWorldState>, rawVersion: unknown): MergeWorldState['haven'] {
+  const raw = value && typeof value === 'object' ? value as Partial<MergeWorldState['haven']> : {};
+  const tileStages: MergeWorldState['haven']['tileStages'] = {};
+  if (raw.tileStages && typeof raw.tileStages === 'object') {
+    for (const [characterId, stage] of Object.entries(raw.tileStages)) {
+      if (KNOWN_CHARACTERS.has(characterId as MergeCharacterId) && Number.isInteger(stage) && Number(stage) >= 0 && Number(stage) <= 4) {
+        tileStages[characterId as MergeCharacterId] = Number(stage) as HavenStage;
+      }
+    }
+  }
+  if (source.unlockedCharacters?.includes('mossprout') && tileStages.mossprout == null) {
+    const chapters = source.characterProgress?.mossprout?.completedChapterIds ?? [];
+    tileStages.mossprout = chapters.includes('mossprout-chapter-0') && rawVersion !== 14 ? 1 : 0;
+  }
+  const revealState = raw.revealState === 'revealed' || raw.revealState === 'first_restore_complete'
+    ? raw.revealState
+    : tileStages.mossprout && tileStages.mossprout > 0 && rawVersion !== 14 ? 'revealed' : 'hidden';
+  return {
+    tileStages,
+    revealState,
+    mossproutStoryLevel: Math.max(0, Math.floor(finite(raw.mossproutStoryLevel, 0))),
+    nextProceduralOrder: Math.max(1, Math.floor(finite(raw.nextProceduralOrder, 1))),
+  };
 }
 
 function tapGenerator(state: MergeWorldState, generatorId: string, now: number, seed: string): MergeWorldCommandResult {
@@ -939,6 +1004,7 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
       }, now);
     }
   }
+  next = ensureProceduralOrders(next, now);
   next = touch(next, now);
   return { state: next, changed: true, servedOrderId: order.id, energyGranted: energyRefund, clearedMistCells, message: `${order.title} served.` };
 }
@@ -1145,13 +1211,13 @@ function rerollOrder(state: MergeWorldState, orderId: string, now: number): Merg
   if ((order.rerollAvailableAt ?? order.createdAt + 86_400_000) > now) return unchanged(state, 'This request can be changed after it has had a day on the table.');
   if (state.lastFreeRerollDayId === dayId) return unchanged(state, 'Your free request change has already been used today.');
   const next: MergeWorldState = { ...state, activeOrders: state.activeOrders.filter((item) => item.id !== orderId), lastFreeRerollDayId: dayId, recentOrderKeys: [...state.recentOrderKeys, templateKeyForOrder(order)].slice(-RECENT_ORDER_LIMIT) };
-  return changed(touch(next, now), 'Feastle brought a different request.');
+  return changed(touch(ensureProceduralOrders(next, now), now), 'A different request drifted in.');
 }
 
 function reconcileCharacters(state: MergeWorldState, ids: string[], now: number): MergeWorldState {
   const additions = ids.filter((id): id is MergeCharacterId => KNOWN_CHARACTERS.has(id as MergeCharacterId) && !state.unlockedCharacters.includes(id as MergeCharacterId));
   if (!additions.length) return state;
-  return touch({
+  return touch(ensureProceduralOrders({
     ...state,
     unlockedCharacters: [...state.unlockedCharacters, ...additions],
     companionDiscovery: {
@@ -1170,7 +1236,7 @@ function reconcileCharacters(state: MergeWorldState, ids: string[], now: number)
         })),
       ],
     },
-  }, now);
+  }, now), now);
 }
 
 function reconcileFriendship(state: MergeWorldState, levels: Partial<Record<MergeCharacterId, number>>, now: number): MergeWorldState {
@@ -1185,7 +1251,7 @@ function reconcileFriendship(state: MergeWorldState, levels: Partial<Record<Merg
     changedState = true;
   }
   const next = changedState ? { ...state, characterProgress } : state;
-  return next === state ? state : touch(next, now);
+  return next === state ? state : touch(ensureProceduralOrders(next, now), now);
 }
 
 function reconcileStory(
@@ -1204,7 +1270,7 @@ function reconcileStory(
     ? ensureCharacterGenerators(state, story.familyId, now)
     : state;
   if (story.familyId !== 'feastle') {
-    const existing = next.activeOrders.filter((order) => order.characterId === story.familyId);
+    const existing = next.activeOrders.filter((order) => order.characterId === story.familyId && Boolean(order.storyArcId));
     const servedIds = new Set([
       ...next.externalRewardReceipts
         .filter((receipt) => receipt.kind === 'story_order_served')
@@ -1218,7 +1284,7 @@ function reconcileStory(
           .filter((order) => !servedIds.has(order.id))
           .slice(0, effectiveActPhase === 'regular_orders' ? 3 : undefined)
       : [];
-    const keep = next.activeOrders.filter((order) => order.characterId !== story.familyId);
+    const keep = next.activeOrders.filter((order) => order.characterId !== story.familyId || !order.storyArcId);
     const activeOrders = [...keep, ...wanted.map((order) => existing.find((item) => item.id === order.id
       && JSON.stringify(item.requirements) === JSON.stringify(order.requirements)) ?? order)];
     if (activeOrders.length !== next.activeOrders.length || activeOrders.some((order, index) => order.id !== next.activeOrders[index]?.id)) {
@@ -1226,7 +1292,7 @@ function reconcileStory(
     }
     return next === state ? state : touch(next, now);
   }
-  const feastleOrders = state.activeOrders.filter((order) => order.characterId === 'feastle');
+  const feastleOrders = state.activeOrders.filter((order) => order.characterId === 'feastle' && Boolean(order.storyArcId));
   const servedStoryOrderIds = new Set(state.externalRewardReceipts
     .filter((receipt) => receipt.kind === 'story_order_served')
     .map((receipt) => receipt.id.replace('merge-story-served:', '')));
@@ -1237,7 +1303,7 @@ function reconcileStory(
     : [];
   // Ownership unlocks a character, but only an authored story beat may create
   // an order. Generic legacy orders are removed during story reconciliation.
-  const keepOrders = state.activeOrders.filter((order) => order.characterId !== 'feastle' && order.storyArcId);
+  const keepOrders = state.activeOrders.filter((order) => order.characterId !== 'feastle' || !order.storyArcId);
   const activeOrders = [...keepOrders, ...wanted.map((order) => feastleOrders.find((existing) => existing.id === order.id) ?? order)];
   if (activeOrders.length !== state.activeOrders.length || activeOrders.some((order, index) => order.id !== state.activeOrders[index]?.id)) {
     next = { ...next, activeOrders };
@@ -1568,7 +1634,65 @@ function ensureCharacterGenerators(state: MergeWorldState, characterId: MergeCha
   return generatorIds.reduce((current, generatorId) => ensureGenerator(current, generatorId, now), state);
 }
 
+function ensureProceduralOrders(state: MergeWorldState, now: number): MergeWorldState {
+  // Chapter 0 is still teaching the authored loop. The repeatable economy
+  // begins after the first non-Mossprout companion completes their introduction.
+  const unlocked = state.companionDiscovery.records.some((record) => record.characterId !== 'mossprout' && record.firstOrderCompletedAt != null);
+  if (!unlocked) return state;
+  const procedural = state.activeOrders.filter((order) => !order.storyArcId);
+  if (procedural.length >= 3) return state;
+  const existingKeys = new Set(procedural.map(templateKeyForOrder));
+  const recent = new Set(state.recentOrderKeys);
+  const eligible = MERGE_ORDER_TEMPLATES.filter((template) => {
+    if (template.signature || template.chapterId || !state.unlockedCharacters.includes(template.characterId)) return false;
+    if (existingKeys.has(template.key)) return false;
+    const friendship = state.characterProgress[template.characterId]?.friendshipLevel ?? 1;
+    if (template.minimumFriendshipLevel && friendship < template.minimumFriendshipLevel) return false;
+    if (template.maximumFriendshipLevel && friendship > template.maximumFriendshipLevel) return false;
+    return template.requirements.every((requirement) => {
+      const definition = MERGE_ITEMS_BY_ID.get(requirement.definitionId);
+      return Boolean(definition && state.unlockedChains.includes(definition.chainId));
+    });
+  });
+  const ranked = [...eligible].sort((left, right) => {
+    const leftRecent = recent.has(left.key) ? 1 : 0;
+    const rightRecent = recent.has(right.key) ? 1 : 0;
+    if (leftRecent !== rightRecent) return leftRecent - rightRecent;
+    const leftFavourite = left.characterId === state.favouriteCharacterId ? 0 : 1;
+    const rightFavourite = right.characterId === state.favouriteCharacterId ? 0 : 1;
+    if (leftFavourite !== rightFavourite) return leftFavourite - rightFavourite;
+    return proceduralOrderRank(left.key, state.completedOrderCount + state.haven.nextProceduralOrder)
+      - proceduralOrderRank(right.key, state.completedOrderCount + state.haven.nextProceduralOrder);
+  });
+  const count = Math.min(3 - procedural.length, ranked.length);
+  if (count < 1) return state;
+  const orders = ranked.slice(0, count).map((template, index): MergeOrder => ({
+    id: `merge-order:${state.haven.nextProceduralOrder + index}:${template.key}`,
+    characterId: template.characterId,
+    title: template.title,
+    difficulty: template.difficulty,
+    requirements: template.requirements.map((requirement) => ({ ...requirement })),
+    reward: { ...template.reward },
+    createdAt: now,
+    rerollAvailableAt: now + 86_400_000,
+    signature: false,
+    purpose: 'normal',
+  }));
+  return {
+    ...state,
+    activeOrders: [...state.activeOrders, ...orders],
+    haven: { ...state.haven, nextProceduralOrder: state.haven.nextProceduralOrder + count },
+  };
+}
+
+function proceduralOrderRank(key: string, seed: number) {
+  let hash = seed | 0;
+  for (let index = 0; index < key.length; index += 1) hash = Math.imul(hash ^ key.charCodeAt(index), 16777619);
+  return hash >>> 0;
+}
+
 function templateKeyForOrder(order: MergeOrder) {
+  if (order.id.startsWith('merge-order:')) return order.id.split(':').slice(2).join(':');
   return order.id.split(':').slice(4).join(':') || order.title;
 }
 

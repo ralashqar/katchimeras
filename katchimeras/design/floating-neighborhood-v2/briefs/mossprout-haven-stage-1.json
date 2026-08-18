@@ -1,0 +1,14 @@
+{
+  "key": "mossprout_haven_stage_1",
+  "kind": "resident",
+  "concept": "First Garden: the first meaningful improvement Mossprout and the player build together.",
+  "floor": "One continuous calm deep-green moss floor with an open front half.",
+  "main_structure": "One low curved beginner planter at the rear with three broad leafy plants and a few large flowers.",
+  "rear_props": ["one chunky watering-stone ornament"],
+  "side_props": [],
+  "perimeter": { "material": "smooth green moss", "palette": ["moss green", "leaf green", "pale lime"], "emblems": "simple leaf forms" },
+  "cliff": { "materials": ["warm sandstone"], "palette": ["warm ochre", "soft umber"] },
+  "lighting": "soft filtered daylight",
+  "must_keep": ["canonical geometry", "quiet open front half", "modest readable garden"],
+  "must_exclude": ["creature", "pond", "bench", "building", "large tree", "path", "tiny clutter"]
+}

@@ -2,6 +2,7 @@ import { COMPANION_DISCOVERIES_BY_ID, type CompanionDiscoveryDefinition } from '
 import type { StoredHomeDayRecord, StoredHomeState } from '@/types/home';
 import type { MergeBoardItem, MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import type { PlayerProfileSnapshot } from '@/types/player-profile-snapshot';
+import { MOSSPROUT_FTUE_SCRIPT } from '@/features/onboarding/mossprout-ftue-script';
 import { createInitialMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
@@ -30,6 +31,7 @@ type FixtureDefinition = {
   description: string;
   tags: string[];
   ftueStep: string | null;
+  launchRoute?: PlayerProfileSnapshot['launchRoute'];
   buildWorld: (now: number) => MergeWorldState;
   meaningfulDays?: number;
 };
@@ -52,7 +54,7 @@ function ftueRun(stepId: string, now: number) {
     schemaVersion: 6,
     runId: `fixture-ftue-${stepId.replaceAll('.', '-')}`,
     scriptId: 'mossprout-first-session',
-    scriptVersion: 13,
+    scriptVersion: MOSSPROUT_FTUE_SCRIPT.version,
     stepId,
     status: complete ? 'complete' : 'active',
     startedAt: timestamp,
@@ -60,7 +62,7 @@ function ftueRun(stepId: string, now: number) {
     completedAt: complete ? timestamp : null,
     answers: {},
     receipts: [],
-    mergeInstalled: stepId.startsWith('merge.') || stepId.startsWith('discovery.') || complete,
+    mergeInstalled: stepId.startsWith('merge.') || stepId.startsWith('discovery.') || stepId.startsWith('haven.') || complete,
     awardedMergeEnergy: null,
     objectiveProgress: {},
   };
@@ -157,6 +159,19 @@ function chapterZeroReady(now: number) {
 
 function startSteppling(now: number) {
   return reduceMergeWorld(chapterZeroReady(now), { type: 'startStepplingDiscovery', now: now + 1 }).state;
+}
+
+function mossproutHavenRestore(now: number) {
+  const state = startSteppling(now);
+  return {
+    ...state,
+    coins: Math.max(state.coins, 170),
+    haven: {
+      ...state.haven,
+      tileStages: { ...state.haven.tileStages, mossprout: 0 as const },
+      revealState: 'hidden' as const,
+    },
+  };
 }
 
 function claimDiscoveryParcel(state: MergeWorldState, discoveryId: string, now: number) {
@@ -267,6 +282,7 @@ function gateFive(now: number) {
 const FIXTURE_DEFINITIONS: readonly FixtureDefinition[] = [
   { id: 'fresh-first-launch', name: 'Fresh first launch', description: 'Before onboarding begins.', tags: ['FTUE'], ftueStep: null, meaningfulDays: 0, buildWorld: (now) => createInitialMergeWorldState(now) },
   { id: 'mossprout-merge-start', name: 'Mossprout · Merge begins', description: 'The first Mossprout board interaction.', tags: ['FTUE', 'Mossprout'], ftueStep: 'merge.seed_drag', buildWorld: (now) => createMossproutChapterZeroState(now) },
+  { id: 'mossprout-haven-restore', name: 'Mossprout · Restore Haven', description: 'Right before restoring the Forgotten Clearing into the First Garden.', tags: ['FTUE', 'Mossprout', 'Haven'], ftueStep: 'haven.mossprout.restore', launchRoute: '/(tabs)/katchimeras', buildWorld: mossproutHavenRestore },
   { id: 'steppling-parcel', name: 'Steppling · Parcel waiting', description: 'Tests the forced parcel spotlight and tap.', tags: ['FTUE', 'Steppling', 'Parcel'], ftueStep: 'discovery.steppling.parcel', buildWorld: (now) => stepplingAtStage(-1, now) },
   { id: 'steppling-final-clue', name: 'Steppling · Final clue', description: 'One Dreambound merge before Steppling appears.', tags: ['FTUE', 'Steppling', 'Reveal'], ftueStep: 'discovery.steppling.boot', buildWorld: (now) => stepplingAtStage(2, now) },
   { id: 'steppling-first-order', name: 'Steppling · First order', description: 'Steppling is revealed; Gate 3 remains blocked until the first order.', tags: ['FTUE', 'Steppling', 'Order'], ftueStep: 'discovery.steppling.spawn', buildWorld: (now) => stepplingAtStage(3, now) },
@@ -295,7 +311,7 @@ export function buildPlayerProfileFixtures(now = Date.now()): PlayerProfileSnaps
       timePolicy: 'relative',
       createdAt: new Date(now).toISOString(),
       tags: fixture.tags,
-      launchRoute: fixture.ftueStep == null ? '/(tabs)/today' : '/(tabs)/games',
+      launchRoute: fixture.launchRoute ?? (fixture.ftueStep == null ? '/(tabs)/today' : '/(tabs)/games'),
       summary: fixtureSummary(state, fixture.ftueStep),
       domains: {
         keyValue: { schemaVersion: 1, values: fixtureKeyValues(now, fixture.ftueStep, fixture.meaningfulDays ?? 4) },

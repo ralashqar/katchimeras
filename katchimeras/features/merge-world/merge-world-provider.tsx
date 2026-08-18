@@ -212,7 +212,10 @@ export function MergeWorldProvider({
 
   const reconcileMossproutStory = useCallback((current: MergeWorldState, now = Date.now()) => {
     const story = loadMossproutStory();
-    const result = reduceMergeWorld(current, {
+    const havenResult = reduceMergeWorld(current, {
+      type: 'reconcileHavenStory', characterId: 'mossprout', storyLevel: story.currentLevel, now,
+    });
+    const result = reduceMergeWorld(havenResult.state, {
       type: 'reconcileStory', familyId: 'mossprout', status: story.status,
       targetLevel: story.targetLevel, actPhase: story.actPhase, now,
     });

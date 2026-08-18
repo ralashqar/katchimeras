@@ -1,6 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 import type { MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
+import type { HavenStage } from '@/constants/haven-catalog';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld, resetMergeActivityForDay } from '@/utils/merge-world/engine';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
 import { MOSSPROUT_FTUE_JOURNAL_ENERGY } from '@/utils/merge-world/economy-policy';
@@ -196,6 +197,19 @@ export const claimMossproutFtueStepEnergy = claimDailyStepEnergy;
 /** Opens the fixed first board discovery after Mossprout's Chapter 0 return. */
 export function installStepplingFtueDiscovery(now = Date.now()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'startStepplingDiscovery', now }), now);
+}
+
+/** Atomically spends Merge Coins and advances one linear Haven environment. */
+export function upgradeStoredHavenTile(characterId: import('@/types/merge-world').MergeCharacterId, stage: HavenStage, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId, stage, now }), now);
+}
+
+export function revealStoredHaven(now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'revealHaven', now }), now);
+}
+
+export function reconcileStoredHavenStory(characterId: import('@/types/merge-world').MergeCharacterId, storyLevel: number, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'reconcileHavenStory', characterId, storyLevel, now }), now);
 }
 
 export async function resetMergeWorldStateForDebug(now = Date.now()): Promise<void> {

@@ -94,6 +94,14 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
   const needsThirdEggAnswer = run.status === 'active'
     && run.stepId === 'egg.ready'
     && run.answers['egg.mind.focus'] == null;
+  const needsHavenFocus = run.status === 'active'
+    && run.scriptVersion < 15
+    && run.stepId === 'haven.mossprout.restore';
+  const hasHavenRevealReceipt = run.receipts.some((receipt) => receipt.actionId === 'haven.reveal_world');
+  const needsPreParcelHavenReveal = run.status === 'active'
+    && run.scriptVersion < 16
+    && run.stepId === 'discovery.steppling.parcel'
+    && !hasHavenRevealReceipt;
   if (run.schemaVersion === 6 && run.scriptVersion === MOSSPROUT_FTUE_SCRIPT.version && !needsThirdEggAnswer) return run;
   const now = new Date().toISOString();
   if (replayDreamMistChapter) return {
@@ -113,9 +121,13 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
   };
   const removedMergeSteps = new Set(['merge.first', 'merge.flower', 'energy.capture', 'energy.awarded', 'merge.flower_return', 'merge.final']);
   const replacedDiscoverySteps = new Set(['discovery.steppling.seed', 'discovery.steppling.sprout', 'discovery.steppling.plant']);
-  const migratedStepId = run.status === 'active' && run.stepId === 'chapter.complete'
-    ? 'merge.return_note'
-    : run.stepId;
+  const migratedStepId = needsPreParcelHavenReveal
+    ? 'haven.reveal'
+    : needsHavenFocus
+    ? 'haven.mossprout.focus'
+    : run.status === 'active' && run.stepId === 'chapter.complete'
+      ? 'merge.return_note'
+      : run.stepId;
   return {
     ...run,
     schemaVersion: 6,
@@ -294,6 +306,13 @@ function ftueEventMatches(matcher: FtueEventMatcher, event: FtueEvent) {
     return (matcher.discoveryId == null || matcher.discoveryId === event.discoveryId)
       && (matcher.stage == null || matcher.stage === event.stage)
       && (matcher.completedCharacterId == null || matcher.completedCharacterId === event.completedCharacterId);
+  }
+  if (matcher.type === 'ui_target_pressed' && event.type === 'ui_target_pressed') {
+    return matcher.target == null || JSON.stringify(matcher.target) === JSON.stringify(event.target);
+  }
+  if (matcher.type === 'haven_upgrade_completed' && event.type === 'haven_upgrade_completed') {
+    return (matcher.characterId == null || matcher.characterId === event.characterId)
+      && (matcher.stage == null || matcher.stage === event.stage);
   }
   return matcher.type === 'order_served'
     && event.type === 'order_served'

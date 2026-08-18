@@ -1,0 +1,14 @@
+{
+  "key": "mossprout_haven_stage_2",
+  "kind": "resident",
+  "concept": "Rain Garden Nook: Mossprout begins treating the restored garden as a lasting home.",
+  "floor": "One continuous calm green lawn with a large open centre for the separate character layer.",
+  "main_structure": "A modest rain-fed pond at rear-right and one simple wooden garden bench at rear-left.",
+  "rear_props": ["curved stepping-stone path", "one familiar watering can"],
+  "side_props": ["medium ferns", "established flowering plants", "mossy pond stones"],
+  "perimeter": { "material": "smooth green moss", "palette": ["moss green", "leaf green", "pale lime"], "emblems": "simple leaf forms" },
+  "cliff": { "materials": ["warm sandstone"], "palette": ["warm ochre", "soft umber"] },
+  "lighting": "soft warm daylight after rain",
+  "must_keep": ["canonical geometry", "open central lawn", "clear midpoint between stages 1 and 3", "environment only"],
+  "must_exclude": ["creature", "large canopy tree", "glowing lanterns", "large stump", "dense woodland wall", "building", "text"]
+}

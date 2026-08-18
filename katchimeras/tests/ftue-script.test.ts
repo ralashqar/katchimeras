@@ -46,6 +46,7 @@ test('script migration rechecks a cached two-answer run instead of bypassing the
   assert.match(runtime, /run\.stepId === 'egg\.ready'[\s\S]*?run\.answers\['egg\.mind\.focus'\] == null/);
   assert.match(runtime, /if \(snapshot === undefined\)[\s\S]*?const migrated = migrateCurrentScript\(snapshot\)/);
   assert.doesNotMatch(runtime, /if \(snapshot !== undefined\) return snapshot/);
+  assert.match(runtime, /needsPreParcelHavenReveal[\s\S]*?run\.scriptVersion < 16[\s\S]*?run\.stepId === 'discovery\.steppling\.parcel'/);
 });
 
 test('backend catalog contains only allowlisted privacy-safe action ids', () => {
@@ -54,7 +55,7 @@ test('backend catalog contains only allowlisted privacy-safe action ids', () => 
 });
 
 test('Supabase receipt allowlist matches every backend FTUE action', () => {
-  const migration = readFileSync('supabase/migrations/20260817153000_register_mossprout_ftue_v13.sql', 'utf8');
+  const migration = readFileSync('supabase/migrations/20260818170000_register_mossprout_ftue_v16.sql', 'utf8');
   for (const item of FTUE_ACTION_CATALOG.filter((entry) => entry.backendEvent)) {
     assert.match(migration, new RegExp(`'${item.stepId}',\\s*'${item.actionId}'`));
   }
@@ -246,11 +247,14 @@ test('the active FTUE hides the bottom bar only on the tab presenting its curren
 test('FTUE cross-surface CTAs navigate between sibling tabs under the shared curtain', () => {
   const today = readFileSync('app/(tabs)/today.tsx', 'utf8');
   const merge = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
+  const roster = readFileSync('components/katchadeck/roster/katchimera-roster-route-screen.tsx', 'utf8');
   const transition = readFileSync('features/navigation/game-screen-transition.tsx', 'utf8');
   assert.match(merge, /router\.navigate\(\{ pathname: '\/today', params: \{ onboardingCapture: '1' \} \}\)/);
   assert.doesNotMatch(merge, /router\.dismissTo\(\{ pathname: '\/today'/);
   assert.match(today, /router\.navigate\(\{ pathname: '\/games', params: \{ familyId: 'mossprout' \} \}\)/);
   assert.doesNotMatch(today, /router\.push\(\{ pathname: '\/\(tabs\)\/games'/);
+  assert.match(roster, /onFtueReveal=\{\(\) => \{[\s\S]*?router\.navigate\(\{ pathname: '\/games', params: \{ familyId: 'mossprout' \} \}\)/);
+  assert.doesNotMatch(roster, /onFtueReveal=\{\(\) => \{[\s\S]*?router\.dismissTo\(\{ pathname: '\/games'/);
   assert.match(transition, /const commitPhase = useCallback[\s\S]*?phaseRef\.current = next;[\s\S]*?setPhase\(next\);/);
   assert.match(transition, /commitPhase\('covered'\)[\s\S]*?current\.navigate\(\)[\s\S]*?commitPhase\('waiting_ready'\)/);
 });

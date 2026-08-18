@@ -11,16 +11,37 @@ const read = (relative: string) => readFileSync(resolve(root, relative), 'utf8')
 
 test('profile fixture catalog covers every planned discovery milestone', () => {
   const fixtures = buildPlayerProfileFixtures(NOW);
-  assert.equal(PLAYER_PROFILE_FIXTURE_COUNT, 16);
-  assert.equal(fixtures.length, 16);
+  assert.equal(PLAYER_PROFILE_FIXTURE_COUNT, 17);
+  assert.equal(fixtures.length, 17);
   assert.equal(new Set(fixtures.map((fixture) => fixture.id)).size, fixtures.length);
   assert.deepEqual(fixtures.map((fixture) => fixture.id), [
-    'fixture:fresh-first-launch', 'fixture:mossprout-merge-start',
+    'fixture:fresh-first-launch', 'fixture:mossprout-merge-start', 'fixture:mossprout-haven-restore',
     'fixture:steppling-parcel', 'fixture:steppling-final-clue', 'fixture:steppling-first-order',
     'fixture:gate-3-fork', 'fixture:gate-3-feastle-parcel', 'fixture:gate-3-feastle-final', 'fixture:gate-4-queued',
     'fixture:gate-4-fork', 'fixture:gate-4-baristabbit-parcel', 'fixture:gate-4-baristabbit-final', 'fixture:gate-5-queued',
     'fixture:gate-5-bedrotte-parcel', 'fixture:gate-5-bedrotte-final', 'fixture:early-pool-complete',
   ]);
+});
+
+test('Mossprout Haven fixture opens immediately before the first environment restore', () => {
+  const fixture = buildPlayerProfileFixtures(NOW).find((candidate) => candidate.id === 'fixture:mossprout-haven-restore');
+  assert.ok(fixture);
+  assert.equal(fixture.launchRoute, '/(tabs)/katchimeras');
+  assert.equal(fixture.summary.ftueStep, 'haven.mossprout.restore');
+  assert.equal(fixture.domains.mergeWorld.state.coins, 170);
+  assert.equal(fixture.domains.mergeWorld.state.haven.tileStages.mossprout, 0);
+  assert.equal(fixture.domains.mergeWorld.state.haven.revealState, 'hidden');
+  assert.ok(fixture.domains.mergeWorld.state.characterProgress.mossprout?.completedChapterIds.includes('mossprout-chapter-0'));
+  assert.equal(fixture.summary.pendingParcelCount, 1);
+
+  const run = JSON.parse(fixture.domains.keyValue.values['katchimeras.ftue-run.v4'] ?? '{}') as {
+    mergeInstalled?: boolean;
+    scriptVersion?: number;
+    stepId?: string;
+  };
+  assert.equal(run.stepId, 'haven.mossprout.restore');
+  assert.equal(run.scriptVersion, 16);
+  assert.equal(run.mergeInstalled, true);
 });
 
 test('every authored profile fixture is internally coherent and synthetic', () => {

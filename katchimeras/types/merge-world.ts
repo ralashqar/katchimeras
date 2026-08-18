@@ -1,4 +1,5 @@
 import type { WispId } from '@/types/wisp';
+import type { HavenRevealState, HavenStage } from '@/constants/haven-catalog';
 
 export type MergeFamilyId = 'food' | 'drink' | 'adventure' | 'nature' | 'comfort' | 'social' | 'mind' | 'creative';
 export type MergeChainId =
@@ -251,7 +252,7 @@ export type MergeStepEnergyDay = {
 };
 
 export type MergeWorldState = {
-  version: 13;
+  version: 14;
   revision: number;
   createdAt: number;
   updatedAt: number;
@@ -286,6 +287,12 @@ export type MergeWorldState = {
   characterProgress: Partial<Record<MergeCharacterId, MergeCharacterProgress>>;
   externalRewardReceipts: MergeExternalRewardReceipt[];
   companionDiscovery: CompanionDiscoveryProgress;
+  haven: {
+    tileStages: Partial<Record<MergeCharacterId, HavenStage>>;
+    revealState: HavenRevealState;
+    mossproutStoryLevel: number;
+    nextProceduralOrder: number;
+  };
 };
 
 export type MergeWorldCommand =
@@ -314,6 +321,9 @@ export type MergeWorldCommand =
   | { type: 'reconcileCharacters'; characterIds: string[]; now: number }
   | { type: 'reconcileFriendship'; levels: Partial<Record<MergeCharacterId, number>>; now: number }
   | { type: 'reconcileStory'; familyId: MergeCharacterId; status: string; targetLevel: number; actPhase?: string; orderTemplateKeys?: string[]; servedOrderIds?: string[]; now: number }
+  | { type: 'reconcileHavenStory'; characterId: MergeCharacterId; storyLevel: number; now: number }
+  | { type: 'upgradeHavenTile'; characterId: MergeCharacterId; stage: HavenStage; now: number }
+  | { type: 'revealHaven'; now: number }
   | { type: 'ackExternalReward'; receiptId: string; now: number };
 
 export type MergeWorldFailureReason =
@@ -339,4 +349,5 @@ export type MergeWorldCommandResult = {
   energyGranted?: number;
   stepEnergyClaim?: { consumedSteps: number; remainingClaimableSteps: number; beforeEnergy: number; afterEnergy: number; status: 'awarded' | 'below_threshold' | 'daily_cap' | 'duplicate' };
   itemsQueued?: number;
+  havenUpgrade?: { characterId: MergeCharacterId; stage: HavenStage; coinCost: number };
 };
