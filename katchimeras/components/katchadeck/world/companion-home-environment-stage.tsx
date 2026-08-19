@@ -1,4 +1,3 @@
-import { Image } from 'expo-image';
 import { memo, useEffect, type RefObject } from 'react';
 import { StyleSheet, useWindowDimensions, View, type View as ViewType } from 'react-native';
 import Animated, { cancelAnimation, Easing, type SharedValue, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
@@ -9,6 +8,8 @@ import type { HomeVisualKey } from '@/types/home';
 import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-backgrounds';
 import type { QuestionnaireImageSource } from '@/utils/companion-questionnaire-presentation';
 import { companionHomeStageLayout } from '@/utils/companion-home-layout';
+
+import { CreatureAnimatedArt } from './creature-animated-art';
 
 export const CompanionHomeEnvironmentStage = memo(
   function CompanionHomeEnvironmentStage({
@@ -114,15 +115,12 @@ export const CompanionHomeEnvironmentStage = memo(
               stage="grown"
               visualKey={visualKey}
             />
-            <Image
+            <CreatureAnimatedArt
               accessibilityLabel={`${name}, your Katchimera`}
-              cachePolicy="memory-disk"
-              contentFit="contain"
-              priority="high"
+              fallbackSource={creature}
               onLoad={onCreatureReady}
-              source={creature}
               style={StyleSheet.absoluteFill}
-              transition={0}
+              visualKey={visualKey}
             />
           </Animated.View>
         </Animated.View> : null}

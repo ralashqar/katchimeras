@@ -37,3 +37,11 @@ npx supabase functions deploy generate-katchimera-art --no-verify-jwt --use-api
 - This setup stores generated images remotely instead of bundling them into the app.
 - That keeps the app bundle smaller and makes iteration much faster.
 - Once the visual style is locked, we can optionally bundle a small flagship subset locally.
+
+## Animated Narrative Portraits
+
+The static-cutout to Seedance video to transparent animated-WebP workflow is documented separately:
+
+- `docs/katchimera-idle-animation-pipeline.md`
+- `scripts/generate-katchimera-idle.py`
+- Supabase Edge Function: `generate-katchimera-idle`

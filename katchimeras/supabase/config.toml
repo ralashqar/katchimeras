@@ -445,3 +445,8 @@ entrypoint = "./functions/revenuecat-webhook/index.ts"
 enabled = true
 verify_jwt = true
 entrypoint = "./functions/reconcile-revenuecat/index.ts"
+
+[functions.generate-katchimera-idle]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/generate-katchimera-idle/index.ts"

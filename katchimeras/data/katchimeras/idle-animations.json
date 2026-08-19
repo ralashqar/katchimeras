@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "animations": {
+    "mossprout": {
+      "asset": "assets/images/katchimeras/animations/mossprout-idle.webp",
+      "fallback": "assets/images/katchimeras/cutouts/mossprout.png",
+      "width": 512,
+      "height": 512,
+      "fps": 24,
+      "frameCount": 97,
+      "loopMode": "cycle",
+      "byteSize": 3071236,
+      "generationModel": "fal-ai/bytedance/seedance/v1.5/pro/image-to-video",
+      "matteModel": "bria/video/background-removal",
+      "maxByteSize": 3145728,
+      "generationPrompt": "Locked-off camera and fixed square composition. Mossprout remains in exactly the same position and scale, with the planted foot pinned. Create only a gentle living idle: subtle breathing, one soft natural blink, and tiny leaf movement. Preserve the exact character design, silhouette, face, colours, proportions, paws, tail leaves, forehead emblem, lighting and polished 3D illustration style. The flat magenta background remains perfectly uniform and motionless. No camera motion, zoom, crop, walking, waving, speech, new objects, shadows on the background, particles, scene changes or character redesign. Return smoothly to the exact starting pose.",
+      "durationSeconds": 4,
+      "generationResolution": "720p"
+    },
+    "steppling": {
+      "asset": "assets/images/katchimeras/animations/steppling-idle.webp",
+      "fallback": "assets/images/katchimeras/cutouts/steppling-standing.png",
+      "width": 512,
+      "height": 512,
+      "fps": 24,
+      "frameCount": 97,
+      "loopMode": "cycle",
+      "byteSize": 2642550,
+      "maxByteSize": 3145728,
+      "generationModel": "fal-ai/bytedance/seedance/v1.5/pro/image-to-video",
+      "matteModel": "bria/video/background-removal",
+      "generationRequestId": "01a01ba1-83be-7d60-bdea-f6036964a15b",
+      "matteRequestId": "01a01ba2-643e-78c0-9b7a-3813c8bc0d16",
+      "generationPrompt": "Locked-off camera and fixed square composition. Steppling remains in exactly the same position and scale. Keep every foot, paw, or base contact point planted and prevent positional drift. Create only a slow living idle: a near-still idle with only two permitted motions during the entire four-second clip: one very small continuous breathing cycle, with the belly and chest expanding once slowly from the start to the midpoint and returning once slowly from the midpoint to the end, plus exactly one natural blink at the midpoint; do not repeat the breath or blink; no head movement, ear movement, tuft movement, mouth movement, expression change, arm movement, hand movement, leg movement, foot movement, bouncing, bobbing, swaying, or secondary motion; keep the backpack and trail marker completely rigid and keep both shoes fully planted. Preserve the exact character design, silhouette, face, colours, proportions, anatomy, accessories, markings, lighting, materials, and polished 3D illustration style. The flat #D95BFF chroma-key background remains perfectly uniform and motionless. No camera motion, zoom, crop, walking, waving, speech, lip movement, new objects, background shadows, particles, scene changes, morphing, or character redesign. Return smoothly to the exact starting pose.",
+      "durationSeconds": 4,
+      "generationResolution": "720p",
+      "edgeDecontamination": "alpha-preserving-colour-extension"
+    }
+  }
+}
