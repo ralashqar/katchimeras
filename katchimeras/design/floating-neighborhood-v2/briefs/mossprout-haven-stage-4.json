@@ -3,12 +3,12 @@
   "kind": "resident",
   "concept": "Heart of the Grove: Mossprout's definitive signature Haven, resolved around an ancient magical tree.",
   "floor": "Deep forest moss with an open front-center clearing and a narrow pond around the rear roots.",
-  "main_structure": "One ancient magical tree at rear-center with a broad trunk, compact luminous canopy, and hollow-like root arch.",
-  "rear_props": ["large moss boulders", "oversized ferns", "restrained glowing plants"],
+  "main_structure": "The same rear-center tree is now one ancient magical tree with a smooth broad trunk, root hollow, and five to seven large cloud-like foliage masses.",
+  "rear_props": ["the resolved rounded resting nook at rear-left", "a few oversized restrained luminous plants around the pond"],
   "side_props": ["two warm garden lanterns"],
   "perimeter": { "material": "ancient rounded moss masses", "palette": ["deep emerald", "olive", "mint glow"], "emblems": "broad luminous leaves" },
   "cliff": { "materials": ["mossy olive stone", "warm sandstone"], "palette": ["olive", "ochre", "umber"] },
   "lighting": "soft woodland daylight with restrained mint magic and warm amber lanterns",
   "must_keep": ["canonical geometry", "open front-center", "tree as immediate signature silhouette"],
-  "must_exclude": ["creature", "house", "bridge", "path", "stepping stones", "dense clutter"]
+  "must_exclude": ["creature", "house", "bridge", "path", "stepping stones", "leaf-by-leaf canopy", "bark veins", "grass blades", "realistic texture", "dense clutter"]
 }

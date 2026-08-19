@@ -7,7 +7,9 @@ canvas and intentionally reuse the full asset's world-space frame.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
+import time
 from pathlib import Path
 
 from PIL import Image
@@ -80,7 +82,20 @@ def main() -> None:
         print(f"Hex tile bounds verified for {len(assets)} assets.")
         return
 
-    OUTPUT.write_text(content, encoding="utf-8", newline="\n")
+    temporary = OUTPUT.with_name(f".{OUTPUT.name}.generation.tmp")
+    temporary.unlink(missing_ok=True)
+    try:
+        temporary.write_text(content, encoding="utf-8", newline="\n")
+        for attempt in range(20):
+            try:
+                os.replace(temporary, OUTPUT)
+                break
+            except OSError:
+                if attempt == 19:
+                    raise
+                time.sleep(0.25)
+    finally:
+        temporary.unlink(missing_ok=True)
     print(f"Wrote {OUTPUT.relative_to(ROOT)} for {len(assets)} assets.")
 
 

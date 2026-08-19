@@ -11,6 +11,11 @@ settings, promotion command, runtime integration, QA, and handoff format. This
 file records art direction and approved examples; it does not replace that
 runbook.
 
+For a Katchimera's five-stage Haven progression, use the dedicated
+[Haven environment art pipeline](../../docs/haven-environment-art-pipeline.md).
+It uses individually generated endpoint and interpolation states, rather than
+the single-environment generation contract below.
+
 ## Reference policy
 
 - The checked-in Katchimeras style anchor is authoritative for shape language:

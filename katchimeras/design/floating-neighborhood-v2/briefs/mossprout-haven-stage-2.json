@@ -3,12 +3,12 @@
   "kind": "resident",
   "concept": "Rain Garden Nook: Mossprout begins treating the restored garden as a lasting home.",
   "floor": "One continuous calm green lawn with a large open centre for the separate character layer.",
-  "main_structure": "A modest rain-fed pond at rear-right and one simple wooden garden bench at rear-left.",
-  "rear_props": ["curved stepping-stone path", "one familiar watering can"],
-  "side_props": ["medium ferns", "established flowering plants", "mossy pond stones"],
+  "main_structure": "The same rear-center sprout continues growing while a modest rounded rain-fed pond forms from the rear-right damp patch.",
+  "rear_props": ["one chunky rounded log bench at rear-left", "three broad pond-edge stones"],
+  "side_props": ["two or three large simplified fern masses"],
   "perimeter": { "material": "smooth green moss", "palette": ["moss green", "leaf green", "pale lime"], "emblems": "simple leaf forms" },
   "cliff": { "materials": ["warm sandstone"], "palette": ["warm ochre", "soft umber"] },
   "lighting": "soft warm daylight after rain",
   "must_keep": ["canonical geometry", "open central lawn", "clear midpoint between stages 1 and 3", "environment only"],
-  "must_exclude": ["creature", "large canopy tree", "glowing lanterns", "large stump", "dense woodland wall", "building", "text"]
+  "must_exclude": ["creature", "path", "stepping-stone path", "large canopy tree", "glowing lanterns", "dense woodland wall", "building", "grass blades", "realistic texture", "text"]
 }

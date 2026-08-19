@@ -2,13 +2,13 @@
   "key": "mossprout_haven_stage_0",
   "kind": "resident",
   "concept": "Forgotten Clearing: Mossprout has just arrived in a sparse, humble corner of the Haven.",
-  "floor": "Muted forest moss interrupted by a few broad patches of warm bare soil; the front half stays open.",
+  "floor": "Sparse broad masses of muted forest moss and warm bare soil with no granular texture; the front half stays open.",
   "main_structure": "No structure; one tiny pale-green sprout near the rear-center is the focal point.",
-  "rear_props": ["three large simple rocks grouped at rear-left"],
-  "side_props": [],
+  "rear_props": ["two or three large rounded rocks grouped at rear-left"],
+  "side_props": ["one simple worn rounded watering can at rear-right"],
   "perimeter": { "material": "weathered desaturated moss", "palette": ["olive", "forest moss", "warm soil"], "emblems": "none" },
   "cliff": { "materials": ["warm sandstone"], "palette": ["warm ochre", "soft umber"] },
   "lighting": "soft neutral daylight",
   "must_keep": ["canonical geometry", "quiet open front half", "visibly incomplete composition"],
-  "must_exclude": ["creature", "pond", "bench", "building", "path", "magic landmark", "tiny clutter"]
+  "must_exclude": ["creature", "pond", "bench", "building", "path", "magic landmark", "grass blades", "realistic texture", "tiny clutter"]
 }

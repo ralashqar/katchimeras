@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 2,
+  "character": "mossprout",
+  "displayName": "Mossprout",
+  "stageCount": 5,
+  "canonicalNeutralSource": "design/floating-neighborhood-v2/floating-neutral-source.png",
+  "styleReferences": [
+    "design/floating-neighborhood-v2/floating-mossprout-source.png"
+  ],
+  "generation": {
+    "engine": "codex-built-in-imagegen",
+    "minimumSourceSize": 1024,
+    "canonicalSize": 2048,
+    "background": "#FF00FF",
+    "backgroundRemoval": "birefnet-matted-output",
+    "candidateCount": 1
+  },
+  "generationOrder": [0, 4, 2, 1, 3],
+  "referenceGraph": {
+    "0": {
+      "kind": "endpoint",
+      "references": ["canonicalNeutralSource", "styleReferences"]
+    },
+    "4": {
+      "kind": "endpoint",
+      "references": ["canonicalNeutralSource", "styleReferences"]
+    },
+    "2": {
+      "kind": "interpolation",
+      "between": [0, 4]
+    },
+    "1": {
+      "kind": "interpolation",
+      "between": [0, 2]
+    },
+    "3": {
+      "kind": "interpolation",
+      "between": [2, 4]
+    }
+  },
+  "invariants": {
+    "geometry": [
+      "Preserve the exact square canvas, flat-top hex footprint, camera, scale, deep tapered island, centered recessed front stairs, and transparent padding.",
+      "Keep one small circular standing patch in the lower third, horizontally centered immediately above the front stairs.",
+      "The standing patch is only large enough for the Katchimera, connects to the stairs with at most one broad stepping stone, and remains at the same anchor in every stage.",
+      "Keep the middle readable while allowing the environment to grow naturally around the lower standing patch."
+    ],
+    "style": [
+      "Premium cozy stylized 3D toy diorama.",
+      "Chunky rounded clay-like forms, broad soft bevels, matte simplified materials, low-frequency surfaces, warm diffuse light, and clean silhouettes.",
+      "Every important feature must remain readable at 256 pixels."
+    ],
+    "persistentLandmarks": [
+      "The sprout grows into the signature tree at rear-center without changing its anchor position.",
+      "The damp rear-right garden patch becomes the pond and remains rear-right.",
+      "The resting nook develops at rear-left.",
+      "The small lower-center character standing patch remains open at every stage."
+    ],
+    "exclude": [
+      "creature",
+      "egg",
+      "text",
+      "watermark",
+      "bridge",
+      "large central platform",
+      "standing patch in the vertical center",
+      "long central path",
+      "grass blades",
+      "bark veins",
+      "leaf-by-leaf canopies",
+      "tiny flowers",
+      "pebbles",
+      "cracks",
+      "specks",
+      "filigree",
+      "dense prop clutter",
+      "realistic textures"
+    ]
+  },
+  "stages": [
+    {
+      "id": 0,
+      "key": "mossprout_haven_stage_0",
+      "name": "Forgotten Clearing",
+      "narrative": "Mossprout has only just arrived.",
+      "floor": "Broad warm bare-soil masses cover most of the floor, broken by sparse muted moss with no granular texture.",
+      "landmark": "One tiny pale-green sprout at rear-center.",
+      "props": ["two or three large rounded rocks at rear-left", "one simple worn watering can at rear-right"],
+      "palette": ["muted moss", "olive", "warm ochre", "soft umber"],
+      "lighting": "Soft neutral daylight.",
+      "density": "Very sparse and visibly incomplete."
+    },
+    {
+      "id": 1,
+      "key": "mossprout_haven_stage_1",
+      "name": "First Garden",
+      "narrative": "The player helps Mossprout establish somewhere to grow.",
+      "floor": "Warm earth still covers much of the floor while larger healthy moss patches begin reconnecting.",
+      "landmark": "The same rear-center sprout is larger beside one low curved garden bed.",
+      "props": ["three or four oversized simple flowers", "the restored rounded watering can"],
+      "palette": ["moss green", "leaf green", "pale lime", "warm ochre"],
+      "lighting": "Soft filtered daylight.",
+      "density": "Modest beginner garden with large readable shapes."
+    },
+    {
+      "id": 2,
+      "key": "mossprout_haven_stage_2",
+      "name": "Garden Nook",
+      "narrative": "Mossprout begins treating the place as home.",
+      "floor": "Healthy lawn and moss cover most of the floor while two or three broad earth remnants remain.",
+      "landmark": "The same sprout continues growing; a simple rounded pond forms from the rear-right damp patch.",
+      "props": ["one chunky rounded log bench at rear-left", "three broad pond-edge stones", "two or three large fern masses"],
+      "palette": ["moss green", "leaf green", "soft pond blue", "honey wood"],
+      "lighting": "Soft warm daylight after rain.",
+      "density": "Clearly established but uncluttered."
+    },
+    {
+      "id": 3,
+      "key": "mossprout_haven_stage_3",
+      "name": "Flourishing Woodland",
+      "narrative": "Mossprout helps the surrounding clearing come back to life.",
+      "floor": "Rich continuous forest moss with a calm middle and the small lower standing patch kept clear.",
+      "landmark": "The rear-center sprout has become a small tree with three or four cloud-like foliage masses; the rear-right pond is broader.",
+      "props": ["the established rear-left resting nook", "one large mushroom cluster", "two chunky warm garden lanterns"],
+      "palette": ["emerald", "olive", "pale lime", "pond blue", "warm amber"],
+      "lighting": "Filtered woodland daylight with restrained warm lantern light.",
+      "density": "Rich and flourishing, using only a few large forms."
+    },
+    {
+      "id": 4,
+      "key": "mossprout_haven_stage_4",
+      "name": "Enchanted Grove",
+      "narrative": "Mossprout's home reaches its definitive magical form.",
+      "floor": "Deep smooth forest moss with a luminous rear-right pond and the small lower standing patch kept clear.",
+      "landmark": "The same rear-center tree is now a signature ancient magical tree with a smooth broad trunk, root hollow, and five to seven large cloud-like foliage masses.",
+      "props": ["the resolved rear-left resting nook", "two chunky lanterns", "a few oversized luminous plants around the pond"],
+      "palette": ["deep emerald", "olive", "mint glow", "pond blue", "warm amber"],
+      "lighting": "Soft woodland daylight with restrained mint magic and warm amber accents.",
+      "density": "Definitive landmark composition without micro-detail."
+    }
+  ]
+}

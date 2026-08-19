@@ -8,8 +8,10 @@ anchors remain identical across an art-direction set.
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from PIL import Image
@@ -19,6 +21,25 @@ from hex_tile_alpha import resize_rgba_premultiplied
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_ROOT = ROOT / "assets" / "images" / "katchimeras" / "world" / "hex"
+
+
+def save_webp_atomically(image: Image.Image, path: Path, *, quality: int) -> None:
+    """Publish a complete WebP even while Metro is reading the prior asset."""
+
+    temporary = path.with_name(f".{path.name}.packaging.tmp")
+    temporary.unlink(missing_ok=True)
+    try:
+        image.save(temporary, format="WEBP", quality=quality, method=6)
+        for attempt in range(20):
+            try:
+                os.replace(temporary, path)
+                return
+            except OSError:
+                if attempt == 19:
+                    raise
+                time.sleep(0.25)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def main() -> None:
@@ -64,7 +85,7 @@ def main() -> None:
             if source.size == (size, size)
             else resize_rgba_premultiplied(source, (size, size))
         )
-        image.save(path, format="WEBP", quality=min(args.quality, quality), method=6)
+        save_webp_atomically(image, path, quality=min(args.quality, quality))
         print(path.relative_to(ROOT), f"{path.stat().st_size // 1024} KB")
 
     if not args.skip_bounds:

@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 2,
+  "character": "steppling",
+  "displayName": "Steppling",
+  "stageCount": 5,
+  "canonicalNeutralSource": "design/floating-neighborhood-v2/floating-neutral-source.png",
+  "styleReferences": [
+    "design/floating-neighborhood-v2/floating-steppling-source.png"
+  ],
+  "generation": {
+    "engine": "codex-built-in-imagegen",
+    "minimumSourceSize": 1024,
+    "canonicalSize": 2048,
+    "background": "#FF00FF",
+    "backgroundRemoval": "birefnet-matted-output",
+    "candidateCount": 1
+  },
+  "generationOrder": [0, 4, 2, 1, 3],
+  "referenceGraph": {
+    "0": {
+      "kind": "endpoint",
+      "references": ["canonicalNeutralSource", "styleReferences"]
+    },
+    "4": {
+      "kind": "endpoint",
+      "references": ["canonicalNeutralSource", "styleReferences"]
+    },
+    "2": {
+      "kind": "interpolation",
+      "between": [0, 4]
+    },
+    "1": {
+      "kind": "interpolation",
+      "between": [0, 2]
+    },
+    "3": {
+      "kind": "interpolation",
+      "between": [2, 4]
+    }
+  },
+  "invariants": {
+    "geometry": [
+      "Preserve the exact square canvas, flat-top hex footprint, camera, scale, deep tapered island, centered recessed front stairs, and transparent padding.",
+      "Keep one small circular standing patch in the lower third, horizontally centered immediately above the front stairs.",
+      "The standing patch is only large enough for Steppling, connects to the stairs with at most one broad stepping stone, and remains at the same anchor in every stage.",
+      "Keep the middle readable while allowing the trailhead environment to develop naturally around the lower standing patch."
+    ],
+    "style": [
+      "Premium cozy stylized 3D toy diorama matching the approved Steppling runtime tile.",
+      "Chunky rounded clay-like forms, broad soft bevels, matte simplified materials, low-frequency surfaces, warm diffuse light, and clean silhouettes.",
+      "Use Steppling's established sky-blue, muted slate, warm ochre, sandstone, timber, and orange-accent palette.",
+      "Every important feature must remain readable at 256 pixels."
+    ],
+    "persistentLandmarks": [
+      "The small rear-center trail marker develops into the signature explorer lookout without changing its anchor position.",
+      "The upper-left resting point develops into a bench and water station and remains upper-left.",
+      "The upper-right route marker develops into the map and gear point and remains upper-right.",
+      "The small lower-center character standing patch remains open at every stage."
+    ],
+    "exclude": [
+      "creature",
+      "egg",
+      "text",
+      "readable writing",
+      "watermark",
+      "bridge",
+      "large central platform",
+      "standing patch in the vertical center",
+      "long central path",
+      "dense footprint trail",
+      "pine needles",
+      "individual grass blades",
+      "tiny leaves",
+      "pebbles",
+      "cracks",
+      "grains",
+      "specks",
+      "dense hiking clutter",
+      "realistic textures"
+    ]
+  },
+  "stages": [
+    {
+      "id": 0,
+      "key": "steppling_haven_stage_0",
+      "name": "Forgotten Trailhead",
+      "narrative": "Steppling has found the beginning of a path, but nowhere yet to pause or plan.",
+      "floor": "Broad bare compacted trail earth covers most of the floor in warm muted ochre, with two or three large faded slate patches and no repeated texture.",
+      "landmark": "One short weathered blank waypoint post at rear-center.",
+      "props": ["one rolled blanket near the upper-right wall", "two large rounded stones near the upper-left wall"],
+      "palette": ["warm ochre", "muted slate", "soft sandstone", "faded sky blue"],
+      "lighting": "Clear soft neutral trail daylight.",
+      "density": "Very sparse, exposed, and visibly incomplete."
+    },
+    {
+      "id": 1,
+      "key": "steppling_haven_stage_1",
+      "name": "First Waypoint",
+      "narrative": "The first useful marker makes stepping outside feel possible.",
+      "floor": "Warm compacted trail earth remains dominant while a few broad smooth slate stepping areas establish the first usable route.",
+      "landmark": "The same rear-center waypoint is repaired and gains one simple orange direction marker with no writing.",
+      "props": ["one chunky rest stool at upper-left", "one compact water bowl", "one neatly rolled trail blanket at upper-right"],
+      "palette": ["warm ochre", "sky blue", "muted slate", "burnt orange", "honey timber"],
+      "lighting": "Clear friendly daylight with one restrained amber marker glow.",
+      "density": "A modest first stopping place with large useful shapes."
+    },
+    {
+      "id": 2,
+      "key": "steppling_haven_stage_2",
+      "name": "Trail Rest",
+      "narrative": "Steppling creates a dependable place to prepare, rest, and choose the next route.",
+      "floor": "The compacted ochre floor is established with a few broad slate rest areas and an uncluttered middle.",
+      "landmark": "The rear-center waypoint becomes a compact open timber trail shelter with a rounded muted-blue canopy.",
+      "props": ["one chunky bench and broad water station at upper-left", "one blank map board and simple gear stand at upper-right", "two rounded pine forms along the rear wall"],
+      "palette": ["sky blue", "warm ochre", "muted slate", "honey timber", "pine green", "burnt orange"],
+      "lighting": "Soft sunny trail daylight with one warm shelter lantern.",
+      "density": "Clearly established and useful without hiking clutter."
+    },
+    {
+      "id": 3,
+      "key": "steppling_haven_stage_3",
+      "name": "Pathfinder Basecamp",
+      "narrative": "The trailhead becomes a welcoming base for familiar routes and curious detours.",
+      "floor": "Smooth ochre and slate floor masses create a rich trailhead composition while the small lower standing patch stays clear.",
+      "landmark": "The same rear-center shelter grows into a compact hiking lodge with a broad blue roof, glowing doorway, and low lookout deck.",
+      "props": ["the established upper-left bench and water station", "the upper-right blank map and gear point", "three large cloud-like pine forms", "two chunky trail lanterns"],
+      "palette": ["sky blue", "slate blue", "warm ochre", "sandstone", "pine green", "amber"],
+      "lighting": "Bright highland daylight with restrained warm lodge and lantern light.",
+      "density": "Rich, welcoming, and clearly developed using only broad readable forms."
+    },
+    {
+      "id": 4,
+      "key": "steppling_haven_stage_4",
+      "name": "Grand Explorer's Lookout",
+      "narrative": "Steppling's path opens into a definitive home for movement, perspective, and every journey still ahead.",
+      "floor": "A polished but low-detail highland trailhead of broad warm ochre and slate masses surrounds the small lower standing patch.",
+      "landmark": "The same rear-center lodge culminates in a signature rounded explorer lookout with an elevated blue-roofed viewing deck, warm glowing doorway, and one large simple orange waypoint emblem without text.",
+      "props": ["the resolved upper-left rest and water nook", "the resolved upper-right map and gear point", "four large rounded pine masses framing the lookout", "three chunky amber route lanterns", "one simple oversized telescope on the rear deck"],
+      "palette": ["deep sky blue", "muted slate", "warm ochre", "gold sandstone", "pine green", "burnt orange", "warm amber"],
+      "lighting": "Clear golden highland daylight with restrained amber landmark glow.",
+      "density": "Definitive signature destination with a strong silhouette and no micro-detail."
+    }
+  ]
+}

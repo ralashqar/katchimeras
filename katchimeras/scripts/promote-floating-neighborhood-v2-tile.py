@@ -67,14 +67,14 @@ def main() -> None:
     candidate = (ROOT / args.candidate).resolve()
     if not candidate.is_file():
         raise SystemExit(f"Candidate does not exist: {candidate}")
-    image = Image.open(candidate)
-    if image.width != image.height or image.width < 1024:
-        raise SystemExit(f"Candidate must be square and at least 1024px; got {image.size}.")
-    rgb = image.convert("RGB")
-    edge = image.width - 1
-    corners = ((0, 0), (edge, 0), (0, edge), (edge, edge))
-    if any(max(rgb.getpixel(point)) > 5 for point in corners):
-        raise SystemExit("Candidate corners must be pure black before matting.")
+    with Image.open(candidate) as image:
+        if image.width != image.height or image.width < 1024:
+            raise SystemExit(f"Candidate must be square and at least 1024px; got {image.size}.")
+        rgb = image.convert("RGB")
+        edge = image.width - 1
+        corners = ((0, 0), (edge, 0), (0, edge), (edge, edge))
+        if any(max(rgb.getpixel(point)) > 5 for point in corners):
+            raise SystemExit("Candidate corners must be pure black before matting.")
 
     stem = (
         f"floating-home-{key}"
@@ -106,7 +106,7 @@ def main() -> None:
     if not args.dry_run:
         source.parent.mkdir(parents=True, exist_ok=True)
         if candidate != source.resolve():
-            shutil.copy2(candidate, source)
+            replace_file(candidate, source)
 
     pipeline = [
         sys.executable,

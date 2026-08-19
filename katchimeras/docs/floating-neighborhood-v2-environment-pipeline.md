@@ -1,5 +1,12 @@
 # Floating Neighbourhood V2 environment pipeline
 
+Linear multi-stage Haven environments use the dedicated
+[`haven-environment-art-pipeline.md`](./haven-environment-art-pipeline.md) runbook.
+That workflow adds progression continuity and set-level review without weakening
+this pipeline's single-environment canonical-base rules. Its Codex endpoint/interpolation
+workflow and magenta-to-BiRefNet preparation contract deliberately override the
+single-environment input and background rules below.
+
 This is the canonical, fresh-context runbook for creating resident environments,
 home-archetype islands, and zodiac sanctuaries. Follow it even when earlier conversation history is
 available. The longer visual history and approved examples live in
