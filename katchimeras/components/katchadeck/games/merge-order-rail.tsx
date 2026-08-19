@@ -23,6 +23,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppFontFamilies } from '@/constants/theme';
 import { MERGE_CHARACTER_NAMES } from '@/constants/merge-world-catalog';
+import { MERGE_WORLD_UI_ART } from '@/constants/merge-world-ui-art';
 import type { MergeRailInteractionGate } from '@/features/onboarding/merge-ftue';
 import type { HomeVisualKey } from '@/types/home';
 import type { MergeCharacterId, MergeOrder, MergeWorldArrival } from '@/types/merge-world';
@@ -38,7 +39,6 @@ const TRAY_GAP = 10;
 const TRAY_HEIGHT = 120;
 const TRAY_ITEM_SIZE = 34;
 const TRAY_ART = require('../../../assets/images/katchimeras/merge-world/ui/order-service-tray.webp');
-const READY_TICK_ART = require('../../../assets/images/katchimeras/merge-world/ui/ready-tick.webp');
 const ORDER_REWARD_ART = {
   bond: require('../../../assets/images/katchimeras/merge-world/ui/bond.webp'),
   coins: require('../../../assets/images/katchimeras/merge-world/ui/coin.webp'),
@@ -382,7 +382,7 @@ function OrderTrayCard({ entry, index, interactionAllowed, interactionLocked, on
                 exiting={reduceMotion ? FadeOut.duration(70) : ITEM_TICK_OUT}
                 pointerEvents="none"
                 style={styles.itemReadyTick}>
-                <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" source={READY_TICK_ART} style={styles.itemReadyTickArt} transition={0} />
+                <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" source={MERGE_WORLD_UI_ART.readyTick} style={styles.itemReadyTickArt} transition={0} />
               </Animated.View>
             ) : null}
           </Animated.View>

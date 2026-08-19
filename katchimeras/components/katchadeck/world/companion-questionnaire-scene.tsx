@@ -120,7 +120,6 @@ export function CompanionQuestionnaireScene({
         bubbleBody={spokenHelperText}
         bubbleVariant="questionnaire"
         creature={creature}
-        enterFromLifted
         environmentKey={environmentKey}
         lifted
         name={companionName}
@@ -203,7 +202,7 @@ export function CompanionQuestionnaireScene({
                         onPress={() => select(option)}
                         style={({ pressed }) => [
                           styles.option,
-                          selected && { borderColor: accentColor, backgroundColor: '#FFF5D8' },
+                          selected && { borderColor: accentColor, backgroundColor: KatchaUI.companionScenePanel.cardSelected },
                           pressed && styles.optionPressed,
                         ]}>
                         {option.icon ? (
@@ -211,7 +210,7 @@ export function CompanionQuestionnaireScene({
                             <IconSymbol color={accentColor} name={option.icon} size={21} />
                           </View>
                         ) : null}
-                        <ThemedText style={styles.optionLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+                        <ThemedText style={styles.optionLabel} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>
                           {option.label}
                         </ThemedText>
                         <IconSymbol
@@ -251,16 +250,16 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
     fontWeight: '900',
   },
-  interactionPanel: { backgroundColor: '#211A13', borderColor: 'rgba(248,220,165,0.2)', borderCurve: 'continuous', borderRadius: 28, borderWidth: 1, boxShadow: '0 16px 38px rgba(31,20,10,0.32), inset 0 1px 0 rgba(255,255,255,0.06)', flex: 1, minHeight: 0, overflow: 'hidden' },
+  interactionPanel: { backgroundColor: KatchaUI.companionScenePanel.background, borderColor: KatchaUI.companionScenePanel.border, borderCurve: 'continuous', borderRadius: 28, borderWidth: 1, boxShadow: KatchaUI.companionScenePanel.shadow, flex: 1, minHeight: 0, overflow: 'hidden' },
   progressBlock: { gap: 9, paddingBottom: 12, paddingHorizontal: 16, paddingTop: 15 },
   progressHeading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   progressCount: { ...KatchaUI.type.meta, fontSize: 10, fontVariant: ['tabular-nums'], fontWeight: '900' },
-  track: { backgroundColor: '#413525', borderColor: 'rgba(255,235,192,0.2)', borderRadius: 999, borderWidth: 1, height: 8, overflow: 'hidden' },
+  track: { backgroundColor: KatchaUI.companionScenePanel.softBackground, borderColor: KatchaUI.companionScenePanel.softBorder, borderRadius: 999, borderWidth: 1, height: 8, overflow: 'hidden' },
   trackFill: { borderRadius: 999, height: '100%', transformOrigin: 'left center', width: '100%' },
   lowerScroll: { backgroundColor: 'transparent', flex: 1, minHeight: 0 },
   lowerContent: { backgroundColor: 'transparent', flexGrow: 1, paddingBottom: 12, paddingHorizontal: 14, paddingTop: 2 },
   options: { backgroundColor: 'transparent', gap: 10 },
-  option: { alignItems: 'center', backgroundColor: 'rgba(255,250,239,0.97)', borderColor: 'rgba(117,82,44,0.22)', borderCurve: 'continuous', borderRadius: 19, borderWidth: 1, boxShadow: '0 7px 18px rgba(67,42,17,0.2), inset 0 1px 0 rgba(255,255,255,0.9)', flexDirection: 'row', gap: 12, minHeight: 62, paddingHorizontal: 15, paddingVertical: 10 },
+  option: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.cardBackground, borderColor: KatchaUI.companionScenePanel.cardBorder, borderCurve: 'continuous', borderRadius: 19, borderWidth: 1, boxShadow: '0 6px 16px rgba(12,22,15,0.22), inset 0 1px 0 rgba(255,255,255,0.06)', flexDirection: 'row', gap: 12, minHeight: 62, paddingHorizontal: 15, paddingVertical: 10 },
   optionPressed: { opacity: 0.88, transform: [{ scale: 0.985 }] },
   optionIcon: { alignItems: 'center', borderRadius: 999, height: 40, justifyContent: 'center', width: 40 },
   optionLabel: { ...KatchaUI.type.companionAction, flex: 1 },

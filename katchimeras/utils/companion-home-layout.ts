@@ -1,13 +1,9 @@
 import type { HomeVisualKey } from '@/types/home';
 import { todayExplorationCreatureStageFrame } from '@/utils/today-kingdom-hero-layout';
 
-const MIN_STAGE_OFFSET_X = 82;
-const MAX_STAGE_OFFSET_X = 126;
-const MIN_STAGE_LIFT = 32;
-const MAX_STAGE_LIFT = 52;
-const BACKGROUND_OVERSCAN = 1.35;
-const COMPANION_CREATURE_SCALE = 1.34;
-const COMPANION_CREATURE_DROP_RATIO = 0.03;
+const BACKGROUND_OVERSCAN = 1.18;
+const COMPANION_CREATURE_SCALE = 1.08;
+const GROWN_CUTOUT_VISIBLE_BOTTOM = 0.94;
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -15,9 +11,9 @@ function clamp(value: number, minimum: number, maximum: number): number {
 
 /**
  * Companion Home reuses Today's measured environment contact point, then
- * moves the authored environment and its resident as one composition. The
- * resident then settles three percent lower so its visible base meets the
- * platform naturally across the companion navigation pages.
+ * keeps the authored environment and its grown resident centred. This is the
+ * same platform anchor used by Today, with a mature-cutout baseline instead
+ * of the hatchling-specific alpha catalogue.
  */
 export function companionHomeStageLayout(
   viewportWidth: number,
@@ -30,15 +26,10 @@ export function companionHomeStageLayout(
     0,
     visualKey,
   );
-  const visibleBottomRatio =
-    (todayCreatureFrame.stageContactY - todayCreatureFrame.top)
-    / todayCreatureFrame.size;
   const creatureSize = todayCreatureFrame.size * COMPANION_CREATURE_SCALE;
-  const creatureDropY = viewportHeight * COMPANION_CREATURE_DROP_RATIO;
   const creatureTop =
     todayCreatureFrame.stageContactY
-    - creatureSize * visibleBottomRatio
-    + creatureDropY;
+    - creatureSize * GROWN_CUTOUT_VISIBLE_BOTTOM;
   const creatureFrame = {
     ...todayCreatureFrame,
     centerY: creatureTop + creatureSize / 2,
@@ -47,29 +38,34 @@ export function companionHomeStageLayout(
     top: creatureTop,
     width: creatureSize,
   };
-  const translateX = clamp(
-    viewportWidth * 0.26,
-    MIN_STAGE_OFFSET_X,
-    MAX_STAGE_OFFSET_X,
-  );
-  const translateY = -clamp(
-    viewportHeight * 0.055,
-    MIN_STAGE_LIFT,
-    MAX_STAGE_LIFT,
-  );
+  const translateX = 0;
+  // A small camera drop exposes more foreground and lets the controls begin
+  // below the Haven plaque without pushing the character off its platform.
+  const translateY = clamp(viewportHeight * 0.014, 8, 14);
 
   return {
     backgroundImageSize:
       Math.max(viewportWidth, viewportHeight) * BACKGROUND_OVERSCAN,
-    creatureDropY,
+    creatureDropY: 0,
     creatureFrame,
     translateX,
     translateY,
   };
 }
 
-export function companionDestinationStageLift(viewportHeight: number): number {
-  return Math.min(150, Math.max(118, viewportHeight * 0.16));
+export function companionDestinationStageLift(
+  viewportHeight: number,
+  viewportWidth = viewportHeight,
+): number {
+  const backgroundSize = Math.max(viewportWidth, viewportHeight) * BACKGROUND_OVERSCAN;
+  const stageDrop = clamp(viewportHeight * 0.014, 8, 14);
+  // Raise the shared art plane to its coverage boundary. The two-pixel guard
+  // prevents filtered image edges from appearing on fractional-pixel screens.
+  return Math.max(0, (backgroundSize - viewportHeight) / 2 + stageDrop - 2);
+}
+
+export function companionHubHeroSpacer(viewportHeight: number): number {
+  return Math.min(500, Math.max(338, viewportHeight * 0.56));
 }
 
 /**
@@ -97,8 +93,9 @@ export function companionSpeechBubbleDrop(viewportHeight: number): number {
 export function companionDestinationSpeechBubbleTop(
   viewportHeight: number,
   safeAreaTop: number,
+  viewportWidth = viewportHeight,
 ): number {
-  return safeAreaTop + 92 + companionDestinationStageLift(viewportHeight);
+  return safeAreaTop + 92 + companionDestinationStageLift(viewportHeight, viewportWidth);
 }
 
 export function companionQuestListSpacer(viewportHeight: number): number {

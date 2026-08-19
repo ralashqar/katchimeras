@@ -11,9 +11,11 @@ import {
   type View as ViewType,
 } from 'react-native';
 import Animated, { FadeIn, FadeInLeft, FadeInRight, FadeOut, useReducedMotion } from 'react-native-reanimated';
+import { GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KatchaDialog } from '@/components/katchadeck/ui/katcha-dialog';
+import { ExplorationEnvironmentProgressionProvider } from '@/components/katchadeck/home/exploration-environment-progression-context';
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import { KatchaUI } from '@/constants/katcha-ui';
@@ -42,6 +44,7 @@ import {
   companionViewportResetKey,
 } from '@/utils/companion-interaction';
 import { CompanionCinematicStage } from './companion-cinematic-stage';
+import { useCompanionEnvironmentPan } from './use-companion-environment-pan';
 import { CompanionGameBackdrop } from './companion-game-backdrop';
 import { CompanionInsightThread } from './companion-insight-thread';
 import { CompanionPrimaryAction, CompanionSecondaryAction } from './companion-interaction-primitives';
@@ -108,7 +111,7 @@ import { quickGoalsForDay } from '@/utils/companion-quick-goals';
 import { CompanionCheckInCard, CompanionCheckInPage } from './companion-check-in';
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
 import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-backgrounds';
-import { companionQuestListSpacer } from '@/utils/companion-home-layout';
+import { companionHubHeroSpacer, companionQuestListSpacer } from '@/utils/companion-home-layout';
 import type { CompanionQuickGoalCompletionReceipt } from '@/hooks/use-companion-quick-goals';
 import type { GoalTaskSourceRect } from '@/components/katchadeck/goals/goal-task-row';
 import { BondRewardFlightOverlay } from '@/components/katchadeck/goals/bond-reward-overlay';
@@ -157,6 +160,7 @@ export type CompanionInteractionSheetProps = {
   accentColor: string;
   questionnaireBackground: TodayAtmosphereBackground;
   homeEnvironmentKey?: TodayExplorationBackgroundKey | null;
+  homeEnvironmentStage?: number | null;
   houseLevel?: number;
   initialDestination?: CompanionDestination | null;
   initialConversationDefinitionId?: string;
@@ -617,10 +621,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const [endAttemptOpen, setEndAttemptOpen] = useState(false);
   const [leaveQuestOpen, setLeaveQuestOpen] = useState(false);
   const [activeCheckIn, setActiveCheckIn] = useState<CompanionJourneyCheckIn | null>(props.journeyCheckIn);
-  const [hasShownHome, setHasShownHome] = useState(false);
   const contentRef = useRef<ScrollView>(null);
   const reduceMotion = useReducedMotion();
-  const visual = getCreatureVisual(props.visualKey);
+  const visual = getCreatureVisual(props.visualKey, 'grown');
   const goalsToday = quickGoalsForDay(
     props.quickGoalState,
     props.quickGoalDayId,
@@ -656,8 +659,12 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   })}:quick-goal-picker:${quickGoalPickerOpen}:quest-experience:${questExperienceOpen}:journey-questionnaire:${journeyQuestionnaireOpen}`;
 
   const resetViewport = useCallback(() => {
+    if (route.kind === 'dashboard') {
+      contentRef.current?.scrollToEnd({ animated: false });
+      return;
+    }
     contentRef.current?.scrollTo({ x: 0, y: 0, animated: false });
-  }, []);
+  }, [route.kind]);
 
   useEffect(() => {
     Keyboard.dismiss();
@@ -690,16 +697,6 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   }, [activeAttemptId, resetViewport]);
 
   useEffect(() => setActiveCheckIn(null), [props.creatureId]);
-
-  useEffect(() => {
-    setHasShownHome(false);
-  }, [props.creatureId]);
-
-  useEffect(() => {
-    if (route.kind === 'dashboard' && !hasShownHome) {
-      setHasShownHome(true);
-    }
-  }, [hasShownHome, route.kind]);
 
   const hasActiveIdealSkinQuestionnaire = Boolean(
     idealSkinDefinitionId
@@ -827,6 +824,11 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     (journeyQuestionnaireOpen && props.journeyDefinition) ||
     (checkInOpen && activeCheckIn)
   );
+  const environmentPan = useCompanionEnvironmentPan({
+    activeKey: `${props.creatureId}:${props.homeEnvironmentKey ?? 'none'}`,
+    enabled: props.active !== false && !questGameVisible && !questionnaireExperience && Boolean(props.homeEnvironmentKey),
+    visualKey: props.visualKey,
+  });
   useEffect(() => {
     onExperienceActiveChange?.(Boolean(activeAttemptId));
     return () => onExperienceActiveChange?.(false);
@@ -1072,7 +1074,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       )
     : null;
 
-  return (<>
+  return (
+    <ExplorationEnvironmentProgressionProvider stage={props.homeEnvironmentStage ?? null}>
+      <>
         <CompanionSheetShell
           background={props.questionnaireBackground}
           fullBleed
@@ -1081,6 +1085,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           portal={!props.embedded}
           showClose={false}
           surface={questGameVisible ? 'night' : 'parchment'}>
+        <GestureDetector gesture={environmentPan.gesture}>
+        <View style={styles.environmentPanFrame}>
         {questGameVisible ? (
           <CompanionGameBackdrop
             backgroundKey={props.homeEnvironmentKey ?? null}
@@ -1098,17 +1104,19 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             celebrate={Boolean((route.kind === 'visit' || route.kind === 'conversation') && conversationExperience?.session.outcomePresentation?.celebrate)}
             creature={visual.source}
             creatureTargetRef={creatureRewardTargetRef}
-            enterFromLifted={(route.kind === 'visit' || route.kind === 'conversation') && hasShownHome}
             environmentKey={props.homeEnvironmentKey ?? null}
+            houseLevel={props.houseLevel}
             lifted
             name={props.name}
             onBackgroundReady={() => setTransitionBackgroundReady(true)}
             onCreatureReady={() => setTransitionCreatureReady(true)}
             rewardPulseKey={rewardPulseKey}
+            sceneTranslateX={environmentPan.translateX}
             onSpeechBubblePress={conversationExperience && conversationFlow.phase !== 'awaiting_choice' && conversationFlow.phase !== 'committing'
               ? conversationFlow.advance
               : undefined}
             showSpeechBubble
+            showNameplate={route.kind === 'dashboard'}
             title={quickGoalPickerOpen
               ? 'Which small step feels right?'
               : route.kind === 'chat_lobby'
@@ -1256,6 +1264,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         {(route.kind === 'destination' || route.kind === 'dashboard' || route.kind === 'shared_history' || quickGoalPickerOpen) && !questGameVisible && !questionnaireExperience ? (
           <CompanionDestinationHeader
             backLabel={quickGoalPickerOpen ? 'Goals' : destination === 'quest' && canReturnToQuestList ? 'Quest list' : route.kind === 'dashboard' ? 'Kingdom' : 'Dashboard'}
+            bondProgress={route.kind === 'dashboard' ? displayedBondProgress : undefined}
+            compactHub={route.kind === 'dashboard'}
             label={route.kind === 'dashboard' ? 'Dashboard' : route.kind === 'shared_history' ? props.familyId === 'feastle' ? 'Recipe Book' : 'Shared history' : destinationLabel}
             titleTone={destination === 'achievements' ? 'gold' : 'default'}
             onBack={
@@ -1292,6 +1302,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             bounces={!activeAttemptId}
             contentContainerStyle={[
               styles.scrollContent,
+              route.kind === 'dashboard' && styles.dashboardScrollContent,
+              route.kind === 'dashboard' && { paddingBottom: Math.max(12, insets.bottom + 8) },
               activeAttemptId && styles.activeScrollContent,
               questionnaireExperience && [
                 styles.questionnaireScrollContent,
@@ -1299,8 +1311,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             ]}
             contentInsetAdjustmentBehavior="never"
             keyboardShouldPersistTaps="handled"
-            onContentSizeChange={activeAttemptId ? resetViewport : undefined}
-            onLayout={activeAttemptId ? resetViewport : undefined}
+            onContentSizeChange={activeAttemptId || route.kind === 'dashboard' ? resetViewport : undefined}
+            onLayout={activeAttemptId || route.kind === 'dashboard' ? resetViewport : undefined}
             overScrollMode={activeAttemptId ? 'never' : 'auto'}
             scrollEnabled={!activeAttemptId && !questionnaireExperience}
             showsVerticalScrollIndicator={false}>
@@ -1308,13 +1320,20 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               key={destination ?? route.kind}
               entering={entering}
               exiting={FadeOut.duration(100)}
-              style={activeAttemptId || questionnaireExperience ? styles.activeExperience : undefined}>
+              style={[
+                activeAttemptId || questionnaireExperience ? styles.activeExperience : undefined,
+                route.kind === 'dashboard' && styles.dashboardExperience,
+              ]}>
               {(route.kind === 'destination' || route.kind === 'dashboard' || route.kind === 'shared_history' || quickGoalPickerOpen) && !questionnaireExperience ? (
                 <View
                   accessibilityElementsHidden
                   pointerEvents="none"
                   style={[
                     styles.destinationStageSpacer,
+                    route.kind === 'dashboard' && {
+                      minHeight: companionHubHeroSpacer(viewportHeight),
+                    },
+                    route.kind === 'dashboard' && styles.dashboardStageSpacer,
                     destination === 'quest' && {
                       minHeight: companionQuestListSpacer(viewportHeight),
                     },
@@ -1735,15 +1754,23 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             to={bondReward.to}
           />
         ) : null}
+        </View>
+        </GestureDetector>
         </CompanionSheetShell>
-  </>);
+      </>
+    </ExplorationEnvironmentProgressionProvider>
+  );
 }
 
 const styles = StyleSheet.create({
+  environmentPanFrame: { flex: 1, minHeight: 0 },
   contentFrame: { flex: 1, minHeight: 0 },
   destinationStageSpacer: { minHeight: 244 },
   youStageSpacer: { minHeight: 188 },
   scrollContent: { paddingBottom: 12, paddingHorizontal: 4 },
+  dashboardScrollContent: { flexGrow: 1 },
+  dashboardExperience: { flexGrow: 1 },
+  dashboardStageSpacer: { flexGrow: 1 },
   activeScrollContent: { flexGrow: 1, paddingBottom: 0, paddingHorizontal: 0 },
   questionnaireScrollContent: { flexGrow: 1, paddingHorizontal: 0 },
   activeExperience: { flex: 1 },

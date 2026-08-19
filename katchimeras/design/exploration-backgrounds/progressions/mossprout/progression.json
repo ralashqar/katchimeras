@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "character": "mossprout",
+  "canonicalSize": 2048,
+  "runtimeSizes": [2048, 1024],
+  "webpQuality": 88,
+  "stages": [
+    { "id": 0, "level": 1, "name": "Forgotten Clearing", "source": "stage-0-source.png", "cropCenter": [0.5, 0.54] },
+    { "id": 1, "level": 2, "name": "First Garden", "source": "stage-1-source.png", "cropCenter": [0.5, 0.5] },
+    { "id": 2, "level": 3, "name": "Garden Nook", "source": "stage-2-source.png", "cropCenter": [0.5, 0.5] },
+    { "id": 3, "level": 4, "name": "Flourishing Woodland", "source": "stage-3-source.png", "cropCenter": [0.5, 0.5] },
+    { "id": 4, "level": 5, "name": "Heart of the Grove", "source": "stage-4-source.png", "cropCenter": [0.5, 0.52] }
+  ]
+}

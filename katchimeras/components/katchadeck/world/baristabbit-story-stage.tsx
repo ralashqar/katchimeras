@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 
-import { CompanionMergeRequestTray } from '@/components/katchadeck/world/companion-merge-request-tray';
+import { COMPANION_MERGE_REQUEST_PALETTE, CompanionMergeRequestTray } from '@/components/katchadeck/world/companion-merge-request-tray';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { KatchaUI } from '@/constants/katcha-ui';
 import { BARISTABBIT_CHAPTER_ONE_ORDER_POOL } from '@/utils/companion-story';
 import { beginBaristabbitReturn, loadBaristabbitStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
 
@@ -23,14 +24,15 @@ export function BaristabbitStoryStage({ onBegin, onJournal, onMore, onOpenConver
   const regularProgress = story.orderDeck?.servedOrderIds.filter((id) => id.startsWith('merge-story:baristabbit:chapter-1:')).length ?? 0;
   const requests = story.status === 'order_active'
     ? story.actPhase === 'signature_order'
-      ? [{ title: 'The Pause Table', description: 'A warm ritual, a bright reset, and an optional sweet pairing.', definitionId: 'drink:hot:5' }]
+      ? [{ title: 'The Pause Table', description: 'A warm ritual, a bright reset, and an optional sweet pairing.', definitionId: 'drink:hot:5', served: false }]
       : (story.orderDeck?.templateKeys ?? []).flatMap((key) => {
           const order = BARISTABBIT_CHAPTER_ONE_ORDER_POOL.find((item) => item.key === key);
-          return order && !story.orderDeck?.servedOrderIds.includes(`merge-story:baristabbit:chapter-1:${key}`)
-            ? [{ title: order.title, description: order.description, definitionId: order.definitionId }]
+          return order
+            ? [{ title: order.title, description: order.description, definitionId: order.definitionId, served: story.orderDeck?.servedOrderIds.includes(`merge-story:baristabbit:chapter-1:${key}`) ?? false }]
             : [];
-        }).slice(0, 3)
+        })
     : [];
+  const orderBody = requests.length > 1 ? 'Make and serve these orders.' : 'Make and serve this order.';
   const title = complete
     ? 'The Pause Table is remembered'
     : returnReady
@@ -52,52 +54,52 @@ export function BaristabbitStoryStage({ onBegin, onJournal, onMore, onOpenConver
 
   return <Animated.View entering={FadeInUp.duration(220)} style={styles.stage}>
     <View style={styles.heading}>
-      <View style={styles.level}><ThemedText selectable style={styles.levelText} lightColor="#FFF9EC" darkColor="#FFF9EC">{story.currentLevel}</ThemedText></View>
+      <View style={styles.level}><ThemedText selectable style={styles.levelText} lightColor={KatchaUI.companionScenePanel.accentInk} darkColor={KatchaUI.companionScenePanel.accentInk}>{story.currentLevel}</ThemedText></View>
       <View style={styles.copy}>
-        <ThemedText selectable style={styles.eyebrow} lightColor="#805637" darkColor="#805637">THE PAUSE TABLE</ThemedText>
-        <ThemedText selectable style={styles.title} lightColor="#35271F" darkColor="#35271F">{title}</ThemedText>
+        <ThemedText selectable style={styles.eyebrow} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>THE PAUSE TABLE</ThemedText>
+        <ThemedText selectable style={styles.title} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>{title}</ThemedText>
       </View>
     </View>
-    <ThemedText selectable style={styles.body} lightColor="#655044" darkColor="#655044">{body}</ThemedText>
+    <ThemedText numberOfLines={2} selectable style={styles.body} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{requests.length ? orderBody : body}</ThemedText>
     {returnReady && story.pendingBondPoints > 0 ? <View accessibilityLabel={`${story.pendingBondPoints} Bond earned from the tray`} style={styles.bondSummary}>
-      <IconSymbol color="#FFF9E9" name="heart.fill" size={15} />
-      <ThemedText selectable style={styles.bondSummaryText} lightColor="#FFF9E9" darkColor="#FFF9E9">+{story.pendingBondPoints} Bond from the counter</ThemedText>
+      <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name="heart.fill" size={15} />
+      <ThemedText selectable style={styles.bondSummaryText} lightColor={KatchaUI.companionScenePanel.accentInk} darkColor={KatchaUI.companionScenePanel.accentInk}>+{story.pendingBondPoints} Bond from the counter</ThemedText>
     </View> : null}
     <CompanionMergeRequestTray
       accessibilityLabel="Baristabbit's requested merge items"
       eyebrow="ON THE COUNTER"
-      palette={{ trayBackground: 'rgba(255,255,255,0.55)', trayBorder: 'rgba(119,76,46,0.2)', rowBackground: '#FFF9EF', eyebrow: '#805637', count: '#6A503F', title: '#35271F', description: '#6B594D', item: '#745947', badgeBackground: '#70482E', badgeText: '#FFF9E9' }}
-      requests={requests.map((request) => ({ id: request.title, title: request.title, description: request.description, definitionIds: [request.definitionId] }))}
+      palette={COMPANION_MERGE_REQUEST_PALETTE}
+      requests={requests.map((request) => ({ id: request.title, title: request.title, description: request.description, definitionIds: [request.definitionId], served: request.served }))}
     />
     {!complete ? <Pressable accessibilityRole="button" onPress={() => {
       if (returnReady && story.pendingConversationId) { beginBaristabbitReturn(); onOpenConversation(story.pendingConversationId); }
       else if (needsBeginning) onBegin();
       else onOpenMerge(story.activeOrderId);
     }} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
-      <IconSymbol color="#FFF9E9" name={returnReady ? 'bubble.left.and.bubble.right.fill' : 'cup.and.saucer.fill'} size={19} />
-      <ThemedText style={styles.primaryLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">{returnReady ? 'Read Baristabbit’s note' : needsBeginning ? 'Meet Baristabbit' : requests.length > 1 ? 'Open all orders' : 'Make the request'}</ThemedText>
-      <IconSymbol color="#FFF9E9" name="arrow.right" size={17} />
+      <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name={returnReady ? 'bubble.left.and.bubble.right.fill' : 'cup.and.saucer.fill'} size={19} />
+      <ThemedText style={styles.primaryLabel} lightColor={KatchaUI.companionScenePanel.accentInk} darkColor={KatchaUI.companionScenePanel.accentInk}>{returnReady ? 'Read Baristabbit’s note' : needsBeginning ? 'Meet Baristabbit' : requests.length > 1 ? 'Open all orders' : 'Make the request'}</ThemedText>
+      <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name="arrow.right" size={17} />
     </Pressable> : <Pressable accessibilityRole="button" onPress={onMore} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
-      <IconSymbol color="#FFF9E9" name="bubble.left.and.bubble.right.fill" size={19} />
-      <ThemedText style={styles.primaryLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">More with Baristabbit</ThemedText>
-      <IconSymbol color="#FFF9E9" name="arrow.right" size={17} />
+      <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name="bubble.left.and.bubble.right.fill" size={19} />
+      <ThemedText style={styles.primaryLabel} lightColor={KatchaUI.companionScenePanel.accentInk} darkColor={KatchaUI.companionScenePanel.accentInk}>More with Baristabbit</ThemedText>
+      <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name="arrow.right" size={17} />
     </Pressable>}
     {!needsBeginning ? <Pressable accessibilityRole="button" onPress={onJournal} style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
-      <View style={styles.secondaryCopy}><IconSymbol color="#70482E" name="book.closed.fill" size={17} /><ThemedText style={styles.secondaryLabel} lightColor="#70482E" darkColor="#70482E">Journal a drink pause</ThemedText></View>
-      <IconSymbol color="#70482E" name="arrow.right" size={15} />
+      <View style={styles.secondaryCopy}><IconSymbol color={KatchaUI.companionScenePanel.inkSoft} name="book.closed.fill" size={17} /><ThemedText style={styles.secondaryLabel} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>Journal a drink pause</ThemedText></View>
+      <IconSymbol color={KatchaUI.companionScenePanel.inkSoft} name="arrow.right" size={15} />
     </Pressable> : null}
   </Animated.View>;
 }
 
 const styles = StyleSheet.create({
-  stage: { backgroundColor: '#FFF1DD', borderColor: 'rgba(119,76,46,0.28)', borderCurve: 'continuous', borderRadius: 28, borderWidth: 1, boxShadow: '0 12px 28px rgba(73,45,28,0.16)', gap: 14, padding: 18 },
+  stage: { backgroundColor: KatchaUI.companionScenePanel.background, borderColor: KatchaUI.companionScenePanel.border, borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, boxShadow: KatchaUI.companionScenePanel.shadow, gap: 7, padding: 10 },
   heading: { alignItems: 'center', flexDirection: 'row', gap: 12 },
-  level: { alignItems: 'center', backgroundColor: '#87573A', borderRadius: 18, height: 48, justifyContent: 'center', width: 48 },
-  levelText: { fontSize: 20, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  level: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.accent, borderRadius: 14, height: 40, justifyContent: 'center', width: 40 },
+  levelText: { fontSize: 17, fontWeight: '900', fontVariant: ['tabular-nums'] },
   copy: { flex: 1, gap: 2 }, eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 },
-  title: { fontSize: 21, fontWeight: '900', letterSpacing: -0.35, lineHeight: 25 }, body: { fontSize: 13.5, lineHeight: 20 },
-  bondSummary: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: '#718C58', borderCurve: 'continuous', borderRadius: 999, flexDirection: 'row', gap: 7, minHeight: 34, paddingHorizontal: 12 },
+  title: { fontSize: 18, fontWeight: '900', letterSpacing: -0.25, lineHeight: 22 }, body: { fontSize: 12, lineHeight: 17 },
+  bondSummary: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: KatchaUI.companionScenePanel.accent, borderCurve: 'continuous', borderRadius: 999, flexDirection: 'row', gap: 7, minHeight: 34, paddingHorizontal: 12 },
   bondSummaryText: { fontSize: 11.5, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  primary: { alignItems: 'center', backgroundColor: '#70482E', borderCurve: 'continuous', borderRadius: 19, flexDirection: 'row', gap: 10, minHeight: 54, paddingHorizontal: 15 }, primaryLabel: { flex: 1, fontSize: 15, fontWeight: '900' },
-  secondary: { alignItems: 'center', borderRadius: 17, flexDirection: 'row', justifyContent: 'space-between', minHeight: 46, paddingHorizontal: 13 }, secondaryCopy: { alignItems: 'center', flexDirection: 'row', gap: 9 }, secondaryLabel: { fontSize: 13, fontWeight: '900' }, pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
+  primary: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.accent, borderCurve: 'continuous', borderRadius: 15, flexDirection: 'row', gap: 8, minHeight: 43, paddingHorizontal: 12 }, primaryLabel: { flex: 1, fontSize: 13, fontWeight: '900' },
+  secondary: { alignItems: 'center', borderRadius: 14, flexDirection: 'row', justifyContent: 'space-between', minHeight: 36, paddingHorizontal: 10 }, secondaryCopy: { alignItems: 'center', flexDirection: 'row', gap: 7 }, secondaryLabel: { fontSize: 11, fontWeight: '900' }, pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
 });

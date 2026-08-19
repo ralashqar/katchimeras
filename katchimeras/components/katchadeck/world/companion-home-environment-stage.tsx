@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { memo, useEffect, type RefObject } from 'react';
 import { StyleSheet, useWindowDimensions, View, type View as ViewType } from 'react-native';
-import Animated, { cancelAnimation, Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { cancelAnimation, Easing, type SharedValue, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
 import { TodayExplorationBackground } from '@/components/katchadeck/home/today-exploration-background';
@@ -20,6 +20,7 @@ export const CompanionHomeEnvironmentStage = memo(
     onBackgroundReady,
     onCreatureReady,
     rewardPulseKey = 0,
+    sceneTranslateX,
     visualKey,
   }: {
     backgroundKey: TodayExplorationBackgroundKey | null;
@@ -30,6 +31,7 @@ export const CompanionHomeEnvironmentStage = memo(
     onBackgroundReady?: () => void;
     onCreatureReady?: () => void;
     rewardPulseKey?: number;
+    sceneTranslateX?: SharedValue<number>;
     visualKey: HomeVisualKey;
   }) {
     const { height, width } = useWindowDimensions();
@@ -37,12 +39,12 @@ export const CompanionHomeEnvironmentStage = memo(
     const feedback = useSharedValue(0);
     const shake = useSharedValue(0);
     const layout = companionHomeStageLayout(width, height, visualKey);
-    const stageTransform = {
+    const stageTransform = useAnimatedStyle(() => ({
       transform: [
-        { translateX: layout.translateX },
+        { translateX: layout.translateX + (sceneTranslateX?.value ?? 0) },
         { translateY: layout.translateY },
       ],
-    } as const;
+    }));
     const showBackground = layer === 'background' || layer === 'both';
     const showCreature = layer === 'creature' || layer === 'both';
     useEffect(() => {
@@ -84,16 +86,16 @@ export const CompanionHomeEnvironmentStage = memo(
           showCreature && !showBackground && styles.creatureLayerRoot,
         ]}>
         {showBackground && backgroundKey ? (
-          <View style={[styles.backgroundPlane, stageTransform]}>
+          <Animated.View style={[styles.backgroundPlane, stageTransform]}>
             <TodayExplorationBackground
               backgroundKey={backgroundKey}
               imageSize={layout.backgroundImageSize}
               onLoad={onBackgroundReady}
             />
-          </View>
+          </Animated.View>
         ) : null}
 
-        {showCreature ? <View style={[styles.creaturePlane, stageTransform]}>
+        {showCreature ? <Animated.View style={[styles.creaturePlane, stageTransform]}>
           <Animated.View
             collapsable={false}
             ref={creatureTargetRef}
@@ -109,6 +111,7 @@ export const CompanionHomeEnvironmentStage = memo(
             <Animated.View style={[styles.rewardGlow, glowStyle]} />
             <CreatureGroundShadow
               frameSize={layout.creatureFrame.size}
+              stage="grown"
               visualKey={visualKey}
             />
             <Image
@@ -122,7 +125,7 @@ export const CompanionHomeEnvironmentStage = memo(
               transition={0}
             />
           </Animated.View>
-        </View> : null}
+        </Animated.View> : null}
       </View>
     );
   },

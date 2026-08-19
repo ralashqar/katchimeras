@@ -51,9 +51,10 @@
       "Every important feature must remain readable at 256 pixels."
     ],
     "persistentLandmarks": [
-      "The sprout grows into the signature tree at rear-center without changing its anchor position.",
-      "The damp rear-right garden patch becomes the pond and remains rear-right.",
-      "The resting nook develops at rear-left.",
+      "The unfinished twig-and-leaf shelter at rear-left matures in place into the signature enchanted leaf home.",
+      "The simple pond remains anchored at left while its water and planting become richer.",
+      "The stump seat and two botanical lanterns remain anchored at rear-right.",
+      "The same moss-capped rocks persist while their moss and flowers mature.",
       "The small lower-center character standing patch remains open at every stage."
     ],
     "exclude": [
@@ -84,8 +85,8 @@
       "name": "Forgotten Clearing",
       "narrative": "Mossprout has only just arrived.",
       "floor": "Broad warm bare-soil masses cover most of the floor, broken by sparse muted moss with no granular texture.",
-      "landmark": "One tiny pale-green sprout at rear-center.",
-      "props": ["two or three large rounded rocks at rear-left", "one simple worn watering can at rear-right"],
+      "landmark": "An unfinished low twig-and-loose-leaf shelter frame at rear-left.",
+      "props": ["a shallow simple pond at left", "a plain low stump at rear-right", "unfinished lantern stakes", "sparse sprouts and moss-capped rocks"],
       "palette": ["muted moss", "olive", "warm ochre", "soft umber"],
       "lighting": "Soft neutral daylight.",
       "density": "Very sparse and visibly incomplete."
@@ -96,8 +97,8 @@
       "name": "First Garden",
       "narrative": "The player helps Mossprout establish somewhere to grow.",
       "floor": "Warm earth still covers much of the floor while larger healthy moss patches begin reconnecting.",
-      "landmark": "The same rear-center sprout is larger beside one low curved garden bed.",
-      "props": ["three or four oversized simple flowers", "the restored rounded watering can"],
+      "landmark": "The same rear-left shelter has a stable arched twig frame and one incomplete layer of broad leaves.",
+      "props": ["the same tidier pond", "the plain usable stump seat", "two simple warm seed-pod lanterns", "young fern clusters"],
       "palette": ["moss green", "leaf green", "pale lime", "warm ochre"],
       "lighting": "Soft filtered daylight.",
       "density": "Modest beginner garden with large readable shapes."
@@ -108,8 +109,8 @@
       "name": "Garden Nook",
       "narrative": "Mossprout begins treating the place as home.",
       "floor": "Healthy lawn and moss cover most of the floor while two or three broad earth remnants remain.",
-      "landmark": "The same sprout continues growing; a simple rounded pond forms from the rear-right damp patch.",
-      "props": ["one chunky rounded log bench at rear-left", "three broad pond-edge stones", "two or three large fern masses"],
+      "landmark": "The same rear-left shelter is now a complete established layered-leaf home.",
+      "props": ["the same clean blue pond at left", "the established rounded stump chair at rear-right", "two warm lanterns", "several broad fern masses"],
       "palette": ["moss green", "leaf green", "soft pond blue", "honey wood"],
       "lighting": "Soft warm daylight after rain.",
       "density": "Clearly established but uncluttered."
@@ -120,8 +121,8 @@
       "name": "Flourishing Woodland",
       "narrative": "Mossprout helps the surrounding clearing come back to life.",
       "floor": "Rich continuous forest moss with a calm middle and the small lower standing patch kept clear.",
-      "landmark": "The rear-center sprout has become a small tree with three or four cloud-like foliage masses; the rear-right pond is broader.",
-      "props": ["the established rear-left resting nook", "one large mushroom cluster", "two chunky warm garden lanterns"],
+      "landmark": "The same rear-left leaf home flourishes with fuller leaves, modest vines, and a few flower buds.",
+      "props": ["two lily pads in the same left pond", "a moss-cushioned stump chair", "two vine-wrapped botanical lanterns", "richer ferns and mossy rocks"],
       "palette": ["emerald", "olive", "pale lime", "pond blue", "warm amber"],
       "lighting": "Filtered woodland daylight with restrained warm lantern light.",
       "density": "Rich and flourishing, using only a few large forms."
@@ -131,9 +132,9 @@
       "key": "mossprout_haven_stage_4",
       "name": "Enchanted Grove",
       "narrative": "Mossprout's home reaches its definitive magical form.",
-      "floor": "Deep smooth forest moss with a luminous rear-right pond and the small lower standing patch kept clear.",
-      "landmark": "The same rear-center tree is now a signature ancient magical tree with a smooth broad trunk, root hollow, and five to seven large cloud-like foliage masses.",
-      "props": ["the resolved rear-left resting nook", "two chunky lanterns", "a few oversized luminous plants around the pond"],
+      "floor": "Deep smooth forest moss with the luminous left pond and the small lower standing patch kept clear.",
+      "landmark": "The same rear-left shelter is now the signature enchanted leaf home with restrained flowers, vines, and warm hanging lights.",
+      "props": ["the same luminous lily pond at left", "the resolved moss-cushioned stump chair", "two polished botanical lanterns", "mature mossy rocks and luminous perimeter plants"],
       "palette": ["deep emerald", "olive", "mint glow", "pond blue", "warm amber"],
       "lighting": "Soft woodland daylight with restrained mint magic and warm amber accents.",
       "density": "Definitive landmark composition without micro-detail."

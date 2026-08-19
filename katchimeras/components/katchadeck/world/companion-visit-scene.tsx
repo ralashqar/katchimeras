@@ -46,20 +46,11 @@ export function CompanionVisitScene({
   };
 
   return (
-    <ScrollView
-      bounces={false}
-      contentContainerStyle={[
-        styles.content,
-        {
-          minHeight: height,
-          paddingBottom: insets.bottom + 24,
-          paddingHorizontal: tablet ? Math.max(28, (width - 720) / 2) : 20,
-          paddingTop: insets.top + 12,
-        },
-      ]}
-      contentInsetAdjustmentBehavior="never"
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}>
+    <View style={[styles.content, {
+      paddingBottom: insets.bottom + 10,
+      paddingHorizontal: tablet ? Math.max(28, (width - 720) / 2) : 16,
+      paddingTop: insets.top + 10,
+    }]}>
       <View style={styles.topBar}>
         <KatchimeraBackButton accessibilityLabel="Back to Katchimeras" onPress={onClose} />
         <ThemedText
@@ -81,25 +72,31 @@ export function CompanionVisitScene({
         </Pressable>
       </View>
 
-      <View accessibilityElementsHidden pointerEvents="none" style={{ minHeight: companionHomeHeroSpacer(height) }} />
+      <View accessibilityElementsHidden pointerEvents="none" style={{ flex: 1, minHeight: companionHomeHeroSpacer(height) }} />
 
       <Animated.View
         entering={reduceMotion ? undefined : FadeInUp.duration(240)}
-        style={styles.panel}>
+        style={[styles.panel, { height: Math.min(440, Math.max(220, height * 0.46)) }]}>
+        <ScrollView
+          bounces
+          contentContainerStyle={styles.panelContent}
+          contentInsetAdjustmentBehavior="never"
+          nestedScrollEnabled
+          showsVerticalScrollIndicator={false}>
         <View style={styles.eyebrowRow}>
-          <ThemedText selectable style={styles.eyebrow} lightColor="#806126" darkColor="#806126">
+          <ThemedText selectable style={styles.eyebrow} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>
             {completed ? 'VISIT COMPLETE' : plan.eyebrow}
           </ThemedText>
           <View style={styles.bondPill}>
-            <IconSymbol color="#A16A45" name="heart.fill" size={12} />
-            <ThemedText style={styles.bondLabel} lightColor="#6B4B2C" darkColor="#6B4B2C">
+            <IconSymbol color={KatchaUI.companionScenePanel.accent} name="heart.fill" size={12} />
+            <ThemedText style={styles.bondLabel} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>
               {bondProgress.label}
             </ThemedText>
           </View>
         </View>
 
         {plan.helperText ? (
-          <ThemedText selectable style={styles.helper} lightColor="#6E5B48" darkColor="#6E5B48">
+          <ThemedText selectable style={styles.helper} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>
             {plan.helperText}
           </ThemedText>
         ) : null}
@@ -119,11 +116,11 @@ export function CompanionVisitScene({
                 <ThemedText
                   selectable
                   style={styles.responseLabel}
-                  lightColor="#3B2C20"
-                  darkColor="#3B2C20">
+                  lightColor={KatchaUI.companionScenePanel.ink}
+                  darkColor={KatchaUI.companionScenePanel.ink}>
                   {response.label}
                 </ThemedText>
-                <IconSymbol color="#806040" name="chevron.right" size={15} />
+                <IconSymbol color={KatchaUI.companionScenePanel.accent} name="chevron.right" size={15} />
               </Pressable>
             ))}
             {secondaryResponses.length ? (
@@ -134,7 +131,7 @@ export function CompanionVisitScene({
                     key={response.id}
                     onPress={() => respond(response)}
                     style={({ pressed }) => [styles.secondaryResponse, pressed && styles.pressed]}>
-                    <ThemedText style={styles.secondaryLabel} lightColor="#725A40" darkColor="#725A40">
+                    <ThemedText style={styles.secondaryLabel} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>
                       {response.label}
                     </ThemedText>
                   </Pressable>
@@ -147,7 +144,7 @@ export function CompanionVisitScene({
             <View style={styles.keptIcon}>
               <IconSymbol color="#FFF8E7" name="checkmark" size={17} weight="bold" />
             </View>
-            <ThemedText selectable style={styles.keptText} lightColor="#5D4B37" darkColor="#5D4B37">
+            <ThemedText selectable style={styles.keptText} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>
               {completionKind === 'deferred'
                 ? 'Nothing was added to memory. You can return whenever it suits you.'
                 : completionKind === 'quiet'
@@ -165,12 +162,12 @@ export function CompanionVisitScene({
             accessibilityRole="button"
             onPress={onOpenHistory}
             style={({ pressed }) => [styles.utility, pressed && styles.pressed]}>
-            <IconSymbol color="#795A34" name="clock.arrow.circlepath" size={17} />
-            <ThemedText style={styles.utilityLabel} lightColor="#4A3725" darkColor="#4A3725">
+            <IconSymbol color={KatchaUI.companionScenePanel.accent} name="clock.arrow.circlepath" size={17} />
+            <ThemedText style={styles.utilityLabel} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>
               Shared history
             </ThemedText>
             {memoryCount ? (
-              <ThemedText style={styles.count} lightColor="#806126" darkColor="#806126">
+              <ThemedText style={styles.count} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>
                 {memoryCount}
               </ThemedText>
             ) : null}
@@ -179,41 +176,43 @@ export function CompanionVisitScene({
             accessibilityRole="button"
             onPress={onOpenMore}
             style={({ pressed }) => [styles.utility, pressed && styles.pressed]}>
-            <IconSymbol color="#795A34" name="square.grid.2x2.fill" size={17} />
-            <ThemedText style={styles.utilityLabel} lightColor="#4A3725" darkColor="#4A3725">
+            <IconSymbol color={KatchaUI.companionScenePanel.accent} name="square.grid.2x2.fill" size={17} />
+            <ThemedText style={styles.utilityLabel} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>
               More
             </ThemedText>
           </Pressable>
         </View>
+        </ScrollView>
       </Animated.View>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { flexGrow: 1, gap: 12, position: 'relative' },
+  content: { flex: 1, gap: 10, minHeight: 0, position: 'relative' },
   topBar: { alignItems: 'center', flexDirection: 'row', minHeight: 48, position: 'relative', zIndex: 4 },
   name: { ...KatchaUI.type.companionName, flex: 1, paddingHorizontal: 12, textAlign: 'center' },
   topAction: { alignItems: 'center', height: 44, justifyContent: 'center', width: 44 },
   panel: {
-    backgroundColor: KatchaUI.companionPanel.background,
-    borderColor: KatchaUI.companionPanel.border,
+    backgroundColor: KatchaUI.companionScenePanel.background,
+    borderColor: KatchaUI.companionScenePanel.border,
     borderCurve: 'continuous',
     borderRadius: 30,
     borderWidth: 1,
-    boxShadow: KatchaUI.companionPanel.shadow,
-    gap: 14,
-    padding: 16,
+    boxShadow: KatchaUI.companionScenePanel.shadow,
+    minHeight: 0,
+    overflow: 'hidden',
   },
+  panelContent: { flexGrow: 1, gap: 12, padding: 14 },
   eyebrowRow: { alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'space-between' },
   eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.25 },
-  bondPill: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.48)', borderRadius: 999, flexDirection: 'row', gap: 5, paddingHorizontal: 9, paddingVertical: 6 },
+  bondPill: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.softBackground, borderRadius: 999, flexDirection: 'row', gap: 5, paddingHorizontal: 9, paddingVertical: 6 },
   bondLabel: { fontSize: 11, fontWeight: '800' },
   helper: { fontSize: 14, lineHeight: 20 },
   responses: { gap: 9 },
   response: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.52)',
+    backgroundColor: KatchaUI.companionScenePanel.cardBackground,
     borderColor: 'rgba(109,78,43,0.14)',
     borderCurve: 'continuous',
     borderRadius: 18,
@@ -225,16 +224,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 10,
   },
-  responsePrimary: { backgroundColor: '#FFF5D8', borderColor: 'rgba(168,117,47,0.28)' },
+  responsePrimary: { backgroundColor: KatchaUI.companionScenePanel.cardSelected, borderColor: 'rgba(242,197,87,0.42)' },
   responseLabel: { flex: 1, fontSize: 15, fontWeight: '800', lineHeight: 20 },
   secondaryResponses: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', paddingTop: 2 },
   secondaryResponse: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
   secondaryLabel: { fontSize: 12, fontWeight: '800' },
-  keptRow: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.48)', borderRadius: 18, flexDirection: 'row', gap: 11, padding: 13 },
+  keptRow: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.softBackground, borderRadius: 18, flexDirection: 'row', gap: 11, padding: 13 },
   keptIcon: { alignItems: 'center', backgroundColor: '#75A987', borderRadius: 999, height: 30, justifyContent: 'center', width: 30 },
   keptText: { flex: 1, fontSize: 13, lineHeight: 18 },
   utilityRow: { flexDirection: 'row', gap: 8 },
-  utility: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 16, flex: 1, flexDirection: 'row', gap: 7, minHeight: 44, paddingHorizontal: 11 },
+  utility: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.softBackground, borderRadius: 16, flex: 1, flexDirection: 'row', gap: 7, minHeight: 44, paddingHorizontal: 11 },
   utilityLabel: { flex: 1, fontSize: 12, fontWeight: '800' },
   count: { fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '900' },
   pressed: { opacity: 0.72, transform: [{ scale: 0.985 }] },

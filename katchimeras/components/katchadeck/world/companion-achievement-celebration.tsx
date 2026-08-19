@@ -34,7 +34,7 @@ export function CompanionAchievementCelebration({ achievements, onAchievementSee
   const items = orderAchievementCelebrationQueue(achievements).flatMap((achievement): RewardSplashItem[] => {
     const family = katchimeraFamilyById.get(achievement.familyId);
     if (!family) return [];
-    const companionSource = family.anchorVisualKey ? getCreatureVisual(family.anchorVisualKey).source : null;
+    const companionSource = family.anchorVisualKey ? getCreatureVisual(family.anchorVisualKey, 'grown').source : null;
     return [{
       id: achievement.id,
       eyebrow: 'Achievement unlocked',

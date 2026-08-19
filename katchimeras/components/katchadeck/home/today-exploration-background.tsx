@@ -16,6 +16,8 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import todayScene from '@/data/today-scene.json';
+import { useExplorationEnvironmentProgressionStage } from '@/components/katchadeck/home/exploration-environment-progression-context';
+import { EXPLORATION_ENVIRONMENT_PROGRESSION_SOURCES } from '@/constants/exploration-environment-progression-sources';
 import {
   resolveTodayExplorationDragTranslation,
   resolveTodayExplorationSwipeDirection,
@@ -287,6 +289,7 @@ export function useTodayExplorationBackgroundMotion({
 export function TodayExplorationBackground({
   backgroundKey,
   contentFit = 'fill',
+  environmentStage,
   imageSize,
   onLoad,
   translateX,
@@ -294,13 +297,30 @@ export function TodayExplorationBackground({
 }: {
   backgroundKey: TodayExplorationBackgroundKey;
   contentFit?: 'cover' | 'fill';
+  environmentStage?: number | null;
   imageSize: number;
   onLoad?: () => void;
   translateX?: SharedValue<number>;
   verticalOffset?: number;
 }) {
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
-  const background = TODAY_EXPLORATION_BACKGROUND_SOURCES[backgroundKey];
+  const inheritedEnvironmentStage = useExplorationEnvironmentProgressionStage();
+  const selectedEnvironmentStage = environmentStage ?? inheritedEnvironmentStage;
+  const progression = backgroundKey === 'home'
+    ? undefined
+    : EXPLORATION_ENVIRONMENT_PROGRESSION_SOURCES[backgroundKey];
+  const progressionStage = selectedEnvironmentStage != null && progression && progression.length > 0
+    ? Math.max(0, Math.min(progression.length - 1, Math.round(selectedEnvironmentStage)))
+    : null;
+  const progressionSource = progressionStage == null || !progression
+    ? null
+    : progression[progressionStage];
+  const background = progressionSource
+    ? {
+        recyclingKey: `today-${backgroundKey}-exploration-stage-${progressionStage}-${imageSize > 1100 ? 'full' : 'medium'}`,
+        source: imageSize > 1100 ? progressionSource.full : progressionSource.medium,
+      }
+    : TODAY_EXPLORATION_BACKGROUND_SOURCES[backgroundKey];
   const panStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX?.value ?? 0 }],
   }));

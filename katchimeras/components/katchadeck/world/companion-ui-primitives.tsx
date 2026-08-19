@@ -21,6 +21,7 @@ import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { KatchaUI } from '@/constants/katcha-ui';
 import type { KatchaSurface } from '@/constants/katcha-ui';
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
+import type { CompanionBondProgress } from '@/utils/companion-bond';
 
 export function CompanionSheetShell({
   children,
@@ -64,11 +65,15 @@ export function CompanionSheetShell({
 
 export function CompanionDestinationHeader({
   backLabel = 'Home',
+  bondProgress,
+  compactHub = false,
   label,
   onBack,
   titleTone = 'default',
 }: {
   backLabel?: string;
+  bondProgress?: CompanionBondProgress;
+  compactHub?: boolean;
   label: string;
   onBack: () => void;
   titleTone?: 'default' | 'gold';
@@ -78,7 +83,19 @@ export function CompanionDestinationHeader({
   return (
     <View style={[styles.destinationHeader, { paddingTop: insets.top + 10 }]}>
       <CompanionBackAction label={backLabel} onPress={onBack} tone="night" />
-      <View style={styles.destinationHeading}>
+      {compactHub && bondProgress ? (
+        <View
+          accessibilityLabel={`Bond level ${bondProgress.level}, ${Math.round(bondProgress.ratio * 100)} percent to the next level`}
+          style={styles.bondPill}>
+          <IconSymbol color="#F27F7C" name="heart.fill" size={19} />
+          <View style={styles.bondCopy}>
+            <ThemedText selectable style={styles.bondLabel} lightColor="#FFF6D8" darkColor="#FFF6D8">Bond {bondProgress.level}</ThemedText>
+            <View style={styles.bondTrack}>
+              <View style={[styles.bondFill, { width: `${Math.max(bondProgress.totalPoints ? 6 : 0, bondProgress.ratio * 100)}%` }]} />
+            </View>
+          </View>
+        </View>
+      ) : <View style={styles.destinationHeading}>
         <ThemedText
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.3}
@@ -90,7 +107,7 @@ export function CompanionDestinationHeader({
           darkColor={goldTitle ? '#FFD36E' : '#FFF9EA'}>
           {label}
         </ThemedText>
-      </View>
+      </View>}
     </View>
   );
 }
@@ -353,6 +370,24 @@ const styles = StyleSheet.create({
     textShadowOffset: { height: 3, width: 0 },
     textShadowRadius: 4,
   },
+  bondPill: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(34,43,36,0.88)',
+    borderColor: 'rgba(243,219,154,0.34)',
+    borderCurve: 'continuous',
+    borderRadius: 18,
+    borderWidth: 1,
+    boxShadow: '0 5px 14px rgba(14,24,17,0.28), inset 0 1px 0 rgba(255,255,255,0.12)',
+    flexDirection: 'row',
+    gap: 8,
+    marginLeft: 'auto',
+    minHeight: 44,
+    paddingHorizontal: 12,
+  },
+  bondCopy: { gap: 3, minWidth: 76 },
+  bondLabel: { fontSize: 11, fontVariant: ['tabular-nums'], fontWeight: '900', lineHeight: 14 },
+  bondTrack: { backgroundColor: 'rgba(255,246,216,0.18)', borderRadius: 999, height: 5, overflow: 'hidden' },
+  bondFill: { backgroundColor: '#E7B64C', borderRadius: 999, height: '100%' },
   destinationSurface: {
     backgroundColor: 'transparent',
     flex: 1,

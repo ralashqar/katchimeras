@@ -45,7 +45,7 @@ export function CompanionSkinsThread({
           if (!skin.visualKey) return null;
           const selected = skin.id === equippedSkinId;
         const available = activePlus;
-          const visual = getCreatureVisual(skin.visualKey);
+          const visual = getCreatureVisual(skin.visualKey, 'grown');
           return (
             <Pressable
               accessibilityLabel={`${available ? 'Equip' : 'Unlock with Plus'} ${skin.displayName}`}

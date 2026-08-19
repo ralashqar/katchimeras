@@ -93,6 +93,24 @@ test('new cinematic environments resolve independently of the shown creature', (
   }
 });
 
+test('Mossprout companion cinematics are wired to five optimized Haven stages', () => {
+  const source = fs.readFileSync(
+    path.join(process.cwd(), 'constants/exploration-environment-progression-sources.ts'),
+    'utf8',
+  );
+  for (let stage = 0; stage < 5; stage += 1) {
+    for (const suffix of ['', '_1024']) {
+      const filename = `mossprout-exploration-stage-${stage}${suffix}.webp`;
+      assert.match(source, new RegExp(filename.replace('.', '\\.'), 'u'));
+      assert.ok(fs.existsSync(path.join(
+        process.cwd(),
+        'assets/images/katchimeras/world/backgrounds',
+        filename,
+      )));
+    }
+  }
+});
+
 test('an explicit unsupported environment does not borrow the creature background', () => {
   assert.equal(
     todayKatchimeraExplorationBackgroundKeyForPresentation({

@@ -4,7 +4,16 @@ const { existsSync, readFileSync } = require('node:fs');
 const { join } = require('node:path');
 
 const root = join(__dirname, '..');
-const managedCharacters = ['mossprout', 'steppling'];
+const managedCharacters = [
+  'mossprout',
+  'steppling',
+  'feastle',
+  'bedrotte',
+  'pagelet',
+  'gatherglow',
+  'tasklet',
+  'shellio',
+];
 const required = [
   'docs/haven-environment-art-pipeline.md',
   ...managedCharacters.map((character) => `design/floating-neighborhood-v2/haven/${character}/progression.json`),
@@ -109,6 +118,8 @@ const preparer = readFileSync(join(root, 'scripts/prepare-haven-progression.py')
 for (const contract of [
   'matted.png',
   'normalize_matte',
+  'chroma_foreground_mask',
+  'chroma-backed interior restore',
   'resize_rgba_premultiplied',
   'birefnet-matted-output',
   'stage-{stage_id}-alpha.png',

@@ -114,7 +114,8 @@ test('You questionnaires advance on selection while consequential tasks retain c
   assert.match(questionnaireScene, /onSpeechBubbleHeightChange=\{setSpeechBubbleHeight\}/);
   assert.doesNotMatch(questionnaireScene, /styles\.creatureFrame|styles\.bubble,/);
   assert.match(cinematicStage, /speechBubbleQuestionnaire/);
-  assert.match(cinematicStage, /minHeight: 146/);
+  assert.match(cinematicStage, /numberOfLines=\{questionnaireBubble \? 2 : 3\}/);
+  assert.match(cinematicStage, /adjustsFontSizeToFit=\{Boolean\(numberOfLines\)\}/);
   assert.match(cinematicStage, /questionTitleLong/);
   assert.match(cinematicStage, /onLayout=.*onSpeechBubbleHeightChange/);
   assert.match(cinematicStage, /function TypewriterText/);
@@ -219,6 +220,9 @@ test('conversation replies, memories, and outcomes advance without redundant con
   );
   assert.doesNotMatch(scene, /Change answer|Yes, remember this/);
   assert.match(scene, /<ConversationOutcomeCard/);
+  assert.match(scene, /height: Math\.min\(440, Math\.max\(220, height \* 0\.46\)\)/);
+  assert.match(scene, /nestedScrollEnabled/);
+  assert.doesNotMatch(scene, /minHeight: height/);
   assert.doesNotMatch(scene, /CONVERSATION TAKEAWAY|Finish this thought|reflection_reveal/);
   assert.doesNotMatch(scene, /Save this insight|Don’t save|Add to my insights|Keep it as a result only/);
   assert.match(scene, /AutomaticInsightTransition/);
@@ -420,21 +424,62 @@ test('the launch chat lobby nests conversations while Shared History returns to 
     'utf8',
   );
   assert.match(dashboard, />\s*Chat\s*</);
-  assert.ok(
-    dashboard.indexOf('onPress={onChat}') < dashboard.indexOf("ITEMS.map"),
-    'Chat belongs above the dashboard destinations',
-  );
-  for (const destination of ['quest', 'goals', 'achievements', 'insight', 'skins']) {
-    assert.match(dashboard, new RegExp(`destination: '${destination}'`));
-  }
+  assert.match(dashboard, /styles\.actionTray/);
+  assert.match(dashboard, /styles\.dock/);
+  assert.match(dashboard, /label="Merge"/);
+  assert.match(dashboard, /label="Journal"/);
+  assert.match(dashboard, /label="Collection"/);
+  assert.match(dashboard, /onPress=\{\(\) => press\(onChat\)\}/);
+  for (const destination of ['quest', 'goals']) assert.match(dashboard, new RegExp(`destination: '${destination}'`));
+  for (const destination of ['achievements', 'insight', 'skins']) assert.match(dashboard, new RegExp(`onSelect\\('${destination}'\\)`));
 
   const interaction = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'),
     'utf8',
   );
   assert.match(interaction, /const openChat = \(\) =>/);
+  assert.match(interaction, /getCreatureVisual\(props\.visualKey, 'grown'\)/);
   assert.match(interaction, /onChat=\{openChat\}/);
+  assert.match(interaction, /\n\s+lifted\s*\n/);
+  assert.doesNotMatch(interaction, /enterFromLifted/);
   assert.doesNotMatch(interaction, /autoIntroductionCreatureRef/);
+});
+
+test('companion scene panels share one palette, stay anchored, and bound speech copy', () => {
+  const worldPath = path.join(process.cwd(), 'components', 'katchadeck', 'world');
+  const cinematic = fs.readFileSync(path.join(worldPath, 'companion-cinematic-stage.tsx'), 'utf8');
+  const chat = fs.readFileSync(path.join(worldPath, 'companion-chat-lobby.tsx'), 'utf8');
+  const visit = fs.readFileSync(path.join(worldPath, 'companion-visit-scene.tsx'), 'utf8');
+  const questionnaire = fs.readFileSync(path.join(worldPath, 'companion-questionnaire-scene.tsx'), 'utf8');
+  const conversation = fs.readFileSync(path.join(worldPath, 'companion-conversation-scene.tsx'), 'utf8');
+  const story = fs.readFileSync(path.join(worldPath, 'feastle-story-stage.tsx'), 'utf8');
+  const interaction = fs.readFileSync(path.join(worldPath, 'companion-interaction-sheet.tsx'), 'utf8');
+  const cinematicPan = fs.readFileSync(path.join(worldPath, 'use-companion-environment-pan.ts'), 'utf8');
+
+  assert.match(cinematic, /availableBubbleWidth/);
+  assert.match(cinematic, /numberOfLines=\{questionnaireBubble \? 2 : 3\}/);
+  assert.match(cinematic, /minimumFontScale=\{0\.72\}/);
+  for (const panel of [chat, visit, questionnaire, conversation, story]) {
+    assert.match(panel, /KatchaUI\.companionScenePanel\.background/);
+  }
+  for (const panel of [chat, visit, conversation]) {
+    assert.match(panel, /nestedScrollEnabled/);
+  }
+  for (const panel of [chat, visit]) {
+    assert.match(panel, /height: Math\.min\(440, Math\.max\(220, height \* 0\.46\)\)/);
+  }
+  assert.match(conversation, /height: panelHeight/);
+  assert.match(conversation, /onContentSizeChange=\{\(_, contentHeight\) =>/);
+  assert.match(conversation, /optionInk/);
+  assert.match(conversation, /const shortPanelBottomLift = panelScrollable/);
+  assert.match(conversation, /paddingBottom: 20/);
+  assert.match(interaction, /<GestureDetector gesture=\{environmentPan\.gesture\}>/);
+  assert.match(interaction, /sceneTranslateX=\{environmentPan\.translateX\}/);
+  assert.match(cinematicPan, /resolveTodayExplorationDragTranslation/);
+  assert.match(cinematicPan, /overscrollResistance: 0/);
+  assert.match(cinematicPan, /onFinalize\(\(\) =>/);
+  assert.match(cinematicPan, /withSpring\(0, spring\)/);
+  assert.match(cinematic, /width: bubbleWidth, zIndex: 4 \}, subjectPanStyle/);
 });
 
 test('ideal-skin onboarding gates launch companions and skin equipment opens a bespoke Plus offer', () => {
@@ -617,7 +662,9 @@ test('Feastle story scenes advance contextually without a completion menu', () =
   const interaction = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'), 'utf8');
   const scene = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-conversation-scene.tsx'), 'utf8');
   const stage = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'feastle-story-stage.tsx'), 'utf8');
+  const journeyStage = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'journey-cohort-story-stage.tsx'), 'utf8');
   const requestTray = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-merge-request-tray.tsx'), 'utf8');
+  const mergeOrderRail = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-order-rail.tsx'), 'utf8');
   assert.match(interaction, /const feastleStoryFlow = Boolean/);
   assert.match(interaction, /\^feastle:friendship:\[234\]\$/);
   assert.match(interaction, /storyFinale=\{feastleStoryFinale\}/);
@@ -629,6 +676,14 @@ test('Feastle story scenes advance contextually without a completion menu', () =
   assert.match(stage, /FEASTLE_STORY_REQUESTS\[story\.targetLevel\]/);
   assert.match(stage, /CompanionMergeRequestTray/);
   assert.match(requestTray, /PersistentMergeItemArt/);
+  assert.match(requestTray, /\n\s+horizontal\n/);
+  assert.match(requestTray, /styles\.rail/);
+  assert.doesNotMatch(requestTray, /flexWrap: 'wrap'/);
+  assert.match(requestTray, /MERGE_WORLD_UI_ART\.readyTick/);
+  assert.match(mergeOrderRail, /MERGE_WORLD_UI_ART\.readyTick/);
+  assert.match(journeyStage, /servedOrderIds\.includes/);
+  assert.doesNotMatch(journeyStage, /\.slice\(0, 3\)/);
+  assert.doesNotMatch(requestTray, /\{request\.description\}/);
   assert.match(stage, /Open all orders/);
   assert.match(stage, /\{!complete \? <Pressable/);
   assert.match(stage, />More with Feastle</);
@@ -653,6 +708,13 @@ test('companion viewport resets across destinations and content-shape transition
   assert.notEqual(companionViewportResetKey({ ...base, journeyNodeId: 'understand-goal' }), quest);
   assert.notEqual(companionViewportResetKey({ ...base, activeAttemptId: 'attempt-1' }), quest);
   assert.equal(companionViewportResetKey({ ...base }), quest);
+
+  const interaction = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'),
+    'utf8',
+  );
+  assert.match(interaction, /route\.kind === 'dashboard'[\s\S]*?scrollToEnd\(\{ animated: false \}\)/);
+  assert.match(interaction, /onContentSizeChange=\{activeAttemptId \|\| route\.kind === 'dashboard' \? resetViewport : undefined\}/);
 });
 
 test('quest offer exposes one focused acceptance action', () => {

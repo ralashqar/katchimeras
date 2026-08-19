@@ -521,6 +521,36 @@ export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_STEPPLING_HAVEN_STAGE_1_HEX_TILE: 
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_STEPPLING_HAVEN_STAGE_2_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_steppling_haven_stage_2_hex_tile.webp');
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_STEPPLING_HAVEN_STAGE_3_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_steppling_haven_stage_3_hex_tile.webp');
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_STEPPLING_HAVEN_STAGE_4_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_steppling_haven_stage_4_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_FEASTLE_HAVEN_STAGE_0_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_feastle_haven_stage_0_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_FEASTLE_HAVEN_STAGE_1_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_feastle_haven_stage_1_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_FEASTLE_HAVEN_STAGE_2_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_feastle_haven_stage_2_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_FEASTLE_HAVEN_STAGE_3_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_feastle_haven_stage_3_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_FEASTLE_HAVEN_STAGE_4_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_feastle_haven_stage_4_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_BEDROTTE_HAVEN_STAGE_0_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_bedrotte_haven_stage_0_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_BEDROTTE_HAVEN_STAGE_1_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_bedrotte_haven_stage_1_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_BEDROTTE_HAVEN_STAGE_2_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_bedrotte_haven_stage_2_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_BEDROTTE_HAVEN_STAGE_3_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_bedrotte_haven_stage_3_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_BEDROTTE_HAVEN_STAGE_4_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_bedrotte_haven_stage_4_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_PAGELET_HAVEN_STAGE_0_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_pagelet_haven_stage_0_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_PAGELET_HAVEN_STAGE_1_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_pagelet_haven_stage_1_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_PAGELET_HAVEN_STAGE_2_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_pagelet_haven_stage_2_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_PAGELET_HAVEN_STAGE_3_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_pagelet_haven_stage_3_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_PAGELET_HAVEN_STAGE_4_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_pagelet_haven_stage_4_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_GATHERGLOW_HAVEN_STAGE_0_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_haven_stage_0_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_GATHERGLOW_HAVEN_STAGE_1_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_haven_stage_1_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_GATHERGLOW_HAVEN_STAGE_2_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_haven_stage_2_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_GATHERGLOW_HAVEN_STAGE_3_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_haven_stage_3_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_GATHERGLOW_HAVEN_STAGE_4_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_haven_stage_4_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_TASKLET_HAVEN_STAGE_0_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_tasklet_haven_stage_0_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_TASKLET_HAVEN_STAGE_1_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_tasklet_haven_stage_1_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_TASKLET_HAVEN_STAGE_2_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_tasklet_haven_stage_2_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_TASKLET_HAVEN_STAGE_3_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_tasklet_haven_stage_3_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_TASKLET_HAVEN_STAGE_4_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_tasklet_haven_stage_4_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HAVEN_STAGE_0_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_haven_stage_0_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HAVEN_STAGE_1_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_haven_stage_1_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HAVEN_STAGE_2_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_haven_stage_2_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HAVEN_STAGE_3_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_haven_stage_3_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HAVEN_STAGE_4_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_haven_stage_4_hex_tile.webp');
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_hex_tile.webp');
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HAVEN_STAGE_0_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_0_hex_tile.webp');
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HAVEN_STAGE_1_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_1_hex_tile.webp');
@@ -712,6 +742,48 @@ const stepplingHavenSources = (stage: 0 | 1 | 2 | 3 | 4, full: ImageSourcePropTy
           : require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_steppling_haven_stage_4_hex_tile_512.webp'),
   full,
 });
+const feastleHavenSourceSets = [
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_feastle_haven_stage_0_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_feastle_haven_stage_0_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_FEASTLE_HAVEN_STAGE_0_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_feastle_haven_stage_1_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_feastle_haven_stage_1_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_FEASTLE_HAVEN_STAGE_1_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_feastle_haven_stage_2_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_feastle_haven_stage_2_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_FEASTLE_HAVEN_STAGE_2_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_feastle_haven_stage_3_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_feastle_haven_stage_3_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_FEASTLE_HAVEN_STAGE_3_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_feastle_haven_stage_4_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_feastle_haven_stage_4_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_FEASTLE_HAVEN_STAGE_4_HEX_TILE },
+] as const satisfies readonly KingdomHexTileLodSources[];
+const bedrotteHavenSourceSets = [
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_bedrotte_haven_stage_0_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_bedrotte_haven_stage_0_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_BEDROTTE_HAVEN_STAGE_0_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_bedrotte_haven_stage_1_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_bedrotte_haven_stage_1_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_BEDROTTE_HAVEN_STAGE_1_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_bedrotte_haven_stage_2_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_bedrotte_haven_stage_2_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_BEDROTTE_HAVEN_STAGE_2_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_bedrotte_haven_stage_3_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_bedrotte_haven_stage_3_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_BEDROTTE_HAVEN_STAGE_3_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_bedrotte_haven_stage_4_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_bedrotte_haven_stage_4_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_BEDROTTE_HAVEN_STAGE_4_HEX_TILE },
+] as const satisfies readonly KingdomHexTileLodSources[];
+const pageletHavenSourceSets = [
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_pagelet_haven_stage_0_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_pagelet_haven_stage_0_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_PAGELET_HAVEN_STAGE_0_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_pagelet_haven_stage_1_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_pagelet_haven_stage_1_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_PAGELET_HAVEN_STAGE_1_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_pagelet_haven_stage_2_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_pagelet_haven_stage_2_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_PAGELET_HAVEN_STAGE_2_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_pagelet_haven_stage_3_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_pagelet_haven_stage_3_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_PAGELET_HAVEN_STAGE_3_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_pagelet_haven_stage_4_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_pagelet_haven_stage_4_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_PAGELET_HAVEN_STAGE_4_HEX_TILE },
+] as const satisfies readonly KingdomHexTileLodSources[];
+const gatherglowHavenSourceSets = [
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_haven_stage_0_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_haven_stage_0_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_GATHERGLOW_HAVEN_STAGE_0_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_haven_stage_1_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_haven_stage_1_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_GATHERGLOW_HAVEN_STAGE_1_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_haven_stage_2_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_haven_stage_2_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_GATHERGLOW_HAVEN_STAGE_2_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_haven_stage_3_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_haven_stage_3_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_GATHERGLOW_HAVEN_STAGE_3_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_haven_stage_4_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_haven_stage_4_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_GATHERGLOW_HAVEN_STAGE_4_HEX_TILE },
+] as const satisfies readonly KingdomHexTileLodSources[];
+const taskletHavenSourceSets = [
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_tasklet_haven_stage_0_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_tasklet_haven_stage_0_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_TASKLET_HAVEN_STAGE_0_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_tasklet_haven_stage_1_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_tasklet_haven_stage_1_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_TASKLET_HAVEN_STAGE_1_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_tasklet_haven_stage_2_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_tasklet_haven_stage_2_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_TASKLET_HAVEN_STAGE_2_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_tasklet_haven_stage_3_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_tasklet_haven_stage_3_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_TASKLET_HAVEN_STAGE_3_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_tasklet_haven_stage_4_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_tasklet_haven_stage_4_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_TASKLET_HAVEN_STAGE_4_HEX_TILE },
+] as const satisfies readonly KingdomHexTileLodSources[];
+const shellioHavenSourceSets = [
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_haven_stage_0_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_haven_stage_0_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HAVEN_STAGE_0_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_haven_stage_1_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_haven_stage_1_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HAVEN_STAGE_1_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_haven_stage_2_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_haven_stage_2_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HAVEN_STAGE_2_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_haven_stage_3_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_haven_stage_3_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HAVEN_STAGE_3_HEX_TILE },
+  { thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_haven_stage_4_hex_tile_256.webp'), medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_haven_stage_4_hex_tile_512.webp'), full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HAVEN_STAGE_4_HEX_TILE },
+] as const satisfies readonly KingdomHexTileLodSources[];
 const KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
   thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_hex_tile_256.webp'),
   medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_hex_tile_512.webp'),
@@ -1217,9 +1289,99 @@ const STEPPLING_HAVEN_TILES: Partial<Record<number, KingdomHexTileSpec>> = {
   4: stepplingHavenTile(4, KINGDOM_FLOATING_NEIGHBORHOOD_V2_STEPPLING_HAVEN_STAGE_4_HEX_TILE),
 };
 
+const feastleHavenTile = (stage: 0 | 1 | 2 | 3 | 4, source: ImageSourcePropType): KingdomHexTileSpec => ({
+  source,
+  sources: feastleHavenSourceSets[stage],
+  alphaBounds: hexTileAlphaBounds(`floating_neighborhood_v2_feastle_haven_stage_${stage}_hex_tile.webp`),
+  faceBounds: FLOATING_NEIGHBORHOOD_V2_FACE_BOUNDS,
+});
+const FEASTLE_HAVEN_TILES: Partial<Record<number, KingdomHexTileSpec>> = {
+  0: feastleHavenTile(0, KINGDOM_FLOATING_NEIGHBORHOOD_V2_FEASTLE_HAVEN_STAGE_0_HEX_TILE),
+  1: feastleHavenTile(1, KINGDOM_FLOATING_NEIGHBORHOOD_V2_FEASTLE_HAVEN_STAGE_1_HEX_TILE),
+  2: feastleHavenTile(2, KINGDOM_FLOATING_NEIGHBORHOOD_V2_FEASTLE_HAVEN_STAGE_2_HEX_TILE),
+  3: feastleHavenTile(3, KINGDOM_FLOATING_NEIGHBORHOOD_V2_FEASTLE_HAVEN_STAGE_3_HEX_TILE),
+  4: feastleHavenTile(4, KINGDOM_FLOATING_NEIGHBORHOOD_V2_FEASTLE_HAVEN_STAGE_4_HEX_TILE),
+};
+
+const bedrotteHavenTile = (stage: 0 | 1 | 2 | 3 | 4, source: ImageSourcePropType): KingdomHexTileSpec => ({
+  source,
+  sources: bedrotteHavenSourceSets[stage],
+  alphaBounds: hexTileAlphaBounds(`floating_neighborhood_v2_bedrotte_haven_stage_${stage}_hex_tile.webp`),
+  faceBounds: FLOATING_NEIGHBORHOOD_V2_FACE_BOUNDS,
+});
+const BEDROTTE_HAVEN_TILES: Partial<Record<number, KingdomHexTileSpec>> = {
+  0: bedrotteHavenTile(0, KINGDOM_FLOATING_NEIGHBORHOOD_V2_BEDROTTE_HAVEN_STAGE_0_HEX_TILE),
+  1: bedrotteHavenTile(1, KINGDOM_FLOATING_NEIGHBORHOOD_V2_BEDROTTE_HAVEN_STAGE_1_HEX_TILE),
+  2: bedrotteHavenTile(2, KINGDOM_FLOATING_NEIGHBORHOOD_V2_BEDROTTE_HAVEN_STAGE_2_HEX_TILE),
+  3: bedrotteHavenTile(3, KINGDOM_FLOATING_NEIGHBORHOOD_V2_BEDROTTE_HAVEN_STAGE_3_HEX_TILE),
+  4: bedrotteHavenTile(4, KINGDOM_FLOATING_NEIGHBORHOOD_V2_BEDROTTE_HAVEN_STAGE_4_HEX_TILE),
+};
+
+const pageletHavenTile = (stage: 0 | 1 | 2 | 3 | 4, source: ImageSourcePropType): KingdomHexTileSpec => ({
+  source,
+  sources: pageletHavenSourceSets[stage],
+  alphaBounds: hexTileAlphaBounds(`floating_neighborhood_v2_pagelet_haven_stage_${stage}_hex_tile.webp`),
+  faceBounds: FLOATING_NEIGHBORHOOD_V2_FACE_BOUNDS,
+});
+const PAGELET_HAVEN_TILES: Partial<Record<number, KingdomHexTileSpec>> = {
+  0: pageletHavenTile(0, KINGDOM_FLOATING_NEIGHBORHOOD_V2_PAGELET_HAVEN_STAGE_0_HEX_TILE),
+  1: pageletHavenTile(1, KINGDOM_FLOATING_NEIGHBORHOOD_V2_PAGELET_HAVEN_STAGE_1_HEX_TILE),
+  2: pageletHavenTile(2, KINGDOM_FLOATING_NEIGHBORHOOD_V2_PAGELET_HAVEN_STAGE_2_HEX_TILE),
+  3: pageletHavenTile(3, KINGDOM_FLOATING_NEIGHBORHOOD_V2_PAGELET_HAVEN_STAGE_3_HEX_TILE),
+  4: pageletHavenTile(4, KINGDOM_FLOATING_NEIGHBORHOOD_V2_PAGELET_HAVEN_STAGE_4_HEX_TILE),
+};
+
+const gatherglowHavenTile = (stage: 0 | 1 | 2 | 3 | 4, source: ImageSourcePropType): KingdomHexTileSpec => ({
+  source,
+  sources: gatherglowHavenSourceSets[stage],
+  alphaBounds: hexTileAlphaBounds(`floating_neighborhood_v2_gatherglow_haven_stage_${stage}_hex_tile.webp`),
+  faceBounds: FLOATING_NEIGHBORHOOD_V2_FACE_BOUNDS,
+});
+const GATHERGLOW_HAVEN_TILES: Partial<Record<number, KingdomHexTileSpec>> = {
+  0: gatherglowHavenTile(0, KINGDOM_FLOATING_NEIGHBORHOOD_V2_GATHERGLOW_HAVEN_STAGE_0_HEX_TILE),
+  1: gatherglowHavenTile(1, KINGDOM_FLOATING_NEIGHBORHOOD_V2_GATHERGLOW_HAVEN_STAGE_1_HEX_TILE),
+  2: gatherglowHavenTile(2, KINGDOM_FLOATING_NEIGHBORHOOD_V2_GATHERGLOW_HAVEN_STAGE_2_HEX_TILE),
+  3: gatherglowHavenTile(3, KINGDOM_FLOATING_NEIGHBORHOOD_V2_GATHERGLOW_HAVEN_STAGE_3_HEX_TILE),
+  4: gatherglowHavenTile(4, KINGDOM_FLOATING_NEIGHBORHOOD_V2_GATHERGLOW_HAVEN_STAGE_4_HEX_TILE),
+};
+
+const taskletHavenTile = (stage: 0 | 1 | 2 | 3 | 4, source: ImageSourcePropType): KingdomHexTileSpec => ({
+  source,
+  sources: taskletHavenSourceSets[stage],
+  alphaBounds: hexTileAlphaBounds(`floating_neighborhood_v2_tasklet_haven_stage_${stage}_hex_tile.webp`),
+  faceBounds: FLOATING_NEIGHBORHOOD_V2_FACE_BOUNDS,
+});
+const TASKLET_HAVEN_TILES: Partial<Record<number, KingdomHexTileSpec>> = {
+  0: taskletHavenTile(0, KINGDOM_FLOATING_NEIGHBORHOOD_V2_TASKLET_HAVEN_STAGE_0_HEX_TILE),
+  1: taskletHavenTile(1, KINGDOM_FLOATING_NEIGHBORHOOD_V2_TASKLET_HAVEN_STAGE_1_HEX_TILE),
+  2: taskletHavenTile(2, KINGDOM_FLOATING_NEIGHBORHOOD_V2_TASKLET_HAVEN_STAGE_2_HEX_TILE),
+  3: taskletHavenTile(3, KINGDOM_FLOATING_NEIGHBORHOOD_V2_TASKLET_HAVEN_STAGE_3_HEX_TILE),
+  4: taskletHavenTile(4, KINGDOM_FLOATING_NEIGHBORHOOD_V2_TASKLET_HAVEN_STAGE_4_HEX_TILE),
+};
+
+const shellioHavenTile = (stage: 0 | 1 | 2 | 3 | 4, source: ImageSourcePropType): KingdomHexTileSpec => ({
+  source,
+  sources: shellioHavenSourceSets[stage],
+  alphaBounds: hexTileAlphaBounds(`floating_neighborhood_v2_shellio_haven_stage_${stage}_hex_tile.webp`),
+  faceBounds: FLOATING_NEIGHBORHOOD_V2_FACE_BOUNDS,
+});
+const SHELLIO_HAVEN_TILES: Partial<Record<number, KingdomHexTileSpec>> = {
+  0: shellioHavenTile(0, KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HAVEN_STAGE_0_HEX_TILE),
+  1: shellioHavenTile(1, KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HAVEN_STAGE_1_HEX_TILE),
+  2: shellioHavenTile(2, KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HAVEN_STAGE_2_HEX_TILE),
+  3: shellioHavenTile(3, KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HAVEN_STAGE_3_HEX_TILE),
+  4: shellioHavenTile(4, KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HAVEN_STAGE_4_HEX_TILE),
+};
+
 export function havenHexTileSpec(characterId: string, stage: number): KingdomHexTileSpec | null {
   if (characterId === 'mossprout') return MOSSPROUT_HAVEN_TILES[stage] ?? null;
   if (characterId === 'steppling') return STEPPLING_HAVEN_TILES[stage] ?? null;
+  if (characterId === 'feastle') return FEASTLE_HAVEN_TILES[stage] ?? null;
+  if (characterId === 'bedrotte') return BEDROTTE_HAVEN_TILES[stage] ?? null;
+  if (characterId === 'pagelet') return PAGELET_HAVEN_TILES[stage] ?? null;
+  if (characterId === 'gatherglow') return GATHERGLOW_HAVEN_TILES[stage] ?? null;
+  if (characterId === 'tasklet') return TASKLET_HAVEN_TILES[stage] ?? null;
+  if (characterId === 'shellio') return SHELLIO_HAVEN_TILES[stage] ?? null;
   return null;
 }
 
@@ -1253,6 +1415,12 @@ export const KINGDOM_HEX_ART_DIRECTION_SETS: KingdomHexArtDirectionSet[] = [
       havenResidentTiles: {
         mossprout: MOSSPROUT_HAVEN_TILES,
         steppling: STEPPLING_HAVEN_TILES,
+        feastle: FEASTLE_HAVEN_TILES,
+        bedrotte: BEDROTTE_HAVEN_TILES,
+        pagelet: PAGELET_HAVEN_TILES,
+        gatherglow: GATHERGLOW_HAVEN_TILES,
+        tasklet: TASKLET_HAVEN_TILES,
+        shellio: SHELLIO_HAVEN_TILES,
       },
       useCustomResidentTiles: false,
       zodiacs: FLOATING_NEIGHBORHOOD_V2_ZODIAC_TILES,

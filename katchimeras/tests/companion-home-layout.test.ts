@@ -5,51 +5,65 @@ import {
   companionDestinationSpeechBubbleTop,
   companionDestinationStageLift,
   companionHomeHeroSpacer,
+  companionHubHeroSpacer,
   companionHomeStageLayout,
   companionQuestionnaireHeroSpacer,
   companionQuestListSpacer,
   companionSpeechTitleTier,
   companionSpeechBubbleDrop,
 } from '../utils/companion-home-layout';
+import { resolveCreatureGroundShadowLayout } from '../utils/creature-ground-shadow';
 
-test('companion home moves its environment and resident up and to the right', () => {
+test('companion home centres its grown resident on the Today platform', () => {
   const layout = companionHomeStageLayout(390, 844, 'mossprout');
 
-  assert.ok(layout.translateX >= 82 && layout.translateX <= 126);
-  assert.ok(layout.translateY <= -32 && layout.translateY >= -52);
+  assert.equal(layout.translateX, 0);
+  assert.ok(layout.translateY >= 8 && layout.translateY <= 14);
   assert.ok(layout.backgroundImageSize > 844);
-  assert.ok(layout.creatureFrame.size > 240);
+  assert.ok(layout.creatureFrame.size > 200);
 });
 
 test('companion home framing remains bounded on compact and tablet viewports', () => {
   const compact = companionHomeStageLayout(320, 568, 'steppling');
   const tablet = companionHomeStageLayout(834, 1194, 'vesperitt');
 
-  assert.equal(compact.translateX, 83.2);
-  assert.equal(compact.translateY, -32);
-  assert.equal(tablet.translateX, 126);
-  assert.equal(tablet.translateY, -52);
+  assert.equal(compact.translateX, 0);
+  assert.equal(compact.translateY, 8);
+  assert.equal(tablet.translateX, 0);
+  assert.equal(tablet.translateY, 14);
 });
 
 test('the creature contact point is preserved before the shared stage transform', () => {
   const layout = companionHomeStageLayout(390, 844, 'feastle');
   const visibleBottom = layout.creatureFrame.top
-    + layout.creatureFrame.size * 0.894531;
+    + layout.creatureFrame.size * 0.94;
 
   assert.ok(
     Math.abs(
       visibleBottom
       - layout.creatureFrame.stageContactY
-      - layout.creatureDropY
     ) < 0.0001,
   );
-  assert.ok(Math.abs(layout.creatureDropY - 25.32) < 0.0001);
+  assert.equal(layout.creatureDropY, 0);
 });
 
 test('destination pose lifts the complete cinematic stage toward the top', () => {
-  assert.equal(companionDestinationStageLift(568), 118);
-  assert.equal(companionDestinationStageLift(844), 135.04);
-  assert.equal(companionDestinationStageLift(1194), 150);
+  assert.ok(Math.abs(companionDestinationStageLift(568, 320) - 57.12) < 0.0001);
+  assert.ok(Math.abs(companionDestinationStageLift(844, 390) - 85.776) < 0.0001);
+  assert.ok(Math.abs(companionDestinationStageLift(1194, 834) - 119.46) < 0.0001);
+});
+
+test('compact hub reserves the lower interaction zone across phone and tablet sizes', () => {
+  assert.equal(companionHubHeroSpacer(568), 338);
+  assert.ok(Math.abs(companionHubHeroSpacer(844) - 472.64) < 0.0001);
+  assert.equal(companionHubHeroSpacer(1194), 500);
+});
+
+test('grown companion shadows use the mature canvas baseline', () => {
+  const mossprout = resolveCreatureGroundShadowLayout('mossprout', 200, 1, 'grown');
+  const feastle = resolveCreatureGroundShadowLayout('feastle', 200, 1, 'grown');
+  assert.equal(mossprout.contactY, 188);
+  assert.equal(feastle.contactY, 188);
 });
 
 test('top-level companion home hands content off closer to the lifted art', () => {
@@ -73,11 +87,11 @@ test('every companion page keeps its speech bubble lower beside the creature', (
   assert.equal(companionSpeechBubbleDrop(1194), 84);
 });
 
-test('destination speech bubble remains below top chrome after the stage lift', () => {
-  for (const height of [568, 844, 1194]) {
+test('destination speech bubble remains below top chrome after the coverage-safe stage lift', () => {
+  for (const [width, height] of [[320, 568], [390, 844], [834, 1194]]) {
     const safeTop = height === 568 ? 20 : 47;
-    const authoredTop = companionDestinationSpeechBubbleTop(height, safeTop);
-    const visibleTop = authoredTop - companionDestinationStageLift(height);
+    const authoredTop = companionDestinationSpeechBubbleTop(height, safeTop, width);
+    const visibleTop = authoredTop - companionDestinationStageLift(height, width);
     assert.ok(Math.abs(visibleTop - (safeTop + 92)) < 0.0001);
   }
 });

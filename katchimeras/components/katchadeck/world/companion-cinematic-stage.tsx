@@ -4,6 +4,7 @@ import { type LayoutChangeEvent, Pressable, type StyleProp, StyleSheet, type Tex
 import Animated, {
   Easing,
   FadeIn,
+  type SharedValue,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -13,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { CelebrationParticles } from '@/components/katchadeck/world/companion-achievement-celebration';
-import { KatchaSurfacePalette, KatchaUI } from '@/constants/katcha-ui';
+import { KatchaUI } from '@/constants/katcha-ui';
 import type { HomeVisualKey } from '@/types/home';
 import type { QuestionnaireImageSource } from '@/utils/companion-questionnaire-presentation';
 import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-backgrounds';
@@ -22,11 +23,10 @@ import {
   companionDestinationStageLift,
   companionSpeechTitleTier,
   companionSpeechBubbleDrop,
+  companionHomeStageLayout,
 } from '@/utils/companion-home-layout';
 
 import { CompanionHomeEnvironmentStage } from './companion-home-environment-stage';
-
-const parchment = KatchaSurfacePalette.parchment;
 
 export function CompanionCinematicStage({
   creature,
@@ -34,16 +34,18 @@ export function CompanionCinematicStage({
   bubbleBody,
   bubbleVariant = 'default',
   celebrate = false,
-  enterFromLifted = false,
   environmentKey,
+  houseLevel,
   lifted,
   name,
   rewardPulseKey = 0,
+  sceneTranslateX,
   onSpeechBubbleHeightChange,
   onBackgroundReady,
   onCreatureReady,
   onSpeechBubblePress,
   showSpeechBubble = true,
+  showNameplate = false,
   title,
   visualKey,
 }: {
@@ -52,16 +54,18 @@ export function CompanionCinematicStage({
   celebrate?: boolean;
   creature: QuestionnaireImageSource;
   creatureTargetRef?: RefObject<ViewType | null>;
-  enterFromLifted?: boolean;
   environmentKey: TodayExplorationBackgroundKey | null;
+  houseLevel?: number;
   lifted: boolean;
   name: string;
   rewardPulseKey?: number;
+  sceneTranslateX?: SharedValue<number>;
   onSpeechBubbleHeightChange?: (height: number) => void;
   onBackgroundReady?: () => void;
   onCreatureReady?: () => void;
   onSpeechBubblePress?: () => void;
   showSpeechBubble?: boolean;
+  showNameplate?: boolean;
   title: string;
   visualKey: HomeVisualKey;
 }) {
@@ -89,24 +93,30 @@ export function CompanionCinematicStage({
     }
     onSpeechBubblePress?.();
   };
-  const liftProgress = useSharedValue(enterFromLifted ? 1 : 0);
+  const liftProgress = useSharedValue(lifted ? 1 : 0);
   const tabletGutter = Math.max(28, (width - 720) / 2);
   const horizontalGutter = width >= 700 ? tabletGutter : 20;
+  const availableBubbleWidth = width - horizontalGutter * 2;
+  const flexibleBubbleRatio = defaultTitleTier === 'long'
+    ? 0.98
+    : defaultTitleTier === 'medium'
+      ? 0.92
+      : 0.84;
   const bubbleWidth = questionnaireBubble
-    ? width >= 700
-      ? Math.min(390, width * 0.48)
-      : (width - horizontalGutter * 2) * 0.62
-    : width >= 700
-      ? Math.min(330, width * 0.4)
-      : (width - horizontalGutter * 2) * 0.56;
-  const destinationLift = companionDestinationStageLift(height);
+    ? Math.min(width >= 700 ? 560 : 470, availableBubbleWidth * 0.96)
+    : Math.min(width >= 700 ? 520 : 460, availableBubbleWidth * flexibleBubbleRatio);
+  const destinationLift = companionDestinationStageLift(height, width);
   const speechBubbleDrop = companionSpeechBubbleDrop(height);
+  const stageLayout = companionHomeStageLayout(width, height, visualKey);
   // The complete art plane lifts on destination pages. Offset the bubble
   // before that transform so its visible position remains below navigation
   // chrome instead of rising beneath the back button.
   const speechBubbleTop = lifted
-    ? companionDestinationSpeechBubbleTop(height, insets.top)
-    : insets.top + 146 + speechBubbleDrop;
+    ? companionDestinationSpeechBubbleTop(height, insets.top, width)
+    : insets.top + 84 + speechBubbleDrop * 0.25;
+  const nameplateTop = stageLayout.creatureFrame.stageContactY
+    + stageLayout.translateY
+    + 7;
 
   useEffect(() => {
     liftProgress.value = reduceMotion
@@ -120,6 +130,9 @@ export function CompanionCinematicStage({
   const liftStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -destinationLift * liftProgress.value }],
   }));
+  const subjectPanStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: sceneTranslateX?.value ?? 0 }],
+  }));
 
   return (
     <View pointerEvents="box-none" style={styles.root}>
@@ -130,19 +143,20 @@ export function CompanionCinematicStage({
           layer="background"
           name={name}
           onBackgroundReady={onBackgroundReady}
+          sceneTranslateX={sceneTranslateX}
           visualKey={visualKey}
         />
       </Animated.View>
 
       <LinearGradient
         colors={[
-          'rgba(230,205,167,0)',
-          'rgba(230,205,167,0)',
-          'rgba(230,205,167,0.22)',
-          'rgba(230,205,167,0.82)',
-          parchment.background,
+          'rgba(19,36,24,0)',
+          'rgba(19,36,24,0)',
+          'rgba(19,36,24,0.10)',
+          'rgba(19,36,24,0.42)',
+          'rgba(19,36,24,0.76)',
         ]}
-        locations={[0, 0.62, 0.74, 0.9, 1]}
+        locations={[0, 0.68, 0.78, 0.9, 1]}
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, styles.parchmentBlend]}
       />
@@ -154,7 +168,7 @@ export function CompanionCinematicStage({
             entering={questionnaireBubble && !reduceMotion ? FadeIn.duration(180) : undefined}
             key={questionnaireBubble ? `question:${title}` : 'destination-speech'}
             onLayout={(event: LayoutChangeEvent) => onSpeechBubbleHeightChange?.(event.nativeEvent.layout.height)}
-            style={{ left: horizontalGutter, position: 'absolute', top: speechBubbleTop, width: bubbleWidth, zIndex: 1 }}>
+            style={[{ left: (width - bubbleWidth) / 2, position: 'absolute', top: speechBubbleTop, width: bubbleWidth, zIndex: 4 }, subjectPanStyle]}>
             <Pressable
               accessibilityHint={!speechFullyRevealed ? 'Shows the full message' : onSpeechBubblePress ? 'Advances to the next part of the conversation' : undefined}
               accessibilityRole={speechBubblePressable ? 'button' : undefined}
@@ -180,6 +194,8 @@ export function CompanionCinematicStage({
                 questionnaireBubble && styles.questionTitle,
                 questionnaireBubble && title.length > 58 && styles.questionTitleLong,
               ]}
+              numberOfLines={questionnaireBubble ? 2 : 3}
+              minimumFontScale={0.72}
               text={title}
               lightColor="#342317"
               darkColor="#342317"
@@ -193,6 +209,8 @@ export function CompanionCinematicStage({
                 reduceMotion={reduceMotion}
                 revealAll={revealAllSpeech}
                 style={styles.questionBody}
+                numberOfLines={2}
+                minimumFontScale={0.76}
                 text={bubbleBody}
                 lightColor="#6B5544"
                 darkColor="#6B5544"
@@ -218,8 +236,22 @@ export function CompanionCinematicStage({
           name={name}
           onCreatureReady={onCreatureReady}
           rewardPulseKey={rewardPulseKey}
+          sceneTranslateX={sceneTranslateX}
           visualKey={visualKey}
         />
+
+        {showNameplate ? (
+          <Animated.View
+            accessibilityLabel={`${name}, Haven level ${houseLevel ?? 1}`}
+            style={[styles.nameplate, { top: nameplateTop }, subjectPanStyle]}>
+            <ThemedText selectable style={styles.nameplateEyebrow} lightColor="#F5EBD2" darkColor="#F5EBD2">
+              HAVEN · LV {houseLevel ?? 1}
+            </ThemedText>
+            <ThemedText adjustsFontSizeToFit minimumFontScale={0.78} numberOfLines={1} selectable style={styles.nameplateName} lightColor="#FFD86B" darkColor="#FFD86B">
+              {name}
+            </ThemedText>
+          </Animated.View>
+        ) : null}
       </Animated.View>
     </View>
   );
@@ -233,6 +265,8 @@ function TypewriterText({
   onComplete,
   reduceMotion,
   revealAll = false,
+  minimumFontScale = 0.72,
+  numberOfLines,
   style,
   text,
 }: {
@@ -243,6 +277,8 @@ function TypewriterText({
   onComplete?: () => void;
   reduceMotion: boolean;
   revealAll?: boolean;
+  minimumFontScale?: number;
+  numberOfLines?: number;
   style: StyleProp<TextStyle>;
   text: string;
 }) {
@@ -281,17 +317,23 @@ function TypewriterText({
   return (
     <View style={styles.typewriterFrame}>
       <ThemedText
+        adjustsFontSizeToFit={Boolean(numberOfLines)}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
         maxFontSizeMultiplier={1.3}
+        minimumFontScale={minimumFontScale}
+        numberOfLines={numberOfLines}
         style={[style, styles.typewriterMeasure]}
         lightColor={lightColor}
         darkColor={darkColor}>
         {text}
       </ThemedText>
       <ThemedText
+        adjustsFontSizeToFit={Boolean(numberOfLines)}
         accessibilityLabel={text}
         maxFontSizeMultiplier={1.3}
+        minimumFontScale={minimumFontScale}
+        numberOfLines={numberOfLines}
         selectable={complete}
         style={[StyleSheet.absoluteFill, style]}
         lightColor={lightColor}
@@ -327,23 +369,22 @@ const styles = StyleSheet.create({
   },
   speechBubble: {
     backgroundColor: 'rgba(255,248,231,0.96)',
-    borderColor: 'rgba(103,72,39,0.22)',
+    borderColor: 'rgba(141,99,43,0.40)',
     borderCurve: 'continuous',
     borderRadius: 27,
-    borderWidth: 1,
+    borderWidth: 2,
     boxShadow:
-      '0 12px 30px rgba(48,33,18,0.22), inset 0 1px 0 rgba(255,255,255,0.92)',
-    gap: 8,
-    paddingHorizontal: 17,
-    paddingVertical: 16,
+      '0 10px 24px rgba(33,25,15,0.24), inset 0 0 0 3px rgba(255,255,255,0.36), inset 0 1px 0 rgba(255,255,255,0.94)',
+    gap: 5,
+    paddingHorizontal: 18,
+    paddingVertical: 13,
     width: '100%',
   },
   speechBubblePressed: { opacity: 0.9, transform: [{ scale: 0.985 }] },
   speechBubbleQuestionnaire: {
-    minHeight: 146,
-    paddingBottom: 20,
+    paddingBottom: 15,
     paddingHorizontal: 18,
-    paddingTop: 20,
+    paddingTop: 15,
   },
   speechTail: {
     backgroundColor: '#FFF8E7',
@@ -351,29 +392,31 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderRightColor: 'rgba(103,72,39,0.18)',
     borderRightWidth: 1,
-    bottom: 34,
+    bottom: -11,
     height: 22,
     position: 'absolute',
-    right: -10,
-    transform: [{ rotate: '-45deg' }],
+    left: '50%',
+    marginLeft: -11,
+    transform: [{ rotate: '45deg' }],
     width: 22,
   },
   title: {
     ...KatchaUI.type.companionDisplay,
-    fontSize: 31,
-    lineHeight: 33,
+    fontSize: 22,
+    lineHeight: 27,
+    textAlign: 'center',
   },
   titleCompact: {
-    fontSize: 28,
-    lineHeight: 30,
+    fontSize: 20,
+    lineHeight: 25,
   },
   titleMedium: {
-    fontSize: 25,
-    lineHeight: 29,
+    fontSize: 20,
+    lineHeight: 25,
   },
   titleLong: {
-    fontSize: 21,
-    lineHeight: 25,
+    fontSize: 18,
+    lineHeight: 23,
   },
   questionTitle: {
     fontSize: 22,
@@ -388,4 +431,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
   },
+  nameplate: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(35,42,31,0.84)',
+    borderColor: 'rgba(244,220,152,0.42)',
+    borderCurve: 'continuous',
+    borderRadius: 18,
+    borderWidth: 1,
+    boxShadow: '0 7px 16px rgba(17,24,17,0.32), inset 0 1px 0 rgba(255,255,255,0.14)',
+    gap: 0,
+    left: '50%',
+    marginLeft: -92,
+    minHeight: 50,
+    paddingHorizontal: 18,
+    paddingVertical: 5,
+    position: 'absolute',
+    width: 184,
+    zIndex: 5,
+  },
+  nameplateEyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 0.8, lineHeight: 12 },
+  nameplateName: { ...KatchaUI.type.companionName, fontSize: 23, lineHeight: 27, textAlign: 'center' },
 });

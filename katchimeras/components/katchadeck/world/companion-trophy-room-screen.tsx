@@ -69,7 +69,7 @@ export function CompanionTrophyRoomScreen({ creatureId, embedded = false }: { cr
   );
   const unlocked = entries.filter((entry) => entry.record).length;
   const companionSource = family?.anchorVisualKey
-    ? getCreatureVisual(family.anchorVisualKey).source
+    ? getCreatureVisual(family.anchorVisualKey, 'grown').source
     : null;
   const environmentKey = todayKatchimeraExplorationBackgroundKeyForEnvironment(family?.anchorVisualKey);
   const maxWidth = Math.min(720, width);

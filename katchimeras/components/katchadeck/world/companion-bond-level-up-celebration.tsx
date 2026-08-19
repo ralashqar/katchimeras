@@ -45,7 +45,7 @@ export function CompanionBondLevelUpCelebration({ onContinue, receipt }: {
   const progress = useSharedValue(reduceMotion ? 1 : 0);
   const familyId = familyIdFromCompanionId(receipt.creatureId);
   const family = familyId ? katchimeraFamilyById.get(familyId) : null;
-  const companionSource = family?.anchorVisualKey ? getCreatureVisual(family.anchorVisualKey).source : null;
+  const companionSource = family?.anchorVisualKey ? getCreatureVisual(family.anchorVisualKey, 'grown').source : null;
   const next = companionBondProgressForTotal(receipt.afterTotal);
   const compactHeight = height < 740;
   const heroSize = Math.min(width * 0.72, height * (compactHeight ? 0.29 : 0.32), 310);

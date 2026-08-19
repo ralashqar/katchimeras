@@ -1,5 +1,6 @@
 import { CREATURE_HATCHLING_ALPHA_BOUNDS } from '@/constants/creature-hatchling-alpha-bounds.gen';
 import type { HomeVisualKey } from '@/types/home';
+import type { CreatureGrowthStage } from '@/utils/creature-art';
 
 const DEFAULT_ALPHA_BOUNDS = { left: 0.2, top: 0.05, right: 0.8, bottom: 0.94 };
 
@@ -20,8 +21,15 @@ export function resolveCreatureGroundShadowLayout(
   visualKey: HomeVisualKey,
   frameSize: number,
   sizeMultiplier = 1,
+  stage: CreatureGrowthStage = 'hatchling',
 ): CreatureGroundShadowLayout {
-  const bounds = CREATURE_HATCHLING_ALPHA_BOUNDS[visualKey] ?? DEFAULT_ALPHA_BOUNDS;
+  // Mature cutouts predate the generated hatchling measurements and use a
+  // consistent square presentation canvas. Never borrow a hatchling's body
+  // bounds for the persistent companion: it can move the shadow well away
+  // from the grown character's feet.
+  const bounds = stage === 'hatchling'
+    ? CREATURE_HATCHLING_ALPHA_BOUNDS[visualKey] ?? DEFAULT_ALPHA_BOUNDS
+    : DEFAULT_ALPHA_BOUNDS;
   const visibleWidth = Math.max(1, (bounds.right - bounds.left) * frameSize);
   const baseWidth = Math.min(
     frameSize * 0.42,

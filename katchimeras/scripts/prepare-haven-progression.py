@@ -11,7 +11,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageFilter
+import numpy as np
 
 from hex_tile_alpha import postprocess_hex_tile_edges, resize_rgba_premultiplied
 
@@ -94,13 +95,66 @@ def black_composite(alpha_path: Path, output: Path) -> None:
         black.convert("RGB").save(output)
 
 
-def normalize_matte(matted_path: Path, alpha_output: Path, canonical_size: int) -> None:
-    """Apply the shared edge treatment and normalize without restoring chroma pixels."""
+def chroma_foreground_mask(source: Image.Image, target_size: tuple[int, int]) -> np.ndarray:
+    """Return non-chroma pixels enclosed by the outer magenta backdrop.
+
+    BiRefNet is useful for the antialiased outer silhouette, but it can classify
+    large quiet floors as background. The generated chroma source is authoritative
+    for enclosed interior pixels. Magenta-like pixels are never restored, even
+    when a landmark arch or similar shape encloses them away from the canvas edge.
+    Warm props, shadows, and quiet floor regions remain eligible for restoration.
+    """
+    rgb = source.convert("RGB").resize(target_size, Image.Resampling.LANCZOS)
+    pixels = np.asarray(rgb).astype(np.int16)
+    red, green, blue = (pixels[..., channel] for channel in range(3))
+    chroma = (
+        (red > 160)
+        & (blue > 140)
+        & (green < 130)
+        & ((red - green) > 70)
+        & ((blue - green) > 55)
+    )
+    outside = np.zeros_like(chroma)
+    outside[0, :] = chroma[0, :]
+    outside[-1, :] = chroma[-1, :]
+    outside[:, 0] = chroma[:, 0]
+    outside[:, -1] = chroma[:, -1]
+    while True:
+        grown = outside.copy()
+        grown[1:, :] |= outside[:-1, :]
+        grown[:-1, :] |= outside[1:, :]
+        grown[:, 1:] |= outside[:, :-1]
+        grown[:, :-1] |= outside[:, 1:]
+        grown &= chroma
+        if np.array_equal(grown, outside):
+            break
+        outside = grown
+    return (~outside) & (~chroma)
+
+
+def normalize_matte(
+    matted_path: Path,
+    source_path: Path,
+    alpha_output: Path,
+    canonical_size: int,
+) -> None:
+    """Combine BiRefNet's exterior edge with the chroma source's intact interior."""
     with Image.open(matted_path) as matted_image:
         rgba = matted_image.convert("RGBA")
-    black_source = Image.new("RGBA", rgba.size, (0, 0, 0, 255))
-    black_source.alpha_composite(rgba)
-    processed = postprocess_hex_tile_edges(rgba, black_source)
+    with Image.open(source_path) as source_image:
+        source_rgb = source_image.convert("RGB").resize(rgba.size, Image.Resampling.LANCZOS)
+        foreground = chroma_foreground_mask(source_image, rgba.size)
+    safe_interior = np.asarray(
+        Image.fromarray(foreground.astype(np.uint8) * 255, mode="L").filter(ImageFilter.MinFilter(7))
+    ) == 255
+    pixels = np.asarray(rgba).copy()
+    source_pixels = np.asarray(source_rgb)
+    restore = safe_interior & (pixels[..., 3] < 255)
+    pixels[..., :3] = np.where(restore[..., None], source_pixels, pixels[..., :3])
+    pixels[..., 3] = np.where(restore, 255, pixels[..., 3])
+    print("chroma-backed interior restore:", int(np.count_nonzero(restore)), "px")
+    restored = Image.fromarray(pixels, mode="RGBA")
+    processed = postprocess_hex_tile_edges(restored, source_rgb)
     if processed.size != (canonical_size, canonical_size):
         processed = resize_rgba_premultiplied(processed, (canonical_size, canonical_size))
     alpha_output.parent.mkdir(parents=True, exist_ok=True)
@@ -158,7 +212,7 @@ def prepare_stage(
     matted = work / "matted.png"
     if not matted.is_file():
         raise SystemExit(f"BiRefNet did not produce {matted}")
-    normalize_matte(matted, alpha_output, canonical_size)
+    normalize_matte(matted, source, alpha_output, canonical_size)
     validation = validate_alpha(alpha_output)
     black_composite(alpha_output, black_output)
     minimum_margin = min(validation["margins"].values())

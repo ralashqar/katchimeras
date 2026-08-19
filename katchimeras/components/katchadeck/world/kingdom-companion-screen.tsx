@@ -19,11 +19,12 @@ import { hasQuickGoalTemplates } from '@/constants/companion-quick-goals';
 import { AppFontFamilies, KatchaDeckUI } from '@/constants/theme';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
-import type { CompanionDiscoveryRecord } from '@/types/merge-world';
+import type { CompanionDiscoveryRecord, MergeCharacterId } from '@/types/merge-world';
 import { useKingdomQuests } from '@/hooks/use-kingdom-quests';
 import { useCompanionQuickGoals } from '@/hooks/use-companion-quick-goals';
 import { useCompanionAchievements } from '@/hooks/use-companion-achievements';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
+import { useHavenTileStages } from '@/hooks/use-haven-tile-stages';
 import type { CompanionReflectionDraft } from '@/types/companion-interaction';
 import type { JournalSource, ManualJournalSubmission } from '@/types/home';
 import type { KatchimeraFamilyId, KatchimeraSkinId, KatchimeraWardrobeState } from '@/types/katchimera';
@@ -224,6 +225,7 @@ export function KingdomCompanionScreen({
   const archive = useAllDays();
   const { days } = archive;
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
+  const havenTileStages = useHavenTileStages();
   const kingdom = useMemo(() => {
     const derived = withDevAvailableKatchimeras(
       withDiscoveredKatchimeras(deriveKingdom(days), discoveryRecords),
@@ -363,6 +365,11 @@ export function KingdomCompanionScreen({
       ?? 'home'
     );
   }, [quests.selectedResident?.creature]);
+  const selectedHomeEnvironmentStage = useMemo(() => {
+    const familyId = quests.selectedResident?.creature.familyId;
+    if (!familyId) return 0;
+    return havenTileStages[familyId as MergeCharacterId] ?? 0;
+  }, [havenTileStages, quests.selectedResident?.creature.familyId]);
   const selectedSkinOptions = useMemo(
     () =>
       selectedFamilyId
@@ -542,6 +549,7 @@ export function KingdomCompanionScreen({
           accentColor={quests.selectedResident.creature.accentColor}
           questionnaireBackground={kingdomBackground}
           homeEnvironmentKey={selectedHomeEnvironmentKey}
+          homeEnvironmentStage={selectedHomeEnvironmentStage}
           houseLevel={quests.selectedResident.resident.houseLevel}
           initialDestination={quests.selectedResident.destination}
           initialConversationDefinitionId={ftueConversationDefinitionId}

@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 
-import { CompanionMergeRequestTray } from '@/components/katchadeck/world/companion-merge-request-tray';
+import { COMPANION_MERGE_REQUEST_PALETTE, CompanionMergeRequestTray } from '@/components/katchadeck/world/companion-merge-request-tray';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { KatchaUI } from '@/constants/katcha-ui';
 import { beginMossproutChapterOne, beginMossproutReturn, loadMossproutStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
 
 const REQUESTS = {
@@ -35,17 +36,17 @@ export function MossproutStoryStage({ onMore, onOpenConversation, onOpenMerge }:
 
   return <Animated.View entering={FadeInUp.duration(220)} style={styles.stage}>
     <View style={styles.heading}>
-      <View style={styles.badge}><IconSymbol color="#F5FFE4" name="leaf.fill" size={20} /></View>
+      <View style={styles.badge}><IconSymbol color={KatchaUI.companionScenePanel.accentInk} name="leaf.fill" size={20} /></View>
       <View style={styles.copy}>
-        <ThemedText style={styles.eyebrow} lightColor="#647A3D" darkColor="#647A3D">WHERE THE WATER GOES</ThemedText>
-        <ThemedText selectable style={styles.title} lightColor="#344127" darkColor="#344127">{title}</ThemedText>
+        <ThemedText style={styles.eyebrow} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>WHERE THE WATER GOES</ThemedText>
+        <ThemedText selectable style={styles.title} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>{title}</ThemedText>
       </View>
     </View>
-    <ThemedText selectable style={styles.body} lightColor="#596149" darkColor="#596149">{body}</ThemedText>
+    <ThemedText numberOfLines={2} selectable style={styles.body} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{body}</ThemedText>
     <CompanionMergeRequestTray
       accessibilityLabel="Mossprout's requested merge items"
       eyebrow="NEXT REQUEST"
-      palette={{ trayBackground: 'rgba(255,255,255,0.5)', trayBorder: 'rgba(100,122,61,0.24)', rowBackground: '#F9F6DE', eyebrow: '#647A3D', count: '#526033', title: '#344127', description: '#667054', item: '#536336', badgeBackground: '#657B3E', badgeText: '#F7FFE8' }}
+      palette={COMPANION_MERGE_REQUEST_PALETTE}
       requests={requests}
     />
     <Pressable accessibilityRole="button" onPress={() => {
@@ -54,20 +55,20 @@ export function MossproutStoryStage({ onMore, onOpenConversation, onOpenMerge }:
       else if (story.status === 'intro_available') { const next = beginMossproutChapterOne(); onOpenMerge(next.activeOrderId); }
       else onOpenMerge(story.activeOrderId);
     }} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
-      <IconSymbol color="#F7FFE8" name={returnReady ? 'envelope.fill' : complete ? 'bubble.left.and.bubble.right.fill' : 'leaf.fill'} size={18} />
-      <ThemedText style={styles.primaryLabel} lightColor="#F7FFE8" darkColor="#F7FFE8">{complete ? 'More with Mossprout' : returnReady ? 'Read Mossprout’s note' : 'Open the garden'}</ThemedText>
-      <IconSymbol color="#F7FFE8" name="arrow.right" size={16} />
+      <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name={returnReady ? 'envelope.fill' : complete ? 'bubble.left.and.bubble.right.fill' : 'leaf.fill'} size={18} />
+      <ThemedText style={styles.primaryLabel} lightColor={KatchaUI.companionScenePanel.accentInk} darkColor={KatchaUI.companionScenePanel.accentInk}>{complete ? 'More with Mossprout' : returnReady ? 'Read Mossprout’s note' : 'Open the garden'}</ThemedText>
+      <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name="arrow.right" size={16} />
     </Pressable>
   </Animated.View>;
 }
 
 const styles = StyleSheet.create({
-  stage: { backgroundColor: '#F2F0D2', borderColor: 'rgba(93,113,57,0.3)', borderCurve: 'continuous', borderRadius: 28, borderWidth: 1, boxShadow: '0 12px 28px rgba(53,68,38,0.16)', gap: 14, padding: 18 },
-  heading: { alignItems: 'center', flexDirection: 'row', gap: 12 },
-  badge: { alignItems: 'center', backgroundColor: '#657B3E', borderRadius: 18, height: 48, justifyContent: 'center', width: 48 },
+  stage: { backgroundColor: KatchaUI.companionScenePanel.background, borderColor: KatchaUI.companionScenePanel.border, borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, boxShadow: KatchaUI.companionScenePanel.shadow, gap: 7, padding: 10 },
+  heading: { alignItems: 'center', flexDirection: 'row', gap: 9 },
+  badge: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.accent, borderRadius: 14, height: 40, justifyContent: 'center', width: 40 },
   copy: { flex: 1, gap: 2 }, eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 },
-  title: { fontSize: 21, fontWeight: '900', letterSpacing: -0.35, lineHeight: 25 },
-  body: { fontSize: 13.5, lineHeight: 20 },
-  primary: { alignItems: 'center', backgroundColor: '#657B3E', borderCurve: 'continuous', borderRadius: 19, flexDirection: 'row', gap: 10, minHeight: 54, paddingHorizontal: 15 },
-  primaryLabel: { flex: 1, fontSize: 15, fontWeight: '900' }, pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
+  title: { fontSize: 18, fontWeight: '900', letterSpacing: -0.25, lineHeight: 22 },
+  body: { fontSize: 12, lineHeight: 17 },
+  primary: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.accent, borderCurve: 'continuous', borderRadius: 15, flexDirection: 'row', gap: 8, minHeight: 43, paddingHorizontal: 12 },
+  primaryLabel: { flex: 1, fontSize: 13, fontWeight: '900' }, pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
 });

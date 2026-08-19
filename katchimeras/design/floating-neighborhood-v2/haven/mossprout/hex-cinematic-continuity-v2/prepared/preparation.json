@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "character": "mossprout",
+  "backgroundRemoval": "birefnet-matted-output",
+  "createdAt": "2026-08-19T13:25:22.474073+00:00",
+  "records": [
+    {
+      "stage": 0,
+      "sourcePath": "design/floating-neighborhood-v2/haven/mossprout/hex-cinematic-continuity-v2/stage-0-chroma.png",
+      "sourceSha256": "6f2a47286671314decb6f61fa5398eb0dd0d609544104389df56ab6675d755fe",
+      "alphaPath": "design/floating-neighborhood-v2/haven/mossprout/hex-cinematic-continuity-v2/prepared/stage-0-alpha.png",
+      "alphaSha256": "a03ea7c8c1a289ea42f0104376ac65dc4c35ff9d4a945e043f427f63a7ab3d71",
+      "blackCandidatePath": "design/floating-neighborhood-v2/haven/mossprout/hex-cinematic-continuity-v2/prepared/stage-0.png",
+      "blackCandidateSha256": "a05235ffeacb4a42672893343b752e083ea549aceb9a6e558b267809bdc228a3",
+      "validation": {
+        "size": [
+          2048,
+          2048
+        ],
+        "bounds": [
+          86,
+          253,
+          1965,
+          1900
+        ],
+        "margins": {
+          "left": 86,
+          "top": 253,
+          "right": 83,
+          "bottom": 148
+        },
+        "opaquePixels": 2069146
+      },
+      "status": "prepared"
+    },
+    {
+      "stage": 1,
+      "sourcePath": "design/floating-neighborhood-v2/haven/mossprout/hex-cinematic-continuity-v2/stage-1-chroma.png",
+      "sourceSha256": "19944760797f90d2519657d43d63bc15a406723b087dd8a9f9ea9422fa131a99",
+      "alphaPath": "design/floating-neighborhood-v2/haven/mossprout/hex-cinematic-continuity-v2/prepared/stage-1-alpha.png",
+      "alphaSha256": "ae4b012b79f6464a59576c616012600e30760c87d76bc684b010fdeb9778ae36",
+      "blackCandidatePath": "design/floating-neighborhood-v2/haven/mossprout/hex-cinematic-continuity-v2/prepared/stage-1.png",
+      "blackCandidateSha256": "6332ec4493c982ca4a121288974965a6a22bd73d0f4cb0edb2b5abcfd1805d62",
+      "validation": {
+        "size": [
+          2048,
+          2048
+        ],
+        "bounds": [
+          88,
+          255,
+          1965,
+          1900
+        ],
+        "margins": {
+          "left": 88,
+          "top": 255,
+          "right": 83,
+          "bottom": 148
+        },
+        "opaquePixels": 2068758
+      },
+      "status": "prepared"
+    },
+    {
+      "stage": 2,
+      "sourcePath": "design/floating-neighborhood-v2/haven/mossprout/hex-cinematic-continuity-v2/stage-2-chroma.png",
+      "sourceSha256": "2290749e5c911c1e86cf86c87daf980a7c5b3aa1ac3ce0445c2028a527dfb9d3",
+      "alphaPath": "design/floating-neighborhood-v2/haven/mossprout/hex-cinematic-continuity-v2/prepared/stage-2-alpha.png",
+      "alphaSha256": "c9c62f77438dba1d47bd0f59d6c732f38a4dbf38309018ef1845cfb930f97cd1",
+      "blackCandidatePath": "design/floating-neighborhood-v2/haven/mossprout/hex-cinematic-continuity-v2/prepared/stage-2.png",
+      "blackCandidateSha256": "5d236fa1e0e58c8c6ffa6b6902da86d63563bbce494b899f015e0f9dd41d724e",
+      "validation": {
+        "size": [
+          2048,
+          2048
+        ],
+        "bounds": [
+          88,
+          250,
+          1963,
+          1903
+        ],
+        "margins": {
+          "left": 88,
+          "top": 250,
+          "right": 85,
+          "bottom": 145
+        },
+        "opaquePixels": 2077501
+      },
+      "status": "prepared"
+    },
+    {
+      "stage": 3,
+      "sourcePath": "design/floating-neighborhood-v2/haven/mossprout/hex-cinematic-continuity-v2/stage-3-chroma.png",
+      "sourceSha256": "1ee710ed3925ffea69941a8d700cace2fbfd51d7e5e12877045dc6cb1a1786b7",
+      "alphaPath": "design/floating-neighborhood-v2/haven/mossprout/hex-cinematic-continuity-v2/prepared/stage-3-alpha.png",
+      "alphaSha256": "20378ae643e1cd488910ee21709eb68eedfa4d85db0116ce5fffa6b346bbf43a",
+      "blackCandidatePath": "design/floating-neighborhood-v2/haven/mossprout/hex-cinematic-continuity-v2/prepared/stage-3.png",
+      "blackCandidateSha256": "f2a2d1bfe6172a54c177c13a4ff476fe86e1c2240404fe0ca96d2b1ee75691fc",
+      "validation": {
+        "size": [
+          2048,
+          2048
+        ],
+        "bounds": [
+          87,
+          253,
+          1963,
+          1903
+        ],
+        "margins": {
+          "left": 87,
+          "top": 253,
+          "right": 85,
+          "bottom": 145
+        },
+        "opaquePixels": 2079683
+      },
+      "status": "prepared"
+    },
+    {
+      "stage": 4,
+      "sourcePath": "design/floating-neighborhood-v2/haven/mossprout/hex-cinematic-continuity-v2/stage-4-chroma.png",
+      "sourceSha256": "d88405db10bdf17ee99165c7792969297871afe650192904cbf09651e32221af",
+      "alphaPath": "design/floating-neighborhood-v2/haven/mossprout/hex-cinematic-continuity-v2/prepared/stage-4-alpha.png",
+      "alphaSha256": "8887175a12b110d62c9437e87df6e963b58358186bd95d07fc4b8b90a4d43718",
+      "blackCandidatePath": "design/floating-neighborhood-v2/haven/mossprout/hex-cinematic-continuity-v2/prepared/stage-4.png",
+      "blackCandidateSha256": "9a737f866d53af9790a019198c60a9a87e0ccc8f69d3f284b52b88dc73c32c1c",
+      "validation": {
+        "size": [
+          2048,
+          2048
+        ],
+        "bounds": [
+          88,
+          214,
+          1960,
+          1906
+        ],
+        "margins": {
+          "left": 88,
+          "top": 214,
+          "right": 88,
+          "bottom": 142
+        },
+        "opaquePixels": 2113525
+      },
+      "status": "prepared"
+    }
+  ]
+}

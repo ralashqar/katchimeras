@@ -1,6 +1,6 @@
 # Haven environment art pipeline
 
-This is the reusable production path for a Katchimera's five linear Haven environment states. Mossprout is the reference implementation.
+This is the reusable production path for a Katchimera's five linear Haven environment states. Mossprout and Steppling are the initial references. The validated production batches currently cover Feastle, Bedrotte, Pagelet, Gatherglow, Tasklet, and Shellio.
 
 The pipeline generates five separate square images, removes their chroma backgrounds, reviews them as a complete set, and promotes them atomically to the canonical PNG and runtime WebP assets. A grid or contact sheet may be useful for review, but it is never cropped into production art.
 
@@ -88,7 +88,9 @@ For every task:
 6. Copy the accepted built-in output into the task's `expectedOutputPath`, named `stage-N-chroma.png`.
 7. Continue only after that dependency exists.
 
-The image generator may vary the magenta slightly despite the prompt. That is expected; preparation uses the project's BiRefNet matte instead of exact color deletion.
+The image generator may vary the magenta slightly despite the prompt. That is expected; preparation combines the project's BiRefNet outer matte with an edge-connected chroma silhouette instead of deleting one exact color.
+
+Landmark arches and other open structures may enclose background away from the canvas edge. Preparation explicitly excludes every magenta-like pixel from interior restoration, so these openings remain transparent instead of becoming solid pink cutouts.
 
 Endpoint approval is important. Before generating Stage 2, confirm that Stage 0 and Stage 4 share the same island shell and camera but have a large, readable difference in floor coverage, silhouette, and landmark development.
 
@@ -103,7 +105,7 @@ python scripts/prepare-haven-progression.py `
   --force
 ```
 
-This runs the existing BiRefNet Heavy matting path and creates:
+This runs the existing BiRefNet Heavy matting path plus chroma-backed interior repair and creates:
 
 ```text
 prepared/stage-0.png
@@ -114,7 +116,7 @@ prepared/stage-4-alpha.png
 prepared/preparation.json
 ```
 
-`stage-N-alpha.png` is the 2048px transparent master. `stage-N.png` is its exact 2048px black composite for canonical source compatibility. The preparer intentionally starts from the pipeline's raw `matted.png`, applies the shared edge treatment, and uses premultiplied-alpha resizing. Do not substitute the pipeline's chroma-backed `final.png`, because source-backed interior restoration can bring back the generated chroma field.
+`stage-N-alpha.png` is the 2048px transparent master. `stage-N.png` is its exact 2048px black composite for canonical source compatibility. The preparer starts from the pipeline's raw `matted.png`, retains BiRefNet's antialiased exterior edge, restores only the safe interior enclosed by edge-connected magenta, applies the shared edge treatment, and uses premultiplied-alpha resizing. This prevents semantic matting from cutting holes in broad quiet floors without restoring the exterior chroma field.
 
 Preparation validates square source size, transparent corners, visible coverage, and records source/output hashes and alpha bounds.
 

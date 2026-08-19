@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 2,
+  "character": "feastle",
+  "displayName": "Feastle",
+  "stageCount": 5,
+  "canonicalNeutralSource": "design/floating-neighborhood-v2/floating-neutral-source.png",
+  "styleReferences": ["design/floating-neighborhood-v2/floating-feastle-source.png"],
+  "generation": { "engine": "codex-built-in-imagegen", "minimumSourceSize": 1024, "canonicalSize": 2048, "background": "#FF00FF", "backgroundRemoval": "birefnet-matted-output", "candidateCount": 1 },
+  "generationOrder": [0, 4, 2, 1, 3],
+  "referenceGraph": {
+    "0": { "kind": "endpoint", "references": ["canonicalNeutralSource", "styleReferences"] },
+    "4": { "kind": "endpoint", "references": ["canonicalNeutralSource", "styleReferences"] },
+    "2": { "kind": "interpolation", "between": [0, 4] },
+    "1": { "kind": "interpolation", "between": [0, 2] },
+    "3": { "kind": "interpolation", "between": [2, 4] }
+  },
+  "invariants": {
+    "geometry": [
+      "Preserve the exact square canvas, flat-top hex footprint, camera, scale, deep tapered island, centered recessed front stairs, and transparent padding.",
+      "Keep one small circular standing patch in the lower third, horizontally centered immediately above the front stairs.",
+      "The standing patch is only large enough for Feastle and remains at the same anchor in every stage.",
+      "Allow the kitchen to grow around the standing patch without turning the whole middle into empty floor."
+    ],
+    "style": [
+      "Premium cozy stylized 3D toy diorama matching the approved Feastle runtime tile.",
+      "Chunky rounded clay-like forms, broad soft bevels, matte simplified materials, low-frequency surfaces, warm diffuse light, and clean silhouettes.",
+      "Use Feastle's sage green, terracotta, biscuit cream, honey timber, and amber palette.",
+      "Every important feature must remain readable at 256 pixels."
+    ],
+    "persistentLandmarks": [
+      "The small rear-left hearth develops into the signature grand community oven without changing its anchor.",
+      "The rear-right prep point develops into the main serving counter and remains rear-right.",
+      "The upper-left seating point and upper-right refreshment point remain in their respective sides.",
+      "The small lower-center character standing patch remains open at every stage."
+    ],
+    "exclude": ["creature", "egg", "text", "readable writing", "watermark", "bridge", "large central platform", "standing patch in the vertical center", "tiny food pieces", "tableware clutter", "crumbs", "steam particles", "individual herbs", "pebbles", "cracks", "specks", "realistic textures"]
+  },
+  "stages": [
+    { "id": 0, "key": "feastle_haven_stage_0", "name": "Cold Hearth", "narrative": "Feastle has found a place to cook, but the old hearth and empty floor cannot yet welcome anyone.", "floor": "Mostly bare warm terracotta earth with two or three broad worn cream patches and ample unfinished space.", "landmark": "One tiny unlit cream-stone hearth shell at the rear-left.", "props": ["one empty broad crate at rear-right", "one large clay herb pot at upper-left"], "palette": ["faded terracotta", "biscuit cream", "muted sage", "pale timber"], "lighting": "Soft neutral daylight with no active hearth glow.", "density": "Very sparse, practical, and visibly incomplete." },
+    { "id": 1, "key": "feastle_haven_stage_1", "name": "First Warm Meal", "narrative": "A repaired fire and one useful table make the first shared meal possible.", "floor": "Warm terracotta floor remains dominant with a few broad cream kitchen slabs near the rear.", "landmark": "The same rear-left hearth is repaired, lit, and gains one rounded chimney.", "props": ["one simple prep table at rear-right", "one two-seat bench at upper-left", "one oversized herb pot at upper-right"], "palette": ["terracotta", "biscuit cream", "sage green", "honey timber", "soft amber"], "lighting": "Friendly daylight with a restrained warm hearth glow.", "density": "A modest first kitchen made from large useful shapes." },
+    { "id": 2, "key": "feastle_haven_stage_2", "name": "Working Kitchen", "narrative": "Feastle establishes a dependable place for preparing food and looking after everyday needs.", "floor": "Six to eight broad softly beveled terracotta kitchen tiles establish the room while the lower standing patch remains open.", "landmark": "The rear-left hearth becomes a compact cream-stone oven with terracotta roof and broad arched opening.", "props": ["one serving counter and large soup pot at rear-right", "one chunky picnic bench at upper-left", "one drink trolley at upper-right", "two broad herb pots"], "palette": ["terracotta", "sage green", "biscuit cream", "honey timber", "amber"], "lighting": "Soft warm daylight with one oven glow and two broad lantern pools.", "density": "Clearly established and generous without food clutter." },
+    { "id": 3, "key": "feastle_haven_stage_3", "name": "Shared Feast Court", "narrative": "The kitchen opens into a welcoming table where ordinary meals become moments of connection.", "floor": "Rich broad terracotta and cream floor masses frame the standing patch without creating a central plaza.", "landmark": "The same oven grows into a rounded open-air feast kitchen with a wider chimney and warm canopy.", "props": ["the established rear-right serving counter", "a long rounded communal table along the upper-middle edge", "the upper-left bench", "the upper-right drink trolley", "three broad amber lanterns"], "palette": ["deep terracotta", "sage green", "warm cream", "golden timber", "amber"], "lighting": "Golden afternoon light with warm oven and lantern glow.", "density": "Rich and celebratory, composed from a few large readable forms." },
+    { "id": 4, "key": "feastle_haven_stage_4", "name": "Grand Community Hearth", "narrative": "Feastle's home becomes the Haven's definitive gathering place for warmth, nourishment, and celebration.", "floor": "Polished low-detail terracotta kitchen paving surrounds the small lower standing patch with strong broad color masses.", "landmark": "The same rear-left oven culminates in a signature grand rounded community hearth with tall terracotta chimney, broad glowing arch, and one oversized herb-leaf emblem without text.", "props": ["a resolved rear-right serving kitchen", "a broad curved communal feast table", "the upper-left garden seating nook", "the upper-right refreshment trolley", "four chunky amber lanterns", "two oversized produce bowls"], "palette": ["rich terracotta", "deep sage", "biscuit cream", "golden timber", "warm amber"], "lighting": "Warm celebratory golden daylight with a strong but soft hearth glow.", "density": "Definitive signature destination with abundance expressed through bold silhouettes, not micro-detail." }
+  ]
+}

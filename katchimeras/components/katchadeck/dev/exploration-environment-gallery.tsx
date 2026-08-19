@@ -22,6 +22,7 @@ import {
 import { DevAtmosphereLayer } from '@/components/katchadeck/world/atmosphere-layer';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { EXPLORATION_ENVIRONMENT_PROGRESSION_SOURCES } from '@/constants/exploration-environment-progression-sources';
 import { AppFontFamilies, KatchaDeckUI, Lantern } from '@/constants/theme';
 import { DEV_EXPLORATION_ENVIRONMENT_PREVIEWS } from '@/utils/dev-exploration-environments';
 import { safeGoBack } from '@/utils/safe-navigation';
@@ -35,17 +36,40 @@ export function ExplorationEnvironmentGallery() {
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedEnvironmentStage, setSelectedEnvironmentStage] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(true);
   const selected =
     DEV_EXPLORATION_ENVIRONMENT_PREVIEWS[selectedIndex]
     ?? DEV_EXPLORATION_ENVIRONMENT_PREVIEWS[0];
+  const selectedProgression = selected
+    ? EXPLORATION_ENVIRONMENT_PROGRESSION_SOURCES[selected.backgroundKey]
+    : undefined;
+  const selectedStageCount = selectedProgression?.length ?? 0;
+  const selectedStage = selectedStageCount > 0
+    ? Math.min(selectedEnvironmentStage, selectedStageCount - 1)
+    : null;
+
+  const selectEnvironment = useCallback((index: number) => {
+    setSelectedEnvironmentStage(0);
+    setSelectedIndex(index);
+  }, []);
 
   const selectAdjacent = useCallback((direction: -1 | 1) => {
+    setSelectedEnvironmentStage(0);
     setSelectedIndex((current) => {
       const count = DEV_EXPLORATION_ENVIRONMENT_PREVIEWS.length;
       return count > 0 ? (current + direction + count) % count : 0;
     });
   }, []);
+  const selectAdjacentStage = useCallback((direction: -1 | 1) => {
+    if (selectedStageCount < 2) {
+      return;
+    }
+    setSelectedEnvironmentStage((current) => (
+      (Math.min(current, selectedStageCount - 1) + direction + selectedStageCount)
+      % selectedStageCount
+    ));
+  }, [selectedStageCount]);
   const motion = useTodayExplorationBackgroundMotion({
     activeKey: selected?.backgroundKey,
     enabled: selected != null,
@@ -70,7 +94,9 @@ export function ExplorationEnvironmentGallery() {
         <View style={styles.preview}>
           <TodayExplorationBackground
             backgroundKey={selected.backgroundKey}
+            environmentStage={selectedStage}
             imageSize={motion.imageSize}
+            key={`${selected.backgroundKey}:${selectedStage ?? 'base'}`}
             translateX={motion.translateX}
           />
           <TodayExplorationSceneLayer translateX={motion.translateX}>
@@ -195,7 +221,7 @@ export function ExplorationEnvironmentGallery() {
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
                   key={preview.backgroundKey}
-                  onPress={() => setSelectedIndex(index)}
+                  onPress={() => selectEnvironment(index)}
                   style={({ pressed }) => [
                     styles.environmentChip,
                     active ? styles.environmentChipActive : null,
@@ -212,6 +238,78 @@ export function ExplorationEnvironmentGallery() {
               );
             })}
           </ScrollView>
+
+          {selectedStage != null && selectedStageCount > 1 ? (
+            <View style={styles.levelControl}>
+              <View style={styles.levelCopy}>
+                <ThemedText
+                  style={styles.levelTitle}
+                  lightColor={Lantern.moon50}
+                  darkColor={Lantern.moon50}>
+                  Level art
+                </ThemedText>
+                <ThemedText
+                  selectable
+                  style={styles.levelCounter}
+                  lightColor={Lantern.moon300}
+                  darkColor={Lantern.moon300}>
+                  {selectedStage + 1}/{selectedStageCount}
+                </ThemedText>
+              </View>
+
+              <View style={styles.levelStepper}>
+                <Pressable
+                  accessibilityLabel="Previous environment level"
+                  accessibilityRole="button"
+                  hitSlop={6}
+                  onPress={() => selectAdjacentStage(-1)}
+                  style={({ pressed }) => [
+                    styles.levelArrow,
+                    pressed ? styles.pressed : null,
+                  ]}>
+                  <IconSymbol color={Lantern.moon50} name="chevron.left" size={15} />
+                </Pressable>
+
+                <View accessibilityRole="tablist" style={styles.levelTabs}>
+                  {selectedProgression?.map((_, stage) => {
+                    const active = stage === selectedStage;
+                    return (
+                      <Pressable
+                        accessibilityLabel={`Environment level ${stage + 1}`}
+                        accessibilityRole="tab"
+                        accessibilityState={{ selected: active }}
+                        key={stage}
+                        onPress={() => setSelectedEnvironmentStage(stage)}
+                        style={({ pressed }) => [
+                          styles.levelTab,
+                          active ? styles.levelTabActive : null,
+                          pressed ? styles.pressed : null,
+                        ]}>
+                        <ThemedText
+                          style={styles.levelTabLabel}
+                          lightColor={active ? Lantern.emberInk : Lantern.moon50}
+                          darkColor={active ? Lantern.emberInk : Lantern.moon50}>
+                          {stage + 1}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <Pressable
+                  accessibilityLabel="Next environment level"
+                  accessibilityRole="button"
+                  hitSlop={6}
+                  onPress={() => selectAdjacentStage(1)}
+                  style={({ pressed }) => [
+                    styles.levelArrow,
+                    pressed ? styles.pressed : null,
+                  ]}>
+                  <IconSymbol color={Lantern.moon50} name="chevron.right" size={15} />
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
 
           <ThemedText
             selectable
@@ -327,6 +425,72 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
+  },
+  levelArrow: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 245, 220, 0.16)',
+    borderCurve: 'continuous',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  levelControl: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.055)',
+    borderColor: 'rgba(255, 245, 220, 0.12)',
+    borderCurve: 'continuous',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+  },
+  levelCopy: {
+    flexShrink: 1,
+    gap: 1,
+  },
+  levelCounter: {
+    fontFamily: AppFontFamilies.manrope,
+    fontSize: 10.5,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '800',
+  },
+  levelStepper: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  levelTab: {
+    alignItems: 'center',
+    borderCurve: 'continuous',
+    borderRadius: 999,
+    height: 28,
+    justifyContent: 'center',
+    width: 28,
+  },
+  levelTabActive: {
+    backgroundColor: Lantern.ember300,
+  },
+  levelTabLabel: {
+    fontFamily: AppFontFamilies.manrope,
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '900',
+  },
+  levelTabs: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 2,
+  },
+  levelTitle: {
+    fontFamily: AppFontFamilies.manrope,
+    fontSize: 11.5,
+    fontWeight: '800',
   },
   pressed: {
     opacity: 0.72,
