@@ -249,7 +249,7 @@ function FtueSpotlight({ frames, opacity, radius, screen, theme }: {
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <SpotlightDimPanels
+      <SpotlightDimMask
         color={`rgb(${theme.dimColor})`}
         opacity={dimOpacity}
         screen={screen}
@@ -265,108 +265,32 @@ function FtueSpotlight({ frames, opacity, radius, screen, theme }: {
 
 type AnimatedSpotlightSlot = ReturnType<typeof useAnimatedSpotlightSlot>;
 
-function SpotlightDimPanels({ color, opacity, screen, slot }: {
+function SpotlightDimMask({ color, opacity, screen, slot }: {
   color: string;
   opacity: SharedValue<number>;
   screen: { height: number; width: number };
   slot: AnimatedSpotlightSlot;
 }) {
-  const topStyle = useAnimatedStyle(() => ({
-    height: Math.max(0, slot.y.value),
-    opacity: opacity.value,
-    width: screen.width,
-  }), [screen.width]);
-  const bottomStyle = useAnimatedStyle(() => ({
-    height: Math.max(0, screen.height - slot.y.value - slot.height.value),
-    opacity: opacity.value,
-    top: Math.max(0, slot.y.value + slot.height.value),
-    width: screen.width,
-  }), [screen.height, screen.width]);
-  const leftStyle = useAnimatedStyle(() => ({
+  const spreadRadius = Math.max(1, Math.hypot(screen.width, screen.height));
+  const style = useAnimatedStyle(() => ({
+    borderRadius: slot.corner.value,
     height: Math.max(0, slot.height.value),
+    left: slot.x.value,
     opacity: opacity.value,
-    top: Math.max(0, slot.y.value),
-    width: Math.max(0, slot.x.value),
+    top: slot.y.value,
+    width: Math.max(0, slot.width.value),
   }));
-  const rightStyle = useAnimatedStyle(() => ({
-    height: Math.max(0, slot.height.value),
-    left: Math.max(0, slot.x.value + slot.width.value),
-    opacity: opacity.value,
-    top: Math.max(0, slot.y.value),
-    width: Math.max(0, screen.width - slot.x.value - slot.width.value),
-  }), [screen.width]);
-  const panelStyle = { backgroundColor: color, position: 'absolute' as const };
-  return <>
-    <Animated.View style={[panelStyle, { left: 0, top: 0 }, topStyle]} />
-    <Animated.View style={[panelStyle, { left: 0 }, bottomStyle]} />
-    <Animated.View style={[panelStyle, { left: 0 }, leftStyle]} />
-    <Animated.View style={[panelStyle, rightStyle]} />
-    <SpotlightCornerFillers color={color} opacity={opacity} slot={slot} />
-  </>;
-}
 
-/**
- * The four dim panels leave a rectangular opening. These corner pieces fill the
- * parts outside the spotlight's quarter-circle arcs, turning that opening into
- * a true rounded rectangle without bringing a Skia surface back onto the board.
- */
-function SpotlightCornerFillers({ color, opacity, slot }: {
-  color: string;
-  opacity: SharedValue<number>;
-  slot: AnimatedSpotlightSlot;
-}) {
-  const topLeftStyle = useAnimatedStyle(() => {
-    const corner = Math.max(0, Math.min(slot.corner.value, slot.width.value / 2, slot.height.value / 2));
-    return {
-      borderBottomRightRadius: corner,
-      height: corner,
-      left: slot.x.value,
-      opacity: corner > 0.5 ? opacity.value : 0,
-      top: slot.y.value,
-      width: corner,
-    };
-  });
-  const topRightStyle = useAnimatedStyle(() => {
-    const corner = Math.max(0, Math.min(slot.corner.value, slot.width.value / 2, slot.height.value / 2));
-    return {
-      borderBottomLeftRadius: corner,
-      height: corner,
-      left: slot.x.value + slot.width.value - corner,
-      opacity: corner > 0.5 ? opacity.value : 0,
-      top: slot.y.value,
-      width: corner,
-    };
-  });
-  const bottomLeftStyle = useAnimatedStyle(() => {
-    const corner = Math.max(0, Math.min(slot.corner.value, slot.width.value / 2, slot.height.value / 2));
-    return {
-      borderTopRightRadius: corner,
-      height: corner,
-      left: slot.x.value,
-      opacity: corner > 0.5 ? opacity.value : 0,
-      top: slot.y.value + slot.height.value - corner,
-      width: corner,
-    };
-  });
-  const bottomRightStyle = useAnimatedStyle(() => {
-    const corner = Math.max(0, Math.min(slot.corner.value, slot.width.value / 2, slot.height.value / 2));
-    return {
-      borderTopLeftRadius: corner,
-      height: corner,
-      left: slot.x.value + slot.width.value - corner,
-      opacity: corner > 0.5 ? opacity.value : 0,
-      top: slot.y.value + slot.height.value - corner,
-      width: corner,
-    };
-  });
-  const fillerStyle = [styles.spotlightCornerFiller, { backgroundColor: color }];
-
-  return <>
-    <Animated.View style={[fillerStyle, topLeftStyle]} />
-    <Animated.View style={[fillerStyle, topRightStyle]} />
-    <Animated.View style={[fillerStyle, bottomLeftStyle]} />
-    <Animated.View style={[fillerStyle, bottomRightStyle]} />
-  </>;
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.spotlightDimShadow,
+        { boxShadow: `0 0 0 ${spreadRadius}px ${color}` },
+        style,
+      ]}
+    />
+  );
 }
 
 function NativeSpotlightRing({ slot, theme }: {
@@ -629,7 +553,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     position: 'absolute',
   },
-  spotlightCornerFiller: {
+  spotlightDimShadow: {
+    backgroundColor: 'transparent',
+    borderCurve: 'continuous',
     position: 'absolute',
   },
 });

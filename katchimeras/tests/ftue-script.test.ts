@@ -183,19 +183,18 @@ test('Merge FTUE never inserts guide panels into the fixed board layout', () => 
   assert.match(merge, /Future guidance belongs in an absolute world-space[\s\S]*?tray, counter, and board retain identical frames/);
 });
 
-test('Merge FTUE spotlight is an absolute native-view overlay with transparent target cutouts', () => {
+test('Merge FTUE spotlight uses a lifecycle-safe native rounded cutout', () => {
   const overlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
   const merge = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   assert.match(overlay, /StyleSheet\.absoluteFillObject/);
   assert.match(overlay, /pointerEvents="none"/);
-  assert.match(overlay, /<SpotlightDimPanels/);
-  assert.match(overlay, /<SpotlightCornerFillers/);
-  assert.match(overlay, /borderBottomRightRadius: corner/);
-  assert.match(overlay, /borderBottomLeftRadius: corner/);
-  assert.match(overlay, /borderTopRightRadius: corner/);
-  assert.match(overlay, /borderTopLeftRadius: corner/);
+  assert.match(overlay, /<SpotlightDimMask/);
+  assert.match(overlay, /Math\.hypot\(screen\.width, screen\.height\)/);
+  assert.match(overlay, /borderRadius: slot\.corner\.value/);
+  assert.match(overlay, /boxShadow: `0 0 0 \$\{spreadRadius\}px \$\{color\}`/);
+  assert.doesNotMatch(overlay, /SpotlightCornerFillers|spotlightCornerFiller/);
   assert.match(overlay, /<NativeSpotlightRing slot=\{slot0\}/);
-  assert.doesNotMatch(overlay, /@shopify\/react-native-skia|<Canvas|FillType|usePathValue/);
+  assert.doesNotMatch(overlay, /@shopify\/react-native-skia|<Canvas|usePathValue|BlurMask/);
   assert.match(overlay, /spotlightTransitionDurationMs: 420/);
   assert.match(overlay, /withTiming\(frame\.x, timing\)/);
   assert.match(overlay, /borderColor: theme\.focusRingColor/);

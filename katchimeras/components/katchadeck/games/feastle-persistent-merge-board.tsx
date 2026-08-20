@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { scheduleOnUI } from 'react-native-worklets';
@@ -715,6 +715,46 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
 
   const selectedOccupant = selectedCell == null ? null : presentation.board[selectedCell]?.occupant;
   const selectedDefinitionId = selectedOccupant?.kind === 'item' ? selectedOccupant.definitionId : null;
+  const matchingCells = useMemo(() => {
+    if (selectedCell == null || !selectedDefinitionId) return [];
+    return presentation.board.flatMap((cell, index) => {
+      if (index === selectedCell) return [];
+      const itemMatch = cell.occupant?.kind === 'item' && cell.occupant.definitionId === selectedDefinitionId;
+      const echoMatch = cell.mist?.kind === 'echo' && cell.mist.definitionId === selectedDefinitionId;
+      const dreamboundMatch = cell.mist?.kind === 'dreambound_item' && cell.mist.active && cell.mist.boundDefinitionId === selectedDefinitionId;
+      return itemMatch || echoMatch || dreamboundMatch ? [index] : [];
+    });
+  }, [presentation.board, selectedCell, selectedDefinitionId]);
+  const matchingCellsKey = matchingCells.join(':');
+  const matchingCellSet = useMemo(() => new Set(matchingCells), [matchingCells]);
+  const selectedHintTarget = useMemo(() => {
+    if (selectedCell == null || matchingCells.length === 0) return null;
+    const selectedOrigin = cellOrigins[selectedCell];
+    return matchingCells.reduce((closest, candidate) => {
+      const closestOrigin = cellOrigins[closest];
+      const candidateOrigin = cellOrigins[candidate];
+      const closestDistance = Math.hypot(closestOrigin.x - selectedOrigin.x, closestOrigin.y - selectedOrigin.y);
+      const candidateDistance = Math.hypot(candidateOrigin.x - selectedOrigin.x, candidateOrigin.y - selectedOrigin.y);
+      return candidateDistance < closestDistance ? candidate : closest;
+    });
+  }, [cellOrigins, matchingCells, selectedCell]);
+  const [matchHintActive, setMatchHintActive] = useState(false);
+  useEffect(() => {
+    setMatchHintActive(false);
+    if (reduceMotion || selectedCell == null || selectedHintTarget == null) return;
+    const timeout = setTimeout(() => setMatchHintActive(true), 2800);
+    return () => clearTimeout(timeout);
+  }, [matchingCellsKey, reduceMotion, selectedCell, selectedDefinitionId, selectedHintTarget]);
+  const matchHintForCell = useCallback((cell: number) => {
+    if (!matchHintActive || selectedCell == null) return null;
+    const target = cell === selectedCell ? selectedHintTarget : matchingCellSet.has(cell) ? selectedCell : null;
+    if (target == null) return null;
+    const from = mergeCellCenter(geometry, cell);
+    const to = mergeCellCenter(geometry, target);
+    const distance = Math.max(1, Math.hypot(to.x - from.x, to.y - from.y));
+    const strength = Math.min(2.25, cellSize * 0.045);
+    return { x: (to.x - from.x) / distance * strength, y: (to.y - from.y) / distance * strength };
+  }, [cellSize, geometry, matchHintActive, matchingCellSet, selectedCell, selectedHintTarget]);
 
   const boardGesture = useMemo(() => Gesture.Pan()
     .enabled(entranceInteractive)
@@ -909,11 +949,6 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
         const echoGenerator = cell.mist?.kind === 'echo' && cell.mist.generatorId ? MERGE_GENERATORS_BY_ID.get(cell.mist.generatorId) : null;
         const companionDiscovery = cell.mist?.kind === 'dreambound_item' ? COMPANION_DISCOVERIES_BY_ID.get(cell.mist.discoveryId) : null;
         const discoveryStage = companionDiscovery && cell.mist?.kind === 'dreambound_item' ? companionDiscovery.stages[cell.mist.sequenceIndex] : null;
-        const compatible = Boolean(selectedDefinitionId && selectedCell !== index && (
-          (item && item.definitionId === selectedDefinitionId)
-          || echoDefinition?.id === selectedDefinitionId
-          || (cell.mist?.kind === 'dreambound_item' && cell.mist.active && cell.mist.boundDefinitionId === selectedDefinitionId)
-        ));
         const label = generator ? `${generator.name}. Tap to generate. Costs 1 Energy.`
           : definition ? `${definition.name}, tier ${definition.tier}`
             : echoDefinition ? `Dream Echo: ${echoDefinition.name}${echoGenerator ? ` from the ${echoGenerator.name}` : ''}. Find its matching item to wake this cell.`
@@ -925,7 +960,6 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
           accessibilityDisabled={gateKind === 'locked' || (gateKind === 'drag' && index !== gateFromCell) || (gateKind === 'generator' && index !== gateGeneratorCell)}
           accessibilityLabel={label}
           blocked={cell.locked && !occupant}
-          compatible={compatible}
           height={cellSize}
           index={index}
           invalid={invalidFeedback?.cell === index}
@@ -933,6 +967,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
           left={origin.x}
           onActivate={accessibleAction}
           mist={cell.mist}
+          matchHint={matchHintForCell(index)}
           top={origin.y}
           width={cellSize}
         />;
@@ -944,6 +979,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       {sprites.filter((sprite) => sprite.occupant.kind !== 'item' || !hiddenItemInstanceIds?.has(sprite.occupant.instanceId)).map((sprite) => {
         const origin = cellOrigins[sprite.cell];
         const id = spriteId(sprite);
+        const matchHint = sprite.occupant.kind === 'item' ? matchHintForCell(sprite.cell) : null;
         return <PersistentSprite
           baseX={origin.x}
           baseY={origin.y}
@@ -959,6 +995,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
           instanceId={id}
           key={id}
           motion={motions[id]}
+          matchHint={matchHint}
           artCache={artCache}
           mossproutOnboarding={mossproutOnboarding}
           occupant={sprite.occupant}
@@ -968,7 +1005,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       })}
     </View>
     {selectedCell != null && presentation.board[selectedCell]?.occupant
-      ? <SelectedCellCorners cell={selectedCell} geometry={geometry} reduceMotion={reduceMotion} />
+      ? <SelectedCellCorners cell={selectedCell} dragPhase={dragPhase} geometry={geometry} reduceMotion={reduceMotion} />
       : null}
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.feedbackLayer]}>
       {mistDissipations.map((dissipation) => <DreamMistDissipation effect={dissipation} geometry={geometry} key={dissipation.id} reduceMotion={reduceMotion} />)}
@@ -979,18 +1016,18 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   </View>;
 });
 
-const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibilityDisabled, accessibilityLabel, blocked, invalid, compatible, index, left, top, width, height, mist, onActivate }: {
+const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibilityDisabled, accessibilityLabel, blocked, invalid, index, left, top, width, height, matchHint, mist, onActivate }: {
   accessibilityActionLabel: string;
   accessibilityDisabled: boolean;
   accessibilityLabel: string;
   blocked: boolean;
   invalid: boolean;
-  compatible: boolean;
   index: number;
   left: number;
   top: number;
   width: number;
   height: number;
+  matchHint: { x: number; y: number } | null;
   mist: MergeDreamMist | null;
   onActivate: (cell: number) => void;
 }) {
@@ -1006,13 +1043,14 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
       accessibilityState={{ disabled: accessibilityDisabled }}
       onAccessibilityAction={() => onActivate(index)}
       style={styles.cellPressable}>
-      {compatible || invalid ? <View pointerEvents="none" style={[
+      {invalid ? <View pointerEvents="none" style={[
         styles.cellStateOverlay,
-        compatible && styles.cellStateCompatible,
         invalid && styles.cellStateInvalid,
       ]} /> : null}
-      {lockedDefinitionId ? <View pointerEvents="none" style={[styles.echoItem, compatible && styles.echoItemCompatible]}>
-        <DreamEchoItemArt compatible={compatible} definitionId={lockedDefinitionId} size={Math.min(width, height) - 4} />
+      {lockedDefinitionId ? <View pointerEvents="none" style={styles.echoItem}>
+        <MergeMatchHint active={matchHint != null} offsetX={matchHint?.x ?? 0} offsetY={matchHint?.y ?? 0}>
+          <DreamEchoItemArt definitionId={lockedDefinitionId} size={Math.min(width, height) - 4} />
+        </MergeMatchHint>
       </View> : null}
       {lockedDefinitionId ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" pointerEvents="none" recyclingKey="merge-dream-mist-lower" source={DREAM_MIST_LOWER} style={[styles.lockedOverlay, styles.lowerMistOverlay]} transition={0} /> : null}
       {blocked && !lockedDefinitionId ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" recyclingKey="merge-dream-mist-full" source={DREAM_MIST_FULL} style={[styles.lockedOverlay, styles.fullMistOverlay]} transition={0} /> : null}
@@ -1118,7 +1156,7 @@ function DreamMistDissipation({ effect, geometry, reduceMotion }: {
       <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" enforceEarlyResizing recyclingKey="merge-dissipating-cloud" source={DREAM_MIST_LOWER} style={styles.lockedOverlay} transition={0} />
     </Animated.View>
     <Animated.View style={[styles.mistEchoGhost, { height: size - 4, width: size - 4 }, echoStyle]}>
-      <DreamEchoItemArt compatible={false} definitionId={effect.definitionId} size={effect.sequenceIndex == null ? size - 4 : size - 8} />
+      <DreamEchoItemArt definitionId={effect.definitionId} size={effect.sequenceIndex == null ? size - 4 : size - 8} />
       {effect.sequenceIndex == null ? null : <View style={styles.discoveryStageDots}>
         {[0, 1, 2].map((stage) => <View key={stage} style={[styles.discoveryStageDot, stage <= effect.sequenceIndex! && styles.discoveryStageDotActive]} />)}
       </View>}
@@ -1166,7 +1204,29 @@ function HoverCellOverlay({ geometry, hoverCell }: { geometry: MergeBoardGeometr
   return <Animated.View pointerEvents="none" style={[styles.hoverCell, { height: geometry.cellSize, width: geometry.cellSize }, style]} />;
 }
 
-const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, baseY, cellSize, activeDragId, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, entranceDelay, grabX, grabY, motion, artCache, mossproutOnboarding, reduceMotion, onComplete, occupant }: {
+function MergeMatchHint({ active, children, offsetX, offsetY }: { active: boolean; children: ReactNode; offsetX: number; offsetY: number }) {
+  const progress = useSharedValue(0);
+  useEffect(() => {
+    cancelAnimation(progress);
+    progress.value = active
+      ? withRepeat(withSequence(
+          withTiming(1, { duration: 900, easing: Easing.inOut(Easing.quad) }),
+          withTiming(0, { duration: 900, easing: Easing.inOut(Easing.quad) }),
+        ), -1, false)
+      : withTiming(0, { duration: 160, easing: Easing.out(Easing.quad) });
+    return () => cancelAnimation(progress);
+  }, [active, progress]);
+  const style = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: offsetX * progress.value },
+      { translateY: offsetY * progress.value },
+      { scale: 1 + progress.value * 0.055 },
+    ],
+  }), [offsetX, offsetY]);
+  return <Animated.View style={[styles.matchHint, style]}>{children}</Animated.View>;
+}
+
+const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, baseY, cellSize, activeDragId, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, entranceDelay, grabX, grabY, matchHint, motion, artCache, mossproutOnboarding, reduceMotion, onComplete, occupant }: {
   instanceId: string;
   baseX: number;
   baseY: number;
@@ -1179,6 +1239,7 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   entranceDelay: number | null;
   grabX: SharedValue<number>;
   grabY: SharedValue<number>;
+  matchHint: { x: number; y: number } | null;
   motion?: SpriteMotion;
   artCache: MergeArtCache;
   mossproutOnboarding: boolean;
@@ -1360,9 +1421,11 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   }, [activeDragId, activeMotionKind, animating, arcHeight, cellSize, dragPhase, dragTranslationX, dragTranslationY, entranceProgress, grabX, grabY, instanceId, reduceMotion, spriteOpacity, targetX, targetY]);
 
   return <Animated.View pointerEvents="none" style={[styles.sprite, { height: cellSize, left: 0, top: 0, width: cellSize }, animatedStyle]}>
+    <MergeMatchHint active={matchHint != null && !motion} offsetX={matchHint?.x ?? 0} offsetY={matchHint?.y ?? 0}>
       {occupant.kind === 'generator'
         ? <PersistentGeneratorArt artCache={artCache} generatorId={occupant.generatorId} mossproutOnboarding={mossproutOnboarding} size={cellSize} />
         : <PersistentMergeItemArt artCache={artCache} definitionId={occupant.definitionId} size={cellSize - 4} />}
+    </MergeMatchHint>
     </Animated.View>;
 });
 
@@ -1378,8 +1441,10 @@ function PersistentGeneratorArt({ artCache, generatorId, mossproutOnboarding, si
   </View>;
 }
 
-function SelectedCellCorners({ cell, geometry, reduceMotion }: { cell: number; geometry: MergeBoardGeometry; reduceMotion: boolean }) {
+function SelectedCellCorners({ cell, dragPhase, geometry, reduceMotion }: { cell: number; dragPhase: SharedValue<number>; geometry: MergeBoardGeometry; reduceMotion: boolean }) {
   const pulse = useSharedValue(0);
+  const visibility = useSharedValue(dragPhase.value === 1 ? 0 : 1);
+  const dropScale = useSharedValue(1);
   const origin = mergeCellOrigin(geometry, cell);
   useEffect(() => {
     pulse.value = reduceMotion
@@ -1390,9 +1455,33 @@ function SelectedCellCorners({ cell, geometry, reduceMotion }: { cell: number; g
         ), -1, false);
     return () => cancelAnimation(pulse);
   }, [pulse, reduceMotion]);
+  useAnimatedReaction(
+    () => dragPhase.value,
+    (phase, previousPhase) => {
+      if (phase === 1) {
+        cancelAnimation(visibility);
+        cancelAnimation(dropScale);
+        visibility.value = withTiming(0, { duration: reduceMotion ? 1 : 80, easing: Easing.out(Easing.quad) });
+        dropScale.value = reduceMotion ? 1 : 0.82;
+      } else if (previousPhase === 1) {
+        visibility.value = withTiming(1, { duration: reduceMotion ? 1 : 100, easing: Easing.out(Easing.cubic) });
+        dropScale.value = reduceMotion
+          ? 1
+          : withSequence(
+              withTiming(1.12, { duration: 130, easing: Easing.out(Easing.cubic) }),
+              withSpring(1, { damping: 10, mass: 0.48, stiffness: 250 }),
+            );
+      }
+    },
+    [reduceMotion],
+  );
+  useEffect(() => () => {
+    cancelAnimation(visibility);
+    cancelAnimation(dropScale);
+  }, [dropScale, visibility]);
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(pulse.value, [0, 1], [0.96, 1]),
-    transform: [{ scale: interpolate(pulse.value, [0, 1], [1, 1.045]) }],
+    opacity: visibility.value * interpolate(pulse.value, [0, 1], [0.96, 1]),
+    transform: [{ scale: dropScale.value * interpolate(pulse.value, [0, 1], [1, 1.045]) }],
   }));
   const cornerSize = Math.max(14, geometry.cellSize * 0.29);
   const arm = Math.max(4, geometry.cellSize * 0.075);
@@ -1411,13 +1500,15 @@ function SelectedCellCorners({ cell, geometry, reduceMotion }: { cell: number; g
       key={position}
       style={[
         styles.selectionCorner,
-        { borderLeftWidth: arm, borderTopLeftRadius: cornerRadius, borderTopWidth: arm, height: cornerSize, width: cornerSize },
+        { height: cornerSize, width: cornerSize },
         position === 'topLeft' && styles.selectionCornerTopLeft,
         position === 'topRight' && styles.selectionCornerTopRight,
         position === 'bottomLeft' && styles.selectionCornerBottomLeft,
         position === 'bottomRight' && styles.selectionCornerBottomRight,
-      ]}
-    />)}
+      ]}>
+      <View style={[styles.selectionCornerOutline, { borderLeftWidth: arm + 2, borderTopLeftRadius: cornerRadius + 1, borderTopWidth: arm + 2 }]} />
+      <View style={[styles.selectionCornerFill, { borderLeftWidth: arm, borderTopLeftRadius: cornerRadius, borderTopWidth: arm }]} />
+    </View>)}
   </Animated.View>;
 }
 
@@ -1495,7 +1586,7 @@ export function PersistentMergeItemArt({ artCache, desaturateOpacity = 0, defini
   return <View style={[styles.familyArt, { height: size, width: size }]}><View style={[styles.familyDisc, { backgroundColor: desaturated ? '#A3A2AA' : definition.color }]}><IconSymbol color={desaturated ? '#56555D' : '#4A291B'} name={definition.icon} size={Math.max(17, size * 0.48)} /></View></View>;
 }
 
-function DreamEchoItemArt({ compatible, definitionId, size }: { compatible: boolean; definitionId: string; size: number }) {
+function DreamEchoItemArt({ definitionId, size }: { definitionId: string; size: number }) {
   const definition = MERGE_ITEMS_BY_ID.get(definitionId);
   if (!definition) return null;
   // Keep Dream Echoes on the same Expo Image decode/cache path as ordinary
@@ -1503,12 +1594,8 @@ function DreamEchoItemArt({ compatible, definitionId, size }: { compatible: bool
   // its spawned sprite, merge result, and dissolving Echo in one frame. Having
   // Skia decode that source while Expo Image mounted the other two could crash
   // the native renderer after the reducer had already persisted the merge.
-  return <View style={[
-    styles.dreamEchoArt,
-    compatible ? styles.dreamEchoArtCompatible : styles.dreamEchoArtDormant,
-    { height: size, width: size },
-  ]}>
-    <PersistentMergeItemArt desaturateOpacity={compatible ? 0.48 : 0.68} definitionId={definitionId} size={size} />
+  return <View style={[styles.dreamEchoArt, { height: size, width: size }]}>
+    <PersistentMergeItemArt desaturateOpacity={0.26} definitionId={definitionId} size={size} />
   </View>;
 }
 
@@ -1520,7 +1607,6 @@ const styles = StyleSheet.create({
   cell: { alignItems: 'center', justifyContent: 'center', overflow: 'visible', position: 'absolute' },
   cellPressable: { alignItems: 'center', height: '100%', justifyContent: 'center', width: '100%' },
   cellStateOverlay: { ...StyleSheet.absoluteFillObject, borderCurve: 'continuous', borderRadius: 4, borderWidth: 1.5, zIndex: 1 },
-  cellStateCompatible: { backgroundColor: 'rgba(241,217,149,0.68)', borderColor: '#D19135' },
   cellStateInvalid: { backgroundColor: 'rgba(217,94,75,0.2)', borderColor: '#D95E4B' },
   lockedOverlay: { ...StyleSheet.absoluteFillObject, height: '100%', width: '100%' },
   fullMistOverlay: { zIndex: 1 },
@@ -1530,7 +1616,6 @@ const styles = StyleSheet.create({
   discoveryStageDot: { backgroundColor: 'rgba(255,255,255,0.28)', borderRadius: 3, height: 4, width: 4 },
   discoveryStageDotActive: { backgroundColor: '#F4D795' },
   echoItem: { alignItems: 'center', justifyContent: 'center', opacity: 1, position: 'absolute', zIndex: 2 },
-  echoItemCompatible: { backgroundColor: 'rgba(205, 249, 255, 0.2)', borderColor: 'rgba(209, 252, 255,0.9)', borderRadius: 999, borderWidth: 1.5, boxShadow: '0 0 12px rgba(133, 237, 255, 0.92)', opacity: 1, transform: [{ scale: 1.06 }] },
   hoverCell: { backgroundColor: 'rgba(244,204,110,0.34)', borderColor: '#E1A644', borderCurve: 'continuous', borderRadius: 4, borderWidth: 2, left: 0, position: 'absolute', top: 0, zIndex: 20 },
   feedbackLayer: { zIndex: 2000 },
   invalidCellFeedback: { alignItems: 'center', backgroundColor: 'rgba(205,76,56,0.38)', borderColor: '#F38A72', borderCurve: 'continuous', borderRadius: 4, borderWidth: 2, boxShadow: '0 0 12px rgba(225,91,67,0.42)', justifyContent: 'center', position: 'absolute', zIndex: 1450 },
@@ -1543,8 +1628,11 @@ const styles = StyleSheet.create({
   mistEchoGhost: { alignItems: 'center', justifyContent: 'center', position: 'absolute', zIndex: 2 },
   mistParticle: { borderRadius: 999, boxShadow: '0 0 7px rgba(211,239,255,0.7)', position: 'absolute', zIndex: 3 },
   sprite: { alignItems: 'center', justifyContent: 'center', position: 'absolute' },
+  matchHint: { alignItems: 'center', justifyContent: 'center' },
   selectedCorners: { position: 'absolute', zIndex: 1300 },
-  selectionCorner: { borderColor: '#18D5E6', borderCurve: 'continuous', boxShadow: '0 2px 2px rgba(5,59,72,0.92), 0 0 8px rgba(45,225,240,0.78)', position: 'absolute' },
+  selectionCorner: { position: 'absolute' },
+  selectionCornerOutline: { ...StyleSheet.absoluteFillObject, borderColor: '#075B69', borderCurve: 'continuous' },
+  selectionCornerFill: { borderColor: '#18D5E6', borderCurve: 'continuous', bottom: 1, left: 1, position: 'absolute', right: 1, top: 1 },
   selectionCornerTopLeft: { left: 0, top: 0 },
   selectionCornerTopRight: { right: 0, top: 0, transform: [{ rotate: '90deg' }] },
   selectionCornerBottomLeft: { bottom: 0, left: 0, transform: [{ rotate: '-90deg' }] },
@@ -1552,8 +1640,6 @@ const styles = StyleSheet.create({
   familyArt: { alignItems: 'center', justifyContent: 'center' },
   familyDisc: { alignItems: 'center', borderColor: 'rgba(255,244,213,0.65)', borderRadius: 16, borderWidth: 2, boxShadow: '0 3px 8px rgba(38,19,11,0.32)', height: '76%', justifyContent: 'center', width: '76%' },
   dreamEchoArt: { alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  dreamEchoArtDormant: { opacity: 1 },
-  dreamEchoArtCompatible: { opacity: 1 },
   generatorArt: { height: '92%', width: '92%' },
   generatorSprite: { alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
   generatorSparkles: { left: '6%', overflow: 'visible', position: 'absolute', top: '-28%', zIndex: 4 },
