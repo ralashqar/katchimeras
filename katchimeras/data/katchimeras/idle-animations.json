@@ -1,6 +1,25 @@
 {
   "version": 1,
   "animations": {
+    "baristabbit": {
+      "asset": "assets/images/katchimeras/animations/baristabbit-idle.webp",
+      "fallback": "assets/images/katchimeras/cutouts/baristabbit.png",
+      "width": 512,
+      "height": 512,
+      "fps": 24,
+      "frameCount": 97,
+      "loopMode": "cycle",
+      "byteSize": 2507134,
+      "maxByteSize": 3145728,
+      "generationModel": "fal-ai/bytedance/seedance/v1.5/pro/image-to-video",
+      "matteModel": "bria/video/background-removal",
+      "generationRequestId": "01a020a3-5058-7543-a1f8-4a934741fc20",
+      "matteRequestId": "01a020a7-93fd-7e02-9cf6-5c21f8524f4e",
+      "generationPrompt": "Locked-off camera and fixed square composition. Baristabbit remains in exactly the same position and scale. Keep every foot, paw, or base contact point planted and prevent positional drift. Create only a slow living idle: an extremely restrained near-still idle: exactly one shallow, barely perceptible breathing cycle across the full four seconds and exactly one soft natural blink near the midpoint; keep the belly and chest outline almost unchanged with no deep inhale, puffing, swelling, squash-and-stretch, whole-body scaling, head bob, or shoulder lift; no latte-ear movement, mug-handle movement, mouth movement, expression change, arm movement, hand movement, leg movement, foot movement, tail movement, bouncing, bobbing, swaying, or secondary motion; keep both feet fully planted and keep both latte ears, the mug handle, apron, amber core, and coffee-bean tail completely rigid. Preserve the exact character design, silhouette, face, colours, proportions, anatomy, accessories, markings, lighting, materials, and polished 3D illustration style. The flat #D95BFF chroma-key background remains perfectly uniform and motionless. No camera motion, zoom, crop, walking, waving, speech, lip movement, new objects, background shadows, particles, scene changes, morphing, or character redesign. Return smoothly to the exact starting pose.",
+      "durationSeconds": 4,
+      "generationResolution": "720p",
+      "edgeDecontamination": "alpha-preserving-colour-extension"
+    },
     "feastle": {
       "asset": "assets/images/katchimeras/animations/feastle-idle.webp",
       "fallback": "assets/images/katchimeras/cutouts/feastle.png",

@@ -4,12 +4,14 @@ import type { ImageSourcePropType } from 'react-native';
 import type { HomeVisualKey } from '@/types/home';
 
 const CREATURE_IDLE_ANIMATION_SOURCES: Partial<Record<HomeVisualKey, ImageSourcePropType>> = {
+  'baristabbit': require('../assets/images/katchimeras/animations/baristabbit-idle.webp'),
   'feastle': require('../assets/images/katchimeras/animations/feastle-idle.webp'),
   'mossprout': require('../assets/images/katchimeras/animations/mossprout-idle.webp'),
   'steppling': require('../assets/images/katchimeras/animations/steppling-idle.webp'),
 };
 
 const CREATURE_IDLE_FALLBACK_SOURCES: Partial<Record<HomeVisualKey, ImageSourcePropType>> = {
+  'baristabbit': require('../assets/images/katchimeras/cutouts/baristabbit.png'),
   'feastle': require('../assets/images/katchimeras/cutouts/feastle.png'),
   'mossprout': require('../assets/images/katchimeras/cutouts/mossprout-standing.png'),
   'steppling': require('../assets/images/katchimeras/cutouts/steppling-standing.png'),

@@ -35,6 +35,7 @@ import { KatchaDeckUI } from '@/constants/theme';
 import { HOME_FTUE_CAMERA_SCALE } from '@/constants/home-loop-layout';
 import todayScene from '@/data/today-scene.json';
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
+import { CreatureAnimatedArt } from '@/components/katchadeck/world/creature-animated-art';
 import type { HomeArchetypeId } from '@/types/world-identity';
 import {
   todayEggShoulderWispFrame,
@@ -209,6 +210,8 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   const discoveryCreatureSource = discoveryCreature
     ? resolveCreatureArtSource(discoveryCreature.visualKey, { variantCell: discoveryCreature.variantCell })
     : null;
+  const animatedFtueMossprout = discoveryHatch?.policy === 'ftue_discovery'
+    && discoveryCreature?.visualKey === 'mossprout';
   const feedExpressionSequence = useMemo<readonly EggExpressionCue[]>(() => [
     { faceId: FEED_HAPPY_EXPRESSION_IDS[0], atMs: 80, durationMs: 180 },
     { faceId: FEED_HAPPY_EXPRESSION_IDS[1], atMs: 430, durationMs: 190 },
@@ -221,6 +224,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   const discoveryCrackOne = useSharedValue(discoveryPhaseAtLeast(discoveryPhase, 'cracking') ? 1 : 0);
   const discoveryCrackTwo = useSharedValue(discoveryPhaseAtLeast(discoveryPhase, 'cracking') ? 1 : 0);
   const discoveryPulse = useSharedValue(0);
+  const discoveryCreatureHover = useSharedValue(0);
   const [transientEffectsMounted, setTransientEffectsMounted] = useState(false);
   const transientEffectsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -318,6 +322,26 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
     reduceMotion,
     returningFromDailyHatch,
   ]);
+
+  useEffect(() => {
+    cancelAnimation(discoveryCreatureHover);
+    const shouldHover = animatedFtueMossprout
+      && discoveryPhaseAtLeast(discoveryPhase, 'subject_settling')
+      && !reduceMotion;
+    if (!shouldHover) {
+      discoveryCreatureHover.value = withTiming(0, { duration: reduceMotion ? 1 : 180 });
+      return;
+    }
+    discoveryCreatureHover.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1_350, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0, { duration: 1_350, easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1,
+      false,
+    );
+    return () => cancelAnimation(discoveryCreatureHover);
+  }, [animatedFtueMossprout, discoveryCreatureHover, discoveryPhase, reduceMotion]);
   const mountTransientEffects = useCallback(() => {
     if (transientEffectsTimerRef.current) clearTimeout(transientEffectsTimerRef.current);
     setTransientEffectsMounted(true);
@@ -635,6 +659,9 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
     opacity: discoveryCreatureEntry.value * 0.72,
     transform: [{ scale: 0.75 + discoveryCreatureEntry.value * 0.3 }],
   }));
+  const discoveryCreatureHoverStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: discoveryCreatureHover.value * -5 }],
+  }));
   const discoveryTitleVisible = discoveryPhaseAtLeast(discoveryPhase, 'subject_settling');
   const discoveryTitleStyle = useAnimatedStyle(() => ({
     opacity: discoveryTitleVisible ? discoveryCreatureEntry.value : 0,
@@ -826,6 +853,16 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
             },
             discoveryCreatureStyle,
           ]}>
+          {animatedFtueMossprout ? (
+            <RotatingRadialSunburst
+              baseOpacity={0.9}
+              size={discoveryCreatureFrame.size * 1.8}
+              style={{
+                left: -discoveryCreatureFrame.size * 0.4,
+                top: -discoveryCreatureFrame.size * 0.4,
+              }}
+            />
+          ) : null}
           <CreatureGroundShadow frameSize={discoveryCreatureFrame.size} visualKey={discoveryCreature.visualKey} />
           <AnimatedImage
             contentFit="contain"
@@ -834,18 +871,30 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
             tintColor={discoveryCreature.accentColor}
             transition={0}
           />
-          <Image
-            allowDownscaling={false}
-            cachePolicy="memory-disk"
-            contentFit="contain"
-            onError={onDiscoveryCreatureError}
-            onLoad={onDiscoveryCreatureReady}
-            pointerEvents="none"
-            priority="high"
-            source={discoveryCreatureSource}
-            style={StyleSheet.absoluteFill}
-            transition={0}
-          />
+          <Animated.View style={[StyleSheet.absoluteFill, discoveryCreatureHoverStyle]}>
+            {animatedFtueMossprout ? (
+              <CreatureAnimatedArt
+                accessibilityLabel={`${discoveryCreature.name} animated`}
+                fallbackSource={discoveryCreatureSource}
+                onLoad={onDiscoveryCreatureReady}
+                style={StyleSheet.absoluteFill}
+                visualKey={discoveryCreature.visualKey}
+              />
+            ) : (
+              <Image
+                allowDownscaling={false}
+                cachePolicy="memory-disk"
+                contentFit="contain"
+                onError={onDiscoveryCreatureError}
+                onLoad={onDiscoveryCreatureReady}
+                pointerEvents="none"
+                priority="high"
+                source={discoveryCreatureSource}
+                style={StyleSheet.absoluteFill}
+                transition={0}
+              />
+            )}
+          </Animated.View>
         </Animated.View>
       ) : null}
       {discoveryWispId ? (

@@ -565,6 +565,21 @@ test('Discovery Hatch remains inside the forming Home Egg stage', () => {
   assert.match(route, /hatchPresentation=\{isHatching \? hatchPresentation : null\}/);
 });
 
+test('FTUE Mossprout hatches as the animated hovering hero with Egg celebration rays', () => {
+  const egg = readFileSync('components/katchadeck/home/today-kingdom-egg-hero.tsx', 'utf8');
+  const animatedArt = readFileSync('components/katchadeck/world/creature-animated-art.tsx', 'utf8');
+  const idleSources = readFileSync('constants/creature-idle-animation-sources.ts', 'utf8');
+
+  assert.match(egg, /discoveryHatch\?\.policy === 'ftue_discovery'[\s\S]*?discoveryCreature\?\.visualKey === 'mossprout'/);
+  assert.match(egg, /<RotatingRadialSunburst[\s\S]*?baseOpacity=\{0\.9\}/);
+  assert.match(egg, /<CreatureAnimatedArt[\s\S]*?fallbackSource=\{discoveryCreatureSource\}/);
+  assert.match(egg, /discoveryPhaseAtLeast\(discoveryPhase, 'subject_settling'\)/);
+  assert.match(egg, /translateY: discoveryCreatureHover\.value \* -5/);
+  assert.match(animatedArt, /useAppleWebpCodec=\{false\}/);
+  assert.match(animatedArt, /useReducedMotion\(\)/);
+  assert.match(idleSources, /'mossprout': require\('\.\.\/assets\/images\/katchimeras\/animations\/mossprout-idle\.webp'\)/);
+});
+
 test('Discovery Hatch waits for creature art and fails back to a retryable Egg', () => {
   const controller = readFileSync('features/today/use-today-hatch-reveal-controller.ts', 'utf8');
   assert.match(controller, /!assetsReadyRef\.current\.subject/);
