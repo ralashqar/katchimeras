@@ -58,6 +58,7 @@
     "art:idle:check": "python scripts/verify-katchimera-idle.py",
     "art:achievement-icons": "python scripts/process-achievement-icon-sheet.py",
     "art:merge-items:audit": "python scripts/process-merge-world-item-sheets.py --audit-only && python scripts/process-merge-world-item-sheets.py --manifest scripts/merge-world-item-art-manifest-v4.json --audit-only && python scripts/process-merge-world-item-sheets.py --manifest scripts/merge-world-generator-art-manifest-v4.json --out-dir assets/images/katchimeras/merge-world/generators --audit-only",
+    "art:merge-board:generate": "python scripts/generate-merge-board-base.py",
     "art:merge-locks:audit": "python scripts/process-merge-locked-cell-art.py --audit-only",
     "art:achievement-generate": "python scripts/generate-achievement-trophy-sheet.py",
     "art:egg-avatars": "python scripts/generate-egg-avatar-skins.py",
