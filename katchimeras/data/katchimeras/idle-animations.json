@@ -1,21 +1,43 @@
 {
   "version": 1,
   "animations": {
-    "mossprout": {
-      "asset": "assets/images/katchimeras/animations/mossprout-idle.webp",
-      "fallback": "assets/images/katchimeras/cutouts/mossprout.png",
+    "feastle": {
+      "asset": "assets/images/katchimeras/animations/feastle-idle.webp",
+      "fallback": "assets/images/katchimeras/cutouts/feastle.png",
       "width": 512,
       "height": 512,
       "fps": 24,
       "frameCount": 97,
       "loopMode": "cycle",
-      "byteSize": 3071236,
+      "byteSize": 2576488,
+      "maxByteSize": 3145728,
+      "generationModel": "fal-ai/bytedance/seedance/v1.5/pro/image-to-video",
+      "matteModel": "bria/video/background-removal",
+      "generationRequestId": "01a01e2d-070b-72d3-b737-1a2a254fe220",
+      "matteRequestId": "01a01e2d-e7a6-7dc2-b97a-93885382ad70",
+      "generationPrompt": "Locked-off camera and fixed square composition. Feastle remains in exactly the same position and scale. Keep every foot, paw, or base contact point planted and prevent positional drift. Create only a slow living idle: an extremely restrained near-still idle: exactly one shallow, barely perceptible breathing cycle across the full four seconds and exactly one soft natural blink near the midpoint; keep the belly and chest outline almost unchanged with no deep inhale, puffing, swelling, squash-and-stretch, whole-body scaling, head bob, or shoulder lift; no fork-ear movement, spoon-ear movement, mouth movement, expression change, arm movement, hand movement, leg movement, foot movement, tail movement, bouncing, bobbing, swaying, or secondary motion; keep both feet fully planted and keep both utensil ears completely rigid. Preserve the exact character design, silhouette, face, colours, proportions, anatomy, accessories, markings, lighting, materials, and polished 3D illustration style. The flat #D95BFF chroma-key background remains perfectly uniform and motionless. No camera motion, zoom, crop, walking, waving, speech, lip movement, new objects, background shadows, particles, scene changes, morphing, or character redesign. Return smoothly to the exact starting pose.",
+      "durationSeconds": 4,
+      "generationResolution": "720p",
+      "edgeDecontamination": "alpha-preserving-colour-extension"
+    },
+    "mossprout": {
+      "asset": "assets/images/katchimeras/animations/mossprout-idle.webp",
+      "fallback": "assets/images/katchimeras/cutouts/mossprout-standing.png",
+      "width": 512,
+      "height": 512,
+      "fps": 24,
+      "frameCount": 97,
+      "loopMode": "cycle",
+      "byteSize": 3010720,
       "generationModel": "fal-ai/bytedance/seedance/v1.5/pro/image-to-video",
       "matteModel": "bria/video/background-removal",
       "maxByteSize": 3145728,
-      "generationPrompt": "Locked-off camera and fixed square composition. Mossprout remains in exactly the same position and scale, with the planted foot pinned. Create only a gentle living idle: subtle breathing, one soft natural blink, and tiny leaf movement. Preserve the exact character design, silhouette, face, colours, proportions, paws, tail leaves, forehead emblem, lighting and polished 3D illustration style. The flat magenta background remains perfectly uniform and motionless. No camera motion, zoom, crop, walking, waving, speech, new objects, shadows on the background, particles, scene changes or character redesign. Return smoothly to the exact starting pose.",
+      "generationPrompt": "Locked-off camera and fixed square composition. Mossprout remains in exactly the same position and scale. Keep every foot, paw, or base contact point planted and prevent positional drift. Create only a slow living idle: a near-still idle with only two permitted motions during the entire four-second clip: one very small continuous breathing cycle, with the belly and chest expanding once slowly from the start to the midpoint and returning once slowly from the midpoint to the end, plus exactly one natural blink near the midpoint; do not repeat the breath or blink; no head movement, leaf movement, mouth movement, expression change, arm movement, hand movement, leg movement, foot movement, bouncing, bobbing, swaying, or secondary motion; keep every leaf completely rigid and keep both feet fully planted. Preserve the exact character design, silhouette, face, colours, proportions, anatomy, accessories, markings, lighting, materials, and polished 3D illustration style. The flat #D95BFF chroma-key background remains perfectly uniform and motionless. No camera motion, zoom, crop, walking, waving, speech, lip movement, new objects, background shadows, particles, scene changes, morphing, or character redesign. Return smoothly to the exact starting pose.",
       "durationSeconds": 4,
-      "generationResolution": "720p"
+      "generationResolution": "720p",
+      "edgeDecontamination": "alpha-preserving-colour-extension",
+      "generationRequestId": "01a01bfd-411a-7482-8acf-0596c13ad93b",
+      "matteRequestId": "01a01bfe-39d9-7e63-a31a-1042b8094781"
     },
     "steppling": {
       "asset": "assets/images/katchimeras/animations/steppling-idle.webp",

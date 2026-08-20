@@ -8,7 +8,10 @@ import { useEffect, useRef, useState } from 'react';
 import { AppState, type AppStateStatus, type ImageStyle, type StyleProp } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
-import { resolveCreatureIdleAnimationSource } from '@/constants/creature-idle-animation-sources';
+import {
+  resolveCreatureIdleAnimationSource,
+  resolveCreatureIdleFallbackSource,
+} from '@/constants/creature-idle-animation-sources';
 import type { HomeVisualKey } from '@/types/home';
 import type { QuestionnaireImageSource } from '@/utils/companion-questionnaire-presentation';
 
@@ -43,8 +46,9 @@ export function CreatureAnimatedArt({
   const [animationFailed, setAnimationFailed] = useState(false);
   const [animationReady, setAnimationReady] = useState(false);
   const animationSource = resolveCreatureIdleAnimationSource(visualKey);
+  const idleFallbackSource = resolveCreatureIdleFallbackSource(visualKey) ?? fallbackSource;
   const shouldAnimate = Boolean(animationSource) && !animationFailed && !reduceMotion && isFocused && appState === 'active';
-  const source = animationSource && !animationFailed && !reduceMotion ? animationSource : fallbackSource;
+  const source = animationSource && !animationFailed && !reduceMotion ? animationSource : idleFallbackSource;
 
   useEffect(() => {
     if (!animationSource) return;
@@ -144,7 +148,7 @@ export function CreatureAnimatedArt({
       onLoadStart={animationSource && source === animationSource ? () => {
         logIdleDiagnostic('info', 'load-start', { source: 'animated', visualKey });
       } : undefined}
-      placeholder={fallbackSource}
+      placeholder={idleFallbackSource}
       placeholderContentFit="contain"
       priority="high"
       ref={imageRef}
