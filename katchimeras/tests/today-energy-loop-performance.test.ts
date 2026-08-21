@@ -101,6 +101,8 @@ test('manual journal action feedback waits until its native sheet is dismissed',
   assert.match(todaySource, /runAfterNativeModalDismiss\(\(\) => \{[\s\S]*?queueCareCompletion\(action, rewardAlreadyAnimated\)/);
   assert.match(todaySource, /deferredCareMergeEnergyRef\.current = guidedCapture\.mergeEnergyAmount \?\? 0;[\s\S]*queueCareCompletionAfterJournalDismiss\(guidedCapture\.action\)/);
   assert.match(todaySource, /launchJournalRewardFromBottomAfterDismiss\(\{[\s\S]*mergeEnergyAmount: journalMergeReward\?\.totalEnergy \?\? 0/);
+  assert.match(todaySource, /const addRewardedManualJournalEntry = useCallback[\s\S]*?grantJournalCaptureEnergy\(\{[\s\S]*?recordId: journalRecordId\(command\.idempotencyKey\)/);
+  assert.match(todaySource, /addRewardedManualJournalEntry\(submission, target\)/);
   assert.match(todaySource, /runAfterNativeModalDismiss\(\(\) => \{[\s\S]*currencyFrom: from,[\s\S]*imageSource: GAME_CURRENCY_ART\.energy/);
   assert.match(todaySource, /hapticOnSave=\{!pendingCareIntent\}/);
   assert.match(journalSource, /if \(hapticOnSave\) successHaptic\(\)/);

@@ -199,6 +199,36 @@ export function installStepplingFtueDiscovery(now = Date.now()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'startStepplingDiscovery', now }), now);
 }
 
+/** Immediately persists a Today journal payout using the same receipts as provider reconciliation. */
+export function grantJournalCaptureEnergy(input: {
+  companionEnergy: number;
+  dayId: string;
+  journalEnergy: number;
+  recordId: string;
+}, now = Date.now()) {
+  const rewards = [
+    ...(input.journalEnergy > 0 ? [{
+      receiptId: `activity:egg-journal:${input.dayId}:${input.recordId}`,
+      kind: 'daily_journal_energy' as const,
+      amount: input.journalEnergy,
+      label: 'Journal memory',
+      grantDayId: input.dayId,
+    }] : []),
+    ...(input.companionEnergy > 0 ? [{
+      receiptId: `activity:egg-companion:${input.dayId}`,
+      kind: 'daily_companion_energy' as const,
+      amount: input.companionEnergy,
+      label: 'Companion reflection',
+      grantDayId: input.dayId,
+    }] : []),
+  ];
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'grantActivityRewardsBatch',
+    rewards,
+    now,
+  }), now);
+}
+
 /** Atomically spends Merge Coins and advances one linear Haven environment. */
 export function upgradeStoredHavenTile(characterId: import('@/types/merge-world').MergeCharacterId, stage: HavenStage, now = Date.now()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId, stage, now }), now);

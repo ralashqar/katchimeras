@@ -4,13 +4,11 @@ import type { MergeStepEnergyDay } from '@/types/merge-world';
 export const MERGE_ENERGY_REGEN_CAP = 50;
 export const MERGE_INITIAL_ENERGY = 20;
 export const MERGE_ENERGY_REGEN_MS = 3 * 60_000;
-export const MERGE_DAILY_ACTIVITY_ENERGY_LIMIT = 20;
 export const MERGE_DAILY_JOURNAL_ENERGY = 10;
 export const MERGE_JOURNAL_ENERGY_CURVE = [10, 6, 3, 1] as const;
 export const MERGE_DAILY_COMPANION_ENERGY = 5;
 export const MERGE_DAILY_QUEST_ENERGY = 5;
 export const STEPS_PER_MERGE_ENERGY = 300;
-export const MERGE_DAILY_STEP_ENERGY_LIMIT = 20;
 export const MOSSPROUT_FTUE_JOURNAL_ENERGY = 20;
 
 export type MergeJournalRewardPreview = {
@@ -27,12 +25,15 @@ export type YesterdayStepEnergyOffer = {
 };
 
 export function mergeJournalEnergyForCapture(index: number): number {
-  return MERGE_JOURNAL_ENERGY_CURVE[Math.max(0, Math.floor(index))] ?? 0;
+  // Journaling never becomes worthless. The first captures taper quickly, then
+  // every additional completed action keeps a small one-Energy floor instead
+  // of disabling the card once the authored curve is exhausted.
+  return MERGE_JOURNAL_ENERGY_CURVE[Math.max(0, Math.floor(index))] ?? 1;
 }
 
 export function mergeStepEnergyPreview(observedSteps: number): number {
   const safeSteps = Number.isFinite(observedSteps) ? Math.max(0, Math.floor(observedSteps)) : 0;
-  return Math.min(MERGE_DAILY_STEP_ENERGY_LIMIT, Math.floor(safeSteps / STEPS_PER_MERGE_ENERGY));
+  return Math.floor(safeSteps / STEPS_PER_MERGE_ENERGY);
 }
 
 /** A completed bootstrap is the one daily conversion for this source day. */

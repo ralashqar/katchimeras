@@ -18,8 +18,6 @@ import {
   mergeLevelForXp,
 } from '@/constants/merge-world-catalog';
 import {
-  MERGE_DAILY_ACTIVITY_ENERGY_LIMIT,
-  MERGE_DAILY_STEP_ENERGY_LIMIT,
   MERGE_ENERGY_REGEN_CAP,
   MERGE_ENERGY_REGEN_MS,
   MERGE_INITIAL_ENERGY,
@@ -1117,7 +1115,10 @@ function grantActivityRewardsBatch(
     processed.add(reward.receiptId);
     changedState = true;
     const requested = Math.max(0, Math.floor(reward.amount));
-    const awarded = Math.min(requested, Math.max(0, MERGE_DAILY_ACTIVITY_ENERGY_LIMIT - (activityEnergyByDay[reward.grantDayId] ?? 0)));
+    // Receipt identity prevents duplicate grants. Do not impose a second daily
+    // ceiling here: the reward policy already tapers repeat journal actions to
+    // one Energy, and earned Energy is intentionally allowed above regen cap.
+    const awarded = requested;
     amount += awarded;
     activityEnergyByDay[reward.grantDayId] = (activityEnergyByDay[reward.grantDayId] ?? 0) + awarded;
     // Activity rewards may retain non-item memory markers, but item-bearing
@@ -1171,10 +1172,9 @@ function claimStepEnergy(
     ? observedSteps
     : Math.max(0, observedSteps - (existing?.accountedSteps ?? observedSteps));
   const availableSteps = (existing?.remainderSteps ?? 0) + newSteps;
-  const remainingEnergy = Math.max(0, MERGE_DAILY_STEP_ENERGY_LIMIT - (existing?.energyAwarded ?? 0));
-  const energyGranted = Math.min(Math.floor(availableSteps / STEPS_PER_MERGE_ENERGY), remainingEnergy);
+  const energyGranted = Math.floor(availableSteps / STEPS_PER_MERGE_ENERGY);
   const consumedSteps = energyGranted * STEPS_PER_MERGE_ENERGY;
-  const remainderSteps = remainingEnergy === 0 ? 0 : Math.max(0, availableSteps - consumedSteps);
+  const remainderSteps = Math.max(0, availableSteps - consumedSteps);
   const nextDay = {
     highestObservedSteps,
     accountedSteps: highestObservedSteps,
@@ -1199,7 +1199,7 @@ function claimStepEnergy(
       remainingClaimableSteps: remainderSteps,
       beforeEnergy,
       afterEnergy: beforeEnergy + energyGranted,
-      status: energyGranted > 0 ? 'awarded' : remainingEnergy === 0 ? 'daily_cap' : 'below_threshold',
+      status: energyGranted > 0 ? 'awarded' : 'below_threshold',
     },
   };
 }
@@ -1735,13 +1735,11 @@ function normalizeStepEnergyByDay(value: unknown): MergeWorldState['stepEnergyBy
   for (const [dayId, raw] of Object.entries(value)) {
     if (!raw || typeof raw !== 'object') continue;
     const source = raw as Partial<MergeWorldState['stepEnergyByDay'][string]>;
-    const energyAwarded = Math.min(MERGE_DAILY_STEP_ENERGY_LIMIT, Math.max(0, Math.floor(finite(source.energyAwarded, 0))));
+    const energyAwarded = Math.max(0, Math.floor(finite(source.energyAwarded, 0)));
     normalized[dayId] = {
       highestObservedSteps: Math.max(0, Math.floor(finite(source.highestObservedSteps, 0))),
       accountedSteps: Math.max(0, Math.floor(finite(source.accountedSteps, 0))),
-      remainderSteps: energyAwarded >= MERGE_DAILY_STEP_ENERGY_LIMIT
-        ? 0
-        : Math.max(0, Math.floor(finite(source.remainderSteps, 0))) % STEPS_PER_MERGE_ENERGY,
+      remainderSteps: Math.max(0, Math.floor(finite(source.remainderSteps, 0))) % STEPS_PER_MERGE_ENERGY,
       energyAwarded,
       bootstrapClaimed: Boolean(source.bootstrapClaimed),
       lastObservedAt: typeof source.lastObservedAt === 'string' ? source.lastObservedAt : '',

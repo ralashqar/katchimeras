@@ -114,6 +114,8 @@ test('FTUE step energy checks yesterday, skips below 300, and always exposes the
   assert.match(today, /ftueStepDays\.at\(-2\)/);
   assert.match(today, /nextStepId: energy > 0 \? 'energy\.steps_offer' : 'energy\.steps_reward'/);
   assert.match(today, /setFtueDisplayedSteps\(Math\.max\(remainingSteps/);
+  assert.match(today, /actionId: 'steps'[\s\S]*?amount: TODAY_GROWTH_REWARDS\.movement[\s\S]*?sourceId: `yesterday-steps:\$\{claimDayId\}`/);
+  assert.match(today, /energyAmount: TODAY_GROWTH_REWARDS\.movement[\s\S]*?mergeEnergyAmount: energy/);
   assert.match(today, /mergeEnergyAmount: energy/);
   assert.match(today, /onMergeEnergyTokenArrive/);
   assert.doesNotMatch(today, /<FtueLifeEnergyOverlay/);
@@ -126,7 +128,8 @@ test('FTUE step energy checks yesterday, skips below 300, and always exposes the
   assert.match(feed, /pendingMergeEnergyTokenArriveRef/);
   assert.equal(mergeStepEnergyPreview(299), 0);
   assert.equal(mergeStepEnergyPreview(300), 1);
-  assert.equal(mergeStepEnergyPreview(6_300), 20);
+  assert.equal(mergeStepEnergyPreview(6_300), 21);
+  assert.equal(mergeStepEnergyPreview(30_000), 100);
   assert.equal(buildYesterdayStepEnergyOffer({ dayId: '2026-08-14', observedAt: '2026-08-14T23:59:00.000Z', observedSteps: 299 }), null);
   assert.deepEqual(
     buildYesterdayStepEnergyOffer({ dayId: '2026-08-14', observedAt: '2026-08-14T23:59:00.000Z', observedSteps: 300 }),

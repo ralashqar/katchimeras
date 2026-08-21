@@ -185,7 +185,7 @@ import {
   loadCompanionJournalHandoff,
   loadPendingCompanionJournalHandoff,
 } from '@/utils/companion-journal-handoff';
-import { journalIdempotencyKey, journalRecordId } from '@/utils/journal-domain';
+import { journalIdempotencyKey, journalRecordId, submissionToJournalCommand } from '@/utils/journal-domain';
 import {
   eggReactionTint,
   guidedCaptureFlowForCareAction,
@@ -204,7 +204,7 @@ import {
   type MergeJournalRewardPreview,
   type YesterdayStepEnergyOffer,
 } from '@/utils/merge-world/economy-policy';
-import { claimDailyStepEnergy, claimMossproutFtueStepEnergy, grantMossproutFtueJournalEnergy, loadMergeWorldState } from '@/utils/merge-world/repository';
+import { claimDailyStepEnergy, claimMossproutFtueStepEnergy, grantJournalCaptureEnergy, grantMossproutFtueJournalEnergy, loadMergeWorldState } from '@/utils/merge-world/repository';
 import { getPedometerAccess, readRecentPedometerStepDays, type PedometerStepDay } from '@/utils/pedometer-steps';
 import {
   activeSemanticQuestPrompt,
@@ -738,6 +738,23 @@ function HomeScreen() {
       title: 'Capture this',
     };
   }, [formingDay, journalMergeReward]);
+  const addRewardedManualJournalEntry = useCallback((
+    submission: ManualJournalSubmission,
+    target: DayInputTarget,
+  ) => {
+    addManualJournalEntry(submission, target);
+    if (!formingDay || target === 'yesterday' || !journalMergeReward) return;
+    const command = submissionToJournalCommand(submission, new Date());
+    if (!command) return;
+    void grantJournalCaptureEnergy({
+      companionEnergy: journalMergeReward.companionEnergy,
+      dayId: formingDay.isoDate,
+      journalEnergy: journalMergeReward.dailyJournalEnergy,
+      recordId: journalRecordId(command.idempotencyKey),
+    }).catch((error) => {
+      console.error('[today] Could not persist journal Energy', error);
+    });
+  }, [addManualJournalEntry, formingDay, journalMergeReward]);
   useEffect(() => {
     if (ftueRun?.stepId === 'energy.journal_reward') setOnboardingEnergyReady(ftueRun.awardedMergeEnergy ?? MOSSPROUT_FTUE_JOURNAL_ENERGY);
   }, [ftueRun?.awardedMergeEnergy, ftueRun?.stepId]);
@@ -824,8 +841,18 @@ function HomeScreen() {
         commitFtueAction({ actionId: 'energy.convert_steps', evidenceRef: 'pedometer:no-energy', nextStepId: 'energy.steps_reward' });
         return;
       }
+      // FTUE step conversion should feel identical to the regular Today
+      // movement payout: persist Today Growth, then let the shared five-token
+      // flight drive the Egg shake, radiance pulse, meter feedback, and haptics.
+      awardTodayGrowth({
+        actionId: 'steps',
+        amount: TODAY_GROWTH_REWARDS.movement,
+        source: 'movement',
+        sourceId: `yesterday-steps:${claimDayId}`,
+      }, formingTarget);
       startEggFeed(currencyFrom, {
         currencyFrom,
+        energyAmount: TODAY_GROWTH_REWARDS.movement,
         energyOnly: true,
         imageSource: GAME_CURRENCY_ART.energy,
         mergeEnergyAmount: energy,
@@ -843,7 +870,7 @@ function HomeScreen() {
       setFtueLifeEnergyBusy(false);
       commitFtueAction({ actionId: 'energy.convert_steps', evidenceRef: 'pedometer:error', nextStepId: 'energy.steps_reward' });
     }
-  }, [formingDay, ftueLifeEnergyBusy, ftueRun?.runId, ftueStepDays, startEggFeed]);
+  }, [awardTodayGrowth, formingDay, formingTarget, ftueLifeEnergyBusy, ftueRun?.runId, ftueStepDays, startEggFeed]);
   const convertYesterdaySteps = useCallback(async (currencyFrom: Parameters<typeof startEggFeed>[0]) => {
     const offer = yesterdayStepEnergyOffer;
     if (!offer || yesterdayStepEnergyBusy) return;
@@ -1317,7 +1344,7 @@ function HomeScreen() {
   }, [navigateAfterTodayModalCloses, setQuickNoteOpen]);
   const handleGuidedTextDetailSubmit = useCallback(async (text: string) => {
     if (!guidedTextDetail) return;
-    addManualJournalEntry({
+    addRewardedManualJournalEntry({
       ...guidedTextDetail.submission,
       fields: {
         ...guidedTextDetail.submission.fields,
@@ -1327,7 +1354,7 @@ function HomeScreen() {
     }, guidedTextDetail.target);
     setGuidedTextDetail(null);
     setMicrocopy('Detail added to the memory');
-  }, [addManualJournalEntry, guidedTextDetail, setMicrocopy]);
+  }, [addRewardedManualJournalEntry, guidedTextDetail, setMicrocopy]);
 
   const {
     photoPrompt,
@@ -1381,7 +1408,7 @@ function HomeScreen() {
       journalSource,
       confirmedFacets: [],
     };
-    addManualJournalEntry(submission, formingTarget);
+    addRewardedManualJournalEntry(submission, formingTarget);
     cancelSemanticNoteQuestCapture();
     clearPendingJournalNote();
     pulseEgg();
@@ -1390,7 +1417,7 @@ function HomeScreen() {
       mergeEnergyAmount: journalMergeReward?.totalEnergy ?? 0,
     });
     setMicrocopy('Kept as a general note');
-  }, [addManualJournalEntry, clearPendingJournalNote, formingTarget, journalMergeReward?.totalEnergy, launchJournalRewardFromBottomAfterDismiss, pendingJournalNote, pulseEgg, setMicrocopy]);
+  }, [addRewardedManualJournalEntry, clearPendingJournalNote, formingTarget, journalMergeReward?.totalEnergy, launchJournalRewardFromBottomAfterDismiss, pendingJournalNote, pulseEgg, setMicrocopy]);
   const { recentAvgSteps, memoryQuests, categories, categoriesLoading } = useTodayCategoryModel({
     allDays,
     formingDay,
@@ -2922,7 +2949,7 @@ function HomeScreen() {
               }, guidedCapture.target);
               markCareDomainCommit();
             }
-            addManualJournalEntry(submission, guidedCapture.target);
+            addRewardedManualJournalEntry(submission, guidedCapture.target);
             if (!guidedCapture.committed && guidedCapture.handoff) {
               const source = submission.journalSource ?? guidedCapture.journalSource ?? { kind: 'manual' as const, sourceId: guidedCapture.handoff.id };
               const recordId = journalRecordId(journalIdempotencyKey(source, submission.sessionId ?? guidedCapture.handoff.id));
@@ -3022,7 +3049,7 @@ function HomeScreen() {
               queueCareCompletionAfterJournalDismiss(completingCareAction);
             }
             const target = companionJournalHandoff?.target ?? manualJournalTarget ?? formingTarget;
-            addManualJournalEntry(submission, target);
+            addRewardedManualJournalEntry(submission, target);
             if (companionJournalHandoff) {
               const source = submission.journalSource ?? { kind: 'manual' as const, sourceId: companionJournalHandoff.id };
               const recordId = journalRecordId(journalIdempotencyKey(
@@ -3126,7 +3153,7 @@ function HomeScreen() {
           }}
           onClose={() => setQuickGoalJournal(null)}
           onSave={(submission) => {
-            addManualJournalEntry(submission, 'today');
+            addRewardedManualJournalEntry(submission, 'today');
             quickGoals.markJournaled(quickGoalJournal.completion.id);
             setQuickGoalJournal(null);
             pulseEgg();
@@ -3171,7 +3198,7 @@ function HomeScreen() {
             clearPendingJournalNote();
           }}
           onSave={async (submission) => {
-            addManualJournalEntry(submission, formingTarget);
+            addRewardedManualJournalEntry(submission, formingTarget);
             clearPendingJournalNote();
             pulseEgg();
             launchJournalRewardFromBottomAfterDismiss({

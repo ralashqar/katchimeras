@@ -679,7 +679,7 @@ test('Energy regenerates every three minutes and stops at the natural capacity',
   assert.equal(regenerated.state.energy.value, 50);
 });
 
-test('daily journal, companion, and quest rewards are idempotent and limited to twenty Energy', () => {
+test('daily journal, companion, and quest rewards remain idempotent without discarding earned Energy', () => {
   const state = { ...createInitialMergeWorldState(NOW), energy: { value: 0, regenCap: 50, lastRegenAt: NOW } };
   const rewards = [
     { receiptId: 'journal:today', kind: 'daily_journal_energy' as const, amount: 10, label: 'Journal', grantDayId: '2026-08-12' },
@@ -689,9 +689,9 @@ test('daily journal, companion, and quest rewards are idempotent and limited to 
   ];
   const first = reduceMergeWorld(state, { type: 'grantActivityRewardsBatch', rewards, now: NOW + 1 });
   const duplicate = reduceMergeWorld(first.state, { type: 'grantActivityRewardsBatch', rewards, now: NOW + 2 });
-  assert.equal(first.state.energy.value, 20);
-  assert.equal(first.energyGranted, 20);
-  assert.equal(first.state.activityEnergyByDay['2026-08-12'], 20);
+  assert.equal(first.state.energy.value, 30);
+  assert.equal(first.energyGranted, 30);
+  assert.equal(first.state.activityEnergyByDay['2026-08-12'], 30);
   assert.equal(duplicate.changed, false);
 });
 
@@ -759,11 +759,12 @@ test('earned Energy crosses the natural capacity without losing any journal rewa
   assert.equal(later.state.energy.value, 58);
 });
 
-test('journal reward preview follows the diminishing capture curve with a separate companion bonus', () => {
+test('journal reward preview diminishes to a permanent one-Energy floor with a separate companion bonus', () => {
   const ordinary = { id: 'ordinary', flowId: 'general', createdAt: '2026-08-12T09:00:00.000Z', source: { kind: 'manual', sourceId: 'ordinary' } };
   const second = { ...ordinary, id: 'second', createdAt: '2026-08-12T09:30:00.000Z', source: { kind: 'manual', sourceId: 'second' } };
   const third = { ...ordinary, id: 'third', createdAt: '2026-08-12T09:45:00.000Z', source: { kind: 'manual', sourceId: 'third' } };
   const fourth = { ...ordinary, id: 'fourth', createdAt: '2026-08-12T09:50:00.000Z', source: { kind: 'manual', sourceId: 'fourth' } };
+  const fifth = { ...ordinary, id: 'fifth', createdAt: '2026-08-12T09:55:00.000Z', source: { kind: 'manual', sourceId: 'fifth' } };
   const companion = { id: 'companion', flowId: 'general', createdAt: '2026-08-12T10:00:00.000Z', source: { kind: 'manual', sourceId: 'companion', origin: { kind: 'companion_reflection', creatureId: 'c', promptId: 'p', promptText: 'p' } } };
   const day = (journalRecords: unknown[]) => ({ id: 'day', isoDate: '2026-08-12', journalRecords }) as unknown as HomeDayRecord;
   assert.equal(mergeJournalRewardPreview([], { companion: true, now: new Date(NOW) }).totalEnergy, 15);
@@ -771,12 +772,13 @@ test('journal reward preview follows the diminishing capture curve with a separa
   assert.equal(mergeJournalRewardPreview([day([ordinary])], { companion: true, now: new Date(NOW) }).totalEnergy, 11);
   assert.equal(mergeJournalRewardPreview([day([ordinary, companion])], { companion: true, now: new Date(NOW) }).totalEnergy, 3);
   assert.equal(mergeJournalRewardPreview([day([ordinary, second, third])], { companion: false, now: new Date(NOW) }).totalEnergy, 1);
-  assert.equal(mergeJournalRewardPreview([day([ordinary, second, third, fourth])], { companion: false, now: new Date(NOW) }).totalEnergy, 0);
+  assert.equal(mergeJournalRewardPreview([day([ordinary, second, third, fourth])], { companion: false, now: new Date(NOW) }).totalEnergy, 1);
+  assert.equal(mergeJournalRewardPreview([day([ordinary, second, third, fourth, fifth])], { companion: false, now: new Date(NOW) }).totalEnergy, 1);
   assert.deepEqual(
-    mergeActivityRewards([day([ordinary, second, third, fourth])], new Date(NOW))
+    mergeActivityRewards([day([ordinary, second, third, fourth, fifth])], new Date(NOW))
       .filter((reward) => reward.kind === 'daily_journal_energy')
       .map((reward) => reward.amount),
-    [10, 6, 3, 1],
+    [10, 6, 3, 1, 1],
   );
 });
 
@@ -833,6 +835,18 @@ test('the first meaningful daily capture creates Energy and a safe non-item memo
   const duplicate = reduceMergeWorld(granted.state, { type: 'grantActivityRewardsBatch', rewards, now: NOW + 2 });
   assert.equal(duplicate.changed, false);
 
+});
+
+test('step Energy grants the full conversion above the former daily ceiling', () => {
+  const initial = createMossproutChapterZeroState(NOW);
+  const result = reduceMergeWorld(initial, {
+    type: 'claimStepEnergy', dayId: '2026-08-14', observedSteps: 30_000,
+    observedAt: new Date(NOW).toISOString(), allowBootstrap: true, receiptId: 'steps:uncapped', now: NOW + 1,
+  });
+  assert.equal(result.energyGranted, 100);
+  assert.equal(result.stepEnergyClaim?.consumedSteps, 30_000);
+  assert.equal(result.state.energy.value, initial.energy.value + 100);
+  assert.equal(result.state.stepEnergyByDay['2026-08-14']?.energyAwarded, 100);
 });
 
 test('Dream Echo and Dreambound locked cells use the regular merge morph transaction', () => {
