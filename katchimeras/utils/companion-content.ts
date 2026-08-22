@@ -274,6 +274,54 @@ export function normaliseCompanionContentState(value: unknown): CompanionContent
   };
 }
 
+/**
+ * Removes conversation and invitation state produced by one local day while
+ * preserving introductions, prior-day history, and cross-day configuration.
+ * This gives developer Today resets the same "never served" semantics as a
+ * genuinely new day.
+ */
+export function resetCompanionContentForDay(
+  state: CompanionContentState,
+  dayId: string,
+): CompanionContentState {
+  const removedSessions = state.conversationSessions.filter((session) => (
+    session.createdDayId === dayId || session.servedDayId === dayId
+  ));
+  const removedSignals = state.conversationSignals.filter((signal) => signal.dayId === dayId);
+  const removedReceipts = state.conversationReceipts.filter((receipt) => receipt.dayId === dayId);
+  const removedSessionIds = new Set(removedSessions.map((session) => session.id));
+  const removedEvidenceIds = new Set([
+    ...removedSessionIds,
+    ...removedSignals.flatMap((signal) => [signal.id, signal.sourceId]),
+    ...removedReceipts.map((receipt) => receipt.id),
+    ...removedSessions.flatMap((session) => session.evidenceRefs.map((evidence) => evidence.sourceId)),
+  ]);
+  const belongsToResetDay = (evidence: CompanionEvidenceRef) => (
+    evidence.dayId === dayId
+    || removedSessionIds.has(evidence.sourceId)
+    || removedEvidenceIds.has(evidence.sourceId)
+  );
+
+  return normaliseCompanionContentState({
+    ...state,
+    invitations: state.invitations.filter((invitation) => invitation.dayId !== dayId),
+    memories: state.memories.filter((memory) => !memory.evidenceRefs.some(belongsToResetDay)),
+    insights: state.insights.filter((insight) => (
+      !removedSessionIds.has(insight.sourceSessionId)
+      && !insight.evidenceRefs.some(belongsToResetDay)
+    )),
+    visitPlans: state.visitPlans.filter((plan) => plan.dayId !== dayId),
+    conversationReceipts: state.conversationReceipts.filter((receipt) => receipt.dayId !== dayId),
+    telemetry: state.telemetry.filter((event) => event.dayId !== dayId),
+    events: state.events.filter((event) => event.dayId !== dayId),
+    conversationSessions: state.conversationSessions.filter((session) => !removedSessionIds.has(session.id)),
+    conversationSignals: state.conversationSignals.filter((signal) => signal.dayId !== dayId),
+    processedConversationEvidenceIds: state.processedConversationEvidenceIds.filter((id) => !removedEvidenceIds.has(id)),
+    servedConversationDayKeys: state.servedConversationDayKeys.filter((key) => !key.endsWith(`:${dayId}`)),
+    conversationTelemetry: state.conversationTelemetry.filter((event) => !removedSessionIds.has(event.sessionId)),
+  });
+}
+
 export function introductionForFamily(
   state: CompanionContentState,
   familyId: KatchimeraFamilyId

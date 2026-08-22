@@ -17,18 +17,22 @@ type HubRow = {
 };
 
 export function CompanionDashboard({
+  activityLabel = 'Merge',
   companionName,
   developerContent,
   onChat,
+  onBack,
   onJournalMerge,
   onOpenMerge,
   onOpenHistory,
   onSelect,
   statuses,
 }: {
+  activityLabel?: string;
   companionName: string;
   developerContent?: ReactNode;
-  onChat: () => void;
+  onChat?: () => void;
+  onBack?: () => void;
   onJournalMerge?: () => void;
   onOpenMerge?: () => void;
   onOpenHistory: () => void;
@@ -64,6 +68,10 @@ export function CompanionDashboard({
 
   return (
     <Animated.View entering={reduceMotion ? undefined : FadeInUp.duration(220)} style={styles.stack}>
+      {onBack ? <Pressable accessibilityRole="button" onPress={() => press(onBack)} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
+        <IconSymbol color={KatchaUI.companionScenePanel.ink} name="chevron.left" size={16} />
+        <ThemedText style={styles.backLabel} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>Back to today</ThemedText>
+      </Pressable> : null}
       <View accessibilityLabel={`Things to do with ${companionName}`} style={styles.actionTray}>
         {rows.map((row) => (
           <Pressable
@@ -92,22 +100,22 @@ export function CompanionDashboard({
         <Animated.View entering={reduceMotion ? undefined : FadeInUp.duration(170)} style={styles.collectionTray}>
           <CollectionAction icon="trophy.fill" label="Achievements" onPress={() => press(() => onSelect('achievements'))} status={statuses.achievements} />
           <CollectionAction icon="star.fill" label="Insights" onPress={() => press(() => onSelect('insight'))} status={statuses.insight} />
-          <CollectionAction icon="paintbrush.fill" label="Skins" onPress={() => press(() => onSelect('skins'))} status={statuses.skins} />
+          <CollectionAction icon="rectangle.portrait.fill" label="Katchimera Cards" onPress={() => press(() => onSelect('skins'))} status={statuses.skins} />
         </Animated.View>
       ) : null}
 
       <View accessibilityLabel="Companion shortcuts" style={styles.dock}>
-        <DockAction disabled={!onOpenMerge} icon="square.grid.2x2.fill" label="Merge" onPress={() => press(() => onOpenMerge?.())} />
+        <DockAction disabled={!onOpenMerge} icon="square.grid.2x2.fill" label={activityLabel} onPress={() => press(() => onOpenMerge?.())} />
         <DockAction disabled={!onJournalMerge} icon="book.closed.fill" label="Journal" onPress={() => press(() => onJournalMerge?.())} />
         <DockAction active={collectionOpen} icon="circle.grid.2x2.fill" label="Collection" onPress={() => press(() => setCollectionOpen((open) => !open))} />
-        <Pressable
+        {onChat ? <Pressable
           accessibilityHint={`Start or continue a conversation with ${companionName}`}
           accessibilityRole="button"
           onPress={() => press(onChat)}
           style={({ pressed }) => [styles.chatAction, pressed && styles.chatPressed]}>
           <View style={styles.chatIcon}><IconSymbol color="#5A3B18" name="bubble.left.and.bubble.right.fill" size={23} weight="bold" /></View>
           <ThemedText selectable style={styles.chatLabel} lightColor="#493116" darkColor="#493116">Chat</ThemedText>
-        </Pressable>
+        </Pressable> : null}
       </View>
       {developerContent}
     </Animated.View>
@@ -154,6 +162,8 @@ function CollectionAction({ icon, label, onPress, status }: {
 
 const styles = StyleSheet.create({
   stack: { gap: 10, paddingBottom: 12 },
+  back: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: KatchaUI.companionScenePanel.softBackground, borderRadius: 14, flexDirection: 'row', gap: 5, minHeight: 36, paddingHorizontal: 11 },
+  backLabel: { fontSize: 11, fontWeight: '900' },
   actionTray: {
     backgroundColor: KatchaUI.companionScenePanel.background,
     borderColor: KatchaUI.companionScenePanel.border,

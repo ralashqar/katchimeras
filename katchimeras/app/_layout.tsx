@@ -128,6 +128,7 @@ function RootLayout() {
           <Stack.Screen name="location-privacy" options={{ title: 'Photo places' }} />
           <Stack.Screen name="hatch-your-past" options={{ headerShown: false, gestureEnabled: false, title: 'Hatch your past' }} />
           <Stack.Screen name="katchimera/[creatureId]" options={{ animation: 'none', headerShown: false }} />
+          <Stack.Screen name="katchimera/[creatureId]/activity" options={{ animation: 'slide_from_right', headerShown: false }} />
           <Stack.Screen name="wisp/[wispId]" options={{ headerShown: false }} />
           <Stack.Screen name="katchimera/[creatureId]/achievements" options={{ headerShown: false }} />
           <Stack.Screen name="katchimera/[creatureId]/quest/[questId]/game" options={{ animation: 'none', headerShown: false, gestureEnabled: false }} />

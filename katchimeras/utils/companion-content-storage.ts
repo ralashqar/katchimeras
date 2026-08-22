@@ -2,6 +2,7 @@ import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import {
   emptyCompanionContentState,
   normaliseCompanionContentState,
+  resetCompanionContentForDay,
   type CompanionContentState,
 } from '@/utils/companion-content';
 import { CONVERSATION_V2_IDEAL_SKIN_FAMILIES, isConversationV2IdealSkinFamily } from '@/types/companion-conversation';
@@ -36,6 +37,11 @@ export function resetIdealSkinOnboardingForDebug(): void {
 
 export function resetAllKatchimeraContentForDebug(): void {
   saveCompanionContentState(emptyCompanionContentState());
+  resetListeners.forEach((listener) => listener());
+}
+
+export function resetKatchimeraContentForDayForDebug(dayId: string): void {
+  saveCompanionContentState(resetCompanionContentForDay(loadCompanionContentState(), dayId));
   resetListeners.forEach((listener) => listener());
 }
 

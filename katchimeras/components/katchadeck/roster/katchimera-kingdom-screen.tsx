@@ -284,7 +284,7 @@ export function KatchimeraKingdomScreen({
           surface="night">
           <View style={styles.discoveryHint}>
             <ThemedText selectable style={styles.discoveryHintText} lightColor="#E9E3F5" darkColor="#E9E3F5">
-              Keep progressing on the Merge board to discover who is waiting here.
+              Keep living days and growing your relationships to discover who is waiting here.
             </ThemedText>
           </View>
         </KatchaSheet>
@@ -298,21 +298,10 @@ export function KatchimeraKingdomScreen({
         const current = environment?.stages[currentStage];
         const next = environment?.stages[currentStage + 1];
         const storyReady = next ? havenStoryGateSatisfied(mergeWorld, next.storyGate) : false;
-        const affordable = next ? mergeWorld.coins >= next.coinCost : false;
         const currentArt = havenHexTileSpec(characterId, currentStage);
         const nextArt = next ? havenHexTileSpec(characterId, next.stage) : null;
         return <KatchaSheet
           footer={<View style={styles.actions}>
-            {next ? <View collapsable={false} ref={setRestoreButtonNode} style={styles.restoreButtonAnchor}>
-              <KatchaButton
-                disabled={!storyReady || !affordable}
-                fullWidth
-                icon="sparkles"
-                label={!storyReady ? 'Continue story to unlock' : !affordable ? `${next.coinCost - mergeWorld.coins} more Coins needed` : `Restore · ${next.coinCost} Coins`}
-                loading={upgrading}
-                onPress={() => void beginUpgrade(characterId, slot.creature.creatureId, slot.creature.name, currentStage, next)}
-              />
-            </View> : null}
             {ftueStepId !== 'haven.mossprout.restore' ? <KatchaButton fullWidth label={`Visit ${slot.creature.name}`} onPress={() => { setDetailCreatureId(null); onSelectCreature(slot.creature.creatureId); }} variant="secondary" /> : null}
           </View>}
           header={{ eyebrow: `${slot.creature.name.toUpperCase()} · HAVEN LV${currentStage}`, title: current?.name ?? `${slot.creature.name}’s Haven`, subtitle: current?.narrative ?? 'A home with room to grow.' }}
@@ -338,7 +327,7 @@ export function KatchimeraKingdomScreen({
               <ThemedText style={styles.discoveryHintText} lightColor="#D7E2D1" darkColor="#D7E2D1">{next.narrative}</ThemedText>
               <View style={styles.requirementRow}>
                 <ThemedText style={styles.requirement} lightColor={storyReady ? '#CBEBA5' : '#E8C889'} darkColor={storyReady ? '#CBEBA5' : '#E8C889'}>{storyReady ? '✓ Story ready' : '◌ Story locked'}</ThemedText>
-                <ThemedText style={styles.requirement} lightColor={affordable ? '#FFE19A' : '#E8C889'} darkColor={affordable ? '#FFE19A' : '#E8C889'}>● {mergeWorld.coins} / {next.coinCost} Coins</ThemedText>
+                <ThemedText style={styles.requirement} lightColor="#FFE19A" darkColor="#FFE19A">Grows through Journey Days</ThemedText>
               </View>
             </> : <ThemedText style={styles.nextTitle} lightColor="#FFE19A" darkColor="#FFE19A">Signature Haven complete</ThemedText>}
             {upgradeError ? <ThemedText selectable style={styles.upgradeError} lightColor="#FFD2C8" darkColor="#FFD2C8">{upgradeError}</ThemedText> : null}
@@ -346,14 +335,14 @@ export function KatchimeraKingdomScreen({
         </KatchaSheet>;
       })() : null}
       {ftueStepId === 'haven.reveal' ? <KatchaSheet
-        footer={<KatchaButton fullWidth icon="arrow.right" label="Continue to Merge" onPress={onFtueReveal} />}
-        header={{ eyebrow: 'THE WORLD OPENS', title: 'THE HAVEN', subtitle: 'Every friend you meet brings another part of the Haven to life. A new trail is waiting back on the Merge board.' }}
+        footer={<KatchaButton fullWidth icon="sparkles" label="Finish" onPress={onFtueReveal} />}
+        header={{ eyebrow: 'YOUR WORLD GREW', title: 'MOSSPROUT’S GARDEN', subtitle: 'The Sprout you made now lives here permanently.' }}
         onRequestClose={() => undefined}
         showClose={false}
         surface="night">
         <View style={styles.progressCard}>
-          <ThemedText style={styles.nextTitle} lightColor="#FFE19A" darkColor="#FFE19A">Mossprout’s little garden is only the beginning.</ThemedText>
-          <ThemedText style={styles.discoveryHintText} lightColor="#D7E2D1" darkColor="#D7E2D1">Dream Mist marks the homes of friends you have not met yet.</ThemedText>
+              <ThemedText style={styles.nextTitle} lightColor="#FFE19A" darkColor="#FFE19A">Your first day with Mossprout is complete.</ThemedText>
+              <ThemedText style={styles.discoveryHintText} lightColor="#D7E2D1" darkColor="#D7E2D1">Return whenever Mossprout has a new story—or whenever you simply want to spend time in the garden.</ThemedText>
         </View>
       </KatchaSheet> : null}
       {!upgradePresentation && (ftueStepId === 'haven.mossprout.focus' || ftueStepId === 'haven.mossprout.restore') ? (

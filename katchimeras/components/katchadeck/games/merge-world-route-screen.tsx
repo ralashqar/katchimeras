@@ -20,20 +20,22 @@ import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability
 import { deriveTomorrowDayRecord, hydrateAllDays } from '@/game/days';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { KATCHIMERA_MERGE_PROFILES } from '@/constants/merge-world-catalog';
+import { familyIdFromCompanionId } from '@/constants/katchimera-skins';
 import type { MergeCharacterId } from '@/types/merge-world';
 import { scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
 import { useGameScreenTransition } from '@/features/navigation/game-screen-transition';
 
 export function MergeWorldRouteScreen() {
   const isFocused = useIsFocused();
-  const { familyId } = useLocalSearchParams<{ familyId?: string }>();
+  const { creatureId, familyId } = useLocalSearchParams<{ creatureId?: string; familyId?: string }>();
   const hasPresentedBoard = useRef(false);
   const [backgroundReady, setBackgroundReady] = useState(false);
   const { suppressEntranceMotion, target } = useGameScreenTransition();
   const { height, width } = useWindowDimensions();
   const { days } = useAllDays();
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
-  const featuredCharacterId = familyId && familyId in KATCHIMERA_MERGE_PROFILES ? familyId as MergeCharacterId : null;
+  const routeFamilyId = familyId ?? familyIdFromCompanionId(creatureId);
+  const featuredCharacterId = routeFamilyId && routeFamilyId in KATCHIMERA_MERGE_PROFILES ? routeFamilyId as MergeCharacterId : null;
   const playBoardEntrance = isFocused && !hasPresentedBoard.current
     && !(target === 'merge' && suppressEntranceMotion);
   useEffect(() => {

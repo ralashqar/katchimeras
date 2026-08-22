@@ -9,9 +9,9 @@ export const MOSSPROUT_CHAPTER_ZERO_REQUESTS = [
   {
     id: `${ORDER_PREFIX}first-sprout`,
     badge: 'FIRST',
-    title: 'A First Sprout',
-    description: 'Merge the two Seeds Mossprout brought.',
-    definitionId: 'nature:garden:2',
+    title: 'The Remembered Plant',
+    description: 'Make a Sprout, then wake its Dream Echo into a Plant.',
+    definitionId: 'nature:garden:3',
   },
   {
     id: `${ORDER_PREFIX}home-plant`,
@@ -33,15 +33,17 @@ export function mossproutChapterZeroOrder(now: number, rewardWispId: WispId = 's
   return {
     id: MOSSPROUT_CHAPTER_ZERO_REQUESTS[0].id,
     characterId: 'mossprout',
-    title: 'Something to plant',
-    description: 'Drag the two matching Seeds together.',
+    title: 'The Remembered Plant',
+    description: 'Merge the Seeds, then wake the Sprout Echo in the mist.',
     difficulty: 'small',
-    requirements: [{ definitionId: 'nature:garden:2', quantity: 1 }],
+    requirements: [{ definitionId: 'nature:garden:3', quantity: 1 }],
     reward: { coins: 20, mergeXp: 15, friendshipXp: 8, energy: 0 },
     createdAt: now,
     signature: false,
     purpose: 'normal',
+    chapterId: 'mossprout-chapter-0',
     storyArcId: 'mossprout-chapter-0',
+    storyTargetLevel: 1,
   };
 }
 
@@ -100,12 +102,28 @@ export function advanceMossproutChapterZero(state: MergeWorldState, servedOrderI
     };
   }
   if (servedOrderId !== MOSSPROUT_CHAPTER_ZERO_REQUESTS[0].id) return state;
+  return completeMossproutChapterZeroSlice(state, now);
+}
+
+/**
+ * The current FTUE ends after the first Sprout. Retire the older multi-order
+ * tutorial and return the Wild Garden to its normal Seed/Pebble drop table.
+ */
+export function completeMossproutChapterZeroSlice(state: MergeWorldState, now = Date.now()): MergeWorldState {
+  const garden = state.generators[FTUE_GARDEN_GENERATOR_ID];
+  const activeOrders = state.activeOrders.filter((order) => !order.id.startsWith(ORDER_PREFIX));
+  const alreadyComplete = activeOrders.length === state.activeOrders.length
+    && !state.energy.regenPaused
+    && (!garden || garden.forcedDropDefinitionId == null);
+  if (alreadyComplete) return state;
   return {
     ...state,
-    activeOrders: [
-      ...state.activeOrders,
-      mossproutChapterZeroHomePlantOrder(now),
-    ],
+    activeOrders,
+    energy: { ...state.energy, regenPaused: false, lastRegenAt: now },
+    generators: {
+      ...state.generators,
+      ...(garden ? { [FTUE_GARDEN_GENERATOR_ID]: { ...garden, forcedDropDefinitionId: null } } : {}),
+    },
   };
 }
 

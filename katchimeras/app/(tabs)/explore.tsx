@@ -173,9 +173,10 @@ export default function ExploreScreen() {
         {
           text: 'Reset everything',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
             clearAllStoredValues();
             clearBaseCustomisation();
+            await resetKatchimeraProgressForDebug({ resetAt: Date.now(), resetDevAccess: true });
             router.replace('/onboarding');
           },
         },

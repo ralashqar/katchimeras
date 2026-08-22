@@ -1,5 +1,6 @@
 import type { WispId } from '@/types/wisp';
 import type { HavenRevealState, HavenStage } from '@/constants/haven-catalog';
+import type { KatchimeraSkinId } from '@/types/katchimera';
 
 export type MergeFamilyId = 'food' | 'drink' | 'adventure' | 'nature' | 'comfort' | 'social' | 'mind' | 'creative';
 export type MergeChainId =
@@ -80,6 +81,27 @@ export type MergeGeneratorState = {
   forcedDropDefinitionId: string | null;
 };
 
+export type MergeCharacterActivityOpportunity = {
+  id: string;
+  familyId: MergeCharacterId;
+  dayId: string;
+  generatorId: string;
+  dropDefinitionIds: string[];
+  usedCount: number;
+  createdAt: number;
+};
+
+export type KatchimeraCardAcquisition = 'journey_match' | 'coins';
+
+export type OwnedKatchimeraCard = {
+  cardId: KatchimeraSkinId;
+  familyId: MergeCharacterId;
+  acquisition: KatchimeraCardAcquisition;
+  sourceReceiptId: string;
+  acquiredAt: number;
+  coinCost: number;
+};
+
 export type MergeOrderRequirement = {
   definitionId: string;
   quantity: number;
@@ -124,6 +146,14 @@ export type MergeGeneratorUnlockReceipt = {
 export type MergeCharacterProgress = {
   friendshipLevel: number;
   completedChapterIds: string[];
+};
+
+export type MossproutDailyGardenOrders = {
+  dayId: string;
+  activeOrderId: string | null;
+  offeredOrderIds: string[];
+  servedOrderIds: string[];
+  complete: boolean;
 };
 
 export type CompanionDiscoverySource = 'ftue_hatch' | 'board_discovery' | 'legacy_grandfather';
@@ -275,6 +305,9 @@ export type MergeWorldState = {
   unlockedCharacters: MergeCharacterId[];
   favouriteCharacterId: MergeCharacterId | null;
   activeOrders: MergeOrder[];
+  mossproutDailyGardenOrders: MossproutDailyGardenOrders | null;
+  characterActivityOpportunities: MergeCharacterActivityOpportunity[];
+  ownedKatchimeraCards: OwnedKatchimeraCard[];
   completedOrderCount: number;
   recentOrderKeys: string[];
   expansions: string[];
@@ -297,7 +330,7 @@ export type MergeWorldState = {
 
 export type MergeWorldCommand =
   | { type: 'refreshTime'; now: number }
-  | { type: 'tapGenerator'; generatorId: string; now: number; seed: string }
+  | { type: 'tapGenerator'; generatorId: string; now: number; seed: string; spendEnergy?: boolean; activityOpportunityId?: string }
   | { type: 'setGeneratorForcedDrop'; generatorId: string; definitionId: string | null; now: number }
   | { type: 'upgradeGenerator'; generatorId: string; now: number }
   | { type: 'move'; from: number; to: number; now: number }
@@ -312,6 +345,9 @@ export type MergeWorldCommand =
   | { type: 'claimStepEnergy'; dayId: string; observedSteps: number; observedAt: string; allowBootstrap: boolean; receiptId: string; now: number }
   | { type: 'setEnergyRegenPaused'; paused: boolean; now: number }
   | { type: 'featureCharacter'; characterId: MergeCharacterId; now: number }
+  | { type: 'reconcileCharacterActivity'; familyId: MergeCharacterId; dayId: string; status: string; activity: { objectiveId: string; mergeOrderId: string; opportunityId: string; generatorId: string; dropDefinitionIds: string[] } | null; now: number }
+  | { type: 'grantKatchimeraCard'; cardId: KatchimeraSkinId; familyId: MergeCharacterId; sourceReceiptId: string; now: number }
+  | { type: 'purchaseKatchimeraCard'; cardId: KatchimeraSkinId; familyId: MergeCharacterId; cost: number; purchaseId: string; now: number }
   | { type: 'ackGeneratorUnlock'; receiptId: string; now: number }
   | { type: 'rerollOrder'; orderId: string; now: number }
   | { type: 'startStepplingDiscovery'; now: number }

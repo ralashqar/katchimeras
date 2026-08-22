@@ -47,6 +47,7 @@ import {
   STEPPLING_DISCOVERY_ID,
 } from '@/constants/companion-discovery-catalog';
 import type { CompanionDiscoveryDefinition } from '@/constants/companion-discovery-catalog';
+import { katchimeraSkinById } from '@/constants/katchimera-skins';
 
 const KNOWN_CHARACTERS = new Set<MergeCharacterId>(Object.keys(KATCHIMERA_MERGE_PROFILES) as MergeCharacterId[]);
 const RECENT_ORDER_LIMIT = 8;
@@ -98,6 +99,9 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     unlockedCharacters: [],
     favouriteCharacterId: null,
     activeOrders: [],
+    mossproutDailyGardenOrders: null,
+    characterActivityOpportunities: [],
+    ownedKatchimeraCards: [],
     completedOrderCount: 0,
     recentOrderKeys: [],
     expansions: [],
@@ -124,7 +128,7 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
     case 'refreshTime':
       return result(state, current, current === state ? undefined : 'Energy refreshed.');
     case 'tapGenerator':
-      return tapGenerator(current, command.generatorId, command.now, command.seed);
+      return tapGenerator(current, command.generatorId, command.now, command.seed, command.spendEnergy !== false, command.activityOpportunityId);
     case 'setGeneratorForcedDrop':
       return setGeneratorForcedDrop(current, command.generatorId, command.definitionId, command.now);
     case 'upgradeGenerator':
@@ -164,6 +168,12 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
       if (current.favouriteCharacterId === command.characterId) return unchanged(current);
       return changed(touch({ ...current, favouriteCharacterId: command.characterId }, command.now));
     }
+    case 'reconcileCharacterActivity':
+      return reconcileCharacterActivity(current, command, command.now);
+    case 'grantKatchimeraCard':
+      return grantKatchimeraCard(current, command.cardId, command.familyId, command.sourceReceiptId, command.now);
+    case 'purchaseKatchimeraCard':
+      return purchaseKatchimeraCard(current, command.cardId, command.familyId, command.cost, command.purchaseId, command.now);
     case 'ackGeneratorUnlock': {
       const receipts = current.generatorUnlockReceipts.map((receipt) => receipt.id === command.receiptId && receipt.seenAt == null
         ? { ...receipt, seenAt: command.now }
@@ -292,8 +302,37 @@ export function resetMergeActivityForDay(
   const stepEnergyByDay = { ...state.stepEnergyByDay };
   const hadStepClaim = Boolean(stepEnergyDayId && Object.prototype.hasOwnProperty.call(stepEnergyByDay, stepEnergyDayId));
   if (stepEnergyDayId) delete stepEnergyByDay[stepEnergyDayId];
-  if (!hadDailyTotal && !hadStepClaim && processedActivityReceiptIds.length === state.processedActivityReceiptIds.length && arrivals.length === state.arrivals.length) return state;
-  return touch({ ...state, processedActivityReceiptIds, activityEnergyByDay, stepEnergyByDay, arrivals }, now);
+  const resetsMossproutGarden = state.unlockedCharacters.includes('mossprout');
+  const freshGardenOrders = resetsMossproutGarden ? mossproutDailyGardenOrderBatch(dayId, now) : [];
+  const activeOrders = resetsMossproutGarden
+    ? [
+        ...state.activeOrders.filter((order) => order.storyArcId !== 'mossprout:casual-garden'),
+        ...freshGardenOrders,
+      ]
+    : state.activeOrders;
+  const mossproutDailyGardenOrders = resetsMossproutGarden ? {
+    dayId,
+    activeOrderId: freshGardenOrders[0]!.id,
+    offeredOrderIds: freshGardenOrders.map((order) => order.id),
+    servedOrderIds: [],
+    complete: false,
+  } : state.mossproutDailyGardenOrders;
+  if (
+    !hadDailyTotal
+    && !hadStepClaim
+    && !resetsMossproutGarden
+    && processedActivityReceiptIds.length === state.processedActivityReceiptIds.length
+    && arrivals.length === state.arrivals.length
+  ) return state;
+  return touch({
+    ...state,
+    processedActivityReceiptIds,
+    activityEnergyByDay,
+    stepEnergyByDay,
+    arrivals,
+    activeOrders,
+    mossproutDailyGardenOrders,
+  }, now);
 }
 
 export function normalizeMergeWorldState(value: unknown, now = Date.now()): MergeWorldState {
@@ -340,6 +379,38 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     // every authored request, so normalization must never silently discard
     // off-screen orders.
     activeOrders: Array.isArray(source.activeOrders) ? source.activeOrders.map(normalizeOrder) : [],
+    mossproutDailyGardenOrders: normalizeMossproutDailyGardenOrders(source.mossproutDailyGardenOrders),
+    characterActivityOpportunities: Array.isArray(source.characterActivityOpportunities)
+      ? source.characterActivityOpportunities.filter((opportunity) => (
+          opportunity
+          && typeof opportunity.id === 'string'
+          && typeof opportunity.familyId === 'string'
+          && typeof opportunity.dayId === 'string'
+          && typeof opportunity.generatorId === 'string'
+          && Array.isArray(opportunity.dropDefinitionIds)
+        )).map((opportunity) => ({
+          ...opportunity,
+          dropDefinitionIds: opportunity.dropDefinitionIds.filter((definitionId) => typeof definitionId === 'string' && MERGE_ITEMS_BY_ID.has(definitionId)),
+          usedCount: Math.max(0, Math.floor(finite(opportunity.usedCount, 0))),
+          createdAt: finite(opportunity.createdAt, now),
+        }))
+      : [],
+    ownedKatchimeraCards: Array.isArray(source.ownedKatchimeraCards)
+      ? source.ownedKatchimeraCards.filter((card) => {
+          const definition = card && typeof card.cardId === 'string' ? katchimeraSkinById.get(card.cardId) : null;
+          return Boolean(
+            definition
+            && definition.familyId === card.familyId
+            && KNOWN_CHARACTERS.has(card.familyId)
+            && (card.acquisition === 'journey_match' || card.acquisition === 'coins')
+            && typeof card.sourceReceiptId === 'string'
+          );
+        }).map((card) => ({
+          ...card,
+          acquiredAt: finite(card.acquiredAt, now),
+          coinCost: Math.max(0, Math.floor(finite(card.coinCost, 0))),
+        }))
+      : [],
     completedOrderCount: Math.max(0, finite(source.completedOrderCount, 0)),
     recentOrderKeys: uniqueStrings(source.recentOrderKeys).slice(-RECENT_ORDER_LIMIT),
     expansions: uniqueStrings(source.expansions),
@@ -424,18 +495,28 @@ function normalizeHaven(value: unknown, source: Partial<MergeWorldState>, rawVer
   };
 }
 
-function tapGenerator(state: MergeWorldState, generatorId: string, now: number, seed: string): MergeWorldCommandResult {
+function tapGenerator(state: MergeWorldState, generatorId: string, now: number, seed: string, spendEnergy: boolean, activityOpportunityId?: string): MergeWorldCommandResult {
   const generator = state.generators[generatorId];
   if (!generator) return unchanged(state, 'That generator is not unlocked.');
-  if (state.energy.value < 1) return unchanged(state, 'You need more Merge Energy.', 'no_energy');
+  const opportunity = activityOpportunityId
+    ? state.characterActivityOpportunities.find((candidate) => candidate.id === activityOpportunityId)
+    : null;
+  if (activityOpportunityId && (!opportunity || opportunity.generatorId !== generatorId)) {
+    return unchanged(state, 'Mossprout has not found anything else for the Garden today.');
+  }
+  if (opportunity && opportunity.usedCount >= opportunity.dropDefinitionIds.length) {
+    return unchanged(state, "That's everything Mossprout found today.");
+  }
+  if (spendEnergy && state.energy.value < 1) return unchanged(state, 'You need more Merge Energy.', 'no_energy');
   const cell = firstEmptyCell(state.board, hash(`${seed}:cell`));
   if (cell < 0) return unchanged(state, 'The board is full. Merge or store an item first.', 'board_full');
   // Level one always starts at tier one. Upgrades add a bounded chance of a
   // better seed without changing which authored chains the generator owns.
   const dropIndex = randomUnit(`${seed}:chain:${state.revision}`) < 0.5 ? 0 : 1;
-  const baseDefinitionId = generator.forcedDropDefinitionId ?? generator.tierOneDropDefinitionIds[dropIndex];
+  const authoredDefinitionId = opportunity?.dropDefinitionIds[opportunity.usedCount];
+  const baseDefinitionId = authoredDefinitionId ?? generator.forcedDropDefinitionId ?? generator.tierOneDropDefinitionIds[dropIndex];
   const betterDropRoll = randomUnit(`${seed}:upgrade:${state.revision}`);
-  const bonusTier = generator.forcedDropDefinitionId ? 0 : generator.level >= 4 && betterDropRoll < 0.05
+  const bonusTier = authoredDefinitionId || generator.forcedDropDefinitionId ? 0 : generator.level >= 4 && betterDropRoll < 0.05
     ? 2
     : betterDropRoll < Math.max(0, generator.level - 1) * 0.1 ? 1 : 0;
   const definitionId = bonusTier ? baseDefinitionId.replace(/:1$/, `:${1 + bonusTier}`) : baseDefinitionId;
@@ -447,7 +528,12 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
     ...state,
     board,
     nextInstance: state.nextInstance + 1,
-    energy: { ...state.energy, value: state.energy.value - 1 },
+    energy: spendEnergy ? { ...state.energy, value: state.energy.value - 1 } : state.energy,
+    characterActivityOpportunities: opportunity
+      ? state.characterActivityOpportunities.map((candidate) => candidate.id === opportunity.id
+          ? { ...candidate, usedCount: candidate.usedCount + 1 }
+          : candidate)
+      : state.characterActivityOpportunities,
   }, now);
   const discovery = applyDiscovery(next, definitionId, now);
   next = discovery.state;
@@ -745,10 +831,6 @@ function installDreamboundPath(board: MergeBoardCell[], definition: CompanionDis
   });
 }
 
-function companionDefinition(discoveryId: string) {
-  return COMPANION_DISCOVERIES_BY_ID.get(discoveryId);
-}
-
 function themeForFamily(familyId: MergeWorldArrival['familyId']): MergeWorldArrival['theme'] {
   if (familyId === 'drink') return 'ritual';
   if (familyId === 'adventure') return 'movement';
@@ -759,7 +841,7 @@ function themeForFamily(familyId: MergeWorldArrival['familyId']): MergeWorldArri
   return familyId;
 }
 
-function discoveryArrival(definition: NonNullable<ReturnType<typeof companionDefinition>>, now: number): MergeWorldArrival {
+function discoveryArrival(definition: CompanionDiscoveryDefinition, now: number): MergeWorldArrival {
   const item = MERGE_ITEMS_BY_ID.get(definition.entryDefinitionId)!;
   return {
     id: `arrival:discovery:${definition.id}`, kind: 'discovery_parcel', createdAt: now,
@@ -871,7 +953,9 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
       kind: 'friendship' as const,
       characterId: order.characterId,
       amount: order.reward.friendshipXp,
-      presentation: order.storyArcId ? 'quiet_summary' as const : 'celebration' as const,
+      presentation: order.storyArcId && order.storyArcId !== 'mossprout:casual-garden'
+        ? 'quiet_summary' as const
+        : 'celebration' as const,
       sourceId: order.storyArcId,
       storyStep: order.storyStep,
       storyStepCount: order.storyStepCount,
@@ -948,6 +1032,26 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
     landmarks,
     generators,
   };
+  if (
+    order.storyArcId === 'mossprout:casual-garden'
+    && next.mossproutDailyGardenOrders?.dayId === order.storyBeatId
+  ) {
+    const currentDaily = next.mossproutDailyGardenOrders!;
+    const servedOrderIds = [...new Set([...currentDaily.servedOrderIds, order.id])].slice(-3);
+    const complete = servedOrderIds.length >= 3;
+    const offeredOrderIds = mossproutDailyGardenOrderBatch(currentDaily.dayId, now).map((candidate) => candidate.id);
+    const activeOrderId = offeredOrderIds.find((id) => !servedOrderIds.includes(id)) ?? null;
+    next = {
+      ...next,
+      mossproutDailyGardenOrders: {
+        ...currentDaily,
+        activeOrderId,
+        offeredOrderIds,
+        servedOrderIds,
+        complete,
+      },
+    };
+  }
   next = advanceMossproutChapterZero(next, order.id, now);
   if (order.storyArcId === `${order.characterId}:discovery`) {
     const discoveryRecord = next.companionDiscovery.records.find((record) => record.characterId === order.characterId);
@@ -1252,6 +1356,199 @@ function reconcileFriendship(state: MergeWorldState, levels: Partial<Record<Merg
   }
   const next = changedState ? { ...state, characterProgress } : state;
   return next === state ? state : touch(ensureProceduralOrders(next, now), now);
+}
+
+function reconcileCharacterActivity(
+  state: MergeWorldState,
+  command: Extract<MergeWorldCommand, { type: 'reconcileCharacterActivity' }>,
+  now: number,
+): MergeWorldCommandResult {
+  if (command.familyId !== 'mossprout') return unchanged(state);
+  let next = ensureCharacterGenerators(state, 'mossprout', now);
+  const showsOrder = command.status === 'activity_in_progress' && command.activity != null;
+  const keepOrders = next.activeOrders.filter((order) => (
+    order.characterId !== 'mossprout'
+    || (order.storyArcId !== 'mossprout:dry-pond' && (order.storyArcId !== 'mossprout:casual-garden' || !showsOrder))
+  ));
+  const activity = command.activity;
+  const requirements = activity?.objectiveId === 'mossprout:objective:place-for-rain'
+    ? [{ definitionId: 'nature:waterside:2', quantity: 1 }]
+    : activity?.objectiveId === 'mossprout:objective:bank-that-holds'
+      ? [{ definitionId: 'nature:garden:3', quantity: 1 }]
+      : activity?.objectiveId === 'mossprout:objective:little-rain-garden'
+        ? [{ definitionId: 'nature:garden:4', quantity: 1 }, { definitionId: 'nature:waterside:3', quantity: 1 }]
+        : [];
+  const title = activity?.objectiveId === 'mossprout:objective:place-for-rain'
+    ? 'A Place for Rain'
+    : activity?.objectiveId === 'mossprout:objective:bank-that-holds'
+      ? 'A Bank That Holds'
+      : 'The Little Rain Garden';
+  const coinReward = activity?.objectiveId === 'mossprout:objective:place-for-rain' ? 20
+    : activity?.objectiveId === 'mossprout:objective:bank-that-holds' ? 30 : 50;
+  const existingOrder = activity ? next.activeOrders.find((order) => order.id === activity.mergeOrderId) : null;
+  const storyOrder: MergeOrder | null = showsOrder && activity ? existingOrder ?? {
+    id: activity.mergeOrderId,
+    characterId: 'mossprout',
+    title,
+    description: title === 'A Place for Rain'
+      ? 'Make a Shell to catch the first drops.'
+      : title === 'A Bank That Holds'
+        ? 'Grow a Plant to hold the pond bank.'
+        : 'Finish the garden with a Flower and Tidepool.',
+    difficulty: requirements.length > 1 ? 'major' : 'small',
+    requirements,
+    reward: { coins: coinReward, mergeXp: 0, friendshipXp: 0, energy: 0 },
+    createdAt: now,
+    signature: false,
+    purpose: 'normal',
+    storyArcId: 'mossprout:dry-pond',
+    storyBeatId: activity.objectiveId,
+  } : null;
+  let activeOrders = storyOrder ? [...keepOrders, storyOrder] : keepOrders;
+  let dailyGarden = next.mossproutDailyGardenOrders;
+  if (!showsOrder) {
+    const sameDay = dailyGarden?.dayId === command.dayId;
+    const servedOrderIds = sameDay ? dailyGarden!.servedOrderIds : [];
+    const batch = mossproutDailyGardenOrderBatch(command.dayId, now);
+    const activeBatch = batch.filter((order) => !servedOrderIds.includes(order.id));
+    const existingById = new Map(activeOrders.map((order) => [order.id, order]));
+    activeOrders = [
+      ...activeOrders.filter((order) => order.storyArcId !== 'mossprout:casual-garden'),
+      ...activeBatch.map((order) => existingById.get(order.id) ?? order),
+    ];
+    dailyGarden = {
+      dayId: command.dayId,
+      activeOrderId: activeBatch[0]?.id ?? null,
+      offeredOrderIds: batch.map((order) => order.id),
+      servedOrderIds,
+      complete: servedOrderIds.length >= batch.length,
+    };
+  }
+  let opportunities = next.characterActivityOpportunities;
+  if (activity && !opportunities.some((opportunity) => opportunity.id === activity.opportunityId)) {
+    opportunities = [...opportunities, {
+      id: activity.opportunityId,
+      familyId: 'mossprout',
+      dayId: command.dayId,
+      generatorId: activity.generatorId,
+      dropDefinitionIds: [...activity.dropDefinitionIds],
+      usedCount: 0,
+      createdAt: now,
+    }];
+  }
+  const changedState = next !== state
+    || activeOrders.length !== next.activeOrders.length
+    || activeOrders.some((order, index) => order.id !== next.activeOrders[index]?.id)
+    || dailyGarden !== next.mossproutDailyGardenOrders
+    || opportunities !== next.characterActivityOpportunities;
+  if (!changedState) return unchanged(state);
+  next = touch({
+    ...next,
+    activeOrders,
+    mossproutDailyGardenOrders: dailyGarden,
+    characterActivityOpportunities: opportunities,
+  }, now);
+  return changed(next, "Mossprout's Garden is ready.");
+}
+
+function mossproutDailyGardenOrder(dayId: string, step: number, now: number): MergeOrder {
+  const gardenFirst = proceduralOrderRank(dayId, 1) % 2 === 0;
+  const primary = gardenFirst ? 'nature:garden' : 'nature:waterside';
+  const secondary = gardenFirst ? 'nature:waterside' : 'nature:garden';
+  const requirements = step === 1
+    ? [{ definitionId: `${primary}:2`, quantity: 1 }]
+    : step === 2
+      ? [{ definitionId: `${secondary}:3`, quantity: 1 }, { definitionId: `${primary}:2`, quantity: 1 }]
+      : [{ definitionId: `${primary}:4`, quantity: 1 }, { definitionId: `${secondary}:3`, quantity: 1 }];
+  const difficulty = step === 1 ? 'small' as const : step === 2 ? 'medium' as const : 'major' as const;
+  return {
+    id: `merge-order:mossprout:daily:${dayId}:${step}`,
+    characterId: 'mossprout',
+    title: step === 1 ? 'A little Garden beginning' : step === 2 ? 'Two parts of the Garden' : 'A thriving pond edge',
+    description: step === 1
+      ? 'Bring Mossprout one reachable piece to begin today.'
+      : step === 2
+        ? 'Bring one piece from each side of the Wild Garden.'
+        : 'Finish today with a higher-tier Garden and Waterside pairing.',
+    difficulty,
+    requirements,
+    reward: step === 1
+      ? { coins: 20, mergeXp: 18, friendshipXp: 3, energy: 2 }
+      : step === 2
+        ? { coins: 45, mergeXp: 36, friendshipXp: 5, energy: 3 }
+        : { coins: 80, mergeXp: 64, friendshipXp: 8, energy: 4 },
+    createdAt: now,
+    signature: false,
+    purpose: 'normal',
+    storyArcId: 'mossprout:casual-garden',
+    storyBeatId: dayId,
+    storyStep: step,
+    storyStepCount: 3,
+  };
+}
+
+function mossproutDailyGardenOrderBatch(dayId: string, now: number): MergeOrder[] {
+  return [1, 2, 3].map((step) => mossproutDailyGardenOrder(dayId, step, now));
+}
+
+function grantKatchimeraCard(
+  state: MergeWorldState,
+  cardId: string,
+  familyId: MergeCharacterId,
+  sourceReceiptId: string,
+  now: number,
+): MergeWorldCommandResult {
+  const definition = katchimeraSkinById.get(cardId);
+  if (!definition || definition.familyId !== familyId || !definition.visualKey || !KNOWN_CHARACTERS.has(familyId)) {
+    return unchanged(state, 'That card is not ready yet.');
+  }
+  if (state.ownedKatchimeraCards.some((card) => card.cardId === cardId || card.sourceReceiptId === sourceReceiptId)) {
+    return unchanged(state, 'That card is already in your collection.');
+  }
+  return changed(touch({
+    ...state,
+    ownedKatchimeraCards: [...state.ownedKatchimeraCards, {
+      cardId,
+      familyId,
+      acquisition: 'journey_match',
+      sourceReceiptId,
+      acquiredAt: now,
+      coinCost: 0,
+    }],
+  }, now), `${definition.displayName} joined your card collection.`);
+}
+
+function purchaseKatchimeraCard(
+  state: MergeWorldState,
+  cardId: string,
+  familyId: MergeCharacterId,
+  cost: number,
+  purchaseId: string,
+  now: number,
+): MergeWorldCommandResult {
+  const definition = katchimeraSkinById.get(cardId);
+  const coinCost = Math.max(0, Math.floor(cost));
+  if (!definition || definition.familyId !== familyId || !definition.visualKey || !KNOWN_CHARACTERS.has(familyId)) {
+    return unchanged(state, 'That card is not ready yet.');
+  }
+  if (state.ownedKatchimeraCards.some((card) => card.cardId === cardId || card.sourceReceiptId === purchaseId)) {
+    return unchanged(state, 'That card is already in your collection.');
+  }
+  const familyCollectionOpen = state.ownedKatchimeraCards.some((card) => card.familyId === familyId && card.acquisition === 'journey_match');
+  if (!familyCollectionOpen) return unchanged(state, 'Discover your matched card first.');
+  if (state.coins < coinCost) return unchanged(state, `You need ${coinCost} Coins for this card.`);
+  return changed(touch({
+    ...state,
+    coins: state.coins - coinCost,
+    ownedKatchimeraCards: [...state.ownedKatchimeraCards, {
+      cardId,
+      familyId,
+      acquisition: 'coins',
+      sourceReceiptId: purchaseId,
+      acquiredAt: now,
+      coinCost,
+    }],
+  }, now), `${definition.displayName} joined your card collection.`);
 }
 
 function reconcileStory(
@@ -1973,6 +2270,19 @@ function normalizeDreamMist(value: unknown, legacyLocked: boolean): MergeBoardCe
     if (candidateIds.length) return { kind: 'discovery_fork', gateId: mist.gateId, candidateIds, recommendedCharacterId };
   }
   return legacyLocked ? { kind: 'dormant' } : null;
+}
+
+function normalizeMossproutDailyGardenOrders(value: unknown): MergeWorldState['mossproutDailyGardenOrders'] {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<NonNullable<MergeWorldState['mossproutDailyGardenOrders']>>;
+  if (typeof candidate.dayId !== 'string') return null;
+  return {
+    dayId: candidate.dayId,
+    activeOrderId: typeof candidate.activeOrderId === 'string' ? candidate.activeOrderId : null,
+    offeredOrderIds: uniqueStrings(candidate.offeredOrderIds).slice(-3),
+    servedOrderIds: uniqueStrings(candidate.servedOrderIds).slice(-3),
+    complete: Boolean(candidate.complete),
+  };
 }
 
 function normalizeCompanionDiscovery(

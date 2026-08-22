@@ -34,9 +34,12 @@ const SPLASH_GOLD = '#F6C653';
 const SPLASH_GOLD_DEEP = '#75450A';
 const SPLASH_INK = '#173D57';
 
-export function CompanionBondLevelUpCelebration({ onContinue, receipt }: {
+export type CompanionBondCelebrationVariant = 'journey_complete' | 'level_up';
+
+export function CompanionBondLevelUpCelebration({ onContinue, receipt, variant = 'level_up' }: {
   onContinue: () => void;
   receipt: CompanionBondAwardReceipt;
+  variant?: CompanionBondCelebrationVariant;
 }) {
   const reduceMotion = useReducedMotion();
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
@@ -53,6 +56,7 @@ export function CompanionBondLevelUpCelebration({ onContinue, receipt }: {
   const titleSize = width < 360 ? 30 : width < 420 ? 34 : 38;
   const numberSize = compactHeight ? 76 : 88;
   const bottomDockBottom = Math.max(12, insets.bottom + 8);
+  const journeyComplete = variant === 'journey_complete';
 
   useEffect(() => {
     progress.value = withDelay(180, withTiming(1, { duration: reduceMotion ? 100 : 560, easing: Easing.out(Easing.cubic) }));
@@ -125,7 +129,7 @@ export function CompanionBondLevelUpCelebration({ onContinue, receipt }: {
           <Animated.View entering={reduceMotion ? FadeIn.duration(100) : FadeInUp.duration(300)} style={styles.heading}>
             <View style={styles.eyebrowChip}>
               <ThemedText selectable style={styles.eyebrow} lightColor={SPLASH_GOLD_DEEP} darkColor={SPLASH_GOLD_DEEP}>
-                Bond level up
+                {journeyComplete ? 'Journey Day complete' : 'Bond level up'}
               </ThemedText>
             </View>
             <ThemedText
@@ -133,7 +137,9 @@ export function CompanionBondLevelUpCelebration({ onContinue, receipt }: {
               style={[styles.title, { fontSize: titleSize, lineHeight: titleSize + 7 }]}
               lightColor={SPLASH_INK}
               darkColor={SPLASH_INK}>
-              {family?.displayName ?? 'Katchimera'} grew closer
+              {journeyComplete
+                ? `A day with ${family?.displayName ?? 'your Katchimera'}`
+                : `${family?.displayName ?? 'Katchimera'} grew closer`}
             </ThemedText>
           </Animated.View>
 
@@ -142,7 +148,9 @@ export function CompanionBondLevelUpCelebration({ onContinue, receipt }: {
             {companionSource ? (
               <Animated.View entering={reduceMotion ? FadeIn.duration(100) : FadeIn.duration(280).delay(70)} style={{ height: heroSize, width: heroSize }}>
                 <Image
-                  accessibilityLabel={`${family?.displayName ?? 'Katchimera'} at its new bond level`}
+                  accessibilityLabel={journeyComplete
+                    ? `${family?.displayName ?? 'Katchimera'} after completing today's Journey`
+                    : `${family?.displayName ?? 'Katchimera'} at its new bond level`}
                   contentFit="contain"
                   source={companionSource}
                   style={StyleSheet.absoluteFill}
@@ -153,19 +161,31 @@ export function CompanionBondLevelUpCelebration({ onContinue, receipt }: {
           </View>
 
           <View accessibilityLiveRegion="polite" style={[styles.numberStage, { height: numberSize + 13 }]}>
-            <Animated.View style={[styles.levelNumber, oldStyle]}>
-              <GoldLevelNumber number={receipt.beforeLevel} size={numberSize} />
-            </Animated.View>
-            <Animated.View style={[styles.levelNumber, nextStyle]}>
-              <GoldLevelNumber number={receipt.afterLevel} size={numberSize} />
-            </Animated.View>
+            {journeyComplete ? (
+              <Animated.View style={[styles.levelNumber, nextStyle]}>
+                <GoldLevelNumber
+                  accessibilityLabel={`${receipt.points} Bond gained`}
+                  number={`+${receipt.points}`}
+                  size={numberSize}
+                />
+              </Animated.View>
+            ) : (
+              <>
+                <Animated.View style={[styles.levelNumber, oldStyle]}>
+                  <GoldLevelNumber number={receipt.beforeLevel} size={numberSize} />
+                </Animated.View>
+                <Animated.View style={[styles.levelNumber, nextStyle]}>
+                  <GoldLevelNumber number={receipt.afterLevel} size={numberSize} />
+                </Animated.View>
+              </>
+            )}
           </View>
 
           <View style={styles.copy}>
             <View style={styles.bondName}>
               <IconSymbol color="#A95043" name="heart.fill" size={17} />
               <ThemedText selectable style={styles.bondLabel} lightColor="#3A2A1D" darkColor="#3A2A1D">
-                {next.label} bond
+                {journeyComplete ? `+${receipt.points} Bond` : `${next.label} bond`}
               </ThemedText>
             </View>
             <ThemedText selectable style={styles.total} lightColor="#4F3A25" darkColor="#4F3A25">
@@ -187,10 +207,14 @@ export function CompanionBondLevelUpCelebration({ onContinue, receipt }: {
   );
 }
 
-function GoldLevelNumber({ number, size }: { number: number; size: number }) {
+function GoldLevelNumber({ accessibilityLabel, number, size }: {
+  accessibilityLabel?: string;
+  number: number | string;
+  size: number;
+}) {
   const dynamicStyle = { fontSize: size, lineHeight: size + 10 };
   return (
-    <View accessibilityLabel={`Bond level ${number}`} style={styles.numberStack}>
+    <View accessibilityLabel={accessibilityLabel ?? `Bond level ${number}`} style={styles.numberStack}>
       <ThemedText
         accessibilityElementsHidden
         style={[styles.number, styles.numberShadow, dynamicStyle]}

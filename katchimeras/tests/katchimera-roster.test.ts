@@ -247,7 +247,7 @@ test('roster reconciliation preserves unchanged card identities and replaces onl
   }
 });
 
-test('the bottom bar exposes Katchimeras while the retired world route redirects to it', () => {
+test('the bottom bar exposes Haven while the retired world route redirects to it', () => {
   const layout = fs.readFileSync(
     path.join(process.cwd(), 'app', '(tabs)', '_layout.tsx'),
     'utf8',
@@ -256,8 +256,15 @@ test('the bottom bar exposes Katchimeras while the retired world route redirects
     path.join(process.cwd(), 'app', '(tabs)', 'world.tsx'),
     'utf8',
   );
+  const tabBar = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'meadow-tab-bar.tsx'),
+    'utf8',
+  );
   assert.match(layout, /name="world"[\s\S]*?href: null/);
-  assert.match(layout, /name="katchimeras"[\s\S]*?title: 'Katchimeras'/);
+  assert.match(layout, /name="katchimeras"[\s\S]*?title: 'Haven'/);
+  assert.match(layout, /name="games"[\s\S]*?href: null/);
+  assert.match(tabBar, /HIDDEN_ROUTES = new Set\(\[[^\]]*'games'/);
+  assert.doesNotMatch(tabBar, /games: 'merge'/);
   assert.match(worldRoute, /<Redirect href="\/katchimeras"/);
   assert.doesNotMatch(worldRoute, /KingdomCompanionScreen|KingdomHexCanvas/);
 });
@@ -275,7 +282,7 @@ test('the Katchimeras tab toggles between grid and Haven while companion Back re
   assert.match(kingdomScreen, /<KingdomHexCanvas[\s\S]*?onSelectResident=\{selectResident\}/);
   assert.match(kingdomScreen, /<HavenTileHudLayer[\s\S]*?onOpen=\{openHavenDetail\}/);
   assert.match(kingdomScreen, /Hidden in the Dream Mist/);
-  assert.match(kingdomScreen, /Keep progressing on the Merge board/);
+  assert.match(kingdomScreen, /Keep living days and growing your relationships/);
   assert.match(companionRoute, /onCloseCompanion=\{\(\) =>[\s\S]*?: router\.back\(\)\}/);
 });
 

@@ -1,8 +1,11 @@
 import { resetTodayInState } from '@/game/days/actions';
+import { resetRelationshipProgressForDayForDebug } from '@/game/katchimeras/relationship-progression';
 import { shiftLocalDate, toLocalDateId } from '@/game/days/date';
 import { homeRepository } from '@/storage/repositories/home-repository';
+import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import type { StoredHomeState } from '@/types/home';
 import { resetStoredCompanionQuickGoalProgressForDay } from '@/utils/companion-quick-goal-storage';
+import { resetKatchimeraContentForDayForDebug } from '@/utils/companion-content-storage';
 import { resetMergeWorldActivityForDayForDebug } from '@/utils/merge-world/repository';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { cancelTodayCareGameRound } from '@/utils/today-care-game-round';
@@ -22,6 +25,10 @@ export async function resetTodayForDebug(now = new Date()): Promise<StoredHomeSt
   if (!state) return null;
 
   resetStoredCompanionQuickGoalProgressForDay(state.today.isoDate);
+  resetKatchimeraContentForDayForDebug(state.today.isoDate);
+  relationshipProgressionRepository.update((current) => (
+    resetRelationshipProgressForDayForDebug(current, state.today.isoDate)
+  ));
   cancelTodayCareGameRound();
   clearTodayEnergyFeedback();
   clearTodayEnergyTraces();

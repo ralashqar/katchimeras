@@ -38,6 +38,12 @@ const COIN_BURST = [
 ] as const;
 
 export type MergeScreenPoint = { x: number; y: number };
+type MergeRewardArrivalHandler = (
+  amount: number,
+  contactWindowMs: number,
+  index: number,
+  totalAmount: number,
+) => void;
 export type MergeServeItemFlight = {
   definitionId: string;
   from: MergeScreenPoint;
@@ -57,8 +63,8 @@ export type MergeServeRewardFlight = {
 
 export function MergeServeRewardOverlay({ flight, onCoinArrive, onEnergyArrive, onFinish, onItemsArrive }: {
   flight: MergeServeRewardFlight | null;
-  onCoinArrive: (amount: number) => void;
-  onEnergyArrive: (amount: number) => void;
+  onCoinArrive: MergeRewardArrivalHandler;
+  onEnergyArrive: MergeRewardArrivalHandler;
   onFinish: () => void;
   onItemsArrive: () => void;
 }) {
@@ -133,8 +139,8 @@ function ServingItem({ count, index, item, onItemsArrive }: {
 
 function ParallelRewardPayout({ flight, onCoinArrive, onEnergyArrive, onFinish }: {
   flight: MergeServeRewardFlight;
-  onCoinArrive: (amount: number) => void;
-  onEnergyArrive: (amount: number) => void;
+  onCoinArrive: MergeRewardArrivalHandler;
+  onEnergyArrive: MergeRewardArrivalHandler;
   onFinish: () => void;
 }) {
   const requiredGroups = Number(flight.coinAmount > 0) + Number(flight.energyAmount > 0);
@@ -179,7 +185,7 @@ function RewardPayout({ amount, art, from, nonce, onArrive, onFinish, to, varian
   art: number;
   from: MergeScreenPoint;
   nonce: string;
-  onArrive: (amount: number) => void;
+  onArrive: MergeRewardArrivalHandler;
   onFinish: () => void;
   to: MergeScreenPoint;
   variant: 'coin' | 'energy';
@@ -203,26 +209,29 @@ function RewardPayout({ amount, art, from, nonce, onArrive, onFinish, to, varian
       onArrive={onArrive}
       onFinish={onFinish}
       to={to}
+      totalAmount={amount}
       variant={variant}
     />
   ));
 }
 
-function RewardToken({ amount, art, count, from, index, onArrive, onFinish, to, variant }: {
+function RewardToken({ amount, art, count, from, index, onArrive, onFinish, to, totalAmount, variant }: {
   amount: number;
   art: number;
   count: number;
   from: MergeScreenPoint;
   index: number;
-  onArrive: (amount: number) => void;
+  onArrive: MergeRewardArrivalHandler;
   onFinish: () => void;
   to: MergeScreenPoint;
+  totalAmount: number;
   variant: 'coin' | 'energy';
 }) {
   const rise = useSharedValue(0);
   const flight = useSharedValue(0);
   const hover = useSharedValue(0);
   const reduceMotion = useReducedMotion();
+  const contactWindowMs = mergeRewardContactWindowMs(count, reduceMotion);
   const baseVector = COIN_BURST[index] ?? COIN_BURST[COIN_BURST.length - 1];
   const vector = variant === 'energy'
     ? { ...baseVector, rotation: -baseVector.rotation, x: baseVector.x + 8, y: baseVector.y + 5 }
@@ -242,7 +251,7 @@ function RewardToken({ amount, art, count, from, index, onArrive, onFinish, to, 
       easing: Easing.in(Easing.cubic),
     }, (finished) => {
       if (!finished) return;
-      runOnJS(onArrive)(amount);
+      runOnJS(onArrive)(amount, contactWindowMs, index, totalAmount);
       if (index === count - 1) runOnJS(onFinish)();
     }));
     return () => {
@@ -250,7 +259,7 @@ function RewardToken({ amount, art, count, from, index, onArrive, onFinish, to, 
       cancelAnimation(hover);
       cancelAnimation(rise);
     };
-  }, [amount, count, flight, hover, index, onArrive, onFinish, reduceMotion, rise, variant]);
+  }, [amount, contactWindowMs, count, flight, hover, index, onArrive, onFinish, reduceMotion, rise, totalAmount, variant]);
 
   const motionStyle = useAnimatedStyle(() => {
     const stagedX = from.x + vector.x * rise.value;
@@ -277,6 +286,10 @@ function RewardToken({ amount, art, count, from, index, onArrive, onFinish, to, 
   }, [from.x, from.y, index, reduceMotion, to.x, to.y]);
 
   return <Animated.View style={[styles.rewardToken, motionStyle]}><Image accessibilityIgnoresInvertColors contentFit="contain" source={art} style={styles.rewardTokenArt} transition={0} /></Animated.View>;
+}
+
+export function mergeRewardContactWindowMs(count: number, reduceMotion: boolean) {
+  return Math.max(0, count - 1) * (reduceMotion ? 25 : COIN_STAGGER_MS);
 }
 
 const styles = StyleSheet.create({

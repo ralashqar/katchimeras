@@ -4,6 +4,7 @@ import type { MergeWorldCommandResult, MergeWorldState } from '@/types/merge-wor
 import type { HavenStage } from '@/constants/haven-catalog';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld, resetMergeActivityForDay } from '@/utils/merge-world/engine';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
+import { completeMossproutChapterZeroSlice } from '@/utils/merge-world/chapter-zero-policy';
 import { MOSSPROUT_FTUE_JOURNAL_ENERGY } from '@/utils/merge-world/economy-policy';
 
 const DATABASE_NAME = 'katchimeras-merge-world.db';
@@ -240,6 +241,43 @@ export function revealStoredHaven(now = Date.now()) {
 
 export function reconcileStoredHavenStory(characterId: import('@/types/merge-world').MergeCharacterId, storyLevel: number, now = Date.now()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'reconcileHavenStory', characterId, storyLevel, now }), now);
+}
+
+/** Completes the Chapter Zero handoff by publishing today's normal Garden batch immediately. */
+export function seedStoredMossproutGardenAfterFtue(dayId: string, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => {
+    const completedChapterZero = completeMossproutChapterZeroSlice(state, now);
+    return reduceMergeWorld(completedChapterZero, {
+      type: 'reconcileCharacterActivity',
+      familyId: 'mossprout',
+      dayId,
+      status: 'complete',
+      activity: null,
+      now,
+    });
+  }, now);
+}
+
+export function grantStoredKatchimeraCard(
+  familyId: import('@/types/merge-world').MergeCharacterId,
+  cardId: string,
+  sourceReceiptId: string,
+  now = Date.now(),
+) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'grantKatchimeraCard', familyId, cardId, sourceReceiptId, now,
+  }), now);
+}
+
+export function purchaseStoredKatchimeraCard(
+  familyId: import('@/types/merge-world').MergeCharacterId,
+  cardId: string,
+  purchaseId: string,
+  now = Date.now(),
+) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'purchaseKatchimeraCard', familyId, cardId, cost: 150, purchaseId, now,
+  }), now);
 }
 
 export async function resetMergeWorldStateForDebug(now = Date.now()): Promise<void> {

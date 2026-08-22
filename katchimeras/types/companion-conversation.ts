@@ -129,6 +129,8 @@ export type ConversationNode =
       title: string;
       insightKey: string;
       category: string;
+      /** Lightweight results are shown as a conclusion without becoming a saved profile insight. */
+      persistence?: 'offer_save' | 'display_only';
       results: readonly ConversationInsightResultDefinition[];
       nextNodeId: string | null;
     }
@@ -192,6 +194,8 @@ export type ConversationDefinition = {
   version: number;
   familyId: ConversationV2FamilyId;
   title: string;
+  /** Short, action-led copy used when this conversation appears as a daily card. */
+  actionTitle?: string;
   trigger: ConversationTriggerKind;
   triggerRouteKeys?: readonly string[];
   minimumBondLevel: 1 | 2 | 3 | 4;
@@ -208,6 +212,14 @@ export type ConversationDefinition = {
   requiresActiveFocus?: boolean;
   requiresNoActiveFocus?: boolean;
   requiresNoActiveQuest?: boolean;
+  /** Editorial reason this conversation exists. Used to keep character content intentional. */
+  purpose?: 'journey' | 'get_to_know' | 'reflection' | 'learned_insight' | 'planning' | 'card_discovery' | 'bond_milestone';
+  /** Where the character experience should return after this conversation resolves. */
+  returnTarget?: 'character_home' | 'chat_lobby' | 'garden' | 'goals' | 'quest';
+  /** Whether the authored beat may be selected again after completion. */
+  repeatPolicy?: 'once_ever' | 'once_per_journey_day' | 'after_cooldown';
+  /** Stable editorial subject used to avoid serving near-duplicate prompts too close together. */
+  topicKey?: string;
 };
 
 export type ConversationTurn = {

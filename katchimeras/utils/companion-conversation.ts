@@ -256,6 +256,7 @@ export function selectConversationDefinition(input: {
     definition.familyId === input.familyId
     && definition.minimumBondLevel <= input.bondLevel
     && (definition.minimumFriendshipLevel ?? 1) <= (input.friendshipLevel ?? input.bondLevel)
+    && conversationDefinitionIsEligible(definition, input.sessions, input.dayId)
   );
   if (!pool.length) return null;
   const signal = input.signals
@@ -296,19 +297,29 @@ export function selectConversationFromPool(input: {
   hasActiveFocus?: boolean;
   hasActiveQuest?: boolean;
   excludeDefinitionIds?: readonly string[];
+  dayId?: string;
+  bondLevel?: 1 | 2 | 3 | 4;
+  friendshipLevel?: number;
+  allowCooldownFallback?: boolean;
 }): ConversationDefinition | null {
   const excluded = new Set(input.excludeDefinitionIds ?? []);
-  const candidates = input.definitions.filter((definition) =>
+  const pool = input.definitions.filter((definition) =>
     definition.familyId === input.familyId
     && !excluded.has(definition.id)
+    && definition.minimumBondLevel <= (input.bondLevel ?? 4)
+    && (definition.minimumFriendshipLevel ?? 1) <= (input.friendshipLevel ?? input.bondLevel ?? 4)
     && !definition.contextualOnly
     && !definition.isOpener
     && (!definition.requiresActiveFocus || input.hasActiveFocus)
     && (!definition.requiresNoActiveFocus || !input.hasActiveFocus)
     && (!definition.requiresNoActiveQuest || !input.hasActiveQuest)
-    && (input.poolId === 'play' || (definition.format !== 'poll' && definition.format !== 'profile_game'))
+    && (input.poolId === 'play' || input.poolId === 'nature-question' || (definition.format !== 'poll' && definition.format !== 'profile_game'))
     && (!input.poolId || definition.tags?.includes(input.poolId))
   );
+  const eligible = pool.filter((definition) => conversationDefinitionIsEligible(definition, input.sessions, input.dayId));
+  const candidates = eligible.length || !input.allowCooldownFallback
+    ? eligible
+    : pool.filter((definition) => definition.repeatPolicy === 'after_cooldown');
   return chooseRecentAware(candidates, input.sessions, input.seed);
 }
 
@@ -320,7 +331,13 @@ export function selectConversationForMode(input: {
   seed: string;
   hasActiveFocus?: boolean;
   hasActiveQuest?: boolean;
+  dayId?: string;
+  bondLevel?: 1 | 2 | 3 | 4;
+  friendshipLevel?: number;
+  allowCooldownFallback?: boolean;
+  excludeDefinitionIds?: readonly string[];
 }): ConversationDefinition | null {
+  const excluded = new Set(input.excludeDefinitionIds ?? []);
   const talkPoolIds = new Set(input.definitions.flatMap((definition) => definition.isOpener
     ? definition.nodes.flatMap((node) => node.kind === 'choice'
         ? node.options.flatMap((option) => option.transition?.kind === 'pool'
@@ -330,19 +347,25 @@ export function selectConversationForMode(input: {
           : [])
         : [])
     : []));
-  const candidates = input.definitions.filter((definition) => {
-    if (definition.familyId !== input.familyId || definition.contextualOnly) return false;
+  const modePool = input.definitions.filter((definition) => {
+    if (definition.familyId !== input.familyId || definition.contextualOnly || excluded.has(definition.id)) return false;
+    if (definition.minimumBondLevel > (input.bondLevel ?? 4)) return false;
+    if ((definition.minimumFriendshipLevel ?? 1) > (input.friendshipLevel ?? input.bondLevel ?? 4)) return false;
     if (definition.requiresActiveFocus && !input.hasActiveFocus) return false;
     if (definition.requiresNoActiveFocus && input.hasActiveFocus) return false;
     if (definition.requiresNoActiveQuest && input.hasActiveQuest) return false;
     if (input.mode === 'play') return definition.format === 'profile_game' || definition.format === 'poll';
-    if (input.mode === 'discover') return definition.format === 'insight_game';
+    if (input.mode === 'discover') return definition.format === 'insight_game' && !definition.tags?.includes('nature-question');
     if (input.mode === 'plan') return definition.id.endsWith(':goal-discovery');
     return !definition.isOpener
       && definition.format !== 'poll'
       && definition.format !== 'profile_game'
       && Boolean(definition.tags?.some((tag) => talkPoolIds.has(tag)));
   });
+  const eligible = modePool.filter((definition) => conversationDefinitionIsEligible(definition, input.sessions, input.dayId));
+  const candidates = eligible.length || !input.allowCooldownFallback
+    ? eligible
+    : modePool.filter((definition) => definition.repeatPolicy === 'after_cooldown');
   if (input.mode === 'play') {
     const formGame = candidates.find((definition) =>
       definition.format === 'profile_game'
@@ -432,7 +455,7 @@ export function validateConversationDefinitions(definitions: readonly Conversati
         if (node.suggestedQuickGoalIds.length < 2 || node.suggestedQuickGoalIds.length > 3) issues.push(`${definition.id}:${node.id}: matched goal needs two or three supporting steps`);
       }
     }
-    if (!definition.isOpener && hasOutcomeLessEnding(definition)) issues.push(`${definition.id}: reachable ending has no outcome`);
+    if (!definition.isOpener && !definition.purpose && hasOutcomeLessEnding(definition)) issues.push(`${definition.id}: reachable ending has no outcome`);
     const reachable = reachableNodeIds(definition);
     for (const node of definition.nodes) if (!reachable.has(node.id)) issues.push(`${definition.id}:${node.id}: unreachable`);
   }
@@ -776,6 +799,30 @@ function chooseRecentAware(
     () => definition
   ));
   return chooseStable(weighted, seed);
+}
+
+function conversationDefinitionIsEligible(
+  definition: ConversationDefinition,
+  sessions: readonly ConversationSession[],
+  dayId?: string,
+): boolean {
+  if (!definition.repeatPolicy) return true;
+  const completed = sessions.filter((session) =>
+    !session.preview && session.definitionId === definition.id && session.status === 'completed'
+  );
+  if (definition.repeatPolicy === 'once_ever' && completed.length) return false;
+  if (definition.repeatPolicy === 'once_per_journey_day' && dayId && completed.some((session) => session.servedDayId === dayId)) return false;
+  if (definition.repeatPolicy === 'after_cooldown' && dayId && completed.some((session) =>
+    calendarDayDistance(session.servedDayId, dayId) < Math.max(1, definition.cooldownDays)
+  )) return false;
+  return true;
+}
+
+function calendarDayDistance(fromDayId: string, toDayId: string): number {
+  const from = Date.parse(`${fromDayId}T12:00:00Z`);
+  const to = Date.parse(`${toDayId}T12:00:00Z`);
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return Number.POSITIVE_INFINITY;
+  return Math.max(0, Math.floor((to - from) / 86_400_000));
 }
 
 function stableHash(value: string): number {

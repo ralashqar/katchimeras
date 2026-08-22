@@ -31,6 +31,7 @@ import Animated, {
 
 import { ThemedText } from '@/components/themed-text';
 import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
+import { runRewardArrivalMotion } from '@/components/katchadeck/ui/reward-arrival-motion';
 import { KatchaDeckUI } from '@/constants/theme';
 import { HOME_FTUE_CAMERA_SCALE } from '@/constants/home-loop-layout';
 import todayScene from '@/data/today-scene.json';
@@ -456,22 +457,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   // the original LanternEgg feedback instead of scaling the shell itself.
   const triggerEggFeedback = useCallback(() => {
     mountTransientEffects();
-    cancelAnimation(feedbackShake);
-    cancelAnimation(feedbackPulse);
-    feedbackPulse.value = withSequence(
-      withTiming(1, { duration: reduceMotion ? 70 : 110, easing: Easing.out(Easing.cubic) }),
-      withTiming(0, { duration: reduceMotion ? 150 : 320, easing: Easing.out(Easing.cubic) }),
-    );
-    if (!reduceMotion) {
-      feedbackShake.value = 0;
-      feedbackShake.value = withSequence(
-        withTiming(1, { duration: 75, easing: Easing.linear }),
-        withTiming(-1, { duration: 80, easing: Easing.linear }),
-        withTiming(0.72, { duration: 85, easing: Easing.linear }),
-        withTiming(-0.42, { duration: 90, easing: Easing.linear }),
-        withTiming(0, { duration: 130, easing: Easing.out(Easing.cubic) }),
-      );
-    }
+    runRewardArrivalMotion(feedbackPulse, feedbackShake, reduceMotion);
     ripple.value = 0;
     ripple.value = withTiming(1, {
       duration: reduceMotion ? 220 : 420,

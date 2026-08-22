@@ -140,8 +140,11 @@ test('yesterday step Energy is a required top action with synchronized counters'
   assert.doesNotMatch(stepConversionSource, /offer\.observedSteps - arrivedEnergy/);
   assert.match(nurtureSource, /<AnimatedIntegerText[\s\S]*?durationMs=\{EGG_FEED_PAYOUT_DURATION_MS\}[\s\S]*?easing="linear"[\s\S]*?value=\{displayedSteps\}/);
   assert.match(feedOverlaySource, /export const EGG_FEED_PAYOUT_DURATION_MS = TOKEN_RISE_MS[\s\S]*?TOKEN_FLIGHT_MS/);
-  assert.match(topHudSource, /animateValue: true,[\s\S]*?id: 'energy'/);
-  assert.match(currencyHudSource, /<AnimatedIntegerText[\s\S]*?durationMs=\{animateValue \? 220 : 0\}/);
+  assert.match(topHudSource, /GameCurrencyHud/);
+  assert.match(topHudSource, /GAME_CURRENCY_ART\.coins/);
+  assert.match(topHudSource, /id: 'coins'/);
+  assert.doesNotMatch(topHudSource, /id: 'energy'|id: 'gems'|GAME_CURRENCY_ART\.energy|GAME_CURRENCY_ART\.gems/);
+  assert.match(currencyHudSource, /<AnimatedIntegerText[\s\S]*?durationMs=\{animateValue \? valueAnimationDurationMs : 0\}/);
   assert.match(animatedIntegerSource, /requestAnimationFrame\(tick\)/);
   assert.match(stepConversionSource, /receiptId: `daily-steps:\$\{formingDay\?\.isoDate \?\? 'today'\}:\$\{offer\.dayId\}`/);
   assert.match(stepConversionSource, /setYesterdayStepEnergyCompletionKey\(offer\.dayId\)/);
@@ -170,6 +173,8 @@ test('developer Reset Today makes yesterday step Energy claimable again', () => 
   );
 
   assert.match(resetSource, /toLocalDateId\(shiftLocalDate\(resetDay, -1\)\)/);
+  assert.match(resetSource, /resetKatchimeraContentForDayForDebug\(state\.today\.isoDate\)/);
+  assert.match(resetSource, /resetRelationshipProgressForDayForDebug\(current, state\.today\.isoDate\)/);
   assert.match(resetSource, /resetMergeWorldActivityForDayForDebug\(state\.today\.isoDate, now\.getTime\(\), yesterdayDayId\)/);
   assert.match(engineSource, /if \(stepEnergyDayId\) delete stepEnergyByDay\[stepEnergyDayId\]/);
 });

@@ -14,17 +14,17 @@ export function MossproutFtueStoryStage({ onOpenMerge }: { onOpenMerge: () => vo
         <View style={styles.mark}><IconSymbol color={KatchaUI.companionScenePanel.accentInk} name="leaf.fill" size={21} /></View>
         <View style={styles.copy}>
           <ThemedText selectable style={styles.eyebrow} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>A LITTLE PLACE TO BEGIN</ThemedText>
-          <ThemedText selectable style={styles.title} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>Two things to grow</ThemedText>
+          <ThemedText selectable style={styles.title} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>Wake the first Plant</ThemedText>
         </View>
       </View>
       <ThemedText selectable style={styles.body} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>
-        Make these two items in the Wild Garden.
+        Merge two Seeds, then wake the matching Dream Echo hidden in Mossprout&apos;s Garden.
       </ThemedText>
       <CompanionMergeRequestTray
-        accessibilityLabel="Mossprout's first two requests"
+        accessibilityLabel="Mossprout's first request"
         eyebrow="GARDEN REQUESTS"
         palette={COMPANION_MERGE_REQUEST_PALETTE}
-        requests={MOSSPROUT_CHAPTER_ZERO_REQUESTS.slice(0, 2).map((request) => ({
+        requests={MOSSPROUT_CHAPTER_ZERO_REQUESTS.slice(0, 1).map((request) => ({
           id: request.id,
           badge: request.badge,
           title: request.title,

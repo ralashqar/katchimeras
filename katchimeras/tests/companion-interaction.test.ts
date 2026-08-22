@@ -63,7 +63,7 @@ test('Today and companion goals share deliberate task-row interactions', () => {
   assert.match(todayScreen, /<TodayGoalsExperience/);
   assert.match(todayScreen, /initialMode=\{quickGoalSheetMode\}/);
   assert.match(todayScreen, /!quickGoalsOpen/);
-  assert.match(todayScreen, /isHatching \|\|[\s\S]*?quickGoalsOpen \|\|[\s\S]*?timelineDay\.kind/);
+  assert.match(todayScreen, /const flowBusy =[\s\S]*?isHatching \|\|[\s\S]*?quickGoalsOpen \|\|/);
   assert.match(quickGoalHook, /CompanionQuickGoalCompletionReceipt/);
   assert.match(quickGoalHook, /bondAward: awarded\.awarded/);
   assert.doesNotMatch(goalModal, /Nicely done · \+5 bond/);
@@ -152,9 +152,10 @@ test('You questionnaires advance on selection while consequential tasks retain c
   assert.doesNotMatch(journey, /previous focus kept in history/);
 });
 
-test('bond rewards queue, fly into the creature, respect reduced motion, and gate level-up splashes', () => {
+test('bond rewards queue, fly into the creature, respect reduced motion, and celebrate completed Journey Days', () => {
   const overlay = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'goals', 'bond-reward-overlay.tsx'), 'utf8');
   const stage = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-home-environment-stage.tsx'), 'utf8');
+  const rewardMotion = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'reward-arrival-motion.ts'), 'utf8');
   const interaction = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'), 'utf8');
   const levelUp = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-bond-level-up-celebration.tsx'), 'utf8');
   const kingdom = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-companion-screen.tsx'), 'utf8');
@@ -165,17 +166,23 @@ test('bond rewards queue, fly into the creature, respect reduced motion, and gat
   assert.match(overlay, /Haptics\.impactAsync/);
   assert.match(overlay, /useDisposableTimers\('bond-reward-flight'\)/);
   assert.match(stage, /rewardPulseKey/);
-  assert.match(stage, /withSequence/);
+  assert.match(stage, /runRewardArrivalMotion/);
+  assert.match(rewardMotion, /withSequence/);
   assert.match(interaction, /pendingBondCelebration/);
   assert.match(interaction, /2_800/);
   assert.match(levelUp, /Bond level up/);
+  assert.match(levelUp, /Journey Day complete/);
+  assert.match(levelUp, /variant === 'journey_complete'/);
   assert.match(levelUp, /setTimeout\(onContinue/);
   assert.match(levelUp, /screenReaderEnabled \? 'Return to story' : 'Return now'/);
   assert.match(levelUp, /RisingArrow/);
-  assert.match(kingdom, /!bondLevelUp && !quests\.selectedPendingBondCelebration/);
+  assert.match(kingdom, /receipt\.kind === 'journey_day_completed'/);
+  assert.match(kingdom, /variant: 'journey_complete'/);
+  assert.match(kingdom, /ftueConversationDefinitionId === MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID[\s\S]*?receipt\.kind === 'journey_day_completed'[\s\S]*?return;/);
+  assert.match(kingdom, /!bondCelebration && !quests\.selectedPendingBondCelebration/);
 });
 
-test('Merge and Feastle story navigation replaces the prior story screen and pauses hidden rewards', () => {
+test('legacy Merge return remains safe while Mossprout opens its character-owned Garden', () => {
   const merge = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-world-screen.tsx'), 'utf8');
   const route = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'katchimera-companion-route-screen.tsx'), 'utf8');
   const interaction = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'), 'utf8');
@@ -183,9 +190,10 @@ test('Merge and Feastle story navigation replaces the prior story screen and pau
   assert.match(merge, /storyNavigationPendingRef/);
   assert.match(merge, /source: 'merge-world'/);
   assert.match(route, /source === 'merge-world' \? transitionTo\(\{/);
-  assert.match(route, /navigate: \(\) => router\.dismissTo\('\/games'\)/);
-  assert.match(route, /onOpenMerge=\{\(orderId, selectedFamilyId\) => transitionTo/);
-  assert.match(route, /familyId: selectedFamilyId \?\? familyId/);
+  assert.match(route, /navigate: \(\) => router\.dismissTo\('\/katchimeras'\)/);
+  assert.match(route, /onOpenMerge=\{familyId === 'mossprout'/);
+  assert.match(route, /pathname: '\/katchimera\/\[creatureId\]\/activity'/);
+  assert.doesNotMatch(route, /onOpenMerge=.*pathname: '\/games'/);
   assert.match(interaction, /if \(!props\.active \|\| !receipt \|\| bondReward\) return/);
   assert.match(interaction, /if \(props\.active !== false\) return/);
 });
@@ -220,7 +228,7 @@ test('conversation replies, memories, and outcomes advance without redundant con
   );
   assert.doesNotMatch(scene, /Change answer|Yes, remember this/);
   assert.match(scene, /<ConversationOutcomeCard/);
-  assert.match(scene, /height: Math\.min\(440, Math\.max\(220, height \* 0\.46\)\)/);
+  assert.match(scene, /const panelMaxHeight = Math\.min\(440, Math\.max\(220, height \* 0\.46\)\)/);
   assert.match(scene, /nestedScrollEnabled/);
   assert.doesNotMatch(scene, /minHeight: height/);
   assert.doesNotMatch(scene, /CONVERSATION TAKEAWAY|Finish this thought|reflection_reveal/);
@@ -230,7 +238,9 @@ test('conversation replies, memories, and outcomes advance without redundant con
   assert.match(flow, /onCommitMemory\(node\.summary\.replace/);
   assert.match(flow, /useLayoutEffect\(\(\) => \{[\s\S]*?session\.pendingReply === undefined[\s\S]*?onContinue\(\)/);
   assert.match(flow, /conversationReplyDelayMs/);
+  assert.match(flow, /skipCompletedTransition/);
   assert.match(flow, /screenReaderEnabled/);
+  assert.doesNotMatch(scene, /Undo saved insight|Saved .* returning to your story/);
   assert.doesNotMatch(scene, /is following your answer|Tap to move on sooner|Double-tap for the next line/);
   assert.match(scene, /<PrimaryAction label="Continue" onPress=\{onAdvance\}/);
   assert.match(stage, /Shows the full message/);
@@ -336,6 +346,17 @@ test('FTUE companion launch starts on conversation without a dashboard frame', (
   assert.equal(state.destination, null);
 });
 
+test('a completed FTUE return cannot replay after an ordinary Garden visit', () => {
+  const route = fs.readFileSync('app/katchimera/[creatureId].tsx', 'utf8');
+  const interaction = fs.readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
+  const provider = fs.readFileSync('features/merge-world/merge-world-provider.tsx', 'utf8');
+
+  assert.match(route, /ftue === 'chapter-zero-return'[\s\S]*?ftueRun\?\.status === 'active'[\s\S]*?ftueRun\.stepId === 'companion\.chapter_zero_return'[\s\S]*?MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID/);
+  assert.match(interaction, /conversationSession\.status === 'completed'[\s\S]*?completedInitialConversationRef\.current = props\.conversationSession\.id;[\s\S]*?return;[\s\S]*?requestStoryConversation/);
+  assert.match(provider, /servedOrder\?\.storyArcId !== 'mossprout:casual-garden'[\s\S]*?recordKatchimeraActionCompletion/);
+  assert.match(provider, /slotId: 'garden'[\s\S]*?kind: 'garden_request'[\s\S]*?subtitle: 'Garden request complete'/);
+});
+
 test('the first-meeting introduction is a focused route that returns to the dashboard', () => {
   const initial = createCompanionInteractionState({});
   const introduction = companionInteractionReducer(initial, { type: 'open_introduction' });
@@ -426,7 +447,8 @@ test('the launch chat lobby nests conversations while Shared History returns to 
   assert.match(dashboard, />\s*Chat\s*</);
   assert.match(dashboard, /styles\.actionTray/);
   assert.match(dashboard, /styles\.dock/);
-  assert.match(dashboard, /label="Merge"/);
+  assert.match(dashboard, /activityLabel = 'Merge'/);
+  assert.match(dashboard, /label=\{activityLabel\}/);
   assert.match(dashboard, /label="Journal"/);
   assert.match(dashboard, /label="Collection"/);
   assert.match(dashboard, /onPress=\{\(\) => press\(onChat\)\}/);
@@ -439,7 +461,7 @@ test('the launch chat lobby nests conversations while Shared History returns to 
   );
   assert.match(interaction, /const openChat = \(\) =>/);
   assert.match(interaction, /getCreatureVisual\(props\.visualKey, 'grown'\)/);
-  assert.match(interaction, /onChat=\{openChat\}/);
+  assert.match(interaction, /onChat=\{props\.familyId === 'mossprout' \? undefined : openChat\}/);
   assert.match(interaction, /\n\s+lifted\s*\n/);
   assert.doesNotMatch(interaction, /enterFromLifted/);
   assert.doesNotMatch(interaction, /autoIntroductionCreatureRef/);
@@ -469,6 +491,10 @@ test('companion scene panels share one palette, stay anchored, and bound speech 
     assert.match(panel, /height: Math\.min\(440, Math\.max\(220, height \* 0\.46\)\)/);
   }
   assert.match(conversation, /height: panelHeight/);
+  assert.match(conversation, /activeGameQuestion\?\.id \?\? 'no-question'/);
+  assert.match(conversation, /key=\{panelContentKey\}/);
+  assert.match(conversation, /LinearTransition\.duration\(180\)/);
+  assert.match(conversation, /PANEL_SCROLL_VERTICAL_PADDING/);
   assert.match(conversation, /onContentSizeChange=\{\(_, contentHeight\) =>/);
   assert.match(conversation, /optionInk/);
   assert.match(conversation, /const shortPanelBottomLift = panelScrollable/);
@@ -482,7 +508,99 @@ test('companion scene panels share one palette, stay anchored, and bound speech 
   assert.match(cinematic, /width: bubbleWidth, zIndex: 4 \}, subjectPanStyle/);
 });
 
-test('ideal-skin onboarding gates launch companions and skin equipment opens a bespoke Plus offer', () => {
+test('Mossprout owns a compact Journey action stack without redundant headings or clipped swipe motion', () => {
+  const worldPath = path.join(process.cwd(), 'components', 'katchadeck', 'world');
+  const mossprout = fs.readFileSync(path.join(worldPath, 'mossprout-story-stage.tsx'), 'utf8');
+  const interaction = fs.readFileSync(path.join(worldPath, 'companion-interaction-sheet.tsx'), 'utf8');
+  const dashboard = fs.readFileSync(path.join(worldPath, 'companion-dashboard.tsx'), 'utf8');
+  const sharedRows = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'day-action-row.tsx'), 'utf8');
+
+  assert.match(mossprout, /resolveMossproutDayActions/);
+  assert.doesNotMatch(mossprout, /slice\(0, 3\)/);
+  assert.match(mossprout, /\(\['together', 'field', 'garden'\] as const\)\.flatMap/);
+  assert.doesNotMatch(mossprout, /Today with Mossprout|active.*slots/);
+  assert.match(interaction, /outcomeRequiresManualAdvance: props\.familyId === 'mossprout'/);
+  assert.match(interaction, /conversations=\{props\.mossproutActionCandidates\}/);
+  assert.doesNotMatch(interaction, /outcomeAutoAdvanceMs: props\.familyId === 'mossprout'/);
+  assert.match(interaction, /if \(props\.familyId !== 'mossprout'\) selectExperienceDestination\('insight'\)/);
+  assert.match(mossprout, /<DayActionCardSurface/);
+  assert.match(mossprout, /<DayActionActiveRow/);
+  assert.match(mossprout, /<DayActionCompletedRow/);
+  assert.match(sharedRows, /rowX\.value = withDelay/);
+  assert.doesNotMatch(sharedRows, /HORIZONTAL_MOTION_GUTTER/);
+  assert.match(sharedRows, /marginHorizontal: -windowWidth/);
+  assert.match(sharedRows, /paddingHorizontal: windowWidth/);
+  assert.match(sharedRows, /skipFramePositionStyle = useMemo\(\(\) => \(\{ left: windowWidth \}\)/);
+  assert.match(sharedRows, /skipFrame: \{[^}]*borderRadius: 20[^}]*overflow: 'hidden'/);
+  assert.match(interaction, /fullWidth=\{mossproutActionDashboard\}/);
+  assert.match(interaction, /mossproutActionScrollContent: \{ paddingHorizontal: KatchaUI\.layout\.phoneGutter \+ 4 \}/);
+  assert.match(mossprout, /maxHeight: 276/);
+  assert.match(mossprout, /overflow: 'visible'/);
+  assert.match(interaction, /nameplateTitle=\{mossproutNameplate\?\.title\}/);
+  assert.doesNotMatch(mossprout, /label="Talk"|onTalk/);
+  assert.match(interaction, /onChat=\{props\.familyId === 'mossprout' \? undefined : openChat\}/);
+  assert.match(dashboard, /onChat \? <Pressable/);
+});
+
+test('completed action rows preserve their outro while Bond reward renders update the parent', () => {
+  const sharedRows = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'day-action-row.tsx'),
+    'utf8'
+  );
+
+  assert.match(sharedRows, /const onFinishedRef = useRef\(onFinished\)/);
+  assert.match(sharedRows, /const onRewardRequestRef = useRef\(onRewardRequest\)/);
+  assert.match(sharedRows, /runOnJS\(notifyFinished\)\(\)/);
+  assert.match(sharedRows, /const request = onRewardRequestRef\.current/);
+  assert.match(sharedRows, /claimRewardAnimation\(rewardAnimationId\)/);
+  assert.match(sharedRows, /REWARD_REPLAY_GUARD_MS = 12_000/);
+  assert.doesNotMatch(sharedRows, /\[chargeGlow, onFinished,/);
+});
+
+test('Mossprout home reads Garden orders with or without the retained Merge provider', () => {
+  const stage = fs.readFileSync('components/katchadeck/world/mossprout-story-stage.tsx', 'utf8');
+  const provider = fs.readFileSync('features/merge-world/merge-world-provider.tsx', 'utf8');
+  assert.match(stage, /useOptionalMergeWorldState/);
+  assert.match(stage, /loadMergeWorldState\(\)/);
+  assert.match(stage, /subscribeMergeWorldSnapshots\(adopt\)/);
+  assert.match(stage, /nextState\.revision > current\.revision/);
+  assert.doesNotMatch(stage, /useMergeWorldState\(\)/);
+  assert.match(provider, /export function useOptionalMergeWorldState\(\)/);
+});
+
+test('Mossprout routes nature cards directly into their focused activity', () => {
+  const worldPath = path.join(process.cwd(), 'components', 'katchadeck', 'world');
+  const mossprout = fs.readFileSync(path.join(worldPath, 'mossprout-story-stage.tsx'), 'utf8');
+  const homeModel = fs.readFileSync(path.join(process.cwd(), 'game', 'katchimeras', 'mossprout-home.ts'), 'utf8');
+  const interaction = fs.readFileSync(path.join(worldPath, 'companion-interaction-sheet.tsx'), 'utf8');
+  const conversations = fs.readFileSync(path.join(process.cwd(), 'constants', 'mossprout-story-conversations.ts'), 'utf8');
+  const questHook = fs.readFileSync(path.join(process.cwd(), 'hooks', 'use-kingdom-quests.ts'), 'utf8');
+  const today = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'home', 'today-nurture-experience.tsx'), 'utf8');
+
+  assert.match(homeModel, /quest-mossprout-green-photo/);
+  assert.match(homeModel, /quest-mossprout-nature-note/);
+  assert.match(homeModel, /kind: 'garden_request'/);
+  assert.match(homeModel, /reward: \{ kind: 'coins'/);
+  assert.match(mossprout, /PersistentMergeItemArt/);
+  assert.match(mossprout, /journeyGardenRequest/);
+  assert.match(mossprout, /visibleDefinitions\.map/);
+  assert.match(homeModel, /expandRequirementDefinitionIds\(liveRequest\.requirements\)/);
+  assert.doesNotMatch(mossprout, /subtitle=\{action\.subtitle/);
+  assert.doesNotMatch(mossprout, /eyebrow=\{action\.progressLabel/);
+  assert.match(interaction, /props\.onSelectOffer\(questId\);\s+if \(!props\.onAccept\(questId\)\) return;\s+setDirectQuestOrigin/);
+  assert.match(interaction, /destination === 'quest' && directQuestOrigin/);
+  assert.match(interaction, /conversations=\{props\.mossproutActionCandidates\}/);
+  assert.match(interaction, /offers=\{props\.actionOffers\}/);
+  assert.match(conversations, /\.\.\.mossproutNatureQuestions/);
+  assert.match(conversations, /\.\.\.mossproutPlanningConversations/);
+  assert.match(questHook, /label: question\.actionTitle \?\? question\.title/);
+  assert.doesNotMatch(questHook, /label: 'Mossprout has a question'/);
+  assert.match(homeModel, /MOSSPROUT_DAILY_FIELD_NOTE_ACTION_ID/);
+  assert.match(questHook, /selectedActionOffers:/);
+  assert.match(today, /<DayActionCardSurface/);
+});
+
+test('form questionnaires gate launch companions while Katchimera Cards remain collection-only', () => {
   const interaction = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'),
     'utf8',
@@ -492,7 +610,8 @@ test('ideal-skin onboarding gates launch companions and skin equipment opens a b
     'utf8',
   );
   const questHook = fs.readFileSync(path.join(process.cwd(), 'hooks', 'use-kingdom-quests.ts'), 'utf8');
-  const paywall = fs.readFileSync(path.join(process.cwd(), 'app', 'modal.tsx'), 'utf8');
+  const cards = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-skins-thread.tsx'), 'utf8');
+  const cardHook = fs.readFileSync(path.join(process.cwd(), 'hooks', 'use-katchimera-cards.ts'), 'utf8');
   const profile = fs.readFileSync(path.join(process.cwd(), 'app', '(tabs)', 'explore.tsx'), 'utf8');
   const progressReset = fs.readFileSync(path.join(process.cwd(), 'utils', 'reset-katchimera-progress-for-debug.ts'), 'utf8');
   const companionRoute = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'katchimera-companion-route-screen.tsx'), 'utf8');
@@ -507,12 +626,13 @@ test('ideal-skin onboarding gates launch companions and skin equipment opens a b
   assert.match(questHook, /const existingExplicitSession = input\.definitionId/);
   assert.match(questHook, /if \(existingExplicitSession\) return current/);
   assert.match(interaction, /idealSkinOnboardingRequired\s*\? props\.onClose/);
-  assert.match(kingdom, /source: 'katchimera-skin'/);
-  assert.match(kingdom, /economy\.snapshot\.activePlus \? applyWardrobeToKingdom/);
-  assert.match(paywall, /Share every day card/);
-  assert.match(paywall, /questionnaire match/);
-  assert.match(paywall, /safeDismissModal/);
-  assert.match(companionRoute, /if \(!isFocused\) return <View style=\{styles\.inactiveScreen\} \/>;/);
+  assert.match(kingdom, /const presentationKingdom = kingdom/);
+  assert.doesNotMatch(kingdom, /economy\.snapshot\.activePlus \? applyWardrobeToKingdom/);
+  assert.match(cards, /They do not change your companion or your relationship/);
+  assert.match(cards, /Your first card will be revealed during an early Journey Day/);
+  assert.match(cards, /KATCHIMERA_CARD_PRICE/);
+  assert.match(cardHook, /KATCHIMERA_CARD_PRICE = 150/);
+  assert.match(companionRoute, /if \(!isFocused \|\| !discovery\.ready\) return <View style=\{styles\.inactiveScreen\} \/>;/);
   assert.match(interaction, /if \(!props\.active \|\| !idealSkinOnboardingRequired/);
   assert.match(interaction, /selectExperienceDestination\('insight'\)/);
   assert.match(profile, /Reset Katchimeras progress/);

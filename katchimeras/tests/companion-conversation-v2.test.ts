@@ -22,6 +22,7 @@ import {
 import type { StoredHomeDayRecord } from '@/types/home';
 import {
   answerConversation,
+  conversationQuestionCount,
   conversationGameQuestion,
   continueConversation,
   createConversationSession,
@@ -36,6 +37,7 @@ import { reconcileConversationJournalSignals } from '@/utils/companion-conversat
 import {
   emptyCompanionContentState,
   normaliseCompanionContentState,
+  resetCompanionContentForDay,
   upsertConversationSession,
 } from '@/utils/companion-content';
 import {
@@ -49,9 +51,33 @@ import { questDefinition } from '@/utils/quests/definitions';
 const familyIds = ['baristabbit', 'steppling', 'flexel'] as const;
 const authoredStoryFamilies = new Set(['baristabbit', 'steppling', 'voyagle', 'flexel', 'bedrotte']);
 
+test('resetting Today makes its conversation pool unserved without erasing prior sessions', () => {
+  const definition = companionConversationDefinitionsForFamily('mossprout')[0]!;
+  const prior = createConversationSession({ definition, formId: 'mossprout', dayId: '2026-08-21', createdAt: 1 });
+  const today = createConversationSession({ definition, formId: 'mossprout', dayId: '2026-08-22', createdAt: 2 });
+  let state = upsertConversationSession(emptyCompanionContentState(), prior);
+  state = upsertConversationSession(state, today);
+  state = {
+    ...state,
+    servedConversationDayKeys: ['mossprout:2026-08-21', 'mossprout:2026-08-22'],
+    conversationSignals: [{
+      id: 'signal:today', kind: 'journal', familyId: 'mossprout', sourceId: 'journal:today',
+      dayId: '2026-08-22', createdAt: 2, expiresAt: 3,
+    }],
+    processedConversationEvidenceIds: ['journal:today', 'journal:prior'],
+  };
+
+  const reset = resetCompanionContentForDay(state, '2026-08-22');
+
+  assert.deepEqual(reset.conversationSessions.map((session) => session.id), [prior.id]);
+  assert.deepEqual(reset.servedConversationDayKeys, ['mossprout:2026-08-21']);
+  assert.deepEqual(reset.conversationSignals, []);
+  assert.deepEqual(reset.processedConversationEvidenceIds, ['journal:prior']);
+});
+
 test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gated', () => {
   assert.deepEqual(validateConversationDefinitions(companionConversationDefinitionsV2), []);
-  assert.equal(companionConversationDefinitionsV2.length, 53 * CONVERSATION_V2_FAMILIES.length + 53);
+  assert.equal(companionConversationDefinitionsV2.length, 1363);
   assert.deepEqual(CONVERSATION_V2_ENABLED_FAMILIES, CONVERSATION_V2_FAMILIES);
   assert.deepEqual(CONVERSATION_V2_IDEAL_SKIN_FAMILIES, familyIds);
   assert.equal(isConversationV2Family('feastle'), true);
@@ -68,9 +94,23 @@ test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gate
     }
     assert.ok(katchimeraFamilyById.get(familyId)!.skinIds.length >= 6, `${familyId} needs at least six forms`);
     assert.ok(katchimeraFamilyById.get(familyId)!.skinIds.length <= 12, `${familyId} catalog has grown beyond reviewable scope`);
-    assert.equal(pack.length, familyId === 'feastle' ? 73 : familyId === 'mossprout' ? 66 : authoredStoryFamilies.has(familyId) ? 57 : 53);
-    assert.equal(pack.filter((item) => item.trigger === 'evergreen').length, familyId === 'mossprout' ? 24 : familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 12 : 11);
-    assert.equal(pack.filter((item) => item.isOpener).length, familyId === 'mossprout' ? 21 : familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 9 : 8);
+    if (familyId === 'mossprout') {
+      assert.equal(pack.length, 51);
+      assert.equal(pack.filter((item) => item.trigger === 'evergreen').length, 39);
+      assert.equal(pack.filter((item) => item.trigger === 'journal').length, 3);
+      assert.equal(pack.filter((item) => item.trigger === 'goal_debrief').length, 0);
+      assert.equal(pack.filter((item) => item.trigger === 'quest_debrief').length, 0);
+      assert.equal(pack.filter((item) => item.trigger === 'bond').length, 3);
+      assert.equal(pack.filter((item) => item.trigger === 'poll').length, 4);
+      assert.equal(pack.filter((item) => item.trigger === 'signature_game').length, 2);
+      assert.equal(pack.filter((item) => item.format === 'insight_game').length, 10);
+      assert.equal(pack.some((item) => /^mossprout:story:\d+$/.test(item.id)), false);
+      assert.ok(pack.every((item) => item.purpose && item.returnTarget && item.repeatPolicy));
+      continue;
+    }
+    assert.equal(pack.length, familyId === 'feastle' ? 73 : authoredStoryFamilies.has(familyId) ? 57 : 53);
+    assert.equal(pack.filter((item) => item.trigger === 'evergreen').length, familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 12 : 11);
+    assert.equal(pack.filter((item) => item.isOpener).length, familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 9 : 8);
     assert.equal(pack.filter((item) => item.trigger === 'journal').length, 6);
     assert.equal(pack.filter((item) => item.trigger === 'goal_debrief').length, 2);
     assert.equal(pack.filter((item) => item.trigger === 'quest_debrief').length, 2);
@@ -79,6 +119,56 @@ test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gate
     assert.equal(pack.filter((item) => item.trigger === 'signature_game').length, 5);
     assert.equal(pack.filter((item) => item.format === 'insight_game').length, familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 5 : 4);
   }
+});
+
+test('Mossprout keeps Journey questions gated while offering a separate daily nature pool', () => {
+  const definitions = companionConversationDefinitionsForFamily('mossprout');
+  const journeyQuestions = definitions.filter((definition) => definition.purpose === 'get_to_know' && definition.contextualOnly);
+  assert.equal(journeyQuestions.length, 4);
+  assert.ok(journeyQuestions.every((definition) => definition.tags?.includes('nature')));
+  assert.ok(journeyQuestions.every((definition) => definition.repeatPolicy === 'once_ever'));
+  assert.ok(journeyQuestions.every((definition) => definition.nodes.filter((node) => node.kind === 'choice' || node.kind === 'poll').length === 3));
+
+  const dailyQuestions = definitions.filter((definition) => definition.tags?.includes('nature-question'));
+  assert.equal(dailyQuestions.length, 8);
+  assert.ok(dailyQuestions.every((definition) => Boolean(definition.actionTitle)));
+  assert.equal(new Set(dailyQuestions.map((definition) => definition.actionTitle)).size, dailyQuestions.length);
+  assert.equal(dailyQuestions.some((definition) => definition.actionTitle === 'Mossprout has a question'), false);
+  assert.ok(dailyQuestions.every((definition) => !definition.contextualOnly && definition.repeatPolicy === 'after_cooldown'));
+  assert.equal(dailyQuestions.filter((definition) => definition.format === 'poll').length, 4);
+  assert.equal(dailyQuestions.filter((definition) => definition.format === 'insight_game').length, 4);
+  assert.ok(dailyQuestions.filter((definition) => definition.format === 'poll')
+    .every((definition) => definition.nodes.some((node) => node.kind === 'poll')));
+  assert.ok(dailyQuestions.filter((definition) => definition.format === 'insight_game')
+    .every((definition) => definition.nodes.some((node) => node.kind === 'insight_reveal' && node.persistence === 'display_only')));
+
+  const dailyJournals = definitions.filter((definition) => definition.tags?.includes('nature-journal'));
+  assert.equal(dailyJournals.length, 6);
+  assert.ok(dailyJournals.every((definition) => definition.nodes.some((node) => node.kind === 'journal_handoff')));
+});
+
+test('Mossprout post-Journey selectors always find a question, field note, insight, and nature plan', () => {
+  const definitions = companionConversationDefinitionsForFamily('mossprout');
+  const shared = { familyId: 'mossprout' as const, definitions, sessions: [], dayId: '2026-08-21', bondLevel: 1 as const, friendshipLevel: 1 };
+  const question = selectConversationFromPool({ ...shared, poolId: 'nature-question', seed: 'mossprout:question' });
+  const insight = selectConversationForMode({ ...shared, mode: 'discover', seed: 'mossprout:insight' });
+  const journal = selectConversationFromPool({ ...shared, poolId: 'nature-journal', seed: 'mossprout:journal' });
+  const plan = selectConversationFromPool({ ...shared, poolId: 'goals', seed: 'mossprout:plan' });
+
+  assert.ok(question?.tags?.includes('nature-question'));
+  assert.ok(journal?.tags?.includes('nature-journal'));
+  assert.equal(insight?.id, 'mossprout:insight:nature-connection');
+  assert.equal(plan?.id, 'mossprout:conversation:nature-goal-discovery');
+  assert.equal(conversationQuestionCount(plan!), 4);
+});
+
+test('Mossprout Day 1 includes an authored focus card with three optional nature goals', () => {
+  const definition = companionConversationDefinitionsForFamily('mossprout')
+    .find((item) => item.id === 'mossprout:quiet-patch:first-flower:goal-plan');
+  assert.ok(definition);
+  const proposals = definition.nodes.filter((node) => node.kind === 'goal_proposal');
+  assert.ok(proposals.length >= 1);
+  assert.ok(proposals.every((node) => node.suggestedQuickGoalIds.length === 3));
 });
 
 test('a conversation resumes on the next question and reaches its authored result', () => {
@@ -530,11 +620,11 @@ test('authored-family insights use five meaningful questions while every form-ga
     const games = companionConversationDefinitionsForFamily(familyId)
       .flatMap((definition) => definition.nodes)
       .filter((node) => node.kind === 'profile_game' || node.kind === 'insight_game');
-    assert.equal(games.length, familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 6 : 5);
+    assert.equal(games.length, familyId === 'mossprout' ? 11 : familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 6 : 5);
     for (const game of games.filter((candidate) => candidate.kind === 'profile_game')) {
       assert.deepEqual(validateProfileQuestionGraph(`${familyId}:test`, game), []);
     }
-    assert.equal(games.filter((game) => game.kind === 'insight_game').every((game) => game.questions.length === 5), true);
+    assert.equal(games.filter((game) => game.kind === 'insight_game').every((game) => game.questions.length === (familyId === 'mossprout' ? 4 : 5)), true);
   }
 });
 
@@ -545,6 +635,15 @@ test('journal, goal, quest, and bond chats resolve to their correct outcome clas
     const goalDebriefs = pack.filter((definition) => definition.trigger === 'goal_debrief');
     const questDebriefs = pack.filter((definition) => definition.trigger === 'quest_debrief');
     const bondChats = pack.filter((definition) => definition.trigger === 'bond');
+    if (familyId === 'mossprout') {
+      assert.equal(journals.length, 3);
+      assert.ok(journals.every((definition) => definition.purpose === 'reflection'));
+      assert.equal(goalDebriefs.length, 0);
+      assert.equal(questDebriefs.length, 0);
+      assert.equal(bondChats.length, 3);
+      assert.ok(bondChats.every((definition) => definition.purpose === 'bond_milestone'));
+      continue;
+    }
     assert.equal(journals.length, 6);
     assert.ok(journals.every((definition) => definition.nodes.some((node) => node.kind === 'memory_proposal')));
     assert.ok(goalDebriefs.every((definition) => definition.nodes.some((node) => node.kind === 'goal_proposal')));
@@ -559,6 +658,23 @@ test('journal, goal, quest, and bond chats resolve to their correct outcome clas
 
 test('goal conversations cover every available authored-family goal template', () => {
   for (const familyId of CONVERSATION_V2_FAMILIES) {
+    if (familyId === 'mossprout') {
+      const quickGoalIds = new Set(companionConversationDefinitionsForFamily(familyId)
+        .flatMap((definition) => definition.nodes)
+        .filter((node) => node.kind === 'goal_proposal')
+        .flatMap((node) => node.suggestedQuickGoalIds));
+      assert.deepEqual([...quickGoalIds].sort(), [
+        'mossprout:care-for-plant',
+        'mossprout:notice-living-thing',
+        'mossprout:same-place',
+        'mossprout:season-change',
+        'mossprout:sit-outside',
+        'mossprout:step-outside',
+        'mossprout:visit-green',
+        'mossprout:window-view',
+      ]);
+      continue;
+    }
     const offeredIds = new Set(companionConversationDefinitionsForFamily(familyId)
       .flatMap((definition) => definition.nodes)
       .filter((node) => node.kind === 'goal_proposal')

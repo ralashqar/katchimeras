@@ -17,11 +17,14 @@ import { buildCompanionAffinityProfile, nextEligibleCompanionGate, recommendComp
 import { reduceMergeWorld } from '@/utils/merge-world/engine';
 import { mergeWorldPendingPersistence, type MergeWorldPendingPersistence } from '@/utils/merge-world/persistence-buffer';
 import { loadFirstSession } from '@/features/onboarding/first-session';
-import { isMossproutChapterZeroActive } from '@/utils/merge-world/chapter-zero-policy';
+import { mossproutDailyActionDeck, mossproutJourneyForDay, recordKatchimeraActionCompletion, recordMossproutFirstGardenRestored, recordMossproutJourneyOrderServed, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
+import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
+import { completeMossproutChapterZeroSlice, isMossproutChapterZeroActive } from '@/utils/merge-world/chapter-zero-policy';
 import { loadMergeWorldState, saveMergeWorldState, subscribeMergeWorldResets, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
-import { isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, loadMossproutStory, markAuthoredCohortOrderActive, markAuthoredCohortOrderServed, markFeastleOrderActive, markFeastleOrderServed, markMossproutOrderActive, markMossproutOrderServed, recordAuthoredCohortQuietBond, recordFeastleQuietBond, recordMossproutQuietBond, subscribeCompanionStories } from '@/utils/companion-story-storage';
+import { isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, markAuthoredCohortOrderActive, markAuthoredCohortOrderServed, markFeastleOrderActive, markFeastleOrderServed, recordAuthoredCohortQuietBond, recordFeastleQuietBond, subscribeCompanionStories } from '@/utils/companion-story-storage';
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 import { loadCompanionQuickGoalState, subscribeCompanionQuickGoals } from '@/utils/companion-quick-goal-storage';
+import { localDayId } from '@/utils/world-identity';
 
 type MergeWorldContextValue = {
   state: MergeWorldState | null;
@@ -148,9 +151,15 @@ export function MergeWorldProvider({
           );
         });
       } else if (receipt.characterId === 'mossprout') {
-        guardStoryReceiptMutation(() => markMossproutOrderServed(
-          receipt.id.replace('merge-story-served:', ''), receipt.amount, receipt.createdAt,
-        ));
+        const orderId = receipt.id.replace('merge-story-served:', '');
+        relationshipProgressionRepository.update((current) => {
+          if (orderId === 'mossprout:chapter-0:first-sprout') {
+            const dayId = localDayId(new Date(receipt.createdAt));
+            const started = startMossproutJourneyDay(current, dayId, receipt.createdAt).state;
+            return recordMossproutFirstGardenRestored(started, dayId, `merge-order:${orderId}`, receipt.createdAt);
+          }
+          return recordMossproutJourneyOrderServed(current, orderId, receipt.createdAt);
+        });
       } else if (isAuthoredCohortFamily(receipt.characterId)) {
         const familyId = receipt.characterId;
         guardStoryReceiptMutation(() => markAuthoredCohortOrderServed(
@@ -175,8 +184,6 @@ export function MergeWorldProvider({
         saveCompanionBondState(awarded.state);
         if (receipt.presentation === 'quiet_summary' && receipt.characterId === 'feastle') {
           guardStoryReceiptMutation(() => recordFeastleQuietBond(receipt.id, receipt.amount, receipt.createdAt));
-        } else if (receipt.presentation === 'quiet_summary' && receipt.characterId === 'mossprout') {
-          guardStoryReceiptMutation(() => recordMossproutQuietBond(receipt.id, receipt.amount, receipt.createdAt));
         } else if (receipt.presentation === 'quiet_summary' && isAuthoredCohortFamily(receipt.characterId)) {
           const familyId = receipt.characterId;
           guardStoryReceiptMutation(() => recordAuthoredCohortQuietBond(familyId, receipt.id, receipt.amount, receipt.createdAt));
@@ -211,18 +218,17 @@ export function MergeWorldProvider({
   }, []);
 
   const reconcileMossproutStory = useCallback((current: MergeWorldState, now = Date.now()) => {
-    const story = loadMossproutStory();
-    const havenResult = reduceMergeWorld(current, {
-      type: 'reconcileHavenStory', characterId: 'mossprout', storyLevel: story.currentLevel, now,
-    });
-    const result = reduceMergeWorld(havenResult.state, {
-      type: 'reconcileStory', familyId: 'mossprout', status: story.status,
-      targetLevel: story.targetLevel, actPhase: story.actPhase, now,
-    });
-    const storyOrder = result.state.activeOrders.find((order) => order.storyArcId === 'mossprout:merge-story');
-    const activeStoryOrderStillExists = result.state.activeOrders.some((order) => order.id === story.activeOrderId);
-    if (storyOrder && !activeStoryOrderStillExists) markMossproutOrderActive(storyOrder.id, now);
-    return result.state;
+    const relationships = relationshipProgressionRepository.load();
+    const dayId = localDayId(new Date(now));
+    const journey = mossproutJourneyForDay(relationships, dayId);
+    return reduceMergeWorld(current, {
+      type: 'reconcileCharacterActivity',
+      familyId: 'mossprout',
+      dayId,
+      status: journey?.status ?? 'idle',
+      activity: journey?.activity ?? null,
+      now,
+    }).state;
   }, []);
 
   const reconcileAuthoredCohortStory = useCallback((current: MergeWorldState, familyId: AuthoredCohortFamilyId, now = Date.now()) => {
@@ -271,13 +277,15 @@ export function MergeWorldProvider({
   }, [reconcileAuthoredCohortStory, reconcileFeastleStory, reconcileMossproutStory]);
 
   const featureAndReconcile = useCallback((current: MergeWorldState, now = Date.now()) => {
-    if (loadFirstSession()?.stage !== 'complete' && isMossproutChapterZeroActive(current)) {
+    const firstSessionComplete = loadFirstSession()?.stage === 'complete';
+    if (!firstSessionComplete && isMossproutChapterZeroActive(current)) {
       const featured = reduceMergeWorld(current, { type: 'featureCharacter', characterId: 'mossprout', now }).state;
       const chapterZeroOrders = featured.activeOrders.filter((order) => order.id.startsWith('mossprout:chapter-0:'));
       return chapterZeroOrders.length === featured.activeOrders.length
         ? featured
         : { ...featured, activeOrders: chapterZeroOrders };
     }
+    if (firstSessionComplete) current = completeMossproutChapterZeroSlice(current, now);
     const characterId = resolveFeaturedCharacter(current);
     if (!characterId) return current;
     let next = reduceMergeWorld(current, { type: 'featureCharacter', characterId, now }).state;
@@ -441,6 +449,25 @@ export function MergeWorldProvider({
       release();
     };
   }, [active, enqueuePersistence, reconcileAuthoredCohortStory, reconcileFeastleStory, reconcileMossproutStory]);
+
+  useEffect(() => {
+    if (!active) return;
+    const release = acquireLifecycleResource('store_subscription', 'merge:relationship-progression');
+    const unsubscribe = relationshipProgressionRepository.subscribe(() => {
+      if (!activeRef.current) return;
+      const current = stateRef.current;
+      if (!current || current.favouriteCharacterId !== 'mossprout') return;
+      const next = reconcileMossproutStory(current);
+      if (next === current) return;
+      stateRef.current = next;
+      if (mountedRef.current) setState(next);
+      enqueuePersistence(next);
+    });
+    return () => {
+      unsubscribe();
+      release();
+    };
+  }, [active, enqueuePersistence, reconcileMossproutStory]);
 
   const flush = useCallback(async () => {
     const worker = startPersistenceWorker();
@@ -617,10 +644,35 @@ export function MergeWorldProvider({
     if (!activeRef.current) return null;
     const current = stateRef.current;
     if (!current) return null;
-    const servedCharacterId = command.type === 'serveOrder'
-      ? current.activeOrders.find((order) => order.id === command.orderId)?.characterId ?? null
+    const servedOrder = command.type === 'serveOrder'
+      ? current.activeOrders.find((order) => order.id === command.orderId) ?? null
       : null;
+    const servedCharacterId = servedOrder?.characterId ?? null;
     const reduced = reduceMergeWorld(current, command);
+    if (reduced.changed && command.type === 'serveOrder' && servedCharacterId === 'mossprout') {
+      relationshipProgressionRepository.update((relationships) => {
+        const withJourney = recordMossproutJourneyOrderServed(relationships, command.orderId, command.now);
+        if (servedOrder?.storyArcId !== 'mossprout:casual-garden') return withJourney;
+        const dayId = servedOrder.storyBeatId ?? localDayId(new Date(command.now));
+        const sequence = mossproutDailyActionDeck(withJourney, dayId).slotSequences.garden;
+        const actionId = `mossprout:garden:${servedOrder.id}`;
+        return recordKatchimeraActionCompletion(withJourney, {
+          dayId,
+          familyId: 'mossprout',
+          actionId,
+          instanceId: `${dayId}:garden:${sequence}:${actionId}`,
+          slotId: 'garden',
+          sequence,
+          kind: 'garden_request',
+          title: servedOrder.title,
+          subtitle: 'Garden request complete',
+          icon: 'leaf.fill',
+          artworkDefinitionIds: servedOrder.requirements.map((requirement) => requirement.definitionId),
+          reward: { kind: 'coins', amount: servedOrder.reward.coins },
+          completedAt: command.now,
+        });
+      });
+    }
     const nextState = reduced.changed && servedCharacterId
       ? reconcileFeaturedStory(reduced.state, servedCharacterId, command.now)
       : reduced.state;
@@ -660,6 +712,14 @@ export function useMergeWorldState() {
   const value = use(MergeWorldStateContext);
   if (!value) throw new Error('useMergeWorldState must be used inside MergeWorldProvider.');
   return value;
+}
+
+/**
+ * Character homes may be mounted without the retained Merge route. In that
+ * shell, Merge-backed suggestions are optional rather than a render error.
+ */
+export function useOptionalMergeWorldState() {
+  return use(MergeWorldStateContext);
 }
 
 export function useMergeWorldActions() {

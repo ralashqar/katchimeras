@@ -38,6 +38,8 @@ export function CompanionCinematicStage({
   houseLevel,
   lifted,
   name,
+  nameplateEyebrow,
+  nameplateTitle,
   rewardPulseKey = 0,
   sceneTranslateX,
   onSpeechBubbleHeightChange,
@@ -58,6 +60,8 @@ export function CompanionCinematicStage({
   houseLevel?: number;
   lifted: boolean;
   name: string;
+  nameplateEyebrow?: string;
+  nameplateTitle?: string;
   rewardPulseKey?: number;
   sceneTranslateX?: SharedValue<number>;
   onSpeechBubbleHeightChange?: (height: number) => void;
@@ -242,13 +246,15 @@ export function CompanionCinematicStage({
 
         {showNameplate ? (
           <Animated.View
-            accessibilityLabel={`${name}, Haven level ${houseLevel ?? 1}`}
+            accessibilityLabel={nameplateTitle
+              ? `${nameplateEyebrow ?? 'Journey'}, ${nameplateTitle}`
+              : `${name}, Haven level ${houseLevel ?? 1}`}
             style={[styles.nameplate, { top: nameplateTop }, subjectPanStyle]}>
             <ThemedText selectable style={styles.nameplateEyebrow} lightColor="#F5EBD2" darkColor="#F5EBD2">
-              HAVEN · LV {houseLevel ?? 1}
+              {nameplateEyebrow ?? `HAVEN · LV ${houseLevel ?? 1}`}
             </ThemedText>
             <ThemedText adjustsFontSizeToFit minimumFontScale={0.78} numberOfLines={1} selectable style={styles.nameplateName} lightColor="#FFD86B" darkColor="#FFD86B">
-              {name}
+              {nameplateTitle ?? name}
             </ThemedText>
           </Animated.View>
         ) : null}

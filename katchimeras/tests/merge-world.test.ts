@@ -6,7 +6,7 @@ import { KATCHIMERA_MERGE_PROFILES, MERGE_GENERATORS, MERGE_ITEMS_BY_ID } from '
 import { COMPANION_BOARD_ALLOCATIONS, COMPANION_BOARD_RESERVE_CELLS, COMPANION_DISCOVERY_CATALOG, MERGE_STARTING_DIAMOND_CELLS } from '@/constants/companion-discovery-catalog';
 import type { HomeDayRecord } from '@/types/home';
 import type { MergeBoardItem, MergeWorldState } from '@/types/merge-world';
-import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
+import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import { BARISTABBIT_CHAPTER_ONE_ORDER_POOL, FEASTLE_ACT_TWO_ORDER_POOL, selectAuthoredCohortOrderKeys, selectFeastleActTwoOrderKeys } from '@/utils/companion-story';
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection } from '@/utils/merge-world/board-geometry';
@@ -15,8 +15,9 @@ import { MERGE_MORPH_DURATION_MS, SPAWN_MOTION_DURATION_MS, isMistMergeTransitio
 import { mergeArtWarmupPlan } from '@/utils/merge-world/art-warmup';
 import { mergeActivityRewards } from '@/utils/merge-world/activity-rewards';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
+import { completeMossproutChapterZeroSlice } from '@/utils/merge-world/chapter-zero-policy';
 import { nextEligibleCompanionGate, recommendCompanionPath } from '@/utils/merge-world/companion-discovery-progression';
-import { MERGE_ENERGY_REGEN_CAP, MERGE_ENERGY_REGEN_MS, MERGE_INITIAL_ENERGY, MOSSPROUT_FTUE_JOURNAL_ENERGY, STEPS_PER_MERGE_ENERGY, mergeJournalRewardPreview, mergeYesterdayStepEnergyPreview } from '@/utils/merge-world/economy-policy';
+import { MERGE_ENERGY_REGEN_CAP, MERGE_ENERGY_REGEN_MS, MERGE_INITIAL_ENERGY, STEPS_PER_MERGE_ENERGY, mergeJournalRewardPreview, mergeYesterdayStepEnergyPreview } from '@/utils/merge-world/economy-policy';
 import {
   createInitialMergeWorldState,
   mergeOrderReady,
@@ -73,24 +74,28 @@ test('Dream Echoes accept only their match and emit persistent FTUE evidence', (
   assert.equal(state.board[23].occupant?.kind === 'item' ? state.board[23].occupant.definitionId : null, 'nature:garden:2');
 });
 
-test('Merge FTUE locks the board for Serve and advances only for its exact order', () => {
+test('Merge FTUE wakes the Sprout Echo before serving the exact first Plant order', () => {
   const initial = createMossproutChapterZeroState(NOW);
   const from = initial.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.instanceId === 'onboarding-seed-a');
   const to = initial.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.instanceId === 'onboarding-seed-b');
-  const merged = reduceMergeWorld(initial, { type: 'move', from, to, now: NOW + 1 }).state;
-  const step = mossproutFtueStep('merge.serve_sprout');
+  let merged = reduceMergeWorld(initial, { type: 'move', from, to, now: NOW + 1 }).state;
+  const sproutCell = merged.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:2');
+  merged = reduceMergeWorld(merged, { type: 'move', from: sproutCell, to: 25, now: NOW + 2 }).state;
+  const step = mossproutFtueStep('merge.serve_plant');
   const orderId = 'mossprout:chapter-0:first-sprout';
   assert.deepEqual(mergeFtueBoardGate(step, merged), { kind: 'locked' });
   assert.deepEqual(mergeFtueRailGate(step), { kind: 'serve', orderId });
-  assert.equal(mergeFtueAllowsCommand(step, merged, { type: 'serveOrder', orderId, now: NOW + 2 }), true);
-  assert.equal(mergeFtueAllowsCommand(step, merged, { type: 'serveOrder', orderId: 'wrong', now: NOW + 2 }), false);
-  const command = { type: 'serveOrder' as const, orderId, now: NOW + 2 };
+  assert.equal(mergeFtueAllowsCommand(step, merged, { type: 'serveOrder', orderId, now: NOW + 3 }), true);
+  assert.equal(mergeFtueAllowsCommand(step, merged, { type: 'serveOrder', orderId: 'wrong', now: NOW + 3 }), false);
+  const command = { type: 'serveOrder' as const, orderId, now: NOW + 3 };
   const result = reduceMergeWorld(merged, command);
   assert.deepEqual(mergeFtueEventForCommand(merged, command, result), { type: 'order_served', orderId, revision: result.state.revision });
-  assert.equal(recoverMergeFtueEvent('merge.serve_sprout', result.state, {
-    'baseline:merge.serve_sprout:merge.serve_sprout': 0,
+  assert.equal(recoverMergeFtueEvent('merge.serve_plant', result.state, {
+    'baseline:merge.serve_plant:merge.serve_home_plant': 0,
   })?.type, 'order_served');
-  assert.deepEqual(result.state.activeOrders.map((order) => order.id), ['mossprout:chapter-0:home-plant']);
+  assert.deepEqual(result.state.activeOrders, []);
+  assert.equal(result.state.generators['wild-garden'].forcedDropDefinitionId, null);
+  assert.equal(result.state.energy.regenPaused, false);
 });
 
 test('Merge FTUE exposes only Mossprout’s highlighted return note after Chapter 0', () => {
@@ -205,7 +210,7 @@ test('a new Merge World uses the consolidated Energy economy', () => {
   assert.deepEqual(state.generators, {});
 });
 
-test('Mossprout Chapter 0 stays inside the centered thirteen-cell clearing', () => {
+test('Mossprout Chapter 0 wakes a Plant through a Sprout Echo and restores the normal Garden basket', () => {
   let state = createMossproutChapterZeroState(NOW, 'heartlet');
   const openCount = () => state.board.filter((cell) => !cell.locked).length;
   assert.equal(openCount(), 13);
@@ -214,7 +219,7 @@ test('Mossprout Chapter 0 stays inside the centered thirteen-cell clearing', () 
   assert.deepEqual(state.generators['wild-garden'].tierOneDropDefinitionIds, ['nature:garden:1', 'nature:waterside:1']);
   assert.equal(state.generators['wild-garden'].forcedDropDefinitionId, 'nature:garden:1');
   assert.deepEqual(state.activeOrders.map((order) => order.id), ['mossprout:chapter-0:first-sprout']);
-  assert.deepEqual(state.activeOrders[0].requirements, [{ definitionId: 'nature:garden:2', quantity: 1 }]);
+  assert.deepEqual(state.activeOrders[0].requirements, [{ definitionId: 'nature:garden:3', quantity: 1 }]);
   assert.deepEqual(state.board.flatMap((cell, index) => cell.mist?.kind === 'echo' && cell.mist.ownerCharacterId === 'mossprout' ? [[index, cell.mist.definitionId]] : []), [
     [23, 'nature:garden:1'], [25, 'nature:garden:2'], [37, 'nature:garden:3'], [39, 'nature:garden:4'], [45, 'nature:garden:5'],
   ]);
@@ -223,98 +228,23 @@ test('Mossprout Chapter 0 stays inside the centered thirteen-cell clearing', () 
   assert.equal(seedCells.length, 2);
   assert.ok(seedCells.every((cell) => state.board[cell].occupant?.kind === 'item' && state.board[cell].occupant.definitionId === 'nature:garden:1'));
   state = reduceMergeWorld(state, { type: 'move', from: seedCells[0], to: seedCells[1], now: NOW + 1 }).state;
-  const echoSeed = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: 'wild-garden', now: NOW + 2, seed: 'echo-seed' });
-  assert.ok(echoSeed.spawnedCell != null);
-  state = echoSeed.state;
-  const seedEcho = reduceMergeWorld(state, { type: 'move', from: echoSeed.spawnedCell!, to: 23, now: NOW + 3 });
-  assert.equal(seedEcho.dreamEchoClearedId, 'mossprout-seed-echo');
-  state = seedEcho.state;
-  assert.equal(openCount(), 13);
-
-  state = reduceMergeWorld(state, { type: 'serveOrder', orderId: 'mossprout:chapter-0:first-sprout', now: NOW + 4 }).state;
-  assert.equal(openCount(), 13);
-  assert.deepEqual(state.activeOrders.map((order) => order.id), ['mossprout:chapter-0:home-plant']);
-  assert.equal(state.energy.value, 3);
-  assert.equal(Boolean(state.characterProgress.mossprout?.completedChapterIds.includes('mossprout-chapter-0')), false);
-  assert.equal(state.externalRewardReceipts.some((receipt) => receipt.kind === 'wisp'), false);
-
-  const mergePair = (definitionId: string, at: number) => {
-    const cells = state.board.flatMap((cell, index) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === definitionId ? [index] : []);
-    assert.ok(cells.length >= 2);
-    state = reduceMergeWorld(state, { type: 'move', from: cells[0], to: cells[1], now: at }).state;
-  };
-  const remainingSprout = state.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:2');
-  const sproutEcho = reduceMergeWorld(state, { type: 'move', from: remainingSprout, to: 25, now: NOW + 5 });
+  const sproutCell = state.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:2');
+  const sproutEcho = reduceMergeWorld(state, { type: 'move', from: sproutCell, to: 25, now: NOW + 2 });
   assert.equal(sproutEcho.dreamEchoClearedId, 'mossprout-sprout-echo');
   state = sproutEcho.state;
   assert.equal(openCount(), 13);
-  state = reduceMergeWorld(state, { type: 'serveOrder', orderId: 'mossprout:chapter-0:home-plant', now: NOW + 6 }).state;
-  assert.equal(openCount(), 13);
-  assert.deepEqual(state.activeOrders.map((order) => order.id), ['mossprout:chapter-0:energy-plant']);
-  assert.deepEqual(state.activeOrders[0].requirements, [{ definitionId: 'nature:garden:4', quantity: 1 }]);
 
-  for (let index = 0; index < 2; index += 1) {
-    state = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: 'wild-garden', now: NOW + 7 + index, seed: `energy-pair:${index}` }).state;
-  }
-  mergePair('nature:garden:1', NOW + 9);
-  state = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: 'wild-garden', now: NOW + 10, seed: 'energy-last-seed' }).state;
-  assert.equal(state.energy.value, 0);
-  assert.equal(reduceMergeWorld(state, { type: 'refreshTime', now: NOW + 86_400_000 }).state.energy.value, 0);
-
-  const journal = reduceMergeWorld(state, {
-    type: 'grantActivityRewardsBatch',
-    rewards: [{ receiptId: 'activity:egg-journal:2026-08-12', kind: 'daily_journal_energy', amount: MOSSPROUT_FTUE_JOURNAL_ENERGY, label: 'Mossprout memory', grantDayId: '2026-08-12' }],
-    now: NOW + 11,
-  });
-  assert.equal(journal.energyGranted, 20);
-  assert.equal(journal.state.energy.value, 20);
-  const duplicateJournal = reduceMergeWorld(journal.state, {
-    type: 'grantActivityRewardsBatch',
-    rewards: [{ receiptId: 'activity:egg-journal:2026-08-12', kind: 'daily_journal_energy', amount: MOSSPROUT_FTUE_JOURNAL_ENERGY, label: 'Mossprout memory', grantDayId: '2026-08-12' }],
-    now: NOW + 12,
-  });
-  assert.equal(duplicateJournal.changed, false);
-
-  const returnStep = mossproutFtueStep('merge.energy.finish_seed');
-  const generatorCell = journal.state.board.findIndex((cell) => cell.occupant?.kind === 'generator' && cell.occupant.generatorId === 'wild-garden');
-  const finalSeedCommand = { type: 'tapGenerator' as const, generatorId: 'wild-garden', now: NOW + 13, seed: 'energy-final-seed' };
-  assert.deepEqual(mergeFtueBoardGate(returnStep, journal.state), { kind: 'generator', cell: generatorCell, generatorId: 'wild-garden' });
-  assert.equal(mergeFtueAllowsCommand(returnStep, journal.state, finalSeedCommand), true);
-  state = reduceMergeWorld(journal.state, finalSeedCommand).state;
-  const finishSproutStep = mossproutFtueStep('merge.energy.finish_sprout');
-  const finishSproutBaseline = mergeFtueStepEntryBaseline(finishSproutStep, state);
-  assert.deepEqual(finishSproutBaseline, {
-    actionId: 'merge.energy.finish_sprout',
-    stepId: 'merge.energy.finish_sprout',
-    value: 1,
-  });
-  assert.equal(
-    recoverMergeFtueEvent(finishSproutStep, state, {
-      'baseline:merge.energy.finish_sprout:merge.energy.finish_sprout': finishSproutBaseline!.value,
-    }),
-    null,
-    'the Sprout carried through Today must not auto-complete the post-return Seed merge',
-  );
-  assert.equal(mergeFtueBoardGate(finishSproutStep, state).kind, 'drag');
-  assert.equal(mergeFtueRepairTarget(mossproutFtueStep('merge.energy.finish_plant'), state), 'merge.energy.finish_sprout');
-  mergePair('nature:garden:1', NOW + 14);
-  assert.equal(recoverMergeFtueEvent(finishSproutStep, state, {
-    'baseline:merge.energy.finish_sprout:merge.energy.finish_sprout': finishSproutBaseline!.value,
-  })?.type, 'merge_completed');
-  assert.equal(mergeFtueRepairTarget(mossproutFtueStep('merge.energy.finish_plant'), state), null);
-  mergePair('nature:garden:2', NOW + 15);
-  const plantCell = state.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:3');
-  const plantEcho = reduceMergeWorld(state, { type: 'move', from: plantCell, to: 37, now: NOW + 16 });
-  assert.equal(plantEcho.dreamEchoClearedId, 'mossprout-plant-echo');
-  state = plantEcho.state;
-  assert.equal(openCount(), 13);
-  state = reduceMergeWorld(state, { type: 'serveOrder', orderId: 'mossprout:chapter-0:energy-plant', now: NOW + 17 }).state;
+  state = reduceMergeWorld(state, { type: 'serveOrder', orderId: 'mossprout:chapter-0:first-sprout', now: NOW + 3 }).state;
   assert.equal(openCount(), 13);
   assert.deepEqual(state.activeOrders, []);
+  assert.equal(state.energy.value, 4);
   assert.equal(state.energy.regenPaused, false);
   assert.equal(state.generators['wild-garden'].forcedDropDefinitionId, null);
-  assert.ok(state.characterProgress.mossprout?.completedChapterIds.includes('mossprout-chapter-0'));
-  assert.ok(state.externalRewardReceipts.some((receipt) => receipt.kind === 'wisp' && receipt.wispId === 'heartlet'));
+  assert.deepEqual(state.generators['wild-garden'].tierOneDropDefinitionIds, ['nature:garden:1', 'nature:waterside:1']);
+  assert.equal(Boolean(state.characterProgress.mossprout?.completedChapterIds.includes('mossprout-chapter-0')), true);
+  assert.ok(state.externalRewardReceipts.some((receipt) => receipt.id === 'merge-story-served:mossprout:chapter-0:first-sprout'));
+  assert.equal(state.externalRewardReceipts.some((receipt) => receipt.kind === 'wisp'), false);
+
 });
 
 test('the all-roster board manifest budgets every cell without sacrificing endgame workspace', () => {
@@ -542,6 +472,160 @@ test('story unlock adds the Pantry and each tap costs exactly one Energy', () =>
   assert.ok(result.spawnedCell != null);
   assert.equal(result.state.board[result.spawnedCell!].occupant?.kind, 'item');
   assert.equal(result.state.discoveries.length, 1);
+});
+
+test('a character-owned activity can use the same generator without the retired Energy cost', () => {
+  const state = storyWorld();
+  const result = reduceMergeWorld(state, {
+    type: 'tapGenerator',
+    generatorId: 'hearth-pantry',
+    now: NOW + 2,
+    seed: 'character-activity-drop',
+    spendEnergy: false,
+  });
+  assert.equal(result.changed, true);
+  assert.equal(result.state.energy.value, state.energy.value);
+  assert.ok(result.spawnedCell != null);
+});
+
+test('Mossprout Journey baskets emit authored drops atomically and stop without Energy', () => {
+  let state = createMossproutChapterZeroState(NOW);
+  state = { ...state, activeOrders: [], energy: { ...state.energy, regenPaused: false }, generators: {
+    ...state.generators,
+    'wild-garden': { ...state.generators['wild-garden'], forcedDropDefinitionId: null },
+  } };
+  const activity = {
+    objectiveId: 'mossprout:objective:place-for-rain',
+    mergeOrderId: 'merge-story:mossprout:dry-pond:place-for-rain',
+    opportunityId: 'mossprout:2026-08-23:dry-pond:day-2:basket',
+    generatorId: 'wild-garden',
+    dropDefinitionIds: ['nature:waterside:1', 'nature:waterside:1', 'nature:garden:1', 'nature:garden:1'],
+  };
+  state = reduceMergeWorld(state, {
+    type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23', status: 'activity_in_progress', activity, now: NOW + 1,
+  }).state;
+  assert.deepEqual(state.activeOrders.map((order) => order.id), [activity.mergeOrderId]);
+  assert.deepEqual(state.activeOrders[0].requirements, [{ definitionId: 'nature:waterside:2', quantity: 1 }]);
+  const energy = state.energy.value;
+  const spawned: string[] = [];
+  for (let index = 0; index < activity.dropDefinitionIds.length; index += 1) {
+    const result = reduceMergeWorld(state, {
+      type: 'tapGenerator', generatorId: 'wild-garden', activityOpportunityId: activity.opportunityId,
+      spendEnergy: false, seed: `mossprout-basket:${index}`, now: NOW + 2 + index,
+    });
+    assert.equal(result.changed, true);
+    const occupant = result.state.board[result.spawnedCell!].occupant;
+    spawned.push(occupant?.kind === 'item' ? occupant.definitionId : 'missing');
+    state = result.state;
+  }
+  assert.deepEqual(spawned, activity.dropDefinitionIds);
+  assert.equal(state.energy.value, energy);
+  const exhausted = reduceMergeWorld(state, {
+    type: 'tapGenerator', generatorId: 'wild-garden', activityOpportunityId: activity.opportunityId,
+    spendEnergy: false, seed: 'mossprout-basket:exhausted', now: NOW + 10,
+  });
+  assert.equal(exhausted.changed, false);
+  assert.match(exhausted.message ?? '', /everything Mossprout found today/i);
+});
+
+test('the matched Katchimera card opens a fixed-price Coin collection without equipping forms', () => {
+  const base = createMossproutChapterZeroState(NOW);
+  const lockedPurchase = reduceMergeWorld(base, {
+    type: 'purchaseKatchimeraCard', familyId: 'mossprout', cardId: 'fernip', cost: 150,
+    purchaseId: 'purchase:fernip', now: NOW + 1,
+  });
+  assert.equal(lockedPurchase.changed, false);
+  const matched = reduceMergeWorld(base, {
+    type: 'grantKatchimeraCard', familyId: 'mossprout', cardId: 'petalimp',
+    sourceReceiptId: 'journey-card:2026-08-23:mossprout', now: NOW + 2,
+  });
+  assert.equal(matched.changed, true);
+  assert.equal(matched.state.ownedKatchimeraCards[0]?.acquisition, 'journey_match');
+  const funded = { ...matched.state, coins: 180 };
+  const purchased = reduceMergeWorld(funded, {
+    type: 'purchaseKatchimeraCard', familyId: 'mossprout', cardId: 'fernip', cost: 150,
+    purchaseId: 'purchase:fernip', now: NOW + 3,
+  });
+  assert.equal(purchased.changed, true);
+  assert.equal(purchased.state.coins, 30);
+  assert.deepEqual(purchased.state.ownedKatchimeraCards.map((card) => card.cardId), ['petalimp', 'fernip']);
+  assert.equal(reduceMergeWorld(purchased.state, {
+    type: 'purchaseKatchimeraCard', familyId: 'mossprout', cardId: 'fernip', cost: 150,
+    purchaseId: 'purchase:fernip', now: NOW + 4,
+  }).changed, false);
+});
+
+test('every fresh Mossprout day offers a three-order Garden batch with increasing difficulty', () => {
+  const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
+  assert.doesNotMatch(screen, /mossprout:\$\{localDayId\(\)\}:unavailable/);
+  assert.match(screen, /mossproutJourney\?\.status === 'activity_in_progress'/);
+  let state = completeMossproutChapterZeroSlice(createMossproutChapterZeroState(NOW), NOW + 1);
+  assert.equal(state.activeOrders.some((order) => order.id.startsWith('mossprout:chapter-0:')), false);
+  assert.equal(state.energy.regenPaused, false);
+  const reconciled = reduceMergeWorld(state, {
+    type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23',
+    status: 'complete', activity: null, now: NOW + 1,
+  });
+  state = reconciled.state;
+  assert.equal(state.activeOrders.filter((order) => order.storyArcId === 'mossprout:casual-garden').length, 3);
+  assert.deepEqual(state.mossproutDailyGardenOrders?.offeredOrderIds, [
+    'merge-order:mossprout:daily:2026-08-23:1',
+    'merge-order:mossprout:daily:2026-08-23:2',
+    'merge-order:mossprout:daily:2026-08-23:3',
+  ]);
+  const observed: { difficulty: string; tiers: number[]; coins: number }[] = [];
+  for (let step = 1; step <= 3; step += 1) {
+    const order = state.activeOrders.find((candidate) => candidate.storyArcId === 'mossprout:casual-garden')!;
+    observed.push({
+      difficulty: order.difficulty,
+      tiers: order.requirements.map((requirement) => MERGE_ITEMS_BY_ID.get(requirement.definitionId)!.tier),
+      coins: order.reward.coins,
+    });
+    let instance = 0;
+    const board = state.board.map((cell) => ({ ...cell }));
+    for (const requirement of order.requirements) {
+      for (let quantity = 0; quantity < requirement.quantity; quantity += 1) {
+        const cell = board.findIndex((candidate) => !candidate.locked && !candidate.mist && !candidate.occupant);
+        assert.ok(cell >= 0);
+        board[cell] = { ...board[cell], occupant: { kind: 'item', instanceId: `daily:${step}:${instance++}`, definitionId: requirement.definitionId } };
+      }
+    }
+    state = reduceMergeWorld({ ...state, board }, { type: 'serveOrder', orderId: order.id, now: NOW + step + 1 }).state;
+    assert.equal(state.mossproutDailyGardenOrders?.servedOrderIds.length, step);
+  }
+  assert.deepEqual(observed, [
+    { difficulty: 'small', tiers: [2], coins: 20 },
+    { difficulty: 'medium', tiers: [3, 2], coins: 45 },
+    { difficulty: 'major', tiers: [4, 3], coins: 80 },
+  ]);
+  assert.equal(state.mossproutDailyGardenOrders?.complete, true);
+  assert.equal(state.activeOrders.some((order) => order.storyArcId === 'mossprout:casual-garden'), false);
+
+  const tomorrow = reduceMergeWorld(state, {
+    type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-24',
+    status: 'complete', activity: null, now: NOW + 10,
+  }).state;
+  assert.equal(tomorrow.mossproutDailyGardenOrders?.dayId, '2026-08-24');
+  assert.equal(tomorrow.activeOrders.filter((order) => order.storyArcId === 'mossprout:casual-garden').length, 3);
+});
+
+test('Reset Today replaces an exhausted Mossprout Garden ledger with a fresh three-order batch', () => {
+  let state = createMossproutChapterZeroState(NOW);
+  state = {
+    ...state,
+    activeOrders: [],
+    mossproutDailyGardenOrders: {
+      dayId: '2026-08-23', activeOrderId: null,
+      offeredOrderIds: ['old:1', 'old:2', 'old:3'], servedOrderIds: ['old:1', 'old:2', 'old:3'], complete: true,
+    },
+  };
+
+  const reset = resetMergeActivityForDay(state, '2026-08-23', NOW + 1);
+  const gardenOrders = reset.activeOrders.filter((order) => order.storyArcId === 'mossprout:casual-garden');
+
+  assert.deepEqual(gardenOrders.map((order) => order.difficulty), ['small', 'medium', 'major']);
+  assert.deepEqual(reset.mossproutDailyGardenOrders?.servedOrderIds, []);
+  assert.equal(reset.mossproutDailyGardenOrders?.activeOrderId, gardenOrders[0]?.id);
 });
 
 test('every Pantry tap is tier one and chooses both chains', () => {
@@ -974,6 +1058,36 @@ test('Merge page keeps a stable parcel stack first in the tray and the board att
   assert.match(screen, /kind: 'board_discovery_fork'/);
 });
 
+test('Merge coin rewards land on the visible HUD coin and count across the contact window', () => {
+  const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
+  const rewardOverlay = readFileSync('components/katchadeck/games/merge-serve-reward-overlay.tsx', 'utf8');
+  const currencyHud = readFileSync('components/katchadeck/ui/game-currency-hud.tsx', 'utf8');
+
+  assert.match(currencyHud, /<View collapsable=\{false\} ref=\{targetRef\} style=\{\[styles\.currencyIcon/);
+  assert.doesNotMatch(currencyHud, /<Animated\.View[^>]*ref=\{targetRef\}/);
+  assert.match(screen, /measureViewInWindow\(coinHudRef\)/);
+  assert.match(screen, /coinTo = \{ x: coinRect\.x - screenRect\.x \+ coinRect\.width \/ 2, y: coinRect\.y - screenRect\.y \+ coinRect\.height \/ 2 \}/);
+  assert.match(rewardOverlay, /const contactWindowMs = mergeRewardContactWindowMs\(count, reduceMotion\)/);
+  assert.match(rewardOverlay, /runOnJS\(onArrive\)\(amount, contactWindowMs, index, totalAmount\)/);
+  assert.doesNotMatch(rewardOverlay, /runOnJS\(onArrive\)\(\{[\s\S]*?mergeRewardContactWindowMs/);
+  assert.match(rewardOverlay, /Math\.max\(0, count - 1\) \* \(reduceMotion \? 25 : COIN_STAGGER_MS\)/);
+  assert.match(screen, /if \(!coinPayoutStartedRef\.current\)[\s\S]*?setCoinValueAnimationDurationMs\(contactWindowMs\)[\s\S]*?totalAmount/);
+  assert.match(screen, /animateValue: presentedCoins != null[\s\S]*?valueAnimationDurationMs: coinValueAnimationDurationMs/);
+  assert.match(currencyHud, /durationMs=\{animateValue \? valueAnimationDurationMs : 0\}[\s\S]*?easing="linear"/);
+});
+
+test('Merge HUD uses the Katchimera back control on the left and keeps currency at the right edge', () => {
+  const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
+
+  assert.match(screen, /<GameHudBar[\s\S]*?leading=\{<KatchimeraBackButton/);
+  assert.match(screen, /companionHeaderLeftInset = Math\.max\(0, KatchaUI\.layout\.phoneGutter - contentLeft\)/);
+  assert.match(screen, /style=\{\[styles\.hudBar, \{ paddingLeft: companionHeaderLeftInset \}\]\}/);
+  assert.match(screen, /trailing=\{<>[\s\S]*?<GameHudItem[\s\S]*?<GameCurrencyHud/);
+  assert.doesNotMatch(screen, /<GameHudControl/);
+  assert.match(screen, /hudBar: \{ justifyContent: 'space-between' \}/);
+  assert.match(screen, /currencyHud: \{ flex: 0, paddingLeft: 18, width: 106 \}/);
+});
+
 test('rail FTUE target refs keep stable callback identities across target revision renders', () => {
   const rail = readFileSync('components/katchadeck/games/merge-order-rail.tsx', 'utf8');
   assert.match(rail, /onRailTargetRef=\{onRailTargetRef\}/);
@@ -1210,6 +1324,8 @@ test('Merge provider reconciles story projection after guarded receipt applicati
   const provider = readFileSync('features/merge-world/merge-world-provider.tsx', 'utf8');
   assert.match(provider, /const reconciled = featureAndReconcile\(friendshipState\)/);
   assert.match(provider, /next = featureAndReconcile\(next\)/);
+  assert.match(provider, /orderId === 'mossprout:chapter-0:first-sprout'/);
+  assert.match(provider, /recordMossproutFirstGardenRestored\(started, dayId/);
 });
 
 test('a retained hidden Merge provider receives debug resets before Games is reopened', () => {

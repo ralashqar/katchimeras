@@ -21,6 +21,7 @@ export type GameCurrencyBalance = {
   suffix?: string;
   targetRef?: RefObject<View | null>;
   value: number;
+  valueAnimationDurationMs?: number;
 };
 
 export const GameCurrencyHud = memo(function GameCurrencyHud({ balances, compact = false, tone = 'default', style }: {
@@ -34,7 +35,7 @@ export const GameCurrencyHud = memo(function GameCurrencyHud({ balances, compact
   </View>;
 });
 
-const GameCurrencyPill = memo(function GameCurrencyPill({ animateValue = false, art, compact, countdownSeconds, id, pulseNonce = 0, suffix, targetRef, tone, value }: GameCurrencyBalance & { compact: boolean; tone: 'default' | 'glass' }) {
+const GameCurrencyPill = memo(function GameCurrencyPill({ animateValue = false, art, compact, countdownSeconds, id, pulseNonce = 0, suffix, targetRef, tone, value, valueAnimationDurationMs = 220 }: GameCurrencyBalance & { compact: boolean; tone: 'default' | 'glass' }) {
   const definition = GAME_CURRENCY_CATALOG[id];
   const pulse = useSharedValue(0);
   useEffect(() => {
@@ -45,13 +46,14 @@ const GameCurrencyPill = memo(function GameCurrencyPill({ animateValue = false, 
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: 1 + pulse.value * 0.09 }] }));
   const glass = tone === 'glass';
   const countdown = countdownSeconds != null ? formatCurrencyCountdown(countdownSeconds) : null;
-  return <Animated.View accessibilityLabel={`${definition.label}: ${value}${suffix ?? ''}${countdown ? `. Next in ${countdown}` : ''}`} ref={targetRef} style={[styles.pill, compact && styles.pillCompact, glass && styles.pillGlass, animatedStyle]}>
+  return <Animated.View accessibilityLabel={`${definition.label}: ${value}${suffix ?? ''}${countdown ? `. Next in ${countdown}` : ''}`} style={[styles.pill, compact && styles.pillCompact, glass && styles.pillGlass, animatedStyle]}>
     <GameSurface contentStyle={[styles.pillContent, compact && styles.pillContentCompact]} density="compact" radius={14} style={styles.pillSurface} tone="cream">
-      <View style={[styles.currencyIcon, compact && styles.currencyIconCompact, glass && styles.currencyIconGlass]}>
+      <View collapsable={false} ref={targetRef} style={[styles.currencyIcon, compact && styles.currencyIconCompact, glass && styles.currencyIconGlass]}>
         {art ? <Image accessibilityIgnoresInvertColors contentFit="contain" source={art} style={[styles.art, compact && styles.artCompact, glass && styles.artGlass]} transition={0} /> : <IconSymbol color={definition.tint} name={definition.icon} size={compact ? 21 : glass ? 33 : 30} />}
       </View>
       <AnimatedIntegerText
-        durationMs={animateValue ? 220 : 0}
+        durationMs={animateValue ? valueAnimationDurationMs : 0}
+        easing="linear"
         formatValue={formatGameCurrency}
         selectable
         style={[styles.value, compact && styles.valueCompact, glass && styles.valueGlass]}

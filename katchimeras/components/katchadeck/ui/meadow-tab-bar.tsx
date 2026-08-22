@@ -18,11 +18,10 @@ import { type GameSurfaceId, useGameScreenTransition } from '@/features/navigati
 // camera. (The carved-wood variant was retired — design/today-mockup-v2.jpeg.)
 
 // Routes that never render as tab items (expo-router registers them anyway).
-const HIDDEN_ROUTES = new Set(['index', 'world', 'you']);
+const HIDDEN_ROUTES = new Set(['index', 'world', 'you', 'games']);
 
 const INACTIVE = 'rgba(226, 221, 238, 0.72)';
 const TRANSITION_SURFACES: Partial<Record<string, GameSurfaceId>> = {
-  games: 'merge',
   katchimeras: 'katchimeras',
   today: 'today',
   you: 'you',

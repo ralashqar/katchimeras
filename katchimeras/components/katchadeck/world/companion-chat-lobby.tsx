@@ -18,6 +18,9 @@ export type CompanionChatStarter = {
   mode: ConversationMode;
   questionCount: number;
   title: string;
+  actionKind?: 'journal_prompt';
+  label?: string;
+  description?: string;
 };
 
 type StartInput = { definitionId?: string; mode?: ConversationMode; poolId?: string; recommendation?: boolean };
@@ -44,6 +47,7 @@ export function CompanionChatLobby({
   onStart,
   recommendation,
   starters,
+  simplified = false,
 }: {
   activeSession: ConversationSession | null;
   familyId: ConversationV2FamilyId;
@@ -54,6 +58,7 @@ export function CompanionChatLobby({
   onStart: (input?: StartInput) => void;
   recommendation: { definitionId: string; sourceKind: ConversationSignalKind } | null;
   starters: readonly CompanionChatStarter[];
+  simplified?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
@@ -114,7 +119,7 @@ export function CompanionChatLobby({
           </Pressable>
         </> : <>
           <View style={styles.sectionHeading}>
-            <ThemedText selectable style={styles.heading} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>What shall we do?</ThemedText>
+            <ThemedText selectable style={styles.heading} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>{simplified ? `Spend a little more time with ${name}` : 'What shall we do?'}</ThemedText>
           </View>
 
           {active ? <Pressable accessibilityHint="Returns to your unfinished conversation" accessibilityRole="button" onPress={onOpenConversation} style={({ pressed }) => [styles.resumeCard, pressed && styles.pressed]}>
@@ -145,11 +150,11 @@ export function CompanionChatLobby({
                 <View style={styles.modeIcon}><IconSymbol color={KatchaUI.companionScenePanel.accent} name={presentation.icon} size={19} /></View>
                 <View style={styles.modeCopy}>
                   <View style={styles.modeTop}>
-                    <ThemedText selectable style={styles.modeLabel} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>{presentation.label}</ThemedText>
+                    <ThemedText selectable style={styles.modeLabel} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>{starter.label ?? presentation.label}</ThemedText>
                     <ThemedText style={styles.metaText} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{starter.questionCount} {starter.questionCount === 1 ? 'question' : 'questions'}</ThemedText>
                   </View>
                   <ThemedText selectable numberOfLines={2} style={styles.modeTitle} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>{starter.title}</ThemedText>
-                  <ThemedText selectable numberOfLines={2} style={styles.modeDescription} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{presentation.description}</ThemedText>
+                  <ThemedText selectable numberOfLines={2} style={styles.modeDescription} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{starter.description ?? presentation.description}</ThemedText>
                   <ThemedText style={styles.modeResult} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>Result: {presentation.result}</ThemedText>
                 </View>
                 <IconSymbol color="#96734B" name="chevron.right" size={16} />
@@ -157,7 +162,18 @@ export function CompanionChatLobby({
             })}
           </View>
 
-          <View style={styles.secondaryActions}>
+          {simplified && !active && !recommendationDefinition && starters.length === 0 ? <View accessibilityLiveRegion="polite" style={styles.emptyState}>
+            <View style={styles.emptyIcon}><IconSymbol color={KatchaUI.companionScenePanel.accent} name="leaf.fill" size={20} /></View>
+            <View style={styles.emptyCopy}>
+              <ThemedText selectable style={styles.emptyTitle} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>That is everything Mossprout has for today</ThemedText>
+              <ThemedText selectable style={styles.emptyBody} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>Your Garden, saved insights, and goals are still waiting on Mossprout’s page.</ThemedText>
+            </View>
+            <Pressable accessibilityRole="button" onPress={onBack} style={({ pressed }) => [styles.emptyAction, pressed && styles.pressed]}>
+              <ThemedText style={styles.emptyActionLabel} lightColor={KatchaUI.companionScenePanel.accentInk} darkColor={KatchaUI.companionScenePanel.accentInk}>Back to today</ThemedText>
+            </Pressable>
+          </View> : null}
+
+          {!simplified ? <View style={styles.secondaryActions}>
             <Pressable accessibilityRole="button" onPress={() => start()} style={({ pressed }) => [styles.secondaryAction, pressed && styles.pressed]}>
               <IconSymbol color={KatchaUI.companionScenePanel.accent} name="sparkles" size={16} />
               <ThemedText style={styles.secondaryActionLabel} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>Surprise me</ThemedText>
@@ -166,7 +182,7 @@ export function CompanionChatLobby({
               <IconSymbol color={KatchaUI.companionScenePanel.accent} name="square.grid.2x2.fill" size={16} />
               <ThemedText style={styles.secondaryActionLabel} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>Browse topics</ThemedText>
             </Pressable>
-          </View>
+          </View> : null}
         </>}
         </ScrollView>
       </Animated.View>
@@ -226,6 +242,13 @@ const styles = StyleSheet.create({
   modeTitle: { fontSize: 16, fontWeight: '900', letterSpacing: -0.15, lineHeight: 20 },
   modeDescription: { fontSize: 12, lineHeight: 16 },
   modeResult: { fontSize: 9.5, fontWeight: '800', lineHeight: 13, paddingTop: 2 },
+  emptyState: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.cardBackground, borderColor: KatchaUI.companionScenePanel.cardBorder, borderRadius: 20, borderWidth: 1, gap: 10, padding: 16 },
+  emptyIcon: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.softBackground, borderRadius: 14, height: 40, justifyContent: 'center', width: 40 },
+  emptyCopy: { gap: 4 },
+  emptyTitle: { fontSize: 15, fontWeight: '900', lineHeight: 20, textAlign: 'center' },
+  emptyBody: { fontSize: 12, lineHeight: 17, textAlign: 'center' },
+  emptyAction: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.accent, borderRadius: 15, justifyContent: 'center', minHeight: 42, paddingHorizontal: 16 },
+  emptyActionLabel: { fontSize: 12, fontWeight: '900' },
   metaText: { fontSize: 9.5, fontWeight: '800', lineHeight: 13 },
   secondaryActions: { flexDirection: 'row', gap: 8 },
   secondaryAction: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.softBackground, borderRadius: 16, flex: 1, flexDirection: 'row', gap: 7, justifyContent: 'center', minHeight: 46, paddingHorizontal: 10 },

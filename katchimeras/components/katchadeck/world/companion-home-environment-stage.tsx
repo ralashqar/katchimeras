@@ -1,6 +1,6 @@
 import { memo, useEffect, type RefObject } from 'react';
 import { StyleSheet, useWindowDimensions, View, type View as ViewType } from 'react-native';
-import Animated, { cancelAnimation, Easing, type SharedValue, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { cancelAnimation, type SharedValue, useAnimatedStyle, useReducedMotion, useSharedValue } from 'react-native-reanimated';
 
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
 import { TodayExplorationBackground } from '@/components/katchadeck/home/today-exploration-background';
@@ -8,6 +8,7 @@ import type { HomeVisualKey } from '@/types/home';
 import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-backgrounds';
 import type { QuestionnaireImageSource } from '@/utils/companion-questionnaire-presentation';
 import { companionHomeStageLayout } from '@/utils/companion-home-layout';
+import { runRewardArrivalMotion } from '@/components/katchadeck/ui/reward-arrival-motion';
 
 import { CreatureAnimatedArt } from './creature-animated-art';
 
@@ -50,16 +51,7 @@ export const CompanionHomeEnvironmentStage = memo(
     const showCreature = layer === 'creature' || layer === 'both';
     useEffect(() => {
       if (!rewardPulseKey) return;
-      feedback.value = withSequence(
-        withTiming(1, { duration: reduceMotion ? 90 : 120, easing: Easing.out(Easing.cubic) }),
-        withTiming(0, { duration: reduceMotion ? 130 : 260, easing: Easing.inOut(Easing.cubic) })
-      );
-      if (!reduceMotion) shake.value = withSequence(
-        withTiming(-1, { duration: 45 }),
-        withTiming(1, { duration: 70 }),
-        withTiming(-0.55, { duration: 62 }),
-        withTiming(0, { duration: 75 })
-      );
+      runRewardArrivalMotion(feedback, shake, reduceMotion);
       return () => {
         cancelAnimation(feedback);
         cancelAnimation(shake);

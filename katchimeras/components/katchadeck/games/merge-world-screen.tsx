@@ -7,7 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { RewardSplash, type RewardSplashItem } from '@/components/katchadeck/ui/reward-splash';
 import { GameCurrencyHud } from '@/components/katchadeck/ui/game-currency-hud';
-import { GameHudBar, GameHudControl, GameHudItem } from '@/components/katchadeck/ui/game-primitives';
+import { GameHudBar, GameHudItem } from '@/components/katchadeck/ui/game-primitives';
+import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
 import { KatchaInlineNotice } from '@/components/katchadeck/ui/katcha-inline-notice';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchaSurfaceProvider } from '@/components/katchadeck/ui/katcha-surface';
@@ -26,9 +27,9 @@ import { MOSSPROUT_FTUE_RETURN_NOTE_ID, mossproutFtueStep } from '@/features/onb
 import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
 import type { FtueCueDefinition, FtueSpotlightDefinition } from '@/features/onboarding/ftue-types';
 import { useGameFeedback } from '@/features/ui/game-feedback-provider';
-import { useGameWallet } from '@/features/ui/game-wallet-provider';
 import { GameUI } from '@/constants/game-ui';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
+import { KatchaUI } from '@/constants/katcha-ui';
 import {
   createMergeBoardSession,
   mergeFtueInteractionKey,
@@ -36,12 +37,17 @@ import {
 } from '@/features/onboarding/merge-ftue-interaction-coordinator';
 import type { MergeCharacterId, MergeOrder, MergeWorldCommand } from '@/types/merge-world';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
-import { mergeOrderEnergyRefund, mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds } from '@/utils/merge-world/engine';
-import { MERGE_ENERGY_REGEN_MS } from '@/utils/merge-world/economy-policy';
-import { beginAuthoredCohortReturn, beginFeastleReturn, beginMossproutReturn, isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, loadMossproutStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
+import { mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds } from '@/utils/merge-world/engine';
+import { isMossproutChapterZeroActive } from '@/utils/merge-world/chapter-zero-policy';
+import { beginAuthoredCohortReturn, beginFeastleReturn, isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
 import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
 import { beginCriticalInteractionWork } from '@/utils/critical-interaction';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
+import { beginMossproutJourneyReturn, mossproutJourneyForDay, recordMossproutFirstGardenRestored, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
+import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
+import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
+import { familyIdFromCompanionId } from '@/constants/katchimera-skins';
+import { localDayId } from '@/utils/world-identity';
 
 import { FeastlePersistentMergeBoard, type MergeBoardScreenMetrics } from './feastle-persistent-merge-board';
 import { MergeParcelFlightOverlay, type MergeParcelFlight } from './merge-parcel-overlay';
@@ -59,7 +65,7 @@ const EARLY_DISCOVERY_REVEAL_COPY: Partial<Record<MergeCharacterId, { descriptio
 export function MergeWorldScreen({ active = true, backgroundReady = true, playBoardEntrance = true }: { active?: boolean; backgroundReady?: boolean; playBoardEntrance?: boolean } = {}) {
   const router = useRouter();
   const { transitionTo } = useGameScreenTransition();
-  const { focusOrderId } = useLocalSearchParams<{ focusOrderId?: string }>();
+  const { creatureId, focusOrderId } = useLocalSearchParams<{ creatureId?: string; focusOrderId?: string }>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { state, loading, error } = useMergeWorldState();
@@ -68,9 +74,10 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const ftueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
   const [selectedCell, setSelectedCell] = useState<number | null>(null);
   const [boardAreaHeight, setBoardAreaHeight] = useState(0);
-  const wallet = useGameWallet();
   const [story, setStory] = useState(loadFeastleStory);
-  const [mossproutStory, setMossproutStory] = useState(loadMossproutStory);
+  const relationships = useRelationshipProgression();
+  const mossproutJourney = mossproutJourneyForDay(relationships, localDayId());
+  const activityFamilyId = familyIdFromCompanionId(creatureId);
   const [authoredStories, setAuthoredStories] = useState(() => ({
     baristabbit: loadAuthoredCohortStory('baristabbit'),
     steppling: loadAuthoredCohortStory('steppling'),
@@ -84,17 +91,14 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const [parcelFlight, setParcelFlight] = useState<MergeParcelFlight | null>(null);
   const [parcelHiddenItemIds, setParcelHiddenItemIds] = useState<Set<string>>(() => new Set());
   const [parcelShakeNonce, setParcelShakeNonce] = useState(0);
-  const [presentedEnergy, setPresentedEnergy] = useState<number | null>(null);
   const [presentedCoins, setPresentedCoins] = useState<number | null>(null);
-  const [energyPulseNonce, setEnergyPulseNonce] = useState(0);
+  const [coinValueAnimationDurationMs, setCoinValueAnimationDurationMs] = useState(0);
   const [coinPulseNonce, setCoinPulseNonce] = useState(0);
-  const [energyClockNow, setEnergyClockNow] = useState(Date.now);
   const [blockedFtuePulseNonce, setBlockedFtuePulseNonce] = useState(0);
   const [boardMetrics, setBoardMetrics] = useState<MergeBoardScreenMetrics | null>(null);
   const [ftueTargetRevision, setFtueTargetRevision] = useState(0);
   const [screenLayoutNonce, setScreenLayoutNonce] = useState(0);
   const screenRef = useRef<View>(null);
-  const energyHudRef = useRef<View>(null);
   const coinHudRef = useRef<View>(null);
   const boardMetricsRef = useRef<MergeBoardScreenMetrics | null>(null);
   const railTargetRefs = useRef(new Map<string, View>());
@@ -102,6 +106,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const activeServeRef = useRef(false);
   const activeParcelRef = useRef(false);
   const activeServeOrderRef = useRef<{ coinAmount: number; energyAmount: number; orderId: string } | null>(null);
+  const coinPayoutStartedRef = useRef(false);
   const serveNonceRef = useRef(0);
   const parcelNonceRef = useRef(0);
   const storyNavigationPendingRef = useRef(false);
@@ -121,6 +126,8 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   ftueStepRef.current = ftueStep;
   const interactionSessionKey = mergeFtueInteractionKey(ftueRun, active);
   const contentWidth = Math.min(width - 12, 600);
+  const contentLeft = Math.max(0, (width - contentWidth) / 2);
+  const companionHeaderLeftInset = Math.max(0, KatchaUI.layout.phoneGutter - contentLeft);
   const flowReady = !loading && state != null;
   useGameSurfaceReadiness('merge', {
     background: backgroundReady,
@@ -129,7 +136,6 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     layout: screenLayoutNonce > 0 && boardAreaHeight > 0,
   }, active);
   const ftueExclusive = ftueStep?.surface === 'merge' && ftueStep.interaction?.mode === 'exclusive';
-  const shouldTickEnergyClock = active && state != null && !state.energy.regenPaused && state.energy.value < state.energy.regenCap;
   const readyOrderIds = useMemo(() => state ? readyMergeOrderIds(state) : new Set<string>(), [state]);
   const ftueBoardGate = useMemo(() => state ? mergeFtueBoardGate(ftueStep, state) : { kind: 'open' as const }, [ftueStep, state]);
   const ftueRailGate = useMemo(() => mergeFtueRailGate(ftueStep), [ftueStep]);
@@ -206,7 +212,6 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
 
   useEffect(() => subscribeCompanionStories(() => {
     setStory(loadFeastleStory());
-    setMossproutStory(loadMossproutStory());
     setAuthoredStories({
       baristabbit: loadAuthoredCohortStory('baristabbit'),
       steppling: loadAuthoredCohortStory('steppling'),
@@ -215,13 +220,6 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       bedrotte: loadAuthoredCohortStory('bedrotte'),
     });
   }), []);
-
-  useEffect(() => {
-    if (!shouldTickEnergyClock) return;
-    setEnergyClockNow(Date.now());
-    const timer = setInterval(() => setEnergyClockNow(Date.now()), 1_000);
-    return () => clearInterval(timer);
-  }, [shouldTickEnergyClock]);
 
   useEffect(() => {
     if (active) storyNavigationPendingRef.current = false;
@@ -255,7 +253,9 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     }
     storyNavigationPendingRef.current = true;
     if (characterId === 'feastle') beginFeastleReturn();
-    else if (characterId === 'mossprout') beginMossproutReturn();
+    else if (characterId === 'mossprout') {
+      relationshipProgressionRepository.update((current) => beginMossproutJourneyReturn(current, localDayId()));
+    }
     else if (isAuthoredCohortFamily(characterId)) beginAuthoredCohortReturn(characterId);
     else setReturnCharacterId((current) => current === characterId ? null : current);
     transitionTo({
@@ -267,6 +267,22 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       }),
     });
   }, [active, ftueStep, router, state?.revision, transitionTo]);
+
+  useEffect(() => {
+    if (!active
+      || ftueRun?.status !== 'active'
+      || ftueRun.stepId !== 'companion.chapter_zero_return'
+      || storyNavigationPendingRef.current) return;
+    storyNavigationPendingRef.current = true;
+    transitionTo({
+      announcement: 'Opening Mossprout',
+      target: 'companion',
+      navigate: () => router.push({
+        pathname: '/katchimera/[creatureId]',
+        params: { creatureId: 'companion:mossprout', ftue: 'chapter-zero-return', source: 'merge-world' },
+      }),
+    });
+  }, [active, ftueRun?.status, ftueRun?.stepId, router, transitionTo]);
 
   useLayoutEffect(() => {
     return () => ftueCoordinator.dispose();
@@ -352,7 +368,22 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       : null;
     if (shouldGuardFtueCommand && !commandToken) return null;
     try {
-      const result = send(command);
+      // Character activities use the polished Merge reducer and presentation,
+      // but their opportunities are paced by Journey content rather than the
+      // retired global Energy economy.
+      const effectiveCommand = creatureId && command.type === 'tapGenerator'
+        ? {
+            ...command,
+            spendEnergy: false as const,
+            ...(activityFamilyId === 'mossprout'
+              && !isMossproutChapterZeroActive(currentState)
+              && mossproutJourney?.status === 'activity_in_progress'
+              && mossproutJourney.activity?.opportunityId
+              ? { activityOpportunityId: mossproutJourney.activity.opportunityId }
+              : {}),
+          }
+        : command;
+      const result = send(effectiveCommand);
       if (result) stateRef.current = result.state;
       const event = mergeFtueEventForCommand(currentState, command, result);
       if (event) {
@@ -371,7 +402,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       if (commandToken) ftueCoordinator.abort(commandToken);
       throw error;
     }
-  }, [ftueCoordinator, handleBlockedFtueInteraction, mergeSessionId, send]);
+  }, [activityFamilyId, creatureId, ftueCoordinator, handleBlockedFtueInteraction, mergeSessionId, mossproutJourney?.activity?.opportunityId, mossproutJourney?.status, send]);
   const pendingParcels = useMemo(() => state?.arrivals.filter((arrival) => (
     arrival.claimedAt == null
     && arrival.kind === 'discovery_parcel'
@@ -397,11 +428,11 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
         characterId: 'feastle' as const,
         bondPoints: story.pendingBondPoints,
       }] : []),
-      ...(mossproutStory.status === 'return_available' ? [{
-        id: `chat-note:${mossproutStory.id}:${mossproutStory.targetLevel}`,
+      ...(mossproutJourney?.status === 'return_available' ? [{
+        id: `chat-note:mossprout:${mossproutJourney.dayId}:${mossproutJourney.beatId}`,
         kind: 'chat_note' as const,
         characterId: 'mossprout' as const,
-        bondPoints: mossproutStory.pendingBondPoints,
+        bondPoints: 0,
       }] : []),
       ...Object.values(authoredStories).flatMap((authoredStory): MergeTrayEntry[] => {
         if (authoredStory.status !== 'return_available' || !isAuthoredCohortFamily(authoredStory.familyId)) return [];
@@ -453,19 +484,19 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     // Midpoint notes sit before the remaining requests so the story beat is
     // immediately visible without replacing or hiding any unserved order.
     return [...parcelEntries, ...returnEntries, ...orderEntries];
-  }, [active, authoredStories, focusOrderId, ftueStep?.id, mossproutStory.id, mossproutStory.pendingBondPoints, mossproutStory.status, mossproutStory.targetLevel, parcelFlight, parcelShakeNonce, pendingParcel, pendingParcels.length, readyOrderIds, returnCharacterId, serveFlight, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
+  }, [active, authoredStories, focusOrderId, ftueStep?.id, mossproutJourney?.beatId, mossproutJourney?.dayId, mossproutJourney?.status, parcelFlight, parcelShakeNonce, pendingParcel, pendingParcels.length, readyOrderIds, returnCharacterId, serveFlight, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
 
   const startServeAnimation = useCallback(async (order: MergeOrder, itemTargets: readonly MergeScreenPoint[]) => {
     if (!state || activeServeRef.current || activeParcelRef.current || parcelFlight) return false;
     activeServeRef.current = true;
+    coinPayoutStartedRef.current = false;
     const boardMetrics = boardMetricsRef.current;
     const servingItems = mergeOrderServingCells(state, order);
-    const [screenRect, coinRect, energyRect] = await Promise.all([
+    const [screenRect, coinRect] = await Promise.all([
       measureViewInWindow(screenRef),
       measureViewInWindow(coinHudRef),
-      measureViewInWindow(energyHudRef),
     ]);
-    if (!boardMetrics || !screenRect || !coinRect || !energyRect || servingItems.length !== itemTargets.length) {
+    if (!boardMetrics || !screenRect || !coinRect || servingItems.length !== itemTargets.length) {
       activeServeRef.current = false;
       return false;
     }
@@ -481,11 +512,11 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     });
     const coinFrom = localTargets.reduce((point, target) => ({ x: point.x + target.x / localTargets.length, y: point.y + target.y / localTargets.length }), { x: 0, y: 0 });
     const coinTo = { x: coinRect.x - screenRect.x + coinRect.width / 2, y: coinRect.y - screenRect.y + coinRect.height / 2 };
-    const energyTo = { x: energyRect.x - screenRect.x + energyRect.width / 2, y: energyRect.y - screenRect.y + energyRect.height / 2 };
+    const energyTo = coinTo;
     serveNonceRef.current += 1;
     activeServeOrderRef.current = {
       coinAmount: order.reward.coins,
-      energyAmount: mergeOrderEnergyRefund(order),
+      energyAmount: 0,
       orderId: order.id,
     };
     setServeHiddenItemIds(new Set(items.map((item) => item.instanceId)));
@@ -507,37 +538,47 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     // Keep the order and its consumed board items in state until every reward
     // token has reached the HUD. Removing the order here would start the tray
     // outro while the coin flight is still running.
-    setPresentedEnergy(state.energy.value);
     setPresentedCoins(state.coins);
-    setServeFlight((current) => current ? { ...current, energyAmount: activeOrder.energyAmount, phase: 'rewards' } : null);
+    setCoinValueAnimationDurationMs(0);
+    setServeFlight((current) => current ? { ...current, energyAmount: 0, phase: 'rewards' } : null);
     if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }, [readyOrderIds, state]);
 
-  const handleCoinArrive = useCallback((amount: number) => {
-    setPresentedCoins((current) => current == null ? amount : current + amount);
+  const handleCoinArrive = useCallback((_amount: number, contactWindowMs: number, _index: number, totalAmount: number) => {
+    if (!coinPayoutStartedRef.current) {
+      coinPayoutStartedRef.current = true;
+      setCoinValueAnimationDurationMs(contactWindowMs);
+      setPresentedCoins((current) => (
+        (current ?? stateRef.current?.coins ?? 0) + (activeServeOrderRef.current?.coinAmount ?? totalAmount)
+      ));
+    }
     setCoinPulseNonce((current) => current + 1);
     if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, []);
 
-  const handleEnergyArrive = useCallback((amount: number) => {
-    setPresentedEnergy((current) => current == null ? amount : current + amount);
-    setEnergyPulseNonce((current) => current + 1);
-    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, []);
+  const handleEnergyArrive = useCallback((_amount: number, _contactWindowMs: number, _index: number, _totalAmount: number) => undefined, []);
 
   const finishServeAnimation = useCallback(() => {
     const activeOrder = activeServeOrderRef.current;
     if (!activeOrder) return;
     const servedOrder = state?.activeOrders.find((order) => order.id === activeOrder.orderId);
     const result = dispatch({ type: 'serveOrder', orderId: activeOrder.orderId, now: Date.now() });
+    if (result?.changed && activeOrder.orderId === 'mossprout:chapter-0:first-sprout') {
+      const dayId = localDayId();
+      relationshipProgressionRepository.update((current) => {
+        const started = startMossproutJourneyDay(current, dayId);
+        return recordMossproutFirstGardenRestored(started.state, dayId, `merge-order:${activeOrder.orderId}`);
+      });
+    }
     if (result?.changed && servedOrder?.signature && servedOrder.characterId !== 'feastle' && servedOrder.characterId !== 'mossprout' && !isAuthoredCohortFamily(servedOrder.characterId)) {
       setReturnCharacterId(servedOrder.characterId);
     }
-    setPresentedEnergy(null);
     setPresentedCoins(null);
+    setCoinValueAnimationDurationMs(0);
     if (!result?.changed) setServeHiddenItemIds(new Set());
     setServeFlight(null);
     activeServeRef.current = false;
+    coinPayoutStartedRef.current = false;
     activeServeOrderRef.current = null;
   }, [dispatch, state?.activeOrders]);
   const handleHiddenItemsRetired = useCallback((instanceIds: readonly string[]) => {
@@ -632,20 +673,17 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const nextThreshold = MERGE_LEVEL_THRESHOLDS[state.mergeLevel] ?? null;
   const currentThreshold = MERGE_LEVEL_THRESHOLDS[state.mergeLevel - 1] ?? 0;
   const levelRatio = nextThreshold == null ? 1 : Math.max(0, Math.min(1, (state.mergeXp - currentThreshold) / (nextThreshold - currentThreshold)));
-  const energyCountdownSeconds = !state.energy.regenPaused && state.energy.value < state.energy.regenCap
-    ? Math.max(1, Math.ceil((MERGE_ENERGY_REGEN_MS - ((energyClockNow - state.energy.lastRegenAt) % MERGE_ENERGY_REGEN_MS)) / 1_000))
-    : null;
   return (
     <View onLayout={() => setScreenLayoutNonce((nonce) => nonce + 1)} ref={screenRef} style={styles.screen}>
       <MergeCommandFeedback />
       <View style={[styles.game, { paddingTop: Math.max(insets.top + 3, 7), paddingBottom: Math.max(insets.bottom + 3, 7), width: contentWidth }]}>
         <GameHudBar
-          content={<GameCurrencyHud balances={[
-            { art: GAME_CURRENCY_ART.energy, countdownSeconds: energyCountdownSeconds ?? undefined, id: 'energy', pulseNonce: energyPulseNonce, suffix: `/${state.energy.regenCap}`, targetRef: energyHudRef, value: presentedEnergy ?? state.energy.value },
-            { art: GAME_CURRENCY_ART.coins, id: 'coins', pulseNonce: coinPulseNonce, targetRef: coinHudRef, value: presentedCoins ?? state.coins },
-            { id: 'gems', value: wallet.gems },
-          ]} style={styles.currencyHud} tone="glass" />}
           density="compact"
+          leading={<KatchimeraBackButton
+            accessibilityLabel={creatureId ? 'Return to Mossprout' : 'Open legacy games'}
+            onPress={() => ftueExclusive ? handleBlockedFtueInteraction() : creatureId ? router.back() : router.push('/legacy-games')}
+          />}
+          style={[styles.hudBar, { paddingLeft: companionHeaderLeftInset }]}
           tone="glass"
           trailing={<>
             <GameHudItem accessibilityLabel={`Merge level ${state.mergeLevel}`} style={styles.levelPill} tone="glass">
@@ -653,9 +691,17 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
               <ThemedText selectable style={styles.levelValue} lightColor={GameUI.color.ink} darkColor={GameUI.color.ink}>{state.mergeLevel}</ThemedText>
               <View pointerEvents="none" style={styles.levelTrack}><View style={[styles.levelFill, { width: `${levelRatio * 100}%` }]} /></View>
             </GameHudItem>
-            <GameHudControl accessibilityLabel="Open legacy games" onPress={() => ftueExclusive ? handleBlockedFtueInteraction() : router.push('/legacy-games')} style={styles.hudAction} tone="glass">
-              <IconSymbol color={GameUI.color.ink} name="gamecontroller.fill" size={18} />
-            </GameHudControl>
+            <GameCurrencyHud balances={[
+              {
+                animateValue: presentedCoins != null,
+                art: GAME_CURRENCY_ART.coins,
+                id: 'coins',
+                pulseNonce: coinPulseNonce,
+                targetRef: coinHudRef,
+                value: presentedCoins ?? state.coins,
+                valueAnimationDurationMs: coinValueAnimationDurationMs,
+              },
+            ]} style={styles.currencyHud} tone="glass" />
           </>}
         />
         {/* Static game geometry: onboarding guidance must never be inserted in
@@ -799,12 +845,12 @@ const styles = StyleSheet.create({
   screen: { alignItems: 'center', backgroundColor: 'transparent', flex: 1, overflow: 'hidden' },
   game: { flex: 1, gap: 7, minHeight: 0 },
   loading: { alignItems: 'center', backgroundColor: '#2B1B13', flex: 1, gap: 12, justifyContent: 'center' },
-  currencyHud: { flex: 1 },
+  currencyHud: { flex: 0, paddingLeft: 18, width: 106 },
+  hudBar: { justifyContent: 'space-between' },
   levelPill: { gap: 3, minWidth: 48, overflow: 'hidden', paddingHorizontal: 7 },
   levelValue: { ...GameUI.type.numeric, fontSize: 13 },
   levelTrack: { backgroundColor: 'rgba(68,51,31,0.12)', bottom: 0, height: 2.5, left: 8, overflow: 'hidden', position: 'absolute', right: 8 },
   levelFill: { backgroundColor: GameUI.color.gold, height: 2.5 },
-  hudAction: { paddingHorizontal: 0, width: 38 },
   mergeArea: { flex: 1, marginTop: 18, minHeight: 0, position: 'relative' },
   serviceCounter: { alignSelf: 'center', height: 32, marginTop: -29, position: 'relative', zIndex: 1 },
   counterUpperLip: { backgroundColor: '#FFE876', height: 3, left: 0, position: 'absolute', right: 0, top: 0 },

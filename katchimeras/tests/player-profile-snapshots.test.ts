@@ -89,6 +89,7 @@ test('profile tooling stays dev-gated, sandboxed, and reachable from the Dev pag
   const economy = read('features/economy/economy-provider.tsx');
   const streak = read('utils/streak-sync.ts');
   const service = read('utils/player-profile-snapshots.ts');
+  const profileRegistry = read('utils/player-profile-domain-registry.ts');
 
   assert.match(manager, /DEV_TOOLS_ENABLED/);
   assert.match(service, /assertDevTools\(\)/);
@@ -99,4 +100,6 @@ test('profile tooling stays dev-gated, sandboxed, and reachable from the Dev pag
   assert.match(streak, /isDevProfileSandboxActive\(\)/);
   assert.match(service, /savePlayerProfileRollback/);
   assert.match(service, /recoverInterruptedPlayerProfileRestore/);
+  assert.match(profileRegistry, /katchimeras\.relationship-progression-v1/);
+  assert.match(service, /relationshipProgressionRepository\.reloadFromStorageForDebug\(\)/);
 });

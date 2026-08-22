@@ -84,9 +84,9 @@ export default function TabLayout() {
           options={{
             freezeOnBlur: true,
             href: guidedSession ? null : undefined,
-            title: 'Katchimeras',
+            title: 'Haven',
             tabBarBadge: feastleStory.unreadReturn ? '' : undefined,
-            tabBarIcon: ({ color }) => <IconSymbol size={26} name="pawprint.fill" color={color} />,
+            tabBarIcon: ({ color }) => <IconSymbol size={26} name="map.fill" color={color} />,
           }}
         />
         <Tabs.Screen
@@ -96,8 +96,8 @@ export default function TabLayout() {
             // it can unmount the visual board/worklets while retaining the
             // warm provider and its already-hydrated merge state.
             freezeOnBlur: false,
-            href: guidedSession && firstSession?.stage === 'today' ? null : undefined,
-            title: 'Merge',
+            href: null,
+            title: 'Activities',
             tabBarBadge: feastleStory.status === 'order_active' ? '' : undefined,
             tabBarIcon: ({ color }) => <IconSymbol size={26} name="circle.grid.2x2.fill" color={color} />,
           }}

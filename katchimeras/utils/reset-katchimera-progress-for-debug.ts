@@ -1,4 +1,5 @@
 import { resetCompanionAchievementsForDebug } from '@/utils/companion-achievements-storage';
+import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { resetAllKatchimeraBondsForDebug } from '@/utils/companion-bond-storage';
 import { resetAllKatchimeraContentForDebug } from '@/utils/companion-content-storage';
 import { resetCompanionDiscoveryForDebug } from '@/utils/companion-discovery-storage';
@@ -27,6 +28,7 @@ export async function resetKatchimeraProgressForDebug({
   resetAllCompanionQuickGoalsForDebug();
   resetCompanionStoriesForDebug();
   resetCompanionAchievementsForDebug();
+  relationshipProgressionRepository.resetForDebug();
 
   if (resetDevAccess) {
     resetDevSubscriptionSimulator();

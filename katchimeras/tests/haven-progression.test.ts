@@ -58,26 +58,23 @@ test('procedural Merge orders fill three slots and remain separate from story or
   assert.ok(procedural.every((order) => order.purpose === 'normal' && !order.signature && !order.chapterId));
 });
 
-test('Mossprout FTUE teaches the tile HUD before restore, then reveals Haven before the trail merge', () => {
-  assert.equal(mossproutFtueStep('companion.chapter_zero_return')?.actions[0]?.nextStepId, 'haven.mossprout.focus');
-  assert.equal(mossproutFtueStep('haven.mossprout.focus')?.camera?.kind, 'focus_target');
-  assert.equal(mossproutFtueStep('haven.mossprout.focus')?.actions[0]?.nextStepId, 'haven.mossprout.restore');
-  assert.equal(mossproutFtueStep('haven.mossprout.restore')?.surface, 'haven');
-  assert.equal(mossproutFtueStep('haven.mossprout.restore')?.cue?.kind, 'tap');
-  assert.equal(mossproutFtueStep('haven.mossprout.restore')?.edges?.[0]?.nextStepId, 'haven.reveal');
-  assert.equal(mossproutFtueStep('haven.reveal')?.actions[0]?.nextStepId, 'discovery.steppling.parcel');
-  assert.equal(mossproutFtueStep('haven.reveal')?.actions[0]?.title, 'Continue to Merge');
-  assert.equal(mossproutFtueStep('discovery.steppling.parcel')?.edges?.[0]?.nextStepId, 'discovery.steppling.sock');
+test('Mossprout FTUE returns after the first order and completes on the companion page', () => {
+  assert.equal(mossproutFtueStep('merge.serve_sprout')?.edges?.[0]?.nextStepId, 'companion.chapter_zero_return');
+  assert.equal(mossproutFtueStep('companion.chapter_zero_return')?.actions[0]?.nextStepId, 'complete');
+  assert.equal(mossproutFtueStep('haven.reveal')?.surface, 'haven');
+  assert.equal(mossproutFtueStep('haven.reveal')?.actions[0]?.nextStepId, 'complete');
+  assert.equal(mossproutFtueStep('haven.reveal')?.actions[0]?.title, 'Finish');
 });
 
-test('Mossprout restore stays in Haven and legacy Merge saves require an explicit return', () => {
+test('the later Haven reveal remains standalone without reopening the global Merge route', () => {
   const rosterRoute = readFileSync('components/katchadeck/roster/katchimera-roster-route-screen.tsx', 'utf8');
   const mergeRoute = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   const restoreHandler = rosterRoute.match(/onFtueRestore=\{\(\) => \{[\s\S]*?\n\s*\}\}\n\s*onFtueReveal=/)?.[0] ?? '';
 
   assert.match(restoreHandler, /dispatchFtueEvent\(\{[\s\S]*?type: 'haven_upgrade_completed'/);
+  assert.doesNotMatch(restoreHandler, /beginMossproutChapterOne/);
   assert.doesNotMatch(restoreHandler, /transitionTo|router\.(?:push|dismissTo)/);
-  assert.match(rosterRoute, /onFtueReveal=\{\(\) => \{[\s\S]*?transitionTo\(\{[\s\S]*?target: 'merge'[\s\S]*?router\.navigate\(\{ pathname: '\/games'/);
-  assert.match(mergeRoute, /label="Visit Haven" onPress=\{openFtueHavenReveal\}/);
-  assert.doesNotMatch(mergeRoute, /useEffect\(\(\) => \{[\s\S]{0,400}ftueRun\.stepId !== 'haven\.reveal'/);
+  assert.match(rosterRoute, /onFtueReveal=\{\(\) => \{[\s\S]*?commitFtueAction\(\{ actionId: 'haven\.reveal_world'/);
+  assert.doesNotMatch(rosterRoute, /onFtueReveal=\{\(\) => \{[\s\S]*?target: 'merge'/);
+  assert.match(mergeRoute, /ftueRun\.stepId !== 'companion\.chapter_zero_return'[\s\S]*?target: 'companion'/);
 });

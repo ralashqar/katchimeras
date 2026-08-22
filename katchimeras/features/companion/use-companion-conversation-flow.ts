@@ -28,8 +28,11 @@ export function useCompanionConversationFlow({
   onComplete,
   onContinue,
   onDismissOutcome,
+  outcomeRequiresManualAdvance = false,
+  outcomeAutoAdvanceMs,
   reduceMotion,
   session,
+  skipCompletedTransition = false,
 }: {
   definition: ConversationDefinition | null;
   onCommitInsight: (node: Extract<ConversationNode, { kind: 'insight_reveal' }>) => void;
@@ -37,8 +40,11 @@ export function useCompanionConversationFlow({
   onComplete: () => void;
   onContinue: () => void;
   onDismissOutcome: () => void;
+  outcomeRequiresManualAdvance?: boolean;
+  outcomeAutoAdvanceMs?: number;
   reduceMotion: boolean;
   session: ConversationSession | null;
+  skipCompletedTransition?: boolean;
 }) {
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
   const automatedRef = useRef(new Set<string>());
@@ -76,6 +82,15 @@ export function useCompanionConversationFlow({
     onContinue();
   }, [definition, onContinue, session]);
 
+  useLayoutEffect(() => {
+    if (!skipCompletedTransition || screenReaderEnabled || !session || !definition || session.outcomePresentation) return;
+    if (session.status !== 'completed') return;
+    const key = `${session.id}:complete`;
+    if (automatedRef.current.has(key)) return;
+    automatedRef.current.add(key);
+    onComplete();
+  }, [definition, node?.kind, onComplete, screenReaderEnabled, session, skipCompletedTransition]);
+
   useEffect(() => {
     if (!session || !definition || session.preview) return;
 
@@ -100,11 +115,11 @@ export function useCompanionConversationFlow({
     }
 
     if (session.outcomePresentation) {
-      if (screenReaderEnabled) return;
+      if (screenReaderEnabled || outcomeRequiresManualAdvance) return;
       const copy = `${session.outcomePresentation.title} ${session.outcomePresentation.message}`;
       const timer = setTimeout(
         onDismissOutcome,
-        conversationReplyDelayMs(copy, reduceMotion),
+        outcomeAutoAdvanceMs ?? conversationReplyDelayMs(copy, reduceMotion),
       );
       return () => clearTimeout(timer);
     }
@@ -115,7 +130,15 @@ export function useCompanionConversationFlow({
       return () => clearTimeout(timer);
     }
 
-    if (session.status === 'completed' || node?.kind === 'end') {
+    if (node?.kind === 'end' && session.status === 'active') {
+      const key = `${session.id}:end`;
+      if (automatedRef.current.has(key)) return;
+      automatedRef.current.add(key);
+      const timer = setTimeout(onContinue, reduceMotion ? 0 : 120);
+      return () => clearTimeout(timer);
+    }
+
+    if (session.status === 'completed') {
       if (screenReaderEnabled) return;
       const key = `${session.id}:complete`;
       if (automatedRef.current.has(key)) return;
@@ -123,7 +146,7 @@ export function useCompanionConversationFlow({
       const timer = setTimeout(onComplete, reduceMotion ? 0 : 360);
       return () => clearTimeout(timer);
     }
-  }, [definition, node, onCommitInsight, onCommitMemory, onComplete, onContinue, onDismissOutcome, reduceMotion, screenReaderEnabled, session]);
+  }, [definition, node, onCommitInsight, onCommitMemory, onComplete, onContinue, onDismissOutcome, outcomeAutoAdvanceMs, outcomeRequiresManualAdvance, reduceMotion, screenReaderEnabled, session]);
 
   const advance = useCallback(() => {
     if (!session || !definition) return;
@@ -135,12 +158,16 @@ export function useCompanionConversationFlow({
       onContinue();
       return;
     }
-    if (session.status === 'completed' || node?.kind === 'end') onComplete();
+    if (node?.kind === 'end' && session.status === 'active') {
+      onContinue();
+      return;
+    }
+    if (session.status === 'completed') onComplete();
   }, [definition, node?.kind, onComplete, onContinue, onDismissOutcome, session]);
 
   return {
     advance,
     phase,
-    requiresManualAdvance: screenReaderEnabled && phase !== 'awaiting_choice' && phase !== 'committing',
+    requiresManualAdvance: (screenReaderEnabled || (outcomeRequiresManualAdvance && Boolean(session?.outcomePresentation))) && phase !== 'awaiting_choice' && phase !== 'committing',
   };
 }

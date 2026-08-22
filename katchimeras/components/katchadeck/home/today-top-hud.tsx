@@ -18,26 +18,15 @@ type TodayTopHudProps = {
 };
 
 export const TodayTopHud = memo(function TodayTopHud({
-  energyValueOverride = null,
-  energyPulseNonce = 0,
   energyTargetRef,
 }: TodayTopHudProps) {
   const wallet = useGameWallet();
   return (
     <GameHudBar
-      content={<GameCurrencyHud balances={[
-        {
-          animateValue: true,
-          art: GAME_CURRENCY_ART.energy,
-          id: 'energy',
-          pulseNonce: energyPulseNonce,
-          suffix: wallet.energyCap > 0 ? `/${wallet.energyCap}` : undefined,
-          targetRef: energyTargetRef,
-          value: energyValueOverride ?? wallet.energy,
-        },
-        { art: GAME_CURRENCY_ART.coins, id: 'coins', value: wallet.coins },
-        { id: 'gems', value: wallet.gems },
-      ]} style={styles.currencyHud} tone="glass" />}
+      content={<>
+        <GameCurrencyHud balances={[{ art: GAME_CURRENCY_ART.coins, id: 'coins', value: wallet.coins }]} style={styles.currencyHud} tone="glass" />
+        <View pointerEvents="none" ref={energyTargetRef} style={styles.hiddenLegacyTarget} />
+      </>}
       density="compact"
       style={styles.hud}
       tone="glass"
@@ -48,4 +37,5 @@ export const TodayTopHud = memo(function TodayTopHud({
 const styles = StyleSheet.create({
   hud: { alignSelf: 'center', maxWidth: 430, width: '100%' },
   currencyHud: { flex: 1 },
+  hiddenLegacyTarget: { height: 1, opacity: 0, position: 'absolute', right: 0, top: 0, width: 1 },
 });

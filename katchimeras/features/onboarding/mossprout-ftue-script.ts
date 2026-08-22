@@ -129,7 +129,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
           resultDefinitionId: 'nature:garden:2',
         },
         commitActionId: 'merge.create_sprout',
-        nextStepId: 'merge.plant.spawn',
+        nextStepId: 'merge.plant.sprout_pair',
       }],
     },
     {
@@ -154,7 +154,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       edges: [{
         event: { type: 'order_served', orderId: 'mossprout:chapter-0:first-sprout' },
         commitActionId: 'merge.serve_sprout',
-        nextStepId: 'merge.plant.sprout_pair',
+        nextStepId: 'companion.chapter_zero_return',
       }],
     },
     {
@@ -177,7 +177,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'merge.plant.sprout_pair', surface: 'merge',
-      guide: { eyebrow: 'The clearing is growing', title: 'Wake the Sprout Echo.', body: 'Use the Sprout that emerged from the mist.' },
+      guide: { eyebrow: 'A half-remembered Plant', title: 'Wake the Sprout Echo.', body: 'Dream Echoes hold shapes the garden remembers. Match this one with your Sprout.' },
       actions: [{ id: 'merge.clear_sprout_echo', title: 'Wake the Sprout Echo', description: 'Drag the Sprout into its Dream Echo.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from: { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 0 }, to: { kind: 'board_dream_echo', echoId: 'mossprout-sprout-echo' } } },
       cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 0 }, to: { kind: 'board_dream_echo', echoId: 'mossprout-sprout-echo' } },
@@ -186,12 +186,12 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'merge.serve_plant', surface: 'merge',
-      guide: { eyebrow: 'Second request', title: 'Bring it home.', body: 'Serve the Plant.' },
-      actions: [{ id: 'merge.serve_home_plant', title: 'Serve the Plant', description: 'Give Mossprout its new Plant.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_order_served', backendEvent: true }],
-      interaction: { mode: 'exclusive', allowed: { kind: 'order_serve', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:home-plant' } } },
-      cue: { kind: 'tap', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:home-plant' } },
-      spotlight: { targets: [{ kind: 'order_requirement_item', orderId: 'mossprout:chapter-0:home-plant', requirementIndex: 0 }, { kind: 'order_serve', orderId: 'mossprout:chapter-0:home-plant' }], grouping: 'individual', padding: 7, radius: 14, dimOpacity: 0.64 },
-      edges: [{ event: { type: 'order_served', orderId: 'mossprout:chapter-0:home-plant' }, commitActionId: 'merge.serve_home_plant', nextStepId: 'merge.energy.spawn_pair' }],
+      guide: { eyebrow: 'The first planting', title: 'Bring it home.', body: 'Give the remembered Plant to Mossprout.' },
+      actions: [{ id: 'merge.serve_home_plant', title: 'Serve the Plant', description: 'Give Mossprout the Plant you woke.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_order_served', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'order_serve', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' } } },
+      cue: { kind: 'tap', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' } },
+      spotlight: { targets: [{ kind: 'order_requirement_item', orderId: 'mossprout:chapter-0:first-sprout', requirementIndex: 0 }, { kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' }], grouping: 'individual', padding: 7, radius: 14, dimOpacity: 0.64 },
+      edges: [{ event: { type: 'order_served', orderId: 'mossprout:chapter-0:first-sprout' }, commitActionId: 'merge.serve_home_plant', nextStepId: 'companion.chapter_zero_return' }],
     },
     {
       id: 'merge.energy.spawn_pair', surface: 'merge',
@@ -317,8 +317,8 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'companion.chapter_zero_return', surface: 'companion',
-      guide: { eyebrow: 'A little place to begin', title: 'Mossprout has something to show you.', body: 'Finish your first chapter together.' },
-      actions: [{ id: 'companion.complete_chapter_zero_return', title: 'Fix up the clearing', description: 'Give Mossprout somewhere to call home.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'haven.mossprout.focus', backendEvent: true }],
+      guide: { eyebrow: 'A little place to begin', title: 'Mossprout has something to show you.', body: 'See what your first Sprout changed.' },
+      actions: [{ id: 'companion.complete_chapter_zero_return', title: 'Finish the Journey Day', description: 'Stay with Mossprout and see what comes next.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'complete', backendEvent: true }],
       blockingBeat: 'chapter_complete',
     },
     {
@@ -352,8 +352,8 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'haven.reveal', surface: 'haven',
-      guide: { eyebrow: 'The world opens', title: 'THE HAVEN', body: 'Every friend you meet brings another part of the Haven to life.' },
-      actions: [{ id: 'haven.reveal_world', title: 'Continue to Merge', description: 'Return to the Merge board and follow the new trail.', icon: 'arrow.right', presentation: 'acknowledgement', handlerId: 'haven_reveal', nextStepId: 'discovery.steppling.parcel', backendEvent: true }],
+      guide: { eyebrow: 'Your world grew', title: 'Mossprout’s Garden', body: 'The Sprout you made now lives here permanently.' },
+      actions: [{ id: 'haven.reveal_world', title: 'Finish', description: 'Your first day with Mossprout is complete.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'haven_reveal', nextStepId: 'complete', backendEvent: true }],
       camera: { kind: 'fit_targets', targets: [{ kind: 'haven_world' }], padding: 28, durationMs: 680 },
       blockingBeat: 'chapter_complete',
     },
@@ -416,6 +416,20 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
 };
 
 const stepsById = new Map(MOSSPROUT_FTUE_SCRIPT.steps.map((step) => [step.id, step]));
+// These authored beats remain available to old local/debug fixtures. The live
+// first-session route uses the Sprout Dream Echo, then returns after one order.
+const retiredFirstSessionStepIds = new Set(MOSSPROUT_FTUE_SCRIPT.steps
+  .filter((step) => step.id.startsWith('merge.plant.')
+    || step.id.startsWith('merge.energy')
+    || step.id.startsWith('energy.')
+    || step.id === 'merge.serve_sprout'
+    || step.id === 'merge.serve_plant'
+    || step.id === 'merge.return_note'
+    || step.id === 'haven.mossprout.focus'
+    || step.id === 'haven.mossprout.restore'
+    || step.id === 'haven.reveal'
+    || step.id.startsWith('discovery.'))
+  .map((step) => step.id));
 export function mossproutFtueStep(stepId: string) { return stepsById.get(stepId) ?? null; }
 export function mossproutFtueAction(stepId: string, actionId: string) { return mossproutFtueStep(stepId)?.actions.find((action) => action.id === actionId) ?? null; }
 
@@ -455,6 +469,8 @@ export function validateMossproutFtueScript(): string[] {
     step?.actions.forEach((action) => { if (action.nextStepId) pending.push(action.nextStepId); });
     step?.edges?.forEach((edge) => pending.push(edge.nextStepId));
   }
-  for (const step of MOSSPROUT_FTUE_SCRIPT.steps) if (!reachable.has(step.id)) errors.push(`Unreachable step: ${step.id}`);
+  for (const step of MOSSPROUT_FTUE_SCRIPT.steps) {
+    if (!reachable.has(step.id) && !retiredFirstSessionStepIds.has(step.id)) errors.push(`Unreachable step: ${step.id}`);
+  }
   return errors;
 }

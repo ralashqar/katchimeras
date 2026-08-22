@@ -6,6 +6,7 @@ import { createClientId } from '@/utils/client-id';
 import { clearDevProfileSession, consumeDevProfileLaunchRoute, getDevProfileSession, isDevProfileSandboxActive, setDevProfileSession } from '@/utils/dev-profile-sandbox';
 import { clearPlayerProfileRollback, loadPlayerProfileRollback, saveCapturedPlayerProfileSnapshot, savePlayerProfileRollback } from '@/utils/dev-profile-snapshot-storage';
 import { flushStoredHomeStateWrites } from '@/utils/home-storage';
+import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { normalizeMergeWorldState } from '@/utils/merge-world/engine';
 import { installMergeWorldStateForDebug, loadMergeWorldState } from '@/utils/merge-world/repository';
 import { captureKeyValueProfileDomain, replaceKeyValueProfileDomain, validateKeyValueProfileDomain } from '@/utils/player-profile-domain-registry';
@@ -105,6 +106,7 @@ export function validatePlayerProfileSnapshot(snapshot: unknown): PlayerProfileS
 
 async function installSnapshot(snapshot: PlayerProfileSnapshot) {
   replaceKeyValueProfileDomain(snapshot.domains.keyValue.values);
+  relationshipProgressionRepository.reloadFromStorageForDebug();
   await installMergeWorldStateForDebug(snapshot.domains.mergeWorld.state);
 }
 

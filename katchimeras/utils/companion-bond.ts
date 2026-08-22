@@ -23,6 +23,7 @@ export type CompanionBondEventKind =
   | 'insight_saved'
   | 'insight_engaged'
   | 'conversation_completed'
+  | 'journey_day_completed'
   | 'merge_order_completed';
 
 export type CompanionBondEvent = {
@@ -83,6 +84,7 @@ export const COMPANION_BOND_REWARDS: Record<CompanionBondEventKind, number> = {
   insight_saved: 15,
   insight_engaged: 10,
   conversation_completed: 8,
+  journey_day_completed: 20,
   merge_order_completed: 0,
 };
 
@@ -192,6 +194,46 @@ export function recordCompanionBondEvent(
       : state.pendingCelebrations ?? [],
   });
   return { state: next, awarded: true, points, receipt };
+}
+
+/** Keeps one aggregate Journey event in sync as optional actions are finished. */
+export function syncCompanionBondEvent(
+  state: CompanionBondState,
+  event: Omit<CompanionBondEvent, 'points'> & { points: number },
+  options: { queueCelebration?: boolean } = {}
+): { state: CompanionBondState; awarded: boolean; points: number; receipt: CompanionBondAwardReceipt | null } {
+  const existing = state.events.find((item) => item.id === event.id);
+  if (!existing) return recordCompanionBondEvent(state, event, options);
+  const targetPoints = Math.max(existing.points, event.points);
+  const delta = targetPoints - existing.points;
+  if (delta <= 0) return { state, awarded: false, points: 0, receipt: null };
+  const before = companionBondProgress(state, event.creatureId);
+  const nextEvents = state.events.map((item) => item.id === event.id ? { ...item, ...event, points: targetPoints } : item);
+  const after = companionBondProgress({ ...state, events: nextEvents }, event.creatureId);
+  const receipt: CompanionBondAwardReceipt = {
+    id: `bond-reward:${event.id}:${targetPoints}`,
+    eventId: event.id,
+    creatureId: event.creatureId,
+    kind: event.kind,
+    points: delta,
+    occurredAt: event.occurredAt,
+    beforeTotal: before.totalPoints,
+    afterTotal: after.totalPoints,
+    beforeLevel: before.level,
+    afterLevel: after.level,
+  };
+  return {
+    state: normaliseCompanionBondState({
+      ...state,
+      events: nextEvents,
+      pendingCelebrations: options.queueCelebration
+        ? [...(state.pendingCelebrations ?? []), receipt]
+        : state.pendingCelebrations ?? [],
+    }),
+    awarded: true,
+    points: delta,
+    receipt,
+  };
 }
 
 export function acknowledgeCompanionBondCelebration(state: CompanionBondState, receiptId: string): CompanionBondState {

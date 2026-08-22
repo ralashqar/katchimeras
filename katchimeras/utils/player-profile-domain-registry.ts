@@ -9,6 +9,7 @@ const EXACT_PROFILE_KEYS = new Set([
   'katchimeras.ftue-run.v4',
   'katchimeras.first-session.v3',
   'katchimeras.onboarding.recap.v1',
+  'katchimeras.relationship-progression-v1',
   'katchimera.wisps.v2',
   'katchimera.wisps.v1',
   'katchimera.scenes.v1',

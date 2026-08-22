@@ -424,7 +424,9 @@ export function buildAuthoredFamilyConversationPack(
 }
 
 export const authoredFamilyConversationDefinitions: readonly ConversationDefinition[] =
-  authoredFamilyConversationManifests.flatMap(buildAuthoredFamilyConversationPack);
+  authoredFamilyConversationManifests.flatMap((manifestValue) =>
+    manifestValue.familyId === 'mossprout' ? [] : buildAuthoredFamilyConversationPack(manifestValue)
+  );
 
 export const authoredFamilyManifestById = new Map(
   authoredFamilyConversationManifests.map((item) => [item.familyId, item])

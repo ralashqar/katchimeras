@@ -62,19 +62,23 @@ test('Supabase receipt allowlist matches every backend FTUE action', () => {
   assert.doesNotMatch(migration, /option_id|option_label|answer_text/);
 });
 
-test('Chapter 0 previews its requests and scripts spawn, merge, Energy recovery, and serve objectives', () => {
+test('Chapter 0 previews its requests and keeps the first-session board tutorial to merge then serve', () => {
   const mergeStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.seed_drag');
   const serveStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.serve_sprout');
   const spawnStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.plant.spawn');
   const pairStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.plant.seed_pairs');
   const finalServeStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.serve_plant');
+  const sproutEchoStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.plant.sprout_pair');
   assert.equal(mossproutFtueAction('merge.seed_drag', 'merge.create_sprout')?.handlerId, 'merge_item_created');
-  assert.equal(mergeStep?.edges?.[0]?.nextStepId, 'merge.plant.spawn');
+  assert.equal(mergeStep?.edges?.[0]?.nextStepId, 'merge.plant.sprout_pair');
+  assert.equal(sproutEchoStep?.edges?.[0]?.nextStepId, 'merge.serve_plant');
   assert.equal(spawnStep?.edges?.[0]?.requiredCount, undefined);
   assert.equal(pairStep?.edges?.[0]?.event.type, 'dream_echo_cleared');
   assert.equal(pairStep?.edges?.[0]?.nextStepId, 'merge.serve_sprout');
-  assert.equal(serveStep?.edges?.[0]?.nextStepId, 'merge.plant.sprout_pair');
-  assert.equal(finalServeStep?.edges?.[0]?.nextStepId, 'merge.energy.spawn_pair');
+  assert.equal(serveStep?.edges?.[0]?.nextStepId, 'companion.chapter_zero_return');
+  assert.equal(mossproutFtueAction('companion.chapter_zero_return', 'companion.complete_chapter_zero_return')?.nextStepId, 'complete');
+  assert.equal(mossproutFtueAction('haven.reveal', 'haven.reveal_world')?.nextStepId, 'complete');
+  assert.equal(finalServeStep?.edges?.[0]?.nextStepId, 'companion.chapter_zero_return');
   assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.energy.last_seed')?.edges?.[0]?.nextStepId, 'merge.energy_exhausted');
   assert.equal(mossproutFtueAction('merge.energy_exhausted', 'merge.tell_me_more')?.nextStepId, 'energy.capture');
   assert.equal(mossproutFtueAction('energy.journal_reward', 'energy.check_steps')?.handlerId, 'pedometer_steps');
@@ -156,13 +160,16 @@ test('FTUE Energy recovery uses one general reflection with no journal hierarchy
   assert.doesNotMatch(today, /pendingFtueJournalCapture|completingFtueCapture|ftuePhotoEvidenceRef/);
 });
 
-test('Mossprout remembers the day, branches playfully, then reveals the shared two-order preview', () => {
+test('Mossprout remembers the day, learns a garden preference, then offers one narrative Garden objective', () => {
   const firstMeetings = mossproutFtueConversationDefinitions.filter((definition) => definition.id.startsWith('mossprout:ftue:first-meeting:'));
-  assert.ok(firstMeetings.every((definition) => definition.version === 2));
+  assert.ok(firstMeetings.every((definition) => definition.version === 3));
   for (const definition of firstMeetings) {
     const arrived = definition.nodes.find((node) => node.id === 'arrived');
     assert.equal(arrived?.kind, 'choice');
     if (arrived?.kind === 'choice') assert.equal(arrived.options.length, 2);
+    const purpose = definition.nodes.find((node) => node.id === 'purpose');
+    assert.equal(purpose?.kind, 'choice');
+    if (purpose?.kind === 'choice') assert.equal(purpose.options.length, 3);
     assert.ok(definition.nodes.some((node) => node.id === 'plan'));
   }
   const interaction = readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
@@ -172,6 +179,8 @@ test('Mossprout remembers the day, branches playfully, then reveals the shared t
   assert.match(interaction, /MossproutFtueStoryStage/);
   assert.match(mossproutStage, /CompanionMergeRequestTray/);
   assert.match(mossproutStage, /MOSSPROUT_CHAPTER_ZERO_REQUESTS/);
+  assert.match(mossproutStage, /Wake the first Plant/);
+  assert.match(mossproutStage, /slice\(0, 1\)/);
   assert.match(feastleStage, /CompanionMergeRequestTray/);
   assert.match(baristabbitStage, /CompanionMergeRequestTray/);
 });
@@ -246,17 +255,21 @@ test('the active FTUE hides the bottom bar only on the tab presenting its curren
   assert.match(devTools, /It resets Today, Katchimera progress, and the Merge board/);
 });
 
-test('FTUE cross-surface CTAs navigate between sibling tabs under the shared curtain', () => {
+test('FTUE returns from the Garden and completes on Mossprout with a fresh Garden batch', () => {
+  const route = readFileSync('app/katchimera/[creatureId].tsx', 'utf8');
   const today = readFileSync('app/(tabs)/today.tsx', 'utf8');
   const merge = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
-  const roster = readFileSync('components/katchadeck/roster/katchimera-roster-route-screen.tsx', 'utf8');
+  const companion = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
+  const kingdom = readFileSync('components/katchadeck/world/kingdom-companion-screen.tsx', 'utf8');
+  const repository = readFileSync('utils/merge-world/repository.ts', 'utf8');
   const transition = readFileSync('features/navigation/game-screen-transition.tsx', 'utf8');
-  assert.match(merge, /router\.navigate\(\{ pathname: '\/today', params: \{ onboardingCapture: '1' \} \}\)/);
-  assert.doesNotMatch(merge, /router\.dismissTo\(\{ pathname: '\/today'/);
-  assert.match(today, /router\.navigate\(\{ pathname: '\/games', params: \{ familyId: 'mossprout' \} \}\)/);
+  assert.match(merge, /ftueRun\.stepId !== 'companion\.chapter_zero_return'[\s\S]*?target: 'companion'[\s\S]*?ftue: 'chapter-zero-return'/);
+  assert.match(companion, /const nextRun = commitFtueAction\(\{ actionId: 'companion\.complete_chapter_zero_return'[\s\S]*?nextRun\?\.status === 'complete'[\s\S]*?seedStoredMossproutGardenAfterFtue/);
+  assert.doesNotMatch(companion, /commitFtueAction\(\{ actionId: 'companion\.complete_chapter_zero_return'[\s\S]{0,500}?router\.dismissTo\('\/katchimeras'\)/);
+  assert.match(repository, /seedStoredMossproutGardenAfterFtue[\s\S]*?completeMossproutChapterZeroSlice[\s\S]*?reconcileCharacterActivity[\s\S]*?status: 'complete'/);
+  assert.match(kingdom, /ftueConversationDefinitionId === MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID[\s\S]*?receipt\.kind === 'journey_day_completed'[\s\S]*?return;/);
+  assert.match(route, /ftueRun\?\.status === 'active'[\s\S]*?ftueRun\.stepId === 'companion\.chapter_zero_return'[\s\S]*?MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID/);
   assert.doesNotMatch(today, /router\.push\(\{ pathname: '\/\(tabs\)\/games'/);
-  assert.match(roster, /onFtueReveal=\{\(\) => \{[\s\S]*?router\.navigate\(\{ pathname: '\/games', params: \{ familyId: 'mossprout' \} \}\)/);
-  assert.doesNotMatch(roster, /onFtueReveal=\{\(\) => \{[\s\S]*?router\.dismissTo\(\{ pathname: '\/games'/);
   assert.match(transition, /const commitPhase = useCallback[\s\S]*?phaseRef\.current = next;[\s\S]*?setPhase\(next\);/);
   assert.match(transition, /commitPhase\('covered'\)[\s\S]*?current\.navigate\(\)[\s\S]*?commitPhase\('waiting_ready'\)/);
 });

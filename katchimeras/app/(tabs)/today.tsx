@@ -594,7 +594,8 @@ function HomeScreen() {
   const formingTarget = homeLoopPresentation.forming?.target ?? 'today';
   const formingDay = homeLoopPresentation.forming?.day ?? null;
   useEffect(() => {
-    if (!screenFocused || !isFormingToday || !formingDay || ftueTodayStep) {
+    const legacyMergeEconomyEnabled = false;
+    if (!legacyMergeEconomyEnabled || !screenFocused || !isFormingToday || !formingDay || ftueTodayStep) {
       if (!yesterdayStepEnergyBusy) {
         setYesterdayStepEnergyOffer(null);
         setYesterdayStepEnergyDisplayedSteps(null);
@@ -722,6 +723,8 @@ function HomeScreen() {
   }, [ftueDisplayedSteps, ftueRun?.stepId]);
 
   const journalMergeReward = useMemo(() => {
+    const legacyMergeEconomyEnabled = false;
+    if (!legacyMergeEconomyEnabled) return null;
     if (!formingDay || manualJournalTarget === 'yesterday') return null;
     const rewardDays = [...allDays.filter((day) => day.id !== formingDay.id), formingDay];
     return mergeJournalRewardPreview(rewardDays, {
@@ -2983,6 +2986,8 @@ function HomeScreen() {
           initialFlowId={manualJournalInitialFlowId}
           initialChoiceId={manualJournalInitialChoiceId}
           initialContext={manualJournalInitialContextId}
+          initialNote={companionJournalHandoff?.generatedDraft}
+          initialNoteExpanded={Boolean(companionJournalHandoff?.generatedDraft)}
           onFlowSelect={!manualJournalInitialFlowId ? openGuidedCaptureFromJournalBrowser : undefined}
           allowedChoiceIds={companionJournalHandoff?.allowedChoiceIds}
           promptTitle={companionJournalHandoff

@@ -38,13 +38,12 @@ import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability
 import { withDiscoveredKatchimeras } from '@/utils/discovered-katchimera-availability';
 import { kingdomCompanionHexSlots } from '@/utils/katchimera-kingdom-slots';
 import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
-import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
+import type { MergeWorldState } from '@/types/merge-world';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
-import { HAVEN_ENVIRONMENTS, havenStoryGateSatisfied } from '@/constants/haven-catalog';
 import { loadMergeWorldState, revealStoredHaven, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
 import { commitFtueAction, dispatchFtueEvent, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
-import { beginMossproutChapterOne } from '@/utils/companion-story-storage';
+import { useHavenTileStages } from '@/hooks/use-haven-tile-stages';
 
 type KatchimeraViewMode = 'grid' | 'haven';
 
@@ -123,6 +122,7 @@ function FocusedKatchimeraRoster({
   const [backgroundReady, setBackgroundReady] = useState(false);
   const [contentReady, setContentReady] = useState(false);
   const [mergeWorld, setMergeWorld] = useState<MergeWorldState | null>(null);
+  const relationshipTileStages = useHavenTileStages();
   const hasCompletedInitialFocus = useRef(false);
   const previousItems = useRef<readonly KatchimeraRosterItem[]>([]);
   const persistent = persistentSnapshot.state;
@@ -165,9 +165,13 @@ function FocusedKatchimeraRoster({
     [kingdom.creatures],
   );
   const residents = useMemo(() => deriveResidents(hatches), [hatches]);
+  const presentationMergeWorld = useMemo(() => mergeWorld ? {
+    ...mergeWorld,
+    haven: { ...mergeWorld.haven, tileStages: relationshipTileStages },
+  } : null, [mergeWorld, relationshipTileStages]);
   const companionSlots = useMemo(
-    () => kingdomCompanionHexSlots(residents, kingdom.creatures, (mergeWorld?.haven.tileStages ?? {}) as Partial<Record<KatchimeraFamilyId, 0 | 1 | 2 | 3 | 4>>),
-    [kingdom.creatures, mergeWorld?.haven.tileStages, residents],
+    () => kingdomCompanionHexSlots(residents, kingdom.creatures, relationshipTileStages as Partial<Record<KatchimeraFamilyId, 0 | 1 | 2 | 3 | 4>>),
+    [kingdom.creatures, relationshipTileStages, residents],
   );
   const eggVisual = useMemo(
     () => days.find((day) => day.isToday)?.egg ?? days[days.length - 1]?.egg ?? null,
@@ -182,13 +186,9 @@ function FocusedKatchimeraRoster({
     const statuses: Partial<Record<string, KingdomResidentStatusGlyph>> = {};
     for (const creature of kingdom.creatures) {
       if (questFor(persistent.quests, creature.creatureId)) statuses[creature.creatureId] = 'active';
-      const characterId = creature.familyId as MergeCharacterId | undefined;
-      const stage = characterId ? mergeWorld?.haven.tileStages[characterId] ?? 0 : 0;
-      const next = characterId ? HAVEN_ENVIRONMENTS[characterId]?.stages[stage + 1] : null;
-      if (next && mergeWorld && havenStoryGateSatisfied(mergeWorld, next.storyGate)) statuses[creature.creatureId] = 'ready';
     }
     return statuses;
-  }, [kingdom.creatures, mergeWorld, persistent.quests]);
+  }, [kingdom.creatures, persistent.quests]);
   const bondForCreature = useCallback(
     (creatureId: string) => companionBondProgress(persistent.bond, creatureId),
     [persistent.bond],
@@ -231,7 +231,7 @@ function FocusedKatchimeraRoster({
     onToggleViewMode();
   }, [onToggleViewMode]);
 
-  return discovery.ready && mergeWorld ? (
+  return discovery.ready && presentationMergeWorld ? (
     <View style={styles.screen}>
       {viewMode === 'grid' ? (
         <KatchimeraRosterScreen
@@ -251,21 +251,19 @@ function FocusedKatchimeraRoster({
           onSelectCreature={openCreature}
           residentStatusGlyphs={statusByCreatureId}
           companionSlots={companionSlots}
-          mergeWorld={mergeWorld}
+          mergeWorld={presentationMergeWorld}
           ftueStepId={ftueRun?.status === 'active' ? ftueRun.stepId : undefined}
           onFtueRestore={() => {
-            beginMossproutChapterOne();
             dispatchFtueEvent({
               type: 'haven_upgrade_completed',
               characterId: 'mossprout',
               stage: 1,
-              revision: mergeWorld.revision,
+              revision: presentationMergeWorld.revision,
             }, 'haven:mossprout:stage-1');
           }}
           onFtueReveal={() => {
             void revealStoredHaven().then(() => {
               commitFtueAction({ actionId: 'haven.reveal_world', evidenceRef: 'haven:revealed' });
-              transitionTo({ announcement: 'Back to the trail', target: 'merge', navigate: () => router.navigate({ pathname: '/games', params: { familyId: 'mossprout' } }) });
             });
           }}
         />

@@ -31,6 +31,8 @@ import { WorldActionStack } from '@/components/katchadeck/world/world-action-sta
 import { CompanionGoalPortrait } from '@/components/katchadeck/goals/goal-task-row';
 import { GoalCompletionCelebration } from '@/components/katchadeck/goals/goal-completion-celebration';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
+import { DayActionCardSurface } from '@/components/katchadeck/ui/day-action-card';
+import { DayActionActiveRow, DayActionCompletedRow } from '@/components/katchadeck/ui/day-action-row';
 import { AnimatedIntegerText } from '@/components/katchadeck/ui/animated-integer-text';
 import {
   MOOD_ART,
@@ -1818,155 +1820,34 @@ function MeasuredChoice({ accent, disabled, dimmed, image, label, onPress, reduc
   );
 }
 
-function CompletedCareRow({ event, onFinished, onRewardFlight, reduceMotion }: {
+function CompletedCareRow({ event, onFinished, onRewardFlight }: {
   event: TodayCareCompletionEvent;
   onFinished: (eventId: string) => void;
   onRewardFlight: (from: FeedSourceRect, action: RankedTodayCareAction, onArrive: () => void) => void;
   reduceMotion: boolean;
 }) {
-  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
-  const rowLayout = useActionRowLayout(reduceMotion);
-  const sourceRef = useRef<ViewType | null>(null);
-  const flightStartedRef = useRef(false);
-  const rowX = useSharedValue(0);
-  const rowOpacity = useSharedValue(1);
-  const rowScale = useSharedValue(0.985);
-  const tickScale = useSharedValue(0.72);
-  const artX = useSharedValue(0);
-  const artRotation = useSharedValue(0);
-  const artScale = useSharedValue(1);
-  const chargeGlow = useSharedValue(0);
-  const rowStyle = useAnimatedStyle(() => ({
-    opacity: rowOpacity.value,
-    transform: [{ translateX: rowX.value }, { scale: rowScale.value }],
-  }));
-  const tickStyle = useAnimatedStyle(() => ({ transform: [{ scale: tickScale.value }] }));
-  const artStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: artX.value },
-      { rotate: `${artRotation.value}deg` },
-      { scale: artScale.value },
-    ],
-  }));
-  const chargeGlowStyle = useAnimatedStyle(() => ({
-    opacity: chargeGlow.value,
-    transform: [{ scale: 0.985 + chargeGlow.value * 0.025 }],
-  }));
-  const beginExit = useCallback(() => {
-    const exitDelay = reduceMotion ? 0 : 155;
-    if (!reduceMotion) {
-      chargeGlow.value = withSequence(
-        withTiming(1, { duration: 90, easing: Easing.out(Easing.cubic) }),
-        withDelay(70, withTiming(0, { duration: 260, easing: Easing.out(Easing.cubic) })),
-      );
-      rowScale.value = withSequence(
-        withTiming(1.04, { duration: 105, easing: Easing.out(Easing.cubic) }),
-        withTiming(0.985, { duration: 270, easing: Easing.in(Easing.cubic) }),
-      );
-    }
-    rowX.value = withDelay(
-      exitDelay,
-      withTiming(windowWidth + 24, {
-        duration: reduceMotion ? 100 : 320,
-        easing: Easing.in(Easing.cubic),
-      }, (finished) => {
-        if (finished) runOnJS(onFinished)(event.id);
-      }),
-    );
-    rowOpacity.value = withDelay(
-      exitDelay + (reduceMotion ? 0 : 90),
-      withTiming(0, { duration: reduceMotion ? 80 : 185, easing: Easing.in(Easing.quad) }),
-    );
-  }, [chargeGlow, event.id, onFinished, reduceMotion, rowOpacity, rowScale, rowX, windowWidth]);
-
-  useEffect(() => {
-    let rewardTimer: ReturnType<typeof setTimeout> | null = null;
-    const frame = requestAnimationFrame(() => {
-      const launch = (rect: FeedSourceRect) => {
-        rewardTimer = setTimeout(() => {
-          if (flightStartedRef.current) return;
-          flightStartedRef.current = true;
-          if (event.rewardAlreadyAnimated) beginExit();
-          else onRewardFlight(rect, event.action, beginExit);
-        }, reduceMotion ? 30 : 90);
-      };
-      if (sourceRef.current) {
-        sourceRef.current.measureInWindow((x, y, width, height) => launch({ h: height, w: width, x, y }));
-      } else {
-        launch({ h: 36, w: 36, x: windowWidth / 2 - 18, y: windowHeight * 0.68 });
-      }
-    });
-    if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    if (reduceMotion) {
-      rowScale.value = withTiming(1, { duration: 80 });
-      tickScale.value = withTiming(1, { duration: 100 });
-      artScale.value = withSequence(withTiming(1.06, { duration: 80 }), withTiming(1, { duration: 110 }));
-    } else {
-      chargeGlow.value = withSequence(
-        withTiming(1, { duration: 150, easing: Easing.out(Easing.cubic) }),
-        withTiming(0.62, { duration: 320, easing: Easing.out(Easing.cubic) }),
-      );
-      rowScale.value = withSequence(
-        withTiming(1.03, { duration: 110, easing: Easing.out(Easing.cubic) }),
-        withTiming(1.015, { duration: 190, easing: Easing.out(Easing.cubic) }),
-      );
-      tickScale.value = withSequence(
-        withTiming(1.12, { duration: 120, easing: Easing.out(Easing.cubic) }),
-        withTiming(1, { duration: 170, easing: Easing.out(Easing.back(1.05)) }),
-      );
-      artScale.value = withSequence(
-        withTiming(1.1, { duration: 100, easing: Easing.out(Easing.cubic) }),
-        withTiming(1, { duration: 170, easing: Easing.out(Easing.cubic) }),
-      );
-      artX.value = withSequence(
-        withTiming(-3, { duration: 45 }),
-        withTiming(4, { duration: 55 }),
-        withTiming(-2, { duration: 50 }),
-        withTiming(0, { duration: 70, easing: Easing.out(Easing.cubic) }),
-      );
-      artRotation.value = withSequence(
-        withTiming(-3, { duration: 45 }),
-        withTiming(4, { duration: 55 }),
-        withTiming(-1.5, { duration: 50 }),
-        withTiming(0, { duration: 70, easing: Easing.out(Easing.cubic) }),
-      );
-    }
-    return () => {
-      cancelAnimationFrame(frame);
-      if (rewardTimer) clearTimeout(rewardTimer);
-    };
-  }, [artRotation, artScale, artX, beginExit, chargeGlow, event.action, event.rewardAlreadyAnimated, onRewardFlight, reduceMotion, rowScale, tickScale, windowHeight, windowWidth]);
-
   return (
-    <Animated.View layout={rowLayout}>
-      <Animated.View style={rowStyle}>
-        <GameSurface contentStyle={styles.careDoorContent} style={styles.careDoor} tone="cream">
-        <Animated.View pointerEvents="none" style={[styles.completionChargeGlow, chargeGlowStyle]} />
-        <Animated.View style={artStyle}>
-          {event.action.category === 'play' && event.action.familyId ? (
-            <CompanionGoalPortrait familyId={event.action.familyId} size={38} />
-          ) : (
-            <CareActionArt action={event.action} completed />
-          )}
-        </Animated.View>
-        <View style={styles.flexCopy}>
-          <ThemedText numberOfLines={1} style={styles.rowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{event.action.title}</ThemedText>
-          <ThemedText numberOfLines={1} style={styles.completedBody} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>
-            {event.action.category === 'play' ? 'Round complete' : 'Added to today'}
-          </ThemedText>
-        </View>
-        <View collapsable={false} ref={sourceRef}>
-          <Reward amount={event.action.growthReward} />
-        </View>
-        <Animated.View style={tickStyle}>
-          <View style={styles.completedTick}><IconSymbol color="#FFF9E9" name="checkmark" size={17} /></View>
-        </Animated.View>
-        </GameSurface>
-      </Animated.View>
-    </Animated.View>
+    <DayActionCompletedRow
+      artwork={event.action.category === 'play' && event.action.familyId ? (
+        <CompanionGoalPortrait familyId={event.action.familyId} size={38} />
+      ) : (
+        <CareActionArt action={event.action} completed />
+      )}
+      onFinished={() => onFinished(event.id)}
+      onRewardRequest={(source, onArrive) => onRewardFlight({
+        h: source.height,
+        w: source.width,
+        x: source.x,
+        y: source.y,
+      }, event.action, onArrive)}
+      reward={<Reward amount={event.action.growthReward} />}
+      rewardAnimationId={event.id}
+      rewardAlreadyAnimated={event.rewardAlreadyAnimated}
+      subtitle={event.action.category === 'play' ? 'Round complete' : 'Added to today'}
+      title={event.action.title}
+    />
   );
 }
-
 function TodayCareGoalRow({ action, entryDelayMs, familyId, goalId, onCompleteQuickGoal, onNotToday, onOpenQuickGoal, onRewardFlight, reduceMotion, swipeExternalGesture }: {
   action: RankedTodayCareAction;
   entryDelayMs: number;
@@ -2196,7 +2077,6 @@ function CareRow({ action, entryDelayMs, onNotToday, onStart, reduceMotion, swip
   reduceMotion: boolean;
   swipeExternalGesture: GestureType;
 }) {
-  const rowLayout = useActionRowLayout(reduceMotion);
   const rewardRef = useRef<ViewType | null>(null);
   const handleStart = () => {
     if (rewardRef.current) {
@@ -2206,38 +2086,27 @@ function CareRow({ action, entryDelayMs, onNotToday, onStart, reduceMotion, swip
     }
   };
   return (
-    <Animated.View layout={rowLayout}>
-      <Animated.View entering={reduceMotion
-        ? FadeIn.delay(entryDelayMs).duration(80)
-        : FadeInUp.delay(entryDelayMs).duration(300).easing(Easing.out(Easing.cubic))}>
-        <CareSwipeShell
-          externalGesture={swipeExternalGesture}
-          label={action.title}
-          onDismiss={onNotToday}
-          reduceMotion={reduceMotion}>
-          <Pressable
-            accessibilityHint="Double tap to start. Swipe right to reveal Skip, or swipe left to close it."
-            accessibilityRole="button"
-            onPress={handleStart}
-            style={({ pressed }) => [styles.careDoorPressable, pressed && styles.rowPressed]}>
-            <GameSurface contentStyle={styles.careDoorContent} style={styles.careDoor} tone="cream">
-            {action.category === 'play' && action.familyId ? (
-              <CompanionGoalPortrait familyId={action.familyId} size={38} />
-            ) : (
-              <CareActionArt action={action} />
-            )}
-            <View style={styles.flexCopy}>
-              <ThemedText numberOfLines={2} selectable style={styles.rowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{action.title}</ThemedText>
-            </View>
-            <View collapsable={false} ref={rewardRef}>
-              <Reward amount={action.growthReward} />
-            </View>
-            <IconSymbol color={Meadow.inkSoft} name="chevron.right" size={16} />
-            </GameSurface>
-          </Pressable>
-        </CareSwipeShell>
-      </Animated.View>
-    </Animated.View>
+    <DayActionActiveRow
+      entryDelayMs={entryDelayMs}
+      externalGesture={swipeExternalGesture}
+      label={action.title}
+      onSkip={onNotToday}>
+      <Pressable
+        accessibilityHint="Double tap to start. Swipe right to reveal Skip, or swipe left to close it."
+        accessibilityRole="button"
+        onPress={handleStart}
+        style={({ pressed }) => [styles.careDoorPressable, pressed && styles.rowPressed]}>
+        <DayActionCardSurface
+          artwork={action.category === 'play' && action.familyId ? (
+            <CompanionGoalPortrait familyId={action.familyId} size={38} />
+          ) : (
+            <CareActionArt action={action} />
+          )}
+          reward={<View collapsable={false} ref={rewardRef}><Reward amount={action.growthReward} /></View>}
+          title={action.title}
+        />
+      </Pressable>
+    </DayActionActiveRow>
   );
 }
 

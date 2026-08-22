@@ -114,13 +114,19 @@ export function CompanionDestinationHeader({
 
 export function CompanionDestinationSurface({
   children,
+  fullWidth = false,
   immersive = false,
 }: {
   children: ReactNode;
+  fullWidth?: boolean;
   immersive?: boolean;
 }) {
   return (
-    <View style={[styles.destinationSurface, immersive && styles.destinationSurfaceImmersive]}>
+    <View style={[
+      styles.destinationSurface,
+      fullWidth && styles.destinationSurfaceFullWidth,
+      immersive && styles.destinationSurfaceImmersive,
+    ]}>
       {children}
     </View>
   );
@@ -396,6 +402,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 3,
   },
+  destinationSurfaceFullWidth: { paddingHorizontal: 0 },
   destinationSurfaceImmersive: {
     backgroundColor: 'transparent',
     borderRadius: 0,

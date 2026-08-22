@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
-import Animated, { FadeInUp, useReducedMotion } from 'react-native-reanimated';
+import Animated, { FadeInUp, LinearTransition, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
@@ -25,6 +25,10 @@ import type { KingdomSkinOption } from '@/utils/katchimera-wardrobe';
 import type { CompanionMemory } from '@/utils/companion-content';
 import type { CompanionBondProgress } from '@/utils/companion-bond';
 import type { CompanionConversationPresentationPhase } from '@/features/companion/use-companion-conversation-flow';
+
+const CHOICE_OPTION_GAP = 9;
+const ESTIMATED_OPTION_ROW_HEIGHT = 61;
+const PANEL_SCROLL_VERTICAL_PADDING = 22;
 
 export function conversationSpeechLine(
   session: ConversationSession,
@@ -127,17 +131,25 @@ export function CompanionConversationScene({
   const showConversationProgress = !session.outcomePresentation
     && session.status !== 'completed'
     && (node?.kind === 'choice' || node?.kind === 'poll' || node?.kind === 'profile_game' || node?.kind === 'insight_game' || node?.kind === 'journal_handoff');
+  const activeGameQuestion = node?.kind === 'profile_game' || node?.kind === 'insight_game'
+    ? conversationGameQuestion(node, session)
+    : null;
   const visibleOptionCount = node?.kind === 'choice' || node?.kind === 'poll'
     ? node.options.length
     : node?.kind === 'profile_game' || node?.kind === 'insight_game'
-      ? conversationGameQuestion(node, session)?.options.length ?? 0
+      ? activeGameQuestion?.options.length ?? 0
       : 0;
   const optionColumns = width >= 360 && visibleOptionCount >= 4 ? 2 : 1;
   const estimatedOptionRows = Math.ceil(visibleOptionCount / optionColumns);
   const estimatedContentHeight = visibleOptionCount > 0
-    ? Math.max(68, estimatedOptionRows * 61 + 3)
+    ? Math.max(
+        68,
+        estimatedOptionRows * ESTIMATED_OPTION_ROW_HEIGHT
+          + Math.max(0, estimatedOptionRows - 1) * CHOICE_OPTION_GAP
+          + PANEL_SCROLL_VERTICAL_PADDING,
+      )
     : 190;
-  const panelContentKey = `${session.currentNodeId}:${session.status}:${session.outcomePresentation?.id ?? 'none'}:${session.pendingReply ?? 'ready'}:${visibleOptionCount}`;
+  const panelContentKey = `${session.currentNodeId}:${activeGameQuestion?.id ?? 'no-question'}:${session.status}:${session.outcomePresentation?.id ?? 'none'}:${session.pendingReply ?? 'ready'}:${visibleOptionCount}`;
   const [measuredPanelContent, setMeasuredPanelContent] = useState({ key: panelContentKey, height: estimatedContentHeight });
   const measuredContentHeight = measuredPanelContent.key === panelContentKey
     ? measuredPanelContent.height
@@ -205,6 +217,7 @@ export function CompanionConversationScene({
       <Animated.View
         accessibilityLabel={`Conversation ${flowPhase.replace('_', ' ')}`}
         entering={reduceMotion ? undefined : FadeInUp.duration(220)}
+        layout={reduceMotion ? undefined : LinearTransition.duration(180)}
         style={{
           backgroundColor: KatchaUI.companionScenePanel.background,
           borderColor: KatchaUI.companionScenePanel.border,
@@ -232,6 +245,7 @@ export function CompanionConversationScene({
         </> : null}
 
         <ScrollView
+          key={panelContentKey}
           bounces={panelScrollable}
           contentContainerStyle={{ gap: 10, paddingBottom: 20, paddingTop: showConversationProgress ? 2 : 6 }}
           contentInsetAdjustmentBehavior="never"
@@ -252,7 +266,7 @@ export function CompanionConversationScene({
             onAdvance={onAdvance}
             requiresManualAdvance={requiresManualAdvance}
           />
-        ) : session.pendingReply !== undefined ? null : session.status === 'completed' || node?.kind === 'end' ? (
+        ) : session.pendingReply !== undefined ? <NarrativeTransition label="Mossprout is thinking…" /> : session.status === 'completed' || node?.kind === 'end' ? (
           session.preview ? <View style={{ alignItems: 'center', gap: 10, paddingVertical: 6 }}>
             <ThemedText selectable style={{ fontSize: 14, lineHeight: 20, textAlign: 'center' }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>Preview complete. Choose another flow below or exit the preview.</ThemedText>
           </View> : <NarrativeTransition
@@ -265,7 +279,7 @@ export function CompanionConversationScene({
         ) : node?.kind === 'poll' ? (
           <ChoiceOptions options={node.options} onAnswer={answer} />
         ) : node?.kind === 'profile_game' || node?.kind === 'insight_game' ? (
-          <ChoiceOptions options={conversationGameQuestion(node, session)?.options ?? []} onAnswer={answer} />
+          <ChoiceOptions options={activeGameQuestion?.options ?? []} onAnswer={answer} />
         ) : node?.kind === 'form_reveal' ? (
           <FormReveal definition={definition} node={node} onAdvance={onAdvance} preview={Boolean(session.preview)} session={session} skins={skins} />
         ) : node?.kind === 'insight_reveal' ? (
@@ -295,7 +309,9 @@ export function CompanionConversationScene({
               <ThemedText selectable style={{ fontSize: 13.5, lineHeight: 20 }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{node.body}</ThemedText>
               <View style={{ alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 <View style={{ backgroundColor: '#F5D985', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 }}>
-                  <ThemedText selectable style={{ fontSize: 11, fontWeight: '900' }} lightColor="#5B421D" darkColor="#5B421D">+{node.rewardGrowth} Egg Growth</ThemedText>
+                  <ThemedText selectable style={{ fontSize: 11, fontWeight: '900' }} lightColor="#5B421D" darkColor="#5B421D">
+                    {definition.familyId === 'mossprout' ? 'Saved with Mossprout' : `+${node.rewardGrowth} Egg Growth`}
+                  </ThemedText>
                 </View>
                 <View style={{ backgroundColor: '#F5D985', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 }}>
                   <ThemedText selectable style={{ fontSize: 11, fontWeight: '900' }} lightColor="#5B421D" darkColor="#5B421D">
@@ -304,7 +320,7 @@ export function CompanionConversationScene({
                 </View>
               </View>
             </View>
-            <PrimaryAction label="Take this to the Egg" onPress={() => onJournalHandoff(true, node)} />
+            <PrimaryAction label={node.saveLabel} onPress={() => onJournalHandoff(true, node)} />
             <SecondaryAction label="Skip" onPress={() => onJournalHandoff(false, node)} />
           </View>
         ) : node?.kind === 'quest_handoff' ? (
@@ -380,7 +396,7 @@ function ChoiceOptions({ disabled = false, options, onAnswer, selectedOptionId =
 }) {
   const { width } = useWindowDimensions();
   const useGrid = width >= 360 && options.length >= 4;
-  return <View accessibilityRole="radiogroup" style={{ flexDirection: useGrid ? 'row' : 'column', flexWrap: useGrid ? 'wrap' : 'nowrap', gap: 9 }}>
+  return <View accessibilityRole="radiogroup" style={{ flexDirection: useGrid ? 'row' : 'column', flexWrap: useGrid ? 'wrap' : 'nowrap', gap: CHOICE_OPTION_GAP }}>
     {options.map((option) => {
       const selected = option.id === selectedOptionId;
       return (
@@ -448,7 +464,7 @@ function ConversationOutcomeCard({ outcome, onAdvance, requiresManualAdvance }: 
         <ThemedText selectable style={{ flex: 1, fontSize: 13, fontWeight: '800', lineHeight: 18 }} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>{item}</ThemedText>
       </View>)}
     </View>
-    <NarrativeTransition label="Saved — returning to your story…" onAdvance={onAdvance} requiresManualAdvance={requiresManualAdvance} />
+    {requiresManualAdvance ? <PrimaryAction label="Done" onPress={onAdvance} /> : null}
   </Animated.View>;
 }
 
@@ -471,9 +487,10 @@ function FormReveal({ definition, node, onAdvance, preview, session, skins }: {
     .slice(-3)
     .map((turn) => optionLabel(definition, session, turn.optionId))
     .filter((label): label is string => Boolean(label));
+  const cardReveal = definition.familyId === 'mossprout' && definition.id === 'mossprout:game:form-finder';
   return <View style={{ gap: 11 }}>
     <View style={{ backgroundColor: KatchaUI.companionScenePanel.cardBackground, borderCurve: 'continuous', borderRadius: 22, gap: 8, padding: 16 }}>
-      <ThemedText selectable style={{ fontSize: 11, fontWeight: '900', letterSpacing: 1.1 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>YOUR CLOSEST FORM</ThemedText>
+      <ThemedText selectable style={{ fontSize: 11, fontWeight: '900', letterSpacing: 1.1 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>{cardReveal ? 'YOUR KATCHIMERA CARD' : 'YOUR CLOSEST FORM'}</ThemedText>
       {topVisual ? <View style={{ alignItems: 'center', height: 170, justifyContent: 'center' }}>
         <Image contentFit="contain" source={topVisual.source} style={{ height: 170, width: '100%' }} transition={220} />
       </View> : null}
@@ -486,9 +503,9 @@ function FormReveal({ definition, node, onAdvance, preview, session, skins }: {
         </View>)}
       </View>
       {runnerName ? <ThemedText selectable style={{ fontSize: 12, fontWeight: '800' }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>Runner-up: {runnerName}</ThemedText> : null}
-      {!top?.unlocked ? <ThemedText selectable style={{ fontSize: 12, lineHeight: 17 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>Not discovered yet. Its hatch cues will stay visible in your collection.</ThemedText> : null}
+      {cardReveal ? <ThemedText selectable style={{ fontSize: 12, lineHeight: 17 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>This match joins your Mossprout card collection for free.</ThemedText> : !top?.unlocked ? <ThemedText selectable style={{ fontSize: 12, lineHeight: 17 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>Not discovered yet. Its hatch cues will stay visible in your collection.</ThemedText> : null}
     </View>
-    <NarrativeTransition label={preview ? 'Preview ready' : 'Saving this match to your insights…'} onAdvance={onAdvance} requiresManualAdvance={preview} />
+    <NarrativeTransition label={preview ? 'Preview ready' : cardReveal ? 'Adding this card to your collection…' : 'Saving this match to your insights…'} onAdvance={onAdvance} requiresManualAdvance={preview} />
   </View>;
 }
 
@@ -545,14 +562,14 @@ function MemoryProposal({ node, onDecision, session }: {
   </View>;
 }
 
-function NarrativeTransition({ label, onAdvance }: {
+function NarrativeTransition({ label, onAdvance, requiresManualAdvance = false }: {
   label: string;
   onAdvance?: () => void;
   requiresManualAdvance?: boolean;
 }) {
   return <View accessibilityLiveRegion="polite" style={{ gap: 9 }}>
     <ThemedText selectable style={{ fontSize: 13.5, fontWeight: '900', lineHeight: 18, textAlign: 'center' }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{label}</ThemedText>
-    {onAdvance ? <PrimaryAction label="Continue" onPress={onAdvance} /> : null}
+    {onAdvance && requiresManualAdvance ? <PrimaryAction label="Continue" onPress={onAdvance} /> : null}
   </View>;
 }
 

@@ -9,6 +9,7 @@ import {
   questBondEventId,
   recordCompanionBondEvent,
   resetCompanionBondForCreatures,
+  syncCompanionBondEvent,
 } from '@/utils/companion-bond';
 import type { CompanionQuestState } from '@/utils/katchimera-quests';
 import { selectBalancedQuestOffers, selectRankedQuestOffers, sortQuestOffersByAvailability } from '@/utils/quest-offer-order';
@@ -53,6 +54,19 @@ test('bond events are idempotent and use their configured reward', () => {
   assert.equal(first.points, 10);
   assert.equal(duplicate.awarded, false);
   assert.equal(duplicate.state.events.length, 1);
+});
+
+test('Journey Bond sync increases one daily event without duplicating prior motes', () => {
+  const event = { id: 'journey-completion:day-1', creatureId: 'mossprout', kind: 'journey_day_completed' as const, occurredAt: 1, dayId: '2026-08-21' };
+  const main = syncCompanionBondEvent(emptyCompanionBondState(), { ...event, points: 12 }, { queueCelebration: true });
+  const optional = syncCompanionBondEvent(main.state, { ...event, points: 16 }, { queueCelebration: true });
+  const capped = syncCompanionBondEvent(optional.state, { ...event, points: 16 }, { queueCelebration: true });
+  assert.equal(optional.points, 4);
+  assert.equal(optional.state.events.length, 1);
+  assert.equal(optional.state.events[0]?.points, 16);
+  assert.equal(optional.receipt?.beforeTotal, 12);
+  assert.equal(optional.receipt?.afterTotal, 16);
+  assert.equal(capped.awarded, false);
 });
 
 test('live awards queue a before/after receipt and reset removes it at true zero', () => {

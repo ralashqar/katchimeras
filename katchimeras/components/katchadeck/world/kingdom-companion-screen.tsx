@@ -6,7 +6,10 @@ import { StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { CompanionAchievementCelebration } from '@/components/katchadeck/world/companion-achievement-celebration';
-import { CompanionBondLevelUpCelebration } from '@/components/katchadeck/world/companion-bond-level-up-celebration';
+import {
+  CompanionBondLevelUpCelebration,
+  type CompanionBondCelebrationVariant,
+} from '@/components/katchadeck/world/companion-bond-level-up-celebration';
 import type { CompanionBondAwardReceipt } from '@/utils/companion-bond';
 import { CompanionInteractionSheet } from '@/components/katchadeck/world/companion-interaction-sheet';
 import { HomeIdentitySheet } from '@/components/katchadeck/world/home-identity-sheet';
@@ -26,6 +29,7 @@ import { useCompanionAchievements } from '@/hooks/use-companion-achievements';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { useHavenTileStages } from '@/hooks/use-haven-tile-stages';
 import type { CompanionReflectionDraft } from '@/types/companion-interaction';
+import type { ConversationNode } from '@/types/companion-conversation';
 import type { JournalSource, ManualJournalSubmission } from '@/types/home';
 import type { KatchimeraFamilyId, KatchimeraSkinId, KatchimeraWardrobeState } from '@/types/katchimera';
 import type { KingdomCreature } from '@/types/kingdom';
@@ -42,7 +46,6 @@ import { prepareCompanionCheckInReflection } from '@/utils/companion-reflection'
 import type { CompanionJourneyCheckIn } from '@/utils/companion-journey';
 import { loadWorldIdentity, saveWorldIdentity } from '@/utils/world-identity';
 import {
-  applyWardrobeToKingdom,
   equipKatchimeraSkin,
   skinsForKingdomCompanion,
 } from '@/utils/katchimera-wardrobe';
@@ -52,6 +55,7 @@ import {
   subscribeKatchimeraWardrobeResets,
 } from '@/utils/katchimera-wardrobe-storage';
 import { companionIdForFamily } from '@/constants/katchimera-skins';
+import { MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID } from '@/constants/mossprout-ftue-conversations';
 import type { CompanionQuickGoal, CompanionQuickGoalCompletion } from '@/utils/companion-quick-goals';
 import { questDefinition } from '@/utils/quests/definitions';
 import type { QuestJournalCaptureMode, QuestJournalTemplate } from '@/utils/quests/journal-templates';
@@ -59,6 +63,7 @@ import type { QuestSubmissionItem } from '@/utils/quests/report-back-evidence';
 import { journalIdempotencyKey, journalRecordId } from '@/utils/journal-domain';
 import { requestCompanionNavigationIntent } from '@/utils/companion-navigation-intent';
 import { createCompanionJournalHandoff } from '@/utils/companion-journal-handoff';
+import { buildCompanionJournalHandoff, type CompanionJournalHandoff } from '@/utils/companion-journal-handoff-domain';
 import { noteEvidenceId } from '@/utils/intelligence/evidence';
 import { buildKatchimeraRoster } from '@/utils/katchimera-roster';
 import { beginQuestCapture, cancelQuestCapture } from '@/utils/quest-capture-session';
@@ -66,7 +71,6 @@ import { completeSemanticNoteQuestCapture } from '@/utils/quests/semantic-note-c
 import { manualJournalFlow } from '@/utils/manual-journal-registry';
 import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability';
 import { withDiscoveredKatchimeras } from '@/utils/discovered-katchimera-availability';
-import { useEconomy } from '@/features/economy/economy-provider';
 
 type QuestJournalReviewContext = {
   initialFlowId: string;
@@ -102,6 +106,14 @@ type EmbeddedJournalReview =
       origin: 'visit';
       initialFlowId: string;
       noteExpanded: boolean;
+    }
+  | {
+      origin: 'conversation';
+      initialFlowId: string;
+      initialChoiceId: string | null;
+      noteExpanded: true;
+      handoff: CompanionJournalHandoff;
+      node: Extract<ConversationNode, { kind: 'journal_handoff' }>;
     }
   | ({
       origin: 'quest';
@@ -221,7 +233,6 @@ export function KingdomCompanionScreen({
 }) {
   const isFocused = useIsFocused();
   const router = useRouter();
-  const economy = useEconomy();
   const archive = useAllDays();
   const { days } = archive;
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
@@ -257,16 +268,18 @@ export function KingdomCompanionScreen({
   const [embeddedJournal, setEmbeddedJournal] = useState<EmbeddedJournalReview | null>(null);
   const [questNoteCapture, setQuestNoteCapture] = useState<QuestNoteCapture | null>(null);
   const [questNoteMismatch, setQuestNoteMismatch] = useState<QuestNoteMismatch | null>(null);
-  const [savedOrigin, setSavedOrigin] = useState<'insight' | 'quest' | 'visit' | null>(null);
+  const [savedOrigin, setSavedOrigin] = useState<'conversation' | 'insight' | 'quest' | 'visit' | null>(null);
   const [questExperienceActive, setQuestExperienceActive] = useState(false);
-  const [bondLevelUp, setBondLevelUp] = useState<CompanionBondAwardReceipt | null>(null);
+  const [bondCelebration, setBondCelebration] = useState<{
+    receipt: CompanionBondAwardReceipt;
+    variant: CompanionBondCelebrationVariant;
+  } | null>(null);
   const { addManualJournalEntry, cloudIntelligenceEnabled } = useHomeScreenState({
     enableInteractiveServices: false,
   });
-  const presentationKingdom = useMemo(
-    () => economy.snapshot.activePlus ? applyWardrobeToKingdom(kingdom, wardrobe) : kingdom,
-    [economy.snapshot.activePlus, kingdom, wardrobe]
-  );
+  // Form artwork is now collected as cards. Card ownership never changes the
+  // persistent companion who lives in Haven.
+  const presentationKingdom = kingdom;
 
   useEffect(
     () => subscribeKatchimeraWardrobeResets(() => setWardrobe(loadKatchimeraWardrobe())),
@@ -312,8 +325,20 @@ export function KingdomCompanionScreen({
   const acknowledgeBondCelebration = quests.acknowledgeBondCelebration;
   const completeBondCelebration = useCallback((receipt: CompanionBondAwardReceipt) => {
     acknowledgeBondCelebration(receipt.id);
-    if (receipt.afterLevel > receipt.beforeLevel) setBondLevelUp(receipt);
-  }, [acknowledgeBondCelebration]);
+    if (
+      ftueConversationDefinitionId === MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID
+      && receipt.kind === 'journey_day_completed'
+    ) {
+      return;
+    }
+    if (receipt.afterLevel > receipt.beforeLevel) {
+      setBondCelebration({ receipt, variant: 'level_up' });
+      return;
+    }
+    if (receipt.kind === 'journey_day_completed') {
+      setBondCelebration({ receipt, variant: 'journey_complete' });
+    }
+  }, [acknowledgeBondCelebration, ftueConversationDefinitionId]);
   const quickGoalFamilyIds = useMemo(() => {
     const ids = new Set<KatchimeraFamilyId>();
     for (const creature of kingdom.creatures) {
@@ -580,11 +605,12 @@ export function KingdomCompanionScreen({
           questCaptureFeedback={quests.questCaptureFeedback}
           submissionItems={quests.selectedQuestItems}
           offers={quests.selectedOffers}
+          actionOffers={quests.selectedActionOffers}
           selectedOfferId={quests.selectedOfferId}
           onSelectOffer={quests.selectOffer}
           criteria={quests.questCriteria}
           onAccept={quests.acceptSelectedQuest}
-          onCashIn={quests.cashInSelectedQuest}
+          onCashIn={() => quests.cashInSelectedQuest({ closeResident: false })}
           onChooseAnotherQuest={quests.chooseAnotherSelectedQuest}
           onSubmitQuest={quests.submitSelectedQuest}
           onClarifyQuestMatch={quests.clarifySelectedQuestMatch}
@@ -612,7 +638,7 @@ export function KingdomCompanionScreen({
           onInsightAction={handleInsightAction}
           memorySaved={Boolean(savedOrigin)}
           bondProgress={quests.selectedBondProgress}
-          pendingBondCelebration={bondLevelUp ? null : quests.selectedPendingBondCelebration}
+          pendingBondCelebration={bondCelebration ? null : quests.selectedPendingBondCelebration}
           onBondCelebrationComplete={completeBondCelebration}
           achievementProgress={selectedAchievementProgress}
           introductionDefinition={quests.selectedIntroductionDefinition}
@@ -680,6 +706,7 @@ export function KingdomCompanionScreen({
           conversationDefinition={quests.selectedConversationDefinition}
           conversationRecommendation={quests.selectedConversationRecommendation}
           conversationStarters={quests.selectedConversationStarters}
+          mossproutActionCandidates={quests.selectedMossproutActionCandidates}
           idealSkinDefinitionId={quests.selectedIdealSkinDefinitionId}
           idealSkinOnboardingRequired={quests.selectedIdealSkinOnboardingRequired}
           conversationQuestOffer={quests.selectedConversationQuestOffer}
@@ -737,16 +764,23 @@ export function KingdomCompanionScreen({
               return;
             }
             quests.recordSelectedConversationJournalHandoffOpened(node);
-            const handoff = createCompanionJournalHandoff({
+            const handoff = buildCompanionJournalHandoff({
               mode: 'story',
               familyId: session.familyId,
               creatureId: resident.creature.creatureId,
               session,
               node,
-              target: today?.state === 'hatched' ? 'tomorrow' : 'today',
+              target: 'today',
+              now: Date.now(),
             });
-            requestCompanionNavigationIntent({ kind: 'journal_handoff', handoffId: handoff.id });
-            router.dismissTo('/today');
+            setEmbeddedJournal({
+              origin: 'conversation',
+              initialFlowId: handoff.flowId,
+              initialChoiceId: handoff.initialChoiceId,
+              noteExpanded: true,
+              handoff,
+              node,
+            });
           }}
           onQuestConversationHandoff={(accept, node) => {
             const quest = quests.selectedConversationQuestOffer;
@@ -782,23 +816,47 @@ export function KingdomCompanionScreen({
           initialChoiceId={'initialChoiceId' in embeddedJournal ? embeddedJournal.initialChoiceId : undefined}
           allowedChoiceIds={embeddedJournal.origin === 'quest'
             ? embeddedJournal.template.allowedChoiceIds
-            : undefined}
+            : embeddedJournal.origin === 'conversation'
+              ? embeddedJournal.handoff.allowedChoiceIds
+              : undefined}
           contextOptionsOverride={embeddedJournal.origin === 'quest' && embeddedJournal.inputMode === 'guided' ? embeddedJournal.template.contextOptions : undefined}
           contextTitleOverride={embeddedJournal.origin === 'quest' && embeddedJournal.inputMode === 'guided' ? embeddedJournal.template.contextTitle : undefined}
           promptBody={embeddedJournal.origin === 'quest'
             ? embeddedJournal.template.promptBody
-            : undefined}
+            : embeddedJournal.origin === 'conversation'
+              ? embeddedJournal.handoff.body
+              : undefined}
           promptTitle={embeddedJournal.origin === 'quest'
             ? embeddedJournal.template.promptTitle
-            : undefined}
+            : embeddedJournal.origin === 'conversation'
+              ? embeddedJournal.handoff.title
+              : undefined}
           saveLabel={embeddedJournal.origin === 'quest'
             ? embeddedJournal.inputMode === 'guided' ? 'Save and complete quest' : 'Check and submit'
-            : undefined}
+            : embeddedJournal.origin === 'conversation'
+              ? embeddedJournal.handoff.saveLabel
+              : undefined}
           initialInputMode={embeddedJournal.origin === 'quest' ? embeddedJournal.inputMode : undefined}
           initialSpecific={embeddedJournal.origin === 'quick_goal' ? embeddedJournal.goal.title : undefined}
-          initialNote={embeddedJournal.origin === 'quick_goal' ? `I completed: ${embeddedJournal.goal.title}` : undefined}
+          initialNote={embeddedJournal.origin === 'quick_goal'
+            ? `I completed: ${embeddedJournal.goal.title}`
+            : embeddedJournal.origin === 'conversation'
+              ? embeddedJournal.handoff.generatedDraft ?? undefined
+              : undefined}
           initialNoteExpanded={embeddedJournal.noteExpanded}
-          journalSource={embeddedJournal.origin === 'quest' ? questJournalSource(embeddedJournal) : embeddedJournal.origin === 'quick_goal' ? {
+          journalSource={embeddedJournal.origin === 'conversation' ? {
+            kind: 'manual',
+            sourceId: embeddedJournal.handoff.id,
+            origin: {
+              kind: 'companion_reflection',
+              creatureId: embeddedJournal.handoff.creatureId,
+              familyId: embeddedJournal.handoff.familyId,
+              promptId: embeddedJournal.node.id,
+              promptText: embeddedJournal.node.prompt,
+              answerIds: embeddedJournal.handoff.answerIds,
+              reflectionMode: 'story',
+            },
+          } : embeddedJournal.origin === 'quest' ? questJournalSource(embeddedJournal) : embeddedJournal.origin === 'quick_goal' ? {
             kind: 'text_note',
             sourceId: embeddedJournal.completion.id,
             origin: {
@@ -828,11 +886,22 @@ export function KingdomCompanionScreen({
           onClose={() => {
             if (embeddedJournal.origin === 'quest') cancelQuestCapture(embeddedJournal.questId);
             setEmbeddedJournal(null);
-            quests.closeSelectedResident();
+            if (embeddedJournal.origin !== 'conversation') quests.closeSelectedResident();
           }}
           onSave={(submission) => {
             addManualJournalEntry(submission, 'today');
             const origin = embeddedJournal.origin;
+            if (origin === 'conversation') {
+              const source = submission.journalSource ?? {
+                kind: 'manual' as const,
+                sourceId: embeddedJournal.handoff.id,
+              };
+              const recordId = journalRecordId(journalIdempotencyKey(
+                source,
+                submission.sessionId ?? embeddedJournal.handoff.id,
+              ));
+              quests.decideSelectedConversationJournalHandoff(true, embeddedJournal.node, recordId);
+            }
             if (origin === 'visit') {
               const specific = typeof submission.fields.specific === 'string' ? submission.fields.specific : '';
               const summary = submission.linkedNote?.text?.trim() || submission.note?.trim() || specific.trim() || 'A moment we talked about';
@@ -981,13 +1050,14 @@ export function KingdomCompanionScreen({
           }}
         />
       ) : null}
-      {isFocused && bondLevelUp ? (
+      {isFocused && bondCelebration ? (
         <CompanionBondLevelUpCelebration
-          onContinue={() => setBondLevelUp(null)}
-          receipt={bondLevelUp}
+          onContinue={() => setBondCelebration(null)}
+          receipt={bondCelebration.receipt}
+          variant={bondCelebration.variant}
         />
       ) : null}
-      {isFocused && companionAchievements.pending.length > 0 && !bondLevelUp && !quests.selectedPendingBondCelebration && !questExperienceActive && !embeddedJournal && !questNoteCapture ? (
+      {isFocused && companionAchievements.pending.length > 0 && !bondCelebration && !quests.selectedPendingBondCelebration && !questExperienceActive && !embeddedJournal && !questNoteCapture ? (
         <CompanionAchievementCelebration
           achievements={companionAchievements.pending}
           onAchievementSeen={(id) => companionAchievements.markSeen([id])}

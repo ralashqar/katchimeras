@@ -20,10 +20,12 @@ export type CompanionJournalHandoff = {
   answerIds: string[];
   target: 'today' | 'tomorrow';
   flowId: string;
+  initialChoiceId: string | null;
   allowedChoiceIds: string[];
   prompt: string;
   title: string;
   body: string;
+  generatedDraft?: string | null;
   saveLabel: string;
   rewardGrowth: number;
   status: CompanionJournalHandoffStatus;
@@ -45,6 +47,15 @@ export function buildCompanionJournalHandoff(input: {
   const characterId = input.familyId as MergeCharacterId;
   const route = companionJournalRouteForFamily(input.familyId);
   const companionName = MERGE_CHARACTER_NAMES[characterId] ?? 'Your Katchimera';
+  const generatedDraft = input.familyId === 'mossprout' && input.session?.definitionId.includes(':nature-journal:')
+    ? mossproutNatureDraft(input.session)
+    : null;
+  const allowedChoiceIds = [...(node?.allowedChoiceIds ?? route.allowedChoiceIds ?? [route.initialChoiceId ?? 'ordinary'])];
+  const initialChoiceId = input.familyId === 'mossprout' && input.session?.definitionId.includes(':nature-journal:')
+    ? mossproutNatureJournalChoiceId(input.session, allowedChoiceIds)
+    : route.initialChoiceId && allowedChoiceIds.includes(route.initialChoiceId)
+      ? route.initialChoiceId
+      : allowedChoiceIds[0] ?? null;
   const theme = 'notice one small part of today worth keeping';
   const id = input.mode === 'story' && input.session && node
     ? `companion-journal:${input.session.id}:${node.id}`
@@ -60,7 +71,8 @@ export function buildCompanionJournalHandoff(input: {
     answerIds: input.session?.turns.map((turn) => turn.optionId) ?? [],
     target: input.target,
     flowId: node?.flowId ?? route.flowId,
-    allowedChoiceIds: [...(node?.allowedChoiceIds ?? route.allowedChoiceIds ?? [route.initialChoiceId ?? 'ordinary'])],
+    initialChoiceId,
+    allowedChoiceIds,
     prompt: input.target === 'tomorrow'
       ? `Today’s Katchimera has already arrived. Tomorrow’s Egg can carry one ${companionName} memory forward.`
       : node?.prompt ?? `Could we give today’s Egg one moment that helps ${theme}? Ordinary counts.`,
@@ -68,6 +80,7 @@ export function buildCompanionJournalHandoff(input: {
     body: input.target === 'tomorrow'
       ? `Choose a small moment from today to carry into Tomorrow’s Egg. ${capitalize(theme)}.`
       : node?.body ?? `Choose a small moment from today. ${capitalize(theme)}.`,
+    generatedDraft,
     saveLabel: node?.saveLabel ?? 'Add to the Egg',
     rewardGrowth: node?.rewardGrowth ?? 20,
     status: 'pending',
@@ -77,8 +90,46 @@ export function buildCompanionJournalHandoff(input: {
   };
 }
 
+function mossproutNatureJournalChoiceId(
+  session: ConversationSession,
+  allowedChoiceIds: readonly string[],
+): string | null {
+  const answerIds = new Set(session.turns.map((turn) => turn.optionId));
+  let choiceId = 'park';
+  if (session.definitionId.endsWith(':three-detail-field-note')) {
+    if (answerIds.has('window') || answerIds.has('indoors')) choiceId = 'home';
+  } else if (session.definitionId.endsWith(':one-growing-thing')) {
+    if (answerIds.has('tended') || answerIds.has('care')) choiceId = 'garden';
+  } else if (session.definitionId.endsWith(':small-return') && answerIds.has('edge')) {
+    choiceId = 'other_place';
+  }
+  return allowedChoiceIds.includes(choiceId) ? choiceId : allowedChoiceIds[0] ?? null;
+}
+
 function capitalize(value: string) {
   return value ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
+}
+
+function mossproutNatureDraft(session: ConversationSession): string | null {
+  const definition = companionConversationDefinitionById.get(session.definitionId);
+  if (!definition) return null;
+  const labels = session.turns.flatMap((turn) => {
+    const node = definition.nodes.find((candidate) => candidate.id === turn.nodeId);
+    if (!node || (node.kind !== 'choice' && node.kind !== 'poll')) return [];
+    const label = node.options.find((option) => option.id === turn.optionId)?.label;
+    return label ? [lowercaseInitial(label)] : [];
+  });
+  if (!labels.length) return null;
+  const [where, detail, meaning] = labels;
+  return [
+    where ? `Nature found me ${where}.` : null,
+    detail ? `I noticed ${detail}.` : null,
+    meaning ? `I want to remember ${meaning}.` : null,
+  ].filter((line): line is string => Boolean(line)).join(' ');
+}
+
+function lowercaseInitial(value: string) {
+  return value ? `${value[0]!.toLocaleLowerCase()}${value.slice(1)}` : value;
 }
 
 export function advanceConversationForJournalHandoff(
@@ -95,6 +146,9 @@ export function advanceConversationForJournalHandoff(
   if (!session || !definition || session.currentNodeId !== handoff.nodeId) return { content, advanced: false };
   let nextSession = recordConversationOutcome(session, `journal-handoff:saved:${journalRecordId}`, now);
   nextSession = continueConversation(nextSession, definition, now);
+  if (definition.nodes.find((node) => node.id === nextSession.currentNodeId)?.kind === 'end') {
+    nextSession = continueConversation(nextSession, definition, now);
+  }
   let nextContent = upsertConversationSession(content, nextSession);
   nextContent = recordConversationTelemetry(nextContent, {
     id: `${session.id}:${handoff.nodeId}:saved`,
