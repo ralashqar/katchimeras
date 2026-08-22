@@ -39,9 +39,15 @@ personalises and upgrades that generator.
 
 ## Board and economy
 
-- Board: 63 cells. Mossprout Chapter 0 begins with a deterministic 17-cell central clearing and ends with 28 open cells.
+- Board: 63 cells partitioned without orphaned fog: 13 starting cells, 12
+  Mossprout Rootbound cells, 18 Garden Growth cells, and 20 Discovery Mist
+  cells.
 - Dream Mist overlays normal tiles. Matching items merge into Dream Echoes, create the next tier on the reclaimed cell, and permanently remove its Mist.
-- Mossprout orders clear small authored Mist clusters; there is no Mist-clearing currency.
+- Garden Growth Mist clears in three-cell groups on active Journey Days 3, 7,
+  12, 15, 21, and 28; there is no Mist-clearing currency.
+- Discovery Mist belongs to Katchimera arrival paths and opens when its
+  companion joins the shared board. Discovery trails dynamically choose empty
+  safe cells and cannot overwrite a Rootbound cell or an item the player owns.
 - Storage: 5 slots, growing at Merge Levels 3, 7, 11, and 15.
 - Merge Energy: 100 cap, one point every two minutes, one point per generator tap.
 - Generator: 12 charges and an 18-minute rest after depletion.
@@ -106,9 +112,83 @@ Serving an authored signature order for Feastle, Baristabbit, Steppling,
 Voyagle, Flexel, or Bedrotte permanently records that chapter's shared-world
 landmark. Landmarks decorate progression outside the 63 inventory cells.
 
+## Mossprout board progression
+
+Mossprout's first long-form board arc spans 28 active Journey days across four
+chapters: Quiet Patch, Returning Pond, Memory Nursery, and Heartwood. Twelve
+Rootbound Echoes keep authored Mossprout cells throughout the arc. Later
+Katchimera discovery trails allocate around any root that is still sealed.
+
+Each covered cell displays one central image only. Rootbound cells show their
+specific contained reward; Garden Growth cells use unmarked full Dream Mist;
+Discovery Mist shows its discovery sparkle. Conditions and explanatory copy
+live in the tap panel rather than additional corner badges. This makes full,
+unmarked Dream Mist the consistent visual language for passive Journey growth,
+not a mergeable item or a required key.
+
+- Each root shows its authored condition when pressed: active Journey days,
+  Friendship, distinct nature-memory days, choosing and acting on a small
+  nature goal with Mossprout, or befriending an associated Wisp.
+- A satisfied condition queues one exact, gate-bound **Root Memory** parcel.
+  Root Memories are Mossprout progression keys: they cannot drop from ordinary
+  generators, merge with normal items, be sold, or be stored. A key only wakes
+  the root named on its parcel. Only one new root parcel may be earned per
+  active day and at most two may wait unopened.
+- Life conditions are accelerators rather than permanent walls. After the
+  authored delay, sustained Mossprout garden play supplies a soft fallback.
+- Matching the parcel item into the ready root consumes the Root Memory,
+  permanently opens the cell, and records an idempotent awakening receipt.
+  The reward is explicit and stays in Mossprout's lane: open space, Wild Garden
+  growth, Memory Nursery growth, a Mossprout Keepsake, a Wisp, a Memory Card,
+  or the Heartwood landmark. Foreign Katchimera chain items are never root keys.
+- The day-12 root awards Fern. The day-21 root awards a rare Veiled Memory Card
+  from the generic Small Wonders collection. Memory Cards reveal into their own
+  album and are intentionally separate from Katchimera skin cards.
+- The day-15 Nursery Key installs the Memory Nursery and its six-tier Keepsake
+  chain. Later daily baskets may request Keepsakes and the authored Memory
+  Bloom, Rain Mirror, and Heartwood Sanctuary recipes.
+- The day-28 Heartwood root awards the Mossprout-associated Grovelight Wisp.
+  Owners of Grovelight can also create a recovery match parcel for a ready root
+  on a seven-active-day cooldown.
+
+Merge state schema v17 persists only privacy-safe progress signals: stable day
+identifiers, counts/stages, Wisp identifiers, and gate receipts. Journal text,
+media, locations, and other raw memory content never enter Merge state.
+When a v15 save had already claimed one of the retired cross-Katchimera root
+parcels, migration preserves that ordinary item and issues the correct bound
+Root Memory once, so no earned progress is lost or duplicated.
+
+The production sprites and their crop manifest live in
+`assets/images/katchimeras/merge-world/items/` and
+`scripts/merge-world-mossprout-progression-art-manifest.json` and
+`scripts/merge-world-mossprout-lane-art-manifest.json`. Checked-in contact
+sheets at `artifacts/merge-world-v4/mossprout-progression-review.png` and
+`artifacts/merge-world-v4/mossprout-lane-review.png` support visual review.
+
 ## Interaction and accessibility
 
-- Tap a generator to produce an item.
+Player-facing wording for covered cells, progression items, parcels, and item
+makers follows the shared [Merge Board Player-Copy Guide](./merge-board-player-copy-guide.md).
+
+- Tap an item maker to produce an item.
+- A persistent inspector below the board remembers the last tapped item,
+  generator, Echo, Rootbound cell, Garden Growth cell, or Discovery cell. It
+  names the selection, previews its art when applicable, and explains the exact
+  merge, Journey, relationship, memory, Wisp, or discovery condition that opens
+  or advances it. Covered-cell inspection works with both touch and
+  accessibility activation.
+- Locked-item thumbnails reuse the exact art shown in their board cell with the
+  lower Dream Mist layered over it. Player copy uses direct instructions such
+  as “Save a nature memory to wake this root”; schema terms, fallback formulas,
+  generator levels, and other internal progression labels never appear in this
+  panel. Item-maker improvements name their visible benefit instead: the Wild
+  Garden begins finding Sprouts and Shells, while the Memory Nursery begins
+  growing Pressed Leaves; later improvements make those finds more frequent.
+- Tapping a locked cell always moves inspection focus to that cell, replacing
+  any previously selected movable item. The same corner frame marks the focused
+  locked cell, but remains completely still to communicate that the cell can be
+  inspected but not dragged. Dragging a matching item onto it remains the wake
+  interaction.
 - Drag an item to move, merge, or combine it; tap-select then tap-destination is equivalent.
 - Select an item to inspect, store, or sell it.
 - Ready request cards expose a Serve action.

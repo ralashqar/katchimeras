@@ -362,24 +362,6 @@
       ]
     },
     {
-      "id": "grovelight",
-      "name": "Grovelight",
-      "rarity": "rare",
-      "seriesId": "mossprout-constellation",
-      "primaryFamilyId": "mossprout",
-      "visualSummary": "Seed lantern with a leaf crown.",
-      "palette": [
-        "moss",
-        "gold"
-      ],
-      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
-      "requiredOutputs": [
-        "grovelight.png",
-        "grovelight.webp",
-        "thumbnails/grovelight.webp"
-      ]
-    },
-    {
       "id": "pearl",
       "name": "Pearl",
       "rarity": "rare",

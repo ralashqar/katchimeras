@@ -6,10 +6,10 @@ import { avatarEssencePrice, FALLBACK_ECONOMY_CONFIG, deterministicVisitorOffer,
 import { historyDaysForAccess } from '@/utils/history-access';
 import type { EconomyConfig } from '@/types/economy';
 
-test('the generated catalog contains 50 ready and 70 planned Wisps', () => {
+test('the generated catalog contains 51 ready and 69 planned Wisps', () => {
   assert.equal(WISP_CATALOG.length, 120);
-  assert.equal(READY_WISPS.length, 50);
-  assert.equal(WISP_CATALOG.filter((item) => item.availability === 'planned').length, 70);
+  assert.equal(READY_WISPS.length, 51);
+  assert.equal(WISP_CATALOG.filter((item) => item.availability === 'planned').length, 69);
   assert.equal(WISP_CATALOG.find((item) => item.id === 'orbit')?.unlockRule?.target, 400);
 });
 

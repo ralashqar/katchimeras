@@ -6,6 +6,8 @@ import type {
   MergeItemDefinition,
   MergeOrderDifficulty,
   MergeReward,
+  MossproutRootReward,
+  MossproutRootRewardPreview,
 } from '@/types/merge-world';
 
 export const MERGE_WORLD_COLUMNS = 7;
@@ -45,6 +47,7 @@ export const MERGE_STARTING_OPEN_CELLS = new Set([
 export const MERGE_CHAIN_IDS: readonly MergeChainId[] = [
   'food:table', 'food:dessert', 'drink:hot', 'drink:refresh',
   'adventure:trail', 'adventure:travel', 'nature:garden', 'nature:waterside',
+  'nature:keepsake', 'nature:root-memory',
   'comfort:rest', 'comfort:care', 'social:gathering', 'social:celebration',
   'mind:work', 'mind:books', 'creative:art', 'creative:screen',
 ];
@@ -79,6 +82,7 @@ export const MERGE_ITEM_CATALOG: readonly MergeItemDefinition[] = [
   ...chain('adventure:travel', 'globe.americas.fill', '#A9A1E8', ['Ticket', 'Map', 'Travel Journal', 'Suitcase', 'Grand Journey', 'Memory Globe']),
   ...chain('nature:garden', 'leaf.fill', '#82C891', ['Seed', 'Sprout', 'Plant', 'Flower', 'Rare Flower', 'Magical Plant', 'Ancient Tree']),
   ...chain('nature:waterside', 'water.waves', '#77C8D0', ['Pebble', 'Shell', 'Tidepool', 'Water Lily', 'Moonlit Cove', 'Ocean Sanctuary']),
+  ...chain('nature:keepsake', 'sparkles', '#79AA76', ['Dew Bead', 'Pressed Leaf', 'Memory Sprig', 'Field Journal', 'Memory Terrarium', 'Living Archive']),
   ...chain('comfort:rest', 'sparkles', '#B7A5D8', ['Pillow Feather', 'Cushion', 'Pillow', 'Blanket Nest', 'Cosy Bed', 'Dream Room']),
   ...chain('comfort:care', 'sparkles', '#EEA49C', ['Bandage', 'Care Pouch', 'First Aid Kit', 'Comfort Basket', 'Healing Cabinet', 'Sanctuary Kit']),
   ...chain('social:gathering', 'fork.knife', '#E9A86F', ['Place Card', 'Shared Plate', 'Picnic Cloth', 'Gathering Table', 'Community Supper', 'Village Festival']),
@@ -87,10 +91,17 @@ export const MERGE_ITEM_CATALOG: readonly MergeItemDefinition[] = [
   ...chain('mind:books', 'sparkles', '#9D7C69', ['Bookmark', 'Pocket Book', 'Story Stack', 'Reading Nook', 'Library Cart', 'Wonder Library']),
   ...chain('creative:art', 'sparkles', '#D88CBC', ['Pencil', 'Sketchbook', 'Paint Set', 'Easel', 'Studio Corner', 'Gallery of Dreams']),
   ...chain('creative:screen', 'sparkles', '#7E87D8', ['Game Token', 'Handheld Game', 'Console', 'Cosy Game Setup', 'Arcade Corner', 'Pixel Palace']),
+  { id: 'mossprout:root-memory:returning-seed', familyId: 'nature', chainId: 'nature:root-memory', branchId: 'quiet_patch', tier: 1, name: 'Returning Seed', icon: 'leaf.fill', color: '#8DB34B', nextItemId: null, sellValue: 0, progressionOnly: true },
+  { id: 'mossprout:root-memory:rain-kept-acorn', familyId: 'nature', chainId: 'nature:root-memory', branchId: 'returning_pond', tier: 1, name: 'Rain-Kept Acorn', icon: 'water.waves', color: '#78B8A8', nextItemId: null, sellValue: 0, progressionOnly: true },
+  { id: 'mossprout:root-memory:nursery-keepsake', familyId: 'nature', chainId: 'nature:root-memory', branchId: 'memory_nursery', tier: 1, name: 'Nursery Keepsake', icon: 'sparkles', color: '#A4B85F', nextItemId: null, sellValue: 0, progressionOnly: true },
+  { id: 'mossprout:root-memory:heartseed', familyId: 'nature', chainId: 'nature:root-memory', branchId: 'heartwood', tier: 1, name: 'Heartseed', icon: 'leaf.fill', color: '#C5A746', nextItemId: null, sellValue: 0, progressionOnly: true },
   {
     id: 'hybrid:picnic-pack', familyId: 'adventure', chainId: 'adventure:travel', branchId: 'hybrid', tier: 1,
     name: 'Picnic Pack', icon: 'sparkles', color: '#F4C982', nextItemId: null, sellValue: 48,
   },
+  { id: 'hybrid:memory-bloom', familyId: 'nature', chainId: 'nature:keepsake', branchId: 'hybrid', tier: 1, name: 'Memory Bloom', icon: 'sparkles', color: '#EEA7B8', nextItemId: null, sellValue: 56 },
+  { id: 'hybrid:rain-mirror', familyId: 'nature', chainId: 'nature:keepsake', branchId: 'hybrid', tier: 1, name: 'Rain Mirror', icon: 'water.waves', color: '#87CBCD', nextItemId: null, sellValue: 64 },
+  { id: 'hybrid:heartwood-sanctuary', familyId: 'nature', chainId: 'nature:keepsake', branchId: 'hybrid', tier: 1, name: 'Heartwood Sanctuary', icon: 'leaf.fill', color: '#D9B85F', nextItemId: null, sellValue: 256 },
 ];
 
 export const MERGE_ITEMS_BY_ID = new Map(MERGE_ITEM_CATALOG.map((item) => [item.id, item]));
@@ -136,6 +147,7 @@ export const MERGE_GENERATORS: readonly MergeGeneratorDefinition[] = [
   generator('ritual-bar', 'Ritual Bar', 'water.waves', '#A76E58', 32, ['drink:hot', 'drink:refresh'], 'Warm rituals and bright refreshments, chosen one small ingredient at a time.'),
   generator('journey-locker', 'Journey Locker', 'figure.walk', '#967044', 33, ['adventure:trail', 'adventure:travel'], 'Walking gear and travel keepsakes for journeys near and far.'),
   generator('wild-garden', 'Wild Garden', 'leaf.fill', '#5E9E69', 38, ['nature:garden', 'nature:waterside'], 'Seeds and waterside treasures from one shared patch of wildness.'),
+  generator('memory-nursery', 'Memory Nursery', 'sparkles', '#79AA76', 45, ['nature:keepsake', 'nature:keepsake'], 'Living keepsakes grown from the small nature moments Mossprout remembers with you.'),
   generator('comfort-chest', 'Comfort Chest', 'sparkles', '#A889B8', 39, ['comfort:rest', 'comfort:care'], 'Restful comforts and practical care for difficult or tender days.'),
   generator('community-cart', 'Community Cart', 'sparkles', '#D88762', 40, ['social:gathering', 'social:celebration'], 'Everything needed to welcome people and mark a joyful moment.'),
   generator('study-desk', 'Study Desk', 'sparkles', '#668EAA', 46, ['mind:work', 'mind:books'], 'Small tools for focus, planning, stories, and thoughtful curiosity.'),
@@ -158,7 +170,7 @@ const MERGE_LOCKED_TIER_ONE_ECHO_CELLS = [
   49, 50, // Creative Playroom
 ] as const;
 
-export const MERGE_LOCKED_TIER_ONE_ECHOES = MERGE_GENERATORS.flatMap((generator, generatorIndex) => (
+export const MERGE_LOCKED_TIER_ONE_ECHOES = MERGE_GENERATORS.filter((generator) => generator.id !== 'memory-nursery').flatMap((generator, generatorIndex) => (
   generator.tierOneDropDefinitionIds.map((definitionId, branchIndex) => ({
     cell: MERGE_LOCKED_TIER_ONE_ECHO_CELLS[generatorIndex * 2 + branchIndex],
     definitionId,
@@ -266,7 +278,61 @@ export const MERGE_ORDER_TEMPLATES: readonly MergeOrderTemplate[] = Object.value
 
 export const MERGE_HYBRID_RECIPES = new Map([
   [['adventure:trail:5', 'food:table:4'].sort().join('+'), 'hybrid:picnic-pack'],
+  [['nature:garden:4', 'nature:keepsake:2'].sort().join('+'), 'hybrid:memory-bloom'],
+  [['nature:waterside:3', 'nature:keepsake:1'].sort().join('+'), 'hybrid:rain-mirror'],
+  [['nature:garden:7', 'nature:keepsake:6'].sort().join('+'), 'hybrid:heartwood-sanctuary'],
 ]);
+
+export type MossproutRootGateDefinition = {
+  id: string;
+  cell: number;
+  chapter: import('@/types/merge-world').MossproutBoardChapter;
+  title: string;
+  story: string;
+  kind: import('@/types/merge-world').MossproutRootGateKind;
+  target: number;
+  revealDay: number;
+  fallbackDelay: number;
+  rootMemoryDefinitionId: string;
+  rewardPreview: MossproutRootRewardPreview;
+  rewards: readonly MossproutRootReward[];
+};
+
+/** Authored over the existing shared Echo reservations so future companion paths keep their cells. */
+export const MOSSPROUT_ROOTBOUND_GATES: readonly MossproutRootGateDefinition[] = [
+  { id: 'root:day-5-first-return', cell: 0, chapter: 'quiet_patch', title: 'The First Returning Root', story: 'A root remembers each day you choose to return.', kind: 'journey_day', target: 5, revealDay: 5, fallbackDelay: 3, rootMemoryDefinitionId: 'mossprout:root-memory:returning-seed', rewardPreview: 'space', rewards: [] },
+  { id: 'root:day-7-two-shores', cell: 1, chapter: 'quiet_patch', title: 'Two Shores', story: 'The garden reaches toward lives beyond its edge.', kind: 'journey_day', target: 7, revealDay: 7, fallbackDelay: 3, rootMemoryDefinitionId: 'mossprout:root-memory:returning-seed', rewardPreview: 'garden_growth', rewards: [{ kind: 'generator_level', generatorId: 'wild-garden', level: 2 }] },
+  { id: 'root:memory-first', cell: 5, chapter: 'returning_pond', title: 'A Memory Took Root', story: 'A kept nature moment glows beneath the soil.', kind: 'memory', target: 1, revealDay: 8, fallbackDelay: 3, rootMemoryDefinitionId: 'mossprout:root-memory:rain-kept-acorn', rewardPreview: 'space', rewards: [] },
+  { id: 'root:friendship-4', cell: 6, chapter: 'returning_pond', title: 'Familiar Rain', story: 'Mossprout trusts this patch enough to let the rain in.', kind: 'friendship', target: 4, revealDay: 10, fallbackDelay: 3, rootMemoryDefinitionId: 'mossprout:root-memory:rain-kept-acorn', rewardPreview: 'space', rewards: [] },
+  { id: 'root:memory-two-days', cell: 7, chapter: 'returning_pond', title: 'A Place Revisited', story: 'Two separate nature memories have begun to recognise one another.', kind: 'memory', target: 2, revealDay: 12, fallbackDelay: 3, rootMemoryDefinitionId: 'mossprout:root-memory:rain-kept-acorn', rewardPreview: 'wisp_nest', rewards: [{ kind: 'wisp', wispId: 'fern' }] },
+  { id: 'root:focus-first', cell: 8, chapter: 'returning_pond', title: 'A Direction for Growing', story: 'Choosing a small nature goal gives this root somewhere to go.', kind: 'focus', target: 1, revealDay: 14, fallbackDelay: 3, rootMemoryDefinitionId: 'mossprout:root-memory:rain-kept-acorn', rewardPreview: 'garden_growth', rewards: [{ kind: 'generator_level', generatorId: 'wild-garden', level: 3 }] },
+  { id: 'root:nursery-key', cell: 12, chapter: 'memory_nursery', title: 'The Nursery Key', story: 'Living keepsakes are ready to grow from remembered days.', kind: 'journey_day', target: 15, revealDay: 15, fallbackDelay: 3, rootMemoryDefinitionId: 'mossprout:root-memory:nursery-keepsake', rewardPreview: 'nursery', rewards: [{ kind: 'generator_unlock', generatorId: 'memory-nursery' }] },
+  { id: 'root:memory-three-days', cell: 13, chapter: 'memory_nursery', title: 'Three Living Days', story: 'The Nursery has learned the shape of your attention.', kind: 'memory', target: 3, revealDay: 17, fallbackDelay: 3, rootMemoryDefinitionId: 'mossprout:root-memory:nursery-keepsake', rewardPreview: 'keepsake', rewards: [{ kind: 'merge_item', definitionId: 'nature:keepsake:2' }] },
+  { id: 'root:friendship-8', cell: 14, chapter: 'memory_nursery', title: 'Trusted Roots', story: 'A deeper bond lets the garden hold more complicated things.', kind: 'friendship', target: 8, revealDay: 19, fallbackDelay: 3, rootMemoryDefinitionId: 'mossprout:root-memory:nursery-keepsake', rewardPreview: 'garden_growth', rewards: [{ kind: 'generator_level', generatorId: 'memory-nursery', level: 2 }] },
+  { id: 'root:focus-second', cell: 21, chapter: 'memory_nursery', title: 'A Rhythm Remembered', story: 'Returning to nearby nature has become a pattern, not a task.', kind: 'focus', target: 2, revealDay: 21, fallbackDelay: 3, rootMemoryDefinitionId: 'mossprout:root-memory:nursery-keepsake', rewardPreview: 'memory_card', rewards: [{ kind: 'memory_card', poolId: 'small-wonders', rarityFloor: 'rare' }] },
+  { id: 'root:wisp-companion', cell: 28, chapter: 'heartwood', title: 'A Small Light Nearby', story: 'A Mossprout Wisp has noticed the same path through the green.', kind: 'wisp', target: 1, revealDay: 24, fallbackDelay: 3, rootMemoryDefinitionId: 'mossprout:root-memory:heartseed', rewardPreview: 'garden_growth', rewards: [{ kind: 'generator_level', generatorId: 'memory-nursery', level: 3 }] },
+  { id: 'root:heartwood', cell: 35, chapter: 'heartwood', title: 'The Heartwood Root', story: 'Every return, memory, and shared garden day gathers here.', kind: 'mastery', target: 28, revealDay: 28, fallbackDelay: 3, rootMemoryDefinitionId: 'mossprout:root-memory:heartseed', rewardPreview: 'heartwood', rewards: [{ kind: 'wisp', wispId: 'grovelight' }, { kind: 'landmark', landmarkId: 'mossprout-heartwood', title: 'Mossprout’s Heartwood' }] },
+] as const;
+
+export const MOSSPROUT_ROOTBOUND_GATES_BY_ID = new Map(MOSSPROUT_ROOTBOUND_GATES.map((gate) => [gate.id, gate]));
+
+/**
+ * The eighteen non-Rootbound cells Mossprout grows back into the playable
+ * board. Three cells open at each authored chapter beat; no currency purchase
+ * or unexplained permanent fog is involved.
+ */
+export const MOSSPROUT_GARDEN_GROWTH_CLEARINGS = [
+  { id: 'seedbed-edge', title: 'Seedbed Edge', revealDay: 3, cells: [19, 20, 26] },
+  { id: 'rainwater-bend', title: 'Rainwater Bend', revealDay: 7, cells: [27, 34, 41] },
+  { id: 'nursery-verge', title: 'Nursery Verge', revealDay: 12, cells: [42, 43, 48] },
+  { id: 'living-border', title: 'Living Border', revealDay: 15, cells: [49, 50, 54] },
+  { id: 'lantern-bank', title: 'Lantern Bank', revealDay: 21, cells: [55, 56, 57] },
+  { id: 'heartwood-rim', title: 'Heartwood Rim', revealDay: 28, cells: [58, 61, 62] },
+] as const;
+
+export const MOSSPROUT_GARDEN_GROWTH_BY_CELL: ReadonlyMap<number, (typeof MOSSPROUT_GARDEN_GROWTH_CLEARINGS)[number]> = new Map(
+  MOSSPROUT_GARDEN_GROWTH_CLEARINGS.flatMap((clearing) => clearing.cells.map((cell) => [cell, clearing] as const)),
+);
 
 export const MERGE_EXPANSIONS = [
   { id: 'clearing-east', title: 'Clear the eastern vines', cells: [26, 27, 34, 41], requiredLevel: 3, coinCost: 120 },

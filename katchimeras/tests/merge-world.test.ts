@@ -172,7 +172,9 @@ test('Merge board flattens its static cells into one native image without a Skia
   assert.match(board, /const lockedDefinitionId = mist\?\.kind === 'echo'/);
   assert.match(board, /lockedDefinitionId \? <View pointerEvents="none" style=\{styles\.echoItem\}/);
   assert.match(board, /<MergeMatchHint active=\{matchHint != null\}/);
-  assert.match(board, /lockedDefinitionId \? <Image[\s\S]*?source=\{DREAM_MIST_LOWER\}/);
+  assert.match(board, /lockedDefinitionId \|\| rootbound \? <Image[\s\S]*?source=\{DREAM_MIST_LOWER\}/);
+  assert.match(board, /rootbound \? <RootboundRewardArt/);
+  assert.doesNotMatch(board, /RootboundBadge|RootRewardPreview/);
   assert.doesNotMatch(board, /blocked && visibleLockedItem/);
   assert.doesNotMatch(board, /mist\?\.kind === 'dreambound_item' \? <View pointerEvents="none" style=\{styles\.discoveryStageDots\}/);
   assert.doesNotMatch(board, /dreamboundSealed/);
@@ -200,7 +202,7 @@ test('board geometry renders and hit-tests with one coordinate system', () => {
 test('a new Merge World uses the consolidated Energy economy', () => {
   const state = createInitialMergeWorldState(NOW);
   assert.deepEqual(mergeWorldCatalogIssues(), []);
-  assert.equal(state.version, 14);
+  assert.equal(state.version, 17);
   assert.equal(state.storageCapacity, 8);
   assert.equal(state.energy.regenCap, MERGE_ENERGY_REGEN_CAP);
   assert.equal(state.energy.value, MERGE_INITIAL_ENERGY);
@@ -354,14 +356,15 @@ test('every newly unlocked non-Mossprout generator can clear either cold tier-on
 
 */
 
-test('normalization removes legacy moon, walking mysteries, and shared tier-one Echoes', () => {
+test('normalization removes legacy mysteries and restores authored Mossprout roots', () => {
   const legacy = structuredClone(createMossproutChapterZeroState(NOW)) as unknown as { board: { mist: unknown }[] };
   legacy.board[8].mist = { kind: 'katchimera', id: 'future-moon', mysteryId: 'moon', ownerCharacterId: null };
   legacy.board[57].mist = { kind: 'katchimera', id: 'future-trail', mysteryId: 'trail', ownerCharacterId: 'steppling' };
 
   const normalized = normalizeMergeWorldState(legacy, NOW + 1);
-  assert.deepEqual(normalized.board[8].mist, { kind: 'dormant' });
-  assert.deepEqual(normalized.board[57].mist, { kind: 'dormant' });
+  assert.equal(normalized.board[8].mist?.kind, 'rootbound_echo');
+  assert.equal(normalized.board[8].mist?.kind === 'rootbound_echo' ? normalized.board[8].mist.gateId : null, 'root:focus-first');
+  assert.deepEqual(normalized.board[57].mist, { kind: 'garden_growth', clearingId: 'lantern-bank', revealDay: 21 });
 });
 
 test('step Energy checkpoints cumulative pedometer totals without paying the same steps twice', () => {
@@ -685,7 +688,7 @@ test('Merge board failures map to concise anchored callouts', () => {
 
   const chapterZero = createMossproutChapterZeroState(NOW);
   const sourceCell = chapterZero.board.findIndex((cell) => cell.occupant?.kind === 'item');
-  const lockedCell = chapterZero.board.findIndex((cell) => cell.locked && cell.mist?.kind === 'dormant');
+  const lockedCell = chapterZero.board.findIndex((cell) => cell.locked && (cell.mist?.kind === 'garden_growth' || cell.mist?.kind === 'discovery_dormant'));
   const locked = reduceMergeWorld(chapterZero, { type: 'move', from: sourceCell, to: lockedCell, now: NOW + 1 });
   assert.equal(locked.changed, false);
   assert.equal(locked.failureReason, 'locked_cell');
@@ -1058,6 +1061,44 @@ test('Merge page keeps a stable parcel stack first in the tray and the board att
   assert.match(screen, /kind: 'board_discovery_fork'/);
 });
 
+test('Merge board keeps a persistent selected-cell inspector below the playable grid', () => {
+  const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
+  const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
+  const inspector = readFileSync('components/katchadeck/games/merge-cell-inspector.tsx', 'utf8');
+  const playerCopy = readFileSync('utils/merge-world/merge-board-player-copy.ts', 'utf8');
+
+  assert.match(screen, /<View onLayout=\{measureBoardArea\} style=\{styles\.boardStage\}>[\s\S]*?<MergeCellInspector/);
+  assert.match(screen, /if \(cell != null\) setInspectedCell\(cell\)/);
+  assert.match(board, /if \(boardCell\?\.mist \|\| boardCell\?\.locked\) \{\s*onSelectRef\.current\(cell\)/);
+  assert.match(inspector, /Tap an item or covered cell for details/);
+  assert.match(inspector, /Opens on Mossprout Journey Day/);
+  assert.match(playerCopy, /Save one nature memory/);
+  assert.match(playerCopy, /Choose a nature goal with Mossprout/);
+  assert.match(playerCopy, /Complete 3 activities for your Mossprout nature goal/);
+  assert.doesNotMatch(playerCopy, /Nearby Nature Focus stage/);
+  assert.match(inspector, /Meet \$\{names\.join\(' or '\)\} to lift this mist/);
+  assert.match(inspector, /mossproutRootRewardArt\(gate\.id\)/);
+  assert.match(inspector, /model\.dreamMist === 'lower'[\s\S]*?DREAM_MIST_LOWER/);
+  assert.match(playerCopy, /the Wild Garden can find Sprouts and Shells/);
+  assert.match(playerCopy, /the Memory Nursery grows Pressed Leaves more often/);
+  assert.match(inspector, /MOSSPROUT ITEM MAKER/);
+  assert.doesNotMatch(playerCopy, /upgrades .* to Level/);
+  assert.doesNotMatch(inspector, /ITEM MAKER .* LEVEL/);
+  assert.doesNotMatch(inspector, /ITEM · LEVEL/);
+  assert.doesNotMatch(board, /Root Match Parcel|Board fallback|active Journey Day|Garden Growth Mist|Discovery Mist|tier \$\{definition\.tier\}|Feastle merge board/);
+  assert.doesNotMatch(screen, /New generator unlocked|new merge chain/);
+});
+
+test('locked cells take selection focus and keep a motionless corner frame', () => {
+  const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
+
+  assert.match(board, /if \(boardCell\?\.mist\?\.kind === 'rootbound_echo'\) \{\s*onSelectRef\.current\(cell\)/);
+  assert.match(board, /if \(boardCell\?\.mist \|\| boardCell\?\.locked\) \{\s*onSelectRef\.current\(cell\)/);
+  assert.match(board, /staticFrame=\{presentation\.board\[selectedCell\]\.locked\}/);
+  assert.match(board, /reduceMotion \|\| staticFrame/);
+  assert.match(board, /transform: \[\{ scale: staticFrame \? 1/);
+});
+
 test('Merge coin rewards land on the visible HUD coin and count across the contact window', () => {
   const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   const rewardOverlay = readFileSync('components/katchadeck/games/merge-serve-reward-overlay.tsx', 'utf8');
@@ -1365,7 +1406,7 @@ test('legacy snapshots migrate into the current version without discarding earne
     energy: { value: 99, cap: 100, lastRegenAt: NOW },
     generators: { 'starter-pantry': { id: 'starter-pantry', familyId: 'food', name: 'Picnic Pantry', level: 1, enabledBranches: ['table'], charges: 9, maxCharges: 12, readyAt: NOW + 1000 } },
   }, NOW + 1);
-  assert.equal(normalized.version, 14);
+  assert.equal(normalized.version, 17);
   assert.equal(normalized.energy.regenCap, 50);
   assert.equal(normalized.energy.value, 99);
   assert.deepEqual(Object.keys(normalized.generators['hearth-pantry']).sort(), ['chainIds', 'forcedDropDefinitionId', 'id', 'level', 'name', 'tierOneDropDefinitionIds', 'upgradeFragments']);
@@ -1374,11 +1415,11 @@ test('legacy snapshots migrate into the current version without discarding earne
   assert.deepEqual(normalized.unlockedChains.sort(), ['food:dessert', 'food:table']);
 });
 
-test('the shared catalog has eight generators, sixteen chains, and all twenty-five profiles', () => {
-  assert.equal(MERGE_GENERATORS.length, 8);
+test('the shared catalog has nine generators, seventeen chains, and all twenty-five profiles', () => {
+  assert.equal(MERGE_GENERATORS.length, 9);
   assert.ok(MERGE_GENERATORS.every((generator) => generator.chainIds.length === 2));
   assert.ok(MERGE_GENERATORS.every((generator) => generator.tierOneDropDefinitionIds.every((id) => id.endsWith(':1'))));
-  assert.equal(new Set(MERGE_GENERATORS.flatMap((generator) => generator.chainIds)).size, 16);
+  assert.equal(new Set(MERGE_GENERATORS.flatMap((generator) => generator.chainIds)).size, 17);
   assert.equal(Object.keys(KATCHIMERA_MERGE_PROFILES).length, 25);
   assert.ok(Object.values(KATCHIMERA_MERGE_PROFILES).every((profile) => profile.coreChains.length === 2));
 });
@@ -1530,7 +1571,7 @@ test('v10 companion ownership migrates into seen grandfathered discovery records
   const legacy = { ...current, version: 10 } as unknown as Record<string, unknown>;
   delete legacy.companionDiscovery;
   const migrated = normalizeMergeWorldState(legacy, NOW + 1);
-  assert.equal(migrated.version, 14);
+  assert.equal(migrated.version, 17);
   assert.deepEqual(new Set(migrated.unlockedCharacters), new Set(['feastle', 'bedrotte']));
   assert.ok(migrated.companionDiscovery.records.every((record) => record.source === 'legacy_grandfather' && record.revealSeenAt != null));
 });

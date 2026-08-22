@@ -20,7 +20,7 @@ for (const [index, item] of catalog.items.entries()) {
   }
 }
 if (catalog.items.length !== 120) throw new Error(`Expected 120 Wisps, found ${catalog.items.length}`);
-if (ready !== 50) throw new Error(`Expected 50 ready Wisps, found ${ready}`);
+if (ready !== 51) throw new Error(`Expected 51 ready Wisps, found ${ready}`);
 for (const item of catalog.items.filter((entry) => entry.availability === 'planned')) {
   if (item.assetRefs !== null) throw new Error(`Planned Wisp ${item.id} must not claim assets`);
 }

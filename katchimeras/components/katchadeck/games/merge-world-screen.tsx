@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ActivityIndicator, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
@@ -15,10 +16,13 @@ import { KatchaSurfaceProvider } from '@/components/katchadeck/ui/katcha-surface
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   MERGE_GENERATORS_BY_ID,
+  MERGE_ITEMS_BY_ID,
   MERGE_CHARACTER_NAMES,
   MERGE_LEVEL_THRESHOLDS,
 } from '@/constants/merge-world-catalog';
 import { mergeWorldGeneratorArt } from '@/constants/merge-world-art';
+import { MEMORY_CARDS_BY_ID } from '@/constants/memory-card-catalog';
+import { RARE_MEMORY_CARD_REVEAL_ART, VEILED_MEMORY_CARD_ART, memoryCardArt } from '@/constants/memory-card-art';
 import { COMPANION_DISCOVERY_CATALOG } from '@/constants/companion-discovery-catalog';
 import { Lantern } from '@/constants/theme';
 import { useMergeWorldActions, useMergeWorldLastResult, useMergeWorldState } from '@/features/merge-world/merge-world-provider';
@@ -50,6 +54,7 @@ import { familyIdFromCompanionId } from '@/constants/katchimera-skins';
 import { localDayId } from '@/utils/world-identity';
 
 import { FeastlePersistentMergeBoard, type MergeBoardScreenMetrics } from './feastle-persistent-merge-board';
+import { MergeCellInspector } from './merge-cell-inspector';
 import { MergeParcelFlightOverlay, type MergeParcelFlight } from './merge-parcel-overlay';
 import { MergeOrderRail, type MergeTrayEntry } from './merge-order-rail';
 import { MergeServeRewardOverlay, type MergeScreenPoint, type MergeServeRewardFlight } from './merge-serve-reward-overlay';
@@ -73,6 +78,8 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const ftueRun = useFtueRun();
   const ftueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
   const [selectedCell, setSelectedCell] = useState<number | null>(null);
+  const [inspectedCell, setInspectedCell] = useState<number | null>(null);
+  const [revealedMemoryCardId, setRevealedMemoryCardId] = useState<string | null>(null);
   const [boardAreaHeight, setBoardAreaHeight] = useState(0);
   const [story, setStory] = useState(loadFeastleStory);
   const relationships = useRelationshipProgression();
@@ -149,15 +156,18 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       const generator = MERGE_GENERATORS_BY_ID.get(receipt.generatorId);
       const art = mergeWorldGeneratorArt(receipt.generatorId);
       if (!generator || !art) return [];
+      const firstItems = [...new Set(generator.tierOneDropDefinitionIds
+        .map((definitionId) => MERGE_ITEMS_BY_ID.get(definitionId)?.name)
+        .filter((name): name is string => Boolean(name)))];
       return [{
         id: receipt.id,
-        eyebrow: 'New generator unlocked',
+        eyebrow: 'New item maker',
         title: generator.name,
         description: generator.unlockDescription,
         image: art,
         imageAccessibilityLabel: generator.name,
-        detail: 'A new merge chain is ready',
-        rewardTitle: 'Placed on your Merge board',
+        detail: firstItems.length ? `Makes ${firstItems.join(' and ')}` : 'Ready to make new items',
+        rewardTitle: 'Ready on your Merge board',
         rewardBody: 'Tap it whenever you want to make something new.',
         tint: generator.color,
         tier: 2,
@@ -405,10 +415,13 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   }, [activityFamilyId, creatureId, ftueCoordinator, handleBlockedFtueInteraction, mergeSessionId, mossproutJourney?.activity?.opportunityId, mossproutJourney?.status, send]);
   const pendingParcels = useMemo(() => state?.arrivals.filter((arrival) => (
     arrival.claimedAt == null
-    && arrival.kind === 'discovery_parcel'
+    && (arrival.kind === 'discovery_parcel' || arrival.kind === 'root_match_parcel' || arrival.kind === 'contextual_parcel' || arrival.kind === 'goal_chest')
     && arrival.itemDefinitionIds.length > 0
   )).sort((left, right) => left.createdAt - right.createdAt) ?? [], [state?.arrivals]);
   const pendingParcel = pendingParcels[0] ?? null;
+  const pendingMemoryCard = state?.ownedMemoryCards.find((card) => card.revealedAt == null) ?? null;
+  const revealedMemoryCard = revealedMemoryCardId ? MEMORY_CARDS_BY_ID.get(revealedMemoryCardId) ?? null : null;
+  const memoryCardPresentation = pendingMemoryCard ? MEMORY_CARDS_BY_ID.get(pendingMemoryCard.cardId) ?? null : revealedMemoryCard;
 
   const trayEntries = useMemo<MergeTrayEntry[]>(() => {
     if (!state) return [];
@@ -641,7 +654,8 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       };
     });
     setParcelHiddenItemIds(new Set(items.map((item) => item.instanceId)));
-    setParcelFlight({ nonce: parcelNonceRef.current, from, items });
+    const arrival = state.arrivals.find((candidate) => candidate.id === arrivalId);
+    setParcelFlight({ nonce: parcelNonceRef.current, from, items, rootMatch: arrival?.kind === 'root_match_parcel' });
     if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }, [dispatch, parcelFlight, serveFlight, state]);
 
@@ -733,7 +747,15 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
               onBlockedInteraction={handleBlockedFtueInteraction}
               onCommand={dispatch}
               onHiddenItemsRetired={handleHiddenItemsRetired}
-              onSelect={setSelectedCell}
+              onInspectMist={setInspectedCell}
+              onInspectRootbound={(gateId) => {
+                const cell = state.board.findIndex((candidate) => candidate.mist?.kind === 'rootbound_echo' && candidate.mist.gateId === gateId);
+                if (cell >= 0) setInspectedCell(cell);
+              }}
+              onSelect={(cell) => {
+                setSelectedCell(cell);
+                if (cell != null) setInspectedCell(cell);
+              }}
               onScreenMetrics={handleBoardScreenMetrics}
               selectedCell={selectedCell}
               state={state}
@@ -742,6 +764,11 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
             /> : null}
             {parcelFlight ? <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.boardInteractionShield} /> : null}
           </View>
+          <MergeCellInspector
+            cell={inspectedCell}
+            onUseGrovelight={(gateId) => dispatch({ type: 'useGrovelightResonance', gateId, dayId: localDayId(), now: Date.now() })}
+            state={state}
+          />
         </View>
 
       </View>
@@ -757,6 +784,27 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
         spotlight={active && !serveFlight ? mergeGuidanceSpotlight : null}
         targetRevision={ftueTargetRevision}
       />
+
+      {active && memoryCardPresentation ? <KatchaSurfaceProvider surface="parchment"><View style={[styles.memoryCardOverlay, { bottom: Math.max(insets.bottom + 20, 28) }]}>
+        <View style={styles.memoryCardArtWrap}>
+          <Image accessibilityIgnoresInvertColors contentFit="contain" source={RARE_MEMORY_CARD_REVEAL_ART} style={styles.memoryCardGlowArt} transition={0} />
+          <Image accessibilityIgnoresInvertColors contentFit="contain" source={pendingMemoryCard ? VEILED_MEMORY_CARD_ART : memoryCardArt(memoryCardPresentation.id)} style={styles.memoryCardArt} transition={180} />
+        </View>
+        <ThemedText lightColor="#675126" darkColor="#675126" style={styles.memoryCardEyebrow}>{pendingMemoryCard ? 'VEILED MEMORY CARD' : 'SMALL WONDERS · RARE'}</ThemedText>
+        <ThemedText lightColor="#322713" darkColor="#322713" style={styles.memoryCardTitle}>{pendingMemoryCard ? 'Something worth remembering' : memoryCardPresentation.name}</ThemedText>
+        <ThemedText lightColor="#675B41" darkColor="#675B41" style={styles.memoryCardBody}>{pendingMemoryCard ? 'This collectible is a memory-themed card, separate from Katchimera skins.' : memoryCardPresentation.reflection}</ThemedText>
+        <KatchaButton
+          fullWidth
+          glow
+          label={pendingMemoryCard ? 'Reveal card' : 'Keep in Memory Album'}
+          onPress={() => {
+            if (pendingMemoryCard) {
+              setRevealedMemoryCardId(pendingMemoryCard.cardId);
+              dispatch({ type: 'revealMemoryCard', cardId: pendingMemoryCard.cardId, now: Date.now() });
+            } else setRevealedMemoryCardId(null);
+          }}
+        />
+      </View></KatchaSurfaceProvider> : null}
 
       {active && ftueStep?.id === 'merge.energy_exhausted' ? (
         <View style={[styles.energyConnectionOverlay, { bottom: Math.max(insets.bottom + 20, 28) }]}>
@@ -862,6 +910,13 @@ const styles = StyleSheet.create({
   boardStage: { alignItems: 'center', elevation: 0, flex: 1, justifyContent: 'flex-start', minHeight: 0, position: 'relative', zIndex: 0 },
   boardInteractionShield: { ...StyleSheet.absoluteFillObject, zIndex: 50 },
   errorBanner: { alignSelf: 'center', maxWidth: 360, position: 'absolute', width: '92%', zIndex: GameUI.layer.notice },
+  memoryCardOverlay: { alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(250,241,207,0.97)', borderColor: 'rgba(127,96,38,0.32)', borderRadius: 24, borderWidth: 1, gap: 8, left: 24, maxWidth: 360, padding: 18, position: 'absolute', right: 24, zIndex: GameUI.layer.modal },
+  memoryCardArtWrap: { alignItems: 'center', height: 178, justifyContent: 'center', width: 148 },
+  memoryCardGlowArt: { height: 166, opacity: 0.46, position: 'absolute', width: 166 },
+  memoryCardArt: { height: 174, width: 130 },
+  memoryCardEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.1, lineHeight: 14, textAlign: 'center' },
+  memoryCardTitle: { fontSize: 21, fontWeight: '900', lineHeight: 26, textAlign: 'center' },
+  memoryCardBody: { fontSize: 13, fontWeight: '600', lineHeight: 18, maxWidth: 290, textAlign: 'center' },
   energyConnectionOverlay: { alignSelf: 'center', backgroundColor: 'rgba(31,24,45,0.9)', borderColor: 'rgba(255,226,151,0.5)', borderCurve: 'continuous', borderRadius: 24, borderWidth: 1, boxShadow: '0 12px 30px rgba(24,14,34,0.42)', gap: 8, left: 18, maxWidth: 430, padding: 18, position: 'absolute', right: 18, zIndex: GameUI.layer.modal },
   energyConnectionEyebrow: { ...GameUI.type.label, fontSize: 11, letterSpacing: 1.4, textAlign: 'center' },
   energyConnectionTitle: { ...GameUI.type.title, fontSize: 19, lineHeight: 24, textAlign: 'center' },

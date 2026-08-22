@@ -43,7 +43,7 @@ test('v13 Mossprout saves backfill a restored tile without charging again', () =
   const current = mossproutWorld();
   const legacy = { ...current, version: 13, haven: undefined };
   const migrated = normalizeMergeWorldState(legacy, NOW);
-  assert.equal(migrated.version, 14);
+  assert.equal(migrated.version, 17);
   assert.equal(migrated.haven.tileStages.mossprout, 1);
   assert.equal(migrated.haven.revealState, 'revealed');
   assert.equal(migrated.coins, current.coins);

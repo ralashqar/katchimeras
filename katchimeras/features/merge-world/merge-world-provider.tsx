@@ -24,6 +24,7 @@ import { loadMergeWorldState, saveMergeWorldState, subscribeMergeWorldResets, su
 import { isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, markAuthoredCohortOrderActive, markAuthoredCohortOrderServed, markFeastleOrderActive, markFeastleOrderServed, recordAuthoredCohortQuietBond, recordFeastleQuietBond, subscribeCompanionStories } from '@/utils/companion-story-storage';
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 import { loadCompanionQuickGoalState, subscribeCompanionQuickGoals } from '@/utils/companion-quick-goal-storage';
+import { loadCompanionJourneyState } from '@/utils/companion-journey-storage';
 import { localDayId } from '@/utils/world-identity';
 
 type MergeWorldContextValue = {
@@ -47,6 +48,41 @@ const SIGNATURE_LEVELS = new Set([4, 8, 12, 16, 20]);
 const AUTHORED_COHORT_FAMILIES: readonly AuthoredCohortFamilyId[] = [
   'baristabbit', 'steppling', 'voyagle', 'flexel', 'bedrotte',
 ];
+
+function mossproutProgressionSignals(days: readonly HomeDayRecord[], friendshipLevel: number, ownedWispIds: string[]) {
+  const relationships = relationshipProgressionRepository.load();
+  const activeJourneyDayIds = [...new Set([
+    ...relationships.journeyDays.filter((journey) => journey.familyId === 'mossprout').map((journey) => journey.dayId),
+    ...relationships.mossproutDailyActionDecks.map((deck) => deck.dayId),
+    ...relationships.completedActionOutros.filter((record) => record.familyId === 'mossprout').map((record) => record.dayId),
+  ])].sort();
+  const completedGardenDayIds = [...new Set(relationships.completedActionOutros
+    .filter((record) => record.familyId === 'mossprout' && record.kind === 'garden_request')
+    .map((record) => record.dayId))].sort();
+  const natureMemoryDayIds = days.filter((day) => {
+    if (!(day.journalRecords?.length || day.moments?.length || day.notes?.length || day.featuredMemory)) return false;
+    const semanticEvidence = JSON.stringify([
+      day.classifiedMemories, day.placeCategorySeeds, day.vision, day.evidence, day.confirmedPlaces,
+    ]).toLowerCase();
+    return ['nature', 'park', 'garden', 'plant', 'flower', 'forest', 'woodland', 'outdoor', 'green'].some((token) => semanticEvidence.includes(token));
+  }).map((day) => day.id);
+  const journey = loadCompanionJourneyState();
+  const goal = [...journey.goals].reverse().find((candidate) => candidate.familyId === 'mossprout');
+  const questCount = goal ? journey.questEvents.filter((event) => event.goalId === goal.id).length : 0;
+  const reflectionCount = goal ? journey.reflectionEvents.filter((event) => event.goalId === goal.id).length : 0;
+  const focusStage = !goal ? 0
+    : goal.status === 'completed' || goal.status === 'abandoned' ? 4
+      : reflectionCount > 0 ? 3
+        : questCount >= 3 ? 2 : 1;
+  return {
+    activeJourneyDayIds,
+    friendshipLevel,
+    natureMemoryDayIds,
+    focusStage,
+    ownedWispIds: ownedWispIds as import('@/types/wisp').WispId[],
+    completedGardenDayIds,
+  };
+}
 
 function changedReceiptIds(before: MergeWorldState, after: MergeWorldState) {
   const previous = new Map(before.externalRewardReceipts.map((receipt) => [receipt.id, receipt.appliedAt]));
@@ -615,6 +651,16 @@ export function MergeWorldProvider({
     const levels = refreshFriendshipLevels();
     next = reduceMergeWorld(next, { type: 'reconcileFriendship', levels, now }).state;
     next = featureAndReconcile(next, now);
+    next = reduceMergeWorld(next, {
+      type: 'reconcileMossproutBoardProgression',
+      signals: mossproutProgressionSignals(
+        days,
+        levels.mossprout ?? 1,
+        Object.entries(wisps.state.inventory).filter(([, item]) => (item?.quantity ?? 0) > 0).map(([id]) => id),
+      ),
+      dayId: localDayId(new Date(now)),
+      now,
+    }).state;
     const rewards = [...mergeActivityRewards(days, new Date(now), { state: next, quickGoals: loadCompanionQuickGoalState() }), ...mergeQuestActivityRewards(questState)];
     const activityResult = reduceMergeWorld(next, { type: 'grantActivityRewardsBatch', rewards, now });
     next = activityResult.state;
@@ -638,7 +684,7 @@ export function MergeWorldProvider({
     if (discoveryGateResult?.changed) setLastResult(discoveryGateResult);
     else if (activityResult.changed) setLastResult(activityResult);
     enqueuePersistence(next);
-  }, [active, characterIds, days, enqueuePersistence, featureAndReconcile, loading, questState, quickGoalRevision, refreshFriendshipLevels]);
+  }, [active, characterIds, days, enqueuePersistence, featureAndReconcile, loading, questState, quickGoalRevision, refreshFriendshipLevels, wisps.state.inventory]);
 
   const dispatch = useCallback((command: MergeWorldCommand): MergeWorldCommandResult | null => {
     if (!activeRef.current) return null;

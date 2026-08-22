@@ -3118,7 +3118,7 @@
           "minimumTier": 1
         }
       },
-      "availability": "planned",
+      "availability": "ready",
       "sortOrder": 71,
       "version": 1,
       "semanticClass": "family_signature",
@@ -3128,7 +3128,11 @@
       "duplicatePolicy": "convert_or_gift",
       "primaryAcquisition": "achievement",
       "affinityFamilyIds": [],
-      "assetRefs": null
+      "assetRefs": {
+        "art": "assets/images/katchimeras/wisps/grovelight.png",
+        "runtime": "assets/images/katchimeras/wisps/grovelight.webp",
+        "thumbnail": "assets/images/katchimeras/wisps/thumbnails/grovelight.webp"
+      }
     },
     {
       "id": "pearl",

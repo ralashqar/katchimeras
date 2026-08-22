@@ -3,6 +3,7 @@ import type { MergeBoardCell, MergeWorldState } from '@/types/merge-world';
 import type { WispId } from '@/types/wisp';
 import { createInitialMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 import { mossproutChapterZeroOrder } from '@/utils/merge-world/chapter-zero-policy';
+import { authoredDormantMistForCell } from '@/utils/merge-world/board-mist-progression';
 
 export function createMossproutChapterZeroState(now = Date.now(), rewardWispId: WispId = 'sprout'): MergeWorldState {
   let state = reduceMergeWorld(createInitialMergeWorldState(now), { type: 'reconcileCharacters', characterIds: ['mossprout'], now }).state;
@@ -11,7 +12,7 @@ export function createMossproutChapterZeroState(now = Date.now(), rewardWispId: 
     locked: !MOSSPROUT_FTUE_OPEN_CELLS.has(index),
     blocker: MOSSPROUT_FTUE_OPEN_CELLS.has(index) ? null : 'clouds',
     regionId: MOSSPROUT_FTUE_OPEN_CELLS.has(index) ? 'central-clearing' : 'inner-mist',
-    mist: MOSSPROUT_FTUE_OPEN_CELLS.has(index) ? null : { kind: 'dormant' },
+    mist: MOSSPROUT_FTUE_OPEN_CELLS.has(index) ? null : authoredDormantMistForCell(index),
     occupant: null,
   }));
   board[31].occupant = { kind: 'generator', generatorId: garden.id };

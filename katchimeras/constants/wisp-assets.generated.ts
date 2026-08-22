@@ -54,4 +54,5 @@ export const WISP_ASSETS = {
   "explorer": { full: require('../assets/images/katchimeras/wisps/explorer.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/explorer.webp') },
   "confetti": { full: require('../assets/images/katchimeras/wisps/confetti.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/confetti.webp') },
   "recall": { full: require('../assets/images/katchimeras/wisps/recall.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/recall.webp') },
+  "grovelight": { full: require('../assets/images/katchimeras/wisps/grovelight.webp'), thumbnail: require('../assets/images/katchimeras/wisps/thumbnails/grovelight.webp') },
 } as const satisfies Partial<Record<WispId, WispAsset>>;

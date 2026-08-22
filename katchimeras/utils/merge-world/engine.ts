@@ -15,6 +15,7 @@ import {
   MERGE_STARTING_OPEN_CELLS,
   MOSSPROUT_STORY_AWAKENINGS,
   MERGE_WORLD_SIZE,
+  MOSSPROUT_ROOTBOUND_GATES_BY_ID,
   mergeLevelForXp,
 } from '@/constants/merge-world-catalog';
 import {
@@ -48,6 +49,23 @@ import {
 } from '@/constants/companion-discovery-catalog';
 import type { CompanionDiscoveryDefinition } from '@/constants/companion-discovery-catalog';
 import { katchimeraSkinById } from '@/constants/katchimera-skins';
+import { MEMORY_CARDS_BY_ID } from '@/constants/memory-card-catalog';
+import {
+  awakenMossproutRoot,
+  emptyMossproutBoardProgression,
+  installMossproutRootboundEchoes,
+  migrateMossproutRootParcels,
+  normalizeMossproutBoardProgression,
+  reconcileMossproutBoardProgression,
+  useGrovelightResonance,
+} from '@/utils/merge-world/mossprout-board-progression';
+import {
+  allocateCompanionDiscoveryPath,
+  allocateDiscoveryForkAnchor,
+  authoredDormantMistForCell,
+  boardMistPartitionIssues,
+  reconcileDiscoveryMist,
+} from '@/utils/merge-world/board-mist-progression';
 
 const KNOWN_CHARACTERS = new Set<MergeCharacterId>(Object.keys(KATCHIMERA_MERGE_PROFILES) as MergeCharacterId[]);
 const RECENT_ORDER_LIMIT = 8;
@@ -72,11 +90,11 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     locked: !MERGE_STARTING_OPEN_CELLS.has(index),
     blocker: MERGE_STARTING_OPEN_CELLS.has(index) ? null : index % 3 === 0 ? 'rocks' : index % 3 === 1 ? 'clouds' : 'vines',
     regionId: regionForCell(index),
-    mist: MERGE_STARTING_OPEN_CELLS.has(index) ? null : { kind: 'dormant' },
+    mist: MERGE_STARTING_OPEN_CELLS.has(index) ? null : authoredDormantMistForCell(index),
     occupant: null,
   }));
   let state: MergeWorldState = {
-    version: 14,
+    version: 17,
     revision: 0,
     createdAt: now,
     updatedAt: now,
@@ -102,6 +120,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     mossproutDailyGardenOrders: null,
     characterActivityOpportunities: [],
     ownedKatchimeraCards: [],
+    ownedMemoryCards: [],
     completedOrderCount: 0,
     recentOrderKeys: [],
     expansions: [],
@@ -116,9 +135,13 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     companionDiscovery: {
       records: [], openedGateIds: [], completedGateIds: [], queuedGateIds: [], active: null, lastStartedDayId: null, events: [],
     },
+    mossproutBoardProgression: emptyMossproutBoardProgression(),
     haven: { tileStages: {}, revealState: 'hidden', mossproutStoryLevel: 0, nextProceduralOrder: 1 },
   };
   state = reconcileCharacters(state, characterIds, now);
+  if (state.unlockedCharacters.includes('mossprout')) {
+    state = { ...state, board: installMossproutRootboundEchoes(state.board, state.mossproutBoardProgression) };
+  }
   return state;
 }
 
@@ -213,6 +236,23 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
       const next = reconcileStory(current, command, command.now);
       return result(state, next, next === current ? undefined : 'Story request refreshed.');
     }
+    case 'reconcileMossproutBoardProgression': {
+      const next = reconcileMossproutBoardProgression(current, command.signals, command.dayId, command.now);
+      return result(current, next === current ? current : touch(next, command.now), next === current ? undefined : 'Mossprout’s roots shifted beneath the Mist.');
+    }
+    case 'useGrovelightResonance': {
+      const next = useGrovelightResonance(current, command.gateId, command.dayId, command.now);
+      return next ? changed(touch(next, command.now), 'Grovelight found the matching memory.') : unchanged(current, 'Grovelight cannot resonate here yet.');
+    }
+    case 'revealMemoryCard': {
+      let updated = false;
+      const ownedMemoryCards = current.ownedMemoryCards.map((card) => {
+        if (card.cardId !== command.cardId || card.revealedAt != null) return card;
+        updated = true;
+        return { ...card, revealedAt: command.now };
+      });
+      return updated ? changed(touch({ ...current, ownedMemoryCards }, command.now), 'A Memory Card revealed itself.') : unchanged(current);
+    }
     case 'reconcileHavenStory': {
       if (command.characterId !== 'mossprout' || command.storyLevel <= current.haven.mossproutStoryLevel) return unchanged(current);
       return changed(touch({
@@ -303,7 +343,7 @@ export function resetMergeActivityForDay(
   const hadStepClaim = Boolean(stepEnergyDayId && Object.prototype.hasOwnProperty.call(stepEnergyByDay, stepEnergyDayId));
   if (stepEnergyDayId) delete stepEnergyByDay[stepEnergyDayId];
   const resetsMossproutGarden = state.unlockedCharacters.includes('mossprout');
-  const freshGardenOrders = resetsMossproutGarden ? mossproutDailyGardenOrderBatch(dayId, now) : [];
+  const freshGardenOrders = resetsMossproutGarden ? mossproutDailyGardenOrderBatch(dayId, now, state.mossproutBoardProgression.activeDayIds.length, Boolean(state.generators['memory-nursery'])) : [];
   const activeOrders = resetsMossproutGarden
     ? [
         ...state.activeOrders.filter((order) => order.storyArcId !== 'mossprout:casual-garden'),
@@ -339,19 +379,19 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   if (!value || typeof value !== 'object') return createInitialMergeWorldState(now);
   const rawVersion = (value as { version?: unknown }).version;
   const source = value as Partial<MergeWorldState>;
-  if ((rawVersion !== 1 && rawVersion !== 2 && rawVersion !== 3 && rawVersion !== 4 && rawVersion !== 5 && rawVersion !== 6 && rawVersion !== 7 && rawVersion !== 8 && rawVersion !== 9 && rawVersion !== 10 && rawVersion !== 11 && rawVersion !== 12 && rawVersion !== 13 && rawVersion !== 14) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
+  if ((rawVersion !== 1 && rawVersion !== 2 && rawVersion !== 3 && rawVersion !== 4 && rawVersion !== 5 && rawVersion !== 6 && rawVersion !== 7 && rawVersion !== 8 && rawVersion !== 9 && rawVersion !== 10 && rawVersion !== 11 && rawVersion !== 12 && rawVersion !== 13 && rawVersion !== 14 && rawVersion !== 15 && rawVersion !== 16 && rawVersion !== 17) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
     return createInitialMergeWorldState(now);
   }
   const fallback = createInitialMergeWorldState(now);
   let normalized: MergeWorldState = {
     ...fallback,
     ...source,
-    version: 14,
+    version: 17,
     revision: finite(source.revision, 0),
     createdAt: finite(source.createdAt, now),
     updatedAt: finite(source.updatedAt, now),
     nextInstance: Math.max(1, finite(source.nextInstance, 1)),
-    board: dedupeMigratedGenerators(source.board.map((cell, index) => normalizeCell(cell, fallback.board[index]))),
+    board: dedupeMigratedGenerators(source.board.map((cell, index) => normalizeCell(cell, fallback.board[index], index))),
     storage: Array.isArray(source.storage) ? source.storage.filter(validBoardItem) : [],
     storageCapacity: Math.max(8, finite(source.storageCapacity, 8)),
     rewardInbox: Array.isArray(source.rewardInbox) ? source.rewardInbox : [],
@@ -411,6 +451,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
           coinCost: Math.max(0, Math.floor(finite(card.coinCost, 0))),
         }))
       : [],
+    ownedMemoryCards: normalizeOwnedMemoryCards(source.ownedMemoryCards, now),
     completedOrderCount: Math.max(0, finite(source.completedOrderCount, 0)),
     recentOrderKeys: uniqueStrings(source.recentOrderKeys).slice(-RECENT_ORDER_LIMIT),
     expansions: uniqueStrings(source.expansions),
@@ -427,6 +468,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
       : fallback.characterProgress,
     externalRewardReceipts: Array.isArray(source.externalRewardReceipts) ? source.externalRewardReceipts : [],
     companionDiscovery: normalizeCompanionDiscovery(source.companionDiscovery, source.unlockedCharacters, source.activeOrders, rawVersion, now),
+    mossproutBoardProgression: normalizeMossproutBoardProgression(source.mossproutBoardProgression),
     haven: normalizeHaven(source.haven, source, rawVersion),
   };
   normalized = {
@@ -441,6 +483,11 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   };
   normalized = enforceMossproutChapterZeroDropOverride(normalized);
   normalized = migrateActivityInbox(normalized);
+  normalized = migrateMossproutRootParcels(normalized, rawVersion, now);
+  if (normalized.unlockedCharacters.includes('mossprout')) {
+    normalized = { ...normalized, board: installMossproutRootboundEchoes(normalized.board, normalized.mossproutBoardProgression) };
+  }
+  normalized = reconcileDiscoveryMist(normalized, now);
   // Version 1/2 Pantry charges, cooldowns, and parcels intentionally disappear.
   // Version 3's five single-chain generators migrate into the shared eight.
   normalized = ensureProceduralOrders(normalized, now);
@@ -482,11 +529,11 @@ function normalizeHaven(value: unknown, source: Partial<MergeWorldState>, rawVer
   }
   if (source.unlockedCharacters?.includes('mossprout') && tileStages.mossprout == null) {
     const chapters = source.characterProgress?.mossprout?.completedChapterIds ?? [];
-    tileStages.mossprout = chapters.includes('mossprout-chapter-0') && rawVersion !== 14 ? 1 : 0;
+    tileStages.mossprout = chapters.includes('mossprout-chapter-0') && rawVersion !== 16 && rawVersion !== 17 ? 1 : 0;
   }
   const revealState = raw.revealState === 'revealed' || raw.revealState === 'first_restore_complete'
     ? raw.revealState
-    : tileStages.mossprout && tileStages.mossprout > 0 && rawVersion !== 14 ? 'revealed' : 'hidden';
+    : tileStages.mossprout && tileStages.mossprout > 0 && rawVersion !== 16 && rawVersion !== 17 ? 'revealed' : 'hidden';
   return {
     tileStages,
     revealState,
@@ -497,7 +544,7 @@ function normalizeHaven(value: unknown, source: Partial<MergeWorldState>, rawVer
 
 function tapGenerator(state: MergeWorldState, generatorId: string, now: number, seed: string, spendEnergy: boolean, activityOpportunityId?: string): MergeWorldCommandResult {
   const generator = state.generators[generatorId];
-  if (!generator) return unchanged(state, 'That generator is not unlocked.');
+  if (!generator) return unchanged(state, 'That item maker is not available yet.');
   const opportunity = activityOpportunityId
     ? state.characterActivityOpportunities.find((candidate) => candidate.id === activityOpportunityId)
     : null;
@@ -520,7 +567,7 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
     ? 2
     : betterDropRoll < Math.max(0, generator.level - 1) * 0.1 ? 1 : 0;
   const definitionId = bonusTier ? baseDefinitionId.replace(/:1$/, `:${1 + bonusTier}`) : baseDefinitionId;
-  if (!MERGE_ITEMS_BY_ID.has(definitionId)) return unchanged(state, 'This generator has no available drops.');
+  if (!MERGE_ITEMS_BY_ID.has(definitionId)) return unchanged(state, 'This item maker has nothing to make right now.');
   const item: MergeBoardItem = { kind: 'item', instanceId: `merge-item:${state.nextInstance}`, definitionId };
   const board = [...state.board];
   board[cell] = { ...board[cell], occupant: item };
@@ -542,9 +589,9 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
 
 function setGeneratorForcedDrop(state: MergeWorldState, generatorId: string, definitionId: string | null, now: number): MergeWorldCommandResult {
   const generator = state.generators[generatorId];
-  if (!generator) return unchanged(state, 'That generator is not unlocked.');
+  if (!generator) return unchanged(state, 'That item maker is not available yet.');
   if (definitionId != null && !generator.tierOneDropDefinitionIds.includes(definitionId)) {
-    return unchanged(state, 'That item does not belong to this generator.');
+    return unchanged(state, 'That item does not come from this item maker.');
   }
   if (generator.forcedDropDefinitionId === definitionId) return unchanged(state);
   const nextGenerator = { ...generator, forcedDropDefinitionId: definitionId };
@@ -557,12 +604,12 @@ export function mergeGeneratorUpgradeCost(level: number): number | null {
 
 function upgradeGenerator(state: MergeWorldState, generatorId: string, now: number): MergeWorldCommandResult {
   const generator = state.generators[generatorId];
-  if (!generator) return unchanged(state, 'That generator is not unlocked.');
+  if (!generator) return unchanged(state, 'That item maker is not available yet.');
   const cost = mergeGeneratorUpgradeCost(generator.level);
-  if (cost == null) return unchanged(state, 'This generator is fully upgraded.');
-  if (generator.upgradeFragments < cost) return unchanged(state, `Find ${cost - generator.upgradeFragments} more generator fragments.`);
+  if (cost == null) return unchanged(state, 'This item maker cannot improve any further.');
+  if (generator.upgradeFragments < cost) return unchanged(state, 'Serve more requests before improving this item maker.');
   const upgraded = { ...generator, level: generator.level + 1, upgradeFragments: generator.upgradeFragments - cost };
-  return changed(touch({ ...state, generators: { ...state.generators, [generatorId]: upgraded } }, now), `${generator.name} reached level ${upgraded.level}.`);
+  return changed(touch({ ...state, generators: { ...state.generators, [generatorId]: upgraded } }, now), `${generator.name} can now find better items more often.`);
 }
 
 function openCompanionDiscoveryGate(
@@ -590,7 +637,8 @@ function openCompanionDiscoveryGate(
     && [...COMPANION_DISCOVERIES_BY_ID.values()].some((definition) => definition.characterId === characterId)
   )).slice(0, 3);
   if (!candidateIds.length) return unchanged(state);
-  const anchorCell = DISCOVERY_FORK_ANCHOR_CELL;
+  const anchorCell = allocateDiscoveryForkAnchor(state.board, DISCOVERY_FORK_ANCHOR_CELL);
+  if (anchorCell < 0) return unchanged(state, 'Make one empty board space for the next discovery.');
   const board = [...state.board];
   board[anchorCell] = {
     ...board[anchorCell], locked: true, blocker: 'clouds', occupant: null,
@@ -626,13 +674,15 @@ function selectCompanionDiscoveryPath(state: MergeWorldState, characterId: Merge
   const definition = [...COMPANION_DISCOVERIES_BY_ID.values()].find((candidate) => candidate.characterId === characterId);
   if (!definition) return unchanged(state);
   const board = [...state.board];
-  board[active.anchorCell] = { ...board[active.anchorCell], locked: true, blocker: 'clouds', occupant: null, mist: { kind: 'dormant' } };
-  installDreamboundPath(board, definition, active.gateId);
+  board[active.anchorCell] = { ...board[active.anchorCell], locked: false, blocker: null, occupant: null, mist: null };
+  const pathCells = allocateCompanionDiscoveryPath(board, definition);
+  if (!pathCells) return unchanged(state, 'Make three empty board spaces for this discovery trail.');
+  installDreamboundPath(board, definition, active.gateId, pathCells);
   const arrival = discoveryArrival(definition, now);
   const discoveryProgress = recordDiscoveryEvent({
     ...state.companionDiscovery,
     active: {
-      ...active, discoveryId: definition.id, anchorCell: definition.pathCells.at(-1)!, pathCells: [...definition.pathCells],
+      ...active, discoveryId: definition.id, anchorCell: pathCells.at(-1)!, pathCells,
       selectedCharacterId: characterId, pathId: definition.pathId, stage: 0,
     },
   }, {
@@ -658,7 +708,9 @@ function startStepplingDiscovery(state: MergeWorldState, now: number): MergeWorl
   if (!definition || !garden) return unchanged(state, 'Finish Mossprout\'s garden first.');
   const anchorCell = STEPPLING_DISCOVERY_ANCHOR_CELL;
   const board = [...state.board];
-  installDreamboundPath(board, definition, definition.gateId);
+  const pathCells = allocateCompanionDiscoveryPath(board, definition);
+  if (!pathCells) return unchanged(state, 'Make three empty board spaces for Stepplingâ€™s trail.');
+  installDreamboundPath(board, definition, definition.gateId, pathCells);
   const arrival = discoveryArrival(definition, now);
   let discoveryProgress: MergeWorldState['companionDiscovery'] = {
     ...state.companionDiscovery,
@@ -666,8 +718,8 @@ function startStepplingDiscovery(state: MergeWorldState, now: number): MergeWorl
     active: {
       discoveryId: definition.id,
       gateId: definition.gateId,
-      anchorCell,
-      pathCells: [...definition.pathCells],
+      anchorCell: pathCells.at(-1) ?? anchorCell,
+      pathCells,
       candidateIds: ['steppling' as const],
       recommendedCharacterId: 'steppling' as const,
       selectedCharacterId: 'steppling' as const,
@@ -715,7 +767,8 @@ function advanceCompanionDiscovery(state: MergeWorldState, from: number, to: num
   const board = [...state.board];
   board[from] = { ...board[from], occupant: null };
   if (!completesDiscovery) {
-    const nextCell = definition.pathCells[nextStage];
+    const nextCell = active.pathCells[nextStage];
+    if (!validCell(nextCell)) return unchanged(state, 'The discovery trail needs another board space.');
     board[to] = { ...board[to], locked: false, blocker: null, mist: null, occupant: { kind: 'item', instanceId: `merge-item:${state.nextInstance}`, definitionId: upgradedDefinitionId } };
     const nextMist = board[nextCell].mist;
     if (nextMist?.kind === 'dreambound_item') board[nextCell] = { ...board[nextCell], mist: { ...nextMist, active: true } };
@@ -788,29 +841,30 @@ function advanceCompanionDiscovery(state: MergeWorldState, from: number, to: num
     id: `discovery-event:reveal:${definition.id}`, kind: 'character_revealed', gateId: active.gateId,
     discoveryId: definition.id, characterId: definition.characterId, stage: nextStage, createdAt: now,
   });
+  const completedState = reconcileDiscoveryMist(touch({
+    ...state,
+    board,
+    generators: {
+      ...state.generators,
+      ...(garden ? { 'wild-garden': { ...garden, forcedDropDefinitionId: null } } : {}),
+      [generator.id]: { ...generatorState(generator.id), forcedDropDefinitionId: primaryTierOne },
+    },
+    generatorUnlockReceipts: state.generatorUnlockReceipts.some((receipt) => receipt.id === receiptId)
+      ? state.generatorUnlockReceipts
+      : [...state.generatorUnlockReceipts, { id: receiptId, generatorId: generator.id, createdAt: now, seenAt: null }],
+    unlockedFamilies: [...new Set([...state.unlockedFamilies, MERGE_ITEMS_BY_ID.get(primaryTierOne)!.familyId])],
+    unlockedChains: [...new Set([...state.unlockedChains, primaryChain])],
+    unlockedCharacters: [...new Set([...state.unlockedCharacters, definition.characterId])],
+    favouriteCharacterId: definition.characterId,
+    activeOrders: [...state.activeOrders, firstOrder],
+    characterProgress: {
+      ...state.characterProgress,
+      [definition.characterId]: state.characterProgress[definition.characterId] ?? { friendshipLevel: 1, completedChapterIds: [] },
+    },
+    companionDiscovery: discoveryProgress,
+  }, now), now);
   return {
-    state: touch({
-      ...state,
-      board,
-      generators: {
-        ...state.generators,
-        ...(garden ? { 'wild-garden': { ...garden, forcedDropDefinitionId: null } } : {}),
-        [generator.id]: { ...generatorState(generator.id), forcedDropDefinitionId: primaryTierOne },
-      },
-      generatorUnlockReceipts: state.generatorUnlockReceipts.some((receipt) => receipt.id === receiptId)
-        ? state.generatorUnlockReceipts
-        : [...state.generatorUnlockReceipts, { id: receiptId, generatorId: generator.id, createdAt: now, seenAt: null }],
-      unlockedFamilies: [...new Set([...state.unlockedFamilies, MERGE_ITEMS_BY_ID.get(primaryTierOne)!.familyId])],
-      unlockedChains: [...new Set([...state.unlockedChains, primaryChain])],
-      unlockedCharacters: [...new Set([...state.unlockedCharacters, definition.characterId])],
-      favouriteCharacterId: definition.characterId,
-      activeOrders: [...state.activeOrders, firstOrder],
-      characterProgress: {
-        ...state.characterProgress,
-        [definition.characterId]: state.characterProgress[definition.characterId] ?? { friendshipLevel: 1, completedChapterIds: [] },
-      },
-      companionDiscovery: discoveryProgress,
-    }, now),
+    state: completedState,
     changed: true,
     mergedCell: to,
     companionDiscoveryAdvanced: { discoveryId: definition.id, stage: nextStage, completedCharacterId: definition.characterId },
@@ -818,14 +872,14 @@ function advanceCompanionDiscovery(state: MergeWorldState, from: number, to: num
   };
 }
 
-function installDreamboundPath(board: MergeBoardCell[], definition: CompanionDiscoveryDefinition, gateId: string) {
-  definition.pathCells.forEach((cell, sequenceIndex) => {
+function installDreamboundPath(board: MergeBoardCell[], definition: CompanionDiscoveryDefinition, gateId: string, pathCells: readonly number[], activeStage = 0) {
+  pathCells.forEach((cell, sequenceIndex) => {
     const stage = definition.stages[sequenceIndex];
     board[cell] = {
       ...board[cell], locked: true, blocker: 'clouds', occupant: null,
       mist: {
         kind: 'dreambound_item', discoveryId: definition.id, gateId, pathId: definition.pathId,
-        sequenceIndex, boundDefinitionId: stage.boundDefinitionId, active: sequenceIndex === 0,
+        sequenceIndex, boundDefinitionId: stage.boundDefinitionId, active: sequenceIndex === activeStage,
       },
     };
   });
@@ -858,6 +912,28 @@ function moveItem(state: MergeWorldState, from: number, to: number, now: number)
   if (!source) return unchanged(state);
   const companionDiscoveryResult = advanceCompanionDiscovery(state, from, to, now);
   if (companionDiscoveryResult) return companionDiscoveryResult;
+  const rootbound = state.board[to].mist?.kind === 'rootbound_echo' ? state.board[to].mist : null;
+  if (rootbound) {
+    if (!rootbound.ready) return unchanged(state, 'This root is still listening for its condition.', 'sealed_mist');
+    if (source.kind !== 'item' || source.definitionId !== rootbound.definitionId || source.progressionGateId !== rootbound.gateId) {
+      return unchanged(state, 'Bring this root’s own Root Memory from Mossprout’s parcel.', 'wrong_echo_match');
+    }
+    const board = [...state.board];
+    board[from] = { ...board[from], occupant: null };
+    board[to] = { ...board[to], locked: false, blocker: null, mist: null, occupant: null };
+    const receipt = { id: `rootbound:${rootbound.gateId}`, source: 'dream_echo' as const, clearedCells: [to], createdAt: now };
+    let next = awakenMossproutRoot({
+      ...state,
+      board,
+      boardAwakeningReceipts: state.boardAwakeningReceipts.some((entry) => entry.id === receipt.id) ? state.boardAwakeningReceipts : [...state.boardAwakeningReceipts, receipt],
+    }, rootbound.gateId, now);
+    next = touch(next, now);
+    return {
+      state: next, changed: true, mergedCell: to, dreamEchoClearedId: rootbound.id,
+      clearedMistCells: [to],
+      message: `${MOSSPROUT_ROOTBOUND_GATES_BY_ID.get(rootbound.gateId)?.title ?? 'A root'} awakened.`,
+    };
+  }
   const echo = state.board[to].mist?.kind === 'echo' ? state.board[to].mist : null;
   if (echo) {
     if (source.kind !== 'item' || source.definitionId !== echo.definitionId) return unchanged(state, 'Find its match.', 'wrong_echo_match');
@@ -899,6 +975,9 @@ function moveItem(state: MergeWorldState, from: number, to: number, now: number)
     board[from] = { ...board[from], occupant: null };
     board[to] = { ...board[to], occupant: source };
     return changed(touch({ ...state, board }, now));
+  }
+  if ((source.kind === 'item' && isProgressionItem(source)) || (target.kind === 'item' && isProgressionItem(target))) {
+    return unchanged(state, 'A Root Memory only merges with its own Rootbound Echo.', 'wrong_echo_match');
   }
   if (source.kind === 'generator' || target.kind === 'generator') {
     board[from] = { ...board[from], occupant: target };
@@ -1039,7 +1118,7 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
     const currentDaily = next.mossproutDailyGardenOrders!;
     const servedOrderIds = [...new Set([...currentDaily.servedOrderIds, order.id])].slice(-3);
     const complete = servedOrderIds.length >= 3;
-    const offeredOrderIds = mossproutDailyGardenOrderBatch(currentDaily.dayId, now).map((candidate) => candidate.id);
+    const offeredOrderIds = mossproutDailyGardenOrderBatch(currentDaily.dayId, now, state.mossproutBoardProgression.activeDayIds.length, Boolean(state.generators['memory-nursery'])).map((candidate) => candidate.id);
     const activeOrderId = offeredOrderIds.find((id) => !servedOrderIds.includes(id)) ?? null;
     next = {
       ...next,
@@ -1115,6 +1194,7 @@ function storeItem(state: MergeWorldState, cell: number, now: number): MergeWorl
   if (!validCell(cell) || state.storage.length >= state.storageCapacity) return unchanged(state, 'Storage is full.');
   const occupant = state.board[cell].occupant;
   if (!occupant || occupant.kind !== 'item') return unchanged(state, 'Only merge items can be stored.');
+  if (isProgressionItem(occupant)) return unchanged(state, 'Root Memories stay on the board until they find their root.');
   const board = [...state.board];
   board[cell] = { ...board[cell], occupant: null };
   return changed(touch({ ...state, board, storage: [...state.storage, occupant] }, now), 'Item stored.');
@@ -1135,6 +1215,7 @@ function sellItem(state: MergeWorldState, cell: number, now: number): MergeWorld
   if (!validCell(cell)) return unchanged(state);
   const occupant = state.board[cell].occupant;
   if (!occupant || occupant.kind !== 'item') return unchanged(state, 'Only merge items can be sold.');
+  if (isProgressionItem(occupant)) return unchanged(state, 'Root Memories cannot be sold.');
   const definition = MERGE_ITEMS_BY_ID.get(occupant.definitionId);
   const board = [...state.board];
   board[cell] = { ...board[cell], occupant: null };
@@ -1171,8 +1252,9 @@ function claimArrival(state: MergeWorldState, arrivalId: string, now: number): M
   arrival.itemDefinitionIds.forEach((definitionId, index) => {
     const instanceId = `merge-item:${nextInstance++}`;
     const cell = openCells[index];
-    board[cell] = { ...board[cell], occupant: { kind: 'item', instanceId, definitionId } };
-    spawnedItems.push({ instanceId, definitionId, cell });
+    const progressionGateId = arrival.kind === 'root_match_parcel' ? arrival.progressionGateId : undefined;
+    board[cell] = { ...board[cell], occupant: { kind: 'item', instanceId, definitionId, ...(progressionGateId ? { progressionGateId } : {}) } };
+    spawnedItems.push({ instanceId, definitionId, ...(progressionGateId ? { progressionGateId } : {}), cell });
   });
   const companionDiscovery = arrival.kind === 'discovery_parcel' && arrival.discoveryId
     ? recordDiscoveryEvent(state.companionDiscovery, {
@@ -1320,8 +1402,8 @@ function rerollOrder(state: MergeWorldState, orderId: string, now: number): Merg
 
 function reconcileCharacters(state: MergeWorldState, ids: string[], now: number): MergeWorldState {
   const additions = ids.filter((id): id is MergeCharacterId => KNOWN_CHARACTERS.has(id as MergeCharacterId) && !state.unlockedCharacters.includes(id as MergeCharacterId));
-  if (!additions.length) return state;
-  return touch(ensureProceduralOrders({
+  if (!additions.length) return reconcileDiscoveryMist(state, now);
+  const reconciled = touch(ensureProceduralOrders({
     ...state,
     unlockedCharacters: [...state.unlockedCharacters, ...additions],
     companionDiscovery: {
@@ -1341,6 +1423,7 @@ function reconcileCharacters(state: MergeWorldState, ids: string[], now: number)
       ],
     },
   }, now), now);
+  return reconcileDiscoveryMist(reconciled, now);
 }
 
 function reconcileFriendship(state: MergeWorldState, levels: Partial<Record<MergeCharacterId, number>>, now: number): MergeWorldState {
@@ -1409,7 +1492,7 @@ function reconcileCharacterActivity(
   if (!showsOrder) {
     const sameDay = dailyGarden?.dayId === command.dayId;
     const servedOrderIds = sameDay ? dailyGarden!.servedOrderIds : [];
-    const batch = mossproutDailyGardenOrderBatch(command.dayId, now);
+    const batch = mossproutDailyGardenOrderBatch(command.dayId, now, next.mossproutBoardProgression.activeDayIds.length, Boolean(next.generators['memory-nursery']));
     const activeBatch = batch.filter((order) => !servedOrderIds.includes(order.id));
     const existingById = new Map(activeOrders.map((order) => [order.id, order]));
     activeOrders = [
@@ -1451,20 +1534,29 @@ function reconcileCharacterActivity(
   return changed(next, "Mossprout's Garden is ready.");
 }
 
-function mossproutDailyGardenOrder(dayId: string, step: number, now: number): MergeOrder {
+function mossproutDailyGardenOrder(dayId: string, step: number, now: number, activeDayCount: number, nurseryUnlocked: boolean): MergeOrder {
   const gardenFirst = proceduralOrderRank(dayId, 1) % 2 === 0;
   const primary = gardenFirst ? 'nature:garden' : 'nature:waterside';
   const secondary = gardenFirst ? 'nature:waterside' : 'nature:garden';
-  const requirements = step === 1
-    ? [{ definitionId: `${primary}:2`, quantity: 1 }]
-    : step === 2
-      ? [{ definitionId: `${secondary}:3`, quantity: 1 }, { definitionId: `${primary}:2`, quantity: 1 }]
-      : [{ definitionId: `${primary}:4`, quantity: 1 }, { definitionId: `${secondary}:3`, quantity: 1 }];
+  const requirements = nurseryUnlocked && activeDayCount >= 22 && step === 3
+    ? [{ definitionId: 'hybrid:memory-bloom', quantity: 1 }, { definitionId: 'nature:waterside:4', quantity: 1 }]
+    : nurseryUnlocked && activeDayCount >= 15 && step === 2
+      ? [{ definitionId: 'nature:keepsake:2', quantity: 1 }, { definitionId: `${primary}:3`, quantity: 1 }]
+      : nurseryUnlocked && activeDayCount >= 15 && step === 3
+        ? [{ definitionId: 'nature:keepsake:3', quantity: 1 }, { definitionId: `${secondary}:4`, quantity: 1 }]
+        : step === 1
+          ? [{ definitionId: `${primary}:2`, quantity: 1 }]
+          : step === 2
+            ? [{ definitionId: `${secondary}:3`, quantity: 1 }, { definitionId: `${primary}:2`, quantity: 1 }]
+            : [{ definitionId: `${primary}:${activeDayCount >= 8 ? 5 : 4}`, quantity: 1 }, { definitionId: `${secondary}:${activeDayCount >= 8 ? 4 : 3}`, quantity: 1 }];
   const difficulty = step === 1 ? 'small' as const : step === 2 ? 'medium' as const : 'major' as const;
   return {
     id: `merge-order:mossprout:daily:${dayId}:${step}`,
     characterId: 'mossprout',
-    title: step === 1 ? 'A little Garden beginning' : step === 2 ? 'Two parts of the Garden' : 'A thriving pond edge',
+    title: step === 1 ? 'A little Garden beginning'
+      : nurseryUnlocked && activeDayCount >= 15 && step === 2 ? 'A keepsake takes root'
+        : nurseryUnlocked && activeDayCount >= 22 && step === 3 ? 'A memory in bloom'
+          : step === 2 ? 'Two parts of the Garden' : 'A thriving pond edge',
     description: step === 1
       ? 'Bring Mossprout one reachable piece to begin today.'
       : step === 2
@@ -1487,8 +1579,8 @@ function mossproutDailyGardenOrder(dayId: string, step: number, now: number): Me
   };
 }
 
-function mossproutDailyGardenOrderBatch(dayId: string, now: number): MergeOrder[] {
-  return [1, 2, 3].map((step) => mossproutDailyGardenOrder(dayId, step, now));
+function mossproutDailyGardenOrderBatch(dayId: string, now: number, activeDayCount = 1, nurseryUnlocked = false): MergeOrder[] {
+  return [1, 2, 3].map((step) => mossproutDailyGardenOrder(dayId, step, now, activeDayCount, nurseryUnlocked));
 }
 
 function grantKatchimeraCard(
@@ -2129,7 +2221,7 @@ function normalizeArrivals(value: unknown): MergeWorldArrival[] {
     if (!candidate || typeof candidate !== 'object') return [];
     const arrival = candidate as Partial<MergeWorldArrival>;
     if (typeof arrival.id !== 'string'
-      || (arrival.kind !== 'contextual_parcel' && arrival.kind !== 'memory_arrival' && arrival.kind !== 'goal_chest' && arrival.kind !== 'discovery_parcel')
+      || (arrival.kind !== 'contextual_parcel' && arrival.kind !== 'memory_arrival' && arrival.kind !== 'goal_chest' && arrival.kind !== 'discovery_parcel' && arrival.kind !== 'root_match_parcel')
       || typeof arrival.dayId !== 'string'
       || typeof arrival.label !== 'string'
       || !MERGE_CHAIN_IDS.includes(arrival.chainId as MergeWorldArrival['chainId'])) return [];
@@ -2149,13 +2241,14 @@ function normalizeArrivals(value: unknown): MergeWorldArrival[] {
       familyId: item.familyId,
       chainId: arrival.chainId as MergeWorldArrival['chainId'],
       characterId: arrival.characterId && KNOWN_CHARACTERS.has(arrival.characterId) ? arrival.characterId : undefined,
-      source: arrival.source === 'journal' || arrival.source === 'companion_story' || arrival.source === 'goal' || arrival.source === 'legacy' || arrival.source === 'discovery'
+      source: arrival.source === 'journal' || arrival.source === 'companion_story' || arrival.source === 'goal' || arrival.source === 'legacy' || arrival.source === 'discovery' || arrival.source === 'companion_progression'
         ? arrival.source
         : arrival.kind === 'goal_chest'
           ? 'goal'
           : arrival.id.includes('companion-story-starter') ? 'companion_story' : arrival.kind === 'memory_arrival' ? 'journal' : 'legacy',
       itemDefinitionIds: uniqueStrings(arrival.itemDefinitionIds).filter((id) => MERGE_ITEMS_BY_ID.has(id)),
       discoveryId: typeof arrival.discoveryId === 'string' ? arrival.discoveryId : undefined,
+      progressionGateId: typeof arrival.progressionGateId === 'string' && MOSSPROUT_ROOTBOUND_GATES_BY_ID.has(arrival.progressionGateId) ? arrival.progressionGateId : undefined,
       memoryRef,
       claimedAt: arrival.claimedAt == null ? null : finite(arrival.claimedAt, 0),
       seenAt: arrival.seenAt == null ? null : finite(arrival.seenAt, 0),
@@ -2220,7 +2313,27 @@ function normalizeLandmarks(value: unknown): MergeWorldLandmark[] {
   });
 }
 
-function normalizeCell(value: unknown, fallback: MergeBoardCell): MergeBoardCell {
+function normalizeOwnedMemoryCards(value: unknown, now: number): MergeWorldState['ownedMemoryCards'] {
+  if (!Array.isArray(value)) return [];
+  const receipts = new Set<string>();
+  return value.flatMap((candidate) => {
+    if (!candidate || typeof candidate !== 'object') return [];
+    const card = candidate as Partial<MergeWorldState['ownedMemoryCards'][number]>;
+    const definition = typeof card.cardId === 'string' ? MEMORY_CARDS_BY_ID.get(card.cardId) : null;
+    if (!definition || typeof card.sourceReceiptId !== 'string' || receipts.has(card.sourceReceiptId)) return [];
+    receipts.add(card.sourceReceiptId);
+    return [{
+      cardId: definition.id,
+      poolId: definition.poolId,
+      rarity: definition.rarity,
+      sourceReceiptId: card.sourceReceiptId,
+      acquiredAt: finite(card.acquiredAt, now),
+      revealedAt: card.revealedAt == null ? null : finite(card.revealedAt, now),
+    }];
+  });
+}
+
+function normalizeCell(value: unknown, fallback: MergeBoardCell, index: number): MergeBoardCell {
   if (!value || typeof value !== 'object') return fallback;
   const cell = value as Partial<MergeBoardCell>;
   const occupant = cell.occupant && typeof cell.occupant === 'object' ? cell.occupant : null;
@@ -2230,7 +2343,7 @@ function normalizeCell(value: unknown, fallback: MergeBoardCell): MergeBoardCell
     regionId: cell.regionId === 'central-clearing' || cell.regionId === 'inner-mist' || cell.regionId === 'mid-mist' || cell.regionId === 'deep-mist' || cell.regionId === 'ancient-dream'
       ? cell.regionId
       : fallback.regionId,
-    mist: normalizeDreamMist(cell.mist, Boolean(cell.locked)),
+    mist: normalizeDreamMist(cell.mist, Boolean(cell.locked), index),
     occupant: occupant?.kind === 'item' && validBoardItem(occupant)
       ? occupant
       : occupant?.kind === 'generator' && typeof occupant.generatorId === 'string'
@@ -2239,10 +2352,25 @@ function normalizeCell(value: unknown, fallback: MergeBoardCell): MergeBoardCell
   };
 }
 
-function normalizeDreamMist(value: unknown, legacyLocked: boolean): MergeBoardCell['mist'] {
-  if (!value || typeof value !== 'object') return legacyLocked ? { kind: 'dormant' } : null;
-  const mist = value as { kind?: unknown; id?: unknown; definitionId?: unknown; generatorId?: unknown; ownerCharacterId?: unknown; discoveryId?: unknown; gateId?: unknown; pathId?: unknown; sequenceIndex?: unknown; boundDefinitionId?: unknown; active?: unknown; candidateIds?: unknown; recommendedCharacterId?: unknown };
-  if (mist.kind === 'dormant') return { kind: 'dormant' };
+function normalizeDreamMist(value: unknown, legacyLocked: boolean, index: number): MergeBoardCell['mist'] {
+  if (!value || typeof value !== 'object') return legacyLocked ? authoredDormantMistForCell(index) : null;
+  const mist = value as { kind?: unknown; id?: unknown; definitionId?: unknown; generatorId?: unknown; ownerCharacterId?: unknown; discoveryId?: unknown; gateId?: unknown; pathId?: unknown; sequenceIndex?: unknown; boundDefinitionId?: unknown; active?: unknown; candidateIds?: unknown; characterIds?: unknown; clearingId?: unknown; revealDay?: unknown; recommendedCharacterId?: unknown; chapter?: unknown; ready?: unknown };
+  if (mist.kind === 'dormant') return authoredDormantMistForCell(index);
+  if (mist.kind === 'garden_growth') {
+    const authored = authoredDormantMistForCell(index);
+    if (authored.kind === 'garden_growth') return authored;
+  }
+  if (mist.kind === 'discovery_dormant') {
+    const authored = authoredDormantMistForCell(index);
+    if (authored.kind === 'discovery_dormant') return authored;
+  }
+  if (mist.kind === 'rootbound_echo' && typeof mist.gateId === 'string') {
+    const definition = MOSSPROUT_ROOTBOUND_GATES_BY_ID.get(mist.gateId);
+    if (definition) return {
+      kind: 'rootbound_echo', id: definition.id, gateId: definition.id, definitionId: definition.rootMemoryDefinitionId,
+      chapter: definition.chapter, ready: Boolean(mist.ready),
+    };
+  }
   if (mist.kind === 'echo' && typeof mist.id === 'string' && typeof mist.definitionId === 'string' && MERGE_ITEMS_BY_ID.has(mist.definitionId)) {
     const ownerCharacterId = typeof mist.ownerCharacterId === 'string' && KNOWN_CHARACTERS.has(mist.ownerCharacterId as MergeCharacterId)
       ? mist.ownerCharacterId as MergeCharacterId
@@ -2269,7 +2397,7 @@ function normalizeDreamMist(value: unknown, legacyLocked: boolean): MergeBoardCe
       : null;
     if (candidateIds.length) return { kind: 'discovery_fork', gateId: mist.gateId, candidateIds, recommendedCharacterId };
   }
-  return legacyLocked ? { kind: 'dormant' } : null;
+  return legacyLocked ? authoredDormantMistForCell(index) : null;
 }
 
 function normalizeMossproutDailyGardenOrders(value: unknown): MergeWorldState['mossproutDailyGardenOrders'] {
@@ -2388,7 +2516,10 @@ function restoreActiveDreamboundDiscovery(state: MergeWorldState, rawVersion: un
     : state.arrivals;
   if (hasPath) return arrivals === state.arrivals ? state : { ...state, arrivals };
   const board = [...state.board];
-  installDreamboundPath(board, definition, active.gateId);
+  const pathCells = allocateCompanionDiscoveryPath(board, definition);
+  if (!pathCells) return arrivals === state.arrivals ? state : { ...state, arrivals };
+  const restoredStage = rawVersion === 12 || rawVersion === 13 ? active.stage : 0;
+  installDreamboundPath(board, definition, active.gateId, pathCells, restoredStage);
   return {
     ...state,
     board,
@@ -2396,8 +2527,8 @@ function restoreActiveDreamboundDiscovery(state: MergeWorldState, rawVersion: un
     companionDiscovery: {
       ...state.companionDiscovery,
       active: {
-        ...active, anchorCell: definition.pathCells.at(-1)!, pathCells: [...definition.pathCells],
-        stage: rawVersion === 12 || rawVersion === 13 ? active.stage : 0,
+        ...active, anchorCell: pathCells.at(-1)!, pathCells,
+        stage: restoredStage,
       },
     },
   };
@@ -2437,7 +2568,14 @@ function migrateGeneratorId(id: string): string {
 function validBoardItem(value: unknown): value is MergeBoardItem {
   if (!value || typeof value !== 'object') return false;
   const item = value as Partial<MergeBoardItem>;
-  return item.kind === 'item' && typeof item.instanceId === 'string' && typeof item.definitionId === 'string' && MERGE_ITEMS_BY_ID.has(item.definitionId);
+  if (item.kind !== 'item' || typeof item.instanceId !== 'string' || typeof item.definitionId !== 'string' || !MERGE_ITEMS_BY_ID.has(item.definitionId)) return false;
+  if (item.progressionGateId == null) return true;
+  const gate = MOSSPROUT_ROOTBOUND_GATES_BY_ID.get(item.progressionGateId);
+  return Boolean(gate && gate.rootMemoryDefinitionId === item.definitionId);
+}
+
+function isProgressionItem(item: MergeBoardItem) {
+  return Boolean(item.progressionGateId) || Boolean(MERGE_ITEMS_BY_ID.get(item.definitionId)?.progressionOnly);
 }
 
 function validGeneratorUnlockReceipt(value: unknown): value is MergeWorldState['generatorUnlockReceipts'][number] {
@@ -2544,7 +2682,7 @@ function randomUnit(value: string) {
 }
 
 export function mergeWorldCatalogIssues(): string[] {
-  const issues: string[] = [];
+  const issues: string[] = [...boardMistPartitionIssues()];
   for (const item of MERGE_ITEM_CATALOG) {
     if (item.nextItemId && !MERGE_ITEMS_BY_ID.has(item.nextItemId)) issues.push(`${item.id} has missing next item ${item.nextItemId}`);
   }

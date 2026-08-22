@@ -7,7 +7,7 @@ export type MergeChainId =
   | 'food:table' | 'food:dessert'
   | 'drink:hot' | 'drink:refresh'
   | 'adventure:trail' | 'adventure:travel'
-  | 'nature:garden' | 'nature:waterside'
+  | 'nature:garden' | 'nature:waterside' | 'nature:keepsake' | 'nature:root-memory'
   | 'comfort:rest' | 'comfort:care'
   | 'social:gathering' | 'social:celebration'
   | 'mind:work' | 'mind:books'
@@ -32,12 +32,16 @@ export type MergeItemDefinition = {
   color: string;
   nextItemId: string | null;
   sellValue: number;
+  /** Progression-only items never enter generators, orders, storage, selling, or ordinary merges. */
+  progressionOnly?: boolean;
 };
 
 export type MergeBoardItem = {
   kind: 'item';
   instanceId: string;
   definitionId: string;
+  /** Root Parcel matches are bound to one authored Rootbound Echo. */
+  progressionGateId?: string;
 };
 
 export type MergeBoardGenerator = {
@@ -51,7 +55,10 @@ export type MergeBoardRegionId = 'central-clearing' | 'inner-mist' | 'mid-mist' 
 
 export type MergeDreamMist =
   | { kind: 'dormant' }
+  | { kind: 'garden_growth'; clearingId: string; revealDay: number }
+  | { kind: 'discovery_dormant'; characterIds: MergeCharacterId[] }
   | { kind: 'echo'; id: string; definitionId: string; ownerCharacterId: MergeCharacterId | null; generatorId?: string }
+  | { kind: 'rootbound_echo'; id: string; gateId: string; definitionId: string; chapter: MossproutBoardChapter; ready: boolean }
   | { kind: 'discovery_fork'; gateId: string; candidateIds: MergeCharacterId[]; recommendedCharacterId: MergeCharacterId | null }
   | { kind: 'dreambound_item'; discoveryId: string; gateId: string; pathId: string; sequenceIndex: number; boundDefinitionId: string; active: boolean };
 
@@ -81,6 +88,41 @@ export type MergeGeneratorState = {
   forcedDropDefinitionId: string | null;
 };
 
+export type MossproutBoardChapter = 'quiet_patch' | 'returning_pond' | 'memory_nursery' | 'heartwood';
+export type MossproutRootGateKind = 'journey_day' | 'friendship' | 'memory' | 'focus' | 'wisp' | 'mastery';
+export type MossproutRootRewardPreview = 'space' | 'garden_growth' | 'wisp_nest' | 'nursery' | 'keepsake' | 'memory_card' | 'heartwood';
+export type MossproutRootReward =
+  | { kind: 'generator_unlock'; generatorId: 'memory-nursery' }
+  | { kind: 'generator_level'; generatorId: 'wild-garden' | 'memory-nursery'; level: 2 | 3 }
+  | { kind: 'merge_item'; definitionId: string }
+  | { kind: 'wisp'; wispId: WispId }
+  | { kind: 'memory_card'; poolId: 'small-wonders'; rarityFloor: MemoryCardRarity }
+  | { kind: 'landmark'; landmarkId: 'mossprout-heartwood'; title: string };
+export type MossproutRootGateState = {
+  gateId: string;
+  status: 'sealed' | 'ready' | 'awakened';
+  readyAt: number | null;
+  awakenedAt: number | null;
+  parcelId: string | null;
+  fallbackUsed: boolean;
+};
+export type MossproutProgressionSignals = {
+  activeJourneyDayIds: string[];
+  friendshipLevel: number;
+  natureMemoryDayIds: string[];
+  focusStage: number;
+  ownedWispIds: WispId[];
+  completedGardenDayIds: string[];
+};
+export type MossproutBoardProgression = {
+  activeDayIds: string[];
+  chapter: MossproutBoardChapter;
+  gates: Record<string, MossproutRootGateState>;
+  lastParcelDayId: string | null;
+  grovelightResonanceDayIds: string[];
+  signals: MossproutProgressionSignals;
+};
+
 export type MergeCharacterActivityOpportunity = {
   id: string;
   familyId: MergeCharacterId;
@@ -100,6 +142,17 @@ export type OwnedKatchimeraCard = {
   sourceReceiptId: string;
   acquiredAt: number;
   coinCost: number;
+};
+
+export type MemoryCardRarity = 'common' | 'uncommon' | 'rare';
+
+export type OwnedMemoryCard = {
+  cardId: string;
+  poolId: 'small-wonders';
+  rarity: MemoryCardRarity;
+  sourceReceiptId: string;
+  acquiredAt: number;
+  revealedAt: number | null;
 };
 
 export type MergeOrderRequirement = {
@@ -238,7 +291,7 @@ export type MergeLifeTheme =
 
 export type MergeWorldArrival = {
   id: string;
-  kind: 'contextual_parcel' | 'memory_arrival' | 'goal_chest' | 'discovery_parcel';
+  kind: 'contextual_parcel' | 'memory_arrival' | 'goal_chest' | 'discovery_parcel' | 'root_match_parcel';
   createdAt: number;
   dayId: string;
   label: string;
@@ -246,8 +299,9 @@ export type MergeWorldArrival = {
   familyId: MergeFamilyId;
   chainId: MergeChainId;
   characterId?: MergeCharacterId;
-  source: 'journal' | 'companion_story' | 'goal' | 'legacy' | 'discovery';
+  source: 'journal' | 'companion_story' | 'goal' | 'legacy' | 'discovery' | 'companion_progression';
   discoveryId?: string;
+  progressionGateId?: string;
   itemDefinitionIds: string[];
   memoryRef?: { dayId: string; journalRecordId: string; sourceKind: 'manual' | 'photo' | 'text_note' | 'voice_note' };
   claimedAt: number | null;
@@ -282,7 +336,7 @@ export type MergeStepEnergyDay = {
 };
 
 export type MergeWorldState = {
-  version: 14;
+  version: 17;
   revision: number;
   createdAt: number;
   updatedAt: number;
@@ -308,6 +362,7 @@ export type MergeWorldState = {
   mossproutDailyGardenOrders: MossproutDailyGardenOrders | null;
   characterActivityOpportunities: MergeCharacterActivityOpportunity[];
   ownedKatchimeraCards: OwnedKatchimeraCard[];
+  ownedMemoryCards: OwnedMemoryCard[];
   completedOrderCount: number;
   recentOrderKeys: string[];
   expansions: string[];
@@ -320,6 +375,7 @@ export type MergeWorldState = {
   characterProgress: Partial<Record<MergeCharacterId, MergeCharacterProgress>>;
   externalRewardReceipts: MergeExternalRewardReceipt[];
   companionDiscovery: CompanionDiscoveryProgress;
+  mossproutBoardProgression: MossproutBoardProgression;
   haven: {
     tileStages: Partial<Record<MergeCharacterId, HavenStage>>;
     revealState: HavenRevealState;
@@ -356,6 +412,9 @@ export type MergeWorldCommand =
   | { type: 'ackCompanionDiscoveryReveal'; characterId: MergeCharacterId; now: number }
   | { type: 'reconcileCharacters'; characterIds: string[]; now: number }
   | { type: 'reconcileFriendship'; levels: Partial<Record<MergeCharacterId, number>>; now: number }
+  | { type: 'reconcileMossproutBoardProgression'; signals: MossproutProgressionSignals; dayId: string; now: number }
+  | { type: 'useGrovelightResonance'; gateId: string; dayId: string; now: number }
+  | { type: 'revealMemoryCard'; cardId: string; now: number }
   | { type: 'reconcileStory'; familyId: MergeCharacterId; status: string; targetLevel: number; actPhase?: string; orderTemplateKeys?: string[]; servedOrderIds?: string[]; now: number }
   | { type: 'reconcileHavenStory'; characterId: MergeCharacterId; storyLevel: number; now: number }
   | { type: 'upgradeHavenTile'; characterId: MergeCharacterId; stage: HavenStage; now: number }
@@ -380,7 +439,7 @@ export type MergeWorldCommandResult = {
   companionDiscoveryAdvanced?: { discoveryId: string; stage: number; completedCharacterId?: MergeCharacterId };
   clearedMistCells?: number[];
   spawnedCell?: number;
-  spawnedItems?: { instanceId: string; definitionId: string; cell: number }[];
+  spawnedItems?: { instanceId: string; definitionId: string; progressionGateId?: string; cell: number }[];
   servedOrderId?: string;
   energyGranted?: number;
   stepEnergyClaim?: { consumedSteps: number; remainingClaimableSteps: number; beforeEnergy: number; afterEnergy: number; status: 'awarded' | 'below_threshold' | 'daily_cap' | 'duplicate' };

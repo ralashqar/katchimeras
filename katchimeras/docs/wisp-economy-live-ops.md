@@ -3,7 +3,8 @@
 ## Source of truth
 
 - `data/wisps/catalog.json` contains the original 50 production Wisps.
-- `data/wisps/catalog.planned.json` contains the 70 planned identities.
+- `data/wisps/catalog.planned.json` contains the full 120-Wisp roster; 51 are
+  production-ready and 69 remain planned after Grovelight's Mossprout unlock.
 - `npm run wisps:catalog:generate` produces the runtime catalog, typed IDs, literal Expo asset registry, and art briefs.
 - Planned Wisps must keep `assetRefs: null`. Promote artwork through the Wisp asset pipeline, set the source entry to `ready`, then regenerate.
 - `data/economy/fallback.json` is the safe bundled configuration. Remote configuration may change availability and offers, but may only reference ready IDs known to the installed catalog.

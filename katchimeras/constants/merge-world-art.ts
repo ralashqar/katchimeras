@@ -1,3 +1,6 @@
+import { MOSSPROUT_ROOTBOUND_GATES_BY_ID } from '@/constants/merge-world-catalog';
+import { VEILED_MEMORY_CARD_ART } from '@/constants/memory-card-art';
+
 export const MERGE_WORLD_ITEM_ART = {
   'food:table:1': require('../assets/images/katchimeras/merge-world/items/food-table-1-ingredient.webp'),
   'food:table:2': require('../assets/images/katchimeras/merge-world/items/food-table-2-snack.webp'),
@@ -36,6 +39,16 @@ export const MERGE_WORLD_ITEM_ART = {
   'nature:waterside:4': require('../assets/images/katchimeras/merge-world/items/nature-waterside-4-water-lily.webp'),
   'nature:waterside:5': require('../assets/images/katchimeras/merge-world/items/nature-waterside-5-moonlit-cove.webp'),
   'nature:waterside:6': require('../assets/images/katchimeras/merge-world/items/nature-waterside-6-ocean-sanctuary.webp'),
+  'nature:keepsake:1': require('../assets/images/katchimeras/merge-world/items/nature-keepsake-1-dew-bead.webp'),
+  'nature:keepsake:2': require('../assets/images/katchimeras/merge-world/items/nature-keepsake-2-pressed-leaf.webp'),
+  'nature:keepsake:3': require('../assets/images/katchimeras/merge-world/items/nature-keepsake-3-memory-sprig.webp'),
+  'nature:keepsake:4': require('../assets/images/katchimeras/merge-world/items/nature-keepsake-4-field-journal.webp'),
+  'nature:keepsake:5': require('../assets/images/katchimeras/merge-world/items/nature-keepsake-5-memory-terrarium.webp'),
+  'nature:keepsake:6': require('../assets/images/katchimeras/merge-world/items/nature-keepsake-6-living-archive.webp'),
+  'mossprout:root-memory:returning-seed': require('../assets/images/katchimeras/merge-world/items/mossprout-root-returning-seed.webp'),
+  'mossprout:root-memory:rain-kept-acorn': require('../assets/images/katchimeras/merge-world/items/mossprout-root-rain-kept-acorn.webp'),
+  'mossprout:root-memory:nursery-keepsake': require('../assets/images/katchimeras/merge-world/items/mossprout-root-nursery-keepsake.webp'),
+  'mossprout:root-memory:heartseed': require('../assets/images/katchimeras/merge-world/items/mossprout-root-heartseed.webp'),
   'adventure:trail:1': require('../assets/images/katchimeras/merge-world/items/adventure-trail-1-sock.webp'),
   'adventure:trail:2': require('../assets/images/katchimeras/merge-world/items/adventure-trail-2-shoe.webp'),
   'adventure:trail:3': require('../assets/images/katchimeras/merge-world/items/adventure-trail-3-boot.webp'),
@@ -97,6 +110,9 @@ export const MERGE_WORLD_ITEM_ART = {
   'creative:screen:5': require('../assets/images/katchimeras/merge-world/items/creative-screen-5-arcade-corner.webp'),
   'creative:screen:6': require('../assets/images/katchimeras/merge-world/items/creative-screen-6-pixel-palace.webp'),
   'hybrid:picnic-pack': require('../assets/images/katchimeras/merge-world/items/hybrid-picnic-pack.webp'),
+  'hybrid:memory-bloom': require('../assets/images/katchimeras/merge-world/items/hybrid-memory-bloom.webp'),
+  'hybrid:rain-mirror': require('../assets/images/katchimeras/merge-world/items/hybrid-rain-mirror.webp'),
+  'hybrid:heartwood-sanctuary': require('../assets/images/katchimeras/merge-world/items/hybrid-heartwood-sanctuary.webp'),
 } as const;
 
 export type MergeWorldAuthoredItemId = keyof typeof MERGE_WORLD_ITEM_ART;
@@ -106,6 +122,7 @@ export const MERGE_WORLD_GENERATOR_ART = {
   'ritual-bar': require('../assets/images/katchimeras/merge-world/generators/ritual-bar.webp'),
   'journey-locker': require('../assets/images/katchimeras/merge-world/generators/journey-locker.webp'),
   'wild-garden': require('../assets/images/katchimeras/merge-world/generators/wild-garden.webp'),
+  'memory-nursery': require('../assets/images/katchimeras/merge-world/items/memory-nursery-stage-1.webp'),
   'comfort-chest': require('../assets/images/katchimeras/merge-world/generators/comfort-chest.webp'),
   'community-cart': require('../assets/images/katchimeras/merge-world/generators/community-cart.webp'),
   'study-desk': require('../assets/images/katchimeras/merge-world/generators/study-desk.webp'),
@@ -119,7 +136,44 @@ export function mergeWorldItemArt(definitionId: string) {
   return MERGE_WORLD_ITEM_ART[definitionId as MergeWorldAuthoredItemId] ?? null;
 }
 
-export function mergeWorldGeneratorArt(generatorId: string, options?: { mossproutOnboarding?: boolean }) {
+export function mergeWorldGeneratorArt(generatorId: string, options?: { mossproutOnboarding?: boolean; level?: number }) {
   if (generatorId === 'wild-garden' && options?.mossproutOnboarding) return MOSSPROUT_SPROUTING_POT_ART;
+  if (generatorId === 'wild-garden' && (options?.level ?? 1) >= 3) return MOSSPROUT_PROGRESSION_ART.wildGardenUpgrades[1];
+  if (generatorId === 'wild-garden' && (options?.level ?? 1) >= 2) return MOSSPROUT_PROGRESSION_ART.wildGardenUpgrades[0];
+  if (generatorId === 'memory-nursery') return MOSSPROUT_PROGRESSION_ART.memoryNursery[Math.max(0, Math.min(2, (options?.level ?? 1) - 1))];
   return MERGE_WORLD_GENERATOR_ART[generatorId as MergeWorldAuthoredGeneratorId] ?? null;
+}
+
+export const MOSSPROUT_PROGRESSION_ART = {
+  memoryNursery: [
+    require('../assets/images/katchimeras/merge-world/items/memory-nursery-stage-1.webp'),
+    require('../assets/images/katchimeras/merge-world/items/memory-nursery-stage-2.webp'),
+    require('../assets/images/katchimeras/merge-world/items/memory-nursery-stage-3.webp'),
+  ],
+  wildGardenUpgrades: [
+    require('../assets/images/katchimeras/merge-world/items/wild-garden-stage-2.webp'),
+    require('../assets/images/katchimeras/merge-world/items/wild-garden-stage-3.webp'),
+  ],
+  rootParcelClosed: require('../assets/images/katchimeras/merge-world/items/root-match-parcel-closed.webp'),
+  rootParcelOpen: require('../assets/images/katchimeras/merge-world/items/root-match-parcel-open.webp'),
+  fernWispNest: require('../assets/images/katchimeras/merge-world/items/mossprout-fern-wisp-nest.webp'),
+  grovelightWispNest: require('../assets/images/katchimeras/merge-world/items/mossprout-grovelight-wisp-nest.webp'),
+  heartwoodLandmark: require('../assets/images/katchimeras/merge-world/items/mossprout-heartwood-landmark.webp'),
+} as const;
+
+/** Keeps every Rootbound preview on the board and in its inspector identical. */
+export function mossproutRootRewardArt(gateId: string) {
+  const gate = MOSSPROUT_ROOTBOUND_GATES_BY_ID.get(gateId);
+  if (!gate) return null;
+  const generatorReward = gate.rewards.find((reward) => reward.kind === 'generator_level');
+  return gate.rewardPreview === 'wisp_nest' ? MOSSPROUT_PROGRESSION_ART.fernWispNest
+    : gate.rewardPreview === 'heartwood' ? MOSSPROUT_PROGRESSION_ART.heartwoodLandmark
+      : gate.rewardPreview === 'memory_card' ? VEILED_MEMORY_CARD_ART
+        : gate.rewardPreview === 'nursery' ? MOSSPROUT_PROGRESSION_ART.memoryNursery[0]
+          : gate.rewardPreview === 'keepsake' ? mergeWorldItemArt('nature:keepsake:2')
+            : generatorReward?.kind === 'generator_level' && generatorReward.generatorId === 'wild-garden'
+              ? MOSSPROUT_PROGRESSION_ART.wildGardenUpgrades[generatorReward.level - 2]
+              : generatorReward?.kind === 'generator_level' && generatorReward.generatorId === 'memory-nursery'
+                ? MOSSPROUT_PROGRESSION_ART.memoryNursery[generatorReward.level - 1]
+                : mergeWorldItemArt(gate.rootMemoryDefinitionId);
 }

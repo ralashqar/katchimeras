@@ -16,6 +16,7 @@ import Animated, {
 
 import { GameBadge } from '@/components/katchadeck/ui/game-surface';
 import type { MergeWorldArrival } from '@/types/merge-world';
+import { MOSSPROUT_PROGRESSION_ART } from '@/constants/merge-world-art';
 
 import { PersistentMergeItemArt } from './feastle-persistent-merge-board';
 import type { MergeScreenPoint } from './merge-serve-reward-overlay';
@@ -32,6 +33,7 @@ export type MergeParcelFlight = {
   nonce: number;
   from: MergeScreenPoint;
   items: { instanceId: string; definitionId: string; destinationSize: number; to: MergeScreenPoint }[];
+  rootMatch?: boolean;
 };
 
 export const MergeParcelTrayCard = forwardRef<NativeView, {
@@ -67,7 +69,7 @@ export const MergeParcelTrayCard = forwardRef<NativeView, {
       style={({ pressed }) => [styles.parcelCard, pressed && styles.parcelPressed]}>
       <Animated.View ref={ref} style={[styles.parcelCrate, shakeStyle]}>
         <View pointerEvents="none" style={styles.parcelGlow} />
-        <Image accessibilityIgnoresInvertColors contentFit="contain" source={PARCEL_ART} style={styles.parcelArt} transition={0} />
+        <Image accessibilityIgnoresInvertColors contentFit="contain" source={arrival.kind === 'root_match_parcel' ? MOSSPROUT_PROGRESSION_ART.rootParcelClosed : PARCEL_ART} style={styles.parcelArt} transition={0} />
         {arrival.kind === 'goal_chest' ? <GameBadge icon="star.fill" style={styles.goalBadge} tone="gold" /> : null}
         {arrival.kind === 'discovery_parcel' ? <GameBadge icon="sparkles" style={styles.discoveryBadge} tone="dark" /> : null}
         <GameBadge label={count} style={styles.countBadge} tone="gold" />
@@ -85,7 +87,7 @@ export function MergeParcelFlightOverlay({ flight, onFinish, onItemArrive }: {
   if (!flight) return null;
   return (
     <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" pointerEvents="none" style={styles.flightOverlay}>
-      <ParcelOpening from={flight.from} />
+      <ParcelOpening from={flight.from} rootMatch={Boolean(flight.rootMatch)} />
       {flight.items.map((item, index) => <ParcelFlyingItem
         count={flight.items.length}
         flightNonce={flight.nonce}
@@ -100,7 +102,7 @@ export function MergeParcelFlightOverlay({ flight, onFinish, onItemArrive }: {
   );
 }
 
-function ParcelOpening({ from }: { from: MergeScreenPoint }) {
+function ParcelOpening({ from, rootMatch }: { from: MergeScreenPoint; rootMatch: boolean }) {
   const progress = useSharedValue(0);
   const reduceMotion = useReducedMotion();
   useEffect(() => {
@@ -120,7 +122,7 @@ function ParcelOpening({ from }: { from: MergeScreenPoint }) {
     opacity: interpolate(progress.value, [0, 0.2, 1], [0, 0.9, 0]),
     transform: [{ scale: interpolate(progress.value, [0, 1], [0.45, 1.75]) }],
   }));
-  return <Animated.View style={[styles.openingCrate, style]}><Animated.View style={[styles.openingGlow, glowStyle]} /><Image accessibilityIgnoresInvertColors contentFit="contain" source={PARCEL_ART} style={styles.openingArt} transition={0} /></Animated.View>;
+  return <Animated.View style={[styles.openingCrate, style]}><Animated.View style={[styles.openingGlow, glowStyle]} /><Image accessibilityIgnoresInvertColors contentFit="contain" source={rootMatch ? MOSSPROUT_PROGRESSION_ART.rootParcelOpen : PARCEL_ART} style={styles.openingArt} transition={0} /></Animated.View>;
 }
 
 function ParcelFlyingItem({ count, flightNonce, from, index, item, onFinish, onItemArrive }: {

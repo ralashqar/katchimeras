@@ -25,8 +25,8 @@ import Animated, {
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
 import { MergeBoardEffectsLayer, type MergeBoardEffect, type MergeBoardEffectKind } from '@/components/katchadeck/games/merge-spawn-effects-layer';
-import { mergeWorldGeneratorArt, mergeWorldItemArt } from '@/constants/merge-world-art';
-import { MERGE_GENERATORS_BY_ID, MERGE_HYBRID_RECIPES, MERGE_ITEMS_BY_ID, MERGE_WORLD_COLUMNS, MERGE_WORLD_ROWS } from '@/constants/merge-world-catalog';
+import { mergeWorldGeneratorArt, mergeWorldItemArt, mossproutRootRewardArt } from '@/constants/merge-world-art';
+import { MERGE_CHARACTER_NAMES, MERGE_GENERATORS_BY_ID, MERGE_HYBRID_RECIPES, MERGE_ITEMS_BY_ID, MERGE_WORLD_COLUMNS, MERGE_WORLD_ROWS, MOSSPROUT_ROOTBOUND_GATES_BY_ID } from '@/constants/merge-world-catalog';
 import { COMPANION_DISCOVERIES_BY_ID } from '@/constants/companion-discovery-catalog';
 import type { MergeBoardInteractionGate } from '@/features/onboarding/merge-ftue';
 import type { MergeBoardOperationReceipt, MergeBoardSessionId, MergeInteractionGateReceipt } from '@/features/onboarding/merge-ftue-interaction-coordinator';
@@ -38,6 +38,7 @@ import type { MergeBoardOccupant, MergeDreamMist, MergeWorldCommand, MergeWorldC
 import { mergeCellFeedbackForFailure, type MergeCellFeedbackTone } from '@/utils/merge-board-feedback';
 import { MERGE_MORPH_DURATION_MS, MERGE_MORPH_REDUCED_MOTION_DURATION_MS, SPAWN_MOTION_DURATION_MS, isMistMergeTransition, mergeMotionPiecewise, mergeSpriteMotionFrame, spawnSpriteMotionFrame, type MergeBoardMotionKind } from '@/utils/merge-board-motion';
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection, type MergeBoardGeometry } from '@/utils/merge-world/board-geometry';
+import { mossproutRootConditionCopy, mossproutRootReadyCopy, mossproutRootRewardCopy } from '@/utils/merge-world/merge-board-player-copy';
 
 export type MergeBoardScreenMetrics = { geometry: MergeBoardGeometry; x: number; y: number };
 
@@ -129,7 +130,7 @@ function isInterruptibleMotion(motion?: SpriteMotion) {
   return motion == null || motion.kind === 'move' || motion.kind === 'swap' || motion.kind === 'return' || motion.kind === 'spawn' || motion.kind === 'merge-result';
 }
 
-export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onCommandSettled, onInteractionGateCommitted, onScreenMetrics, onBlockedInteraction, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', sessionId, hiddenItemInstanceIds, animateEntrance = true }: {
+export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onCommandSettled, onInteractionGateCommitted, onScreenMetrics, onBlockedInteraction, onInspectMist, onInspectRootbound, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', sessionId, hiddenItemInstanceIds, animateEntrance = true }: {
   state: MergeWorldState;
   width: number;
   animateEntrance?: boolean;
@@ -141,6 +142,8 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   onInteractionGateCommitted?: (receipt: MergeInteractionGateReceipt) => void;
   onScreenMetrics?: (metrics: MergeBoardScreenMetrics) => void;
   onBlockedInteraction?: () => void;
+  onInspectMist?: (cell: number) => void;
+  onInspectRootbound?: (gateId: string) => void;
   onHiddenItemsRetired?: (instanceIds: readonly string[]) => void;
   interactionGate?: MergeBoardInteractionGate;
   interactionSessionKey?: string;
@@ -471,7 +474,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       return;
     }
     const targetCell = current.board[to];
-    if (!targetCell || (targetCell.locked && targetCell.mist?.kind !== 'echo' && targetCell.mist?.kind !== 'dreambound_item')) {
+    if (!targetCell || (targetCell.locked && targetCell.mist?.kind !== 'echo' && targetCell.mist?.kind !== 'rootbound_echo' && targetCell.mist?.kind !== 'dreambound_item')) {
       if (targetCell?.locked) {
         showCellFeedback(to, 'locked_cell');
         returnHome();
@@ -521,6 +524,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       nextMotions[spriteId(result)] = { kind: 'merge-result', startX: targetOrigin.x, startY: targetOrigin.y };
       const mistDefinitionId = targetCell.mist?.kind === 'echo'
         ? targetCell.mist.definitionId
+        : targetCell.mist?.kind === 'rootbound_echo' ? targetCell.mist.definitionId
         : targetCell.mist?.kind === 'dreambound_item' ? targetCell.mist.boundDefinitionId : null;
       if (mistDefinitionId) {
         const dissipation: DreamMistDissipationRecord = {
@@ -658,8 +662,17 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   const emitBoardCancel = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number) => boardCancelRef.current(instanceId, worldX, worldY, epoch), []);
   const tapEmptyCell = useCallback((cell: number) => {
     const boardCell = presentationRef.current.board[cell];
-    if (boardCell?.locked) showCellFeedback(cell, 'locked_cell');
-  }, [showCellFeedback]);
+    if (boardCell?.mist?.kind === 'rootbound_echo') {
+      onSelectRef.current(cell);
+      onInspectRootbound?.(boardCell.mist.gateId);
+      return;
+    }
+    if (boardCell?.mist || boardCell?.locked) {
+      onSelectRef.current(cell);
+      onInspectMist?.(cell);
+      return;
+    }
+  }, [onInspectMist, onInspectRootbound]);
   emptyCellTapRef.current = tapEmptyCell;
   const emitEmptyCellTap = useCallback((cell: number) => emptyCellTapRef.current(cell), []);
 
@@ -686,8 +699,14 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     }
     const current = presentationRef.current;
     const boardCell = current.board[cell];
-    if (boardCell?.locked && ((boardCell.mist?.kind !== 'echo' && boardCell.mist?.kind !== 'dreambound_item') || selectedCellRef.current == null)) {
-      showCellFeedback(cell, 'locked_cell');
+    if (boardCell?.mist?.kind === 'rootbound_echo') {
+      onSelectRef.current(cell);
+      onInspectRootbound?.(boardCell.mist.gateId);
+      return;
+    }
+    if (boardCell?.mist || boardCell?.locked) {
+      onSelectRef.current(cell);
+      onInspectMist?.(cell);
       return;
     }
     const occupant = current.board[cell]?.occupant;
@@ -698,7 +717,8 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       return;
     }
     const selectedCell = selectedCellRef.current;
-    if (selectedCell == null) {
+    const selectedItem = selectedCell == null ? null : current.board[selectedCell]?.occupant;
+    if (selectedCell == null || selectedItem?.kind !== 'item') {
       if (occupant?.kind === 'item') onSelectRef.current(cell);
       return;
     }
@@ -711,20 +731,24 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
         dropRef.current(spriteId(selected), to.x - from.x, to.y - from.y);
       }
     }
-  }, [blockInteraction, gateFromCell, gateGeneratorCell, gateKind, gateToCell, geometry, showCellFeedback]);
+  }, [blockInteraction, gateFromCell, gateGeneratorCell, gateKind, gateToCell, geometry, onInspectMist, onInspectRootbound]);
 
   const selectedOccupant = selectedCell == null ? null : presentation.board[selectedCell]?.occupant;
   const selectedDefinitionId = selectedOccupant?.kind === 'item' ? selectedOccupant.definitionId : null;
+  const selectedProgressionGateId = selectedOccupant?.kind === 'item' ? selectedOccupant.progressionGateId : undefined;
   const matchingCells = useMemo(() => {
     if (selectedCell == null || !selectedDefinitionId) return [];
     return presentation.board.flatMap((cell, index) => {
       if (index === selectedCell) return [];
-      const itemMatch = cell.occupant?.kind === 'item' && cell.occupant.definitionId === selectedDefinitionId;
+      const itemMatch = !selectedProgressionGateId && cell.occupant?.kind === 'item' && !cell.occupant.progressionGateId && cell.occupant.definitionId === selectedDefinitionId;
       const echoMatch = cell.mist?.kind === 'echo' && cell.mist.definitionId === selectedDefinitionId;
+      const rootboundMatch = cell.mist?.kind === 'rootbound_echo' && cell.mist.ready
+        && cell.mist.definitionId === selectedDefinitionId
+        && (!selectedProgressionGateId || cell.mist.gateId === selectedProgressionGateId);
       const dreamboundMatch = cell.mist?.kind === 'dreambound_item' && cell.mist.active && cell.mist.boundDefinitionId === selectedDefinitionId;
-      return itemMatch || echoMatch || dreamboundMatch ? [index] : [];
+      return itemMatch || echoMatch || rootboundMatch || dreamboundMatch ? [index] : [];
     });
-  }, [presentation.board, selectedCell, selectedDefinitionId]);
+  }, [presentation.board, selectedCell, selectedDefinitionId, selectedProgressionGateId]);
   const matchingCellsKey = matchingCells.join(':');
   const matchingCellSet = useMemo(() => new Set(matchingCells), [matchingCells]);
   const selectedHintTarget = useMemo(() => {
@@ -924,7 +948,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   // translateY animation; measuring that Animated.View cached a temporary
   // screen Y and caused parcel flights to land below their eventual cells.
   return <View onLayout={reportScreenMetrics} ref={boardRef} style={[styles.boardFrame, { height: boardHeight, width: boardWidth }]}>
-    <GestureDetector gesture={boardGesture}><Animated.View accessibilityLabel="Feastle merge board, seven columns by nine rows" style={[styles.board, busy && styles.boardAnimating, { height: boardHeight, padding, width: boardWidth }, boardEntranceStyle]}>
+    <GestureDetector gesture={boardGesture}><Animated.View accessibilityLabel="Merge board, seven columns by nine rows" style={[styles.board, busy && styles.boardAnimating, { height: boardHeight, padding, width: boardWidth }, boardEntranceStyle]}>
     <LinearGradient colors={['#788143', '#55602F', '#384321']} locations={[0, 0.52, 1]} pointerEvents="none" style={styles.boardGradient} />
     <Image
       accessibilityIgnoresInvertColors
@@ -945,18 +969,31 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
         const item = occupant?.kind === 'item' ? occupant : null;
         const generator = occupant?.kind === 'generator' ? MERGE_GENERATORS_BY_ID.get(occupant.generatorId) : null;
         const definition = item ? MERGE_ITEMS_BY_ID.get(item.definitionId) : null;
-        const echoDefinition = cell.mist?.kind === 'echo' ? MERGE_ITEMS_BY_ID.get(cell.mist.definitionId) : null;
-        const echoGenerator = cell.mist?.kind === 'echo' && cell.mist.generatorId ? MERGE_GENERATORS_BY_ID.get(cell.mist.generatorId) : null;
+        const nextDefinition = definition?.nextItemId ? MERGE_ITEMS_BY_ID.get(definition.nextItemId) : null;
+        const echoDefinition = cell.mist?.kind === 'echo' || cell.mist?.kind === 'rootbound_echo' ? MERGE_ITEMS_BY_ID.get(cell.mist.definitionId) : null;
         const companionDiscovery = cell.mist?.kind === 'dreambound_item' ? COMPANION_DISCOVERIES_BY_ID.get(cell.mist.discoveryId) : null;
         const discoveryStage = companionDiscovery && cell.mist?.kind === 'dreambound_item' ? companionDiscovery.stages[cell.mist.sequenceIndex] : null;
-        const label = generator ? `${generator.name}. Tap to generate. Costs 1 Energy.`
-          : definition ? `${definition.name}, tier ${definition.tier}`
-            : echoDefinition ? `Dream Echo: ${echoDefinition.name}${echoGenerator ? ` from the ${echoGenerator.name}` : ''}. Find its matching item to wake this cell.`
+        const dormantNames = cell.mist?.kind === 'discovery_dormant'
+          ? cell.mist.characterIds.map((id) => MERGE_CHARACTER_NAMES[id]).filter(Boolean)
+          : [];
+        const label = generator ? `${generator.name}. Tap to make an item. Costs 1 Energy.`
+          : definition ? nextDefinition
+            ? `${definition.name}. Merge with another ${definition.name} to make ${nextDefinition.name}.`
+            : `${definition.name}. This item cannot be merged any further.`
+            : cell.mist?.kind === 'rootbound_echo' ? rootboundAccessibilityLabel(cell.mist.gateId, cell.mist.ready)
+            : echoDefinition ? `Sleeping ${echoDefinition.name}. Bring another ${echoDefinition.name} here to wake it.`
               : discoveryStage ? `${discoveryStage.clue}. ${cell.mist?.kind === 'dreambound_item' && cell.mist.active ? `Bring another ${MERGE_ITEMS_BY_ID.get(cell.mist.boundDefinitionId)?.name ?? 'matching item'} here.` : 'Follow the trail to wake this item.'}`
                 : cell.mist?.kind === 'discovery_fork' ? 'Several paths are moving beneath the Dream Mist. Choose one to investigate.'
+                  : cell.mist?.kind === 'garden_growth' ? `Hidden garden patch. It opens on Mossprout Journey Day ${cell.mist.revealDay}. You do not need an item.`
+                    : cell.mist?.kind === 'discovery_dormant' ? dormantNames.length
+                      ? `A path to ${dormantNames.join(' or ')}. Meet them to open this space.`
+                      : 'A future Katchimera story will open this space.'
                 : cell.mist ? 'Something is hidden in the Dream Mist.' : 'Empty board space';
         return <BoardCell
-          accessibilityActionLabel={gateKind === 'drag' && index === gateFromCell ? 'Merge with highlighted item' : generator ? 'Generate item' : 'Select or move item'}
+          accessibilityActionLabel={gateKind === 'drag' && index === gateFromCell
+            ? 'Merge with highlighted item'
+            : generator ? 'Make an item'
+              : cell.mist || cell.locked ? 'Show details' : 'Select or move item'}
           accessibilityDisabled={gateKind === 'locked' || (gateKind === 'drag' && index !== gateFromCell) || (gateKind === 'generator' && index !== gateGeneratorCell)}
           accessibilityLabel={label}
           blocked={cell.locked && !occupant}
@@ -997,6 +1034,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
           motion={motions[id]}
           matchHint={matchHint}
           artCache={artCache}
+          generatorLevel={sprite.occupant.kind === 'generator' ? presentation.generators[sprite.occupant.generatorId]?.level ?? 1 : 1}
           mossproutOnboarding={mossproutOnboarding}
           occupant={sprite.occupant}
           onComplete={completeMotion}
@@ -1004,8 +1042,8 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
         />;
       })}
     </View>
-    {selectedCell != null && presentation.board[selectedCell]?.occupant
-      ? <SelectedCellCorners cell={selectedCell} dragPhase={dragPhase} geometry={geometry} reduceMotion={reduceMotion} />
+    {selectedCell != null && presentation.board[selectedCell] && (presentation.board[selectedCell].occupant || presentation.board[selectedCell].locked)
+      ? <SelectedCellCorners cell={selectedCell} dragPhase={dragPhase} geometry={geometry} reduceMotion={reduceMotion} staticFrame={presentation.board[selectedCell].locked} />
       : null}
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.feedbackLayer]}>
       {mistDissipations.map((dissipation) => <DreamMistDissipation effect={dissipation} geometry={geometry} key={dissipation.id} reduceMotion={reduceMotion} />)}
@@ -1031,6 +1069,7 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
   mist: MergeDreamMist | null;
   onActivate: (cell: number) => void;
 }) {
+  const rootbound = mist?.kind === 'rootbound_echo' ? mist : null;
   const lockedDefinitionId = mist?.kind === 'echo'
     ? mist.definitionId
     : mist?.kind === 'dreambound_item' ? mist.boundDefinitionId : null;
@@ -1052,15 +1091,41 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
           <DreamEchoItemArt definitionId={lockedDefinitionId} size={Math.min(width, height) - 4} />
         </MergeMatchHint>
       </View> : null}
-      {lockedDefinitionId ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" pointerEvents="none" recyclingKey="merge-dream-mist-lower" source={DREAM_MIST_LOWER} style={[styles.lockedOverlay, styles.lowerMistOverlay]} transition={0} /> : null}
-      {blocked && !lockedDefinitionId ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" recyclingKey="merge-dream-mist-full" source={DREAM_MIST_FULL} style={[styles.lockedOverlay, styles.fullMistOverlay]} transition={0} /> : null}
+      {rootbound ? <RootboundRewardArt gateId={rootbound.gateId} matchHint={matchHint} ready={rootbound.ready} size={Math.min(width, height) - 4} /> : null}
+      {lockedDefinitionId || rootbound ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" pointerEvents="none" recyclingKey="merge-dream-mist-lower" source={DREAM_MIST_LOWER} style={[styles.lockedOverlay, styles.lowerMistOverlay]} transition={0} /> : null}
+      {mist?.kind === 'discovery_dormant' ? <View pointerEvents="none" style={styles.mistCategoryArt}><IconSymbol color="#F4D795" name="sparkles" size={Math.max(17, Math.min(width, height) * 0.38)} /></View> : null}
+      {blocked && !lockedDefinitionId && !rootbound ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" recyclingKey="merge-dream-mist-full" source={DREAM_MIST_FULL} style={[styles.lockedOverlay, styles.fullMistOverlay]} transition={0} /> : null}
       {mist?.kind === 'discovery_fork' ? <View pointerEvents="none" style={styles.discoveryClue}>
         <IconSymbol color="#F4D795" name="sparkles" size={Math.max(18, Math.min(width, height) * 0.44)} />
-        <View style={styles.discoveryStageDots}>{mist.candidateIds.map((id) => <View key={id} style={[styles.discoveryStageDot, styles.discoveryStageDotActive]} />)}</View>
       </View> : null}
     </View>
   </View>;
 });
+
+function RootboundRewardArt({ gateId, matchHint, ready, size }: {
+  gateId: string;
+  matchHint: { x: number; y: number } | null;
+  ready: boolean;
+  size: number;
+}) {
+  const gate = MOSSPROUT_ROOTBOUND_GATES_BY_ID.get(gateId);
+  if (!gate) return null;
+  const image = mossproutRootRewardArt(gateId);
+  if (!image) return null;
+  return <View pointerEvents="none" style={[styles.echoItem, ready && styles.rootRewardReady]}>
+    <MergeMatchHint active={matchHint != null} offsetX={matchHint?.x ?? 0} offsetY={matchHint?.y ?? 0}>
+      <Image accessibilityIgnoresInvertColors contentFit="contain" source={image} style={{ height: size, width: size }} transition={0} />
+    </MergeMatchHint>
+  </View>;
+}
+
+function rootboundAccessibilityLabel(gateId: string, ready: boolean) {
+  const root = MOSSPROUT_ROOTBOUND_GATES_BY_ID.get(gateId);
+  if (!root) return 'Sleeping root. Select for details.';
+  return ready
+    ? `${root.title}. Ready to wake. ${mossproutRootReadyCopy(root)} ${mossproutRootRewardCopy(root)}`
+    : `${root.title}. Sleeping root. ${mossproutRootConditionCopy(root)} ${mossproutRootRewardCopy(root)}`;
+}
 
 function InvalidCellFeedback({ cell, geometry }: { cell: number; geometry: MergeBoardGeometry }) {
   const progress = useSharedValue(0);
@@ -1157,9 +1222,6 @@ function DreamMistDissipation({ effect, geometry, reduceMotion }: {
     </Animated.View>
     <Animated.View style={[styles.mistEchoGhost, { height: size - 4, width: size - 4 }, echoStyle]}>
       <DreamEchoItemArt definitionId={effect.definitionId} size={effect.sequenceIndex == null ? size - 4 : size - 8} />
-      {effect.sequenceIndex == null ? null : <View style={styles.discoveryStageDots}>
-        {[0, 1, 2].map((stage) => <View key={stage} style={[styles.discoveryStageDot, stage <= effect.sequenceIndex! && styles.discoveryStageDotActive]} />)}
-      </View>}
     </Animated.View>
     {!reduceMotion ? DREAM_MIST_PARTICLES.map((particle, index) => <DreamMistParticle index={index} key={index} particle={particle} progress={progress} size={size} />) : null}
   </View>;
@@ -1226,7 +1288,7 @@ function MergeMatchHint({ active, children, offsetX, offsetY }: { active: boolea
   return <Animated.View style={[styles.matchHint, style]}>{children}</Animated.View>;
 }
 
-const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, baseY, cellSize, activeDragId, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, entranceDelay, grabX, grabY, matchHint, motion, artCache, mossproutOnboarding, reduceMotion, onComplete, occupant }: {
+const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, baseY, cellSize, activeDragId, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, entranceDelay, generatorLevel, grabX, grabY, matchHint, motion, artCache, mossproutOnboarding, reduceMotion, onComplete, occupant }: {
   instanceId: string;
   baseX: number;
   baseY: number;
@@ -1237,6 +1299,7 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   dragTranslationX: SharedValue<number>;
   dragTranslationY: SharedValue<number>;
   entranceDelay: number | null;
+  generatorLevel: number;
   grabX: SharedValue<number>;
   grabY: SharedValue<number>;
   matchHint: { x: number; y: number } | null;
@@ -1423,15 +1486,16 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   return <Animated.View pointerEvents="none" style={[styles.sprite, { height: cellSize, left: 0, top: 0, width: cellSize }, animatedStyle]}>
     <MergeMatchHint active={matchHint != null && !motion} offsetX={matchHint?.x ?? 0} offsetY={matchHint?.y ?? 0}>
       {occupant.kind === 'generator'
-        ? <PersistentGeneratorArt artCache={artCache} generatorId={occupant.generatorId} mossproutOnboarding={mossproutOnboarding} size={cellSize} />
+        ? <PersistentGeneratorArt artCache={artCache} generatorId={occupant.generatorId} level={generatorLevel} mossproutOnboarding={mossproutOnboarding} size={cellSize} />
         : <PersistentMergeItemArt artCache={artCache} definitionId={occupant.definitionId} size={cellSize - 4} />}
     </MergeMatchHint>
     </Animated.View>;
 });
 
-function PersistentGeneratorArt({ artCache, generatorId, mossproutOnboarding, size }: { artCache: MergeArtCache; generatorId: string; mossproutOnboarding: boolean; size: number }) {
-  const art = mergeWorldGeneratorArt(generatorId, { mossproutOnboarding });
-  const source = artCache.get(mergeGeneratorArtCacheKey(generatorId, mossproutOnboarding)) ?? art;
+function PersistentGeneratorArt({ artCache, generatorId, level, mossproutOnboarding, size }: { artCache: MergeArtCache; generatorId: string; level: number; mossproutOnboarding: boolean; size: number }) {
+  const art = mergeWorldGeneratorArt(generatorId, { mossproutOnboarding, level });
+  const usesProgressionArt = (generatorId === 'wild-garden' && level > 1) || generatorId === 'memory-nursery';
+  const source = usesProgressionArt ? art : artCache.get(mergeGeneratorArtCacheKey(generatorId, mossproutOnboarding)) ?? art;
   return <View style={[styles.generatorSprite, { height: size, width: size }]}>
     <GeneratorSparkles size={size} />
     {source ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={`merge-generator-${generatorId}`} source={source} style={styles.generatorArt} transition={0} /> : null}
@@ -1441,23 +1505,30 @@ function PersistentGeneratorArt({ artCache, generatorId, mossproutOnboarding, si
   </View>;
 }
 
-function SelectedCellCorners({ cell, dragPhase, geometry, reduceMotion }: { cell: number; dragPhase: SharedValue<number>; geometry: MergeBoardGeometry; reduceMotion: boolean }) {
+function SelectedCellCorners({ cell, dragPhase, geometry, reduceMotion, staticFrame }: { cell: number; dragPhase: SharedValue<number>; geometry: MergeBoardGeometry; reduceMotion: boolean; staticFrame: boolean }) {
   const pulse = useSharedValue(0);
   const visibility = useSharedValue(dragPhase.value === 1 ? 0 : 1);
   const dropScale = useSharedValue(1);
   const origin = mergeCellOrigin(geometry, cell);
   useEffect(() => {
-    pulse.value = reduceMotion
+    pulse.value = reduceMotion || staticFrame
       ? 0
       : withRepeat(withSequence(
           withTiming(1, { duration: 720, easing: Easing.inOut(Easing.quad) }),
           withTiming(0, { duration: 720, easing: Easing.inOut(Easing.quad) }),
         ), -1, false);
     return () => cancelAnimation(pulse);
-  }, [pulse, reduceMotion]);
+  }, [pulse, reduceMotion, staticFrame]);
   useAnimatedReaction(
     () => dragPhase.value,
     (phase, previousPhase) => {
+      if (staticFrame) {
+        cancelAnimation(visibility);
+        cancelAnimation(dropScale);
+        visibility.value = 1;
+        dropScale.value = 1;
+        return;
+      }
       if (phase === 1) {
         cancelAnimation(visibility);
         cancelAnimation(dropScale);
@@ -1473,15 +1544,15 @@ function SelectedCellCorners({ cell, dragPhase, geometry, reduceMotion }: { cell
             );
       }
     },
-    [reduceMotion],
+    [reduceMotion, staticFrame],
   );
   useEffect(() => () => {
     cancelAnimation(visibility);
     cancelAnimation(dropScale);
   }, [dropScale, visibility]);
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: visibility.value * interpolate(pulse.value, [0, 1], [0.96, 1]),
-    transform: [{ scale: dropScale.value * interpolate(pulse.value, [0, 1], [1, 1.045]) }],
+    opacity: staticFrame ? 1 : visibility.value * interpolate(pulse.value, [0, 1], [0.96, 1]),
+    transform: [{ scale: staticFrame ? 1 : dropScale.value * interpolate(pulse.value, [0, 1], [1, 1.045]) }],
   }));
   const cornerSize = Math.max(14, geometry.cellSize * 0.29);
   const arm = Math.max(4, geometry.cellSize * 0.075);
@@ -1612,10 +1683,9 @@ const styles = StyleSheet.create({
   fullMistOverlay: { zIndex: 1 },
   lowerMistOverlay: { zIndex: 4 },
   discoveryClue: { alignItems: 'center', backgroundColor: 'transparent', borderColor: 'rgba(244,215,149,0.72)', borderRadius: 999, borderWidth: 1, height: '76%', justifyContent: 'center', position: 'absolute', width: '76%', zIndex: 3 },
-  discoveryStageDots: { bottom: 5, flexDirection: 'row', gap: 3, position: 'absolute', zIndex: 5 },
-  discoveryStageDot: { backgroundColor: 'rgba(255,255,255,0.28)', borderRadius: 3, height: 4, width: 4 },
-  discoveryStageDotActive: { backgroundColor: '#F4D795' },
   echoItem: { alignItems: 'center', justifyContent: 'center', opacity: 1, position: 'absolute', zIndex: 2 },
+  rootRewardReady: { filter: 'brightness(1.12)', opacity: 1 },
+  mistCategoryArt: { alignItems: 'center', justifyContent: 'center', opacity: 0.82, position: 'absolute', zIndex: 2 },
   hoverCell: { backgroundColor: 'rgba(244,204,110,0.34)', borderColor: '#E1A644', borderCurve: 'continuous', borderRadius: 4, borderWidth: 2, left: 0, position: 'absolute', top: 0, zIndex: 20 },
   feedbackLayer: { zIndex: 2000 },
   invalidCellFeedback: { alignItems: 'center', backgroundColor: 'rgba(205,76,56,0.38)', borderColor: '#F38A72', borderCurve: 'continuous', borderRadius: 4, borderWidth: 2, boxShadow: '0 0 12px rgba(225,91,67,0.42)', justifyContent: 'center', position: 'absolute', zIndex: 1450 },
