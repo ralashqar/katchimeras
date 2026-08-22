@@ -6,6 +6,7 @@ import {
   beginMossproutJourneyReturn,
   completeMossproutJourneyConversation,
   completeMossproutJourneyDay,
+  completeMossproutJourneyGoalPlan,
   completeMossproutJourneyOpening,
   emptyRelationshipProgressState,
   makeMossproutResolutionAvailable,
@@ -419,8 +420,9 @@ test('Mossprout Day 1 exposes its goal and fun threads after the main Garden jou
   actions = resolveMossproutDayActions({ goals: [], journey, offers, storyComplete: false });
   assert.deepEqual(actions.map((action) => action.kind), ['fun_chat', 'photo_request', 'goal_plan']);
   assert.equal(actions.filter((action) => action.kind === 'photo_request' || action.kind === 'note_request').length, 1);
+  assert.equal(actions.find((action) => action.kind === 'goal_plan')?.destination.kind, 'focus_questionnaire');
 
-  state = completeMossproutJourneyConversation(state, 'mossprout:quiet-patch:first-flower:goal-plan', 4);
+  state = completeMossproutJourneyGoalPlan(state, '2026-08-21', 4);
   actions = resolveMossproutDayActions({ goals: [], journey: mossproutJourneyForDay(state, '2026-08-21'), offers, storyComplete: false });
   assert.equal(actions[0]?.kind, 'goal_plan');
   assert.equal(actions[0]?.status, 'completed');

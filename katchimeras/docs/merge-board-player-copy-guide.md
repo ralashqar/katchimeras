@@ -60,8 +60,8 @@ Drag another [item name] here → [result name].
 | `journey_day: 7` | Spend 7 Journey Days with [Katchimera]. |
 | `friendship: 4` | Grow your friendship with [Katchimera] to Level 4. |
 | `memory: 2` | Save [kind] memories on 2 different days. |
-| `focusStage: 1` | Choose a small [theme] goal with [Katchimera]. |
-| `focusStage: 2` | Complete 3 activities for your [Katchimera] goal. |
+| `focusStage: 1` | Choose a [theme] direction with [Katchimera]. |
+| `focusStage: 2` | Complete 3 activities that support your [theme] direction. |
 | `wisp: 1` | Befriend a Wisp connected to [Katchimera]. |
 | passive reveal day | Opens on [Katchimera] Journey Day 12. You don’t need an item. |
 | matching definition ID | Drag another [visible item name] here. |
@@ -69,6 +69,11 @@ Drag another [item name] here → [result name].
 
 Use numerals for visible game values and compact progress instructions, such as
 `Journey Day 7`, `Friendship Level 4`, or `Complete 3 activities`.
+
+For direction-based roots, name the meaningful choice made in the companion
+questionnaire. Do not call an individual Today activity a direction. The first
+root recognises the saved direction; later roots can recognise the practical
+activities completed after that direction was chosen.
 
 ## Describe rewards by their visible effect
 
@@ -125,7 +130,7 @@ inspector. They must not expose additional debugging or balancing information.
 Example:
 
 ```text
-A Direction for Growing. Sleeping root. Choose a nature goal with Mossprout.
+A Direction for Growing. Sleeping root. Choose a nature direction with Mossprout.
 The Wild Garden finds Sprouts and Shells more often.
 ```
 

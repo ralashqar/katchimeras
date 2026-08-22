@@ -18,7 +18,7 @@ export type CompanionChatStarter = {
   mode: ConversationMode;
   questionCount: number;
   title: string;
-  actionKind?: 'journal_prompt';
+  actionKind?: 'journal_prompt' | 'journey_focus';
   label?: string;
   description?: string;
 };
@@ -44,6 +44,7 @@ export function CompanionChatLobby({
   onBack,
   onOpenConversation,
   onOpenHistory,
+  onOpenJourneyFocus,
   onStart,
   recommendation,
   starters,
@@ -55,6 +56,7 @@ export function CompanionChatLobby({
   onBack: () => void;
   onOpenConversation: () => void;
   onOpenHistory: () => void;
+  onOpenJourneyFocus: () => void;
   onStart: (input?: StartInput) => void;
   recommendation: { definitionId: string; sourceKind: ConversationSignalKind } | null;
   starters: readonly CompanionChatStarter[];
@@ -144,8 +146,10 @@ export function CompanionChatLobby({
               return <Pressable
                 accessibilityHint={`${starter.questionCount} questions. ${presentation.result}.`}
                 accessibilityRole="button"
-                key={starter.mode}
-                onPress={() => start({ definitionId: starter.definitionId, mode: starter.mode })}
+                key={`${starter.mode}:${starter.definitionId}`}
+                onPress={() => starter.actionKind === 'journey_focus'
+                  ? onOpenJourneyFocus()
+                  : start({ definitionId: starter.definitionId, mode: starter.mode })}
                 style={({ pressed }) => [styles.modeCard, pressed && styles.pressed]}>
                 <View style={styles.modeIcon}><IconSymbol color={KatchaUI.companionScenePanel.accent} name={presentation.icon} size={19} /></View>
                 <View style={styles.modeCopy}>

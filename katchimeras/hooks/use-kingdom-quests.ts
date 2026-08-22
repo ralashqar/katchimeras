@@ -8,7 +8,7 @@ import { useQuestCapabilities } from '@/hooks/use-quest-capabilities';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { mossproutConversationActionCompletion } from '@/game/katchimeras/mossprout-home';
-import { completeMossproutJourneyConversation, mossproutDailyActionDeck, mossproutJourneyForDay, recordKatchimeraActionCompletion, recordMossproutMatchedCard } from '@/game/katchimeras/relationship-progression';
+import { completeMossproutJourneyConversation, completeMossproutJourneyGoalPlan, mossproutDailyActionDeck, mossproutJourneyForDay, recordKatchimeraActionCompletion, recordMossproutMatchedCard } from '@/game/katchimeras/relationship-progression';
 import type { HomeDayRecord, MemoryQualityScore, StoredHomeDayRecord } from '@/types/home';
 import type { KingdomCreature, KingdomState } from '@/types/kingdom';
 import type { KatchimeraSkinId } from '@/types/katchimera';
@@ -186,6 +186,16 @@ type SelectedResident = {
   creature: KingdomCreature;
   resident: KingdomResident;
   destination: CompanionDestination | null;
+};
+
+type MossproutActionCandidate = {
+  definitionId: string;
+  mode: ConversationMode;
+  questionCount: number;
+  title: string;
+  actionKind?: 'journal_prompt' | 'journey_focus';
+  label?: string;
+  description?: string;
 };
 
 type Args = {
@@ -1061,7 +1071,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     });
     return selection?.signal ? { definitionId: selection.definition.id, sourceKind: selection.signal.kind } : null;
   }, [companionContentState.conversationSessions, companionContentState.conversationSignals, selectedBondProgress.level, selectedEncounterId, selectedFamilyId, selectedFriendshipProgress.level, today?.isoDate]);
-  const selectedMossproutActionCandidates = useMemo(() => {
+  const selectedMossproutActionCandidates = useMemo<MossproutActionCandidate[]>(() => {
     if (selectedFamilyId !== 'mossprout' || !selectedEncounterId || !today?.isoDate) return [];
     const allDefinitions = companionConversationDefinitionsForFamily('mossprout');
     const definitions = allDefinitions
@@ -1105,12 +1115,20 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     const questions = collectPool('nature-question');
     const insights = collectMode('discover');
     const journals = collectPool('nature-journal');
-    const plans = collectPool('goals');
+    const focusDirection = {
+      mode: 'plan' as const,
+      actionKind: 'journey_focus' as const,
+      definitionId: 'mossprout-nearby-nature',
+      title: 'Grow a nearby-nature rhythm',
+      questionCount: 3,
+      label: 'Find a nature direction',
+      description: 'Answer three thoughtful questions, then choose one meaningful direction to grow with Mossprout.',
+    };
     return [
       ...questions.map((question) => ({ mode: 'talk' as const, definitionId: question.id, title: question.title, questionCount: conversationQuestionCount(question), label: question.actionTitle ?? question.title, description: 'A playful nature question that helps Mossprout get to know you.' })),
       ...journals.map((journal) => ({ mode: 'talk' as const, actionKind: 'journal_prompt' as const, definitionId: journal.id, title: journal.title, questionCount: conversationQuestionCount(journal), label: journal.actionTitle ?? journal.title, description: 'Three small nature choices become a Mossprout journal entry.' })),
       ...insights.map((insight) => ({ mode: 'discover' as const, definitionId: insight.id, title: insight.title, questionCount: conversationQuestionCount(insight), label: 'Learn something together', description: 'A short conversation that can become a saved insight about you.' })),
-      ...plans.map((plan) => ({ mode: 'plan' as const, definitionId: plan.id, title: plan.title, questionCount: conversationQuestionCount(plan), label: 'Find nature goals that fit', description: 'Answer four meaningful questions, then choose up to three matched goals.' })),
+      focusDirection,
     ];
   }, [companionContentState.conversationSessions, selectedBondProgress.level, selectedEncounterId, selectedFamilyId, selectedFriendshipProgress.level, today?.isoDate]);
   const selectedConversationStarters = useMemo(() => {
@@ -1756,6 +1774,11 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       });
     }
     if (result.createdGoalId) {
+      if (selectedFamilyId === 'mossprout' && today?.isoDate) {
+        relationshipProgressionRepository.update((current) => (
+          completeMossproutJourneyGoalPlan(current, today.isoDate)
+        ));
+      }
       awardBond({
         id: `journey-conversation:${selectedResident.creature.creatureId}:${sessionId}`,
         creatureId: selectedResident.creature.creatureId,
@@ -1763,7 +1786,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         occurredAt: Date.now(),
         dayId: today?.isoDate,
       });
-      setMicrocopy('Goal plan updated');
+      setMicrocopy(selectedFamilyId === 'mossprout' ? 'Nature direction chosen' : 'Goal plan updated');
     }
     return result.completed ? result.suggestedQuickGoalIds : [];
   }, [awardBond, companionJourneyState, selectedDailyInvitation, selectedFamilyId, selectedJourneyDefinition, selectedResident, today?.isoDate]);

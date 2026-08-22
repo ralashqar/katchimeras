@@ -24,7 +24,7 @@ export type MossproutActionConversation = {
   title: string;
   label?: string;
   description?: string;
-  actionKind?: 'journal_prompt';
+  actionKind?: 'journal_prompt' | 'journey_focus';
 };
 
 export type MossproutActionGardenRequest = {
@@ -214,6 +214,7 @@ export function resolveMossproutDayActions(input: {
   consumedActionIds?: Partial<Record<KatchimeraActionSlotId, readonly string[]>>;
   dayId?: string;
   goals: readonly MossproutActionGoal[];
+  hasActiveFocus?: boolean;
   gardenRequests?: readonly MossproutActionGardenRequest[];
   journeyGardenRequest?: MossproutActionGardenRequest | null;
   journey: JourneyDayRecord | null;
@@ -269,7 +270,7 @@ export function resolveMossproutDayActions(input: {
       if (!action.outroAcknowledgedAt) actions.push(mapConversationAction(action, true));
       continue;
     }
-    if (action.kind === 'goal_plan' && unfinishedGoals.length) continue;
+    if (action.kind === 'goal_plan' && (unfinishedGoals.length || input.hasActiveFocus)) continue;
     actions.push(mapConversationAction(action, false));
   }
 
@@ -277,7 +278,7 @@ export function resolveMossproutDayActions(input: {
   const hasJourneyFun = journey?.actions.some((action) => action.kind === 'playful_game' && action.status !== 'completed');
   for (const conversation of input.conversations ?? []) {
     if (journey?.actions.some((action) => action.definitionId === conversation.definitionId)) continue;
-    if (conversation.mode === 'plan' && (unfinishedGoals.length > 0 || hasJourneyGoal)) continue;
+    if (conversation.mode === 'plan' && (unfinishedGoals.length > 0 || input.hasActiveFocus || hasJourneyGoal)) continue;
     if (conversation.actionKind !== 'journal_prompt' && (conversation.mode === 'talk' || conversation.mode === 'play') && hasJourneyFun) continue;
     const planning = conversation.mode === 'plan';
     const insight = conversation.mode === 'discover';
@@ -293,7 +294,9 @@ export function resolveMossproutDayActions(input: {
       disabled: false,
       status: 'ready',
       reward: { kind: 'bond', amount: 4 },
-      destination: { kind: 'conversation', definitionId: conversation.definitionId },
+      destination: planning
+        ? { kind: 'focus_questionnaire' }
+        : { kind: 'conversation', definitionId: conversation.definitionId },
       completedAt: null,
       outroAcknowledgedAt: null,
     });
@@ -487,11 +490,12 @@ function mapConversationAction(action: JourneyDayActionRecord, completed: boolea
   return {
     id: action.id,
     kind: goal ? 'goal_plan' : 'fun_chat',
-    title: goal ? 'Choose a small nature focus' : formFinder ? 'Find your nature-side card' : 'The official garden survey',
-    subtitle: goal ? 'Talk it through, then keep up to three gentle goals.' : formFinder ? 'Answer a few questions and discover your first card.' : 'Three quick nature questions, taken unnecessarily seriously.',
+    title: goal ? 'Find a nature direction' : formFinder ? 'Find your nature-side card' : 'The official garden survey',
+    subtitle: goal ? 'Answer three thoughtful questions with Mossprout and choose what you want to grow.' : formFinder ? 'Answer a few questions and discover your first card.' : 'Three quick nature questions, taken unnecessarily seriously.',
     icon: goal ? 'scope' : 'sparkles', required: false, disabled: completed, status: completed ? 'completed' : 'ready',
     artKey: mossproutConversationArtKey(action.definitionId ?? '', goal ? 'goal_plan' : 'fun_chat'),
-    reward: { kind: 'bond', amount: action.bondContribution }, destination: { kind: 'conversation', definitionId: action.definitionId ?? '' },
+    reward: { kind: 'bond', amount: action.bondContribution },
+    destination: goal ? { kind: 'focus_questionnaire' } : { kind: 'conversation', definitionId: action.definitionId ?? '' },
     completedAt: action.completedAt, outroAcknowledgedAt: action.outroAcknowledgedAt,
   };
 }

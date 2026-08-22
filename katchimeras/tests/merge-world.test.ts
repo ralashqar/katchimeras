@@ -1073,8 +1073,8 @@ test('Merge board keeps a persistent selected-cell inspector below the playable 
   assert.match(inspector, /Tap an item or covered cell for details/);
   assert.match(inspector, /Opens on Mossprout Journey Day/);
   assert.match(playerCopy, /Save one nature memory/);
-  assert.match(playerCopy, /Choose a nature goal with Mossprout/);
-  assert.match(playerCopy, /Complete 3 activities for your Mossprout nature goal/);
+  assert.match(playerCopy, /Choose a nature direction with Mossprout/);
+  assert.match(playerCopy, /Complete 3 activities that support your nature direction/);
   assert.doesNotMatch(playerCopy, /Nearby Nature Focus stage/);
   assert.match(inspector, /Meet \$\{names\.join\(' or '\)\} to lift this mist/);
   assert.match(inspector, /mossproutRootRewardArt\(gate\.id\)/);

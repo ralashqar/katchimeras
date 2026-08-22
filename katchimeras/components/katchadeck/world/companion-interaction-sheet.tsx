@@ -1054,6 +1054,11 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     if (isConversationV2Family(props.familyId)) experience.showChatLobby();
     else experience.showVisit();
   };
+  const openJourneyFocus = () => {
+    if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+    if (!props.journeyConversation) props.onStartJourneyConversation();
+    experience.openJourneyQuestionnaire(props.journeyConversation?.id);
+  };
   const destinationHeroTitle = destination === 'quest'
     ? directQuestOrigin
       ? props.activeQuest?.title ?? 'A small nature moment'
@@ -1199,6 +1204,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             onBack={experience.showHome}
             onOpenConversation={experience.showConversation}
             onOpenHistory={openHistory}
+            onOpenJourneyFocus={openJourneyFocus}
             onStart={props.onStartConversation}
             recommendation={props.conversationRecommendation}
             simplified={props.familyId === 'mossprout'}
@@ -1425,7 +1431,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   }}
                   onStartFocus={(preference, supportStyle) => {
                     props.onCompleteIntroduction(preference, supportStyle);
-                    if (isConversationV2Family(props.familyId)) {
+                    if (props.familyId === 'mossprout') {
+                      props.onStartJourneyConversation(preference);
+                      experience.openJourneyQuestionnaire(null);
+                    } else if (isConversationV2Family(props.familyId)) {
                       props.onStartConversation({ mode: 'plan' });
                       experience.showConversation();
                     } else {
@@ -1529,6 +1538,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   conversationSession={props.conversationSession}
                   conversations={props.mossproutActionCandidates}
                   goals={goalsToday}
+                  hasActiveFocus={Boolean(activeJourneyFocus)}
                   offers={props.actionOffers}
                   relationships={relationships}
                   onCompleteGoal={props.onCompleteQuickGoal}
@@ -1542,6 +1552,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                     openedStoryConversationRef.current = null;
                     requestStoryConversation(definitionId);
                   }}
+                  onOpenFocusDirection={openJourneyFocus}
                   onOpenMerge={(orderId) => props.onOpenMerge?.(orderId, props.familyId)}
                   onOpenQuestDirect={(questId, originActionId) => {
                     props.onSelectOffer(questId);
@@ -1681,14 +1692,18 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                 {quickGoalPanel}
                 {isConversationV2Family(props.familyId) ? (
                   <CompanionSection
-                    description={activeJourneyFocus
-                      ? 'Talk through what fits now and add concrete steps without replacing your current plan.'
-                      : 'Answer four short questions to find a useful direction and choose optional next steps.'}
-                    label={activeJourneyFocus ? 'Talk through your next direction' : 'Find a direction'}>
+                    description={props.familyId === 'mossprout'
+                      ? activeJourneyFocus
+                        ? 'Reflect on what fits now and choose a new nature direction when you are ready.'
+                        : 'Answer three thoughtful questions and choose one nature direction to grow.'
+                      : activeJourneyFocus
+                        ? 'Talk through what fits now and add concrete steps without replacing your current plan.'
+                        : 'Answer four short questions to find a useful direction and choose optional next steps.'}
+                    label={props.familyId === 'mossprout' && activeJourneyFocus ? 'Choose a new direction' : activeJourneyFocus ? 'Talk through your next direction' : 'Find a direction'}>
                     <CompanionPrimaryAction
                       icon="bubble.left.and.bubble.right.fill"
-                      label={activeJourneyFocus ? 'Choose a Plan conversation' : 'Find a direction with me'}
-                      onPress={experience.showChatLobby}
+                      label={props.familyId === 'mossprout' && activeJourneyFocus ? 'Choose a new direction' : activeJourneyFocus ? 'Choose a Plan conversation' : 'Find a direction with me'}
+                      onPress={props.familyId === 'mossprout' ? openJourneyFocus : experience.showChatLobby}
                     />
                   </CompanionSection>
                 ) : null}

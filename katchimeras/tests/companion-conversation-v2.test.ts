@@ -22,7 +22,6 @@ import {
 import type { StoredHomeDayRecord } from '@/types/home';
 import {
   answerConversation,
-  conversationQuestionCount,
   conversationGameQuestion,
   continueConversation,
   createConversationSession,
@@ -147,7 +146,7 @@ test('Mossprout keeps Journey questions gated while offering a separate daily na
   assert.ok(dailyJournals.every((definition) => definition.nodes.some((node) => node.kind === 'journal_handoff')));
 });
 
-test('Mossprout post-Journey selectors always find a question, field note, insight, and nature plan', () => {
+test('Mossprout post-Journey selectors keep the retired quick-goal planner out of the nature pool', () => {
   const definitions = companionConversationDefinitionsForFamily('mossprout');
   const shared = { familyId: 'mossprout' as const, definitions, sessions: [], dayId: '2026-08-21', bondLevel: 1 as const, friendshipLevel: 1 };
   const question = selectConversationFromPool({ ...shared, poolId: 'nature-question', seed: 'mossprout:question' });
@@ -158,8 +157,9 @@ test('Mossprout post-Journey selectors always find a question, field note, insig
   assert.ok(question?.tags?.includes('nature-question'));
   assert.ok(journal?.tags?.includes('nature-journal'));
   assert.equal(insight?.id, 'mossprout:insight:nature-connection');
-  assert.equal(plan?.id, 'mossprout:conversation:nature-goal-discovery');
-  assert.equal(conversationQuestionCount(plan!), 4);
+  assert.equal(plan, null);
+  const retiredQuickGoalPlanner = definitions.find((definition) => definition.id === 'mossprout:conversation:nature-goal-discovery');
+  assert.equal(retiredQuickGoalPlanner?.contextualOnly, true);
 });
 
 test('Mossprout Day 1 includes an authored focus card with three optional nature goals', () => {

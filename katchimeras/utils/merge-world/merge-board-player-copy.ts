@@ -41,10 +41,10 @@ export function mossproutRootReadyCopy(root: MossproutRootGateDefinition) {
 }
 
 function mossproutNatureGoalConditionCopy(stage: number) {
-  if (stage === 1) return 'Choose a nature goal with Mossprout.';
-  if (stage === 2) return 'Complete 3 activities for your Mossprout nature goal.';
-  if (stage === 3) return 'Reflect on your nature goal with Mossprout.';
-  return 'Review your nature goal with Mossprout and choose what comes next.';
+  if (stage === 1) return 'Choose a nature direction with Mossprout.';
+  if (stage === 2) return 'Complete 3 activities that support your nature direction.';
+  if (stage === 3) return 'Reflect on your nature direction with Mossprout.';
+  return 'Review your nature direction with Mossprout and choose what comes next.';
 }
 
 function itemMakerImprovementCopy(itemMakerId: string, level: number) {

@@ -5,7 +5,10 @@ import { KATCHIMERA_MERGE_PROFILES, MERGE_GENERATORS, MERGE_ITEMS_BY_ID, MOSSPRO
 import type { MergeWorldState, MossproutProgressionSignals, MossproutRootGateState } from '@/types/merge-world';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 import { mossproutRootConditionCopy, mossproutRootReadyCopy, mossproutRootRewardCopy } from '@/utils/merge-world/merge-board-player-copy';
+import { mossproutFocusStage } from '@/utils/merge-world/mossprout-focus-progression';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
+import { answerJourneyConversation, emptyCompanionJourneyState, startJourneyConversation } from '@/utils/companion-journey';
+import { addCompanionQuickGoal, completeCompanionQuickGoal, emptyCompanionQuickGoalState } from '@/utils/companion-quick-goals';
 
 const NOW = Date.UTC(2026, 7, 22, 12);
 
@@ -34,11 +37,50 @@ test('every Mossprout root translates internal rules into concrete player instru
 
   assert.match(copy, /Reach Mossprout Journey Day 15/);
   assert.match(copy, /Reach Friendship Level 8 with Mossprout/);
-  assert.match(copy, /Choose a nature goal with Mossprout/);
-  assert.match(copy, /Complete 3 activities for your Mossprout nature goal/);
+  assert.match(copy, /Choose a nature direction with Mossprout/);
+  assert.match(copy, /Complete 3 activities that support your nature direction/);
   assert.match(copy, /Adds the Memory Nursery to your board/);
   assert.match(copy, /Gives a rare Memory Card to reveal/);
   assert.doesNotMatch(copy, /generator|tier|focus stage|fallback|gate|target|definition|receipt|schema|progress \d/i);
+});
+
+test('the Mossprout direction questionnaire and its activities advance board focus roots', () => {
+  let journey = startJourneyConversation(emptyCompanionJourneyState(), 'mossprout', 100);
+  const answers = ['attention', 'garden', 'care-plant'];
+  for (const [index, answer] of answers.entries()) {
+    const session = journey.conversations.find((candidate) => candidate.familyId === 'mossprout' && !candidate.completedAt)!;
+    journey = answerJourneyConversation(journey, session.id, answer, 110 + index).state;
+  }
+  assert.equal(mossproutFocusStage(journey, emptyCompanionQuickGoalState()), 1);
+
+  let quickGoals = emptyCompanionQuickGoalState();
+  for (let index = 0; index < 3; index += 1) {
+    const added = addCompanionQuickGoal(quickGoals, {
+      familyId: 'mossprout',
+      title: `Nature activity ${index + 1}`,
+      cadence: { kind: 'once', dayId: `2026-08-${20 + index}` },
+    }, 200 + index);
+    quickGoals = added.state;
+    quickGoals = completeCompanionQuickGoal(
+      quickGoals,
+      added.goal!.id,
+      `2026-08-${20 + index}`,
+      300 + index,
+    ).state;
+  }
+  assert.equal(mossproutFocusStage(journey, quickGoals), 2);
+
+  const goal = journey.goals.find((candidate) => candidate.familyId === 'mossprout')!;
+  journey = {
+    ...journey,
+    reflectionEvents: [{
+      id: 'reflection:mossprout:test', familyId: 'mossprout', goalId: goal.id,
+      sourceId: 'test', occurredAt: 400,
+    }],
+  };
+  assert.equal(mossproutFocusStage(journey, quickGoals), 3);
+  journey = { ...journey, goals: journey.goals.map((candidate) => candidate.id === goal.id ? { ...candidate, status: 'completed' } : candidate) };
+  assert.equal(mossproutFocusStage(journey, quickGoals), 4);
 });
 
 function awakenedEarlierGates(state: MergeWorldState, beforeGateId: string): MergeWorldState {

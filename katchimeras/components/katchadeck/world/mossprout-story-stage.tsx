@@ -85,6 +85,7 @@ export function MossproutStoryStage({
   activeQuestId,
   conversations,
   goals,
+  hasActiveFocus,
   offers,
   relationships,
   onCompleteGoal,
@@ -94,6 +95,7 @@ export function MossproutStoryStage({
   onUndoGoal,
   onDashboard,
   onOpenConversation,
+  onOpenFocusDirection,
   onOpenMerge,
   onOpenQuestDirect,
   onBondRewardRequest,
@@ -103,6 +105,7 @@ export function MossproutStoryStage({
   conversationSession: ConversationSession | null;
   conversations: readonly CompanionChatStarter[];
   goals: readonly CompanionQuickGoalForDay[];
+  hasActiveFocus: boolean;
   offers: CompanionQuestOfferViewModel[];
   relationships: RelationshipProgressState;
   onCompleteGoal: (goalId: string) => CompanionQuickGoalCompletionReceipt;
@@ -112,6 +115,7 @@ export function MossproutStoryStage({
   onUndoGoal: (goalId: string) => boolean;
   onDashboard: () => void;
   onOpenConversation: (definitionId: string) => void;
+  onOpenFocusDirection: () => void;
   onOpenMerge: (orderId?: string | null) => void;
   onOpenQuestDirect: (questId: string, originActionId: string) => void;
   onBondRewardRequest: (source: DayActionSourceRect, onArrive: () => void) => void;
@@ -157,13 +161,14 @@ export function MossproutStoryStage({
     dayId,
     gardenRequests,
     goals: goals.map((item) => ({ id: item.goal.id, templateId: item.goal.templateId, title: item.goal.title, completed: Boolean(item.completion) })),
+    hasActiveFocus,
     journey,
     journeyGardenRequest,
     offers,
     skippedActionIds: relationships.skippedActionIds,
     slotSequences: mossproutDailyActionDeck(relationships, dayId).slotSequences,
     storyComplete,
-  }), [activeQuestId, conversations, dayId, gardenRequests, goals, journey, journeyGardenRequest, offers, relationships, storyComplete]);
+  }), [activeQuestId, conversations, dayId, gardenRequests, goals, hasActiveFocus, journey, journeyGardenRequest, offers, relationships, storyComplete]);
 
   useEffect(() => {
     relationshipProgressionRepository.update((current) => goals.reduce((state, item) => {
@@ -277,6 +282,7 @@ export function MossproutStoryStage({
     if (action.disabled || action.status === 'completed') return;
     if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
     if (action.destination.kind === 'journey') return openJourney();
+    if (action.destination.kind === 'focus_questionnaire') return onOpenFocusDirection();
     if (action.destination.kind === 'conversation') return onOpenConversation(action.destination.definitionId);
     if (action.destination.kind === 'garden') {
       if (journey?.status === 'activity_available') {

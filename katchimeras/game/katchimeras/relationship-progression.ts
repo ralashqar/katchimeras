@@ -454,6 +454,17 @@ export function completeMossproutJourneyConversation(
   return state;
 }
 
+export function completeMossproutJourneyGoalPlan(
+  state: RelationshipProgressState,
+  dayId: string,
+  now = Date.now(),
+): RelationshipProgressState {
+  const journey = mossproutJourneyForDay(state, dayId);
+  const action = journey?.actions.find((candidate) => candidate.kind === 'goal_plan' && candidate.status !== 'completed');
+  if (!journey || !action?.definitionId) return state;
+  return completeJourneyAction(state, journey, action.definitionId, now);
+}
+
 export function acknowledgeMossproutJourneyActionOutro(
   state: RelationshipProgressState,
   dayId: string,

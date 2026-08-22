@@ -15,6 +15,7 @@ import type { CompanionQuestState } from '@/utils/katchimera-quests';
 import { mergeActivityRewards, mergeQuestActivityRewards } from '@/utils/merge-world/activity-rewards';
 import { buildCompanionAffinityProfile, nextEligibleCompanionGate, recommendCompanionPath } from '@/utils/merge-world/companion-discovery-progression';
 import { reduceMergeWorld } from '@/utils/merge-world/engine';
+import { mossproutFocusStage } from '@/utils/merge-world/mossprout-focus-progression';
 import { mergeWorldPendingPersistence, type MergeWorldPendingPersistence } from '@/utils/merge-world/persistence-buffer';
 import { loadFirstSession } from '@/features/onboarding/first-session';
 import { mossproutDailyActionDeck, mossproutJourneyForDay, recordKatchimeraActionCompletion, recordMossproutFirstGardenRestored, recordMossproutJourneyOrderServed, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
@@ -24,7 +25,7 @@ import { loadMergeWorldState, saveMergeWorldState, subscribeMergeWorldResets, su
 import { isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, markAuthoredCohortOrderActive, markAuthoredCohortOrderServed, markFeastleOrderActive, markFeastleOrderServed, recordAuthoredCohortQuietBond, recordFeastleQuietBond, subscribeCompanionStories } from '@/utils/companion-story-storage';
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 import { loadCompanionQuickGoalState, subscribeCompanionQuickGoals } from '@/utils/companion-quick-goal-storage';
-import { loadCompanionJourneyState } from '@/utils/companion-journey-storage';
+import { loadCompanionJourneyState, subscribeCompanionJourneys } from '@/utils/companion-journey-storage';
 import { localDayId } from '@/utils/world-identity';
 
 type MergeWorldContextValue = {
@@ -67,13 +68,8 @@ function mossproutProgressionSignals(days: readonly HomeDayRecord[], friendshipL
     return ['nature', 'park', 'garden', 'plant', 'flower', 'forest', 'woodland', 'outdoor', 'green'].some((token) => semanticEvidence.includes(token));
   }).map((day) => day.id);
   const journey = loadCompanionJourneyState();
-  const goal = [...journey.goals].reverse().find((candidate) => candidate.familyId === 'mossprout');
-  const questCount = goal ? journey.questEvents.filter((event) => event.goalId === goal.id).length : 0;
-  const reflectionCount = goal ? journey.reflectionEvents.filter((event) => event.goalId === goal.id).length : 0;
-  const focusStage = !goal ? 0
-    : goal.status === 'completed' || goal.status === 'abandoned' ? 4
-      : reflectionCount > 0 ? 3
-        : questCount >= 3 ? 2 : 1;
+  const quickGoals = loadCompanionQuickGoalState();
+  const focusStage = mossproutFocusStage(journey, quickGoals);
   return {
     activeJourneyDayIds,
     friendshipLevel,
@@ -110,6 +106,7 @@ export function MergeWorldProvider({
   const [lastResult, setLastResult] = useState<MergeWorldCommandResult | null>(null);
   const [friendshipLevels, setFriendshipLevels] = useState<Partial<Record<MergeCharacterId, number>>>({});
   const [quickGoalRevision, setQuickGoalRevision] = useState(0);
+  const [journeyRevision, setJourneyRevision] = useState(0);
   const stateRef = useRef(state);
   const activeRef = useRef(active);
   const mountedRef = useRef(true);
@@ -629,6 +626,17 @@ export function MergeWorldProvider({
     // the lightweight batch reconciliation effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
+  useEffect(() => {
+    if (!active) return;
+    const release = acquireLifecycleResource('store_subscription', 'merge:companion-journeys');
+    const unsubscribe = subscribeCompanionJourneys(() => {
+      if (activeRef.current) setJourneyRevision((value) => value + 1);
+    });
+    return () => {
+      unsubscribe();
+      release();
+    };
+  }, [active]);
 
   useEffect(() => {
     if (!active) return;
@@ -684,7 +692,7 @@ export function MergeWorldProvider({
     if (discoveryGateResult?.changed) setLastResult(discoveryGateResult);
     else if (activityResult.changed) setLastResult(activityResult);
     enqueuePersistence(next);
-  }, [active, characterIds, days, enqueuePersistence, featureAndReconcile, loading, questState, quickGoalRevision, refreshFriendshipLevels, wisps.state.inventory]);
+  }, [active, characterIds, days, enqueuePersistence, featureAndReconcile, journeyRevision, loading, questState, quickGoalRevision, refreshFriendshipLevels, wisps.state.inventory]);
 
   const dispatch = useCallback((command: MergeWorldCommand): MergeWorldCommandResult | null => {
     if (!activeRef.current) return null;

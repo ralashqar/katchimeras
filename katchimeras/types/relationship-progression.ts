@@ -82,6 +82,7 @@ export type KatchimeraDayActionReward = {
 
 export type KatchimeraDayActionDestination =
   | { kind: 'journey' }
+  | { kind: 'focus_questionnaire' }
   | { kind: 'conversation'; definitionId: string }
   | { kind: 'quest'; questId: string }
   | { kind: 'goal'; goalId: string }

@@ -641,7 +641,7 @@ const mossproutNatureInsight: ConversationDefinition = {
 const mossproutPlanningConversations: readonly ConversationDefinition[] = [
   {
     id: 'mossprout:conversation:nature-goal-discovery', version: 1, familyId: 'mossprout', title: 'Find nature goals that fit',
-    trigger: 'evergreen', minimumBondLevel: 1, cooldownDays: 1, format: 'narrative', purpose: 'planning',
+    trigger: 'evergreen', minimumBondLevel: 1, cooldownDays: 1, contextualOnly: true, format: 'narrative', purpose: 'planning',
     returnTarget: 'character_home', repeatPolicy: 'after_cooldown', topicKey: 'nature-goal-discovery', tags: ['mossprout', 'goals'], entryNodeId: 'time',
     nodes: [
       { id: 'time', kind: 'choice', phase: 'explore', prompt: 'How much room could nature realistically have in your day?', options: [
