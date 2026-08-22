@@ -582,7 +582,13 @@ function normalizeJourneyDay(journey: JourneyDayRecord): JourneyDayRecord {
 }
 
 export function journeyBondPoints(journey: Pick<JourneyDayRecord, 'actions'>) {
-  return Math.min(20, journey.actions.reduce((total, action) => total + (action.status === 'completed' ? action.bondContribution : 0), 0));
+  // Each Journey action renders its own Bond amount. The aggregate receipt must
+  // equal those visible contributions so every completed card creates a delta
+  // receipt and a reward flight.
+  return journey.actions.reduce(
+    (total, action) => total + (action.status === 'completed' ? action.bondContribution : 0),
+    0,
+  );
 }
 
 function journeyActions(beatId: string): JourneyDayActionRecord[] {

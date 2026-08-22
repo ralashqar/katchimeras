@@ -3,6 +3,7 @@ import {
   MOSSPROUT_GARDEN_GROWTH_BY_CELL,
   MOSSPROUT_GARDEN_GROWTH_CLEARINGS,
   MOSSPROUT_ROOTBOUND_GATES,
+  MERGE_STARTING_OPEN_CELLS,
 } from '@/constants/merge-world-catalog';
 import type { MergeBoardCell, MergeCharacterId, MergeDreamMist, MergeWorldState } from '@/types/merge-world';
 
@@ -22,7 +23,9 @@ for (const allocation of COMPANION_BOARD_ALLOCATIONS) {
 export function authoredDormantMistForCell(cell: number): MergeDreamMist {
   const clearing = MOSSPROUT_GARDEN_GROWTH_BY_CELL.get(cell);
   if (clearing) return { kind: 'garden_growth', clearingId: clearing.id, revealDay: clearing.revealDay };
-  return { kind: 'discovery_dormant', characterIds: [...(DISCOVERY_CHARACTERS_BY_CELL.get(cell) ?? [])] };
+  // Personal worlds reserve their remaining mist for that companion's future
+  // regions. Discovering another Katchimera must never annex Mossprout's board.
+  return { kind: 'dormant' };
 }
 
 export function reconcileGardenGrowthMist(state: MergeWorldState, activeJourneyDays: number, now: number): MergeWorldState {
@@ -114,11 +117,10 @@ export function allocateDiscoveryForkAnchor(board: readonly MergeBoardCell[], pr
 
 export function boardMistPartitionIssues() {
   const issues: string[] = [];
-  const open = 13;
+  const open = MERGE_STARTING_OPEN_CELLS.size;
   const roots = ROOTBOUND_CELLS.size;
   const growth = MOSSPROUT_GARDEN_GROWTH_BY_CELL.size;
-  const discovery = DISCOVERY_CHARACTERS_BY_CELL.size;
-  if (open + roots + growth + discovery !== 63) issues.push(`Board mist partition covers ${open + roots + growth + discovery} of 63 cells.`);
-  for (const [cell, owners] of DISCOVERY_CHARACTERS_BY_CELL) if (!owners.length) issues.push(`Discovery Mist cell ${cell} has no companion owner.`);
+  const reserved = 63 - open - roots - growth;
+  if (reserved < 0 || open + roots + growth + reserved !== 63) issues.push(`Board mist partition covers ${open + roots + growth + reserved} of 63 cells.`);
   return issues;
 }

@@ -5,7 +5,7 @@ export type MergeCellFeedbackTone = 'blocked' | 'warning' | 'hint';
 export function mergeCellFeedbackForFailure(reason?: MergeWorldFailureReason): { message: string; tone: MergeCellFeedbackTone } | null {
   switch (reason) {
     case 'locked_cell': return { message: 'LOCKED', tone: 'blocked' };
-    case 'no_energy': return { message: 'NO ENERGY', tone: 'warning' };
+    case 'generator_resting': return { message: 'GROWING MORE', tone: 'warning' };
     case 'board_full': return { message: 'BOARD FULL', tone: 'warning' };
     case 'wrong_echo_match': return { message: 'FIND ITS MATCH', tone: 'hint' };
     case 'sealed_mist': return { message: 'SEALED', tone: 'blocked' };

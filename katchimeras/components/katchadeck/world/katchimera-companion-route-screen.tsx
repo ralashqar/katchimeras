@@ -33,7 +33,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConvers
       const completedAt = Date.now();
       const nextRun = commitFtueAction({ actionId: 'companion.complete_chapter_zero_return', evidenceRef: ftueConversationDefinitionId ?? 'mossprout-chapter-zero-return' });
       if (nextRun?.status === 'complete') {
-        void seedStoredMossproutGardenAfterFtue(localDayId(new Date(completedAt)), completedAt).catch((error) => {
+        return seedStoredMossproutGardenAfterFtue(localDayId(new Date(completedAt)), completedAt).then(() => undefined).catch((error) => {
           console.warn('Could not prepare Mossprout’s next Garden orders', error);
         });
       }

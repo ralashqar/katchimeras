@@ -44,6 +44,7 @@ import {
   companionQuestInlineNoteAction,
   companionQuestInlinePhotoAction,
   companionQuestPresentation,
+  companionInitialConversationCompletionReady,
   companionViewportResetKey,
 } from '@/utils/companion-interaction';
 import { CompanionCinematicStage } from './companion-cinematic-stage';
@@ -168,7 +169,7 @@ export type CompanionInteractionSheetProps = {
   houseLevel?: number;
   initialDestination?: CompanionDestination | null;
   initialConversationDefinitionId?: string;
-  onInitialConversationComplete?: () => void;
+  onInitialConversationComplete?: () => void | Promise<void>;
   ftueOrderPreviewActive?: boolean;
   onFtueOpenMerge?: () => void;
   onSelectDestination?: (destination: CompanionDestination | null) => void;
@@ -322,6 +323,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     : null;
   const [transitionBackgroundReady, setTransitionBackgroundReady] = useState(false);
   const [transitionCreatureReady, setTransitionCreatureReady] = useState(false);
+  const [mossproutHubEntranceSettled, setMossproutHubEntranceSettled] = useState(false);
+  const [mossproutHubViewportSettled, setMossproutHubViewportSettled] = useState(false);
   useGameSurfaceReadiness('companion', {
     background: transitionBackgroundReady,
     data: true,
@@ -543,21 +546,28 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       props.conversationSession?.definitionId === props.initialConversationDefinitionId
       && props.conversationSession.status === 'completed'
     ) {
+      if (props.conversationSession.outcomePresentation) {
+        // A restored FTUE result still belongs to the active conversation.
+        // Keep it pending until the player presses its explicit action.
+        initialConversationObservedActiveRef.current = true;
+        return;
+      }
       if (initialConversationObservedActiveRef.current) return;
       completedInitialConversationRef.current = props.conversationSession.id;
       return;
     }
     requestStoryConversation(props.initialConversationDefinitionId);
-  }, [props.active, props.conversationSession?.definitionId, props.conversationSession?.id, props.conversationSession?.status, props.initialConversationDefinitionId, requestStoryConversation]);
+  }, [props.active, props.conversationSession?.definitionId, props.conversationSession?.id, props.conversationSession?.outcomePresentation, props.conversationSession?.status, props.initialConversationDefinitionId, requestStoryConversation]);
   useEffect(() => {
     const definitionId = props.initialConversationDefinitionId;
     const session = props.conversationSession;
-    if (!definitionId || !session || session.definitionId !== definitionId || session.status !== 'completed') return;
+    if (!session || !companionInitialConversationCompletionReady(session, definitionId)) return;
     if (completedInitialConversationRef.current === session.id) return;
     completedInitialConversationRef.current = session.id;
-    onInitialConversationComplete?.();
-    experience.showHome();
-  }, [experience, onInitialConversationComplete, props.conversationSession, props.initialConversationDefinitionId]);
+    void Promise.resolve(onInitialConversationComplete?.())
+      .catch((error) => console.warn('Could not finish the companion return handoff', error))
+      .then(showFeastleStoryHome);
+  }, [onInitialConversationComplete, props.conversationSession, props.initialConversationDefinitionId, showFeastleStoryHome]);
   const beginFeastleIntroduction = useCallback(() => {
     // The card press is the launch authority. Clear any request left behind by
     // a previous mount so a failed/pre-hydration attempt cannot swallow taps.
@@ -701,6 +711,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   }, [route.kind]);
 
   useEffect(() => {
+    if (mossproutActionDashboard) return;
     Keyboard.dismiss();
     resetViewport();
     const frame = requestAnimationFrame(resetViewport);
@@ -712,7 +723,31 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       cancelAnimationFrame(frame);
       clearTimeout(settled);
     };
-  }, [resetViewport, viewportResetKey]);
+  }, [mossproutActionDashboard, resetViewport, viewportResetKey]);
+
+  useEffect(() => {
+    if (!mossproutActionDashboard) {
+      setMossproutHubEntranceSettled(false);
+      setMossproutHubViewportSettled(false);
+      return;
+    }
+    setMossproutHubEntranceSettled(false);
+    setMossproutHubViewportSettled(false);
+    Keyboard.dismiss();
+    const viewportTimer = setTimeout(() => {
+      setMossproutHubViewportSettled(true);
+    }, reduceMotion ? 140 : 280);
+    // Keep action motion behind a deterministic JS-side settling window. This
+    // avoids coupling the page mount to a native layout-animation callback.
+    const entranceTimer = setTimeout(
+      () => setMossproutHubEntranceSettled(true),
+      reduceMotion ? 180 : 360,
+    );
+    return () => {
+      clearTimeout(viewportTimer);
+      clearTimeout(entranceTimer);
+    };
+  }, [mossproutActionDashboard, reduceMotion]);
 
   useEffect(() => {
     if (!activeAttemptId) return;
@@ -1031,7 +1066,11 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       }
       if (props.journeyDefinition) {
         if (!props.journeyConversation) props.onStartJourneyConversation();
-        experience.openJourneyQuestionnaire(props.journeyConversation?.id);
+        if (props.familyId === 'mossprout') {
+          experience.openFocusQuestionnaire(props.journeyConversation?.id);
+        } else {
+          experience.openJourneyQuestionnaire(props.journeyConversation?.id);
+        }
         return;
       }
       selectDestination('goals');
@@ -1057,7 +1096,11 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const openJourneyFocus = () => {
     if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
     if (!props.journeyConversation) props.onStartJourneyConversation();
-    experience.openJourneyQuestionnaire(props.journeyConversation?.id);
+    if (props.familyId === 'mossprout') {
+      experience.openFocusQuestionnaire(props.journeyConversation?.id);
+    } else {
+      experience.openJourneyQuestionnaire(props.journeyConversation?.id);
+    }
   };
   const destinationHeroTitle = destination === 'quest'
     ? directQuestOrigin
@@ -1169,7 +1212,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             onCreatureReady={() => setTransitionCreatureReady(true)}
             rewardPulseKey={rewardPulseKey}
             sceneTranslateX={environmentPan.translateX}
-            onSpeechBubblePress={conversationExperience && conversationFlow.phase !== 'awaiting_choice' && conversationFlow.phase !== 'committing'
+            onSpeechBubblePress={conversationExperience
+              && !conversationFlow.requiresManualAdvance
+              && conversationFlow.phase !== 'awaiting_choice'
+              && conversationFlow.phase !== 'committing'
               ? conversationFlow.advance
               : undefined}
             showSpeechBubble
@@ -1367,7 +1413,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             ref={contentRef}
             automaticallyAdjustContentInsets={false}
             automaticallyAdjustKeyboardInsets={false}
-            bounces={!activeAttemptId}
+            bounces={!activeAttemptId && !mossproutActionDashboard}
             contentContainerStyle={[
               styles.scrollContent,
               route.kind === 'dashboard' && styles.dashboardScrollContent,
@@ -1380,10 +1426,11 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             ]}
             contentInsetAdjustmentBehavior="never"
             keyboardShouldPersistTaps="handled"
-            onContentSizeChange={activeAttemptId || route.kind === 'dashboard' ? resetViewport : undefined}
-            onLayout={activeAttemptId || route.kind === 'dashboard' ? resetViewport : undefined}
-            overScrollMode={activeAttemptId ? 'never' : 'auto'}
-            scrollEnabled={!activeAttemptId && !questionnaireExperience}
+            onContentSizeChange={activeAttemptId || (route.kind === 'dashboard' && !mossproutActionDashboard) ? resetViewport : undefined}
+            onLayout={activeAttemptId || (route.kind === 'dashboard' && !mossproutActionDashboard) ? resetViewport : undefined}
+            overScrollMode={activeAttemptId || mossproutActionDashboard ? 'never' : 'auto'}
+            scrollEnabled={!activeAttemptId && !questionnaireExperience && !mossproutActionDashboard}
+            style={mossproutActionDashboard ? styles.mossproutActionViewport : undefined}
             showsVerticalScrollIndicator={false}>
             <Animated.View
               key={destination ?? route.kind}
@@ -1392,6 +1439,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               style={[
                 activeAttemptId || questionnaireExperience ? styles.activeExperience : undefined,
                 route.kind === 'dashboard' && styles.dashboardExperience,
+                mossproutActionDashboard && styles.mossproutActionExperience,
               ]}>
               {(route.kind === 'destination' || route.kind === 'dashboard' || route.kind === 'shared_history' || quickGoalPickerOpen) && !questionnaireExperience ? (
                 <View
@@ -1403,6 +1451,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                       minHeight: companionHubHeroSpacer(viewportHeight),
                     },
                     route.kind === 'dashboard' && styles.dashboardStageSpacer,
+                    mossproutActionDashboard && styles.mossproutActionStageSpacer,
                     destination === 'quest' && {
                       minHeight: companionQuestListSpacer(viewportHeight),
                     },
@@ -1497,6 +1546,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                 <CompanionJourneyQuestionnairePage
                   accentColor={props.accentColor}
                   background={props.questionnaireBackground}
+                  bondProgress={displayedBondProgress}
                   companionName={props.name}
                   conversation={props.journeyConversation}
                   creature={visual.source}
@@ -1507,12 +1557,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   onAddTasks={props.onAddQuickGoalSuggestions}
                   onAnswer={props.onAnswerJourneyConversation}
                   onBack={requestClose}
+                  onDone={experience.showHome}
                   onDismissTasks={props.onDismissQuickGoalSuggestions}
-                  onViewTasks={() => {
-                    props.onDismissQuickGoalSuggestions();
-                    experience.returnToDestination();
-                    selectDestination('goals');
-                  }}
+                  onOpenMore={experience.showHome}
+                  presentation={props.familyId === 'mossprout' ? 'conversation' : 'immersive'}
                   quickGoalSuggestionIds={props.quickGoalSuggestionIds}
                   resultReady={Boolean(journeyQuestionnaireSessionId && !props.journeyConversation)}
                   visualKey={props.visualKey}
@@ -1546,7 +1594,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   onSkipGoal={props.onSkipQuickGoal}
                   onSnoozeGoal={props.onSnoozeQuickGoal}
                   onUndoGoal={props.onUndoQuickGoal}
-                  onDashboard={() => setShowMossproutDashboard(true)}
+                  onDashboard={openHistory}
                   onOpenConversation={(definitionId) => {
                     pendingStoryConversationRef.current = null;
                     openedStoryConversationRef.current = null;
@@ -1561,6 +1609,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                     selectDestination('quest');
                   }}
                   onBondRewardRequest={requestStoryReward}
+                  motionReady={mossproutHubEntranceSettled && mossproutHubViewportSettled}
                   swipeExternalGesture={environmentPan.gesture}
                 />
               ) : route.kind === 'dashboard' && props.familyId === 'baristabbit' && !showBaristabbitDashboard ? (
@@ -1875,7 +1924,10 @@ const styles = StyleSheet.create({
   youStageSpacer: { minHeight: 188 },
   scrollContent: { paddingBottom: 12, paddingHorizontal: 4 },
   dashboardScrollContent: { flexGrow: 1 },
-  mossproutActionScrollContent: { paddingHorizontal: KatchaUI.layout.phoneGutter + 4 },
+  mossproutActionScrollContent: { flexGrow: 1, overflow: 'hidden', paddingHorizontal: KatchaUI.layout.phoneGutter + 4 },
+  mossproutActionExperience: { flex: 1, minHeight: 0 },
+  mossproutActionStageSpacer: { flex: 1, minHeight: 0 },
+  mossproutActionViewport: { flex: 1 },
   dashboardExperience: { flexGrow: 1 },
   dashboardStageSpacer: { flexGrow: 1 },
   activeScrollContent: { flexGrow: 1, paddingBottom: 0, paddingHorizontal: 0 },

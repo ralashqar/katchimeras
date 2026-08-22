@@ -86,6 +86,11 @@ export type MergeGeneratorState = {
   chainIds: [MergeChainId, MergeChainId];
   tierOneDropDefinitionIds: [string, string];
   forcedDropDefinitionId: string | null;
+  /** Personal-world production replaces the retired universal Energy wallet. */
+  capacity: number;
+  charges: number;
+  restDurationMs: number;
+  restStartedAt: number | null;
 };
 
 export type MossproutBoardChapter = 'quiet_patch' | 'returning_pond' | 'memory_nursery' | 'heartwood';
@@ -336,7 +341,9 @@ export type MergeStepEnergyDay = {
 };
 
 export type MergeWorldState = {
-  version: 17;
+  version: 18;
+  /** The first personal Merge World is owned by Mossprout. */
+  ownerCharacterId: 'mossprout';
   revision: number;
   createdAt: number;
   updatedAt: number;
@@ -423,7 +430,7 @@ export type MergeWorldCommand =
 
 export type MergeWorldFailureReason =
   | 'locked_cell'
-  | 'no_energy'
+  | 'generator_resting'
   | 'board_full'
   | 'wrong_echo_match'
   | 'sealed_mist';

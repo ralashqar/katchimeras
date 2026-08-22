@@ -79,6 +79,10 @@ export function useCompanionExperienceController({
     (sessionId?: string | null) => dispatch({ type: 'open_journey_questionnaire', sessionId }),
     []
   );
+  const openFocusQuestionnaire = useCallback(
+    (sessionId?: string | null) => dispatch({ type: 'open_focus_questionnaire', sessionId }),
+    []
+  );
   const syncJourneySession = useCallback(
     (sessionId: string) => dispatch({ type: 'sync_journey_session', sessionId }),
     []
@@ -119,8 +123,8 @@ export function useCompanionExperienceController({
     activeAttemptId: state.route.kind === 'quest_experience' ? state.route.attemptId : null,
     questExperienceOpen: state.route.kind === 'quest_experience',
     quickGoalPickerOpen: state.route.kind === 'quick_goal_picker',
-    journeyQuestionnaireOpen: state.route.kind === 'journey_questionnaire',
-    journeyQuestionnaireSessionId: state.route.kind === 'journey_questionnaire'
+    journeyQuestionnaireOpen: state.route.kind === 'journey_questionnaire' || state.route.kind === 'focus_questionnaire',
+    journeyQuestionnaireSessionId: state.route.kind === 'journey_questionnaire' || state.route.kind === 'focus_questionnaire'
       ? state.route.sessionId
       : null,
     checkInOpen: state.route.kind === 'check_in',
@@ -136,6 +140,7 @@ export function useCompanionExperienceController({
     openQuickGoalPicker,
     openIntroduction,
     openJourneyQuestionnaire,
+    openFocusQuestionnaire,
     syncJourneySession,
     openCheckIn,
     openQuestExperience,

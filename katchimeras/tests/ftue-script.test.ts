@@ -4,9 +4,17 @@ import test from 'node:test';
 
 import { FTUE_ACTION_CATALOG, FTUE_HANDLER_REGISTRY } from '@/features/onboarding/ftue-action-registry';
 import { ftueHidesBottomBar, ftueOwnsOpeningHome } from '@/features/onboarding/ftue-navigation-policy';
-import { MOSSPROUT_FTUE_SCRIPT, mossproutFtueAction, validateMossproutFtueScript } from '@/features/onboarding/mossprout-ftue-script';
+import { FTUE_EGG_ANSWER_GROWTH_REWARD, MOSSPROUT_FTUE_SCRIPT, mossproutFtueAction, validateMossproutFtueScript } from '@/features/onboarding/mossprout-ftue-script';
 import { mossproutFtueConversationDefinitions } from '@/constants/mossprout-ftue-conversations';
 import { buildYesterdayStepEnergyOffer, mergeStepEnergyPreview } from '@/utils/merge-world/economy-policy';
+import {
+  FTUE_OPENING_CAMERA_DURATION_MS,
+  FTUE_OPENING_UI_DELAY_MS,
+  FTUE_OPENING_CAMERA_PAN_Y,
+  clampFtueCameraPanToCoverage,
+  ftueHomeCameraPanTarget,
+  ftueHomeCameraPinchTarget,
+} from '@/features/onboarding/ftue-home-camera';
 
 test('Mossprout FTUE script has valid transitions and registered handlers', () => {
   assert.deepEqual(validateMossproutFtueScript(), []);
@@ -21,7 +29,6 @@ test('the Egg asks three focused questions before Hatch and each offers privacy'
   const opening = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'egg.opening');
   assert.equal(opening?.actions.length, 1);
   const personalSteps = ['egg.opening', 'egg.context', 'egg.mind'].map((id) => MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === id));
-  assert.equal(personalSteps.length, 3);
   personalSteps.forEach((step) => {
     assert.equal(step?.actions.length, 1);
     assert.ok(step?.actions[0]?.options?.some((option) => option.private));
@@ -41,9 +48,10 @@ test('every Egg question keeps Home focused and normal Hatch is impossible durin
   assert.match(controller, /!allowDailyHatch[\s\S]*?hatchingActiveRef\.current/);
 });
 
-test('script migration rechecks a cached two-answer run instead of bypassing the third question', () => {
+test('script migration restores skipped Egg questions before Hatch', () => {
   const runtime = readFileSync('features/onboarding/ftue-runtime.ts', 'utf8');
-  assert.match(runtime, /run\.stepId === 'egg\.ready'[\s\S]*?run\.answers\['egg\.mind\.focus'\] == null/);
+  assert.match(runtime, /run\.stepId === 'egg\.ready'[\s\S]*?run\.answers\['egg\.context\.activity'\] == null/);
+  assert.match(runtime, /pendingEggQuestion[\s\S]*?\? pendingEggQuestion/);
   assert.match(runtime, /if \(snapshot === undefined\)[\s\S]*?const migrated = migrateCurrentScript\(snapshot\)/);
   assert.doesNotMatch(runtime, /if \(snapshot !== undefined\) return snapshot/);
   assert.match(runtime, /needsPreParcelHavenReveal[\s\S]*?run\.scriptVersion < 16[\s\S]*?run\.stepId === 'discovery\.steppling\.parcel'/);
@@ -55,11 +63,14 @@ test('backend catalog contains only allowlisted privacy-safe action ids', () => 
 });
 
 test('Supabase receipt allowlist matches every backend FTUE action', () => {
-  const migration = readFileSync('supabase/migrations/20260818170000_register_mossprout_ftue_v16.sql', 'utf8');
+  const migration = readFileSync('supabase/migrations/20260822173032_register_mossprout_ftue_v17.sql', 'utf8');
+  const priorMigration = readFileSync('supabase/migrations/20260818170000_register_mossprout_ftue_v16.sql', 'utf8');
   for (const item of FTUE_ACTION_CATALOG.filter((entry) => entry.backendEvent)) {
-    assert.match(migration, new RegExp(`'${item.stepId}',\\s*'${item.actionId}'`));
+    assert.match(priorMigration, new RegExp(`'${item.stepId}',\\s*'${item.actionId}'`));
   }
-  assert.doesNotMatch(migration, /option_id|option_label|answer_text/);
+  assert.match(migration, /script_version = 16/);
+  assert.doesNotMatch(migration, /step_id not in/);
+  assert.doesNotMatch(`${priorMigration}\n${migration}`, /option_id|option_label|answer_text/);
 });
 
 test('Chapter 0 previews its requests and keeps the first-session board tutorial to merge then serve', () => {
@@ -70,7 +81,7 @@ test('Chapter 0 previews its requests and keeps the first-session board tutorial
   const finalServeStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.serve_plant');
   const sproutEchoStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.plant.sprout_pair');
   assert.equal(mossproutFtueAction('merge.seed_drag', 'merge.create_sprout')?.handlerId, 'merge_item_created');
-  assert.equal(mergeStep?.edges?.[0]?.nextStepId, 'merge.plant.sprout_pair');
+  assert.equal(mergeStep?.edges?.[0]?.nextStepId, 'merge.serve_sprout');
   assert.equal(sproutEchoStep?.edges?.[0]?.nextStepId, 'merge.serve_plant');
   assert.equal(spawnStep?.edges?.[0]?.requiredCount, undefined);
   assert.equal(pairStep?.edges?.[0]?.event.type, 'dream_echo_cleared');
@@ -104,7 +115,7 @@ test('Chapter 0 previews its requests and keeps the first-session board tutorial
   assert.ok(mossproutFtueAction('companion.order_preview', 'companion.open_garden'));
 });
 
-test('FTUE step energy checks yesterday, skips below 300, and always exposes the return action', () => {
+test('FTUE step conversion is retired from the Mossprout first session', () => {
   const today = readFileSync('app/(tabs)/today.tsx', 'utf8');
   const pedometer = readFileSync('utils/pedometer-steps.ts', 'utf8');
   const nurture = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
@@ -131,14 +142,11 @@ test('FTUE step energy checks yesterday, skips below 300, and always exposes the
   assert.match(scriptedActions, /energy\.convert_steps/);
   assert.match(feed, /pendingMergeEnergyTokenArriveRef/);
   assert.equal(mergeStepEnergyPreview(299), 0);
-  assert.equal(mergeStepEnergyPreview(300), 1);
-  assert.equal(mergeStepEnergyPreview(6_300), 21);
-  assert.equal(mergeStepEnergyPreview(30_000), 100);
+  assert.equal(mergeStepEnergyPreview(300), 0);
+  assert.equal(mergeStepEnergyPreview(6_300), 0);
+  assert.equal(mergeStepEnergyPreview(30_000), 0);
   assert.equal(buildYesterdayStepEnergyOffer({ dayId: '2026-08-14', observedAt: '2026-08-14T23:59:00.000Z', observedSteps: 299 }), null);
-  assert.deepEqual(
-    buildYesterdayStepEnergyOffer({ dayId: '2026-08-14', observedAt: '2026-08-14T23:59:00.000Z', observedSteps: 300 }),
-    { dayId: '2026-08-14', energy: 1, observedAt: '2026-08-14T23:59:00.000Z', observedSteps: 300 },
-  );
+  assert.equal(buildYesterdayStepEnergyOffer({ dayId: '2026-08-14', observedAt: '2026-08-14T23:59:00.000Z', observedSteps: 300 }), null);
   assert.equal(mossproutFtueAction('energy.steps_reward', 'energy.return')?.title, 'Back to Mossprout');
 });
 
@@ -260,11 +268,14 @@ test('FTUE returns from the Garden and completes on Mossprout with a fresh Garde
   const today = readFileSync('app/(tabs)/today.tsx', 'utf8');
   const merge = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   const companion = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
+  const interaction = readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
   const kingdom = readFileSync('components/katchadeck/world/kingdom-companion-screen.tsx', 'utf8');
   const repository = readFileSync('utils/merge-world/repository.ts', 'utf8');
   const transition = readFileSync('features/navigation/game-screen-transition.tsx', 'utf8');
   assert.match(merge, /ftueRun\.stepId !== 'companion\.chapter_zero_return'[\s\S]*?target: 'companion'[\s\S]*?ftue: 'chapter-zero-return'/);
   assert.match(companion, /const nextRun = commitFtueAction\(\{ actionId: 'companion\.complete_chapter_zero_return'[\s\S]*?nextRun\?\.status === 'complete'[\s\S]*?seedStoredMossproutGardenAfterFtue/);
+  assert.match(companion, /return seedStoredMossproutGardenAfterFtue[\s\S]*?\.then\(\(\) => undefined\)/);
+  assert.match(interaction, /Promise\.resolve\(onInitialConversationComplete\?\.\(\)\)[\s\S]*?\.then\(showFeastleStoryHome\)/);
   assert.doesNotMatch(companion, /commitFtueAction\(\{ actionId: 'companion\.complete_chapter_zero_return'[\s\S]{0,500}?router\.dismissTo\('\/katchimeras'\)/);
   assert.match(repository, /seedStoredMossproutGardenAfterFtue[\s\S]*?completeMossproutChapterZeroSlice[\s\S]*?reconcileCharacterActivity[\s\S]*?status: 'complete'/);
   assert.match(kingdom, /ftueConversationDefinitionId === MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID[\s\S]*?receipt\.kind === 'journey_day_completed'[\s\S]*?return;/);
@@ -296,15 +307,7 @@ test('the tabless opening uses a centered full-bleed Home camera without scaling
   assert.match(home, /<\/Animated\.View>[\s\S]*?<View[\s\S]*style=\{\[styles\.chrome/);
 });
 
-test('the opening camera slowly pinches in before revealing UI and retreats across three questions', async () => {
-  const {
-    FTUE_OPENING_CAMERA_DURATION_MS,
-    FTUE_OPENING_UI_DELAY_MS,
-    FTUE_OPENING_CAMERA_PAN_Y,
-    clampFtueCameraPanToCoverage,
-    ftueHomeCameraPanTarget,
-    ftueHomeCameraPinchTarget,
-  } = await import('../features/onboarding/ftue-home-camera');
+test('the opening camera pinches in before revealing UI and retreats across three questions', () => {
   const route = readFileSync('app/(tabs)/today.tsx', 'utf8');
   const nurture = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
   const motion = readFileSync('components/katchadeck/home/today-environment-motion.tsx', 'utf8');
@@ -366,8 +369,7 @@ test('the opening camera slowly pinches in before revealing UI and retreats acro
   assert.match(nurture, /HOME_FTUE_CAMERA_Y_OFFSET \* onboardingCameraProgress\.value[\s\S]*?clampedOnboardingCameraPanY\.value/);
 });
 
-test('each Discovery Egg answer grants the same visual Growth', async () => {
-  const { FTUE_EGG_ANSWER_GROWTH_REWARD, MOSSPROUT_FTUE_SCRIPT } = await import('../features/onboarding/mossprout-ftue-script');
+test('each Discovery Egg answer grants the same visual Growth', () => {
   const questionSteps = MOSSPROUT_FTUE_SCRIPT.steps.filter((step) =>
     ['egg.opening', 'egg.context', 'egg.mind'].includes(step.id)
   );

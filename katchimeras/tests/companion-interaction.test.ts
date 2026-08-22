@@ -17,6 +17,7 @@ import {
   companionQuestSkipsPreview,
   companionQuestUsesFullBleed,
   companionViewportResetKey,
+  companionInitialConversationCompletionReady,
   createCompanionInteractionState,
   insightForArchetype,
 } from '@/utils/companion-interaction';
@@ -228,7 +229,8 @@ test('conversation replies, memories, and outcomes advance without redundant con
   );
   assert.doesNotMatch(scene, /Change answer|Yes, remember this/);
   assert.match(scene, /<ConversationOutcomeCard/);
-  assert.match(scene, /const panelMaxHeight = Math\.min\(440, Math\.max\(220, height \* 0\.46\)\)/);
+  assert.match(scene, /useCompanionAdaptivePanel/);
+  assert.match(scene, /onContentSizeChange=\{\(_, contentHeight\) => adaptivePanel\.onContentHeightChange\(contentHeight\)\}/);
   assert.match(scene, /nestedScrollEnabled/);
   assert.doesNotMatch(scene, /minHeight: height/);
   assert.doesNotMatch(scene, /CONVERSATION TAKEAWAY|Finish this thought|reflection_reveal/);
@@ -346,6 +348,33 @@ test('FTUE companion launch starts on conversation without a dashboard frame', (
   assert.equal(state.destination, null);
 });
 
+test('FTUE waits for the player to dismiss a completed conversation result', () => {
+  const definitionId = 'mossprout:ftue:chapter-zero-return';
+  const completed = {
+    definitionId,
+    status: 'completed' as const,
+  };
+  assert.equal(companionInitialConversationCompletionReady({
+    ...completed,
+    outcomePresentation: {
+      id: 'outcome:quiet-clearing',
+      kind: 'insight' as const,
+      eyebrow: 'YOUR NATURE RESULT',
+      title: 'A Quiet Clearing',
+      message: 'The garden can become somewhere the volume comes down.',
+      celebrate: true,
+      createdAt: 1,
+    },
+  }, definitionId), false);
+  assert.equal(companionInitialConversationCompletionReady(completed, definitionId), true);
+  assert.equal(companionInitialConversationCompletionReady(completed, 'another-conversation'), false);
+
+  const interaction = fs.readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
+  assert.match(interaction, /!conversationFlow\.requiresManualAdvance[\s\S]*?conversationFlow\.advance/);
+  assert.match(interaction, /companionInitialConversationCompletionReady\(session, definitionId\)/);
+  assert.match(interaction, /conversationSession\.outcomePresentation[\s\S]*?initialConversationObservedActiveRef\.current = true/);
+});
+
 test('a completed FTUE return cannot replay after an ordinary Garden visit', () => {
   const route = fs.readFileSync('app/katchimera/[creatureId].tsx', 'utf8');
   const interaction = fs.readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
@@ -419,6 +448,25 @@ test('focused companion routes unwind to their destination, then home, then King
   assert.equal(companionRouteBackAction(home), 'close_experience');
 });
 
+test('Mossprout nature direction is a standalone focused route that backs directly home', () => {
+  const initial = createCompanionInteractionState({});
+  const questionnaire = companionInteractionReducer(initial, {
+    type: 'open_focus_questionnaire',
+    sessionId: 'nature-direction-1',
+  });
+
+  assert.deepEqual(questionnaire.route, {
+    kind: 'focus_questionnaire',
+    sessionId: 'nature-direction-1',
+  });
+  assert.equal(questionnaire.destination, null);
+  assert.equal(companionRouteBackAction(questionnaire), 'return_to_home');
+  assert.deepEqual(
+    companionInteractionReducer(questionnaire, { type: 'return_to_destination' }).route,
+    { kind: 'dashboard' },
+  );
+});
+
 test('the launch chat lobby nests conversations while Shared History returns to the dashboard', () => {
   const initial = createCompanionInteractionState({});
   const chat = companionInteractionReducer(initial, { type: 'show_chat_lobby' });
@@ -490,14 +538,13 @@ test('companion scene panels share one palette, stay anchored, and bound speech 
   for (const panel of [chat, visit]) {
     assert.match(panel, /height: Math\.min\(440, Math\.max\(220, height \* 0\.46\)\)/);
   }
-  assert.match(conversation, /height: panelHeight/);
+  assert.match(conversation, /height: adaptivePanel\.panelHeight/);
   assert.match(conversation, /activeGameQuestion\?\.id \?\? 'no-question'/);
   assert.match(conversation, /key=\{panelContentKey\}/);
-  assert.match(conversation, /LinearTransition\.duration\(180\)/);
-  assert.match(conversation, /PANEL_SCROLL_VERTICAL_PADDING/);
-  assert.match(conversation, /onContentSizeChange=\{\(_, contentHeight\) =>/);
-  assert.match(conversation, /optionInk/);
-  assert.match(conversation, /const shortPanelBottomLift = panelScrollable/);
+  assert.match(conversation, /LinearTransition\.duration\(COMPANION_PANEL_LAYOUT_DURATION_MS\)/);
+  assert.match(conversation, /useCompanionAdaptivePanel/);
+  assert.match(conversation, /onContentSizeChange=\{\(_, contentHeight\) => adaptivePanel\.onContentHeightChange\(contentHeight\)\}/);
+  assert.match(conversation, /const shortPanelBottomLift = adaptivePanel\.scrollable/);
   assert.match(conversation, /paddingBottom: 20/);
   assert.match(interaction, /<GestureDetector gesture=\{environmentPan\.gesture\}>/);
   assert.match(interaction, /sceneTranslateX=\{environmentPan\.translateX\}/);
@@ -515,20 +562,37 @@ test('Mossprout owns a compact Journey action stack without redundant headings o
   const dashboard = fs.readFileSync(path.join(worldPath, 'companion-dashboard.tsx'), 'utf8');
   const sharedRows = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'day-action-row.tsx'), 'utf8');
   const sharedGoalRow = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'day-action-goal-row.tsx'), 'utf8');
+  const actionTransition = fs.readFileSync(path.join(process.cwd(), 'hooks', 'use-katchimera-action-transition.ts'), 'utf8');
   const today = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'home', 'today-nurture-experience.tsx'), 'utf8');
 
   assert.match(mossprout, /resolveMossproutDayActions/);
   assert.doesNotMatch(mossprout, /slice\(0, 3\)/);
-  assert.match(mossprout, /composeMossproutVisibleActions\(actions, completingAction\)/);
-  assert.match(mossprout, /key=\{`\$\{dayId\}:\$\{action\.id\}`\}/);
-  assert.match(mossprout, /useDayActionStackPresentation/);
-  assert.match(mossprout, /actionStack\.entryDelayMs/);
-  assert.match(mossprout, /animateLayout=\{actionStack\.isMoving/);
+  assert.match(mossprout, /const MAX_VISIBLE_ACTIONS = 3/);
+  assert.match(mossprout, /composeMossproutVisibleActions\(actions, completingAction, MAX_VISIBLE_ACTIONS\)/);
+  assert.match(mossprout, /presentedActions\.map\(\(presentedAction\) =>/);
+  assert.match(mossprout, /key=\{presentedActionKey\}/);
+  assert.match(mossprout, /useKatchimeraActionStackTransition/);
+  assert.match(mossprout, /start=\{actionTransition\.isStartingCompletion\(presentedActionKey\)\}/);
+  assert.doesNotMatch(mossprout, /animateLayout=\{false\}/);
   assert.match(mossprout, /<DayActionGoalRow/);
   assert.match(mossprout, /<QuickGoalActionModal/);
-  assert.match(mossprout, /setSelfCompletingGoalAction\(action\)/);
+  assert.match(mossprout, /setSelfCompletingGoalAction\(presentedAction\)/);
   assert.match(mossprout, /recordHandledKatchimeraActionCompletion/);
   assert.match(sharedRows, /animateLayout \? LinearTransition/);
+  assert.match(sharedRows, /if \(!start\) return/);
+  assert.doesNotMatch(sharedRows, /\.withCallback\(/);
+  assert.match(interaction, /motionReady=\{mossproutHubEntranceSettled && mossproutHubViewportSettled\}/);
+  assert.match(interaction, /const entranceTimer = setTimeout\([\s\S]*?setMossproutHubEntranceSettled\(true\)/);
+  assert.doesNotMatch(interaction, /enteringBase\.withCallback/);
+  assert.doesNotMatch(interaction, /runOnJS\(markMossproutHubEntranceSettled\)/);
+  assert.match(actionTransition, /'settling'[\s\S]*?'inserting'[\s\S]*?'completing'[\s\S]*?'awaiting_source'[\s\S]*?'compacting'/);
+  assert.match(actionTransition, /departedId: id,[\s\S]*?items: current\.items,[\s\S]*?phase: 'awaiting_source'[\s\S]*?acknowledgeRef\.current\(completedItem\)/);
+  assert.match(actionTransition, /nextItems\[departureIndex\] = replacementItem/);
+  assert.match(actionTransition, /items: \[\.\.\.refreshed, missingItem\]/);
+  assert.doesNotMatch(actionTransition, /\.sort\(/);
+  assert.match(actionTransition, /const STACK_COMPACTION_MS = 330/);
+  assert.match(actionTransition, /const STACK_ENTRY_MS = 320/);
+  assert.match(actionTransition, /presentation\.phase !== 'compacting' && presentation\.phase !== 'inserting'/);
   assert.match(sharedRows, /export const DAY_ACTION_MOTION/);
   assert.match(sharedGoalRow, /GoalCompletionCelebration/);
   assert.match(sharedGoalRow, /artRotation\.value = withSequence/);
@@ -551,8 +615,11 @@ test('Mossprout owns a compact Journey action stack without redundant headings o
   assert.match(sharedRows, /skipFramePositionStyle = useMemo\(\(\) => \(\{ left: windowWidth \}\)/);
   assert.match(sharedRows, /skipFrame: \{[^}]*borderRadius: 20[^}]*overflow: 'hidden'/);
   assert.match(interaction, /fullWidth=\{mossproutActionDashboard\}/);
-  assert.match(interaction, /mossproutActionScrollContent: \{ paddingHorizontal: KatchaUI\.layout\.phoneGutter \+ 4 \}/);
-  assert.match(mossprout, /maxHeight: 276/);
+  assert.match(interaction, /mossproutActionScrollContent: \{ flexGrow: 1, overflow: 'hidden', paddingHorizontal: KatchaUI\.layout\.phoneGutter \+ 4 \}/);
+  assert.match(mossprout, /const ACTION_STACK_HEIGHT = 212/);
+  assert.match(mossprout, /const ACTION_TRAY_HEIGHT = 273/);
+  assert.match(mossprout, /height: ACTION_TRAY_HEIGHT/);
+  assert.match(mossprout, /height: ACTION_STACK_HEIGHT/);
   assert.match(mossprout, /overflow: 'visible'/);
   assert.match(interaction, /nameplateTitle=\{mossproutNameplate\?\.title\}/);
   assert.doesNotMatch(mossprout, /label="Talk"|onTalk/);
@@ -573,6 +640,74 @@ test('completed action rows preserve their outro while Bond reward renders updat
   assert.match(sharedRows, /claimRewardAnimation\(rewardAnimationId\)/);
   assert.match(sharedRows, /REWARD_REPLAY_GUARD_MS = 12_000/);
   assert.doesNotMatch(sharedRows, /\[chargeGlow, onFinished,/);
+});
+
+test('Mossprout nature direction keeps its legacy content inside the modern shell and returns home from Done', () => {
+  const homeModel = fs.readFileSync(
+    path.join(process.cwd(), 'game', 'katchimeras', 'mossprout-home.ts'),
+    'utf8',
+  );
+  const stage = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'mossprout-story-stage.tsx'),
+    'utf8',
+  );
+  const interaction = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'),
+    'utf8',
+  );
+  const journeyThread = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-journey-thread.tsx'),
+    'utf8',
+  );
+  const questionnaireScene = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-questionnaire-scene.tsx'),
+    'utf8',
+  );
+  const conversationScene = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-conversation-scene.tsx'),
+    'utf8',
+  );
+  const choiceList = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-choice-list.tsx'),
+    'utf8',
+  );
+  const adaptivePanel = fs.readFileSync(
+    path.join(process.cwd(), 'hooks', 'use-companion-adaptive-panel.ts'),
+    'utf8',
+  );
+  const journeyDefinitions = fs.readFileSync(
+    path.join(process.cwd(), 'constants', 'companion-journeys.ts'),
+    'utf8',
+  );
+
+  assert.match(homeModel, /goal \? \{ kind: 'focus_questionnaire' \}/);
+  assert.match(stage, /action\.destination\.kind === 'focus_questionnaire'[\s\S]*?onOpenFocusDirection\(\)/);
+  assert.match(interaction, /presentation=\{props\.familyId === 'mossprout' \? 'conversation' : 'immersive'\}/);
+  assert.match(interaction, /onDone=\{experience\.showHome\}/);
+  assert.match(interaction, /const openJourneyFocus = \(\) =>[\s\S]*?experience\.openFocusQuestionnaire/);
+  assert.match(questionnaireScene, /presentation\?: 'immersive' \| 'conversation'/);
+  assert.match(questionnaireScene, /conversationPanel/);
+  assert.match(questionnaireScene, /useCompanionAdaptivePanel/);
+  assert.match(questionnaireScene, /LinearTransition\.duration\(COMPANION_PANEL_LAYOUT_DURATION_MS\)/);
+  assert.match(questionnaireScene, /adaptivePanel\.onContentHeightChange\(contentHeight\)/);
+  assert.match(questionnaireScene, /paddingBottom: conversationPresentation \? insets\.bottom \+ 16 : 0/);
+  assert.match(questionnaireScene, /<CompanionChoiceList/);
+  assert.match(conversationScene, /<CompanionChoiceList/);
+  assert.doesNotMatch(conversationScene, /useGrid|optionColumns|width: useGrid/);
+  assert.match(choiceList, /companionChoiceColumnCount\(width, options\.length\) === 2/);
+  assert.match(choiceList, /width: useGrid \? '48%' : '100%'/);
+  assert.match(choiceList, /presentation === 'responsive-grid'/);
+  assert.match(adaptivePanel, /const availableHeight = viewportHeight[\s\S]*?const panelHeight = Math\.min/);
+  assert.match(adaptivePanel, /viewportWidth >= 360 && optionCount >= 4 \? 2 : 1/);
+  assert.match(adaptivePanel, /COMPANION_PANEL_LAYOUT_DURATION_MS = 220/);
+  assert.match(journeyThread, /label="Done"/);
+  assert.match(journeyThread, /choicePresentation=\{presentation === 'conversation' \? 'single-column' : 'responsive-grid'\}/);
+  assert.match(journeyThread, /helperText=\{presentation === 'conversation' \? undefined : node\.helperText\}/);
+  assert.match(journeyThread, /icon: presentation === 'conversation'[\s\S]*?\? undefined/);
+  assert.doesNotMatch(journeyThread, /label=\{added \|\| alreadyAdded \? 'View tasks'/);
+  assert.match(journeyDefinitions, /What would you like to notice or experience through nearby nature\?/);
+  assert.match(journeyDefinitions, /Where is that most possible for you\?/);
+  assert.match(journeyDefinitions, /What nearby-nature direction feels realistic now\?/);
 });
 
 test('Mossprout home reads Garden orders with or without the retained Merge provider', () => {
@@ -852,7 +987,12 @@ test('companion viewport resets across destinations and content-shape transition
     'utf8',
   );
   assert.match(interaction, /route\.kind === 'dashboard'[\s\S]*?scrollToEnd\(\{ animated: false \}\)/);
-  assert.match(interaction, /onContentSizeChange=\{activeAttemptId \|\| route\.kind === 'dashboard' \? resetViewport : undefined\}/);
+  assert.match(interaction, /onContentSizeChange=\{activeAttemptId \|\| \(route\.kind === 'dashboard' && !mossproutActionDashboard\) \? resetViewport : undefined\}/);
+  assert.match(interaction, /bounces=\{!activeAttemptId && !mossproutActionDashboard\}/);
+  assert.match(interaction, /overScrollMode=\{activeAttemptId \|\| mossproutActionDashboard \? 'never' : 'auto'\}/);
+  assert.match(interaction, /scrollEnabled=\{!activeAttemptId && !questionnaireExperience && !mossproutActionDashboard\}/);
+  assert.match(interaction, /mossproutActionDashboard && styles\.mossproutActionStageSpacer/);
+  assert.match(interaction, /mossproutActionStageSpacer: \{ flex: 1, minHeight: 0 \}/);
 });
 
 test('quest offer exposes one focused acceptance action', () => {

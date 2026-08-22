@@ -976,7 +976,8 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
         const dormantNames = cell.mist?.kind === 'discovery_dormant'
           ? cell.mist.characterIds.map((id) => MERGE_CHARACTER_NAMES[id]).filter(Boolean)
           : [];
-        const label = generator ? `${generator.name}. Tap to make an item. Costs 1 Energy.`
+        const generatorState = occupant?.kind === 'generator' ? state.generators[occupant.generatorId] : null;
+        const label = generator ? `${generator.name}. ${generatorState?.charges ?? 0} of ${generatorState?.capacity ?? 0} finds ready. Tap to make an item.`
           : definition ? nextDefinition
             ? `${definition.name}. Merge with another ${definition.name} to make ${nextDefinition.name}.`
             : `${definition.name}. This item cannot be merged any further.`

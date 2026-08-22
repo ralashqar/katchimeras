@@ -91,9 +91,13 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
   const restartingLegacyMerge = run.status === 'active'
     && run.scriptVersion < 7
     && run.stepId.startsWith('merge.');
-  const needsThirdEggAnswer = run.status === 'active'
-    && run.stepId === 'egg.ready'
-    && run.answers['egg.mind.focus'] == null;
+  const pendingEggQuestion = run.status === 'active' && run.stepId === 'egg.ready'
+    ? run.answers['egg.context.activity'] == null
+      ? 'egg.context'
+      : run.answers['egg.mind.focus'] == null
+        ? 'egg.mind'
+        : null
+    : null;
   const needsHavenFocus = run.status === 'active'
     && run.scriptVersion < 15
     && run.stepId === 'haven.mossprout.restore';
@@ -102,7 +106,7 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
     && run.scriptVersion < 16
     && run.stepId === 'discovery.steppling.parcel'
     && !hasHavenRevealReceipt;
-  if (run.schemaVersion === 6 && run.scriptVersion === MOSSPROUT_FTUE_SCRIPT.version && !needsThirdEggAnswer) return run;
+  if (run.schemaVersion === 6 && run.scriptVersion === MOSSPROUT_FTUE_SCRIPT.version && !pendingEggQuestion) return run;
   const now = new Date().toISOString();
   if (replayDreamMistChapter) return {
     ...run,
@@ -132,8 +136,8 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
     ...run,
     schemaVersion: 6,
     scriptVersion: MOSSPROUT_FTUE_SCRIPT.version,
-    stepId: needsThirdEggAnswer
-      ? 'egg.mind'
+    stepId: pendingEggQuestion
+      ? pendingEggQuestion
       : restartingLegacyMerge
         ? 'companion.order_preview'
         : replacedDiscoverySteps.has(migratedStepId)

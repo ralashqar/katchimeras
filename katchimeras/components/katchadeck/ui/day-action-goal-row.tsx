@@ -24,6 +24,8 @@ const COMPLETION_WATCHDOG_MS = 3_200;
 export function DayActionGoalRow({
   animateLayout,
   artwork,
+  disabled = false,
+  enteringEnabled = true,
   entryDelayMs,
   externalGesture,
   label,
@@ -37,6 +39,8 @@ export function DayActionGoalRow({
 }: {
   animateLayout: boolean;
   artwork: ReactNode;
+  disabled?: boolean;
+  enteringEnabled?: boolean;
   entryDelayMs: number;
   externalGesture?: GestureType;
   label: string;
@@ -191,7 +195,8 @@ export function DayActionGoalRow({
   return (
     <DayActionActiveRow
       animateLayout={animateLayout}
-      disabled={completing}
+      disabled={completing || disabled}
+      enteringEnabled={enteringEnabled}
       entryDelayMs={entryDelayMs}
       externalGesture={externalGesture}
       label={label}
@@ -202,7 +207,7 @@ export function DayActionGoalRow({
             accessibilityHint="Opens goal options"
             accessibilityLabel={title}
             accessibilityRole="button"
-            disabled={completing}
+            disabled={completing || disabled}
             onPress={() => onOpen(beginCompletion)}
             style={({ pressed }) => pressed && styles.pressed}>
             <DayActionCardSurface
@@ -216,7 +221,7 @@ export function DayActionGoalRow({
                     accessibilityHint="Completes this goal now"
                     accessibilityLabel={`Complete ${title}`}
                     accessibilityRole="button"
-                    disabled={completing}
+                    disabled={completing || disabled}
                     hitSlop={8}
                     onPress={(event) => {
                       event.stopPropagation();

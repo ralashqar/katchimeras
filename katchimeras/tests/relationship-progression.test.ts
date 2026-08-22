@@ -363,7 +363,7 @@ test('the first Garden order unlocks the return insight before completing Day 1'
 
   state = completeMossproutJourneyConversation(state, 'mossprout:quiet-patch:first-flower:goal-plan', 4);
   state = completeMossproutJourneyConversation(state, 'mossprout:quiet-patch:first-flower:playful', 5);
-  assert.equal(mossproutJourneyForDay(state, '2026-08-21')?.completionReceipt?.bondPoints, 20);
+  assert.equal(mossproutJourneyForDay(state, '2026-08-21')?.completionReceipt?.bondPoints, 24);
 });
 
 test('a Journey Garden card uses the live order title, reward, and every requested item', () => {

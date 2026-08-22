@@ -88,15 +88,14 @@ export function mossproutGoalArtKey(templateId?: string): KatchimeraActionArtKey
 }
 
 /**
- * Today keeps the post-action queue mounted beneath a completed row, then lets
- * those stable rows compact when the outro leaves. Insert the completion into
- * that already-advanced queue instead of replacing its slot, which would hide
- * and remount the card immediately below it.
+ * Keep the post-action queue mounted beneath a completed row. The presentation
+ * coordinator reserves that row's slot through its outro, then replaces the
+ * slot atomically so the cards above and below do not move twice.
  */
 export function composeMossproutVisibleActions(
   actions: readonly KatchimeraDayAction[],
   completingAction: KatchimeraDayAction | null,
-  limit = MOSSPROUT_ACTION_SLOT_IDS.length,
+  limit: number = MOSSPROUT_ACTION_SLOT_IDS.length,
 ): KatchimeraDayAction[] {
   const active = actions.filter((action) => action.status !== 'completed');
   if (!completingAction) return active.slice(0, limit);

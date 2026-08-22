@@ -8,7 +8,7 @@ const NOW = Date.UTC(2026, 7, 18, 12);
 
 function world(coins: number, chapterComplete = false) {
   const fresh = createInitialMergeWorldState(NOW, ['mossprout']);
-  return normalizeMergeWorldState({
+  return {
     ...fresh,
     coins,
     characterProgress: {
@@ -18,7 +18,7 @@ function world(coins: number, chapterComplete = false) {
         completedChapterIds: chapterComplete ? ['mossprout-chapter-0'] : [],
       },
     },
-  }, NOW);
+  };
 }
 
 const derive = (mergeWorld: ReturnType<typeof world>, saving = false) => deriveHavenTilePresentation({

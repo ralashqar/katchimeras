@@ -736,7 +736,7 @@ function HomeScreen() {
     if (!journalMergeReward || !formingDay) return undefined;
     if (journalMergeReward.totalEnergy <= 0) return undefined;
     return {
-      detail: 'Feed this memory to the Egg. Any Merge Energy appears after it is saved.',
+      detail: 'Feed this memory to the Egg. Mossprout can remember it without turning it into game fuel.',
       status: 'available' as const,
       title: 'Capture this',
     };

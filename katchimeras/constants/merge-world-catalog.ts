@@ -15,10 +15,14 @@ export const MERGE_WORLD_ROWS = 9;
 export const MERGE_WORLD_SIZE = MERGE_WORLD_COLUMNS * MERGE_WORLD_ROWS;
 
 export const MOSSPROUT_FTUE_OPEN_CELLS = new Set([
+  16, 18,
   17,
+  22,
   23, 24, 25,
   29, 30, 31, 32, 33,
+  36,
   37, 38, 39,
+  40, 44, 46,
   45,
 ]);
 
@@ -37,10 +41,14 @@ export const MOSSPROUT_STORY_AWAKENINGS = {
 } as const;
 
 export const MERGE_STARTING_OPEN_CELLS = new Set([
+  16, 18,
   17,
+  22,
   23, 24, 25,
   29, 30, 31, 32, 33,
+  36,
   37, 38, 39,
+  40, 44, 46,
   45,
 ]);
 

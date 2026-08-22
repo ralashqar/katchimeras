@@ -94,7 +94,8 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     occupant: null,
   }));
   let state: MergeWorldState = {
-    version: 17,
+    version: 18,
+    ownerCharacterId: 'mossprout',
     revision: 0,
     createdAt: now,
     updatedAt: now,
@@ -149,9 +150,9 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
   const current = refreshTime(state, command.now);
   switch (command.type) {
     case 'refreshTime':
-      return result(state, current, current === state ? undefined : 'Energy refreshed.');
+      return result(state, current, current === state ? undefined : 'The garden is ready again.');
     case 'tapGenerator':
-      return tapGenerator(current, command.generatorId, command.now, command.seed, command.spendEnergy !== false, command.activityOpportunityId);
+      return tapGenerator(current, command.generatorId, command.now, command.seed, command.activityOpportunityId);
     case 'setGeneratorForcedDrop':
       return setGeneratorForcedDrop(current, command.generatorId, command.definitionId, command.now);
     case 'upgradeGenerator':
@@ -379,14 +380,18 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   if (!value || typeof value !== 'object') return createInitialMergeWorldState(now);
   const rawVersion = (value as { version?: unknown }).version;
   const source = value as Partial<MergeWorldState>;
-  if ((rawVersion !== 1 && rawVersion !== 2 && rawVersion !== 3 && rawVersion !== 4 && rawVersion !== 5 && rawVersion !== 6 && rawVersion !== 7 && rawVersion !== 8 && rawVersion !== 9 && rawVersion !== 10 && rawVersion !== 11 && rawVersion !== 12 && rawVersion !== 13 && rawVersion !== 14 && rawVersion !== 15 && rawVersion !== 16 && rawVersion !== 17) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
+  // v18 intentionally starts the first personal Merge World cleanly. Earlier
+  // snapshots are shared-board prototypes and cannot be assigned safely to a
+  // single companion without carrying their ownership compromises forward.
+  if (rawVersion !== 18 || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
     return createInitialMergeWorldState(now);
   }
   const fallback = createInitialMergeWorldState(now);
   let normalized: MergeWorldState = {
     ...fallback,
     ...source,
-    version: 17,
+    version: 18,
+    ownerCharacterId: 'mossprout',
     revision: finite(source.revision, 0),
     createdAt: finite(source.createdAt, now),
     updatedAt: finite(source.updatedAt, now),
@@ -542,7 +547,7 @@ function normalizeHaven(value: unknown, source: Partial<MergeWorldState>, rawVer
   };
 }
 
-function tapGenerator(state: MergeWorldState, generatorId: string, now: number, seed: string, spendEnergy: boolean, activityOpportunityId?: string): MergeWorldCommandResult {
+function tapGenerator(state: MergeWorldState, generatorId: string, now: number, seed: string, activityOpportunityId?: string): MergeWorldCommandResult {
   const generator = state.generators[generatorId];
   if (!generator) return unchanged(state, 'That item maker is not available yet.');
   const opportunity = activityOpportunityId
@@ -554,7 +559,9 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
   if (opportunity && opportunity.usedCount >= opportunity.dropDefinitionIds.length) {
     return unchanged(state, "That's everything Mossprout found today.");
   }
-  if (spendEnergy && state.energy.value < 1) return unchanged(state, 'You need more Merge Energy.', 'no_energy');
+  if (!opportunity && generator.charges < 1) {
+    return unchanged(state, `${generator.name} is growing more supplies.`, 'generator_resting');
+  }
   const cell = firstEmptyCell(state.board, hash(`${seed}:cell`));
   if (cell < 0) return unchanged(state, 'The board is full. Merge or store an item first.', 'board_full');
   // Level one always starts at tier one. Upgrades add a bounded chance of a
@@ -571,11 +578,17 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
   const item: MergeBoardItem = { kind: 'item', instanceId: `merge-item:${state.nextInstance}`, definitionId };
   const board = [...state.board];
   board[cell] = { ...board[cell], occupant: item };
+  const charges = opportunity ? generator.charges : Math.max(0, generator.charges - 1);
+  const nextGenerator = opportunity ? generator : {
+    ...generator,
+    charges,
+    restStartedAt: charges === 0 ? now : generator.restStartedAt,
+  };
   let next = touch({
     ...state,
     board,
     nextInstance: state.nextInstance + 1,
-    energy: spendEnergy ? { ...state.energy, value: state.energy.value - 1 } : state.energy,
+    generators: { ...state.generators, [generatorId]: nextGenerator },
     characterActivityOpportunities: opportunity
       ? state.characterActivityOpportunities.map((candidate) => candidate.id === opportunity.id
           ? { ...candidate, usedCount: candidate.usedCount + 1 }
@@ -1027,20 +1040,6 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
     || state.activeOrders.filter((item) => item.storyArcId === order.storyArcId && item.storyTargetLevel === order.storyTargetLevel).length <= 1;
   const externalRewardReceipts: MergeExternalRewardReceipt[] = [
     ...state.externalRewardReceipts,
-    ...(state.unlockedCharacters.includes(order.characterId) ? [{
-      id: `merge-friendship:${order.id}`,
-      kind: 'friendship' as const,
-      characterId: order.characterId,
-      amount: order.reward.friendshipXp,
-      presentation: order.storyArcId && order.storyArcId !== 'mossprout:casual-garden'
-        ? 'quiet_summary' as const
-        : 'celebration' as const,
-      sourceId: order.storyArcId,
-      storyStep: order.storyStep,
-      storyStepCount: order.storyStepCount,
-      createdAt: now,
-      appliedAt: null,
-    }] : []),
     ...(order.reward.wispId ? [{
       id: `merge-wisp:${order.id}:${order.reward.wispId}`,
       kind: 'wisp' as const,
@@ -1085,7 +1084,6 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
   const landmarks = landmarkDefinition && !state.landmarks.some((landmark) => landmark.id === landmarkDefinition.id)
     ? [...state.landmarks, { id: landmarkDefinition.id, characterId: order.characterId, chapterId: order.chapterId ?? `${order.characterId}-chapter-1`, unlockedAt: now }]
     : state.landmarks;
-  const energyRefund = mergeOrderEnergyRefund(order);
   const fragmentGeneratorId = GENERATOR_BY_CHAIN[KATCHIMERA_MERGE_PROFILES[order.characterId].coreChains[0]];
   const fragmentGenerator = state.generators[fragmentGeneratorId];
   const generators = fragmentGenerator ? {
@@ -1102,7 +1100,6 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
     mergeXp,
     mergeLevel: mergeLevelForXp(mergeXp),
     storageCapacity: storageCapacityForLevel(mergeLevelForXp(mergeXp)),
-    energy: { ...state.energy, value: state.energy.value + energyRefund },
     completedOrderCount,
     activeOrders: state.activeOrders.filter((item) => item.id !== orderId),
     recentOrderKeys: [...state.recentOrderKeys, templateKeyForOrder(order)].slice(-RECENT_ORDER_LIMIT),
@@ -1187,7 +1184,7 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
   }
   next = ensureProceduralOrders(next, now);
   next = touch(next, now);
-  return { state: next, changed: true, servedOrderId: order.id, energyGranted: energyRefund, clearedMistCells, message: `${order.title} served.` };
+  return { state: next, changed: true, servedOrderId: order.id, energyGranted: 0, clearedMistCells, message: `${order.title} served.` };
 }
 
 function storeItem(state: MergeWorldState, cell: number, now: number): MergeWorldCommandResult {
@@ -2102,20 +2099,13 @@ function applyDiscovery(state: MergeWorldState, definitionId: string, now: numbe
 
 function refreshTime(state: MergeWorldState, now: number): MergeWorldState {
   let changedState = false;
-  let energy = state.energy;
-  if (energy.regenPaused) return state;
-  if (energy.value < energy.regenCap && now > energy.lastRegenAt) {
-    const ticks = Math.floor((now - energy.lastRegenAt) / MERGE_ENERGY_REGEN_MS);
-    if (ticks > 0) {
-      const value = Math.min(energy.regenCap, energy.value + ticks);
-      energy = { ...energy, value, lastRegenAt: value >= energy.regenCap ? now : energy.lastRegenAt + ticks * MERGE_ENERGY_REGEN_MS };
-      changedState = true;
-    }
-  } else if (energy.value >= energy.regenCap && energy.lastRegenAt !== now) {
-    energy = { ...energy, lastRegenAt: now };
+  const generators = Object.fromEntries(Object.entries(state.generators).map(([id, generator]) => {
+    if (generator.charges > 0 || generator.restStartedAt == null) return [id, generator];
+    if (now - generator.restStartedAt < generator.restDurationMs) return [id, generator];
     changedState = true;
-  }
-  return changedState ? touch({ ...state, energy }, now) : state;
+    return [id, { ...generator, charges: generator.capacity, restStartedAt: null }];
+  }));
+  return changedState ? touch({ ...state, generators }, now) : state;
 }
 
 function normalizeStepEnergyByDay(value: unknown): MergeWorldState['stepEnergyByDay'] {
@@ -2148,6 +2138,10 @@ function generatorState(id: string): MergeGeneratorState {
     chainIds: [...definition.chainIds],
     tierOneDropDefinitionIds: [...definition.tierOneDropDefinitionIds],
     forcedDropDefinitionId: null,
+    capacity: 12,
+    charges: 12,
+    restDurationMs: 18 * 60_000,
+    restStartedAt: null,
   };
 }
 
@@ -2618,6 +2612,13 @@ function normalizeGenerator(value: unknown, id: string): MergeGeneratorState {
       && fallback.tierOneDropDefinitionIds.includes(generator.forcedDropDefinitionId)
       ? generator.forcedDropDefinitionId
       : null,
+    capacity: Math.max(1, Math.floor(finite(generator.capacity, fallback.capacity))),
+    charges: Math.max(0, Math.min(
+      Math.max(1, Math.floor(finite(generator.capacity, fallback.capacity))),
+      Math.floor(finite(generator.charges, fallback.charges)),
+    )),
+    restDurationMs: Math.max(60_000, finite(generator.restDurationMs, fallback.restDurationMs)),
+    restStartedAt: generator.restStartedAt == null ? null : finite(generator.restStartedAt, 0),
   };
 }
 

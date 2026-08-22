@@ -5,12 +5,8 @@ export const FTUE_ANSWER_CAMERA_DURATION_MS = 1050;
 export const FTUE_OPENING_CAMERA_PAN_Y = -72;
 
 /**
- * Authored pinch targets for the three-question Egg opening.
- *
- * The first beat travels all the way to the normal gesture maximum. After the
- * Each answer completes one third of the total logarithmic zoom journey.
- * Geometric targets make every transition the same proportional camera move;
- * equal additive scale subtraction makes the later zoom-outs look larger.
+ * Authored pinch targets for the three-question Egg opening. Each answer
+ * completes one third of the logarithmic zoom journey.
  */
 export function ftueHomeCameraPinchTarget(
   stepId: string | null | undefined,
@@ -43,8 +39,8 @@ export function ftueHomeCameraDuration(stepId: string | null | undefined): numbe
 
 /**
  * Keeps the enlarged answer panel from covering the Egg at the closest zoom.
- * The scene translation retreats in the same three authored beats as the
- * logarithmic zoom and reaches the existing FTUE baseline at Egg readiness.
+ * The scene translation retreats across the three answers and reaches the
+ * normal baseline when the Egg is ready.
  */
 export function ftueHomeCameraPanTarget(stepId: string | null | undefined): number {
   switch (stepId) {

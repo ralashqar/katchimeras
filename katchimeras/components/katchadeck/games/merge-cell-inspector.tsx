@@ -117,9 +117,14 @@ function inspectorModel(state: MergeWorldState, cell: number | null): InspectorM
     const level = generatorState?.level ?? 1;
     const outputs = [...new Set(definition.chainIds.map((chainId) => titleCase(chainId.split(':')[1])))]
       .join(' and ');
+    const readiness = generatorState
+      ? generatorState.charges > 0
+        ? `${generatorState.charges} of ${generatorState.capacity} finds ready.`
+        : 'Resting while new finds grow.'
+      : '';
     return {
       art: mergeWorldGeneratorArt(definition.id, { level }),
-      body: generatorUseCopy(definition.id, level, outputs),
+      body: `${readiness} ${generatorUseCopy(definition.id, level, outputs)}`.trim(),
       eyebrow: definition.id === 'wild-garden' || definition.id === 'memory-nursery'
         ? 'MOSSPROUT ITEM MAKER'
         : 'ITEM MAKER',

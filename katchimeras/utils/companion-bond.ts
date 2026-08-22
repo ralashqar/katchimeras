@@ -66,6 +66,11 @@ export type CompanionBondProgress = {
   nextLabel: 'Familiar' | 'Devoted' | 'Kindred' | null;
   pointsRemaining: number;
   isMax: boolean;
+  relationshipStage: 'Stranger' | 'Familiar' | 'Friend' | 'Close Friend' | 'Confidant' | 'Kindred';
+  relationshipStageIndex: 0 | 1 | 2 | 3 | 4 | 5;
+  relationshipStageRatio: number;
+  nextRelationshipStage: 'Familiar' | 'Friend' | 'Close Friend' | 'Confidant' | 'Kindred' | null;
+  relationshipPointsRemaining: number;
 };
 
 export const COMPANION_BOND_REWARDS: Record<CompanionBondEventKind, number> = {
@@ -145,6 +150,15 @@ export const COMPANION_BOND_LEVELS = [
   { level: 4, label: 'Kindred', threshold: 400 },
 ] as const;
 
+export const COMPANION_RELATIONSHIP_STAGES = [
+  { index: 0, label: 'Stranger', threshold: 0 },
+  { index: 1, label: 'Familiar', threshold: 20 },
+  { index: 2, label: 'Friend', threshold: 100 },
+  { index: 3, label: 'Close Friend', threshold: 240 },
+  { index: 4, label: 'Confidant', threshold: 450 },
+  { index: 5, label: 'Kindred', threshold: 800 },
+] as const;
+
 export function emptyCompanionBondState(): CompanionBondState {
   return { schemaVersion: 2, events: [], pendingCelebrations: [], resetCutoffsByCreature: {} };
 }
@@ -167,6 +181,9 @@ export function recordCompanionBondEvent(
   event: Omit<CompanionBondEvent, 'points'> & { points?: number },
   options: { queueCelebration?: boolean } = {}
 ): { state: CompanionBondState; awarded: boolean; points: number; receipt: CompanionBondAwardReceipt | null } {
+  // The event ID is the only award guard. Distinct completed tasks must always
+  // pay their advertised Bond and queue their own flight receipt, even when
+  // several conversations are completed with the same companion on one day.
   if (state.events.some((item) => item.id === event.id)) return { state, awarded: false, points: 0, receipt: null };
   const points = event.points ?? COMPANION_BOND_REWARDS[event.kind];
   const before = companionBondProgress(state, event.creatureId);
@@ -296,6 +313,11 @@ export function companionBondProgressForTotal(totalPoints: number): CompanionBon
   const next = COMPANION_BOND_LEVELS.find((item) => item.level === current.level + 1) ?? null;
   const segmentTarget = next ? next.threshold - current.threshold : 0;
   const segmentPoints = next ? Math.min(segmentTarget, Math.max(0, totalPoints - current.threshold)) : 0;
+  const relationship = [...COMPANION_RELATIONSHIP_STAGES].reverse().find((item) => totalPoints >= item.threshold)
+    ?? COMPANION_RELATIONSHIP_STAGES[0];
+  const nextRelationship = COMPANION_RELATIONSHIP_STAGES.find((item) => item.index === relationship.index + 1) ?? null;
+  const relationshipSegmentTarget = nextRelationship ? nextRelationship.threshold - relationship.threshold : 0;
+  const relationshipSegmentPoints = nextRelationship ? Math.max(0, totalPoints - relationship.threshold) : 0;
   return {
     level: current.level,
     label: current.label,
@@ -307,6 +329,13 @@ export function companionBondProgressForTotal(totalPoints: number): CompanionBon
     nextLabel: (next?.label as 'Familiar' | 'Devoted' | 'Kindred' | undefined) ?? null,
     pointsRemaining: next ? Math.max(0, next.threshold - totalPoints) : 0,
     isMax: !next,
+    relationshipStage: relationship.label,
+    relationshipStageIndex: relationship.index,
+    relationshipStageRatio: nextRelationship && relationshipSegmentTarget > 0
+      ? Math.min(1, relationshipSegmentPoints / relationshipSegmentTarget)
+      : 1,
+    nextRelationshipStage: nextRelationship ? nextRelationship.label as Exclude<CompanionBondProgress['relationshipStage'], 'Stranger'> : null,
+    relationshipPointsRemaining: nextRelationship ? Math.max(0, nextRelationship.threshold - totalPoints) : 0,
   };
 }
 

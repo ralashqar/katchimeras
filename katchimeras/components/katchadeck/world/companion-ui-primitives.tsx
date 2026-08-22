@@ -86,13 +86,13 @@ export function CompanionDestinationHeader({
       <CompanionBackAction label={backLabel} onPress={onBack} tone="night" />
       {compactHub && bondProgress ? (
         <View
-          accessibilityLabel={`Bond level ${bondProgress.level}, ${Math.round(bondProgress.ratio * 100)} percent to the next level`}
+          accessibilityLabel={`${bondProgress.relationshipStage} bond, ${Math.round(bondProgress.relationshipStageRatio * 100)} percent to the next stage`}
           style={styles.bondPill}>
           <BondIconArt size={27} />
           <View style={styles.bondCopy}>
-            <ThemedText selectable style={styles.bondLabel} lightColor="#FFF6D8" darkColor="#FFF6D8">Bond {bondProgress.level}</ThemedText>
+            <ThemedText selectable style={styles.bondLabel} lightColor="#FFF6D8" darkColor="#FFF6D8">{bondProgress.relationshipStage}</ThemedText>
             <View style={styles.bondTrack}>
-              <View style={[styles.bondFill, { width: `${Math.max(bondProgress.totalPoints ? 6 : 0, bondProgress.ratio * 100)}%` }]} />
+              <View style={[styles.bondFill, { width: `${Math.max(bondProgress.totalPoints ? 6 : 0, bondProgress.relationshipStageRatio * 100)}%` }]} />
             </View>
           </View>
         </View>

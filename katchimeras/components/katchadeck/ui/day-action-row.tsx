@@ -105,6 +105,7 @@ export function DayActionActiveRow({
   animateLayout = true,
   children,
   disabled = false,
+  enteringEnabled = true,
   entryDelayMs = 0,
   externalGesture,
   label,
@@ -113,12 +114,18 @@ export function DayActionActiveRow({
   animateLayout?: boolean;
   children: ReactNode;
   disabled?: boolean;
+  enteringEnabled?: boolean;
   entryDelayMs?: number;
   externalGesture?: GestureType;
   label: string;
   onSkip?: () => void;
 }) {
   const reduceMotion = useReducedMotion();
+  const entryAnimation = !enteringEnabled
+    ? undefined
+    : reduceMotion
+      ? FadeIn.delay(entryDelayMs).duration(80)
+      : FadeInUp.delay(entryDelayMs).duration(DAY_ACTION_MOTION.entryDurationMs).easing(Easing.out(Easing.cubic));
   const content = onSkip ? (
     <DayActionSwipeShell
       disabled={disabled}
@@ -131,9 +138,7 @@ export function DayActionActiveRow({
 
   return (
     <Animated.View layout={animateLayout ? LinearTransition.duration(reduceMotion ? 100 : DAY_ACTION_MOTION.layoutDurationMs).easing(Easing.inOut(Easing.cubic)) : undefined}>
-      <Animated.View entering={reduceMotion
-        ? FadeIn.delay(entryDelayMs).duration(80)
-        : FadeInUp.delay(entryDelayMs).duration(DAY_ACTION_MOTION.entryDurationMs).easing(Easing.out(Easing.cubic))}>
+      <Animated.View entering={entryAnimation}>
         {content}
       </Animated.View>
     </Animated.View>
@@ -141,21 +146,29 @@ export function DayActionActiveRow({
 }
 
 export function DayActionCompletedRow({
+  animateLayout = true,
   artwork,
+  enteringEnabled = false,
+  entryDelayMs = 0,
   onFinished,
   onRewardRequest,
   reward,
   rewardAnimationId,
   rewardAlreadyAnimated = false,
+  start = true,
   subtitle,
   title,
 }: {
+  animateLayout?: boolean;
   artwork: ReactNode;
+  enteringEnabled?: boolean;
+  entryDelayMs?: number;
   onFinished: () => void;
   onRewardRequest?: (source: DayActionSourceRect, onArrive: () => void) => void;
   reward?: ReactNode;
   rewardAnimationId?: string;
   rewardAlreadyAnimated?: boolean;
+  start?: boolean;
   subtitle?: string | null;
   title: string;
 }) {
@@ -201,6 +214,11 @@ export function DayActionCompletedRow({
   onFinishedRef.current = onFinished;
   onRewardRequestRef.current = onRewardRequest;
   const notifyFinished = useCallback(() => onFinishedRef.current(), []);
+  const entryAnimation = !enteringEnabled
+    ? undefined
+    : reduceMotion
+      ? FadeIn.delay(entryDelayMs).duration(80)
+      : FadeInUp.delay(entryDelayMs).duration(DAY_ACTION_MOTION.entryDurationMs).easing(Easing.out(Easing.cubic));
 
   const finish = useCallback(() => {
     if (finishedRef.current) return;
@@ -230,6 +248,7 @@ export function DayActionCompletedRow({
   }, [chargeGlow, notifyFinished, reduceMotion, rowOpacity, rowScale, rowX, windowWidth]);
 
   useEffect(() => {
+    if (!start) return;
     const frame = requestAnimationFrame(() => {
       const requestReward = (source: DayActionSourceRect) => {
         rewardTimerRef.current = setTimeout(() => {
@@ -291,11 +310,12 @@ export function DayActionCompletedRow({
       if (rewardTimerRef.current) clearTimeout(rewardTimerRef.current);
       if (watchdogRef.current) clearTimeout(watchdogRef.current);
     };
-  }, [artRotation, artScale, artX, chargeGlow, finish, reduceMotion, rewardAlreadyAnimated, rewardAnimationId, rowScale, tickScale, windowHeight, windowWidth]);
+  }, [artRotation, artScale, artX, chargeGlow, finish, reduceMotion, rewardAlreadyAnimated, rewardAnimationId, rowScale, start, tickScale, windowHeight, windowWidth]);
 
   return (
     <Animated.View
-      layout={LinearTransition.duration(reduceMotion ? 100 : DAY_ACTION_MOTION.layoutDurationMs).easing(Easing.inOut(Easing.cubic))}
+      entering={entryAnimation}
+      layout={animateLayout ? LinearTransition.duration(reduceMotion ? 100 : DAY_ACTION_MOTION.layoutDurationMs).easing(Easing.inOut(Easing.cubic)) : undefined}
       style={[styles.motionViewport, motionViewportStyle]}>
       <Animated.View style={[styles.completedRow, rowStyle]}>
         <DayActionCardSurface

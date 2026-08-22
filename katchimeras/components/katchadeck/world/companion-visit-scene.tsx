@@ -91,7 +91,7 @@ export function CompanionVisitScene({
           <View style={styles.bondPill}>
             <BondIconArt size={18} />
             <ThemedText style={styles.bondLabel} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>
-              {bondProgress.label}
+              {bondProgress.relationshipStage}
             </ThemedText>
           </View>
         </View>

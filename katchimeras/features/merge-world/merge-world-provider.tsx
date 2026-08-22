@@ -53,8 +53,7 @@ const AUTHORED_COHORT_FAMILIES: readonly AuthoredCohortFamilyId[] = [
 function mossproutProgressionSignals(days: readonly HomeDayRecord[], friendshipLevel: number, ownedWispIds: string[]) {
   const relationships = relationshipProgressionRepository.load();
   const activeJourneyDayIds = [...new Set([
-    ...relationships.journeyDays.filter((journey) => journey.familyId === 'mossprout').map((journey) => journey.dayId),
-    ...relationships.mossproutDailyActionDecks.map((deck) => deck.dayId),
+    ...relationships.journeyDays.filter((journey) => journey.familyId === 'mossprout' && journey.status === 'complete').map((journey) => journey.dayId),
     ...relationships.completedActionOutros.filter((record) => record.familyId === 'mossprout').map((record) => record.dayId),
   ])].sort();
   const completedGardenDayIds = [...new Set(relationships.completedActionOutros

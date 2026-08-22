@@ -28,13 +28,13 @@ const openingActions: readonly FtueActionDefinition[] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 16,
+  version: 17,
   entryStepId: 'egg.opening',
   terminalStepId: 'complete',
   steps: [
     {
       id: 'egg.opening', surface: 'today',
-      guide: { eyebrow: 'A tiny spark', title: 'Something is waiting.', body: 'Share one piece of today.' },
+      guide: { eyebrow: 'A tiny spark', title: 'Something is waiting.', body: 'One small piece of today is enough.' },
       actions: openingActions,
     },
     {
@@ -59,7 +59,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       id: 'egg.mind', surface: 'today',
       guide: { eyebrow: 'Almost awake', title: 'One last thing.', body: 'What has your attention?' },
       actions: [{
-        id: 'egg.mind.focus', title: "What's on your mind?", description: 'Share a bit with me and turn it into Energy.', icon: 'sparkles',
+        id: 'egg.mind.focus', title: "What's on your mind?", description: 'Share a little of what has your attention.', icon: 'sparkles',
         presentation: 'inline_choice', handlerId: 'day_prompt', promptKind: 'day_focus', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
         nextStepId: 'egg.ready', backendEvent: true,
         options: [
@@ -129,12 +129,12 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
           resultDefinitionId: 'nature:garden:2',
         },
         commitActionId: 'merge.create_sprout',
-        nextStepId: 'merge.plant.sprout_pair',
+        nextStepId: 'merge.serve_sprout',
       }],
     },
     {
       id: 'merge.serve_sprout', surface: 'merge',
-      guide: { eyebrow: 'First request', title: 'Help Mossprout.', body: 'Serve the Sprout.' },
+      guide: { eyebrow: 'First request', title: 'Give the garden its beginning.', body: 'Serve the Sprout to Mossprout.' },
       actions: [{ id: 'merge.serve_sprout', title: 'Serve the Sprout', description: 'Give Mossprout what it needs.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_order_served', backendEvent: true }],
       interaction: {
         mode: 'exclusive',
@@ -317,8 +317,8 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'companion.chapter_zero_return', surface: 'companion',
-      guide: { eyebrow: 'A little place to begin', title: 'Mossprout has something to show you.', body: 'See what your first Sprout changed.' },
-      actions: [{ id: 'companion.complete_chapter_zero_return', title: 'Finish the Journey Day', description: 'Stay with Mossprout and see what comes next.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'complete', backendEvent: true }],
+      guide: { eyebrow: 'A promise for tomorrow', title: 'Some roots only wake with time.', body: 'The next part of the Garden needs another day together, not more merging.' },
+      actions: [{ id: 'companion.complete_chapter_zero_return', title: 'Return tomorrow', description: 'Mossprout will remember this first day.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'complete', backendEvent: true }],
       blockingBeat: 'chapter_complete',
     },
     {

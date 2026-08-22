@@ -82,7 +82,7 @@ export function reconcileMossproutBoardProgression(
     if (current?.status === 'ready' || current?.status === 'awakened') return false;
     if (activeDayIds.length < definition.revealDay) return false;
     return primaryProgress(definition.kind, signals, activeDayIds.length) >= definition.target
-      || fallbackSatisfied(definition.revealDay, definition.fallbackDelay, signals, activeDayIds.length);
+      || fallbackSatisfied(definition.kind, definition.revealDay, definition.fallbackDelay, activeDayIds.length);
   });
   if (canQueueToday && eligible[0]) {
     const definition = eligible[0];
@@ -289,6 +289,7 @@ function unlockMemoryNursery(state: MergeWorldState, now: number): MergeWorldSta
         id: 'memory-nursery', name: 'Memory Nursery', level: 1, upgradeFragments: 0,
         chainIds: ['nature:keepsake', 'nature:keepsake'],
         tierOneDropDefinitionIds: ['nature:keepsake:1', 'nature:keepsake:1'], forcedDropDefinitionId: null,
+        capacity: 10, charges: 10, restDurationMs: 24 * 60_000, restStartedAt: null,
       },
     },
     unlockedChains: [...new Set([...state.unlockedChains, 'nature:keepsake' as const])],
@@ -307,8 +308,11 @@ function primaryProgress(kind: string, signals: MossproutProgressionSignals, act
   return 0;
 }
 
-function fallbackSatisfied(revealDay: number, delay: number, signals: MossproutProgressionSignals, activeDays: number) {
-  return activeDays >= revealDay + delay && signals.completedGardenDayIds.length >= Math.max(1, Math.ceil(revealDay / 7));
+function fallbackSatisfied(kind: string, revealDay: number, delay: number, activeDays: number) {
+  // Privacy- or consent-sensitive inputs may resolve through additional days
+  // together. Bond, story-day and mastery locks never yield to Merge play.
+  if (kind !== 'memory' && kind !== 'focus' && kind !== 'wisp') return false;
+  return activeDays >= revealDay + delay;
 }
 
 function chapterForDay(day: number): MossproutBoardChapter {

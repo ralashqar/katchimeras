@@ -226,7 +226,7 @@ export function KingdomCompanionScreen({
   onOpenMerge?: (orderId?: string | null, familyId?: KatchimeraFamilyId) => void;
   onOpenQuestGame?: (creatureId: string, questId: string) => void;
   ftueConversationDefinitionId?: string;
-  onFtueConversationComplete?: () => void;
+  onFtueConversationComplete?: () => void | Promise<void>;
   ftueOrderPreviewActive?: boolean;
   onFtueOpenMerge?: () => void;
   discoveryRecords?: readonly CompanionDiscoveryRecord[];

@@ -6,7 +6,6 @@ import {
   companionBondProgress,
   emptyCompanionBondState,
   normaliseCompanionBondState,
-  questBondEventId,
   recordCompanionBondEvent,
   resetCompanionBondForCreatures,
   syncCompanionBondEvent,
@@ -56,17 +55,39 @@ test('bond events are idempotent and use their configured reward', () => {
   assert.equal(duplicate.state.events.length, 1);
 });
 
-test('Journey Bond sync increases one daily event without duplicating prior motes', () => {
+test('every distinct conversation task awards its advertised Bond on the same day', () => {
+  const first = recordCompanionBondEvent(emptyCompanionBondState(), {
+    id: 'conversation:mossprout:morning', creatureId: 'mossprout', kind: 'conversation_completed', occurredAt: 1, dayId: '2026-08-22',
+  }, { queueCelebration: true });
+  const repeated = recordCompanionBondEvent(first.state, {
+    id: 'conversation:mossprout:evening', creatureId: 'companion:mossprout', kind: 'conversation_completed', occurredAt: 2, dayId: '2026-08-22',
+  }, { queueCelebration: true });
+  const nextDay = recordCompanionBondEvent(repeated.state, {
+    id: 'conversation:mossprout:tomorrow', creatureId: 'mossprout', kind: 'conversation_completed', occurredAt: 3, dayId: '2026-08-23',
+  }, { queueCelebration: true });
+  assert.equal(first.points, 8);
+  assert.equal(repeated.awarded, true);
+  assert.equal(repeated.points, 8);
+  assert.equal(nextDay.awarded, true);
+  assert.equal(nextDay.state.pendingCelebrations?.length, 3);
+  assert.equal(companionBondProgress(nextDay.state, 'mossprout').relationshipStage, 'Familiar');
+  assert.equal(companionBondProgress(nextDay.state, 'mossprout').relationshipPointsRemaining, 76);
+});
+
+test('Journey Bond sync queues every newly advertised contribution without duplicating prior motes', () => {
   const event = { id: 'journey-completion:day-1', creatureId: 'mossprout', kind: 'journey_day_completed' as const, occurredAt: 1, dayId: '2026-08-21' };
-  const main = syncCompanionBondEvent(emptyCompanionBondState(), { ...event, points: 12 }, { queueCelebration: true });
-  const optional = syncCompanionBondEvent(main.state, { ...event, points: 16 }, { queueCelebration: true });
-  const capped = syncCompanionBondEvent(optional.state, { ...event, points: 16 }, { queueCelebration: true });
-  assert.equal(optional.points, 4);
-  assert.equal(optional.state.events.length, 1);
-  assert.equal(optional.state.events[0]?.points, 16);
-  assert.equal(optional.receipt?.beforeTotal, 12);
-  assert.equal(optional.receipt?.afterTotal, 16);
-  assert.equal(capped.awarded, false);
+  const main = syncCompanionBondEvent(emptyCompanionBondState(), { ...event, points: 16 }, { queueCelebration: true });
+  const firstOptional = syncCompanionBondEvent(main.state, { ...event, points: 20 }, { queueCelebration: true });
+  const secondOptional = syncCompanionBondEvent(firstOptional.state, { ...event, points: 24 }, { queueCelebration: true });
+  const duplicate = syncCompanionBondEvent(secondOptional.state, { ...event, points: 24 }, { queueCelebration: true });
+  assert.equal(firstOptional.points, 4);
+  assert.equal(secondOptional.points, 4);
+  assert.equal(secondOptional.state.events.length, 1);
+  assert.equal(secondOptional.state.events[0]?.points, 24);
+  assert.equal(secondOptional.state.pendingCelebrations?.length, 3);
+  assert.equal(secondOptional.receipt?.beforeTotal, 20);
+  assert.equal(secondOptional.receipt?.afterTotal, 24);
+  assert.equal(duplicate.awarded, false);
 });
 
 test('live awards queue a before/after receipt and reset removes it at true zero', () => {

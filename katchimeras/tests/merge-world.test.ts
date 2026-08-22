@@ -74,14 +74,12 @@ test('Dream Echoes accept only their match and emit persistent FTUE evidence', (
   assert.equal(state.board[23].occupant?.kind === 'item' ? state.board[23].occupant.definitionId : null, 'nature:garden:2');
 });
 
-test('Merge FTUE wakes the Sprout Echo before serving the exact first Plant order', () => {
+test('Merge FTUE serves the first Sprout immediately after teaching one merge', () => {
   const initial = createMossproutChapterZeroState(NOW);
   const from = initial.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.instanceId === 'onboarding-seed-a');
   const to = initial.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.instanceId === 'onboarding-seed-b');
   let merged = reduceMergeWorld(initial, { type: 'move', from, to, now: NOW + 1 }).state;
-  const sproutCell = merged.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:2');
-  merged = reduceMergeWorld(merged, { type: 'move', from: sproutCell, to: 25, now: NOW + 2 }).state;
-  const step = mossproutFtueStep('merge.serve_plant');
+  const step = mossproutFtueStep('merge.serve_sprout');
   const orderId = 'mossprout:chapter-0:first-sprout';
   assert.deepEqual(mergeFtueBoardGate(step, merged), { kind: 'locked' });
   assert.deepEqual(mergeFtueRailGate(step), { kind: 'serve', orderId });
@@ -90,8 +88,8 @@ test('Merge FTUE wakes the Sprout Echo before serving the exact first Plant orde
   const command = { type: 'serveOrder' as const, orderId, now: NOW + 3 };
   const result = reduceMergeWorld(merged, command);
   assert.deepEqual(mergeFtueEventForCommand(merged, command, result), { type: 'order_served', orderId, revision: result.state.revision });
-  assert.equal(recoverMergeFtueEvent('merge.serve_plant', result.state, {
-    'baseline:merge.serve_plant:merge.serve_home_plant': 0,
+  assert.equal(recoverMergeFtueEvent('merge.serve_sprout', result.state, {
+    'baseline:merge.serve_sprout:merge.serve_sprout': 0,
   })?.type, 'order_served');
   assert.deepEqual(result.state.activeOrders, []);
   assert.equal(result.state.generators['wild-garden'].forcedDropDefinitionId, null);
@@ -199,29 +197,30 @@ test('board geometry renders and hit-tests with one coordinate system', () => {
   assert.equal(mergeNeighborCellInDirection(geometry, 6, 900, 0), null);
 });
 
-test('a new Merge World uses the consolidated Energy economy', () => {
+test('a new Merge World is Mossprout-owned and begins with twenty playable cells', () => {
   const state = createInitialMergeWorldState(NOW);
   assert.deepEqual(mergeWorldCatalogIssues(), []);
-  assert.equal(state.version, 17);
+  assert.equal(state.version, 18);
+  assert.equal(state.ownerCharacterId, 'mossprout');
   assert.equal(state.storageCapacity, 8);
   assert.equal(state.energy.regenCap, MERGE_ENERGY_REGEN_CAP);
   assert.equal(state.energy.value, MERGE_INITIAL_ENERGY);
-  assert.equal(state.energy.regenCap, 50);
-  assert.equal(state.energy.value, 20);
-  assert.equal(state.board.filter((cell) => !cell.locked).length, 13);
+  assert.equal(state.energy.regenCap, 0);
+  assert.equal(state.energy.value, 0);
+  assert.equal(state.board.filter((cell) => !cell.locked).length, 20);
   assert.deepEqual(state.generators, {});
 });
 
-test('Mossprout Chapter 0 wakes a Plant through a Sprout Echo and restores the normal Garden basket', () => {
+test('Mossprout Chapter 0 teaches one merge, serves one Sprout, and restores the Garden basket', () => {
   let state = createMossproutChapterZeroState(NOW, 'heartlet');
   const openCount = () => state.board.filter((cell) => !cell.locked).length;
-  assert.equal(openCount(), 13);
-  assert.equal(state.energy.value, 4);
-  assert.equal(state.energy.regenPaused, true);
+  assert.equal(openCount(), 20);
+  assert.equal(state.energy.value, 0);
+  assert.equal(state.energy.regenPaused, false);
   assert.deepEqual(state.generators['wild-garden'].tierOneDropDefinitionIds, ['nature:garden:1', 'nature:waterside:1']);
   assert.equal(state.generators['wild-garden'].forcedDropDefinitionId, 'nature:garden:1');
   assert.deepEqual(state.activeOrders.map((order) => order.id), ['mossprout:chapter-0:first-sprout']);
-  assert.deepEqual(state.activeOrders[0].requirements, [{ definitionId: 'nature:garden:3', quantity: 1 }]);
+  assert.deepEqual(state.activeOrders[0].requirements, [{ definitionId: 'nature:garden:2', quantity: 1 }]);
   assert.deepEqual(state.board.flatMap((cell, index) => cell.mist?.kind === 'echo' && cell.mist.ownerCharacterId === 'mossprout' ? [[index, cell.mist.definitionId]] : []), [
     [23, 'nature:garden:1'], [25, 'nature:garden:2'], [37, 'nature:garden:3'], [39, 'nature:garden:4'], [45, 'nature:garden:5'],
   ]);
@@ -230,16 +229,10 @@ test('Mossprout Chapter 0 wakes a Plant through a Sprout Echo and restores the n
   assert.equal(seedCells.length, 2);
   assert.ok(seedCells.every((cell) => state.board[cell].occupant?.kind === 'item' && state.board[cell].occupant.definitionId === 'nature:garden:1'));
   state = reduceMergeWorld(state, { type: 'move', from: seedCells[0], to: seedCells[1], now: NOW + 1 }).state;
-  const sproutCell = state.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:2');
-  const sproutEcho = reduceMergeWorld(state, { type: 'move', from: sproutCell, to: 25, now: NOW + 2 });
-  assert.equal(sproutEcho.dreamEchoClearedId, 'mossprout-sprout-echo');
-  state = sproutEcho.state;
-  assert.equal(openCount(), 13);
-
   state = reduceMergeWorld(state, { type: 'serveOrder', orderId: 'mossprout:chapter-0:first-sprout', now: NOW + 3 }).state;
-  assert.equal(openCount(), 13);
+  assert.equal(openCount(), 20);
   assert.deepEqual(state.activeOrders, []);
-  assert.equal(state.energy.value, 4);
+  assert.equal(state.energy.value, 0);
   assert.equal(state.energy.regenPaused, false);
   assert.equal(state.generators['wild-garden'].forcedDropDefinitionId, null);
   assert.deepEqual(state.generators['wild-garden'].tierOneDropDefinitionIds, ['nature:garden:1', 'nature:waterside:1']);
@@ -375,7 +368,7 @@ test('step Energy checkpoints cumulative pedometer totals without paying the sam
   });
   assert.equal(first.energyGranted, 20);
   assert.equal(first.stepEnergyClaim?.consumedSteps, 20 * STEPS_PER_MERGE_ENERGY);
-  assert.equal(first.state.energy.value, 24);
+  assert.equal(first.state.energy.value, 20);
   const duplicate = reduceMergeWorld(first.state, {
     type: 'claimStepEnergy', dayId: '2026-08-12', observedSteps: 6_000,
     observedAt: new Date(NOW + 2).toISOString(), allowBootstrap: true, receiptId: 'steps:first', now: NOW + 2,
@@ -395,7 +388,7 @@ test('step Energy checkpoints cumulative pedometer totals without paying the sam
     observedAt: new Date(NOW + 3).toISOString(), allowBootstrap: false, receiptId: 'steps:correction', now: NOW + 3,
   });
   assert.equal(correctedDown.energyGranted, 0);
-  assert.equal(correctedDown.state.energy.value, 24);
+  assert.equal(correctedDown.state.energy.value, 20);
 
   const remainderStart = reduceMergeWorld(createMossproutChapterZeroState(NOW), {
     type: 'claimStepEnergy', dayId: '2026-08-13', observedSteps: 299,
@@ -452,7 +445,7 @@ test('generator forced-drop mode validates, emits the exact item, and can be cle
   assert.equal(state.generators['wild-garden'].forcedDropDefinitionId, null);
 });
 
-test('normalization repairs the Seed override on a persisted active Mossprout tutorial', () => {
+test('normalization intentionally resets pre-v18 Merge snapshots', () => {
   const active = createMossproutChapterZeroState(NOW);
   const stale = {
     ...active,
@@ -463,15 +456,17 @@ test('normalization repairs the Seed override on a persisted active Mossprout tu
     },
   };
   const normalized = normalizeMergeWorldState(stale, NOW + 1);
-  assert.equal(normalized.generators['wild-garden'].forcedDropDefinitionId, 'nature:garden:1');
+  assert.equal(normalized.version, 18);
+  assert.equal(normalized.ownerCharacterId, 'mossprout');
+  assert.deepEqual(normalized.generators, {});
 });
 
-test('story unlock adds the Pantry and each tap costs exactly one Energy', () => {
+test('story unlock adds the Pantry and each tap consumes one generator charge', () => {
   let state = storyWorld();
-  const before = state.energy.value;
+  const before = state.generators['hearth-pantry'].charges;
   const result = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: 'hearth-pantry', now: NOW + 2, seed: 'first-drop' });
   assert.equal(result.changed, true);
-  assert.equal(result.state.energy.value, before - 1);
+  assert.equal(result.state.generators['hearth-pantry'].charges, before - 1);
   assert.ok(result.spawnedCell != null);
   assert.equal(result.state.board[result.spawnedCell!].occupant?.kind, 'item');
   assert.equal(result.state.discoveries.length, 1);
@@ -680,7 +675,7 @@ test('a full board rejects a Pantry tap without spending Energy', () => {
 
 test('Merge board failures map to concise anchored callouts', () => {
   assert.deepEqual(mergeCellFeedbackForFailure('locked_cell'), { message: 'LOCKED', tone: 'blocked' });
-  assert.deepEqual(mergeCellFeedbackForFailure('no_energy'), { message: 'NO ENERGY', tone: 'warning' });
+  assert.deepEqual(mergeCellFeedbackForFailure('generator_resting'), { message: 'GROWING MORE', tone: 'warning' });
   assert.deepEqual(mergeCellFeedbackForFailure('board_full'), { message: 'BOARD FULL', tone: 'warning' });
   assert.deepEqual(mergeCellFeedbackForFailure('wrong_echo_match'), { message: 'FIND ITS MATCH', tone: 'hint' });
   assert.deepEqual(mergeCellFeedbackForFailure('sealed_mist'), { message: 'SEALED', tone: 'blocked' });
@@ -695,8 +690,8 @@ test('Merge board failures map to concise anchored callouts', () => {
   const noEnergy = reduceMergeWorld({ ...chapterZero, energy: { ...chapterZero.energy, value: 0 } }, {
     type: 'tapGenerator', generatorId: 'wild-garden', now: NOW + 2, seed: 'empty-energy',
   });
-  assert.equal(noEnergy.changed, false);
-  assert.equal(noEnergy.failureReason, 'no_energy');
+  assert.equal(noEnergy.changed, true);
+  assert.equal(noEnergy.failureReason, undefined);
 });
 
 test('Merge motion contracts old art before the new item overshoots into place', () => {
@@ -755,15 +750,17 @@ test('identical items merge and preserve deterministic item progression', () => 
   assert.equal(result.discoveryId, 'food:table:2');
 });
 
-test('Energy regenerates every three minutes and stops at the natural capacity', () => {
-  const state = { ...createInitialMergeWorldState(NOW), energy: { value: 48, regenCap: 50, lastRegenAt: NOW } };
-  assert.equal(MERGE_ENERGY_REGEN_MS, 3 * 60_000);
-  const early = reduceMergeWorld(state, { type: 'refreshTime', now: NOW + MERGE_ENERGY_REGEN_MS - 1 });
-  assert.equal(early.state.energy.value, 48);
-  const firstTick = reduceMergeWorld(early.state, { type: 'refreshTime', now: NOW + MERGE_ENERGY_REGEN_MS });
-  assert.equal(firstTick.state.energy.value, 49);
-  const regenerated = reduceMergeWorld(firstTick.state, { type: 'refreshTime', now: NOW + MERGE_ENERGY_REGEN_MS * 2 });
-  assert.equal(regenerated.state.energy.value, 50);
+test('depleted generators rest and refill after their authored duration', () => {
+  let state = storyWorld();
+  state = { ...state, generators: { ...state.generators, 'hearth-pantry': { ...state.generators['hearth-pantry'], charges: 1, capacity: 1 } } };
+  const depleted = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: 'hearth-pantry', now: NOW + 1, seed: 'last-charge' });
+  assert.equal(depleted.state.generators['hearth-pantry'].charges, 0);
+  assert.equal(depleted.state.generators['hearth-pantry'].restStartedAt, NOW + 1);
+  const resting = reduceMergeWorld(depleted.state, { type: 'tapGenerator', generatorId: 'hearth-pantry', now: NOW + 2, seed: 'too-soon' });
+  assert.equal(resting.failureReason, 'generator_resting');
+  const refreshed = reduceMergeWorld(depleted.state, { type: 'refreshTime', now: NOW + 1 + depleted.state.generators['hearth-pantry'].restDurationMs });
+  assert.equal(refreshed.state.generators['hearth-pantry'].charges, 1);
+  assert.equal(refreshed.state.generators['hearth-pantry'].restStartedAt, null);
 });
 
 test('daily journal, companion, and quest rewards remain idempotent without discarding earned Energy', () => {
@@ -823,7 +820,7 @@ test('debug Today reset reopens only yesterday step conversion without taking ba
   assert.equal(reset.energy.value, energyBeforeReset);
   assert.equal(reset.stepEnergyByDay['2026-08-11'], undefined);
   assert.ok(reset.stepEnergyByDay['2026-08-10']);
-  assert.equal(mergeYesterdayStepEnergyPreview(3_000, reset.stepEnergyByDay['2026-08-11']), 10);
+  assert.equal(mergeYesterdayStepEnergyPreview(3_000, reset.stepEnergyByDay['2026-08-11']), 0);
 
   const claimedAgain = reduceMergeWorld(reset, {
     type: 'claimStepEnergy', dayId: '2026-08-11', observedSteps: 3_000,
@@ -846,7 +843,7 @@ test('earned Energy crosses the natural capacity without losing any journal rewa
   assert.equal(later.state.energy.value, 58);
 });
 
-test('journal reward preview diminishes to a permanent one-Energy floor with a separate companion bonus', () => {
+test('journal reward preview never turns life input into Merge Energy', () => {
   const ordinary = { id: 'ordinary', flowId: 'general', createdAt: '2026-08-12T09:00:00.000Z', source: { kind: 'manual', sourceId: 'ordinary' } };
   const second = { ...ordinary, id: 'second', createdAt: '2026-08-12T09:30:00.000Z', source: { kind: 'manual', sourceId: 'second' } };
   const third = { ...ordinary, id: 'third', createdAt: '2026-08-12T09:45:00.000Z', source: { kind: 'manual', sourceId: 'third' } };
@@ -854,22 +851,22 @@ test('journal reward preview diminishes to a permanent one-Energy floor with a s
   const fifth = { ...ordinary, id: 'fifth', createdAt: '2026-08-12T09:55:00.000Z', source: { kind: 'manual', sourceId: 'fifth' } };
   const companion = { id: 'companion', flowId: 'general', createdAt: '2026-08-12T10:00:00.000Z', source: { kind: 'manual', sourceId: 'companion', origin: { kind: 'companion_reflection', creatureId: 'c', promptId: 'p', promptText: 'p' } } };
   const day = (journalRecords: unknown[]) => ({ id: 'day', isoDate: '2026-08-12', journalRecords }) as unknown as HomeDayRecord;
-  assert.equal(mergeJournalRewardPreview([], { companion: true, now: new Date(NOW) }).totalEnergy, 15);
-  assert.equal(mergeJournalRewardPreview([], { companion: false, now: new Date(NOW) }).totalEnergy, 10);
-  assert.equal(mergeJournalRewardPreview([day([ordinary])], { companion: true, now: new Date(NOW) }).totalEnergy, 11);
-  assert.equal(mergeJournalRewardPreview([day([ordinary, companion])], { companion: true, now: new Date(NOW) }).totalEnergy, 3);
-  assert.equal(mergeJournalRewardPreview([day([ordinary, second, third])], { companion: false, now: new Date(NOW) }).totalEnergy, 1);
-  assert.equal(mergeJournalRewardPreview([day([ordinary, second, third, fourth])], { companion: false, now: new Date(NOW) }).totalEnergy, 1);
-  assert.equal(mergeJournalRewardPreview([day([ordinary, second, third, fourth, fifth])], { companion: false, now: new Date(NOW) }).totalEnergy, 1);
+  assert.equal(mergeJournalRewardPreview([], { companion: true, now: new Date(NOW) }).totalEnergy, 0);
+  assert.equal(mergeJournalRewardPreview([], { companion: false, now: new Date(NOW) }).totalEnergy, 0);
+  assert.equal(mergeJournalRewardPreview([day([ordinary])], { companion: true, now: new Date(NOW) }).totalEnergy, 0);
+  assert.equal(mergeJournalRewardPreview([day([ordinary, companion])], { companion: true, now: new Date(NOW) }).totalEnergy, 0);
+  assert.equal(mergeJournalRewardPreview([day([ordinary, second, third])], { companion: false, now: new Date(NOW) }).totalEnergy, 0);
+  assert.equal(mergeJournalRewardPreview([day([ordinary, second, third, fourth])], { companion: false, now: new Date(NOW) }).totalEnergy, 0);
+  assert.equal(mergeJournalRewardPreview([day([ordinary, second, third, fourth, fifth])], { companion: false, now: new Date(NOW) }).totalEnergy, 0);
   assert.deepEqual(
     mergeActivityRewards([day([ordinary, second, third, fourth, fifth])], new Date(NOW))
       .filter((reward) => reward.kind === 'daily_journal_energy')
       .map((reward) => reward.amount),
-    [10, 6, 3, 1, 1],
+    [0, 0, 0, 0, 0],
   );
 });
 
-test('a Tomorrow Egg companion journal earns its own fifteen Energy immediately', () => {
+test('a Tomorrow Egg companion journal is remembered without awarding Merge Energy', () => {
   const tomorrow = {
     id: 'day-2026-08-13', isoDate: '2026-08-13',
     journalRecords: [{
@@ -881,11 +878,11 @@ test('a Tomorrow Egg companion journal earns its own fifteen Energy immediately'
   assert.deepEqual(rewards.map((reward) => reward.kind), ['daily_journal_energy', 'daily_companion_energy']);
   assert.deepEqual(rewards.map((reward) => reward.grantDayId), ['2026-08-13', '2026-08-13']);
   const result = reduceMergeWorld(createInitialMergeWorldState(NOW), { type: 'grantActivityRewardsBatch', rewards, now: NOW + 1 });
-  assert.equal(result.energyGranted, 15);
-  assert.equal(result.state.energy.value, 35);
+  assert.equal(result.energyGranted, 0);
+  assert.equal(result.state.energy.value, 0);
 });
 
-test('an ordinary food journal grants Energy without creating a second stock economy', () => {
+test('an ordinary food journal creates neither Merge Energy nor a second stock economy', () => {
   const day = {
     id: 'day-2026-08-12', isoDate: '2026-08-12', promptAnswers: [], moments: [], capturedMeanings: [], stepsCount: 0,
     journalRecords: [{ id: 'food-entry', flowId: 'food', createdAt: '2026-08-12T10:00:00.000Z' }],
@@ -894,7 +891,7 @@ test('an ordinary food journal grants Energy without creating a second stock eco
   assert.deepEqual(rewards.map((reward) => reward.kind), ['daily_journal_energy']);
   const result = reduceMergeWorld(createInitialMergeWorldState(NOW), { type: 'grantActivityRewardsBatch', rewards, now: NOW + 1 });
   assert.equal(result.state.rewardInbox.length, 0);
-  assert.equal(result.energyGranted, 10);
+  assert.equal(result.energyGranted, 0);
 });
 
 test('the first meaningful daily capture creates Energy and a safe non-item memory arrival only', () => {
@@ -986,7 +983,7 @@ test('claiming a retained legacy activity basket still places both ingredients',
   assert.equal(state.board.filter((cell) => cell.occupant?.kind === 'item').length, 2);
 });
 
-test('schema seven migrates old activity parcels into companion-owned typed arrivals', () => {
+test('pre-v18 activity parcels are discarded by the intentional world reset', () => {
   const source = storyWorld();
   const normalized = normalizeMergeWorldState({
     ...source,
@@ -994,25 +991,20 @@ test('schema seven migrates old activity parcels into companion-owned typed arri
     rewardInbox: [{ id: 'unknown-old-parcel', createdAt: NOW, items: ['adventure:trail:4'], source: 'activity' }],
   }, NOW + 1);
   assert.equal(normalized.rewardInbox.some((entry) => entry.source === 'activity'), false);
-  const parcel = normalized.arrivals.find((arrival) => arrival.id === 'arrival:migrated:unknown-old-parcel');
-  assert.equal(parcel?.characterId, 'feastle');
-  assert.equal(parcel?.source, 'legacy');
-  assert.deepEqual(parcel?.itemDefinitionIds, ['food:table:1', 'food:dessert:1']);
-
-  const repeated = normalizeMergeWorldState(normalized, NOW + 2);
-  assert.equal(repeated.arrivals.filter((arrival) => arrival.id === parcel?.id).length, 1);
+  assert.equal(normalized.version, 18);
+  assert.equal(normalized.ownerCharacterId, 'mossprout');
+  assert.deepEqual(normalized.arrivals, []);
 });
 
-test('legacy companion starter receipts retain their encoded companion ownership', () => {
+test('legacy companion starter receipts cannot annex Mossprout’s personal world', () => {
   const source = createInitialMergeWorldState(NOW, ['feastle', 'pagelet']);
   const normalized = normalizeMergeWorldState({
     ...source,
     version: 6,
     rewardInbox: [{ id: 'activity:companion-story-starter:pagelet', createdAt: NOW, items: ['food:table:1'], source: 'activity' }],
   }, NOW + 1);
-  const parcel = normalized.arrivals.find((arrival) => arrival.characterId === 'pagelet');
-  assert.equal(parcel?.source, 'companion_story');
-  assert.deepEqual(parcel?.itemDefinitionIds, ['mind:books:1', 'mind:work:1']);
+  assert.deepEqual(normalized.arrivals, []);
+  assert.deepEqual(normalized.unlockedCharacters, []);
 });
 
 test('item parcels reject a full board without consuming the arrival', () => {
@@ -1228,7 +1220,7 @@ test('Merge FTUE commits before visual settlement and preserves all native anima
   assert.match(board, /DREAM_MIST_PARTICLES\.map/);
 });
 
-test('a companion journal grants Energy without starter item parcels', () => {
+test('a companion journal grants no Merge Energy or starter item parcels', () => {
   const day = {
     id: 'day-2026-08-12', isoDate: '2026-08-12', promptAnswers: [], moments: [], capturedMeanings: [], stepsCount: 0,
     journalRecords: [{
@@ -1240,7 +1232,7 @@ test('a companion journal grants Energy without starter item parcels', () => {
   assert.deepEqual(rewards.map((reward) => reward.kind), ['daily_journal_energy', 'daily_companion_energy']);
   const first = reduceMergeWorld(createInitialMergeWorldState(NOW), { type: 'grantActivityRewardsBatch', rewards, now: NOW + 1 });
   const duplicate = reduceMergeWorld(first.state, { type: 'grantActivityRewardsBatch', rewards, now: NOW + 2 });
-  assert.equal(first.energyGranted, 15);
+  assert.equal(first.energyGranted, 0);
   assert.equal(first.state.rewardInbox.length, 0);
   assert.equal(first.state.arrivals.length, 0);
   assert.equal(duplicate.changed, false);
@@ -1389,30 +1381,30 @@ test('a retained hidden Merge provider adopts repository Energy rewards before G
   assert.match(provider, /stateRef\.current = freshState;[\s\S]*?setState\(freshState\);/);
 });
 
-test('serving a story order consumes its item, refunds Energy, and emits a durable receipt', () => {
+test('serving a story order consumes its item without Energy or friendship rewards', () => {
   let state = storyWorld();
   const order = state.activeOrders[0];
   state = { ...withItems(state, [[29, item('served', order.requirements[0].definitionId)]]), energy: { ...state.energy, value: 0 } };
   assert.equal(mergeOrderReady(state, order), true);
   const result = reduceMergeWorld(state, { type: 'serveOrder', orderId: order.id, now: NOW + 2 });
   assert.equal(result.servedOrderId, order.id);
-  assert.equal(result.state.energy.value, 2);
+  assert.equal(result.state.energy.value, 0);
+  assert.equal(result.energyGranted, 0);
   assert.ok(result.state.externalRewardReceipts.some((receipt) => receipt.kind === 'story_order_served'));
+  assert.equal(result.state.externalRewardReceipts.some((receipt) => receipt.id.startsWith('merge-friendship:')), false);
 });
 
-test('legacy snapshots migrate into the current version without discarding earned overflow Energy', () => {
+test('legacy snapshots reset cleanly into Mossprout’s v18 personal world', () => {
   const normalized = normalizeMergeWorldState({
     ...createInitialMergeWorldState(NOW), version: 2,
     energy: { value: 99, cap: 100, lastRegenAt: NOW },
     generators: { 'starter-pantry': { id: 'starter-pantry', familyId: 'food', name: 'Picnic Pantry', level: 1, enabledBranches: ['table'], charges: 9, maxCharges: 12, readyAt: NOW + 1000 } },
   }, NOW + 1);
-  assert.equal(normalized.version, 17);
-  assert.equal(normalized.energy.regenCap, 50);
-  assert.equal(normalized.energy.value, 99);
-  assert.deepEqual(Object.keys(normalized.generators['hearth-pantry']).sort(), ['chainIds', 'forcedDropDefinitionId', 'id', 'level', 'name', 'tierOneDropDefinitionIds', 'upgradeFragments']);
-  assert.equal(normalized.generators['hearth-pantry'].forcedDropDefinitionId, null);
-  assert.deepEqual(normalized.generators['hearth-pantry'].chainIds, ['food:table', 'food:dessert']);
-  assert.deepEqual(normalized.unlockedChains.sort(), ['food:dessert', 'food:table']);
+  assert.equal(normalized.version, 18);
+  assert.equal(normalized.ownerCharacterId, 'mossprout');
+  assert.equal(normalized.energy.value, 0);
+  assert.deepEqual(normalized.generators, {});
+  assert.deepEqual(normalized.unlockedChains, []);
 });
 
 test('the shared catalog has nine generators, seventeen chains, and all twenty-five profiles', () => {
@@ -1563,20 +1555,20 @@ test('Steppling FTUE parcel completes three Dreambound merges into the Journey L
   assert.deepEqual(new Set(state.companionDiscovery.events.map((event) => event.kind)), new Set([
     'gate_eligible', 'gate_activated', 'path_chosen', 'parcel_claimed', 'stage_advanced', 'character_revealed', 'first_order_completed',
   ]));
-  assert.equal(state.board.filter((cell) => !cell.locked).length, 16);
+  assert.equal(state.board.filter((cell) => !cell.locked).length, 22);
 });
 
-test('v10 companion ownership migrates into seen grandfathered discovery records', () => {
+test('v10 companion ownership resets instead of populating Mossprout’s world', () => {
   const current = createInitialMergeWorldState(NOW, ['feastle', 'bedrotte']);
   const legacy = { ...current, version: 10 } as unknown as Record<string, unknown>;
   delete legacy.companionDiscovery;
   const migrated = normalizeMergeWorldState(legacy, NOW + 1);
-  assert.equal(migrated.version, 17);
-  assert.deepEqual(new Set(migrated.unlockedCharacters), new Set(['feastle', 'bedrotte']));
-  assert.ok(migrated.companionDiscovery.records.every((record) => record.source === 'legacy_grandfather' && record.revealSeenAt != null));
+  assert.equal(migrated.version, 18);
+  assert.deepEqual(migrated.unlockedCharacters, []);
+  assert.deepEqual(migrated.companionDiscovery.records, []);
 });
 
-test('v12 discovery records infer introduction completion without skipping an active first order', () => {
+test('v12 discovery records reset without leaking a foreign companion', () => {
   const base = createInitialMergeWorldState(NOW, ['steppling']);
   const record = {
     characterId: 'steppling', source: 'board_discovery' as const, gateId: 'gate-2-steppling', pathId: 'overgrown-trail',
@@ -1586,7 +1578,7 @@ test('v12 discovery records infer introduction completion without skipping an ac
     ...base, version: 12,
     companionDiscovery: { ...base.companionDiscovery, records: [record] },
   }, NOW + 1);
-  assert.equal(completed.companionDiscovery.records[0].firstOrderCompletedAt, NOW + 1);
+  assert.deepEqual(completed.companionDiscovery.records, []);
 
   const pending = normalizeMergeWorldState({
     ...base, version: 12,
@@ -1598,7 +1590,8 @@ test('v12 discovery records infer introduction completion without skipping an ac
     }],
     companionDiscovery: { ...base.companionDiscovery, records: [record] },
   }, NOW + 1);
-  assert.equal(pending.companionDiscovery.records[0].firstOrderCompletedAt, null);
+  assert.deepEqual(pending.companionDiscovery.records, []);
+  assert.equal(pending.activeOrders.some((order) => order.characterId === 'steppling'), false);
 });
 
 test('normalization restores a missing deterministic parcel for an untouched active path', () => {

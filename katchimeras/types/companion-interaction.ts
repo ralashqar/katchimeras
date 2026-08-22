@@ -159,6 +159,7 @@ export type CompanionRoute =
   | { kind: 'destination'; destination: CompanionDestination }
   | { kind: 'quick_goal_picker'; destination: 'goals' }
   | { kind: 'journey_questionnaire'; destination: 'goals'; sessionId: string | null }
+  | { kind: 'focus_questionnaire'; sessionId: string | null }
   | { kind: 'check_in'; destination: 'goals'; checkInId: string }
   | { kind: 'quest_experience'; destination: 'quest'; attemptId: string | null };
 
@@ -173,6 +174,7 @@ export type CompanionInteractionAction =
   | { type: 'review_item'; itemId: string | null }
   | { type: 'open_quick_goal_picker' }
   | { type: 'open_journey_questionnaire'; sessionId?: string | null }
+  | { type: 'open_focus_questionnaire'; sessionId?: string | null }
   | { type: 'sync_journey_session'; sessionId: string }
   | { type: 'open_check_in'; checkInId: string }
   | { type: 'open_quest_experience' }

@@ -4,19 +4,20 @@ import test from 'node:test';
 
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
+import type { MergeWorldState } from '@/types/merge-world';
 
 const NOW = Date.UTC(2026, 7, 18, 12);
 
-function mossproutWorld() {
+function mossproutWorld(): MergeWorldState {
   const fresh = createInitialMergeWorldState(NOW, ['mossprout']);
-  return normalizeMergeWorldState({
+  return {
     ...fresh,
     coins: 2_000,
     characterProgress: {
       ...fresh.characterProgress,
       mossprout: { friendshipLevel: 4, completedChapterIds: ['mossprout-chapter-0'] },
     },
-  }, NOW);
+  };
 }
 
 test('Haven upgrades are linear, story-gated, and debit Merge Coins atomically', () => {
@@ -39,14 +40,14 @@ test('Haven upgrades are linear, story-gated, and debit Merge Coins atomically',
   assert.equal(second.state.coins, 1_450);
 });
 
-test('v13 Mossprout saves backfill a restored tile without charging again', () => {
+test('v13 Mossprout saves reset into the v18 personal-world contract', () => {
   const current = mossproutWorld();
   const legacy = { ...current, version: 13, haven: undefined };
   const migrated = normalizeMergeWorldState(legacy, NOW);
-  assert.equal(migrated.version, 17);
-  assert.equal(migrated.haven.tileStages.mossprout, 1);
-  assert.equal(migrated.haven.revealState, 'revealed');
-  assert.equal(migrated.coins, current.coins);
+  assert.equal(migrated.version, 18);
+  assert.equal(migrated.ownerCharacterId, 'mossprout');
+  assert.equal(migrated.haven.tileStages.mossprout, undefined);
+  assert.equal(migrated.haven.revealState, 'hidden');
 });
 
 test('procedural Merge orders fill three slots and remain separate from story orders', () => {

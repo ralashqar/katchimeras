@@ -31,6 +31,11 @@ function bond(totalPoints: number): CompanionBondProgress {
     nextLabel: 'Familiar',
     pointsRemaining: Math.max(0, 250 - totalPoints),
     isMax: false,
+    relationshipStage: totalPoints >= 240 ? 'Close Friend' : totalPoints >= 100 ? 'Friend' : totalPoints >= 20 ? 'Familiar' : 'Stranger',
+    relationshipStageIndex: totalPoints >= 240 ? 3 : totalPoints >= 100 ? 2 : totalPoints >= 20 ? 1 : 0,
+    relationshipStageRatio: Math.min(1, totalPoints / 250),
+    nextRelationshipStage: 'Close Friend',
+    relationshipPointsRemaining: Math.max(0, 250 - totalPoints),
   };
 }
 

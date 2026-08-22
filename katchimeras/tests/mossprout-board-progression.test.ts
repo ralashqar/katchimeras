@@ -135,22 +135,22 @@ test('Mossprout queues one exact root match per active day and reconciliation is
 
 test('every covered board cell belongs to one clear progression lane', () => {
   const state = createInitialMergeWorldState(NOW, ['mossprout']);
-  assert.equal(state.board.filter((cell) => !cell.locked).length, 13);
+  assert.equal(state.board.filter((cell) => !cell.locked).length, 20);
   assert.equal(state.board.filter((cell) => cell.mist?.kind === 'rootbound_echo').length, 12);
   assert.equal(state.board.filter((cell) => cell.mist?.kind === 'garden_growth').length, 18);
-  assert.equal(state.board.filter((cell) => cell.mist?.kind === 'discovery_dormant').length, 20);
+  assert.equal(state.board.filter((cell) => cell.mist?.kind === 'dormant').length, 13);
 });
 
-test('v16 dormant fog migrates into the authored Garden Growth and Discovery lanes', () => {
+test('v16 fog resets into the authored Mossprout-only v18 board', () => {
   const legacy = structuredClone(createInitialMergeWorldState(NOW, ['mossprout'])) as unknown as { version: number; board: MergeWorldState['board'] };
   legacy.version = 16;
   legacy.board = legacy.board.map((cell) => cell.locked && cell.mist?.kind !== 'rootbound_echo'
     ? { ...cell, mist: { kind: 'dormant' as const } }
     : cell);
   const migrated = normalizeMergeWorldState(legacy, NOW + 1);
-  assert.equal(migrated.version, 17);
+  assert.equal(migrated.version, 18);
   assert.equal(migrated.board.filter((cell) => cell.mist?.kind === 'garden_growth').length, 18);
-  assert.equal(migrated.board.filter((cell) => cell.mist?.kind === 'discovery_dormant').length, 20);
+  assert.equal(migrated.board.filter((cell) => cell.mist?.kind === 'dormant').length, 25);
 });
 
 test('Garden Growth Mist opens three cells at each authored Journey beat', () => {
@@ -168,7 +168,7 @@ test('Garden Growth Mist opens three cells at each authored Journey beat', () =>
   }
 });
 
-test('all Garden Growth, Discovery Mist, and Rootbound cells can be permanently opened', () => {
+test('all authored Garden Growth and Rootbound cells can open while future personal regions remain dormant', () => {
   const fullSignals = signals(28, {
     friendshipLevel: 20,
     natureMemoryDayIds: ['memory-1', 'memory-2', 'memory-3'],
@@ -188,7 +188,8 @@ test('all Garden Growth, Discovery Mist, and Rootbound cells can be permanently 
   state = reduceMergeWorld(state, {
     type: 'reconcileCharacters', characterIds: Object.keys(KATCHIMERA_MERGE_PROFILES), now: NOW + 100,
   }).state;
-  assert.equal(state.board.filter((cell) => cell.locked || cell.mist).length, 0);
+  assert.equal(state.board.filter((cell) => cell.mist?.kind === 'garden_growth' || cell.mist?.kind === 'rootbound_echo').length, 0);
+  assert.equal(state.board.filter((cell) => cell.mist?.kind === 'dormant').length, 13);
   assert.equal(state.expansions.length, MOSSPROUT_GARDEN_GROWTH_CLEARINGS.length);
 });
 
@@ -272,7 +273,7 @@ test('the day-21 root awards a separate rare Memory Card and reveal receipt', ()
   assert.equal(revealed.state.ownedMemoryCards[0].revealedAt, NOW + 4);
 });
 
-test('v15 claimed foreign matches migrate safely to a replacement Root Memory parcel', () => {
+test('v15 claimed foreign matches are removed by the intentional v18 reset', () => {
   let current = createInitialMergeWorldState(NOW, ['mossprout']);
   current = reduceMergeWorld(current, {
     type: 'reconcileMossproutBoardProgression', signals: signals(5), dayId: 'active-05', now: NOW + 1,
@@ -286,11 +287,10 @@ test('v15 claimed foreign matches migrate safely to a replacement Root Memory pa
   legacy.board[itemCell].occupant = { kind: 'item', instanceId: 'legacy-foreign-match', definitionId: 'food:table:1' };
   legacy.arrivals[0].itemDefinitionIds = ['food:table:1'];
   const migrated = normalizeMergeWorldState(legacy, NOW + 3);
-  assert.equal(migrated.version, 17);
-  assert.equal(migrated.board[itemCell].occupant?.kind === 'item' ? migrated.board[itemCell].occupant.definitionId : null, 'food:table:1');
-  const replacement = migrated.arrivals.find((arrival) => arrival.id === 'arrival:root-memory-reissue:root:day-5-first-return:v16');
-  assert.deepEqual(replacement?.itemDefinitionIds, ['mossprout:root-memory:returning-seed']);
-  assert.equal(replacement?.claimedAt, null);
+  assert.equal(migrated.version, 18);
+  assert.equal(migrated.ownerCharacterId, 'mossprout');
+  assert.equal(migrated.board.some((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'food:table:1'), false);
+  assert.deepEqual(migrated.arrivals, []);
 });
 
 test('nature-memory roots use the authored soft fallback after sustained garden play', () => {

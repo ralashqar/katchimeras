@@ -6,9 +6,24 @@ import type {
   CompanionDestination,
   QuestCaptureFeedback,
 } from '@/types/companion-interaction';
+import type { ConversationSession } from '@/types/companion-conversation';
 import type { QuestSubmissionItem } from '@/utils/quests/report-back-evidence';
 import type { QuestRuntimeStatus } from '@/utils/quests/runtime';
 import type { InteractiveQuestExecution } from '@/utils/quests/experiences/types';
+
+export function companionInitialConversationCompletionReady(
+  session: Pick<ConversationSession, 'definitionId' | 'outcomePresentation' | 'status'> | null | undefined,
+  definitionId: string | null | undefined,
+): boolean {
+  return Boolean(
+    definitionId
+    && session?.definitionId === definitionId
+    && session.status === 'completed'
+    // A result is part of the conversation, not post-conversation chrome.
+    // FTUE may finish only after the player explicitly dismisses it.
+    && !session.outcomePresentation
+  );
+}
 
 export function createCompanionInteractionState(input: {
   initialDestination?: CompanionDestination | null;
@@ -97,8 +112,18 @@ export function companionInteractionReducer(
           sessionId: action.sessionId ?? null,
         },
       };
+    case 'open_focus_questionnaire':
+      return {
+        ...state,
+        destination: null,
+        reviewItemId: null,
+        route: {
+          kind: 'focus_questionnaire',
+          sessionId: action.sessionId ?? null,
+        },
+      };
     case 'sync_journey_session':
-      return state.route.kind === 'journey_questionnaire'
+      return state.route.kind === 'journey_questionnaire' || state.route.kind === 'focus_questionnaire'
         ? { ...state, route: { ...state.route, sessionId: action.sessionId } }
         : state;
     case 'open_check_in':
@@ -120,7 +145,7 @@ export function companionInteractionReducer(
         ? { ...state, route: { ...state.route, attemptId: action.attemptId } }
         : state;
     case 'return_to_destination': {
-      if (state.route.kind === 'introduction') {
+      if (state.route.kind === 'introduction' || state.route.kind === 'focus_questionnaire') {
         return {
           ...state,
           destination: null,
@@ -168,8 +193,8 @@ export type CompanionBackAction =
   | 'close_experience';
 
 /**
- * One source of truth for companion back navigation. Focused experiences
- * always unwind to their owning destination before the experience can close.
+ * One source of truth for companion back navigation. Destination-owned
+ * experiences unwind to that destination; standalone focused flows return home.
  */
 export function companionRouteBackAction(
   state: CompanionInteractionState
@@ -181,6 +206,7 @@ export function companionRouteBackAction(
   if (state.route.kind === 'chat_lobby') return 'return_to_home';
   if (state.route.kind === 'conversation') return 'return_to_chat_lobby';
   if (state.route.kind === 'visit' || state.route.kind === 'introduction') return 'return_to_home';
+  if (state.route.kind === 'focus_questionnaire') return 'return_to_home';
   if (state.route.kind === 'shared_history') return 'return_to_home';
   if (state.route.kind === 'destination') return 'return_to_home';
   return 'return_to_destination';

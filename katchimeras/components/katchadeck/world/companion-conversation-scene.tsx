@@ -26,10 +26,13 @@ import type { KingdomSkinOption } from '@/utils/katchimera-wardrobe';
 import type { CompanionMemory } from '@/utils/companion-content';
 import type { CompanionBondProgress } from '@/utils/companion-bond';
 import type { CompanionConversationPresentationPhase } from '@/features/companion/use-companion-conversation-flow';
-
-const CHOICE_OPTION_GAP = 9;
-const ESTIMATED_OPTION_ROW_HEIGHT = 61;
-const PANEL_SCROLL_VERTICAL_PADDING = 22;
+import {
+  companionChoiceColumnCount,
+  COMPANION_PANEL_LAYOUT_DURATION_MS,
+  estimatedCompanionChoiceContentHeight,
+  useCompanionAdaptivePanel,
+} from '@/hooks/use-companion-adaptive-panel';
+import { CompanionChoiceList } from './companion-choice-list';
 
 export function conversationSpeechLine(
   session: ConversationSession,
@@ -140,28 +143,25 @@ export function CompanionConversationScene({
     : node?.kind === 'profile_game' || node?.kind === 'insight_game'
       ? activeGameQuestion?.options.length ?? 0
       : 0;
-  const optionColumns = width >= 360 && visibleOptionCount >= 4 ? 2 : 1;
-  const estimatedOptionRows = Math.ceil(visibleOptionCount / optionColumns);
   const estimatedContentHeight = visibleOptionCount > 0
-    ? Math.max(
-        68,
-        estimatedOptionRows * ESTIMATED_OPTION_ROW_HEIGHT
-          + Math.max(0, estimatedOptionRows - 1) * CHOICE_OPTION_GAP
-          + PANEL_SCROLL_VERTICAL_PADDING,
+    ? estimatedCompanionChoiceContentHeight(
+        visibleOptionCount,
+        companionChoiceColumnCount(width, visibleOptionCount),
       )
     : 190;
   const panelContentKey = `${session.currentNodeId}:${activeGameQuestion?.id ?? 'no-question'}:${session.status}:${session.outcomePresentation?.id ?? 'none'}:${session.pendingReply ?? 'ready'}:${visibleOptionCount}`;
-  const [measuredPanelContent, setMeasuredPanelContent] = useState({ key: panelContentKey, height: estimatedContentHeight });
-  const measuredContentHeight = measuredPanelContent.key === panelContentKey
-    ? measuredPanelContent.height
-    : estimatedContentHeight;
-  const panelMaxHeight = Math.min(440, Math.max(220, height * 0.46));
   const panelChromeHeight = showConversationProgress ? 51 : 20;
-  const panelHeight = Math.min(panelMaxHeight, Math.max(148, measuredContentHeight + panelChromeHeight));
-  const panelScrollable = measuredContentHeight + panelChromeHeight > panelMaxHeight;
-  const shortPanelBottomLift = panelScrollable
+  const adaptivePanel = useCompanionAdaptivePanel({
+    chromeHeight: panelChromeHeight,
+    contentKey: panelContentKey,
+    estimatedContentHeight,
+    safeAreaBottom: insets.bottom,
+    safeAreaTop: insets.top,
+    viewportHeight: height,
+  });
+  const shortPanelBottomLift = adaptivePanel.scrollable
     ? 0
-    : Math.min(22, Math.max(0, (panelMaxHeight - panelHeight) * 0.1));
+    : Math.min(22, Math.max(0, (adaptivePanel.maxHeight - adaptivePanel.panelHeight) * 0.1));
 
   useEffect(() => {
     if (!session.outcomePresentation?.celebrate || process.env.EXPO_OS !== 'ios') return;
@@ -194,11 +194,11 @@ export function CompanionConversationScene({
               darkColor="#FFD36E">
               {name}
             </ThemedText>
-            <View accessibilityLabel={`Bond level ${bondProgress.level}, ${Math.round(bondProgress.ratio * 100)} percent to the next level`} style={{ alignItems: 'center', flexDirection: 'row', gap: 6 }}>
+            <View accessibilityLabel={`${bondProgress.relationshipStage} bond, ${Math.round(bondProgress.relationshipStageRatio * 100)} percent to the next stage`} style={{ alignItems: 'center', flexDirection: 'row', gap: 6 }}>
               <BondIconArt size={17} />
-              <ThemedText selectable style={{ fontSize: 9.5, fontVariant: ['tabular-nums'], fontWeight: '900' }} lightColor="#FFF1CC" darkColor="#FFF1CC">Bond {bondProgress.level}</ThemedText>
+              <ThemedText selectable style={{ fontSize: 9.5, fontWeight: '900' }} lightColor="#FFF1CC" darkColor="#FFF1CC">{bondProgress.relationshipStage}</ThemedText>
               <View style={{ backgroundColor: 'rgba(255,244,213,0.25)', borderRadius: 999, flex: 1, height: 5, overflow: 'hidden' }}>
-                <View style={{ backgroundColor: '#E8B547', borderRadius: 999, height: '100%', width: `${Math.max(bondProgress.totalPoints ? 5 : 0, bondProgress.ratio * 100)}%` }} />
+                <View style={{ backgroundColor: '#E8B547', borderRadius: 999, height: '100%', width: `${Math.max(bondProgress.totalPoints ? 5 : 0, bondProgress.relationshipStageRatio * 100)}%` }} />
               </View>
             </View>
           </View>
@@ -218,7 +218,7 @@ export function CompanionConversationScene({
       <Animated.View
         accessibilityLabel={`Conversation ${flowPhase.replace('_', ' ')}`}
         entering={reduceMotion ? undefined : FadeInUp.duration(220)}
-        layout={reduceMotion ? undefined : LinearTransition.duration(180)}
+        layout={reduceMotion ? undefined : LinearTransition.duration(COMPANION_PANEL_LAYOUT_DURATION_MS)}
         style={{
           backgroundColor: KatchaUI.companionScenePanel.background,
           borderColor: KatchaUI.companionScenePanel.border,
@@ -226,7 +226,7 @@ export function CompanionConversationScene({
           borderRadius: 30,
           borderWidth: 1,
           boxShadow: KatchaUI.companionScenePanel.shadow,
-          height: panelHeight,
+          height: adaptivePanel.panelHeight,
           overflow: 'hidden',
           paddingHorizontal: 12,
           paddingTop: showConversationProgress ? 12 : 8,
@@ -247,18 +247,13 @@ export function CompanionConversationScene({
 
         <ScrollView
           key={panelContentKey}
-          bounces={panelScrollable}
+          bounces={adaptivePanel.scrollable}
           contentContainerStyle={{ gap: 10, paddingBottom: 20, paddingTop: showConversationProgress ? 2 : 6 }}
           contentInsetAdjustmentBehavior="never"
           keyboardShouldPersistTaps="handled"
           nestedScrollEnabled
-          onContentSizeChange={(_, contentHeight) => {
-            const nextHeight = Math.ceil(contentHeight);
-            setMeasuredPanelContent((current) => current.key === panelContentKey && current.height === nextHeight
-              ? current
-              : { key: panelContentKey, height: nextHeight });
-          }}
-          scrollEnabled={panelScrollable}
+          onContentSizeChange={(_, contentHeight) => adaptivePanel.onContentHeightChange(contentHeight)}
+          scrollEnabled={adaptivePanel.scrollable}
           showsVerticalScrollIndicator={false}
           style={{ flex: 1, minHeight: 0 }}>
         {session.outcomePresentation ? (
@@ -276,11 +271,11 @@ export function CompanionConversationScene({
             requiresManualAdvance={requiresManualAdvance}
           />
         ) : node?.kind === 'choice' ? (
-          <ChoiceOptions options={node.options} onAnswer={answer} />
+          <CompanionChoiceList options={node.options} onSelect={answer} />
         ) : node?.kind === 'poll' ? (
-          <ChoiceOptions options={node.options} onAnswer={answer} />
+          <CompanionChoiceList options={node.options} onSelect={answer} />
         ) : node?.kind === 'profile_game' || node?.kind === 'insight_game' ? (
-          <ChoiceOptions options={activeGameQuestion?.options ?? []} onAnswer={answer} />
+          <CompanionChoiceList options={activeGameQuestion?.options ?? []} onSelect={answer} />
         ) : node?.kind === 'form_reveal' ? (
           <FormReveal definition={definition} node={node} onAdvance={onAdvance} preview={Boolean(session.preview)} session={session} skins={skins} />
         ) : node?.kind === 'insight_reveal' ? (
@@ -389,53 +384,6 @@ function GoalBundleProposal({ hasActiveGoalPlan, node, onDecision }: {
   </View>;
 }
 
-function ChoiceOptions({ disabled = false, options, onAnswer, selectedOptionId = null }: {
-  disabled?: boolean;
-  options: readonly ConversationOptionLike[];
-  onAnswer: (id: string) => void;
-  selectedOptionId?: string | null;
-}) {
-  const { width } = useWindowDimensions();
-  const useGrid = width >= 360 && options.length >= 4;
-  return <View accessibilityRole="radiogroup" style={{ flexDirection: useGrid ? 'row' : 'column', flexWrap: useGrid ? 'wrap' : 'nowrap', gap: CHOICE_OPTION_GAP }}>
-    {options.map((option) => {
-      const selected = option.id === selectedOptionId;
-      return (
-      <Pressable
-        accessibilityState={{ disabled, selected }}
-        accessibilityRole="button"
-        disabled={disabled}
-        key={option.id}
-        onPress={() => onAnswer(option.id)}
-        style={({ pressed }) => ({
-          alignItems: 'center',
-          backgroundColor: selected ? KatchaUI.companionScenePanel.optionBackgroundSelected : KatchaUI.companionScenePanel.optionBackground,
-          borderColor: selected ? 'rgba(139,96,29,0.58)' : KatchaUI.companionScenePanel.optionBorder,
-          borderCurve: 'continuous',
-          borderRadius: 18,
-          borderWidth: 1,
-          flexDirection: 'row',
-          gap: 10,
-          justifyContent: 'space-between',
-          minHeight: 52,
-          opacity: disabled && !selected ? 0.62 : pressed ? 0.72 : 1,
-          paddingHorizontal: 15,
-          paddingVertical: 10,
-          transform: [{ scale: pressed ? 0.985 : 1 }],
-          width: useGrid ? '48%' : '100%',
-        })}>
-        <ThemedText selectable style={{ flex: 1, fontSize: 15, fontWeight: '800', lineHeight: 20 }} lightColor={KatchaUI.companionScenePanel.optionInk} darkColor={KatchaUI.companionScenePanel.optionInk}>{option.label}</ThemedText>
-        {selected ? <IconSymbol color={KatchaUI.companionScenePanel.optionIcon} name="checkmark" size={15} weight="bold" />
-          : disabled ? <View style={{ width: 15 }} />
-            : <IconSymbol color={KatchaUI.companionScenePanel.optionIcon} name="chevron.right" size={15} />}
-      </Pressable>
-      );
-    })}
-  </View>;
-}
-
-type ConversationOptionLike = { id: string; label: string };
-
 function conversationPrompt(
   prompt: string,
   definition: ConversationDefinition,
@@ -465,7 +413,7 @@ function ConversationOutcomeCard({ outcome, onAdvance, requiresManualAdvance }: 
         <ThemedText selectable style={{ flex: 1, fontSize: 13, fontWeight: '800', lineHeight: 18 }} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>{item}</ThemedText>
       </View>)}
     </View>
-    {requiresManualAdvance ? <PrimaryAction label="Done" onPress={onAdvance} /> : null}
+    {requiresManualAdvance ? <PrimaryAction label="Continue" onPress={onAdvance} /> : null}
   </Animated.View>;
 }
 

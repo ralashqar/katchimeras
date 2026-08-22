@@ -18,8 +18,8 @@ import {
   MERGE_GENERATORS_BY_ID,
   MERGE_ITEMS_BY_ID,
   MERGE_CHARACTER_NAMES,
-  MERGE_LEVEL_THRESHOLDS,
 } from '@/constants/merge-world-catalog';
+import { mossproutWorldChapterForActiveDays } from '@/constants/mossprout-world-chapters';
 import { mergeWorldGeneratorArt } from '@/constants/merge-world-art';
 import { MEMORY_CARDS_BY_ID } from '@/constants/memory-card-catalog';
 import { RARE_MEMORY_CARD_REVEAL_ART, VEILED_MEMORY_CARD_ART, memoryCardArt } from '@/constants/memory-card-art';
@@ -684,9 +684,12 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     return <View style={styles.loading}><ActivityIndicator color={Lantern.ember300} size="large" /><ThemedText darkColor="#FFF0CE">Opening the pantry…</ThemedText></View>;
   }
 
-  const nextThreshold = MERGE_LEVEL_THRESHOLDS[state.mergeLevel] ?? null;
-  const currentThreshold = MERGE_LEVEL_THRESHOLDS[state.mergeLevel - 1] ?? 0;
-  const levelRatio = nextThreshold == null ? 1 : Math.max(0, Math.min(1, (state.mergeXp - currentThreshold) / (nextThreshold - currentThreshold)));
+  const activeGardenDays = state.mossproutBoardProgression.activeDayIds.length;
+  const worldChapter = mossproutWorldChapterForActiveDays(activeGardenDays);
+  const chapterRatio = Math.max(0, Math.min(1,
+    (Math.max(1, activeGardenDays) - worldChapter.firstActiveDay + 1)
+      / (worldChapter.finalActiveDay - worldChapter.firstActiveDay + 1),
+  ));
   return (
     <View onLayout={() => setScreenLayoutNonce((nonce) => nonce + 1)} ref={screenRef} style={styles.screen}>
       <MergeCommandFeedback />
@@ -700,10 +703,10 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
           style={[styles.hudBar, { paddingLeft: companionHeaderLeftInset }]}
           tone="glass"
           trailing={<>
-            <GameHudItem accessibilityLabel={`Merge level ${state.mergeLevel}`} style={styles.levelPill} tone="glass">
-              <IconSymbol color={GameUI.color.goldStrong} name="star.fill" size={14} />
-              <ThemedText selectable style={styles.levelValue} lightColor={GameUI.color.ink} darkColor={GameUI.color.ink}>{state.mergeLevel}</ThemedText>
-              <View pointerEvents="none" style={styles.levelTrack}><View style={[styles.levelFill, { width: `${levelRatio * 100}%` }]} /></View>
+            <GameHudItem accessibilityLabel={`Mossprout chapter ${worldChapter.number}: ${worldChapter.title}`} style={styles.levelPill} tone="glass">
+              <IconSymbol color={GameUI.color.goldStrong} name="leaf.fill" size={14} />
+              <ThemedText numberOfLines={1} style={styles.levelValue} lightColor={GameUI.color.ink} darkColor={GameUI.color.ink}>{worldChapter.title}</ThemedText>
+              <View pointerEvents="none" style={styles.levelTrack}><View style={[styles.levelFill, { width: `${chapterRatio * 100}%` }]} /></View>
             </GameHudItem>
             <GameCurrencyHud balances={[
               {

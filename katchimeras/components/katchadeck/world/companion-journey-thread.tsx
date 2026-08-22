@@ -26,6 +26,7 @@ import {
 } from '@/utils/companion-questionnaire-presentation';
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
 import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-backgrounds';
+import type { CompanionBondProgress } from '@/utils/companion-bond';
 import {
   CompanionQuestionnaireScene,
   QuestionnaireResultNotice,
@@ -369,6 +370,7 @@ export function LegacyCompanionJourneyDiscoveryThread({
 export function CompanionJourneyQuestionnairePage({
   accentColor,
   background,
+  bondProgress,
   companionName,
   conversation,
   creature,
@@ -379,14 +381,17 @@ export function CompanionJourneyQuestionnairePage({
   onAddTasks,
   onAnswer,
   onBack,
+  onDone,
   onDismissTasks,
-  onViewTasks,
+  onOpenMore,
+  presentation = 'immersive',
   quickGoalSuggestionIds,
   resultReady,
   visualKey,
 }: {
   accentColor: string;
   background: TodayAtmosphereBackground;
+  bondProgress?: CompanionBondProgress;
   companionName: string;
   conversation: CompanionJourneyConversationSession | null;
   creature: QuestionnaireImageSource;
@@ -397,8 +402,10 @@ export function CompanionJourneyQuestionnairePage({
   onAddTasks: (templateIds: readonly string[]) => readonly string[];
   onAnswer: (sessionId: string, value: string) => readonly string[];
   onBack: () => void;
+  onDone: () => void;
   onDismissTasks: () => void;
-  onViewTasks: () => void;
+  onOpenMore?: () => void;
+  presentation?: 'immersive' | 'conversation';
   quickGoalSuggestionIds: readonly string[];
   resultReady: boolean;
   visualKey: HomeVisualKey;
@@ -425,11 +432,16 @@ export function CompanionJourneyQuestionnairePage({
       <CompanionQuestionnaireScene
         accentColor={accentColor}
         background={background}
+        bondProgress={bondProgress}
         companionName={companionName}
         creature={creature}
         environmentKey={environmentKey}
-        helperText="This direction can shape future questions, goals, quests, and reflections."
+        helperText={presentation === 'conversation'
+          ? undefined
+          : 'This direction can shape future questions, goals, quests, and reflections.'}
         onBack={onBack}
+        onOpenMore={onOpenMore}
+        presentation={presentation}
         result
         stepLabel="Your direction"
         title={activeFocus?.title ?? 'Your goal plan is ready'}
@@ -456,7 +468,6 @@ export function CompanionJourneyQuestionnairePage({
               onPress={() => {
                 onDismissTasks();
                 setTaskDecision('none');
-                onBack();
               }}
               style={({ pressed }) => [styles.resultTextAction, pressed && styles.pressed]}>
               <ThemedText style={styles.resultTextActionLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
@@ -466,9 +477,12 @@ export function CompanionJourneyQuestionnairePage({
           </>
         ) : (
           <CompanionPrimaryAction
-            icon={added || alreadyAdded ? 'arrow.right' : 'checkmark'}
-            label={added || alreadyAdded ? 'View tasks' : 'Done'}
-            onPress={added || alreadyAdded ? onViewTasks : onBack}
+            icon="checkmark"
+            label="Done"
+            onPress={() => {
+              onDismissTasks();
+              onDone();
+            }}
           />
         )}
       </CompanionQuestionnaireScene>
@@ -480,11 +494,14 @@ export function CompanionJourneyQuestionnairePage({
       <CompanionQuestionnaireScene
         accentColor={accentColor}
         background={background}
+        bondProgress={bondProgress}
         companionName={companionName}
         creature={creature}
         environmentKey={environmentKey}
-        helperText="Give me a moment to gather the right choices."
+        helperText={presentation === 'conversation' ? undefined : 'Give me a moment to gather the right choices.'}
         onBack={onBack}
+        onOpenMore={onOpenMore}
+        presentation={presentation}
         stepLabel="Set direction"
         visualKey={visualKey}
         title="Preparing your questions…"
@@ -497,18 +514,24 @@ export function CompanionJourneyQuestionnairePage({
     <CompanionQuestionnaireScene
       accentColor={accentColor}
       background={background}
+      bondProgress={bondProgress}
       companionName={companionName}
+      choicePresentation={presentation === 'conversation' ? 'single-column' : 'responsive-grid'}
       creature={creature}
       environmentKey={environmentKey}
-      helperText={node.helperText}
+      helperText={presentation === 'conversation' ? undefined : node.helperText}
       onBack={onBack}
+      onOpenMore={onOpenMore}
       onSelect={(option) => onAnswer(conversation.id, option.id)}
       options={(node.options ?? []).map((option) => ({
         id: option.id,
         label: option.label,
-        icon: companionQuestionnaireOptionIcon(option.id, option.label),
+        icon: presentation === 'conversation'
+          ? undefined
+          : companionQuestionnaireOptionIcon(option.id, option.label),
       }))}
       progress={progress.ratio}
+      presentation={presentation}
       stepLabel={`Question ${progress.current} of ${progress.total}`}
       title={node.prompt}
       visualKey={visualKey}

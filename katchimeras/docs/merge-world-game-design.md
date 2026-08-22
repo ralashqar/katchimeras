@@ -1,5 +1,10 @@
 # Katchimeras Persistent Merge World
 
+> Historical shared-world design. The production Mossprout vertical slice now
+> follows [Mossprout Personal Merge World v18](./mossprout-personal-merge-world-v18.md).
+> Where this document mentions a shared board, Merge Energy, or orders awarding
+> Friendship, the v18 document is authoritative.
+
 **Status:** Focused v1 implemented · **Source:** Persistent Merge World GDS sections 1–34
 
 ## Product role

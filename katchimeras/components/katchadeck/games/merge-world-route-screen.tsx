@@ -7,35 +7,22 @@ import { MergeWorldScreen } from '@/components/katchadeck/games/merge-world-scre
 import { TodayExplorationBackground } from '@/components/katchadeck/home/today-exploration-background';
 import { MergeWorldProvider } from '@/features/merge-world/merge-world-provider';
 import { useAllDays } from '@/hooks/use-all-days';
-import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
 import { homeRepository } from '@/storage/repositories/home-repository';
-import { loadCompanionBondState } from '@/utils/companion-bond-storage';
-import { buildOwnedGameCompanions } from '@/utils/game-hub';
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import { loadCompanionQuests } from '@/utils/katchimera-quests';
-import { applyWardrobeToKingdom } from '@/utils/katchimera-wardrobe';
-import { loadKatchimeraWardrobe } from '@/utils/katchimera-wardrobe-storage';
-import { deriveKingdom } from '@/utils/kingdom-engine';
-import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability';
 import { deriveTomorrowDayRecord, hydrateAllDays } from '@/game/days';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
-import { KATCHIMERA_MERGE_PROFILES } from '@/constants/merge-world-catalog';
-import { familyIdFromCompanionId } from '@/constants/katchimera-skins';
-import type { MergeCharacterId } from '@/types/merge-world';
 import { scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
 import { useGameScreenTransition } from '@/features/navigation/game-screen-transition';
 
 export function MergeWorldRouteScreen() {
   const isFocused = useIsFocused();
-  const { creatureId, familyId } = useLocalSearchParams<{ creatureId?: string; familyId?: string }>();
+  useLocalSearchParams<{ creatureId?: string; familyId?: string }>();
   const hasPresentedBoard = useRef(false);
   const [backgroundReady, setBackgroundReady] = useState(false);
   const { suppressEntranceMotion, target } = useGameScreenTransition();
   const { height, width } = useWindowDimensions();
   const { days } = useAllDays();
-  const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
-  const routeFamilyId = familyId ?? familyIdFromCompanionId(creatureId);
-  const featuredCharacterId = routeFamilyId && routeFamilyId in KATCHIMERA_MERGE_PROFILES ? routeFamilyId as MergeCharacterId : null;
   const playBoardEntrance = isFocused && !hasPresentedBoard.current
     && !(target === 'merge' && suppressEntranceMotion);
   useEffect(() => {
@@ -62,28 +49,24 @@ export function MergeWorldRouteScreen() {
       : currentDays;
     const resolveCompanionId = companionIdResolverForHomeState(homeState);
     const quests = loadCompanionQuests(resolveCompanionId);
-    const bond = loadCompanionBondState(quests, resolveCompanionId, homeState);
-    const kingdom = applyWardrobeToKingdom(
-      withDevAvailableKatchimeras(deriveKingdom([...currentDays]), allKatchimerasAvailable),
-      loadKatchimeraWardrobe(),
-    );
     return {
       // Companion ownership is canonical in Merge World v11. Historical day
       // creatures are Wisps/legacy memories and must not unlock new board
       // companions. The dev availability switch remains an explicit override.
-      characterIds: allKatchimerasAvailable
-        ? buildOwnedGameCompanions(kingdom.creatures, bond).map((companion) => companion.familyId)
-        : [],
+      // Mossprout is the first personal Merge World. Other companions retain
+      // their own relationship systems until their worlds receive a vertical
+      // slice; they no longer place foreign generators on this board.
+      characterIds: ['mossprout'],
       activityDays,
       quests,
     };
-  }, [allKatchimerasAvailable, days, isFocused]);
+  }, [days, isFocused]);
 
   return (
-    <MergeWorldProvider active={isFocused} characterIds={persistent.characterIds} days={persistent.activityDays} featuredCharacterId={featuredCharacterId} questState={persistent.quests}>
+    <MergeWorldProvider active={isFocused} characterIds={persistent.characterIds} days={persistent.activityDays} featuredCharacterId="mossprout" questState={persistent.quests}>
       <View style={styles.screen}>
         {isFocused ? <>
-          <TodayExplorationBackground backgroundKey="home" contentFit="cover" imageSize={Math.max(height, width)} onLoad={() => setBackgroundReady(true)} />
+          <TodayExplorationBackground backgroundKey="mossprout" contentFit="cover" imageSize={Math.max(height, width)} onLoad={() => setBackgroundReady(true)} />
           <View style={styles.world}>
             <MergeWorldScreen active={isFocused} backgroundReady={backgroundReady} playBoardEntrance={playBoardEntrance} />
           </View>

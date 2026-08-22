@@ -1,5 +1,9 @@
 # Merge World game-layer architecture
 
+> Historical architecture reference. State ownership, progression boundaries,
+> and economy behavior were superseded by
+> [Mossprout Personal Merge World v18](./mossprout-personal-merge-world-v18.md).
+
 ## Boundaries
 
 The feature is split into four layers:
