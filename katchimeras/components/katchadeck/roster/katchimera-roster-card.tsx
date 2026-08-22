@@ -9,6 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { AppFontFamilies } from '@/constants/theme';
 import { lifeAspectById } from '@/constants/life-aspects';
@@ -145,7 +146,7 @@ function KatchimeraRosterCardComponent({
               </ThemedText>
             </View>
             <View style={styles.progressRow}>
-              <IconSymbol name="heart.fill" size={10} color="#F2CB69" />
+              <BondIconArt size={15} />
               <ThemedText style={styles.points} lightColor="#E7D8B7" darkColor="#E7D8B7">
                 {item.bond.isMax
                   ? item.bond.totalPoints

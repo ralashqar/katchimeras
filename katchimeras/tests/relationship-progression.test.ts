@@ -15,6 +15,7 @@ import {
   normalizeRelationshipProgressState,
   recordMossproutFirstGardenRestored,
   recordKatchimeraActionCompletion,
+  recordHandledKatchimeraActionCompletion,
   recordMossproutJourneyOrderServed,
   recordMossproutMatchedCard,
   resetRelationshipProgressForDayForDebug,
@@ -23,7 +24,7 @@ import {
   startMossproutJourneyDay,
 } from '../game/katchimeras/relationship-progression';
 import { mossproutStoryConversationDefinitions } from '../constants/mossprout-story-conversations';
-import { MOSSPROUT_DAILY_FIELD_NOTE_ACTION_ID, mossproutConversationActionCompletion, mossproutJourneyDayStatus, resolveMossproutDayActions, resolveMossproutHome } from '../game/katchimeras/mossprout-home';
+import { composeMossproutVisibleActions, MOSSPROUT_DAILY_FIELD_NOTE_ACTION_ID, mossproutConversationActionCompletion, mossproutConversationArtKey, mossproutGoalArtKey, mossproutJourneyDayStatus, resolveMossproutDayActions, resolveMossproutHome } from '../game/katchimeras/mossprout-home';
 import type { KatchimeraDayAction } from '../types/relationship-progression';
 
 test('legacy relationship state normalizes with an empty skipped-action ledger', () => {
@@ -37,6 +38,86 @@ test('legacy relationship state normalizes with an empty skipped-action ledger',
   assert.deepEqual(normalized.skippedActionIds, []);
   assert.equal(normalized.schemaVersion, 2);
   assert.deepEqual(normalized.mossproutDailyActionDecks, []);
+});
+
+test('every bespoke Mossprout question and journal resolves to its intended action artwork', () => {
+  const conversationArt = {
+    'mossprout:conversation:nature-question:suspicious-path': 'mossprout:suspicious-path',
+    'mossprout:conversation:nature-question:weather-committee': 'mossprout:nature-weather',
+    'mossprout:conversation:nature-question:garden-guests': 'mossprout:garden-guest',
+    'mossprout:conversation:nature-question:outdoor-luxury': 'mossprout:outdoor-luxury',
+    'mossprout:conversation:nature-question:tree-neighbour': 'mossprout:tree-neighbour',
+    'mossprout:conversation:nature-question:cloud-job': 'mossprout:cloud-job',
+    'mossprout:conversation:nature-question:pocket-expedition': 'today:quest',
+    'mossprout:conversation:nature-question:garden-rule': 'mossprout:garden-rules',
+    'mossprout:conversation:nature-journal:three-detail-field-note': 'today:reflection',
+    'mossprout:conversation:nature-journal:weather-in-the-day': 'mossprout:nature-weather',
+    'mossprout:conversation:nature-journal:one-growing-thing': 'today:reflection',
+    'mossprout:conversation:nature-journal:sound-map': 'mossprout:nature-sound-map',
+    'mossprout:conversation:nature-journal:light-on-the-place': 'mossprout:nature-light',
+    'mossprout:conversation:nature-journal:small-return': 'today:place',
+    'mossprout:game:form-finder': 'mossprout:nature-card',
+    'mossprout:insight:nature-connection': 'mossprout:nature-insight',
+  } as const;
+
+  for (const [definitionId, artKey] of Object.entries(conversationArt)) {
+    assert.equal(mossproutConversationArtKey(definitionId), artKey, definitionId);
+  }
+});
+
+test('Mossprout goals reuse Today artwork where it fits and bespoke artwork where it does not', () => {
+  const goalArt = {
+    'mossprout:step-outside': 'today:movement',
+    'mossprout:sit-outside': 'today:movement',
+    'mossprout:visit-green': 'today:place',
+    'mossprout:same-place': 'today:place',
+    'mossprout:care-for-plant': 'mossprout:plant-care',
+    'mossprout:window-view': 'mossprout:nature-window',
+    'mossprout:notice-living-thing': 'mossprout:nature-observation',
+    'mossprout:season-change': 'mossprout:nature-observation',
+  } as const;
+
+  for (const [templateId, artKey] of Object.entries(goalArt)) {
+    assert.equal(mossproutGoalArtKey(templateId), artKey, templateId);
+  }
+});
+
+test('a completed Mossprout row is inserted without unmounting the card below it', () => {
+  const makeAction = (id: string, slotId: 'together' | 'field' | 'garden'): KatchimeraDayAction => ({
+    id,
+    instanceId: `old-presentation:${slotId}:${id}`,
+    slotId,
+    kind: 'fun_chat',
+    title: id,
+    subtitle: null,
+    icon: 'bubble.left.fill',
+    required: false,
+    disabled: false,
+    status: 'ready',
+    reward: null,
+    destination: { kind: 'journey' },
+    completedAt: null,
+    outroAcknowledgedAt: null,
+  });
+  const first = makeAction('first', 'together');
+  const promoted = makeAction('third', 'field');
+  const incoming = makeAction('new', 'garden');
+  const completed = {
+    ...makeAction('second', 'field'),
+    instanceId: 'completion:second',
+    disabled: true,
+    status: 'completed' as const,
+    completedAt: 10,
+  };
+
+  assert.deepEqual(
+    composeMossproutVisibleActions([first, promoted, incoming], completed).map((action) => action.id),
+    ['first', 'second', 'third'],
+  );
+  assert.deepEqual(
+    composeMossproutVisibleActions([first, promoted, incoming], null).map((action) => action.id),
+    ['first', 'third', 'new'],
+  );
 });
 
 test('Mossprout nameplate reports the current Journey Day instead of repeating the companion name', () => {
@@ -453,6 +534,21 @@ test('Mossprout action completion receipts are durable and idempotent', () => {
   assert.deepEqual(once.mossproutDailyActionDecks[0]?.consumedActionIds.field, [input.actionId]);
 });
 
+test('self-animated Katchimera completions consume their slot without replaying an outro', () => {
+  const input = {
+    dayId: '2026-08-21', familyId: 'mossprout' as const, actionId: 'mossprout:goal:walk-outside',
+    instanceId: '2026-08-21:field:0:mossprout:goal:walk-outside', slotId: 'field' as const, sequence: 0,
+    kind: 'goal_checkoff' as const, title: 'Step outside for five minutes', subtitle: 'A small promise kept',
+    icon: 'checkmark.circle.fill' as const, artworkDefinitionIds: [], reward: { kind: 'bond' as const, amount: 5 }, completedAt: 10,
+  };
+  const state = recordHandledKatchimeraActionCompletion(emptyRelationshipProgressState(), input);
+  const receipt = state.completedActionOutros[0];
+  assert.equal(receipt?.actionId, input.actionId);
+  assert.deepEqual(state.acknowledgedActionOutroIds, [receipt?.id]);
+  assert.equal(state.mossproutDailyActionDecks[0]?.slotSequences.field, 1);
+  assert.deepEqual(state.mossproutDailyActionDecks[0]?.consumedActionIds.field, [input.actionId]);
+});
+
 test('legacy duplicate action completions collapse to an acknowledged logical receipt', () => {
   const base = {
     dayId: '2026-08-21', familyId: 'mossprout' as const, actionId: 'mossprout:conversation:nature-question',
@@ -513,10 +609,12 @@ test('completed independent Mossprout conversations retain the dashboard action 
   assert.equal(questionReceipt.actionId, `mossprout:conversation:${question.id}`);
   assert.equal(questionReceipt.title, question.actionTitle);
   assert.equal(questionReceipt.kind, 'fun_chat');
+  assert.equal(questionReceipt.artKey, mossproutConversationArtKey(question.id, 'fun_chat'));
   assert.deepEqual(questionReceipt.reward, { kind: 'bond', amount: 4 });
   assert.equal(journalReceipt.actionId, MOSSPROUT_DAILY_FIELD_NOTE_ACTION_ID);
   assert.equal(journalReceipt.title, journal.actionTitle);
   assert.equal(journalReceipt.kind, 'journal_prompt');
+  assert.equal(journalReceipt.artKey, mossproutConversationArtKey(journal.id, 'journal_prompt'));
 });
 
 test('every Mossprout field note has its own action-led card title', () => {

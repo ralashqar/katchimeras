@@ -148,6 +148,18 @@ export function recordKatchimeraActionCompletion(
   }, input.dayId, input.slotId, input.actionId);
 }
 
+/** Records slot consumption while suppressing a second outro owned by the screen's active row. */
+export function recordHandledKatchimeraActionCompletion(
+  state: RelationshipProgressState,
+  input: Omit<KatchimeraActionCompletionRecord, 'id'>,
+): RelationshipProgressState {
+  return acknowledgeKatchimeraExternalActionOutro(
+    recordKatchimeraActionCompletion(state, input),
+    input.dayId,
+    input.instanceId,
+  );
+}
+
 export function resetRelationshipProgressForDayForDebug(
   state: RelationshipProgressState,
   dayId: string,

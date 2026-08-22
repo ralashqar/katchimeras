@@ -33,7 +33,7 @@ test('companion home framing remains bounded on compact and tablet viewports', (
   assert.equal(tablet.translateY, 14);
 });
 
-test('the creature contact point is preserved before the shared stage transform', () => {
+test('the creature sits slightly below the environment contact point', () => {
   const layout = companionHomeStageLayout(390, 844, 'feastle');
   const visibleBottom = layout.creatureFrame.top
     + layout.creatureFrame.size * 0.94;
@@ -42,9 +42,10 @@ test('the creature contact point is preserved before the shared stage transform'
     Math.abs(
       visibleBottom
       - layout.creatureFrame.stageContactY
+      - layout.creatureDropY
     ) < 0.0001,
   );
-  assert.equal(layout.creatureDropY, 0);
+  assert.ok(layout.creatureDropY >= 4 && layout.creatureDropY <= 6);
 });
 
 test('destination pose lifts the complete cinematic stage toward the top', () => {

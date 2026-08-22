@@ -514,10 +514,28 @@ test('Mossprout owns a compact Journey action stack without redundant headings o
   const interaction = fs.readFileSync(path.join(worldPath, 'companion-interaction-sheet.tsx'), 'utf8');
   const dashboard = fs.readFileSync(path.join(worldPath, 'companion-dashboard.tsx'), 'utf8');
   const sharedRows = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'day-action-row.tsx'), 'utf8');
+  const sharedGoalRow = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'day-action-goal-row.tsx'), 'utf8');
+  const today = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'home', 'today-nurture-experience.tsx'), 'utf8');
 
   assert.match(mossprout, /resolveMossproutDayActions/);
   assert.doesNotMatch(mossprout, /slice\(0, 3\)/);
-  assert.match(mossprout, /\(\['together', 'field', 'garden'\] as const\)\.flatMap/);
+  assert.match(mossprout, /composeMossproutVisibleActions\(actions, completingAction\)/);
+  assert.match(mossprout, /key=\{`\$\{dayId\}:\$\{action\.id\}`\}/);
+  assert.match(mossprout, /useDayActionStackPresentation/);
+  assert.match(mossprout, /actionStack\.entryDelayMs/);
+  assert.match(mossprout, /animateLayout=\{actionStack\.isMoving/);
+  assert.match(mossprout, /<DayActionGoalRow/);
+  assert.match(mossprout, /<QuickGoalActionModal/);
+  assert.match(mossprout, /setSelfCompletingGoalAction\(action\)/);
+  assert.match(mossprout, /recordHandledKatchimeraActionCompletion/);
+  assert.match(sharedRows, /animateLayout \? LinearTransition/);
+  assert.match(sharedRows, /export const DAY_ACTION_MOTION/);
+  assert.match(sharedGoalRow, /GoalCompletionCelebration/);
+  assert.match(sharedGoalRow, /artRotation\.value = withSequence/);
+  assert.match(sharedGoalRow, /rowX\.value = withDelay/);
+  assert.match(today, /<DayActionGoalRow/);
+  assert.match(today, /<DayActionSwipeShell/);
+  assert.doesNotMatch(today, /function TodayCareGoalRow|function CareSwipeShell/);
   assert.doesNotMatch(mossprout, /Today with Mossprout|active.*slots/);
   assert.match(interaction, /outcomeRequiresManualAdvance: props\.familyId === 'mossprout'/);
   assert.match(interaction, /conversations=\{props\.mossproutActionCandidates\}/);
@@ -1113,4 +1131,50 @@ test('blank text without a voice recording cannot create a reflection', () => {
       promptText: 'What stayed with you?',
     },
   }), null);
+});
+
+test('Mossprout action cards render semantic raster art while garden orders keep merge item art', () => {
+  const stage = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'mossprout-story-stage.tsx'), 'utf8');
+  assert.match(stage, /katchimeraActionArt\(action\.artKey\)/);
+  assert.match(stage, /if \(!definitions\.length && art\)/);
+  assert.match(stage, /if \(definitions\.length === 1\).*PersistentMergeItemArt/);
+
+  const iconDirectory = path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'action-icons', 'mossprout');
+  const files = fs.readdirSync(iconDirectory).filter((file) => file.endsWith('.png'));
+  assert.equal(files.length, 15);
+  for (const file of files) {
+    const png = fs.readFileSync(path.join(iconDirectory, file));
+    assert.equal(png.subarray(1, 4).toString('ascii'), 'PNG', file);
+    assert.equal(png.readUInt32BE(16), 256, `${file} width`);
+    assert.equal(png.readUInt32BE(20), 256, `${file} height`);
+    assert.equal(png[25], 6, `${file} must retain RGBA transparency`);
+  }
+});
+
+test('Katchimera Bond currency uses its bespoke artwork in chips, meters, summaries, and flight tokens', () => {
+  const root = process.cwd();
+  const currency = fs.readFileSync(path.join(root, 'constants', 'game-currency-art.ts'), 'utf8');
+  const actionCard = fs.readFileSync(path.join(root, 'components', 'katchadeck', 'ui', 'day-action-card.tsx'), 'utf8');
+  const mossprout = fs.readFileSync(path.join(root, 'components', 'katchadeck', 'world', 'mossprout-story-stage.tsx'), 'utf8');
+  const flight = fs.readFileSync(path.join(root, 'components', 'katchadeck', 'goals', 'bond-reward-overlay.tsx'), 'utf8');
+  const bondSurfaces = [
+    'companion-bond-meter.tsx',
+    'companion-bond-level-up-celebration.tsx',
+    'companion-conversation-scene.tsx',
+    'companion-quest-thread.tsx',
+    'companion-ui-primitives.tsx',
+    'companion-visit-scene.tsx',
+    'feastle-story-stage.tsx',
+    'baristabbit-story-stage.tsx',
+    'journey-cohort-story-stage.tsx',
+  ].map((file) => fs.readFileSync(path.join(root, 'components', 'katchadeck', 'world', file), 'utf8'));
+
+  assert.match(currency, /bond: require\('\.\.\/assets\/images\/katchimeras\/merge-world\/ui\/bond\.webp'\)/);
+  assert.equal(fs.existsSync(path.join(root, 'assets', 'images', 'katchimeras', 'merge-world', 'ui', 'bond.webp')), true);
+  assert.match(actionCard, /reward\.kind === 'bond' \? GAME_CURRENCY_ART\.bond/);
+  assert.match(mossprout, /reward\.kind === 'bond' \? GAME_CURRENCY_ART\.bond/);
+  assert.match(flight, /<BondIconArt size=\{22\}/);
+  assert.match(flight, /<BondIconArt size=\{28\}/);
+  assert.doesNotMatch(flight, /heart\.fill/);
+  for (const surface of bondSurfaces) assert.match(surface, /BondIconArt/);
 });

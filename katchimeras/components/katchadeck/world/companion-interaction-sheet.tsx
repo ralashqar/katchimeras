@@ -1532,6 +1532,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   offers={props.actionOffers}
                   relationships={relationships}
                   onCompleteGoal={props.onCompleteQuickGoal}
+                  onRememberGoal={props.onRememberQuickGoal}
+                  onSkipGoal={props.onSkipQuickGoal}
+                  onSnoozeGoal={props.onSnoozeQuickGoal}
+                  onUndoGoal={props.onUndoQuickGoal}
                   onDashboard={() => setShowMossproutDashboard(true)}
                   onOpenConversation={(definitionId) => {
                     pendingStoryConversationRef.current = null;

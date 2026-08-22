@@ -11,6 +11,7 @@ import Animated, { FadeInUp, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TodaySceneBackdrop } from '@/components/katchadeck/home/today-scene-backdrop';
+import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
@@ -87,7 +88,7 @@ export function CompanionDestinationHeader({
         <View
           accessibilityLabel={`Bond level ${bondProgress.level}, ${Math.round(bondProgress.ratio * 100)} percent to the next level`}
           style={styles.bondPill}>
-          <IconSymbol color="#F27F7C" name="heart.fill" size={19} />
+          <BondIconArt size={27} />
           <View style={styles.bondCopy}>
             <ThemedText selectable style={styles.bondLabel} lightColor="#FFF6D8" darkColor="#FFF6D8">Bond {bondProgress.level}</ThemedText>
             <View style={styles.bondTrack}>

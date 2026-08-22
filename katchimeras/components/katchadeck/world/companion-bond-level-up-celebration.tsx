@@ -20,6 +20,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
+import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { familyIdFromCompanionId, katchimeraFamilyById } from '@/constants/katchimera-skins';
@@ -183,7 +184,7 @@ export function CompanionBondLevelUpCelebration({ onContinue, receipt, variant =
 
           <View style={styles.copy}>
             <View style={styles.bondName}>
-              <IconSymbol color="#A95043" name="heart.fill" size={17} />
+              <BondIconArt size={27} />
               <ThemedText selectable style={styles.bondLabel} lightColor="#3A2A1D" darkColor="#3A2A1D">
                 {journeyComplete ? `+${receipt.points} Bond` : `${next.label} bond`}
               </ThemedText>

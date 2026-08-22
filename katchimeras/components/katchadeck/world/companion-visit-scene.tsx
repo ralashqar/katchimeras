@@ -4,6 +4,7 @@ import Animated, { FadeInUp, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
+import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaUI } from '@/constants/katcha-ui';
@@ -88,7 +89,7 @@ export function CompanionVisitScene({
             {completed ? 'VISIT COMPLETE' : plan.eyebrow}
           </ThemedText>
           <View style={styles.bondPill}>
-            <IconSymbol color={KatchaUI.companionScenePanel.accent} name="heart.fill" size={12} />
+            <BondIconArt size={18} />
             <ThemedText style={styles.bondLabel} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>
               {bondProgress.label}
             </ThemedText>

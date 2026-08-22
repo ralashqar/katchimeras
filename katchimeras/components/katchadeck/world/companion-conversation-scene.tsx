@@ -6,6 +6,7 @@ import Animated, { FadeInUp, LinearTransition, useReducedMotion } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
+import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaUI } from '@/constants/katcha-ui';
@@ -194,7 +195,7 @@ export function CompanionConversationScene({
               {name}
             </ThemedText>
             <View accessibilityLabel={`Bond level ${bondProgress.level}, ${Math.round(bondProgress.ratio * 100)} percent to the next level`} style={{ alignItems: 'center', flexDirection: 'row', gap: 6 }}>
-              <IconSymbol color="#F07C78" name="heart.fill" size={11} />
+              <BondIconArt size={17} />
               <ThemedText selectable style={{ fontSize: 9.5, fontVariant: ['tabular-nums'], fontWeight: '900' }} lightColor="#FFF1CC" darkColor="#FFF1CC">Bond {bondProgress.level}</ThemedText>
               <View style={{ backgroundColor: 'rgba(255,244,213,0.25)', borderRadius: 999, flex: 1, height: 5, overflow: 'hidden' }}>
                 <View style={{ backgroundColor: '#E8B547', borderRadius: 999, height: '100%', width: `${Math.max(bondProgress.totalPoints ? 5 : 0, bondProgress.ratio * 100)}%` }} />

@@ -8,8 +8,8 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useKatchaSurface } from '@/components/katchadeck/ui/katcha-surface';
+import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaUI } from '@/constants/katcha-ui';
 import type { CompanionBondProgress } from '@/utils/companion-bond';
 
@@ -38,7 +38,7 @@ export function CompanionBondMeter({ name, progress }: { name: string; progress:
         { backgroundColor: tokens.subtle, borderColor: tokens.border, boxShadow: tokens.cardShadow },
       ]}
       accessibilityLabel={`Bond with ${name}. ${valueLabel}. ${hint}`}>
-      <View style={styles.icon}><IconSymbol name="heart.fill" size={14} color="#A95043" /></View>
+      <View style={styles.icon}><BondIconArt size={24} /></View>
       <ThemedText style={styles.label} lightColor={tokens.text} darkColor={tokens.text}>Bond</ThemedText>
       <View
         accessibilityRole="progressbar"

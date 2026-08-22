@@ -3,6 +3,7 @@ import { todayExplorationCreatureStageFrame } from '@/utils/today-kingdom-hero-l
 
 const BACKGROUND_OVERSCAN = 1.18;
 const COMPANION_CREATURE_SCALE = 1.08;
+const COMPANION_CREATURE_DROP_RATIO = 0.006;
 const GROWN_CUTOUT_VISIBLE_BOTTOM = 0.94;
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -27,9 +28,11 @@ export function companionHomeStageLayout(
     visualKey,
   );
   const creatureSize = todayCreatureFrame.size * COMPANION_CREATURE_SCALE;
+  const creatureDropY = clamp(viewportHeight * COMPANION_CREATURE_DROP_RATIO, 4, 6);
   const creatureTop =
     todayCreatureFrame.stageContactY
-    - creatureSize * GROWN_CUTOUT_VISIBLE_BOTTOM;
+    - creatureSize * GROWN_CUTOUT_VISIBLE_BOTTOM
+    + creatureDropY;
   const creatureFrame = {
     ...todayCreatureFrame,
     centerY: creatureTop + creatureSize / 2,
@@ -46,7 +49,7 @@ export function companionHomeStageLayout(
   return {
     backgroundImageSize:
       Math.max(viewportWidth, viewportHeight) * BACKGROUND_OVERSCAN,
-    creatureDropY: 0,
+    creatureDropY,
     creatureFrame,
     translateX,
     translateY,

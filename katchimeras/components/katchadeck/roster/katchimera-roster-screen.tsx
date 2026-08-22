@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KatchimeraRosterCard } from '@/components/katchadeck/roster/katchimera-roster-card';
 import { KatchimeraRosterFilters } from '@/components/katchadeck/roster/katchimera-roster-filters';
+import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
 import { TodaySceneBackdrop } from '@/components/katchadeck/home/today-scene-backdrop';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -319,7 +320,7 @@ function RosterHero({
         </ThemedText>
         {featured ? (
           <View style={styles.featuredBond}>
-            <IconSymbol name="heart.fill" size={13} color="#F0CF6B" />
+            <BondIconArt size={20} />
             <ThemedText style={styles.featuredBondText} lightColor="#F4E7C3" darkColor="#F4E7C3">
               {featured.name} · Bond level {featured.bond.level}
             </ThemedText>

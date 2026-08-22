@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { KatchaUI } from '@/constants/katcha-ui';
 import { Meadow } from '@/constants/meadow-theme';
@@ -78,7 +79,7 @@ export function CompanionQuestChoices({
                 <ThemedText numberOfLines={2} style={styles.offerHint} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{offer.hint}</ThemedText>
                 <View style={styles.offerFooter}>
                   <View style={styles.offerMeta}>
-                    <Meta icon="heart.fill" label={`+${offer.bondReward} bond`} />
+                    <Meta bond label={`+${offer.bondReward} bond`} />
                     <Meta icon="timer" label={`${offer.estimatedMinutes} min`} />
                   </View>
                   {selected && !unavailable ? (
@@ -107,8 +108,8 @@ export function CompanionQuestChoices({
   );
 }
 
-function Meta({ icon, label }: { icon: IconSymbolName; label: string }) {
-  return <View style={styles.meta}><IconSymbol name={icon} size={11} color={Meadow.inkSoft} /><ThemedText style={styles.metaText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{label}</ThemedText></View>;
+function Meta({ bond = false, icon, label }: { bond?: boolean; icon?: IconSymbolName; label: string }) {
+  return <View style={styles.meta}>{bond ? <BondIconArt size={17} /> : icon ? <IconSymbol name={icon} size={11} color={Meadow.inkSoft} /> : null}<ThemedText style={styles.metaText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{label}</ThemedText></View>;
 }
 
 function questFamilyIcon(family: CompanionQuestOfferViewModel['family']): IconSymbolName {

@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { type ReactNode, useCallback, useEffect, useMemo, useRef } from 'react';
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View, type View as ViewType } from 'react-native';
 import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import Animated, {
@@ -25,13 +25,70 @@ import { DayActionCardSurface, DayActionCompletedTick } from './day-action-card'
 
 export type DayActionSourceRect = { x: number; y: number; width: number; height: number };
 
-const REVEAL_WIDTH = 96;
+export const DAY_ACTION_MOTION = {
+  batchSettleMs: 680,
+  entryBaseDelayMs: 55,
+  entryDurationMs: 300,
+  entryStaggerMs: 45,
+  layoutDurationMs: 300,
+  revealWidth: 96,
+} as const;
+
+const REVEAL_WIDTH = DAY_ACTION_MOTION.revealWidth;
 const UNDERLAY_OVERLAP = 36;
 const ACTIVATION_DISTANCE = 6;
 const SECOND_SWIPE_DISMISS_DISTANCE = 22;
 const CLOSE_DISTANCE = 22;
 const REWARD_REPLAY_GUARD_MS = 12_000;
 const recentRewardAnimations = new Map<string, number>();
+
+export function useDayActionStackPresentation<T>({
+  frozen = false,
+  getId,
+  items,
+}: {
+  frozen?: boolean;
+  getId: (item: T) => string;
+  items: readonly T[];
+}) {
+  const reduceMotion = useReducedMotion();
+  const settledItemsRef = useRef<readonly T[]>(items);
+  const settledPositionsRef = useRef(new Map(items.map((item, index) => [getId(item), index])));
+  const presentedItems = frozen ? settledItemsRef.current : items;
+  const currentPositions = useMemo(
+    () => new Map(presentedItems.map((item, index) => [getId(item), index])),
+    [getId, presentedItems],
+  );
+  const newlyIntroducedIds = new Set(
+    [...currentPositions.keys()].filter((id) => !settledPositionsRef.current.has(id)),
+  );
+  const movingIds = new Set(
+    [...currentPositions].filter(([id, index]) => {
+      const previousIndex = settledPositionsRef.current.get(id);
+      return previousIndex != null && previousIndex !== index;
+    }).map(([id]) => id),
+  );
+
+  useLayoutEffect(() => {
+    if (frozen) return;
+    settledItemsRef.current = items;
+    settledPositionsRef.current = currentPositions;
+  }, [currentPositions, frozen, items]);
+
+  return {
+    entryDelayMs(id: string, index: number) {
+      if (reduceMotion) return 0;
+      return newlyIntroducedIds.has(id)
+        ? DAY_ACTION_MOTION.batchSettleMs + index * DAY_ACTION_MOTION.entryStaggerMs
+        : DAY_ACTION_MOTION.entryBaseDelayMs + Math.min(index, 5) * DAY_ACTION_MOTION.entryStaggerMs;
+    },
+    isMoving(id: string) {
+      return movingIds.has(id);
+    },
+    newlyIntroducedIds,
+    presentedItems,
+  };
+}
 
 function claimRewardAnimation(rewardAnimationId?: string) {
   if (!rewardAnimationId) return true;
@@ -45,6 +102,7 @@ function claimRewardAnimation(rewardAnimationId?: string) {
 }
 
 export function DayActionActiveRow({
+  animateLayout = true,
   children,
   disabled = false,
   entryDelayMs = 0,
@@ -52,6 +110,7 @@ export function DayActionActiveRow({
   label,
   onSkip,
 }: {
+  animateLayout?: boolean;
   children: ReactNode;
   disabled?: boolean;
   entryDelayMs?: number;
@@ -71,10 +130,10 @@ export function DayActionActiveRow({
   ) : children;
 
   return (
-    <Animated.View layout={LinearTransition.duration(reduceMotion ? 100 : 190)}>
+    <Animated.View layout={animateLayout ? LinearTransition.duration(reduceMotion ? 100 : DAY_ACTION_MOTION.layoutDurationMs).easing(Easing.inOut(Easing.cubic)) : undefined}>
       <Animated.View entering={reduceMotion
         ? FadeIn.delay(entryDelayMs).duration(80)
-        : FadeInUp.delay(entryDelayMs).duration(300).easing(Easing.out(Easing.cubic))}>
+        : FadeInUp.delay(entryDelayMs).duration(DAY_ACTION_MOTION.entryDurationMs).easing(Easing.out(Easing.cubic))}>
         {content}
       </Animated.View>
     </Animated.View>
@@ -236,7 +295,7 @@ export function DayActionCompletedRow({
 
   return (
     <Animated.View
-      layout={LinearTransition.duration(reduceMotion ? 100 : 190)}
+      layout={LinearTransition.duration(reduceMotion ? 100 : DAY_ACTION_MOTION.layoutDurationMs).easing(Easing.inOut(Easing.cubic))}
       style={[styles.motionViewport, motionViewportStyle]}>
       <Animated.View style={[styles.completedRow, rowStyle]}>
         <DayActionCardSurface

@@ -45,6 +45,28 @@ export type KatchimeraDayActionKind =
   | 'goal_checkoff'
   | 'garden_request';
 
+export type KatchimeraActionArtKey =
+  | 'today:movement'
+  | 'today:photo'
+  | 'today:place'
+  | 'today:quest'
+  | 'today:reflection'
+  | 'mossprout:cloud-job'
+  | 'mossprout:garden-guest'
+  | 'mossprout:garden-rules'
+  | 'mossprout:journey'
+  | 'mossprout:nature-card'
+  | 'mossprout:nature-insight'
+  | 'mossprout:nature-light'
+  | 'mossprout:nature-observation'
+  | 'mossprout:nature-sound-map'
+  | 'mossprout:nature-weather'
+  | 'mossprout:nature-window'
+  | 'mossprout:outdoor-luxury'
+  | 'mossprout:plant-care'
+  | 'mossprout:suspicious-path'
+  | 'mossprout:tree-neighbour';
+
 export type KatchimeraActionSlotId = 'together' | 'field' | 'garden';
 
 export type MossproutDailyActionDeck = {
@@ -76,6 +98,7 @@ export type KatchimeraDayAction = {
   title: string;
   subtitle: string | null;
   icon: import('@/components/ui/icon-symbol').IconSymbolName;
+  artKey?: KatchimeraActionArtKey;
   artworkDefinitionId?: string | null;
   artworkDefinitionIds?: string[];
   progressLabel?: string | null;
@@ -100,6 +123,7 @@ export type KatchimeraActionCompletionRecord = {
   title: string;
   subtitle: string;
   icon: import('@/components/ui/icon-symbol').IconSymbolName;
+  artKey?: KatchimeraActionArtKey;
   artworkDefinitionIds: string[];
   reward: KatchimeraDayActionReward | null;
   completedAt: number;

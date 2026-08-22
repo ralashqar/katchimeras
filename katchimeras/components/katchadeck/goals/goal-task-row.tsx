@@ -18,6 +18,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { GameSurface } from '@/components/katchadeck/ui/game-surface';
 import { katchimeraFamilyById } from '@/constants/katchimera-skins';
@@ -189,7 +190,7 @@ export function GoalTaskRow({
               accessibilityLiveRegion="polite"
               entering={reduceMotion ? undefined : ZoomIn.duration(210).easing(Easing.out(Easing.back(1.08)))}
               style={styles.portraitReward}>
-              <IconSymbol color="#FFF9E9" name="heart.fill" size={11} />
+              <BondIconArt size={17} />
               <ThemedText style={styles.portraitRewardText} lightColor="#FFF9E9" darkColor="#FFF9E9">+{rewardPoints}</ThemedText>
             </Animated.View>
           ) : null}

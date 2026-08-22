@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 
 import { COMPANION_MERGE_REQUEST_PALETTE, CompanionMergeRequestTray } from '@/components/katchadeck/world/companion-merge-request-tray';
+import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaUI } from '@/constants/katcha-ui';
@@ -91,7 +92,7 @@ export function JourneyCohortStoryStage({ familyId, onBegin, onJournal, onMore, 
       <View style={styles.copy}><ThemedText style={styles.eyebrow} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>{copy.eyebrow}</ThemedText><ThemedText style={styles.title} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>{title}</ThemedText></View>
     </View>
     <ThemedText style={styles.body} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{body}</ThemedText>
-    {returnReady && story.pendingBondPoints > 0 ? <View style={styles.bond}><IconSymbol color={KatchaUI.companionScenePanel.accentInk} name="heart.fill" size={15} /><ThemedText style={styles.bondText} lightColor={KatchaUI.companionScenePanel.accentInk} darkColor={KatchaUI.companionScenePanel.accentInk}>+{story.pendingBondPoints} Bond from the route</ThemedText></View> : null}
+    {returnReady && story.pendingBondPoints > 0 ? <View style={styles.bond}><BondIconArt size={23} /><ThemedText style={styles.bondText} lightColor={KatchaUI.companionScenePanel.accentInk} darkColor={KatchaUI.companionScenePanel.accentInk}>+{story.pendingBondPoints} Bond from the route</ThemedText></View> : null}
     <CompanionMergeRequestTray
       accessibilityLabel={`${copy.requestArea} requests`}
       eyebrow={copy.requestArea}

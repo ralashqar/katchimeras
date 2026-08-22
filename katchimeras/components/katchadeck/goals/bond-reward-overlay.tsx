@@ -15,7 +15,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
 import { AppFontFamilies } from '@/constants/theme';
 import { useDisposableTimers } from '@/hooks/use-disposable-timers';
 import type { GoalTaskSourceRect } from './goal-task-row';
@@ -40,7 +40,7 @@ export function BondRewardFlightOverlay({ from, onFinish, onTokenArrive, points,
         left: from.x + from.width / 2 - 46,
         top: from.y + from.height / 2 - 21,
       }]}>
-        <IconSymbol color="#FFF8E7" name="heart.fill" size={15} />
+        <BondIconArt size={22} />
         <ThemedText style={styles.points} lightColor="#FFF8E7" darkColor="#FFF8E7">+{points} Bond</ThemedText>
       </Animated.View>
       {amounts.map((amount, index) => (
@@ -113,7 +113,7 @@ function BondHeartToken({ count, from, index, onArrive, reduceMotion, to }: {
 
   return (
     <Animated.View style={[styles.token, tokenStyle]}>
-      <IconSymbol color="#FFF8E7" name="heart.fill" size={17} />
+      <BondIconArt size={28} />
     </Animated.View>
   );
 }
@@ -126,8 +126,7 @@ const styles = StyleSheet.create({
   },
   points: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '900' },
   token: {
-    alignItems: 'center', backgroundColor: '#A95043', borderColor: '#F5D887', borderRadius: 999,
-    borderWidth: 2, boxShadow: '0 4px 10px rgba(92,42,35,0.3)', height: 28, justifyContent: 'center',
+    alignItems: 'center', boxShadow: '0 4px 10px rgba(92,42,35,0.3)', height: 28, justifyContent: 'center',
     left: 0, position: 'absolute', top: 0, width: 28,
   },
 });

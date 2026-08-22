@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 
 import { COMPANION_MERGE_REQUEST_PALETTE, CompanionMergeRequestTray } from '@/components/katchadeck/world/companion-merge-request-tray';
+import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaUI } from '@/constants/katcha-ui';
@@ -92,7 +93,7 @@ export function FeastleStoryStage({ onBeginIntroduction, onJournalFood, onMore, 
       <View style={styles.landmarkCopy}><ThemedText style={styles.landmarkEyebrow} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>LANDMARK UNLOCKED</ThemedText><ThemedText selectable style={styles.landmarkTitle} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>{'Feastle\'s First Table'}</ThemedText><ThemedText selectable style={styles.landmarkBody} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>A piece of your shared story now lives in the world.</ThemedText></View>
     </View> : null}
     {returnReady && story.pendingBondPoints > 0 ? <View accessibilityLabel={`${story.pendingBondPoints} Bond earned from this chapter`} style={styles.bondSummary}>
-      <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name="heart.fill" size={15} />
+      <BondIconArt size={23} />
       <ThemedText selectable style={styles.bondSummaryText} lightColor={KatchaUI.companionScenePanel.accentInk} darkColor={KatchaUI.companionScenePanel.accentInk}>+{story.pendingBondPoints} Bond from the tray</ThemedText>
     </View> : null}
     <CompanionMergeRequestTray

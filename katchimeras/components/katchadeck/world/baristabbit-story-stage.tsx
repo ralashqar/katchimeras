@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 
 import { COMPANION_MERGE_REQUEST_PALETTE, CompanionMergeRequestTray } from '@/components/katchadeck/world/companion-merge-request-tray';
+import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaUI } from '@/constants/katcha-ui';
@@ -62,7 +63,7 @@ export function BaristabbitStoryStage({ onBegin, onJournal, onMore, onOpenConver
     </View>
     <ThemedText numberOfLines={2} selectable style={styles.body} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{requests.length ? orderBody : body}</ThemedText>
     {returnReady && story.pendingBondPoints > 0 ? <View accessibilityLabel={`${story.pendingBondPoints} Bond earned from the tray`} style={styles.bondSummary}>
-      <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name="heart.fill" size={15} />
+      <BondIconArt size={23} />
       <ThemedText selectable style={styles.bondSummaryText} lightColor={KatchaUI.companionScenePanel.accentInk} darkColor={KatchaUI.companionScenePanel.accentInk}>+{story.pendingBondPoints} Bond from the counter</ThemedText>
     </View> : null}
     <CompanionMergeRequestTray

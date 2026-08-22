@@ -1,6 +1,6 @@
 import { Image, type ImageRef } from 'expo-image';
 import * as Haptics from 'expo-haptics';
-import { memo, type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { InteractionManager, Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type ImageSourcePropType, type LayoutChangeEvent, type View as ViewType } from 'react-native';
 import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import Animated, {
@@ -29,10 +29,10 @@ import { TodayExplorationBackground } from '@/components/katchadeck/home/today-e
 import { TODAY_DORMANT_ZZZ_TOP_OFFSET, TodayDormantEggIndicator, TodayKingdomEggHero } from '@/components/katchadeck/home/today-kingdom-egg-hero';
 import { WorldActionStack } from '@/components/katchadeck/world/world-action-stack';
 import { CompanionGoalPortrait } from '@/components/katchadeck/goals/goal-task-row';
-import { GoalCompletionCelebration } from '@/components/katchadeck/goals/goal-completion-celebration';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { DayActionCardSurface } from '@/components/katchadeck/ui/day-action-card';
-import { DayActionActiveRow, DayActionCompletedRow } from '@/components/katchadeck/ui/day-action-row';
+import { DayActionGoalRow } from '@/components/katchadeck/ui/day-action-goal-row';
+import { DayActionActiveRow, DayActionCompletedRow, DayActionSwipeShell, useDayActionStackPresentation } from '@/components/katchadeck/ui/day-action-row';
 import { AnimatedIntegerText } from '@/components/katchadeck/ui/animated-integer-text';
 import {
   MOOD_ART,
@@ -366,25 +366,16 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
     && completionEvent.action.destination.kind !== 'quick_goal';
   const checkInTransitionActive = checkInSelection != null
     || (completionIsCheckIn && completionEvent != null);
-  const settledRemainingActionsRef = useRef(remainingActions);
-  useLayoutEffect(() => {
-    if (!actionListLocked && !completionIsStandard && !checkInTransitionActive) {
-      settledRemainingActionsRef.current = remainingActions;
-    }
-  }, [actionListLocked, checkInTransitionActive, completionIsStandard, remainingActions]);
-  const displayedRemainingActions = completionIsStandard && completionEvent
-    ? settledRemainingActionsRef.current.filter((action) => action.instanceId !== completionEvent.action.instanceId)
-    : checkInTransitionActive || actionListLocked
-      ? settledRemainingActionsRef.current
-      : remainingActions;
-  const previouslySettledRemainingActionIds = new Set(
-    settledRemainingActionsRef.current.map((action) => action.instanceId),
-  );
-  const newlyIntroducedRemainingActionIds = new Set(
-    remainingActions
-      .filter((action) => !previouslySettledRemainingActionIds.has(action.instanceId))
-      .map((action) => action.instanceId),
-  );
+  const standardActionStack = useDayActionStackPresentation({
+    frozen: actionListLocked || completionIsStandard || checkInTransitionActive,
+    getId: (action: RankedTodayCareAction) => action.instanceId,
+    items: remainingActions,
+  });
+  const displayedStandardRows = completionIsStandard && completionEvent
+    ? standardActionStack.presentedItems.map((action) => action.instanceId === completionEvent.action.instanceId
+      ? { event: completionEvent, kind: 'completed' as const }
+      : { action, kind: 'active' as const })
+    : standardActionStack.presentedItems.map((action) => ({ action, kind: 'active' as const }));
   const stageTop = topInset + TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA;
   const sceneVerticalNudge = HOME_SCENE_Y_OFFSET;
   const contentVerticalNudge = HOME_ACTIONS_Y_OFFSET;
@@ -1047,48 +1038,59 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
             </Animated.View>
           ) : null}
 
-          {completionIsStandard && completionEvent ? (
-            <CompletedCareRow
-              event={completionEvent}
-              key={completionEvent.id}
-              onFinished={onCompletionAnimationEnd}
-              onRewardFlight={onRewardFlight}
-              reduceMotion={reduceMotion}
-            />
-          ) : null}
-
-          {displayedRemainingActions.map((action, index) => action.destination.kind === 'quick_goal' ? (
-            <TodayCareGoalRow
-              action={action}
-              entryDelayMs={newlyIntroducedRemainingActionIds.has(action.instanceId)
-                ? ACTION_BATCH_LAYOUT_SETTLE_MS + index * 55
-                : reduceMotion ? 0 : 55 + Math.min(index, 5) * 45}
-              familyId={action.destination.familyId}
-              goalId={action.destination.goalId}
-              key={action.instanceId}
-              onCompleteQuickGoal={onCompleteQuickGoal}
-              onNotToday={() => onCareNotToday(action)}
-              onOpenQuickGoal={onOpenQuickGoal}
-              onRewardFlight={onRewardFlight}
-              swipeExternalGesture={careSwipeExternalGesture}
-              reduceMotion={reduceMotion}
-            />
-          ) : (
-            <CareRow
-              action={action}
-              entryDelayMs={newlyIntroducedRemainingActionIds.has(action.instanceId)
-                ? ACTION_BATCH_LAYOUT_SETTLE_MS + index * 55
-                : reduceMotion ? 0 : 55 + Math.min(index, 5) * 45}
-              key={action.instanceId}
-              onNotToday={() => onCareNotToday(action)}
-              onStart={(rewardFrom) => {
-                if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
-                onCareStart(action, rewardFrom);
-              }}
-              swipeExternalGesture={careSwipeExternalGesture}
-              reduceMotion={reduceMotion}
-            />
-          ))}
+          {displayedStandardRows.map((row, index) => {
+            if (row.kind === 'completed') return (
+              <CompletedCareRow
+                event={row.event}
+                key={row.event.action.instanceId}
+                onFinished={onCompletionAnimationEnd}
+                onRewardFlight={onRewardFlight}
+                reduceMotion={reduceMotion}
+              />
+            );
+            const action = row.action;
+            const entryDelayMs = standardActionStack.entryDelayMs(action.instanceId, index);
+            const animateLayout = standardActionStack.isMoving(action.instanceId);
+            const quickGoalDestination = action.destination.kind === 'quick_goal' ? action.destination : null;
+            return quickGoalDestination ? (
+              <DayActionGoalRow
+                animateLayout={animateLayout}
+                artwork={<CompanionGoalPortrait familyId={quickGoalDestination.familyId} size={38} />}
+                entryDelayMs={entryDelayMs}
+                externalGesture={careSwipeExternalGesture}
+                key={action.instanceId}
+                label={action.title}
+                onCompletionRequest={(source, onRewardArrive) => {
+                  const complete = () => {
+                    onRewardArrive();
+                    requestAnimationFrame(() => onCompleteQuickGoal(quickGoalDestination.goalId));
+                  };
+                  if (source) {
+                    onRewardFlight({ h: source.height, w: source.width, x: source.x, y: source.y }, action, complete);
+                  } else {
+                    complete();
+                  }
+                }}
+                onOpen={(completeFromOrigin) => onOpenQuickGoal(quickGoalDestination.goalId, completeFromOrigin)}
+                onSkip={() => onCareNotToday(action)}
+                reward={<Reward amount={action.growthReward} />}
+                title={action.title}
+              />
+            ) : (
+              <CareRow
+                action={action}
+                animateLayout={animateLayout}
+                entryDelayMs={entryDelayMs}
+                key={action.instanceId}
+                onNotToday={() => onCareNotToday(action)}
+                onStart={(rewardFrom) => {
+                  if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+                  onCareStart(action, rewardFrom);
+                }}
+                swipeExternalGesture={careSwipeExternalGesture}
+              />
+            );
+          })}
 
           {!actions.length && !checkInSelection && !completionIsStandard ? (
             <Animated.View entering={FadeIn.duration(180)} style={styles.thriving}>
@@ -1168,15 +1170,6 @@ function HatchRevealAction({ onAdd, onReveal, reduceMotion }: {
   );
 }
 
-function useActionRowLayout(reduceMotion: boolean) {
-  return useMemo(
-    () => reduceMotion
-      ? undefined
-      : LinearTransition.duration(300).easing(Easing.inOut(Easing.cubic)),
-    [reduceMotion],
-  );
-}
-
 type InlineChoice = {
   accent: string;
   feedImage: number;
@@ -1235,7 +1228,6 @@ function getFtueChoiceColumnCount(choiceCount: number): number {
 
 const INITIAL_ACTION_STACK_SETTLE_MS = 560;
 const FTUE_CAMERA_COVERAGE_BLEED = 2;
-const ACTION_BATCH_LAYOUT_SETTLE_MS = 680;
 const NURTURE_ACTION_CLUSTER_FALLBACK_HEIGHT = 67;
 const NURTURE_TOAST_TOP_GAP = 6;
 
@@ -1452,12 +1444,11 @@ function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent
   return (
     <Animated.View
       entering={entering}>
-      <CareSwipeShell
+      <DayActionSwipeShell
         disabled={interactionLocked || !allowSkip}
         externalGesture={swipeExternalGesture}
         label={action.title}
-        onDismiss={onSkip}
-        reduceMotion={reduceMotion}>
+        onDismiss={onSkip}>
         <Animated.View style={panelStyle}>
           <GameSurface
             contentStyle={[styles.inlineCardContent, illustratedChoices && styles.illustratedCardContent]}
@@ -1576,7 +1567,7 @@ function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent
           </View>
           </GameSurface>
         </Animated.View>
-      </CareSwipeShell>
+      </DayActionSwipeShell>
     </Animated.View>
   );
 }
@@ -1848,162 +1839,6 @@ function CompletedCareRow({ event, onFinished, onRewardFlight }: {
     />
   );
 }
-function TodayCareGoalRow({ action, entryDelayMs, familyId, goalId, onCompleteQuickGoal, onNotToday, onOpenQuickGoal, onRewardFlight, reduceMotion, swipeExternalGesture }: {
-  action: RankedTodayCareAction;
-  entryDelayMs: number;
-  familyId: Parameters<typeof CompanionGoalPortrait>[0]['familyId'];
-  goalId: string;
-  onCompleteQuickGoal: (goalId: string) => CompanionQuickGoalCompletionReceipt;
-  onNotToday: () => void;
-  onOpenQuickGoal: (goalId: string, completeFromOrigin: () => void) => void;
-  onRewardFlight: (from: FeedSourceRect, action: RankedTodayCareAction, onArrive: () => void) => void;
-  reduceMotion: boolean;
-  swipeExternalGesture: GestureType;
-}) {
-  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
-  const rowLayout = useActionRowLayout(reduceMotion);
-  const rewardRef = useRef<ViewType | null>(null);
-  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const celebratingRef = useRef(false);
-  const [celebrating, setCelebrating] = useState(false);
-  const [celebrationSource, setCelebrationSource] = useState<FeedSourceRect | null>(null);
-  const rowX = useSharedValue(0);
-  const rowOpacity = useSharedValue(1);
-  const portraitX = useSharedValue(0);
-  const portraitRotation = useSharedValue(0);
-  const portraitScale = useSharedValue(1);
-  const rowScale = useSharedValue(1);
-  const chargeGlow = useSharedValue(0);
-
-  useEffect(() => () => timersRef.current.forEach(clearTimeout), []);
-
-  const rowStyle = useAnimatedStyle(() => ({
-    opacity: rowOpacity.value,
-    transform: [{ translateX: rowX.value }, { scale: rowScale.value }],
-  }));
-  const chargeGlowStyle = useAnimatedStyle(() => ({
-    opacity: chargeGlow.value,
-    transform: [{ scale: 0.985 + chargeGlow.value * 0.025 }],
-  }));
-  const portraitStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: portraitX.value },
-      { rotate: `${portraitRotation.value}deg` },
-      { scale: portraitScale.value },
-    ],
-  }));
-  const schedule = (callback: () => void, delay: number) => timersRef.current.push(setTimeout(callback, delay));
-
-  const beginCompletion = (source: FeedSourceRect | null) => {
-    if (celebratingRef.current) return;
-    celebratingRef.current = true;
-    setCelebrationSource(source);
-    setCelebrating(true);
-    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    if (!reduceMotion) {
-      chargeGlow.value = withSequence(
-        withTiming(1, { duration: 150, easing: Easing.out(Easing.cubic) }),
-        withTiming(0.62, { duration: 300, easing: Easing.out(Easing.cubic) }),
-        withDelay(100, withTiming(1, { duration: 90, easing: Easing.out(Easing.cubic) })),
-        withTiming(0, { duration: 260, easing: Easing.out(Easing.cubic) }),
-      );
-      rowScale.value = withSequence(
-        withTiming(1.027, { duration: 120, easing: Easing.out(Easing.cubic) }),
-        withTiming(1.014, { duration: 180, easing: Easing.out(Easing.cubic) }),
-        withDelay(220, withTiming(1.04, { duration: 100, easing: Easing.out(Easing.cubic) })),
-        withTiming(0.985, { duration: 260, easing: Easing.in(Easing.cubic) }),
-      );
-      portraitScale.value = withSequence(
-        withTiming(1.08, { duration: 120, easing: Easing.out(Easing.cubic) }),
-        withTiming(1, { duration: 180, easing: Easing.out(Easing.back(1.05)) }),
-      );
-      portraitX.value = withSequence(
-        withTiming(-5, { duration: 55, easing: Easing.inOut(Easing.quad) }),
-        withTiming(6, { duration: 70, easing: Easing.inOut(Easing.quad) }),
-        withTiming(-3, { duration: 60, easing: Easing.inOut(Easing.quad) }),
-        withTiming(0, { duration: 85, easing: Easing.out(Easing.cubic) }),
-      );
-      portraitRotation.value = withSequence(
-        withTiming(-4, { duration: 55, easing: Easing.inOut(Easing.quad) }),
-        withTiming(5, { duration: 70, easing: Easing.inOut(Easing.quad) }),
-        withTiming(-2.5, { duration: 60, easing: Easing.inOut(Easing.quad) }),
-        withTiming(0, { duration: 85, easing: Easing.out(Easing.cubic) }),
-      );
-      rowX.value = withDelay(620, withTiming(42, { duration: 260, easing: Easing.in(Easing.cubic) }));
-      rowOpacity.value = withDelay(680, withTiming(0, { duration: 210, easing: Easing.in(Easing.quad) }));
-    }
-
-    schedule(() => {
-      const complete = () => {
-        if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        onCompleteQuickGoal(goalId);
-      };
-      if (source) onRewardFlight(source, action, complete);
-      else complete();
-    }, reduceMotion ? 60 : 190);
-  };
-  const handleComplete = () => {
-    if (rewardRef.current) {
-      rewardRef.current.measureInWindow((x, y, width, height) => beginCompletion({ h: height, w: width, x, y }));
-    } else {
-      beginCompletion({ h: 38, w: 38, x: windowWidth - 64, y: windowHeight * 0.68 });
-    }
-  };
-
-  return (
-    <Animated.View layout={rowLayout}>
-      <Animated.View entering={reduceMotion
-        ? FadeIn.delay(entryDelayMs).duration(80)
-        : FadeInUp.delay(entryDelayMs).duration(300).easing(Easing.out(Easing.cubic))}>
-      <CareSwipeShell
-        disabled={celebrating}
-        externalGesture={swipeExternalGesture}
-        label={action.title}
-        onDismiss={onNotToday}
-        reduceMotion={reduceMotion}>
-        <Animated.View style={rowStyle}>
-          <Pressable
-            accessibilityHint="Opens this goal"
-            accessibilityLabel={action.title}
-            accessibilityRole="button"
-            disabled={celebrating}
-            onPress={() => onOpenQuickGoal(goalId, handleComplete)}
-            style={({ pressed }) => [styles.careDoorPressable, pressed && styles.rowPressed]}>
-            <GameSurface contentStyle={styles.careDoorContent} style={styles.careDoor} tone="cream">
-            {celebrating ? (
-              <Animated.View pointerEvents="none" style={[styles.completionChargeGlow, chargeGlowStyle]} />
-            ) : null}
-            <Animated.View style={portraitStyle}>
-              <CompanionGoalPortrait familyId={familyId} size={38} />
-            </Animated.View>
-            <View style={styles.flexCopy}>
-              <ThemedText numberOfLines={2} style={styles.rowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{action.title}</ThemedText>
-            </View>
-            <View collapsable={false} ref={rewardRef}>
-              <Reward amount={action.growthReward} />
-            </View>
-            <IconSymbol color={Meadow.inkSoft} name="chevron.right" size={16} />
-            {celebrating ? (
-              <GoalCompletionCelebration
-                reducedMotion={reduceMotion}
-                source={celebrationSource ? {
-                  height: celebrationSource.h,
-                  width: celebrationSource.w,
-                  x: celebrationSource.x,
-                  y: celebrationSource.y,
-                } : null}
-              />
-            ) : null}
-            </GameSurface>
-          </Pressable>
-        </Animated.View>
-      </CareSwipeShell>
-      </Animated.View>
-    </Animated.View>
-  );
-}
-
 function YesterdayStepEnergyRow({ busy, completionKey, displayedSteps, energy, onConvert, onFinished, reduceMotion }: {
   busy: boolean;
   completionKey: string | null;
@@ -2069,12 +1904,12 @@ function YesterdayStepEnergyRow({ busy, completionKey, displayedSteps, energy, o
   );
 }
 
-function CareRow({ action, entryDelayMs, onNotToday, onStart, reduceMotion, swipeExternalGesture }: {
+function CareRow({ action, animateLayout, entryDelayMs, onNotToday, onStart, swipeExternalGesture }: {
   action: RankedTodayCareAction;
+  animateLayout: boolean;
   entryDelayMs: number;
   onNotToday: () => void;
   onStart: (rewardFrom: FeedSourceRect) => void;
-  reduceMotion: boolean;
   swipeExternalGesture: GestureType;
 }) {
   const rewardRef = useRef<ViewType | null>(null);
@@ -2087,6 +1922,7 @@ function CareRow({ action, entryDelayMs, onNotToday, onStart, reduceMotion, swip
   };
   return (
     <DayActionActiveRow
+      animateLayout={animateLayout}
       entryDelayMs={entryDelayMs}
       externalGesture={swipeExternalGesture}
       label={action.title}
@@ -2208,186 +2044,6 @@ function InlineScriptedChoice({ action, completionEvent, enterFromBottom = false
         selection={selection}
         swipeExternalGesture={swipeExternalGesture}
       />
-    </View>
-  );
-}
-
-const CARE_REVEAL_WIDTH = 96;
-const CARE_UNDERLAY_OVERLAP = 36;
-const CARE_SWIPE_ACTIVATION_DISTANCE = 6;
-const CARE_SECOND_SWIPE_DISMISS_DISTANCE = 22;
-const CARE_SWIPE_CLOSE_DISTANCE = 22;
-
-function CareSwipeShell({ children, disabled = false, externalGesture, label, onDismiss, reduceMotion }: {
-  children: ReactNode;
-  disabled?: boolean;
-  externalGesture: GestureType;
-  label: string;
-  onDismiss: () => void;
-  reduceMotion: boolean;
-}) {
-  const { width: windowWidth } = useWindowDimensions();
-  const translateX = useSharedValue(0);
-  const gestureStartX = useSharedValue(0);
-  const gestureStartedOpen = useSharedValue(0);
-  const gestureEnded = useSharedValue(0);
-  const revealed = useSharedValue(0);
-  const dismissing = useSharedValue(0);
-  const dismissDistance = windowWidth + 24;
-  const settleDuration = reduceMotion ? 80 : 165;
-  const dismissDuration = reduceMotion ? 100 : 230;
-
-  const notifyDismiss = useCallback(() => {
-    if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
-  }, []);
-  const finishDismiss = useCallback(() => onDismiss(), [onDismiss]);
-  const animateDismiss = useCallback(() => {
-    if (dismissing.value > 0) return;
-    dismissing.value = 1;
-    revealed.value = 0;
-    notifyDismiss();
-    translateX.value = withTiming(
-      dismissDistance,
-      { duration: dismissDuration, easing: Easing.inOut(Easing.cubic) },
-      (finished) => {
-        if (finished) runOnJS(finishDismiss)();
-      },
-    );
-  }, [dismissDistance, dismissDuration, dismissing, finishDismiss, notifyDismiss, revealed, translateX]);
-
-  useEffect(() => {
-    if (!disabled || dismissing.value > 0) return;
-    revealed.value = 0;
-    translateX.value = withTiming(0, {
-      duration: reduceMotion ? 60 : 120,
-      easing: Easing.out(Easing.cubic),
-    });
-  }, [disabled, dismissing, reduceMotion, revealed, translateX]);
-
-  const gesture = useMemo(() => Gesture.Pan()
-    .enabled(!disabled)
-    .maxPointers(1)
-    // Both directions are intentional: right reveals Skip and, once revealed,
-    // left closes it again without requiring the action to be taken.
-    .activeOffsetX([-CARE_SWIPE_ACTIVATION_DISTANCE, CARE_SWIPE_ACTIVATION_DISTANCE])
-    .failOffsetY([-14, 14])
-    .blocksExternalGesture(externalGesture)
-    .onBegin(() => {
-      if (dismissing.value > 0) return;
-      cancelAnimation(translateX);
-      gestureStartX.value = translateX.value;
-      gestureStartedOpen.value = revealed.value;
-      gestureEnded.value = 0;
-    })
-    .onUpdate((event) => {
-      if (dismissing.value > 0) return;
-      const rawX = gestureStartX.value + event.translationX;
-      if (rawX < 0) {
-        translateX.value = Math.max(-8, rawX * 0.12);
-        return;
-      }
-      if (gestureStartedOpen.value > 0) {
-        translateX.value = Math.min(dismissDistance, rawX);
-        return;
-      }
-      translateX.value = rawX <= CARE_REVEAL_WIDTH
-        ? rawX
-        : CARE_REVEAL_WIDTH + (rawX - CARE_REVEAL_WIDTH) * 0.14;
-    })
-    .onEnd((event) => {
-      gestureEnded.value = 1;
-      if (dismissing.value > 0) return;
-      const commitsSecondSwipe = gestureStartedOpen.value > 0
-        && (event.translationX >= CARE_SECOND_SWIPE_DISMISS_DISTANCE || event.velocityX >= 420);
-      if (commitsSecondSwipe) {
-        dismissing.value = 1;
-        revealed.value = 0;
-        runOnJS(notifyDismiss)();
-        translateX.value = withTiming(
-          dismissDistance,
-          { duration: dismissDuration, easing: Easing.inOut(Easing.cubic) },
-          (finished) => {
-            if (finished) runOnJS(finishDismiss)();
-          },
-        );
-        return;
-      }
-      if (gestureStartedOpen.value > 0) {
-        const shouldClose = event.translationX <= -CARE_SWIPE_CLOSE_DISTANCE || event.velocityX <= -360;
-        revealed.value = shouldClose ? 0 : 1;
-        translateX.value = withTiming(shouldClose ? 0 : CARE_REVEAL_WIDTH, {
-          duration: settleDuration,
-          easing: Easing.out(Easing.cubic),
-        });
-        return;
-      }
-      const shouldReveal = translateX.value >= CARE_REVEAL_WIDTH * 0.32 || event.velocityX >= 360;
-      revealed.value = shouldReveal ? 1 : 0;
-      translateX.value = withTiming(shouldReveal ? CARE_REVEAL_WIDTH : 0, {
-        duration: settleDuration,
-        easing: Easing.out(Easing.cubic),
-      });
-    })
-    .onFinalize(() => {
-      if (gestureEnded.value > 0 || dismissing.value > 0) return;
-      translateX.value = withTiming(
-        gestureStartedOpen.value > 0 ? CARE_REVEAL_WIDTH : 0,
-        { duration: settleDuration, easing: Easing.out(Easing.cubic) },
-      );
-    }), [
-      disabled,
-      dismissDistance,
-      dismissDuration,
-      dismissing,
-      externalGesture,
-      finishDismiss,
-      gestureEnded,
-      gestureStartX,
-      gestureStartedOpen,
-      notifyDismiss,
-      revealed,
-      settleDuration,
-      translateX,
-    ]);
-
-  const rowStyle = useAnimatedStyle(() => {
-    const dismissProgress = Math.max(
-      0,
-      Math.min(1, (translateX.value - CARE_REVEAL_WIDTH) / Math.max(1, dismissDistance - CARE_REVEAL_WIDTH)),
-    );
-    return {
-      opacity: 1 - dismissProgress,
-      transform: [{ translateX: translateX.value }],
-    };
-  });
-  const actionStyle = useAnimatedStyle(() => {
-    const revealProgress = Math.max(0, Math.min(1, translateX.value / CARE_REVEAL_WIDTH));
-    const dismissProgress = Math.max(
-      0,
-      Math.min(1, (translateX.value - CARE_REVEAL_WIDTH) / Math.max(1, dismissDistance - CARE_REVEAL_WIDTH)),
-    );
-    return {
-      opacity: revealProgress * (1 - dismissProgress),
-      transform: [{ translateX: -8 + revealProgress * 8 }, { scale: 0.96 + revealProgress * 0.04 }],
-    };
-  });
-
-  return (
-    <View style={styles.careSwipeContainer}>
-      <Animated.View style={[styles.notTodayActionFrame, actionStyle]}>
-        <Pressable
-          accessibilityLabel={`Skip ${label} for today`}
-          accessibilityRole="button"
-          hitSlop={6}
-          onPress={animateDismiss}
-          style={({ pressed }) => [styles.notTodayAction, pressed && styles.notTodayPressed]}>
-          <IconSymbol color="#FFF9E9" name="xmark" size={16} />
-          <ThemedText style={styles.notTodayLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">Skip</ThemedText>
-        </Pressable>
-      </Animated.View>
-      <GestureDetector gesture={gesture}>
-        <Animated.View style={rowStyle}>{children}</Animated.View>
-      </GestureDetector>
     </View>
   );
 }
@@ -2625,10 +2281,8 @@ const styles = StyleSheet.create({
   choicePressed: { backgroundColor: 'rgba(255,244,204,0.58)', transform: [{ translateY: 1 }, { scale: 0.98 }] },
   quickChoiceArt: { height: 27, width: 31 },
   quickChoiceLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '800', textAlign: 'center' },
-  careSwipeContainer: { backgroundColor: 'transparent', borderCurve: 'continuous', borderRadius: 20, overflow: 'hidden', position: 'relative' },
   careDoorPressable: { borderRadius: 18 },
   careDoor: { minHeight: 58 },
-  careDoorContent: { alignItems: 'center', flexDirection: 'row', gap: 9, minHeight: 55, paddingHorizontal: 10, paddingVertical: 6 },
   stepEnergyContent: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 62, paddingHorizontal: 14, paddingVertical: 8 },
   stepEnergyPulse: { backgroundColor: Meadow.gold },
   stepEnergyMetric: { alignItems: 'center', flexDirection: 'row', gap: 9 },
@@ -2639,14 +2293,9 @@ const styles = StyleSheet.create({
   stepEnergyReward: { alignItems: 'center', flexDirection: 'row', gap: 4, justifyContent: 'flex-end', minWidth: 72 },
   stepEnergyArt: { height: 34, width: 34 },
   stepEnergyRewardValue: { fontFamily: AppFontFamilies.manrope, fontSize: 15, fontVariant: ['tabular-nums'], fontWeight: '900' },
-  completionChargeGlow: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,225,126,0.18)', borderColor: 'rgba(255,229,137,0.82)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1.5, boxShadow: '0 0 22px rgba(255,210,91,0.64), inset 0 0 15px rgba(255,244,190,0.36)' },
   completedIcon: { opacity: 0.92 },
   completedBody: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '700', lineHeight: 14 },
   completedTick: { alignItems: 'center', backgroundColor: '#527A49', borderColor: 'rgba(255,248,218,0.9)', borderRadius: 999, borderWidth: 1.5, boxShadow: '0 3px 8px rgba(49,79,42,0.24), inset 0 1px 0 rgba(255,255,255,0.2)', height: 34, justifyContent: 'center', width: 34 },
-  notTodayActionFrame: { backgroundColor: '#8F6046', bottom: 0, left: 0, position: 'absolute', top: 0, width: CARE_REVEAL_WIDTH + CARE_UNDERLAY_OVERLAP },
-  notTodayAction: { alignItems: 'center', flexDirection: 'row', gap: 5, height: '100%', justifyContent: 'center', paddingHorizontal: 10, width: CARE_REVEAL_WIDTH },
-  notTodayPressed: { backgroundColor: '#744A35' },
-  notTodayLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '900' },
   thriving: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.38)', borderColor: Meadow.cardBorder, borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 11, minHeight: 76, padding: 11 },
   smallIconWell: { alignItems: 'center', backgroundColor: 'rgba(229,190,106,0.18)', borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
   smallEnergyArt: { height: 34, width: 34 },
