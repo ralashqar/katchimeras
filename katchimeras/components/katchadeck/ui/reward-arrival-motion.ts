@@ -6,6 +6,18 @@ import {
   withTiming,
 } from 'react-native-reanimated';
 
+/** Exact icon pulse used when each Today-style reward token reaches its target. */
+export function runRewardIconArrivalPulse(
+  pulse: SharedValue<number>,
+  reduceMotion: boolean,
+) {
+  cancelAnimation(pulse);
+  pulse.value = withSequence(
+    withTiming(1, { duration: reduceMotion ? 45 : 85, easing: Easing.out(Easing.cubic) }),
+    withTiming(0, { duration: reduceMotion ? 90 : 170, easing: Easing.out(Easing.cubic) }),
+  );
+}
+
 /** Canonical Today-style reaction used whenever reward tokens land on a character target. */
 export function runRewardArrivalMotion(
   pulse: SharedValue<number>,

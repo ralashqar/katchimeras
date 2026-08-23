@@ -58,6 +58,7 @@ import { todayCareArt } from '@/constants/today-care-art';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import { DASHBOARD_STAT_ART, MANUAL_JOURNAL_ART } from '@/constants/journal-art-sources';
 import { GameRewardChip, GameSurface } from '@/components/katchadeck/ui/game-surface';
+import { runRewardIconArrivalPulse } from '@/components/katchadeck/ui/reward-arrival-motion';
 import type { HomeDayRecord, HomeTimelineDay, SleepQuality } from '@/types/home';
 import type { SceneVariantId } from '@/types/scene';
 import type { HomeArchetypeId } from '@/types/world-identity';
@@ -2086,11 +2087,7 @@ function GrowthMeter({ growth }: { growth: TodayGrowthSummary }) {
     if (feedback.index < 0) return;
     lastLandingAtRef.current = Date.now();
     setMeterTargetEnergy((current) => Math.min(growth.energyTarget, current + Math.max(0, feedback.amount)));
-    cancelAnimation(iconPulse);
-    iconPulse.value = withSequence(
-      withTiming(1, { duration: reduceMotion ? 45 : 85, easing: Easing.out(Easing.cubic) }),
-      withTiming(0, { duration: reduceMotion ? 90 : 170, easing: Easing.out(Easing.cubic) }),
-    );
+    runRewardIconArrivalPulse(iconPulse, reduceMotion);
   }, [feedback.amount, feedback.index, feedback.key, growth.energyTarget, iconPulse, reduceMotion]);
   useEffect(() => {
     const previous = previousEnergyRef.current;

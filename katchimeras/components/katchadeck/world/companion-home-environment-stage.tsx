@@ -106,6 +106,7 @@ export const CompanionHomeEnvironmentStage = memo(
               frameSize={layout.creatureFrame.size}
               stage="grown"
               visualKey={visualKey}
+              widthMultiplier={1.65}
             />
             <CreatureAnimatedArt
               accessibilityLabel={`${name}, your Katchimera`}

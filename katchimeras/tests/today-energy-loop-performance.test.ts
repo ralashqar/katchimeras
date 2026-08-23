@@ -121,6 +121,7 @@ test('yesterday step Energy is a required top action with synchronized counters'
   const currencyHudSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'game-currency-hud.tsx'), 'utf8');
   const animatedIntegerSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'animated-integer-text.tsx'), 'utf8');
   const feedOverlaySource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'home', 'egg-feed-overlay.tsx'), 'utf8');
+  const tokenFlightSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'reward-token-flight.tsx'), 'utf8');
   const stepRowIndex = nurtureSource.indexOf('<YesterdayStepEnergyRow');
   const moodRowIndex = nurtureSource.indexOf('{displayedMoodAction || displayedSleepAction');
   assert.ok(stepRowIndex >= 0 && stepRowIndex < moodRowIndex);
@@ -139,7 +140,9 @@ test('yesterday step Energy is a required top action with synchronized counters'
   assert.match(stepConversionSource, /onMergeEnergyTokenArrive: \(amount\) => \{[\s\S]*?setEnergyHudValueOverride\(beforeEnergy \+ arrivedEnergy\)/);
   assert.doesNotMatch(stepConversionSource, /offer\.observedSteps - arrivedEnergy/);
   assert.match(nurtureSource, /<AnimatedIntegerText[\s\S]*?durationMs=\{EGG_FEED_PAYOUT_DURATION_MS\}[\s\S]*?easing="linear"[\s\S]*?value=\{displayedSteps\}/);
-  assert.match(feedOverlaySource, /export const EGG_FEED_PAYOUT_DURATION_MS = TOKEN_RISE_MS[\s\S]*?TOKEN_FLIGHT_MS/);
+  assert.match(feedOverlaySource, /export const EGG_FEED_PAYOUT_DURATION_MS = REWARD_TOKEN_PAYOUT_DURATION_MS/);
+  assert.match(feedOverlaySource, /<RewardTokenFlight[\s\S]*?source=\{GAME_CURRENCY_ART\.energy\}/);
+  assert.match(tokenFlightSource, /REWARD_TOKEN_RISE_MS = 140[\s\S]*?REWARD_TOKEN_HOVER_MS = 150[\s\S]*?REWARD_TOKEN_FLIGHT_MS = 380/);
   assert.match(topHudSource, /GameCurrencyHud/);
   assert.match(topHudSource, /GAME_CURRENCY_ART\.coins/);
   assert.match(topHudSource, /id: 'coins'/);

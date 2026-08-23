@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
 import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
+import { CelebrationHeroNumber } from '@/components/katchadeck/ui/celebration-hero-number';
 import { GameSurface } from '@/components/katchadeck/ui/game-surface';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
@@ -66,23 +67,16 @@ export function CompanionBondLevelUpCelebration({ autoContinue = true, continueL
   const next = companionBondProgressForTotal(receipt.afterTotal);
   const compactHeight = height < 740;
   const journeyComplete = variant === 'journey_complete';
+  const journeyDayNumber = journeyHandoff?.dayNumber ?? 1;
   const heroSize = journeyComplete
     ? Math.min(width * 0.68, height * (compactHeight ? 0.27 : 0.3), 270)
     : Math.min(width * 0.72, height * (compactHeight ? 0.29 : 0.32), 310);
   const raySize = journeyComplete
     ? Math.min(width * 0.84, heroSize * 1.18, 318)
     : Math.min(width * 1.04, heroSize * 1.34, 410);
-  const titleSize = journeyComplete
-    ? (width < 360 ? 25 : 28)
-    : (width < 360 ? 30 : width < 420 ? 34 : 38);
-  const numberSize = journeyComplete ? (compactHeight ? 58 : 66) : (compactHeight ? 76 : 88);
+  const titleSize = width < 360 ? 30 : width < 420 ? 34 : 38;
+  const numberSize = compactHeight ? 76 : 88;
   const bottomDockBottom = Math.max(12, insets.bottom + 8);
-  const journeyBondTarget = next.nextRelationshipStage
-    ? next.totalPoints + next.relationshipPointsRemaining
-    : next.totalPoints;
-  const journeyBondRatio = journeyBondTarget > 0
-    ? Math.min(1, next.totalPoints / journeyBondTarget)
-    : 1;
 
   useEffect(() => {
     progress.value = withDelay(180, withTiming(1, { duration: reduceMotion ? 100 : 560, easing: Easing.out(Easing.cubic) }));
@@ -157,18 +151,11 @@ export function CompanionBondLevelUpCelebration({ autoContinue = true, continueL
             entering={reduceMotion ? FadeIn.duration(100) : FadeInUp.duration(300)}
             style={[styles.heading, journeyComplete && styles.journeyHeading]}>
             {journeyComplete ? (
-              <View style={styles.journeyPlaque}>
-                <View pointerEvents="none" style={styles.journeyPlaqueHighlight} />
-                <IconSymbol color="#F7CF60" name="sparkles" size={13} />
-                <View style={styles.journeyPlaqueCopy}>
-                  <ThemedText style={styles.journeyPlaqueEyebrow} lightColor="#FFF7D9" darkColor="#FFF7D9">
-                    {journeyHandoff ? `JOURNEY DAY ${journeyHandoff.dayNumber}` : 'JOURNEY COMPLETE'}
-                  </ThemedText>
-                  <ThemedText selectable style={styles.journeyPlaqueTitle} lightColor="#FFD76B" darkColor="#FFD76B">
-                    Journey Day Complete
-                  </ThemedText>
-                </View>
-                <IconSymbol color="#F7CF60" name="sparkles" size={13} />
+              <View style={styles.journeyEyebrowChip}>
+                <IconSymbol color="#75450A" name="sparkles" size={13} />
+                <ThemedText selectable style={styles.journeyEyebrow} lightColor="#75450A" darkColor="#75450A">
+                  Journey complete
+                </ThemedText>
               </View>
             ) : (
               <>
@@ -217,15 +204,14 @@ export function CompanionBondLevelUpCelebration({ autoContinue = true, continueL
           {journeyComplete ? (
             <Animated.View
               accessibilityLiveRegion="polite"
-              style={[styles.journeyReward, nextStyle]}>
-              <BondIconArt size={48} />
-              <View style={[styles.journeyRewardNumber, { height: numberSize + 10, width: 132 }]}>
-                <GoldLevelNumber
-                  accessibilityLabel={`${receipt.points} Bond gained`}
-                  number={`+${receipt.points}`}
-                  size={numberSize}
-                />
-              </View>
+              entering={reduceMotion ? FadeIn.duration(100) : FadeInUp.duration(340).delay(130)}
+              style={styles.journeyDayHero}>
+              <CelebrationHeroNumber
+                accessibilityLabel={`Journey Day ${journeyDayNumber} complete`}
+                label="JOURNEY DAY"
+                numberSize={compactHeight ? 70 : 82}
+                value={journeyDayNumber}
+              />
             </Animated.View>
           ) : (
             <View accessibilityLiveRegion="polite" style={[styles.numberStage, { height: numberSize + 13 }]}>
@@ -240,25 +226,7 @@ export function CompanionBondLevelUpCelebration({ autoContinue = true, continueL
             </View>
           )}
 
-          {journeyComplete ? (
-            <View
-              accessibilityLabel={next.nextRelationshipStage
-                ? `${next.totalPoints} of ${journeyBondTarget} Bond toward ${next.nextRelationshipStage}.`
-                : `${next.totalPoints} Bond. Maximum relationship stage reached.`}
-              accessibilityRole="progressbar"
-              accessibilityValue={{ min: 0, max: Math.max(1, journeyBondTarget), now: next.totalPoints }}
-              style={styles.journeyProgressCard}>
-              <View style={styles.journeyProgressTrack}>
-                <View style={[styles.journeyProgressFill, { width: `${Math.max(next.totalPoints ? 6 : 0, journeyBondRatio * 100)}%` }]} />
-                <View pointerEvents="none" style={styles.journeyProgressLabel}>
-                  <ThemedText selectable style={styles.journeyProgressValue} lightColor="#FFFBE9" darkColor="#FFFBE9">
-                    {next.totalPoints} / {journeyBondTarget}
-                  </ThemedText>
-                </View>
-                <View pointerEvents="none" style={styles.journeyProgressShine} />
-              </View>
-            </View>
-          ) : <View style={styles.copy}>
+          {journeyComplete ? null : <View style={styles.copy}>
             <View style={styles.bondName}>
               <BondIconArt size={27} />
               <ThemedText selectable style={styles.bondLabel} lightColor="#3A2A1D" darkColor="#3A2A1D">
@@ -372,11 +340,8 @@ const styles = StyleSheet.create({
   journeyScrollContent: { gap: 3, justifyContent: 'flex-start', paddingHorizontal: 16 },
   heading: { alignItems: 'center', gap: 6, maxWidth: 540, overflow: 'visible', paddingHorizontal: 4, width: '100%', zIndex: 2 },
   journeyHeading: { gap: 0 },
-  journeyPlaque: { alignItems: 'center', backgroundColor: 'rgba(34,76,43,0.96)', borderColor: '#D7A447', borderCurve: 'continuous', borderRadius: 21, borderWidth: 2, boxShadow: '0 7px 16px rgba(40,28,13,0.24), inset 0 2px 0 rgba(255,255,255,0.16), inset 0 -3px 0 rgba(14,45,24,0.26)', flexDirection: 'row', gap: 10, justifyContent: 'center', minHeight: 62, paddingHorizontal: 18, width: '86%' },
-  journeyPlaqueHighlight: { ...StyleSheet.absoluteFillObject, borderColor: 'rgba(255,239,177,0.3)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, margin: 3 },
-  journeyPlaqueCopy: { alignItems: 'center', gap: 1 },
-  journeyPlaqueEyebrow: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '900', letterSpacing: 1.35, lineHeight: 12 },
-  journeyPlaqueTitle: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 19, fontWeight: '700', letterSpacing: -0.3, lineHeight: 23 },
+  journeyEyebrowChip: { alignItems: 'center', backgroundColor: 'rgba(255,247,218,0.82)', borderColor: 'rgba(255,255,255,0.74)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 5, minHeight: 29, paddingHorizontal: 12 },
+  journeyEyebrow: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '900', letterSpacing: 1.3, textTransform: 'uppercase' },
   eyebrowChip: { backgroundColor: 'rgba(255,247,218,0.76)', borderColor: 'rgba(255,255,255,0.7)', borderRadius: 999, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 5 },
   eyebrow: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '900', letterSpacing: 1.4, textTransform: 'uppercase' },
   title: { fontFamily: AppFontFamilies.fredokaBold, fontWeight: '700', letterSpacing: -0.8, overflow: 'visible', paddingBottom: 5, paddingHorizontal: 8, textAlign: 'center', width: '100%' },
@@ -389,14 +354,7 @@ const styles = StyleSheet.create({
   numberStack: { alignItems: 'center', overflow: 'visible', width: '100%' },
   number: { fontFamily: AppFontFamilies.fredokaBold, fontVariant: ['tabular-nums'], fontWeight: '700', overflow: 'visible', paddingHorizontal: 8, textAlign: 'center', textShadowColor: 'rgba(255,250,207,0.9)', textShadowOffset: { height: -1, width: 0 }, textShadowRadius: 1.5, width: '100%' },
   numberShadow: { left: 0, position: 'absolute', textShadowColor: 'rgba(92,53,7,0.3)', textShadowOffset: { height: 0, width: 0 }, textShadowRadius: 8, top: 0, transform: [{ translateY: 4 }] },
-  journeyReward: { alignItems: 'center', flexDirection: 'row', gap: 2, justifyContent: 'center', minHeight: 76, zIndex: 3 },
-  journeyRewardNumber: { alignItems: 'center', justifyContent: 'center' },
-  journeyProgressCard: { alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(246,243,224,0.8)', borderColor: 'rgba(255,255,246,0.72)', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, boxShadow: '0 5px 14px rgba(35,65,54,0.18), inset 0 1px 0 rgba(255,255,255,0.78)', height: 36, justifyContent: 'center', maxWidth: 330, paddingHorizontal: 8, width: '76%', zIndex: 2 },
-  journeyProgressTrack: { backgroundColor: 'rgba(31,27,19,0.74)', borderColor: 'rgba(255,239,196,0.34)', borderRadius: 999, borderWidth: 2, boxShadow: '0 5px 14px rgba(20,16,9,0.3), inset 0 1px 3px rgba(0,0,0,0.28)', height: 18, overflow: 'hidden', position: 'relative', width: '100%' },
-  journeyProgressFill: { backgroundColor: '#82B94D', borderRadius: 999, bottom: 0, left: 0, position: 'absolute', top: 0 },
-  journeyProgressLabel: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
-  journeyProgressValue: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 10.5, fontVariant: ['tabular-nums'], lineHeight: 13 },
-  journeyProgressShine: { backgroundColor: 'rgba(255,255,255,0.24)', borderRadius: 999, height: 3, left: 8, position: 'absolute', right: 8, top: 2 },
+  journeyDayHero: { alignItems: 'center', justifyContent: 'center', minHeight: 102, overflow: 'visible', zIndex: 3 },
   copy: { alignItems: 'center', backgroundColor: 'rgba(255,249,224,0.84)', borderColor: 'rgba(255,255,255,0.76)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, gap: 3, paddingHorizontal: 18, paddingVertical: 9, zIndex: 2 },
   bondName: { alignItems: 'center', flexDirection: 'row', gap: 7 },
   bondLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 17, fontWeight: '900' },

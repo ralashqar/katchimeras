@@ -13,13 +13,16 @@ export const CreatureGroundShadow = memo(function CreatureGroundShadow({
   sizeMultiplier = CREATURE_CONTACT_SHADOW_SCALE,
   stage = 'hatchling',
   visualKey,
+  widthMultiplier = 1,
 }: {
   frameSize: number;
   sizeMultiplier?: number;
   stage?: CreatureGrowthStage;
   visualKey: HomeVisualKey;
+  widthMultiplier?: number;
 }) {
   const layout = resolveCreatureGroundShadowLayout(visualKey, frameSize, sizeMultiplier, stage);
+  const width = layout.width * widthMultiplier;
 
   return (
     <Image
@@ -31,10 +34,10 @@ export const CreatureGroundShadow = memo(function CreatureGroundShadow({
       transition={0}
       style={{
         height: layout.height,
-        left: layout.left,
+        left: layout.left - (width - layout.width) / 2,
         position: 'absolute',
         top: layout.top,
-        width: layout.width,
+        width,
       }}
     />
   );

@@ -124,6 +124,8 @@ test('Mossprout Journey status uses the shared compact plaque without joining ac
   const stage = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/mossprout-story-stage.tsx'), 'utf8');
   const milestone = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/katchimera-journey-status-plaque.tsx'), 'utf8');
   const celebration = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/companion-bond-level-up-celebration.tsx'), 'utf8');
+  const streakTitle = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/streak/streak-hero-title.tsx'), 'utf8');
+  const heroNumber = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/ui/celebration-hero-number.tsx'), 'utf8');
   assert.match(stage, /journey && !storyComplete[\s\S]*?<KatchimeraJourneyStatusPlaque/);
   assert.match(stage, /status=\{journey\.status === 'complete' \? 'complete' : 'in_progress'\}/);
   assert.match(milestone, /position: 'absolute'/);
@@ -135,7 +137,10 @@ test('Mossprout Journey status uses the shared compact plaque without joining ac
   assert.match(milestone, /useReducedMotion\(\)/);
   assert.match(sheet, /showNameplate=\{route\.kind === 'dashboard' && props\.familyId !== 'mossprout'\}/);
   assert.doesNotMatch(sheet, /mossproutJourneyDayStatus|mossproutNameplate/);
-  assert.match(celebration, /styles\.journeyPlaque/);
+  assert.match(celebration, /styles\.journeyEyebrowChip[\s\S]*?<CelebrationHeroNumber[\s\S]*?label="JOURNEY DAY"/);
+  assert.doesNotMatch(celebration, /journeyStageNode|COMPANION_RELATIONSHIP_STAGES/);
+  assert.match(streakTitle, /<CelebrationHeroNumber[\s\S]*?label="DAY STREAK"/);
+  assert.match(heroNumber, /withRepeat[\s\S]*?1_450[\s\S]*?AppFontFamilies\.fredokaBold/);
 });
 
 test('narrative modes use only the shared Katchimera header', () => {
@@ -145,4 +150,13 @@ test('narrative modes use only the shared Katchimera header', () => {
   assert.doesNotMatch(conversation, /preservesFtueHeader|Open companion story dashboard|headerVisual/);
   assert.match(questionnaire, /conversationPresentation \? <KatchimeraPageHeader/);
   assert.doesNotMatch(questionnaire, /conversationHeader|modernHeaderCopy|Open companion story dashboard/);
+});
+
+test('the companion-stage ground shadow is wider without becoming taller', () => {
+  const shadow = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/creature-ground-shadow.tsx'), 'utf8');
+  const stage = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/companion-home-environment-stage.tsx'), 'utf8');
+  assert.match(shadow, /widthMultiplier = 1/);
+  assert.match(shadow, /const width = layout\.width \* widthMultiplier/);
+  assert.match(shadow, /left: layout\.left - \(width - layout\.width\) \/ 2/);
+  assert.match(stage, /<CreatureGroundShadow[\s\S]*?stage="grown"[\s\S]*?widthMultiplier=\{1\.65\}/);
 });

@@ -2,16 +2,14 @@ import { useEffect, useMemo, useState, type RefObject } from 'react';
 import { StyleSheet, useWindowDimensions, View, type View as ViewType } from 'react-native';
 import Animated, {
   cancelAnimation,
-  Easing,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
-  withSequence,
-  withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
+import { runRewardIconArrivalPulse } from '@/components/katchadeck/ui/reward-arrival-motion';
 import { GameCurrencyHud } from '@/components/katchadeck/ui/game-currency-hud';
 import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
 import { ThemedText } from '@/components/themed-text';
@@ -45,7 +43,7 @@ export function KatchimeraPageHeader({
   const { width } = useWindowDimensions();
   const compact = width < 360;
   const reduceMotion = useReducedMotion();
-  const medallionScale = useSharedValue(1);
+  const medallionScale = useSharedValue(0);
   const medallionGlow = useSharedValue(0);
   const wallet = useGameWallet();
   const [bondState, setBondState] = useState(loadCompanionBondState);
@@ -60,23 +58,15 @@ export function KatchimeraPageHeader({
     : 0;
   useEffect(() => {
     if (!bondRewardPulseKey) return;
-    cancelAnimation(medallionScale);
-    cancelAnimation(medallionGlow);
-    medallionScale.value = withSequence(
-      withTiming(reduceMotion ? 1 : 1.14, { duration: reduceMotion ? 0 : 90, easing: Easing.out(Easing.cubic) }),
-      withTiming(1, { duration: reduceMotion ? 0 : 190, easing: Easing.out(Easing.cubic) }),
-    );
-    medallionGlow.value = withSequence(
-      withTiming(reduceMotion ? 0.58 : 1, { duration: reduceMotion ? 55 : 80, easing: Easing.out(Easing.cubic) }),
-      withTiming(0, { duration: reduceMotion ? 130 : 190, easing: Easing.out(Easing.cubic) }),
-    );
+    runRewardIconArrivalPulse(medallionScale, reduceMotion);
+    runRewardIconArrivalPulse(medallionGlow, reduceMotion);
   }, [bondRewardPulseKey, medallionGlow, medallionScale, reduceMotion]);
   useEffect(() => () => {
     cancelAnimation(medallionScale);
     cancelAnimation(medallionGlow);
   }, [medallionGlow, medallionScale]);
   const medallionPulseStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: medallionScale.value }],
+    transform: [{ scale: 1 + medallionScale.value * 0.23 }],
   }));
   const medallionGlowStyle = useAnimatedStyle(() => ({
     opacity: medallionGlow.value,
