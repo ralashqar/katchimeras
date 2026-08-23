@@ -70,22 +70,79 @@ test('Today action rows use neutral unframed art and reversible swipe actions', 
   assert.match(source, /<DayActionSwipeShell/);
 });
 
-test('Katchimera collection pages share a centered Bond header and reciprocal navigation', () => {
+test('Katchimera pages share a centered toy-like Bond header with coins at the right', () => {
   const header = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/katchimera-page-header.tsx'), 'utf8');
   const cards = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/companion-cards-screen.tsx'), 'utf8');
   const trophies = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/companion-trophy-room-screen.tsx'), 'utf8');
   const layout = fs.readFileSync(path.resolve(process.cwd(), 'app/_layout.tsx'), 'utf8');
-  assert.match(header, /width: 96/);
-  assert.match(header, /styles\.center/);
-  assert.match(cards, /<KatchimeraPageHeader[\s\S]*?onOpenTrophies/);
-  assert.match(trophies, /<KatchimeraPageHeader[\s\S]*?onOpenCards/);
+  assert.match(header, /useWindowDimensions\(\)/);
+  assert.match(header, /styles\.bondMedallion/);
+  assert.match(header, /ref=\{bondIconTargetRef\}/);
+  assert.match(header, /medallionPulseStyle/);
+  assert.match(header, /medallionGlowStyle/);
+  assert.doesNotMatch(header, />Bond<\/ThemedText>/);
+  assert.match(header, /backgroundColor: '#F14D7B'/);
+  assert.match(header, /position: 'absolute',[\s\S]*?width: 180/);
+  assert.match(header, /bondProgress\.totalPoints\}\/\{relationshipTarget/);
+  assert.match(header, /height: 13/);
+  assert.match(header, /trackValue: \{ \.\.\.GameUI\.type\.numeric, fontFamily: GameUI\.type\.title\.fontFamily, fontSize: 9\.5/);
+  assert.match(header, /useGameWallet\(\)/);
+  assert.match(header, /<GameCurrencyHud[\s\S]*?GAME_CURRENCY_ART\.coins[\s\S]*?id: 'coins'/);
+  assert.doesNotMatch(header, /<GameCurrencyHud[\s\S]{0,220}?\bcompact\b/);
+  assert.doesNotMatch(header, /currencyHud: \{[^}]*paddingLeft/);
+  assert.doesNotMatch(header, /HeaderAction|onOpenCards|onOpenTrophies/);
+  assert.match(cards, /<KatchimeraPageHeader/);
+  assert.match(trophies, /<KatchimeraPageHeader/);
+  assert.doesNotMatch(cards, /onOpenTrophies/);
+  assert.doesNotMatch(trophies, /onOpenCards/);
   assert.match(layout, /katchimera\/\[creatureId\]\/cards/);
 });
 
-test('Katchimera hub collection buttons swap the embedded content instead of pushing a route', () => {
+test('Mossprout collection buttons live in the bottom dock and swap embedded content', () => {
   const sheet = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/companion-interaction-sheet.tsx'), 'utf8');
+  const stage = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/mossprout-story-stage.tsx'), 'utf8');
+  const dock = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/katchimera-bottom-dock.tsx'), 'utf8');
+  const navArt = fs.readFileSync(path.resolve(process.cwd(), 'constants/katchimera-nav-art.ts'), 'utf8');
   assert.match(sheet, /onOpenCards=\{\(\) => selectDestination\('skins'\)\}/);
   assert.match(sheet, /onOpenTrophies=\{\(\) => selectDestination\('achievements'\)\}/);
+  assert.match(stage, /id: 'garden', label: 'Garden'[\s\S]*?id: 'discoveries', label: 'Discoveries'[\s\S]*?id: 'skins', label: 'Skins'[\s\S]*?id: 'trophies', label: 'Trophies'/);
+  assert.doesNotMatch(stage, /label: 'Journey'/);
+  assert.match(dock, /featuredId/);
+  assert.match(dock, /icon: \{ height: 40, width: 40 \}/);
+  assert.match(dock, /fontSize: 12/);
+  ['garden', 'discoveries', 'skins', 'trophies'].forEach((id) => assert.match(navArt, new RegExp(`${id}: require`)));
+  assert.match(navArt, /navigation\/mossprout\/garden\.webp/);
+  ['discoveries', 'skins', 'trophies'].forEach((id) => {
+    assert.match(navArt, new RegExp(`navigation/shared/${id}\\.webp`));
+  });
   assert.match(sheet, /destination === 'achievements'[\s\S]*?<CompanionTrophyRoomScreen creatureId=\{props\.creatureId\} embedded/);
   assert.match(sheet, /destination === 'skins'[\s\S]*?<CompanionSkinsThread/);
+});
+
+test('Mossprout Journey status uses the shared compact plaque without joining action layout animation', () => {
+  const sheet = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/companion-interaction-sheet.tsx'), 'utf8');
+  const stage = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/mossprout-story-stage.tsx'), 'utf8');
+  const milestone = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/katchimera-journey-status-plaque.tsx'), 'utf8');
+  const celebration = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/companion-bond-level-up-celebration.tsx'), 'utf8');
+  assert.match(stage, /journey && !storyComplete[\s\S]*?<KatchimeraJourneyStatusPlaque/);
+  assert.match(stage, /status=\{journey\.status === 'complete' \? 'complete' : 'in_progress'\}/);
+  assert.match(milestone, /position: 'absolute'/);
+  assert.match(milestone, /Journey Day \{dayNumber\}/);
+  assert.match(milestone, /complete \? 'Complete' : 'In progress'/);
+  assert.match(milestone, /complete \? 'checkmark' : 'circle\.fill'/);
+  assert.doesNotMatch(milestone, /FIRST JOURNEY DAY|tomorrow/);
+  assert.match(milestone, /minHeight: 50/);
+  assert.match(milestone, /useReducedMotion\(\)/);
+  assert.match(sheet, /showNameplate=\{route\.kind === 'dashboard' && props\.familyId !== 'mossprout'\}/);
+  assert.doesNotMatch(sheet, /mossproutJourneyDayStatus|mossproutNameplate/);
+  assert.match(celebration, /styles\.journeyPlaque/);
+});
+
+test('narrative modes use only the shared Katchimera header', () => {
+  const conversation = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/companion-conversation-scene.tsx'), 'utf8');
+  const questionnaire = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/companion-questionnaire-scene.tsx'), 'utf8');
+  assert.match(conversation, /<KatchimeraPageHeader[\s\S]*?onBack=\{onClose\}/);
+  assert.doesNotMatch(conversation, /preservesFtueHeader|Open companion story dashboard|headerVisual/);
+  assert.match(questionnaire, /conversationPresentation \? <KatchimeraPageHeader/);
+  assert.doesNotMatch(questionnaire, /conversationHeader|modernHeaderCopy|Open companion story dashboard/);
 });

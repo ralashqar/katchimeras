@@ -293,7 +293,12 @@ function OrderTrayCard({ entry, index, interactionAllowed, interactionLocked, on
   const recipientName = recipient?.displayName ?? MERGE_CHARACTER_NAMES[order.characterId];
   const recipientVisualKey = recipient?.visualKey ?? CHARACTER_VISUALS[order.characterId];
   const characterSource = resolveCreatureArtSource(recipientVisualKey, { lod: 'medium' });
+  const orderCardTargetKey = `order-card:${order.id}`;
   const serveTargetKey = `order-serve:${order.id}`;
+  const setOrderCardTargetRef = useCallback(
+    (view: View | null) => onRailTargetRef?.(orderCardTargetKey, view),
+    [onRailTargetRef, orderCardTargetKey],
+  );
   const setServeTargetRef = useCallback(
     (view: View | null) => onRailTargetRef?.(serveTargetKey, view),
     [onRailTargetRef, serveTargetKey],
@@ -336,6 +341,7 @@ function OrderTrayCard({ entry, index, interactionAllowed, interactionLocked, on
       accessibilityState={{ disabled: interactionLocked && !interactionAllowed }}
       onLongPress={interactionLocked ? onBlockedInteraction : onReroll}
       onPress={interactionLocked ? onBlockedInteraction : ready ? beginServe : undefined}
+      ref={setOrderCardTargetRef}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       {ready ? (
         <Animated.View

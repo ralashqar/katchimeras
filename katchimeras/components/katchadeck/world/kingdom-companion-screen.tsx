@@ -212,14 +212,13 @@ export function KingdomCompanionScreen({
   initialCreatureId,
   onCloseCompanion,
   onOpenMerge,
-  onOpenCards,
-  onOpenTrophies,
   onOpenQuestGame,
   ftueConversationDefinitionId,
   onFtueConversationComplete,
   ftueOrderPreviewActive = false,
   ftueBondSpotlightActive = false,
   ftueDayOneActionActive = false,
+  ftueNavigationLocked = false,
   onFtueBondSpotlightComplete,
   onFtueJourneyDayComplete,
   onFtueOpenMerge,
@@ -229,14 +228,13 @@ export function KingdomCompanionScreen({
   initialCreatureId?: string;
   onCloseCompanion?: () => void;
   onOpenMerge?: (orderId?: string | null, familyId?: KatchimeraFamilyId) => void;
-  onOpenCards?: () => void;
-  onOpenTrophies?: () => void;
   onOpenQuestGame?: (creatureId: string, questId: string) => void;
   ftueConversationDefinitionId?: string;
   onFtueConversationComplete?: () => void | Promise<void>;
   ftueOrderPreviewActive?: boolean;
   ftueBondSpotlightActive?: boolean;
   ftueDayOneActionActive?: boolean;
+  ftueNavigationLocked?: boolean;
   onFtueBondSpotlightComplete?: () => void;
   onFtueJourneyDayComplete?: () => void;
   onFtueOpenMerge?: () => void;
@@ -591,10 +589,9 @@ export function KingdomCompanionScreen({
           ftueOrderPreviewActive={ftueOrderPreviewActive}
           ftueBondSpotlightActive={ftueBondSpotlightActive}
           ftueDayOneActionActive={ftueDayOneActionActive}
+          ftueNavigationLocked={ftueNavigationLocked}
           onFtueBondSpotlightComplete={onFtueBondSpotlightComplete}
           onFtueOpenMerge={onFtueOpenMerge}
-          onOpenCards={onOpenCards}
-          onOpenTrophies={onOpenTrophies}
           onSelectDestination={quests.selectDestination}
           onClose={() => {
             quests.closeSelectedResident();
@@ -1074,9 +1071,8 @@ export function KingdomCompanionScreen({
           dismissible={!ftueDayOneActionActive}
           journeyHandoff={ftueDayOneActionActive ? {
             dayNumber: 1,
-            gardenNote: 'Want to keep playing? Garden orders stay open today.',
-            recap: ['You met Mossprout', 'The Quiet Patch began to grow'],
-            tomorrowPreview: 'Tomorrow · Someone new may find the Garden.',
+            recap: ['You met Mossprout', 'You restored the Quiet Patch', 'You chose one Bond moment'],
+            tomorrowPreview: 'New growth begins tomorrow.',
           } : undefined}
           onContinue={() => {
             const finishesFtue = ftueDayOneActionActive && bondCelebration.variant === 'journey_complete';

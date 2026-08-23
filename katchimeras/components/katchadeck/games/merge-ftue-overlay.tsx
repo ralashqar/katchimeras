@@ -15,8 +15,13 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
-import type { FtueCueDefinition, FtueSpotlightDefinition, FtueTarget } from '@/features/onboarding/ftue-types';
+import { EggAvatar } from '@/components/katchadeck/egg-avatar/egg-avatar';
+import { ThemedText } from '@/components/themed-text';
+import { KatchaDeckUI } from '@/constants/theme';
+import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
+import type { FtueCueDefinition, FtueGuide, FtueSpotlightDefinition, FtueTarget } from '@/features/onboarding/ftue-types';
 import { resolveFtueBoardCell } from '@/features/onboarding/merge-ftue';
+import type { EggAvatarFaceId } from '@/types/egg-avatar';
 import type { MergeWorldState } from '@/types/merge-world';
 import { mergeCellOrigin } from '@/utils/merge-world/board-geometry';
 
@@ -25,6 +30,13 @@ import type { MergeBoardScreenMetrics } from './feastle-persistent-merge-board';
 const HAND_ART = require('../../../assets/images/katchimeras/merge-world/ui/ftue-hand.webp');
 const HAND_TIP_X = 0.28;
 const HAND_TIP_Y = 0.2;
+const GUIDE_EXPRESSION_FACE_IDS = [
+  'happy-squint',
+  'curious',
+  'gentle-smile',
+  'big-grin',
+  'single-wink',
+] as const satisfies readonly EggAvatarFaceId[];
 
 export type MergeFtueVisualTheme = {
   dimColor: string;
@@ -66,6 +78,7 @@ type MergeFtueOverlayProps = {
   blockedPulseNonce: number;
   boardMetrics: MergeBoardScreenMetrics | null;
   cue: FtueCueDefinition | null;
+  guide: FtueGuide | null;
   layoutNonce: number;
   screenRef: RefObject<View | null>;
   railTargetRefs: RefObject<Map<string, View>>;
@@ -79,6 +92,7 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
   blockedPulseNonce,
   boardMetrics,
   cue,
+  guide,
   layoutNonce,
   screenRef,
   railTargetRefs,
@@ -198,7 +212,7 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
     <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      pointerEvents="none"
+      pointerEvents="box-none"
       style={styles.overlay}>
       <FtueSpotlight
         frames={showSpotlight ? currentLayout?.spotlightFrames ?? [] : []}
@@ -207,6 +221,13 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
         screen={currentLayout?.screen ?? { height: 0, width: 0 }}
         theme={theme}
       />
+      {guide && showSpotlight && currentLayout?.configKey === configKey ? (
+        <MergeFtueEggGuide
+          anchor={guideAnchorFrame(spotlight, currentLayout.spotlightFrames)}
+          guide={guide}
+          screen={currentLayout.screen}
+        />
+      ) : null}
       <FtueFingerCue
         blockedPulseNonce={blockedPulseNonce}
         cue={showCue ? currentLayout?.cue ?? null : null}
@@ -249,12 +270,22 @@ function FtueSpotlight({ frames, opacity, radius, screen, theme }: {
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <SpotlightDimMask
-        color={`rgb(${theme.dimColor})`}
-        opacity={dimOpacity}
-        screen={screen}
-        slot={boundingSlot}
-      />
+      {frames.length > 1 ? (
+        <NativeMultiSpotlightDimMask
+          color={`rgb(${theme.dimColor})`}
+          frames={frames}
+          opacity={dimOpacity}
+          radius={radius}
+          screen={screen}
+        />
+      ) : (
+        <SpotlightDimMask
+          color={`rgb(${theme.dimColor})`}
+          opacity={dimOpacity}
+          screen={screen}
+          slot={boundingSlot}
+        />
+      )}
       <NativeSpotlightRing slot={slot0} theme={theme} />
       <NativeSpotlightRing slot={slot1} theme={theme} />
       <NativeSpotlightRing slot={slot2} theme={theme} />
@@ -293,6 +324,108 @@ function SpotlightDimMask({ color, opacity, screen, slot }: {
   );
 }
 
+function NativeMultiSpotlightDimMask({ color, frames, opacity, radius, screen }: {
+  color: string;
+  frames: readonly Frame[];
+  opacity: SharedValue<number>;
+  radius: number;
+  screen: { height: number; width: number };
+}) {
+  const segments = useMemo(
+    () => roundedMultiCutoutSegments(frames, radius, screen),
+    [frames, radius, screen],
+  );
+  const opacityStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+  return (
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, opacityStyle]}>
+      {segments.map((segment) => (
+        <View
+          key={`${segment.y}:${segment.x}:${segment.width}:${segment.height}`}
+          style={[
+            styles.multiCutoutSegment,
+            {
+              backgroundColor: color,
+              height: segment.height,
+              left: segment.x,
+              top: segment.y,
+              width: segment.width,
+            },
+          ]}
+        />
+      ))}
+    </Animated.View>
+  );
+}
+
+/**
+ * Tessellates the dim layer around every opening. React Native cannot subtract
+ * two native rounded views from one shadow, so a small set of horizontal bands
+ * preserves two independent holes without mounting a Canvas during FTUE.
+ */
+function roundedMultiCutoutSegments(
+  frames: readonly Frame[],
+  radius: number,
+  screen: { height: number; width: number },
+): Frame[] {
+  const stepsPerCorner = 6;
+  const yStops = new Set<number>([0, screen.height]);
+  frames.forEach((frame) => {
+    const corner = Math.min(radius, frame.width / 2, frame.height / 2);
+    yStops.add(clamp(frame.y, 0, screen.height));
+    yStops.add(clamp(frame.y + frame.height, 0, screen.height));
+    for (let step = 1; step <= stepsPerCorner; step += 1) {
+      const offset = corner * step / stepsPerCorner;
+      yStops.add(clamp(frame.y + offset, 0, screen.height));
+      yStops.add(clamp(frame.y + frame.height - offset, 0, screen.height));
+    }
+  });
+
+  const sortedStops = [...yStops].sort((a, b) => a - b);
+  const segments: Frame[] = [];
+  for (let index = 0; index < sortedStops.length - 1; index += 1) {
+    const top = sortedStops[index];
+    const bottom = sortedStops[index + 1];
+    if (bottom - top <= 0.1) continue;
+    const midY = top + (bottom - top) / 2;
+    const openings = frames
+      .flatMap((frame) => {
+        const range = roundedFrameRangeAtY(frame, radius, midY);
+        return range ? [range] : [];
+      })
+      .sort((a, b) => a.left - b.left);
+    let cursor = 0;
+    openings.forEach((opening) => {
+      const left = clamp(opening.left, 0, screen.width);
+      const right = clamp(opening.right, 0, screen.width);
+      if (left > cursor) segments.push({ x: cursor, y: top, width: left - cursor, height: bottom - top });
+      cursor = Math.max(cursor, right);
+    });
+    if (cursor < screen.width) segments.push({ x: cursor, y: top, width: screen.width - cursor, height: bottom - top });
+  }
+  return segments;
+}
+
+function roundedFrameRangeAtY(frame: Frame, radius: number, y: number) {
+  if (y < frame.y || y > frame.y + frame.height) return null;
+  const corner = Math.min(radius, frame.width / 2, frame.height / 2);
+  if (corner <= 0) return { left: frame.x, right: frame.x + frame.width };
+  const localY = y - frame.y;
+  const distanceFromCornerCenter = localY < corner
+    ? corner - localY
+    : localY > frame.height - corner
+      ? localY - (frame.height - corner)
+      : 0;
+  const inset = distanceFromCornerCenter > 0
+    ? corner - Math.sqrt(Math.max(0, corner * corner - distanceFromCornerCenter * distanceFromCornerCenter))
+    : 0;
+  return { left: frame.x + inset, right: frame.x + frame.width - inset };
+}
+
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
 function NativeSpotlightRing({ slot, theme }: {
   slot: AnimatedSpotlightSlot;
   theme: MergeFtueVisualTheme;
@@ -320,6 +453,7 @@ function mergeFtueOverlayPropsEqual(previous: MergeFtueOverlayProps, next: Merge
     previous.blockedPulseNonce !== next.blockedPulseNonce
     || previous.boardMetrics !== next.boardMetrics
     || previous.cue !== next.cue
+    || previous.guide !== next.guide
     || previous.layoutNonce !== next.layoutNonce
     || previous.railTargetRefs !== next.railTargetRefs
     || previous.screenRef !== next.screenRef
@@ -456,7 +590,7 @@ function FtueFingerCue({ blockedPulseNonce, cue, points, resetKey, theme }: {
   }, [cueKind, reduceMotion, travelX, travelY, visible]);
 
   return (
-    <Animated.View style={[
+    <Animated.View pointerEvents="none" style={[
       styles.hand,
       {
         height: theme.fingerSize,
@@ -479,6 +613,119 @@ function FtueFingerCue({ blockedPulseNonce, cue, points, resetKey, theme }: {
   );
 }
 
+function MergeFtueEggGuide({ anchor, guide, screen }: {
+  anchor: Frame;
+  guide: FtueGuide;
+  screen: { height: number; width: number };
+}) {
+  const { equippedFaceId, equippedSkinId } = useEggAvatar();
+  const reduceMotion = useReducedMotion();
+  const [guideFaceId, setGuideFaceId] = useState<EggAvatarFaceId>(equippedFaceId);
+  const avatarWobble = useSharedValue(0);
+  const avatarMotionStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: -2 },
+      { rotateZ: `${avatarWobble.value}deg` },
+    ],
+  }));
+
+  useEffect(() => {
+    let cancelled = false;
+    let reactionTimer: ReturnType<typeof setTimeout> | null = null;
+    let restoreTimer: ReturnType<typeof setTimeout> | null = null;
+    setGuideFaceId(equippedFaceId);
+
+    const scheduleReaction = (first = false) => {
+      reactionTimer = setTimeout(() => {
+        if (cancelled) return;
+        const available = GUIDE_EXPRESSION_FACE_IDS.filter((faceId) => faceId !== equippedFaceId);
+        const nextFace = available[Math.floor(Math.random() * available.length)] ?? 'happy-squint';
+        setGuideFaceId(nextFace);
+        if (!reduceMotion) {
+          avatarWobble.value = withSequence(
+            withTiming(-1.7, { duration: 70, easing: Easing.inOut(Easing.quad) }),
+            withTiming(1.5, { duration: 85, easing: Easing.inOut(Easing.quad) }),
+            withTiming(-0.8, { duration: 75, easing: Easing.inOut(Easing.quad) }),
+            withTiming(0, { duration: 105, easing: Easing.out(Easing.cubic) }),
+          );
+        }
+        restoreTimer = setTimeout(() => {
+          if (cancelled) return;
+          setGuideFaceId(equippedFaceId);
+          scheduleReaction();
+        }, 780 + Math.round(Math.random() * 420));
+      }, first
+        ? 900 + Math.round(Math.random() * 900)
+        : 3_000 + Math.round(Math.random() * 2_400));
+    };
+
+    scheduleReaction(true);
+    return () => {
+      cancelled = true;
+      if (reactionTimer) clearTimeout(reactionTimer);
+      if (restoreTimer) clearTimeout(restoreTimer);
+      cancelAnimation(avatarWobble);
+      avatarWobble.value = 0;
+    };
+  }, [avatarWobble, equippedFaceId, reduceMotion]);
+
+  const calloutWidth = Math.min(326, screen.width - 28);
+  const estimatedHeight = 96;
+  const calloutLeft = clamp(
+    anchor.x + anchor.width / 2 - calloutWidth / 2,
+    14,
+    screen.width - calloutWidth - 14,
+  );
+  const belowTop = anchor.y + anchor.height + 14;
+  const calloutBelow = belowTop + estimatedHeight <= screen.height - 14;
+  const calloutTop = calloutBelow
+    ? belowTop
+    : Math.max(14, anchor.y - estimatedHeight - 14);
+  const tailLeft = clamp(
+    anchor.x + anchor.width / 2 - calloutLeft - 10,
+    38,
+    calloutWidth - 34,
+  );
+
+  return (
+    <View
+      accessibilityLabel={`${guide.title} ${guide.body}`}
+      accessibilityLiveRegion="polite"
+      pointerEvents="none"
+      style={[
+        styles.eggGuideCallout,
+        { left: calloutLeft, minHeight: estimatedHeight, top: calloutTop, width: calloutWidth },
+      ]}>
+      <View pointerEvents="none" style={[
+        styles.eggGuideTail,
+        calloutBelow ? styles.eggGuideTailAbove : styles.eggGuideTailBelow,
+        { left: tailLeft },
+      ]} />
+      <Animated.View
+        accessibilityLabel="Your Egg is showing you around"
+        pointerEvents="none"
+        style={[styles.eggGuideAvatar, avatarMotionStyle]}>
+        <EggAvatar faceId={guideFaceId} presentation="button" size={76} skinId={equippedSkinId} />
+      </Animated.View>
+      <ThemedText style={[styles.eggGuideMessage, styles.eggGuideMessageLayout]} lightColor="#35422F" darkColor="#35422F">
+        <ThemedText style={[styles.eggGuideMessage, styles.eggGuideEmphasis]} lightColor="#668A49" darkColor="#668A49">
+          {guide.title}
+        </ThemedText>
+        {' '}{guide.body}
+      </ThemedText>
+    </View>
+  );
+}
+
+function guideAnchorFrame(spotlight: FtueSpotlightDefinition | null, frames: readonly Frame[]) {
+  if (!frames.length) return { height: 0, width: 0, x: 0, y: 0 };
+  if (spotlight?.grouping !== 'bounding_rect') {
+    const orderCardIndex = spotlight?.targets.findIndex((target) => target.kind === 'order_card') ?? -1;
+    if (orderCardIndex >= 0 && frames[orderCardIndex]) return frames[orderCardIndex];
+  }
+  return boundingFrame(frames);
+}
+
 async function resolveTargetFrame(
   target: FtueTarget,
   state: MergeWorldState,
@@ -486,12 +733,14 @@ async function resolveTargetFrame(
   railTargetRefs: Map<string, View>,
   screen: Frame,
 ): Promise<Frame | null> {
-  if (target.kind === 'order_serve' || target.kind === 'tray_chat_note' || target.kind === 'tray_parcel') {
-    const targetKey = target.kind === 'order_serve'
-      ? `order-serve:${target.orderId}`
-      : target.kind === 'tray_chat_note'
-        ? `chat-note:${target.noteId}`
-        : `tray-parcel:${target.arrivalId}`;
+  if (target.kind === 'order_card' || target.kind === 'order_serve' || target.kind === 'tray_chat_note' || target.kind === 'tray_parcel') {
+    const targetKey = target.kind === 'order_card'
+      ? `order-card:${target.orderId}`
+      : target.kind === 'order_serve'
+        ? `order-serve:${target.orderId}`
+        : target.kind === 'tray_chat_note'
+          ? `chat-note:${target.noteId}`
+          : `tray-parcel:${target.arrivalId}`;
     const measured = await measureView(railTargetRefs.get(targetKey) ?? null);
     return measured ? {
       height: measured.height,
@@ -547,8 +796,58 @@ function measureView(view: View | null): Promise<Frame | null> {
 
 const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, zIndex: 250 },
-  hand: { position: 'absolute' },
+  hand: { position: 'absolute', zIndex: 4 },
   handArt: { height: '100%', width: '100%' },
+  eggGuideCallout: {
+    alignItems: 'center',
+    backgroundColor: '#FFF9E8',
+    borderColor: 'rgba(124,151,83,0.42)',
+    borderCurve: 'continuous',
+    borderRadius: 21,
+    borderWidth: 1,
+    boxShadow: '0 12px 30px rgba(25,42,25,0.28)',
+    flexDirection: 'row',
+    gap: 9,
+    justifyContent: 'center',
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    position: 'absolute',
+    zIndex: 2,
+  },
+  eggGuideTail: {
+    backgroundColor: '#FFF9E8',
+    height: 20,
+    position: 'absolute',
+    transform: [{ rotate: '45deg' }],
+    width: 20,
+    zIndex: 0,
+  },
+  eggGuideTailAbove: {
+    borderLeftColor: 'rgba(124,151,83,0.42)',
+    borderLeftWidth: 1,
+    borderTopColor: 'rgba(124,151,83,0.42)',
+    borderTopWidth: 1,
+    top: -10,
+  },
+  eggGuideTailBelow: {
+    borderBottomColor: 'rgba(124,151,83,0.42)',
+    borderBottomWidth: 1,
+    borderRightColor: 'rgba(124,151,83,0.42)',
+    borderRightWidth: 1,
+    bottom: -10,
+  },
+  eggGuideAvatar: { flexShrink: 0, height: 76, width: 76, zIndex: 1 },
+  eggGuideMessage: {
+    ...KatchaDeckUI.typography.ftueHeroTitle,
+    fontSize: 16.5,
+    lineHeight: 21,
+  },
+  eggGuideMessageLayout: {
+    flex: 1,
+    zIndex: 1,
+  },
+  eggGuideEmphasis: { fontWeight: '900' },
+  multiCutoutSegment: { position: 'absolute' },
   nativeSpotlightRing: {
     borderWidth: 2,
     position: 'absolute',

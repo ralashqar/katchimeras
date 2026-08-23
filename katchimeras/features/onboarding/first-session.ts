@@ -1,4 +1,5 @@
 import { beginFtueRun, commitFtueAction, loadFtueRun, updateFtueRun, useFtueRun } from './ftue-runtime';
+import { resetEggAvatarSelection } from '@/utils/egg-avatar-storage';
 
 export type FirstSessionStage = 'today' | 'merge' | 'complete';
 
@@ -19,6 +20,7 @@ export function loadFirstSession(): FirstSessionState | null {
 }
 
 export function beginFirstSession(options: { restart?: boolean } = {}): FirstSessionState {
+  if (options.restart) resetEggAvatarSelection();
   beginFtueRun(options);
   return loadFirstSession()!;
 }

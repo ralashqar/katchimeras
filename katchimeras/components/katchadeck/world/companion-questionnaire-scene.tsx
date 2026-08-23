@@ -1,12 +1,11 @@
 import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
 import {
-  Pressable,
   ScrollView,
   StyleSheet,
   useWindowDimensions,
   View,
+  type View as ViewType,
 } from 'react-native';
 import Animated, {
   Easing,
@@ -21,10 +20,9 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TodaySceneBackdrop } from '@/components/katchadeck/home/today-scene-backdrop';
-import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
 import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import { KatchaUI } from '@/constants/katcha-ui';
 import {
   companionChoiceColumnCount,
@@ -54,7 +52,9 @@ export { CompanionResultNotice as QuestionnaireResultNotice } from './companion-
 export function CompanionQuestionnaireScene({
   accentColor,
   background,
+  bondIconTargetRef,
   bondProgress,
+  bondRewardPulseKey = 0,
   children,
   choicePresentation = 'responsive-grid',
   companionName,
@@ -62,9 +62,6 @@ export function CompanionQuestionnaireScene({
   environmentKey,
   helperText,
   onBack,
-  onOpenMore,
-  onOpenCards,
-  onOpenTrophies,
   onSelect,
   options,
   progress,
@@ -77,7 +74,9 @@ export function CompanionQuestionnaireScene({
 }: {
   accentColor: string;
   background: TodayAtmosphereBackground;
+  bondIconTargetRef?: RefObject<ViewType | null>;
   bondProgress?: CompanionBondProgress;
+  bondRewardPulseKey?: number;
   children?: ReactNode;
   choicePresentation?: 'responsive-grid' | 'single-column';
   companionName: string;
@@ -85,9 +84,6 @@ export function CompanionQuestionnaireScene({
   environmentKey: TodayExplorationBackgroundKey | null;
   helperText?: string;
   onBack: () => void;
-  onOpenMore?: () => void;
-  onOpenCards?: () => void;
-  onOpenTrophies?: () => void;
   onSelect?: (option: CompanionQuestionnaireOption) => void;
   options?: readonly CompanionQuestionnaireOption[];
   progress?: number;
@@ -179,66 +175,24 @@ export function CompanionQuestionnaireScene({
         },
       ]}>
         {conversationPresentation ? <KatchimeraPageHeader
+          bondIconTargetRef={bondIconTargetRef}
           bondProgress={bondProgress}
+          bondRewardPulseKey={bondRewardPulseKey}
           includeSafeArea={false}
           onBack={onBack}
-          onOpenCards={onOpenCards}
-          onOpenTrophies={onOpenTrophies}
         /> : null}
-        <View style={[styles.header, conversationPresentation && styles.conversationHeader, conversationPresentation && { display: 'none' }]}>
+        {!conversationPresentation ? <View style={styles.header}>
           <KatchimeraBackButton
             accessibilityHint="Your completed answers are saved"
             accessibilityLabel="Exit to You"
             onPress={onBack}
           />
-          {conversationPresentation ? (
-            <>
-              <View style={styles.portraitFrame}>
-                <Image accessibilityLabel={`${companionName} portrait`} contentFit="contain" source={creature} style={styles.portrait} />
-              </View>
-              <View style={styles.modernHeaderCopy}>
-                <ThemedText
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.72}
-                  numberOfLines={1}
-                  style={styles.companionName}
-                  lightColor="#FFD36E"
-                  darkColor="#FFD36E">
-                  {companionName}
-                </ThemedText>
-                {bondProgress ? (
-                  <View
-                    accessibilityLabel={`${bondProgress.relationshipStage} bond, ${Math.round(bondProgress.relationshipStageRatio * 100)} percent to the next stage`}
-                    style={styles.bondRow}>
-                    <BondIconArt size={17} />
-                    <ThemedText style={styles.bondLabel} lightColor="#FFF1CC" darkColor="#FFF1CC">
-                      {bondProgress.relationshipStage}
-                    </ThemedText>
-                    <View style={styles.bondTrack}>
-                      <View style={[styles.bondFill, { width: `${Math.max(bondProgress.totalPoints ? 5 : 0, bondProgress.relationshipStageRatio * 100)}%` }]} />
-                    </View>
-                  </View>
-                ) : null}
-              </View>
-              {onOpenMore ? (
-                <Pressable
-                  accessibilityLabel="Open companion story dashboard"
-                  accessibilityRole="button"
-                  onPress={onOpenMore}
-                  style={({ pressed }) => [styles.storyButton, pressed && styles.storyButtonPressed]}>
-                  <IconSymbol color="#6B4A24" name="book.closed.fill" size={17} weight="bold" />
-                  <ThemedText style={styles.storyButtonLabel} lightColor="#6B4A24" darkColor="#6B4A24">Story</ThemedText>
-                </Pressable>
-              ) : null}
-            </>
-          ) : (
-            <View style={styles.headerCopy}>
-              <ThemedText style={styles.eyebrow} lightColor="#FFD36E" darkColor="#FFD36E">
-                You &amp; {companionName}
-              </ThemedText>
-            </View>
-          )}
-        </View>
+          <View style={styles.headerCopy}>
+            <ThemedText style={styles.eyebrow} lightColor="#FFD36E" darkColor="#FFD36E">
+              You &amp; {companionName}
+            </ThemedText>
+          </View>
+        </View> : null}
 
         <View
           pointerEvents="none"
@@ -328,19 +282,7 @@ const styles = StyleSheet.create({
   content: { alignSelf: 'center', flex: 1, gap: 10, maxWidth: 620, minHeight: 0, paddingHorizontal: 16, paddingTop: 12, width: '100%', zIndex: 3 },
   conversationContent: { maxWidth: 720 },
   header: { alignItems: 'center', flexDirection: 'row', gap: 12 },
-  conversationHeader: { gap: 0, minHeight: 48, zIndex: 4 },
   headerCopy: { flex: 1, gap: 1 },
-  portraitFrame: { alignItems: 'center', backgroundColor: 'rgba(255,247,220,0.92)', borderColor: 'rgba(255,225,158,0.7)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, height: 46, justifyContent: 'center', marginLeft: 10, overflow: 'hidden', width: 46 },
-  portrait: { height: 44, width: 44 },
-  modernHeaderCopy: { flex: 1, gap: 3, paddingHorizontal: 9 },
-  companionName: { ...KatchaUI.type.companionName, fontSize: 22, lineHeight: 25 },
-  bondRow: { alignItems: 'center', flexDirection: 'row', gap: 6 },
-  bondLabel: { fontSize: 9.5, fontWeight: '900' },
-  bondTrack: { backgroundColor: 'rgba(255,244,213,0.25)', borderRadius: 999, flex: 1, height: 5, overflow: 'hidden' },
-  bondFill: { backgroundColor: '#E8B547', borderRadius: 999, height: '100%' },
-  storyButton: { alignItems: 'center', backgroundColor: 'rgba(255,248,225,0.94)', borderCurve: 'continuous', borderRadius: 14, gap: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 10 },
-  storyButtonPressed: { opacity: 0.68 },
-  storyButtonLabel: { fontSize: 8.5, fontWeight: '900' },
   eyebrow: {
     ...KatchaUI.type.sectionTitle,
     textShadowColor: 'rgba(30,70,111,0.92)',

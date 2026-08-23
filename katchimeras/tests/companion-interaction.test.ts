@@ -153,13 +153,15 @@ test('You questionnaires advance on selection while consequential tasks retain c
   assert.doesNotMatch(journey, /previous focus kept in history/);
 });
 
-test('bond rewards queue, fly into the creature, respect reduced motion, and celebrate completed Journey Days', () => {
+test('bond rewards fly into the top-bar Bond icon while preserving the creature reaction and Journey celebration', () => {
   const overlay = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'goals', 'bond-reward-overlay.tsx'), 'utf8');
   const stage = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-home-environment-stage.tsx'), 'utf8');
+  const header = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'katchimera-page-header.tsx'), 'utf8');
   const rewardMotion = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'reward-arrival-motion.ts'), 'utf8');
   const interaction = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'), 'utf8');
   const levelUp = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-bond-level-up-celebration.tsx'), 'utf8');
   const kingdom = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-companion-screen.tsx'), 'utf8');
+  const devTools = fs.readFileSync(path.join(process.cwd(), 'app', '(tabs)', 'explore.tsx'), 'utf8');
 
   assert.match(overlay, /Math\.min\(5/);
   assert.match(overlay, /onTokenArrive/);
@@ -168,20 +170,47 @@ test('bond rewards queue, fly into the creature, respect reduced motion, and cel
   assert.match(overlay, /useDisposableTimers\('bond-reward-flight'\)/);
   assert.match(stage, /rewardPulseKey/);
   assert.match(stage, /runRewardArrivalMotion/);
+  assert.match(header, /bondIconTargetRef/);
+  assert.match(header, /bondRewardPulseKey/);
+  assert.match(header, /medallionScale\.value = withSequence/);
+  assert.match(header, /medallionGlow\.value = withSequence/);
+  assert.match(header, /styles\.medallionGlow/);
   assert.match(rewardMotion, /withSequence/);
   assert.match(interaction, /pendingBondCelebration/);
+  assert.match(interaction, /const bondRewardTargetRef = useRef/);
+  assert.match(interaction, /const targetView = bondRewardTargetRef\.current/);
+  assert.match(interaction, /bondIconTargetRef=\{bondRewardTargetRef\}/);
+  assert.match(interaction, /bondRewardPulseKey=\{rewardPulseKey\}/);
+  assert.doesNotMatch(interaction, /creatureRewardTargetRef/);
   assert.match(interaction, /2_800/);
   assert.match(levelUp, /Bond level up/);
-  assert.match(levelUp, /Journey Day complete/);
+  assert.match(levelUp, /JOURNEY DAY \$\{journeyHandoff\.dayNumber\}/);
+  assert.match(levelUp, /Journey Day Complete/);
   assert.match(levelUp, /variant === 'journey_complete'/);
   assert.match(levelUp, /setTimeout\(onContinue/);
   assert.match(levelUp, /screenReaderEnabled \? 'Return to story' : 'Return now'/);
   assert.match(levelUp, /RisingArrow/);
+  assert.match(levelUp, /journeyComplete[\s\S]*?styles\.journeyScrollContent/);
+  assert.match(levelUp, /width \* 0\.68[\s\S]*?compactHeight \? 0\.27 : 0\.3[\s\S]*?270/);
+  assert.match(levelUp, /<CelebrationParticles[\s\S]*?styles\.journeyConfetti[\s\S]*?tint="#82B94D"/);
+  assert.match(levelUp, /journeyConfetti: \{ top: '52%', zIndex: 1 \}[\s\S]*?heroCreature: \{ zIndex: 2 \}/);
+  assert.match(levelUp, /journeyComplete \? \(compactHeight \? 58 : 66\)/);
+  assert.match(levelUp, /<BondIconArt size=\{48\}[\s\S]*?number=\{`\+\$\{receipt\.points\}`\}/);
+  assert.match(levelUp, /styles\.journeyProgressCard[\s\S]*?styles\.journeyProgressTrack/);
+  assert.match(levelUp, /journeyBondTarget[\s\S]*?next\.totalPoints \+ next\.relationshipPointsRemaining/);
+  assert.match(levelUp, /journeyBondRatio[\s\S]*?next\.totalPoints \/ journeyBondTarget/);
+  assert.match(levelUp, /styles\.journeyProgressLabel[\s\S]*?\{next\.totalPoints\} \/ \{journeyBondTarget\}/);
+  assert.doesNotMatch(levelUp, /journeyProgressRemaining/);
+  assert.match(levelUp, /<KatchaButton[\s\S]*?fullWidth[\s\S]*?glow[\s\S]*?labelStyle=\{KatchaDeckUI\.typography\.ftuePanelTitle\}/);
+  assert.doesNotMatch(levelUp, /journeyContinueButton/);
+  assert.doesNotMatch(levelUp, /Friendship grows across real days/);
   assert.match(kingdom, /receipt\.kind === 'journey_day_completed'/);
   assert.match(kingdom, /variant: 'journey_complete'/);
   assert.match(kingdom, /ftueDayOneActionActive && receipt\.kind === 'journey_day_completed'[\s\S]*?variant: 'journey_complete'/);
-  assert.match(kingdom, /autoContinue=\{!ftueDayOneActionActive\}[\s\S]*?Finish for today/);
+  assert.match(kingdom, /autoContinue=\{!ftueDayOneActionActive\}[\s\S]*?Back to Mossprout/);
   assert.match(kingdom, /!bondCelebration && !quests\.selectedPendingBondCelebration/);
+  assert.match(devTools, /Preview Journey Day 1 splash[\s\S]*?journeySplashPreview/);
+  assert.match(devTools, /DEV_JOURNEY_DAY_ONE_RECEIPT[\s\S]*?variant="journey_complete"/);
 });
 
 test('legacy Merge return remains safe while Mossprout opens its character-owned Garden', () => {
@@ -570,7 +599,7 @@ test('Mossprout owns a compact Journey action stack without redundant headings o
   assert.doesNotMatch(mossprout, /slice\(0, 3\)/);
   assert.match(mossprout, /const MAX_VISIBLE_ACTIONS = 3/);
   assert.match(mossprout, /composeMossproutVisibleActions\(presentedActionCandidates, completingAction, MAX_VISIBLE_ACTIONS\)/);
-  assert.match(mossprout, /dayOneActionChoiceActive[\s\S]*?choiceIds[\s\S]*?slice\(0, MAX_VISIBLE_ACTIONS\)/);
+  assert.match(mossprout, /dayOneChoiceActionIds[\s\S]*?includeActionIds: dayOneActionChoiceActive \? dayOneChoiceActionIds : undefined/);
   assert.match(mossprout, /presentedActions\.map\(\(presentedAction\) =>/);
   assert.match(mossprout, /key=\{presentedActionKey\}/);
   assert.match(mossprout, /useKatchimeraActionStackTransition/);
@@ -622,11 +651,12 @@ test('Mossprout owns a compact Journey action stack without redundant headings o
   assert.match(interaction, /mossproutActionScrollContent: \{ flexGrow: 1, overflow: 'hidden', paddingHorizontal: KatchaUI\.layout\.phoneGutter \+ 4 \}/);
   assert.match(mossprout, /const ACTION_STACK_HEIGHT = 212/);
   assert.match(mossprout, /actionSlot: \{[^}]*height: ACTION_STACK_HEIGHT[^}]*justifyContent: 'flex-end'/);
-  assert.match(mossprout, /const ACTION_TRAY_HEIGHT = 273/);
+  assert.match(mossprout, /const ACTION_TRAY_HEIGHT = 284/);
   assert.match(mossprout, /height: ACTION_TRAY_HEIGHT/);
   assert.match(mossprout, /height: ACTION_STACK_HEIGHT/);
   assert.match(mossprout, /overflow: 'visible'/);
-  assert.match(interaction, /nameplateTitle=\{mossproutNameplate\?\.title\}/);
+  assert.match(interaction, /showNameplate=\{route\.kind === 'dashboard' && props\.familyId !== 'mossprout'\}/);
+  assert.doesNotMatch(interaction, /mossproutJourneyDayStatus|mossproutNameplate/);
   assert.doesNotMatch(mossprout, /label="Talk"|onTalk/);
   assert.match(interaction, /onChat=\{props\.familyId === 'mossprout' \? undefined : openChat\}/);
   assert.match(dashboard, /onChat \? <Pressable/);
@@ -1318,9 +1348,8 @@ test('Katchimera Bond currency uses its bespoke artwork in chips, meters, summar
   const bondSurfaces = [
     'companion-bond-meter.tsx',
     'companion-bond-level-up-celebration.tsx',
-    'companion-conversation-scene.tsx',
     'companion-quest-thread.tsx',
-    'companion-ui-primitives.tsx',
+    'katchimera-page-header.tsx',
     'companion-visit-scene.tsx',
     'feastle-story-stage.tsx',
     'baristabbit-story-stage.tsx',

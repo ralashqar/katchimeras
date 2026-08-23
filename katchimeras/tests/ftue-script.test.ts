@@ -3,7 +3,13 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { FTUE_ACTION_CATALOG, FTUE_HANDLER_REGISTRY } from '@/features/onboarding/ftue-action-registry';
-import { ftueHidesBottomBar, ftueOwnsOpeningHome } from '@/features/onboarding/ftue-navigation-policy';
+import {
+  activeFtueNavigationPolicy,
+  ftueHidesBottomBar,
+  ftueLocksSurfaceNavigation,
+  ftueOwnsOpeningHome,
+  ftueResumeTargetMatches,
+} from '@/features/onboarding/ftue-navigation-policy';
 import { FTUE_EGG_ANSWER_GROWTH_REWARD, MOSSPROUT_FTUE_SCRIPT, mossproutFtueAction, validateMossproutFtueScript } from '@/features/onboarding/mossprout-ftue-script';
 import { mossproutFtueConversationDefinitions } from '@/constants/mossprout-ftue-conversations';
 import { buildYesterdayStepEnergyOffer, mergeStepEnergyPreview } from '@/utils/merge-world/economy-policy';
@@ -113,8 +119,8 @@ test('Chapter 0 previews its requests and keeps the first-session board tutorial
   ]);
   assert.equal(mergeStep?.spotlight?.grouping, 'bounding_rect');
   assert.deepEqual(serveStep?.spotlight?.targets, [
+    { kind: 'order_card', orderId: 'mossprout:chapter-0:first-sprout' },
     { kind: 'order_requirement_item', orderId: 'mossprout:chapter-0:first-sprout', requirementIndex: 0 },
-    { kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' },
   ]);
   assert.ok(mossproutFtueAction('companion.order_preview', 'companion.open_garden'));
 });
@@ -213,6 +219,8 @@ test('Merge FTUE spotlight uses a lifecycle-safe native rounded cutout', () => {
   assert.match(overlay, /StyleSheet\.absoluteFillObject/);
   assert.match(overlay, /pointerEvents="none"/);
   assert.match(overlay, /<SpotlightDimMask/);
+  assert.match(overlay, /<NativeMultiSpotlightDimMask/);
+  assert.match(overlay, /roundedMultiCutoutSegments\(frames, radius, screen\)/);
   assert.match(overlay, /Math\.hypot\(screen\.width, screen\.height\)/);
   assert.match(overlay, /borderRadius: slot\.corner\.value/);
   assert.match(overlay, /boxShadow: `0 0 0 \$\{spreadRadius\}px \$\{color\}`/);
@@ -226,6 +234,36 @@ test('Merge FTUE spotlight uses a lifecycle-safe native rounded cutout', () => {
   assert.match(overlay, /spotlight\.grouping === 'bounding_rect'[\s\S]*?boundingFrame\(resolved\)/);
   assert.match(merge, /spotlight=\{active && !serveFlight \? mergeGuidanceSpotlight : null\}/);
   assert.match(merge, /const mergeGuidanceSpotlight = ftueStep\?\.spotlight \?\? postFtueDiscoveryGuidance\.spotlight/);
+  assert.match(merge, /const mergeGuidanceGuide = ftueStep\?\.surface === 'merge' \? ftueStep\.guide : null/);
+  assert.match(merge, /guide=\{active && !serveFlight \? mergeGuidanceGuide : null\}/);
+  assert.match(overlay, /<MergeFtueEggGuide[\s\S]*?guideAnchorFrame\(spotlight, currentLayout\.spotlightFrames\)/);
+  assert.ok(overlay.indexOf('<MergeFtueEggGuide') < overlay.indexOf('<FtueFingerCue'), 'the finger must render above the guide bubble');
+  assert.match(overlay, /pointerEvents="box-none"[\s\S]*?<MergeFtueEggGuide/);
+  assert.match(overlay, /function MergeFtueEggGuide[\s\S]*?pointerEvents="none"[\s\S]*?styles\.eggGuideAvatar[\s\S]*?<EggAvatar[^>]*size=\{76\}/);
+  assert.match(overlay, /hand: \{ position: 'absolute', zIndex: 4 \}/);
+  assert.doesNotMatch(overlay, /eggGuideAvatar(?:Badge|Background|Ring)/);
+  assert.match(overlay, /target\.kind === 'order_card'[\s\S]*?`order-card:\$\{target\.orderId\}`/);
+  const rail = readFileSync('components/katchadeck/games/merge-order-rail.tsx', 'utf8');
+  assert.match(rail, /const orderCardTargetKey = `order-card:\$\{order\.id\}`[\s\S]*?ref=\{setOrderCardTargetRef\}/);
+});
+
+test('post-Garden companion FTUE owns navigation and has a durable resume target', () => {
+  const bondRun = { status: 'active' as const, stepId: 'companion.bond_spotlight' };
+  const bondPolicy = activeFtueNavigationPolicy(bondRun);
+  assert.deepEqual(bondPolicy?.resume, { kind: 'companion', creatureId: 'companion:mossprout' });
+  assert.equal(ftueLocksSurfaceNavigation(bondRun, 'companion'), true);
+  assert.equal(ftueLocksSurfaceNavigation(bondRun, 'merge'), false);
+  assert.equal(ftueResumeTargetMatches(bondPolicy!.resume, '/katchimera/companion%3Amossprout'), true);
+
+  const returnPolicy = activeFtueNavigationPolicy({ status: 'active', stepId: 'companion.chapter_zero_return' });
+  assert.deepEqual(returnPolicy?.resume, {
+    kind: 'companion',
+    creatureId: 'companion:mossprout',
+    ftue: 'chapter-zero-return',
+  });
+  assert.equal(ftueResumeTargetMatches(returnPolicy!.resume, '/katchimera/companion:mossprout', { ftue: 'chapter-zero-return' }), true);
+  assert.equal(ftueResumeTargetMatches(returnPolicy!.resume, '/katchimera/companion:mossprout'), false);
+  assert.equal(activeFtueNavigationPolicy({ status: 'complete', stepId: 'complete' }), null);
 });
 
 test('Merge FTUE updates one persistent finger and spotlight tree for each measured target', () => {
@@ -276,6 +314,7 @@ test('FTUE returns from the Garden, teaches one Bond action, and completes manua
   const coachmark = readFileSync('components/katchadeck/onboarding/companion-ftue-coachmark.tsx', 'utf8');
   const kingdom = readFileSync('components/katchadeck/world/kingdom-companion-screen.tsx', 'utf8');
   const mossproutStage = readFileSync('components/katchadeck/world/mossprout-story-stage.tsx', 'utf8');
+  const journeyMilestone = readFileSync('components/katchadeck/world/katchimera-journey-status-plaque.tsx', 'utf8');
   const bondCelebration = readFileSync('components/katchadeck/world/companion-bond-level-up-celebration.tsx', 'utf8');
   const repository = readFileSync('utils/merge-world/repository.ts', 'utf8');
   const transition = readFileSync('features/navigation/game-screen-transition.tsx', 'utf8');
@@ -290,15 +329,20 @@ test('FTUE returns from the Garden, teaches one Bond action, and completes manua
   assert.match(repository, /seedStoredMossproutGardenAfterFtue[\s\S]*?completeMossproutChapterZeroSlice[\s\S]*?reconcileCharacterActivity[\s\S]*?status: 'complete'/);
   assert.match(kingdom, /ftueDayOneActionActive && receipt\.kind === 'journey_day_completed'[\s\S]*?variant: 'journey_complete'/);
   assert.match(kingdom, /autoContinue=\{!ftueDayOneActionActive\}[\s\S]*?Back to Mossprout[\s\S]*?dismissible=\{!ftueDayOneActionActive\}[\s\S]*?onFtueJourneyDayComplete/);
-  assert.match(bondCelebration, /onRequestClose=\{dismissible \? onContinue : \(\) => \{\}\}[\s\S]*?Journey Days are new chapters with Mossprout/);
+  assert.match(bondCelebration, /onRequestClose=\{dismissible \? onContinue : \(\) => \{\}\}[\s\S]*?<GameSurface[\s\S]*?Journey Day \$\{journeyHandoff\.dayNumber\} timeline/);
   assert.match(companion, /scheduleMossproutJourneyDayReminder\(completedDayId\)/);
   assert.doesNotMatch(companion, /router\.dismissTo\('\/today'\)/);
-  assert.match(mossproutStage, /Journey Day \{journeyDayNumber\} complete[\s\S]*?Day \{journeyDayNumber \+ 1\} tomorrow/);
+  assert.match(mossproutStage, /<KatchimeraJourneyStatusPlaque[\s\S]*?dayNumber=\{journeyDayNumber\}[\s\S]*?status=\{journey\.status === 'complete'/);
+  assert.match(journeyMilestone, /Journey Day \{dayNumber\}[\s\S]*?complete \? 'Complete' : 'In progress'/);
   assert.match(mossproutStage, /relationshipProgressionRepository\.update\(reconcileMossproutDayOneChoices\)/);
-  assert.match(mossproutStage, /Tutorials may spotlight or lock this stack[\s\S]*?const presentedActionCandidates = actions/);
-  assert.doesNotMatch(mossproutStage, /actions\.filter\(\(action\) => choiceIds\.has\(action\.id\)\)/);
+  assert.match(mossproutStage, /dayOneChoiceActionIds[\s\S]*?includeActionIds: dayOneActionChoiceActive \? dayOneChoiceActionIds : undefined/);
+  assert.match(mossproutStage, /Coin-only requests remain in the Garden[\s\S]*?const presentedActionCandidates = actions/);
+  assert.match(bondCelebration, /journeyBondRatio[\s\S]*?styles\.journeyProgressCard/);
+  assert.match(bondCelebration, /accessibilityLabel=\{`Journey Day \$\{journeyHandoff\.dayNumber\} timeline`\}[\s\S]*?styles\.timelineLockedMarker/);
   assert.match(coachmark, /useEggAvatar\(\)[\s\S]*?<EggAvatar/);
-  assert.match(coachmark, /styles\.speechTail[\s\S]*?styles\.avatarBadge/);
+  assert.match(coachmark, /styles\.speechTail[\s\S]*?styles\.guideAvatar[\s\S]*?<EggAvatar/);
+  assert.doesNotMatch(coachmark, /avatarBadge(?:Background|Ring)?/);
+  assert.ok(coachmark.indexOf('style={[styles.callout') < coachmark.indexOf('{showFinger ? ('), 'the companion finger must render above the unified Egg bubble');
   assert.match(coachmark, /roundedCutout[\s\S]*?boxShadow: `0 0 0 \$\{spotlightSpread\}px[\s\S]*?borderRadius: spotlightRadius/);
   assert.match(coachmark, /ftue-hand\.webp[\s\S]*?HAND_TIP_X[\s\S]*?HAND_TIP_Y[\s\S]*?<Image/);
   assert.match(coachmark, /showFinger = true[\s\S]*?\{showFinger \? \(/);
@@ -307,8 +351,9 @@ test('FTUE returns from the Garden, teaches one Bond action, and completes manua
   assert.match(coachmark, /useReducedMotion\(\)[\s\S]*?!reduceMotion[\s\S]*?withSequence\(/);
   assert.match(coachmark, /rotateZ: `\$\{avatarWobble\.value\}deg`/);
   assert.match(coachmark, /clearTimeout\(reactionTimer\)[\s\S]*?clearTimeout\(restoreTimer\)[\s\S]*?cancelAnimation\(avatarWobble\)/);
-  assert.match(coachmark, /size=\{92\}/);
-  assert.match(coachmark, /translateY: -7/);
+  assert.match(coachmark, /size=\{76\}/);
+  assert.match(coachmark, /translateY: -2/);
+  assert.match(coachmark, /callout: \{[\s\S]*?flexDirection: 'row'[\s\S]*?guideAvatar: \{ flexShrink: 0/);
   assert.doesNotMatch(coachmark, /styles\.(eyebrow|title|body)/);
   assert.match(interaction, /message=\{\[[\s\S]*?emphasis: true, text: 'Bond\.'[\s\S]*?emphasis: true, text: 'one thing'/);
   assert.match(today, /resolveMossproutJourneyHandoff[\s\S]*?companionJourneyHook=\{mossproutJourneyHandoff\}[\s\S]*?onOpenCompanionJourney=\{openMossproutJourney\}/);

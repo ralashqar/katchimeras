@@ -19,8 +19,7 @@ import { ExplorationEnvironmentProgressionProvider } from '@/components/katchade
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import { KatchaUI } from '@/constants/katcha-ui';
-import { mossproutJourneyDayStatus } from '@/game/katchimeras/mossprout-home';
-import { mossproutJourneyForDay, mossproutStory } from '@/game/katchimeras/relationship-progression';
+import { mossproutJourneyForDay } from '@/game/katchimeras/relationship-progression';
 import { useCompanionExperienceController } from '@/features/companion/use-companion-experience-controller';
 import { useCompanionConversationFlow } from '@/features/companion/use-companion-conversation-flow';
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
@@ -174,13 +173,12 @@ export type CompanionInteractionSheetProps = {
   ftueOrderPreviewActive?: boolean;
   ftueBondSpotlightActive?: boolean;
   ftueDayOneActionActive?: boolean;
+  ftueNavigationLocked?: boolean;
   onFtueBondSpotlightComplete?: () => void;
   onFtueOpenMerge?: () => void;
   onSelectDestination?: (destination: CompanionDestination | null) => void;
   onClose: () => void;
   onOpenMerge?: (orderId?: string | null, familyId?: KatchimeraFamilyId) => void;
-  onOpenCards?: () => void;
-  onOpenTrophies?: () => void;
   onJournalFood: () => void;
   onOpenTodayGoals: () => void;
   embedded?: boolean;
@@ -324,12 +322,6 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const ftueDayOneChoiceCompleted = Boolean(mossproutJourney?.actions.some(
     (action) => action.kind !== 'journey' && action.status === 'completed',
   ));
-  const mossproutNameplate = props.familyId === 'mossprout'
-    ? mossproutJourneyDayStatus(
-        mossproutJourney,
-        mossproutStory(relationships).activeBeatId === 'heartwood:complete',
-      )
-    : null;
   const [transitionBackgroundReady, setTransitionBackgroundReady] = useState(false);
   const [transitionCreatureReady, setTransitionCreatureReady] = useState(false);
   const [mossproutHubEntranceSettled, setMossproutHubEntranceSettled] = useState(false);
@@ -370,7 +362,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const [showMossproutDashboard, setShowMossproutDashboard] = useState(false);
   const [directQuestOrigin, setDirectQuestOrigin] = useState<{ actionId: string; questId: string } | null>(null);
   const onBondCelebrationComplete = props.onBondCelebrationComplete;
-  const creatureRewardTargetRef = useRef<ViewType | null>(null);
+  const bondRewardTargetRef = useRef<ViewType | null>(null);
   const ftueBondTargetRef = useRef<ViewType | null>(null);
   const ftueActionTargetRef = useRef<ViewType | null>(null);
   const [bondReward, setBondReward] = useState<{
@@ -423,12 +415,12 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         rewardLaunchTimerRef.current = setTimeout(() => launch(attempt + 1), 50);
         return;
       }
-      const targetView = creatureRewardTargetRef.current;
+      const targetView = bondRewardTargetRef.current;
       if (!targetView) {
         if (attempt < 1) {
           rewardLaunchTimerRef.current = setTimeout(() => launch(attempt + 1), 50);
         } else {
-          const target = { height: 160, width: 160, x: viewportWidth * 0.58, y: viewportHeight * 0.24 };
+          const target = { height: 54, width: 54, x: viewportWidth / 2 - 96, y: insets.top + 2 };
           const fallback = { height: 52, width: 104, x: viewportWidth / 2 - 52, y: viewportHeight - 150 };
           setBondReward({ from: pendingRewardSourceRef.current ?? fallback, receipt, to: target });
           pendingRewardSourceRef.current = null;
@@ -453,7 +445,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       if (rewardLaunchTimerRef.current) clearTimeout(rewardLaunchTimerRef.current);
       rewardLaunchTimerRef.current = null;
     };
-  }, [bondReward, props.active, props.familyId, props.pendingBondCelebration, rewardSourceVersion, viewportHeight, viewportWidth]);
+  }, [bondReward, insets.top, props.active, props.familyId, props.pendingBondCelebration, rewardSourceVersion, viewportHeight, viewportWidth]);
 
   useEffect(() => {
     if (props.active !== false) return;
@@ -838,6 +830,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     resetViewport();
   };
   const requestClose = () => {
+    if (props.ftueNavigationLocked) return;
     if (checkInOpen || journeyQuestionnaireOpen) {
       Keyboard.dismiss();
       if (journeyQuestionnaireSessionId && !props.journeyConversation) props.onDismissQuickGoalSuggestions();
@@ -847,6 +840,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     else resetViewport();
   };
   const selectDestination = (nextDestination: CompanionDestination) => {
+    if (props.ftueNavigationLocked) return;
     Keyboard.dismiss();
     resetViewport();
     experience.selectDestination(nextDestination);
@@ -1217,13 +1211,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             bubbleVariant={quickGoalPickerOpen ? 'questionnaire' : 'default'}
             celebrate={Boolean((route.kind === 'visit' || route.kind === 'conversation') && conversationExperience?.session.outcomePresentation?.celebrate)}
             creature={visual.source}
-            creatureTargetRef={creatureRewardTargetRef}
             environmentKey={props.homeEnvironmentKey ?? null}
             houseLevel={props.houseLevel}
             lifted
             name={props.name}
-            nameplateEyebrow={mossproutNameplate?.eyebrow}
-            nameplateTitle={mossproutNameplate?.title}
             onBackgroundReady={() => setTransitionBackgroundReady(true)}
             onCreatureReady={() => setTransitionCreatureReady(true)}
             rewardPulseKey={rewardPulseKey}
@@ -1235,7 +1226,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               ? conversationFlow.advance
               : undefined}
             showSpeechBubble
-            showNameplate={route.kind === 'dashboard'}
+            showNameplate={route.kind === 'dashboard' && props.familyId !== 'mossprout'}
             title={quickGoalPickerOpen
               ? 'Which small step feels right?'
               : route.kind === 'chat_lobby'
@@ -1274,10 +1265,13 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           />
         ) : route.kind === 'visit' || route.kind === 'conversation' ? (
           conversationExperience ? <CompanionConversationScene
+            bondIconTargetRef={bondRewardTargetRef}
             bondProgress={displayedBondProgress}
+            bondRewardPulseKey={rewardPulseKey}
             definition={conversationExperience.definition}
             hasActiveFocus={Boolean(activeJourneyFocus)}
             journalMergeEnergyPreview={journalMergeEnergyPreview}
+            navigationLocked={props.ftueNavigationLocked}
             name={props.name}
             flowPhase={conversationFlow.phase}
             onAdvance={conversationFlow.advance}
@@ -1326,9 +1320,6 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               ) selectExperienceDestination('insight');
             }}
             memories={props.memories}
-            onOpenMore={experience.showHome}
-            onOpenCards={() => selectDestination('skins')}
-            onOpenTrophies={() => selectDestination('achievements')}
             onStoryComplete={experience.showHome}
             onUpdateMemory={props.onUpdateMemory}
             session={conversationExperience.session}
@@ -1389,13 +1380,15 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         {(route.kind === 'destination' || route.kind === 'dashboard' || route.kind === 'shared_history' || quickGoalPickerOpen) && !questGameVisible && !questionnaireExperience ? (
           <CompanionDestinationHeader
             backLabel={quickGoalPickerOpen ? 'Goals' : destination === 'quest' && directQuestOrigin ? props.name : destination === 'quest' && canReturnToQuestList ? 'Quest list' : route.kind === 'dashboard' ? 'Kingdom' : 'Dashboard'}
+            bondIconTargetRef={bondRewardTargetRef}
             bondProgress={displayedBondProgress}
+            bondRewardPulseKey={rewardPulseKey}
             bondTargetRef={route.kind === 'dashboard' && props.familyId === 'mossprout' ? ftueBondTargetRef : undefined}
             compactHub={route.kind === 'dashboard'}
+            hideTitle={route.kind === 'dashboard'}
+            navigationLocked={props.ftueNavigationLocked}
             label={route.kind === 'dashboard' ? 'Dashboard' : route.kind === 'shared_history' ? props.familyId === 'feastle' ? 'Recipe Book' : 'Shared history' : destinationLabel}
             titleTone={destination === 'achievements' ? 'gold' : 'default'}
-            onOpenCards={() => selectDestination('skins')}
-            onOpenTrophies={() => selectDestination('achievements')}
             onBack={
               quickGoalPickerOpen
                 ? experience.returnToDestination
@@ -1567,7 +1560,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                 <CompanionJourneyQuestionnairePage
                   accentColor={props.accentColor}
                   background={props.questionnaireBackground}
+                  bondIconTargetRef={bondRewardTargetRef}
                   bondProgress={displayedBondProgress}
+                  bondRewardPulseKey={rewardPulseKey}
                   companionName={props.name}
                   conversation={props.journeyConversation}
                   creature={visual.source}
@@ -1580,7 +1575,6 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   onBack={requestClose}
                   onDone={experience.showHome}
                   onDismissTasks={props.onDismissQuickGoalSuggestions}
-                  onOpenMore={experience.showHome}
                   presentation={props.familyId === 'mossprout' ? 'conversation' : 'immersive'}
                   quickGoalSuggestionIds={props.quickGoalSuggestionIds}
                   resultReady={Boolean(journeyQuestionnaireSessionId && !props.journeyConversation)}
@@ -1621,14 +1615,17 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                     openedStoryConversationRef.current = null;
                     requestStoryConversation(definitionId);
                   }}
+                  onOpenCards={() => selectDestination('skins')}
                   onOpenFocusDirection={openJourneyFocus}
                   onOpenMerge={(orderId) => props.onOpenMerge?.(orderId, props.familyId)}
                   onOpenQuestDirect={(questId, originActionId) => {
                     openQuestOffer(questId, originActionId);
                   }}
+                  onOpenTrophies={() => selectDestination('achievements')}
                   onBondRewardRequest={requestStoryReward}
                   actionStackTargetRef={ftueActionTargetRef}
                   dayOneActionChoiceActive={props.ftueBondSpotlightActive || props.ftueDayOneActionActive}
+                  navigationLocked={props.ftueNavigationLocked}
                   motionReady={mossproutHubEntranceSettled && mossproutHubViewportSettled}
                   swipeExternalGesture={environmentPan.gesture}
                   tutorialInteractionLocked={props.ftueBondSpotlightActive}
@@ -1908,7 +1905,6 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             onFinish={() => {
               if (rewardFinishTimerRef.current) clearTimeout(rewardFinishTimerRef.current);
               setDisplayedBondTotal(bondReward.receipt.afterTotal);
-              setRewardPulseKey((key) => key + 1);
               pendingStoryRewardArrivalRef.current?.();
               pendingStoryRewardArrivalRef.current = null;
               rewardFinishTimerRef.current = setTimeout(() => {

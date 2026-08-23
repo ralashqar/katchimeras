@@ -1,4 +1,5 @@
 import { getStoredJson, removeStoredValue, setStoredJson } from '@/utils/app-storage';
+import { resetEggAvatarSelection } from '@/utils/egg-avatar-storage';
 
 const ONBOARDING_STORAGE_KEY = 'katchadeck.onboarding-profile';
 
@@ -31,4 +32,5 @@ export function saveOnboardingProfile(profile: OnboardingProfile) {
 
 export function resetOnboardingProfile() {
   removeStoredValue(ONBOARDING_STORAGE_KEY);
+  resetEggAvatarSelection();
 }

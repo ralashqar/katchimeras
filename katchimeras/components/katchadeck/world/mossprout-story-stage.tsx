@@ -18,7 +18,6 @@ import { QuickGoalActionModal } from '@/components/katchadeck/goals/quick-goal-a
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
-import { KatchaUI } from '@/constants/katcha-ui';
 import { katchimeraActionArt } from '@/constants/katchimera-action-art';
 import { Meadow } from '@/constants/meadow-theme';
 import { composeMossproutVisibleActions, mossproutGoalArtKey, resolveMossproutDayActions, type MossproutActionGardenRequest } from '@/game/katchimeras/mossprout-home';
@@ -53,11 +52,13 @@ import { loadMergeWorldState, subscribeMergeWorldSnapshots } from '@/utils/merge
 import { localDayId } from '@/utils/world-identity';
 
 import type { CompanionChatStarter } from './companion-chat-lobby';
+import { KatchimeraBottomDock } from './katchimera-bottom-dock';
+import { KatchimeraJourneyStatusPlaque } from './katchimera-journey-status-plaque';
 
 const MAX_ORDER_ART_ITEMS = 3;
 const MAX_VISIBLE_ACTIONS = 3;
 const ACTION_STACK_HEIGHT = 212;
-const ACTION_TRAY_HEIGHT = 273;
+const ACTION_TRAY_HEIGHT = 284;
 
 function useMossproutMergeWorldState() {
   const providedMergeWorld = useOptionalMergeWorldState();
@@ -105,12 +106,15 @@ export function MossproutStoryStage({
   onUndoGoal,
   onDashboard,
   onOpenConversation,
+  onOpenCards,
   onOpenFocusDirection,
   onOpenMerge,
   onOpenQuestDirect,
+  onOpenTrophies,
   onBondRewardRequest,
   dayOneActionChoiceActive = false,
   actionStackTargetRef,
+  navigationLocked = false,
   tutorialInteractionLocked = false,
   motionReady,
   swipeExternalGesture,
@@ -129,12 +133,15 @@ export function MossproutStoryStage({
   onUndoGoal: (goalId: string) => boolean;
   onDashboard: () => void;
   onOpenConversation: (definitionId: string) => void;
+  onOpenCards: () => void;
   onOpenFocusDirection: () => void;
   onOpenMerge: (orderId?: string | null) => void;
   onOpenQuestDirect: (questId: string, originActionId: string) => void;
+  onOpenTrophies: () => void;
   onBondRewardRequest: (source: DayActionSourceRect, onArrive: () => void) => void;
   dayOneActionChoiceActive?: boolean;
   actionStackTargetRef?: RefObject<ViewType | null>;
+  navigationLocked?: boolean;
   tutorialInteractionLocked?: boolean;
   motionReady: boolean;
   swipeExternalGesture?: GestureType;
@@ -149,6 +156,9 @@ export function MossproutStoryStage({
   const journeyDayNumber = mossproutJourneyDayNumber(relationships, dayId);
   const story = mossproutStory(relationships);
   const storyComplete = story.activeBeatId === 'heartwood:complete';
+  const dayOneChoiceActionIds = useMemo(() => journey?.beatId === 'quiet-patch:first-flower'
+    ? journey.actions.filter((action) => action.kind !== 'journey').map((action) => action.id)
+    : [], [journey?.actions, journey?.beatId]);
   const mossproutOrders = useMemo(() => (mergeWorldState?.activeOrders ?? [])
     .filter((order) => order.characterId === 'mossprout')
     .map((order): MossproutActionGardenRequest => ({
@@ -187,6 +197,7 @@ export function MossproutStoryStage({
     gardenRequests,
     goals: goals.map((item) => ({ id: item.goal.id, templateId: item.goal.templateId, title: item.goal.title, completed: Boolean(item.completion) })),
     hasActiveFocus,
+    includeActionIds: dayOneActionChoiceActive ? dayOneChoiceActionIds : undefined,
     journey,
     journeyDayNumber,
     journeyGardenRequest,
@@ -194,9 +205,10 @@ export function MossproutStoryStage({
     skippedActionIds: relationships.skippedActionIds,
     slotSequences: mossproutDailyActionDeck(relationships, dayId).slotSequences,
     storyComplete,
-  }), [activeQuestId, conversations, dayId, gardenRequests, goals, hasActiveFocus, journey, journeyDayNumber, journeyGardenRequest, offers, relationships, storyComplete]);
-  // Tutorials may spotlight or lock this stack, but must never replace the
-  // normal resolver or decide which actions the player is allowed to see.
+  }), [activeQuestId, conversations, dayId, dayOneActionChoiceActive, dayOneChoiceActionIds, gardenRequests, goals, hasActiveFocus, journey, journeyDayNumber, journeyGardenRequest, offers, relationships, storyComplete]);
+  // The Day 1 Bond lesson temporarily scopes the normal resolver to its three
+  // authored relationship choices. Coin-only requests remain in the Garden
+  // and return to this rotation after FTUE completes.
   const presentedActionCandidates = actions;
 
   useEffect(() => {
@@ -382,13 +394,12 @@ export function MossproutStoryStage({
   const stackInteractionLocked = tutorialInteractionLocked || actionTransition.interactionLocked || Boolean(selfCompletingGoalAction);
 
   return <View style={styles.stage}>
-    {journey?.status === 'complete' && !storyComplete ? (
-      <View accessibilityLabel={`Journey Day ${journeyDayNumber} complete. Journey Day ${journeyDayNumber + 1} begins tomorrow.`} style={styles.journeyStatus}>
-        <IconSymbol color={Meadow.goldDeep} name="leaf.fill" size={13} />
-        <ThemedText style={styles.journeyStatusText} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-          Journey Day {journeyDayNumber} complete · Day {journeyDayNumber + 1} tomorrow
-        </ThemedText>
-      </View>
+    {journey && !storyComplete ? (
+      <KatchimeraJourneyStatusPlaque
+        dayNumber={journeyDayNumber}
+        revealKey={journey.id}
+        status={journey.status === 'complete' ? 'complete' : 'in_progress'}
+      />
     ) : null}
     <View ref={actionStackTargetRef} accessibilityLabel="Mossprout Journey Day actions" style={styles.actionStack}>
       <View style={styles.actionSlot}>
@@ -507,13 +518,16 @@ export function MossproutStoryStage({
       />
     ) : null}
 
-    <View accessibilityLabel="Mossprout navigation" style={styles.dock}>
-      <DockAction icon="square.grid.2x2.fill" label="Garden" onPress={() => onOpenMerge(journey?.activity?.mergeOrderId)} />
-      <View style={styles.dockDivider} />
-      <DockAction icon="map.fill" label="Journey" onPress={openJourney} />
-      <View style={styles.dockDivider} />
-      <DockAction icon="sparkles" label="Discoveries" onPress={onDashboard} />
-    </View>
+    <KatchimeraBottomDock
+      disabled={navigationLocked}
+      featuredId="garden"
+      items={[
+        { id: 'garden', label: 'Garden', onPress: () => onOpenMerge(journey?.activity?.mergeOrderId) },
+        { id: 'discoveries', label: 'Discoveries', onPress: onDashboard },
+        { id: 'skins', label: 'Skins', onPress: onOpenCards },
+        { id: 'trophies', label: 'Trophies', onPress: onOpenTrophies },
+      ]}
+    />
   </View>;
 }
 
@@ -544,21 +558,8 @@ function ActionRewardChip({ reward }: {
   }} />;
 }
 
-function DockAction({ icon, label, onPress }: {
-  icon: React.ComponentProps<typeof IconSymbol>['name'];
-  label: string;
-  onPress: () => void;
-}) {
-  return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.dockAction, pressed && styles.pressed]}>
-    <IconSymbol color={Meadow.goldDeep} name={icon} size={17} />
-    <ThemedText style={styles.dockLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>{label}</ThemedText>
-  </Pressable>;
-}
-
 const styles = StyleSheet.create({
   stage: { alignSelf: 'stretch', gap: 8, height: ACTION_TRAY_HEIGHT, overflow: 'visible', paddingBottom: 3 },
-  journeyStatus: { alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(247,239,203,0.94)', borderColor: 'rgba(125,103,49,0.22)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 5, minHeight: 27, paddingHorizontal: 11, position: 'absolute', top: -34, zIndex: 6 },
-  journeyStatusText: { fontSize: 9.5, fontWeight: '900', lineHeight: 12 },
   actionStack: { height: ACTION_STACK_HEIGHT },
   actionSlot: { gap: 7, height: ACTION_STACK_HEIGHT, justifyContent: 'flex-end', overflow: 'visible' },
   actionArtwork: { height: 46, width: 46 },
@@ -566,10 +567,6 @@ const styles = StyleSheet.create({
   quietCopy: { flex: 1, gap: 1 },
   quietTitle: { fontSize: 14, fontWeight: '900', lineHeight: 17 },
   quietBody: { fontSize: 10, lineHeight: 13 },
-  dock: { alignItems: 'center', backgroundColor: '#E9D6B5', borderColor: KatchaUI.companionPanel.cardBorder, borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: KatchaUI.companionPanel.cardShadow, flexDirection: 'row', minHeight: 50, padding: 3 },
-  dockAction: { alignItems: 'center', borderRadius: 13, flex: 1, flexDirection: 'row', gap: 7, justifyContent: 'center', minHeight: 42 },
-  dockDivider: { backgroundColor: KatchaUI.companionPanel.divider, height: 25, width: 1 },
-  dockLabel: { fontSize: 9.5, fontWeight: '900' },
   pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
   disabled: { opacity: 0.68 },
   comboArtwork: { height: 48, position: 'relative', width: 52 },

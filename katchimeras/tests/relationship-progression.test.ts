@@ -26,7 +26,7 @@ import {
   startMossproutJourneyDay,
 } from '../game/katchimeras/relationship-progression';
 import { mossproutStoryConversationDefinitions } from '../constants/mossprout-story-conversations';
-import { composeMossproutVisibleActions, MOSSPROUT_DAILY_FIELD_NOTE_ACTION_ID, mossproutConversationActionCompletion, mossproutConversationArtKey, mossproutGoalArtKey, mossproutJourneyDayStatus, resolveMossproutDayActions, resolveMossproutHome } from '../game/katchimeras/mossprout-home';
+import { composeMossproutVisibleActions, MOSSPROUT_DAILY_FIELD_NOTE_ACTION_ID, mossproutConversationActionCompletion, mossproutConversationArtKey, mossproutGoalArtKey, resolveMossproutDayActions, resolveMossproutHome } from '../game/katchimeras/mossprout-home';
 import type { KatchimeraDayAction } from '../types/relationship-progression';
 import type { JourneyDayRecord, RelationshipProgressState } from '../types/relationship-progression';
 import { mossproutJourneyDayNumber, resolveMossproutJourneyHandoff } from '../game/katchimeras/mossprout-journey-handoff';
@@ -263,29 +263,6 @@ test('a completed Mossprout row is inserted without unmounting the card below it
     composeMossproutVisibleActions([first, promoted, incoming], null).map((action) => action.id),
     ['first', 'third', 'new'],
   );
-});
-
-test('Mossprout nameplate reports the current Journey Day instead of repeating the companion name', () => {
-  assert.deepEqual(mossproutJourneyDayStatus(null, false), {
-    eyebrow: "TODAY'S JOURNEY",
-    title: 'Ready to Begin',
-  });
-  assert.deepEqual(mossproutJourneyDayStatus(null, true), {
-    eyebrow: 'GARDEN JOURNEY',
-    title: 'The Dry Pond Is Restored',
-  });
-
-  const started = startMossproutJourneyDay(emptyRelationshipProgressState(), '2026-08-22').state;
-  const journey = mossproutJourneyForDay(started, '2026-08-22');
-  assert.ok(journey);
-  assert.deepEqual(mossproutJourneyDayStatus(journey, false), {
-    eyebrow: 'FIRST JOURNEY DAY',
-    title: 'Garden Task in Progress',
-  });
-  assert.deepEqual(mossproutJourneyDayStatus({ ...journey, status: 'complete' }, false), {
-    eyebrow: 'FIRST JOURNEY DAY',
-    title: 'Journey Day Complete',
-  });
 });
 
 test('legacy Mossprout slot decks gain empty consumed queues', () => {
@@ -573,6 +550,43 @@ test('Mossprout Day 1 exposes its goal and fun threads after the main Garden jou
   actions = resolveMossproutDayActions({ goals: [], journey: mossproutJourneyForDay(state, '2026-08-21'), offers, storyComplete: false });
   assert.equal(mossproutJourneyForDay(state, '2026-08-21')?.actions.find((action) => action.kind === 'playful_game')?.status, 'skipped');
   assert.equal(actions.some((action) => action.id === 'mossprout:quiet-patch:first-flower:playful'), false);
+});
+
+test('the Day 1 Bond lesson shows its three authored choices without coin-only Garden orders', () => {
+  const dayId = '2026-08-21';
+  let state = startMossproutJourneyDay(emptyRelationshipProgressState(), dayId, 1).state;
+  state = recordMossproutFirstGardenRestored(state, dayId, 'merge-order:first-plant', 2);
+  state = completeMossproutJourneyConversation(state, 'mossprout:ftue:chapter-zero-return', 3);
+  const mainAction = mossproutJourneyForDay(state, dayId)!.actions.find((action) => action.kind === 'journey')!;
+  state = acknowledgeMossproutJourneyActionOutro(state, dayId, mainAction.id, 4);
+  const journey = mossproutJourneyForDay(state, dayId)!;
+  const choiceIds = journey.actions
+    .filter((action) => action.kind !== 'journey')
+    .map((action) => action.id);
+
+  const actions = resolveMossproutDayActions({
+    dayId,
+    gardenRequests: [{
+      id: 'coin-order',
+      title: 'A coin-only Garden order',
+      description: 'This does not grow Bond.',
+      difficulty: 'small',
+      requirements: [{ definitionId: 'nature:garden:2', quantity: 1 }],
+      coins: 20,
+    }],
+    goals: [],
+    hasActiveFocus: true,
+    includeActionIds: choiceIds,
+    journey,
+    offers: [],
+    storyComplete: false,
+  });
+
+  assert.equal(choiceIds.length, 3);
+  assert.equal(actions.length, 3);
+  assert.deepEqual(new Set(actions.map((action) => action.id)), new Set(choiceIds));
+  assert.equal(actions.every((action) => action.reward?.kind === 'bond'), true);
+  assert.equal(actions.some((action) => action.kind === 'garden_request'), false);
 });
 
 test('a Journey action keeps one row identity through completion and reveals its replacements', () => {

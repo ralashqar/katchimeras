@@ -58,7 +58,7 @@ export function CompanionFtueCoachmark({
   const avatarWobble = useSharedValue(0);
   const avatarMotionStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateY: -7 },
+      { translateY: -2 },
       { rotateZ: `${avatarWobble.value}deg` },
     ],
   }));
@@ -126,13 +126,21 @@ export function CompanionFtueCoachmark({
   }, [height, targetRef, width]);
 
   if (!focus) return null;
-  const calloutWidth = Math.min(336, width - 64);
-  const estimatedHeight = buttonLabel ? 170 : 116;
-  const preferredTop = placement === 'below'
-    ? focus.y + focus.height + 14
-    : focus.y - estimatedHeight - 14;
-  const calloutTop = Math.max(18, Math.min(height - estimatedHeight - 18, preferredTop));
-  const calloutLeft = Math.max(48, Math.min(width - calloutWidth - 16, focus.x + focus.width / 2 - calloutWidth / 2));
+  const calloutWidth = Math.min(326, width - 28);
+  const estimatedHeight = buttonLabel ? 170 : 96;
+  const belowTop = focus.y + focus.height + 14;
+  const aboveTop = focus.y - estimatedHeight - 14;
+  const canFitBelow = belowTop + estimatedHeight <= height - 18;
+  const canFitAbove = aboveTop >= 18;
+  const calloutBelow = placement === 'below'
+    ? canFitBelow || !canFitAbove
+    : !(canFitAbove || !canFitBelow);
+  const calloutTop = Math.max(18, Math.min(
+    height - estimatedHeight - 18,
+    calloutBelow ? belowTop : aboveTop,
+  ));
+  const calloutLeft = Math.max(14, Math.min(width - calloutWidth - 14, focus.x + focus.width / 2 - calloutWidth / 2));
+  const tailLeft = Math.max(38, Math.min(calloutWidth - 34, focus.x + focus.width / 2 - calloutLeft - 10));
   const spotlightRadius = Math.min(26, focus.height / 2);
   const spotlightSpread = Math.max(1, Math.hypot(width, height));
   const fingerLeft = Math.max(4, Math.min(width - HAND_SIZE - 4, focus.x + focus.width / 2 - HAND_SIZE * HAND_TIP_X));
@@ -143,7 +151,7 @@ export function CompanionFtueCoachmark({
       accessibilityViewIsModal={Boolean(buttonLabel)}
       entering={FadeIn.duration(180)}
       exiting={FadeOut.duration(130)}
-      pointerEvents="box-none"
+      pointerEvents={buttonLabel ? 'auto' : 'box-none'}
       style={styles.root}>
       <View pointerEvents="none" style={styles.spotlightLayer}>
         <View style={[styles.roundedCutout, {
@@ -162,6 +170,49 @@ export function CompanionFtueCoachmark({
           width: focus.width,
         }]} />
       </View>
+      <View
+        accessibilityLiveRegion="polite"
+        pointerEvents={buttonLabel ? 'auto' : 'none'}
+        style={[styles.callout, { left: calloutLeft, top: calloutTop, width: calloutWidth }]}>
+        <View pointerEvents="none" style={[
+          styles.speechTail,
+          calloutBelow ? styles.speechTailAbove : styles.speechTailBelow,
+          { left: tailLeft },
+        ]} />
+        <Animated.View
+          accessibilityLabel="Your Egg is showing you around"
+          pointerEvents="none"
+          style={[styles.guideAvatar, avatarMotionStyle]}>
+          <EggAvatar
+            faceId={guideFaceId}
+            presentation="button"
+            size={76}
+            skinId={equippedSkinId}
+          />
+        </Animated.View>
+        <View style={styles.calloutContent}>
+          <ThemedText style={styles.message} lightColor="#35422F" darkColor="#35422F">
+            {message.map((part, index) => (
+              <ThemedText
+                key={`${index}:${part.text}`}
+                style={[styles.message, part.emphasis && styles.messageEmphasis]}
+                lightColor={part.emphasis ? '#668A49' : '#35422F'}
+                darkColor={part.emphasis ? '#668A49' : '#35422F'}>
+                {part.text}
+              </ThemedText>
+            ))}
+          </ThemedText>
+          {buttonLabel && onContinue ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={onContinue}
+              style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
+              <ThemedText style={styles.buttonLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">{buttonLabel}</ThemedText>
+              <IconSymbol color="#FFF9E9" name="arrow.right" size={15} />
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
       {showFinger ? (
         <Animated.View
           entering={FadeIn.delay(100).duration(180)}
@@ -175,44 +226,6 @@ export function CompanionFtueCoachmark({
           <Image contentFit="contain" source={HAND_ART} style={StyleSheet.absoluteFill} />
         </Animated.View>
       ) : null}
-      <View
-        accessibilityLiveRegion="polite"
-        pointerEvents={buttonLabel ? 'auto' : 'none'}
-        style={[styles.callout, { left: calloutLeft, top: calloutTop, width: calloutWidth }]}>
-        <View pointerEvents="none" style={styles.speechTail} />
-        <View accessibilityLabel="Your Egg is showing you around" style={styles.avatarBadge}>
-          <View pointerEvents="none" style={styles.avatarBadgeBackground} />
-          <Animated.View style={[styles.guideAvatar, avatarMotionStyle]}>
-            <EggAvatar
-              faceId={guideFaceId}
-              presentation="button"
-              size={92}
-              skinId={equippedSkinId}
-            />
-          </Animated.View>
-          <View pointerEvents="none" style={styles.avatarBadgeRing} />
-        </View>
-        <ThemedText style={styles.message} lightColor="#35422F" darkColor="#35422F">
-          {message.map((part, index) => (
-            <ThemedText
-              key={`${index}:${part.text}`}
-              style={[styles.message, part.emphasis && styles.messageEmphasis]}
-              lightColor={part.emphasis ? '#668A49' : '#35422F'}
-              darkColor={part.emphasis ? '#668A49' : '#35422F'}>
-              {part.text}
-            </ThemedText>
-          ))}
-        </ThemedText>
-        {buttonLabel && onContinue ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={onContinue}
-            style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
-            <ThemedText style={styles.buttonLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">{buttonLabel}</ThemedText>
-            <IconSymbol color="#FFF9E9" name="arrow.right" size={15} />
-          </Pressable>
-        ) : null}
-      </View>
     </Animated.View>
   );
 }
@@ -232,62 +245,51 @@ const styles = StyleSheet.create({
     boxShadow: '0 0 18px rgba(167,231,103,0.92)',
     position: 'absolute',
   },
-  hand: { position: 'absolute' },
+  hand: { position: 'absolute', zIndex: 4 },
   callout: {
+    alignItems: 'center',
     backgroundColor: '#FFF9E8',
     borderColor: 'rgba(124,151,83,0.42)',
     borderCurve: 'continuous',
     borderRadius: 22,
     borderWidth: 1,
     boxShadow: '0 12px 30px rgba(25,42,25,0.28)',
-    gap: 8,
-    minHeight: 116,
-    paddingBottom: 15,
-    paddingLeft: 50,
-    paddingRight: 15,
-    paddingTop: 15,
+    flexDirection: 'row',
+    gap: 9,
+    minHeight: 96,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
     position: 'absolute',
+    zIndex: 2,
   },
   speechTail: {
     backgroundColor: '#FFF9E8',
-    borderBottomColor: 'rgba(124,151,83,0.42)',
-    borderBottomWidth: 1,
+    height: 20,
+    position: 'absolute',
+    transform: [{ rotate: '45deg' }],
+    width: 20,
+    zIndex: 0,
+  },
+  speechTailAbove: {
     borderLeftColor: 'rgba(124,151,83,0.42)',
     borderLeftWidth: 1,
-    height: 22,
-    left: -11,
-    position: 'absolute',
-    top: 35,
-    transform: [{ rotate: '45deg' }],
-    width: 22,
+    borderTopColor: 'rgba(124,151,83,0.42)',
+    borderTopWidth: 1,
+    top: -10,
   },
-  avatarBadge: {
-    alignItems: 'center',
-    height: 82,
-    justifyContent: 'center',
-    left: -42,
-    overflow: 'visible',
-    position: 'absolute',
-    top: 11,
-    width: 82,
+  speechTailBelow: {
+    borderBottomColor: 'rgba(124,151,83,0.42)',
+    borderBottomWidth: 1,
+    borderRightColor: 'rgba(124,151,83,0.42)',
+    borderRightWidth: 1,
+    bottom: -10,
   },
-  avatarBadgeBackground: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#E9F1CE',
-    borderRadius: 999,
-    boxShadow: '0 7px 18px rgba(27,50,25,0.28)',
-  },
-  avatarBadgeRing: {
-    ...StyleSheet.absoluteFillObject,
-    borderColor: '#B7CF7C',
-    borderRadius: 999,
-    borderWidth: 3,
-  },
-  guideAvatar: { height: 92, width: 92 },
+  guideAvatar: { flexShrink: 0, height: 76, width: 76, zIndex: 1 },
+  calloutContent: { flex: 1, gap: 8, zIndex: 1 },
   message: {
     ...KatchaDeckUI.typography.ftueHeroTitle,
-    fontSize: 18,
-    lineHeight: 23,
+    fontSize: 16.5,
+    lineHeight: 21,
   },
   messageEmphasis: { fontWeight: '900' },
   button: { alignItems: 'center', alignSelf: 'stretch', backgroundColor: '#668A49', borderRadius: 15, flexDirection: 'row', justifyContent: 'center', marginTop: 5, minHeight: 45, gap: 8 },

@@ -1,12 +1,10 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import { useEffect, useState, type ReactNode, type RefObject } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, useWindowDimensions, View, type View as ViewType } from 'react-native';
 import Animated, { FadeInUp, LinearTransition, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
-import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaUI } from '@/constants/katcha-ui';
@@ -66,7 +64,9 @@ export function conversationSpeechLine(
 }
 
 export function CompanionConversationScene({
+  bondIconTargetRef,
   bondProgress,
+  bondRewardPulseKey = 0,
   definition,
   developerContent,
   flowPhase,
@@ -81,9 +81,6 @@ export function CompanionConversationScene({
   onJournalHandoff,
   onQuestHandoff,
   hasActiveFocus,
-  onOpenMore,
-  onOpenCards,
-  onOpenTrophies,
   storyFlow = false,
   storyFinale = false,
   session,
@@ -91,8 +88,11 @@ export function CompanionConversationScene({
   questOffer,
   requiresManualAdvance,
   journalMergeEnergyPreview,
+  navigationLocked = false,
 }: {
+  bondIconTargetRef?: RefObject<ViewType | null>;
   bondProgress: CompanionBondProgress;
+  bondRewardPulseKey?: number;
   definition: ConversationDefinition;
   developerContent?: ReactNode;
   flowPhase: CompanionConversationPresentationPhase;
@@ -114,9 +114,6 @@ export function CompanionConversationScene({
   hasActiveFocus: boolean;
   memories: readonly CompanionMemory[];
   onUpdateMemory: (input: { memoryId: string; status: 'confirmed' | 'rejected' | 'forgotten'; summary?: string }) => void;
-  onOpenMore: () => void;
-  onOpenCards?: () => void;
-  onOpenTrophies?: () => void;
   onStoryComplete?: () => void;
   storyFlow?: boolean;
   storyFinale?: boolean;
@@ -125,13 +122,12 @@ export function CompanionConversationScene({
   questOffer: { id: string; title: string; hint: string } | null;
   requiresManualAdvance: boolean;
   journalMergeEnergyPreview: number;
+  navigationLocked?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
   const node = conversationNode(definition, session.currentNodeId);
-  const headerSkin = skins.find((skin) => skin.id === session.formId) ?? skins[0] ?? null;
-  const headerVisual = headerSkin ? getCreatureVisual(headerSkin.visualKey, 'grown') : null;
   const haptic = () => {
     if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
   };
@@ -167,8 +163,6 @@ export function CompanionConversationScene({
   const shortPanelBottomLift = adaptivePanel.scrollable
     ? 0
     : Math.min(22, Math.max(0, (adaptivePanel.maxHeight - adaptivePanel.panelHeight) * 0.1));
-  const preservesFtueHeader = definition.id.includes(':ftue:');
-
   useEffect(() => {
     if (!session.outcomePresentation?.celebrate || process.env.EXPO_OS !== 'ios') return;
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -183,48 +177,14 @@ export function CompanionConversationScene({
       paddingHorizontal: width >= 700 ? Math.max(28, (width - 720) / 2) : 16,
       paddingTop: insets.top + 10,
     }}>
-      {!preservesFtueHeader ? <KatchimeraPageHeader
+      <KatchimeraPageHeader
+        bondIconTargetRef={bondIconTargetRef}
         bondProgress={bondProgress}
+        bondRewardPulseKey={bondRewardPulseKey}
         includeSafeArea={false}
+        navigationLocked={navigationLocked}
         onBack={onClose}
-        onOpenCards={onOpenCards}
-        onOpenTrophies={onOpenTrophies}
-      /> : null}
-      <View style={[{ alignItems: 'center', flexDirection: 'row', minHeight: 48, zIndex: 4 }, !preservesFtueHeader && { display: 'none' }]}>
-        <KatchimeraBackButton accessibilityLabel="Back to Katchimeras" onPress={onClose} />
-        <View style={{ alignItems: 'center', flex: 1, flexDirection: 'row', gap: 9, paddingHorizontal: 10 }}>
-          <View style={{ alignItems: 'center', backgroundColor: 'rgba(255,247,220,0.92)', borderColor: 'rgba(255,225,158,0.7)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, height: 46, justifyContent: 'center', overflow: 'hidden', width: 46 }}>
-            {headerVisual ? <Image accessibilityLabel={`${name} portrait`} contentFit="contain" source={headerVisual.source} style={{ height: 44, width: 44 }} /> : null}
-          </View>
-          <View style={{ flex: 1, gap: 3 }}>
-            <ThemedText
-              adjustsFontSizeToFit
-              minimumFontScale={0.72}
-              numberOfLines={1}
-              selectable
-              style={{ ...KatchaUI.type.companionName, fontSize: 22, lineHeight: 25 }}
-              lightColor="#FFD36E"
-              darkColor="#FFD36E">
-              {name}
-            </ThemedText>
-            <View accessibilityLabel={`${bondProgress.relationshipStage} bond, ${Math.round(bondProgress.relationshipStageRatio * 100)} percent to the next stage`} style={{ alignItems: 'center', flexDirection: 'row', gap: 6 }}>
-              <BondIconArt size={17} />
-              <ThemedText selectable style={{ fontSize: 9.5, fontWeight: '900' }} lightColor="#FFF1CC" darkColor="#FFF1CC">{bondProgress.relationshipStage}</ThemedText>
-              <View style={{ backgroundColor: 'rgba(255,244,213,0.25)', borderRadius: 999, flex: 1, height: 5, overflow: 'hidden' }}>
-                <View style={{ backgroundColor: '#E8B547', borderRadius: 999, height: '100%', width: `${Math.max(bondProgress.totalPoints ? 5 : 0, bondProgress.relationshipStageRatio * 100)}%` }} />
-              </View>
-            </View>
-          </View>
-        </View>
-        <Pressable
-          accessibilityLabel="Open companion story dashboard"
-          accessibilityRole="button"
-          onPress={onOpenMore}
-          style={({ pressed }) => ({ alignItems: 'center', backgroundColor: 'rgba(255,248,225,0.94)', borderCurve: 'continuous', borderRadius: 14, gap: 1, minHeight: 44, justifyContent: 'center', opacity: pressed ? 0.68 : 1, paddingHorizontal: 10 })}>
-          <IconSymbol color="#6B4A24" name="book.closed.fill" size={17} weight="bold" />
-          <ThemedText selectable style={{ fontSize: 8.5, fontWeight: '900' }} lightColor="#6B4A24" darkColor="#6B4A24">Story</ThemedText>
-        </Pressable>
-      </View>
+      />
 
       <View accessibilityElementsHidden pointerEvents="none" style={{ flex: 1, minHeight: 120 }} />
 

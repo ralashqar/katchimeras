@@ -86,6 +86,20 @@ test('egg avatar selection accepts only the versioned launch catalog', () => {
   assert.equal(isEggAvatarSkinId('lattelet'), false);
 });
 
+test('onboarding restarts reset every equipped Egg avatar layer through shared storage', () => {
+  const storage = readFileSync(path.join(root, 'utils', 'egg-avatar-storage.ts'), 'utf8');
+  const provider = readFileSync(path.join(root, 'features', 'egg-avatar', 'egg-avatar-provider.tsx'), 'utf8');
+  const onboarding = readFileSync(path.join(root, 'utils', 'onboarding-state.ts'), 'utf8');
+  const firstSession = readFileSync(path.join(root, 'features', 'onboarding', 'first-session.ts'), 'utf8');
+
+  assert.match(storage, /resetEggAvatarSelection[\s\S]*?DEFAULT_EGG_AVATAR_SELECTION/);
+  assert.match(storage, /removeStoredValue\(VERSION_TWO_EGG_AVATAR_STORAGE_KEY\)[\s\S]*?removeStoredValue\(LEGACY_EGG_AVATAR_STORAGE_KEY\)/);
+  assert.match(storage, /saveEggAvatarSelection\(selection\)[\s\S]*?return selection/);
+  assert.match(provider, /subscribeEggAvatarSelection\(\(\) => setState\(loadEggAvatarSelection\(\)\)\)/);
+  assert.match(onboarding, /resetOnboardingProfile\(\)[\s\S]*?resetEggAvatarSelection\(\)/);
+  assert.match(firstSession, /if \(options\.restart\) resetEggAvatarSelection\(\)/);
+});
+
 test('ready catalog has stable unique ids and Classic is first', () => {
   assert.ok(EGG_AVATAR_SKIN_IDS.length >= 10);
   assert.equal(new Set(EGG_AVATAR_SKIN_IDS).size, EGG_AVATAR_SKIN_IDS.length);

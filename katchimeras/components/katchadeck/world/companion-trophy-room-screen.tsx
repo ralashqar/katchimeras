@@ -109,7 +109,6 @@ export function CompanionTrophyRoomScreen({ creatureId, embedded = false }: { cr
       <KatchimeraPageHeader
         creatureId={creatureId}
         onBack={() => router.back()}
-        onOpenCards={() => router.replace({ pathname: '/katchimera/[creatureId]/cards', params: { creatureId } })}
       />
       <View style={[styles.topBar, { width: maxWidth }]}>
         <View style={styles.topTitleWrap}>

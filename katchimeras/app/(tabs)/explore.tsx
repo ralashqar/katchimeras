@@ -16,6 +16,7 @@ import { SectionHeader } from '@/components/katchadeck/ui/section-header';
 import { ThemedText } from '@/components/themed-text';
 import { StreakMilestoneCelebration } from '@/components/katchadeck/streak/streak-milestone-celebration';
 import { CompanionAchievementCelebration } from '@/components/katchadeck/world/companion-achievement-celebration';
+import { CompanionBondLevelUpCelebration } from '@/components/katchadeck/world/companion-bond-level-up-celebration';
 import { createStarterReveal } from '@/constants/katchadeck';
 import { COMPANION_ACHIEVEMENT_CATALOG } from '@/constants/companion-achievements';
 import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
@@ -48,6 +49,7 @@ import { setAllKatchimerasAvailableEnabled } from '@/utils/dev-settings';
 import type { DayVisionSummary, PhotoVisionResult, StoredHomeDayRecord } from '@/types/home';
 import type { CompanionAchievementDef } from '@/types/companion-achievements';
 import type { StreakMilestone } from '@/types/streak';
+import type { CompanionBondAwardReceipt } from '@/utils/companion-bond';
 import { pickRandomAchievement } from '@/utils/achievement-celebration';
 import { STREAK_MILESTONE_REWARDS } from '@/utils/streak-engine';
 import {
@@ -58,6 +60,19 @@ import {
 import { resetKatchimeraProgressForDebug } from '@/utils/reset-katchimera-progress-for-debug';
 import { setFeastleStoryStateForDebug } from '@/utils/companion-story-storage';
 import { triggerNativeCrashForDiagnostics } from '@/utils/crash-reporting';
+
+const DEV_JOURNEY_DAY_ONE_RECEIPT = {
+  id: 'dev-preview:journey-day-1',
+  eventId: 'dev-preview:journey-day-1',
+  creatureId: 'companion:mossprout',
+  kind: 'journey_day_completed',
+  points: 20,
+  occurredAt: 0,
+  beforeTotal: 4,
+  afterTotal: 24,
+  beforeLevel: 1,
+  afterLevel: 1,
+} satisfies CompanionBondAwardReceipt;
 
 export default function ExploreScreen() {
   const router = useRouter();
@@ -118,6 +133,7 @@ export default function ExploreScreen() {
   const [lastAchievementPreviewId, setLastAchievementPreviewId] = useState<string | null>(null);
   const [streakPreview, setStreakPreview] = useState<StreakMilestone | null>(null);
   const [lastStreakPreviewDays, setLastStreakPreviewDays] = useState<number | null>(null);
+  const [journeySplashPreview, setJourneySplashPreview] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -458,6 +474,12 @@ export default function ExploreScreen() {
     setLastStreakPreviewDays(days);
   }
 
+  function handlePreviewJourneySplash() {
+    setAchievementPreview(null);
+    setStreakPreview(null);
+    setJourneySplashPreview(true);
+  }
+
   return (
     <View style={styles.screen}>
       <AmbientBackground
@@ -556,6 +578,7 @@ export default function ExploreScreen() {
                 <KatchaButton label="Preview comic beats (LLM)" onPress={handlePreviewComicBeats} variant="secondary" />
                 <KatchaButton label="Preview random achievement splash" onPress={handlePreviewRandomAchievement} variant="secondary" />
                 <KatchaButton label="Preview random streak splash" onPress={handlePreviewRandomStreak} variant="secondary" />
+                <KatchaButton label="Preview Journey Day 1 splash" onPress={handlePreviewJourneySplash} variant="secondary" />
                 <KatchaButton label="Preview Hatch Your Past" onPress={() => router.push('/hatch-your-past')} variant="secondary" />
                 <KatchaButton label="Reset home loop" onPress={handleResetHomeLoop} variant="secondary" />
                 <KatchaButton label="Replay personality + zodiac" onPress={handleReplayWorldIdentity} variant="secondary" />
@@ -732,6 +755,20 @@ export default function ExploreScreen() {
           milestone={streakPreview}
           onDismiss={() => setStreakPreview(null)}
           preview
+        />
+      ) : null}
+      {journeySplashPreview ? (
+        <CompanionBondLevelUpCelebration
+          autoContinue={false}
+          continueLabel="Back to Dev"
+          journeyHandoff={{
+            dayNumber: 1,
+            recap: ['You met Mossprout', 'You restored the Quiet Patch', 'You chose one Bond moment'],
+            tomorrowPreview: 'New growth begins tomorrow.',
+          }}
+          onContinue={() => setJourneySplashPreview(false)}
+          receipt={DEV_JOURNEY_DAY_ONE_RECEIPT}
+          variant="journey_complete"
         />
       ) : null}
     </View>

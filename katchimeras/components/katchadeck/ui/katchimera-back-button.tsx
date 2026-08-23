@@ -6,11 +6,15 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 export function KatchimeraBackButton({
   accessibilityHint,
   accessibilityLabel = 'Back',
+  compact = false,
+  disabled = false,
   onPress,
   style,
 }: {
   accessibilityHint?: string;
   accessibilityLabel?: string;
+  compact?: boolean;
+  disabled?: boolean;
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
 }) {
@@ -24,11 +28,13 @@ export function KatchimeraBackButton({
       accessibilityHint={accessibilityHint}
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       hitSlop={8}
       onPress={goBack}
-      style={({ pressed }) => [styles.button, style, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.button, compact && styles.buttonCompact, style, disabled && styles.disabled, pressed && styles.pressed]}
     >
-      <IconSymbol name="chevron.left" size={22} color="#71442B" />
+      <IconSymbol name="chevron.left" size={compact ? 21 : 24} color="#74461F" />
     </Pressable>
   );
 }
@@ -36,15 +42,17 @@ export function KatchimeraBackButton({
 const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,244,214,0.97)',
-    borderColor: 'rgba(151,96,49,0.28)',
+    backgroundColor: '#FFF0CE',
+    borderColor: '#C99137',
     borderCurve: 'continuous',
-    borderRadius: 16,
-    borderWidth: 1,
-    boxShadow: '0 5px 14px rgba(81,46,28,0.20), inset 0 1px 0 rgba(255,255,255,0.72)',
-    height: 44,
+    borderRadius: 17,
+    borderWidth: 2,
+    boxShadow: '0 5px 14px rgba(81,46,28,0.22), inset 0 2px 0 rgba(255,255,255,0.86), inset 0 -3px 0 rgba(182,116,33,0.17)',
+    height: 48,
     justifyContent: 'center',
-    width: 44,
+    width: 48,
   },
+  buttonCompact: { borderRadius: 15, height: 42, width: 42 },
   pressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
+  disabled: { opacity: 0.48 },
 });

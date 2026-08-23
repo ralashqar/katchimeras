@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 
 import { flushFtueReceipts, scheduleFtueReceiptSync } from './ftue-sync';
 import { flushFtuePersistence, useFtueRun } from './ftue-runtime';
+import { FtueNavigationReconciler } from './ftue-navigation-reconciler';
 
 /** Boots the offline-first FTUE outbox; screens remain owners of domain actions. */
 export function FtueProvider({ children }: { children: ReactNode }) {
@@ -18,5 +19,5 @@ export function FtueProvider({ children }: { children: ReactNode }) {
     });
     return () => subscription.remove();
   }, []);
-  return children;
+  return <>{children}<FtueNavigationReconciler /></>;
 }

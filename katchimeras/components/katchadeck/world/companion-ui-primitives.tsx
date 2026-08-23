@@ -66,30 +66,41 @@ export function CompanionSheetShell({
 
 export function CompanionDestinationHeader({
   backLabel = 'Home',
+  bondIconTargetRef,
   bondProgress,
+  bondRewardPulseKey = 0,
   bondTargetRef,
   compactHub = false,
+  hideTitle = false,
   label,
+  navigationLocked = false,
   onBack,
-  onOpenCards,
-  onOpenTrophies,
   titleTone = 'default',
 }: {
   backLabel?: string;
+  bondIconTargetRef?: RefObject<ViewType | null>;
   bondProgress?: CompanionBondProgress;
+  bondRewardPulseKey?: number;
   bondTargetRef?: RefObject<ViewType | null>;
   compactHub?: boolean;
+  hideTitle?: boolean;
   label: string;
+  navigationLocked?: boolean;
   onBack: () => void;
-  onOpenCards?: () => void;
-  onOpenTrophies?: () => void;
   titleTone?: 'default' | 'gold';
 }) {
   const goldTitle = titleTone === 'gold';
   return (
     <View>
-      <KatchimeraPageHeader bondProgress={bondProgress} bondTargetRef={bondTargetRef} onBack={onBack} onOpenCards={onOpenCards} onOpenTrophies={onOpenTrophies} />
-      <View style={styles.destinationHeading}>
+      <KatchimeraPageHeader
+        bondIconTargetRef={bondIconTargetRef}
+        bondProgress={bondProgress}
+        bondRewardPulseKey={bondRewardPulseKey}
+        bondTargetRef={bondTargetRef}
+        navigationLocked={navigationLocked}
+        onBack={onBack}
+      />
+      {!hideTitle ? <View style={styles.destinationHeading}>
         <ThemedText
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.3}
@@ -101,7 +112,7 @@ export function CompanionDestinationHeader({
           darkColor={goldTitle ? '#FFD36E' : '#FFF9EA'}>
           {label}
         </ThemedText>
-      </View>
+      </View> : null}
     </View>
   );
 }

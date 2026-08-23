@@ -4,6 +4,10 @@ import type { FtueActionDefinition, FtueScriptDefinition } from './ftue-types';
 import { STEPPLING_DISCOVERY_ID } from '@/constants/companion-discovery-catalog';
 
 const privateChoice = { id: 'private', label: 'Prefer not to say', icon: 'lock.fill', private: true } as const;
+const mossproutCompanionResume = {
+  lock: true,
+  resume: { kind: 'companion', creatureId: 'companion:mossprout' },
+} as const;
 // The Discovery Egg is an authored three-beat sequence. Each answer must move
 // its physical growth by the same amount, regardless of the normal daily
 // reward assigned to that answer's semantic source.
@@ -143,11 +147,11 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       cue: { kind: 'tap', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' } },
       spotlight: {
         targets: [
+          { kind: 'order_card', orderId: 'mossprout:chapter-0:first-sprout' },
           { kind: 'order_requirement_item', orderId: 'mossprout:chapter-0:first-sprout', requirementIndex: 0 },
-          { kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' },
         ],
         grouping: 'individual',
-        padding: 7,
+        padding: 9,
         radius: 14,
         dimOpacity: 0.64,
       },
@@ -190,7 +194,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       actions: [{ id: 'merge.serve_home_plant', title: 'Serve the Plant', description: 'Give Mossprout the Plant you woke.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_order_served', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'order_serve', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' } } },
       cue: { kind: 'tap', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' } },
-      spotlight: { targets: [{ kind: 'order_requirement_item', orderId: 'mossprout:chapter-0:first-sprout', requirementIndex: 0 }, { kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' }], grouping: 'individual', padding: 7, radius: 14, dimOpacity: 0.64 },
+      spotlight: { targets: [{ kind: 'order_card', orderId: 'mossprout:chapter-0:first-sprout' }, { kind: 'order_requirement_item', orderId: 'mossprout:chapter-0:first-sprout', requirementIndex: 0 }], grouping: 'individual', padding: 9, radius: 14, dimOpacity: 0.64 },
       edges: [{ event: { type: 'order_served', orderId: 'mossprout:chapter-0:first-sprout' }, commitActionId: 'merge.serve_home_plant', nextStepId: 'companion.chapter_zero_return' }],
     },
     {
@@ -303,7 +307,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       actions: [{ id: 'merge.energy.serve_plant', title: 'Serve the Plant', description: 'Finish Mossproutâ€™s home.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_order_served', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'order_serve', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:energy-plant' } } },
       cue: { kind: 'tap', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:energy-plant' } },
-      spotlight: { targets: [{ kind: 'order_requirement_item', orderId: 'mossprout:chapter-0:energy-plant', requirementIndex: 0 }, { kind: 'order_serve', orderId: 'mossprout:chapter-0:energy-plant' }], grouping: 'individual', padding: 7, radius: 14, dimOpacity: 0.64 },
+      spotlight: { targets: [{ kind: 'order_card', orderId: 'mossprout:chapter-0:energy-plant' }, { kind: 'order_requirement_item', orderId: 'mossprout:chapter-0:energy-plant', requirementIndex: 0 }], grouping: 'individual', padding: 9, radius: 14, dimOpacity: 0.64 },
       edges: [{ event: { type: 'order_served', orderId: 'mossprout:chapter-0:energy-plant' }, commitActionId: 'merge.energy.serve_plant', nextStepId: 'merge.return_note' }],
     },
     {
@@ -317,16 +321,19 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'companion.chapter_zero_return', surface: 'companion',
+      navigation: { ...mossproutCompanionResume, resume: { ...mossproutCompanionResume.resume, ftue: 'chapter-zero-return' } },
       guide: { eyebrow: 'A promise for tomorrow', title: 'Some roots only wake with time.', body: 'The next part of the Garden needs another day together, not more merging.' },
       actions: [{ id: 'companion.complete_chapter_zero_return', title: 'Choose how to finish today', description: 'Pick one small way to spend time with Mossprout.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'companion.bond_spotlight', backendEvent: true }],
     },
     {
       id: 'companion.bond_spotlight', surface: 'companion',
+      navigation: mossproutCompanionResume,
       guide: { eyebrow: 'Your time together', title: 'This is your Bond.', body: 'It grows through meaningful moments with Mossprout across real days. Merge play cannot grind it.' },
       actions: [{ id: 'companion.acknowledge_bond', title: 'Show today\'s choices', description: 'See the small things you can do with Mossprout today.', icon: 'heart.fill', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'companion.day_one_action', backendEvent: true }],
     },
     {
       id: 'companion.day_one_action', surface: 'companion',
+      navigation: mossproutCompanionResume,
       guide: { eyebrow: 'Time together grows Bond', title: 'Choose one thing.', body: 'You never need to finish every card. Pick the one that feels right today.' },
       actions: [{ id: 'companion.complete_day_one_action', title: 'Complete one Bond action', description: 'Choose any one of Mossprout\'s action cards.', icon: 'heart.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'complete', backendEvent: true }],
       blockingBeat: 'chapter_complete',
@@ -418,7 +425,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       actions: [{ id: 'discovery.steppling.serve', title: 'Serve the Shoe', description: 'Complete Steppling’s first request.', icon: 'figure.walk', presentation: 'observed_game_action', handlerId: 'merge_order_served', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'order_serve', target: { kind: 'order_serve', orderId: 'steppling:discovery:first-trail' } } },
       cue: { kind: 'tap', target: { kind: 'order_serve', orderId: 'steppling:discovery:first-trail' } },
-      spotlight: { targets: [{ kind: 'order_requirement_item', orderId: 'steppling:discovery:first-trail', requirementIndex: 0 }, { kind: 'order_serve', orderId: 'steppling:discovery:first-trail' }], grouping: 'individual', padding: 7, radius: 14, dimOpacity: 0.62 },
+      spotlight: { targets: [{ kind: 'order_card', orderId: 'steppling:discovery:first-trail' }, { kind: 'order_requirement_item', orderId: 'steppling:discovery:first-trail', requirementIndex: 0 }], grouping: 'individual', padding: 9, radius: 14, dimOpacity: 0.62 },
       edges: [{ event: { type: 'order_served', orderId: 'steppling:discovery:first-trail' }, commitActionId: 'discovery.steppling.serve', nextStepId: 'complete' }],
     },
     { id: 'complete', surface: 'today', guide: { eyebrow: '', title: '', body: '' }, actions: [] },

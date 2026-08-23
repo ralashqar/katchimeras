@@ -2,6 +2,18 @@ import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import type { DayPromptKind, TodayGrowthSource } from '@/types/home';
 
 export type FtueSurface = 'today' | 'hatch' | 'companion' | 'merge' | 'haven';
+export type FtueResumeTarget =
+  | { kind: 'today' }
+  | { kind: 'haven' }
+  | { kind: 'companion'; creatureId: string; ftue?: string }
+  | { kind: 'merge'; creatureId: string };
+
+export type FtueNavigationDirective = {
+  /** Prevent leaving this authored beat through app chrome or native back navigation. */
+  lock: boolean;
+  /** Durable route identity used to restore this beat after a cold launch or foreground. */
+  resume: FtueResumeTarget;
+};
 export type FtuePresentation = 'inline_choice' | 'route_action' | 'cta_action' | 'observed_game_action' | 'acknowledgement';
 export type FtueHandlerId =
   | 'day_prompt'
@@ -59,6 +71,7 @@ export type FtueTarget =
   | { kind: 'board_discovery_fork'; gateId: string }
   | { kind: 'order_requirement_item'; orderId: string; requirementIndex: number; occurrence?: number }
   | { kind: 'board_cell'; cell: number }
+  | { kind: 'order_card'; orderId: string }
   | { kind: 'order_serve'; orderId: string }
   | { kind: 'tray_chat_note'; noteId: string }
   | { kind: 'tray_parcel'; arrivalId: string }
@@ -143,6 +156,7 @@ export type FtueGraphEdge = {
 export type FtueStepDefinition = {
   id: string;
   surface: FtueSurface;
+  navigation?: FtueNavigationDirective;
   guide: FtueGuide;
   actions: readonly FtueActionDefinition[];
   interaction?: FtueInteractionPolicy;

@@ -1,11 +1,11 @@
-import { createContext, type PropsWithChildren, use, useCallback, useMemo, useState } from 'react';
+import { createContext, type PropsWithChildren, use, useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { EggAvatarFaceDefinition, EggAvatarFaceId, EggAvatarHatDefinition, EggAvatarHatId, EggAvatarHeldAccessoryDefinition, EggAvatarHeldAccessoryId, EggAvatarSkinDefinition, EggAvatarSkinId } from '@/types/egg-avatar';
 import { eggAvatarFace } from '@/constants/egg-avatar-faces';
 import { eggAvatarHat } from '@/constants/egg-avatar-hats';
 import { eggAvatarHeldAccessory } from '@/constants/egg-avatar-held-accessories';
 import { eggAvatarSkin } from '@/constants/egg-avatar-skins';
-import { equipEggAvatarFace, equipEggAvatarHat, equipEggAvatarHeldAccessory, equipEggAvatarSkin, loadEggAvatarSelection } from '@/utils/egg-avatar-storage';
+import { equipEggAvatarFace, equipEggAvatarHat, equipEggAvatarHeldAccessory, equipEggAvatarSkin, loadEggAvatarSelection, subscribeEggAvatarSelection } from '@/utils/egg-avatar-storage';
 
 type EggAvatarContextValue = {
   equippedSkin: EggAvatarSkinDefinition;
@@ -26,6 +26,8 @@ const EggAvatarContext = createContext<EggAvatarContextValue | null>(null);
 
 export function EggAvatarProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState(loadEggAvatarSelection);
+
+  useEffect(() => subscribeEggAvatarSelection(() => setState(loadEggAvatarSelection())), []);
 
   const equipSkin = useCallback((skinId: EggAvatarSkinId) => {
     setState(equipEggAvatarSkin(skinId));

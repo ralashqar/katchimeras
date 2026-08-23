@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useEffect, useState, type RefObject } from 'react';
+import { Pressable, StyleSheet, TextInput, View, type View as ViewType } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -370,7 +370,9 @@ export function LegacyCompanionJourneyDiscoveryThread({
 export function CompanionJourneyQuestionnairePage({
   accentColor,
   background,
+  bondIconTargetRef,
   bondProgress,
+  bondRewardPulseKey = 0,
   companionName,
   conversation,
   creature,
@@ -383,7 +385,6 @@ export function CompanionJourneyQuestionnairePage({
   onBack,
   onDone,
   onDismissTasks,
-  onOpenMore,
   presentation = 'immersive',
   quickGoalSuggestionIds,
   resultReady,
@@ -391,7 +392,9 @@ export function CompanionJourneyQuestionnairePage({
 }: {
   accentColor: string;
   background: TodayAtmosphereBackground;
+  bondIconTargetRef?: RefObject<ViewType | null>;
   bondProgress?: CompanionBondProgress;
+  bondRewardPulseKey?: number;
   companionName: string;
   conversation: CompanionJourneyConversationSession | null;
   creature: QuestionnaireImageSource;
@@ -404,7 +407,6 @@ export function CompanionJourneyQuestionnairePage({
   onBack: () => void;
   onDone: () => void;
   onDismissTasks: () => void;
-  onOpenMore?: () => void;
   presentation?: 'immersive' | 'conversation';
   quickGoalSuggestionIds: readonly string[];
   resultReady: boolean;
@@ -432,7 +434,9 @@ export function CompanionJourneyQuestionnairePage({
       <CompanionQuestionnaireScene
         accentColor={accentColor}
         background={background}
+        bondIconTargetRef={bondIconTargetRef}
         bondProgress={bondProgress}
+        bondRewardPulseKey={bondRewardPulseKey}
         companionName={companionName}
         creature={creature}
         environmentKey={environmentKey}
@@ -440,7 +444,6 @@ export function CompanionJourneyQuestionnairePage({
           ? undefined
           : 'This direction can shape future questions, goals, quests, and reflections.'}
         onBack={onBack}
-        onOpenMore={onOpenMore}
         presentation={presentation}
         result
         stepLabel="Your direction"
@@ -494,13 +497,14 @@ export function CompanionJourneyQuestionnairePage({
       <CompanionQuestionnaireScene
         accentColor={accentColor}
         background={background}
+        bondIconTargetRef={bondIconTargetRef}
         bondProgress={bondProgress}
+        bondRewardPulseKey={bondRewardPulseKey}
         companionName={companionName}
         creature={creature}
         environmentKey={environmentKey}
         helperText={presentation === 'conversation' ? undefined : 'Give me a moment to gather the right choices.'}
         onBack={onBack}
-        onOpenMore={onOpenMore}
         presentation={presentation}
         stepLabel="Set direction"
         visualKey={visualKey}
@@ -514,14 +518,15 @@ export function CompanionJourneyQuestionnairePage({
     <CompanionQuestionnaireScene
       accentColor={accentColor}
       background={background}
+      bondIconTargetRef={bondIconTargetRef}
       bondProgress={bondProgress}
+      bondRewardPulseKey={bondRewardPulseKey}
       companionName={companionName}
       choicePresentation={presentation === 'conversation' ? 'single-column' : 'responsive-grid'}
       creature={creature}
       environmentKey={environmentKey}
       helperText={presentation === 'conversation' ? undefined : node.helperText}
       onBack={onBack}
-      onOpenMore={onOpenMore}
       onSelect={(option) => onAnswer(conversation.id, option.id)}
       options={(node.options ?? []).map((option) => ({
         id: option.id,

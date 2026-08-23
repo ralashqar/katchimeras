@@ -13,6 +13,7 @@ import { useGameScreenTransition } from '@/features/navigation/game-screen-trans
 import { useCompanionDiscoveryRecords } from '@/hooks/use-companion-discovery-records';
 import { localDayId } from '@/utils/world-identity';
 import { scheduleMossproutJourneyDayReminder } from '@/utils/mossprout-journey-notification';
+import { useFtueNavigationLock } from '@/features/onboarding/use-ftue-navigation-lock';
 
 export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConversationDefinitionId }: { creatureId: string; source?: 'merge-world'; ftueConversationDefinitionId?: string }) {
   const isFocused = useIsFocused();
@@ -21,6 +22,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConvers
   const familyId = familyIdFromCompanionId(creatureId);
   const ftueHandoffRef = useRef(false);
   const ftueRun = useFtueRun();
+  const ftueNavigationLocked = useFtueNavigationLock(ftueRun, 'companion', isFocused);
   const discovery = useCompanionDiscoveryRecords();
   const completeFtueConversation = useCallback(() => {
     const run = loadFtueRun();
@@ -100,11 +102,10 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConvers
       ftueOrderPreviewActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.order_preview'}
       ftueBondSpotlightActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.bond_spotlight'}
       ftueDayOneActionActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.day_one_action'}
+      ftueNavigationLocked={ftueNavigationLocked}
       onFtueBondSpotlightComplete={acknowledgeFtueBond}
       onFtueJourneyDayComplete={completeFtueJourneyDay}
       onFtueOpenMerge={openFtueGarden}
-      onOpenCards={() => router.push({ pathname: '/katchimera/[creatureId]/cards', params: { creatureId } })}
-      onOpenTrophies={() => router.push({ pathname: '/katchimera/[creatureId]/achievements', params: { creatureId } })}
       initialCreatureId={creatureId}
       onCloseCompanion={() => source === 'merge-world' ? transitionTo({
         announcement: 'Returning to Haven',

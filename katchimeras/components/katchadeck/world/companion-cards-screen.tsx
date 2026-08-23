@@ -18,7 +18,6 @@ export function CompanionCardsScreen({ creatureId }: { creatureId: string }) {
       <KatchimeraPageHeader
         creatureId={creatureId}
         onBack={() => router.back()}
-        onOpenTrophies={() => router.replace({ pathname: '/katchimera/[creatureId]/achievements', params: { creatureId } })}
       />
       <View style={styles.titleWrap}><ThemedText style={styles.title} lightColor="#FFD36E" darkColor="#FFD36E">Katchimera cards</ThemedText></View>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]} showsVerticalScrollIndicator={false}>

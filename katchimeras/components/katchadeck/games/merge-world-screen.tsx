@@ -219,6 +219,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   }, [ftueStep, state]);
   const mergeGuidanceCue = ftueStep?.cue ?? postFtueDiscoveryGuidance.cue;
   const mergeGuidanceSpotlight = ftueStep?.spotlight ?? postFtueDiscoveryGuidance.spotlight;
+  const mergeGuidanceGuide = ftueStep?.surface === 'merge' ? ftueStep.guide : null;
 
   useEffect(() => subscribeCompanionStories(() => {
     setStory(loadFeastleStory());
@@ -770,6 +771,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
         blockedPulseNonce={blockedFtuePulseNonce}
         boardMetrics={boardMetrics}
         cue={active && !serveFlight ? mergeGuidanceCue : null}
+        guide={active && !serveFlight ? mergeGuidanceGuide : null}
         layoutNonce={screenLayoutNonce}
         screenRef={screenRef}
         railTargetRefs={railTargetRefs}

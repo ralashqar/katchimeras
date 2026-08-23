@@ -38,11 +38,6 @@ export type MossproutActionGardenRequest = {
   storyStepCount?: number | null;
 };
 
-export type MossproutJourneyDayStatus = {
-  eyebrow: string;
-  title: string;
-};
-
 export const MOSSPROUT_DAILY_FIELD_NOTE_ACTION_ID = 'mossprout:daily:field-note';
 const MOSSPROUT_ACTION_SLOT_IDS = ['together', 'field', 'garden'] as const;
 
@@ -108,31 +103,6 @@ export function composeMossproutVisibleActions(
     completingAction,
     ...active.slice(insertionIndex),
   ].slice(0, limit);
-}
-
-export function mossproutJourneyDayStatus(
-  journey: JourneyDayRecord | null,
-  storyComplete: boolean,
-): MossproutJourneyDayStatus {
-  if (!journey) return storyComplete
-    ? { eyebrow: 'GARDEN JOURNEY', title: 'The Dry Pond Is Restored' }
-    : { eyebrow: "TODAY'S JOURNEY", title: 'Ready to Begin' };
-
-  const dryPondDay = /^dry-pond:day-(\d+)$/.exec(journey.beatId)?.[1];
-  const eyebrow = journey.beatId === 'quiet-patch:first-flower'
-    ? 'FIRST JOURNEY DAY'
-    : dryPondDay
-      ? `DRY POND · DAY ${dryPondDay}`
-      : "TODAY'S JOURNEY";
-
-  if (journey.status === 'complete') return { eyebrow, title: 'Journey Day Complete' };
-  if (journey.status === 'activity_available') return { eyebrow, title: 'Garden Task Ready' };
-  if (journey.status === 'activity_in_progress') return { eyebrow, title: 'Garden Task in Progress' };
-  if (journey.status === 'return_available' || journey.status === 'resolution_ready') {
-    return { eyebrow, title: 'Return to Mossprout' };
-  }
-  if (journey.status === 'living') return { eyebrow, title: 'Noticing in Progress' };
-  return { eyebrow, title: 'Story in Progress' };
 }
 
 const GARDEN_REQUESTS: Record<string, { title: string; subtitle: string; definitionId: string; orderId: string; coins: number }> = {
@@ -214,6 +184,7 @@ export function resolveMossproutDayActions(input: {
   dayId?: string;
   goals: readonly MossproutActionGoal[];
   hasActiveFocus?: boolean;
+  includeActionIds?: readonly string[];
   gardenRequests?: readonly MossproutActionGardenRequest[];
   journeyGardenRequest?: MossproutActionGardenRequest | null;
   journeyDayNumber?: number;
@@ -225,6 +196,7 @@ export function resolveMossproutDayActions(input: {
 }): KatchimeraDayAction[] {
   const actions: KatchimeraDayAction[] = [];
   const journey = input.journey;
+  const includedActionIds = input.includeActionIds ? new Set(input.includeActionIds) : null;
   const mainRecord = journey?.actions.find((action) => action.kind === 'journey') ?? null;
   const pendingMainOutro = mainRecord?.status === 'completed' && !mainRecord.outroAcknowledgedAt;
   if (pendingMainOutro && journey) actions.push(completedJourneyAction(journey, mainRecord));
@@ -275,7 +247,7 @@ export function resolveMossproutDayActions(input: {
       if (!action.outroAcknowledgedAt) actions.push(mapConversationAction(action, true));
       continue;
     }
-    if (action.kind === 'goal_plan' && (unfinishedGoals.length || input.hasActiveFocus)) continue;
+    if (action.kind === 'goal_plan' && (unfinishedGoals.length || input.hasActiveFocus) && !includedActionIds?.has(action.id)) continue;
     actions.push(mapConversationAction(action, false));
   }
 
@@ -335,7 +307,9 @@ export function resolveMossproutDayActions(input: {
   const skippedSourcePrefix = `${dayId}:source:`;
   const fieldNoteUsedToday = [...consumed].some(isFieldNoteActionId)
     || [...skipped].some((id) => id.startsWith(skippedSourcePrefix) && isFieldNoteActionId(id.slice(skippedSourcePrefix.length)));
-  const eligible = prioritize(dedupe(actions)).filter((action) => (
+  const eligible = prioritize(dedupe(includedActionIds
+    ? actions.filter((action) => includedActionIds.has(action.id))
+    : actions)).filter((action) => (
     action.status === 'completed'
     || (!action.disabled
       && (action.required
