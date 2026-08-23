@@ -66,7 +66,26 @@ test('Today action rows use neutral unframed art and reversible swipe actions', 
   const source = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/home/today-nurture-experience.tsx'), 'utf8');
   assert.doesNotMatch(source, /GameIconWell/);
   assert.match(source, /doorIconArt: \{ height: 46, width: 46 \}/);
-  assert.match(source, /<GameSurface contentStyle=\{styles\.careDoorContent\} style=\{styles\.careDoor\} tone="cream">/);
-  assert.match(source, /activeOffsetX\(\[-CARE_SWIPE_ACTIVATION_DISTANCE, CARE_SWIPE_ACTIVATION_DISTANCE\]\)/);
-  assert.match(source, /shouldClose = event\.translationX <= -CARE_SWIPE_CLOSE_DISTANCE \|\| event\.velocityX <= -360/);
+  assert.match(source, /<DayActionCardSurface/);
+  assert.match(source, /<DayActionSwipeShell/);
+});
+
+test('Katchimera collection pages share a centered Bond header and reciprocal navigation', () => {
+  const header = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/katchimera-page-header.tsx'), 'utf8');
+  const cards = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/companion-cards-screen.tsx'), 'utf8');
+  const trophies = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/companion-trophy-room-screen.tsx'), 'utf8');
+  const layout = fs.readFileSync(path.resolve(process.cwd(), 'app/_layout.tsx'), 'utf8');
+  assert.match(header, /width: 96/);
+  assert.match(header, /styles\.center/);
+  assert.match(cards, /<KatchimeraPageHeader[\s\S]*?onOpenTrophies/);
+  assert.match(trophies, /<KatchimeraPageHeader[\s\S]*?onOpenCards/);
+  assert.match(layout, /katchimera\/\[creatureId\]\/cards/);
+});
+
+test('Katchimera hub collection buttons swap the embedded content instead of pushing a route', () => {
+  const sheet = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/world/companion-interaction-sheet.tsx'), 'utf8');
+  assert.match(sheet, /onOpenCards=\{\(\) => selectDestination\('skins'\)\}/);
+  assert.match(sheet, /onOpenTrophies=\{\(\) => selectDestination\('achievements'\)\}/);
+  assert.match(sheet, /destination === 'achievements'[\s\S]*?<CompanionTrophyRoomScreen creatureId=\{props\.creatureId\} embedded/);
+  assert.match(sheet, /destination === 'skins'[\s\S]*?<CompanionSkinsThread/);
 });

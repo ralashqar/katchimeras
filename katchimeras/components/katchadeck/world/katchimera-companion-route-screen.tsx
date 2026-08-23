@@ -81,6 +81,8 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConvers
       onFtueConversationComplete={ftueConversationDefinitionId ? completeFtueConversation : undefined}
       ftueOrderPreviewActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.order_preview'}
       onFtueOpenMerge={openFtueGarden}
+      onOpenCards={() => router.push({ pathname: '/katchimera/[creatureId]/cards', params: { creatureId } })}
+      onOpenTrophies={() => router.push({ pathname: '/katchimera/[creatureId]/achievements', params: { creatureId } })}
       initialCreatureId={creatureId}
       onCloseCompanion={() => source === 'merge-world' ? transitionTo({
         announcement: 'Returning to Haven',

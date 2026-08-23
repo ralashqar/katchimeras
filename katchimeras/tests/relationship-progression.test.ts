@@ -657,7 +657,7 @@ test('Mossprout macro progression advances once across distinct Journey Days', (
     state = completeMossproutJourneyDay(state, dayId, { objectiveId: `dry-${index}`, activityReceiptId: `activity-${index}`, resolutionId: `resolution-${index}` }, 20 + index);
   }
   assert.equal(mossproutStory(state).habitatStage, 2);
-  assert.equal(mossproutStory(state).activeBeatId, 'dry-pond:complete');
+  assert.equal(mossproutStory(state).activeBeatId, 'memory-nursery:nursery-key');
 });
 
 test('the Dry Pond slice alternates narrative, Merge activity, return, and real-day gates', () => {
@@ -713,6 +713,32 @@ test('the Dry Pond slice alternates narrative, Merge activity, return, and real-
     state = completeMossproutJourneyConversation(state, `mossprout:${day.beatId}:resolution`, 23 + index * 5);
     assert.equal(mossproutJourneyForDay(state, day.dayId)?.status, 'complete');
   }
-  assert.equal(mossproutStory(state).activeBeatId, 'dry-pond:complete');
+  assert.equal(mossproutStory(state).activeBeatId, 'memory-nursery:nursery-key');
   assert.equal(mossproutStory(state).habitatStage, 2);
+});
+
+test('over-threshold Mossprout saves play every Memory Nursery and Heartwood beat without skipping', () => {
+  let state = startMossproutJourneyDay(emptyRelationshipProgressState(), '2026-08-01', 1).state;
+  state = completeMossproutJourneyDay(state, '2026-08-01', { objectiveId: 'first', activityReceiptId: 'first', resolutionId: 'first' }, 2);
+  for (const [index, dayId] of ['2026-08-02', '2026-08-03', '2026-08-04', '2026-08-05'].entries()) {
+    state = startMossproutJourneyDay(state, dayId, 10 + index).state;
+    state = completeMossproutJourneyDay(state, dayId, { objectiveId: `pond:${index}`, activityReceiptId: `pond:${index}`, resolutionId: `pond:${index}` }, 20 + index);
+  }
+
+  const expectedBeats = [
+    'memory-nursery:nursery-key', 'memory-nursery:keepsake-root',
+    'memory-nursery:garden-remembers', 'memory-nursery:lantern-bank',
+    'heartwood:mirror-for-rain', 'heartwood:rings-of-attention',
+    'heartwood:place-that-holds', 'heartwood:heartwood',
+  ];
+  for (const [index, beatId] of expectedBeats.entries()) {
+    const dayId = `2026-08-${String(index + 6).padStart(2, '0')}`;
+    const started = startMossproutJourneyDay(state, dayId, 100 + index, 28);
+    assert.equal(started.journey?.beatId, beatId);
+    state = completeMossproutJourneyDay(started.state, dayId, { objectiveId: `extended:${index}`, activityReceiptId: `extended:${index}`, resolutionId: `extended:${index}` }, 120 + index);
+    if (index === 3) assert.equal(mossproutStory(state).habitatStage, 3);
+  }
+  assert.equal(mossproutStory(state).activeBeatId, 'heartwood:complete');
+  assert.equal(mossproutStory(state).habitatStage, 4);
+  assert.equal(startMossproutJourneyDay(state, '2026-08-20', 200, 28).reason, 'resting');
 });

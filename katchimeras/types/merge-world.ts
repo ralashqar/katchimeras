@@ -208,6 +208,8 @@ export type MergeCharacterProgress = {
 
 export type MossproutDailyGardenOrders = {
   dayId: string;
+  /** Frozen when the day's batch is created so milestone changes cannot rewrite live orders. */
+  chapterId?: 'quiet-patch' | 'returning-pond' | 'memory-nursery' | 'heartwood';
   activeOrderId: string | null;
   offeredOrderIds: string[];
   servedOrderIds: string[];

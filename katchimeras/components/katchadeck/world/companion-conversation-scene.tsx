@@ -33,6 +33,7 @@ import {
   useCompanionAdaptivePanel,
 } from '@/hooks/use-companion-adaptive-panel';
 import { CompanionChoiceList } from './companion-choice-list';
+import { KatchimeraPageHeader } from './katchimera-page-header';
 
 export function conversationSpeechLine(
   session: ConversationSession,
@@ -81,6 +82,8 @@ export function CompanionConversationScene({
   onQuestHandoff,
   hasActiveFocus,
   onOpenMore,
+  onOpenCards,
+  onOpenTrophies,
   storyFlow = false,
   storyFinale = false,
   session,
@@ -112,6 +115,8 @@ export function CompanionConversationScene({
   memories: readonly CompanionMemory[];
   onUpdateMemory: (input: { memoryId: string; status: 'confirmed' | 'rejected' | 'forgotten'; summary?: string }) => void;
   onOpenMore: () => void;
+  onOpenCards?: () => void;
+  onOpenTrophies?: () => void;
   onStoryComplete?: () => void;
   storyFlow?: boolean;
   storyFinale?: boolean;
@@ -162,6 +167,7 @@ export function CompanionConversationScene({
   const shortPanelBottomLift = adaptivePanel.scrollable
     ? 0
     : Math.min(22, Math.max(0, (adaptivePanel.maxHeight - adaptivePanel.panelHeight) * 0.1));
+  const preservesFtueHeader = definition.id.includes(':ftue:');
 
   useEffect(() => {
     if (!session.outcomePresentation?.celebrate || process.env.EXPO_OS !== 'ios') return;
@@ -177,7 +183,14 @@ export function CompanionConversationScene({
       paddingHorizontal: width >= 700 ? Math.max(28, (width - 720) / 2) : 16,
       paddingTop: insets.top + 10,
     }}>
-      <View style={{ alignItems: 'center', flexDirection: 'row', minHeight: 48, zIndex: 4 }}>
+      {!preservesFtueHeader ? <KatchimeraPageHeader
+        bondProgress={bondProgress}
+        includeSafeArea={false}
+        onBack={onClose}
+        onOpenCards={onOpenCards}
+        onOpenTrophies={onOpenTrophies}
+      /> : null}
+      <View style={[{ alignItems: 'center', flexDirection: 'row', minHeight: 48, zIndex: 4 }, !preservesFtueHeader && { display: 'none' }]}>
         <KatchimeraBackButton accessibilityLabel="Back to Katchimeras" onPress={onClose} />
         <View style={{ alignItems: 'center', flex: 1, flexDirection: 'row', gap: 9, paddingHorizontal: 10 }}>
           <View style={{ alignItems: 'center', backgroundColor: 'rgba(255,247,220,0.92)', borderColor: 'rgba(255,225,158,0.7)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, height: 46, justifyContent: 'center', overflow: 'hidden', width: 46 }}>

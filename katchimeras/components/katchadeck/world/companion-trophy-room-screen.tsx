@@ -17,7 +17,6 @@ import type { CompanionAchievementEntry, CompanionAchievementPillar } from '@/ty
 import { getCreatureVisual } from '@/game/days';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
-import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
 import { companionAchievementIconSource } from '@/constants/achievement-icon-sources';
 import { companionQuestListSpacer } from '@/utils/companion-home-layout';
 import { todayKatchimeraExplorationBackgroundKeyForEnvironment } from '@/utils/today-exploration-backgrounds';
@@ -28,6 +27,7 @@ import type { KatchimeraFamilyId } from '@/types/katchimera';
 import { WispArtwork } from '@/components/katchadeck/wisps/wisp-artwork';
 
 import { CompanionCinematicStage } from './companion-cinematic-stage';
+import { KatchimeraPageHeader } from './katchimera-page-header';
 
 const PILLAR_TINT: Record<CompanionAchievementPillar, string> = {
   domain: '#55795D',
@@ -106,8 +106,12 @@ export function CompanionTrophyRoomScreen({ creatureId, embedded = false }: { cr
           visualKey={family.anchorVisualKey}
         />
       ) : null}
-      <View style={[styles.topBar, { paddingTop: insets.top + 10, width: maxWidth }]}>
-        <KatchimeraBackButton accessibilityLabel={`Back to ${family.displayName}`} onPress={() => router.back()} />
+      <KatchimeraPageHeader
+        creatureId={creatureId}
+        onBack={() => router.back()}
+        onOpenCards={() => router.replace({ pathname: '/katchimera/[creatureId]/cards', params: { creatureId } })}
+      />
+      <View style={[styles.topBar, { width: maxWidth }]}>
         <View style={styles.topTitleWrap}>
           <ThemedText
             adjustsFontSizeToFit
@@ -123,7 +127,6 @@ export function CompanionTrophyRoomScreen({ creatureId, embedded = false }: { cr
             {unlocked}/{entries.length} earned
           </ThemedText>
         </View>
-        <View style={styles.topBalance} />
       </View>
       <ScrollView
         contentContainerStyle={[

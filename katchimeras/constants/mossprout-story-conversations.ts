@@ -489,6 +489,31 @@ const dryPondJourneyConversations: readonly ConversationDefinition[] = [
   journeyConversation('mossprout:dry-pond:day-4:resolution', 'The pond remembers', 'It caught the rain. Every leaf is shining.', "It's ours.", 'Ours—and ready for whoever finds it next.', 'The Little Rain Garden is complete.'),
 ];
 
+const extendedJourneyCopy = [
+  ['memory-nursery:nursery-key', 'The Nursery Key', 'Behind the pond, an old greenhouse door has begun to glow.', 'The lock is listening.', 'Then let us bring it something living to remember.', 'The Memory Nursery is ready to open.'],
+  ['memory-nursery:keepsake-root', 'A Keepsake Takes Root', 'A bare nursery bed is waiting for one remembered thing and one growing thing.', 'They belong together.', 'Memory needs roots if it is going to keep growing.', 'A new bed settles into the nursery.'],
+  ['memory-nursery:garden-remembers', 'What the Garden Remembers', 'The nursery has begun arranging old moments into new patterns.', 'Show me what it kept.', 'Not every memory stays still. Some of them become habitat.', 'The nursery remembers in leaves and water.'],
+  ['memory-nursery:lantern-bank', 'The Lantern Bank', 'One dark bank remains beside the nursery path.', 'It needs its own light.', 'A Memory Bloom can hold the kind of light that knows its way home.', 'The lantern bank glows, and the nursery is complete.'],
+  ['heartwood:mirror-for-rain', 'A Mirror for Rain', 'Rain has revealed a path beyond the nursery, toward the oldest tree in the grove.', 'Let us follow it.', 'First we need a mirror that can carry the sky beneath the branches.', 'The ancient grove reflects a way forward.'],
+  ['heartwood:rings-of-attention', 'Rings of Attention', 'The old tree has kept a record of every patient season.', 'What has it noticed?', 'Perhaps attention leaves rings too, even when nobody can see them.', 'A new ring brightens beneath the bark.'],
+  ['heartwood:place-that-holds', 'A Place That Holds', 'The grove is alive, but it needs somewhere delicate things can remain.', 'We can make shelter.', 'Growth is not only reaching outward. Sometimes it is making room.', 'The grove now holds what matters without closing around it.'],
+  ['heartwood:heartwood', 'Heartwood', 'At the centre of the grove, every path in the garden meets.', 'We made it here.', 'Slowly, together, and without asking the garden to become anything else.', 'Heartwood is complete. The whole garden carries our history.'],
+] as const;
+
+const extendedJourneyConversations: readonly ConversationDefinition[] = extendedJourneyCopy.flatMap(([beatId, title, prompt, label, reply, ending]) => [
+  beatId === 'memory-nursery:nursery-key' || beatId === 'heartwood:mirror-for-rain'
+    ? journeyInsightConversation(`mossprout:${beatId}:opening`, title, prompt, `${beatId}:reflection`)
+    : journeyConversation(`mossprout:${beatId}:opening`, title, prompt, label, reply, 'The Merge World is ready when you are.'),
+  journeyConversation(`mossprout:${beatId}:resolution`, title, ending, 'Stay a moment.', 'Some changes deserve a quiet look.', ending),
+]);
+
+const extendedJourneyActionConversations: readonly ConversationDefinition[] = [
+  journeyGoalConversation('mossprout:memory-nursery:keepsake-root', 'Keep one living memory'),
+  journeyPlayfulConversation('mossprout:memory-nursery:garden-remembers', 'The nursery guessing game', 'Which tiny detail would the garden be most likely to remember?'),
+  journeyGoalConversation('mossprout:heartwood:rings-of-attention', 'Return with attention'),
+  journeyPlayfulConversation('mossprout:heartwood:place-that-holds', 'Official grove architecture', 'What should every truly excellent shelter include?'),
+];
+
 const mossproutJourneyActionConversations: readonly ConversationDefinition[] = MOSSPROUT_DRY_POND_BEAT_IDS.flatMap((beatId, index) => {
   const prefix = `mossprout:${beatId}`;
   return [
@@ -689,7 +714,9 @@ const mossproutPlanningConversations: readonly ConversationDefinition[] = [
 
 export const mossproutStoryConversationDefinitions: readonly ConversationDefinition[] = [
   ...dryPondJourneyConversations,
+  ...extendedJourneyConversations,
   ...mossproutJourneyActionConversations,
+  ...extendedJourneyActionConversations,
   mossproutFirstDayGoalConversation,
   mossproutFirstDayPlayfulConversation,
   mossproutFormFinder,

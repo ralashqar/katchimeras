@@ -139,7 +139,7 @@ export function MossproutStoryStage({
   const dayId = localDayId();
   const journey = mossproutJourneyForDay(relationships, dayId);
   const story = mossproutStory(relationships);
-  const storyComplete = story.activeBeatId === 'dry-pond:complete';
+  const storyComplete = story.activeBeatId === 'heartwood:complete';
   const mossproutOrders = useMemo(() => (mergeWorldState?.activeOrders ?? [])
     .filter((order) => order.characterId === 'mossprout')
     .map((order): MossproutActionGardenRequest => ({
@@ -280,7 +280,8 @@ export function MossproutStoryStage({
 
   const openJourney = () => {
     if (!journey) {
-      const started = relationshipProgressionRepository.update((current) => startMossproutJourneyDay(current, dayId).state);
+      const activeDayCount = mergeWorldState?.mossproutBoardProgression.activeDayIds.length ?? 0;
+      const started = relationshipProgressionRepository.update((current) => startMossproutJourneyDay(current, dayId, Date.now(), activeDayCount).state);
       const opening = mossproutJourneyForDay(started, dayId)?.openingConversationId;
       if (opening) onOpenConversation(opening);
       else onOpenMerge('mossprout:chapter-0:first-sprout');

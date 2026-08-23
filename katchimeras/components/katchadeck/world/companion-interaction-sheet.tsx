@@ -175,6 +175,8 @@ export type CompanionInteractionSheetProps = {
   onSelectDestination?: (destination: CompanionDestination | null) => void;
   onClose: () => void;
   onOpenMerge?: (orderId?: string | null, familyId?: KatchimeraFamilyId) => void;
+  onOpenCards?: () => void;
+  onOpenTrophies?: () => void;
   onJournalFood: () => void;
   onOpenTodayGoals: () => void;
   embedded?: boolean;
@@ -318,7 +320,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const mossproutNameplate = props.familyId === 'mossprout'
     ? mossproutJourneyDayStatus(
         mossproutJourney,
-        mossproutStory(relationships).activeBeatId === 'dry-pond:complete',
+        mossproutStory(relationships).activeBeatId === 'heartwood:complete',
       )
     : null;
   const [transitionBackgroundReady, setTransitionBackgroundReady] = useState(false);
@@ -1316,6 +1318,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             }}
             memories={props.memories}
             onOpenMore={experience.showHome}
+            onOpenCards={() => selectDestination('skins')}
+            onOpenTrophies={() => selectDestination('achievements')}
             onStoryComplete={experience.showHome}
             onUpdateMemory={props.onUpdateMemory}
             session={conversationExperience.session}
@@ -1376,10 +1380,12 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         {(route.kind === 'destination' || route.kind === 'dashboard' || route.kind === 'shared_history' || quickGoalPickerOpen) && !questGameVisible && !questionnaireExperience ? (
           <CompanionDestinationHeader
             backLabel={quickGoalPickerOpen ? 'Goals' : destination === 'quest' && directQuestOrigin ? props.name : destination === 'quest' && canReturnToQuestList ? 'Quest list' : route.kind === 'dashboard' ? 'Kingdom' : 'Dashboard'}
-            bondProgress={route.kind === 'dashboard' ? displayedBondProgress : undefined}
+            bondProgress={displayedBondProgress}
             compactHub={route.kind === 'dashboard'}
             label={route.kind === 'dashboard' ? 'Dashboard' : route.kind === 'shared_history' ? props.familyId === 'feastle' ? 'Recipe Book' : 'Shared history' : destinationLabel}
             titleTone={destination === 'achievements' ? 'gold' : 'default'}
+            onOpenCards={() => selectDestination('skins')}
+            onOpenTrophies={() => selectDestination('achievements')}
             onBack={
               quickGoalPickerOpen
                 ? experience.returnToDestination

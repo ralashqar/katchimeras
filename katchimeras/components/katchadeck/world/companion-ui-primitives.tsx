@@ -8,10 +8,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 import Animated, { FadeInUp, useReducedMotion } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TodaySceneBackdrop } from '@/components/katchadeck/home/today-scene-backdrop';
-import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
@@ -23,6 +21,7 @@ import { KatchaUI } from '@/constants/katcha-ui';
 import type { KatchaSurface } from '@/constants/katcha-ui';
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
 import type { CompanionBondProgress } from '@/utils/companion-bond';
+import { KatchimeraPageHeader } from './katchimera-page-header';
 
 export function CompanionSheetShell({
   children,
@@ -70,6 +69,8 @@ export function CompanionDestinationHeader({
   compactHub = false,
   label,
   onBack,
+  onOpenCards,
+  onOpenTrophies,
   titleTone = 'default',
 }: {
   backLabel?: string;
@@ -77,26 +78,15 @@ export function CompanionDestinationHeader({
   compactHub?: boolean;
   label: string;
   onBack: () => void;
+  onOpenCards?: () => void;
+  onOpenTrophies?: () => void;
   titleTone?: 'default' | 'gold';
 }) {
-  const insets = useSafeAreaInsets();
   const goldTitle = titleTone === 'gold';
   return (
-    <View style={[styles.destinationHeader, { paddingTop: insets.top + 10 }]}>
-      <CompanionBackAction label={backLabel} onPress={onBack} tone="night" />
-      {compactHub && bondProgress ? (
-        <View
-          accessibilityLabel={`${bondProgress.relationshipStage} bond, ${Math.round(bondProgress.relationshipStageRatio * 100)} percent to the next stage`}
-          style={styles.bondPill}>
-          <BondIconArt size={27} />
-          <View style={styles.bondCopy}>
-            <ThemedText selectable style={styles.bondLabel} lightColor="#FFF6D8" darkColor="#FFF6D8">{bondProgress.relationshipStage}</ThemedText>
-            <View style={styles.bondTrack}>
-              <View style={[styles.bondFill, { width: `${Math.max(bondProgress.totalPoints ? 6 : 0, bondProgress.relationshipStageRatio * 100)}%` }]} />
-            </View>
-          </View>
-        </View>
-      ) : <View style={styles.destinationHeading}>
+    <View>
+      <KatchimeraPageHeader bondProgress={bondProgress} onBack={onBack} onOpenCards={onOpenCards} onOpenTrophies={onOpenTrophies} />
+      <View style={styles.destinationHeading}>
         <ThemedText
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.3}
@@ -108,7 +98,7 @@ export function CompanionDestinationHeader({
           darkColor={goldTitle ? '#FFD36E' : '#FFF9EA'}>
           {label}
         </ThemedText>
-      </View>}
+      </View>
     </View>
   );
 }
@@ -352,18 +342,17 @@ const styles = StyleSheet.create({
     zIndex: 4,
   },
   destinationHeading: {
-    alignItems: 'flex-end',
-    flex: 1,
+    alignItems: 'center',
     justifyContent: 'center',
     minHeight: KatchaUI.touchTarget,
     minWidth: 0,
+    paddingHorizontal: KatchaUI.layout.phoneGutter,
   },
   destinationTitle: {
     ...KatchaUI.type.companionPageTitle,
     fontSize: 25,
     lineHeight: 30,
-    paddingRight: 2,
-    textAlign: 'right',
+    textAlign: 'center',
     textShadowColor: 'rgba(23,40,49,0.65)',
     textShadowOffset: { height: 2, width: 0 },
     textShadowRadius: 3,

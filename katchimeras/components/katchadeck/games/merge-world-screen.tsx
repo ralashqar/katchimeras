@@ -10,6 +10,7 @@ import { RewardSplash, type RewardSplashItem } from '@/components/katchadeck/ui/
 import { GameCurrencyHud } from '@/components/katchadeck/ui/game-currency-hud';
 import { GameHudBar, GameHudItem } from '@/components/katchadeck/ui/game-primitives';
 import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
+import { KatchimeraPageHeader } from '@/components/katchadeck/world/katchimera-page-header';
 import { KatchaInlineNotice } from '@/components/katchadeck/ui/katcha-inline-notice';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchaSurfaceProvider } from '@/components/katchadeck/ui/katcha-surface';
@@ -579,7 +580,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     if (result?.changed && activeOrder.orderId === 'mossprout:chapter-0:first-sprout') {
       const dayId = localDayId();
       relationshipProgressionRepository.update((current) => {
-        const started = startMossproutJourneyDay(current, dayId);
+        const started = startMossproutJourneyDay(current, dayId, Date.now(), stateRef.current?.mossproutBoardProgression.activeDayIds.length ?? 0);
         return recordMossproutFirstGardenRestored(started.state, dayId, `merge-order:${activeOrder.orderId}`);
       });
     }
@@ -694,12 +695,19 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     <View onLayout={() => setScreenLayoutNonce((nonce) => nonce + 1)} ref={screenRef} style={styles.screen}>
       <MergeCommandFeedback />
       <View style={[styles.game, { paddingTop: Math.max(insets.top + 3, 7), paddingBottom: Math.max(insets.bottom + 3, 7), width: contentWidth }]}>
+        {!ftueExclusive && creatureId ? <KatchimeraPageHeader
+          creatureId={creatureId}
+          includeSafeArea={false}
+          onBack={() => router.back()}
+          onOpenCards={() => router.push({ pathname: '/katchimera/[creatureId]/cards', params: { creatureId } })}
+          onOpenTrophies={() => router.push({ pathname: '/katchimera/[creatureId]/achievements', params: { creatureId } })}
+        /> : null}
         <GameHudBar
           density="compact"
-          leading={<KatchimeraBackButton
+          leading={ftueExclusive || !creatureId ? <KatchimeraBackButton
             accessibilityLabel={creatureId ? 'Return to Mossprout' : 'Open legacy games'}
             onPress={() => ftueExclusive ? handleBlockedFtueInteraction() : creatureId ? router.back() : router.push('/legacy-games')}
-          />}
+          /> : undefined}
           style={[styles.hudBar, { paddingLeft: companionHeaderLeftInset }]}
           tone="glass"
           trailing={<>

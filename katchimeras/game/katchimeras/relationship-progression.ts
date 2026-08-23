@@ -1,5 +1,6 @@
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import type { JourneyDayActionRecord, JourneyDayRecord, KatchimeraActionCompletionRecord, KatchimeraActionSlotId, KatchimeraDayAction, KatchimeraStoryProgress, MossproutDailyActionDeck, RelationshipProgressState } from '@/types/relationship-progression';
+import { MOSSPROUT_EXTENDED_JOURNEY_BEATS, MOSSPROUT_HEARTWOOD_CHAPTER_ID, MOSSPROUT_MEMORY_NURSERY_CHAPTER_ID, mossproutExtendedBeatById } from '@/constants/mossprout-journey-chapters';
 
 export const MOSSPROUT_QUIET_PATCH_CHAPTER_ID = 'mossprout:chapter:quiet-patch';
 export const MOSSPROUT_DRY_POND_CHAPTER_ID = 'mossprout:chapter:dry-pond';
@@ -269,16 +270,20 @@ export function startMossproutJourneyDay(
   state: RelationshipProgressState,
   dayId: string,
   now = Date.now(),
+  activeDayCount = 0,
 ): { state: RelationshipProgressState; journey: JourneyDayRecord | null; reason: 'started' | 'existing' | 'another_companion' | 'resting' } {
   const existing = journeyForDay(state, dayId);
   if (existing) return { state, journey: existing.familyId === 'mossprout' ? existing : null, reason: existing.familyId === 'mossprout' ? 'existing' : 'another_companion' };
   const story = mossproutStory(state, now);
-  if (story.habitatStage >= 2 && story.completedChapterIds.includes(MOSSPROUT_DRY_POND_CHAPTER_ID)) {
+  const extendedBeat = mossproutExtendedBeatById.get(story.activeBeatId);
+  if (story.activeBeatId === 'heartwood:complete'
+    || (story.habitatStage >= 2 && story.completedChapterIds.includes(MOSSPROUT_DRY_POND_CHAPTER_ID)
+      && (!extendedBeat || activeDayCount < extendedBeat.minimumActiveDays))) {
     return { state, journey: null, reason: 'resting' };
   }
-  const chapterId = story.habitatStage === 0 ? MOSSPROUT_QUIET_PATCH_CHAPTER_ID : MOSSPROUT_DRY_POND_CHAPTER_ID;
+  const chapterId = story.habitatStage === 0 ? MOSSPROUT_QUIET_PATCH_CHAPTER_ID : extendedBeat?.chapterId ?? MOSSPROUT_DRY_POND_CHAPTER_ID;
   const beatId = story.habitatStage === 0 ? 'quiet-patch:first-flower' : story.activeBeatId;
-  const openingConversationId = chapterId === MOSSPROUT_DRY_POND_CHAPTER_ID
+  const openingConversationId = chapterId !== MOSSPROUT_QUIET_PATCH_CHAPTER_ID
     ? `mossprout:${beatId}:opening`
     : null;
   const journey: JourneyDayRecord = {
@@ -313,6 +318,7 @@ export function completeMossproutJourneyOpening(
   const journey = mossproutJourneyForDay(state, dayId);
   if (!journey || journey.status !== 'opening') return state;
   const activityDefinition = DRY_POND_ACTIVITY[journey.beatId as keyof typeof DRY_POND_ACTIVITY];
+  const extendedDefinition = mossproutExtendedBeatById.get(journey.beatId);
   const activity = activityDefinition ? {
     kind: 'merge' as const,
     objectiveId: activityDefinition.objectiveId,
@@ -320,6 +326,13 @@ export function completeMossproutJourneyOpening(
     opportunityId: `mossprout:${dayId}:${journey.beatId}:basket`,
     generatorId: 'wild-garden',
     dropDefinitionIds: [...activityDefinition.drops],
+  } : extendedDefinition ? {
+    kind: 'merge' as const,
+    objectiveId: extendedDefinition.objectiveId,
+    mergeOrderId: extendedDefinition.mergeOrderId,
+    opportunityId: `mossprout:${dayId}:${journey.beatId}:open-play`,
+    generatorId: 'wild-garden',
+    dropDefinitionIds: [],
   } : null;
   const profileConversationId = journey.beatId === 'dry-pond:day-2' ? 'mossprout:game:form-finder' : null;
   return replaceJourney(state, journey.id, {
@@ -514,12 +527,34 @@ export function completeMossproutJourneyDay(
   } else if (target.beatId === 'dry-pond:day-4') {
     story = {
       ...story,
-      activeBeatId: 'dry-pond:complete',
+      activeChapterId: MOSSPROUT_MEMORY_NURSERY_CHAPTER_ID,
+      activeBeatId: MOSSPROUT_EXTENDED_JOURNEY_BEATS[0].beatId,
       completedChapterIds: unique([...story.completedChapterIds, MOSSPROUT_DRY_POND_CHAPTER_ID]),
       completedObjectiveIds,
       habitatStage: 2,
       updatedAt: now,
     };
+  } else {
+    const extendedIndex = MOSSPROUT_EXTENDED_JOURNEY_BEATS.findIndex((beat) => beat.beatId === target.beatId);
+    if (extendedIndex >= 0) {
+      const current = MOSSPROUT_EXTENDED_JOURNEY_BEATS[extendedIndex];
+      const next = MOSSPROUT_EXTENDED_JOURNEY_BEATS[extendedIndex + 1];
+      const completesNursery = current.chapterId === MOSSPROUT_MEMORY_NURSERY_CHAPTER_ID && next?.chapterId === MOSSPROUT_HEARTWOOD_CHAPTER_ID;
+      const completesHeartwood = current.chapterId === MOSSPROUT_HEARTWOOD_CHAPTER_ID && !next;
+      story = {
+        ...story,
+        activeChapterId: next?.chapterId ?? MOSSPROUT_HEARTWOOD_CHAPTER_ID,
+        activeBeatId: next?.beatId ?? 'heartwood:complete',
+        completedChapterIds: completesNursery
+          ? unique([...story.completedChapterIds, MOSSPROUT_MEMORY_NURSERY_CHAPTER_ID])
+          : completesHeartwood
+            ? unique([...story.completedChapterIds, MOSSPROUT_HEARTWOOD_CHAPTER_ID])
+            : story.completedChapterIds,
+        completedObjectiveIds,
+        habitatStage: completesHeartwood ? 4 : completesNursery ? 3 : story.habitatStage,
+        updatedAt: now,
+      };
+    }
   }
   return {
     ...state,
@@ -610,6 +645,16 @@ function journeyActions(beatId: string): JourneyDayActionRecord[] {
     },
   ];
   const prefix = `mossprout:${beatId}`;
+  const extendedAction = mossproutExtendedBeatById.get(beatId)?.optionalAction;
+  if (extendedAction === 'goal' || extendedAction === 'playful') return [
+    { id: `${prefix}:journey`, kind: 'journey', required: true, definitionId: `${prefix}:opening`, status: 'ready', bondContribution: 12, completedAt: null, outroAcknowledgedAt: null },
+    extendedAction === 'goal'
+      ? { id: `${prefix}:goal-plan`, kind: 'goal_plan', required: false, definitionId: `${prefix}:goal-plan`, status: 'ready', bondContribution: 4, completedAt: null, outroAcknowledgedAt: null }
+      : { id: `${prefix}:playful`, kind: 'playful_game', required: false, definitionId: `${prefix}:playful`, status: 'ready', bondContribution: 4, completedAt: null, outroAcknowledgedAt: null },
+  ];
+  if (mossproutExtendedBeatById.has(beatId)) return [
+    { id: `${prefix}:journey`, kind: 'journey', required: true, definitionId: `${prefix}:opening`, status: 'ready', bondContribution: 12, completedAt: null, outroAcknowledgedAt: null },
+  ];
   return [
     { id: `${prefix}:journey`, kind: 'journey', required: true, definitionId: `${prefix}:opening`, status: 'ready', bondContribution: 12, completedAt: null, outroAcknowledgedAt: null },
     { id: `${prefix}:goal-plan`, kind: 'goal_plan', required: false, definitionId: `${prefix}:goal-plan`, status: 'ready', bondContribution: 4, completedAt: null, outroAcknowledgedAt: null },

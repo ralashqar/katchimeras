@@ -213,6 +213,8 @@ export function KingdomCompanionScreen({
   initialCreatureId,
   onCloseCompanion,
   onOpenMerge,
+  onOpenCards,
+  onOpenTrophies,
   onOpenQuestGame,
   ftueConversationDefinitionId,
   onFtueConversationComplete,
@@ -224,6 +226,8 @@ export function KingdomCompanionScreen({
   initialCreatureId?: string;
   onCloseCompanion?: () => void;
   onOpenMerge?: (orderId?: string | null, familyId?: KatchimeraFamilyId) => void;
+  onOpenCards?: () => void;
+  onOpenTrophies?: () => void;
   onOpenQuestGame?: (creatureId: string, questId: string) => void;
   ftueConversationDefinitionId?: string;
   onFtueConversationComplete?: () => void | Promise<void>;
@@ -581,6 +585,8 @@ export function KingdomCompanionScreen({
           onInitialConversationComplete={onFtueConversationComplete}
           ftueOrderPreviewActive={ftueOrderPreviewActive}
           onFtueOpenMerge={onFtueOpenMerge}
+          onOpenCards={onOpenCards}
+          onOpenTrophies={onOpenTrophies}
           onSelectDestination={quests.selectDestination}
           onClose={() => {
             quests.closeSelectedResident();

@@ -41,6 +41,7 @@ import { companionFirstPersonText } from '@/utils/companion-dialogue';
 import type { CompanionBondProgress } from '@/utils/companion-bond';
 import { CompanionChoiceList } from './companion-choice-list';
 import { CompanionCinematicStage } from './companion-cinematic-stage';
+import { KatchimeraPageHeader } from './katchimera-page-header';
 
 export type CompanionQuestionnaireOption = {
   id: string;
@@ -62,6 +63,8 @@ export function CompanionQuestionnaireScene({
   helperText,
   onBack,
   onOpenMore,
+  onOpenCards,
+  onOpenTrophies,
   onSelect,
   options,
   progress,
@@ -83,6 +86,8 @@ export function CompanionQuestionnaireScene({
   helperText?: string;
   onBack: () => void;
   onOpenMore?: () => void;
+  onOpenCards?: () => void;
+  onOpenTrophies?: () => void;
   onSelect?: (option: CompanionQuestionnaireOption) => void;
   options?: readonly CompanionQuestionnaireOption[];
   progress?: number;
@@ -173,7 +178,14 @@ export function CompanionQuestionnaireScene({
           paddingTop: insets.top + 12,
         },
       ]}>
-        <View style={[styles.header, conversationPresentation && styles.conversationHeader]}>
+        {conversationPresentation ? <KatchimeraPageHeader
+          bondProgress={bondProgress}
+          includeSafeArea={false}
+          onBack={onBack}
+          onOpenCards={onOpenCards}
+          onOpenTrophies={onOpenTrophies}
+        /> : null}
+        <View style={[styles.header, conversationPresentation && styles.conversationHeader, conversationPresentation && { display: 'none' }]}>
           <KatchimeraBackButton
             accessibilityHint="Your completed answers are saved"
             accessibilityLabel="Exit to You"
