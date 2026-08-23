@@ -63,12 +63,14 @@ test('backend catalog contains only allowlisted privacy-safe action ids', () => 
 });
 
 test('Supabase receipt allowlist matches every backend FTUE action', () => {
-  const migration = readFileSync('supabase/migrations/20260822173032_register_mossprout_ftue_v17.sql', 'utf8');
+  const migration = readFileSync('supabase/migrations/20260823194500_register_mossprout_ftue_v19.sql', 'utf8');
+  const v18Migration = readFileSync('supabase/migrations/20260823173000_register_mossprout_ftue_v18.sql', 'utf8');
+  const v17Migration = readFileSync('supabase/migrations/20260822173032_register_mossprout_ftue_v17.sql', 'utf8');
   const priorMigration = readFileSync('supabase/migrations/20260818170000_register_mossprout_ftue_v16.sql', 'utf8');
   for (const item of FTUE_ACTION_CATALOG.filter((entry) => entry.backendEvent)) {
-    assert.match(priorMigration, new RegExp(`'${item.stepId}',\\s*'${item.actionId}'`));
+    assert.match(`${priorMigration}\n${v17Migration}\n${v18Migration}\n${migration}`, new RegExp(`'${item.stepId}',\\s*'${item.actionId}'`));
   }
-  assert.match(migration, /script_version = 16/);
+  assert.match(migration, /script_version = 18/);
   assert.doesNotMatch(migration, /step_id not in/);
   assert.doesNotMatch(`${priorMigration}\n${migration}`, /option_id|option_label|answer_text/);
 });
@@ -87,7 +89,9 @@ test('Chapter 0 previews its requests and keeps the first-session board tutorial
   assert.equal(pairStep?.edges?.[0]?.event.type, 'dream_echo_cleared');
   assert.equal(pairStep?.edges?.[0]?.nextStepId, 'merge.serve_sprout');
   assert.equal(serveStep?.edges?.[0]?.nextStepId, 'companion.chapter_zero_return');
-  assert.equal(mossproutFtueAction('companion.chapter_zero_return', 'companion.complete_chapter_zero_return')?.nextStepId, 'complete');
+  assert.equal(mossproutFtueAction('companion.chapter_zero_return', 'companion.complete_chapter_zero_return')?.nextStepId, 'companion.bond_spotlight');
+  assert.equal(mossproutFtueAction('companion.bond_spotlight', 'companion.acknowledge_bond')?.nextStepId, 'companion.day_one_action');
+  assert.equal(mossproutFtueAction('companion.day_one_action', 'companion.complete_day_one_action')?.nextStepId, 'complete');
   assert.equal(mossproutFtueAction('haven.reveal', 'haven.reveal_world')?.nextStepId, 'complete');
   assert.equal(finalServeStep?.edges?.[0]?.nextStepId, 'companion.chapter_zero_return');
   assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.energy.last_seed')?.edges?.[0]?.nextStepId, 'merge.energy_exhausted');
@@ -263,22 +267,52 @@ test('the active FTUE hides the bottom bar only on the tab presenting its curren
   assert.match(devTools, /It resets Today, Katchimera progress, and the Merge board/);
 });
 
-test('FTUE returns from the Garden and completes on Mossprout with a fresh Garden batch', () => {
+test('FTUE returns from the Garden, teaches one Bond action, and completes manually on Mossprout', () => {
   const route = readFileSync('app/katchimera/[creatureId].tsx', 'utf8');
   const today = readFileSync('app/(tabs)/today.tsx', 'utf8');
   const merge = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   const companion = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
   const interaction = readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
+  const coachmark = readFileSync('components/katchadeck/onboarding/companion-ftue-coachmark.tsx', 'utf8');
   const kingdom = readFileSync('components/katchadeck/world/kingdom-companion-screen.tsx', 'utf8');
+  const mossproutStage = readFileSync('components/katchadeck/world/mossprout-story-stage.tsx', 'utf8');
+  const bondCelebration = readFileSync('components/katchadeck/world/companion-bond-level-up-celebration.tsx', 'utf8');
   const repository = readFileSync('utils/merge-world/repository.ts', 'utf8');
   const transition = readFileSync('features/navigation/game-screen-transition.tsx', 'utf8');
   assert.match(merge, /ftueRun\.stepId !== 'companion\.chapter_zero_return'[\s\S]*?target: 'companion'[\s\S]*?ftue: 'chapter-zero-return'/);
-  assert.match(companion, /const nextRun = commitFtueAction\(\{ actionId: 'companion\.complete_chapter_zero_return'[\s\S]*?nextRun\?\.status === 'complete'[\s\S]*?seedStoredMossproutGardenAfterFtue/);
+  assert.match(companion, /commitFtueAction\(\{ actionId: 'companion\.complete_chapter_zero_return'[\s\S]*?const completeFtueJourneyDay/);
+  assert.match(companion, /actionId: 'companion\.complete_day_one_action'[\s\S]*?nextRun\?\.status !== 'complete'[\s\S]*?seedStoredMossproutGardenAfterFtue/);
+  assert.match(companion, /stepId !== 'companion\.bond_spotlight'[\s\S]*?actionId: 'companion\.acknowledge_bond'/);
   assert.match(companion, /return seedStoredMossproutGardenAfterFtue[\s\S]*?\.then\(\(\) => undefined\)/);
   assert.match(interaction, /Promise\.resolve\(onInitialConversationComplete\?\.\(\)\)[\s\S]*?\.then\(showFeastleStoryHome\)/);
+  assert.match(interaction, /CompanionFtueCoachmark[\s\S]*?ftueBondSpotlightActive[\s\S]*?ftueDayOneActionActive/);
   assert.doesNotMatch(companion, /commitFtueAction\(\{ actionId: 'companion\.complete_chapter_zero_return'[\s\S]{0,500}?router\.dismissTo\('\/katchimeras'\)/);
   assert.match(repository, /seedStoredMossproutGardenAfterFtue[\s\S]*?completeMossproutChapterZeroSlice[\s\S]*?reconcileCharacterActivity[\s\S]*?status: 'complete'/);
-  assert.match(kingdom, /ftueConversationDefinitionId === MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID[\s\S]*?receipt\.kind === 'journey_day_completed'[\s\S]*?return;/);
+  assert.match(kingdom, /ftueDayOneActionActive && receipt\.kind === 'journey_day_completed'[\s\S]*?variant: 'journey_complete'/);
+  assert.match(kingdom, /autoContinue=\{!ftueDayOneActionActive\}[\s\S]*?Back to Mossprout[\s\S]*?dismissible=\{!ftueDayOneActionActive\}[\s\S]*?onFtueJourneyDayComplete/);
+  assert.match(bondCelebration, /onRequestClose=\{dismissible \? onContinue : \(\) => \{\}\}[\s\S]*?Journey Days are new chapters with Mossprout/);
+  assert.match(companion, /scheduleMossproutJourneyDayReminder\(completedDayId\)/);
+  assert.doesNotMatch(companion, /router\.dismissTo\('\/today'\)/);
+  assert.match(mossproutStage, /Journey Day \{journeyDayNumber\} complete[\s\S]*?Day \{journeyDayNumber \+ 1\} tomorrow/);
+  assert.match(mossproutStage, /relationshipProgressionRepository\.update\(reconcileMossproutDayOneChoices\)/);
+  assert.match(mossproutStage, /Tutorials may spotlight or lock this stack[\s\S]*?const presentedActionCandidates = actions/);
+  assert.doesNotMatch(mossproutStage, /actions\.filter\(\(action\) => choiceIds\.has\(action\.id\)\)/);
+  assert.match(coachmark, /useEggAvatar\(\)[\s\S]*?<EggAvatar/);
+  assert.match(coachmark, /styles\.speechTail[\s\S]*?styles\.avatarBadge/);
+  assert.match(coachmark, /roundedCutout[\s\S]*?boxShadow: `0 0 0 \$\{spotlightSpread\}px[\s\S]*?borderRadius: spotlightRadius/);
+  assert.match(coachmark, /ftue-hand\.webp[\s\S]*?HAND_TIP_X[\s\S]*?HAND_TIP_Y[\s\S]*?<Image/);
+  assert.match(coachmark, /showFinger = true[\s\S]*?\{showFinger \? \(/);
+  assert.match(interaction, /emphasis: true, text: 'one thing'[\s\S]*?showFinger=\{false\}/);
+  assert.match(coachmark, /GUIDE_EXPRESSION_FACE_IDS[\s\S]*?Math\.random\(\)[\s\S]*?setGuideFaceId\(nextFace\)/);
+  assert.match(coachmark, /useReducedMotion\(\)[\s\S]*?!reduceMotion[\s\S]*?withSequence\(/);
+  assert.match(coachmark, /rotateZ: `\$\{avatarWobble\.value\}deg`/);
+  assert.match(coachmark, /clearTimeout\(reactionTimer\)[\s\S]*?clearTimeout\(restoreTimer\)[\s\S]*?cancelAnimation\(avatarWobble\)/);
+  assert.match(coachmark, /size=\{92\}/);
+  assert.match(coachmark, /translateY: -7/);
+  assert.doesNotMatch(coachmark, /styles\.(eyebrow|title|body)/);
+  assert.match(interaction, /message=\{\[[\s\S]*?emphasis: true, text: 'Bond\.'[\s\S]*?emphasis: true, text: 'one thing'/);
+  assert.match(today, /resolveMossproutJourneyHandoff[\s\S]*?companionJourneyHook=\{mossproutJourneyHandoff\}[\s\S]*?onOpenCompanionJourney=\{openMossproutJourney\}/);
+  assert.match(today, /handoff\?\.state === 'ready_to_begin' \? handoff : null/);
   assert.match(route, /ftueRun\?\.status === 'active'[\s\S]*?ftueRun\.stepId === 'companion\.chapter_zero_return'[\s\S]*?MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID/);
   assert.doesNotMatch(today, /router\.push\(\{ pathname: '\/\(tabs\)\/games'/);
   assert.match(transition, /const commitPhase = useCallback[\s\S]*?phaseRef\.current = next;[\s\S]*?setPhase\(next\);/);

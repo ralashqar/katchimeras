@@ -19,8 +19,8 @@ export type JourneyActivity = {
   dropDefinitionIds: string[];
 };
 
-export type JourneyDayActionKind = 'journey' | 'goal_plan' | 'playful_game';
-export type JourneyDayActionStatus = 'ready' | 'active' | 'completed';
+export type JourneyDayActionKind = 'journey' | 'goal_plan' | 'playful_game' | 'journal_prompt';
+export type JourneyDayActionStatus = 'ready' | 'active' | 'completed' | 'skipped';
 
 export type JourneyDayActionRecord = {
   id: string;

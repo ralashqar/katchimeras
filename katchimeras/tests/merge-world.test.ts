@@ -553,7 +553,65 @@ test('the matched Katchimera card opens a fixed-price Coin collection without eq
   }).changed, false);
 });
 
-test('an early Mossprout day reveals its three-order Garden batch one order at a time', () => {
+test('Mossprout first resident and card unlock atomically from serving its named order', () => {
+  const base = createMossproutChapterZeroState(NOW);
+  const activity = {
+    objectiveId: 'mossprout:objective:place-for-rain',
+    mergeOrderId: 'merge-story:mossprout:dry-pond:place-for-rain',
+    opportunityId: 'mossprout:2026-08-23:resident-order',
+    generatorId: 'wild-garden',
+    dropDefinitionIds: ['nature:waterside:2'],
+  };
+  let matchProjection = reduceMergeWorld(base, {
+    type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23', status: 'activity_in_progress', activity,
+    residentSignals: { completedObjectiveIds: [], matchedCardIds: ['petalimp'], firstResidentSkinId: 'petalimp', habitatStage: 1 }, now: NOW + 3,
+  }).state;
+  const residentOrder = matchProjection.activeOrders.find((order) => order.id === activity.mergeOrderId)!;
+  assert.equal(residentOrder.recipientSkinId, 'petalimp');
+  assert.equal(residentOrder.reward.katchimeraCardId, 'petalimp');
+  assert.deepEqual(matchProjection.mossproutResidentSkinIds, ['mossprout']);
+  assert.equal(matchProjection.ownedKatchimeraCards.some((card) => card.cardId === 'petalimp'), false);
+  const cell = matchProjection.board.findIndex((candidate) => !candidate.locked && candidate.occupant == null);
+  matchProjection = {
+    ...matchProjection,
+    board: matchProjection.board.map((candidate, index) => index === cell ? {
+      ...candidate,
+      occupant: { kind: 'item' as const, instanceId: 'resident-order-shell', definitionId: 'nature:waterside:2' },
+    } : candidate),
+  };
+  matchProjection = reduceMergeWorld(matchProjection, { type: 'serveOrder', orderId: activity.mergeOrderId, now: NOW + 3.5 }).state;
+  assert.deepEqual(matchProjection.mossproutResidentSkinIds, ['mossprout', 'petalimp']);
+  assert.equal(matchProjection.ownedKatchimeraCards.find((card) => card.cardId === 'petalimp')?.acquisition, 'story_resident');
+
+  const storyProjection = reduceMergeWorld(matchProjection, {
+    type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23', status: 'complete', activity: null,
+    residentSignals: {
+      completedObjectiveIds: ['mossprout:objective:nursery-key'], matchedCardIds: ['petalimp'], habitatStage: 2,
+    }, now: NOW + 4,
+  }).state;
+  assert.deepEqual(storyProjection.mossproutResidentSkinIds, ['mossprout', 'petalimp', 'fernip']);
+});
+
+test('advanced Mossprout orders show one different unlocked resident per request', () => {
+  const activeDayIds = Array.from({ length: 28 }, (_, index) => `2026-07-${String(index + 1).padStart(2, '0')}`);
+  const base = {
+    ...createMossproutChapterZeroState(NOW),
+    mossproutBoardProgression: {
+      ...createMossproutChapterZeroState(NOW).mossproutBoardProgression,
+      activeDayIds,
+    },
+  };
+  const state = reduceMergeWorld(base, {
+    type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23', status: 'complete', activity: null,
+    residentSignals: { completedObjectiveIds: [], matchedCardIds: [], habitatStage: 4 }, now: NOW + 1,
+  }).state;
+  const orders = state.activeOrders.filter((order) => order.storyArcId === 'mossprout:casual-garden');
+  assert.equal(orders.length, 3);
+  assert.equal(new Set(orders.map((order) => order.recipientSkinId)).size, 3);
+  assert.ok(orders.every((order) => state.mossproutResidentSkinIds.includes(order.recipientSkinId!)));
+});
+
+test('an early Mossprout day serves its authored batch before continuing one order at a time', () => {
   const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   assert.doesNotMatch(screen, /mossprout:\$\{localDayId\(\)\}:unavailable/);
   assert.match(screen, /mossproutJourney\?\.status === 'activity_in_progress'/);
@@ -598,7 +656,12 @@ test('an early Mossprout day reveals its three-order Garden batch one order at a
     { difficulty: 'major', tiers: [4, 3], coins: 80 },
   ]);
   assert.equal(state.mossproutDailyGardenOrders?.complete, true);
-  assert.equal(state.activeOrders.some((order) => order.storyArcId === 'mossprout:casual-garden'), false);
+  const tailOrder = state.activeOrders.find((order) => order.storyArcId === 'mossprout:casual-garden');
+  assert.match(tailOrder?.id ?? '', /:tail:4$/);
+  assert.equal(tailOrder?.reward.coins, 8);
+  assert.equal(tailOrder?.reward.mergeXp, 7);
+  assert.equal(tailOrder?.reward.friendshipXp, 0);
+  assert.equal(tailOrder?.reward.energy, 0);
 
   const tomorrow = reduceMergeWorld(state, {
     type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-24',
@@ -661,6 +724,12 @@ test('a Mossprout story request preempts routine Garden orders', () => {
   }).state;
   assert.equal(state.activeOrders.some((order) => order.storyArcId === 'mossprout:casual-garden'), false);
   assert.deepEqual(state.activeOrders.find((order) => order.id === 'merge-story:mossprout:memory-nursery:nursery-key')?.requirements.map((requirement) => requirement.definitionId), ['nature:garden:5', 'nature:waterside:4']);
+  const restored = reduceMergeWorld(state, {
+    type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23', status: 'complete', activity: null,
+    now: NOW + 4,
+  }).state;
+  assert.equal(restored.activeOrders.filter((order) => order.storyArcId === 'mossprout:casual-garden').length, 1);
+  assert.equal(restored.activeOrders.some((order) => order.id === 'merge-story:mossprout:memory-nursery:nursery-key'), false);
 });
 
 test('every Pantry tap is tier one and chooses both chains', () => {
@@ -1144,14 +1213,14 @@ test('Merge coin rewards land on the visible HUD coin and count across the conta
   assert.match(currencyHud, /durationMs=\{animateValue \? valueAnimationDurationMs : 0\}[\s\S]*?easing="linear"/);
 });
 
-test('Merge HUD uses the shared Katchimera header and keeps chapter and currency in a secondary row', () => {
+test('Merge HUD stays board-specific with only back navigation and Coins', () => {
   const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
 
-  assert.match(screen, /<KatchimeraPageHeader[\s\S]*?onOpenCards=[\s\S]*?onOpenTrophies=/);
-  assert.match(screen, /leading=\{ftueExclusive \|\| !creatureId \? <KatchimeraBackButton/);
-  assert.match(screen, /companionHeaderLeftInset = Math\.max\(0, KatchaUI\.layout\.phoneGutter - contentLeft\)/);
-  assert.match(screen, /style=\{\[styles\.hudBar, \{ paddingLeft: companionHeaderLeftInset \}\]\}/);
-  assert.match(screen, /trailing=\{<>[\s\S]*?<GameHudItem[\s\S]*?<GameCurrencyHud/);
+  assert.doesNotMatch(screen, /KatchimeraPageHeader/);
+  assert.doesNotMatch(screen, /onOpenCards|onOpenTrophies/);
+  assert.match(screen, /leading=\{<KatchimeraBackButton/);
+  assert.match(screen, /trailing=\{<GameCurrencyHud/);
+  assert.doesNotMatch(screen, /GameHudItem|worldChapter|chapterRatio/);
   assert.doesNotMatch(screen, /<GameHudControl/);
   assert.match(screen, /hudBar: \{ justifyContent: 'space-between' \}/);
   assert.match(screen, /currencyHud: \{ flex: 0, paddingLeft: 18, width: 106 \}/);

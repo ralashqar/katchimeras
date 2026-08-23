@@ -89,6 +89,7 @@ import { homeRepository } from '@/storage/repositories/home-repository';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useCompanionQuickGoals } from '@/hooks/use-companion-quick-goals';
 import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
+import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
 import { useBackfillStatus } from '@/utils/backfill-status';
 import { DiscoveryReveal } from '@/components/katchadeck/world/discovery-reveal';
 import { CompanionAchievementCelebration } from '@/components/katchadeck/world/companion-achievement-celebration';
@@ -146,7 +147,7 @@ import { journalNoteRouteNeedsConfirmation } from '@/utils/journal-routing';
 import { runAfterNativeModalDismiss } from '@/utils/native-modal-navigation';
 import { trackStreakEvent } from '@/utils/streak-sync';
 import { defaultStreakCaptureTarget } from '@/utils/streak-engine';
-import { loadWorldIdentity } from '@/utils/world-identity';
+import { loadWorldIdentity, localDayId } from '@/utils/world-identity';
 import { shiftLocalDate, toLocalDateId } from '@/game/days/date';
 import {
   todayExplorationCreatureStageFrame,
@@ -157,6 +158,7 @@ import {
 import { atmosphereSettingsForPlan, resolveDayAtmosphere } from '@/utils/day-atmosphere';
 import { todayDailyHatchActive, todayHatchRunsInPlace, todayHatchShowsDashboard, todayHatchShowsResident, todayHatchShowsWorldShift } from '@/utils/today-hatch-presentation';
 import { identityForCreature } from '@/utils/katchimera-identity';
+import { resolveMossproutJourneyHandoff } from '@/game/katchimeras/mossprout-journey-handoff';
 import {
   todayKatchimeraExplorationBackgroundKeyForPresentation,
   type TodayExplorationBackgroundKey,
@@ -270,6 +272,7 @@ function HomeScreen() {
   const wallet = useGameWallet();
   const { microcopy, setMicrocopy } = useMicrocopy();
   const ftueRun = useFtueRun();
+  const relationships = useRelationshipProgression();
   const ftueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
   const ftueTodayStep = ftueStep?.surface === 'today' ? ftueStep : null;
   const ftueOpeningOwnsHome = ftueOwnsOpeningHome(ftueRun);
@@ -293,6 +296,16 @@ function HomeScreen() {
     const timer = setInterval(() => setGrowthNow(new Date()), 30_000);
     return () => clearInterval(timer);
   }, [screenFocused]);
+  const mossproutJourneyHandoff = useMemo(() => {
+    const handoff = resolveMossproutJourneyHandoff({
+      dayId: localDayId(growthNow),
+      ftueStatus: ftueRun?.status ?? null,
+      relationships,
+    });
+    // The Day 1 completion already has a dedicated endcap on Mossprout's
+    // screen. Today should only surface the next actionable Journey Day.
+    return handoff?.state === 'ready_to_begin' ? handoff : null;
+  }, [ftueRun?.status, growthNow, relationships]);
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -542,6 +555,18 @@ function HomeScreen() {
       }),
     });
   }, [router, transitionTo]);
+  const openMossproutJourney = useCallback(() => {
+    transitionTo({
+      announcement: mossproutJourneyHandoff?.state === 'ready_to_begin'
+        ? 'Opening Mossprout Journey Day 2'
+        : 'Opening Mossprout',
+      target: 'companion',
+      navigate: () => router.push({
+        pathname: '/katchimera/[creatureId]',
+        params: { creatureId: 'companion:mossprout' },
+      }),
+    });
+  }, [mossproutJourneyHandoff?.state, router, transitionTo]);
   const companionResumeStartedRef = useRef(false);
   useEffect(() => {
     if (ftueRun?.stepId !== 'companion.first_meeting') {
@@ -2634,6 +2659,7 @@ function HomeScreen() {
           actions={presentedNurtureActions}
           bottomInset={insets.bottom}
           completionEvent={queuedCareCompletion?.action.category === 'check_in' ? queuedCareCompletion : flowBusy ? null : queuedCareCompletion}
+          companionJourneyHook={mossproutJourneyHandoff}
           companionWispId={activeWispId}
           day={formingDay}
           eggTargetRef={eggTargetRef}
@@ -2675,6 +2701,7 @@ function HomeScreen() {
           onCareStart={handleCareStart}
           onCompleteQuickGoal={handleNurtureCompleteGoal}
           onCompletionAnimationEnd={finishCareCompletion}
+          onOpenCompanionJourney={openMossproutJourney}
           onOpenQuickGoal={handleNurtureOpenGoal}
           onHatchAssetsReady={handleHatchSubjectReady}
           onHatchAssetsError={handleHatchSubjectError}
@@ -2742,9 +2769,10 @@ function HomeScreen() {
           viewedDay={viewedDay}
           showHatchedActionDock={SHOW_HATCHED_ACTION_DOCK && Boolean(isDay && selectedDay.isToday)}
           showHatchedReflectionCard={SHOW_HATCHED_REFLECTION_CARD}
-          showCompanionInvitation={Boolean(isDay && selectedDay.isToday && selectedHatchedCompanionId)}
+          showCompanionInvitation={Boolean(isDay && selectedDay.isToday && (selectedHatchedCompanionId || mossproutJourneyHandoff))}
           companionName={isDay && selectedDay.creature ? selectedDay.creature.name : undefined}
-          onOpenCompanion={selectedHatchedCompanionId ? () => {
+          companionJourneyHook={mossproutJourneyHandoff}
+          onOpenCompanion={mossproutJourneyHandoff ? openMossproutJourney : selectedHatchedCompanionId ? () => {
             router.push({
               pathname: '/katchimera/[creatureId]',
               params: { creatureId: selectedHatchedCompanionId },

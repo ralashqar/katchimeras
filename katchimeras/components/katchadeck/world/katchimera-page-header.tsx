@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useState, type RefObject } from 'react';
+import { Pressable, StyleSheet, View, type View as ViewType } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
@@ -13,6 +13,7 @@ export function KatchimeraPageHeader({
   bondProgress: suppliedBondProgress,
   creatureId,
   includeSafeArea = true,
+  bondTargetRef,
   onBack,
   onOpenCards,
   onOpenTrophies,
@@ -20,6 +21,7 @@ export function KatchimeraPageHeader({
   bondProgress?: CompanionBondProgress;
   creatureId?: string;
   includeSafeArea?: boolean;
+  bondTargetRef?: RefObject<ViewType | null>;
   onBack: () => void;
   onOpenCards?: () => void;
   onOpenTrophies?: () => void;
@@ -37,7 +39,7 @@ export function KatchimeraPageHeader({
       <View style={styles.side}><KatchimeraBackButton onPress={onBack} /></View>
       <View style={styles.center}>
         {bondProgress ? (
-          <View accessibilityLabel={`${bondProgress.relationshipStage} bond, ${Math.round(bondProgress.relationshipStageRatio * 100)} percent to the next stage`} style={styles.bondPill}>
+          <View ref={bondTargetRef} accessibilityLabel={`${bondProgress.relationshipStage} bond, ${Math.round(bondProgress.relationshipStageRatio * 100)} percent to the next stage`} style={styles.bondPill}>
             <BondIconArt size={25} />
             <View style={styles.bondCopy}>
               <ThemedText numberOfLines={1} style={styles.bondLabel} lightColor="#FFF6D8" darkColor="#FFF6D8">{bondProgress.relationshipStage}</ThemedText>

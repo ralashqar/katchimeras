@@ -6,21 +6,19 @@ import { ActivityIndicator, StyleSheet, View, useWindowDimensions, type LayoutCh
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { KatchimeraCardRevealModal } from '@/components/katchadeck/collection/katchimera-card-deck-carousel';
 import { RewardSplash, type RewardSplashItem } from '@/components/katchadeck/ui/reward-splash';
 import { GameCurrencyHud } from '@/components/katchadeck/ui/game-currency-hud';
-import { GameHudBar, GameHudItem } from '@/components/katchadeck/ui/game-primitives';
+import { GameHudBar } from '@/components/katchadeck/ui/game-primitives';
 import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
-import { KatchimeraPageHeader } from '@/components/katchadeck/world/katchimera-page-header';
 import { KatchaInlineNotice } from '@/components/katchadeck/ui/katcha-inline-notice';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchaSurfaceProvider } from '@/components/katchadeck/ui/katcha-surface';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   MERGE_GENERATORS_BY_ID,
   MERGE_ITEMS_BY_ID,
   MERGE_CHARACTER_NAMES,
 } from '@/constants/merge-world-catalog';
-import { mossproutWorldChapterForActiveDays } from '@/constants/mossprout-world-chapters';
 import { mergeWorldGeneratorArt } from '@/constants/merge-world-art';
 import { MEMORY_CARDS_BY_ID } from '@/constants/memory-card-catalog';
 import { RARE_MEMORY_CARD_REVEAL_ART, VEILED_MEMORY_CARD_ART, memoryCardArt } from '@/constants/memory-card-art';
@@ -34,12 +32,12 @@ import type { FtueCueDefinition, FtueSpotlightDefinition } from '@/features/onbo
 import { useGameFeedback } from '@/features/ui/game-feedback-provider';
 import { GameUI } from '@/constants/game-ui';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
-import { KatchaUI } from '@/constants/katcha-ui';
 import {
   createMergeBoardSession,
   mergeFtueInteractionKey,
   MergeFtueInteractionCoordinator,
 } from '@/features/onboarding/merge-ftue-interaction-coordinator';
+import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { MergeCharacterId, MergeOrder, MergeWorldCommand } from '@/types/merge-world';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
 import { mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds } from '@/utils/merge-world/engine';
@@ -51,6 +49,7 @@ import { resolveCreatureArtSource } from '@/utils/creature-art';
 import { beginMossproutJourneyReturn, mossproutJourneyForDay, recordMossproutFirstGardenRestored, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
+import { useKatchimeraCards } from '@/hooks/use-katchimera-cards';
 import { familyIdFromCompanionId } from '@/constants/katchimera-skins';
 import { localDayId } from '@/utils/world-identity';
 
@@ -81,6 +80,8 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const [selectedCell, setSelectedCell] = useState<number | null>(null);
   const [inspectedCell, setInspectedCell] = useState<number | null>(null);
   const [revealedMemoryCardId, setRevealedMemoryCardId] = useState<string | null>(null);
+  const [revealedKatchimeraCardId, setRevealedKatchimeraCardId] = useState<KatchimeraSkinId | null>(null);
+  const { cards: mossproutCards } = useKatchimeraCards('mossprout');
   const [boardAreaHeight, setBoardAreaHeight] = useState(0);
   const [story, setStory] = useState(loadFeastleStory);
   const relationships = useRelationshipProgression();
@@ -134,8 +135,6 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   ftueStepRef.current = ftueStep;
   const interactionSessionKey = mergeFtueInteractionKey(ftueRun, active);
   const contentWidth = Math.min(width - 12, 600);
-  const contentLeft = Math.max(0, (width - contentWidth) / 2);
-  const companionHeaderLeftInset = Math.max(0, KatchaUI.layout.phoneGutter - contentLeft);
   const flowReady = !loading && state != null;
   useGameSurfaceReadiness('merge', {
     background: backgroundReady,
@@ -587,6 +586,9 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     if (result?.changed && servedOrder?.signature && servedOrder.characterId !== 'feastle' && servedOrder.characterId !== 'mossprout' && !isAuthoredCohortFamily(servedOrder.characterId)) {
       setReturnCharacterId(servedOrder.characterId);
     }
+    if (result?.changed && servedOrder?.reward.katchimeraCardId) {
+      setRevealedKatchimeraCardId(servedOrder.reward.katchimeraCardId);
+    }
     setPresentedCoins(null);
     setCoinValueAnimationDurationMs(0);
     if (!result?.changed) setServeHiddenItemIds(new Set());
@@ -685,38 +687,19 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     return <View style={styles.loading}><ActivityIndicator color={Lantern.ember300} size="large" /><ThemedText darkColor="#FFF0CE">Opening the pantry…</ThemedText></View>;
   }
 
-  const activeGardenDays = state.mossproutBoardProgression.activeDayIds.length;
-  const worldChapter = mossproutWorldChapterForActiveDays(activeGardenDays);
-  const chapterRatio = Math.max(0, Math.min(1,
-    (Math.max(1, activeGardenDays) - worldChapter.firstActiveDay + 1)
-      / (worldChapter.finalActiveDay - worldChapter.firstActiveDay + 1),
-  ));
   return (
     <View onLayout={() => setScreenLayoutNonce((nonce) => nonce + 1)} ref={screenRef} style={styles.screen}>
       <MergeCommandFeedback />
       <View style={[styles.game, { paddingTop: Math.max(insets.top + 3, 7), paddingBottom: Math.max(insets.bottom + 3, 7), width: contentWidth }]}>
-        {!ftueExclusive && creatureId ? <KatchimeraPageHeader
-          creatureId={creatureId}
-          includeSafeArea={false}
-          onBack={() => router.back()}
-          onOpenCards={() => router.push({ pathname: '/katchimera/[creatureId]/cards', params: { creatureId } })}
-          onOpenTrophies={() => router.push({ pathname: '/katchimera/[creatureId]/achievements', params: { creatureId } })}
-        /> : null}
         <GameHudBar
           density="compact"
-          leading={ftueExclusive || !creatureId ? <KatchimeraBackButton
+          leading={<KatchimeraBackButton
             accessibilityLabel={creatureId ? 'Return to Mossprout' : 'Open legacy games'}
             onPress={() => ftueExclusive ? handleBlockedFtueInteraction() : creatureId ? router.back() : router.push('/legacy-games')}
-          /> : undefined}
-          style={[styles.hudBar, { paddingLeft: companionHeaderLeftInset }]}
+          />}
+          style={styles.hudBar}
           tone="glass"
-          trailing={<>
-            <GameHudItem accessibilityLabel={`Mossprout chapter ${worldChapter.number}: ${worldChapter.title}`} style={styles.levelPill} tone="glass">
-              <IconSymbol color={GameUI.color.goldStrong} name="leaf.fill" size={14} />
-              <ThemedText numberOfLines={1} style={styles.levelValue} lightColor={GameUI.color.ink} darkColor={GameUI.color.ink}>{worldChapter.title}</ThemedText>
-              <View pointerEvents="none" style={styles.levelTrack}><View style={[styles.levelFill, { width: `${chapterRatio * 100}%` }]} /></View>
-            </GameHudItem>
-            <GameCurrencyHud balances={[
+          trailing={<GameCurrencyHud balances={[
               {
                 animateValue: presentedCoins != null,
                 art: GAME_CURRENCY_ART.coins,
@@ -726,8 +709,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
                 value: presentedCoins ?? state.coins,
                 valueAnimationDurationMs: coinValueAnimationDurationMs,
               },
-            ]} style={styles.currencyHud} tone="glass" />
-          </>}
+            ]} style={styles.currencyHud} tone="glass" />}
         />
         {/* Static game geometry: onboarding guidance must never be inserted in
             this flex column. Future guidance belongs in an absolute world-space
@@ -852,6 +834,14 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       {error ? <KatchaSurfaceProvider surface="parchment"><View style={[styles.errorBanner, { top: Math.max(insets.top + 56, 64) }]}><KatchaInlineNotice body={error} title="Merge paused" tone="danger" /></View></KatchaSurfaceProvider> : null}
       <MergeServeRewardOverlay flight={serveFlight} onCoinArrive={handleCoinArrive} onEnergyArrive={handleEnergyArrive} onFinish={finishServeAnimation} onItemsArrive={handleServeItemsArrive} />
       <MergeParcelFlightOverlay flight={parcelFlight} onFinish={finishParcelFlight} onItemArrive={handleParcelItemArrive} />
+      <KatchimeraCardRevealModal
+        cardId={revealedKatchimeraCardId}
+        cards={mossproutCards}
+        onDone={() => {
+          setRevealedKatchimeraCardId(null);
+          if (creatureId) router.back();
+        }}
+      />
       {active && mergeCelebrationRewards.length ? <RewardSplash
         items={mergeCelebrationRewards}
         onItemSeen={(receiptId) => receiptId.startsWith('companion-discovery:')
@@ -906,10 +896,6 @@ const styles = StyleSheet.create({
   loading: { alignItems: 'center', backgroundColor: '#2B1B13', flex: 1, gap: 12, justifyContent: 'center' },
   currencyHud: { flex: 0, paddingLeft: 18, width: 106 },
   hudBar: { justifyContent: 'space-between' },
-  levelPill: { gap: 3, minWidth: 48, overflow: 'hidden', paddingHorizontal: 7 },
-  levelValue: { ...GameUI.type.numeric, fontSize: 13 },
-  levelTrack: { backgroundColor: 'rgba(68,51,31,0.12)', bottom: 0, height: 2.5, left: 8, overflow: 'hidden', position: 'absolute', right: 8 },
-  levelFill: { backgroundColor: GameUI.color.gold, height: 2.5 },
   mergeArea: { flex: 1, marginTop: 18, minHeight: 0, position: 'relative' },
   serviceCounter: { alignSelf: 'center', height: 32, marginTop: -29, position: 'relative', zIndex: 1 },
   counterUpperLip: { backgroundColor: '#FFE876', height: 3, left: 0, position: 'absolute', right: 0, top: 0 },

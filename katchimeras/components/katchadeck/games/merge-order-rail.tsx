@@ -22,6 +22,7 @@ import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunbur
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppFontFamilies } from '@/constants/theme';
+import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import { MERGE_CHARACTER_NAMES } from '@/constants/merge-world-catalog';
 import { MERGE_WORLD_UI_ART } from '@/constants/merge-world-ui-art';
 import type { MergeRailInteractionGate } from '@/features/onboarding/merge-ftue';
@@ -288,7 +289,10 @@ function OrderTrayCard({ entry, index, interactionAllowed, interactionLocked, on
   const [serving, setServing] = useState(false);
   const servingRef = useRef(false);
   const itemRefs = useRef<(View | null)[]>([]);
-  const characterSource = resolveCreatureArtSource(CHARACTER_VISUALS[order.characterId], { lod: 'medium' });
+  const recipient = order.recipientSkinId ? katchimeraSkinById.get(order.recipientSkinId) : null;
+  const recipientName = recipient?.displayName ?? MERGE_CHARACTER_NAMES[order.characterId];
+  const recipientVisualKey = recipient?.visualKey ?? CHARACTER_VISUALS[order.characterId];
+  const characterSource = resolveCreatureArtSource(recipientVisualKey, { lod: 'medium' });
   const serveTargetKey = `order-serve:${order.id}`;
   const setServeTargetRef = useCallback(
     (view: View | null) => onRailTargetRef?.(serveTargetKey, view),
@@ -328,7 +332,7 @@ function OrderTrayCard({ entry, index, interactionAllowed, interactionLocked, on
   return (
     <Pressable
       accessible={!interactionLocked}
-      accessibilityLabel={`${MERGE_CHARACTER_NAMES[order.characterId]} order, ${order.title}${ready ? ', ready to serve' : ''}`}
+      accessibilityLabel={`${recipientName} order, ${order.title}${ready ? ', ready to serve' : ''}`}
       accessibilityState={{ disabled: interactionLocked && !interactionAllowed }}
       onLongPress={interactionLocked ? onBlockedInteraction : onReroll}
       onPress={interactionLocked ? onBlockedInteraction : ready ? beginServe : undefined}
@@ -352,7 +356,7 @@ function OrderTrayCard({ entry, index, interactionAllowed, interactionLocked, on
         <Pressable
           accessible={!interactionLocked}
           accessibilityHint="Shows the rewards for this request"
-          accessibilityLabel={`${MERGE_CHARACTER_NAMES[order.characterId]} reward details`}
+          accessibilityLabel={`${recipientName} reward details`}
           accessibilityRole="button"
           onPress={(event) => {
             event.stopPropagation();
@@ -363,7 +367,7 @@ function OrderTrayCard({ entry, index, interactionAllowed, interactionLocked, on
             setRewardOpen((current) => !current);
           }}
           style={({ pressed }) => [styles.characterButton, pressed && styles.characterPressed]}>
-          <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={`merge-order-${order.characterId}`} source={characterSource} style={styles.character} transition={0} />
+          <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={`merge-order-${order.recipientSkinId ?? order.characterId}`} source={characterSource} style={styles.character} transition={0} />
         </Pressable>
       </Animated.View>
       {rewardOpen ? <OrderRewardPopup order={order} reduceMotion={reduceMotion} /> : null}

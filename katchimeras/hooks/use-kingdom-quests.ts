@@ -228,7 +228,12 @@ function loadIdentityAwareCompanionBondState() {
 function settleMossproutJourneyBond(dayId: string) {
   const journey = mossproutJourneyForDay(relationshipProgressionRepository.load(), dayId);
   const receipt = journey?.status === 'complete' ? journey.completionReceipt : null;
-  if (!receipt) return;
+  if (!journey || !receipt) return;
+  // The first Journey Day deliberately settles after the player chooses one
+  // optional action card. This makes the visible action the cause of the Bond
+  // reward and avoids turning all three cards into a checklist.
+  if (journey.beatId === 'quiet-patch:first-flower'
+    && !journey.actions.some((action) => action.kind !== 'journey' && action.status === 'completed')) return;
   const current = loadIdentityAwareCompanionBondState();
   const result = syncCompanionBondEvent(current, {
     id: receipt.id,
@@ -239,6 +244,40 @@ function settleMossproutJourneyBond(dayId: string) {
     dayId: receipt.dayId,
   }, { queueCelebration: true });
   if (result.awarded) saveCompanionBondState(result.state);
+}
+
+function isMossproutJourneyConversation(definitionId: string, dayId?: string | null) {
+  const relationships = relationshipProgressionRepository.load();
+  const journey = dayId
+    ? mossproutJourneyForDay(relationships, dayId)
+    : [...relationships.journeyDays].reverse().find((candidate) => candidate.familyId === 'mossprout' && (
+        candidate.openingConversationId === definitionId
+        || candidate.profileConversationId === definitionId
+        || candidate.returnConversationId === definitionId
+        || candidate.actions.some((action) => action.definitionId === definitionId)
+      ));
+  return Boolean(journey && (
+    journey.openingConversationId === definitionId
+    || journey.profileConversationId === definitionId
+    || journey.returnConversationId === definitionId
+    || journey.actions.some((action) => action.definitionId === definitionId)
+  ));
+}
+
+/**
+ * Commits the relationship side of a completed conversation before its UI is
+ * dismissed. The mounted completion effect below remains as crash recovery,
+ * but normal flows no longer return to the hub and publish this state later.
+ */
+function settleMossproutJourneyConversation(session: ConversationSession) {
+  if (session.preview || session.status !== 'completed' || !isMossproutJourneyConversation(session.definitionId, session.servedDayId)) return;
+  const completedAt = session.completedAt ?? session.updatedAt;
+  relationshipProgressionRepository.update((current) => completeMossproutJourneyConversation(
+    current,
+    session.definitionId,
+    completedAt,
+  ));
+  settleMossproutJourneyBond(session.servedDayId);
 }
 
 function conversationHasIndependentBond(definitionId: string, dayId?: string | null) {
@@ -998,17 +1037,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     const completedAt = selectedConversationSession.completedAt ?? selectedConversationSession.updatedAt;
     const match = /^feastle:friendship:(\d+)$/.exec(selectedConversationSession.definitionId);
     if (match) completeFeastleConversation(Number(match[1]), completedAt);
-    if (selectedConversationSession.definitionId.startsWith('mossprout:dry-pond:')
-      || selectedConversationSession.definitionId === 'mossprout:game:form-finder'
-      || selectedConversationSession.definitionId.startsWith('mossprout:quiet-patch:')
-      || selectedConversationSession.definitionId === 'mossprout:ftue:chapter-zero-return') {
-      relationshipProgressionRepository.update((current) => completeMossproutJourneyConversation(
-        current,
-        selectedConversationSession.definitionId,
-        completedAt,
-      ));
-      settleMossproutJourneyBond(selectedConversationSession.servedDayId);
-    }
+    settleMossproutJourneyConversation(selectedConversationSession);
     if (selectedConversationDefinition) {
       recordIndependentMossproutActionCompletion(selectedConversationSession, selectedConversationDefinition);
     }
@@ -1778,14 +1807,16 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         relationshipProgressionRepository.update((current) => (
           completeMossproutJourneyGoalPlan(current, today.isoDate)
         ));
+        settleMossproutJourneyBond(today.isoDate);
+      } else {
+        awardBond({
+          id: `journey-conversation:${selectedResident.creature.creatureId}:${sessionId}`,
+          creatureId: selectedResident.creature.creatureId,
+          kind: 'goal_created',
+          occurredAt: Date.now(),
+          dayId: today?.isoDate,
+        });
       }
-      awardBond({
-        id: `journey-conversation:${selectedResident.creature.creatureId}:${sessionId}`,
-        creatureId: selectedResident.creature.creatureId,
-        kind: 'goal_created',
-        occurredAt: Date.now(),
-        dayId: today?.isoDate,
-      });
       setMicrocopy(selectedFamilyId === 'mossprout' ? 'Nature direction chosen' : 'Goal plan updated');
     }
     return result.completed ? result.suggestedQuickGoalIds : [];
@@ -2409,6 +2440,20 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     const occurredAt = Date.now();
     const result = selectedConversationSession.insightResult;
     const displayOnly = node.persistence === 'display_only';
+    if (!selectedConversationSession.preview
+      && selectedConversationDefinition.id === 'mossprout:ftue:chapter-zero-return') {
+      const firstResidentByResult: Record<string, string> = {
+        'quiet-clearing': 'fernip',
+        'curious-grove': 'petalimp',
+        'shared-patch': 'blossle',
+      };
+      const residentId = firstResidentByResult[result.resultId];
+      if (residentId) relationshipProgressionRepository.update((current) => recordMossproutMatchedCard(
+        current,
+        selectedConversationSession.servedDayId,
+        residentId,
+      ));
+    }
     let outcomeSession = recordConversationOutcome(selectedConversationSession, `${accept ? 'insight-confirmed' : 'insight-dismissed'}:${node.insightKey}`, occurredAt);
     outcomeSession = continueConversation(outcomeSession, selectedConversationDefinition, occurredAt);
     if (accept) {
@@ -2701,6 +2746,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     ) {
       nextSession = continueConversation(nextSession, selectedConversationDefinition, occurredAt);
     }
+    settleMossproutJourneyConversation(nextSession);
     recordIndependentMossproutActionCompletion(nextSession, selectedConversationDefinition);
     setCompanionContentState((current) => {
       let next = current;
@@ -2798,11 +2844,12 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     });
     const feastleLevel = selectedConversationDefinition?.id.match(/^feastle:friendship:(\d+)$/)?.[1];
     if (feastleLevel) completeFeastleConversation(Number(feastleLevel));
-    if (selectedConversationDefinition?.id.startsWith('mossprout:dry-pond:')
-      || selectedConversationDefinition?.id === 'mossprout:game:form-finder'
-      || selectedConversationDefinition?.id.startsWith('mossprout:quiet-patch:')
-      || selectedConversationDefinition?.id === 'mossprout:ftue:chapter-zero-return') {
-      relationshipProgressionRepository.update((current) => completeMossproutJourneyConversation(current, selectedConversationDefinition.id));
+    if (selectedConversationDefinition && isMossproutJourneyConversation(selectedConversationDefinition.id, selectedConversationSession.servedDayId)) {
+      relationshipProgressionRepository.update((current) => completeMossproutJourneyConversation(
+        current,
+        selectedConversationDefinition.id,
+        occurredAt,
+      ));
       settleMossproutJourneyBond(selectedConversationSession.servedDayId);
     }
     const authoredMatch = selectedConversationDefinition?.id.match(/^(baristabbit|steppling|voyagle|flexel|bedrotte):story:(\d+)$/);

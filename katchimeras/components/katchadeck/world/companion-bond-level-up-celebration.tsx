@@ -37,7 +37,19 @@ const SPLASH_INK = '#173D57';
 
 export type CompanionBondCelebrationVariant = 'journey_complete' | 'level_up';
 
-export function CompanionBondLevelUpCelebration({ onContinue, receipt, variant = 'level_up' }: {
+export type CompanionJourneyDayHandoffContent = {
+  dayNumber: number;
+  gardenNote: string;
+  recap: readonly string[];
+  tomorrowPreview: string;
+};
+
+export function CompanionBondLevelUpCelebration({ autoContinue = true, continueLabel, dismissible = true, journeyHandoff, message, onContinue, receipt, variant = 'level_up' }: {
+  autoContinue?: boolean;
+  continueLabel?: string;
+  dismissible?: boolean;
+  journeyHandoff?: CompanionJourneyDayHandoffContent;
+  message?: string;
   onContinue: () => void;
   receipt: CompanionBondAwardReceipt;
   variant?: CompanionBondCelebrationVariant;
@@ -78,10 +90,10 @@ export function CompanionBondLevelUpCelebration({ onContinue, receipt, variant =
   }, []);
 
   useEffect(() => {
-    if (screenReaderEnabled) return;
+    if (screenReaderEnabled || !autoContinue) return;
     const timer = setTimeout(onContinue, reduceMotion ? 700 : 2800);
     return () => clearTimeout(timer);
-  }, [onContinue, reduceMotion, screenReaderEnabled]);
+  }, [autoContinue, onContinue, reduceMotion, screenReaderEnabled]);
 
   const oldStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.value, [0, 0.62, 1], [1, 0, 0]),
@@ -99,7 +111,7 @@ export function CompanionBondLevelUpCelebration({ onContinue, receipt, variant =
     <Modal
       animationType={reduceMotion ? 'none' : 'fade'}
       navigationBarTranslucent
-      onRequestClose={onContinue}
+      onRequestClose={dismissible ? onContinue : () => {}}
       presentationStyle="fullScreen"
       statusBarTranslucent
       visible>
@@ -138,8 +150,10 @@ export function CompanionBondLevelUpCelebration({ onContinue, receipt, variant =
               style={[styles.title, { fontSize: titleSize, lineHeight: titleSize + 7 }]}
               lightColor={SPLASH_INK}
               darkColor={SPLASH_INK}>
-              {journeyComplete
-                ? `A day with ${family?.displayName ?? 'your Katchimera'}`
+                {journeyComplete
+                ? journeyHandoff
+                  ? `Journey Day ${journeyHandoff.dayNumber} complete`
+                  : `A day with ${family?.displayName ?? 'your Katchimera'}`
                 : `${family?.displayName ?? 'Katchimera'} grew closer`}
             </ThemedText>
           </Animated.View>
@@ -192,7 +206,32 @@ export function CompanionBondLevelUpCelebration({ onContinue, receipt, variant =
             <ThemedText selectable style={styles.total} lightColor="#4F3A25" darkColor="#4F3A25">
               {receipt.afterTotal} total bond
             </ThemedText>
+            {message ? <ThemedText selectable style={styles.message} lightColor="#4F3A25" darkColor="#4F3A25">{message}</ThemedText> : null}
           </View>
+
+          {journeyComplete && journeyHandoff ? (
+            <View style={styles.handoffCard}>
+              <ThemedText style={styles.handoffEyebrow} lightColor="#6E541F" darkColor="#6E541F">Today</ThemedText>
+              <View style={styles.recapList}>
+                {journeyHandoff.recap.map((item) => (
+                  <View key={item} style={styles.recapRow}>
+                    <IconSymbol color="#628447" name="checkmark.circle.fill" size={17} />
+                    <ThemedText style={styles.recapText} lightColor="#3E3525" darkColor="#3E3525">{item}</ThemedText>
+                  </View>
+                ))}
+              </View>
+              <View style={styles.handoffDivider} />
+              <ThemedText style={styles.handoffTitle} lightColor="#263B2C" darkColor="#263B2C">Friendship grows across real days</ThemedText>
+              <ThemedText style={styles.handoffBody} lightColor="#4F5B4A" darkColor="#4F5B4A">
+                Journey Days are new chapters with Mossprout. A new one can begin on a new day.
+              </ThemedText>
+              <View style={styles.tomorrowRow}>
+                <IconSymbol color="#7A6A31" name="sparkles" size={16} />
+                <ThemedText style={styles.tomorrowText} lightColor="#4A412A" darkColor="#4A412A">{journeyHandoff.tomorrowPreview}</ThemedText>
+              </View>
+              <ThemedText style={styles.gardenNote} lightColor="#5A664D" darkColor="#5A664D">{journeyHandoff.gardenNote}</ThemedText>
+            </View>
+          ) : null}
         </ScrollView>
 
         <View style={[styles.bottomDock, { bottom: bottomDockBottom }]}>
@@ -200,7 +239,7 @@ export function CompanionBondLevelUpCelebration({ onContinue, receipt, variant =
             accessibilityRole="button"
             onPress={onContinue}
             style={({ pressed }) => [styles.continueButton, pressed && styles.pressed]}>
-            <ThemedText style={styles.continueLabel} lightColor="#FFF9EC" darkColor="#FFF9EC">{screenReaderEnabled ? 'Return to story' : 'Return now'}</ThemedText>
+            <ThemedText style={styles.continueLabel} lightColor="#FFF9EC" darkColor="#FFF9EC">{continueLabel ?? (screenReaderEnabled ? 'Return to story' : 'Return now')}</ThemedText>
           </Pressable>
         </View>
       </View>
@@ -270,6 +309,18 @@ const styles = StyleSheet.create({
   bondName: { alignItems: 'center', flexDirection: 'row', gap: 7 },
   bondLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 17, fontWeight: '900' },
   total: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontVariant: ['tabular-nums'], fontWeight: '700' },
+  message: { fontFamily: AppFontFamilies.manrope, fontSize: 12, fontWeight: '700', lineHeight: 17, maxWidth: 280, paddingTop: 4, textAlign: 'center' },
+  handoffCard: { backgroundColor: 'rgba(255,249,224,0.9)', borderColor: 'rgba(255,255,255,0.8)', borderRadius: 20, borderWidth: 1, gap: 7, maxWidth: 520, paddingHorizontal: 16, paddingVertical: 13, width: '100%', zIndex: 2 },
+  handoffEyebrow: { fontFamily: AppFontFamilies.manrope, fontSize: 10, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase' },
+  recapList: { gap: 5 },
+  recapRow: { alignItems: 'center', flexDirection: 'row', gap: 7 },
+  recapText: { flex: 1, fontFamily: AppFontFamilies.manrope, fontSize: 12, fontWeight: '800', lineHeight: 16 },
+  handoffDivider: { backgroundColor: 'rgba(108,91,54,0.16)', height: 1, marginVertical: 2 },
+  handoffTitle: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 17, fontWeight: '700', lineHeight: 20 },
+  handoffBody: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '700', lineHeight: 16 },
+  tomorrowRow: { alignItems: 'center', backgroundColor: 'rgba(230,205,117,0.2)', borderRadius: 12, flexDirection: 'row', gap: 7, paddingHorizontal: 10, paddingVertical: 8 },
+  tomorrowText: { flex: 1, fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '800', lineHeight: 15 },
+  gardenNote: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '700', lineHeight: 14 },
   bottomDock: { alignItems: 'center', left: 0, paddingHorizontal: 22, position: 'absolute', right: 0, zIndex: 5 },
   continueButton: { alignItems: 'center', backgroundColor: '#315F7D', borderCurve: 'continuous', borderRadius: 17, boxShadow: '0 8px 18px rgba(34,73,99,0.28)', justifyContent: 'center', maxWidth: 520, minHeight: 52, paddingHorizontal: 22, width: '100%' },
   continueLabel: { ...KatchaUI.type.action, textAlign: 'center' },

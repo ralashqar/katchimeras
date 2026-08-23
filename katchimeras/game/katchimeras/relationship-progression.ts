@@ -10,17 +10,17 @@ export type MossproutDryPondBeatId = typeof MOSSPROUT_DRY_POND_BEATS[number];
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
 const DRY_POND_ACTIVITY = {
-  'dry-pond:day-2': {
+  'dry-pond:day-1': {
     objectiveId: 'mossprout:objective:place-for-rain',
     mergeOrderId: 'merge-story:mossprout:dry-pond:place-for-rain',
     drops: ['nature:waterside:1', 'nature:waterside:1', 'nature:garden:1', 'nature:garden:1'],
   },
-  'dry-pond:day-3': {
+  'dry-pond:day-2': {
     objectiveId: 'mossprout:objective:bank-that-holds',
     mergeOrderId: 'merge-story:mossprout:dry-pond:bank-that-holds',
     drops: ['nature:garden:1', 'nature:garden:1', 'nature:garden:1', 'nature:garden:1', 'nature:waterside:1'],
   },
-  'dry-pond:day-4': {
+  'dry-pond:day-3': {
     objectiveId: 'mossprout:objective:little-rain-garden',
     mergeOrderId: 'merge-story:mossprout:dry-pond:little-rain-garden',
     drops: ['nature:garden:3', 'nature:waterside:2', 'nature:garden:1', 'nature:garden:1', 'nature:garden:1', 'nature:garden:1', 'nature:waterside:1', 'nature:waterside:1'],
@@ -57,6 +57,20 @@ export function normalizeRelationshipProgressState(value: unknown): Relationship
     ? candidate.mossproutDailyActionDecks.map(normalizeMossproutDailyActionDeck).filter((deck): deck is MossproutDailyActionDeck => Boolean(deck)).slice(-14)
     : [];
   return { schemaVersion: 2, journeyDays, stories, acknowledgedActionOutroIds, skippedActionIds, completedActionOutros, mossproutDailyActionDecks };
+}
+
+/** Applies newly authored Day 1 choices to an already-loaded repository cache. */
+export function reconcileMossproutDayOneChoices(state: RelationshipProgressState): RelationshipProgressState {
+  let changed = false;
+  const journeyDays = state.journeyDays.map((journey) => {
+    if (journey.familyId !== 'mossprout' || journey.beatId !== 'quiet-patch:first-flower') return journey;
+    const authoredIds = journeyActions(journey.beatId).map((action) => action.id);
+    const storedIds = new Set(journey.actions.map((action) => action.id));
+    if (authoredIds.every((id) => storedIds.has(id))) return journey;
+    changed = true;
+    return { ...journey, actions: normalizeJourneyActions(journey) };
+  });
+  return changed ? { ...state, journeyDays } : state;
 }
 
 export function mossproutDailyActionDeck(state: RelationshipProgressState, dayId: string): MossproutDailyActionDeck {
@@ -266,6 +280,14 @@ export function mossproutJourneyForDay(state: RelationshipProgressState, dayId: 
   return journey?.familyId === 'mossprout' ? journey : null;
 }
 
+export function mossproutFirstResidentCardId(state: RelationshipProgressState): string | null {
+  return state.journeyDays.find((journey) => (
+    journey.familyId === 'mossprout'
+    && journey.beatId === 'quiet-patch:first-flower'
+    && typeof journey.matchedCardId === 'string'
+  ))?.matchedCardId ?? null;
+}
+
 export function startMossproutJourneyDay(
   state: RelationshipProgressState,
   dayId: string,
@@ -295,7 +317,7 @@ export function startMossproutJourneyDay(
     beatId,
     openingConversationId,
     profileConversationId: null,
-    matchedCardId: null,
+    matchedCardId: beatId === 'dry-pond:day-1' ? mossproutFirstResidentCardId(state) : null,
     returnConversationId: null,
     activity: null,
     resolutionAvailableAt: null,
@@ -334,7 +356,7 @@ export function completeMossproutJourneyOpening(
     generatorId: 'wild-garden',
     dropDefinitionIds: [],
   } : null;
-  const profileConversationId = journey.beatId === 'dry-pond:day-2' ? 'mossprout:game:form-finder' : null;
+  const profileConversationId = null;
   return replaceJourney(state, journey.id, {
     ...journey,
     status: activity ? 'activity_available' : 'living',
@@ -350,7 +372,7 @@ export function recordMossproutMatchedCard(
   cardId: string,
 ): RelationshipProgressState {
   const journey = mossproutJourneyForDay(state, dayId);
-  if (!journey || journey.beatId !== 'dry-pond:day-2' || journey.matchedCardId === cardId) return state;
+  if (!journey || !['quiet-patch:first-flower', 'dry-pond:day-2'].includes(journey.beatId) || journey.matchedCardId === cardId) return state;
   return replaceJourney(state, journey.id, { ...journey, matchedCardId: cardId });
 }
 
@@ -473,7 +495,7 @@ export function completeMossproutJourneyGoalPlan(
   now = Date.now(),
 ): RelationshipProgressState {
   const journey = mossproutJourneyForDay(state, dayId);
-  const action = journey?.actions.find((candidate) => candidate.kind === 'goal_plan' && candidate.status !== 'completed');
+  const action = journey?.actions.find((candidate) => candidate.kind === 'goal_plan' && (candidate.status === 'ready' || candidate.status === 'active'));
   if (!journey || !action?.definitionId) return state;
   return completeJourneyAction(state, journey, action.definitionId, now);
 }
@@ -610,10 +632,54 @@ function normalizeJourneyDay(journey: JourneyDayRecord): JourneyDayRecord {
     activity: journey.activity?.kind === 'merge' ? journey.activity : null,
     resolutionAvailableAt: Number.isFinite(journey.resolutionAvailableAt) ? journey.resolutionAvailableAt : null,
     completionReceipt: journey.completionReceipt ?? null,
-    actions: Array.isArray(journey.actions)
-      ? journey.actions.map((action) => ({ ...action, outroAcknowledgedAt: action.outroAcknowledgedAt ?? null }))
-      : journeyActions(journey.beatId),
+    actions: normalizeJourneyActions(journey),
   };
+}
+
+/**
+ * Day 1's optional choice set was expanded after some FTUE journeys had
+ * already been persisted. Reconcile that one authored set by stable action ID
+ * so an in-progress save gains the missing choices without losing lifecycle
+ * state from choices it already knows about.
+ */
+function normalizeJourneyActions(journey: JourneyDayRecord): JourneyDayActionRecord[] {
+  const stored = Array.isArray(journey.actions)
+    ? journey.actions.map((action) => ({ ...action, outroAcknowledgedAt: action.outroAcknowledgedAt ?? null }))
+    : [];
+  if (journey.beatId !== 'quiet-patch:first-flower') {
+    return stored.length ? stored : journeyActions(journey.beatId);
+  }
+
+  const authored = journeyActions(journey.beatId);
+  const storedById = new Map(stored.map((action) => [action.id, action]));
+  const completedChoice = stored.find((action) => action.kind !== 'journey' && action.status === 'completed');
+  const choiceClosedAt = completedChoice?.completedAt ?? journey.completedAt;
+  const authoredIds = new Set(authored.map((action) => action.id));
+  const reconciled = authored.map((action): JourneyDayActionRecord => {
+    const existing = storedById.get(action.id);
+    if (existing) return {
+      ...action,
+      status: existing.status,
+      completedAt: existing.completedAt ?? null,
+      outroAcknowledgedAt: existing.outroAcknowledgedAt ?? null,
+    };
+    if (action.kind === 'journey' && journey.status === 'complete') return {
+      ...action,
+      status: 'completed',
+      completedAt: journey.completedAt,
+      outroAcknowledgedAt: journey.completedAt,
+    };
+    if (action.kind !== 'journey' && completedChoice) return {
+      ...action,
+      status: 'skipped',
+      completedAt: null,
+      outroAcknowledgedAt: choiceClosedAt,
+    };
+    return action;
+  });
+
+  // Preserve any historical action that is no longer in the authored set.
+  return [...reconciled, ...stored.filter((action) => !authoredIds.has(action.id))];
 }
 
 export function journeyBondPoints(journey: Pick<JourneyDayRecord, 'actions'>) {
@@ -630,17 +696,22 @@ function journeyActions(beatId: string): JourneyDayActionRecord[] {
   if (beatId === 'quiet-patch:first-flower') return [
     {
       id: 'mossprout:quiet-patch:first-flower:journey', kind: 'journey', required: true,
-      definitionId: 'mossprout:ftue:chapter-zero-return', status: 'ready', bondContribution: 16, completedAt: null,
+      definitionId: 'mossprout:ftue:chapter-zero-return', status: 'ready', bondContribution: 0, completedAt: null,
       outroAcknowledgedAt: null,
     },
     {
       id: 'mossprout:quiet-patch:first-flower:goal-plan', kind: 'goal_plan', required: false,
-      definitionId: 'mossprout:quiet-patch:first-flower:goal-plan', status: 'ready', bondContribution: 4, completedAt: null,
+      definitionId: 'mossprout:quiet-patch:first-flower:goal-plan', status: 'ready', bondContribution: 20, completedAt: null,
       outroAcknowledgedAt: null,
     },
     {
       id: 'mossprout:quiet-patch:first-flower:playful', kind: 'playful_game', required: false,
-      definitionId: 'mossprout:quiet-patch:first-flower:playful', status: 'ready', bondContribution: 4, completedAt: null,
+      definitionId: 'mossprout:quiet-patch:first-flower:playful', status: 'ready', bondContribution: 20, completedAt: null,
+      outroAcknowledgedAt: null,
+    },
+    {
+      id: 'mossprout:quiet-patch:first-flower:field-note', kind: 'journal_prompt', required: false,
+      definitionId: 'mossprout:conversation:nature-journal:one-growing-thing', status: 'ready', bondContribution: 20, completedAt: null,
       outroAcknowledgedAt: null,
     },
   ];
@@ -670,9 +741,18 @@ function completeMainAction(actions: JourneyDayActionRecord[], now: number) {
 
 function completeJourneyAction(state: RelationshipProgressState, journey: JourneyDayRecord, definitionId: string, now: number) {
   if (journey.actions.some((action) => action.definitionId === definitionId && action.status === 'completed')) return state;
-  const actions = journey.actions.map((action) => action.definitionId === definitionId
-    ? { ...action, status: 'completed' as const, completedAt: now, outroAcknowledgedAt: null }
-    : action);
+  const selectedAction = journey.actions.find((action) => action.definitionId === definitionId);
+  if (!selectedAction || selectedAction.status === 'skipped') return state;
+  const chooseOneDay = journey.beatId === 'quiet-patch:first-flower' && selectedAction.kind !== 'journey';
+  const actions = journey.actions.map((action) => {
+    if (action.definitionId === definitionId) {
+      return { ...action, status: 'completed' as const, completedAt: now, outroAcknowledgedAt: null };
+    }
+    if (chooseOneDay && action.kind !== 'journey' && action.status !== 'completed') {
+      return { ...action, status: 'skipped' as const, completedAt: null, outroAcknowledgedAt: now };
+    }
+    return action;
+  });
   const bondPoints = journeyBondPoints({ actions });
   return replaceJourney(state, journey.id, {
     ...journey,

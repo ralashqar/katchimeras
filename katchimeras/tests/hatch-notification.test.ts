@@ -4,6 +4,17 @@ import test from 'node:test';
 import type { StoredHomeDayRecord, StoredHomeState } from '../types/home';
 import type { OnboardingProfile } from '../utils/onboarding-state';
 import { resolveHatchNotificationPlan } from '../utils/hatch-notification-plan';
+import { nextMossproutJourneyReminderDate } from '../utils/mossprout-journey-notification-plan';
+
+test('Mossprout Journey reminder targets the next local morning', () => {
+  const target = nextMossproutJourneyReminderDate('2026-08-23');
+  assert.ok(target);
+  assert.equal(target.getFullYear(), 2026);
+  assert.equal(target.getMonth(), 7);
+  assert.equal(target.getDate(), 24);
+  assert.equal(target.getHours(), 9);
+  assert.equal(target.getMinutes(), 0);
+});
 
 function day(
   isoDate: string,

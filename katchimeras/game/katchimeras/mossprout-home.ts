@@ -143,26 +143,26 @@ const GARDEN_REQUESTS: Record<string, { title: string; subtitle: string; definit
     orderId: 'mossprout:chapter-0:first-sprout',
     coins: 20,
   },
-  'dry-pond:day-2': {
+  'dry-pond:day-1': {
     title: 'Make a place for rain',
     subtitle: 'Create a Shell to catch the first drops.',
     definitionId: 'nature:waterside:2',
     orderId: 'merge-story:mossprout:dry-pond:place-for-rain',
     coins: 20,
   },
-  'dry-pond:day-3': {
+  'dry-pond:day-2': {
     title: 'Grow roots for the pond bank',
     subtitle: 'Make a Plant to hold the soft edge together.',
     definitionId: 'nature:garden:3',
     orderId: 'merge-story:mossprout:dry-pond:bank-that-holds',
-    coins: 20,
+    coins: 30,
   },
-  'dry-pond:day-4': {
+  'dry-pond:day-3': {
     title: 'Finish the little rain garden',
     subtitle: 'Make the final Flower and Tidepool.',
     definitionId: 'nature:garden:4',
     orderId: 'merge-story:mossprout:dry-pond:little-rain-garden',
-    coins: 20,
+    coins: 50,
   },
 };
 
@@ -216,6 +216,7 @@ export function resolveMossproutDayActions(input: {
   hasActiveFocus?: boolean;
   gardenRequests?: readonly MossproutActionGardenRequest[];
   journeyGardenRequest?: MossproutActionGardenRequest | null;
+  journeyDayNumber?: number;
   journey: JourneyDayRecord | null;
   offers: readonly MossproutActionOffer[];
   skippedActionIds?: readonly string[];
@@ -228,8 +229,12 @@ export function resolveMossproutDayActions(input: {
   const pendingMainOutro = mainRecord?.status === 'completed' && !mainRecord.outroAcknowledgedAt;
   if (pendingMainOutro && journey) actions.push(completedJourneyAction(journey, mainRecord));
   else if (!journey) actions.push({
-    id: 'mossprout:start-journey', kind: 'story_chat', title: 'Spend today with Mossprout',
-    subtitle: 'Begin today\'s story and see what the Garden needs.', icon: 'leaf.fill', required: true,
+    id: 'mossprout:start-journey', kind: 'story_chat', title: input.journeyDayNumber && input.journeyDayNumber > 1
+      ? `Begin Journey Day ${input.journeyDayNumber}`
+      : 'Spend today with Mossprout',
+    subtitle: input.journeyDayNumber && input.journeyDayNumber > 1
+      ? 'A new day opens the next part of Mossprout\'s story.'
+      : 'Begin today\'s story and see what the Garden needs.', icon: 'leaf.fill', required: true,
     artKey: 'mossprout:journey',
     disabled: false, status: 'ready', reward: { kind: 'bond', amount: 12 }, destination: { kind: 'journey' },
     completedAt: null, outroAcknowledgedAt: null,
@@ -265,6 +270,7 @@ export function resolveMossproutDayActions(input: {
 
   for (const action of journey?.actions ?? []) {
     if (action.kind === 'journey') continue;
+    if (action.status === 'skipped') continue;
     if (action.status === 'completed') {
       if (!action.outroAcknowledgedAt) actions.push(mapConversationAction(action, true));
       continue;
@@ -273,8 +279,8 @@ export function resolveMossproutDayActions(input: {
     actions.push(mapConversationAction(action, false));
   }
 
-  const hasJourneyGoal = journey?.actions.some((action) => action.kind === 'goal_plan' && action.status !== 'completed');
-  const hasJourneyFun = journey?.actions.some((action) => action.kind === 'playful_game' && action.status !== 'completed');
+  const hasJourneyGoal = journey?.actions.some((action) => action.kind === 'goal_plan' && (action.status === 'ready' || action.status === 'active'));
+  const hasJourneyFun = journey?.actions.some((action) => action.kind === 'playful_game' && (action.status === 'ready' || action.status === 'active'));
   for (const conversation of input.conversations ?? []) {
     if (journey?.actions.some((action) => action.definitionId === conversation.definitionId)) continue;
     if (conversation.mode === 'plan' && (unfinishedGoals.length > 0 || input.hasActiveFocus || hasJourneyGoal)) continue;
@@ -384,7 +390,10 @@ export function resolveMossproutDayActions(input: {
     const sequence = sequences[slotId] ?? 0;
     return [{
       ...action,
-      instanceId: action.status === 'completed' ? action.id : `${dayId}:${slotId}:${sequence}:${action.id}`,
+      // Status changes must not change a rendered row's identity. Keeping the
+      // same instance id lets the active card become its completed outro in
+      // place instead of unmounting and re-entering as a different row.
+      instanceId: `${dayId}:${slotId}:${sequence}:${action.id}`,
       sourceSlotId: slotForAction(action),
       sequence,
       slotId,
@@ -486,13 +495,14 @@ function completedJourneyAction(journey: JourneyDayRecord, record: JourneyDayAct
 function mapConversationAction(action: JourneyDayActionRecord, completed: boolean): KatchimeraDayAction {
   const goal = action.kind === 'goal_plan';
   const formFinder = action.definitionId === 'mossprout:game:form-finder';
+  const fieldNote = action.kind === 'journal_prompt';
   return {
     id: action.id,
-    kind: goal ? 'goal_plan' : 'fun_chat',
-    title: goal ? 'Find a nature direction' : formFinder ? 'Find your nature-side card' : 'The official garden survey',
-    subtitle: goal ? 'Answer three thoughtful questions with Mossprout and choose what you want to grow.' : formFinder ? 'Answer a few questions and discover your first card.' : 'Three quick nature questions, taken unnecessarily seriously.',
-    icon: goal ? 'scope' : 'sparkles', required: false, disabled: completed, status: completed ? 'completed' : 'ready',
-    artKey: mossproutConversationArtKey(action.definitionId ?? '', goal ? 'goal_plan' : 'fun_chat'),
+    kind: goal ? 'goal_plan' : fieldNote ? 'journal_prompt' : 'fun_chat',
+    title: goal ? 'Find a nature direction' : fieldNote ? 'Keep one growing thing' : formFinder ? 'Find your nature-side card' : 'The official garden survey',
+    subtitle: goal ? 'Choose a small direction for tomorrow.' : fieldNote ? 'Notice one living detail worth remembering.' : formFinder ? 'Answer a few questions and discover your first card.' : 'Three quick nature questions, taken unnecessarily seriously.',
+    icon: goal ? 'scope' : fieldNote ? 'square.and.pencil' : 'sparkles', required: false, disabled: completed, status: completed ? 'completed' : 'ready',
+    artKey: mossproutConversationArtKey(action.definitionId ?? '', goal ? 'goal_plan' : fieldNote ? 'journal_prompt' : 'fun_chat'),
     reward: { kind: 'bond', amount: action.bondContribution },
     destination: goal ? { kind: 'focus_questionnaire' } : { kind: 'conversation', definitionId: action.definitionId ?? '' },
     completedAt: action.completedAt, outroAcknowledgedAt: action.outroAcknowledgedAt,

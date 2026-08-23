@@ -119,6 +119,7 @@ import { companionHubHeroSpacer, companionQuestListSpacer } from '@/utils/compan
 import type { CompanionQuickGoalCompletionReceipt } from '@/hooks/use-companion-quick-goals';
 import type { GoalTaskSourceRect } from '@/components/katchadeck/goals/goal-task-row';
 import { BondRewardFlightOverlay } from '@/components/katchadeck/goals/bond-reward-overlay';
+import { CompanionFtueCoachmark } from '@/components/katchadeck/onboarding/companion-ftue-coachmark';
 import { CompanionIntroduction } from './companion-introduction';
 import { CompanionTrophyRoomScreen } from './companion-trophy-room-screen';
 import { CompanionVisitScene } from './companion-visit-scene';
@@ -171,6 +172,9 @@ export type CompanionInteractionSheetProps = {
   initialConversationDefinitionId?: string;
   onInitialConversationComplete?: () => void | Promise<void>;
   ftueOrderPreviewActive?: boolean;
+  ftueBondSpotlightActive?: boolean;
+  ftueDayOneActionActive?: boolean;
+  onFtueBondSpotlightComplete?: () => void;
   onFtueOpenMerge?: () => void;
   onSelectDestination?: (destination: CompanionDestination | null) => void;
   onClose: () => void;
@@ -317,6 +321,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const mossproutJourney = props.familyId === 'mossprout'
     ? mossproutJourneyForDay(relationships, localDayId())
     : null;
+  const ftueDayOneChoiceCompleted = Boolean(mossproutJourney?.actions.some(
+    (action) => action.kind !== 'journey' && action.status === 'completed',
+  ));
   const mossproutNameplate = props.familyId === 'mossprout'
     ? mossproutJourneyDayStatus(
         mossproutJourney,
@@ -364,6 +371,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const [directQuestOrigin, setDirectQuestOrigin] = useState<{ actionId: string; questId: string } | null>(null);
   const onBondCelebrationComplete = props.onBondCelebrationComplete;
   const creatureRewardTargetRef = useRef<ViewType | null>(null);
+  const ftueBondTargetRef = useRef<ViewType | null>(null);
+  const ftueActionTargetRef = useRef<ViewType | null>(null);
   const [bondReward, setBondReward] = useState<{
     from: GoalTaskSourceRect;
     receipt: CompanionBondAwardReceipt;
@@ -1381,6 +1390,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           <CompanionDestinationHeader
             backLabel={quickGoalPickerOpen ? 'Goals' : destination === 'quest' && directQuestOrigin ? props.name : destination === 'quest' && canReturnToQuestList ? 'Quest list' : route.kind === 'dashboard' ? 'Kingdom' : 'Dashboard'}
             bondProgress={displayedBondProgress}
+            bondTargetRef={route.kind === 'dashboard' && props.familyId === 'mossprout' ? ftueBondTargetRef : undefined}
             compactHub={route.kind === 'dashboard'}
             label={route.kind === 'dashboard' ? 'Dashboard' : route.kind === 'shared_history' ? props.familyId === 'feastle' ? 'Recipe Book' : 'Shared history' : destinationLabel}
             titleTone={destination === 'achievements' ? 'gold' : 'default'}
@@ -1617,8 +1627,11 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                     openQuestOffer(questId, originActionId);
                   }}
                   onBondRewardRequest={requestStoryReward}
+                  actionStackTargetRef={ftueActionTargetRef}
+                  dayOneActionChoiceActive={props.ftueBondSpotlightActive || props.ftueDayOneActionActive}
                   motionReady={mossproutHubEntranceSettled && mossproutHubViewportSettled}
                   swipeExternalGesture={environmentPan.gesture}
+                  tutorialInteractionLocked={props.ftueBondSpotlightActive}
                 />
               ) : route.kind === 'dashboard' && props.familyId === 'baristabbit' && !showBaristabbitDashboard ? (
                 <BaristabbitStoryStage
@@ -1659,7 +1672,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                     goals: goalStatus,
                     achievements: `${props.achievementProgress.earned} of ${props.achievementProgress.total} earned`,
                     insight: props.insights.length ? `${props.insights.length} insight${props.insights.length === 1 ? '' : 's'} discovered` : 'Discover something about yourself',
-                    skins: 'Collect cards with Coins earned in the Garden',
+                    skins: 'Reveal resident cards by helping in the Garden',
                   }}
                 />
               ) : route.kind === 'shared_history' ? (
@@ -1902,7 +1915,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                 onBondCelebrationComplete(bondReward.receipt);
                 setBondReward(null);
                 rewardFinishTimerRef.current = null;
-              }, reduceMotion ? 120 : 420);
+              // The completed row needs 475ms to leave and its replacement
+              // needs another 320ms to enter. Do not cover that handoff with
+              // the Journey celebration before the tray has visibly settled.
+              }, reduceMotion ? 120 : 900);
             }}
             onTokenArrive={(amount) => {
               setDisplayedBondTotal((total) => Math.min(
@@ -1913,6 +1929,31 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             }}
             points={bondReward.receipt.points}
             to={bondReward.to}
+          />
+        ) : null}
+        {props.active !== false && mossproutActionDashboard && props.ftueBondSpotlightActive ? (
+          <CompanionFtueCoachmark
+            buttonLabel="Show today’s choices"
+            message={[
+              { text: 'This is your ' },
+              { emphasis: true, text: 'Bond.' },
+              { text: ' Meaningful moments across real days grow it. Merge play cannot grind it.' },
+            ]}
+            onContinue={props.onFtueBondSpotlightComplete}
+            placement="below"
+            targetRef={ftueBondTargetRef}
+          />
+        ) : null}
+        {props.active !== false && mossproutActionDashboard && props.ftueDayOneActionActive && !ftueDayOneChoiceCompleted ? (
+          <CompanionFtueCoachmark
+            message={[
+              { text: 'Choose ' },
+              { emphasis: true, text: 'one thing' },
+              { text: ' that feels right. You never need to finish every card.' },
+            ]}
+            placement="above"
+            showFinger={false}
+            targetRef={ftueActionTargetRef}
           />
         ) : null}
         </View>

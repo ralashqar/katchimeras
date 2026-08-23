@@ -55,7 +55,6 @@ import {
   subscribeKatchimeraWardrobeResets,
 } from '@/utils/katchimera-wardrobe-storage';
 import { companionIdForFamily } from '@/constants/katchimera-skins';
-import { MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID } from '@/constants/mossprout-ftue-conversations';
 import type { CompanionQuickGoal, CompanionQuickGoalCompletion } from '@/utils/companion-quick-goals';
 import { questDefinition } from '@/utils/quests/definitions';
 import type { QuestJournalCaptureMode, QuestJournalTemplate } from '@/utils/quests/journal-templates';
@@ -219,6 +218,10 @@ export function KingdomCompanionScreen({
   ftueConversationDefinitionId,
   onFtueConversationComplete,
   ftueOrderPreviewActive = false,
+  ftueBondSpotlightActive = false,
+  ftueDayOneActionActive = false,
+  onFtueBondSpotlightComplete,
+  onFtueJourneyDayComplete,
   onFtueOpenMerge,
   discoveryRecords = [],
 }: {
@@ -232,6 +235,10 @@ export function KingdomCompanionScreen({
   ftueConversationDefinitionId?: string;
   onFtueConversationComplete?: () => void | Promise<void>;
   ftueOrderPreviewActive?: boolean;
+  ftueBondSpotlightActive?: boolean;
+  ftueDayOneActionActive?: boolean;
+  onFtueBondSpotlightComplete?: () => void;
+  onFtueJourneyDayComplete?: () => void;
   onFtueOpenMerge?: () => void;
   discoveryRecords?: readonly CompanionDiscoveryRecord[];
 }) {
@@ -329,10 +336,8 @@ export function KingdomCompanionScreen({
   const acknowledgeBondCelebration = quests.acknowledgeBondCelebration;
   const completeBondCelebration = useCallback((receipt: CompanionBondAwardReceipt) => {
     acknowledgeBondCelebration(receipt.id);
-    if (
-      ftueConversationDefinitionId === MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID
-      && receipt.kind === 'journey_day_completed'
-    ) {
+    if (ftueDayOneActionActive && receipt.kind === 'journey_day_completed') {
+      setBondCelebration({ receipt, variant: 'journey_complete' });
       return;
     }
     if (receipt.afterLevel > receipt.beforeLevel) {
@@ -342,7 +347,7 @@ export function KingdomCompanionScreen({
     if (receipt.kind === 'journey_day_completed') {
       setBondCelebration({ receipt, variant: 'journey_complete' });
     }
-  }, [acknowledgeBondCelebration, ftueConversationDefinitionId]);
+  }, [acknowledgeBondCelebration, ftueDayOneActionActive]);
   const quickGoalFamilyIds = useMemo(() => {
     const ids = new Set<KatchimeraFamilyId>();
     for (const creature of kingdom.creatures) {
@@ -584,6 +589,9 @@ export function KingdomCompanionScreen({
           initialConversationDefinitionId={ftueConversationDefinitionId}
           onInitialConversationComplete={onFtueConversationComplete}
           ftueOrderPreviewActive={ftueOrderPreviewActive}
+          ftueBondSpotlightActive={ftueBondSpotlightActive}
+          ftueDayOneActionActive={ftueDayOneActionActive}
+          onFtueBondSpotlightComplete={onFtueBondSpotlightComplete}
           onFtueOpenMerge={onFtueOpenMerge}
           onOpenCards={onOpenCards}
           onOpenTrophies={onOpenTrophies}
@@ -959,7 +967,10 @@ export function KingdomCompanionScreen({
               }
             }
             setEmbeddedJournal(null);
-            setSavedOrigin(origin === 'quick_goal' ? null : origin);
+            // Conversation journal completion already updates its conversation,
+            // Journey action, and Bond state in one transaction. Scheduling the
+            // generic 1.25s refresh here remounted the hub mid-outro.
+            setSavedOrigin(origin === 'quick_goal' || origin === 'conversation' ? null : origin);
             if (origin === 'quest' && embeddedJournal.origin === 'quest' && embeddedJournal.inputMode !== 'guided') quests.refreshQuestState();
             if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           }}
@@ -1058,7 +1069,20 @@ export function KingdomCompanionScreen({
       ) : null}
       {isFocused && bondCelebration ? (
         <CompanionBondLevelUpCelebration
-          onContinue={() => setBondCelebration(null)}
+          autoContinue={!ftueDayOneActionActive}
+          continueLabel={ftueDayOneActionActive ? 'Back to Mossprout' : undefined}
+          dismissible={!ftueDayOneActionActive}
+          journeyHandoff={ftueDayOneActionActive ? {
+            dayNumber: 1,
+            gardenNote: 'Want to keep playing? Garden orders stay open today.',
+            recap: ['You met Mossprout', 'The Quiet Patch began to grow'],
+            tomorrowPreview: 'Tomorrow · Someone new may find the Garden.',
+          } : undefined}
+          onContinue={() => {
+            const finishesFtue = ftueDayOneActionActive && bondCelebration.variant === 'journey_complete';
+            setBondCelebration(null);
+            if (finishesFtue) onFtueJourneyDayComplete?.();
+          }}
           receipt={bondCelebration.receipt}
           variant={bondCelebration.variant}
         />

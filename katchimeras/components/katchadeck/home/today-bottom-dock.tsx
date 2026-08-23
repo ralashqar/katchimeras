@@ -13,6 +13,8 @@ import { Lantern } from '@/constants/theme';
 import type { HomeDayRecord } from '@/types/home';
 import type { TodayCategoryState } from '@/utils/today-categories';
 import { ThemedText } from '@/components/themed-text';
+import { CompanionJourneyHookCard } from '@/components/katchadeck/home/companion-journey-hook-card';
+import type { MossproutJourneyHandoffViewModel } from '@/game/katchimeras/mossprout-journey-handoff';
 
 type TodayBottomDockProps = {
   canHatch: boolean;
@@ -24,6 +26,7 @@ type TodayBottomDockProps = {
   showHatchedReflectionCard: boolean;
   showCompanionInvitation?: boolean;
   companionName?: string;
+  companionJourneyHook?: MossproutJourneyHandoffViewModel | null;
   onOpenCompanion?: () => void;
   showFormingActions?: boolean;
   recording: boolean;
@@ -66,6 +69,7 @@ export function TodayBottomDock({
   showHatchedReflectionCard,
   showCompanionInvitation = false,
   companionName,
+  companionJourneyHook = null,
   onOpenCompanion,
   showFormingActions = true,
   recording,
@@ -203,6 +207,9 @@ export function TodayBottomDock({
         ) : null}
       </Animated.View>
 
+      {isHatched && companionJourneyHook && onOpenCompanion ? (
+        <CompanionJourneyHookCard model={companionJourneyHook} onPress={onOpenCompanion} />
+      ) : null}
       {isHatched && showHatchedActionDock ? (
         <View style={styles.actionDock}>
           <Animated.View entering={popEnter(140)}>
@@ -213,7 +220,7 @@ export function TodayBottomDock({
           </Animated.View>
         </View>
       ) : null}
-      {isHatched && showCompanionInvitation && onOpenCompanion ? (
+      {isHatched && showCompanionInvitation && !companionJourneyHook && onOpenCompanion ? (
         <KatchaButton
           fullWidth
           icon="heart.fill"

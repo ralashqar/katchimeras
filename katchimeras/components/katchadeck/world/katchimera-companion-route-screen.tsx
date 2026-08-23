@@ -12,6 +12,7 @@ import { installMossproutOnboardingMergeWorld, seedStoredMossproutGardenAfterFtu
 import { useGameScreenTransition } from '@/features/navigation/game-screen-transition';
 import { useCompanionDiscoveryRecords } from '@/hooks/use-companion-discovery-records';
 import { localDayId } from '@/utils/world-identity';
+import { scheduleMossproutJourneyDayReminder } from '@/utils/mossprout-journey-notification';
 
 export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConversationDefinitionId }: { creatureId: string; source?: 'merge-world'; ftueConversationDefinitionId?: string }) {
   const isFocused = useIsFocused();
@@ -39,6 +40,23 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConvers
       }
     }
   }, [ftueConversationDefinitionId]);
+  const completeFtueJourneyDay = useCallback(() => {
+    const run = loadFtueRun();
+    if (run?.status !== 'active' || run.stepId !== 'companion.day_one_action') return;
+    const completedAt = Date.now();
+    const nextRun = commitFtueAction({ actionId: 'companion.complete_day_one_action', evidenceRef: 'mossprout-journey-day-one-bond-action' });
+    if (nextRun?.status !== 'complete') return;
+    const completedDayId = localDayId(new Date(completedAt));
+    void seedStoredMossproutGardenAfterFtue(completedDayId, completedAt).catch((error) => {
+      console.warn('Could not prepare Mossprout\'s next Garden orders', error);
+    });
+    void scheduleMossproutJourneyDayReminder(completedDayId).catch(() => {});
+  }, []);
+  const acknowledgeFtueBond = useCallback(() => {
+    const run = loadFtueRun();
+    if (run?.status !== 'active' || run.stepId !== 'companion.bond_spotlight') return;
+    commitFtueAction({ actionId: 'companion.acknowledge_bond', evidenceRef: 'mossprout-bond-meter-spotlight' });
+  }, []);
   const openFtueGarden = useCallback(() => {
     if (ftueHandoffRef.current) return;
     ftueHandoffRef.current = true;
@@ -80,6 +98,10 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConvers
       discoveryRecords={discovery.records}
       onFtueConversationComplete={ftueConversationDefinitionId ? completeFtueConversation : undefined}
       ftueOrderPreviewActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.order_preview'}
+      ftueBondSpotlightActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.bond_spotlight'}
+      ftueDayOneActionActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.day_one_action'}
+      onFtueBondSpotlightComplete={acknowledgeFtueBond}
+      onFtueJourneyDayComplete={completeFtueJourneyDay}
       onFtueOpenMerge={openFtueGarden}
       onOpenCards={() => router.push({ pathname: '/katchimera/[creatureId]/cards', params: { creatureId } })}
       onOpenTrophies={() => router.push({ pathname: '/katchimera/[creatureId]/achievements', params: { creatureId } })}

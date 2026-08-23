@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { Pressable, StyleSheet, View, type View as ViewType } from 'react-native';
 import type { GestureType } from 'react-native-gesture-handler';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -22,6 +22,7 @@ import { KatchaUI } from '@/constants/katcha-ui';
 import { katchimeraActionArt } from '@/constants/katchimera-action-art';
 import { Meadow } from '@/constants/meadow-theme';
 import { composeMossproutVisibleActions, mossproutGoalArtKey, resolveMossproutDayActions, type MossproutActionGardenRequest } from '@/game/katchimeras/mossprout-home';
+import { mossproutJourneyDayNumber } from '@/game/katchimeras/mossprout-journey-handoff';
 import {
   acknowledgeKatchimeraExternalActionOutro,
   acknowledgeMossproutJourneyActionOutro,
@@ -30,6 +31,7 @@ import {
   mossproutDailyActionDeck,
   mossproutJourneyForDay,
   mossproutStory,
+  reconcileMossproutDayOneChoices,
   recordKatchimeraActionCompletion,
   recordHandledKatchimeraActionCompletion,
   skipKatchimeraDayAction,
@@ -107,6 +109,9 @@ export function MossproutStoryStage({
   onOpenMerge,
   onOpenQuestDirect,
   onBondRewardRequest,
+  dayOneActionChoiceActive = false,
+  actionStackTargetRef,
+  tutorialInteractionLocked = false,
   motionReady,
   swipeExternalGesture,
 }: {
@@ -128,6 +133,9 @@ export function MossproutStoryStage({
   onOpenMerge: (orderId?: string | null) => void;
   onOpenQuestDirect: (questId: string, originActionId: string) => void;
   onBondRewardRequest: (source: DayActionSourceRect, onArrive: () => void) => void;
+  dayOneActionChoiceActive?: boolean;
+  actionStackTargetRef?: RefObject<ViewType | null>;
+  tutorialInteractionLocked?: boolean;
   motionReady: boolean;
   swipeExternalGesture?: GestureType;
 }) {
@@ -138,6 +146,7 @@ export function MossproutStoryStage({
   const { ready: mergeWorldReady, state: mergeWorldState } = useMossproutMergeWorldState();
   const dayId = localDayId();
   const journey = mossproutJourneyForDay(relationships, dayId);
+  const journeyDayNumber = mossproutJourneyDayNumber(relationships, dayId);
   const story = mossproutStory(relationships);
   const storyComplete = story.activeBeatId === 'heartwood:complete';
   const mossproutOrders = useMemo(() => (mergeWorldState?.activeOrders ?? [])
@@ -161,6 +170,11 @@ export function MossproutStoryStage({
   }, [journey?.activity?.mergeOrderId, mossproutOrders]);
 
   useEffect(() => {
+    if (!dayOneActionChoiceActive || journey?.beatId !== 'quiet-patch:first-flower') return;
+    relationshipProgressionRepository.update(reconcileMossproutDayOneChoices);
+  }, [dayOneActionChoiceActive, journey?.beatId, journey?.id, journey?.actions.length]);
+
+  useEffect(() => {
     if (journey?.status !== 'living' || (journey.resolutionAvailableAt ?? Infinity) > Date.now()) return;
     relationshipProgressionRepository.update((current) => makeMossproutResolutionAvailable(current, dayId));
   }, [dayId, journey?.resolutionAvailableAt, journey?.status]);
@@ -174,12 +188,16 @@ export function MossproutStoryStage({
     goals: goals.map((item) => ({ id: item.goal.id, templateId: item.goal.templateId, title: item.goal.title, completed: Boolean(item.completion) })),
     hasActiveFocus,
     journey,
+    journeyDayNumber,
     journeyGardenRequest,
     offers,
     skippedActionIds: relationships.skippedActionIds,
     slotSequences: mossproutDailyActionDeck(relationships, dayId).slotSequences,
     storyComplete,
-  }), [activeQuestId, conversations, dayId, gardenRequests, goals, hasActiveFocus, journey, journeyGardenRequest, offers, relationships, storyComplete]);
+  }), [activeQuestId, conversations, dayId, gardenRequests, goals, hasActiveFocus, journey, journeyDayNumber, journeyGardenRequest, offers, relationships, storyComplete]);
+  // Tutorials may spotlight or lock this stack, but must never replace the
+  // normal resolver or decide which actions the player is allowed to see.
+  const presentedActionCandidates = actions;
 
   useEffect(() => {
     relationshipProgressionRepository.update((current) => goals.reduce((state, item) => {
@@ -228,7 +246,7 @@ export function MossproutStoryStage({
 
   const completingAction = useMemo(() => {
     const byPresentationId = new Map<string, KatchimeraDayAction>();
-    for (const action of [...actions.filter((candidate) => candidate.status === 'completed'), ...externalCompletions]) {
+    for (const action of [...presentedActionCandidates.filter((candidate) => candidate.status === 'completed'), ...externalCompletions]) {
       byPresentationId.set(action.instanceId ?? action.id, action);
     }
     const slotOrder = { together: 0, field: 1, garden: 2 } as const;
@@ -237,9 +255,9 @@ export function MossproutStoryStage({
       || slotOrder[left.slotId ?? 'together'] - slotOrder[right.slotId ?? 'together']
       || (left.instanceId ?? left.id).localeCompare(right.instanceId ?? right.id)
     )[0] ?? null;
-  }, [actions, externalCompletions]);
+  }, [externalCompletions, presentedActionCandidates]);
 
-  const resolvedVisibleActions = composeMossproutVisibleActions(actions, completingAction, MAX_VISIBLE_ACTIONS);
+  const resolvedVisibleActions = composeMossproutVisibleActions(presentedActionCandidates, completingAction, MAX_VISIBLE_ACTIONS);
   const actionId = useCallback((action: KatchimeraDayAction) => `${dayId}:${action.instanceId ?? action.id}`, [dayId]);
   const sourceActions = useMemo(() => {
     if (!selfCompletingGoalAction) return resolvedVisibleActions;
@@ -361,10 +379,18 @@ export function MossproutStoryStage({
     ? goals.find((item) => item.goal.id === selectedGoalId) ?? null
     : null;
   const presentedActions = actionTransition.items;
-  const stackInteractionLocked = actionTransition.interactionLocked || Boolean(selfCompletingGoalAction);
+  const stackInteractionLocked = tutorialInteractionLocked || actionTransition.interactionLocked || Boolean(selfCompletingGoalAction);
 
   return <View style={styles.stage}>
-    <View accessibilityLabel="Mossprout Journey Day actions" style={styles.actionStack}>
+    {journey?.status === 'complete' && !storyComplete ? (
+      <View accessibilityLabel={`Journey Day ${journeyDayNumber} complete. Journey Day ${journeyDayNumber + 1} begins tomorrow.`} style={styles.journeyStatus}>
+        <IconSymbol color={Meadow.goldDeep} name="leaf.fill" size={13} />
+        <ThemedText style={styles.journeyStatusText} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+          Journey Day {journeyDayNumber} complete · Day {journeyDayNumber + 1} tomorrow
+        </ThemedText>
+      </View>
+    ) : null}
+    <View ref={actionStackTargetRef} accessibilityLabel="Mossprout Journey Day actions" style={styles.actionStack}>
       <View style={styles.actionSlot}>
       {presentedActions.map((presentedAction) => {
         const presentedActionKey = actionId(presentedAction);
@@ -531,6 +557,8 @@ function DockAction({ icon, label, onPress }: {
 
 const styles = StyleSheet.create({
   stage: { alignSelf: 'stretch', gap: 8, height: ACTION_TRAY_HEIGHT, overflow: 'visible', paddingBottom: 3 },
+  journeyStatus: { alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(247,239,203,0.94)', borderColor: 'rgba(125,103,49,0.22)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 5, minHeight: 27, paddingHorizontal: 11, position: 'absolute', top: -34, zIndex: 6 },
+  journeyStatusText: { fontSize: 9.5, fontWeight: '900', lineHeight: 12 },
   actionStack: { height: ACTION_STACK_HEIGHT },
   actionSlot: { gap: 7, height: ACTION_STACK_HEIGHT, justifyContent: 'flex-end', overflow: 'visible' },
   actionArtwork: { height: 46, width: 46 },

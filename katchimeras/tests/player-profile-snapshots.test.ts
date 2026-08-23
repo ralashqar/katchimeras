@@ -40,7 +40,7 @@ test('Mossprout Haven fixture opens immediately before the first environment res
     stepId?: string;
   };
   assert.equal(run.stepId, 'haven.mossprout.restore');
-  assert.equal(run.scriptVersion, 17);
+  assert.equal(run.scriptVersion, 19);
   assert.equal(run.mergeInstalled, true);
 });
 

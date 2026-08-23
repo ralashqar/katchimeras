@@ -179,7 +179,8 @@ test('bond rewards queue, fly into the creature, respect reduced motion, and cel
   assert.match(levelUp, /RisingArrow/);
   assert.match(kingdom, /receipt\.kind === 'journey_day_completed'/);
   assert.match(kingdom, /variant: 'journey_complete'/);
-  assert.match(kingdom, /ftueConversationDefinitionId === MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID[\s\S]*?receipt\.kind === 'journey_day_completed'[\s\S]*?return;/);
+  assert.match(kingdom, /ftueDayOneActionActive && receipt\.kind === 'journey_day_completed'[\s\S]*?variant: 'journey_complete'/);
+  assert.match(kingdom, /autoContinue=\{!ftueDayOneActionActive\}[\s\S]*?Finish for today/);
   assert.match(kingdom, /!bondCelebration && !quests\.selectedPendingBondCelebration/);
 });
 
@@ -568,7 +569,8 @@ test('Mossprout owns a compact Journey action stack without redundant headings o
   assert.match(mossprout, /resolveMossproutDayActions/);
   assert.doesNotMatch(mossprout, /slice\(0, 3\)/);
   assert.match(mossprout, /const MAX_VISIBLE_ACTIONS = 3/);
-  assert.match(mossprout, /composeMossproutVisibleActions\(actions, completingAction, MAX_VISIBLE_ACTIONS\)/);
+  assert.match(mossprout, /composeMossproutVisibleActions\(presentedActionCandidates, completingAction, MAX_VISIBLE_ACTIONS\)/);
+  assert.match(mossprout, /dayOneActionChoiceActive[\s\S]*?choiceIds[\s\S]*?slice\(0, MAX_VISIBLE_ACTIONS\)/);
   assert.match(mossprout, /presentedActions\.map\(\(presentedAction\) =>/);
   assert.match(mossprout, /key=\{presentedActionKey\}/);
   assert.match(mossprout, /useKatchimeraActionStackTransition/);
@@ -786,10 +788,10 @@ test('form questionnaires gate launch companions while Katchimera Cards remain c
   assert.match(interaction, /idealSkinOnboardingRequired\s*\? props\.onClose/);
   assert.match(kingdom, /const presentationKingdom = kingdom/);
   assert.doesNotMatch(kingdom, /economy\.snapshot\.activePlus \? applyWardrobeToKingdom/);
-  assert.match(cards, /They do not change your companion or your relationship/);
-  assert.match(cards, /Your first card will be revealed during an early Journey Day/);
-  assert.match(cards, /KATCHIMERA_CARD_PRICE/);
-  assert.match(cardHook, /KATCHIMERA_CARD_PRICE = 150/);
+  assert.match(cards, /Each resident has one card/);
+  assert.match(cards, /A new visitor will bring the first card during an early Journey Day/);
+  assert.match(cards, /KatchimeraCardDeckCarousel/);
+  assert.match(cardHook, /card\.owned && card\.id !== familyId/);
   assert.match(companionRoute, /if \(!isFocused \|\| !discovery\.ready\) return <View style=\{styles\.inactiveScreen\} \/>;/);
   assert.match(interaction, /if \(!props\.active \|\| !idealSkinOnboardingRequired/);
   assert.match(interaction, /selectExperienceDestination\('insight'\)/);

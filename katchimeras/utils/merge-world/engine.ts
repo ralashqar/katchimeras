@@ -52,7 +52,9 @@ import type { CompanionDiscoveryDefinition } from '@/constants/companion-discove
 import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import { MEMORY_CARDS_BY_ID } from '@/constants/memory-card-catalog';
 import { mossproutWorldChapterForActiveDays, type MossproutWorldChapter } from '@/constants/mossprout-world-chapters';
-import { mossproutExtendedBeatByObjectiveId } from '@/constants/mossprout-journey-chapters';
+import { MOSSPROUT_EXTENDED_JOURNEY_BEATS, mossproutExtendedBeatByObjectiveId } from '@/constants/mossprout-journey-chapters';
+import { MOSSPROUT_GARDEN_RESIDENT_IDS, MOSSPROUT_RESIDENT_IDS, MOSSPROUT_WEATHER_RESIDENT_IDS, mossproutResidentById } from '@/constants/mossprout-residents';
+import type { KatchimeraSkinId } from '@/types/katchimera';
 import {
   awakenMossproutRoot,
   emptyMossproutBoardProgression,
@@ -124,6 +126,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     mossproutDailyGardenOrders: null,
     characterActivityOpportunities: [],
     ownedKatchimeraCards: [],
+    mossproutResidentSkinIds: ['mossprout'],
     ownedMemoryCards: [],
     completedOrderCount: 0,
     recentOrderKeys: [],
@@ -348,7 +351,7 @@ export function resetMergeActivityForDay(
   if (stepEnergyDayId) delete stepEnergyByDay[stepEnergyDayId];
   const resetsMossproutGarden = state.unlockedCharacters.includes('mossprout');
   const gardenChapter = mossproutWorldChapterForActiveDays(state.mossproutBoardProgression.activeDayIds.length);
-  const freshGardenOrders = resetsMossproutGarden ? mossproutDailyGardenOrderBatch(dayId, now, gardenChapter.id) : [];
+  const freshGardenOrders = resetsMossproutGarden ? mossproutDailyGardenOrderBatch(dayId, now, gardenChapter.id, state.mossproutResidentSkinIds) : [];
   const visibleGardenOrders = freshGardenOrders.slice(0, mossproutDailyGardenOrderWindow(gardenChapter.id));
   const activeOrders = resetsMossproutGarden
     ? [
@@ -363,6 +366,10 @@ export function resetMergeActivityForDay(
     offeredOrderIds: freshGardenOrders.map((order) => order.id),
     servedOrderIds: [],
     complete: false,
+    nextOrderSequence: 4,
+    tailServedCount: 0,
+    activeTailSequences: [],
+    lastRecipientSkinId: null,
   } : state.mossproutDailyGardenOrders;
   if (
     !hadDailyTotal
@@ -453,7 +460,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
             definition
             && definition.familyId === card.familyId
             && KNOWN_CHARACTERS.has(card.familyId)
-            && (card.acquisition === 'journey_match' || card.acquisition === 'coins')
+            && (card.acquisition === 'journey_match' || card.acquisition === 'story_resident' || card.acquisition === 'coins')
             && typeof card.sourceReceiptId === 'string'
           );
         }).map((card) => ({
@@ -462,6 +469,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
           coinCost: Math.max(0, Math.floor(finite(card.coinCost, 0))),
         }))
       : [],
+    mossproutResidentSkinIds: normalizeMossproutResidentSkinIds(source.mossproutResidentSkinIds, source.ownedKatchimeraCards),
     ownedMemoryCards: normalizeOwnedMemoryCards(source.ownedMemoryCards, now),
     completedOrderCount: Math.max(0, finite(source.completedOrderCount, 0)),
     recentOrderKeys: uniqueStrings(source.recentOrderKeys).slice(-RECENT_ORDER_LIMIT),
@@ -1115,32 +1123,58 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
     landmarks,
     generators,
   };
+  const rewardCardId = order.reward.katchimeraCardId;
+  if (rewardCardId) {
+    const sourceReceiptId = `resident-order:${order.id}:${rewardCardId}`;
+    const alreadyOwned = next.ownedKatchimeraCards.some((card) => (
+      card.cardId === rewardCardId || card.sourceReceiptId === sourceReceiptId
+    ));
+    const residentIds = new Set<KatchimeraSkinId>(next.mossproutResidentSkinIds);
+    residentIds.add(rewardCardId);
+    next = {
+      ...next,
+      mossproutResidentSkinIds: MOSSPROUT_RESIDENT_IDS.filter((id) => residentIds.has(id)),
+      ownedKatchimeraCards: alreadyOwned ? next.ownedKatchimeraCards : [...next.ownedKatchimeraCards, {
+        cardId: rewardCardId,
+        familyId: order.characterId,
+        acquisition: 'story_resident',
+        sourceReceiptId,
+        acquiredAt: now,
+        coinCost: 0,
+      }],
+    };
+  }
   if (
     order.storyArcId === 'mossprout:casual-garden'
     && next.mossproutDailyGardenOrders?.dayId === order.storyBeatId
   ) {
     const currentDaily = next.mossproutDailyGardenOrders!;
-    const servedOrderIds = [...new Set([...currentDaily.servedOrderIds, order.id])].slice(-3);
-    const complete = servedOrderIds.length >= 3;
+    const tailSequence = mossproutTailSequence(order.id);
+    const servedOrderIds = tailSequence == null
+      ? [...new Set([...currentDaily.servedOrderIds, order.id])].slice(-3)
+      : currentDaily.servedOrderIds;
     const chapterId = currentDaily.chapterId ?? mossproutWorldChapterForActiveDays(state.mossproutBoardProgression.activeDayIds.length).id;
-    const batch = mossproutDailyGardenOrderBatch(currentDaily.dayId, now, chapterId);
-    const offeredOrderIds = batch.map((candidate) => candidate.id);
-    const activeOrderId = offeredOrderIds.find((id) => !servedOrderIds.includes(id)) ?? null;
-    const visibleOrders = batch.filter((candidate) => !servedOrderIds.includes(candidate.id)).slice(0, mossproutDailyGardenOrderWindow(chapterId));
+    const dailyAfterServe = {
+      ...currentDaily,
+      servedOrderIds,
+      activeTailSequences: (currentDaily.activeTailSequences ?? []).filter((sequence) => sequence !== tailSequence),
+      tailServedCount: (currentDaily.tailServedCount ?? 0) + (tailSequence == null ? 0 : 1),
+      lastRecipientSkinId: order.recipientSkinId ?? 'mossprout',
+    };
+    const queue = mossproutRoutineQueue(
+      dailyAfterServe,
+      now,
+      chapterId,
+      next.mossproutResidentSkinIds,
+      next.activeOrders.filter((candidate) => candidate.storyArcId === 'mossprout:casual-garden'),
+    );
     next = {
       ...next,
       activeOrders: [
         ...next.activeOrders.filter((candidate) => candidate.storyArcId !== 'mossprout:casual-garden'),
-        ...visibleOrders,
+        ...queue.orders,
       ],
-      mossproutDailyGardenOrders: {
-        ...currentDaily,
-        chapterId,
-        activeOrderId,
-        offeredOrderIds,
-        servedOrderIds,
-        complete,
-      },
+      mossproutDailyGardenOrders: queue.daily,
     };
   }
   next = advanceMossproutChapterZero(next, order.id, now);
@@ -1405,7 +1439,35 @@ function claimStepEnergy(
 function rerollOrder(state: MergeWorldState, orderId: string, now: number): MergeWorldCommandResult {
   const order = state.activeOrders.find((item) => item.id === orderId);
   const dayId = localDayId(now);
-  if (!order || order.purpose === 'signature' || order.storyArcId) return unchanged(state, 'Story requests stay until you are ready.');
+  if (!order || order.purpose === 'signature' || (order.storyArcId && order.storyArcId !== 'mossprout:casual-garden')) {
+    return unchanged(state, 'Story requests stay until you are ready.');
+  }
+  if (order.storyArcId === 'mossprout:casual-garden') {
+    if (state.lastFreeRerollDayId === dayId) return unchanged(state, 'Your free request change has already been used today.');
+    const residents = MOSSPROUT_RESIDENT_IDS.filter((id) => state.mossproutResidentSkinIds.includes(id));
+    const currentRecipient = (order.recipientSkinId ?? 'mossprout') as (typeof MOSSPROUT_RESIDENT_IDS)[number];
+    const currentIndex = Math.max(0, residents.indexOf(currentRecipient));
+    const recipientSkinId = residents.length > 1 ? residents[(currentIndex + 1) % residents.length]! : residents[0] ?? 'mossprout';
+    const resident = mossproutResidentById.get(recipientSkinId)!;
+    const copyIndex = proceduralOrderRank(`${order.id}:reroll:${dayId}`, 37) % resident.requestCopy.length;
+    const replacement: MergeOrder = {
+      ...order,
+      recipientSkinId,
+      title: resident.requestCopy[copyIndex]!.title,
+      description: resident.requestCopy[copyIndex]!.description,
+      createdAt: now,
+      rerollAvailableAt: now + 86_400_000,
+    };
+    return changed(touch({
+      ...state,
+      activeOrders: state.activeOrders.map((candidate) => candidate.id === orderId ? replacement : candidate),
+      lastFreeRerollDayId: dayId,
+      mossproutDailyGardenOrders: state.mossproutDailyGardenOrders ? {
+        ...state.mossproutDailyGardenOrders,
+        lastRecipientSkinId: recipientSkinId,
+      } : null,
+    }, now), 'A different garden resident has a request.');
+  }
   if ((order.rerollAvailableAt ?? order.createdAt + 86_400_000) > now) return unchanged(state, 'This request can be changed after it has had a day on the table.');
   if (state.lastFreeRerollDayId === dayId) return unchanged(state, 'Your free request change has already been used today.');
   const next: MergeWorldState = { ...state, activeOrders: state.activeOrders.filter((item) => item.id !== orderId), lastFreeRerollDayId: dayId, recentOrderKeys: [...state.recentOrderKeys, templateKeyForOrder(order)].slice(-RECENT_ORDER_LIMIT) };
@@ -1453,13 +1515,72 @@ function reconcileFriendship(state: MergeWorldState, levels: Partial<Record<Merg
   return next === state ? state : touch(ensureProceduralOrders(next, now), now);
 }
 
+function reconcileMossproutResidents(
+  state: MergeWorldState,
+  signals: Extract<MergeWorldCommand, { type: 'reconcileCharacterActivity' }>['residentSignals'],
+  now: number,
+): MergeWorldState {
+  if (!signals) return state;
+  const validResidentIds = new Set<KatchimeraSkinId>(MOSSPROUT_RESIDENT_IDS);
+  const matchedCardIds = signals.matchedCardIds.filter((id) => validResidentIds.has(id));
+  // A matched form remains a teased visitor until the player serves its first
+  // request. That order is the single atomic point where it becomes both a
+  // resident and an owned card.
+  const residentIds = new Set<KatchimeraSkinId>(['mossprout', ...state.mossproutResidentSkinIds]);
+  if (signals.habitatStage >= 2 && matchedCardIds.length === 0 && residentIds.size === 1) {
+    residentIds.add(MOSSPROUT_GARDEN_RESIDENT_IDS[0]);
+  }
+  const completedObjectives = new Set(signals.completedObjectiveIds);
+  // Older advanced saves may have the habitat milestone without the objective
+  // receipts that were introduced later. Treat the completed chapter as the
+  // source of truth so those gardens receive the same resident roster.
+  if (signals.habitatStage >= 3) {
+    for (const beat of MOSSPROUT_EXTENDED_JOURNEY_BEATS.filter((candidate) => candidate.chapterId.includes('memory-nursery'))) {
+      completedObjectives.add(beat.objectiveId);
+    }
+  }
+  if (signals.habitatStage >= 4) {
+    for (const beat of MOSSPROUT_EXTENDED_JOURNEY_BEATS.filter((candidate) => candidate.chapterId.includes('heartwood'))) {
+      completedObjectives.add(beat.objectiveId);
+    }
+  }
+  for (const beat of MOSSPROUT_EXTENDED_JOURNEY_BEATS) {
+    if (!completedObjectives.has(beat.objectiveId) || beat.objectiveId === 'mossprout:objective:heartwood') continue;
+    const preferred = beat.chapterId.includes('memory-nursery')
+      ? [...MOSSPROUT_GARDEN_RESIDENT_IDS, ...MOSSPROUT_WEATHER_RESIDENT_IDS]
+      : [...MOSSPROUT_WEATHER_RESIDENT_IDS, ...MOSSPROUT_GARDEN_RESIDENT_IDS];
+    const nextResidentId = preferred.find((id) => !residentIds.has(id));
+    if (nextResidentId) residentIds.add(nextResidentId);
+  }
+  const orderedResidentIds = MOSSPROUT_RESIDENT_IDS.filter((id) => residentIds.has(id));
+  const existingCards = new Set(state.ownedKatchimeraCards.map((card) => card.cardId));
+  const ownedKatchimeraCards = [...state.ownedKatchimeraCards];
+  for (const residentId of orderedResidentIds) {
+    if (residentId === 'mossprout' || matchedCardIds.includes(residentId)) continue;
+    if (existingCards.has(residentId)) continue;
+    ownedKatchimeraCards.push({
+      cardId: residentId,
+      familyId: 'mossprout',
+      acquisition: 'story_resident',
+      sourceReceiptId: `resident-unlock:${residentId}`,
+      acquiredAt: now,
+      coinCost: 0,
+    });
+    existingCards.add(residentId);
+  }
+  const residentsChanged = orderedResidentIds.length !== state.mossproutResidentSkinIds.length
+    || orderedResidentIds.some((id, index) => id !== state.mossproutResidentSkinIds[index]);
+  if (!residentsChanged && ownedKatchimeraCards.length === state.ownedKatchimeraCards.length) return state;
+  return touch({ ...state, mossproutResidentSkinIds: orderedResidentIds, ownedKatchimeraCards }, now);
+}
+
 function reconcileCharacterActivity(
   state: MergeWorldState,
   command: Extract<MergeWorldCommand, { type: 'reconcileCharacterActivity' }>,
   now: number,
 ): MergeWorldCommandResult {
   if (command.familyId !== 'mossprout') return unchanged(state);
-  let next = ensureCharacterGenerators(state, 'mossprout', now);
+  let next = reconcileMossproutResidents(ensureCharacterGenerators(state, 'mossprout', now), command.residentSignals, now);
   const showsOrder = command.status === 'activity_in_progress' && command.activity != null;
   const keepOrders = next.activeOrders.filter((order) => (
     order.characterId !== 'mossprout'
@@ -1484,47 +1605,73 @@ function reconcileCharacterActivity(
   const coinReward = activity?.objectiveId === 'mossprout:objective:place-for-rain' ? 20
     : activity?.objectiveId === 'mossprout:objective:bank-that-holds' ? 30 : 50;
   const existingOrder = activity ? next.activeOrders.find((order) => order.id === activity.mergeOrderId) : null;
-  const storyOrder: MergeOrder | null = showsOrder && activity ? existingOrder ?? {
+  const firstResidentSkinId = activity?.objectiveId === 'mossprout:objective:place-for-rain'
+    ? command.residentSignals?.firstResidentSkinId ?? null
+    : null;
+  const firstResident = firstResidentSkinId ? mossproutResidentById.get(firstResidentSkinId) : null;
+  const residentRequest = firstResident?.requestCopy[0];
+  const authoredStoryOrder: MergeOrder | null = showsOrder && activity ? {
     id: activity.mergeOrderId,
     characterId: 'mossprout',
-    title,
-    description: extendedStoryBeat?.description ?? (title === 'A Place for Rain'
+    recipientSkinId: firstResidentSkinId ?? undefined,
+    title: residentRequest?.title ?? title,
+    description: residentRequest?.description ?? extendedStoryBeat?.description ?? (title === 'A Place for Rain'
       ? 'Make a Shell to catch the first drops.'
       : title === 'A Bank That Holds'
         ? 'Grow a Plant to hold the pond bank.'
         : 'Finish the garden with a Flower and Tidepool.'),
     difficulty: requirements.length > 1 ? 'major' : 'small',
     requirements,
-    reward: { coins: coinReward, mergeXp: 0, friendshipXp: 0, energy: 0 },
+    reward: {
+      coins: coinReward,
+      mergeXp: 0,
+      friendshipXp: 0,
+      energy: 0,
+      katchimeraCardId: firstResidentSkinId ?? undefined,
+    },
     createdAt: now,
     signature: false,
     purpose: 'normal',
     storyArcId: extendedStoryBeat?.chapterId ?? 'mossprout:dry-pond',
     storyBeatId: activity.objectiveId,
   } : null;
+  // Re-author the active activity order on reconciliation so a Journey result
+  // that arrives after the order shell was first created cannot leave a stale
+  // Mossprout recipient or omit the card reward.
+  const storyOrder = authoredStoryOrder && existingOrder
+    ? { ...existingOrder, ...authoredStoryOrder, createdAt: existingOrder.createdAt }
+    : authoredStoryOrder;
   let activeOrders = storyOrder ? [...keepOrders, storyOrder] : keepOrders;
   let dailyGarden = next.mossproutDailyGardenOrders;
   if (!showsOrder) {
     const sameDay = dailyGarden?.dayId === command.dayId;
-    const servedOrderIds = sameDay ? dailyGarden!.servedOrderIds : [];
     const chapterId = sameDay && dailyGarden?.chapterId
       ? dailyGarden.chapterId
       : mossproutWorldChapterForActiveDays(next.mossproutBoardProgression.activeDayIds.length).id;
-    const batch = mossproutDailyGardenOrderBatch(command.dayId, now, chapterId);
-    const activeBatch = batch.filter((order) => !servedOrderIds.includes(order.id)).slice(0, mossproutDailyGardenOrderWindow(chapterId));
-    const existingById = new Map(activeOrders.map((order) => [order.id, order]));
-    activeOrders = [
-      ...activeOrders.filter((order) => order.storyArcId !== 'mossprout:casual-garden'),
-      ...activeBatch.map((order) => existingById.get(order.id) ?? order),
-    ];
-    dailyGarden = {
+    const baseDaily: NonNullable<MergeWorldState['mossproutDailyGardenOrders']> = sameDay ? dailyGarden! : {
       dayId: command.dayId,
       chapterId,
-      activeOrderId: activeBatch[0]?.id ?? null,
-      offeredOrderIds: batch.map((order) => order.id),
-      servedOrderIds,
-      complete: servedOrderIds.length >= batch.length,
+      activeOrderId: null,
+      offeredOrderIds: [],
+      servedOrderIds: [],
+      complete: false,
+      nextOrderSequence: 4,
+      tailServedCount: 0,
+      activeTailSequences: [],
+      lastRecipientSkinId: null,
     };
+    const queue = mossproutRoutineQueue(
+      baseDaily,
+      now,
+      chapterId,
+      next.mossproutResidentSkinIds,
+      activeOrders.filter((order) => order.storyArcId === 'mossprout:casual-garden'),
+    );
+    activeOrders = [
+      ...activeOrders.filter((order) => order.storyArcId !== 'mossprout:casual-garden'),
+      ...queue.orders,
+    ];
+    dailyGarden = queue.daily;
   }
   let opportunities = next.characterActivityOpportunities;
   if (activity && activity.dropDefinitionIds.length > 0 && !opportunities.some((opportunity) => opportunity.id === activity.opportunityId)) {
@@ -1559,17 +1706,39 @@ function mossproutDailyGardenOrderWindow(chapterId: MossproutChapterId) {
   return chapterId === 'quiet-patch' ? 1 : chapterId === 'returning-pond' ? 2 : 3;
 }
 
-function mossproutDailyGardenOrder(dayId: string, step: number, now: number, chapterId: MossproutChapterId): MergeOrder {
-  const gardenFirst = proceduralOrderRank(dayId, 1) % 2 === 0;
+function mossproutResidentForOrder(
+  dayId: string,
+  sequence: number,
+  residentSkinIds: readonly KatchimeraSkinId[],
+): KatchimeraSkinId {
+  const available = MOSSPROUT_RESIDENT_IDS.filter((id) => residentSkinIds.includes(id));
+  const pool = available.length ? available : ['mossprout'];
+  const start = proceduralOrderRank(dayId, 11) % pool.length;
+  return pool[(start + sequence - 1) % pool.length]!;
+}
+
+function mossproutDailyGardenOrder(
+  dayId: string,
+  sequence: number,
+  now: number,
+  chapterId: MossproutChapterId,
+  residentSkinIds: readonly KatchimeraSkinId[],
+): MergeOrder {
+  const authored = sequence <= 3;
+  const step = authored ? sequence : ((sequence - 4) % 3) + 1;
+  const recipientSkinId = mossproutResidentForOrder(dayId, sequence, residentSkinIds);
+  const resident = mossproutResidentById.get(recipientSkinId) ?? mossproutResidentById.get('mossprout')!;
+  const theme = resident.requestThemes[proceduralOrderRank(`${dayId}:${sequence}`, 17) % resident.requestThemes.length];
+  const gardenFirst = theme === 'garden' ? true : theme === 'waterside' ? false : proceduralOrderRank(dayId, sequence) % 2 === 0;
   const primary = gardenFirst ? 'nature:garden' : 'nature:waterside';
   const secondary = gardenFirst ? 'nature:waterside' : 'nature:garden';
-  const requirements = chapterId === 'heartwood' && step === 2
+  const requirements = authored && chapterId === 'heartwood' && step === 2
     ? [{ definitionId: 'nature:keepsake:4', quantity: 1 }, { definitionId: `${primary}:5`, quantity: 1 }]
-    : chapterId === 'heartwood' && step === 3
+    : authored && chapterId === 'heartwood' && step === 3
       ? [{ definitionId: 'nature:keepsake:5', quantity: 1 }, { definitionId: `${primary}:6`, quantity: 1 }]
-      : chapterId === 'memory-nursery' && step === 2
+      : authored && chapterId === 'memory-nursery' && step === 2
       ? [{ definitionId: 'nature:keepsake:2', quantity: 1 }, { definitionId: `${primary}:3`, quantity: 1 }]
-      : chapterId === 'memory-nursery' && step === 3
+      : authored && chapterId === 'memory-nursery' && step === 3
         ? [{ definitionId: 'hybrid:memory-bloom', quantity: 1 }, { definitionId: `${secondary}:4`, quantity: 1 }]
         : step === 1
           ? [{ definitionId: `${primary}:${chapterId === 'quiet-patch' ? 2 : chapterId === 'returning-pond' ? 3 : 4}`, quantity: 1 }]
@@ -1577,37 +1746,88 @@ function mossproutDailyGardenOrder(dayId: string, step: number, now: number, cha
             ? [{ definitionId: `${secondary}:${chapterId === 'quiet-patch' ? 2 : 3}`, quantity: 1 }, { definitionId: `${primary}:${chapterId === 'quiet-patch' ? 2 : 3}`, quantity: 1 }]
             : [{ definitionId: `${primary}:${chapterId === 'quiet-patch' ? 4 : 5}`, quantity: 1 }, { definitionId: `${secondary}:${chapterId === 'quiet-patch' ? 3 : 4}`, quantity: 1 }];
   const difficulty = step === 1 ? 'small' as const : step === 2 ? 'medium' as const : 'major' as const;
+  const copy = resident.requestCopy[proceduralOrderRank(`${dayId}:${sequence}`, 29) % resident.requestCopy.length]!;
+  const fullReward = step === 1
+    ? { coins: 20, mergeXp: 18, friendshipXp: 0, energy: 2 }
+    : step === 2
+      ? { coins: 45, mergeXp: 36, friendshipXp: 0, energy: 3 }
+      : { coins: 80, mergeXp: 64, friendshipXp: 0, energy: 4 };
   return {
-    id: `merge-order:mossprout:daily:${dayId}:${step}`,
+    id: authored
+      ? `merge-order:mossprout:daily:${dayId}:${sequence}`
+      : `merge-order:mossprout:daily:${dayId}:tail:${sequence}`,
     characterId: 'mossprout',
-    title: step === 1 ? 'A little Garden beginning'
-      : (chapterId === 'memory-nursery' || chapterId === 'heartwood') && step === 2 ? 'A keepsake takes root'
-        : chapterId === 'heartwood' && step === 3 ? 'A lasting place'
-          : step === 2 ? 'Two parts of the Garden' : 'A thriving pond edge',
-    description: step === 1
-      ? 'Bring Mossprout one reachable piece to begin today.'
-      : step === 2
-        ? 'Bring one piece from each side of the Wild Garden.'
-        : 'Finish today with a higher-tier Garden and Waterside pairing.',
+    recipientSkinId,
+    title: copy.title,
+    description: copy.description,
     difficulty,
     requirements,
-    reward: step === 1
-      ? { coins: 20, mergeXp: 18, friendshipXp: 0, energy: 2 }
-      : step === 2
-        ? { coins: 45, mergeXp: 36, friendshipXp: 0, energy: 3 }
-        : { coins: 80, mergeXp: 64, friendshipXp: 0, energy: 4 },
+    reward: authored ? fullReward : {
+      coins: Math.max(1, Math.round(fullReward.coins * 0.4)),
+      mergeXp: Math.max(1, Math.round(fullReward.mergeXp * 0.4)),
+      friendshipXp: 0,
+      energy: 0,
+    },
     createdAt: now,
     signature: false,
     purpose: 'normal',
     storyArcId: 'mossprout:casual-garden',
     storyBeatId: dayId,
-    storyStep: step,
-    storyStepCount: 3,
+    storyStep: sequence,
+    storyStepCount: authored ? 3 : undefined,
   };
 }
 
-function mossproutDailyGardenOrderBatch(dayId: string, now: number, chapterId: MossproutChapterId): MergeOrder[] {
-  return [1, 2, 3].map((step) => mossproutDailyGardenOrder(dayId, step, now, chapterId));
+function mossproutDailyGardenOrderBatch(
+  dayId: string,
+  now: number,
+  chapterId: MossproutChapterId,
+  residentSkinIds: readonly KatchimeraSkinId[] = ['mossprout'],
+): MergeOrder[] {
+  return [1, 2, 3].map((step) => mossproutDailyGardenOrder(dayId, step, now, chapterId, residentSkinIds));
+}
+
+function mossproutTailSequence(orderId: string): number | null {
+  const match = orderId.match(/:tail:(\d+)$/);
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isInteger(value) && value >= 4 ? value : null;
+}
+
+function mossproutRoutineQueue(
+  daily: NonNullable<MergeWorldState['mossproutDailyGardenOrders']>,
+  now: number,
+  chapterId: MossproutChapterId,
+  residentSkinIds: readonly KatchimeraSkinId[],
+  existingOrders: readonly MergeOrder[] = [],
+) {
+  const window = mossproutDailyGardenOrderWindow(chapterId);
+  const authored = [1, 2, 3].filter((sequence) => !daily.servedOrderIds.includes(`merge-order:mossprout:daily:${daily.dayId}:${sequence}`));
+  const activeTailSequences = [...new Set((daily.activeTailSequences ?? []).filter((sequence) => Number.isInteger(sequence) && sequence >= 4))];
+  let nextOrderSequence = Math.max(4, daily.nextOrderSequence ?? 4);
+  const sequences = [...authored, ...activeTailSequences].slice(0, window);
+  while (sequences.length < window) {
+    sequences.push(nextOrderSequence);
+    activeTailSequences.push(nextOrderSequence);
+    nextOrderSequence += 1;
+  }
+  const existingById = new Map(existingOrders.map((order) => [order.id, order]));
+  const orders = sequences.map((sequence) => {
+    const generated = mossproutDailyGardenOrder(daily.dayId, sequence, now, chapterId, residentSkinIds);
+    return existingById.get(generated.id) ?? generated;
+  });
+  return {
+    orders,
+    daily: {
+      ...daily,
+      chapterId,
+      activeOrderId: orders[0]?.id ?? null,
+      offeredOrderIds: [1, 2, 3].map((sequence) => `merge-order:mossprout:daily:${daily.dayId}:${sequence}`),
+      complete: daily.servedOrderIds.length >= 3,
+      nextOrderSequence,
+      activeTailSequences: sequences.filter((sequence) => sequence >= 4),
+    },
+  };
 }
 
 function grantKatchimeraCard(
@@ -2438,7 +2658,30 @@ function normalizeMossproutDailyGardenOrders(value: unknown): MergeWorldState['m
     offeredOrderIds: uniqueStrings(candidate.offeredOrderIds).slice(-3),
     servedOrderIds: uniqueStrings(candidate.servedOrderIds).slice(-3),
     complete: Boolean(candidate.complete),
+    nextOrderSequence: Math.max(4, Math.floor(finite(candidate.nextOrderSequence, 4))),
+    tailServedCount: Math.max(0, Math.floor(finite(candidate.tailServedCount, 0))),
+    activeTailSequences: Array.isArray(candidate.activeTailSequences)
+      ? [...new Set(candidate.activeTailSequences
+          .map((sequence) => Math.floor(finite(sequence, 0)))
+          .filter((sequence) => sequence >= 4))].slice(0, 3)
+      : [],
+    lastRecipientSkinId: typeof candidate.lastRecipientSkinId === 'string' && mossproutResidentById.has(candidate.lastRecipientSkinId as KatchimeraSkinId)
+      ? candidate.lastRecipientSkinId as KatchimeraSkinId
+      : null,
   };
+}
+
+function normalizeMossproutResidentSkinIds(value: unknown, rawCards: unknown): KatchimeraSkinId[] {
+  const valid = new Set<KatchimeraSkinId>(MOSSPROUT_RESIDENT_IDS);
+  const stored = uniqueStrings(value).filter((id): id is KatchimeraSkinId => valid.has(id as KatchimeraSkinId));
+  const legacyJourneyMatches = Array.isArray(rawCards) ? rawCards.flatMap((card): KatchimeraSkinId[] => {
+    if (!card || typeof card !== 'object') return [];
+    const candidate = card as Partial<MergeWorldState['ownedKatchimeraCards'][number]>;
+    return candidate.acquisition === 'journey_match' && typeof candidate.cardId === 'string' && valid.has(candidate.cardId as KatchimeraSkinId)
+      ? [candidate.cardId as KatchimeraSkinId]
+      : [];
+  }) : [];
+  return [...new Set<KatchimeraSkinId>(['mossprout', ...stored, ...legacyJourneyMatches])];
 }
 
 function normalizeCompanionDiscovery(
@@ -2686,13 +2929,20 @@ export function mergeOrderEnergyRefund(order: MergeOrder): number {
   // Chapter 0 deliberately pays no Energy so its journal shortage lands on
   // the scripted value. Preserve the established economy for all other orders.
   if (order.id.startsWith('mossprout:chapter-0:')) return Math.max(0, Math.floor(order.reward.energy));
+  if (mossproutTailSequence(order.id) != null) return 0;
   if (order.signature || order.purpose === 'signature') return 5;
   return order.difficulty === 'medium' ? 3 : order.difficulty === 'major' ? 5 : 2;
 }
 
 function normalizeOrder(value: MergeOrder): MergeOrder {
+  const recipientSkinId = value.characterId === 'mossprout'
+    && typeof value.recipientSkinId === 'string'
+    && mossproutResidentById.has(value.recipientSkinId)
+    ? value.recipientSkinId
+    : value.characterId === 'mossprout' ? 'mossprout' : undefined;
   return {
     ...value,
+    recipientSkinId,
     purpose: value.purpose ?? (value.signature ? 'signature' : 'normal'),
     rerollAvailableAt: value.signature ? undefined : value.rerollAvailableAt ?? value.createdAt + 86_400_000,
   };

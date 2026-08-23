@@ -28,7 +28,7 @@ const openingActions: readonly FtueActionDefinition[] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 17,
+  version: 19,
   entryStepId: 'egg.opening',
   terminalStepId: 'complete',
   steps: [
@@ -318,7 +318,17 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'companion.chapter_zero_return', surface: 'companion',
       guide: { eyebrow: 'A promise for tomorrow', title: 'Some roots only wake with time.', body: 'The next part of the Garden needs another day together, not more merging.' },
-      actions: [{ id: 'companion.complete_chapter_zero_return', title: 'Return tomorrow', description: 'Mossprout will remember this first day.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'complete', backendEvent: true }],
+      actions: [{ id: 'companion.complete_chapter_zero_return', title: 'Choose how to finish today', description: 'Pick one small way to spend time with Mossprout.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'companion.bond_spotlight', backendEvent: true }],
+    },
+    {
+      id: 'companion.bond_spotlight', surface: 'companion',
+      guide: { eyebrow: 'Your time together', title: 'This is your Bond.', body: 'It grows through meaningful moments with Mossprout across real days. Merge play cannot grind it.' },
+      actions: [{ id: 'companion.acknowledge_bond', title: 'Show today\'s choices', description: 'See the small things you can do with Mossprout today.', icon: 'heart.fill', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'companion.day_one_action', backendEvent: true }],
+    },
+    {
+      id: 'companion.day_one_action', surface: 'companion',
+      guide: { eyebrow: 'Time together grows Bond', title: 'Choose one thing.', body: 'You never need to finish every card. Pick the one that feels right today.' },
+      actions: [{ id: 'companion.complete_day_one_action', title: 'Complete one Bond action', description: 'Choose any one of Mossprout\'s action cards.', icon: 'heart.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'complete', backendEvent: true }],
       blockingBeat: 'chapter_complete',
     },
     {

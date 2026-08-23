@@ -1,10 +1,11 @@
 import * as Haptics from 'expo-haptics';
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect, type RefObject } from 'react';
 import {
   KeyboardAvoidingView,
   type StyleProp,
   StyleSheet,
   View,
+  type View as ViewType,
   type ViewStyle,
 } from 'react-native';
 import Animated, { FadeInUp, useReducedMotion } from 'react-native-reanimated';
@@ -66,6 +67,7 @@ export function CompanionSheetShell({
 export function CompanionDestinationHeader({
   backLabel = 'Home',
   bondProgress,
+  bondTargetRef,
   compactHub = false,
   label,
   onBack,
@@ -75,6 +77,7 @@ export function CompanionDestinationHeader({
 }: {
   backLabel?: string;
   bondProgress?: CompanionBondProgress;
+  bondTargetRef?: RefObject<ViewType | null>;
   compactHub?: boolean;
   label: string;
   onBack: () => void;
@@ -85,7 +88,7 @@ export function CompanionDestinationHeader({
   const goldTitle = titleTone === 'gold';
   return (
     <View>
-      <KatchimeraPageHeader bondProgress={bondProgress} onBack={onBack} onOpenCards={onOpenCards} onOpenTrophies={onOpenTrophies} />
+      <KatchimeraPageHeader bondProgress={bondProgress} bondTargetRef={bondTargetRef} onBack={onBack} onOpenCards={onOpenCards} onOpenTrophies={onOpenTrophies} />
       <View style={styles.destinationHeading}>
         <ThemedText
           adjustsFontSizeToFit

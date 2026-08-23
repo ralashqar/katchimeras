@@ -61,7 +61,9 @@ test('procedural Merge orders fill three slots and remain separate from story or
 
 test('Mossprout FTUE returns after the first order and completes on the companion page', () => {
   assert.equal(mossproutFtueStep('merge.serve_sprout')?.edges?.[0]?.nextStepId, 'companion.chapter_zero_return');
-  assert.equal(mossproutFtueStep('companion.chapter_zero_return')?.actions[0]?.nextStepId, 'complete');
+  assert.equal(mossproutFtueStep('companion.chapter_zero_return')?.actions[0]?.nextStepId, 'companion.bond_spotlight');
+  assert.equal(mossproutFtueStep('companion.bond_spotlight')?.actions[0]?.nextStepId, 'companion.day_one_action');
+  assert.equal(mossproutFtueStep('companion.day_one_action')?.actions[0]?.nextStepId, 'complete');
   assert.equal(mossproutFtueStep('haven.reveal')?.surface, 'haven');
   assert.equal(mossproutFtueStep('haven.reveal')?.actions[0]?.nextStepId, 'complete');
   assert.equal(mossproutFtueStep('haven.reveal')?.actions[0]?.title, 'Finish');

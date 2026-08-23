@@ -14,6 +14,7 @@ import {
   mossproutJourneyForDay,
   mossproutStory,
   normalizeRelationshipProgressState,
+  reconcileMossproutDayOneChoices,
   recordMossproutFirstGardenRestored,
   recordKatchimeraActionCompletion,
   recordHandledKatchimeraActionCompletion,
@@ -27,6 +28,86 @@ import {
 import { mossproutStoryConversationDefinitions } from '../constants/mossprout-story-conversations';
 import { composeMossproutVisibleActions, MOSSPROUT_DAILY_FIELD_NOTE_ACTION_ID, mossproutConversationActionCompletion, mossproutConversationArtKey, mossproutGoalArtKey, mossproutJourneyDayStatus, resolveMossproutDayActions, resolveMossproutHome } from '../game/katchimeras/mossprout-home';
 import type { KatchimeraDayAction } from '../types/relationship-progression';
+import type { JourneyDayRecord, RelationshipProgressState } from '../types/relationship-progression';
+import { mossproutJourneyDayNumber, resolveMossproutJourneyHandoff } from '../game/katchimeras/mossprout-journey-handoff';
+
+function firstJourneyCompleteState(dayId = '2026-08-23'): RelationshipProgressState {
+  const journey: JourneyDayRecord = {
+    id: `journey-day:${dayId}:mossprout`,
+    dayId,
+    familyId: 'mossprout',
+    status: 'complete',
+    chapterId: 'mossprout:chapter:quiet-patch',
+    beatId: 'quiet-patch:first-flower',
+    openingConversationId: null,
+    profileConversationId: null,
+    matchedCardId: 'mossprout-form:mossling',
+    returnConversationId: null,
+    activity: null,
+    resolutionAvailableAt: null,
+    signalReceiptIds: [],
+    activityReceiptIds: [],
+    resolutionId: 'quiet-patch:first-flower:resolution',
+    actions: [],
+    startedAt: new Date(`${dayId}T10:00:00`).getTime(),
+    completedAt: new Date(`${dayId}T11:00:00`).getTime(),
+    completionReceipt: {
+      id: `journey-complete:${dayId}:mossprout`,
+      journeyId: `journey-day:${dayId}:mossprout`,
+      familyId: 'mossprout',
+      dayId,
+      beatId: 'quiet-patch:first-flower',
+      bondPoints: 20,
+      completedActivity: true,
+      offeredGoal: true,
+      cardId: 'mossprout-form:mossling',
+      completedActionIds: [],
+      createdAt: new Date(`${dayId}T11:00:00`).getTime(),
+    },
+  };
+  return { ...emptyRelationshipProgressState(), journeyDays: [journey] };
+}
+
+test('first Journey Day handoff changes from completion to waiting and then Day 2 ready', () => {
+  const relationships = firstJourneyCompleteState();
+  assert.equal(resolveMossproutJourneyHandoff({ dayId: '2026-08-23', ftueStatus: 'active', relationships })?.state, 'completed_today');
+
+  const waiting = resolveMossproutJourneyHandoff({ dayId: '2026-08-23', ftueStatus: 'complete', relationships });
+  assert.equal(waiting?.state, 'waiting_for_next_day');
+  assert.match(waiting?.body ?? '', /Garden orders are still available today/);
+
+  const ready = resolveMossproutJourneyHandoff({ dayId: '2026-08-24', ftueStatus: 'complete', relationships });
+  assert.equal(ready?.state, 'ready_to_begin');
+  assert.equal(ready?.title, 'Journey Day 2 is ready');
+  assert.equal(mossproutJourneyDayNumber(relationships, '2026-08-24'), 2);
+});
+
+test('starting Day 2 removes the initial Home handoff hook', () => {
+  const relationships = firstJourneyCompleteState();
+  relationships.journeyDays.push({
+    ...relationships.journeyDays[0]!,
+    id: 'journey-day:2026-08-24:mossprout',
+    dayId: '2026-08-24',
+    beatId: 'dry-pond:day-1',
+    chapterId: 'mossprout:chapter:dry-pond',
+    status: 'opening',
+    completionReceipt: null,
+    completedAt: null,
+    startedAt: new Date('2026-08-24T09:00:00').getTime(),
+  });
+  assert.equal(resolveMossproutJourneyHandoff({ dayId: '2026-08-24', ftueStatus: 'complete', relationships }), null);
+});
+
+test('the next unstarted Mossprout chapter is labelled as Journey Day 2', () => {
+  const actions = resolveMossproutDayActions({
+    goals: [],
+    journey: null,
+    journeyDayNumber: 2,
+    offers: [],
+    storyComplete: false,
+  });
+  assert.equal(actions[0]?.title, 'Begin Journey Day 2');
+});
 
 test('legacy relationship state normalizes with an empty skipped-action ledger', () => {
   const normalized = normalizeRelationshipProgressState({
@@ -39,6 +120,69 @@ test('legacy relationship state normalizes with an empty skipped-action ledger',
   assert.deepEqual(normalized.skippedActionIds, []);
   assert.equal(normalized.schemaVersion, 2);
   assert.deepEqual(normalized.mossproutDailyActionDecks, []);
+});
+
+test('legacy Mossprout Day 1 saves gain all three FTUE choices', () => {
+  const legacy = firstJourneyCompleteState('2026-08-23');
+  legacy.journeyDays[0]!.actions = [{
+    id: 'mossprout:quiet-patch:first-flower:field-note',
+    kind: 'journal_prompt',
+    required: false,
+    definitionId: 'mossprout:conversation:nature-journal:one-growing-thing',
+    status: 'ready',
+    bondContribution: 20,
+    completedAt: null,
+    outroAcknowledgedAt: null,
+  }];
+
+  const normalized = normalizeRelationshipProgressState(legacy);
+  const journey = mossproutJourneyForDay(normalized, '2026-08-23');
+  const choices = journey!.actions.filter((action) => action.kind !== 'journey');
+  assert.deepEqual(choices.map((action) => action.kind), ['goal_plan', 'playful_game', 'journal_prompt']);
+  assert.equal(choices.every((action) => action.status === 'ready'), true);
+
+  const visible = resolveMossproutDayActions({
+    dayId: '2026-08-23',
+    goals: [],
+    journey,
+    offers: [],
+    storyComplete: false,
+  }).filter((action) => choices.some((choice) => choice.id === action.id));
+  assert.equal(visible.length, 3);
+});
+
+test('Day 1 choice reconciliation preserves completion and keeps alternatives closed', () => {
+  const legacy = firstJourneyCompleteState('2026-08-23');
+  legacy.journeyDays[0]!.actions = [{
+    id: 'mossprout:quiet-patch:first-flower:field-note',
+    kind: 'journal_prompt',
+    required: false,
+    definitionId: 'mossprout:conversation:nature-journal:one-growing-thing',
+    status: 'completed',
+    bondContribution: 20,
+    completedAt: 100,
+    outroAcknowledgedAt: null,
+  }];
+
+  const normalized = normalizeRelationshipProgressState(legacy);
+  const choices = mossproutJourneyForDay(normalized, '2026-08-23')!.actions.filter((action) => action.kind !== 'journey');
+  assert.deepEqual(choices.map((action) => action.status), ['skipped', 'skipped', 'completed']);
+  assert.equal(choices.find((action) => action.status === 'completed')?.completedAt, 100);
+});
+
+test('live Day 1 reconciliation repairs a cached one-choice journey exactly once', () => {
+  const cached = firstJourneyCompleteState('2026-08-23');
+  cached.journeyDays[0]!.actions = [{
+    id: 'mossprout:quiet-patch:first-flower:field-note',
+    kind: 'journal_prompt', required: false,
+    definitionId: 'mossprout:conversation:nature-journal:one-growing-thing',
+    status: 'ready', bondContribution: 20, completedAt: null, outroAcknowledgedAt: null,
+  }];
+
+  const repaired = reconcileMossproutDayOneChoices(cached);
+  assert.notEqual(repaired, cached);
+  assert.equal(repaired.journeyDays[0]?.actions.filter((action) => action.kind !== 'journey').length, 3);
+  assert.equal(reconcileMossproutDayOneChoices(repaired), repaired);
 });
 
 test('every bespoke Mossprout question and journal resolves to its intended action artwork', () => {
@@ -357,13 +501,14 @@ test('the first Garden order unlocks the return insight before completing Day 1'
   state = completeMossproutJourneyConversation(state, 'mossprout:ftue:chapter-zero-return', 3);
   journey = mossproutJourneyForDay(state, '2026-08-21');
   assert.equal(journey?.status, 'complete');
-  assert.equal(journey?.completionReceipt?.bondPoints, 16);
+  assert.equal(journey?.completionReceipt?.bondPoints, 0);
   assert.equal(journey?.actions.find((action) => action.kind === 'playful_game')?.status, 'ready');
   assert.equal(mossproutStory(state).habitatStage, 1);
 
   state = completeMossproutJourneyConversation(state, 'mossprout:quiet-patch:first-flower:goal-plan', 4);
   state = completeMossproutJourneyConversation(state, 'mossprout:quiet-patch:first-flower:playful', 5);
-  assert.equal(mossproutJourneyForDay(state, '2026-08-21')?.completionReceipt?.bondPoints, 24);
+  assert.equal(mossproutJourneyForDay(state, '2026-08-21')?.completionReceipt?.bondPoints, 20);
+  assert.equal(mossproutJourneyForDay(state, '2026-08-21')?.actions.filter((action) => action.status === 'skipped').length, 2);
 });
 
 test('a Journey Garden card uses the live order title, reward, and every requested item', () => {
@@ -371,14 +516,10 @@ test('a Journey Garden card uses the live order title, reward, and every request
   state = completeMossproutJourneyDay(state, '2026-08-21', { objectiveId: 'first-sprout', activityReceiptId: 'sprout', resolutionId: 'ftue' }, 2);
   state = startMossproutJourneyDay(state, '2026-08-22', 3).state;
   state = completeMossproutJourneyOpening(state, '2026-08-22', 4);
-  state = makeMossproutResolutionAvailable(state, '2026-08-22', { force: true }, 5);
-  state = completeMossproutJourneyConversation(state, 'mossprout:dry-pond:day-1:resolution', 6);
-  state = startMossproutJourneyDay(state, '2026-08-23', 7).state;
-  state = completeMossproutJourneyOpening(state, '2026-08-23', 8);
 
   const actions = resolveMossproutDayActions({
     goals: [],
-    journey: mossproutJourneyForDay(state, '2026-08-23'),
+    journey: mossproutJourneyForDay(state, '2026-08-22'),
     journeyGardenRequest: {
       id: 'live-order', title: 'The order on the board', description: 'Bring these exact pieces.', difficulty: 'major',
       requirements: [
@@ -411,16 +552,16 @@ test('Mossprout Day 1 exposes its goal and fun threads after the main Garden jou
   ];
   let actions = resolveMossproutDayActions({ goals: [], journey, offers, storyComplete: false });
   assert.deepEqual(actions.map((action) => action.slotId), ['together', 'field', 'garden']);
-  assert.deepEqual(actions.map((action) => action.kind), ['story_chat', 'photo_request', 'fun_chat']);
+  assert.deepEqual(actions.map((action) => action.kind), ['story_chat', 'journal_prompt', 'fun_chat']);
   assert.equal(actions[0]?.status, 'completed');
 
   const mainAction = journey?.actions.find((action) => action.kind === 'journey');
   state = acknowledgeMossproutJourneyActionOutro(state, '2026-08-21', mainAction!.id, 3.5);
   journey = mossproutJourneyForDay(state, '2026-08-21');
   actions = resolveMossproutDayActions({ goals: [], journey, offers, storyComplete: false });
-  assert.deepEqual(actions.map((action) => action.kind), ['fun_chat', 'photo_request', 'goal_plan']);
+  assert.deepEqual(actions.map((action) => action.kind), ['fun_chat', 'journal_prompt', 'photo_request']);
   assert.equal(actions.filter((action) => action.kind === 'photo_request' || action.kind === 'note_request').length, 1);
-  assert.equal(actions.find((action) => action.kind === 'goal_plan')?.destination.kind, 'focus_questionnaire');
+  assert.equal(journey?.actions.find((action) => action.kind === 'goal_plan')?.status, 'ready');
 
   state = completeMossproutJourneyGoalPlan(state, '2026-08-21', 4);
   actions = resolveMossproutDayActions({ goals: [], journey: mossproutJourneyForDay(state, '2026-08-21'), offers, storyComplete: false });
@@ -430,7 +571,32 @@ test('Mossprout Day 1 exposes its goal and fun threads after the main Garden jou
 
   state = completeMossproutJourneyConversation(state, 'mossprout:quiet-patch:first-flower:playful', 5);
   actions = resolveMossproutDayActions({ goals: [], journey: mossproutJourneyForDay(state, '2026-08-21'), offers, storyComplete: false });
-  assert.equal(actions.some((action) => action.slotId === 'together' && action.status === 'completed'), true);
+  assert.equal(mossproutJourneyForDay(state, '2026-08-21')?.actions.find((action) => action.kind === 'playful_game')?.status, 'skipped');
+  assert.equal(actions.some((action) => action.id === 'mossprout:quiet-patch:first-flower:playful'), false);
+});
+
+test('a Journey action keeps one row identity through completion and reveals its replacements', () => {
+  const dayId = '2026-08-21';
+  let state = startMossproutJourneyDay(emptyRelationshipProgressState(), dayId, 1).state;
+  state = recordMossproutFirstGardenRestored(state, dayId, 'merge-order:first-plant', 2);
+  state = completeMossproutJourneyConversation(state, 'mossprout:ftue:chapter-zero-return', 3);
+  const mainAction = mossproutJourneyForDay(state, dayId)!.actions.find((action) => action.kind === 'journey')!;
+  state = acknowledgeMossproutJourneyActionOutro(state, dayId, mainAction.id, 3.5);
+  const offers = [
+    { id: 'quest-mossprout-green-photo', title: 'Photograph something green', hint: 'A nature photo', family: 'photo', bondReward: 4 },
+    { id: 'quest-mossprout-nature-note', title: 'Keep a tiny field note', hint: 'A nature note', family: 'journal', bondReward: 4 },
+  ];
+  const before = resolveMossproutDayActions({ dayId, goals: [], journey: mossproutJourneyForDay(state, dayId), offers, storyComplete: false });
+  const fieldNote = before.find((action) => action.kind === 'journal_prompt')!;
+
+  state = completeMossproutJourneyConversation(state, 'mossprout:conversation:nature-journal:one-growing-thing', 4);
+  const after = resolveMossproutDayActions({ dayId, goals: [], journey: mossproutJourneyForDay(state, dayId), offers, storyComplete: false });
+  const completed = after.find((action) => action.status === 'completed')!;
+  const visible = composeMossproutVisibleActions(after, completed, 3);
+
+  assert.equal(completed.instanceId, fieldNote.instanceId);
+  assert.equal(visible.length, 3);
+  assert.equal(visible.filter((action) => action.status !== 'completed').length, 2);
 });
 
 test('Mossprout keeps offering independent nature activities after Journey actions are exhausted', () => {
@@ -439,6 +605,7 @@ test('Mossprout keeps offering independent nature activities after Journey actio
   state = completeMossproutJourneyConversation(state, 'mossprout:ftue:chapter-zero-return', 3);
   state = completeMossproutJourneyConversation(state, 'mossprout:quiet-patch:first-flower:goal-plan', 4);
   state = completeMossproutJourneyConversation(state, 'mossprout:quiet-patch:first-flower:playful', 5);
+  state = completeMossproutJourneyConversation(state, 'mossprout:conversation:nature-journal:one-growing-thing', 5.5);
   for (const action of mossproutJourneyForDay(state, '2026-08-21')!.actions) {
     state = acknowledgeMossproutJourneyActionOutro(state, '2026-08-21', action.id, 6);
   }
@@ -662,57 +829,63 @@ test('Mossprout macro progression advances once across distinct Journey Days', (
 
 test('the Dry Pond slice alternates narrative, Merge activity, return, and real-day gates', () => {
   let state = startMossproutJourneyDay(emptyRelationshipProgressState(), '2026-08-21', 1).state;
+  state = recordMossproutMatchedCard(state, '2026-08-21', 'fernip');
   state = completeMossproutJourneyDay(state, '2026-08-21', { objectiveId: 'first-sprout', activityReceiptId: 'sprout', resolutionId: 'ftue' }, 2);
 
   state = startMossproutJourneyDay(state, '2026-08-22', 3).state;
   assert.equal(mossproutJourneyForDay(state, '2026-08-22')?.status, 'opening');
+  assert.equal(mossproutJourneyForDay(state, '2026-08-22')?.matchedCardId, 'fernip');
   state = completeMossproutJourneyConversation(state, 'mossprout:dry-pond:day-1:opening', 4);
-  assert.equal(mossproutJourneyForDay(state, '2026-08-22')?.status, 'living');
-  state = makeMossproutResolutionAvailable(state, '2026-08-22', { signalReceiptId: 'signal:rain' }, 5);
+  assert.equal(mossproutJourneyForDay(state, '2026-08-22')?.status, 'activity_available');
+  const residentActivity = mossproutJourneyForDay(state, '2026-08-22')!.activity!;
+  assert.equal(residentActivity.objectiveId, 'mossprout:objective:place-for-rain');
+  state = startMossproutJourneyActivity(state, '2026-08-22');
+  state = recordMossproutJourneyOrderServed(state, residentActivity.mergeOrderId, 5);
+  state = beginMossproutJourneyReturn(state, '2026-08-22');
   state = completeMossproutJourneyConversation(state, 'mossprout:dry-pond:day-1:resolution', 6);
   assert.equal(mossproutJourneyForDay(state, '2026-08-22')?.status, 'complete');
+  assert.equal(mossproutJourneyForDay(state, '2026-08-22')?.completionReceipt?.cardId, 'fernip');
   assert.equal(mossproutStory(state).activeBeatId, 'dry-pond:day-2');
 
   state = startMossproutJourneyDay(state, '2026-08-23', 7).state;
   state = completeMossproutJourneyOpening(state, '2026-08-23', 8);
   assert.equal(mossproutJourneyForDay(state, '2026-08-23')?.status, 'activity_available');
-  state = recordMossproutMatchedCard(state, '2026-08-23', 'fernip');
-  state = completeMossproutJourneyConversation(state, 'mossprout:game:form-finder', 8.5);
   const available = mossproutJourneyForDay(state, '2026-08-23');
   assert.equal(available?.status, 'activity_available');
-  assert.deepEqual(available?.activity?.dropDefinitionIds, ['nature:waterside:1', 'nature:waterside:1', 'nature:garden:1', 'nature:garden:1']);
+  assert.equal(available?.activity?.objectiveId, 'mossprout:objective:bank-that-holds');
   state = startMossproutJourneyActivity(state, '2026-08-23');
   state = recordMossproutJourneyOrderServed(state, available!.activity!.mergeOrderId, 9);
   assert.equal(mossproutJourneyForDay(state, '2026-08-23')?.status, 'return_available');
   state = beginMossproutJourneyReturn(state, '2026-08-23');
   state = completeMossproutJourneyConversation(state, 'mossprout:dry-pond:day-2:resolution', 10);
   assert.equal(mossproutJourneyForDay(state, '2026-08-23')?.status, 'complete');
-  assert.equal(mossproutJourneyForDay(state, '2026-08-23')?.completionReceipt?.cardId, 'fernip');
-  assert.equal(mossproutJourneyForDay(state, '2026-08-23')?.completionReceipt?.bondPoints, 16);
+  assert.equal(mossproutJourneyForDay(state, '2026-08-23')?.completionReceipt?.cardId, null);
+  assert.equal(mossproutJourneyForDay(state, '2026-08-23')?.completionReceipt?.bondPoints, 12);
   assert.equal(mossproutStory(state).activeBeatId, 'dry-pond:day-3');
 
   state = completeMossproutJourneyConversation(state, 'mossprout:dry-pond:day-2:goal-plan', 10.5);
-  assert.equal(mossproutJourneyForDay(state, '2026-08-23')?.completionReceipt?.bondPoints, 20);
-  assert.equal(mossproutJourneyForDay(state, '2026-08-23')?.actions.filter((action) => action.status === 'completed').length, 3);
+  assert.equal(mossproutJourneyForDay(state, '2026-08-23')?.completionReceipt?.bondPoints, 16);
+  assert.equal(mossproutJourneyForDay(state, '2026-08-23')?.actions.filter((action) => action.status === 'completed').length, 2);
 
   const sameDay = startMossproutJourneyDay(state, '2026-08-23', 11);
   assert.equal(sameDay.journey?.status, 'complete');
   assert.equal(mossproutStory(sameDay.state).activeBeatId, 'dry-pond:day-3');
 
-  for (const [index, day] of [
-    { dayId: '2026-08-24', beatId: 'dry-pond:day-3' },
-    { dayId: '2026-08-25', beatId: 'dry-pond:day-4' },
-  ].entries()) {
-    state = startMossproutJourneyDay(state, day.dayId, 20 + index * 5).state;
-    state = completeMossproutJourneyConversation(state, `mossprout:${day.beatId}:opening`, 21 + index * 5);
-    const activity = mossproutJourneyForDay(state, day.dayId)?.activity;
-    assert.ok(activity);
-    state = startMossproutJourneyActivity(state, day.dayId);
-    state = recordMossproutJourneyOrderServed(state, activity!.mergeOrderId, 22 + index * 5);
-    state = beginMossproutJourneyReturn(state, day.dayId);
-    state = completeMossproutJourneyConversation(state, `mossprout:${day.beatId}:resolution`, 23 + index * 5);
-    assert.equal(mossproutJourneyForDay(state, day.dayId)?.status, 'complete');
-  }
+  state = startMossproutJourneyDay(state, '2026-08-24', 20).state;
+  state = completeMossproutJourneyConversation(state, 'mossprout:dry-pond:day-3:opening', 21);
+  const majorActivity = mossproutJourneyForDay(state, '2026-08-24')!.activity!;
+  assert.equal(majorActivity.objectiveId, 'mossprout:objective:little-rain-garden');
+  state = startMossproutJourneyActivity(state, '2026-08-24');
+  state = recordMossproutJourneyOrderServed(state, majorActivity.mergeOrderId, 22);
+  state = beginMossproutJourneyReturn(state, '2026-08-24');
+  state = completeMossproutJourneyConversation(state, 'mossprout:dry-pond:day-3:resolution', 23);
+
+  state = startMossproutJourneyDay(state, '2026-08-25', 25).state;
+  state = completeMossproutJourneyConversation(state, 'mossprout:dry-pond:day-4:opening', 26);
+  assert.equal(mossproutJourneyForDay(state, '2026-08-25')?.status, 'living');
+  state = makeMossproutResolutionAvailable(state, '2026-08-25', { force: true }, 27);
+  state = completeMossproutJourneyConversation(state, 'mossprout:dry-pond:day-4:resolution', 28);
+  assert.equal(mossproutJourneyForDay(state, '2026-08-25')?.status, 'complete');
   assert.equal(mossproutStory(state).activeBeatId, 'memory-nursery:nursery-key');
   assert.equal(mossproutStory(state).habitatStage, 2);
 });

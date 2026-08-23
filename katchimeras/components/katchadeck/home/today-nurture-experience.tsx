@@ -82,6 +82,8 @@ import type { FtueActionDefinition, FtueChoiceOption } from '@/features/onboardi
 import { clampFtueCameraPanToCoverage } from '@/features/onboarding/ftue-home-camera';
 import type { TodayHatchPresentation } from '@/utils/today-hatch-presentation';
 import type { YesterdayStepEnergyOffer } from '@/utils/merge-world/economy-policy';
+import { CompanionJourneyHookCard } from '@/components/katchadeck/home/companion-journey-hook-card';
+import type { MossproutJourneyHandoffViewModel } from '@/game/katchimeras/mossprout-journey-handoff';
 
 type TodayNurtureExperienceProps = {
   actionListLocked: boolean;
@@ -91,6 +93,7 @@ type TodayNurtureExperienceProps = {
   completionEvent: TodayCareCompletionEvent | null;
   day: HomeDayRecord;
   companionWispId?: WispId | null;
+  companionJourneyHook?: MossproutJourneyHandoffViewModel | null;
   feedbackKey: number;
   feedExpressionKey?: number;
   focusMode?: boolean;
@@ -107,6 +110,7 @@ type TodayNurtureExperienceProps = {
   onCompleteQuickGoal: (goalId: string) => CompanionQuickGoalCompletionReceipt;
   onCompletionAnimationEnd: (eventId: string, onHandoff?: () => void) => void;
   onOpenQuickGoal: (goalId: string, completeFromOrigin: () => void) => void;
+  onOpenCompanionJourney?: () => void;
   onChooseMood: (choiceId: MoodMonumentChoiceId, label: string, from: FeedSourceRect, imageSource: number, accent: string, currencyFrom: FeedSourceRect) => void;
   onChooseSleep: (quality: SleepQuality, label: string, from: FeedSourceRect, imageSource: number, accent: string, currencyFrom: FeedSourceRect) => void;
   onReveal: () => void;
@@ -179,6 +183,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   bottomInset,
   completionEvent,
   companionWispId,
+  companionJourneyHook = null,
   day,
   eggTargetRef,
   energyHudPulseNonce,
@@ -200,6 +205,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   onCompleteQuickGoal,
   onCompletionAnimationEnd,
   onOpenQuickGoal,
+  onOpenCompanionJourney,
   onChooseMood,
   onChooseSleep,
   onReveal,
@@ -977,6 +983,9 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           pointerEvents={actionStackInteractive ? 'auto' : 'none'}
           style={actionStackRevealStyle}>
           <Animated.View style={styles.careSection}>
+          {companionJourneyHook && onOpenCompanionJourney ? (
+            <CompanionJourneyHookCard model={companionJourneyHook} onPress={onOpenCompanionJourney} />
+          ) : null}
           {onboardingGuide ? (
             <Animated.View entering={FadeInUp.duration(260)} key={onboardingGuide.title} style={styles.onboardingGuide}>
               <FtueGuideCopy guide={onboardingGuide} />

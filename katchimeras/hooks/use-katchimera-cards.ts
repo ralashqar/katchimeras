@@ -9,8 +9,6 @@ import {
   subscribeMergeWorldSnapshots,
 } from '@/utils/merge-world/repository';
 
-export const KATCHIMERA_CARD_PRICE = 150;
-
 export type KatchimeraCardOption = {
   id: KatchimeraSkinId;
   displayName: string;
@@ -52,7 +50,7 @@ export function useKatchimeraCards(familyId: KatchimeraFamilyId | null) {
     }));
   }, [familyId, snapshot?.cards]);
 
-  const collectionOpen = cards.some((card) => card.acquisition === 'journey_match');
+  const collectionOpen = cards.some((card) => card.owned && card.id !== familyId);
   const purchase = useCallback(async (cardId: KatchimeraSkinId) => {
     if (!familyId) return null;
     const now = Date.now();
