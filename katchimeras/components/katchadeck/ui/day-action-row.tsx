@@ -6,9 +6,9 @@ import Animated, {
   cancelAnimation,
   Easing,
   FadeIn,
-  FadeInUp,
   LinearTransition,
   runOnJS,
+  SlideInLeft,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -125,7 +125,7 @@ export function DayActionActiveRow({
     ? undefined
     : reduceMotion
       ? FadeIn.delay(entryDelayMs).duration(80)
-      : FadeInUp.delay(entryDelayMs).duration(DAY_ACTION_MOTION.entryDurationMs).easing(Easing.out(Easing.cubic));
+      : SlideInLeft.delay(entryDelayMs).duration(DAY_ACTION_MOTION.entryDurationMs).easing(Easing.out(Easing.cubic));
   const content = onSkip ? (
     <DayActionSwipeShell
       disabled={disabled}
@@ -218,7 +218,7 @@ export function DayActionCompletedRow({
     ? undefined
     : reduceMotion
       ? FadeIn.delay(entryDelayMs).duration(80)
-      : FadeInUp.delay(entryDelayMs).duration(DAY_ACTION_MOTION.entryDurationMs).easing(Easing.out(Easing.cubic));
+      : SlideInLeft.delay(entryDelayMs).duration(DAY_ACTION_MOTION.entryDurationMs).easing(Easing.out(Easing.cubic));
 
   const finish = useCallback(() => {
     if (finishedRef.current) return;

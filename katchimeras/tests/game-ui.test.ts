@@ -52,11 +52,14 @@ test('currency artwork remains large and unframed inside shared pills', () => {
   assert.match(source, /return `\$\{minutes\}m \$\{String\(safeSeconds % 60\)\.padStart\(2, '0'\)\}s`/);
 });
 
-test('Merge keeps Energy regeneration inside the currency HUD', () => {
-  const source = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/games/merge-world-screen.tsx'), 'utf8');
-  assert.match(source, /countdownSeconds: energyCountdownSeconds \?\? undefined/);
-  assert.doesNotMatch(source, /Next Energy in about|energyStatusRow|generatorUpgradePressable/);
-  assert.doesNotMatch(source, /L\{upgradeGenerator\.level\}/);
+test('Merge omits the retired Energy HUD and presents generator spawning as unlimited', () => {
+  const screenSource = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/games/merge-world-screen.tsx'), 'utf8');
+  const inspectorSource = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/games/merge-cell-inspector.tsx'), 'utf8');
+  const policySource = fs.readFileSync(path.resolve(process.cwd(), 'utils/merge-world/economy-policy.ts'), 'utf8');
+  assert.doesNotMatch(screenSource, /countdownSeconds: energyCountdownSeconds|Next Energy in about|energyStatusRow|generatorUpgradePressable/);
+  assert.doesNotMatch(screenSource, /L\{upgradeGenerator\.level\}/);
+  assert.match(policySource, /export const MERGE_GENERATORS_UNLIMITED = true/);
+  assert.match(inspectorSource, /Unlimited finds ready\./);
 });
 
 test('Today action rows use neutral unframed art and reversible swipe actions', () => {

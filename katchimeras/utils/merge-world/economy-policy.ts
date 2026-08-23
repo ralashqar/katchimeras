@@ -2,7 +2,7 @@ import type { HomeDayRecord, JournalRecord } from '@/types/home';
 import type { MergeStepEnergyDay } from '@/types/merge-world';
 
 // Kept as zero-valued compatibility fields while v18 snapshots and older
-// action receipts are retired. Play pacing now belongs to each generator.
+// action receipts are retired.
 export const MERGE_ENERGY_REGEN_CAP = 0;
 export const MERGE_INITIAL_ENERGY = 0;
 export const MERGE_ENERGY_REGEN_MS = 0;
@@ -12,6 +12,10 @@ export const MERGE_DAILY_COMPANION_ENERGY = 0;
 export const MERGE_DAILY_QUEST_ENERGY = 0;
 export const STEPS_PER_MERGE_ENERGY = 300;
 export const MOSSPROUT_FTUE_JOURNAL_ENERGY = 0;
+
+// Temporary product policy: keep capacity/rest data in saved worlds for the
+// eventual economy redesign, but never consume it or block generator taps.
+export const MERGE_GENERATORS_UNLIMITED = true;
 
 export type MergeJournalRewardPreview = {
   dailyJournalEnergy: number;

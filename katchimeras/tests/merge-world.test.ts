@@ -461,12 +461,12 @@ test('normalization intentionally resets pre-v18 Merge snapshots', () => {
   assert.deepEqual(normalized.generators, {});
 });
 
-test('story unlock adds the Pantry and each tap consumes one generator charge', () => {
+test('story unlock adds the Pantry and generator taps preserve capacity while spawning is unlimited', () => {
   let state = storyWorld();
   const before = state.generators['hearth-pantry'].charges;
   const result = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: 'hearth-pantry', now: NOW + 2, seed: 'first-drop' });
   assert.equal(result.changed, true);
-  assert.equal(result.state.generators['hearth-pantry'].charges, before - 1);
+  assert.equal(result.state.generators['hearth-pantry'].charges, before);
   assert.ok(result.spawnedCell != null);
   assert.equal(result.state.board[result.spawnedCell!].occupant?.kind, 'item');
   assert.equal(result.state.discoveries.length, 1);
@@ -750,17 +750,15 @@ test('identical items merge and preserve deterministic item progression', () => 
   assert.equal(result.discoveryId, 'food:table:2');
 });
 
-test('depleted generators rest and refill after their authored duration', () => {
+test('depleted saved generators can spawn immediately while generator capacity is disabled', () => {
   let state = storyWorld();
-  state = { ...state, generators: { ...state.generators, 'hearth-pantry': { ...state.generators['hearth-pantry'], charges: 1, capacity: 1 } } };
-  const depleted = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: 'hearth-pantry', now: NOW + 1, seed: 'last-charge' });
-  assert.equal(depleted.state.generators['hearth-pantry'].charges, 0);
-  assert.equal(depleted.state.generators['hearth-pantry'].restStartedAt, NOW + 1);
-  const resting = reduceMergeWorld(depleted.state, { type: 'tapGenerator', generatorId: 'hearth-pantry', now: NOW + 2, seed: 'too-soon' });
-  assert.equal(resting.failureReason, 'generator_resting');
-  const refreshed = reduceMergeWorld(depleted.state, { type: 'refreshTime', now: NOW + 1 + depleted.state.generators['hearth-pantry'].restDurationMs });
-  assert.equal(refreshed.state.generators['hearth-pantry'].charges, 1);
-  assert.equal(refreshed.state.generators['hearth-pantry'].restStartedAt, null);
+  state = { ...state, generators: { ...state.generators, 'hearth-pantry': { ...state.generators['hearth-pantry'], charges: 0, restStartedAt: NOW } } };
+  const spawned = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: 'hearth-pantry', now: NOW + 1, seed: 'unlimited-drop' });
+  assert.equal(spawned.changed, true);
+  assert.equal(spawned.failureReason, undefined);
+  assert.ok(spawned.spawnedCell != null);
+  assert.equal(spawned.state.generators['hearth-pantry'].charges, 0);
+  assert.equal(spawned.state.generators['hearth-pantry'].restStartedAt, NOW);
 });
 
 test('daily journal, companion, and quest rewards remain idempotent without discarding earned Energy', () => {

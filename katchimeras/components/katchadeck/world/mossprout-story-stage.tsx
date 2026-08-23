@@ -531,7 +531,7 @@ function DockAction({ icon, label, onPress }: {
 const styles = StyleSheet.create({
   stage: { alignSelf: 'stretch', gap: 8, height: ACTION_TRAY_HEIGHT, overflow: 'visible', paddingBottom: 3 },
   actionStack: { height: ACTION_STACK_HEIGHT },
-  actionSlot: { gap: 7, height: ACTION_STACK_HEIGHT, overflow: 'visible' },
+  actionSlot: { gap: 7, height: ACTION_STACK_HEIGHT, justifyContent: 'flex-end', overflow: 'visible' },
   actionArtwork: { height: 46, width: 46 },
   quietContent: { alignItems: 'center', flexDirection: 'row', gap: 10, minHeight: 66, paddingHorizontal: 11, paddingVertical: 7 },
   quietCopy: { flex: 1, gap: 1 },

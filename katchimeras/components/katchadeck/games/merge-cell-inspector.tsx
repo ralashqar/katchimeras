@@ -16,6 +16,7 @@ import {
 } from '@/constants/merge-world-catalog';
 import { mergeWorldGeneratorArt, mergeWorldItemArt, mossproutRootRewardArt } from '@/constants/merge-world-art';
 import type { MergeWorldState } from '@/types/merge-world';
+import { MERGE_GENERATORS_UNLIMITED } from '@/utils/merge-world/economy-policy';
 import { mossproutRootConditionCopy, mossproutRootReadyCopy, mossproutRootRewardCopy } from '@/utils/merge-world/merge-board-player-copy';
 
 const DREAM_MIST_LOWER = require('../../../assets/images/katchimeras/merge-world/locked/dream-mist-lower.webp');
@@ -117,11 +118,13 @@ function inspectorModel(state: MergeWorldState, cell: number | null): InspectorM
     const level = generatorState?.level ?? 1;
     const outputs = [...new Set(definition.chainIds.map((chainId) => titleCase(chainId.split(':')[1])))]
       .join(' and ');
-    const readiness = generatorState
-      ? generatorState.charges > 0
-        ? `${generatorState.charges} of ${generatorState.capacity} finds ready.`
-        : 'Resting while new finds grow.'
-      : '';
+    const readiness = MERGE_GENERATORS_UNLIMITED
+      ? 'Unlimited finds ready.'
+      : generatorState
+        ? generatorState.charges > 0
+          ? `${generatorState.charges} of ${generatorState.capacity} finds ready.`
+          : 'Resting while new finds grow.'
+        : '';
     return {
       art: mergeWorldGeneratorArt(definition.id, { level }),
       body: `${readiness} ${generatorUseCopy(definition.id, level, outputs)}`.trim(),

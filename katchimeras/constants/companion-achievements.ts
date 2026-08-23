@@ -390,7 +390,7 @@ function recordingHelpFor(def: CompanionAchievementDef): string {
     return 'Open this Katchimera’s goals, choose a goal, and mark it complete. Repeating and completing a goal again counts again.';
   }
   if (def.metric.signal.endsWith('.quests')) {
-    return 'Accept and complete quests with this Katchimera. Only quests confirmed as completed count.';
+    return 'Start and complete quests with this Katchimera. Only quests confirmed as completed count.';
   }
   if (def.metric.signal.endsWith('.journeyGoals')) {
     return 'Open this Katchimera’s Journey and complete its longer goals. Each completed Journey goal counts once.';

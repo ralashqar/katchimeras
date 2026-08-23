@@ -21,6 +21,7 @@ import {
 import {
   MERGE_ENERGY_REGEN_CAP,
   MERGE_ENERGY_REGEN_MS,
+  MERGE_GENERATORS_UNLIMITED,
   MERGE_INITIAL_ENERGY,
   STEPS_PER_MERGE_ENERGY,
 } from '@/utils/merge-world/economy-policy';
@@ -559,7 +560,7 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
   if (opportunity && opportunity.usedCount >= opportunity.dropDefinitionIds.length) {
     return unchanged(state, "That's everything Mossprout found today.");
   }
-  if (!opportunity && generator.charges < 1) {
+  if (!MERGE_GENERATORS_UNLIMITED && !opportunity && generator.charges < 1) {
     return unchanged(state, `${generator.name} is growing more supplies.`, 'generator_resting');
   }
   const cell = firstEmptyCell(state.board, hash(`${seed}:cell`));
@@ -578,12 +579,13 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
   const item: MergeBoardItem = { kind: 'item', instanceId: `merge-item:${state.nextInstance}`, definitionId };
   const board = [...state.board];
   board[cell] = { ...board[cell], occupant: item };
-  const charges = opportunity ? generator.charges : Math.max(0, generator.charges - 1);
-  const nextGenerator = opportunity ? generator : {
+  const usesCapacity = !MERGE_GENERATORS_UNLIMITED && !opportunity;
+  const charges = usesCapacity ? Math.max(0, generator.charges - 1) : generator.charges;
+  const nextGenerator = usesCapacity ? {
     ...generator,
     charges,
     restStartedAt: charges === 0 ? now : generator.restStartedAt,
-  };
+  } : generator;
   let next = touch({
     ...state,
     board,

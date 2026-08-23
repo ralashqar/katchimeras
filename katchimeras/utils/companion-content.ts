@@ -493,7 +493,7 @@ export function selectCompanionDailyInvitation(
       ...base,
       kind: 'resume_quest',
       title: 'Pick up where you left off',
-      body: input.questTitles?.[input.activeQuestId] ?? 'Your accepted quest is waiting for you.',
+      body: input.questTitles?.[input.activeQuestId] ?? 'Your quest is waiting for you.',
       destination: 'quest',
       questId: input.activeQuestId,
     };

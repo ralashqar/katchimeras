@@ -18,14 +18,10 @@ import { CompanionSection, CompanionStatusBadge } from './companion-interaction-
 
 export function CompanionQuestChoices({
   offers,
-  selectedId,
-  onSelect,
-  onAccept,
+  onRun,
 }: {
   offers: CompanionQuestOfferViewModel[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  onAccept: (id: string) => void;
+  onRun: (id: string) => void;
 }) {
   const availableCount = offers.filter((offer) => offer.availableToday !== false).length;
   return (
@@ -41,39 +37,35 @@ export function CompanionQuestChoices({
           const completed = Boolean(offer.completedToday);
           const repeatable = Boolean(offer.repeatable);
           const unavailable = offer.availableToday === false;
-          const selected = selectedId === offer.id && !unavailable;
           const icon = questFamilyIcon(offer.family);
           return (
             <Pressable
               key={offer.id}
-              accessibilityRole="radio"
-              accessibilityState={{ disabled: unavailable, selected }}
-              accessibilityLabel={`${offer.title}. ${completed ? repeatable ? 'Played today and available to play again.' : 'Completed today.' : unavailable ? 'Available tomorrow.' : `${offer.bondReward} bond. About ${offer.estimatedMinutes} minutes.`}`}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: unavailable }}
+              accessibilityLabel={`${offer.title}. ${completed ? repeatable ? 'Played today and available to run again.' : 'Completed today.' : unavailable ? 'Available tomorrow.' : `${offer.bondReward} bond. About ${offer.estimatedMinutes} minutes. Opens immediately.`}`}
               onPress={() => {
-                if (!unavailable) onSelect(offer.id);
+                if (!unavailable) onRun(offer.id);
               }}
               style={({ pressed }) => [
                 styles.offer,
                 completed && styles.offerCompleted,
                 unavailable && styles.offerUnavailable,
-                selected && styles.offerSelected,
                 pressed && !unavailable && styles.pressed,
               ]}>
-              <View style={[styles.offerArt, completed && styles.offerArtCompleted, selected && styles.offerArtSelected]}>
-                <IconSymbol name={completed && !repeatable ? 'checkmark' : icon} size={31} color={completed ? Meadow.leafDeep : selected ? Meadow.goldDeep : Meadow.iconOnCard} />
+              <View style={[styles.offerArt, completed && styles.offerArtCompleted]}>
+                <IconSymbol name={completed && !repeatable ? 'checkmark' : icon} size={31} color={completed ? Meadow.leafDeep : Meadow.iconOnCard} />
               </View>
               <View style={styles.offerCopy}>
                 <View style={styles.offerTopline}>
-                  <ThemedText style={styles.offerCategory} lightColor={completed ? Meadow.leafDeep : selected ? Meadow.goldDeep : Meadow.leafDeep} darkColor={completed ? Meadow.leafDeep : selected ? Meadow.goldDeep : Meadow.leafDeep}>
+                  <ThemedText style={styles.offerCategory} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>
                     {completed
                       ? repeatable ? 'Played today · Replayable' : 'Completed today'
                       : unavailable
                         ? 'Real life · Available tomorrow'
                         : `${offer.lane === 'mini_game' ? 'Mini-game' : 'Real life'}${offer.recommended ? ' · Recommended' : ` · ${offer.categoryLabel}`}`}
                   </ThemedText>
-                  <View style={[styles.radio, selected && styles.radioSelected, completed && styles.radioCompleted]}>
-                    {completed || selected ? <IconSymbol name="checkmark" size={12} color="#FFF6DA" /> : null}
-                  </View>
+                  {!unavailable ? <IconSymbol name="chevron.right" size={15} color={Meadow.inkSoft} /> : null}
                 </View>
                 <ThemedText numberOfLines={2} style={styles.offerTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{offer.title}</ThemedText>
                 <ThemedText numberOfLines={2} style={styles.offerHint} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{offer.hint}</ThemedText>
@@ -82,22 +74,6 @@ export function CompanionQuestChoices({
                     <Meta bond label={`+${offer.bondReward} bond`} />
                     <Meta icon="timer" label={`${offer.estimatedMinutes} min`} />
                   </View>
-                  {selected && !unavailable ? (
-                    <Animated.View entering={FadeIn.duration(140)}>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`Accept ${offer.title}`}
-                        hitSlop={5}
-                        onPress={(event) => {
-                          event.stopPropagation();
-                          onAccept(offer.id);
-                        }}
-                        style={({ pressed }) => [styles.accept, pressed && styles.acceptPressed]}>
-                        <ThemedText style={styles.acceptText} lightColor={Meadow.ink} darkColor={Meadow.ink}>{completed && repeatable ? 'Play again' : 'Accept'}</ThemedText>
-                        <IconSymbol name="arrow.right" size={12} color={Meadow.ink} />
-                      </Pressable>
-                    </Animated.View>
-                  ) : null}
                 </View>
               </View>
             </Pressable>
@@ -450,10 +426,8 @@ const styles = StyleSheet.create({
   offer: { alignItems: 'center', backgroundColor: KatchaUI.companionPanel.cardBackground, borderColor: KatchaUI.companionPanel.cardBorder, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: KatchaUI.companionPanel.cardShadow, flexDirection: 'row', gap: 11, minHeight: 108, padding: 9 },
   offerCompleted: { backgroundColor: KatchaUI.companionPanel.cardComplete, borderColor: 'rgba(85,104,75,0.48)' },
   offerUnavailable: { opacity: 0.72 },
-  offerSelected: { backgroundColor: KatchaUI.companionPanel.cardSelected, borderColor: Meadow.goldDeep, boxShadow: '0 10px 25px rgba(92,57,20,0.25), inset 0 1px 0 rgba(255,252,235,0.9), 0 0 0 1px rgba(229,190,106,0.24)' },
   offerArt: { alignItems: 'center', backgroundColor: 'rgba(138,112,80,0.10)', borderColor: 'rgba(255,248,230,0.28)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, boxShadow: 'inset 0 1px 0 rgba(255,248,230,0.38)', height: 82, justifyContent: 'center', width: 72 },
   offerArtCompleted: { backgroundColor: 'rgba(107,128,95,0.15)', borderColor: 'rgba(85,104,75,0.28)' },
-  offerArtSelected: { backgroundColor: Meadow.goldSoft },
   offerCopy: { flex: 1, gap: 3, minWidth: 0 },
   offerTopline: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   offerCategory: { fontSize: 9.5, fontWeight: '900', letterSpacing: 0.7, textTransform: 'uppercase' },
@@ -463,12 +437,6 @@ const styles = StyleSheet.create({
   offerMeta: { flexDirection: 'row', flexShrink: 1, gap: 6 },
   meta: { alignItems: 'center', backgroundColor: 'rgba(138,112,80,0.09)', borderRadius: 999, flexDirection: 'row', gap: 3, minHeight: 20, paddingHorizontal: 6 },
   metaText: { fontSize: 9.5, fontVariant: ['tabular-nums'], fontWeight: '700' },
-  accept: { alignItems: 'center', backgroundColor: '#E7B951', borderColor: 'rgba(255,244,204,0.72)', borderCurve: 'continuous', borderRadius: 11, borderWidth: 1, boxShadow: '-2px 3px 7px rgba(92,57,20,0.22), inset 0 1px 0 rgba(255,252,234,0.72)', flexDirection: 'row', gap: 4, minHeight: 30, paddingHorizontal: 9 },
-  acceptText: { fontSize: 10.5, fontWeight: '900' },
-  acceptPressed: { opacity: 0.78, transform: [{ scale: 0.96 }] },
-  radio: { alignItems: 'center', borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, height: 22, justifyContent: 'center', width: 22 },
-  radioSelected: { backgroundColor: Meadow.goldDeep, borderColor: Meadow.goldDeep },
-  radioCompleted: { backgroundColor: Meadow.leafDeep, borderColor: Meadow.leafDeep },
   root: { backgroundColor: KatchaUI.companionPanel.background, borderColor: KatchaUI.companionPanel.border, borderCurve: 'continuous', borderRadius: 29, borderWidth: 1, boxShadow: KatchaUI.companionPanel.shadow, gap: 18, marginBottom: 12, padding: 16 },
   intro: { gap: 8 },
   activeSummary: { gap: 10 },

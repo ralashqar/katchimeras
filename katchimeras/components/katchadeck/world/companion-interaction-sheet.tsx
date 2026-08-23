@@ -844,11 +844,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     const action = quest.primaryAction;
     if (!action) return;
     if (process.env.EXPO_OS === 'ios') {
-      if (action.kind === 'accept') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      else void Haptics.selectionAsync();
+      void Haptics.selectionAsync();
     }
-    if (action.kind === 'accept') props.onAccept(selectedOffer?.id);
-    else if (action.kind === 'quest_action') props.onQuestAction();
+    if (action.kind === 'quest_action') props.onQuestAction();
     else if (action.kind === 'review_match') setReviewItem(action.item.id);
     else if (action.kind === 'submit') props.onSubmitQuest(action.item);
     else {
@@ -926,7 +924,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       ? null
     : destination === 'quest' && quest.primaryAction && !inlineQuestNoteAction && !inlineQuestPhotoAction
       ? reviewItem ? null : (
-          <CompanionPrimaryAction label={quest.mode === 'offer' ? 'Accept selected quest' : quest.primaryAction.label} icon={quest.primaryAction.icon} onPress={runPrimary} disabled={quest.mode === 'analysing'} />
+          <CompanionPrimaryAction label={quest.primaryAction.label} icon={quest.primaryAction.icon} onPress={runPrimary} disabled={quest.mode === 'analysing'} />
         )
       : destination === 'quest'
         ? null
@@ -1039,6 +1037,14 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     : conversationExperience
     ? conversationSpeechLine(conversationExperience.session, conversationExperience.definition)
     : visitSpeech;
+  const openQuestOffer = (questId: string, originActionId?: string) => {
+    props.onSelectOffer(questId);
+    const alreadyActive = props.activeQuest?.questId === questId;
+    if (!alreadyActive && !props.onAccept(questId)) return false;
+    if (originActionId) setDirectQuestOrigin({ actionId: originActionId, questId });
+    selectDestination('quest');
+    return true;
+  };
   const respondToVisit = (response: CompanionVisitResponse) => {
     props.onRespondVisit(response);
     if (response.action === 'open_achievements') {
@@ -1050,12 +1056,11 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       return;
     }
     if (response.action === 'accept_quest') {
-      props.onAccept(visitPlan.questId);
+      if (visitPlan.questId) openQuestOffer(visitPlan.questId);
       return;
     }
     if (response.action === 'open_quest') {
-      if (visitPlan.questId) props.onSelectOffer(visitPlan.questId);
-      selectDestination('quest');
+      if (visitPlan.questId) openQuestOffer(visitPlan.questId);
       return;
     }
     if (response.action === 'open_focus') {
@@ -1603,10 +1608,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   onOpenFocusDirection={openJourneyFocus}
                   onOpenMerge={(orderId) => props.onOpenMerge?.(orderId, props.familyId)}
                   onOpenQuestDirect={(questId, originActionId) => {
-                    props.onSelectOffer(questId);
-                    if (!props.onAccept(questId)) return;
-                    setDirectQuestOrigin({ actionId: originActionId, questId });
-                    selectDestination('quest');
+                    openQuestOffer(questId, originActionId);
                   }}
                   onBondRewardRequest={requestStoryReward}
                   motionReady={mossproutHubEntranceSettled && mossproutHubViewportSettled}
@@ -1691,11 +1693,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                 <View>
                   <CompanionQuestChoices
                     offers={props.offers}
-                    selectedId={selectedOffer?.id ?? null}
-                    onSelect={props.onSelectOffer}
-                    onAccept={(offerId) => {
+                    onRun={(offerId) => {
                       if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                      props.onAccept(offerId);
+                      openQuestOffer(offerId);
                     }}
                   />
                 </View>

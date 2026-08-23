@@ -38,6 +38,7 @@ import type { MergeBoardOccupant, MergeDreamMist, MergeWorldCommand, MergeWorldC
 import { mergeCellFeedbackForFailure, type MergeCellFeedbackTone } from '@/utils/merge-board-feedback';
 import { MERGE_MORPH_DURATION_MS, MERGE_MORPH_REDUCED_MOTION_DURATION_MS, SPAWN_MOTION_DURATION_MS, isMistMergeTransition, mergeMotionPiecewise, mergeSpriteMotionFrame, spawnSpriteMotionFrame, type MergeBoardMotionKind } from '@/utils/merge-board-motion';
 import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection, type MergeBoardGeometry } from '@/utils/merge-world/board-geometry';
+import { MERGE_GENERATORS_UNLIMITED } from '@/utils/merge-world/economy-policy';
 import { mossproutRootConditionCopy, mossproutRootReadyCopy, mossproutRootRewardCopy } from '@/utils/merge-world/merge-board-player-copy';
 
 export type MergeBoardScreenMetrics = { geometry: MergeBoardGeometry; x: number; y: number };
@@ -977,7 +978,10 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
           ? cell.mist.characterIds.map((id) => MERGE_CHARACTER_NAMES[id]).filter(Boolean)
           : [];
         const generatorState = occupant?.kind === 'generator' ? state.generators[occupant.generatorId] : null;
-        const label = generator ? `${generator.name}. ${generatorState?.charges ?? 0} of ${generatorState?.capacity ?? 0} finds ready. Tap to make an item.`
+        const generatorReadiness = MERGE_GENERATORS_UNLIMITED
+          ? 'Unlimited finds ready.'
+          : `${generatorState?.charges ?? 0} of ${generatorState?.capacity ?? 0} finds ready.`;
+        const label = generator ? `${generator.name}. ${generatorReadiness} Tap to make an item.`
           : definition ? nextDefinition
             ? `${definition.name}. Merge with another ${definition.name} to make ${nextDefinition.name}.`
             : `${definition.name}. This item cannot be merged any further.`

@@ -294,7 +294,6 @@ export function buildCompanionQuestViewModel(input: {
     return {
       mode: 'offer', eyebrow: 'A new quest', title: offer.title, message: offer.hint,
       rewardLabel: 'Grow your bond', statusTone: 'neutral', criteria: [], evidence: [],
-      primaryAction: { kind: 'accept', label: 'Accept quest', icon: 'sparkles' },
     };
   }
   if (!activeQuest) {

@@ -40,7 +40,7 @@ export function conversationSpeechLine(
 ): string {
   if (session.outcomePresentation) {
     const outcome = session.outcomePresentation;
-    if (outcome.kind === 'quest') return `Quest accepted: ${outcome.title}.`;
+    if (outcome.kind === 'quest') return `Quest started: ${outcome.title}.`;
     if (outcome.kind === 'task') return `Done — ${outcome.title} is on your goals list.`;
     if (outcome.kind === 'focus' || outcome.kind === 'goal') return `Done — ${outcome.title} is ready in your goals.`;
     if (outcome.kind === 'insight') return `I’ve added ${outcome.title} to what I know about you.`;

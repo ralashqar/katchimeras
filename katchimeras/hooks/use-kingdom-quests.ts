@@ -1357,11 +1357,11 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       Date.now()
     );
     if (!next) {
-      setMicrocopy('Quest already active');
+      setMicrocopy('Quest already running');
       return false;
     }
     commitCompanionQuestState(next);
-    setMicrocopy('Quest accepted');
+    setMicrocopy('Quest started');
     if (options?.openDestination !== false) {
       setSelectedResident((current) => (current ? { ...current, destination: 'quest' } : current));
     }
@@ -2765,10 +2765,10 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     if (accept && quest && (accepted || selectedConversationSession.preview)) {
       outcomeSession = withConversationOutcome(outcomeSession, {
         kind: 'quest',
-        eyebrow: selectedConversationSession.preview ? 'PREVIEW OUTCOME' : 'QUEST ACCEPTED',
+        eyebrow: selectedConversationSession.preview ? 'PREVIEW OUTCOME' : 'QUEST STARTED',
         title: quest.title,
         message: selectedConversationSession.preview
-          ? 'This is how an accepted quest would be confirmed. Nothing was changed.'
+          ? 'This is how a started quest would be confirmed. Nothing was changed.'
           : quest.hint,
         celebrate: !selectedConversationSession.preview,
         destination: 'quest',

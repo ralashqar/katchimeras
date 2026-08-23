@@ -579,6 +579,8 @@ test('Mossprout owns a compact Journey action stack without redundant headings o
   assert.match(mossprout, /setSelfCompletingGoalAction\(presentedAction\)/);
   assert.match(mossprout, /recordHandledKatchimeraActionCompletion/);
   assert.match(sharedRows, /animateLayout \? LinearTransition/);
+  assert.ok((sharedRows.match(/SlideInLeft\.delay\(entryDelayMs\)/g) ?? []).length >= 2);
+  assert.doesNotMatch(sharedRows, /FadeInUp\.delay\(entryDelayMs\)/);
   assert.match(sharedRows, /if \(!start\) return/);
   assert.doesNotMatch(sharedRows, /\.withCallback\(/);
   assert.match(interaction, /motionReady=\{mossproutHubEntranceSettled && mossproutHubViewportSettled\}/);
@@ -617,6 +619,7 @@ test('Mossprout owns a compact Journey action stack without redundant headings o
   assert.match(interaction, /fullWidth=\{mossproutActionDashboard\}/);
   assert.match(interaction, /mossproutActionScrollContent: \{ flexGrow: 1, overflow: 'hidden', paddingHorizontal: KatchaUI\.layout\.phoneGutter \+ 4 \}/);
   assert.match(mossprout, /const ACTION_STACK_HEIGHT = 212/);
+  assert.match(mossprout, /actionSlot: \{[^}]*height: ACTION_STACK_HEIGHT[^}]*justifyContent: 'flex-end'/);
   assert.match(mossprout, /const ACTION_TRAY_HEIGHT = 273/);
   assert.match(mossprout, /height: ACTION_TRAY_HEIGHT/);
   assert.match(mossprout, /height: ACTION_STACK_HEIGHT/);
@@ -740,7 +743,9 @@ test('Mossprout routes nature cards directly into their focused activity', () =>
   assert.match(homeModel, /expandRequirementDefinitionIds\(liveRequest\.requirements\)/);
   assert.doesNotMatch(mossprout, /subtitle=\{action\.subtitle/);
   assert.doesNotMatch(mossprout, /eyebrow=\{action\.progressLabel/);
-  assert.match(interaction, /props\.onSelectOffer\(questId\);\s+if \(!props\.onAccept\(questId\)\) return;\s+setDirectQuestOrigin/);
+  assert.match(interaction, /const alreadyActive = props\.activeQuest\?\.questId === questId;/);
+  assert.match(interaction, /if \(!alreadyActive && !props\.onAccept\(questId\)\) return false;/);
+  assert.match(interaction, /onRun=\{\(offerId\) =>/);
   assert.match(interaction, /destination === 'quest' && directQuestOrigin/);
   assert.match(interaction, /conversations=\{props\.mossproutActionCandidates\}/);
   assert.match(interaction, /offers=\{props\.actionOffers\}/);
@@ -995,14 +1000,25 @@ test('companion viewport resets across destinations and content-shape transition
   assert.match(interaction, /mossproutActionStageSpacer: \{ flex: 1, minHeight: 0 \}/);
 });
 
-test('quest offer exposes one focused acceptance action', () => {
+test('quest offers open directly without a separate acceptance action', () => {
+  const choices = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-quest-thread.tsx'),
+    'utf8',
+  );
+  const interaction = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'),
+    'utf8',
+  );
   const model = buildCompanionQuestViewModel({
     activeQuest: null, offer: { id: 'quest-park', title: 'A green spot', hint: 'Take a photo of a park.' },
     runtime: null, questComplete: false, captureFeedback: null, items: [], criteria: [],
   });
   assert.equal(model.mode, 'offer');
-  assert.equal(model.primaryAction?.kind, 'accept');
-  assert.equal(model.primaryAction?.label, 'Accept quest');
+  assert.equal(model.primaryAction, undefined);
+  assert.match(choices, /accessibilityRole="button"/);
+  assert.match(choices, /onRun\(offer\.id\)/);
+  assert.doesNotMatch(choices, /accessibilityRole="radio"|Accept \$\{offer\.title\}|>Accept</);
+  assert.doesNotMatch(interaction, /Accept selected quest/);
 });
 
 test('blocked and active quests expose only the runtime recovery action', () => {

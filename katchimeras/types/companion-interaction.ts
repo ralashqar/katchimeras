@@ -116,7 +116,6 @@ export type CompanionQuestCriterionViewModel = {
 };
 
 export type CompanionQuestPrimaryAction =
-  | { kind: 'accept'; label: string; icon: IconSymbolName }
   | { kind: 'quest_action'; label: string; icon: IconSymbolName; nextAction: QuestNextAction }
   | { kind: 'review_match'; label: string; icon: IconSymbolName; item: QuestSubmissionItem }
   | { kind: 'submit'; label: string; icon: IconSymbolName; item: QuestSubmissionItem }
