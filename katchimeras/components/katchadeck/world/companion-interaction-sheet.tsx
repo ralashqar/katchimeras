@@ -1760,7 +1760,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                     description={props.familyId === 'mossprout'
                       ? activeJourneyFocus
                         ? 'Reflect on what fits now and choose a new nature direction when you are ready.'
-                        : 'Answer three thoughtful questions and choose one nature direction to grow.'
+                        : 'Three quick questions, then keep a small idea if it fits.'
                       : activeJourneyFocus
                         ? 'Talk through what fits now and add concrete steps without replacing your current plan.'
                         : 'Answer four short questions to find a useful direction and choose optional next steps.'}

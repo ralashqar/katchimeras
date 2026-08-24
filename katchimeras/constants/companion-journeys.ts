@@ -1302,33 +1302,33 @@ const pagelet: CompanionJourneyDefinition = {
 
 const mossprout: CompanionJourneyDefinition = {
   id: 'mossprout-nearby-nature',
-  version: 3,
+  version: 4,
   familyId: 'mossprout',
   title: 'Nearby nature',
-  introduction: 'Build a relationship with nearby nature through ordinary places, window views, weather, or something growing.',
-  conversationTitle: 'Grow a nearby-nature rhythm',
-  conversationStartLabel: 'Choose a nature direction',
+  introduction: 'Find one small way to notice, visit, or care for the nature already nearby.',
+  conversationTitle: 'Find a small nature rhythm',
+  conversationStartLabel: 'Find what fits',
   startNodeId: 'nature-need',
   nodes: [
     {
       id: 'nature-need',
       kind: 'single_choice',
-      prompt: 'What would you like to notice or experience through nearby nature?',
-      helperText: 'A window view, houseplant, street tree, garden, or outdoor place can all count.',
+      prompt: 'What are you hoping to find outside?',
+      helperText: 'Mossprout unfolds a very small map.',
       options: [
-        { id: 'pause', label: 'A restorative pause', nextNodeId: 'nature-place' },
-        { id: 'attention', label: 'More attention to the living world', nextNodeId: 'nature-place' },
-        { id: 'routine', label: 'A small reason to pause and look', nextNodeId: 'nature-place' },
+        { id: 'pause', label: 'A little breathing room', nextNodeId: 'nature-place' },
+        { id: 'attention', label: 'Something worth noticing', nextNodeId: 'nature-place' },
+        { id: 'routine', label: 'A reason to look up', nextNodeId: 'nature-place' },
         { id: 'care', label: 'Something living to care for', nextNodeId: 'nature-place' },
       ],
     },
     {
       id: 'nature-place',
       kind: 'single_choice',
-      prompt: 'Where is that most possible for you?',
-      helperText: 'Choose the most accessible place, not the most impressive.',
+      prompt: 'Where could that happen without a special trip?',
+      helperText: 'Doorsteps and windowsills count.',
       options: [
-        { id: 'park', label: 'A nearby park or green', nextNodeId: 'nature-goal' },
+        { id: 'park', label: 'A nearby park or green space', nextNodeId: 'nature-goal' },
         { id: 'street', label: 'My street or daily route', nextNodeId: 'nature-goal' },
         { id: 'garden', label: 'A garden, balcony, or windowsill', nextNodeId: 'nature-goal' },
         { id: 'varied', label: 'Different outdoor places', nextNodeId: 'nature-goal' },
@@ -1339,10 +1339,10 @@ const mossprout: CompanionJourneyDefinition = {
       id: 'nature-goal',
       kind: 'single_choice',
       createsGoalTypeId: 'outdoor-rhythm',
-      prompt: 'What nearby-nature direction feels realistic now?',
-      helperText: 'Choose something accessible in an ordinary week. It does not need to happen every day.',
+      prompt: 'Which sounds doable this week?',
+      helperText: 'Keep it small. Weather gets a vote.',
       options: [
-        { id: 'daily-outside', label: 'Make room for brief nature moments', goalTitle: 'Build a small nearby-nature pause', suggestedQuickGoalIds: ['mossprout:step-outside', 'mossprout:window-view'], nextNodeId: null },
+        { id: 'daily-outside', label: 'Make room for a brief pause', goalTitle: 'Build a small nearby-nature pause', suggestedQuickGoalIds: ['mossprout:step-outside', 'mossprout:window-view'], nextNodeId: null },
         { id: 'green-place', label: 'Return to a nearby green place', goalTitle: 'Build a relationship with one nearby green place', suggestedQuickGoalIds: ['mossprout:visit-green', 'mossprout:same-place'], nextNodeId: null },
         { id: 'notice-season', label: 'Notice the season changing', goalTitle: 'Pay attention to small seasonal changes', suggestedQuickGoalIds: ['mossprout:season-change', 'mossprout:notice-living-thing'], nextNodeId: null },
         { id: 'care-plant', label: 'Care for something growing', goalTitle: 'Create a gentle plant-care rhythm', suggestedQuickGoalIds: ['mossprout:care-for-plant', 'mossprout:sit-outside'], nextNodeId: null },
@@ -1354,14 +1354,14 @@ const mossprout: CompanionJourneyDefinition = {
     'outdoor-rhythm': { label: 'Outdoor rhythm', fallbackTitle: 'Grow a nearby nature rhythm' },
   },
   checkIn: {
-    prompt: 'What happened in nearby nature today?',
+    prompt: 'What happened outside today?',
     options: [
       { id: 'paused', label: 'Being outside changed my pace' },
       { id: 'living', label: 'I noticed something living' },
       { id: 'returned', label: 'I returned to a familiar place' },
       { id: 'cared', label: 'I cared for something growing' },
       { id: 'indoors', label: 'I noticed nature from indoors' },
-      { id: 'none', label: 'There was no nature moment today' },
+      { id: 'none', label: 'Nothing today' },
     ],
   },
   stages: [
@@ -1371,10 +1371,10 @@ const mossprout: CompanionJourneyDefinition = {
     { id: 'decide', title: 'Choose what continues', description: 'Keep, reshape, pause, or complete this nature goal.', requirement: { kind: 'goal_resolved', target: 1 } },
   ],
   reflectionPrompts: {
-    choose: 'What could an ordinary nearby outdoor place give you right now?',
-    return: 'What did you notice outside today that supported “{goal}”?',
-    review: 'Across your recent outdoor moments, how did returning to “{goal}” affect your attention or mood?',
-    decide: 'What should happen next with “{goal}”: keep returning, try a new place, pause, or call it complete?',
+    choose: 'What could a nearby place give you right now?',
+    return: 'What did you notice while trying “{goal}”?',
+    review: 'What changed when you returned to “{goal}”?',
+    decide: 'Keep “{goal}”, change it, pause it, or call it complete?',
   },
 };
 

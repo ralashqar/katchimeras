@@ -795,7 +795,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
         )}
       </View>
       ) : null}
-      {hatchReadyFocus && !hatchPresentation && !onboardingFocus ? (
+      {hatchReadyFocus && !hatchPresentation ? (
         <Animated.View
           entering={reduceMotion ? FadeIn.duration(80) : FadeInDown.duration(260).easing(Easing.out(Easing.cubic))}
           style={[styles.hatchReadyAction, { top: fixedActionClusterTop }]}>

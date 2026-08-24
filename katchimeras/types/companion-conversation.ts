@@ -43,6 +43,8 @@ export type ConversationOption = {
   transition?: ConversationTransition;
   intentId?: string;
   affinity?: Partial<Record<KatchimeraSkinId, number>>;
+  /** Short authored phrase used when this answer becomes part of an editable journal draft. */
+  journalFragment?: string;
 };
 
 export type ConversationProfileQuestion = {
@@ -169,6 +171,8 @@ export type ConversationNode =
       prompt: string;
       title: string;
       body: string;
+      /** Placeholders use choice node ids, for example: "I noticed {{found}}." */
+      draftTemplate?: string;
       flowId: string;
       allowedChoiceIds: readonly string[];
       saveLabel: string;

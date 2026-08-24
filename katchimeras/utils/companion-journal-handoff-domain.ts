@@ -113,12 +113,19 @@ function capitalize(value: string) {
 function mossproutNatureDraft(session: ConversationSession): string | null {
   const definition = companionConversationDefinitionById.get(session.definitionId);
   if (!definition) return null;
-  const labels = session.turns.flatMap((turn) => {
+  const handoff = definition.nodes.find((node) => node.kind === 'journal_handoff');
+  const fragments = new Map(session.turns.flatMap((turn) => {
     const node = definition.nodes.find((candidate) => candidate.id === turn.nodeId);
     if (!node || (node.kind !== 'choice' && node.kind !== 'poll')) return [];
-    const label = node.options.find((option) => option.id === turn.optionId)?.label;
-    return label ? [lowercaseInitial(label)] : [];
-  });
+    const option = node.options.find((candidate) => candidate.id === turn.optionId);
+    const fragment = option?.journalFragment ?? (option?.label ? lowercaseInitial(option.label) : null);
+    return fragment ? [[node.id, fragment] as const] : [];
+  }));
+  if (handoff?.kind === 'journal_handoff' && handoff.draftTemplate) {
+    const draft = handoff.draftTemplate.replace(/\{\{([^}]+)\}\}/g, (_match, nodeId: string) => fragments.get(nodeId) ?? '');
+    return draft.replace(/\s+([.,!?])/g, '$1').replace(/\s{2,}/g, ' ').trim() || null;
+  }
+  const labels = [...fragments.values()];
   if (!labels.length) return null;
   const [where, detail, meaning] = labels;
   return [

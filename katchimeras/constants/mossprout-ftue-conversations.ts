@@ -67,7 +67,7 @@ function definition(key: string, opening: string): ConversationDefinition {
 
 const chapterZeroReturnDefinition: ConversationDefinition = {
   id: MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID,
-  version: 3,
+  version: 4,
   familyId: 'mossprout',
   title: 'A little place to begin',
   trigger: 'evergreen',
@@ -75,7 +75,7 @@ const chapterZeroReturnDefinition: ConversationDefinition = {
   cooldownDays: 3650,
   contextualOnly: true,
   isOpener: true,
-  format: 'insight_game',
+  format: 'narrative',
   purpose: 'journey',
   returnTarget: 'character_home',
   repeatPolicy: 'once_ever',
@@ -86,48 +86,18 @@ const chapterZeroReturnDefinition: ConversationDefinition = {
     {
       id: 'home', kind: 'choice', phase: 'opening',
       prompt: 'You did it. I put the Plant by the door. It already looks braver out here.',
+      options: [{ id: 'made-together', label: 'We made it together.', reply: 'Then it has very good roots.', nextNodeId: 'promise' }],
+    },
+    {
+      id: 'promise', kind: 'choice', phase: 'resolve',
+      prompt: 'Before we go: what should this garden always make room for?',
       options: [
-        { id: 'looks-home', label: 'It looks at home.', reply: 'Our first little corner of the world.', nextNodeId: 'changed' },
-        { id: 'made-together', label: 'We made it together.', reply: 'Then it has very good roots.', nextNodeId: 'changed' },
+        { id: 'promise-quiet', label: 'Quiet', reply: 'Then we will never fill every corner.', nextNodeId: 'end' },
+        { id: 'promise-surprise', label: 'Surprise', reply: 'Good. I will distrust any path that behaves too sensibly.', nextNodeId: 'end' },
+        { id: 'promise-care', label: 'Care', reply: 'Then everything we grow will have a reason beyond looking pretty.', nextNodeId: 'end' },
       ],
     },
-    {
-      id: 'changed', kind: 'choice', phase: 'resolve',
-      prompt: 'The whole clearing felt that tiny bit of growth. Come and see what our day changed.',
-      options: [{ id: 'see-garden', label: 'Show me the garden.', reply: 'First, I want to know what kind of place we are growing for you.', nextNodeId: 'insight' }],
-    },
-    {
-      id: 'insight', kind: 'insight_game', title: 'What should our garden become?', revealNodeId: 'reveal', questions: [
-        { id: 'welcome', prompt: 'When you step outside, what helps you arrive?', options: [
-          { id: 'rest-welcome', label: 'A quiet patch', reply: 'Some places welcome you by asking for nothing.', nextNodeId: null },
-          { id: 'wonder-welcome', label: 'Something unexpected', reply: 'A surprise gives your attention somewhere cheerful to land.', nextNodeId: null },
-          { id: 'tend-welcome', label: 'Something living nearby', reply: 'You notice that a place is full of neighbours.', nextNodeId: null },
-        ] },
-        { id: 'weather', prompt: 'A little rain starts. What sounds best?', options: [
-          { id: 'rest-weather', label: 'Listen from somewhere sheltered', reply: 'A roof, rain, and no need to hurry.', nextNodeId: null },
-          { id: 'wonder-weather', label: 'See what the rain changes', reply: 'Every surface tells a different rain story.', nextNodeId: null },
-          { id: 'tend-weather', label: 'Check which plants look happiest', reply: 'Very considerate. Also excellent plant gossip.', nextNodeId: null },
-        ] },
-        { id: 'return', prompt: 'What would make you come back tomorrow?', options: [
-          { id: 'rest-return', label: 'Knowing I could slow down there', reply: 'Then the garden should always leave a little room.', nextNodeId: null },
-          { id: 'wonder-return', label: 'Wondering what changed', reply: 'Gardens are extremely slow magicians.', nextNodeId: null },
-          { id: 'tend-return', label: 'Having something to look after', reply: 'Care gives a visit roots.', nextNodeId: null },
-        ] },
-        { id: 'gift', prompt: 'Choose one thing for our first corner to give back.', options: [
-          { id: 'rest-gift', label: 'A calmer feeling', reply: 'A soft place for the day to settle.', nextNodeId: null },
-          { id: 'wonder-gift', label: 'A tiny discovery', reply: 'Something small enough to miss if you rush.', nextNodeId: null },
-          { id: 'tend-gift', label: 'A reason to care', reply: 'Then growing the garden can mean something beyond making it pretty.', nextNodeId: null },
-        ] },
-      ],
-    },
-    {
-      id: 'reveal', kind: 'insight_reveal', title: 'What Mossprout learned from your first garden', insightKey: 'first-garden-purpose', category: 'Nature', nextNodeId: 'end', results: [
-        { id: 'quiet-clearing', title: 'A Quiet Clearing', reflection: 'You want outdoor places to make room rather than make demands.', summary: 'The garden can become somewhere the volume comes down and your day is allowed to settle.', emblemId: 'mossprout-first-quiet', matchOptionIds: ['rest-welcome', 'rest-weather', 'rest-return', 'rest-gift'] },
-        { id: 'curious-grove', title: 'A Curious Grove', reflection: 'Small changes and discoveries are what pull your attention into a place.', summary: 'The garden can stay a little surprising—alive with details that reward another look.', emblemId: 'mossprout-first-wonder', matchOptionIds: ['wonder-welcome', 'wonder-weather', 'wonder-return', 'wonder-gift'] },
-        { id: 'shared-patch', title: 'A Shared Patch', reflection: 'A place matters more when it contains something living to notice and care for.', summary: 'The garden can grow through relationship: returning, tending, and learning its small inhabitants.', emblemId: 'mossprout-first-care', matchOptionIds: ['tend-welcome', 'tend-weather', 'tend-return', 'tend-gift'] },
-      ],
-    },
-    { id: 'end', kind: 'end', message: 'Your first Plant has somewhere to grow—and now Mossprout knows what kind of garden to grow around it.' },
+    { id: 'end', kind: 'end', message: 'The first Plant is home. Mossprout keeps your promise for the road ahead.' },
   ],
 };
 

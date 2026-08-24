@@ -90,25 +90,15 @@ function journeyGoalConversation(prefix: string, title: string): ConversationDef
 
 function journeyPlayfulConversation(prefix: string, title: string, pollPrompt: string): ConversationDefinition {
   return {
-    id: `${prefix}:playful`, version: 4, familyId: 'mossprout', title, trigger: 'poll', minimumBondLevel: 1,
+    id: `${prefix}:playful`, version: 5, familyId: 'mossprout', title, trigger: 'poll', minimumBondLevel: 1,
     cooldownDays: 3650, contextualOnly: true, format: 'poll', purpose: 'get_to_know', returnTarget: 'character_home',
-    repeatPolicy: 'once_ever', topicKey: `${prefix}:playful`, tags: ['mossprout', 'nature', 'playful'], entryNodeId: 'one', nodes: [
-      { id: 'one', kind: 'choice', prompt: 'A path disappears behind ferns. Your first thought?', options: [
-        { id: 'follow', label: 'Obviously I follow it', reply: 'Correct. Suspicious paths hate being ignored.', nextNodeId: 'two' },
-        { id: 'look', label: 'I inspect it first', reply: 'A sensible amount of mystery.', nextNodeId: 'two' },
-        { id: 'snack', label: 'Do I have snacks?', reply: 'The most experienced woodland question.', nextNodeId: 'two' },
-      ] },
-      { id: 'two', kind: 'choice', prompt: 'Pick a tiny outdoor luxury.', options: [
-        { id: 'shade', label: 'Perfect tree shade', reply: 'A room made entirely of leaves.', nextNodeId: 'poll' },
-        { id: 'rain', label: 'Rain while safely sheltered', reply: 'Excellent weather, excellent roof.', nextNodeId: 'poll' },
-        { id: 'sun', label: 'The first warm sun', reply: 'A solar-powered little victory.', nextNodeId: 'poll' },
-      ] },
-      { id: 'poll', kind: 'poll', prompt: pollPrompt, helperText: 'A fictional poll from visitors to the Haven.', options: [
+    repeatPolicy: 'once_ever', topicKey: `${prefix}:playful`, tags: ['mossprout', 'nature', 'playful'], entryNodeId: 'poll', nodes: [
+      { id: 'poll', kind: 'poll', prompt: pollPrompt, helperText: 'The Haven is voting too.', options: [
         { id: 'forest', label: 'A hidden forest path', reply: 'The ferns have voted to adopt you.', nextNodeId: null, villageWeight: 44 },
         { id: 'garden', label: 'A slightly wild garden', reply: 'Useful, beautiful, and allowed to be messy.', nextNodeId: null, villageWeight: 34 },
         { id: 'coast', label: 'Windy water and open sky', reply: 'Your thoughts may need more horizon.', nextNodeId: null, villageWeight: 22 },
       ], nextNodeId: 'end' },
-      { id: 'end', kind: 'end', message: 'Mossprout records the result with unnecessary seriousness.' },
+      { id: 'end', kind: 'end', message: '{{coStar}} demands a recount. Mossprout refuses.' },
     ],
   };
 }
@@ -128,58 +118,34 @@ function natureQuestionConversation(input: {
   const archetype = input.outcome === 'archetype';
   return {
     id: `mossprout:conversation:nature-question:${input.id}`,
-    version: 2,
+    version: 3,
     familyId: 'mossprout',
     title: input.title,
     actionTitle: input.actionTitle,
     trigger: 'evergreen',
     minimumBondLevel: 1,
     cooldownDays: 1,
-    format: archetype ? 'insight_game' : 'poll',
+    format: archetype ? 'narrative' : 'poll',
     purpose: 'get_to_know',
     returnTarget: 'character_home',
     repeatPolicy: 'after_cooldown',
     topicKey: `nature-question:${input.id}`,
     tags: ['mossprout', 'nature', 'nature-question'],
-    entryNodeId: archetype ? 'game' : 'first',
+    entryNodeId: 'first',
     nodes: archetype ? [
-      {
-        id: 'game', kind: 'insight_game', title: input.title, revealNodeId: 'reveal', questions: [
-          { id: 'first', prompt: input.firstPrompt, options: input.first.map(([id, label, reply]) => ({ id, label, reply, nextNodeId: null })) },
-          { id: 'second', prompt: input.secondPrompt, options: input.second.map(([id, label, reply]) => ({ id, label, reply, nextNodeId: null })) },
-          { id: 'change', prompt: 'The Garden changes while you are looking. What do you do?', options: [
-            { id: `${input.id}:change:0`, label: 'Follow the change', reply: 'Curiosity has quick little roots.', nextNodeId: null },
-            { id: `${input.id}:change:1`, label: 'Stop and notice it', reply: 'A careful look keeps more than it takes.', nextNodeId: null },
-            { id: `${input.id}:change:2`, label: 'Give it time', reply: 'Some answers prefer not to be hurried.', nextNodeId: null },
-          ] },
-          { id: 'keep', prompt: 'What should Mossprout keep from this extremely serious result?', options: [
-            { id: `${input.id}:keep:0`, label: 'The adventure', reply: 'Filed under paths worth following.', nextNodeId: null },
-            { id: `${input.id}:keep:1`, label: 'The small detail', reply: 'Filed under things most people miss.', nextNodeId: null },
-            { id: `${input.id}:keep:2`, label: 'The gentle choice', reply: 'Filed under care without fuss.', nextNodeId: null },
-          ] },
-        ],
-      },
-      {
-        id: 'reveal', kind: 'insight_reveal', title: 'Your nature-side result', insightKey: `nature-fun:${input.id}`,
-        category: 'Nature', persistence: 'display_only', nextNodeId: 'end',
-        results: [0, 1, 2].map((index) => ({
-          id: `${input.id}:result:${index}`,
-          title: input.resultTitles?.[index] ?? ['A Curious Sprout', 'A Careful Fern', 'A Ready Root'][index]!,
-          reflection: input.ending,
-          summary: `${input.ending} This is a playful result, not a permanent label.`,
-          emblemId: `mossprout-fun-${index + 1}`,
-          matchOptionIds: [input.first[index]![0], input.second[index]![0], `${input.id}:change:${index}`, `${input.id}:keep:${index}`],
-        })),
-      },
-      { id: 'end', kind: 'end', message: input.ending },
-    ] : [
       {
         id: 'first', kind: 'choice', phase: 'explore', prompt: input.firstPrompt,
         options: input.first.map(([id, label, reply]) => ({ id, label, reply, nextNodeId: 'second' })),
       },
       {
-        id: 'second', kind: 'poll', prompt: input.secondPrompt, helperText: 'A fictional poll from visitors to the Haven.',
-        options: input.second.map(([id, label, reply], index) => ({ id, label, reply, nextNodeId: null, villageWeight: [42, 34, 24][index]! })),
+        id: 'second', kind: 'choice', phase: 'resolve', prompt: input.secondPrompt,
+        options: input.second.map(([id, label, reply]) => ({ id, label, reply, nextNodeId: 'end' })),
+      },
+      { id: 'end', kind: 'end', message: input.ending },
+    ] : [
+      {
+        id: 'first', kind: 'poll', prompt: input.firstPrompt, helperText: 'The Haven is voting too.',
+        options: input.first.map(([id, label, reply], index) => ({ id, label, reply, nextNodeId: null, villageWeight: [42, 34, 24][index]! })),
         nextNodeId: 'end',
       },
       { id: 'end', kind: 'end', message: input.ending },
@@ -345,9 +311,10 @@ function natureJournalConversation(input: {
   }[];
   ending: string;
 }): ConversationDefinition {
+  const prompts = [input.prompts[0]!, input.prompts.at(-1)!];
   return {
     id: `mossprout:conversation:nature-journal:${input.id}`,
-    version: 2,
+    version: 3,
     familyId: 'mossprout',
     actionTitle: input.actionTitle,
     title: input.title,
@@ -360,26 +327,68 @@ function natureJournalConversation(input: {
     repeatPolicy: 'after_cooldown',
     topicKey: `nature-journal:${input.id}`,
     tags: ['mossprout', 'nature', 'nature-journal'],
-    entryNodeId: input.prompts[0]!.id,
+    entryNodeId: prompts[0]!.id,
     nodes: [
-      ...input.prompts.map((item, index) => ({
+      ...prompts.map((item, index) => ({
         id: item.id,
         kind: 'choice' as const,
         phase: index === input.prompts.length - 1 ? 'resolve' as const : 'explore' as const,
         prompt: item.prompt,
         options: item.options.map(([id, label, reply]) => ({
-          id, label, reply, nextNodeId: input.prompts[index + 1]?.id ?? 'save-note',
+          id, label, reply, journalFragment: mossproutJournalFragment(input.id, item.id, id, label),
+          nextNodeId: prompts[index + 1]?.id ?? 'save-note',
         })),
       })),
       {
         id: 'save-note', kind: 'journal_handoff', prompt: 'Keep this small nature moment?',
         title: input.title, body: 'Mossprout shaped your answers into a small field note. Edit anything, then keep it here in your journal together.',
+        draftTemplate: MOSSPROUT_JOURNAL_DRAFT_TEMPLATES[input.id],
         flowId: 'went_somewhere', allowedChoiceIds: ['park', 'garden', 'forest', 'home', 'other_place'],
         saveLabel: 'Save field note', rewardGrowth: 20, nextNodeId: 'end',
       },
       { id: 'end', kind: 'end', message: input.ending },
     ],
   };
+}
+
+const MOSSPROUT_JOURNAL_DRAFT_TEMPLATES: Readonly<Record<string, string>> = {
+  'three-detail-field-note': 'Nature found me {{where}}. I want to remember {{keep}}.',
+  'weather-in-the-day': 'Today felt {{weather}}. I would caption it “{{line}}.”',
+  'one-growing-thing': 'I noticed {{found}}. For now, I want to {{next}}.',
+  'sound-map': 'Nearest to me was {{nearest}}. I would keep {{keep}}.',
+  'light-on-the-place': 'The light was {{kind}}. My field note says: “{{line}}.”',
+  'small-return': 'I am thinking of {{place}}. Returning could be easy if I {{when}}.',
+};
+
+const MOSSPROUT_JOURNAL_FRAGMENTS: Readonly<Record<string, string>> = {
+  'three-detail-field-note:where:outside': 'somewhere outside',
+  'three-detail-field-note:where:window': 'through a window',
+  'three-detail-field-note:where:indoors': 'beside something growing indoors',
+  'weather-in-the-day:weather:bright': 'bright and warm',
+  'weather-in-the-day:weather:wet': 'rainy or damp',
+  'weather-in-the-day:weather:wind': 'windy and changeable',
+  'one-growing-thing:found:wild': 'something growing wild',
+  'one-growing-thing:found:tended': 'something someone tends',
+  'one-growing-thing:found:tiny': 'something very small',
+  'one-growing-thing:next:remember': 'remember it',
+  'one-growing-thing:next:return': 'look again another day',
+  'one-growing-thing:next:care': 'give it a little care',
+  'sound-map:nearest:bird': 'a bird or animal',
+  'sound-map:nearest:weather': 'wind, rain, or leaves',
+  'sound-map:nearest:people': 'people moving nearby',
+  'light-on-the-place:kind:bright': 'clear and bright',
+  'light-on-the-place:kind:gold': 'warm and golden',
+  'light-on-the-place:kind:dim': 'soft, grey, or dim',
+  'small-return:place:near': 'somewhere very nearby',
+  'small-return:place:green': 'a properly green place',
+  'small-return:place:edge': 'an overlooked edge or corner',
+  'small-return:when:route': 'build it into a route',
+  'small-return:when:weather': 'wait for different weather',
+  'small-return:when:remember': 'simply remember it for now',
+};
+
+function mossproutJournalFragment(journalId: string, nodeId: string, optionId: string, label: string) {
+  return MOSSPROUT_JOURNAL_FRAGMENTS[`${journalId}:${nodeId}:${optionId}`] ?? `${label[0]!.toLocaleLowerCase()}${label.slice(1)}`;
 }
 
 const mossproutNatureJournals: readonly ConversationDefinition[] = [
@@ -581,14 +590,14 @@ const mossproutFormFinder: ConversationDefinition = {
 
 function bondConversation(level: 2 | 3 | 4, prompt: string, ending: string): ConversationDefinition {
   return {
-    id: `mossprout:conversation:bond-${level}`, version: 3, familyId: 'mossprout', title: `A change Mossprout noticed`,
+    id: `mossprout:conversation:bond-${level}`, version: 4, familyId: 'mossprout', title: 'Mossprout has a question',
     trigger: 'bond', minimumBondLevel: level, cooldownDays: 3650, contextualOnly: true, format: 'narrative',
     purpose: 'bond_milestone', returnTarget: 'character_home', repeatPolicy: 'once_ever', topicKey: `bond-${level}`,
     tags: ['mossprout', 'bond'], entryNodeId: 'question', nodes: [
       { id: 'question', kind: 'choice', phase: 'explore', prompt, options: [
-        { id: 'quiet', label: 'Keep noticing quietly', reply: 'Quiet attention grows deep roots.', nextNodeId: 'end' },
-        { id: 'curious', label: 'Ask me curious things', reply: 'Good. I have a pocket full of questions.', nextNodeId: 'end' },
-        { id: 'practical', label: 'Give me small ideas', reply: 'Small enough to fit into a real day.', nextNodeId: 'end' },
+        { id: 'quiet', label: 'Notice things with me', reply: 'Mossprout nods. “Quiet company, then.”', nextNodeId: 'end' },
+        { id: 'curious', label: 'Ask me odd questions', reply: '“Excellent. I have several about worms.”', nextNodeId: 'end' },
+        { id: 'practical', label: 'Give me tiny ideas', reply: '“Pocket-sized. No grand expeditions.”', nextNodeId: 'end' },
       ] },
       { id: 'end', kind: 'end', message: ending },
     ],
@@ -596,23 +605,23 @@ function bondConversation(level: 2 | 3 | 4, prompt: string, ending: string): Con
 }
 
 const mossproutBondConversations = [
-  bondConversation(2, 'We have spent enough time together that I am learning how you notice things. How should I help?', 'Mossprout remembers how to meet you here.'),
-  bondConversation(3, 'The garden feels less like mine and more like ours. What should we grow more of between visits?', 'Another corner of the garden feels shared.'),
-  bondConversation(4, 'You have changed this place without ever asking it to hurry. What should I keep reminding you?', 'The pond keeps the answer in its reflection.'),
+  bondConversation(2, '“I think I know how you like to wander,” Mossprout says. “But how should I join in?”', 'Mossprout tucks your answer under their hat for next time.'),
+  bondConversation(3, 'Mossprout marks a new patch of the map OURS. “What should we grow between visits?”', '{{coStar}} adds a crooked star beside your answer.'),
+  bondConversation(4, 'At {{place}}, Mossprout pauses. “What should I keep reminding you?”', 'The garden keeps your answer somewhere safe.'),
 ] as const;
 
 function reflectionConversation(id: string, title: string, prompt: string, routeKeys: readonly string[]): ConversationDefinition {
   return {
-    id: `mossprout:conversation:${id}`, version: 3, familyId: 'mossprout', title, trigger: 'journal',
+    id: `mossprout:conversation:${id}`, version: 4, familyId: 'mossprout', title, trigger: 'journal',
     triggerRouteKeys: routeKeys, minimumBondLevel: 1, cooldownDays: 5, contextualOnly: true, format: 'narrative',
     purpose: 'reflection', returnTarget: 'character_home', repeatPolicy: 'after_cooldown', topicKey: id,
     tags: ['mossprout', 'reflection'], entryNodeId: 'question', nodes: [
       { id: 'question', kind: 'choice', phase: 'explore', prompt, options: [
-        { id: 'detail', label: 'One small detail stayed with me', reply: 'Small details are excellent at carrying whole places.', nextNodeId: 'end' },
-        { id: 'feeling', label: 'Mostly the feeling of it', reply: 'A feeling can be a kind of weather too.', nextNodeId: 'end' },
-        { id: 'nothing', label: 'Nothing particular', reply: 'That is all right. A day does not need to become a lesson.', nextNodeId: 'end' },
+        { id: 'detail', label: 'One small detail', reply: '“Those are good at carrying whole places.”', nextNodeId: 'end' },
+        { id: 'feeling', label: 'Mostly the feeling', reply: '“A feeling can be weather too.”', nextNodeId: 'end' },
+        { id: 'nothing', label: 'Nothing in particular', reply: '“Fair. Not every day needs a lesson.”', nextNodeId: 'end' },
       ] },
-      { id: 'end', kind: 'end', message: 'Mossprout lets the moment settle without trying to improve it.' },
+      { id: 'end', kind: 'end', message: 'Mossprout lets the moment be enough.' },
     ],
   };
 }
@@ -624,21 +633,16 @@ const mossproutReflections = [
 ] as const;
 
 const mossproutNatureInsight: ConversationDefinition = {
-  id: 'mossprout:insight:nature-connection', version: 1, familyId: 'mossprout', title: 'What does nature give back to you?',
+  id: 'mossprout:insight:nature-connection', version: 2, familyId: 'mossprout', title: 'What do you look for outside?',
   trigger: 'signature_game', minimumBondLevel: 1, cooldownDays: 30, format: 'insight_game', purpose: 'learned_insight',
-  returnTarget: 'character_home', repeatPolicy: 'after_cooldown', topicKey: 'nature-connection', tags: ['mossprout', 'insight', 'reflection'], entryNodeId: 'game',
+  returnTarget: 'character_home', repeatPolicy: 'after_cooldown', topicKey: 'nature-connection', tags: ['mossprout', 'insight', 'reflection', 'short-form'], entryNodeId: 'game',
   nodes: [
     {
-      id: 'game', kind: 'insight_game', title: 'What does nature give back to you?', revealNodeId: 'reveal', questions: [
+      id: 'game', kind: 'insight_game', title: 'What do you look for outside?', revealNodeId: 'reveal', questions: [
         { id: 'arrival', prompt: 'When you reach somewhere green, what changes first?', options: [
           { id: 'calm-arrival', label: 'My thoughts get quieter', reply: 'The place gives your thoughts more room.', nextNodeId: null },
           { id: 'curious-arrival', label: 'I start looking around', reply: 'Curiosity arrives before you have to invite it.', nextNodeId: null },
           { id: 'care-arrival', label: 'I notice what needs care', reply: 'You see the place as something alive, not scenery.', nextNodeId: null },
-        ] },
-        { id: 'detail', prompt: 'Which detail is most likely to stay with you?', options: [
-          { id: 'calm-detail', label: 'The air or the quiet', reply: 'The atmosphere becomes the memory.', nextNodeId: null },
-          { id: 'curious-detail', label: 'Something unexpected', reply: 'One odd detail can hold the whole visit.', nextNodeId: null },
-          { id: 'care-detail', label: 'A plant or living visitor', reply: 'You remember the lives sharing the place.', nextNodeId: null },
         ] },
         { id: 'return', prompt: 'What makes you want to return?', options: [
           { id: 'calm-return', label: 'Knowing I can breathe there', reply: 'The place has become a soft landing.', nextNodeId: null },
@@ -653,10 +657,10 @@ const mossproutNatureInsight: ConversationDefinition = {
       ],
     },
     {
-      id: 'reveal', kind: 'insight_reveal', title: 'What Mossprout learned about you', insightKey: 'nature-connection', category: 'Nature', nextNodeId: 'end', results: [
-        { id: 'quiet-refuge', title: 'Nature as a Quiet Refuge', reflection: 'You seem to meet nature as somewhere the volume can come down without demanding anything from you.', summary: 'Green spaces matter most when they offer room to breathe, quieter thoughts, and a steadier feeling to carry back into the day.', emblemId: 'mossprout-nature-calm', matchOptionIds: ['calm-arrival', 'calm-detail', 'calm-return', 'calm-gift'] },
-        { id: 'living-mystery', title: 'Nature as a Living Mystery', reflection: 'You meet the outdoors with your attention awake. Change and small surprises make familiar places feel new.', summary: 'Nature connects with you through curiosity: unexpected details, changing paths, and discoveries that keep the world from feeling finished.', emblemId: 'mossprout-nature-curious', matchOptionIds: ['curious-arrival', 'curious-detail', 'curious-return', 'curious-gift'] },
-        { id: 'shared-garden', title: 'Nature as a Shared Garden', reflection: 'You notice that outdoor places are full of other lives. Connection grows through attention and care.', summary: 'Nature feels meaningful when it becomes a relationship—something living to notice, revisit, protect, or gently tend.', emblemId: 'mossprout-nature-care', matchOptionIds: ['care-arrival', 'care-detail', 'care-return', 'care-gift'] },
+      id: 'reveal', kind: 'insight_reveal', title: 'Your outside instinct', insightKey: 'nature-connection', category: 'Nature', nextNodeId: 'end', results: [
+        { id: 'quiet-refuge', title: 'For a quieter head', reflection: 'You look for somewhere the volume can drop.', summary: 'A little air, space, and stillness may be what matters most.', emblemId: 'mossprout-nature-calm', matchOptionIds: ['calm-arrival', 'calm-return', 'calm-gift'] },
+        { id: 'living-mystery', title: 'For something to notice', reflection: 'You go outside with your attention awake.', summary: 'Change, odd details, and small discoveries keep a place alive.', emblemId: 'mossprout-nature-curious', matchOptionIds: ['curious-arrival', 'curious-return', 'curious-gift'] },
+        { id: 'shared-garden', title: 'For something to care about', reflection: 'You notice the lives sharing a place with you.', summary: 'Returning and tending turn a patch of nature into a relationship.', emblemId: 'mossprout-nature-care', matchOptionIds: ['care-arrival', 'care-return', 'care-gift'] },
       ],
     },
     { id: 'end', kind: 'end', message: 'Keep it if it feels true. We can learn something different later.' },
@@ -665,47 +669,41 @@ const mossproutNatureInsight: ConversationDefinition = {
 
 const mossproutPlanningConversations: readonly ConversationDefinition[] = [
   {
-    id: 'mossprout:conversation:nature-goal-discovery', version: 1, familyId: 'mossprout', title: 'Find nature goals that fit',
+    id: 'mossprout:conversation:nature-goal-discovery', version: 2, familyId: 'mossprout', title: 'Find a small nature rhythm',
     trigger: 'evergreen', minimumBondLevel: 1, cooldownDays: 1, contextualOnly: true, format: 'narrative', purpose: 'planning',
     returnTarget: 'character_home', repeatPolicy: 'after_cooldown', topicKey: 'nature-goal-discovery', tags: ['mossprout', 'goals'], entryNodeId: 'time',
     nodes: [
-      { id: 'time', kind: 'choice', phase: 'explore', prompt: 'How much room could nature realistically have in your day?', options: [
+      { id: 'time', kind: 'choice', phase: 'explore', prompt: 'How much room is there on an ordinary day?', options: [
         { id: 'time-minute', label: 'About one minute', reply: 'A minute is enough for one real detail.', nextNodeId: 'place' },
         { id: 'time-short', label: 'Five or ten minutes', reply: 'A small pocket with room to breathe.', nextNodeId: 'place' },
         { id: 'time-outing', label: 'A proper little outing', reply: 'Then curiosity may wear its muddy shoes.', nextNodeId: 'place' },
         { id: 'time-variable', label: 'It changes day to day', reply: 'We can choose goals that bend instead of break.', nextNodeId: 'place' },
       ] },
-      { id: 'place', kind: 'choice', phase: 'deepen', prompt: 'Where is a goal most likely to survive real life?', options: [
-        { id: 'place-home', label: 'At home or by a window', reply: 'Home already contains small habitats.', nextNodeId: 'benefit' },
-        { id: 'place-route', label: 'On a route I already take', reply: 'No extra expedition required.', nextNodeId: 'benefit' },
-        { id: 'place-green', label: 'In a park or green place', reply: 'Somewhere leaves can interrupt the noise.', nextNodeId: 'benefit' },
-        { id: 'place-anywhere', label: 'Wherever I happen to be', reply: 'Then the goal should travel lightly.', nextNodeId: 'benefit' },
+      { id: 'place', kind: 'choice', phase: 'deepen', prompt: 'Where would it actually happen?', options: [
+        { id: 'place-home', label: 'At home or by a window', reply: 'Home has habitats too.', nextNodeId: 'style' },
+        { id: 'place-route', label: 'On a route I already take', reply: 'No extra expedition required.', nextNodeId: 'style' },
+        { id: 'place-green', label: 'In a park or green place', reply: 'Somewhere leaves can interrupt.', nextNodeId: 'style' },
+        { id: 'place-anywhere', label: 'Wherever I happen to be', reply: 'Then it should travel lightly.', nextNodeId: 'style' },
       ] },
-      { id: 'benefit', kind: 'choice', phase: 'deepen', prompt: 'What would you most like nature to give back?', options: [
-        { id: 'benefit-calm', label: 'A quieter pace', reply: 'We will favour pauses over achievements.', nextNodeId: 'style' },
-        { id: 'benefit-curious', label: 'Something interesting', reply: 'A goal can leave room for surprise.', nextNodeId: 'style' },
-        { id: 'benefit-care', label: 'Something worth caring for', reply: 'Tending makes attention visible.', nextNodeId: 'style' },
-        { id: 'benefit-return', label: 'A reason to go back', reply: 'Returning turns a place into a relationship.', nextNodeId: 'style' },
-      ] },
-      { id: 'style', kind: 'choice', phase: 'resolve', prompt: 'Which kind of action sounds kind rather than demanding?', options: [
+      { id: 'style', kind: 'choice', phase: 'resolve', prompt: 'What would you actually do?', options: [
         { id: 'style-notice', label: 'Notice one small detail', reply: 'One detail, no report required.', nextNodeId: 'goals-notice' },
         { id: 'style-pause', label: 'Pause outside briefly', reply: 'A pause is allowed to stay small.', nextNodeId: 'goals-pause' },
         { id: 'style-tend', label: 'Care for something growing', reply: 'A practical kind of attention.', nextNodeId: 'goals-tend' },
         { id: 'style-visit', label: 'Visit or revisit a place', reply: 'A place can become familiar one return at a time.', nextNodeId: 'goals-visit' },
       ] },
-      { id: 'goals-notice', kind: 'goal_proposal', prompt: 'Which of these matched goals should join Today?', goalTypeId: 'mossprout:nature-connection', goalTitle: 'Goals for a noticing nature', summary: 'Your answers point toward small observations that can fit around real life.', suggestedQuickGoalIds: ['mossprout:notice-living-thing', 'mossprout:season-change', 'mossprout:window-view'], nextNodeId: 'end' },
-      { id: 'goals-pause', kind: 'goal_proposal', prompt: 'Which of these matched goals should join Today?', goalTypeId: 'mossprout:nature-connection', goalTitle: 'Goals for a quieter nature pause', summary: 'Your answers favour a little breathing room without turning it into homework.', suggestedQuickGoalIds: ['mossprout:step-outside', 'mossprout:sit-outside', 'mossprout:window-view'], nextNodeId: 'end' },
-      { id: 'goals-tend', kind: 'goal_proposal', prompt: 'Which of these matched goals should join Today?', goalTypeId: 'mossprout:nature-connection', goalTitle: 'Goals for gentle tending', summary: 'Your answers connect nature with attention, care, and visible follow-through.', suggestedQuickGoalIds: ['mossprout:care-for-plant', 'mossprout:notice-living-thing', 'mossprout:same-place'], nextNodeId: 'end' },
-      { id: 'goals-visit', kind: 'goal_proposal', prompt: 'Which of these matched goals should join Today?', goalTypeId: 'mossprout:nature-connection', goalTitle: 'Goals for returning outdoors', summary: 'Your answers suggest making a little more room for place, change, and return.', suggestedQuickGoalIds: ['mossprout:visit-green', 'mossprout:same-place', 'mossprout:season-change'], nextNodeId: 'end' },
+      { id: 'goals-notice', kind: 'goal_proposal', prompt: 'These could fit. Keep any?', goalTypeId: 'mossprout:nature-connection', goalTitle: 'Notice a little more', summary: 'Small observations, fitted around real life.', suggestedQuickGoalIds: ['mossprout:notice-living-thing', 'mossprout:season-change', 'mossprout:window-view'], nextNodeId: 'end' },
+      { id: 'goals-pause', kind: 'goal_proposal', prompt: 'These could fit. Keep any?', goalTypeId: 'mossprout:nature-connection', goalTitle: 'Make a little room', summary: 'A breath of outside, without the homework.', suggestedQuickGoalIds: ['mossprout:step-outside', 'mossprout:sit-outside', 'mossprout:window-view'], nextNodeId: 'end' },
+      { id: 'goals-tend', kind: 'goal_proposal', prompt: 'These could fit. Keep any?', goalTypeId: 'mossprout:nature-connection', goalTitle: 'Tend something small', summary: 'Care you can see and do.', suggestedQuickGoalIds: ['mossprout:care-for-plant', 'mossprout:notice-living-thing', 'mossprout:same-place'], nextNodeId: 'end' },
+      { id: 'goals-visit', kind: 'goal_proposal', prompt: 'These could fit. Keep any?', goalTypeId: 'mossprout:nature-connection', goalTitle: 'Go back and see', summary: 'A place becomes familiar one return at a time.', suggestedQuickGoalIds: ['mossprout:visit-green', 'mossprout:same-place', 'mossprout:season-change'], nextNodeId: 'end' },
       { id: 'end', kind: 'end', message: 'The goals should fit your day. Your day does not have to fit the goals.' },
     ],
   },
   {
-    id: 'mossprout:conversation:quest-handoff', version: 3, familyId: 'mossprout', title: 'Choose a nature invitation',
+    id: 'mossprout:conversation:quest-handoff', version: 4, familyId: 'mossprout', title: 'Take a small invitation',
     trigger: 'evergreen', minimumBondLevel: 1, cooldownDays: 3, contextualOnly: true, format: 'narrative', purpose: 'planning',
     returnTarget: 'quest', repeatPolicy: 'after_cooldown', topicKey: 'quest-handoff', tags: ['mossprout', 'quest'], entryNodeId: 'quest',
     nodes: [
-      { id: 'quest', kind: 'quest_handoff', prompt: 'Would one of these nature invitations fit?', suggestedQuestIds: ['quest-mossprout-green-photo', 'quest-mossprout-nature-note'], fallbackNodeId: 'fallback', nextNodeId: 'end' },
+      { id: 'quest', kind: 'quest_handoff', prompt: 'Want one small reason to look around?', suggestedQuestIds: ['quest-mossprout-green-photo', 'quest-mossprout-nature-note'], fallbackNodeId: 'fallback', nextNodeId: 'end' },
       { id: 'fallback', kind: 'choice', phase: 'resolve', prompt: 'Nothing needs to be forced today.', options: [{ id: 'later', label: 'Leave it for later', reply: 'The path will still be here.', nextNodeId: 'end' }] },
       { id: 'end', kind: 'end', message: 'Choose only what feels like an invitation.' },
     ],
@@ -713,10 +711,6 @@ const mossproutPlanningConversations: readonly ConversationDefinition[] = [
 ];
 
 export const mossproutStoryConversationDefinitions: readonly ConversationDefinition[] = [
-  ...dryPondJourneyConversations,
-  ...extendedJourneyConversations,
-  ...mossproutJourneyActionConversations,
-  ...extendedJourneyActionConversations,
   mossproutFirstDayGoalConversation,
   mossproutFirstDayPlayfulConversation,
   mossproutFormFinder,

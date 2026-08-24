@@ -1,5 +1,6 @@
 import type { ConversationDefinition } from '@/types/companion-conversation';
 import type { KatchimeraActionArtKey, KatchimeraActionCompletionRecord, KatchimeraActionSlotId, KatchimeraDayAction, JourneyDayActionRecord, JourneyDayRecord } from '@/types/relationship-progression';
+import { mossproutCampaignEpisodeByBeatId } from '@/constants/mossprout-campaign';
 
 export type MossproutActionOffer = {
   id: string;
@@ -120,6 +121,13 @@ const GARDEN_REQUESTS: Record<string, { title: string; subtitle: string; definit
     orderId: 'merge-story:mossprout:dry-pond:place-for-rain',
     coins: 20,
   },
+  'returning-pond:place-for-rain': {
+    title: 'Make a place for rain',
+    subtitle: 'Create a Shell to catch the first drops.',
+    definitionId: 'nature:waterside:2',
+    orderId: 'merge-story:mossprout:dry-pond:place-for-rain',
+    coins: 20,
+  },
   'dry-pond:day-2': {
     title: 'Grow roots for the pond bank',
     subtitle: 'Make a Plant to hold the soft edge together.',
@@ -127,7 +135,21 @@ const GARDEN_REQUESTS: Record<string, { title: string; subtitle: string; definit
     orderId: 'merge-story:mossprout:dry-pond:bank-that-holds',
     coins: 30,
   },
+  'returning-pond:bank-that-holds': {
+    title: 'Grow roots for the pond bank',
+    subtitle: 'Make a Plant to hold the soft edge together.',
+    definitionId: 'nature:garden:3',
+    orderId: 'merge-story:mossprout:dry-pond:bank-that-holds',
+    coins: 30,
+  },
   'dry-pond:day-3': {
+    title: 'Finish the little rain garden',
+    subtitle: 'Make the final Flower and Tidepool.',
+    definitionId: 'nature:garden:4',
+    orderId: 'merge-story:mossprout:dry-pond:little-rain-garden',
+    coins: 50,
+  },
+  'returning-pond:rain-garden': {
     title: 'Finish the little rain garden',
     subtitle: 'Make the final Flower and Tidepool.',
     definitionId: 'nature:garden:4',
@@ -426,7 +448,15 @@ function activeJourneyAction(
   record: JourneyDayActionRecord | null,
   liveRequest?: MossproutActionGardenRequest | null,
 ): KatchimeraDayAction {
-  const garden = GARDEN_REQUESTS[journey.beatId];
+  const campaignEpisode = mossproutCampaignEpisodeByBeatId.get(journey.beatId);
+  const campaignRequirement = campaignEpisode?.requirements[0];
+  const garden = GARDEN_REQUESTS[journey.beatId] ?? (campaignEpisode?.completionMode === 'merge' && campaignRequirement && campaignEpisode.mergeOrderId ? {
+    title: campaignEpisode.title,
+    subtitle: campaignEpisode.requirements.length > 1 ? 'Bring Mossprout every piece for this part of the garden.' : 'Make this living piece for Mossprout.',
+    definitionId: campaignRequirement.definitionId,
+    orderId: campaignEpisode.mergeOrderId,
+    coins: 20,
+  } : null);
   const gardenActive = journey.status === 'activity_available' || journey.status === 'activity_in_progress';
   if (gardenActive && garden) return {
     id: record?.id ?? `${journey.id}:garden`, kind: 'garden_request', title: liveRequest?.title ?? garden.title, subtitle: liveRequest?.description ?? garden.subtitle,

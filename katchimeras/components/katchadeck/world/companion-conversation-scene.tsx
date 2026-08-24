@@ -295,12 +295,12 @@ export function CompanionConversationScene({
         ) : node?.kind === 'quest_handoff' ? (
           <View style={{ gap: 10 }}>
             {questOffer ? <View style={{ backgroundColor: KatchaUI.companionScenePanel.cardBackground, borderColor: 'rgba(168,117,47,0.3)', borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, gap: 7, padding: 16 }}>
-              <ThemedText selectable style={{ fontSize: 10, fontWeight: '900', letterSpacing: 1.1 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>A QUEST PICKED FOR YOU</ThemedText>
+              <ThemedText selectable style={{ fontSize: 10, fontWeight: '900', letterSpacing: 1.1 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>A SMALL INVITATION</ThemedText>
               <ThemedText selectable style={{ fontSize: 21, fontWeight: '900', lineHeight: 26 }} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>{questOffer.title}</ThemedText>
               <ThemedText selectable style={{ fontSize: 13, lineHeight: 19 }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{questOffer.hint}</ThemedText>
             </View> : <View style={{ alignItems: 'center', gap: 8, paddingVertical: 12 }}>
               <IconSymbol color="#8B672E" name="sparkles" size={20} />
-              <ThemedText selectable style={{ fontSize: 14, lineHeight: 20, textAlign: 'center' }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>Bringing your answers together…</ThemedText>
+              <ThemedText selectable style={{ fontSize: 14, lineHeight: 20, textAlign: 'center' }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>Looking for one that fits…</ThemedText>
             </View>}
             {questOffer ? <PrimaryAction label="Take this quest" onPress={() => onQuestHandoff(true, node)} /> : null}
             {questOffer ? <SecondaryAction label="Skip" onPress={() => onQuestHandoff(false, node)} /> : null}
@@ -328,11 +328,11 @@ function GoalBundleProposal({ hasActiveGoalPlan, node, onDecision }: {
     : [...current, id]);
   return <View style={{ gap: 11 }}>
     <View style={{ gap: 5 }}>
-      <ThemedText selectable style={{ fontSize: 10, fontWeight: '900', letterSpacing: 1.1 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>A GOAL PLAN FOR YOU</ThemedText>
+      <ThemedText selectable style={{ fontSize: 10, fontWeight: '900', letterSpacing: 1.1 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>A FEW IDEAS</ThemedText>
       <ThemedText selectable style={{ fontSize: 19, fontWeight: '900', lineHeight: 24 }} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>{node.goalTitle}</ThemedText>
       {node.summary ? <ThemedText selectable style={{ fontSize: 14, lineHeight: 20 }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{node.summary}</ThemedText> : null}
       <ThemedText selectable style={{ fontSize: 13, lineHeight: 18 }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>
-        {hasActiveGoalPlan ? 'Choose any steps you want to add to your current goals.' : 'Choose one or more concrete steps. The first is my best match for your answers.'}
+        {hasActiveGoalPlan ? 'Keep any that fit your current goals.' : 'Pick one, a few, or none.'}
       </ThemedText>
     </View>
     {suggestions.map((suggestion, index) => {
@@ -347,7 +347,7 @@ function GoalBundleProposal({ hasActiveGoalPlan, node, onDecision }: {
           {selected ? <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name="checkmark" size={14} weight="bold" /> : null}
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          {index === 0 ? <ThemedText selectable style={{ fontSize: 9, fontWeight: '900', letterSpacing: 0.8 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>BEST MATCH</ThemedText> : null}
+          {index === 0 ? <ThemedText selectable style={{ fontSize: 9, fontWeight: '900', letterSpacing: 0.8 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>TRY THIS FIRST</ThemedText> : null}
           <ThemedText selectable style={{ fontSize: 14, fontWeight: '800', lineHeight: 19 }} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>{suggestion.title}</ThemedText>
         </View>
       </Pressable>;

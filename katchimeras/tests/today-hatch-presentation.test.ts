@@ -181,9 +181,17 @@ test('Daily Hatch reveals one full, flippable card in a claim splash', () => {
 });
 
 test('the retrospective hatch-ready Egg uses the Achievement rays and Energy ripple', () => {
+  const today = readFileSync(path.join(process.cwd(), 'app/(tabs)/today.tsx'), 'utf8');
   const nurture = readFileSync(path.join(process.cwd(), 'components/katchadeck/home/today-nurture-experience.tsx'), 'utf8');
   const egg = readFileSync(path.join(process.cwd(), 'components/katchadeck/home/today-kingdom-egg-hero.tsx'), 'utf8');
 
+  assert.match(today, /const retrospectiveHatchReady = Boolean\(pendingHatchDay\?\.canHatch\)[\s\S]*?&& !discoveryHatchActive/);
+  assert.match(today, /const hatchReadyFocus = dailyHatchActive \|\| retrospectiveHatchReady/);
+  assert.match(today, /const nurtureOnboardingFocus = !hatchReadyFocus &&/);
+  assert.match(today, /if \(!retrospectiveHatchReady\) return;[\s\S]*?void handleReveal\(\)/);
+  assert.match(today, /hatchReadyLabel=\{pendingHatchDay \? 'Hatch Yesterday' : undefined\}/);
+  assert.match(nurture, /hatchReadyFocus && !hatchPresentation \? \(/);
+  assert.doesNotMatch(nurture, /hatchReadyFocus && !hatchPresentation && !onboardingFocus/);
   assert.match(nurture, /isReady=\{hatchPresentation \? false : hatchReadyFocus \|\| ready\}/);
   assert.match(egg, /readyShake\.value = withRepeat/);
   assert.match(egg, /<RotatingRadialSunburst/);

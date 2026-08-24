@@ -53,7 +53,7 @@ test('Mossprout nature answers create an editable journal draft and complete onl
   const definition = [...companionConversationDefinitionById.values()]
     .find((candidate) => candidate.tags?.includes('nature-journal'))!;
   let session = createConversationSession({ definition, formId: 'mossprout', dayId: '2026-08-21', createdAt: 20 });
-  for (let index = 0; index < 3; index += 1) {
+  for (let index = 0; index < 2; index += 1) {
     const node = definition.nodes.find((candidate) => candidate.id === session.currentNodeId);
     assert.equal(node?.kind, 'choice');
     if (node?.kind !== 'choice') throw new Error('Expected a nature journal question.');
@@ -67,7 +67,7 @@ test('Mossprout nature answers create an editable journal draft and complete onl
     mode: 'story', familyId: 'mossprout', creatureId: 'mossprout', session, node, target: 'today', now: 25,
   });
   assert.match(handoff.generatedDraft ?? '', /Nature found me/);
-  assert.match(handoff.generatedDraft ?? '', /I noticed/);
+  assert.match(handoff.generatedDraft ?? '', /I want to remember/);
   assert.equal(session.status, 'active');
   const content = upsertConversationSession(emptyCompanionContentState(), session);
   const saved = advanceConversationForJournalHandoff(content, handoff, 'nature-journal-record', 26);
@@ -83,8 +83,9 @@ test('every Mossprout field note asks bespoke questions before an in-place journ
   for (const definition of definitions) {
     const questions = definition.nodes.filter((node) => node.kind === 'choice');
     const handoff = definition.nodes.find((node) => node.kind === 'journal_handoff');
-    assert.equal(questions.length, 3, `${definition.id} should ask three questions`);
+    assert.equal(questions.length, 2, `${definition.id} should ask two questions`);
     assert.ok(questions.every((question) => question.options.length >= 3), `${definition.id} should never collapse to one Outdoors option`);
+    assert.ok(handoff?.draftTemplate, `${definition.id} should author its draft rather than join raw labels`);
     assert.ok(handoff && !/egg/i.test(handoff.body), `${definition.id} should keep journaling with Mossprout`);
     assert.equal(handoff?.saveLabel, 'Save field note');
   }
@@ -105,8 +106,8 @@ test('Mossprout field-note answers resolve directly to a journal subcategory', (
     });
   };
 
-  assert.equal(build('mossprout:conversation:nature-journal:three-detail-field-note', ['window', 'colour', 'calm']).initialChoiceId, 'home');
-  assert.equal(build('mossprout:conversation:nature-journal:one-growing-thing', ['tended', 'change', 'care']).initialChoiceId, 'garden');
-  assert.equal(build('mossprout:conversation:nature-journal:small-return', ['edge', 'change', 'remember']).initialChoiceId, 'other_place');
-  assert.equal(build('mossprout:conversation:nature-journal:weather-in-the-day', ['bright', 'plans', 'soft']).initialChoiceId, 'park');
+  assert.equal(build('mossprout:conversation:nature-journal:three-detail-field-note', ['window', 'calm']).initialChoiceId, 'home');
+  assert.equal(build('mossprout:conversation:nature-journal:one-growing-thing', ['tended', 'care']).initialChoiceId, 'garden');
+  assert.equal(build('mossprout:conversation:nature-journal:small-return', ['edge', 'remember']).initialChoiceId, 'other_place');
+  assert.equal(build('mossprout:conversation:nature-journal:weather-in-the-day', ['bright', 'soft']).initialChoiceId, 'park');
 });

@@ -8,6 +8,7 @@ import {
 } from '@/constants/companion-conversations-v2';
 import { FEASTLE_FIRST_MEETING_DEFINITION_ID } from '@/constants/feastle-friendship-conversations';
 import { BARISTABBIT_FIRST_MEETING_DEFINITION_ID } from '@/constants/baristabbit-story-conversations';
+import { resolveMossproutCampaignConversation } from '@/constants/mossprout-campaign-conversations';
 import { katchimeraFamilyById, katchimeraSkinById } from '@/constants/katchimera-skins';
 import { companionQuickGoalTemplateById, quickGoalTemplatesForFamily } from '@/constants/companion-quick-goals';
 import type { ConversationDefinition } from '@/types/companion-conversation';
@@ -76,7 +77,7 @@ test('resetting Today makes its conversation pool unserved without erasing prior
 
 test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gated', () => {
   assert.deepEqual(validateConversationDefinitions(companionConversationDefinitionsV2), []);
-  assert.equal(companionConversationDefinitionsV2.length, 1363);
+  assert.equal(companionConversationDefinitionsV2.length, 1375);
   assert.deepEqual(CONVERSATION_V2_ENABLED_FAMILIES, CONVERSATION_V2_FAMILIES);
   assert.deepEqual(CONVERSATION_V2_IDEAL_SKIN_FAMILIES, familyIds);
   assert.equal(isConversationV2Family('feastle'), true);
@@ -94,15 +95,15 @@ test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gate
     assert.ok(katchimeraFamilyById.get(familyId)!.skinIds.length >= 6, `${familyId} needs at least six forms`);
     assert.ok(katchimeraFamilyById.get(familyId)!.skinIds.length <= 12, `${familyId} catalog has grown beyond reviewable scope`);
     if (familyId === 'mossprout') {
-      assert.equal(pack.length, 51);
-      assert.equal(pack.filter((item) => item.trigger === 'evergreen').length, 39);
+      assert.equal(pack.length, 63);
+      assert.equal(pack.filter((item) => item.trigger === 'evergreen').length, 54);
       assert.equal(pack.filter((item) => item.trigger === 'journal').length, 3);
       assert.equal(pack.filter((item) => item.trigger === 'goal_debrief').length, 0);
       assert.equal(pack.filter((item) => item.trigger === 'quest_debrief').length, 0);
       assert.equal(pack.filter((item) => item.trigger === 'bond').length, 3);
-      assert.equal(pack.filter((item) => item.trigger === 'poll').length, 4);
+      assert.equal(pack.filter((item) => item.trigger === 'poll').length, 1);
       assert.equal(pack.filter((item) => item.trigger === 'signature_game').length, 2);
-      assert.equal(pack.filter((item) => item.format === 'insight_game').length, 10);
+      assert.equal(pack.filter((item) => item.format === 'insight_game').length, 1);
       assert.equal(pack.some((item) => /^mossprout:story:\d+$/.test(item.id)), false);
       assert.ok(pack.every((item) => item.purpose && item.returnTarget && item.repeatPolicy));
       continue;
@@ -120,13 +121,14 @@ test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gate
   }
 });
 
-test('Mossprout keeps Journey questions gated while offering a separate daily nature pool', () => {
+test('Mossprout keeps only the current Journey extras and offers a concise daily nature pool', () => {
   const definitions = companionConversationDefinitionsForFamily('mossprout');
   const journeyQuestions = definitions.filter((definition) => definition.purpose === 'get_to_know' && definition.contextualOnly);
-  assert.equal(journeyQuestions.length, 4);
+  assert.equal(journeyQuestions.length, 1);
   assert.ok(journeyQuestions.every((definition) => definition.tags?.includes('nature')));
   assert.ok(journeyQuestions.every((definition) => definition.repeatPolicy === 'once_ever'));
-  assert.ok(journeyQuestions.every((definition) => definition.nodes.filter((node) => node.kind === 'choice' || node.kind === 'poll').length === 3));
+  assert.ok(journeyQuestions.every((definition) => definition.nodes.filter((node) => node.kind === 'choice' || node.kind === 'poll').length === 1));
+  assert.equal(definitions.some((definition) => definition.id.includes('dry-pond:day-')), false);
 
   const dailyQuestions = definitions.filter((definition) => definition.tags?.includes('nature-question'));
   assert.equal(dailyQuestions.length, 8);
@@ -135,11 +137,14 @@ test('Mossprout keeps Journey questions gated while offering a separate daily na
   assert.equal(dailyQuestions.some((definition) => definition.actionTitle === 'Mossprout has a question'), false);
   assert.ok(dailyQuestions.every((definition) => !definition.contextualOnly && definition.repeatPolicy === 'after_cooldown'));
   assert.equal(dailyQuestions.filter((definition) => definition.format === 'poll').length, 4);
-  assert.equal(dailyQuestions.filter((definition) => definition.format === 'insight_game').length, 4);
+  assert.equal(dailyQuestions.filter((definition) => definition.format === 'narrative').length, 4);
+  assert.equal(dailyQuestions.filter((definition) => definition.format === 'insight_game').length, 0);
   assert.ok(dailyQuestions.filter((definition) => definition.format === 'poll')
     .every((definition) => definition.nodes.some((node) => node.kind === 'poll')));
-  assert.ok(dailyQuestions.filter((definition) => definition.format === 'insight_game')
-    .every((definition) => definition.nodes.some((node) => node.kind === 'insight_reveal' && node.persistence === 'display_only')));
+  assert.ok(dailyQuestions.every((definition) => {
+    const interactions = definition.nodes.filter((node) => node.kind === 'choice' || node.kind === 'poll');
+    return interactions.length >= 1 && interactions.length <= 2;
+  }));
 
   const dailyJournals = definitions.filter((definition) => definition.tags?.includes('nature-journal'));
   assert.equal(dailyJournals.length, 6);
@@ -169,6 +174,42 @@ test('Mossprout Day 1 includes an authored focus card with three optional nature
   const proposals = definition.nodes.filter((node) => node.kind === 'goal_proposal');
   assert.ok(proposals.length >= 1);
   assert.ok(proposals.every((node) => node.suggestedQuickGoalIds.length === 3));
+});
+
+test('Mossprout goal ideas respond to the place, time, and action answers', () => {
+  const definition = companionConversationDefinitionsForFamily('mossprout')
+    .find((item) => item.id === 'mossprout:conversation:nature-goal-discovery')!;
+  const turn = (nodeId: string, optionId: string, answeredAt: number) => ({
+    id: `${nodeId}:${optionId}`, nodeId, optionId, answeredAt,
+  });
+  const home = resolveMossproutCampaignConversation(definition, undefined, [
+    turn('time', 'time-short', 1), turn('place', 'place-home', 2), turn('style', 'style-tend', 3),
+  ]);
+  const outing = resolveMossproutCampaignConversation(definition, undefined, [
+    turn('time', 'time-outing', 1), turn('place', 'place-green', 2), turn('style', 'style-visit', 3),
+  ]);
+  const homeGoals = home.nodes.find((node) => node.kind === 'goal_proposal' && node.id === 'goals-tend');
+  const outingGoals = outing.nodes.find((node) => node.kind === 'goal_proposal' && node.id === 'goals-visit');
+  assert.ok(homeGoals?.kind === 'goal_proposal' && outingGoals?.kind === 'goal_proposal');
+  assert.deepEqual(homeGoals.suggestedQuickGoalIds.slice(0, 2), ['mossprout:care-for-plant', 'mossprout:notice-living-thing']);
+  assert.deepEqual(outingGoals.suggestedQuickGoalIds.slice(0, 2), ['mossprout:visit-green', 'mossprout:same-place']);
+});
+
+test('Mossprout optional copy stays short and avoids questionnaire filler', () => {
+  const definitions = companionConversationDefinitionsForFamily('mossprout').filter((definition) =>
+    definition.tags?.some((tag) => ['nature-question', 'nature-journal', 'reflection', 'goals'].includes(tag))
+  );
+  const banned = /based on your answers|thoughtful questions|meaningful direction|personalized|tailored for you/i;
+  for (const definition of definitions) {
+    const copy = JSON.stringify(definition);
+    assert.doesNotMatch(copy, banned, `${definition.id} contains filler copy`);
+    for (const node of definition.nodes) {
+      if (node.kind === 'choice' || node.kind === 'poll') {
+        assert.ok(node.prompt.split(/\s+/).length <= 24, `${definition.id}:${node.id} prompt is too long`);
+        assert.ok(node.options.every((option) => option.label.split(/\s+/).length <= 8), `${definition.id}:${node.id} has a long answer`);
+      }
+    }
+  }
 });
 
 test('a conversation resumes on the next question and reaches its authored result', () => {
@@ -620,11 +661,11 @@ test('authored-family insights use five meaningful questions while every form-ga
     const games = companionConversationDefinitionsForFamily(familyId)
       .flatMap((definition) => definition.nodes)
       .filter((node) => node.kind === 'profile_game' || node.kind === 'insight_game');
-    assert.equal(games.length, familyId === 'mossprout' ? 11 : familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 6 : 5);
+    assert.equal(games.length, familyId === 'mossprout' ? 2 : familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 6 : 5);
     for (const game of games.filter((candidate) => candidate.kind === 'profile_game')) {
       assert.deepEqual(validateProfileQuestionGraph(`${familyId}:test`, game), []);
     }
-    assert.equal(games.filter((game) => game.kind === 'insight_game').every((game) => game.questions.length === (familyId === 'mossprout' ? 4 : 5)), true);
+    assert.equal(games.filter((game) => game.kind === 'insight_game').every((game) => game.questions.length === (familyId === 'mossprout' ? 3 : 5)), true);
   }
 });
 

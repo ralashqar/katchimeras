@@ -407,7 +407,8 @@ export function validateConversationDefinitions(definitions: readonly Conversati
       }
       if (node.kind === 'profile_game' || node.kind === 'insight_game') {
         if (node.kind === 'profile_game') issues.push(...validateProfileQuestionGraph(definition.id, node));
-        if (node.kind === 'insight_game' && node.questions.length < 4) issues.push(`${definition.id}:${node.id}: insight game needs at least four questions`);
+        const minimumInsightQuestions = definition.tags?.includes('short-form') ? 3 : 4;
+        if (node.kind === 'insight_game' && node.questions.length < minimumInsightQuestions) issues.push(`${definition.id}:${node.id}: insight game needs at least ${minimumInsightQuestions} questions`);
         if (node.kind === 'insight_game' && node.questions.length > 6) issues.push(`${definition.id}:${node.id}: insight game exceeds six questions`);
         for (const [questionIndex, question] of node.questions.entries()) {
           if (question.options.length < 2) issues.push(`${definition.id}:${node.id}:${question.id}: needs at least two options`);
@@ -430,7 +431,7 @@ export function validateConversationDefinitions(definitions: readonly Conversati
             }
             for (const result of reveal.results) {
               const evidenceQuestions = node.questions.filter((question) => question.options.some((option) => result.matchOptionIds.includes(option.id)));
-              if (evidenceQuestions.length < 4) issues.push(`${definition.id}:${reveal.id}:${result.id}: result uses fewer than four questions`);
+              if (evidenceQuestions.length < minimumInsightQuestions) issues.push(`${definition.id}:${reveal.id}:${result.id}: result uses fewer than ${minimumInsightQuestions} questions`);
             }
           }
         }

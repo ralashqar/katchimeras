@@ -5,7 +5,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { Stack } from 'expo-router';
 import * as Sentry from '@sentry/react-native';
 import * as SystemUI from 'expo-system-ui';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
 import { Colors } from '@/constants/theme';
@@ -25,6 +25,7 @@ import { GameWalletProvider } from '@/features/ui/game-wallet-provider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import '@/utils/travel-memory-task';
 import { initializeCrashReporting } from '@/utils/crash-reporting';
+import { runMossproutCampaignV2Migration } from '@/utils/mossprout-campaign-v2-migration';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -47,18 +48,27 @@ function RootLayout() {
     InstrumentSerif: require('../assets/fonts/InstrumentSerif-Regular.ttf'),
     Manrope: require('../assets/fonts/Manrope-Variable.ttf'),
   });
+  const [campaignReady, setCampaignReady] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void runMossproutCampaignV2Migration()
+      .catch((error) => Sentry.captureException(error))
+      .finally(() => { if (active) setCampaignReady(true); });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(themeColors.background);
   }, [themeColors.background]);
 
   useEffect(() => {
-    if (fontsLoaded) {
+    if (fontsLoaded && campaignReady) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [campaignReady, fontsLoaded]);
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded || !campaignReady) {
     return null;
   }
 

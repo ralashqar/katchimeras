@@ -1,4 +1,4 @@
-import type { KatchimeraFamilyId } from '@/types/katchimera';
+import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 
 export type JourneyDayStatus =
   | 'opening'
@@ -168,16 +168,31 @@ export type JourneyDayCompletionReceipt = {
 
 export type KatchimeraStoryProgress = {
   familyId: KatchimeraFamilyId;
+  campaignVersion?: number;
   activeChapterId: string;
   activeBeatId: string;
   completedChapterIds: string[];
   completedObjectiveIds: string[];
+  completedBeatIds?: string[];
+  storyFacts?: MossproutStoryFacts;
+  coStarSkinId?: KatchimeraSkinId | null;
   habitatStage: 0 | 1 | 2 | 3 | 4;
   updatedAt: number;
 };
 
+export type MossproutStoryFactKey =
+  | 'garden_promise'
+  | 'pond_approach'
+  | 'pond_priority'
+  | 'welcome_style'
+  | 'memory_style'
+  | 'lantern_for'
+  | 'sanctuary_purpose';
+
+export type MossproutStoryFacts = Partial<Record<MossproutStoryFactKey, string>>;
+
 export type RelationshipProgressState = {
-  schemaVersion: 2;
+  schemaVersion: 3;
   journeyDays: JourneyDayRecord[];
   stories: Partial<Record<KatchimeraFamilyId, KatchimeraStoryProgress>>;
   acknowledgedActionOutroIds: string[];

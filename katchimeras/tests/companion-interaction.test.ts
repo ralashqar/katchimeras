@@ -282,12 +282,12 @@ test('conversation replies, memories, and outcomes advance without redundant con
   assert.match(stage, /Shows the full message/);
   assert.match(stage, /revealAll=\{revealAllSpeech\}/);
   assert.doesNotMatch(scene, /A SECONDARY THREAD|WHY THIS RESULT|REVIEW YOUR ANSWERS|Replay from the beginning/);
-  assert.match(scene, /A QUEST PICKED FOR YOU/);
+  assert.match(scene, /A SMALL INVITATION/);
   assert.match(scene, /label="Take this quest"/);
   assert.doesNotMatch(scene, /There is no matching quest available right now/);
   assert.match(scene, /function GoalBundleProposal/);
   assert.match(scene, /accessibilityRole="checkbox"/);
-  assert.match(scene, /BEST MATCH/);
+  assert.match(scene, /TRY THIS FIRST/);
   assert.match(scene, /Add \$\{selectedIds\.length\} goals/);
   assert.match(scene, /outcome\.items\?\.map/);
   assert.match(interaction, /destination === 'goals'/);
@@ -744,9 +744,9 @@ test('Mossprout nature direction keeps its legacy content inside the modern shel
   assert.match(journeyThread, /helperText=\{presentation === 'conversation' \? undefined : node\.helperText\}/);
   assert.match(journeyThread, /icon: presentation === 'conversation'[\s\S]*?\? undefined/);
   assert.doesNotMatch(journeyThread, /label=\{added \|\| alreadyAdded \? 'View tasks'/);
-  assert.match(journeyDefinitions, /What would you like to notice or experience through nearby nature\?/);
-  assert.match(journeyDefinitions, /Where is that most possible for you\?/);
-  assert.match(journeyDefinitions, /What nearby-nature direction feels realistic now\?/);
+  assert.match(journeyDefinitions, /What are you hoping to find outside\?/);
+  assert.match(journeyDefinitions, /Where could that happen without a special trip\?/);
+  assert.match(journeyDefinitions, /Which sounds doable this week\?/);
 });
 
 test('Mossprout home reads Garden orders with or without the retained Merge provider', () => {

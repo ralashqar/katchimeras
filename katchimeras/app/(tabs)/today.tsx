@@ -505,6 +505,18 @@ function HomeScreen() {
   });
   const dailyHatchActive = todayDailyHatchActive(hatchPresentation);
   const discoveryHatchInPlace = todayHatchRunsInPlace(hatchPresentation);
+  // Readiness is a UI state only when the same press handler can start it.
+  // Discovery FTUE deliberately blocks Daily Hatch; a sealed yesterday must
+  // therefore stay entirely out of the ready presentation until that owner
+  // releases Home. This prevents a rattling Egg and dead Hatch CTA.
+  const retrospectiveHatchReady = Boolean(pendingHatchDay?.canHatch)
+    && !discoveryHatchActive;
+  const hatchReadyFocus = dailyHatchActive || retrospectiveHatchReady;
+  const nurtureOnboardingFocus = !hatchReadyFocus && (
+    ftueOpeningFocus
+    || ftueEnergyFocus
+    || (isHatching && hatchPresentation.policy === 'ftue_discovery')
+  );
   const { days: allDays } = useAllDays();
   const legacyDiscoveryPersonalLine = useMemo(() => {
     const today = allDays.find((day) => day.isToday);
@@ -1065,12 +1077,9 @@ function HomeScreen() {
       // never fall through to the normal daily hatch and select another pet.
       return;
     }
-    if (
-      !pendingHatchDay
-      || (!pendingHatchDay.canHatch && !acceleratedHatchReadyRef.current)
-    ) return;
+    if (!retrospectiveHatchReady) return;
     void handleReveal();
-  }, [discoveryHatchActive, ftueRun?.stepId, handleDiscoveryReveal, handleReveal, pendingHatchDay]);
+  }, [discoveryHatchActive, ftueRun?.stepId, handleDiscoveryReveal, handleReveal, retrospectiveHatchReady]);
 
   useEffect(() => {
     if (!hatchAfterCheckIn || selectedDay?.kind !== 'day') return;
@@ -2651,7 +2660,7 @@ function HomeScreen() {
             || energyLoopStatus === 'awaiting_completion'
             || energyLoopStatus === 'rewarding'
           }
-          actionListHidden={isHatching || Boolean(pendingHatchDay?.canHatch) || feastleJournalReward !== null || dailyNewDayIntro}
+          actionListHidden={isHatching || retrospectiveHatchReady || feastleJournalReward !== null || dailyNewDayIntro}
           actionTransitionActive={
             energyLoopStatus === 'rewarding'
             || energyLoopStatus === 'entering'
@@ -2671,15 +2680,15 @@ function HomeScreen() {
           focusMode={false}
           growth={nurtureGrowth}
           hatchPresentation={isHatching ? hatchPresentation : null}
-          hatchReadyFocus={dailyHatchActive || Boolean(pendingHatchDay?.canHatch)}
-          hatchReadyLabel={pendingHatchDay ? `Reveal ${formatHatchWeekday(pendingHatchDay.isoDate)}` : undefined}
+          hatchReadyFocus={hatchReadyFocus}
+          hatchReadyLabel={pendingHatchDay ? 'Hatch Yesterday' : undefined}
           homeArchetypeId={homeArchetypeId}
           microcopy={microcopy}
           newDayIntro={dailyNewDayIntro}
           onboardingGuide={onboardingGuide}
           onboardingCameraDurationMs={ftueHomeCameraDuration(ftueRun?.stepId)}
           onboardingCameraPanY={ftueHomeCameraPanTarget(ftueRun?.status === 'active' ? ftueRun.stepId : null)}
-          onboardingFocus={ftueOpeningFocus || ftueEnergyFocus || (isHatching && hatchPresentation.policy === 'ftue_discovery')}
+          onboardingFocus={nurtureOnboardingFocus}
           onboardingTopHudVisible={ftueEnergyFocus}
           onboardingUiVisible={ftueOpeningUiVisible && !ftueEnergyBridgeStep}
           scriptedActions={ftueTodayStep?.actions.filter((action) => action.presentation === 'inline_choice' || action.presentation === 'route_action' || action.presentation === 'cta_action' || action.presentation === 'acknowledgement') ?? []}
@@ -3490,11 +3499,6 @@ function formatNewDayDate(isoDate: string | undefined): string {
     day: 'numeric',
     month: 'long',
   }).format(new Date(`${isoDate}T12:00:00`));
-}
-
-function formatHatchWeekday(isoDate: string | undefined): string {
-  if (!isoDate) return 'Today';
-  return new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(new Date(`${isoDate}T12:00:00`));
 }
 
 const styles = StyleSheet.create({

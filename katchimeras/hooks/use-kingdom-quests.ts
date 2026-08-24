@@ -79,6 +79,7 @@ import {
   companionConversationDefinitionById,
   companionConversationDefinitionsForFamily,
 } from '@/constants/companion-conversations-v2';
+import { resolveMossproutCampaignConversation } from '@/constants/mossprout-campaign-conversations';
 import { companionIdForFamily, katchimeraSkinById } from '@/constants/katchimera-skins';
 import { grantStoredKatchimeraCard } from '@/utils/merge-world/repository';
 import { companionQuickGoalTemplateById } from '@/constants/companion-quick-goals';
@@ -274,9 +275,15 @@ function settleMossproutJourneyConversation(session: ConversationSession) {
   const completedAt = session.completedAt ?? session.updatedAt;
   relationshipProgressionRepository.update((current) => completeMossproutJourneyConversation(
     current,
-    session.definitionId,
+    session,
     completedAt,
   ));
+  if (session.definitionId === 'mossprout:campaign-v2:returning-pond:place-for-rain:opening') {
+    const residentId = relationshipProgressionRepository.load().stories.mossprout?.coStarSkinId;
+    if (residentId) void grantStoredKatchimeraCard(
+      'mossprout', residentId, `journey-card:${session.servedDayId}:mossprout`, completedAt,
+    );
+  }
   settleMossproutJourneyBond(session.servedDayId);
 }
 
@@ -1029,9 +1036,16 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         .find((session) => session.familyId === selectedFamilyId && !session.preview && session.status !== 'archived')
       ?? null;
   }, [companionContentState, selectedFamilyId]);
-  const selectedConversationDefinition = selectedConversationSession
-    ? companionConversationDefinitionById.get(selectedConversationSession.definitionId) ?? null
-    : null;
+  const selectedConversationDefinition = useMemo(() => {
+    if (!selectedConversationSession) return null;
+    const definition = companionConversationDefinitionById.get(selectedConversationSession.definitionId) ?? null;
+    if (!definition || definition.familyId !== 'mossprout') return definition;
+    return resolveMossproutCampaignConversation(
+      definition,
+      relationshipProgressionRepository.load().stories.mossprout,
+      selectedConversationSession.turns,
+    );
+  }, [selectedConversationSession]);
   useEffect(() => {
     if (!selectedConversationSession || selectedConversationSession.preview || selectedConversationSession.status !== 'completed') return;
     const completedAt = selectedConversationSession.completedAt ?? selectedConversationSession.updatedAt;
@@ -1151,12 +1165,12 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       title: 'Grow a nearby-nature rhythm',
       questionCount: 3,
       label: 'Find a nature direction',
-      description: 'Answer three thoughtful questions, then choose one meaningful direction to grow with Mossprout.',
+      description: 'Three practical questions, then keep up to three small ideas.',
     };
     return [
-      ...questions.map((question) => ({ mode: 'talk' as const, definitionId: question.id, title: question.title, questionCount: conversationQuestionCount(question), label: question.actionTitle ?? question.title, description: 'A playful nature question that helps Mossprout get to know you.' })),
-      ...journals.map((journal) => ({ mode: 'talk' as const, actionKind: 'journal_prompt' as const, definitionId: journal.id, title: journal.title, questionCount: conversationQuestionCount(journal), label: journal.actionTitle ?? journal.title, description: 'Three small nature choices become a Mossprout journal entry.' })),
-      ...insights.map((insight) => ({ mode: 'discover' as const, definitionId: insight.id, title: insight.title, questionCount: conversationQuestionCount(insight), label: 'Learn something together', description: 'A short conversation that can become a saved insight about you.' })),
+      ...questions.map((question) => ({ mode: 'talk' as const, definitionId: question.id, title: question.title, questionCount: conversationQuestionCount(question), label: question.actionTitle ?? question.title, description: 'A short garden scene—one or two choices.' })),
+      ...journals.map((journal) => ({ mode: 'talk' as const, actionKind: 'journal_prompt' as const, definitionId: journal.id, title: journal.title, questionCount: conversationQuestionCount(journal), label: journal.actionTitle ?? journal.title, description: 'Two quick choices become an editable field note.' })),
+      ...insights.map((insight) => ({ mode: 'discover' as const, definitionId: insight.id, title: insight.title, questionCount: conversationQuestionCount(insight), label: 'Find your outside instinct', description: 'Three questions, then a result you can keep or leave.' })),
       focusDirection,
     ];
   }, [companionContentState.conversationSessions, selectedBondProgress.level, selectedEncounterId, selectedFamilyId, selectedFriendshipProgress.level, today?.isoDate]);
@@ -2300,8 +2314,11 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       : summary.trim();
     const journeyFinder = !selectedConversationSession.preview
       && selectedFamilyId === 'mossprout'
-      && selectedConversationDefinition.id === 'mossprout:game:form-finder'
-      && mossproutJourneyForDay(relationshipProgressionRepository.load(), selectedConversationSession.servedDayId)?.status === 'profile_available';
+      && (selectedConversationDefinition.id === 'mossprout:game:form-finder'
+        || selectedConversationDefinition.id === 'mossprout:campaign-v2:returning-pond:place-for-rain:opening')
+      && ['opening', 'profile_available'].includes(
+        mossproutJourneyForDay(relationshipProgressionRepository.load(), selectedConversationSession.servedDayId)?.status ?? '',
+      );
     let outcomeSession = recordConversationOutcome(
       selectedConversationSession,
       `${remember ? 'memory-confirmed' : 'memory-rejected'}:${node.memoryKey}`,

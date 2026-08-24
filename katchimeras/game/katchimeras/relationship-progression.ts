@@ -1,26 +1,37 @@
 import type { KatchimeraFamilyId } from '@/types/katchimera';
+import type { ConversationSession } from '@/types/companion-conversation';
 import type { JourneyDayActionRecord, JourneyDayRecord, KatchimeraActionCompletionRecord, KatchimeraActionSlotId, KatchimeraDayAction, KatchimeraStoryProgress, MossproutDailyActionDeck, RelationshipProgressState } from '@/types/relationship-progression';
-import { MOSSPROUT_EXTENDED_JOURNEY_BEATS, MOSSPROUT_HEARTWOOD_CHAPTER_ID, MOSSPROUT_MEMORY_NURSERY_CHAPTER_ID, mossproutExtendedBeatById } from '@/constants/mossprout-journey-chapters';
+import { MOSSPROUT_HEARTWOOD_CHAPTER_ID, mossproutExtendedBeatById } from '@/constants/mossprout-journey-chapters';
+import {
+  MOSSPROUT_CAMPAIGN_EPISODES,
+  MOSSPROUT_CAMPAIGN_VERSION,
+  MOSSPROUT_RESIDENT_BY_OPTION_ID,
+  MOSSPROUT_STORY_FACT_BY_OPTION_ID,
+  mossproutCampaignEpisodeAvailable,
+  mossproutCampaignEpisodeByBeatId,
+  nextMossproutCampaignEpisode,
+  validMossproutCoStar,
+} from '@/constants/mossprout-campaign';
 
 export const MOSSPROUT_QUIET_PATCH_CHAPTER_ID = 'mossprout:chapter:quiet-patch';
 export const MOSSPROUT_DRY_POND_CHAPTER_ID = 'mossprout:chapter:dry-pond';
-export const MOSSPROUT_DRY_POND_BEATS = ['dry-pond:day-1', 'dry-pond:day-2', 'dry-pond:day-3', 'dry-pond:day-4'] as const;
+export const MOSSPROUT_DRY_POND_BEATS = ['returning-pond:place-for-rain', 'returning-pond:bank-that-holds', 'returning-pond:rain-garden'] as const;
 export type MossproutDryPondBeatId = typeof MOSSPROUT_DRY_POND_BEATS[number];
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
 const DRY_POND_ACTIVITY = {
-  'dry-pond:day-1': {
+  'returning-pond:place-for-rain': {
     objectiveId: 'mossprout:objective:place-for-rain',
     mergeOrderId: 'merge-story:mossprout:dry-pond:place-for-rain',
     drops: ['nature:waterside:1', 'nature:waterside:1', 'nature:garden:1', 'nature:garden:1'],
   },
-  'dry-pond:day-2': {
+  'returning-pond:bank-that-holds': {
     objectiveId: 'mossprout:objective:bank-that-holds',
     mergeOrderId: 'merge-story:mossprout:dry-pond:bank-that-holds',
     drops: ['nature:garden:1', 'nature:garden:1', 'nature:garden:1', 'nature:garden:1', 'nature:waterside:1'],
   },
-  'dry-pond:day-3': {
+  'returning-pond:rain-garden': {
     objectiveId: 'mossprout:objective:little-rain-garden',
     mergeOrderId: 'merge-story:mossprout:dry-pond:little-rain-garden',
     drops: ['nature:garden:3', 'nature:waterside:2', 'nature:garden:1', 'nature:garden:1', 'nature:garden:1', 'nature:garden:1', 'nature:waterside:1', 'nature:waterside:1'],
@@ -28,7 +39,7 @@ const DRY_POND_ACTIVITY = {
 } as const;
 
 export function emptyRelationshipProgressState(): RelationshipProgressState {
-  return { schemaVersion: 2, journeyDays: [], stories: {}, acknowledgedActionOutroIds: [], skippedActionIds: [], completedActionOutros: [], mossproutDailyActionDecks: [] };
+  return { schemaVersion: 3, journeyDays: [], stories: {}, acknowledgedActionOutroIds: [], skippedActionIds: [], completedActionOutros: [], mossproutDailyActionDecks: [] };
 }
 
 export function normalizeRelationshipProgressState(value: unknown): RelationshipProgressState {
@@ -37,9 +48,7 @@ export function normalizeRelationshipProgressState(value: unknown): Relationship
   const journeyDays = Array.isArray(candidate.journeyDays)
     ? candidate.journeyDays.filter(isJourneyDayRecord).map(normalizeJourneyDay)
     : [];
-  const stories = candidate.stories && typeof candidate.stories === 'object'
-    ? candidate.stories
-    : {};
+  const stories = normalizeStories(candidate.stories);
   const acknowledgedActionOutroIds = Array.isArray(candidate.acknowledgedActionOutroIds)
     ? candidate.acknowledgedActionOutroIds.filter((id): id is string => typeof id === 'string')
     : [];
@@ -56,7 +65,28 @@ export function normalizeRelationshipProgressState(value: unknown): Relationship
   const mossproutDailyActionDecks = Array.isArray(candidate.mossproutDailyActionDecks)
     ? candidate.mossproutDailyActionDecks.map(normalizeMossproutDailyActionDeck).filter((deck): deck is MossproutDailyActionDeck => Boolean(deck)).slice(-14)
     : [];
-  return { schemaVersion: 2, journeyDays, stories, acknowledgedActionOutroIds, skippedActionIds, completedActionOutros, mossproutDailyActionDecks };
+  return { schemaVersion: 3, journeyDays, stories, acknowledgedActionOutroIds, skippedActionIds, completedActionOutros, mossproutDailyActionDecks };
+}
+
+function normalizeStories(value: unknown): RelationshipProgressState['stories'] {
+  if (!value || typeof value !== 'object') return {};
+  const stories = value as RelationshipProgressState['stories'];
+  const mossprout = stories.mossprout;
+  if (!mossprout) return stories;
+  const completedBeatIds = Array.isArray(mossprout.completedBeatIds)
+    ? mossprout.completedBeatIds.filter((id): id is string => typeof id === 'string')
+    : [];
+  const storyFacts = mossprout.storyFacts && typeof mossprout.storyFacts === 'object' ? mossprout.storyFacts : {};
+  return {
+    ...stories,
+    mossprout: {
+      ...mossprout,
+      campaignVersion: Number.isInteger(mossprout.campaignVersion) ? mossprout.campaignVersion : 1,
+      completedBeatIds,
+      storyFacts,
+      coStarSkinId: validMossproutCoStar(mossprout.coStarSkinId) ? mossprout.coStarSkinId : null,
+    },
+  };
 }
 
 /** Applies newly authored Day 1 choices to an already-loaded repository cache. */
@@ -262,10 +292,14 @@ function normalizeMossproutDailyActionDeck(value: unknown): MossproutDailyAction
 export function mossproutStory(state: RelationshipProgressState, now = Date.now()): KatchimeraStoryProgress {
   return state.stories.mossprout ?? {
     familyId: 'mossprout',
+    campaignVersion: MOSSPROUT_CAMPAIGN_VERSION,
     activeChapterId: MOSSPROUT_QUIET_PATCH_CHAPTER_ID,
     activeBeatId: 'quiet-patch:first-flower',
     completedChapterIds: [],
     completedObjectiveIds: [],
+    completedBeatIds: [],
+    storyFacts: {},
+    coStarSkinId: null,
     habitatStage: 0,
     updatedAt: now,
   };
@@ -281,9 +315,8 @@ export function mossproutJourneyForDay(state: RelationshipProgressState, dayId: 
 }
 
 export function mossproutFirstResidentCardId(state: RelationshipProgressState): string | null {
-  return state.journeyDays.find((journey) => (
+  return mossproutStory(state).coStarSkinId ?? state.journeyDays.find((journey) => (
     journey.familyId === 'mossprout'
-    && journey.beatId === 'quiet-patch:first-flower'
     && typeof journey.matchedCardId === 'string'
   ))?.matchedCardId ?? null;
 }
@@ -297,27 +330,23 @@ export function startMossproutJourneyDay(
   const existing = journeyForDay(state, dayId);
   if (existing) return { state, journey: existing.familyId === 'mossprout' ? existing : null, reason: existing.familyId === 'mossprout' ? 'existing' : 'another_companion' };
   const story = mossproutStory(state, now);
-  const extendedBeat = mossproutExtendedBeatById.get(story.activeBeatId);
-  if (story.activeBeatId === 'heartwood:complete'
-    || (story.habitatStage >= 2 && story.completedChapterIds.includes(MOSSPROUT_DRY_POND_CHAPTER_ID)
-      && (!extendedBeat || activeDayCount < extendedBeat.minimumActiveDays))) {
+  const nextEpisode = nextMossproutCampaignEpisode(story.completedBeatIds ?? []);
+  if (!nextEpisode || !mossproutCampaignEpisodeAvailable(nextEpisode, activeDayCount)) {
     return { state, journey: null, reason: 'resting' };
   }
-  const chapterId = story.habitatStage === 0 ? MOSSPROUT_QUIET_PATCH_CHAPTER_ID : extendedBeat?.chapterId ?? MOSSPROUT_DRY_POND_CHAPTER_ID;
-  const beatId = story.habitatStage === 0 ? 'quiet-patch:first-flower' : story.activeBeatId;
-  const openingConversationId = chapterId !== MOSSPROUT_QUIET_PATCH_CHAPTER_ID
-    ? `mossprout:${beatId}:opening`
-    : null;
+  const chapterId = nextEpisode.chapterId;
+  const beatId = nextEpisode.beatId;
+  const openingConversationId = nextEpisode.episodeNumber === 1 ? null : nextEpisode.openingConversationId;
   const journey: JourneyDayRecord = {
     id: `journey-day:${dayId}:mossprout`,
     dayId,
     familyId: 'mossprout',
-    status: chapterId === MOSSPROUT_QUIET_PATCH_CHAPTER_ID ? 'activity_in_progress' : 'opening',
+    status: nextEpisode.episodeNumber === 1 ? 'activity_in_progress' : 'opening',
     chapterId,
     beatId,
     openingConversationId,
     profileConversationId: null,
-    matchedCardId: beatId === 'dry-pond:day-1' ? mossproutFirstResidentCardId(state) : null,
+    matchedCardId: story.coStarSkinId ?? null,
     returnConversationId: null,
     activity: null,
     resolutionAvailableAt: null,
@@ -339,9 +368,17 @@ export function completeMossproutJourneyOpening(
 ): RelationshipProgressState {
   const journey = mossproutJourneyForDay(state, dayId);
   if (!journey || journey.status !== 'opening') return state;
+  const episodeDefinition = mossproutCampaignEpisodeByBeatId.get(journey.beatId);
   const activityDefinition = DRY_POND_ACTIVITY[journey.beatId as keyof typeof DRY_POND_ACTIVITY];
   const extendedDefinition = mossproutExtendedBeatById.get(journey.beatId);
-  const activity = activityDefinition ? {
+  const activity = episodeDefinition?.completionMode === 'merge' && episodeDefinition.mergeOrderId && episodeDefinition.objectiveId ? {
+    kind: 'merge' as const,
+    objectiveId: episodeDefinition.objectiveId,
+    mergeOrderId: episodeDefinition.mergeOrderId,
+    opportunityId: `mossprout:${dayId}:${journey.beatId}:campaign`,
+    generatorId: 'wild-garden',
+    dropDefinitionIds: activityDefinition ? [...activityDefinition.drops] : [],
+  } : activityDefinition ? {
     kind: 'merge' as const,
     objectiveId: activityDefinition.objectiveId,
     mergeOrderId: activityDefinition.mergeOrderId,
@@ -356,6 +393,12 @@ export function completeMossproutJourneyOpening(
     generatorId: 'wild-garden',
     dropDefinitionIds: [],
   } : null;
+  if (episodeDefinition?.completionMode === 'story') {
+    return completeMossproutJourneyDay(state, dayId, {
+      activityReceiptId: `story:${journey.beatId}`,
+      resolutionId: journey.openingConversationId ?? episodeDefinition.openingConversationId,
+    }, now);
+  }
   const profileConversationId = null;
   return replaceJourney(state, journey.id, {
     ...journey,
@@ -372,8 +415,10 @@ export function recordMossproutMatchedCard(
   cardId: string,
 ): RelationshipProgressState {
   const journey = mossproutJourneyForDay(state, dayId);
-  if (!journey || !['quiet-patch:first-flower', 'dry-pond:day-2'].includes(journey.beatId) || journey.matchedCardId === cardId) return state;
-  return replaceJourney(state, journey.id, { ...journey, matchedCardId: cardId });
+  if (!journey || !validMossproutCoStar(cardId) || journey.matchedCardId === cardId) return state;
+  const next = replaceJourney(state, journey.id, { ...journey, matchedCardId: cardId });
+  const story = mossproutStory(next);
+  return { ...next, stories: { ...next.stories, mossprout: { ...story, coStarSkinId: cardId, updatedAt: Date.now() } } };
 }
 
 export function makeMossproutResolutionAvailable(
@@ -392,7 +437,8 @@ export function makeMossproutResolutionAvailable(
     ...journey,
     status: 'resolution_ready',
     signalReceiptIds,
-    returnConversationId: `mossprout:${journey.beatId}:resolution`,
+    returnConversationId: mossproutCampaignEpisodeByBeatId.get(journey.beatId)?.resolutionConversationId
+      ?? `mossprout:${journey.beatId}:resolution`,
   });
 }
 
@@ -417,7 +463,8 @@ export function recordMossproutJourneyOrderServed(
     ...journey,
     status: 'return_available',
     activityReceiptIds: unique([...journey.activityReceiptIds, `merge-order:${orderId}`]),
-    returnConversationId: `mossprout:${journey.beatId}:resolution`,
+    returnConversationId: mossproutCampaignEpisodeByBeatId.get(journey.beatId)?.resolutionConversationId
+      ?? `mossprout:${journey.beatId}:resolution`,
     resolutionAvailableAt: now,
   });
 }
@@ -455,15 +502,21 @@ export function completeMossproutJourneyResolution(
   return completeMossproutJourneyDay(state, dayId, {
     objectiveId: journey.beatId === 'quiet-patch:first-flower' ? 'mossprout:objective:first-sprout' : journey.activity?.objectiveId,
     activityReceiptId: journey.activityReceiptIds.at(-1) ?? (journey.activity ? `merge-order:${journey.activity.mergeOrderId}` : `story:${journey.beatId}`),
-    resolutionId: journey.returnConversationId ?? `mossprout:${journey.beatId}:resolution`,
+    resolutionId: journey.returnConversationId
+      ?? mossproutCampaignEpisodeByBeatId.get(journey.beatId)?.resolutionConversationId
+      ?? `mossprout:${journey.beatId}:resolution`,
   }, now);
 }
 
 export function completeMossproutJourneyConversation(
   state: RelationshipProgressState,
-  definitionId: string,
+  input: string | Pick<ConversationSession, 'definitionId' | 'turns' | 'formResult' | 'preview'>,
   now = Date.now(),
 ): RelationshipProgressState {
+  const definitionId = typeof input === 'string' ? input : input.definitionId;
+  const withFacts = typeof input === 'string' || input.preview
+    ? state
+    : recordMossproutCampaignSession(state, input, now);
   const journey = [...state.journeyDays].reverse().find((candidate) => (
     candidate.familyId === 'mossprout'
     && (candidate.openingConversationId === definitionId
@@ -471,22 +524,53 @@ export function completeMossproutJourneyConversation(
       || candidate.returnConversationId === definitionId
       || candidate.actions.some((action) => action.definitionId === definitionId))
   ));
-  if (!journey) return state;
+  if (!journey) return withFacts;
   if (journey.openingConversationId === definitionId && journey.status === 'opening') {
-    return completeMossproutJourneyOpening(state, journey.dayId, now);
+    return completeMossproutJourneyOpening(withFacts, journey.dayId, now);
   }
   if (journey.profileConversationId === definitionId && journey.status === 'profile_available' && journey.activity) {
-    const withAction = completeJourneyAction(state, journey, definitionId, now);
+    const withAction = completeJourneyAction(withFacts, journey, definitionId, now);
     const updated = mossproutJourneyForDay(withAction, journey.dayId)!;
     return replaceJourney(withAction, journey.id, { ...updated, status: 'activity_available' });
   }
   if (journey.returnConversationId === definitionId && journey.status === 'resolution_ready') {
-    return completeMossproutJourneyResolution(state, journey.dayId, now);
+    return completeMossproutJourneyResolution(withFacts, journey.dayId, now);
   }
   if (journey.actions.some((action) => action.definitionId === definitionId && action.kind !== 'journey')) {
-    return completeJourneyAction(state, journey, definitionId, now);
+    return completeJourneyAction(withFacts, journey, definitionId, now);
   }
-  return state;
+  return withFacts;
+}
+
+function recordMossproutCampaignSession(
+  state: RelationshipProgressState,
+  session: Pick<ConversationSession, 'turns' | 'formResult'>,
+  now: number,
+) {
+  let story = mossproutStory(state, now);
+  let changed = false;
+  const storyFacts = { ...(story.storyFacts ?? {}) };
+  for (const turn of session.turns) {
+    const resident = MOSSPROUT_RESIDENT_BY_OPTION_ID[turn.optionId];
+    if (resident && story.coStarSkinId !== resident) {
+      story = { ...story, coStarSkinId: resident };
+      changed = true;
+    }
+    const effect = MOSSPROUT_STORY_FACT_BY_OPTION_ID[turn.optionId];
+    if (!effect || storyFacts[effect.key] === effect.value) continue;
+    storyFacts[effect.key] = effect.value;
+    changed = true;
+  }
+  const matched = session.formResult?.topFormId;
+  if (validMossproutCoStar(matched) && story.coStarSkinId !== matched) {
+    story = { ...story, coStarSkinId: matched };
+    changed = true;
+  }
+  if (!changed) return state;
+  return {
+    ...state,
+    stories: { ...state.stories, mossprout: { ...story, storyFacts, updatedAt: now } },
+  };
 }
 
 export function completeMossproutJourneyGoalPlan(
@@ -530,54 +614,29 @@ export function completeMossproutJourneyDay(
   const completedObjectiveIds = input.objectiveId && !story.completedObjectiveIds.includes(input.objectiveId)
     ? [...story.completedObjectiveIds, input.objectiveId]
     : story.completedObjectiveIds;
-  if (target.beatId === 'quiet-patch:first-flower') {
-    story = {
-      ...story,
-      activeChapterId: MOSSPROUT_DRY_POND_CHAPTER_ID,
-      activeBeatId: 'dry-pond:day-1',
-      completedChapterIds: unique([...story.completedChapterIds, MOSSPROUT_QUIET_PATCH_CHAPTER_ID]),
-      completedObjectiveIds,
-      habitatStage: 1,
-      updatedAt: now,
-    };
-  } else if (target.beatId === 'dry-pond:day-1') {
-    story = { ...story, activeBeatId: 'dry-pond:day-2', completedObjectiveIds, updatedAt: now };
-  } else if (target.beatId === 'dry-pond:day-2') {
-    story = { ...story, activeBeatId: 'dry-pond:day-3', completedObjectiveIds, updatedAt: now };
-  } else if (target.beatId === 'dry-pond:day-3') {
-    story = { ...story, activeBeatId: 'dry-pond:day-4', completedObjectiveIds, updatedAt: now };
-  } else if (target.beatId === 'dry-pond:day-4') {
-    story = {
-      ...story,
-      activeChapterId: MOSSPROUT_MEMORY_NURSERY_CHAPTER_ID,
-      activeBeatId: MOSSPROUT_EXTENDED_JOURNEY_BEATS[0].beatId,
-      completedChapterIds: unique([...story.completedChapterIds, MOSSPROUT_DRY_POND_CHAPTER_ID]),
-      completedObjectiveIds,
-      habitatStage: 2,
-      updatedAt: now,
-    };
-  } else {
-    const extendedIndex = MOSSPROUT_EXTENDED_JOURNEY_BEATS.findIndex((beat) => beat.beatId === target.beatId);
-    if (extendedIndex >= 0) {
-      const current = MOSSPROUT_EXTENDED_JOURNEY_BEATS[extendedIndex];
-      const next = MOSSPROUT_EXTENDED_JOURNEY_BEATS[extendedIndex + 1];
-      const completesNursery = current.chapterId === MOSSPROUT_MEMORY_NURSERY_CHAPTER_ID && next?.chapterId === MOSSPROUT_HEARTWOOD_CHAPTER_ID;
-      const completesHeartwood = current.chapterId === MOSSPROUT_HEARTWOOD_CHAPTER_ID && !next;
-      story = {
-        ...story,
-        activeChapterId: next?.chapterId ?? MOSSPROUT_HEARTWOOD_CHAPTER_ID,
-        activeBeatId: next?.beatId ?? 'heartwood:complete',
-        completedChapterIds: completesNursery
-          ? unique([...story.completedChapterIds, MOSSPROUT_MEMORY_NURSERY_CHAPTER_ID])
-          : completesHeartwood
-            ? unique([...story.completedChapterIds, MOSSPROUT_HEARTWOOD_CHAPTER_ID])
-            : story.completedChapterIds,
-        completedObjectiveIds,
-        habitatStage: completesHeartwood ? 4 : completesNursery ? 3 : story.habitatStage,
-        updatedAt: now,
-      };
-    }
-  }
+  const currentEpisode = mossproutCampaignEpisodeByBeatId.get(target.beatId);
+  const completedBeatIds = unique([...(story.completedBeatIds ?? []), target.beatId]);
+  const nextEpisode = nextMossproutCampaignEpisode(completedBeatIds);
+  const completesChapter = Boolean(currentEpisode && (!nextEpisode || nextEpisode.chapterId !== currentEpisode.chapterId));
+  const completedChapterIds = completesChapter && currentEpisode
+    ? unique([...story.completedChapterIds, currentEpisode.chapterId])
+    : story.completedChapterIds;
+  const habitatStage = currentEpisode?.episodeNumber === 13 ? 4
+    : currentEpisode?.episodeNumber === 9 ? 3
+      : currentEpisode?.episodeNumber === 5 ? 2
+        : currentEpisode?.episodeNumber === 2 ? 1
+          : story.habitatStage;
+  story = {
+    ...story,
+    campaignVersion: MOSSPROUT_CAMPAIGN_VERSION,
+    activeChapterId: nextEpisode?.chapterId ?? MOSSPROUT_HEARTWOOD_CHAPTER_ID,
+    activeBeatId: nextEpisode?.beatId ?? 'heartwood:complete',
+    completedBeatIds,
+    completedChapterIds,
+    completedObjectiveIds,
+    habitatStage,
+    updatedAt: now,
+  };
   return {
     ...state,
     journeyDays: state.journeyDays.map((journey) => journey.id === target.id ? {
@@ -594,7 +653,7 @@ export function completeMossproutJourneyDay(
         beatId: target.beatId,
         bondPoints: journeyBondPoints({ ...journey, actions: completeMainAction(journey.actions, now) }),
         completedActivity: Boolean(target.activity),
-        offeredGoal: target.beatId === 'dry-pond:day-3',
+        offeredGoal: currentEpisode?.optionalAction === 'goal',
         cardId: target.matchedCardId,
         completedActionIds: completeMainAction(target.actions, now).filter((action) => action.status === 'completed').map((action) => action.id),
         createdAt: now,
@@ -715,22 +774,28 @@ function journeyActions(beatId: string): JourneyDayActionRecord[] {
       outroAcknowledgedAt: null,
     },
   ];
-  const prefix = `mossprout:${beatId}`;
-  const extendedAction = mossproutExtendedBeatById.get(beatId)?.optionalAction;
-  if (extendedAction === 'goal' || extendedAction === 'playful') return [
-    { id: `${prefix}:journey`, kind: 'journey', required: true, definitionId: `${prefix}:opening`, status: 'ready', bondContribution: 12, completedAt: null, outroAcknowledgedAt: null },
-    extendedAction === 'goal'
-      ? { id: `${prefix}:goal-plan`, kind: 'goal_plan', required: false, definitionId: `${prefix}:goal-plan`, status: 'ready', bondContribution: 4, completedAt: null, outroAcknowledgedAt: null }
-      : { id: `${prefix}:playful`, kind: 'playful_game', required: false, definitionId: `${prefix}:playful`, status: 'ready', bondContribution: 4, completedAt: null, outroAcknowledgedAt: null },
-  ];
-  if (mossproutExtendedBeatById.has(beatId)) return [
-    { id: `${prefix}:journey`, kind: 'journey', required: true, definitionId: `${prefix}:opening`, status: 'ready', bondContribution: 12, completedAt: null, outroAcknowledgedAt: null },
-  ];
-  return [
-    { id: `${prefix}:journey`, kind: 'journey', required: true, definitionId: `${prefix}:opening`, status: 'ready', bondContribution: 12, completedAt: null, outroAcknowledgedAt: null },
-    { id: `${prefix}:goal-plan`, kind: 'goal_plan', required: false, definitionId: `${prefix}:goal-plan`, status: 'ready', bondContribution: 4, completedAt: null, outroAcknowledgedAt: null },
-    { id: `${prefix}:playful`, kind: 'playful_game', required: false, definitionId: beatId === 'dry-pond:day-2' ? 'mossprout:game:form-finder' : `${prefix}:playful`, status: 'ready', bondContribution: 4, completedAt: null, outroAcknowledgedAt: null },
-  ];
+  const episodeDefinition = mossproutCampaignEpisodeByBeatId.get(beatId);
+  if (!episodeDefinition) return [];
+  const prefix = `mossprout:campaign-v2:${beatId}`;
+  const actions: JourneyDayActionRecord[] = [{
+    id: `${prefix}:journey`, kind: 'journey', required: true,
+    definitionId: episodeDefinition.openingConversationId, status: 'ready', bondContribution: 12,
+    completedAt: null, outroAcknowledgedAt: null,
+  }];
+  if (episodeDefinition.optionalAction === 'goal') actions.push({
+    id: `${prefix}:goal-plan`, kind: 'goal_plan', required: false, definitionId: `${prefix}:goal-plan`,
+    status: 'ready', bondContribution: 4, completedAt: null, outroAcknowledgedAt: null,
+  });
+  if (episodeDefinition.optionalAction === 'playful') actions.push({
+    id: `${prefix}:playful`, kind: 'playful_game', required: false, definitionId: `${prefix}:playful`,
+    status: 'ready', bondContribution: 4, completedAt: null, outroAcknowledgedAt: null,
+  });
+  if (episodeDefinition.optionalAction === 'reflection') actions.push({
+    id: `${prefix}:field-note`, kind: 'journal_prompt', required: false,
+    definitionId: 'mossprout:conversation:nature-journal:one-growing-thing',
+    status: 'ready', bondContribution: 4, completedAt: null, outroAcknowledgedAt: null,
+  });
+  return actions;
 }
 
 function completeMainAction(actions: JourneyDayActionRecord[], now: number) {
