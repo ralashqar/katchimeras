@@ -34,6 +34,24 @@ export type KingdomWorldViewPlacement = {
   verticalOffsetHexTileHeight: number;
 };
 
+export type KingdomFocusTarget = { id: string; x: number; y: number };
+
+export function nearestKingdomFocusTarget(
+  point: { x: number; y: number },
+  targets: readonly KingdomFocusTarget[]
+): KingdomFocusTarget | null {
+  let nearest: KingdomFocusTarget | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const target of targets) {
+    const distance = (target.x - point.x) ** 2 + (target.y - point.y) ** 2;
+    if (distance < nearestDistance) {
+      nearest = target;
+      nearestDistance = distance;
+    }
+  }
+  return nearest;
+}
+
 export function kingdomWorldViewPoint(
   center: { x: number; y: number },
   placement: KingdomWorldViewPlacement

@@ -206,9 +206,9 @@ export default function DevAssetLabScreen() {
                   style={({ pressed }) => [styles.hexSetCard, active ? styles.hexSetCardActive : null, pressed ? styles.tilePressed : null]}>
                   <View style={styles.hexPreviewRow}>
                     <View style={styles.hexPreview}>
-                      <Image source={set.selection.default.source} style={styles.hexPreviewArt} contentFit="contain" transition={0} />
+                      <Image source={(set.previewTile ?? set.selection.default).source} style={styles.hexPreviewArt} contentFit="contain" transition={0} />
                       <ThemedText style={styles.hexPreviewLabel} lightColor="#8C96B8" darkColor="#8C96B8">
-                        empty
+                        {set.previewTile ? 'sample' : 'empty'}
                       </ThemedText>
                     </View>
                     <View style={styles.hexPreview}>
@@ -233,6 +233,16 @@ export default function DevAssetLabScreen() {
               );
             })}
           </View>
+          {hexArtDirectionSetId === 'organic_islands_v1' ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.replace('/katchimeras')}
+              style={({ pressed }) => [styles.hexPreviewAction, pressed ? styles.tilePressed : null]}>
+              <ThemedText style={styles.hexSetAction} lightColor="#101521" darkColor="#101521">
+                Preview organic islands in Haven
+              </ThemedText>
+            </Pressable>
+          ) : null}
           <ThemedText style={styles.hexGroupTitle} lightColor="#E8EEFF" darkColor="#E8EEFF">
             Center tile
           </ThemedText>
@@ -976,6 +986,14 @@ const styles = StyleSheet.create({
   hexSetTitle: { fontSize: 14, fontWeight: '900' },
   hexSetDesc: { fontSize: 11.5, lineHeight: 15 },
   hexSetAction: { fontSize: 12, fontWeight: '900', marginTop: 2 },
+  hexPreviewAction: {
+    alignItems: 'center',
+    backgroundColor: '#FFC36B',
+    borderRadius: 14,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: 14,
+  },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tile: {
     alignItems: 'center',

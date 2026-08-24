@@ -44,6 +44,7 @@ export type KingdomTileArtLayer = {
   fallbackSource: ImageSourcePropType | null;
   fallbackSources?: KingdomHexTileLodSources;
   frame: { left: number; top: number; width: number; height: number };
+  residentAnchor?: { x: number; y: number };
   source: ImageSourcePropType;
   sources?: KingdomHexTileLodSources;
 };
@@ -143,6 +144,13 @@ function artLayerFor(
     : residentTile ?? (tile.kind === 'home' ? homeTile : tile.kind === 'zodiac' ? zodiacTile : hexTiles.default);
   const baseBounds = tileAlphaBoundsOrBase('selected-base', hexTiles.default.alphaBounds, FULL_IMAGE_BOUNDS);
   const selectedBounds = tileAlphaBoundsOrBase(tile.id, selected.alphaBounds, baseBounds);
+  const frame = kingdomTileArtFrame({
+    alignmentMode: verticalAlignmentMode,
+    assetBounds: selectedBounds,
+    faceBounds: selected.faceBounds,
+    referenceBounds: baseBounds,
+    target: tileVisibleBounds(tile.cx, tile.cy),
+  });
 
   return {
     alphaBounds: selectedBounds,
@@ -152,13 +160,13 @@ function artLayerFor(
     depth: tile.depth,
     fallbackSource: residentTile || locked ? hexTiles.default.source : null,
     fallbackSources: residentTile || locked ? hexTiles.default.sources : undefined,
-    frame: kingdomTileArtFrame({
-      alignmentMode: verticalAlignmentMode,
-      assetBounds: selectedBounds,
-      faceBounds: selected.faceBounds,
-      referenceBounds: baseBounds,
-      target: tileVisibleBounds(tile.cx, tile.cy),
-    }),
+    frame,
+    residentAnchor: selected.residentAnchor
+      ? {
+          x: frame.left + frame.width * selected.residentAnchor.x,
+          y: frame.top + frame.height * selected.residentAnchor.y,
+        }
+      : undefined,
     source: selected.source,
     sources: selected.sources,
   };

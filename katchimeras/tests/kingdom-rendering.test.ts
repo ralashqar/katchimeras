@@ -18,6 +18,7 @@ import {
   kingdomCameraSnapshotForTarget,
   kingdomSceneMetrics,
   kingdomWorldViewPoint,
+  nearestKingdomFocusTarget,
   rectsIntersect,
   residentLodWithHysteresis,
   tileLodWithHysteresis,
@@ -77,6 +78,60 @@ test('persistent Katchimera surfaces use original cutouts instead of hatchlings'
   assert.match(merge, /resolveCreatureArtSource\(record\.characterId, \{ stage: 'grown' \}\)/);
   assert.doesNotMatch(merge, /CREATURE_HATCHLING_SOURCES/);
   assert.doesNotMatch(goalSurfaces, /stage: 'hatchling'/);
+});
+
+test('organic islands use a roomier invisible hex layout profile', () => {
+  const organic = kingdomWorldViewConfig.hexTiles.layoutProfiles['organic-islands-v1'];
+  const current = kingdomWorldViewConfig.hexTiles.layoutProfiles['floating-neighborhood-v2'];
+  assert.deepEqual(organic, { horizontalSpacing: 1.28, verticalSpacing: 1.28 });
+  assert.ok(organic.horizontalSpacing > current.horizontalSpacing);
+  assert.ok(organic.verticalSpacing > current.verticalSpacing);
+});
+
+test('magnetic focus selects the nearest island deterministically', () => {
+  const targets = [
+    { id: 'home', x: 0, y: 0 },
+    { id: 'mossprout', x: 460, y: 180 },
+    { id: 'zodiac', x: -420, y: 190 },
+  ];
+  assert.equal(nearestKingdomFocusTarget({ x: 390, y: 140 }, targets)?.id, 'mossprout');
+  assert.equal(nearestKingdomFocusTarget({ x: -360, y: 160 }, targets)?.id, 'zodiac');
+  assert.equal(nearestKingdomFocusTarget({ x: 20, y: 10 }, targets)?.id, 'home');
+  assert.equal(nearestKingdomFocusTarget({ x: 0, y: 0 }, [])?.id, undefined);
+});
+
+test('Organic-island runtime LODs and bounds are bundled', () => {
+  const keys = [
+    'organic_island_v1_mossprout_hex_tile',
+    'organic_island_v1_mossprout_haven_stage_4_hex_tile',
+    'organic_island_v1_baristabbit_hex_tile',
+    'organic_island_v1_gatherglow_hex_tile',
+  ];
+  for (const key of keys) {
+    for (const suffix of ['.webp', '_512.webp', '_256.webp']) {
+      const asset = path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'world', 'hex', `${key}${suffix}`);
+      assert.ok(fs.existsSync(asset), `missing ${asset}`);
+      assert.ok(fs.statSync(asset).size > 0, `empty ${asset}`);
+    }
+  }
+  const bounds = fs.readFileSync(path.join(process.cwd(), 'constants', 'kingdom-hex-tile-bounds.gen.ts'), 'utf8');
+  assert.match(bounds, /organic_island_v1_mossprout_hex_tile\.webp/);
+  assert.match(bounds, /organic_island_v1_mossprout_haven_stage_4_hex_tile\.webp/);
+  assert.match(bounds, /organic_island_v1_baristabbit_hex_tile\.webp/);
+  assert.match(bounds, /organic_island_v1_gatherglow_hex_tile\.webp/);
+});
+
+test('Organic Islands art pipeline locks soft-toy thumbnail and packaging contracts', () => {
+  const contract = JSON.parse(
+    fs.readFileSync(path.join(process.cwd(), 'design', 'organic-islands-v1', 'art-pipeline.json'), 'utf8')
+  );
+  assert.deepEqual(contract.style.thumbnailReviewSizes, [128, 256]);
+  assert.deepEqual(contract.packaging.lods, [1024, 512, 256]);
+  assert.equal(contract.style.principle, 'Add hierarchy, not noise');
+  assert.equal(contract.render.background, '#FF00FF');
+  assert.equal(contract.render.environmentOnly, true);
+  assert.equal(contract.style.residentClearZoneWidthRatio, 0.15);
+  assert.ok(contract.qualityGates.includes('resident zone remains unobstructed'));
 });
 
 const TILE_TARGET = { left: -245, top: -148, right: 245, bottom: 196 };

@@ -1,0 +1,81 @@
+{
+  "id": "organic-islands-v1",
+  "purpose": "Standalone Katchimera Haven islands rendered inside invisible hex layout cells.",
+  "style": {
+    "medium": "soft matte molded-toy 3D",
+    "thumbnailReviewSizes": [128, 256],
+    "baseDepthRatio": { "min": 0.18, "max": 0.25 },
+    "residentClearZoneWidthRatio": 0.15,
+    "cottageRoofLeafCount": { "min": 8, "max": 12 },
+    "principle": "Add hierarchy, not noise",
+    "required": [
+      "broad flat color regions",
+      "large cushion-like bevels",
+      "chunky clean silhouettes",
+      "soft diffuse lighting",
+      "major-contact ambient occlusion only",
+      "organic silhouette inside an invisible hex footprint"
+    ],
+    "forbidden": [
+      "micro-texture",
+      "grass blades",
+      "speckles and grit",
+      "fine leaf veins",
+      "many tiny flowers",
+      "etched stone",
+      "thin structural pieces",
+      "visible hex border",
+      "character baked into environment",
+      "bridge or cloud connection",
+      "text, logo, watermark, or UI"
+    ]
+  },
+  "progression": {
+    "invariants": [
+      "camera",
+      "island footprint",
+      "base depth",
+      "ground silhouette",
+      "resident anchor",
+      "identity landmark positions"
+    ],
+    "stages": {
+      "0": "newly claimed home",
+      "1": "settled",
+      "2": "growing",
+      "3": "flourishing",
+      "4": "signature sanctuary with three to five bold upgrades"
+    }
+  },
+  "render": {
+    "background": "#FF00FF",
+    "camera": "square orthographic three-quarter isometric",
+    "environmentOnly": true,
+    "transparentPadding": "generous"
+  },
+  "paths": {
+    "masterDirectory": "design/organic-islands-v1/{family}",
+    "chroma": "{family}-{environment}-stage-{stage}-chroma.png",
+    "alpha": "{family}-{environment}-stage-{stage}-alpha.png",
+    "runtimeKey": "organic_island_v1_{family}_haven_stage_{stage}_hex_tile"
+  },
+  "extraction": {
+    "tool": "$CODEX_HOME/skills/.system/imagegen/scripts/remove_chroma_key.py",
+    "preferred": ["--auto-key", "border", "--tolerance", "48", "--edge-contract", "3"],
+    "note": "Use a tight hard matte for warm wood assets because magenta soft-despill can contaminate red/yellow channels. Always inspect the result."
+  },
+  "packaging": {
+    "tool": "scripts/package-transparent-hex-tile.py",
+    "lods": [1024, 512, 256],
+    "boundsTool": "scripts/generate-hex-tile-bounds.py"
+  },
+  "qualityGates": [
+    "landmarks remain distinct at 128 px",
+    "resident zone remains unobstructed",
+    "stage upgrade is visible through silhouette or value grouping",
+    "no upgrade adds texture noise",
+    "transparent corners and no chroma fringe",
+    "all three runtime LODs exist",
+    "generated bounds are current"
+  ]
+}

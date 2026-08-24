@@ -448,6 +448,17 @@ export type KingdomHexTileSpec = {
   sources?: KingdomHexTileLodSources;
   alphaBounds: KingdomHexTileAlphaBounds;
   faceBounds?: KingdomHexTileAlphaBounds;
+  /** Normalized point in the square art frame where the live resident stands. */
+  residentAnchor?: { x: number; y: number };
+};
+
+export type KingdomHexPresentation = {
+  focusMode: 'none' | 'magnetic';
+  focusedScale: number;
+  unfocusedScale: number;
+  residentScale: number;
+  snapAnchorY: number;
+  snapDurationMs: number;
 };
 
 const hexTileAlphaBounds = (
@@ -469,6 +480,7 @@ export type KingdomHexTileSelection = {
   locked: KingdomHexTileSpec;
   residentTiles?: Partial<Record<HomeVisualKey, KingdomHexTileSpec>>;
   havenResidentTiles?: Partial<Record<string, Partial<Record<number, KingdomHexTileSpec>>>>;
+  presentation?: KingdomHexPresentation;
   useCustomResidentTiles: boolean;
   zodiacs: Record<ZodiacSignId, KingdomHexTileSpec>;
 };
@@ -477,6 +489,7 @@ export type KingdomHexArtDirectionSet = {
   description: string;
   id: string;
   label: string;
+  previewTile?: KingdomHexTileSpec;
   selection: KingdomHexTileSelection;
 };
 
@@ -552,6 +565,10 @@ export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HAVEN_STAGE_2_HEX_TILE: Im
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HAVEN_STAGE_3_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_haven_stage_3_hex_tile.webp');
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HAVEN_STAGE_4_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_haven_stage_4_hex_tile.webp');
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_hex_tile.webp');
+export const KINGDOM_ORGANIC_ISLAND_V1_MOSSPROUT_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/organic_island_v1_mossprout_hex_tile.webp');
+export const KINGDOM_ORGANIC_ISLAND_V1_MOSSPROUT_HAVEN_STAGE_4_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/organic_island_v1_mossprout_haven_stage_4_hex_tile.webp');
+export const KINGDOM_ORGANIC_ISLAND_V1_BARISTABBIT_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/organic_island_v1_baristabbit_hex_tile.webp');
+export const KINGDOM_ORGANIC_ISLAND_V1_GATHERGLOW_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/organic_island_v1_gatherglow_hex_tile.webp');
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HAVEN_STAGE_0_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_0_hex_tile.webp');
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HAVEN_STAGE_1_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_1_hex_tile.webp');
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HAVEN_STAGE_2_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_haven_stage_2_hex_tile.webp');
@@ -788,6 +805,26 @@ const KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HEX_TILE_SOURCES: KingdomHexTil
   thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_hex_tile_256.webp'),
   medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_hex_tile_512.webp'),
   full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_MOSSPROUT_HEX_TILE,
+};
+const KINGDOM_ORGANIC_ISLAND_V1_MOSSPROUT_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/organic_island_v1_mossprout_hex_tile_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/organic_island_v1_mossprout_hex_tile_512.webp'),
+  full: KINGDOM_ORGANIC_ISLAND_V1_MOSSPROUT_HEX_TILE,
+};
+const KINGDOM_ORGANIC_ISLAND_V1_MOSSPROUT_HAVEN_STAGE_4_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/organic_island_v1_mossprout_haven_stage_4_hex_tile_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/organic_island_v1_mossprout_haven_stage_4_hex_tile_512.webp'),
+  full: KINGDOM_ORGANIC_ISLAND_V1_MOSSPROUT_HAVEN_STAGE_4_HEX_TILE,
+};
+const KINGDOM_ORGANIC_ISLAND_V1_BARISTABBIT_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/organic_island_v1_baristabbit_hex_tile_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/organic_island_v1_baristabbit_hex_tile_512.webp'),
+  full: KINGDOM_ORGANIC_ISLAND_V1_BARISTABBIT_HEX_TILE,
+};
+const KINGDOM_ORGANIC_ISLAND_V1_GATHERGLOW_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/organic_island_v1_gatherglow_hex_tile_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/organic_island_v1_gatherglow_hex_tile_512.webp'),
+  full: KINGDOM_ORGANIC_ISLAND_V1_GATHERGLOW_HEX_TILE,
 };
 const mossproutHavenSources = (stage: 0 | 1 | 2 | 3 | 4, full: ImageSourcePropType): KingdomHexTileLodSources => ({
   thumb: stage === 0
@@ -1226,6 +1263,36 @@ const FLOATING_NEIGHBORHOOD_V2_RESIDENT_TILES: Partial<
     faceBounds: FLOATING_NEIGHBORHOOD_V2_FACE_BOUNDS,
   },
 };
+const ORGANIC_ISLAND_V1_MOSSPROUT_TILE: KingdomHexTileSpec = {
+  source: KINGDOM_ORGANIC_ISLAND_V1_MOSSPROUT_HEX_TILE,
+  sources: KINGDOM_ORGANIC_ISLAND_V1_MOSSPROUT_HEX_TILE_SOURCES,
+  alphaBounds: hexTileAlphaBounds('organic_island_v1_mossprout_hex_tile.webp'),
+  // The full square is the invisible layout footprint. The organic silhouette
+  // occupies less of it, preserving real air between neighbouring cells.
+  faceBounds: { left: 0, top: 250, right: 1024, bottom: 760 },
+  residentAnchor: { x: 0.5, y: 0.5 },
+};
+const ORGANIC_ISLAND_V1_MOSSPROUT_HAVEN_STAGE_4_TILE: KingdomHexTileSpec = {
+  source: KINGDOM_ORGANIC_ISLAND_V1_MOSSPROUT_HAVEN_STAGE_4_HEX_TILE,
+  sources: KINGDOM_ORGANIC_ISLAND_V1_MOSSPROUT_HAVEN_STAGE_4_HEX_TILE_SOURCES,
+  alphaBounds: hexTileAlphaBounds('organic_island_v1_mossprout_haven_stage_4_hex_tile.webp'),
+  faceBounds: { left: 0, top: 250, right: 1024, bottom: 760 },
+  residentAnchor: { x: 0.5, y: 0.51 },
+};
+const ORGANIC_ISLAND_V1_BARISTABBIT_TILE: KingdomHexTileSpec = {
+  source: KINGDOM_ORGANIC_ISLAND_V1_BARISTABBIT_HEX_TILE,
+  sources: KINGDOM_ORGANIC_ISLAND_V1_BARISTABBIT_HEX_TILE_SOURCES,
+  alphaBounds: hexTileAlphaBounds('organic_island_v1_baristabbit_hex_tile.webp'),
+  faceBounds: { left: 0, top: 250, right: 1024, bottom: 760 },
+  residentAnchor: { x: 0.5, y: 0.51 },
+};
+const ORGANIC_ISLAND_V1_GATHERGLOW_TILE: KingdomHexTileSpec = {
+  source: KINGDOM_ORGANIC_ISLAND_V1_GATHERGLOW_HEX_TILE,
+  sources: KINGDOM_ORGANIC_ISLAND_V1_GATHERGLOW_HEX_TILE_SOURCES,
+  alphaBounds: hexTileAlphaBounds('organic_island_v1_gatherglow_hex_tile.webp'),
+  faceBounds: { left: 0, top: 250, right: 1024, bottom: 760 },
+  residentAnchor: { x: 0.43, y: 0.63 },
+};
 const FLOATING_NEIGHBORHOOD_V2_HOME_TILES: Record<HomeArchetypeId, KingdomHexTileSpec> = {
   explorer: FLOATING_NEIGHBORHOOD_V2_HOME_EXPLORER_TILE,
   creator: FLOATING_NEIGHBORHOOD_V2_HOME_CREATOR_TILE,
@@ -1421,6 +1488,40 @@ export const KINGDOM_HEX_ART_DIRECTION_SETS: KingdomHexArtDirectionSet[] = [
         gatherglow: GATHERGLOW_HAVEN_TILES,
         tasklet: TASKLET_HAVEN_TILES,
         shellio: SHELLIO_HAVEN_TILES,
+      },
+      useCustomResidentTiles: false,
+      zodiacs: FLOATING_NEIGHBORHOOD_V2_ZODIAC_TILES,
+    },
+  },
+  {
+    id: 'organic_islands_v1',
+    label: 'Organic islands v1',
+    description: 'Developer proof: invisible hex footprints, open air, and bespoke family havens.',
+    previewTile: ORGANIC_ISLAND_V1_MOSSPROUT_TILE,
+    selection: {
+      center: FLOATING_NEIGHBORHOOD_V2_HOME_TILE,
+      default: FLOATING_NEIGHBORHOOD_V2_NEUTRAL_TILE,
+      homes: FLOATING_NEIGHBORHOOD_V2_HOME_TILES,
+      layoutProfile: 'organic-islands-v1',
+      locked: KINGDOM_DREAM_MIST_LOCKED_TILE_V1,
+      residentTiles: {
+        ...FLOATING_NEIGHBORHOOD_V2_RESIDENT_TILES,
+        mossprout: ORGANIC_ISLAND_V1_MOSSPROUT_TILE,
+        baristabbit: ORGANIC_ISLAND_V1_BARISTABBIT_TILE,
+        gatherglow: ORGANIC_ISLAND_V1_GATHERGLOW_TILE,
+      },
+      havenResidentTiles: {
+        mossprout: {
+          4: ORGANIC_ISLAND_V1_MOSSPROUT_HAVEN_STAGE_4_TILE,
+        },
+      },
+      presentation: {
+        focusMode: 'none',
+        focusedScale: 1,
+        unfocusedScale: 1,
+        residentScale: 1.45,
+        snapAnchorY: 0.48,
+        snapDurationMs: 220,
       },
       useCustomResidentTiles: false,
       zodiacs: FLOATING_NEIGHBORHOOD_V2_ZODIAC_TILES,

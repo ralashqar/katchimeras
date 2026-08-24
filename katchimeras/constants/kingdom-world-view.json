@@ -30,6 +30,10 @@
       "floating-neighborhood-v2": {
         "horizontalSpacing": 1.168,
         "verticalSpacing": 1.168
+      },
+      "organic-islands-v1": {
+        "horizontalSpacing": 1.28,
+        "verticalSpacing": 1.28
       }
     }
   }
