@@ -1,9 +1,10 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { ActivityIndicator, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import { ActivityIndicator, BackHandler, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeIn, FadeOut, ZoomIn, useReducedMotion } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { KatchimeraCardRevealModal } from '@/components/katchadeck/collection/katchimera-card-deck-carousel';
@@ -14,6 +15,8 @@ import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back
 import { KatchaInlineNotice } from '@/components/katchadeck/ui/katcha-inline-notice';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchaSurfaceProvider } from '@/components/katchadeck/ui/katcha-surface';
+import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
+import { CelebrationParticles } from '@/components/katchadeck/world/companion-achievement-celebration';
 import {
   MERGE_GENERATORS_BY_ID,
   MERGE_ITEMS_BY_ID,
@@ -27,8 +30,10 @@ import { Lantern } from '@/constants/theme';
 import { useMergeWorldActions, useMergeWorldLastResult, useMergeWorldState } from '@/features/merge-world/merge-world-provider';
 import { commitFtueAction, dispatchFtueEvent, registerFtueObjectiveBaseline, repairFtueStep, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { MOSSPROUT_FTUE_RETURN_NOTE_ID, mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
-import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
+import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, mergeFtueStepForBoard, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
 import type { FtueCueDefinition, FtueSpotlightDefinition } from '@/features/onboarding/ftue-types';
+import { useFtueNavigationLock } from '@/features/onboarding/use-ftue-navigation-lock';
+import { authorizeResidentFtuePause } from '@/features/onboarding/resident-ftue-pause-session';
 import { useGameFeedback } from '@/features/ui/game-feedback-provider';
 import { GameUI } from '@/constants/game-ui';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
@@ -50,7 +55,8 @@ import { beginMossproutJourneyReturn, mossproutJourneyForDay, mossproutJourneyRu
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
 import { useKatchimeraCards } from '@/hooks/use-katchimera-cards';
-import { familyIdFromCompanionId } from '@/constants/katchimera-skins';
+import { familyIdFromCompanionId, katchimeraSkinById } from '@/constants/katchimera-skins';
+import { mossproutResidentById } from '@/constants/mossprout-residents';
 import { localDayId } from '@/utils/world-identity';
 import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
 
@@ -71,13 +77,35 @@ const EARLY_DISCOVERY_REVEAL_COPY: Partial<Record<MergeCharacterId, { descriptio
 export function MergeWorldScreen({ active = true, backgroundReady = true, playBoardEntrance = true }: { active?: boolean; backgroundReady?: boolean; playBoardEntrance?: boolean } = {}) {
   const router = useRouter();
   const { transitionTo } = useGameScreenTransition();
-  const { creatureId, focusOrderId } = useLocalSearchParams<{ creatureId?: string; focusOrderId?: string }>();
+  const { creatureId, focusOrderId, residentHandoff } = useLocalSearchParams<{
+    creatureId?: string;
+    focusOrderId?: string;
+    residentHandoff?: string;
+  }>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { state, loading, error } = useMergeWorldState();
   const { dispatch: send } = useMergeWorldActions();
   const ftueRun = useFtueRun();
-  const ftueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
+  const ftueNavigationLocked = useFtueNavigationLock(ftueRun, 'merge', active);
+  const scriptedFtueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
+  const ftueStep = useMemo(() => mergeFtueStepForBoard(state, scriptedFtueStep), [scriptedFtueStep, state]);
+  const residentFtueActive = Boolean(ftueStep?.id.startsWith('merge.resident_'));
+  const returnToResidentStory = useCallback(() => {
+    if (!creatureId) return;
+    authorizeResidentFtuePause();
+    // `navigate` reuses the companion route already beneath Merge, avoiding a
+    // duplicate companion/board pair every time the player pauses this step.
+    router.navigate({ pathname: '/katchimera/[creatureId]', params: { creatureId, residentResume: '1' } });
+  }, [creatureId, router]);
+  useEffect(() => {
+    if (!active || !residentFtueActive) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      returnToResidentStory();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [active, residentFtueActive, returnToResidentStory]);
   const [selectedCell, setSelectedCell] = useState<number | null>(null);
   const [inspectedCell, setInspectedCell] = useState<number | null>(null);
   const [revealedMemoryCardId, setRevealedMemoryCardId] = useState<string | null>(null);
@@ -108,6 +136,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const [coinPulseNonce, setCoinPulseNonce] = useState(0);
   const [blockedFtuePulseNonce, setBlockedFtuePulseNonce] = useState(0);
   const [boardMetrics, setBoardMetrics] = useState<MergeBoardScreenMetrics | null>(null);
+  const [boardVisualReady, setBoardVisualReady] = useState(false);
   const [ftueTargetRevision, setFtueTargetRevision] = useState(0);
   const [screenLayoutNonce, setScreenLayoutNonce] = useState(0);
   const screenRef = useRef<View>(null);
@@ -136,19 +165,22 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   stateRef.current = state;
   ftueRunRef.current = ftueRun;
   ftueStepRef.current = ftueStep;
-  const interactionSessionKey = mergeFtueInteractionKey(ftueRun, active);
+  const interactionSessionKey = `${mergeFtueInteractionKey(ftueRun, active)}:${ftueStep?.id ?? 'open'}`;
   const contentWidth = Math.min(width - 12, 600);
   const flowReady = !loading && state != null;
   useGameSurfaceReadiness('merge', {
     background: backgroundReady,
     data: flowReady,
-    foreground: boardMetrics != null,
+    foreground: boardMetrics != null && boardVisualReady,
     layout: screenLayoutNonce > 0 && boardAreaHeight > 0,
   }, active);
   const ftueExclusive = ftueStep?.surface === 'merge' && ftueStep.interaction?.mode === 'exclusive';
   const readyOrderIds = useMemo(() => state ? readyMergeOrderIds(state) : new Set<string>(), [state]);
+  const activeResidentDiscovery = state?.residentCardDiscovery.records.find((record) => record.status !== 'locked' && record.status !== 'card_earned') ?? null;
+  const pendingResidentDialogue = state?.residentCardDiscovery.records.find((record) => record.status === 'revealed' && record.dialogueSeenAt == null) ?? null;
+  const pendingResidentCardReveal = state?.residentCardDiscovery.records.find((record) => record.status === 'card_earned' && record.cardRevealSeenAt == null) ?? null;
   const ftueBoardGate = useMemo(() => state ? mergeFtueBoardGate(ftueStep, state) : { kind: 'open' as const }, [ftueStep, state]);
-  const ftueRailGate = useMemo(() => mergeFtueRailGate(ftueStep), [ftueStep]);
+  const ftueRailGate = useMemo(() => state ? mergeFtueRailGate(ftueStep, state) : { kind: 'locked' as const }, [ftueStep, state]);
   const hiddenAnimatedItemIds = useMemo(() => new Set([
     ...serveHiddenItemIds,
     ...parcelHiddenItemIds,
@@ -223,6 +255,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const mergeGuidanceCue = ftueStep?.cue ?? postFtueDiscoveryGuidance.cue;
   const mergeGuidanceSpotlight = ftueStep?.spotlight ?? postFtueDiscoveryGuidance.spotlight;
   const mergeGuidanceGuide = ftueStep?.surface === 'merge' ? ftueStep.guide : null;
+  const mergeGuidanceVisible = active && !serveFlight && !parcelFlight;
 
   useEffect(() => subscribeCompanionStories(() => {
     setStory(loadFeastleStory());
@@ -234,6 +267,11 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       bedrotte: loadAuthoredCohortStory('bedrotte'),
     });
   }), []);
+
+  useEffect(() => {
+    if (!active || revealedKatchimeraCardId || !pendingResidentCardReveal) return;
+    setRevealedKatchimeraCardId(pendingResidentCardReveal.residentId);
+  }, [active, pendingResidentCardReveal, revealedKatchimeraCardId]);
 
   useEffect(() => {
     if (active) storyNavigationPendingRef.current = false;
@@ -320,9 +358,47 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
 
   useEffect(() => {
     if (!active || !state || !ftueStep || !ftueRun) return;
+    if (
+      ftueRun.status === 'active'
+      && ftueRun.stepId === 'companion.resident_parcel_ready'
+      && ftueStep.id.startsWith('merge.resident_')
+    ) {
+      // Complete the route-first parcel handoff only once Merge is focused and
+      // its durable board has identified the canonical resident step. This is
+      // the single owner transfer for the companion -> Merge boundary.
+      commitFtueAction({
+        actionId: 'companion.open_resident_parcel',
+        evidenceRef: 'merge-focused:resident-parcel-handoff',
+        nextStepId: ftueStep.id,
+      });
+      if (residentHandoff === '1') router.setParams({ residentHandoff: undefined });
+      return;
+    }
+    if (
+      ftueRun.status === 'active'
+      && ftueStep.id.startsWith('merge.resident_')
+      && ftueRun.stepId !== ftueStep.id
+      && ftueRun.stepId.startsWith('merge.resident_')
+    ) {
+      repairFtueStep(ftueRun.stepId, ftueStep.id);
+      return;
+    }
     const repairTarget = mergeFtueRepairTarget(ftueStep, state);
     if (repairTarget) repairFtueStep(ftueStep.id, repairTarget);
-  }, [active, ftueRun, ftueStep, state]);
+  }, [active, ftueRun, ftueStep, residentHandoff, router, state]);
+
+  useEffect(() => {
+    if (
+      !active
+      || residentHandoff !== '1'
+      || ftueRun?.status !== 'active'
+      || !ftueRun.stepId.startsWith('merge.resident_')
+    ) return;
+    // A process resume may restore the already-accepted Merge step while the
+    // one-shot handoff query is still present. Remove it so later navigation
+    // cannot be mistaken for a fresh companion-to-board transfer.
+    router.setParams({ residentHandoff: undefined });
+  }, [active, ftueRun?.status, ftueRun?.stepId, residentHandoff, router]);
 
   useEffect(() => {
     if (!active || !state || !ftueStep || !ftueRun) return;
@@ -419,7 +495,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   }, [activityFamilyId, creatureId, ftueCoordinator, handleBlockedFtueInteraction, mergeSessionId, mossproutJourney?.activity?.opportunityId, mossproutJourney?.status, send]);
   const pendingParcels = useMemo(() => state?.arrivals.filter((arrival) => (
     arrival.claimedAt == null
-    && (arrival.kind === 'discovery_parcel' || arrival.kind === 'root_match_parcel' || arrival.kind === 'contextual_parcel' || arrival.kind === 'goal_chest')
+    && (arrival.kind === 'discovery_parcel' || arrival.kind === 'root_match_parcel' || arrival.kind === 'resident_card_parcel' || arrival.kind === 'contextual_parcel' || arrival.kind === 'goal_chest')
     && arrival.itemDefinitionIds.length > 0
   )).sort((left, right) => left.createdAt - right.createdAt) ?? [], [state?.arrivals]);
   const pendingParcel = pendingParcels[0] ?? null;
@@ -478,7 +554,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     const visibleOrders = chapterZeroActive
       ? chapterZeroOrders.slice(0, 1)
       : mossproutJourneyExclusive
-        ? state.activeOrders.filter((order) => journeyOrderIds.has(order.id))
+        ? state.activeOrders.filter((order) => journeyOrderIds.has(order.id) || order.storyArcId === activeResidentDiscovery?.id)
         : state.activeOrders;
     const prioritizedOrders = visibleOrders
       .map((order, sourceIndex) => ({ order, sourceIndex }))
@@ -499,7 +575,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       itemReadiness: mergeOrderItemReadiness(state, order),
       ready: readyOrderIds.has(order.id),
     }));
-    const parcelEntries: MergeTrayEntry[] = !chapterZeroActive && !mossproutJourneyExclusive && pendingParcel ? [{
+    const parcelEntries: MergeTrayEntry[] = !chapterZeroActive && pendingParcel && (!mossproutJourneyExclusive || pendingParcel.kind === 'resident_card_parcel') ? [{
       id: 'parcel-stack',
       kind: 'parcel',
       arrival: pendingParcel,
@@ -510,7 +586,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     // Midpoint notes sit before the remaining requests so the story beat is
     // immediately visible without replacing or hiding any unserved order.
     return [...parcelEntries, ...returnEntries, ...orderEntries];
-  }, [active, authoredStories, focusOrderId, ftueStep?.id, mossproutJourney?.activity, mossproutJourney?.beatId, mossproutJourney?.dayId, mossproutJourney?.status, mossproutJourneyExclusive, parcelFlight, parcelShakeNonce, pendingParcel, pendingParcels.length, readyOrderIds, returnCharacterId, serveFlight, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
+  }, [active, activeResidentDiscovery?.id, authoredStories, focusOrderId, ftueStep?.id, mossproutJourney?.activity, mossproutJourney?.beatId, mossproutJourney?.dayId, mossproutJourney?.status, mossproutJourneyExclusive, parcelFlight, parcelShakeNonce, pendingParcel, pendingParcels.length, readyOrderIds, returnCharacterId, serveFlight, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
 
   const startServeAnimation = useCallback(async (order: MergeOrder, itemTargets: readonly MergeScreenPoint[]) => {
     if (!state || activeServeRef.current || activeParcelRef.current || parcelFlight) return false;
@@ -688,6 +764,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     activeParcelRef.current = false;
     setParcelHiddenItemIds(new Set());
     setParcelFlight(null);
+    setFtueTargetRevision((revision) => revision + 1);
     if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }, []);
 
@@ -702,13 +779,20 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
 
   return (
     <View onLayout={() => setScreenLayoutNonce((nonce) => nonce + 1)} ref={screenRef} style={styles.screen}>
+      <Stack.Screen options={{ gestureEnabled: !residentFtueActive }} />
       <MergeCommandFeedback />
       <View style={[styles.game, { paddingTop: Math.max(insets.top + 3, 7), paddingBottom: Math.max(insets.bottom + 3, 7), width: contentWidth }]}>
         <GameHudBar
           density="compact"
           leading={<KatchimeraBackButton
             accessibilityLabel={creatureId ? 'Return to Mossprout' : 'Open legacy games'}
-            onPress={() => ftueExclusive ? handleBlockedFtueInteraction() : creatureId ? router.back() : router.push('/legacy-games')}
+            disabled={ftueNavigationLocked && !residentFtueActive}
+            onPress={() => residentFtueActive && creatureId
+              ? returnToResidentStory()
+              : ftueNavigationLocked || ftueExclusive
+                ? handleBlockedFtueInteraction()
+                : creatureId ? router.back() : router.push('/legacy-games')}
+            style={ftueNavigationLocked && !residentFtueActive ? styles.hiddenBackButton : undefined}
           />}
           style={styles.hudBar}
           tone="glass"
@@ -763,6 +847,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
                 if (cell != null) setInspectedCell(cell);
               }}
               onScreenMetrics={handleBoardScreenMetrics}
+              onVisualReady={() => setBoardVisualReady(true)}
               selectedCell={selectedCell}
               state={state}
               sessionId={mergeSessionId}
@@ -782,13 +867,13 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       <MergeFtueOverlay
         blockedPulseNonce={blockedFtuePulseNonce}
         boardMetrics={boardMetrics}
-        cue={active && !serveFlight ? mergeGuidanceCue : null}
-        guide={active && !serveFlight ? mergeGuidanceGuide : null}
+        cue={mergeGuidanceVisible ? mergeGuidanceCue : null}
+        guide={mergeGuidanceVisible ? mergeGuidanceGuide : null}
         layoutNonce={screenLayoutNonce}
         screenRef={screenRef}
         railTargetRefs={railTargetRefs}
         state={state}
-        spotlight={active && !serveFlight ? mergeGuidanceSpotlight : null}
+        spotlight={mergeGuidanceVisible ? mergeGuidanceSpotlight : null}
         targetRevision={ftueTargetRevision}
       />
 
@@ -848,12 +933,35 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       {error ? <KatchaSurfaceProvider surface="parchment"><View style={[styles.errorBanner, { top: Math.max(insets.top + 56, 64) }]}><KatchaInlineNotice body={error} title="Merge paused" tone="danger" /></View></KatchaSurfaceProvider> : null}
       <MergeServeRewardOverlay flight={serveFlight} onCoinArrive={handleCoinArrive} onEnergyArrive={handleEnergyArrive} onFinish={finishServeAnimation} onItemsArrive={handleServeItemsArrive} />
       <MergeParcelFlightOverlay flight={parcelFlight} onFinish={finishParcelFlight} onItemArrive={handleParcelItemArrive} />
+      {active && pendingResidentDialogue ? <ResidentRevealDialogue
+        onContinue={() => dispatch({ type: 'ackResidentCardDialogue', discoveryId: pendingResidentDialogue.id, now: Date.now() })}
+        residentId={pendingResidentDialogue.residentId}
+      /> : null}
       <KatchimeraCardRevealModal
         cardId={revealedKatchimeraCardId}
         cards={mossproutCards}
         onDone={() => {
+          const discovery = stateRef.current?.residentCardDiscovery.records.find((record) => record.residentId === revealedKatchimeraCardId && record.status === 'card_earned' && record.cardRevealSeenAt == null);
+          if (discovery) {
+            dispatch({ type: 'ackResidentCardReveal', discoveryId: discovery.id, now: Date.now() });
+          }
           setRevealedKatchimeraCardId(null);
-          if (creatureId) router.back();
+          if (!creatureId) return;
+          const returnToMatchResult = () => router.back();
+          if (discovery) {
+            // The card confirmation is the final Merge-owned FTUE action. Use
+            // the same stack return that previously worked only when pressed
+            // manually, preserving the completed match conversation beneath
+            // this route so Mossprout can say who the closest match was.
+            const accepted = transitionTo({
+              announcement: 'Returning to Mossprout',
+              navigate: returnToMatchResult,
+              target: 'companion',
+            });
+            if (!accepted) returnToMatchResult();
+            return;
+          }
+          returnToMatchResult();
         }}
       />
       {active && mergeCelebrationRewards.length ? <RewardSplash
@@ -864,6 +972,41 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       /> : null}
     </View>
   );
+}
+
+function ResidentRevealDialogue({ residentId, onContinue }: { residentId: KatchimeraSkinId; onContinue: () => void }) {
+  const reduceMotion = useReducedMotion();
+  const [celebrating, setCelebrating] = useState(true);
+  const resident = katchimeraSkinById.get(residentId);
+  const image = resolveCreatureArtSource(resident?.visualKey ?? 'mossprout', { stage: 'grown' });
+  const name = resident?.displayName ?? residentId;
+  const dialogue = mossproutResidentById.get(residentId)?.revealDialogue
+    ?? 'Mossprout told me this garden was growing. Help me with two small things, and I may stay.';
+  useEffect(() => {
+    if (reduceMotion) {
+      setCelebrating(false);
+      return;
+    }
+    const timer = setTimeout(() => setCelebrating(false), 1_150);
+    return () => clearTimeout(timer);
+  }, [reduceMotion]);
+  return <Animated.View accessibilityViewIsModal entering={FadeIn.duration(reduceMotion ? 80 : 220)} exiting={FadeOut.duration(reduceMotion ? 80 : 180)} style={styles.residentRevealOverlay}>
+    {celebrating ? <Animated.View exiting={FadeOut.duration(150)} key="resident-celebration" pointerEvents="none" style={styles.residentRevealHero}>
+      <RotatingRadialSunburst baseOpacity={0.9} rotationDurationMs={18_000} size={390} style={styles.residentRevealRays} />
+      <CelebrationParticles layerStyle={styles.residentRevealConfetti} tier={3} tint="#8DD56B" />
+      <Animated.View entering={reduceMotion ? FadeIn.duration(80) : ZoomIn.duration(560)} style={styles.residentRevealArtWrap}>
+        <Image accessibilityLabel={name} contentFit="contain" source={image} style={styles.residentRevealArt} transition={0} />
+      </Animated.View>
+    </Animated.View> : <Animated.View entering={FadeIn.duration(reduceMotion ? 80 : 260)} key="resident-dialogue" style={styles.residentDialogueStage}>
+      <Image accessibilityLabel={name} contentFit="contain" source={image} style={styles.residentDialogueArt} transition={0} />
+      <View style={styles.residentSpeech}>
+        <ThemedText style={styles.residentEyebrow} lightColor="#D6B758" darkColor="#D6B758">A GARDEN RESIDENT ANSWERED</ThemedText>
+        <ThemedText selectable style={styles.residentTitle} lightColor="#332918" darkColor="#332918">{name}</ThemedText>
+        <ThemedText selectable style={styles.residentBody} lightColor="#5C513B" darkColor="#5C513B">{`“${dialogue}”`}</ThemedText>
+        <KatchaButton fullWidth glow label="See the first request" onPress={onContinue} />
+      </View>
+    </Animated.View>}
+  </Animated.View>;
 }
 
 function MergeCommandFeedback() {
@@ -910,6 +1053,7 @@ const styles = StyleSheet.create({
   loading: { alignItems: 'center', backgroundColor: '#2B1B13', flex: 1, gap: 12, justifyContent: 'center' },
   currencyHud: { flex: 0, paddingLeft: 18, width: 106 },
   hudBar: { justifyContent: 'space-between' },
+  hiddenBackButton: { opacity: 0 },
   mergeArea: { flex: 1, marginTop: 18, minHeight: 0, position: 'relative' },
   serviceCounter: { alignSelf: 'center', height: 32, marginTop: -29, position: 'relative', zIndex: 1 },
   counterUpperLip: { backgroundColor: '#FFE876', height: 3, left: 0, position: 'absolute', right: 0, top: 0 },
@@ -928,6 +1072,18 @@ const styles = StyleSheet.create({
   memoryCardEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.1, lineHeight: 14, textAlign: 'center' },
   memoryCardTitle: { fontSize: 21, fontWeight: '900', lineHeight: 26, textAlign: 'center' },
   memoryCardBody: { fontSize: 13, fontWeight: '600', lineHeight: 18, maxWidth: 290, textAlign: 'center' },
+  residentRevealOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', backgroundColor: 'rgba(24,42,23,0.88)', justifyContent: 'center', paddingHorizontal: 22, zIndex: GameUI.layer.modal },
+  residentRevealHero: { alignItems: 'center', height: 300, justifyContent: 'center', marginBottom: -22, width: 390 },
+  residentRevealRays: { left: 0, top: -45 },
+  residentRevealConfetti: { top: '50%', zIndex: 3 },
+  residentRevealArtWrap: { alignItems: 'center', height: 286, justifyContent: 'center', width: 286, zIndex: 2 },
+  residentRevealArt: { height: 286, width: 286 },
+  residentDialogueStage: { alignItems: 'center', maxWidth: 390, width: '100%' },
+  residentDialogueArt: { height: 220, marginBottom: -24, width: 220, zIndex: 4 },
+  residentSpeech: { backgroundColor: '#FFF8E6', borderColor: '#D6B758', borderCurve: 'continuous', borderRadius: 25, borderWidth: 2, gap: 8, maxWidth: 390, padding: 18, width: '100%', zIndex: 3 },
+  residentEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.25, textAlign: 'center' },
+  residentTitle: { fontSize: 27, fontWeight: '900', lineHeight: 31, textAlign: 'center' },
+  residentBody: { fontSize: 15, fontWeight: '700', lineHeight: 21, paddingBottom: 5, textAlign: 'center' },
   energyConnectionOverlay: { alignSelf: 'center', backgroundColor: 'rgba(31,24,45,0.9)', borderColor: 'rgba(255,226,151,0.5)', borderCurve: 'continuous', borderRadius: 24, borderWidth: 1, boxShadow: '0 12px 30px rgba(24,14,34,0.42)', gap: 8, left: 18, maxWidth: 430, padding: 18, position: 'absolute', right: 18, zIndex: GameUI.layer.modal },
   energyConnectionEyebrow: { ...GameUI.type.label, fontSize: 11, letterSpacing: 1.4, textAlign: 'center' },
   energyConnectionTitle: { ...GameUI.type.title, fontSize: 19, lineHeight: 24, textAlign: 'center' },

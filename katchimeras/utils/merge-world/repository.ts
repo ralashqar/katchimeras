@@ -269,6 +269,17 @@ export function grantStoredKatchimeraCard(
   }), now);
 }
 
+export function activateStoredResidentCardDiscovery(
+  campaignId: string,
+  journeyDayId: string,
+  residentId: string,
+  now = Date.now(),
+) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'activateResidentCardDiscovery', campaignId, journeyDayId, residentId, now,
+  }), now);
+}
+
 export function purchaseStoredKatchimeraCard(
   familyId: import('@/types/merge-world').MergeCharacterId,
   cardId: string,

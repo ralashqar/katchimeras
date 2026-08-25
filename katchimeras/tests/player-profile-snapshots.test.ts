@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
+import { MOSSPROUT_FTUE_SCRIPT } from '@/features/onboarding/mossprout-ftue-script';
 import { buildPlayerProfileFixtures, PLAYER_PROFILE_FIXTURE_COUNT } from '@/utils/player-profile-fixtures';
 
 const NOW = Date.parse('2026-08-17T12:00:00Z');
@@ -40,7 +41,7 @@ test('Mossprout Haven fixture opens immediately before the first environment res
     stepId?: string;
   };
   assert.equal(run.stepId, 'haven.mossprout.restore');
-  assert.equal(run.scriptVersion, 19);
+  assert.equal(run.scriptVersion, MOSSPROUT_FTUE_SCRIPT.version);
   assert.equal(run.mergeInstalled, true);
 });
 

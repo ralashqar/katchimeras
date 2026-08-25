@@ -8,6 +8,9 @@ export type JourneyDayStatus =
   | 'activity_in_progress'
   | 'return_available'
   | 'resolution_ready'
+  | 'resident_discovery'
+  | 'resident_orders'
+  | 'card_reward'
   | 'complete';
 
 export type JourneyActivity = {
@@ -252,7 +255,7 @@ export type MossproutStoryFactKey =
 export type MossproutStoryFacts = Partial<Record<MossproutStoryFactKey, string>>;
 
 export type RelationshipProgressState = {
-  schemaVersion: 4;
+  schemaVersion: 5;
   journeyDays: JourneyDayRecord[];
   stories: Partial<Record<KatchimeraFamilyId, KatchimeraStoryProgress>>;
   skippedActionIds: string[];

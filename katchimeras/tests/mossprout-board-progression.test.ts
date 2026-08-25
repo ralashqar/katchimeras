@@ -1,379 +1,217 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { KATCHIMERA_MERGE_PROFILES, MERGE_GENERATORS, MERGE_ITEMS_BY_ID, MOSSPROUT_GARDEN_GROWTH_CLEARINGS, MOSSPROUT_ROOTBOUND_GATES } from '@/constants/merge-world-catalog';
-import type { MergeWorldState, MossproutProgressionSignals, MossproutRootGateState } from '@/types/merge-world';
-import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
-import { mossproutRootConditionCopy, mossproutRootReadyCopy, mossproutRootRewardCopy } from '@/utils/merge-world/merge-board-player-copy';
-import { mossproutFocusStage } from '@/utils/merge-world/mossprout-focus-progression';
-import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
-import { answerJourneyConversation, emptyCompanionJourneyState, startJourneyConversation } from '@/utils/companion-journey';
-import { addCompanionQuickGoal, completeCompanionQuickGoal, emptyCompanionQuickGoalState } from '@/utils/companion-quick-goals';
+import {
+  LEGACY_RESIDENT_CARD_KEY_DEFINITION_ID,
+  MOSSPROUT_RESIDENT_CARD_NODES,
+  RESIDENT_CARD_DEFINITION_ID,
+  RESIDENT_CARD_KEY_DEFINITION_ID,
+  RETIRED_RESIDENT_NODE_ROOT_GATE_IDS,
+} from '@/constants/resident-card-discovery';
+import { mergeFtueBoardGate, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepForBoard } from '@/features/onboarding/merge-ftue';
+import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
+import type { MergeWorldState, MossproutProgressionSignals } from '@/types/merge-world';
+import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld, resetMergeActivityForDay } from '@/utils/merge-world/engine';
 
-const NOW = Date.UTC(2026, 7, 22, 12);
+const NOW = new Date('2026-08-25T10:00:00.000Z').getTime();
 
-function activeDays(count: number) {
-  return Array.from({ length: count }, (_, index) => `active-${String(index + 1).padStart(2, '0')}`);
+function fresh() {
+  return { ...createInitialMergeWorldState(NOW, ['mossprout']), activeOrders: [] };
 }
 
-function signals(count: number, overrides: Partial<MossproutProgressionSignals> = {}): MossproutProgressionSignals {
-  return {
-    activeJourneyDayIds: activeDays(count),
-    friendshipLevel: 1,
-    natureMemoryDayIds: [],
-    focusStage: 0,
-    ownedWispIds: [],
-    completedGardenDayIds: [],
-    ...overrides,
-  };
+function activate(residentId = 'petalimp' as const) {
+  return reduceMergeWorld(fresh(), {
+    type: 'activateResidentCardDiscovery', campaignId: 'mossprout:journey', journeyDayId: 'journey-day-1', residentId, now: NOW + 1,
+  }).state;
 }
 
-test('every Mossprout root translates internal rules into concrete player instructions', () => {
-  const copy = MOSSPROUT_ROOTBOUND_GATES.flatMap((root) => [
-    mossproutRootConditionCopy(root),
-    mossproutRootReadyCopy(root),
-    mossproutRootRewardCopy(root),
-  ]).join(' ');
-
-  assert.match(copy, /Reach Mossprout Journey Day 15/);
-  assert.match(copy, /Reach Friendship Level 8 with Mossprout/);
-  assert.match(copy, /Choose a nature direction with Mossprout/);
-  assert.match(copy, /Complete 3 activities that support your nature direction/);
-  assert.match(copy, /Adds the Memory Nursery to your board/);
-  assert.match(copy, /Gives a rare Memory Card to reveal/);
-  assert.doesNotMatch(copy, /generator|tier|focus stage|fallback|gate|target|definition|receipt|schema|progress \d/i);
-});
-
-test('the Mossprout direction questionnaire and its activities advance board focus roots', () => {
-  let journey = startJourneyConversation(emptyCompanionJourneyState(), 'mossprout', 100);
-  const answers = ['attention', 'garden', 'care-plant'];
-  for (const [index, answer] of answers.entries()) {
-    const session = journey.conversations.find((candidate) => candidate.familyId === 'mossprout' && !candidate.completedAt)!;
-    journey = answerJourneyConversation(journey, session.id, answer, 110 + index).state;
-  }
-  assert.equal(mossproutFocusStage(journey, emptyCompanionQuickGoalState()), 1);
-
-  let quickGoals = emptyCompanionQuickGoalState();
-  for (let index = 0; index < 3; index += 1) {
-    const added = addCompanionQuickGoal(quickGoals, {
-      familyId: 'mossprout',
-      title: `Nature activity ${index + 1}`,
-      cadence: { kind: 'once', dayId: `2026-08-${20 + index}` },
-    }, 200 + index);
-    quickGoals = added.state;
-    quickGoals = completeCompanionQuickGoal(
-      quickGoals,
-      added.goal!.id,
-      `2026-08-${20 + index}`,
-      300 + index,
-    ).state;
-  }
-  assert.equal(mossproutFocusStage(journey, quickGoals), 2);
-
-  const goal = journey.goals.find((candidate) => candidate.familyId === 'mossprout')!;
-  journey = {
-    ...journey,
-    reflectionEvents: [{
-      id: 'reflection:mossprout:test', familyId: 'mossprout', goalId: goal.id,
-      sourceId: 'test', occurredAt: 400,
-    }],
-  };
-  assert.equal(mossproutFocusStage(journey, quickGoals), 3);
-  journey = { ...journey, goals: journey.goals.map((candidate) => candidate.id === goal.id ? { ...candidate, status: 'completed' } : candidate) };
-  assert.equal(mossproutFocusStage(journey, quickGoals), 4);
-});
-
-function awakenedEarlierGates(state: MergeWorldState, beforeGateId: string): MergeWorldState {
-  const gates: Record<string, MossproutRootGateState> = { ...state.mossproutBoardProgression.gates };
-  for (const definition of MOSSPROUT_ROOTBOUND_GATES) {
-    if (definition.id === beforeGateId) break;
-    gates[definition.id] = {
-      gateId: definition.id,
-      status: 'awakened',
-      readyAt: NOW,
-      awakenedAt: NOW,
-      parcelId: `arrival:root-match:${definition.id}`,
-      fallbackUsed: false,
-    };
-  }
-  return {
-    ...state,
-    mossproutBoardProgression: { ...state.mossproutBoardProgression, gates, lastParcelDayId: null },
-  };
-}
-
-function claimAndAwaken(state: MergeWorldState, gateId: string, now: number) {
-  const arrivalId = `arrival:root-match:${gateId}`;
-  const claimed = reduceMergeWorld(state, { type: 'claimArrival', arrivalId, now });
+function claimAndReveal(state: MergeWorldState) {
+  const record = state.residentCardDiscovery.records[0]!;
+  const claimed = reduceMergeWorld(state, { type: 'claimArrival', arrivalId: record.parcelId!, now: NOW + 2 });
   assert.equal(claimed.changed, true);
-  assert.equal(claimed.spawnedItems?.length, 1);
-  const sourceCell = claimed.spawnedItems![0].cell;
-  const targetCell = MOSSPROUT_ROOTBOUND_GATES.find((gate) => gate.id === gateId)!.cell;
-  return reduceMergeWorld(claimed.state, { type: 'move', from: sourceCell, to: targetCell, now: now + 1 });
+  const keyCell = claimed.state.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === RESIDENT_CARD_KEY_DEFINITION_ID);
+  const revealed = reduceMergeWorld(claimed.state, { type: 'move', from: keyCell, to: record.nodeCell, now: NOW + 3 });
+  assert.deepEqual(revealed.residentCardRevealed, { discoveryId: record.id, residentId: record.residentId });
+  return revealed.state;
 }
 
-test('Mossprout queues one exact root match per active day and reconciliation is idempotent', () => {
-  let state = createInitialMergeWorldState(NOW, ['mossprout']);
-  const dayFive = signals(5);
-  const first = reduceMergeWorld(state, {
-    type: 'reconcileMossproutBoardProgression', signals: dayFive, dayId: 'active-05', now: NOW + 1,
-  });
-  assert.equal(first.changed, true);
-  state = first.state;
-  assert.equal(state.arrivals.filter((arrival) => arrival.kind === 'root_match_parcel').length, 1);
-  assert.deepEqual(state.arrivals.find((arrival) => arrival.kind === 'root_match_parcel')?.itemDefinitionIds, ['mossprout:root-memory:returning-seed']);
-  assert.equal(state.arrivals.find((arrival) => arrival.kind === 'root_match_parcel')?.chainId, 'nature:root-memory');
-  assert.equal(state.mossproutBoardProgression.gates['root:day-5-first-return'].status, 'ready');
-  assert.equal(state.board[0].mist?.kind === 'rootbound_echo' ? state.board[0].mist.ready : null, true);
-
-  const repeated = reduceMergeWorld(state, {
-    type: 'reconcileMossproutBoardProgression', signals: dayFive, dayId: 'active-05', now: NOW + 2,
-  });
-  assert.equal(repeated.changed, false);
-  assert.equal(repeated.state.arrivals.filter((arrival) => arrival.kind === 'root_match_parcel').length, 1);
-});
-
-test('Journey milestones parcel two fragments that merge into the matching Root Memory', () => {
-  let state = awakenedEarlierGates(createInitialMergeWorldState(NOW, ['mossprout']), 'root:focus-first');
-  state = reduceMergeWorld(state, {
-    type: 'reconcileMossproutBoardProgression',
-    signals: signals(14, { completedBeatIds: ['returning-pond:rain-garden'] }),
-    dayId: 'active-14',
-    now: NOW + 1,
-  }).state;
-  const arrival = state.arrivals.find((candidate) => candidate.id === 'arrival:root-match:root:focus-first');
-  assert.deepEqual(arrival?.itemDefinitionIds, ['mossprout:root-fragment:rain-kept', 'mossprout:root-fragment:rain-kept']);
-
-  const claimed = reduceMergeWorld(state, { type: 'claimArrival', arrivalId: arrival!.id, now: NOW + 2 });
-  assert.equal(claimed.spawnedItems?.length, 2);
-  const [first, second] = claimed.spawnedItems!;
-  const merged = reduceMergeWorld(claimed.state, { type: 'move', from: first.cell, to: second.cell, now: NOW + 3 });
-  const mergedOccupant = merged.state.board[second.cell].occupant;
-  assert.equal(mergedOccupant?.kind === 'item' ? mergedOccupant.definitionId : null, 'mossprout:root-memory:rain-kept-acorn');
-  const awakened = reduceMergeWorld(merged.state, { type: 'move', from: second.cell, to: 8, now: NOW + 4 });
-  assert.equal(awakened.state.mossproutBoardProgression.gates['root:focus-first'].status, 'awakened');
-});
-
-test('every covered board cell belongs to one clear progression lane', () => {
-  const state = createInitialMergeWorldState(NOW, ['mossprout']);
-  assert.equal(state.board.filter((cell) => !cell.locked).length, 20);
-  assert.equal(state.board.filter((cell) => cell.mist?.kind === 'rootbound_echo').length, 12);
-  assert.equal(state.board.filter((cell) => cell.mist?.kind === 'garden_growth').length, 18);
-  assert.equal(state.board.filter((cell) => cell.mist?.kind === 'dormant').length, 13);
-});
-
-test('v16 fog resets into the authored Mossprout-only v18 board', () => {
-  const legacy = structuredClone(createInitialMergeWorldState(NOW, ['mossprout'])) as unknown as { version: number; board: MergeWorldState['board'] };
-  legacy.version = 16;
-  legacy.board = legacy.board.map((cell) => cell.locked && cell.mist?.kind !== 'rootbound_echo'
-    ? { ...cell, mist: { kind: 'dormant' as const } }
-    : cell);
-  const migrated = normalizeMergeWorldState(legacy, NOW + 1);
-  assert.equal(migrated.version, 18);
-  assert.equal(migrated.board.filter((cell) => cell.mist?.kind === 'garden_growth').length, 18);
-  assert.equal(migrated.board.filter((cell) => cell.mist?.kind === 'dormant').length, 25);
-});
-
-test('Garden Growth Mist opens three cells at each authored Journey beat', () => {
-  let state = createInitialMergeWorldState(NOW, ['mossprout']);
-  for (const [index, clearing] of MOSSPROUT_GARDEN_GROWTH_CLEARINGS.entries()) {
-    state = reduceMergeWorld(state, {
-      type: 'reconcileMossproutBoardProgression',
-      signals: signals(clearing.revealDay),
-      dayId: `growth-${clearing.revealDay}`,
-      now: NOW + index + 1,
-    }).state;
-    assert.ok(state.expansions.includes(clearing.id));
-    assert.ok(clearing.cells.every((cell) => state.board[cell].mist?.kind !== 'garden_growth'));
-    assert.equal(state.board.filter((cell) => cell.mist?.kind === 'garden_growth').length, 18 - ((index + 1) * 3));
-  }
-});
-
-test('all authored Garden Growth and Rootbound cells can open while future personal regions remain dormant', () => {
-  const fullSignals = signals(28, {
-    friendshipLevel: 20,
-    natureMemoryDayIds: ['memory-1', 'memory-2', 'memory-3'],
-    focusStage: 4,
-    ownedWispIds: ['fern'],
-    completedGardenDayIds: ['garden-1', 'garden-2', 'garden-3', 'garden-4'],
-  });
-  let state = createInitialMergeWorldState(NOW, ['mossprout']);
-  for (let index = 0; index < MOSSPROUT_ROOTBOUND_GATES.length; index += 1) {
-    state = reduceMergeWorld(state, {
-      type: 'reconcileMossproutBoardProgression', signals: fullSignals, dayId: `root-queue-${index}`, now: NOW + index * 4 + 1,
-    }).state;
-    const ready = MOSSPROUT_ROOTBOUND_GATES.find((gate) => state.mossproutBoardProgression.gates[gate.id]?.status === 'ready');
-    assert.ok(ready);
-    state = claimAndAwaken(state, ready.id, NOW + index * 4 + 2).state;
-  }
-  state = reduceMergeWorld(state, {
-    type: 'reconcileCharacters', characterIds: Object.keys(KATCHIMERA_MERGE_PROFILES), now: NOW + 100,
-  }).state;
-  assert.equal(state.board.filter((cell) => cell.mist?.kind === 'garden_growth' || cell.mist?.kind === 'rootbound_echo').length, 0);
-  assert.equal(state.board.filter((cell) => cell.mist?.kind === 'dormant').length, 13);
-  assert.equal(state.expansions.length, MOSSPROUT_GARDEN_GROWTH_CLEARINGS.length);
-});
-
-test('every root uses progression-only Mossprout art and no generator can drop it', () => {
-  const generatorDrops = new Set(MERGE_GENERATORS.flatMap((generator) => generator.tierOneDropDefinitionIds));
-  for (const gate of MOSSPROUT_ROOTBOUND_GATES) {
-    const item = MERGE_ITEMS_BY_ID.get(gate.rootMemoryDefinitionId);
-    assert.ok(item, gate.id);
-    assert.equal(item.familyId, 'nature');
-    assert.equal(item.chainId, 'nature:root-memory');
-    assert.equal(item.progressionOnly, true);
-    assert.equal(generatorDrops.has(item.id), false);
-  }
-});
-
-test('Root Memories are gate-bound and cannot be stored, sold, or used on a sibling root', () => {
-  let state = createInitialMergeWorldState(NOW, ['mossprout']);
-  state = reduceMergeWorld(state, {
-    type: 'reconcileMossproutBoardProgression', signals: signals(5), dayId: 'active-05', now: NOW + 1,
-  }).state;
-  state = reduceMergeWorld(state, {
-    type: 'reconcileMossproutBoardProgression', signals: signals(7), dayId: 'active-07', now: NOW + 2,
-  }).state;
-  const claimed = reduceMergeWorld(state, {
-    type: 'claimArrival', arrivalId: 'arrival:root-match:root:day-5-first-return', now: NOW + 3,
-  });
-  const sourceCell = claimed.spawnedItems![0].cell;
-  assert.equal(claimed.state.board[sourceCell].occupant?.kind === 'item' ? claimed.state.board[sourceCell].occupant.progressionGateId : null, 'root:day-5-first-return');
-  assert.equal(reduceMergeWorld(claimed.state, { type: 'storeItem', cell: sourceCell, now: NOW + 4 }).changed, false);
-  assert.equal(reduceMergeWorld(claimed.state, { type: 'sellItem', cell: sourceCell, now: NOW + 5 }).changed, false);
-  const wrongRoot = reduceMergeWorld(claimed.state, { type: 'move', from: sourceCell, to: 1, now: NOW + 6 });
-  assert.equal(wrongRoot.changed, false);
-  assert.equal(wrongRoot.failureReason, 'wrong_echo_match');
-  assert.ok(wrongRoot.state.board[sourceCell].occupant);
-});
-
-test('a sealed root rejects its match until its life condition is ready', () => {
-  const state = createInitialMergeWorldState(NOW, ['mossprout']);
-  const sourceCell = state.board.findIndex((cell) => !cell.locked && !cell.mist && !cell.occupant);
-  assert.ok(sourceCell >= 0);
+function placeRequirement(state: MergeWorldState, definitionId: string, now: number) {
+  const cell = state.board.findIndex((entry) => !entry.locked && !entry.mist && !entry.occupant);
+  assert.ok(cell >= 0);
   const board = [...state.board];
-  board[sourceCell] = {
-    ...board[sourceCell],
-    occupant: { kind: 'item', instanceId: 'test:sealed-root-match', definitionId: 'mossprout:root-memory:returning-seed', progressionGateId: 'root:day-5-first-return' },
+  board[cell] = { ...board[cell], occupant: { kind: 'item', instanceId: `test:${now}`, definitionId } };
+  return { ...state, board, revision: state.revision + 1, updatedAt: now };
+}
+
+test('all eight resident cards are visible as locked board nodes in their authored cells', () => {
+  const state = fresh();
+  assert.deepEqual(MOSSPROUT_RESIDENT_CARD_NODES.map((node) => node.cell), [0, 1, 5, 6, 7, 8, 12, 13]);
+  for (const node of MOSSPROUT_RESIDENT_CARD_NODES) {
+    const cell = state.board[node.cell];
+    assert.equal(cell.locked, true);
+    assert.equal(cell.mist?.kind, 'resident_card');
+    if (cell.mist?.kind === 'resident_card') {
+      assert.equal(cell.mist.ready, false);
+      assert.equal(cell.mist.residentId, null);
+    }
+  }
+});
+
+test('activation is idempotent and creates one bound parcel for one card', () => {
+  const state = activate();
+  const replay = reduceMergeWorld(state, {
+    type: 'activateResidentCardDiscovery', campaignId: 'mossprout:journey', journeyDayId: 'journey-day-1', residentId: 'petalimp', now: NOW + 2,
+  });
+  assert.equal(state.residentCardDiscovery.records.length, 1);
+  assert.equal(state.arrivals.filter((arrival) => arrival.kind === 'resident_card_parcel').length, 1);
+  assert.equal(replay.changed, false);
+  const node = state.board[0].mist;
+  assert.equal(node?.kind, 'resident_card');
+  if (node?.kind === 'resident_card') assert.equal(node.ready, true);
+});
+
+test('a sealed resident card can reveal its Journey resident in any locked card cell', () => {
+  const state = activate();
+  const record = state.residentCardDiscovery.records[0]!;
+  const claimed = reduceMergeWorld(state, { type: 'claimArrival', arrivalId: record.parcelId!, now: NOW + 2 }).state;
+  const keyCell = claimed.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === RESIDENT_CARD_KEY_DEFINITION_ID);
+  const sibling = MOSSPROUT_RESIDENT_CARD_NODES.find((node) => node.residentId === 'fernip')!;
+  const revealed = reduceMergeWorld(claimed, { type: 'move', from: keyCell, to: sibling.cell, now: NOW + 3 });
+  assert.equal(revealed.changed, true);
+  assert.deepEqual(revealed.residentCardRevealed, { discoveryId: record.id, residentId: 'petalimp' });
+  assert.equal(revealed.state.residentCardDiscovery.records[0]?.nodeCell, sibling.cell);
+  assert.equal(revealed.state.board[sibling.cell].locked, false);
+  assert.equal(revealed.state.board[record.nodeCell].mist?.kind, 'resident_card');
+  assert.equal(revealed.state.board[record.nodeCell].locked, true);
+});
+
+test('a later resident allocates another locked card after an earlier resident chose its authored cell', () => {
+  const first = activate();
+  const firstRecord = first.residentCardDiscovery.records[0]!;
+  const claimed = reduceMergeWorld(first, { type: 'claimArrival', arrivalId: firstRecord.parcelId!, now: NOW + 2 }).state;
+  const cardCell = claimed.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === RESIDENT_CARD_DEFINITION_ID);
+  const fernipNode = MOSSPROUT_RESIDENT_CARD_NODES.find((node) => node.residentId === 'fernip')!;
+  const revealed = reduceMergeWorld(claimed, { type: 'move', from: cardCell, to: fernipNode.cell, now: NOW + 3 }).state;
+  const second = reduceMergeWorld(revealed, {
+    type: 'activateResidentCardDiscovery', campaignId: 'mossprout:journey', journeyDayId: 'journey-day-2', residentId: 'fernip', now: NOW + 4,
+  });
+  assert.equal(second.changed, true);
+  assert.notEqual(second.state.residentCardDiscovery.records[1]?.nodeCell, fernipNode.cell);
+  assert.equal(second.state.board[fernipNode.cell].locked, false);
+});
+
+test('resident FTUE binds its parcel and drag targets to the active discovery', () => {
+  const ready = activate();
+  const record = ready.residentCardDiscovery.records[0]!;
+  assert.equal(mergeFtueStepForBoard(ready, null)?.id, 'merge.resident_parcel');
+  assert.deepEqual(mergeFtueRailGate(mossproutFtueStep('merge.resident_parcel'), ready), { kind: 'parcel', arrivalId: record.parcelId });
+
+  const claimed = reduceMergeWorld(ready, { type: 'claimArrival', arrivalId: record.parcelId!, now: NOW + 2 }).state;
+  assert.equal(mergeFtueStepForBoard(claimed, null)?.id, 'merge.resident_card');
+  const cardCell = claimed.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === RESIDENT_CARD_DEFINITION_ID);
+  assert.deepEqual(mergeFtueBoardGate(mossproutFtueStep('merge.resident_card'), claimed), {
+    kind: 'drag', fromCell: cardCell, toCell: record.nodeCell,
+  });
+  assert.equal(mergeFtueRepairTarget(mossproutFtueStep('merge.resident_parcel'), claimed), 'merge.resident_card');
+});
+
+test('normalization migrates a claimed legacy key and never deletes the gated card', () => {
+  const state = activate();
+  const record = state.residentCardDiscovery.records[0]!;
+  const claimed = reduceMergeWorld(state, { type: 'claimArrival', arrivalId: record.parcelId!, now: NOW + 2 }).state;
+  const legacy: MergeWorldState = {
+    ...claimed,
+    board: claimed.board.map((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === RESIDENT_CARD_DEFINITION_ID
+      ? { ...cell, occupant: { ...cell.occupant, definitionId: LEGACY_RESIDENT_CARD_KEY_DEFINITION_ID } }
+      : cell),
   };
-  const result = reduceMergeWorld({ ...state, board }, { type: 'move', from: sourceCell, to: 0, now: NOW + 1 });
-  assert.equal(result.changed, false);
-  assert.equal(result.failureReason, 'sealed_mist');
-  assert.equal(result.state.board[sourceCell].occupant?.kind, 'item');
+  const normalized = normalizeMergeWorldState(legacy, NOW + 3);
+  const migrated = normalized.board.find((cell) => cell.occupant?.kind === 'item' && cell.occupant.progressionGateId === record.nodeGateId)?.occupant;
+  assert.equal(migrated?.kind === 'item' ? migrated.definitionId : null, RESIDENT_CARD_DEFINITION_ID);
+  assert.equal(normalized.arrivals.filter((arrival) => arrival.kind === 'resident_card_parcel' && arrival.claimedAt == null).length, 0);
 });
 
-test('authored roots upgrade Mossprout generators and award a visible rare Wisp', () => {
-  let garden = awakenedEarlierGates(createMossproutChapterZeroState(NOW), 'root:day-7-two-shores');
-  garden = reduceMergeWorld(garden, {
-    type: 'reconcileMossproutBoardProgression', signals: signals(7), dayId: 'active-07', now: NOW + 1,
-  }).state;
-  const grown = claimAndAwaken(garden, 'root:day-7-two-shores', NOW + 2);
-  assert.equal(grown.state.generators['wild-garden'].level, 2);
+test('reveal, resident dialogue, two sequential orders, and card reward form one durable lifecycle', () => {
+  let state = claimAndReveal(activate());
+  const record = state.residentCardDiscovery.records[0]!;
+  assert.equal(record.status, 'revealed');
+  state = reduceMergeWorld(state, { type: 'ackResidentCardDialogue', discoveryId: record.id, now: NOW + 4 }).state;
+  assert.equal(state.activeOrders.length, 1);
+  assert.equal(state.activeOrders[0]?.storyStep, 1);
 
-  let fern = awakenedEarlierGates(createInitialMergeWorldState(NOW, ['mossprout']), 'root:memory-two-days');
-  fern = reduceMergeWorld(fern, {
-    type: 'reconcileMossproutBoardProgression',
-    signals: signals(12, { natureMemoryDayIds: ['memory-1', 'memory-2'] }),
-    dayId: 'active-12', now: NOW + 4,
-  }).state;
-  const woken = claimAndAwaken(fern, 'root:memory-two-days', NOW + 5);
-  assert.equal(woken.state.externalRewardReceipts.find((receipt) => receipt.sourceId === 'root:memory-two-days')?.wispId, 'fern');
+  let order = state.activeOrders[0]!;
+  state = placeRequirement(state, order.requirements[0]!.definitionId, NOW + 5);
+  const first = reduceMergeWorld(state, { type: 'serveOrder', orderId: order.id, now: NOW + 6 });
+  assert.equal(first.residentCardEarned, undefined);
+  assert.equal(first.state.activeOrders.find((candidate) => candidate.storyArcId === record.id)?.storyStep, 2);
+
+  order = first.state.activeOrders.find((candidate) => candidate.storyArcId === record.id)!;
+  state = placeRequirement(first.state, order.requirements[0]!.definitionId, NOW + 7);
+  const second = reduceMergeWorld(state, { type: 'serveOrder', orderId: order.id, now: NOW + 8 });
+  assert.deepEqual(second.residentCardEarned, { discoveryId: record.id, residentId: 'petalimp' });
+  assert.equal(second.state.residentCardDiscovery.records[0]?.status, 'card_earned');
+  assert.equal(second.state.ownedKatchimeraCards.find((card) => card.cardId === 'petalimp')?.acquisition, 'resident_discovery');
+  assert.equal(second.state.residentCardDiscovery.records[0]?.cardRevealSeenAt, null);
+
+  const acknowledged = reduceMergeWorld(second.state, { type: 'ackResidentCardReveal', discoveryId: record.id, now: NOW + 9 });
+  assert.equal(acknowledged.state.residentCardDiscovery.records[0]?.cardRevealSeenAt, NOW + 9);
 });
 
-test('the day-21 root awards a separate rare Memory Card and reveal receipt', () => {
-  let state = awakenedEarlierGates(createInitialMergeWorldState(NOW, ['mossprout']), 'root:focus-second');
-  state = reduceMergeWorld(state, {
-    type: 'reconcileMossproutBoardProgression', signals: signals(21, { focusStage: 2 }), dayId: 'active-21', now: NOW + 1,
-  }).state;
-  const awakened = claimAndAwaken(state, 'root:focus-second', NOW + 2);
-  assert.equal(awakened.state.ownedKatchimeraCards.length, 0);
-  assert.equal(awakened.state.ownedMemoryCards.length, 1);
-  assert.equal(awakened.state.ownedMemoryCards[0].rarity, 'rare');
-  assert.equal(awakened.state.ownedMemoryCards[0].revealedAt, null);
-  const revealed = reduceMergeWorld(awakened.state, { type: 'revealMemoryCard', cardId: awakened.state.ownedMemoryCards[0].cardId, now: NOW + 4 });
-  assert.equal(revealed.state.ownedMemoryCards[0].revealedAt, NOW + 4);
+test('normalization resumes parcel, reveal, orders, and unacknowledged card states without duplication', () => {
+  let state = activate();
+  state = normalizeMergeWorldState(state, NOW + 10);
+  assert.equal(state.residentCardDiscovery.records.length, 1);
+  assert.equal(state.arrivals.filter((arrival) => arrival.kind === 'resident_card_parcel').length, 1);
+
+  state = claimAndReveal(state);
+  const revealed = normalizeMergeWorldState(state, NOW + 11);
+  assert.equal(revealed.residentCardDiscovery.records[0]?.status, 'revealed');
+  assert.equal(revealed.board[0].locked, false);
+
+  const orders = reduceMergeWorld(revealed, { type: 'ackResidentCardDialogue', discoveryId: revealed.residentCardDiscovery.records[0]!.id, now: NOW + 12 }).state;
+  const resumed = normalizeMergeWorldState(orders, NOW + 13);
+  assert.equal(resumed.activeOrders.filter((order) => order.storyArcId === resumed.residentCardDiscovery.records[0]!.id).length, 1);
 });
 
-test('v15 claimed foreign matches are removed by the intentional v18 reset', () => {
-  let current = createInitialMergeWorldState(NOW, ['mossprout']);
-  current = reduceMergeWorld(current, {
-    type: 'reconcileMossproutBoardProgression', signals: signals(5), dayId: 'active-05', now: NOW + 1,
-  }).state;
-  const claimed = reduceMergeWorld(current, {
-    type: 'claimArrival', arrivalId: 'arrival:root-match:root:day-5-first-return', now: NOW + 2,
-  });
-  const itemCell = claimed.spawnedItems![0].cell;
-  const legacy = structuredClone(claimed.state) as unknown as { version: number; board: MergeWorldState['board']; arrivals: MergeWorldState['arrivals'] };
-  legacy.version = 15;
-  legacy.board[itemCell].occupant = { kind: 'item', instanceId: 'legacy-foreign-match', definitionId: 'food:table:1' };
-  legacy.arrivals[0].itemDefinitionIds = ['food:table:1'];
-  const migrated = normalizeMergeWorldState(legacy, NOW + 3);
-  assert.equal(migrated.version, 18);
-  assert.equal(migrated.ownerCharacterId, 'mossprout');
-  assert.equal(migrated.board.some((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'food:table:1'), false);
-  assert.deepEqual(migrated.arrivals, []);
+test('reset current Journey rewinds its parcel, card node, orders, sealed card, and earned resident', () => {
+  let state = claimAndReveal(activate());
+  const record = state.residentCardDiscovery.records[0]!;
+  state = reduceMergeWorld(state, { type: 'ackResidentCardDialogue', discoveryId: record.id, now: NOW + 4 }).state;
+  const reset = resetMergeActivityForDay(state, 'journey-day-1', NOW + 5);
+  assert.equal(reset.residentCardDiscovery.records.some((candidate) => candidate.id === record.id), false);
+  assert.equal(reset.arrivals.some((arrival) => arrival.discoveryId === record.id), false);
+  assert.equal(reset.activeOrders.some((order) => order.storyArcId === record.id), false);
+  assert.equal(reset.ownedKatchimeraCards.some((card) => card.cardId === record.residentId), false);
+  assert.equal(reset.board[record.nodeCell].mist?.kind, 'resident_card');
+  assert.equal(reset.board[record.nodeCell].locked, true);
 });
 
-test('nature-memory roots use the authored soft fallback after sustained garden play', () => {
-  let state = awakenedEarlierGates(createInitialMergeWorldState(NOW, ['mossprout']), 'root:memory-first');
-  state = reduceMergeWorld(state, {
-    type: 'reconcileMossproutBoardProgression',
-    signals: signals(11, { completedGardenDayIds: ['garden-1', 'garden-2'] }),
-    dayId: 'active-11',
-    now: NOW + 1,
-  }).state;
-  assert.equal(state.mossproutBoardProgression.gates['root:memory-first'].status, 'ready');
-  assert.equal(state.mossproutBoardProgression.gates['root:memory-first'].fallbackUsed, true);
+test('v18 owned resident cards migrate to earned records and never replay their reveal', () => {
+  const old = createInitialMergeWorldState(NOW, ['mossprout']);
+  const migrated = normalizeMergeWorldState({
+    ...old,
+    version: 18,
+    residentCardDiscovery: undefined,
+    ownedKatchimeraCards: [{ cardId: 'fernip', familyId: 'mossprout', acquisition: 'story_resident', sourceReceiptId: 'legacy:fernip', acquiredAt: NOW, coinCost: 0 }],
+  }, NOW + 1);
+  const record = migrated.residentCardDiscovery.records.find((candidate) => candidate.residentId === 'fernip');
+  assert.equal(record?.status, 'card_earned');
+  assert.equal(record?.cardRevealSeenAt, NOW);
+  assert.equal(migrated.board[1].locked, false);
 });
 
-test('awakening the day-15 Nursery Key installs the keepsake generator and chain', () => {
-  let state = awakenedEarlierGates(createInitialMergeWorldState(NOW, ['mossprout']), 'root:nursery-key');
-  state = reduceMergeWorld(state, {
-    type: 'reconcileMossproutBoardProgression', signals: signals(15), dayId: 'active-15', now: NOW + 1,
-  }).state;
-  const awakened = claimAndAwaken(state, 'root:nursery-key', NOW + 2);
-  assert.equal(awakened.changed, true);
-  assert.equal(awakened.state.mossproutBoardProgression.gates['root:nursery-key'].status, 'awakened');
-  assert.ok(awakened.state.generators['memory-nursery']);
-  assert.ok(awakened.state.unlockedChains.includes('nature:keepsake'));
-  assert.ok(awakened.state.board.some((cell) => cell.occupant?.kind === 'generator' && cell.occupant.generatorId === 'memory-nursery'));
-});
-
-test('Grovelight replaces a consumed or lost match parcel once per cooldown window', () => {
-  let state = createInitialMergeWorldState(NOW, ['mossprout']);
-  state = reduceMergeWorld(state, {
-    type: 'reconcileMossproutBoardProgression',
-    signals: signals(5, { ownedWispIds: ['grovelight'] }),
-    dayId: 'active-05',
-    now: NOW + 1,
-  }).state;
-  const claimed = reduceMergeWorld(state, {
-    type: 'claimArrival', arrivalId: 'arrival:root-match:root:day-5-first-return', now: NOW + 2,
-  });
-  assert.equal(claimed.changed, true);
-  const matchCell = claimed.spawnedItems![0].cell;
-  const board = [...claimed.state.board];
-  board[matchCell] = { ...board[matchCell], occupant: null };
-
-  const recovered = reduceMergeWorld({ ...claimed.state, board }, {
-    type: 'useGrovelightResonance', gateId: 'root:day-5-first-return', dayId: 'active-05', now: NOW + 3,
-  });
-  assert.equal(recovered.changed, true);
-  assert.ok(recovered.state.arrivals.some((arrival) => arrival.id === 'arrival:grovelight:root:day-5-first-return:active-05'));
-  const duplicate = reduceMergeWorld(recovered.state, {
-    type: 'useGrovelightResonance', gateId: 'root:day-5-first-return', dayId: 'active-05', now: NOW + 4,
-  });
-  assert.equal(duplicate.changed, false);
-});
-
-test('the day-28 Heartwood root awards Grovelight exactly once', () => {
-  let state = awakenedEarlierGates(createInitialMergeWorldState(NOW, ['mossprout']), 'root:heartwood');
-  state = reduceMergeWorld(state, {
-    type: 'reconcileMossproutBoardProgression', signals: signals(28), dayId: 'active-28', now: NOW + 1,
-  }).state;
-  const awakened = claimAndAwaken(state, 'root:heartwood', NOW + 2);
-  assert.equal(awakened.changed, true);
-  const rewards = awakened.state.externalRewardReceipts.filter((receipt) => receipt.id === 'merge-wisp:mossprout:grovelight');
-  assert.equal(rewards.length, 1);
-  assert.equal(rewards[0].wispId, 'grovelight');
+test('retired root parcels are removed while their material rewards settle once through receipts', () => {
+  const signals: MossproutProgressionSignals = {
+    activeJourneyDayIds: Array.from({ length: 17 }, (_, index) => `day-${index + 1}`),
+    completedBeatIds: [], friendshipLevel: 1, natureMemoryDayIds: [], focusStage: 0, ownedWispIds: [], completedGardenDayIds: [],
+  };
+  const first = reduceMergeWorld(fresh(), { type: 'reconcileMossproutBoardProgression', signals, dayId: 'day-17', now: NOW + 1 }).state;
+  const replay = reduceMergeWorld(first, { type: 'reconcileMossproutBoardProgression', signals, dayId: 'day-17', now: NOW + 2 }).state;
+  assert.equal(first.generators['wild-garden']?.level, 3);
+  assert.ok(first.generators['memory-nursery']);
+  assert.ok(first.externalRewardReceipts.some((receipt) => receipt.id === 'retired-root:wisp:fern'));
+  assert.ok(first.rewardInbox.some((entry) => entry.id === 'retired-root:keepsake'));
+  assert.equal(first.residentCardDiscovery.campaignMilestoneReceiptIds.length, 5);
+  assert.equal(replay.residentCardDiscovery.campaignMilestoneReceiptIds.length, 5);
+  assert.equal(replay.arrivals.some((arrival) => arrival.progressionGateId && RETIRED_RESIDENT_NODE_ROOT_GATE_IDS.has(arrival.progressionGateId)), false);
 });

@@ -13,6 +13,8 @@ import {
   nextMossproutCampaignEpisode,
   validMossproutCoStar,
 } from '@/constants/mossprout-campaign';
+import { MOSSPROUT_JOURNEY_CAMPAIGN } from '@/constants/mossprout-journey-campaign';
+import { nextJourneyCampaignDay } from '@/game/katchimeras/journey-campaign';
 
 export const MOSSPROUT_QUIET_PATCH_CHAPTER_ID = 'mossprout:chapter:quiet-patch';
 export const MOSSPROUT_DRY_POND_CHAPTER_ID = 'mossprout:chapter:dry-pond';
@@ -40,7 +42,7 @@ const DRY_POND_ACTIVITY = {
 } as const;
 
 export function emptyRelationshipProgressState(): RelationshipProgressState {
-  return { schemaVersion: 4, journeyDays: [], stories: {}, skippedActionIds: [], actionCompletionEvents: [], mossproutDailyActionDecks: [] };
+  return { schemaVersion: 5, journeyDays: [], stories: {}, skippedActionIds: [], actionCompletionEvents: [], mossproutDailyActionDecks: [] };
 }
 
 export function normalizeRelationshipProgressState(value: unknown): RelationshipProgressState {
@@ -94,7 +96,7 @@ export function normalizeRelationshipProgressState(value: unknown): Relationship
   const mossproutDailyActionDecks = Array.isArray(candidate.mossproutDailyActionDecks)
     ? candidate.mossproutDailyActionDecks.map(normalizeMossproutDailyActionDeck).filter((deck): deck is MossproutDailyActionDeck => Boolean(deck)).slice(-14)
     : [];
-  return { schemaVersion: 4, journeyDays, stories, skippedActionIds, actionCompletionEvents, mossproutDailyActionDecks };
+  return { schemaVersion: 5, journeyDays, stories, skippedActionIds, actionCompletionEvents, mossproutDailyActionDecks };
 }
 
 function normalizeStories(value: unknown): RelationshipProgressState['stories'] {
@@ -511,7 +513,7 @@ function normalizeMossproutDailyActionDeck(value: unknown): MossproutDailyAction
 export function mossproutStory(state: RelationshipProgressState, now = Date.now()): KatchimeraStoryProgress {
   return state.stories.mossprout ?? {
     familyId: 'mossprout',
-    campaignVersion: MOSSPROUT_CAMPAIGN_VERSION,
+    campaignVersion: MOSSPROUT_JOURNEY_CAMPAIGN.version,
     activeChapterId: MOSSPROUT_QUIET_PATCH_CHAPTER_ID,
     activeBeatId: 'quiet-patch:first-flower',
     completedChapterIds: [],
@@ -544,8 +546,8 @@ export function mossproutJourneyRuntimeDayId(state: RelationshipProgressState, c
   if (!quickMode) return calendarDayId;
   const active = [...state.journeyDays].reverse().find((journey) => journey.familyId === 'mossprout' && journey.status !== 'complete');
   if (active) return active.dayId;
-  const nextEpisode = nextMossproutCampaignEpisode(mossproutStory(state).completedBeatIds ?? []);
-  return nextEpisode ? `${calendarDayId}:mossprout-journey-${String(nextEpisode.episodeNumber).padStart(2, '0')}` : calendarDayId;
+  const nextDay = nextJourneyCampaignDay(MOSSPROUT_JOURNEY_CAMPAIGN, mossproutStory(state).completedBeatIds ?? []);
+  return nextDay ? `${calendarDayId}:mossprout-journey-${String(nextDay.number).padStart(2, '0')}` : calendarDayId;
 }
 
 export function mossproutFirstResidentCardId(state: RelationshipProgressState): string | null {
@@ -565,8 +567,10 @@ export function startMossproutJourneyDay(
   const existing = journeyForDay(state, dayId);
   if (existing) return { state, journey: existing.familyId === 'mossprout' ? existing : null, reason: existing.familyId === 'mossprout' ? 'existing' : 'another_companion' };
   const story = mossproutStory(state, now);
-  const nextEpisode = nextMossproutCampaignEpisode(story.completedBeatIds ?? []);
-  if (!nextEpisode || (!allowEarlyStart && !mossproutCampaignEpisodeAvailable(nextEpisode, activeDayCount))) {
+  const campaignDay = nextJourneyCampaignDay(MOSSPROUT_JOURNEY_CAMPAIGN, story.completedBeatIds ?? []);
+  const nextEpisode = campaignDay ? mossproutCampaignEpisodeByBeatId.get(campaignDay.id) ?? null : null;
+  // activeDayCount counts days already played; this starts the day about to begin.
+  if (!campaignDay || !nextEpisode || (!allowEarlyStart && activeDayCount + 1 < campaignDay.unlockActiveDay)) {
     return { state, journey: null, reason: 'resting' };
   }
   const chapterId = nextEpisode.chapterId;
@@ -636,6 +640,15 @@ export function completeMossproutJourneyOpening(
       resolutionId: journey.openingConversationId ?? episodeDefinition.openingConversationId,
     }, now);
   }
+  if (episodeDefinition && episodeDefinition.episodeNumber >= 3 && episodeDefinition.episodeNumber <= 9) {
+    return replaceJourney(state, journey.id, {
+      ...journey,
+      status: 'resident_discovery',
+      activity: null,
+      profileConversationId: null,
+      resolutionAvailableAt: null,
+    });
+  }
   const profileConversationId = null;
   return replaceJourney(state, journey.id, {
     ...journey,
@@ -653,7 +666,12 @@ export function recordMossproutMatchedCard(
 ): RelationshipProgressState {
   const journey = mossproutJourneyForDay(state, dayId);
   if (!journey || !validMossproutCoStar(cardId) || journey.matchedCardId === cardId) return state;
-  const next = replaceJourney(state, journey.id, { ...journey, matchedCardId: cardId });
+  const next = replaceJourney(state, journey.id, {
+    ...journey,
+    matchedCardId: cardId,
+    status: journey.status === 'profile_available' ? 'resident_discovery' : journey.status,
+    activity: journey.status === 'profile_available' ? null : journey.activity,
+  });
   const story = mossproutStory(next);
   return { ...next, stories: { ...next.stories, mossprout: { ...story, coStarSkinId: cardId, updatedAt: Date.now() } } };
 }
@@ -741,6 +759,14 @@ export function completeMossproutJourneyResolution(
 ): RelationshipProgressState {
   const journey = mossproutJourneyForDay(state, dayId);
   if (!journey || journey.status !== 'resolution_ready') return state;
+  if (journey.beatId === 'quiet-patch:first-flower') {
+    return replaceJourney(state, journey.id, {
+      ...journey,
+      status: 'profile_available',
+      profileConversationId: 'mossprout:game:form-finder',
+      resolutionId: journey.returnConversationId ?? 'mossprout:ftue:chapter-zero-return',
+    });
+  }
   return completeMossproutJourneyDay(state, dayId, {
     objectiveId: journey.beatId === 'quiet-patch:first-flower' ? 'mossprout:objective:first-sprout' : journey.activity?.objectiveId,
     activityReceiptId: journey.activityReceiptIds.at(-1) ?? (journey.activity ? `merge-order:${journey.activity.mergeOrderId}` : `story:${journey.beatId}`),
@@ -770,10 +796,11 @@ export function completeMossproutJourneyConversation(
   if (journey.openingConversationId === definitionId && journey.status === 'opening') {
     return completeMossproutJourneyOpening(withFacts, journey.dayId, now);
   }
-  if (journey.profileConversationId === definitionId && journey.status === 'profile_available' && journey.activity) {
+  if (journey.profileConversationId === definitionId && journey.status === 'profile_available') {
     const withAction = completeJourneyAction(withFacts, journey, definitionId, now);
     const updated = mossproutJourneyForDay(withAction, journey.dayId)!;
-    return replaceJourney(withAction, journey.id, { ...updated, status: 'activity_available' });
+    const matchedCardId = typeof input === 'string' ? updated.matchedCardId : input.formResult?.topFormId ?? updated.matchedCardId;
+    return replaceJourney(withAction, journey.id, { ...updated, status: 'resident_discovery', matchedCardId, activity: null });
   }
   if (journey.returnConversationId === definitionId && journey.status === 'resolution_ready') {
     return completeMossproutJourneyResolution(withFacts, journey.dayId, now);
@@ -870,7 +897,7 @@ export function completeMossproutJourneyDay(
           : story.habitatStage;
   story = {
     ...story,
-    campaignVersion: MOSSPROUT_CAMPAIGN_VERSION,
+    campaignVersion: MOSSPROUT_JOURNEY_CAMPAIGN.version,
     activeChapterId: nextEpisode?.chapterId ?? MOSSPROUT_HEARTWOOD_CHAPTER_ID,
     activeBeatId: nextEpisode?.beatId ?? 'heartwood:complete',
     completedBeatIds,
@@ -904,6 +931,23 @@ export function completeMossproutJourneyDay(
     } : journey),
     stories: { ...state.stories, mossprout: story },
   };
+}
+
+export function completeMossproutResidentCardDiscovery(
+  state: RelationshipProgressState,
+  journeyDayId: string,
+  residentId: string,
+  discoveryId: string,
+  now = Date.now(),
+): RelationshipProgressState {
+  const journey = mossproutJourneyForDay(state, journeyDayId);
+  if (!journey || journey.status === 'complete' || !validMossproutCoStar(residentId)) return state;
+  const matched = recordMossproutMatchedCard(state, journeyDayId, residentId);
+  return completeMossproutJourneyDay(matched, journeyDayId, {
+    objectiveId: journey.activity?.objectiveId,
+    activityReceiptId: `resident-card:${discoveryId}`,
+    resolutionId: `resident-card-reveal:${discoveryId}`,
+  }, now);
 }
 
 export function havenTileStagesFromRelationships(state: RelationshipProgressState) {
@@ -1095,7 +1139,7 @@ function isJourneyDayRecord(value: unknown): value is JourneyDayRecord {
   return typeof record.id === 'string'
     && typeof record.dayId === 'string'
     && typeof record.familyId === 'string'
-    && ['opening', 'profile_available', 'living', 'activity_available', 'activity_in_progress', 'return_available', 'resolution_ready', 'complete', 'active'].includes(record.status)
+    && ['opening', 'profile_available', 'living', 'activity_available', 'activity_in_progress', 'return_available', 'resolution_ready', 'resident_discovery', 'resident_orders', 'card_reward', 'complete', 'active'].includes(record.status)
     && typeof record.chapterId === 'string'
     && typeof record.beatId === 'string'
     && Array.isArray(record.signalReceiptIds)

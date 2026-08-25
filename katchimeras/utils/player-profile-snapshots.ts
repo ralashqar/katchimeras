@@ -11,6 +11,7 @@ import { normalizeMergeWorldState } from '@/utils/merge-world/engine';
 import { installMergeWorldStateForDebug, loadMergeWorldState } from '@/utils/merge-world/repository';
 import { captureKeyValueProfileDomain, replaceKeyValueProfileDomain, validateKeyValueProfileDomain } from '@/utils/player-profile-domain-registry';
 import { setJourneyQuickModeEnabled } from '@/utils/dev-settings';
+import { captureContentFlowJournal, installContentFlowJournalForDebug } from '@/features/content-flow/content-flow-repository';
 
 const RESTORE_JOURNAL_KEY = 'katchadeck.dev.profile-snapshot-restore-v1';
 
@@ -45,7 +46,7 @@ export async function capturePlayerProfileSnapshot(input: {
 }): Promise<PlayerProfileSnapshot> {
   assertDevTools();
   await Promise.all([flushStoredHomeStateWrites(), flushFtuePersistence()]);
-  const state = await loadMergeWorldState();
+  const [state, contentFlow] = await Promise.all([loadMergeWorldState(), captureContentFlowJournal()]);
   const values = captureKeyValueProfileDomain();
   const ftueRaw = values['katchimeras.ftue-run.v4'];
   let ftueStep: string | null = null;
@@ -64,6 +65,7 @@ export async function capturePlayerProfileSnapshot(input: {
     domains: {
       keyValue: { schemaVersion: 1, values },
       mergeWorld: { schemaVersion: 1, state },
+      contentFlow,
     },
   };
   if (input.persist !== false) await saveCapturedPlayerProfileSnapshot(snapshot);
@@ -102,6 +104,7 @@ export function validatePlayerProfileSnapshot(snapshot: unknown): PlayerProfileS
       errors.push('Merge World state cannot be normalized.');
     }
   }
+  if (candidate.domains?.contentFlow && candidate.domains.contentFlow.schemaVersion !== 1) errors.push('Content Flow profile domain has an unsupported version.');
   return { ok: errors.length === 0, errors };
 }
 
@@ -110,6 +113,7 @@ async function installSnapshot(snapshot: PlayerProfileSnapshot) {
   replaceKeyValueProfileDomain(snapshot.domains.keyValue.values);
   relationshipProgressionRepository.reloadFromStorageForDebug();
   await installMergeWorldStateForDebug(snapshot.domains.mergeWorld.state);
+  await installContentFlowJournalForDebug(snapshot.domains.contentFlow ?? { schemaVersion: 1, runs: [] });
 }
 
 export async function replacePlayerProfileSnapshot(snapshot: PlayerProfileSnapshot, options: { createRollback?: boolean } = {}): Promise<void> {

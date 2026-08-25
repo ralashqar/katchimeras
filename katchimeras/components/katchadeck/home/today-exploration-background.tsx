@@ -291,6 +291,8 @@ export function TodayExplorationBackground({
   contentFit = 'fill',
   environmentStage,
   imageSize,
+  onDisplay,
+  onError,
   onLoad,
   translateX,
   verticalOffset = 0,
@@ -299,6 +301,8 @@ export function TodayExplorationBackground({
   contentFit?: 'cover' | 'fill';
   environmentStage?: number | null;
   imageSize: number;
+  onDisplay?: () => void;
+  onError?: (error: string) => void;
   onLoad?: () => void;
   translateX?: SharedValue<number>;
   verticalOffset?: number;
@@ -345,6 +349,8 @@ export function TodayExplorationBackground({
           enforceEarlyResizing
           pointerEvents="none"
           priority="high"
+          onDisplay={onDisplay}
+          onError={(event) => onError?.(event.error)}
           onLoad={onLoad}
           recyclingKey={background.recyclingKey}
           source={background.source}

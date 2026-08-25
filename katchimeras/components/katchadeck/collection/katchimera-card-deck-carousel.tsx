@@ -1,10 +1,10 @@
 import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeInUp, useReducedMotion } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeInUp, interpolate, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import {
   DeckCardHitTarget,
@@ -21,6 +21,7 @@ import type { KatchimeraCardOption } from '@/hooks/use-katchimera-cards';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { DailyCardSize } from '@/utils/daily-card-layout';
 import { resolveCollectionDeckWindow } from '@/utils/collection-deck';
+import { VEILED_MEMORY_CARD_ART } from '@/constants/memory-card-art';
 
 type KatchimeraCardDeckCarouselProps = {
   cards: readonly KatchimeraCardOption[];
@@ -161,6 +162,20 @@ export function KatchimeraCardRevealModal({ cardId, cards, onDone }: {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
+  const flip = useSharedValue(0);
+  useEffect(() => {
+    flip.value = 0;
+    if (cardId) flip.value = withTiming(1, { duration: reduceMotion ? 100 : 720, easing: Easing.inOut(Easing.cubic) });
+  }, [cardId, flip, reduceMotion]);
+  const flipStyle = useAnimatedStyle(() => ({ transform: [
+    { perspective: 900 },
+    { rotateY: `${interpolate(flip.value, [0, 1], [-82, 0])}deg` },
+    { scale: interpolate(flip.value, [0, 0.55, 1], [0.92, 1.03, 1]) },
+  ] }));
+  const cardBackStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(flip.value, [0, 0.46, 0.5], [1, 1, 0]),
+    transform: [{ perspective: 900 }, { rotateY: `${interpolate(flip.value, [0, 0.5], [0, 90])}deg` }],
+  }));
   const revealed = cards.find((card) => card.id === cardId);
   if (!cardId || !revealed) return null;
   // The repository subscription normally arrives in the same frame as the
@@ -181,7 +196,8 @@ export function KatchimeraCardRevealModal({ cardId, cards, onDone }: {
             <ThemedText style={styles.revealBody} lightColor="rgba(255,248,228,0.74)" darkColor="rgba(255,248,228,0.74)">Their first request is complete. The rest of this nature set is still waiting to be discovered.</ThemedText>
           </Animated.View>
           <View style={styles.revealDeck}>
-            <KatchimeraCardDeckCarousel cards={revealCards} initialCardId={cardId} maxCardHeight={Math.min(450, height * 0.52)} />
+            <Animated.View style={[styles.flipStage, flipStyle]}><KatchimeraCardDeckCarousel cards={revealCards} initialCardId={cardId} maxCardHeight={Math.min(450, height * 0.52)} /></Animated.View>
+            <Animated.View pointerEvents="none" style={[styles.cardBack, cardBackStyle]}><Image accessibilityLabel="Veiled Katchimera card" contentFit="contain" source={VEILED_MEMORY_CARD_ART} style={styles.cardBackImage} transition={0} /></Animated.View>
           </View>
           <View style={styles.revealAction}><KatchaButton fullWidth glow label="Done" onPress={onDone} /></View>
         </View>
@@ -223,5 +239,8 @@ const styles = StyleSheet.create({
   revealTitle: { fontSize: 25, fontWeight: '900', letterSpacing: -0.55, lineHeight: 30, textAlign: 'center' },
   revealBody: { fontSize: 12, fontWeight: '700', lineHeight: 17, maxWidth: 330, textAlign: 'center' },
   revealDeck: { flex: 1, justifyContent: 'center' },
+  flipStage: { backfaceVisibility: 'hidden' },
+  cardBack: { alignItems: 'center', bottom: 0, justifyContent: 'center', left: 0, position: 'absolute', right: 0, top: 0 },
+  cardBackImage: { height: 390, maxHeight: '88%', width: 270 },
   revealAction: { paddingHorizontal: 24 },
 });

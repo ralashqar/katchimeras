@@ -82,6 +82,9 @@ const chain = (
 };
 
 export const MERGE_ITEM_CATALOG: readonly MergeItemDefinition[] = [
+  { id: 'mossprout:resident-card:sealed', familyId: 'nature', chainId: 'nature:root-memory', branchId: 'resident_card', tier: 1, name: 'Sealed Resident Card', icon: 'sparkles', color: '#E5CE79', nextItemId: null, sellValue: 0, progressionOnly: true },
+  // Retained only so v19 saves can be normalized before their claimed key is migrated.
+  { id: 'mossprout:resident-card:key', familyId: 'nature', chainId: 'nature:root-memory', branchId: 'resident_card_legacy', tier: 1, name: 'Sealed Resident Card', icon: 'sparkles', color: '#E5CE79', nextItemId: null, sellValue: 0, progressionOnly: true },
   ...chain('food:table', 'fork.knife', '#F0B870', ['Ingredient', 'Snack', 'Dish', 'Meal', 'Feast', 'Banquet']),
   ...chain('food:dessert', 'sparkles', '#F2A9B8', ['Flour Scoop', 'Cake Batter', 'Cupcake', 'Layer Cake', 'Celebration Cake', 'Dream Cake']),
   ...chain('drink:hot', 'sparkles', '#C98A66', ['Tea Leaf', 'Tea Cup', 'Teapot', 'Cocoa Tray', 'Café Service', 'Hearth Ceremony']),

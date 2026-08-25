@@ -23,7 +23,7 @@ import { loadCompanionBondState, saveCompanionBondState } from '@/utils/companio
 import { homeRepository } from '@/storage/repositories/home-repository';
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import { loadCompanionQuests } from '@/utils/katchimera-quests';
-import { grantStoredKatchimeraCard } from '@/utils/merge-world/repository';
+import { publishContentFlowDomainEvent, submitActiveContentFlowScene } from '@/features/content-flow/content-flow-director';
 
 export type KatchimeraActionCompletionCommit = {
   completion: KatchimeraActionCompletionEvent | null;
@@ -75,13 +75,6 @@ export function commitKatchimeraActionCompletion(input: {
     return recordKatchimeraActionCompletionEvent(progressed, { source: origin, completedAt });
   });
 
-  if (session.definitionId === 'mossprout:campaign-v2:returning-pond:place-for-rain:opening') {
-    const residentId = relationships.stories.mossprout?.coStarSkinId;
-    if (residentId) void grantStoredKatchimeraCard(
-      'mossprout', residentId, `journey-card:${session.servedDayId}:mossprout`, completedAt,
-    );
-  }
-
   if (!origin) return { completion: null, rewardReceipt: null };
   const completionId = katchimeraActionCompletionEventId(origin);
   let completion = relationships.actionCompletionEvents.find((event) => event.id === completionId)
@@ -132,6 +125,20 @@ export function commitKatchimeraActionCompletion(input: {
     ));
     completion = relationships.actionCompletionEvents.find((event) => event.id === completion!.id) ?? completion;
   }
+  if (origin.journeyActionId && origin.kind !== 'story_chat') {
+    const action = origin.kind === 'goal_plan' ? 'goal' : origin.kind === 'journal_prompt' ? 'reflection' : 'playful';
+    void publishContentFlowDomainEvent({
+      eventId: `optional-action-completed:${completion.id}`,
+      type: 'optional_action.completed',
+      payload: { action, completionId: completion.id },
+      occurredAt: completedAt,
+    });
+  }
+  void submitActiveContentFlowScene(
+    session.definitionId,
+    session.formResult ? 'questionnaire.completed' : 'conversation.completed',
+    session.formResult?.topFormId ? { matchedCardId: session.formResult.topFormId } : undefined,
+  );
   return { completion, rewardReceipt };
 }
 

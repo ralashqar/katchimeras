@@ -1,9 +1,11 @@
 import { Image } from 'expo-image';
 import { memo, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
+  FadeIn,
+  FadeOut,
   interpolate,
   useAnimatedStyle,
   useReducedMotion,
@@ -20,7 +22,7 @@ import { ThemedText } from '@/components/themed-text';
 import { KatchaDeckUI } from '@/constants/theme';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import type { FtueCueDefinition, FtueGuide, FtueSpotlightDefinition, FtueTarget } from '@/features/onboarding/ftue-types';
-import { resolveFtueBoardCell } from '@/features/onboarding/merge-ftue';
+import { resolveFtueBoardCell, resolveFtueRailTargetKey } from '@/features/onboarding/merge-ftue';
 import type { EggAvatarFaceId } from '@/types/egg-avatar';
 import type { MergeWorldState } from '@/types/merge-world';
 import { mergeCellOrigin } from '@/utils/merge-world/board-geometry';
@@ -30,6 +32,7 @@ import type { MergeBoardScreenMetrics } from './feastle-persistent-merge-board';
 const HAND_ART = require('../../../assets/images/katchimeras/merge-world/ui/ftue-hand.webp');
 const HAND_TIP_X = 0.28;
 const HAND_TIP_Y = 0.2;
+const GUIDE_AUTO_DISMISS_MS = 4_800;
 const GUIDE_EXPRESSION_FACE_IDS = [
   'happy-squint',
   'curious',
@@ -102,6 +105,7 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
   visualTheme,
 }: MergeFtueOverlayProps) {
   const [layout, setLayout] = useState<OverlayLayout | null>(null);
+  const [dismissedGuideKey, setDismissedGuideKey] = useState<string | null>(null);
   const stateRef = useRef(state);
   const measurementGenerationRef = useRef(0);
   const screenFrameRef = useRef<Frame | null>(null);
@@ -199,34 +203,77 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
   ]);
 
   const currentLayout = layout;
-  const showSpotlight = Boolean(currentLayout?.spotlightFrames.length);
+  const presentationReady = currentLayout?.configKey === configKey
+    && currentLayout.targetRevision === targetRevision;
+  const spotlightReady = Boolean(presentationReady && currentLayout?.spotlightFrames.length);
+  const guideKey = guide && presentationReady ? `${configKey}:${guide.title}:${guide.body}` : null;
+  // One authored flag owns the complete guidance presentation. By default the
+  // spotlight, finger, and Egg copy persist until the required command changes
+  // the FTUE node. Only explicitly transient beats (currently the resident
+  // request introduction) may dismiss the Egg copy and spotlight together.
+  const guideDismissible = Boolean(spotlight?.dismissOnGuideClose);
+  const guideDismissed = Boolean(guideDismissible && guideKey && dismissedGuideKey === guideKey);
+  const spotlightDismissed = guideDismissed;
+  const showSpotlight = spotlightReady && !spotlightDismissed;
   // Hide the previous moving hand while its replacement target is measured;
   // the same native finger view is reused for the next presentation.
   const showCue = Boolean(
-    currentLayout?.configKey === configKey
-      && currentLayout.targetRevision === targetRevision
+    presentationReady
       && currentLayout.cue
       && currentLayout.cuePoints,
   );
+  const showGuide = Boolean(
+    guideKey
+      && guide
+      && showSpotlight
+      && presentationReady
+      && !guideDismissed,
+  );
+
+  useEffect(() => {
+    if (!guideDismissible || !showGuide || !guideKey) return;
+    const timer = setTimeout(() => setDismissedGuideKey(guideKey), GUIDE_AUTO_DISMISS_MS);
+    return () => clearTimeout(timer);
+  }, [guideDismissible, guideKey, showGuide]);
+
+  const dismissGuide = () => {
+    if (guideDismissible && guideKey) setDismissedGuideKey(guideKey);
+  };
   return (
     <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       pointerEvents="box-none"
       style={styles.overlay}>
-      <FtueSpotlight
-        frames={showSpotlight ? currentLayout?.spotlightFrames ?? [] : []}
-        opacity={showSpotlight ? currentLayout?.spotlightOpacity ?? 0 : 0}
-        radius={currentLayout?.spotlightRadius ?? 12}
-        screen={currentLayout?.screen ?? { height: 0, width: 0 }}
-        theme={theme}
-      />
-      {guide && showSpotlight && currentLayout?.configKey === configKey ? (
-        <MergeFtueEggGuide
-          anchor={guideAnchorFrame(spotlight, currentLayout.spotlightFrames)}
-          guide={guide}
-          screen={currentLayout.screen}
+      {!spotlightDismissed ? (
+        <FtueSpotlight
+          frames={showSpotlight ? currentLayout?.spotlightFrames ?? [] : []}
+          opacity={showSpotlight ? currentLayout?.spotlightOpacity ?? 0 : 0}
+          radius={currentLayout?.spotlightRadius ?? 12}
+          screen={currentLayout?.screen ?? { height: 0, width: 0 }}
+          theme={theme}
         />
+      ) : null}
+      {showGuide && guide && currentLayout ? (
+        <>
+          {guideDismissible ? <Pressable
+            accessibilityLabel="Dismiss Merge guidance"
+            accessibilityRole="button"
+            onPress={dismissGuide}
+            style={styles.guideDismissLayer}
+          /> : null}
+          <Animated.View
+            entering={FadeIn.duration(150)}
+            exiting={FadeOut.duration(150)}
+            pointerEvents="none"
+            style={StyleSheet.absoluteFill}>
+            <MergeFtueEggGuide
+              anchor={guideAnchorFrame(spotlight, currentLayout.spotlightFrames)}
+              guide={guide}
+              screen={currentLayout.screen}
+            />
+          </Animated.View>
+        </>
       ) : null}
       <FtueFingerCue
         blockedPulseNonce={blockedPulseNonce}
@@ -733,14 +780,16 @@ async function resolveTargetFrame(
   railTargetRefs: Map<string, View>,
   screen: Frame,
 ): Promise<Frame | null> {
-  if (target.kind === 'order_card' || target.kind === 'order_serve' || target.kind === 'tray_chat_note' || target.kind === 'tray_parcel') {
-    const targetKey = target.kind === 'order_card'
-      ? `order-card:${target.orderId}`
-      : target.kind === 'order_serve'
-        ? `order-serve:${target.orderId}`
-        : target.kind === 'tray_chat_note'
-          ? `chat-note:${target.noteId}`
-          : `tray-parcel:${target.arrivalId}`;
+  const targetKey = target.kind === 'order_card'
+    ? `order-card:${target.orderId}`
+    : target.kind === 'order_serve'
+      ? `order-serve:${target.orderId}`
+      : target.kind === 'tray_chat_note'
+        ? `chat-note:${target.noteId}`
+        : target.kind === 'tray_parcel'
+          ? `tray-parcel:${target.arrivalId}`
+          : resolveFtueRailTargetKey(state, target);
+  if (targetKey) {
     const measured = await measureView(railTargetRefs.get(targetKey) ?? null);
     return measured ? {
       height: measured.height,
@@ -796,6 +845,7 @@ function measureView(view: View | null): Promise<Frame | null> {
 
 const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, zIndex: 250 },
+  guideDismissLayer: { ...StyleSheet.absoluteFillObject, zIndex: 1 },
   hand: { position: 'absolute', zIndex: 4 },
   handArt: { height: '100%', width: '100%' },
   eggGuideCallout: {

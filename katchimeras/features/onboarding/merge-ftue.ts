@@ -3,6 +3,71 @@ import type { MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from
 import type { FtueEvent, FtueStepDefinition, FtueTarget } from './ftue-types';
 import { mossproutFtueStep } from './mossprout-ftue-script';
 
+function activeResidentDiscovery(state: MergeWorldState) {
+  const records = [...state.residentCardDiscovery.records].reverse();
+  return records.find((record) => record.status !== 'locked' && (record.status !== 'card_earned' || record.cardRevealSeenAt == null))
+    ?? records.find((record) => record.status !== 'locked')
+    ?? null;
+}
+
+/** Canonical resident step derived from durable board progress, not UI history. */
+export function residentFtueCanonicalStep(state: MergeWorldState) {
+  const record = activeResidentDiscovery(state);
+  if (!record) return null;
+  return record.status === 'parcel_ready'
+    ? 'merge.resident_parcel'
+    : record.status === 'parcel_claimed'
+      ? 'merge.resident_card'
+      : record.status === 'revealed' && record.dialogueSeenAt == null
+        ? 'merge.resident_dialogue'
+        : record.status === 'revealed' || record.status === 'orders_active'
+          ? 'merge.resident_orders'
+          : record.cardRevealSeenAt == null
+            ? 'merge.resident_card_reward'
+            : 'complete';
+}
+
+/**
+ * Resident discovery is durable Merge progress, so its guidance must not
+ * disappear merely because the one-time global FTUE run was completed or
+ * persisted one transition late. While a resident sequence is physically
+ * active on the board, that board state owns the corresponding Merge step.
+ */
+export function mergeFtueStepForBoard(
+  state: MergeWorldState | null,
+  scriptedStep: FtueStepDefinition | null,
+) {
+  if (!state) return scriptedStep;
+  const residentStepId = residentFtueCanonicalStep(state);
+  if (!residentStepId?.startsWith('merge.resident_')) return scriptedStep;
+  return mossproutFtueStep(residentStepId) ?? scriptedStep;
+}
+
+function activeResidentOrder(state: MergeWorldState) {
+  const discovery = activeResidentDiscovery(state);
+  return discovery ? state.activeOrders.find((order) => order.storyArcId === discovery.id) ?? null : null;
+}
+
+export function resolveFtueRailTargetKey(state: MergeWorldState | null, target: FtueTarget): string | null {
+  if (target.kind === 'active_resident_parcel') {
+    if (!state) return null;
+    const discovery = activeResidentDiscovery(state);
+    const parcel = discovery ? state.arrivals.find((arrival) => arrival.kind === 'resident_card_parcel'
+      && arrival.discoveryId === discovery.id && arrival.claimedAt == null) : null;
+    return parcel ? `tray-parcel:${parcel.id}` : null;
+  }
+  const order = target.kind === 'active_resident_order_card' || target.kind === 'active_resident_order_serve'
+    ? state ? activeResidentOrder(state) : null
+    : null;
+  if (target.kind === 'active_resident_order_card') return order ? `order-card:${order.id}` : null;
+  if (target.kind === 'active_resident_order_serve') return order ? `order-serve:${order.id}` : null;
+  if (target.kind === 'order_card') return `order-card:${target.orderId}`;
+  if (target.kind === 'order_serve') return `order-serve:${target.orderId}`;
+  if (target.kind === 'tray_chat_note') return `chat-note:${target.noteId}`;
+  if (target.kind === 'tray_parcel') return `tray-parcel:${target.arrivalId}`;
+  return null;
+}
+
 export type MergeBoardInteractionGate =
   | { kind: 'open' }
   | { kind: 'locked' }
@@ -17,6 +82,22 @@ export type MergeRailInteractionGate =
   | { kind: 'chat_note'; noteId: string };
 
 export function resolveFtueBoardCell(state: MergeWorldState, target: FtueTarget) {
+  if (target.kind === 'active_resident_card_item') {
+    const discovery = activeResidentDiscovery(state);
+    if (!discovery) return null;
+    const cell = state.board.findIndex((entry) => entry.occupant?.kind === 'item'
+      && entry.occupant.progressionGateId === discovery.nodeGateId);
+    return cell >= 0 ? cell : null;
+  }
+  if (target.kind === 'active_resident_card_node') {
+    const discovery = activeResidentDiscovery(state);
+    if (!discovery) return null;
+    // Any still-locked resident-card cell is a valid physical match. The
+    // active Journey discovery decides who is revealed, not the chosen cell.
+    const cell = state.board.findIndex((entry) => entry.mist?.kind === 'resident_card'
+      && entry.mist.discoveryId === discovery.id && entry.mist.ready);
+    return cell >= 0 ? cell : null;
+  }
   if (target.kind === 'board_cell') return target.cell;
   if (target.kind === 'board_generator') {
     const cell = state.board.findIndex((entry) => entry.occupant?.kind === 'generator' && entry.occupant.generatorId === target.generatorId);
@@ -64,17 +145,19 @@ export function mergeFtueBoardGate(step: FtueStepDefinition | null, state: Merge
   return fromCell == null || toCell == null ? { kind: 'locked' } : { kind: 'drag', fromCell, toCell };
 }
 
-export function mergeFtueRailGate(step: FtueStepDefinition | null): MergeRailInteractionGate {
+export function mergeFtueRailGate(step: FtueStepDefinition | null, state?: MergeWorldState): MergeRailInteractionGate {
   const policy = step?.surface === 'merge' ? step.interaction : null;
   if (!policy || policy.mode === 'none') return { kind: 'open' };
   if (policy.allowed.kind === 'chat_note_tap' && policy.allowed.target.kind === 'tray_chat_note') {
     return { kind: 'chat_note', noteId: policy.allowed.target.noteId };
   }
-  if (policy.allowed.kind === 'parcel_tap' && policy.allowed.target.kind === 'tray_parcel') {
-    return { kind: 'parcel', arrivalId: policy.allowed.target.arrivalId };
+  if (policy.allowed.kind === 'parcel_tap') {
+    const key = resolveFtueRailTargetKey(state ?? null, policy.allowed.target);
+    return key?.startsWith('tray-parcel:') ? { kind: 'parcel', arrivalId: key.slice('tray-parcel:'.length) } : { kind: 'locked' };
   }
-  if (policy.allowed.kind !== 'order_serve' || policy.allowed.target.kind !== 'order_serve') return { kind: 'locked' };
-  return { kind: 'serve', orderId: policy.allowed.target.orderId };
+  if (policy.allowed.kind !== 'order_serve') return { kind: 'locked' };
+  const key = resolveFtueRailTargetKey(state ?? null, policy.allowed.target);
+  return key?.startsWith('order-serve:') ? { kind: 'serve', orderId: key.slice('order-serve:'.length) } : { kind: 'locked' };
 }
 
 export function mergeFtueAllowsChatNote(step: FtueStepDefinition | null, noteId: string) {
@@ -99,12 +182,12 @@ export function mergeFtueAllowsCommand(step: FtueStepDefinition | null, state: M
       && command.generatorId === policy.allowed.target.generatorId;
   }
   if (policy.allowed.kind === 'chat_note_tap') return false;
-  if (policy.allowed.kind === 'parcel_tap') return policy.allowed.target.kind === 'tray_parcel'
-    && command.type === 'claimArrival'
-    && command.arrivalId === policy.allowed.target.arrivalId;
-  return policy.allowed.target.kind === 'order_serve'
-    && command.type === 'serveOrder'
-    && command.orderId === policy.allowed.target.orderId;
+  if (policy.allowed.kind === 'parcel_tap') {
+    const key = resolveFtueRailTargetKey(state, policy.allowed.target);
+    return command.type === 'claimArrival' && key === `tray-parcel:${command.arrivalId}`;
+  }
+  const key = resolveFtueRailTargetKey(state, policy.allowed.target);
+  return command.type === 'serveOrder' && key === `order-serve:${command.orderId}`;
 }
 
 export function mergeFtueEventForCommand(
@@ -114,6 +197,10 @@ export function mergeFtueEventForCommand(
 ): FtueEvent | null {
   if (!result?.changed) return null;
   if (command.type === 'move' && result.mergedCell != null) {
+    if (result.residentCardRevealed) return {
+      type: 'resident_card_revealed', discoveryId: result.residentCardRevealed.discoveryId,
+      residentId: result.residentCardRevealed.residentId, revision: result.state.revision,
+    };
     if (result.companionDiscoveryAdvanced) return {
       type: 'companion_discovery_advanced',
       discoveryId: result.companionDiscoveryAdvanced.discoveryId,
@@ -155,11 +242,27 @@ export function mergeFtueEventForCommand(
     };
   }
   if (command.type === 'serveOrder' && result.servedOrderId) {
-    return { type: 'order_served', orderId: result.servedOrderId, revision: result.state.revision };
+    const order = before.activeOrders.find((candidate) => candidate.id === result.servedOrderId);
+    const residentDiscoveryId = order?.storyArcId && before.residentCardDiscovery.records.some((record) => record.id === order.storyArcId)
+      ? order.storyArcId
+      : undefined;
+    return {
+      type: 'order_served', orderId: result.servedOrderId,
+      ...(residentDiscoveryId ? { residentDiscoveryId } : {}),
+      revision: result.state.revision,
+    };
   }
   if (command.type === 'claimArrival') {
-    return { type: 'arrival_claimed', arrivalId: command.arrivalId, revision: result.state.revision };
+    const arrival = before.arrivals.find((candidate) => candidate.id === command.arrivalId);
+    const residentDiscoveryId = arrival?.kind === 'resident_card_parcel' ? arrival.discoveryId : undefined;
+    return {
+      type: 'arrival_claimed', arrivalId: command.arrivalId,
+      ...(residentDiscoveryId ? { residentDiscoveryId } : {}),
+      revision: result.state.revision,
+    };
   }
+  if (command.type === 'ackResidentCardDialogue') return { type: 'resident_dialogue_acknowledged', discoveryId: command.discoveryId, revision: result.state.revision };
+  if (command.type === 'ackResidentCardReveal') return { type: 'resident_card_reveal_acknowledged', discoveryId: command.discoveryId, revision: result.state.revision };
   return null;
 }
 
@@ -190,6 +293,23 @@ function matchingEvidenceCount(step: FtueStepDefinition, state: MergeWorldState)
       : state.companionDiscovery.records.some((record) => record.characterId === event.completedCharacterId) ? event.stage ?? 0 : 0;
     return activeStage;
   }
+  if (event.type === 'arrival_claimed' && event.residentDiscovery) {
+    const record = activeResidentDiscovery(state);
+    return record && record.status !== 'parcel_ready' ? 1 : 0;
+  }
+  if (event.type === 'resident_card_revealed') {
+    const record = activeResidentDiscovery(state);
+    return record && (record.status === 'revealed' || record.status === 'orders_active' || record.status === 'card_earned') ? 1 : 0;
+  }
+  if (event.type === 'resident_dialogue_acknowledged') {
+    return activeResidentDiscovery(state)?.dialogueSeenAt != null ? 1 : 0;
+  }
+  if (event.type === 'order_served' && event.residentDiscovery) {
+    return activeResidentDiscovery(state)?.servedOrderIds.length ?? 0;
+  }
+  if (event.type === 'resident_card_reveal_acknowledged') {
+    return activeResidentDiscovery(state)?.cardRevealSeenAt != null ? 1 : 0;
+  }
   return null;
 }
 
@@ -208,6 +328,11 @@ export function mergeFtueStepEntryBaseline(step: FtueStepDefinition | null, stat
  * means finish_sprout was skipped before the player performed it.
  */
 export function mergeFtueRepairTarget(step: FtueStepDefinition | null, state: MergeWorldState) {
+  if (step?.id.startsWith('merge.resident_')) {
+    const canonicalStep = residentFtueCanonicalStep(state);
+    if (!canonicalStep) return step.id === 'merge.resident_parcel' ? null : 'merge.resident_parcel';
+    return canonicalStep === step.id ? null : canonicalStep;
+  }
   if (step?.id !== 'merge.energy.finish_plant') return null;
   const count = (definitionId: string) => state.board.reduce((total, cell) => (
     total + Number(cell.occupant?.kind === 'item' && cell.occupant.definitionId === definitionId)
@@ -278,6 +403,25 @@ export function recoverMergeFtueEvent(stepOrId: FtueStepDefinition | string | nu
       completedCharacterId: event.completedCharacterId,
       revision: state.revision,
     };
+  }
+  const resident = activeResidentDiscovery(state);
+  if (event.type === 'arrival_claimed' && event.residentDiscovery && resident && resident.status !== 'parcel_ready' && 1 - baseline > progress) {
+    return { type: 'arrival_claimed', arrivalId: resident.parcelId ?? `arrival:${resident.id}`, residentDiscoveryId: resident.id, revision: state.revision };
+  }
+  if (event.type === 'resident_card_revealed' && resident && resident.revealedAt != null && 1 - baseline > progress) {
+    return { type: 'resident_card_revealed', discoveryId: resident.id, residentId: resident.residentId, revision: state.revision };
+  }
+  if (event.type === 'resident_dialogue_acknowledged' && resident?.dialogueSeenAt != null && 1 - baseline > progress) {
+    return { type: 'resident_dialogue_acknowledged', discoveryId: resident.id, revision: state.revision };
+  }
+  if (event.type === 'order_served' && event.residentDiscovery && resident && resident.servedOrderIds.length - baseline > progress) {
+    return {
+      type: 'order_served', orderId: resident.servedOrderIds[baseline + progress] ?? resident.servedOrderIds.at(-1)!,
+      residentDiscoveryId: resident.id, revision: state.revision,
+    };
+  }
+  if (event.type === 'resident_card_reveal_acknowledged' && resident?.cardRevealSeenAt != null && 1 - baseline > progress) {
+    return { type: 'resident_card_reveal_acknowledged', discoveryId: resident.id, revision: state.revision };
   }
   return null;
 }

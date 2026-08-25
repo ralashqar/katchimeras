@@ -38,6 +38,18 @@ test('developer navigation and tool implementations share the preview-safe gate'
   }
 });
 
+test('a global four-finger emergency gesture can escape an FTUE soft lock only in dev builds', () => {
+  const rootLayout = read('app/_layout.tsx');
+  assert.match(rootLayout, /event\.nativeEvent\.touches\.length < 4/);
+  assert.match(rootLayout, /DEV_TOOLS_ENABLED \? captureEmergencyDevGesture : undefined/);
+  assert.match(rootLayout, /router\.push\('\/dev-tools'\)/);
+  assert.match(rootLayout, /Stack\.Screen name="dev-tools"/);
+  const ftueNavigation = read('features/onboarding/ftue-navigation-reconciler.tsx');
+  assert.match(ftueNavigation, /ftueNavigationYieldsToDevRecovery\(pathnameRef\.current\)/);
+  assert.match(read('features/onboarding/ftue-dev-recovery.ts'), /'\/dev-'/);
+  assert.match(read('app/dev-tools.tsx'), /export \{ default \} from '\.\/\(tabs\)\/explore'/);
+});
+
 test('Journey developer tools expose scoped reset, quick mode, and full reset controls', () => {
   const devPage = read('app/(tabs)/explore.tsx');
   const settings = read('utils/dev-settings.ts');

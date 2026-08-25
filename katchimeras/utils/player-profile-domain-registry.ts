@@ -10,6 +10,7 @@ const EXACT_PROFILE_KEYS = new Set([
   'katchimeras.first-session.v3',
   'katchimeras.onboarding.recap.v1',
   'katchimeras.relationship-progression-v1',
+  'katchimeras.content-flow-migration.v1',
   'katchimera.wisps.v2',
   'katchimera.wisps.v1',
   'katchimera.scenes.v1',
@@ -77,4 +78,5 @@ export const PLAYER_PROFILE_STORAGE_KEYS = [...EXACT_PROFILE_KEYS] as readonly s
 export const PLAYER_PROFILE_DOMAIN_REGISTRY = [
   { id: 'keyValue', schemaVersion: 1, description: 'Player-owned local key/value stores' },
   { id: 'mergeWorld', schemaVersion: 1, description: 'Transactional Merge World SQLite snapshot' },
+  { id: 'contentFlow', schemaVersion: 1, description: 'Durable FTUE and Journey content-flow journal' },
 ] as const;

@@ -50,6 +50,8 @@ export function useCompanionConversationFlow({
   const automatedRef = useRef(new Set<string>());
   const node = definition && session ? conversationNode(definition, session.currentNodeId) : null;
   const journeyNarrative = definition?.purpose === 'journey' && definition.format === 'narrative';
+  const directResidentParcelHandoff = definition?.id === 'mossprout:game:form-finder'
+    && !session?.preview;
   const journeyNarrativeAdvanceReady = Boolean(
     journeyNarrative
     && (session?.pendingReply !== undefined || node?.kind === 'end')
@@ -88,14 +90,25 @@ export function useCompanionConversationFlow({
     onContinue();
   }, [definition, journeyNarrative, onContinue, session]);
 
+  // The first resident questionnaire already explains why this visitor is a
+  // match. Its reveal node is only a durable graph boundary; do not mount a
+  // second "preparing/waiting" screen before the actionable parcel panel.
   useLayoutEffect(() => {
-    if (!skipCompletedTransition || screenReaderEnabled || !session || !definition || session.outcomePresentation) return;
+    if (!directResidentParcelHandoff || !session || node?.kind !== 'form_reveal') return;
+    const key = `${session.id}:${node.id}:direct-resident-parcel`;
+    if (automatedRef.current.has(key)) return;
+    automatedRef.current.add(key);
+    onContinue();
+  }, [directResidentParcelHandoff, node, onContinue, session]);
+
+  useLayoutEffect(() => {
+    if (!skipCompletedTransition || (screenReaderEnabled && !directResidentParcelHandoff) || !session || !definition || session.outcomePresentation) return;
     if (session.status !== 'completed') return;
     const key = `${session.id}:complete`;
     if (automatedRef.current.has(key)) return;
     automatedRef.current.add(key);
     onComplete();
-  }, [definition, node?.kind, onComplete, screenReaderEnabled, session, skipCompletedTransition]);
+  }, [definition, directResidentParcelHandoff, node?.kind, onComplete, screenReaderEnabled, session, skipCompletedTransition]);
 
   useEffect(() => {
     if (!session || !definition || session.preview) return;
@@ -131,6 +144,7 @@ export function useCompanionConversationFlow({
     }
 
     if (node?.kind === 'form_reveal') {
+      if (directResidentParcelHandoff) return;
       if (screenReaderEnabled) return;
       const timer = setTimeout(onContinue, reduceMotion ? 120 : 1900);
       return () => clearTimeout(timer);
@@ -149,6 +163,11 @@ export function useCompanionConversationFlow({
     }
 
     if (session.status === 'completed') {
+      // The resident questionnaire is revisited after the card is earned so
+      // Mossprout can confirm the match. That final result is a deliberate
+      // player-controlled exit, even after a cold remount. Its earlier parcel
+      // handoff still completes through skipCompletedTransition above.
+      if (directResidentParcelHandoff) return;
       if (screenReaderEnabled) return;
       // Manual Journey narratives must remain on their authored handoff until
       // the player presses its action. FTUE opts into the immediate transition
@@ -163,7 +182,7 @@ export function useCompanionConversationFlow({
       }, reduceMotion ? 0 : 360);
       return () => clearTimeout(timer);
     }
-  }, [definition, journeyNarrative, node, onCommitInsight, onCommitMemory, onComplete, onContinue, onDismissOutcome, outcomeAutoAdvanceMs, outcomeRequiresManualAdvance, reduceMotion, screenReaderEnabled, session, skipCompletedTransition]);
+  }, [definition, directResidentParcelHandoff, journeyNarrative, node, onCommitInsight, onCommitMemory, onComplete, onContinue, onDismissOutcome, outcomeAutoAdvanceMs, outcomeRequiresManualAdvance, reduceMotion, screenReaderEnabled, session, skipCompletedTransition]);
 
   const advance = useCallback(() => {
     if (!session || !definition) return;

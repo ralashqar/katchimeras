@@ -14,7 +14,10 @@ import {
 export function MossproutJourneyRequestPanel({
   actionLabel = 'Go to the Garden',
   animateEntrance = true,
+  countLabel,
   disabled = false,
+  eyebrow = 'GARDEN REQUESTS',
+  fitContent = false,
   onAction,
   requests,
   standalone = false,
@@ -22,7 +25,10 @@ export function MossproutJourneyRequestPanel({
 }: {
   actionLabel?: string;
   animateEntrance?: boolean;
+  countLabel?: string;
   disabled?: boolean;
+  eyebrow?: string;
+  fitContent?: boolean;
   onAction?: () => void;
   requests: readonly CompanionMergeRequest[];
   standalone?: boolean;
@@ -32,7 +38,7 @@ export function MossproutJourneyRequestPanel({
     <Animated.View
       accessibilityLabel={`${title}. Garden requests`}
       entering={animateEntrance ? FadeInUp.duration(220) : undefined}
-      style={[styles.content, standalone && styles.standalone]}>
+      style={[styles.content, standalone && styles.standalone, fitContent && styles.fitContent]}>
       <View style={styles.heading}>
         <View style={styles.mark}>
           <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name="leaf.fill" size={19} />
@@ -43,7 +49,8 @@ export function MossproutJourneyRequestPanel({
       </View>
       <CompanionMergeRequestTray
         accessibilityLabel={`${title}. Garden requests`}
-        eyebrow="GARDEN REQUESTS"
+        countLabel={countLabel}
+        eyebrow={eyebrow}
         palette={COMPANION_MERGE_REQUEST_PALETTE}
         requests={requests}
       />
@@ -73,6 +80,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     padding: 10,
   },
+  fitContent: { flex: 0 },
   heading: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   mark: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.accent, borderRadius: 12, height: 34, justifyContent: 'center', width: 34 },
   headingCopy: { flex: 1, justifyContent: 'center' },

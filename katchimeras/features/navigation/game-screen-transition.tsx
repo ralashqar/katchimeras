@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import {
   createContext,
@@ -34,6 +35,7 @@ type TransitionPhase = 'idle' | 'covering' | 'covered' | 'waiting_ready' | 'reve
 
 type TransitionRequest = {
   announcement: string;
+  createdAt: number;
   id: number;
   navigate: () => void;
   target: GameSurfaceId;
@@ -46,7 +48,7 @@ type TransitionContextValue = {
   reportReadiness: (surface: GameSurfaceId, readiness: GameSurfaceReadiness) => void;
   suppressEntranceMotion: boolean;
   target: GameSurfaceId | null;
-  transitionTo: (request: Omit<TransitionRequest, 'id'>) => boolean;
+  transitionTo: (request: Omit<TransitionRequest, 'createdAt' | 'id'>) => boolean;
 };
 
 const READY: GameSurfaceReadiness = { background: true, data: true, foreground: true, layout: true };
@@ -56,6 +58,7 @@ const REVEAL_DURATION_MS = 280;
 const REDUCED_MOTION_DURATION_MS = 120;
 const MINIMUM_COVERED_MS = 120;
 const READINESS_TIMEOUT_MS = 8_000;
+const HARD_RECOVERY_TIMEOUT_MS = 10_000;
 
 const TransitionContext = createContext<TransitionContextValue | null>(null);
 
@@ -70,6 +73,7 @@ function missingReadiness(readiness: GameSurfaceReadiness) {
 }
 
 export function GameScreenTransitionProvider({ children }: PropsWithChildren) {
+  const pathname = usePathname();
   const [phase, setPhase] = useState<TransitionPhase>('idle');
   const [request, setRequest] = useState<TransitionRequest | null>(null);
   const [readiness, setReadiness] = useState<GameSurfaceReadiness>(READY);
@@ -81,18 +85,23 @@ export function GameScreenTransitionProvider({ children }: PropsWithChildren) {
   const coveredAtRef = useRef(0);
   const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hardRecoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pathnameRef = useRef(pathname);
 
   phaseRef.current = phase;
   requestRef.current = request;
   readinessRef.current = readiness;
+  pathnameRef.current = pathname;
 
   const clearTimers = useCallback(() => {
     if (navigationFrameRef.current !== null) cancelAnimationFrame(navigationFrameRef.current);
     if (revealTimerRef.current !== null) clearTimeout(revealTimerRef.current);
     if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
+    if (hardRecoveryTimerRef.current !== null) clearTimeout(hardRecoveryTimerRef.current);
     navigationFrameRef.current = null;
     revealTimerRef.current = null;
     timeoutRef.current = null;
+    hardRecoveryTimerRef.current = null;
   }, []);
 
   useEffect(() => clearTimers, [clearTimers]);
@@ -105,15 +114,27 @@ export function GameScreenTransitionProvider({ children }: PropsWithChildren) {
     setPhase(next);
   }, []);
 
-  const transitionTo = useCallback((next: Omit<TransitionRequest, 'id'>) => {
+  const transitionTo = useCallback((next: Omit<TransitionRequest, 'createdAt' | 'id'>) => {
     if (phaseRef.current !== 'idle') return false;
     clearTimers();
-    const created = { ...next, id: ++sequenceRef.current };
+    const created = { ...next, createdAt: Date.now(), id: ++sequenceRef.current };
     requestRef.current = created;
     readinessRef.current = NOT_READY;
     setRequest(created);
     setReadiness(NOT_READY);
     commitPhase('covering');
+    hardRecoveryTimerRef.current = setTimeout(() => {
+      const activeRequest = requestRef.current;
+      if (!activeRequest || activeRequest.id !== created.id || phaseRef.current === 'idle') return;
+      console.warn('[screen-transition] Hard recovery revealed a stalled curtain', {
+        elapsedMs: Date.now() - activeRequest.createdAt,
+        phase: phaseRef.current,
+        pathname: pathnameRef.current,
+        target: activeRequest.target,
+        transitionId: activeRequest.id,
+      });
+      commitPhase('revealing');
+    }, HARD_RECOVERY_TIMEOUT_MS);
     void AccessibilityInfo.announceForAccessibility(next.announcement);
     return true;
   }, [clearTimers, commitPhase]);
@@ -134,6 +155,14 @@ export function GameScreenTransitionProvider({ children }: PropsWithChildren) {
     const currentRequest = requestRef.current;
     if (!currentRequest || currentRequest.target !== surface) return;
     readinessRef.current = next;
+    if (__DEV__) {
+      console.info('[screen-transition] Destination readiness changed', {
+        pathname: pathnameRef.current,
+        readiness: next,
+        surface,
+        transitionId: currentRequest.id,
+      });
+    }
     setReadiness((current) => {
       if (
         current.background === next.background
@@ -165,8 +194,11 @@ export function GameScreenTransitionProvider({ children }: PropsWithChildren) {
         const activeRequest = requestRef.current;
         if (!activeRequest || activeRequest.id !== current.id) return;
         console.warn('[screen-transition] Destination readiness timed out', {
+          elapsedMs: Date.now() - activeRequest.createdAt,
           missing: missingReadiness(readinessRef.current),
+          pathname: pathnameRef.current,
           target: activeRequest.target,
+          transitionId: activeRequest.id,
         });
         beginReveal();
       }, READINESS_TIMEOUT_MS);

@@ -59,6 +59,7 @@ export type MergeDreamMist =
   | { kind: 'discovery_dormant'; characterIds: MergeCharacterId[] }
   | { kind: 'echo'; id: string; definitionId: string; ownerCharacterId: MergeCharacterId | null; generatorId?: string }
   | { kind: 'rootbound_echo'; id: string; gateId: string; definitionId: string; chapter: MossproutBoardChapter; ready: boolean }
+  | { kind: 'resident_card'; discoveryId: string; gateId: string; residentId: KatchimeraSkinId | null; ready: boolean }
   | { kind: 'discovery_fork'; gateId: string; candidateIds: MergeCharacterId[]; recommendedCharacterId: MergeCharacterId | null }
   | { kind: 'dreambound_item'; discoveryId: string; gateId: string; pathId: string; sequenceIndex: number; boundDefinitionId: string; active: boolean };
 
@@ -139,7 +140,7 @@ export type MergeCharacterActivityOpportunity = {
   createdAt: number;
 };
 
-export type KatchimeraCardAcquisition = 'journey_match' | 'story_resident' | 'coins';
+export type KatchimeraCardAcquisition = 'journey_match' | 'story_resident' | 'resident_discovery' | 'coins';
 
 export type OwnedKatchimeraCard = {
   cardId: KatchimeraSkinId;
@@ -271,6 +272,35 @@ export type CompanionDiscoveryProgress = {
   events: CompanionDiscoveryTelemetryEvent[];
 };
 
+export type ResidentCardDiscoveryStatus =
+  | 'locked'
+  | 'parcel_ready'
+  | 'parcel_claimed'
+  | 'revealed'
+  | 'orders_active'
+  | 'card_earned';
+
+export type ResidentCardDiscoveryRecord = {
+  id: string;
+  campaignId: string;
+  journeyDayId: string;
+  residentId: KatchimeraSkinId;
+  nodeGateId: string;
+  nodeCell: number;
+  status: ResidentCardDiscoveryStatus;
+  parcelId: string | null;
+  revealedAt: number | null;
+  dialogueSeenAt: number | null;
+  servedOrderIds: string[];
+  earnedAt: number | null;
+  cardRevealSeenAt: number | null;
+};
+
+export type ResidentCardDiscoveryProgress = {
+  records: ResidentCardDiscoveryRecord[];
+  campaignMilestoneReceiptIds: string[];
+};
+
 export type MergeRewardInboxEntry = {
   id: string;
   createdAt: number;
@@ -307,7 +337,7 @@ export type MergeLifeTheme =
 
 export type MergeWorldArrival = {
   id: string;
-  kind: 'contextual_parcel' | 'memory_arrival' | 'goal_chest' | 'discovery_parcel' | 'root_match_parcel';
+  kind: 'contextual_parcel' | 'memory_arrival' | 'goal_chest' | 'discovery_parcel' | 'root_match_parcel' | 'resident_card_parcel';
   createdAt: number;
   dayId: string;
   label: string;
@@ -352,7 +382,7 @@ export type MergeStepEnergyDay = {
 };
 
 export type MergeWorldState = {
-  version: 18;
+  version: 19;
   /** The first personal Merge World is owned by Mossprout. */
   ownerCharacterId: 'mossprout';
   revision: number;
@@ -394,6 +424,7 @@ export type MergeWorldState = {
   characterProgress: Partial<Record<MergeCharacterId, MergeCharacterProgress>>;
   externalRewardReceipts: MergeExternalRewardReceipt[];
   companionDiscovery: CompanionDiscoveryProgress;
+  residentCardDiscovery: ResidentCardDiscoveryProgress;
   mossproutBoardProgression: MossproutBoardProgression;
   haven: {
     tileStages: Partial<Record<MergeCharacterId, HavenStage>>;
@@ -429,6 +460,9 @@ export type MergeWorldCommand =
   | { type: 'openCompanionDiscoveryGate'; gateId: string; candidateIds: MergeCharacterId[]; recommendedCharacterId: MergeCharacterId | null; now: number }
   | { type: 'selectCompanionDiscoveryPath'; characterId: MergeCharacterId; now: number }
   | { type: 'ackCompanionDiscoveryReveal'; characterId: MergeCharacterId; now: number }
+  | { type: 'activateResidentCardDiscovery'; campaignId: string; journeyDayId: string; residentId: KatchimeraSkinId; now: number }
+  | { type: 'ackResidentCardDialogue'; discoveryId: string; now: number }
+  | { type: 'ackResidentCardReveal'; discoveryId: string; now: number }
   | { type: 'reconcileCharacters'; characterIds: string[]; now: number }
   | { type: 'reconcileFriendship'; levels: Partial<Record<MergeCharacterId, number>>; now: number }
   | { type: 'reconcileMossproutBoardProgression'; signals: MossproutProgressionSignals; dayId: string; now: number }
@@ -456,6 +490,8 @@ export type MergeWorldCommandResult = {
   mergedCell?: number;
   dreamEchoClearedId?: string;
   companionDiscoveryAdvanced?: { discoveryId: string; stage: number; completedCharacterId?: MergeCharacterId };
+  residentCardRevealed?: { discoveryId: string; residentId: KatchimeraSkinId };
+  residentCardEarned?: { discoveryId: string; residentId: KatchimeraSkinId };
   clearedMistCells?: number[];
   spawnedCell?: number;
   spawnedItems?: { instanceId: string; definitionId: string; progressionGateId?: string; cell: number }[];

@@ -6,7 +6,7 @@ import { ftuePersonalizationKey, useFtueRun } from '@/features/onboarding/ftue-r
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 
 export default function KatchimeraCompanionRoute() {
-  const { creatureId, source, story, ftue } = useLocalSearchParams<{ creatureId: string; source?: string; story?: string; ftue?: string }>();
+  const { creatureId, source, story, ftue, residentResume } = useLocalSearchParams<{ creatureId: string; source?: string; story?: string; ftue?: string; residentResume?: string }>();
   const ftueRun = useFtueRun();
   const isMossprout = creatureId === 'companion:mossprout';
   const ftueConversationDefinitionId = !isMossprout
@@ -28,6 +28,7 @@ export default function KatchimeraCompanionRoute() {
       creatureId={creatureId}
       ftueConversationDefinitionId={ftueConversationDefinitionId}
       journeyReturnConversationDefinitionId={journeyReturnConversationDefinitionId}
+      residentStoryResumeRequested={residentResume === '1'}
       source={source === 'merge-world' ? 'merge-world' : undefined}
     />
   );

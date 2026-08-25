@@ -1,5 +1,6 @@
 import { MERGE_ITEMS_BY_ID, MOSSPROUT_ROOTBOUND_GATES, MOSSPROUT_ROOTBOUND_GATES_BY_ID } from '@/constants/merge-world-catalog';
 import { selectMemoryCard } from '@/constants/memory-card-catalog';
+import { RETIRED_RESIDENT_NODE_ROOT_GATE_IDS } from '@/constants/resident-card-discovery';
 import type {
   MergeBoardCell,
   MergeWorldArrival,
@@ -78,6 +79,7 @@ export function reconcileMossproutBoardProgression(
   const queuedRootParcels = arrivals.filter((arrival) => arrival.kind === 'root_match_parcel' && arrival.claimedAt == null).length;
   const canQueueToday = progression.lastParcelDayId !== dayId && queuedRootParcels < 2;
   const eligible = MOSSPROUT_ROOTBOUND_GATES.filter((definition) => {
+    if (RETIRED_RESIDENT_NODE_ROOT_GATE_IDS.has(definition.id)) return false;
     const current = progression.gates[definition.id];
     if (current?.status === 'ready' || current?.status === 'awakened') return false;
     if (activeDayIds.length < definition.revealDay) return false;
@@ -126,6 +128,7 @@ export function reconcileMossproutBoardProgression(
 export function installMossproutRootboundEchoes(board: MergeBoardCell[], progression: MossproutBoardProgression): MergeBoardCell[] {
   let next = board;
   for (const definition of MOSSPROUT_ROOTBOUND_GATES) {
+    if (RETIRED_RESIDENT_NODE_ROOT_GATE_IDS.has(definition.id)) continue;
     const gate = progression.gates[definition.id];
     if (gate?.status === 'awakened') continue;
     const cell = next[definition.cell];
@@ -274,7 +277,7 @@ export function migrateMossproutRootParcels(state: MergeWorldState, rawVersion: 
   return arrivals === state.arrivals && progression === state.mossproutBoardProgression ? state : { ...state, arrivals, mossproutBoardProgression: progression };
 }
 
-function unlockMemoryNursery(state: MergeWorldState, now: number): MergeWorldState {
+export function unlockMemoryNursery(state: MergeWorldState, now: number): MergeWorldState {
   if (state.generators['memory-nursery']) return state;
   const preferred = 45;
   const cell = state.board[preferred]?.occupant == null && !state.board[preferred]?.locked && !state.board[preferred]?.mist

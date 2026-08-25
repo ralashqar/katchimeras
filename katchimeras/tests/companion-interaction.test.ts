@@ -420,7 +420,8 @@ test('a completed FTUE return cannot replay after an ordinary Garden visit', () 
   const provider = fs.readFileSync('features/merge-world/merge-world-provider.tsx', 'utf8');
 
   assert.match(route, /ftue === 'chapter-zero-return'[\s\S]*?ftueRun\?\.status === 'active'[\s\S]*?ftueRun\.stepId === 'companion\.chapter_zero_return'[\s\S]*?MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID/);
-  assert.match(interaction, /conversationSession\.status === 'completed'[\s\S]*?completedInitialConversationRef\.current = props\.conversationSession\.id;[\s\S]*?return;[\s\S]*?requestStoryConversation/);
+  assert.match(interaction, /conversationSession\.status === 'completed'[\s\S]*?A restored completed session still needs to run the completion effect[\s\S]*?return;[\s\S]*?requestStoryConversation/);
+  assert.doesNotMatch(interaction, /conversationSession\.status === 'completed'[\s\S]{0,600}?completedInitialConversationRef\.current = props\.conversationSession\.id/);
   assert.match(provider, /servedOrder\?\.storyArcId !== 'mossprout:casual-garden'[\s\S]*?recordKatchimeraActionCompletion/);
   assert.match(provider, /slotId: 'garden'[\s\S]*?kind: 'garden_request'[\s\S]*?subtitle: 'Garden request complete'/);
 });
@@ -827,11 +828,11 @@ test('active Journey presentation hides optional cards and Merge tray entries', 
   assert.doesNotMatch(stage, /visibleExternalCompletions = journeyExclusive \? \[\] : externalCompletions/);
   assert.match(stage, /const journeyMergeActive = journey\?\.status === 'activity_available' \|\| journey\?\.status === 'activity_in_progress'/);
   assert.match(stage, /journeyEpisode\.mergeOrders\.map/);
-  assert.match(stage, /journeyMergeActive && journeyEpisode \? <View[\s\S]*?<MossproutJourneyRequestPanel/);
+  assert.match(stage, /journeyMergeActive && journeyEpisode && !residentStoryResumeActive \? <View[\s\S]*?<MossproutJourneyRequestPanel/);
   assert.match(stage, /animateEntrance=\{false\}/);
   assert.match(stage, /standalone/);
   assert.match(stage, /const JOURNEY_REQUEST_TRAY_HEIGHT = 348/);
-  assert.match(stage, /style=\{\[styles\.stage, journeyMergeActive && styles\.journeyRequestStage\]\}/);
+  assert.match(stage, /journeyMergeActive && !residentStoryResumeActive[\s\S]*?styles\.journeyRequestStage/);
   assert.match(stage, /journeyRequestPanel:[\s\S]*?flex: 1/);
   assert.match(stage, /journey && !storyComplete && !journeyMergeActive/);
   assert.match(journeyPanel, /COMPANION_MERGE_REQUEST_PALETTE/);
@@ -872,7 +873,7 @@ test('Journey narrative replies and task bridge wait for the player', () => {
   assert.doesNotMatch(scene, /journeyRequestHandoffVisible && \{ flexGrow: 1, justifyContent: 'center' \}/);
   assert.match(scene, /journeyRequestHandoffVisible \? 'journey-handoff' : 'standard'/);
   assert.match(scene, /<MossproutJourneyRequestPanel[\s\S]*?animateEntrance=\{false\}/);
-  assert.match(journeyPanel, /<CompanionMergeRequestTray[\s\S]*?eyebrow="GARDEN REQUESTS"/);
+  assert.match(journeyPanel, /eyebrow = 'GARDEN REQUESTS'[\s\S]*?<CompanionMergeRequestTray[\s\S]*?eyebrow=\{eyebrow\}/);
   assert.match(interaction, /journeyOpeningEpisode\?\.mergeOrders\.map/);
   assert.match(interaction, /journeyTaskRequests=\{journeyTaskRequests\}/);
   assert.match(interaction, /journeyTaskTitle=\{journeyOpeningEpisode\?\.title\}/);

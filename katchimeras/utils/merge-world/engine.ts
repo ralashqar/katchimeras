@@ -55,6 +55,15 @@ import { mossproutWorldChapterForActiveDays, type MossproutWorldChapter } from '
 import { MOSSPROUT_EXTENDED_JOURNEY_BEATS, mossproutExtendedBeatByObjectiveId } from '@/constants/mossprout-journey-chapters';
 import { mossproutCampaignEpisodeByBeatId, mossproutCampaignEpisodeByObjectiveId } from '@/constants/mossprout-campaign';
 import { MOSSPROUT_GARDEN_RESIDENT_IDS, MOSSPROUT_RESIDENT_IDS, MOSSPROUT_WEATHER_RESIDENT_IDS, mossproutResidentById } from '@/constants/mossprout-residents';
+import {
+  MOSSPROUT_RESIDENT_CARD_NODE_BY_GATE,
+  MOSSPROUT_RESIDENT_CARD_NODE_BY_RESIDENT,
+  MOSSPROUT_RESIDENT_CARD_NODES,
+  LEGACY_RESIDENT_CARD_KEY_DEFINITION_ID,
+  RESIDENT_CARD_DEFINITION_ID,
+  RETIRED_RESIDENT_NODE_ROOT_GATE_IDS,
+  residentDiscoveryOrders,
+} from '@/constants/resident-card-discovery';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import {
   awakenMossproutRoot,
@@ -64,6 +73,7 @@ import {
   normalizeMossproutBoardProgression,
   reconcileMossproutBoardProgression,
   useGrovelightResonance,
+  unlockMemoryNursery,
 } from '@/utils/merge-world/mossprout-board-progression';
 import {
   allocateCompanionDiscoveryPath,
@@ -100,7 +110,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     occupant: null,
   }));
   let state: MergeWorldState = {
-    version: 18,
+    version: 19,
     ownerCharacterId: 'mossprout',
     revision: 0,
     createdAt: now,
@@ -143,6 +153,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     companionDiscovery: {
       records: [], openedGateIds: [], completedGateIds: [], queuedGateIds: [], active: null, lastStartedDayId: null, events: [],
     },
+    residentCardDiscovery: { records: [], campaignMilestoneReceiptIds: [] },
     mossproutBoardProgression: emptyMossproutBoardProgression(),
     haven: { tileStages: {}, revealState: 'hidden', mossproutStoryLevel: 0, nextProceduralOrder: 1 },
   };
@@ -150,6 +161,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
   if (state.unlockedCharacters.includes('mossprout')) {
     state = { ...state, board: installMossproutRootboundEchoes(state.board, state.mossproutBoardProgression) };
   }
+  state = { ...state, board: installResidentCardNodes(state.board, state.residentCardDiscovery) };
   return state;
 }
 
@@ -232,6 +244,12 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
         companionDiscovery: { ...current.companionDiscovery, records },
       }, command.now)) : unchanged(current);
     }
+    case 'activateResidentCardDiscovery':
+      return activateResidentCardDiscovery(current, command, command.now);
+    case 'ackResidentCardDialogue':
+      return ackResidentCardDialogue(current, command.discoveryId, command.now);
+    case 'ackResidentCardReveal':
+      return ackResidentCardReveal(current, command.discoveryId, command.now);
     case 'reconcileCharacters': {
       const next = reconcileCharacters(current, command.characterIds, command.now);
       return result(state, next, next === current ? undefined : 'Merge World welcomed new visitors.');
@@ -245,7 +263,8 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
       return result(state, next, next === current ? undefined : 'Story request refreshed.');
     }
     case 'reconcileMossproutBoardProgression': {
-      const next = reconcileMossproutBoardProgression(current, command.signals, command.dayId, command.now);
+      const roots = reconcileMossproutBoardProgression(current, command.signals, command.dayId, command.now);
+      const next = grantRetiredRootMilestones(roots, command.signals.activeJourneyDayIds.length, command.now);
       return result(current, next === current ? current : touch(next, command.now), next === current ? undefined : 'Mossprout’s roots shifted beneath the Mist.');
     }
     case 'useGrovelightResonance': {
@@ -282,6 +301,39 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
       return changed(touch({ ...current, externalRewardReceipts: receipts }, command.now));
     }
   }
+}
+
+function grantRetiredRootMilestones(state: MergeWorldState, activeDays: number, now: number): MergeWorldState {
+  const receipts = new Set(state.residentCardDiscovery.campaignMilestoneReceiptIds);
+  let next = state;
+  const grant = (id: string, day: number, apply: (current: MergeWorldState) => MergeWorldState) => {
+    if (activeDays < day || receipts.has(id)) return;
+    next = apply(next);
+    receipts.add(id);
+  };
+  grant('retired-root:day-7-two-shores', 7, (current) => {
+    const installed = ensureCharacterGenerators(current, 'mossprout', now);
+    const generator = installed.generators['wild-garden'];
+    return generator && generator.level < 2 ? { ...installed, generators: { ...installed.generators, 'wild-garden': { ...generator, level: 2 } } } : installed;
+  });
+  grant('retired-root:memory-two-days', 12, (current) => current.externalRewardReceipts.some((receipt) => receipt.id === 'retired-root:wisp:fern') ? current : {
+    ...current,
+    externalRewardReceipts: [...current.externalRewardReceipts, { id: 'retired-root:wisp:fern', kind: 'wisp', characterId: 'mossprout', amount: 1, wispId: 'fern', sourceId: 'resident-node-migration', createdAt: now, appliedAt: null }],
+  });
+  grant('retired-root:focus-first', 14, (current) => {
+    const installed = ensureCharacterGenerators(current, 'mossprout', now);
+    const generator = installed.generators['wild-garden'];
+    return generator && generator.level < 3 ? { ...installed, generators: { ...installed.generators, 'wild-garden': { ...generator, level: 3 } } } : installed;
+  });
+  grant('retired-root:nursery-key', 15, (current) => unlockMemoryNursery(current, now));
+  grant('retired-root:memory-three-days', 17, (current) => current.rewardInbox.some((entry) => entry.id === 'retired-root:keepsake') ? current : {
+    ...current,
+    rewardInbox: [...current.rewardInbox, { id: 'retired-root:keepsake', createdAt: now, items: ['nature:keepsake:2'], source: 'activity' }],
+  });
+  const campaignMilestoneReceiptIds = [...receipts];
+  return campaignMilestoneReceiptIds.length === state.residentCardDiscovery.campaignMilestoneReceiptIds.length && next === state
+    ? state
+    : { ...next, residentCardDiscovery: { ...next.residentCardDiscovery, campaignMilestoneReceiptIds } };
 }
 
 export function mergeOrderReady(state: MergeWorldState, order: MergeOrder): boolean {
@@ -334,6 +386,10 @@ export function resetMergeActivityForDay(
   now = Date.now(),
   stepEnergyDayId?: string,
 ): MergeWorldState {
+  const residentDiscoveries = state.residentCardDiscovery.records.filter((record) => record.journeyDayId === dayId);
+  const residentDiscoveryIds = new Set(residentDiscoveries.map((record) => record.id));
+  const residentGateIds = new Set(residentDiscoveries.map((record) => record.nodeGateId));
+  const residentIds = new Set(residentDiscoveries.map((record) => record.residentId));
   const receiptIds = new Set([
     `activity:egg-journal:${dayId}`,
     `activity:egg-companion:${dayId}`,
@@ -343,7 +399,7 @@ export function resetMergeActivityForDay(
   ]);
   const processedActivityReceiptIds = state.processedActivityReceiptIds.filter((id) => !receiptIds.has(id)
     && !(id.startsWith('activity:goal-chest:') && id.endsWith(`:${dayId}`)));
-  const arrivals = state.arrivals.filter((arrival) => arrival.dayId !== dayId);
+  const arrivals = state.arrivals.filter((arrival) => arrival.dayId !== dayId && !residentDiscoveryIds.has(arrival.discoveryId ?? ''));
   const activityEnergyByDay = { ...state.activityEnergyByDay };
   const hadDailyTotal = Object.prototype.hasOwnProperty.call(activityEnergyByDay, dayId);
   delete activityEnergyByDay[dayId];
@@ -354,7 +410,7 @@ export function resetMergeActivityForDay(
   const gardenChapter = mossproutWorldChapterForActiveDays(state.mossproutBoardProgression.activeDayIds.length);
   const freshGardenOrders = resetsMossproutGarden ? mossproutDailyGardenOrderBatch(dayId, now, gardenChapter.id, state.mossproutResidentSkinIds) : [];
   const visibleGardenOrders = freshGardenOrders.slice(0, mossproutDailyGardenOrderWindow(gardenChapter.id));
-  const activeOrders = resetsMossproutGarden
+  let activeOrders = resetsMossproutGarden
     ? [
         ...state.activeOrders.filter((order) => (
           order.characterId !== 'mossprout'
@@ -365,6 +421,7 @@ export function resetMergeActivityForDay(
         ...visibleGardenOrders,
       ]
     : state.activeOrders;
+  activeOrders = activeOrders.filter((order) => !residentDiscoveryIds.has(order.storyArcId ?? ''));
   const mossproutDailyGardenOrders = resetsMossproutGarden ? {
     dayId,
     chapterId: gardenChapter.id,
@@ -377,12 +434,29 @@ export function resetMergeActivityForDay(
     activeTailSequences: [],
     lastRecipientSkinId: null,
   } : state.mossproutDailyGardenOrders;
+  const residentCardDiscovery = residentDiscoveries.length === 0 ? state.residentCardDiscovery : {
+    ...state.residentCardDiscovery,
+    records: state.residentCardDiscovery.records.filter((record) => !residentDiscoveryIds.has(record.id)),
+  };
+  const ownedKatchimeraCards = residentDiscoveries.length === 0 ? state.ownedKatchimeraCards : state.ownedKatchimeraCards.filter((card) => (
+    !residentIds.has(card.cardId) || card.acquisition !== 'resident_discovery'
+  ));
+  const mossproutResidentSkinIds = MOSSPROUT_RESIDENT_IDS.filter((residentId) => (
+    residentId === 'mossprout' || ownedKatchimeraCards.some((card) => card.cardId === residentId)
+  ));
+  let board = residentDiscoveries.length === 0 ? state.board : state.board.map((cell) => (
+    cell.occupant?.kind === 'item' && residentGateIds.has(cell.occupant.progressionGateId ?? '')
+      ? { ...cell, occupant: null }
+      : cell
+  ));
+  board = installResidentCardNodes(board, residentCardDiscovery);
   if (
     !hadDailyTotal
     && !hadStepClaim
     && !resetsMossproutGarden
     && processedActivityReceiptIds.length === state.processedActivityReceiptIds.length
     && arrivals.length === state.arrivals.length
+    && residentDiscoveries.length === 0
   ) return state;
   return touch({
     ...state,
@@ -392,6 +466,10 @@ export function resetMergeActivityForDay(
     arrivals,
     activeOrders,
     mossproutDailyGardenOrders,
+    board,
+    residentCardDiscovery,
+    ownedKatchimeraCards,
+    mossproutResidentSkinIds,
   }, now);
 }
 
@@ -402,14 +480,14 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   // v18 intentionally starts the first personal Merge World cleanly. Earlier
   // snapshots are shared-board prototypes and cannot be assigned safely to a
   // single companion without carrying their ownership compromises forward.
-  if (rawVersion !== 18 || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
+  if ((rawVersion !== 18 && rawVersion !== 19) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
     return createInitialMergeWorldState(now);
   }
   const fallback = createInitialMergeWorldState(now);
   let normalized: MergeWorldState = {
     ...fallback,
     ...source,
-    version: 18,
+    version: 19,
     ownerCharacterId: 'mossprout',
     revision: finite(source.revision, 0),
     createdAt: finite(source.createdAt, now),
@@ -466,7 +544,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
             definition
             && definition.familyId === card.familyId
             && KNOWN_CHARACTERS.has(card.familyId)
-            && (card.acquisition === 'journey_match' || card.acquisition === 'story_resident' || card.acquisition === 'coins')
+            && (card.acquisition === 'journey_match' || card.acquisition === 'story_resident' || card.acquisition === 'resident_discovery' || card.acquisition === 'coins')
             && typeof card.sourceReceiptId === 'string'
           );
         }).map((card) => ({
@@ -493,6 +571,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
       : fallback.characterProgress,
     externalRewardReceipts: Array.isArray(source.externalRewardReceipts) ? source.externalRewardReceipts : [],
     companionDiscovery: normalizeCompanionDiscovery(source.companionDiscovery, source.unlockedCharacters, source.activeOrders, rawVersion, now),
+    residentCardDiscovery: normalizeResidentCardDiscovery(source.residentCardDiscovery, source.ownedKatchimeraCards, now),
     mossproutBoardProgression: normalizeMossproutBoardProgression(source.mossproutBoardProgression),
     haven: normalizeHaven(source.haven, source, rawVersion),
   };
@@ -509,9 +588,13 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   normalized = enforceMossproutChapterZeroDropOverride(normalized);
   normalized = migrateActivityInbox(normalized);
   normalized = migrateMossproutRootParcels(normalized, rawVersion, now);
+  normalized = migrateRetiredRootsToResidentNodes(normalized);
+  normalized = migrateResidentCardItems(normalized);
+  normalized = recoverResidentCardDiscovery(normalized, now);
   if (normalized.unlockedCharacters.includes('mossprout')) {
     normalized = { ...normalized, board: installMossproutRootboundEchoes(normalized.board, normalized.mossproutBoardProgression) };
   }
+  normalized = { ...normalized, board: installResidentCardNodes(normalized.board, normalized.residentCardDiscovery) };
   normalized = reconcileDiscoveryMist(normalized, now);
   // Version 1/2 Pantry charges, cooldowns, and parcels intentionally disappear.
   // Version 3's five single-chain generators migrate into the shared eight.
@@ -944,6 +1027,188 @@ function discoveryArrival(definition: CompanionDiscoveryDefinition, now: number)
   };
 }
 
+function normalizeResidentCardDiscovery(
+  value: unknown,
+  ownedCards: MergeWorldState['ownedKatchimeraCards'] | undefined,
+  now: number,
+): MergeWorldState['residentCardDiscovery'] {
+  const raw = value && typeof value === 'object' ? value as Partial<MergeWorldState['residentCardDiscovery']> : {};
+  const records = Array.isArray(raw.records) ? raw.records.filter((record) => (
+    record && typeof record.id === 'string' && typeof record.residentId === 'string'
+    && MOSSPROUT_RESIDENT_CARD_NODE_BY_RESIDENT.has(record.residentId)
+  )).map((record) => ({
+    ...record,
+    campaignId: typeof record.campaignId === 'string' ? record.campaignId : 'mossprout:journey',
+    journeyDayId: typeof record.journeyDayId === 'string' ? record.journeyDayId : 'legacy',
+    servedOrderIds: uniqueStrings(record.servedOrderIds),
+    revealedAt: record.revealedAt == null ? null : finite(record.revealedAt, now),
+    dialogueSeenAt: record.dialogueSeenAt == null ? null : finite(record.dialogueSeenAt, now),
+    earnedAt: record.earnedAt == null ? null : finite(record.earnedAt, now),
+    cardRevealSeenAt: record.cardRevealSeenAt == null ? null : finite(record.cardRevealSeenAt, now),
+  })) : [];
+  const byResident = new Map(records.map((record) => [record.residentId, record]));
+  for (const card of ownedCards ?? []) {
+    const node = MOSSPROUT_RESIDENT_CARD_NODE_BY_RESIDENT.get(card.cardId);
+    if (!node || byResident.has(card.cardId)) continue;
+    const record = {
+      id: `resident-discovery:legacy:${card.cardId}`,
+      campaignId: 'legacy', journeyDayId: 'legacy', residentId: card.cardId,
+      nodeGateId: node.gateId, nodeCell: node.cell, status: 'card_earned' as const,
+      parcelId: null, revealedAt: card.acquiredAt, dialogueSeenAt: card.acquiredAt,
+      servedOrderIds: [], earnedAt: card.acquiredAt, cardRevealSeenAt: card.acquiredAt,
+    };
+    records.push(record);
+    byResident.set(card.cardId, record);
+  }
+  return { records, campaignMilestoneReceiptIds: uniqueStrings(raw.campaignMilestoneReceiptIds) };
+}
+
+function migrateRetiredRootsToResidentNodes(state: MergeWorldState): MergeWorldState {
+  const board = state.board.map((cell) => cell.occupant?.kind === 'item' && cell.occupant.progressionGateId && RETIRED_RESIDENT_NODE_ROOT_GATE_IDS.has(cell.occupant.progressionGateId)
+    ? { ...cell, occupant: null }
+    : cell);
+  const storage = state.storage.filter((item) => !item.progressionGateId || !RETIRED_RESIDENT_NODE_ROOT_GATE_IDS.has(item.progressionGateId));
+  const arrivals = state.arrivals.filter((arrival) => arrival.claimedAt != null || !arrival.progressionGateId || !RETIRED_RESIDENT_NODE_ROOT_GATE_IDS.has(arrival.progressionGateId));
+  return board.every((cell, index) => cell === state.board[index]) && storage.length === state.storage.length && arrivals.length === state.arrivals.length
+    ? state
+    : { ...state, board, storage, arrivals };
+}
+
+function migrateResidentCardItems(state: MergeWorldState): MergeWorldState {
+  const migrateItem = (item: MergeBoardItem): MergeBoardItem => item.definitionId === LEGACY_RESIDENT_CARD_KEY_DEFINITION_ID
+    ? { ...item, definitionId: RESIDENT_CARD_DEFINITION_ID }
+    : item;
+  const board = state.board.map((cell) => cell.occupant?.kind === 'item'
+    ? { ...cell, occupant: migrateItem(cell.occupant) }
+    : cell);
+  const storage = state.storage.map(migrateItem);
+  const arrivals = state.arrivals.map((arrival) => arrival.kind === 'resident_card_parcel'
+    ? { ...arrival, itemDefinitionIds: arrival.itemDefinitionIds.map((id) => id === LEGACY_RESIDENT_CARD_KEY_DEFINITION_ID ? RESIDENT_CARD_DEFINITION_ID : id) }
+    : arrival);
+  return { ...state, board, storage, arrivals };
+}
+
+function recoverResidentCardDiscovery(state: MergeWorldState, now: number): MergeWorldState {
+  let arrivals = state.arrivals;
+  let records = state.residentCardDiscovery.records;
+  for (const record of state.residentCardDiscovery.records) {
+    if (record.status !== 'parcel_ready' && record.status !== 'parcel_claimed') continue;
+    const cardExists = state.board.some((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === RESIDENT_CARD_DEFINITION_ID && cell.occupant.progressionGateId === record.nodeGateId)
+      || state.storage.some((item) => item.definitionId === RESIDENT_CARD_DEFINITION_ID && item.progressionGateId === record.nodeGateId);
+    const unclaimed = arrivals.find((arrival) => arrival.kind === 'resident_card_parcel' && arrival.discoveryId === record.id && arrival.claimedAt == null);
+    if (cardExists || unclaimed) continue;
+    const parcelId = `${record.parcelId ?? `arrival:${record.id}`}:reissue`;
+    arrivals = [...arrivals, {
+      id: parcelId, kind: 'resident_card_parcel', createdAt: now, dayId: localDayId(now), label: 'A veiled resident parcel',
+      theme: 'nature', familyId: 'nature', chainId: 'nature:root-memory', characterId: 'mossprout', source: 'companion_progression',
+      discoveryId: record.id, progressionGateId: record.nodeGateId, itemDefinitionIds: [RESIDENT_CARD_DEFINITION_ID], claimedAt: null, seenAt: null,
+    }];
+    records = records.map((candidate) => candidate.id === record.id ? { ...candidate, parcelId, status: 'parcel_ready' as const } : candidate);
+  }
+  return arrivals === state.arrivals && records === state.residentCardDiscovery.records ? state : {
+    ...state, arrivals, residentCardDiscovery: { ...state.residentCardDiscovery, records },
+  };
+}
+
+function installResidentCardNodes(
+  board: MergeWorldState['board'],
+  progress: MergeWorldState['residentCardDiscovery'],
+): MergeWorldState['board'] {
+  let next = board;
+  const activeRecord = [...progress.records].reverse().find((record) => record.status === 'parcel_ready' || record.status === 'parcel_claimed') ?? null;
+  for (const node of MOSSPROUT_RESIDENT_CARD_NODES) {
+    // A resident occupies the physical card cell the player actually chose.
+    // Resident identity is authored by the Journey and is deliberately not
+    // hard-wired to a particular locked card position.
+    const openedRecord = progress.records.find((candidate) => candidate.nodeCell === node.cell
+      && (candidate.status === 'revealed' || candidate.status === 'orders_active' || candidate.status === 'card_earned'));
+    const opened = Boolean(openedRecord);
+    const cell = next[node.cell];
+    if (!cell || cell.occupant) continue;
+    if (opened) {
+      if (!cell.locked && !cell.mist) continue;
+      if (next === board) next = [...board];
+      next[node.cell] = { ...cell, locked: false, blocker: null, mist: null };
+      continue;
+    }
+    const ready = Boolean(activeRecord);
+    const residentId = ready ? activeRecord!.residentId : null;
+    const discoveryId = activeRecord?.id ?? `resident-node:${node.residentId}`;
+    if (cell.mist?.kind === 'resident_card' && cell.mist.gateId === node.gateId && cell.mist.discoveryId === discoveryId && cell.mist.ready === ready && cell.mist.residentId === residentId) continue;
+    if (next === board) next = [...board];
+    next[node.cell] = {
+      ...cell,
+      locked: true,
+      blocker: 'vines',
+      mist: { kind: 'resident_card', discoveryId, gateId: node.gateId, residentId, ready },
+    };
+  }
+  return next;
+}
+
+function activateResidentCardDiscovery(
+  state: MergeWorldState,
+  command: Extract<MergeWorldCommand, { type: 'activateResidentCardDiscovery' }>,
+  now: number,
+): MergeWorldCommandResult {
+  const node = MOSSPROUT_RESIDENT_CARD_NODE_BY_RESIDENT.get(command.residentId);
+  if (!node || command.residentId === 'mossprout') return unchanged(state, 'This resident does not have a campaign card node.');
+  const existing = state.residentCardDiscovery.records.find((record) => record.residentId === command.residentId);
+  if (existing) return unchanged({ ...state, board: installResidentCardNodes(state.board, state.residentCardDiscovery) });
+  const occupiedCells = new Set(state.residentCardDiscovery.records
+    .filter((record) => record.status === 'revealed' || record.status === 'orders_active' || record.status === 'card_earned')
+    .map((record) => record.nodeCell));
+  const allocatedNode = !occupiedCells.has(node.cell)
+    ? node
+    : MOSSPROUT_RESIDENT_CARD_NODES.find((candidate) => !occupiedCells.has(candidate.cell));
+  if (!allocatedNode) return unchanged(state, 'Every resident card space has already been revealed.');
+  const id = `resident-discovery:${command.journeyDayId}:${command.residentId}`;
+  const parcelId = `arrival:${id}`;
+  const record: MergeWorldState['residentCardDiscovery']['records'][number] = {
+    id, campaignId: command.campaignId, journeyDayId: command.journeyDayId, residentId: command.residentId,
+    nodeGateId: allocatedNode.gateId, nodeCell: allocatedNode.cell, status: 'parcel_ready', parcelId,
+    revealedAt: null, dialogueSeenAt: null, servedOrderIds: [], earnedAt: null, cardRevealSeenAt: null,
+  };
+  const arrival: MergeWorldArrival = {
+    id: parcelId, kind: 'resident_card_parcel', createdAt: now, dayId: localDayId(now),
+    label: 'A veiled resident parcel', theme: 'nature', familyId: 'nature', chainId: 'nature:root-memory',
+    characterId: 'mossprout', source: 'companion_progression', discoveryId: id, progressionGateId: allocatedNode.gateId,
+    itemDefinitionIds: [RESIDENT_CARD_DEFINITION_ID], claimedAt: null, seenAt: null,
+  };
+  const residentCardDiscovery = { ...state.residentCardDiscovery, records: [...state.residentCardDiscovery.records, record] };
+  const next = touch({
+    ...state,
+    residentCardDiscovery,
+    arrivals: state.arrivals.some((candidate) => candidate.id === parcelId) ? state.arrivals : [...state.arrivals, arrival],
+    board: installResidentCardNodes(state.board, residentCardDiscovery),
+  }, now);
+  return changed(next, 'A veiled card parcel is waiting for you.');
+}
+
+function ackResidentCardDialogue(state: MergeWorldState, discoveryId: string, now: number): MergeWorldCommandResult {
+  const record = state.residentCardDiscovery.records.find((candidate) => candidate.id === discoveryId);
+  if (!record || (record.status !== 'revealed' && record.status !== 'orders_active')) return unchanged(state);
+  const orders = residentDiscoveryOrders(discoveryId, record.residentId, now);
+  const first = orders[0];
+  const activeOrders = state.activeOrders.some((order) => order.id === first.id) || record.servedOrderIds.includes(first.id)
+    ? state.activeOrders
+    : [...state.activeOrders.filter((order) => order.storyArcId !== discoveryId), first];
+  const records = state.residentCardDiscovery.records.map((candidate) => candidate.id === discoveryId
+    ? { ...candidate, status: 'orders_active' as const, dialogueSeenAt: candidate.dialogueSeenAt ?? now }
+    : candidate);
+  return changed(touch({ ...state, activeOrders, residentCardDiscovery: { ...state.residentCardDiscovery, records } }, now), `${record.residentId} has a first garden request.`);
+}
+
+function ackResidentCardReveal(state: MergeWorldState, discoveryId: string, now: number): MergeWorldCommandResult {
+  let updated = false;
+  const records = state.residentCardDiscovery.records.map((record) => {
+    if (record.id !== discoveryId || record.status !== 'card_earned' || record.cardRevealSeenAt != null) return record;
+    updated = true;
+    return { ...record, cardRevealSeenAt: now };
+  });
+  return updated ? changed(touch({ ...state, residentCardDiscovery: { ...state.residentCardDiscovery, records } }, now)) : unchanged(state);
+}
+
 function moveItem(state: MergeWorldState, from: number, to: number, now: number): MergeWorldCommandResult {
   if (!validCell(from) || !validCell(to) || from === to) return unchanged(state, 'Choose an open board space.');
   const source = state.board[from].occupant;
@@ -951,6 +1216,30 @@ function moveItem(state: MergeWorldState, from: number, to: number, now: number)
   if (!source) return unchanged(state);
   const companionDiscoveryResult = advanceCompanionDiscovery(state, from, to, now);
   if (companionDiscoveryResult) return companionDiscoveryResult;
+  const residentCard = state.board[to].mist?.kind === 'resident_card' ? state.board[to].mist : null;
+  if (residentCard) {
+    if (!residentCard.ready) return unchanged(state, 'This card is still veiled.', 'sealed_mist');
+    const record = state.residentCardDiscovery.records.find((candidate) => candidate.id === residentCard.discoveryId
+      && candidate.status === 'parcel_claimed');
+    if (source.kind !== 'item' || source.definitionId !== RESIDENT_CARD_DEFINITION_ID || !record || source.progressionGateId !== record.nodeGateId) {
+      return unchanged(state, 'Bring a sealed resident card from its parcel to this card.', 'wrong_echo_match');
+    }
+    if (!record) return unchanged(state);
+    const board = [...state.board];
+    board[from] = { ...board[from], occupant: null };
+    board[to] = { ...board[to], locked: false, blocker: null, mist: null, occupant: null };
+    const records = state.residentCardDiscovery.records.map((candidate) => candidate.id === record.id
+      ? { ...candidate, nodeCell: to, nodeGateId: residentCard.gateId, status: 'revealed' as const, revealedAt: candidate.revealedAt ?? now }
+      : candidate);
+    const residentCardDiscovery = { ...state.residentCardDiscovery, records };
+    const settledBoard = installResidentCardNodes(board, residentCardDiscovery);
+    return {
+      state: touch({ ...state, board: settledBoard, residentCardDiscovery }, now),
+      changed: true, mergedCell: to, clearedMistCells: [to],
+      residentCardRevealed: { discoveryId: record.id, residentId: record.residentId },
+      message: `${record.residentId} was hiding behind the card.`,
+    };
+  }
   const rootbound = state.board[to].mist?.kind === 'rootbound_echo' ? state.board[to].mist : null;
   if (rootbound) {
     if (!rootbound.ready) return unchanged(state, 'This root is still listening for its condition.', 'sealed_mist');
@@ -1128,6 +1417,7 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
       upgradeFragments: fragmentGenerator.upgradeFragments + (order.signature || order.storyArcId ? 2 : 1),
     },
   } : state.generators;
+  let residentCardEarned: MergeWorldCommandResult['residentCardEarned'];
   let next: MergeWorldState = {
     ...state,
     board,
@@ -1231,6 +1521,49 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
       generators: { ...next.generators, [generatorId]: { ...discoveryGenerator, forcedDropDefinitionId: null } },
     };
   }
+  const residentDiscovery = order.storyArcId
+    ? next.residentCardDiscovery.records.find((record) => record.id === order.storyArcId && record.status === 'orders_active')
+    : null;
+  if (residentDiscovery) {
+    const authoredOrders = residentDiscoveryOrders(residentDiscovery.id, residentDiscovery.residentId, now);
+    const servedOrderIds = [...new Set([...residentDiscovery.servedOrderIds, order.id])];
+    const nextAuthoredOrder = authoredOrders.find((candidate) => !servedOrderIds.includes(candidate.id));
+    let ownedKatchimeraCards = next.ownedKatchimeraCards;
+    let mossproutResidentSkinIds = next.mossproutResidentSkinIds;
+    const earned = !nextAuthoredOrder;
+    if (earned) {
+      const sourceReceiptId = `resident-discovery-card:${residentDiscovery.id}`;
+      if (!ownedKatchimeraCards.some((card) => card.cardId === residentDiscovery.residentId || card.sourceReceiptId === sourceReceiptId)) {
+        ownedKatchimeraCards = [...ownedKatchimeraCards, {
+          cardId: residentDiscovery.residentId,
+          familyId: 'mossprout',
+          acquisition: 'resident_discovery',
+          sourceReceiptId,
+          acquiredAt: now,
+          coinCost: 0,
+        }];
+      }
+      mossproutResidentSkinIds = MOSSPROUT_RESIDENT_IDS.filter((id) => id === 'mossprout' || ownedKatchimeraCards.some((card) => card.cardId === id));
+      residentCardEarned = { discoveryId: residentDiscovery.id, residentId: residentDiscovery.residentId };
+    }
+    const records = next.residentCardDiscovery.records.map((record) => record.id === residentDiscovery.id
+      ? {
+          ...record,
+          servedOrderIds,
+          status: earned ? 'card_earned' as const : 'orders_active' as const,
+          earnedAt: earned ? record.earnedAt ?? now : record.earnedAt,
+        }
+      : record);
+    next = {
+      ...next,
+      activeOrders: nextAuthoredOrder && !next.activeOrders.some((candidate) => candidate.id === nextAuthoredOrder.id)
+        ? [...next.activeOrders.filter((candidate) => candidate.storyArcId !== residentDiscovery.id), nextAuthoredOrder]
+        : next.activeOrders,
+      ownedKatchimeraCards,
+      mossproutResidentSkinIds,
+      residentCardDiscovery: { ...next.residentCardDiscovery, records },
+    };
+  }
   const awakening = MOSSPROUT_STORY_AWAKENINGS[order.id as keyof typeof MOSSPROUT_STORY_AWAKENINGS];
   let clearedMistCells: number[] | undefined;
   if (awakening && !next.boardAwakeningReceipts.some((receipt) => receipt.id === awakening.id)) {
@@ -1251,9 +1584,10 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
       }, now);
     }
   }
-  next = ensureProceduralOrders(next, now);
+  const residentSequenceActive = next.residentCardDiscovery.records.some((record) => record.status !== 'locked' && record.status !== 'card_earned');
+  if (!residentSequenceActive) next = ensureProceduralOrders(next, now);
   next = touch(next, now);
-  return { state: next, changed: true, servedOrderId: order.id, energyGranted: 0, clearedMistCells, message: `${order.title} served.` };
+  return { state: next, changed: true, servedOrderId: order.id, energyGranted: 0, clearedMistCells, residentCardEarned, message: `${order.title} served.` };
 }
 
 function storeItem(state: MergeWorldState, cell: number, now: number): MergeWorldCommandResult {
@@ -1318,7 +1652,7 @@ function claimArrival(state: MergeWorldState, arrivalId: string, now: number): M
   arrival.itemDefinitionIds.forEach((definitionId, index) => {
     const instanceId = `merge-item:${nextInstance++}`;
     const cell = openCells[index];
-    const progressionGateId = arrival.kind === 'root_match_parcel' ? arrival.progressionGateId : undefined;
+    const progressionGateId = arrival.kind === 'root_match_parcel' || arrival.kind === 'resident_card_parcel' ? arrival.progressionGateId : undefined;
     board[cell] = { ...board[cell], occupant: { kind: 'item', instanceId, definitionId, ...(progressionGateId ? { progressionGateId } : {}) } };
     spawnedItems.push({ instanceId, definitionId, ...(progressionGateId ? { progressionGateId } : {}), cell });
   });
@@ -1329,6 +1663,14 @@ function claimArrival(state: MergeWorldState, arrivalId: string, now: number): M
         discoveryId: arrival.discoveryId, characterId: arrival.characterId, createdAt: now,
       })
     : state.companionDiscovery;
+  const residentCardDiscovery = arrival.kind === 'resident_card_parcel' && arrival.discoveryId
+    ? {
+        ...state.residentCardDiscovery,
+        records: state.residentCardDiscovery.records.map((record) => record.id === arrival.discoveryId && record.status === 'parcel_ready'
+          ? { ...record, status: 'parcel_claimed' as const }
+          : record),
+      }
+    : state.residentCardDiscovery;
   return {
     ...changed(touch({
     ...state,
@@ -1336,6 +1678,7 @@ function claimArrival(state: MergeWorldState, arrivalId: string, now: number): M
     nextInstance,
     arrivals: state.arrivals.map((item) => item.id === arrivalId ? { ...item, claimedAt: now, seenAt: item.seenAt ?? now } : item),
     companionDiscovery,
+    residentCardDiscovery,
     }, now), `${arrival.label} placed on the board.`),
     spawnedItems,
   };
@@ -1541,62 +1884,15 @@ function reconcileMossproutResidents(
   now: number,
 ): MergeWorldState {
   if (!signals) return state;
-  const validResidentIds = new Set<KatchimeraSkinId>(MOSSPROUT_RESIDENT_IDS);
-  const matchedCardIds = signals.matchedCardIds.filter((id) => validResidentIds.has(id));
-  // A matched form remains a teased visitor until the player serves its first
-  // request. That order is the single atomic point where it becomes both a
-  // resident and an owned card.
-  const residentIds = new Set<KatchimeraSkinId>(['mossprout', ...state.mossproutResidentSkinIds]);
-  if (signals.habitatStage >= 2 && matchedCardIds.length === 0 && residentIds.size === 1) {
-    residentIds.add(MOSSPROUT_GARDEN_RESIDENT_IDS[0]);
-  }
-  const completedObjectives = new Set(signals.completedObjectiveIds);
-  for (const beatId of signals.completedBeatIds ?? []) {
-    const guest = mossproutCampaignEpisodeByBeatId.get(beatId)?.guestSkinId;
-    const resolvedGuest = guest === 'matched' ? signals.firstResidentSkinId : guest;
-    if (resolvedGuest) residentIds.add(resolvedGuest);
-  }
-  // Older advanced saves may have the habitat milestone without the objective
-  // receipts that were introduced later. Treat the completed chapter as the
-  // source of truth so those gardens receive the same resident roster.
-  if (signals.habitatStage >= 3) {
-    for (const beat of MOSSPROUT_EXTENDED_JOURNEY_BEATS.filter((candidate) => candidate.chapterId.includes('memory-nursery'))) {
-      completedObjectives.add(beat.objectiveId);
-    }
-  }
-  if (signals.habitatStage >= 4) {
-    for (const beat of MOSSPROUT_EXTENDED_JOURNEY_BEATS.filter((candidate) => candidate.chapterId.includes('heartwood'))) {
-      completedObjectives.add(beat.objectiveId);
-    }
-  }
-  for (const beat of MOSSPROUT_EXTENDED_JOURNEY_BEATS) {
-    if (!completedObjectives.has(beat.objectiveId) || beat.objectiveId === 'mossprout:objective:heartwood') continue;
-    const preferred = beat.chapterId.includes('memory-nursery')
-      ? [...MOSSPROUT_GARDEN_RESIDENT_IDS, ...MOSSPROUT_WEATHER_RESIDENT_IDS]
-      : [...MOSSPROUT_WEATHER_RESIDENT_IDS, ...MOSSPROUT_GARDEN_RESIDENT_IDS];
-    const nextResidentId = preferred.find((id) => !residentIds.has(id));
-    if (nextResidentId) residentIds.add(nextResidentId);
-  }
-  const orderedResidentIds = MOSSPROUT_RESIDENT_IDS.filter((id) => residentIds.has(id));
-  const existingCards = new Set(state.ownedKatchimeraCards.map((card) => card.cardId));
-  const ownedKatchimeraCards = [...state.ownedKatchimeraCards];
-  for (const residentId of orderedResidentIds) {
-    if (residentId === 'mossprout' || matchedCardIds.includes(residentId)) continue;
-    if (existingCards.has(residentId)) continue;
-    ownedKatchimeraCards.push({
-      cardId: residentId,
-      familyId: 'mossprout',
-      acquisition: 'story_resident',
-      sourceReceiptId: `resident-unlock:${residentId}`,
-      acquiredAt: now,
-      coinCost: 0,
-    });
-    existingCards.add(residentId);
-  }
+  // Relationship signals choose and schedule residents, but never grant cards.
+  // Parcel -> locked node -> dialogue -> two orders is the only new-card path.
+  const orderedResidentIds = MOSSPROUT_RESIDENT_IDS.filter((residentId) => (
+    residentId === 'mossprout' || state.ownedKatchimeraCards.some((card) => card.cardId === residentId)
+  ));
   const residentsChanged = orderedResidentIds.length !== state.mossproutResidentSkinIds.length
     || orderedResidentIds.some((id, index) => id !== state.mossproutResidentSkinIds[index]);
-  if (!residentsChanged && ownedKatchimeraCards.length === state.ownedKatchimeraCards.length) return state;
-  return touch({ ...state, mossproutResidentSkinIds: orderedResidentIds, ownedKatchimeraCards }, now);
+  if (!residentsChanged) return state;
+  return touch({ ...state, mossproutResidentSkinIds: orderedResidentIds }, now);
 }
 
 function reconcileCharacterActivity(
@@ -1653,7 +1949,7 @@ function reconcileCharacterActivity(
       mergeXp: 0,
       friendshipXp: 0,
       energy: 0,
-      katchimeraCardId: guestSkinId && !next.ownedKatchimeraCards.some((card) => card.cardId === guestSkinId) ? guestSkinId : undefined,
+      katchimeraCardId: undefined,
     },
     createdAt: now,
     signature: false,
@@ -1883,6 +2179,9 @@ function grantKatchimeraCard(
   if (!definition || definition.familyId !== familyId || !definition.visualKey || !KNOWN_CHARACTERS.has(familyId)) {
     return unchanged(state, 'That card is not ready yet.');
   }
+  if (familyId === 'mossprout' && MOSSPROUT_RESIDENT_CARD_NODE_BY_RESIDENT.has(cardId)) {
+    return unchanged(state, 'Meet this resident through its veiled garden card.');
+  }
   if (state.ownedKatchimeraCards.some((card) => card.cardId === cardId || card.sourceReceiptId === sourceReceiptId)) {
     return unchanged(state, 'That card is already in your collection.');
   }
@@ -1911,6 +2210,9 @@ function purchaseKatchimeraCard(
   const coinCost = Math.max(0, Math.floor(cost));
   if (!definition || definition.familyId !== familyId || !definition.visualKey || !KNOWN_CHARACTERS.has(familyId)) {
     return unchanged(state, 'That card is not ready yet.');
+  }
+  if (familyId === 'mossprout' && MOSSPROUT_RESIDENT_CARD_NODE_BY_RESIDENT.has(cardId)) {
+    return unchanged(state, 'Meet this resident through its veiled garden card.');
   }
   if (state.ownedKatchimeraCards.some((card) => card.cardId === cardId || card.sourceReceiptId === purchaseId)) {
     return unchanged(state, 'That card is already in your collection.');
@@ -2507,7 +2809,7 @@ function normalizeArrivals(value: unknown): MergeWorldArrival[] {
     if (!candidate || typeof candidate !== 'object') return [];
     const arrival = candidate as Partial<MergeWorldArrival>;
     if (typeof arrival.id !== 'string'
-      || (arrival.kind !== 'contextual_parcel' && arrival.kind !== 'memory_arrival' && arrival.kind !== 'goal_chest' && arrival.kind !== 'discovery_parcel' && arrival.kind !== 'root_match_parcel')
+      || (arrival.kind !== 'contextual_parcel' && arrival.kind !== 'memory_arrival' && arrival.kind !== 'goal_chest' && arrival.kind !== 'discovery_parcel' && arrival.kind !== 'root_match_parcel' && arrival.kind !== 'resident_card_parcel')
       || typeof arrival.dayId !== 'string'
       || typeof arrival.label !== 'string'
       || !MERGE_CHAIN_IDS.includes(arrival.chainId as MergeWorldArrival['chainId'])) return [];
@@ -2534,7 +2836,7 @@ function normalizeArrivals(value: unknown): MergeWorldArrival[] {
           : arrival.id.includes('companion-story-starter') ? 'companion_story' : arrival.kind === 'memory_arrival' ? 'journal' : 'legacy',
       itemDefinitionIds: uniqueStrings(arrival.itemDefinitionIds).filter((id) => MERGE_ITEMS_BY_ID.has(id)),
       discoveryId: typeof arrival.discoveryId === 'string' ? arrival.discoveryId : undefined,
-      progressionGateId: typeof arrival.progressionGateId === 'string' && MOSSPROUT_ROOTBOUND_GATES_BY_ID.has(arrival.progressionGateId) ? arrival.progressionGateId : undefined,
+      progressionGateId: typeof arrival.progressionGateId === 'string' && (MOSSPROUT_ROOTBOUND_GATES_BY_ID.has(arrival.progressionGateId) || MOSSPROUT_RESIDENT_CARD_NODE_BY_GATE.has(arrival.progressionGateId)) ? arrival.progressionGateId : undefined,
       memoryRef,
       claimedAt: arrival.claimedAt == null ? null : finite(arrival.claimedAt, 0),
       seenAt: arrival.seenAt == null ? null : finite(arrival.seenAt, 0),
@@ -2640,7 +2942,7 @@ function normalizeCell(value: unknown, fallback: MergeBoardCell, index: number):
 
 function normalizeDreamMist(value: unknown, legacyLocked: boolean, index: number): MergeBoardCell['mist'] {
   if (!value || typeof value !== 'object') return legacyLocked ? authoredDormantMistForCell(index) : null;
-  const mist = value as { kind?: unknown; id?: unknown; definitionId?: unknown; generatorId?: unknown; ownerCharacterId?: unknown; discoveryId?: unknown; gateId?: unknown; pathId?: unknown; sequenceIndex?: unknown; boundDefinitionId?: unknown; active?: unknown; candidateIds?: unknown; characterIds?: unknown; clearingId?: unknown; revealDay?: unknown; recommendedCharacterId?: unknown; chapter?: unknown; ready?: unknown };
+  const mist = value as { kind?: unknown; id?: unknown; definitionId?: unknown; generatorId?: unknown; ownerCharacterId?: unknown; discoveryId?: unknown; gateId?: unknown; residentId?: unknown; pathId?: unknown; sequenceIndex?: unknown; boundDefinitionId?: unknown; active?: unknown; candidateIds?: unknown; characterIds?: unknown; clearingId?: unknown; revealDay?: unknown; recommendedCharacterId?: unknown; chapter?: unknown; ready?: unknown };
   if (mist.kind === 'dormant') return authoredDormantMistForCell(index);
   if (mist.kind === 'garden_growth') {
     const authored = authoredDormantMistForCell(index);
@@ -2655,6 +2957,16 @@ function normalizeDreamMist(value: unknown, legacyLocked: boolean, index: number
     if (definition) return {
       kind: 'rootbound_echo', id: definition.id, gateId: definition.id, definitionId: definition.rootMemoryDefinitionId,
       chapter: definition.chapter, ready: Boolean(mist.ready),
+    };
+  }
+  if (mist.kind === 'resident_card' && typeof mist.gateId === 'string') {
+    const node = MOSSPROUT_RESIDENT_CARD_NODE_BY_GATE.get(mist.gateId);
+    const residentId = typeof mist.residentId === 'string' && MOSSPROUT_RESIDENT_CARD_NODE_BY_RESIDENT.has(mist.residentId as KatchimeraSkinId)
+      ? mist.residentId as KatchimeraSkinId
+      : null;
+    if (node) return {
+      kind: 'resident_card', discoveryId: typeof mist.discoveryId === 'string' ? mist.discoveryId : `resident-node:${node.residentId}`,
+      gateId: node.gateId, residentId, ready: Boolean(mist.ready),
     };
   }
   if (mist.kind === 'echo' && typeof mist.id === 'string' && typeof mist.definitionId === 'string' && MERGE_ITEMS_BY_ID.has(mist.definitionId)) {
@@ -2884,7 +3196,9 @@ function validBoardItem(value: unknown): value is MergeBoardItem {
   if (item.kind !== 'item' || typeof item.instanceId !== 'string' || typeof item.definitionId !== 'string' || !MERGE_ITEMS_BY_ID.has(item.definitionId)) return false;
   if (item.progressionGateId == null) return true;
   const gate = MOSSPROUT_ROOTBOUND_GATES_BY_ID.get(item.progressionGateId);
-  return Boolean(gate && (gate.rootMemoryDefinitionId === item.definitionId || gate.fragmentDefinitionId === item.definitionId));
+  if (gate && (gate.rootMemoryDefinitionId === item.definitionId || gate.fragmentDefinitionId === item.definitionId)) return true;
+  return MOSSPROUT_RESIDENT_CARD_NODE_BY_GATE.has(item.progressionGateId)
+    && (item.definitionId === RESIDENT_CARD_DEFINITION_ID || item.definitionId === LEGACY_RESIDENT_CARD_KEY_DEFINITION_ID);
 }
 
 function isProgressionItem(item: MergeBoardItem) {

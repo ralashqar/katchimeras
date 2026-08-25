@@ -176,9 +176,12 @@ export type CompanionInteractionSheetProps = {
   ftueOrderPreviewActive?: boolean;
   ftueBondSpotlightActive?: boolean;
   ftueDayOneActionActive?: boolean;
+  ftueResidentHandoffActive?: boolean;
+  ftueResidentStoryResume?: boolean;
   ftueNavigationLocked?: boolean;
   onFtueBondSpotlightComplete?: () => void;
   onFtueOpenMerge?: () => void;
+  onFtueOpenResidentParcel?: () => void;
   onSelectDestination?: (destination: CompanionDestination | null) => void;
   onClose: () => void;
   onOpenMerge?: (orderId?: string | null, familyId?: KatchimeraFamilyId) => void;
@@ -526,9 +529,19 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     syncJourneySession,
     route,
   } = experience;
-  const mossproutActionDashboard = route.kind === 'dashboard'
+  const residentFtueDashboard = props.familyId === 'mossprout'
+    && Boolean(props.ftueResidentHandoffActive);
+  const residentStoryResumeDashboard = residentFtueDashboard
+    && Boolean(props.ftueResidentStoryResume);
+  // The companion route is reused across the affinity conversation and its
+  // resident handoff. Never let that completed conversation subroute outrank
+  // the authored parcel or Continue Story dashboard.
+  const dashboardRouteActive = route.kind === 'dashboard' || residentFtueDashboard;
+  const mossproutActionDashboard = dashboardRouteActive
     && props.familyId === 'mossprout'
     && !showMossproutDashboard;
+  const residentParcelGardenPanelActive = props.ftueResidentHandoffActive
+    && !props.ftueResidentStoryResume;
   const requestStoryConversation = useCallback((definitionId: string, actionOrigin?: KatchimeraActionOrigin) => {
     if (
       props.conversationSession?.definitionId === definitionId
@@ -545,6 +558,30 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     pendingStoryConversationRef.current = definitionId;
     startConversation({ definitionId, actionOrigin });
   }, [props.conversationDefinition?.id, props.conversationSession?.definitionId, props.conversationSession?.status, showConversation, startConversation]);
+  const autoOpenedJourneyProfileRef = useRef<string | null>(null);
+  useEffect(() => {
+    const definitionId = mossproutJourney?.status === 'profile_available'
+      ? mossproutJourney.profileConversationId
+      : null;
+    if (!props.active || props.familyId !== 'mossprout' || props.ftueResidentHandoffActive || !definitionId) {
+      if (!definitionId) autoOpenedJourneyProfileRef.current = null;
+      return;
+    }
+    // Let the Bond reward finish cleanly. Once its FTUE step advances, launch
+    // the questionnaire directly instead of briefly restoring the action list.
+    if (props.ftueBondSpotlightActive || props.ftueDayOneActionActive) return;
+    const requestId = `${mossproutJourney?.id ?? 'mossprout'}:${definitionId}`;
+    if (autoOpenedJourneyProfileRef.current === requestId) return;
+    autoOpenedJourneyProfileRef.current = requestId;
+    requestStoryConversation(definitionId);
+  }, [mossproutJourney?.id, mossproutJourney?.profileConversationId, mossproutJourney?.status, props.active, props.familyId, props.ftueBondSpotlightActive, props.ftueDayOneActionActive, props.ftueResidentHandoffActive, requestStoryConversation]);
+  useEffect(() => {
+    if (!props.active || !residentFtueDashboard) return;
+    pendingStoryConversationRef.current = null;
+    openedStoryConversationRef.current = null;
+    initialConversationDefinitionRef.current = null;
+    showFeastleStoryHome();
+  }, [props.active, residentFtueDashboard, showFeastleStoryHome]);
   useEffect(() => {
     const definitionId = props.initialConversationDefinitionId;
     if (!definitionId) {
@@ -577,7 +614,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         return;
       }
       if (initialConversationObservedActiveRef.current) return;
-      completedInitialConversationRef.current = props.conversationSession.id;
+      // A restored completed session still needs to run the completion effect
+      // below. Marking it handled here strands the sheet on its passive
+      // "Returning to Mossprout" presentation until an unrelated tap calls
+      // advance manually.
       return;
     }
     // This prop is a one-shot deep-link request, not permanent ownership of
@@ -1099,6 +1139,14 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     }
     showFeastleStoryHome();
   }, [conversationExperience?.session, conversationFamilyId, openConversationMerge, showFeastleStoryHome]);
+  const exitCompletedConversation = useCallback(() => {
+    // Completion is an explicit route boundary, not another conversation
+    // action. Clear retained launch bookkeeping and return straight to the
+    // companion dashboard even when this route was restored from Merge.
+    pendingStoryConversationRef.current = null;
+    openedStoryConversationRef.current = null;
+    showFeastleStoryHome();
+  }, [showFeastleStoryHome]);
   const conversationFlow = useCompanionConversationFlow({
     definition: conversationExperience?.definition ?? null,
     onCommitInsight: commitConversationInsight,
@@ -1282,11 +1330,13 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           />
         ) : !questionnaireExperience ? (
           <CompanionCinematicStage
-            bubbleBody={idealSkinPreparing
+            bubbleBody={residentStoryResumeDashboard
+              ? undefined
+              : idealSkinPreparing
               ? 'A few quick choices will shape your closest skin match.'
               : quickGoalPickerOpen ? 'Choose one for today, or make a small goal of your own.' : destinationHeroBody}
             bubbleVariant={quickGoalPickerOpen ? 'questionnaire' : 'default'}
-            celebrate={Boolean((route.kind === 'visit' || route.kind === 'conversation') && conversationExperience?.session.outcomePresentation?.celebrate)}
+            celebrate={Boolean(!residentStoryResumeDashboard && (route.kind === 'visit' || route.kind === 'conversation') && conversationExperience?.session.outcomePresentation?.celebrate)}
             creature={visual.source}
             environmentKey={props.homeEnvironmentKey ?? null}
             houseLevel={props.houseLevel}
@@ -1296,15 +1346,17 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             onCreatureReady={() => setTransitionCreatureReady(true)}
             rewardPulseKey={rewardPulseKey}
             sceneTranslateX={environmentPan.translateX}
-            onSpeechBubblePress={conversationExperience
+            onSpeechBubblePress={!residentStoryResumeDashboard && conversationExperience
               && !conversationFlow.requiresManualAdvance
               && conversationFlow.phase !== 'awaiting_choice'
               && conversationFlow.phase !== 'committing'
               ? conversationFlow.advance
               : undefined}
-            showSpeechBubble
+            showSpeechBubble={!residentParcelGardenPanelActive}
             showNameplate={route.kind === 'dashboard' && props.familyId !== 'mossprout'}
-            title={quickGoalPickerOpen
+            title={residentStoryResumeDashboard
+              ? 'What should we do together?'
+              : quickGoalPickerOpen
               ? 'Which small step feels right?'
               : route.kind === 'chat_lobby'
                 ? 'What are you in the mood for?'
@@ -1340,7 +1392,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             simplified={props.familyId === 'mossprout'}
             starters={props.conversationStarters}
           />
-        ) : route.kind === 'visit' || route.kind === 'conversation' ? (
+        ) : (route.kind === 'visit' || route.kind === 'conversation') && !residentFtueDashboard ? (
           conversationExperience ? <CompanionConversationScene
             bondIconTargetRef={bondRewardTargetRef}
             bondProgress={displayedBondProgress}
@@ -1361,6 +1413,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               : props.familyId === 'mossprout'
                 ? experience.showHome
                 : route.kind === 'conversation' && !feastleFirstMeetingActive && !baristabbitFirstMeetingActive && !journeyCohortFirstMeetingActive && !feastleStoryFlow ? experience.showChatLobby : experience.showHome}
+            onCompletedExit={exitCompletedConversation}
             onContinue={props.onContinueConversation}
             onEquipForm={conversationExperience.session.preview ? () => undefined : props.onEquipSkin}
             onGoalDecision={props.onGoalConversationDecision}
@@ -1457,17 +1510,17 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             <CompanionBackAction label="Kingdom" onPress={props.onClose} />
           </View>
         ) : null}
-        {(route.kind === 'destination' || route.kind === 'dashboard' || route.kind === 'shared_history' || quickGoalPickerOpen) && !questGameVisible && !questionnaireExperience ? (
+        {(route.kind === 'destination' || dashboardRouteActive || route.kind === 'shared_history' || quickGoalPickerOpen) && !questGameVisible && !questionnaireExperience ? (
           <CompanionDestinationHeader
-            backLabel={quickGoalPickerOpen ? 'Goals' : destination === 'quest' && directQuestOrigin ? props.name : destination === 'quest' && canReturnToQuestList ? 'Quest list' : route.kind === 'dashboard' ? 'Kingdom' : 'Dashboard'}
+            backLabel={quickGoalPickerOpen ? 'Goals' : destination === 'quest' && directQuestOrigin ? props.name : destination === 'quest' && canReturnToQuestList ? 'Quest list' : dashboardRouteActive ? 'Kingdom' : 'Dashboard'}
             bondIconTargetRef={bondRewardTargetRef}
             bondProgress={displayedBondProgress}
             bondRewardPulseKey={rewardPulseKey}
-            bondTargetRef={route.kind === 'dashboard' && props.familyId === 'mossprout' ? ftueBondTargetRef : undefined}
-            compactHub={route.kind === 'dashboard'}
-            hideTitle={route.kind === 'dashboard'}
+            bondTargetRef={dashboardRouteActive && props.familyId === 'mossprout' ? ftueBondTargetRef : undefined}
+            compactHub={dashboardRouteActive}
+            hideTitle={dashboardRouteActive}
             navigationLocked={props.ftueNavigationLocked}
-            label={route.kind === 'dashboard' ? 'Dashboard' : route.kind === 'shared_history' ? props.familyId === 'feastle' ? 'Recipe Book' : 'Shared history' : destinationLabel}
+            label={dashboardRouteActive ? 'Dashboard' : route.kind === 'shared_history' ? props.familyId === 'feastle' ? 'Recipe Book' : 'Shared history' : destinationLabel}
             titleTone={destination === 'achievements' ? 'gold' : 'default'}
             onBack={
               quickGoalPickerOpen
@@ -1479,7 +1532,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   }
                 : destination === 'quest' && canReturnToQuestList
                 ? () => setLeaveQuestOpen(true)
-                : route.kind === 'dashboard'
+                : dashboardRouteActive
                   ? requestClose
                   : experience.showHome
             }
@@ -1510,9 +1563,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             bounces={!activeAttemptId && !mossproutActionDashboard}
             contentContainerStyle={[
               styles.scrollContent,
-              route.kind === 'dashboard' && styles.dashboardScrollContent,
+              dashboardRouteActive && styles.dashboardScrollContent,
               mossproutActionDashboard && styles.mossproutActionScrollContent,
-              route.kind === 'dashboard' && { paddingBottom: Math.max(12, insets.bottom + 8) },
+              dashboardRouteActive && { paddingBottom: Math.max(12, insets.bottom + 8) },
               activeAttemptId && styles.activeScrollContent,
               questionnaireExperience && [
                 styles.questionnaireScrollContent,
@@ -1532,19 +1585,19 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               exiting={FadeOut.duration(100)}
               style={[
                 activeAttemptId || questionnaireExperience ? styles.activeExperience : undefined,
-                route.kind === 'dashboard' && styles.dashboardExperience,
+                dashboardRouteActive && styles.dashboardExperience,
                 mossproutActionDashboard && styles.mossproutActionExperience,
               ]}>
-              {(route.kind === 'destination' || route.kind === 'dashboard' || route.kind === 'shared_history' || quickGoalPickerOpen) && !questionnaireExperience ? (
+              {(route.kind === 'destination' || dashboardRouteActive || route.kind === 'shared_history' || quickGoalPickerOpen) && !questionnaireExperience ? (
                 <View
                   accessibilityElementsHidden
                   pointerEvents="none"
                   style={[
                     styles.destinationStageSpacer,
-                    route.kind === 'dashboard' && {
+                    dashboardRouteActive && {
                       minHeight: companionHubHeroSpacer(viewportHeight),
                     },
-                    route.kind === 'dashboard' && styles.dashboardStageSpacer,
+                    dashboardRouteActive && styles.dashboardStageSpacer,
                     mossproutActionDashboard && styles.mossproutActionStageSpacer,
                     destination === 'quest' && {
                       minHeight: companionQuestListSpacer(viewportHeight),
@@ -1660,7 +1713,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   resultReady={Boolean(journeyQuestionnaireSessionId && !props.journeyConversation)}
                   visualKey={props.visualKey}
                 />
-              ) : idealSkinOnboardingRequired ? null : route.kind === 'dashboard' && (props.familyId === 'steppling' || props.familyId === 'voyagle' || props.familyId === 'flexel' || props.familyId === 'bedrotte') && !showJourneyCohortDashboard ? (
+              ) : idealSkinOnboardingRequired ? null : dashboardRouteActive && (props.familyId === 'steppling' || props.familyId === 'voyagle' || props.familyId === 'flexel' || props.familyId === 'bedrotte') && !showJourneyCohortDashboard ? (
                 <JourneyCohortStoryStage
                   familyId={props.familyId}
                   onBegin={beginJourneyCohortIntroduction}
@@ -1673,9 +1726,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   }}
                   onOpenMerge={(orderId) => props.onOpenMerge?.(orderId, props.familyId)}
                 />
-              ) : route.kind === 'dashboard' && props.familyId === 'mossprout' && props.ftueOrderPreviewActive && props.onFtueOpenMerge ? (
+              ) : dashboardRouteActive && props.familyId === 'mossprout' && props.ftueOrderPreviewActive && props.onFtueOpenMerge ? (
                 <MossproutFtueStoryStage onOpenMerge={props.onFtueOpenMerge} />
-              ) : route.kind === 'dashboard' && props.familyId === 'mossprout' && !showMossproutDashboard ? (
+              ) : dashboardRouteActive && props.familyId === 'mossprout' && !showMossproutDashboard ? (
                 <MossproutStoryStage
                   activeQuestId={props.activeQuest?.questId}
                   conversationSession={props.conversationSession}
@@ -1709,6 +1762,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   motionReady={mossproutHubEntranceSettled && mossproutHubViewportSettled}
                   swipeExternalGesture={environmentPan.gesture}
                   tutorialInteractionLocked={props.ftueBondSpotlightActive}
+                  residentParcelHandoffActive={residentParcelGardenPanelActive}
+                  residentStoryResumeActive={props.ftueResidentStoryResume}
+                  residentStoryResumeTitle="Continue story"
+                  onResumeResidentStory={props.onFtueOpenResidentParcel}
                 />
               ) : route.kind === 'dashboard' && props.familyId === 'baristabbit' && !showBaristabbitDashboard ? (
                 <BaristabbitStoryStage

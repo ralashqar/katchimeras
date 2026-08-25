@@ -17,12 +17,18 @@ export function mergeGeneratorArtCacheKey(generatorId: string, mossproutOnboardi
   return `generator:${generatorId}:${mossproutOnboarding ? 'mossprout' : 'default'}`;
 }
 
-export function useMergeArtCache(state: MergeWorldState, mossproutOnboarding: boolean): MergeArtCache {
+export function useMergeArtCache(
+  state: MergeWorldState,
+  mossproutOnboarding: boolean,
+  onInitialArtReady?: () => void,
+): MergeArtCache {
   const plan = useMemo(() => mergeArtWarmupPlan(state), [state]);
   const signature = `${mossproutOnboarding ? '1' : '0'}|${plan.generatorIds.join(',')}|${plan.itemDefinitionIds.join(',')}`;
   const retainedRef = useRef(new Map<string, ImageRef>());
   const generationRef = useRef(0);
   const [cache, setCache] = useState<MergeArtCache>(() => new Map());
+  const onInitialArtReadyRef = useRef(onInitialArtReady);
+  onInitialArtReadyRef.current = onInitialArtReady;
 
   useEffect(() => {
     const generation = ++generationRef.current;
@@ -44,7 +50,7 @@ export function useMergeArtCache(state: MergeWorldState, mossproutOnboarding: bo
     });
     setCache(new Map(retainedRef.current));
 
-    const task = InteractionManager.runAfterInteractions(() => {
+    const loadDesiredArt = () => {
       const missing = [...desired].filter(([key]) => !retainedRef.current.has(key));
       let cursor = 0;
       const loadWorker = async () => {
@@ -67,13 +73,23 @@ export function useMergeArtCache(state: MergeWorldState, mossproutOnboarding: bo
       // with the JS/native input pipeline during the first FTUE tap burst.
       const workerCount = Math.min(1, missing.length);
       void Promise.all(Array.from({ length: workerCount }, loadWorker)).then(() => {
-        if (!cancelled && generation === generationRef.current) setCache(new Map(retainedRef.current));
+        if (!cancelled && generation === generationRef.current) {
+          setCache(new Map(retainedRef.current));
+          onInitialArtReadyRef.current?.();
+        }
       });
-    });
+    };
+    // A transition curtain is already shielding this initial decode. Waiting
+    // for InteractionManager here can create a circular dependency: the art
+    // waits for navigation interactions while navigation waits for the art.
+    const task = onInitialArtReadyRef.current
+      ? null
+      : InteractionManager.runAfterInteractions(loadDesiredArt);
+    if (onInitialArtReadyRef.current) queueMicrotask(loadDesiredArt);
 
     return () => {
       cancelled = true;
-      task.cancel();
+      task?.cancel();
     };
     // The stable signature prevents a spawn revision from restarting identical work.
     // eslint-disable-next-line react-hooks/exhaustive-deps

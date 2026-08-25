@@ -12,6 +12,7 @@ import { cancelTodayCareGameRound } from '@/utils/today-care-game-round';
 import { clearTodayEnergyTraces } from '@/utils/today-energy-loop-performance';
 import { clearTodayPatch } from '@/utils/today-patch-storage';
 import { clearBaseCustomisation } from '@/utils/world-base-customisation';
+import { deleteContentFlowRunsForDayForDebug } from '@/features/content-flow/content-flow-repository';
 
 import { clearTodayEnergyFeedback } from './today-energy-feedback';
 
@@ -40,7 +41,10 @@ export async function resetTodayForDebug(now = new Date()): Promise<StoredHomeSt
   const stateToday = new Date(`${state.today.isoDate}T12:00:00`);
   const resetDay = Number.isNaN(stateToday.getTime()) ? now : stateToday;
   const yesterdayDayId = toLocalDateId(shiftLocalDate(resetDay, -1));
-  await resetMergeWorldActivityForDayForDebug(state.today.isoDate, now.getTime(), yesterdayDayId);
+  await Promise.all([
+    resetMergeWorldActivityForDayForDebug(state.today.isoDate, now.getTime(), yesterdayDayId),
+    deleteContentFlowRunsForDayForDebug(state.today.isoDate),
+  ]);
 
   const next = resetTodayInState(state, loadOnboardingProfile(), now);
   homeRepository.save(next, { allowHatchDowngrade: true, allowTodayReset: true });

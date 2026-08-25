@@ -1,4 +1,5 @@
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
+import type { ContentFlowRun } from '@/types/content-flow';
 
 export type PlayerProfileSnapshotSource = 'fixture' | 'capture' | 'rollback';
 export type PlayerProfileSnapshotTimePolicy = 'relative' | 'frozen';
@@ -26,6 +27,7 @@ export type PlayerProfileSnapshot = {
   domains: {
     keyValue: { schemaVersion: 1; values: Record<string, string> };
     mergeWorld: { schemaVersion: 1; state: MergeWorldState };
+    contentFlow?: { schemaVersion: 1; runs: ContentFlowRun[] };
   };
 };
 

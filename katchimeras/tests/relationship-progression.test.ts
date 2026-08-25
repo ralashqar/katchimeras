@@ -10,6 +10,7 @@ import {
   completeMossproutJourneyDay,
   completeMossproutJourneyGoalPlan,
   completeMossproutJourneyOpening,
+  completeMossproutResidentCardDiscovery,
   emptyRelationshipProgressState,
   makeMossproutResolutionAvailable,
   mossproutDailyActionDeck,
@@ -31,6 +32,8 @@ import {
 } from '../game/katchimeras/relationship-progression';
 import { mossproutStoryConversationDefinitions } from '../constants/mossprout-story-conversations';
 import { MOSSPROUT_CAMPAIGN_EPISODES } from '../constants/mossprout-campaign';
+import { MOSSPROUT_JOURNEY_CAMPAIGN } from '../constants/mossprout-journey-campaign';
+import { validateJourneyCampaign } from '../game/katchimeras/journey-campaign';
 import { mossproutCampaignConversationDefinitions } from '../constants/mossprout-campaign-conversations';
 import { composeMossproutVisibleActions, MOSSPROUT_DAILY_FIELD_NOTE_ACTION_ID, mossproutActionInstanceId, mossproutConversationActionCompletion, mossproutConversationArtKey, mossproutGoalArtKey, resolveMossproutDayActions, resolveMossproutHome } from '../game/katchimeras/mossprout-home';
 import type { JourneyDayRecord, KatchimeraDayAction, RelationshipProgressState } from '../types/relationship-progression';
@@ -71,6 +74,11 @@ function firstJourneyCompleteState(dayId = '2026-08-23'): RelationshipProgressSt
     },
   };
   return { ...emptyRelationshipProgressState(), journeyDays: [journey] };
+}
+
+function finishDayOneResident(state: RelationshipProgressState, dayId: string, now: number) {
+  const matched = recordMossproutMatchedCard(state, dayId, 'petalimp');
+  return completeMossproutResidentCardDiscovery(matched, dayId, 'petalimp', `test-resident:${dayId}`, now);
 }
 
 test('first Journey Day handoff changes from completion to waiting and then Day 2 ready', () => {
@@ -123,6 +131,8 @@ test('Journey Day 1 supports a complete manual narrative flow without FTUE', () 
   assert.equal(mossproutJourneyForDay(state, dayId)?.returnConversationId, 'mossprout:ftue:chapter-zero-return');
 
   state = completeMossproutJourneyConversation(state, 'mossprout:ftue:chapter-zero-return', 4);
+  assert.equal(mossproutJourneyForDay(state, dayId)?.status, 'profile_available');
+  state = finishDayOneResident(state, dayId, 5);
   assert.equal(mossproutJourneyForDay(state, dayId)?.status, 'complete');
 });
 
@@ -267,7 +277,7 @@ test('legacy relationship state normalizes with an empty skipped-action ledger',
     completedActionOutros: [],
   });
   assert.deepEqual(normalized.skippedActionIds, []);
-  assert.equal(normalized.schemaVersion, 4);
+  assert.equal(normalized.schemaVersion, 5);
   assert.deepEqual(normalized.mossproutDailyActionDecks, []);
 });
 
@@ -625,6 +635,7 @@ test('the first Garden order unlocks the return insight before completing Day 1'
   assert.equal(mossproutStory(state).habitatStage, 0);
 
   state = completeMossproutJourneyConversation(state, 'mossprout:ftue:chapter-zero-return', 3);
+  state = finishDayOneResident(state, '2026-08-21', 3.1);
   journey = mossproutJourneyForDay(state, '2026-08-21');
   assert.equal(journey?.status, 'complete');
   assert.equal(journey?.completionReceipt?.bondPoints, 0);
@@ -673,6 +684,7 @@ test('Mossprout Day 1 exposes its goal and fun threads after the main Garden jou
   let state = startMossproutJourneyDay(emptyRelationshipProgressState(), '2026-08-21', 1).state;
   state = recordMossproutFirstGardenRestored(state, '2026-08-21', 'merge-order:first-plant', 2);
   state = completeMossproutJourneyConversation(state, 'mossprout:ftue:chapter-zero-return', 3);
+  state = finishDayOneResident(state, '2026-08-21', 3.1);
   let journey = mossproutJourneyForDay(state, '2026-08-21');
   const offers = [
     { id: 'quest-mossprout-green-photo', title: 'Photograph something green', hint: 'A nature photo', family: 'photo', bondReward: 4 },
@@ -708,6 +720,7 @@ test('the Day 1 Bond lesson shows its three authored choices without coin-only G
   let state = startMossproutJourneyDay(emptyRelationshipProgressState(), dayId, 1).state;
   state = recordMossproutFirstGardenRestored(state, dayId, 'merge-order:first-plant', 2);
   state = completeMossproutJourneyConversation(state, 'mossprout:ftue:chapter-zero-return', 3);
+  state = finishDayOneResident(state, dayId, 3.1);
   const mainAction = mossproutJourneyForDay(state, dayId)!.actions.find((action) => action.kind === 'journey')!;
   state = acknowledgeMossproutJourneyActionOutro(state, dayId, mainAction.id, 4);
   const journey = mossproutJourneyForDay(state, dayId)!;
@@ -745,6 +758,7 @@ test('a Journey action keeps one row identity through completion and reveals its
   let state = startMossproutJourneyDay(emptyRelationshipProgressState(), dayId, 1).state;
   state = recordMossproutFirstGardenRestored(state, dayId, 'merge-order:first-plant', 2);
   state = completeMossproutJourneyConversation(state, 'mossprout:ftue:chapter-zero-return', 3);
+  state = finishDayOneResident(state, dayId, 3.1);
   const mainAction = mossproutJourneyForDay(state, dayId)!.actions.find((action) => action.kind === 'journey')!;
   state = acknowledgeMossproutJourneyActionOutro(state, dayId, mainAction.id, 3.5);
   const offers = [
@@ -768,6 +782,7 @@ test('Mossprout keeps offering independent nature activities after Journey actio
   let state = startMossproutJourneyDay(emptyRelationshipProgressState(), '2026-08-21', 1).state;
   state = recordMossproutFirstGardenRestored(state, '2026-08-21', 'merge-order:first-plant', 2);
   state = completeMossproutJourneyConversation(state, 'mossprout:ftue:chapter-zero-return', 3);
+  state = finishDayOneResident(state, '2026-08-21', 3.1);
   state = completeMossproutJourneyConversation(state, 'mossprout:quiet-patch:first-flower:goal-plan', 4);
   state = completeMossproutJourneyConversation(state, 'mossprout:quiet-patch:first-flower:playful', 5);
   state = completeMossproutJourneyConversation(state, 'mossprout:conversation:nature-journal:one-growing-thing', 5.5);
@@ -1194,4 +1209,16 @@ test('Campaign V2 remembers consequential answers and the recurring resident', (
   assert.equal(mossproutStory(state).storyFacts?.garden_promise, 'surprise');
   assert.equal(mossproutStory(state).storyFacts?.lantern_for, 'lost_things');
   assert.equal(mossproutStory(state).coStarSkinId, 'fernip');
+});
+
+test('the modular Mossprout campaign validates and gives every day one authored insight', () => {
+  assert.deepEqual(validateJourneyCampaign(MOSSPROUT_JOURNEY_CAMPAIGN), []);
+  assert.equal(MOSSPROUT_JOURNEY_CAMPAIGN.days.length, 13);
+  assert.equal(new Set(MOSSPROUT_JOURNEY_CAMPAIGN.days.map((day) => day.insightKey)).size, 13);
+  assert.deepEqual(MOSSPROUT_JOURNEY_CAMPAIGN.days[0]?.steps.map((step) => step.kind), [
+    'conversation', 'merge_orders', 'conversation', 'optional_action', 'questionnaire', 'resident_discovery', 'complete',
+  ]);
+  assert.equal(MOSSPROUT_JOURNEY_CAMPAIGN.days[1]?.steps.some((step) => step.kind === 'merge_orders'), true);
+  assert.equal(MOSSPROUT_JOURNEY_CAMPAIGN.days.slice(2, 9).every((day) => day.steps.some((step) => step.kind === 'resident_discovery')), true);
+  assert.equal(MOSSPROUT_JOURNEY_CAMPAIGN.days.slice(2, 9).every((day) => day.steps.every((step) => step.kind !== 'merge_orders')), true);
 });

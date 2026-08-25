@@ -4,6 +4,7 @@ import { AppState } from 'react-native';
 import { companionIdForFamily, katchimeraSkinById } from '@/constants/katchimera-skins';
 import { MOSSPROUT_CAMPAIGN_EPISODES, mossproutCampaignEpisodeByBeatId, mossproutCampaignOrderDrops } from '@/constants/mossprout-campaign';
 import { KATCHIMERA_MERGE_PROFILES } from '@/constants/merge-world-catalog';
+import { nextUnearnedMossproutResident } from '@/constants/resident-card-discovery';
 import { useWisps } from '@/features/wisps/wisp-provider';
 import type { HomeDayRecord } from '@/types/home';
 import type { MergeCharacterId, MergeExternalRewardReceipt, MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
@@ -20,7 +21,7 @@ import { reduceMergeWorld } from '@/utils/merge-world/engine';
 import { mossproutFocusStage } from '@/utils/merge-world/mossprout-focus-progression';
 import { mergeWorldPendingPersistence, type MergeWorldPendingPersistence } from '@/utils/merge-world/persistence-buffer';
 import { loadFirstSession } from '@/features/onboarding/first-session';
-import { mossproutDailyActionDeck, mossproutJourneyForDay, mossproutJourneyRuntimeDayId, mossproutStory, recordKatchimeraActionCompletion, recordMossproutFirstGardenRestored, recordMossproutJourneyOrderServed, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
+import { completeMossproutResidentCardDiscovery, mossproutDailyActionDeck, mossproutJourneyForDay, mossproutJourneyRuntimeDayId, mossproutStory, recordKatchimeraActionCompletion, recordMossproutFirstGardenRestored, recordMossproutJourneyOrderServed, recordMossproutMatchedCard, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { completeMossproutChapterZeroSlice, isMossproutChapterZeroActive } from '@/utils/merge-world/chapter-zero-policy';
 import { loadMergeWorldState, saveMergeWorldState, subscribeMergeWorldResets, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
@@ -30,6 +31,7 @@ import { loadCompanionQuickGoalState, subscribeCompanionQuickGoals } from '@/uti
 import { loadCompanionJourneyState, subscribeCompanionJourneys } from '@/utils/companion-journey-storage';
 import { localDayId } from '@/utils/world-identity';
 import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
+import { acknowledgeActiveContentFlowNavigation, acknowledgeActiveContentFlowPresentation, publishContentFlowDomainEvent } from '@/features/content-flow/content-flow-director';
 
 type MergeWorldContextValue = {
   state: MergeWorldState | null;
@@ -690,6 +692,7 @@ export function MergeWorldProvider({
 
   useEffect(() => {
     if (!active || loading) return;
+    void acknowledgeActiveContentFlowNavigation('merge');
     const current = stateRef.current;
     if (!current) return;
     const now = Date.now();
@@ -697,6 +700,22 @@ export function MergeWorldProvider({
     const levels = refreshFriendshipLevels();
     next = reduceMergeWorld(next, { type: 'reconcileFriendship', levels, now }).state;
     next = featureAndReconcile(next, now);
+    const relationships = relationshipProgressionRepository.load();
+    const residentJourney = [...relationships.journeyDays].reverse().find((journey) => journey.familyId === 'mossprout' && journey.status === 'resident_discovery');
+    if (residentJourney) {
+      const existingDiscovery = next.residentCardDiscovery.records.find((record) => record.journeyDayId === residentJourney.dayId);
+      if (!existingDiscovery) {
+        const earnedIds = next.ownedKatchimeraCards.filter((card) => card.familyId === 'mossprout').map((card) => card.cardId);
+        const residentId = nextUnearnedMossproutResident(earnedIds, residentJourney.matchedCardId as KatchimeraSkinId | null);
+        if (residentId) {
+          const activated = reduceMergeWorld(next, {
+            type: 'activateResidentCardDiscovery', campaignId: 'mossprout:journey', journeyDayId: residentJourney.dayId, residentId, now,
+          });
+          next = activated.state;
+          relationshipProgressionRepository.update((currentRelationships) => recordMossproutMatchedCard(currentRelationships, residentJourney.dayId, residentId));
+        }
+      }
+    }
     next = reduceMergeWorld(next, {
       type: 'reconcileMossproutBoardProgression',
       signals: mossproutProgressionSignals(
@@ -740,7 +759,65 @@ export function MergeWorldProvider({
       ? current.activeOrders.find((order) => order.id === command.orderId) ?? null
       : null;
     const servedCharacterId = servedOrder?.characterId ?? null;
+    const claimedArrival = command.type === 'claimArrival'
+      ? current.arrivals.find((arrival) => arrival.id === command.arrivalId) ?? null
+      : null;
+    const servedJourneyObjectiveId = command.type === 'serveOrder'
+      ? [...relationshipProgressionRepository.load().journeyDays].reverse().find((journey) => (
+          journey.status === 'activity_in_progress'
+          && (journey.activity?.mergeOrderIds ?? (journey.activity ? [journey.activity.mergeOrderId] : [])).includes(command.orderId)
+        ))?.activity?.objectiveId
+      : undefined;
     const reduced = reduceMergeWorld(current, command);
+    if (reduced.changed && command.type === 'serveOrder') void publishContentFlowDomainEvent({
+      eventId: `merge-order-served:${command.orderId}:${reduced.state.revision}`,
+      type: 'merge.order_served',
+      objectiveId: servedJourneyObjectiveId,
+      payload: { orderId: command.orderId },
+      occurredAt: command.now,
+    });
+    if (reduced.changed && command.type === 'claimArrival' && claimedArrival?.kind === 'resident_card_parcel') void publishContentFlowDomainEvent({
+      eventId: `resident-parcel-claimed:${command.arrivalId}`,
+      type: 'resident.parcel_claimed',
+      payload: { arrivalId: command.arrivalId, discoveryId: claimedArrival.discoveryId ?? null },
+      occurredAt: command.now,
+    });
+    if (reduced.changed && reduced.residentCardRevealed) void publishContentFlowDomainEvent({
+      eventId: `resident-revealed:${reduced.residentCardRevealed.discoveryId}`,
+      type: 'resident.revealed',
+      payload: reduced.residentCardRevealed,
+      occurredAt: 'now' in command ? command.now : Date.now(),
+    });
+    if (reduced.changed && command.type === 'ackResidentCardDialogue') {
+      void acknowledgeActiveContentFlowPresentation('resident.dialogue');
+      const record = reduced.state.residentCardDiscovery.records.find((candidate) => candidate.id === command.discoveryId);
+      if (record) relationshipProgressionRepository.update((relationships) => {
+        const journey = mossproutJourneyForDay(relationships, record.journeyDayId);
+        if (!journey || journey.status !== 'resident_discovery') return relationships;
+        return { ...relationships, journeyDays: relationships.journeyDays.map((candidate) => candidate.id === journey.id ? { ...candidate, status: 'resident_orders' } : candidate) };
+      });
+    }
+    if (reduced.changed && command.type === 'serveOrder' && reduced.residentCardEarned) {
+      void publishContentFlowDomainEvent({
+        eventId: `resident-orders-completed:${reduced.residentCardEarned.discoveryId}`,
+        type: 'resident.orders_completed',
+        payload: reduced.residentCardEarned,
+        occurredAt: command.now,
+      });
+      const record = reduced.state.residentCardDiscovery.records.find((candidate) => candidate.id === reduced.residentCardEarned!.discoveryId);
+      if (record) relationshipProgressionRepository.update((relationships) => {
+        const journey = mossproutJourneyForDay(relationships, record.journeyDayId);
+        if (!journey || journey.status === 'complete') return relationships;
+        return { ...relationships, journeyDays: relationships.journeyDays.map((candidate) => candidate.id === journey.id ? { ...candidate, status: 'card_reward' } : candidate) };
+      });
+    }
+    if (reduced.changed && command.type === 'ackResidentCardReveal') {
+      void acknowledgeActiveContentFlowPresentation('resident.card_reward');
+      const record = reduced.state.residentCardDiscovery.records.find((candidate) => candidate.id === command.discoveryId);
+      if (record?.status === 'card_earned') relationshipProgressionRepository.update((relationships) => completeMossproutResidentCardDiscovery(
+        relationships, record.journeyDayId, record.residentId, record.id, command.now,
+      ));
+    }
     if (reduced.changed && command.type === 'serveOrder' && servedCharacterId === 'mossprout') {
       relationshipProgressionRepository.update((relationships) => {
         const withJourney = recordMossproutJourneyOrderServed(relationships, command.orderId, command.now);

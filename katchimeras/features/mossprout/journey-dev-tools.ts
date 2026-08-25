@@ -3,6 +3,7 @@ import { lastMossproutJourney, resetLastMossproutJourneyForDebug } from '@/game/
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { resetKatchimeraConversationDefinitionsForDebug } from '@/utils/companion-content-storage';
 import { resetMergeWorldActivityForDayForDebug } from '@/utils/merge-world/repository';
+import { deleteContentFlowRunsForDayForDebug } from '@/features/content-flow/content-flow-repository';
 
 export async function resetCurrentMossproutJourneyForDebug(now = Date.now()): Promise<{
   reset: boolean;
@@ -21,6 +22,9 @@ export async function resetCurrentMossproutJourneyForDebug(now = Date.now()): Pr
   ].filter((id): id is string => typeof id === 'string');
   resetKatchimeraConversationDefinitionsForDebug(definitionIds);
   relationshipProgressionRepository.update((state) => resetLastMossproutJourneyForDebug(state, now));
-  await resetMergeWorldActivityForDayForDebug(journey.dayId, now);
+  await Promise.all([
+    resetMergeWorldActivityForDayForDebug(journey.dayId, now),
+    deleteContentFlowRunsForDayForDebug(journey.dayId),
+  ]);
   return { reset: true, episodeNumber: episode?.episodeNumber ?? null };
 }

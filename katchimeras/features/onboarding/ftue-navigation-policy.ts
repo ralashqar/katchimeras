@@ -70,3 +70,22 @@ export function ftueResumeTargetMatches(
   const ftueParam = params.ftue;
   return (Array.isArray(ftueParam) ? ftueParam[0] : ftueParam) === target.ftue;
 }
+
+/**
+ * Foregrounding must never pop an already-visible resident Garden back to its
+ * stale companion handoff. The mounted Merge route is authoritative while the
+ * graph or durable board still identifies any resident-discovery step.
+ */
+export function ftueForegroundKeepsResidentMerge(
+  run: Pick<FtueRunState, 'status' | 'stepId'> | null,
+  pathname: string,
+  canonicalBoardStep: string | null,
+): boolean {
+  const normalizedPath = decodeURIComponent(pathname).replace(/\/$/, '') || '/';
+  if (!normalizedPath.endsWith('/activity')) return false;
+  if (canonicalBoardStep?.startsWith('merge.resident_')) return true;
+  return Boolean(
+    run?.status === 'active'
+    && (run.stepId === 'companion.resident_parcel_ready' || run.stepId.startsWith('merge.resident_'))
+  );
+}

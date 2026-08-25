@@ -83,7 +83,7 @@ import { resolveMossproutCampaignConversation } from '@/constants/mossprout-camp
 import { companionIdForFamily, katchimeraSkinById } from '@/constants/katchimera-skins';
 import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
 import { companionQuickGoalTemplateById } from '@/constants/companion-quick-goals';
-import { grantStoredKatchimeraCard } from '@/utils/merge-world/repository';
+import { activateStoredResidentCardDiscovery } from '@/utils/merge-world/repository';
 import type { ConversationDefinition, ConversationMode, ConversationNode, ConversationOutcomePresentation, ConversationSession } from '@/types/companion-conversation';
 import type { KatchimeraActionOrigin } from '@/types/relationship-progression';
 import { isConversationV2Family, isConversationV2IdealSkinFamily } from '@/types/companion-conversation';
@@ -2409,12 +2409,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         selectedConversationSession.servedDayId,
         topFormId,
       ));
-      void grantStoredKatchimeraCard(
-        'mossprout',
-        topFormId,
-        `journey-card:${selectedConversationSession.servedDayId}:mossprout`,
-        occurredAt,
-      );
+      void activateStoredResidentCardDiscovery('mossprout:journey', selectedConversationSession.servedDayId, topFormId, occurredAt);
     }
     if (!selectedConversationSession.preview && isFormInsight && !journeyFinder && selectedFamilyId !== 'mossprout') {
       awardBond({

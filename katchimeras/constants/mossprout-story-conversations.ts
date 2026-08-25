@@ -2,7 +2,7 @@ import type { ConversationDefinition, ConversationProfileQuestion } from '@/type
 import type { KatchimeraSkinId } from '@/types/katchimera';
 
 const MOSS_FORMS = [
-  'mossprout', 'petalimp', 'fernip', 'amberleaf', 'blossle',
+  'petalimp', 'fernip', 'amberleaf', 'blossle',
   'drizzlet', 'driftkin', 'tempesto', 'mistle',
 ] as const satisfies readonly KatchimeraSkinId[];
 const MOSSPROUT_DRY_POND_BEAT_IDS = ['dry-pond:day-1', 'dry-pond:day-2', 'dry-pond:day-3', 'dry-pond:day-4'] as const;
@@ -545,13 +545,13 @@ const mossproutFirstDayGoalConversation = journeyGoalConversation(
 const mossproutProfileQuestions: readonly ConversationProfileQuestion[] = [
   {
     id: 'nature-world', prompt: 'Which part of the outdoors feels most like your place?', options: [
-      { id: 'green', label: 'Leaves, gardens and growing things', reply: 'A green answer. Mossprout approves.', nextNodeId: null, nextQuestionId: 'green-form', affinity: { mossprout: 1, petalimp: 1, fernip: 1 } },
+      { id: 'green', label: 'Leaves, gardens and growing things', reply: 'A green answer. Mossprout approves.', nextNodeId: null, nextQuestionId: 'green-form', affinity: { petalimp: 1, fernip: 1, blossle: 1 } },
       { id: 'season', label: 'Colour, seasons and changing light', reply: 'You notice a place changing its coat.', nextNodeId: null, nextQuestionId: 'season-form', affinity: { amberleaf: 1, blossle: 1, mistle: 1 } },
       { id: 'weather', label: 'Rain, wind and open sky', reply: 'The weather gets to be part of the place.', nextNodeId: null, nextQuestionId: 'weather-form', affinity: { drizzlet: 1, driftkin: 1, tempesto: 1 } },
     ],
   },
   { id: 'green-form', prompt: 'What draws you closer?', options: [
-    { id: 'moss', label: 'Soft, quiet green places', reply: 'Mossprout knows those well.', nextNodeId: null, nextQuestionId: 'finish', affinity: { mossprout: 5 } },
+    { id: 'moss', label: 'Soft, quiet green places', reply: 'Mossprout knows those well.', nextNodeId: null, nextQuestionId: 'finish', affinity: { fernip: 5 } },
     { id: 'flowers', label: 'Flowers and tended gardens', reply: 'A little care, made visible.', nextNodeId: null, nextQuestionId: 'finish', affinity: { petalimp: 5 } },
     { id: 'ferns', label: 'Woodland and hidden paths', reply: 'Some paths prefer not to announce themselves.', nextNodeId: null, nextQuestionId: 'finish', affinity: { fernip: 5 } },
   ] },
@@ -566,7 +566,7 @@ const mossproutProfileQuestions: readonly ConversationProfileQuestion[] = [
     { id: 'storm', label: 'A distant storm', reply: 'Large weather, safely watched.', nextNodeId: null, nextQuestionId: 'finish', affinity: { tempesto: 5 } },
   ] },
   { id: 'finish', prompt: 'What should time in nature give back?', options: [
-    { id: 'calm', label: 'A little calm', reply: 'Then we will leave room for quiet.', nextNodeId: null, nextQuestionId: null, affinity: { mossprout: 1, mistle: 1, drizzlet: 1 } },
+    { id: 'calm', label: 'A little calm', reply: 'Then we will leave room for quiet.', nextNodeId: null, nextQuestionId: null, affinity: { fernip: 1, mistle: 1, drizzlet: 1 } },
     { id: 'wonder', label: 'Something to notice', reply: 'Curiosity has very good roots.', nextNodeId: null, nextQuestionId: null, affinity: { fernip: 1, blossle: 1, tempesto: 1 } },
     { id: 'care', label: 'Something to care for', reply: 'Care is one way a place becomes yours.', nextNodeId: null, nextQuestionId: null, affinity: { petalimp: 1, amberleaf: 1, driftkin: 1 } },
   ] },
@@ -578,13 +578,12 @@ const mossproutFormDescriptions = Object.fromEntries(MOSS_FORMS.map((formId) => 
 ])) as Partial<Record<KatchimeraSkinId, string>>;
 
 const mossproutFormFinder: ConversationDefinition = {
-  id: 'mossprout:game:form-finder', version: 5, familyId: 'mossprout', title: 'Find your nature-side card',
+  id: 'mossprout:game:form-finder', version: 6, familyId: 'mossprout', title: 'Who is closest to your nature?',
   trigger: 'signature_game', minimumBondLevel: 1, cooldownDays: 3650, contextualOnly: true, format: 'profile_game',
   purpose: 'card_discovery', returnTarget: 'character_home', repeatPolicy: 'once_ever', topicKey: 'nature-card',
   tags: ['forms', 'mossprout'], entryNodeId: 'game', nodes: [
-    { id: 'game', kind: 'profile_game', title: 'Find your nature-side card', entryQuestionId: 'nature-world', questions: mossproutProfileQuestions, revealNodeId: 'reveal' },
-    { id: 'reveal', kind: 'form_reveal', title: 'Your first Mossprout card', descriptions: mossproutFormDescriptions, memoryKey: 'preference:mossprout:form-match', nextNodeId: 'end' },
-    { id: 'end', kind: 'end', message: 'This one is yours. The other cards can be discovered later.' },
+    { id: 'game', kind: 'profile_game', title: 'Who is closest to your nature?', entryQuestionId: 'nature-world', questions: mossproutProfileQuestions, revealNodeId: 'reveal' },
+    { id: 'reveal', kind: 'form_reveal', title: 'Someone feels close', descriptions: mossproutFormDescriptions, memoryKey: 'preference:mossprout:form-match', nextNodeId: null },
   ],
 };
 

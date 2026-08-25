@@ -77,6 +77,7 @@ export function CompanionConversationScene({
   onAdvance,
   onAnswer,
   onClose,
+  onCompletedExit,
   onMemoryDecision,
   onGoalDecision,
   onInsightDecision,
@@ -106,6 +107,7 @@ export function CompanionConversationScene({
   onAdvance: () => void;
   onAnswer: (optionId: string) => void;
   onClose: () => void;
+  onCompletedExit: () => void;
   onContinue: () => void;
   onEquipForm: (formId: KatchimeraSkinId) => void;
   onMemoryDecision: (remember: boolean, summary: string) => void;
@@ -257,19 +259,24 @@ export function CompanionConversationScene({
           label={journeyNarrative ? 'Continue the story' : 'Mossprout is thinking…'}
           onAdvance={journeyNarrative ? onAdvance : undefined}
           requiresManualAdvance={journeyNarrative && requiresManualAdvance}
-        /> : session.status === 'completed' || node?.kind === 'end' ? (
+        /> : session.status === 'completed' ? (
           session.preview ? <View style={{ alignItems: 'center', gap: 10, paddingVertical: 6 }}>
             <ThemedText selectable style={{ fontSize: 14, lineHeight: 20, textAlign: 'center' }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>Preview complete. Choose another flow below or exit the preview.</ThemedText>
-          </View> : journeyNarrative && node?.kind === 'end' && journeyTaskHandoff ? <MossproutJourneyRequestPanel
+          </View> : <ConversationCompletion
+            label={definition.id === 'mossprout:game:form-finder' ? 'Closest match found' : 'Conversation complete'}
+            onContinue={onCompletedExit}
+          />
+        ) : node?.kind === 'end' ? (
+          journeyNarrative && journeyTaskHandoff ? <MossproutJourneyRequestPanel
             animateEntrance={false}
             onAction={requiresManualAdvance ? onAdvance : undefined}
             requests={journeyTaskRequests}
             title={journeyTaskTitle ?? 'Today’s Garden requests'}
           /> : <NarrativeTransition
-            label={journeyNarrative && node?.kind === 'end'
+            label={journeyNarrative
               ? journeyTaskHandoff ? 'Your Garden request is ready' : 'Finish today’s Journey'
-              : storyFlow && !storyFinale ? 'Opening the next chapter…' : `Returning to ${name}…`}
-            actionLabel={journeyNarrative && node?.kind === 'end'
+              : storyFlow && !storyFinale ? 'Opening the next chapter…' : 'Finish this conversation'}
+            actionLabel={journeyNarrative
               ? journeyTaskHandoff ? 'Go to the Garden' : 'Finish Journey'
               : undefined}
             onAdvance={onAdvance}
@@ -444,22 +451,22 @@ function FormReveal({ definition, node, onAdvance, preview, session, skins }: {
   const cardReveal = definition.familyId === 'mossprout' && definition.id === 'mossprout:game:form-finder';
   return <View style={{ gap: 11 }}>
     <View style={{ backgroundColor: KatchaUI.companionScenePanel.cardBackground, borderCurve: 'continuous', borderRadius: 22, gap: 8, padding: 16 }}>
-      <ThemedText selectable style={{ fontSize: 11, fontWeight: '900', letterSpacing: 1.1 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>{cardReveal ? 'YOUR KATCHIMERA CARD' : 'YOUR CLOSEST FORM'}</ThemedText>
-      {topVisual ? <View style={{ alignItems: 'center', height: 170, justifyContent: 'center' }}>
+      <ThemedText selectable style={{ fontSize: 11, fontWeight: '900', letterSpacing: 1.1 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>{cardReveal ? 'SOMEONE FEELS CLOSE' : 'YOUR CLOSEST FORM'}</ThemedText>
+      {!cardReveal && topVisual ? <View style={{ alignItems: 'center', height: 170, justifyContent: 'center' }}>
         <Image contentFit="contain" source={topVisual.source} style={{ height: 170, width: '100%' }} transition={220} />
       </View> : null}
-      <ThemedText selectable style={{ fontSize: 26, fontWeight: '900' }} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>{topName}</ThemedText>
-      <ThemedText selectable style={{ fontSize: 14, lineHeight: 20 }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{node.descriptions[topId] ?? 'A form that fits the choices you made today.'}</ThemedText>
+      <ThemedText selectable style={{ fontSize: 26, fontWeight: '900' }} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>{cardReveal ? 'A veiled garden visitor' : topName}</ThemedText>
+      <ThemedText selectable style={{ fontSize: 14, lineHeight: 20 }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{cardReveal ? 'Your choices point to one resident, but meeting them is part of the story. Open their parcel in the garden to find out who answered.' : node.descriptions[topId] ?? 'A form that fits the choices you made today.'}</ThemedText>
       <ThemedText selectable style={{ fontSize: 9.5, fontWeight: '900', letterSpacing: 1 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>BECAUSE YOU CHOSE</ThemedText>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
         {reasons.map((reason) => <View key={reason} style={{ backgroundColor: 'rgba(217,164,62,0.15)', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 6 }}>
           <ThemedText selectable style={{ fontSize: 10.5, fontWeight: '800' }} lightColor="#74572C" darkColor="#74572C">{reason}</ThemedText>
         </View>)}
       </View>
-      {runnerName ? <ThemedText selectable style={{ fontSize: 12, fontWeight: '800' }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>Runner-up: {runnerName}</ThemedText> : null}
-      {cardReveal ? <ThemedText selectable style={{ fontSize: 12, lineHeight: 17 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>This match joins your Mossprout card collection for free.</ThemedText> : !top?.unlocked ? <ThemedText selectable style={{ fontSize: 12, lineHeight: 17 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>Not discovered yet. Its hatch cues will stay visible in your collection.</ThemedText> : null}
+      {!cardReveal && runnerName ? <ThemedText selectable style={{ fontSize: 12, fontWeight: '800' }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>Runner-up: {runnerName}</ThemedText> : null}
+      {cardReveal ? <ThemedText selectable style={{ fontSize: 12, lineHeight: 17 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>The card is not earned yet. Reveal the resident, then help with two small requests.</ThemedText> : !top?.unlocked ? <ThemedText selectable style={{ fontSize: 12, lineHeight: 17 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>Not discovered yet. Its hatch cues will stay visible in your collection.</ThemedText> : null}
     </View>
-    <NarrativeTransition label={preview ? 'Preview ready' : cardReveal ? 'Adding this card to your collection…' : 'Saving this match to your insights…'} onAdvance={onAdvance} requiresManualAdvance={preview} />
+    <NarrativeTransition label={preview ? 'Preview ready' : cardReveal ? 'Preparing a veiled parcel…' : 'Saving this match to your insights…'} onAdvance={onAdvance} requiresManualAdvance={preview} />
   </View>;
 }
 
@@ -514,6 +521,13 @@ function MemoryProposal({ node, onDecision, session }: {
     </View>
     <PrimaryAction label="Finish preview" onPress={() => onDecision(false, summary)} />
   </View>;
+}
+
+function ConversationCompletion({ label, onContinue }: { label: string; onContinue: () => void }) {
+  return <Animated.View accessibilityLabel={label} entering={FadeInUp.duration(180)} style={{ gap: 10 }}>
+    <ThemedText selectable style={{ fontSize: 13.5, fontWeight: '900', lineHeight: 18, textAlign: 'center' }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{label}</ThemedText>
+    <PrimaryAction label="Continue" onPress={onContinue} />
+  </Animated.View>;
 }
 
 function NarrativeTransition({ actionLabel = 'Continue', label, onAdvance, requiresManualAdvance = false }: {

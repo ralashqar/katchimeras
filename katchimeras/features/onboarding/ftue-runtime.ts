@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 
 import { createClientId } from '@/utils/client-id';
 import { getStoredJson, setStoredJsonAsync } from '@/utils/app-storage';
+import { mirrorFtueActionInShadow, mirrorFtueEventInShadow } from '@/features/content-flow/ftue-shadow-bridge';
 
 import { MOSSPROUT_FTUE_SCRIPT, mossproutFtueAction, mossproutFtueStep } from './mossprout-ftue-script';
 import type { FtueAnswer, FtueCommitReceipt, FtueEvent, FtueEventMatcher, FtueRunState, FtueSurface, FtueSurfaceViewModel } from './ftue-types';
@@ -106,6 +107,9 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
     && run.scriptVersion < 16
     && run.stepId === 'discovery.steppling.parcel'
     && !hasHavenRevealReceipt;
+  const needsResidentParcelConfirmation = run.status === 'active'
+    && run.scriptVersion < 21
+    && run.stepId === 'merge.resident_parcel';
   if (run.schemaVersion === 6 && run.scriptVersion === MOSSPROUT_FTUE_SCRIPT.version && !pendingEggQuestion) return run;
   const now = new Date().toISOString();
   if (replayDreamMistChapter) return {
@@ -125,7 +129,9 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
   };
   const removedMergeSteps = new Set(['merge.first', 'merge.flower', 'energy.capture', 'energy.awarded', 'merge.flower_return', 'merge.final']);
   const replacedDiscoverySteps = new Set(['discovery.steppling.seed', 'discovery.steppling.sprout', 'discovery.steppling.plant']);
-  const migratedStepId = needsPreParcelHavenReveal
+  const migratedStepId = needsResidentParcelConfirmation
+    ? 'companion.resident_parcel_ready'
+    : needsPreParcelHavenReveal
     ? 'haven.reveal'
     : needsHavenFocus
     ? 'haven.mossprout.focus'
@@ -205,9 +211,12 @@ export function repairFtueStep(expectedStepId: string, targetStepId: string) {
   const receipts = current.receipts.filter((receipt) => receipt.stepId !== targetStepId);
   const objectiveProgress = Object.fromEntries(Object.entries(current.objectiveProgress)
     .filter(([key]) => !key.includes(`${targetStepId}:`)));
+  const complete = targetStepId === MOSSPROUT_FTUE_SCRIPT.terminalStepId;
   return publish({
     ...current,
     stepId: targetStepId,
+    status: complete ? 'complete' : current.status,
+    completedAt: complete ? new Date().toISOString() : current.completedAt,
     receipts,
     objectiveProgress,
     updatedAt: new Date().toISOString(),
@@ -281,6 +290,7 @@ export function commitFtueAction(input: {
     receipts,
     updatedAt: now,
   });
+  void mirrorFtueActionInShadow(current, input.actionId, next?.stepId ?? nextStepId);
   scheduleReceiptSync();
   return next;
 }
@@ -304,13 +314,20 @@ function ftueEventMatches(matcher: FtueEventMatcher, event: FtueEvent) {
     return matcher.noteId == null || matcher.noteId === event.noteId;
   }
   if (matcher.type === 'arrival_claimed' && event.type === 'arrival_claimed') {
-    return matcher.arrivalId == null || matcher.arrivalId === event.arrivalId;
+    return (matcher.arrivalId == null || matcher.arrivalId === event.arrivalId)
+      && (!matcher.residentDiscovery || event.residentDiscoveryId != null);
   }
   if (matcher.type === 'companion_discovery_advanced' && event.type === 'companion_discovery_advanced') {
     return (matcher.discoveryId == null || matcher.discoveryId === event.discoveryId)
       && (matcher.stage == null || matcher.stage === event.stage)
       && (matcher.completedCharacterId == null || matcher.completedCharacterId === event.completedCharacterId);
   }
+  if (matcher.type === 'resident_card_revealed' && event.type === 'resident_card_revealed') {
+    return (matcher.discoveryId == null || matcher.discoveryId === event.discoveryId)
+      && (matcher.residentId == null || matcher.residentId === event.residentId);
+  }
+  if (matcher.type === 'resident_dialogue_acknowledged' && event.type === 'resident_dialogue_acknowledged') return matcher.discoveryId == null || matcher.discoveryId === event.discoveryId;
+  if (matcher.type === 'resident_card_reveal_acknowledged' && event.type === 'resident_card_reveal_acknowledged') return matcher.discoveryId == null || matcher.discoveryId === event.discoveryId;
   if (matcher.type === 'ui_target_pressed' && event.type === 'ui_target_pressed') {
     return matcher.target == null || JSON.stringify(matcher.target) === JSON.stringify(event.target);
   }
@@ -320,7 +337,8 @@ function ftueEventMatches(matcher: FtueEventMatcher, event: FtueEvent) {
   }
   return matcher.type === 'order_served'
     && event.type === 'order_served'
-    && (matcher.orderId == null || matcher.orderId === event.orderId);
+    && (matcher.orderId == null || matcher.orderId === event.orderId)
+    && (!matcher.residentDiscovery || event.residentDiscoveryId != null);
 }
 
 export function dispatchFtueEvent(event: FtueEvent, evidenceRef?: string) {
@@ -338,7 +356,9 @@ export function dispatchFtueEvent(event: FtueEvent, evidenceRef?: string) {
     [progressKey]: Math.min(nextCount, requiredCount),
   };
   if (nextCount < requiredCount) {
-    return publish({ ...current, objectiveProgress, updatedAt: now });
+    const pending = publish({ ...current, objectiveProgress, updatedAt: now });
+    void mirrorFtueEventInShadow(current, event, pending?.stepId ?? current.stepId);
+    return pending;
   }
 
   const action = mossproutFtueAction(current.stepId, edge.commitActionId);
@@ -373,6 +393,7 @@ export function dispatchFtueEvent(event: FtueEvent, evidenceRef?: string) {
     receipts: [...current.receipts, receipt],
     updatedAt: now,
   });
+  void mirrorFtueEventInShadow(current, event, next?.stepId ?? nextStepId);
   scheduleReceiptSync();
   return next;
 }

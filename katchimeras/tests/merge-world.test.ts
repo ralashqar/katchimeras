@@ -170,7 +170,7 @@ test('Merge board flattens its static cells into one native image without a Skia
   assert.match(board, /const lockedDefinitionId = mist\?\.kind === 'echo'/);
   assert.match(board, /lockedDefinitionId \? <View pointerEvents="none" style=\{styles\.echoItem\}/);
   assert.match(board, /<MergeMatchHint active=\{matchHint != null\}/);
-  assert.match(board, /lockedDefinitionId \|\| rootbound \? <Image[\s\S]*?source=\{DREAM_MIST_LOWER\}/);
+  assert.match(board, /lockedDefinitionId \|\| rootbound \|\| residentCard \? <Image[\s\S]*?source=\{DREAM_MIST_LOWER\}/);
   assert.match(board, /rootbound \? <RootboundRewardArt/);
   assert.doesNotMatch(board, /RootboundBadge|RootRewardPreview/);
   assert.doesNotMatch(board, /blocked && visibleLockedItem/);
@@ -200,7 +200,7 @@ test('board geometry renders and hit-tests with one coordinate system', () => {
 test('a new Merge World is Mossprout-owned and begins with twenty playable cells', () => {
   const state = createInitialMergeWorldState(NOW);
   assert.deepEqual(mergeWorldCatalogIssues(), []);
-  assert.equal(state.version, 18);
+  assert.equal(state.version, 19);
   assert.equal(state.ownerCharacterId, 'mossprout');
   assert.equal(state.storageCapacity, 8);
   assert.equal(state.energy.regenCap, MERGE_ENERGY_REGEN_CAP);
@@ -349,14 +349,14 @@ test('every newly unlocked non-Mossprout generator can clear either cold tier-on
 
 */
 
-test('normalization removes legacy mysteries and restores authored Mossprout roots', () => {
+test('normalization removes legacy mysteries and restores authored resident-card nodes', () => {
   const legacy = structuredClone(createMossproutChapterZeroState(NOW)) as unknown as { board: { mist: unknown }[] };
   legacy.board[8].mist = { kind: 'katchimera', id: 'future-moon', mysteryId: 'moon', ownerCharacterId: null };
   legacy.board[57].mist = { kind: 'katchimera', id: 'future-trail', mysteryId: 'trail', ownerCharacterId: 'steppling' };
 
   const normalized = normalizeMergeWorldState(legacy, NOW + 1);
-  assert.equal(normalized.board[8].mist?.kind, 'rootbound_echo');
-  assert.equal(normalized.board[8].mist?.kind === 'rootbound_echo' ? normalized.board[8].mist.gateId : null, 'root:focus-first');
+  assert.equal(normalized.board[8].mist?.kind, 'resident_card');
+  assert.equal(normalized.board[8].mist?.kind === 'resident_card' ? normalized.board[8].mist.gateId : null, 'mossprout:resident-card:mistle');
   assert.deepEqual(normalized.board[57].mist, { kind: 'garden_growth', clearingId: 'lantern-bank', revealDay: 21 });
 });
 
@@ -456,7 +456,7 @@ test('normalization intentionally resets pre-v18 Merge snapshots', () => {
     },
   };
   const normalized = normalizeMergeWorldState(stale, NOW + 1);
-  assert.equal(normalized.version, 18);
+  assert.equal(normalized.version, 19);
   assert.equal(normalized.ownerCharacterId, 'mossprout');
   assert.deepEqual(normalized.generators, {});
 });
@@ -591,34 +591,25 @@ test('multi-order Journey reconciliation repairs an exhausted saved basket', () 
   assert.equal(spawn.message?.includes('everything Mossprout found'), false);
 });
 
-test('the matched Katchimera card opens a fixed-price Coin collection without equipping forms', () => {
+test('Mossprout resident cards cannot bypass their locked board nodes with Coins', () => {
   const base = createMossproutChapterZeroState(NOW);
   const lockedPurchase = reduceMergeWorld(base, {
     type: 'purchaseKatchimeraCard', familyId: 'mossprout', cardId: 'fernip', cost: 150,
     purchaseId: 'purchase:fernip', now: NOW + 1,
   });
   assert.equal(lockedPurchase.changed, false);
-  const matched = reduceMergeWorld(base, {
-    type: 'grantKatchimeraCard', familyId: 'mossprout', cardId: 'petalimp',
-    sourceReceiptId: 'journey-card:2026-08-23:mossprout', now: NOW + 2,
-  });
-  assert.equal(matched.changed, true);
-  assert.equal(matched.state.ownedKatchimeraCards[0]?.acquisition, 'journey_match');
-  const funded = { ...matched.state, coins: 180 };
+  const funded = { ...base, coins: 180 };
   const purchased = reduceMergeWorld(funded, {
     type: 'purchaseKatchimeraCard', familyId: 'mossprout', cardId: 'fernip', cost: 150,
     purchaseId: 'purchase:fernip', now: NOW + 3,
   });
-  assert.equal(purchased.changed, true);
-  assert.equal(purchased.state.coins, 30);
-  assert.deepEqual(purchased.state.ownedKatchimeraCards.map((card) => card.cardId), ['petalimp', 'fernip']);
-  assert.equal(reduceMergeWorld(purchased.state, {
-    type: 'purchaseKatchimeraCard', familyId: 'mossprout', cardId: 'fernip', cost: 150,
-    purchaseId: 'purchase:fernip', now: NOW + 4,
-  }).changed, false);
+  assert.equal(purchased.changed, false);
+  assert.equal(purchased.state.coins, 180);
+  assert.deepEqual(purchased.state.ownedKatchimeraCards.map((card) => card.cardId), []);
+  assert.match(purchased.message ?? '', /veiled garden card/i);
 });
 
-test('Mossprout first resident and card unlock atomically from serving its named order', () => {
+test('ordinary Mossprout Journey orders never grant resident cards', () => {
   const base = createMossproutChapterZeroState(NOW);
   const activity = {
     objectiveId: 'mossprout:objective:pond-knock',
@@ -634,7 +625,7 @@ test('Mossprout first resident and card unlock atomically from serving its named
   }).state;
   const residentOrder = matchProjection.activeOrders.find((order) => order.id === activity.mergeOrderId)!;
   assert.equal(residentOrder.recipientSkinId, 'petalimp');
-  assert.equal(residentOrder.reward.katchimeraCardId, 'petalimp');
+  assert.equal(residentOrder.reward.katchimeraCardId, undefined);
   assert.deepEqual(matchProjection.mossproutResidentSkinIds, ['mossprout']);
   assert.equal(matchProjection.ownedKatchimeraCards.some((card) => card.cardId === 'petalimp'), false);
   const cell = matchProjection.board.findIndex((candidate) => !candidate.locked && candidate.occupant == null);
@@ -646,8 +637,8 @@ test('Mossprout first resident and card unlock atomically from serving its named
     } : candidate),
   };
   matchProjection = reduceMergeWorld(matchProjection, { type: 'serveOrder', orderId: activity.mergeOrderId, now: NOW + 3.5 }).state;
-  assert.deepEqual(matchProjection.mossproutResidentSkinIds, ['mossprout', 'petalimp']);
-  assert.equal(matchProjection.ownedKatchimeraCards.find((card) => card.cardId === 'petalimp')?.acquisition, 'story_resident');
+  assert.deepEqual(matchProjection.mossproutResidentSkinIds, ['mossprout']);
+  assert.equal(matchProjection.ownedKatchimeraCards.find((card) => card.cardId === 'petalimp'), undefined);
 
   const storyProjection = reduceMergeWorld(matchProjection, {
     type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23', status: 'complete', activity: null,
@@ -655,13 +646,18 @@ test('Mossprout first resident and card unlock atomically from serving its named
       completedObjectiveIds: ['mossprout:objective:nursery-key'], matchedCardIds: ['petalimp'], habitatStage: 2,
     }, now: NOW + 4,
   }).state;
-  assert.deepEqual(storyProjection.mossproutResidentSkinIds, ['mossprout', 'petalimp', 'fernip']);
+  assert.deepEqual(storyProjection.mossproutResidentSkinIds, ['mossprout']);
 });
 
 test('advanced Mossprout orders show one different unlocked resident per request', () => {
   const activeDayIds = Array.from({ length: 28 }, (_, index) => `2026-07-${String(index + 1).padStart(2, '0')}`);
   const base = {
     ...createMossproutChapterZeroState(NOW),
+    ownedKatchimeraCards: ['petalimp', 'fernip', 'blossle'].map((cardId, index) => ({
+      cardId, familyId: 'mossprout' as const, acquisition: 'resident_discovery' as const,
+      sourceReceiptId: `resident-test:${cardId}`, acquiredAt: NOW + index, coinCost: 0,
+    })),
+    mossproutResidentSkinIds: ['mossprout', 'petalimp', 'fernip', 'blossle'],
     mossproutBoardProgression: {
       ...createMossproutChapterZeroState(NOW).mossproutBoardProgression,
       activeDayIds,
@@ -1167,7 +1163,7 @@ test('pre-v18 activity parcels are discarded by the intentional world reset', ()
     rewardInbox: [{ id: 'unknown-old-parcel', createdAt: NOW, items: ['adventure:trail:4'], source: 'activity' }],
   }, NOW + 1);
   assert.equal(normalized.rewardInbox.some((entry) => entry.source === 'activity'), false);
-  assert.equal(normalized.version, 18);
+  assert.equal(normalized.version, 19);
   assert.equal(normalized.ownerCharacterId, 'mossprout');
   assert.deepEqual(normalized.arrivals, []);
 });
@@ -1571,13 +1567,13 @@ test('serving a story order consumes its item without Energy or friendship rewar
   assert.equal(result.state.externalRewardReceipts.some((receipt) => receipt.id.startsWith('merge-friendship:')), false);
 });
 
-test('legacy snapshots reset cleanly into Mossprout’s v18 personal world', () => {
+test('legacy snapshots reset cleanly into Mossprout’s v19 personal world', () => {
   const normalized = normalizeMergeWorldState({
     ...createInitialMergeWorldState(NOW), version: 2,
     energy: { value: 99, cap: 100, lastRegenAt: NOW },
     generators: { 'starter-pantry': { id: 'starter-pantry', familyId: 'food', name: 'Picnic Pantry', level: 1, enabledBranches: ['table'], charges: 9, maxCharges: 12, readyAt: NOW + 1000 } },
   }, NOW + 1);
-  assert.equal(normalized.version, 18);
+  assert.equal(normalized.version, 19);
   assert.equal(normalized.ownerCharacterId, 'mossprout');
   assert.equal(normalized.energy.value, 0);
   assert.deepEqual(normalized.generators, {});
@@ -1740,7 +1736,7 @@ test('v10 companion ownership resets instead of populating Mossprout’s world',
   const legacy = { ...current, version: 10 } as unknown as Record<string, unknown>;
   delete legacy.companionDiscovery;
   const migrated = normalizeMergeWorldState(legacy, NOW + 1);
-  assert.equal(migrated.version, 18);
+  assert.equal(migrated.version, 19);
   assert.deepEqual(migrated.unlockedCharacters, []);
   assert.deepEqual(migrated.companionDiscovery.records, []);
 });

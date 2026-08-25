@@ -220,10 +220,13 @@ export function KingdomCompanionScreen({
   ftueOrderPreviewActive = false,
   ftueBondSpotlightActive = false,
   ftueDayOneActionActive = false,
+  ftueResidentHandoffActive = false,
+  ftueResidentStoryResume = false,
   ftueNavigationLocked = false,
   onFtueBondSpotlightComplete,
   onFtueJourneyDayComplete,
   onFtueOpenMerge,
+  onFtueOpenResidentParcel,
   discoveryRecords = [],
 }: {
   presentation?: KingdomCompanionPresentation;
@@ -237,10 +240,13 @@ export function KingdomCompanionScreen({
   ftueOrderPreviewActive?: boolean;
   ftueBondSpotlightActive?: boolean;
   ftueDayOneActionActive?: boolean;
+  ftueResidentHandoffActive?: boolean;
+  ftueResidentStoryResume?: boolean;
   ftueNavigationLocked?: boolean;
   onFtueBondSpotlightComplete?: () => void;
   onFtueJourneyDayComplete?: () => void;
   onFtueOpenMerge?: () => void;
+  onFtueOpenResidentParcel?: () => void;
   discoveryRecords?: readonly CompanionDiscoveryRecord[];
 }) {
   const isFocused = useIsFocused();
@@ -282,6 +288,7 @@ export function KingdomCompanionScreen({
   const [savedOrigin, setSavedOrigin] = useState<'conversation' | 'insight' | 'quest' | 'visit' | null>(null);
   const [questExperienceActive, setQuestExperienceActive] = useState(false);
   const [bondCelebration, setBondCelebration] = useState<{
+    continueFtueAfter?: boolean;
     journeyDayNumber?: number;
     receipt: CompanionBondAwardReceipt;
     variant: CompanionBondCelebrationVariant;
@@ -341,7 +348,18 @@ export function KingdomCompanionScreen({
       ? mossproutJourneyDayNumberForCompletionEvent(relationshipProgressionRepository.load(), receipt.eventId) ?? undefined
       : undefined;
     if (ftueDayOneActionActive && receipt.kind === 'journey_day_completed') {
-      setBondCelebration({ journeyDayNumber, receipt, variant: 'journey_complete' });
+      setBondCelebration({ continueFtueAfter: true, journeyDayNumber, receipt, variant: 'journey_complete' });
+      return;
+    }
+    if (ftueDayOneActionActive) {
+      // Day 1 now continues into resident discovery before the Journey itself
+      // completes. The selected Bond action advances FTUE after its own reward
+      // flight; it must not wait for the later Journey-completion receipt.
+      if (receipt.afterLevel > receipt.beforeLevel) {
+        setBondCelebration({ continueFtueAfter: true, receipt, variant: 'level_up' });
+      } else {
+        onFtueJourneyDayComplete?.();
+      }
       return;
     }
     if (receipt.afterLevel > receipt.beforeLevel) {
@@ -351,7 +369,7 @@ export function KingdomCompanionScreen({
     if (receipt.kind === 'journey_day_completed') {
       setBondCelebration({ journeyDayNumber, receipt, variant: 'journey_complete' });
     }
-  }, [acknowledgeBondCelebration, ftueDayOneActionActive]);
+  }, [acknowledgeBondCelebration, ftueDayOneActionActive, onFtueJourneyDayComplete]);
   const quickGoalFamilyIds = useMemo(() => {
     const ids = new Set<KatchimeraFamilyId>();
     for (const creature of kingdom.creatures) {
@@ -594,9 +612,12 @@ export function KingdomCompanionScreen({
           ftueOrderPreviewActive={ftueOrderPreviewActive}
           ftueBondSpotlightActive={ftueBondSpotlightActive}
           ftueDayOneActionActive={ftueDayOneActionActive}
+          ftueResidentHandoffActive={ftueResidentHandoffActive}
+          ftueResidentStoryResume={ftueResidentStoryResume}
           ftueNavigationLocked={ftueNavigationLocked}
           onFtueBondSpotlightComplete={onFtueBondSpotlightComplete}
           onFtueOpenMerge={onFtueOpenMerge}
+          onFtueOpenResidentParcel={onFtueOpenResidentParcel}
           onSelectDestination={quests.selectDestination}
           onClose={() => {
             quests.closeSelectedResident();
@@ -1081,7 +1102,7 @@ export function KingdomCompanionScreen({
             tomorrowPreview: 'New growth begins tomorrow.',
           } : undefined}
           onContinue={() => {
-            const finishesFtue = ftueDayOneActionActive && bondCelebration.variant === 'journey_complete';
+            const finishesFtue = bondCelebration.continueFtueAfter === true;
             setBondCelebration(null);
             if (finishesFtue) onFtueJourneyDayComplete?.();
           }}

@@ -193,6 +193,7 @@ test('heavy game surfaces navigate only under the shared readiness curtain', () 
   assert.match(rootSource, /<GameScreenTransitionProvider>[\s\S]*?<Stack>/);
   assert.match(transitionSource, /commitPhase\('covering'\)[\s\S]*?current\.navigate\(\)[\s\S]*?commitPhase\('waiting_ready'\)/);
   assert.match(transitionSource, /READINESS_TIMEOUT_MS = 8_000/);
+  assert.match(transitionSource, /HARD_RECOVERY_TIMEOUT_MS = 10_000[\s\S]*?Hard recovery revealed a stalled curtain[\s\S]*?commitPhase\('revealing'\)/);
   assert.match(transitionSource, /useReducedMotion\(\)/);
   assert.match(tabBarSource, /games: 'merge'[\s\S]*?today: 'today'/);
   assert.match(mergeSource, /useGameSurfaceReadiness\('merge',[\s\S]*?foreground: boardMetrics != null/);

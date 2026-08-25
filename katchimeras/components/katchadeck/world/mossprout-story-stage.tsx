@@ -54,6 +54,7 @@ import { loadMergeWorldState, subscribeMergeWorldSnapshots } from '@/utils/merge
 import { localDayId } from '@/utils/world-identity';
 import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
 import { mossproutCampaignEpisodeByBeatId } from '@/constants/mossprout-campaign';
+import { RESIDENT_CARD_DEFINITION_ID } from '@/constants/resident-card-discovery';
 
 import type { CompanionChatStarter } from './companion-chat-lobby';
 import { KatchimeraBottomDock } from './katchimera-bottom-dock';
@@ -65,6 +66,12 @@ const MAX_VISIBLE_ACTIONS = 3;
 const ACTION_STACK_HEIGHT = 212;
 const ACTION_TRAY_HEIGHT = 284;
 const JOURNEY_REQUEST_TRAY_HEIGHT = 348;
+const RESIDENT_PARCEL_REQUESTS = [{
+  id: 'mossprout:resident-parcel',
+  title: 'A veiled parcel',
+  description: 'A sealed resident card is waiting inside.',
+  definitionIds: [RESIDENT_CARD_DEFINITION_ID],
+}] as const;
 
 function useMossproutMergeWorldState() {
   const providedMergeWorld = useOptionalMergeWorldState();
@@ -123,6 +130,10 @@ export function MossproutStoryStage({
   actionStackTargetRef,
   navigationLocked = false,
   tutorialInteractionLocked = false,
+  residentParcelHandoffActive = false,
+  residentStoryResumeActive = false,
+  residentStoryResumeTitle = 'Continue story',
+  onResumeResidentStory,
   motionReady,
   swipeExternalGesture,
 }: {
@@ -150,6 +161,10 @@ export function MossproutStoryStage({
   actionStackTargetRef?: RefObject<ViewType | null>;
   navigationLocked?: boolean;
   tutorialInteractionLocked?: boolean;
+  residentParcelHandoffActive?: boolean;
+  residentStoryResumeActive?: boolean;
+  residentStoryResumeTitle?: string;
+  onResumeResidentStory?: () => void;
   motionReady: boolean;
   swipeExternalGesture?: GestureType;
 }) {
@@ -300,8 +315,27 @@ export function MossproutStoryStage({
   }, [externalCompletions]);
 
   const resolvedVisibleActions = composeMossproutVisibleActions(presentedActionCandidates, completingAction, MAX_VISIBLE_ACTIONS);
+  const residentResumeAction = useMemo(() => ({
+    id: 'mossprout:resident-story-resume',
+    instanceId: 'mossprout:resident-story-resume',
+    slotId: 'together' as const,
+    sequence: 0,
+    kind: 'story_chat' as const,
+    title: residentStoryResumeTitle,
+    subtitle: 'Return to the resident waiting in the Garden',
+    icon: 'sparkles' as const,
+    artKey: 'mossprout:journey' as const,
+    required: true,
+    disabled: false,
+    status: 'active' as const,
+    reward: null,
+    destination: { kind: 'garden' as const, orderId: null },
+    completedAt: null,
+    outroAcknowledgedAt: null,
+  } satisfies KatchimeraDayAction), [residentStoryResumeTitle]);
   const actionId = useCallback((action: KatchimeraDayAction) => action.completionEventId ?? action.instanceId ?? `${dayId}:${action.id}`, [dayId]);
   const sourceActions = useMemo(() => {
+    if (residentStoryResumeActive) return [residentResumeAction];
     if (journeyExclusive) return resolvedVisibleActions;
     if (!selfCompletingGoalAction) return resolvedVisibleActions;
     const selfId = actionId(selfCompletingGoalAction);
@@ -321,7 +355,7 @@ export function MossproutStoryStage({
       selfCompletingGoalAction,
       ...resolvedVisibleActions.slice(insertionIndex),
     ].slice(0, MAX_VISIBLE_ACTIONS);
-  }, [actionId, journeyExclusive, resolvedVisibleActions, selfCompletingGoalAction]);
+  }, [actionId, journeyExclusive, residentResumeAction, residentStoryResumeActive, resolvedVisibleActions, selfCompletingGoalAction]);
 
   const finishActionOutro = useCallback((action: KatchimeraDayAction) => {
     relationshipProgressionRepository.update((current) => {
@@ -395,6 +429,7 @@ export function MossproutStoryStage({
   const openAction = (action: KatchimeraDayAction) => {
     if (action.disabled || action.status === 'completed') return;
     if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+    if (residentStoryResumeActive && action.id === residentResumeAction.id) return onResumeResidentStory?.();
     if (action.destination.kind === 'journey') return openJourney(action);
     if (action.destination.kind === 'focus_questionnaire') return onOpenFocusDirection();
     if (action.destination.kind === 'conversation') return onOpenConversation(action.destination.definitionId, mossproutActionOrigin(action, dayId, journey));
@@ -458,15 +493,35 @@ export function MossproutStoryStage({
   const presentedActions = actionTransition.items;
   const stackInteractionLocked = tutorialInteractionLocked || actionTransition.interactionLocked || Boolean(selfCompletingGoalAction);
 
-  return <View style={[styles.stage, journeyMergeActive && styles.journeyRequestStage]}>
-    {journey && !storyComplete && !journeyMergeActive ? (
+  return <View style={[
+    styles.stage,
+    residentParcelHandoffActive
+      ? styles.residentParcelStage
+      : journeyMergeActive && !residentStoryResumeActive
+        ? styles.journeyRequestStage
+        : styles.actionStage,
+  ]}>
+    {journey && !storyComplete && !journeyMergeActive && !residentParcelHandoffActive && !residentStoryResumeActive ? (
       <KatchimeraJourneyStatusPlaque
         dayNumber={journeyDayNumber}
         revealKey={journey.id}
         status={journey.status === 'complete' ? 'complete' : 'in_progress'}
       />
     ) : null}
-    {journeyMergeActive && journeyEpisode ? <View ref={actionStackTargetRef} style={styles.journeyRequestPanel}>
+    {residentParcelHandoffActive ? <View ref={actionStackTargetRef} style={styles.residentParcelPanel}>
+      <MossproutJourneyRequestPanel
+        actionLabel="Go to the Garden"
+        animateEntrance={false}
+        countLabel="1 parcel"
+        disabled={tutorialInteractionLocked}
+        eyebrow="GARDEN PARCEL"
+        fitContent
+        onAction={onResumeResidentStory}
+        requests={RESIDENT_PARCEL_REQUESTS}
+        standalone
+        title="Someone answered from the Garden"
+      />
+    </View> : journeyMergeActive && journeyEpisode && !residentStoryResumeActive ? <View ref={actionStackTargetRef} style={styles.journeyRequestPanel}>
       <MossproutJourneyRequestPanel
         actionLabel={journey.status === 'activity_available' ? 'Go to the Garden' : 'Continue in the Garden'}
         animateEntrance={false}
@@ -596,7 +651,7 @@ export function MossproutStoryStage({
       />
     ) : null}
 
-    <KatchimeraBottomDock
+    {!residentParcelHandoffActive && !residentStoryResumeActive ? <KatchimeraBottomDock
       disabled={navigationLocked}
       featuredId="garden"
       items={[
@@ -605,7 +660,7 @@ export function MossproutStoryStage({
         { id: 'skins', label: 'Skins', onPress: onOpenCards },
         { id: 'trophies', label: 'Trophies', onPress: onOpenTrophies },
       ]}
-    />
+    /> : null}
   </View>;
 }
 
@@ -637,10 +692,13 @@ function ActionRewardChip({ reward }: {
 }
 
 const styles = StyleSheet.create({
-  stage: { alignSelf: 'stretch', gap: 8, height: ACTION_TRAY_HEIGHT, overflow: 'visible', paddingBottom: 3 },
+  stage: { alignSelf: 'stretch', gap: 8, overflow: 'visible', paddingBottom: 3 },
+  actionStage: { height: ACTION_TRAY_HEIGHT },
   journeyRequestStage: { height: JOURNEY_REQUEST_TRAY_HEIGHT },
+  residentParcelStage: { justifyContent: 'flex-end' },
   actionStack: { height: ACTION_STACK_HEIGHT },
   journeyRequestPanel: { flex: 1 },
+  residentParcelPanel: { alignSelf: 'stretch' },
   actionSlot: { gap: 7, height: ACTION_STACK_HEIGHT, justifyContent: 'flex-end', overflow: 'visible' },
   actionArtwork: { height: 46, width: 46 },
   quietContent: { alignItems: 'center', flexDirection: 'row', gap: 10, minHeight: 66, paddingHorizontal: 11, paddingVertical: 7 },

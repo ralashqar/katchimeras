@@ -1,7 +1,13 @@
 import { MOSSPROUT_ROOTBOUND_GATES_BY_ID } from '@/constants/merge-world-catalog';
 import { VEILED_MEMORY_CARD_ART } from '@/constants/memory-card-art';
 
+export const RESIDENT_CARD_ART = VEILED_MEMORY_CARD_ART;
+
 export const MERGE_WORLD_ITEM_ART = {
+  // The carried card and every locked resident-card cell intentionally share
+  // one face: the FTUE teaches a literal identical-card merge.
+  'mossprout:resident-card:sealed': RESIDENT_CARD_ART,
+  'mossprout:resident-card:key': RESIDENT_CARD_ART,
   'food:table:1': require('../assets/images/katchimeras/merge-world/items/food-table-1-ingredient.webp'),
   'food:table:2': require('../assets/images/katchimeras/merge-world/items/food-table-2-snack.webp'),
   'food:table:3': require('../assets/images/katchimeras/merge-world/items/food-table-3-dish.webp'),

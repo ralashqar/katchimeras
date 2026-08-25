@@ -8,6 +8,12 @@ const mossproutCompanionResume = {
   lock: true,
   resume: { kind: 'companion', creatureId: 'companion:mossprout' },
 } as const;
+const mossproutMergeResume = {
+  // Merge remains the durable cold-start destination, but Back is a supported
+  // escape to Mossprout's single Continue story card.
+  lock: false,
+  resume: { kind: 'merge', creatureId: 'companion:mossprout' },
+} as const;
 // The Discovery Egg is an authored three-beat sequence. Each answer must move
 // its physical growth by the same amount, regardless of the normal daily
 // reward assigned to that answer's semantic source.
@@ -32,7 +38,7 @@ const openingActions: readonly FtueActionDefinition[] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 19,
+  version: 22,
   entryStepId: 'egg.opening',
   terminalStepId: 'complete',
   steps: [
@@ -335,7 +341,55 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       id: 'companion.day_one_action', surface: 'companion',
       navigation: mossproutCompanionResume,
       guide: { eyebrow: 'Time together grows Bond', title: 'Choose one thing.', body: 'You never need to finish every card. Pick the one that feels right today.' },
-      actions: [{ id: 'companion.complete_day_one_action', title: 'Complete one Bond action', description: 'Choose any one of Mossprout\'s action cards.', icon: 'heart.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'complete', backendEvent: true }],
+      actions: [{ id: 'companion.complete_day_one_action', title: 'Complete one Bond action', description: 'Choose any one of Mossprout\'s action cards.', icon: 'heart.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'companion.resident_affinity', backendEvent: true }],
+      blockingBeat: 'chapter_complete',
+    },
+    {
+      id: 'companion.resident_affinity', surface: 'companion', navigation: mossproutCompanionResume,
+      guide: { eyebrow: 'Someone else heard us', title: 'Who feels closest to your nature?', body: 'Your answers prepare a veiled parcel without giving away who is inside.' },
+      actions: [{ id: 'companion.complete_resident_affinity', title: 'Find the closest resident', description: 'Answer a few quick nature questions.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'companion.resident_parcel_ready', backendEvent: true }],
+    },
+    {
+      id: 'companion.resident_parcel_ready', surface: 'companion', navigation: mossproutCompanionResume,
+      guide: { eyebrow: 'A veiled parcel is waiting', title: 'Someone answered from the Garden.', body: 'Open their parcel, then match what is inside to the glowing card.' },
+      actions: [{ id: 'companion.open_resident_parcel', title: 'Go to the Garden', description: 'Open the resident parcel on the Merge board.', icon: 'shippingbox.fill', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'merge.resident_parcel', backendEvent: true }],
+    },
+    {
+      id: 'merge.resident_parcel', surface: 'merge', navigation: mossproutMergeResume,
+      guide: { eyebrow: 'A veiled parcel', title: 'Open what the resident sent.', body: 'There is a sealed card waiting inside.' },
+      actions: [{ id: 'merge.claim_resident_parcel', title: 'Open the parcel', description: 'Place the sealed card on the board.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'merge_parcel_claimed', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'parcel_tap', target: { kind: 'active_resident_parcel' } } },
+      cue: { kind: 'tap', target: { kind: 'active_resident_parcel' } },
+      spotlight: { targets: [{ kind: 'active_resident_parcel' }], padding: 7, radius: 14, dimOpacity: 0.62 },
+      edges: [{ event: { type: 'arrival_claimed', residentDiscovery: true }, commitActionId: 'merge.claim_resident_parcel', nextStepId: 'merge.resident_card' }],
+    },
+    {
+      id: 'merge.resident_card', surface: 'merge', navigation: mossproutMergeResume,
+      guide: { eyebrow: 'The Egg noticed a match', title: 'Bring the two cards together.', body: 'Drag the sealed card onto the glowing mystery card.' },
+      actions: [{ id: 'merge.reveal_resident', title: 'Reveal the resident', description: 'Match the sealed card to the mystery card.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from: { kind: 'active_resident_card_item' }, to: { kind: 'active_resident_card_node' } } },
+      cue: { kind: 'drag', from: { kind: 'active_resident_card_item' }, to: { kind: 'active_resident_card_node' } },
+      spotlight: { targets: [{ kind: 'active_resident_card_item' }, { kind: 'active_resident_card_node' }], grouping: 'bounding_rect', padding: 4, radius: 12, dimOpacity: 0.64 },
+      edges: [{ event: { type: 'resident_card_revealed' }, commitActionId: 'merge.reveal_resident', nextStepId: 'merge.resident_dialogue' }],
+    },
+    {
+      id: 'merge.resident_dialogue', surface: 'merge', navigation: mossproutMergeResume,
+      guide: { eyebrow: 'A new voice', title: 'Meet the resident.', body: 'They have their own request for the garden.' },
+      actions: [{ id: 'merge.meet_resident', title: 'Meet the resident', description: 'Hear what they need.', icon: 'bubble.left.fill', presentation: 'observed_game_action', handlerId: 'acknowledgement', backendEvent: true }],
+      edges: [{ event: { type: 'resident_dialogue_acknowledged' }, commitActionId: 'merge.meet_resident', nextStepId: 'merge.resident_orders' }],
+    },
+    {
+      id: 'merge.resident_orders', surface: 'merge', navigation: mossproutMergeResume,
+      guide: { eyebrow: 'Help them settle in', title: 'Complete the requests.', body: 'The next appears after this one is served.' },
+      actions: [{ id: 'merge.serve_resident_orders', title: 'Serve the requests', description: 'Help the resident earn their place in the deck.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_order_served', backendEvent: true }],
+      spotlight: { targets: [{ kind: 'active_resident_order_card' }], padding: 5, radius: 14, dimOpacity: 0.38, dismissOnGuideClose: true },
+      edges: [{ event: { type: 'order_served', residentDiscovery: true }, requiredCount: 2, commitActionId: 'merge.serve_resident_orders', nextStepId: 'merge.resident_card_reward' }],
+    },
+    {
+      id: 'merge.resident_card_reward', surface: 'merge', navigation: mossproutMergeResume,
+      guide: { eyebrow: 'Card earned', title: 'Reveal the card in your deck.', body: 'This resident is now part of Mossprout’s garden set.' },
+      actions: [{ id: 'merge.ack_resident_card', title: 'Reveal the card', description: 'Watch it turn over in the deck.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'acknowledgement', backendEvent: true }],
+      edges: [{ event: { type: 'resident_card_reveal_acknowledged' }, commitActionId: 'merge.ack_resident_card', nextStepId: 'complete' }],
       blockingBeat: 'chapter_complete',
     },
     {
@@ -473,6 +527,20 @@ export function validateMossproutFtueScript(): string[] {
       if (!MOSSPROUT_FTUE_SCRIPT.steps.some((candidate) => candidate.id === edge.nextStepId)) errors.push(`Missing edge step ${edge.nextStepId}`);
     }
     if (step.spotlight && step.spotlight.targets.length === 0) errors.push(`Spotlight has no targets: ${step.id}`);
+    if (step.id === 'merge.resident_parcel') {
+      const allowed = step.interaction?.mode === 'exclusive' ? step.interaction.allowed : null;
+      if (allowed?.kind !== 'parcel_tap' || allowed.target.kind !== 'active_resident_parcel') errors.push('Resident parcel step is not bound to the active parcel');
+      if (step.edges?.[0]?.event.type !== 'arrival_claimed' || !step.edges[0].event.residentDiscovery) errors.push('Resident parcel step accepts an unrelated arrival');
+    }
+    if (step.id === 'merge.resident_card') {
+      const allowed = step.interaction?.mode === 'exclusive' ? step.interaction.allowed : null;
+      if (allowed?.kind !== 'board_drag' || allowed.from.kind !== 'active_resident_card_item' || allowed.to.kind !== 'active_resident_card_node') {
+        errors.push('Resident reveal step is not bound to its sealed card and mystery node');
+      }
+    }
+    if (step.id === 'merge.resident_orders' && (step.edges?.[0]?.event.type !== 'order_served' || !step.edges[0].event.residentDiscovery)) {
+      errors.push('Resident request step accepts an unrelated order');
+    }
   }
   if (!ids.has(MOSSPROUT_FTUE_SCRIPT.entryStepId)) errors.push('Missing entry step');
   if (!ids.has(MOSSPROUT_FTUE_SCRIPT.terminalStepId)) errors.push('Missing terminal step');

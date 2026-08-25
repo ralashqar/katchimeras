@@ -25,7 +25,7 @@ import Animated, {
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
 import { MergeBoardEffectsLayer, type MergeBoardEffect, type MergeBoardEffectKind } from '@/components/katchadeck/games/merge-spawn-effects-layer';
-import { mergeWorldGeneratorArt, mergeWorldItemArt, mossproutRootRewardArt } from '@/constants/merge-world-art';
+import { mergeWorldGeneratorArt, mergeWorldItemArt, mossproutRootRewardArt, RESIDENT_CARD_ART } from '@/constants/merge-world-art';
 import { MERGE_CHARACTER_NAMES, MERGE_GENERATORS_BY_ID, MERGE_HYBRID_RECIPES, MERGE_ITEMS_BY_ID, MERGE_WORLD_COLUMNS, MERGE_WORLD_ROWS, MOSSPROUT_ROOTBOUND_GATES_BY_ID } from '@/constants/merge-world-catalog';
 import { COMPANION_DISCOVERIES_BY_ID } from '@/constants/companion-discovery-catalog';
 import type { MergeBoardInteractionGate } from '@/features/onboarding/merge-ftue';
@@ -131,7 +131,7 @@ function isInterruptibleMotion(motion?: SpriteMotion) {
   return motion == null || motion.kind === 'move' || motion.kind === 'swap' || motion.kind === 'return' || motion.kind === 'spawn' || motion.kind === 'merge-result';
 }
 
-export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onCommandSettled, onInteractionGateCommitted, onScreenMetrics, onBlockedInteraction, onInspectMist, onInspectRootbound, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', sessionId, hiddenItemInstanceIds, animateEntrance = true }: {
+export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onCommandSettled, onInteractionGateCommitted, onScreenMetrics, onVisualReady, onBlockedInteraction, onInspectMist, onInspectRootbound, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', sessionId, hiddenItemInstanceIds, animateEntrance = true }: {
   state: MergeWorldState;
   width: number;
   animateEntrance?: boolean;
@@ -142,6 +142,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   onCommandSettled?: (receipt: MergeBoardOperationReceipt) => void;
   onInteractionGateCommitted?: (receipt: MergeInteractionGateReceipt) => void;
   onScreenMetrics?: (metrics: MergeBoardScreenMetrics) => void;
+  onVisualReady?: () => void;
   onBlockedInteraction?: () => void;
   onInspectMist?: (cell: number) => void;
   onInspectRootbound?: (gateId: string) => void;
@@ -239,7 +240,12 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   const gateToCell = interactionGate.kind === 'drag' ? interactionGate.toCell : -1;
   const gateGeneratorCell = interactionGate.kind === 'generator' ? interactionGate.cell : -1;
   const mossproutOnboarding = presentation.activeOrders.some((order) => order.id.startsWith('mossprout:chapter-0:'));
-  const artCache = useMergeArtCache(presentation, mossproutOnboarding);
+  const [baseArtDisplayed, setBaseArtDisplayed] = useState(false);
+  const [cellArtReady, setCellArtReady] = useState(false);
+  const artCache = useMergeArtCache(presentation, mossproutOnboarding, () => setCellArtReady(true));
+  useEffect(() => {
+    if (baseArtDisplayed && cellArtReady) onVisualReady?.();
+  }, [baseArtDisplayed, cellArtReady, onVisualReady]);
   useMergeBoardFrameProbe(busy || boardEffects.length > 0, dragPhase);
 
   const emitBoardEffect = useCallback((cell: number, kind: MergeBoardEffectKind) => {
@@ -475,7 +481,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       return;
     }
     const targetCell = current.board[to];
-    if (!targetCell || (targetCell.locked && targetCell.mist?.kind !== 'echo' && targetCell.mist?.kind !== 'rootbound_echo' && targetCell.mist?.kind !== 'dreambound_item')) {
+    if (!targetCell || (targetCell.locked && targetCell.mist?.kind !== 'echo' && targetCell.mist?.kind !== 'rootbound_echo' && targetCell.mist?.kind !== 'dreambound_item' && targetCell.mist?.kind !== 'resident_card')) {
       if (targetCell?.locked) {
         showCellFeedback(to, 'locked_cell');
         returnHome();
@@ -517,6 +523,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     const nextMotions: Record<string, Omit<SpriteMotion, 'operationId' | 'token'>> = {};
     let nextSprites: SpriteRecord[];
 
+    const residentCardReveal = Boolean(predicted.residentCardRevealed && predicted.mergedCell === to);
     const mistMerging = !target && isMistMergeTransition(targetCell.mist?.kind, predicted.mergedCell, to, Boolean(resultingOccupant));
     if (mistMerging && resultingOccupant) {
       const result: SpriteRecord = { occupant: resultingOccupant, cell: to };
@@ -537,6 +544,10 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
         setMistDissipations((current) => [...current.slice(-2), dissipation]);
         timers.schedule(() => setMistDissipations((current) => current.filter((entry) => entry.id !== dissipation.id)), reduceMotion ? 220 : 560);
       }
+      emitBoardEffect(to, 'merge');
+    } else if (residentCardReveal) {
+      nextSprites = currentSprites.filter((entry) => spriteId(entry) !== instanceId);
+      nextMotions[instanceId] = { kind: 'merge-source', startX: sourceOrigin.x + dx, startY: sourceOrigin.y + dy };
       emitBoardEffect(to, 'merge');
     } else if (merging && target && resultingOccupant?.kind === 'item') {
       const result: SpriteRecord = { occupant: resultingOccupant, cell: to };
@@ -559,7 +570,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     hoverCell.value = -1;
     onSelect(to);
     if (process.env.EXPO_OS === 'ios') {
-      void Haptics.impactAsync(merging || mistMerging
+      void Haptics.impactAsync(merging || mistMerging || residentCardReveal
         ? Haptics.ImpactFeedbackStyle.Medium
         : Haptics.ImpactFeedbackStyle.Light);
     }
@@ -958,6 +969,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       contentFit="fill"
       enforceEarlyResizing
       pointerEvents="none"
+      onDisplay={() => setBaseArtDisplayed(true)}
       recyclingKey="merge-board-static-base"
       source={MERGE_BOARD_BASE}
       style={{ borderRadius: 5, height: cellSize * MERGE_WORLD_ROWS, left: inset, position: 'absolute', top: inset, width: cellSize * MERGE_WORLD_COLUMNS }}
@@ -986,6 +998,9 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
             ? `${definition.name}. Merge with another ${definition.name} to make ${nextDefinition.name}.`
             : `${definition.name}. This item cannot be merged any further.`
             : cell.mist?.kind === 'rootbound_echo' ? rootboundAccessibilityLabel(cell.mist.gateId, cell.mist.ready)
+            : cell.mist?.kind === 'resident_card' ? cell.mist.ready
+              ? 'Mystery resident card. Bring the sealed card from its parcel here to reveal who is waiting.'
+              : 'A locked resident card. Continue Mossprout’s Journey to discover who is waiting.'
             : echoDefinition ? `Sleeping ${echoDefinition.name}. Bring another ${echoDefinition.name} here to wake it.`
               : discoveryStage ? `${discoveryStage.clue}. ${cell.mist?.kind === 'dreambound_item' && cell.mist.active ? `Bring another ${MERGE_ITEMS_BY_ID.get(cell.mist.boundDefinitionId)?.name ?? 'matching item'} here.` : 'Follow the trail to wake this item.'}`
                 : cell.mist?.kind === 'discovery_fork' ? 'Several paths are moving beneath the Dream Mist. Choose one to investigate.'
@@ -1075,6 +1090,7 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
   onActivate: (cell: number) => void;
 }) {
   const rootbound = mist?.kind === 'rootbound_echo' ? mist : null;
+  const residentCard = mist?.kind === 'resident_card' ? mist : null;
   const lockedDefinitionId = mist?.kind === 'echo'
     ? mist.definitionId
     : mist?.kind === 'dreambound_item' ? mist.boundDefinitionId : null;
@@ -1097,9 +1113,10 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
         </MergeMatchHint>
       </View> : null}
       {rootbound ? <RootboundRewardArt gateId={rootbound.gateId} matchHint={matchHint} ready={rootbound.ready} size={Math.min(width, height) - 4} /> : null}
-      {lockedDefinitionId || rootbound ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" pointerEvents="none" recyclingKey="merge-dream-mist-lower" source={DREAM_MIST_LOWER} style={[styles.lockedOverlay, styles.lowerMistOverlay]} transition={0} /> : null}
+      {residentCard ? <View pointerEvents="none" style={styles.echoItem}><MergeMatchHint active={matchHint != null} offsetX={matchHint?.x ?? 0} offsetY={matchHint?.y ?? 0}><Image accessibilityIgnoresInvertColors contentFit="contain" source={RESIDENT_CARD_ART} style={{ height: Math.min(width, height) - 8, opacity: residentCard.ready ? 1 : 0.72, width: Math.min(width, height) - 8 }} transition={0} /></MergeMatchHint></View> : null}
+      {lockedDefinitionId || rootbound || residentCard ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" pointerEvents="none" recyclingKey="merge-dream-mist-lower" source={DREAM_MIST_LOWER} style={[styles.lockedOverlay, styles.lowerMistOverlay]} transition={0} /> : null}
       {mist?.kind === 'discovery_dormant' ? <View pointerEvents="none" style={styles.mistCategoryArt}><IconSymbol color="#F4D795" name="sparkles" size={Math.max(17, Math.min(width, height) * 0.38)} /></View> : null}
-      {blocked && !lockedDefinitionId && !rootbound ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" recyclingKey="merge-dream-mist-full" source={DREAM_MIST_FULL} style={[styles.lockedOverlay, styles.fullMistOverlay]} transition={0} /> : null}
+      {blocked && !lockedDefinitionId && !rootbound && !residentCard ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" recyclingKey="merge-dream-mist-full" source={DREAM_MIST_FULL} style={[styles.lockedOverlay, styles.fullMistOverlay]} transition={0} /> : null}
       {mist?.kind === 'discovery_fork' ? <View pointerEvents="none" style={styles.discoveryClue}>
         <IconSymbol color="#F4D795" name="sparkles" size={Math.max(18, Math.min(width, height) * 0.44)} />
       </View> : null}

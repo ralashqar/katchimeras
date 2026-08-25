@@ -45,11 +45,13 @@ export const COMPANION_MERGE_REQUEST_PALETTE: CompanionMergeRequestPalette = {
 
 export function CompanionMergeRequestTray({
   accessibilityLabel,
+  countLabel,
   eyebrow,
   palette,
   requests,
 }: {
   accessibilityLabel: string;
+  countLabel?: string;
   eyebrow: string;
   palette: CompanionMergeRequestPalette;
   requests: readonly CompanionMergeRequest[];
@@ -63,7 +65,7 @@ export function CompanionMergeRequestTray({
       <View style={styles.heading}>
         <ThemedText selectable style={styles.eyebrow} lightColor={palette.eyebrow} darkColor={palette.eyebrow}>{eyebrow}</ThemedText>
         <ThemedText selectable style={styles.count} lightColor={palette.count} darkColor={palette.count}>
-          {requests.length} {requests.length === 1 ? 'order' : 'orders'}
+          {countLabel ?? `${requests.length} ${requests.length === 1 ? 'order' : 'orders'}`}
         </ThemedText>
       </View>
       <ScrollView

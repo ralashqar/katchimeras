@@ -69,12 +69,17 @@ export type FtueTarget =
   | { kind: 'board_dream_echo'; echoId: string }
   | { kind: 'board_companion_discovery'; discoveryId: string }
   | { kind: 'board_discovery_fork'; gateId: string }
+  | { kind: 'active_resident_card_item' }
+  | { kind: 'active_resident_card_node' }
   | { kind: 'order_requirement_item'; orderId: string; requirementIndex: number; occurrence?: number }
   | { kind: 'board_cell'; cell: number }
   | { kind: 'order_card'; orderId: string }
   | { kind: 'order_serve'; orderId: string }
   | { kind: 'tray_chat_note'; noteId: string }
   | { kind: 'tray_parcel'; arrivalId: string }
+  | { kind: 'active_resident_parcel' }
+  | { kind: 'active_resident_order_card' }
+  | { kind: 'active_resident_order_serve' }
   | { kind: 'haven_tile'; characterId: string }
   | { kind: 'haven_tile_hud'; characterId: string }
   | { kind: 'haven_upgrade_button'; characterId: string }
@@ -90,6 +95,8 @@ export type FtueSpotlightDefinition = {
   padding?: number;
   radius?: number;
   dimOpacity?: number;
+  /** Remove this spotlight when its transient Egg guide is dismissed. */
+  dismissOnGuideClose?: boolean;
 };
 
 export type FtueInteractionPolicy =
@@ -119,10 +126,13 @@ export type FtueEvent =
       resultCell: number;
       revision: number;
     }
-  | { type: 'order_served'; orderId: string; revision: number }
+  | { type: 'order_served'; orderId: string; residentDiscoveryId?: string; revision: number }
   | { type: 'chat_note_opened'; noteId: string; revision: number }
-  | { type: 'arrival_claimed'; arrivalId: string; revision: number }
+  | { type: 'arrival_claimed'; arrivalId: string; residentDiscoveryId?: string; revision: number }
   | { type: 'companion_discovery_advanced'; discoveryId: string; stage: number; completedCharacterId?: string; revision: number }
+  | { type: 'resident_card_revealed'; discoveryId: string; residentId: string; revision: number }
+  | { type: 'resident_dialogue_acknowledged'; discoveryId: string; revision: number }
+  | { type: 'resident_card_reveal_acknowledged'; discoveryId: string; revision: number }
   | { type: 'ui_target_pressed'; target: FtueTarget; revision: number }
   | { type: 'haven_upgrade_completed'; characterId: string; stage: number; revision: number };
 
@@ -135,10 +145,13 @@ export type FtueEventMatcher =
     }
   | { type: 'dream_echo_cleared'; echoId?: string; resultDefinitionId?: string }
   | { type: 'item_spawned'; generatorId?: string; definitionId?: string }
-  | { type: 'order_served'; orderId?: string }
+  | { type: 'order_served'; orderId?: string; residentDiscovery?: boolean }
   | { type: 'chat_note_opened'; noteId?: string }
-  | { type: 'arrival_claimed'; arrivalId?: string }
+  | { type: 'arrival_claimed'; arrivalId?: string; residentDiscovery?: boolean }
   | { type: 'companion_discovery_advanced'; discoveryId?: string; stage?: number; completedCharacterId?: string }
+  | { type: 'resident_card_revealed'; discoveryId?: string; residentId?: string }
+  | { type: 'resident_dialogue_acknowledged'; discoveryId?: string }
+  | { type: 'resident_card_reveal_acknowledged'; discoveryId?: string }
   | { type: 'ui_target_pressed'; target?: FtueTarget }
   | { type: 'haven_upgrade_completed'; characterId?: string; stage?: number };
 

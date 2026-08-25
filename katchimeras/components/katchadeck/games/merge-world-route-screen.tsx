@@ -1,6 +1,7 @@
 import { useIsFocused } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { MergeWorldScreen } from '@/components/katchadeck/games/merge-world-screen';
@@ -14,23 +15,23 @@ import { deriveTomorrowDayRecord, hydrateAllDays } from '@/game/days';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
 import { useGameScreenTransition } from '@/features/navigation/game-screen-transition';
+import { usePresentedAssetReadiness } from '@/features/navigation/presented-asset-readiness';
 
 export function MergeWorldRouteScreen() {
   const isFocused = useIsFocused();
   useLocalSearchParams<{ creatureId?: string; familyId?: string }>();
   const hasPresentedBoard = useRef(false);
-  const [backgroundReady, setBackgroundReady] = useState(false);
+  const backgroundPresentation = usePresentedAssetReadiness(isFocused, {
+    fallbackAfterMs: null,
+    label: 'Mossprout Garden backdrop',
+  });
   const { suppressEntranceMotion, target } = useGameScreenTransition();
   const { height, width } = useWindowDimensions();
   const { days } = useAllDays();
   const playBoardEntrance = isFocused && !hasPresentedBoard.current
     && !(target === 'merge' && suppressEntranceMotion);
   useEffect(() => {
-    if (!isFocused) {
-      setBackgroundReady(false);
-      return;
-    }
-    setBackgroundReady(false);
+    if (!isFocused) return;
     hasPresentedBoard.current = true;
     scheduleForegroundLifecycleAudit('merge');
   }, [isFocused]);
@@ -66,9 +67,22 @@ export function MergeWorldRouteScreen() {
     <MergeWorldProvider active={isFocused} characterIds={persistent.characterIds} days={persistent.activityDays} featuredCharacterId="mossprout" questState={persistent.quests}>
       <View style={styles.screen}>
         {isFocused ? <>
-          <TodayExplorationBackground backgroundKey="mossprout" contentFit="cover" imageSize={Math.max(height, width)} onLoad={() => setBackgroundReady(true)} />
+          <LinearGradient
+            colors={['#57B7DF', '#79C9C0', '#789F50']}
+            end={{ x: 0.5, y: 1 }}
+            start={{ x: 0.5, y: 0 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <TodayExplorationBackground
+            key={`merge-background-${backgroundPresentation.generation}`}
+            backgroundKey="mossprout"
+            contentFit="cover"
+            imageSize={Math.max(height, width)}
+            onDisplay={backgroundPresentation.onDisplay}
+            onError={backgroundPresentation.onError}
+          />
           <View style={styles.world}>
-            <MergeWorldScreen active={isFocused} backgroundReady={backgroundReady} playBoardEntrance={playBoardEntrance} />
+            <MergeWorldScreen active={isFocused} backgroundReady={backgroundPresentation.ready} playBoardEntrance={playBoardEntrance} />
           </View>
         </> : null}
       </View>

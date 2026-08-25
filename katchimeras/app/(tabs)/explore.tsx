@@ -586,6 +586,7 @@ export default function ExploreScreen() {
                 <KatchaButton label="Reset today only" onPress={handleResetToday} variant="secondary" />
                 <KatchaButton label="Restart first-session onboarding · keep profile" onPress={handleRestartFirstSession} variant="primary" />
                 <KatchaButton label="Profile Snapshots" onPress={() => router.push('/dev-profile-snapshots' as Href)} variant="primary" />
+                <KatchaButton label="Content Flow Inspector" onPress={() => router.push('/dev-content-flow' as Href)} variant="secondary" />
                 <KatchaButton label={journeyToolsOpen ? 'Hide Journey tools' : 'Journey tools'} onPress={() => setJourneyToolsOpen((open) => !open)} variant="primary" />
                 {journeyToolsOpen ? <View style={styles.journeyTools}>
                   <View style={styles.devToggleCopy}>

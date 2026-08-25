@@ -3,9 +3,12 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { Stack } from 'expo-router';
+import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import * as Sentry from '@sentry/react-native';
 import * as SystemUI from 'expo-system-ui';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { View, type GestureResponderEvent } from 'react-native';
 import 'react-native-reanimated';
 
 import { Colors } from '@/constants/theme';
@@ -26,6 +29,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import '@/utils/travel-memory-task';
 import { initializeCrashReporting } from '@/utils/crash-reporting';
 import { runMossproutCampaignV2Migration } from '@/utils/mossprout-campaign-v2-migration';
+import { ContentFlowProvider } from '@/features/content-flow/content-flow-provider';
+import { runContentFlowSaveMigration } from '@/features/content-flow/content-flow-migration';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -41,6 +46,7 @@ if (DEV_TOOLS_ENABLED) {
 }
 
 function RootLayout() {
+  const router = useRouter();
   const colorScheme = useColorScheme();
   const themeColors = Colors[colorScheme === 'light' ? 'light' : 'dark'];
   const [fontsLoaded] = useFonts({
@@ -49,10 +55,25 @@ function RootLayout() {
     Manrope: require('../assets/fonts/Manrope-Variable.ttf'),
   });
   const [campaignReady, setCampaignReady] = useState(false);
+  const lastEmergencyDevOpenRef = useRef(0);
+
+  const captureEmergencyDevGesture = useCallback((event: GestureResponderEvent) => {
+    if (!DEV_TOOLS_ENABLED || event.nativeEvent.touches.length < 4) return false;
+    const now = Date.now();
+    if (now - lastEmergencyDevOpenRef.current < 1_500) return false;
+    lastEmergencyDevOpenRef.current = now;
+    if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    // Push a root copy of the complete Developer Tools page instead of
+    // replacing the FTUE-owned companion route. The latter is protected by
+    // usePreventRemove during recovery.
+    router.push('/dev-tools');
+    return false;
+  }, [router]);
 
   useEffect(() => {
     let active = true;
     void runMossproutCampaignV2Migration()
+      .then(() => runContentFlowSaveMigration())
       .catch((error) => Sentry.captureException(error))
       .finally(() => { if (active) setCampaignReady(true); });
     return () => { active = false; };
@@ -99,6 +120,7 @@ function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <View onStartShouldSetResponderCapture={DEV_TOOLS_ENABLED ? captureEmergencyDevGesture : undefined} style={{ flex: 1 }}>
       <ThemeProvider value={navigationTheme}>
         <GameUIProvider>
           <EconomyProvider>
@@ -108,6 +130,7 @@ function RootLayout() {
                   <AvatarAccessReconciler />
                   <WispProvider>
                     <SceneProvider>
+                    <ContentFlowProvider>
                     <FtueProvider>
                     <AppActivityProvider>
                       <DevProfileLaunchReconciler />
@@ -123,8 +146,10 @@ function RootLayout() {
           <Stack.Screen name="dev-photo-place-lab" options={{ title: 'Photo Place Lab' }} />
           <Stack.Screen name="dev-subscription-lab" options={{ title: 'Subscription Simulator' }} />
           <Stack.Screen name="dev-ui-gallery" options={{ title: 'Game UI Gallery' }} />
+          <Stack.Screen name="dev-tools" options={{ headerShown: false, title: 'Developer Tools' }} />
           <Stack.Screen name="dev-profile-snapshots" options={{ title: 'Profile Snapshots' }} />
           <Stack.Screen name="dev-profile-snapshot-capture" options={{ contentStyle: { backgroundColor: 'transparent' }, presentation: 'formSheet', sheetAllowedDetents: [0.5, 1], sheetGrabberVisible: true, title: 'Capture Profile' }} />
+          <Stack.Screen name="dev-content-flow" options={{ title: 'Content Flow Inspector' }} />
           <Stack.Screen name="intelligence-lab" options={{ title: 'Intelligence Lab' }} />
           <Stack.Screen name="moment-capture" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="note-capture" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
@@ -151,6 +176,7 @@ function RootLayout() {
                       </GameScreenTransitionProvider>
                     </AppActivityProvider>
                     </FtueProvider>
+                    </ContentFlowProvider>
                     </SceneProvider>
                   </WispProvider>
                 </EggAvatarProvider>
@@ -159,6 +185,7 @@ function RootLayout() {
           </EconomyProvider>
         </GameUIProvider>
       </ThemeProvider>
+      </View>
     </GestureHandlerRootView>
   );
 }
