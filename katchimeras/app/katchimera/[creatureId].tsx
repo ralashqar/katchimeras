@@ -9,9 +9,11 @@ export default function KatchimeraCompanionRoute() {
   const { creatureId, source, story, ftue, residentResume } = useLocalSearchParams<{ creatureId: string; source?: string; story?: string; ftue?: string; residentResume?: string }>();
   const ftueRun = useFtueRun();
   const isMossprout = creatureId === 'companion:mossprout';
+  const firstMeetingFtueActive = ftueRun?.status === 'active'
+    && ftueRun.stepId === 'companion.first_meeting';
   const ftueConversationDefinitionId = !isMossprout
     ? undefined
-    : ftue === '1'
+    : ftue === '1' && firstMeetingFtueActive
       ? mossproutFtueConversationDefinitionId(ftuePersonalizationKey())
       : ftue === 'chapter-zero-return'
         && ftueRun?.status === 'active'
@@ -26,6 +28,7 @@ export default function KatchimeraCompanionRoute() {
   return (
     <KatchimeraCompanionRouteScreen
       creatureId={creatureId}
+      ftueRouteOrigin={isMossprout && Boolean(ftue)}
       ftueConversationDefinitionId={ftueConversationDefinitionId}
       journeyReturnConversationDefinitionId={journeyReturnConversationDefinitionId}
       residentStoryResumeRequested={residentResume === '1'}

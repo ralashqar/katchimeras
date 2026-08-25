@@ -10,9 +10,15 @@ import {
   ftueLocksSurfaceNavigation,
   ftueOwnsOpeningHome,
   ftueResumeTargetMatches,
+  residentJourneyReachedMatchResult,
 } from '@/features/onboarding/ftue-navigation-policy';
+import type { JourneyDayRecord } from '@/types/relationship-progression';
 import { FTUE_EGG_ANSWER_GROWTH_REWARD, MOSSPROUT_FTUE_SCRIPT, mossproutFtueAction, mossproutFtueStep, validateMossproutFtueScript } from '@/features/onboarding/mossprout-ftue-script';
-import { authorizeResidentFtuePause, clearResidentFtuePause, isResidentFtuePauseAuthorized } from '@/features/onboarding/resident-ftue-pause-session';
+import {
+  reduceResidentFtueNavigationSession,
+  residentMergeLiveRouteDecision,
+  type ResidentFtueNavigationSession,
+} from '@/features/onboarding/resident-ftue-navigation-session';
 import { ftueNavigationYieldsToDevRecovery } from '@/features/onboarding/ftue-dev-recovery';
 import { mossproutFtueConversationDefinitions } from '@/constants/mossprout-ftue-conversations';
 import { buildYesterdayStepEnergyOffer, mergeStepEnergyPreview } from '@/utils/merge-world/economy-policy';
@@ -73,6 +79,7 @@ test('backend catalog contains only allowlisted privacy-safe action ids', () => 
 });
 
 test('Supabase receipt allowlist matches every backend FTUE action', () => {
+  const v23Migration = readFileSync('supabase/migrations/20260825223000_register_mossprout_ftue_v23.sql', 'utf8');
   const v22Migration = readFileSync('supabase/migrations/20260825190000_register_mossprout_ftue_v22.sql', 'utf8');
   const v21Migration = readFileSync('supabase/migrations/20260825173000_register_mossprout_ftue_v21.sql', 'utf8');
   const v20Migration = readFileSync('supabase/migrations/20260825150000_register_mossprout_ftue_v20.sql', 'utf8');
@@ -81,8 +88,9 @@ test('Supabase receipt allowlist matches every backend FTUE action', () => {
   const v17Migration = readFileSync('supabase/migrations/20260822173032_register_mossprout_ftue_v17.sql', 'utf8');
   const priorMigration = readFileSync('supabase/migrations/20260818170000_register_mossprout_ftue_v16.sql', 'utf8');
   for (const item of FTUE_ACTION_CATALOG.filter((entry) => entry.backendEvent)) {
-    assert.match(`${priorMigration}\n${v17Migration}\n${v18Migration}\n${migration}\n${v20Migration}\n${v21Migration}\n${v22Migration}`, new RegExp(`'${item.stepId}',\\s*'${item.actionId}'`));
+    assert.match(`${priorMigration}\n${v17Migration}\n${v18Migration}\n${migration}\n${v20Migration}\n${v21Migration}\n${v22Migration}\n${v23Migration}`, new RegExp(`'${item.stepId}',\\s*'${item.actionId}'`));
   }
+  assert.match(v23Migration, /script_version = 22/);
   assert.match(v22Migration, /script_version = 21/);
   assert.match(migration, /script_version = 18/);
   assert.doesNotMatch(migration, /step_id not in/);
@@ -108,6 +116,8 @@ test('Chapter 0 previews its requests and keeps the first-session board tutorial
   assert.equal(mossproutFtueAction('companion.day_one_action', 'companion.complete_day_one_action')?.nextStepId, 'companion.resident_affinity');
   assert.equal(mossproutFtueAction('companion.resident_affinity', 'companion.complete_resident_affinity')?.nextStepId, 'companion.resident_parcel_ready');
   assert.equal(mossproutFtueAction('companion.resident_parcel_ready', 'companion.open_resident_parcel')?.nextStepId, 'merge.resident_parcel');
+  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.resident_card_reward')?.edges?.[0]?.nextStepId, 'companion.resident_match_result');
+  assert.equal(mossproutFtueAction('companion.resident_match_result', 'companion.ack_resident_match_result')?.nextStepId, 'complete');
   assert.equal(mossproutFtueAction('haven.reveal', 'haven.reveal_world')?.nextStepId, 'complete');
   assert.equal(finalServeStep?.edges?.[0]?.nextStepId, 'companion.chapter_zero_return');
   assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.energy.last_seed')?.edges?.[0]?.nextStepId, 'merge.energy_exhausted');
@@ -315,24 +325,34 @@ test('resident discovery pauses on one standard Mossprout action card and resume
   const conversationFlow = readFileSync('features/companion/use-companion-conversation-flow.ts', 'utf8');
   const stage = readFileSync('components/katchadeck/world/mossprout-story-stage.tsx', 'utf8');
   const merge = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
-  const pauseSession = readFileSync('features/onboarding/resident-ftue-pause-session.ts', 'utf8');
+  const navigationSession = readFileSync('features/onboarding/resident-ftue-navigation-session.ts', 'utf8');
   assert.match(route, /residentResume[\s\S]*?residentStoryResumeRequested=\{residentResume === '1'\}/);
-  assert.match(reconciler, /startingHandoffRequested[\s\S]*?companion\.resident_parcel_ready[\s\S]*?endsWith\('\/activity'\)[\s\S]*?return;/);
   assert.match(reconciler, /residentResumeRequested[\s\S]*?run\.stepId\.startsWith\('merge\.resident_'\)[\s\S]*?return;/);
   assert.match(reconciler, /initialResumeHandledRef[\s\S]*?initialResumeHandledRef\.current = true;[\s\S]*?restoreOwnedStep/);
   assert.doesNotMatch(reconciler, /useFtueRun|liveRun\?\.stepId/);
   assert.match(reconciler, /finally \{[\s\S]*?restoringRef\.current = false;[\s\S]*?run = loadFtueRun\(\);[\s\S]*?const currentPathname/);
-  assert.match(reconciler, /nextState !== 'active'\) clearResidentFtuePause\(\)[\s\S]*?restoreOwnedStep/);
+  assert.match(reconciler, /residentMergeSessionBlocksReconciliation\(\) \|\| residentMergeSessionOwnsRoute\(\)[\s\S]*?loadMergeWorldState/);
+  assert.match(reconciler, /loadMergeWorldState\(\)[\s\S]*?residentMergeSessionBlocksReconciliation\(\) \|\| residentMergeSessionOwnsRoute\(\)[\s\S]*?return;/);
+  assert.match(reconciler, /nextState !== 'active'\) markResidentMergeRecoveryPending\(\)[\s\S]*?restoreLiveResidentRoute\(\)[\s\S]*?restoreOwnedStep/);
+  assert.match(reconciler, /pathname, residentSession, restoreLiveResidentRoute/);
   assert.match(reconciler, /ftueForegroundKeepsResidentMerge\(run, currentPathname, residentCanonicalStep\)[\s\S]*?repairFtueStep\(run\.stepId, repairTarget\)[\s\S]*?return;/);
-  assert.match(merge, /returnToResidentStory[\s\S]*?authorizeResidentFtuePause\(\)[\s\S]*?residentResume: '1'/);
+  assert.match(merge, /returnToResidentStory[\s\S]*?pauseResidentMerge\(\)[\s\S]*?residentResume: '1'/);
   assert.match(merge, /ackResidentCardReveal[\s\S]*?announcement: 'Returning to Mossprout'[\s\S]*?target: 'companion'/);
-  assert.match(pauseSession, /let residentPauseAuthorized = false[\s\S]*?clearResidentFtuePause/);
+  assert.match(merge, /ackResidentCardReveal[\s\S]*?Promise\.all\(\[flushMergeWorld\(\), flushFtuePersistence\(\)\]\)[\s\S]*?Returning to Mossprout/);
+  assert.match(merge, /markResidentMergePresented\(\)/);
+  assert.match(merge, /finishResidentMergeSession\(\)[\s\S]*?returnToMatchResult/);
+  assert.match(navigationSession, /'idle'[\s\S]*?'handoff'[\s\S]*?'merge_presented'[\s\S]*?'recovery_pending'[\s\S]*?'paused'/);
   assert.match(companion, /residentStoryResumeActive[\s\S]*?initialConversationDefinitionId=\{!residentStoryResumeActive/);
   assert.doesNotMatch(interaction, /A VEILED PARCEL IS WAITING|Return to the exact resident step you left/);
   assert.match(interaction, /residentFtueDashboard = props\.familyId === 'mossprout'[\s\S]*?props\.ftueResidentHandoffActive[\s\S]*?dashboardRouteActive = route\.kind === 'dashboard' \|\| residentFtueDashboard/);
   assert.match(interaction, /exitCompletedConversation[\s\S]*?pendingStoryConversationRef\.current = null[\s\S]*?openedStoryConversationRef\.current = null[\s\S]*?showFeastleStoryHome\(\)/);
   assert.match(interaction, /onCompletedExit=\{exitCompletedConversation\}/);
   assert.match(conversationScene, /session\.status === 'completed'[\s\S]*?<ConversationCompletion[\s\S]*?Closest match found[\s\S]*?onContinue=\{onCompletedExit\}/);
+  assert.match(interaction, /companionInitialConversationCompletionReady[\s\S]*?if \(props\.ftueResidentMatchResultActive\) return/);
+  assert.match(interaction, /exitCompletedConversation[\s\S]*?mossprout:game:form-finder[\s\S]*?onInitialConversationComplete/);
+  assert.match(companion, /completeResidentResultExit[\s\S]*?ownedKatchimeraCards[\s\S]*?resident_discovery[\s\S]*?updateFtueRun\(\{ stepId: 'complete', status: 'complete'/);
+  assert.match(interaction, /completedInitialConversationRef = useRef[\s\S]*?completedConversationExitRef = useRef/);
+  assert.match(interaction, /exitCompletedConversation[\s\S]*?completedConversationExitRef\.current === completedConversationSessionId/);
   assert.doesNotMatch(conversationScene, /Returning to \$\{name\}/);
   assert.match(conversationFlow, /session\.status === 'completed'[\s\S]*?if \(directResidentParcelHandoff\) return;[\s\S]*?onComplete/);
   assert.match(interaction, /\(route\.kind === 'visit' \|\| route\.kind === 'conversation'\) && !residentFtueDashboard/);
@@ -342,17 +362,86 @@ test('resident discovery pauses on one standard Mossprout action card and resume
   assert.match(stage, /if \(residentStoryResumeActive\) return \[residentResumeAction\]/);
   assert.match(stage, /title: residentStoryResumeTitle[\s\S]*?onResumeResidentStory/);
   assert.match(stage, /!residentStoryResumeActive \? <KatchimeraBottomDock/);
-  assert.match(companion, /residentStoryResumeRequested[\s\S]*?isResidentFtuePauseAuthorized\(\)[\s\S]*?ftueResidentHandoffActive/);
+  assert.match(companion, /residentStoryResumeRequested[\s\S]*?isResidentMergePaused\(\)[\s\S]*?ftueResidentHandoffActive/);
   assert.match(companion, /residentMergeFtueActive && !residentStoryResumeActive/);
 });
 
-test('resident Merge pause authority expires instead of surviving an app resume', () => {
-  clearResidentFtuePause();
-  assert.equal(isResidentFtuePauseAuthorized(), false);
-  authorizeResidentFtuePause();
-  assert.equal(isResidentFtuePauseAuthorized(), true);
-  clearResidentFtuePause();
-  assert.equal(isResidentFtuePauseAuthorized(), false);
+test('completed FTUE query flags cannot retain companion conversation or resident dashboard ownership', () => {
+  const route = readFileSync('app/katchimera/[creatureId].tsx', 'utf8');
+  const companion = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
+
+  assert.match(route, /firstMeetingFtueActive = ftueRun\?\.status === 'active'[\s\S]*?ftueRun\.stepId === 'companion\.first_meeting'/);
+  assert.match(route, /ftue === '1' && firstMeetingFtueActive/);
+  assert.match(companion, /residentParcelReady = Boolean\(navigationFtueRun\?\.status === 'active'[\s\S]*?latestMossproutJourney\?\.matchedCardId/);
+  assert.match(companion, /ftueResidentHandoffActive = Boolean\(navigationFtueRun\?\.status === 'active'[\s\S]*?residentParcelReady\)\)/);
+  assert.match(route, /ftueRouteOrigin=\{isMossprout && Boolean\(ftue\)\}/);
+  assert.match(companion, /ftueRouteOrigin && navigationFtueRun\?\.status !== 'active'[\s\S]*?router\.dismissTo\('\/today'\)/);
+});
+
+test('a durably earned resident card restores the explicit FTUE match result', () => {
+  const completedResidentJourney = {
+    familyId: 'mossprout',
+    status: 'complete',
+    matchedCardId: 'petalimp',
+    completionReceipt: { cardId: 'petalimp' },
+  } as JourneyDayRecord;
+
+  assert.equal(residentJourneyReachedMatchResult({ status: 'active', stepId: 'merge.resident_card_reward' }, [completedResidentJourney]), true);
+  assert.equal(residentJourneyReachedMatchResult({ status: 'active', stepId: 'companion.resident_parcel_ready' }, [completedResidentJourney]), true);
+  assert.equal(residentJourneyReachedMatchResult({ status: 'complete', stepId: 'complete' }, [completedResidentJourney]), false);
+  assert.equal(residentJourneyReachedMatchResult({ status: 'active', stepId: 'companion.first_meeting' }, [completedResidentJourney]), false);
+});
+
+test('resident Merge navigation distinguishes handoff, foreground recovery, pause, and completion', () => {
+  const idle: ResidentFtueNavigationSession = { generation: 0, phase: 'idle' };
+  const handoff = reduceResidentFtueNavigationSession(idle, { type: 'begin_handoff' });
+  assert.deepEqual(handoff, { generation: 1, phase: 'handoff' });
+  assert.equal(residentMergeLiveRouteDecision({
+    pathname: '/katchimera/companion:mossprout',
+    runActive: true,
+    session: handoff,
+    stepId: 'merge.resident_parcel',
+    yieldsToRecoveryRoute: false,
+  }), 'none', 'the normal CTA must own its transition');
+
+  const recovery = reduceResidentFtueNavigationSession(handoff, { type: 'app_backgrounded' });
+  assert.equal(recovery.phase, 'recovery_pending');
+  assert.equal(reduceResidentFtueNavigationSession(recovery, { type: 'cancel_handoff' }).phase, 'idle');
+  assert.equal(residentMergeLiveRouteDecision({
+    pathname: '/katchimera/companion:mossprout',
+    runActive: true,
+    session: recovery,
+    stepId: 'merge.resident_card',
+    yieldsToRecoveryRoute: false,
+  }), 'restore_merge', 'a late iOS companion route must return to Merge');
+  assert.equal(residentMergeLiveRouteDecision({
+    pathname: '/katchimera/companion:mossprout/activity',
+    runActive: true,
+    session: recovery,
+    stepId: 'merge.resident_card',
+    yieldsToRecoveryRoute: false,
+  }), 'none');
+
+  const presented = reduceResidentFtueNavigationSession(recovery, { type: 'merge_presented' });
+  assert.equal(presented.phase, 'merge_presented');
+  const paused = reduceResidentFtueNavigationSession(presented, { type: 'pause' });
+  assert.equal(paused.phase, 'paused');
+  assert.equal(residentMergeLiveRouteDecision({
+    pathname: '/katchimera/companion:mossprout',
+    runActive: true,
+    session: paused,
+    stepId: 'merge.resident_orders',
+    yieldsToRecoveryRoute: false,
+  }), 'none');
+  assert.equal(reduceResidentFtueNavigationSession(paused, { type: 'begin_handoff' }).phase, 'handoff');
+  assert.equal(reduceResidentFtueNavigationSession(presented, { type: 'finish' }).phase, 'idle');
+  assert.equal(residentMergeLiveRouteDecision({
+    pathname: '/dev-tools',
+    runActive: true,
+    session: presented,
+    stepId: 'merge.resident_orders',
+    yieldsToRecoveryRoute: true,
+  }), 'none');
 });
 
 test('FTUE navigation always yields to the four-finger Developer Tools recovery route', () => {
@@ -469,19 +558,23 @@ test('FTUE returns from the Garden, teaches one Bond action, and completes manua
   assert.match(companion, /commitFtueAction\(\{ actionId: 'companion\.complete_chapter_zero_return'[\s\S]*?const completeFtueJourneyDay/);
   assert.match(companion, /actionId: 'companion\.complete_day_one_action'[\s\S]*?nextRun\?\.status !== 'complete'[\s\S]*?seedStoredMossproutGardenAfterFtue/);
   assert.match(companion, /openFtueResidentParcel[\s\S]*?activateStoredResidentCardDiscovery[\s\S]*?router\.push/);
+  assert.match(companion, /beginResidentMergeHandoff\(\)[\s\S]*?await activateStoredResidentCardDiscovery/);
+  assert.match(companion, /catch \(error\) \{[\s\S]*?cancelResidentMergeHandoff\(\)/);
   assert.match(companion, /await activateStoredResidentCardDiscovery[\s\S]*?actionId: 'companion\.open_resident_parcel'[\s\S]*?nextStepId: 'merge\.resident_parcel'[\s\S]*?await flushFtuePersistence\(\)[\s\S]*?const navigateToResidentMerge[\s\S]*?navigate: navigateToResidentMerge/);
   const residentActivationIndex = companion.indexOf('await activateStoredResidentCardDiscovery');
+  const residentSessionIndex = companion.lastIndexOf('beginResidentMergeHandoff()', residentActivationIndex);
   const residentOwnershipIndex = companion.indexOf("actionId: 'companion.open_resident_parcel'", residentActivationIndex);
   const residentPersistenceIndex = companion.indexOf('await flushFtuePersistence()', residentOwnershipIndex);
   const coveredNavigationIndex = companion.indexOf('const navigateToResidentMerge', residentActivationIndex);
   const transitionRequestIndex = companion.indexOf('const transitionAccepted', coveredNavigationIndex);
-  assert.ok(residentActivationIndex >= 0 && residentActivationIndex < residentOwnershipIndex);
+  assert.ok(residentSessionIndex >= 0 && residentSessionIndex < residentActivationIndex);
+  assert.ok(residentActivationIndex < residentOwnershipIndex);
   assert.ok(residentOwnershipIndex < residentPersistenceIndex);
   assert.ok(residentPersistenceIndex < coveredNavigationIndex);
   assert.ok(coveredNavigationIndex < transitionRequestIndex);
   assert.doesNotMatch(companion, /params: \{ creatureId, residentHandoff: '1' \}/);
   assert.match(merge, /ftueRun\.stepId === 'companion\.resident_parcel_ready'[\s\S]*?actionId: 'companion\.open_resident_parcel'[\s\S]*?nextStepId: ftueStep\.id/);
-  assert.match(companion, /initialConversationDefinitionId=\{!residentStoryResumeActive[\s\S]*?ftueRun\.stepId === 'companion\.resident_affinity'[\s\S]*?mossprout:game:form-finder/);
+  assert.match(companion, /initialConversationDefinitionId=\{!residentStoryResumeActive[\s\S]*?navigationFtueRun\.stepId === 'companion\.resident_affinity'[\s\S]*?navigationFtueRun\.stepId === 'companion\.resident_match_result'[\s\S]*?mossprout:game:form-finder/);
   assert.match(companion, /dayOneBondActionDone[\s\S]*?repair:mossprout-day-one-bond-action/);
   assert.match(companion, /companion\.bond_spotlight[\s\S]*?repair:mossprout-bond-spotlight/);
   assert.match(companion, /questionnaireAlreadyDone[\s\S]*?repair:mossprout-resident-affinity/);
@@ -497,7 +590,10 @@ test('FTUE returns from the Garden, teaches one Bond action, and completes manua
   assert.match(kingdom, /autoContinue=\{!ftueDayOneActionActive\}[\s\S]*?Back to Mossprout[\s\S]*?dismissible=\{!ftueDayOneActionActive\}[\s\S]*?onFtueJourneyDayComplete/);
   assert.match(bondCelebration, /onRequestClose=\{dismissible \? onContinue : \(\) => \{\}\}[\s\S]*?<GameSurface[\s\S]*?Journey Day \$\{journeyHandoff\.dayNumber\} timeline/);
   assert.match(companion, /scheduleMossproutJourneyDayReminder\(completedDayId\)/);
-  assert.doesNotMatch(companion, /router\.dismissTo\('\/today'\)/);
+  assert.match(
+    companion,
+    /ftueRouteOrigin && navigationFtueRun\?\.status !== 'active'[\s\S]*?router\.dismissTo\('\/today'\)/,
+  );
   assert.match(mossproutStage, /<KatchimeraJourneyStatusPlaque[\s\S]*?dayNumber=\{journeyDayNumber\}[\s\S]*?status=\{journey\.status === 'complete'/);
   assert.match(journeyMilestone, /Journey Day \{dayNumber\}[\s\S]*?complete \? 'Complete' : 'In progress'/);
   assert.match(mossproutStage, /relationshipProgressionRepository\.update\(reconcileMossproutDayOneChoices\)/);

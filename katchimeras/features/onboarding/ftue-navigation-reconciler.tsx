@@ -1,14 +1,24 @@
 import { useGlobalSearchParams, usePathname, useRootNavigationState, useRouter, type Href } from 'expo-router';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
 import type { FtueResumeTarget } from './ftue-types';
 import { ftueNavigationYieldsToDevRecovery } from './ftue-dev-recovery';
-import { activeFtueNavigationPolicy, ftueForegroundKeepsResidentMerge, ftueResumeTargetMatches } from './ftue-navigation-policy';
+import { activeFtueNavigationPolicy, ftueForegroundKeepsResidentMerge, ftueResumeTargetMatches, residentJourneyReachedMatchResult } from './ftue-navigation-policy';
 import { residentFtueCanonicalStep } from './merge-ftue';
-import { loadFtueRun, repairFtueStep } from './ftue-runtime';
-import { clearResidentFtuePause, isResidentFtuePauseAuthorized } from './resident-ftue-pause-session';
+import { loadFtueRun, repairFtueStep, updateFtueRun } from './ftue-runtime';
+import {
+  finishResidentMergeSession,
+  getResidentMergeSession,
+  isResidentMergePaused,
+  markResidentMergeRecoveryPending,
+  residentMergeLiveRouteDecision,
+  residentMergeSessionBlocksReconciliation,
+  residentMergeSessionOwnsRoute,
+  subscribeResidentMergeSession,
+} from './resident-ftue-navigation-session';
 import { loadMergeWorldState } from '@/utils/merge-world/repository';
+import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 
 function hrefForResumeTarget(target: FtueResumeTarget): Href {
   if (target.kind === 'today') return '/(tabs)/today';
@@ -31,6 +41,11 @@ export function FtueNavigationReconciler() {
   const pathname = usePathname();
   const params = useGlobalSearchParams() as Record<string, string | string[] | undefined>;
   const rootNavigationState = useRootNavigationState();
+  const residentSession = useSyncExternalStore(
+    subscribeResidentMergeSession,
+    getResidentMergeSession,
+    getResidentMergeSession,
+  );
   const initialResumeHandledRef = useRef(false);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const pathnameRef = useRef(pathname);
@@ -40,29 +55,50 @@ export function FtueNavigationReconciler() {
 
   const restoringRef = useRef(false);
 
+  const restoreLiveResidentRoute = useCallback(() => {
+    const session = getResidentMergeSession();
+    if (!residentMergeSessionOwnsRoute(session)) return false;
+    const run = loadFtueRun();
+    const currentPathname = pathnameRef.current;
+    const decision = residentMergeLiveRouteDecision({
+      pathname: currentPathname,
+      runActive: run?.status === 'active',
+      session,
+      stepId: run?.stepId ?? null,
+      yieldsToRecoveryRoute: ftueNavigationYieldsToDevRecovery(currentPathname),
+    });
+    if (decision === 'finish_session') {
+      finishResidentMergeSession();
+      return false;
+    }
+    if (decision === 'none') return true;
+    const normalizedPathname = decodeURIComponent(currentPathname).replace(/\/$/, '');
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      console.info('[resident-ftue-navigation] Restoring presented Merge route', {
+        pathname: normalizedPathname,
+        phase: session.phase,
+        stepId: run?.stepId ?? null,
+      });
+    }
+    router.replace({
+      pathname: '/katchimera/[creatureId]/activity',
+      params: { creatureId: 'companion:mossprout' },
+    });
+    return true;
+  }, [router]);
+
   const restoreOwnedStep = useCallback(async () => {
     if (ftueNavigationYieldsToDevRecovery(pathnameRef.current)) return;
+    if (residentMergeSessionBlocksReconciliation() || residentMergeSessionOwnsRoute()) return;
     if (restoringRef.current) return;
     restoringRef.current = true;
     let run = loadFtueRun();
-    let residentCanonicalStep: string | null = null;
-    const startingPathname = decodeURIComponent(pathnameRef.current).replace(/\/$/, '');
-    const startingHandoffParam = paramsRef.current.residentHandoff;
-    const startingHandoffRequested = (Array.isArray(startingHandoffParam)
-      ? startingHandoffParam[0]
-      : startingHandoffParam) === '1';
-    // Normal companion -> Merge navigation owns this boundary. The global
-    // launch/foreground reconciler must not read or repair the board while the
-    // transition curtain is moving between those two mounted routes.
-    if (
-      startingHandoffRequested
-      && run?.status === 'active'
-      && run.stepId === 'companion.resident_parcel_ready'
-      && startingPathname.endsWith('/activity')
-    ) {
-      restoringRef.current = false;
-      return;
+    if (residentJourneyReachedMatchResult(run, relationshipProgressionRepository.load().journeyDays)) {
+      updateFtueRun({ stepId: 'companion.resident_match_result', status: 'active', completedAt: null });
+      finishResidentMergeSession();
+      run = loadFtueRun();
     }
+    let residentCanonicalStep: string | null = null;
     try {
       // A process kill can persist the board command before the graph event.
       // Repair that split write from the board's canonical resident lifecycle
@@ -80,6 +116,10 @@ export function FtueNavigationReconciler() {
     } finally {
       restoringRef.current = false;
     }
+    // A player can accept the parcel while cold-start repair is awaiting the
+    // board repository. The CTA now owns that boundary; never navigate from
+    // the stale recovery operation after a live handoff has begun.
+    if (residentMergeSessionBlocksReconciliation() || residentMergeSessionOwnsRoute()) return;
     // Never route from the snapshot captured before the asynchronous board
     // read. The player can press the parcel CTA while that read is in flight,
     // advancing companion.resident_parcel_ready to merge.resident_parcel.
@@ -92,8 +132,6 @@ export function FtueNavigationReconciler() {
     const policy = activeFtueNavigationPolicy(run);
     const residentResumeParam = currentParams.residentResume;
     const residentResumeRequested = (Array.isArray(residentResumeParam) ? residentResumeParam[0] : residentResumeParam) === '1';
-    const residentHandoffParam = currentParams.residentHandoff;
-    const residentHandoffRequested = (Array.isArray(residentHandoffParam) ? residentHandoffParam[0] : residentHandoffParam) === '1';
     const normalizedPathname = decodeURIComponent(currentPathname).replace(/\/$/, '');
     if (ftueForegroundKeepsResidentMerge(run, currentPathname, residentCanonicalStep)) {
       // Older saves can still carry the pre-handoff companion node. Being on
@@ -105,30 +143,21 @@ export function FtueNavigationReconciler() {
           : 'merge.resident_parcel';
         repairFtueStep(run.stepId, repairTarget);
       }
-      clearResidentFtuePause();
       return;
     }
-    // The parcel CTA deliberately navigates first and transfers graph
-    // ownership only after Merge has loaded its durable board. Do not enforce
-    // the still-companion-owned step during that one route boundary.
-    if (residentHandoffRequested
-      && run?.status === 'active'
-      && run.stepId === 'companion.resident_parcel_ready'
-      && normalizedPathname.endsWith('/activity')) return;
     // Back is an authored pause point only inside the current foreground
     // session. A stale query parameter restored by iOS must never outrank the
     // persisted Merge-owned graph step after foreground or process launch.
     if (residentResumeRequested
-      && isResidentFtuePauseAuthorized()
+      && isResidentMergePaused()
       && run?.status === 'active'
       && run.stepId.startsWith('merge.resident_')
       && normalizedPathname.startsWith('/katchimera/')) return;
     if (!policy) {
-      clearResidentFtuePause();
+      finishResidentMergeSession();
       return;
     }
     if (ftueResumeTargetMatches(policy.resume, currentPathname, currentParams)) {
-      if (policy.resume.kind === 'merge') clearResidentFtuePause();
       return;
     }
     router.replace(hrefForResumeTarget(policy.resume));
@@ -141,15 +170,22 @@ export function FtueNavigationReconciler() {
   }, [restoreOwnedStep, rootNavigationState?.key]);
 
   useEffect(() => {
+    if (appStateRef.current !== 'active') return;
+    void restoreLiveResidentRoute();
+  }, [pathname, residentSession, restoreLiveResidentRoute]);
+
+  useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       const previousState = appStateRef.current;
       appStateRef.current = nextState;
-      if (nextState !== 'active') clearResidentFtuePause();
+      if (nextState !== 'active') markResidentMergeRecoveryPending();
       if (nextState !== 'active' || previousState === 'active') return;
+      if (restoreLiveResidentRoute()) return;
+      if (residentMergeSessionBlocksReconciliation()) return;
       requestAnimationFrame(() => void restoreOwnedStep());
     });
     return () => subscription.remove();
-  }, [restoreOwnedStep]);
+  }, [restoreLiveResidentRoute, restoreOwnedStep]);
 
   return null;
 }

@@ -38,7 +38,7 @@ const openingActions: readonly FtueActionDefinition[] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 22,
+  version: 23,
   entryStepId: 'egg.opening',
   terminalStepId: 'complete',
   steps: [
@@ -389,7 +389,13 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       id: 'merge.resident_card_reward', surface: 'merge', navigation: mossproutMergeResume,
       guide: { eyebrow: 'Card earned', title: 'Reveal the card in your deck.', body: 'This resident is now part of Mossprout’s garden set.' },
       actions: [{ id: 'merge.ack_resident_card', title: 'Reveal the card', description: 'Watch it turn over in the deck.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'acknowledgement', backendEvent: true }],
-      edges: [{ event: { type: 'resident_card_reveal_acknowledged' }, commitActionId: 'merge.ack_resident_card', nextStepId: 'complete' }],
+      edges: [{ event: { type: 'resident_card_reveal_acknowledged' }, commitActionId: 'merge.ack_resident_card', nextStepId: 'companion.resident_match_result' }],
+      blockingBeat: 'chapter_complete',
+    },
+    {
+      id: 'companion.resident_match_result', surface: 'companion', navigation: mossproutCompanionResume,
+      guide: { eyebrow: 'Closest match found', title: 'Your first resident card is home.', body: 'Continue when you are ready to return to Mossprout’s normal day.' },
+      actions: [{ id: 'companion.ack_resident_match_result', title: 'Continue', description: 'Finish the first-session story and unlock Mossprout’s normal activities.', icon: 'checkmark.circle.fill', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'complete', backendEvent: true }],
       blockingBeat: 'chapter_complete',
     },
     {

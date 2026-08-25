@@ -217,10 +217,12 @@ export function KingdomCompanionScreen({
   ftueConversationDefinitionId,
   initialConversationDefinitionId,
   onFtueConversationComplete,
+  onCompletedConversationExit,
   ftueOrderPreviewActive = false,
   ftueBondSpotlightActive = false,
   ftueDayOneActionActive = false,
   ftueResidentHandoffActive = false,
+  ftueResidentMatchResultActive = false,
   ftueResidentStoryResume = false,
   ftueNavigationLocked = false,
   onFtueBondSpotlightComplete,
@@ -237,10 +239,12 @@ export function KingdomCompanionScreen({
   ftueConversationDefinitionId?: string;
   initialConversationDefinitionId?: string;
   onFtueConversationComplete?: () => void | Promise<void>;
+  onCompletedConversationExit?: (definitionId: string) => boolean | Promise<boolean>;
   ftueOrderPreviewActive?: boolean;
   ftueBondSpotlightActive?: boolean;
   ftueDayOneActionActive?: boolean;
   ftueResidentHandoffActive?: boolean;
+  ftueResidentMatchResultActive?: boolean;
   ftueResidentStoryResume?: boolean;
   ftueNavigationLocked?: boolean;
   onFtueBondSpotlightComplete?: () => void;
@@ -609,10 +613,12 @@ export function KingdomCompanionScreen({
           initialDestination={quests.selectedResident.destination}
           initialConversationDefinitionId={ftueConversationDefinitionId ?? initialConversationDefinitionId}
           onInitialConversationComplete={onFtueConversationComplete}
+          onCompletedConversationExit={onCompletedConversationExit}
           ftueOrderPreviewActive={ftueOrderPreviewActive}
           ftueBondSpotlightActive={ftueBondSpotlightActive}
           ftueDayOneActionActive={ftueDayOneActionActive}
           ftueResidentHandoffActive={ftueResidentHandoffActive}
+          ftueResidentMatchResultActive={ftueResidentMatchResultActive}
           ftueResidentStoryResume={ftueResidentStoryResume}
           ftueNavigationLocked={ftueNavigationLocked}
           onFtueBondSpotlightComplete={onFtueBondSpotlightComplete}

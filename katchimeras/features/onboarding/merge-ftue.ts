@@ -24,7 +24,7 @@ export function residentFtueCanonicalStep(state: MergeWorldState) {
           ? 'merge.resident_orders'
           : record.cardRevealSeenAt == null
             ? 'merge.resident_card_reward'
-            : 'complete';
+            : 'companion.resident_match_result';
 }
 
 /**

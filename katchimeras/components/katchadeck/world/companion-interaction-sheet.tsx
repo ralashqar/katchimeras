@@ -173,10 +173,12 @@ export type CompanionInteractionSheetProps = {
   initialDestination?: CompanionDestination | null;
   initialConversationDefinitionId?: string;
   onInitialConversationComplete?: () => void | Promise<void>;
+  onCompletedConversationExit?: (definitionId: string) => boolean | Promise<boolean>;
   ftueOrderPreviewActive?: boolean;
   ftueBondSpotlightActive?: boolean;
   ftueDayOneActionActive?: boolean;
   ftueResidentHandoffActive?: boolean;
+  ftueResidentMatchResultActive?: boolean;
   ftueResidentStoryResume?: boolean;
   ftueNavigationLocked?: boolean;
   onFtueBondSpotlightComplete?: () => void;
@@ -362,6 +364,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const onExperienceActiveChange = props.onExperienceActiveChange;
   const onInitialConversationComplete = props.onInitialConversationComplete;
+  const onCompletedConversationExit = props.onCompletedConversationExit;
   const [showFeastleDashboard, setShowFeastleDashboard] = useState(false);
   const [showBaristabbitDashboard, setShowBaristabbitDashboard] = useState(false);
   const [showJourneyCohortDashboard, setShowJourneyCohortDashboard] = useState(false);
@@ -506,6 +509,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const openedStoryConversationRef = useRef<string | null>(null);
   const initialConversationDefinitionRef = useRef<string | null>(null);
   const completedInitialConversationRef = useRef<string | null>(null);
+  const completedConversationExitRef = useRef<string | null>(null);
   const initialConversationObservedActiveRef = useRef(false);
   const completedFeastleIntroductionRef = useRef<string | null>(null);
   const completedBaristabbitIntroductionRef = useRef<string | null>(null);
@@ -631,12 +635,13 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     const definitionId = props.initialConversationDefinitionId;
     const session = props.conversationSession;
     if (!session || !companionInitialConversationCompletionReady(session, definitionId)) return;
+    if (props.ftueResidentMatchResultActive) return;
     if (completedInitialConversationRef.current === session.id) return;
     completedInitialConversationRef.current = session.id;
     void Promise.resolve(onInitialConversationComplete?.())
       .catch((error) => console.warn('Could not finish the companion return handoff', error))
       .then(showFeastleStoryHome);
-  }, [onInitialConversationComplete, props.conversationSession, props.initialConversationDefinitionId, showFeastleStoryHome]);
+  }, [onInitialConversationComplete, props.conversationSession, props.ftueResidentMatchResultActive, props.initialConversationDefinitionId, showFeastleStoryHome]);
   const beginFeastleIntroduction = useCallback(() => {
     // The card press is the launch authority. Clear any request left behind by
     // a previous mount so a failed/pre-hydration attempt cannot swallow taps.
@@ -1139,14 +1144,30 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     }
     showFeastleStoryHome();
   }, [conversationExperience?.session, conversationFamilyId, openConversationMerge, showFeastleStoryHome]);
+  const completedConversationDefinitionId = conversationExperience?.definition.id;
+  const completedConversationSessionId = conversationExperience?.session.id;
+  const completedConversationStatus = conversationExperience?.session.status;
   const exitCompletedConversation = useCallback(() => {
     // Completion is an explicit route boundary, not another conversation
     // action. Clear retained launch bookkeeping and return straight to the
     // companion dashboard even when this route was restored from Merge.
     pendingStoryConversationRef.current = null;
     openedStoryConversationRef.current = null;
+    if (completedConversationDefinitionId && completedConversationStatus === 'completed' && completedConversationSessionId) {
+      if (completedConversationExitRef.current === completedConversationSessionId) return;
+      completedConversationExitRef.current = completedConversationSessionId;
+      void Promise.resolve(onCompletedConversationExit?.(completedConversationDefinitionId) ?? false)
+        .then((handled) => handled || completedConversationDefinitionId !== 'mossprout:game:form-finder'
+          ? undefined
+          : onInitialConversationComplete?.())
+        .then(showFeastleStoryHome, (error) => {
+          completedConversationExitRef.current = null;
+          console.warn('Could not finish the completed conversation exit', error);
+        });
+      return;
+    }
     showFeastleStoryHome();
-  }, [showFeastleStoryHome]);
+  }, [completedConversationDefinitionId, completedConversationSessionId, completedConversationStatus, onCompletedConversationExit, onInitialConversationComplete, showFeastleStoryHome]);
   const conversationFlow = useCompanionConversationFlow({
     definition: conversationExperience?.definition ?? null,
     onCommitInsight: commitConversationInsight,

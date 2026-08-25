@@ -1,5 +1,6 @@
 import type { FtueNavigationDirective, FtueResumeTarget, FtueRunState, FtueSurface } from './ftue-types';
 import { mossproutFtueStep } from './mossprout-ftue-script';
+import type { JourneyDayRecord } from '@/types/relationship-progression';
 
 export type ActiveFtueNavigationPolicy = FtueNavigationDirective & {
   stepId: string;
@@ -13,6 +14,35 @@ const PRE_MOSSPROUT_CONVERSATION_STEPS = new Set([
   'egg.ready',
   'hatch.reveal',
 ]);
+
+const RESIDENT_COMPLETION_RECOVERY_STEPS = new Set([
+  'companion.resident_affinity',
+  'companion.resident_parcel_ready',
+  'merge.resident_parcel',
+  'merge.resident_card',
+  'merge.resident_dialogue',
+  'merge.resident_orders',
+  'merge.resident_card_reward',
+]);
+
+/**
+ * The resident card and Journey completion are written by the Merge domain.
+ * If that durable write wins a process-kill race against the FTUE receipt,
+ * restore the authored match-result acknowledgement rather than either
+ * retaining Merge ownership or silently skipping the final Mossprout beat.
+ */
+export function residentJourneyReachedMatchResult(
+  run: Pick<FtueRunState, 'status' | 'stepId'> | null,
+  journeys: readonly JourneyDayRecord[],
+): boolean {
+  if (run?.status !== 'active' || !RESIDENT_COMPLETION_RECOVERY_STEPS.has(run.stepId)) return false;
+  return [...journeys].reverse().some((journey) => (
+    journey.familyId === 'mossprout'
+    && journey.status === 'complete'
+    && Boolean(journey.matchedCardId)
+    && Boolean(journey.completionReceipt?.cardId)
+  ));
+}
 
 /** Keep the opening authored adventure focused until the player talks to Mossprout. */
 export function ftueOwnsOpeningHome(run: Pick<FtueRunState, 'status' | 'stepId'> | null): boolean {

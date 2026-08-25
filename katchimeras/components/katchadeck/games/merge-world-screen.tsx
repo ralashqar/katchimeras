@@ -28,12 +28,16 @@ import { RARE_MEMORY_CARD_REVEAL_ART, VEILED_MEMORY_CARD_ART, memoryCardArt } fr
 import { COMPANION_DISCOVERY_CATALOG } from '@/constants/companion-discovery-catalog';
 import { Lantern } from '@/constants/theme';
 import { useMergeWorldActions, useMergeWorldLastResult, useMergeWorldState } from '@/features/merge-world/merge-world-provider';
-import { commitFtueAction, dispatchFtueEvent, registerFtueObjectiveBaseline, repairFtueStep, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { commitFtueAction, dispatchFtueEvent, flushFtuePersistence, registerFtueObjectiveBaseline, repairFtueStep, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { MOSSPROUT_FTUE_RETURN_NOTE_ID, mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, mergeFtueStepForBoard, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
 import type { FtueCueDefinition, FtueSpotlightDefinition } from '@/features/onboarding/ftue-types';
 import { useFtueNavigationLock } from '@/features/onboarding/use-ftue-navigation-lock';
-import { authorizeResidentFtuePause } from '@/features/onboarding/resident-ftue-pause-session';
+import {
+  finishResidentMergeSession,
+  markResidentMergePresented,
+  pauseResidentMerge,
+} from '@/features/onboarding/resident-ftue-navigation-session';
 import { useGameFeedback } from '@/features/ui/game-feedback-provider';
 import { GameUI } from '@/constants/game-ui';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
@@ -77,15 +81,14 @@ const EARLY_DISCOVERY_REVEAL_COPY: Partial<Record<MergeCharacterId, { descriptio
 export function MergeWorldScreen({ active = true, backgroundReady = true, playBoardEntrance = true }: { active?: boolean; backgroundReady?: boolean; playBoardEntrance?: boolean } = {}) {
   const router = useRouter();
   const { transitionTo } = useGameScreenTransition();
-  const { creatureId, focusOrderId, residentHandoff } = useLocalSearchParams<{
+  const { creatureId, focusOrderId } = useLocalSearchParams<{
     creatureId?: string;
     focusOrderId?: string;
-    residentHandoff?: string;
   }>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { state, loading, error } = useMergeWorldState();
-  const { dispatch: send } = useMergeWorldActions();
+  const { dispatch: send, flush: flushMergeWorld } = useMergeWorldActions();
   const ftueRun = useFtueRun();
   const ftueNavigationLocked = useFtueNavigationLock(ftueRun, 'merge', active);
   const scriptedFtueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
@@ -93,7 +96,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const residentFtueActive = Boolean(ftueStep?.id.startsWith('merge.resident_'));
   const returnToResidentStory = useCallback(() => {
     if (!creatureId) return;
-    authorizeResidentFtuePause();
+    pauseResidentMerge();
     // `navigate` reuses the companion route already beneath Merge, avoiding a
     // duplicate companion/board pair every time the player pauses this step.
     router.navigate({ pathname: '/katchimera/[creatureId]', params: { creatureId, residentResume: '1' } });
@@ -152,6 +155,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const parcelNonceRef = useRef(0);
   const storyNavigationPendingRef = useRef(false);
   const ftuePreviewNavigationPendingRef = useRef(false);
+  const residentCardReturnPendingRef = useRef(false);
   const mergeSessionRef = useRef<ReturnType<typeof createMergeBoardSession> | null>(null);
   if (!mergeSessionRef.current) mergeSessionRef.current = createMergeBoardSession();
   const mergeSession = mergeSessionRef.current;
@@ -174,6 +178,19 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     foreground: boardMetrics != null && boardVisualReady,
     layout: screenLayoutNonce > 0 && boardAreaHeight > 0,
   }, active);
+  useEffect(() => {
+    if (
+      !active
+      || !residentFtueActive
+      || !backgroundReady
+      || !flowReady
+      || boardMetrics == null
+      || !boardVisualReady
+      || screenLayoutNonce <= 0
+      || boardAreaHeight <= 0
+    ) return;
+    markResidentMergePresented();
+  }, [active, backgroundReady, boardAreaHeight, boardMetrics, boardVisualReady, flowReady, residentFtueActive, screenLayoutNonce]);
   const ftueExclusive = ftueStep?.surface === 'merge' && ftueStep.interaction?.mode === 'exclusive';
   const readyOrderIds = useMemo(() => state ? readyMergeOrderIds(state) : new Set<string>(), [state]);
   const activeResidentDiscovery = state?.residentCardDiscovery.records.find((record) => record.status !== 'locked' && record.status !== 'card_earned') ?? null;
@@ -371,7 +388,6 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
         evidenceRef: 'merge-focused:resident-parcel-handoff',
         nextStepId: ftueStep.id,
       });
-      if (residentHandoff === '1') router.setParams({ residentHandoff: undefined });
       return;
     }
     if (
@@ -385,20 +401,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     }
     const repairTarget = mergeFtueRepairTarget(ftueStep, state);
     if (repairTarget) repairFtueStep(ftueStep.id, repairTarget);
-  }, [active, ftueRun, ftueStep, residentHandoff, router, state]);
-
-  useEffect(() => {
-    if (
-      !active
-      || residentHandoff !== '1'
-      || ftueRun?.status !== 'active'
-      || !ftueRun.stepId.startsWith('merge.resident_')
-    ) return;
-    // A process resume may restore the already-accepted Merge step while the
-    // one-shot handoff query is still present. Remove it so later navigation
-    // cannot be mistaken for a fresh companion-to-board transfer.
-    router.setParams({ residentHandoff: undefined });
-  }, [active, ftueRun?.status, ftueRun?.stepId, residentHandoff, router]);
+  }, [active, ftueRun, ftueStep, state]);
 
   useEffect(() => {
     if (!active || !state || !ftueStep || !ftueRun) return;
@@ -941,11 +944,18 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
         cardId={revealedKatchimeraCardId}
         cards={mossproutCards}
         onDone={() => {
+          if (residentCardReturnPendingRef.current) return;
           const discovery = stateRef.current?.residentCardDiscovery.records.find((record) => record.residentId === revealedKatchimeraCardId && record.status === 'card_earned' && record.cardRevealSeenAt == null);
           if (discovery) {
-            dispatch({ type: 'ackResidentCardReveal', discoveryId: discovery.id, now: Date.now() });
+            residentCardReturnPendingRef.current = true;
+            const result = dispatch({ type: 'ackResidentCardReveal', discoveryId: discovery.id, now: Date.now() });
+            if (!result?.changed) {
+              residentCardReturnPendingRef.current = false;
+              return;
+            }
           }
           setRevealedKatchimeraCardId(null);
+          if (discovery) finishResidentMergeSession();
           if (!creatureId) return;
           const returnToMatchResult = () => router.back();
           if (discovery) {
@@ -953,12 +963,19 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
             // the same stack return that previously worked only when pressed
             // manually, preserving the completed match conversation beneath
             // this route so Mossprout can say who the closest match was.
-            const accepted = transitionTo({
-              announcement: 'Returning to Mossprout',
-              navigate: returnToMatchResult,
-              target: 'companion',
-            });
-            if (!accepted) returnToMatchResult();
+            // Persist both sides of the terminal handoff before uncovering
+            // Mossprout. A process kill here must restore the explicit match
+            // result node, never the prior parcel/card step.
+            void Promise.all([flushMergeWorld(), flushFtuePersistence()])
+              .catch((error) => console.warn('Could not persist the resident match result handoff', error))
+              .then(() => {
+                const accepted = transitionTo({
+                  announcement: 'Returning to Mossprout',
+                  navigate: returnToMatchResult,
+                  target: 'companion',
+                });
+                if (!accepted) returnToMatchResult();
+              });
             return;
           }
           returnToMatchResult();
