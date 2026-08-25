@@ -255,6 +255,9 @@ export function DayActionCompletedRow({
           if (rewardStartedRef.current) return;
           rewardStartedRef.current = true;
           const request = onRewardRequestRef.current;
+          // Persisted-receipt flows omit rewardAnimationId so a remount can
+          // safely retry. Ephemeral reward owners may still opt into the local
+          // replay guard by supplying an ID.
           if (rewardAlreadyAnimated || !request || !claimRewardAnimation(rewardAnimationId)) finish();
           else {
             watchdogRef.current = setTimeout(finish, 2_800);

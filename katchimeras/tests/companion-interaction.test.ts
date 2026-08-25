@@ -278,6 +278,9 @@ test('conversation replies, memories, and outcomes advance without redundant con
   assert.match(flow, /conversationReplyDelayMs/);
   assert.match(flow, /skipCompletedTransition/);
   assert.match(flow, /screenReaderEnabled/);
+  assert.match(flow, /const key = `\$\{session\.id\}:end`;[\s\S]*?const timer = setTimeout\(\(\) => \{[\s\S]*?automatedRef\.current\.add\(key\);[\s\S]*?onContinue\(\);/);
+  assert.match(flow, /const key = `\$\{session\.id\}:complete`;[\s\S]*?const timer = setTimeout\(\(\) => \{[\s\S]*?automatedRef\.current\.add\(key\);[\s\S]*?onComplete\(\);/);
+  assert.doesNotMatch(flow, /automatedRef\.current\.add\(key\);\s*const timer = setTimeout\((?:onContinue|onComplete)/);
   assert.doesNotMatch(scene, /Undo saved insight|Saved .* returning to your story/);
   assert.doesNotMatch(scene, /is following your answer|Tap to move on sooner|Double-tap for the next line/);
   assert.match(scene, /<PrimaryAction label="Continue" onPress=\{onAdvance\}/);
@@ -563,20 +566,39 @@ test('companion scene panels share one palette, stay anchored, and bound speech 
   const cinematicPan = fs.readFileSync(path.join(worldPath, 'use-companion-environment-pan.ts'), 'utf8');
 
   assert.match(cinematic, /availableBubbleWidth/);
-  assert.match(cinematic, /questionnaireBubble && styles\.questionTitle,[\s\S]*?numberOfLines=\{4\}[\s\S]*?minimumFontScale=\{0\.72\}/);
+  assert.match(cinematic, /const speechTitle = title\.trim\(\)/);
+  assert.match(cinematic, /const speechBubbleVisible = showSpeechBubble && \(hasSpeechTitle \|\| hasSpeechBody\)/);
+  assert.match(cinematic, /\{speechBubbleVisible \? \(/);
+  assert.match(cinematic, /entering=\{reduceMotion \? undefined : ZoomIn\.duration\(190\)/);
+  assert.match(cinematic, /exiting=\{reduceMotion \? undefined : ZoomOut\.duration\(140\)/);
+  assert.match(cinematic, /if \(!speechBubbleVisible\) onSpeechBubbleHeightChange\?\.\(0\)/);
+  assert.doesNotMatch(cinematic, /\{showSpeechBubble \? \(/);
+  assert.match(cinematic, /questionnaireBubble && styles\.questionTitle,[\s\S]*?numberOfLines=\{4\}[\s\S]*?minimumFontScale=\{0\.48\}/);
   assert.match(cinematic, /fontSize: 22,[\s\S]*?lineHeight: 25/);
   assert.doesNotMatch(cinematic, /questionnaireBubble && title\.length/);
   assert.doesNotMatch(cinematic, /styles\.title(?:Compact|Medium|Long)/);
+  assert.match(cinematic, /setFitWidth\(\(current\) => current === nextWidth \? current : nextWidth\)/);
+  assert.match(cinematic, /numberOfLines && fitWidth > 0/);
+  assert.match(cinematic, /activeFitRef\.current\.width !== fitWidth[\s\S]*?activeFitRef\.current\.scale !== measurementScale/);
   assert.match(cinematic, /const lineCount = event\.nativeEvent\.lines\.length/);
   assert.match(cinematic, /lineCount <= numberOfLines/);
-  assert.match(cinematic, /current - 0\.025/);
+  assert.match(cinematic, /measurementScale === 1/);
+  assert.match(cinematic, /overflowingScale - measurementScale <= 0\.002/);
+  assert.match(cinematic, /\(measurementScale \+ overflowingScale\) \/ 2/);
+  assert.match(cinematic, /\(fittingScale \+ measurementScale\) \/ 2/);
   assert.match(cinematic, /lineHeight: baseLineHeight \* fittedFontScale/);
   assert.match(cinematic, /setFitComplete\(true\)/);
   assert.match(cinematic, /height: fittedLineHeight \* Math\.min\(numberOfLines/);
-  assert.match(cinematic, /overflow: 'hidden'/);
-  assert.match(cinematic, /position: 'absolute',[\s\S]*?right: 0,[\s\S]*?top: 0/);
+  assert.match(cinematic, /onLayout=\{\(event\) => \{[\s\S]*?style=\{styles\.typewriterLayout\}>[\s\S]*?styles\.typewriterMeasure[\s\S]*?<View style=\{\[styles\.typewriterFrame, fittedFrameStyle\]\}>/);
+  assert.match(cinematic, /numberOfLines=\{fitComplete \? numberOfLines : undefined\}/);
+  assert.doesNotMatch(cinematic, /typewriterFitting|Boolean\(numberOfLines\) && !fitComplete/);
+  assert.doesNotMatch(cinematic, /fitFallbackActive/);
+  assert.match(cinematic, /typewriterFrame: \{ overflow: 'hidden'/);
+  assert.match(cinematic, /typewriterMeasure: \{[\s\S]*?color: 'transparent'/);
+  assert.doesNotMatch(cinematic, /typewriterMeasure: \{[^}]*opacity: 0/);
+  assert.match(cinematic, /typewriterMeasure: \{[\s\S]*?left: 0,[\s\S]*?position: 'absolute',[\s\S]*?top: 0/);
   assert.doesNotMatch(cinematic, /adjustsFontSizeToFit=\{Boolean\(numberOfLines && needsFontScale\)\}/);
-  assert.match(cinematic, /minimumFontScale=\{0\.72\}/);
+  assert.match(cinematic, /minimumFontScale=\{0\.48\}/);
   for (const panel of [chat, visit, questionnaire, conversation, story]) {
     assert.match(panel, /KatchaUI\.companionScenePanel\.background/);
   }
@@ -691,7 +713,19 @@ test('completed action rows preserve their outro while Bond reward renders updat
   assert.match(sharedRows, /runOnJS\(notifyFinished\)\(\)/);
   assert.match(sharedRows, /const request = onRewardRequestRef\.current/);
   assert.match(sharedRows, /claimRewardAnimation\(rewardAnimationId\)/);
-  assert.match(sharedRows, /REWARD_REPLAY_GUARD_MS = 12_000/);
+  assert.match(sharedRows, /Persisted-receipt flows omit rewardAnimationId/);
+  const mossprout = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'mossprout-story-stage.tsx'),
+    'utf8'
+  );
+  const quests = fs.readFileSync(path.join(process.cwd(), 'hooks', 'use-kingdom-quests.ts'), 'utf8');
+  const completion = fs.readFileSync(path.join(process.cwd(), 'game', 'katchimeras', 'action-completion.ts'), 'utf8');
+  assert.doesNotMatch(mossprout, /rewardAnimationId=/);
+  assert.match(quests, /const completedNow = nextSession\.status === 'completed'[\s\S]*?settleMossproutConversationCompletion\(nextSession, selectedConversationDefinition\)/);
+  assert.match(quests, /settleMossproutConversationCompletion\(dismissedSelectedSession, selectedConversationDefinition\)/);
+  assert.match(completion, /recordKatchimeraActionCompletionEvent\(progressed, \{ source: origin, completedAt \}\)/);
+  assert.match(completion, /recordCompanionBondEvent\([\s\S]*?queueCelebration: false/);
+  assert.match(mossprout, /rewardReceipt: event\.rewardReceipt/);
   assert.doesNotMatch(sharedRows, /\[chargeGlow, onFinished,/);
 });
 
@@ -766,7 +800,7 @@ test('Mossprout nature direction keeps its legacy content inside the modern shel
 test('a failed Mossprout Journey start never falls through to the first Merge board', () => {
   const stage = fs.readFileSync('components/katchadeck/world/mossprout-story-stage.tsx', 'utf8');
   assert.match(stage, /const startedJourney = mossproutJourneyForDay\(started, dayId\);[\s\S]*?if \(!startedJourney\) return;/);
-  assert.match(stage, /const opening = startedJourney\.openingConversationId;[\s\S]*?if \(opening\) onOpenConversation\(opening\);/);
+  assert.match(stage, /const opening = startedJourney\.openingConversationId;[\s\S]*?if \(opening\) onOpenConversation\(opening, origin\);/);
   assert.doesNotMatch(stage, /else onOpenMerge\('mossprout:chapter-0:first-sprout'\)/);
 });
 
@@ -783,24 +817,42 @@ test('active Journey presentation hides optional cards and Merge tray entries', 
   const stage = fs.readFileSync('components/katchadeck/world/mossprout-story-stage.tsx', 'utf8');
   const journeyPanel = fs.readFileSync('components/katchadeck/world/mossprout-journey-request-panel.tsx', 'utf8');
   const merge = fs.readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
+  const route = fs.readFileSync('app/katchimera/[creatureId].tsx', 'utf8');
+  const routeScreen = fs.readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
+  const kingdom = fs.readFileSync('components/katchadeck/world/kingdom-companion-screen.tsx', 'utf8');
+  const questHook = fs.readFileSync('hooks/use-kingdom-quests.ts', 'utf8');
   assert.match(stage, /const journeyExclusive = Boolean\(journey && journey\.status !== 'complete'\)/);
   assert.match(stage, /if \(journeyExclusive\) return resolvedVisibleActions/);
+  assert.match(stage, /for \(const action of externalCompletions\)/);
+  assert.doesNotMatch(stage, /visibleExternalCompletions = journeyExclusive \? \[\] : externalCompletions/);
   assert.match(stage, /const journeyMergeActive = journey\?\.status === 'activity_available' \|\| journey\?\.status === 'activity_in_progress'/);
   assert.match(stage, /journeyEpisode\.mergeOrders\.map/);
   assert.match(stage, /journeyMergeActive && journeyEpisode \? <View[\s\S]*?<MossproutJourneyRequestPanel/);
   assert.match(stage, /animateEntrance=\{false\}/);
   assert.match(stage, /standalone/);
+  assert.match(stage, /const JOURNEY_REQUEST_TRAY_HEIGHT = 348/);
+  assert.match(stage, /style=\{\[styles\.stage, journeyMergeActive && styles\.journeyRequestStage\]\}/);
   assert.match(stage, /journeyRequestPanel:[\s\S]*?flex: 1/);
   assert.match(stage, /journey && !storyComplete && !journeyMergeActive/);
   assert.match(journeyPanel, /COMPANION_MERGE_REQUEST_PALETTE/);
   assert.match(journeyPanel, /standalone && styles\.standalone/);
   assert.match(journeyPanel, /backgroundColor: KatchaUI\.companionScenePanel\.background/);
+  assert.doesNotMatch(journeyPanel, /TODAY’S JOURNEY/);
   assert.match(stage, /journey\.status === 'activity_available' \? 'Go to the Garden' : 'Continue in the Garden'/);
   assert.match(stage, /served: servedOrderIds\.has\(order\.id\)/);
   assert.match(merge, /mossproutJourneyExclusive[\s\S]*?state\.activeOrders\.filter\(\(order\) => journeyOrderIds\.has\(order\.id\)\)/);
   assert.match(merge, /mossproutJourneyExclusive[\s\S]*?journeyReturnReady \? \[mossproutReturnEntry\] : \[\]/);
   assert.match(merge, /!chapterZeroActive && !mossproutJourneyExclusive && pendingParcel/);
   assert.match(merge, /beginMossproutJourneyReturn\(current, mossproutJourneyDayId\)/);
+  assert.match(merge, /params: \{ creatureId: `companion:\$\{characterId\}`, source: 'merge-world', story: 'return' \}/);
+  assert.match(route, /source === 'merge-world' && story === 'return'/);
+  assert.match(route, /journey\.familyId === 'mossprout' && journey\.status === 'resolution_ready'/);
+  assert.match(route, /journeyReturnConversationDefinitionId=\{journeyReturnConversationDefinitionId\}/);
+  assert.match(routeScreen, /initialConversationDefinitionId=\{journeyReturnConversationDefinitionId\}/);
+  assert.match(kingdom, /initialConversationDefinitionId=\{ftueConversationDefinitionId \?\? initialConversationDefinitionId\}/);
+  assert.match(questHook, /mossproutJourneyRuntimeDayId\(relationships, dayId, isJourneyQuickModeEnabled\(\)\)/);
+  assert.match(stage, /mossproutActionOrigin\(action, dayId, journey\)/);
+  assert.match(questHook, /selectedFamilyId === 'mossprout'[\s\S]*?mossproutConversationCompletionDayId\(calendarConversationDayId\)/);
 });
 
 test('Journey narrative replies and task bridge wait for the player', () => {
@@ -816,17 +868,29 @@ test('Journey narrative replies and task bridge wait for the player', () => {
   assert.match(flow, /screenReaderEnabled \|\| journeyNarrativeAdvanceReady/);
   assert.match(scene, /journeyTaskHandoff \? 'Go to the Garden' : 'Finish Journey'/);
   assert.match(scene, /<MossproutJourneyRequestPanel/);
+  assert.match(scene, /journeyRequestHandoffVisible \? undefined : LinearTransition/);
+  assert.doesNotMatch(scene, /journeyRequestHandoffVisible && \{ flexGrow: 1, justifyContent: 'center' \}/);
+  assert.match(scene, /journeyRequestHandoffVisible \? 'journey-handoff' : 'standard'/);
+  assert.match(scene, /<MossproutJourneyRequestPanel[\s\S]*?animateEntrance=\{false\}/);
   assert.match(journeyPanel, /<CompanionMergeRequestTray[\s\S]*?eyebrow="GARDEN REQUESTS"/);
   assert.match(interaction, /journeyOpeningEpisode\?\.mergeOrders\.map/);
   assert.match(interaction, /journeyTaskRequests=\{journeyTaskRequests\}/);
   assert.match(interaction, /journeyTaskTitle=\{journeyOpeningEpisode\?\.title\}/);
-  assert.match(interaction, /completeMossproutJourneyConversation\([\s\S]*?startMossproutJourneyActivity\(completed, journey\.dayId\)/);
+  assert.doesNotMatch(interaction, /completeMossproutJourneyConversation\(/);
+  assert.match(interaction, /const relationships = relationshipProgressionRepository\.load\(\)/);
+  assert.match(interaction, /initialConversationDefinitionRef\.current !== definitionId[\s\S]*?initialConversationObservedActiveRef\.current = false/);
+  assert.match(interaction, /if \(initialConversationObservedActiveRef\.current\) return;[\s\S]*?requestStoryConversation\(definitionId\)/);
+  assert.match(interaction, /if \(episode && journey && orderId && openConversationMerge\)/);
+  assert.doesNotMatch(interaction, /if \(props\.ftueNavigationLocked && episode && journey && orderId && openConversationMerge\)/);
+  assert.match(interaction, /startMossproutJourneyActivity\(current, journey\.dayId\)[\s\S]*?openConversationMerge\(orderId, 'mossprout'\)/);
   assert.match(interaction, /openConversationMerge\(orderId, 'mossprout'\)/);
   assert.match(interaction, /onComplete: completeConversation/);
   assert.match(interaction, /skipCompletedTransition: props\.familyId === 'mossprout' && Boolean\(props\.ftueNavigationLocked\)/);
   assert.match(flow, /if \(journeyNarrative && !skipCompletedTransition\) \{[\s\S]*?onContinue\(\);[\s\S]*?onComplete\(\);/);
   const questHook = fs.readFileSync('hooks/use-kingdom-quests.ts', 'utf8');
-  assert.match(questHook, /if \(matchesDefinition\(servedDayJourney\)\) return true;[\s\S]*?journeyDays\]\.reverse\(\)\.some\(matchesDefinition\)/);
+  const completion = fs.readFileSync('game/katchimeras/action-completion.ts', 'utf8');
+  assert.match(questHook, /settleMossproutConversationCompletion\(nextSession, selectedConversationDefinition\)/);
+  assert.match(completion, /\[\.\.\.current\.journeyDays\]\.reverse\(\)\.find/);
   const mergeScreen = fs.readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   assert.match(mergeScreen, /onPress=\{\(\) => ftueExclusive \? handleBlockedFtueInteraction\(\) : creatureId \? router\.back\(\)/);
   const provider = fs.readFileSync('features/merge-world/merge-world-provider.tsx', 'utf8');
@@ -902,7 +966,7 @@ test('form questionnaires gate launch companions while Katchimera Cards remain c
   assert.doesNotMatch(interaction, /useLayoutEffect/);
   assert.match(interaction, /setInterval\(\(\) => \{\s*startConversation\(\{ definitionId: idealSkinDefinitionId \}\);\s*\}, 250\)/);
   assert.match(questHook, /const existingExplicitSession = input\.definitionId/);
-  assert.match(questHook, /if \(existingExplicitSession\) return current/);
+  assert.match(questHook, /if \(existingExplicitSession\) \{[\s\S]*?actionOrigin: input\.actionOrigin/);
   assert.match(interaction, /idealSkinOnboardingRequired\s*\? props\.onClose/);
   assert.match(kingdom, /const presentationKingdom = kingdom/);
   assert.doesNotMatch(kingdom, /economy\.snapshot\.activePlus \? applyWardrobeToKingdom/);
@@ -1245,7 +1309,7 @@ test('quest completion returns to a list with completed real-life and replayable
   );
   assert.match(questThread, /Completed today/);
   assert.match(questThread, /Played today · Replayable/);
-  assert.match(questThread, /Play again/);
+  assert.match(questThread, /available to run again/);
   assert.match(companionScreen, /Back to quests/);
   assert.match(companionScreen, /finishQuestResultNotice/);
   assert.match(questHook, /selectedQuestItems\.find[\s\S]*\?\? captureSubmissionItem/);
@@ -1317,7 +1381,7 @@ test('journal flows reveal Merge Energy after capture without advertising a zero
   );
   assert.match(today, /if \(journalMergeReward\.totalEnergy <= 0\) return undefined/);
   assert.match(today, /title: 'Capture this'/);
-  assert.match(today, /Any Merge Energy appears after it is saved/);
+  assert.match(today, /Mossprout can remember it without turning it into game fuel/);
   assert.match(today, /const mergeEnergyAmount = !guidedCapture\.committed[\s\S]*guidedCapture\.handoff[\s\S]*journalMergeReward\?\.dailyJournalEnergy \?\? 0/);
   assert.match(today, /launchJournalRewardFromBottomAfterDismiss\(\{[\s\S]*mergeEnergyAmount: guidedCapture\.mergeEnergyAmount \?\? 0/);
   assert.match(today, /feastleJournalReward\.target === 'tomorrow' \? 'Tomorrow’s' : 'Today’s'/);

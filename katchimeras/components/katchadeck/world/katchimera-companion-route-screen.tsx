@@ -15,7 +15,12 @@ import { localDayId } from '@/utils/world-identity';
 import { scheduleMossproutJourneyDayReminder } from '@/utils/mossprout-journey-notification';
 import { useFtueNavigationLock } from '@/features/onboarding/use-ftue-navigation-lock';
 
-export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConversationDefinitionId }: { creatureId: string; source?: 'merge-world'; ftueConversationDefinitionId?: string }) {
+export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConversationDefinitionId, journeyReturnConversationDefinitionId }: {
+  creatureId: string;
+  source?: 'merge-world';
+  ftueConversationDefinitionId?: string;
+  journeyReturnConversationDefinitionId?: string;
+}) {
   const isFocused = useIsFocused();
   const router = useRouter();
   const { transitionTo } = useGameScreenTransition();
@@ -97,6 +102,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueConvers
   return (
     <KingdomCompanionScreen
       ftueConversationDefinitionId={ftueConversationDefinitionId}
+      initialConversationDefinitionId={journeyReturnConversationDefinitionId}
       discoveryRecords={discovery.records}
       onFtueConversationComplete={ftueConversationDefinitionId ? completeFtueConversation : undefined}
       ftueOrderPreviewActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.order_preview'}

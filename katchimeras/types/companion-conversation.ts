@@ -299,6 +299,8 @@ export type ConversationSession = {
   encounterTurns?: number;
   /** Development-only dialogue browser session. It cannot write player outcomes. */
   preview?: boolean;
+  /** Exact home action that launched this session; never reconstructed at completion time. */
+  actionOrigin?: import('@/types/relationship-progression').KatchimeraActionOrigin;
 };
 
 export type ConversationSignalKind = 'journal' | 'goal_debrief' | 'quest_debrief' | 'bond' | 'achievement';

@@ -19,11 +19,7 @@ import { ExplorationEnvironmentProgressionProvider } from '@/components/katchade
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import { KatchaUI } from '@/constants/katcha-ui';
-import {
-  completeMossproutJourneyConversation,
-  mossproutJourneyForDay,
-  startMossproutJourneyActivity,
-} from '@/game/katchimeras/relationship-progression';
+import { mossproutJourneyForDay, startMossproutJourneyActivity } from '@/game/katchimeras/relationship-progression';
 import { useCompanionExperienceController } from '@/features/companion/use-companion-experience-controller';
 import { useCompanionConversationFlow } from '@/features/companion/use-companion-conversation-flow';
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
@@ -81,6 +77,7 @@ import { companionFormGreeting } from '@/utils/companion-dialogue';
 import { CompanionSkinsThread } from './companion-skins-thread';
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 import type { ConversationDefinition, ConversationMode, ConversationNode, ConversationOutcomeDestination, ConversationSession, ConversationSignalKind } from '@/types/companion-conversation';
+import type { KatchimeraActionOrigin } from '@/types/relationship-progression';
 import type { KingdomSkinOption } from '@/utils/katchimera-wardrobe';
 import { CompanionDiscoveryThread } from './companion-discovery-thread';
 import {
@@ -294,7 +291,7 @@ export type CompanionInteractionSheetProps = {
   conversationQuestOffer: { id: string; title: string; hint: string } | null;
   onAnswerConversation: (optionId: string) => void;
   onContinueConversation: () => void;
-  onStartConversation: (input?: { definitionId?: string; mode?: ConversationMode; poolId?: string; recommendation?: boolean }) => void;
+  onStartConversation: (input?: { definitionId?: string; mode?: ConversationMode; poolId?: string; recommendation?: boolean; actionOrigin?: KatchimeraActionOrigin }) => void;
   onKeepTalkingConversation: (poolId?: string) => void;
   onMemoryConversationDecision: (remember: boolean, summary: string) => void;
   onGoalConversationDecision: (selectedTemplateIds: readonly string[] | null, node: Extract<ConversationNode, { kind: 'goal_proposal' }>) => void;
@@ -381,6 +378,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const [displayedBondTotal, setDisplayedBondTotal] = useState<number | null>(null);
   const pendingRewardSourceRef = useRef<GoalTaskSourceRect | null>(null);
   const pendingStoryRewardArrivalRef = useRef<(() => void) | null>(null);
+  const [storyRewardReceipt, setStoryRewardReceipt] = useState<CompanionBondAwardReceipt | null>(null);
   const rewardLaunchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rewardFinishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showQuickGoalReward = useCallback((
@@ -391,9 +389,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     pendingRewardSourceRef.current = source;
     setRewardSourceVersion((current) => current + 1);
   }, []);
-  const requestStoryReward = useCallback((source: GoalTaskSourceRect, onArrive: () => void) => {
+  const requestStoryReward = useCallback((source: GoalTaskSourceRect, onArrive: () => void, receipt?: CompanionBondAwardReceipt) => {
     pendingRewardSourceRef.current = source;
     pendingStoryRewardArrivalRef.current = onArrive;
+    if (receipt) setStoryRewardReceipt(receipt);
     setRewardSourceVersion((current) => current + 1);
   }, []);
   const displayedBondProgress = useMemo(
@@ -405,12 +404,13 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     rewardFinishTimerRef.current = null;
     setDisplayedBondTotal(null);
     setBondReward(null);
+    setStoryRewardReceipt(null);
     pendingRewardSourceRef.current = null;
     pendingStoryRewardArrivalRef.current = null;
   }, [props.creatureId]);
 
   useEffect(() => {
-    const receipt = props.pendingBondCelebration;
+    const receipt = storyRewardReceipt ?? props.pendingBondCelebration;
     if (!props.active || !receipt || bondReward) return;
     if (props.familyId === 'mossprout' && !pendingRewardSourceRef.current) return;
     setDisplayedBondTotal(receipt.beforeTotal);
@@ -451,7 +451,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       if (rewardLaunchTimerRef.current) clearTimeout(rewardLaunchTimerRef.current);
       rewardLaunchTimerRef.current = null;
     };
-  }, [bondReward, insets.top, props.active, props.familyId, props.pendingBondCelebration, rewardSourceVersion, viewportHeight, viewportWidth]);
+  }, [bondReward, insets.top, props.active, props.familyId, props.pendingBondCelebration, rewardSourceVersion, storyRewardReceipt, viewportHeight, viewportWidth]);
 
   useEffect(() => {
     if (props.active !== false) return;
@@ -460,6 +460,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     rewardLaunchTimerRef.current = null;
     rewardFinishTimerRef.current = null;
     setBondReward(null);
+    setStoryRewardReceipt(null);
     setDisplayedBondTotal(null);
     pendingStoryRewardArrivalRef.current = null;
   }, [props.active]);
@@ -475,6 +476,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       setDisplayedBondTotal(bondReward.receipt.afterTotal);
       onBondCelebrationComplete(bondReward.receipt);
       setBondReward(null);
+      setStoryRewardReceipt(null);
       rewardFinishTimerRef.current = null;
     }, 2_800);
     return () => {
@@ -499,6 +501,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const showFeastleStoryHome = experience.showHome;
   const pendingStoryConversationRef = useRef<string | null>(null);
   const openedStoryConversationRef = useRef<string | null>(null);
+  const initialConversationDefinitionRef = useRef<string | null>(null);
   const completedInitialConversationRef = useRef<string | null>(null);
   const initialConversationObservedActiveRef = useRef(false);
   const completedFeastleIntroductionRef = useRef<string | null>(null);
@@ -526,7 +529,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const mossproutActionDashboard = route.kind === 'dashboard'
     && props.familyId === 'mossprout'
     && !showMossproutDashboard;
-  const requestStoryConversation = useCallback((definitionId: string) => {
+  const requestStoryConversation = useCallback((definitionId: string, actionOrigin?: KatchimeraActionOrigin) => {
     if (
       props.conversationSession?.definitionId === definitionId
       && props.conversationSession.status === 'active'
@@ -540,19 +543,31 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       return;
     }
     pendingStoryConversationRef.current = definitionId;
-    startConversation({ definitionId });
+    startConversation({ definitionId, actionOrigin });
   }, [props.conversationDefinition?.id, props.conversationSession?.definitionId, props.conversationSession?.status, showConversation, startConversation]);
   useEffect(() => {
-    if (!props.active || !props.initialConversationDefinitionId) return;
+    const definitionId = props.initialConversationDefinitionId;
+    if (!definitionId) {
+      initialConversationDefinitionRef.current = null;
+      initialConversationObservedActiveRef.current = false;
+      completedInitialConversationRef.current = null;
+      return;
+    }
+    if (initialConversationDefinitionRef.current !== definitionId) {
+      initialConversationDefinitionRef.current = definitionId;
+      initialConversationObservedActiveRef.current = false;
+      completedInitialConversationRef.current = null;
+    }
+    if (!props.active) return;
     if (
-      props.conversationSession?.definitionId === props.initialConversationDefinitionId
+      props.conversationSession?.definitionId === definitionId
       && props.conversationSession.status === 'active'
     ) {
       initialConversationObservedActiveRef.current = true;
       return;
     }
     if (
-      props.conversationSession?.definitionId === props.initialConversationDefinitionId
+      props.conversationSession?.definitionId === definitionId
       && props.conversationSession.status === 'completed'
     ) {
       if (props.conversationSession.outcomePresentation) {
@@ -565,7 +580,12 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       completedInitialConversationRef.current = props.conversationSession.id;
       return;
     }
-    requestStoryConversation(props.initialConversationDefinitionId);
+    // This prop is a one-shot deep-link request, not permanent ownership of
+    // the conversation route. Once its session has appeared, an explicit
+    // player action must be free to replace it without this effect relaunching
+    // the Journey conversation and swallowing the new action.
+    if (initialConversationObservedActiveRef.current) return;
+    requestStoryConversation(definitionId);
   }, [props.active, props.conversationSession?.definitionId, props.conversationSession?.id, props.conversationSession?.outcomePresentation, props.conversationSession?.status, props.initialConversationDefinitionId, requestStoryConversation]);
   useEffect(() => {
     const definitionId = props.initialConversationDefinitionId;
@@ -1057,24 +1077,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       return;
     }
 
-    const next = relationshipProgressionRepository.update((current) => {
-      const completed = completeMossproutJourneyConversation(
-        current,
-        session,
-        session.completedAt ?? session.updatedAt,
-      );
-      const journey = [...completed.journeyDays].reverse().find((candidate) => (
-        candidate.familyId === 'mossprout'
-        && (candidate.openingConversationId === session.definitionId
-          || candidate.profileConversationId === session.definitionId
-          || candidate.returnConversationId === session.definitionId
-          || candidate.actions.some((action) => action.definitionId === session.definitionId))
-      ));
-      return episode && journey?.status === 'activity_available'
-        ? startMossproutJourneyActivity(completed, journey.dayId)
-        : completed;
-    });
-    const journey = [...next.journeyDays].reverse().find((candidate) => (
+    const relationships = relationshipProgressionRepository.load();
+    const journey = [...relationships.journeyDays].reverse().find((candidate) => (
       candidate.familyId === 'mossprout'
       && (candidate.openingConversationId === session.definitionId
         || candidate.profileConversationId === session.definitionId
@@ -1085,7 +1089,11 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       !journey.activity?.servedOrderIds?.includes(candidate)
     )) ?? journey?.activity?.mergeOrderId;
 
-    if (episode && orderId && openConversationMerge) {
+    // Reaching this callback in an ordinary Journey requires the player to
+    // press the visible Garden request button. Send that explicit handoff
+    // straight to Merge just like FTUE; do not bounce through Mossprout home.
+    if (episode && journey && orderId && openConversationMerge) {
+      relationshipProgressionRepository.update((current) => startMossproutJourneyActivity(current, journey.dayId));
       openConversationMerge(orderId, 'mossprout');
       return;
     }
@@ -1682,10 +1690,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   onSnoozeGoal={props.onSnoozeQuickGoal}
                   onUndoGoal={props.onUndoQuickGoal}
                   onDashboard={openHistory}
-                  onOpenConversation={(definitionId) => {
+                  onOpenConversation={(definitionId, actionOrigin) => {
                     pendingStoryConversationRef.current = null;
                     openedStoryConversationRef.current = null;
-                    requestStoryConversation(definitionId);
+                    requestStoryConversation(definitionId, actionOrigin);
                   }}
                   onOpenCards={() => selectDestination('skins')}
                   onOpenFocusDirection={openJourneyFocus}
@@ -1982,6 +1990,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               rewardFinishTimerRef.current = setTimeout(() => {
                 onBondCelebrationComplete(bondReward.receipt);
                 setBondReward(null);
+                setStoryRewardReceipt(null);
                 rewardFinishTimerRef.current = null;
               // The completed row needs 475ms to leave and its replacement
               // needs another 320ms to enter. Do not cover that handoff with

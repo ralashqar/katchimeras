@@ -1,9 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useMemo, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { type LayoutChangeEvent, Pressable, type StyleProp, StyleSheet, type TextStyle, useWindowDimensions, View, type View as ViewType } from 'react-native';
 import Animated, {
   Easing,
-  FadeIn,
+  ZoomIn,
+  ZoomOut,
   type SharedValue,
   useAnimatedStyle,
   useReducedMotion,
@@ -77,18 +78,22 @@ export function CompanionCinematicStage({
   const reduceMotion = useReducedMotion();
   const { height, width } = useWindowDimensions();
   const questionnaireBubble = bubbleVariant === 'questionnaire';
-  const defaultTitleTier = companionSpeechTitleTier(title);
-  const speechKey = `${title}\u0000${questionnaireBubble ? bubbleBody ?? '' : ''}`;
-  const hasSpeechBody = Boolean(questionnaireBubble && bubbleBody);
+  const speechTitle = title.trim();
+  const speechBody = questionnaireBubble ? bubbleBody?.trim() ?? '' : '';
+  const hasSpeechTitle = speechTitle.length > 0;
+  const hasSpeechBody = speechBody.length > 0;
+  const speechBubbleVisible = showSpeechBubble && (hasSpeechTitle || hasSpeechBody);
+  const defaultTitleTier = companionSpeechTitleTier(speechTitle);
+  const speechKey = `${speechTitle}\u0000${speechBody}`;
   const [revealAllSpeechKey, setRevealAllSpeechKey] = useState<string | null>(reduceMotion ? speechKey : null);
   const [revealedTitleKey, setRevealedTitleKey] = useState<string | null>(reduceMotion ? speechKey : null);
   const [revealedBodyKey, setRevealedBodyKey] = useState<string | null>(reduceMotion || !hasSpeechBody ? speechKey : null);
   const revealAllSpeech = reduceMotion || revealAllSpeechKey === speechKey;
-  const speechFullyRevealed = revealAllSpeech || (
-    revealedTitleKey === speechKey
+  const speechFullyRevealed = !speechBubbleVisible || revealAllSpeech || (
+    (!hasSpeechTitle || revealedTitleKey === speechKey)
     && (!hasSpeechBody || revealedBodyKey === speechKey)
   );
-  const speechBubblePressable = !speechFullyRevealed || Boolean(onSpeechBubblePress);
+  const speechBubblePressable = speechBubbleVisible && (!speechFullyRevealed || Boolean(onSpeechBubblePress));
   const handleSpeechBubblePress = () => {
     if (!speechFullyRevealed) {
       setRevealAllSpeechKey(speechKey);
@@ -130,6 +135,10 @@ export function CompanionCinematicStage({
         });
   }, [liftProgress, lifted, reduceMotion]);
 
+  useEffect(() => {
+    if (!speechBubbleVisible) onSpeechBubbleHeightChange?.(0);
+  }, [onSpeechBubbleHeightChange, speechBubbleVisible]);
+
   const liftStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -destinationLift * liftProgress.value }],
   }));
@@ -165,11 +174,12 @@ export function CompanionCinematicStage({
       />
 
       <Animated.View pointerEvents={speechBubblePressable ? 'box-none' : 'none'} style={[styles.foregroundPlane, liftStyle]}>
-        {showSpeechBubble ? (
+        {speechBubbleVisible ? (
           <Animated.View
-            accessibilityLabel={`${name} says: ${title}`}
-            entering={questionnaireBubble && !reduceMotion ? FadeIn.duration(180) : undefined}
-            key={questionnaireBubble ? `question:${title}` : 'destination-speech'}
+            accessibilityLabel={`${name} says: ${[speechTitle, speechBody].filter(Boolean).join(' ')}`}
+            entering={reduceMotion ? undefined : ZoomIn.duration(190).easing(Easing.out(Easing.cubic))}
+            exiting={reduceMotion ? undefined : ZoomOut.duration(140).easing(Easing.in(Easing.cubic))}
+            key={questionnaireBubble ? `question:${speechKey}` : 'destination-speech'}
             onLayout={(event: LayoutChangeEvent) => onSpeechBubbleHeightChange?.(event.nativeEvent.layout.height)}
             style={[{ left: (width - bubbleWidth) / 2, position: 'absolute', top: speechBubbleTop, width: bubbleWidth, zIndex: 4 }, subjectPanStyle]}>
             <Pressable
@@ -183,9 +193,9 @@ export function CompanionCinematicStage({
                 pressed && speechBubblePressable && styles.speechBubblePressed,
               ]}>
               <View style={styles.speechTail} />
-            <TypewriterText
+            {hasSpeechTitle ? <TypewriterText
               durationMs={560}
-              key={`speech-title:${title}`}
+              key={`speech-title:${speechTitle}`}
               onComplete={() => setRevealedTitleKey(speechKey)}
               reduceMotion={reduceMotion}
               revealAll={revealAllSpeech}
@@ -194,23 +204,23 @@ export function CompanionCinematicStage({
                 questionnaireBubble && styles.questionTitle,
               ]}
               numberOfLines={4}
-              minimumFontScale={0.72}
-              text={title}
+              minimumFontScale={0.48}
+              text={speechTitle}
               lightColor="#342317"
               darkColor="#342317"
-            />
-            {questionnaireBubble && bubbleBody ? (
+            /> : null}
+            {hasSpeechBody ? (
               <TypewriterText
                 delayMs={170}
                 durationMs={640}
-                key={`speech-body:${bubbleBody}`}
+                key={`speech-body:${speechBody}`}
                 onComplete={() => setRevealedBodyKey(speechKey)}
                 reduceMotion={reduceMotion}
                 revealAll={revealAllSpeech}
                 style={styles.questionBody}
                 numberOfLines={2}
-                minimumFontScale={0.76}
-                text={bubbleBody}
+                minimumFontScale={0.48}
+                text={speechBody}
                 lightColor="#6B5544"
                 darkColor="#6B5544"
               />
@@ -287,7 +297,12 @@ function TypewriterText({
   const [visibleCount, setVisibleCount] = useState(() => reduceMotion ? characters.length : 0);
   const [fittedFontScale, setFittedFontScale] = useState(1);
   const [fitComplete, setFitComplete] = useState(!numberOfLines);
+  const [fitWidth, setFitWidth] = useState(0);
   const [measuredLineCount, setMeasuredLineCount] = useState<number | null>(null);
+  const largestFittingScaleRef = useRef<number | null>(null);
+  const smallestOverflowingScaleRef = useRef<number | null>(null);
+  const activeFitRef = useRef({ scale: fittedFontScale, width: fitWidth });
+  activeFitRef.current = { scale: fittedFontScale, width: fitWidth };
   const flattenedStyle = StyleSheet.flatten(style);
   const baseFontSize = typeof flattenedStyle?.fontSize === 'number' ? flattenedStyle.fontSize : 14;
   const baseLineHeight = typeof flattenedStyle?.lineHeight === 'number' ? flattenedStyle.lineHeight : baseFontSize * 1.2;
@@ -304,7 +319,9 @@ function TypewriterText({
     setFittedFontScale(1);
     setFitComplete(!numberOfLines);
     setMeasuredLineCount(null);
-  }, [numberOfLines, text]);
+    largestFittingScaleRef.current = null;
+    smallestOverflowingScaleRef.current = null;
+  }, [fitWidth, numberOfLines, text]);
 
   useEffect(() => {
     if (reduceMotion || revealAll) {
@@ -336,39 +353,73 @@ function TypewriterText({
     if (complete) onComplete?.();
   }, [complete, onComplete]);
   return (
-    <View style={[styles.typewriterFrame, fittedFrameStyle]}>
-      {numberOfLines ? <ThemedText
+    <View
+      onLayout={(event) => {
+        const nextWidth = Math.round(event.nativeEvent.layout.width * 2) / 2;
+        if (nextWidth > 0) setFitWidth((current) => current === nextWidth ? current : nextWidth);
+      }}
+      style={styles.typewriterLayout}>
+      {numberOfLines && fitWidth > 0 ? <ThemedText
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
-        key={`fit:${fittedFontScale}`}
+        key={`fit:${fitWidth}:${fittedFontScale}`}
         maxFontSizeMultiplier={1.3}
         onTextLayout={(event) => {
+          const measurementScale = fittedFontScale;
+          if (
+            activeFitRef.current.width !== fitWidth
+            || activeFitRef.current.scale !== measurementScale
+          ) return;
           const lineCount = event.nativeEvent.lines.length;
-          setMeasuredLineCount(lineCount);
           if (fitComplete) return;
-          if (lineCount <= numberOfLines || fittedFontScale <= minimumFontScale) {
+
+          if (lineCount <= numberOfLines) {
+            largestFittingScaleRef.current = measurementScale;
+            const overflowingScale = smallestOverflowingScaleRef.current;
+            if (measurementScale === 1 || overflowingScale === null || overflowingScale - measurementScale <= 0.002) {
+              setMeasuredLineCount(lineCount);
+              setFitComplete(true);
+              return;
+            }
+            setFittedFontScale(Number(((measurementScale + overflowingScale) / 2).toFixed(4)));
+            return;
+          }
+
+          smallestOverflowingScaleRef.current = measurementScale;
+          const fittingScale = largestFittingScaleRef.current;
+          if (measurementScale <= minimumFontScale) {
+            setMeasuredLineCount(numberOfLines);
             setFitComplete(true);
             return;
           }
-          setFittedFontScale((current) => current <= minimumFontScale
-            ? current
-            : Math.max(minimumFontScale, Number((current - 0.025).toFixed(3))));
+          if (fittingScale !== null && measurementScale - fittingScale <= 0.002) {
+            setFittedFontScale(fittingScale);
+            setMeasuredLineCount(numberOfLines);
+            setFitComplete(true);
+            return;
+          }
+          const nextScale = fittingScale === null
+            ? (minimumFontScale + measurementScale) / 2
+            : (fittingScale + measurementScale) / 2;
+          setFittedFontScale(Number(Math.max(minimumFontScale, nextScale).toFixed(4)));
         }}
-        style={[style, fittedTextStyle, styles.typewriterMeasure]}
+        style={[style, fittedTextStyle, styles.typewriterMeasure, { width: fitWidth }]}
         lightColor={lightColor}
         darkColor={darkColor}>
         {text}
       </ThemedText> : null}
-      <ThemedText
-        accessibilityLabel={text}
-        maxFontSizeMultiplier={1.3}
-        numberOfLines={numberOfLines}
-        selectable={complete}
-        style={[StyleSheet.absoluteFill, style, fittedTextStyle]}
-        lightColor={lightColor}
-        darkColor={darkColor}>
-        {characters.slice(0, visibleCount).join('')}
-      </ThemedText>
+      <View style={[styles.typewriterFrame, fittedFrameStyle]}>
+        <ThemedText
+          accessibilityLabel={text}
+          maxFontSizeMultiplier={1.3}
+          numberOfLines={fitComplete ? numberOfLines : undefined}
+          selectable={complete}
+          style={[StyleSheet.absoluteFill, style, fittedTextStyle]}
+          lightColor={lightColor}
+          darkColor={darkColor}>
+          {characters.slice(0, visibleCount).join('')}
+        </ThemedText>
+      </View>
     </View>
   );
 }
@@ -389,16 +440,15 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 2,
   },
-  typewriterFrame: {
+  typewriterLayout: {
     alignSelf: 'stretch',
-    overflow: 'hidden',
     position: 'relative',
   },
+  typewriterFrame: { overflow: 'hidden', position: 'relative' },
   typewriterMeasure: {
+    color: 'transparent',
     left: 0,
-    opacity: 0,
     position: 'absolute',
-    right: 0,
     top: 0,
   },
   speechBubble: {

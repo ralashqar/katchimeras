@@ -215,6 +215,7 @@ export function KingdomCompanionScreen({
   onOpenMerge,
   onOpenQuestGame,
   ftueConversationDefinitionId,
+  initialConversationDefinitionId,
   onFtueConversationComplete,
   ftueOrderPreviewActive = false,
   ftueBondSpotlightActive = false,
@@ -231,6 +232,7 @@ export function KingdomCompanionScreen({
   onOpenMerge?: (orderId?: string | null, familyId?: KatchimeraFamilyId) => void;
   onOpenQuestGame?: (creatureId: string, questId: string) => void;
   ftueConversationDefinitionId?: string;
+  initialConversationDefinitionId?: string;
   onFtueConversationComplete?: () => void | Promise<void>;
   ftueOrderPreviewActive?: boolean;
   ftueBondSpotlightActive?: boolean;
@@ -587,7 +589,7 @@ export function KingdomCompanionScreen({
           homeEnvironmentStage={selectedHomeEnvironmentStage}
           houseLevel={quests.selectedResident.resident.houseLevel}
           initialDestination={quests.selectedResident.destination}
-          initialConversationDefinitionId={ftueConversationDefinitionId}
+          initialConversationDefinitionId={ftueConversationDefinitionId ?? initialConversationDefinitionId}
           onInitialConversationComplete={onFtueConversationComplete}
           ftueOrderPreviewActive={ftueOrderPreviewActive}
           ftueBondSpotlightActive={ftueBondSpotlightActive}

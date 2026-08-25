@@ -138,6 +138,12 @@ export function CompanionConversationScene({
   const reduceMotion = useReducedMotion();
   const node = conversationNode(definition, session.currentNodeId);
   const journeyNarrative = definition.purpose === 'journey' && definition.format === 'narrative';
+  const journeyRequestHandoffVisible = !session.outcomePresentation
+    && session.pendingReply === undefined
+    && !session.preview
+    && journeyNarrative
+    && node?.kind === 'end'
+    && journeyTaskHandoff;
   const haptic = () => {
     if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
   };
@@ -154,13 +160,15 @@ export function CompanionConversationScene({
     : node?.kind === 'profile_game' || node?.kind === 'insight_game'
       ? activeGameQuestion?.options.length ?? 0
       : 0;
-  const estimatedContentHeight = visibleOptionCount > 0
+  const estimatedContentHeight = journeyRequestHandoffVisible
+    ? 253
+    : visibleOptionCount > 0
     ? estimatedCompanionChoiceContentHeight(
         visibleOptionCount,
         companionChoiceColumnCount(width, visibleOptionCount),
       )
     : 190;
-  const panelContentKey = `${session.currentNodeId}:${activeGameQuestion?.id ?? 'no-question'}:${session.status}:${session.outcomePresentation?.id ?? 'none'}:${session.pendingReply ?? 'ready'}:${visibleOptionCount}`;
+  const panelContentKey = `${session.currentNodeId}:${activeGameQuestion?.id ?? 'no-question'}:${session.status}:${session.outcomePresentation?.id ?? 'none'}:${session.pendingReply ?? 'ready'}:${visibleOptionCount}:${journeyRequestHandoffVisible ? 'journey-handoff' : 'standard'}`;
   const panelChromeHeight = showConversationProgress ? 51 : 20;
   const adaptivePanel = useCompanionAdaptivePanel({
     chromeHeight: panelChromeHeight,
@@ -201,7 +209,7 @@ export function CompanionConversationScene({
       <Animated.View
         accessibilityLabel={`Conversation ${flowPhase.replace('_', ' ')}`}
         entering={reduceMotion ? undefined : FadeInUp.duration(220)}
-        layout={reduceMotion ? undefined : LinearTransition.duration(COMPANION_PANEL_LAYOUT_DURATION_MS)}
+        layout={reduceMotion || journeyRequestHandoffVisible ? undefined : LinearTransition.duration(COMPANION_PANEL_LAYOUT_DURATION_MS)}
         style={{
           backgroundColor: KatchaUI.companionScenePanel.background,
           borderColor: KatchaUI.companionScenePanel.border,
@@ -253,6 +261,7 @@ export function CompanionConversationScene({
           session.preview ? <View style={{ alignItems: 'center', gap: 10, paddingVertical: 6 }}>
             <ThemedText selectable style={{ fontSize: 14, lineHeight: 20, textAlign: 'center' }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>Preview complete. Choose another flow below or exit the preview.</ThemedText>
           </View> : journeyNarrative && node?.kind === 'end' && journeyTaskHandoff ? <MossproutJourneyRequestPanel
+            animateEntrance={false}
             onAction={requiresManualAdvance ? onAdvance : undefined}
             requests={journeyTaskRequests}
             title={journeyTaskTitle ?? 'Today’s Garden requests'}

@@ -38,7 +38,6 @@ export function MossproutJourneyRequestPanel({
           <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name="leaf.fill" size={19} />
         </View>
         <View style={styles.headingCopy}>
-          <ThemedText selectable style={styles.eyebrow} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>TODAY’S JOURNEY</ThemedText>
           <ThemedText selectable numberOfLines={2} style={styles.title} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>{title}</ThemedText>
         </View>
       </View>
@@ -62,7 +61,7 @@ export function MossproutJourneyRequestPanel({
 }
 
 const styles = StyleSheet.create({
-  content: { gap: 9 },
+  content: { gap: 8 },
   standalone: {
     backgroundColor: KatchaUI.companionScenePanel.background,
     borderColor: KatchaUI.companionScenePanel.border,
@@ -72,12 +71,11 @@ const styles = StyleSheet.create({
     boxShadow: KatchaUI.companionScenePanel.shadow,
     flex: 1,
     overflow: 'hidden',
-    padding: 12,
+    padding: 10,
   },
-  heading: { alignItems: 'center', flexDirection: 'row', gap: 9 },
-  mark: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.accent, borderRadius: 13, height: 38, justifyContent: 'center', width: 38 },
-  headingCopy: { flex: 1, gap: 1 },
-  eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+  heading: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  mark: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.accent, borderRadius: 12, height: 34, justifyContent: 'center', width: 34 },
+  headingCopy: { flex: 1, justifyContent: 'center' },
   title: { fontSize: 17, fontWeight: '900', lineHeight: 21 },
   action: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.accent, borderCurve: 'continuous', borderRadius: 17, justifyContent: 'center', minHeight: 52, paddingHorizontal: 16 },
   actionDisabled: { opacity: 0.42 },

@@ -114,14 +114,19 @@ export type KatchimeraDayAction = {
   destination: KatchimeraDayActionDestination;
   completedAt: number | null;
   outroAcknowledgedAt: number | null;
+  /** Present only while replaying a durable completion ledger event. */
+  completionEventId?: string;
+  rewardReceipt?: KatchimeraActionRewardReceipt | null;
 };
 
-export type KatchimeraActionCompletionRecord = {
-  id: string;
+export type KatchimeraActionOrigin = {
   dayId: string;
   familyId: KatchimeraFamilyId;
   actionId: string;
   instanceId: string;
+  /** Logical queue lane that owns rotation/consumption. */
+  sourceSlotId: KatchimeraActionSlotId;
+  /** Visible lane used for the row. It may be borrowed from another queue. */
   slotId: KatchimeraActionSlotId;
   sequence: number;
   kind: KatchimeraDayActionKind;
@@ -131,6 +136,57 @@ export type KatchimeraActionCompletionRecord = {
   artKey?: KatchimeraActionArtKey;
   artworkDefinitionIds: string[];
   reward: KatchimeraDayActionReward | null;
+  journeyId?: string;
+  journeyActionId?: string;
+  presentation: 'action_card' | 'none';
+};
+
+export type KatchimeraActionRewardReceipt = {
+  id: string;
+  eventId: string;
+  creatureId: string;
+  kind:
+    | 'hatch'
+    | 'ideal_skin_questionnaire_completed'
+    | 'goal_created'
+    | 'goal_completed'
+    | 'real_life_quest_completed'
+    | 'mini_game_completed'
+    | 'quick_goal_completed'
+    | 'discovery_answered'
+    | 'quest_completed'
+    | 'reflection_saved'
+    | 'check_in_completed'
+    | 'insight_saved'
+    | 'insight_engaged'
+    | 'conversation_completed'
+    | 'journey_day_completed'
+    | 'merge_order_completed';
+  points: number;
+  occurredAt: number;
+  beforeTotal: number;
+  afterTotal: number;
+  beforeLevel: 1 | 2 | 3 | 4;
+  afterLevel: 1 | 2 | 3 | 4;
+};
+
+/**
+ * Durable presentation ledger entry. Domain completion and its reward are
+ * committed once; the home screen only acknowledges this event after the
+ * reward flight and row outro have both finished.
+ */
+export type KatchimeraActionCompletionEvent = {
+  id: string;
+  source: KatchimeraActionOrigin;
+  completedAt: number;
+  rewardEventId: string | null;
+  rewardReceipt: KatchimeraActionRewardReceipt | null;
+  acknowledgedAt: number | null;
+};
+
+/** @deprecated Save-migration input only. */
+export type KatchimeraActionCompletionRecord = Omit<KatchimeraActionOrigin, 'sourceSlotId' | 'presentation'> & {
+  id: string;
   completedAt: number;
 };
 
@@ -196,11 +252,10 @@ export type MossproutStoryFactKey =
 export type MossproutStoryFacts = Partial<Record<MossproutStoryFactKey, string>>;
 
 export type RelationshipProgressState = {
-  schemaVersion: 3;
+  schemaVersion: 4;
   journeyDays: JourneyDayRecord[];
   stories: Partial<Record<KatchimeraFamilyId, KatchimeraStoryProgress>>;
-  acknowledgedActionOutroIds: string[];
   skippedActionIds: string[];
-  completedActionOutros: KatchimeraActionCompletionRecord[];
+  actionCompletionEvents: KatchimeraActionCompletionEvent[];
   mossproutDailyActionDecks: MossproutDailyActionDeck[];
 };

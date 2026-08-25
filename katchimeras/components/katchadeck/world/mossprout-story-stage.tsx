@@ -20,11 +20,11 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import { katchimeraActionArt } from '@/constants/katchimera-action-art';
 import { Meadow } from '@/constants/meadow-theme';
-import { composeMossproutVisibleActions, mossproutGoalArtKey, resolveMossproutDayActions, type MossproutActionGardenRequest } from '@/game/katchimeras/mossprout-home';
+import { composeMossproutVisibleActions, mossproutActionOrigin, mossproutGoalArtKey, resolveMossproutDayActions, type MossproutActionGardenRequest } from '@/game/katchimeras/mossprout-home';
 import { mossproutJourneyDayNumber } from '@/game/katchimeras/mossprout-journey-handoff';
 import {
   acknowledgeKatchimeraExternalActionOutro,
-  acknowledgeMossproutJourneyActionOutro,
+  acknowledgeKatchimeraActionCompletion,
   beginMossproutJourneyReturn,
   completeMossproutJourneyConversation,
   makeMossproutResolutionAvailable,
@@ -44,7 +44,7 @@ import { useGameScreenTransition } from '@/features/navigation/game-screen-trans
 import { useKatchimeraActionStackTransition } from '@/hooks/use-katchimera-action-transition';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import type { CompanionQuestOfferViewModel } from '@/types/companion-interaction';
-import type { KatchimeraDayAction, RelationshipProgressState } from '@/types/relationship-progression';
+import type { KatchimeraActionOrigin, KatchimeraDayAction, RelationshipProgressState } from '@/types/relationship-progression';
 import type { ConversationSession } from '@/types/companion-conversation';
 import type { MergeWorldState } from '@/types/merge-world';
 import type { CompanionQuickGoalCompletionReceipt } from '@/hooks/use-companion-quick-goals';
@@ -64,6 +64,7 @@ const MAX_ORDER_ART_ITEMS = 3;
 const MAX_VISIBLE_ACTIONS = 3;
 const ACTION_STACK_HEIGHT = 212;
 const ACTION_TRAY_HEIGHT = 284;
+const JOURNEY_REQUEST_TRAY_HEIGHT = 348;
 
 function useMossproutMergeWorldState() {
   const providedMergeWorld = useOptionalMergeWorldState();
@@ -138,13 +139,13 @@ export function MossproutStoryStage({
   onSnoozeGoal: (goalId: string) => boolean;
   onUndoGoal: (goalId: string) => boolean;
   onDashboard: () => void;
-  onOpenConversation: (definitionId: string) => void;
+  onOpenConversation: (definitionId: string, actionOrigin?: KatchimeraActionOrigin) => void;
   onOpenCards: () => void;
   onOpenFocusDirection: () => void;
   onOpenMerge: (orderId?: string | null) => void;
   onOpenQuestDirect: (questId: string, originActionId: string) => void;
   onOpenTrophies: () => void;
-  onBondRewardRequest: (source: DayActionSourceRect, onArrive: () => void) => void;
+  onBondRewardRequest: (source: DayActionSourceRect, onArrive: () => void, receipt?: NonNullable<KatchimeraDayAction['rewardReceipt']>) => void;
   dayOneActionChoiceActive?: boolean;
   actionStackTargetRef?: RefObject<ViewType | null>;
   navigationLocked?: boolean;
@@ -238,7 +239,7 @@ export function MossproutStoryStage({
     relationshipProgressionRepository.update((current) => goals.reduce((state, item) => {
       if (!item.completion) return state;
       const actionId = `mossprout:goal:${item.goal.id}`;
-      if (state.completedActionOutros.some((record) => record.dayId === dayId && record.actionId === actionId)) return state;
+      if (state.actionCompletionEvents.some((event) => event.source.dayId === dayId && event.source.actionId === actionId)) return state;
       const slotId = 'together';
       const sequence = mossproutDailyActionDeck(state, dayId).slotSequences[slotId];
       const instanceId = `${dayId}:${slotId}:${sequence}:${actionId}`;
@@ -255,7 +256,7 @@ export function MossproutStoryStage({
       if (!offer.completedToday || !['quest-mossprout-green-photo', 'quest-mossprout-nature-note'].includes(offer.id)) return state;
       const photo = offer.family === 'photo';
       const actionId = `mossprout:quest:${offer.id}`;
-      if (state.completedActionOutros.some((record) => record.dayId === dayId && record.actionId === actionId)) return state;
+      if (state.actionCompletionEvents.some((event) => event.source.dayId === dayId && event.source.actionId === actionId)) return state;
       const sequence = mossproutDailyActionDeck(state, dayId).slotSequences.field;
       return recordKatchimeraActionCompletion(state, {
         dayId, familyId: 'mossprout', actionId, instanceId: `${dayId}:field:${sequence}:${actionId}`, slotId: 'field', sequence, kind: photo ? 'photo_request' : 'note_request',
@@ -266,23 +267,28 @@ export function MossproutStoryStage({
     }, current));
   }, [dayId, offers]);
 
-  const externalCompletions = useMemo(() => relationships.completedActionOutros
-    .filter((record) => record.familyId === 'mossprout'
-      && record.dayId === dayId
-      && !relationships.acknowledgedActionOutroIds.includes(record.id))
-    .map((record) => ({
-      id: record.actionId, kind: record.kind, title: record.title, subtitle: record.subtitle, icon: record.icon, artKey: record.artKey,
-      instanceId: record.instanceId, slotId: record.slotId, sequence: record.sequence,
-      artworkDefinitionId: record.artworkDefinitionIds[0], artworkDefinitionIds: record.artworkDefinitionIds,
-      required: false, disabled: true, status: 'completed' as const, reward: record.reward,
-      destination: { kind: 'journey' as const }, completedAt: record.completedAt, outroAcknowledgedAt: null,
+  const externalCompletions = useMemo(() => relationships.actionCompletionEvents
+    .filter((event) => event.source.familyId === 'mossprout'
+      && !event.acknowledgedAt
+      && event.source.presentation === 'action_card')
+    .sort((left, right) => left.completedAt - right.completedAt || left.id.localeCompare(right.id))
+    .map((event) => ({
+      id: event.source.actionId, kind: event.source.kind, title: event.source.title, subtitle: event.source.subtitle,
+      icon: event.source.icon, artKey: event.source.artKey, instanceId: event.source.instanceId,
+      sourceSlotId: event.source.sourceSlotId, slotId: event.source.slotId, sequence: event.source.sequence,
+      artworkDefinitionId: event.source.artworkDefinitionIds[0], artworkDefinitionIds: event.source.artworkDefinitionIds,
+      required: false, disabled: true, status: 'completed' as const, reward: event.source.reward,
+      destination: { kind: 'journey' as const }, completedAt: event.completedAt, outroAcknowledgedAt: null,
+      completionEventId: event.id, rewardReceipt: event.rewardReceipt,
     } satisfies KatchimeraDayAction)),
-  [dayId, relationships.acknowledgedActionOutroIds, relationships.completedActionOutros]);
+  [relationships.actionCompletionEvents]);
 
   const completingAction = useMemo(() => {
     const byPresentationId = new Map<string, KatchimeraDayAction>();
-    const visibleExternalCompletions = journeyExclusive ? [] : externalCompletions;
-    for (const action of [...presentedActionCandidates.filter((candidate) => candidate.status === 'completed'), ...visibleExternalCompletions]) {
+    // Journey exclusivity hides optional actions, but must not erase the
+    // completion/reward sequence for an action the player explicitly ran
+    // through developer tooling or another direct launch path.
+    for (const action of externalCompletions) {
       byPresentationId.set(action.instanceId ?? action.id, action);
     }
     const slotOrder = { together: 0, field: 1, garden: 2 } as const;
@@ -291,10 +297,10 @@ export function MossproutStoryStage({
       || slotOrder[left.slotId ?? 'together'] - slotOrder[right.slotId ?? 'together']
       || (left.instanceId ?? left.id).localeCompare(right.instanceId ?? right.id)
     )[0] ?? null;
-  }, [externalCompletions, journeyExclusive, presentedActionCandidates]);
+  }, [externalCompletions]);
 
   const resolvedVisibleActions = composeMossproutVisibleActions(presentedActionCandidates, completingAction, MAX_VISIBLE_ACTIONS);
-  const actionId = useCallback((action: KatchimeraDayAction) => `${dayId}:${action.instanceId ?? action.id}`, [dayId]);
+  const actionId = useCallback((action: KatchimeraDayAction) => action.completionEventId ?? action.instanceId ?? `${dayId}:${action.id}`, [dayId]);
   const sourceActions = useMemo(() => {
     if (journeyExclusive) return resolvedVisibleActions;
     if (!selfCompletingGoalAction) return resolvedVisibleActions;
@@ -319,12 +325,10 @@ export function MossproutStoryStage({
 
   const finishActionOutro = useCallback((action: KatchimeraDayAction) => {
     relationshipProgressionRepository.update((current) => {
-      const belongsToJourney = Boolean(journey?.actions.some((candidate) => candidate.id === action.id));
-      return belongsToJourney
-        ? acknowledgeMossproutJourneyActionOutro(current, dayId, action.id)
-        : acknowledgeKatchimeraExternalActionOutro(current, dayId, action.instanceId ?? action.id);
+      if (action.completionEventId) return acknowledgeKatchimeraActionCompletion(current, action.completionEventId);
+      return acknowledgeKatchimeraExternalActionOutro(current, dayId, action.instanceId ?? action.id);
     });
-  }, [dayId, journey?.actions]);
+  }, [dayId]);
   const actionTransition = useKatchimeraActionStackTransition({
     acknowledgeCompletion: finishActionOutro,
     getId: actionId,
@@ -333,14 +337,18 @@ export function MossproutStoryStage({
     ready: motionReady && mergeWorldReady && screenTransitionPhase === 'idle',
   });
 
-  const openJourney = () => {
+  const openJourney = (sourceAction?: KatchimeraDayAction) => {
     if (!journey) {
       const activeDayCount = mergeWorldState?.mossproutBoardProgression.activeDayIds.length ?? 0;
       const started = relationshipProgressionRepository.update((current) => startMossproutJourneyDay(current, dayId, Date.now(), activeDayCount, quickMode).state);
       const startedJourney = mossproutJourneyForDay(started, dayId);
       if (!startedJourney) return;
       const opening = startedJourney.openingConversationId;
-      if (opening) onOpenConversation(opening);
+      const mainAction = startedJourney.actions.find((candidate) => candidate.kind === 'journey');
+      const origin = sourceAction && mainAction
+        ? mossproutActionOrigin({ ...sourceAction, id: mainAction.id }, dayId, startedJourney)
+        : undefined;
+      if (opening) onOpenConversation(opening, origin);
       return;
     }
     if (journey.status === 'opening' && journey.openingConversationId) {
@@ -362,9 +370,9 @@ export function MossproutStoryStage({
           return onOpenMerge(journeyGardenRequest?.id ?? repairedJourney.activity?.mergeOrderId);
         }
       }
-      return onOpenConversation(journey.openingConversationId);
+      return onOpenConversation(journey.openingConversationId, sourceAction ? mossproutActionOrigin(sourceAction, dayId, journey) : undefined);
     }
-    if (journey.status === 'profile_available' && journey.profileConversationId) return onOpenConversation(journey.profileConversationId);
+    if (journey.status === 'profile_available' && journey.profileConversationId) return onOpenConversation(journey.profileConversationId, sourceAction ? mossproutActionOrigin(sourceAction, dayId, journey) : undefined);
     if (journey.status === 'activity_available') {
       relationshipProgressionRepository.update((current) => startMossproutJourneyActivity(current, dayId));
       return onOpenMerge(journeyGardenRequest?.id ?? journey.activity?.mergeOrderId);
@@ -373,23 +381,23 @@ export function MossproutStoryStage({
     if (journey.status === 'return_available') {
       const next = relationshipProgressionRepository.update((current) => beginMossproutJourneyReturn(current, dayId));
       const returning = mossproutJourneyForDay(next, dayId);
-      if (returning?.returnConversationId) onOpenConversation(returning.returnConversationId);
+      if (returning?.returnConversationId) onOpenConversation(returning.returnConversationId, sourceAction ? mossproutActionOrigin(sourceAction, dayId, returning) : undefined);
       return;
     }
-    if (journey.status === 'resolution_ready' && journey.returnConversationId) return onOpenConversation(journey.returnConversationId);
+    if (journey.status === 'resolution_ready' && journey.returnConversationId) return onOpenConversation(journey.returnConversationId, sourceAction ? mossproutActionOrigin(sourceAction, dayId, journey) : undefined);
     if (journey.status === 'living') {
       const next = relationshipProgressionRepository.update((current) => makeMossproutResolutionAvailable(current, dayId, { force: new Date().getHours() >= 21 }));
       const returning = mossproutJourneyForDay(next, dayId);
-      if (returning?.returnConversationId) onOpenConversation(returning.returnConversationId);
+      if (returning?.returnConversationId) onOpenConversation(returning.returnConversationId, sourceAction ? mossproutActionOrigin(sourceAction, dayId, returning) : undefined);
     }
   };
 
   const openAction = (action: KatchimeraDayAction) => {
     if (action.disabled || action.status === 'completed') return;
     if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
-    if (action.destination.kind === 'journey') return openJourney();
+    if (action.destination.kind === 'journey') return openJourney(action);
     if (action.destination.kind === 'focus_questionnaire') return onOpenFocusDirection();
-    if (action.destination.kind === 'conversation') return onOpenConversation(action.destination.definitionId);
+    if (action.destination.kind === 'conversation') return onOpenConversation(action.destination.definitionId, mossproutActionOrigin(action, dayId, journey));
     if (action.destination.kind === 'garden') {
       if (journey?.status === 'activity_available') {
         relationshipProgressionRepository.update((current) => startMossproutJourneyActivity(current, dayId));
@@ -450,7 +458,7 @@ export function MossproutStoryStage({
   const presentedActions = actionTransition.items;
   const stackInteractionLocked = tutorialInteractionLocked || actionTransition.interactionLocked || Boolean(selfCompletingGoalAction);
 
-  return <View style={styles.stage}>
+  return <View style={[styles.stage, journeyMergeActive && styles.journeyRequestStage]}>
     {journey && !storyComplete && !journeyMergeActive ? (
       <KatchimeraJourneyStatusPlaque
         dayNumber={journeyDayNumber}
@@ -480,9 +488,12 @@ export function MossproutStoryStage({
             enteringEnabled={entering}
             key={presentedActionKey}
             onFinished={() => actionTransition.onCompletedExit(presentedActionKey)}
-            onRewardRequest={presentedAction.reward?.kind === 'bond' ? onBondRewardRequest : undefined}
+            onRewardRequest={presentedAction.reward?.kind === 'bond'
+              ? presentedAction.rewardReceipt
+                ? (source, onArrive) => onBondRewardRequest(source, onArrive, presentedAction.rewardReceipt!)
+                : onBondRewardRequest
+              : undefined}
             reward={presentedAction.reward ? <ActionRewardChip reward={presentedAction.reward} /> : undefined}
-            rewardAnimationId={presentedAction.instanceId ?? presentedAction.id}
             start={actionTransition.isStartingCompletion(presentedActionKey)}
             title={presentedAction.title}
           />
@@ -627,6 +638,7 @@ function ActionRewardChip({ reward }: {
 
 const styles = StyleSheet.create({
   stage: { alignSelf: 'stretch', gap: 8, height: ACTION_TRAY_HEIGHT, overflow: 'visible', paddingBottom: 3 },
+  journeyRequestStage: { height: JOURNEY_REQUEST_TRAY_HEIGHT },
   actionStack: { height: ACTION_STACK_HEIGHT },
   journeyRequestPanel: { flex: 1 },
   actionSlot: { gap: 7, height: ACTION_STACK_HEIGHT, justifyContent: 'flex-end', overflow: 'visible' },

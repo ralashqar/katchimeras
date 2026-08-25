@@ -50,6 +50,7 @@ export function createConversationSession(input: {
   encounterId?: string;
   encounterTargetTurns?: number;
   encounterTurns?: number;
+  actionOrigin?: ConversationSession['actionOrigin'];
 }): ConversationSession {
   const createdAt = input.createdAt ?? Date.now();
   const entryNode = conversationNode(input.definition, input.definition.entryNodeId);
@@ -78,6 +79,7 @@ export function createConversationSession(input: {
     ...(input.encounterTargetTurns ? { encounterTargetTurns: input.encounterTargetTurns } : {}),
     encounterTurns: input.encounterTurns ?? 0,
     ...(input.preview ? { preview: true } : {}),
+    ...(input.actionOrigin ? { actionOrigin: input.actionOrigin } : {}),
   };
 }
 

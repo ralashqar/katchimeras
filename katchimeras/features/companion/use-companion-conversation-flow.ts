@@ -140,8 +140,11 @@ export function useCompanionConversationFlow({
       if (journeyNarrative) return;
       const key = `${session.id}:end`;
       if (automatedRef.current.has(key)) return;
-      automatedRef.current.add(key);
-      const timer = setTimeout(onContinue, reduceMotion ? 0 : 120);
+      const timer = setTimeout(() => {
+        if (automatedRef.current.has(key)) return;
+        automatedRef.current.add(key);
+        onContinue();
+      }, reduceMotion ? 0 : 120);
       return () => clearTimeout(timer);
     }
 
@@ -153,8 +156,11 @@ export function useCompanionConversationFlow({
       if (journeyNarrative && !skipCompletedTransition) return;
       const key = `${session.id}:complete`;
       if (automatedRef.current.has(key)) return;
-      automatedRef.current.add(key);
-      const timer = setTimeout(onComplete, reduceMotion ? 0 : 360);
+      const timer = setTimeout(() => {
+        if (automatedRef.current.has(key)) return;
+        automatedRef.current.add(key);
+        onComplete();
+      }, reduceMotion ? 0 : 360);
       return () => clearTimeout(timer);
     }
   }, [definition, journeyNarrative, node, onCommitInsight, onCommitMemory, onComplete, onContinue, onDismissOutcome, outcomeAutoAdvanceMs, outcomeRequiresManualAdvance, reduceMotion, screenReaderEnabled, session, skipCompletedTransition]);

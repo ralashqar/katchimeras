@@ -58,7 +58,7 @@ function mossproutProgressionSignals(days: readonly HomeDayRecord[], friendshipL
   const completedBeatIds = mossproutStory(relationships).completedBeatIds ?? [];
   const activeJourneyDayIds = [...new Set([
     ...relationships.journeyDays.filter((journey) => journey.familyId === 'mossprout' && journey.status === 'complete').map((journey) => journey.dayId),
-    ...relationships.completedActionOutros.filter((record) => record.familyId === 'mossprout').map((record) => record.dayId),
+    ...relationships.actionCompletionEvents.filter((event) => event.source.familyId === 'mossprout').map((event) => event.source.dayId),
   ])].sort();
   if (isJourneyQuickModeEnabled()) {
     const simulatedActiveDays = Math.max(
@@ -71,9 +71,9 @@ function mossproutProgressionSignals(days: readonly HomeDayRecord[], friendshipL
       activeJourneyDayIds.push(`journey-quick:${String(activeJourneyDayIds.length + 1).padStart(2, '0')}`);
     }
   }
-  const completedGardenDayIds = [...new Set(relationships.completedActionOutros
-    .filter((record) => record.familyId === 'mossprout' && record.kind === 'garden_request')
-    .map((record) => record.dayId))].sort();
+  const completedGardenDayIds = [...new Set(relationships.actionCompletionEvents
+    .filter((event) => event.source.familyId === 'mossprout' && event.source.kind === 'garden_request')
+    .map((event) => event.source.dayId))].sort();
   const natureMemoryDayIds = days.filter((day) => {
     if (!(day.journalRecords?.length || day.moments?.length || day.notes?.length || day.featuredMemory)) return false;
     const semanticEvidence = JSON.stringify([

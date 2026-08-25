@@ -75,6 +75,40 @@ test('resetting Today makes its conversation pool unserved without erasing prior
   assert.deepEqual(reset.processedConversationEvidenceIds, ['journal:prior']);
 });
 
+test('Mossprout optional narrative endings preserve the exact launching action origin', () => {
+  for (const definitionId of [
+    'mossprout:conversation:nature-question:pocket-expedition',
+    'mossprout:conversation:nature-question:weather-committee',
+  ]) {
+    const definition = companionConversationDefinitionsForFamily('mossprout').find((candidate) => candidate.id === definitionId)!;
+    const actionOrigin = {
+      dayId: '2026-08-25', familyId: 'mossprout' as const, actionId: `action:${definitionId}`,
+      instanceId: `2026-08-25:together:1:action:${definitionId}`, sourceSlotId: 'together' as const,
+      slotId: 'together' as const, sequence: 1, kind: 'fun_chat' as const, title: definition.actionTitle ?? definition.title,
+      subtitle: definition.title, icon: 'bubble.left.fill' as const, artworkDefinitionIds: [],
+      reward: { kind: 'bond' as const, amount: 4 }, presentation: 'action_card' as const,
+    };
+    let session = createConversationSession({
+      definition, formId: 'mossprout', dayId: actionOrigin.dayId, actionOrigin,
+    });
+    for (let guard = 0; session.status === 'active' && guard < 10; guard += 1) {
+      if (session.pendingReply !== undefined) {
+        session = continueConversation(session, definition, guard + 1);
+        continue;
+      }
+      const node = definition.nodes.find((candidate) => candidate.id === session.currentNodeId)!;
+      if (node.kind === 'choice' || node.kind === 'poll') {
+        session = answerConversation(session, definition, node.options[0]!.id, guard + 1).session;
+      } else {
+        session = continueConversation(session, definition, guard + 1);
+      }
+    }
+    assert.equal(session.status, 'completed', definitionId);
+    assert.equal(session.actionOrigin?.instanceId, actionOrigin.instanceId);
+    assert.equal(session.actionOrigin?.actionId, actionOrigin.actionId);
+  }
+});
+
 test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gated', () => {
   assert.deepEqual(validateConversationDefinitions(companionConversationDefinitionsV2), []);
   assert.equal(companionConversationDefinitionsV2.length, 1376);

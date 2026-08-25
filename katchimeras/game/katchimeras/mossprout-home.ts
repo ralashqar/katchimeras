@@ -1,5 +1,5 @@
 import type { ConversationDefinition } from '@/types/companion-conversation';
-import type { KatchimeraActionArtKey, KatchimeraActionCompletionRecord, KatchimeraActionSlotId, KatchimeraDayAction, JourneyDayActionRecord, JourneyDayRecord } from '@/types/relationship-progression';
+import type { KatchimeraActionArtKey, KatchimeraActionCompletionRecord, KatchimeraActionOrigin, KatchimeraActionSlotId, KatchimeraDayAction, JourneyDayActionRecord, JourneyDayRecord } from '@/types/relationship-progression';
 import { mossproutCampaignEpisodeByBeatId } from '@/constants/mossprout-campaign';
 
 export type MossproutActionOffer = {
@@ -27,6 +27,52 @@ export type MossproutActionConversation = {
   description?: string;
   actionKind?: 'journal_prompt' | 'journey_focus';
 };
+
+/**
+ * One logical dashboard card keeps this identity from its active state through
+ * its completed reward/outro state. Conversation session IDs belong to the
+ * narrative screen and must never be used as action-row identities.
+ */
+export function mossproutActionInstanceId(
+  dayId: string,
+  slotId: KatchimeraActionSlotId,
+  sequence: number,
+  actionId: string,
+) {
+  return `${dayId}:${slotId}:${sequence}:${actionId}`;
+}
+
+/** Captures the exact card identity before navigation can change the deck. */
+export function mossproutActionOrigin(
+  action: KatchimeraDayAction,
+  dayId: string,
+  journey?: JourneyDayRecord | null,
+): KatchimeraActionOrigin {
+  const sourceSlotId = action.sourceSlotId ?? slotForAction(action);
+  const slotId = action.slotId ?? sourceSlotId;
+  const sequence = action.sequence ?? 0;
+  return {
+    dayId,
+    familyId: 'mossprout',
+    actionId: action.id,
+    instanceId: action.instanceId ?? mossproutActionInstanceId(dayId, sourceSlotId, sequence, action.id),
+    sourceSlotId,
+    slotId,
+    sequence,
+    kind: action.kind,
+    title: action.title,
+    subtitle: action.subtitle ?? '',
+    icon: action.icon,
+    ...(action.artKey ? { artKey: action.artKey } : {}),
+    artworkDefinitionIds: action.artworkDefinitionIds?.length
+      ? [...action.artworkDefinitionIds]
+      : action.artworkDefinitionId ? [action.artworkDefinitionId] : [],
+    reward: action.reward,
+    ...(journey ? { journeyId: journey.id } : {}),
+    ...(journey?.actions.some((candidate) => candidate.id === action.id) ? { journeyActionId: action.id } : {}),
+    presentation: 'action_card',
+  };
+}
 
 export type MossproutActionGardenRequest = {
   id: string;
@@ -241,15 +287,20 @@ export function resolveMossproutDayActions(input: {
   if (journey && journey.status !== 'complete') {
     const journeyAction = actions[0];
     if (!journeyAction) return [];
-    const slotId = slotForAction(journeyAction);
-    const sequence = input.slotSequences?.[slotId] ?? 0;
-    return [{
-      ...journeyAction,
-      instanceId: `${input.dayId ?? journey.dayId}:${slotId}:${sequence}:${journeyAction.id}`,
-      sourceSlotId: slotId,
-      sequence,
-      slotId,
-    }];
+    const pendingCompletionOutros = journey.actions
+      .filter((action) => action.kind !== 'journey' && action.status === 'completed' && !action.outroAcknowledgedAt)
+      .map((action) => mapConversationAction(action, true));
+    return [journeyAction, ...pendingCompletionOutros].map((action) => {
+      const slotId = slotForAction(action);
+      const sequence = input.slotSequences?.[slotId] ?? 0;
+      return {
+        ...action,
+        instanceId: mossproutActionInstanceId(input.dayId ?? journey.dayId, slotId, sequence, action.id),
+        sourceSlotId: slotId,
+        sequence,
+        slotId,
+      };
+    });
   }
 
   const unfinishedGoals = input.goals.filter((goal) => !goal.completed);
@@ -400,14 +451,16 @@ export function resolveMossproutDayActions(input: {
   return MOSSPROUT_ACTION_SLOT_IDS.flatMap((slotId) => {
     const action = selected.get(slotId);
     if (!action) return [];
-    const sequence = sequences[slotId] ?? 0;
+    const sourceSlotId = slotForAction(action);
+    const sequence = sequences[sourceSlotId] ?? 0;
     return [{
       ...action,
       // Status changes must not change a rendered row's identity. Keeping the
       // same instance id lets the active card become its completed outro in
-      // place instead of unmounting and re-entering as a different row.
-      instanceId: `${dayId}:${slotId}:${sequence}:${action.id}`,
-      sourceSlotId: slotForAction(action),
+      // place instead of unmounting and re-entering as a different row. Use
+      // its logical queue rather than its temporary overflow display slot.
+      instanceId: mossproutActionInstanceId(dayId, sourceSlotId, sequence, action.id),
+      sourceSlotId,
       sequence,
       slotId,
     }];
