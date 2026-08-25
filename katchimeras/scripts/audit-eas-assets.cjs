@@ -6,10 +6,9 @@ const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 
 const projectRoot = path.resolve(__dirname, '..');
-const repoRoot = path.resolve(projectRoot, '..');
 const assetsRoot = path.join(projectRoot, 'assets');
 const auditRoot = path.join(projectRoot, 'dist', 'asset-audit');
-const easIgnorePath = path.join(repoRoot, '.easignore');
+const easIgnorePath = path.join(projectRoot, '.easignore');
 const reportPath = path.join(projectRoot, 'docs', 'eas-asset-audit.md');
 const startMarker = '# BEGIN GENERATED UNUSED ASSETS';
 const endMarker = '# END GENERATED UNUSED ASSETS';
@@ -18,7 +17,6 @@ const checkMode = process.argv.includes('--check');
 
 const slash = (value) => value.split(path.sep).join('/');
 const projectRelative = (value) => slash(path.relative(projectRoot, value));
-const repoRelative = (value) => slash(path.relative(repoRoot, value));
 const mib = (bytes) => bytes / 1024 / 1024;
 const formatMiB = (bytes) => `${mib(bytes).toFixed(1)} MiB`;
 
@@ -208,7 +206,7 @@ function buildManagedSection(unused) {
   return [
     startMarker,
     '# Generated from the union of iOS/Android Metro assets plus native config assets.',
-    ...unused.map((item) => `/${repoRelative(item.absolute)}`),
+    ...unused.map((item) => `/${projectRelative(item.absolute)}`),
     endMarker,
   ].join('\n');
 }
@@ -299,7 +297,7 @@ function main() {
   if (writeMode) {
     fs.writeFileSync(easIgnorePath, nextIgnore);
     fs.writeFileSync(reportPath, report);
-    console.log(`Updated ${repoRelative(easIgnorePath)} and ${projectRelative(reportPath)}`);
+    console.log(`Updated ${projectRelative(easIgnorePath)} and ${projectRelative(reportPath)}`);
     return;
   }
   if (checkMode) {
