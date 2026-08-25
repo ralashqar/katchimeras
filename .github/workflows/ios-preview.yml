@@ -1,0 +1,66 @@
+name: iOS Preview Build
+
+run-name: iOS preview from ${{ github.ref_name }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      refresh_devices:
+        description: Include newly registered iPhones
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build iOS preview on EAS
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    defaults:
+      run:
+        working-directory: katchimeras
+
+    steps:
+      - name: Check out selected branch
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.14.0
+          cache: npm
+          cache-dependency-path: katchimeras/package-lock.json
+
+      - name: Set up Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: 22.4.0
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run preview preflight
+        run: npm run build:ios:preview:check
+
+      - name: Build iOS preview
+        env:
+          REFRESH_DEVICES: ${{ inputs.refresh_devices }}
+        shell: bash
+        run: |
+          if [ "$REFRESH_DEVICES" = "true" ]; then
+            eas build \
+              --platform ios \
+              --profile preview \
+              --non-interactive \
+              --refresh-ad-hoc-provisioning-profile
+          else
+            eas build \
+              --platform ios \
+              --profile preview \
+              --non-interactive
+          fi
