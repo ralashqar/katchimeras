@@ -10,6 +10,7 @@ import { relationshipProgressionRepository } from '@/storage/repositories/relati
 import { normalizeMergeWorldState } from '@/utils/merge-world/engine';
 import { installMergeWorldStateForDebug, loadMergeWorldState } from '@/utils/merge-world/repository';
 import { captureKeyValueProfileDomain, replaceKeyValueProfileDomain, validateKeyValueProfileDomain } from '@/utils/player-profile-domain-registry';
+import { setJourneyQuickModeEnabled } from '@/utils/dev-settings';
 
 const RESTORE_JOURNAL_KEY = 'katchadeck.dev.profile-snapshot-restore-v1';
 
@@ -105,6 +106,7 @@ export function validatePlayerProfileSnapshot(snapshot: unknown): PlayerProfileS
 }
 
 async function installSnapshot(snapshot: PlayerProfileSnapshot) {
+  setJourneyQuickModeEnabled(false);
   replaceKeyValueProfileDomain(snapshot.domains.keyValue.values);
   relationshipProgressionRepository.reloadFromStorageForDebug();
   await installMergeWorldStateForDebug(snapshot.domains.mergeWorld.state);

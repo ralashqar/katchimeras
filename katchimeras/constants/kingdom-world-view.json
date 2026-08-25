@@ -4,11 +4,6 @@
     "horizontalOffsetHexTileWidth": 0,
     "verticalOffsetHexTileHeight": 0.2
   },
-  "zodiac": {
-    "globalScale": 2,
-    "horizontalOffsetHexTileWidth": 0,
-    "verticalOffsetHexTileHeight": 0.2
-  },
   "egg": {
     "globalScale": 0.35,
     "horizontalOffsetHexTileWidth": 0,
@@ -28,8 +23,8 @@
         "verticalSpacing": 0.98
       },
       "floating-neighborhood-v2": {
-        "horizontalSpacing": 1.168,
-        "verticalSpacing": 1.168
+        "horizontalSpacing": 1.02,
+        "verticalSpacing": 1.02
       },
       "organic-islands-v1": {
         "horizontalSpacing": 1.28,

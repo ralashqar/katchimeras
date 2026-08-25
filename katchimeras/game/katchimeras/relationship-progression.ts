@@ -1,6 +1,6 @@
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import type { ConversationSession } from '@/types/companion-conversation';
-import type { JourneyDayActionRecord, JourneyDayRecord, KatchimeraActionCompletionRecord, KatchimeraActionSlotId, KatchimeraDayAction, KatchimeraStoryProgress, MossproutDailyActionDeck, RelationshipProgressState } from '@/types/relationship-progression';
+import type { JourneyDayActionRecord, JourneyDayRecord, KatchimeraActionCompletionRecord, KatchimeraActionSlotId, KatchimeraDayAction, KatchimeraStoryProgress, MossproutDailyActionDeck, MossproutStoryFactKey, RelationshipProgressState } from '@/types/relationship-progression';
 import { MOSSPROUT_HEARTWOOD_CHAPTER_ID, mossproutExtendedBeatById } from '@/constants/mossprout-journey-chapters';
 import {
   MOSSPROUT_CAMPAIGN_EPISODES,
@@ -9,6 +9,7 @@ import {
   MOSSPROUT_STORY_FACT_BY_OPTION_ID,
   mossproutCampaignEpisodeAvailable,
   mossproutCampaignEpisodeByBeatId,
+  mossproutCampaignOrderDrops,
   nextMossproutCampaignEpisode,
   validMossproutCoStar,
 } from '@/constants/mossprout-campaign';
@@ -220,6 +221,68 @@ export function resetRelationshipProgressForDayForDebug(
   };
 }
 
+const STORY_FACT_KEYS_BY_BEAT: Readonly<Partial<Record<string, readonly MossproutStoryFactKey[]>>> = {
+  'quiet-patch:first-flower': ['garden_promise'],
+  'quiet-patch:pond-knock': ['pond_approach'],
+  'returning-pond:bank-that-holds': ['pond_priority'],
+  'returning-pond:rain-garden': ['welcome_style'],
+  'memory-nursery:keepsake-root': ['memory_style'],
+  'memory-nursery:lantern-bank': ['lantern_for'],
+  'heartwood:place-that-holds': ['sanctuary_purpose'],
+};
+
+/** Rewinds only the most recently started Mossprout Journey episode. */
+export function resetLastMossproutJourneyForDebug(
+  state: RelationshipProgressState,
+  now = Date.now(),
+): RelationshipProgressState {
+  const target = lastMossproutJourney(state);
+  if (!target) return state;
+  const targetEpisode = mossproutCampaignEpisodeByBeatId.get(target.beatId);
+  const story = mossproutStory(state, now);
+  const completedBeatIds = target.status === 'complete'
+    ? (story.completedBeatIds ?? []).filter((beatId) => beatId !== target.beatId)
+    : story.completedBeatIds ?? [];
+  const completedBeatSet = new Set(completedBeatIds);
+  const completedChapterIds = [...new Set(MOSSPROUT_CAMPAIGN_EPISODES
+    .map((episode) => episode.chapterId)
+    .filter((chapterId) => MOSSPROUT_CAMPAIGN_EPISODES
+      .filter((episode) => episode.chapterId === chapterId)
+      .every((episode) => completedBeatSet.has(episode.beatId))))];
+  const furthestEpisode = Math.max(0, ...MOSSPROUT_CAMPAIGN_EPISODES
+    .filter((episode) => completedBeatSet.has(episode.beatId))
+    .map((episode) => episode.episodeNumber));
+  const habitatStage = furthestEpisode >= 13 ? 4 : furthestEpisode >= 9 ? 3 : furthestEpisode >= 5 ? 2 : furthestEpisode >= 2 ? 1 : 0;
+  const storyFacts = { ...(story.storyFacts ?? {}) };
+  for (const key of STORY_FACT_KEYS_BY_BEAT[target.beatId] ?? []) delete storyFacts[key];
+  const dayPrefix = `${target.dayId}:`;
+  return {
+    ...state,
+    journeyDays: state.journeyDays.filter((journey) => journey.id !== target.id),
+    acknowledgedActionOutroIds: state.acknowledgedActionOutroIds.filter((id) => !id.startsWith(dayPrefix)),
+    skippedActionIds: state.skippedActionIds.filter((id) => !id.startsWith(dayPrefix)),
+    completedActionOutros: state.completedActionOutros.filter((record) => record.dayId !== target.dayId),
+    mossproutDailyActionDecks: state.mossproutDailyActionDecks.filter((deck) => deck.dayId !== target.dayId),
+    stories: {
+      ...state.stories,
+      mossprout: {
+        ...story,
+        activeChapterId: targetEpisode?.chapterId ?? target.chapterId,
+        activeBeatId: target.beatId,
+        completedBeatIds,
+        completedChapterIds,
+        completedObjectiveIds: targetEpisode?.objectiveId
+          ? story.completedObjectiveIds.filter((objectiveId) => objectiveId !== targetEpisode.objectiveId)
+          : story.completedObjectiveIds,
+        storyFacts,
+        coStarSkinId: targetEpisode?.episodeNumber === 1 ? null : story.coStarSkinId,
+        habitatStage,
+        updatedAt: now,
+      },
+    },
+  };
+}
+
 function dedupeKatchimeraActionCompletions(
   records: readonly KatchimeraActionCompletionRecord[],
   acknowledgedIds: ReadonlySet<string>,
@@ -314,6 +377,21 @@ export function mossproutJourneyForDay(state: RelationshipProgressState, dayId: 
   return journey?.familyId === 'mossprout' ? journey : null;
 }
 
+export function lastMossproutJourney(state: RelationshipProgressState): JourneyDayRecord | null {
+  return [...state.journeyDays]
+    .filter((journey) => journey.familyId === 'mossprout')
+    .sort((left, right) => right.startedAt - left.startedAt)[0] ?? null;
+}
+
+/** Gives quick mode a fresh logical day while normal play stays calendar-bound. */
+export function mossproutJourneyRuntimeDayId(state: RelationshipProgressState, calendarDayId: string, quickMode = false): string {
+  if (!quickMode) return calendarDayId;
+  const active = [...state.journeyDays].reverse().find((journey) => journey.familyId === 'mossprout' && journey.status !== 'complete');
+  if (active) return active.dayId;
+  const nextEpisode = nextMossproutCampaignEpisode(mossproutStory(state).completedBeatIds ?? []);
+  return nextEpisode ? `${calendarDayId}:mossprout-journey-${String(nextEpisode.episodeNumber).padStart(2, '0')}` : calendarDayId;
+}
+
 export function mossproutFirstResidentCardId(state: RelationshipProgressState): string | null {
   return mossproutStory(state).coStarSkinId ?? state.journeyDays.find((journey) => (
     journey.familyId === 'mossprout'
@@ -326,22 +404,23 @@ export function startMossproutJourneyDay(
   dayId: string,
   now = Date.now(),
   activeDayCount = 0,
+  allowEarlyStart = false,
 ): { state: RelationshipProgressState; journey: JourneyDayRecord | null; reason: 'started' | 'existing' | 'another_companion' | 'resting' } {
   const existing = journeyForDay(state, dayId);
   if (existing) return { state, journey: existing.familyId === 'mossprout' ? existing : null, reason: existing.familyId === 'mossprout' ? 'existing' : 'another_companion' };
   const story = mossproutStory(state, now);
   const nextEpisode = nextMossproutCampaignEpisode(story.completedBeatIds ?? []);
-  if (!nextEpisode || !mossproutCampaignEpisodeAvailable(nextEpisode, activeDayCount)) {
+  if (!nextEpisode || (!allowEarlyStart && !mossproutCampaignEpisodeAvailable(nextEpisode, activeDayCount))) {
     return { state, journey: null, reason: 'resting' };
   }
   const chapterId = nextEpisode.chapterId;
   const beatId = nextEpisode.beatId;
-  const openingConversationId = nextEpisode.episodeNumber === 1 ? null : nextEpisode.openingConversationId;
+  const openingConversationId = nextEpisode.openingConversationId;
   const journey: JourneyDayRecord = {
     id: `journey-day:${dayId}:mossprout`,
     dayId,
     familyId: 'mossprout',
-    status: nextEpisode.episodeNumber === 1 ? 'activity_in_progress' : 'opening',
+    status: 'opening',
     chapterId,
     beatId,
     openingConversationId,
@@ -375,9 +454,11 @@ export function completeMossproutJourneyOpening(
     kind: 'merge' as const,
     objectiveId: episodeDefinition.objectiveId,
     mergeOrderId: episodeDefinition.mergeOrderId,
+    mergeOrderIds: episodeDefinition.mergeOrders.map((order) => order.id),
+    servedOrderIds: [],
     opportunityId: `mossprout:${dayId}:${journey.beatId}:campaign`,
     generatorId: 'wild-garden',
-    dropDefinitionIds: activityDefinition ? [...activityDefinition.drops] : [],
+    dropDefinitionIds: mossproutCampaignOrderDrops(episodeDefinition),
   } : activityDefinition ? {
     kind: 'merge' as const,
     objectiveId: activityDefinition.objectiveId,
@@ -456,16 +537,21 @@ export function recordMossproutJourneyOrderServed(
   const journey = [...state.journeyDays].reverse().find((candidate) => (
     candidate.familyId === 'mossprout'
     && candidate.status === 'activity_in_progress'
-    && candidate.activity?.mergeOrderId === orderId
+    && (candidate.activity?.mergeOrderIds ?? (candidate.activity ? [candidate.activity.mergeOrderId] : [])).includes(orderId)
   ));
   if (!journey) return state;
+  const orderIds = journey.activity?.mergeOrderIds ?? (journey.activity ? [journey.activity.mergeOrderId] : []);
+  const servedOrderIds = unique([...(journey.activity?.servedOrderIds ?? []), orderId]);
+  const finished = orderIds.every((candidate) => servedOrderIds.includes(candidate));
   return replaceJourney(state, journey.id, {
     ...journey,
-    status: 'return_available',
+    status: finished ? 'return_available' : 'activity_in_progress',
+    activity: journey.activity ? { ...journey.activity, servedOrderIds } : null,
     activityReceiptIds: unique([...journey.activityReceiptIds, `merge-order:${orderId}`]),
-    returnConversationId: mossproutCampaignEpisodeByBeatId.get(journey.beatId)?.resolutionConversationId
-      ?? `mossprout:${journey.beatId}:resolution`,
-    resolutionAvailableAt: now,
+    returnConversationId: finished
+      ? mossproutCampaignEpisodeByBeatId.get(journey.beatId)?.resolutionConversationId ?? `mossprout:${journey.beatId}:resolution`
+      : journey.returnConversationId,
+    resolutionAvailableAt: finished ? now : journey.resolutionAvailableAt,
   });
 }
 
@@ -681,6 +767,23 @@ function lateNight(now: number) {
 }
 
 function normalizeJourneyDay(journey: JourneyDayRecord): JourneyDayRecord {
+  const episodeDefinition = mossproutCampaignEpisodeByBeatId.get(journey.beatId);
+  const authoredOrderIds = episodeDefinition?.mergeOrders.map((order) => order.id) ?? [];
+  const storedActivity = journey.activity?.kind === 'merge' ? journey.activity : null;
+  const servedFromReceipts = journey.activityReceiptIds
+    .filter((receiptId) => receiptId.startsWith('merge-order:'))
+    .map((receiptId) => receiptId.slice('merge-order:'.length))
+    .filter((orderId) => authoredOrderIds.includes(orderId));
+  const activity = storedActivity && journey.status !== 'complete' && authoredOrderIds.length
+    ? {
+        ...storedActivity,
+        objectiveId: episodeDefinition?.objectiveId ?? storedActivity.objectiveId,
+        mergeOrderId: authoredOrderIds[0]!,
+        mergeOrderIds: authoredOrderIds,
+        servedOrderIds: unique([...(storedActivity.servedOrderIds ?? []), ...servedFromReceipts]).filter((orderId) => authoredOrderIds.includes(orderId)),
+        dropDefinitionIds: episodeDefinition ? mossproutCampaignOrderDrops(episodeDefinition) : storedActivity.dropDefinitionIds,
+      }
+    : storedActivity;
   return {
     ...journey,
     status: (journey.status as string) === 'active' ? 'activity_in_progress' : journey.status,
@@ -688,7 +791,7 @@ function normalizeJourneyDay(journey: JourneyDayRecord): JourneyDayRecord {
     profileConversationId: typeof journey.profileConversationId === 'string' ? journey.profileConversationId : null,
     matchedCardId: typeof journey.matchedCardId === 'string' ? journey.matchedCardId : null,
     returnConversationId: typeof journey.returnConversationId === 'string' ? journey.returnConversationId : null,
-    activity: journey.activity?.kind === 'merge' ? journey.activity : null,
+    activity,
     resolutionAvailableAt: Number.isFinite(journey.resolutionAvailableAt) ? journey.resolutionAvailableAt : null,
     completionReceipt: journey.completionReceipt ?? null,
     actions: normalizeJourneyActions(journey),

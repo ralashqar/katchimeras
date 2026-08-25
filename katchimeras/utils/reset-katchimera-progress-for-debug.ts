@@ -7,7 +7,7 @@ import { resetCompanionJourneysForDebug } from '@/utils/companion-journey-storag
 import { resetAllCompanionQuickGoalsForDebug } from '@/utils/companion-quick-goal-storage';
 import { resetCompanionStoriesForDebug } from '@/utils/companion-story-storage';
 import { resetDevSubscriptionSimulator } from '@/utils/dev-subscription-simulator';
-import { setAllKatchimerasAvailableEnabled } from '@/utils/dev-settings';
+import { setAllKatchimerasAvailableEnabled, setJourneyQuickModeEnabled } from '@/utils/dev-settings';
 import { resetKatchimeraWardrobeForDebug } from '@/utils/katchimera-wardrobe-storage';
 import { resetCompanionQuestsForDebug } from '@/utils/katchimera-quests';
 import { resetMergeWorldStateForDebug } from '@/utils/merge-world/repository';
@@ -19,6 +19,7 @@ export async function resetKatchimeraProgressForDebug({
   resetAt?: number;
   resetDevAccess?: boolean;
 } = {}): Promise<void> {
+  setJourneyQuickModeEnabled(false);
   resetAllKatchimeraContentForDebug();
   resetKatchimeraWardrobeForDebug();
   resetAllKatchimeraBondsForDebug(resetAt);

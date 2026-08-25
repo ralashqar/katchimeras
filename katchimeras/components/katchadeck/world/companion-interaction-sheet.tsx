@@ -19,7 +19,11 @@ import { ExplorationEnvironmentProgressionProvider } from '@/components/katchade
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import { KatchaUI } from '@/constants/katcha-ui';
-import { mossproutJourneyForDay } from '@/game/katchimeras/relationship-progression';
+import {
+  completeMossproutJourneyConversation,
+  mossproutJourneyForDay,
+  startMossproutJourneyActivity,
+} from '@/game/katchimeras/relationship-progression';
 import { useCompanionExperienceController } from '@/features/companion/use-companion-experience-controller';
 import { useCompanionConversationFlow } from '@/features/companion/use-companion-conversation-flow';
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
@@ -143,6 +147,8 @@ import { homeRepository } from '@/storage/repositories/home-repository';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
 import { localDayId } from '@/utils/world-identity';
+import { mossproutCampaignEpisodeByOpeningId } from '@/constants/mossprout-campaign';
+import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 
 const LazyQuestExperienceHost = lazy(async () => {
   const module = await import('./quests/quest-experience-host');
@@ -1011,6 +1017,17 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   );
   const feastleStoryFinale = conversationExperience?.definition.id === 'feastle:friendship:4'
     || /^(?:baristabbit|steppling|voyagle|flexel|bedrotte):story:8$/.test(conversationExperience?.definition.id ?? '');
+  const journeyOpeningEpisode = conversationExperience
+    ? mossproutCampaignEpisodeByOpeningId.get(conversationExperience.definition.id)
+    : null;
+  const journeyTaskRequests = journeyOpeningEpisode?.mergeOrders.map((order, index, orders) => ({
+    id: order.id,
+    badge: orders.length > 1 ? `${index + 1} OF ${orders.length}` : undefined,
+    title: order.title,
+    description: order.description,
+    definitionIds: order.requirements.map((requirement) => requirement.definitionId),
+    quantity: order.requirements.length === 1 ? order.requirements[0]?.quantity : undefined,
+  })) ?? [];
   const onMemoryConversationDecision = props.onMemoryConversationDecision;
   const onInsightConversationDecision = props.onInsightConversationDecision;
   const onDismissConversationOutcome = props.onDismissConversationOutcome;
@@ -1024,17 +1041,69 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     onDismissConversationOutcome();
     if (props.familyId === 'mossprout') showFeastleStoryHome();
   }, [onDismissConversationOutcome, props.familyId, showFeastleStoryHome]);
+  const conversationFamilyId = props.familyId;
+  const openConversationMerge = props.onOpenMerge;
+  const completeConversation = useCallback(() => {
+    const session = conversationExperience?.session;
+    const episode = session
+      ? mossproutCampaignEpisodeByOpeningId.get(session.definitionId)
+      : null;
+    if (
+      conversationFamilyId !== 'mossprout'
+      || !session
+      || session.preview
+    ) {
+      showFeastleStoryHome();
+      return;
+    }
+
+    const next = relationshipProgressionRepository.update((current) => {
+      const completed = completeMossproutJourneyConversation(
+        current,
+        session,
+        session.completedAt ?? session.updatedAt,
+      );
+      const journey = [...completed.journeyDays].reverse().find((candidate) => (
+        candidate.familyId === 'mossprout'
+        && (candidate.openingConversationId === session.definitionId
+          || candidate.profileConversationId === session.definitionId
+          || candidate.returnConversationId === session.definitionId
+          || candidate.actions.some((action) => action.definitionId === session.definitionId))
+      ));
+      return episode && journey?.status === 'activity_available'
+        ? startMossproutJourneyActivity(completed, journey.dayId)
+        : completed;
+    });
+    const journey = [...next.journeyDays].reverse().find((candidate) => (
+      candidate.familyId === 'mossprout'
+      && (candidate.openingConversationId === session.definitionId
+        || candidate.profileConversationId === session.definitionId
+        || candidate.returnConversationId === session.definitionId
+        || candidate.actions.some((action) => action.definitionId === session.definitionId))
+    ));
+    const orderId = journey?.activity?.mergeOrderIds?.find((candidate) => (
+      !journey.activity?.servedOrderIds?.includes(candidate)
+    )) ?? journey?.activity?.mergeOrderId;
+
+    if (episode && orderId && openConversationMerge) {
+      openConversationMerge(orderId, 'mossprout');
+      return;
+    }
+    showFeastleStoryHome();
+  }, [conversationExperience?.session, conversationFamilyId, openConversationMerge, showFeastleStoryHome]);
   const conversationFlow = useCompanionConversationFlow({
     definition: conversationExperience?.definition ?? null,
     onCommitInsight: commitConversationInsight,
     onCommitMemory: commitConversationMemory,
-    onComplete: showFeastleStoryHome,
+    onComplete: completeConversation,
     onContinue: props.onContinueConversation,
     onDismissOutcome: dismissConversationOutcome,
     outcomeRequiresManualAdvance: props.familyId === 'mossprout',
     reduceMotion,
     session: conversationExperience?.session ?? null,
-    skipCompletedTransition: props.familyId === 'mossprout',
+    // FTUE keeps its directed handoff. Ordinary Journey Days wait on the
+    // visible mission card and let the player decide when to enter the Garden.
+    skipCompletedTransition: props.familyId === 'mossprout' && Boolean(props.ftueNavigationLocked),
   });
   const idealSkinPreparing = idealSkinOnboardingRequired && !conversationExperience;
   const visitStageSpeech = idealSkinPreparing
@@ -1271,6 +1340,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             definition={conversationExperience.definition}
             hasActiveFocus={Boolean(activeJourneyFocus)}
             journalMergeEnergyPreview={journalMergeEnergyPreview}
+            journeyTaskHandoff={mossproutCampaignEpisodeByOpeningId.has(conversationExperience.definition.id)}
+            journeyTaskRequests={journeyTaskRequests}
+            journeyTaskTitle={journeyOpeningEpisode?.title}
             navigationLocked={props.ftueNavigationLocked}
             name={props.name}
             flowPhase={conversationFlow.phase}

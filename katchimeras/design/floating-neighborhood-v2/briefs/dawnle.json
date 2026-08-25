@@ -1,0 +1,36 @@
+{
+  "key": "dawnle",
+  "kind": "resident",
+  "concept": "A serene first-light terrace where the first gold of morning turns one gentle beginning into something worth greeting.",
+  "floor": "One broad continuous pale-peach sunrise floor across the full top face, formed from only six to eight oversized softly beveled stone slabs with no rays, mosaic, rug, or separate path.",
+  "main_structure": "One broad open-front cream sunrise pavilion at the rear with a softly arched peach roof and one oversized half-sun disc glowing above the open horizon window.",
+  "rear_props": [
+    "one broad morning table with one oversized teapot and two large cup forms",
+    "two large golden dawn lanterns flanking the rear pavilion"
+  ],
+  "side_props": [
+    "one chunky curved waking bench and one oversized closed morning journal on the upper-left edge",
+    "one simple water basin with one broad dew-drop ornament and one rounded pale-sage shrub on the upper-right edge"
+  ],
+  "perimeter": {
+    "material": "one continuous smooth peach-and-cream sunrise parapet with broad rounded capstones",
+    "palette": ["pale peach", "warm cream", "soft sunrise gold", "pale sage"],
+    "emblems": "four oversized simple half-sun and dew-drop emblems"
+  },
+  "cliff": {
+    "materials": ["large warm-cream sandstone blocks", "large pale-peach clay blocks", "a few broad muted-gold stone blocks"],
+    "palette": ["warm cream", "pale peach", "muted sunrise gold"]
+  },
+  "lighting": "soft luminous dawn light with one broad horizon glow and two large warm-gold lantern pools",
+  "must_keep": [
+    "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
+    "entire bottom/front half as quiet open pale-peach sunrise floor",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature, bird, person, or egg baked into the bitmap",
+    "center circle, sunburst platform, plaza, ring, rug, path, or indentation",
+    "bridges, clouds, readable journal text, labels, watermark, external shadow",
+    "tiny dew droplets, sparkles, sun rays, flowers, grass blades, pebbles, cracks, specks, or dense texture"
+  ]
+}

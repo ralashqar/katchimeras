@@ -49,6 +49,11 @@ export function useCompanionConversationFlow({
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
   const automatedRef = useRef(new Set<string>());
   const node = definition && session ? conversationNode(definition, session.currentNodeId) : null;
+  const journeyNarrative = definition?.purpose === 'journey' && definition.format === 'narrative';
+  const journeyNarrativeAdvanceReady = Boolean(
+    journeyNarrative
+    && (session?.pendingReply !== undefined || node?.kind === 'end')
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -79,8 +84,9 @@ export function useCompanionConversationFlow({
   // question or outcome without mounting a waiting screen.
   useLayoutEffect(() => {
     if (!session || !definition || session.pendingReply === undefined) return;
+    if (journeyNarrative) return;
     onContinue();
-  }, [definition, onContinue, session]);
+  }, [definition, journeyNarrative, onContinue, session]);
 
   useLayoutEffect(() => {
     if (!skipCompletedTransition || screenReaderEnabled || !session || !definition || session.outcomePresentation) return;
@@ -131,6 +137,7 @@ export function useCompanionConversationFlow({
     }
 
     if (node?.kind === 'end' && session.status === 'active') {
+      if (journeyNarrative) return;
       const key = `${session.id}:end`;
       if (automatedRef.current.has(key)) return;
       automatedRef.current.add(key);
@@ -140,13 +147,17 @@ export function useCompanionConversationFlow({
 
     if (session.status === 'completed') {
       if (screenReaderEnabled) return;
+      // Manual Journey narratives must remain on their authored handoff until
+      // the player presses its action. FTUE opts into the immediate transition
+      // through skipCompletedTransition above.
+      if (journeyNarrative && !skipCompletedTransition) return;
       const key = `${session.id}:complete`;
       if (automatedRef.current.has(key)) return;
       automatedRef.current.add(key);
       const timer = setTimeout(onComplete, reduceMotion ? 0 : 360);
       return () => clearTimeout(timer);
     }
-  }, [definition, node, onCommitInsight, onCommitMemory, onComplete, onContinue, onDismissOutcome, outcomeAutoAdvanceMs, outcomeRequiresManualAdvance, reduceMotion, screenReaderEnabled, session]);
+  }, [definition, journeyNarrative, node, onCommitInsight, onCommitMemory, onComplete, onContinue, onDismissOutcome, outcomeAutoAdvanceMs, outcomeRequiresManualAdvance, reduceMotion, screenReaderEnabled, session, skipCompletedTransition]);
 
   const advance = useCallback(() => {
     if (!session || !definition) return;
@@ -159,15 +170,20 @@ export function useCompanionConversationFlow({
       return;
     }
     if (node?.kind === 'end' && session.status === 'active') {
+      if (journeyNarrative && !skipCompletedTransition) {
+        onContinue();
+        onComplete();
+        return;
+      }
       onContinue();
       return;
     }
     if (session.status === 'completed') onComplete();
-  }, [definition, node?.kind, onComplete, onContinue, onDismissOutcome, session]);
+  }, [definition, journeyNarrative, node?.kind, onComplete, onContinue, onDismissOutcome, session, skipCompletedTransition]);
 
   return {
     advance,
     phase,
-    requiresManualAdvance: (screenReaderEnabled || (outcomeRequiresManualAdvance && Boolean(session?.outcomePresentation))) && phase !== 'awaiting_choice' && phase !== 'committing',
+    requiresManualAdvance: (screenReaderEnabled || journeyNarrativeAdvanceReady || (outcomeRequiresManualAdvance && Boolean(session?.outcomePresentation))) && phase !== 'awaiting_choice' && phase !== 'committing',
   };
 }

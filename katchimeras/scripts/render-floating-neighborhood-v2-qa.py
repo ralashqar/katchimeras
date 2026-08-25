@@ -86,6 +86,12 @@ FILENAMES = {
     "home-dreamer": "floating_neighborhood_v2_home_dreamer_hex_tile.webp",
     "tasklet": "floating_neighborhood_v2_tasklet_hex_tile.webp",
     "feastle": "floating_neighborhood_v2_feastle_hex_tile.webp",
+    "baristabbit": "floating_neighborhood_v2_baristabbit_hex_tile.webp",
+    "mendle": "floating_neighborhood_v2_mendle_hex_tile.webp",
+    "dawnle": "floating_neighborhood_v2_dawnle_hex_tile.webp",
+    "pixooka": "floating_neighborhood_v2_pixooka_hex_tile.webp",
+    "museling": "floating_neighborhood_v2_museling_hex_tile.webp",
+    "encora": "floating_neighborhood_v2_encora_hex_tile.webp",
     "cheerlet": "floating_neighborhood_v2_cheerlet_hex_tile.webp",
     "skylo": "floating_neighborhood_v2_skylo_hex_tile.webp",
     "pagelet": "floating_neighborhood_v2_pagelet_hex_tile.webp",
@@ -166,6 +172,51 @@ def main() -> None:
         "qa-tasklet-feastle-neighborhood.png",
         resident_tiles,
         [(-1, 1, "tasklet"), (1, 0, "feastle")],
+    )
+    baristabbit_tiles = [
+        (q, r, "baristabbit" if (q, r) == (1, 0) else kind)
+        for q, r, kind in base_tiles
+    ]
+    render(
+        "qa-baristabbit-neighborhood.png",
+        baristabbit_tiles,
+        [(1, 0, "baristabbit")],
+    )
+    mendle_dawnle_tiles = [
+        (
+            q,
+            r,
+            "mendle"
+            if (q, r) == (-1, 1)
+            else "dawnle"
+            if (q, r) == (1, 0)
+            else kind,
+        )
+        for q, r, kind in base_tiles
+    ]
+    render(
+        "qa-mendle-dawnle-neighborhood.png",
+        mendle_dawnle_tiles,
+        [(-1, 1, "mendle"), (1, 0, "dawnle")],
+    )
+    creative_tiles = [
+        (
+            q,
+            r,
+            "pixooka"
+            if (q, r) == (0, -1)
+            else "museling"
+            if (q, r) == (-1, 1)
+            else "encora"
+            if (q, r) == (1, 0)
+            else kind,
+        )
+        for q, r, kind in base_tiles
+    ]
+    render(
+        "qa-pixooka-museling-encora-neighborhood.png",
+        creative_tiles,
+        [(0, -1, "pixooka"), (-1, 1, "museling"), (1, 0, "encora")],
     )
     surface_theme_tiles = [
         (q, r, "cheerlet" if (q, r) == (0, 1) else kind)
@@ -279,29 +330,30 @@ def main() -> None:
         [],
         [(q, r) for q, r, _ in home_archetype_tiles],
     )
-    ring_coords = [(0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1)]
-    render_zodiac_neighborhood(
-        "qa-zodiac-fire-earth.png",
-        [
-            (*ring_coords[0], "aries", "fire"),
-            (*ring_coords[1], "leo", "fire"),
-            (*ring_coords[2], "sagittarius", "fire"),
-            (*ring_coords[3], "taurus", "earth"),
-            (*ring_coords[4], "virgo", "earth"),
-            (*ring_coords[5], "capricorn", "earth"),
-        ],
-    )
-    render_zodiac_neighborhood(
-        "qa-zodiac-air-water.png",
-        [
-            (*ring_coords[0], "gemini", "air"),
-            (*ring_coords[1], "libra", "air"),
-            (*ring_coords[2], "aquarius", "air"),
-            (*ring_coords[3], "cancer", "water"),
-            (*ring_coords[4], "scorpio", "water"),
-            (*ring_coords[5], "pisces", "water"),
-        ],
-    )
+    if "zodiac" in WORLD_VIEW:
+        ring_coords = [(0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1)]
+        render_zodiac_neighborhood(
+            "qa-zodiac-fire-earth.png",
+            [
+                (*ring_coords[0], "aries", "fire"),
+                (*ring_coords[1], "leo", "fire"),
+                (*ring_coords[2], "sagittarius", "fire"),
+                (*ring_coords[3], "taurus", "earth"),
+                (*ring_coords[4], "virgo", "earth"),
+                (*ring_coords[5], "capricorn", "earth"),
+            ],
+        )
+        render_zodiac_neighborhood(
+            "qa-zodiac-air-water.png",
+            [
+                (*ring_coords[0], "gemini", "air"),
+                (*ring_coords[1], "libra", "air"),
+                (*ring_coords[2], "aquarius", "air"),
+                (*ring_coords[3], "cancer", "water"),
+                (*ring_coords[4], "scorpio", "water"),
+                (*ring_coords[5], "pisces", "water"),
+            ],
+        )
 
 
 if __name__ == "__main__":

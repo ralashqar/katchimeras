@@ -249,20 +249,18 @@ function settleMossproutJourneyBond(dayId: string) {
 
 function isMossproutJourneyConversation(definitionId: string, dayId?: string | null) {
   const relationships = relationshipProgressionRepository.load();
-  const journey = dayId
-    ? mossproutJourneyForDay(relationships, dayId)
-    : [...relationships.journeyDays].reverse().find((candidate) => candidate.familyId === 'mossprout' && (
-        candidate.openingConversationId === definitionId
-        || candidate.profileConversationId === definitionId
-        || candidate.returnConversationId === definitionId
-        || candidate.actions.some((action) => action.definitionId === definitionId)
-      ));
-  return Boolean(journey && (
-    journey.openingConversationId === definitionId
-    || journey.profileConversationId === definitionId
-    || journey.returnConversationId === definitionId
-    || journey.actions.some((action) => action.definitionId === definitionId)
+  const matchesDefinition = (candidate: typeof relationships.journeyDays[number] | null | undefined) => Boolean(candidate && (
+    candidate.familyId === 'mossprout'
+    && (candidate.openingConversationId === definitionId
+      || candidate.profileConversationId === definitionId
+      || candidate.returnConversationId === definitionId
+      || candidate.actions.some((action) => action.definitionId === definitionId))
   ));
+  const servedDayJourney = dayId ? mossproutJourneyForDay(relationships, dayId) : null;
+  if (matchesDefinition(servedDayJourney)) return true;
+  // Quick Mode can advance the Journey date ahead of the conversation's real
+  // calendar day. Conversation identity is the durable link in that case.
+  return [...relationships.journeyDays].reverse().some(matchesDefinition);
 }
 
 /**
@@ -2221,6 +2219,13 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
               friendshipLevel: selectedFriendshipProgress.level,
             });
       if (!definition) return current;
+      if (input.definitionId && definition.repeatPolicy === 'once_ever' && current.conversationSessions.some((session) =>
+        !session.preview
+        && session.familyId === selectedFamilyId
+        && session.definitionId === definition.id
+        && session.definitionVersion === definition.version
+        && session.status === 'completed'
+      )) return current;
       const existingExplicitSession = input.definitionId
         ? [...current.conversationSessions].reverse().find((session) =>
             !session.preview

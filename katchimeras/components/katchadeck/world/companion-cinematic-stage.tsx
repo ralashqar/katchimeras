@@ -76,7 +76,6 @@ export function CompanionCinematicStage({
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const { height, width } = useWindowDimensions();
-  const compact = height < 735;
   const questionnaireBubble = bubbleVariant === 'questionnaire';
   const defaultTitleTier = companionSpeechTitleTier(title);
   const speechKey = `${title}\u0000${questionnaireBubble ? bubbleBody ?? '' : ''}`;
@@ -192,13 +191,9 @@ export function CompanionCinematicStage({
               revealAll={revealAllSpeech}
               style={[
                 styles.title,
-                compact && styles.titleCompact,
-                !questionnaireBubble && defaultTitleTier === 'medium' && styles.titleMedium,
-                !questionnaireBubble && defaultTitleTier === 'long' && styles.titleLong,
                 questionnaireBubble && styles.questionTitle,
-                questionnaireBubble && title.length > 58 && styles.questionTitleLong,
               ]}
-              numberOfLines={questionnaireBubble ? 2 : 3}
+              numberOfLines={4}
               minimumFontScale={0.72}
               text={title}
               lightColor="#342317"
@@ -290,6 +285,26 @@ function TypewriterText({
 }) {
   const characters = useMemo(() => Array.from(text), [text]);
   const [visibleCount, setVisibleCount] = useState(() => reduceMotion ? characters.length : 0);
+  const [fittedFontScale, setFittedFontScale] = useState(1);
+  const [fitComplete, setFitComplete] = useState(!numberOfLines);
+  const [measuredLineCount, setMeasuredLineCount] = useState<number | null>(null);
+  const flattenedStyle = StyleSheet.flatten(style);
+  const baseFontSize = typeof flattenedStyle?.fontSize === 'number' ? flattenedStyle.fontSize : 14;
+  const baseLineHeight = typeof flattenedStyle?.lineHeight === 'number' ? flattenedStyle.lineHeight : baseFontSize * 1.2;
+  const fittedTextStyle = fittedFontScale < 1 ? {
+    fontSize: baseFontSize * fittedFontScale,
+    lineHeight: baseLineHeight * fittedFontScale,
+  } : undefined;
+  const fittedLineHeight = baseLineHeight * fittedFontScale;
+  const fittedFrameStyle = numberOfLines ? {
+    height: fittedLineHeight * Math.min(numberOfLines, Math.max(1, measuredLineCount ?? numberOfLines)),
+  } : undefined;
+
+  useEffect(() => {
+    setFittedFontScale(1);
+    setFitComplete(!numberOfLines);
+    setMeasuredLineCount(null);
+  }, [numberOfLines, text]);
 
   useEffect(() => {
     if (reduceMotion || revealAll) {
@@ -321,27 +336,35 @@ function TypewriterText({
     if (complete) onComplete?.();
   }, [complete, onComplete]);
   return (
-    <View style={styles.typewriterFrame}>
-      <ThemedText
-        adjustsFontSizeToFit={Boolean(numberOfLines)}
+    <View style={[styles.typewriterFrame, fittedFrameStyle]}>
+      {numberOfLines ? <ThemedText
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
+        key={`fit:${fittedFontScale}`}
         maxFontSizeMultiplier={1.3}
-        minimumFontScale={minimumFontScale}
-        numberOfLines={numberOfLines}
-        style={[style, styles.typewriterMeasure]}
+        onTextLayout={(event) => {
+          const lineCount = event.nativeEvent.lines.length;
+          setMeasuredLineCount(lineCount);
+          if (fitComplete) return;
+          if (lineCount <= numberOfLines || fittedFontScale <= minimumFontScale) {
+            setFitComplete(true);
+            return;
+          }
+          setFittedFontScale((current) => current <= minimumFontScale
+            ? current
+            : Math.max(minimumFontScale, Number((current - 0.025).toFixed(3))));
+        }}
+        style={[style, fittedTextStyle, styles.typewriterMeasure]}
         lightColor={lightColor}
         darkColor={darkColor}>
         {text}
-      </ThemedText>
+      </ThemedText> : null}
       <ThemedText
-        adjustsFontSizeToFit={Boolean(numberOfLines)}
         accessibilityLabel={text}
         maxFontSizeMultiplier={1.3}
-        minimumFontScale={minimumFontScale}
         numberOfLines={numberOfLines}
         selectable={complete}
-        style={[StyleSheet.absoluteFill, style]}
+        style={[StyleSheet.absoluteFill, style, fittedTextStyle]}
         lightColor={lightColor}
         darkColor={darkColor}>
         {characters.slice(0, visibleCount).join('')}
@@ -368,10 +391,15 @@ const styles = StyleSheet.create({
   },
   typewriterFrame: {
     alignSelf: 'stretch',
+    overflow: 'hidden',
     position: 'relative',
   },
   typewriterMeasure: {
+    left: 0,
     opacity: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
   },
   speechBubble: {
     backgroundColor: 'rgba(255,248,231,0.96)',
@@ -409,28 +437,12 @@ const styles = StyleSheet.create({
   title: {
     ...KatchaUI.type.companionDisplay,
     fontSize: 22,
-    lineHeight: 27,
+    lineHeight: 25,
     textAlign: 'center',
-  },
-  titleCompact: {
-    fontSize: 20,
-    lineHeight: 25,
-  },
-  titleMedium: {
-    fontSize: 20,
-    lineHeight: 25,
-  },
-  titleLong: {
-    fontSize: 18,
-    lineHeight: 23,
   },
   questionTitle: {
     fontSize: 22,
-    lineHeight: 27,
-  },
-  questionTitleLong: {
-    fontSize: 19,
-    lineHeight: 24,
+    lineHeight: 25,
   },
   questionBody: {
     ...KatchaUI.type.companionBody,

@@ -12,6 +12,7 @@ type Candidate = {
 };
 
 type Props = {
+  allowDownscaling?: boolean;
   fallbackSource?: ImageSourcePropType | null;
   onFailure?: () => void;
   onReady?: () => void;
@@ -29,6 +30,7 @@ export function worldImageSourceKey(source: ImageSourcePropType): string {
 }
 
 export const SeamlessWorldImage = memo(function SeamlessWorldImage({
+  allowDownscaling = true,
   fallbackSource,
   onFailure,
   onReady,
@@ -88,7 +90,7 @@ export const SeamlessWorldImage = memo(function SeamlessWorldImage({
         <Image
           source={displayed.source}
           contentFit="contain"
-          allowDownscaling
+          allowDownscaling={allowDownscaling}
           cachePolicy="memory"
           recyclingKey={displayed.key}
           transition={0}
@@ -101,7 +103,7 @@ export const SeamlessWorldImage = memo(function SeamlessWorldImage({
           <Image
             source={candidate.source}
             contentFit="contain"
-            allowDownscaling
+            allowDownscaling={allowDownscaling}
             cachePolicy="memory"
             recyclingKey={candidate.key}
             transition={0}

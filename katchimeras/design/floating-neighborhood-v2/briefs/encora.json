@@ -1,0 +1,36 @@
+{
+  "key": "encora",
+  "kind": "resident",
+  "concept": "A warm listening and music-making garden where rhythm, practice, and shared sound can reshape the mood of a whole day.",
+  "floor": "One broad continuous deep-teal acoustic floor across the full top face, formed from only six to eight oversized softly beveled timber panels without staff lines, rugs, paths, or repeated texture.",
+  "main_structure": "One broad open-front burgundy-and-gold acoustic pavilion at the rear with a rounded sound-shell canopy and one oversized simple soundwave ornament above the opening.",
+  "rear_props": [
+    "one broad low music table with one oversized drum pad, one simple keyboard block, and one large listening horn",
+    "two large amber stage lanterns flanking the rear pavilion"
+  ],
+  "side_props": [
+    "one chunky curved listening bench and one oversized closed record chest on the upper-left edge",
+    "one broad instrument stand holding one simplified string instrument and one rounded sound planter on the upper-right edge"
+  ],
+  "perimeter": {
+    "material": "one continuous smooth deep-teal acoustic border with broad burgundy and gold capstones",
+    "palette": ["deep teal", "muted burgundy", "warm gold", "cream"],
+    "emblems": "four oversized simple soundwave and rhythm-dot emblems"
+  },
+  "cliff": {
+    "materials": ["large midnight-teal stone blocks", "large muted-burgundy clay blocks", "a few broad cream and warm-gold blocks"],
+    "palette": ["midnight teal", "muted burgundy", "warm cream", "gold"]
+  },
+  "lighting": "soft warm dusk lighting from one broad pavilion glow and two large amber lantern pools",
+  "must_keep": [
+    "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
+    "entire bottom/front half as quiet open deep-teal acoustic floor",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature, performer, audience, or egg baked into the bitmap",
+    "center circle, raised stage, platform, plaza, ring, rug, path, or indentation",
+    "bridges, clouds, readable music, text, logos, watermark, external shadow",
+    "tiny notes, strings, keys, knobs, cables, speakers, confetti, light specks, or dense clutter"
+  ]
+}

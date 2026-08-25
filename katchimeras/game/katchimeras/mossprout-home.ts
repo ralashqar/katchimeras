@@ -235,6 +235,23 @@ export function resolveMossproutDayActions(input: {
   });
   else if (journey.status !== 'complete' && !input.storyComplete) actions.push(activeJourneyAction(journey, mainRecord, input.journeyGardenRequest));
 
+  // An active Journey Day owns the action stack. Its opening, required Merge
+  // work, and return scene must read as one uninterrupted story; routine goals,
+  // conversations, quests, and Garden requests resume only after completion.
+  if (journey && journey.status !== 'complete') {
+    const journeyAction = actions[0];
+    if (!journeyAction) return [];
+    const slotId = slotForAction(journeyAction);
+    const sequence = input.slotSequences?.[slotId] ?? 0;
+    return [{
+      ...journeyAction,
+      instanceId: `${input.dayId ?? journey.dayId}:${slotId}:${sequence}:${journeyAction.id}`,
+      sourceSlotId: slotId,
+      sequence,
+      slotId,
+    }];
+  }
+
   const unfinishedGoals = input.goals.filter((goal) => !goal.completed);
   for (const goal of unfinishedGoals) actions.push({
     id: `mossprout:goal:${goal.id}`, kind: 'goal_checkoff', title: goal.title,
@@ -471,8 +488,8 @@ function activeJourneyAction(
   const living = journey.status === 'living';
   return {
     id: record?.id ?? `${journey.id}:story`, kind: 'story_chat',
-    title: returning ? 'Show Mossprout what changed' : living ? 'Mossprout is still noticing today' : 'Continue today\'s story',
-    subtitle: returning ? 'Return to the Garden and finish today together.' : living ? 'This will open when today has had a little more time.' : 'Talk with Mossprout before choosing what to do next.',
+    title: returning ? 'Mossprout: “I have something for you”' : living ? 'Mossprout is still noticing today' : 'Continue today\'s story',
+    subtitle: returning ? 'Go back to Mossprout to finish today’s story.' : living ? 'This will open when today has had a little more time.' : 'Talk with Mossprout before choosing what to do next.',
     icon: returning ? 'bubble.left.fill' : 'leaf.fill', required: true, disabled: living, status: 'active',
     artKey: 'mossprout:journey',
     reward: { kind: 'bond', amount: record?.bondContribution ?? 12 }, destination: { kind: 'journey' },

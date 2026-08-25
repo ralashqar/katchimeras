@@ -77,7 +77,7 @@ test('resetting Today makes its conversation pool unserved without erasing prior
 
 test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gated', () => {
   assert.deepEqual(validateConversationDefinitions(companionConversationDefinitionsV2), []);
-  assert.equal(companionConversationDefinitionsV2.length, 1375);
+  assert.equal(companionConversationDefinitionsV2.length, 1376);
   assert.deepEqual(CONVERSATION_V2_ENABLED_FAMILIES, CONVERSATION_V2_FAMILIES);
   assert.deepEqual(CONVERSATION_V2_IDEAL_SKIN_FAMILIES, familyIds);
   assert.equal(isConversationV2Family('feastle'), true);
@@ -95,8 +95,8 @@ test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gate
     assert.ok(katchimeraFamilyById.get(familyId)!.skinIds.length >= 6, `${familyId} needs at least six forms`);
     assert.ok(katchimeraFamilyById.get(familyId)!.skinIds.length <= 12, `${familyId} catalog has grown beyond reviewable scope`);
     if (familyId === 'mossprout') {
-      assert.equal(pack.length, 63);
-      assert.equal(pack.filter((item) => item.trigger === 'evergreen').length, 54);
+      assert.equal(pack.length, 64);
+      assert.equal(pack.filter((item) => item.trigger === 'evergreen').length, 55);
       assert.equal(pack.filter((item) => item.trigger === 'journal').length, 3);
       assert.equal(pack.filter((item) => item.trigger === 'goal_debrief').length, 0);
       assert.equal(pack.filter((item) => item.trigger === 'quest_debrief').length, 0);

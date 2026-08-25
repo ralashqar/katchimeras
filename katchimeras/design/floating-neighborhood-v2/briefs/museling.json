@@ -1,0 +1,36 @@
+{
+  "key": "museling",
+  "kind": "resident",
+  "concept": "A bright making studio where an idea can become a painting, a small sculpture, or simply a joyful first mark.",
+  "floor": "One broad continuous pale-aqua studio floor across the full top face, formed from only six oversized softly beveled resin slabs without paint splatters, grids, rugs, or separate paths.",
+  "main_structure": "One broad open-front cream artist studio at the rear with a rounded coral-and-violet roof, one large blank canvas, and one oversized glowing spark ornament above the opening.",
+  "rear_props": [
+    "one broad making table with one oversized palette, two large paint pots, and one chunky brush",
+    "two large warm studio lamps flanking the rear workspace"
+  ],
+  "side_props": [
+    "one chunky blank easel and one broad closed supply chest on the upper-left edge",
+    "one simple rounded clay sculpture on a broad low plinth and one oversized pencil cup on the upper-right edge"
+  ],
+  "perimeter": {
+    "material": "one continuous smooth coral-and-aqua studio border with broad cream capstones",
+    "palette": ["pale aqua", "warm coral", "muted violet", "cream"],
+    "emblems": "four oversized simple spark, brush, and palette emblems"
+  },
+  "cliff": {
+    "materials": ["large warm-cream stone blocks", "large coral clay blocks", "a few broad aqua and muted-violet blocks"],
+    "palette": ["warm cream", "coral", "pale aqua", "muted violet"]
+  },
+  "lighting": "soft cheerful daylight with one broad creative-spark glow and two large warm studio lamp pools",
+  "must_keep": [
+    "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
+    "entire bottom/front half as quiet open pale-aqua studio floor",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature, person, portrait, or egg baked into the bitmap",
+    "center circle, platform, plaza, ring, rug, path, paint puddle, or indentation",
+    "bridges, clouds, artwork on the canvas, readable labels, text, watermark, external shadow",
+    "tiny brushes, paint flecks, ink splatters, pencil marks, loose paper, specks, or dense clutter"
+  ]
+}

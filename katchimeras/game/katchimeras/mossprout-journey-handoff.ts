@@ -68,6 +68,17 @@ export function mossproutJourneyDayNumber(
   return journeys.filter((journey) => journey.dayId < dayId).length + 1;
 }
 
+export function mossproutJourneyDayNumberForCompletionEvent(
+  relationships: RelationshipProgressState,
+  eventId: string,
+): number | null {
+  const journey = mossproutJourneys(relationships).find((candidate) => (
+    candidate.completionReceipt?.id === eventId
+    || `journey-completion:${candidate.id}` === eventId
+  ));
+  return journey ? mossproutJourneyDayNumber(relationships, journey.dayId) : null;
+}
+
 function mossproutJourneys(relationships: RelationshipProgressState): JourneyDayRecord[] {
   return relationships.journeyDays
     .filter((journey) => journey.familyId === 'mossprout')

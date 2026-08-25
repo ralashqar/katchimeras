@@ -46,12 +46,13 @@ import { beginAuthoredCohortReturn, beginFeastleReturn, isAuthoredCohortFamily, 
 import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
 import { beginCriticalInteractionWork } from '@/utils/critical-interaction';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
-import { beginMossproutJourneyReturn, mossproutJourneyForDay, recordMossproutFirstGardenRestored, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
+import { beginMossproutJourneyReturn, mossproutJourneyForDay, mossproutJourneyRuntimeDayId, recordMossproutFirstGardenRestored, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
 import { useKatchimeraCards } from '@/hooks/use-katchimera-cards';
 import { familyIdFromCompanionId } from '@/constants/katchimera-skins';
 import { localDayId } from '@/utils/world-identity';
+import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
 
 import { FeastlePersistentMergeBoard, type MergeBoardScreenMetrics } from './feastle-persistent-merge-board';
 import { MergeCellInspector } from './merge-cell-inspector';
@@ -85,7 +86,9 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const [boardAreaHeight, setBoardAreaHeight] = useState(0);
   const [story, setStory] = useState(loadFeastleStory);
   const relationships = useRelationshipProgression();
-  const mossproutJourney = mossproutJourneyForDay(relationships, localDayId());
+  const mossproutJourneyDayId = mossproutJourneyRuntimeDayId(relationships, localDayId(), isJourneyQuickModeEnabled());
+  const mossproutJourney = mossproutJourneyForDay(relationships, mossproutJourneyDayId);
+  const mossproutJourneyExclusive = Boolean(mossproutJourney && mossproutJourney.status !== 'complete');
   const activityFamilyId = familyIdFromCompanionId(creatureId);
   const [authoredStories, setAuthoredStories] = useState(() => ({
     baristabbit: loadAuthoredCohortStory('baristabbit'),
@@ -265,7 +268,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     storyNavigationPendingRef.current = true;
     if (characterId === 'feastle') beginFeastleReturn();
     else if (characterId === 'mossprout') {
-      relationshipProgressionRepository.update((current) => beginMossproutJourneyReturn(current, localDayId()));
+      relationshipProgressionRepository.update((current) => beginMossproutJourneyReturn(current, mossproutJourneyDayId));
     }
     else if (isAuthoredCohortFamily(characterId)) beginAuthoredCohortReturn(characterId);
     else setReturnCharacterId((current) => current === characterId ? null : current);
@@ -277,7 +280,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
         params: { creatureId: `companion:${characterId}`, source: 'merge-world', story: 'return' },
       }),
     });
-  }, [active, ftueStep, router, state?.revision, transitionTo]);
+  }, [active, ftueStep, mossproutJourneyDayId, router, state?.revision, transitionTo]);
 
   useEffect(() => {
     if (!active
@@ -429,7 +432,16 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     const featured = state.favouriteCharacterId;
     const chapterZeroOrders = state.activeOrders.filter((order) => order.id.startsWith('mossprout:chapter-0:'));
     const chapterZeroActive = chapterZeroOrders.length > 0;
-    const returnEntries: MergeTrayEntry[] = chapterZeroActive ? [] : [
+    const mossproutReturnEntry: MergeTrayEntry = {
+      id: `chat-note:mossprout:${mossproutJourney?.dayId}:${mossproutJourney?.beatId}`,
+      kind: 'chat_note',
+      characterId: 'mossprout',
+      bondPoints: 0,
+    };
+    const journeyReturnReady = mossproutJourney?.status === 'return_available' || mossproutJourney?.status === 'resolution_ready';
+    const returnEntries: MergeTrayEntry[] = chapterZeroActive ? [] : mossproutJourneyExclusive
+      ? journeyReturnReady ? [mossproutReturnEntry] : []
+      : [
       ...(ftueStep?.id === 'merge.return_note' ? [{
         id: MOSSPROUT_FTUE_RETURN_NOTE_ID,
         kind: 'chat_note' as const,
@@ -441,12 +453,6 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
         kind: 'chat_note' as const,
         characterId: 'feastle' as const,
         bondPoints: story.pendingBondPoints,
-      }] : []),
-      ...(mossproutJourney?.status === 'return_available' ? [{
-        id: `chat-note:mossprout:${mossproutJourney.dayId}:${mossproutJourney.beatId}`,
-        kind: 'chat_note' as const,
-        characterId: 'mossprout' as const,
-        bondPoints: 0,
       }] : []),
       ...Object.values(authoredStories).flatMap((authoredStory): MergeTrayEntry[] => {
         if (authoredStory.status !== 'return_available' || !isAuthoredCohortFamily(authoredStory.familyId)) return [];
@@ -467,7 +473,13 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     const focusCharacterId = focusOrderId
       ? state.activeOrders.find((order) => order.id === focusOrderId)?.characterId ?? null
       : null;
-    const visibleOrders = chapterZeroActive ? chapterZeroOrders.slice(0, 1) : state.activeOrders;
+    const journeyOrderIds = new Set(mossproutJourney?.activity?.mergeOrderIds
+      ?? (mossproutJourney?.activity ? [mossproutJourney.activity.mergeOrderId] : []));
+    const visibleOrders = chapterZeroActive
+      ? chapterZeroOrders.slice(0, 1)
+      : mossproutJourneyExclusive
+        ? state.activeOrders.filter((order) => journeyOrderIds.has(order.id))
+        : state.activeOrders;
     const prioritizedOrders = visibleOrders
       .map((order, sourceIndex) => ({ order, sourceIndex }))
       .sort((left, right) => {
@@ -487,7 +499,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       itemReadiness: mergeOrderItemReadiness(state, order),
       ready: readyOrderIds.has(order.id),
     }));
-    const parcelEntries: MergeTrayEntry[] = !chapterZeroActive && pendingParcel ? [{
+    const parcelEntries: MergeTrayEntry[] = !chapterZeroActive && !mossproutJourneyExclusive && pendingParcel ? [{
       id: 'parcel-stack',
       kind: 'parcel',
       arrival: pendingParcel,
@@ -498,7 +510,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     // Midpoint notes sit before the remaining requests so the story beat is
     // immediately visible without replacing or hiding any unserved order.
     return [...parcelEntries, ...returnEntries, ...orderEntries];
-  }, [active, authoredStories, focusOrderId, ftueStep?.id, mossproutJourney?.beatId, mossproutJourney?.dayId, mossproutJourney?.status, parcelFlight, parcelShakeNonce, pendingParcel, pendingParcels.length, readyOrderIds, returnCharacterId, serveFlight, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
+  }, [active, authoredStories, focusOrderId, ftueStep?.id, mossproutJourney?.activity, mossproutJourney?.beatId, mossproutJourney?.dayId, mossproutJourney?.status, mossproutJourneyExclusive, parcelFlight, parcelShakeNonce, pendingParcel, pendingParcels.length, readyOrderIds, returnCharacterId, serveFlight, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
 
   const startServeAnimation = useCallback(async (order: MergeOrder, itemTargets: readonly MergeScreenPoint[]) => {
     if (!state || activeServeRef.current || activeParcelRef.current || parcelFlight) return false;

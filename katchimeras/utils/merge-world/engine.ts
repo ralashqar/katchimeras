@@ -53,6 +53,7 @@ import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import { MEMORY_CARDS_BY_ID } from '@/constants/memory-card-catalog';
 import { mossproutWorldChapterForActiveDays, type MossproutWorldChapter } from '@/constants/mossprout-world-chapters';
 import { MOSSPROUT_EXTENDED_JOURNEY_BEATS, mossproutExtendedBeatByObjectiveId } from '@/constants/mossprout-journey-chapters';
+import { mossproutCampaignEpisodeByBeatId, mossproutCampaignEpisodeByObjectiveId } from '@/constants/mossprout-campaign';
 import { MOSSPROUT_GARDEN_RESIDENT_IDS, MOSSPROUT_RESIDENT_IDS, MOSSPROUT_WEATHER_RESIDENT_IDS, mossproutResidentById } from '@/constants/mossprout-residents';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import {
@@ -355,7 +356,12 @@ export function resetMergeActivityForDay(
   const visibleGardenOrders = freshGardenOrders.slice(0, mossproutDailyGardenOrderWindow(gardenChapter.id));
   const activeOrders = resetsMossproutGarden
     ? [
-        ...state.activeOrders.filter((order) => order.storyArcId !== 'mossprout:casual-garden'),
+        ...state.activeOrders.filter((order) => (
+          order.characterId !== 'mossprout'
+          || (order.storyArcId !== 'mossprout:casual-garden'
+            && order.storyArcId !== 'mossprout:dry-pond'
+            && !order.storyArcId?.startsWith('mossprout:chapter:'))
+        )),
         ...visibleGardenOrders,
       ]
     : state.activeOrders;
@@ -570,7 +576,7 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
   if (activityOpportunityId && (!opportunity || opportunity.generatorId !== generatorId)) {
     return unchanged(state, 'Mossprout has not found anything else for the Garden today.');
   }
-  if (opportunity && opportunity.usedCount >= opportunity.dropDefinitionIds.length) {
+  if (opportunity && !MERGE_GENERATORS_UNLIMITED && opportunity.usedCount >= opportunity.dropDefinitionIds.length) {
     return unchanged(state, "That's everything Mossprout found today.");
   }
   if (!MERGE_GENERATORS_UNLIMITED && !opportunity && generator.charges < 1) {
@@ -581,7 +587,12 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
   // Level one always starts at tier one. Upgrades add a bounded chance of a
   // better seed without changing which authored chains the generator owns.
   const dropIndex = randomUnit(`${seed}:chain:${state.revision}`) < 0.5 ? 0 : 1;
-  const authoredDefinitionId = opportunity?.dropDefinitionIds[opportunity.usedCount];
+  const authoredDropIndex = opportunity?.dropDefinitionIds.length
+    ? opportunity.usedCount % opportunity.dropDefinitionIds.length
+    : -1;
+  const authoredDefinitionId = authoredDropIndex >= 0
+    ? opportunity?.dropDefinitionIds[authoredDropIndex]
+    : undefined;
   const baseDefinitionId = authoredDefinitionId ?? generator.forcedDropDefinitionId ?? generator.tierOneDropDefinitionIds[dropIndex];
   const betterDropRoll = randomUnit(`${seed}:upgrade:${state.revision}`);
   const bonusTier = authoredDefinitionId || generator.forcedDropDefinitionId ? 0 : generator.level >= 4 && betterDropRoll < 0.05
@@ -1004,7 +1015,13 @@ function moveItem(state: MergeWorldState, from: number, to: number, now: number)
     board[to] = { ...board[to], occupant: source };
     return changed(touch({ ...state, board }, now));
   }
-  if ((source.kind === 'item' && isProgressionItem(source)) || (target.kind === 'item' && isProgressionItem(target))) {
+  const progressionMergeGateId = source.kind === 'item' && target.kind === 'item'
+    && source.progressionGateId && source.progressionGateId === target.progressionGateId
+    && source.definitionId === target.definitionId
+    && MERGE_ITEMS_BY_ID.get(source.definitionId)?.nextItemId === MOSSPROUT_ROOTBOUND_GATES_BY_ID.get(source.progressionGateId)?.rootMemoryDefinitionId
+    ? source.progressionGateId
+    : null;
+  if (!progressionMergeGateId && ((source.kind === 'item' && isProgressionItem(source)) || (target.kind === 'item' && isProgressionItem(target)))) {
     return unchanged(state, 'A Root Memory only merges with its own Rootbound Echo.', 'wrong_echo_match');
   }
   if (source.kind === 'generator' || target.kind === 'generator') {
@@ -1023,7 +1040,10 @@ function moveItem(state: MergeWorldState, from: number, to: number, now: number)
   board[from] = { ...board[from], occupant: null };
   board[to] = {
     ...board[to],
-    occupant: { kind: 'item', instanceId: `merge-item:${state.nextInstance}`, definitionId: resultId },
+    occupant: {
+      kind: 'item', instanceId: `merge-item:${state.nextInstance}`, definitionId: resultId,
+      ...(progressionMergeGateId ? { progressionGateId: progressionMergeGateId } : {}),
+    },
   };
   let next = touch({ ...state, board, nextInstance: state.nextInstance + 1 }, now);
   const discovery = applyDiscovery(next, resultId, now);
@@ -1531,6 +1551,11 @@ function reconcileMossproutResidents(
     residentIds.add(MOSSPROUT_GARDEN_RESIDENT_IDS[0]);
   }
   const completedObjectives = new Set(signals.completedObjectiveIds);
+  for (const beatId of signals.completedBeatIds ?? []) {
+    const guest = mossproutCampaignEpisodeByBeatId.get(beatId)?.guestSkinId;
+    const resolvedGuest = guest === 'matched' ? signals.firstResidentSkinId : guest;
+    if (resolvedGuest) residentIds.add(resolvedGuest);
+  }
   // Older advanced saves may have the habitat milestone without the objective
   // receipts that were introduced later. Treat the completed chapter as the
   // source of truth so those gardens receive the same resident roster.
@@ -1581,15 +1606,17 @@ function reconcileCharacterActivity(
 ): MergeWorldCommandResult {
   if (command.familyId !== 'mossprout') return unchanged(state);
   let next = reconcileMossproutResidents(ensureCharacterGenerators(state, 'mossprout', now), command.residentSignals, now);
-  const showsOrder = command.status === 'activity_in_progress' && command.activity != null;
+  const journeyExclusive = command.status !== 'idle' && command.status !== 'complete';
+  const showsOrder = (command.status === 'activity_available' || command.status === 'activity_in_progress') && command.activity != null;
   const keepOrders = next.activeOrders.filter((order) => (
     order.characterId !== 'mossprout'
     || ((order.storyArcId !== 'mossprout:dry-pond' && !order.storyArcId?.startsWith('mossprout:chapter:'))
-      && (order.storyArcId !== 'mossprout:casual-garden' || !showsOrder))
+      && (order.storyArcId !== 'mossprout:casual-garden' || !journeyExclusive))
   ));
   const activity = command.activity;
+  const episodeDefinition = activity ? mossproutCampaignEpisodeByObjectiveId.get(activity.objectiveId) : null;
   const extendedStoryBeat = activity ? mossproutExtendedBeatByObjectiveId.get(activity.objectiveId) : null;
-  const requirements = extendedStoryBeat ? [...extendedStoryBeat.requirements]
+  const legacyRequirements = extendedStoryBeat ? [...extendedStoryBeat.requirements]
     : activity?.objectiveId === 'mossprout:objective:place-for-rain'
     ? [{ definitionId: 'nature:waterside:2', quantity: 1 }]
     : activity?.objectiveId === 'mossprout:objective:bank-that-holds'
@@ -1597,43 +1624,44 @@ function reconcileCharacterActivity(
       : activity?.objectiveId === 'mossprout:objective:little-rain-garden'
         ? [{ definitionId: 'nature:garden:4', quantity: 1 }, { definitionId: 'nature:waterside:3', quantity: 1 }]
         : [];
-  const title = extendedStoryBeat?.title ?? (activity?.objectiveId === 'mossprout:objective:place-for-rain'
+  const legacyTitle = extendedStoryBeat?.title ?? (activity?.objectiveId === 'mossprout:objective:place-for-rain'
     ? 'A Place for Rain'
     : activity?.objectiveId === 'mossprout:objective:bank-that-holds'
       ? 'A Bank That Holds'
       : 'The Little Rain Garden');
-  const coinReward = activity?.objectiveId === 'mossprout:objective:place-for-rain' ? 20
+  const legacyCoinReward = activity?.objectiveId === 'mossprout:objective:place-for-rain' ? 20
     : activity?.objectiveId === 'mossprout:objective:bank-that-holds' ? 30 : 50;
-  const existingOrder = activity ? next.activeOrders.find((order) => order.id === activity.mergeOrderId) : null;
-  const firstResidentSkinId = activity?.objectiveId === 'mossprout:objective:place-for-rain'
+  const authoredOrders = episodeDefinition?.mergeOrders.length
+    ? episodeDefinition.mergeOrders
+    : activity ? [{ id: activity.mergeOrderId, title: legacyTitle, description: extendedStoryBeat?.description ?? 'Make this living piece for the Garden.', requirements: legacyRequirements, coins: legacyCoinReward }] : [];
+  const servedOrderIds = new Set(activity?.servedOrderIds ?? []);
+  const activeOrderDefinition = authoredOrders.find((order) => !servedOrderIds.has(order.id)) ?? null;
+  const existingOrder = activeOrderDefinition ? next.activeOrders.find((order) => order.id === activeOrderDefinition.id) : null;
+  const guestSkinId = episodeDefinition?.guestSkinId === 'matched'
     ? command.residentSignals?.firstResidentSkinId ?? null
-    : null;
-  const firstResident = firstResidentSkinId ? mossproutResidentById.get(firstResidentSkinId) : null;
-  const residentRequest = firstResident?.requestCopy[0];
-  const authoredStoryOrder: MergeOrder | null = showsOrder && activity ? {
-    id: activity.mergeOrderId,
+    : episodeDefinition?.guestSkinId ?? null;
+  const authoredStoryOrder: MergeOrder | null = showsOrder && activity && activeOrderDefinition ? {
+    id: activeOrderDefinition.id,
     characterId: 'mossprout',
-    recipientSkinId: firstResidentSkinId ?? undefined,
-    title: residentRequest?.title ?? title,
-    description: residentRequest?.description ?? extendedStoryBeat?.description ?? (title === 'A Place for Rain'
-      ? 'Make a Shell to catch the first drops.'
-      : title === 'A Bank That Holds'
-        ? 'Grow a Plant to hold the pond bank.'
-        : 'Finish the garden with a Flower and Tidepool.'),
-    difficulty: requirements.length > 1 ? 'major' : 'small',
-    requirements,
+    recipientSkinId: guestSkinId ?? undefined,
+    title: activeOrderDefinition.title,
+    description: activeOrderDefinition.description,
+    difficulty: activeOrderDefinition.requirements.length > 1 ? 'major' : 'small',
+    requirements: [...activeOrderDefinition.requirements],
     reward: {
-      coins: coinReward,
+      coins: activeOrderDefinition.coins,
       mergeXp: 0,
       friendshipXp: 0,
       energy: 0,
-      katchimeraCardId: firstResidentSkinId ?? undefined,
+      katchimeraCardId: guestSkinId && !next.ownedKatchimeraCards.some((card) => card.cardId === guestSkinId) ? guestSkinId : undefined,
     },
     createdAt: now,
     signature: false,
     purpose: 'normal',
-    storyArcId: extendedStoryBeat?.chapterId ?? 'mossprout:dry-pond',
+    storyArcId: episodeDefinition?.chapterId ?? extendedStoryBeat?.chapterId ?? 'mossprout:dry-pond',
     storyBeatId: activity.objectiveId,
+    storyStep: Math.max(1, authoredOrders.findIndex((order) => order.id === activeOrderDefinition.id) + 1),
+    storyStepCount: authoredOrders.length,
   } : null;
   // Re-author the active activity order on reconciliation so a Journey result
   // that arrives after the order shell was first created cannot leave a stale
@@ -1643,7 +1671,7 @@ function reconcileCharacterActivity(
     : authoredStoryOrder;
   let activeOrders = storyOrder ? [...keepOrders, storyOrder] : keepOrders;
   let dailyGarden = next.mossproutDailyGardenOrders;
-  if (!showsOrder) {
+  if (!showsOrder && !journeyExclusive) {
     const sameDay = dailyGarden?.dayId === command.dayId;
     const chapterId = sameDay && dailyGarden?.chapterId
       ? dailyGarden.chapterId
@@ -1674,16 +1702,30 @@ function reconcileCharacterActivity(
     dailyGarden = queue.daily;
   }
   let opportunities = next.characterActivityOpportunities;
-  if (activity && activity.dropDefinitionIds.length > 0 && !opportunities.some((opportunity) => opportunity.id === activity.opportunityId)) {
-    opportunities = [...opportunities, {
-      id: activity.opportunityId,
-      familyId: 'mossprout',
-      dayId: command.dayId,
-      generatorId: activity.generatorId,
-      dropDefinitionIds: [...activity.dropDefinitionIds],
-      usedCount: 0,
-      createdAt: now,
-    }];
+  if (activity && activity.dropDefinitionIds.length > 0) {
+    const existingOpportunity = opportunities.find((opportunity) => opportunity.id === activity.opportunityId);
+    if (!existingOpportunity) {
+      opportunities = [...opportunities, {
+        id: activity.opportunityId,
+        familyId: 'mossprout',
+        dayId: command.dayId,
+        generatorId: activity.generatorId,
+        dropDefinitionIds: [...activity.dropDefinitionIds],
+        usedCount: 0,
+        createdAt: now,
+      }];
+    } else if (
+      existingOpportunity.dropDefinitionIds.length !== activity.dropDefinitionIds.length
+      || existingOpportunity.dropDefinitionIds.some((definitionId, index) => definitionId !== activity.dropDefinitionIds[index])
+    ) {
+      // Repair active saves created before multi-order Journey baskets carried
+      // enough authored ingredients for every required order.
+      opportunities = opportunities.map((opportunity) => opportunity.id === activity.opportunityId ? {
+        ...opportunity,
+        dropDefinitionIds: [...activity.dropDefinitionIds],
+        usedCount: Math.min(opportunity.usedCount, activity.dropDefinitionIds.length),
+      } : opportunity);
+    }
   }
   const changedState = next !== state
     || activeOrders.length !== next.activeOrders.length
@@ -2842,7 +2884,7 @@ function validBoardItem(value: unknown): value is MergeBoardItem {
   if (item.kind !== 'item' || typeof item.instanceId !== 'string' || typeof item.definitionId !== 'string' || !MERGE_ITEMS_BY_ID.has(item.definitionId)) return false;
   if (item.progressionGateId == null) return true;
   const gate = MOSSPROUT_ROOTBOUND_GATES_BY_ID.get(item.progressionGateId);
-  return Boolean(gate && gate.rootMemoryDefinitionId === item.definitionId);
+  return Boolean(gate && (gate.rootMemoryDefinitionId === item.definitionId || gate.fragmentDefinitionId === item.definitionId));
 }
 
 function isProgressionItem(item: MergeBoardItem) {

@@ -1,0 +1,36 @@
+{
+  "key": "baristabbit",
+  "kind": "resident",
+  "concept": "A snug open-air woodland cafe where Baristabbit welcomes neighbours with warm drinks and soft baked treats.",
+  "floor": "One broad continuous honey-oak cafe floor across the full top face, formed from only six to eight oversized softly beveled planks with no seams, crumbs, rugs, or separate paths.",
+  "main_structure": "One broad open-front cream-and-caramel cafe pavilion at the rear with a softly arched terracotta roof, one large service opening, and one simple steaming-cup silhouette above the opening without text.",
+  "rear_props": [
+    "one broad rounded service counter with one oversized coffee pot and two large cup forms",
+    "two large amber cafe lanterns flanking the rear pavilion"
+  ],
+  "side_props": [
+    "one chunky curved cafe bench and one broad round table on the upper-left edge",
+    "one compact pastry trolley with three oversized bun forms and one broad planter on the upper-right edge"
+  ],
+  "perimeter": {
+    "material": "one continuous smooth sage-green cafe-garden border with broad cream capstones",
+    "palette": ["soft sage green", "warm cream", "caramel brown", "muted terracotta"],
+    "emblems": "four oversized simple cup-and-paired-ear silhouette emblems"
+  },
+  "cliff": {
+    "materials": ["large biscuit-sandstone blocks", "large caramel clay blocks", "a few broad muted terracotta blocks"],
+    "palette": ["biscuit cream", "caramel brown", "muted terracotta"]
+  },
+  "lighting": "soft warm morning light with one gentle service-window glow and two large amber lantern pools",
+  "must_keep": [
+    "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
+    "entire bottom/front half as quiet open honey-oak floor",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature, rabbit, person, or egg baked into the bitmap",
+    "center circle, platform, plaza, ring, rug, path, or indentation",
+    "bridges, clouds, readable menu, labels, text, watermark, external shadow",
+    "tiny food pieces, tableware clutter, crumbs, steam particles, flowers, grass blades, pebbles, cracks, specks, or dense texture"
+  ]
+}

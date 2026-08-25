@@ -46,10 +46,11 @@ export type CompanionJourneyDayHandoffContent = {
   tomorrowPreview: string;
 };
 
-export function CompanionBondLevelUpCelebration({ autoContinue = true, continueLabel, dismissible = true, journeyHandoff, message, onContinue, receipt, variant = 'level_up' }: {
+export function CompanionBondLevelUpCelebration({ autoContinue = true, continueLabel, dismissible = true, journeyDayNumber, journeyHandoff, message, onContinue, receipt, variant = 'level_up' }: {
   autoContinue?: boolean;
   continueLabel?: string;
   dismissible?: boolean;
+  journeyDayNumber?: number;
   journeyHandoff?: CompanionJourneyDayHandoffContent;
   message?: string;
   onContinue: () => void;
@@ -67,7 +68,7 @@ export function CompanionBondLevelUpCelebration({ autoContinue = true, continueL
   const next = companionBondProgressForTotal(receipt.afterTotal);
   const compactHeight = height < 740;
   const journeyComplete = variant === 'journey_complete';
-  const journeyDayNumber = journeyHandoff?.dayNumber ?? 1;
+  const resolvedJourneyDayNumber = journeyDayNumber ?? journeyHandoff?.dayNumber ?? 1;
   const heroSize = journeyComplete
     ? Math.min(width * 0.68, height * (compactHeight ? 0.27 : 0.3), 270)
     : Math.min(width * 0.72, height * (compactHeight ? 0.29 : 0.32), 310);
@@ -207,10 +208,10 @@ export function CompanionBondLevelUpCelebration({ autoContinue = true, continueL
               entering={reduceMotion ? FadeIn.duration(100) : FadeInUp.duration(340).delay(130)}
               style={styles.journeyDayHero}>
               <CelebrationHeroNumber
-                accessibilityLabel={`Journey Day ${journeyDayNumber} complete`}
+                accessibilityLabel={`Journey Day ${resolvedJourneyDayNumber} complete`}
                 label="JOURNEY DAY"
                 numberSize={compactHeight ? 70 : 82}
-                value={journeyDayNumber}
+                value={resolvedJourneyDayNumber}
               />
             </Animated.View>
           ) : (

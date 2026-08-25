@@ -532,7 +532,7 @@ function ChatNoteTrayCard({ entry, onPress, onRailTargetRef, reduceMotion }: {
       </Animated.View>
       <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" source={TRAY_ART} style={styles.trayArt} transition={0} />
       <Animated.View entering={reduceMotion ? FadeIn.duration(100) : FadeInUp.delay(115).duration(240).easing(CONTROLLED_EASE)} style={styles.notePaper}>
-        <ThemedText numberOfLines={2} style={styles.noteTitle} lightColor="#4A291B" darkColor="#4A291B">Got something for you</ThemedText>
+        <ThemedText numberOfLines={2} style={styles.noteTitle} lightColor="#4A291B" darkColor="#4A291B">I have something for you</ThemedText>
         <View pointerEvents="none" style={styles.noteIconBadge}>
           <IconSymbol color="#FFF6DB" name="envelope.fill" size={12} />
         </View>

@@ -45,7 +45,7 @@ import { retryFtueSync } from '@/features/onboarding/ftue-sync';
 import { clearTodayPatch } from '@/utils/today-patch-storage';
 import { clearBaseCustomisation } from '@/utils/world-base-customisation';
 import { resetWorldIdentityOnboarding } from '@/utils/world-identity';
-import { setAllKatchimerasAvailableEnabled } from '@/utils/dev-settings';
+import { isJourneyQuickModeEnabled, setAllKatchimerasAvailableEnabled, setJourneyQuickModeEnabled } from '@/utils/dev-settings';
 import type { DayVisionSummary, PhotoVisionResult, StoredHomeDayRecord } from '@/types/home';
 import type { CompanionAchievementDef } from '@/types/companion-achievements';
 import type { StreakMilestone } from '@/types/streak';
@@ -60,6 +60,7 @@ import {
 import { resetKatchimeraProgressForDebug } from '@/utils/reset-katchimera-progress-for-debug';
 import { setFeastleStoryStateForDebug } from '@/utils/companion-story-storage';
 import { triggerNativeCrashForDiagnostics } from '@/utils/crash-reporting';
+import { resetCurrentMossproutJourneyForDebug } from '@/features/mossprout/journey-dev-tools';
 
 const DEV_JOURNEY_DAY_ONE_RECEIPT = {
   id: 'dev-preview:journey-day-1',
@@ -91,6 +92,8 @@ export default function ExploreScreen() {
     beats: string[] | null;
   } | null>(null);
   const [backfilling, setBackfilling] = useState(false);
+  const [journeyToolsOpen, setJourneyToolsOpen] = useState(false);
+  const [journeyQuickMode, setJourneyQuickMode] = useState(isJourneyQuickModeEnabled());
 
   const handleResetKatchimerasProgress = () => {
     Alert.alert(
@@ -105,6 +108,7 @@ export default function ExploreScreen() {
             try {
               const resetAt = Date.now();
               await resetKatchimeraProgressForDebug({ resetAt, resetDevAccess: true });
+              setJourneyQuickMode(false);
               Alert.alert('Katchimeras progress reset', 'Katchimera questionnaires and Friendship now begin from question one and level one. Merge World has returned to its starting board.');
             } catch (caught) {
               Alert.alert('Reset did not finish', caught instanceof Error ? caught.message : 'Katchimeras progress could not be reset. Please try again.');
@@ -139,6 +143,7 @@ export default function ExploreScreen() {
     useCallback(() => {
       setProfile(loadOnboardingProfile());
       setStoredState(homeRepository.load());
+      setJourneyQuickMode(isJourneyQuickModeEnabled());
     }, [])
   );
 
@@ -150,7 +155,8 @@ export default function ExploreScreen() {
       {
         text: 'Restart',
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
+          await resetKatchimeraProgressForDebug({ resetAt: Date.now() });
           resetOnboardingProfile();
           router.replace('/onboarding');
         },
@@ -232,9 +238,59 @@ export default function ExploreScreen() {
               await resetTodayForDebug();
               beginFirstSession({ restart: true });
               await resetKatchimeraProgressForDebug({ resetAt });
+              setJourneyQuickMode(false);
               router.replace('/(tabs)/today');
             } catch (caught) {
               Alert.alert('Restart did not finish', caught instanceof Error ? caught.message : 'The first-session flow could not be restarted.');
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  function handleResetCurrentJourney() {
+    Alert.alert(
+      'Reset the latest Journey Day?',
+      'Reopens only Mossprout’s most recently started Journey Day. The Merge board and earlier Journey Days stay intact.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset Journey Day',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await resetCurrentMossproutJourneyForDebug();
+              if (!result.reset) {
+                Alert.alert('No Journey Day yet', 'Start Mossprout’s Journey once, then this control can rewind the latest day.');
+                return;
+              }
+              Alert.alert('Journey Day reset', result.episodeNumber ? `Journey Day ${result.episodeNumber} is ready to play again.` : 'The latest Journey Day is ready to play again.');
+            } catch (caught) {
+              Alert.alert('Journey reset did not finish', caught instanceof Error ? caught.message : 'The latest Journey Day could not be reset.');
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  function handleResetJourneyAndBoard() {
+    Alert.alert(
+      'Reset Journey and Merge board?',
+      'Clears all Katchimera conversations, insights, Friendship progress and the entire Merge board. Your onboarding profile, journal and hatched collection stay safe.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset all',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await resetKatchimeraProgressForDebug({ resetAt: Date.now() });
+              setJourneyQuickMode(false);
+              Alert.alert('Journey and board reset', 'Mossprout and the Merge board are back at their starting state.');
+            } catch (caught) {
+              Alert.alert('Reset did not finish', caught instanceof Error ? caught.message : 'Journey and Merge progress could not be reset.');
             }
           },
         },
@@ -530,6 +586,30 @@ export default function ExploreScreen() {
                 <KatchaButton label="Reset today only" onPress={handleResetToday} variant="secondary" />
                 <KatchaButton label="Restart first-session onboarding · keep profile" onPress={handleRestartFirstSession} variant="primary" />
                 <KatchaButton label="Profile Snapshots" onPress={() => router.push('/dev-profile-snapshots' as Href)} variant="primary" />
+                <KatchaButton label={journeyToolsOpen ? 'Hide Journey tools' : 'Journey tools'} onPress={() => setJourneyToolsOpen((open) => !open)} variant="primary" />
+                {journeyToolsOpen ? <View style={styles.journeyTools}>
+                  <View style={styles.devToggleCopy}>
+                    <ThemedText selectable style={styles.devToggleTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">Mossprout Journey</ThemedText>
+                    <ThemedText selectable style={styles.devToggleBody} lightColor="#C4D8FF" darkColor="#C4D8FF">Replay one episode, remove daily waits, or return Journey and Merge to their starting state.</ThemedText>
+                  </View>
+                  <KatchaButton label="Reset current Journey Day" onPress={handleResetCurrentJourney} variant="secondary" />
+                  <View style={styles.devToggleRow}>
+                    <View style={styles.devToggleCopy}>
+                      <ThemedText selectable style={styles.devToggleTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">Journey quick mode</ThemedText>
+                      <ThemedText selectable style={styles.devToggleBody} lightColor="#C4D8FF" darkColor="#C4D8FF">Makes the next Journey Day available immediately after the previous one.</ThemedText>
+                    </View>
+                    <Switch
+                      accessibilityLabel="Enable Mossprout Journey quick mode"
+                      onValueChange={(enabled) => {
+                        setJourneyQuickModeEnabled(enabled);
+                        setJourneyQuickMode(enabled);
+                      }}
+                      trackColor={{ false: 'rgba(200,216,255,0.2)', true: '#5FA87B' }}
+                      value={journeyQuickMode}
+                    />
+                  </View>
+                  <KatchaButton label="Reset all Journey + Merge progress" onPress={handleResetJourneyAndBoard} variant="destructive" />
+                </View> : null}
                 {ftueRun ? <View style={styles.devToggleCopy}>
                   <ThemedText selectable style={styles.devToggleTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">FTUE: {ftueRun.stepId}</ThemedText>
                   <ThemedText selectable style={styles.devToggleBody} lightColor="#C4D8FF" darkColor="#C4D8FF">
@@ -998,6 +1078,15 @@ const styles = StyleSheet.create({
   },
   devActions: {
     gap: 10,
+  },
+  journeyTools: {
+    backgroundColor: 'rgba(95,168,123,0.08)',
+    borderColor: 'rgba(155,215,176,0.22)',
+    borderCurve: 'continuous',
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 10,
+    padding: 12,
   },
   devToggleRow: {
     alignItems: 'center',

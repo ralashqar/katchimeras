@@ -92,12 +92,21 @@ const chapterZeroReturnDefinition: ConversationDefinition = {
       id: 'promise', kind: 'choice', phase: 'resolve',
       prompt: 'Before we go: what should this garden always make room for?',
       options: [
-        { id: 'promise-quiet', label: 'Quiet', reply: 'Then we will never fill every corner.', nextNodeId: 'end' },
-        { id: 'promise-surprise', label: 'Surprise', reply: 'Good. I will distrust any path that behaves too sensibly.', nextNodeId: 'end' },
-        { id: 'promise-care', label: 'Care', reply: 'Then everything we grow will have a reason beyond looking pretty.', nextNodeId: 'end' },
+        { id: 'promise-quiet', label: 'Quiet', reply: 'Then we will never fill every corner.', nextNodeId: 'insight' },
+        { id: 'promise-surprise', label: 'Surprise', reply: 'Good. I will distrust any path that behaves too sensibly.', nextNodeId: 'insight' },
+        { id: 'promise-care', label: 'Care', reply: 'Then everything we grow will have a reason beyond looking pretty.', nextNodeId: 'insight' },
       ],
     },
-    { id: 'end', kind: 'end', message: 'The first Plant is home. Mossprout keeps your promise for the road ahead.' },
+    {
+      id: 'insight', kind: 'insight_reveal', title: 'What I noticed about you',
+      insightKey: 'mossprout-journey-1-garden-promise', category: 'Nature',
+      persistence: 'offer_save', allowSecondary: false, nextNodeId: 'end', results: [
+        { id: 'quiet-room', title: 'You make room for quiet', reflection: 'You value places that leave enough space for you to hear yourself.', summary: 'You value places that protect quiet and breathing room.', emblemId: 'mossprout-journey-1', matchOptionIds: ['promise-quiet'] },
+        { id: 'wild-room', title: 'You make room for surprise', reflection: 'You feel most alive in places that can still surprise you.', summary: 'You value places with room for discovery and play.', emblemId: 'mossprout-journey-1', matchOptionIds: ['promise-surprise'] },
+        { id: 'caring-room', title: 'You make room for care', reflection: 'You notice when a place can help small living things feel held.', summary: 'You value places shaped by practical care.', emblemId: 'mossprout-journey-1', matchOptionIds: ['promise-care'] },
+      ],
+    },
+    { id: 'end', kind: 'end', message: 'The first Plant is home. I’ll keep your promise for the road ahead.' },
   ],
 };
 

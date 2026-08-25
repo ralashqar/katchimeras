@@ -21,7 +21,7 @@ export function emptyMossproutBoardProgression(): MossproutBoardProgression {
     lastParcelDayId: null,
     grovelightResonanceDayIds: [],
     signals: {
-      activeJourneyDayIds: [], friendshipLevel: 1, natureMemoryDayIds: [], focusStage: 0,
+      activeJourneyDayIds: [], completedBeatIds: [], friendshipLevel: 1, natureMemoryDayIds: [], focusStage: 0,
       ownedWispIds: [], completedGardenDayIds: [],
     },
   };
@@ -81,12 +81,13 @@ export function reconcileMossproutBoardProgression(
     const current = progression.gates[definition.id];
     if (current?.status === 'ready' || current?.status === 'awakened') return false;
     if (activeDayIds.length < definition.revealDay) return false;
+    if (definition.requiredBeatId && signals.completedBeatIds) return signals.completedBeatIds.includes(definition.requiredBeatId);
     return primaryProgress(definition.kind, signals, activeDayIds.length) >= definition.target
       || fallbackSatisfied(definition.kind, definition.revealDay, definition.fallbackDelay, activeDayIds.length);
   });
   if (canQueueToday && eligible[0]) {
     const definition = eligible[0];
-    const fallbackUsed = primaryProgress(definition.kind, signals, activeDayIds.length) < definition.target;
+    const fallbackUsed = !definition.requiredBeatId && primaryProgress(definition.kind, signals, activeDayIds.length) < definition.target;
     const parcelId = `arrival:root-match:${definition.id}`;
     progression.gates[definition.id] = {
       gateId: definition.id, status: 'ready', readyAt: now, awakenedAt: null, parcelId, fallbackUsed,
@@ -106,7 +107,9 @@ export function reconcileMossproutBoardProgression(
         characterId: 'mossprout',
         source: 'companion_progression',
         progressionGateId: definition.id,
-        itemDefinitionIds: [definition.rootMemoryDefinitionId],
+        itemDefinitionIds: definition.fragmentDefinitionId && definition.requiredBeatId && signals.completedBeatIds?.includes(definition.requiredBeatId)
+          ? [definition.fragmentDefinitionId, definition.fragmentDefinitionId]
+          : [definition.rootMemoryDefinitionId],
         claimedAt: null,
         seenAt: null,
       };
@@ -326,6 +329,7 @@ function normalizeSignals(value: unknown): MossproutProgressionSignals {
   const source = value && typeof value === 'object' ? value as Partial<MossproutProgressionSignals> : {};
   return {
     activeJourneyDayIds: uniqueStrings(source.activeJourneyDayIds),
+    completedBeatIds: Array.isArray(source.completedBeatIds) ? uniqueStrings(source.completedBeatIds) : undefined,
     friendshipLevel: Math.max(1, Math.min(20, Math.floor(Number(source.friendshipLevel) || 1))),
     natureMemoryDayIds: uniqueStrings(source.natureMemoryDayIds),
     focusStage: Math.max(0, Math.min(4, Math.floor(Number(source.focusStage) || 0))),

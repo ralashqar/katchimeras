@@ -163,6 +163,44 @@ and large biscuit/terracotta cliff blocks carry the theme. The entire
 bottom/front half and stairs remain open for the live creature sprite. The
 generation received no legacy Feastle or resident-tile art.
 
+Baristabbit uses one broad open-front cream-and-caramel cafe pavilion, a rounded
+service counter, chunky curved bench, broad round table, pastry trolley, and two
+large amber lanterns in a rear-and-upper-side frame. Oversized honey-oak planks
+replace the generic grass face. Its sage-and-cream border, cup emblems, and large
+biscuit/caramel/terracotta cliff blocks carry the cafe identity while the entire
+bottom/front stage remains open for the live creature sprite.
+
+Mendle uses one broad blanket alcove with a candle-heart lamp, an oversized
+mending table, chunky armchair, blanket chest, keepsake box, and two warm
+lanterns. A few broad muted-mauve felt panels form the quiet open stage. Its
+lavender-and-cream upholstered border, heart-patch emblems, and large
+cream/plum/mint cliff blocks carry the gentle-repair identity without tiny
+stitching or fabric noise.
+
+Dawnle uses one broad open sunrise pavilion, a morning tea table, curved waking
+bench, dew basin, rounded shrubs, and two golden lanterns. A few oversized
+pale-peach slabs form the quiet open stage. Its peach-and-cream parapet,
+half-sun and dew emblems, and large cream/peach/gold cliff blocks carry the
+first-light identity without ray patterns, sparkles, or foreground clutter.
+
+Pixooka uses one broad teal-and-violet play lounge with a blank display, one
+oversized controller, curved sofa, game chest, puzzle blocks, and two cyan-gold
+lanterns. Broad indigo carpet panels form the open stage. Its controller and
+puzzle emblems plus large indigo/teal/violet cliff blocks carry the gaming
+identity without screen content, pixel noise, or foreground clutter.
+
+Museling uses one broad cream artist studio with a blank canvas, making table,
+blank easel, simple sculpture, supply chest, and two warm studio lamps. Broad
+pale-aqua resin slabs form the open stage. Its coral-and-aqua border, spark and
+palette emblems, and large cream/coral/aqua cliff blocks carry the making
+identity without paint flecks, loose paper, or tiny tools.
+
+Encora uses one broad burgundy-and-gold acoustic pavilion, an oversized drum
+pad, simple keyboard block, listening horn, curved bench, string instrument,
+and two amber lanterns. Broad deep-teal timber panels form the open stage. Its
+soundwave emblems and large teal/burgundy/gold cliff blocks carry the music
+identity without tiny notes, cables, controls, or a raised stage.
+
 Cheerlet uses one broad wavy teal pavilion, one small cake, two chunky gift
 blocks, two three-balloon bunches, two lanterns, and oversized coral flowers.
 Its smooth teal hedge and large alternating cream, coral, and muted-teal cliff
@@ -261,6 +299,16 @@ compositions with `python scripts/render-floating-neighborhood-v2-qa.py`.
 v2 spacing, painter order, and live egg scale.
 `qa-tasklet-feastle-neighborhood.png` adds both resident habitats and their live
 creature sprites at production scale and anchor positions.
+`qa-baristabbit-neighborhood.png` verifies the cozy cafe habitat with
+Baristabbit at the production anchor, including the clear front stage and close
+JSON-driven v2 neighbourhood spacing.
+`qa-mendle-dawnle-neighborhood.png` verifies the gentle-repair and first-light
+habitats together with both live residents at their production anchors, clear
+front stages, shared face alignment, and close JSON-driven v2 spacing.
+`qa-pixooka-museling-encora-neighborhood.png` verifies the play, making, and
+music habitats together with all three live residents, distinct thumbnail
+silhouettes, open front stages, shared face alignment, and close JSON-driven v2
+spacing.
 `qa-cheerlet-surface-theme.png` shows the simplified home, neutral, Cheerlet,
 Tasklet, and Feastle treatments with live creatures to verify that every
 resident stage remains clear at production scale.

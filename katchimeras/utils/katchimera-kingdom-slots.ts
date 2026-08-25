@@ -5,8 +5,6 @@ import type { KingdomResident } from '@/utils/kingdom-residents';
 import type { HavenStage } from '@/constants/haven-catalog';
 import { hexSpiral, type HexCoord } from '@/utils/world-hex';
 
-export const KINGDOM_ZODIAC_RESERVED_COORD: HexCoord = { q: -1, r: 1 };
-
 type KingdomHexCompanionSlotBase = {
   coord: HexCoord;
   familyId: KatchimeraFamilyId;
@@ -32,12 +30,7 @@ export function kingdomCompanionTileId(familyId: KatchimeraFamilyId): string {
   return `family:${familyId}`;
 }
 
-const FAMILY_SLOT_COORDS = hexSpiral(katchimeraFamilies.length + 1, false)
-  .filter((coord) => (
-    coord.q !== KINGDOM_ZODIAC_RESERVED_COORD.q
-    || coord.r !== KINGDOM_ZODIAC_RESERVED_COORD.r
-  ))
-  .slice(0, katchimeraFamilies.length);
+const FAMILY_SLOT_COORDS = hexSpiral(katchimeraFamilies.length, false);
 
 /**
  * Builds every authored family slot in catalog order. Ownership changes only

@@ -718,7 +718,7 @@ function resolveInsightResult(
   const topScore = ranked[0]?.score ?? 0;
   const runnerUp = ranked[1];
   const scoreMargin = Math.max(0, topScore - (runnerUp?.score ?? 0));
-  const mixed = Boolean(runnerUp?.result && scoreMargin <= 1);
+  const mixed = node.allowSecondary !== false && Boolean(runnerUp?.result && scoreMargin <= 1);
   const supportingTraits = turns
     .map((turn) => optionLabelForTurn(definition, turn))
     .filter((label): label is string => Boolean(label))

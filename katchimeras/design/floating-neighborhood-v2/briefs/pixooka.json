@@ -1,0 +1,36 @@
+{
+  "key": "pixooka",
+  "kind": "resident",
+  "concept": "A cozy play lounge where bright challenges, shared adventures, and satisfying stopping points turn focused gaming into restorative play.",
+  "floor": "One broad continuous deep-indigo playroom carpet across the full top face, divided into only four to six oversized softly joined panels without pixels, grids, rugs, paths, or repeated texture.",
+  "main_structure": "One broad open-front teal-and-violet arcade lounge at the rear with a rounded canopy, one large blank dark display, and two oversized simple controller-button forms built into the frame.",
+  "rear_props": [
+    "one broad low game console with one oversized controller and three large unmarked buttons",
+    "two large cyan-and-gold playroom lanterns flanking the rear lounge"
+  ],
+  "side_props": [
+    "one chunky curved sofa with two oversized cushion blocks on the upper-left edge",
+    "one broad closed game chest and three oversized puzzle-block forms on the upper-right edge"
+  ],
+  "perimeter": {
+    "material": "one continuous smooth teal-and-indigo playroom border with broad violet capstones",
+    "palette": ["deep indigo", "soft teal", "muted violet", "warm gold"],
+    "emblems": "four oversized simple controller-button and puzzle-block emblems"
+  },
+  "cliff": {
+    "materials": ["large midnight-indigo stone blocks", "large muted-teal clay blocks", "a few broad violet and warm-gold blocks"],
+    "palette": ["midnight indigo", "muted teal", "soft violet", "warm gold"]
+  },
+  "lighting": "soft cozy evening light from one broad display glow and two large cyan-gold lantern pools",
+  "must_keep": [
+    "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
+    "entire bottom/front half as quiet open deep-indigo carpet",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature, person, hand, or egg baked into the bitmap",
+    "center circle, platform, plaza, ring, rug, path, game board, or indentation",
+    "bridges, clouds, readable screen content, text, logos, watermark, external shadow",
+    "tiny pixels, button labels, cables, cartridges, score displays, specks, confetti, or dense clutter"
+  ]
+}

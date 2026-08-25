@@ -1,0 +1,36 @@
+{
+  "key": "mendle",
+  "kind": "resident",
+  "concept": "A tender mending retreat where blankets, warm light, and a few careful repair tools make difficult days feel softer.",
+  "floor": "One broad continuous muted-mauve felt floor across the full top face, divided into only four to six oversized softly joined cushion panels without stitching, patches, rugs, or a separate path.",
+  "main_structure": "One broad open-front cream-and-lavender blanket alcove at the rear with a rounded canopy, one oversized folded blanket, and one large candle-heart lamp set into the back wall.",
+  "rear_props": [
+    "one broad low mending table with one oversized spool, one folded cloth, and one simple bandage roll",
+    "two large warm cream lanterns flanking the rear alcove"
+  ],
+  "side_props": [
+    "one chunky cushioned armchair and one broad closed keepsake box on the upper-left edge",
+    "one simple blanket chest and one oversized rounded mint planter on the upper-right edge"
+  ],
+  "perimeter": {
+    "material": "one continuous smooth upholstered lavender border with broad cream capstones",
+    "palette": ["dusty lavender", "muted mauve", "warm cream", "soft mint"],
+    "emblems": "four oversized simple heart-patch and bandage emblems"
+  },
+  "cliff": {
+    "materials": ["large warm-cream stone blocks", "large muted plum clay blocks", "a few broad soft-mint stone blocks"],
+    "palette": ["warm cream", "muted plum", "soft mint"]
+  },
+  "lighting": "soft calm evening light from one large candle-heart glow and two broad warm lantern pools",
+  "must_keep": [
+    "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
+    "entire bottom/front half as quiet open muted-mauve felt floor",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature, person, or egg baked into the bitmap",
+    "center circle, platform, plaza, ring, rug, path, or indentation",
+    "bridges, clouds, readable labels, text, watermark, external shadow",
+    "tiny stitches, fabric fibers, loose thread, tiny tools, flowers, grass blades, pebbles, cracks, specks, or dense clutter"
+  ]
+}

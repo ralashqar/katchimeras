@@ -13,7 +13,11 @@ export type JourneyDayStatus =
 export type JourneyActivity = {
   kind: 'merge';
   objectiveId: string;
+  /** First authored order, retained for save compatibility and deep links. */
   mergeOrderId: string;
+  /** Complete authored sequence. Older saves safely fall back to mergeOrderId. */
+  mergeOrderIds?: string[];
+  servedOrderIds?: string[];
   opportunityId: string;
   generatorId: string;
   dropDefinitionIds: string[];

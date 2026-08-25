@@ -133,6 +133,27 @@ test('Mossprout queues one exact root match per active day and reconciliation is
   assert.equal(repeated.state.arrivals.filter((arrival) => arrival.kind === 'root_match_parcel').length, 1);
 });
 
+test('Journey milestones parcel two fragments that merge into the matching Root Memory', () => {
+  let state = awakenedEarlierGates(createInitialMergeWorldState(NOW, ['mossprout']), 'root:focus-first');
+  state = reduceMergeWorld(state, {
+    type: 'reconcileMossproutBoardProgression',
+    signals: signals(14, { completedBeatIds: ['returning-pond:rain-garden'] }),
+    dayId: 'active-14',
+    now: NOW + 1,
+  }).state;
+  const arrival = state.arrivals.find((candidate) => candidate.id === 'arrival:root-match:root:focus-first');
+  assert.deepEqual(arrival?.itemDefinitionIds, ['mossprout:root-fragment:rain-kept', 'mossprout:root-fragment:rain-kept']);
+
+  const claimed = reduceMergeWorld(state, { type: 'claimArrival', arrivalId: arrival!.id, now: NOW + 2 });
+  assert.equal(claimed.spawnedItems?.length, 2);
+  const [first, second] = claimed.spawnedItems!;
+  const merged = reduceMergeWorld(claimed.state, { type: 'move', from: first.cell, to: second.cell, now: NOW + 3 });
+  const mergedOccupant = merged.state.board[second.cell].occupant;
+  assert.equal(mergedOccupant?.kind === 'item' ? mergedOccupant.definitionId : null, 'mossprout:root-memory:rain-kept-acorn');
+  const awakened = reduceMergeWorld(merged.state, { type: 'move', from: second.cell, to: 8, now: NOW + 4 });
+  assert.equal(awakened.state.mossproutBoardProgression.gates['root:focus-first'].status, 'awakened');
+});
+
 test('every covered board cell belongs to one clear progression lane', () => {
   const state = createInitialMergeWorldState(NOW, ['mossprout']);
   assert.equal(state.board.filter((cell) => !cell.locked).length, 20);

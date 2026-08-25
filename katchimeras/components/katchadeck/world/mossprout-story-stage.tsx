@@ -26,9 +26,11 @@ import {
   acknowledgeKatchimeraExternalActionOutro,
   acknowledgeMossproutJourneyActionOutro,
   beginMossproutJourneyReturn,
+  completeMossproutJourneyConversation,
   makeMossproutResolutionAvailable,
   mossproutDailyActionDeck,
   mossproutJourneyForDay,
+  mossproutJourneyRuntimeDayId,
   mossproutStory,
   reconcileMossproutDayOneChoices,
   recordKatchimeraActionCompletion,
@@ -50,10 +52,13 @@ import type { CompanionQuickGoalCompletion, CompanionQuickGoalForDay } from '@/u
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 import { loadMergeWorldState, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
 import { localDayId } from '@/utils/world-identity';
+import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
+import { mossproutCampaignEpisodeByBeatId } from '@/constants/mossprout-campaign';
 
 import type { CompanionChatStarter } from './companion-chat-lobby';
 import { KatchimeraBottomDock } from './katchimera-bottom-dock';
 import { KatchimeraJourneyStatusPlaque } from './katchimera-journey-status-plaque';
+import { MossproutJourneyRequestPanel } from './mossprout-journey-request-panel';
 
 const MAX_ORDER_ART_ITEMS = 3;
 const MAX_VISIBLE_ACTIONS = 3;
@@ -94,6 +99,7 @@ function useMossproutMergeWorldState() {
 
 export function MossproutStoryStage({
   activeQuestId,
+  conversationSession,
   conversations,
   goals,
   hasActiveFocus,
@@ -151,8 +157,10 @@ export function MossproutStoryStage({
   const selectedGoalCompletionRef = useRef<(() => void) | null>(null);
   const { phase: screenTransitionPhase } = useGameScreenTransition();
   const { ready: mergeWorldReady, state: mergeWorldState } = useMossproutMergeWorldState();
-  const dayId = localDayId();
+  const quickMode = isJourneyQuickModeEnabled();
+  const dayId = mossproutJourneyRuntimeDayId(relationships, localDayId(), quickMode);
   const journey = mossproutJourneyForDay(relationships, dayId);
+  const journeyExclusive = Boolean(journey && journey.status !== 'complete');
   const journeyDayNumber = mossproutJourneyDayNumber(relationships, dayId);
   const story = mossproutStory(relationships);
   const storyComplete = story.activeBeatId === 'heartwood:complete';
@@ -175,9 +183,24 @@ export function MossproutStoryStage({
     mergeWorldState?.activeOrders.find((candidate) => candidate.id === order.id)?.storyArcId === 'mossprout:casual-garden'
   )), [mergeWorldState?.activeOrders, mossproutOrders]);
   const journeyGardenRequest = useMemo(() => {
-    const orderId = journey?.activity?.mergeOrderId;
-    return orderId ? mossproutOrders.find((order) => order.id === orderId) ?? null : null;
-  }, [journey?.activity?.mergeOrderId, mossproutOrders]);
+    const orderIds = journey?.activity?.mergeOrderIds ?? (journey?.activity ? [journey.activity.mergeOrderId] : []);
+    return orderIds.length ? mossproutOrders.find((order) => orderIds.includes(order.id)) ?? null : null;
+  }, [journey?.activity, mossproutOrders]);
+  const journeyMergeActive = journey?.status === 'activity_available' || journey?.status === 'activity_in_progress';
+  const journeyEpisode = journey ? mossproutCampaignEpisodeByBeatId.get(journey.beatId) : null;
+  const journeyRequestPreviews = useMemo(() => {
+    if (!journeyMergeActive || !journeyEpisode) return [];
+    const servedOrderIds = new Set(journey?.activity?.servedOrderIds ?? []);
+    return journeyEpisode.mergeOrders.map((order, index, orders) => ({
+      id: order.id,
+      badge: orders.length > 1 ? `${index + 1} OF ${orders.length}` : undefined,
+      title: order.title,
+      description: order.description,
+      definitionIds: order.requirements.map((requirement) => requirement.definitionId),
+      quantity: order.requirements.length === 1 ? order.requirements[0]?.quantity : undefined,
+      served: servedOrderIds.has(order.id),
+    }));
+  }, [journey?.activity?.servedOrderIds, journeyEpisode, journeyMergeActive]);
 
   useEffect(() => {
     if (!dayOneActionChoiceActive || journey?.beatId !== 'quiet-patch:first-flower') return;
@@ -258,7 +281,8 @@ export function MossproutStoryStage({
 
   const completingAction = useMemo(() => {
     const byPresentationId = new Map<string, KatchimeraDayAction>();
-    for (const action of [...presentedActionCandidates.filter((candidate) => candidate.status === 'completed'), ...externalCompletions]) {
+    const visibleExternalCompletions = journeyExclusive ? [] : externalCompletions;
+    for (const action of [...presentedActionCandidates.filter((candidate) => candidate.status === 'completed'), ...visibleExternalCompletions]) {
       byPresentationId.set(action.instanceId ?? action.id, action);
     }
     const slotOrder = { together: 0, field: 1, garden: 2 } as const;
@@ -267,11 +291,12 @@ export function MossproutStoryStage({
       || slotOrder[left.slotId ?? 'together'] - slotOrder[right.slotId ?? 'together']
       || (left.instanceId ?? left.id).localeCompare(right.instanceId ?? right.id)
     )[0] ?? null;
-  }, [externalCompletions, presentedActionCandidates]);
+  }, [externalCompletions, journeyExclusive, presentedActionCandidates]);
 
   const resolvedVisibleActions = composeMossproutVisibleActions(presentedActionCandidates, completingAction, MAX_VISIBLE_ACTIONS);
   const actionId = useCallback((action: KatchimeraDayAction) => `${dayId}:${action.instanceId ?? action.id}`, [dayId]);
   const sourceActions = useMemo(() => {
+    if (journeyExclusive) return resolvedVisibleActions;
     if (!selfCompletingGoalAction) return resolvedVisibleActions;
     const selfId = actionId(selfCompletingGoalAction);
     if (resolvedVisibleActions.some((action) => actionId(action) === selfId)) {
@@ -290,7 +315,7 @@ export function MossproutStoryStage({
       selfCompletingGoalAction,
       ...resolvedVisibleActions.slice(insertionIndex),
     ].slice(0, MAX_VISIBLE_ACTIONS);
-  }, [actionId, resolvedVisibleActions, selfCompletingGoalAction]);
+  }, [actionId, journeyExclusive, resolvedVisibleActions, selfCompletingGoalAction]);
 
   const finishActionOutro = useCallback((action: KatchimeraDayAction) => {
     relationshipProgressionRepository.update((current) => {
@@ -311,19 +336,40 @@ export function MossproutStoryStage({
   const openJourney = () => {
     if (!journey) {
       const activeDayCount = mergeWorldState?.mossproutBoardProgression.activeDayIds.length ?? 0;
-      const started = relationshipProgressionRepository.update((current) => startMossproutJourneyDay(current, dayId, Date.now(), activeDayCount).state);
-      const opening = mossproutJourneyForDay(started, dayId)?.openingConversationId;
+      const started = relationshipProgressionRepository.update((current) => startMossproutJourneyDay(current, dayId, Date.now(), activeDayCount, quickMode).state);
+      const startedJourney = mossproutJourneyForDay(started, dayId);
+      if (!startedJourney) return;
+      const opening = startedJourney.openingConversationId;
       if (opening) onOpenConversation(opening);
-      else onOpenMerge('mossprout:chapter-0:first-sprout');
       return;
     }
-    if (journey.status === 'opening' && journey.openingConversationId) return onOpenConversation(journey.openingConversationId);
+    if (journey.status === 'opening' && journey.openingConversationId) {
+      // A completed opening can briefly outlive its relationship handoff when
+      // the player returns home immediately. Repair that handoff here instead
+      // of explicitly launching the once-only opening a second time.
+      if (
+        conversationSession?.definitionId === journey.openingConversationId
+        && conversationSession.status === 'completed'
+      ) {
+        const repaired = relationshipProgressionRepository.update((current) => completeMossproutJourneyConversation(
+          current,
+          conversationSession,
+          conversationSession.completedAt ?? conversationSession.updatedAt,
+        ));
+        const repairedJourney = mossproutJourneyForDay(repaired, dayId);
+        if (repairedJourney?.status === 'activity_available') {
+          relationshipProgressionRepository.update((current) => startMossproutJourneyActivity(current, dayId));
+          return onOpenMerge(journeyGardenRequest?.id ?? repairedJourney.activity?.mergeOrderId);
+        }
+      }
+      return onOpenConversation(journey.openingConversationId);
+    }
     if (journey.status === 'profile_available' && journey.profileConversationId) return onOpenConversation(journey.profileConversationId);
     if (journey.status === 'activity_available') {
       relationshipProgressionRepository.update((current) => startMossproutJourneyActivity(current, dayId));
-      return onOpenMerge(journey.activity?.mergeOrderId);
+      return onOpenMerge(journeyGardenRequest?.id ?? journey.activity?.mergeOrderId);
     }
-    if (journey.status === 'activity_in_progress') return onOpenMerge(journey.activity?.mergeOrderId ?? 'mossprout:chapter-0:first-sprout');
+    if (journey.status === 'activity_in_progress') return onOpenMerge(journeyGardenRequest?.id ?? journey.activity?.mergeOrderId ?? 'mossprout:chapter-0:first-sprout');
     if (journey.status === 'return_available') {
       const next = relationshipProgressionRepository.update((current) => beginMossproutJourneyReturn(current, dayId));
       const returning = mossproutJourneyForDay(next, dayId);
@@ -351,6 +397,17 @@ export function MossproutStoryStage({
       return onOpenMerge(action.destination.orderId);
     }
     if (action.destination.kind === 'quest') return onOpenQuestDirect(action.destination.questId, action.id);
+  };
+  const openJourneyGarden = () => {
+    if (!journey?.activity) return;
+    if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+    if (journey.status === 'activity_available') {
+      relationshipProgressionRepository.update((current) => startMossproutJourneyActivity(current, dayId));
+    }
+    const orderId = journey.activity.mergeOrderIds?.find((candidate) => (
+      !journey.activity?.servedOrderIds?.includes(candidate)
+    )) ?? journey.activity.mergeOrderId;
+    onOpenMerge(orderId);
   };
 
   const completeGoalAction = useCallback((
@@ -394,14 +451,24 @@ export function MossproutStoryStage({
   const stackInteractionLocked = tutorialInteractionLocked || actionTransition.interactionLocked || Boolean(selfCompletingGoalAction);
 
   return <View style={styles.stage}>
-    {journey && !storyComplete ? (
+    {journey && !storyComplete && !journeyMergeActive ? (
       <KatchimeraJourneyStatusPlaque
         dayNumber={journeyDayNumber}
         revealKey={journey.id}
         status={journey.status === 'complete' ? 'complete' : 'in_progress'}
       />
     ) : null}
-    <View ref={actionStackTargetRef} accessibilityLabel="Mossprout Journey Day actions" style={styles.actionStack}>
+    {journeyMergeActive && journeyEpisode ? <View ref={actionStackTargetRef} style={styles.journeyRequestPanel}>
+      <MossproutJourneyRequestPanel
+        actionLabel={journey.status === 'activity_available' ? 'Go to the Garden' : 'Continue in the Garden'}
+        animateEntrance={false}
+        disabled={navigationLocked || tutorialInteractionLocked}
+        onAction={openJourneyGarden}
+        requests={journeyRequestPreviews}
+        standalone
+        title={journeyEpisode.title}
+      />
+    </View> : <View ref={actionStackTargetRef} accessibilityLabel="Mossprout Journey Day actions" style={styles.actionStack}>
       <View style={styles.actionSlot}>
       {presentedActions.map((presentedAction) => {
         const presentedActionKey = actionId(presentedAction);
@@ -493,7 +560,7 @@ export function MossproutStoryStage({
         </GameSurface>
       </Animated.View> : null}
       </View>
-    </View>
+    </View>}
 
     {selectedGoal ? (
       <QuickGoalActionModal
@@ -561,6 +628,7 @@ function ActionRewardChip({ reward }: {
 const styles = StyleSheet.create({
   stage: { alignSelf: 'stretch', gap: 8, height: ACTION_TRAY_HEIGHT, overflow: 'visible', paddingBottom: 3 },
   actionStack: { height: ACTION_STACK_HEIGHT },
+  journeyRequestPanel: { flex: 1 },
   actionSlot: { gap: 7, height: ACTION_STACK_HEIGHT, justifyContent: 'flex-end', overflow: 'visible' },
   actionArtwork: { height: 46, width: 46 },
   quietContent: { alignItems: 'center', flexDirection: 'row', gap: 10, minHeight: 66, paddingHorizontal: 11, paddingVertical: 7 },

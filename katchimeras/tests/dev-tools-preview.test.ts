@@ -37,3 +37,20 @@ test('developer navigation and tool implementations share the preview-safe gate'
     assert.doesNotMatch(implementation, /if \([^\n]*!?__DEV__/, `${relative} must not reject preview builds via __DEV__`);
   }
 });
+
+test('Journey developer tools expose scoped reset, quick mode, and full reset controls', () => {
+  const devPage = read('app/(tabs)/explore.tsx');
+  const settings = read('utils/dev-settings.ts');
+  const journeyTools = read('features/mossprout/journey-dev-tools.ts');
+  const fullReset = read('utils/reset-katchimera-progress-for-debug.ts');
+  const snapshots = read('utils/player-profile-snapshots.ts');
+
+  assert.match(devPage, /Reset current Journey Day/);
+  assert.match(devPage, /Journey quick mode/);
+  assert.match(devPage, /Reset all Journey \+ Merge progress/);
+  assert.match(journeyTools, /resetLastMossproutJourneyForDebug/);
+  assert.match(settings, /JOURNEY_QUICK_MODE_KEY/);
+  assert.match(fullReset, /setJourneyQuickModeEnabled\(false\)/);
+  assert.match(snapshots, /setJourneyQuickModeEnabled\(false\)/);
+  assert.match(devPage, /await resetKatchimeraProgressForDebug\(\{ resetAt: Date\.now\(\) \}\);[\s\S]*?resetOnboardingProfile\(\)/);
+});

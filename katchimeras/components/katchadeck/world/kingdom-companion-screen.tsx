@@ -13,7 +13,6 @@ import {
 import type { CompanionBondAwardReceipt } from '@/utils/companion-bond';
 import { CompanionInteractionSheet } from '@/components/katchadeck/world/companion-interaction-sheet';
 import { HomeIdentitySheet } from '@/components/katchadeck/world/home-identity-sheet';
-import { ZodiacTileSheet } from '@/components/katchadeck/world/zodiac-tile-sheet';
 import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-sheet';
 import { CompanionReflectionComposerModal } from '@/components/katchadeck/world/companion-reflection-composer-modal';
 import { KatchaDialog } from '@/components/katchadeck/ui/katcha-dialog';
@@ -70,6 +69,8 @@ import { completeSemanticNoteQuestCapture } from '@/utils/quests/semantic-note-c
 import { manualJournalFlow } from '@/utils/manual-journal-registry';
 import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability';
 import { withDiscoveredKatchimeras } from '@/utils/discovered-katchimera-availability';
+import { mossproutJourneyDayNumberForCompletionEvent } from '@/game/katchimeras/mossprout-journey-handoff';
+import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 
 type QuestJournalReviewContext = {
   initialFlowId: string;
@@ -273,13 +274,13 @@ export function KingdomCompanionScreen({
   const [wardrobe, setWardrobe] = useState<KatchimeraWardrobeState>(loadKatchimeraWardrobe);
   const [pendingPlusSkin, setPendingPlusSkin] = useState<{ familyId: KatchimeraFamilyId; skinId: KatchimeraSkinId } | null>(null);
   const [homeIdentityOpen, setHomeIdentityOpen] = useState(false);
-  const [zodiacOpen, setZodiacOpen] = useState(false);
   const [embeddedJournal, setEmbeddedJournal] = useState<EmbeddedJournalReview | null>(null);
   const [questNoteCapture, setQuestNoteCapture] = useState<QuestNoteCapture | null>(null);
   const [questNoteMismatch, setQuestNoteMismatch] = useState<QuestNoteMismatch | null>(null);
   const [savedOrigin, setSavedOrigin] = useState<'conversation' | 'insight' | 'quest' | 'visit' | null>(null);
   const [questExperienceActive, setQuestExperienceActive] = useState(false);
   const [bondCelebration, setBondCelebration] = useState<{
+    journeyDayNumber?: number;
     receipt: CompanionBondAwardReceipt;
     variant: CompanionBondCelebrationVariant;
   } | null>(null);
@@ -334,8 +335,11 @@ export function KingdomCompanionScreen({
   const acknowledgeBondCelebration = quests.acknowledgeBondCelebration;
   const completeBondCelebration = useCallback((receipt: CompanionBondAwardReceipt) => {
     acknowledgeBondCelebration(receipt.id);
+    const journeyDayNumber = receipt.kind === 'journey_day_completed'
+      ? mossproutJourneyDayNumberForCompletionEvent(relationshipProgressionRepository.load(), receipt.eventId) ?? undefined
+      : undefined;
     if (ftueDayOneActionActive && receipt.kind === 'journey_day_completed') {
-      setBondCelebration({ receipt, variant: 'journey_complete' });
+      setBondCelebration({ journeyDayNumber, receipt, variant: 'journey_complete' });
       return;
     }
     if (receipt.afterLevel > receipt.beforeLevel) {
@@ -343,7 +347,7 @@ export function KingdomCompanionScreen({
       return;
     }
     if (receipt.kind === 'journey_day_completed') {
-      setBondCelebration({ receipt, variant: 'journey_complete' });
+      setBondCelebration({ journeyDayNumber, receipt, variant: 'journey_complete' });
     }
   }, [acknowledgeBondCelebration, ftueDayOneActionActive]);
   const quickGoalFamilyIds = useMemo(() => {
@@ -567,7 +571,6 @@ export function KingdomCompanionScreen({
       ) : <View style={styles.companionRouteStage} />}
 
       {homeIdentityOpen ? <HomeIdentitySheet identity={identity} onChange={updateIdentity} onClose={() => setHomeIdentityOpen(false)} /> : null}
-      {zodiacOpen ? <ZodiacTileSheet identity={identity} onChange={updateIdentity} onClose={() => setZodiacOpen(false)} /> : null}
 
       {quests.selectedResident && !embeddedJournal && !questNoteCapture ? (
         <CompanionInteractionSheet
@@ -1069,6 +1072,7 @@ export function KingdomCompanionScreen({
           autoContinue={!ftueDayOneActionActive}
           continueLabel={ftueDayOneActionActive ? 'Back to Mossprout' : undefined}
           dismissible={!ftueDayOneActionActive}
+          journeyDayNumber={bondCelebration.journeyDayNumber}
           journeyHandoff={ftueDayOneActionActive ? {
             dayNumber: 1,
             recap: ['You met Mossprout', 'You restored the Quiet Patch', 'You chose one Bond moment'],

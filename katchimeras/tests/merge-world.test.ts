@@ -486,7 +486,7 @@ test('a character-owned activity can use the same generator without the retired 
   assert.ok(result.spawnedCell != null);
 });
 
-test('Mossprout Journey baskets emit authored drops atomically and stop without Energy', () => {
+test('Mossprout Journey baskets emit authored drops atomically and cycle without Energy', () => {
   let state = createMossproutChapterZeroState(NOW);
   state = { ...state, activeOrders: [], energy: { ...state.energy, regenPaused: false }, generators: {
     ...state.generators,
@@ -494,7 +494,8 @@ test('Mossprout Journey baskets emit authored drops atomically and stop without 
   } };
   const activity = {
     objectiveId: 'mossprout:objective:place-for-rain',
-    mergeOrderId: 'merge-story:mossprout:dry-pond:place-for-rain',
+    mergeOrderId: 'merge-story:mossprout:dry-pond:rain-catcher',
+    mergeOrderIds: ['merge-story:mossprout:dry-pond:rain-catcher', 'merge-story:mossprout:dry-pond:first-puddle'],
     opportunityId: 'mossprout:2026-08-23:dry-pond:day-2:basket',
     generatorId: 'wild-garden',
     dropDefinitionIds: ['nature:waterside:1', 'nature:waterside:1', 'nature:garden:1', 'nature:garden:1'],
@@ -522,8 +523,72 @@ test('Mossprout Journey baskets emit authored drops atomically and stop without 
     type: 'tapGenerator', generatorId: 'wild-garden', activityOpportunityId: activity.opportunityId,
     spendEnergy: false, seed: 'mossprout-basket:exhausted', now: NOW + 10,
   });
-  assert.equal(exhausted.changed, false);
-  assert.match(exhausted.message ?? '', /everything Mossprout found today/i);
+  assert.equal(exhausted.changed, true);
+  const recycled = exhausted.state.board[exhausted.spawnedCell!].occupant;
+  assert.equal(recycled?.kind === 'item' ? recycled.definitionId : null, activity.dropDefinitionIds[0]);
+  assert.equal(exhausted.message?.includes('everything Mossprout found today'), false);
+});
+
+test('an active Mossprout Journey suppresses routine orders through its return handoff', () => {
+  const activity = {
+    objectiveId: 'mossprout:objective:pond-knock',
+    mergeOrderId: 'merge-story:mossprout:quiet-patch:listening-place',
+    mergeOrderIds: ['merge-story:mossprout:quiet-patch:listening-place', 'merge-story:mossprout:quiet-patch:path-for-water'],
+    opportunityId: 'mossprout:2026-08-23:exclusive-journey',
+    generatorId: 'wild-garden',
+    dropDefinitionIds: [],
+  };
+  let state = completeMossproutChapterZeroSlice(createMossproutChapterZeroState(NOW), NOW + 1);
+  state = reduceMergeWorld(state, {
+    type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23', status: 'complete', activity: null, now: NOW + 2,
+  }).state;
+  assert.ok(state.activeOrders.some((order) => order.storyArcId === 'mossprout:casual-garden'));
+
+  state = reduceMergeWorld(state, {
+    type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23', status: 'opening', activity: null, now: NOW + 3,
+  }).state;
+  assert.equal(state.activeOrders.some((order) => order.storyArcId === 'mossprout:casual-garden'), false);
+
+  state = reduceMergeWorld(state, {
+    type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23', status: 'activity_available', activity, now: NOW + 4,
+  }).state;
+  assert.deepEqual(state.activeOrders.filter((order) => order.characterId === 'mossprout').map((order) => order.id), [activity.mergeOrderId]);
+
+  state = reduceMergeWorld(state, {
+    type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23', status: 'return_available', activity, now: NOW + 5,
+  }).state;
+  assert.equal(state.activeOrders.some((order) => order.characterId === 'mossprout'), false);
+});
+
+test('multi-order Journey reconciliation repairs an exhausted saved basket', () => {
+  const opportunityId = 'mossprout:2026-08-23:pond-knock:campaign';
+  const drops = ['nature:waterside:1', 'nature:waterside:1', 'nature:garden:1', 'nature:garden:1', 'nature:waterside:1'];
+  const activity = {
+    objectiveId: 'mossprout:objective:pond-knock',
+    mergeOrderId: 'merge-story:mossprout:quiet-patch:listening-place',
+    mergeOrderIds: ['merge-story:mossprout:quiet-patch:listening-place', 'merge-story:mossprout:quiet-patch:path-for-water'],
+    opportunityId,
+    generatorId: 'wild-garden',
+    dropDefinitionIds: drops,
+  };
+  const base = createMossproutChapterZeroState(NOW);
+  const stale = {
+    ...base,
+    characterActivityOpportunities: [{
+      id: opportunityId, familyId: 'mossprout' as const, dayId: '2026-08-23', generatorId: 'wild-garden',
+      dropDefinitionIds: [], usedCount: 0, createdAt: NOW,
+    }],
+  };
+  const repaired = reduceMergeWorld(stale, {
+    type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23', status: 'activity_in_progress', activity, now: NOW + 1,
+  }).state;
+  assert.deepEqual(repaired.characterActivityOpportunities.find((opportunity) => opportunity.id === opportunityId)?.dropDefinitionIds, drops);
+  const spawn = reduceMergeWorld(repaired, {
+    type: 'tapGenerator', generatorId: 'wild-garden', activityOpportunityId: opportunityId,
+    spendEnergy: false, seed: 'repaired-basket', now: NOW + 2,
+  });
+  assert.equal(spawn.changed, true);
+  assert.equal(spawn.message?.includes('everything Mossprout found'), false);
 });
 
 test('the matched Katchimera card opens a fixed-price Coin collection without equipping forms', () => {
@@ -556,8 +621,9 @@ test('the matched Katchimera card opens a fixed-price Coin collection without eq
 test('Mossprout first resident and card unlock atomically from serving its named order', () => {
   const base = createMossproutChapterZeroState(NOW);
   const activity = {
-    objectiveId: 'mossprout:objective:place-for-rain',
-    mergeOrderId: 'merge-story:mossprout:dry-pond:place-for-rain',
+    objectiveId: 'mossprout:objective:pond-knock',
+    mergeOrderId: 'merge-story:mossprout:quiet-patch:listening-place',
+    mergeOrderIds: ['merge-story:mossprout:quiet-patch:listening-place', 'merge-story:mossprout:quiet-patch:path-for-water'],
     opportunityId: 'mossprout:2026-08-23:resident-order',
     generatorId: 'wild-garden',
     dropDefinitionIds: ['nature:waterside:2'],
@@ -673,9 +739,14 @@ test('an early Mossprout day serves its authored batch before continuing one ord
 
 test('Reset Today replaces an exhausted Mossprout Garden ledger with the first order in its fresh batch', () => {
   let state = createMossproutChapterZeroState(NOW);
+  const journeyOrder = {
+    ...state.activeOrders[0]!,
+    id: 'merge-story:mossprout:quiet-patch:listening-place',
+    storyArcId: 'mossprout:chapter:quiet-patch',
+  };
   state = {
     ...state,
-    activeOrders: [],
+    activeOrders: [journeyOrder],
     mossproutDailyGardenOrders: {
       dayId: '2026-08-23', activeOrderId: null,
       offeredOrderIds: ['old:1', 'old:2', 'old:3'], servedOrderIds: ['old:1', 'old:2', 'old:3'], complete: true,
@@ -686,6 +757,7 @@ test('Reset Today replaces an exhausted Mossprout Garden ledger with the first o
   const gardenOrders = reset.activeOrders.filter((order) => order.storyArcId === 'mossprout:casual-garden');
 
   assert.deepEqual(gardenOrders.map((order) => order.difficulty), ['small']);
+  assert.equal(reset.activeOrders.some((order) => order.id === journeyOrder.id), false);
   assert.deepEqual(reset.mossproutDailyGardenOrders?.servedOrderIds, []);
   assert.equal(reset.mossproutDailyGardenOrders?.activeOrderId, gardenOrders[0]?.id);
 });
@@ -719,17 +791,17 @@ test('a Mossprout story request preempts routine Garden orders', () => {
   state = reduceMergeWorld(state, { type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23', status: 'complete', activity: null, now: NOW + 2 }).state;
   state = reduceMergeWorld(state, {
     type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23', status: 'activity_in_progress',
-    activity: { objectiveId: 'mossprout:objective:nursery-key', mergeOrderId: 'merge-story:mossprout:memory-nursery:nursery-key', opportunityId: 'none', generatorId: 'wild-garden', dropDefinitionIds: [] },
+    activity: { objectiveId: 'mossprout:objective:nursery-key', mergeOrderId: 'merge-story:mossprout:memory-nursery:ivy-gate', opportunityId: 'none', generatorId: 'wild-garden', dropDefinitionIds: [] },
     now: NOW + 3,
   }).state;
   assert.equal(state.activeOrders.some((order) => order.storyArcId === 'mossprout:casual-garden'), false);
-  assert.deepEqual(state.activeOrders.find((order) => order.id === 'merge-story:mossprout:memory-nursery:nursery-key')?.requirements.map((requirement) => requirement.definitionId), ['nature:garden:5', 'nature:waterside:4']);
+  assert.deepEqual(state.activeOrders.find((order) => order.id === 'merge-story:mossprout:memory-nursery:ivy-gate')?.requirements.map((requirement) => requirement.definitionId), ['nature:garden:5']);
   const restored = reduceMergeWorld(state, {
     type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23', status: 'complete', activity: null,
     now: NOW + 4,
   }).state;
   assert.equal(restored.activeOrders.filter((order) => order.storyArcId === 'mossprout:casual-garden').length, 1);
-  assert.equal(restored.activeOrders.some((order) => order.id === 'merge-story:mossprout:memory-nursery:nursery-key'), false);
+  assert.equal(restored.activeOrders.some((order) => order.id === 'merge-story:mossprout:memory-nursery:ivy-gate'), false);
 });
 
 test('every Pantry tap is tier one and chooses both chains', () => {

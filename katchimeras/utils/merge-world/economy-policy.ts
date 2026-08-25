@@ -15,6 +15,7 @@ export const MOSSPROUT_FTUE_JOURNAL_ENERGY = 0;
 
 // Temporary product policy: keep capacity/rest data in saved worlds for the
 // eventual economy redesign, but never consume it or block generator taps.
+// Authored Journey baskets also cycle their useful drops instead of exhausting.
 export const MERGE_GENERATORS_UNLIMITED = true;
 
 export type MergeJournalRewardPreview = {

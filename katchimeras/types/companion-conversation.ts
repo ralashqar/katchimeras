@@ -133,6 +133,8 @@ export type ConversationNode =
       category: string;
       /** Lightweight results are shown as a conclusion without becoming a saved profile insight. */
       persistence?: 'offer_save' | 'display_only';
+      /** Journey insights deliberately resolve to one clear authored observation. */
+      allowSecondary?: boolean;
       results: readonly ConversationInsightResultDefinition[];
       nextNodeId: string | null;
     }

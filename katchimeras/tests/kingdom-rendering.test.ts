@@ -8,10 +8,7 @@ import kingdomWorldViewConfig from '../constants/kingdom-world-view.json';
 import todayScene from '../data/today-scene.json';
 import { visiblePixelBoundsFromRgba } from '../utils/alpha-bounds';
 import { katchimeraFamilies } from '../constants/katchimera-skins';
-import {
-  KINGDOM_ZODIAC_RESERVED_COORD,
-  kingdomCompanionHexSlots,
-} from '../utils/katchimera-kingdom-slots';
+import { kingdomCompanionHexSlots } from '../utils/katchimera-kingdom-slots';
 import {
   cameraTranslationBounds,
   frameToRect,
@@ -43,6 +40,7 @@ import {
   HEX_TILE_H,
   HEX_TILE_W,
   KINGDOM_HEX_LAYOUT_PROFILES,
+  hexSpiral,
   hexTileTopPoints,
   hexToWorld,
 } from '../utils/world-hex';
@@ -121,6 +119,25 @@ test('Organic-island runtime LODs and bounds are bundled', () => {
   assert.match(bounds, /organic_island_v1_gatherglow_hex_tile\.webp/);
 });
 
+test('Floating neighbourhood v2 bundles and maps its new resident environments', () => {
+  const residentKeys = ['baristabbit', 'mendle', 'dawnle', 'pixooka', 'museling', 'encora'];
+  for (const residentKey of residentKeys) {
+    const key = `floating_neighborhood_v2_${residentKey}_hex_tile`;
+    for (const suffix of ['.webp', '_512.webp', '_256.webp']) {
+      const asset = path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'world', 'hex', `${key}${suffix}`);
+      assert.ok(fs.existsSync(asset), `missing ${asset}`);
+      assert.ok(fs.statSync(asset).size > 0, `empty ${asset}`);
+    }
+  }
+
+  const bounds = fs.readFileSync(path.join(process.cwd(), 'constants', 'kingdom-hex-tile-bounds.gen.ts'), 'utf8');
+  const visuals = fs.readFileSync(path.join(process.cwd(), 'utils', 'world-visuals.ts'), 'utf8');
+  for (const residentKey of residentKeys) {
+    assert.match(bounds, new RegExp(`floating_neighborhood_v2_${residentKey}_hex_tile\\.webp`));
+    assert.match(visuals, new RegExp(`${residentKey}:\\s*{[\\s\\S]*floating_neighborhood_v2_${residentKey}_hex_tile\\.webp`));
+  }
+});
+
 test('Organic Islands art pipeline locks soft-toy thumbnail and packaging contracts', () => {
   const contract = JSON.parse(
     fs.readFileSync(path.join(process.cwd(), 'design', 'organic-islands-v1', 'art-pipeline.json'), 'utf8')
@@ -150,17 +167,14 @@ function renderedAssetX(frame: { left: number; width: number }, assetX: number):
   return frame.left + (assetX / 1024) * frame.width;
 }
 
-test('Kingdom reserves one permanent catalog slot for every Katchimera family', () => {
+test('Kingdom assigns every Katchimera family to the uninterrupted hex spiral', () => {
   const locked = kingdomCompanionHexSlots([], []);
   assert.equal(locked.length, 25);
   assert.deepEqual(locked.map((slot) => slot.familyId), katchimeraFamilies.map((family) => family.id));
   assert.equal(new Set(locked.map((slot) => slot.id)).size, locked.length);
   assert.equal(new Set(locked.map((slot) => `${slot.coord.q}:${slot.coord.r}`)).size, locked.length);
   assert.ok(locked.every((slot) => slot.kind === 'locked'));
-  assert.ok(locked.every((slot) => (
-    slot.coord.q !== KINGDOM_ZODIAC_RESERVED_COORD.q
-    || slot.coord.r !== KINGDOM_ZODIAC_RESERVED_COORD.r
-  )));
+  assert.deepEqual(locked.map((slot) => slot.coord), hexSpiral(katchimeraFamilies.length, false));
 });
 
 test('discovering a Katchimera transforms its existing Kingdom slot without moving it', () => {
@@ -202,16 +216,17 @@ test('discovering a Katchimera transforms its existing Kingdom slot without movi
 test('Today day tiles retain a stable alternating row while the camera recenters selection', () => {
   const viewportWidth = 400;
   const spacing = todayHexKingdomSpacing(viewportWidth, 18, 1.15);
+  const neighborhoodSpacing = kingdomWorldViewConfig.hexTiles.layoutProfiles['floating-neighborhood-v2'];
   const first = todayHexDayWorldPosition(0, spacing.horizontalStride, spacing.verticalStep);
   const second = todayHexDayWorldPosition(1, spacing.horizontalStride, spacing.verticalStep);
   const third = todayHexDayWorldPosition(2, spacing.horizontalStride, spacing.verticalStep);
   const camera = todayHexCameraTarget(1, spacing.horizontalStride, spacing.verticalStep);
 
   assert.deepEqual(first, { x: 0, y: 0 });
-  assertClose(second.x, (viewportWidth - 36) * 1.15 * 0.75 * 1.168);
+  assertClose(second.x, (viewportWidth - 36) * 1.15 * 0.75 * neighborhoodSpacing.horizontalSpacing);
   assertClose(
     second.y,
-    (viewportWidth - 36) * 1.15 * (HEX_TILE_H / HEX_TILE_W) * 0.5 * 1.168,
+    (viewportWidth - 36) * 1.15 * (HEX_TILE_H / HEX_TILE_W) * 0.5 * neighborhoodSpacing.verticalSpacing,
   );
   assertClose(third.x, second.x * 2);
   assert.equal(third.y, 0);
@@ -546,12 +561,13 @@ test('connected floating layout applies the measured two-percent seam overlap', 
   assert.ok(neighborPoints[3].y < centerPoints[1].y);
 });
 
-test('floating neighbourhood v2 applies a uniform sixteen-point-eight-percent air gap', () => {
+test('floating neighbourhood v2 applies a uniform two-percent air gap', () => {
   const center = hexToWorld({ q: 0, r: 0 }, 'floating-neighborhood-v2');
   const southEast = hexToWorld({ q: 1, r: 0 }, 'floating-neighborhood-v2');
   const spacing = kingdomWorldViewConfig.hexTiles.layoutProfiles['floating-neighborhood-v2'];
   assertClose(southEast.x - center.x, HEX_TILE_W * 0.75 * spacing.horizontalSpacing);
   assertClose(southEast.y - center.y, HEX_TILE_H * 0.5 * spacing.verticalSpacing);
+  assert.deepEqual(spacing, { horizontalSpacing: 1.02, verticalSpacing: 1.02 });
   assert.ok(southEast.x > hexToWorld({ q: 1, r: 0 }, 'connected-floating-v1').x);
 });
 

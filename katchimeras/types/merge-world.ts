@@ -113,6 +113,7 @@ export type MossproutRootGateState = {
 };
 export type MossproutProgressionSignals = {
   activeJourneyDayIds: string[];
+  completedBeatIds?: string[];
   friendshipLevel: number;
   natureMemoryDayIds: string[];
   focusStage: number;
@@ -419,7 +420,7 @@ export type MergeWorldCommand =
   | { type: 'claimStepEnergy'; dayId: string; observedSteps: number; observedAt: string; allowBootstrap: boolean; receiptId: string; now: number }
   | { type: 'setEnergyRegenPaused'; paused: boolean; now: number }
   | { type: 'featureCharacter'; characterId: MergeCharacterId; now: number }
-  | { type: 'reconcileCharacterActivity'; familyId: MergeCharacterId; dayId: string; status: string; activity: { objectiveId: string; mergeOrderId: string; opportunityId: string; generatorId: string; dropDefinitionIds: string[] } | null; residentSignals?: { completedObjectiveIds: string[]; matchedCardIds: KatchimeraSkinId[]; firstResidentSkinId?: KatchimeraSkinId | null; habitatStage: 0 | 1 | 2 | 3 | 4 }; now: number }
+  | { type: 'reconcileCharacterActivity'; familyId: MergeCharacterId; dayId: string; status: string; activity: { objectiveId: string; mergeOrderId: string; mergeOrderIds?: string[]; servedOrderIds?: string[]; opportunityId: string; generatorId: string; dropDefinitionIds: string[] } | null; residentSignals?: { completedObjectiveIds: string[]; completedBeatIds?: string[]; matchedCardIds: KatchimeraSkinId[]; firstResidentSkinId?: KatchimeraSkinId | null; habitatStage: 0 | 1 | 2 | 3 | 4 }; now: number }
   | { type: 'grantKatchimeraCard'; cardId: KatchimeraSkinId; familyId: MergeCharacterId; sourceReceiptId: string; now: number }
   | { type: 'purchaseKatchimeraCard'; cardId: KatchimeraSkinId; familyId: MergeCharacterId; cost: number; purchaseId: string; now: number }
   | { type: 'ackGeneratorUnlock'; receiptId: string; now: number }

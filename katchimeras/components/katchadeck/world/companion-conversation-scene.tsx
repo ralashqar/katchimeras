@@ -31,6 +31,8 @@ import {
   useCompanionAdaptivePanel,
 } from '@/hooks/use-companion-adaptive-panel';
 import { CompanionChoiceList } from './companion-choice-list';
+import type { CompanionMergeRequest } from './companion-merge-request-tray';
+import { MossproutJourneyRequestPanel } from './mossprout-journey-request-panel';
 import { KatchimeraPageHeader } from './katchimera-page-header';
 
 export function conversationSpeechLine(
@@ -45,6 +47,7 @@ export function conversationSpeechLine(
     if (outcome.kind === 'insight') return `I’ve added ${outcome.title} to what I know about you.`;
     return `I’ll remember: ${outcome.title}`;
   }
+  if (session.pendingReply !== undefined) return session.pendingReply;
   if (session.status === 'completed' && session.lastReply) return session.lastReply;
   const node = conversationNode(definition, session.currentNodeId);
   if (!node) return 'We can stay here quietly for a moment.';
@@ -81,6 +84,9 @@ export function CompanionConversationScene({
   onJournalHandoff,
   onQuestHandoff,
   hasActiveFocus,
+  journeyTaskHandoff = false,
+  journeyTaskRequests = [],
+  journeyTaskTitle,
   storyFlow = false,
   storyFinale = false,
   session,
@@ -112,6 +118,9 @@ export function CompanionConversationScene({
   onJournalHandoff: (open: boolean, node: Extract<ConversationNode, { kind: 'journal_handoff' }>) => void;
   onQuestHandoff: (accept: boolean, node: Extract<ConversationNode, { kind: 'quest_handoff' }>) => void;
   hasActiveFocus: boolean;
+  journeyTaskHandoff?: boolean;
+  journeyTaskRequests?: readonly CompanionMergeRequest[];
+  journeyTaskTitle?: string;
   memories: readonly CompanionMemory[];
   onUpdateMemory: (input: { memoryId: string; status: 'confirmed' | 'rejected' | 'forgotten'; summary?: string }) => void;
   onStoryComplete?: () => void;
@@ -128,6 +137,7 @@ export function CompanionConversationScene({
   const { height, width } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
   const node = conversationNode(definition, session.currentNodeId);
+  const journeyNarrative = definition.purpose === 'journey' && definition.format === 'narrative';
   const haptic = () => {
     if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
   };
@@ -235,11 +245,24 @@ export function CompanionConversationScene({
             onAdvance={onAdvance}
             requiresManualAdvance={requiresManualAdvance}
           />
-        ) : session.pendingReply !== undefined ? <NarrativeTransition label="Mossprout is thinking…" /> : session.status === 'completed' || node?.kind === 'end' ? (
+        ) : session.pendingReply !== undefined ? <NarrativeTransition
+          label={journeyNarrative ? 'Continue the story' : 'Mossprout is thinking…'}
+          onAdvance={journeyNarrative ? onAdvance : undefined}
+          requiresManualAdvance={journeyNarrative && requiresManualAdvance}
+        /> : session.status === 'completed' || node?.kind === 'end' ? (
           session.preview ? <View style={{ alignItems: 'center', gap: 10, paddingVertical: 6 }}>
             <ThemedText selectable style={{ fontSize: 14, lineHeight: 20, textAlign: 'center' }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>Preview complete. Choose another flow below or exit the preview.</ThemedText>
-          </View> : <NarrativeTransition
-            label={storyFlow && !storyFinale ? 'Opening the next chapter…' : `Returning to ${name}…`}
+          </View> : journeyNarrative && node?.kind === 'end' && journeyTaskHandoff ? <MossproutJourneyRequestPanel
+            onAction={requiresManualAdvance ? onAdvance : undefined}
+            requests={journeyTaskRequests}
+            title={journeyTaskTitle ?? 'Today’s Garden requests'}
+          /> : <NarrativeTransition
+            label={journeyNarrative && node?.kind === 'end'
+              ? journeyTaskHandoff ? 'Your Garden request is ready' : 'Finish today’s Journey'
+              : storyFlow && !storyFinale ? 'Opening the next chapter…' : `Returning to ${name}…`}
+            actionLabel={journeyNarrative && node?.kind === 'end'
+              ? journeyTaskHandoff ? 'Go to the Garden' : 'Finish Journey'
+              : undefined}
             onAdvance={onAdvance}
             requiresManualAdvance={requiresManualAdvance}
           />
@@ -484,14 +507,15 @@ function MemoryProposal({ node, onDecision, session }: {
   </View>;
 }
 
-function NarrativeTransition({ label, onAdvance, requiresManualAdvance = false }: {
+function NarrativeTransition({ actionLabel = 'Continue', label, onAdvance, requiresManualAdvance = false }: {
+  actionLabel?: string;
   label: string;
   onAdvance?: () => void;
   requiresManualAdvance?: boolean;
 }) {
   return <View accessibilityLiveRegion="polite" style={{ gap: 9 }}>
     <ThemedText selectable style={{ fontSize: 13.5, fontWeight: '900', lineHeight: 18, textAlign: 'center' }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{label}</ThemedText>
-    {onAdvance && requiresManualAdvance ? <PrimaryAction label="Continue" onPress={onAdvance} /> : null}
+    {onAdvance && requiresManualAdvance ? <PrimaryAction label={actionLabel} onPress={onAdvance} /> : null}
   </View>;
 }
 

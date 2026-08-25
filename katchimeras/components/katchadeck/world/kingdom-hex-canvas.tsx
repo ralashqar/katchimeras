@@ -27,13 +27,12 @@ import { useKingdomLodScheduler } from '@/components/katchadeck/world/use-kingdo
 import { useKingdomTileScheduler } from '@/components/katchadeck/world/use-kingdom-tile-scheduler';
 import { KINGDOM_RENDERING } from '@/constants/kingdom-rendering';
 import kingdomWorldViewConfig from '@/constants/kingdom-world-view.json';
-import { zodiacFamiliarSource } from '@/constants/world-identity-art';
 import { Lantern } from '@/constants/theme';
 import type { EggVisualState } from '@/types/home';
 import type { FtueCameraDirective } from '@/features/onboarding/ftue-types';
 import type { WorldIdentityState } from '@/types/world-identity';
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
-import { homePreset, zodiacProfile } from '@/utils/world-identity';
+import { homePreset } from '@/utils/world-identity';
 import { HEX_TILE_H, HEX_TILE_W, hexDrawDepth } from '@/utils/world-hex';
 import {
   kingdomWorldViewPoint,
@@ -52,6 +51,7 @@ import {
 import { useScenePerformanceProbe } from '@/hooks/use-scene-performance-probe';
 import {
   kingdomHexTileSet,
+  kingdomHexTileOverlaySourceForLod,
   kingdomHexTileSourceForLod,
   worldAssetSource,
   type KingdomHexTileLod,
@@ -81,15 +81,12 @@ type Props = {
   onSelectLocked?: () => void;
   onSelectResident?: (creatureId: string, label: string) => void;
   onSelectHome?: () => void;
-  onSelectZodiac?: () => void;
   onUpgradePresentationComplete?: (presentation: HavenTileUpgradePresentation) => void;
   upgradePresentation?: HavenTileUpgradePresentation | null;
 };
 
 const CREATURE_SIZE = 58;
 const CREATURE_WORLD_SCALE = kingdomWorldViewConfig.katchimera.globalScale;
-const ZODIAC_WORLD_SCALE = kingdomWorldViewConfig.zodiac.globalScale;
-const ZODIAC_WORLD_SIZE = CREATURE_SIZE * ZODIAC_WORLD_SCALE;
 const EGG_STAGE_W = 200;
 const EGG_STAGE_H = 258;
 const EGG_WORLD_SCALE = kingdomWorldViewConfig.egg.globalScale;
@@ -119,7 +116,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   onSelectLocked,
   onSelectResident,
   onSelectHome,
-  onSelectZodiac,
   onUpgradePresentationComplete,
   upgradePresentation,
 }: Props) {
@@ -484,40 +480,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       });
     }
 
-    const zodiacTile = scene.tiles.find((tile) => tile.kind === 'zodiac');
-    const zodiac = zodiacProfile(identity?.zodiacSignId);
-    if (zodiacTile && zodiac && scheduler.readyTileIds.has(zodiacTile.id)) {
-      const runtime = runtimeById.get(zodiacTile.id);
-      if (runtime && (scheduler.visibleTileIds.has(zodiacTile.id) || runtime.phase === 'exiting')) {
-        const { x, y } = artLayerById.get(zodiacTile.id)?.residentAnchor ?? kingdomWorldViewPoint(
-          { x: zodiacTile.cx, y: zodiacTile.cy },
-          kingdomWorldViewConfig.zodiac
-        );
-        items.push({
-          depth: hexDrawDepth({ x, y }, 4),
-          node: (
-            <ZodiacCreature
-              accessibilityLabel={`${zodiac.familiarName}, ${zodiac.name} star companion`}
-              focusAnchorX={zodiacTile.cx}
-              focusAnchorY={zodiacTile.cy}
-              focusId={zodiacTile.id}
-              focusScale={tileFocusScale(zodiacTile.id)}
-              key={`zodiac-creature-${zodiac.id}`}
-              onFocus={interactionEnabled ? camera.focusResident : ignoreFocus}
-              onPress={onSelectZodiac}
-              phase={runtime.phase}
-              settled={!camera.isMoving}
-              source={zodiacFamiliarSource(zodiac.element, camera.residentLod)}
-              x={x}
-              y={y}
-            />
-          ),
-        });
-      }
-    }
-
     return items.sort((a, b) => a.depth - b.depth).map((item) => item.node);
-  }, [allowedResidentCharacterId, artLayerById, camera.focusResident, camera.isMoving, camera.residentLod, creatureWorldSize, identity?.zodiacSignId, ignoreFocus, interactionEnabled, onSelectLocked, onSelectResident, onSelectZodiac, residentStatusGlyphs, runtimeById, scene.tiles, scheduler.readyTileIds, scheduler.visibleTileIds, tileFocusScale, upgradePhase, upgradePresentation]);
+  }, [allowedResidentCharacterId, artLayerById, camera.focusResident, camera.isMoving, camera.residentLod, creatureWorldSize, ignoreFocus, interactionEnabled, onSelectLocked, onSelectResident, residentStatusGlyphs, runtimeById, scene.tiles, scheduler.readyTileIds, scheduler.visibleTileIds, tileFocusScale, upgradePhase, upgradePresentation]);
 
   const centerRuntime = runtimeById.get(scene.centerTile.id);
   const home = homePreset(identity?.selectedHomeArchetypeId);
@@ -551,6 +515,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                   ? 'medium'
                   : scheduledLod;
               const source = kingdomHexTileSourceForLod(layer, lod);
+              const overlaySource = kingdomHexTileOverlaySourceForLod(layer, lod);
               const fallbackSource = layer.fallbackSource
                 ? kingdomHexTileSourceForLod(
                     { source: layer.fallbackSource, sources: layer.fallbackSources },
@@ -567,6 +532,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                     frame={layer.frame}
                     lod={lod}
                     source={source}
+                    overlaySource={overlaySource}
                     fallbackSource={fallbackSource}
                     phase={runtime.phase}
                     priority={lod === 'full' || layer.id === scene.centerTile.id ? 'high' : scheduler.visibleTileIds.has(layer.id) ? 'normal' : 'low'}
@@ -704,6 +670,7 @@ type TileArtProps = {
   priority: 'low' | 'normal' | 'high';
   settled: boolean;
   source: ImageSourcePropType;
+  overlaySource: ImageSourcePropType | null;
 };
 
 const KingdomTileArt = memo(function KingdomTileArt({
@@ -722,6 +689,7 @@ const KingdomTileArt = memo(function KingdomTileArt({
   priority,
   settled,
   source,
+  overlaySource,
 }: TileArtProps) {
   const opacity = useSharedValue(0);
   const lift = useSharedValue(12);
@@ -761,12 +729,20 @@ const KingdomTileArt = memo(function KingdomTileArt({
     <TileFocusTransform anchorX={focusAnchorX} anchorY={focusAnchorY} frame={frame} scale={focusScale}>
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, animatedStyle]}>
         <SeamlessWorldImage
+          allowDownscaling={lod !== 'full'}
           source={source}
           fallbackSource={fallbackSource}
           priority={priority}
           onReady={handleLoaded}
           onFailure={handleFailed}
         />
+        {overlaySource ? (
+          <SeamlessWorldImage
+            allowDownscaling={lod !== 'full'}
+            source={overlaySource}
+            priority={priority}
+          />
+        ) : null}
       </Animated.View>
     </TileFocusTransform>
   );
@@ -797,14 +773,18 @@ const HavenUpgradeTileArt = memo(function HavenUpgradeTileArt({
   const newStyle = useAnimatedStyle(() => ({ opacity: newOpacity.value }));
   const oldSource = kingdomHexTileSourceForLod(fromLayer, 'medium');
   const newSource = kingdomHexTileSourceForLod(toLayer, 'medium');
+  const oldOverlaySource = kingdomHexTileOverlaySourceForLod(fromLayer, 'medium');
+  const newOverlaySource = kingdomHexTileOverlaySourceForLod(toLayer, 'medium');
 
   return (
     <>
       <Animated.View pointerEvents="none" style={[styles.tileArt, fromLayer.frame, oldStyle]}>
         <SeamlessWorldImage priority="high" source={oldSource} />
+        {oldOverlaySource ? <SeamlessWorldImage priority="high" source={oldOverlaySource} /> : null}
       </Animated.View>
       <Animated.View pointerEvents="none" style={[styles.tileArt, toLayer.frame, newStyle]}>
         <SeamlessWorldImage priority="high" source={newSource} />
+        {newOverlaySource ? <SeamlessWorldImage priority="high" source={newOverlaySource} /> : null}
       </Animated.View>
     </>
   );
@@ -1064,81 +1044,6 @@ const ResidentCreature = memo(function ResidentCreature({
           ) : null}
           {source ? <SeamlessWorldImage source={source} priority="normal" onReady={markReady} onFailure={markReady} /> : null}
           {statusGlyph ? <ResidentStatusGlyph status={statusGlyph} /> : null}
-        </Animated.View>
-      </Pressable>
-    </TileFocusTransform>
-  );
-});
-
-const ZodiacCreature = memo(function ZodiacCreature({
-  accessibilityLabel,
-  focusAnchorX,
-  focusAnchorY,
-  focusId,
-  focusScale,
-  onFocus,
-  onPress,
-  phase,
-  settled,
-  source,
-  x,
-  y,
-}: {
-  accessibilityLabel: string;
-  focusAnchorX: number;
-  focusAnchorY: number;
-  focusId: string;
-  focusScale: number;
-  onFocus: (x: number, y: number, options?: { id?: string }) => void;
-  onPress?: () => void;
-  phase: KingdomTilePhase;
-  settled: boolean;
-  source: ImageSourcePropType;
-  x: number;
-  y: number;
-}) {
-  const [ready, setReady] = useState(false);
-  const opacity = useSharedValue(0);
-  const lift = useSharedValue(12);
-  const shownRef = useRef(false);
-
-  useEffect(() => {
-    if (phase === 'exiting') {
-      opacity.value = withTiming(0, { duration: KINGDOM_RENDERING.exitDurationMs });
-      lift.value = withTiming(6, { duration: KINGDOM_RENDERING.exitDurationMs });
-      return;
-    }
-    if (!ready || (!shownRef.current && !settled)) return;
-    shownRef.current = true;
-    opacity.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) });
-    lift.value = withSpring(0, { damping: 14, stiffness: 210 });
-  }, [lift, opacity, phase, ready, settled]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: lift.value }],
-  }));
-  const handlePress = useCallback(() => {
-    onFocus(x, y, { id: focusId });
-    onPress?.();
-  }, [focusId, onFocus, onPress, x, y]);
-  const markReady = useCallback(() => setReady(true), []);
-  const frame = {
-    height: ZODIAC_WORLD_SIZE,
-    left: x - ZODIAC_WORLD_SIZE / 2,
-    top: y - CREATURE_SIZE * 0.63 - (ZODIAC_WORLD_SIZE - CREATURE_SIZE),
-    width: ZODIAC_WORLD_SIZE,
-  };
-
-  return (
-    <TileFocusTransform anchorX={focusAnchorX} anchorY={focusAnchorY} frame={frame} scale={focusScale}>
-      <Pressable
-        accessibilityLabel={accessibilityLabel}
-        accessibilityRole="button"
-        onPress={handlePress}
-        style={StyleSheet.absoluteFill}>
-        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, animatedStyle]}>
-          <SeamlessWorldImage source={source} priority="normal" onReady={markReady} onFailure={markReady} />
         </Animated.View>
       </Pressable>
     </TileFocusTransform>

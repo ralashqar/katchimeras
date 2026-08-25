@@ -2,6 +2,7 @@ import { createContext, type PropsWithChildren, use, useCallback, useEffect, use
 import { AppState } from 'react-native';
 
 import { companionIdForFamily, katchimeraSkinById } from '@/constants/katchimera-skins';
+import { MOSSPROUT_CAMPAIGN_EPISODES, mossproutCampaignEpisodeByBeatId, mossproutCampaignOrderDrops } from '@/constants/mossprout-campaign';
 import { KATCHIMERA_MERGE_PROFILES } from '@/constants/merge-world-catalog';
 import { useWisps } from '@/features/wisps/wisp-provider';
 import type { HomeDayRecord } from '@/types/home';
@@ -19,7 +20,7 @@ import { reduceMergeWorld } from '@/utils/merge-world/engine';
 import { mossproutFocusStage } from '@/utils/merge-world/mossprout-focus-progression';
 import { mergeWorldPendingPersistence, type MergeWorldPendingPersistence } from '@/utils/merge-world/persistence-buffer';
 import { loadFirstSession } from '@/features/onboarding/first-session';
-import { mossproutDailyActionDeck, mossproutJourneyForDay, mossproutStory, recordKatchimeraActionCompletion, recordMossproutFirstGardenRestored, recordMossproutJourneyOrderServed, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
+import { mossproutDailyActionDeck, mossproutJourneyForDay, mossproutJourneyRuntimeDayId, mossproutStory, recordKatchimeraActionCompletion, recordMossproutFirstGardenRestored, recordMossproutJourneyOrderServed, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { completeMossproutChapterZeroSlice, isMossproutChapterZeroActive } from '@/utils/merge-world/chapter-zero-policy';
 import { loadMergeWorldState, saveMergeWorldState, subscribeMergeWorldResets, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
@@ -28,6 +29,7 @@ import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 import { loadCompanionQuickGoalState, subscribeCompanionQuickGoals } from '@/utils/companion-quick-goal-storage';
 import { loadCompanionJourneyState, subscribeCompanionJourneys } from '@/utils/companion-journey-storage';
 import { localDayId } from '@/utils/world-identity';
+import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
 
 type MergeWorldContextValue = {
   state: MergeWorldState | null;
@@ -53,10 +55,22 @@ const AUTHORED_COHORT_FAMILIES: readonly AuthoredCohortFamilyId[] = [
 
 function mossproutProgressionSignals(days: readonly HomeDayRecord[], friendshipLevel: number, ownedWispIds: string[]) {
   const relationships = relationshipProgressionRepository.load();
+  const completedBeatIds = mossproutStory(relationships).completedBeatIds ?? [];
   const activeJourneyDayIds = [...new Set([
     ...relationships.journeyDays.filter((journey) => journey.familyId === 'mossprout' && journey.status === 'complete').map((journey) => journey.dayId),
     ...relationships.completedActionOutros.filter((record) => record.familyId === 'mossprout').map((record) => record.dayId),
   ])].sort();
+  if (isJourneyQuickModeEnabled()) {
+    const simulatedActiveDays = Math.max(
+      activeJourneyDayIds.length,
+      ...MOSSPROUT_CAMPAIGN_EPISODES
+        .filter((episode) => completedBeatIds.includes(episode.beatId))
+        .map((episode) => episode.unlockGardenDay),
+    );
+    while (activeJourneyDayIds.length < simulatedActiveDays) {
+      activeJourneyDayIds.push(`journey-quick:${String(activeJourneyDayIds.length + 1).padStart(2, '0')}`);
+    }
+  }
   const completedGardenDayIds = [...new Set(relationships.completedActionOutros
     .filter((record) => record.familyId === 'mossprout' && record.kind === 'garden_request')
     .map((record) => record.dayId))].sort();
@@ -72,6 +86,7 @@ function mossproutProgressionSignals(days: readonly HomeDayRecord[], friendshipL
   const focusStage = mossproutFocusStage(journey, quickGoals);
   return {
     activeJourneyDayIds,
+    completedBeatIds,
     friendshipLevel,
     natureMemoryDayIds,
     focusStage,
@@ -187,8 +202,9 @@ export function MergeWorldProvider({
         const orderId = receipt.id.replace('merge-story-served:', '');
         relationshipProgressionRepository.update((current) => {
           if (orderId === 'mossprout:chapter-0:first-sprout') {
-            const dayId = localDayId(new Date(receipt.createdAt));
-            const started = startMossproutJourneyDay(current, dayId, receipt.createdAt).state;
+            const quickMode = isJourneyQuickModeEnabled();
+            const dayId = mossproutJourneyRuntimeDayId(current, localDayId(new Date(receipt.createdAt)), quickMode);
+            const started = startMossproutJourneyDay(current, dayId, receipt.createdAt, 0, quickMode).state;
             return recordMossproutFirstGardenRestored(started, dayId, `merge-order:${orderId}`, receipt.createdAt);
           }
           return recordMossproutJourneyOrderServed(current, orderId, receipt.createdAt);
@@ -252,27 +268,32 @@ export function MergeWorldProvider({
 
   const reconcileMossproutStory = useCallback((current: MergeWorldState, now = Date.now()) => {
     const relationships = relationshipProgressionRepository.load();
-    const dayId = localDayId(new Date(now));
+    const dayId = mossproutJourneyRuntimeDayId(relationships, localDayId(new Date(now)), isJourneyQuickModeEnabled());
     const journey = mossproutJourneyForDay(relationships, dayId);
+    const journeyEpisode = journey ? mossproutCampaignEpisodeByBeatId.get(journey.beatId) : null;
+    const journeyActivity = journey?.activity && journeyEpisode ? {
+      ...journey.activity,
+      dropDefinitionIds: mossproutCampaignOrderDrops(journeyEpisode),
+    } : journey?.activity ?? null;
     const story = mossproutStory(relationships, now);
     const matchedCardIds = [...new Set(relationships.journeyDays.flatMap((journeyDay) => {
       if (journeyDay.familyId !== 'mossprout' || typeof journeyDay.matchedCardId !== 'string') return [];
       const skin = katchimeraSkinById.get(journeyDay.matchedCardId);
       return skin?.familyId === 'mossprout' ? [journeyDay.matchedCardId as KatchimeraSkinId] : [];
     }))];
-    const firstResidentSkinId = journey?.beatId === 'dry-pond:day-1'
-      && typeof journey.matchedCardId === 'string'
-      && katchimeraSkinById.get(journey.matchedCardId)?.familyId === 'mossprout'
-      ? journey.matchedCardId as KatchimeraSkinId
+    const firstResidentSkinId = typeof story.coStarSkinId === 'string'
+      && katchimeraSkinById.get(story.coStarSkinId)?.familyId === 'mossprout'
+      ? story.coStarSkinId as KatchimeraSkinId
       : null;
     return reduceMergeWorld(current, {
       type: 'reconcileCharacterActivity',
       familyId: 'mossprout',
       dayId,
       status: journey?.status ?? 'idle',
-      activity: journey?.activity ?? null,
+      activity: journeyActivity,
       residentSignals: {
         completedObjectiveIds: story.completedObjectiveIds,
+        completedBeatIds: story.completedBeatIds ?? [],
         matchedCardIds,
         firstResidentSkinId,
         habitatStage: story.habitatStage,
