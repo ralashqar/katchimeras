@@ -1196,7 +1196,16 @@ function ackResidentCardDialogue(state: MergeWorldState, discoveryId: string, no
   const records = state.residentCardDiscovery.records.map((candidate) => candidate.id === discoveryId
     ? { ...candidate, status: 'orders_active' as const, dialogueSeenAt: candidate.dialogueSeenAt ?? now }
     : candidate);
-  return changed(touch({ ...state, activeOrders, residentCardDiscovery: { ...state.residentCardDiscovery, records } }, now), `${record.residentId} has a first garden request.`);
+  const garden = state.generators['wild-garden'];
+  const generators = record.residentId === 'petalimp' && garden
+    ? { ...state.generators, 'wild-garden': { ...garden, forcedDropDefinitionId: 'nature:garden:1' } }
+    : state.generators;
+  return changed(touch({
+    ...state,
+    activeOrders,
+    generators,
+    residentCardDiscovery: { ...state.residentCardDiscovery, records },
+  }, now), `${record.residentId} has a garden request.`);
 }
 
 function ackResidentCardReveal(state: MergeWorldState, discoveryId: string, now: number): MergeWorldCommandResult {

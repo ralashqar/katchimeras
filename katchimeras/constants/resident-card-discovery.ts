@@ -37,19 +37,23 @@ export function nextUnearnedMossproutResident(earnedIds: readonly KatchimeraSkin
   return MOSSPROUT_RESIDENT_CARD_NODES.find((node) => !earned.has(node.residentId))?.residentId ?? null;
 }
 
-export function residentDiscoveryOrders(discoveryId: string, residentId: KatchimeraSkinId, now: number): [MergeOrder, MergeOrder] {
+export function residentDiscoveryOrders(discoveryId: string, residentId: KatchimeraSkinId, now: number): MergeOrder[] {
   const resident = mossproutResidentById.get(residentId) ?? mossproutResidentById.get('mossprout')!;
   const theme = resident.requestThemes[0] ?? 'garden';
   const chain = theme === 'waterside' ? 'nature:waterside' : theme === 'keepsake' ? 'nature:keepsake' : 'nature:garden';
   const copy = resident.requestCopy;
-  return [0, 1].map((index): MergeOrder => ({
+  const firstResidentLesson = residentId === 'petalimp';
+  const requestCount = firstResidentLesson ? 1 : 2;
+  return Array.from({ length: requestCount }, (_, index): MergeOrder => ({
     id: `${discoveryId}:order:${index + 1}`,
     characterId: 'mossprout',
     recipientSkinId: residentId,
     title: copy[index]?.title ?? `A request from ${residentId}`,
     description: copy[index]?.description ?? 'Bring one small thing for the garden.',
     difficulty: 'small',
-    requirements: [{ definitionId: `${chain}:${index + 2}`, quantity: 1 }],
+    // Petalimp's fixed FTUE request is the tier-three Plant produced by the
+    // Seed -> locked Seed -> locked Sprout lesson.
+    requirements: [{ definitionId: firstResidentLesson ? 'nature:garden:3' : `${chain}:${index + 2}`, quantity: 1 }],
     reward: { coins: 15 + index * 5, mergeXp: 4, friendshipXp: 4, energy: 0 },
     createdAt: now,
     signature: false,
@@ -57,8 +61,8 @@ export function residentDiscoveryOrders(discoveryId: string, residentId: Katchim
     storyArcId: discoveryId,
     storyBeatId: discoveryId,
     storyStep: index + 1,
-    storyStepCount: 2,
-  })) as [MergeOrder, MergeOrder];
+    storyStepCount: requestCount,
+  }));
 }
 
 export const MOSSPROUT_DISCOVERABLE_RESIDENT_IDS = MOSSPROUT_RESIDENT_IDS.filter((id) => id !== 'mossprout');

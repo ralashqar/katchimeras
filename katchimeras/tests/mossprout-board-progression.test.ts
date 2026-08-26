@@ -8,10 +8,11 @@ import {
   RESIDENT_CARD_KEY_DEFINITION_ID,
   RETIRED_RESIDENT_NODE_ROOT_GATE_IDS,
 } from '@/constants/resident-card-discovery';
-import { mergeFtueBoardGate, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepForBoard } from '@/features/onboarding/merge-ftue';
+import { mergeFtueBoardGate, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepForBoard, residentFtueCanonicalStep } from '@/features/onboarding/merge-ftue';
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import type { MergeWorldState, MossproutProgressionSignals } from '@/types/merge-world';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld, resetMergeActivityForDay } from '@/utils/merge-world/engine';
+import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
 
 const NOW = new Date('2026-08-25T10:00:00.000Z').getTime();
 
@@ -110,8 +111,9 @@ test('resident FTUE binds its parcel and drag targets to the active discovery', 
   assert.equal(mergeFtueStepForBoard(claimed, null)?.id, 'merge.resident_card');
   const cardCell = claimed.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === RESIDENT_CARD_DEFINITION_ID);
   assert.deepEqual(mergeFtueBoardGate(mossproutFtueStep('merge.resident_card'), claimed), {
-    kind: 'drag', fromCell: cardCell, toCell: record.nodeCell,
+    kind: 'drag', fromCell: cardCell, toCell: 8,
   });
+  assert.notEqual(record.nodeCell, 8);
   assert.equal(mergeFtueRepairTarget(mossproutFtueStep('merge.resident_parcel'), claimed), 'merge.resident_card');
 });
 
@@ -131,30 +133,62 @@ test('normalization migrates a claimed legacy key and never deletes the gated ca
   assert.equal(normalized.arrivals.filter((arrival) => arrival.kind === 'resident_card_parcel' && arrival.claimedAt == null).length, 0);
 });
 
-test('reveal, resident dialogue, two sequential orders, and card reward form one durable lifecycle', () => {
+test('Petalimp has one tier-three request and earns its card after that request', () => {
   let state = claimAndReveal(activate());
   const record = state.residentCardDiscovery.records[0]!;
   assert.equal(record.status, 'revealed');
   state = reduceMergeWorld(state, { type: 'ackResidentCardDialogue', discoveryId: record.id, now: NOW + 4 }).state;
   assert.equal(state.activeOrders.length, 1);
   assert.equal(state.activeOrders[0]?.storyStep, 1);
+  assert.equal(state.activeOrders[0]?.storyStepCount, 1);
+  assert.equal(state.activeOrders[0]?.requirements[0]?.definitionId, 'nature:garden:3');
 
-  let order = state.activeOrders[0]!;
+  const order = state.activeOrders[0]!;
   state = placeRequirement(state, order.requirements[0]!.definitionId, NOW + 5);
-  const first = reduceMergeWorld(state, { type: 'serveOrder', orderId: order.id, now: NOW + 6 });
-  assert.equal(first.residentCardEarned, undefined);
-  assert.equal(first.state.activeOrders.find((candidate) => candidate.storyArcId === record.id)?.storyStep, 2);
+  const served = reduceMergeWorld(state, { type: 'serveOrder', orderId: order.id, now: NOW + 6 });
+  assert.deepEqual(served.residentCardEarned, { discoveryId: record.id, residentId: 'petalimp' });
+  assert.equal(served.state.residentCardDiscovery.records[0]?.status, 'card_earned');
+  assert.equal(served.state.ownedKatchimeraCards.find((card) => card.cardId === 'petalimp')?.acquisition, 'resident_discovery');
+  assert.equal(served.state.residentCardDiscovery.records[0]?.cardRevealSeenAt, null);
 
-  order = first.state.activeOrders.find((candidate) => candidate.storyArcId === record.id)!;
-  state = placeRequirement(first.state, order.requirements[0]!.definitionId, NOW + 7);
-  const second = reduceMergeWorld(state, { type: 'serveOrder', orderId: order.id, now: NOW + 8 });
-  assert.deepEqual(second.residentCardEarned, { discoveryId: record.id, residentId: 'petalimp' });
-  assert.equal(second.state.residentCardDiscovery.records[0]?.status, 'card_earned');
-  assert.equal(second.state.ownedKatchimeraCards.find((card) => card.cardId === 'petalimp')?.acquisition, 'resident_discovery');
-  assert.equal(second.state.residentCardDiscovery.records[0]?.cardRevealSeenAt, null);
+  const acknowledged = reduceMergeWorld(served.state, { type: 'ackResidentCardReveal', discoveryId: record.id, now: NOW + 7 });
+  assert.equal(acknowledged.state.residentCardDiscovery.records[0]?.cardRevealSeenAt, NOW + 7);
+});
 
-  const acknowledged = reduceMergeWorld(second.state, { type: 'ackResidentCardReveal', discoveryId: record.id, now: NOW + 9 });
-  assert.equal(acknowledged.state.residentCardDiscovery.records[0]?.cardRevealSeenAt, NOW + 9);
+test('the first resident lesson resumes through forced Seed, locked Seed, locked Sprout, then Serve', () => {
+  let state = createMossproutChapterZeroState(NOW);
+  state = {
+    ...state,
+    activeOrders: [],
+    board: state.board.map((cell) => cell.occupant?.kind === 'item' ? { ...cell, occupant: null } : cell),
+  };
+  state = reduceMergeWorld(state, {
+    type: 'activateResidentCardDiscovery', campaignId: 'mossprout:journey', journeyDayId: 'journey-day-1', residentId: 'petalimp', now: NOW + 1,
+  }).state;
+  const record = state.residentCardDiscovery.records[0]!;
+  state = reduceMergeWorld(state, { type: 'claimArrival', arrivalId: record.parcelId!, now: NOW + 2 }).state;
+  const cardGate = mergeFtueBoardGate(mossproutFtueStep('merge.resident_card'), state);
+  assert.equal(cardGate.kind, 'drag');
+  if (cardGate.kind !== 'drag') return;
+  state = reduceMergeWorld(state, { type: 'move', from: cardGate.fromCell, to: cardGate.toCell, now: NOW + 3 }).state;
+  state = reduceMergeWorld(state, { type: 'ackResidentCardDialogue', discoveryId: record.id, now: NOW + 4 }).state;
+  assert.equal(residentFtueCanonicalStep(state), 'merge.resident_seed_spawn');
+  assert.equal(state.generators['wild-garden']?.forcedDropDefinitionId, 'nature:garden:1');
+
+  const spawned = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: 'wild-garden', now: NOW + 5, seed: 'resident-ftue' });
+  const spawnedOccupant = spawned.state.board[spawned.spawnedCell!]?.occupant;
+  assert.equal(spawnedOccupant?.kind, 'item');
+  assert.equal(spawnedOccupant?.kind === 'item' ? spawnedOccupant.definitionId : null, 'nature:garden:1');
+  state = spawned.state;
+  assert.equal(residentFtueCanonicalStep(state), 'merge.resident_seed_echo');
+  state = reduceMergeWorld(state, { type: 'move', from: spawned.spawnedCell!, to: 23, now: NOW + 6 }).state;
+  assert.equal(residentFtueCanonicalStep(state), 'merge.resident_sprout_echo');
+  state = reduceMergeWorld(state, { type: 'move', from: 23, to: 25, now: NOW + 7 }).state;
+  assert.equal(state.board[25]?.occupant?.kind === 'item' ? state.board[25]?.occupant?.definitionId : null, 'nature:garden:3');
+  assert.equal(residentFtueCanonicalStep(state), 'merge.resident_orders');
+  const order = state.activeOrders.find((candidate) => candidate.storyArcId === record.id)!;
+  const served = reduceMergeWorld(state, { type: 'serveOrder', orderId: order.id, now: NOW + 8 });
+  assert.deepEqual(served.residentCardEarned, { discoveryId: record.id, residentId: 'petalimp' });
 });
 
 test('normalization resumes parcel, reveal, orders, and unacknowledged card states without duplication', () => {

@@ -21,6 +21,13 @@ const RESIDENT_BY_PLACE: Readonly<Record<string, KatchimeraSkinId>> = {
   windy_hill: 'driftkin',
 };
 
+/**
+ * The first-session resident lesson is authored around Petalimp's Garden
+ * request. Later Journey resident discoveries can still use affinity and
+ * next-unearned selection; the FTUE itself must remain deterministic.
+ */
+export const MOSSPROUT_FTUE_FIRST_RESIDENT_ID: KatchimeraSkinId = 'petalimp';
+
 export function mossproutResidentForPlace(placeId: string | null | undefined): KatchimeraSkinId | null {
   return placeId ? RESIDENT_BY_PLACE[placeId] ?? null : null;
 }
@@ -31,7 +38,7 @@ export function recordMossproutOnboardingAnswer(actionId: string, optionId: stri
   const profile = loadOnboardingProfile();
   const mossproutAnswers = { ...profile.mossproutAnswers, [field]: optionId };
   const matchedResidentId = field === 'companionPlaceId'
-    ? mossproutResidentForPlace(optionId)
+    ? MOSSPROUT_FTUE_FIRST_RESIDENT_ID
     : profile.matchedResidentId;
   const next = {
     ...profile,
@@ -43,6 +50,16 @@ export function recordMossproutOnboardingAnswer(actionId: string, optionId: stri
     mossproutAnswers,
     matchedResidentId,
   };
+  saveOnboardingProfile(next);
+  return next;
+}
+
+/** Repairs active/older first-session saves that chose a resident before the
+ * deterministic Petalimp lesson was introduced. */
+export function ensureMossproutFtueFirstResident() {
+  const profile = loadOnboardingProfile();
+  if (profile.matchedResidentId === MOSSPROUT_FTUE_FIRST_RESIDENT_ID) return profile;
+  const next = { ...profile, matchedResidentId: MOSSPROUT_FTUE_FIRST_RESIDENT_ID };
   saveOnboardingProfile(next);
   return next;
 }

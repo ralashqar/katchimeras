@@ -1,4 +1,5 @@
 import type { MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
+import { MERGE_WORLD_COLUMNS } from '@/constants/merge-world-catalog';
 
 import type { FtueEvent, FtueStepDefinition, FtueTarget } from './ftue-types';
 import { mossproutFtueStep } from './mossprout-ftue-script';
@@ -8,6 +9,19 @@ function activeResidentDiscovery(state: MergeWorldState) {
   return records.find((record) => record.status !== 'locked' && (record.status !== 'card_earned' || record.cardRevealSeenAt == null))
     ?? records.find((record) => record.status !== 'locked')
     ?? null;
+}
+
+const RESIDENT_SEED_ECHO_ID = 'mossprout-seed-echo';
+const RESIDENT_SPROUT_ECHO_ID = 'mossprout-sprout-echo';
+
+function residentGrowthLessonStep(state: MergeWorldState) {
+  const seedEchoCleared = state.boardAwakeningReceipts.some((receipt) => receipt.id === `dream-echo:${RESIDENT_SEED_ECHO_ID}`);
+  const sproutEchoCleared = state.boardAwakeningReceipts.some((receipt) => receipt.id === `dream-echo:${RESIDENT_SPROUT_ECHO_ID}`);
+  if (!seedEchoCleared) {
+    const seedReady = state.board.some((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:1');
+    return seedReady ? 'merge.resident_seed_echo' : 'merge.resident_seed_spawn';
+  }
+  return sproutEchoCleared ? 'merge.resident_orders' : 'merge.resident_sprout_echo';
 }
 
 /** Canonical resident step derived from durable board progress, not UI history. */
@@ -21,7 +35,9 @@ export function residentFtueCanonicalStep(state: MergeWorldState) {
       : record.status === 'revealed' && record.dialogueSeenAt == null
         ? 'merge.resident_dialogue'
         : record.status === 'revealed' || record.status === 'orders_active'
-          ? 'merge.resident_orders'
+          ? record.residentId === 'petalimp'
+            ? residentGrowthLessonStep(state)
+            : 'merge.resident_orders'
           : record.cardRevealSeenAt == null
             ? 'merge.resident_card_reward'
             : 'companion.resident_match_result';
@@ -92,11 +108,22 @@ export function resolveFtueBoardCell(state: MergeWorldState, target: FtueTarget)
   if (target.kind === 'active_resident_card_node') {
     const discovery = activeResidentDiscovery(state);
     if (!discovery) return null;
-    // Any still-locked resident-card cell is a valid physical match. The
-    // active Journey discovery decides who is revealed, not the chosen cell.
-    const cell = state.board.findIndex((entry) => entry.mist?.kind === 'resident_card'
-      && entry.mist.discoveryId === discovery.id && entry.mist.ready);
-    return cell >= 0 ? cell : null;
+    // Any still-locked resident-card cell can reveal the Journey resident, but
+    // the first lesson points at exactly one deterministic, nearby card. That
+    // keeps the finger swipe short while preserving free placement later.
+    const sourceCell = state.board.findIndex((entry) => entry.occupant?.kind === 'item'
+      && entry.occupant.progressionGateId === discovery.nodeGateId);
+    const candidates = state.board.flatMap((entry, cell) => entry.mist?.kind === 'resident_card'
+      && entry.mist.discoveryId === discovery.id && entry.mist.ready ? [cell] : []);
+    if (!candidates.length) return null;
+    if (sourceCell < 0) return candidates[0] ?? null;
+    const sourceColumn = sourceCell % MERGE_WORLD_COLUMNS;
+    const sourceRow = Math.floor(sourceCell / MERGE_WORLD_COLUMNS);
+    return candidates.reduce((nearest, cell) => {
+      const distance = Math.abs((cell % MERGE_WORLD_COLUMNS) - sourceColumn) + Math.abs(Math.floor(cell / MERGE_WORLD_COLUMNS) - sourceRow);
+      const nearestDistance = Math.abs((nearest % MERGE_WORLD_COLUMNS) - sourceColumn) + Math.abs(Math.floor(nearest / MERGE_WORLD_COLUMNS) - sourceRow);
+      return distance < nearestDistance || (distance === nearestDistance && cell < nearest) ? cell : nearest;
+    });
   }
   if (target.kind === 'board_cell') return target.cell;
   if (target.kind === 'board_generator') {

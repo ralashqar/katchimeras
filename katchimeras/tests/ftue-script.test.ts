@@ -78,7 +78,7 @@ test('the Egg asks five distinct player-focused questions before Hatch', () => {
   );
 });
 
-test('local player details stay bounded and companion places select a resident safely', () => {
+test('local player details stay bounded while the first FTUE resident stays fixed to Petalimp', () => {
   const profile = readFileSync('features/onboarding/mossprout-profile.ts', 'utf8');
   const state = readFileSync('utils/onboarding-state.ts', 'utf8');
   assert.match(state, /replace\(\/\[\\u0000-\\u001F\\u007F\]\/g, ' '\)\.replace\(\/\\s\+\/g, ' '\)\.trim\(\)/);
@@ -88,6 +88,8 @@ test('local player details stay bounded and companion places select a resident s
   assert.match(profile, /rainy_pond: 'drizzlet'/);
   assert.match(profile, /windy_hill: 'driftkin'/);
   assert.match(profile, /RESIDENT_BY_PLACE\[placeId\] \?\? null/);
+  assert.match(profile, /MOSSPROUT_FTUE_FIRST_RESIDENT_ID: KatchimeraSkinId = 'petalimp'/);
+  assert.match(profile, /field === 'companionPlaceId'[\s\S]*?MOSSPROUT_FTUE_FIRST_RESIDENT_ID/);
 });
 
 test('the first Bond action opens one real multiple-choice question before completion', () => {
@@ -186,6 +188,7 @@ test('Supabase receipt allowlist matches every backend FTUE action', () => {
   const v27Migration = readFileSync('supabase/migrations/20260826090000_register_mossprout_ftue_v27.sql', 'utf8');
   const v28Migration = readFileSync('supabase/migrations/20260826120000_register_mossprout_ftue_v28.sql', 'utf8');
   const v29Migration = readFileSync('supabase/migrations/20260826143000_register_mossprout_ftue_v29.sql', 'utf8');
+  const v30Migration = readFileSync('supabase/migrations/20260826170000_register_mossprout_ftue_v30.sql', 'utf8');
   const v23Migration = readFileSync('supabase/migrations/20260825223000_register_mossprout_ftue_v23.sql', 'utf8');
   const v22Migration = readFileSync('supabase/migrations/20260825190000_register_mossprout_ftue_v22.sql', 'utf8');
   const v21Migration = readFileSync('supabase/migrations/20260825173000_register_mossprout_ftue_v21.sql', 'utf8');
@@ -195,7 +198,7 @@ test('Supabase receipt allowlist matches every backend FTUE action', () => {
   const v17Migration = readFileSync('supabase/migrations/20260822173032_register_mossprout_ftue_v17.sql', 'utf8');
   const priorMigration = readFileSync('supabase/migrations/20260818170000_register_mossprout_ftue_v16.sql', 'utf8');
   for (const item of FTUE_ACTION_CATALOG.filter((entry) => entry.backendEvent)) {
-    assert.match(`${priorMigration}\n${v17Migration}\n${v18Migration}\n${migration}\n${v20Migration}\n${v21Migration}\n${v22Migration}\n${v23Migration}\n${v24Migration}\n${v25Migration}\n${v26Migration}\n${v27Migration}\n${v28Migration}\n${v29Migration}`, new RegExp(`'${item.stepId}',\\s*'${item.actionId}'`));
+    assert.match(`${priorMigration}\n${v17Migration}\n${v18Migration}\n${migration}\n${v20Migration}\n${v21Migration}\n${v22Migration}\n${v23Migration}\n${v24Migration}\n${v25Migration}\n${v26Migration}\n${v27Migration}\n${v28Migration}\n${v29Migration}\n${v30Migration}`, new RegExp(`'${item.stepId}',\\s*'${item.actionId}'`));
   }
   assert.match(v24Migration, /script_version = 23/);
   assert.match(v25Migration, /script_version = 24/);
@@ -203,11 +206,12 @@ test('Supabase receipt allowlist matches every backend FTUE action', () => {
   assert.match(v27Migration, /script_version = 26/);
   assert.match(v28Migration, /script_version = 27/);
   assert.match(v29Migration, /script_version = 28/);
+  assert.match(v30Migration, /script_version = 29/);
   assert.match(v23Migration, /script_version = 22/);
   assert.match(v22Migration, /script_version = 21/);
   assert.match(migration, /script_version = 18/);
   assert.doesNotMatch(migration, /step_id not in/);
-  assert.doesNotMatch(`${priorMigration}\n${migration}\n${v20Migration}\n${v24Migration}\n${v25Migration}\n${v26Migration}\n${v27Migration}\n${v28Migration}\n${v29Migration}`, /option_id|option_label|answer_text/);
+  assert.doesNotMatch(`${priorMigration}\n${migration}\n${v20Migration}\n${v24Migration}\n${v25Migration}\n${v26Migration}\n${v27Migration}\n${v28Migration}\n${v29Migration}\n${v30Migration}`, /option_id|option_label|answer_text/);
 });
 
 test('Chapter 0 previews its requests and keeps the first-session board tutorial to merge then serve', () => {
@@ -231,6 +235,12 @@ test('Chapter 0 previews its requests and keeps the first-session board tutorial
   assert.equal(mossproutFtueAction('companion.day_one_action', 'companion.complete_day_one_action')?.nextStepId, 'companion.garden_intro');
   assert.equal(mossproutFtueAction('companion.resident_affinity', 'companion.complete_resident_affinity')?.nextStepId, 'companion.resident_parcel_ready');
   assert.equal(mossproutFtueAction('companion.resident_parcel_ready', 'companion.open_resident_parcel')?.nextStepId, 'merge.resident_parcel');
+  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.resident_dialogue')?.edges?.[0]?.nextStepId, 'merge.resident_seed_spawn');
+  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.resident_seed_spawn')?.edges?.[0]?.nextStepId, 'merge.resident_seed_echo');
+  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.resident_seed_echo')?.edges?.[0]?.nextStepId, 'merge.resident_sprout_echo');
+  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.resident_sprout_echo')?.edges?.[0]?.nextStepId, 'merge.resident_orders');
+  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.resident_orders')?.edges?.[0]?.requiredCount, undefined);
+  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.resident_orders')?.interaction?.mode, 'exclusive');
   assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.resident_card_reward')?.edges?.[0]?.nextStepId, 'companion.resident_match_result');
   assert.equal(mossproutFtueAction('companion.resident_match_result', 'companion.ack_resident_match_result')?.nextStepId, 'complete');
   assert.equal(mossproutFtueAction('haven.reveal', 'haven.reveal_world')?.nextStepId, 'complete');
@@ -742,7 +752,7 @@ test('FTUE starts friendship before the Garden and returns directly to the match
   const transition = readFileSync('features/navigation/game-screen-transition.tsx', 'utf8');
   const ftueRuntime = readFileSync('features/onboarding/ftue-runtime.ts', 'utf8');
   assert.match(merge, /ftueRun\.stepId !== 'companion\.chapter_zero_return'[\s\S]*?target: 'companion'[\s\S]*?ftue: 'chapter-zero-return'/);
-  assert.match(companion, /const matchedResidentId = loadOnboardingProfile\(\)\.matchedResidentId[\s\S]*?actionId: 'companion\.complete_chapter_zero_return'[\s\S]*?nextStepId: matchedResidentId \? 'companion\.resident_parcel_ready' : 'companion\.resident_affinity'/);
+  assert.match(companion, /const matchedResidentId = ensureMossproutFtueFirstResident\(\)\.matchedResidentId[\s\S]*?actionId: 'companion\.complete_chapter_zero_return'[\s\S]*?nextStepId: matchedResidentId \? 'companion\.resident_parcel_ready' : 'companion\.resident_affinity'/);
   assert.match(companion, /run\.stepId === 'companion\.nickname'[\s\S]*?saveMossproutPlayerNickname[\s\S]*?kind: 'friendship_started'[\s\S]*?actionId: 'companion\.save_nickname'/);
   assert.match(companion, /kind: 'friendship_started'[\s\S]*?queueCelebration: true/);
   assert.match(companion, /MOSSPROUT_FTUE_NAME_BOND_TARGET - companionBondProgress/);
@@ -753,6 +763,7 @@ test('FTUE starts friendship before the Garden and returns directly to the match
   assert.match(mossproutFtueStage, /onFinished=\{\(\) => undefined\}/);
   assert.match(companion, /actionId: 'companion\.complete_day_one_action'[\s\S]*?nextRun\?\.status !== 'complete'[\s\S]*?seedStoredMossproutGardenAfterFtue/);
   assert.match(companion, /openFtueResidentParcel[\s\S]*?activateStoredResidentCardDiscovery[\s\S]*?router\.push/);
+  assert.match(companion, /activateStoredResidentCardDiscovery\([\s\S]*?MOSSPROUT_FTUE_FIRST_RESIDENT_ID/);
   assert.match(companion, /beginResidentMergeHandoff\(\)[\s\S]*?await activateStoredResidentCardDiscovery/);
   assert.match(companion, /catch \(error\) \{[\s\S]*?cancelResidentMergeHandoff\(\)/);
   assert.match(companion, /await activateStoredResidentCardDiscovery[\s\S]*?actionId: 'companion\.open_resident_parcel'[\s\S]*?nextStepId: 'merge\.resident_parcel'[\s\S]*?await flushFtuePersistence\(\)[\s\S]*?const navigateToResidentMerge[\s\S]*?navigate: navigateToResidentMerge/);

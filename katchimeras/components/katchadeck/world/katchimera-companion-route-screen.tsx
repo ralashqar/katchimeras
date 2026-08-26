@@ -25,7 +25,11 @@ import { useRelationshipProgression } from '@/hooks/use-relationship-progression
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { recordMossproutMatchedCard } from '@/game/katchimeras/relationship-progression';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
-import { saveMossproutPlayerNickname } from '@/features/onboarding/mossprout-profile';
+import {
+  ensureMossproutFtueFirstResident,
+  MOSSPROUT_FTUE_FIRST_RESIDENT_ID,
+  saveMossproutPlayerNickname,
+} from '@/features/onboarding/mossprout-profile';
 import { companionBondProgress, recordCompanionBondEvent } from '@/utils/companion-bond';
 import { loadCompanionBondState, saveCompanionBondState } from '@/utils/companion-bond-storage';
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
@@ -177,7 +181,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       if (ftueHandoffRef.current) return;
       ftueHandoffRef.current = true;
       const completedAt = Date.now();
-      const matchedResidentId = loadOnboardingProfile().matchedResidentId;
+      const matchedResidentId = ensureMossproutFtueFirstResident().matchedResidentId;
       if (matchedResidentId) {
         relationshipProgressionRepository.update((current) => {
           const journey = [...current.journeyDays].reverse().find((candidate) => candidate.familyId === 'mossprout');
@@ -326,7 +330,15 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     if (residentParcelOpeningRef.current) return;
     const currentRelationships = relationshipProgressionRepository.load();
     const journey = [...currentRelationships.journeyDays].reverse().find((candidate) => candidate.familyId === 'mossprout') ?? null;
-    if (!journey?.matchedCardId) return;
+    if (!journey) return;
+    ensureMossproutFtueFirstResident();
+    if (journey.matchedCardId !== MOSSPROUT_FTUE_FIRST_RESIDENT_ID) {
+      relationshipProgressionRepository.update((current) => recordMossproutMatchedCard(
+        current,
+        journey.dayId,
+        MOSSPROUT_FTUE_FIRST_RESIDENT_ID,
+      ));
+    }
     beginResidentMergeHandoff();
     residentParcelOpeningRef.current = true;
     try {
@@ -354,7 +366,12 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       // Merge before navigation. Foreground recovery can now restore the board
       // exactly like the earlier Merge tutorial instead of seeing the stale
       // companion step and returning the player to Mossprout.
-      await activateStoredResidentCardDiscovery('mossprout:journey', journey.dayId, journey.matchedCardId, Date.now());
+      await activateStoredResidentCardDiscovery(
+        'mossprout:journey',
+        journey.dayId,
+        MOSSPROUT_FTUE_FIRST_RESIDENT_ID,
+        Date.now(),
+      );
       const handoffRun = loadFtueRun();
       if (handoffRun?.status === 'active' && handoffRun.stepId === 'companion.resident_parcel_ready') {
         commitFtueAction({

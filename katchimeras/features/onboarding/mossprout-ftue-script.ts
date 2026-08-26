@@ -103,7 +103,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 29,
+  version: 30,
   entryStepId: 'egg.opening',
   terminalStepId: 'complete',
   steps: [
@@ -429,14 +429,43 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       id: 'merge.resident_dialogue', surface: 'merge', navigation: mossproutMergeResume,
       guide: { eyebrow: 'A new voice', title: 'Meet the resident.', body: 'They have their own request for the garden.' },
       actions: [{ id: 'merge.meet_resident', title: 'Meet the resident', description: 'Hear what they need.', icon: 'bubble.left.fill', presentation: 'observed_game_action', handlerId: 'acknowledgement', backendEvent: true }],
-      edges: [{ event: { type: 'resident_dialogue_acknowledged' }, commitActionId: 'merge.meet_resident', nextStepId: 'merge.resident_orders' }],
+      edges: [{ event: { type: 'resident_dialogue_acknowledged' }, commitActionId: 'merge.meet_resident', nextStepId: 'merge.resident_seed_spawn' }],
+    },
+    {
+      id: 'merge.resident_seed_spawn', surface: 'merge', navigation: mossproutMergeResume,
+      guide: { eyebrow: 'Petalimp’s request', title: 'Grow one Seed.', body: 'Tap the Wild Garden once. It will give you the Seed we need.' },
+      actions: [{ id: 'merge.spawn_resident_seed', title: 'Grow a Seed', description: 'Tap the Wild Garden once.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_generator_spawned', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'generator_tap', target: { kind: 'board_generator', generatorId: 'wild-garden' } } },
+      cue: { kind: 'tap', target: { kind: 'board_generator', generatorId: 'wild-garden' } },
+      spotlight: { targets: [{ kind: 'board_generator', generatorId: 'wild-garden' }], padding: 5, radius: 12, dimOpacity: 0.64 },
+      edges: [{ event: { type: 'item_spawned', generatorId: 'wild-garden', definitionId: 'nature:garden:1' }, commitActionId: 'merge.spawn_resident_seed', nextStepId: 'merge.resident_seed_echo' }],
+    },
+    {
+      id: 'merge.resident_seed_echo', surface: 'merge', navigation: mossproutMergeResume,
+      guide: { eyebrow: 'A Seed in the mist', title: 'Match the locked Seed.', body: 'Drag your Seed onto the identical Seed under the clouds.' },
+      actions: [{ id: 'merge.clear_resident_seed_echo', title: 'Make a Sprout', description: 'Drag the Seed into its locked match.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 }, to: { kind: 'board_dream_echo', echoId: 'mossprout-seed-echo' } } },
+      cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 }, to: { kind: 'board_dream_echo', echoId: 'mossprout-seed-echo' } },
+      spotlight: { targets: [{ kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 }, { kind: 'board_dream_echo', echoId: 'mossprout-seed-echo' }], grouping: 'bounding_rect', padding: 3, radius: 11, dimOpacity: 0.64 },
+      edges: [{ event: { type: 'dream_echo_cleared', echoId: 'mossprout-seed-echo', resultDefinitionId: 'nature:garden:2' }, commitActionId: 'merge.clear_resident_seed_echo', nextStepId: 'merge.resident_sprout_echo' }],
+    },
+    {
+      id: 'merge.resident_sprout_echo', surface: 'merge', navigation: mossproutMergeResume,
+      guide: { eyebrow: 'A Sprout in the mist', title: 'Match the locked Sprout.', body: 'Drag your new Sprout onto the identical Sprout under the clouds.' },
+      actions: [{ id: 'merge.clear_resident_sprout_echo', title: 'Make a Plant', description: 'Drag the Sprout into its locked match.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from: { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 0 }, to: { kind: 'board_dream_echo', echoId: 'mossprout-sprout-echo' } } },
+      cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 0 }, to: { kind: 'board_dream_echo', echoId: 'mossprout-sprout-echo' } },
+      spotlight: { targets: [{ kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 0 }, { kind: 'board_dream_echo', echoId: 'mossprout-sprout-echo' }], grouping: 'bounding_rect', padding: 3, radius: 11, dimOpacity: 0.64 },
+      edges: [{ event: { type: 'dream_echo_cleared', echoId: 'mossprout-sprout-echo', resultDefinitionId: 'nature:garden:3' }, commitActionId: 'merge.clear_resident_sprout_echo', nextStepId: 'merge.resident_orders' }],
     },
     {
       id: 'merge.resident_orders', surface: 'merge', navigation: mossproutMergeResume,
-      guide: { eyebrow: 'Help them settle in', title: 'Complete the requests.', body: 'The next appears after this one is served.' },
-      actions: [{ id: 'merge.serve_resident_orders', title: 'Serve the requests', description: 'Help the resident earn their place in the deck.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_order_served', backendEvent: true }],
-      spotlight: { targets: [{ kind: 'active_resident_order_card' }], padding: 5, radius: 14, dimOpacity: 0.38, dismissOnGuideClose: true },
-      edges: [{ event: { type: 'order_served', residentDiscovery: true }, requiredCount: 2, commitActionId: 'merge.serve_resident_orders', nextStepId: 'merge.resident_card_reward' }],
+      guide: { eyebrow: 'Petalimp’s request', title: 'Serve the Plant.', body: 'Tap Serve to give Petalimp the Plant you grew.' },
+      actions: [{ id: 'merge.serve_resident_orders', title: 'Serve the request', description: 'Help Petalimp earn their place in the deck.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_order_served', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'order_serve', target: { kind: 'active_resident_order_serve' } } },
+      cue: { kind: 'tap', target: { kind: 'active_resident_order_serve' } },
+      spotlight: { targets: [{ kind: 'active_resident_order_card' }, { kind: 'active_resident_order_serve' }], grouping: 'individual', padding: 7, radius: 14, dimOpacity: 0.38, dismissOnGuideClose: true },
+      edges: [{ event: { type: 'order_served', residentDiscovery: true }, commitActionId: 'merge.serve_resident_orders', nextStepId: 'merge.resident_card_reward' }],
     },
     {
       id: 'merge.resident_card_reward', surface: 'merge', navigation: mossproutMergeResume,
@@ -600,8 +629,26 @@ export function validateMossproutFtueScript(): string[] {
         errors.push('Resident reveal step is not bound to its sealed card and mystery node');
       }
     }
+    if (step.id === 'merge.resident_seed_spawn') {
+      const allowed = step.interaction?.mode === 'exclusive' ? step.interaction.allowed : null;
+      if (allowed?.kind !== 'generator_tap' || allowed.target.kind !== 'board_generator' || allowed.target.generatorId !== 'wild-garden') {
+        errors.push('Resident Seed lesson is not bound to one Wild Garden tap');
+      }
+    }
+    if (step.id === 'merge.resident_seed_echo' || step.id === 'merge.resident_sprout_echo') {
+      const allowed = step.interaction?.mode === 'exclusive' ? step.interaction.allowed : null;
+      if (allowed?.kind !== 'board_drag' || allowed.to.kind !== 'board_dream_echo') {
+        errors.push(`Resident locked-slot lesson is not an exclusive drag: ${step.id}`);
+      }
+    }
     if (step.id === 'merge.resident_orders' && (step.edges?.[0]?.event.type !== 'order_served' || !step.edges[0].event.residentDiscovery)) {
       errors.push('Resident request step accepts an unrelated order');
+    }
+    if (step.id === 'merge.resident_orders') {
+      const allowed = step.interaction?.mode === 'exclusive' ? step.interaction.allowed : null;
+      if (allowed?.kind !== 'order_serve' || allowed.target.kind !== 'active_resident_order_serve' || step.edges?.[0]?.requiredCount != null) {
+        errors.push('First resident request must gate one active Serve action');
+      }
     }
   }
   if (!ids.has(MOSSPROUT_FTUE_SCRIPT.entryStepId)) errors.push('Missing entry step');
