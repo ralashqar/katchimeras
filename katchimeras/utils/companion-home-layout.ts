@@ -1,4 +1,9 @@
 import type { HomeVisualKey } from '@/types/home';
+import {
+  HOME_FTUE_CAMERA_SCALE,
+  HOME_FTUE_CAMERA_Y_OFFSET,
+  HOME_SCENE_Y_OFFSET,
+} from '@/constants/home-loop-layout';
 import { todayExplorationCreatureStageFrame } from '@/utils/today-kingdom-hero-layout';
 
 const BACKGROUND_OVERSCAN = 1.18;
@@ -65,6 +70,60 @@ export function companionDestinationStageLift(
   // Raise the shared art plane to its coverage boundary. The two-pixel guard
   // prevents filtered image edges from appearing on fractional-pixel screens.
   return Math.max(0, (backgroundSize - viewportHeight) / 2 + stageDrop - 2);
+}
+
+/**
+ * Maps the retained FTUE hatch subject and the regular Companion subject onto
+ * one identical screen-space frame throughout their crossfade. Each renderer
+ * has different authored size and alpha-baseline geometry, so merely applying
+ * the same destination lift makes their blended silhouette appear to jump.
+ */
+export function companionFtueSubjectHandoffLayout(
+  viewportWidth: number,
+  viewportHeight: number,
+  visualKey: HomeVisualKey,
+) {
+  const hatchFrame = todayExplorationCreatureStageFrame(
+    viewportWidth,
+    viewportHeight,
+    0,
+    visualKey,
+  );
+  const regularLayout = companionHomeStageLayout(viewportWidth, viewportHeight, visualKey);
+  const destinationLift = companionDestinationStageLift(viewportHeight, viewportWidth);
+  const viewportCenterY = viewportHeight / 2;
+  const hatchCenterY = viewportCenterY
+    + (HOME_SCENE_Y_OFFSET + hatchFrame.centerY - viewportCenterY)
+      * HOME_FTUE_CAMERA_SCALE
+    + HOME_FTUE_CAMERA_Y_OFFSET;
+  const hatchSize = hatchFrame.size * HOME_FTUE_CAMERA_SCALE;
+  const regularRawCenterY = regularLayout.creatureFrame.centerY + regularLayout.translateY;
+  const regularFinalCenterY = regularRawCenterY - destinationLift;
+  const regularSize = regularLayout.creatureFrame.size;
+
+  const incomingStartScale = hatchSize / regularSize;
+  const incomingStartTranslateY = hatchCenterY - (
+    viewportCenterY
+    + (regularRawCenterY - viewportCenterY) * incomingStartScale
+  );
+  const outgoingEndScale = regularSize / hatchSize;
+  const outgoingEndTranslateY = regularFinalCenterY - (
+    viewportCenterY
+    + (hatchCenterY - viewportCenterY) * outgoingEndScale
+  );
+
+  return {
+    destinationLift,
+    hatchCenterY,
+    hatchSize,
+    incomingStartScale,
+    incomingStartTranslateY,
+    outgoingEndScale,
+    outgoingEndTranslateY,
+    regularFinalCenterY,
+    regularRawCenterY,
+    regularSize,
+  };
 }
 
 export function companionHubHeroSpacer(viewportHeight: number): number {

@@ -41,7 +41,7 @@ type TransitionRequest = {
   announcement: string;
   createdAt: number;
   id: number;
-  navigate: () => void;
+  navigate: () => void | Promise<void>;
   target: GameSurfaceId;
   expectedPathname?: string;
   navigationKey?: string;
@@ -190,10 +190,13 @@ export function GameScreenTransitionProvider({ children }: PropsWithChildren) {
     if (!current || phaseRef.current !== 'covering') return;
     coveredAtRef.current = Date.now();
     commitPhase('covered');
-    navigationFrameRef.current = requestAnimationFrame(() => {
+    navigationFrameRef.current = requestAnimationFrame(async () => {
       navigationFrameRef.current = null;
       try {
-        current.navigate();
+        // Durable ownership changes can run here without exposing an
+        // intermediate source screen: the curtain is already fully covered.
+        // Readiness begins only after the destination was actually mounted.
+        await current.navigate();
       } catch (error) {
         console.warn('[screen-transition] Navigation failed', error);
         commitPhase('failed_recoverable');

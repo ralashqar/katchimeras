@@ -314,107 +314,108 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   const openFtueGarden = useCallback(async () => {
     if (ftueHandoffRef.current) return;
     ftueHandoffRef.current = true;
-    const run = loadFtueRun();
-    try {
-      await installMossproutOnboardingMergeWorld(Date.now(), ftueWispForRun(run));
-      updateFtueRun({ mergeInstalled: true });
-      const result = await advanceFtueActionDurably({
-        expectedStepId: 'companion.order_preview',
-        actionId: 'companion.open_garden',
-        evidenceRef: 'mossprout-order-preview',
-      });
-      if (result.run?.status !== 'active' || result.step?.surface !== 'merge') {
-        ftueHandoffRef.current = false;
-        return;
-      }
-      transitionTo({
-        announcement: "Opening Mossprout's Garden",
-        target: 'merge',
-        navigate: () => router.push({ pathname: '/katchimera/[creatureId]/activity', params: { creatureId } }),
-      });
-    } catch (error) {
+    const transitionAccepted = transitionTo({
+      announcement: "Opening Mossprout's Garden",
+      target: 'merge',
+      navigate: async () => {
+        const run = loadFtueRun();
+        try {
+          await installMossproutOnboardingMergeWorld(Date.now(), ftueWispForRun(run));
+          updateFtueRun({ mergeInstalled: true });
+          const result = await advanceFtueActionDurably({
+            expectedStepId: 'companion.order_preview',
+            actionId: 'companion.open_garden',
+            evidenceRef: 'mossprout-order-preview',
+          });
+          if (result.run?.status !== 'active' || result.step?.surface !== 'merge') {
+            throw new Error('Mossprout Garden did not accept FTUE ownership');
+          }
+          router.push({ pathname: '/katchimera/[creatureId]/activity', params: { creatureId } });
+        } catch (error) {
+          ftueHandoffRef.current = false;
+          console.warn('Could not prepare Mossprout Garden', error);
+          throw error;
+        }
+      },
+    });
+    if (!transitionAccepted) {
+      // Another transition owns the curtain, so this request was not queued.
       ftueHandoffRef.current = false;
-      console.warn('Could not prepare Mossprout Garden', error);
     }
   }, [creatureId, router, transitionTo]);
   const openFtueResidentParcel = useCallback(async () => {
     if (residentParcelOpeningRef.current) return;
-    const currentRelationships = relationshipProgressionRepository.load();
-    const journey = [...currentRelationships.journeyDays].reverse().find((candidate) => candidate.familyId === 'mossprout') ?? null;
-    if (!journey) return;
-    ensureMossproutFtueFirstResident();
-    if (journey.matchedCardId !== MOSSPROUT_FTUE_FIRST_RESIDENT_ID) {
-      relationshipProgressionRepository.update((current) => recordMossproutMatchedCard(
-        current,
-        journey.dayId,
-        MOSSPROUT_FTUE_FIRST_RESIDENT_ID,
-      ));
-    }
-    beginResidentMergeHandoff();
     residentParcelOpeningRef.current = true;
-    try {
-      // Repair older persisted runs one authored edge at a time. Each commit is
-      // idempotent, so this is also safe on the normal path.
-      for (let index = 0; index < 5; index += 1) {
-        const run = loadFtueRun();
-        if (run?.status !== 'active') break;
-        if (run.stepId === 'companion.bond_spotlight') {
-          commitFtueAction({ actionId: 'companion.acknowledge_bond', evidenceRef: 'parcel-handoff:bond' });
-          continue;
+    const transitionAccepted = transitionTo({
+      announcement: 'Opening the veiled resident parcel',
+      target: 'merge',
+      // The source stays intact until the curtain is covered. Only then do we
+      // move durable ownership to Merge and mount its route.
+      navigate: async () => {
+        try {
+          const currentRelationships = relationshipProgressionRepository.load();
+          const journey = [...currentRelationships.journeyDays].reverse().find((candidate) => candidate.familyId === 'mossprout') ?? null;
+          if (!journey) throw new Error('No Mossprout Journey exists for the resident parcel');
+          ensureMossproutFtueFirstResident();
+          if (journey.matchedCardId !== MOSSPROUT_FTUE_FIRST_RESIDENT_ID) {
+            relationshipProgressionRepository.update((current) => recordMossproutMatchedCard(
+              current,
+              journey.dayId,
+              MOSSPROUT_FTUE_FIRST_RESIDENT_ID,
+            ));
+          }
+          beginResidentMergeHandoff();
+          // Repair older persisted runs one authored edge at a time. Each
+          // commit is idempotent, so this is safe on the normal path too.
+          for (let index = 0; index < 5; index += 1) {
+            const run = loadFtueRun();
+            if (run?.status !== 'active') break;
+            if (run.stepId === 'companion.bond_spotlight') {
+              commitFtueAction({ actionId: 'companion.acknowledge_bond', evidenceRef: 'parcel-handoff:bond' });
+              continue;
+            }
+            if (run.stepId === 'companion.day_one_action') {
+              commitFtueAction({ actionId: 'companion.complete_day_one_action', evidenceRef: 'parcel-handoff:day-one-action' });
+              continue;
+            }
+            if (run.stepId === 'companion.resident_affinity') {
+              commitFtueAction({ actionId: 'companion.complete_resident_affinity', evidenceRef: 'parcel-handoff:resident-affinity' });
+              continue;
+            }
+            if (run.stepId === 'companion.resident_parcel_ready' || run.stepId.startsWith('merge.resident_')) break;
+            break;
+          }
+          await activateStoredResidentCardDiscovery(
+            'mossprout:journey',
+            journey.dayId,
+            MOSSPROUT_FTUE_FIRST_RESIDENT_ID,
+            Date.now(),
+          );
+          const handoffRun = loadFtueRun();
+          if (handoffRun?.status === 'active' && handoffRun.stepId === 'companion.resident_parcel_ready') {
+            commitFtueAction({
+              actionId: 'companion.open_resident_parcel',
+              evidenceRef: 'parcel-handoff:merge-owner',
+              nextStepId: 'merge.resident_parcel',
+            });
+            await flushFtuePersistence();
+          }
+          // Push rather than replace while the FTUE removal lock is mounted.
+          router.push({
+            pathname: '/katchimera/[creatureId]/activity',
+            params: { creatureId },
+          });
+        } catch (error) {
+          cancelResidentMergeHandoff();
+          residentParcelOpeningRef.current = false;
+          console.warn('Could not open the veiled resident parcel', error);
+          throw error;
         }
-        if (run.stepId === 'companion.day_one_action') {
-          commitFtueAction({ actionId: 'companion.complete_day_one_action', evidenceRef: 'parcel-handoff:day-one-action' });
-          continue;
-        }
-        if (run.stepId === 'companion.resident_affinity') {
-          commitFtueAction({ actionId: 'companion.complete_resident_affinity', evidenceRef: 'parcel-handoff:resident-affinity' });
-          continue;
-        }
-        if (run.stepId === 'companion.resident_parcel_ready' || run.stepId.startsWith('merge.resident_')) break;
-        break;
-      }
-      // Create the durable board parcel first, then transfer FTUE ownership to
-      // Merge before navigation. Foreground recovery can now restore the board
-      // exactly like the earlier Merge tutorial instead of seeing the stale
-      // companion step and returning the player to Mossprout.
-      await activateStoredResidentCardDiscovery(
-        'mossprout:journey',
-        journey.dayId,
-        MOSSPROUT_FTUE_FIRST_RESIDENT_ID,
-        Date.now(),
-      );
-      const handoffRun = loadFtueRun();
-      if (handoffRun?.status === 'active' && handoffRun.stepId === 'companion.resident_parcel_ready') {
-        commitFtueAction({
-          actionId: 'companion.open_resident_parcel',
-          evidenceRef: 'parcel-handoff:merge-owner',
-          nextStepId: 'merge.resident_parcel',
-        });
-        // Make the ownership boundary durable before the route changes. This
-        // also covers suspending or terminating the app during the curtain.
-        await flushFtuePersistence();
-      }
-      const navigateToResidentMerge = () => {
-        router.push({
-          pathname: '/katchimera/[creatureId]/activity',
-          params: { creatureId },
-        });
-      };
-      const transitionAccepted = transitionTo({
-        announcement: 'Opening the veiled resident parcel',
-        target: 'merge',
-        // Push while the companion FTUE lock is still mounted. Replacing this
-        // route is interpreted as a removal and is intentionally rejected by
-        // usePreventRemove, which previously left the curtain covered forever.
-        navigate: navigateToResidentMerge,
-      });
-      if (!transitionAccepted) {
-        navigateToResidentMerge();
-      }
-    } catch (error) {
+      },
+    });
+    if (!transitionAccepted) {
       cancelResidentMergeHandoff();
       residentParcelOpeningRef.current = false;
-      console.warn('Could not open the veiled resident parcel', error);
     }
   }, [creatureId, router, transitionTo]);
 

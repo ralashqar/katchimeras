@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   companionDestinationSpeechBubbleTop,
   companionDestinationStageLift,
+  companionFtueSubjectHandoffLayout,
   companionHomeHeroSpacer,
   companionHubHeroSpacer,
   companionHomeStageLayout,
@@ -52,6 +53,33 @@ test('destination pose lifts the complete cinematic stage toward the top', () =>
   assert.ok(Math.abs(companionDestinationStageLift(568, 320) - 57.12) < 0.0001);
   assert.ok(Math.abs(companionDestinationStageLift(844, 390) - 85.776) < 0.0001);
   assert.ok(Math.abs(companionDestinationStageLift(1194, 834) - 119.46) < 0.0001);
+});
+
+test('FTUE hatch and regular Companion subjects share one continuous handoff frame', () => {
+  for (const [width, height] of [[320, 568], [390, 844], [834, 1194]]) {
+    const handoff = companionFtueSubjectHandoffLayout(width, height, 'mossprout');
+    const centerY = height / 2;
+    for (const progress of [0, 0.25, 0.5, 0.75, 1]) {
+      const incomingScale = handoff.incomingStartScale
+        + (1 - handoff.incomingStartScale) * progress;
+      const incomingTranslateY = handoff.incomingStartTranslateY
+        + (-handoff.destinationLift - handoff.incomingStartTranslateY) * progress;
+      const incomingCenterY = centerY
+        + (handoff.regularRawCenterY - centerY) * incomingScale
+        + incomingTranslateY;
+      const incomingSize = handoff.regularSize * incomingScale;
+
+      const outgoingScale = 1 + (handoff.outgoingEndScale - 1) * progress;
+      const outgoingTranslateY = handoff.outgoingEndTranslateY * progress;
+      const outgoingCenterY = centerY
+        + (handoff.hatchCenterY - centerY) * outgoingScale
+        + outgoingTranslateY;
+      const outgoingSize = handoff.hatchSize * outgoingScale;
+
+      assert.ok(Math.abs(incomingCenterY - outgoingCenterY) < 0.0001);
+      assert.ok(Math.abs(incomingSize - outgoingSize) < 0.0001);
+    }
+  }
 });
 
 test('compact hub reserves the lower interaction zone across phone and tablet sizes', () => {

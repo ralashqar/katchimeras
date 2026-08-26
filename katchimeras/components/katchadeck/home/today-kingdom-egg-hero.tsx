@@ -104,6 +104,7 @@ type TodayKingdomEggHeroProps = {
   growthProgress?: number;
   deferGrowthUntilEnergyArrival?: boolean;
   discoveryHatch?: TodayHatchPresentation | null;
+  discoveryHandoffProgress?: SharedValue<number>;
   eggShowFace?: boolean;
   eggSkinId?: EggAvatarSkinId;
   onDiscoveryCreatureError?: () => void;
@@ -159,6 +160,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   growthProgress,
   deferGrowthUntilEnergyArrival = false,
   discoveryHatch = null,
+  discoveryHandoffProgress,
   eggShowFace = true,
   eggSkinId,
   onDiscoveryCreatureError,
@@ -652,7 +654,11 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
     transform: [{ scale: 0.75 + discoveryCreatureEntry.value * 0.3 }],
   }));
   const discoveryCreatureHoverStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: discoveryCreatureHover.value * -5 }],
+    transform: [{
+      translateY: discoveryCreatureHover.value
+        * -5
+        * (1 - (discoveryHandoffProgress?.value ?? 0)),
+    }],
   }));
   const discoveryTitleVisible = discoveryPhaseAtLeast(discoveryPhase, 'subject_settling');
   const discoveryTitleStyle = useAnimatedStyle(() => ({

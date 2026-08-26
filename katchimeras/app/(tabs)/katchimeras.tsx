@@ -4,16 +4,27 @@ import { MossproutEggFtueSurface } from '@/components/katchadeck/world/mossprout
 import { mossproutFtueConversationDefinitionId } from '@/constants/mossprout-ftue-conversations';
 import { useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
+import { useIsFocused } from '@react-navigation/native';
+import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 function MossproutOpeningSurface({ companionActive, conversationDefinitionId }: {
   companionActive: boolean;
   conversationDefinitionId?: string;
 }) {
+  const [companionVisualReady, setCompanionVisualReady] = useState(false);
+  useEffect(() => {
+    if (!companionActive) setCompanionVisualReady(false);
+  }, [companionActive]);
+  const handleCompanionVisualReady = useCallback(() => setCompanionVisualReady(true), []);
+
   return (
     <View style={styles.openingSurface}>
-      <MossproutEggFtueSurface companionStageActive={companionActive} />
-      {companionActive ? (
+      <MossproutEggFtueSurface
+        companionStageActive={companionActive}
+        onCompanionVisualReady={handleCompanionVisualReady}
+      />
+      {companionActive && companionVisualReady ? (
         <View style={styles.companionOverlay}>
           <KatchimeraCompanionRouteScreen
             creatureId="companion:mossprout"
@@ -29,6 +40,7 @@ function MossproutOpeningSurface({ companionActive, conversationDefinitionId }: 
 }
 
 export default function KatchimerasScreen() {
+  const isFocused = useIsFocused();
   const ftueRun = useFtueRun();
   const ftueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
 
@@ -45,6 +57,12 @@ export default function KatchimerasScreen() {
     || ftueStep?.id === 'companion.day_one_action'
     || ftueStep?.id === 'companion.garden_intro'
     || ftueStep?.id === 'companion.order_preview';
+  // Navigation retains tab and root-stack routes for history. Retain only a
+  // lightweight shell while Haven is covered by Merge or another full page;
+  // no hidden environment, creature animation, or companion controller may
+  // continue rendering behind the focused destination.
+  if (!isFocused) return <View style={styles.inactiveScreen} />;
+
   // Keep one Grove host alive across the hatch boundary. Only the subject is
   // exchanged; Companion contributes transparent UI and never mounts another
   // full-screen environment behind or above the Grove compositor.
@@ -64,5 +82,6 @@ export default function KatchimerasScreen() {
 
 const styles = StyleSheet.create({
   companionOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 50 },
+  inactiveScreen: { flex: 1 },
   openingSurface: { flex: 1 },
 });

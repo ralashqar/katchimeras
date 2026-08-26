@@ -4,7 +4,6 @@ import { Gesture } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
   Easing,
-  useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withTiming,
@@ -42,7 +41,11 @@ import { getCreatureVisual } from '@/game/days';
 import { useAllDays } from '@/hooks/use-all-days';
 import type { FtueActionDefinition, FtueChoiceOption } from '@/features/onboarding/ftue-types';
 import type { RankedTodayCareAction } from '@/utils/today-care';
-import { companionDestinationStageLift, companionHomeStageLayout } from '@/utils/companion-home-layout';
+import {
+  companionDestinationStageLift,
+  companionFtueSubjectHandoffLayout,
+  companionHomeStageLayout,
+} from '@/utils/companion-home-layout';
 import { todayGrowthSummary, TODAY_GROWTH_REWARDS, type TodayGrowthSummary } from '@/utils/today-growth';
 import { todayKatchimeraExplorationBackgroundKeyForEnvironment } from '@/utils/today-exploration-backgrounds';
 
@@ -58,10 +61,9 @@ const MOSSPROUT_ENVIRONMENT_KEY = todayKatchimeraExplorationBackgroundKeyForEnvi
 const MOSSPROUT_VISUAL = getCreatureVisual('mossprout', 'grown');
 
 const SUBJECT_HANDOFF_DURATION_MS = 420;
-const SUBJECT_READY_FALLBACK_MS = 1200;
-
-export function MossproutEggFtueSurface({ companionStageActive = false }: {
+export function MossproutEggFtueSurface({ companionStageActive = false, onCompanionVisualReady }: {
   companionStageActive?: boolean;
+  onCompanionVisualReady?: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
@@ -74,10 +76,10 @@ export function MossproutEggFtueSurface({ companionStageActive = false }: {
   const stepId = step?.id ?? null;
   const [actionBusy, setActionBusy] = useState(false);
   // A direct relaunch into Companion has no live hatch subject to preserve.
-  // Start settled in that case; a live Egg -> Companion transition crossfades
-  // the retained hatch result before disposing the expensive Egg subject.
+  // Start settled in that case. A live Egg -> Companion transition moves the
+  // retained hatch subject to the exact Grove frame, then exchanges renderer
+  // ownership in one commit so two animated Mossprouts never overlap.
   const [subjectHandoffSettled, setSubjectHandoffSettled] = useState(companionStageActive);
-  const [regularSubjectReady, setRegularSubjectReady] = useState(companionStageActive);
   const subjectHandoff = useSharedValue(companionStageActive ? 1 : 0);
   const sceneTranslateX = useSharedValue(0);
   const inactiveGesture = useMemo(() => Gesture.Tap().enabled(false), []);
@@ -87,6 +89,11 @@ export function MossproutEggFtueSurface({ companionStageActive = false }: {
   );
   const regularStageLayout = companionHomeStageLayout(windowWidth, windowHeight, 'mossprout');
   const regularSubjectLift = companionDestinationStageLift(windowHeight, windowWidth);
+  const subjectHandoffLayout = companionFtueSubjectHandoffLayout(
+    windowWidth,
+    windowHeight,
+    'mossprout',
+  );
   const baseSceneSize = Math.max(windowHeight, windowWidth);
   const sceneHandoffScale = regularStageLayout.backgroundImageSize
     / baseSceneSize
@@ -119,12 +126,7 @@ export function MossproutEggFtueSurface({ companionStageActive = false }: {
     if (!companionStageActive) {
       subjectHandoff.value = 0;
       setSubjectHandoffSettled(false);
-      setRegularSubjectReady(false);
       return;
-    }
-    if (!regularSubjectReady) {
-      const readyFallback = setTimeout(() => setRegularSubjectReady(true), SUBJECT_READY_FALLBACK_MS);
-      return () => clearTimeout(readyFallback);
     }
     if (subjectHandoff.value >= 1 && subjectHandoffSettled) return;
     setSubjectHandoffSettled(false);
@@ -135,21 +137,11 @@ export function MossproutEggFtueSurface({ companionStageActive = false }: {
     });
     const settleTimer = setTimeout(() => setSubjectHandoffSettled(true), duration + 34);
     return () => clearTimeout(settleTimer);
-  }, [companionStageActive, reduceMotion, regularSubjectReady, subjectHandoff, subjectHandoffSettled]);
+  }, [companionStageActive, reduceMotion, subjectHandoff, subjectHandoffSettled]);
 
-  const handleRegularSubjectReady = useCallback(() => {
-    setRegularSubjectReady(true);
-  }, []);
-
-  const regularSubjectStyle = useAnimatedStyle(() => ({
-    opacity: subjectHandoff.value,
-    // Regular Companion Grove lifts the complete destination art plane. The
-    // persistent FTUE host owns only the replacement creature, so reproduce
-    // that exact shared transform here instead of ending at Today's anchor.
-    transform: [{
-      translateY: -regularSubjectLift * subjectHandoff.value,
-    }],
-  }));
+  useEffect(() => {
+    if (companionStageActive && subjectHandoffSettled) onCompanionVisualReady?.();
+  }, [companionStageActive, onCompanionVisualReady, subjectHandoffSettled]);
 
   const completeDiscoveryHatch = useCallback(() => {
     commitFtueAction({ actionId: 'egg.hatch', evidenceRef: 'discovery-hatch:mossprout-grove' });
@@ -333,17 +325,21 @@ export function MossproutEggFtueSurface({ companionStageActive = false }: {
             timelineDays={[day]}
             topInset={insets.top}
             subjectHandoffProgress={subjectHandoff}
+            subjectHandoffFades={false}
+            subjectHandoffScale={subjectHandoffLayout.outgoingEndScale}
+            subjectHandoffTranslateY={subjectHandoffLayout.outgoingEndTranslateY}
             subjectHidden={subjectHandoffSettled}
           />
         </View>
-        {companionStageActive ? (
-          <Animated.View pointerEvents="none" style={[styles.regularSubject, regularSubjectStyle]}>
+        {companionStageActive && subjectHandoffSettled ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.regularSubject, { transform: [{ translateY: -regularSubjectLift }] }]}>
             <CompanionHomeEnvironmentStage
               backgroundKey={null}
               creature={MOSSPROUT_VISUAL.source}
               layer="creature"
               name="Mossprout"
-              onCreatureReady={handleRegularSubjectReady}
               visualKey="mossprout"
             />
           </Animated.View>

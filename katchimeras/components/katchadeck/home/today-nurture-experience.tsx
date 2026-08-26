@@ -149,7 +149,10 @@ type TodayNurtureExperienceProps = {
   sceneHandoffScale?: number;
   sceneHandoffTranslateY?: number;
   subjectHidden?: boolean;
+  subjectHandoffFades?: boolean;
   subjectHandoffProgress?: SharedValue<number>;
+  subjectHandoffScale?: number;
+  subjectHandoffTranslateY?: number;
   hatchPresentation?: TodayHatchPresentation | null;
   onHatchAssetsReady?: () => void;
   onHatchAssetsError?: () => void;
@@ -237,7 +240,10 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   sceneHandoffScale = 1,
   sceneHandoffTranslateY = 0,
   subjectHidden = false,
+  subjectHandoffFades = true,
   subjectHandoffProgress,
+  subjectHandoffScale = 1,
+  subjectHandoffTranslateY = 0,
   hatchPresentation = null,
   onHatchAssetsReady,
   onHatchAssetsError,
@@ -723,8 +729,16 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
     setCheckInSlotHeight(0);
   }, [checkInTransitionActive, displayedMoodAction, displayedSleepAction]);
   const subjectHandoffStyle = useAnimatedStyle(() => ({
-    opacity: 1 - (subjectHandoffProgress?.value ?? 0),
-  }));
+    opacity: subjectHandoffFades ? 1 - (subjectHandoffProgress?.value ?? 0) : 1,
+    transform: [
+      {
+        translateY: subjectHandoffTranslateY * (subjectHandoffProgress?.value ?? 0),
+      },
+      {
+        scale: 1 + (subjectHandoffScale - 1) * (subjectHandoffProgress?.value ?? 0),
+      },
+    ],
+  }), [subjectHandoffFades]);
   const sceneHandoffStyle = useAnimatedStyle(() => {
     const progress = sceneHandoffProgress?.value ?? 0;
     return {
@@ -759,7 +773,10 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
       </View>
       {!subjectHidden ? <Animated.View
         pointerEvents="box-none"
-        style={[styles.eggStage, { top: stageTop + sceneLift }, projectedEggStageStyle, subjectHandoffStyle]}>
+        style={[styles.subjectHandoffPlane, subjectHandoffStyle]}>
+      <Animated.View
+        pointerEvents="box-none"
+        style={[styles.eggStage, { top: stageTop + sceneLift }, projectedEggStageStyle]}>
         {newDayIntro ? (
           <CelebrationParticles
             layerStyle={[styles.newDayConfetti, { top: explorationEggFrame.centerY }]}
@@ -789,10 +806,12 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           onDiscoveryCreatureReady={onHatchAssetsReady}
           pinchStrength={0}
           projectedCameraScale={projectedEggCameraScale}
+          discoveryHandoffProgress={subjectHandoffProgress}
           showDormantIndicator={false}
           showForcedSleepIndicator={false}
           targetRef={eggTargetRef}
         />
+      </Animated.View>
       </Animated.View> : null}
       {!subjectHidden && onboardingEggSleeping ? (
         <TodayDormantEggIndicator
@@ -2276,6 +2295,7 @@ const styles = StyleSheet.create({
   quietDayLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '900' },
   actionPressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
   eggStage: { alignItems: 'center', height: TODAY_KINGDOM_STAGE_HEIGHT, justifyContent: 'center', left: 0, overflow: 'visible', position: 'absolute', right: 0, zIndex: 2 },
+  subjectHandoffPlane: { ...StyleSheet.absoluteFillObject, zIndex: 2 },
   newDayConfetti: { left: '50%', zIndex: 0 },
   environmentFade: { bottom: 0, experimental_backgroundImage: 'linear-gradient(to bottom, rgba(247,241,226,0) 0%, rgba(247,241,226,0.72) 62%, #F7F1E2 100%)', height: 150, left: 0, position: 'absolute', right: 0, zIndex: 1 },
   meterAnchor: { left: 0, position: 'absolute', right: 0, zIndex: 4 },
