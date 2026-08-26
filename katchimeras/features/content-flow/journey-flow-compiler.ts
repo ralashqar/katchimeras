@@ -1,7 +1,7 @@
-import { defineContentFlow } from '@/features/content-flow/content-flow-compiler';
 import type { ContentFlowDefinition, ContentFlowNode } from '@/types/content-flow';
 import type { JourneyCampaignDefinition, JourneyCampaignStep, JourneyDayDefinition } from '@/types/journey-campaign';
 import { conversationScene, mergeOrderTask, residentDiscoveryChapter } from './content-flow-templates';
+import { defineStory } from './story-manifest';
 
 function stepEntry(step: JourneyCampaignStep) {
   return step.id;
@@ -18,7 +18,7 @@ function compileStep(step: JourneyCampaignStep, next: string): ContentFlowNode[]
     case 'optional_action':
       // Optional actions are published as independent child flows. They never
       // hold the Journey Day completion cursor hostage.
-      return [{ id: step.id, kind: 'effect', effectId: `publish-${step.action}`, effectType: 'optional_action.publish', payload: { action: step.action }, next }];
+      return [{ id: step.id, kind: 'effect', capability: 'optional_action.publish', effectId: `publish-${step.action}`, effectType: 'optional_action.publish', payload: { action: step.action }, next }];
     case 'resident_discovery': return residentDiscoveryChapter({ id: step.id, selection: step.selection, next });
     case 'complete': return [{ id: step.id, kind: 'complete' }];
   }
@@ -29,12 +29,12 @@ export function compileJourneyDayFlow(campaign: JourneyCampaignDefinition, day: 
     const nextStep = day.steps[index + 1];
     return compileStep(step, nextStep ? stepEntry(nextStep) : step.id);
   });
-  return defineContentFlow({
+  return defineStory({
     id: `${campaign.id}:${day.id}`,
     version: campaign.version,
     entryNodeId: day.steps[0]!.id,
     nodes,
-    metadata: { kind: 'journey_day', campaignId: campaign.id, familyId: campaign.familyId, dayId: day.id, dayNumber: day.number, title: day.title, insightKey: day.insightKey },
+    metadata: { kind: 'journey_day' as const, campaignId: campaign.id, familyId: campaign.familyId, dayId: day.id, dayNumber: day.number, title: day.title, insightKey: day.insightKey },
   });
 }
 

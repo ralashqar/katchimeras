@@ -2,31 +2,25 @@ import { createClientId } from '@/utils/client-id';
 import type { ContentFlowCommand, ContentFlowDefinition, ContentFlowEvent, ContentFlowPendingWork, ContentFlowRun } from '@/types/content-flow';
 
 import { contentFlowEffectHandler, validatePendingContentFlowWork } from './content-flow-capabilities';
-import { contentFlowDefinition, registerContentFlowDefinition } from './content-flow-catalog';
+import { contentFlowDefinition, latestContentFlowDefinition, registerContentFlowDefinition } from './content-flow-catalog';
 import { contentFlowEventMatches, createContentFlowRun, reduceContentFlow, stabilizeContentFlow } from './content-flow-interpreter';
-import { listContentFlowRuns, loadContentFlowRun, saveContentFlowTransition } from './content-flow-repository';
+import { listContentFlowRuns, loadContentFlowRun, reduceContentFlowRunAtomically, saveContentFlowTransition } from './content-flow-repository';
 
 const workInFlight = new Set<string>();
 
-async function persistAndRunEffects(definition: ContentFlowDefinition, run: ContentFlowRun, pendingWork: ContentFlowPendingWork): Promise<ContentFlowRun> {
-  await saveContentFlowTransition(run);
+async function runPendingEffects(definition: ContentFlowDefinition, run: ContentFlowRun, pendingWork: ContentFlowPendingWork): Promise<ContentFlowRun> {
   if (pendingWork.kind !== 'effect') return run;
   if (workInFlight.has(pendingWork.key)) return run;
   const error = validatePendingContentFlowWork(pendingWork);
   if (error) {
-    const failed = reduceContentFlow(definition, run, { type: 'fail', message: error }).run;
-    await saveContentFlowTransition(failed);
-    return failed;
+    return await dispatchContentFlowCommand(run.runId, { type: 'fail', message: error }) ?? run;
   }
   workInFlight.add(pendingWork.key);
   try {
     const result = await contentFlowEffectHandler(pendingWork.effectType)!({ run, effectKey: pendingWork.key, payload: pendingWork.payload });
-    const transition = reduceContentFlow(definition, run, { type: 'effect_completed', effectKey: pendingWork.key, result });
-    return persistAndRunEffects(definition, transition.run, transition.pendingWork);
+    return await dispatchContentFlowCommand(run.runId, { type: 'effect_completed', effectKey: pendingWork.key, result }) ?? run;
   } catch (caught) {
-    const failed = reduceContentFlow(definition, run, { type: 'fail', message: caught instanceof Error ? caught.message : 'Content flow effect failed' }).run;
-    await saveContentFlowTransition(failed);
-    return failed;
+    return await dispatchContentFlowCommand(run.runId, { type: 'fail', message: caught instanceof Error ? caught.message : 'Content flow effect failed' }) ?? run;
   } finally {
     workInFlight.delete(pendingWork.key);
   }
@@ -38,28 +32,52 @@ export async function startContentFlow(
 ) {
   registerContentFlowDefinition(definition);
   const run = createContentFlowRun(definition, { runId: input.runId ?? createClientId('flow'), parentRunId: input.parentRunId, variables: input.variables, now: input.now });
-  return persistAndRunEffects(definition, run, stabilizeContentFlow(definition, run, input.now).pendingWork);
+  await saveContentFlowTransition(run);
+  return runPendingEffects(definition, run, stabilizeContentFlow(definition, run, input.now).pendingWork);
 }
 
 export async function dispatchContentFlowCommand(runId: string, command: ContentFlowCommand): Promise<ContentFlowRun | null> {
   const run = await loadContentFlowRun(runId);
   if (!run) return null;
-  const definition = contentFlowDefinition(run.definitionId, run.definitionVersion);
+  let definition = contentFlowDefinition(run.definitionId, run.definitionVersion);
   if (!definition) {
-    const failed = { ...run, phase: 'failed_recoverable' as const, status: 'failed_recoverable' as const, error: `Missing definition ${run.definitionId}@${run.definitionVersion}`, updatedAt: Date.now() };
-    await saveContentFlowTransition(failed);
-    return failed;
+    const latest = latestContentFlowDefinition(run.definitionId);
+    const migratedNode = latest?.migrations?.[run.nodeId] ?? (latest?.nodes.some((node) => node.id === run.nodeId) ? run.nodeId : null);
+    if (latest && migratedNode) {
+      const migrated = { ...run, definitionVersion: latest.version, nodeId: migratedNode, phase: 'entering' as const, error: null, updatedAt: Date.now(), revision: run.revision + 1 };
+      await saveContentFlowTransition(migrated);
+      definition = latest;
+    } else {
+      const failed = { ...run, phase: 'failed_recoverable' as const, status: 'failed_recoverable' as const, error: `Missing definition ${run.definitionId}@${run.definitionVersion} and no migration for ${run.nodeId}`, updatedAt: Date.now(), revision: run.revision + 1 };
+      await saveContentFlowTransition(failed);
+      return failed;
+    }
   }
-  if (command.type === 'record_event' && await import('./content-flow-repository').then(({ contentFlowEventWasRecorded }) => contentFlowEventWasRecorded(command.event.eventId))) return run;
-  const transition = reduceContentFlow(definition, run, command);
-  await saveContentFlowTransition(transition.run, command.type === 'record_event' ? command.event : undefined);
-  return persistAndRunEffects(definition, transition.run, transition.pendingWork);
+  const reduced = await reduceContentFlowRunAtomically({
+    runId,
+    event: command.type === 'record_event' ? command.event : undefined,
+    reduce: (current) => reduceContentFlow(definition, current, command).run,
+  });
+  if (!reduced.run) return null;
+  const pendingWork = stabilizeContentFlow(definition, reduced.run, command.now).pendingWork;
+  const finalRun = await runPendingEffects(definition, reduced.run, pendingWork);
+  if (finalRun.status === 'completed' && finalRun.parentRunId) await completeChildAndResumeParent(finalRun.runId);
+  return finalRun;
 }
 
 export async function startChildContentFlow(parentRunId: string, definition: ContentFlowDefinition, variables?: ContentFlowRun['variables']) {
   const parent = await loadContentFlowRun(parentRunId);
   if (!parent || parent.status !== 'active') throw new Error(`Cannot suspend inactive parent flow ${parentRunId}`);
-  await saveContentFlowTransition({ ...parent, phase: 'suspended', updatedAt: Date.now() });
+  let didSuspend = false;
+  const suspended = await reduceContentFlowRunAtomically({
+    runId: parentRunId,
+    reduce: (current) => {
+      if (current.status !== 'active' || current.phase === 'suspended' || current.revision !== parent.revision) return current;
+      didSuspend = true;
+      return { ...current, phase: 'suspended', updatedAt: Date.now() };
+    },
+  });
+  if (!didSuspend || !suspended.run || suspended.run.phase !== 'suspended') throw new Error(`Could not suspend parent flow ${parentRunId}`);
   return startContentFlow(definition, { parentRunId, variables });
 }
 
@@ -70,8 +88,14 @@ export async function completeChildAndResumeParent(childRunId: string): Promise<
   if (!parent || parent.status !== 'active' || parent.phase !== 'suspended') return parent;
   const definition = contentFlowDefinition(parent.definitionId, parent.definitionVersion);
   if (!definition) return parent;
-  const resumed = stabilizeContentFlow(definition, { ...parent, phase: 'entering', updatedAt: Date.now() });
-  return persistAndRunEffects(definition, resumed.run, resumed.pendingWork);
+  const resumed = await reduceContentFlowRunAtomically({
+    runId: parent.runId,
+    reduce: (current) => current.status === 'active' && current.phase === 'suspended'
+      ? stabilizeContentFlow(definition, { ...current, phase: 'entering', updatedAt: Date.now() }).run
+      : current,
+  });
+  if (!resumed.run) return null;
+  return runPendingEffects(definition, resumed.run, stabilizeContentFlow(definition, resumed.run).pendingWork);
 }
 
 export function contentFlowDomainEvent(input: Omit<ContentFlowEvent, 'eventId' | 'occurredAt'> & { eventId?: string; occurredAt?: number }): ContentFlowEvent {
@@ -153,6 +177,22 @@ export async function acknowledgeActiveContentFlowNavigation(surface: string): P
     const key = `${run.runId}:${run.nodeId}:navigation:${node.routeId}`;
     const updated = await dispatchContentFlowCommand(run.runId, { type: 'navigation_acknowledged', navigationKey: key });
     if (updated) results.push(updated);
+  }
+  return results;
+}
+
+/** Re-drives durable automatic work after a cold launch or foreground. */
+export async function resumeActiveContentFlows(): Promise<ContentFlowRun[]> {
+  const results: ContentFlowRun[] = [];
+  const runs = await listContentFlowRuns({ activeOnly: true });
+  for (const run of runs) {
+    if (run.executionMode !== 'live' || run.phase === 'suspended') continue;
+    const definition = contentFlowDefinition(run.definitionId, run.definitionVersion) ?? latestContentFlowDefinition(run.definitionId);
+    if (!definition) continue;
+    const stabilized = await reduceContentFlowRunAtomically({ runId: run.runId, reduce: (current) => stabilizeContentFlow(definition, current).run });
+    if (!stabilized.run) continue;
+    const resumed = await runPendingEffects(definition, stabilized.run, stabilizeContentFlow(definition, stabilized.run).pendingWork);
+    results.push(resumed);
   }
   return results;
 }

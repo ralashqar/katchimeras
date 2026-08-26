@@ -72,8 +72,24 @@ export function activeFtueNavigationPolicy(
 ): ActiveFtueNavigationPolicy | null {
   if (run?.status !== 'active') return null;
   const step = mossproutFtueStep(run.stepId);
-  if (!step?.navigation) return null;
-  return { ...step.navigation, stepId: step.id, surface: step.surface };
+  if (!step) return null;
+  if (step.navigation) return { ...step.navigation, stepId: step.id, surface: step.surface };
+
+  // A route is part of every active node's durable identity. Most authored
+  // nodes do not need bespoke navigation, so derive their canonical surface
+  // here instead of allowing an omitted optional field to disable recovery.
+  // Explicit node policies (for example resident Merge's supported Back
+  // pause) continue to override these locked defaults.
+  const resume: FtueResumeTarget = step.surface === 'merge'
+    ? { kind: 'merge', creatureId: 'companion:mossprout' }
+    : step.surface === 'companion'
+      ? { kind: 'companion', creatureId: 'companion:mossprout', ftue: '1' }
+      : step.surface === 'haven'
+        ? { kind: 'haven' }
+        : step.id === 'energy.capture'
+          ? { kind: 'today', onboardingCapture: '1' }
+          : { kind: 'today' };
+  return { lock: true, resume, stepId: step.id, surface: step.surface };
 }
 
 export function ftueLocksSurfaceNavigation(
@@ -98,6 +114,10 @@ export function ftueResumeTargetMatches(
 ): boolean {
   const normalizedPath = decodeURIComponent(pathname).replace(/\/$/, '') || '/';
   if (normalizedPath !== ftueResumePath(target)) return false;
+  if (target.kind === 'today' && target.onboardingCapture) {
+    const captureParam = params.onboardingCapture;
+    return (Array.isArray(captureParam) ? captureParam[0] : captureParam) === target.onboardingCapture;
+  }
   if (target.kind !== 'companion' || !target.ftue) return true;
   const ftueParam = params.ftue;
   return (Array.isArray(ftueParam) ? ftueParam[0] : ftueParam) === target.ftue;

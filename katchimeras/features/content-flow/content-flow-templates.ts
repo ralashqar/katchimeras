@@ -1,5 +1,5 @@
-import { defineContentFlow } from './content-flow-compiler';
 import type { ContentFlowNode, ContentFlowSurface } from '@/types/content-flow';
+import { defineStory, story } from './story-manifest';
 
 export function conversationScene(input: {
   id: string;
@@ -11,6 +11,7 @@ export function conversationScene(input: {
   return {
     id: input.id,
     kind: 'scene',
+    capability: input.questionnaire ? 'story.questionnaire' : 'story.conversation',
     surface: 'companion',
     sceneId: input.conversationId,
     payload: input.payload,
@@ -28,6 +29,7 @@ export function mergeOrderTask(input: {
   return {
     id: input.id,
     kind: 'task',
+    capability: 'merge.orders',
     surface: 'merge',
     taskId: input.objectiveId,
     payload: { objectiveId: input.objectiveId, orders: input.orders },
@@ -48,13 +50,13 @@ export function residentDiscoveryChapter(input: {
     requestCount: 2,
   };
   return [
-    { id: prefix, kind: 'effect', effectId: 'grant-parcel', effectType: 'resident.grant_parcel', payload, next: `${prefix}:open-garden` },
-    { id: `${prefix}:open-garden`, kind: 'route', routeId: 'open-garden', route: '/game/merge-world', surface: 'merge', lock: true, next: `${prefix}:parcel` },
-    { id: `${prefix}:parcel`, kind: 'task', surface: 'merge', taskId: 'claim-resident-parcel', payload, requirements: [{ id: 'parcel', event: { type: 'resident.parcel_claimed' } }], next: `${prefix}:revealed` },
-    { id: `${prefix}:revealed`, kind: 'task', surface: 'merge', taskId: 'reveal-resident', payload, requirements: [{ id: 'reveal', event: { type: 'resident.revealed' } }], next: `${prefix}:dialogue` },
-    { id: `${prefix}:dialogue`, kind: 'presentation', surface: 'merge', presentationId: 'resident-dialogue', presentationType: 'resident.dialogue', payload, next: `${prefix}:orders` },
-    { id: `${prefix}:orders`, kind: 'task', surface: 'merge', taskId: 'resident-orders', payload, requirements: [{ id: 'orders', event: { type: 'resident.orders_completed' } }], next: `${prefix}:card-reward` },
-    { id: `${prefix}:card-reward`, kind: 'presentation', surface: 'collection', presentationId: 'resident-card-reward', presentationType: 'resident.card_reward', payload, replayPolicy: 'continue', next: input.next },
+    story.effect({ id: prefix, capability: 'resident.grant_parcel', effectId: 'grant-parcel', payload, next: `${prefix}:open-garden` }),
+    story.route({ id: `${prefix}:open-garden`, route: 'merge', lock: true, next: `${prefix}:parcel`, readiness: ['route', 'data', 'layout', 'background', 'foreground', 'interaction_target'] }),
+    story.task({ id: `${prefix}:parcel`, capability: 'resident.parcel', surface: 'merge', taskId: 'claim-resident-parcel', payload, requirements: [{ id: 'parcel', event: { type: 'resident.parcel_claimed' } }], next: `${prefix}:revealed` }),
+    story.task({ id: `${prefix}:revealed`, capability: 'resident.reveal', surface: 'merge', taskId: 'reveal-resident', payload, requirements: [{ id: 'reveal', event: { type: 'resident.revealed' } }], next: `${prefix}:dialogue` }),
+    story.presentation({ id: `${prefix}:dialogue`, capability: 'resident.dialogue', surface: 'merge', presentationId: 'resident-dialogue', payload, next: `${prefix}:orders` }),
+    story.task({ id: `${prefix}:orders`, capability: 'resident.orders', surface: 'merge', taskId: 'resident-orders', payload, requirements: [{ id: 'orders', event: { type: 'resident.orders_completed' } }], next: `${prefix}:card-reward` }),
+    story.presentation({ id: `${prefix}:card-reward`, capability: 'resident.card_reward', surface: 'collection', presentationId: 'resident-card-reward', payload, replayPolicy: 'continue', next: input.next }),
   ];
 }
 
@@ -66,16 +68,16 @@ export function rewardedChildActionFlow(input: {
   rewardPresentationType: string;
   surface?: ContentFlowSurface;
 }) {
-  return defineContentFlow({
+  return defineStory({
     id: input.id,
     version: input.version,
     entryNodeId: 'activity',
     nodes: [
-      { id: 'activity', kind: 'scene', surface: input.surface ?? 'companion', sceneId: input.sceneId, actions: [{ id: 'activity.completed', next: 'reward' }] },
-      { id: 'reward', kind: 'effect', effectId: 'reward', effectType: input.rewardEffectType, next: 'reward-presentation' },
-      { id: 'reward-presentation', kind: 'presentation', surface: 'companion', presentationId: 'reward', presentationType: input.rewardPresentationType, replayPolicy: 'replay', next: 'complete' },
+      { id: 'activity', kind: 'scene', capability: 'story.conversation', surface: input.surface ?? 'companion', sceneId: input.sceneId, actions: [{ id: 'activity.completed', next: 'reward' }] },
+      { id: 'reward', kind: 'effect', capability: 'story.reward_effect', effectId: 'reward', effectType: input.rewardEffectType, next: 'reward-presentation' },
+      { id: 'reward-presentation', kind: 'presentation', capability: 'story.reward', surface: 'companion', presentationId: 'reward', presentationType: input.rewardPresentationType, replayPolicy: 'replay', next: 'complete' },
       { id: 'complete', kind: 'complete' },
     ],
-    metadata: { kind: 'child_action' },
+    metadata: { kind: 'child_action' as const },
   });
 }

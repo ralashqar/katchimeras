@@ -3,7 +3,7 @@ import type { DayPromptKind, TodayGrowthSource } from '@/types/home';
 
 export type FtueSurface = 'today' | 'hatch' | 'companion' | 'merge' | 'haven';
 export type FtueResumeTarget =
-  | { kind: 'today' }
+  | { kind: 'today'; onboardingCapture?: '1' }
   | { kind: 'haven' }
   | { kind: 'companion'; creatureId: string; ftue?: string }
   | { kind: 'merge'; creatureId: string };

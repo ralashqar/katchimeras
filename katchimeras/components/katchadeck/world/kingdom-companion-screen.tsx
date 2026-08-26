@@ -227,6 +227,7 @@ export function KingdomCompanionScreen({
   ftueResidentMatchResultActive = false,
   ftueResidentStoryResume = false,
   ftueNavigationLocked = false,
+  ftueCompanionSurfaceOwned = false,
   onFtueBondSpotlightComplete,
   onFtueJourneyDayComplete,
   onFtueOpenMerge,
@@ -252,6 +253,7 @@ export function KingdomCompanionScreen({
   ftueResidentMatchResultActive?: boolean;
   ftueResidentStoryResume?: boolean;
   ftueNavigationLocked?: boolean;
+  ftueCompanionSurfaceOwned?: boolean;
   onFtueBondSpotlightComplete?: () => void;
   onFtueJourneyDayComplete?: () => void;
   onFtueOpenMerge?: () => void;
@@ -630,6 +632,7 @@ export function KingdomCompanionScreen({
           ftueResidentMatchResultActive={ftueResidentMatchResultActive}
           ftueResidentStoryResume={ftueResidentStoryResume}
           ftueNavigationLocked={ftueNavigationLocked}
+          ftueCompanionSurfaceOwned={ftueCompanionSurfaceOwned}
           onFtueBondSpotlightComplete={onFtueBondSpotlightComplete}
           onFtueOpenMerge={onFtueOpenMerge}
           onFtueProfileContinue={onFtueProfileContinue}

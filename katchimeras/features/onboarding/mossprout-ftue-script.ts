@@ -6,7 +6,10 @@ import { MOSSPROUT_BOND_SHARE_PROMPTS } from './mossprout-bond-share';
 
 const mossproutCompanionResume = {
   lock: true,
-  resume: { kind: 'companion', creatureId: 'companion:mossprout' },
+  // This query parameter is part of the route identity, not decoration. It
+  // tells the companion route to present the authored FTUE surface rather
+  // than the ordinary Mossprout dashboard after a cold launch.
+  resume: { kind: 'companion', creatureId: 'companion:mossprout', ftue: '1' },
 } as const;
 const mossproutMergeResume = {
   // Merge remains the durable cold-start destination, but Back is a supported

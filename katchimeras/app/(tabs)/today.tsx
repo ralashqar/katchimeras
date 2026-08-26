@@ -117,7 +117,7 @@ import { useTodayEnergyLoop } from '@/features/today/use-today-energy-loop';
 import { useTodayEnergyFrameProbe } from '@/features/today/use-today-energy-frame-probe';
 import { TodayEnergyProfiler } from '@/features/today/today-energy-profiler';
 import { useAppActivity } from '@/features/performance/app-activity';
-import { beginFtueAction, commitFtueAction, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { advanceFtueActionDurably, beginFtueAction, commitFtueAction, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { ftueOwnsOpeningHome } from '@/features/onboarding/ftue-navigation-policy';
 import {
   FTUE_OPENING_UI_DELAY_MS,
@@ -557,8 +557,12 @@ function HomeScreen() {
     if (ftueRun?.stepId !== 'hatch.reveal' || hatchPresentation.phase !== 'idle') return;
     restoreDiscoveryReveal(FTUE_MOSSPROUT_CREATURE);
   }, [ftueRun?.stepId, hatchPresentation.phase, restoreDiscoveryReveal]);
-  const talkToMossprout = useCallback(() => {
-    commitFtueAction({ actionId: 'hatch.talk_to_mossprout' });
+  const talkToMossprout = useCallback(async () => {
+    const result = await advanceFtueActionDurably({
+      expectedStepId: 'hatch.reveal',
+      actionId: 'hatch.talk_to_mossprout',
+    });
+    if (result.run?.status !== 'active' || result.run.stepId !== 'companion.intro_action') return;
     transitionTo({
       announcement: 'Opening Mossprout',
       target: 'companion',
@@ -597,9 +601,13 @@ function HomeScreen() {
       }),
     });
   }, [ftueRun?.stepId, router, screenFocused, transitionTo]);
-  const returnToMossprout = useCallback(() => {
+  const returnToMossprout = useCallback(async () => {
     setOnboardingEnergyReady(null);
-    commitFtueAction({ actionId: 'energy.return' });
+    const result = await advanceFtueActionDurably({
+      expectedStepId: 'energy.steps_reward',
+      actionId: 'energy.return',
+    });
+    if (result.run?.status !== 'active' || result.step?.surface !== 'merge') return;
     transitionTo({
       announcement: 'Opening Merge',
       target: 'merge',

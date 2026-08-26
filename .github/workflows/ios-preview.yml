@@ -55,6 +55,9 @@ jobs:
       - name: Run preview preflight
         run: npm run build:ios:preview:check
 
+      - name: Verify story flows
+        run: npm run verify:story-flows
+
       - name: Build iOS preview
         env:
           REFRESH_DEVICES: ${{ inputs.refresh_devices }}

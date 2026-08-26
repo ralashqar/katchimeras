@@ -47,6 +47,7 @@ export function createContentFlowRun(
     updatedAt: now,
     completedAt: null,
     error: null,
+    revision: 0,
   }, now).run;
 }
 
@@ -70,7 +71,15 @@ function nodeFor(definition: ContentFlowDefinition, id: string): ContentFlowNode
 function pendingWorkFor(run: ContentFlowRun, node: ContentFlowNode): ContentFlowPendingWork {
   if (node.kind === 'effect') return { kind: 'effect', key: contentFlowEffectKey(run, node.effectId), effectType: node.effectType, payload: node.payload ?? {} };
   if (node.kind === 'presentation') return { kind: 'presentation', key: contentFlowPresentationKey(run, node.presentationId), presentationType: node.presentationType, payload: node.payload ?? {}, replayPolicy: node.replayPolicy ?? 'replay' };
-  if (node.kind === 'route') return { kind: 'navigation', key: contentFlowNavigationKey(run, node.routeId), route: node.route, surface: node.surface, lock: node.lock ?? false };
+  if (node.kind === 'route') return {
+    kind: 'navigation',
+    key: contentFlowNavigationKey(run, node.routeId),
+    target: node.target,
+    surface: node.surface,
+    lock: node.lock ?? false,
+    backPolicy: node.backPolicy ?? (node.lock ? 'locked' : 'pause'),
+    readiness: node.readiness ?? ['route', 'data', 'layout', 'background', 'foreground'],
+  };
   return { kind: 'none' };
 }
 

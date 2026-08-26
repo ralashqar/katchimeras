@@ -83,6 +83,7 @@ type MergeFtueOverlayProps = {
   cue: FtueCueDefinition | null;
   guide: FtueGuide | null;
   layoutNonce: number;
+  onReadinessChange?: (ready: boolean) => void;
   screenRef: RefObject<View | null>;
   railTargetRefs: RefObject<Map<string, View>>;
   spotlight: FtueSpotlightDefinition | null;
@@ -97,6 +98,7 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
   cue,
   guide,
   layoutNonce,
+  onReadinessChange,
   screenRef,
   railTargetRefs,
   spotlight,
@@ -205,6 +207,10 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
   const currentLayout = layout;
   const presentationReady = currentLayout?.configKey === configKey
     && currentLayout.targetRevision === targetRevision;
+  useEffect(() => {
+    onReadinessChange?.(Boolean((!cue && !spotlight) || presentationReady));
+    return () => onReadinessChange?.(false);
+  }, [cue, onReadinessChange, presentationReady, spotlight]);
   const spotlightReady = Boolean(presentationReady && currentLayout?.spotlightFrames.length);
   const guideKey = guide && presentationReady ? `${configKey}:${guide.title}:${guide.body}` : null;
   // One authored flag owns the complete guidance presentation. By default the

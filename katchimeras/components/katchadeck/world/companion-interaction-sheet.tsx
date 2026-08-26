@@ -186,6 +186,8 @@ export type CompanionInteractionSheetProps = {
   ftueResidentMatchResultActive?: boolean;
   ftueResidentStoryResume?: boolean;
   ftueNavigationLocked?: boolean;
+  /** Active FTUE owns this companion surface; normal dashboard must fail closed. */
+  ftueCompanionSurfaceOwned?: boolean;
   onFtueBondSpotlightComplete?: () => void;
   onFtueOpenMerge?: () => void;
   onFtueProfileContinue?: (nickname?: string) => void;
@@ -570,7 +572,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   // The companion route is reused across the affinity conversation and its
   // resident handoff. Never let that completed conversation subroute outrank
   // the authored parcel or Continue Story dashboard.
-  const dashboardRouteActive = route.kind === 'dashboard' || residentFtueDashboard;
+  const dashboardRouteActive = route.kind === 'dashboard'
+    || residentFtueDashboard
+    || Boolean(props.ftueCompanionSurfaceOwned && route.kind !== 'conversation');
   const mossproutActionDashboard = dashboardRouteActive
     && props.familyId === 'mossprout'
     && !showMossproutDashboard;
@@ -1842,7 +1846,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                 />
               ) : dashboardRouteActive && props.familyId === 'mossprout' && props.ftueOrderPreviewActive && props.onFtueOpenMerge ? (
                 <MossproutFtueStoryStage onOpenMerge={props.onFtueOpenMerge} />
-              ) : dashboardRouteActive && props.familyId === 'mossprout' && !showMossproutDashboard ? (
+              ) : dashboardRouteActive
+                && props.familyId === 'mossprout'
+                && !showMossproutDashboard
+                && (!props.ftueCompanionSurfaceOwned || residentFtueDashboard) ? (
                 <MossproutStoryStage
                   activeQuestId={props.activeQuest?.questId}
                   conversationSession={props.conversationSession}

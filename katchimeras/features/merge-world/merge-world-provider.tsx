@@ -31,7 +31,7 @@ import { loadCompanionQuickGoalState, subscribeCompanionQuickGoals } from '@/uti
 import { loadCompanionJourneyState, subscribeCompanionJourneys } from '@/utils/companion-journey-storage';
 import { localDayId } from '@/utils/world-identity';
 import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
-import { acknowledgeActiveContentFlowNavigation, acknowledgeActiveContentFlowPresentation, publishContentFlowDomainEvent } from '@/features/content-flow/content-flow-director';
+import { acknowledgeActiveContentFlowPresentation, publishContentFlowDomainEvent } from '@/features/content-flow/content-flow-director';
 
 type MergeWorldContextValue = {
   state: MergeWorldState | null;
@@ -692,7 +692,6 @@ export function MergeWorldProvider({
 
   useEffect(() => {
     if (!active || loading) return;
-    void acknowledgeActiveContentFlowNavigation('merge');
     const current = stateRef.current;
     if (!current) return;
     const now = Date.now();

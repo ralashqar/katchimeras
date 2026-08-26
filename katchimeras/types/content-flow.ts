@@ -1,5 +1,33 @@
 export type ContentFlowSurface = 'today' | 'hatch' | 'companion' | 'merge' | 'haven' | 'collection' | 'none';
 
+export type ContentFlowBackPolicy = 'allow' | 'pause' | 'locked';
+export type ContentFlowReplayPolicy = 'replay' | 'continue';
+export type ContentFlowReadinessGate =
+  | 'route'
+  | 'data'
+  | 'layout'
+  | 'background'
+  | 'foreground'
+  | 'interaction_target';
+
+export type StoryRouteId = 'today' | 'companion' | 'merge' | 'haven' | 'collection';
+
+export type StoryRouteTarget = {
+  id: StoryRouteId;
+  pathname: string;
+  surface: ContentFlowSurface;
+  params?: Readonly<Record<string, string>>;
+};
+
+export type ContentFlowNodePolicy = {
+  /** Renderer/domain capability used by this node. Validated when authored. */
+  capability: string;
+  /** Explicit Back behavior. Visible nodes may never inherit screen-specific behavior. */
+  backPolicy?: ContentFlowBackPolicy;
+  /** Readiness gates required before revealing a routed destination. */
+  readiness?: readonly ContentFlowReadinessGate[];
+};
+
 export type ContentFlowValue = string | number | boolean | null;
 export type ContentFlowVariables = Record<string, ContentFlowValue>;
 
@@ -26,6 +54,7 @@ export type ContentFlowNode =
   | {
       id: string;
       kind: 'scene';
+      capability: string;
       surface: ContentFlowSurface;
       sceneId: string;
       payload?: Readonly<Record<string, unknown>>;
@@ -34,6 +63,7 @@ export type ContentFlowNode =
   | {
       id: string;
       kind: 'task';
+      capability: string;
       surface: ContentFlowSurface;
       taskId: string;
       payload?: Readonly<Record<string, unknown>>;
@@ -44,6 +74,7 @@ export type ContentFlowNode =
   | {
       id: string;
       kind: 'effect';
+      capability: string;
       effectId: string;
       effectType: string;
       payload?: Readonly<Record<string, unknown>>;
@@ -52,20 +83,24 @@ export type ContentFlowNode =
   | {
       id: string;
       kind: 'presentation';
+      capability: string;
       surface: ContentFlowSurface;
       presentationId: string;
       presentationType: string;
       payload?: Readonly<Record<string, unknown>>;
-      replayPolicy?: 'replay' | 'continue';
+      replayPolicy?: ContentFlowReplayPolicy;
       next: string;
     }
   | {
       id: string;
       kind: 'route';
+      capability: string;
       surface: ContentFlowSurface;
       routeId: string;
-      route: string;
+      target: StoryRouteTarget;
       lock?: boolean;
+      backPolicy?: ContentFlowBackPolicy;
+      readiness?: readonly ContentFlowReadinessGate[];
       next: string;
     }
   | {
@@ -82,6 +117,8 @@ export type ContentFlowDefinition = {
   entryNodeId: string;
   nodes: readonly ContentFlowNode[];
   metadata?: Readonly<Record<string, unknown>>;
+  /** Stable node aliases used to migrate released saves after a manifest edit. */
+  migrations?: Readonly<Record<string, string>>;
 };
 
 export type ContentFlowRunPhase =
@@ -114,6 +151,8 @@ export type ContentFlowRun = {
   updatedAt: number;
   completedAt: number | null;
   error: string | null;
+  /** Optimistic revision used by the atomic command reducer. */
+  revision: number;
 };
 
 export type ContentFlowEvent = {
@@ -139,7 +178,15 @@ export type ContentFlowPendingWork =
   | { kind: 'none' }
   | { kind: 'effect'; key: string; effectType: string; payload: Readonly<Record<string, unknown>> }
   | { kind: 'presentation'; key: string; presentationType: string; payload: Readonly<Record<string, unknown>>; replayPolicy: 'replay' | 'continue' }
-  | { kind: 'navigation'; key: string; route: string; surface: ContentFlowSurface; lock: boolean };
+  | {
+      kind: 'navigation';
+      key: string;
+      target: StoryRouteTarget;
+      surface: ContentFlowSurface;
+      lock: boolean;
+      backPolicy: ContentFlowBackPolicy;
+      readiness: readonly ContentFlowReadinessGate[];
+    };
 
 export type ContentFlowTransition = {
   run: ContentFlowRun;
@@ -159,4 +206,5 @@ export type ContentFlowSurfaceViewModel = {
   surface: ContentFlowSurface;
   blocksNavigation: boolean;
   pendingWork: ContentFlowPendingWork;
+  conflictRunIds: readonly string[];
 };

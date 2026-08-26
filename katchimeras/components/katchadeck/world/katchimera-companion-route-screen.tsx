@@ -7,7 +7,7 @@ import { KingdomCompanionScreen } from '@/components/katchadeck/world/kingdom-co
 import { markFlowStart, reportFlowReady } from '@/utils/flow-performance';
 import { companionIdForFamily, familyIdFromCompanionId } from '@/constants/katchimera-skins';
 import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
-import { commitFtueAction, completeFtueRun, flushFtuePersistence, ftueWispForRun, loadFtueRun, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { advanceFtueActionDurably, commitFtueAction, completeFtueRun, flushFtuePersistence, ftueWispForRun, loadFtueRun, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { activateStoredResidentCardDiscovery, installMossproutOnboardingMergeWorld, loadMergeWorldState, seedStoredMossproutGardenAfterFtue } from '@/utils/merge-world/repository';
 import { useGameScreenTransition } from '@/features/navigation/game-screen-transition';
 import { useCompanionDiscoveryRecords } from '@/hooks/use-companion-discovery-records';
@@ -36,6 +36,7 @@ import {
   MOSSPROUT_FTUE_NAME_BOND_TARGET,
   mossproutBondShareSelection,
 } from '@/features/onboarding/mossprout-bond-share';
+import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 
 function isResidentFtueStep(stepId: string) {
   return stepId === 'companion.resident_affinity'
@@ -76,6 +77,10 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   const navigationFtueRun = shouldRestoreResidentMatchResult && ftueRun
     ? { ...ftueRun, stepId: 'companion.resident_match_result' }
     : ftueRun;
+  const ftueCompanionSurfaceOwned = Boolean(
+    navigationFtueRun?.status === 'active'
+    && mossproutFtueStep(navigationFtueRun.stepId)?.surface === 'companion'
+  );
   const ftueNavigationLocked = useFtueNavigationLock(navigationFtueRun, 'companion', isFocused);
   const latestMossproutJourney = [...relationships.journeyDays].reverse().find((journey) => journey.familyId === 'mossprout') ?? null;
   const residentParcelReady = Boolean(navigationFtueRun?.status === 'active'
@@ -291,22 +296,31 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     if (run?.status !== 'active' || run.stepId !== 'companion.bond_spotlight') return;
     commitFtueAction({ actionId: 'companion.acknowledge_bond', evidenceRef: 'mossprout-bond-meter-spotlight' });
   }, []);
-  const openFtueGarden = useCallback(() => {
+  const openFtueGarden = useCallback(async () => {
     if (ftueHandoffRef.current) return;
     ftueHandoffRef.current = true;
     const run = loadFtueRun();
-    void installMossproutOnboardingMergeWorld(Date.now(), ftueWispForRun(run)).then(() => {
+    try {
+      await installMossproutOnboardingMergeWorld(Date.now(), ftueWispForRun(run));
       updateFtueRun({ mergeInstalled: true });
-      commitFtueAction({ actionId: 'companion.open_garden', evidenceRef: 'mossprout-order-preview' });
+      const result = await advanceFtueActionDurably({
+        expectedStepId: 'companion.order_preview',
+        actionId: 'companion.open_garden',
+        evidenceRef: 'mossprout-order-preview',
+      });
+      if (result.run?.status !== 'active' || result.step?.surface !== 'merge') {
+        ftueHandoffRef.current = false;
+        return;
+      }
       transitionTo({
         announcement: "Opening Mossprout's Garden",
         target: 'merge',
         navigate: () => router.push({ pathname: '/katchimera/[creatureId]/activity', params: { creatureId } }),
       });
-    }).catch((error) => {
+    } catch (error) {
       ftueHandoffRef.current = false;
       console.warn('Could not prepare Mossprout Garden', error);
-    });
+    }
   }, [creatureId, router, transitionTo]);
   const openFtueResidentParcel = useCallback(async () => {
     if (residentParcelOpeningRef.current) return;
@@ -425,6 +439,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       ftueResidentMatchResultActive={residentMatchResultActive}
       ftueResidentStoryResume={residentStoryResumeActive}
       ftueNavigationLocked={ftueNavigationLocked}
+      ftueCompanionSurfaceOwned={ftueCompanionSurfaceOwned}
       onFtueBondSpotlightComplete={acknowledgeFtueBond}
       onFtueJourneyDayComplete={completeFtueJourneyDay}
       onFtueOpenMerge={openFtueGarden}

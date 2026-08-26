@@ -2,8 +2,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { Stack } from 'expo-router';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Sentry from '@sentry/react-native';
 import * as SystemUI from 'expo-system-ui';
@@ -30,6 +29,7 @@ import '@/utils/travel-memory-task';
 import { initializeCrashReporting } from '@/utils/crash-reporting';
 import { runMossproutCampaignV2Migration } from '@/utils/mossprout-campaign-v2-migration';
 import { ContentFlowProvider } from '@/features/content-flow/content-flow-provider';
+import { ContentFlowNavigationCoordinator } from '@/features/content-flow/content-flow-navigation-coordinator';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -133,6 +133,7 @@ function RootLayout() {
                     <AppActivityProvider>
                       <DevProfileLaunchReconciler />
                       <GameScreenTransitionProvider>
+                      <ContentFlowNavigationCoordinator />
                       <Stack>
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

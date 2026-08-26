@@ -28,7 +28,7 @@ import { RARE_MEMORY_CARD_REVEAL_ART, VEILED_MEMORY_CARD_ART, memoryCardArt } fr
 import { COMPANION_DISCOVERY_CATALOG } from '@/constants/companion-discovery-catalog';
 import { Lantern } from '@/constants/theme';
 import { useMergeWorldActions, useMergeWorldLastResult, useMergeWorldState } from '@/features/merge-world/merge-world-provider';
-import { commitFtueAction, dispatchFtueEvent, flushFtuePersistence, registerFtueObjectiveBaseline, repairFtueStep, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { advanceFtueActionDurably, commitFtueAction, dispatchFtueEvent, flushFtuePersistence, registerFtueObjectiveBaseline, repairFtueStep, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { MOSSPROUT_FTUE_RETURN_NOTE_ID, mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, mergeFtueStepForBoard, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
 import type { FtueCueDefinition, FtueSpotlightDefinition } from '@/features/onboarding/ftue-types';
@@ -140,6 +140,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const [blockedFtuePulseNonce, setBlockedFtuePulseNonce] = useState(0);
   const [boardMetrics, setBoardMetrics] = useState<MergeBoardScreenMetrics | null>(null);
   const [boardVisualReady, setBoardVisualReady] = useState(false);
+  const [ftueInteractionTargetReady, setFtueInteractionTargetReady] = useState(false);
   const [ftueTargetRevision, setFtueTargetRevision] = useState(0);
   const [screenLayoutNonce, setScreenLayoutNonce] = useState(0);
   const screenRef = useRef<View>(null);
@@ -176,6 +177,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     background: backgroundReady,
     data: flowReady,
     foreground: boardMetrics != null && boardVisualReady,
+    interaction_target: ftueInteractionTargetReady,
     layout: screenLayoutNonce > 0 && boardAreaHeight > 0,
   }, active);
   useEffect(() => {
@@ -299,7 +301,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     }
   }, [active]);
 
-  const openCharacterReturn = useCallback((characterId: MergeOrder['characterId'], noteId: string) => {
+  const openCharacterReturn = useCallback(async (characterId: MergeOrder['characterId'], noteId: string) => {
     if (!active || storyNavigationPendingRef.current) return;
     if (noteId === MOSSPROUT_FTUE_RETURN_NOTE_ID) {
       if (!mergeFtueAllowsChatNote(ftueStep, noteId)) {
@@ -309,6 +311,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       }
       const nextRun = dispatchFtueEvent({ type: 'chat_note_opened', noteId, revision: state?.revision ?? 0 });
       if (nextRun?.stepId !== 'companion.chapter_zero_return') return;
+      await flushFtuePersistence();
       storyNavigationPendingRef.current = true;
       transitionTo({
         announcement: 'Opening Mossprout',
@@ -428,9 +431,12 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, []);
 
-  const openFtueEnergyCapture = useCallback(() => {
-    const next = commitFtueAction({ actionId: 'merge.tell_me_more' });
-    if (next?.stepId !== 'energy.capture') return;
+  const openFtueEnergyCapture = useCallback(async () => {
+    const result = await advanceFtueActionDurably({
+      expectedStepId: 'merge.energy_exhausted',
+      actionId: 'merge.tell_me_more',
+    });
+    if (result.run?.stepId !== 'energy.capture') return;
     transitionTo({
       announcement: 'Returning to Today',
       target: 'today',
@@ -873,6 +879,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
         cue={mergeGuidanceVisible ? mergeGuidanceCue : null}
         guide={mergeGuidanceVisible ? mergeGuidanceGuide : null}
         layoutNonce={screenLayoutNonce}
+        onReadinessChange={setFtueInteractionTargetReady}
         screenRef={screenRef}
         railTargetRefs={railTargetRefs}
         state={state}

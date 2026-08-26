@@ -1,6 +1,6 @@
-import { defineContentFlow } from '@/features/content-flow/content-flow-compiler';
 import type { ContentFlowDefinition, ContentFlowEventMatcher, ContentFlowNode } from '@/types/content-flow';
 import type { FtueEventMatcher, FtueScriptDefinition, FtueStepDefinition } from '@/features/onboarding/ftue-types';
+import { defineStory } from './story-manifest';
 
 function matcher(input: FtueEventMatcher): ContentFlowEventMatcher {
   const { type, ...where } = input;
@@ -13,6 +13,7 @@ function compileStep(step: FtueStepDefinition, terminalStepId: string): ContentF
     return {
       id: step.id,
       kind: 'task',
+      capability: 'legacy.ftue.task',
       surface: step.surface,
       taskId: `ftue:${step.id}`,
       payload: { legacyFtueStepId: step.id },
@@ -24,6 +25,7 @@ function compileStep(step: FtueStepDefinition, terminalStepId: string): ContentF
   return {
     id: step.id,
     kind: 'scene',
+    capability: 'legacy.ftue.scene',
     surface: step.surface,
     sceneId: `ftue:${step.id}`,
     payload: { legacyFtueStepId: step.id },
@@ -73,6 +75,7 @@ export function compileFtueFlow(script: FtueScriptDefinition): ContentFlowDefini
       nodes.push({
         id: dayOneEffectNodeId,
         kind: 'effect',
+        capability: 'relationship.complete_day_one_lesson',
         effectId: 'relationship.complete_day_one_lesson',
         effectType: 'relationship.complete_day_one_lesson',
         payload: {},
@@ -80,11 +83,11 @@ export function compileFtueFlow(script: FtueScriptDefinition): ContentFlowDefini
       });
     }
   }
-  return defineContentFlow({
+  return defineStory({
     id: script.id,
     version: script.version,
     entryNodeId: script.entryStepId,
     nodes,
-    metadata: { kind: 'ftue', legacyAdapter: true, retiredNodeIds: script.steps.filter((step) => !reachable.has(step.id)).map((step) => step.id) },
+    metadata: { kind: 'ftue' as const, legacyAdapter: true, retiredNodeIds: script.steps.filter((step) => !reachable.has(step.id)).map((step) => step.id) },
   });
 }

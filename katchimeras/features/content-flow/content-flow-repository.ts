@@ -7,6 +7,10 @@ let databasePromise: ReturnType<typeof SQLite.openDatabaseAsync> | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
 const listeners = new Set<() => void>();
 
+function normalizeRun(run: ContentFlowRun): ContentFlowRun {
+  return { ...run, revision: Number.isInteger(run.revision) ? run.revision : 0 };
+}
+
 function serialized<T>(work: () => Promise<T>): Promise<T> {
   const result = writeQueue.then(work, work);
   writeQueue = result.then(() => undefined, () => undefined);
@@ -70,7 +74,7 @@ export async function loadContentFlowRun(runId: string): Promise<ContentFlowRun 
   const db = await database();
   const row = await db.getFirstAsync<{ run_json: string }>('SELECT run_json FROM content_flow_runs WHERE run_id = ?', [runId]);
   if (!row) return null;
-  try { return JSON.parse(row.run_json) as ContentFlowRun; } catch { return null; }
+  try { return normalizeRun(JSON.parse(row.run_json) as ContentFlowRun); } catch { return null; }
 }
 
 export async function listContentFlowRuns(options: { activeOnly?: boolean } = {}): Promise<ContentFlowRun[]> {
@@ -81,8 +85,35 @@ export async function listContentFlowRuns(options: { activeOnly?: boolean } = {}
       : 'SELECT run_json FROM content_flow_runs ORDER BY updated_at DESC',
   );
   return rows.flatMap((row) => {
-    try { return [JSON.parse(row.run_json) as ContentFlowRun]; } catch { return []; }
+    try { return [normalizeRun(JSON.parse(row.run_json) as ContentFlowRun)]; } catch { return []; }
   });
+}
+
+async function writeRun(db: Awaited<ReturnType<typeof database>>, run: ContentFlowRun) {
+  await db.runAsync(
+    `INSERT INTO content_flow_runs (run_id, definition_id, definition_version, parent_run_id, status, node_id, phase, updated_at, run_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(run_id) DO UPDATE SET
+       definition_id = excluded.definition_id,
+       definition_version = excluded.definition_version,
+       parent_run_id = excluded.parent_run_id,
+       status = excluded.status,
+       node_id = excluded.node_id,
+       phase = excluded.phase,
+       updated_at = excluded.updated_at,
+       run_json = excluded.run_json`,
+    [run.runId, run.definitionId, run.definitionVersion, run.parentRunId, run.status, run.nodeId, run.phase, run.updatedAt, JSON.stringify(run)],
+  );
+  for (const [effectKey, receipt] of Object.entries(run.effectReceipts)) {
+    const marker = ':effect:';
+    const markerIndex = effectKey.indexOf(marker);
+    const nodeId = markerIndex < 0 ? run.nodeId : effectKey.slice(run.runId.length + 1, markerIndex);
+    await db.runAsync(
+      `INSERT OR IGNORE INTO content_flow_effect_receipts (effect_key, run_id, node_id, completed_at, result_json)
+       VALUES (?, ?, ?, ?, ?)`,
+      [effectKey, run.runId, nodeId, receipt.completedAt, receipt.result === undefined ? null : JSON.stringify(receipt.result)],
+    );
+  }
 }
 
 export async function saveContentFlowTransition(run: ContentFlowRun, event?: ContentFlowEvent): Promise<void> {
@@ -96,33 +127,50 @@ export async function saveContentFlowTransition(run: ContentFlowRun, event?: Con
           [event.eventId, event.runId, event.nodeId, event.type, event.occurredAt, JSON.stringify(event)],
         );
       }
-      await db.runAsync(
-        `INSERT INTO content_flow_runs (run_id, definition_id, definition_version, parent_run_id, status, node_id, phase, updated_at, run_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(run_id) DO UPDATE SET
-           definition_id = excluded.definition_id,
-           definition_version = excluded.definition_version,
-           parent_run_id = excluded.parent_run_id,
-           status = excluded.status,
-           node_id = excluded.node_id,
-           phase = excluded.phase,
-           updated_at = excluded.updated_at,
-           run_json = excluded.run_json`,
-        [run.runId, run.definitionId, run.definitionVersion, run.parentRunId, run.status, run.nodeId, run.phase, run.updatedAt, JSON.stringify(run)],
-      );
-      for (const [effectKey, receipt] of Object.entries(run.effectReceipts)) {
-        const marker = ':effect:';
-        const markerIndex = effectKey.indexOf(marker);
-        const nodeId = markerIndex < 0 ? run.nodeId : effectKey.slice(run.runId.length + 1, markerIndex);
-        await db.runAsync(
-          `INSERT OR IGNORE INTO content_flow_effect_receipts (effect_key, run_id, node_id, completed_at, result_json)
-           VALUES (?, ?, ?, ?, ?)`,
-          [effectKey, run.runId, nodeId, receipt.completedAt, receipt.result === undefined ? null : JSON.stringify(receipt.result)],
-        );
-      }
+      await writeRun(db, normalizeRun(run));
     });
   });
   listeners.forEach((listener) => listener());
+}
+
+/**
+ * Reads, reduces and persists one command inside the same serialized SQLite
+ * transaction. Callers cannot overwrite a newer cursor with a stale snapshot.
+ */
+export async function reduceContentFlowRunAtomically(input: {
+  runId: string;
+  event?: ContentFlowEvent;
+  reduce: (current: ContentFlowRun) => ContentFlowRun;
+}): Promise<{ run: ContentFlowRun | null; eventRecorded: boolean }> {
+  const result = await serialized(async () => {
+    const db = await database();
+    let output: { run: ContentFlowRun | null; eventRecorded: boolean } = { run: null, eventRecorded: false };
+    await db.withTransactionAsync(async () => {
+      const row = await db.getFirstAsync<{ run_json: string }>('SELECT run_json FROM content_flow_runs WHERE run_id = ?', [input.runId]);
+      if (!row) return;
+      let current: ContentFlowRun;
+      try { current = normalizeRun(JSON.parse(row.run_json) as ContentFlowRun); } catch { return; }
+      if (input.event) {
+        const duplicate = await db.getFirstAsync('SELECT event_id FROM content_flow_events WHERE event_id = ?', [input.event.eventId]);
+        if (duplicate) {
+          output = { run: current, eventRecorded: false };
+          return;
+        }
+        await db.runAsync(
+          `INSERT INTO content_flow_events (event_id, run_id, node_id, event_type, occurred_at, event_json)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [input.event.eventId, input.event.runId, input.event.nodeId, input.event.type, input.event.occurredAt, JSON.stringify(input.event)],
+        );
+      }
+      const reduced = normalizeRun(input.reduce(current));
+      const next = { ...reduced, revision: current.revision + 1 };
+      await writeRun(db, next);
+      output = { run: next, eventRecorded: Boolean(input.event) };
+    });
+    return output;
+  });
+  if (result.run) listeners.forEach((listener) => listener());
+  return result;
 }
 
 export async function contentFlowEventWasRecorded(eventId: string): Promise<boolean> {

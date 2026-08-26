@@ -1,22 +1,32 @@
 import { useSyncExternalStore } from 'react';
 
 import { createClientId } from '@/utils/client-id';
-import { getStoredJson, setStoredJsonAsync } from '@/utils/app-storage';
+import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { dispatchFtueActionToContentFlow, dispatchFtueEventToContentFlow } from '@/features/content-flow/ftue-content-flow-runtime';
 import { completeDayOneLesson } from '@/game/katchimeras/action-runtime';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 
 import { MOSSPROUT_FTUE_SCRIPT, mossproutFtueAction, mossproutFtueStep } from './mossprout-ftue-script';
 import { ftueNeedsV28QuestionnaireRestart, ftueV28QuestionnaireLoopRecoveryStep } from './ftue-migration-policy';
-import type { FtueAnswer, FtueCommitReceipt, FtueEvent, FtueEventMatcher, FtueRunState, FtueSurface, FtueSurfaceViewModel } from './ftue-types';
+import { activeFtueNavigationPolicy } from './ftue-navigation-policy';
+import type {
+  FtueAnswer,
+  FtueCommitReceipt,
+  FtueEvent,
+  FtueEventMatcher,
+  FtueNavigationDirective,
+  FtueRunState,
+  FtueStepDefinition,
+  FtueSurface,
+  FtueSurfaceViewModel,
+} from './ftue-types';
 
 const STORAGE_KEY = 'katchimeras.ftue-run.v4';
 const LEGACY_STORAGE_KEY = 'katchimeras.first-session.v3';
 const listeners = new Set<() => void>();
 let snapshot: FtueRunState | null | undefined;
 let migrationNotificationQueued = false;
-let pendingPersistence: FtueRunState | null | undefined;
-let persistenceWorker: Promise<void> | null = null;
+let durableAdvanceQueue: Promise<unknown> = Promise.resolve();
 
 type LegacyFirstSession = { stage?: 'today' | 'merge' | 'journal_for_energy' | 'complete'; startedAt?: string; mergeInstalled?: boolean };
 
@@ -54,34 +64,20 @@ function migrateLegacy(): FtueRunState | null {
   return run;
 }
 
-function enqueuePersistence(next: FtueRunState | null) {
-  pendingPersistence = next;
-  if (persistenceWorker) return;
-  persistenceWorker = (async () => {
-    while (pendingPersistence !== undefined) {
-      const value = pendingPersistence;
-      pendingPersistence = undefined;
-      await setStoredJsonAsync(STORAGE_KEY, value);
-    }
-  })().catch(() => {
-    // The in-memory run remains authoritative for this session. Merge-domain
-    // recovery reconstructs missed observed events after an interrupted write.
-  }).finally(() => {
-    persistenceWorker = null;
-    if (pendingPersistence !== undefined) enqueuePersistence(pendingPersistence);
-  });
-}
-
 export async function flushFtuePersistence() {
-  while (persistenceWorker || pendingPersistence !== undefined) {
-    if (!persistenceWorker && pendingPersistence !== undefined) enqueuePersistence(pendingPersistence);
-    await persistenceWorker;
-  }
+  // FTUE checkpoints use expo-sqlite's synchronous localStorage adapter, so
+  // there is no second writer to flush. Keep this boundary async for callers
+  // that atomically pair it with domain repositories and Content Flow.
+  await Promise.resolve();
 }
 
 function publish(next: FtueRunState | null) {
+  // `expo-sqlite/localStorage` is synchronous. Write through before publishing
+  // the new snapshot so a process kill immediately after a CTA can never
+  // restore the destination route with the previous FTUE node. The async
+  // Content Flow is journaled separately by the durable route-boundary API.
+  setStoredJson(STORAGE_KEY, next);
   snapshot = next;
-  enqueuePersistence(next);
   listeners.forEach((listener) => listener());
   return next;
 }
@@ -162,12 +158,18 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
 }
 
 export function loadFtueRun(): FtueRunState | null {
-  if (snapshot === undefined) snapshot = getStoredJson<FtueRunState | null>(STORAGE_KEY, null) ?? migrateLegacy();
+  if (snapshot === undefined) {
+    const stored = getStoredJson<FtueRunState | null>(STORAGE_KEY, null);
+    snapshot = stored ?? migrateLegacy();
+    if (!stored && snapshot) {
+      setStoredJson(STORAGE_KEY, snapshot);
+    }
+  }
   if (snapshot) {
     const migrated = migrateCurrentScript(snapshot);
     if (migrated !== snapshot) {
       snapshot = migrated;
-      enqueuePersistence(migrated);
+      setStoredJson(STORAGE_KEY, migrated);
       if (!migrationNotificationQueued) {
         migrationNotificationQueued = true;
         queueMicrotask(() => {
@@ -284,6 +286,8 @@ export function commitFtueAction(input: {
   private?: boolean;
   evidenceRef?: string | null;
   nextStepId?: string;
+  /** Reserved for the durable route-boundary wrapper. */
+  skipContentFlowDispatch?: boolean;
 }) {
   const started = beginFtueAction(input.actionId);
   const current = loadFtueRun();
@@ -323,7 +327,9 @@ export function commitFtueAction(input: {
       flowRunId: current.runId,
     }));
   }
-  void dispatchFtueActionToContentFlow(current, input.actionId, next?.stepId ?? nextStepId);
+  if (!input.skipContentFlowDispatch) {
+    void dispatchFtueActionToContentFlow(current, input.actionId, next?.stepId ?? nextStepId);
+  }
   scheduleReceiptSync();
   return next;
 }
@@ -372,6 +378,55 @@ function ftueEventMatches(matcher: FtueEventMatcher, event: FtueEvent) {
     && event.type === 'order_served'
     && (matcher.orderId == null || matcher.orderId === event.orderId)
     && (!matcher.residentDiscovery || event.residentDiscoveryId != null);
+}
+
+export type DurableFtueAdvanceResult = {
+  advanced: boolean;
+  run: FtueRunState | null;
+  step: FtueStepDefinition | null;
+  resume: FtueNavigationDirective['resume'] | null;
+};
+
+/**
+ * The only supported boundary for an FTUE action that changes routes.
+ *
+ * The legacy snapshot is written through synchronously, its queued native
+ * write is flushed, and the Content Flow journal is confirmed before the
+ * caller receives a navigation intent. Repeated taps return the current run
+ * without advancing a second time.
+ */
+export function advanceFtueActionDurably(input: {
+  expectedStepId: string;
+  actionId: string;
+  optionId?: string | null;
+  optionLabel?: string | null;
+  private?: boolean;
+  evidenceRef?: string | null;
+  nextStepId?: string;
+}): Promise<DurableFtueAdvanceResult> {
+  const operation = durableAdvanceQueue.then(async () => {
+    const before = loadFtueRun();
+    if (!before || before.status !== 'active') {
+      return { advanced: false, run: before, step: null, resume: null };
+    }
+    if (before.stepId !== input.expectedStepId) {
+      const step = mossproutFtueStep(before.stepId) ?? null;
+      return { advanced: false, run: before, step, resume: activeFtueNavigationPolicy(before)?.resume ?? null };
+    }
+    const next = commitFtueAction({ ...input, skipContentFlowDispatch: true });
+    await flushFtuePersistence();
+    if (next) await dispatchFtueActionToContentFlow(before, input.actionId, next.stepId);
+    const persisted = loadFtueRun();
+    const step = persisted?.status === 'active' ? mossproutFtueStep(persisted.stepId) ?? null : null;
+    return {
+      advanced: Boolean(persisted && persisted.stepId !== before.stepId),
+      run: persisted,
+      step,
+      resume: activeFtueNavigationPolicy(persisted)?.resume ?? null,
+    };
+  });
+  durableAdvanceQueue = operation.then(() => undefined, () => undefined);
+  return operation;
 }
 
 export function dispatchFtueEvent(event: FtueEvent, evidenceRef?: string) {

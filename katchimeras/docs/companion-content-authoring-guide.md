@@ -6,6 +6,11 @@ remaining companion from modular fallback copy to a fully authored content set.
 Batch status and family-specific risk briefs are tracked in
 [`companion-editorial-rollout.md`](./companion-editorial-rollout.md).
 
+For FTUE, Journey Day, resident, route, reward, and interruption-safe node
+authoring, follow [`story-flow-authoring.md`](./story-flow-authoring.md). Story
+sequence and navigation must use that shared runtime rather than screen-owned
+booleans or bespoke timers.
+
 ## Speech-bubble copy budget
 
 Questionnaire prompts and companion questions share a compact speech

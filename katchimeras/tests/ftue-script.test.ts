@@ -420,10 +420,22 @@ test('post-Garden companion FTUE owns navigation and has a durable resume target
   assert.match(mergeScreen, /<Stack\.Screen options=\{\{ gestureEnabled: !residentFtueActive \}\}/);
   const bondRun = { status: 'active' as const, stepId: 'companion.bond_spotlight' };
   const bondPolicy = activeFtueNavigationPolicy(bondRun);
-  assert.deepEqual(bondPolicy?.resume, { kind: 'companion', creatureId: 'companion:mossprout' });
+  assert.deepEqual(bondPolicy?.resume, { kind: 'companion', creatureId: 'companion:mossprout', ftue: '1' });
   assert.equal(ftueLocksSurfaceNavigation(bondRun, 'companion'), true);
   assert.equal(ftueLocksSurfaceNavigation(bondRun, 'merge'), false);
-  assert.equal(ftueResumeTargetMatches(bondPolicy!.resume, '/katchimera/companion%3Amossprout'), true);
+  assert.equal(ftueResumeTargetMatches(bondPolicy!.resume, '/katchimera/companion%3Amossprout', { ftue: '1' }), true);
+  assert.equal(ftueResumeTargetMatches(bondPolicy!.resume, '/katchimera/companion%3Amossprout'), false);
+
+  const introPolicy = activeFtueNavigationPolicy({ status: 'active', stepId: 'companion.intro_action' });
+  assert.deepEqual(introPolicy?.resume, { kind: 'companion', creatureId: 'companion:mossprout', ftue: '1' });
+  const conversationPolicy = activeFtueNavigationPolicy({ status: 'active', stepId: 'companion.first_meeting' });
+  assert.deepEqual(conversationPolicy?.resume, { kind: 'companion', creatureId: 'companion:mossprout', ftue: '1' });
+  const earlyMergePolicy = activeFtueNavigationPolicy({ status: 'active', stepId: 'merge.seed_drag' });
+  assert.deepEqual(earlyMergePolicy?.resume, { kind: 'merge', creatureId: 'companion:mossprout' });
+  const capturePolicy = activeFtueNavigationPolicy({ status: 'active', stepId: 'energy.capture' });
+  assert.deepEqual(capturePolicy?.resume, { kind: 'today', onboardingCapture: '1' });
+  assert.equal(ftueResumeTargetMatches(capturePolicy!.resume, '/today', { onboardingCapture: '1' }), true);
+  assert.equal(ftueResumeTargetMatches(capturePolicy!.resume, '/today'), false);
 
   const returnPolicy = activeFtueNavigationPolicy({ status: 'active', stepId: 'companion.chapter_zero_return' });
   assert.deepEqual(returnPolicy?.resume, {
@@ -454,6 +466,39 @@ test('post-Garden companion FTUE owns navigation and has a durable resume target
   ), false);
 });
 
+test('route-changing FTUE actions persist before navigation and owned companion UI fails closed', () => {
+  const runtime = readFileSync('features/onboarding/ftue-runtime.ts', 'utf8');
+  const today = readFileSync('app/(tabs)/today.tsx', 'utf8');
+  const companion = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
+  const interaction = readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
+  const reconciler = readFileSync('features/onboarding/ftue-navigation-reconciler.tsx', 'utf8');
+
+  const writeThroughIndex = runtime.indexOf('setStoredJson(STORAGE_KEY, next)');
+  const publishSnapshotIndex = runtime.indexOf('snapshot = next', writeThroughIndex);
+  assert.ok(writeThroughIndex >= 0 && writeThroughIndex < publishSnapshotIndex);
+  assert.doesNotMatch(runtime, /setStoredJsonAsync|pendingPersistence|persistenceWorker/);
+  assert.match(runtime, /advanceFtueActionDurably[\s\S]*?commitFtueAction\(\{ \.\.\.input, skipContentFlowDispatch: true \}\)[\s\S]*?await flushFtuePersistence\(\)[\s\S]*?await dispatchFtueActionToContentFlow/);
+  assert.match(today, /talkToMossprout = useCallback\(async \(\) => \{[\s\S]*?await advanceFtueActionDurably[\s\S]*?stepId !== 'companion\.intro_action'[\s\S]*?transitionTo/);
+  assert.match(companion, /openFtueGarden = useCallback\(async \(\) => \{[\s\S]*?await advanceFtueActionDurably[\s\S]*?result\.step\?\.surface !== 'merge'[\s\S]*?transitionTo/);
+  assert.match(reconciler, /run\.stepId === 'hatch\.reveal'[\s\S]*?currentFtueRoute === '1'[\s\S]*?advanceFtueActionDurably/);
+  assert.match(companion, /ftueCompanionSurfaceOwned = Boolean\([\s\S]*?mossproutFtueStep\(navigationFtueRun\.stepId\)\?\.surface === 'companion'/);
+  assert.match(interaction, /!showMossproutDashboard[\s\S]*?!props\.ftueCompanionSurfaceOwned \|\| residentFtueDashboard/);
+  assert.match(interaction, /residentParcelHandoffActive=\{residentParcelGardenPanelActive\}/);
+});
+
+test('every active FTUE node has a canonical cold-start route', () => {
+  for (const step of MOSSPROUT_FTUE_SCRIPT.steps) {
+    if (step.id === MOSSPROUT_FTUE_SCRIPT.terminalStepId) continue;
+    const policy = activeFtueNavigationPolicy({ status: 'active', stepId: step.id });
+    assert.ok(policy, `missing navigation policy for ${step.id}`);
+    assert.equal(policy.surface, step.surface);
+    if (step.surface === 'merge') assert.equal(policy.resume.kind, 'merge');
+    else if (step.surface === 'companion') assert.equal(policy.resume.kind, 'companion');
+    else if (step.surface === 'haven') assert.equal(policy.resume.kind, 'haven');
+    else assert.equal(policy.resume.kind, 'today');
+  }
+});
+
 test('resident discovery pauses on one standard Mossprout action card and resumes the exact Merge step', () => {
   const route = readFileSync('app/katchimera/[creatureId].tsx', 'utf8');
   const reconciler = readFileSync('features/onboarding/ftue-navigation-reconciler.tsx', 'utf8');
@@ -482,7 +527,7 @@ test('resident discovery pauses on one standard Mossprout action card and resume
   assert.match(navigationSession, /'idle'[\s\S]*?'handoff'[\s\S]*?'merge_presented'[\s\S]*?'recovery_pending'[\s\S]*?'paused'/);
   assert.match(companion, /residentStoryResumeActive[\s\S]*?initialConversationDefinitionId=\{!residentStoryResumeActive/);
   assert.doesNotMatch(interaction, /A VEILED PARCEL IS WAITING|Return to the exact resident step you left/);
-  assert.match(interaction, /residentFtueDashboard = props\.familyId === 'mossprout'[\s\S]*?props\.ftueResidentHandoffActive[\s\S]*?dashboardRouteActive = route\.kind === 'dashboard' \|\| residentFtueDashboard/);
+  assert.match(interaction, /residentFtueDashboard = props\.familyId === 'mossprout'[\s\S]*?props\.ftueResidentHandoffActive[\s\S]*?dashboardRouteActive = route\.kind === 'dashboard'[\s\S]*?residentFtueDashboard[\s\S]*?props\.ftueCompanionSurfaceOwned/);
   assert.match(interaction, /exitCompletedConversation[\s\S]*?pendingStoryConversationRef\.current = null[\s\S]*?openedStoryConversationRef\.current = null[\s\S]*?showFeastleStoryHome\(\)/);
   assert.match(interaction, /onCompletedExit=\{exitCompletedConversation\}/);
   assert.match(conversationScene, /session\.status === 'completed'[\s\S]*?<ConversationCompletion[\s\S]*?Closest match found[\s\S]*?onContinue=\{onCompletedExit\}/);

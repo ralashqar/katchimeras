@@ -6,7 +6,7 @@ import type { FtueResumeTarget } from './ftue-types';
 import { ftueNavigationYieldsToDevRecovery } from './ftue-dev-recovery';
 import { activeFtueNavigationPolicy, ftueForegroundKeepsResidentMerge, ftueResumeTargetMatches, residentJourneyReachedMatchResult } from './ftue-navigation-policy';
 import { residentFtueCanonicalStep } from './merge-ftue';
-import { loadFtueRun, repairFtueStep, updateFtueRun } from './ftue-runtime';
+import { advanceFtueActionDurably, loadFtueRun, repairFtueStep, updateFtueRun } from './ftue-runtime';
 import {
   finishResidentMergeSession,
   getResidentMergeSession,
@@ -21,7 +21,9 @@ import { loadMergeWorldState } from '@/utils/merge-world/repository';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 
 function hrefForResumeTarget(target: FtueResumeTarget): Href {
-  if (target.kind === 'today') return '/(tabs)/today';
+  if (target.kind === 'today') return target.onboardingCapture
+    ? { pathname: '/(tabs)/today', params: { onboardingCapture: target.onboardingCapture } }
+    : '/(tabs)/today';
   if (target.kind === 'haven') return '/katchimeras';
   if (target.kind === 'merge') {
     return {
@@ -93,6 +95,29 @@ export function FtueNavigationReconciler() {
     if (restoringRef.current) return;
     restoringRef.current = true;
     let run = loadFtueRun();
+    const currentPathAtStart = decodeURIComponent(pathnameRef.current).replace(/\/$/, '') || '/';
+    const currentFtueParam = paramsRef.current.ftue;
+    const currentFtueRoute = Array.isArray(currentFtueParam) ? currentFtueParam[0] : currentFtueParam;
+    // The destination route can be restored by iOS after the CTA advanced only
+    // in memory in an older build. Treat the canonical FTUE companion route as
+    // durable evidence that the hatch handoff happened, then repair the graph
+    // before choosing any presentation. This is deliberately narrow: ordinary
+    // companion routes can never manufacture FTUE progress.
+    if (run?.status === 'active'
+      && run.stepId === 'hatch.reveal'
+      && currentPathAtStart === '/katchimera/companion:mossprout'
+      && currentFtueRoute === '1') {
+      try {
+        await advanceFtueActionDurably({
+          expectedStepId: 'hatch.reveal',
+          actionId: 'hatch.talk_to_mossprout',
+          evidenceRef: 'route-recovery:companion-ftue',
+        });
+      } catch (error) {
+        console.warn('Could not repair the hatch-to-companion FTUE handoff', error);
+      }
+      run = loadFtueRun();
+    }
     if (residentJourneyReachedMatchResult(run, relationshipProgressionRepository.load().journeyDays)) {
       updateFtueRun({ stepId: 'companion.resident_match_result', status: 'active', completedAt: null });
       finishResidentMergeSession();
