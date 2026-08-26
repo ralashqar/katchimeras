@@ -30,7 +30,6 @@ import '@/utils/travel-memory-task';
 import { initializeCrashReporting } from '@/utils/crash-reporting';
 import { runMossproutCampaignV2Migration } from '@/utils/mossprout-campaign-v2-migration';
 import { ContentFlowProvider } from '@/features/content-flow/content-flow-provider';
-import { runContentFlowSaveMigration } from '@/features/content-flow/content-flow-migration';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -73,7 +72,6 @@ function RootLayout() {
   useEffect(() => {
     let active = true;
     void runMossproutCampaignV2Migration()
-      .then(() => runContentFlowSaveMigration())
       .catch((error) => Sentry.captureException(error))
       .finally(() => { if (active) setCampaignReady(true); });
     return () => { active = false; };

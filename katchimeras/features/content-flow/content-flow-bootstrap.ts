@@ -3,6 +3,8 @@ import { nextUnearnedMossproutResident } from '@/constants/resident-card-discove
 import { MOSSPROUT_FTUE_SCRIPT } from '@/features/onboarding/mossprout-ftue-script';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import { activateStoredResidentCardDiscovery, loadMergeWorldState } from '@/utils/merge-world/repository';
+import { completeDayOneLesson } from '@/game/katchimeras/action-runtime';
+import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 
 import { registerContentFlowEffect } from './content-flow-capabilities';
 import { registerContentFlowDefinition } from './content-flow-catalog';
@@ -34,5 +36,10 @@ export function bootstrapContentFlowCatalog() {
     return { effectKey, residentId, dayId };
   });
   registerContentFlowEffect('optional_action.publish', async ({ effectKey, payload }) => ({ effectKey, action: payload.action }));
+  registerContentFlowEffect('relationship.complete_day_one_lesson', async ({ run, effectKey }) => {
+    const completedAt = Date.now();
+    relationshipProgressionRepository.update((state) => completeDayOneLesson(state, { completedAt, flowRunId: run.runId }));
+    return { effectKey, completedAt, flowRunId: run.runId };
+  });
   bootstrapped = true;
 }

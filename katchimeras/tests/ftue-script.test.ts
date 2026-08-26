@@ -14,7 +14,6 @@ import {
 } from '@/features/onboarding/ftue-navigation-policy';
 import type { JourneyDayRecord } from '@/types/relationship-progression';
 import { FTUE_EGG_ANSWER_GROWTH_REWARD, MOSSPROUT_FTUE_SCRIPT, mossproutFtueAction, mossproutFtueStep, validateMossproutFtueScript } from '@/features/onboarding/mossprout-ftue-script';
-import { mossproutFtueDayOneLessonCompleted } from '@/features/onboarding/mossprout-ftue-progress';
 import { ftueNeedsV28QuestionnaireRestart, ftueV28QuestionnaireLoopRecoveryStep } from '@/features/onboarding/ftue-migration-policy';
 import { MOSSPROUT_BOND_SHARE_PROMPTS, mossproutBondShareSelection } from '@/features/onboarding/mossprout-bond-share';
 import { MOSSPROUT_GARDEN_INTRO_BEATS, mossproutGardenIntroBeat } from '@/features/onboarding/mossprout-garden-intro';
@@ -77,19 +76,6 @@ test('the Egg asks five distinct player-focused questions before Hatch', () => {
       ['A mossy forest', 'A flower meadow', 'A rainy pond', 'A windy hill'],
     ],
   );
-});
-
-test('Day 1 lesson completion survives a persisted FTUE reload', () => {
-  const beforeCompletion = {
-    receipts: [{ actionId: 'companion.complete_day_one_action', status: 'pending' as const }],
-  };
-  assert.equal(mossproutFtueDayOneLessonCompleted(beforeCompletion), false);
-
-  const persisted = JSON.parse(JSON.stringify({
-    ...beforeCompletion,
-    receipts: [{ actionId: 'companion.complete_day_one_action', status: 'committed' as const }],
-  }));
-  assert.equal(mossproutFtueDayOneLessonCompleted(persisted), true);
 });
 
 test('local player details stay bounded and companion places select a resident safely', () => {
@@ -709,6 +695,7 @@ test('FTUE starts friendship before the Garden and returns directly to the match
   const bondCelebration = readFileSync('components/katchadeck/world/companion-bond-level-up-celebration.tsx', 'utf8');
   const repository = readFileSync('utils/merge-world/repository.ts', 'utf8');
   const transition = readFileSync('features/navigation/game-screen-transition.tsx', 'utf8');
+  const ftueRuntime = readFileSync('features/onboarding/ftue-runtime.ts', 'utf8');
   assert.match(merge, /ftueRun\.stepId !== 'companion\.chapter_zero_return'[\s\S]*?target: 'companion'[\s\S]*?ftue: 'chapter-zero-return'/);
   assert.match(companion, /const matchedResidentId = loadOnboardingProfile\(\)\.matchedResidentId[\s\S]*?actionId: 'companion\.complete_chapter_zero_return'[\s\S]*?nextStepId: matchedResidentId \? 'companion\.resident_parcel_ready' : 'companion\.resident_affinity'/);
   assert.match(companion, /run\.stepId === 'companion\.nickname'[\s\S]*?saveMossproutPlayerNickname[\s\S]*?kind: 'friendship_started'[\s\S]*?actionId: 'companion\.save_nickname'/);
@@ -743,9 +730,8 @@ test('FTUE starts friendship before the Garden and returns directly to the match
   assert.match(companion, /completeResidentResultExit[\s\S]*?await seedStoredMossproutGardenAfterFtue[\s\S]*?completeFtueRun\(\)/);
   assert.match(companion, /ftueRun\?\.status !== 'complete'[\s\S]*?postFtueGardenRepairRef[\s\S]*?seedStoredMossproutGardenAfterFtue/);
   assert.match(companion, /const ftueResidentHandoffActive = Boolean\([\s\S]*?navigationFtueRun\.stepId !== 'companion\.resident_match_result'[\s\S]*?residentParcelReady/);
-  assert.match(companion, /dayOneBondActionDone[\s\S]*?repair:mossprout-day-one-bond-action/);
-  assert.match(companion, /companion\.bond_spotlight[\s\S]*?repair:mossprout-bond-spotlight/);
-  assert.match(companion, /questionnaireAlreadyDone[\s\S]*?repair:mossprout-resident-affinity/);
+  assert.doesNotMatch(companion, /repair:mossprout-day-one-bond-action|repair:mossprout-bond-spotlight|repair:mossprout-resident-affinity/);
+  assert.match(ftueRuntime, /input\.actionId === 'companion\.complete_day_one_action'[\s\S]*?completeDayOneLesson/);
   assert.doesNotMatch(companion, /complete_resident_affinity'[\s\S]{0,500}?router\.push/);
   assert.match(companion, /stepId !== 'companion\.bond_spotlight'[\s\S]*?actionId: 'companion\.acknowledge_bond'/);
   assert.match(companion, /return seedStoredMossproutGardenAfterFtue[\s\S]*?\.then\(\(\) => undefined\)/);

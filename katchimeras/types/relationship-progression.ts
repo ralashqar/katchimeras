@@ -76,6 +76,13 @@ export type KatchimeraActionArtKey =
 
 export type KatchimeraActionSlotId = 'together' | 'field' | 'garden';
 
+export type ActionOwner =
+  | { kind: 'journey'; journeyId: string; journeyActionId: string }
+  | { kind: 'daily_action' }
+  | { kind: 'goal'; goalId: string }
+  | { kind: 'quest'; questId: string }
+  | { kind: 'garden'; orderId: string | null };
+
 export type MossproutDailyActionDeck = {
   dayId: string;
   slotSequences: Record<KatchimeraActionSlotId, number>;
@@ -176,18 +183,66 @@ export type KatchimeraActionRewardReceipt = {
   afterLevel: 1 | 2 | 3 | 4;
 };
 
-/**
- * Durable presentation ledger entry. Domain completion and its reward are
- * committed once; the home screen only acknowledges this event after the
- * reward flight and row outro have both finished.
- */
-export type KatchimeraActionCompletionEvent = {
-  id: string;
-  source: KatchimeraActionOrigin;
+export type ActionCompletionCommand = {
+  commandId: string;
+  actionInstanceId: string;
+  actionId: string;
+  dayId: string;
+  familyId: KatchimeraFamilyId;
+  owner: ActionOwner;
+  sourceSlotId: KatchimeraActionSlotId;
+  slotId: KatchimeraActionSlotId;
+  sequence: number;
+  outcome: 'completed' | 'skipped';
+  rotationEffect: 'consume' | 'preserve';
+  rewardIntent: KatchimeraDayActionReward | null;
+  presentation: 'action_card' | 'none';
+  card: Pick<KatchimeraActionOrigin, 'kind' | 'title' | 'subtitle' | 'icon' | 'artKey' | 'artworkDefinitionIds'>;
   completedAt: number;
+};
+
+export type ActionCompletionRecord = {
+  id: string;
+  commandId: string;
+  actionInstanceId: string;
+  actionId: string;
+  dayId: string;
+  familyId: KatchimeraFamilyId;
+  kind: KatchimeraDayActionKind;
+  owner: ActionOwner;
+  sourceSlotId: KatchimeraActionSlotId;
+  slotId: KatchimeraActionSlotId;
+  sequence: number;
+  outcome: 'completed' | 'skipped';
+  rotationEffect: 'consume' | 'preserve';
+  rewardIntent: KatchimeraDayActionReward | null;
   rewardEventId: string | null;
   rewardReceipt: KatchimeraActionRewardReceipt | null;
-  acknowledgedAt: number | null;
+  completedAt: number;
+};
+
+export type ActionPresentationRecord = {
+  id: string;
+  completionId: string;
+  dayId: string;
+  slotId: KatchimeraActionSlotId;
+  status: 'pending' | 'claimed' | 'dismissed';
+  card: Pick<KatchimeraActionOrigin, 'kind' | 'title' | 'subtitle' | 'icon' | 'artKey' | 'artworkDefinitionIds' | 'reward'>;
+  createdAt: number;
+  claimedAt: number | null;
+  dismissedAt: number | null;
+};
+
+export type ActionBoardSlot = {
+  slotId: KatchimeraActionSlotId;
+  action: KatchimeraDayAction | null;
+  enabled: boolean;
+};
+
+export type ActionBoardSnapshot = {
+  dayId: string;
+  slots: readonly [ActionBoardSlot, ActionBoardSlot, ActionBoardSlot];
+  presentations: readonly ActionPresentationRecord[];
 };
 
 /** @deprecated Save-migration input only. */
@@ -258,10 +313,15 @@ export type MossproutStoryFactKey =
 export type MossproutStoryFacts = Partial<Record<MossproutStoryFactKey, string>>;
 
 export type RelationshipProgressState = {
-  schemaVersion: 6;
+  schemaVersion: 7;
   journeyDays: JourneyDayRecord[];
   stories: Partial<Record<KatchimeraFamilyId, KatchimeraStoryProgress>>;
+  milestones: {
+    dayOneLessonCompletedAt: number | null;
+    dayOneLessonFlowRunId: string | null;
+  };
   skippedActionIds: string[];
-  actionCompletionEvents: KatchimeraActionCompletionEvent[];
+  actionCompletions: ActionCompletionRecord[];
+  actionPresentations: ActionPresentationRecord[];
   mossproutDailyActionDecks: MossproutDailyActionDeck[];
 };

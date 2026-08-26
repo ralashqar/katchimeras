@@ -1,5 +1,5 @@
 import type { ConversationDefinition, ConversationSession } from '@/types/companion-conversation';
-import type { KatchimeraActionCompletionEvent, KatchimeraActionOrigin } from '@/types/relationship-progression';
+import type { ActionCompletionRecord, KatchimeraActionOrigin } from '@/types/relationship-progression';
 import { companionIdForFamily } from '@/constants/katchimera-skins';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { mossproutActionInstanceId, mossproutConversationActionCompletion } from '@/game/katchimeras/mossprout-home';
@@ -9,8 +9,8 @@ import {
   katchimeraActionCompletionEventId,
   mossproutDailyActionDeck,
   mossproutJourneyForDay,
-  recordKatchimeraActionCompletionEvent,
 } from '@/game/katchimeras/relationship-progression';
+import { actionCommandFromOrigin, commitActionCompletion } from '@/game/katchimeras/action-runtime';
 import {
   companionBondProgress,
   recordCompanionBondEvent,
@@ -24,11 +24,9 @@ import { homeRepository } from '@/storage/repositories/home-repository';
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import { loadCompanionQuests } from '@/utils/katchimera-quests';
 import { publishContentFlowDomainEvent, submitActiveContentFlowScene } from '@/features/content-flow/content-flow-director';
-import { loadFtueRun } from '@/features/onboarding/ftue-runtime';
-import { mossproutFtueDayOneLessonCompleted } from '@/features/onboarding/mossprout-ftue-progress';
 
 export type KatchimeraActionCompletionCommit = {
-  completion: KatchimeraActionCompletionEvent | null;
+  completion: ActionCompletionRecord | null;
   rewardReceipt: CompanionBondAwardReceipt | null;
 };
 
@@ -79,13 +77,13 @@ export function commitKatchimeraActionCompletion(input: {
         return progressed;
       }
     }
-    return recordKatchimeraActionCompletionEvent(progressed, { source: origin, completedAt });
+    return commitActionCompletion(progressed, actionCommandFromOrigin(origin, completedAt));
   });
 
   if (!origin) return { completion: null, rewardReceipt: null };
   const completionId = katchimeraActionCompletionEventId(origin);
-  let completion = relationships.actionCompletionEvents.find((event) => event.id === completionId)
-    ?? relationships.actionCompletionEvents.find((event) => event.source.dayId === origin!.dayId && event.source.actionId === origin!.actionId)
+  let completion = relationships.actionCompletions.find((event) => event.id === completionId)
+    ?? relationships.actionCompletions.find((event) => event.dayId === origin!.dayId && event.actionId === origin!.actionId)
     ?? null;
   if (!completion) return { completion: null, rewardReceipt: null };
 
@@ -100,7 +98,7 @@ export function commitKatchimeraActionCompletion(input: {
 
   if (relatedJourney?.completionReceipt && journeyBondCanSettle(
     relatedJourney,
-    mossproutFtueDayOneLessonCompleted(loadFtueRun()),
+    Boolean(relationships.milestones.dayOneLessonCompletedAt),
   )) {
     const receipt = relatedJourney.completionReceipt;
     const points = remainingJourneyBondPoints(relationships, bondState, relatedJourney.id, receipt.bondPoints);
@@ -133,7 +131,7 @@ export function commitKatchimeraActionCompletion(input: {
     relationships = relationshipProgressionRepository.update((current) => (
       attachKatchimeraActionRewardReceipt(current, completion!.id, rewardReceipt!)
     ));
-    completion = relationships.actionCompletionEvents.find((event) => event.id === completion!.id) ?? completion;
+    completion = relationships.actionCompletions.find((event) => event.id === completion!.id) ?? completion;
   }
   if (origin.journeyActionId && origin.kind !== 'story_chat') {
     const action = origin.kind === 'goal_plan' ? 'goal' : origin.kind === 'journal_prompt' ? 'reflection' : 'playful';
@@ -152,14 +150,56 @@ export function commitKatchimeraActionCompletion(input: {
   return { completion, rewardReceipt };
 }
 
+/**
+ * Reward outbox worker. Completion already owns slot availability; this may be
+ * retried on every foreground without duplicating Bond because event IDs are
+ * derived from the durable completion command.
+ */
+export function reconcilePendingActionRewards(): number {
+  let relationships = relationshipProgressionRepository.load();
+  const pending = relationships.actionCompletions.filter((completion) => (
+    completion.rewardIntent?.kind === 'bond'
+    && completion.rewardIntent.amount > 0
+    && !completion.rewardReceipt
+    && completion.rewardEventId
+  ));
+  if (!pending.length) return 0;
+
+  const homeState = homeRepository.load();
+  const resolveCompanionId = companionIdResolverForHomeState(homeState);
+  const questState = loadCompanionQuests(resolveCompanionId);
+  let bondState = loadCompanionBondState(questState, resolveCompanionId, homeState);
+  let settled = 0;
+  for (const completion of pending) {
+    const eventId = completion.rewardEventId!;
+    const result = recordCompanionBondEvent(bondState, {
+      id: eventId,
+      creatureId: companionIdForFamily(completion.familyId),
+      kind: 'conversation_completed',
+      points: completion.rewardIntent!.amount,
+      occurredAt: completion.completedAt,
+      dayId: completion.dayId,
+    }, { queueCelebration: false });
+    bondState = result.state;
+    const receipt = result.receipt ?? receiptForBondEvent(bondState, eventId);
+    if (!receipt) continue;
+    relationships = relationshipProgressionRepository.update((state) => (
+      attachKatchimeraActionRewardReceipt(state, completion.id, receipt)
+    ));
+    settled += 1;
+  }
+  saveCompanionBondState(bondState);
+  return settled;
+}
+
 function remainingJourneyBondPoints(
   relationships: ReturnType<typeof relationshipProgressionRepository.load>,
   bondState: CompanionBondState,
   journeyId: string,
   authoredPoints: number,
 ) {
-  const individuallyAwarded = relationships.actionCompletionEvents.reduce((total, event) => {
-    if (event.source.journeyId !== journeyId || event.source.kind === 'story_chat' || !event.rewardEventId) return total;
+  const individuallyAwarded = relationships.actionCompletions.reduce((total, event) => {
+    if (event.owner.kind !== 'journey' || event.owner.journeyId !== journeyId || event.kind === 'story_chat' || !event.rewardEventId) return total;
     const awarded = bondState.events.find((bondEvent) => bondEvent.id === event.rewardEventId)?.points ?? 0;
     return total + awarded;
   }, 0);

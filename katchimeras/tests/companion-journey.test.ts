@@ -32,6 +32,7 @@ import { companionCheckInQuestion, companionCheckInSuggestedGoalIds } from '@/ut
 import type { CompanionQuest } from '@/utils/katchimera-quests';
 import { identityForEncounter } from '@/utils/katchimera-identity';
 import { themedQuestOffers } from '@/utils/quests/themed';
+import type { KatchimeraActionOrigin } from '@/types/relationship-progression';
 
 test('an introduction preference can seed Focus without asking it twice', () => {
   const definition = companionJourneyByFamilyId.get('steppling')!;
@@ -462,6 +463,31 @@ test('legacy foundation and specialist discovery goals migrate once', () => {
   assert.equal(goalsForJourneyFamily(first, 'vesperitt').find((goal) => goal.id.includes('vesperitt'))?.status, 'paused');
   assert.equal(primaryGoalForFamily(first, 'shellio')?.goalTypeId, 'shellio-direction');
   assert.equal(primaryGoalForFamily(first, 'shellio')?.title, 'Return to the canal safely');
+});
+
+test('an Action Board focus launch durably owns an existing questionnaire session', () => {
+  const origin = {
+    dayId: '2026-08-26',
+    familyId: 'mossprout',
+    actionId: 'mossprout:daily:nature-direction',
+    instanceId: '2026-08-26:together:2:mossprout:daily:nature-direction',
+    sourceSlotId: 'together',
+    slotId: 'together',
+    sequence: 2,
+    kind: 'goal_plan',
+    title: 'Find a nature direction',
+    subtitle: 'Choose a small direction for tomorrow.',
+    icon: 'scope',
+    artworkDefinitionIds: [],
+    reward: { kind: 'bond', amount: 4 },
+    rotationEffect: 'consume',
+    presentation: 'action_card',
+  } satisfies KatchimeraActionOrigin;
+  const started = startJourneyConversation(emptyCompanionJourneyState(), 'mossprout', 100);
+  const attached = startJourneyConversation(started, 'mossprout', 101, undefined, origin);
+  const session = activeConversationForFamily(attached, 'mossprout')!;
+  assert.deepEqual(session.actionOrigin, origin);
+  assert.equal(attached.conversations.length, 1);
 });
 
 test('legacy journey goals normalise into schema-v4 goal plans without losing progress', () => {

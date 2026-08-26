@@ -12,11 +12,9 @@ import {
 } from '@/features/content-flow/content-flow-interpreter';
 import { compileJourneyCampaignFlows } from '@/features/content-flow/journey-flow-compiler';
 import { compileFtueFlow } from '@/features/content-flow/ftue-flow-adapter';
-import { journeyNodeForLegacyRecord, migrateJourneyRecordToContentFlow } from '@/features/content-flow/content-flow-legacy-mapping';
 import { rewardedChildActionFlow } from '@/features/content-flow/content-flow-templates';
 import { MOSSPROUT_FTUE_SCRIPT } from '@/features/onboarding/mossprout-ftue-script';
 import type { ContentFlowDefinition, ContentFlowEvent } from '@/types/content-flow';
-import type { JourneyDayRecord } from '@/types/relationship-progression';
 
 const COMPLETE_FLOW = defineContentFlow({
   id: 'test:durable',
@@ -136,6 +134,12 @@ test('the existing FTUE graph compiles without screen-owned step semantics', () 
   assert.deepEqual(validateContentFlowDefinition(flow), []);
   assert.equal(flow.entryNodeId, MOSSPROUT_FTUE_SCRIPT.entryStepId);
   assert.equal(flow.nodes.find((node) => node.id === MOSSPROUT_FTUE_SCRIPT.terminalStepId)?.kind, 'complete');
+  const dayOneEffect = flow.nodes.find((node) => node.kind === 'effect' && node.effectType === 'relationship.complete_day_one_lesson');
+  assert.ok(dayOneEffect);
+  const dayOneScene = flow.nodes.find((node) => node.kind === 'scene' && node.actions.some((action) => action.id === 'companion.complete_day_one_action'));
+  assert.equal(dayOneScene?.kind === 'scene'
+    ? dayOneScene.actions.find((action) => action.id === 'companion.complete_day_one_action')?.next
+    : null, dayOneEffect.id);
   const natureTheme = flow.nodes.find((node) => node.id === 'egg.nature_theme');
   assert.equal(natureTheme?.kind, 'scene');
   if (natureTheme?.kind === 'scene') {
@@ -143,24 +147,16 @@ test('the existing FTUE graph compiles without screen-owned step semantics', () 
   }
 });
 
-function legacyJourney(status: JourneyDayRecord['status'], overrides: Partial<JourneyDayRecord> = {}): JourneyDayRecord {
-  return {
-    id: 'journey-day:2026-08-25:mossprout', dayId: '2026-08-25', familyId: 'mossprout', status,
-    chapterId: 'dry-pond', beatId: MOSSPROUT_JOURNEY_CAMPAIGN.days[1]!.id,
-    openingConversationId: 'opening', profileConversationId: null, matchedCardId: null, returnConversationId: 'resolution',
-    activity: { kind: 'merge', objectiveId: 'pond', mergeOrderId: 'one', mergeOrderIds: ['one', 'two'], servedOrderIds: [], opportunityId: 'opportunity', generatorId: 'garden', dropDefinitionIds: [] },
-    resolutionAvailableAt: null, signalReceiptIds: [], activityReceiptIds: [], resolutionId: null, actions: [], startedAt: 1, completedAt: null, completionReceipt: null,
-    ...overrides,
-  };
-}
-
-test('legacy Journey migration resumes at the earliest incomplete authored node', () => {
-  const inProgress = legacyJourney('activity_in_progress');
-  assert.match(journeyNodeForLegacyRecord(inProgress) ?? '', /:orders$/);
-  const served = legacyJourney('activity_in_progress', { activity: { ...inProgress.activity!, servedOrderIds: ['one', 'two'] } });
-  assert.match(journeyNodeForLegacyRecord(served) ?? '', /:resolution$/);
-  const reward = legacyJourney('card_reward', { beatId: MOSSPROUT_JOURNEY_CAMPAIGN.days[2]!.id });
-  const migrated = migrateJourneyRecordToContentFlow(reward, 100)!;
-  assert.match(migrated.nodeId, /:resident:card-reward$/);
-  assert.equal(migrated.phase, 'awaiting_presentation');
+test('Day 1 Content Flow completion durably crosses the relationship effect before Garden', () => {
+  const flow = compileFtueFlow(MOSSPROUT_FTUE_SCRIPT);
+  const base = createContentFlowRun(flow, { runId: 'ftue-day-one', now: 1 });
+  const atLesson = { ...base, nodeId: 'companion.day_one_action', phase: 'awaiting_input' as const };
+  const effect = reduceContentFlow(flow, atLesson, { type: 'submit_scene', actionId: 'companion.complete_day_one_action', now: 2 });
+  assert.equal(effect.run.phase, 'awaiting_effect');
+  assert.equal(effect.pendingWork.kind, 'effect');
+  if (effect.pendingWork.kind !== 'effect') return;
+  assert.equal(effect.pendingWork.effectType, 'relationship.complete_day_one_lesson');
+  const advanced = reduceContentFlow(flow, effect.run, { type: 'effect_completed', effectKey: effect.pendingWork.key, now: 3 });
+  assert.equal(advanced.run.nodeId, 'companion.garden_intro');
+  assert.equal(Object.keys(advanced.run.effectReceipts).length, 1);
 });

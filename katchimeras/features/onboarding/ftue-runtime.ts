@@ -2,7 +2,9 @@ import { useSyncExternalStore } from 'react';
 
 import { createClientId } from '@/utils/client-id';
 import { getStoredJson, setStoredJsonAsync } from '@/utils/app-storage';
-import { mirrorFtueActionInShadow, mirrorFtueEventInShadow } from '@/features/content-flow/ftue-shadow-bridge';
+import { dispatchFtueActionToContentFlow, dispatchFtueEventToContentFlow } from '@/features/content-flow/ftue-content-flow-runtime';
+import { completeDayOneLesson } from '@/game/katchimeras/action-runtime';
+import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 
 import { MOSSPROUT_FTUE_SCRIPT, mossproutFtueAction, mossproutFtueStep } from './mossprout-ftue-script';
 import { ftueNeedsV28QuestionnaireRestart, ftueV28QuestionnaireLoopRecoveryStep } from './ftue-migration-policy';
@@ -315,7 +317,13 @@ export function commitFtueAction(input: {
     receipts,
     updatedAt: now,
   });
-  void mirrorFtueActionInShadow(current, input.actionId, next?.stepId ?? nextStepId);
+  if (input.actionId === 'companion.complete_day_one_action') {
+    relationshipProgressionRepository.update((relationships) => completeDayOneLesson(relationships, {
+      completedAt: Date.parse(now),
+      flowRunId: current.runId,
+    }));
+  }
+  void dispatchFtueActionToContentFlow(current, input.actionId, next?.stepId ?? nextStepId);
   scheduleReceiptSync();
   return next;
 }
@@ -382,7 +390,7 @@ export function dispatchFtueEvent(event: FtueEvent, evidenceRef?: string) {
   };
   if (nextCount < requiredCount) {
     const pending = publish({ ...current, objectiveProgress, updatedAt: now });
-    void mirrorFtueEventInShadow(current, event, pending?.stepId ?? current.stepId);
+    void dispatchFtueEventToContentFlow(current, event, pending?.stepId ?? current.stepId);
     return pending;
   }
 
@@ -418,7 +426,7 @@ export function dispatchFtueEvent(event: FtueEvent, evidenceRef?: string) {
     receipts: [...current.receipts, receipt],
     updatedAt: now,
   });
-  void mirrorFtueEventInShadow(current, event, next?.stepId ?? nextStepId);
+  void dispatchFtueEventToContentFlow(current, event, next?.stepId ?? nextStepId);
   scheduleReceiptSync();
   return next;
 }

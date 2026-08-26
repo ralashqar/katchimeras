@@ -7,8 +7,8 @@ import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 import { useQuestCapabilities } from '@/hooks/use-quest-capabilities';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
-import { completeMossproutJourneyGoalPlan, mossproutJourneyForDay, mossproutJourneyRuntimeDayId, recordMossproutMatchedCard } from '@/game/katchimeras/relationship-progression';
-import { commitKatchimeraActionCompletion } from '@/game/katchimeras/action-completion';
+import { completeMossproutFocusAction, completeMossproutJourneyGoalPlan, mossproutJourneyForDay, mossproutJourneyRuntimeDayId, recordMossproutMatchedCard } from '@/game/katchimeras/relationship-progression';
+import { commitKatchimeraActionCompletion, reconcilePendingActionRewards } from '@/game/katchimeras/action-completion';
 import type { HomeDayRecord, MemoryQualityScore, StoredHomeDayRecord } from '@/types/home';
 import type { KingdomCreature, KingdomState } from '@/types/kingdom';
 import type { KatchimeraSkinId } from '@/types/katchimera';
@@ -239,8 +239,8 @@ function settleMossproutJourneyBond(dayId: string) {
   if (journey.beatId === 'quiet-patch:first-flower'
     && !journey.actions.some((action) => action.kind !== 'journey' && action.status === 'completed')) return;
   const current = loadIdentityAwareCompanionBondState();
-  const individuallyAwarded = relationships.actionCompletionEvents.reduce((total, event) => {
-    if (event.source.journeyId !== journey.id || event.source.kind === 'story_chat' || !event.rewardEventId) return total;
+  const individuallyAwarded = relationships.actionCompletions.reduce((total, event) => {
+    if (event.owner.kind !== 'journey' || event.owner.journeyId !== journey.id || event.kind === 'story_chat' || !event.rewardEventId) return total;
     return total + (current.events.find((bondEvent) => bondEvent.id === event.rewardEventId)?.points ?? 0);
   }, 0);
   const result = syncCompanionBondEvent(current, {
@@ -1720,14 +1720,18 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     });
     setMicrocopy(status === 'completed' ? 'Goal completed' : 'Goal updated');
   }, [awardBond, companionDiscoveryState.answers, selectedFamilyId, selectedResident, today?.isoDate]);
-  const startSelectedJourneyConversation = useCallback((preference?: CompanionIntroductionAnswer) => {
+  const startSelectedJourneyConversation = useCallback((
+    preference?: CompanionIntroductionAnswer,
+    actionOrigin?: KatchimeraActionOrigin,
+  ) => {
     if (!selectedFamilyId || !selectedJourneyDefinition) return;
     setCompanionJourneyState((current) => {
       const next = startJourneyConversation(
         current,
         selectedFamilyId,
         Date.now(),
-        preference ? { nodeId: preference.nodeId, value: preference.optionId } : undefined
+        preference ? { nodeId: preference.nodeId, value: preference.optionId } : undefined,
+        actionOrigin,
       );
       if (next !== current) saveCompanionJourneyState(next);
       return next;
@@ -1783,12 +1787,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       });
     }
     if (result.createdGoalId) {
-      if (selectedFamilyId === 'mossprout' && today?.isoDate) {
-        relationshipProgressionRepository.update((current) => (
-          completeMossproutJourneyGoalPlan(current, today.isoDate)
-        ));
-        settleMossproutJourneyBond(today.isoDate);
-      } else {
+      if (selectedFamilyId !== 'mossprout') {
         awardBond({
           id: `journey-conversation:${selectedResident.creature.creatureId}:${sessionId}`,
           creatureId: selectedResident.creature.creatureId,
@@ -1801,6 +1800,17 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     }
     return result.completed ? result.suggestedQuickGoalIds : [];
   }, [awardBond, companionJourneyState, selectedDailyInvitation, selectedFamilyId, selectedJourneyDefinition, selectedResident, today?.isoDate]);
+  const completeSelectedJourneyQuestionnaire = useCallback((sessionId: string | null) => {
+    if (selectedFamilyId !== 'mossprout' || !today?.isoDate || !sessionId) return;
+    const session = companionJourneyState.conversations.find((candidate) => candidate.id === sessionId);
+    if (!session?.completedAt) return;
+    const completedAt = Date.now();
+    relationshipProgressionRepository.update((current) => session.actionOrigin
+      ? completeMossproutFocusAction(current, today.isoDate, session.actionOrigin, completedAt)
+      : completeMossproutJourneyGoalPlan(current, today.isoDate, completedAt));
+    reconcilePendingActionRewards();
+    settleMossproutJourneyBond(today.isoDate);
+  }, [companionJourneyState.conversations, selectedFamilyId, today?.isoDate]);
   const startSelectedJourneyCheckIn = useCallback(() => {
     if (!selectedResident || !selectedFamilyId || !today?.isoDate) return null;
     const result = startJourneyCheckIn(companionJourneyState, {
@@ -3237,6 +3247,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     deferSelectedIntroduction,
     completeSelectedIntroduction,
     answerSelectedJourneyConversation,
+    completeSelectedJourneyQuestionnaire,
     startSelectedJourneyCheckIn,
     answerSelectedJourneyCheckIn,
     backSelectedJourneyCheckIn,

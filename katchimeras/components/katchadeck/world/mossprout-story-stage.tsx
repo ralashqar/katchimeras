@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Pressable, StyleSheet, View, type View as ViewType } from 'react-native';
 import type { GestureType } from 'react-native-gesture-handler';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -11,7 +11,7 @@ import {
   DayActionIcon,
   DayActionRewardChip,
 } from '@/components/katchadeck/ui/day-action-card';
-import { DayActionActiveRow, DayActionCompletedRow, type DayActionSourceRect } from '@/components/katchadeck/ui/day-action-row';
+import { DayActionActiveRow, DayActionCompletedRow, DayActionReplacementSlot, type DayActionSourceRect } from '@/components/katchadeck/ui/day-action-row';
 import { DayActionGoalRow } from '@/components/katchadeck/ui/day-action-goal-row';
 import { GameSurface } from '@/components/katchadeck/ui/game-surface';
 import { QuickGoalActionModal } from '@/components/katchadeck/goals/quick-goal-action-modal';
@@ -20,14 +20,13 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import { katchimeraActionArt } from '@/constants/katchimera-action-art';
 import { Meadow } from '@/constants/meadow-theme';
-import { composeMossproutVisibleActions, mossproutActionOrigin, mossproutGoalArtKey, resolveMossproutDayActions, type MossproutActionGardenRequest } from '@/game/katchimeras/mossprout-home';
+import { mossproutActionOrigin, mossproutActiveConversationAction, mossproutGoalArtKey, resolveMossproutDayActions, type MossproutActionGardenRequest } from '@/game/katchimeras/mossprout-home';
+import { actionPresentationAsDayAction, claimActionPresentation, createActionBoardSnapshot, dismissActionPresentation, reconcileActionPresentationsAfterHydration } from '@/game/katchimeras/action-runtime';
 import { mossproutJourneyDayNumber } from '@/game/katchimeras/mossprout-journey-handoff';
 import {
-  acknowledgeKatchimeraDayActionOutro,
   beginMossproutJourneyReturn,
   completeMossproutJourneyConversation,
   makeMossproutResolutionAvailable,
-  isMossproutFtueRoutineActionId,
   mossproutDailyActionDeck,
   mossproutJourneyForDay,
   mossproutJourneyRuntimeDayId,
@@ -40,8 +39,7 @@ import {
   startMossproutJourneyDay,
 } from '@/game/katchimeras/relationship-progression';
 import { useOptionalMergeWorldState } from '@/features/merge-world/merge-world-provider';
-import { useGameScreenTransition } from '@/features/navigation/game-screen-transition';
-import { useKatchimeraActionStackTransition } from '@/hooks/use-katchimera-action-transition';
+import { useActionPresentationController } from '@/hooks/use-action-presentation';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import type { CompanionQuestOfferViewModel } from '@/types/companion-interaction';
 import type { KatchimeraActionOrigin, KatchimeraDayAction, RelationshipProgressState } from '@/types/relationship-progression';
@@ -127,7 +125,6 @@ export function MossproutStoryStage({
   onOpenTrophies,
   onBondRewardRequest,
   dayOneActionChoiceActive = false,
-  dayOneLessonCompleted = false,
   actionStackTargetRef,
   navigationLocked = false,
   tutorialInteractionLocked = false,
@@ -135,7 +132,6 @@ export function MossproutStoryStage({
   residentStoryResumeActive = false,
   residentStoryResumeTitle = 'Continue story',
   onResumeResidentStory,
-  motionReady,
   swipeExternalGesture,
 }: {
   activeQuestId?: string | null;
@@ -153,13 +149,12 @@ export function MossproutStoryStage({
   onDashboard: () => void;
   onOpenConversation: (definitionId: string, actionOrigin?: KatchimeraActionOrigin) => void;
   onOpenCards: () => void;
-  onOpenFocusDirection: () => void;
+  onOpenFocusDirection: (actionOrigin?: KatchimeraActionOrigin) => void;
   onOpenMerge: (orderId?: string | null) => void;
   onOpenQuestDirect: (questId: string, originActionId: string) => void;
   onOpenTrophies: () => void;
   onBondRewardRequest: (source: DayActionSourceRect, onArrive: () => void, receipt?: NonNullable<KatchimeraDayAction['rewardReceipt']>) => void;
   dayOneActionChoiceActive?: boolean;
-  dayOneLessonCompleted?: boolean;
   actionStackTargetRef?: RefObject<ViewType | null>;
   navigationLocked?: boolean;
   tutorialInteractionLocked?: boolean;
@@ -167,17 +162,57 @@ export function MossproutStoryStage({
   residentStoryResumeActive?: boolean;
   residentStoryResumeTitle?: string;
   onResumeResidentStory?: () => void;
-  motionReady: boolean;
   swipeExternalGesture?: GestureType;
 }) {
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [selfCompletingGoalAction, setSelfCompletingGoalAction] = useState<KatchimeraDayAction | null>(null);
+  const [localReplacementTransition, setLocalReplacementTransition] = useState<{
+    phase: 'concealed' | 'revealing';
+    slotId: KatchimeraDayAction['slotId'];
+  } | null>(null);
+  const localReplacementCommitRef = useRef<(() => void) | null>(null);
   const selectedGoalCompletionRef = useRef<(() => void) | null>(null);
   const actionSlotDebugRef = useRef('');
-  const { phase: screenTransitionPhase } = useGameScreenTransition();
-  const { ready: mergeWorldReady, state: mergeWorldState } = useMossproutMergeWorldState();
+  const { state: mergeWorldState } = useMossproutMergeWorldState();
   const quickMode = isJourneyQuickModeEnabled();
+  const dayOneLessonCompleted = Boolean(relationships.milestones.dayOneLessonCompletedAt);
   const dayId = mossproutJourneyRuntimeDayId(relationships, localDayId(), quickMode);
+  const stageLocalReplacement = useCallback((
+    slotId: KatchimeraDayAction['slotId'],
+    commitReplacement: () => void,
+  ) => {
+    if (localReplacementCommitRef.current) return;
+    localReplacementCommitRef.current = commitReplacement;
+    setLocalReplacementTransition({ phase: 'concealed', slotId });
+  }, []);
+  useEffect(() => {
+    if (!localReplacementTransition) return;
+    if (localReplacementTransition.phase === 'concealed') {
+      // Do not swap the child in the same React commit that hides the lane.
+      // One committed concealed frame primes the shared values on the UI
+      // thread, preventing the replacement from flashing at translateX: 0.
+      const frame = requestAnimationFrame(() => {
+        const commitReplacement = localReplacementCommitRef.current;
+        localReplacementCommitRef.current = null;
+        commitReplacement?.();
+        setLocalReplacementTransition((current) => current?.phase === 'concealed'
+          ? { ...current, phase: 'revealing' }
+          : current);
+      });
+      return () => cancelAnimationFrame(frame);
+    }
+    const timer = setTimeout(() => setLocalReplacementTransition(null), 360);
+    return () => clearTimeout(timer);
+  }, [localReplacementTransition]);
+  useEffect(() => () => {
+    // A route change must not lose a staged durable skip command.
+    const commitReplacement = localReplacementCommitRef.current;
+    localReplacementCommitRef.current = null;
+    commitReplacement?.();
+  }, []);
+  useEffect(() => {
+    relationshipProgressionRepository.update((current) => reconcileActionPresentationsAfterHydration(current));
+  }, [dayId]);
   const journey = mossproutJourneyForDay(relationships, dayId);
   const journeyExclusive = Boolean(journey && journey.status !== 'complete');
   const journeyDayNumber = mossproutJourneyDayNumber(relationships, dayId);
@@ -258,7 +293,7 @@ export function MossproutStoryStage({
     relationshipProgressionRepository.update((current) => goals.reduce((state, item) => {
       if (!item.completion) return state;
       const actionId = `mossprout:goal:${item.goal.id}`;
-      if (state.actionCompletionEvents.some((event) => event.source.dayId === dayId && event.source.actionId === actionId)) return state;
+      if (state.actionCompletions.some((event) => event.dayId === dayId && event.actionId === actionId)) return state;
       const slotId = 'together';
       const sequence = mossproutDailyActionDeck(state, dayId).slotSequences[slotId];
       const instanceId = `${dayId}:${slotId}:${sequence}:${actionId}`;
@@ -275,7 +310,7 @@ export function MossproutStoryStage({
       if (!offer.completedToday || !['quest-mossprout-green-photo', 'quest-mossprout-nature-note'].includes(offer.id)) return state;
       const photo = offer.family === 'photo';
       const actionId = `mossprout:quest:${offer.id}`;
-      if (state.actionCompletionEvents.some((event) => event.source.dayId === dayId && event.source.actionId === actionId)) return state;
+      if (state.actionCompletions.some((event) => event.dayId === dayId && event.actionId === actionId)) return state;
       const sequence = mossproutDailyActionDeck(state, dayId).slotSequences.field;
       return recordKatchimeraActionCompletion(state, {
         dayId, familyId: 'mossprout', actionId, instanceId: `${dayId}:field:${sequence}:${actionId}`, slotId: 'field', sequence, kind: photo ? 'photo_request' : 'note_request',
@@ -286,40 +321,9 @@ export function MossproutStoryStage({
     }, current));
   }, [dayId, offers]);
 
-  const externalCompletions = useMemo(() => relationships.actionCompletionEvents
-    .filter((event) => event.source.familyId === 'mossprout'
-      && !event.acknowledgedAt
-      && !isMossproutFtueRoutineActionId(event.source.actionId)
-      && event.source.presentation === 'action_card')
-    .sort((left, right) => left.completedAt - right.completedAt || left.id.localeCompare(right.id))
-    .map((event) => ({
-      id: event.source.actionId, kind: event.source.kind, title: event.source.title, subtitle: event.source.subtitle,
-      icon: event.source.icon, artKey: event.source.artKey, instanceId: event.source.instanceId,
-      sourceSlotId: event.source.sourceSlotId, slotId: event.source.slotId, sequence: event.source.sequence,
-      artworkDefinitionId: event.source.artworkDefinitionIds[0], artworkDefinitionIds: event.source.artworkDefinitionIds,
-      required: false, disabled: true, status: 'completed' as const, reward: event.source.reward,
-      destination: { kind: 'journey' as const }, completedAt: event.completedAt, outroAcknowledgedAt: null,
-      completionEventId: event.id, rewardReceipt: event.rewardReceipt,
-    } satisfies KatchimeraDayAction)),
-  [relationships.actionCompletionEvents]);
-
-  const completingAction = useMemo(() => {
-    const byPresentationId = new Map<string, KatchimeraDayAction>();
-    // Journey exclusivity hides optional actions, but must not erase the
-    // completion/reward sequence for an action the player explicitly ran
-    // through developer tooling or another direct launch path.
-    for (const action of externalCompletions) {
-      byPresentationId.set(action.instanceId ?? action.id, action);
-    }
-    const slotOrder = { together: 0, field: 1, garden: 2 } as const;
-    return [...byPresentationId.values()].sort((left, right) =>
-      (left.completedAt ?? Number.MAX_SAFE_INTEGER) - (right.completedAt ?? Number.MAX_SAFE_INTEGER)
-      || slotOrder[left.slotId ?? 'together'] - slotOrder[right.slotId ?? 'together']
-      || (left.instanceId ?? left.id).localeCompare(right.instanceId ?? right.id)
-    )[0] ?? null;
-  }, [externalCompletions]);
-
-  const resolvedVisibleActions = composeMossproutVisibleActions(presentedActionCandidates, completingAction, MAX_VISIBLE_ACTIONS);
+  const resolvedVisibleActions = presentedActionCandidates
+    .filter((action) => action.status === 'ready' || action.status === 'active')
+    .slice(0, MAX_VISIBLE_ACTIONS);
   const residentResumeAction = useMemo(() => ({
     id: 'mossprout:resident-story-resume',
     instanceId: 'mossprout:resident-story-resume',
@@ -339,39 +343,78 @@ export function MossproutStoryStage({
     outroAcknowledgedAt: null,
   } satisfies KatchimeraDayAction), [residentStoryResumeTitle]);
   const actionId = useCallback((action: KatchimeraDayAction) => action.completionEventId ?? action.instanceId ?? `${dayId}:${action.id}`, [dayId]);
+  const activeConversationAction = useMemo(() => {
+    if (conversationSession?.actionOrigin?.dayId !== dayId) return null;
+    const pinned = conversationSession ? mossproutActiveConversationAction(conversationSession) : null;
+    return pinned;
+  }, [conversationSession, dayId]);
   const sourceActions = useMemo(() => {
     if (residentStoryResumeActive) return [residentResumeAction];
-    if (journeyExclusive) return resolvedVisibleActions;
-    if (!selfCompletingGoalAction) return resolvedVisibleActions;
-    const selfId = actionId(selfCompletingGoalAction);
-    if (resolvedVisibleActions.some((action) => actionId(action) === selfId)) {
-      return resolvedVisibleActions.map((action) => actionId(action) === selfId ? selfCompletingGoalAction : action);
+    let visible = [...resolvedVisibleActions];
+    if (activeConversationAction) {
+      const pinnedId = actionId(activeConversationAction);
+      const matchingIndex = visible.findIndex((action) => actionId(action) === pinnedId);
+      const slotIndex = visible.findIndex((action) => action.slotId === activeConversationAction.slotId);
+      const replacementIndex = matchingIndex >= 0 ? matchingIndex : slotIndex;
+      if (replacementIndex >= 0) {
+        visible = visible.map((action, index) => index === replacementIndex ? activeConversationAction : action);
+      } else {
+        const insertionIndex = Math.min(
+          visible.length,
+          activeConversationAction.slotId === 'field' ? 1 : activeConversationAction.slotId === 'garden' ? 2 : 0,
+        );
+        visible = [
+          ...visible.slice(0, insertionIndex),
+          activeConversationAction,
+          ...visible.slice(insertionIndex),
+        ].slice(0, MAX_VISIBLE_ACTIONS);
+      }
     }
-    const replacementIndex = resolvedVisibleActions.findIndex((action) => action.slotId === selfCompletingGoalAction.slotId);
+    if (journeyExclusive || !selfCompletingGoalAction) return visible;
+    const selfId = actionId(selfCompletingGoalAction);
+    if (visible.some((action) => actionId(action) === selfId)) {
+      return visible.map((action) => actionId(action) === selfId ? selfCompletingGoalAction : action);
+    }
+    const replacementIndex = visible.findIndex((action) => action.slotId === selfCompletingGoalAction.slotId);
     if (replacementIndex >= 0) {
-      return resolvedVisibleActions.map((action, index) => index === replacementIndex ? selfCompletingGoalAction : action);
+      return visible.map((action, index) => index === replacementIndex ? selfCompletingGoalAction : action);
     }
     const insertionIndex = Math.min(
-      resolvedVisibleActions.length,
+      visible.length,
       selfCompletingGoalAction.slotId === 'field' ? 1 : selfCompletingGoalAction.slotId === 'garden' ? 2 : 0,
     );
     return [
-      ...resolvedVisibleActions.slice(0, insertionIndex),
+      ...visible.slice(0, insertionIndex),
       selfCompletingGoalAction,
-      ...resolvedVisibleActions.slice(insertionIndex),
+      ...visible.slice(insertionIndex),
     ].slice(0, MAX_VISIBLE_ACTIONS);
-  }, [actionId, journeyExclusive, residentResumeAction, residentStoryResumeActive, resolvedVisibleActions, selfCompletingGoalAction]);
+  }, [actionId, activeConversationAction, journeyExclusive, residentResumeAction, residentStoryResumeActive, resolvedVisibleActions, selfCompletingGoalAction]);
 
-  const finishActionOutro = useCallback((action: KatchimeraDayAction) => {
-    relationshipProgressionRepository.update((current) => acknowledgeKatchimeraDayActionOutro(current, dayId, action));
-  }, [dayId]);
-  const actionTransition = useKatchimeraActionStackTransition({
-    acknowledgeCompletion: finishActionOutro,
-    getId: actionId,
-    isCompleted: (action: KatchimeraDayAction) => action.status === 'completed',
-    items: sourceActions,
-    ready: motionReady && mergeWorldReady && screenTransitionPhase === 'idle',
+  const boardSnapshot = useMemo(() => createActionBoardSnapshot(dayId, sourceActions, relationships.actionPresentations), [dayId, relationships.actionPresentations, sourceActions]);
+  const nextPresentation = boardSnapshot.presentations[0] ?? null;
+  const claimedPresentation = relationships.actionPresentations.find((item) => item.dayId === dayId && item.status === 'claimed') ?? null;
+  const controllerPresentation = claimedPresentation ?? nextPresentation;
+  const presentationController = useActionPresentationController({
+    presentationId: nextPresentation?.id ?? null,
+    claim: (id) => { relationshipProgressionRepository.update((current) => claimActionPresentation(current, id)); },
+    dismiss: (id) => { relationshipProgressionRepository.update((current) => dismissActionPresentation(current, id)); },
+    presentationSlotId: controllerPresentation?.slotId ?? null,
   });
+  const displayedPresentation = presentationController.activeId
+    ? relationships.actionPresentations.find((item) => item.id === presentationController.activeId) ?? null
+    : null;
+  // Reserve a pending presentation's lane during render, before the claiming
+  // effect runs. This guarantees the replacement's first mount happens only
+  // in the revealing phase and makes Reanimated entrance behavior deterministic.
+  const hiddenPresentationSlot = localReplacementTransition?.phase === 'concealed'
+    ? localReplacementTransition.slotId
+    : presentationController.phase === 'revealing'
+      ? null
+      : displayedPresentation?.slotId ?? nextPresentation?.slotId ?? null;
+  const boardActionCount = boardSnapshot.slots.filter((slot) => slot.action).length;
+  const presentationAction = useMemo(() => displayedPresentation
+    ? actionPresentationAsDayAction(displayedPresentation, relationships.actionCompletions.find((item) => item.id === displayedPresentation.completionId))
+    : null, [displayedPresentation, relationships.actionCompletions]);
 
   const openJourney = (sourceAction?: KatchimeraDayAction) => {
     if (!journey) {
@@ -433,7 +476,7 @@ export function MossproutStoryStage({
     if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
     if (residentStoryResumeActive && action.id === residentResumeAction.id) return onResumeResidentStory?.();
     if (action.destination.kind === 'journey') return openJourney(action);
-    if (action.destination.kind === 'focus_questionnaire') return onOpenFocusDirection();
+    if (action.destination.kind === 'focus_questionnaire') return onOpenFocusDirection(mossproutActionOrigin(action, dayId, journey));
     if (action.destination.kind === 'conversation') return onOpenConversation(action.destination.definitionId, mossproutActionOrigin(action, dayId, journey));
     if (action.destination.kind === 'garden') {
       if (journey?.status === 'activity_available') {
@@ -492,114 +535,35 @@ export function MossproutStoryStage({
   const selectedGoal = selectedGoalId
     ? goals.find((item) => item.goal.id === selectedGoalId) ?? null
     : null;
-  const presentedActions = actionTransition.items;
-  const stackInteractionLocked = tutorialInteractionLocked || actionTransition.interactionLocked || Boolean(selfCompletingGoalAction);
+  const stackInteractionLocked = tutorialInteractionLocked || Boolean(selfCompletingGoalAction);
 
   useEffect(() => {
     if (typeof __DEV__ === 'undefined' || !__DEV__) return;
-    const summarizeAction = (action: KatchimeraDayAction, index?: number) => ({
-      ...(index == null ? {} : { index }),
-      id: action.id,
-      instanceId: action.instanceId ?? null,
-      kind: action.kind,
-      sourceSlotId: action.sourceSlotId ?? null,
-      slotId: action.slotId ?? null,
-      sequence: action.sequence ?? null,
-      status: action.status,
-      disabledByAction: action.disabled,
-      disabledWhenRendered: action.disabled || stackInteractionLocked,
-      destination: action.destination.kind,
-      completionEventId: action.completionEventId ?? null,
-    });
-    const deck = mossproutDailyActionDeck(relationships, dayId);
-    const snapshot = {
-      source: 'action-stage',
+    const eligible = actions.filter((action) => (action.status === 'ready' || action.status === 'active') && !action.disabled);
+    const enabled = boardSnapshot.slots.filter((slot) => slot.enabled).length;
+    if (eligible.length < MAX_VISIBLE_ACTIONS || enabled === MAX_VISIBLE_ACTIONS) return;
+    const invariant = {
+      invariant: 'three-eligible-actions-require-three-enabled-slots',
       dayId,
-      ftue: {
-        dayOneActionChoiceActive,
-        dayOneLessonCompleted,
-      },
-      readiness: {
-        motionReady,
-        mergeWorldReady,
-        screenTransitionPhase,
-      },
-      locks: {
-        navigationLocked,
-        tutorialInteractionLocked,
-        transitionInteractionLocked: actionTransition.interactionLocked,
-        stackInteractionLocked,
-        selfCompletingGoalActionId: selfCompletingGoalAction?.id ?? null,
-      },
-      journey: journey ? {
-        id: journey.id,
-        beatId: journey.beatId,
-        status: journey.status,
-        exclusive: journeyExclusive,
-        actions: journey.actions.map((action) => ({
-          id: action.id,
-          definitionId: action.definitionId,
-          kind: action.kind,
-          status: action.status,
-          outroAcknowledged: Boolean(action.outroAcknowledgedAt),
-        })),
-      } : null,
-      resolverInput: {
-        hasActiveFocus,
-        unfinishedGoalIds: goals.filter((goal) => !goal.completion).map((goal) => goal.goal.id),
-        includedActionIds: dayOneActionChoiceActive ? dayOneChoiceActionIds : [],
-        conversationCandidates: conversations.map((conversation) => ({
-          definitionId: conversation.definitionId,
-          mode: conversation.mode,
-          actionKind: conversation.actionKind ?? null,
-        })),
-        gardenRequestIds: gardenRequests.map((request) => request.id),
-        offerIds: offers.map((offer) => offer.id),
-        consumedActionIds: deck.consumedActionIds,
-        slotSequences: deck.slotSequences,
-        skippedActionIds: relationships.skippedActionIds,
-      },
-      pipeline: {
-        resolved: actions.map((action) => summarizeAction(action)),
-        externalCompletions: externalCompletions.map((action) => summarizeAction(action)),
-        completingAction: completingAction ? summarizeAction(completingAction) : null,
-        visible: resolvedVisibleActions.map((action) => summarizeAction(action)),
-        source: sourceActions.map((action) => summarizeAction(action)),
-        transitionPhase: actionTransition.phase,
-        rendered: presentedActions.map((action, index) => summarizeAction(action, index)),
-      },
+      milestone: relationships.milestones,
+      completionIds: relationships.actionCompletions.map((item) => item.id),
+      eligibleActionIds: eligible.map((action) => action.id),
+      slots: boardSnapshot.slots.map((slot) => ({ slotId: slot.slotId, actionId: slot.action?.id ?? null, enabled: slot.enabled })),
+      presentationQueue: relationships.actionPresentations.map((item) => ({ id: item.id, status: item.status, slotId: item.slotId })),
+      lockState: { tutorialInteractionLocked, selfCompletingGoal: Boolean(selfCompletingGoalAction), presentation: presentationController.phase },
     };
-    const serialized = JSON.stringify(snapshot);
+    const serialized = JSON.stringify(invariant);
     if (serialized === actionSlotDebugRef.current) return;
     actionSlotDebugRef.current = serialized;
-    console.info('[mossprout-action-slots]', serialized);
+    console.error('[action-board-invariant]', serialized);
+    throw new Error(`Action board invariant failed: ${serialized}`);
   }, [
-    actionTransition.interactionLocked,
-    actionTransition.phase,
     actions,
-    completingAction,
-    conversations,
+    boardSnapshot,
     dayId,
-    dayOneActionChoiceActive,
-    dayOneChoiceActionIds,
-    dayOneLessonCompleted,
-    externalCompletions,
-    gardenRequests,
-    goals,
-    hasActiveFocus,
-    journey,
-    journeyExclusive,
-    mergeWorldReady,
-    motionReady,
-    navigationLocked,
-    offers,
-    presentedActions,
+    presentationController.phase,
     relationships,
-    resolvedVisibleActions,
-    screenTransitionPhase,
     selfCompletingGoalAction,
-    sourceActions,
-    stackInteractionLocked,
     tutorialInteractionLocked,
   ]);
 
@@ -643,64 +607,67 @@ export function MossproutStoryStage({
       />
     </View> : <View ref={actionStackTargetRef} accessibilityLabel="Mossprout Journey Day actions" style={styles.actionStack}>
       <View style={styles.actionSlot}>
-      {presentedActions.map((presentedAction) => {
-        const presentedActionKey = actionId(presentedAction);
-        const entering = actionTransition.isEntering(presentedActionKey);
-        if (presentedAction.status === 'completed') return (
-          <DayActionCompletedRow
-            animateLayout
-            artwork={<MossproutActionArtwork action={presentedAction} />}
-            enteringEnabled={entering}
-            key={presentedActionKey}
-            onFinished={() => actionTransition.onCompletedExit(presentedActionKey)}
-            onRewardRequest={presentedAction.reward?.kind === 'bond'
-              ? presentedAction.rewardReceipt
-                ? (source, onArrive) => onBondRewardRequest(source, onArrive, presentedAction.rewardReceipt!)
-                : onBondRewardRequest
-              : undefined}
-            reward={presentedAction.reward ? <ActionRewardChip reward={presentedAction.reward} /> : undefined}
-            start={actionTransition.isStartingCompletion(presentedActionKey)}
-            title={presentedAction.title}
-          />
+      {boardSnapshot.slots.map((slot) => {
+        const presentedAction = slot.action;
+        const enteringEnabled = presentationController.revealingSlotId === slot.slotId
+          || (localReplacementTransition?.phase === 'revealing' && localReplacementTransition.slotId === slot.slotId);
+        const wrapSlot = (content: ReactNode) => (
+          <DayActionReplacementSlot
+            concealed={slot.slotId === hiddenPresentationSlot}
+            key={`action-slot:${slot.slotId}`}
+            ready={Boolean(presentedAction)}
+            revealing={enteringEnabled}>
+            {content}
+          </DayActionReplacementSlot>
         );
+        if (!presentedAction) return wrapSlot(null);
+        const presentedActionKey = actionId(presentedAction);
         if (presentedAction.destination.kind === 'goal') {
           const goalId = presentedAction.destination.goalId;
-          return (
+          return wrapSlot(
           <DayActionGoalRow
             animateLayout
             artwork={<MossproutActionArtwork action={presentedAction} />}
             disabled={stackInteractionLocked}
-            enteringEnabled={entering}
+            enteringEnabled={false}
             entryDelayMs={0}
             externalGesture={swipeExternalGesture}
             key={presentedActionKey}
             label={presentedAction.title}
             onBeginCompletion={() => setSelfCompletingGoalAction(presentedAction)}
             onCompletionRequest={(source, onRewardArrive) => completeGoalAction(presentedAction, source, onRewardArrive)}
-            onFinished={() => setSelfCompletingGoalAction((current) => current?.id === presentedAction.id ? null : current)}
+            onFinished={() => {
+              stageLocalReplacement(presentedAction.slotId, () => {
+                setSelfCompletingGoalAction((current) => current?.id === presentedAction.id ? null : current);
+              });
+            }}
             onOpen={(completeFromOrigin) => {
               selectedGoalCompletionRef.current = completeFromOrigin;
               setSelectedGoalId(goalId);
             }}
             onSkip={!presentedAction.required && !stackInteractionLocked ? () => {
-              relationshipProgressionRepository.update((current) => skipKatchimeraDayAction(current, dayId, presentedAction));
+              stageLocalReplacement(presentedAction.slotId, () => {
+                relationshipProgressionRepository.update((current) => skipKatchimeraDayAction(current, dayId, presentedAction));
+              });
             } : undefined}
             reward={presentedAction.reward ? <ActionRewardChip reward={presentedAction.reward} /> : undefined}
             title={presentedAction.title}
-          />
+          />,
           );
         }
-        return (
+        return wrapSlot(
           <DayActionActiveRow
             animateLayout
             disabled={presentedAction.disabled || stackInteractionLocked}
-            enteringEnabled={entering}
+            enteringEnabled={false}
             entryDelayMs={0}
             externalGesture={swipeExternalGesture}
             key={presentedActionKey}
             label={presentedAction.title}
             onSkip={!presentedAction.required && !presentedAction.disabled && !stackInteractionLocked ? () => {
-              relationshipProgressionRepository.update((current) => skipKatchimeraDayAction(current, dayId, presentedAction));
+              stageLocalReplacement(presentedAction.slotId, () => {
+                relationshipProgressionRepository.update((current) => skipKatchimeraDayAction(current, dayId, presentedAction));
+              });
             } : undefined}>
             <Pressable
               accessibilityActions={!presentedAction.required && !presentedAction.disabled && !stackInteractionLocked ? [{ label: 'Skip for today', name: 'skip' }] : undefined}
@@ -710,7 +677,9 @@ export function MossproutStoryStage({
               disabled={presentedAction.disabled || stackInteractionLocked}
               onAccessibilityAction={(event) => {
                 if (event.nativeEvent.actionName === 'skip') {
-                  relationshipProgressionRepository.update((current) => skipKatchimeraDayAction(current, dayId, presentedAction));
+                  stageLocalReplacement(presentedAction.slotId, () => {
+                    relationshipProgressionRepository.update((current) => skipKatchimeraDayAction(current, dayId, presentedAction));
+                  });
                 }
               }}
               onPress={() => openAction(presentedAction)}
@@ -722,11 +691,32 @@ export function MossproutStoryStage({
                 trailing={presentedAction.disabled ? <IconSymbol color={Meadow.inkFaint} name="lock.fill" size={15} /> : undefined}
               />
             </Pressable>
-          </DayActionActiveRow>
+          </DayActionActiveRow>,
         );
       })}
 
-      {!presentedActions.length && actionTransition.phase === 'resting' ? <Animated.View entering={FadeIn.duration(180)}>
+      {presentationAction && displayedPresentation && presentationController.activeId === displayedPresentation.id ? (
+        <View
+          pointerEvents="box-none"
+          style={[styles.presentationOverlay, { top: ['together', 'field', 'garden'].indexOf(displayedPresentation.slotId) * 73 }]}>
+          <DayActionCompletedRow
+            animateLayout={false}
+            artwork={<MossproutActionArtwork action={presentationAction} />}
+            enteringEnabled={false}
+            onFinished={() => presentationController.finish(displayedPresentation.id)}
+            onRewardRequest={presentationAction.reward?.kind === 'bond'
+              ? presentationAction.rewardReceipt
+                ? (source, onArrive) => onBondRewardRequest(source, onArrive, presentationAction.rewardReceipt!)
+                : onBondRewardRequest
+              : undefined}
+            reward={presentationAction.reward ? <ActionRewardChip reward={presentationAction.reward} /> : undefined}
+            start={presentationController.phase === 'animating'}
+            title={presentationAction.title}
+          />
+        </View>
+      ) : null}
+
+      {!boardActionCount ? <Animated.View entering={FadeIn.duration(180)}>
         <GameSurface contentStyle={styles.quietContent} tone="cream">
           <DayActionIcon icon="leaf.fill" />
           <View style={styles.quietCopy}>
@@ -809,7 +799,8 @@ const styles = StyleSheet.create({
   actionStack: { height: ACTION_STACK_HEIGHT },
   journeyRequestPanel: { flex: 1 },
   residentParcelPanel: { alignSelf: 'stretch' },
-  actionSlot: { gap: 7, height: ACTION_STACK_HEIGHT, justifyContent: 'flex-end', overflow: 'visible' },
+  actionSlot: { gap: 7, height: ACTION_STACK_HEIGHT, justifyContent: 'flex-end', overflow: 'visible', position: 'relative' },
+  presentationOverlay: { left: 0, position: 'absolute', right: 0, zIndex: 20 },
   actionArtwork: { height: 46, width: 46 },
   quietContent: { alignItems: 'center', flexDirection: 'row', gap: 10, minHeight: 66, paddingHorizontal: 11, paddingVertical: 7 },
   quietCopy: { flex: 1, gap: 1 },

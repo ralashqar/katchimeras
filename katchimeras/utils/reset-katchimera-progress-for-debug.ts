@@ -12,7 +12,6 @@ import { resetKatchimeraWardrobeForDebug } from '@/utils/katchimera-wardrobe-sto
 import { resetCompanionQuestsForDebug } from '@/utils/katchimera-quests';
 import { resetMergeWorldStateForDebug } from '@/utils/merge-world/repository';
 import { resetContentFlowJournalForDebug } from '@/features/content-flow/content-flow-repository';
-import { runContentFlowSaveMigration } from '@/features/content-flow/content-flow-migration';
 
 export async function resetKatchimeraProgressForDebug({
   resetAt = Date.now(),
@@ -40,5 +39,4 @@ export async function resetKatchimeraProgressForDebug({
 
   await resetMergeWorldStateForDebug(resetAt);
   await resetContentFlowJournalForDebug();
-  await runContentFlowSaveMigration(resetAt);
 }

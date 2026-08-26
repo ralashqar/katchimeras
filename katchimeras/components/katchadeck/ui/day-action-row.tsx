@@ -145,6 +145,76 @@ export function DayActionActiveRow({
   );
 }
 
+/**
+ * Permanent lane wrapper for completion replacement sequencing. Because this
+ * wrapper never unmounts, its slide does not depend on React/Reanimated
+ * classifying the replacement row as a new native view.
+ */
+export function DayActionReplacementSlot({
+  children,
+  concealed,
+  ready,
+  revealing,
+}: {
+  children: ReactNode;
+  concealed: boolean;
+  ready: boolean;
+  revealing: boolean;
+}) {
+  const { width: windowWidth } = useWindowDimensions();
+  const reduceMotion = useReducedMotion();
+  const pendingRevealRef = useRef(concealed);
+  const translateX = useSharedValue(concealed ? -windowWidth : 0);
+  const opacity = useSharedValue(concealed ? 0 : 1);
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  useLayoutEffect(() => {
+    if (concealed) {
+      pendingRevealRef.current = true;
+      cancelAnimation(translateX);
+      cancelAnimation(opacity);
+      translateX.value = reduceMotion ? 0 : -windowWidth;
+      opacity.value = 0;
+      return;
+    }
+    if (!ready) return;
+    if (!revealing && !pendingRevealRef.current) {
+      translateX.value = 0;
+      opacity.value = 1;
+      return;
+    }
+    // Locally completed goal/skip rows never enter the concealed presentation
+    // phase. Put their permanent lane at the same off-screen start point before
+    // revealing so this path cannot turn into a 0 -> 0 timing (a visual snap).
+    if (revealing && !pendingRevealRef.current) {
+      cancelAnimation(translateX);
+      cancelAnimation(opacity);
+      translateX.value = reduceMotion ? 0 : -windowWidth;
+      opacity.value = 0;
+    }
+    pendingRevealRef.current = false;
+    translateX.value = withTiming(0, {
+      duration: reduceMotion ? 80 : DAY_ACTION_MOTION.entryDurationMs,
+      easing: Easing.out(Easing.cubic),
+    });
+    opacity.value = withTiming(1, {
+      duration: reduceMotion ? 80 : Math.min(180, DAY_ACTION_MOTION.entryDurationMs),
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [concealed, opacity, ready, reduceMotion, revealing, translateX, windowWidth]);
+
+  return (
+    <Animated.View
+      pointerEvents={concealed ? 'none' : 'auto'}
+      style={[styles.replacementSlot, animatedStyle, concealed && styles.replacementSlotConcealed]}>
+      {children}
+    </Animated.View>
+  );
+}
+
 export function DayActionCompletedRow({
   animateLayout = true,
   artwork,
@@ -497,6 +567,8 @@ export function DayActionSwipeShell({
 }
 
 const styles = StyleSheet.create({
+  replacementSlot: { minHeight: 0, overflow: 'visible' },
+  replacementSlotConcealed: { minHeight: 66, opacity: 0 },
   completedRow: { borderCurve: 'continuous', borderRadius: 20, overflow: 'hidden' },
   completionGlow: {
     ...StyleSheet.absoluteFillObject,

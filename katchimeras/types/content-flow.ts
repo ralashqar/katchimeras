@@ -97,7 +97,7 @@ export type ContentFlowRunPhase =
 
 export type ContentFlowRun = {
   schemaVersion: 1;
-  executionMode: 'shadow' | 'live';
+  executionMode: 'live';
   runId: string;
   definitionId: string;
   definitionVersion: number;

@@ -182,7 +182,6 @@ export type CompanionInteractionSheetProps = {
   ftueBondSpotlightActive?: boolean;
   ftueDayOneActionActive?: boolean;
   ftueDayOneActionAnswerId?: string | null;
-  ftueDayOneLessonCompleted?: boolean;
   ftueResidentHandoffActive?: boolean;
   ftueResidentMatchResultActive?: boolean;
   ftueResidentStoryResume?: boolean;
@@ -260,8 +259,9 @@ export type CompanionInteractionSheetProps = {
   journeyProgress: CompanionGoalJourneyProgress | null;
   journeyMomentLoggedToday: boolean;
   questAdvancesJourneyGoal: boolean;
-  onStartJourneyConversation: (preference?: CompanionIntroductionAnswer) => void;
+  onStartJourneyConversation: (preference?: CompanionIntroductionAnswer, actionOrigin?: KatchimeraActionOrigin) => void;
   onAnswerJourneyConversation: (sessionId: string, value: string) => readonly string[];
+  onCompleteJourneyQuestionnaire: (sessionId: string | null) => void;
   onLogJourneyMoment: (kindId: string, note?: string) => void;
   onSetJourneyGoalStatus: (goalId: string, status: CompanionJourneyGoalStatus) => void;
   onSetPrimaryJourneyGoal: (goalId: string) => void;
@@ -334,7 +334,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const mossproutJourney = props.familyId === 'mossprout'
     ? mossproutJourneyForDay(relationships, localDayId())
     : null;
-  const ftueDayOneLessonCompleted = Boolean(props.ftueDayOneLessonCompleted);
+  const ftueDayOneLessonCompleted = Boolean(relationships.milestones.dayOneLessonCompletedAt);
   const [ftueBondQuestionId, setFtueBondQuestionId] = useState<string | null>(null);
   const [ftueGardenStoryBeatIndex, setFtueGardenStoryBeatIndex] = useState(0);
   const ftueBondQuestion = mossproutBondSharePrompt(ftueBondQuestionId);
@@ -952,7 +952,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     if (props.ftueNavigationLocked) return;
     if (checkInOpen || journeyQuestionnaireOpen) {
       Keyboard.dismiss();
-      if (journeyQuestionnaireSessionId && !props.journeyConversation) props.onDismissQuickGoalSuggestions();
+      if (journeyQuestionnaireSessionId && !props.journeyConversation) {
+        props.onDismissQuickGoalSuggestions();
+        props.onCompleteJourneyQuestionnaire(journeyQuestionnaireSessionId);
+      }
     }
     const backAction = experience.requestBack();
     if (backAction === 'confirm_attempt_exit') setEndAttemptOpen(true);
@@ -1297,9 +1300,11 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     if (isConversationV2Family(props.familyId)) experience.showChatLobby();
     else experience.showVisit();
   };
-  const openJourneyFocus = () => {
+  const openJourneyFocus = (actionOrigin?: KatchimeraActionOrigin) => {
     if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
-    if (!props.journeyConversation) props.onStartJourneyConversation();
+    // Always pass the origin. If a questionnaire session already exists, the
+    // domain attaches it to that durable session instead of losing ownership.
+    props.onStartJourneyConversation(undefined, actionOrigin);
     if (props.familyId === 'mossprout') {
       experience.openFocusQuestionnaire(props.journeyConversation?.id);
     } else {
@@ -1797,7 +1802,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   onAddTasks={props.onAddQuickGoalSuggestions}
                   onAnswer={props.onAnswerJourneyConversation}
                   onBack={requestClose}
-                  onDone={experience.showHome}
+                  onDone={() => {
+                    props.onCompleteJourneyQuestionnaire(journeyQuestionnaireSessionId);
+                    experience.showHome();
+                  }}
                   onDismissTasks={props.onDismissQuickGoalSuggestions}
                   presentation={props.familyId === 'mossprout' ? 'conversation' : 'immersive'}
                   quickGoalSuggestionIds={props.quickGoalSuggestionIds}
@@ -1864,9 +1872,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   onBondRewardRequest={requestStoryReward}
                   actionStackTargetRef={ftueActionTargetRef}
                   dayOneActionChoiceActive={props.ftueBondSpotlightActive || props.ftueDayOneActionActive}
-                  dayOneLessonCompleted={ftueDayOneLessonCompleted}
                   navigationLocked={props.ftueNavigationLocked}
-                  motionReady={mossproutHubEntranceSettled && mossproutHubViewportSettled}
                   swipeExternalGesture={environmentPan.gesture}
                   tutorialInteractionLocked={props.ftueBondSpotlightActive}
                   residentParcelHandoffActive={residentParcelGardenPanelActive}

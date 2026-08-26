@@ -56,11 +56,35 @@ export function compileFtueFlow(script: FtueScriptDefinition): ContentFlowDefini
     stack.push(...step.actions.flatMap((action) => action.nextStepId ? [action.nextStepId] : []));
     stack.push(...step.actions.flatMap((action) => action.options?.flatMap((option) => option.nextStepId ? [option.nextStepId] : []) ?? []));
   }
+  const nodes = script.steps.filter((step) => reachable.has(step.id)).map((step) => compileStep(step, script.terminalStepId));
+  const dayOneEffectNodeId = 'effect.relationship.complete_day_one_lesson';
+  const dayOneSceneIndex = nodes.findIndex((node) => node.kind === 'scene'
+    && node.actions.some((action) => action.id === 'companion.complete_day_one_action'));
+  if (dayOneSceneIndex >= 0) {
+    const scene = nodes[dayOneSceneIndex]!;
+    if (scene.kind === 'scene') {
+      const dayOneAction = scene.actions.find((action) => action.id === 'companion.complete_day_one_action')!;
+      nodes[dayOneSceneIndex] = {
+        ...scene,
+        actions: scene.actions.map((action) => action.id === dayOneAction.id
+          ? { ...action, next: dayOneEffectNodeId }
+          : action),
+      };
+      nodes.push({
+        id: dayOneEffectNodeId,
+        kind: 'effect',
+        effectId: 'relationship.complete_day_one_lesson',
+        effectType: 'relationship.complete_day_one_lesson',
+        payload: {},
+        next: dayOneAction.next,
+      });
+    }
+  }
   return defineContentFlow({
     id: script.id,
     version: script.version,
     entryNodeId: script.entryStepId,
-    nodes: script.steps.filter((step) => reachable.has(step.id)).map((step) => compileStep(step, script.terminalStepId)),
+    nodes,
     metadata: { kind: 'ftue', legacyAdapter: true, retiredNodeIds: script.steps.filter((step) => !reachable.has(step.id)).map((step) => step.id) },
   });
 }

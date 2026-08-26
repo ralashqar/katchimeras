@@ -103,7 +103,6 @@ test('You questionnaires advance on selection while consequential tasks retain c
     path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'),
     'utf8',
   );
-
   assert.match(questionnaireScene, /onSelect\(option\)/);
   assert.doesNotMatch(questionnaireScene, /confirmSelection|selectionFooter/);
   assert.doesNotMatch(questionnaireScene, /setTimeout/);
@@ -646,19 +645,20 @@ test('Mossprout owns a compact Journey action stack without redundant headings o
   const dashboard = fs.readFileSync(path.join(worldPath, 'companion-dashboard.tsx'), 'utf8');
   const sharedRows = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'day-action-row.tsx'), 'utf8');
   const sharedGoalRow = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'day-action-goal-row.tsx'), 'utf8');
-  const actionTransition = fs.readFileSync(path.join(process.cwd(), 'hooks', 'use-katchimera-action-transition.ts'), 'utf8');
   const today = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'home', 'today-nurture-experience.tsx'), 'utf8');
 
   assert.match(mossprout, /resolveMossproutDayActions/);
-  assert.doesNotMatch(mossprout, /slice\(0, 3\)/);
   assert.match(mossprout, /const MAX_VISIBLE_ACTIONS = 3/);
-  assert.match(mossprout, /composeMossproutVisibleActions\(presentedActionCandidates, completingAction, MAX_VISIBLE_ACTIONS\)/);
   assert.match(mossprout, /dayOneChoiceActionIds[\s\S]*?includeActionIds: dayOneActionChoiceActive \? dayOneChoiceActionIds : undefined/);
-  assert.match(mossprout, /presentedActions\.map\(\(presentedAction\) =>/);
+  assert.match(mossprout, /boardSnapshot\.slots\.map\(\(slot\) =>/);
+  assert.doesNotMatch(mossprout, /presentationGap/);
+  assert.match(mossprout, /presentationController\.revealingSlotId === slot\.slotId/);
   assert.match(mossprout, /key=\{presentedActionKey\}/);
-  assert.match(mossprout, /useKatchimeraActionStackTransition/);
-  assert.match(mossprout, /start=\{actionTransition\.isStartingCompletion\(presentedActionKey\)\}/);
-  assert.doesNotMatch(mossprout, /animateLayout=\{false\}/);
+  assert.match(mossprout, /createActionBoardSnapshot/);
+  assert.match(mossprout, /mossproutActiveConversationAction\(conversationSession\)/);
+  assert.match(mossprout, /activeConversationAction[\s\S]*?visible = visible\.map/);
+  assert.match(mossprout, /useActionPresentationController/);
+  assert.match(mossprout, /presentationOverlay/);
   assert.match(mossprout, /<DayActionGoalRow/);
   assert.match(mossprout, /<QuickGoalActionModal/);
   assert.match(mossprout, /setSelfCompletingGoalAction\(presentedAction\)/);
@@ -667,19 +667,16 @@ test('Mossprout owns a compact Journey action stack without redundant headings o
   assert.ok((sharedRows.match(/SlideInLeft\.delay\(entryDelayMs\)/g) ?? []).length >= 2);
   assert.doesNotMatch(sharedRows, /FadeInUp\.delay\(entryDelayMs\)/);
   assert.match(sharedRows, /if \(!start\) return/);
+  assert.match(mossprout, /<DayActionReplacementSlot/);
+  assert.match(sharedRows, /pendingRevealRef\.current = true/);
+  assert.match(sharedRows, /if \(revealing && !pendingRevealRef\.current\)[\s\S]*?translateX\.value = reduceMotion \? 0 : -windowWidth/);
+  assert.match(mossprout, /setLocalReplacementTransition\(\{ phase: 'concealed', slotId \}\)/);
+  assert.match(mossprout, /requestAnimationFrame\(\(\) => \{[\s\S]*?commitReplacement\?\.\(\)[\s\S]*?phase: 'revealing'/);
+  assert.match(mossprout, /hiddenPresentationSlot = localReplacementTransition\?\.phase === 'concealed'/);
   assert.doesNotMatch(sharedRows, /\.withCallback\(/);
-  assert.match(interaction, /motionReady=\{mossproutHubEntranceSettled && mossproutHubViewportSettled\}/);
   assert.match(interaction, /const entranceTimer = setTimeout\([\s\S]*?setMossproutHubEntranceSettled\(true\)/);
   assert.doesNotMatch(interaction, /enteringBase\.withCallback/);
   assert.doesNotMatch(interaction, /runOnJS\(markMossproutHubEntranceSettled\)/);
-  assert.match(actionTransition, /'settling'[\s\S]*?'inserting'[\s\S]*?'completing'[\s\S]*?'awaiting_source'[\s\S]*?'compacting'/);
-  assert.match(actionTransition, /departedId: id,[\s\S]*?items: current\.items,[\s\S]*?phase: 'awaiting_source'[\s\S]*?acknowledgeRef\.current\(completedItem\)/);
-  assert.match(actionTransition, /nextItems\[departureIndex\] = replacementItem/);
-  assert.match(actionTransition, /items: \[\.\.\.refreshed, missingItem\]/);
-  assert.doesNotMatch(actionTransition, /\.sort\(/);
-  assert.match(actionTransition, /const STACK_COMPACTION_MS = 330/);
-  assert.match(actionTransition, /const STACK_ENTRY_MS = 320/);
-  assert.match(actionTransition, /presentation\.phase !== 'compacting' && presentation\.phase !== 'inserting'/);
   assert.match(sharedRows, /export const DAY_ACTION_MOTION/);
   assert.match(sharedGoalRow, /GoalCompletionCelebration/);
   assert.match(sharedGoalRow, /artRotation\.value = withSequence/);
@@ -734,12 +731,14 @@ test('completed action rows preserve their outro while Bond reward renders updat
   );
   const quests = fs.readFileSync(path.join(process.cwd(), 'hooks', 'use-kingdom-quests.ts'), 'utf8');
   const completion = fs.readFileSync(path.join(process.cwd(), 'game', 'katchimeras', 'action-completion.ts'), 'utf8');
+  const actionRuntime = fs.readFileSync(path.join(process.cwd(), 'game', 'katchimeras', 'action-runtime.ts'), 'utf8');
   assert.doesNotMatch(mossprout, /rewardAnimationId=/);
   assert.match(quests, /const completedNow = nextSession\.status === 'completed'[\s\S]*?settleMossproutConversationCompletion\(nextSession, selectedConversationDefinition\)/);
   assert.match(quests, /settleMossproutConversationCompletion\(dismissedSelectedSession, selectedConversationDefinition\)/);
-  assert.match(completion, /recordKatchimeraActionCompletionEvent\(progressed, \{ source: origin, completedAt \}\)/);
+  assert.match(completion, /commitActionCompletion\(progressed, actionCommandFromOrigin\(origin, completedAt\)\)/);
   assert.match(completion, /recordCompanionBondEvent\([\s\S]*?queueCelebration: false/);
-  assert.match(mossprout, /rewardReceipt: event\.rewardReceipt/);
+  assert.match(actionRuntime, /rewardReceipt: completion\.rewardReceipt/);
+  assert.match(mossprout, /presentationAction\.rewardReceipt/);
   assert.doesNotMatch(sharedRows, /\[chargeGlow, onFinished,/);
 });
 
@@ -761,6 +760,7 @@ test('Mossprout normal actions survive the FTUE encounter handoff', () => {
 });
 
 test('Mossprout nature direction keeps its legacy content inside the modern shell and returns home from Done', () => {
+  const quests = fs.readFileSync(path.join(process.cwd(), 'hooks', 'use-kingdom-quests.ts'), 'utf8');
   const homeModel = fs.readFileSync(
     path.join(process.cwd(), 'game', 'katchimeras', 'mossprout-home.ts'),
     'utf8',
@@ -799,10 +799,15 @@ test('Mossprout nature direction keeps its legacy content inside the modern shel
   );
 
   assert.match(homeModel, /goal \? \{ kind: 'focus_questionnaire' \}/);
-  assert.match(stage, /action\.destination\.kind === 'focus_questionnaire'[\s\S]*?onOpenFocusDirection\(\)/);
+  assert.match(stage, /action\.destination\.kind === 'focus_questionnaire'[\s\S]*?onOpenFocusDirection\(mossproutActionOrigin\(action, dayId, journey\)\)/);
   assert.match(interaction, /presentation=\{props\.familyId === 'mossprout' \? 'conversation' : 'immersive'\}/);
-  assert.match(interaction, /onDone=\{experience\.showHome\}/);
-  assert.match(interaction, /const openJourneyFocus = \(\) =>[\s\S]*?experience\.openFocusQuestionnaire/);
+  assert.match(interaction, /onDone=\{\(\) => \{[\s\S]*?onCompleteJourneyQuestionnaire\(journeyQuestionnaireSessionId\)[\s\S]*?experience\.showHome\(\)/);
+  assert.match(quests, /const completeSelectedJourneyQuestionnaire = useCallback[\s\S]*?completeMossproutFocusAction/);
+  const answerStart = quests.indexOf('const answerSelectedJourneyConversation');
+  const completionStart = quests.indexOf('const completeSelectedJourneyQuestionnaire', answerStart);
+  assert.ok(answerStart >= 0 && completionStart > answerStart);
+  assert.doesNotMatch(quests.slice(answerStart, completionStart), /completeMossproutFocusAction|completeMossproutJourneyGoalPlan/);
+  assert.match(interaction, /const openJourneyFocus = \(actionOrigin\?: KatchimeraActionOrigin\) =>[\s\S]*?onStartJourneyConversation\(undefined, actionOrigin\)[\s\S]*?experience\.openFocusQuestionnaire/);
   assert.match(questionnaireScene, /presentation\?: 'immersive' \| 'conversation'/);
   assert.match(questionnaireScene, /conversationPanel/);
   assert.match(questionnaireScene, /useCompanionAdaptivePanel/);
@@ -854,8 +859,8 @@ test('active Journey presentation hides optional cards and Merge tray entries', 
   const questHook = fs.readFileSync('hooks/use-kingdom-quests.ts', 'utf8');
   assert.match(stage, /const journeyExclusive = Boolean\(journey && journey\.status !== 'complete'\)/);
   assert.match(stage, /if \(journeyExclusive\) return resolvedVisibleActions/);
-  assert.match(stage, /for \(const action of externalCompletions\)/);
-  assert.doesNotMatch(stage, /visibleExternalCompletions = journeyExclusive \? \[\] : externalCompletions/);
+  assert.match(stage, /relationships\.actionPresentations/);
+  assert.match(stage, /actionPresentationAsDayAction/);
   assert.match(stage, /const journeyMergeActive = journey\?\.status === 'activity_available' \|\| journey\?\.status === 'activity_in_progress'/);
   assert.match(stage, /journeyEpisode\.mergeOrders\.map/);
   assert.match(stage, /journeyMergeActive && journeyEpisode && !residentStoryResumeActive \? <View[\s\S]*?<MossproutJourneyRequestPanel/);

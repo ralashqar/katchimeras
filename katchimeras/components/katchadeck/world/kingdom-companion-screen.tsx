@@ -223,7 +223,6 @@ export function KingdomCompanionScreen({
   ftueBondSpotlightActive = false,
   ftueDayOneActionActive = false,
   ftueDayOneActionAnswerId = null,
-  ftueDayOneLessonCompleted = false,
   ftueResidentHandoffActive = false,
   ftueResidentMatchResultActive = false,
   ftueResidentStoryResume = false,
@@ -249,7 +248,6 @@ export function KingdomCompanionScreen({
   ftueBondSpotlightActive?: boolean;
   ftueDayOneActionActive?: boolean;
   ftueDayOneActionAnswerId?: string | null;
-  ftueDayOneLessonCompleted?: boolean;
   ftueResidentHandoffActive?: boolean;
   ftueResidentMatchResultActive?: boolean;
   ftueResidentStoryResume?: boolean;
@@ -628,7 +626,6 @@ export function KingdomCompanionScreen({
           ftueBondSpotlightActive={ftueBondSpotlightActive}
           ftueDayOneActionActive={ftueDayOneActionActive}
           ftueDayOneActionAnswerId={ftueDayOneActionAnswerId}
-          ftueDayOneLessonCompleted={ftueDayOneLessonCompleted}
           ftueResidentHandoffActive={ftueResidentHandoffActive}
           ftueResidentMatchResultActive={ftueResidentMatchResultActive}
           ftueResidentStoryResume={ftueResidentStoryResume}
@@ -721,6 +718,7 @@ export function KingdomCompanionScreen({
           questAdvancesJourneyGoal={quests.selectedQuestAdvancesJourneyGoal}
           onStartJourneyConversation={quests.startSelectedJourneyConversation}
           onAnswerJourneyConversation={quests.answerSelectedJourneyConversation}
+          onCompleteJourneyQuestionnaire={quests.completeSelectedJourneyQuestionnaire}
           onLogJourneyMoment={quests.logSelectedJourneyMoment}
           onSetJourneyGoalStatus={quests.setSelectedJourneyGoalStatus}
           onSetPrimaryJourneyGoal={quests.setSelectedPrimaryJourneyGoal}

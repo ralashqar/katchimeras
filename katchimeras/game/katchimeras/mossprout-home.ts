@@ -1,4 +1,4 @@
-import type { ConversationDefinition } from '@/types/companion-conversation';
+import type { ConversationDefinition, ConversationSession } from '@/types/companion-conversation';
 import type { KatchimeraActionArtKey, KatchimeraActionCompletionRecord, KatchimeraActionOrigin, KatchimeraActionSlotId, KatchimeraDayAction, JourneyDayActionRecord, JourneyDayRecord } from '@/types/relationship-progression';
 import { mossproutCampaignEpisodeByBeatId } from '@/constants/mossprout-campaign';
 
@@ -75,6 +75,39 @@ export function mossproutActionOrigin(
   };
 }
 
+/**
+ * Keeps the exact dashboard card stable while its conversation is active.
+ * Conversation-pool eligibility may change as soon as a session starts, but
+ * opening a route is not an action completion and must never rotate the board.
+ */
+export function mossproutActiveConversationAction(
+  session: Pick<ConversationSession, 'actionOrigin' | 'definitionId' | 'status'>,
+): KatchimeraDayAction | null {
+  const origin = session.actionOrigin;
+  if (!origin || session.status !== 'active') return null;
+  return {
+    id: origin.actionId,
+    instanceId: origin.instanceId,
+    sourceSlotId: origin.sourceSlotId,
+    slotId: origin.slotId,
+    sequence: origin.sequence,
+    kind: origin.kind,
+    title: origin.title,
+    subtitle: origin.subtitle,
+    icon: origin.icon,
+    ...(origin.artKey ? { artKey: origin.artKey } : {}),
+    artworkDefinitionId: origin.artworkDefinitionIds[0],
+    artworkDefinitionIds: [...origin.artworkDefinitionIds],
+    required: false,
+    disabled: false,
+    status: 'active',
+    reward: origin.reward,
+    destination: { kind: 'conversation', definitionId: session.definitionId },
+    completedAt: null,
+    outroAcknowledgedAt: null,
+  };
+}
+
 export type MossproutActionGardenRequest = {
   id: string;
   title: string;
@@ -128,33 +161,6 @@ export function mossproutGoalArtKey(templateId?: string): KatchimeraActionArtKey
   if (templateId?.endsWith(':window-view')) return 'mossprout:nature-window';
   if (templateId?.endsWith(':notice-living-thing') || templateId?.endsWith(':season-change')) return 'mossprout:nature-observation';
   return 'today:quest';
-}
-
-/**
- * Keep the post-action queue mounted beneath a completed row. The presentation
- * coordinator reserves that row's slot through its outro, then replaces the
- * slot atomically so the cards above and below do not move twice.
- */
-export function composeMossproutVisibleActions(
-  actions: readonly KatchimeraDayAction[],
-  completingAction: KatchimeraDayAction | null,
-  limit: number = MOSSPROUT_ACTION_SLOT_IDS.length,
-): KatchimeraDayAction[] {
-  const active = actions.filter((action) => action.status !== 'completed');
-  // Journey completion outros are produced directly by the resolver and do
-  // not have an external completion event. They still need to render once so
-  // the transition can acknowledge them and release their occupied slot.
-  const completion = completingAction ?? actions.find((action) => action.status === 'completed') ?? null;
-  if (!completion) return active.slice(0, limit);
-  const requestedIndex = completion.slotId
-    ? MOSSPROUT_ACTION_SLOT_IDS.indexOf(completion.slotId)
-    : 0;
-  const insertionIndex = Math.min(active.length, Math.max(0, requestedIndex));
-  return [
-    ...active.slice(0, insertionIndex),
-    completion,
-    ...active.slice(insertionIndex),
-  ].slice(0, limit);
 }
 
 const GARDEN_REQUESTS: Record<string, { title: string; subtitle: string; definitionId: string; orderId: string; coins: number }> = {
@@ -272,9 +278,7 @@ export function resolveMossproutDayActions(input: {
   const journey = input.journey;
   const includedActionIds = input.includeActionIds ? new Set(input.includeActionIds) : null;
   const mainRecord = journey?.actions.find((action) => action.kind === 'journey') ?? null;
-  const pendingMainOutro = mainRecord?.status === 'completed' && !mainRecord.outroAcknowledgedAt;
-  if (pendingMainOutro && journey) actions.push(completedJourneyAction(journey, mainRecord));
-  else if (!journey) actions.push({
+  if (!journey) actions.push({
     id: 'mossprout:start-journey', kind: 'story_chat', title: input.journeyDayNumber && input.journeyDayNumber > 1
       ? `Begin Journey Day ${input.journeyDayNumber}`
       : 'Spend today with Mossprout',
@@ -293,10 +297,7 @@ export function resolveMossproutDayActions(input: {
   if (journey && journey.status !== 'complete') {
     const journeyAction = actions[0];
     if (!journeyAction) return [];
-    const pendingCompletionOutros = journey.actions
-      .filter((action) => action.kind !== 'journey' && action.status === 'completed' && !action.outroAcknowledgedAt)
-      .map((action) => mapConversationAction(action, true));
-    return [journeyAction, ...pendingCompletionOutros].map((action) => {
+    return [journeyAction].map((action) => {
       const slotId = slotForAction(action);
       const sequence = input.slotSequences?.[slotId] ?? 0;
       return {
@@ -342,10 +343,7 @@ export function resolveMossproutDayActions(input: {
   for (const action of journey?.actions ?? []) {
     if (action.kind === 'journey') continue;
     if (action.status === 'skipped') continue;
-    if (action.status === 'completed') {
-      if (!action.outroAcknowledgedAt) actions.push(mapConversationAction(action, true));
-      continue;
-    }
+    if (action.status === 'completed') continue;
     if (action.kind === 'goal_plan'
       && (unfinishedGoals.length || input.hasActiveFocus)
       && !includedActionIds?.has(action.id)
@@ -423,8 +421,8 @@ export function resolveMossproutDayActions(input: {
   const eligible = prioritize(dedupe(includedActionIds
     ? actions.filter((action) => includedActionIds.has(action.id))
     : actions)).filter((action) => (
-    action.status === 'completed'
-    || (!action.disabled
+    (action.status === 'ready' || action.status === 'active')
+    && (!action.disabled
       && (action.required
         || (!consumed.has(action.id)
           && !skipped.has(`${dayId}:source:${action.id}`)
@@ -496,7 +494,7 @@ function isFieldNoteActionId(actionId: string) {
 
 function chooseSlotAction(slotId: KatchimeraActionSlotId, actions: readonly KatchimeraDayAction[], sequence: number) {
   if (!actions.length) return null;
-  const fixed = actions.find((action) => action.required || action.status === 'completed' || action.kind === 'goal_checkoff');
+  const fixed = actions.find((action) => action.required || action.kind === 'goal_checkoff');
   if (fixed) return fixed;
   const rotation = slotId === 'together'
     ? (['fun_chat', 'insight_chat', 'goal_plan'] as const)
@@ -526,7 +524,7 @@ function prioritize(actions: KatchimeraDayAction[]) {
 }
 
 function actionPriority(action: KatchimeraDayAction, gardenIndex: number) {
-  if (action.required || action.status === 'completed') return 0;
+  if (action.required) return 0;
   if (action.kind === 'goal_checkoff' || action.kind === 'goal_plan') return 10;
   if (action.kind === 'garden_request') return gardenIndex === 0 ? 20 : 60 + gardenIndex;
   if (action.kind === 'journal_prompt') return 30;
@@ -577,16 +575,6 @@ function expandRequirementDefinitionIds(requirements: MossproutActionGardenReque
   return requirements.flatMap((requirement) => (
     Array.from({ length: Math.max(1, requirement.quantity) }, () => requirement.definitionId)
   ));
-}
-
-function completedJourneyAction(journey: JourneyDayRecord, record: JourneyDayActionRecord): KatchimeraDayAction {
-  return {
-    id: record.id, kind: 'story_chat', title: journey.beatId === 'quiet-patch:first-flower' ? 'The first Garden is restored' : 'Today\'s Journey is complete',
-    subtitle: 'Mossprout will remember what you did together.', icon: 'leaf.fill', required: true, disabled: true,
-    artKey: 'mossprout:journey',
-    status: 'completed', reward: { kind: 'bond', amount: record.bondContribution }, destination: { kind: 'journey' },
-    completedAt: record.completedAt, outroAcknowledgedAt: record.outroAcknowledgedAt,
-  };
 }
 
 function mapConversationAction(action: JourneyDayActionRecord, completed: boolean): KatchimeraDayAction {

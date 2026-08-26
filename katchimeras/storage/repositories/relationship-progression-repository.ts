@@ -2,15 +2,15 @@ import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { emptyRelationshipProgressState, normalizeRelationshipProgressState } from '@/game/katchimeras/relationship-progression';
 import type { RelationshipProgressState } from '@/types/relationship-progression';
 
-const STORAGE_KEY = 'katchimeras.relationship-progression-v1';
+const STORAGE_KEY = 'katchimeras.relationship-progression-v2';
 const listeners = new Set<(state: RelationshipProgressState) => void>();
 let cache: RelationshipProgressState | null = null;
 
 function hydrateRelationshipProgression(): RelationshipProgressState {
   const stored = getStoredJson<unknown>(STORAGE_KEY, emptyRelationshipProgressState());
   const normalized = normalizeRelationshipProgressState(stored);
-  // Hydration is also the durable save migration boundary. Rewriting the
-  // canonical form ensures a legacy FTUE slot cannot return on the next boot.
+  // Hydration dismisses presentations that were already claimed before an
+  // interrupted animation. Visual work is never replayed as progression.
   if (JSON.stringify(stored) !== JSON.stringify(normalized)) setStoredJson(STORAGE_KEY, normalized);
   return normalized;
 }

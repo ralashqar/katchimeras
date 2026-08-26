@@ -8,7 +8,6 @@ import { markFlowStart, reportFlowReady } from '@/utils/flow-performance';
 import { companionIdForFamily, familyIdFromCompanionId } from '@/constants/katchimera-skins';
 import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
 import { commitFtueAction, completeFtueRun, flushFtuePersistence, ftueWispForRun, loadFtueRun, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
-import { mossproutFtueDayOneLessonCompleted } from '@/features/onboarding/mossprout-ftue-progress';
 import { activateStoredResidentCardDiscovery, installMossproutOnboardingMergeWorld, loadMergeWorldState, seedStoredMossproutGardenAfterFtue } from '@/utils/merge-world/repository';
 import { useGameScreenTransition } from '@/features/navigation/game-screen-transition';
 import { useCompanionDiscoveryRecords } from '@/hooks/use-companion-discovery-records';
@@ -59,7 +58,6 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   const familyId = familyIdFromCompanionId(creatureId);
   const ftueHandoffRef = useRef(false);
   const postFtueGardenRepairRef = useRef<string | null>(null);
-  const actionSlotDebugRef = useRef('');
   const ftueRun = useFtueRun();
   const discovery = useCompanionDiscoveryRecords();
   const relationships = useRelationshipProgression();
@@ -101,35 +99,6 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     && navigationFtueRun.stepId === 'companion.resident_match_result';
   const residentFtueGraphActive = navigationFtueRun?.status === 'active'
     && isResidentFtueStep(navigationFtueRun.stepId);
-  const ftueDayOneLessonCompleted = mossproutFtueDayOneLessonCompleted(ftueRun);
-  useEffect(() => {
-    if (typeof __DEV__ === 'undefined' || !__DEV__ || familyId !== 'mossprout' || !isFocused) return;
-    const snapshot = {
-      source: 'ftue-route',
-      run: ftueRun ? {
-        status: ftueRun.status,
-        stepId: ftueRun.stepId,
-        scriptVersion: ftueRun.scriptVersion,
-        completedAt: ftueRun.completedAt,
-        hasBondShareAnswer: Boolean(ftueRun.answers['companion.choose_bond_share']),
-        dayOneReceipts: ftueRun.receipts
-          .filter((receipt) => receipt.actionId === 'companion.choose_bond_share'
-            || receipt.actionId === 'companion.complete_day_one_action')
-          .map((receipt) => ({
-            actionId: receipt.actionId,
-            status: receipt.status,
-            stepId: receipt.stepId,
-            committedAt: receipt.committedAt,
-            presentedAt: receipt.presentedAt,
-          })),
-      } : null,
-      dayOneLessonCompleted: ftueDayOneLessonCompleted,
-    };
-    const serialized = JSON.stringify(snapshot);
-    if (serialized === actionSlotDebugRef.current) return;
-    actionSlotDebugRef.current = serialized;
-    console.info('[mossprout-action-slots]', serialized);
-  }, [familyId, ftueDayOneLessonCompleted, ftueRun, isFocused]);
   useEffect(() => {
     if (!shouldRestoreResidentMatchResult) return;
     updateFtueRun({ stepId: 'companion.resident_match_result', status: 'active', completedAt: null });
@@ -418,25 +387,6 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     return acquireLifecycleResource('companion_scene', `companion:${creatureId}`);
   }, [creatureId, isFocused]);
 
-  useEffect(() => {
-    if (!isFocused || ftueRun?.status !== 'active' || !latestMossproutJourney) return;
-    const dayOneBondActionDone = latestMossproutJourney.beatId === 'quiet-patch:first-flower'
-      && latestMossproutJourney.actions.some((action) => action.kind !== 'journey' && action.status === 'completed');
-    const questionnaireAlreadyDone = latestMossproutJourney.matchedCardId
-      && ['resident_discovery', 'resident_orders', 'card_reward', 'complete'].includes(latestMossproutJourney.status);
-    if (ftueRun.stepId === 'companion.bond_spotlight' && (dayOneBondActionDone || questionnaireAlreadyDone)) {
-      commitFtueAction({ actionId: 'companion.acknowledge_bond', evidenceRef: 'repair:mossprout-bond-spotlight' });
-      return;
-    }
-    if (ftueRun.stepId === 'companion.day_one_action' && (dayOneBondActionDone || questionnaireAlreadyDone)) {
-      commitFtueAction({ actionId: 'companion.complete_day_one_action', evidenceRef: 'repair:mossprout-day-one-bond-action' });
-      return;
-    }
-    if (ftueRun.stepId === 'companion.resident_affinity' && questionnaireAlreadyDone) {
-      commitFtueAction({ actionId: 'companion.complete_resident_affinity', evidenceRef: 'repair:mossprout-resident-affinity' });
-    }
-  }, [ftueRun?.status, ftueRun?.stepId, isFocused, latestMossproutJourney]);
-
   // Root stack routes can remain mounted while another route is on top. Do not
   // retain the kingdom, interaction sheet, image stage, subscriptions, or
   // animation worklets behind Today, Merge, or a quest. All durable companion
@@ -471,7 +421,6 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       ftueBondSpotlightActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.bond_spotlight'}
       ftueDayOneActionActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.day_one_action'}
       ftueDayOneActionAnswerId={ftueRun?.answers['companion.choose_bond_share']?.optionId ?? null}
-      ftueDayOneLessonCompleted={ftueDayOneLessonCompleted}
       ftueResidentHandoffActive={ftueResidentHandoffActive}
       ftueResidentMatchResultActive={residentMatchResultActive}
       ftueResidentStoryResume={residentStoryResumeActive}

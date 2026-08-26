@@ -101,6 +101,6 @@ test('profile tooling stays dev-gated, sandboxed, and reachable from the Dev pag
   assert.match(streak, /isDevProfileSandboxActive\(\)/);
   assert.match(service, /savePlayerProfileRollback/);
   assert.match(service, /recoverInterruptedPlayerProfileRestore/);
-  assert.match(profileRegistry, /katchimeras\.relationship-progression-v1/);
+  assert.match(profileRegistry, /katchimeras\.relationship-progression-v2/);
   assert.match(service, /relationshipProgressionRepository\.reloadFromStorageForDebug\(\)/);
 });

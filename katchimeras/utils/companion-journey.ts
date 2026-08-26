@@ -7,6 +7,7 @@ import {
 } from '@/constants/companion-journeys';
 import { companionSpeechCopyIssues } from '@/constants/companion-speech-copy';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
+import type { KatchimeraActionOrigin } from '@/types/relationship-progression';
 import type { CompanionDiscoveryState } from '@/utils/companion-discovery';
 import type { CompanionQuest } from '@/utils/katchimera-quests';
 import { questDefinition } from '@/utils/quests/definitions';
@@ -60,6 +61,8 @@ export type CompanionJourneyConversationSession = {
   startedAt: number;
   completedAt?: number;
   answers: CompanionJourneyConversationAnswer[];
+  /** Exact Action Board card that launched this questionnaire, if any. */
+  actionOrigin?: KatchimeraActionOrigin;
 };
 
 export type CompanionJourneyQuestEvent = {
@@ -353,11 +356,22 @@ export function startJourneyConversation(
   state: CompanionJourneyState,
   familyId: KatchimeraFamilyId,
   startedAt = Date.now(),
-  seedAnswer?: { nodeId: string; value: string }
+  seedAnswer?: { nodeId: string; value: string },
+  actionOrigin?: KatchimeraActionOrigin,
 ): CompanionJourneyState {
   const ownerFamilyId = canonicalFamilyId(familyId) ?? familyId;
   const definition = companionJourneyByFamilyId.get(ownerFamilyId);
-  if (!definition || activeConversationForFamily(state, ownerFamilyId)) return state;
+  if (!definition) return state;
+  const active = activeConversationForFamily(state, ownerFamilyId);
+  if (active) {
+    if (!actionOrigin || active.actionOrigin?.instanceId === actionOrigin.instanceId) return state;
+    return {
+      ...state,
+      conversations: state.conversations.map((session) => session.id === active.id
+        ? { ...session, actionOrigin }
+        : session),
+    };
+  }
   const startNode = companionJourneyNode(definition, definition.startNodeId);
   const seedChoice = seedAnswer?.nodeId === definition.startNodeId && startNode?.kind === 'single_choice'
     ? startNode.options?.find((option) => option.id === seedAnswer.value || option.label === seedAnswer.value)
@@ -374,6 +388,7 @@ export function startJourneyConversation(
     answers: canSeed && startNode
       ? [{ nodeId: startNode.id, value: seedChoice!.id, answeredAt: startedAt }]
       : [],
+    ...(actionOrigin ? { actionOrigin } : {}),
   };
   return { ...state, conversations: [...state.conversations, session] };
 }
