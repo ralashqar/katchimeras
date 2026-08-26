@@ -14,6 +14,7 @@ import { TodaySceneBackdrop } from '@/components/katchadeck/home/today-scene-bac
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
+import type { KatchaSheetEntranceMotion } from '@/components/katchadeck/ui/katcha-sheet';
 import { useKatchaSurface } from '@/components/katchadeck/ui/katcha-surface';
 import { StatusBadge, type StatusTone } from '@/components/katchadeck/ui/status-badge';
 import { ThemedText } from '@/components/themed-text';
@@ -27,30 +28,36 @@ import { KatchimeraPageHeader } from './katchimera-page-header';
 export function CompanionSheetShell({
   children,
   background,
+  entranceMotion = 'sheet',
   fullBleed = false,
   keyboardAvoiding = true,
   onRequestClose,
   portal = true,
   showClose = true,
   surface = 'parchment',
+  transparent = false,
 }: {
   children: ReactNode;
   background?: TodayAtmosphereBackground;
+  entranceMotion?: KatchaSheetEntranceMotion;
   fullBleed?: boolean;
   keyboardAvoiding?: boolean;
   onRequestClose: () => void;
   portal?: boolean;
   showClose?: boolean;
   surface?: KatchaSurface;
+  transparent?: boolean;
 }) {
   return (
     <KatchaSheet
       fullBleed={fullBleed}
+      entranceMotion={entranceMotion}
       onRequestClose={onRequestClose}
       portal={portal}
       showClose={showClose}
       size={fullBleed ? 'full' : 'tall'}
-      surface={surface}>
+      surface={surface}
+      transparent={transparent}>
       <View style={styles.shellFrame}>
         {background ? <TodaySceneBackdrop background={background} scene={null} variant="splash" /> : null}
         <KeyboardAvoidingView

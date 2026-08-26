@@ -16,8 +16,10 @@ export function createMossproutChapterZeroState(now = Date.now(), rewardWispId: 
     occupant: null,
   }));
   board[31].occupant = { kind: 'generator', generatorId: garden.id };
-  board[30].occupant = { kind: 'item', instanceId: 'onboarding-seed-a', definitionId: 'nature:garden:1' };
-  board[32].occupant = { kind: 'item', instanceId: 'onboarding-seed-b', definitionId: 'nature:garden:1' };
+  board[29].occupant = { kind: 'item', instanceId: 'onboarding-seed-a', definitionId: 'nature:garden:1' };
+  board[30].occupant = { kind: 'item', instanceId: 'onboarding-seed-b', definitionId: 'nature:garden:1' };
+  board[32].occupant = { kind: 'item', instanceId: 'onboarding-seed-c', definitionId: 'nature:garden:1' };
+  board[33].occupant = { kind: 'item', instanceId: 'onboarding-seed-d', definitionId: 'nature:garden:1' };
   for (const echo of MOSSPROUT_DREAM_ECHOES) {
     board[echo.cell] = {
       ...board[echo.cell],

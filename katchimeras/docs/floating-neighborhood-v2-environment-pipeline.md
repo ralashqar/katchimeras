@@ -1,5 +1,7 @@
 # Floating Neighbourhood V2 environment pipeline
 
+> Production rule: Floating Neighbourhood V2 is the permanent player-facing Haven art direction. World Asset Lab may preview other sets, but its persisted developer override must never select art for `KingdomHexCanvas` in the live Haven route. The centre tile is Home and Mossprout is pinned to the first adjacent hex.
+
 Linear multi-stage Haven environments use the dedicated
 [`haven-environment-art-pipeline.md`](./haven-environment-art-pipeline.md) runbook.
 That workflow adds progression continuity and set-level review without weakening

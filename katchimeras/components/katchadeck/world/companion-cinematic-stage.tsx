@@ -30,6 +30,15 @@ import {
 
 import { CompanionHomeEnvironmentStage } from './companion-home-environment-stage';
 
+export function normalizeCompanionSpeechText(text: string | undefined): string {
+  return (text ?? '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]*\n[ \t]*/g, '\n')
+    .replace(/\n{2,}/g, '\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
 export function CompanionCinematicStage({
   creature,
   creatureTargetRef,
@@ -50,6 +59,7 @@ export function CompanionCinematicStage({
   onSpeechBubblePress,
   showSpeechBubble = true,
   showNameplate = false,
+  stagePresentation = 'full',
   title,
   visualKey,
 }: {
@@ -72,14 +82,15 @@ export function CompanionCinematicStage({
   onSpeechBubblePress?: () => void;
   showSpeechBubble?: boolean;
   showNameplate?: boolean;
+  stagePresentation?: 'full' | 'speech-only';
   title: string;
   visualKey: HomeVisualKey;
 }) {
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const { height, width } = useWindowDimensions();
-  const incomingSpeechTitle = title.trim();
-  const incomingSpeechBody = bubbleVariant === 'questionnaire' ? bubbleBody?.trim() ?? '' : '';
+  const incomingSpeechTitle = normalizeCompanionSpeechText(title);
+  const incomingSpeechBody = bubbleVariant === 'questionnaire' ? normalizeCompanionSpeechText(bubbleBody) : '';
   const incomingSpeechPresent = incomingSpeechTitle.length > 0 || incomingSpeechBody.length > 0;
   const [retainedSpeech, setRetainedSpeech] = useState(() => ({
     body: incomingSpeechBody,
@@ -167,6 +178,12 @@ export function CompanionCinematicStage({
     if (!speechBubbleVisible) onSpeechBubbleHeightChange?.(0);
   }, [onSpeechBubbleHeightChange, speechBubbleVisible]);
 
+  useEffect(() => {
+    if (stagePresentation !== 'speech-only') return;
+    onBackgroundReady?.();
+    onCreatureReady?.();
+  }, [onBackgroundReady, onCreatureReady, stagePresentation]);
+
   const liftStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -destinationLift * liftProgress.value }],
   }));
@@ -176,7 +193,7 @@ export function CompanionCinematicStage({
 
   return (
     <View pointerEvents="box-none" style={styles.root}>
-      <Animated.View pointerEvents="none" style={[styles.plane, liftStyle]}>
+      {stagePresentation === 'full' ? <Animated.View pointerEvents="none" style={[styles.plane, liftStyle]}>
         <CompanionHomeEnvironmentStage
           backgroundKey={environmentKey}
           creature={creature}
@@ -186,9 +203,9 @@ export function CompanionCinematicStage({
           sceneTranslateX={sceneTranslateX}
           visualKey={visualKey}
         />
-      </Animated.View>
+      </Animated.View> : null}
 
-      <LinearGradient
+      {stagePresentation === 'full' ? <LinearGradient
         colors={[
           'rgba(19,36,24,0)',
           'rgba(19,36,24,0)',
@@ -199,7 +216,7 @@ export function CompanionCinematicStage({
         locations={[0, 0.68, 0.78, 0.9, 1]}
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, styles.parchmentBlend]}
-      />
+      /> : null}
 
       <Animated.View pointerEvents={speechBubblePressable ? 'box-none' : 'none'} style={[styles.foregroundPlane, liftStyle]}>
         {speechBubbleVisible ? (
@@ -264,7 +281,7 @@ export function CompanionCinematicStage({
           />
         ) : null}
 
-        <CompanionHomeEnvironmentStage
+        {stagePresentation === 'full' ? <CompanionHomeEnvironmentStage
           backgroundKey={environmentKey}
           creature={creature}
           creatureTargetRef={creatureTargetRef}
@@ -274,9 +291,9 @@ export function CompanionCinematicStage({
           rewardPulseKey={rewardPulseKey}
           sceneTranslateX={sceneTranslateX}
           visualKey={visualKey}
-        />
+        /> : null}
 
-        {showNameplate ? (
+        {showNameplate && stagePresentation === 'full' ? (
           <Animated.View
             accessibilityLabel={nameplateTitle
               ? `${nameplateEyebrow ?? 'Journey'}, ${nameplateTitle}`

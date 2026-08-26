@@ -72,7 +72,7 @@ import {
   migrateMossproutRootParcels,
   normalizeMossproutBoardProgression,
   reconcileMossproutBoardProgression,
-  useGrovelightResonance,
+  useGrovelightResonance as applyGrovelightResonance,
   unlockMemoryNursery,
 } from '@/utils/merge-world/mossprout-board-progression';
 import {
@@ -268,7 +268,7 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
       return result(current, next === current ? current : touch(next, command.now), next === current ? undefined : 'Mossprout’s roots shifted beneath the Mist.');
     }
     case 'useGrovelightResonance': {
-      const next = useGrovelightResonance(current, command.gateId, command.dayId, command.now);
+      const next = applyGrovelightResonance(current, command.gateId, command.dayId, command.now);
       return next ? changed(touch(next, command.now), 'Grovelight found the matching memory.') : unchanged(current, 'Grovelight cannot resonate here yet.');
     }
     case 'revealMemoryCard': {

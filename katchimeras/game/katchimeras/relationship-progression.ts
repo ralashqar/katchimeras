@@ -27,7 +27,7 @@ export function isMossproutFtueRoutineActionId(actionId: string) {
   return actionId.startsWith(MOSSPROUT_FTUE_ROUTINE_ACTION_PREFIX);
 }
 
-const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+const RELATIONSHIP_REFLECTION_MS = 4 * 60 * 60 * 1000;
 
 const DRY_POND_ACTIVITY = {
   'returning-pond:place-for-rain': {
@@ -509,7 +509,7 @@ export function completeMossproutJourneyOpening(
     status: activity ? 'activity_available' : 'living',
     activity,
     profileConversationId,
-    resolutionAvailableAt: activity ? null : lateNight(now) ? now : now + TWO_HOURS_MS,
+    resolutionAvailableAt: activity ? null : lateNight(now) ? now : now + RELATIONSHIP_REFLECTION_MS,
   });
 }
 

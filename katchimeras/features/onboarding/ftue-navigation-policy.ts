@@ -8,13 +8,20 @@ export type ActiveFtueNavigationPolicy = FtueNavigationDirective & {
 };
 
 const PRE_MOSSPROUT_CONVERSATION_STEPS = new Set([
+  'haven.home_notice',
+  'haven.mossprout_focus',
+  'haven.mossprout_reveal',
+  'grove.egg_inspect',
   'egg.nature_theme',
   'egg.companion_identity',
   'egg.opening',
   'egg.context',
   'egg.mind',
   'egg.ready',
-  'hatch.reveal',
+  'companion.first_meeting',
+  'companion.day_one_action',
+  'companion.garden_intro',
+  'companion.order_preview',
 ]);
 
 const RESIDENT_COMPLETION_RECOVERY_STEPS = new Set([
@@ -23,6 +30,9 @@ const RESIDENT_COMPLETION_RECOVERY_STEPS = new Set([
   'merge.resident_parcel',
   'merge.resident_card',
   'merge.resident_dialogue',
+  'merge.resident_seed_spawn',
+  'merge.resident_seed_echo',
+  'merge.resident_sprout_echo',
   'merge.resident_orders',
   'merge.resident_card_reward',
 ]);
@@ -51,21 +61,6 @@ export function ftueOwnsOpeningHome(run: Pick<FtueRunState, 'status' | 'stepId'>
   return run?.status === 'active' && PRE_MOSSPROUT_CONVERSATION_STEPS.has(run.stepId);
 }
 
-export function ftueHidesBottomBar(
-  run: Pick<FtueRunState, 'status' | 'stepId'> | null,
-  activeTabRoute: string,
-): boolean {
-  if (run?.status !== 'active') return false;
-  const surface = mossproutFtueStep(run.stepId)?.surface;
-  // A persisted graph may point at Merge while the app cold-opens on Today.
-  // Hide navigation only on the tab currently presenting that graph surface,
-  // otherwise the player must retain a route to Dev reset and recovery.
-  if (activeTabRoute === 'today') return surface === 'today' || surface === 'hatch';
-  if (activeTabRoute === 'games') return surface === 'merge';
-  if (activeTabRoute === 'katchimeras') return surface === 'haven';
-  return false;
-}
-
 /** Resolve navigation behavior from the authored step instead of screen-specific IDs. */
 export function activeFtueNavigationPolicy(
   run: Pick<FtueRunState, 'status' | 'stepId'> | null,
@@ -84,11 +79,9 @@ export function activeFtueNavigationPolicy(
     ? { kind: 'merge', creatureId: 'companion:mossprout' }
     : step.surface === 'companion'
       ? { kind: 'companion', creatureId: 'companion:mossprout', ftue: '1' }
-      : step.surface === 'haven'
+      : step.surface === 'haven' || step.surface === 'today' || step.surface === 'hatch'
         ? { kind: 'haven' }
-        : step.id === 'energy.capture'
-          ? { kind: 'today', onboardingCapture: '1' }
-          : { kind: 'today' };
+        : { kind: 'today' };
   return { lock: true, resume, stepId: step.id, surface: step.surface };
 }
 

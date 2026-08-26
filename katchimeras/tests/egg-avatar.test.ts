@@ -440,6 +440,25 @@ test('Today egg uses the shared calibrated body and face compositor', () => {
   assert.match(compositor, /body\.scale \* residual\.scale/);
 });
 
+test('Haven home tile renders the live customized Egg instead of a static substitute', () => {
+  const haven = readFileSync(
+    path.join(root, 'components', 'katchadeck', 'world', 'kingdom-hex-canvas.tsx'),
+    'utf8',
+  );
+  const kingdomEgg = haven.slice(haven.indexOf('const KingdomEgg'), haven.indexOf('const RevealedCompanionEgg'));
+
+  assert.match(kingdomEgg, /const avatar = useEggAvatar\(\)/);
+  assert.match(kingdomEgg, /<EggAvatarArtwork/);
+  assert.match(kingdomEgg, /skinId=\{avatar\.equippedSkinId\}/);
+  assert.match(kingdomEgg, /faceId=\{avatar\.equippedFaceId\}/);
+  assert.match(kingdomEgg, /hatId=\{avatar\.equippedHatId\}/);
+  assert.match(kingdomEgg, /heldAccessoryId=\{avatar\.equippedHeldAccessoryId\}/);
+  assert.match(kingdomEgg, /resolution="high"/);
+  assert.doesNotMatch(kingdomEgg, /egg-base\.webp|KINGDOM_EGG_SOURCE/);
+  assert.match(haven, /HAVEN_HOME_EGG_AVATAR_SCALE = 1\.2/);
+  assert.match(haven, /kingdomWorldViewConfig\.egg\.globalScale \* HAVEN_HOME_EGG_AVATAR_SCALE/);
+});
+
 test('accessory-heavy skins carry explicit core-silhouette calibration', () => {
   for (const skinId of ['moss', 'barista', 'pumpkin'] as const) {
     const presentation = allEggAvatarItems('body').find((skin) => skin.id === skinId)?.presentation;

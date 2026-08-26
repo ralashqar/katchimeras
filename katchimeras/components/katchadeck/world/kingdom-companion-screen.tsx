@@ -209,6 +209,8 @@ function questNoteSubmission(
 export type KingdomCompanionPresentation = 'world' | 'roster' | 'companion';
 
 export function KingdomCompanionScreen({
+  active,
+  forceMossproutAvailable = false,
   presentation = 'world',
   initialCreatureId,
   onCloseCompanion,
@@ -228,6 +230,8 @@ export function KingdomCompanionScreen({
   ftueResidentStoryResume = false,
   ftueNavigationLocked = false,
   ftueCompanionSurfaceOwned = false,
+  renderRegularStage = false,
+  reuseUnderlyingStage = false,
   onFtueBondSpotlightComplete,
   onFtueJourneyDayComplete,
   onFtueOpenMerge,
@@ -254,14 +258,19 @@ export function KingdomCompanionScreen({
   ftueResidentStoryResume?: boolean;
   ftueNavigationLocked?: boolean;
   ftueCompanionSurfaceOwned?: boolean;
+  renderRegularStage?: boolean;
+  reuseUnderlyingStage?: boolean;
   onFtueBondSpotlightComplete?: () => void;
   onFtueJourneyDayComplete?: () => void;
   onFtueOpenMerge?: () => void;
   onFtueProfileContinue?: (nickname?: string) => void;
   onFtueOpenResidentParcel?: () => void;
   discoveryRecords?: readonly CompanionDiscoveryRecord[];
+  active?: boolean;
+  forceMossproutAvailable?: boolean;
 }) {
-  const isFocused = useIsFocused();
+  const routeFocused = useIsFocused();
+  const isFocused = active ?? routeFocused;
   const router = useRouter();
   const archive = useAllDays();
   const { days } = archive;
@@ -272,7 +281,7 @@ export function KingdomCompanionScreen({
       withDiscoveredKatchimeras(deriveKingdom(days), discoveryRecords),
       allKatchimerasAvailable,
     );
-    if (!ftueConversationDefinitionId || derived.creatures.some((creature) => creature.creatureId === 'companion:mossprout')) return derived;
+    if ((!ftueConversationDefinitionId && !forceMossproutAvailable) || derived.creatures.some((creature) => creature.creatureId === 'companion:mossprout')) return derived;
     const mossprout: KingdomCreature = {
       dayId: 'ftue-discovery',
       isoDate: new Date().toISOString().slice(0, 10),
@@ -288,7 +297,7 @@ export function KingdomCompanionScreen({
       accentColor: '#8FBE67',
     };
     return { ...derived, creatures: [mossprout, ...derived.creatures] };
-  }, [allKatchimerasAvailable, days, discoveryRecords, ftueConversationDefinitionId]);
+  }, [allKatchimerasAvailable, days, discoveryRecords, forceMossproutAvailable, ftueConversationDefinitionId]);
 
   const [identity, setIdentity] = useState<WorldIdentityState>(loadWorldIdentity);
   const [wardrobe, setWardrobe] = useState<KatchimeraWardrobeState>(loadKatchimeraWardrobe);
@@ -593,7 +602,7 @@ export function KingdomCompanionScreen({
   };
 
   return (
-    <GestureHandlerRootView style={styles.screen}>
+    <GestureHandlerRootView style={[styles.screen, reuseUnderlyingStage && styles.transparentScreen]}>
       {presentation === 'roster' || presentation === 'world' ? (
         <KatchimeraRosterScreen
           background={kingdomBackground}
@@ -601,7 +610,7 @@ export function KingdomCompanionScreen({
           onGoToday={() => router.dismissTo('/today')}
           onSelectCreature={quests.selectResident}
         />
-      ) : <View style={styles.companionRouteStage} />}
+      ) : <View style={[styles.companionRouteStage, reuseUnderlyingStage && styles.transparentScreen]} />}
 
       {homeIdentityOpen ? <HomeIdentitySheet identity={identity} onChange={updateIdentity} onClose={() => setHomeIdentityOpen(false)} /> : null}
 
@@ -611,6 +620,8 @@ export function KingdomCompanionScreen({
           key={`${quests.selectedResident.creature.creatureId}:${quests.questCaptureRestoreKey ?? 'standard'}`}
           onExperienceActiveChange={setQuestExperienceActive}
           embedded={presentation === 'companion'}
+          renderRegularStage={renderRegularStage}
+          reuseUnderlyingStage={reuseUnderlyingStage}
           creatureId={quests.selectedResident.creature.creatureId}
           name={quests.selectedResident.creature.name}
           visualKey={quests.selectedResident.creature.visualKey}
@@ -1202,6 +1213,7 @@ export function KingdomCompanionScreen({
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: '#55A9E2', flex: 1 },
+  transparentScreen: { backgroundColor: 'transparent' },
   stage: { flex: 1 },
   companionRouteStage: { flex: 1, backgroundColor: '#11131B' },
   header: {

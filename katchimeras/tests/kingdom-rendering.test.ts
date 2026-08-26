@@ -169,12 +169,17 @@ function renderedAssetX(frame: { left: number; width: number }, assetX: number):
 
 test('Kingdom assigns every Katchimera family to the uninterrupted hex spiral', () => {
   const locked = kingdomCompanionHexSlots([], []);
+  const expectedCoords = hexSpiral(katchimeraFamilies.length, false);
   assert.equal(locked.length, 25);
   assert.deepEqual(locked.map((slot) => slot.familyId), katchimeraFamilies.map((family) => family.id));
   assert.equal(new Set(locked.map((slot) => slot.id)).size, locked.length);
   assert.equal(new Set(locked.map((slot) => `${slot.coord.q}:${slot.coord.r}`)).size, locked.length);
   assert.ok(locked.every((slot) => slot.kind === 'locked'));
-  assert.deepEqual(locked.map((slot) => slot.coord), hexSpiral(katchimeraFamilies.length, false));
+  assert.deepEqual(
+    [...locked.map((slot) => `${slot.coord.q}:${slot.coord.r}`)].sort(),
+    [...expectedCoords.map((coord) => `${coord.q}:${coord.r}`)].sort(),
+  );
+  assert.deepEqual(locked.find((slot) => slot.familyId === 'mossprout')?.coord, expectedCoords[0]);
 });
 
 test('discovering a Katchimera transforms its existing Kingdom slot without moving it', () => {

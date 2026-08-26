@@ -1,6 +1,6 @@
 import { Image, type ImageRef } from 'expo-image';
 import * as Haptics from 'expo-haptics';
-import { memo, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { InteractionManager, Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type ImageSourcePropType, type LayoutChangeEvent, type View as ViewType } from 'react-native';
 import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import Animated, {
@@ -62,6 +62,7 @@ import { runRewardIconArrivalPulse } from '@/components/katchadeck/ui/reward-arr
 import type { HomeDayRecord, HomeTimelineDay, SleepQuality } from '@/types/home';
 import type { SceneVariantId } from '@/types/scene';
 import type { HomeArchetypeId } from '@/types/world-identity';
+import type { EggAvatarSkinId } from '@/types/egg-avatar';
 import type { WispId } from '@/types/wisp';
 import type { RankedTodayCareAction } from '@/utils/today-care';
 import type { TodayGrowthSummary } from '@/utils/today-growth';
@@ -119,12 +120,16 @@ type TodayNurtureExperienceProps = {
   onSelectDay: (dayId: string) => void;
   careSwipeExternalGesture: GestureType;
   environmentGesture: GestureType;
+  environmentContent?: ReactNode;
   sceneTranslateX: SharedValue<number>;
   sceneId: SceneVariantId;
+  sceneEnvironmentStage?: number | null;
   topInset: number;
   bottomInset: number;
   timelineDays: HomeTimelineDay[];
   eggTargetRef: RefObject<View | null>;
+  eggShowFace?: boolean;
+  eggSkinId?: EggAvatarSkinId;
   energyHudPulseNonce?: number;
   energyHudTargetRef?: RefObject<View | null>;
   energyHudValueOverride?: number | null;
@@ -139,6 +144,12 @@ type TodayNurtureExperienceProps = {
   newDayIntro?: boolean;
   onboardingTopHudVisible?: boolean;
   onboardingUiVisible?: boolean;
+  sceneOnly?: boolean;
+  sceneHandoffProgress?: SharedValue<number>;
+  sceneHandoffScale?: number;
+  sceneHandoffTranslateY?: number;
+  subjectHidden?: boolean;
+  subjectHandoffProgress?: SharedValue<number>;
   hatchPresentation?: TodayHatchPresentation | null;
   onHatchAssetsReady?: () => void;
   onHatchAssetsError?: () => void;
@@ -187,6 +198,8 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   companionJourneyHook = null,
   day,
   eggTargetRef,
+  eggShowFace = true,
+  eggSkinId,
   energyHudPulseNonce,
   energyHudTargetRef,
   energyHudValueOverride = null,
@@ -219,6 +232,12 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   newDayIntro = false,
   onboardingTopHudVisible = false,
   onboardingUiVisible = true,
+  sceneOnly = false,
+  sceneHandoffProgress,
+  sceneHandoffScale = 1,
+  sceneHandoffTranslateY = 0,
+  subjectHidden = false,
+  subjectHandoffProgress,
   hatchPresentation = null,
   onHatchAssetsReady,
   onHatchAssetsError,
@@ -238,8 +257,10 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   onYesterdayStepEnergyPanelFinished,
   careSwipeExternalGesture,
   environmentGesture,
+  environmentContent,
   sceneTranslateX,
   sceneId,
+  sceneEnvironmentStage,
   timelineDays,
   topInset,
 }: TodayNurtureExperienceProps) {
@@ -389,7 +410,17 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   // With its tab bar hidden, the authored opening can use the same centered
   // vertical composition as a settled hatched day. The normal forming camera
   // stays lifted to reserve room for its persistent action/navigation dock.
-  const sceneLift = onboardingFocus ? HOME_SCENE_Y_OFFSET : -100 + sceneVerticalNudge;
+  // A scene-only host has no Today action dock to make room for. Keep its
+  // environment full-bleed when the FTUE hands the persistent Grove to the
+  // Companion UI; applying Today's regular -100px lift exposes the cream root
+  // along the device bottom.
+  const sceneLift = sceneHandoffProgress
+    ? HOME_SCENE_Y_OFFSET
+    : sceneOnly
+    ? 0
+    : onboardingFocus
+      ? HOME_SCENE_Y_OFFSET
+      : -100 + sceneVerticalNudge;
   const tabBarHeight = homeTabBarHeight(bottomInset);
   const actionDockBottom = onboardingFocus
     ? bottomInset + HOME_ACTIONS_TAB_BAR_GAP
@@ -691,27 +722,44 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
     if (displayedMoodAction || displayedSleepAction || checkInTransitionActive) return;
     setCheckInSlotHeight(0);
   }, [checkInTransitionActive, displayedMoodAction, displayedSleepAction]);
+  const subjectHandoffStyle = useAnimatedStyle(() => ({
+    opacity: 1 - (subjectHandoffProgress?.value ?? 0),
+  }));
+  const sceneHandoffStyle = useAnimatedStyle(() => {
+    const progress = sceneHandoffProgress?.value ?? 0;
+    return {
+      transform: [
+        { translateY: sceneHandoffTranslateY * progress },
+        { scale: 1 + (sceneHandoffScale - 1) * progress },
+      ],
+    };
+  });
 
   return (
     <View style={styles.root}>
       <View pointerEvents="none" style={styles.focusSceneViewport}>
-        <Animated.View style={[styles.focusSceneCamera, focusSceneStyle]}>
-          <TodayEnvironmentViewportMotionLayer
-            additionalScale={hatchCameraScale}
-            focusY={scenePinchFocusY}
-            viewportHeight={windowHeight}>
-            <TodayExplorationBackground
-              backgroundKey={sceneId}
-              imageSize={sceneImageSize}
-              translateX={sceneTranslateX}
-              verticalOffset={sceneLift}
-            />
-          </TodayEnvironmentViewportMotionLayer>
+        <Animated.View style={[styles.focusSceneCamera, sceneHandoffStyle]}>
+          <Animated.View style={[styles.focusSceneCamera, focusSceneStyle]}>
+            <TodayEnvironmentViewportMotionLayer
+              additionalScale={hatchCameraScale}
+              focusY={scenePinchFocusY}
+              viewportHeight={windowHeight}>
+              {environmentContent ?? (
+                <TodayExplorationBackground
+                  backgroundKey={sceneId}
+                  environmentStage={sceneEnvironmentStage}
+                  imageSize={sceneImageSize}
+                  translateX={sceneTranslateX}
+                  verticalOffset={sceneLift}
+                />
+              )}
+            </TodayEnvironmentViewportMotionLayer>
+          </Animated.View>
         </Animated.View>
       </View>
-      <Animated.View
+      {!subjectHidden ? <Animated.View
         pointerEvents="box-none"
-        style={[styles.eggStage, { top: stageTop + sceneLift }, projectedEggStageStyle]}>
+        style={[styles.eggStage, { top: stageTop + sceneLift }, projectedEggStageStyle, subjectHandoffStyle]}>
         {newDayIntro ? (
           <CelebrationParticles
             layerStyle={[styles.newDayConfetti, { top: explorationEggFrame.centerY }]}
@@ -725,6 +773,8 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           coreColor={day.egg.coreColor}
           deferGrowthUntilEnergyArrival
           discoveryHatch={hatchPresentation}
+          eggShowFace={eggShowFace}
+          eggSkinId={eggSkinId}
           explorationStageTop={stageTop}
           feedbackKey={feedbackKey}
           feedExpressionKey={feedExpressionKey}
@@ -743,8 +793,8 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           showForcedSleepIndicator={false}
           targetRef={eggTargetRef}
         />
-      </Animated.View>
-      {onboardingEggSleeping ? (
+      </Animated.View> : null}
+      {!subjectHidden && onboardingEggSleeping ? (
         <TodayDormantEggIndicator
           energyRatio={growth.energyRatio}
           focusX={windowWidth / 2}
@@ -755,7 +805,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           top={onboardingZzzTop}
         />
       ) : null}
-      <View
+      {!sceneOnly ? <View
         pointerEvents={focusMode ? 'none' : 'box-none'}
         style={[styles.chrome, focusMode && styles.chromeHidden]}>
       {!hatchReadyFocus && regularEggSleeping ? (
@@ -1123,7 +1173,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           </ScrollView>
       </GestureDetector>
       ) : null}
-      </View>
+      </View> : null}
     </View>
   );
 });

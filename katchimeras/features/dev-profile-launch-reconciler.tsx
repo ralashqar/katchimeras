@@ -15,7 +15,7 @@ export function DevProfileLaunchReconciler() {
         return;
       }
       const route = consumeDevProfileLaunchRoute();
-      if (route) router.replace(route);
+      if (route) router.navigate(route);
     });
     return () => { cancelled = true; };
   }, [router]);

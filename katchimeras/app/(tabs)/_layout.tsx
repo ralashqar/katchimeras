@@ -1,31 +1,18 @@
 import { Redirect, Tabs } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 
-import { DayCaptureSession } from '@/components/katchadeck/home/day-capture-session';
 import { StreakBootstrap } from '@/components/katchadeck/streak/streak-bootstrap';
-import { MeadowTabBar } from '@/components/katchadeck/ui/meadow-tab-bar';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
-import { useFirstSession } from '@/features/onboarding/first-session';
-import { ftueHidesBottomBar } from '@/features/onboarding/ftue-navigation-policy';
-import { useFtueRun } from '@/features/onboarding/ftue-runtime';
-import { loadFeastleStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
 
-// Today is the daily capture surface. The lightweight Katchimeras roster is
-// visible in navigation; the persistent world route remains registered but
-// hidden while its London/hex presentation is out of the main tab bar.
+// Haven is the persistent Home. The old tab destinations remain registered so
+// existing deep links and developer tools keep working, but there is no longer
+// a player-facing bottom navigation competing with the Haven world.
 export const unstable_settings = {
-  initialRouteName: 'today',
+  initialRouteName: 'katchimeras',
 };
 
 export default function TabLayout() {
   const onboardingProfile = loadOnboardingProfile();
-  const firstSession = useFirstSession();
-  const ftueRun = useFtueRun();
-  const guidedSession = firstSession != null && firstSession.stage !== 'complete';
-  const [feastleStory, setFeastleStory] = useState(loadFeastleStory);
-  useEffect(() => subscribeCompanionStories(() => setFeastleStory(loadFeastleStory())), []);
 
   if (!onboardingProfile.completed) {
     return <Redirect href="/onboarding" />;
@@ -33,15 +20,9 @@ export default function TabLayout() {
 
   return (
     <>
-      <DayCaptureSession />
       <StreakBootstrap />
       <Tabs
-        // The carved-wood Meadow bar (generated art + centre capture button)
-        // replaces the stock bar entirely.
-        tabBar={(props) => {
-          const activeRoute = props.state.routes[props.state.index]?.name ?? '';
-          return ftueHidesBottomBar(ftueRun, activeRoute) ? null : <MeadowTabBar {...props} />;
-        }}
+        tabBar={() => null}
         screenOptions={{
           headerShown: false,
           tabBarHideOnKeyboard: true,
@@ -61,8 +42,8 @@ export default function TabLayout() {
           name="today"
           options={{
             freezeOnBlur: false,
+            href: null,
             title: 'Today',
-            tabBarIcon: ({ color }) => <IconSymbol size={26} name="moon.stars.fill" color={color} />,
           }}
         />
         <Tabs.Screen
@@ -83,10 +64,7 @@ export default function TabLayout() {
           name="katchimeras"
           options={{
             freezeOnBlur: true,
-            href: guidedSession ? null : undefined,
             title: 'Haven',
-            tabBarBadge: feastleStory.unreadReturn ? '' : undefined,
-            tabBarIcon: ({ color }) => <IconSymbol size={26} name="map.fill" color={color} />,
           }}
         />
         <Tabs.Screen
@@ -98,26 +76,22 @@ export default function TabLayout() {
             freezeOnBlur: false,
             href: null,
             title: 'Activities',
-            tabBarBadge: feastleStory.status === 'order_active' ? '' : undefined,
-            tabBarIcon: ({ color }) => <IconSymbol size={26} name="circle.grid.2x2.fill" color={color} />,
           }}
         />
         <Tabs.Screen
           name="collection"
           options={{
             freezeOnBlur: true,
-            href: guidedSession ? null : undefined,
+            href: null,
             title: 'Deck',
-            tabBarIcon: ({ color }) => <IconSymbol size={26} name="sparkles" color={color} />,
           }}
         />
         <Tabs.Screen
           name="explore"
           options={{
             freezeOnBlur: true,
-            href: DEV_DEBUG_NAV_ENABLED ? '/explore' : null,
+            href: null,
             title: 'Dev',
-            tabBarIcon: ({ color }) => <IconSymbol size={26} name="paperplane.fill" color={color} />,
           }}
         />
       </Tabs>

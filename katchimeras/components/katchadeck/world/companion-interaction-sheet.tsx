@@ -23,6 +23,7 @@ import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import { mossproutJourneyForDay, startMossproutJourneyActivity } from '@/game/katchimeras/relationship-progression';
 import { useCompanionExperienceController } from '@/features/companion/use-companion-experience-controller';
 import { useCompanionConversationFlow } from '@/features/companion/use-companion-conversation-flow';
+import { useGameFeedback } from '@/features/ui/game-feedback-provider';
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
 import type { HomeVisualKey, MemoryQualityScore } from '@/types/home';
 import type {
@@ -147,7 +148,7 @@ import { useGameSurfaceReadiness } from '@/features/navigation/game-screen-trans
 import { localDayId } from '@/utils/world-identity';
 import { mossproutCampaignEpisodeByOpeningId } from '@/constants/mossprout-campaign';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
-import { mossproutBondSharePrompt, mossproutBondShareSelection } from '@/features/onboarding/mossprout-bond-share';
+import { MOSSPROUT_BOND_SHARE_PROMPTS, mossproutBondSharePrompt, mossproutBondShareSelection } from '@/features/onboarding/mossprout-bond-share';
 import { MOSSPROUT_GARDEN_INTRO_BEATS, mossproutGardenIntroBeat } from '@/features/onboarding/mossprout-garden-intro';
 
 const LazyQuestExperienceHost = lazy(async () => {
@@ -198,6 +199,9 @@ export type CompanionInteractionSheetProps = {
   onJournalFood: () => void;
   onOpenTodayGoals: () => void;
   embedded?: boolean;
+  /** Draw the canonical companion environment while retaining a transparent FTUE shell. */
+  renderRegularStage?: boolean;
+  reuseUnderlyingStage?: boolean;
   activeQuest: { questId: string; title: string; hint: string; semanticInput?: boolean; journalInput?: boolean; journalFallback?: boolean; assistedJournalInput?: boolean; execution?: InteractiveQuestExecution | null; resolvedConfig?: Record<string, unknown>; offerSeed?: string } | null;
   questComplete: boolean;
   questRuntime: QuestRuntimeStatus | null;
@@ -332,6 +336,9 @@ export type CompanionInteractionSheetProps = {
 };
 
 export function CompanionInteractionSheet(props: CompanionInteractionSheetProps) {
+  const gameFeedback = useGameFeedback();
+  const shownFtueMemoryNoticeRef = useRef<string | null>(null);
+  const shownFtueBondMemoryNoticeRef = useRef<string | null>(null);
   const relationships = useRelationshipProgression();
   const mossproutJourney = props.familyId === 'mossprout'
     ? mossproutJourneyForDay(relationships, localDayId())
@@ -365,6 +372,38 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     && props.conversationDefinition?.id === props.initialConversationDefinitionId
     && (props.conversationSession.status === 'active' || props.conversationSession.status === 'completed')
   );
+  useEffect(() => {
+    const session = props.conversationSession;
+    if (
+      !props.active
+      || props.familyId !== 'mossprout'
+      || !session?.definitionId.startsWith('mossprout:ftue:first-meeting:')
+      || session.currentNodeId !== 'remembered'
+    ) return;
+    const noticeId = `${session.id}:answers-remembered`;
+    if (shownFtueMemoryNoticeRef.current === noticeId) return;
+    shownFtueMemoryNoticeRef.current = noticeId;
+    gameFeedback.show({
+      durationMs: 2_400,
+      icon: 'sparkles',
+      id: noticeId,
+      message: 'Mossprout remembers your answers',
+      placement: 'middle',
+    });
+  }, [gameFeedback, props.active, props.conversationSession, props.familyId]);
+  useEffect(() => {
+    const answerId = props.ftueDayOneActionAnswerId;
+    if (!props.active || props.familyId !== 'mossprout' || !answerId) return;
+    if (shownFtueBondMemoryNoticeRef.current === answerId) return;
+    shownFtueBondMemoryNoticeRef.current = answerId;
+    gameFeedback.show({
+      durationMs: 2_400,
+      icon: 'leaf.fill',
+      id: `mossprout-bond-memory:${answerId}`,
+      message: 'Mossprout will remember this',
+      placement: 'middle',
+    });
+  }, [gameFeedback, props.active, props.familyId, props.ftueDayOneActionAnswerId]);
   useGameSurfaceReadiness('companion', {
     background: transitionBackgroundReady,
     data: initialConversationContentReady,
@@ -1393,9 +1432,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       : props.ftueProfileStep === 'bond'
         ? `Nice to meet you, ${loadOnboardingProfile().playerNickname || 'friend'}! We are friends now.`
         : props.ftueProfileStep === 'bond_choice'
-          ? ftueBondShare?.prompt.reply
+          ? ftueBondShare?.answer.reply
+            ?? ftueBondShare?.prompt.reply
             ?? ftueBondQuestion?.prompt
-            ?? 'What would you like to share with me first?'
+            ?? MOSSPROUT_BOND_SHARE_PROMPTS[0].prompt
         : props.ftueProfileStep === 'garden_intro'
           ? ftueGardenStoryBeat.line
           : props.ftueProfileStep === 'resident_result'
@@ -1409,13 +1449,15 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     <ExplorationEnvironmentProgressionProvider stage={props.homeEnvironmentStage ?? null}>
       <>
         <CompanionSheetShell
-          background={props.questionnaireBackground}
+          background={props.reuseUnderlyingStage ? undefined : props.questionnaireBackground}
+          entranceMotion={props.reuseUnderlyingStage ? 'fade' : 'sheet'}
           fullBleed
           keyboardAvoiding={!questGameVisible}
           onRequestClose={requestClose}
           portal={!props.embedded}
           showClose={false}
-          surface={questGameVisible ? 'night' : 'parchment'}>
+          surface={questGameVisible ? 'night' : 'parchment'}
+          transparent={Boolean(props.reuseUnderlyingStage && !questGameVisible)}>
         <GestureDetector gesture={environmentPan.gesture}>
         <View style={styles.environmentPanFrame}>
         {questGameVisible ? (
@@ -1454,6 +1496,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               : undefined}
             showSpeechBubble={!initialConversationHandoffPending && (Boolean(mossproutFtueSpeechTitle) || !residentParcelGardenPanelActive)}
             showNameplate={route.kind === 'dashboard' && props.familyId !== 'mossprout'}
+            stagePresentation={props.reuseUnderlyingStage && !props.renderRegularStage ? 'speech-only' : 'full'}
             title={mossproutFtueSpeechTitle ?? (residentStoryResumeDashboard
               ? 'What should we do together?'
               : quickGoalPickerOpen

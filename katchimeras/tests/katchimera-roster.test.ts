@@ -252,7 +252,7 @@ test('roster reconciliation preserves unchanged card identities and replaces onl
   }
 });
 
-test('the bottom bar exposes Haven while the retired world route redirects to it', () => {
+test('Haven is the sole player home while retired routes stay hidden', () => {
   const layout = fs.readFileSync(
     path.join(process.cwd(), 'app', '(tabs)', '_layout.tsx'),
     'utf8',
@@ -261,33 +261,49 @@ test('the bottom bar exposes Haven while the retired world route redirects to it
     path.join(process.cwd(), 'app', '(tabs)', 'world.tsx'),
     'utf8',
   );
-  const tabBar = fs.readFileSync(
-    path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'meadow-tab-bar.tsx'),
+  const todayRoute = fs.readFileSync(
+    path.join(process.cwd(), 'app', '(tabs)', 'today.tsx'),
     'utf8',
   );
+  assert.match(layout, /tabBar=\{\(\) => null\}/);
   assert.match(layout, /name="world"[\s\S]*?href: null/);
+  assert.match(layout, /name="today"[\s\S]*?href: null/);
   assert.match(layout, /name="katchimeras"[\s\S]*?title: 'Haven'/);
   assert.match(layout, /name="games"[\s\S]*?href: null/);
-  assert.match(tabBar, /HIDDEN_ROUTES = new Set\(\[[^\]]*'games'/);
-  assert.doesNotMatch(tabBar, /games: 'merge'/);
   assert.match(worldRoute, /<Redirect href="\/katchimeras"/);
+  assert.match(todayRoute, /<Redirect href="\/katchimeras"/);
   assert.doesNotMatch(worldRoute, /KingdomCompanionScreen|KingdomHexCanvas/);
 });
 
-test('the Katchimeras tab toggles between grid and Haven while companion Back returns to that tab state', () => {
+test('the Katchimeras tab permanently renders the hex Haven while companion Back returns there', () => {
   const read = (...segments: string[]) => fs.readFileSync(path.join(process.cwd(), ...segments), 'utf8');
   const rosterRoute = read('components', 'katchadeck', 'roster', 'katchimera-roster-route-screen.tsx');
   const kingdomScreen = read('components', 'katchadeck', 'roster', 'katchimera-kingdom-screen.tsx');
+  const kingdomCanvas = read('components', 'katchadeck', 'world', 'kingdom-hex-canvas.tsx');
+  const youRoute = read('app', '(tabs)', 'you.tsx');
+  const worldVisuals = read('utils', 'world-visuals.ts');
   const companionRoute = read('components', 'katchadeck', 'world', 'katchimera-companion-route-screen.tsx');
 
-  assert.match(rosterRoute, /useState<KatchimeraViewMode>\('grid'\)/);
-  assert.match(rosterRoute, /current === 'grid' \? 'haven' : 'grid'/);
-  assert.match(rosterRoute, /<KatchimeraRosterScreen[\s\S]*?<KatchimeraKingdomScreen/);
+  assert.doesNotMatch(rosterRoute, /KatchimeraViewMode|current === 'grid'|<KatchimeraRosterScreen/);
+  assert.match(rosterRoute, /return isFocused \? <FocusedKatchimeraRoster \/> : null/);
+  assert.match(rosterRoute, /<KatchimeraKingdomScreen/);
+  assert.match(kingdomCanvas, /value: playerHavenHexTileSet\(\)/);
+  assert.doesNotMatch(kingdomCanvas, /value: kingdomHexTileSet\(\)/);
+  assert.match(worldVisuals, /playerHavenHexTileSet[\s\S]*?set\.id === 'floating_neighborhood_v2'/);
   assert.match(rosterRoute, /router\.push\(\{ pathname: '\/katchimera\/\[creatureId\]'/);
   assert.match(kingdomScreen, /<KingdomHexCanvas[\s\S]*?onSelectResident=\{selectResident\}/);
   assert.match(kingdomScreen, /<HavenTileHudLayer[\s\S]*?onOpen=\{openHavenDetail\}/);
   assert.match(kingdomScreen, /Hidden in the Dream Mist/);
   assert.match(kingdomScreen, /Keep living days and growing your relationships/);
+  assert.match(rosterRoute, /stepId === 'haven\.home_notice'/);
+  assert.match(rosterRoute, /stepId === 'haven\.mossprout_reveal'[\s\S]*?kind: 'revealed_egg'/);
+  assert.match(rosterRoute, /const discoveryCompanionSlots[\s\S]*?kind: 'locked' as const/);
+  assert.match(rosterRoute, /announcement: 'Opening You'[\s\S]*?router\.push\('\/you'\)/);
+  assert.match(kingdomScreen, /<EggAvatar[\s\S]*?accessibilityLabel="Open You"|accessibilityLabel="Open You"[\s\S]*?<EggAvatar/);
+  assert.match(kingdomScreen, /characterId: 'mossprout'[\s\S]*?zoom: 1\.32/);
+  assert.match(kingdomScreen, /familyId === 'mossprout'\) advanceOpening/);
+  assert.match(kingdomCanvas, /candidate\.companion\?\.familyId === targetCharacterId/);
+  assert.match(youRoute, /accessibilityLabel="Back to Haven"[\s\S]*?router\.canGoBack\(\)[\s\S]*?router\.replace\('\/katchimeras'\)/);
   assert.match(companionRoute, /onCloseCompanion=\{\(\) =>[\s\S]*?: router\.back\(\)\}/);
 });
 
@@ -360,6 +376,8 @@ test('the roster, companion, and Block Blast use isolated route boundaries', () 
   assert.match(rosterScreen, /hasCompletedInitialLoad/);
   assert.match(rosterScreen, /FadeIn\.duration\(240\)/);
   assert.match(rosterRoute, /useAllDays\(\{ refreshOnFocus: false \}\)/);
+  assert.match(rosterRoute, /<KatchimeraKingdomScreen/);
+  assert.doesNotMatch(rosterRoute, /KatchimeraViewMode|Show Katchimera grid|<KatchimeraRosterScreen/);
   assert.match(rosterCard, /recyclingKey=\{artworkKey\}/);
   assert.match(rosterCard, /transition=\{0\}/);
   assert.doesNotMatch(rosterCard, /useReducedMotion/);

@@ -4,7 +4,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { type Href, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
@@ -14,6 +15,7 @@ import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { SectionHeader } from '@/components/katchadeck/ui/section-header';
 import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { StreakMilestoneCelebration } from '@/components/katchadeck/streak/streak-milestone-celebration';
 import { CompanionAchievementCelebration } from '@/components/katchadeck/world/companion-achievement-celebration';
 import { CompanionBondLevelUpCelebration } from '@/components/katchadeck/world/companion-bond-level-up-celebration';
@@ -77,6 +79,7 @@ const DEV_JOURNEY_DAY_ONE_RECEIPT = {
 
 export default function ExploreScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const ftueRun = useFtueRun();
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   const [profile, setProfile] = useState(loadOnboardingProfile());
@@ -227,7 +230,7 @@ export default function ExploreScreen() {
   function handleRestartFirstSession() {
     Alert.alert(
       'Restart first-session onboarding?',
-      'Keeps your profile, personality, zodiac, settings, and past days. It resets Today, Katchimera progress, and the Merge board, then restarts the scripted Mossprout flow.',
+      'Keeps your profile, personality, zodiac, settings, and past days. It resets the first Egg presentation, Katchimera progress, and the Merge board, then restarts the new Mossprout flow in Haven.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -236,10 +239,10 @@ export default function ExploreScreen() {
             try {
               const resetAt = Date.now();
               await resetTodayForDebug();
-              beginFirstSession({ restart: true });
               await resetKatchimeraProgressForDebug({ resetAt });
               setJourneyQuickMode(false);
-              router.replace('/(tabs)/today');
+              beginFirstSession({ restart: true });
+              router.navigate('/(tabs)/katchimeras');
             } catch (caught) {
               Alert.alert('Restart did not finish', caught instanceof Error ? caught.message : 'The first-session flow could not be restarted.');
             }
@@ -543,6 +546,14 @@ export default function ExploreScreen() {
         colors={KatchaDeckUI.gradients.world}
         meshColors={['rgba(95,168,123,0.14)', 'rgba(200,216,255,0.1)', 'rgba(106,95,232,0.12)', 'rgba(227,160,110,0.1)']}
       />
+      <Pressable
+        accessibilityHint="Returns to your Haven"
+        accessibilityLabel="Close Developer Tools"
+        accessibilityRole="button"
+        onPress={() => router.navigate('/(tabs)/katchimeras')}
+        style={({ pressed }) => [styles.closeButton, { top: insets.top + 12 }, pressed && styles.closeButtonPressed]}>
+        <IconSymbol color="#F8FBFF" name="xmark" size={20} weight="bold" />
+      </Pressable>
       <ScrollView
         contentContainerStyle={styles.content}
         contentInsetAdjustmentBehavior="automatic"
@@ -992,6 +1003,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 24,
   },
+  closeButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(24,27,40,0.94)',
+    borderColor: 'rgba(200,216,255,0.22)',
+    borderCurve: 'continuous',
+    borderRadius: 24,
+    borderWidth: 1,
+    boxShadow: '0 4px 14px rgba(0,0,0,0.28)',
+    height: 48,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 16,
+    width: 48,
+    zIndex: 50,
+  },
+  closeButtonPressed: { opacity: 0.8, transform: [{ scale: 0.96 }] },
   kicker: {
     fontSize: 11,
     marginBottom: 6,

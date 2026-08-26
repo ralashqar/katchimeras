@@ -21,8 +21,11 @@ type EggAvatarArtworkProps = {
   faceId: EggAvatarFaceId;
   hatId?: EggAvatarHatId | null;
   heldAccessoryId?: EggAvatarHeldAccessoryId | null;
+  onError?: () => void;
+  onLoad?: () => void;
   priority?: 'low' | 'normal' | 'high';
   resolution?: 'thumbnail' | 'app' | 'high';
+  showFace?: boolean;
   skinId: EggAvatarSkinId;
   style?: StyleProp<ViewStyle>;
   transition?: number;
@@ -60,8 +63,11 @@ export function EggAvatarArtwork({
   faceId,
   hatId,
   heldAccessoryId,
+  onError,
+  onLoad,
   priority = 'normal',
   resolution = 'app',
+  showFace = true,
   skinId,
   style,
   transition = 0,
@@ -105,20 +111,24 @@ export function EggAvatarArtwork({
         allowDownscaling={allowDownscaling}
         cachePolicy="memory-disk"
         contentFit="contain"
+        onError={onError}
+        onLoad={onLoad}
         priority={priority}
         source={bodySource}
         style={eggAvatarBodyPresentationStyle(skinId)}
         transition={transition}
       />
-      <Image
-        allowDownscaling={allowDownscaling}
-        cachePolicy="memory-disk"
-        contentFit="contain"
-        priority={priority}
-        source={faceSource}
-        style={centeredLayerStyle(EGG_AVATAR_FACE_PRESENTATION_SCALE)}
-        transition={faceTransitionDuration}
-      />
+      {showFace ? (
+        <Image
+          allowDownscaling={allowDownscaling}
+          cachePolicy="memory-disk"
+          contentFit="contain"
+          priority={priority}
+          source={faceSource}
+          style={centeredLayerStyle(EGG_AVATAR_FACE_PRESENTATION_SCALE)}
+          transition={faceTransitionDuration}
+        />
+      ) : null}
       {hat ? (
         <Image
           allowDownscaling={allowDownscaling}

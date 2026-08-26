@@ -116,13 +116,17 @@ function artLayerFor(
     familyAnchor ?? (tile.kind === 'companion' && tile.companion?.kind === 'owned' && tile.companion.creature.aspectId
       ? lifeAspectById.get(tile.companion.creature.aspectId)?.anchorVisualKey ?? null
       : null);
-  const themedResidentTile =
+  const havenResidentTile =
+    tile.kind === 'companion' && (tile.companion?.kind === 'owned' || tile.companion?.kind === 'revealed_egg')
+      ? hexTiles.havenResidentTiles?.[tile.companion.familyId]?.[tile.companion.havenStage] ?? null
+      : null;
+  const themedResidentTile = havenResidentTile ?? (
     tile.kind === 'companion' && tile.companion?.kind === 'owned'
-      ? hexTiles.havenResidentTiles?.[tile.companion.familyId]?.[tile.companion.havenStage]
-        ?? hexTiles.residentTiles?.[tile.companion.creature.visualKey]
+      ? hexTiles.residentTiles?.[tile.companion.creature.visualKey]
         ?? (aspectAnchor ? hexTiles.residentTiles?.[aspectAnchor] : null)
         ?? null
-      : null;
+      : null
+  );
   const customResidentTile =
     !themedResidentTile && hexTiles.useCustomResidentTiles && tile.kind === 'companion' && tile.companion?.kind === 'owned'
       ? katchimeraHexTileForCreature(tile.companion.creature)

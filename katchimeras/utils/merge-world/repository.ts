@@ -375,6 +375,8 @@ export async function installMossproutOnboardingMergeWorld(now = Date.now(), rew
 
 export type MossproutMergeFtueStepId =
   | 'merge.seed_drag'
+  | 'merge.second_seed_drag'
+  | 'merge.first_bloom'
   | 'merge.serve_sprout'
   | 'merge.plant.spawn'
   | 'merge.plant.seed_pairs'
@@ -385,8 +387,12 @@ export async function prepareMossproutMergeFtueForDebug(step: MossproutMergeFtue
   let prepared = await installMossproutOnboardingMergeWorld(now);
   if (step === 'merge.seed_drag') return prepared;
   prepared = mergeFirstPair(prepared, 'nature:garden:1', now + 1);
+  if (step === 'merge.second_seed_drag') return persistPreparedFtueState(prepared);
+  prepared = mergeFirstPair(prepared, 'nature:garden:1', now + 2);
+  if (step === 'merge.first_bloom') return persistPreparedFtueState(prepared);
+  prepared = mergeFirstPair(prepared, 'nature:garden:2', now + 3);
   if (step === 'merge.plant.spawn') return persistPreparedFtueState(prepared);
-  prepared = reduceMergeWorld(prepared, { type: 'tapGenerator', generatorId: 'wild-garden', now: now + 2, seed: 'ftue-debug:echo-seed' }).state;
+  prepared = reduceMergeWorld(prepared, { type: 'tapGenerator', generatorId: 'wild-garden', now: now + 4, seed: 'ftue-debug:echo-seed' }).state;
   if (step === 'merge.plant.seed_pairs') return persistPreparedFtueState(prepared);
   prepared = mergeDefinitionIntoEcho(prepared, 'nature:garden:1', 'mossprout-seed-echo', now + 3);
   if (step === 'merge.serve_sprout') return persistPreparedFtueState(prepared);

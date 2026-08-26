@@ -3,6 +3,7 @@ import type { KatchimeraFamilyId } from '@/types/katchimera';
 import type { KingdomCreature } from '@/types/kingdom';
 import type { KingdomResident } from '@/utils/kingdom-residents';
 import type { HavenStage } from '@/constants/haven-catalog';
+import type { EggAvatarSkinId } from '@/types/egg-avatar';
 import { hexSpiral, type HexCoord } from '@/utils/world-hex';
 
 type KingdomHexCompanionSlotBase = {
@@ -22,8 +23,16 @@ export type KingdomHexOwnedCompanionSlot = KingdomHexCompanionSlotBase & {
   havenStage: HavenStage;
 };
 
+/** A discovered Grove whose Katchimera is still inside its Egg. */
+export type KingdomHexRevealedEggCompanionSlot = KingdomHexCompanionSlotBase & {
+  kind: 'revealed_egg';
+  havenStage: HavenStage;
+  eggSkinId: EggAvatarSkinId;
+};
+
 export type KingdomHexCompanionSlot =
   | KingdomHexLockedCompanionSlot
+  | KingdomHexRevealedEggCompanionSlot
   | KingdomHexOwnedCompanionSlot;
 
 export function kingdomCompanionTileId(familyId: KatchimeraFamilyId): string {
@@ -31,6 +40,13 @@ export function kingdomCompanionTileId(familyId: KatchimeraFamilyId): string {
 }
 
 const FAMILY_SLOT_COORDS = hexSpiral(katchimeraFamilies.length, false);
+const FAMILY_SLOT_ORDER: KatchimeraFamilyId[] = [
+  'mossprout',
+  ...katchimeraFamilies.map((family) => family.id).filter((familyId) => familyId !== 'mossprout'),
+];
+const FAMILY_SLOT_COORD_BY_ID = new Map(
+  FAMILY_SLOT_ORDER.map((familyId, index) => [familyId, FAMILY_SLOT_COORDS[index]] as const),
+);
 
 /**
  * Builds every authored family slot in catalog order. Ownership changes only
@@ -57,9 +73,9 @@ export function kingdomCompanionHexSlots(
     ownedByFamily.set(creature.familyId, { creature, resident });
   }
 
-  return katchimeraFamilies.map((family, index) => {
+  return katchimeraFamilies.map((family) => {
     const base = {
-      coord: FAMILY_SLOT_COORDS[index],
+      coord: FAMILY_SLOT_COORD_BY_ID.get(family.id) ?? FAMILY_SLOT_COORDS[0],
       familyId: family.id,
       id: kingdomCompanionTileId(family.id),
     };

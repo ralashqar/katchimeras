@@ -188,11 +188,12 @@ test('the existing FTUE graph compiles without screen-owned step semantics', () 
   assert.equal(dayOneScene?.kind === 'scene'
     ? dayOneScene.actions.find((action) => action.id === 'companion.complete_day_one_action')?.next
     : null, dayOneEffect.id);
-  const natureTheme = flow.nodes.find((node) => node.id === 'egg.nature_theme');
-  assert.equal(natureTheme?.kind, 'scene');
-  if (natureTheme?.kind === 'scene') {
-    assert.deepEqual(new Set(natureTheme.actions.map((action) => action.next)), new Set(['egg.companion_identity']));
+  const opening = flow.nodes.find((node) => node.id === 'egg.opening');
+  assert.equal(opening?.kind, 'scene');
+  if (opening?.kind === 'scene') {
+    assert.deepEqual(new Set(opening.actions.map((action) => action.next)), new Set(['egg.context']));
   }
+  assert.equal(flow.nodes.some((node) => node.id === 'egg.nature_theme'), false);
 });
 
 test('Day 1 Content Flow completion durably crosses the relationship effect before Garden', () => {

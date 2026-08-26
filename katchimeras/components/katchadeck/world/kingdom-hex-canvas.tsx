@@ -14,9 +14,11 @@ import Animated, {
   withSequence,
   withSpring,
   withTiming,
+  withRepeat,
 } from 'react-native-reanimated';
 
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
+import { EggAvatarArtwork } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
 import { HavenUpgradeEffects } from '@/components/katchadeck/world/haven-upgrade-effects';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { KingdomTileArtLayer, KingdomTileRender } from '@/components/katchadeck/world/kingdom-hex-scene';
@@ -28,6 +30,7 @@ import { useKingdomTileScheduler } from '@/components/katchadeck/world/use-kingd
 import { KINGDOM_RENDERING } from '@/constants/kingdom-rendering';
 import kingdomWorldViewConfig from '@/constants/kingdom-world-view.json';
 import { Lantern } from '@/constants/theme';
+import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import type { EggVisualState } from '@/types/home';
 import type { FtueCameraDirective } from '@/features/onboarding/ftue-types';
 import type { WorldIdentityState } from '@/types/world-identity';
@@ -50,7 +53,7 @@ import {
 } from '@/utils/haven-upgrade-presentation';
 import { useScenePerformanceProbe } from '@/hooks/use-scene-performance-probe';
 import {
-  kingdomHexTileSet,
+  playerHavenHexTileSet,
   kingdomHexTileOverlaySourceForLod,
   kingdomHexTileSourceForLod,
   worldAssetSource,
@@ -78,21 +81,23 @@ type Props = {
   onResidentAnchorsChange?: (anchors: KingdomResidentScreenAnchor[]) => void;
   residentStatusGlyphs?: Partial<Record<string, KingdomResidentStatusGlyph>>;
   recenterBottom?: number;
-  onSelectLocked?: () => void;
+  onSelectLocked?: (familyId: string) => void;
   onSelectResident?: (creatureId: string, label: string) => void;
   onSelectHome?: () => void;
   onUpgradePresentationComplete?: (presentation: HavenTileUpgradePresentation) => void;
   upgradePresentation?: HavenTileUpgradePresentation | null;
+  highlightedLockedFamilyId?: string | null;
+  discoveryRevealFamilyId?: string | null;
 };
 
 const CREATURE_SIZE = 58;
 const CREATURE_WORLD_SCALE = kingdomWorldViewConfig.katchimera.globalScale;
 const EGG_STAGE_W = 200;
 const EGG_STAGE_H = 258;
-const EGG_WORLD_SCALE = kingdomWorldViewConfig.egg.globalScale;
+const HAVEN_HOME_EGG_AVATAR_SCALE = 1.2;
+const EGG_WORLD_SCALE = kingdomWorldViewConfig.egg.globalScale * HAVEN_HOME_EGG_AVATAR_SCALE;
 const EGG_WORLD_W = EGG_STAGE_W * EGG_WORLD_SCALE;
 const EGG_WORLD_H = EGG_STAGE_H * EGG_WORLD_SCALE;
-const KINGDOM_EGG_SOURCE = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
 const KINGDOM_DREAM_MIST_LOCK_SOURCES: Record<KingdomResidentLod, ImageSourcePropType> = {
   thumb: require('../../../assets/images/katchimeras/world/hex/kingdom_dream_mist_lock_v1_256.webp'),
   medium: require('../../../assets/images/katchimeras/world/hex/kingdom_dream_mist_lock_v1_512.webp'),
@@ -118,10 +123,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   onSelectHome,
   onUpgradePresentationComplete,
   upgradePresentation,
+  highlightedLockedFamilyId,
+  discoveryRevealFamilyId = null,
 }: Props) {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [assetRevision, setAssetRevision] = useState(0);
   const [upgradePhase, setUpgradePhase] = useState<HavenUpgradePresentationPhase>('armed');
+  const [discoveryPhase, setDiscoveryPhase] = useState<HavenUpgradePresentationPhase>('armed');
   const reduceMotion = useReducedMotion();
 
   useFocusEffect(
@@ -131,7 +139,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   );
 
   const hexTileSelection = useMemo(
-    () => ({ revision: assetRevision, value: kingdomHexTileSet() }),
+    () => ({ revision: assetRevision, value: playerHavenHexTileSet() }),
     [assetRevision]
   );
   const verticalAlignmentSelection = useMemo(
@@ -172,6 +180,32 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const tile = toScene.tiles.find((candidate) => candidate.id === `family:${upgradePresentation.characterId}`);
     return fromLayer && toLayer && tile ? { fromLayer, tile, toLayer } : null;
   }, [companionSlots, hexTileSelection, identity, upgradePresentation, verticalAlignmentSelection]);
+  const discoveryLayers = useMemo(() => {
+    if (!discoveryRevealFamilyId) return null;
+    const revealed = companionSlots.find((slot) => slot.familyId === discoveryRevealFamilyId && slot.kind === 'revealed_egg');
+    if (!revealed) return null;
+    const lockedSlots = companionSlots.map((slot) => slot.familyId === discoveryRevealFamilyId
+      ? { id: slot.id, coord: slot.coord, familyId: slot.familyId, kind: 'locked' as const }
+      : slot);
+    const fromScene = buildKingdomHexScene(lockedSlots, hexTileSelection.value, identity, verticalAlignmentSelection.value);
+    const fromLayer = fromScene.tileArtLayers.find((layer) => layer.id === revealed.id);
+    const toLayer = scene.tileArtLayers.find((layer) => layer.id === revealed.id);
+    const tile = scene.tiles.find((candidate) => candidate.id === revealed.id);
+    return fromLayer && toLayer && tile ? { fromLayer, tile, toLayer } : null;
+  }, [companionSlots, discoveryRevealFamilyId, hexTileSelection, identity, scene.tileArtLayers, scene.tiles, verticalAlignmentSelection]);
+  useEffect(() => {
+    if (!discoveryLayers) {
+      setDiscoveryPhase('armed');
+      return;
+    }
+    setDiscoveryPhase('cover');
+    const revealTimer = setTimeout(() => setDiscoveryPhase('reveal'), reduceMotion ? 80 : 360);
+    const completeTimer = setTimeout(() => setDiscoveryPhase('complete'), reduceMotion ? 360 : 1_120);
+    return () => {
+      clearTimeout(revealTimer);
+      clearTimeout(completeTimer);
+    };
+  }, [discoveryLayers, reduceMotion]);
   const camera = useKingdomHexCamera({
     center: { x: scene.centerTile.cx, y: scene.centerTile.cy },
     centerId: scene.centerTile.id,
@@ -206,20 +240,23 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       fitTutorialWorld(tutorialCamera.durationMs);
       return;
     }
-    if (tutorialCamera.target.kind !== 'haven_tile') return;
-    const targetCharacterId = tutorialCamera.target.characterId;
-    const tile = scene.tiles.find((candidate) => (
-      candidate.kind === 'companion'
-      && candidate.companion?.kind === 'owned'
-      && candidate.companion.familyId === targetCharacterId
-    ));
+    const target = tutorialCamera.target;
+    const targetCharacterId = target.kind === 'haven_tile' ? target.characterId : null;
+    const tile = target.kind === 'haven_home'
+      ? scene.centerTile
+      : targetCharacterId
+        ? scene.tiles.find((candidate) => (
+            candidate.kind === 'companion'
+            && candidate.companion?.familyId === targetCharacterId
+          ))
+        : null;
     if (!tile) return;
     focusTutorialResident(tile.cx, tile.cy, {
       anchorY: tutorialCamera.anchorY,
       durationMs: tutorialCamera.durationMs,
       zoom: tutorialCamera.zoom,
     });
-  }, [fitTutorialWorld, focusTutorialResident, scene.tiles, tutorialCamera, tutorialCameraKey, tutorialCameraReady]);
+  }, [fitTutorialWorld, focusTutorialResident, scene.centerTile, scene.tiles, tutorialCamera, tutorialCameraKey, tutorialCameraReady]);
   const upgradeCompletionRef = useRef(onUpgradePresentationComplete);
   const upgradeFocusRef = useRef(camera.focusUpgrade);
   const upgradeLayersRef = useRef(upgradeLayers);
@@ -323,6 +360,29 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       },
     };
   }, [cameraSnapshot, scene.height, scene.width, upgradeLayers]);
+  const discoveryEffectGeometry = useMemo(() => {
+    if (!discoveryLayers) return null;
+    const screenFrame = (layer: KingdomTileArtLayer) => ({
+      height: layer.frame.height * cameraSnapshot.scale,
+      left: scene.width / 2 + cameraSnapshot.tx + (layer.frame.left - scene.width / 2) * cameraSnapshot.scale,
+      top: scene.height / 2 + cameraSnapshot.ty + (layer.frame.top - scene.height / 2) * cameraSnapshot.scale,
+      width: layer.frame.width * cameraSnapshot.scale,
+    });
+    const frame = screenFrame(discoveryLayers.toLayer);
+    return {
+      area: frame,
+      silhouetteFrame: frame,
+      target: {
+        x: scene.width / 2 + cameraSnapshot.tx + (discoveryLayers.tile.cx - scene.width / 2) * cameraSnapshot.scale,
+        y: scene.height / 2 + cameraSnapshot.ty + (discoveryLayers.tile.cy - scene.height / 2) * cameraSnapshot.scale,
+      },
+    };
+  }, [cameraSnapshot, discoveryLayers, scene.height, scene.width]);
+  const discoveryPresentation = useMemo<HavenTileUpgradePresentation | null>(() => discoveryRevealFamilyId ? ({
+    characterId: 'mossprout', coinCost: 0, coinOrigin: { x: 0, y: 0 }, creatureId: 'egg:mossprout', creatureName: 'Mossprout',
+    fromStage: 0, nonce: 32, palette: { accent: '#F5E58A', glow: '#A8E873', mist: 'rgba(226,255,213,0.88)', primary: '#4F9F57' },
+    reactionLine: '', status: 'playing', toStage: 0, upgradeName: 'Grove revealed',
+  }) : null, [discoveryRevealFamilyId]);
   const cameraTransitionActive = useSharedValue(camera.isMoving ? 1 : 0);
   useEffect(() => {
     cameraTransitionActive.value = camera.isMoving ? 1 : 0;
@@ -424,10 +484,12 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       const artLayer = artLayerById.get(tile.id);
       const focusScale = tileFocusScale(tile.id);
       if (tile.companion.kind === 'locked') {
+        const lockedFamilyId = tile.companion.familyId;
         items.push({
           depth: tile.depth + 3,
           node: (
             <LockedCompanionTile
+              highlighted={lockedFamilyId === highlightedLockedFamilyId}
               key={`locked-${tile.id}`}
               lod={camera.residentLod}
               focusAnchorX={tile.cx}
@@ -435,11 +497,31 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               focusScale={focusScale}
               focusId={tile.id}
               onFocus={interactionEnabled ? camera.focusResident : ignoreFocus}
-              onSelectLocked={interactionEnabled ? onSelectLocked : undefined}
+              onSelectLocked={interactionEnabled ? () => onSelectLocked?.(lockedFamilyId) : undefined}
               phase={runtime.phase}
               settled={!camera.isMoving}
               x={tile.cx}
               y={tile.cy}
+            />
+          ),
+        });
+        continue;
+      }
+      if (tile.companion.kind === 'revealed_egg') {
+        items.push({
+          depth: tile.depth + 3,
+          node: (
+            <RevealedCompanionEgg
+              eggSkinId={tile.companion.eggSkinId}
+              focusAnchorX={tile.cx}
+              focusAnchorY={tile.cy}
+              focusScale={focusScale}
+              key={`revealed-egg-${tile.id}`}
+              onPress={interactionEnabled ? () => onSelectLocked?.(tile.companion!.familyId) : undefined}
+              phase={runtime.phase}
+              settled={!camera.isMoving}
+              x={artLayer?.residentAnchor?.x ?? tile.cx}
+              y={(artLayer?.residentAnchor?.y ?? tile.cy) - 8}
             />
           ),
         });
@@ -481,7 +563,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     }
 
     return items.sort((a, b) => a.depth - b.depth).map((item) => item.node);
-  }, [allowedResidentCharacterId, artLayerById, camera.focusResident, camera.isMoving, camera.residentLod, creatureWorldSize, ignoreFocus, interactionEnabled, onSelectLocked, onSelectResident, residentStatusGlyphs, runtimeById, scene.tiles, scheduler.readyTileIds, scheduler.visibleTileIds, tileFocusScale, upgradePhase, upgradePresentation]);
+  }, [allowedResidentCharacterId, artLayerById, camera.focusResident, camera.isMoving, camera.residentLod, creatureWorldSize, highlightedLockedFamilyId, ignoreFocus, interactionEnabled, onSelectLocked, onSelectResident, residentStatusGlyphs, runtimeById, scene.tiles, scheduler.readyTileIds, scheduler.visibleTileIds, tileFocusScale, upgradePhase, upgradePresentation]);
 
   const centerRuntime = runtimeById.get(scene.centerTile.id);
   const home = homePreset(identity?.selectedHomeArchetypeId);
@@ -550,6 +632,14 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                       toLayer={upgradeLayers.toLayer}
                     />
                   ) : null}
+                  {discoveryLayers && layer.id === discoveryLayers.tile.id && discoveryPhase !== 'complete' ? (
+                    <HavenUpgradeTileArt
+                      fromLayer={discoveryLayers.fromLayer}
+                      phase={discoveryPhase}
+                      reducedMotion={reduceMotion}
+                      toLayer={discoveryLayers.toLayer}
+                    />
+                  ) : null}
                 </Fragment>
               );
             })}
@@ -593,6 +683,19 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           silhouetteFrame={upgradeEffectGeometry.silhouetteFrame}
           silhouetteSource={kingdomHexTileSourceForLod(upgradeLayers.toLayer, 'medium')}
           target={upgradeEffectGeometry.target}
+        />
+      ) : null}
+      {!upgradePresentation && discoveryPresentation && discoveryEffectGeometry && discoveryLayers && discoveryPhase !== 'complete' ? (
+        <HavenUpgradeEffects
+          area={discoveryEffectGeometry.area}
+          phase={discoveryPhase}
+          presentation={discoveryPresentation}
+          reducedMotion={reduceMotion}
+          showCoins={false}
+          showReaction={false}
+          silhouetteFrame={discoveryEffectGeometry.silhouetteFrame}
+          silhouetteSource={kingdomHexTileSourceForLod(discoveryLayers.toLayer, 'medium')}
+          target={discoveryEffectGeometry.target}
         />
       ) : null}
     </View>
@@ -809,6 +912,7 @@ const KingdomEgg = memo(function KingdomEgg({
   settled: boolean;
   onPress?: () => void;
 }) {
+  const avatar = useEggAvatar();
   const [ready, setReady] = useState(false);
   const opacity = useSharedValue(0);
   const lift = useSharedValue(10);
@@ -837,7 +941,83 @@ const KingdomEgg = memo(function KingdomEgg({
     <TileFocusTransform anchorX={focusAnchorX} anchorY={focusAnchorY} frame={frame} scale={focusScale}>
       <Animated.View style={[StyleSheet.absoluteFill, animatedStyle]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Kingdom egg" onPress={onPress} style={StyleSheet.absoluteFill}>
-          <SeamlessWorldImage source={KINGDOM_EGG_SOURCE} priority="high" onReady={markReady} onFailure={markReady} />
+          <EggAvatarArtwork
+            allowDownscaling={false}
+            faceId={avatar.equippedFaceId}
+            hatId={avatar.equippedHatId}
+            heldAccessoryId={avatar.equippedHeldAccessoryId}
+            onError={markReady}
+            onLoad={markReady}
+            priority="high"
+            resolution="high"
+            skinId={avatar.equippedSkinId}
+            style={StyleSheet.absoluteFill}
+            transition={0}
+          />
+        </Pressable>
+      </Animated.View>
+    </TileFocusTransform>
+  );
+});
+
+const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
+  eggSkinId,
+  x,
+  y,
+  focusAnchorX,
+  focusAnchorY,
+  focusScale,
+  phase,
+  settled,
+  onPress,
+}: {
+  eggSkinId: Extract<KingdomHexCompanionSlot, { kind: 'revealed_egg' }>['eggSkinId'];
+  x: number;
+  y: number;
+  focusAnchorX: number;
+  focusAnchorY: number;
+  focusScale: number;
+  phase: KingdomTilePhase;
+  settled: boolean;
+  onPress?: () => void;
+}) {
+  const opacity = useSharedValue(0);
+  const pulse = useSharedValue(1);
+  const shownRef = useRef(false);
+  useEffect(() => {
+    if (phase === 'exiting') {
+      opacity.value = withTiming(0, { duration: KINGDOM_RENDERING.exitDurationMs });
+      return;
+    }
+    if (!shownRef.current && !settled) return;
+    shownRef.current = true;
+    opacity.value = withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) });
+    pulse.value = withRepeat(withSequence(
+      withTiming(1.055, { duration: 760, easing: Easing.inOut(Easing.quad) }),
+      withTiming(1, { duration: 760, easing: Easing.inOut(Easing.quad) }),
+    ), -1);
+  }, [opacity, phase, pulse, settled]);
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: pulse.value }],
+  }));
+  const width = 82;
+  const height = 106;
+  const frame = { height, left: x - width / 2, top: y - height, width };
+  return (
+    <TileFocusTransform anchorX={focusAnchorX} anchorY={focusAnchorY} frame={frame} scale={focusScale}>
+      <Animated.View style={[StyleSheet.absoluteFill, animatedStyle]}>
+        <Pressable accessibilityLabel="Inspect Mossprout Egg" accessibilityRole="button" onPress={onPress} style={StyleSheet.absoluteFill}>
+          <EggAvatarArtwork
+            faceId="curious"
+            hatId={null}
+            heldAccessoryId={null}
+            priority="high"
+            resolution="high"
+            showFace={false}
+            skinId={eggSkinId}
+            style={StyleSheet.absoluteFill}
+          />
         </Pressable>
       </Animated.View>
     </TileFocusTransform>
@@ -845,6 +1025,7 @@ const KingdomEgg = memo(function KingdomEgg({
 });
 
 const LockedCompanionTile = memo(function LockedCompanionTile({
+  highlighted,
   lod,
   focusAnchorX,
   focusAnchorY,
@@ -857,6 +1038,7 @@ const LockedCompanionTile = memo(function LockedCompanionTile({
   x,
   y,
 }: {
+  highlighted: boolean;
   lod: KingdomResidentLod;
   focusAnchorX: number;
   focusAnchorY: number;
@@ -887,6 +1069,17 @@ const LockedCompanionTile = memo(function LockedCompanionTile({
     lift.value = reduceMotion ? withTiming(0, { duration: 80 }) : withSpring(0, { damping: 14, stiffness: 210 });
   }, [lift, opacity, phase, reduceMotion, settled]);
 
+  useEffect(() => {
+    cancelAnimation(pulse);
+    pulse.value = highlighted && !reduceMotion
+      ? withRepeat(withSequence(
+          withTiming(1.1, { duration: 760, easing: Easing.inOut(Easing.quad) }),
+          withTiming(1, { duration: 760, easing: Easing.inOut(Easing.quad) }),
+        ), -1)
+      : withTiming(1, { duration: 120 });
+    return () => cancelAnimation(pulse);
+  }, [highlighted, pulse, reduceMotion]);
+
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ translateY: lift.value }, { scale: pulse.value }],
@@ -916,7 +1109,7 @@ const LockedCompanionTile = memo(function LockedCompanionTile({
         accessibilityRole="button"
         onPress={handlePress}
         style={[styles.lockedTileHitTarget, StyleSheet.absoluteFill]}>
-        <Animated.View pointerEvents="none" style={[styles.lockedTileLockWrap, animatedStyle]}>
+        <Animated.View pointerEvents="none" style={[styles.lockedTileLockWrap, highlighted && styles.highlightedLockedTile, animatedStyle]}>
           <Image
             accessibilityIgnoresInvertColors
             cachePolicy="memory-disk"
@@ -1071,6 +1264,11 @@ const styles = StyleSheet.create({
   lockedTileLockWrap: {
     height: LOCKED_TILE_LOCK_SIZE,
     width: LOCKED_TILE_LOCK_SIZE,
+  },
+  highlightedLockedTile: {
+    backgroundColor: 'rgba(150, 239, 113, 0.18)',
+    borderRadius: LOCKED_TILE_LOCK_SIZE / 2,
+    boxShadow: '0 0 26px rgba(150, 239, 113, 0.82)',
   },
   lockedTileLock: { height: '100%', width: '100%' },
   homeTileHitTarget: { height: 84, position: 'absolute', width: 108 },

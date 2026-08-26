@@ -32,6 +32,7 @@ import { Meadow } from '@/constants/meadow-theme';
 
 export type KatchaSheetSize = 'compact' | 'tall' | 'full';
 export type KatchaSheetCloseReason = 'button' | 'backdrop' | 'swipe' | 'hardwareBack';
+export type KatchaSheetEntranceMotion = 'sheet' | 'fade';
 
 export type KatchaSheetHeader = {
   eyebrow?: string;
@@ -44,6 +45,7 @@ export type KatchaSheetHeader = {
 export type KatchaSheetProps = {
   children: ReactNode;
   footer?: ReactNode;
+  entranceMotion?: KatchaSheetEntranceMotion;
   fullBleed?: boolean;
   header?: KatchaSheetHeader;
   keyboardAvoiding?: boolean;
@@ -56,11 +58,13 @@ export type KatchaSheetProps = {
   showClose?: boolean;
   size?: KatchaSheetSize;
   surface?: KatchaSurface;
+  transparent?: boolean;
   zIndex?: number;
 };
 
 export function KatchaSheet({
   children,
+  entranceMotion = 'sheet',
   footer,
   fullBleed = false,
   header,
@@ -74,6 +78,7 @@ export function KatchaSheet({
   showClose = true,
   size = 'compact',
   surface = 'night',
+  transparent = false,
   zIndex = 50,
 }: KatchaSheetProps) {
   const window = useWindowDimensions();
@@ -133,15 +138,23 @@ export function KatchaSheet({
 
   const content = (
     <View style={[styles.overlay, !portal && { zIndex }]}>
-      <Animated.View
+      {!transparent ? <Animated.View
         entering={reduceMotion ? FadeIn.duration(80) : FadeIn.duration(180)}
         exiting={FadeOut.duration(160)}
         style={[styles.backdrop, { backgroundColor: palette.scrim }]}>
         <Pressable accessibilityLabel="Close popup" onPressIn={() => close('backdrop')} style={StyleSheet.absoluteFill} />
-      </Animated.View>
+      </Animated.View> : null}
       <Animated.View
-        entering={reduceMotion ? FadeIn.duration(80) : SlideInDown.duration(KatchaUI.motion.sheetIn)}
-        exiting={reduceMotion ? FadeOut.duration(80) : SlideOutDown.duration(KatchaUI.motion.sheetOut)}
+        entering={reduceMotion
+          ? FadeIn.duration(80)
+          : entranceMotion === 'fade'
+            ? FadeIn.duration(220)
+            : SlideInDown.duration(KatchaUI.motion.sheetIn)}
+        exiting={reduceMotion
+          ? FadeOut.duration(80)
+          : entranceMotion === 'fade'
+            ? FadeOut.duration(160)
+            : SlideOutDown.duration(KatchaUI.motion.sheetOut)}
         style={[
           styles.sheetFrame,
           {
@@ -157,7 +170,9 @@ export function KatchaSheet({
             styles.sheet,
             expanded && styles.expanded,
             dragStyle,
-            { backgroundColor: palette.background, borderColor: palette.borderStrong, boxShadow: palette.shadow },
+            transparent
+              ? styles.transparentSheet
+              : { backgroundColor: palette.background, borderColor: palette.borderStrong, boxShadow: palette.shadow },
             {
               borderRadius: size === 'full' ? 0 : KatchaUI.radius.sheet,
               borderWidth: size === 'full' ? 0 : 1,
@@ -242,6 +257,7 @@ const styles = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFillObject },
   sheetFrame: { position: 'absolute' },
   sheet: { gap: 8 },
+  transparentSheet: { backgroundColor: 'transparent', borderColor: 'transparent', boxShadow: 'none' },
   content: { gap: 10 },
   fullBleedContent: { gap: 0, paddingBottom: 0, paddingHorizontal: 0, paddingTop: 0 },
   expanded: { flex: 1, minHeight: 0 },

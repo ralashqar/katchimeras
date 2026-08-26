@@ -25,14 +25,13 @@ import {
   MOSSPROUT_BOND_SHARE_PROMPTS,
   MOSSPROUT_FTUE_BOND_SHARE_REWARD_PREVIEW,
   MOSSPROUT_FTUE_NAME_BOND_REWARD_PREVIEW,
-  mossproutBondSharePrompt,
   mossproutBondShareSelection,
 } from '@/features/onboarding/mossprout-bond-share';
 
 const INTRODUCTION_REWARD = { amount: MOSSPROUT_FTUE_NAME_BOND_REWARD_PREVIEW, kind: 'bond' as const };
 const BOND_SHARE_REWARD = { amount: MOSSPROUT_FTUE_BOND_SHARE_REWARD_PREVIEW, kind: 'bond' as const };
 
-export function MossproutFtueStoryStage({ actionStackTargetRef, activeBondQuestionId, gardenStoryActionIcon = 'leaf.fill', gardenStoryActionLabel = 'Show me the Garden', mode = 'garden', nickname, onBondQuestionChange, onBondRewardRequest, onContinue, onOpenMerge, pendingBondCelebration }: {
+export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActionIcon = 'leaf.fill', gardenStoryActionLabel = 'Show me the Garden', mode = 'garden', nickname, onBondRewardRequest, onContinue, onOpenMerge, pendingBondCelebration }: {
   actionStackTargetRef?: RefObject<ViewType | null>;
   activeBondQuestionId?: string | null;
   gardenStoryActionIcon?: string;
@@ -49,7 +48,6 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, activeBondQuesti
   const [nameModalOpen, setNameModalOpen] = useState(false);
   const [draft, setDraft] = useState(nickname ?? '');
   const selectedBondShare = mossproutBondShareSelection(ftueRun?.answers['companion.choose_bond_share']?.optionId);
-  const activeBondQuestion = mossproutBondSharePrompt(activeBondQuestionId);
   const completedBondShareReward = {
     amount: pendingBondCelebration?.points ?? MOSSPROUT_FTUE_BOND_SHARE_REWARD_PREVIEW,
     kind: 'bond' as const,
@@ -96,42 +94,16 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, activeBondQuesti
             subtitle={selectedBondShare.answer.label}
             title={selectedBondShare.prompt.cardLabel}
           />
-        ) : activeBondQuestion ? (
-          <Animated.View entering={FadeInUp.duration(180)} style={styles.answerPanel}>
-            <View style={styles.answerGrid}>
-              {activeBondQuestion.options.map((option) => (
-                <Pressable
-                  accessibilityRole="button"
-                  key={option.id}
-                  onPress={() => onContinue?.(`${activeBondQuestion.id}:${option.id}`)}
-                  style={({ pressed }) => [styles.answerOption, pressed && styles.pressed]}>
-                  <DayActionIcon icon={option.icon} />
-                  <ThemedText
-                    style={styles.answerLabel}
-                    lightColor={KatchaUI.companionScenePanel.optionInk}
-                    darkColor={KatchaUI.companionScenePanel.optionInk}>
-                    {option.label}
-                  </ThemedText>
-                </Pressable>
-              ))}
-            </View>
-            <Pressable accessibilityRole="button" onPress={() => onBondQuestionChange?.(null)} style={({ pressed }) => [styles.changeQuestion, pressed && styles.pressed]}>
-              <IconSymbol color={KatchaUI.companionScenePanel.inkSoft} name="chevron.left" size={15} />
-              <ThemedText style={styles.changeQuestionLabel} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>
-                Choose another card
-              </ThemedText>
-            </Pressable>
-          </Animated.View>
-        ) : MOSSPROUT_BOND_SHARE_PROMPTS.map((choice) => (
-          <DayActionActiveRow animateLayout={false} key={choice.id} label={choice.cardLabel}>
+        ) : MOSSPROUT_BOND_SHARE_PROMPTS[0].options.map((option) => (
+          <DayActionActiveRow animateLayout={false} key={option.id} label={option.label}>
             <Pressable
               accessibilityRole="button"
-              onPress={() => onBondQuestionChange?.(choice.id)}
+              onPress={() => onContinue?.(`${MOSSPROUT_BOND_SHARE_PROMPTS[0].id}:${option.id}`)}
               style={({ pressed }) => pressed && styles.pressed}>
               <DayActionCardSurface
-                artwork={<DayActionIcon icon={choice.icon} />}
+                artwork={<DayActionIcon icon={option.icon} />}
                 reward={<DayActionRewardChip reward={BOND_SHARE_REWARD} />}
-                title={choice.cardLabel}
+                title={option.label}
               />
             </Pressable>
           </DayActionActiveRow>

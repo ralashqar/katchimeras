@@ -7,6 +7,7 @@ import {
   RESIDENT_CARD_DEFINITION_ID,
   RESIDENT_CARD_KEY_DEFINITION_ID,
   RETIRED_RESIDENT_NODE_ROOT_GATE_IDS,
+  residentDiscoveryOrders,
 } from '@/constants/resident-card-discovery';
 import { mergeFtueBoardGate, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepForBoard, residentFtueCanonicalStep } from '@/features/onboarding/merge-ftue';
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
@@ -153,6 +154,13 @@ test('Petalimp has one tier-three request and earns its card after that request'
 
   const acknowledged = reduceMergeWorld(served.state, { type: 'ackResidentCardReveal', discoveryId: record.id, now: NOW + 7 });
   assert.equal(acknowledged.state.residentCardDiscovery.records[0]?.cardRevealSeenAt, NOW + 7);
+});
+
+test('later resident discoveries retain their normal two-request lifecycle', () => {
+  const orders = residentDiscoveryOrders('resident-discovery:later:fernip', 'fernip', NOW);
+  assert.equal(orders.length, 2);
+  assert.deepEqual(orders.map((order) => order.storyStep), [1, 2]);
+  assert.equal(orders.every((order) => order.storyStepCount === 2), true);
 });
 
 test('the first resident lesson resumes through forced Seed, locked Seed, locked Sprout, then Serve', () => {

@@ -1759,6 +1759,18 @@ export function kingdomHexTileSet(): KingdomHexTileSelection {
   };
 }
 
+/**
+ * The authored, player-facing Haven art direction. Developer asset-lab
+ * overrides deliberately do not flow through this selector.
+ */
+export function playerHavenHexTileSet(): KingdomHexTileSelection {
+  const selection = KINGDOM_HEX_ART_DIRECTION_SETS.find(
+    (set) => set.id === 'floating_neighborhood_v2',
+  )?.selection;
+  if (!selection) throw new Error('Floating Neighbourhood V2 Haven art is unavailable.');
+  return selection;
+}
+
 export const DECAL_ATLAS: ImageSourcePropType = require('../assets/images/katchimeras/world/decals/_atlas.webp');
 export const DECAL_ATLAS_COLS = 4;
 export const DECAL_ATLAS_ROWS = 4;

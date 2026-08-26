@@ -22,7 +22,7 @@ export default function OnboardingRoute() {
         preferenceIds: current.preferenceIds.length ? current.preferenceIds : ['cozy'],
       });
     }
-    router.replace(mode === 'identity' ? '/(tabs)/you' : '/(tabs)/today');
+    router.navigate(mode === 'identity' ? '/(tabs)/you' : '/(tabs)/katchimeras');
   }, [mode, router]);
 
   return <View style={styles.root}>

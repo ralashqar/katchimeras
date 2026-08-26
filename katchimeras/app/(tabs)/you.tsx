@@ -1,10 +1,12 @@
 import { useIsFocused } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { useEffect, useMemo } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSharedValue } from 'react-native-reanimated';
 
 import { EggAvatarProfileScreen } from '@/components/katchadeck/egg-avatar/egg-avatar-profile-screen';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { TodayExplorationBackground } from '@/components/katchadeck/home/today-exploration-background';
 import { TodayKingdomEggHero } from '@/components/katchadeck/home/today-kingdom-egg-hero';
 import { HOME_SCENE_Y_OFFSET } from '@/constants/home-loop-layout';
@@ -23,6 +25,7 @@ import { todayGrowthSummary } from '@/utils/today-growth';
 const YOU_AVATAR_RELATIVE_Y_OFFSET = 18;
 
 export default function YouScreen() {
+  const router = useRouter();
   const focused = useIsFocused();
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
@@ -118,6 +121,17 @@ export default function YouScreen() {
         />
       </View>
       <EggAvatarProfileScreen bottomInset={insets.bottom} days={days} />
+      <Pressable
+        accessibilityHint="Returns to your Haven"
+        accessibilityLabel="Back to Haven"
+        accessibilityRole="button"
+        onPress={() => {
+          if (router.canGoBack()) router.back();
+          else router.navigate('/(tabs)/katchimeras');
+        }}
+        style={({ pressed }) => [styles.backButton, { top: insets.top + 12 }, pressed && styles.backButtonPressed]}>
+        <IconSymbol color="#47392E" name="chevron.left" size={26} weight="bold" />
+      </Pressable>
     </View>
   );
 }
@@ -134,4 +148,20 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
   },
+  backButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,249,231,0.94)',
+    borderColor: 'rgba(71,57,46,0.14)',
+    borderCurve: 'continuous',
+    borderRadius: 24,
+    borderWidth: 1,
+    boxShadow: '0 3px 12px rgba(42,22,9,0.18)',
+    height: 48,
+    justifyContent: 'center',
+    left: 16,
+    position: 'absolute',
+    width: 48,
+    zIndex: 50,
+  },
+  backButtonPressed: { opacity: 0.82, transform: [{ scale: 0.96 }] },
 });

@@ -18,47 +18,22 @@ export type MossproutBondSharePrompt = {
     id: string;
     icon: IconSymbolName;
     label: string;
+    reply?: string;
   }[];
 };
 
 export const MOSSPROUT_BOND_SHARE_PROMPTS = [
   {
-    id: 'calm',
-    cardLabel: 'Share what helps me feel calm',
-    icon: 'moon.stars.fill',
-    prompt: 'What helps you feel calm?',
-    reply: 'I’ll remember that. We can make room for it together.',
-    options: [
-      { id: 'quiet_time', icon: 'moon.stars.fill', label: 'Quiet time' },
-      { id: 'music_stories', icon: 'music.note', label: 'Music or stories' },
-      { id: 'being_outside', icon: 'leaf.fill', label: 'Being outside' },
-      { id: 'someone_nearby', icon: 'person.2.fill', label: 'Someone nearby' },
-    ],
-  },
-  {
-    id: 'smile',
-    cardLabel: 'Share what makes me smile',
-    icon: 'face.smiling',
-    prompt: 'What often makes you smile?',
-    reply: 'I like knowing that about you.',
-    options: [
-      { id: 'something_silly', icon: 'face.smiling', label: 'Something silly' },
-      { id: 'making_things', icon: 'paintbrush.fill', label: 'Making things' },
-      { id: 'time_with_people', icon: 'person.2.fill', label: 'Time with people' },
-      { id: 'little_surprises', icon: 'sparkles', label: 'Little surprises' },
-    ],
-  },
-  {
-    id: 'grow',
-    cardLabel: 'Share what I want to grow',
+    id: 'hard-day-help',
+    cardLabel: 'What helps on a hard day?',
     icon: 'leaf.fill',
-    prompt: 'What would you like to grow?',
-    reply: 'We can grow that one small step at a time.',
+    prompt: 'What usually helps when your day isn’t going well?',
+    reply: 'I’ll remember that.',
     options: [
-      { id: 'confidence', icon: 'star.fill', label: 'Confidence' },
-      { id: 'helpful_habit', icon: 'checkmark.circle.fill', label: 'A helpful habit' },
-      { id: 'creativity', icon: 'paintbrush.fill', label: 'Creativity' },
-      { id: 'friendship', icon: 'heart.fill', label: 'A friendship' },
+      { id: 'getting_outside', icon: 'leaf.fill', label: 'Getting outside', reply: 'Fresh air does make things feel less stuck.' },
+      { id: 'being_with_someone', icon: 'person.2.fill', label: 'Being with someone', reply: 'It’s easier when you’re not carrying everything alone.' },
+      { id: 'having_time_alone', icon: 'house.fill', label: 'Having time alone', reply: 'Quiet helps some things grow.' },
+      { id: 'doing_something_enjoyable', icon: 'sparkles', label: 'Doing something I enjoy', reply: 'Maybe fun is more useful than people give it credit for.' },
     ],
   },
 ] as const satisfies readonly MossproutBondSharePrompt[];

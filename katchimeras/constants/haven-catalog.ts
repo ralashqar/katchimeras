@@ -32,7 +32,7 @@ export const MOSSPROUT_HAVEN: HavenEnvironment = {
   characterId: 'mossprout',
   stages: [
     { stage: 0, name: 'Forgotten Clearing', objective: 'A little place to begin', narrative: 'Mossprout has only just arrived.', coinCost: 0, storyGate: 'discovered' },
-    { stage: 1, name: 'First Garden', objective: 'Restore the Little Garden', narrative: 'Help Mossprout establish somewhere to grow.', coinCost: 150, storyGate: 'chapter_zero_complete', reactionLine: 'Oh! It feels like ours now.', effectPalette: MOSSPROUT_EFFECT_PALETTE },
+    { stage: 1, name: 'First Garden', objective: 'Restore the Little Garden', narrative: 'Help Mossprout establish somewhere to grow.', coinCost: 50, storyGate: 'chapter_zero_complete', reactionLine: 'Oh! It feels like ours now.', effectPalette: MOSSPROUT_EFFECT_PALETTE },
     { stage: 2, name: 'Rain Garden Nook', objective: 'Build the Rain Garden Nook', narrative: 'Mossprout begins treating this place as home.', coinCost: 400, storyGate: 'story_level_2', reactionLine: 'Listen—the rain knows where to go.', effectPalette: MOSSPROUT_EFFECT_PALETTE },
     { stage: 3, name: 'Flourishing Woodland', objective: 'Restore the Flourishing Woodland', narrative: 'Mossprout helps the whole clearing return to life.', coinCost: 900, storyGate: 'story_level_3', reactionLine: 'Everything’s waking up.', effectPalette: MOSSPROUT_EFFECT_PALETTE },
     { stage: 4, name: 'Heart of the Grove', objective: 'Awaken the Heart of the Grove', narrative: 'An ancient tree marks the resolution of Mossprout’s first great arc.', coinCost: 1800, storyGate: 'story_level_4', reactionLine: 'There. The grove remembers.', effectPalette: MOSSPROUT_EFFECT_PALETTE },

@@ -87,6 +87,12 @@ function scheduleReceiptSync() {
 }
 
 function migrateCurrentScript(run: FtueRunState): FtueRunState {
+  // The life-companion pivot intentionally restarts unfinished prototype FTUE
+  // runs at the Haven. This resets only the guided run; saved life captures and
+  // source photos remain untouched in their existing repositories.
+  if (run.status === 'active' && run.scriptVersion < 32) {
+    return freshRun(new Date(run.startedAt));
+  }
   const replayDreamMistChapter = run.scriptVersion < 10;
   const restartingLegacyMerge = run.status === 'active'
     && run.scriptVersion < 7
@@ -105,6 +111,10 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
     && run.scriptVersion < 15
     && run.stepId === 'haven.mossprout.restore';
   const hasHavenRevealReceipt = run.receipts.some((receipt) => receipt.actionId === 'haven.reveal_world');
+  const needsV33FirstBloomBridge = run.status === 'active'
+    && run.scriptVersion === 32
+    && run.stepId === 'haven.reveal'
+    && !hasHavenRevealReceipt;
   const needsPreParcelHavenReveal = run.status === 'active'
     && run.scriptVersion < 16
     && run.stepId === 'discovery.steppling.parcel'
@@ -131,7 +141,9 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
   };
   const removedMergeSteps = new Set(['merge.first', 'merge.flower', 'energy.capture', 'energy.awarded', 'merge.flower_return', 'merge.final']);
   const replacedDiscoverySteps = new Set(['discovery.steppling.seed', 'discovery.steppling.sprout', 'discovery.steppling.plant']);
-  const migratedStepId = needsResidentParcelConfirmation
+  const migratedStepId = needsV33FirstBloomBridge
+    ? 'haven.first_bloom'
+    : needsResidentParcelConfirmation
     ? 'companion.resident_parcel_ready'
     : needsPreParcelHavenReveal
     ? 'haven.reveal'
@@ -540,12 +552,14 @@ export function useFtueSurface(surface: FtueSurface) {
 }
 
 export function ftuePersonalizedLine(run = loadFtueRun()) {
-  const companionGoal = run?.answers['egg.desired_feeling'] ?? run?.answers['egg.companion_goal'];
+  const companionGoal = run?.answers['egg.support_style'] ?? run?.answers['egg.desired_feeling'] ?? run?.answers['egg.companion_goal'];
   const context = run?.answers['egg.context.activity'];
   const opening = Object.values(run?.answers ?? {}).find((answer) => answer.actionId.startsWith('egg.') && !answer.private);
   const id = companionGoal?.optionId ?? context?.optionId ?? opening?.optionId;
   const lines: Record<string, string> = {
     more_calm: 'You wanted more calm. We can grow it one small piece at a time.',
+    more_energy: 'You wanted more energy. This garden definitely does too.',
+    something_new: 'You wanted something new. Well… this is pretty new.',
     more_confidence: 'You wanted more confidence. I can cheer for every brave little step.',
     more_fun: 'You wanted more fun. Gardens are very good at tiny surprises.',
     more_connection: 'You wanted more connection. I am glad we found each other.',
@@ -563,17 +577,17 @@ export function ftuePersonalizedLine(run = loadFtueRun()) {
 }
 
 export function ftuePersonalizationKey(run = loadFtueRun()) {
-  const companionGoal = run?.answers['egg.desired_feeling'] ?? run?.answers['egg.companion_goal'];
+  const companionGoal = run?.answers['egg.support_style'] ?? run?.answers['egg.desired_feeling'] ?? run?.answers['egg.companion_goal'];
   const context = run?.answers['egg.context.activity'];
   const opening = Object.values(run?.answers ?? {}).find((answer) => answer.actionId.startsWith('egg.') && !answer.private);
   const id = companionGoal?.optionId ?? context?.optionId ?? opening?.optionId ?? 'default';
-  return ['more_calm', 'more_confidence', 'more_fun', 'more_connection', 'calm', 'encouragement', 'fun', 'company', 'discovery', 'outside', 'family', 'friends', 'relaxing', 'work', 'tired', 'rough', 'home'].includes(id)
+  return ['more_energy', 'more_calm', 'something_new', 'more_confidence', 'more_fun', 'more_connection', 'calm', 'encouragement', 'fun', 'company', 'discovery', 'outside', 'family', 'friends', 'relaxing', 'work', 'tired', 'rough', 'home'].includes(id)
     ? id
     : 'default';
 }
 
 export function ftueWispForRun(run = loadFtueRun()) {
-  const answer = run?.answers['egg.desired_feeling'] ?? run?.answers['egg.context.activity'] ?? Object.values(run?.answers ?? {}).find((item) => !item.private);
+  const answer = run?.answers['egg.support_style'] ?? run?.answers['egg.desired_feeling'] ?? run?.answers['egg.context.activity'] ?? Object.values(run?.answers ?? {}).find((item) => !item.private);
   if (answer?.optionId === 'more_connection' || answer?.optionId === 'family' || answer?.optionId === 'friends' || answer?.optionId === 'people') return 'heartlet';
   if (answer?.optionId === 'more_calm' || answer?.optionId === 'relaxing' || answer?.optionId === 'rest') return 'moonlit';
   return 'sprout';

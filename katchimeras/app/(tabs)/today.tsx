@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import {
   ActivityIndicator,
@@ -75,7 +75,6 @@ import { InlineVoiceNote } from '@/components/katchadeck/world/inline-voice-note
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { presenceEnter } from '@/components/katchadeck/motion';
 import { ThemedText } from '@/components/themed-text';
-import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { hasQuickGoalTemplates } from '@/constants/companion-quick-goals';
 import { AppFontFamilies, KatchaDeckUI, Lantern } from '@/constants/theme';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
@@ -134,7 +133,6 @@ import { useScenes } from '@/features/scenes/scene-provider';
 import { useGameWallet } from '@/features/ui/game-wallet-provider';
 import { resolveHomeLoopPresentation } from '@/features/today/home-loop-presentation';
 import { regularTodayCameraPinchTarget } from '@/features/today/regular-today-camera';
-import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
 import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
 import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
 import { MemoryClarificationSheet } from '@/components/katchadeck/world/memory-clarification-sheet';
@@ -256,18 +254,15 @@ const QUICK_PROMPT_CATEGORIES: {
   { id: 'sleep', title: 'Sleep', icon: 'bed.double.fill', accent: '#AAB2FF', section: 'more' },
 ];
 
+// Today is retired as a top-level destination. The Mossprout FTUE owns its
+// environment and only reuses the proven Egg presentation components.
 export default function TodayRouteScreen() {
-  const screenFocused = useIsFocused();
-  useEffect(() => {
-    if (!screenFocused) return;
-    scheduleForegroundLifecycleAudit('today');
-    return acquireLifecycleResource('today_scene', 'today-home-screen');
-  }, [screenFocused]);
-  if (!screenFocused) return <View style={styles.inactiveScreen} />;
-  return <HomeScreen />;
+  return <Redirect href="/katchimeras" />;
 }
 
-function HomeScreen() {
+// Retained as the legacy implementation reference while the route redirects to
+// Haven. Nothing in the FTUE imports or mounts this screen.
+export function LegacyTodayScreen() {
   const router = useRouter();
   const { transitionTo } = useGameScreenTransition();
   const wallet = useGameWallet();
@@ -275,9 +270,18 @@ function HomeScreen() {
   const ftueRun = useFtueRun();
   const relationships = useRelationshipProgression();
   const ftueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
-  const ftueTodayStep = ftueStep?.surface === 'today' ? ftueStep : null;
+  const ftueTodayStep = ftueStep && (
+    ftueStep.surface === 'today'
+    || ftueStep.id === 'grove.egg_inspect'
+    || ftueStep.id === 'egg.opening'
+    || ftueStep.id === 'egg.context'
+    || ftueStep.id === 'egg.mind'
+    || ftueStep.id === 'egg.ready'
+  ) ? ftueStep : null;
   const ftueOpeningOwnsHome = ftueOwnsOpeningHome(ftueRun);
-  const ftueOpeningFocus = Boolean(ftueRun?.status === 'active' && ftueRun.stepId.startsWith('egg.'));
+  const ftueOpeningFocus = Boolean(ftueRun?.status === 'active' && (
+    ftueRun.stepId === 'grove.egg_inspect' || ftueRun.stepId.startsWith('egg.')
+  ));
   const ftueEnergyFocus = Boolean(ftueRun?.status === 'active' && ftueRun.stepId.startsWith('energy.'));
   const ftueEnergyBridgeStep = ftueRun?.stepId === 'energy.journal_reward';
   const discoveryHatchActive = ftueOpeningOwnsHome;
@@ -493,7 +497,6 @@ function HomeScreen() {
     handleReveal,
     handleClaim,
     handleDiscoveryReveal,
-    restoreDiscoveryReveal,
   } = useTodayHatchRevealController({
     selectedDay: pendingHatchDay ?? selectedDay,
     triggerHatchIfReady,
@@ -553,25 +556,6 @@ function HomeScreen() {
   useEffect(() => { syncWispsFromDays(collectibleDays); }, [collectibleDays, syncWispsFromDays]);
   useEffect(() => { syncScenesFromDays(collectibleDays); }, [collectibleDays, syncScenesFromDays]);
   const isDay = selectedDay?.kind === 'day';
-  useEffect(() => {
-    if (ftueRun?.stepId !== 'hatch.reveal' || hatchPresentation.phase !== 'idle') return;
-    restoreDiscoveryReveal(FTUE_MOSSPROUT_CREATURE);
-  }, [ftueRun?.stepId, hatchPresentation.phase, restoreDiscoveryReveal]);
-  const talkToMossprout = useCallback(async () => {
-    const result = await advanceFtueActionDurably({
-      expectedStepId: 'hatch.reveal',
-      actionId: 'hatch.talk_to_mossprout',
-    });
-    if (result.run?.status !== 'active' || result.run.stepId !== 'companion.intro_action') return;
-    transitionTo({
-      announcement: 'Opening Mossprout',
-      target: 'companion',
-      navigate: () => router.push({
-        pathname: '/katchimera/[creatureId]',
-        params: { creatureId: 'companion:mossprout', ftue: '1' },
-      }),
-    });
-  }, [router, transitionTo]);
   const openMossproutJourney = useCallback(() => {
     transitionTo({
       announcement: mossproutJourneyHandoff?.state === 'ready_to_begin'
@@ -584,23 +568,6 @@ function HomeScreen() {
       }),
     });
   }, [mossproutJourneyHandoff?.state, router, transitionTo]);
-  const companionResumeStartedRef = useRef(false);
-  useEffect(() => {
-    if (ftueRun?.stepId !== 'companion.intro_action' && ftueRun?.stepId !== 'companion.first_meeting') {
-      companionResumeStartedRef.current = false;
-      return;
-    }
-    if (!screenFocused || companionResumeStartedRef.current) return;
-    companionResumeStartedRef.current = true;
-    transitionTo({
-      announcement: 'Opening Mossprout',
-      target: 'companion',
-      navigate: () => router.push({
-        pathname: '/katchimera/[creatureId]',
-        params: { creatureId: 'companion:mossprout', ftue: '1' },
-      }),
-    });
-  }, [ftueRun?.stepId, router, screenFocused, transitionTo]);
   const returnToMossprout = useCallback(async () => {
     setOnboardingEnergyReady(null);
     const result = await advanceFtueActionDurably({
@@ -1914,6 +1881,10 @@ function HomeScreen() {
       handleRevealPress();
       return;
     }
+    if (action.id === 'grove.begin_attunement') {
+      commitFtueAction({ actionId: action.id, evidenceRef: 'grove:mossprout:egg-close-up' });
+      return;
+    }
     if (action.id === 'energy.return') {
       returnToMossprout();
       return;
@@ -2683,6 +2654,8 @@ function HomeScreen() {
           companionWispId={activeWispId}
           day={formingDay}
           eggTargetRef={eggTargetRef}
+          eggShowFace={false}
+          eggSkinId="moss"
           energyHudPulseNonce={energyHudPulseNonce}
           energyHudTargetRef={energyHudTargetRef}
           energyHudValueOverride={energyHudValueOverride}
@@ -3482,20 +3455,6 @@ function HomeScreen() {
             dismissSceneDiscovery(pendingSceneDiscoveryId);
           }}
         />
-      ) : null}
-      {hatchPresentation.policy === 'ftue_discovery' && hatchPresentation.phase === 'awaiting_interaction' ? (
-        <Animated.View entering={presenceEnter(120)} style={[styles.discoveryInteractionCta, { bottom: insets.bottom + 34 }]}>
-          <ThemedText selectable style={styles.discoveryInteractionHint} lightColor="#FFF6DE" darkColor="#FFF6DE">
-            Mossprout is waiting for you.
-          </ThemedText>
-          <KatchaButton
-            fullWidth
-            glow
-            label="Talk to Mossprout"
-            labelStyle={KatchaDeckUI.typography.ftuePanelTitle}
-            onPress={talkToMossprout}
-          />
-        </Animated.View>
       ) : null}
     </View>
     </GestureDetector>

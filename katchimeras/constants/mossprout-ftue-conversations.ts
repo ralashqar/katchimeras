@@ -4,6 +4,9 @@ export const MOSSPROUT_FTUE_CONVERSATION_PREFIX = 'mossprout:ftue:first-meeting'
 export const MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID = 'mossprout:ftue:chapter-zero-return';
 
 const openingLines: Record<string, string> = {
+  more_energy: 'You said you wanted more energy. This garden definitely does.',
+  more_calm: 'You said you wanted more calm. I think this place could use some too.',
+  something_new: 'You wanted something new. Well… this is pretty new.',
   calm: 'I felt a quiet glow in my shell.',
   encouragement: 'I felt a brave little spark in my shell.',
   fun: 'I heard something bright and playful outside.',
@@ -23,7 +26,7 @@ const openingLines: Record<string, string> = {
 function definition(key: string, opening: string): ConversationDefinition {
   return {
     id: `${MOSSPROUT_FTUE_CONVERSATION_PREFIX}:${key}`,
-    version: 4,
+    version: 5,
     familyId: 'mossprout',
     title: 'Meet Mossprout',
     trigger: 'evergreen',
@@ -37,13 +40,31 @@ function definition(key: string, opening: string): ConversationDefinition {
     repeatPolicy: 'once_ever',
     topicKey: 'first-meeting',
     tags: ['ftue', 'story', 'first-meeting'],
-    entryNodeId: 'remembered',
+    entryNodeId: 'hello',
     nodes: [
       {
-        id: 'remembered', kind: 'choice', phase: 'opening', prompt: `Hi! I’m Mossprout. ${opening}`,
-        options: [{ id: 'hello', label: 'Hi, Mossprout!', reply: 'I grow a garden from the little things we do together.', nextNodeId: 'ask_name' }],
+        id: 'hello', kind: 'choice', phase: 'opening', prompt: '…Oh.\nI was hoping it would look better out here.\nI’m Mossprout.',
+        options: [
+          { id: 'hello', label: 'Hi Mossprout.', reply: 'Hi.', nextNodeId: 'stuck' },
+          { id: 'what-happened', label: 'What happened here?', reply: 'I wish I knew.', nextNodeId: 'stuck' },
+          { id: 'tiny', label: 'You’re tiny.', reply: 'The garden is also enormous. Both things can be true.', nextNodeId: 'stuck' },
+        ],
       },
-      { id: 'ask_name', kind: 'end', message: 'There is one thing I want to know first.' },
+      {
+        id: 'stuck', kind: 'choice', phase: 'deepen',
+        prompt: 'This place used to grow.\nNow everything seems stuck.\nDo you ever feel like that?',
+        options: [
+          { id: 'sometimes', label: 'Sometimes.', reply: 'Then maybe we can figure some things out together.', nextNodeId: 'remembered' },
+          { id: 'not-really', label: 'Not really.', reply: 'Then maybe you can help me figure it out.', nextNodeId: 'remembered' },
+          { id: 'all-the-time', label: 'All the time.', reply: 'Then maybe we can figure some things out together.', nextNodeId: 'remembered' },
+        ],
+      },
+      {
+        id: 'remembered', kind: 'choice', phase: 'resolve',
+        prompt: opening,
+        options: [{ id: 'continue', label: 'Continue', reply: 'Maybe this place can grow again.', nextNodeId: 'end' }],
+      },
+      { id: 'end', kind: 'end', message: 'Let’s start with something small.' },
     ],
   };
 }
@@ -68,10 +89,10 @@ const chapterZeroReturnDefinition: ConversationDefinition = {
   nodes: [
     {
       id: 'home', kind: 'choice', phase: 'opening',
-      prompt: 'It already feels brighter! Someone nearby heard us too.',
-      options: [{ id: 'meet-them', label: 'Who is it?', reply: 'Your answers found someone who likes the same kind of nature.', nextNodeId: 'end' }],
+      prompt: 'It worked. Maybe this place can grow again.',
+      options: [{ id: 'see-change', label: 'See what changed', reply: 'The first bloom belongs in the Grove.', nextNodeId: 'end' }],
     },
-    { id: 'end', kind: 'end', message: 'A parcel is waiting in the garden.' },
+    { id: 'end', kind: 'end', message: 'Come on. You should see it from the Haven.' },
   ],
 };
 

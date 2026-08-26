@@ -161,7 +161,7 @@ export const MERGE_GENERATORS: readonly MergeGeneratorDefinition[] = [
   generator('hearth-pantry', 'Hearth Pantry', 'fork.knife', '#C97847', 31, ['food:table', 'food:dessert'], 'Ingredients and baking basics for savoury tables and sweet finishes.'),
   generator('ritual-bar', 'Ritual Bar', 'water.waves', '#A76E58', 32, ['drink:hot', 'drink:refresh'], 'Warm rituals and bright refreshments, chosen one small ingredient at a time.'),
   generator('journey-locker', 'Journey Locker', 'figure.walk', '#967044', 33, ['adventure:trail', 'adventure:travel'], 'Walking gear and travel keepsakes for journeys near and far.'),
-  generator('wild-garden', 'Wild Garden', 'leaf.fill', '#5E9E69', 38, ['nature:garden', 'nature:waterside'], 'Seeds and waterside treasures from one shared patch of wildness.'),
+  generator('wild-garden', 'Garden Basket', 'leaf.fill', '#5E9E69', 38, ['nature:garden', 'nature:waterside'], 'Seeds and waterside treasures from one shared patch of wildness.'),
   generator('memory-nursery', 'Memory Nursery', 'sparkles', '#79AA76', 45, ['nature:keepsake', 'nature:keepsake'], 'Living keepsakes grown from the small nature moments Mossprout remembers with you.'),
   generator('comfort-chest', 'Comfort Chest', 'sparkles', '#A889B8', 39, ['comfort:rest', 'comfort:care'], 'Restful comforts and practical care for difficult or tender days.'),
   generator('community-cart', 'Community Cart', 'sparkles', '#D88762', 40, ['social:gathering', 'social:celebration'], 'Everything needed to welcome people and mark a joyful moment.'),
@@ -317,7 +317,7 @@ export type MossproutRootGateDefinition = {
 
 /** Authored over the existing shared Echo reservations so future companion paths keep their cells. */
 export const MOSSPROUT_ROOTBOUND_GATES: readonly MossproutRootGateDefinition[] = [
-  { id: 'root:day-5-first-return', cell: 0, chapter: 'quiet_patch', title: 'The First Returning Root', story: 'A root remembers each day you choose to return.', kind: 'journey_day', target: 5, revealDay: 5, fallbackDelay: 3, rootMemoryDefinitionId: 'mossprout:root-memory:returning-seed', rewardPreview: 'space', rewards: [] },
+  { id: 'root:day-5-first-return', cell: 0, chapter: 'quiet_patch', title: 'The First Returning Root', story: 'A root opens when Mossprout begins to know you.', kind: 'friendship', target: 2, revealDay: 2, fallbackDelay: 3, rootMemoryDefinitionId: 'mossprout:root-memory:returning-seed', rewardPreview: 'space', rewards: [] },
   { id: 'root:day-7-two-shores', cell: 1, chapter: 'quiet_patch', title: 'Two Shores', story: 'The garden reaches toward lives beyond its edge.', kind: 'journey_day', target: 7, revealDay: 7, fallbackDelay: 3, rootMemoryDefinitionId: 'mossprout:root-memory:returning-seed', rewardPreview: 'garden_growth', rewards: [{ kind: 'generator_level', generatorId: 'wild-garden', level: 2 }] },
   { id: 'root:memory-first', cell: 5, chapter: 'returning_pond', title: 'A Memory Took Root', story: 'A kept nature moment glows beneath the soil.', kind: 'memory', target: 1, revealDay: 8, fallbackDelay: 3, rootMemoryDefinitionId: 'mossprout:root-memory:rain-kept-acorn', rewardPreview: 'space', rewards: [] },
   { id: 'root:friendship-4', cell: 6, chapter: 'returning_pond', title: 'Familiar Rain', story: 'Mossprout trusts this patch enough to let the rain in.', kind: 'friendship', target: 4, revealDay: 10, fallbackDelay: 3, rootMemoryDefinitionId: 'mossprout:root-memory:rain-kept-acorn', rewardPreview: 'space', rewards: [] },
@@ -339,7 +339,7 @@ export const MOSSPROUT_ROOTBOUND_GATES_BY_ID = new Map(MOSSPROUT_ROOTBOUND_GATES
  * or unexplained permanent fog is involved.
  */
 export const MOSSPROUT_GARDEN_GROWTH_CLEARINGS = [
-  { id: 'seedbed-edge', title: 'Seedbed Edge', revealDay: 3, cells: [19, 20, 26] },
+  { id: 'seedbed-edge', title: 'Seedbed Edge', revealDay: 2, cells: [19, 20, 26] },
   { id: 'rainwater-bend', title: 'Rainwater Bend', revealDay: 7, cells: [27, 34, 41] },
   { id: 'nursery-verge', title: 'Nursery Verge', revealDay: 12, cells: [42, 43, 48] },
   { id: 'living-border', title: 'Living Border', revealDay: 15, cells: [49, 50, 54] },

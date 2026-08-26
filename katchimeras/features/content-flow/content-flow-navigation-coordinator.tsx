@@ -62,7 +62,9 @@ export function ContentFlowNavigationCoordinator() {
     if (pausedKeyRef.current === owner.work.key || attemptedKeyRef.current === owner.work.key) return;
     const targetSurface = gameSurface(owner.work.surface);
     if (!targetSurface) return;
-    const navigate = () => router.replace({ pathname: owner.work.target.pathname, params: owner.work.target.params } as never);
+    // Content-flow ownership is global, while its destinations can be nested
+    // Tab leaves. `navigate` crosses that navigator boundary; `replace` cannot.
+    const navigate = () => router.navigate({ pathname: owner.work.target.pathname, params: owner.work.target.params } as never);
     const accepted = transitionTo({
       announcement: 'Opening the next part of your story',
       expectedPathname: owner.work.target.pathname,

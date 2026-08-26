@@ -232,7 +232,7 @@ test('legacy Merge return remains safe while Mossprout opens its character-owned
   assert.match(merge, /storyNavigationPendingRef/);
   assert.match(merge, /source: 'merge-world'/);
   assert.match(route, /source === 'merge-world' \? transitionTo\(\{/);
-  assert.match(route, /navigate: \(\) => router\.dismissTo\('\/katchimeras'\)/);
+  assert.match(route, /navigate: \(\) => router\.dismissTo\('\/\(tabs\)\/katchimeras'\)/);
   assert.match(route, /onOpenMerge=\{familyId === 'mossprout'/);
   assert.match(route, /pathname: '\/katchimera\/\[creatureId\]\/activity'/);
   assert.doesNotMatch(route, /onOpenMerge=.*pathname: '\/games'/);
@@ -579,7 +579,7 @@ test('companion scene panels share one palette, stay anchored, and bound speech 
   const cinematicPan = fs.readFileSync(path.join(worldPath, 'use-companion-environment-pan.ts'), 'utf8');
 
   assert.match(cinematic, /availableBubbleWidth/);
-  assert.match(cinematic, /const incomingSpeechTitle = title\.trim\(\)[\s\S]*?const speechTitle = renderedSpeech\.title/);
+  assert.match(cinematic, /const incomingSpeechTitle = normalizeCompanionSpeechText\(title\)[\s\S]*?const speechTitle = renderedSpeech\.title/);
   assert.match(cinematic, /const speechBubbleVisible = showSpeechBubble && \(hasSpeechTitle \|\| hasSpeechBody\)/);
   assert.match(cinematic, /\{speechBubbleVisible \? \(/);
   assert.match(cinematic, /entering=\{reduceMotion \? undefined : ZoomIn\.duration\(190\)/);

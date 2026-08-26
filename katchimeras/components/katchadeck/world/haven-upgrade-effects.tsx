@@ -76,6 +76,8 @@ type Props = {
   silhouetteFrame: EffectRect;
   silhouetteSource: ImageSourcePropType;
   target: { x: number; y: number };
+  showCoins?: boolean;
+  showReaction?: boolean;
 };
 
 export const HavenUpgradeEffects = memo(function HavenUpgradeEffects({
@@ -86,6 +88,8 @@ export const HavenUpgradeEffects = memo(function HavenUpgradeEffects({
   silhouetteFrame,
   silhouetteSource,
   target,
+  showCoins: coinsEnabled = true,
+  showReaction: reactionEnabled = true,
 }: Props) {
   const cover = useSharedValue(0);
   const reveal = useSharedValue(0);
@@ -109,9 +113,9 @@ export const HavenUpgradeEffects = memo(function HavenUpgradeEffects({
     transform: [{ translateY: interpolate(reveal.value, [0, 1], [18, -22]) }],
   }));
 
-  const showCoins = !reducedMotion && (phase === 'payment' || phase === 'cover');
+  const showCoins = coinsEnabled && !reducedMotion && (phase === 'payment' || phase === 'cover');
   const showEnergy = !reducedMotion && ['cover', 'reveal', 'react'].includes(phase);
-  const showReaction = phase === 'react' || phase === 'complete';
+  const showReaction = reactionEnabled && (phase === 'react' || phase === 'complete');
 
   return (
     <View accessibilityElementsHidden pointerEvents="auto" style={StyleSheet.absoluteFill}>

@@ -20,6 +20,12 @@ test('feedback receipts deduplicate by stable id and preserve order', () => {
   const second = enqueueGameFeedback(duplicate, { id: 'offline', message: 'Offline', tone: 'danger' }, 'fallback:3');
   assert.deepEqual(second.map((item) => item.id), ['save', 'offline']);
   assert.equal(second[0].durationMs, 1_800);
+  assert.equal(second[0].placement, 'bottom');
+});
+
+test('feedback receipts retain an explicit middle placement', () => {
+  const queue = enqueueGameFeedback([], { message: 'Remembered', placement: 'middle' }, 'memory');
+  assert.equal(queue[0].placement, 'middle');
 });
 
 test('cozy-playful surfaces provide a complete semantic treatment', () => {

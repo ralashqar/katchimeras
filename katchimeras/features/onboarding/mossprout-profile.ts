@@ -7,9 +7,9 @@ import {
 } from '@/utils/onboarding-state';
 
 const ACTION_FIELDS: Readonly<Record<string, keyof MossproutOnboardingAnswers>> = {
-  'egg.desired_feeling': 'desiredFeelingId',
-  'egg.main_difficulty': 'mainDifficultyId',
-  'egg.support_style': 'supportStyleId',
+  'egg.desired_feeling': 'attunementPlaceId',
+  'egg.main_difficulty': 'currentFeelingId',
+  'egg.support_style': 'desiredMoreId',
   'egg.life_priority': 'lifePriorityId',
   'egg.companion_place': 'companionPlaceId',
 };
@@ -42,9 +42,9 @@ export function recordMossproutOnboardingAnswer(actionId: string, optionId: stri
     : profile.matchedResidentId;
   const next = {
     ...profile,
-    aspirationId: field === 'desiredFeelingId' ? optionId : profile.aspirationId,
-    painPointIds: field === 'mainDifficultyId' ? [optionId] : profile.painPointIds,
-    preferenceIds: field === 'supportStyleId' || field === 'lifePriorityId'
+    aspirationId: field === 'desiredMoreId' ? optionId : profile.aspirationId,
+    painPointIds: field === 'currentFeelingId' ? [optionId] : profile.painPointIds,
+    preferenceIds: field === 'attunementPlaceId' || field === 'lifePriorityId'
       ? [optionId, ...profile.preferenceIds.filter((id) => id !== optionId)]
       : profile.preferenceIds,
     mossproutAnswers,

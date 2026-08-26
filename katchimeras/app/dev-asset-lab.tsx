@@ -236,7 +236,7 @@ export default function DevAssetLabScreen() {
           {hexArtDirectionSetId === 'organic_islands_v1' ? (
             <Pressable
               accessibilityRole="button"
-              onPress={() => router.replace('/katchimeras')}
+              onPress={() => router.navigate('/(tabs)/katchimeras')}
               style={({ pressed }) => [styles.hexPreviewAction, pressed ? styles.tilePressed : null]}>
               <ThemedText style={styles.hexSetAction} lightColor="#101521" darkColor="#101521">
                 Preview organic islands in Haven

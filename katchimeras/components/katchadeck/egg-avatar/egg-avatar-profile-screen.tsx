@@ -15,7 +15,6 @@ import { EGG_AVATAR_FACES } from '@/constants/egg-avatar-faces';
 import { EGG_AVATAR_HATS } from '@/constants/egg-avatar-hats';
 import { EGG_AVATAR_HELD_ACCESSORIES } from '@/constants/egg-avatar-held-accessories';
 import { EGG_AVATAR_SKINS } from '@/constants/egg-avatar-skins';
-import { homeTabBarHeight } from '@/constants/home-loop-layout';
 import { Meadow } from '@/constants/meadow-theme';
 import { READY_WISPS } from '@/constants/wisps';
 import { SCENE_CATALOG } from '@/constants/scenes';
@@ -62,7 +61,7 @@ export function EggAvatarProfileScreen({ bottomInset = 0, days }: { bottomInset?
   const syncScenesFromDays = scenes.syncFromDays;
   useEffect(() => { syncWispsFromDays(days); }, [days, syncWispsFromDays]);
   useEffect(() => { syncScenesFromDays(days); }, [days, syncScenesFromDays]);
-  const tabBarHeight = homeTabBarHeight(bottomInset);
+  const tabBarHeight = Math.max(bottomInset, 12);
   const panelHeight = eggAvatarCustomizerPanelHeight(height);
   const cellWidth = (width - PANEL_HORIZONTAL_BORDER - GRID_HORIZONTAL_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
 

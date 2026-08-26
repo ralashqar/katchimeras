@@ -55,6 +55,7 @@ import { useTodayEnvironmentMotionValues } from '@/components/katchadeck/home/to
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { EggAvatarArtwork, eggAvatarBodyPresentationStyle } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
 import type { EggExpressionCue } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
+import type { EggAvatarSkinId } from '@/types/egg-avatar';
 import { WispCompanion } from '@/components/katchadeck/wisps/wisp-companion';
 import { WispArtwork } from '@/components/katchadeck/wisps/wisp-artwork';
 import { wispDefinition } from '@/constants/wisps';
@@ -103,6 +104,8 @@ type TodayKingdomEggHeroProps = {
   growthProgress?: number;
   deferGrowthUntilEnergyArrival?: boolean;
   discoveryHatch?: TodayHatchPresentation | null;
+  eggShowFace?: boolean;
+  eggSkinId?: EggAvatarSkinId;
   onDiscoveryCreatureError?: () => void;
   onDiscoveryCreatureReady?: () => void;
   onEggPress?: () => void;
@@ -156,6 +159,8 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   growthProgress,
   deferGrowthUntilEnergyArrival = false,
   discoveryHatch = null,
+  eggShowFace = true,
+  eggSkinId,
   onDiscoveryCreatureError,
   onDiscoveryCreatureReady,
   onEggPress,
@@ -165,6 +170,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   targetRef,
 }: TodayKingdomEggHeroProps) {
   const { equippedFaceId, equippedSkinId } = useEggAvatar();
+  const presentedSkinId = eggSkinId ?? equippedSkinId;
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
   const explorationEggFrame = todayExplorationEggStageFrame(
@@ -772,9 +778,12 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
                   }
                   expressionSequenceKey={discoveryHatch ? `${discoveryHatch.dayId}:${discoveryHatch.animationKey}:discovery` : feedExpressionKey > 0 ? `feed:${feedExpressionKey}` : 'idle'}
                   faceId={forceSleeping ? 'sleepy' : equippedFaceId}
+                  hatId={eggSkinId ? null : undefined}
+                  heldAccessoryId={eggSkinId ? null : undefined}
                   priority="high"
                   resolution="high"
-                  skinId={equippedSkinId}
+                  showFace={eggShowFace}
+                  skinId={presentedSkinId}
                   style={StyleSheet.absoluteFill}
                   transition={0}
                 />
@@ -785,7 +794,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
                     contentFit="contain"
                     priority="high"
                     source={DISCOVERY_CRACK_ONE}
-                    style={[StyleSheet.absoluteFill, eggAvatarBodyPresentationStyle(equippedSkinId), discoveryCrackOneStyle]}
+                    style={[StyleSheet.absoluteFill, eggAvatarBodyPresentationStyle(presentedSkinId), discoveryCrackOneStyle]}
                     transition={0}
                   />
                   <AnimatedImage
@@ -794,7 +803,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
                     contentFit="contain"
                     priority="high"
                     source={DISCOVERY_CRACK_TWO}
-                    style={[StyleSheet.absoluteFill, eggAvatarBodyPresentationStyle(equippedSkinId), discoveryCrackTwoStyle]}
+                    style={[StyleSheet.absoluteFill, eggAvatarBodyPresentationStyle(presentedSkinId), discoveryCrackTwoStyle]}
                     transition={0}
                   />
                 </> : null}

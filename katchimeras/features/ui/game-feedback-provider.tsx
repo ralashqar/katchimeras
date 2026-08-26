@@ -4,7 +4,7 @@ import { StyleSheet } from 'react-native';
 import { KatchaSurfaceProvider } from '@/components/katchadeck/ui/katcha-surface';
 import { KatchaToast } from '@/components/katchadeck/ui/katcha-toast';
 import { GameUI } from '@/constants/game-ui';
-import { enqueueGameFeedback, type GameFeedbackInput, type GameFeedbackTone, type QueuedGameFeedback } from '@/utils/game-feedback';
+import { enqueueGameFeedback, type GameFeedbackInput, type QueuedGameFeedback } from '@/utils/game-feedback';
 
 export type { GameFeedbackInput, GameFeedbackTone } from '@/utils/game-feedback';
 
@@ -33,7 +33,12 @@ export function GameFeedbackProvider({ children }: PropsWithChildren) {
   return <GameFeedbackContext value={value}>
     {children}
     <KatchaSurfaceProvider surface="parchment">
-      <KatchaToast icon={active?.icon} message={active?.message ?? null} placementStyle={styles.toast} tone={active?.tone} />
+      <KatchaToast
+        icon={active?.icon}
+        message={active?.message ?? null}
+        placementStyle={active?.placement === 'middle' ? styles.middleToast : styles.bottomToast}
+        tone={active?.tone}
+      />
     </KatchaSurfaceProvider>
   </GameFeedbackContext>;
 }
@@ -44,4 +49,9 @@ export function useGameFeedback() {
   return value;
 }
 
-const styles = StyleSheet.create({ toast: { bottom: 112, zIndex: GameUI.layer.toast } });
+const styles = StyleSheet.create({
+  bottomToast: { bottom: 112, zIndex: GameUI.layer.toast },
+  // The top edge begins at mid-screen, immediately below the lifted Companion
+  // subject's platform contact across supported phone aspect ratios.
+  middleToast: { top: '50%', zIndex: GameUI.layer.toast },
+});

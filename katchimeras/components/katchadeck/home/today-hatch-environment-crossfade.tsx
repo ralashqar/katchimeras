@@ -13,14 +13,19 @@ import { useScenes } from '@/features/scenes/scene-provider';
 import { HOME_SCENE_Y_OFFSET } from '@/constants/home-loop-layout';
 import { todayHatchCreature, type TodayHatchPhase, type TodayHatchPresentation } from '@/utils/today-hatch-presentation';
 import { todayKatchimeraExplorationBackgroundKeyForPresentation } from '@/utils/today-exploration-backgrounds';
+import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-backgrounds';
 
 export function TodayHatchEnvironmentCrossfade({
   imageSize,
   onDestinationReady,
+  originBackgroundKey,
+  environmentStage,
   presentation,
 }: {
   imageSize: number;
   onDestinationReady?: () => void;
+  originBackgroundKey?: TodayExplorationBackgroundKey;
+  environmentStage?: number | null;
   presentation: TodayHatchPresentation;
 }) {
   const reduceMotion = useReducedMotion();
@@ -49,7 +54,8 @@ export function TodayHatchEnvironmentCrossfade({
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <Animated.View style={[StyleSheet.absoluteFill, homeStyle]}>
         <TodayExplorationBackground
-          backgroundKey={equippedSceneId}
+          backgroundKey={originBackgroundKey ?? equippedSceneId}
+          environmentStage={environmentStage}
           imageSize={imageSize}
           verticalOffset={HOME_SCENE_Y_OFFSET}
         />
@@ -58,6 +64,7 @@ export function TodayHatchEnvironmentCrossfade({
         <Animated.View style={[StyleSheet.absoluteFill, destinationStyle]}>
           <TodayExplorationBackground
             backgroundKey={destinationKey}
+            environmentStage={environmentStage}
             imageSize={imageSize}
             onLoad={onDestinationReady}
             verticalOffset={HOME_SCENE_Y_OFFSET}

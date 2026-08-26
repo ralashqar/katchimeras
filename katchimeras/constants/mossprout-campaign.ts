@@ -31,7 +31,7 @@ export type MossproutCampaignEpisode = {
 
 export const MOSSPROUT_CAMPAIGN_EPISODES: readonly MossproutCampaignEpisode[] = [
   episode(1, 1, 'quiet-patch:first-flower', 'mossprout:chapter:quiet-patch', 'A Little Place to Begin', 'mossprout:objective:first-sprout', [
-    order('mossprout:chapter-0:first-sprout', 'The First Sprout', 'Grow one small beginning for our quiet patch.', [['nature:garden:2', 1]], 15),
+    order('mossprout:chapter-0:first-sprout', 'The First Bloom', 'Bring two Sprouts together for our quiet patch.', [['nature:garden:3', 1]], 20),
   ], null, null, 'goal'),
   episode(2, 2, 'quiet-patch:pond-knock', 'mossprout:chapter:quiet-patch', 'The Pond Knocked Twice', 'mossprout:objective:pond-knock', [
     order('merge-story:mossprout:quiet-patch:listening-place', 'A Listening Place', 'Make a little waterside perch so we can listen without trampling the clues.', [['nature:waterside:2', 1]], 20),

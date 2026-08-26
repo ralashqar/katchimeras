@@ -28,7 +28,7 @@ test('Haven upgrades are linear, story-gated, and debit Merge Coins atomically',
   const first = reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, now: NOW + 2 });
   assert.equal(first.changed, true);
   assert.equal(first.state.haven.tileStages.mossprout, 1);
-  assert.equal(first.state.coins, 1_850);
+  assert.equal(first.state.coins, 1_950);
   assert.equal(first.state.haven.revealState, 'first_restore_complete');
 
   const locked = reduceMergeWorld(first.state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 2, now: NOW + 3 });
@@ -37,7 +37,7 @@ test('Haven upgrades are linear, story-gated, and debit Merge Coins atomically',
   const second = reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 2, now: NOW + 5 });
   assert.equal(second.changed, true);
   assert.equal(second.state.haven.tileStages.mossprout, 2);
-  assert.equal(second.state.coins, 1_450);
+  assert.equal(second.state.coins, 1_550);
 });
 
 test('v13 Mossprout saves reset into the v19 personal-world contract', () => {
@@ -59,23 +59,20 @@ test('procedural Merge orders fill three slots and remain separate from story or
   assert.ok(procedural.every((order) => order.purpose === 'normal' && !order.signature && !order.chapterId));
 });
 
-test('Mossprout FTUE introduces friendship before the Garden and then opens the matched resident chapter', () => {
-  assert.equal(mossproutFtueStep('hatch.reveal')?.actions[0]?.nextStepId, 'companion.intro_action');
-  assert.equal(mossproutFtueStep('companion.intro_action')?.actions[0]?.nextStepId, 'companion.first_meeting');
-  assert.equal(mossproutFtueStep('companion.first_meeting')?.actions[0]?.nextStepId, 'companion.nickname');
-  assert.equal(mossproutFtueStep('companion.nickname')?.actions[0]?.nextStepId, 'companion.bond_intro');
-  assert.equal(mossproutFtueStep('companion.bond_intro')?.actions[0]?.nextStepId, 'companion.bond_spotlight');
-  assert.equal(mossproutFtueStep('companion.bond_spotlight')?.actions[0]?.nextStepId, 'companion.day_one_action');
-  assert.equal(mossproutFtueStep('companion.day_one_action')?.actions.find((action) => action.id === 'companion.choose_bond_share')?.options?.length, 3);
+test('Mossprout FTUE introduces one Bond answer before the Garden and returns to Haven', () => {
+  assert.equal(mossproutFtueStep('egg.ready')?.actions[0]?.nextStepId, 'companion.first_meeting');
+  assert.equal(mossproutFtueStep('companion.first_meeting')?.actions[0]?.nextStepId, 'companion.day_one_action');
+  assert.equal(mossproutFtueStep('companion.day_one_action')?.actions.find((action) => action.id === 'companion.choose_bond_share')?.options?.length, 4);
   assert.equal(mossproutFtueStep('companion.day_one_action')?.actions.find((action) => action.id === 'companion.complete_day_one_action')?.nextStepId, 'companion.garden_intro');
   assert.equal(mossproutFtueStep('companion.garden_intro')?.actions[0]?.nextStepId, 'companion.order_preview');
   assert.equal(mossproutFtueStep('merge.serve_sprout')?.edges?.[0]?.nextStepId, 'companion.chapter_zero_return');
-  assert.equal(mossproutFtueStep('companion.chapter_zero_return')?.actions[0]?.nextStepId, 'companion.resident_parcel_ready');
+  assert.equal(mossproutFtueStep('companion.chapter_zero_return')?.actions[0]?.nextStepId, 'haven.first_bloom');
+  assert.equal(mossproutFtueStep('haven.first_bloom')?.actions[0]?.nextStepId, 'companion.resident_parcel_ready');
   // Retained as a recovery route for older resident-matching saves.
   assert.equal(mossproutFtueStep('companion.resident_affinity')?.actions[0]?.nextStepId, 'companion.resident_parcel_ready');
   assert.equal(mossproutFtueStep('companion.resident_parcel_ready')?.actions[0]?.nextStepId, 'merge.resident_parcel');
   assert.equal(mossproutFtueStep('merge.resident_card_reward')?.edges?.[0]?.nextStepId, 'companion.resident_match_result');
-  assert.equal(mossproutFtueStep('companion.resident_match_result')?.actions[0]?.nextStepId, 'complete');
+  assert.equal(mossproutFtueStep('companion.resident_match_result')?.actions[0]?.nextStepId, 'haven.reveal');
   assert.equal(mossproutFtueStep('haven.reveal')?.surface, 'haven');
   assert.equal(mossproutFtueStep('haven.reveal')?.actions[0]?.nextStepId, 'complete');
   assert.equal(mossproutFtueStep('haven.reveal')?.actions[0]?.title, 'Finish');

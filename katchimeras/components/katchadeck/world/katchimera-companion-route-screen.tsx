@@ -7,8 +7,8 @@ import { KingdomCompanionScreen } from '@/components/katchadeck/world/kingdom-co
 import { markFlowStart, reportFlowReady } from '@/utils/flow-performance';
 import { companionIdForFamily, familyIdFromCompanionId } from '@/constants/katchimera-skins';
 import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
-import { advanceFtueActionDurably, commitFtueAction, completeFtueRun, flushFtuePersistence, ftueWispForRun, loadFtueRun, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
-import { activateStoredResidentCardDiscovery, installMossproutOnboardingMergeWorld, loadMergeWorldState, seedStoredMossproutGardenAfterFtue } from '@/utils/merge-world/repository';
+import { advanceFtueActionDurably, commitFtueAction, flushFtuePersistence, ftueWispForRun, loadFtueRun, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { activateStoredResidentCardDiscovery, installMossproutOnboardingMergeWorld, loadMergeWorldState, revealStoredHaven, seedStoredMossproutGardenAfterFtue } from '@/utils/merge-world/repository';
 import { useGameScreenTransition } from '@/features/navigation/game-screen-transition';
 import { useCompanionDiscoveryRecords } from '@/hooks/use-companion-discovery-records';
 import { localDayId } from '@/utils/world-identity';
@@ -24,7 +24,6 @@ import {
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { recordMossproutMatchedCard } from '@/game/katchimeras/relationship-progression';
-import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import {
   ensureMossproutFtueFirstResident,
   MOSSPROUT_FTUE_FIRST_RESIDENT_ID,
@@ -49,15 +48,24 @@ function isResidentFtueStep(stepId: string) {
     || stepId.startsWith('merge.resident_');
 }
 
-export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOrigin = false, ftueConversationDefinitionId, journeyReturnConversationDefinitionId, residentStoryResumeRequested = false }: {
+export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOrigin = false, ftueConversationDefinitionId, journeyReturnConversationDefinitionId, residentStoryResumeRequested = false, renderRegularStage = false, reuseUnderlyingStage = false, hostedInHaven = false }: {
   creatureId: string;
   source?: 'merge-world';
   ftueRouteOrigin?: boolean;
   ftueConversationDefinitionId?: string;
   journeyReturnConversationDefinitionId?: string;
   residentStoryResumeRequested?: boolean;
+  renderRegularStage?: boolean;
+  reuseUnderlyingStage?: boolean;
+  hostedInHaven?: boolean;
 }) {
   const isFocused = useIsFocused();
+  // During the opening FTUE this controller is a presentation layer inside
+  // Haven, not a route of its own. React Navigation focus/readiness can briefly
+  // fall false while the app backgrounds or the FTUE graph changes steps. The
+  // Haven host remains the owner, so its companion layer must not replace the
+  // whole scene with the standalone route's empty inactive fallback.
+  const surfaceActive = hostedInHaven || isFocused;
   const router = useRouter();
   const { transitionTo } = useGameScreenTransition();
   const familyId = familyIdFromCompanionId(creatureId);
@@ -85,7 +93,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     navigationFtueRun?.status === 'active'
     && mossproutFtueStep(navigationFtueRun.stepId)?.surface === 'companion'
   );
-  const ftueNavigationLocked = useFtueNavigationLock(navigationFtueRun, 'companion', isFocused);
+  const ftueNavigationLocked = useFtueNavigationLock(navigationFtueRun, 'companion', surfaceActive);
   const latestMossproutJourney = [...relationships.journeyDays].reverse().find((journey) => journey.familyId === 'mossprout') ?? null;
   const residentParcelReady = Boolean(navigationFtueRun?.status === 'active'
     && latestMossproutJourney?.matchedCardId
@@ -147,19 +155,25 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     // chapter-zero callback. Preserve that callback's other responsibility:
     // install the first normal Garden batch before releasing FTUE ownership.
     await seedStoredMossproutGardenAfterFtue(localDayId(new Date(completedAt)), completedAt);
-    if (authoredTerminalExit) {
-      commitFtueAction({ actionId: 'companion.ack_resident_match_result', evidenceRef: 'mossprout-resident-match-result' });
+    if (residentRecoveryExit && !authoredTerminalExit) {
+      updateFtueRun({ stepId: 'companion.resident_match_result', status: 'active', completedAt: null });
     }
-    // Always perform the terminal write. A migrated or interrupted profile can
-    // already contain the acknowledgement receipt while its graph still says
-    // active, in which case replaying commitFtueAction intentionally does not
-    // advance it.
-    completeFtueRun();
+    await advanceFtueActionDurably({
+      expectedStepId: 'companion.resident_match_result',
+      actionId: 'companion.ack_resident_match_result',
+      evidenceRef: 'mossprout-resident-match-result',
+      nextStepId: 'haven.reveal',
+    });
     ftueHandoffRef.current = false;
     finishResidentMergeSession();
     await flushFtuePersistence();
+    transitionTo({
+      announcement: 'Returning to your Haven',
+      target: 'katchimeras',
+      navigate: () => router.dismissTo('/(tabs)/katchimeras'),
+    });
     return true;
-  }, []);
+  }, [router, transitionTo]);
   useEffect(() => {
     if (!isFocused || ftueRun?.status !== 'complete') return;
     const repairKey = `${ftueRun.runId}:${ftueRun.completedAt ?? 'complete'}`;
@@ -180,35 +194,32 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     if (run?.stepId === 'companion.chapter_zero_return') {
       if (ftueHandoffRef.current) return;
       ftueHandoffRef.current = true;
-      const completedAt = Date.now();
-      const matchedResidentId = ensureMossproutFtueFirstResident().matchedResidentId;
-      if (matchedResidentId) {
-        relationshipProgressionRepository.update((current) => {
-          const journey = [...current.journeyDays].reverse().find((candidate) => candidate.familyId === 'mossprout');
-          return journey ? recordMossproutMatchedCard(current, journey.dayId, matchedResidentId) : current;
-        });
-      }
-      const nextRun = commitFtueAction({
+      const result = await advanceFtueActionDurably({
+        expectedStepId: 'companion.chapter_zero_return',
         actionId: 'companion.complete_chapter_zero_return',
         evidenceRef: ftueConversationDefinitionId ?? 'mossprout-chapter-zero-return',
-        nextStepId: matchedResidentId ? 'companion.resident_parcel_ready' : 'companion.resident_affinity',
+        nextStepId: 'haven.first_bloom',
       });
-      if (nextRun?.status === 'complete') {
-        return seedStoredMossproutGardenAfterFtue(localDayId(new Date(completedAt)), completedAt).then(() => undefined).catch((error) => {
-          console.warn('Could not prepare Mossprout’s next Garden orders', error);
+      if (result.run?.stepId === 'haven.first_bloom') {
+        await revealStoredHaven();
+        await flushFtuePersistence();
+        transitionTo({
+          announcement: 'Showing the First Bloom',
+          target: 'katchimeras',
+          navigate: () => router.dismissTo('/(tabs)/katchimeras'),
         });
+        return;
       }
+      ftueHandoffRef.current = false;
     }
     if (run?.stepId === 'companion.resident_affinity') {
       commitFtueAction({ actionId: 'companion.complete_resident_affinity', evidenceRef: 'mossprout-resident-affinity' });
       return;
     }
     if (run?.stepId === 'companion.resident_match_result') {
-      commitFtueAction({ actionId: 'companion.ack_resident_match_result', evidenceRef: 'mossprout-resident-match-result' });
-      finishResidentMergeSession();
-      await flushFtuePersistence();
+      await completeResidentResultExit('mossprout:ftue:resident-match-result');
     }
-  }, [ftueConversationDefinitionId]);
+  }, [completeResidentResultExit, ftueConversationDefinitionId, router, transitionTo]);
   const completeFtueProfileStep = useCallback((nickname?: string) => {
     const run = loadFtueRun();
     if (run?.status !== 'active') return;
@@ -422,12 +433,14 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   // retain the kingdom, interaction sheet, image stage, subscriptions, or
   // animation worklets behind Today, Merge, or a quest. All durable companion
   // progress already lives in the repositories and is rehydrated on focus.
-  if (!isFocused || !discovery.ready || (residentMergeFtueActive && !residentStoryResumeActive)) {
+  if (!surfaceActive || (!discovery.ready && !hostedInHaven) || (residentMergeFtueActive && !residentStoryResumeActive)) {
     return <View style={styles.inactiveScreen} />;
   }
 
   return (
     <KingdomCompanionScreen
+      active={surfaceActive}
+      forceMossproutAvailable={hostedInHaven}
       ftueConversationDefinitionId={ftueConversationDefinitionId}
       initialConversationDefinitionId={!residentStoryResumeActive && navigationFtueRun?.status === 'active' && navigationFtueRun.stepId === 'companion.resident_affinity'
         ? 'mossprout:game:form-finder'
@@ -464,13 +477,13 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       onFtueOpenResidentParcel={openFtueResidentParcel}
       initialCreatureId={creatureId}
       onCloseCompanion={() => ftueRouteOrigin && navigationFtueRun?.status !== 'active' ? transitionTo({
-        announcement: 'Opening Today',
-        target: 'today',
-        navigate: () => router.dismissTo('/today'),
+        announcement: 'Returning to Haven',
+        target: 'katchimeras',
+        navigate: () => router.dismissTo('/(tabs)/katchimeras'),
       }) : source === 'merge-world' ? transitionTo({
         announcement: 'Returning to Haven',
         target: 'katchimeras',
-        navigate: () => router.dismissTo('/katchimeras'),
+        navigate: () => router.dismissTo('/(tabs)/katchimeras'),
       }) : router.back()}
       onOpenMerge={familyId === 'mossprout' ? (orderId) => {
         transitionTo({
@@ -490,6 +503,8 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
         });
       }}
       presentation="companion"
+      renderRegularStage={renderRegularStage}
+      reuseUnderlyingStage={reuseUnderlyingStage}
     />
   );
 }

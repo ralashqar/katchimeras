@@ -9,9 +9,9 @@ export const MOSSPROUT_CHAPTER_ZERO_REQUESTS = [
   {
     id: `${ORDER_PREFIX}first-sprout`,
     badge: 'FIRST',
-    title: 'A Brighter Corner',
-    description: 'Grow a Sprout to make the Garden feel welcoming again.',
-    definitionId: 'nature:garden:2',
+    title: 'The First Bloom',
+    description: 'Bring two Sprouts together to make the Grove grow again.',
+    definitionId: 'nature:garden:3',
   },
   {
     id: `${ORDER_PREFIX}home-plant`,
@@ -33,10 +33,10 @@ export function mossproutChapterZeroOrder(now: number, rewardWispId: WispId = 's
   return {
     id: MOSSPROUT_CHAPTER_ZERO_REQUESTS[0].id,
     characterId: 'mossprout',
-    title: 'A Brighter Corner',
-    description: 'Grow a Sprout to make the Garden feel welcoming again.',
+    title: 'The First Bloom',
+    description: 'Bring two Sprouts together to make the Grove grow again.',
     difficulty: 'small',
-    requirements: [{ definitionId: 'nature:garden:2', quantity: 1 }],
+    requirements: [{ definitionId: 'nature:garden:3', quantity: 1 }],
     reward: { coins: 20, mergeXp: 15, friendshipXp: 0, energy: 0 },
     createdAt: now,
     signature: false,
@@ -106,8 +106,8 @@ export function advanceMossproutChapterZero(state: MergeWorldState, servedOrderI
 }
 
 /**
- * The current FTUE ends after the first Sprout. Retire the older multi-order
- * tutorial and return the Wild Garden to its normal Seed/Pebble drop table.
+ * The current FTUE ends after the First Bloom. Retire the older multi-order
+ * tutorial and return the Garden Basket to its normal Seed/Pebble drop table.
  */
 export function completeMossproutChapterZeroSlice(state: MergeWorldState, now = Date.now()): MergeWorldState {
   const garden = state.generators[FTUE_GARDEN_GENERATOR_ID];
