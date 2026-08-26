@@ -59,14 +59,23 @@ test('procedural Merge orders fill three slots and remain separate from story or
   assert.ok(procedural.every((order) => order.purpose === 'normal' && !order.signature && !order.chapterId));
 });
 
-test('Mossprout FTUE continues from Day One into the resident-card chapter', () => {
-  assert.equal(mossproutFtueStep('merge.serve_sprout')?.edges?.[0]?.nextStepId, 'companion.chapter_zero_return');
-  assert.equal(mossproutFtueStep('companion.chapter_zero_return')?.actions[0]?.nextStepId, 'companion.bond_spotlight');
+test('Mossprout FTUE introduces friendship before the Garden and then opens the matched resident chapter', () => {
+  assert.equal(mossproutFtueStep('hatch.reveal')?.actions[0]?.nextStepId, 'companion.intro_action');
+  assert.equal(mossproutFtueStep('companion.intro_action')?.actions[0]?.nextStepId, 'companion.first_meeting');
+  assert.equal(mossproutFtueStep('companion.first_meeting')?.actions[0]?.nextStepId, 'companion.nickname');
+  assert.equal(mossproutFtueStep('companion.nickname')?.actions[0]?.nextStepId, 'companion.bond_intro');
+  assert.equal(mossproutFtueStep('companion.bond_intro')?.actions[0]?.nextStepId, 'companion.bond_spotlight');
   assert.equal(mossproutFtueStep('companion.bond_spotlight')?.actions[0]?.nextStepId, 'companion.day_one_action');
-  assert.equal(mossproutFtueStep('companion.day_one_action')?.actions[0]?.nextStepId, 'companion.resident_affinity');
+  assert.equal(mossproutFtueStep('companion.day_one_action')?.actions.find((action) => action.id === 'companion.choose_bond_share')?.options?.length, 3);
+  assert.equal(mossproutFtueStep('companion.day_one_action')?.actions.find((action) => action.id === 'companion.complete_day_one_action')?.nextStepId, 'companion.garden_intro');
+  assert.equal(mossproutFtueStep('companion.garden_intro')?.actions[0]?.nextStepId, 'companion.order_preview');
+  assert.equal(mossproutFtueStep('merge.serve_sprout')?.edges?.[0]?.nextStepId, 'companion.chapter_zero_return');
+  assert.equal(mossproutFtueStep('companion.chapter_zero_return')?.actions[0]?.nextStepId, 'companion.resident_parcel_ready');
+  // Retained as a recovery route for older resident-matching saves.
   assert.equal(mossproutFtueStep('companion.resident_affinity')?.actions[0]?.nextStepId, 'companion.resident_parcel_ready');
   assert.equal(mossproutFtueStep('companion.resident_parcel_ready')?.actions[0]?.nextStepId, 'merge.resident_parcel');
-  assert.equal(mossproutFtueStep('merge.resident_card_reward')?.edges?.[0]?.nextStepId, 'complete');
+  assert.equal(mossproutFtueStep('merge.resident_card_reward')?.edges?.[0]?.nextStepId, 'companion.resident_match_result');
+  assert.equal(mossproutFtueStep('companion.resident_match_result')?.actions[0]?.nextStepId, 'complete');
   assert.equal(mossproutFtueStep('haven.reveal')?.surface, 'haven');
   assert.equal(mossproutFtueStep('haven.reveal')?.actions[0]?.nextStepId, 'complete');
   assert.equal(mossproutFtueStep('haven.reveal')?.actions[0]?.title, 'Finish');

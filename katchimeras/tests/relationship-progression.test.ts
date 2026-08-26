@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   acknowledgeKatchimeraActionCompletion,
+  acknowledgeKatchimeraDayActionOutro,
   acknowledgeMossproutJourneyActionOutro,
   attachKatchimeraActionRewardReceipt,
   beginMossproutJourneyReturn,
@@ -12,6 +13,7 @@ import {
   completeMossproutJourneyOpening,
   completeMossproutResidentCardDiscovery,
   emptyRelationshipProgressState,
+  isMossproutFtueRoutineActionId,
   makeMossproutResolutionAvailable,
   mossproutDailyActionDeck,
   mossproutJourneyForDay,
@@ -277,7 +279,7 @@ test('legacy relationship state normalizes with an empty skipped-action ledger',
     completedActionOutros: [],
   });
   assert.deepEqual(normalized.skippedActionIds, []);
-  assert.equal(normalized.schemaVersion, 5);
+  assert.equal(normalized.schemaVersion, 6);
   assert.deepEqual(normalized.mossproutDailyActionDecks, []);
 });
 
@@ -753,6 +755,78 @@ test('the Day 1 Bond lesson shows its three authored choices without coin-only G
   assert.equal(actions.some((action) => action.kind === 'garden_request'), false);
 });
 
+test('the inline Day 1 FTUE receipt refills all three action rows without completing a Journey action', () => {
+  const dayId = '2026-08-21';
+  let state = startMossproutJourneyDay(emptyRelationshipProgressState(), dayId, 1).state;
+  state = recordMossproutFirstGardenRestored(state, dayId, 'merge-order:first-plant', 2);
+  state = completeMossproutJourneyConversation(state, 'mossprout:ftue:chapter-zero-return', 3);
+  state = finishDayOneResident(state, dayId, 5);
+  const journeyBeforeAcknowledgement = mossproutJourneyForDay(state, dayId)!;
+  for (const action of journeyBeforeAcknowledgement.actions.filter((candidate) => candidate.status === 'completed')) {
+    state = acknowledgeMossproutJourneyActionOutro(state, dayId, action.id, 6);
+  }
+
+  const input = {
+    dayId,
+    goals: [],
+    hasActiveFocus: true,
+    journey: mossproutJourneyForDay(state, dayId),
+    offers: [],
+    storyComplete: false,
+  };
+  const withoutFtueReceipt = resolveMossproutDayActions(input);
+  const actions = resolveMossproutDayActions({ ...input, dayOneLessonCompleted: true });
+
+  assert.equal(withoutFtueReceipt.length, 2);
+  assert.equal(actions.length, 3);
+  assert.deepEqual(new Set(actions.map((action) => action.kind)), new Set(['goal_plan', 'fun_chat', 'journal_prompt']));
+});
+
+test('the completed Day 1 Journey outro renders once and then releases the Together slot', () => {
+  const dayId = '2026-08-21';
+  let state = startMossproutJourneyDay(emptyRelationshipProgressState(), dayId, 1).state;
+  state = recordMossproutFirstGardenRestored(state, dayId, 'merge-order:first-plant', 2);
+  state = completeMossproutJourneyConversation(state, 'mossprout:ftue:chapter-zero-return', 3);
+  state = finishDayOneResident(state, dayId, 4);
+
+  const input = {
+    dayId,
+    dayOneLessonCompleted: true,
+    gardenRequests: [{
+      id: 'daily-order',
+      title: 'A Garden request',
+      description: 'Bring one growing thing.',
+      difficulty: 'small' as const,
+      requirements: [{ definitionId: 'nature:garden:2', quantity: 1 }],
+      coins: 20,
+    }],
+    goals: [],
+    hasActiveFocus: false,
+    offers: [],
+    storyComplete: false,
+  };
+  const beforeAcknowledgement = resolveMossproutDayActions({
+    ...input,
+    journey: mossproutJourneyForDay(state, dayId),
+  });
+  const visibleOutro = composeMossproutVisibleActions(beforeAcknowledgement, null);
+
+  assert.equal(beforeAcknowledgement.length, 3);
+  assert.equal(visibleOutro.length, 3);
+  assert.equal(visibleOutro[0]?.kind, 'story_chat');
+  assert.equal(visibleOutro[0]?.status, 'completed');
+
+  state = acknowledgeKatchimeraDayActionOutro(state, dayId, visibleOutro[0]!, 5);
+  const afterAcknowledgement = resolveMossproutDayActions({
+    ...input,
+    journey: mossproutJourneyForDay(state, dayId),
+  });
+
+  assert.equal(afterAcknowledgement.length, 3);
+  assert.equal(afterAcknowledgement.every((action) => action.status !== 'completed'), true);
+  assert.equal(afterAcknowledgement.some((action) => action.slotId === 'together'), true);
+});
+
 test('a Journey action keeps one row identity through completion and reveals its replacements', () => {
   const dayId = '2026-08-21';
   let state = startMossproutJourneyDay(emptyRelationshipProgressState(), dayId, 1).state;
@@ -883,13 +957,131 @@ test('Mossprout action completion receipts are durable and idempotent', () => {
   assert.deepEqual(once.mossproutDailyActionDecks[0]?.consumedActionIds.field, [input.actionId]);
 });
 
+test('Journey and FTUE completions never consume a normal daily action slot', () => {
+  const dayId = '2026-08-21';
+  const source = {
+    dayId,
+    familyId: 'mossprout' as const,
+    actionId: 'mossprout:quiet-patch:first-flower:field-note',
+    instanceId: `${dayId}:field:0:mossprout:quiet-patch:first-flower:field-note`,
+    sourceSlotId: 'field' as const,
+    slotId: 'field' as const,
+    sequence: 0,
+    kind: 'journal_prompt' as const,
+    title: 'Notice one growing thing',
+    subtitle: 'Field note kept with Mossprout',
+    icon: 'square.and.pencil' as const,
+    artworkDefinitionIds: [],
+    reward: { kind: 'bond' as const, amount: 20 },
+    journeyId: `journey-day:${dayId}:mossprout`,
+    journeyActionId: 'mossprout:quiet-patch:first-flower:field-note',
+    rotationEffect: 'preserve' as const,
+    presentation: 'action_card' as const,
+  };
+  const recorded = recordKatchimeraActionCompletionEvent(emptyRelationshipProgressState(), { source, completedAt: 10 });
+
+  assert.equal(recorded.actionCompletionEvents.length, 1);
+  assert.deepEqual(mossproutDailyActionDeck(recorded, dayId), {
+    dayId,
+    slotSequences: { together: 0, field: 0, garden: 0 },
+    consumedActionIds: { together: [], field: [], garden: [] },
+  });
+
+  const legacyPersisted = {
+    ...recorded,
+    mossproutDailyActionDecks: [{
+      dayId,
+      slotSequences: { together: 0, field: 1, garden: 0 },
+      consumedActionIds: { together: [], field: [source.actionId], garden: [] },
+    }],
+  };
+  assert.deepEqual(mossproutDailyActionDeck(legacyPersisted, dayId), {
+    dayId,
+    slotSequences: { together: 0, field: 0, garden: 0 },
+    consumedActionIds: { together: [], field: [], garden: [] },
+  });
+
+  const withNormalCompletion = recordKatchimeraActionCompletionEvent(recorded, {
+    completedAt: 20,
+    source: {
+      ...source,
+      actionId: 'mossprout:conversation:normal-field-note',
+      instanceId: `${dayId}:field:0:mossprout:conversation:normal-field-note`,
+      journeyId: undefined,
+      journeyActionId: undefined,
+      rotationEffect: 'consume',
+      reward: { kind: 'bond', amount: 4 },
+    },
+  });
+  assert.equal(mossproutDailyActionDeck(withNormalCompletion, dayId).slotSequences.field, 1);
+  assert.deepEqual(mossproutDailyActionDeck(withNormalCompletion, dayId).consumedActionIds.field, [
+    'mossprout:conversation:normal-field-note',
+  ]);
+});
+
+test('legacy Meet Mossprout FTUE receipts release the routine action row', () => {
+  const dayId = '2026-08-21';
+  const actionId = 'mossprout:conversation:mossprout:ftue:first-meeting:calm';
+  const source = {
+    dayId,
+    familyId: 'mossprout' as const,
+    actionId,
+    instanceId: `${dayId}:together:0:${actionId}`,
+    sourceSlotId: 'together' as const,
+    slotId: 'together' as const,
+    sequence: 0,
+    kind: 'fun_chat' as const,
+    title: 'Meet Mossprout',
+    subtitle: 'Mossprout loved that answer',
+    icon: 'bubble.left.fill' as const,
+    artworkDefinitionIds: [],
+    reward: { kind: 'bond' as const, amount: 4 },
+    rotationEffect: 'preserve' as const,
+    presentation: 'action_card' as const,
+  };
+
+  assert.equal(isMossproutFtueRoutineActionId(actionId), true);
+  const newlyRecorded = recordKatchimeraActionCompletionEvent(emptyRelationshipProgressState(), {
+    source,
+    completedAt: 10,
+  });
+  assert.equal(newlyRecorded.mossproutDailyActionDecks.length, 0);
+
+  const repaired = normalizeRelationshipProgressState({
+    ...newlyRecorded,
+    actionCompletionEvents: [{
+      ...newlyRecorded.actionCompletionEvents[0],
+      source: { ...newlyRecorded.actionCompletionEvents[0]!.source, rotationEffect: undefined },
+      acknowledgedAt: null,
+    }],
+    mossproutDailyActionDecks: [{
+      dayId,
+      slotSequences: { together: 1, field: 0, garden: 0 },
+      consumedActionIds: { together: [actionId], field: [], garden: [] },
+    }],
+  });
+  assert.equal(repaired.actionCompletionEvents[0]?.acknowledgedAt, 10);
+  assert.equal(repaired.actionCompletionEvents[0]?.source.rotationEffect, 'preserve');
+  assert.deepEqual(repaired.mossproutDailyActionDecks[0], {
+    dayId,
+    slotSequences: { together: 0, field: 0, garden: 0 },
+    consumedActionIds: { together: [], field: [], garden: [] },
+  });
+  assert.deepEqual(mossproutDailyActionDeck(repaired, dayId), {
+    dayId,
+    slotSequences: { together: 0, field: 0, garden: 0 },
+    consumedActionIds: { together: [], field: [], garden: [] },
+  });
+  assert.deepEqual(normalizeRelationshipProgressState(repaired), repaired, 'the repaired schema remains stable on the next hydration');
+});
+
 test('completion events keep their launch identity, reward receipt, and replay until acknowledged', () => {
   const source = {
     dayId: '2026-08-21', familyId: 'mossprout' as const, actionId: 'mossprout:conversation:weather',
     instanceId: '2026-08-21:together:2:mossprout:conversation:weather', sourceSlotId: 'together' as const,
     slotId: 'garden' as const, sequence: 2, kind: 'fun_chat' as const, title: 'Choose the perfect weather',
     subtitle: 'A very official weather decision', icon: 'bubble.left.fill' as const, artworkDefinitionIds: [],
-    reward: { kind: 'bond' as const, amount: 4 }, presentation: 'action_card' as const,
+    reward: { kind: 'bond' as const, amount: 4 }, rotationEffect: 'consume' as const, presentation: 'action_card' as const,
   };
   let state = recordKatchimeraActionCompletionEvent(emptyRelationshipProgressState(), { source, completedAt: 10 });
   const completion = state.actionCompletionEvents[0]!;
@@ -912,7 +1104,7 @@ test('multiple unacknowledged completion events retain chronological queue order
     dayId, familyId: 'mossprout' as const, actionId, instanceId: `${dayId}:together:0:${actionId}`,
     sourceSlotId: 'together' as const, slotId: 'together' as const, sequence: 0, kind: 'fun_chat' as const,
     title: actionId, subtitle: '', icon: 'bubble.left.fill' as const, artworkDefinitionIds: [],
-    reward: { kind: 'bond' as const, amount: 4 }, presentation: 'action_card' as const,
+    reward: { kind: 'bond' as const, amount: 4 }, rotationEffect: 'consume' as const, presentation: 'action_card' as const,
   });
   let state = recordKatchimeraActionCompletionEvent(emptyRelationshipProgressState(), {
     source: makeSource('2026-08-22', 'second'), completedAt: 20,

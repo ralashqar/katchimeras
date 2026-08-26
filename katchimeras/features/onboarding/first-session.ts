@@ -1,4 +1,4 @@
-import { beginFtueRun, commitFtueAction, loadFtueRun, updateFtueRun, useFtueRun } from './ftue-runtime';
+import { beginFtueRun, completeFtueRun, loadFtueRun, updateFtueRun, useFtueRun } from './ftue-runtime';
 import { resetEggAvatarSelection } from '@/utils/egg-avatar-storage';
 
 export type FirstSessionStage = 'today' | 'merge' | 'complete';
@@ -34,7 +34,7 @@ export function updateFirstSession(patch: Partial<Pick<FirstSessionState, 'stage
 }
 
 export function completeFirstSession() {
-  updateFtueRun({ stepId: 'complete', status: 'complete', completedAt: new Date().toISOString() });
+  completeFtueRun();
   return loadFirstSession();
 }
 

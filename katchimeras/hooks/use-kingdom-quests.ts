@@ -1070,7 +1070,13 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     return selection?.signal ? { definitionId: selection.definition.id, sourceKind: selection.signal.kind } : null;
   }, [companionContentState.conversationSessions, companionContentState.conversationSignals, selectedBondProgress.level, selectedEncounterId, selectedFamilyId, selectedFriendshipProgress.level, today?.isoDate]);
   const selectedMossproutActionCandidates = useMemo<MossproutActionCandidate[]>(() => {
-    if (selectedFamilyId !== 'mossprout' || !selectedEncounterId || !today?.isoDate) return [];
+    if (selectedFamilyId !== 'mossprout' || !today?.isoDate) return [];
+    // Dashboard actions belong to the resident and the current day, not to a
+    // transient visit encounter. The resident route can legitimately clear or
+    // recreate selectedEncounterId while FTUE hands ownership back to normal
+    // play. Gating the pool on that value left only the two seeded Garden
+    // orders after FTUE, so the completed tutorial row had no replacement.
+    const actionSelectionSeed = `mossprout-actions:${selectedResident?.creature.creatureId ?? 'mossprout'}:${today.isoDate}`;
     const allDefinitions = companionConversationDefinitionsForFamily('mossprout');
     const definitions = allDefinitions
       .filter((definition) => definition.format !== 'profile_game' || isConversationV2IdealSkinFamily('mossprout'));
@@ -1082,11 +1088,15 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
           poolId,
           definitions,
           sessions: companionContentState.conversationSessions,
-          seed: `${selectedEncounterId}:actions:${poolId}`,
+          seed: `${actionSelectionSeed}:${poolId}`,
           excludeDefinitionIds: selected.map((definition) => definition.id),
           dayId: today.isoDate,
           bondLevel: selectedBondProgress.level,
           friendshipLevel: selectedFriendshipProgress.level,
+          // The action stack is a rotating daily surface. Once all authored
+          // entries in a family have been seen recently, reuse an authored
+          // after-cooldown entry rather than permanently shrinking the stack.
+          allowCooldownFallback: true,
         });
         if (!next) return selected;
         selected.push(next);
@@ -1100,11 +1110,12 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
           mode,
           definitions,
           sessions: companionContentState.conversationSessions,
-          seed: `${selectedEncounterId}:actions:${mode}`,
+          seed: `${actionSelectionSeed}:${mode}`,
           excludeDefinitionIds: selected.map((definition) => definition.id),
           dayId: today.isoDate,
           bondLevel: selectedBondProgress.level,
           friendshipLevel: selectedFriendshipProgress.level,
+          allowCooldownFallback: true,
         });
         if (!next) return selected;
         selected.push(next);
@@ -1128,7 +1139,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       ...insights.map((insight) => ({ mode: 'discover' as const, definitionId: insight.id, title: insight.title, questionCount: conversationQuestionCount(insight), label: 'Find your outside instinct', description: 'Three questions, then a result you can keep or leave.' })),
       focusDirection,
     ];
-  }, [companionContentState.conversationSessions, selectedBondProgress.level, selectedEncounterId, selectedFamilyId, selectedFriendshipProgress.level, today?.isoDate]);
+  }, [companionContentState.conversationSessions, selectedBondProgress.level, selectedFamilyId, selectedFriendshipProgress.level, selectedResident?.creature.creatureId, today?.isoDate]);
   const selectedConversationStarters = useMemo(() => {
     if (!selectedFamilyId || !selectedEncounterId || !isConversationV2Family(selectedFamilyId) || !today?.isoDate) return [];
     if (selectedFamilyId === 'mossprout') {

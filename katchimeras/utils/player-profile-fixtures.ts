@@ -9,20 +9,28 @@ import type { OnboardingProfile } from '@/utils/onboarding-state';
 
 const DAY = 86_400_000;
 const COMPLETE_PROFILE: OnboardingProfile = {
+  schemaVersion: 3,
   completed: true,
   aspirationId: 'feel-more-present',
   painPointIds: ['days-blur-together'],
   preferenceIds: ['small-daily-steps'],
   completedAt: 'relative',
   hatchHour: 20,
+  playerNickname: null,
+  mossproutAnswers: { desiredFeelingId: null, mainDifficultyId: null, supportStyleId: null, lifePriorityId: null, companionPlaceId: null },
+  matchedResidentId: null,
 };
 const FRESH_PROFILE: OnboardingProfile = {
+  schemaVersion: 3,
   completed: false,
   aspirationId: null,
   painPointIds: [],
   preferenceIds: [],
   completedAt: null,
   hatchHour: null,
+  playerNickname: null,
+  mossproutAnswers: { desiredFeelingId: null, mainDifficultyId: null, supportStyleId: null, lifePriorityId: null, companionPlaceId: null },
+  matchedResidentId: null,
 };
 
 type FixtureDefinition = {

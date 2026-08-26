@@ -9,6 +9,7 @@ import {
   recordCompanionBondEvent,
   resetCompanionBondForCreatures,
   syncCompanionBondEvent,
+  companionBondProgressForTotal,
 } from '@/utils/companion-bond';
 import type { CompanionQuestState } from '@/utils/katchimera-quests';
 import { selectBalancedQuestOffers, selectRankedQuestOffers, sortQuestOffersByAvailability } from '@/utils/quest-offer-order';
@@ -55,6 +56,13 @@ test('bond events are idempotent and use their configured reward', () => {
   assert.equal(duplicate.state.events.length, 1);
 });
 
+test('Familiar begins only when the first Bond level is completely filled', () => {
+  assert.equal(companionBondProgressForTotal(20).relationshipStage, 'Stranger');
+  assert.equal(companionBondProgressForTotal(49).relationshipStage, 'Stranger');
+  assert.equal(companionBondProgressForTotal(50).relationshipStage, 'Familiar');
+  assert.equal(companionBondProgressForTotal(50).level, 2);
+});
+
 test('every distinct conversation task awards its advertised Bond on the same day', () => {
   const first = recordCompanionBondEvent(emptyCompanionBondState(), {
     id: 'conversation:mossprout:morning', creatureId: 'mossprout', kind: 'conversation_completed', occurredAt: 1, dayId: '2026-08-22',
@@ -70,8 +78,8 @@ test('every distinct conversation task awards its advertised Bond on the same da
   assert.equal(repeated.points, 8);
   assert.equal(nextDay.awarded, true);
   assert.equal(nextDay.state.pendingCelebrations?.length, 3);
-  assert.equal(companionBondProgress(nextDay.state, 'mossprout').relationshipStage, 'Familiar');
-  assert.equal(companionBondProgress(nextDay.state, 'mossprout').relationshipPointsRemaining, 76);
+  assert.equal(companionBondProgress(nextDay.state, 'mossprout').relationshipStage, 'Stranger');
+  assert.equal(companionBondProgress(nextDay.state, 'mossprout').relationshipPointsRemaining, 26);
 });
 
 test('Journey Bond sync queues every newly advertised contribution without duplicating prior motes', () => {

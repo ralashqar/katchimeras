@@ -9,8 +9,8 @@ export const MOSSPROUT_CHAPTER_ZERO_REQUESTS = [
   {
     id: `${ORDER_PREFIX}first-sprout`,
     badge: 'FIRST',
-    title: 'The Remembered Plant',
-    description: 'Bring two Seeds together to make Mossprout’s first Sprout.',
+    title: 'A Brighter Corner',
+    description: 'Grow a Sprout to make the Garden feel welcoming again.',
     definitionId: 'nature:garden:2',
   },
   {
@@ -33,8 +33,8 @@ export function mossproutChapterZeroOrder(now: number, rewardWispId: WispId = 's
   return {
     id: MOSSPROUT_CHAPTER_ZERO_REQUESTS[0].id,
     characterId: 'mossprout',
-    title: 'The Remembered Plant',
-    description: 'Bring two Seeds together to make Mossprout’s first Sprout.',
+    title: 'A Brighter Corner',
+    description: 'Grow a Sprout to make the Garden feel welcoming again.',
     difficulty: 'small',
     requirements: [{ definitionId: 'nature:garden:2', quantity: 1 }],
     reward: { coins: 20, mergeXp: 15, friendshipXp: 0, energy: 0 },

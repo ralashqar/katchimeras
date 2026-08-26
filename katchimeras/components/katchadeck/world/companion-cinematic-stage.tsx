@@ -1,8 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { type LayoutChangeEvent, Pressable, type StyleProp, StyleSheet, type TextStyle, useWindowDimensions, View, type View as ViewType } from 'react-native';
 import Animated, {
   Easing,
+  LinearTransition,
   ZoomIn,
   ZoomOut,
   type SharedValue,
@@ -77,9 +78,33 @@ export function CompanionCinematicStage({
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const { height, width } = useWindowDimensions();
-  const questionnaireBubble = bubbleVariant === 'questionnaire';
-  const speechTitle = title.trim();
-  const speechBody = questionnaireBubble ? bubbleBody?.trim() ?? '' : '';
+  const incomingSpeechTitle = title.trim();
+  const incomingSpeechBody = bubbleVariant === 'questionnaire' ? bubbleBody?.trim() ?? '' : '';
+  const incomingSpeechPresent = incomingSpeechTitle.length > 0 || incomingSpeechBody.length > 0;
+  const [retainedSpeech, setRetainedSpeech] = useState(() => ({
+    body: incomingSpeechBody,
+    title: incomingSpeechTitle,
+    variant: bubbleVariant,
+  }));
+  useLayoutEffect(() => {
+    if (!incomingSpeechPresent) return;
+    setRetainedSpeech((current) => (
+      current.body === incomingSpeechBody
+      && current.title === incomingSpeechTitle
+      && current.variant === bubbleVariant
+        ? current
+        : { body: incomingSpeechBody, title: incomingSpeechTitle, variant: bubbleVariant }
+    ));
+  }, [bubbleVariant, incomingSpeechBody, incomingSpeechPresent, incomingSpeechTitle]);
+  // Conversation commits can briefly clear the current node before the next
+  // node arrives. Keep the last real line mounted during that handoff; callers
+  // still hide the bubble explicitly with showSpeechBubble when it should leave.
+  const renderedSpeech = incomingSpeechPresent
+    ? { body: incomingSpeechBody, title: incomingSpeechTitle, variant: bubbleVariant }
+    : retainedSpeech;
+  const questionnaireBubble = renderedSpeech.variant === 'questionnaire';
+  const speechTitle = renderedSpeech.title;
+  const speechBody = questionnaireBubble ? renderedSpeech.body : '';
   const hasSpeechTitle = speechTitle.length > 0;
   const hasSpeechBody = speechBody.length > 0;
   const speechBubbleVisible = showSpeechBubble && (hasSpeechTitle || hasSpeechBody);
@@ -94,6 +119,9 @@ export function CompanionCinematicStage({
     && (!hasSpeechBody || revealedBodyKey === speechKey)
   );
   const speechBubblePressable = speechBubbleVisible && (!speechFullyRevealed || Boolean(onSpeechBubblePress));
+  const speechBubbleLayout = reduceMotion
+    ? undefined
+    : LinearTransition.duration(190).easing(Easing.out(Easing.cubic));
   const handleSpeechBubblePress = () => {
     if (!speechFullyRevealed) {
       setRevealAllSpeechKey(speechKey);
@@ -179,7 +207,8 @@ export function CompanionCinematicStage({
             accessibilityLabel={`${name} says: ${[speechTitle, speechBody].filter(Boolean).join(' ')}`}
             entering={reduceMotion ? undefined : ZoomIn.duration(190).easing(Easing.out(Easing.cubic))}
             exiting={reduceMotion ? undefined : ZoomOut.duration(140).easing(Easing.in(Easing.cubic))}
-            key={questionnaireBubble ? `question:${speechKey}` : 'destination-speech'}
+            key={questionnaireBubble ? 'questionnaire-speech' : 'destination-speech'}
+            layout={speechBubbleLayout}
             onLayout={(event: LayoutChangeEvent) => onSpeechBubbleHeightChange?.(event.nativeEvent.layout.height)}
             style={[{ left: (width - bubbleWidth) / 2, position: 'absolute', top: speechBubbleTop, width: bubbleWidth, zIndex: 4 }, subjectPanStyle]}>
             <Pressable
@@ -195,7 +224,6 @@ export function CompanionCinematicStage({
               <View style={styles.speechTail} />
             {hasSpeechTitle ? <TypewriterText
               durationMs={560}
-              key={`speech-title:${speechTitle}`}
               onComplete={() => setRevealedTitleKey(speechKey)}
               reduceMotion={reduceMotion}
               revealAll={revealAllSpeech}
@@ -213,7 +241,6 @@ export function CompanionCinematicStage({
               <TypewriterText
                 delayMs={170}
                 durationMs={640}
-                key={`speech-body:${speechBody}`}
                 onComplete={() => setRevealedBodyKey(speechKey)}
                 reduceMotion={reduceMotion}
                 revealAll={revealAllSpeech}
@@ -294,7 +321,13 @@ function TypewriterText({
   text: string;
 }) {
   const characters = useMemo(() => Array.from(text), [text]);
-  const [visibleCount, setVisibleCount] = useState(() => reduceMotion ? characters.length : 0);
+  const [revealState, setRevealState] = useState(() => ({
+    count: reduceMotion ? characters.length : 0,
+    text,
+  }));
+  const visibleCount = revealState.text === text
+    ? revealState.count
+    : reduceMotion || revealAll ? characters.length : 0;
   const [fittedFontScale, setFittedFontScale] = useState(1);
   const [fitComplete, setFitComplete] = useState(!numberOfLines);
   const [fitWidth, setFitWidth] = useState(0);
@@ -318,18 +351,17 @@ function TypewriterText({
   useEffect(() => {
     setFittedFontScale(1);
     setFitComplete(!numberOfLines);
-    setMeasuredLineCount(null);
     largestFittingScaleRef.current = null;
     smallestOverflowingScaleRef.current = null;
   }, [fitWidth, numberOfLines, text]);
 
   useEffect(() => {
     if (reduceMotion || revealAll) {
-      setVisibleCount(characters.length);
+      setRevealState({ count: characters.length, text });
       return;
     }
 
-    setVisibleCount(0);
+    setRevealState({ count: 0, text });
     let frame: number | null = null;
     const startAt = performance.now() + delayMs;
     const reveal = (timestamp: number) => {
@@ -339,14 +371,18 @@ function TypewriterText({
       }
       const ratio = Math.min(1, (timestamp - startAt) / durationMs);
       const nextCount = Math.min(characters.length, Math.ceil(characters.length * ratio));
-      setVisibleCount((current) => current === nextCount ? current : nextCount);
+      setRevealState((current) => (
+        current.text === text && current.count === nextCount
+          ? current
+          : { count: nextCount, text }
+      ));
       if (ratio < 1) frame = requestAnimationFrame(reveal);
     };
     frame = requestAnimationFrame(reveal);
     return () => {
       if (frame !== null) cancelAnimationFrame(frame);
     };
-  }, [characters, delayMs, durationMs, reduceMotion, revealAll]);
+  }, [characters, delayMs, durationMs, reduceMotion, revealAll, text]);
 
   const complete = visibleCount >= characters.length;
   useEffect(() => {

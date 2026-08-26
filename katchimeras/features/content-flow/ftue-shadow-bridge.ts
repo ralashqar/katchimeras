@@ -33,7 +33,15 @@ async function recordComparison(runId: string, expectedNodeId: string, source: s
 export async function mirrorFtueActionInShadow(before: FtueRunState, actionId: string, expectedNodeId: string) {
   const run = await ensureShadowRun(before);
   if (run.executionMode !== 'shadow' || run.nodeId !== before.stepId) return;
-  await dispatchContentFlowCommand(run.runId, { type: 'submit_scene', actionId });
+  const definition = contentFlowDefinition(MOSSPROUT_FTUE_SCRIPT.id, MOSSPROUT_FTUE_SCRIPT.version);
+  const node = definition?.nodes.find((candidate) => candidate.id === before.stepId);
+  const shadowActionId = node?.kind === 'scene'
+    ? node.actions.find((action) => (
+      (action.id === actionId || action.id.startsWith(`${actionId}#branch-`))
+      && action.next === expectedNodeId
+    ))?.id ?? actionId
+    : actionId;
+  await dispatchContentFlowCommand(run.runId, { type: 'submit_scene', actionId: shadowActionId });
   await recordComparison(run.runId, expectedNodeId, `action:${actionId}`);
 }
 

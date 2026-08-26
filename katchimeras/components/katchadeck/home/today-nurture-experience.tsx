@@ -406,7 +406,12 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   // world-space buffer before the egg's measured visual top.
   const growthMeterTop = eggVisualTop - 81;
   const scenePinchFocusY = stageTop + sceneLift + explorationEggFrame.centerY;
-  const onboardingEggSleeping = Boolean(onboardingFocus && scriptedMoodAction && !scriptedMoodSelection);
+  const openingQuestionAwaitingAnswer = scriptedTextChoiceAction?.id === 'egg.desired_feeling'
+    && !currentScriptedTextSelection;
+  const onboardingEggSleeping = Boolean(onboardingFocus && (
+    (scriptedMoodAction && !scriptedMoodSelection)
+    || openingQuestionAwaitingAnswer
+  ));
   // A fresh regular Today Egg begins in the same dormant visual state as the
   // Discovery Egg. The first real-life action owns the wake-up: its feed
   // expression plays immediately, then its persisted Growth receipt keeps the
@@ -1201,6 +1206,32 @@ const FTUE_CHOICE_TONES = [
 
 function getFtueChoiceArt(option: FtueChoiceOption): ImageSourcePropType {
   switch (option.domainChoiceId ?? option.id) {
+    case 'more_calm':
+    case 'quiet_company':
+    case 'looking_after_myself':
+      return SLEEP_ART.good;
+    case 'more_confidence':
+    case 'little_cheer':
+      return MOOD_ART.radiant;
+    case 'more_fun':
+    case 'creativity_and_play':
+      return MANUAL_JOURNAL_ART.event;
+    case 'more_connection':
+    case 'friends_and_family':
+      return MANUAL_JOURNAL_ART.people;
+    case 'too_much_to_do':
+    case 'getting_things_done':
+    case 'one_small_step':
+      return MANUAL_JOURNAL_ART.work;
+    case 'low_energy':
+      return SLEEP_ART.low;
+    case 'big_feelings':
+      return MOOD_ART.stormy;
+    case 'mossy_forest':
+    case 'flower_meadow':
+    case 'rainy_pond':
+    case 'windy_hill':
+      return MANUAL_JOURNAL_ART.place;
     case 'work':
     case 'progress':
       return MANUAL_JOURNAL_ART.work;
@@ -1410,12 +1441,13 @@ function InlineSleep({ action, completionEvent, interactionLocked, onChoose, onF
   );
 }
 
-function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent, enterFromBottom = false, illustratedChoices = false, interactionLocked, metric, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture, textChoices = false, wide = false }: {
+function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent, enterFromBottom = false, ftueQuestionLayout = false, illustratedChoices = false, interactionLocked, metric, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture, textChoices = false, wide = false }: {
   action: RankedTodayCareAction;
   allowSkip?: boolean;
   choices: InlineChoice[];
   completionEvent: TodayCareCompletionEvent | null;
   enterFromBottom?: boolean;
+  ftueQuestionLayout?: boolean;
   illustratedChoices?: boolean;
   interactionLocked: boolean;
   metric?: InlineMetric;
@@ -1468,7 +1500,7 @@ function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent
             pointerEvents="none"
             style={[styles.inlineSelectionPulse, { backgroundColor: ownedSelection?.accent ?? 'transparent' }, pulseStyle]}
           />
-          <InlineHeading action={action} allowSkip={allowSkip} disabled={interactionLocked} hideReward={metric != null} illustrated={illustratedChoices} onSkip={onSkip} rewardRef={rewardRef} />
+          <InlineHeading action={action} allowSkip={allowSkip} disabled={interactionLocked} ftueQuestionLayout={ftueQuestionLayout} hideReward={metric != null} illustrated={illustratedChoices} onSkip={onSkip} rewardRef={rewardRef} />
           {metric ? (
             <View collapsable={false} ref={metricRef} style={styles.inlineMetric}>
               <Image contentFit="contain" source={metric.art} style={styles.inlineMetricArt} transition={0} />
@@ -1515,6 +1547,7 @@ function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent
                 }}
                 reduceMotion={reduceMotion}
                 selected={ownedSelection?.id === choice.id}
+                showGlint={!ftueQuestionLayout}
                 surface={choice.surface ?? '#FFF7E8'}
                 threeColumn={illustratedColumnCount === 3}
                 width={illustratedTileWidth}
@@ -1582,10 +1615,11 @@ function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent
   );
 }
 
-function InlineHeading({ action, allowSkip, disabled, hideReward = false, illustrated = false, onSkip, rewardRef }: {
+function InlineHeading({ action, allowSkip, disabled, ftueQuestionLayout = false, hideReward = false, illustrated = false, onSkip, rewardRef }: {
   action: RankedTodayCareAction;
   allowSkip: boolean;
   disabled: boolean;
+  ftueQuestionLayout?: boolean;
   hideReward?: boolean;
   illustrated?: boolean;
   onSkip: () => void;
@@ -1598,7 +1632,7 @@ function InlineHeading({ action, allowSkip, disabled, hideReward = false, illust
     onSkip();
   };
   return (
-    <View style={[styles.inlineHeading, illustrated && styles.illustratedHeading, wideIllustrated && styles.illustratedHeadingWide]}>
+    <View style={[styles.inlineHeading, illustrated && styles.illustratedHeading, ftueQuestionLayout && styles.ftueQuestionHeading, wideIllustrated && styles.illustratedHeadingWide]}>
       {allowSkip ? (
         <Pressable
           accessibilityLabel={`Skip ${action.title} for today`}
@@ -1615,20 +1649,22 @@ function InlineHeading({ action, allowSkip, disabled, hideReward = false, illust
         illustrated && styles.illustratedQuestionAnchor,
         illustrated && allowSkip && styles.illustratedQuestionAnchorSkippable,
         wideIllustrated && styles.illustratedQuestionAnchorWide,
+        ftueQuestionLayout && styles.ftueQuestionAnchor,
       ]}>
         <ThemedText
-          numberOfLines={2}
+          numberOfLines={ftueQuestionLayout ? 3 : 2}
           style={[
             styles.inlineQuestion,
             allowSkip ? styles.inlineQuestionSkippable : hideReward ? styles.inlineQuestionCentered : styles.inlineQuestionRequired,
             illustrated && styles.illustratedQuestion,
             wideIllustrated && styles.illustratedQuestionWide,
+            ftueQuestionLayout && styles.ftueQuestionText,
           ]}
           lightColor={allowSkip ? Meadow.ink : KatchaDeckUI.ftue.goldDeep}
           darkColor={allowSkip ? Meadow.ink : KatchaDeckUI.ftue.goldDeep}>
           {action.title}
         </ThemedText>
-        {illustrated ? (
+        {illustrated && !ftueQuestionLayout ? (
           <ThemedText
             numberOfLines={2}
             style={[styles.illustratedQuestionBody, wideIllustrated && styles.illustratedQuestionBodyWide]}
@@ -1639,7 +1675,7 @@ function InlineHeading({ action, allowSkip, disabled, hideReward = false, illust
         ) : null}
       </View>
       {!hideReward ? (
-        <View collapsable={false} ref={rewardRef} style={styles.inlineReward}>
+        <View collapsable={false} ref={rewardRef} style={ftueQuestionLayout ? styles.ftueQuestionReward : styles.inlineReward}>
           {illustrated ? <FtueEnergyBadge amount={action.growthReward} wide={wideIllustrated} /> : <Reward amount={action.growthReward} />}
         </View>
       ) : null}
@@ -1663,7 +1699,7 @@ function FtueEnergyBadge({ amount, wide }: { amount: number; wide: boolean }) {
   );
 }
 
-function MeasuredIllustratedChoice({ accent, disabled, dimmed, icon, image, label, onPress, reduceMotion, selected, surface, threeColumn, width }: {
+function MeasuredIllustratedChoice({ accent, disabled, dimmed, icon, image, label, onPress, reduceMotion, selected, showGlint, surface, threeColumn, width }: {
   accent: string;
   disabled: boolean;
   dimmed: boolean;
@@ -1673,6 +1709,7 @@ function MeasuredIllustratedChoice({ accent, disabled, dimmed, icon, image, labe
   onPress: (from: FeedSourceRect) => void;
   reduceMotion: boolean;
   selected: boolean;
+  showGlint: boolean;
   surface: string;
   threeColumn: boolean;
   width: number;
@@ -1717,9 +1754,11 @@ function MeasuredIllustratedChoice({ accent, disabled, dimmed, icon, image, labe
       <ThemedText numberOfLines={2} style={[styles.illustratedChoiceLabel, threeColumn && styles.illustratedChoiceLabelThreeColumn]} lightColor={Meadow.ink} darkColor={Meadow.ink}>
         {label}
       </ThemedText>
-      <View style={[styles.illustratedChoiceGlint, { backgroundColor: accent }]}>
-        <IconSymbol color="#FFFDF4" name={selected ? 'checkmark' : 'sparkles'} size={selected ? 12 : 10} />
-      </View>
+      {showGlint ? (
+        <View style={[styles.illustratedChoiceGlint, { backgroundColor: accent }]}>
+          <IconSymbol color="#FFFDF4" name={selected ? 'checkmark' : 'sparkles'} size={selected ? 12 : 10} />
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -2025,12 +2064,13 @@ function InlineScriptedChoice({ action, completionEvent, enterFromBottom = false
   swipeExternalGesture: GestureType;
 }) {
   const sourceRef = useRef<ViewType | null>(null);
+  const visibleOptions = options.slice(0, 4);
   return (
     <View collapsable={false} ref={sourceRef}>
       <InlineCheckInPanel
         action={action}
         allowSkip={false}
-        choices={options.map((option, index) => ({
+        choices={visibleOptions.map((option, index) => ({
           accent: FTUE_CHOICE_TONES[index % FTUE_CHOICE_TONES.length].accent,
           feedImage: GAME_CURRENCY_ART.energy,
           icon: option.icon,
@@ -2041,11 +2081,12 @@ function InlineScriptedChoice({ action, completionEvent, enterFromBottom = false
         }))}
         completionEvent={completionEvent}
         enterFromBottom={enterFromBottom}
+        ftueQuestionLayout
         illustratedChoices
         interactionLocked={interactionLocked}
         metric={metric}
         onChoose={(choice, from, currencyFrom) => {
-          const option = options.find((candidate) => candidate.id === choice.id);
+          const option = visibleOptions.find((candidate) => candidate.id === choice.id);
           if (option) onChoose(option, from, currencyFrom);
         }}
         onFinished={onFinished ?? (() => {})}
@@ -2227,14 +2268,17 @@ const styles = StyleSheet.create({
   inlineSelectionPulse: { ...StyleSheet.absoluteFillObject, borderRadius: 16 },
   inlineHeading: { alignItems: 'center', justifyContent: 'center', minHeight: 38, position: 'relative' },
   illustratedHeading: { alignItems: 'flex-start', justifyContent: 'flex-start', minHeight: 48 },
+  ftueQuestionHeading: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'flex-start', minHeight: 0, width: '100%' },
   illustratedHeadingWide: { minHeight: 64 },
   inlineQuestionAnchor: { width: '100%' },
   illustratedQuestionAnchor: { paddingLeft: 5, paddingRight: 84 },
+  ftueQuestionAnchor: { flex: 1, minWidth: 0, paddingLeft: 5, paddingRight: 0, width: 'auto' },
   illustratedQuestionAnchorSkippable: { paddingLeft: 52 },
   illustratedQuestionAnchorWide: { paddingLeft: 10, paddingRight: 132 },
   inlineQuestion: { ...KatchaDeckUI.typography.ftuePanelTitle, textAlign: 'center', width: '100%' },
   illustratedQuestion: { fontSize: 18, letterSpacing: -0.3, lineHeight: 20, paddingHorizontal: 0, textAlign: 'left' },
   illustratedQuestionWide: { fontSize: 24, letterSpacing: -0.48, lineHeight: 27 },
+  ftueQuestionText: { paddingHorizontal: 0, paddingLeft: 0, paddingRight: 0, textAlign: 'left' },
   illustratedQuestionBody: { ...KatchaDeckUI.typography.ftuePanelBody, fontSize: 10, lineHeight: 12, marginTop: 0 },
   illustratedQuestionBodyWide: { fontSize: 12.5, lineHeight: 16, marginTop: 2 },
   inlineQuestionRequired: { paddingLeft: 8, paddingRight: 68 },
@@ -2245,6 +2289,7 @@ const styles = StyleSheet.create({
   inlineSkipPressed: { backgroundColor: 'rgba(122,84,44,0.16)', transform: [{ scale: 0.96 }] },
   inlineSkipLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '800' },
   inlineReward: { position: 'absolute', right: 0, top: 1, zIndex: 2 },
+  ftueQuestionReward: { flexShrink: 0, zIndex: 2 },
   ftueEnergyBadge: { alignItems: 'center', backgroundColor: '#FFF4C7', borderColor: 'rgba(213,163,44,0.62)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1.5, boxShadow: '0 4px 10px rgba(134,91,19,0.18), inset 0 1px 0 rgba(255,255,255,0.92)', flexDirection: 'row', gap: 2, height: 44, justifyContent: 'center', paddingHorizontal: 5, width: 76 },
   ftueEnergyBadgeWide: { borderRadius: 19, gap: 3, height: 56, paddingHorizontal: 8, width: 104 },
   ftueEnergyBadgeArt: { height: 27, width: 24 },

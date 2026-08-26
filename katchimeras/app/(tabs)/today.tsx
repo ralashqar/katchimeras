@@ -127,6 +127,7 @@ import {
 } from '@/features/onboarding/ftue-home-camera';
 import { FTUE_MOSSPROUT_CREATURE } from '@/features/onboarding/mossprout-ftue-creature';
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
+import { recordMossproutOnboardingAnswer } from '@/features/onboarding/mossprout-profile';
 import type { FtueActionDefinition, FtueChoiceOption } from '@/features/onboarding/ftue-types';
 import { useWisps } from '@/features/wisps/wisp-provider';
 import { useScenes } from '@/features/scenes/scene-provider';
@@ -581,7 +582,7 @@ function HomeScreen() {
   }, [mossproutJourneyHandoff?.state, router, transitionTo]);
   const companionResumeStartedRef = useRef(false);
   useEffect(() => {
-    if (ftueRun?.stepId !== 'companion.first_meeting') {
+    if (ftueRun?.stepId !== 'companion.intro_action' && ftueRun?.stepId !== 'companion.first_meeting') {
       companionResumeStartedRef.current = false;
       return;
     }
@@ -1879,12 +1880,14 @@ function HomeScreen() {
           if (completesEnergyCapture) {
             await completeFtueJournalCapture(action.id, sourceId, { id: option.id, label: option.label });
           } else {
+            recordMossproutOnboardingAnswer(action.id, option.id);
             commitFtueAction({
               actionId: action.id,
               optionId: option.id,
               optionLabel: option.label,
               private: option.private,
               evidenceRef: sourceId,
+              nextStepId: option.nextStepId,
             });
           }
           setMicrocopy(option.private ? 'The Egg felt the moment, without saving an answer.' : `${option.label} reached the Egg`);

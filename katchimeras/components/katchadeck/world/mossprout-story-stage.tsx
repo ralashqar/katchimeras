@@ -23,11 +23,11 @@ import { Meadow } from '@/constants/meadow-theme';
 import { composeMossproutVisibleActions, mossproutActionOrigin, mossproutGoalArtKey, resolveMossproutDayActions, type MossproutActionGardenRequest } from '@/game/katchimeras/mossprout-home';
 import { mossproutJourneyDayNumber } from '@/game/katchimeras/mossprout-journey-handoff';
 import {
-  acknowledgeKatchimeraExternalActionOutro,
-  acknowledgeKatchimeraActionCompletion,
+  acknowledgeKatchimeraDayActionOutro,
   beginMossproutJourneyReturn,
   completeMossproutJourneyConversation,
   makeMossproutResolutionAvailable,
+  isMossproutFtueRoutineActionId,
   mossproutDailyActionDeck,
   mossproutJourneyForDay,
   mossproutJourneyRuntimeDayId,
@@ -127,6 +127,7 @@ export function MossproutStoryStage({
   onOpenTrophies,
   onBondRewardRequest,
   dayOneActionChoiceActive = false,
+  dayOneLessonCompleted = false,
   actionStackTargetRef,
   navigationLocked = false,
   tutorialInteractionLocked = false,
@@ -158,6 +159,7 @@ export function MossproutStoryStage({
   onOpenTrophies: () => void;
   onBondRewardRequest: (source: DayActionSourceRect, onArrive: () => void, receipt?: NonNullable<KatchimeraDayAction['rewardReceipt']>) => void;
   dayOneActionChoiceActive?: boolean;
+  dayOneLessonCompleted?: boolean;
   actionStackTargetRef?: RefObject<ViewType | null>;
   navigationLocked?: boolean;
   tutorialInteractionLocked?: boolean;
@@ -171,6 +173,7 @@ export function MossproutStoryStage({
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [selfCompletingGoalAction, setSelfCompletingGoalAction] = useState<KatchimeraDayAction | null>(null);
   const selectedGoalCompletionRef = useRef<(() => void) | null>(null);
+  const actionSlotDebugRef = useRef('');
   const { phase: screenTransitionPhase } = useGameScreenTransition();
   const { ready: mergeWorldReady, state: mergeWorldState } = useMossproutMergeWorldState();
   const quickMode = isJourneyQuickModeEnabled();
@@ -233,6 +236,7 @@ export function MossproutStoryStage({
     conversations,
     consumedActionIds: mossproutDailyActionDeck(relationships, dayId).consumedActionIds,
     dayId,
+    dayOneLessonCompleted,
     gardenRequests,
     goals: goals.map((item) => ({ id: item.goal.id, templateId: item.goal.templateId, title: item.goal.title, completed: Boolean(item.completion) })),
     hasActiveFocus,
@@ -244,7 +248,7 @@ export function MossproutStoryStage({
     skippedActionIds: relationships.skippedActionIds,
     slotSequences: mossproutDailyActionDeck(relationships, dayId).slotSequences,
     storyComplete,
-  }), [activeQuestId, conversations, dayId, dayOneActionChoiceActive, dayOneChoiceActionIds, gardenRequests, goals, hasActiveFocus, journey, journeyDayNumber, journeyGardenRequest, offers, relationships, storyComplete]);
+  }), [activeQuestId, conversations, dayId, dayOneActionChoiceActive, dayOneChoiceActionIds, dayOneLessonCompleted, gardenRequests, goals, hasActiveFocus, journey, journeyDayNumber, journeyGardenRequest, offers, relationships, storyComplete]);
   // The Day 1 Bond lesson temporarily scopes the normal resolver to its three
   // authored relationship choices. Coin-only requests remain in the Garden
   // and return to this rotation after FTUE completes.
@@ -285,6 +289,7 @@ export function MossproutStoryStage({
   const externalCompletions = useMemo(() => relationships.actionCompletionEvents
     .filter((event) => event.source.familyId === 'mossprout'
       && !event.acknowledgedAt
+      && !isMossproutFtueRoutineActionId(event.source.actionId)
       && event.source.presentation === 'action_card')
     .sort((left, right) => left.completedAt - right.completedAt || left.id.localeCompare(right.id))
     .map((event) => ({
@@ -358,10 +363,7 @@ export function MossproutStoryStage({
   }, [actionId, journeyExclusive, residentResumeAction, residentStoryResumeActive, resolvedVisibleActions, selfCompletingGoalAction]);
 
   const finishActionOutro = useCallback((action: KatchimeraDayAction) => {
-    relationshipProgressionRepository.update((current) => {
-      if (action.completionEventId) return acknowledgeKatchimeraActionCompletion(current, action.completionEventId);
-      return acknowledgeKatchimeraExternalActionOutro(current, dayId, action.instanceId ?? action.id);
-    });
+    relationshipProgressionRepository.update((current) => acknowledgeKatchimeraDayActionOutro(current, dayId, action));
   }, [dayId]);
   const actionTransition = useKatchimeraActionStackTransition({
     acknowledgeCompletion: finishActionOutro,
@@ -492,6 +494,114 @@ export function MossproutStoryStage({
     : null;
   const presentedActions = actionTransition.items;
   const stackInteractionLocked = tutorialInteractionLocked || actionTransition.interactionLocked || Boolean(selfCompletingGoalAction);
+
+  useEffect(() => {
+    if (typeof __DEV__ === 'undefined' || !__DEV__) return;
+    const summarizeAction = (action: KatchimeraDayAction, index?: number) => ({
+      ...(index == null ? {} : { index }),
+      id: action.id,
+      instanceId: action.instanceId ?? null,
+      kind: action.kind,
+      sourceSlotId: action.sourceSlotId ?? null,
+      slotId: action.slotId ?? null,
+      sequence: action.sequence ?? null,
+      status: action.status,
+      disabledByAction: action.disabled,
+      disabledWhenRendered: action.disabled || stackInteractionLocked,
+      destination: action.destination.kind,
+      completionEventId: action.completionEventId ?? null,
+    });
+    const deck = mossproutDailyActionDeck(relationships, dayId);
+    const snapshot = {
+      source: 'action-stage',
+      dayId,
+      ftue: {
+        dayOneActionChoiceActive,
+        dayOneLessonCompleted,
+      },
+      readiness: {
+        motionReady,
+        mergeWorldReady,
+        screenTransitionPhase,
+      },
+      locks: {
+        navigationLocked,
+        tutorialInteractionLocked,
+        transitionInteractionLocked: actionTransition.interactionLocked,
+        stackInteractionLocked,
+        selfCompletingGoalActionId: selfCompletingGoalAction?.id ?? null,
+      },
+      journey: journey ? {
+        id: journey.id,
+        beatId: journey.beatId,
+        status: journey.status,
+        exclusive: journeyExclusive,
+        actions: journey.actions.map((action) => ({
+          id: action.id,
+          definitionId: action.definitionId,
+          kind: action.kind,
+          status: action.status,
+          outroAcknowledged: Boolean(action.outroAcknowledgedAt),
+        })),
+      } : null,
+      resolverInput: {
+        hasActiveFocus,
+        unfinishedGoalIds: goals.filter((goal) => !goal.completion).map((goal) => goal.goal.id),
+        includedActionIds: dayOneActionChoiceActive ? dayOneChoiceActionIds : [],
+        conversationCandidates: conversations.map((conversation) => ({
+          definitionId: conversation.definitionId,
+          mode: conversation.mode,
+          actionKind: conversation.actionKind ?? null,
+        })),
+        gardenRequestIds: gardenRequests.map((request) => request.id),
+        offerIds: offers.map((offer) => offer.id),
+        consumedActionIds: deck.consumedActionIds,
+        slotSequences: deck.slotSequences,
+        skippedActionIds: relationships.skippedActionIds,
+      },
+      pipeline: {
+        resolved: actions.map((action) => summarizeAction(action)),
+        externalCompletions: externalCompletions.map((action) => summarizeAction(action)),
+        completingAction: completingAction ? summarizeAction(completingAction) : null,
+        visible: resolvedVisibleActions.map((action) => summarizeAction(action)),
+        source: sourceActions.map((action) => summarizeAction(action)),
+        transitionPhase: actionTransition.phase,
+        rendered: presentedActions.map((action, index) => summarizeAction(action, index)),
+      },
+    };
+    const serialized = JSON.stringify(snapshot);
+    if (serialized === actionSlotDebugRef.current) return;
+    actionSlotDebugRef.current = serialized;
+    console.info('[mossprout-action-slots]', serialized);
+  }, [
+    actionTransition.interactionLocked,
+    actionTransition.phase,
+    actions,
+    completingAction,
+    conversations,
+    dayId,
+    dayOneActionChoiceActive,
+    dayOneChoiceActionIds,
+    dayOneLessonCompleted,
+    externalCompletions,
+    gardenRequests,
+    goals,
+    hasActiveFocus,
+    journey,
+    journeyExclusive,
+    mergeWorldReady,
+    motionReady,
+    navigationLocked,
+    offers,
+    presentedActions,
+    relationships,
+    resolvedVisibleActions,
+    screenTransitionPhase,
+    selfCompletingGoalAction,
+    sourceActions,
+    stackInteractionLocked,
+    tutorialInteractionLocked,
+  ]);
 
   return <View style={[
     styles.stage,

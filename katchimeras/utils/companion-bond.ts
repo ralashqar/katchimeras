@@ -10,6 +10,7 @@ import {
 
 export type CompanionBondEventKind =
   | 'hatch'
+  | 'friendship_started'
   | 'ideal_skin_questionnaire_completed'
   | 'goal_created'
   | 'goal_completed'
@@ -75,6 +76,7 @@ export type CompanionBondProgress = {
 
 export const COMPANION_BOND_REWARDS: Record<CompanionBondEventKind, number> = {
   hatch: 10,
+  friendship_started: 20,
   ideal_skin_questionnaire_completed: 20,
   goal_created: 15,
   goal_completed: 20,
@@ -152,7 +154,7 @@ export const COMPANION_BOND_LEVELS = [
 
 export const COMPANION_RELATIONSHIP_STAGES = [
   { index: 0, label: 'Stranger', threshold: 0 },
-  { index: 1, label: 'Familiar', threshold: 20 },
+  { index: 1, label: 'Familiar', threshold: 50 },
   { index: 2, label: 'Friend', threshold: 100 },
   { index: 3, label: 'Close Friend', threshold: 240 },
   { index: 4, label: 'Confidant', threshold: 450 },

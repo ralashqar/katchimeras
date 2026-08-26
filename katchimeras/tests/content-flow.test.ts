@@ -136,6 +136,11 @@ test('the existing FTUE graph compiles without screen-owned step semantics', () 
   assert.deepEqual(validateContentFlowDefinition(flow), []);
   assert.equal(flow.entryNodeId, MOSSPROUT_FTUE_SCRIPT.entryStepId);
   assert.equal(flow.nodes.find((node) => node.id === MOSSPROUT_FTUE_SCRIPT.terminalStepId)?.kind, 'complete');
+  const natureTheme = flow.nodes.find((node) => node.id === 'egg.nature_theme');
+  assert.equal(natureTheme?.kind, 'scene');
+  if (natureTheme?.kind === 'scene') {
+    assert.deepEqual(new Set(natureTheme.actions.map((action) => action.next)), new Set(['egg.companion_identity']));
+  }
 });
 
 function legacyJourney(status: JourneyDayRecord['status'], overrides: Partial<JourneyDayRecord> = {}): JourneyDayRecord {

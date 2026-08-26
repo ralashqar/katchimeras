@@ -24,6 +24,8 @@ import { homeRepository } from '@/storage/repositories/home-repository';
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import { loadCompanionQuests } from '@/utils/katchimera-quests';
 import { publishContentFlowDomainEvent, submitActiveContentFlowScene } from '@/features/content-flow/content-flow-director';
+import { loadFtueRun } from '@/features/onboarding/ftue-runtime';
+import { mossproutFtueDayOneLessonCompleted } from '@/features/onboarding/mossprout-ftue-progress';
 
 export type KatchimeraActionCompletionCommit = {
   completion: KatchimeraActionCompletionEvent | null;
@@ -60,7 +62,12 @@ export function commitKatchimeraActionCompletion(input: {
       : current;
     origin ??= relatedJourney
       ? journeyConversationOrigin(current, relatedJourney, session, definition, completedAt)
-      : legacyConversationOrigin(progressed, session, definition, completedAt);
+      // Scripted FTUE conversations are navigation/progression beats. Without
+      // an explicit Journey origin they must not fall through into the normal
+      // daily action deck and occupy one of its three rows after FTUE exits.
+      : definition.tags?.includes('ftue')
+        ? null
+        : legacyConversationOrigin(progressed, session, definition, completedAt);
     if (!origin) return progressed;
 
     // A Journey card remains active across its opening and Merge interlude.
@@ -91,7 +98,10 @@ export function commitKatchimeraActionCompletion(input: {
     ? relationships.journeyDays.find((journey) => journey.id === relatedJourneyId) ?? null
     : null;
 
-  if (relatedJourney?.completionReceipt && journeyBondCanSettle(relatedJourney)) {
+  if (relatedJourney?.completionReceipt && journeyBondCanSettle(
+    relatedJourney,
+    mossproutFtueDayOneLessonCompleted(loadFtueRun()),
+  )) {
     const receipt = relatedJourney.completionReceipt;
     const points = remainingJourneyBondPoints(relationships, bondState, relatedJourney.id, receipt.bondPoints);
     const result = syncCompanionBondEvent(bondState, {
@@ -180,6 +190,7 @@ function legacyConversationOrigin(
     ...(completion.artKey ? { artKey: completion.artKey } : {}),
     artworkDefinitionIds: completion.artworkDefinitionIds,
     reward: completion.reward,
+    rotationEffect: 'consume',
     presentation: 'action_card',
   };
 }
@@ -217,14 +228,18 @@ function journeyConversationOrigin(
     reward: { kind: 'bond', amount: journeyAction.bondContribution },
     journeyId: journey.id,
     journeyActionId: journeyAction.id,
+    rotationEffect: 'preserve',
     presentation: 'action_card',
   };
 }
 
-function journeyBondCanSettle(journey: NonNullable<ReturnType<typeof mossproutJourneyForDay>>) {
+function journeyBondCanSettle(
+  journey: NonNullable<ReturnType<typeof mossproutJourneyForDay>>,
+  dayOneLessonCompleted: boolean,
+) {
   if (journey.status !== 'complete') return false;
   if (journey.beatId !== 'quiet-patch:first-flower') return true;
-  return journey.actions.some((action) => action.kind !== 'journey' && action.status === 'completed');
+  return dayOneLessonCompleted;
 }
 
 function receiptForBondEvent(state: CompanionBondState, eventId: string): CompanionBondAwardReceipt | null {

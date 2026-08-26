@@ -219,8 +219,11 @@ export function KingdomCompanionScreen({
   onFtueConversationComplete,
   onCompletedConversationExit,
   ftueOrderPreviewActive = false,
+  ftueProfileStep = null,
   ftueBondSpotlightActive = false,
   ftueDayOneActionActive = false,
+  ftueDayOneActionAnswerId = null,
+  ftueDayOneLessonCompleted = false,
   ftueResidentHandoffActive = false,
   ftueResidentMatchResultActive = false,
   ftueResidentStoryResume = false,
@@ -228,6 +231,7 @@ export function KingdomCompanionScreen({
   onFtueBondSpotlightComplete,
   onFtueJourneyDayComplete,
   onFtueOpenMerge,
+  onFtueProfileContinue,
   onFtueOpenResidentParcel,
   discoveryRecords = [],
 }: {
@@ -241,8 +245,11 @@ export function KingdomCompanionScreen({
   onFtueConversationComplete?: () => void | Promise<void>;
   onCompletedConversationExit?: (definitionId: string) => boolean | Promise<boolean>;
   ftueOrderPreviewActive?: boolean;
+  ftueProfileStep?: 'intro_action' | 'nickname' | 'bond' | 'bond_choice' | 'garden_intro' | 'resident_result' | null;
   ftueBondSpotlightActive?: boolean;
   ftueDayOneActionActive?: boolean;
+  ftueDayOneActionAnswerId?: string | null;
+  ftueDayOneLessonCompleted?: boolean;
   ftueResidentHandoffActive?: boolean;
   ftueResidentMatchResultActive?: boolean;
   ftueResidentStoryResume?: boolean;
@@ -250,6 +257,7 @@ export function KingdomCompanionScreen({
   onFtueBondSpotlightComplete?: () => void;
   onFtueJourneyDayComplete?: () => void;
   onFtueOpenMerge?: () => void;
+  onFtueProfileContinue?: (nickname?: string) => void;
   onFtueOpenResidentParcel?: () => void;
   discoveryRecords?: readonly CompanionDiscoveryRecord[];
 }) {
@@ -348,6 +356,7 @@ export function KingdomCompanionScreen({
   const acknowledgeBondCelebration = quests.acknowledgeBondCelebration;
   const completeBondCelebration = useCallback((receipt: CompanionBondAwardReceipt) => {
     acknowledgeBondCelebration(receipt.id);
+    if (receipt.kind === 'friendship_started') return;
     const journeyDayNumber = receipt.kind === 'journey_day_completed'
       ? mossproutJourneyDayNumberForCompletionEvent(relationshipProgressionRepository.load(), receipt.eventId) ?? undefined
       : undefined;
@@ -615,14 +624,18 @@ export function KingdomCompanionScreen({
           onInitialConversationComplete={onFtueConversationComplete}
           onCompletedConversationExit={onCompletedConversationExit}
           ftueOrderPreviewActive={ftueOrderPreviewActive}
+          ftueProfileStep={ftueProfileStep}
           ftueBondSpotlightActive={ftueBondSpotlightActive}
           ftueDayOneActionActive={ftueDayOneActionActive}
+          ftueDayOneActionAnswerId={ftueDayOneActionAnswerId}
+          ftueDayOneLessonCompleted={ftueDayOneLessonCompleted}
           ftueResidentHandoffActive={ftueResidentHandoffActive}
           ftueResidentMatchResultActive={ftueResidentMatchResultActive}
           ftueResidentStoryResume={ftueResidentStoryResume}
           ftueNavigationLocked={ftueNavigationLocked}
           onFtueBondSpotlightComplete={onFtueBondSpotlightComplete}
           onFtueOpenMerge={onFtueOpenMerge}
+          onFtueProfileContinue={onFtueProfileContinue}
           onFtueOpenResidentParcel={onFtueOpenResidentParcel}
           onSelectDestination={quests.selectDestination}
           onClose={() => {
@@ -1099,7 +1112,7 @@ export function KingdomCompanionScreen({
       {isFocused && bondCelebration ? (
         <CompanionBondLevelUpCelebration
           autoContinue={!ftueDayOneActionActive}
-          continueLabel={ftueDayOneActionActive ? 'Back to Mossprout' : undefined}
+          continueLabel={ftueDayOneActionActive ? 'Hear Mossprout\'s story' : undefined}
           dismissible={!ftueDayOneActionActive}
           journeyDayNumber={bondCelebration.journeyDayNumber}
           journeyHandoff={ftueDayOneActionActive ? {

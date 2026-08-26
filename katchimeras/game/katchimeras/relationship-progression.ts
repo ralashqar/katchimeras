@@ -4,10 +4,8 @@ import type { JourneyDayActionRecord, JourneyDayRecord, KatchimeraActionCompleti
 import { MOSSPROUT_HEARTWOOD_CHAPTER_ID, mossproutExtendedBeatById } from '@/constants/mossprout-journey-chapters';
 import {
   MOSSPROUT_CAMPAIGN_EPISODES,
-  MOSSPROUT_CAMPAIGN_VERSION,
   MOSSPROUT_RESIDENT_BY_OPTION_ID,
   MOSSPROUT_STORY_FACT_BY_OPTION_ID,
-  mossproutCampaignEpisodeAvailable,
   mossproutCampaignEpisodeByBeatId,
   mossproutCampaignOrderDrops,
   nextMossproutCampaignEpisode,
@@ -20,6 +18,13 @@ export const MOSSPROUT_QUIET_PATCH_CHAPTER_ID = 'mossprout:chapter:quiet-patch';
 export const MOSSPROUT_DRY_POND_CHAPTER_ID = 'mossprout:chapter:dry-pond';
 export const MOSSPROUT_DRY_POND_BEATS = ['returning-pond:place-for-rain', 'returning-pond:bank-that-holds', 'returning-pond:rain-garden'] as const;
 export type MossproutDryPondBeatId = typeof MOSSPROUT_DRY_POND_BEATS[number];
+
+const MOSSPROUT_FTUE_ROUTINE_ACTION_PREFIX = 'mossprout:conversation:mossprout:ftue:';
+
+/** FTUE conversations are scripted system beats, never daily action-deck entries. */
+export function isMossproutFtueRoutineActionId(actionId: string) {
+  return actionId.startsWith(MOSSPROUT_FTUE_ROUTINE_ACTION_PREFIX);
+}
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
@@ -42,7 +47,7 @@ const DRY_POND_ACTIVITY = {
 } as const;
 
 export function emptyRelationshipProgressState(): RelationshipProgressState {
-  return { schemaVersion: 5, journeyDays: [], stories: {}, skippedActionIds: [], actionCompletionEvents: [], mossproutDailyActionDecks: [] };
+  return { schemaVersion: 6, journeyDays: [], stories: {}, skippedActionIds: [], actionCompletionEvents: [], mossproutDailyActionDecks: [] };
 }
 
 export function normalizeRelationshipProgressState(value: unknown): RelationshipProgressState {
@@ -82,6 +87,7 @@ export function normalizeRelationshipProgressState(value: unknown): Relationship
       ...(record.artKey ? { artKey: record.artKey } : {}),
       artworkDefinitionIds: record.artworkDefinitionIds,
       reward: record.reward,
+      rotationEffect: isMossproutFtueRoutineActionId(record.actionId) ? 'preserve' : 'consume',
       presentation: 'action_card',
     },
     completedAt: record.completedAt,
@@ -89,14 +95,19 @@ export function normalizeRelationshipProgressState(value: unknown): Relationship
     rewardReceipt: null,
     acknowledgedAt: legacyAcknowledged.has(record.id) ? record.completedAt : null,
   }));
-  const actionCompletionEvents = dedupeKatchimeraActionCompletionEvents([...storedEvents, ...migratedEvents]).slice(-120);
+  const actionCompletionEvents = dedupeKatchimeraActionCompletionEvents([...storedEvents, ...migratedEvents])
+    .map((event) => isMossproutFtueRoutineActionId(event.source.actionId) && !event.acknowledgedAt
+      ? { ...event, acknowledgedAt: event.completedAt }
+      : event)
+    .slice(-120);
   const skippedActionIds = Array.isArray(candidate.skippedActionIds)
     ? candidate.skippedActionIds.filter((id): id is string => typeof id === 'string').slice(-160)
     : [];
-  const mossproutDailyActionDecks = Array.isArray(candidate.mossproutDailyActionDecks)
+  const normalizedDecks = Array.isArray(candidate.mossproutDailyActionDecks)
     ? candidate.mossproutDailyActionDecks.map(normalizeMossproutDailyActionDeck).filter((deck): deck is MossproutDailyActionDeck => Boolean(deck)).slice(-14)
     : [];
-  return { schemaVersion: 5, journeyDays, stories, skippedActionIds, actionCompletionEvents, mossproutDailyActionDecks };
+  const mossproutDailyActionDecks = normalizedDecks.map((deck) => repairMossproutDailyActionDeck(deck, actionCompletionEvents));
+  return { schemaVersion: 6, journeyDays, stories, skippedActionIds, actionCompletionEvents, mossproutDailyActionDecks };
 }
 
 function normalizeStories(value: unknown): RelationshipProgressState['stories'] {
@@ -140,17 +151,46 @@ export function mossproutDailyActionDeck(state: RelationshipProgressState, dayId
     slotSequences: { together: 0, field: 0, garden: 0 },
     consumedActionIds: { together: [], field: [], garden: [] },
   };
+  // Defensively project legacy callers as well as normalized repository state.
+  // Persisted saves are repaired during hydration by the same policy below.
+  const nonRoutineConsumedBySlot: Record<KatchimeraActionSlotId, Set<string>> = {
+    together: new Set(),
+    field: new Set(),
+    garden: new Set(),
+  };
+  for (const event of state.actionCompletionEvents) {
+    if (event.source.dayId !== dayId
+      || event.source.rotationEffect !== 'preserve') continue;
+    nonRoutineConsumedBySlot[event.source.sourceSlotId].add(event.source.actionId);
+  }
+  for (const slotId of ['together', 'field', 'garden'] as const) {
+    for (const actionId of stored.consumedActionIds[slotId]) {
+      if (isMossproutFtueRoutineActionId(actionId)) nonRoutineConsumedBySlot[slotId].add(actionId);
+    }
+  }
   const consumedActionIds = {
-    together: [...stored.consumedActionIds.together],
-    field: [...stored.consumedActionIds.field],
-    garden: [...stored.consumedActionIds.garden],
+    together: stored.consumedActionIds.together.filter((actionId) => !nonRoutineConsumedBySlot.together.has(actionId)),
+    field: stored.consumedActionIds.field.filter((actionId) => !nonRoutineConsumedBySlot.field.has(actionId)),
+    garden: stored.consumedActionIds.garden.filter((actionId) => !nonRoutineConsumedBySlot.garden.has(actionId)),
+  };
+  const storedNonRoutineConsumptionCount = {
+    together: stored.consumedActionIds.together.filter((actionId) => nonRoutineConsumedBySlot.together.has(actionId)).length,
+    field: stored.consumedActionIds.field.filter((actionId) => nonRoutineConsumedBySlot.field.has(actionId)).length,
+    garden: stored.consumedActionIds.garden.filter((actionId) => nonRoutineConsumedBySlot.garden.has(actionId)).length,
+  };
+  const slotSequences = {
+    together: Math.max(0, stored.slotSequences.together - storedNonRoutineConsumptionCount.together),
+    field: Math.max(0, stored.slotSequences.field - storedNonRoutineConsumptionCount.field),
+    garden: Math.max(0, stored.slotSequences.garden - storedNonRoutineConsumptionCount.garden),
   };
   for (const event of state.actionCompletionEvents) {
     const source = event.source;
-    if (source.dayId !== dayId || consumedActionIds[source.sourceSlotId].includes(source.actionId)) continue;
+    if (source.dayId !== dayId
+      || source.rotationEffect !== 'consume'
+      || consumedActionIds[source.sourceSlotId].includes(source.actionId)) continue;
     consumedActionIds[source.sourceSlotId].push(source.actionId);
   }
-  return { ...stored, consumedActionIds };
+  return { ...stored, consumedActionIds, slotSequences };
 }
 
 function advanceMossproutActionSlot(
@@ -233,6 +273,28 @@ export function acknowledgeKatchimeraActionCompletion(
     : acknowledged;
 }
 
+/**
+ * A rendered action outro can be backed by the completion-event ledger, a
+ * Journey action record, or a legacy external event. Keep that ownership
+ * decision inside the domain boundary so presentation code cannot acknowledge
+ * the wrong store and leave its slot waiting forever.
+ */
+export function acknowledgeKatchimeraDayActionOutro(
+  state: RelationshipProgressState,
+  dayId: string,
+  action: KatchimeraDayAction,
+  acknowledgedAt = Date.now(),
+): RelationshipProgressState {
+  if (action.completionEventId) {
+    return acknowledgeKatchimeraActionCompletion(state, action.completionEventId, acknowledgedAt);
+  }
+  const journeyAction = mossproutJourneyForDay(state, dayId)?.actions.find((candidate) => candidate.id === action.id);
+  if (journeyAction) {
+    return acknowledgeMossproutJourneyActionOutro(state, dayId, journeyAction.id, acknowledgedAt);
+  }
+  return acknowledgeKatchimeraExternalActionOutro(state, dayId, action.instanceId ?? action.id);
+}
+
 export function katchimeraActionCompletionEventId(source: Pick<KatchimeraActionOrigin, 'dayId' | 'instanceId'>) {
   return katchimeraActionOutroReceiptId(source.dayId, source.instanceId);
 }
@@ -254,10 +316,13 @@ export function recordKatchimeraActionCompletionEvent(
     rewardReceipt: input.rewardReceipt ?? null,
     acknowledgedAt: input.acknowledgedAt ?? (input.source.presentation === 'none' ? input.completedAt : null),
   };
-  return advanceMossproutActionSlot({
+  const recorded = {
     ...state,
     actionCompletionEvents: [...state.actionCompletionEvents, event].slice(-120),
-  }, input.source.dayId, input.source.sourceSlotId, input.source.actionId);
+  };
+  return input.source.rotationEffect === 'preserve'
+    ? recorded
+    : advanceMossproutActionSlot(recorded, input.source.dayId, input.source.sourceSlotId, input.source.actionId);
 }
 
 export function attachKatchimeraActionRewardReceipt(
@@ -296,6 +361,7 @@ export function recordKatchimeraActionCompletion(
       ...(input.artKey ? { artKey: input.artKey } : {}),
       artworkDefinitionIds: input.artworkDefinitionIds,
       reward: input.reward,
+      rotationEffect: 'consume',
       presentation: 'action_card',
     },
   });
@@ -438,8 +504,45 @@ function normalizeKatchimeraActionOrigin(value: unknown): KatchimeraActionOrigin
     slotId,
     sequence: Number.isInteger(source.sequence) ? source.sequence! : 0,
     artworkDefinitionIds: source.artworkDefinitionIds.filter((id): id is string => typeof id === 'string'),
+    rotationEffect: source.journeyActionId || isMossproutFtueRoutineActionId(source.actionId)
+      ? 'preserve'
+      : source.rotationEffect === 'preserve' ? 'preserve' : 'consume',
     presentation: source.presentation === 'none' ? 'none' : 'action_card',
   };
+}
+
+function repairMossproutDailyActionDeck(
+  deck: MossproutDailyActionDeck,
+  events: readonly KatchimeraActionCompletionEvent[],
+): MossproutDailyActionDeck {
+  const preservedBySlot: Record<KatchimeraActionSlotId, Set<string>> = {
+    together: new Set(),
+    field: new Set(),
+    garden: new Set(),
+  };
+  for (const event of events) {
+    if (event.source.dayId !== deck.dayId || event.source.rotationEffect !== 'preserve') continue;
+    preservedBySlot[event.source.sourceSlotId].add(event.source.actionId);
+  }
+  for (const slotId of ['together', 'field', 'garden'] as const) {
+    for (const actionId of deck.consumedActionIds[slotId]) {
+      if (isMossproutFtueRoutineActionId(actionId)) preservedBySlot[slotId].add(actionId);
+    }
+  }
+
+  let changed = false;
+  const consumedActionIds = { ...deck.consumedActionIds };
+  const slotSequences = { ...deck.slotSequences };
+  for (const slotId of ['together', 'field', 'garden'] as const) {
+    const original = deck.consumedActionIds[slotId];
+    const repaired = original.filter((actionId) => !preservedBySlot[slotId].has(actionId));
+    const removed = original.length - repaired.length;
+    if (!removed) continue;
+    changed = true;
+    consumedActionIds[slotId] = repaired;
+    slotSequences[slotId] = Math.max(0, deck.slotSequences[slotId] - removed);
+  }
+  return changed ? { ...deck, consumedActionIds, slotSequences } : deck;
 }
 
 function normalizeKatchimeraActionRewardReceipt(value: unknown): KatchimeraActionRewardReceipt | null {

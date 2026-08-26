@@ -5,23 +5,26 @@ export const FTUE_ANSWER_CAMERA_DURATION_MS = 1050;
 export const FTUE_OPENING_CAMERA_PAN_Y = -72;
 
 /**
- * Authored pinch targets for the three-question Egg opening. Each answer
- * completes one third of the logarithmic zoom journey.
+ * Authored pinch targets for the five-question Egg opening.
  */
 export function ftueHomeCameraPinchTarget(
   stepId: string | null | undefined,
   maxPinchScale: number,
 ): number | null {
   const maximum = Math.max(1, maxPinchScale);
-  const targetForAnswersRemaining = (answersRemaining: number) =>
-    Math.pow(maximum, answersRemaining / 3);
+  const targetForAnswersRemaining = (answersRemaining: number, total = 3) =>
+    Math.pow(maximum, answersRemaining / total);
   switch (stepId) {
     case 'egg.opening':
       return maximum;
     case 'egg.context':
-      return targetForAnswersRemaining(2);
+      return targetForAnswersRemaining(4, 5);
     case 'egg.mind':
-      return targetForAnswersRemaining(1);
+      return targetForAnswersRemaining(3, 5);
+    case 'egg.nature_theme':
+      return targetForAnswersRemaining(2, 5);
+    case 'egg.companion_identity':
+      return targetForAnswersRemaining(1, 5);
     case 'egg.ready':
       return 1;
     default:
@@ -39,7 +42,7 @@ export function ftueHomeCameraDuration(stepId: string | null | undefined): numbe
 
 /**
  * Keeps the enlarged answer panel from covering the Egg at the closest zoom.
- * The scene translation retreats across the three answers and reaches the
+ * The scene translation retreats across the five answers and reaches the
  * normal baseline when the Egg is ready.
  */
 export function ftueHomeCameraPanTarget(stepId: string | null | undefined): number {
@@ -47,9 +50,13 @@ export function ftueHomeCameraPanTarget(stepId: string | null | undefined): numb
     case 'egg.opening':
       return FTUE_OPENING_CAMERA_PAN_Y;
     case 'egg.context':
-      return FTUE_OPENING_CAMERA_PAN_Y * (2 / 3);
+      return FTUE_OPENING_CAMERA_PAN_Y * (4 / 5);
     case 'egg.mind':
-      return FTUE_OPENING_CAMERA_PAN_Y * (1 / 3);
+      return FTUE_OPENING_CAMERA_PAN_Y * (3 / 5);
+    case 'egg.nature_theme':
+      return FTUE_OPENING_CAMERA_PAN_Y * (2 / 5);
+    case 'egg.companion_identity':
+      return FTUE_OPENING_CAMERA_PAN_Y * (1 / 5);
     default:
       return 0;
   }

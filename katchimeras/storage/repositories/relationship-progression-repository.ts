@@ -6,9 +6,18 @@ const STORAGE_KEY = 'katchimeras.relationship-progression-v1';
 const listeners = new Set<(state: RelationshipProgressState) => void>();
 let cache: RelationshipProgressState | null = null;
 
+function hydrateRelationshipProgression(): RelationshipProgressState {
+  const stored = getStoredJson<unknown>(STORAGE_KEY, emptyRelationshipProgressState());
+  const normalized = normalizeRelationshipProgressState(stored);
+  // Hydration is also the durable save migration boundary. Rewriting the
+  // canonical form ensures a legacy FTUE slot cannot return on the next boot.
+  if (JSON.stringify(stored) !== JSON.stringify(normalized)) setStoredJson(STORAGE_KEY, normalized);
+  return normalized;
+}
+
 export const relationshipProgressionRepository = {
   load(): RelationshipProgressState {
-    cache ??= normalizeRelationshipProgressState(getStoredJson<RelationshipProgressState>(STORAGE_KEY, emptyRelationshipProgressState()));
+    cache ??= hydrateRelationshipProgression();
     return cache;
   },
   save(state: RelationshipProgressState) {
@@ -31,9 +40,7 @@ export const relationshipProgressionRepository = {
     this.save(emptyRelationshipProgressState());
   },
   reloadFromStorageForDebug(): RelationshipProgressState {
-    cache = normalizeRelationshipProgressState(
-      getStoredJson<RelationshipProgressState>(STORAGE_KEY, emptyRelationshipProgressState()),
-    );
+    cache = hydrateRelationshipProgression();
     listeners.forEach((listener) => listener(cache!));
     return cache;
   },

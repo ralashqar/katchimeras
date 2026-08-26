@@ -21,6 +21,7 @@ export const FTUE_HANDLER_REGISTRY: Record<FtueHandlerId, { commitOwner: 'fronte
   movement_context: { commitOwner: 'frontend', privacy: 'answer-id-only' },
   haven_upgrade: { commitOwner: 'domain-observer', privacy: 'no-answer' },
   haven_reveal: { commitOwner: 'frontend', privacy: 'no-answer' },
+  player_profile: { commitOwner: 'frontend', privacy: 'no-answer' },
   acknowledgement: { commitOwner: 'frontend', privacy: 'no-answer' },
 };
 

@@ -27,7 +27,14 @@ function compileStep(step: FtueStepDefinition, terminalStepId: string): ContentF
     surface: step.surface,
     sceneId: `ftue:${step.id}`,
     payload: { legacyFtueStepId: step.id },
-    actions: step.actions.map((action) => ({ id: action.id, next: action.nextStepId ?? step.id })),
+    actions: step.actions.flatMap((action) => {
+      const optionTargets = action.options?.map((option) => option.nextStepId ?? action.nextStepId ?? step.id) ?? [];
+      const targets = [...new Set(optionTargets.length ? optionTargets : [action.nextStepId ?? step.id])];
+      return targets.map((next, index) => ({
+        id: index === 0 ? action.id : `${action.id}#branch-${index}`,
+        next,
+      }));
+    }),
   };
 }
 
@@ -47,6 +54,7 @@ export function compileFtueFlow(script: FtueScriptDefinition): ContentFlowDefini
     if (!step) continue;
     stack.push(...(step.edges?.map((edge) => edge.nextStepId) ?? []));
     stack.push(...step.actions.flatMap((action) => action.nextStepId ? [action.nextStepId] : []));
+    stack.push(...step.actions.flatMap((action) => action.options?.flatMap((option) => option.nextStepId ? [option.nextStepId] : []) ?? []));
   }
   return defineContentFlow({
     id: script.id,

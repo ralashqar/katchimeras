@@ -5,6 +5,7 @@ import { getStoredJson, setStoredJsonAsync } from '@/utils/app-storage';
 import { mirrorFtueActionInShadow, mirrorFtueEventInShadow } from '@/features/content-flow/ftue-shadow-bridge';
 
 import { MOSSPROUT_FTUE_SCRIPT, mossproutFtueAction, mossproutFtueStep } from './mossprout-ftue-script';
+import { ftueNeedsV28QuestionnaireRestart, ftueV28QuestionnaireLoopRecoveryStep } from './ftue-migration-policy';
 import type { FtueAnswer, FtueCommitReceipt, FtueEvent, FtueEventMatcher, FtueRunState, FtueSurface, FtueSurfaceViewModel } from './ftue-types';
 
 const STORAGE_KEY = 'katchimeras.ftue-run.v4';
@@ -92,13 +93,16 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
   const restartingLegacyMerge = run.status === 'active'
     && run.scriptVersion < 7
     && run.stepId.startsWith('merge.');
-  const pendingEggQuestion = run.status === 'active' && run.stepId === 'egg.ready'
-    ? run.answers['egg.context.activity'] == null
-      ? 'egg.context'
-      : run.answers['egg.mind.focus'] == null
-        ? 'egg.mind'
-        : null
-    : null;
+  const mistakenParallelOpeningStep = run.status === 'active' ? ({
+    'egg.companion_goal': 'egg.opening',
+    'egg.support_need': 'egg.context',
+    'egg.notice_focus': 'egg.mind',
+  } as const)[run.stepId as 'egg.companion_goal' | 'egg.support_need' | 'egg.notice_focus'] ?? null : null;
+  const questionnaireLoopRecoveryStep = ftueV28QuestionnaireLoopRecoveryStep(run);
+  const rewrittenEggQuestionnaireNeedsRestart = ftueNeedsV28QuestionnaireRestart(run);
+  const replacementOpeningStep = mistakenParallelOpeningStep
+    ?? questionnaireLoopRecoveryStep
+    ?? (rewrittenEggQuestionnaireNeedsRestart ? MOSSPROUT_FTUE_SCRIPT.entryStepId : null);
   const needsHavenFocus = run.status === 'active'
     && run.scriptVersion < 15
     && run.stepId === 'haven.mossprout.restore';
@@ -110,7 +114,7 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
   const needsResidentParcelConfirmation = run.status === 'active'
     && run.scriptVersion < 21
     && run.stepId === 'merge.resident_parcel';
-  if (run.schemaVersion === 6 && run.scriptVersion === MOSSPROUT_FTUE_SCRIPT.version && !pendingEggQuestion) return run;
+  if (run.schemaVersion === 6 && run.scriptVersion === MOSSPROUT_FTUE_SCRIPT.version && !replacementOpeningStep) return run;
   const now = new Date().toISOString();
   if (replayDreamMistChapter) return {
     ...run,
@@ -142,8 +146,8 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
     ...run,
     schemaVersion: 6,
     scriptVersion: MOSSPROUT_FTUE_SCRIPT.version,
-    stepId: pendingEggQuestion
-      ? pendingEggQuestion
+    stepId: replacementOpeningStep
+      ? replacementOpeningStep
       : restartingLegacyMerge
         ? 'companion.order_preview'
         : replacedDiscoverySteps.has(migratedStepId)
@@ -184,6 +188,27 @@ export function updateFtueRun(patch: Partial<Pick<FtueRunState, 'stepId' | 'stat
   const current = loadFtueRun();
   if (!current) return null;
   return publish({ ...current, ...patch, updatedAt: new Date().toISOString() });
+}
+
+/**
+ * Releases every FTUE-owned surface through one idempotent terminal write.
+ *
+ * A completion acknowledgement may already have a committed receipt after a
+ * process interruption or script migration. Replaying that action is then a
+ * no-op, so terminal UI must not rely on the receipt alone to release routing.
+ */
+export function completeFtueRun() {
+  const current = loadFtueRun();
+  if (!current) return null;
+  if (current.status === 'complete' && current.stepId === MOSSPROUT_FTUE_SCRIPT.terminalStepId) return current;
+  const completedAt = new Date().toISOString();
+  return publish({
+    ...current,
+    stepId: MOSSPROUT_FTUE_SCRIPT.terminalStepId,
+    status: 'complete',
+    completedAt,
+    updatedAt: completedAt,
+  });
 }
 
 /**
@@ -452,10 +477,20 @@ export function useFtueSurface(surface: FtueSurface) {
 }
 
 export function ftuePersonalizedLine(run = loadFtueRun()) {
+  const companionGoal = run?.answers['egg.desired_feeling'] ?? run?.answers['egg.companion_goal'];
   const context = run?.answers['egg.context.activity'];
   const opening = Object.values(run?.answers ?? {}).find((answer) => answer.actionId.startsWith('egg.') && !answer.private);
-  const id = context?.optionId ?? opening?.optionId;
+  const id = companionGoal?.optionId ?? context?.optionId ?? opening?.optionId;
   const lines: Record<string, string> = {
+    more_calm: 'You wanted more calm. We can grow it one small piece at a time.',
+    more_confidence: 'You wanted more confidence. I can cheer for every brave little step.',
+    more_fun: 'You wanted more fun. Gardens are very good at tiny surprises.',
+    more_connection: 'You wanted more connection. I am glad we found each other.',
+    calm: 'You wanted a little calm. We can grow it one small piece at a time.',
+    encouragement: 'You wanted a little push. I can cheer for the small steps.',
+    fun: 'You wanted more fun. Gardens are very good at tiny surprises.',
+    company: 'You wanted someone to share with. I am glad I found you.',
+    discovery: 'You like small discoveries. I think we will get along.',
     outside: 'You were outside today? I think we are going to get along.', family: 'You spent time with your people today? I like that.',
     tired: 'Sounds like today took a bit out of you. We can start small.', rough: 'That sounds like a hard day. We can start gently.',
     friends: 'Friends were part of today? That sounds like good growing weather.', relaxing: 'A quiet day can still grow into something lovely.',
@@ -465,17 +500,18 @@ export function ftuePersonalizedLine(run = loadFtueRun()) {
 }
 
 export function ftuePersonalizationKey(run = loadFtueRun()) {
+  const companionGoal = run?.answers['egg.desired_feeling'] ?? run?.answers['egg.companion_goal'];
   const context = run?.answers['egg.context.activity'];
   const opening = Object.values(run?.answers ?? {}).find((answer) => answer.actionId.startsWith('egg.') && !answer.private);
-  const id = context?.optionId ?? opening?.optionId ?? 'default';
-  return ['outside', 'family', 'friends', 'relaxing', 'work', 'tired', 'rough', 'home'].includes(id)
+  const id = companionGoal?.optionId ?? context?.optionId ?? opening?.optionId ?? 'default';
+  return ['more_calm', 'more_confidence', 'more_fun', 'more_connection', 'calm', 'encouragement', 'fun', 'company', 'discovery', 'outside', 'family', 'friends', 'relaxing', 'work', 'tired', 'rough', 'home'].includes(id)
     ? id
     : 'default';
 }
 
 export function ftueWispForRun(run = loadFtueRun()) {
-  const answer = run?.answers['egg.context.activity'] ?? Object.values(run?.answers ?? {}).find((item) => !item.private);
-  if (answer?.optionId === 'family' || answer?.optionId === 'friends' || answer?.optionId === 'people') return 'heartlet';
-  if (answer?.optionId === 'relaxing' || answer?.optionId === 'rest') return 'moonlit';
+  const answer = run?.answers['egg.desired_feeling'] ?? run?.answers['egg.context.activity'] ?? Object.values(run?.answers ?? {}).find((item) => !item.private);
+  if (answer?.optionId === 'more_connection' || answer?.optionId === 'family' || answer?.optionId === 'friends' || answer?.optionId === 'people') return 'heartlet';
+  if (answer?.optionId === 'more_calm' || answer?.optionId === 'relaxing' || answer?.optionId === 'rest') return 'moonlit';
   return 'sprout';
 }

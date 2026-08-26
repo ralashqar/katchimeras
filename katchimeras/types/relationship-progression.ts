@@ -141,6 +141,8 @@ export type KatchimeraActionOrigin = {
   reward: KatchimeraDayActionReward | null;
   journeyId?: string;
   journeyActionId?: string;
+  /** Whether this completion advances the routine daily-action rotation. */
+  rotationEffect: 'consume' | 'preserve';
   presentation: 'action_card' | 'none';
 };
 
@@ -150,6 +152,7 @@ export type KatchimeraActionRewardReceipt = {
   creatureId: string;
   kind:
     | 'hatch'
+    | 'friendship_started'
     | 'ideal_skin_questionnaire_completed'
     | 'goal_created'
     | 'goal_completed'
@@ -188,7 +191,7 @@ export type KatchimeraActionCompletionEvent = {
 };
 
 /** @deprecated Save-migration input only. */
-export type KatchimeraActionCompletionRecord = Omit<KatchimeraActionOrigin, 'sourceSlotId' | 'presentation'> & {
+export type KatchimeraActionCompletionRecord = Omit<KatchimeraActionOrigin, 'sourceSlotId' | 'rotationEffect' | 'presentation'> & {
   id: string;
   completedAt: number;
 };
@@ -255,7 +258,7 @@ export type MossproutStoryFactKey =
 export type MossproutStoryFacts = Partial<Record<MossproutStoryFactKey, string>>;
 
 export type RelationshipProgressState = {
-  schemaVersion: 5;
+  schemaVersion: 6;
   journeyDays: JourneyDayRecord[];
   stories: Partial<Record<KatchimeraFamilyId, KatchimeraStoryProgress>>;
   skippedActionIds: string[];

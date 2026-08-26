@@ -86,7 +86,7 @@ test('Mossprout optional narrative endings preserve the exact launching action o
       instanceId: `2026-08-25:together:1:action:${definitionId}`, sourceSlotId: 'together' as const,
       slotId: 'together' as const, sequence: 1, kind: 'fun_chat' as const, title: definition.actionTitle ?? definition.title,
       subtitle: definition.title, icon: 'bubble.left.fill' as const, artworkDefinitionIds: [],
-      reward: { kind: 'bond' as const, amount: 4 }, presentation: 'action_card' as const,
+      reward: { kind: 'bond' as const, amount: 4 }, rotationEffect: 'consume' as const, presentation: 'action_card' as const,
     };
     let session = createConversationSession({
       definition, formId: 'mossprout', dayId: actionOrigin.dayId, actionOrigin,

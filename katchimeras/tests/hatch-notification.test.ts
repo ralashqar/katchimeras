@@ -50,12 +50,16 @@ function state(
 }
 
 const profile: OnboardingProfile = {
+  schemaVersion: 3,
   completed: true,
   aspirationId: null,
   painPointIds: [],
   preferenceIds: [],
   completedAt: null,
   hatchHour: 20,
+  playerNickname: null,
+  mossproutAnswers: { desiredFeelingId: null, mainDifficultyId: null, supportStyleId: null, lifePriorityId: null, companionPlaceId: null },
+  matchedResidentId: null,
 };
 
 test('daily Wisp flow does not schedule a same-day clock hatch', () => {

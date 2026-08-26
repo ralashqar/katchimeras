@@ -14,7 +14,7 @@ export type FtueNavigationDirective = {
   /** Durable route identity used to restore this beat after a cold launch or foreground. */
   resume: FtueResumeTarget;
 };
-export type FtuePresentation = 'inline_choice' | 'route_action' | 'cta_action' | 'observed_game_action' | 'acknowledgement';
+export type FtuePresentation = 'inline_choice' | 'route_action' | 'cta_action' | 'observed_game_action' | 'acknowledgement' | 'nickname_input';
 export type FtueHandlerId =
   | 'day_prompt'
   | 'private_growth'
@@ -35,6 +35,7 @@ export type FtueHandlerId =
   | 'movement_context'
   | 'haven_upgrade'
   | 'haven_reveal'
+  | 'player_profile'
   | 'acknowledgement';
 
 export type FtueChoiceOption = {
@@ -43,6 +44,7 @@ export type FtueChoiceOption = {
   icon: IconSymbolName;
   private?: boolean;
   domainChoiceId?: string;
+  nextStepId?: string;
 };
 
 export type FtueActionDefinition = {

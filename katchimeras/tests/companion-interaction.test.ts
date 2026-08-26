@@ -124,6 +124,12 @@ test('You questionnaires advance on selection while consequential tasks retain c
   assert.match(cinematicStage, /requestAnimationFrame\(reveal\)/);
   assert.match(cinematicStage, /styles\.typewriterMeasure/);
   assert.match(cinematicStage, /reduceMotion \? characters\.length : 0/);
+  assert.match(cinematicStage, /const renderedSpeech = incomingSpeechPresent[\s\S]*?: retainedSpeech/);
+  assert.match(cinematicStage, /callers[\s\S]*?hide the bubble explicitly with showSpeechBubble/);
+  assert.match(cinematicStage, /key=\{questionnaireBubble \? 'questionnaire-speech' : 'destination-speech'\}[\s\S]*?layout=\{speechBubbleLayout\}/);
+  assert.match(cinematicStage, /LinearTransition\.duration\(190\)\.easing\(Easing\.out\(Easing\.cubic\)\)/);
+  assert.match(cinematicStage, /const visibleCount = revealState\.text === text/);
+  assert.doesNotMatch(cinematicStage, /setMeasuredLineCount\(null\)/);
   assert.doesNotMatch(journey, /autoAddedResultRef/);
   assert.doesNotMatch(checkIn, /autoAddedCheckInRef/);
   assert.match(journey, /onDismissTasks/);
@@ -143,9 +149,9 @@ test('You questionnaires advance on selection while consequential tasks retain c
   assert.doesNotMatch(zodiac, /label="Save reflection"/);
   assert.match(interaction, /Your goals and next steps/);
   assert.match(interaction, /emphasized=\{Boolean\(activeJourneyFocus/);
-  assert.match(interaction, /bubbleBody=\{idealSkinPreparing/);
+  assert.match(interaction, /bubbleBody=\{mossproutFtueSpeechTitle[\s\S]*?: idealSkinPreparing/);
   assert.match(interaction, /quickGoalPickerOpen \? 'Choose one for today, or make a small goal of your own\.' : destinationHeroBody/);
-  assert.match(interaction, /bubbleVariant=\{quickGoalPickerOpen \? 'questionnaire' : 'default'\}/);
+  assert.match(interaction, /bubbleVariant=\{quickGoalPickerOpen && !mossproutFtueSpeechTitle \? 'questionnaire' : 'default'\}/);
   assert.match(interaction, /showSpeechBubble/);
   assert.doesNotMatch(interaction, /styles\.youHeading|styles\.youIntro/);
   assert.match(interaction, /backgroundColor: KatchaUI\.companionPanel\.background/);
@@ -213,7 +219,7 @@ test('bond rewards fly into the top-bar Bond icon while preserving the creature 
   assert.match(kingdom, /receipt\.kind === 'journey_day_completed'/);
   assert.match(kingdom, /variant: 'journey_complete'/);
   assert.match(kingdom, /ftueDayOneActionActive && receipt\.kind === 'journey_day_completed'[\s\S]*?variant: 'journey_complete'/);
-  assert.match(kingdom, /autoContinue=\{!ftueDayOneActionActive\}[\s\S]*?Back to Mossprout/);
+  assert.match(kingdom, /autoContinue=\{!ftueDayOneActionActive\}[\s\S]*?Hear Mossprout\\'s story/);
   assert.match(kingdom, /!bondCelebration && !quests\.selectedPendingBondCelebration/);
   assert.match(devTools, /Preview Journey Day 1 splash[\s\S]*?journeySplashPreview/);
   assert.match(devTools, /DEV_JOURNEY_DAY_ONE_RECEIPT[\s\S]*?variant="journey_complete"/);
@@ -385,6 +391,13 @@ test('FTUE companion launch starts on conversation without a dashboard frame', (
   const state = createCompanionInteractionState({ initialConversation: true });
   assert.equal(state.route.kind, 'conversation');
   assert.equal(state.destination, null);
+
+  const interaction = fs.readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
+  assert.match(interaction, /initialConversationContentReady = !props\.initialConversationDefinitionId[\s\S]*?conversationSession\?\.definitionId === props\.initialConversationDefinitionId[\s\S]*?conversationDefinition\?\.id === props\.initialConversationDefinitionId/);
+  assert.match(interaction, /useLayoutEffect\(\(\) => \{[\s\S]*?routedInitialConversationRef\.current = definitionId;[\s\S]*?route\.kind !== 'conversation'\) showConversation\(\)/);
+  assert.match(interaction, /initialConversationHandoffPending \? null : route\.kind === 'chat_lobby'/);
+  assert.match(interaction, /showSpeechBubble=\{!initialConversationHandoffPending/);
+  assert.match(interaction, /data: initialConversationContentReady[\s\S]*?layout: transitionBackgroundReady && transitionCreatureReady && initialConversationContentReady/);
 });
 
 test('FTUE waits for the player to dismiss a completed conversation result', () => {
@@ -567,7 +580,7 @@ test('companion scene panels share one palette, stay anchored, and bound speech 
   const cinematicPan = fs.readFileSync(path.join(worldPath, 'use-companion-environment-pan.ts'), 'utf8');
 
   assert.match(cinematic, /availableBubbleWidth/);
-  assert.match(cinematic, /const speechTitle = title\.trim\(\)/);
+  assert.match(cinematic, /const incomingSpeechTitle = title\.trim\(\)[\s\S]*?const speechTitle = renderedSpeech\.title/);
   assert.match(cinematic, /const speechBubbleVisible = showSpeechBubble && \(hasSpeechTitle \|\| hasSpeechBody\)/);
   assert.match(cinematic, /\{speechBubbleVisible \? \(/);
   assert.match(cinematic, /entering=\{reduceMotion \? undefined : ZoomIn\.duration\(190\)/);
@@ -728,6 +741,23 @@ test('completed action rows preserve their outro while Bond reward renders updat
   assert.match(completion, /recordCompanionBondEvent\([\s\S]*?queueCelebration: false/);
   assert.match(mossprout, /rewardReceipt: event\.rewardReceipt/);
   assert.doesNotMatch(sharedRows, /\[chargeGlow, onFinished,/);
+});
+
+test('Mossprout normal actions survive the FTUE encounter handoff', () => {
+  const quests = fs.readFileSync(
+    path.join(process.cwd(), 'hooks', 'use-kingdom-quests.ts'),
+    'utf8',
+  );
+
+  const candidateStart = quests.indexOf('const selectedMossproutActionCandidates');
+  const starterStart = quests.indexOf('const selectedConversationStarters', candidateStart);
+  assert.ok(candidateStart >= 0 && starterStart > candidateStart);
+  const candidateSource = quests.slice(candidateStart, starterStart);
+
+  assert.match(candidateSource, /selectedFamilyId !== 'mossprout' \|\| !today\?\.isoDate/);
+  assert.doesNotMatch(candidateSource, /!selectedEncounterId/);
+  assert.match(candidateSource, /mossprout-actions:\$\{selectedResident\?\.creature\.creatureId \?\? 'mossprout'\}:\$\{today\.isoDate\}/);
+  assert.ok((candidateSource.match(/allowCooldownFallback: true/g) ?? []).length >= 2);
 });
 
 test('Mossprout nature direction keeps its legacy content inside the modern shell and returns home from Done', () => {

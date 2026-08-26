@@ -51,6 +51,7 @@ export function mossproutActionOrigin(
   const sourceSlotId = action.sourceSlotId ?? slotForAction(action);
   const slotId = action.slotId ?? sourceSlotId;
   const sequence = action.sequence ?? 0;
+  const journeyAction = journey?.actions.some((candidate) => candidate.id === action.id) ?? false;
   return {
     dayId,
     familyId: 'mossprout',
@@ -68,8 +69,8 @@ export function mossproutActionOrigin(
       ? [...action.artworkDefinitionIds]
       : action.artworkDefinitionId ? [action.artworkDefinitionId] : [],
     reward: action.reward,
-    ...(journey ? { journeyId: journey.id } : {}),
-    ...(journey?.actions.some((candidate) => candidate.id === action.id) ? { journeyActionId: action.id } : {}),
+    ...(journeyAction ? { journeyId: journey!.id, journeyActionId: action.id } : {}),
+    rotationEffect: journeyAction ? 'preserve' : 'consume',
     presentation: 'action_card',
   };
 }
@@ -140,14 +141,18 @@ export function composeMossproutVisibleActions(
   limit: number = MOSSPROUT_ACTION_SLOT_IDS.length,
 ): KatchimeraDayAction[] {
   const active = actions.filter((action) => action.status !== 'completed');
-  if (!completingAction) return active.slice(0, limit);
-  const requestedIndex = completingAction.slotId
-    ? MOSSPROUT_ACTION_SLOT_IDS.indexOf(completingAction.slotId)
+  // Journey completion outros are produced directly by the resolver and do
+  // not have an external completion event. They still need to render once so
+  // the transition can acknowledge them and release their occupied slot.
+  const completion = completingAction ?? actions.find((action) => action.status === 'completed') ?? null;
+  if (!completion) return active.slice(0, limit);
+  const requestedIndex = completion.slotId
+    ? MOSSPROUT_ACTION_SLOT_IDS.indexOf(completion.slotId)
     : 0;
   const insertionIndex = Math.min(active.length, Math.max(0, requestedIndex));
   return [
     ...active.slice(0, insertionIndex),
-    completingAction,
+    completion,
     ...active.slice(insertionIndex),
   ].slice(0, limit);
 }
@@ -256,6 +261,7 @@ export function resolveMossproutDayActions(input: {
   gardenRequests?: readonly MossproutActionGardenRequest[];
   journeyGardenRequest?: MossproutActionGardenRequest | null;
   journeyDayNumber?: number;
+  dayOneLessonCompleted?: boolean;
   journey: JourneyDayRecord | null;
   offers: readonly MossproutActionOffer[];
   skippedActionIds?: readonly string[];
@@ -304,6 +310,9 @@ export function resolveMossproutDayActions(input: {
   }
 
   const unfinishedGoals = input.goals.filter((goal) => !goal.completed);
+  // The current FTUE completes an inline Bond-share lesson rather than one of
+  // these Journey actions. Its graph receipt is the authoritative boundary.
+  const dayOneLessonCompleted = Boolean(input.dayOneLessonCompleted);
   for (const goal of unfinishedGoals) actions.push({
     id: `mossprout:goal:${goal.id}`, kind: 'goal_checkoff', title: goal.title,
     subtitle: 'A small focus you chose with Mossprout.', icon: 'checkmark.circle.fill', required: false,
@@ -337,7 +346,10 @@ export function resolveMossproutDayActions(input: {
       if (!action.outroAcknowledgedAt) actions.push(mapConversationAction(action, true));
       continue;
     }
-    if (action.kind === 'goal_plan' && (unfinishedGoals.length || input.hasActiveFocus) && !includedActionIds?.has(action.id)) continue;
+    if (action.kind === 'goal_plan'
+      && (unfinishedGoals.length || input.hasActiveFocus)
+      && !includedActionIds?.has(action.id)
+      && !dayOneLessonCompleted) continue;
     actions.push(mapConversationAction(action, false));
   }
 
@@ -345,8 +357,19 @@ export function resolveMossproutDayActions(input: {
   const hasJourneyFun = journey?.actions.some((action) => action.kind === 'playful_game' && (action.status === 'ready' || action.status === 'active'));
   for (const conversation of input.conversations ?? []) {
     if (journey?.actions.some((action) => action.definitionId === conversation.definitionId)) continue;
-    if (conversation.mode === 'plan' && (unfinishedGoals.length > 0 || input.hasActiveFocus || hasJourneyGoal)) continue;
-    if (conversation.actionKind !== 'journal_prompt' && (conversation.mode === 'talk' || conversation.mode === 'play') && hasJourneyFun) continue;
+    // During the three-choice lesson, avoid presenting routine activities that
+    // compete with its authored options. Once the player has chosen one, those
+    // other lesson choices are intentionally skipped; let the normal queues
+    // refill the vacated row even when an existing focus would usually defer a
+    // second planning card. Otherwise the post-FTUE screen is stranded at two
+    // rows until the route is recreated.
+    if (conversation.mode === 'plan'
+      && (unfinishedGoals.length > 0 || input.hasActiveFocus || hasJourneyGoal)
+      && !dayOneLessonCompleted) continue;
+    if (conversation.actionKind !== 'journal_prompt'
+      && (conversation.mode === 'talk' || conversation.mode === 'play')
+      && hasJourneyFun
+      && !dayOneLessonCompleted) continue;
     const planning = conversation.mode === 'plan';
     const insight = conversation.mode === 'discover';
     const journaling = conversation.actionKind === 'journal_prompt';
