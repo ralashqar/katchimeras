@@ -43,53 +43,23 @@ half4 main(float2 position) {
 }
 `;
 
-export const WORLD_BOARD_BEVEL_SHADER_SOURCE = `
-uniform float3 baseColor;
-uniform float3 edgeColor;
-uniform float3 rimColor;
-uniform float2 edgeNormal;
-uniform float3 lightDirection;
-uniform float seed;
-${VALUE_NOISE}
-
-half4 main(float2 edgeUv) {
-  float progress = smoothstep(0.0, 1.0, edgeUv.y);
-  float curve = progress * progress * (3.0 - 2.0 * progress);
-  float3 normal = normalize(float3(edgeNormal * (1.0 - curve) * 1.18, 1.0));
-  float diffuse = max(dot(normal, normalize(lightDirection)), 0.0);
-  float lighting = 0.78 + diffuse * 0.22;
-  float variation = valueNoise(float2(edgeUv.x * 0.82 + seed * 0.09, edgeUv.y * 2.1));
-  float3 color = mix(edgeColor, baseColor, curve);
-  color *= lighting * (0.96 + variation * 0.055);
-  float capBand = 1.0 - smoothstep(0.32, 0.70, progress);
-  float capLocal = fract(edgeUv.x / 0.52);
-  float capJoint = 1.0 - smoothstep(0.0, 0.055, min(capLocal, 1.0 - capLocal));
-  color = mix(color, edgeColor * 0.62, capBand * capJoint * 0.72);
-  float rim = smoothstep(0.42, 0.86, progress) * (1.0 - smoothstep(0.86, 1.0, progress));
-  color = mix(color, rimColor, rim * diffuse * 0.13);
-  color *= mix(0.88, 1.0, progress);
-  return half4(half3(color), 1.0);
-}
-`;
-
 export const WORLD_BOARD_GRID_SHADER_SOURCE = `
 uniform float3 seamColor;
-uniform float seamWidth;
-uniform float seed;
-
-float cellHash(float2 value) {
-  return fract(sin(dot(value, float2(127.1, 311.7)) + seed) * 43758.5453);
-}
+uniform float checkerOpacity;
+uniform float checkerInset;
+uniform float checkerRadius;
 
 half4 main(float2 position) {
-  float2 tile = fract(position);
-  float edgeDistance = min(min(tile.x, 1.0 - tile.x), min(tile.y, 1.0 - tile.y));
-  float seam = 1.0 - smoothstep(0.0, seamWidth, edgeDistance);
-  float cellVariation = (cellHash(floor(position)) - 0.5) * 0.026;
-  float alpha = seam * 0.10 + abs(cellVariation) * 0.42;
-  float3 tint = cellVariation >= 0.0 ? float3(1.0) : seamColor;
-  float3 color = mix(seamColor, tint, abs(cellVariation) * 20.0);
-  return half4(half3(color * alpha), half(alpha));
+  float2 tile = fract(position) - float2(0.5);
+  float2 halfSize = float2(0.5 - checkerInset);
+  float2 rounded = abs(tile) - (halfSize - float2(checkerRadius));
+  float roundedDistance = length(max(rounded, float2(0.0)))
+    + min(max(rounded.x, rounded.y), 0.0)
+    - checkerRadius;
+  float roundedMask = 1.0 - smoothstep(-0.004, 0.004, roundedDistance);
+  float checker = mod(floor(position.x) + floor(position.y), 2.0);
+  float alpha = checker * roundedMask * checkerOpacity;
+  return half4(half3(seamColor * alpha), half(alpha));
 }
 `;
 
@@ -132,13 +102,11 @@ half4 main(float2 wallUv) {
 `;
 
 export const WORLD_BOARD_SURFACE_EFFECT = Skia.RuntimeEffect.Make(WORLD_BOARD_SURFACE_SHADER_SOURCE);
-export const WORLD_BOARD_BEVEL_EFFECT = Skia.RuntimeEffect.Make(WORLD_BOARD_BEVEL_SHADER_SOURCE);
 export const WORLD_BOARD_GRID_EFFECT = Skia.RuntimeEffect.Make(WORLD_BOARD_GRID_SHADER_SOURCE);
 export const WORLD_BOARD_DEPTH_EFFECT = Skia.RuntimeEffect.Make(WORLD_BOARD_DEPTH_SHADER_SOURCE);
 
 if (__DEV__) {
   if (!WORLD_BOARD_SURFACE_EFFECT) console.error('World board surface SkSL failed to compile.');
-  if (!WORLD_BOARD_BEVEL_EFFECT) console.error('World board bevel SkSL failed to compile.');
   if (!WORLD_BOARD_GRID_EFFECT) console.error('World board grid SkSL failed to compile.');
   if (!WORLD_BOARD_DEPTH_EFFECT) console.error('World board depth SkSL failed to compile.');
 }

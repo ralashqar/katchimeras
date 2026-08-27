@@ -7,22 +7,10 @@ import {
   type WorldSurfacePoint,
 } from './world-board-lab';
 
-export const WORLD_BOARD_BEVEL_INSET = 0.075;
-export const WORLD_BOARD_BEVEL_DROP = 6;
 export const WORLD_BOARD_CONVEX_RADIUS = 0.15;
 export const WORLD_BOARD_CONCAVE_RADIUS = 0.21;
 export const WORLD_BOARD_CONTOUR_SEGMENTS = 3;
 export const WORLD_BOARD_EDGE_NORMAL_STEPS = 16;
-
-export const WORLD_BOARD_SURFACE_MATERIAL = Object.freeze({
-  bevelDrop: WORLD_BOARD_BEVEL_DROP,
-  bevelWidth: WORLD_BOARD_BEVEL_INSET,
-  concaveRadius: WORLD_BOARD_CONCAVE_RADIUS,
-  contourSegments: WORLD_BOARD_CONTOUR_SEGMENTS,
-  convexRadius: WORLD_BOARD_CONVEX_RADIUS,
-  edgeNormalSteps: WORLD_BOARD_EDGE_NORMAL_STEPS,
-  soilNoiseOctaves: 2,
-});
 
 export type WorldBoardMeshBatch = {
   colors: string[];
@@ -36,18 +24,15 @@ export type WorldBoardEdgeBatch = WorldBoardMeshBatch & {
 };
 
 export type WorldBoardLandmassContour = {
-  inner: readonly WorldSurfacePoint[];
-  outer: readonly WorldSurfacePoint[];
+  boundary: readonly WorldSurfacePoint[];
 };
 
 export type WorldBoardSurfaceMesh = {
-  bevels: readonly WorldBoardEdgeBatch[];
   boardOverlay: WorldBoardMeshBatch;
   contours: readonly WorldBoardLandmassContour[];
   holeMasks: WorldBoardMeshBatch;
   lockedOverlay: WorldBoardMeshBatch;
   stats: {
-    bevelTriangleCount: number;
     boardOverlayTriangleCount: number;
     concaveCornerCount: number;
     contourCount: number;
@@ -74,14 +59,7 @@ type FilletedLoop = {
   points: WorldPoint[];
 };
 
-const SIDE_NEIGHBORS: readonly IsoCell[] = [
-  { col: 0, row: -1 },
-  { col: 1, row: 0 },
-  { col: 0, row: 1 },
-  { col: -1, row: 0 },
-];
 const TERRAIN_COLOR = 'rgb(148,201,70)';
-const BEVEL_COLOR = 'rgb(116,164,57)';
 const WALL_COLOR = 'rgb(171,137,78)';
 const LOCKED_COLOR = 'rgb(185,212,213)';
 const TRANSPARENT = 'rgba(0,0,0,0)';
@@ -218,20 +196,6 @@ function filletLoop(points: readonly WorldPoint[]): FilletedLoop {
   return { concaveCornerCount, convexCornerCount, points: filleted };
 }
 
-function insetLoop(points: readonly WorldPoint[], inset: number): WorldPoint[] {
-  return points.map((point, index) => {
-    const previous = points[(index - 1 + points.length) % points.length];
-    const next = points[(index + 1) % points.length];
-    const incoming = normalize({ x: point.x - previous.x, y: point.y - previous.y });
-    const outgoing = normalize({ x: next.x - point.x, y: next.y - point.y });
-    const firstNormal = { x: -incoming.y, y: incoming.x };
-    const secondNormal = { x: -outgoing.y, y: outgoing.x };
-    const bisector = normalize({ x: firstNormal.x + secondNormal.x, y: firstNormal.y + secondNormal.y });
-    const denominator = Math.max(0.35, Math.abs(bisector.x * firstNormal.x + bisector.y * firstNormal.y));
-    return { x: point.x + bisector.x * inset / denominator, y: point.y + bisector.y * inset / denominator };
-  });
-}
-
 function pointInTriangle(point: WorldPoint, first: WorldPoint, second: WorldPoint, third: WorldPoint): boolean {
   const firstCross = (second.x - first.x) * (point.y - first.y) - (second.y - first.y) * (point.x - first.x);
   const secondCross = (third.x - second.x) * (point.y - second.y) - (third.y - second.y) * (point.x - second.x);
@@ -351,40 +315,26 @@ function isCameraFacingEdge(sceneOrigin: WorldPoint, start: WorldPoint, end: Wor
   return projectedEnd.x - projectedStart.x < -0.001;
 }
 
-function appendEdgeGeometry(
-  bevels: Map<string, WorldBoardEdgeBatch>,
+function appendWallGeometry(
   walls: Map<string, WorldBoardEdgeBatch>,
   manifest: WorldBoardManifest,
-  outer: readonly WorldPoint[],
-  inner: readonly WorldPoint[],
-): { bevelTriangles: number; wallFaces: number } {
+  boundary: readonly WorldPoint[],
+): number {
   let perimeter = 0;
   let wallFaces = 0;
-  for (let index = 0; index < outer.length; index += 1) {
-    const next = (index + 1) % outer.length;
-    const start = outer[index];
-    const end = outer[next];
-    const innerStart = inner[index];
-    const innerEnd = inner[next];
+  for (let index = 0; index < boundary.length; index += 1) {
+    const next = (index + 1) % boundary.length;
+    const start = boundary[index];
+    const end = boundary[next];
     const segmentLength = projectedSegmentLength(manifest.sceneOrigin, start, end) / Math.max(1, Math.hypot(LAB_COLUMN_BASIS.x, LAB_COLUMN_BASIS.y));
     const nextPerimeter = perimeter + segmentLength;
     const normal = quantizedNormal(start, end);
-    const bevel = edgeBatchFor(bevels, normal);
-    const bevelOffset = bevel.vertices.length;
-    [
-      { point: { ...start, z: -WORLD_BOARD_BEVEL_DROP }, uv: { x: perimeter, y: 0 } },
-      { point: { ...end, z: -WORLD_BOARD_BEVEL_DROP }, uv: { x: nextPerimeter, y: 0 } },
-      { point: { ...innerEnd, z: 0 }, uv: { x: nextPerimeter, y: 1 } },
-      { point: { ...innerStart, z: 0 }, uv: { x: perimeter, y: 1 } },
-    ].forEach(({ point, uv }) => appendVertex(bevel, manifest.sceneOrigin, point, uv, BEVEL_COLOR));
-    bevel.indices.push(bevelOffset, bevelOffset + 1, bevelOffset + 2, bevelOffset, bevelOffset + 2, bevelOffset + 3);
-
     if (isCameraFacingEdge(manifest.sceneOrigin, start, end)) {
       const wall = edgeBatchFor(walls, normal);
       const wallOffset = wall.vertices.length;
       [
-        { point: { ...start, z: -WORLD_BOARD_BEVEL_DROP }, uv: { x: perimeter, y: 0 } },
-        { point: { ...end, z: -WORLD_BOARD_BEVEL_DROP }, uv: { x: nextPerimeter, y: 0 } },
+        { point: { ...start, z: 0 }, uv: { x: perimeter, y: 0 } },
+        { point: { ...end, z: 0 }, uv: { x: nextPerimeter, y: 0 } },
         { point: { ...end, z: -manifest.slabThickness }, uv: { x: nextPerimeter, y: 1 } },
         { point: { ...start, z: -manifest.slabThickness }, uv: { x: perimeter, y: 1 } },
       ].forEach(({ point, uv }) => appendVertex(wall, manifest.sceneOrigin, point, uv, WALL_COLOR));
@@ -393,7 +343,7 @@ function appendEdgeGeometry(
     }
     perimeter = nextPerimeter;
   }
-  return { bevelTriangles: outer.length * 2, wallFaces };
+  return wallFaces;
 }
 
 export function buildWorldBoardSurfaceMesh(manifest: WorldBoardManifest): WorldBoardSurfaceMesh {
@@ -401,7 +351,6 @@ export function buildWorldBoardSurfaceMesh(manifest: WorldBoardManifest): WorldB
   const boardOverlay = emptyBatch();
   const holeMasks = emptyBatch();
   const lockedOverlay = emptyBatch();
-  const bevels = new Map<string, WorldBoardEdgeBatch>();
   const walls = new Map<string, WorldBoardEdgeBatch>();
   const cells = manifest.regions.flatMap((region) => region.cells);
   const occupied = new Set(cells.map(cellKey));
@@ -409,22 +358,17 @@ export function buildWorldBoardSurfaceMesh(manifest: WorldBoardManifest): WorldB
   const holeContourCount = rawLoops.filter((loop) => polygonArea(loop) < 0).length;
   let convexCornerCount = 0;
   let concaveCornerCount = 0;
-  let bevelTriangleCount = 0;
   let wallFaceCount = 0;
   const contours = rawLoops.map((loop): WorldBoardLandmassContour => {
     const isHole = polygonArea(loop) < 0;
     const filleted = filletLoop(loop);
     convexCornerCount += filleted.convexCornerCount;
     concaveCornerCount += filleted.concaveCornerCount;
-    const inner = insetLoop(filleted.points, WORLD_BOARD_BEVEL_INSET);
-    if (isHole) appendHoleMask(holeMasks, manifest.sceneOrigin, inner);
-    else appendTopPolygon(terrain, manifest.sceneOrigin, inner);
-    const edgeStats = appendEdgeGeometry(bevels, walls, manifest, filleted.points, inner);
-    bevelTriangleCount += edgeStats.bevelTriangles;
-    wallFaceCount += edgeStats.wallFaces;
+    if (isHole) appendHoleMask(holeMasks, manifest.sceneOrigin, filleted.points);
+    else appendTopPolygon(terrain, manifest.sceneOrigin, filleted.points);
+    wallFaceCount += appendWallGeometry(walls, manifest, filleted.points);
     return {
-      inner: inner.map((point) => ({ ...point, z: 0 })),
-      outer: filleted.points.map((point) => ({ ...point, z: -WORLD_BOARD_BEVEL_DROP })),
+      boundary: filleted.points.map((point) => ({ ...point, z: 0 })),
     };
   });
 
@@ -442,7 +386,6 @@ export function buildWorldBoardSurfaceMesh(manifest: WorldBoardManifest): WorldB
   });
 
   return {
-    bevels: [...bevels.values()].sort((left, right) => edgeBatchKey(left.normal).localeCompare(edgeBatchKey(right.normal))),
     boardOverlay,
     contours,
     holeMasks,
@@ -450,14 +393,13 @@ export function buildWorldBoardSurfaceMesh(manifest: WorldBoardManifest): WorldB
     terrain,
     walls: [...walls.values()].sort((left, right) => edgeBatchKey(left.normal).localeCompare(edgeBatchKey(right.normal))),
     stats: {
-      bevelTriangleCount,
       boardOverlayTriangleCount: boardOverlay.indices.length / 3,
       concaveCornerCount,
       contourCount: contours.length,
-      contourPointCount: contours.reduce((total, contour) => total + contour.outer.length, 0),
+      contourPointCount: contours.reduce((total, contour) => total + contour.boundary.length, 0),
       convexCornerCount,
       holeContourCount,
-      surfaceTriangleCount: terrain.indices.length / 3 + bevelTriangleCount,
+      surfaceTriangleCount: terrain.indices.length / 3,
       tileCount: cells.length,
       wallFaceCount,
       wallTriangleCount: wallFaceCount * 2,

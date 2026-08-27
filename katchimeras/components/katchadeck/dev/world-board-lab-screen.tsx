@@ -39,7 +39,6 @@ import {
 } from '@/utils/world-board-lab';
 import { buildWorldBoardSurfaceMesh } from '@/utils/world-board-surface-mesh';
 import {
-  WORLD_BOARD_BEVEL_EFFECT,
   WORLD_BOARD_DEPTH_EFFECT,
   WORLD_BOARD_GRID_EFFECT,
   WORLD_BOARD_SURFACE_EFFECT,
@@ -58,8 +57,6 @@ const SURFACE_LIGHT_DIRECTION = [-0.34, -0.42, 0.84] as const;
 const GRASS_BASE = [148 / 255, 201 / 255, 70 / 255] as const;
 const GRASS_SHADOW = [115 / 255, 166 / 255, 61 / 255] as const;
 const GRASS_HIGHLIGHT = [173 / 255, 216 / 255, 87 / 255] as const;
-const GRASS_EDGE = [190 / 255, 157 / 255, 82 / 255] as const;
-const GRASS_RIM = [224 / 255, 194 / 255, 104 / 255] as const;
 const LOCKED_BASE = [185 / 255, 212 / 255, 213 / 255] as const;
 const LOCKED_SHADOW = [145 / 255, 180 / 255, 187 / 255] as const;
 const LOCKED_HIGHLIGHT = [222 / 255, 238 / 255, 235 / 255] as const;
@@ -69,7 +66,7 @@ const MOSS_COLOR = [102 / 255, 133 / 255, 53 / 255] as const;
 const BOARD_SEAM_COLOR = [57 / 255, 79 / 255, 34 / 255] as const;
 
 type DebugSettings = { cellIds: boolean; details: boolean; regionLabels: boolean; wireframe: boolean };
-const INITIAL_DEBUG: DebugSettings = { cellIds: false, details: true, regionLabels: true, wireframe: false };
+const INITIAL_DEBUG: DebugSettings = { cellIds: false, details: false, regionLabels: false, wireframe: false };
 
 function polygonPath(points: readonly WorldPoint[]) {
   const path = Skia.Path.Make();
@@ -124,13 +121,11 @@ export function WorldBoardLabScreen() {
   const meshEdges = useMemo(() => {
     const path = Skia.Path.Make();
     surfaceMesh.contours.forEach((contour) => {
-      [contour.outer, contour.inner].forEach((boundary) => {
-        const points = boundary.map((point) => projectLabSurfacePoint(manifest.sceneOrigin, point));
-        points.forEach((point, index) => {
-          const next = points[(index + 1) % points.length];
-          path.moveTo(point.x, point.y);
-          path.lineTo(next.x, next.y);
-        });
+      const points = contour.boundary.map((point) => projectLabSurfacePoint(manifest.sceneOrigin, point));
+      points.forEach((point, index) => {
+        const next = points[(index + 1) % points.length];
+        path.moveTo(point.x, point.y);
+        path.lineTo(next.x, next.y);
       });
     });
     return path;
@@ -224,24 +219,6 @@ export function WorldBoardLabScreen() {
                     <Vertices color="black" indices={surfaceMesh.holeMasks.indices} mode="triangles" vertices={surfaceMesh.holeMasks.vertices} />
                   </Group>
                 ) : null}
-                {surfaceMesh.bevels.map((bevel, index) => WORLD_BOARD_BEVEL_EFFECT ? (
-                  <Group key={`bevel:${index}`}>
-                    <Shader
-                      source={WORLD_BOARD_BEVEL_EFFECT}
-                      uniforms={{
-                        baseColor: GRASS_BASE,
-                        edgeColor: GRASS_EDGE,
-                        edgeNormal: bevel.normal,
-                        lightDirection: SURFACE_LIGHT_DIRECTION,
-                        rimColor: GRASS_RIM,
-                        seed: seedIndex,
-                      }}
-                    />
-                    <Vertices indices={bevel.indices} mode="triangles" textures={bevel.textureCoordinates} vertices={bevel.vertices} />
-                  </Group>
-                ) : (
-                  <Vertices colors={bevel.colors} indices={bevel.indices} key={`bevel-fallback:${index}`} mode="triangles" vertices={bevel.vertices} />
-                ))}
                 {WORLD_BOARD_SURFACE_EFFECT ? (
                   <Group>
                     <Shader
@@ -261,7 +238,10 @@ export function WorldBoardLabScreen() {
                 )}
                 {WORLD_BOARD_GRID_EFFECT ? (
                   <Group>
-                    <Shader source={WORLD_BOARD_GRID_EFFECT} uniforms={{ seamColor: BOARD_SEAM_COLOR, seamWidth: 0.035, seed: seedIndex }} />
+                    <Shader
+                      source={WORLD_BOARD_GRID_EFFECT}
+                      uniforms={{ checkerInset: 0.006, checkerOpacity: 0.075, checkerRadius: 0.045, seamColor: BOARD_SEAM_COLOR }}
+                    />
                     <Vertices indices={surfaceMesh.boardOverlay.indices} mode="triangles" textures={surfaceMesh.boardOverlay.textureCoordinates} vertices={surfaceMesh.boardOverlay.vertices} />
                   </Group>
                 ) : null}
@@ -316,9 +296,9 @@ export function WorldBoardLabScreen() {
       <View pointerEvents="box-none" style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
         <Pressable accessibilityLabel="Close World and Board Lab" accessibilityRole="button" hitSlop={10} onPress={() => safeGoBack(router)} style={({ pressed }) => [styles.roundButton, pressed && styles.pressed]}><IconSymbol color="#F7FBFF" name="chevron.left" size={22} /></Pressable>
         <View pointerEvents="none" style={styles.titleBlock}>
-          <Text selectable style={styles.eyebrow}>OBLIQUE SKIA ISO LAB</Text>
+          <Text selectable style={styles.eyebrow}>FRONT-FACING SKIA ISO LAB</Text>
           <Text selectable style={styles.title}>{seed}</Text>
-          <Text selectable style={styles.meta}>{mode === 'board-focus' ? `Board focus${selectedCell == null ? '' : ` · cell ${selectedCell}`}` : 'World overview'} · top-down oblique / 46px slab</Text>
+          <Text selectable style={styles.meta}>{mode === 'board-focus' ? `Board focus${selectedCell == null ? '' : ` · cell ${selectedCell}`}` : 'Grid overview'} · front isometric / {manifest.slabThickness}px slab</Text>
         </View>
         <Pressable accessibilityLabel="Regenerate ground details" accessibilityRole="button" hitSlop={10} onPress={() => { setSelectedCell(null); setSeedIndex((value) => value + 1); }} style={({ pressed }) => [styles.roundButton, pressed && styles.pressed]}><IconSymbol color="#F7FBFF" name="arrow.clockwise" size={20} /></Pressable>
       </View>

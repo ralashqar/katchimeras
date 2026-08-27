@@ -1,5 +1,3 @@
-import { SLAB_THICKNESS } from './world-iso';
-
 export type WorldPoint = { x: number; y: number };
 export type WorldSurfacePoint = WorldPoint & { z: number };
 export type WorldBounds = { left: number; top: number; right: number; bottom: number; width: number; height: number };
@@ -15,8 +13,8 @@ export type WorldIsoRegion = {
 
 export type WorldBoardSurface = {
   id: string;
-  columns: 7;
-  rows: 9;
+  columns: 6;
+  rows: 7;
   startCol: 0;
   startRow: 0;
   sceneOrigin: WorldPoint;
@@ -39,10 +37,10 @@ export type WorldDecorationMark = {
 
 export type WorldBoardManifest = {
   seed: string;
-  projection: 'oblique-top-down';
+  projection: 'front-isometric';
   tileWidth: typeof LAB_TILE_WIDTH;
   tileHeight: typeof LAB_TILE_HEIGHT;
-  slabThickness: typeof SLAB_THICKNESS;
+  slabThickness: typeof LAB_SLAB_THICKNESS;
   sceneOrigin: WorldPoint;
   regions: readonly WorldIsoRegion[];
   board: WorldBoardSurface;
@@ -53,16 +51,18 @@ export type WorldBoardManifest = {
 
 export type WorldManifestValidation = { valid: boolean; errors: readonly string[] };
 
-const BOARD_COLUMNS = 7 as const;
-const BOARD_ROWS = 9 as const;
+const BOARD_COLUMNS = 6 as const;
+const BOARD_ROWS = 7 as const;
 const SCENE_PADDING = 210;
 
-// Lab-only oblique basis calibrated to the reference, then compressed slightly
-// on the screen-y axis for a lower, more recognisably isometric camera tilt.
-export const LAB_COLUMN_BASIS: WorldPoint = { x: 96, y: -19 };
-export const LAB_ROW_BASIS: WorldPoint = { x: 24, y: 77 };
+// Symmetric 2:1 isometric basis: the camera faces the front corner of the board
+// instead of looking across it from one side. The shallow top diamond and the
+// deeper lab-only slab make the front walls materially more visible.
+export const LAB_COLUMN_BASIS: WorldPoint = { x: 60, y: -30 };
+export const LAB_ROW_BASIS: WorldPoint = { x: 60, y: 30 };
 export const LAB_TILE_WIDTH = 120 as const;
-export const LAB_TILE_HEIGHT = 96 as const;
+export const LAB_TILE_HEIGHT = 60 as const;
+export const LAB_SLAB_THICKNESS = 68 as const;
 
 function labGridCorner(col: number, row: number): WorldPoint {
   return {
@@ -82,26 +82,6 @@ function labCellFromPoint(x: number, y: number): { col: number; row: number } {
   return { col: cornerCol - 0.5, row: cornerRow - 0.5 };
 }
 
-function hashSeed(seed: string): number {
-  let hash = 2166136261;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash ^= seed.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
-function mulberry32(seed: number) {
-  let value = seed >>> 0;
-  return () => {
-    value += 0x6D2B79F5;
-    let next = value;
-    next = Math.imul(next ^ (next >>> 15), next | 1);
-    next ^= next + Math.imul(next ^ (next >>> 7), next | 61);
-    return ((next ^ (next >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 function rectCells(left: number, top: number, width: number, height: number): IsoCell[] {
   return Array.from({ length: width * height }, (_, index) => ({
     col: left + index % width,
@@ -119,33 +99,7 @@ function addOrigin(point: WorldPoint, origin: WorldPoint): WorldPoint {
 
 function createRegions(): WorldIsoRegion[] {
   return [
-    { id: 'home', label: 'Egg Home', role: 'home', cells: rectCells(-4, -4, 3, 3) },
-    { id: 'home-path', label: 'Home Path', role: 'connector', cells: [{ col: -1, row: -2 }, { col: -1, row: -1 }, { col: 0, row: -1 }] },
-    {
-      id: 'future-north-west', label: 'Future Haven', role: 'locked', cells: [
-        { col: -4, row: 1 }, { col: -3, row: 1 },
-        { col: -5, row: 2 }, { col: -4, row: 2 }, { col: -3, row: 2 },
-        { col: -4, row: 3 }, { col: -3, row: 3 },
-      ],
-    },
-    { id: 'future-north-west-path', label: 'Cloud Gate', role: 'connector', cells: [{ col: -2, row: 2 }, { col: -1, row: 2 }] },
-    { id: 'board', label: 'Mossprout Garden', role: 'board', cells: rectCells(0, 0, BOARD_COLUMNS, BOARD_ROWS) },
-    { id: 'moss-path', label: 'Moss Path', role: 'connector', cells: [{ col: 7, row: 1 }] },
-    {
-      id: 'mossprout', label: 'Mossprout', role: 'companion', cells: [
-        { col: 9, row: -1 }, { col: 10, row: -1 },
-        { col: 8, row: 0 }, { col: 9, row: 0 }, { col: 10, row: 0 },
-        { col: 8, row: 1 }, { col: 9, row: 1 }, { col: 10, row: 1 }, { col: 11, row: 1 },
-        { col: 8, row: 2 }, { col: 9, row: 2 }, { col: 10, row: 2 },
-        { col: 9, row: 3 }, { col: 10, row: 3 },
-      ],
-    },
-    { id: 'future-south-east-path', label: 'Cloud Gate', role: 'connector', cells: [{ col: 7, row: 7 }, { col: 8, row: 7 }] },
-    { id: 'future-south-east', label: 'Future Haven', role: 'locked', cells: rectCells(9, 6, 3, 3) },
-    { id: 'west-path', label: 'West Path', role: 'connector', cells: [{ col: 1, row: 9 }] },
-    { id: 'west-garden', label: 'Wildflower Plot', role: 'decor', cells: rectCells(-3, 9, 4, 3) },
-    { id: 'lower-path', label: 'Lower Path', role: 'connector', cells: [{ col: 7, row: 8 }] },
-    { id: 'lower-garden', label: 'Garden Plot', role: 'decor', cells: rectCells(7, 9, 3, 3) },
+    { id: 'board', label: 'Grass Grid', role: 'board', cells: rectCells(0, 0, BOARD_COLUMNS, BOARD_ROWS) },
   ];
 }
 
@@ -153,8 +107,8 @@ function rawBounds(regions: readonly WorldIsoRegion[]): WorldBounds {
   const points = regions.flatMap((region) => region.cells.flatMap((cell) => [
     labGridCorner(cell.col, cell.row),
     labGridCorner(cell.col + 1, cell.row),
-    { ...labGridCorner(cell.col + 1, cell.row + 1), y: labGridCorner(cell.col + 1, cell.row + 1).y + SLAB_THICKNESS },
-    { ...labGridCorner(cell.col, cell.row + 1), y: labGridCorner(cell.col, cell.row + 1).y + SLAB_THICKNESS },
+    { ...labGridCorner(cell.col + 1, cell.row + 1), y: labGridCorner(cell.col + 1, cell.row + 1).y + LAB_SLAB_THICKNESS },
+    { ...labGridCorner(cell.col, cell.row + 1), y: labGridCorner(cell.col, cell.row + 1).y + LAB_SLAB_THICKNESS },
   ]));
   const left = Math.min(...points.map((point) => point.x));
   const top = Math.min(...points.map((point) => point.y));
@@ -212,14 +166,6 @@ export function regionAtWorldPoint(manifest: WorldBoardManifest, point: WorldPoi
   return [...manifest.regions].reverse().find((region) => region.cells.some((cell) => cellKey(cell) === key)) ?? null;
 }
 
-function centerOfCells(cells: readonly IsoCell[], origin: WorldPoint): WorldPoint {
-  const points = cells.map((cell) => isoCellCenter(origin, cell));
-  return {
-    x: points.reduce((total, point) => total + point.x, 0) / points.length,
-    y: points.reduce((total, point) => total + point.y, 0) / points.length,
-  };
-}
-
 export function validateWorldManifest(manifest: Pick<WorldBoardManifest, 'regions' | 'board'>): WorldManifestValidation {
   const errors: string[] = [];
   const occupied = new Map<string, string>();
@@ -233,7 +179,7 @@ export function validateWorldManifest(manifest: Pick<WorldBoardManifest, 'region
     }
   }
   const boardRegion = manifest.regions.find((region) => region.role === 'board');
-  if (!boardRegion || boardRegion.cells.length !== BOARD_COLUMNS * BOARD_ROWS) errors.push('board must contain 7x9 cells');
+  if (!boardRegion || boardRegion.cells.length !== BOARD_COLUMNS * BOARD_ROWS) errors.push('board must contain 6x7 cells');
   if (manifest.board.columns !== BOARD_COLUMNS || manifest.board.rows !== BOARD_ROWS) errors.push('board dimensions changed');
   const start = occupied.keys().next().value as string | undefined;
   const visited = new Set<string>();
@@ -264,39 +210,17 @@ export function generateWorldBoardManifest(seed: string): WorldBoardManifest {
     height: sourceBounds.height + SCENE_PADDING * 2,
   };
   const board: WorldBoardSurface = { id: 'mossprout-board', columns: BOARD_COLUMNS, rows: BOARD_ROWS, startCol: 0, startRow: 0, sceneOrigin };
-  const homeCenter = centerOfCells(regions.find((region) => region.id === 'home')!.cells, sceneOrigin);
-  const mossCenter = centerOfCells(regions.find((region) => region.id === 'mossprout')!.cells, sceneOrigin);
-  const subjects: WorldSubjectAnchor[] = [
-    { id: 'home', position: { x: homeCenter.x - 24, y: homeCenter.y - 48 }, size: 220, depthBias: -34 },
-    { id: 'egg', position: isoCellCenter(sceneOrigin, { col: -2, row: -2 }), size: 96, depthBias: 26 },
-    { id: 'mossprout', position: { x: mossCenter.x, y: mossCenter.y + 4 }, size: 166, depthBias: 24 },
-  ];
-  const random = mulberry32(hashSeed(seed));
-  const decorationCells = regions
-    .filter((region) => region.role === 'home' || region.role === 'companion' || region.role === 'decor')
-    .flatMap((region) => region.cells)
-    .filter(() => random() > 0.48);
-  const decorations = decorationCells.map((cell, index): WorldDecorationMark => {
-    const center = isoCellCenter(sceneOrigin, cell);
-    return {
-      id: `detail:${index}:${cellKey(cell)}`,
-      cell,
-      position: { x: center.x + (random() - 0.5) * 42, y: center.y + (random() - 0.5) * 15 },
-      kind: random() > 0.72 ? 'berries' : 'flower',
-      size: 17 + random() * 12,
-    };
-  });
   return {
     seed,
-    projection: 'oblique-top-down',
+    projection: 'front-isometric',
     tileWidth: LAB_TILE_WIDTH,
     tileHeight: LAB_TILE_HEIGHT,
-    slabThickness: SLAB_THICKNESS,
+    slabThickness: LAB_SLAB_THICKNESS,
     sceneOrigin,
     regions,
     board,
-    subjects,
-    decorations,
+    subjects: [],
+    decorations: [],
     bounds,
   };
 }
