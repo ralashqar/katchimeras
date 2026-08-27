@@ -6,7 +6,6 @@ import {
   boardCellAtWorldPoint,
   boardCellCenter,
   generateWorldBoardManifest,
-  projectLabSurfacePoint,
   projectBoardCell,
   screenPointToWorldBoard,
   validateWorldManifest,
@@ -15,7 +14,7 @@ import {
 import {
   buildWorldBoardSurfaceMesh,
   WORLD_BOARD_BEVEL_DROP,
-  WORLD_BOARD_CORNER_SEGMENTS,
+  WORLD_BOARD_CONTOUR_SEGMENTS,
   type WorldBoardMeshBatch,
 } from '../utils/world-board-surface-mesh';
 
@@ -87,7 +86,7 @@ test('procedural seeds vary detail dressing without moving structural cells', ()
   assert.notDeepEqual(second.decorations, first.decorations);
 });
 
-test('beveled surface mesh is deterministic, valid, and batched', () => {
+test('filleted landmass mesh is deterministic, valid, and material-batched', () => {
   const manifest = generateWorldBoardManifest('surface-mesh');
   const first = buildWorldBoardSurfaceMesh(manifest);
   const second = buildWorldBoardSurfaceMesh(manifest);
@@ -95,61 +94,48 @@ test('beveled surface mesh is deterministic, valid, and batched', () => {
 
   assert.deepEqual(second, first);
   assert.equal(first.stats.tileCount, tileCount);
-  assert.equal(first.stats.surfaceTriangleCount, first.stats.topTriangleCount + first.stats.bevelTriangleCount);
-  assert.ok(first.stats.topTriangleCount >= tileCount * 2);
+  assert.equal(first.stats.surfaceTriangleCount, first.terrain.indices.length / 3 + first.stats.bevelTriangleCount);
   assert.equal(first.stats.wallTriangleCount, first.stats.wallFaceCount * 2);
-  assert.equal(first.surfaces.grass.length <= 16, true);
-  assert.equal(first.surfaces.locked.length <= 16, true);
-  const surfaceBatches = [...first.surfaces.grass, ...first.surfaces.locked];
-  surfaceBatches.forEach((batch) => assertValidMeshBatch(batch, `surface mask ${batch.cornerMask}`));
+  assert.equal(first.bevels.length <= 16, true);
+  assert.equal(first.walls.length <= 16, true);
+  assertValidMeshBatch(first.terrain, 'terrain');
+  assertValidMeshBatch(first.boardOverlay, 'board overlay');
+  assertValidMeshBatch(first.lockedOverlay, 'locked overlay');
+  assertValidMeshBatch(first.holeMasks, 'hole masks');
+  first.bevels.forEach((batch, index) => assertValidMeshBatch(batch, `bevel ${index}`));
   first.walls.forEach((batch, index) => assertValidMeshBatch(batch, `wall ${index}`));
-  assert.equal(surfaceBatches.reduce((total, batch) => total + batch.indices.length / 3, 0), first.stats.surfaceTriangleCount);
+  assert.equal(first.bevels.reduce((total, batch) => total + batch.indices.length / 3, 0), first.stats.bevelTriangleCount);
   assert.equal(first.walls.reduce((total, batch) => total + batch.indices.length / 6, 0), first.stats.wallFaceCount);
-  assert.ok(first.stats.roundedCornerCount > 0);
+  assert.equal(first.stats.boardOverlayTriangleCount, 2);
 });
 
-test('only convex exposed tile corners receive real rounded geometry', () => {
-  const manifest = generateWorldBoardManifest('rounded-corners');
+test('connected terrain traces convex and concave curves while preserving its sky pocket', () => {
+  const manifest = generateWorldBoardManifest('filleted-contours');
   const mesh = buildWorldBoardSurfaceMesh(manifest);
-  const occupied = new Set(manifest.regions.flatMap((region) => region.cells.map((cell) => `${cell.col}:${cell.row}`)));
-  const neighborOffsets = [{ col: 0, row: -1 }, { col: 1, row: 0 }, { col: 0, row: 1 }, { col: -1, row: 0 }];
-  const cornerSides = [[3, 0], [0, 1], [1, 2], [2, 3]] as const;
-
-  mesh.tileProfiles.forEach((profile) => {
-    const roundedCorners = profile.cornerMask.toString(2).replaceAll('0', '').length;
-    assert.equal(profile.outer.length, 4 + roundedCorners * WORLD_BOARD_CORNER_SEGMENTS);
-    assert.equal(profile.inner.length, profile.outer.length);
-    cornerSides.forEach(([firstSide, secondSide], corner) => {
-      const rounded = (profile.cornerMask & (1 << corner)) !== 0;
-      const neighborsAbsent = [firstSide, secondSide].every((side) => {
-        const offset = neighborOffsets[side];
-        return !occupied.has(`${profile.cell.col + offset.col}:${profile.cell.row + offset.row}`);
-      });
-      assert.equal(rounded, neighborsAbsent, `${profile.cell.col}:${profile.cell.row} corner ${corner}`);
-    });
+  assert.equal(mesh.stats.contourCount, 2);
+  assert.equal(mesh.stats.holeContourCount, 1);
+  assert.ok(mesh.stats.convexCornerCount > 0);
+  assert.ok(mesh.stats.concaveCornerCount > 0);
+  assert.ok(mesh.holeMasks.indices.length > 0);
+  mesh.contours.forEach((contour) => {
+    assert.equal(contour.outer.length, contour.inner.length);
+    assert.equal(contour.outer.length % (WORLD_BOARD_CONTOUR_SEGMENTS + 1), 0);
+    assert.ok(contour.outer.every((point) => point.z === -WORLD_BOARD_BEVEL_DROP));
+    assert.ok(contour.inner.every((point) => point.z === 0));
   });
 });
 
-test('neighboring beveled tiles meet at identical lowered seam vertices', () => {
-  const manifest = generateWorldBoardManifest('surface-seams');
+test('merge-board seams are one shader overlay instead of subdivided terrain geometry', () => {
+  const manifest = generateWorldBoardManifest('board-overlay');
   const mesh = buildWorldBoardSurfaceMesh(manifest);
-  const left = mesh.tileProfiles.find((profile) => profile.cell.col === 0 && profile.cell.row === 0);
-  const right = mesh.tileProfiles.find((profile) => profile.cell.col === 1 && profile.cell.row === 0);
-
-  assert.ok(left);
-  assert.ok(right);
-  assert.deepEqual(left.outer[1], right.outer[0]);
-  assert.deepEqual(left.outer[2], right.outer[3]);
-  assert.equal(left.outer[1].z, -WORLD_BOARD_BEVEL_DROP);
-  assert.ok(left.inner.every((point) => point.z === 0));
-  assert.deepEqual(
-    projectLabSurfacePoint(manifest.sceneOrigin, left.outer[1]),
-    projectLabSurfacePoint(manifest.sceneOrigin, right.outer[0]),
-  );
-  assert.deepEqual(
-    projectLabSurfacePoint(manifest.sceneOrigin, left.outer[2]),
-    projectLabSurfacePoint(manifest.sceneOrigin, right.outer[3]),
-  );
+  assert.equal(mesh.boardOverlay.indices.length / 3, 2);
+  assert.deepEqual(mesh.boardOverlay.textureCoordinates, [
+    { x: 0, y: 0 },
+    { x: 7, y: 0 },
+    { x: 7, y: 9 },
+    { x: 0, y: 9 },
+  ]);
+  assert.ok(mesh.terrain.indices.length / 3 < mesh.stats.tileCount * 2);
 });
 
 test('world and screen camera transforms round-trip', () => {
@@ -170,9 +156,11 @@ test('the lab route and Haven entry remain development-only presentation', () =>
   const shaders = fs.readFileSync('utils/world-board-material-shaders.ts', 'utf8');
   assert.match(route, /WorldBoardLabScreen/);
   assert.match(screen, /WORLD_BOARD_SURFACE_EFFECT/);
+  assert.match(screen, /WORLD_BOARD_BEVEL_EFFECT/);
+  assert.match(screen, /WORLD_BOARD_GRID_EFFECT/);
   assert.match(screen, /WORLD_BOARD_DEPTH_EFFECT/);
-  assert.doesNotMatch(screen, /bevelLighting/);
-  assert.match(shaders, /float tileSdf\(float2 uv\)/);
+  assert.doesNotMatch(screen, /GRASS_GROUND_TEXTURE|ImageShader|bevelLighting/);
+  assert.match(shaders, /const float blockWidth = 0\.56/);
   assert.match(shaders, /float valueNoise\(float2 value\)/);
   assert.match(haven, /__DEV__ && onOpenWorldBoardLab/);
   assert.doesNotMatch(haven, /__DEV__ && !ftueStepId && onOpenWorldBoardLab/);

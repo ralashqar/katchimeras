@@ -1,28 +1,28 @@
 import {
   LAB_COLUMN_BASIS,
-  LAB_ROW_BASIS,
   projectLabSurfacePoint,
   type IsoCell,
   type WorldBoardManifest,
   type WorldPoint,
-  type WorldRegionRole,
   type WorldSurfacePoint,
 } from './world-board-lab';
 
 export const WORLD_BOARD_BEVEL_INSET = 0.075;
 export const WORLD_BOARD_BEVEL_DROP = 6;
-export const WORLD_BOARD_CORNER_RADIUS = 0.1;
-export const WORLD_BOARD_CORNER_SEGMENTS = 3;
+export const WORLD_BOARD_CONVEX_RADIUS = 0.15;
+export const WORLD_BOARD_CONCAVE_RADIUS = 0.21;
+export const WORLD_BOARD_CONTOUR_SEGMENTS = 3;
+export const WORLD_BOARD_EDGE_NORMAL_STEPS = 16;
 
 export const WORLD_BOARD_SURFACE_MATERIAL = Object.freeze({
   bevelDrop: WORLD_BOARD_BEVEL_DROP,
   bevelWidth: WORLD_BOARD_BEVEL_INSET,
-  cornerRadius: WORLD_BOARD_CORNER_RADIUS,
-  cornerSegments: WORLD_BOARD_CORNER_SEGMENTS,
+  concaveRadius: WORLD_BOARD_CONCAVE_RADIUS,
+  contourSegments: WORLD_BOARD_CONTOUR_SEGMENTS,
+  convexRadius: WORLD_BOARD_CONVEX_RADIUS,
+  edgeNormalSteps: WORLD_BOARD_EDGE_NORMAL_STEPS,
   soilNoiseOctaves: 2,
 });
-
-type Rgb = { r: number; g: number; b: number };
 
 export type WorldBoardMeshBatch = {
   colors: string[];
@@ -31,40 +31,47 @@ export type WorldBoardMeshBatch = {
   vertices: WorldPoint[];
 };
 
-export type WorldBoardSurfaceBatch = WorldBoardMeshBatch & {
-  cornerMask: number;
-};
-
-export type WorldBoardWallBatch = WorldBoardMeshBatch & {
-  material: 'earth' | 'locked';
+export type WorldBoardEdgeBatch = WorldBoardMeshBatch & {
   normal: WorldPoint;
 };
 
-export type BeveledTileProfile = {
-  cell: IsoCell;
-  cornerMask: number;
+export type WorldBoardLandmassContour = {
   inner: readonly WorldSurfacePoint[];
   outer: readonly WorldSurfacePoint[];
-  regionId: string;
-  role: WorldRegionRole;
 };
 
 export type WorldBoardSurfaceMesh = {
+  bevels: readonly WorldBoardEdgeBatch[];
+  boardOverlay: WorldBoardMeshBatch;
+  contours: readonly WorldBoardLandmassContour[];
+  holeMasks: WorldBoardMeshBatch;
+  lockedOverlay: WorldBoardMeshBatch;
   stats: {
     bevelTriangleCount: number;
-    roundedCornerCount: number;
+    boardOverlayTriangleCount: number;
+    concaveCornerCount: number;
+    contourCount: number;
+    contourPointCount: number;
+    convexCornerCount: number;
+    holeContourCount: number;
     surfaceTriangleCount: number;
     tileCount: number;
-    topTriangleCount: number;
     wallFaceCount: number;
     wallTriangleCount: number;
   };
-  surfaces: {
-    grass: readonly WorldBoardSurfaceBatch[];
-    locked: readonly WorldBoardSurfaceBatch[];
-  };
-  tileProfiles: readonly BeveledTileProfile[];
-  walls: readonly WorldBoardWallBatch[];
+  terrain: WorldBoardMeshBatch;
+  walls: readonly WorldBoardEdgeBatch[];
+};
+
+type BoundaryEdge = {
+  end: WorldPoint;
+  start: WorldPoint;
+};
+
+type FilletedLoop = {
+  concaveCornerCount: number;
+  convexCornerCount: number;
+  points: WorldPoint[];
 };
 
 const SIDE_NEIGHBORS: readonly IsoCell[] = [
@@ -73,298 +80,385 @@ const SIDE_NEIGHBORS: readonly IsoCell[] = [
   { col: 0, row: 1 },
   { col: -1, row: 0 },
 ];
-const CORNER_SIDES: readonly (readonly [number, number])[] = [
-  [3, 0],
-  [0, 1],
-  [1, 2],
-  [2, 3],
-];
+const TERRAIN_COLOR = 'rgb(148,201,70)';
+const BEVEL_COLOR = 'rgb(116,164,57)';
+const WALL_COLOR = 'rgb(171,137,78)';
+const LOCKED_COLOR = 'rgb(185,212,213)';
+const TRANSPARENT = 'rgba(0,0,0,0)';
+const EPSILON = 1e-7;
 
-const GRASS_BASE: Rgb = { r: 137, g: 187, b: 70 };
-const CONNECTOR_BASE: Rgb = { r: 128, g: 174, b: 67 };
-const LOCKED_BASE: Rgb = { r: 185, g: 212, b: 213 };
-const EARTH_BASE: Rgb = { r: 148, g: 116, b: 68 };
-const LOCKED_WALL_BASE: Rgb = { r: 126, g: 158, b: 164 };
-
-function colorString(color: Rgb): string {
-  return `rgb(${color.r},${color.g},${color.b})`;
-}
-
-function emptyBatch(): WorldBoardMeshBatch {
-  return { colors: [], indices: [], textureCoordinates: [], vertices: [] };
+function pointKey(point: WorldPoint): string {
+  return `${point.x}:${point.y}`;
 }
 
 function cellKey(cell: IsoCell): string {
   return `${cell.col}:${cell.row}`;
 }
 
-function sideOccupied(cell: IsoCell, side: number, occupied: ReadonlySet<string>): boolean {
-  const neighbor = SIDE_NEIGHBORS[side];
-  return occupied.has(`${cell.col + neighbor.col}:${cell.row + neighbor.row}`);
+function emptyBatch(): WorldBoardMeshBatch {
+  return { colors: [], indices: [], textureCoordinates: [], vertices: [] };
 }
 
-function tileCornerMask(cell: IsoCell, occupied: ReadonlySet<string>): number {
-  return CORNER_SIDES.reduce((mask, [firstSide, secondSide], corner) => (
-    !sideOccupied(cell, firstSide, occupied) && !sideOccupied(cell, secondSide, occupied)
-      ? mask | (1 << corner)
-      : mask
-  ), 0);
+function cross(first: WorldPoint, second: WorldPoint, third: WorldPoint): number {
+  return (second.x - first.x) * (third.y - second.y) - (second.y - first.y) * (third.x - second.x);
 }
 
-function arcPoints(
-  center: WorldPoint,
-  radius: number,
-  startAngle: number,
-  endAngle: number,
-  z: number,
-): WorldSurfacePoint[] {
-  return Array.from({ length: WORLD_BOARD_CORNER_SEGMENTS + 1 }, (_, index) => {
-    const progress = index / WORLD_BOARD_CORNER_SEGMENTS;
-    const angle = startAngle + (endAngle - startAngle) * progress;
-    return {
-      x: center.x + Math.cos(angle) * radius,
-      y: center.y + Math.sin(angle) * radius,
-      z,
-    };
+function polygonArea(points: readonly WorldPoint[]): number {
+  return points.reduce((area, point, index) => {
+    const next = points[(index + 1) % points.length];
+    return area + point.x * next.y - next.x * point.y;
+  }, 0) / 2;
+}
+
+function normalize(vector: WorldPoint): WorldPoint {
+  const length = Math.hypot(vector.x, vector.y) || 1;
+  return { x: vector.x / length, y: vector.y / length };
+}
+
+function boundaryEdges(cells: readonly IsoCell[], occupied: ReadonlySet<string>): BoundaryEdge[] {
+  return cells.flatMap((cell) => {
+    const left = cell.col;
+    const top = cell.row;
+    const right = cell.col + 1;
+    const bottom = cell.row + 1;
+    const edges: BoundaryEdge[] = [];
+    if (!occupied.has(`${cell.col}:${cell.row - 1}`)) edges.push({ start: { x: left, y: top }, end: { x: right, y: top } });
+    if (!occupied.has(`${cell.col + 1}:${cell.row}`)) edges.push({ start: { x: right, y: top }, end: { x: right, y: bottom } });
+    if (!occupied.has(`${cell.col}:${cell.row + 1}`)) edges.push({ start: { x: right, y: bottom }, end: { x: left, y: bottom } });
+    if (!occupied.has(`${cell.col - 1}:${cell.row}`)) edges.push({ start: { x: left, y: bottom }, end: { x: left, y: top } });
+    return edges;
   });
 }
 
-function roundedBoundary(
-  cell: IsoCell,
-  inset: number,
-  cornerMask: number,
-  z: number,
-): WorldSurfacePoint[] {
-  const left = cell.col + inset;
-  const top = cell.row + inset;
-  const right = cell.col + 1 - inset;
-  const bottom = cell.row + 1 - inset;
-  const radius = Math.max(0, WORLD_BOARD_CORNER_RADIUS - inset);
-  const corners = [
-    { center: { x: left + radius, y: top + radius }, point: { x: left, y: top, z }, start: Math.PI, end: Math.PI * 1.5 },
-    { center: { x: right - radius, y: top + radius }, point: { x: right, y: top, z }, start: -Math.PI / 2, end: 0 },
-    { center: { x: right - radius, y: bottom - radius }, point: { x: right, y: bottom, z }, start: 0, end: Math.PI / 2 },
-    { center: { x: left + radius, y: bottom - radius }, point: { x: left, y: bottom, z }, start: Math.PI / 2, end: Math.PI },
-  ] as const;
-
-  return corners.flatMap((corner, index) => (
-    radius > 0 && (cornerMask & (1 << index)) !== 0
-      ? arcPoints(corner.center, radius, corner.start, corner.end, z)
-      : [corner.point]
-  ));
+function directionIndex(edge: BoundaryEdge): number {
+  const dx = edge.end.x - edge.start.x;
+  const dy = edge.end.y - edge.start.y;
+  if (dx > 0) return 0;
+  if (dy > 0) return 1;
+  if (dx < 0) return 2;
+  return 3;
 }
 
-function tileProfile(
-  cell: IsoCell,
-  regionId: string,
-  role: WorldRegionRole,
-  occupied: ReadonlySet<string>,
-): BeveledTileProfile {
-  const cornerMask = tileCornerMask(cell, occupied);
-  return {
-    cell,
-    cornerMask,
-    regionId,
-    role,
-    outer: roundedBoundary(cell, 0, cornerMask, -WORLD_BOARD_BEVEL_DROP),
-    inner: roundedBoundary(cell, WORLD_BOARD_BEVEL_INSET, cornerMask, 0),
-  };
+function traceBoundaryLoops(edges: readonly BoundaryEdge[]): WorldPoint[][] {
+  const outgoing = new Map<string, number[]>();
+  edges.forEach((edge, index) => {
+    const key = pointKey(edge.start);
+    outgoing.set(key, [...(outgoing.get(key) ?? []), index]);
+  });
+  const used = new Set<number>();
+  const loops: WorldPoint[][] = [];
+  const turnPreference = new Map([[1, 0], [0, 1], [3, 2], [2, 3]]);
+
+  edges.forEach((initialEdge, initialIndex) => {
+    if (used.has(initialIndex)) return;
+    const loop: WorldPoint[] = [];
+    const initialKey = pointKey(initialEdge.start);
+    let edgeIndex = initialIndex;
+    let guard = 0;
+    while (!used.has(edgeIndex) && guard <= edges.length) {
+      guard += 1;
+      used.add(edgeIndex);
+      const edge = edges[edgeIndex];
+      loop.push(edge.start);
+      const endKey = pointKey(edge.end);
+      if (endKey === initialKey) break;
+      const currentDirection = directionIndex(edge);
+      const candidates = (outgoing.get(endKey) ?? []).filter((candidate) => !used.has(candidate));
+      if (!candidates.length) break;
+      candidates.sort((left, right) => {
+        const leftTurn = (directionIndex(edges[left]) - currentDirection + 4) % 4;
+        const rightTurn = (directionIndex(edges[right]) - currentDirection + 4) % 4;
+        return (turnPreference.get(leftTurn) ?? 4) - (turnPreference.get(rightTurn) ?? 4);
+      });
+      edgeIndex = candidates[0];
+    }
+    if (loop.length >= 3) loops.push(loop);
+  });
+  return loops;
+}
+
+function simplifyLoop(points: readonly WorldPoint[]): WorldPoint[] {
+  return points.filter((_, index) => {
+    const previous = points[(index - 1 + points.length) % points.length];
+    const current = points[index];
+    const next = points[(index + 1) % points.length];
+    return Math.abs(cross(previous, current, next)) > EPSILON;
+  });
+}
+
+function filletLoop(points: readonly WorldPoint[]): FilletedLoop {
+  const simplified = simplifyLoop(points);
+  let concaveCornerCount = 0;
+  let convexCornerCount = 0;
+  const filleted = simplified.flatMap((current, index) => {
+    const previous = simplified[(index - 1 + simplified.length) % simplified.length];
+    const next = simplified[(index + 1) % simplified.length];
+    const incoming = normalize({ x: current.x - previous.x, y: current.y - previous.y });
+    const outgoing = normalize({ x: next.x - current.x, y: next.y - current.y });
+    const turn = incoming.x * outgoing.y - incoming.y * outgoing.x;
+    const preferredRadius = turn > 0 ? WORLD_BOARD_CONVEX_RADIUS : WORLD_BOARD_CONCAVE_RADIUS;
+    if (turn > 0) convexCornerCount += 1;
+    else concaveCornerCount += 1;
+    const radius = Math.min(
+      preferredRadius,
+      Math.hypot(current.x - previous.x, current.y - previous.y) * 0.42,
+      Math.hypot(next.x - current.x, next.y - current.y) * 0.42,
+    );
+    const start = { x: current.x - incoming.x * radius, y: current.y - incoming.y * radius };
+    const end = { x: current.x + outgoing.x * radius, y: current.y + outgoing.y * radius };
+    return Array.from({ length: WORLD_BOARD_CONTOUR_SEGMENTS + 1 }, (_, segment) => {
+      const t = segment / WORLD_BOARD_CONTOUR_SEGMENTS;
+      const inverse = 1 - t;
+      return {
+        x: inverse * inverse * start.x + 2 * inverse * t * current.x + t * t * end.x,
+        y: inverse * inverse * start.y + 2 * inverse * t * current.y + t * t * end.y,
+      };
+    });
+  });
+  return { concaveCornerCount, convexCornerCount, points: filleted };
+}
+
+function insetLoop(points: readonly WorldPoint[], inset: number): WorldPoint[] {
+  return points.map((point, index) => {
+    const previous = points[(index - 1 + points.length) % points.length];
+    const next = points[(index + 1) % points.length];
+    const incoming = normalize({ x: point.x - previous.x, y: point.y - previous.y });
+    const outgoing = normalize({ x: next.x - point.x, y: next.y - point.y });
+    const firstNormal = { x: -incoming.y, y: incoming.x };
+    const secondNormal = { x: -outgoing.y, y: outgoing.x };
+    const bisector = normalize({ x: firstNormal.x + secondNormal.x, y: firstNormal.y + secondNormal.y });
+    const denominator = Math.max(0.35, Math.abs(bisector.x * firstNormal.x + bisector.y * firstNormal.y));
+    return { x: point.x + bisector.x * inset / denominator, y: point.y + bisector.y * inset / denominator };
+  });
+}
+
+function pointInTriangle(point: WorldPoint, first: WorldPoint, second: WorldPoint, third: WorldPoint): boolean {
+  const firstCross = (second.x - first.x) * (point.y - first.y) - (second.y - first.y) * (point.x - first.x);
+  const secondCross = (third.x - second.x) * (point.y - second.y) - (third.y - second.y) * (point.x - second.x);
+  const thirdCross = (first.x - third.x) * (point.y - third.y) - (first.y - third.y) * (point.x - third.x);
+  return firstCross >= -EPSILON && secondCross >= -EPSILON && thirdCross >= -EPSILON;
+}
+
+function triangulatePolygon(points: readonly WorldPoint[]): number[] {
+  if (points.length < 3) return [];
+  const order = Array.from({ length: points.length }, (_, index) => index);
+  if (polygonArea(points) < 0) order.reverse();
+  const triangles: number[] = [];
+  let guard = 0;
+  while (order.length > 3 && guard < points.length * points.length) {
+    guard += 1;
+    let earFound = false;
+    for (let index = 0; index < order.length; index += 1) {
+      const previousIndex = order[(index - 1 + order.length) % order.length];
+      const currentIndex = order[index];
+      const nextIndex = order[(index + 1) % order.length];
+      const previous = points[previousIndex];
+      const current = points[currentIndex];
+      const next = points[nextIndex];
+      if (cross(previous, current, next) <= EPSILON) continue;
+      const containsPoint = order.some((candidate) => (
+        candidate !== previousIndex && candidate !== currentIndex && candidate !== nextIndex
+        && pointInTriangle(points[candidate], previous, current, next)
+      ));
+      if (containsPoint) continue;
+      triangles.push(previousIndex, currentIndex, nextIndex);
+      order.splice(index, 1);
+      earFound = true;
+      break;
+    }
+    if (!earFound) break;
+  }
+  if (order.length === 3) triangles.push(order[0], order[1], order[2]);
+  return triangles;
 }
 
 function appendVertex(
   batch: WorldBoardMeshBatch,
   sceneOrigin: WorldPoint,
   point: WorldSurfacePoint,
+  textureCoordinate: WorldPoint,
   color: string,
 ): number {
   const index = batch.vertices.length;
   batch.vertices.push(projectLabSurfacePoint(sceneOrigin, point));
-  batch.textureCoordinates.push({ x: point.x, y: point.y });
+  batch.textureCoordinates.push(textureCoordinate);
   batch.colors.push(color);
   return index;
 }
 
-function appendTop(
+function appendTopPolygon(batch: WorldBoardMeshBatch, sceneOrigin: WorldPoint, points: readonly WorldPoint[]) {
+  const offset = batch.vertices.length;
+  points.forEach((point) => appendVertex(batch, sceneOrigin, { ...point, z: 0 }, point, TERRAIN_COLOR));
+  triangulatePolygon(points).forEach((index) => batch.indices.push(offset + index));
+}
+
+function appendHoleMask(batch: WorldBoardMeshBatch, sceneOrigin: WorldPoint, points: readonly WorldPoint[]) {
+  const offset = batch.vertices.length;
+  points.forEach((point) => appendVertex(batch, sceneOrigin, { ...point, z: 0 }, point, 'black'));
+  triangulatePolygon(points).forEach((index) => batch.indices.push(offset + index));
+}
+
+function appendRect(
   batch: WorldBoardMeshBatch,
   sceneOrigin: WorldPoint,
-  profile: BeveledTileProfile,
+  left: number,
+  top: number,
+  right: number,
+  bottom: number,
   color: string,
-): number {
-  const points = profile.inner;
-  if (points.length === 4) {
-    const offset = batch.vertices.length;
-    points.forEach((point) => appendVertex(batch, sceneOrigin, point, color));
-    batch.indices.push(offset, offset + 1, offset + 2, offset, offset + 2, offset + 3);
-    return 2;
-  }
-
-  const center: WorldSurfacePoint = {
-    x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
-    y: points.reduce((sum, point) => sum + point.y, 0) / points.length,
-    z: 0,
-  };
-  const centerIndex = appendVertex(batch, sceneOrigin, center, color);
-  const boundaryIndices = points.map((point) => appendVertex(batch, sceneOrigin, point, color));
-  boundaryIndices.forEach((index, pointIndex) => {
-    batch.indices.push(centerIndex, index, boundaryIndices[(pointIndex + 1) % boundaryIndices.length]);
-  });
-  return points.length;
-}
-
-function appendBevel(
-  batch: WorldBoardMeshBatch,
-  sceneOrigin: WorldPoint,
-  profile: BeveledTileProfile,
-  color: string,
-): number {
-  const segmentCount = profile.outer.length;
-  for (let index = 0; index < segmentCount; index += 1) {
-    const next = (index + 1) % segmentCount;
-    const offset = batch.vertices.length;
-    [profile.outer[index], profile.outer[next], profile.inner[next], profile.inner[index]]
-      .forEach((point) => appendVertex(batch, sceneOrigin, point, color));
-    batch.indices.push(offset, offset + 1, offset + 2, offset, offset + 2, offset + 3);
-  }
-  return segmentCount * 2;
-}
-
-function surfaceBatchFor(
-  batches: Map<number, WorldBoardSurfaceBatch>,
-  cornerMask: number,
-): WorldBoardSurfaceBatch {
-  const existing = batches.get(cornerMask);
-  if (existing) return existing;
-  const batch = { ...emptyBatch(), cornerMask };
-  batches.set(cornerMask, batch);
-  return batch;
-}
-
-function isCameraFacingEdge(sceneOrigin: WorldPoint, start: WorldSurfacePoint, end: WorldSurfacePoint): boolean {
-  const projectedStart = projectLabSurfacePoint(sceneOrigin, start);
-  const projectedEnd = projectLabSurfacePoint(sceneOrigin, end);
-  return projectedEnd.x - projectedStart.x < -0.001;
-}
-
-function sideForSegment(cell: IsoCell, start: WorldSurfacePoint, end: WorldSurfacePoint): number {
-  const middle = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
-  const distances = [
-    Math.abs(middle.y - cell.row),
-    Math.abs(middle.x - (cell.col + 1)),
-    Math.abs(middle.y - (cell.row + 1)),
-    Math.abs(middle.x - cell.col),
+) {
+  const offset = batch.vertices.length;
+  const points = [
+    { x: left, y: top, z: 0 },
+    { x: right, y: top, z: 0 },
+    { x: right, y: bottom, z: 0 },
+    { x: left, y: bottom, z: 0 },
   ];
-  return distances.indexOf(Math.min(...distances));
+  points.forEach((point) => appendVertex(batch, sceneOrigin, point, { x: point.x, y: point.y }, color));
+  batch.indices.push(offset, offset + 1, offset + 2, offset, offset + 2, offset + 3);
 }
 
-function outwardNormal(start: WorldSurfacePoint, end: WorldSurfacePoint): WorldPoint {
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const length = Math.hypot(dx, dy) || 1;
-  return { x: dy / length, y: -dx / length };
+function quantizedNormal(start: WorldPoint, end: WorldPoint): WorldPoint {
+  const tangent = normalize({ x: end.x - start.x, y: end.y - start.y });
+  const outward = { x: tangent.y, y: -tangent.x };
+  const step = Math.PI * 2 / WORLD_BOARD_EDGE_NORMAL_STEPS;
+  const angle = Math.round(Math.atan2(outward.y, outward.x) / step) * step;
+  return { x: Math.cos(angle), y: Math.sin(angle) };
 }
 
-function wallBatchKey(material: WorldBoardWallBatch['material'], normal: WorldPoint): string {
-  return `${material}:${normal.x.toFixed(4)}:${normal.y.toFixed(4)}`;
+function edgeBatchKey(normal: WorldPoint): string {
+  return `${normal.x.toFixed(4)}:${normal.y.toFixed(4)}`;
 }
 
-function wallBatchFor(
-  batches: Map<string, WorldBoardWallBatch>,
-  material: WorldBoardWallBatch['material'],
-  normal: WorldPoint,
-): WorldBoardWallBatch {
-  const key = wallBatchKey(material, normal);
+function edgeBatchFor(batches: Map<string, WorldBoardEdgeBatch>, normal: WorldPoint): WorldBoardEdgeBatch {
+  const key = edgeBatchKey(normal);
   const existing = batches.get(key);
   if (existing) return existing;
-  const batch = { ...emptyBatch(), material, normal };
+  const batch = { ...emptyBatch(), normal };
   batches.set(key, batch);
   return batch;
 }
 
-function appendWallQuad(
-  batch: WorldBoardMeshBatch,
-  sceneOrigin: WorldPoint,
-  start: WorldSurfacePoint,
-  end: WorldSurfacePoint,
-  slabThickness: number,
-  color: string,
-) {
-  const bottomEnd = { ...end, z: -slabThickness };
-  const bottomStart = { ...start, z: -slabThickness };
+function projectedSegmentLength(sceneOrigin: WorldPoint, start: WorldPoint, end: WorldPoint): number {
   const projectedStart = projectLabSurfacePoint(sceneOrigin, { ...start, z: 0 });
   const projectedEnd = projectLabSurfacePoint(sceneOrigin, { ...end, z: 0 });
-  const startU = projectedStart.x / Math.max(1, Math.hypot(LAB_COLUMN_BASIS.x, LAB_COLUMN_BASIS.y));
-  const endU = projectedEnd.x / Math.max(1, Math.hypot(LAB_COLUMN_BASIS.x, LAB_COLUMN_BASIS.y));
-  const offset = batch.vertices.length;
-  [start, end, bottomEnd, bottomStart].forEach((point) => {
-    batch.vertices.push(projectLabSurfacePoint(sceneOrigin, point));
-    batch.colors.push(color);
-  });
-  batch.textureCoordinates.push(
-    { x: startU, y: 0 },
-    { x: endU, y: 0 },
-    { x: endU, y: 1 },
-    { x: startU, y: 1 },
-  );
-  batch.indices.push(offset, offset + 1, offset + 2, offset, offset + 2, offset + 3);
+  return Math.hypot(projectedEnd.x - projectedStart.x, projectedEnd.y - projectedStart.y);
 }
 
-function appendVisibleWalls(
-  batches: Map<string, WorldBoardWallBatch>,
+function isCameraFacingEdge(sceneOrigin: WorldPoint, start: WorldPoint, end: WorldPoint): boolean {
+  const projectedStart = projectLabSurfacePoint(sceneOrigin, { ...start, z: 0 });
+  const projectedEnd = projectLabSurfacePoint(sceneOrigin, { ...end, z: 0 });
+  return projectedEnd.x - projectedStart.x < -0.001;
+}
+
+function appendEdgeGeometry(
+  bevels: Map<string, WorldBoardEdgeBatch>,
+  walls: Map<string, WorldBoardEdgeBatch>,
   manifest: WorldBoardManifest,
-  profile: BeveledTileProfile,
-  occupied: ReadonlySet<string>,
-): number {
-  let count = 0;
-  for (let index = 0; index < profile.outer.length; index += 1) {
-    const start = profile.outer[index];
-    const end = profile.outer[(index + 1) % profile.outer.length];
-    const side = sideForSegment(profile.cell, start, end);
-    if (sideOccupied(profile.cell, side, occupied) || !isCameraFacingEdge(manifest.sceneOrigin, start, end)) continue;
-    const material = profile.role === 'locked' ? 'locked' : 'earth';
-    const normal = outwardNormal(start, end);
-    const batch = wallBatchFor(batches, material, normal);
-    const base = material === 'locked' ? LOCKED_WALL_BASE : EARTH_BASE;
-    appendWallQuad(batch, manifest.sceneOrigin, start, end, manifest.slabThickness, colorString(base));
-    count += 1;
+  outer: readonly WorldPoint[],
+  inner: readonly WorldPoint[],
+): { bevelTriangles: number; wallFaces: number } {
+  let perimeter = 0;
+  let wallFaces = 0;
+  for (let index = 0; index < outer.length; index += 1) {
+    const next = (index + 1) % outer.length;
+    const start = outer[index];
+    const end = outer[next];
+    const innerStart = inner[index];
+    const innerEnd = inner[next];
+    const segmentLength = projectedSegmentLength(manifest.sceneOrigin, start, end) / Math.max(1, Math.hypot(LAB_COLUMN_BASIS.x, LAB_COLUMN_BASIS.y));
+    const nextPerimeter = perimeter + segmentLength;
+    const normal = quantizedNormal(start, end);
+    const bevel = edgeBatchFor(bevels, normal);
+    const bevelOffset = bevel.vertices.length;
+    [
+      { point: { ...start, z: -WORLD_BOARD_BEVEL_DROP }, uv: { x: perimeter, y: 0 } },
+      { point: { ...end, z: -WORLD_BOARD_BEVEL_DROP }, uv: { x: nextPerimeter, y: 0 } },
+      { point: { ...innerEnd, z: 0 }, uv: { x: nextPerimeter, y: 1 } },
+      { point: { ...innerStart, z: 0 }, uv: { x: perimeter, y: 1 } },
+    ].forEach(({ point, uv }) => appendVertex(bevel, manifest.sceneOrigin, point, uv, BEVEL_COLOR));
+    bevel.indices.push(bevelOffset, bevelOffset + 1, bevelOffset + 2, bevelOffset, bevelOffset + 2, bevelOffset + 3);
+
+    if (isCameraFacingEdge(manifest.sceneOrigin, start, end)) {
+      const wall = edgeBatchFor(walls, normal);
+      const wallOffset = wall.vertices.length;
+      [
+        { point: { ...start, z: -WORLD_BOARD_BEVEL_DROP }, uv: { x: perimeter, y: 0 } },
+        { point: { ...end, z: -WORLD_BOARD_BEVEL_DROP }, uv: { x: nextPerimeter, y: 0 } },
+        { point: { ...end, z: -manifest.slabThickness }, uv: { x: nextPerimeter, y: 1 } },
+        { point: { ...start, z: -manifest.slabThickness }, uv: { x: perimeter, y: 1 } },
+      ].forEach(({ point, uv }) => appendVertex(wall, manifest.sceneOrigin, point, uv, WALL_COLOR));
+      wall.indices.push(wallOffset, wallOffset + 1, wallOffset + 2, wallOffset, wallOffset + 2, wallOffset + 3);
+      wallFaces += 1;
+    }
+    perimeter = nextPerimeter;
   }
-  return count;
+  return { bevelTriangles: outer.length * 2, wallFaces };
 }
 
 export function buildWorldBoardSurfaceMesh(manifest: WorldBoardManifest): WorldBoardSurfaceMesh {
-  const grass = new Map<number, WorldBoardSurfaceBatch>();
-  const locked = new Map<number, WorldBoardSurfaceBatch>();
-  const walls = new Map<string, WorldBoardWallBatch>();
-  const occupied = new Set(manifest.regions.flatMap((region) => region.cells.map(cellKey)));
-  const tileProfiles = manifest.regions.flatMap((region) => region.cells.map((cell) => (
-    tileProfile(cell, region.id, region.role, occupied)
-  )));
-  let topTriangleCount = 0;
+  const terrain = emptyBatch();
+  const boardOverlay = emptyBatch();
+  const holeMasks = emptyBatch();
+  const lockedOverlay = emptyBatch();
+  const bevels = new Map<string, WorldBoardEdgeBatch>();
+  const walls = new Map<string, WorldBoardEdgeBatch>();
+  const cells = manifest.regions.flatMap((region) => region.cells);
+  const occupied = new Set(cells.map(cellKey));
+  const rawLoops = traceBoundaryLoops(boundaryEdges(cells, occupied));
+  const holeContourCount = rawLoops.filter((loop) => polygonArea(loop) < 0).length;
+  let convexCornerCount = 0;
+  let concaveCornerCount = 0;
   let bevelTriangleCount = 0;
   let wallFaceCount = 0;
+  const contours = rawLoops.map((loop): WorldBoardLandmassContour => {
+    const isHole = polygonArea(loop) < 0;
+    const filleted = filletLoop(loop);
+    convexCornerCount += filleted.convexCornerCount;
+    concaveCornerCount += filleted.concaveCornerCount;
+    const inner = insetLoop(filleted.points, WORLD_BOARD_BEVEL_INSET);
+    if (isHole) appendHoleMask(holeMasks, manifest.sceneOrigin, inner);
+    else appendTopPolygon(terrain, manifest.sceneOrigin, inner);
+    const edgeStats = appendEdgeGeometry(bevels, walls, manifest, filleted.points, inner);
+    bevelTriangleCount += edgeStats.bevelTriangles;
+    wallFaceCount += edgeStats.wallFaces;
+    return {
+      inner: inner.map((point) => ({ ...point, z: 0 })),
+      outer: filleted.points.map((point) => ({ ...point, z: -WORLD_BOARD_BEVEL_DROP })),
+    };
+  });
 
-  tileProfiles.forEach((profile) => {
-    const batches = profile.role === 'locked' ? locked : grass;
-    const batch = surfaceBatchFor(batches, profile.cornerMask);
-    const base = profile.role === 'connector' ? CONNECTOR_BASE : profile.role === 'locked' ? LOCKED_BASE : GRASS_BASE;
-    const color = colorString(base);
-    topTriangleCount += appendTop(batch, manifest.sceneOrigin, profile, color);
-    bevelTriangleCount += appendBevel(batch, manifest.sceneOrigin, profile, color);
-    wallFaceCount += appendVisibleWalls(walls, manifest, profile, occupied);
+  appendRect(
+    boardOverlay,
+    manifest.sceneOrigin,
+    manifest.board.startCol,
+    manifest.board.startRow,
+    manifest.board.startCol + manifest.board.columns,
+    manifest.board.startRow + manifest.board.rows,
+    TRANSPARENT,
+  );
+  manifest.regions.filter((region) => region.role === 'locked').forEach((region) => {
+    region.cells.forEach((cell) => appendRect(lockedOverlay, manifest.sceneOrigin, cell.col, cell.row, cell.col + 1, cell.row + 1, LOCKED_COLOR));
   });
 
   return {
-    surfaces: {
-      grass: [...grass.values()].sort((left, right) => left.cornerMask - right.cornerMask),
-      locked: [...locked.values()].sort((left, right) => left.cornerMask - right.cornerMask),
-    },
-    tileProfiles,
-    walls: [...walls.values()].sort((left, right) => wallBatchKey(left.material, left.normal).localeCompare(wallBatchKey(right.material, right.normal))),
+    bevels: [...bevels.values()].sort((left, right) => edgeBatchKey(left.normal).localeCompare(edgeBatchKey(right.normal))),
+    boardOverlay,
+    contours,
+    holeMasks,
+    lockedOverlay,
+    terrain,
+    walls: [...walls.values()].sort((left, right) => edgeBatchKey(left.normal).localeCompare(edgeBatchKey(right.normal))),
     stats: {
       bevelTriangleCount,
-      roundedCornerCount: tileProfiles.reduce((total, profile) => total + profile.cornerMask.toString(2).replaceAll('0', '').length, 0),
-      surfaceTriangleCount: topTriangleCount + bevelTriangleCount,
-      tileCount: tileProfiles.length,
-      topTriangleCount,
+      boardOverlayTriangleCount: boardOverlay.indices.length / 3,
+      concaveCornerCount,
+      contourCount: contours.length,
+      contourPointCount: contours.reduce((total, contour) => total + contour.outer.length, 0),
+      convexCornerCount,
+      holeContourCount,
+      surfaceTriangleCount: terrain.indices.length / 3 + bevelTriangleCount,
+      tileCount: cells.length,
       wallFaceCount,
       wallTriangleCount: wallFaceCount * 2,
     },
