@@ -2,10 +2,12 @@ import {
   BlurMask,
   Canvas,
   Circle,
+  ColorShader,
   Group,
   Image as SkiaImage,
   ImageShader,
   Path,
+  Shader,
   Skia,
   useImage,
   Vertices,
@@ -26,6 +28,8 @@ import { useScenePerformanceProbe } from '@/hooks/use-scene-performance-probe';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
 import { safeGoBack } from '@/utils/safe-navigation';
 import {
+  LAB_COLUMN_BASIS,
+  LAB_ROW_BASIS,
   boardCellAtWorldPoint,
   boardCellCenter,
   generateWorldBoardManifest,
@@ -37,7 +41,14 @@ import {
   type WorldIsoRegion,
   type WorldPoint,
 } from '@/utils/world-board-lab';
-import { buildWorldBoardSurfaceMesh } from '@/utils/world-board-surface-mesh';
+import {
+  WORLD_BOARD_SURFACE_MATERIAL,
+  buildWorldBoardSurfaceMesh,
+} from '@/utils/world-board-surface-mesh';
+import {
+  WORLD_BOARD_DEPTH_EFFECT,
+  WORLD_BOARD_SURFACE_EFFECT,
+} from '@/utils/world-board-material-shaders';
 import {
   GRASS_DETAIL_BERRIES,
   GRASS_DETAIL_FLOWER,
@@ -49,6 +60,12 @@ import { useWorldBoardLabCamera, WorldBoardAnimatedView } from './use-world-boar
 
 const HOME_SOURCE = worldAssetSource('home');
 const MOSSPROUT_SOURCE = resolveCreatureArtSource('mossprout', { lod: 'medium', stage: 'grown' });
+const SURFACE_LIGHT_DIRECTION = [-0.34, -0.42, 0.84] as const;
+const GRASS_FALLBACK = '#89BB46';
+const LOCKED_SURFACE = '#B9D4D5';
+const EARTH_COLOR = [148 / 255, 116 / 255, 68 / 255, 1] as const;
+const LOCKED_WALL_COLOR = [126 / 255, 158 / 255, 164 / 255, 1] as const;
+const MOSS_COLOR = [102 / 255, 133 / 255, 53 / 255, 1] as const;
 
 type DebugSettings = { cellIds: boolean; details: boolean; regionLabels: boolean; wireframe: boolean };
 const INITIAL_DEBUG: DebugSettings = { cellIds: false, details: true, regionLabels: true, wireframe: false };
@@ -107,15 +124,25 @@ export function WorldBoardLabScreen() {
   const meshEdges = useMemo(() => {
     const path = Skia.Path.Make();
     surfaceMesh.tileProfiles.forEach((profile) => {
-      const points = profile.inner.map((point) => projectLabSurfacePoint(manifest.sceneOrigin, point));
-      points.forEach((point, index) => {
-        const next = points[(index + 1) % points.length];
-        path.moveTo(point.x, point.y);
-        path.lineTo(next.x, next.y);
+      [profile.outer, profile.inner].forEach((boundary) => {
+        const points = boundary.map((point) => projectLabSurfacePoint(manifest.sceneOrigin, point));
+        points.forEach((point, index) => {
+          const next = points[(index + 1) % points.length];
+          path.moveTo(point.x, point.y);
+          path.lineTo(next.x, next.y);
+        });
       });
     });
     return path;
   }, [manifest.sceneOrigin, surfaceMesh.tileProfiles]);
+  const surfaceUniforms = useMemo(() => ({
+    antialiasWidth: Math.max(0.0008, 0.72 / (manifest.tileWidth * camera.snapshot.scale)),
+    bevelWidth: WORLD_BOARD_SURFACE_MATERIAL.bevelWidth,
+    columnBasis: LAB_COLUMN_BASIS,
+    lightDirection: SURFACE_LIGHT_DIRECTION,
+    rowBasis: LAB_ROW_BASIS,
+    sceneOrigin: manifest.sceneOrigin,
+  }), [camera.snapshot.scale, manifest.sceneOrigin, manifest.tileWidth]);
 
   const boardRegion = manifest.regions.find((region) => region.role === 'board')!;
   const boardCenter = useMemo(() => regionCenter(boardRegion, manifest.sceneOrigin), [boardRegion, manifest.sceneOrigin]);
@@ -165,28 +192,60 @@ export function WorldBoardLabScreen() {
           {viewport.width > 0 ? (
             <WorldBoardAnimatedView style={[styles.world, { height: manifest.bounds.height, width: manifest.bounds.width }, camera.worldStyle]}>
               <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}>
-                <Vertices colors={surfaceMesh.walls.colors} indices={surfaceMesh.walls.indices} mode="triangles" vertices={surfaceMesh.walls.vertices} />
-                {grassTexture ? (
-                  <Group>
-                    <ImageShader fit="none" image={grassTexture} transform={[{ scale: 0.72 }]} tx="repeat" ty="repeat" />
-                    <Vertices
-                      indices={surfaceMesh.grass.indices}
-                      mode="triangles"
-                      textures={surfaceMesh.grass.textureCoordinates}
-                      vertices={surfaceMesh.grass.vertices}
+                {surfaceMesh.walls.map((wall, index) => WORLD_BOARD_DEPTH_EFFECT ? (
+                  <Group key={`wall:${wall.material}:${index}`}>
+                    <Shader
+                      source={WORLD_BOARD_DEPTH_EFFECT}
+                      uniforms={{
+                        baseColor: wall.material === 'locked' ? LOCKED_WALL_COLOR : EARTH_COLOR,
+                        faceNormal: wall.normal,
+                        lightDirection: SURFACE_LIGHT_DIRECTION,
+                        mossColor: MOSS_COLOR,
+                      }}
                     />
+                    <Vertices indices={wall.indices} mode="triangles" textures={wall.textureCoordinates} vertices={wall.vertices} />
                   </Group>
                 ) : (
-                  <Vertices colors={surfaceMesh.grass.colors} indices={surfaceMesh.grass.indices} mode="triangles" vertices={surfaceMesh.grass.vertices} />
-                )}
-                {grassTexture ? (
-                  <>
-                    <Vertices color="rgba(255,246,185,0.09)" indices={surfaceMesh.bevelLighting.light.indices} mode="triangles" vertices={surfaceMesh.bevelLighting.light.vertices} />
-                    <Vertices color="rgba(66,79,32,0.11)" indices={surfaceMesh.bevelLighting.middle.indices} mode="triangles" vertices={surfaceMesh.bevelLighting.middle.vertices} />
-                    <Vertices color="rgba(38,49,22,0.23)" indices={surfaceMesh.bevelLighting.shade.indices} mode="triangles" vertices={surfaceMesh.bevelLighting.shade.vertices} />
-                  </>
-                ) : null}
-                <Vertices colors={surfaceMesh.locked.colors} indices={surfaceMesh.locked.indices} mode="triangles" vertices={surfaceMesh.locked.vertices} />
+                  <Vertices colors={wall.colors} indices={wall.indices} key={`wall-fallback:${wall.material}:${index}`} mode="triangles" vertices={wall.vertices} />
+                ))}
+                {surfaceMesh.surfaces.grass.map((surface) => WORLD_BOARD_SURFACE_EFFECT ? (
+                  <Group key={`grass:${surface.cornerMask}`}>
+                    <Shader
+                      source={WORLD_BOARD_SURFACE_EFFECT}
+                      uniforms={{
+                        ...surfaceUniforms,
+                        cornerRadii: [0, 1, 2, 3].map((corner) => (
+                          (surface.cornerMask & (1 << corner)) !== 0 ? WORLD_BOARD_SURFACE_MATERIAL.cornerRadius : 0
+                        )),
+                      }}>
+                      {grassTexture ? (
+                        <ImageShader fit="none" image={grassTexture} transform={[{ scale: 0.72 }]} tx="repeat" ty="repeat" />
+                      ) : (
+                        <ColorShader color={GRASS_FALLBACK} />
+                      )}
+                    </Shader>
+                    <Vertices indices={surface.indices} mode="triangles" textures={surface.textureCoordinates} vertices={surface.vertices} />
+                  </Group>
+                ) : (
+                  <Vertices colors={surface.colors} indices={surface.indices} key={`grass-fallback:${surface.cornerMask}`} mode="triangles" vertices={surface.vertices} />
+                ))}
+                {surfaceMesh.surfaces.locked.map((surface) => WORLD_BOARD_SURFACE_EFFECT ? (
+                  <Group key={`locked:${surface.cornerMask}`}>
+                    <Shader
+                      source={WORLD_BOARD_SURFACE_EFFECT}
+                      uniforms={{
+                        ...surfaceUniforms,
+                        cornerRadii: [0, 1, 2, 3].map((corner) => (
+                          (surface.cornerMask & (1 << corner)) !== 0 ? WORLD_BOARD_SURFACE_MATERIAL.cornerRadius : 0
+                        )),
+                      }}>
+                      <ColorShader color={LOCKED_SURFACE} />
+                    </Shader>
+                    <Vertices indices={surface.indices} mode="triangles" textures={surface.textureCoordinates} vertices={surface.vertices} />
+                  </Group>
+                ) : (
+                  <Vertices colors={surface.colors} indices={surface.indices} key={`locked-fallback:${surface.cornerMask}`} mode="triangles" vertices={surface.vertices} />
+                ))}
                 {debug.wireframe ? <Path color="rgba(46,67,28,0.42)" path={meshEdges} strokeWidth={0.9} style="stroke" /> : null}
                 {debug.details ? manifest.decorations.map((detail) => {
                   const image = detail.kind === 'flower' ? flowerTexture : berryTexture;

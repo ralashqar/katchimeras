@@ -328,7 +328,7 @@ export function KatchimeraKingdomScreen({
           </ThemedText>
         </View>
         <View style={styles.headerActions}>
-          {__DEV__ && !ftueStepId && onOpenWorldBoardLab ? (
+          {__DEV__ && onOpenWorldBoardLab ? (
             <Pressable
               accessibilityHint="Opens the procedural world and board experiment"
               accessibilityLabel="Open World and Board Lab"
