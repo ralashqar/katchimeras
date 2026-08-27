@@ -4,6 +4,7 @@ import { StyleSheet, View, type ImageSourcePropType } from 'react-native';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { KINGDOM_RENDERING } from '@/constants/kingdom-rendering';
+import { useSceneImagePerformanceTrace } from '@/hooks/use-scene-performance-probe';
 
 type Candidate = {
   fallback: boolean;
@@ -38,6 +39,7 @@ export const SeamlessWorldImage = memo(function SeamlessWorldImage({
   source,
 }: Props) {
   const sourceKey = useMemo(() => worldImageSourceKey(source), [source]);
+  useSceneImagePerformanceTrace('kingdom', sourceKey);
   const fallbackKey = useMemo(() => (fallbackSource ? worldImageSourceKey(fallbackSource) : null), [fallbackSource]);
   const [displayed, setDisplayed] = useState<Candidate | null>(null);
   const [candidate, setCandidate] = useState<Candidate | null>(() => ({ fallback: false, key: sourceKey, source }));
@@ -66,7 +68,7 @@ export const SeamlessWorldImage = memo(function SeamlessWorldImage({
     if (!candidate) return;
     onReady?.();
     const loaded = candidate;
-    fade.value = withTiming(1, { duration: KINGDOM_RENDERING.lodCrossfadeMs }, (finished) => {
+    fade.value = withTiming(1, { duration: KINGDOM_RENDERING.imageCrossfadeMs }, (finished) => {
       if (finished) runOnJS(commitCandidate)(loaded.key, loaded.source, loaded.fallback);
     });
   }, [candidate, commitCandidate, fade, onReady]);

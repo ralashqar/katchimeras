@@ -300,10 +300,10 @@ test('the Katchimeras tab permanently renders the hex Haven while companion Back
   assert.match(rosterRoute, /const discoveryCompanionSlots[\s\S]*?kind: 'locked' as const/);
   assert.match(rosterRoute, /announcement: 'Opening You'[\s\S]*?router\.push\('\/you'\)/);
   assert.match(kingdomScreen, /<EggAvatar[\s\S]*?accessibilityLabel="Open You"|accessibilityLabel="Open You"[\s\S]*?<EggAvatar/);
-  assert.match(kingdomScreen, /characterId: 'mossprout'[\s\S]*?zoom: 1\.32/);
+  assert.match(kingdomScreen, /characterId: 'mossprout'[\s\S]*?zoom: 1\.25/);
   assert.match(kingdomScreen, /familyId === 'mossprout'\) advanceOpening/);
   assert.match(kingdomCanvas, /candidate\.companion\?\.familyId === targetCharacterId/);
-  assert.match(youRoute, /accessibilityLabel="Back to Haven"[\s\S]*?router\.canGoBack\(\)[\s\S]*?router\.replace\('\/katchimeras'\)/);
+  assert.match(youRoute, /accessibilityLabel="Back to Haven"[\s\S]*?router\.canGoBack\(\)[\s\S]*?router\.navigate\('\/\(tabs\)\/katchimeras'\)/);
   assert.match(companionRoute, /onCloseCompanion=\{\(\) =>[\s\S]*?: router\.back\(\)\}/);
 });
 

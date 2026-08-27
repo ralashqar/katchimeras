@@ -7,7 +7,6 @@ import { GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
   Easing,
-  runOnJS,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -25,8 +24,6 @@ import type { KingdomTileArtLayer, KingdomTileRender } from '@/components/katcha
 import { buildKingdomHexScene } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { SeamlessWorldImage } from '@/components/katchadeck/world/seamless-world-image';
 import { useKingdomHexCamera } from '@/components/katchadeck/world/use-kingdom-hex-camera';
-import { useKingdomLodScheduler } from '@/components/katchadeck/world/use-kingdom-lod-scheduler';
-import { useKingdomTileScheduler } from '@/components/katchadeck/world/use-kingdom-tile-scheduler';
 import { KINGDOM_RENDERING } from '@/constants/kingdom-rendering';
 import kingdomWorldViewConfig from '@/constants/kingdom-world-view.json';
 import { Lantern } from '@/constants/theme';
@@ -39,10 +36,7 @@ import { homePreset } from '@/utils/world-identity';
 import { HEX_TILE_H, HEX_TILE_W, hexDrawDepth } from '@/utils/world-hex';
 import {
   kingdomWorldViewPoint,
-  screenPointToWorld,
-  type KingdomResidentLod,
 } from '@/utils/kingdom-rendering';
-import type { KingdomTilePhase } from '@/utils/kingdom-tile-scheduler';
 import { getDevKingdomHexVerticalAlignmentMode } from '@/utils/dev-asset-overrides';
 import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
 import {
@@ -57,7 +51,6 @@ import {
   kingdomHexTileOverlaySourceForLod,
   kingdomHexTileSourceForLod,
   worldAssetSource,
-  type KingdomHexTileLod,
 } from '@/utils/world-visuals';
 
 export type KingdomHexCenterRef = () => { col: number; row: number; plotId: string | null } | null;
@@ -98,11 +91,7 @@ const HAVEN_HOME_EGG_AVATAR_SCALE = 1.2;
 const EGG_WORLD_SCALE = kingdomWorldViewConfig.egg.globalScale * HAVEN_HOME_EGG_AVATAR_SCALE;
 const EGG_WORLD_W = EGG_STAGE_W * EGG_WORLD_SCALE;
 const EGG_WORLD_H = EGG_STAGE_H * EGG_WORLD_SCALE;
-const KINGDOM_DREAM_MIST_LOCK_SOURCES: Record<KingdomResidentLod, ImageSourcePropType> = {
-  thumb: require('../../../assets/images/katchimeras/world/hex/kingdom_dream_mist_lock_v1_256.webp'),
-  medium: require('../../../assets/images/katchimeras/world/hex/kingdom_dream_mist_lock_v1_512.webp'),
-};
-const TILE_WORLD_LOD_WIDTH = HEX_TILE_W * 1.03;
+const KINGDOM_DREAM_MIST_LOCK_SOURCE = require('../../../assets/images/katchimeras/world/hex/kingdom_dream_mist_lock_v1_512.webp');
 const LOCKED_TILE_HIT_WIDTH = HEX_TILE_W * 0.62;
 const LOCKED_TILE_HIT_HEIGHT = HEX_TILE_H * 0.78;
 const LOCKED_TILE_LOCK_SIZE = 104;
@@ -219,9 +208,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           targets: focusTargets,
         }
       : undefined,
-    residentWorldSize: creatureWorldSize,
     scene,
-    tileWorldWidth: TILE_WORLD_LOD_WIDTH,
     viewport,
   });
   const tutorialCameraKey = tutorialCamera ? JSON.stringify(tutorialCamera) : 'none';
@@ -387,24 +374,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   useEffect(() => {
     cameraTransitionActive.value = camera.isMoving ? 1 : 0;
   }, [camera.isMoving, cameraTransitionActive]);
-  useScenePerformanceProbe('kingdom-camera', cameraTransitionActive);
-  const scheduler = useKingdomTileScheduler({
-    camera: camera.snapshot,
-    cameraReady: camera.ready,
-    isMoving: camera.isMoving,
-    scene,
-    viewport,
-  });
-  const lodScheduler = useKingdomLodScheduler({
-    isMoving: camera.isMoving,
-    requestedLod: camera.tileLod,
-    renderedTiles: scheduler.renderedTiles,
-    visibleTileIds: scheduler.visibleTileIds,
-  });
-  const runtimeById = useMemo(
-    () => new Map(scheduler.renderedTiles.map((item) => [item.layer.id, item.runtime])),
-    [scheduler.renderedTiles]
-  );
+  useScenePerformanceProbe('kingdom-camera', cameraTransitionActive, 'kingdom');
   const artLayerById = useMemo(
     () => new Map(scene.tileArtLayers.map((layer) => [layer.id, layer])),
     [scene.tileArtLayers]
@@ -414,37 +384,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     if (tileId === camera.focusedTileId) return reduceMotion ? 1.04 : presentation.focusedScale;
     return presentation.unfocusedScale;
   }, [camera.focusedTileId, camera.isMoving, presentation, reduceMotion]);
-  const promotedFullTileId = useMemo(() => {
-    if (camera.isMoving || camera.tileLod !== 'full' || viewport.width <= 0 || viewport.height <= 0) {
-      return null;
-    }
-    const center = screenPointToWorld(
-      { x: viewport.width / 2, y: viewport.height / 2 },
-      scene,
-      camera.snapshot,
-    );
-    let nearestId: string | null = null;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-    for (const layer of scene.tileArtLayers) {
-      if (!scheduler.visibleTileIds.has(layer.id)) continue;
-      const x = layer.frame.left + layer.frame.width / 2;
-      const y = layer.frame.top + layer.frame.height / 2;
-      const distance = (x - center.x) ** 2 + (y - center.y) ** 2;
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestId = layer.id;
-      }
-    }
-    return nearestId;
-  }, [
-    camera.isMoving,
-    camera.snapshot,
-    camera.tileLod,
-    scene,
-    scheduler.visibleTileIds,
-    viewport.height,
-    viewport.width,
-  ]);
   const onLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     setViewport((current) => (current.width === width && current.height === height ? current : { width, height }));
@@ -478,9 +417,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const creatureNodes = useMemo(() => {
     const items: { depth: number; node: ReactNode }[] = [];
     for (const tile of scene.tiles) {
-      if (tile.kind !== 'companion' || !tile.companion || !scheduler.readyTileIds.has(tile.id)) continue;
-      const runtime = runtimeById.get(tile.id);
-      if (!runtime || (!scheduler.visibleTileIds.has(tile.id) && runtime.phase !== 'exiting')) continue;
+      if (tile.kind !== 'companion' || !tile.companion) continue;
       const artLayer = artLayerById.get(tile.id);
       const focusScale = tileFocusScale(tile.id);
       if (tile.companion.kind === 'locked') {
@@ -491,15 +428,12 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             <LockedCompanionTile
               highlighted={lockedFamilyId === highlightedLockedFamilyId}
               key={`locked-${tile.id}`}
-              lod={camera.residentLod}
               focusAnchorX={tile.cx}
               focusAnchorY={tile.cy}
               focusScale={focusScale}
               focusId={tile.id}
               onFocus={interactionEnabled ? camera.focusResident : ignoreFocus}
               onSelectLocked={interactionEnabled ? () => onSelectLocked?.(lockedFamilyId) : undefined}
-              phase={runtime.phase}
-              settled={!camera.isMoving}
               x={tile.cx}
               y={tile.cy}
             />
@@ -518,8 +452,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               focusScale={focusScale}
               key={`revealed-egg-${tile.id}`}
               onPress={interactionEnabled ? () => onSelectLocked?.(tile.companion!.familyId) : undefined}
-              phase={runtime.phase}
-              settled={!camera.isMoving}
               x={artLayer?.residentAnchor?.x ?? tile.cx}
               y={(artLayer?.residentAnchor?.y ?? tile.cy) - 8}
             />
@@ -550,9 +482,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             tile={tile}
             x={x}
             y={y}
-            lod={camera.residentLod}
-            phase={runtime.phase}
-            settled={!camera.isMoving}
             statusGlyph={residentStatusGlyphs?.[tile.companion.creature.creatureId] === 'ready' ? undefined : residentStatusGlyphs?.[tile.companion.creature.creatureId]}
             worldSize={creatureWorldSize}
             onFocus={residentInteractionEnabled ? camera.focusResident : ignoreFocus}
@@ -563,15 +492,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     }
 
     return items.sort((a, b) => a.depth - b.depth).map((item) => item.node);
-  }, [allowedResidentCharacterId, artLayerById, camera.focusResident, camera.isMoving, camera.residentLod, creatureWorldSize, highlightedLockedFamilyId, ignoreFocus, interactionEnabled, onSelectLocked, onSelectResident, residentStatusGlyphs, runtimeById, scene.tiles, scheduler.readyTileIds, scheduler.visibleTileIds, tileFocusScale, upgradePhase, upgradePresentation]);
+  }, [allowedResidentCharacterId, artLayerById, camera.focusResident, creatureWorldSize, highlightedLockedFamilyId, ignoreFocus, interactionEnabled, onSelectLocked, onSelectResident, residentStatusGlyphs, scene.tiles, tileFocusScale, upgradePhase, upgradePresentation]);
 
-  const centerRuntime = runtimeById.get(scene.centerTile.id);
   const home = homePreset(identity?.selectedHomeArchetypeId);
-  const showEgg =
-    Boolean(eggVisual) &&
-    scheduler.readyTileIds.has(scene.centerTile.id) &&
-    Boolean(centerRuntime) &&
-    (scheduler.visibleTileIds.has(scene.centerTile.id) || centerRuntime?.phase === 'exiting');
+  const showEgg = Boolean(eggVisual);
 
   return (
     <View style={styles.root} onLayout={onLayout}>
@@ -589,19 +513,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       <GestureDetector key={`kingdom-camera-${assetRevision}`} gesture={camera.gesture}>
         <View style={StyleSheet.absoluteFill}>
           <Animated.View style={[styles.scene, { width: scene.width, height: scene.height }, camera.worldStyle]}>
-            {scheduler.renderedTiles.map(({ layer, runtime }) => {
-              const scheduledLod = lodScheduler.lodFor(layer.id);
-              const lod: KingdomHexTileLod = layer.id === promotedFullTileId
-                ? 'full'
-                : scheduledLod === 'full'
-                  ? 'medium'
-                  : scheduledLod;
-              const source = kingdomHexTileSourceForLod(layer, lod);
-              const overlaySource = kingdomHexTileOverlaySourceForLod(layer, lod);
+            {scene.tileArtLayers.map((layer) => {
+              const source = kingdomHexTileSourceForLod(layer, KINGDOM_RENDERING.havenImageLod);
+              const overlaySource = kingdomHexTileOverlaySourceForLod(layer, KINGDOM_RENDERING.havenImageLod);
               const fallbackSource = layer.fallbackSource
                 ? kingdomHexTileSourceForLod(
                     { source: layer.fallbackSource, sources: layer.fallbackSources },
-                    lod
+                    KINGDOM_RENDERING.havenImageLod
                   )
                 : null;
               return (
@@ -610,19 +528,11 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                     focusAnchorX={scene.tileById.get(layer.id)?.cx ?? layer.frame.left + layer.frame.width / 2}
                     focusAnchorY={scene.tileById.get(layer.id)?.cy ?? layer.frame.top + layer.frame.height / 2}
                     focusScale={tileFocusScale(layer.id)}
-                    id={layer.id}
                     frame={layer.frame}
-                    lod={lod}
                     source={source}
                     overlaySource={overlaySource}
                     fallbackSource={fallbackSource}
-                    phase={runtime.phase}
-                    priority={lod === 'full' || layer.id === scene.centerTile.id ? 'high' : scheduler.visibleTileIds.has(layer.id) ? 'normal' : 'low'}
-                    settled={!camera.isMoving}
-                    onExited={scheduler.markExited}
-                    onFailed={scheduler.markFailed}
-                    onLoaded={scheduler.markLoaded}
-                    onLodReady={lodScheduler.markReady}
+                    priority={layer.id === scene.centerTile.id ? 'high' : 'normal'}
                   />
                   {upgradeLayers && upgradePresentation && layer.id === upgradeLayers.tile.id ? (
                     <HavenUpgradeTileArt
@@ -643,7 +553,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 </Fragment>
               );
             })}
-            {showEgg && centerRuntime ? (
+            {showEgg ? (
               <KingdomEgg
                 {...kingdomWorldViewPoint(
                   { x: scene.centerTile.cx, y: scene.centerTile.cy },
@@ -652,12 +562,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 focusAnchorX={scene.centerTile.cx}
                 focusAnchorY={scene.centerTile.cy}
                 focusScale={tileFocusScale(scene.centerTile.id)}
-                phase={centerRuntime.phase}
-                settled={!camera.isMoving}
                 onPress={interactionEnabled ? camera.recenter : undefined}
               />
             ) : null}
-            {identity?.selectedHomeArchetypeId && centerRuntime ? (
+            {identity?.selectedHomeArchetypeId ? (
               <HomeTileHitTarget
                 accessibilityLabel={`${home.name} home`}
                 onPress={onSelectHome}
@@ -681,7 +589,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           presentation={upgradePresentation}
           reducedMotion={reduceMotion}
           silhouetteFrame={upgradeEffectGeometry.silhouetteFrame}
-          silhouetteSource={kingdomHexTileSourceForLod(upgradeLayers.toLayer, 'medium')}
+          silhouetteSource={kingdomHexTileSourceForLod(upgradeLayers.toLayer, KINGDOM_RENDERING.havenImageLod)}
           target={upgradeEffectGeometry.target}
         />
       ) : null}
@@ -694,7 +602,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           showCoins={false}
           showReaction={false}
           silhouetteFrame={discoveryEffectGeometry.silhouetteFrame}
-          silhouetteSource={kingdomHexTileSourceForLod(discoveryLayers.toLayer, 'medium')}
+          silhouetteSource={kingdomHexTileSourceForLod(discoveryLayers.toLayer, KINGDOM_RENDERING.havenImageLod)}
           target={discoveryEffectGeometry.target}
         />
       ) : null}
@@ -763,15 +671,7 @@ type TileArtProps = {
   focusAnchorY: number;
   focusScale: number;
   frame: { left: number; top: number; width: number; height: number };
-  id: string;
-  lod: KingdomHexTileLod;
-  onExited: (id: string) => void;
-  onFailed: (id: string) => void;
-  onLoaded: (id: string) => void;
-  onLodReady: (id: string, lod: KingdomHexTileLod) => void;
-  phase: KingdomTilePhase;
   priority: 'low' | 'normal' | 'high';
-  settled: boolean;
   source: ImageSourcePropType;
   overlaySource: ImageSourcePropType | null;
 };
@@ -782,71 +682,27 @@ const KingdomTileArt = memo(function KingdomTileArt({
   focusAnchorY,
   focusScale,
   frame,
-  id,
-  lod,
-  onExited,
-  onFailed,
-  onLoaded,
-  onLodReady,
-  phase,
   priority,
-  settled,
   source,
   overlaySource,
 }: TileArtProps) {
-  const opacity = useSharedValue(0);
-  const lift = useSharedValue(12);
-  const shownRef = useRef(false);
-
-  useEffect(() => {
-    if (phase === 'exiting') {
-      opacity.value = withTiming(0, { duration: KINGDOM_RENDERING.exitDurationMs }, (finished) => {
-        if (finished) runOnJS(onExited)(id);
-      });
-      lift.value = withTiming(6, { duration: KINGDOM_RENDERING.exitDurationMs });
-      return;
-    }
-    cancelAnimation(opacity);
-    cancelAnimation(lift);
-    if (phase !== 'visible' && phase !== 'failed') return;
-    if (!shownRef.current && !settled) return;
-    shownRef.current = true;
-    opacity.value = withTiming(1, { duration: KINGDOM_RENDERING.tileIntroMs, easing: Easing.out(Easing.cubic) });
-    lift.value = withTiming(0, { duration: KINGDOM_RENDERING.tileIntroMs, easing: Easing.out(Easing.cubic) });
-  }, [id, lift, onExited, opacity, phase, settled]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: lift.value }],
-  }));
-  const handleLoaded = useCallback(() => {
-    onLoaded(id);
-    onLodReady(id, lod);
-  }, [id, lod, onLoaded, onLodReady]);
-  const handleFailed = useCallback(() => {
-    onFailed(id);
-    onLodReady(id, lod);
-  }, [id, lod, onFailed, onLodReady]);
-
   return (
     <TileFocusTransform anchorX={focusAnchorX} anchorY={focusAnchorY} frame={frame} scale={focusScale}>
-      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, animatedStyle]}>
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
         <SeamlessWorldImage
-          allowDownscaling={lod !== 'full'}
+          allowDownscaling
           source={source}
           fallbackSource={fallbackSource}
           priority={priority}
-          onReady={handleLoaded}
-          onFailure={handleFailed}
         />
         {overlaySource ? (
           <SeamlessWorldImage
-            allowDownscaling={lod !== 'full'}
+            allowDownscaling
             source={overlaySource}
             priority={priority}
           />
         ) : null}
-      </Animated.View>
+      </View>
     </TileFocusTransform>
   );
 });
@@ -874,10 +730,10 @@ const HavenUpgradeTileArt = memo(function HavenUpgradeTileArt({
 
   const oldStyle = useAnimatedStyle(() => ({ opacity: oldOpacity.value }));
   const newStyle = useAnimatedStyle(() => ({ opacity: newOpacity.value }));
-  const oldSource = kingdomHexTileSourceForLod(fromLayer, 'medium');
-  const newSource = kingdomHexTileSourceForLod(toLayer, 'medium');
-  const oldOverlaySource = kingdomHexTileOverlaySourceForLod(fromLayer, 'medium');
-  const newOverlaySource = kingdomHexTileOverlaySourceForLod(toLayer, 'medium');
+  const oldSource = kingdomHexTileSourceForLod(fromLayer, KINGDOM_RENDERING.havenImageLod);
+  const newSource = kingdomHexTileSourceForLod(toLayer, KINGDOM_RENDERING.havenImageLod);
+  const oldOverlaySource = kingdomHexTileOverlaySourceForLod(fromLayer, KINGDOM_RENDERING.havenImageLod);
+  const newOverlaySource = kingdomHexTileOverlaySourceForLod(toLayer, KINGDOM_RENDERING.havenImageLod);
 
   return (
     <>
@@ -899,8 +755,6 @@ const KingdomEgg = memo(function KingdomEgg({
   focusAnchorX,
   focusAnchorY,
   focusScale,
-  phase,
-  settled,
   onPress,
 }: {
   x: number;
@@ -908,27 +762,18 @@ const KingdomEgg = memo(function KingdomEgg({
   focusAnchorX: number;
   focusAnchorY: number;
   focusScale: number;
-  phase: KingdomTilePhase;
-  settled: boolean;
   onPress?: () => void;
 }) {
   const avatar = useEggAvatar();
   const [ready, setReady] = useState(false);
   const opacity = useSharedValue(0);
   const lift = useSharedValue(10);
-  const shownRef = useRef(false);
 
   useEffect(() => {
-    if (phase === 'exiting') {
-      opacity.value = withTiming(0, { duration: KINGDOM_RENDERING.exitDurationMs });
-      lift.value = withTiming(6, { duration: KINGDOM_RENDERING.exitDurationMs });
-      return;
-    }
-    if (!ready || (!shownRef.current && !settled)) return;
-    shownRef.current = true;
+    if (!ready) return;
     opacity.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) });
     lift.value = withSpring(0, { damping: 14, stiffness: 190 });
-  }, [lift, opacity, phase, ready, settled]);
+  }, [lift, opacity, ready]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -942,14 +787,14 @@ const KingdomEgg = memo(function KingdomEgg({
       <Animated.View style={[StyleSheet.absoluteFill, animatedStyle]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Kingdom egg" onPress={onPress} style={StyleSheet.absoluteFill}>
           <EggAvatarArtwork
-            allowDownscaling={false}
+            allowDownscaling
             faceId={avatar.equippedFaceId}
             hatId={avatar.equippedHatId}
             heldAccessoryId={avatar.equippedHeldAccessoryId}
             onError={markReady}
             onLoad={markReady}
             priority="high"
-            resolution="high"
+            resolution="app"
             skinId={avatar.equippedSkinId}
             style={StyleSheet.absoluteFill}
             transition={0}
@@ -967,8 +812,6 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
   focusAnchorX,
   focusAnchorY,
   focusScale,
-  phase,
-  settled,
   onPress,
 }: {
   eggSkinId: Extract<KingdomHexCompanionSlot, { kind: 'revealed_egg' }>['eggSkinId'];
@@ -977,26 +820,17 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
   focusAnchorX: number;
   focusAnchorY: number;
   focusScale: number;
-  phase: KingdomTilePhase;
-  settled: boolean;
   onPress?: () => void;
 }) {
   const opacity = useSharedValue(0);
   const pulse = useSharedValue(1);
-  const shownRef = useRef(false);
   useEffect(() => {
-    if (phase === 'exiting') {
-      opacity.value = withTiming(0, { duration: KINGDOM_RENDERING.exitDurationMs });
-      return;
-    }
-    if (!shownRef.current && !settled) return;
-    shownRef.current = true;
     opacity.value = withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) });
     pulse.value = withRepeat(withSequence(
       withTiming(1.055, { duration: 760, easing: Easing.inOut(Easing.quad) }),
       withTiming(1, { duration: 760, easing: Easing.inOut(Easing.quad) }),
     ), -1);
-  }, [opacity, phase, pulse, settled]);
+  }, [opacity, pulse]);
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ scale: pulse.value }],
@@ -1013,7 +847,7 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
             hatId={null}
             heldAccessoryId={null}
             priority="high"
-            resolution="high"
+            resolution="app"
             showFace={false}
             skinId={eggSkinId}
             style={StyleSheet.absoluteFill}
@@ -1026,28 +860,22 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
 
 const LockedCompanionTile = memo(function LockedCompanionTile({
   highlighted,
-  lod,
   focusAnchorX,
   focusAnchorY,
   focusId,
   focusScale,
   onFocus,
   onSelectLocked,
-  phase,
-  settled,
   x,
   y,
 }: {
   highlighted: boolean;
-  lod: KingdomResidentLod;
   focusAnchorX: number;
   focusAnchorY: number;
   focusId: string;
   focusScale: number;
   onFocus: (x: number, y: number, options?: { id?: string }) => void;
   onSelectLocked?: () => void;
-  phase: KingdomTilePhase;
-  settled: boolean;
   x: number;
   y: number;
 }) {
@@ -1055,19 +883,11 @@ const LockedCompanionTile = memo(function LockedCompanionTile({
   const opacity = useSharedValue(0);
   const lift = useSharedValue(10);
   const pulse = useSharedValue(1);
-  const shownRef = useRef(false);
 
   useEffect(() => {
-    if (phase === 'exiting') {
-      opacity.value = withTiming(0, { duration: KINGDOM_RENDERING.exitDurationMs });
-      lift.value = withTiming(6, { duration: KINGDOM_RENDERING.exitDurationMs });
-      return;
-    }
-    if (!shownRef.current && !settled) return;
-    shownRef.current = true;
     opacity.value = withTiming(1, { duration: reduceMotion ? 80 : 180, easing: Easing.out(Easing.cubic) });
     lift.value = reduceMotion ? withTiming(0, { duration: 80 }) : withSpring(0, { damping: 14, stiffness: 210 });
-  }, [lift, opacity, phase, reduceMotion, settled]);
+  }, [lift, opacity, reduceMotion]);
 
   useEffect(() => {
     cancelAnimation(pulse);
@@ -1114,7 +934,7 @@ const LockedCompanionTile = memo(function LockedCompanionTile({
             accessibilityIgnoresInvertColors
             cachePolicy="memory-disk"
             contentFit="contain"
-            source={KINGDOM_DREAM_MIST_LOCK_SOURCES[lod]}
+            source={KINGDOM_DREAM_MIST_LOCK_SOURCE}
             style={styles.lockedTileLock}
           />
         </Animated.View>
@@ -1129,11 +949,8 @@ type ResidentProps = {
   focusAnchorX: number;
   focusAnchorY: number;
   focusScale: number;
-  lod: KingdomResidentLod;
   onFocus: (x: number, y: number, options?: { id?: string }) => void;
   onSelectResident?: (creatureId: string, label: string) => void;
-  phase: KingdomTilePhase;
-  settled: boolean;
   statusGlyph?: KingdomResidentStatusGlyph;
   tile: KingdomTileRender;
   worldSize: number;
@@ -1147,11 +964,8 @@ const ResidentCreature = memo(function ResidentCreature({
   focusAnchorX,
   focusAnchorY,
   focusScale,
-  lod,
   onFocus,
   onSelectResident,
-  phase,
-  settled,
   statusGlyph,
   tile,
   worldSize,
@@ -1159,27 +973,20 @@ const ResidentCreature = memo(function ResidentCreature({
   y,
 }: ResidentProps) {
   const creature = tile.companion?.kind === 'owned' ? tile.companion.creature : null;
-  const source = creature ? worldAssetSource(`creature:${creature.visualKey}`, lod) : null;
+  const source = creature ? worldAssetSource(`creature:${creature.visualKey}`, KINGDOM_RENDERING.havenImageLod) : null;
   const [ready, setReady] = useState(false);
   const opacity = useSharedValue(0);
   const lift = useSharedValue(12);
   const reactionLift = useSharedValue(0);
   const reactionRotation = useSharedValue(0);
   const reactionScale = useSharedValue(1);
-  const shownRef = useRef(false);
   const reduceMotion = useReducedMotion();
 
   useEffect(() => {
-    if (phase === 'exiting') {
-      opacity.value = withTiming(0, { duration: KINGDOM_RENDERING.exitDurationMs });
-      lift.value = withTiming(6, { duration: KINGDOM_RENDERING.exitDurationMs });
-      return;
-    }
-    if (!ready || (!shownRef.current && !settled)) return;
-    shownRef.current = true;
+    if (!ready) return;
     opacity.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) });
     lift.value = withSpring(0, { damping: 14, stiffness: 210 });
-  }, [lift, opacity, phase, ready, settled]);
+  }, [lift, opacity, ready]);
 
   useEffect(() => {
     if (celebrationNonce === undefined || reduceMotion) return;

@@ -7,7 +7,6 @@ import {
   hexToWorld,
   type KingdomHexLayoutProfileId,
 } from '@/utils/world-hex';
-import type { KingdomHexTileLod } from '@/utils/world-visuals';
 
 export type KingdomCameraSnapshot = {
   tx: number;
@@ -27,12 +26,15 @@ export type KingdomSize = {
   height: number;
 };
 
-export type KingdomResidentLod = 'thumb' | 'medium';
-
 export type KingdomWorldViewPlacement = {
   horizontalOffsetHexTileWidth: number;
   verticalOffsetHexTileHeight: number;
 };
+
+export function clampHavenCameraScale(scale: number, minScale = 0.54): number {
+  'worklet';
+  return Math.min(KINGDOM_RENDERING.havenMaxScale, Math.max(minScale, scale));
+}
 
 export type KingdomFocusTarget = { id: string; x: number; y: number };
 
@@ -180,32 +182,4 @@ export function kingdomCameraSnapshotForTarget(
     scale,
   );
   return { ...translation, scale };
-}
-
-export function tileLodWithHysteresis(current: KingdomHexTileLod | null, screenWidth: number): KingdomHexTileLod {
-  const thresholds = KINGDOM_RENDERING.tileLod;
-
-  if (!current) {
-    if (screenWidth > thresholds.fullUpScreenPoints) return 'full';
-    if (screenWidth > thresholds.mediumUpScreenPoints) return 'medium';
-    return 'thumb';
-  }
-
-  if (current === 'thumb') {
-    return screenWidth > thresholds.mediumUpScreenPoints ? 'medium' : 'thumb';
-  }
-  if (current === 'medium') {
-    if (screenWidth > thresholds.fullUpScreenPoints) return 'full';
-    if (screenWidth < thresholds.mediumDownScreenPoints) return 'thumb';
-    return 'medium';
-  }
-  return screenWidth < thresholds.fullDownScreenPoints ? 'medium' : 'full';
-}
-
-export function residentLodWithHysteresis(current: KingdomResidentLod, screenSize: number): KingdomResidentLod {
-  const thresholds = KINGDOM_RENDERING.residentLod;
-  if (current === 'thumb') {
-    return screenSize > thresholds.mediumUpScreenPoints ? 'medium' : 'thumb';
-  }
-  return screenSize < thresholds.mediumDownScreenPoints ? 'thumb' : 'medium';
 }

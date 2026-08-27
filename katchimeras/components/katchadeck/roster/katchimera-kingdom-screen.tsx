@@ -89,7 +89,7 @@ export function KatchimeraKingdomScreen({
   const ftueStep = ftueStepId ? mossproutFtueStep(ftueStepId) ?? null : null;
   const tutorialCamera = useMemo<FtueCameraDirective | null>(() => {
     if (ftueStepId === 'haven.mossprout_reveal' && enteringGrove) {
-      return { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: 1.32, anchorY: 0.46, durationMs: 360 };
+      return { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: 1.25, anchorY: 0.46, durationMs: 360 };
     }
     return ftueStep?.camera ?? null;
   }, [enteringGrove, ftueStep?.camera, ftueStepId]);

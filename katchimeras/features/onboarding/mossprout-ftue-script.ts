@@ -522,7 +522,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       id: 'haven.mossprout.focus', surface: 'haven',
       guide: { eyebrow: 'A little place to begin', title: 'Mossprout has a home here.', body: 'Tap the garden marker to see what your Coins can restore.' },
       actions: [{ id: 'haven.open_mossprout_upgrade', title: 'Open Mossprout’s Haven', description: 'See the first permanent garden upgrade.', icon: 'leaf.fill', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'haven.mossprout.restore' }],
-      camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: 1.35, anchorY: 0.46, durationMs: 420 },
+      camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: 1.25, anchorY: 0.46, durationMs: 420 },
       interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_tile_hud', characterId: 'mossprout' } } },
       cue: { kind: 'tap', target: { kind: 'haven_tile_hud', characterId: 'mossprout' } },
       spotlight: { targets: [{ kind: 'haven_tile_hud', characterId: 'mossprout' }], padding: 7, radius: 18, dimOpacity: 0.62 },
