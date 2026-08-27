@@ -194,6 +194,9 @@ function FocusedKatchimeraRoster() {
       navigate: () => router.push('/you'),
     });
   }, [router, transitionTo]);
+  const openWorldBoardLab = useCallback(() => {
+    router.push('/dev-world-board-lab');
+  }, [router]);
   const continueFirstBloomToResident = useCallback(async () => {
     const now = Date.now();
     ensureMossproutFtueFirstResident();
@@ -233,6 +236,7 @@ function FocusedKatchimeraRoster() {
           eggVisual={eggVisual}
           onContentReady={() => setContentReady(true)}
           onOpenProfile={openProfile}
+          onOpenWorldBoardLab={openWorldBoardLab}
           onSelectCreature={openCreature}
           residentStatusGlyphs={statusByCreatureId}
           companionSlots={discoveryCompanionSlots}

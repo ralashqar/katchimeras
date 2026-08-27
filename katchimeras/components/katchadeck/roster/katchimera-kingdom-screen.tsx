@@ -15,6 +15,7 @@ import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { EggAvatar } from '@/components/katchadeck/egg-avatar/egg-avatar';
 import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppFontFamilies } from '@/constants/theme';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import type { FtueCameraDirective } from '@/features/onboarding/ftue-types';
@@ -39,6 +40,7 @@ type Props = {
   eggVisual: EggVisualState | null;
   onContentReady?: () => void;
   onOpenProfile: () => void;
+  onOpenWorldBoardLab?: () => void;
   onSelectCreature: (creatureId: string) => void;
   residentStatusGlyphs?: Partial<Record<string, KingdomResidentStatusGlyph>>;
   mergeWorld: MergeWorldState;
@@ -55,6 +57,7 @@ export function KatchimeraKingdomScreen({
   eggVisual,
   onContentReady,
   onOpenProfile,
+  onOpenWorldBoardLab,
   onSelectCreature,
   residentStatusGlyphs,
   mergeWorld,
@@ -324,24 +327,40 @@ export function KatchimeraKingdomScreen({
             {havenOpeningActive ? 'Something is moving in the mist' : 'Tap a home or a mist tile'}
           </ThemedText>
         </View>
-        <Pressable
-          accessibilityHint="Opens your avatar and cosmetics"
-          accessibilityLabel="Open You"
-          accessibilityRole="button"
-          onPress={() => {
-            if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onOpenProfile();
-          }}
-          style={({ pressed }) => [styles.profileButton, pressed && styles.profileButtonPressed]}>
-          <EggAvatar
-            faceId={avatar.equippedFaceId}
-            hatId={avatar.equippedHatId}
-            heldAccessoryId={avatar.equippedHeldAccessoryId}
-            presentation="button"
-            size={42}
-            skinId={avatar.equippedSkinId}
-          />
-        </Pressable>
+        <View style={styles.headerActions}>
+          {__DEV__ && !ftueStepId && onOpenWorldBoardLab ? (
+            <Pressable
+              accessibilityHint="Opens the procedural world and board experiment"
+              accessibilityLabel="Open World and Board Lab"
+              accessibilityRole="button"
+              onPress={() => {
+                if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onOpenWorldBoardLab();
+              }}
+              style={({ pressed }) => [styles.labButton, pressed && styles.profileButtonPressed]}>
+              <IconSymbol color="#FFF1A8" name="sparkles" size={17} />
+              <ThemedText style={styles.labButtonLabel} lightColor="#FFF1A8" darkColor="#FFF1A8">LAB</ThemedText>
+            </Pressable>
+          ) : null}
+          <Pressable
+            accessibilityHint="Opens your avatar and cosmetics"
+            accessibilityLabel="Open You"
+            accessibilityRole="button"
+            onPress={() => {
+              if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onOpenProfile();
+            }}
+            style={({ pressed }) => [styles.profileButton, pressed && styles.profileButtonPressed]}>
+            <EggAvatar
+              faceId={avatar.equippedFaceId}
+              hatId={avatar.equippedHatId}
+              heldAccessoryId={avatar.equippedHeldAccessoryId}
+              presentation="button"
+              size={42}
+              skinId={avatar.equippedSkinId}
+            />
+          </Pressable>
+        </View>
       </View> : null}
       {lockedHintVisible ? (
         <KatchaSheet
@@ -462,6 +481,20 @@ const styles = StyleSheet.create({
     zIndex: 30,
   },
   headerCopy: { flex: 1 },
+  headerActions: { alignItems: 'center', gap: 7 },
+  labButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(25,63,76,0.9)',
+    borderColor: 'rgba(255,241,168,0.64)',
+    borderCurve: 'continuous',
+    borderRadius: 15,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 3,
+    minHeight: 32,
+    paddingHorizontal: 8,
+  },
+  labButtonLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
   profileButton: {
     alignItems: 'center',
     backgroundColor: 'rgba(255,249,231,0.94)',

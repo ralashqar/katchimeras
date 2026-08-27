@@ -27,6 +27,7 @@
     "test:today-growth": "tsx --test tests/ftue-script.test.ts tests/today-growth.test.ts tests/hatch-notification.test.ts tests/home-loop-presentation.test.ts tests/today-hatch-presentation.test.ts tests/today-energy-loop-performance.test.ts tests/home-storage-partition.test.ts",
     "test:streak": "tsx --test tests/streak-engine.test.ts tests/streak-qualification.test.ts",
     "test:world-atlas": "tsx --test tests/world-tile-atlas.test.ts",
+    "test:world-board-lab": "tsx --test tests/world-board-lab.test.ts",
     "test:roles": "tsx --test tests/katchimera-role-framework.test.ts tests/katchimera-identity.test.ts tests/katchimera-wardrobe.test.ts tests/companion-bond.test.ts tests/companion-content.test.ts tests/companion-conversation-v2.test.ts tests/companion-journal-handoff.test.ts tests/companion-interaction.test.ts tests/companion-journey.test.ts tests/companion-quick-goals.test.ts tests/companion-achievements.test.ts tests/semantic-quest-verification.test.ts tests/journal-hatch-affinities.test.ts",
     "avatar:catalog:generate": "node scripts/generate-egg-avatar-catalog.cjs",
     "avatar:catalog:check": "node scripts/generate-egg-avatar-catalog.cjs --check",
