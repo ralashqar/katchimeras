@@ -1,6 +1,7 @@
 import { SLAB_THICKNESS } from './world-iso';
 
 export type WorldPoint = { x: number; y: number };
+export type WorldSurfacePoint = WorldPoint & { z: number };
 export type WorldBounds = { left: number; top: number; right: number; bottom: number; width: number; height: number };
 export type IsoCell = { col: number; row: number };
 export type WorldRegionRole = 'board' | 'home' | 'companion' | 'decor' | 'locked' | 'connector';
@@ -173,6 +174,11 @@ export function isoCellPolygon(sceneOrigin: WorldPoint, cell: IsoCell): readonly
 
 export function isoCellCenter(sceneOrigin: WorldPoint, cell: IsoCell): WorldPoint {
   return addOrigin(labCellCenter(cell.col, cell.row), sceneOrigin);
+}
+
+export function projectLabSurfacePoint(sceneOrigin: WorldPoint, point: WorldSurfacePoint): WorldPoint {
+  const ground = addOrigin(labGridCorner(point.x, point.y), sceneOrigin);
+  return { x: ground.x, y: ground.y - point.z };
 }
 
 export function projectBoardCell(surface: WorldBoardSurface, cell: number): readonly WorldPoint[] {

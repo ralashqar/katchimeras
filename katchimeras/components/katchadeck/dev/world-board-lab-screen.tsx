@@ -8,6 +8,7 @@ import {
   Path,
   Skia,
   useImage,
+  Vertices,
 } from '@shopify/react-native-skia';
 import * as Haptics from 'expo-haptics';
 import { Image as ExpoImage } from 'expo-image';
@@ -29,14 +30,14 @@ import {
   boardCellCenter,
   generateWorldBoardManifest,
   isoCellCenter,
-  isoCellPolygon,
+  projectLabSurfacePoint,
   projectBoardCell,
   regionAtWorldPoint,
   screenPointToWorldBoard,
-  type IsoCell,
   type WorldIsoRegion,
   type WorldPoint,
 } from '@/utils/world-board-lab';
+import { buildWorldBoardSurfaceMesh } from '@/utils/world-board-surface-mesh';
 import {
   GRASS_DETAIL_BERRIES,
   GRASS_DETAIL_FLOWER,
@@ -49,8 +50,8 @@ import { useWorldBoardLabCamera, WorldBoardAnimatedView } from './use-world-boar
 const HOME_SOURCE = worldAssetSource('home');
 const MOSSPROUT_SOURCE = resolveCreatureArtSource('mossprout', { lod: 'medium', stage: 'grown' });
 
-type DebugSettings = { cellIds: boolean; details: boolean; regionLabels: boolean; seams: boolean };
-const INITIAL_DEBUG: DebugSettings = { cellIds: false, details: true, regionLabels: true, seams: true };
+type DebugSettings = { cellIds: boolean; details: boolean; regionLabels: boolean; wireframe: boolean };
+const INITIAL_DEBUG: DebugSettings = { cellIds: false, details: true, regionLabels: true, wireframe: false };
 
 function polygonPath(points: readonly WorldPoint[]) {
   const path = Skia.Path.Make();
@@ -60,14 +61,6 @@ function polygonPath(points: readonly WorldPoint[]) {
   });
   path.close();
   return path;
-}
-
-function offsetPoint(point: WorldPoint, y: number): WorldPoint {
-  return { x: point.x, y: point.y + y };
-}
-
-function keyOf(cell: IsoCell) {
-  return `${cell.col}:${cell.row}`;
 }
 
 function regionCenter(region: WorldIsoRegion, sceneOrigin: WorldPoint) {
@@ -110,44 +103,19 @@ export function WorldBoardLabScreen() {
   }, [camera.moving, transitionActive]);
   useScenePerformanceProbe('world-board-lab-camera', transitionActive);
 
-  const geometry = useMemo(() => {
-    const occupied = new Set(manifest.regions.flatMap((region) => region.cells.map(keyOf)));
-    const tiles = manifest.regions
-      .flatMap((region) => region.cells.map((cell) => ({ cell, region })))
-      .sort((left, right) => {
-        const leftCenter = isoCellCenter(manifest.sceneOrigin, left.cell);
-        const rightCenter = isoCellCenter(manifest.sceneOrigin, right.cell);
-        return leftCenter.y - rightCenter.y || leftCenter.x - rightCenter.x;
-      })
-      .map(({ cell, region }) => {
-        const corners = isoCellPolygon(manifest.sceneOrigin, cell);
-        const [topLeft, , bottomRight, bottomLeft] = corners;
-        return {
-          cell,
-          region,
-          top: polygonPath(corners),
-          frontFace: !occupied.has(`${cell.col}:${cell.row + 1}`)
-            ? polygonPath([bottomLeft, bottomRight, offsetPoint(bottomRight, manifest.slabThickness), offsetPoint(bottomLeft, manifest.slabThickness)])
-            : null,
-          leftFace: !occupied.has(`${cell.col - 1}:${cell.row}`)
-            ? polygonPath([topLeft, bottomLeft, offsetPoint(bottomLeft, manifest.slabThickness), offsetPoint(topLeft, manifest.slabThickness)])
-            : null,
-        };
+  const surfaceMesh = useMemo(() => buildWorldBoardSurfaceMesh(manifest), [manifest]);
+  const meshEdges = useMemo(() => {
+    const path = Skia.Path.Make();
+    surfaceMesh.tileProfiles.forEach((profile) => {
+      const points = profile.inner.map((point) => projectLabSurfacePoint(manifest.sceneOrigin, point));
+      points.forEach((point, index) => {
+        const next = points[(index + 1) % points.length];
+        path.moveTo(point.x, point.y);
+        path.lineTo(next.x, next.y);
       });
-    const seams = Skia.Path.Make();
-    tiles.forEach(({ cell }) => {
-      const [, topRight, bottomRight, bottomLeft] = isoCellPolygon(manifest.sceneOrigin, cell);
-      if (occupied.has(`${cell.col + 1}:${cell.row}`)) {
-        seams.moveTo(topRight.x, topRight.y);
-        seams.lineTo(bottomRight.x, bottomRight.y);
-      }
-      if (occupied.has(`${cell.col}:${cell.row + 1}`)) {
-        seams.moveTo(bottomRight.x, bottomRight.y);
-        seams.lineTo(bottomLeft.x, bottomLeft.y);
-      }
     });
-    return { seams, tiles };
-  }, [manifest]);
+    return path;
+  }, [manifest.sceneOrigin, surfaceMesh.tileProfiles]);
 
   const boardRegion = manifest.regions.find((region) => region.role === 'board')!;
   const boardCenter = useMemo(() => regionCenter(boardRegion, manifest.sceneOrigin), [boardRegion, manifest.sceneOrigin]);
@@ -197,20 +165,29 @@ export function WorldBoardLabScreen() {
           {viewport.width > 0 ? (
             <WorldBoardAnimatedView style={[styles.world, { height: manifest.bounds.height, width: manifest.bounds.width }, camera.worldStyle]}>
               <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}>
-                {geometry.tiles.map(({ cell, frontFace, leftFace, region, top }) => {
-                  const locked = region.role === 'locked';
-                  const connector = region.role === 'connector';
-                  return (
-                    <Group key={`${region.id}:${keyOf(cell)}`}>
-                      {leftFace ? <Path color={locked ? '#76919A' : '#7A6139'} path={leftFace} /> : null}
-                      {frontFace ? <Path color={locked ? '#8AA7AD' : '#947646'} path={frontFace} /> : null}
-                      <Path color={locked ? '#B9D4D5' : connector ? '#86AC49' : '#82B746'} path={top}>
-                        {!locked && grassTexture ? <ImageShader fit="none" image={grassTexture} transform={[{ scale: 0.72 }]} tx="repeat" ty="repeat" /> : null}
-                      </Path>
-                    </Group>
-                  );
-                })}
-                {debug.seams ? <Path color="rgba(57,78,36,0.28)" path={geometry.seams} strokeWidth={1.2} style="stroke" /> : null}
+                <Vertices colors={surfaceMesh.walls.colors} indices={surfaceMesh.walls.indices} mode="triangles" vertices={surfaceMesh.walls.vertices} />
+                {grassTexture ? (
+                  <Group>
+                    <ImageShader fit="none" image={grassTexture} transform={[{ scale: 0.72 }]} tx="repeat" ty="repeat" />
+                    <Vertices
+                      indices={surfaceMesh.grass.indices}
+                      mode="triangles"
+                      textures={surfaceMesh.grass.textureCoordinates}
+                      vertices={surfaceMesh.grass.vertices}
+                    />
+                  </Group>
+                ) : (
+                  <Vertices colors={surfaceMesh.grass.colors} indices={surfaceMesh.grass.indices} mode="triangles" vertices={surfaceMesh.grass.vertices} />
+                )}
+                {grassTexture ? (
+                  <>
+                    <Vertices color="rgba(255,246,185,0.09)" indices={surfaceMesh.bevelLighting.light.indices} mode="triangles" vertices={surfaceMesh.bevelLighting.light.vertices} />
+                    <Vertices color="rgba(66,79,32,0.11)" indices={surfaceMesh.bevelLighting.middle.indices} mode="triangles" vertices={surfaceMesh.bevelLighting.middle.vertices} />
+                    <Vertices color="rgba(38,49,22,0.23)" indices={surfaceMesh.bevelLighting.shade.indices} mode="triangles" vertices={surfaceMesh.bevelLighting.shade.vertices} />
+                  </>
+                ) : null}
+                <Vertices colors={surfaceMesh.locked.colors} indices={surfaceMesh.locked.indices} mode="triangles" vertices={surfaceMesh.locked.vertices} />
+                {debug.wireframe ? <Path color="rgba(46,67,28,0.42)" path={meshEdges} strokeWidth={0.9} style="stroke" /> : null}
                 {debug.details ? manifest.decorations.map((detail) => {
                   const image = detail.kind === 'flower' ? flowerTexture : berryTexture;
                   return image ? <SkiaImage fit="contain" height={detail.size} image={image} key={detail.id} width={detail.size} x={detail.position.x - detail.size / 2} y={detail.position.y - detail.size * 0.7} /> : null;
@@ -272,7 +249,7 @@ export function WorldBoardLabScreen() {
         <View style={styles.controlRow}>
           <LabChip active={mode === 'overview'} label="Overview" onPress={showOverview} />
           <LabChip active={mode === 'board-focus'} label="Board" onPress={focusBoard} />
-          <LabChip active={debug.seams} label="Tile seams" onPress={() => toggleDebug('seams')} />
+          <LabChip active={debug.wireframe} label="Mesh edges" onPress={() => toggleDebug('wireframe')} />
         </View>
         <View style={styles.controlRow}>
           <LabChip active={debug.details} label="Grass details" onPress={() => toggleDebug('details')} />
