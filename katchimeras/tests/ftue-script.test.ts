@@ -794,6 +794,9 @@ test('Haven keeps one Grove compositor through the Egg to Companion handoff', ()
   assert.match(mossproutOpening, /regularSubjectLift = companionDestinationStageLift\(windowHeight, windowWidth\)/);
   assert.match(mossproutOpening, /subjectHandoffScale=\{subjectHandoffLayout\.outgoingEndScale\}[\s\S]*?subjectHandoffTranslateY=\{subjectHandoffLayout\.outgoingEndTranslateY\}/);
   assert.match(havenRoute, /onCompanionVisualReady=\{handleCompanionVisualReady\}[\s\S]*?companionActive && companionVisualReady/);
+  assert.match(havenRoute, /handleCreatureRewardPulse[\s\S]*?rewardPulseKey=\{rewardPulseKey\}[\s\S]*?onVisibleCreatureRewardPulse=\{handleCreatureRewardPulse\}/);
+  assert.match(interaction, /onTokenArrive=\{\(amount\) => \{[\s\S]*?setRewardPulseKey[\s\S]*?props\.onVisibleCreatureRewardPulse\?\.\(\)/);
+  assert.match(mossproutOpening, /layer="creature"[\s\S]*?rewardPulseKey=\{rewardPulseKey\}/);
   assert.match(mossproutOpening, /sceneHandoffScale = regularStageLayout\.backgroundImageSize[\s\S]*?HOME_FTUE_CAMERA_SCALE/);
   assert.match(mossproutOpening, /sceneHandoffTranslateY = regularSceneCenterOffset[\s\S]*?openingSceneCenterOffset \* sceneHandoffScale/);
   assert.match(mossproutOpening, /sceneHandoffProgress=\{subjectHandoff\}[\s\S]*?sceneHandoffScale=\{sceneHandoffScale\}[\s\S]*?sceneHandoffTranslateY=\{sceneHandoffTranslateY\}/);

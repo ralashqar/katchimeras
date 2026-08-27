@@ -202,6 +202,8 @@ export type CompanionInteractionSheetProps = {
   /** Draw the canonical companion environment while retaining a transparent FTUE shell. */
   renderRegularStage?: boolean;
   reuseUnderlyingStage?: boolean;
+  /** Mirrors reward feedback onto a creature rendered by an underlying host. */
+  onVisibleCreatureRewardPulse?: () => void;
   activeQuest: { questId: string; title: string; hint: string; semanticInput?: boolean; journalInput?: boolean; journalFallback?: boolean; assistedJournalInput?: boolean; execution?: InteractiveQuestExecution | null; resolvedConfig?: Record<string, unknown>; offerSeed?: string } | null;
   questComplete: boolean;
   questRuntime: QuestRuntimeStatus | null;
@@ -2223,6 +2225,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                 (total ?? bondReward.receipt.beforeTotal) + amount
               ));
               setRewardPulseKey((key) => key + 1);
+              props.onVisibleCreatureRewardPulse?.();
             }}
             points={bondReward.receipt.points}
             to={bondReward.to}

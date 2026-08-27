@@ -48,7 +48,7 @@ function isResidentFtueStep(stepId: string) {
     || stepId.startsWith('merge.resident_');
 }
 
-export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOrigin = false, ftueConversationDefinitionId, journeyReturnConversationDefinitionId, residentStoryResumeRequested = false, renderRegularStage = false, reuseUnderlyingStage = false, hostedInHaven = false }: {
+export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOrigin = false, ftueConversationDefinitionId, journeyReturnConversationDefinitionId, residentStoryResumeRequested = false, renderRegularStage = false, reuseUnderlyingStage = false, hostedInHaven = false, onVisibleCreatureRewardPulse }: {
   creatureId: string;
   source?: 'merge-world';
   ftueRouteOrigin?: boolean;
@@ -58,6 +58,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   renderRegularStage?: boolean;
   reuseUnderlyingStage?: boolean;
   hostedInHaven?: boolean;
+  onVisibleCreatureRewardPulse?: () => void;
 }) {
   const isFocused = useIsFocused();
   // During the opening FTUE this controller is a presentation layer inside
@@ -541,6 +542,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       presentation="companion"
       renderRegularStage={renderRegularStage}
       reuseUnderlyingStage={reuseUnderlyingStage}
+      onVisibleCreatureRewardPulse={onVisibleCreatureRewardPulse}
     />
   );
 }

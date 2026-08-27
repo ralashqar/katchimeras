@@ -62,9 +62,10 @@ const MOSSPROUT_ENVIRONMENT_KEY = todayKatchimeraExplorationBackgroundKeyForEnvi
 const MOSSPROUT_VISUAL = getCreatureVisual('mossprout', 'grown');
 
 const SUBJECT_HANDOFF_DURATION_MS = 420;
-export function MossproutEggFtueSurface({ companionStageActive = false, onCompanionVisualReady }: {
+export function MossproutEggFtueSurface({ companionStageActive = false, onCompanionVisualReady, rewardPulseKey = 0 }: {
   companionStageActive?: boolean;
   onCompanionVisualReady?: () => void;
+  rewardPulseKey?: number;
 }) {
   const insets = useSafeAreaInsets();
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
@@ -352,6 +353,7 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
               creature={MOSSPROUT_VISUAL.source}
               layer="creature"
               name="Mossprout"
+              rewardPulseKey={rewardPulseKey}
               visualKey="mossprout"
             />
           </Animated.View>

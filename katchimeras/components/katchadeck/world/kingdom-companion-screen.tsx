@@ -232,6 +232,7 @@ export function KingdomCompanionScreen({
   ftueCompanionSurfaceOwned = false,
   renderRegularStage = false,
   reuseUnderlyingStage = false,
+  onVisibleCreatureRewardPulse,
   onFtueBondSpotlightComplete,
   onFtueJourneyDayComplete,
   onFtueOpenMerge,
@@ -260,6 +261,7 @@ export function KingdomCompanionScreen({
   ftueCompanionSurfaceOwned?: boolean;
   renderRegularStage?: boolean;
   reuseUnderlyingStage?: boolean;
+  onVisibleCreatureRewardPulse?: () => void;
   onFtueBondSpotlightComplete?: () => void;
   onFtueJourneyDayComplete?: () => void;
   onFtueOpenMerge?: () => void;
@@ -622,6 +624,7 @@ export function KingdomCompanionScreen({
           embedded={presentation === 'companion'}
           renderRegularStage={renderRegularStage}
           reuseUnderlyingStage={reuseUnderlyingStage}
+          onVisibleCreatureRewardPulse={onVisibleCreatureRewardPulse}
           creatureId={quests.selectedResident.creature.creatureId}
           name={quests.selectedResident.creature.name}
           visualKey={quests.selectedResident.creature.visualKey}

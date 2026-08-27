@@ -13,16 +13,19 @@ function MossproutOpeningSurface({ companionActive, conversationDefinitionId }: 
   conversationDefinitionId?: string;
 }) {
   const [companionVisualReady, setCompanionVisualReady] = useState(false);
+  const [rewardPulseKey, setRewardPulseKey] = useState(0);
   useEffect(() => {
     if (!companionActive) setCompanionVisualReady(false);
   }, [companionActive]);
   const handleCompanionVisualReady = useCallback(() => setCompanionVisualReady(true), []);
+  const handleCreatureRewardPulse = useCallback(() => setRewardPulseKey((key) => key + 1), []);
 
   return (
     <View style={styles.openingSurface}>
       <MossproutEggFtueSurface
         companionStageActive={companionActive}
         onCompanionVisualReady={handleCompanionVisualReady}
+        rewardPulseKey={rewardPulseKey}
       />
       {companionActive && companionVisualReady ? (
         <View style={styles.companionOverlay}>
@@ -31,6 +34,7 @@ function MossproutOpeningSurface({ companionActive, conversationDefinitionId }: 
             ftueConversationDefinitionId={conversationDefinitionId}
             ftueRouteOrigin
             hostedInHaven
+            onVisibleCreatureRewardPulse={handleCreatureRewardPulse}
             reuseUnderlyingStage
           />
         </View>
