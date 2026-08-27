@@ -9,6 +9,7 @@ import { todayExplorationCreatureStageFrame } from '@/utils/today-kingdom-hero-l
 const BACKGROUND_OVERSCAN = 1.18;
 const COMPANION_CREATURE_SCALE = 1.08;
 const COMPANION_CREATURE_DROP_RATIO = 0.006;
+const COMPANION_INTERACTION_CREATURE_DROP_RATIO = 0.07;
 const GROWN_CUTOUT_VISIBLE_BOTTOM = 0.94;
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -72,6 +73,16 @@ export function companionDestinationStageLift(
   return Math.max(0, (backgroundSize - viewportHeight) / 2 + stageDrop - 2);
 }
 
+/** Lowers only the resident on regular interaction pages, not its environment. */
+export function companionInteractionCreatureDrop(
+  viewportWidth: number,
+  viewportHeight: number,
+  visualKey: HomeVisualKey,
+): number {
+  return companionHomeStageLayout(viewportWidth, viewportHeight, visualKey).creatureFrame.size
+    * COMPANION_INTERACTION_CREATURE_DROP_RATIO;
+}
+
 /**
  * Maps the retained FTUE hatch subject and the regular Companion subject onto
  * one identical screen-space frame throughout their crossfade. Each renderer
@@ -91,6 +102,7 @@ export function companionFtueSubjectHandoffLayout(
   );
   const regularLayout = companionHomeStageLayout(viewportWidth, viewportHeight, visualKey);
   const destinationLift = companionDestinationStageLift(viewportHeight, viewportWidth);
+  const interactionCreatureDrop = companionInteractionCreatureDrop(viewportWidth, viewportHeight, visualKey);
   const viewportCenterY = viewportHeight / 2;
   const hatchCenterY = viewportCenterY
     + (HOME_SCENE_Y_OFFSET + hatchFrame.centerY - viewportCenterY)
@@ -98,7 +110,7 @@ export function companionFtueSubjectHandoffLayout(
     + HOME_FTUE_CAMERA_Y_OFFSET;
   const hatchSize = hatchFrame.size * HOME_FTUE_CAMERA_SCALE;
   const regularRawCenterY = regularLayout.creatureFrame.centerY + regularLayout.translateY;
-  const regularFinalCenterY = regularRawCenterY - destinationLift;
+  const regularFinalCenterY = regularRawCenterY - destinationLift + interactionCreatureDrop;
   const regularSize = regularLayout.creatureFrame.size;
 
   const incomingStartScale = hatchSize / regularSize;
@@ -118,6 +130,7 @@ export function companionFtueSubjectHandoffLayout(
     hatchSize,
     incomingStartScale,
     incomingStartTranslateY,
+    interactionCreatureDrop,
     outgoingEndScale,
     outgoingEndTranslateY,
     regularFinalCenterY,

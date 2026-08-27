@@ -4,6 +4,7 @@ import { Gesture } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
   Easing,
+  runOnJS,
   useReducedMotion,
   useSharedValue,
   withTiming,
@@ -120,6 +121,9 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
     handleEnergyTokenArrive,
     handleMergeEnergyTokenArrive,
   } = useEggFeedController();
+  const completeSubjectHandoff = useCallback(() => {
+    setSubjectHandoffSettled(true);
+  }, []);
 
   useEffect(() => {
     cancelAnimation(subjectHandoff);
@@ -134,10 +138,14 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
     subjectHandoff.value = withTiming(1, {
       duration,
       easing: Easing.inOut(Easing.cubic),
+    }, (finished) => {
+      // Renderer ownership must follow the UI-thread terminal frame. A JS
+      // timeout can beat a delayed animation under load and expose a small
+      // near-final-to-final position snap.
+      if (finished) runOnJS(completeSubjectHandoff)();
     });
-    const settleTimer = setTimeout(() => setSubjectHandoffSettled(true), duration + 34);
-    return () => clearTimeout(settleTimer);
-  }, [companionStageActive, reduceMotion, subjectHandoff, subjectHandoffSettled]);
+    return () => cancelAnimation(subjectHandoff);
+  }, [companionStageActive, completeSubjectHandoff, reduceMotion, subjectHandoff, subjectHandoffSettled]);
 
   useEffect(() => {
     if (companionStageActive && subjectHandoffSettled) onCompanionVisualReady?.();
@@ -334,7 +342,11 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
         {companionStageActive && subjectHandoffSettled ? (
           <Animated.View
             pointerEvents="none"
-            style={[styles.regularSubject, { transform: [{ translateY: -regularSubjectLift }] }]}>
+            style={[styles.regularSubject, {
+              transform: [{
+                translateY: -regularSubjectLift + subjectHandoffLayout.interactionCreatureDrop,
+              }],
+            }]}>
             <CompanionHomeEnvironmentStage
               backgroundKey={null}
               creature={MOSSPROUT_VISUAL.source}

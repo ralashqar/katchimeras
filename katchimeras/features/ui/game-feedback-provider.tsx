@@ -3,7 +3,7 @@ import { StyleSheet } from 'react-native';
 
 import { KatchaSurfaceProvider } from '@/components/katchadeck/ui/katcha-surface';
 import { KatchaToast } from '@/components/katchadeck/ui/katcha-toast';
-import { GameUI } from '@/constants/game-ui';
+import { GameUI, TOAST_MESSAGES_ENABLED } from '@/constants/game-ui';
 import { enqueueGameFeedback, type GameFeedbackInput, type QueuedGameFeedback } from '@/utils/game-feedback';
 
 export type { GameFeedbackInput, GameFeedbackTone } from '@/utils/game-feedback';
@@ -21,6 +21,7 @@ export function GameFeedbackProvider({ children }: PropsWithChildren) {
   const active = queue[0] ?? null;
   const dismiss = useCallback(() => setQueue((current) => current.slice(1)), []);
   const show = useCallback((input: GameFeedbackInput | string) => {
+    if (!TOAST_MESSAGES_ENABLED) return;
     const next = typeof input === 'string' ? { message: input } : input;
     setQueue((current) => enqueueGameFeedback(current, next, `feedback:${++nonce.current}`));
   }, []);

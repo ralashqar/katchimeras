@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   companionDestinationSpeechBubbleTop,
   companionDestinationStageLift,
+  companionInteractionCreatureDrop,
   companionFtueSubjectHandoffLayout,
   companionHomeHeroSpacer,
   companionHubHeroSpacer,
@@ -55,6 +56,16 @@ test('destination pose lifts the complete cinematic stage toward the top', () =>
   assert.ok(Math.abs(companionDestinationStageLift(1194, 834) - 119.46) < 0.0001);
 });
 
+test('regular interaction pages lower each resident by seven percent of its frame', () => {
+  for (const [width, height] of [[320, 568], [390, 844], [834, 1194]]) {
+    const layout = companionHomeStageLayout(width, height, 'mossprout');
+    assert.ok(Math.abs(
+      companionInteractionCreatureDrop(width, height, 'mossprout')
+      - layout.creatureFrame.size * 0.07
+    ) < 0.0001);
+  }
+});
+
 test('FTUE hatch and regular Companion subjects share one continuous handoff frame', () => {
   for (const [width, height] of [[320, 568], [390, 844], [834, 1194]]) {
     const handoff = companionFtueSubjectHandoffLayout(width, height, 'mossprout');
@@ -63,7 +74,11 @@ test('FTUE hatch and regular Companion subjects share one continuous handoff fra
       const incomingScale = handoff.incomingStartScale
         + (1 - handoff.incomingStartScale) * progress;
       const incomingTranslateY = handoff.incomingStartTranslateY
-        + (-handoff.destinationLift - handoff.incomingStartTranslateY) * progress;
+        + (
+          -handoff.destinationLift
+          + handoff.interactionCreatureDrop
+          - handoff.incomingStartTranslateY
+        ) * progress;
       const incomingCenterY = centerY
         + (handoff.regularRawCenterY - centerY) * incomingScale
         + incomingTranslateY;

@@ -1,6 +1,10 @@
 import { AppFontFamilies } from '@/constants/theme';
 export { formatGameCurrency } from '@/utils/game-currency';
 
+// Temporary product switch: keep feedback calls intact so they can be refined
+// later, while suppressing every shared toast presentation in one place.
+export const TOAST_MESSAGES_ENABLED = false;
+
 export const GameUI = {
   color: {
     canvas: '#2B1B13',

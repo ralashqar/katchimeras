@@ -28,6 +28,15 @@ test('feedback receipts retain an explicit middle placement', () => {
   assert.equal(queue[0].placement, 'middle');
 });
 
+test('toast presentation can be disabled globally without removing feedback callers', () => {
+  const constants = fs.readFileSync(path.resolve(process.cwd(), 'constants/game-ui.ts'), 'utf8');
+  const toast = fs.readFileSync(path.resolve(process.cwd(), 'components/katchadeck/ui/katcha-toast.tsx'), 'utf8');
+  const provider = fs.readFileSync(path.resolve(process.cwd(), 'features/ui/game-feedback-provider.tsx'), 'utf8');
+  assert.match(constants, /export const TOAST_MESSAGES_ENABLED = false/);
+  assert.match(toast, /if \(!TOAST_MESSAGES_ENABLED \|\| !message\) return null/);
+  assert.match(provider, /show = useCallback[\s\S]*?if \(!TOAST_MESSAGES_ENABLED\) return/);
+});
+
 test('cozy-playful surfaces provide a complete semantic treatment', () => {
   const source = fs.readFileSync(path.resolve(process.cwd(), 'constants/game-ui.ts'), 'utf8');
   ['cream', 'gold', 'teal', 'sage', 'rose', 'dark'].forEach((tone) => {

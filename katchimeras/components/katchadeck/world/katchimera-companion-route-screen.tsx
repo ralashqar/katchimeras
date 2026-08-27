@@ -150,28 +150,47 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       }
     }
     if (!durableCardCompletion) return false;
-    const completedAt = Date.now();
-    // The resident-card graph moved FTUE's terminal edge beyond the old
-    // chapter-zero callback. Preserve that callback's other responsibility:
-    // install the first normal Garden batch before releasing FTUE ownership.
-    await seedStoredMossproutGardenAfterFtue(localDayId(new Date(completedAt)), completedAt);
-    if (residentRecoveryExit && !authoredTerminalExit) {
-      updateFtueRun({ stepId: 'companion.resident_match_result', status: 'active', completedAt: null });
-    }
-    await advanceFtueActionDurably({
-      expectedStepId: 'companion.resident_match_result',
-      actionId: 'companion.ack_resident_match_result',
-      evidenceRef: 'mossprout-resident-match-result',
-      nextStepId: 'haven.reveal',
-    });
-    ftueHandoffRef.current = false;
-    finishResidentMergeSession();
-    await flushFtuePersistence();
-    transitionTo({
+    if (ftueHandoffRef.current) return false;
+    ftueHandoffRef.current = true;
+    let releaseSource: (() => void) | null = null;
+    const sourceCovered = new Promise<void>((resolve) => { releaseSource = resolve; });
+    const transitionAccepted = transitionTo({
       announcement: 'Returning to your Haven',
       target: 'katchimeras',
-      navigate: () => router.dismissTo('/(tabs)/katchimeras'),
+      onCovered: () => releaseSource?.(),
+      navigate: async () => {
+        try {
+          const completedAt = Date.now();
+          // Do not release FTUE ownership until the source narrative is fully
+          // hidden. Otherwise its completion rerender exposes the regular
+          // companion dashboard/Haven during the curtain's cover animation.
+          await seedStoredMossproutGardenAfterFtue(localDayId(new Date(completedAt)), completedAt);
+          if (residentRecoveryExit && !authoredTerminalExit) {
+            updateFtueRun({ stepId: 'companion.resident_match_result', status: 'active', completedAt: null });
+          }
+          await advanceFtueActionDurably({
+            expectedStepId: 'companion.resident_match_result',
+            actionId: 'companion.ack_resident_match_result',
+            evidenceRef: 'mossprout-resident-match-result',
+            nextStepId: 'haven.reveal',
+          });
+          ftueHandoffRef.current = false;
+          finishResidentMergeSession();
+          await flushFtuePersistence();
+          router.dismissTo('/(tabs)/katchimeras');
+        } catch (error) {
+          ftueHandoffRef.current = false;
+          throw error;
+        }
+      },
     });
+    if (!transitionAccepted) {
+      ftueHandoffRef.current = false;
+      return false;
+    }
+    // The interaction sheet hides its completed narrative when this promise
+    // resolves. Keep it mounted until the opaque curtain owns every pixel.
+    await sourceCovered;
     return true;
   }, [router, transitionTo]);
   useEffect(() => {
@@ -194,23 +213,39 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     if (run?.stepId === 'companion.chapter_zero_return') {
       if (ftueHandoffRef.current) return;
       ftueHandoffRef.current = true;
-      const result = await advanceFtueActionDurably({
-        expectedStepId: 'companion.chapter_zero_return',
-        actionId: 'companion.complete_chapter_zero_return',
-        evidenceRef: ftueConversationDefinitionId ?? 'mossprout-chapter-zero-return',
-        nextStepId: 'haven.first_bloom',
+      let releaseSource: (() => void) | null = null;
+      const sourceCovered = new Promise<void>((resolve) => { releaseSource = resolve; });
+      const transitionAccepted = transitionTo({
+        announcement: 'Showing the First Bloom',
+        target: 'katchimeras',
+        onCovered: () => releaseSource?.(),
+        navigate: async () => {
+          try {
+            const result = await advanceFtueActionDurably({
+              expectedStepId: 'companion.chapter_zero_return',
+              actionId: 'companion.complete_chapter_zero_return',
+              evidenceRef: ftueConversationDefinitionId ?? 'mossprout-chapter-zero-return',
+              nextStepId: 'haven.first_bloom',
+            });
+            if (result.run?.stepId !== 'haven.first_bloom') {
+              throw new Error('The First Bloom did not accept FTUE ownership');
+            }
+            await revealStoredHaven();
+            await flushFtuePersistence();
+            ftueHandoffRef.current = false;
+            router.dismissTo('/(tabs)/katchimeras');
+          } catch (error) {
+            ftueHandoffRef.current = false;
+            throw error;
+          }
+        },
       });
-      if (result.run?.stepId === 'haven.first_bloom') {
-        await revealStoredHaven();
-        await flushFtuePersistence();
-        transitionTo({
-          announcement: 'Showing the First Bloom',
-          target: 'katchimeras',
-          navigate: () => router.dismissTo('/(tabs)/katchimeras'),
-        });
+      if (!transitionAccepted) {
+        ftueHandoffRef.current = false;
         return;
       }
-      ftueHandoffRef.current = false;
+      await sourceCovered;
+      return;
     }
     if (run?.stepId === 'companion.resident_affinity') {
       commitFtueAction({ actionId: 'companion.complete_resident_affinity', evidenceRef: 'mossprout-resident-affinity' });

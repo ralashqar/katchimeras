@@ -23,6 +23,7 @@ import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-ba
 import {
   companionDestinationSpeechBubbleTop,
   companionDestinationStageLift,
+  companionInteractionCreatureDrop,
   companionSpeechTitleTier,
   companionSpeechBubbleDrop,
   companionHomeStageLayout,
@@ -155,6 +156,7 @@ export function CompanionCinematicStage({
   const destinationLift = companionDestinationStageLift(height, width);
   const speechBubbleDrop = companionSpeechBubbleDrop(height);
   const stageLayout = companionHomeStageLayout(width, height, visualKey);
+  const interactionCreatureDrop = companionInteractionCreatureDrop(width, height, visualKey);
   // The complete art plane lifts on destination pages. Offset the bubble
   // before that transform so its visible position remains below navigation
   // chrome instead of rising beneath the back button.
@@ -163,6 +165,7 @@ export function CompanionCinematicStage({
     : insets.top + 84 + speechBubbleDrop * 0.25;
   const nameplateTop = stageLayout.creatureFrame.stageContactY
     + stageLayout.translateY
+    + interactionCreatureDrop
     + 7;
 
   useEffect(() => {
@@ -284,6 +287,7 @@ export function CompanionCinematicStage({
         {stagePresentation === 'full' ? <CompanionHomeEnvironmentStage
           backgroundKey={environmentKey}
           creature={creature}
+          creatureVerticalOffset={interactionCreatureDrop}
           creatureTargetRef={creatureTargetRef}
           layer="creature"
           name={name}

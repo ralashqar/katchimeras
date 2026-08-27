@@ -566,10 +566,9 @@ test('resident discovery pauses on one standard Mossprout action card and resume
   assert.match(reconciler, /pathname, residentSession, restoreLiveResidentRoute/);
   assert.match(reconciler, /ftueForegroundKeepsResidentMerge\(run, currentPathname, residentCanonicalStep\)[\s\S]*?repairFtueStep\(run\.stepId, repairTarget\)[\s\S]*?return;/);
   assert.match(merge, /returnToResidentStory[\s\S]*?pauseResidentMerge\(\)[\s\S]*?residentResume: '1'/);
-  assert.match(merge, /ackResidentCardReveal[\s\S]*?announcement: 'Returning to Mossprout'[\s\S]*?target: 'companion'/);
-  assert.match(merge, /ackResidentCardReveal[\s\S]*?Promise\.all\(\[flushMergeWorld\(\), flushFtuePersistence\(\)\]\)[\s\S]*?Returning to Mossprout/);
+  assert.match(merge, /announcement: 'Returning to Mossprout'[\s\S]*?target: 'companion'[\s\S]*?navigate: async \(\) => \{[\s\S]*?ackResidentCardReveal[\s\S]*?Promise\.all\(\[flushMergeWorld\(\), flushFtuePersistence\(\)\]\)[\s\S]*?router\.back\(\)/);
   assert.match(merge, /markResidentMergePresented\(\)/);
-  assert.match(merge, /finishResidentMergeSession\(\)[\s\S]*?returnToMatchResult/);
+  assert.match(merge, /ackResidentCardReveal[\s\S]*?finishResidentMergeSession\(\)[\s\S]*?router\.back\(\)/);
   assert.match(navigationSession, /'idle'[\s\S]*?'handoff'[\s\S]*?'merge_presented'[\s\S]*?'recovery_pending'[\s\S]*?'paused'/);
   assert.match(companion, /residentStoryResumeActive[\s\S]*?initialConversationDefinitionId=\{!residentStoryResumeActive/);
   assert.doesNotMatch(interaction, /A VEILED PARCEL IS WAITING|Return to the exact resident step you left/);
@@ -787,8 +786,10 @@ test('Haven keeps one Grove compositor through the Egg to Companion handoff', ()
   assert.match(mossproutOpening, /subjectHandoffProgress=\{subjectHandoff\}/);
   assert.match(mossproutOpening, /subjectHidden=\{subjectHandoffSettled\}/);
   assert.match(mossproutOpening, /companionStageActive && subjectHandoffSettled[\s\S]*?<CompanionHomeEnvironmentStage/);
-  assert.match(mossproutOpening, /styles\.regularSubject[\s\S]*?translateY: -regularSubjectLift/);
+  assert.match(mossproutOpening, /styles\.regularSubject[\s\S]*?translateY: -regularSubjectLift \+ subjectHandoffLayout\.interactionCreatureDrop/);
   assert.match(mossproutOpening, /subjectHandoffFades=\{false\}/);
+  assert.match(mossproutOpening, /withTiming\(1,[\s\S]*?if \(finished\) runOnJS\(completeSubjectHandoff\)\(\)/);
+  assert.doesNotMatch(mossproutOpening, /settleTimer|setTimeout\(\(\) => setSubjectHandoffSettled/);
   assert.doesNotMatch(mossproutOpening, /regularSubjectReady|SUBJECT_READY_FALLBACK_MS|handleRegularSubjectReady/);
   assert.match(mossproutOpening, /regularSubjectLift = companionDestinationStageLift\(windowHeight, windowWidth\)/);
   assert.match(mossproutOpening, /subjectHandoffScale=\{subjectHandoffLayout\.outgoingEndScale\}[\s\S]*?subjectHandoffTranslateY=\{subjectHandoffLayout\.outgoingEndTranslateY\}/);
@@ -874,7 +875,7 @@ test('FTUE starts a relationship before the Garden, shows First Bloom, and conti
   assert.match(ftueRuntime, /input\.actionId === 'companion\.complete_day_one_action'[\s\S]*?completeDayOneLesson/);
   assert.doesNotMatch(companion, /complete_resident_affinity'[\s\S]{0,500}?router\.push/);
   assert.match(companion, /stepId !== 'companion\.bond_spotlight'[\s\S]*?actionId: 'companion\.acknowledge_bond'/);
-  assert.match(companion, /await revealStoredHaven\(\)[\s\S]*?Showing the First Bloom[\s\S]*?router\.dismissTo\('\/\(tabs\)\/katchimeras'\)/);
+  assert.match(companion, /Showing the First Bloom[\s\S]*?onCovered:[\s\S]*?navigate: async \(\) => \{[\s\S]*?await revealStoredHaven\(\)[\s\S]*?router\.dismissTo\('\/\(tabs\)\/katchimeras'\)/);
   assert.match(interaction, /Promise\.resolve\(onInitialConversationComplete\?\.\(\)\)[\s\S]*?\.then\(showFeastleStoryHome\)/);
   assert.match(interaction, /CompanionFtueCoachmark[\s\S]*?ftueBondSpotlightActive[\s\S]*?ftueDayOneActionActive/);
   assert.match(companion, /advanceFtueActionDurably\([\s\S]*?companion\.complete_chapter_zero_return[\s\S]*?router\.dismissTo\('\/\(tabs\)\/katchimeras'\)/);
@@ -921,7 +922,8 @@ test('FTUE starts a relationship before the Garden, shows First Bloom, and conti
   assert.match(route, /ftueRun\?\.status === 'active'[\s\S]*?ftueRun\.stepId === 'companion\.chapter_zero_return'[\s\S]*?MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID/);
   assert.doesNotMatch(today, /router\.push\(\{ pathname: '\/\(tabs\)\/games'/);
   assert.match(transition, /const commitPhase = useCallback[\s\S]*?phaseRef\.current = next;[\s\S]*?setPhase\(next\);/);
-  assert.match(transition, /commitPhase\('covered'\)[\s\S]*?current\.navigate\(\)[\s\S]*?commitPhase\('waiting_ready'\)/);
+  assert.match(transition, /commitPhase\('covered'\)[\s\S]*?current\.onCovered\?\.\(\)[\s\S]*?current\.navigate\(\)[\s\S]*?commitPhase\('waiting_ready'\)/);
+  assert.match(companion, /const sourceCovered = new Promise<void>[\s\S]*?onCovered: \(\) => releaseSource\?\.\(\)[\s\S]*?navigate: async \(\) => \{[\s\S]*?await sourceCovered/);
 });
 
 test('companion and Merge FTUE steps never suppress the normal Today action rotation', () => {

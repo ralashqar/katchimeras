@@ -45,6 +45,9 @@ type TransitionRequest = {
   target: GameSurfaceId;
   expectedPathname?: string;
   navigationKey?: string;
+  /** Runs only after the curtain is visually opaque. Use this to keep a
+   * source-owned modal or narrative mounted throughout the cover animation. */
+  onCovered?: () => void;
   onReady?: () => void;
   onReturn?: () => void;
   requiredReadiness?: readonly GameSurfaceReadinessGate[];
@@ -190,6 +193,10 @@ export function GameScreenTransitionProvider({ children }: PropsWithChildren) {
     if (!current || phaseRef.current !== 'covering') return;
     coveredAtRef.current = Date.now();
     commitPhase('covered');
+    // This callback is intentionally tied to the animation completion rather
+    // than the React phase render. Consumers can safely release source-owned
+    // UI here without exposing the page beneath it for even one frame.
+    current.onCovered?.();
     navigationFrameRef.current = requestAnimationFrame(async () => {
       navigationFrameRef.current = null;
       try {

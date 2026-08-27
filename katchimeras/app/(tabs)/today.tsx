@@ -568,17 +568,21 @@ export function LegacyTodayScreen() {
       }),
     });
   }, [mossproutJourneyHandoff?.state, router, transitionTo]);
-  const returnToMossprout = useCallback(async () => {
-    setOnboardingEnergyReady(null);
-    const result = await advanceFtueActionDurably({
-      expectedStepId: 'energy.steps_reward',
-      actionId: 'energy.return',
-    });
-    if (result.run?.status !== 'active' || result.step?.surface !== 'merge') return;
+  const returnToMossprout = useCallback(() => {
     transitionTo({
       announcement: 'Opening Merge',
       target: 'merge',
-      navigate: () => router.navigate({ pathname: '/games', params: { familyId: 'mossprout' } }),
+      navigate: async () => {
+        const result = await advanceFtueActionDurably({
+          expectedStepId: 'energy.steps_reward',
+          actionId: 'energy.return',
+        });
+        if (result.run?.status !== 'active' || result.step?.surface !== 'merge') {
+          throw new Error('Merge did not accept the returning FTUE step');
+        }
+        setOnboardingEnergyReady(null);
+        router.navigate({ pathname: '/games', params: { familyId: 'mossprout' } });
+      },
     });
   }, [router, transitionTo]);
   const homeLoopPresentation = useMemo(() => resolveHomeLoopPresentation({

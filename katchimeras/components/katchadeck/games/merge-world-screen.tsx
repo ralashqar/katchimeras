@@ -96,11 +96,17 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const residentFtueActive = Boolean(ftueStep?.id.startsWith('merge.resident_'));
   const returnToResidentStory = useCallback(() => {
     if (!creatureId) return;
-    pauseResidentMerge();
-    // `navigate` reuses the companion route already beneath Merge, avoiding a
-    // duplicate companion/board pair every time the player pauses this step.
-    router.navigate({ pathname: '/katchimera/[creatureId]', params: { creatureId, residentResume: '1' } });
-  }, [creatureId, router]);
+    transitionTo({
+      announcement: 'Returning to Mossprout',
+      target: 'companion',
+      navigate: () => {
+        pauseResidentMerge();
+        // `navigate` reuses the companion route already beneath Merge,
+        // avoiding a duplicate companion/board pair on every pause.
+        router.navigate({ pathname: '/katchimera/[creatureId]', params: { creatureId, residentResume: '1' } });
+      },
+    });
+  }, [creatureId, router, transitionTo]);
   useEffect(() => {
     if (!active || !residentFtueActive) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -301,7 +307,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     }
   }, [active]);
 
-  const openCharacterReturn = useCallback(async (characterId: MergeOrder['characterId'], noteId: string) => {
+  const openCharacterReturn = useCallback((characterId: MergeOrder['characterId'], noteId: string) => {
     if (!active || storyNavigationPendingRef.current) return;
     if (noteId === MOSSPROUT_FTUE_RETURN_NOTE_ID) {
       if (!mergeFtueAllowsChatNote(ftueStep, noteId)) {
@@ -309,35 +315,48 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
         if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         return;
       }
-      const nextRun = dispatchFtueEvent({ type: 'chat_note_opened', noteId, revision: state?.revision ?? 0 });
-      if (nextRun?.stepId !== 'companion.chapter_zero_return') return;
-      await flushFtuePersistence();
       storyNavigationPendingRef.current = true;
-      transitionTo({
+      const accepted = transitionTo({
         announcement: 'Opening Mossprout',
         target: 'companion',
-        navigate: () => router.push({
-          pathname: '/katchimera/[creatureId]',
-          params: { creatureId: 'companion:mossprout', ftue: 'chapter-zero-return', source: 'merge-world' },
-        }),
+        navigate: async () => {
+          try {
+            const nextRun = dispatchFtueEvent({ type: 'chat_note_opened', noteId, revision: state?.revision ?? 0 });
+            if (nextRun?.stepId !== 'companion.chapter_zero_return') {
+              throw new Error('Mossprout did not accept the chapter-zero return');
+            }
+            await flushFtuePersistence();
+            router.push({
+              pathname: '/katchimera/[creatureId]',
+              params: { creatureId: 'companion:mossprout', ftue: 'chapter-zero-return', source: 'merge-world' },
+            });
+          } catch (error) {
+            storyNavigationPendingRef.current = false;
+            throw error;
+          }
+        },
       });
+      if (!accepted) storyNavigationPendingRef.current = false;
       return;
     }
     storyNavigationPendingRef.current = true;
-    if (characterId === 'feastle') beginFeastleReturn();
-    else if (characterId === 'mossprout') {
-      relationshipProgressionRepository.update((current) => beginMossproutJourneyReturn(current, mossproutJourneyDayId));
-    }
-    else if (isAuthoredCohortFamily(characterId)) beginAuthoredCohortReturn(characterId);
-    else setReturnCharacterId((current) => current === characterId ? null : current);
-    transitionTo({
+    const accepted = transitionTo({
       announcement: 'Opening your Katchimera',
       target: 'companion',
-      navigate: () => router.push({
-        pathname: '/katchimera/[creatureId]',
-        params: { creatureId: `companion:${characterId}`, source: 'merge-world', story: 'return' },
-      }),
+      navigate: () => {
+        if (characterId === 'feastle') beginFeastleReturn();
+        else if (characterId === 'mossprout') {
+          relationshipProgressionRepository.update((current) => beginMossproutJourneyReturn(current, mossproutJourneyDayId));
+        }
+        else if (isAuthoredCohortFamily(characterId)) beginAuthoredCohortReturn(characterId);
+        else setReturnCharacterId((current) => current === characterId ? null : current);
+        router.push({
+          pathname: '/katchimera/[creatureId]',
+          params: { creatureId: `companion:${characterId}`, source: 'merge-world', story: 'return' },
+        });
+      },
     });
+    if (!accepted) storyNavigationPendingRef.current = false;
   }, [active, ftueStep, mossproutJourneyDayId, router, state?.revision, transitionTo]);
 
   useEffect(() => {
@@ -363,8 +382,13 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   useEffect(() => {
     if (!active || ftueRun?.status !== 'active' || ftueRun.stepId !== 'companion.order_preview' || ftuePreviewNavigationPendingRef.current) return;
     ftuePreviewNavigationPendingRef.current = true;
-    router.push({ pathname: '/katchimera/[creatureId]', params: { creatureId: 'companion:mossprout' } });
-  }, [active, ftueRun?.status, ftueRun?.stepId, router]);
+    const accepted = transitionTo({
+      announcement: 'Opening Mossprout',
+      target: 'companion',
+      navigate: () => router.push({ pathname: '/katchimera/[creatureId]', params: { creatureId: 'companion:mossprout' } }),
+    });
+    if (!accepted) ftuePreviewNavigationPendingRef.current = false;
+  }, [active, ftueRun?.status, ftueRun?.stepId, router, transitionTo]);
 
   const openFtueHavenReveal = useCallback(() => {
     if (!active || ftueRun?.status !== 'active' || ftueRun.stepId !== 'haven.reveal' || storyNavigationPendingRef.current) return;
@@ -431,16 +455,20 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, []);
 
-  const openFtueEnergyCapture = useCallback(async () => {
-    const result = await advanceFtueActionDurably({
-      expectedStepId: 'merge.energy_exhausted',
-      actionId: 'merge.tell_me_more',
-    });
-    if (result.run?.stepId !== 'energy.capture') return;
+  const openFtueEnergyCapture = useCallback(() => {
     transitionTo({
       announcement: 'Returning to Today',
       target: 'today',
-      navigate: () => router.navigate({ pathname: '/today', params: { onboardingCapture: '1' } }),
+      navigate: async () => {
+        const result = await advanceFtueActionDurably({
+          expectedStepId: 'merge.energy_exhausted',
+          actionId: 'merge.tell_me_more',
+        });
+        if (result.run?.stepId !== 'energy.capture') {
+          throw new Error('Today did not accept the Energy capture FTUE step');
+        }
+        router.navigate({ pathname: '/today', params: { onboardingCapture: '1' } });
+      },
     });
   }, [router, transitionTo]);
 
@@ -955,37 +983,31 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
           const discovery = stateRef.current?.residentCardDiscovery.records.find((record) => record.residentId === revealedKatchimeraCardId && record.status === 'card_earned' && record.cardRevealSeenAt == null);
           if (discovery) {
             residentCardReturnPendingRef.current = true;
-            const result = dispatch({ type: 'ackResidentCardReveal', discoveryId: discovery.id, now: Date.now() });
-            if (!result?.changed) {
-              residentCardReturnPendingRef.current = false;
-              return;
-            }
-          }
-          setRevealedKatchimeraCardId(null);
-          if (discovery) finishResidentMergeSession();
-          if (!creatureId) return;
-          const returnToMatchResult = () => router.back();
-          if (discovery) {
             // The card confirmation is the final Merge-owned FTUE action. Use
-            // the same stack return that previously worked only when pressed
-            // manually, preserving the completed match conversation beneath
-            // this route so Mossprout can say who the closest match was.
-            // Persist both sides of the terminal handoff before uncovering
-            // Mossprout. A process kill here must restore the explicit match
-            // result node, never the prior parcel/card step.
-            void Promise.all([flushMergeWorld(), flushFtuePersistence()])
-              .catch((error) => console.warn('Could not persist the resident match result handoff', error))
-              .then(() => {
-                const accepted = transitionTo({
-                  announcement: 'Returning to Mossprout',
-                  navigate: returnToMatchResult,
-                  target: 'companion',
-                });
-                if (!accepted) returnToMatchResult();
-              });
+            // keep the native reveal modal mounted while the root curtain
+            // covers. Only then acknowledge it, persist the terminal handoff,
+            // and uncover the completed match conversation beneath Merge.
+            let handoffCommitted = false;
+            const accepted = transitionTo({
+              announcement: 'Returning to Mossprout',
+              target: 'companion',
+              navigate: async () => {
+                if (!handoffCommitted) {
+                  const result = dispatch({ type: 'ackResidentCardReveal', discoveryId: discovery.id, now: Date.now() });
+                  if (!result?.changed) throw new Error('Resident card reveal acknowledgement was not accepted');
+                  setRevealedKatchimeraCardId(null);
+                  finishResidentMergeSession();
+                  handoffCommitted = true;
+                }
+                await Promise.all([flushMergeWorld(), flushFtuePersistence()]);
+                router.back();
+              },
+            });
+            if (!accepted) residentCardReturnPendingRef.current = false;
             return;
           }
-          returnToMatchResult();
+          setRevealedKatchimeraCardId(null);
+          if (creatureId) router.back();
         }}
       />
       {active && mergeCelebrationRewards.length ? <RewardSplash

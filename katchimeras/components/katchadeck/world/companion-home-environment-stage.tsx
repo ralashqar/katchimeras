@@ -16,6 +16,7 @@ export const CompanionHomeEnvironmentStage = memo(
   function CompanionHomeEnvironmentStage({
     backgroundKey,
     creature,
+    creatureVerticalOffset = 0,
     creatureTargetRef,
     layer = 'both',
     name,
@@ -27,6 +28,7 @@ export const CompanionHomeEnvironmentStage = memo(
   }: {
     backgroundKey: TodayExplorationBackgroundKey | null;
     creature: QuestionnaireImageSource;
+    creatureVerticalOffset?: number;
     creatureTargetRef?: RefObject<ViewType | null>;
     layer?: 'background' | 'creature' | 'both';
     name: string;
@@ -97,7 +99,7 @@ export const CompanionHomeEnvironmentStage = memo(
               {
                 height: layout.creatureFrame.size,
                 marginLeft: -layout.creatureFrame.size / 2,
-                top: layout.creatureFrame.top,
+                top: layout.creatureFrame.top + creatureVerticalOffset,
                 width: layout.creatureFrame.size,
               }, creatureFeedbackStyle,
             ]}>

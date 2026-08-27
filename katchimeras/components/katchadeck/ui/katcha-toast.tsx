@@ -4,6 +4,7 @@ import Animated, { FadeInDown, FadeOut, useReducedMotion } from 'react-native-re
 import { useKatchaSurface } from '@/components/katchadeck/ui/katcha-surface';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { TOAST_MESSAGES_ENABLED } from '@/constants/game-ui';
 import { KatchaUI } from '@/constants/katcha-ui';
 
 type KatchaToastProps = {
@@ -17,7 +18,7 @@ type KatchaToastProps = {
 export function KatchaToast({ busy = false, icon, message, placementStyle, tone = 'neutral' }: KatchaToastProps) {
   const { tokens } = useKatchaSurface();
   const reduceMotion = useReducedMotion();
-  if (!message) return null;
+  if (!TOAST_MESSAGES_ENABLED || !message) return null;
   const accent = tone === 'danger' ? tokens.destructive : tone === 'success' ? tokens.success : tokens.accent;
   return (
     <Animated.View
