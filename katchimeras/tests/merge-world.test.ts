@@ -15,6 +15,13 @@ import { MERGE_MORPH_DURATION_MS, SPAWN_MOTION_DURATION_MS, isMistMergeTransitio
 import { mergeArtWarmupPlan } from '@/utils/merge-world/art-warmup';
 import { mergeActivityRewards } from '@/utils/merge-world/activity-rewards';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
+import {
+  createHavenMergeSandboxState,
+  HAVEN_MERGE_BOARD_CELL_INDICES,
+  HAVEN_MERGE_BOARD_COLUMNS,
+  HAVEN_MERGE_BOARD_ROWS,
+  havenMergeCellIsVisible,
+} from '@/utils/merge-world/haven-sandbox';
 import { completeMossproutChapterZeroSlice } from '@/utils/merge-world/chapter-zero-policy';
 import { nextEligibleCompanionGate, recommendCompanionPath } from '@/utils/merge-world/companion-discovery-progression';
 import { MERGE_ENERGY_REGEN_CAP, MERGE_ENERGY_REGEN_MS, MERGE_INITIAL_ENERGY, STEPS_PER_MERGE_ENERGY, mergeJournalRewardPreview, mergeYesterdayStepEnergyPreview } from '@/utils/merge-world/economy-policy';
@@ -28,6 +35,43 @@ import {
 } from '@/utils/merge-world/engine';
 
 const NOW = new Date('2026-08-12T12:00:00.000Z').getTime();
+
+test('Haven projects the complete Mossprout starter interaction area onto a 6x7 sandbox', () => {
+  const state = createHavenMergeSandboxState(NOW);
+  assert.equal(HAVEN_MERGE_BOARD_CELL_INDICES.length, 42);
+  assert.equal(new Set(HAVEN_MERGE_BOARD_CELL_INDICES).size, 42);
+  assert.equal(HAVEN_MERGE_BOARD_COLUMNS, 6);
+  assert.equal(HAVEN_MERGE_BOARD_ROWS, 7);
+  assert.equal(state.activeOrders.length, 0);
+  assert.equal(state.externalRewardReceipts.length, 0);
+  assert.ok(state.board.every((cell, index) => havenMergeCellIsVisible(index) || (cell.locked && !cell.occupant)));
+
+  const starterCells = state.board.flatMap((cell, index) => cell.occupant ? [index] : []);
+  assert.deepEqual(starterCells, [29, 30, 31, 32, 33]);
+  assert.ok(starterCells.every(havenMergeCellIsVisible));
+
+  const geometry = {
+    cellIndices: HAVEN_MERGE_BOARD_CELL_INDICES,
+    cellSize: 48,
+    columns: HAVEN_MERGE_BOARD_COLUMNS,
+    gap: 0,
+    inset: 6,
+    rows: HAVEN_MERGE_BOARD_ROWS,
+  };
+  const origin = mergeCellOrigin(geometry, 29);
+  assert.equal(mergeCellFromPoint(geometry, origin.x + 24, origin.y + 24), 29);
+  assert.equal(mergeNeighborCellInDirection(geometry, 29, 1, 0), 30);
+
+  const merged = reduceMergeWorld(state, { type: 'move', from: 29, to: 30, now: NOW + 1 });
+  assert.equal(merged.changed, true);
+  assert.equal(merged.state.board[29].occupant, null);
+  assert.equal(
+    merged.state.board[30].occupant?.kind === 'item'
+      ? merged.state.board[30].occupant.definitionId
+      : null,
+    'nature:garden:2',
+  );
+});
 
 test('Merge FTUE gates the exact authored seed drag and emits a verified merge event', () => {
   const state = createMossproutChapterZeroState(NOW);
@@ -152,7 +196,7 @@ test('Merge board flattens its static cells into one native image without a Skia
   const spawnEffects = readFileSync('components/katchadeck/games/merge-spawn-effects-layer.tsx', 'utf8');
   const ftueOverlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
   const radialSunburst = readFileSync('components/katchadeck/ui/radial-sunburst.tsx', 'utf8');
-  assert.match(board, /source=\{MERGE_BOARD_BASE\}/);
+  assert.match(board, /source=\{layout\.baseSource \?\? MERGE_BOARD_BASE\}/);
   assert.match(boardGenerator, /CELL_LIGHT = "#E8CC98"/);
   assert.match(boardGenerator, /CELL_DARK = "#DEBA7F"/);
   assert.match(boardGenerator, /draw\.rounded_rectangle/);

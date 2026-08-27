@@ -14,6 +14,8 @@ export type KingdomTileFrameTarget = {
   bottom: number;
 };
 
+export type KingdomArtSourceSize = { width: number; height: number };
+
 export type KingdomTileArtFrame = {
   left: number;
   top: number;
@@ -86,5 +88,32 @@ export function kingdomTileArtFrame({
     left: targetCenterX - (assetCenterX / TILE_ASSET_SIZE) * renderedSize,
     top,
     width: renderedSize,
+  };
+}
+
+/**
+ * Fits a non-square structure by its visible width while preserving the
+ * authored aspect ratio. The top visible alpha pixel is anchored to the top
+ * of the complete logical footprint, leaving the deep cliff free to extend
+ * below it just like an ordinary Haven tile.
+ */
+export function kingdomStructureArtFrame({
+  assetBounds,
+  sourceSize,
+  target,
+}: {
+  assetBounds: KingdomTileAlphaBounds;
+  sourceSize: KingdomArtSourceSize;
+  target: KingdomTileFrameTarget;
+}): KingdomTileArtFrame {
+  const targetWidth = target.right - target.left;
+  const assetWidth = assetBounds.right - assetBounds.left;
+  const width = targetWidth * (sourceSize.width / assetWidth);
+  const height = width * (sourceSize.height / sourceSize.width);
+  return {
+    left: target.left - (assetBounds.left / sourceSize.width) * width,
+    top: target.top - (assetBounds.top / sourceSize.height) * height,
+    width,
+    height,
   };
 }

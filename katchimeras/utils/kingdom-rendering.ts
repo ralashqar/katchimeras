@@ -66,10 +66,11 @@ export function kingdomWorldViewPoint(
 
 export function kingdomSceneMetrics(
   residentCount: number,
-  layoutProfile: KingdomHexLayoutProfileId = 'separated-v1'
+  layoutProfile: KingdomHexLayoutProfileId = 'separated-v1',
+  extraCoords: readonly { q: number; r: number }[] = [],
 ) {
   const capacity = Math.max(KINGDOM_RENDERING.sceneResidentCapacity, residentCount);
-  const coords = [{ q: 0, r: 0 }, ...hexSpiral(capacity, false)];
+  const coords = [{ q: 0, r: 0 }, ...hexSpiral(capacity, false), ...extraCoords];
   let halfWidth = HEX_TILE_W / 2;
   let halfHeight = HEX_TILE_H / 2 + HEX_TILE_LIP;
 

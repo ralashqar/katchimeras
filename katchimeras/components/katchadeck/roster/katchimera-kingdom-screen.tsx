@@ -18,6 +18,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppFontFamilies } from '@/constants/theme';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
+import { useHavenMergeSandbox } from '@/hooks/use-haven-merge-sandbox';
 import type { FtueCameraDirective } from '@/features/onboarding/ftue-types';
 import type { EggVisualState } from '@/types/home';
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
@@ -86,6 +87,12 @@ export function KatchimeraKingdomScreen({
   const ftueRecoveryRef = useRef<string | null>(null);
   const enterGroveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const identity = useMemo(loadWorldIdentity, []);
+  const havenMergeSandboxActive = companionSlots.some((slot) => slot.familyId === 'mossprout' && slot.kind === 'owned');
+  const havenMergeSandbox = useHavenMergeSandbox(havenMergeSandboxActive);
+  const havenMergeBoard = useMemo(() => havenMergeSandbox.state ? ({
+    dispatch: havenMergeSandbox.dispatch,
+    state: havenMergeSandbox.state,
+  }) : null, [havenMergeSandbox.dispatch, havenMergeSandbox.state]);
   const ftueStep = ftueStepId ? mossproutFtueStep(ftueStepId) ?? null : null;
   const tutorialCamera = useMemo<FtueCameraDirective | null>(() => {
     if (ftueStepId === 'haven.mossprout_reveal' && enteringGrove) {
@@ -283,6 +290,7 @@ export function KatchimeraKingdomScreen({
         discoveryRevealFamilyId={ftueStepId === 'haven.mossprout_reveal' || ftueStepId === 'haven.first_bloom' ? 'mossprout' : null}
         highlightedLockedFamilyId={ftueStepId === 'haven.mossprout_focus' ? 'mossprout' : null}
         interactionEnabled={havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven'}
+        mergeBoard={havenMergeBoard}
         onSelectHome={() => {
           if (ftueStepId === 'haven.home_notice') advanceOpening();
         }}

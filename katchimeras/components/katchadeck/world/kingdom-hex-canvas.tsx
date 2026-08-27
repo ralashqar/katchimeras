@@ -18,6 +18,10 @@ import Animated, {
 
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
 import { EggAvatarArtwork } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
+import {
+  FeastlePersistentMergeBoard,
+  type MergeBoardLayout,
+} from '@/components/katchadeck/games/feastle-persistent-merge-board';
 import { HavenUpgradeEffects } from '@/components/katchadeck/world/haven-upgrade-effects';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { KingdomTileArtLayer, KingdomTileRender } from '@/components/katchadeck/world/kingdom-hex-scene';
@@ -28,7 +32,9 @@ import { KINGDOM_RENDERING } from '@/constants/kingdom-rendering';
 import kingdomWorldViewConfig from '@/constants/kingdom-world-view.json';
 import { Lantern } from '@/constants/theme';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
+import { createMergeBoardSession } from '@/features/onboarding/merge-ftue-interaction-coordinator';
 import type { EggVisualState } from '@/types/home';
+import type { MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
 import type { FtueCameraDirective } from '@/features/onboarding/ftue-types';
 import type { WorldIdentityState } from '@/types/world-identity';
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
@@ -39,6 +45,11 @@ import {
 } from '@/utils/kingdom-rendering';
 import { getDevKingdomHexVerticalAlignmentMode } from '@/utils/dev-asset-overrides';
 import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
+import {
+  HAVEN_MERGE_BOARD_CELL_INDICES,
+  HAVEN_MERGE_BOARD_COLUMNS,
+  HAVEN_MERGE_BOARD_ROWS,
+} from '@/utils/merge-world/haven-sandbox';
 import {
   HAVEN_UPGRADE_REDUCED_TIMING,
   HAVEN_UPGRADE_TIMING,
@@ -81,6 +92,10 @@ type Props = {
   upgradePresentation?: HavenTileUpgradePresentation | null;
   highlightedLockedFamilyId?: string | null;
   discoveryRevealFamilyId?: string | null;
+  mergeBoard?: {
+    dispatch: (command: MergeWorldCommand) => MergeWorldCommandResult | null;
+    state: MergeWorldState;
+  } | null;
 };
 
 const CREATURE_SIZE = 58;
@@ -95,6 +110,13 @@ const KINGDOM_DREAM_MIST_LOCK_SOURCE = require('../../../assets/images/katchimer
 const LOCKED_TILE_HIT_WIDTH = HEX_TILE_W * 0.62;
 const LOCKED_TILE_HIT_HEIGHT = HEX_TILE_H * 0.78;
 const LOCKED_TILE_LOCK_SIZE = 104;
+const HAVEN_MERGE_BOARD_LAYOUT: MergeBoardLayout = {
+  accessibilityLabel: 'Haven merge board, six columns by seven rows',
+  baseSource: require('../../../assets/images/katchimeras/merge-world/generated/merge-board-base-6x7.webp'),
+  cellIndices: HAVEN_MERGE_BOARD_CELL_INDICES,
+  columns: HAVEN_MERGE_BOARD_COLUMNS,
+  rows: HAVEN_MERGE_BOARD_ROWS,
+};
 
 export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   background,
@@ -114,11 +136,15 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   upgradePresentation,
   highlightedLockedFamilyId,
   discoveryRevealFamilyId = null,
+  mergeBoard = null,
 }: Props) {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [assetRevision, setAssetRevision] = useState(0);
   const [upgradePhase, setUpgradePhase] = useState<HavenUpgradePresentationPhase>('armed');
   const [discoveryPhase, setDiscoveryPhase] = useState<HavenUpgradePresentationPhase>('armed');
+  const [selectedMergeCell, setSelectedMergeCell] = useState<number | null>(null);
+  const mergeSessionRef = useRef<ReturnType<typeof createMergeBoardSession> | null>(null);
+  if (!mergeSessionRef.current) mergeSessionRef.current = createMergeBoardSession();
   const reduceMotion = useReducedMotion();
 
   useFocusEffect(
@@ -326,10 +352,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const visibleFrame = (layer: KingdomTileArtLayer) => {
       const frame = screenFrame(layer);
       return {
-        left: frame.left + (layer.alphaBounds.left / 1024) * frame.width,
-        top: frame.top + (layer.alphaBounds.top / 1024) * frame.height,
-        right: frame.left + (layer.alphaBounds.right / 1024) * frame.width,
-        bottom: frame.top + (layer.alphaBounds.bottom / 1024) * frame.height,
+        left: frame.left + (layer.alphaBounds.left / layer.sourceSize.width) * frame.width,
+        top: frame.top + (layer.alphaBounds.top / layer.sourceSize.height) * frame.height,
+        right: frame.left + (layer.alphaBounds.right / layer.sourceSize.width) * frame.width,
+        bottom: frame.top + (layer.alphaBounds.bottom / layer.sourceSize.height) * frame.height,
       };
     };
     const fromVisible = visibleFrame(upgradeLayers.fromLayer);
@@ -379,6 +405,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     () => new Map(scene.tileArtLayers.map((layer) => [layer.id, layer])),
     [scene.tileArtLayers]
   );
+  const gardenBoardFrame = useMemo(() => (
+    scene.tileArtLayers.find((layer) => layer.kind === 'structure')?.interactionFrame ?? null
+  ), [scene.tileArtLayers]);
   const tileFocusScale = useCallback((tileId: string) => {
     if (!presentation || presentation.focusMode !== 'magnetic' || camera.isMoving || !camera.focusedTileId) return 1;
     if (tileId === camera.focusedTileId) return reduceMotion ? 1.04 : presentation.focusedScale;
@@ -553,6 +582,31 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 </Fragment>
               );
             })}
+            {mergeBoard && gardenBoardFrame && interactionEnabled && !upgradePresentation ? (
+              <View
+                style={[
+                  styles.mergeBoardWorldFrame,
+                  {
+                    height: gardenBoardFrame.height,
+                    left: gardenBoardFrame.left,
+                    top: gardenBoardFrame.top,
+                    width: gardenBoardFrame.width,
+                  },
+                ]}>
+                <FeastlePersistentMergeBoard
+                  animateEntrance={false}
+                  externalPanGesture={camera.panGesture}
+                  layout={HAVEN_MERGE_BOARD_LAYOUT}
+                  maxHeight={gardenBoardFrame.height}
+                  onCommand={mergeBoard.dispatch}
+                  onSelect={setSelectedMergeCell}
+                  selectedCell={selectedMergeCell}
+                  sessionId={mergeSessionRef.current.id}
+                  state={mergeBoard.state}
+                  width={gardenBoardFrame.width}
+                />
+              </View>
+            ) : null}
             {showEgg ? (
               <KingdomEgg
                 {...kingdomWorldViewPoint(
@@ -1065,6 +1119,7 @@ const styles = StyleSheet.create({
   scene: { position: 'relative' },
   focusLayer: { position: 'absolute' },
   tileArt: { position: 'absolute' },
+  mergeBoardWorldFrame: { alignItems: 'center', justifyContent: 'center', position: 'absolute' },
   eggLayer: { height: EGG_WORLD_H, position: 'absolute', width: EGG_WORLD_W },
   creature: { position: 'absolute' },
   lockedTileHitTarget: { alignItems: 'center', justifyContent: 'center', position: 'absolute' },

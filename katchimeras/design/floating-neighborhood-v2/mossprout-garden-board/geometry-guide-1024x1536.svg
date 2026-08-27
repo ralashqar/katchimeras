@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1536" viewBox="0 0 1024 1536">
+  <rect width="1024" height="1536" fill="#111827"/>
+  <path
+    d="M352 146 L672 146 L914 354 L914 1182 L672 1390 L352 1390 L110 1182 L110 354 Z"
+    fill="#8fbd45"
+    stroke="#f7df9a"
+    stroke-width="18"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M374 214 L650 214 L840 382 L840 1154 L650 1322 L374 1322 L184 1154 L184 382 Z"
+    fill="#b8dd64"
+    stroke="#4d762b"
+    stroke-width="22"
+    stroke-linejoin="round"
+  />
+  <path d="M672 146 L914 354" stroke="#5eead4" stroke-width="34" stroke-linecap="round"/>
+  <path d="M352 146 L110 354" stroke="#5eead4" stroke-width="34" stroke-linecap="round"/>
+  <path d="M914 1182 L672 1390" stroke="#5eead4" stroke-width="34" stroke-linecap="round"/>
+  <path d="M110 1182 L352 1390" stroke="#5eead4" stroke-width="34" stroke-linecap="round"/>
+  <rect x="262" y="430" width="500" height="676" rx="82" fill="#dff3a7" fill-opacity="0.72" stroke="#ffffff" stroke-width="10" stroke-dasharray="24 18"/>
+  <path d="M914 354 L914 1182 M110 354 L110 1182" stroke="#ef4444" stroke-width="22" stroke-dasharray="34 20"/>
+  <text x="512" y="80" fill="#ffffff" font-family="Arial, sans-serif" font-size="34" text-anchor="middle">TALL GARDEN — FOUR END PORTS, SEALED MIDDLE</text>
+  <text x="512" y="780" fill="#17330f" font-family="Arial, sans-serif" font-size="44" font-weight="bold" text-anchor="middle">CLEAR 6 × 7 OVERLAY SAFE AREA</text>
+</svg>

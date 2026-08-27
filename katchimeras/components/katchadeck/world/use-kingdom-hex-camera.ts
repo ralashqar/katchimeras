@@ -370,6 +370,7 @@ export function useKingdomHexCamera({
     focusUpgrade,
     focusedTileId,
     gesture,
+    panGesture: pan,
     isMoving: renderState.isMoving,
     ready,
     recenter,

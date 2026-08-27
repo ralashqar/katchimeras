@@ -15,8 +15,14 @@ import {
 import { kingdomSceneMetrics } from '@/utils/kingdom-rendering';
 import {
   kingdomTileArtFrame,
+  kingdomStructureArtFrame,
   type KingdomHexVerticalAlignmentMode,
 } from '@/utils/kingdom-tile-alignment';
+import {
+  MOSSPROUT_GARDEN_BOARD_BOTTOM,
+  MOSSPROUT_GARDEN_BOARD_TOP,
+} from '@/utils/kingdom-map-layout';
+import { MOSSPROUT_GARDEN_BOARD } from '@/utils/kingdom-map-structures';
 import type {
   KingdomHexTileLodSources,
   KingdomHexTileSelection,
@@ -35,15 +41,18 @@ export type KingdomTileRender = {
 export type KingdomTileArtLayer = {
   alphaBounds: { left: number; top: number; right: number; bottom: number };
   id: string;
+  kind: 'structure' | 'tile';
   coord: HexCoord;
   custom: boolean;
   depth: number;
   fallbackSource: ImageSourcePropType | null;
   fallbackSources?: KingdomHexTileLodSources;
   frame: { left: number; top: number; width: number; height: number };
+  interactionFrame?: { left: number; top: number; width: number; height: number };
   overlaySource?: ImageSourcePropType;
   overlaySources?: KingdomHexTileLodSources;
   residentAnchor?: { x: number; y: number };
+  sourceSize: { width: number; height: number };
   source: ImageSourcePropType;
   sources?: KingdomHexTileLodSources;
 };
@@ -155,6 +164,7 @@ function artLayerFor(
   return {
     alphaBounds: selectedBounds,
     id: tile.id,
+    kind: 'tile',
     coord: tile.coord,
     custom: Boolean(residentTile),
     depth: tile.depth,
@@ -170,7 +180,57 @@ function artLayerFor(
         }
       : undefined,
     source: selected.source,
+    sourceSize: { width: 1024, height: 1024 },
     sources: selected.sources,
+  };
+}
+
+function mossproutGardenLayer(
+  companionSlots: KingdomHexCompanionSlot[],
+  centerX: number,
+  centerY: number,
+  layoutProfile: KingdomHexTileSelection['layoutProfile'],
+): KingdomTileArtLayer {
+  const mossprout = companionSlots.find((slot) => slot.familyId === 'mossprout');
+  const art = mossprout && mossprout.kind !== 'locked'
+    ? MOSSPROUT_GARDEN_BOARD.art.revealed
+    : MOSSPROUT_GARDEN_BOARD.art.locked;
+  const topPoint = hexToWorld(MOSSPROUT_GARDEN_BOARD_TOP, layoutProfile);
+  const bottomPoint = hexToWorld(MOSSPROUT_GARDEN_BOARD_BOTTOM, layoutProfile);
+  const topBounds = tileVisibleBounds(topPoint.x + centerX, topPoint.y + centerY);
+  const bottomBounds = tileVisibleBounds(bottomPoint.x + centerX, bottomPoint.y + centerY);
+  const target = {
+    left: Math.min(topBounds.left, bottomBounds.left),
+    top: Math.min(topBounds.top, bottomBounds.top),
+    right: Math.max(topBounds.right, bottomBounds.right),
+    bottom: Math.max(topBounds.bottom, bottomBounds.bottom),
+  };
+  const frame = kingdomStructureArtFrame({
+    assetBounds: art.alphaBounds,
+    sourceSize: art.sourceSize,
+    target,
+  });
+  const mergeSurface = art.mergeSurfaceBounds;
+  const interactionFrame = {
+    left: frame.left + (mergeSurface.left / art.sourceSize.width) * frame.width,
+    top: frame.top + (mergeSurface.top / art.sourceSize.height) * frame.height,
+    width: ((mergeSurface.right - mergeSurface.left) / art.sourceSize.width) * frame.width,
+    height: ((mergeSurface.bottom - mergeSurface.top) / art.sourceSize.height) * frame.height,
+  };
+
+  return {
+    alphaBounds: art.alphaBounds,
+    id: MOSSPROUT_GARDEN_BOARD.id,
+    kind: 'structure',
+    coord: MOSSPROUT_GARDEN_BOARD_TOP,
+    custom: true,
+    depth: hexDrawDepth({ x: bottomPoint.x + centerX, y: bottomPoint.y + centerY }),
+    fallbackSource: null,
+    frame,
+    interactionFrame,
+    overlaySource: art.overlaySource,
+    source: art.source,
+    sourceSize: art.sourceSize,
   };
 }
 
@@ -182,7 +242,8 @@ export function buildKingdomHexScene(
 ): KingdomHexScene {
   const metrics = kingdomSceneMetrics(
     companionSlots.length + 1,
-    hexTiles.layoutProfile
+    hexTiles.layoutProfile,
+    MOSSPROUT_GARDEN_BOARD.footprint,
   );
   const { width, height } = metrics;
   const rawTiles: Omit<KingdomTileRender, 'cx' | 'cy' | 'depth'>[] = [
@@ -206,10 +267,15 @@ export function buildKingdomHexScene(
   const centerTile = tiles.find((tile) => tile.id === CENTER_ID) ?? tiles[0];
   const tileById = new Map(tiles.map((tile) => [tile.id, tile]));
 
+  const tileArtLayers = [
+    ...tiles.map((tile) => artLayerFor(tile, hexTiles, identity, verticalAlignmentMode)),
+    mossproutGardenLayer(companionSlots, metrics.centerX, metrics.centerY, hexTiles.layoutProfile),
+  ].sort((a, b) => a.depth - b.depth);
+
   return {
     centerTile,
     height,
-    tileArtLayers: tiles.map((tile) => artLayerFor(tile, hexTiles, identity, verticalAlignmentMode)),
+    tileArtLayers,
     tileById,
     tiles,
     width,

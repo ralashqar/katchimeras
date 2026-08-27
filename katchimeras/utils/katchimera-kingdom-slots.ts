@@ -4,7 +4,8 @@ import type { KingdomCreature } from '@/types/kingdom';
 import type { KingdomResident } from '@/utils/kingdom-residents';
 import type { HavenStage } from '@/constants/haven-catalog';
 import type { EggAvatarSkinId } from '@/types/egg-avatar';
-import { hexSpiral, type HexCoord } from '@/utils/world-hex';
+import { KINGDOM_FAMILY_SLOT_COORD_BY_ID } from '@/utils/kingdom-map-layout';
+import type { HexCoord } from '@/utils/world-hex';
 
 type KingdomHexCompanionSlotBase = {
   coord: HexCoord;
@@ -39,15 +40,6 @@ export function kingdomCompanionTileId(familyId: KatchimeraFamilyId): string {
   return `family:${familyId}`;
 }
 
-const FAMILY_SLOT_COORDS = hexSpiral(katchimeraFamilies.length, false);
-const FAMILY_SLOT_ORDER: KatchimeraFamilyId[] = [
-  'mossprout',
-  ...katchimeraFamilies.map((family) => family.id).filter((familyId) => familyId !== 'mossprout'),
-];
-const FAMILY_SLOT_COORD_BY_ID = new Map(
-  FAMILY_SLOT_ORDER.map((familyId, index) => [familyId, FAMILY_SLOT_COORDS[index]] as const),
-);
-
 /**
  * Builds every authored family slot in catalog order. Ownership changes only
  * the slot state, so loading snapshots or discovering a companion never moves
@@ -75,7 +67,7 @@ export function kingdomCompanionHexSlots(
 
   return katchimeraFamilies.map((family) => {
     const base = {
-      coord: FAMILY_SLOT_COORD_BY_ID.get(family.id) ?? FAMILY_SLOT_COORDS[0],
+      coord: KINGDOM_FAMILY_SLOT_COORD_BY_ID[family.id],
       familyId: family.id,
       id: kingdomCompanionTileId(family.id),
     };

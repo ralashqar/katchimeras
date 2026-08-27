@@ -39,5 +39,5 @@ test('upgrade energy follows the tile silhouette without central capsule layers'
   assert.match(effects, /LIGHT_RAYS[\s\S]*?RisingArrow/);
   assert.match(effects, /silhouetteSource[\s\S]*?tintColor=\{presentation\.palette\.glow\}/);
   assert.match(scene, /alphaBounds: selectedBounds/);
-  assert.match(canvas, /layer\.alphaBounds\.left \/ 1024[\s\S]*?layer\.alphaBounds\.bottom \/ 1024/);
+  assert.match(canvas, /layer\.alphaBounds\.left \/ layer\.sourceSize\.width[\s\S]*?layer\.alphaBounds\.bottom \/ layer\.sourceSize\.height/);
 });

@@ -10,6 +10,13 @@ import { visiblePixelBoundsFromRgba } from '../utils/alpha-bounds';
 import { katchimeraFamilies } from '../constants/katchimera-skins';
 import { kingdomCompanionHexSlots } from '../utils/katchimera-kingdom-slots';
 import {
+  KINGDOM_FAMILY_SLOT_COORD_BY_ID,
+  MOSSPROUT_GARDEN_BOARD_BOTTOM,
+  MOSSPROUT_GARDEN_BOARD_MOSSPROUT_COORD,
+  MOSSPROUT_GARDEN_BOARD_RESERVED_COORDS,
+  MOSSPROUT_GARDEN_BOARD_TOP,
+} from '../utils/kingdom-map-layout';
+import {
   cameraTranslationBounds,
   clampHavenCameraScale,
   kingdomCameraSnapshotForTarget,
@@ -18,7 +25,7 @@ import {
   nearestKingdomFocusTarget,
   screenPointToWorld,
 } from '../utils/kingdom-rendering';
-import { kingdomTileArtFrame } from '../utils/kingdom-tile-alignment';
+import { kingdomStructureArtFrame, kingdomTileArtFrame } from '../utils/kingdom-tile-alignment';
 import {
   TODAY_EGG_GLOBAL_SCALE,
   TODAY_EGG_VERTICAL_SHIFT_HEIGHT_RATIO,
@@ -36,7 +43,6 @@ import {
   HEX_TILE_H,
   HEX_TILE_W,
   KINGDOM_HEX_LAYOUT_PROFILES,
-  hexSpiral,
   hexTileTopPoints,
   hexToWorld,
 } from '../utils/world-hex';
@@ -152,19 +158,58 @@ function renderedAssetX(frame: { left: number; width: number }, assetX: number):
   return frame.left + (assetX / 1024) * frame.width;
 }
 
-test('Kingdom assigns every Katchimera family to the uninterrupted hex spiral', () => {
+test('Kingdom assigns every family to the stable structure-aware layout', () => {
   const locked = kingdomCompanionHexSlots([], []);
-  const expectedCoords = hexSpiral(katchimeraFamilies.length, false);
+  const reserved = new Set(MOSSPROUT_GARDEN_BOARD_RESERVED_COORDS.map((coord) => `${coord.q}:${coord.r}`));
   assert.equal(locked.length, 25);
   assert.deepEqual(locked.map((slot) => slot.familyId), katchimeraFamilies.map((family) => family.id));
   assert.equal(new Set(locked.map((slot) => slot.id)).size, locked.length);
   assert.equal(new Set(locked.map((slot) => `${slot.coord.q}:${slot.coord.r}`)).size, locked.length);
   assert.ok(locked.every((slot) => slot.kind === 'locked'));
-  assert.deepEqual(
-    [...locked.map((slot) => `${slot.coord.q}:${slot.coord.r}`)].sort(),
-    [...expectedCoords.map((coord) => `${coord.q}:${coord.r}`)].sort(),
+  assert.ok(locked.every((slot) => !reserved.has(`${slot.coord.q}:${slot.coord.r}`)));
+  assert.deepEqual(locked.find((slot) => slot.familyId === 'mossprout')?.coord, MOSSPROUT_GARDEN_BOARD_MOSSPROUT_COORD);
+  assert.deepEqual(Object.fromEntries(locked.map((slot) => [slot.familyId, slot.coord])), KINGDOM_FAMILY_SLOT_COORD_BY_ID);
+});
+
+test('Mossprout garden reserves two cells, four end ports, and sealed middle neighbours', () => {
+  assert.deepEqual(MOSSPROUT_GARDEN_BOARD_TOP, { q: -1, r: 1 });
+  assert.deepEqual(MOSSPROUT_GARDEN_BOARD_BOTTOM, { q: -1, r: 2 });
+  assert.deepEqual(MOSSPROUT_GARDEN_BOARD_MOSSPROUT_COORD, { q: -2, r: 3 });
+
+  const source = fs.readFileSync(path.join(process.cwd(), 'utils', 'kingdom-map-structures.ts'), 'utf8');
+  assert.match(source, /direction: 'upper-right', connectsTo: 'kingdom'/);
+  assert.match(source, /direction: 'upper-left', connectsTo: null/);
+  assert.match(source, /direction: 'lower-left', connectsTo: 'mossprout'/);
+  assert.match(source, /direction: 'lower-right', connectsTo: null/);
+  assert.equal(MOSSPROUT_GARDEN_BOARD_RESERVED_COORDS.length, 8);
+});
+
+test('Mossprout garden ships only fixed 512 by 768 runtime states', () => {
+  const root = path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'world', 'hex');
+  for (const state of ['', '_locked']) {
+    const name = `floating_neighborhood_v2_mossprout_garden_board${state}_512x768.webp`;
+    const asset = fs.readFileSync(path.join(root, name));
+    assert.equal(asset.subarray(0, 4).toString('ascii'), 'RIFF');
+    assert.equal(asset.subarray(8, 12).toString('ascii'), 'WEBP');
+  }
+  const overlay = fs.readFileSync(
+    path.join(root, 'floating_neighborhood_v2_mossprout_garden_board_merge_overlay_512x768.webp'),
   );
-  assert.deepEqual(locked.find((slot) => slot.familyId === 'mossprout')?.coord, expectedCoords[0]);
+  assert.equal(overlay.subarray(0, 4).toString('ascii'), 'RIFF');
+  assert.equal(overlay.subarray(8, 12).toString('ascii'), 'WEBP');
+  const boardBase = fs.readFileSync(
+    path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'merge-world', 'generated', 'merge-board-base-6x7.webp'),
+  );
+  assert.equal(boardBase.subarray(0, 4).toString('ascii'), 'RIFF');
+  assert.equal(boardBase.subarray(8, 12).toString('ascii'), 'WEBP');
+  const overlayScript = fs.readFileSync(
+    path.join(process.cwd(), 'scripts', 'render-mossprout-garden-merge-overlay.py'),
+    'utf8',
+  );
+  assert.match(overlayScript, /COLUMNS = 6/);
+  assert.match(overlayScript, /ROWS = 7/);
+  assert.equal(fs.existsSync(path.join(root, 'floating_neighborhood_v2_mossprout_garden_board.webp')), false);
+  assert.equal(fs.existsSync(path.join(root, 'floating_neighborhood_v2_mossprout_garden_board_1024.webp')), false);
 });
 
 test('discovering a Katchimera transforms its existing Kingdom slot without moving it', () => {
@@ -432,6 +477,16 @@ test('silhouette-center retains the existing tile frame calculation', () => {
   assertClose(frame.top, 24 - ((25 + 998) / 2 / 1024) * expectedSize);
 });
 
+test('portrait structure frames preserve source aspect and align visible width', () => {
+  const bounds = { left: 57, top: 60, right: 967, bottom: 1487 };
+  const sourceSize = { width: 1024, height: 1536 };
+  const frame = kingdomStructureArtFrame({ assetBounds: bounds, sourceSize, target: TILE_TARGET });
+  assertClose(frame.height / frame.width, 1.5);
+  assertClose(frame.left + (bounds.left / sourceSize.width) * frame.width, TILE_TARGET.left);
+  assertClose(frame.left + (bounds.right / sourceSize.width) * frame.width, TILE_TARGET.right);
+  assertClose(frame.top + (bounds.top / sourceSize.height) * frame.height, TILE_TARGET.top);
+});
+
 test('the selected reference tile does not move between vertical alignment modes', () => {
   const legacy = kingdomTileArtFrame({
     alignmentMode: 'silhouette-center',
@@ -586,6 +641,26 @@ test('Haven keeps every configured tile in the persistent render set', () => {
   const { frames } = createKingdomRendererFixture(50);
   assert.equal(frames.length, 51);
   assert.equal(new Set(frames.map((frame) => frame.id)).size, frames.length);
+});
+
+test('the tall garden mounts the shared Merge board without giving cell drags to the camera', () => {
+  const scene = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-hex-scene.ts'),
+    'utf8',
+  );
+  const canvas = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-hex-canvas.tsx'),
+    'utf8',
+  );
+  assert.match(scene, /id: MOSSPROUT_GARDEN_BOARD\.id/);
+  assert.match(scene, /mossprout && mossprout\.kind !== 'locked'[\s\S]*?art\.revealed[\s\S]*?art\.locked/);
+  assert.match(scene, /kind: 'structure'/);
+  assert.match(scene, /overlaySource: art\.overlaySource/);
+  assert.match(scene, /interactionFrame/);
+  assert.match(canvas, /<FeastlePersistentMergeBoard/);
+  assert.match(canvas, /externalPanGesture=\{camera\.panGesture\}/);
+  assert.match(canvas, /layout=\{HAVEN_MERGE_BOARD_LAYOUT\}/);
+  assert.doesNotMatch(canvas, /structure:mossprout-garden/);
 });
 
 test('Haven uses one fixed 512 image tier for tiles and residents', () => {
