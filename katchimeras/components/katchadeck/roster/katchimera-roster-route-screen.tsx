@@ -1,6 +1,6 @@
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { KatchimeraKingdomScreen } from '@/components/katchadeck/roster/katchimera-kingdom-screen';
@@ -25,9 +25,9 @@ import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability
 import { withDiscoveredKatchimeras } from '@/utils/discovered-katchimera-availability';
 import { kingdomCompanionHexSlots, type KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
 import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
-import type { MergeWorldState } from '@/types/merge-world';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
-import { loadMergeWorldState, revealStoredHaven, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
+import { revealStoredHaven } from '@/utils/merge-world/repository';
+import { MergeWorldProvider, useMergeWorldState } from '@/features/merge-world/merge-world-provider';
 import { advanceFtueActionDurably, commitFtueAction, dispatchFtueEvent, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { useHavenTileStages } from '@/hooks/use-haven-tile-stages';
 import { equipEggAvatarHat } from '@/utils/egg-avatar-storage';
@@ -35,6 +35,8 @@ import { ensureMossproutFtueFirstResident, MOSSPROUT_FTUE_FIRST_RESIDENT_ID } fr
 import { completeMossproutJourneyResolution, recordMossproutFirstGardenRestored, recordMossproutMatchedCard, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { localDayId } from '@/utils/world-identity';
+import { deriveTomorrowDayRecord, hydrateAllDays } from '@/game/days';
+import { loadOnboardingProfile } from '@/utils/onboarding-state';
 
 function hatchTimestamp(creature: KingdomCreature, index: number): number {
   const time = Date.parse(`${creature.isoDate}T00:00:00`);
@@ -75,10 +77,41 @@ function loadRosterPersistentSnapshot() {
  */
 export function KatchimeraRosterRouteScreen() {
   const isFocused = useIsFocused();
-  return isFocused ? <FocusedKatchimeraRoster /> : null;
+  return isFocused ? <FocusedKatchimeraRosterBoundary /> : null;
 }
 
-function FocusedKatchimeraRoster() {
+function FocusedKatchimeraRosterBoundary() {
+  const { days } = useAllDays({ refreshOnFocus: false });
+  const mergePersistent = useMemo(() => {
+    const now = new Date();
+    const homeState = homeRepository.load();
+    const profile = loadOnboardingProfile();
+    const hydratedDays = hydrateAllDays(homeState, profile, now);
+    const currentDays = hydratedDays.length > 0 ? hydratedDays : days;
+    const activityDays = homeState?.tomorrow
+      ? [...currentDays, deriveTomorrowDayRecord(homeState, profile, now)]
+      : currentDays;
+    const resolveCompanionId = companionIdResolverForHomeState(homeState);
+    return {
+      activityDays,
+      characterIds: ['mossprout'],
+      quests: loadCompanionQuests(resolveCompanionId),
+    };
+  }, [days]);
+
+  return (
+    <MergeWorldProvider
+      active
+      characterIds={mergePersistent.characterIds}
+      days={mergePersistent.activityDays}
+      featuredCharacterId="mossprout"
+      questState={mergePersistent.quests}>
+      <FocusedKatchimeraRoster days={days} />
+    </MergeWorldProvider>
+  );
+}
+
+function FocusedKatchimeraRoster({ days }: { days: ReturnType<typeof useAllDays>['days'] }) {
   const router = useRouter();
   const ftueRun = useFtueRun();
   const { transitionTo } = useGameScreenTransition();
@@ -87,20 +120,12 @@ function FocusedKatchimeraRoster() {
   // This component is created fresh for every focus session, so its lazy
   // initializer already reads the latest persisted days. Refreshing on that
   // same initial focus would rebuild the just-mounted grid a second time.
-  const { days } = useAllDays({ refreshOnFocus: false });
   const [persistentSnapshot, setPersistentSnapshot] = useState(loadRosterPersistentSnapshot);
   const [contentReady, setContentReady] = useState(false);
-  const [mergeWorld, setMergeWorld] = useState<MergeWorldState | null>(null);
+  const { state: mergeWorld } = useMergeWorldState();
   const relationshipTileStages = useHavenTileStages();
   const hasCompletedInitialFocus = useRef(false);
   const persistent = persistentSnapshot.state;
-
-  useEffect(() => {
-    let active = true;
-    void loadMergeWorldState().then((state) => { if (active) setMergeWorld(state); });
-    const unsubscribe = subscribeMergeWorldSnapshots((state) => { if (active) setMergeWorld(state); });
-    return () => { active = false; unsubscribe(); };
-  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -194,9 +219,6 @@ function FocusedKatchimeraRoster() {
       navigate: () => router.push('/you'),
     });
   }, [router, transitionTo]);
-  const openWorldBoardLab = useCallback(() => {
-    router.push('/dev-world-board-lab');
-  }, [router]);
   const continueFirstBloomToResident = useCallback(async () => {
     const now = Date.now();
     ensureMossproutFtueFirstResident();
@@ -232,11 +254,9 @@ function FocusedKatchimeraRoster() {
     <View style={styles.screen}>
       <KatchimeraKingdomScreen
           background={background}
-          daysHatched={kingdom.totals.daysHatched}
           eggVisual={eggVisual}
           onContentReady={() => setContentReady(true)}
           onOpenProfile={openProfile}
-          onOpenWorldBoardLab={openWorldBoardLab}
           onSelectCreature={openCreature}
           residentStatusGlyphs={statusByCreatureId}
           companionSlots={discoveryCompanionSlots}

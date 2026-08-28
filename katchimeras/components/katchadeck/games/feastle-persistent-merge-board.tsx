@@ -163,7 +163,7 @@ function isInterruptibleMotion(motion?: SpriteMotion) {
   return motion == null || motion.kind === 'move' || motion.kind === 'swap' || motion.kind === 'return' || motion.kind === 'spawn' || motion.kind === 'merge-result';
 }
 
-export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onCommandSettled, onInteractionGateCommitted, onBoardRelease, onScreenMetrics, onVisualReady, onBlockedInteraction, onInspectMist, onInspectRootbound, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', sessionId, hiddenItemInstanceIds, animateEntrance = true, layout = DEFAULT_MERGE_BOARD_LAYOUT }: {
+export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onCommandSettled, onInteractionGateCommitted, onBoardRelease, onScreenMetrics, screenMetricsRevision = 0, onVisualReady, onBlockedInteraction, onInspectMist, onInspectRootbound, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', sessionId, hiddenItemInstanceIds, animateEntrance = true, layout = DEFAULT_MERGE_BOARD_LAYOUT }: {
   state: MergeWorldState;
   width: number;
   animateEntrance?: boolean;
@@ -175,6 +175,8 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   onInteractionGateCommitted?: (receipt: MergeInteractionGateReceipt) => void;
   onBoardRelease?: () => void;
   onScreenMetrics?: (metrics: MergeBoardScreenMetrics) => void;
+  /** Re-measure after an ancestor camera transform settles. */
+  screenMetricsRevision?: number;
   onVisualReady?: () => void;
   onBlockedInteraction?: () => void;
   onInspectMist?: (cell: number) => void;
@@ -223,7 +225,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     });
     return () => cancelAnimationFrame(frame);
   }, [geometry, onScreenMetrics]);
-  useEffect(reportScreenMetrics, [reportScreenMetrics]);
+  useEffect(reportScreenMetrics, [reportScreenMetrics, screenMetricsRevision]);
   const reduceMotion = useReducedMotion();
   const timers = useDisposableTimers('merge-board-feedback');
   const boardEntrance = useSharedValue(animateEntrance ? 0 : 1);

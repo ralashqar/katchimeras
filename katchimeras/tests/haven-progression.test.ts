@@ -5,6 +5,7 @@ import test from 'node:test';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import type { MergeWorldState } from '@/types/merge-world';
+import { prioritizedVisibleMergeOrders } from '@/utils/merge-world/order-presentation';
 
 const NOW = Date.UTC(2026, 7, 18, 12);
 
@@ -59,6 +60,42 @@ test('procedural Merge orders fill three slots and remain separate from story or
   assert.ok(procedural.every((order) => order.purpose === 'normal' && !order.signature && !order.chapterId));
 });
 
+test('Haven order islands share canonical chapter, journey, and character priority', () => {
+  const fresh = normalizeMergeWorldState(createInitialMergeWorldState(NOW, ['mossprout', 'steppling']), NOW);
+  const template = fresh.activeOrders[0]!;
+  const normal = { ...template, id: 'normal:steppling', characterId: 'steppling' as const };
+  const favourite = { ...template, id: 'normal:baristabbit', characterId: 'baristabbit' as const };
+  const focused = { ...template, id: 'focus:mossprout', characterId: 'mossprout' as const };
+  const sameCharacter = { ...template, id: 'normal:mossprout', characterId: 'mossprout' as const };
+  const state = {
+    ...fresh,
+    activeOrders: [normal, favourite, sameCharacter, focused],
+    favouriteCharacterId: 'baristabbit' as const,
+  };
+
+  assert.deepEqual(
+    prioritizedVisibleMergeOrders(state, { focusOrderId: focused.id }).map((order) => order.id),
+    [focused.id, sameCharacter.id, favourite.id, normal.id],
+  );
+
+  const journey = { ...normal, id: 'journey:only' };
+  const resident = { ...favourite, id: 'resident:only', storyArcId: 'resident:active' };
+  assert.deepEqual(
+    prioritizedVisibleMergeOrders({ ...state, activeOrders: [normal, journey, resident] }, {
+      activeResidentDiscoveryId: 'resident:active',
+      exclusiveJourney: true,
+      journeyOrderIds: new Set([journey.id]),
+    }).map((order) => order.id),
+    [resident.id, journey.id],
+  );
+
+  const chapter = { ...focused, id: 'mossprout:chapter-0:first-sprout' };
+  assert.deepEqual(
+    prioritizedVisibleMergeOrders({ ...state, activeOrders: [normal, chapter, favourite] }).map((order) => order.id),
+    [chapter.id],
+  );
+});
+
 test('Mossprout FTUE introduces one Bond answer before the Garden and returns to Haven', () => {
   assert.equal(mossproutFtueStep('egg.ready')?.actions[0]?.nextStepId, 'companion.first_meeting');
   assert.equal(mossproutFtueStep('companion.first_meeting')?.actions[0]?.nextStepId, 'companion.day_one_action');
@@ -89,4 +126,17 @@ test('the later Haven reveal remains standalone without reopening the global Mer
   assert.match(rosterRoute, /onFtueReveal=\{\(\) => \{[\s\S]*?commitFtueAction\(\{ actionId: 'haven\.reveal_world'/);
   assert.doesNotMatch(rosterRoute, /onFtueReveal=\{\(\) => \{[\s\S]*?target: 'merge'/);
   assert.match(mergeRoute, /ftueRun\.stepId !== 'companion\.chapter_zero_return'[\s\S]*?target: 'companion'/);
+});
+
+test('focused Haven owns one canonical Merge provider and no sandbox subscription', () => {
+  const rosterRoute = readFileSync('components/katchadeck/roster/katchimera-roster-route-screen.tsx', 'utf8');
+  const havenScreen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
+
+  assert.match(rosterRoute, /return isFocused \? <FocusedKatchimeraRosterBoundary \/> : null/);
+  assert.match(rosterRoute, /<MergeWorldProvider[\s\S]*?active[\s\S]*?<FocusedKatchimeraRoster/);
+  assert.doesNotMatch(rosterRoute, /loadMergeWorldState|subscribeMergeWorldSnapshots/);
+  assert.match(havenScreen, /useMergeWorldActions/);
+  assert.doesNotMatch(havenScreen, /useHavenMergeSandbox/);
+  assert.match(havenScreen, /mergeFtueAllowsCommand/);
+  assert.match(havenScreen, /mergeFtueEventForCommand/);
 });

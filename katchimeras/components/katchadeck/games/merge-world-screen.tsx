@@ -50,6 +50,7 @@ import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { MergeCharacterId, MergeOrder, MergeWorldCommand } from '@/types/merge-world';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
 import { mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds } from '@/utils/merge-world/engine';
+import { prioritizedVisibleMergeOrders } from '@/utils/merge-world/order-presentation';
 import { isMossproutChapterZeroActive } from '@/utils/merge-world/chapter-zero-policy';
 import { beginAuthoredCohortReturn, beginFeastleReturn, isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
 import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
@@ -542,7 +543,6 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
 
   const trayEntries = useMemo<MergeTrayEntry[]>(() => {
     if (!state) return [];
-    const featured = state.favouriteCharacterId;
     const chapterZeroOrders = state.activeOrders.filter((order) => order.id.startsWith('mossprout:chapter-0:'));
     const chapterZeroActive = chapterZeroOrders.length > 0;
     const mossproutReturnEntry: MergeTrayEntry = {
@@ -583,28 +583,14 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
         bondPoints: 0,
       }] : []),
     ];
-    const focusCharacterId = focusOrderId
-      ? state.activeOrders.find((order) => order.id === focusOrderId)?.characterId ?? null
-      : null;
     const journeyOrderIds = new Set(mossproutJourney?.activity?.mergeOrderIds
       ?? (mossproutJourney?.activity ? [mossproutJourney.activity.mergeOrderId] : []));
-    const visibleOrders = chapterZeroActive
-      ? chapterZeroOrders.slice(0, 1)
-      : mossproutJourneyExclusive
-        ? state.activeOrders.filter((order) => journeyOrderIds.has(order.id) || order.storyArcId === activeResidentDiscovery?.id)
-        : state.activeOrders;
-    const prioritizedOrders = visibleOrders
-      .map((order, sourceIndex) => ({ order, sourceIndex }))
-      .sort((left, right) => {
-        const priority = (order: MergeOrder) => {
-          if (focusOrderId && order.id === focusOrderId) return 0;
-          if (focusCharacterId && order.characterId === focusCharacterId) return 1;
-          if (featured && order.characterId === featured) return focusCharacterId ? 2 : 0;
-          return focusCharacterId ? 3 : 1;
-        };
-        return priority(left.order) - priority(right.order) || left.sourceIndex - right.sourceIndex;
-      })
-      .map(({ order }) => order);
+    const prioritizedOrders = prioritizedVisibleMergeOrders(state, {
+      activeResidentDiscoveryId: activeResidentDiscovery?.id,
+      exclusiveJourney: mossproutJourneyExclusive,
+      focusOrderId,
+      journeyOrderIds,
+    });
     const orderEntries = prioritizedOrders.map((order): MergeTrayEntry => ({
       id: order.id,
       kind: 'order' as const,

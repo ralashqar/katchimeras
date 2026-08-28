@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 
 import {
   KingdomHexCanvas,
+  type KingdomMergeCoinPresentation,
   type KingdomResidentScreenAnchor,
   type KingdomResidentStatusGlyph,
 } from '@/components/katchadeck/world/kingdom-hex-canvas';
@@ -13,35 +14,42 @@ import { HavenTileHudLayer } from '@/components/katchadeck/world/haven-tile-hud-
 import { HavenFtueOverlay } from '@/components/katchadeck/onboarding/haven-ftue-overlay';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
+import { GameCurrencyHud } from '@/components/katchadeck/ui/game-currency-hud';
+import { GameHudBar } from '@/components/katchadeck/ui/game-primitives';
 import { EggAvatar } from '@/components/katchadeck/egg-avatar/egg-avatar';
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import { AppFontFamilies } from '@/constants/theme';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
-import { useHavenMergeSandbox } from '@/hooks/use-haven-merge-sandbox';
+import { useMergeWorldActions } from '@/features/merge-world/merge-world-provider';
+import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
 import type { FtueCameraDirective } from '@/features/onboarding/ftue-types';
 import type { EggVisualState } from '@/types/home';
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
-import { loadWorldIdentity } from '@/utils/world-identity';
+import { loadWorldIdentity, localDayId } from '@/utils/world-identity';
 import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
-import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
+import type { MergeCharacterId, MergeWorldCommand, MergeWorldState } from '@/types/merge-world';
 import { HAVEN_ENVIRONMENTS, havenStoryGateSatisfied, type HavenEnvironmentStage, type HavenStage } from '@/constants/haven-catalog';
 import { completeMossproutHavenUpgrade } from '@/utils/companion-story-storage';
 import { reconcileStoredHavenStory, upgradeStoredHavenTile } from '@/utils/merge-world/repository';
 import { havenHexTileSpec, kingdomHexTileSourceForLod } from '@/utils/world-visuals';
 import type { HavenTileUpgradePresentation } from '@/utils/haven-upgrade-presentation';
 import { deriveHavenTilePresentation } from '@/utils/haven-tile-presentation';
-import { commitFtueAction } from '@/features/onboarding/ftue-runtime';
+import { commitFtueAction, dispatchFtueEvent } from '@/features/onboarding/ftue-runtime';
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
+import { mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueStepForBoard } from '@/features/onboarding/merge-ftue';
+import { mossproutJourneyForDay, mossproutJourneyRuntimeDayId } from '@/game/katchimeras/relationship-progression';
+import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
+import { mergeOrderItemReadiness, readyMergeOrderIds } from '@/utils/merge-world/engine';
+import { prioritizedVisibleMergeOrders } from '@/utils/merge-world/order-presentation';
+import type { MergeOrderTrayEntry } from '@/components/katchadeck/games/merge-order-rail';
 
 type Props = {
   background: TodayAtmosphereBackground;
   companionSlots: KingdomHexCompanionSlot[];
-  daysHatched: number;
   eggVisual: EggVisualState | null;
   onContentReady?: () => void;
   onOpenProfile: () => void;
-  onOpenWorldBoardLab?: () => void;
   onSelectCreature: (creatureId: string) => void;
   residentStatusGlyphs?: Partial<Record<string, KingdomResidentStatusGlyph>>;
   mergeWorld: MergeWorldState;
@@ -54,11 +62,9 @@ type Props = {
 export function KatchimeraKingdomScreen({
   background,
   companionSlots,
-  daysHatched,
   eggVisual,
   onContentReady,
   onOpenProfile,
-  onOpenWorldBoardLab,
   onSelectCreature,
   residentStatusGlyphs,
   mergeWorld,
@@ -78,7 +84,11 @@ export function KatchimeraKingdomScreen({
   const [upgrading, setUpgrading] = useState(false);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const [upgradePresentation, setUpgradePresentation] = useState<HavenTileUpgradePresentation | null>(null);
+  const [presentedCoins, setPresentedCoins] = useState<number | null>(null);
+  const [coinValueAnimationDurationMs, setCoinValueAnimationDurationMs] = useState(0);
+  const [coinPulseNonce, setCoinPulseNonce] = useState(0);
   const [enteringGrove, setEnteringGrove] = useState(false);
+  const coinHudRef = useRef<View>(null);
   const restoreButtonRef = useRef<View>(null);
   const screenRef = useRef<View>(null);
   const ftueTargetRefs = useRef(new Map<string, View>());
@@ -87,17 +97,62 @@ export function KatchimeraKingdomScreen({
   const ftueRecoveryRef = useRef<string | null>(null);
   const enterGroveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const identity = useMemo(loadWorldIdentity, []);
+  const { dispatch: dispatchMergeWorld } = useMergeWorldActions();
+  const relationships = useRelationshipProgression();
+  const mergeWorldRef = useRef(mergeWorld);
+  mergeWorldRef.current = mergeWorld;
   const visibleCompanionSlots = useMemo(
     () => companionSlots.filter((slot) => slot.familyId === 'mossprout'),
     [companionSlots],
   );
-  const havenMergeSandboxActive = visibleCompanionSlots.some((slot) => slot.kind === 'owned');
-  const havenMergeSandbox = useHavenMergeSandbox(havenMergeSandboxActive);
-  const havenMergeBoard = useMemo(() => havenMergeSandbox.state ? ({
-    dispatch: havenMergeSandbox.dispatch,
-    state: havenMergeSandbox.state,
-  }) : null, [havenMergeSandbox.dispatch, havenMergeSandbox.state]);
+  const havenMergeBoardActive = visibleCompanionSlots.some((slot) => slot.kind === 'owned');
+  const mossproutJourneyDayId = mossproutJourneyRuntimeDayId(
+    relationships,
+    localDayId(),
+    isJourneyQuickModeEnabled(),
+  );
+  const mossproutJourney = mossproutJourneyForDay(relationships, mossproutJourneyDayId);
   const ftueStep = ftueStepId ? mossproutFtueStep(ftueStepId) ?? null : null;
+  const boardFtueStep = useMemo(() => mergeFtueStepForBoard(mergeWorld, ftueStep), [ftueStep, mergeWorld]);
+  const boardInteractionGate = useMemo(() => mergeFtueBoardGate(boardFtueStep, mergeWorld), [boardFtueStep, mergeWorld]);
+  const orderInteractionGate = useMemo(() => mergeFtueRailGate(boardFtueStep, mergeWorld), [boardFtueStep, mergeWorld]);
+  const dispatchHavenMergeWorld = useCallback((command: MergeWorldCommand) => {
+    const before = mergeWorldRef.current;
+    const activeStep = mergeFtueStepForBoard(before, ftueStep);
+    if (!mergeFtueAllowsCommand(activeStep, before, command)) return null;
+    const result = dispatchMergeWorld(command);
+    if (result) mergeWorldRef.current = result.state;
+    const event = mergeFtueEventForCommand(before, command, result);
+    if (event) dispatchFtueEvent(event, `haven-merge-command:${event.revision}`);
+    return result;
+  }, [dispatchMergeWorld, ftueStep]);
+  const havenMergeOrders = useMemo<MergeOrderTrayEntry[]>(() => {
+    if (!havenMergeBoardActive) return [];
+    const journeyOrderIds = new Set(mossproutJourney?.activity?.mergeOrderIds
+      ?? (mossproutJourney?.activity ? [mossproutJourney.activity.mergeOrderId] : []));
+    const activeResidentDiscovery = mergeWorld.residentCardDiscovery.records.find((record) => (
+      record.status !== 'locked' && record.status !== 'card_earned'
+    ));
+    const readyOrderIds = readyMergeOrderIds(mergeWorld);
+    return prioritizedVisibleMergeOrders(mergeWorld, {
+      activeResidentDiscoveryId: activeResidentDiscovery?.id,
+      exclusiveJourney: Boolean(mossproutJourney && mossproutJourney.status !== 'complete'),
+      journeyOrderIds,
+    }).slice(0, 3).map((order) => ({
+      id: order.id,
+      itemReadiness: mergeOrderItemReadiness(mergeWorld, order),
+      kind: 'order' as const,
+      order,
+      ready: readyOrderIds.has(order.id),
+    }));
+  }, [havenMergeBoardActive, mergeWorld, mossproutJourney]);
+  const havenMergeBoard = useMemo(() => havenMergeBoardActive ? ({
+    boardInteractionGate,
+    dispatch: dispatchHavenMergeWorld,
+    orderInteractionGate,
+    orders: havenMergeOrders,
+    state: mergeWorld,
+  }) : null, [boardInteractionGate, dispatchHavenMergeWorld, havenMergeBoardActive, havenMergeOrders, mergeWorld, orderInteractionGate]);
   const tutorialCamera = useMemo<FtueCameraDirective | null>(() => {
     if (ftueStepId === 'haven.mossprout_reveal' && enteringGrove) {
       return { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: 1.25, anchorY: 0.46, durationMs: 360 };
@@ -166,20 +221,28 @@ export function KatchimeraKingdomScreen({
       saving: upgrading && upgradePresentation?.characterId === slot.familyId,
     })];
   }), [mergeWorld, upgradePresentation?.characterId, upgrading, visibleCompanionSlots]);
-  const ownedCount = useMemo(
-    () => visibleCompanionSlots.filter((slot) => slot.kind === 'owned').length,
-    [visibleCompanionSlots],
-  );
   const havenOpeningActive = ftueStepId === 'haven.home_notice'
     || ftueStepId === 'haven.mossprout_focus'
     || ftueStepId === 'haven.mossprout_reveal'
     || ftueStepId === 'haven.first_bloom';
-  const subtitle = havenOpeningActive
-    ? 'Your home in the Dream Mist'
-    : [
-        `${ownedCount} ${ownedCount === 1 ? 'companion' : 'companions'}`,
-        `${daysHatched} ${daysHatched === 1 ? 'day together' : 'days together'}`,
-      ].join('  ·  ');
+  const handleMergeCoinPresentation = useCallback((event: KingdomMergeCoinPresentation) => {
+    if (event.type === 'prepare') {
+      setCoinValueAnimationDurationMs(0);
+      setPresentedCoins(event.value);
+      return;
+    }
+    if (event.type === 'contact') {
+      setCoinValueAnimationDurationMs(event.durationMs);
+      setPresentedCoins(event.value);
+      return;
+    }
+    if (event.type === 'pulse') {
+      setCoinPulseNonce((current) => current + 1);
+      return;
+    }
+    setCoinValueAnimationDurationMs(0);
+    setPresentedCoins(null);
+  }, []);
 
   const measureRestoreOrigin = useCallback(() => new Promise<{ x: number; y: number }>((resolve) => {
     const fallback = { x: window.width / 2, y: window.height - Math.max(90, insets.bottom + 66) };
@@ -295,6 +358,8 @@ export function KatchimeraKingdomScreen({
         highlightedLockedFamilyId={ftueStepId === 'haven.mossprout_focus' ? 'mossprout' : null}
         interactionEnabled={havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven'}
         mergeBoard={havenMergeBoard}
+        mergeCoinTargetRef={coinHudRef}
+        onMergeCoinPresentation={handleMergeCoinPresentation}
         onSelectHome={() => {
           if (ftueStepId === 'haven.home_notice') advanceOpening();
         }}
@@ -328,53 +393,42 @@ export function KatchimeraKingdomScreen({
           width={window.width}
         />
       ) : null}
-      {!upgradePresentation ? <View style={[styles.header, { top: insets.top + 14 }]}>
-        <View pointerEvents="none" style={styles.headerCopy}>
-          <ThemedText selectable style={styles.eyebrow} lightColor="#FFD36E" darkColor="#FFD36E">
-            YOUR HAVEN
-          </ThemedText>
-          <ThemedText selectable style={styles.subtitle} lightColor="#F8FCFF" darkColor="#F8FCFF">
-            {subtitle}
-          </ThemedText>
-          <ThemedText selectable style={styles.hint} lightColor="rgba(248,252,255,0.82)" darkColor="rgba(248,252,255,0.82)">
-            {havenOpeningActive ? 'Something is moving in the mist' : 'Tap a home or a mist tile'}
-          </ThemedText>
-        </View>
-        <View style={styles.headerActions}>
-          {__DEV__ && onOpenWorldBoardLab ? (
-            <Pressable
-              accessibilityHint="Opens the procedural world and board experiment"
-              accessibilityLabel="Open World and Board Lab"
+      {!upgradePresentation ? (
+        <View pointerEvents="box-none" style={[styles.topHudLayer, { top: insets.top + 3 }]}>
+          <GameHudBar
+            content={<GameCurrencyHud balances={[{
+              animateValue: presentedCoins != null,
+              art: GAME_CURRENCY_ART.coins,
+              id: 'coins',
+              pulseNonce: coinPulseNonce,
+              targetRef: coinHudRef,
+              value: presentedCoins ?? mergeWorld.coins,
+              valueAnimationDurationMs: coinValueAnimationDurationMs,
+            }]} style={styles.currencyHud} tone="glass" />}
+            density="compact"
+            style={styles.topHud}
+            tone="glass"
+            trailing={<Pressable
+              accessibilityHint="Opens your avatar and cosmetics"
+              accessibilityLabel="Open You"
               accessibilityRole="button"
               onPress={() => {
                 if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                onOpenWorldBoardLab();
+                onOpenProfile();
               }}
-              style={({ pressed }) => [styles.labButton, pressed && styles.profileButtonPressed]}>
-              <IconSymbol color="#FFF1A8" name="sparkles" size={17} />
-              <ThemedText style={styles.labButtonLabel} lightColor="#FFF1A8" darkColor="#FFF1A8">LAB</ThemedText>
-            </Pressable>
-          ) : null}
-          <Pressable
-            accessibilityHint="Opens your avatar and cosmetics"
-            accessibilityLabel="Open You"
-            accessibilityRole="button"
-            onPress={() => {
-              if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              onOpenProfile();
-            }}
-            style={({ pressed }) => [styles.profileButton, pressed && styles.profileButtonPressed]}>
-            <EggAvatar
-              faceId={avatar.equippedFaceId}
-              hatId={avatar.equippedHatId}
-              heldAccessoryId={avatar.equippedHeldAccessoryId}
-              presentation="button"
-              size={42}
-              skinId={avatar.equippedSkinId}
-            />
-          </Pressable>
+              style={({ pressed }) => [styles.profileButton, pressed && styles.profileButtonPressed]}>
+              <EggAvatar
+                faceId={avatar.equippedFaceId}
+                hatId={avatar.equippedHatId}
+                heldAccessoryId={avatar.equippedHeldAccessoryId}
+                presentation="button"
+                size={42}
+                skinId={avatar.equippedSkinId}
+              />
+            </Pressable>}
+          />
         </View>
-      </View> : null}
+      ) : null}
       {lockedHintVisible ? (
         <KatchaSheet
           header={{
@@ -484,30 +538,15 @@ export function KatchimeraKingdomScreen({
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: '#55A9E2', flex: 1 },
-  header: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: 12,
-    left: 20,
+  topHudLayer: {
+    alignItems: 'center',
+    left: 12,
     position: 'absolute',
-    right: 16,
+    right: 12,
     zIndex: 30,
   },
-  headerCopy: { flex: 1 },
-  headerActions: { alignItems: 'center', gap: 7 },
-  labButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(25,63,76,0.9)',
-    borderColor: 'rgba(255,241,168,0.64)',
-    borderCurve: 'continuous',
-    borderRadius: 15,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 3,
-    minHeight: 32,
-    paddingHorizontal: 8,
-  },
-  labButtonLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
+  topHud: { maxWidth: 430, width: '100%' },
+  currencyHud: { flex: 1 },
   profileButton: {
     alignItems: 'center',
     backgroundColor: 'rgba(255,249,231,0.94)',
@@ -521,33 +560,6 @@ const styles = StyleSheet.create({
     width: 54,
   },
   profileButtonPressed: { opacity: 0.82, transform: [{ scale: 0.96 }] },
-  eyebrow: {
-    fontFamily: AppFontFamilies.fredokaBold,
-    fontSize: 28,
-    letterSpacing: 0.1,
-    lineHeight: 34,
-    textShadowColor: 'rgba(30,70,111,0.92)',
-    textShadowOffset: { width: 0, height: 3 },
-    textShadowRadius: 3,
-  },
-  subtitle: {
-    fontFamily: AppFontFamilies.manrope,
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 18,
-    textShadowColor: 'rgba(27,72,111,0.76)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  hint: {
-    fontFamily: AppFontFamilies.manrope,
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 17,
-    textShadowColor: 'rgba(27,72,111,0.76)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
   discoveryHint: {
     backgroundColor: 'rgba(214,203,242,0.09)',
     borderColor: 'rgba(214,203,242,0.2)',

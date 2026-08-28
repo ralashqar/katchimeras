@@ -142,7 +142,7 @@ test('world and screen camera transforms round-trip', () => {
   assert.ok(Math.abs(restored.y - world.y) < 1e-9);
 });
 
-test('the lab route and Haven entry remain development-only presentation', () => {
+test('the lab route remains available without a Haven-page entry', () => {
   const route = fs.readFileSync('app/dev-world-board-lab.tsx', 'utf8');
   const screen = fs.readFileSync('components/katchadeck/dev/world-board-lab-screen.tsx', 'utf8');
   const haven = fs.readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
@@ -160,7 +160,6 @@ test('the lab route and Haven entry remain development-only presentation', () =>
   assert.match(shaders, /mod\(floor\(position\.x\) \+ floor\(position\.y\), 2\.0\)/);
   assert.match(shaders, /float roundedDistance = length/);
   assert.match(shaders, /checker \* roundedMask \* checkerOpacity/);
-  assert.match(haven, /__DEV__ && onOpenWorldBoardLab/);
-  assert.doesNotMatch(haven, /__DEV__ && !ftueStepId && onOpenWorldBoardLab/);
-  assert.match(roster, /router\.push\('\/dev-world-board-lab'\)/);
+  assert.doesNotMatch(haven, /onOpenWorldBoardLab|Open World and Board Lab|>LAB</);
+  assert.doesNotMatch(roster, /router\.push\('\/dev-world-board-lab'\)|onOpenWorldBoardLab/);
 });

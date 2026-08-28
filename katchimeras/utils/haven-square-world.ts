@@ -18,8 +18,13 @@ export const HAVEN_SQUARE_ZONE_SIZE = 600;
 /** Horizontal neighbors leave room for the shared suspension bridges. */
 export const HAVEN_SQUARE_COLUMN_PITCH = 720;
 /** Vertical frames overlap enough for their padded silhouettes to meet slightly. */
-export const HAVEN_SQUARE_ROW_PITCH = 450;
+export const HAVEN_SQUARE_ROW_PITCH = 480;
 export const HAVEN_SQUARE_SCENE_PADDING = 60;
+export const HAVEN_JUNCTION_MINI_ISLAND_SIZE = 160;
+export const HAVEN_JUNCTION_MINI_ISLAND_SPACING = 130;
+export const HAVEN_JUNCTION_MINI_ISLAND_RISE = 10;
+export const HAVEN_JUNCTION_TRAY_SIZE = 95;
+export const HAVEN_JUNCTION_TRAY_TOP_OFFSET = 48;
 
 export const MOSSPROUT_SQUARE_ZONES: readonly HavenSquareZone[] = [
   { id: 'baristabbit-cafe', coord: { column: 0, row: 0 } },
@@ -35,6 +40,39 @@ export function havenSquareZoneFrame(coord: HavenSquareCoord) {
     top: HAVEN_SQUARE_SCENE_PADDING + coord.row * HAVEN_SQUARE_ROW_PITCH,
     width: HAVEN_SQUARE_ZONE_SIZE,
   };
+}
+
+/**
+ * Decorative island centered over the Mossprout/garden seam. The transparent
+ * source padding keeps its visible cliff above the merge playfield.
+ */
+export function mossproutGardenJunctionMiniIslandFrame() {
+  const gardenZone = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'mossprout-garden')!;
+  const gardenFrame = havenSquareZoneFrame(gardenZone.coord);
+  return {
+    height: HAVEN_JUNCTION_MINI_ISLAND_SIZE,
+    left: gardenFrame.left + (gardenFrame.width - HAVEN_JUNCTION_MINI_ISLAND_SIZE) / 2,
+    top: gardenFrame.top - HAVEN_JUNCTION_MINI_ISLAND_RISE,
+    width: HAVEN_JUNCTION_MINI_ISLAND_SIZE,
+  };
+}
+
+export function mossproutGardenJunctionMiniIslandFrames() {
+  const center = mossproutGardenJunctionMiniIslandFrame();
+  return [
+    { ...center, left: center.left - HAVEN_JUNCTION_MINI_ISLAND_SPACING },
+    center,
+    { ...center, left: center.left + HAVEN_JUNCTION_MINI_ISLAND_SPACING },
+  ] as const;
+}
+
+export function mossproutGardenJunctionTrayFrames() {
+  return mossproutGardenJunctionMiniIslandFrames().map((island) => ({
+    height: HAVEN_JUNCTION_TRAY_SIZE,
+    left: island.left + (island.width - HAVEN_JUNCTION_TRAY_SIZE) / 2,
+    top: island.top + HAVEN_JUNCTION_TRAY_TOP_OFFSET,
+    width: HAVEN_JUNCTION_TRAY_SIZE,
+  }));
 }
 
 /**

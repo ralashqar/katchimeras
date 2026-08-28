@@ -130,6 +130,8 @@ export type MergeTrayEntry =
       bondPoints: number;
     };
 
+export type MergeOrderTrayEntry = Extract<MergeTrayEntry, { kind: 'order' }>;
+
 export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel, onReroll, onServe, onBlockedInteraction, onRailTargetRef, interactionGate = { kind: 'open' }, parcelTargetRef }: {
   entries: readonly MergeTrayEntry[];
   focusOrderId?: string;
@@ -242,7 +244,7 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel
               shakeNonce={entry.shakeNonce}
             />
           ) : entry.kind === 'order' ? (
-            <OrderTrayCard
+            <MergeOrderTrayCard
               entry={entry}
               index={index}
               interactionAllowed={interactionGate.kind === 'open' || (interactionGate.kind === 'serve' && interactionGate.orderId === entry.order.id)}
@@ -273,8 +275,8 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel
   );
 }
 
-function OrderTrayCard({ entry, index, interactionAllowed, interactionLocked, onBlockedInteraction, onRailTargetRef, onReroll, onServe, reduceMotion }: {
-  entry: Extract<MergeTrayEntry, { kind: 'order' }>;
+export function MergeOrderTrayCard({ entry, index, interactionAllowed, interactionLocked, onBlockedInteraction, onRailTargetRef, onReroll, onServe, reduceMotion }: {
+  entry: MergeOrderTrayEntry;
   index: number;
   interactionAllowed: boolean;
   interactionLocked: boolean;
