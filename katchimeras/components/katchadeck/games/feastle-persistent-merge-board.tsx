@@ -38,7 +38,7 @@ import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 import type { MergeBoardOccupant, MergeDreamMist, MergeWorldCommand, MergeWorldCommandResult, MergeWorldFailureReason, MergeWorldState } from '@/types/merge-world';
 import { mergeCellFeedbackForFailure, type MergeCellFeedbackTone } from '@/utils/merge-board-feedback';
 import { MERGE_MORPH_DURATION_MS, MERGE_MORPH_REDUCED_MOTION_DURATION_MS, SPAWN_MOTION_DURATION_MS, isMistMergeTransition, mergeMotionPiecewise, mergeSpriteMotionFrame, spawnSpriteMotionFrame, type MergeBoardMotionKind } from '@/utils/merge-board-motion';
-import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection, type MergeBoardGeometry } from '@/utils/merge-world/board-geometry';
+import { mergeCellCenter, mergeCellFrame, mergeCellFromPoint, mergeNeighborCellInDirection, type MergeBoardGeometry, type MergeBoardProjection } from '@/utils/merge-world/board-geometry';
 import { MERGE_GENERATORS_UNLIMITED } from '@/utils/merge-world/economy-policy';
 import { mossproutRootConditionCopy, mossproutRootReadyCopy, mossproutRootRewardCopy } from '@/utils/merge-world/merge-board-player-copy';
 
@@ -57,6 +57,7 @@ export type MergeBoardLayout = {
   cellIndices: readonly number[];
   columns: number;
   rows: number;
+  projection?: MergeBoardProjection;
 };
 
 type SpriteRecord = { occupant: MergeBoardOccupant; cell: number };
@@ -131,10 +132,10 @@ function spriteId(sprite: SpriteRecord) {
 }
 
 function mergeSpriteOrigin(geometry: MergeBoardGeometry, index: number) {
-  const origin = mergeCellOrigin(geometry, index);
+  const center = mergeCellCenter(geometry, index);
   return {
-    x: origin.x,
-    y: origin.y + ((geometry.cellHeight ?? geometry.cellSize) - geometry.cellSize) / 2,
+    x: center.x - geometry.cellSize / 2,
+    y: center.y - geometry.cellSize / 2,
   };
 }
 
@@ -204,10 +205,10 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   const boardHeight = cellHeight * layout.rows + gap * (layout.rows - 1) + inset * 2;
   const baseArtOpacity = Math.max(0, Math.min(1, layout.baseArtOpacity ?? (layout.transparentSurface ? 0 : 1)));
   const showBaseArt = !layout.transparentSurface || baseArtOpacity > 0;
-  const geometry = useMemo<MergeBoardGeometry>(() => ({ columns: layout.columns, rows: layout.rows, cellIndices: layout.cellIndices, cellSize, cellHeight, gap, inset }), [cellHeight, cellSize, gap, inset, layout.cellIndices, layout.columns, layout.rows]);
+  const geometry = useMemo<MergeBoardGeometry>(() => ({ columns: layout.columns, rows: layout.rows, cellIndices: layout.cellIndices, cellSize, cellHeight, gap, inset, projection: layout.projection }), [cellHeight, cellSize, gap, inset, layout.cellIndices, layout.columns, layout.projection, layout.rows]);
   const visibleCellSet = useMemo(() => new Set(layout.cellIndices), [layout.cellIndices]);
-  const cellOrigins = useMemo(
-    () => Object.fromEntries(layout.cellIndices.map((index) => [index, mergeCellOrigin(geometry, index)])) as Record<number, { x: number; y: number }>,
+  const cellFrames = useMemo(
+    () => Object.fromEntries(layout.cellIndices.map((index) => [index, mergeCellFrame(geometry, index)])) as Record<number, ReturnType<typeof mergeCellFrame>>,
     [geometry, layout.cellIndices],
   );
   const boardRef = useRef<View>(null);
@@ -809,15 +810,15 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   const matchingCellSet = useMemo(() => new Set(matchingCells), [matchingCells]);
   const selectedHintTarget = useMemo(() => {
     if (selectedCell == null || matchingCells.length === 0) return null;
-    const selectedOrigin = cellOrigins[selectedCell];
+    const selectedOrigin = cellFrames[selectedCell].center;
     return matchingCells.reduce((closest, candidate) => {
-      const closestOrigin = cellOrigins[closest];
-      const candidateOrigin = cellOrigins[candidate];
+      const closestOrigin = cellFrames[closest].center;
+      const candidateOrigin = cellFrames[candidate].center;
       const closestDistance = Math.hypot(closestOrigin.x - selectedOrigin.x, closestOrigin.y - selectedOrigin.y);
       const candidateDistance = Math.hypot(candidateOrigin.x - selectedOrigin.x, candidateOrigin.y - selectedOrigin.y);
       return candidateDistance < closestDistance ? candidate : closest;
     });
-  }, [cellOrigins, matchingCells, selectedCell]);
+  }, [cellFrames, matchingCells, selectedCell]);
   const [matchHintActive, setMatchHintActive] = useState(false);
   useEffect(() => {
     setMatchHintActive(false);
@@ -844,7 +845,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     .onTouchesDown((event) => {
       const touch = event.allTouches[0];
       if (!touch) return;
-      const cell = mergeCellFromPointWorklet(touch.x, touch.y, geometry.cellSize, geometry.cellHeight ?? geometry.cellSize, geometry.gap, geometry.inset, geometry.columns, geometry.rows, geometry.cellIndices);
+      const cell = mergeCellFromPointWorklet(touch.x, touch.y, geometry.cellSize, geometry.cellHeight ?? geometry.cellSize, geometry.gap, geometry.inset, geometry.columns, geometry.rows, geometry.cellIndices, geometry.projection?.topWidthRatio ?? 1);
       if (gateKind === 'locked' || (gateKind === 'drag' && cell !== gateFromCell) || (gateKind === 'generator' && cell !== gateGeneratorCell)) {
         activeDragId.value = '';
         activeSourceCell.value = -1;
@@ -863,14 +864,9 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       dragHapticTriggered.value = false;
       if (!id) return;
       runOnJS(pickSprite)(id);
-      const visualCell = geometry.cellIndices ? geometry.cellIndices.indexOf(cell) : cell;
-      const column = visualCell % geometry.columns;
-      const row = Math.floor(visualCell / geometry.columns);
-      const pitchX = geometry.cellSize + geometry.gap;
-      const cellHeight = geometry.cellHeight ?? geometry.cellSize;
-      const pitchY = cellHeight + geometry.gap;
-      grabX.value = geometry.inset + column * pitchX;
-      grabY.value = geometry.inset + row * pitchY + (cellHeight - geometry.cellSize) / 2;
+      const center = mergeCellCenterWorklet(cell, geometry.cellSize, geometry.cellHeight ?? geometry.cellSize, geometry.gap, geometry.inset, geometry.columns, geometry.rows, geometry.cellIndices, geometry.projection?.topWidthRatio ?? 1);
+      grabX.value = center.x - geometry.cellSize / 2;
+      grabY.value = center.y - geometry.cellSize / 2;
       dragEpoch.value += 1;
       dragPhase.value = 1;
     })
@@ -897,6 +893,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
         geometry.columns,
         geometry.rows,
         geometry.cellIndices,
+        geometry.projection?.topWidthRatio ?? 1,
       );
     })
     .onTouchesUp((event) => {
@@ -958,7 +955,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
           return;
         }
         const sourceCell = activeSourceCell.value;
-        let targetCell = mergeCellFromPointWorklet(worldX + geometry.cellSize / 2, worldY + geometry.cellSize / 2, geometry.cellSize, geometry.cellHeight ?? geometry.cellSize, geometry.gap, geometry.inset, geometry.columns, geometry.rows, geometry.cellIndices);
+        let targetCell = mergeCellFromPointWorklet(worldX + geometry.cellSize / 2, worldY + geometry.cellSize / 2, geometry.cellSize, geometry.cellHeight ?? geometry.cellSize, geometry.gap, geometry.inset, geometry.columns, geometry.rows, geometry.cellIndices, geometry.projection?.topWidthRatio ?? 1);
         if (isFlick && targetCell === sourceCell) {
           targetCell = mergeNeighborCellInDirection(
             { columns: geometry.columns, rows: geometry.rows, cellIndices: geometry.cellIndices },
@@ -1028,7 +1025,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       {layout.cellIndices.map((index) => {
         const cell = presentation.board[index];
         if (!cell) return null;
-        const origin = cellOrigins[index];
+        const frame = cellFrames[index];
         const occupant = cell.occupant;
         const item = occupant?.kind === 'item' ? occupant : null;
         const generator = occupant?.kind === 'generator' ? MERGE_GENERATORS_BY_ID.get(occupant.generatorId) : null;
@@ -1068,16 +1065,16 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
           accessibilityDisabled={gateKind === 'locked' || (gateKind === 'drag' && index !== gateFromCell) || (gateKind === 'generator' && index !== gateGeneratorCell)}
           accessibilityLabel={label}
           blocked={cell.locked && !occupant}
-          height={cellHeight}
+          height={frame.bounds.height}
           index={index}
           invalid={invalidFeedback?.cell === index}
           key={index}
-          left={origin.x}
+          left={frame.bounds.left}
           onActivate={accessibleAction}
           mist={cell.mist}
           matchHint={matchHintForCell(index)}
-          top={origin.y}
-          width={cellSize}
+          top={frame.bounds.top}
+          width={frame.bounds.width}
         />;
       })}
       <HoverCellOverlay geometry={geometry} hoverCell={hoverCell} />
@@ -1085,12 +1082,12 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       <MergeBoardEffectsLayer effects={boardEffects} geometry={geometry} reduceMotion={reduceMotion} size={cellSize} />
       {sprites.filter((sprite) => visibleCellSet.has(sprite.cell) && (sprite.occupant.kind !== 'item' || !hiddenItemInstanceIds?.has(sprite.occupant.instanceId))).map((sprite) => {
-        const origin = cellOrigins[sprite.cell];
+        const frame = cellFrames[sprite.cell];
         const id = spriteId(sprite);
         const matchHint = sprite.occupant.kind === 'item' ? matchHintForCell(sprite.cell) : null;
         return <PersistentSprite
-          baseX={origin.x}
-          baseY={origin.y + (cellHeight - cellSize) / 2}
+          baseX={frame.center.x - cellSize / 2}
+          baseY={frame.center.y - cellSize / 2}
           cellSize={cellSize}
           activeDragId={activeDragId}
           dragEpoch={dragEpoch}
@@ -1109,6 +1106,9 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
           mossproutOnboarding={mossproutOnboarding}
           occupant={sprite.occupant}
           onComplete={completeMotion}
+          projection={geometry.projection}
+          projectionGridHeight={cellHeight * layout.rows + gap * (layout.rows - 1)}
+          projectionInset={inset}
           reduceMotion={reduceMotion}
         />;
       })}
@@ -1202,7 +1202,7 @@ function rootboundAccessibilityLabel(gateId: string, ready: boolean) {
 
 function InvalidCellFeedback({ cell, geometry }: { cell: number; geometry: MergeBoardGeometry }) {
   const progress = useSharedValue(0);
-  const origin = mergeCellOrigin(geometry, cell);
+  const frame = mergeCellFrame(geometry, cell);
   useEffect(() => {
     progress.value = 0;
     progress.value = withTiming(1, { duration: 280, easing: Easing.out(Easing.quad) });
@@ -1215,7 +1215,7 @@ function InvalidCellFeedback({ cell, geometry }: { cell: number; geometry: Merge
       { scale: interpolate(progress.value, [0, 0.18, 0.72, 1], [1, 1.025, 1.01, 1]) },
     ],
   }));
-  return <Animated.View style={[styles.invalidCellFeedback, { height: geometry.cellHeight ?? geometry.cellSize, left: origin.x, top: origin.y, width: geometry.cellSize }, style]}>
+  return <Animated.View style={[styles.invalidCellFeedback, styles.invalidCellFeedbackRect, { height: frame.bounds.height, left: frame.bounds.left, top: frame.bounds.top, width: frame.bounds.width }, style]}>
     <IconSymbol color="#FFE1B4" name="leaf.fill" size={Math.max(15, geometry.cellSize * 0.38)} />
   </Animated.View>;
 }
@@ -1226,13 +1226,13 @@ function MergeCellCallout({ feedback, geometry, reduceMotion }: {
   reduceMotion: boolean;
 }) {
   const progress = useSharedValue(0);
-  const origin = mergeCellOrigin(geometry, feedback.cell);
+  const frame = mergeCellFrame(geometry, feedback.cell);
   const visualCell = geometry.cellIndices ? geometry.cellIndices.indexOf(feedback.cell) : feedback.cell;
   const row = Math.floor(visualCell / geometry.columns);
   const width = Math.max(82, Math.min(124, geometry.cellSize * 2.3));
   const boardWidth = geometry.inset * 2 + geometry.columns * geometry.cellSize + (geometry.columns - 1) * geometry.gap;
-  const left = Math.max(2, Math.min(boardWidth - width - 2, origin.x + geometry.cellSize / 2 - width / 2));
-  const top = row === geometry.rows - 1 ? origin.y - 24 : origin.y + (geometry.cellHeight ?? geometry.cellSize) + 3;
+  const left = Math.max(2, Math.min(boardWidth - width - 2, frame.center.x - width / 2));
+  const top = row === geometry.rows - 1 ? frame.bounds.top - 24 : frame.bounds.top + frame.bounds.height + 3;
   useEffect(() => {
     progress.value = 0;
     progress.value = withTiming(1, { duration: reduceMotion ? 560 : 700, easing: Easing.out(Easing.cubic) });
@@ -1323,22 +1323,30 @@ function DreamMistParticle({ index, particle, progress, size }: {
 }
 
 function HoverCellOverlay({ geometry, hoverCell }: { geometry: MergeBoardGeometry; hoverCell: SharedValue<number> }) {
+  return <RectangularHoverCellOverlay geometry={geometry} hoverCell={hoverCell} />;
+}
+
+function RectangularHoverCellOverlay({ geometry, hoverCell }: { geometry: MergeBoardGeometry; hoverCell: SharedValue<number> }) {
   const style = useAnimatedStyle(() => {
     const index = hoverCell.value;
-    if (index < 0) return { opacity: 0, transform: [{ translateX: 0 }, { translateY: 0 }] };
+    if (index < 0) return { opacity: 0, transform: [{ translateX: 0 }, { translateY: 0 }, { scaleX: 1 }] };
     const visualIndex = geometry.cellIndices ? geometry.cellIndices.indexOf(index) : index;
-    const column = visualIndex % geometry.columns;
     const row = Math.floor(visualIndex / geometry.columns);
-    const pitchX = geometry.cellSize + geometry.gap;
     const pitchY = (geometry.cellHeight ?? geometry.cellSize) + geometry.gap;
+    const center = mergeCellCenterWorklet(index, geometry.cellSize, geometry.cellHeight ?? geometry.cellSize, geometry.gap, geometry.inset, geometry.columns, geometry.rows, geometry.cellIndices, geometry.projection?.topWidthRatio ?? 1);
+    const logicalCenterY = row * pitchY + (geometry.cellHeight ?? geometry.cellSize) / 2;
+    const gridHeight = geometry.rows * (geometry.cellHeight ?? geometry.cellSize) + Math.max(0, geometry.rows - 1) * geometry.gap;
+    const depth = Math.max(0, Math.min(1, logicalCenterY / Math.max(1, gridHeight)));
+    const widthScale = (geometry.projection?.topWidthRatio ?? 1) + (1 - (geometry.projection?.topWidthRatio ?? 1)) * depth;
     return {
       opacity: 1,
       transform: [
-        { translateX: geometry.inset + column * pitchX },
+        { translateX: center.x - geometry.cellSize / 2 },
         { translateY: geometry.inset + row * pitchY },
+        { scaleX: widthScale },
       ],
     };
-  }, [geometry.cellHeight, geometry.cellIndices, geometry.cellSize, geometry.columns, geometry.gap, geometry.inset]);
+  }, [geometry.cellHeight, geometry.cellIndices, geometry.cellSize, geometry.columns, geometry.gap, geometry.inset, geometry.projection?.topWidthRatio, geometry.rows]);
   return <Animated.View pointerEvents="none" style={[styles.hoverCell, { height: geometry.cellHeight ?? geometry.cellSize, width: geometry.cellSize }, style]} />;
 }
 
@@ -1364,7 +1372,7 @@ function MergeMatchHint({ active, children, offsetX, offsetY }: { active: boolea
   return <Animated.View style={[styles.matchHint, style]}>{children}</Animated.View>;
 }
 
-const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, baseY, cellSize, activeDragId, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, entranceDelay, generatorLevel, grabX, grabY, matchHint, motion, artCache, mossproutOnboarding, reduceMotion, onComplete, occupant }: {
+const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, baseY, cellSize, activeDragId, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, entranceDelay, generatorLevel, grabX, grabY, matchHint, motion, artCache, mossproutOnboarding, projection, projectionGridHeight, projectionInset, reduceMotion, onComplete, occupant }: {
   instanceId: string;
   baseX: number;
   baseY: number;
@@ -1382,6 +1390,9 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   motion?: SpriteMotion;
   artCache: MergeArtCache;
   mossproutOnboarding: boolean;
+  projection?: MergeBoardProjection;
+  projectionGridHeight: number;
+  projectionInset: number;
   reduceMotion: boolean;
   onComplete: (operationId: number, instanceId: string) => void;
   occupant: MergeBoardOccupant;
@@ -1550,6 +1561,7 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   const visualScale = useDerivedValue(() => {
     const p = progress.value;
     const moving = animating.value === 1;
+    const dragging = activeDragId.value === instanceId && dragPhase.value !== 0;
     const motionKind = activeMotionKind.value;
     const spawnFrame = moving && motionKind === 'spawn' ? spawnSpriteMotionFrame(p, reduceMotion) : null;
     const mergeFrame = moving && motionKind?.startsWith('merge-')
@@ -1557,10 +1569,16 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
       : null;
     const intro = Math.max(0, Math.min(1, entranceProgress.value));
     const motionScale = spawnFrame?.scale ?? mergeFrame?.scale ?? scale.value;
+    const travel = spawnFrame?.travel ?? p;
+    const worldY = dragging ? grabY.value + dragTranslationY.value : moving ? y.value + (targetY.value - y.value) * travel : y.value;
+    const depth = projection
+      ? projection.farScale + (1 - projection.farScale) * Math.max(0, Math.min(1, (worldY + cellSize / 2 - projectionInset) / Math.max(1, projectionGridHeight)))
+      : 1;
     return motionScale
+      * depth
       * interpolate(intro, [0, 0.68, 1], [0.72, 1.08, 1])
       * (1 + matchHintProgress.value * 0.055);
-  }, [reduceMotion]);
+  }, [cellSize, instanceId, projection, projectionGridHeight, projectionInset, reduceMotion]);
 
   const artLayoutStyle = useAnimatedStyle(() => {
     const renderedSize = artBaseSize * visualScale.value;
@@ -1593,7 +1611,7 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
     const hintProgress = matchHintProgress.value;
     return {
       opacity: opacity * intro,
-      zIndex: dragging || moving || visualScale.value > 1.001 || hintProgress > 0.001 ? 1000 : 10,
+      zIndex: dragging || moving || visualScale.value > 1.05 || hintProgress > 0.001 ? 1000 : Math.round(20 + worldY),
       transform: [
         { translateX: worldX + matchHintOffsetX * hintProgress },
         { translateY: worldY + matchHintOffsetY * hintProgress + (spawnFrame ? arcHeight.value * spawnFrame.arc + cellSize * spawnFrame.settleY : 0) },
@@ -1628,7 +1646,7 @@ function SelectedCellCorners({ cell, dragPhase, geometry, reduceMotion, staticFr
   const pulse = useSharedValue(0);
   const visibility = useSharedValue(dragPhase.value === 1 ? 0 : 1);
   const dropScale = useSharedValue(1);
-  const origin = mergeCellOrigin(geometry, cell);
+  const frame = mergeCellFrame(geometry, cell);
   useEffect(() => {
     pulse.value = reduceMotion || staticFrame
       ? 0
@@ -1683,7 +1701,7 @@ function SelectedCellCorners({ cell, dragPhase, geometry, reduceMotion, staticFr
     pointerEvents="none"
     style={[
       styles.selectedCorners,
-      { height: (geometry.cellHeight ?? geometry.cellSize) + outset * 2, left: origin.x - outset, top: origin.y - outset, width: geometry.cellSize + outset * 2 },
+      { height: frame.bounds.height + outset * 2, left: frame.bounds.left - outset, top: frame.bounds.top - outset, width: frame.bounds.width + outset * 2 },
       animatedStyle,
     ]}>
     {(['topLeft', 'topRight', 'bottomLeft', 'bottomRight'] as const).map((position) => <View
@@ -1755,13 +1773,43 @@ function GeneratorSparkle({ reduceMotion, size }: {
   </Animated.View>;
 }
 
-function mergeCellFromPointWorklet(x: number, y: number, cellSize: number, cellHeight: number, gap: number, inset: number, columns: number, rows: number, cellIndices?: readonly number[]) {
+function mergeLogicalPointFromProjectedWorklet(x: number, y: number, cellSize: number, cellHeight: number, gap: number, inset: number, columns: number, rows: number, topWidthRatio: number) {
+  'worklet';
+  const localY = y - inset;
+  if (topWidthRatio >= 0.9999) return { x: x - inset, y: localY };
+  const width = columns * cellSize + Math.max(0, columns - 1) * gap;
+  const height = rows * cellHeight + Math.max(0, rows - 1) * gap;
+  const depth = Math.max(0, Math.min(1, localY / Math.max(1, height)));
+  const widthScale = topWidthRatio + (1 - topWidthRatio) * depth;
+  return { x: width / 2 + (x - inset - width / 2) / Math.max(0.001, widthScale), y: localY };
+}
+
+function mergeCellCenterWorklet(index: number, cellSize: number, cellHeight: number, gap: number, inset: number, columns: number, rows: number, cellIndices: readonly number[] | undefined, topWidthRatio: number) {
+  'worklet';
+  const visualCell = cellIndices ? cellIndices.indexOf(index) : index;
+  const column = visualCell % columns;
+  const row = Math.floor(visualCell / columns);
+  const logicalX = column * (cellSize + gap) + cellSize / 2;
+  const logicalY = row * (cellHeight + gap) + cellHeight / 2;
+  if (topWidthRatio >= 0.9999) return { x: inset + logicalX, y: inset + logicalY };
+  const width = columns * cellSize + Math.max(0, columns - 1) * gap;
+  const height = rows * cellHeight + Math.max(0, rows - 1) * gap;
+  const depth = Math.max(0, Math.min(1, logicalY / Math.max(1, height)));
+  const widthScale = topWidthRatio + (1 - topWidthRatio) * depth;
+  return { x: inset + width / 2 + (logicalX - width / 2) * widthScale, y: inset + logicalY };
+}
+
+function mergeCellFromPointWorklet(x: number, y: number, cellSize: number, cellHeight: number, gap: number, inset: number, columns: number, rows: number, cellIndices: readonly number[] | undefined, topWidthRatio: number) {
   'worklet';
   const pitchX = cellSize + gap;
   const pitchY = cellHeight + gap;
-  const column = Math.round((x - inset - cellSize / 2) / pitchX);
-  const row = Math.round((y - inset - cellHeight / 2) / pitchY);
+  const logical = mergeLogicalPointFromProjectedWorklet(x, y, cellSize, cellHeight, gap, inset, columns, rows, topWidthRatio);
+  const column = Math.round((logical.x - cellSize / 2) / pitchX);
+  const row = Math.round((logical.y - cellHeight / 2) / pitchY);
   if (column < 0 || column >= columns || row < 0 || row >= rows) return -1;
+  const logicalCenterX = column * pitchX + cellSize / 2;
+  const logicalCenterY = row * pitchY + cellHeight / 2;
+  if (Math.abs(logical.x - logicalCenterX) > cellSize / 2 + gap / 2 || Math.abs(logical.y - logicalCenterY) > cellHeight / 2 + gap / 2) return -1;
   const visualCell = row * columns + column;
   return cellIndices?.[visualCell] ?? visualCell;
 }
@@ -1811,7 +1859,8 @@ const styles = StyleSheet.create({
   mistCategoryArt: { alignItems: 'center', justifyContent: 'center', opacity: 0.82, position: 'absolute', zIndex: 2 },
   hoverCell: { backgroundColor: 'rgba(244,204,110,0.34)', borderColor: '#E1A644', borderCurve: 'continuous', borderRadius: 4, borderWidth: 2, left: 0, position: 'absolute', top: 0, zIndex: 20 },
   feedbackLayer: { zIndex: 2000 },
-  invalidCellFeedback: { alignItems: 'center', backgroundColor: 'rgba(205,76,56,0.38)', borderColor: '#F38A72', borderCurve: 'continuous', borderRadius: 4, borderWidth: 2, boxShadow: '0 0 12px rgba(225,91,67,0.42)', justifyContent: 'center', position: 'absolute', zIndex: 1450 },
+  invalidCellFeedback: { alignItems: 'center', justifyContent: 'center', position: 'absolute', zIndex: 1450 },
+  invalidCellFeedbackRect: { backgroundColor: 'rgba(205,76,56,0.38)', borderColor: '#F38A72', borderCurve: 'continuous', borderRadius: 4, borderWidth: 2, boxShadow: '0 0 12px rgba(225,91,67,0.42)' },
   cellCallout: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 8, borderWidth: 1, justifyContent: 'center', minHeight: 21, paddingHorizontal: 7, position: 'absolute', zIndex: 1700 },
   cellCalloutBlocked: { backgroundColor: 'rgba(63,54,81,0.94)', borderColor: 'rgba(214,203,242,0.72)' },
   cellCalloutWarning: { backgroundColor: 'rgba(133,61,48,0.95)', borderColor: 'rgba(255,190,132,0.82)' },

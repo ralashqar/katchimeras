@@ -69,13 +69,29 @@ export function mossproutSquareSceneMetrics() {
   };
 }
 
-/** Bounds of the clear 7x6 runtime playfield in the compact merge-island source. */
-export const MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS = {
-  bottom: 726,
-  left: 246,
-  right: 778,
-  top: 270,
+/** Four calibrated corners of the clear gridless playfield in the 1024 source. */
+export const MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS = {
+  bottomLeft: { x: 220, y: 690 },
+  bottomRight: { x: 804, y: 690 },
+  topLeft: { x: 245, y: 215 },
+  topRight: { x: 779, y: 215 },
 } as const;
+
+/** Bounds enclosing the calibrated four-corner overlay. */
+export const MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS = {
+  bottom: MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS.bottomLeft.y,
+  left: MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS.bottomLeft.x,
+  right: MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS.bottomRight.x,
+  top: MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS.topLeft.y,
+} as const;
+
+export const MOSSPROUT_GARDEN_TOP_WIDTH_RATIO = (
+  MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS.topRight.x
+  - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS.topLeft.x
+) / (
+  MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS.bottomRight.x
+  - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS.bottomLeft.x
+);
 
 /** Cell aspect derived from the complete 7x6 runtime playfield. */
 export const MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO = (

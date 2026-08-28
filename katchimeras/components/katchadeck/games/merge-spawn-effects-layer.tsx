@@ -11,7 +11,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
-import { mergeCellOrigin, type MergeBoardGeometry } from '@/utils/merge-world/board-geometry';
+import { mergeCellCenter, type MergeBoardGeometry } from '@/utils/merge-world/board-geometry';
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 const SOFT_GLOW = require('../../../assets/images/katchimeras/soft-glow.png');
@@ -64,9 +64,9 @@ function MergeBoardEffectSlot({ effect, geometry, reduceMotion, size }: {
   size: number;
 }) {
   const progress = useSharedValue(0);
-  const origin = effect ? mergeCellOrigin(geometry, effect.cell) : { x: 0, y: 0 };
-  const centerX = origin.x + size / 2;
-  const centerY = origin.y + size / 2;
+  const center = effect ? mergeCellCenter(geometry, effect.cell) : { x: 0, y: 0 };
+  const centerX = center.x;
+  const centerY = center.y;
 
   useEffect(() => {
     cancelAnimation(progress);

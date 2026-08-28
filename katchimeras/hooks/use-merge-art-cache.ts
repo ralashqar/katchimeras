@@ -13,7 +13,7 @@ export type MergeArtCache = ReadonlyMap<string, ImageRef>;
 // camera-scaled. Keep the authored 256 px texture in memory so those transforms
 // sample real source pixels instead of enlarging the old 96 px warmup decode.
 const MERGE_ART_CACHE_EDGE_PX = 256;
-const MERGE_ART_CACHE_REVISION = `full-${MERGE_ART_CACHE_EDGE_PX}`;
+const MERGE_ART_CACHE_REVISION = `toy-diorama-v1-${MERGE_ART_CACHE_EDGE_PX}`;
 
 export function mergeItemArtCacheKey(definitionId: string) {
   return `${MERGE_ART_CACHE_REVISION}:item:${definitionId}`;

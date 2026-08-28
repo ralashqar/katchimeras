@@ -10,6 +10,8 @@ import {
   HAVEN_SQUARE_ROW_PITCH,
   MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO,
   MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS,
+  MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS,
+  MOSSPROUT_GARDEN_TOP_WIDTH_RATIO,
   MOSSPROUT_SQUARE_ZONES,
   mossproutEggHomeBridgeFrame,
   mossproutSquareSceneMetrics,
@@ -48,14 +50,21 @@ test('square Haven places Baristabbit west of Mossprout and the merge island bel
   assert.deepEqual(mossproutSquareSceneMetrics(), { width: 2160, height: 1170 });
 });
 
-test('the compact merge island hosts all stable Haven cells on one square-cell 7x6 playfield', () => {
+test('the compact merge island hosts all stable Haven cells on one 7x6 playfield', () => {
   assert.equal(HAVEN_MERGE_BOARD_CELL_INDICES.length, 42);
   assert.equal(new Set(HAVEN_MERGE_BOARD_CELL_INDICES).size, 42);
   assert.ok(MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.right > MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.left);
   assert.ok(MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.bottom > MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.top);
-  assert.equal((MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.right - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.left) / 7, 76);
-  assert.equal((MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.bottom - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.top) / 6, 76);
-  assert.equal(MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO, 1);
+  assert.deepEqual(MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS, {
+    bottomLeft: { x: 220, y: 690 },
+    bottomRight: { x: 804, y: 690 },
+    topLeft: { x: 245, y: 215 },
+    topRight: { x: 779, y: 215 },
+  });
+  assert.equal((MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.right - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.left) / 7, 584 / 7);
+  assert.equal((MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.bottom - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.top) / 6, 475 / 6);
+  assert.equal(MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO, (475 / 6) / (584 / 7));
+  assert.equal(MOSSPROUT_GARDEN_TOP_WIDTH_RATIO, 534 / 584);
 });
 
 test('square Haven runtime art includes full, medium, and thumbnail tiers', () => {
@@ -120,17 +129,8 @@ test('the player Haven mounts the square scene and keeps the hex renderer as a f
   assert.match(screen, /squareWorld/);
   assert.match(screen, /familyId === 'mossprout'/);
   assert.match(canvas, /buildMossproutSquareScene/);
-  assert.match(canvas, /baseArtOpacity: 0\.34/);
-  assert.match(canvas, /merge-board-base-7x6\.webp/);
-  assert.ok(fs.existsSync(path.join(
-    process.cwd(),
-    'assets',
-    'images',
-    'katchimeras',
-    'merge-world',
-    'generated',
-    'merge-board-base-7x6.webp',
-  )));
+  assert.doesNotMatch(canvas, /baseArtOpacity: 0\.34|merge-board-base-7x6\.webp/);
+  assert.match(canvas, /HAVEN_MERGE_BOARD_PROJECTION/);
   assert.match(canvas, /cellHeightToWidthRatio: MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO/);
   assert.match(canvas, /fillAvailableSpace: true/);
   assert.match(canvas, /buildKingdomHexScene/);
@@ -150,5 +150,6 @@ test('the player Haven mounts the square scene and keeps the hex renderer as a f
   assert.match(squareScene, /baristabbit-cafe-island\.webp/);
   assert.match(squareScene, /bridge-straight-horizontal-perspective\.webp/);
   assert.match(squareScene, /egg-home-island\.webp/);
-  assert.match(squareScene, /mossprout-merge-island\.webp/);
+  assert.match(squareScene, /mossprout-merge-island-perspective\.webp/);
+  assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'world', 'square', 'mossprout-merge-island-perspective-512.webp')));
 });

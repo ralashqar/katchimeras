@@ -48,6 +48,7 @@ import { getDevKingdomHexVerticalAlignmentMode } from '@/utils/dev-asset-overrid
 import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
 import {
   MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO,
+  MOSSPROUT_GARDEN_TOP_WIDTH_RATIO,
 } from '@/utils/haven-square-world';
 import {
   HAVEN_MERGE_BOARD_CELL_INDICES,
@@ -112,25 +113,35 @@ const EGG_WORLD_SCALE = kingdomWorldViewConfig.egg.globalScale * HAVEN_HOME_EGG_
 const EGG_WORLD_W = EGG_STAGE_W * EGG_WORLD_SCALE;
 const EGG_WORLD_H = EGG_STAGE_H * EGG_WORLD_SCALE;
 const KINGDOM_DREAM_MIST_LOCK_SOURCE = require('../../../assets/images/katchimeras/world/hex/kingdom_dream_mist_lock_v1_512.webp');
+const HAVEN_MERGE_GRID_SOURCE = require('../../../assets/images/katchimeras/merge-world/generated/haven-merge-grid-7x6.webp');
 const LOCKED_TILE_HIT_WIDTH = HEX_TILE_W * 0.62;
 const LOCKED_TILE_HIT_HEIGHT = HEX_TILE_H * 0.78;
 const LOCKED_TILE_LOCK_SIZE = 104;
+const HAVEN_MERGE_BOARD_PROJECTION = {
+  kind: 'trapezoid',
+  topWidthRatio: MOSSPROUT_GARDEN_TOP_WIDTH_RATIO,
+  farScale: 0.94,
+} as const;
 const HAVEN_MERGE_BOARD_LAYOUT: MergeBoardLayout = {
   accessibilityLabel: 'Haven merge board, seven columns by six rows',
+  baseArtOpacity: 1,
+  baseSource: HAVEN_MERGE_GRID_SOURCE,
   cellHeightToWidthRatio: 1.14,
   cellIndices: HAVEN_MERGE_BOARD_CELL_INDICES,
   columns: HAVEN_MERGE_BOARD_COLUMNS,
+  projection: HAVEN_MERGE_BOARD_PROJECTION,
   rows: HAVEN_MERGE_BOARD_ROWS,
   transparentSurface: true,
 };
 const SQUARE_HAVEN_MERGE_BOARD_LAYOUT: MergeBoardLayout = {
   accessibilityLabel: 'Mossprout garden merge board, seven columns by six rows',
-  baseArtOpacity: 0.34,
-  baseSource: require('../../../assets/images/katchimeras/merge-world/generated/merge-board-base-7x6.webp'),
+  baseArtOpacity: 1,
+  baseSource: HAVEN_MERGE_GRID_SOURCE,
   cellHeightToWidthRatio: MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO,
   cellIndices: HAVEN_MERGE_BOARD_CELL_INDICES,
   columns: HAVEN_MERGE_BOARD_COLUMNS,
   fillAvailableSpace: true,
+  projection: HAVEN_MERGE_BOARD_PROJECTION,
   rows: HAVEN_MERGE_BOARD_ROWS,
   transparentSurface: true,
 };

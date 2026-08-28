@@ -9,7 +9,7 @@ import type { MergeBoardItem, MergeWorldState } from '@/types/merge-world';
 import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import { BARISTABBIT_CHAPTER_ONE_ORDER_POOL, FEASTLE_ACT_TWO_ORDER_POOL, selectAuthoredCohortOrderKeys, selectFeastleActTwoOrderKeys } from '@/utils/companion-story';
-import { mergeCellCenter, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection } from '@/utils/merge-world/board-geometry';
+import { mergeCellCenter, mergeCellFrame, mergeCellFromPoint, mergeCellOrigin, mergeNeighborCellInDirection } from '@/utils/merge-world/board-geometry';
 import { mergeCellFeedbackForFailure } from '@/utils/merge-board-feedback';
 import { MERGE_MORPH_DURATION_MS, SPAWN_MOTION_DURATION_MS, isMistMergeTransition, mergeSpriteMotionFrame, spawnSpriteMotionFrame } from '@/utils/merge-board-motion';
 import { mergeArtWarmupPlan } from '@/utils/merge-world/art-warmup';
@@ -75,6 +75,31 @@ test('Haven projects the complete Mossprout starter interaction area onto a 7x6 
       : null,
     'nature:garden:2',
   );
+});
+
+test('Haven perspective geometry keeps rendered cells and touch targets in exact agreement', () => {
+  const geometry = {
+    cellIndices: HAVEN_MERGE_BOARD_CELL_INDICES,
+    cellHeight: 55,
+    cellSize: 48,
+    columns: HAVEN_MERGE_BOARD_COLUMNS,
+    gap: 0,
+    inset: 6,
+    projection: { kind: 'trapezoid' as const, topWidthRatio: 0.87, farScale: 0.92 },
+    rows: HAVEN_MERGE_BOARD_ROWS,
+  };
+  HAVEN_MERGE_BOARD_CELL_INDICES.forEach((index) => {
+    const frame = mergeCellFrame(geometry, index);
+    assert.equal(mergeCellFromPoint(geometry, frame.center.x, frame.center.y), index);
+    assert.ok(frame.depthScale >= 0.92 && frame.depthScale <= 1);
+  });
+  const first = mergeCellFrame(geometry, HAVEN_MERGE_BOARD_CELL_INDICES[0]);
+  const last = mergeCellFrame(geometry, HAVEN_MERGE_BOARD_CELL_INDICES.at(-1)!);
+  const topWidth = first.polygon[1].x - first.polygon[0].x;
+  const bottomWidth = last.polygon[2].x - last.polygon[3].x;
+  assert.ok(topWidth < bottomWidth);
+  assert.ok(first.depthScale < last.depthScale);
+  assert.equal(mergeCellFromPoint(geometry, first.polygon[0].x - 10, first.center.y), null);
 });
 
 test('Merge FTUE gates the exact authored seed drag and emits a verified merge event', () => {
@@ -1375,7 +1400,7 @@ test('Merge board retains destination selection and decorates generators with am
   assert.match(board, /selectionCornerOutline: \{ \.\.\.StyleSheet\.absoluteFillObject, borderColor: '#075B69'/);
   assert.match(board, /selectionCornerFill: \{ borderColor: '#18D5E6'/);
   assert.doesNotMatch(board, /selectionCorner[^\n]*boxShadow/);
-  assert.match(board, /left: origin\.x - outset, top: origin\.y - outset/);
+  assert.match(board, /left: frame\.bounds\.left - outset, top: frame\.bounds\.top - outset/);
   assert.match(board, /\[1, 1\.045\]/);
   assert.doesNotMatch(board, /cellStateSelected|selectionCornerHorizontal|selectionCornerVertical/);
   assert.match(board, /withRepeat\(withSequence\([\s\S]*?withTiming\(1[\s\S]*?withTiming\(0/);
@@ -1450,7 +1475,7 @@ test('animated merge sprites retain their full-resolution authored textures', ()
   );
 
   assert.match(artCache, /MERGE_ART_CACHE_EDGE_PX = 256/);
-  assert.match(artCache, /MERGE_ART_CACHE_REVISION = `full-\$\{MERGE_ART_CACHE_EDGE_PX\}`/);
+  assert.match(artCache, /MERGE_ART_CACHE_REVISION = `toy-diorama-v1-\$\{MERGE_ART_CACHE_EDGE_PX\}`/);
   assert.match(artCache, /maxHeight: MERGE_ART_CACHE_EDGE_PX/);
   assert.match(artCache, /maxWidth: MERGE_ART_CACHE_EDGE_PX/);
   assert.match(board, /function PersistentGeneratorArt[\s\S]*?allowDownscaling=\{false\}/);

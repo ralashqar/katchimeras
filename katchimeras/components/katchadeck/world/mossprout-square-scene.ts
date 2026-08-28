@@ -27,9 +27,9 @@ const BARISTABBIT_CAFE_SOURCES = {
 };
 
 const GARDEN_SOURCES = {
-  full: require('../../../assets/images/katchimeras/world/square/mossprout-merge-island.webp'),
-  medium: require('../../../assets/images/katchimeras/world/square/mossprout-merge-island-512.webp'),
-  thumb: require('../../../assets/images/katchimeras/world/square/mossprout-merge-island-256.webp'),
+  full: require('../../../assets/images/katchimeras/world/square/mossprout-merge-island-perspective.webp'),
+  medium: require('../../../assets/images/katchimeras/world/square/mossprout-merge-island-perspective-512.webp'),
+  thumb: require('../../../assets/images/katchimeras/world/square/mossprout-merge-island-perspective-256.webp'),
 };
 
 const EGG_HOME_SOURCES = {

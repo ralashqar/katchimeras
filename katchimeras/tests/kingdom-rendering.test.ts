@@ -679,10 +679,45 @@ test('the merge island mounts the shared Merge board without giving cell taps or
   assert.match(canvas, /layout=\{squareWorld \? SQUARE_HAVEN_MERGE_BOARD_LAYOUT : HAVEN_MERGE_BOARD_LAYOUT\}/);
   assert.match(canvas, /cellHeightToWidthRatio: 1\.14/);
   assert.match(canvas, /cellHeightToWidthRatio: MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO/);
+  assert.match(canvas, /topWidthRatio: MOSSPROUT_GARDEN_TOP_WIDTH_RATIO/);
+  assert.match(canvas, /farScale: 0\.94/);
+  assert.match(canvas, /baseSource: HAVEN_MERGE_GRID_SOURCE/);
+  assert.match(board, /mergeLogicalPointFromProjectedWorklet/);
+  assert.match(board, /RectangularHoverCellOverlay/);
   assert.match(canvas, /fillAvailableSpace: true/);
   assert.match(canvas, /transparentSurface: true/);
   assert.doesNotMatch(canvas, /focusedSquareZoneId/);
   assert.doesNotMatch(canvas, /structure:mossprout-garden/);
+});
+
+test('Mossprout Merge art is packaged into two guttered shared atlas pages without mounting full pages per sprite', () => {
+  const generated = path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'merge-world', 'generated');
+  const manifest = JSON.parse(fs.readFileSync(path.join(generated, 'mossprout-merge-atlas.json'), 'utf8')) as {
+    atlasSize: number;
+    contentSize: number;
+    entries: Record<string, { height: number; page: string; width: number; x: number; y: number }>;
+    pages: Record<string, string>;
+  };
+  assert.equal(manifest.atlasSize, 1024);
+  assert.equal(manifest.contentSize, 128);
+  assert.deepEqual(Object.keys(manifest.pages).sort(), ['core', 'progression']);
+  assert.equal(Object.keys(manifest.entries).length, 38);
+  Object.values(manifest.entries).forEach((entry) => {
+    assert.equal(entry.width, 128);
+    assert.equal(entry.height, 128);
+    assert.ok(entry.x >= 8 && entry.y >= 8);
+    assert.ok(entry.x + entry.width <= manifest.atlasSize - 8);
+    assert.ok(entry.y + entry.height <= manifest.atlasSize - 8);
+  });
+  Object.values(manifest.pages).forEach((file) => {
+    const atlas = path.join(generated, file);
+    assert.ok(fs.existsSync(atlas));
+    assert.ok(fs.statSync(atlas).size < 512 * 1024);
+  });
+  const renderer = fs.readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'feastle-persistent-merge-board.tsx'), 'utf8');
+  const cache = fs.readFileSync(path.join(process.cwd(), 'hooks', 'use-merge-art-cache.ts'), 'utf8');
+  assert.doesNotMatch(renderer, /PersistentMergeAtlasArt|usePathValue/);
+  assert.doesNotMatch(cache, /mossproutAtlasPagesForArt/);
 });
 
 test('Haven uses one fixed 512 image tier for tiles and residents', () => {

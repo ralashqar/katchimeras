@@ -1,0 +1,277 @@
+{
+  "version": 1,
+  "atlasSize": 1024,
+  "contentSize": 128,
+  "pages": {
+    "core": "mossprout-merge-core-atlas.webp",
+    "progression": "mossprout-merge-progression-atlas.webp"
+  },
+  "entries": {
+    "item:nature:garden:1": {
+      "page": "core",
+      "x": 8,
+      "y": 8,
+      "width": 128,
+      "height": 128
+    },
+    "item:nature:garden:2": {
+      "page": "core",
+      "x": 152,
+      "y": 8,
+      "width": 128,
+      "height": 128
+    },
+    "item:nature:garden:3": {
+      "page": "core",
+      "x": 296,
+      "y": 8,
+      "width": 128,
+      "height": 128
+    },
+    "item:nature:garden:4": {
+      "page": "core",
+      "x": 440,
+      "y": 8,
+      "width": 128,
+      "height": 128
+    },
+    "item:nature:garden:5": {
+      "page": "core",
+      "x": 584,
+      "y": 8,
+      "width": 128,
+      "height": 128
+    },
+    "item:nature:garden:6": {
+      "page": "core",
+      "x": 728,
+      "y": 8,
+      "width": 128,
+      "height": 128
+    },
+    "item:nature:garden:7": {
+      "page": "core",
+      "x": 872,
+      "y": 8,
+      "width": 128,
+      "height": 128
+    },
+    "item:nature:waterside:1": {
+      "page": "core",
+      "x": 8,
+      "y": 152,
+      "width": 128,
+      "height": 128
+    },
+    "item:nature:waterside:2": {
+      "page": "core",
+      "x": 152,
+      "y": 152,
+      "width": 128,
+      "height": 128
+    },
+    "item:nature:waterside:3": {
+      "page": "core",
+      "x": 296,
+      "y": 152,
+      "width": 128,
+      "height": 128
+    },
+    "item:nature:waterside:4": {
+      "page": "core",
+      "x": 440,
+      "y": 152,
+      "width": 128,
+      "height": 128
+    },
+    "item:nature:waterside:5": {
+      "page": "core",
+      "x": 584,
+      "y": 152,
+      "width": 128,
+      "height": 128
+    },
+    "item:nature:waterside:6": {
+      "page": "core",
+      "x": 728,
+      "y": 152,
+      "width": 128,
+      "height": 128
+    },
+    "generator:wild-garden:1": {
+      "page": "core",
+      "x": 872,
+      "y": 152,
+      "width": 128,
+      "height": 128
+    },
+    "generator:wild-garden:2": {
+      "page": "core",
+      "x": 8,
+      "y": 296,
+      "width": 128,
+      "height": 128
+    },
+    "generator:wild-garden:3": {
+      "page": "core",
+      "x": 152,
+      "y": 296,
+      "width": 128,
+      "height": 128
+    },
+    "generator:wild-garden:ftue": {
+      "page": "core",
+      "x": 296,
+      "y": 296,
+      "width": 128,
+      "height": 128
+    },
+    "item:nature:keepsake:1": {
+      "page": "progression",
+      "x": 8,
+      "y": 8,
+      "width": 128,
+      "height": 128
+    },
+    "item:nature:keepsake:2": {
+      "page": "progression",
+      "x": 152,
+      "y": 8,
+      "width": 128,
+      "height": 128
+    },
+    "item:nature:keepsake:3": {
+      "page": "progression",
+      "x": 296,
+      "y": 8,
+      "width": 128,
+      "height": 128
+    },
+    "item:nature:keepsake:4": {
+      "page": "progression",
+      "x": 440,
+      "y": 8,
+      "width": 128,
+      "height": 128
+    },
+    "item:nature:keepsake:5": {
+      "page": "progression",
+      "x": 584,
+      "y": 8,
+      "width": 128,
+      "height": 128
+    },
+    "item:nature:keepsake:6": {
+      "page": "progression",
+      "x": 728,
+      "y": 8,
+      "width": 128,
+      "height": 128
+    },
+    "item:hybrid:memory-bloom": {
+      "page": "progression",
+      "x": 872,
+      "y": 8,
+      "width": 128,
+      "height": 128
+    },
+    "item:hybrid:rain-mirror": {
+      "page": "progression",
+      "x": 8,
+      "y": 152,
+      "width": 128,
+      "height": 128
+    },
+    "item:hybrid:heartwood-sanctuary": {
+      "page": "progression",
+      "x": 152,
+      "y": 152,
+      "width": 128,
+      "height": 128
+    },
+    "generator:memory-nursery:1": {
+      "page": "progression",
+      "x": 296,
+      "y": 152,
+      "width": 128,
+      "height": 128
+    },
+    "generator:memory-nursery:2": {
+      "page": "progression",
+      "x": 440,
+      "y": 152,
+      "width": 128,
+      "height": 128
+    },
+    "generator:memory-nursery:3": {
+      "page": "progression",
+      "x": 584,
+      "y": 152,
+      "width": 128,
+      "height": 128
+    },
+    "reward:mossprout-root-returning-seed": {
+      "page": "progression",
+      "x": 728,
+      "y": 152,
+      "width": 128,
+      "height": 128
+    },
+    "reward:mossprout-root-rain-kept-acorn": {
+      "page": "progression",
+      "x": 872,
+      "y": 152,
+      "width": 128,
+      "height": 128
+    },
+    "reward:mossprout-root-nursery-keepsake": {
+      "page": "progression",
+      "x": 8,
+      "y": 296,
+      "width": 128,
+      "height": 128
+    },
+    "reward:mossprout-root-heartseed": {
+      "page": "progression",
+      "x": 152,
+      "y": 296,
+      "width": 128,
+      "height": 128
+    },
+    "reward:root-match-parcel-closed": {
+      "page": "progression",
+      "x": 296,
+      "y": 296,
+      "width": 128,
+      "height": 128
+    },
+    "reward:root-match-parcel-open": {
+      "page": "progression",
+      "x": 440,
+      "y": 296,
+      "width": 128,
+      "height": 128
+    },
+    "reward:mossprout-fern-wisp-nest": {
+      "page": "progression",
+      "x": 584,
+      "y": 296,
+      "width": 128,
+      "height": 128
+    },
+    "reward:mossprout-grovelight-wisp-nest": {
+      "page": "progression",
+      "x": 728,
+      "y": 296,
+      "width": 128,
+      "height": 128
+    },
+    "reward:mossprout-heartwood-landmark": {
+      "page": "progression",
+      "x": 872,
+      "y": 296,
+      "width": 128,
+      "height": 128
+    }
+  }
+}
