@@ -42,6 +42,7 @@ type UseKingdomHexCameraArgs = {
     reducedMotion: boolean;
     targets: readonly KingdomFocusTarget[];
   };
+  minimumScale?: number;
   panExclusionFrame?: KingdomWorldFrame | null;
   scene: KingdomSize;
   viewport: KingdomSize;
@@ -66,6 +67,7 @@ export function useKingdomHexCamera({
   interactionEnabled = true,
   initialFitWorld = false,
   magneticFocus,
+  minimumScale = 0.54,
   panExclusionFrame,
   scene,
   viewport,
@@ -98,7 +100,7 @@ export function useKingdomHexCamera({
         : 1,
     [viewport.height, viewport.width]
   );
-  const minScale = 0.54;
+  const minScale = minimumScale;
   const maxScale = KINGDOM_RENDERING.havenMaxScale;
   const [renderState, setRenderState] = useState<CameraRenderState>(() => ({
     isMoving: false,
@@ -153,7 +155,7 @@ export function useKingdomHexCamera({
       });
       pinchStartScale.value = clampedZoom;
     },
-    [beginMotion, commitSnapshot, pinchStartScale, scale, scene, tx, ty, viewport]
+    [beginMotion, commitSnapshot, minScale, pinchStartScale, scale, scene, tx, ty, viewport]
   );
 
   const settleAfterPan = useCallback((nextTx: number, nextTy: number, nextScale: number) => {
@@ -307,6 +309,7 @@ export function useKingdomHexCamera({
       beginMotion,
       commitSnapshot,
       interactionEnabled,
+      minScale,
       pinchFocalX,
       pinchFocalY,
       pinchStartScale,
@@ -355,7 +358,7 @@ export function useKingdomHexCamera({
       ? Math.max(minScale, Math.min(baseScale * 0.78, viewport.width / scene.width, viewport.height / scene.height))
       : minScale;
     animateTo(scene.width / 2, scene.height / 2, fitScale, viewport.height / 2, durationMs, onComplete);
-  }, [animateTo, baseScale, scene.height, scene.width, viewport.height, viewport.width]);
+  }, [animateTo, baseScale, minScale, scene.height, scene.width, viewport.height, viewport.width]);
 
   const focusUpgrade = useCallback(
     (x: number, y: number, reducedMotion: boolean, onComplete: () => void) => {

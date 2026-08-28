@@ -647,7 +647,7 @@ test('Haven keeps every configured tile in the persistent render set', () => {
   assert.equal(new Set(frames.map((frame) => frame.id)).size, frames.length);
 });
 
-test('the tall garden mounts the shared Merge board without giving cell drags to the camera', () => {
+test('the merge island mounts the shared Merge board without giving cell taps or drags to the camera', () => {
   const scene = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-hex-scene.ts'),
     'utf8',
@@ -663,9 +663,12 @@ test('the tall garden mounts the shared Merge board without giving cell drags to
   assert.match(scene, /interactionFrame/);
   assert.match(canvas, /<FeastlePersistentMergeBoard/);
   assert.match(canvas, /externalPanGesture=\{camera\.panGesture\}/);
-  assert.match(canvas, /layout=\{HAVEN_MERGE_BOARD_LAYOUT\}/);
+  assert.match(canvas, /layout=\{squareWorld \? SQUARE_HAVEN_MERGE_BOARD_LAYOUT : HAVEN_MERGE_BOARD_LAYOUT\}/);
   assert.match(canvas, /cellHeightToWidthRatio: 1\.14/);
+  assert.match(canvas, /cellHeightToWidthRatio: MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO/);
+  assert.match(canvas, /fillAvailableSpace: true/);
   assert.match(canvas, /transparentSurface: true/);
+  assert.doesNotMatch(canvas, /focusedSquareZoneId/);
   assert.doesNotMatch(canvas, /structure:mossprout-garden/);
 });
 

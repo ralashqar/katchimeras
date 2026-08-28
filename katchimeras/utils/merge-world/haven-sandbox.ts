@@ -3,8 +3,8 @@ import { MERGE_WORLD_COLUMNS } from '@/constants/merge-world-catalog';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
 import { normalizeMergeWorldState } from '@/utils/merge-world/engine';
 
-const HAVEN_VISIBLE_ROWS = [1, 2, 3, 4, 5, 6, 7] as const;
-const HAVEN_VISIBLE_COLUMNS = [1, 2, 3, 4, 5, 6] as const;
+const HAVEN_VISIBLE_ROWS = [1, 2, 3, 4, 5, 6] as const;
+const HAVEN_VISIBLE_COLUMNS = [0, 1, 2, 3, 4, 5, 6] as const;
 
 export const HAVEN_MERGE_BOARD_COLUMNS = HAVEN_VISIBLE_COLUMNS.length;
 export const HAVEN_MERGE_BOARD_ROWS = HAVEN_VISIBLE_ROWS.length;

@@ -36,12 +36,12 @@ import {
 
 const NOW = new Date('2026-08-12T12:00:00.000Z').getTime();
 
-test('Haven projects the complete Mossprout starter interaction area onto a 6x7 sandbox', () => {
+test('Haven projects the complete Mossprout starter interaction area onto a 7x6 sandbox', () => {
   const state = createHavenMergeSandboxState(NOW);
   assert.equal(HAVEN_MERGE_BOARD_CELL_INDICES.length, 42);
   assert.equal(new Set(HAVEN_MERGE_BOARD_CELL_INDICES).size, 42);
-  assert.equal(HAVEN_MERGE_BOARD_COLUMNS, 6);
-  assert.equal(HAVEN_MERGE_BOARD_ROWS, 7);
+  assert.equal(HAVEN_MERGE_BOARD_COLUMNS, 7);
+  assert.equal(HAVEN_MERGE_BOARD_ROWS, 6);
   assert.equal(state.activeOrders.length, 0);
   assert.equal(state.externalRewardReceipts.length, 0);
   assert.ok(state.board.every((cell, index) => havenMergeCellIsVisible(index) || (cell.locked && !cell.occupant)));
@@ -63,7 +63,7 @@ test('Haven projects the complete Mossprout starter interaction area onto a 6x7 
   assert.equal(mergeCellFromPoint(geometry, origin.x + 24, origin.y + 27.5), 29);
   assert.deepEqual(mergeCellCenter(geometry, 29), { x: origin.x + 24, y: origin.y + 27.5 });
   const firstRowOrigin = mergeCellOrigin(geometry, HAVEN_MERGE_BOARD_CELL_INDICES[0]);
-  assert.equal(mergeCellOrigin(geometry, HAVEN_MERGE_BOARD_CELL_INDICES[6]).y, firstRowOrigin.y + 55);
+  assert.equal(mergeCellOrigin(geometry, HAVEN_MERGE_BOARD_CELL_INDICES[7]).y, firstRowOrigin.y + 55);
   assert.equal(mergeNeighborCellInDirection(geometry, 29, 1, 0), 30);
 
   const merged = reduceMergeWorld(state, { type: 'move', from: 29, to: 30, now: NOW + 1 });
