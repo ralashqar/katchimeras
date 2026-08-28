@@ -81,6 +81,26 @@ export function mergeCellFrame(geometry: MergeBoardGeometry, index: number): Mer
   const top = row * pitchY;
   const right = left + geometry.cellSize;
   const bottom = top + cellHeight;
+  if (!geometry.projection) {
+    const bounds = {
+      left: geometry.inset + left,
+      top: geometry.inset + top,
+      width: geometry.cellSize,
+      height: cellHeight,
+    };
+    const polygon = [
+      { x: bounds.left, y: bounds.top },
+      { x: bounds.left + bounds.width, y: bounds.top },
+      { x: bounds.left + bounds.width, y: bounds.top + bounds.height },
+      { x: bounds.left, y: bounds.top + bounds.height },
+    ] as const;
+    return {
+      bounds,
+      center: { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 },
+      depthScale: 1,
+      polygon,
+    };
+  }
   const polygon = [
     mergeProjectPoint(geometry, left, top),
     mergeProjectPoint(geometry, right, top),

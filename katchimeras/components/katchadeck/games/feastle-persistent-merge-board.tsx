@@ -54,7 +54,8 @@ export type MergeBoardLayout = {
   cellHeightToWidthRatio?: number;
   /** Fill the supplied width and maxHeight exactly so no parent gesture leaks through. */
   fillAvailableSpace?: boolean;
-  cellIndices: readonly number[];
+  /** Omit for the dedicated board's direct row-major cell order. */
+  cellIndices?: readonly number[];
   columns: number;
   rows: number;
   projection?: MergeBoardProjection;
@@ -107,7 +108,6 @@ const DREAM_MIST_FULL = require('../../../assets/images/katchimeras/merge-world/
 const DREAM_MIST_LOWER = require('../../../assets/images/katchimeras/merge-world/locked/dream-mist-lower.webp');
 const DEFAULT_MERGE_BOARD_LAYOUT: MergeBoardLayout = {
   accessibilityLabel: 'Merge board, seven columns by nine rows',
-  cellIndices: Array.from({ length: MERGE_WORLD_COLUMNS * MERGE_WORLD_ROWS }, (_, index) => index),
   columns: MERGE_WORLD_COLUMNS,
   rows: MERGE_WORLD_ROWS,
 };
@@ -163,7 +163,7 @@ function isInterruptibleMotion(motion?: SpriteMotion) {
   return motion == null || motion.kind === 'move' || motion.kind === 'swap' || motion.kind === 'return' || motion.kind === 'spawn' || motion.kind === 'merge-result';
 }
 
-export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onCommandSettled, onInteractionGateCommitted, onBoardTap, onScreenMetrics, onVisualReady, onBlockedInteraction, onInspectMist, onInspectRootbound, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', sessionId, hiddenItemInstanceIds, animateEntrance = true, layout = DEFAULT_MERGE_BOARD_LAYOUT }: {
+export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onCommandSettled, onInteractionGateCommitted, onBoardRelease, onScreenMetrics, onVisualReady, onBlockedInteraction, onInspectMist, onInspectRootbound, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', sessionId, hiddenItemInstanceIds, animateEntrance = true, layout = DEFAULT_MERGE_BOARD_LAYOUT }: {
   state: MergeWorldState;
   width: number;
   animateEntrance?: boolean;
@@ -173,7 +173,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   onCommand: (command: MergeWorldCommand) => MergeWorldCommandResult | null;
   onCommandSettled?: (receipt: MergeBoardOperationReceipt) => void;
   onInteractionGateCommitted?: (receipt: MergeInteractionGateReceipt) => void;
-  onBoardTap?: () => void;
+  onBoardRelease?: () => void;
   onScreenMetrics?: (metrics: MergeBoardScreenMetrics) => void;
   onVisualReady?: () => void;
   onBlockedInteraction?: () => void;
@@ -206,11 +206,15 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   const boardHeight = cellHeight * layout.rows + gap * (layout.rows - 1) + inset * 2;
   const baseArtOpacity = Math.max(0, Math.min(1, layout.baseArtOpacity ?? (layout.transparentSurface ? 0 : 1)));
   const showBaseArt = !layout.transparentSurface || baseArtOpacity > 0;
+  const renderedCellIndices = useMemo(
+    () => layout.cellIndices ?? Array.from({ length: layout.columns * layout.rows }, (_, index) => index),
+    [layout.cellIndices, layout.columns, layout.rows],
+  );
   const geometry = useMemo<MergeBoardGeometry>(() => ({ columns: layout.columns, rows: layout.rows, cellIndices: layout.cellIndices, cellSize, cellHeight, gap, inset, projection: layout.projection }), [cellHeight, cellSize, gap, inset, layout.cellIndices, layout.columns, layout.projection, layout.rows]);
-  const visibleCellSet = useMemo(() => new Set(layout.cellIndices), [layout.cellIndices]);
+  const visibleCellSet = useMemo(() => new Set(renderedCellIndices), [renderedCellIndices]);
   const cellFrames = useMemo(
-    () => Object.fromEntries(layout.cellIndices.map((index) => [index, mergeCellFrame(geometry, index)])) as Record<number, ReturnType<typeof mergeCellFrame>>,
-    [geometry, layout.cellIndices],
+    () => Object.fromEntries(renderedCellIndices.map((index) => [index, mergeCellFrame(geometry, index)])) as Record<number, ReturnType<typeof mergeCellFrame>>,
+    [geometry, renderedCellIndices],
   );
   const boardRef = useRef<View>(null);
   const reportScreenMetrics = useCallback(() => {
@@ -273,7 +277,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   const onSelectRef = useRef(onSelect);
   const onCommandSettledRef = useRef(onCommandSettled);
   const onInteractionGateCommittedRef = useRef(onInteractionGateCommitted);
-  const onBoardTapRef = useRef(onBoardTap);
+  const onBoardReleaseRef = useRef(onBoardRelease);
   const selectedCellRef = useRef(selectedCell);
   const launchGeneratorRef = useRef<(generatorId: string) => void>(() => undefined);
   const dropRef = useRef<(instanceId: string, dx: number, dy: number, intendedTargetCell?: number | null) => void>(() => undefined);
@@ -308,7 +312,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   onSelectRef.current = onSelect;
   onCommandSettledRef.current = onCommandSettled;
   onInteractionGateCommittedRef.current = onInteractionGateCommitted;
-  onBoardTapRef.current = onBoardTap;
+  onBoardReleaseRef.current = onBoardRelease;
   selectedCellRef.current = selectedCell;
 
   const showCellFeedback = useCallback((cell: number, reason: MergeWorldFailureReason) => {
@@ -735,10 +739,10 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   }, [onInspectMist, onInspectRootbound]);
   emptyCellTapRef.current = tapEmptyCell;
   const emitEmptyCellTap = useCallback((cell: number) => emptyCellTapRef.current(cell), []);
-  const emitBoardTapFocus = useCallback(() => onBoardTapRef.current?.(), []);
+  const emitBoardReleaseFocus = useCallback(() => onBoardReleaseRef.current?.(), []);
 
   const accessibleAction = useCallback((cell: number) => {
-    emitBoardTapFocus();
+    emitBoardReleaseFocus();
     if (gateKind === 'locked') {
       blockInteraction();
       return;
@@ -793,7 +797,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
         dropRef.current(spriteId(selected), to.x - from.x, to.y - from.y);
       }
     }
-  }, [blockInteraction, emitBoardTapFocus, gateFromCell, gateGeneratorCell, gateKind, gateToCell, geometry, onInspectMist, onInspectRootbound]);
+  }, [blockInteraction, emitBoardReleaseFocus, gateFromCell, gateGeneratorCell, gateKind, gateToCell, geometry, onInspectMist, onInspectRootbound]);
 
   const selectedOccupant = selectedCell == null ? null : presentation.board[selectedCell]?.occupant;
   const selectedDefinitionId = selectedOccupant?.kind === 'item' ? selectedOccupant.definitionId : null;
@@ -912,7 +916,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       if (!id) {
         if (maxGestureDistance.value <= BOARD_TAP_SLOP && activeSourceCell.value >= 0 && releaseCell >= 0) {
           gestureFinished.value = true;
-          runOnJS(emitBoardTapFocus)();
+          runOnJS(emitBoardReleaseFocus)();
           runOnJS(emitEmptyCellTap)(activeSourceCell.value);
         }
         return;
@@ -925,7 +929,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       dragTranslationX.value = dx;
       dragTranslationY.value = dy;
       hoverCell.value = -1;
-      if (releaseCell >= 0) runOnJS(emitBoardTapFocus)();
+      if (releaseCell >= 0) runOnJS(emitBoardReleaseFocus)();
       if (gateKind === 'drag') {
         runOnJS(blockInteraction)();
         runOnJS(emitBoardCancel)(id, grabX.value + dx, grabY.value + dy, dragEpoch.value);
@@ -953,12 +957,13 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
         runOnJS(dragSprite)();
       }
       if (maxGestureDistance.value <= BOARD_TAP_SLOP && !isFlick) {
-        if (releaseCell >= 0) runOnJS(emitBoardTapFocus)();
+        if (releaseCell >= 0) runOnJS(emitBoardReleaseFocus)();
         if (gateKind === 'drag') {
           runOnJS(blockInteraction)();
           runOnJS(emitBoardCancel)(id, worldX, worldY, epoch);
         } else runOnJS(emitBoardTap)(id, worldX, worldY, epoch);
       } else {
+        if (releaseCell >= 0) runOnJS(emitBoardReleaseFocus)();
         if (gateKind === 'generator') {
           runOnJS(blockInteraction)();
           runOnJS(emitBoardCancel)(id, worldX, worldY, epoch);
@@ -1010,7 +1015,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
         dragPhase.value = 2;
         runOnJS(emitBoardCancel)(id, grabX.value + dragTranslationX.value, grabY.value + dragTranslationY.value, dragEpoch.value);
       }
-    }), [activeDragId, activeSourceCell, blockInteraction, dragEpoch, dragHapticTriggered, dragPhase, dragSprite, dragTranslationX, dragTranslationY, emitBoardCancel, emitBoardDrop, emitBoardTap, emitBoardTapFocus, emitEmptyCellTap, entranceInteractive, gateFromCell, gateGeneratorCell, gateKind, gateToCell, geometry, gestureFinished, grabX, grabY, hoverCell, maxGestureDistance, occupancyDefinitions, occupancyIds, pickSprite, touchDownX, touchDownY]);
+    }), [activeDragId, activeSourceCell, blockInteraction, dragEpoch, dragHapticTriggered, dragPhase, dragSprite, dragTranslationX, dragTranslationY, emitBoardCancel, emitBoardDrop, emitBoardReleaseFocus, emitBoardTap, emitEmptyCellTap, entranceInteractive, gateFromCell, gateGeneratorCell, gateKind, gateToCell, geometry, gestureFinished, grabX, grabY, hoverCell, maxGestureDistance, occupancyDefinitions, occupancyIds, pickSprite, touchDownX, touchDownY]);
 
   // Measure a stable, untransformed frame. The visual board enters with a
   // translateY animation; measuring that Animated.View cached a temporary
@@ -1032,7 +1037,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       transition={0}
     /> : null}
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-      {layout.cellIndices.map((index) => {
+      {renderedCellIndices.map((index) => {
         const cell = presentation.board[index];
         if (!cell) return null;
         const frame = cellFrames[index];
@@ -1571,7 +1576,6 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   const visualScale = useDerivedValue(() => {
     const p = progress.value;
     const moving = animating.value === 1;
-    const dragging = activeDragId.value === instanceId && dragPhase.value !== 0;
     const motionKind = activeMotionKind.value;
     const spawnFrame = moving && motionKind === 'spawn' ? spawnSpriteMotionFrame(p, reduceMotion) : null;
     const mergeFrame = moving && motionKind?.startsWith('merge-')
@@ -1579,16 +1583,20 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
       : null;
     const intro = Math.max(0, Math.min(1, entranceProgress.value));
     const motionScale = spawnFrame?.scale ?? mergeFrame?.scale ?? scale.value;
-    const travel = spawnFrame?.travel ?? p;
-    const worldY = dragging ? grabY.value + dragTranslationY.value : moving ? y.value + (targetY.value - y.value) * travel : y.value;
-    const depth = projection
-      ? projection.farScale + (1 - projection.farScale) * Math.max(0, Math.min(1, (worldY + cellSize / 2 - projectionInset) / Math.max(1, projectionGridHeight)))
-      : 1;
+    let depth = 1;
+    if (projection) {
+      const travel = spawnFrame?.travel ?? p;
+      // Keep finger-drag scale at its source depth. Reading the global drag Y
+      // here subscribed every sprite's scale mapper to every pointer frame,
+      // including all sprites on the flat dedicated board.
+      const worldY = moving ? y.value + (targetY.value - y.value) * travel : y.value;
+      depth = projection.farScale + (1 - projection.farScale) * Math.max(0, Math.min(1, (worldY + cellSize / 2 - projectionInset) / Math.max(1, projectionGridHeight)));
+    }
     return motionScale
       * depth
       * interpolate(intro, [0, 0.68, 1], [0.72, 1.08, 1])
       * (1 + matchHintProgress.value * 0.055);
-  }, [cellSize, instanceId, projection, projectionGridHeight, projectionInset, reduceMotion]);
+  }, [cellSize, projection, projectionGridHeight, projectionInset, reduceMotion]);
 
   const artLayoutStyle = useAnimatedStyle(() => {
     const renderedSize = artBaseSize * visualScale.value;
@@ -1621,14 +1629,18 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
     const hintProgress = matchHintProgress.value;
     return {
       opacity: opacity * intro,
-      zIndex: dragging || moving || visualScale.value > 1.05 || hintProgress > 0.001 ? 1000 : Math.round(20 + worldY),
+      // The original dedicated board stays in one flat compositor layer. Only
+      // Haven's projected board needs per-row depth ordering at rest.
+      zIndex: dragging || moving || visualScale.value > (projection ? 1.05 : 1.001) || hintProgress > 0.001
+        ? 1000
+        : projection ? Math.round(20 + worldY) : 10,
       transform: [
         { translateX: worldX + matchHintOffsetX * hintProgress },
         { translateY: worldY + matchHintOffsetY * hintProgress + (spawnFrame ? arcHeight.value * spawnFrame.arc + cellSize * spawnFrame.settleY : 0) },
         { translateY: (1 - intro) * 8 },
       ],
     };
-  }, [activeDragId, activeMotionKind, animating, arcHeight, cellSize, dragPhase, dragTranslationX, dragTranslationY, entranceProgress, grabX, grabY, instanceId, matchHintOffsetX, matchHintOffsetY, matchHintProgress, reduceMotion, spriteOpacity, targetX, targetY, visualScale]);
+  }, [activeDragId, activeMotionKind, animating, arcHeight, cellSize, dragPhase, dragTranslationX, dragTranslationY, entranceProgress, grabX, grabY, instanceId, matchHintOffsetX, matchHintOffsetY, matchHintProgress, projection, reduceMotion, spriteOpacity, targetX, targetY, visualScale]);
 
   return <Animated.View pointerEvents="none" style={[styles.sprite, { height: cellSize, left: 0, top: 0, width: cellSize }, animatedStyle]}>
     <Animated.View pointerEvents="none" style={[styles.spriteArtSurface, artLayoutStyle]}>

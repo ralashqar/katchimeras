@@ -1420,6 +1420,26 @@ test('Merge board retains destination selection and decorates generators with am
   assert.match(board, /Dream Echoes on the same Expo Image decode\/cache path/);
 });
 
+test('the dedicated Merge board keeps the direct-index flat rendering fast path', () => {
+  const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
+  const geometry = readFileSync('utils/merge-world/board-geometry.ts', 'utf8');
+  const defaultLayout = board.slice(
+    board.indexOf('const DEFAULT_MERGE_BOARD_LAYOUT'),
+    board.indexOf('function mergeBoardVisualReducer'),
+  );
+  const visualScaleMapper = board.slice(
+    board.indexOf('const visualScale = useDerivedValue'),
+    board.indexOf('const artLayoutStyle = useAnimatedStyle'),
+  );
+
+  assert.doesNotMatch(defaultLayout, /cellIndices/);
+  assert.match(board, /layout\.cellIndices \?\? Array\.from/);
+  assert.match(board, /cellIndices: layout\.cellIndices/);
+  assert.doesNotMatch(visualScaleMapper, /activeDragId|dragTranslationY|grabY/);
+  assert.match(board, /projection \? Math\.round\(20 \+ worldY\) : 10/);
+  assert.match(geometry, /if \(!geometry\.projection\) \{[\s\S]*?depthScale: 1/);
+});
+
 test('Merge FTUE commits before visual settlement and preserves all native animation paths', () => {
   const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');

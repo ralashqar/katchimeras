@@ -773,7 +773,7 @@ test('Haven camera frame focus fits the complete merge grid with screen padding'
   assert.ok(snapshot.scale <= KINGDOM_RENDERING.havenMaxScale);
 });
 
-test('Haven merge board requests frame focus only after an in-grid tap release', () => {
+test('Haven merge board requests frame focus only after an in-grid tap or drag release', () => {
   const board = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'games', 'feastle-persistent-merge-board.tsx'),
     'utf8',
@@ -784,8 +784,8 @@ test('Haven merge board requests frame focus only after an in-grid tap release',
   );
   const touchDownPath = board.slice(board.indexOf('.onTouchesDown'), board.indexOf('.onUpdate'));
 
-  assert.doesNotMatch(touchDownPath, /emitBoardTapFocus/);
-  assert.match(board, /releaseCell >= 0\) runOnJS\(emitBoardTapFocus\)\(\)/);
+  assert.doesNotMatch(touchDownPath, /emitBoardReleaseFocus/);
+  assert.ok((board.match(/releaseCell >= 0\) runOnJS\(emitBoardReleaseFocus\)\(\)/g) ?? []).length >= 3);
   assert.match(canvas, /focusCameraFrame\(gardenBoardFrame/);
-  assert.match(canvas, /onBoardTap=\{focusMergeBoard\}/);
+  assert.match(canvas, /onBoardRelease=\{focusMergeBoard\}/);
 });
