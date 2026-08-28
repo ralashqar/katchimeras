@@ -100,7 +100,7 @@ export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlo
     kind: 'tile',
     residentAnchor: {
       x: baristabbitFrame.left + baristabbitFrame.width * 0.5,
-      y: baristabbitFrame.top + baristabbitFrame.height * 0.52,
+      y: baristabbitFrame.top + baristabbitFrame.height * 0.54,
     },
     source: BARISTABBIT_CAFE_SOURCES.full,
     sources: BARISTABBIT_CAFE_SOURCES,
@@ -128,7 +128,7 @@ export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlo
     kind: 'tile',
     residentAnchor: {
       x: environmentFrame.left + environmentFrame.width * 0.5,
-      y: environmentFrame.top + environmentFrame.height * 0.47,
+      y: environmentFrame.top + environmentFrame.height * 0.51,
     },
     source: ENVIRONMENT_SOURCES.full,
     sources: ENVIRONMENT_SOURCES,

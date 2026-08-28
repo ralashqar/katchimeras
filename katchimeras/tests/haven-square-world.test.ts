@@ -36,7 +36,7 @@ test('square Haven places Baristabbit west of Mossprout and the merge island bel
     { id: 'mossprout-garden', coord: { column: 1, row: 1 } },
   ]);
   assert.equal(HAVEN_SQUARE_COLUMN_PITCH, 720);
-  assert.equal(HAVEN_SQUARE_ROW_PITCH, 480);
+  assert.equal(HAVEN_SQUARE_ROW_PITCH, 570);
   const baristabbit = havenSquareZoneFrame(MOSSPROUT_SQUARE_ZONES[0].coord);
   const environment = havenSquareZoneFrame(MOSSPROUT_SQUARE_ZONES[1].coord);
   const eggHome = havenSquareZoneFrame(MOSSPROUT_SQUARE_ZONES[2].coord);
@@ -48,7 +48,7 @@ test('square Haven places Baristabbit west of Mossprout and the merge island bel
   assert.equal(eggHome.left - (environment.left + environment.width), 120);
   assert.equal(garden.left, environment.left);
   assert.equal(garden.top, environment.top + HAVEN_SQUARE_ROW_PITCH);
-  assert.equal(environment.top + environment.height - garden.top, 120);
+  assert.equal(environment.top + environment.height - garden.top, 30);
   assert.ok(westernBridge.left < baristabbit.left + baristabbit.width);
   assert.ok(westernBridge.left + westernBridge.width > environment.left);
   assert.ok(easternBridge.left < environment.left + environment.width);
@@ -58,25 +58,25 @@ test('square Haven places Baristabbit west of Mossprout and the merge island bel
   assert.deepEqual(easternBridge, { height: 201, left: 1214, top: 207, width: 453 });
   const junctionMiniIslands = mossproutGardenJunctionMiniIslandFrames();
   const junctionTrays = mossproutGardenJunctionTrayFrames();
-  assert.equal(HAVEN_JUNCTION_MINI_ISLAND_SIZE, 160);
+  assert.equal(HAVEN_JUNCTION_MINI_ISLAND_SIZE, 140);
   assert.equal(HAVEN_JUNCTION_MINI_ISLAND_SPACING, 130);
   assert.equal(HAVEN_JUNCTION_MINI_ISLAND_RISE, 10);
   assert.equal(HAVEN_JUNCTION_TRAY_SIZE, 95);
   assert.equal(HAVEN_JUNCTION_TRAY_TOP_OFFSET, 48);
-  assert.deepEqual(junctionMiniIsland, { height: 160, left: 1000, top: 530, width: 160 });
+  assert.deepEqual(junctionMiniIsland, { height: 140, left: 1010, top: 620, width: 140 });
   assert.deepEqual(junctionMiniIslands, [
-    { height: 160, left: 870, top: 530, width: 160 },
-    { height: 160, left: 1000, top: 530, width: 160 },
-    { height: 160, left: 1130, top: 530, width: 160 },
+    { height: 140, left: 880, top: 620, width: 140 },
+    { height: 140, left: 1010, top: 620, width: 140 },
+    { height: 140, left: 1140, top: 620, width: 140 },
   ]);
   assert.deepEqual(junctionTrays, [
-    { height: 95, left: 902.5, top: 578, width: 95 },
-    { height: 95, left: 1032.5, top: 578, width: 95 },
-    { height: 95, left: 1162.5, top: 578, width: 95 },
+    { height: 95, left: 902.5, top: 668, width: 95 },
+    { height: 95, left: 1032.5, top: 668, width: 95 },
+    { height: 95, left: 1162.5, top: 668, width: 95 },
   ]);
   assert.ok(junctionMiniIsland.top < environment.top + environment.height);
   assert.ok(junctionMiniIsland.top + junctionMiniIsland.height > garden.top);
-  assert.deepEqual(mossproutSquareSceneMetrics(), { width: 2160, height: 1200 });
+  assert.deepEqual(mossproutSquareSceneMetrics(), { width: 2160, height: 1290 });
 });
 
 test('the compact merge island hosts all stable Haven cells on one 7x6 playfield', () => {
@@ -85,15 +85,15 @@ test('the compact merge island hosts all stable Haven cells on one 7x6 playfield
   assert.ok(MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.right > MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.left);
   assert.ok(MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.bottom > MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.top);
   assert.deepEqual(MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS, {
-    bottomLeft: { x: 220, y: 690 },
-    bottomRight: { x: 804, y: 690 },
-    topLeft: { x: 245, y: 215 },
-    topRight: { x: 779, y: 215 },
+    bottomLeft: { x: 205, y: 720 },
+    bottomRight: { x: 819, y: 720 },
+    topLeft: { x: 205, y: 195 },
+    topRight: { x: 819, y: 195 },
   });
-  assert.equal((MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.right - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.left) / 7, 584 / 7);
-  assert.equal((MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.bottom - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.top) / 6, 475 / 6);
-  assert.equal(MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO, (475 / 6) / (584 / 7));
-  assert.equal(MOSSPROUT_GARDEN_TOP_WIDTH_RATIO, 534 / 584);
+  assert.equal((MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.right - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.left) / 7, 614 / 7);
+  assert.equal((MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.bottom - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.top) / 6, 525 / 6);
+  assert.equal(MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO, (525 / 6) / (614 / 7));
+  assert.equal(MOSSPROUT_GARDEN_TOP_WIDTH_RATIO, 1);
 });
 
 test('square Haven runtime art includes full, medium, and thumbnail tiers', () => {
@@ -111,6 +111,41 @@ test('square Haven runtime art includes full, medium, and thumbnail tiers', () =
       assert.ok((bytes[20] & 0x10) !== 0, `${asset} must preserve alpha`);
     }
   }
+});
+
+test('square Haven v2 locks the shared island generation camera', () => {
+  const contract = JSON.parse(fs.readFileSync(
+    path.join(process.cwd(), 'design', 'square-haven-v2', 'island-camera-contract.json'),
+    'utf8',
+  ));
+  assert.equal(contract.id, 'square-haven-v2');
+  assert.deepEqual(contract.camera, {
+    projection: 'orthographic',
+    elevationDegrees: 58,
+    horizontalYawDegrees: 0,
+    rollDegrees: 0,
+    perspectiveConvergence: 'none',
+    minimumRearToFrontWidthRatio: 1,
+  });
+  assert.deepEqual(contract.composition.sideConnections, [
+    { edge: 'left', y: 0.46 },
+    { edge: 'right', y: 0.46 },
+  ]);
+  assert.deepEqual(contract.composition.residentAnchor, { x: 0.5, y: 0.49 });
+});
+
+test('square Haven v2 merge island provides a transparent production master', () => {
+  const masterPath = path.join(
+    process.cwd(),
+    'design',
+    'square-haven-v2',
+    'merge-board',
+    'mossprout-square-merge-island-v4-1024.png',
+  );
+  const master = fs.readFileSync(masterPath);
+  assert.equal(master.readUInt32BE(16), 1024);
+  assert.equal(master.readUInt32BE(20), 1024);
+  assert.equal(master[25], 6, 'square merge-island master must be RGBA PNG');
 });
 
 test('connected Egg Home and perspective bridge include transparent runtime tiers', () => {
