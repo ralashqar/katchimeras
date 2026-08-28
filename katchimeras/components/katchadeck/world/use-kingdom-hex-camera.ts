@@ -15,12 +15,10 @@ import {
   clampCameraTranslation,
   kingdomCameraSnapshotForTarget,
   nearestKingdomFocusTarget,
-  screenPointIsInsideWorldFrame,
   screenPointToWorld,
   type KingdomCameraSnapshot,
   type KingdomFocusTarget,
   type KingdomSize,
-  type KingdomWorldFrame,
 } from '@/utils/kingdom-rendering';
 import { KINGDOM_RENDERING } from '@/constants/kingdom-rendering';
 import { HAVEN_UPGRADE_REDUCED_TIMING, HAVEN_UPGRADE_TIMING } from '@/utils/haven-upgrade-presentation';
@@ -43,7 +41,6 @@ type UseKingdomHexCameraArgs = {
     targets: readonly KingdomFocusTarget[];
   };
   minimumScale?: number;
-  panExclusionFrame?: KingdomWorldFrame | null;
   scene: KingdomSize;
   viewport: KingdomSize;
 };
@@ -68,7 +65,6 @@ export function useKingdomHexCamera({
   initialFitWorld = false,
   magneticFocus,
   minimumScale = 0.54,
-  panExclusionFrame,
   scene,
   viewport,
 }: UseKingdomHexCameraArgs) {
@@ -232,16 +228,6 @@ export function useKingdomHexCamera({
         .maxPointers(1)
         .activeOffsetX([-6, 6])
         .activeOffsetY([-6, 6])
-        .onTouchesDown((event, stateManager) => {
-          const touch = event.allTouches[0];
-          if (!touch || !panExclusionFrame) return;
-          if (screenPointIsInsideWorldFrame(
-            { x: touch.x, y: touch.y },
-            panExclusionFrame,
-            scene,
-            { scale: scale.value, tx: tx.value, ty: ty.value },
-          )) stateManager.fail();
-        })
         .onBegin(() => {
           cancelAnimation(tx);
           cancelAnimation(ty);
@@ -270,7 +256,7 @@ export function useKingdomHexCamera({
           tx.value = withDecay({ velocity: event.velocityX, deceleration: 0.996, clamp: xBounds }, completeDecay);
           ty.value = withDecay({ velocity: event.velocityY, deceleration: 0.996, clamp: yBounds }, completeDecay);
         }),
-    [beginMotion, decayCompletions, interactionEnabled, panExclusionFrame, panStartTx, panStartTy, scale, scene, settleAfterPan, tx, ty, viewport.height, viewport.width]
+    [beginMotion, decayCompletions, interactionEnabled, panStartTx, panStartTy, scale, scene, settleAfterPan, tx, ty, viewport.height, viewport.width]
   );
 
   const pinch = useMemo(
@@ -399,7 +385,6 @@ export function useKingdomHexCamera({
     focusUpgrade,
     focusedTileId,
     gesture,
-    panGesture: pan,
     isMoving: renderState.isMoving,
     ready,
     recenter,

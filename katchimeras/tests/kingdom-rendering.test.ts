@@ -656,13 +656,26 @@ test('the merge island mounts the shared Merge board without giving cell taps or
     path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-hex-canvas.tsx'),
     'utf8',
   );
+  const board = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'games', 'feastle-persistent-merge-board.tsx'),
+    'utf8',
+  );
+  const camera = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'use-kingdom-hex-camera.ts'),
+    'utf8',
+  );
   assert.match(scene, /id: MOSSPROUT_GARDEN_BOARD\.id/);
   assert.match(scene, /mossprout && mossprout\.kind !== 'locked'[\s\S]*?art\.revealed[\s\S]*?art\.locked/);
   assert.match(scene, /kind: 'structure'/);
   assert.match(scene, /overlaySource: art\.overlaySource/);
   assert.match(scene, /interactionFrame/);
   assert.match(canvas, /<FeastlePersistentMergeBoard/);
-  assert.match(canvas, /externalPanGesture=\{camera\.panGesture\}/);
+  assert.ok(canvas.indexOf('<FeastlePersistentMergeBoard') > canvas.indexOf('</GestureDetector>'));
+  assert.match(canvas, /key=\{`haven-merge-board-\$\{assetRevision\}`\}/);
+  assert.match(canvas, /pointerEvents="box-none"[\s\S]*?styles\.mergeBoardInteractionLayer/);
+  assert.doesNotMatch(canvas, /externalPanGesture|camera\.panGesture/);
+  assert.doesNotMatch(board, /blocksExternalGesture|externalPanGesture/);
+  assert.doesNotMatch(camera, /panExclusionFrame|stateManager\.fail/);
   assert.match(canvas, /layout=\{squareWorld \? SQUARE_HAVEN_MERGE_BOARD_LAYOUT : HAVEN_MERGE_BOARD_LAYOUT\}/);
   assert.match(canvas, /cellHeightToWidthRatio: 1\.14/);
   assert.match(canvas, /cellHeightToWidthRatio: MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO/);

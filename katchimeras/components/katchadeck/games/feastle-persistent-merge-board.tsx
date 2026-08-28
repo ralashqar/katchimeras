@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, StyleSheet, View, type ImageSourcePropType } from 'react-native';
-import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { scheduleOnUI } from 'react-native-worklets';
 import Animated, {
   cancelAnimation,
@@ -162,7 +162,7 @@ function isInterruptibleMotion(motion?: SpriteMotion) {
   return motion == null || motion.kind === 'move' || motion.kind === 'swap' || motion.kind === 'return' || motion.kind === 'spawn' || motion.kind === 'merge-result';
 }
 
-export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onCommandSettled, onInteractionGateCommitted, onScreenMetrics, onVisualReady, onBlockedInteraction, onInspectMist, onInspectRootbound, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', sessionId, hiddenItemInstanceIds, animateEntrance = true, externalPanGesture, layout = DEFAULT_MERGE_BOARD_LAYOUT }: {
+export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onCommandSettled, onInteractionGateCommitted, onScreenMetrics, onVisualReady, onBlockedInteraction, onInspectMist, onInspectRootbound, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', sessionId, hiddenItemInstanceIds, animateEntrance = true, layout = DEFAULT_MERGE_BOARD_LAYOUT }: {
   state: MergeWorldState;
   width: number;
   animateEntrance?: boolean;
@@ -182,7 +182,6 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   interactionSessionKey?: string;
   sessionId: MergeBoardSessionId;
   hiddenItemInstanceIds?: ReadonlySet<string>;
-  externalPanGesture?: GestureType;
   layout?: MergeBoardLayout;
 }) {
   const gap = 0;
@@ -837,8 +836,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     return { x: (to.x - from.x) / distance * strength, y: (to.y - from.y) / distance * strength };
   }, [cellSize, geometry, matchHintActive, matchingCellSet, selectedCell, selectedHintTarget]);
 
-  const boardGesture = useMemo(() => {
-    let gesture = Gesture.Pan()
+  const boardGesture = useMemo(() => Gesture.Pan()
     .enabled(entranceInteractive)
     .maxPointers(1)
     .minDistance(0)
@@ -1005,10 +1003,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
         dragPhase.value = 2;
         runOnJS(emitBoardCancel)(id, grabX.value + dragTranslationX.value, grabY.value + dragTranslationY.value, dragEpoch.value);
       }
-    });
-    if (externalPanGesture) gesture = gesture.blocksExternalGesture(externalPanGesture);
-    return gesture;
-  }, [activeDragId, activeSourceCell, blockInteraction, dragEpoch, dragHapticTriggered, dragPhase, dragSprite, dragTranslationX, dragTranslationY, emitBoardCancel, emitBoardDrop, emitBoardTap, emitEmptyCellTap, entranceInteractive, externalPanGesture, gateFromCell, gateGeneratorCell, gateKind, gateToCell, geometry, gestureFinished, grabX, grabY, hoverCell, maxGestureDistance, occupancyDefinitions, occupancyIds, pickSprite, touchDownX, touchDownY]);
+    }), [activeDragId, activeSourceCell, blockInteraction, dragEpoch, dragHapticTriggered, dragPhase, dragSprite, dragTranslationX, dragTranslationY, emitBoardCancel, emitBoardDrop, emitBoardTap, emitEmptyCellTap, entranceInteractive, gateFromCell, gateGeneratorCell, gateKind, gateToCell, geometry, gestureFinished, grabX, grabY, hoverCell, maxGestureDistance, occupancyDefinitions, occupancyIds, pickSprite, touchDownX, touchDownY]);
 
   // Measure a stable, untransformed frame. The visual board enters with a
   // translateY animation; measuring that Animated.View cached a temporary

@@ -270,7 +270,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         }
       : undefined,
     minimumScale: squareWorld ? 0.28 : undefined,
-    panExclusionFrame: mergeBoard ? gardenBoardFrame : null,
     scene,
     viewport,
   });
@@ -625,31 +624,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 </Fragment>
               );
             })}
-            {mergeBoard && gardenBoardFrame && interactionEnabled && !upgradePresentation ? (
-              <View
-                style={[
-                  styles.mergeBoardWorldFrame,
-                  {
-                    height: gardenBoardFrame.height,
-                    left: gardenBoardFrame.left,
-                    top: gardenBoardFrame.top,
-                    width: gardenBoardFrame.width,
-                  },
-                ]}>
-                <FeastlePersistentMergeBoard
-                  animateEntrance={false}
-                  externalPanGesture={camera.panGesture}
-                  layout={squareWorld ? SQUARE_HAVEN_MERGE_BOARD_LAYOUT : HAVEN_MERGE_BOARD_LAYOUT}
-                  maxHeight={gardenBoardFrame.height}
-                  onCommand={mergeBoard.dispatch}
-                  onSelect={selectMergeCell}
-                  selectedCell={selectedMergeCell}
-                  sessionId={mergeSessionRef.current.id}
-                  state={mergeBoard.state}
-                  width={gardenBoardFrame.width}
-                />
-              </View>
-            ) : null}
             {showEgg ? (
               <KingdomEgg
                 {...kingdomWorldViewPoint(
@@ -678,6 +652,42 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           </Animated.View>
         </View>
       </GestureDetector>
+      {/* Keep board input out of the camera handler's native gesture tree.
+          This sibling mirrors the world transform, while box-none lets every
+          point outside the board fall through to the camera underneath. */}
+      {mergeBoard && gardenBoardFrame && interactionEnabled && !upgradePresentation ? (
+        <Animated.View
+          key={`haven-merge-board-${assetRevision}`}
+          pointerEvents="box-none"
+          style={[
+            styles.mergeBoardInteractionLayer,
+            { height: scene.height, width: scene.width },
+            camera.worldStyle,
+          ]}>
+          <View
+            style={[
+              styles.mergeBoardWorldFrame,
+              {
+                height: gardenBoardFrame.height,
+                left: gardenBoardFrame.left,
+                top: gardenBoardFrame.top,
+                width: gardenBoardFrame.width,
+              },
+            ]}>
+            <FeastlePersistentMergeBoard
+              animateEntrance={false}
+              layout={squareWorld ? SQUARE_HAVEN_MERGE_BOARD_LAYOUT : HAVEN_MERGE_BOARD_LAYOUT}
+              maxHeight={gardenBoardFrame.height}
+              onCommand={mergeBoard.dispatch}
+              onSelect={selectMergeCell}
+              selectedCell={selectedMergeCell}
+              sessionId={mergeSessionRef.current.id}
+              state={mergeBoard.state}
+              width={gardenBoardFrame.width}
+            />
+          </View>
+        </Animated.View>
+      ) : null}
       {!upgradePresentation && interactionEnabled ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Recenter kingdom" onPress={camera.recenter} style={[styles.recenter, { bottom: recenterBottom }]}>
           <IconSymbol name="scope" size={22} color={Lantern.moon50} />
@@ -1167,6 +1177,7 @@ const styles = StyleSheet.create({
   focusLayer: { position: 'absolute' },
   tileArt: { position: 'absolute' },
   mergeBoardWorldFrame: { alignItems: 'center', justifyContent: 'center', position: 'absolute' },
+  mergeBoardInteractionLayer: { left: 0, position: 'absolute', top: 0 },
   eggLayer: { height: EGG_WORLD_H, position: 'absolute', width: EGG_WORLD_W },
   creature: { position: 'absolute' },
   lockedTileHitTarget: { alignItems: 'center', justifyContent: 'center', position: 'absolute' },

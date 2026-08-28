@@ -136,7 +136,7 @@ test('the player Haven mounts the square scene and keeps the hex renderer as a f
   assert.match(canvas, /buildKingdomHexScene/);
   assert.match(canvas, /initialFitWorld: squareWorld/);
   assert.match(canvas, /minimumScale: squareWorld \? 0\.28 : undefined/);
-  assert.match(canvas, /panExclusionFrame: mergeBoard \? gardenBoardFrame : null/);
+  assert.doesNotMatch(canvas, /panExclusionFrame/);
   assert.doesNotMatch(canvas, /focusedSquareZoneId/);
   assert.match(canvas, /layer\.id === 'structure:mossprout-square-garden'[\s\S]*?\? 'full'/);
   assert.match(canvas, /kingdomHexTileSourceForLod\(layer, layerLod\)/);
