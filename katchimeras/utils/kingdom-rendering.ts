@@ -206,3 +206,41 @@ export function kingdomCameraSnapshotForTarget(
   );
   return { ...translation, scale };
 }
+
+export function kingdomCameraSnapshotForFrame(
+  viewport: KingdomSize,
+  scene: KingdomSize,
+  frame: KingdomWorldFrame,
+  options: {
+    horizontalPadding?: number;
+    maximumScale: number;
+    minimumScale: number;
+    screenCenterY?: number;
+    verticalPadding?: number;
+  },
+): KingdomCameraSnapshot {
+  const horizontalPadding = Math.max(0, options.horizontalPadding ?? 0);
+  const verticalPadding = Math.max(0, options.verticalPadding ?? horizontalPadding);
+  const availableWidth = Math.max(1, viewport.width - horizontalPadding * 2);
+  const availableHeight = Math.max(1, viewport.height - verticalPadding * 2);
+  const widthScale = frame.width > 0 ? availableWidth / frame.width : options.maximumScale;
+  const heightScale = frame.height > 0 ? availableHeight / frame.height : options.maximumScale;
+  const scale = Math.min(
+    options.maximumScale,
+    Math.max(options.minimumScale, Math.min(widthScale, heightScale)),
+  );
+
+  return kingdomCameraSnapshotForTarget(
+    viewport,
+    scene,
+    {
+      x: frame.left + frame.width / 2,
+      y: frame.top + frame.height / 2,
+    },
+    scale,
+    {
+      x: viewport.width / 2,
+      y: options.screenCenterY ?? viewport.height / 2,
+    },
+  );
+}

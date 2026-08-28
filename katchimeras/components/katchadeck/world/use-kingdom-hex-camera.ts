@@ -13,12 +13,14 @@ import {
 import {
   clampHavenCameraScale,
   clampCameraTranslation,
+  kingdomCameraSnapshotForFrame,
   kingdomCameraSnapshotForTarget,
   nearestKingdomFocusTarget,
   screenPointToWorld,
   type KingdomCameraSnapshot,
   type KingdomFocusTarget,
   type KingdomSize,
+  type KingdomWorldFrame,
 } from '@/utils/kingdom-rendering';
 import { KINGDOM_RENDERING } from '@/constants/kingdom-rendering';
 import { HAVEN_UPGRADE_REDUCED_TIMING, HAVEN_UPGRADE_TIMING } from '@/utils/haven-upgrade-presentation';
@@ -80,6 +82,7 @@ export function useKingdomHexCamera({
   const pinchFocalY = useSharedValue(0);
   const initializedRef = useRef(false);
   const previousSceneRef = useRef(scene);
+  const frameFocusKeyRef = useRef<string | null>(null);
   const decayCompletions = useSharedValue(0);
   const [ready, setReady] = useState(false);
   const [focusedTileId, setFocusedTileId] = useState<string | null>(centerId ?? null);
@@ -124,6 +127,10 @@ export function useKingdomHexCamera({
 
   const beginMotion = useCallback(() => {
     setRenderState((current) => (current.isMoving ? current : { ...current, isMoving: true }));
+  }, []);
+
+  const clearFrameFocus = useCallback(() => {
+    frameFocusKeyRef.current = null;
   }, []);
 
   const animateTo = useCallback(
@@ -234,6 +241,7 @@ export function useKingdomHexCamera({
           panStartTx.value = tx.value;
           panStartTy.value = ty.value;
           decayCompletions.value = 0;
+          runOnJS(clearFrameFocus)();
           runOnJS(beginMotion)();
         })
         .onChange((event) => {
@@ -256,7 +264,7 @@ export function useKingdomHexCamera({
           tx.value = withDecay({ velocity: event.velocityX, deceleration: 0.996, clamp: xBounds }, completeDecay);
           ty.value = withDecay({ velocity: event.velocityY, deceleration: 0.996, clamp: yBounds }, completeDecay);
         }),
-    [beginMotion, decayCompletions, interactionEnabled, panStartTx, panStartTy, scale, scene, settleAfterPan, tx, ty, viewport.height, viewport.width]
+    [beginMotion, clearFrameFocus, decayCompletions, interactionEnabled, panStartTx, panStartTy, scale, scene, settleAfterPan, tx, ty, viewport.height, viewport.width]
   );
 
   const pinch = useMemo(
@@ -272,6 +280,7 @@ export function useKingdomHexCamera({
           pinchStartTy.value = ty.value;
           pinchFocalX.value = event.focalX;
           pinchFocalY.value = event.focalY;
+          runOnJS(clearFrameFocus)();
           runOnJS(beginMotion)();
         })
         .onChange((event) => {
@@ -293,6 +302,7 @@ export function useKingdomHexCamera({
         }),
     [
       beginMotion,
+      clearFrameFocus,
       commitSnapshot,
       interactionEnabled,
       minScale,
@@ -317,6 +327,7 @@ export function useKingdomHexCamera({
   }));
 
   const recenter = useCallback(() => {
+    clearFrameFocus();
     setFocusedTileId(centerId ?? null);
     if (initialFitWorld) {
       const fitScale = viewport.width && viewport.height
@@ -326,25 +337,65 @@ export function useKingdomHexCamera({
       return;
     }
     animateTo(center.x, center.y, baseScale, viewport.height / 2 - viewport.height * 0.02, 260);
-  }, [animateTo, baseScale, center.x, center.y, centerId, initialFitWorld, minScale, scene.height, scene.width, viewport.height, viewport.width]);
+  }, [animateTo, baseScale, center.x, center.y, centerId, clearFrameFocus, initialFitWorld, minScale, scene.height, scene.width, viewport.height, viewport.width]);
 
   const focusResident = useCallback(
     (x: number, y: number, options?: { anchorY?: number; durationMs?: number; id?: string; onComplete?: () => void; zoom?: number }) => {
+      clearFrameFocus();
       if (options?.id) setFocusedTileId(options.id);
       const zoom = Math.min(maxScale, Math.max(scale.value, options?.zoom ?? maxScale));
       const anchorY = options?.anchorY ?? 0.42;
       animateTo(x, y, zoom, viewport.height * anchorY, options?.durationMs ?? 420, options?.onComplete);
     },
-    [animateTo, maxScale, scale, viewport.height]
+    [animateTo, clearFrameFocus, maxScale, scale, viewport.height]
   );
 
   const fitWorld = useCallback((durationMs = 680, onComplete?: () => void) => {
+    clearFrameFocus();
     setFocusedTileId(null);
     const fitScale = viewport.width && viewport.height
       ? Math.max(minScale, Math.min(baseScale * 0.78, viewport.width / scene.width, viewport.height / scene.height))
       : minScale;
     animateTo(scene.width / 2, scene.height / 2, fitScale, viewport.height / 2, durationMs, onComplete);
-  }, [animateTo, baseScale, minScale, scene.height, scene.width, viewport.height, viewport.width]);
+  }, [animateTo, baseScale, clearFrameFocus, minScale, scene.height, scene.width, viewport.height, viewport.width]);
+
+  const focusFrame = useCallback((frame: KingdomWorldFrame, options?: {
+    durationMs?: number;
+    horizontalPadding?: number;
+    screenCenterY?: number;
+    verticalPadding?: number;
+  }) => {
+    if (!viewport.width || !viewport.height || frame.width <= 0 || frame.height <= 0) return;
+    const target = kingdomCameraSnapshotForFrame(viewport, scene, frame, {
+      horizontalPadding: options?.horizontalPadding,
+      maximumScale: maxScale,
+      minimumScale: minScale,
+      screenCenterY: options?.screenCenterY,
+      verticalPadding: options?.verticalPadding,
+    });
+    const key = [target.tx, target.ty, target.scale].map((value) => value.toFixed(3)).join(':');
+    if (frameFocusKeyRef.current === key) return;
+    if (
+      Math.abs(tx.value - target.tx) < 0.75
+      && Math.abs(ty.value - target.ty) < 0.75
+      && Math.abs(scale.value - target.scale) < 0.002
+    ) {
+      commitSnapshot(target.tx, target.ty, target.scale, false);
+      return;
+    }
+    frameFocusKeyRef.current = key;
+    setFocusedTileId(null);
+    animateTo(
+      frame.left + frame.width / 2,
+      frame.top + frame.height / 2,
+      target.scale,
+      options?.screenCenterY ?? viewport.height / 2,
+      options?.durationMs ?? 360,
+      () => {
+        if (frameFocusKeyRef.current === key) frameFocusKeyRef.current = null;
+      },
+    );
+  }, [animateTo, commitSnapshot, maxScale, minScale, scale, scene, tx, ty, viewport]);
 
   const focusUpgrade = useCallback(
     (x: number, y: number, reducedMotion: boolean, onComplete: () => void) => {
@@ -381,6 +432,7 @@ export function useKingdomHexCamera({
 
   return {
     fitWorld,
+    focusFrame,
     focusResident,
     focusUpgrade,
     focusedTileId,

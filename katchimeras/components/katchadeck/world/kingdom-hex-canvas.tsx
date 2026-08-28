@@ -284,6 +284,16 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     scene,
     viewport,
   });
+  const focusCameraFrame = camera.focusFrame;
+  const focusMergeBoard = useCallback(() => {
+    if (!gardenBoardFrame) return;
+    focusCameraFrame(gardenBoardFrame, {
+      durationMs: reduceMotion ? 0 : 360,
+      horizontalPadding: 16,
+      screenCenterY: viewport.height * 0.5,
+      verticalPadding: 72,
+    });
+  }, [focusCameraFrame, gardenBoardFrame, reduceMotion, viewport.height]);
   const tutorialCameraKey = tutorialCamera ? JSON.stringify(tutorialCamera) : 'none';
   const appliedTutorialCameraRef = useRef('none');
   const fitTutorialWorld = camera.fitWorld;
@@ -690,6 +700,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               layout={squareWorld ? SQUARE_HAVEN_MERGE_BOARD_LAYOUT : HAVEN_MERGE_BOARD_LAYOUT}
               maxHeight={gardenBoardFrame.height}
               onCommand={mergeBoard.dispatch}
+              onBoardTap={focusMergeBoard}
               onSelect={selectMergeCell}
               selectedCell={selectedMergeCell}
               sessionId={mergeSessionRef.current.id}

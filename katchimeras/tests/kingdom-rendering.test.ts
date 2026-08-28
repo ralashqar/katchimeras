@@ -19,6 +19,7 @@ import {
 import {
   cameraTranslationBounds,
   clampHavenCameraScale,
+  kingdomCameraSnapshotForFrame,
   kingdomCameraSnapshotForTarget,
   kingdomSceneMetrics,
   kingdomWorldViewPoint,
@@ -749,4 +750,42 @@ test('camera bounds center a scene smaller than the viewport and clamp larger sc
   const bounds = cameraTranslationBounds({ width: 390, height: 844 }, { width: 3200, height: 3000 }, 0.75);
   assert.ok(bounds.x[0] < bounds.x[1]);
   assert.ok(bounds.y[0] < bounds.y[1]);
+});
+
+test('Haven camera frame focus fits the complete merge grid with screen padding', () => {
+  const viewport = { width: 390, height: 844 };
+  const scene = { width: 2100, height: 1170 };
+  const frame = { left: 908, top: 636, width: 342, height: 278 };
+  const snapshot = kingdomCameraSnapshotForFrame(viewport, scene, frame, {
+    horizontalPadding: 16,
+    maximumScale: KINGDOM_RENDERING.havenMaxScale,
+    minimumScale: 0.28,
+    screenCenterY: viewport.height / 2,
+    verticalPadding: 72,
+  });
+  const screenX = (worldX: number) => scene.width / 2 + snapshot.tx + (worldX - scene.width / 2) * snapshot.scale;
+  const screenY = (worldY: number) => scene.height / 2 + snapshot.ty + (worldY - scene.height / 2) * snapshot.scale;
+
+  assert.ok(Math.abs(screenX(frame.left) - 16) < 0.001);
+  assert.ok(Math.abs(screenX(frame.left + frame.width) - (viewport.width - 16)) < 0.001);
+  assert.ok(screenY(frame.top) >= 72);
+  assert.ok(screenY(frame.top + frame.height) <= viewport.height - 72);
+  assert.ok(snapshot.scale <= KINGDOM_RENDERING.havenMaxScale);
+});
+
+test('Haven merge board requests frame focus only after an in-grid tap release', () => {
+  const board = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'games', 'feastle-persistent-merge-board.tsx'),
+    'utf8',
+  );
+  const canvas = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-hex-canvas.tsx'),
+    'utf8',
+  );
+  const touchDownPath = board.slice(board.indexOf('.onTouchesDown'), board.indexOf('.onUpdate'));
+
+  assert.doesNotMatch(touchDownPath, /emitBoardTapFocus/);
+  assert.match(board, /releaseCell >= 0\) runOnJS\(emitBoardTapFocus\)\(\)/);
+  assert.match(canvas, /focusCameraFrame\(gardenBoardFrame/);
+  assert.match(canvas, /onBoardTap=\{focusMergeBoard\}/);
 });

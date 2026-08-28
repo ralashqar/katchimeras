@@ -64,6 +64,7 @@
     "art:merge-board:generate": "python scripts/generate-merge-board-base.py",
     "art:mossprout-merge-atlas": "python scripts/build-mossprout-merge-atlases.py",
     "art:mossprout-merge-items": "python scripts/package-mossprout-toy-items.py && python scripts/build-mossprout-merge-atlases.py",
+    "art:dream-mist": "python scripts/package-dream-mist-toy.py",
     "art:radial-sunburst:generate": "python scripts/generate-radial-sunburst.py",
     "art:merge-locks:audit": "python scripts/process-merge-locked-cell-art.py --audit-only",
     "art:achievement-generate": "python scripts/generate-achievement-trophy-sheet.py",
