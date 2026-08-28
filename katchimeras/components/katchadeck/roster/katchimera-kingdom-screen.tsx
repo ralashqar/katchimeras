@@ -87,7 +87,11 @@ export function KatchimeraKingdomScreen({
   const ftueRecoveryRef = useRef<string | null>(null);
   const enterGroveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const identity = useMemo(loadWorldIdentity, []);
-  const havenMergeSandboxActive = companionSlots.some((slot) => slot.familyId === 'mossprout' && slot.kind === 'owned');
+  const visibleCompanionSlots = useMemo(
+    () => companionSlots.filter((slot) => slot.familyId === 'mossprout'),
+    [companionSlots],
+  );
+  const havenMergeSandboxActive = visibleCompanionSlots.some((slot) => slot.kind === 'owned');
   const havenMergeSandbox = useHavenMergeSandbox(havenMergeSandboxActive);
   const havenMergeBoard = useMemo(() => havenMergeSandbox.state ? ({
     dispatch: havenMergeSandbox.dispatch,
@@ -135,12 +139,12 @@ export function KatchimeraKingdomScreen({
       return;
     }
     if (ftueRestoreStartedRef.current) return;
-    const mossprout = companionSlots.find((slot) => slot.kind === 'owned' && slot.familyId === 'mossprout');
+    const mossprout = visibleCompanionSlots.find((slot) => slot.kind === 'owned');
     if (mossprout?.kind === 'owned') {
       setSelectedCreatureId(mossprout.creature.creatureId);
       if (ftueStepId === 'haven.mossprout.restore') setDetailCreatureId(mossprout.creature.creatureId);
     }
-  }, [companionSlots, ftueStepId]);
+  }, [ftueStepId, visibleCompanionSlots]);
   useEffect(() => {
     if (upgrading || upgradePresentation || (mergeWorld.haven.tileStages.mossprout ?? 0) < 1 || !ftueStepId) return;
     if (ftueRecoveryRef.current === ftueStepId) return;
@@ -152,7 +156,7 @@ export function KatchimeraKingdomScreen({
       onFtueRestore?.();
     }
   }, [ftueStepId, mergeWorld.haven.tileStages.mossprout, onFtueRestore, upgradePresentation, upgrading]);
-  const havenPresentations = useMemo(() => companionSlots.flatMap((slot) => {
+  const havenPresentations = useMemo(() => visibleCompanionSlots.flatMap((slot) => {
     if (slot.kind !== 'owned' || !HAVEN_ENVIRONMENTS[slot.familyId as MergeCharacterId]) return [];
     return [deriveHavenTilePresentation({
       characterId: slot.familyId as MergeCharacterId,
@@ -161,10 +165,10 @@ export function KatchimeraKingdomScreen({
       mergeWorld,
       saving: upgrading && upgradePresentation?.characterId === slot.familyId,
     })];
-  }), [companionSlots, mergeWorld, upgradePresentation?.characterId, upgrading]);
+  }), [mergeWorld, upgradePresentation?.characterId, upgrading, visibleCompanionSlots]);
   const ownedCount = useMemo(
-    () => companionSlots.filter((slot) => slot.kind === 'owned').length,
-    [companionSlots],
+    () => visibleCompanionSlots.filter((slot) => slot.kind === 'owned').length,
+    [visibleCompanionSlots],
   );
   const havenOpeningActive = ftueStepId === 'haven.home_notice'
     || ftueStepId === 'haven.mossprout_focus'
@@ -284,7 +288,7 @@ export function KatchimeraKingdomScreen({
     <View collapsable={false} onLayout={onContentReady} ref={screenRef} style={styles.screen}>
       <KingdomHexCanvas
         background={background}
-        companionSlots={companionSlots}
+        companionSlots={visibleCompanionSlots}
         eggVisual={eggVisual}
         identity={identity}
         discoveryRevealFamilyId={ftueStepId === 'haven.mossprout_reveal' || ftueStepId === 'haven.first_bloom' ? 'mossprout' : null}
@@ -308,6 +312,7 @@ export function KatchimeraKingdomScreen({
         residentStatusGlyphs={residentStatusGlyphs}
         tutorialCamera={tutorialCamera}
         upgradePresentation={upgradePresentation}
+        squareWorld
       />
       {!upgradePresentation ? (
         <HavenTileHudLayer
@@ -400,7 +405,7 @@ export function KatchimeraKingdomScreen({
         </View>
       ) : null}
       {detailCreatureId ? (() => {
-        const slot = companionSlots.find((candidate) => candidate.kind === 'owned' && candidate.creature.creatureId === detailCreatureId);
+        const slot = visibleCompanionSlots.find((candidate) => candidate.kind === 'owned' && candidate.creature.creatureId === detailCreatureId);
         if (!slot || slot.kind !== 'owned') return null;
         const characterId = slot.familyId as MergeCharacterId;
         const environment = HAVEN_ENVIRONMENTS[characterId];

@@ -809,7 +809,7 @@ async function resolveTargetFrame(
   if (cell == null) return null;
   const origin = mergeCellOrigin(boardMetrics.geometry, cell);
   return {
-    height: boardMetrics.geometry.cellSize,
+    height: boardMetrics.geometry.cellHeight ?? boardMetrics.geometry.cellSize,
     width: boardMetrics.geometry.cellSize,
     x: boardMetrics.x + origin.x - screen.x,
     y: boardMetrics.y + origin.y - screen.y,

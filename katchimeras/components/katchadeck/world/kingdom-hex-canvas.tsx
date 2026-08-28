@@ -26,6 +26,7 @@ import { HavenUpgradeEffects } from '@/components/katchadeck/world/haven-upgrade
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { KingdomTileArtLayer, KingdomTileRender } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { buildKingdomHexScene } from '@/components/katchadeck/world/kingdom-hex-scene';
+import { buildMossproutSquareScene } from '@/components/katchadeck/world/mossprout-square-scene';
 import { SeamlessWorldImage } from '@/components/katchadeck/world/seamless-world-image';
 import { useKingdomHexCamera } from '@/components/katchadeck/world/use-kingdom-hex-camera';
 import { KINGDOM_RENDERING } from '@/constants/kingdom-rendering';
@@ -45,6 +46,9 @@ import {
 } from '@/utils/kingdom-rendering';
 import { getDevKingdomHexVerticalAlignmentMode } from '@/utils/dev-asset-overrides';
 import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
+import {
+  MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO,
+} from '@/utils/haven-square-world';
 import {
   HAVEN_MERGE_BOARD_CELL_INDICES,
   HAVEN_MERGE_BOARD_COLUMNS,
@@ -96,6 +100,7 @@ type Props = {
     dispatch: (command: MergeWorldCommand) => MergeWorldCommandResult | null;
     state: MergeWorldState;
   } | null;
+  squareWorld?: boolean;
 };
 
 const CREATURE_SIZE = 58;
@@ -112,10 +117,19 @@ const LOCKED_TILE_HIT_HEIGHT = HEX_TILE_H * 0.78;
 const LOCKED_TILE_LOCK_SIZE = 104;
 const HAVEN_MERGE_BOARD_LAYOUT: MergeBoardLayout = {
   accessibilityLabel: 'Haven merge board, six columns by seven rows',
-  baseSource: require('../../../assets/images/katchimeras/merge-world/generated/merge-board-base-6x7.webp'),
+  cellHeightToWidthRatio: 1.14,
   cellIndices: HAVEN_MERGE_BOARD_CELL_INDICES,
   columns: HAVEN_MERGE_BOARD_COLUMNS,
   rows: HAVEN_MERGE_BOARD_ROWS,
+  transparentSurface: true,
+};
+const SQUARE_HAVEN_MERGE_BOARD_LAYOUT: MergeBoardLayout = {
+  accessibilityLabel: 'Mossprout garden merge board, seven columns by six rows',
+  cellHeightToWidthRatio: MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO,
+  cellIndices: HAVEN_MERGE_BOARD_CELL_INDICES,
+  columns: 7,
+  rows: 6,
+  transparentSurface: true,
 };
 
 export const KingdomHexCanvas = memo(function KingdomHexCanvas({
@@ -137,6 +151,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   highlightedLockedFamilyId,
   discoveryRevealFamilyId = null,
   mergeBoard = null,
+  squareWorld = false,
 }: Props) {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [assetRevision, setAssetRevision] = useState(0);
@@ -162,14 +177,25 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     [assetRevision]
   );
   const scene = useMemo(
-    () => buildKingdomHexScene(companionSlots, hexTileSelection.value, identity, verticalAlignmentSelection.value),
-    [companionSlots, hexTileSelection, identity, verticalAlignmentSelection]
+    () => squareWorld
+      ? buildMossproutSquareScene(companionSlots)
+      : buildKingdomHexScene(companionSlots, hexTileSelection.value, identity, verticalAlignmentSelection.value),
+    [companionSlots, hexTileSelection, identity, squareWorld, verticalAlignmentSelection]
   );
   const presentation = hexTileSelection.value.presentation;
   const creatureWorldSize = CREATURE_SIZE * (presentation?.residentScale ?? CREATURE_WORLD_SCALE);
   const focusTargets = useMemo(
-    () => scene.tiles.map((tile) => ({ id: tile.id, x: tile.cx, y: tile.cy })),
-    [scene.tiles]
+    () => [
+      ...scene.tiles.map((tile) => ({ id: tile.id, x: tile.cx, y: tile.cy })),
+      ...(squareWorld ? scene.tileArtLayers
+        .filter((layer) => layer.kind === 'structure')
+        .map((layer) => ({
+          id: layer.id,
+          x: layer.frame.left + layer.frame.width / 2,
+          y: layer.frame.top + layer.frame.height / 2,
+        })) : []),
+    ],
+    [scene.tileArtLayers, scene.tiles, squareWorld]
   );
   const upgradeLayers = useMemo(() => {
     if (!upgradePresentation) return null;
@@ -178,23 +204,19 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         ? { ...slot, havenStage: stage }
         : slot
     ));
-    const fromScene = buildKingdomHexScene(
-      slotsAtStage(upgradePresentation.fromStage),
-      hexTileSelection.value,
-      identity,
-      verticalAlignmentSelection.value,
-    );
-    const toScene = buildKingdomHexScene(
-      slotsAtStage(upgradePresentation.toStage),
-      hexTileSelection.value,
-      identity,
-      verticalAlignmentSelection.value,
-    );
+    const fromSlots = slotsAtStage(upgradePresentation.fromStage);
+    const toSlots = slotsAtStage(upgradePresentation.toStage);
+    const fromScene = squareWorld
+      ? buildMossproutSquareScene(fromSlots)
+      : buildKingdomHexScene(fromSlots, hexTileSelection.value, identity, verticalAlignmentSelection.value);
+    const toScene = squareWorld
+      ? buildMossproutSquareScene(toSlots)
+      : buildKingdomHexScene(toSlots, hexTileSelection.value, identity, verticalAlignmentSelection.value);
     const fromLayer = fromScene.tileArtLayers.find((layer) => layer.id === `family:${upgradePresentation.characterId}`);
     const toLayer = toScene.tileArtLayers.find((layer) => layer.id === `family:${upgradePresentation.characterId}`);
     const tile = toScene.tiles.find((candidate) => candidate.id === `family:${upgradePresentation.characterId}`);
     return fromLayer && toLayer && tile ? { fromLayer, tile, toLayer } : null;
-  }, [companionSlots, hexTileSelection, identity, upgradePresentation, verticalAlignmentSelection]);
+  }, [companionSlots, hexTileSelection, identity, squareWorld, upgradePresentation, verticalAlignmentSelection]);
   const discoveryLayers = useMemo(() => {
     if (!discoveryRevealFamilyId) return null;
     const revealed = companionSlots.find((slot) => slot.familyId === discoveryRevealFamilyId && slot.kind === 'revealed_egg');
@@ -202,12 +224,14 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const lockedSlots = companionSlots.map((slot) => slot.familyId === discoveryRevealFamilyId
       ? { id: slot.id, coord: slot.coord, familyId: slot.familyId, kind: 'locked' as const }
       : slot);
-    const fromScene = buildKingdomHexScene(lockedSlots, hexTileSelection.value, identity, verticalAlignmentSelection.value);
+    const fromScene = squareWorld
+      ? buildMossproutSquareScene(lockedSlots)
+      : buildKingdomHexScene(lockedSlots, hexTileSelection.value, identity, verticalAlignmentSelection.value);
     const fromLayer = fromScene.tileArtLayers.find((layer) => layer.id === revealed.id);
     const toLayer = scene.tileArtLayers.find((layer) => layer.id === revealed.id);
     const tile = scene.tiles.find((candidate) => candidate.id === revealed.id);
     return fromLayer && toLayer && tile ? { fromLayer, tile, toLayer } : null;
-  }, [companionSlots, discoveryRevealFamilyId, hexTileSelection, identity, scene.tileArtLayers, scene.tiles, verticalAlignmentSelection]);
+  }, [companionSlots, discoveryRevealFamilyId, hexTileSelection, identity, scene.tileArtLayers, scene.tiles, squareWorld, verticalAlignmentSelection]);
   useEffect(() => {
     if (!discoveryLayers) {
       setDiscoveryPhase('armed');
@@ -224,6 +248,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const camera = useKingdomHexCamera({
     center: { x: scene.centerTile.cx, y: scene.centerTile.cy },
     centerId: scene.centerTile.id,
+    initialFitWorld: squareWorld,
     interactionEnabled: interactionEnabled && !upgradePresentation,
     magneticFocus: presentation?.focusMode === 'magnetic'
       ? {
@@ -408,6 +433,17 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const gardenBoardFrame = useMemo(() => (
     scene.tileArtLayers.find((layer) => layer.kind === 'structure')?.interactionFrame ?? null
   ), [scene.tileArtLayers]);
+  const focusSquareZone = camera.focusResident;
+  const focusedSquareZoneId = camera.focusedTileId;
+  const selectMergeCell = useCallback((cell: number | null) => {
+    setSelectedMergeCell(cell);
+    if (!squareWorld || cell == null || !gardenBoardFrame || focusedSquareZoneId === 'structure:mossprout-square-garden') return;
+    focusSquareZone(
+      gardenBoardFrame.left + gardenBoardFrame.width / 2,
+      gardenBoardFrame.top + gardenBoardFrame.height / 2,
+      { anchorY: 0.52, id: 'structure:mossprout-square-garden', zoom: 1.05 },
+    );
+  }, [focusSquareZone, focusedSquareZoneId, gardenBoardFrame, squareWorld]);
   const tileFocusScale = useCallback((tileId: string) => {
     if (!presentation || presentation.focusMode !== 'magnetic' || camera.isMoving || !camera.focusedTileId) return 1;
     if (tileId === camera.focusedTileId) return reduceMotion ? 1.04 : presentation.focusedScale;
@@ -596,10 +632,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 <FeastlePersistentMergeBoard
                   animateEntrance={false}
                   externalPanGesture={camera.panGesture}
-                  layout={HAVEN_MERGE_BOARD_LAYOUT}
+                  layout={squareWorld ? SQUARE_HAVEN_MERGE_BOARD_LAYOUT : HAVEN_MERGE_BOARD_LAYOUT}
                   maxHeight={gardenBoardFrame.height}
                   onCommand={mergeBoard.dispatch}
-                  onSelect={setSelectedMergeCell}
+                  onSelect={selectMergeCell}
                   selectedCell={selectedMergeCell}
                   sessionId={mergeSessionRef.current.id}
                   state={mergeBoard.state}

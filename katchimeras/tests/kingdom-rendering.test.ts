@@ -184,7 +184,7 @@ test('Mossprout garden reserves two cells, four end ports, and sealed middle nei
   assert.equal(MOSSPROUT_GARDEN_BOARD_RESERVED_COORDS.length, 8);
 });
 
-test('Mossprout garden ships only fixed 512 by 768 runtime states', () => {
+test('Mossprout garden ships fixed 512 by 768 runtime states with its painted grid', () => {
   const root = path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'world', 'hex');
   for (const state of ['', '_locked']) {
     const name = `floating_neighborhood_v2_mossprout_garden_board${state}_512x768.webp`;
@@ -192,22 +192,9 @@ test('Mossprout garden ships only fixed 512 by 768 runtime states', () => {
     assert.equal(asset.subarray(0, 4).toString('ascii'), 'RIFF');
     assert.equal(asset.subarray(8, 12).toString('ascii'), 'WEBP');
   }
-  const overlay = fs.readFileSync(
-    path.join(root, 'floating_neighborhood_v2_mossprout_garden_board_merge_overlay_512x768.webp'),
-  );
-  assert.equal(overlay.subarray(0, 4).toString('ascii'), 'RIFF');
-  assert.equal(overlay.subarray(8, 12).toString('ascii'), 'WEBP');
-  const boardBase = fs.readFileSync(
-    path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'merge-world', 'generated', 'merge-board-base-6x7.webp'),
-  );
-  assert.equal(boardBase.subarray(0, 4).toString('ascii'), 'RIFF');
-  assert.equal(boardBase.subarray(8, 12).toString('ascii'), 'WEBP');
-  const overlayScript = fs.readFileSync(
-    path.join(process.cwd(), 'scripts', 'render-mossprout-garden-merge-overlay.py'),
-    'utf8',
-  );
-  assert.match(overlayScript, /COLUMNS = 6/);
-  assert.match(overlayScript, /ROWS = 7/);
+  const structure = fs.readFileSync(path.join(process.cwd(), 'utils', 'kingdom-map-structures.ts'), 'utf8');
+  assert.match(structure, /GARDEN_REVEALED_MERGE_SURFACE_BOUNDS = \{ left: 238, top: 289, right: 800, bottom: 1033 \}/);
+  assert.doesNotMatch(structure, /revealed: \{[\s\S]*?overlaySource:/);
   assert.equal(fs.existsSync(path.join(root, 'floating_neighborhood_v2_mossprout_garden_board.webp')), false);
   assert.equal(fs.existsSync(path.join(root, 'floating_neighborhood_v2_mossprout_garden_board_1024.webp')), false);
 });
@@ -660,6 +647,8 @@ test('the tall garden mounts the shared Merge board without giving cell drags to
   assert.match(canvas, /<FeastlePersistentMergeBoard/);
   assert.match(canvas, /externalPanGesture=\{camera\.panGesture\}/);
   assert.match(canvas, /layout=\{HAVEN_MERGE_BOARD_LAYOUT\}/);
+  assert.match(canvas, /cellHeightToWidthRatio: 1\.14/);
+  assert.match(canvas, /transparentSurface: true/);
   assert.doesNotMatch(canvas, /structure:mossprout-garden/);
 });
 

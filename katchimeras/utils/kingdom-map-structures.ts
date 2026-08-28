@@ -27,7 +27,10 @@ export type KingdomMapStructureDefinition = {
 };
 
 const GARDEN_SOURCE_SIZE = { width: 1024, height: 1536 } as const;
-const GARDEN_MERGE_SURFACE_BOUNDS = { left: 224, top: 400, right: 800, bottom: 1072 } as const;
+// Lift the live board by 37 source pixels (about 5% of its 744 px height) so
+// sprites and hit targets sit on the painted cells rather than below them.
+const GARDEN_REVEALED_MERGE_SURFACE_BOUNDS = { left: 238, top: 289, right: 800, bottom: 1033 } as const;
+const GARDEN_LOCKED_MERGE_SURFACE_BOUNDS = { left: 224, top: 400, right: 800, bottom: 1072 } as const;
 
 export const MOSSPROUT_GARDEN_BOARD: KingdomMapStructureDefinition = {
   id: 'structure:mossprout-garden',
@@ -42,16 +45,15 @@ export const MOSSPROUT_GARDEN_BOARD: KingdomMapStructureDefinition = {
   art: {
     revealed: {
       source: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_garden_board_512x768.webp'),
-      overlaySource: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_garden_board_merge_overlay_512x768.webp'),
       sourceSize: GARDEN_SOURCE_SIZE,
-      alphaBounds: { left: 57, top: 60, right: 967, bottom: 1487 },
-      mergeSurfaceBounds: GARDEN_MERGE_SURFACE_BOUNDS,
+      alphaBounds: { left: 61, top: 86, right: 970, bottom: 1487 },
+      mergeSurfaceBounds: GARDEN_REVEALED_MERGE_SURFACE_BOUNDS,
     },
     locked: {
       source: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_garden_board_locked_512x768.webp'),
       sourceSize: GARDEN_SOURCE_SIZE,
       alphaBounds: { left: 58, top: 61, right: 966, bottom: 1487 },
-      mergeSurfaceBounds: GARDEN_MERGE_SURFACE_BOUNDS,
+      mergeSurfaceBounds: GARDEN_LOCKED_MERGE_SURFACE_BOUNDS,
     },
   },
 };

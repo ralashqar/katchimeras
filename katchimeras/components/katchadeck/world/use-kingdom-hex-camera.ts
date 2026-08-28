@@ -32,6 +32,7 @@ type UseKingdomHexCameraArgs = {
   center: { x: number; y: number };
   centerId?: string;
   interactionEnabled?: boolean;
+  initialFitWorld?: boolean;
   magneticFocus?: {
     anchorY: number;
     durationMs: number;
@@ -60,6 +61,7 @@ export function useKingdomHexCamera({
   center,
   centerId,
   interactionEnabled = true,
+  initialFitWorld = false,
   magneticFocus,
   scene,
   viewport,
@@ -179,12 +181,15 @@ export function useKingdomHexCamera({
     if (!viewport.width || !viewport.height || !scene.width || !scene.height) return;
 
     if (!initializedRef.current) {
+      const initialScale = initialFitWorld
+        ? Math.max(minScale, Math.min(baseScale * 0.78, viewport.width / scene.width, viewport.height / scene.height))
+        : baseScale;
       const home = kingdomCameraSnapshotForTarget(
         viewport,
         scene,
         { x: centerX, y: centerY },
-        baseScale,
-        { x: viewport.width / 2, y: viewport.height / 2 - viewport.height * 0.02 },
+        initialScale,
+        { x: viewport.width / 2, y: viewport.height / 2 },
       );
       tx.value = home.tx;
       ty.value = home.ty;
@@ -212,7 +217,7 @@ export function useKingdomHexCamera({
     ty.value = clamped.ty;
     scale.value = nextScale;
     commitSnapshot(clamped.tx, clamped.ty, nextScale, false);
-  }, [baseScale, centerX, centerY, commitSnapshot, pinchStartScale, scale, scene, tx, ty, viewport]);
+  }, [baseScale, centerX, centerY, commitSnapshot, initialFitWorld, minScale, pinchStartScale, scale, scene, tx, ty, viewport]);
 
   const pan = useMemo(
     () =>
@@ -310,8 +315,15 @@ export function useKingdomHexCamera({
 
   const recenter = useCallback(() => {
     setFocusedTileId(centerId ?? null);
+    if (initialFitWorld) {
+      const fitScale = viewport.width && viewport.height
+        ? Math.max(minScale, Math.min(baseScale * 0.78, viewport.width / scene.width, viewport.height / scene.height))
+        : minScale;
+      animateTo(scene.width / 2, scene.height / 2, fitScale, viewport.height / 2, 260);
+      return;
+    }
     animateTo(center.x, center.y, baseScale, viewport.height / 2 - viewport.height * 0.02, 260);
-  }, [animateTo, baseScale, center.x, center.y, centerId, viewport.height]);
+  }, [animateTo, baseScale, center.x, center.y, centerId, initialFitWorld, minScale, scene.height, scene.width, viewport.height, viewport.width]);
 
   const focusResident = useCallback(
     (x: number, y: number, options?: { anchorY?: number; durationMs?: number; id?: string; onComplete?: () => void; zoom?: number }) => {

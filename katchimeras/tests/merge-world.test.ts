@@ -52,6 +52,7 @@ test('Haven projects the complete Mossprout starter interaction area onto a 6x7 
 
   const geometry = {
     cellIndices: HAVEN_MERGE_BOARD_CELL_INDICES,
+    cellHeight: 55,
     cellSize: 48,
     columns: HAVEN_MERGE_BOARD_COLUMNS,
     gap: 0,
@@ -59,7 +60,10 @@ test('Haven projects the complete Mossprout starter interaction area onto a 6x7 
     rows: HAVEN_MERGE_BOARD_ROWS,
   };
   const origin = mergeCellOrigin(geometry, 29);
-  assert.equal(mergeCellFromPoint(geometry, origin.x + 24, origin.y + 24), 29);
+  assert.equal(mergeCellFromPoint(geometry, origin.x + 24, origin.y + 27.5), 29);
+  assert.deepEqual(mergeCellCenter(geometry, 29), { x: origin.x + 24, y: origin.y + 27.5 });
+  const firstRowOrigin = mergeCellOrigin(geometry, HAVEN_MERGE_BOARD_CELL_INDICES[0]);
+  assert.equal(mergeCellOrigin(geometry, HAVEN_MERGE_BOARD_CELL_INDICES[6]).y, firstRowOrigin.y + 55);
   assert.equal(mergeNeighborCellInDirection(geometry, 29, 1, 0), 30);
 
   const merged = reduceMergeWorld(state, { type: 'move', from: 29, to: 30, now: NOW + 1 });
@@ -943,7 +947,7 @@ test('generator spawn pops from its source, arcs short, then slides into the des
   assert.ok(slide.travel > landing.travel && slide.travel < 1);
   assert.ok(slide.settleY < 0.04);
   assert.deepEqual(spawnSpriteMotionFrame(1), { arc: 0, opacity: 1, scale: 1, settleY: 0, travel: 1 });
-  assert.match(board, /const start = mergeCellOrigin\(geometry, from\)/);
+  assert.match(board, /const start = mergeSpriteOrigin\(geometry, from\)/);
   assert.match(board, /startX: start\.x, startY: start\.y/);
   assert.match(board, /duration: motion\.kind === 'spawn' \? SPAWN_MOTION_DURATION_MS/);
   assert.match(board, /spawnFrame \? arcHeight\.value \* spawnFrame\.arc \+ cellSize \* spawnFrame\.settleY/);

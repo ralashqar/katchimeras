@@ -36,6 +36,7 @@ export type KingdomTileRender = {
   cy: number;
   depth: number;
   companion?: KingdomHexCompanionSlot;
+  squareCoord?: { column: number; row: number };
 };
 
 export type KingdomTileArtLayer = {
@@ -55,6 +56,7 @@ export type KingdomTileArtLayer = {
   sourceSize: { width: number; height: number };
   source: ImageSourcePropType;
   sources?: KingdomHexTileLodSources;
+  squareCoord?: { column: number; row: number };
 };
 
 export type KingdomHexScene = {

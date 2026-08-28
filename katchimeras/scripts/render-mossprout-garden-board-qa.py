@@ -42,12 +42,19 @@ def paste_tile(canvas: Image.Image, filename: str, center: tuple[float, float]) 
     canvas.alpha_composite(image, (left, top))
 
 
-def paste_garden(canvas: Image.Image, locked: bool) -> None:
+def paste_garden(canvas: Image.Image, locked: bool, front_isometric: bool = False) -> None:
     suffix = "_locked" if locked else ""
-    image = Image.open(
-        HEX_DIR / f"floating_neighborhood_v2_mossprout_garden_board{suffix}_512x768.webp"
-    ).convert("RGBA")
-    left_bound, top_bound, right_bound, _ = GARDEN_ALPHA_BOUNDS
+    if front_isometric:
+        image = Image.open(
+            OUT_DIR / "mossprout-garden-board-v3-front-isometric-alpha.png"
+        ).convert("RGBA")
+    else:
+        image = Image.open(
+            HEX_DIR / f"floating_neighborhood_v2_mossprout_garden_board{suffix}_512x768.webp"
+        ).convert("RGBA")
+    left_bound, top_bound, right_bound, _ = (
+        (61, 86, 970, 1487) if front_isometric else GARDEN_ALPHA_BOUNDS
+    )
     scale = HEX_W * VIEW_SCALE / (right_bound - left_bound)
     size = (round(image.width * scale), round(image.height * scale))
     image = image.resize(size, Image.Resampling.LANCZOS)
@@ -58,7 +65,7 @@ def paste_garden(canvas: Image.Image, locked: bool) -> None:
         image,
         (round(target_left - left_bound * scale), round(target_top - top_bound * scale)),
     )
-    if not locked:
+    if not locked and not front_isometric:
         overlay = Image.open(
             HEX_DIR / "floating_neighborhood_v2_mossprout_garden_board_merge_overlay_512x768.webp"
         ).convert("RGBA").resize(size, Image.Resampling.LANCZOS)
@@ -87,10 +94,10 @@ def paste_mossprout(canvas: Image.Image) -> None:
     canvas.alpha_composite(image, (round(x - image.width / 2), round(y - image.height * 0.82)))
 
 
-def render(filename: str, locked: bool) -> None:
+def render(filename: str, locked: bool, front_isometric: bool = False) -> None:
     canvas = Image.new("RGBA", CANVAS, "#0b1020")
     paste_tile(canvas, "floating_neighborhood_v2_home_hex_tile.webp", center_for(0, 0))
-    paste_garden(canvas, locked)
+    paste_garden(canvas, locked, front_isometric)
     paste_tile(
         canvas,
         "floating_neighborhood_v2_mossprout_haven_stage_2_hex_tile.webp",
@@ -106,3 +113,4 @@ if __name__ == "__main__":
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     render("qa-home-garden-mossprout-revealed.png", locked=False)
     render("qa-home-garden-mossprout-locked.png", locked=True)
+    render("qa-home-garden-mossprout-v3-front-isometric.png", locked=False, front_isometric=True)
