@@ -26,6 +26,13 @@ export type KingdomSize = {
   height: number;
 };
 
+export type KingdomWorldFrame = {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+};
+
 export type KingdomWorldViewPlacement = {
   horizontalOffsetHexTileWidth: number;
   verticalOffsetHexTileHeight: number;
@@ -130,6 +137,21 @@ export function screenPointToWorld(
     x: (point.x - scene.width / 2 - camera.tx) / camera.scale + scene.width / 2,
     y: (point.y - scene.height / 2 - camera.ty) / camera.scale + scene.height / 2,
   };
+}
+
+export function screenPointIsInsideWorldFrame(
+  point: { x: number; y: number },
+  frame: KingdomWorldFrame,
+  scene: KingdomSize,
+  camera: KingdomCameraSnapshot,
+): boolean {
+  'worklet';
+  const worldX = (point.x - scene.width / 2 - camera.tx) / camera.scale + scene.width / 2;
+  const worldY = (point.y - scene.height / 2 - camera.ty) / camera.scale + scene.height / 2;
+  return worldX >= frame.left
+    && worldX <= frame.left + frame.width
+    && worldY >= frame.top
+    && worldY <= frame.top + frame.height;
 }
 
 export function cameraTranslationBounds(viewport: KingdomSize, scene: KingdomSize, scale: number) {

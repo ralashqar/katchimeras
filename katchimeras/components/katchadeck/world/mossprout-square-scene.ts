@@ -2,7 +2,7 @@ import type { KingdomHexScene, KingdomTileArtLayer, KingdomTileRender } from '@/
 import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
 import {
   havenSquareZoneFrame,
-  MOSSPROUT_GARDEN_GRID_SOURCE_BOUNDS,
+  MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS,
   MOSSPROUT_SQUARE_ZONES,
   mossproutSquareSceneMetrics,
 } from '@/utils/haven-square-world';
@@ -17,13 +17,13 @@ const ENVIRONMENT_SOURCES = {
 };
 
 const GARDEN_SOURCES = {
-  full: require('../../../assets/images/katchimeras/world/square/mossprout-garden-7x6.webp'),
-  medium: require('../../../assets/images/katchimeras/world/square/mossprout-garden-7x6-512.webp'),
-  thumb: require('../../../assets/images/katchimeras/world/square/mossprout-garden-7x6-256.webp'),
+  full: require('../../../assets/images/katchimeras/world/square/mossprout-garden-6x7-flat.webp'),
+  medium: require('../../../assets/images/katchimeras/world/square/mossprout-garden-6x7-flat-512.webp'),
+  thumb: require('../../../assets/images/katchimeras/world/square/mossprout-garden-6x7-flat-256.webp'),
 };
 
 function interactionFrame(frame: { left: number; top: number; width: number; height: number }) {
-  const bounds = MOSSPROUT_GARDEN_GRID_SOURCE_BOUNDS;
+  const bounds = MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS;
   return {
     height: ((bounds.bottom - bounds.top) / SOURCE_SIZE.height) * frame.height,
     left: frame.left + (bounds.left / SOURCE_SIZE.width) * frame.width,
@@ -92,4 +92,3 @@ export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlo
     width: metrics.width,
   };
 }
-

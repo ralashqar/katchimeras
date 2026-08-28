@@ -12,10 +12,10 @@ export type HavenSquareZone = {
 
 export const HAVEN_SQUARE_ZONE_SIZE = 600;
 /**
- * The transparent source squares overlap so the painted silhouettes sit close
- * together. Their alpha bounds remain separated by a small visible gap.
+ * The source frames overlap by the combined transparent edge padding so the
+ * main island's bottom stair meets the garden's top stair without art overlap.
  */
-export const HAVEN_SQUARE_ZONE_FRAME_OVERLAP = HAVEN_SQUARE_ZONE_SIZE * 0.1;
+export const HAVEN_SQUARE_ZONE_FRAME_OVERLAP = 52;
 export const HAVEN_SQUARE_SCENE_PADDING = 60;
 
 export const MOSSPROUT_SQUARE_ZONES: readonly HavenSquareZone[] = [
@@ -41,17 +41,17 @@ export function mossproutSquareSceneMetrics() {
   };
 }
 
-/** Bounds of the generated 7x6 painted grid in its canonical 1024px source. */
-export const MOSSPROUT_GARDEN_GRID_SOURCE_BOUNDS = {
-  bottom: 677,
-  left: 174,
-  right: 854,
-  top: 244,
+/** Bounds of the clear 6x7 runtime playfield in the unlined garden source. */
+export const MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS = {
+  bottom: 690,
+  left: 276,
+  right: 742,
+  top: 180,
 } as const;
 
-/** Average painted cell aspect, derived from the complete 7x6 source grid. */
+/** Cell aspect derived from the complete 6x7 runtime playfield. */
 export const MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO = (
-  (MOSSPROUT_GARDEN_GRID_SOURCE_BOUNDS.bottom - MOSSPROUT_GARDEN_GRID_SOURCE_BOUNDS.top) / 6
+  (MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.bottom - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.top) / 7
 ) / (
-  (MOSSPROUT_GARDEN_GRID_SOURCE_BOUNDS.right - MOSSPROUT_GARDEN_GRID_SOURCE_BOUNDS.left) / 7
+  (MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.right - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.left) / 6
 );

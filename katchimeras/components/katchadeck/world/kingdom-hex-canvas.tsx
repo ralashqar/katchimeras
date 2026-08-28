@@ -124,11 +124,14 @@ const HAVEN_MERGE_BOARD_LAYOUT: MergeBoardLayout = {
   transparentSurface: true,
 };
 const SQUARE_HAVEN_MERGE_BOARD_LAYOUT: MergeBoardLayout = {
-  accessibilityLabel: 'Mossprout garden merge board, seven columns by six rows',
+  accessibilityLabel: 'Mossprout garden merge board, six columns by seven rows',
+  baseArtOpacity: 0.34,
+  baseSource: require('../../../assets/images/katchimeras/merge-world/generated/merge-board-base-6x7.webp'),
   cellHeightToWidthRatio: MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO,
   cellIndices: HAVEN_MERGE_BOARD_CELL_INDICES,
-  columns: 7,
-  rows: 6,
+  columns: HAVEN_MERGE_BOARD_COLUMNS,
+  fillAvailableSpace: true,
+  rows: HAVEN_MERGE_BOARD_ROWS,
   transparentSurface: true,
 };
 
@@ -245,6 +248,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       clearTimeout(completeTimer);
     };
   }, [discoveryLayers, reduceMotion]);
+  const gardenBoardFrame = useMemo(() => (
+    scene.tileArtLayers.find((layer) => layer.kind === 'structure')?.interactionFrame ?? null
+  ), [scene.tileArtLayers]);
   const camera = useKingdomHexCamera({
     center: { x: scene.centerTile.cx, y: scene.centerTile.cy },
     centerId: scene.centerTile.id,
@@ -259,6 +265,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           targets: focusTargets,
         }
       : undefined,
+    panExclusionFrame: mergeBoard ? gardenBoardFrame : null,
     scene,
     viewport,
   });
@@ -430,9 +437,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     () => new Map(scene.tileArtLayers.map((layer) => [layer.id, layer])),
     [scene.tileArtLayers]
   );
-  const gardenBoardFrame = useMemo(() => (
-    scene.tileArtLayers.find((layer) => layer.kind === 'structure')?.interactionFrame ?? null
-  ), [scene.tileArtLayers]);
   const focusSquareZone = camera.focusResident;
   const focusedSquareZoneId = camera.focusedTileId;
   const selectMergeCell = useCallback((cell: number | null) => {
@@ -579,12 +583,18 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         <View style={StyleSheet.absoluteFill}>
           <Animated.View style={[styles.scene, { width: scene.width, height: scene.height }, camera.worldStyle]}>
             {scene.tileArtLayers.map((layer) => {
-              const source = kingdomHexTileSourceForLod(layer, KINGDOM_RENDERING.havenImageLod);
-              const overlaySource = kingdomHexTileOverlaySourceForLod(layer, KINGDOM_RENDERING.havenImageLod);
+              // The merge garden sits beneath many small interactive sprites
+              // and remains visible while zoomed. Give that single container
+              // its 1024 px tier without promoting every Haven tile globally.
+              const layerLod = squareWorld && layer.id === 'structure:mossprout-square-garden'
+                ? 'full'
+                : KINGDOM_RENDERING.havenImageLod;
+              const source = kingdomHexTileSourceForLod(layer, layerLod);
+              const overlaySource = kingdomHexTileOverlaySourceForLod(layer, layerLod);
               const fallbackSource = layer.fallbackSource
                 ? kingdomHexTileSourceForLod(
                     { source: layer.fallbackSource, sources: layer.fallbackSources },
-                    KINGDOM_RENDERING.havenImageLod
+                    layerLod
                   )
                 : null;
               return (
@@ -597,7 +607,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                     source={source}
                     overlaySource={overlaySource}
                     fallbackSource={fallbackSource}
-                    priority={layer.id === scene.centerTile.id ? 'high' : 'normal'}
+                    priority={layer.id === scene.centerTile.id || layer.id === 'structure:mossprout-square-garden' ? 'high' : 'normal'}
                   />
                   {upgradeLayers && upgradePresentation && layer.id === upgradeLayers.tile.id ? (
                     <HavenUpgradeTileArt

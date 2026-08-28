@@ -12,6 +12,7 @@ import Animated, {
   runOnJS,
   useAnimatedReaction,
   useAnimatedStyle,
+  useDerivedValue,
   useReducedMotion,
   useSharedValue,
   withDelay,
@@ -45,10 +46,14 @@ export type MergeBoardScreenMetrics = { geometry: MergeBoardGeometry; x: number;
 export type MergeBoardLayout = {
   accessibilityLabel: string;
   baseSource?: ImageSourcePropType;
+  /** Opacity for merge-page grid art. Defaults to 0 on transparent surfaces. */
+  baseArtOpacity?: number;
   /** Allows a board painted into its parent artwork to remain visible. */
   transparentSurface?: boolean;
   /** Visual cell height divided by cell width. Square boards default to 1. */
   cellHeightToWidthRatio?: number;
+  /** Fill the supplied width and maxHeight exactly so no parent gesture leaks through. */
+  fillAvailableSpace?: boolean;
   cellIndices: readonly number[];
   columns: number;
   rows: number;
@@ -185,14 +190,21 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   const border = 0;
   const cellHeightToWidthRatio = layout.cellHeightToWidthRatio ?? 1;
   const widthCellSize = (width - (padding + border) * 2 - gap * (layout.columns - 1)) / layout.columns;
-  const heightCellSize = maxHeight == null
+  const availableCellHeight = maxHeight == null
+    ? widthCellSize * cellHeightToWidthRatio
+    : (maxHeight - (padding + border) * 2 - gap * (layout.rows - 1)) / layout.rows;
+  const fillAvailableSpace = layout.fillAvailableSpace === true && maxHeight != null;
+  const cellSize = Math.max(24, fillAvailableSpace
     ? widthCellSize
-    : (maxHeight - (padding + border) * 2 - gap * (layout.rows - 1)) / (layout.rows * cellHeightToWidthRatio);
-  const cellSize = Math.max(24, Math.floor(Math.min(widthCellSize, heightCellSize)));
-  const cellHeight = Math.max(24, Math.floor(cellSize * cellHeightToWidthRatio));
+    : Math.floor(Math.min(widthCellSize, availableCellHeight / cellHeightToWidthRatio)));
+  const cellHeight = Math.max(24, fillAvailableSpace
+    ? availableCellHeight
+    : Math.floor(cellSize * cellHeightToWidthRatio));
   const inset = padding + border;
   const boardWidth = cellSize * layout.columns + gap * (layout.columns - 1) + inset * 2;
   const boardHeight = cellHeight * layout.rows + gap * (layout.rows - 1) + inset * 2;
+  const baseArtOpacity = Math.max(0, Math.min(1, layout.baseArtOpacity ?? (layout.transparentSurface ? 0 : 1)));
+  const showBaseArt = !layout.transparentSurface || baseArtOpacity > 0;
   const geometry = useMemo<MergeBoardGeometry>(() => ({ columns: layout.columns, rows: layout.rows, cellIndices: layout.cellIndices, cellSize, cellHeight, gap, inset }), [cellHeight, cellSize, gap, inset, layout.cellIndices, layout.columns, layout.rows]);
   const visibleCellSet = useMemo(() => new Set(layout.cellIndices), [layout.cellIndices]);
   const cellOrigins = useMemo(
@@ -273,7 +285,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   const gateToCell = interactionGate.kind === 'drag' ? interactionGate.toCell : -1;
   const gateGeneratorCell = interactionGate.kind === 'generator' ? interactionGate.cell : -1;
   const mossproutOnboarding = presentation.activeOrders.some((order) => order.id.startsWith('mossprout:chapter-0:'));
-  const [baseArtDisplayed, setBaseArtDisplayed] = useState(layout.transparentSurface === true);
+  const [baseArtDisplayed, setBaseArtDisplayed] = useState(!showBaseArt);
   const [cellArtReady, setCellArtReady] = useState(false);
   const artCache = useMergeArtCache(presentation, mossproutOnboarding, () => setCellArtReady(true));
   useEffect(() => {
@@ -1004,7 +1016,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   return <View onLayout={reportScreenMetrics} ref={boardRef} style={[styles.boardFrame, { height: boardHeight, width: boardWidth }]}>
     <GestureDetector gesture={boardGesture}><Animated.View accessibilityLabel={layout.accessibilityLabel} style={[styles.board, layout.transparentSurface && styles.boardTransparentSurface, busy && styles.boardAnimating, { height: boardHeight, padding, width: boardWidth }, boardEntranceStyle]}>
     {!layout.transparentSurface ? <LinearGradient colors={['#788143', '#55602F', '#384321']} locations={[0, 0.52, 1]} pointerEvents="none" style={styles.boardGradient} /> : null}
-    {!layout.transparentSurface ? <Image
+    {showBaseArt ? <Image
       accessibilityIgnoresInvertColors
       allowDownscaling
       cachePolicy="memory"
@@ -1014,7 +1026,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       onDisplay={() => setBaseArtDisplayed(true)}
       recyclingKey="merge-board-static-base"
       source={layout.baseSource ?? MERGE_BOARD_BASE}
-      style={{ borderRadius: 5, height: cellHeight * layout.rows, left: inset, position: 'absolute', top: inset, width: cellSize * layout.columns }}
+      style={{ borderRadius: 5, height: cellHeight * layout.rows, left: inset, opacity: baseArtOpacity, position: 'absolute', top: inset, width: cellSize * layout.columns }}
       transition={0}
     /> : null}
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
@@ -1392,7 +1404,12 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   const capturedDragEpoch = useSharedValue(-1);
   const previousMotionToken = useRef<number | null>(null);
   const entranceProgress = useSharedValue(entranceDelay == null ? 1 : 0);
+  const matchHintProgress = useSharedValue(0);
   const entranceReduceMotion = useRef(reduceMotion).current;
+  const matchHintActive = matchHint != null && !motion;
+  const matchHintOffsetX = matchHint?.x ?? 0;
+  const matchHintOffsetY = matchHint?.y ?? 0;
+  const artBaseSize = occupant.kind === 'generator' ? cellSize : cellSize - 4;
 
   useEffect(() => {
     if (entranceDelay == null) return;
@@ -1402,6 +1419,17 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
       : withDelay(entranceDelay, withSpring(1, { damping: 13, mass: 0.58, stiffness: 240 }));
     return () => cancelAnimation(entranceProgress);
   }, [entranceDelay, entranceProgress, entranceReduceMotion]);
+
+  useEffect(() => {
+    cancelAnimation(matchHintProgress);
+    matchHintProgress.value = matchHintActive
+      ? withRepeat(withSequence(
+          withTiming(1, { duration: 900, easing: Easing.inOut(Easing.quad) }),
+          withTiming(0, { duration: 900, easing: Easing.inOut(Easing.quad) }),
+        ), -1, false)
+      : withTiming(0, { duration: 160, easing: Easing.out(Easing.quad) });
+    return () => cancelAnimation(matchHintProgress);
+  }, [matchHintActive, matchHintProgress]);
 
   useAnimatedReaction(
     () => activeDragId.value === instanceId ? dragEpoch.value : -1,
@@ -1514,12 +1542,40 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
 
   useEffect(() => () => {
     cancelAnimation(entranceProgress);
+    cancelAnimation(matchHintProgress);
     cancelAnimation(progress);
     cancelAnimation(scale);
     cancelAnimation(spriteOpacity);
     cancelAnimation(x);
     cancelAnimation(y);
-  }, [entranceProgress, progress, scale, spriteOpacity, x, y]);
+  }, [entranceProgress, matchHintProgress, progress, scale, spriteOpacity, x, y]);
+
+  // Resize the native image view for scale animation instead of transforming
+  // a cell-sized compositor texture. The resting image remains true 1x.
+  const visualScale = useDerivedValue(() => {
+    const p = progress.value;
+    const moving = animating.value === 1;
+    const motionKind = activeMotionKind.value;
+    const spawnFrame = moving && motionKind === 'spawn' ? spawnSpriteMotionFrame(p, reduceMotion) : null;
+    const mergeFrame = moving && motionKind?.startsWith('merge-')
+      ? mergeSpriteMotionFrame(motionKind, p, reduceMotion)
+      : null;
+    const intro = Math.max(0, Math.min(1, entranceProgress.value));
+    const motionScale = spawnFrame?.scale ?? mergeFrame?.scale ?? scale.value;
+    return motionScale
+      * interpolate(intro, [0, 0.68, 1], [0.72, 1.08, 1])
+      * (1 + matchHintProgress.value * 0.055);
+  }, [reduceMotion]);
+
+  const artLayoutStyle = useAnimatedStyle(() => {
+    const renderedSize = artBaseSize * visualScale.value;
+    return {
+      height: renderedSize,
+      left: (cellSize - renderedSize) / 2,
+      top: (cellSize - renderedSize) / 2,
+      width: renderedSize,
+    };
+  }, [artBaseSize, cellSize]);
 
   const animatedStyle = useAnimatedStyle(() => {
     const p = progress.value;
@@ -1539,35 +1595,34 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
     let opacity = mergeFrame?.opacity ?? spriteOpacity.value;
     if (spawnFrame) opacity = spawnFrame.opacity;
     const intro = Math.max(0, Math.min(1, entranceProgress.value));
-    const motionScale = spawnFrame?.scale ?? mergeFrame?.scale ?? scale.value;
+    const hintProgress = matchHintProgress.value;
     return {
       opacity: opacity * intro,
-      zIndex: dragging || moving || scale.value > 1.001 ? 1000 : 10,
+      zIndex: dragging || moving || visualScale.value > 1.001 || hintProgress > 0.001 ? 1000 : 10,
       transform: [
-        { translateX: worldX },
-        { translateY: worldY + (spawnFrame ? arcHeight.value * spawnFrame.arc + cellSize * spawnFrame.settleY : 0) },
+        { translateX: worldX + matchHintOffsetX * hintProgress },
+        { translateY: worldY + matchHintOffsetY * hintProgress + (spawnFrame ? arcHeight.value * spawnFrame.arc + cellSize * spawnFrame.settleY : 0) },
         { translateY: (1 - intro) * 8 },
-        { scale: motionScale * interpolate(intro, [0, 0.68, 1], [0.72, 1.08, 1]) },
       ],
     };
-  }, [activeDragId, activeMotionKind, animating, arcHeight, cellSize, dragPhase, dragTranslationX, dragTranslationY, entranceProgress, grabX, grabY, instanceId, reduceMotion, spriteOpacity, targetX, targetY]);
+  }, [activeDragId, activeMotionKind, animating, arcHeight, cellSize, dragPhase, dragTranslationX, dragTranslationY, entranceProgress, grabX, grabY, instanceId, matchHintOffsetX, matchHintOffsetY, matchHintProgress, reduceMotion, spriteOpacity, targetX, targetY, visualScale]);
 
   return <Animated.View pointerEvents="none" style={[styles.sprite, { height: cellSize, left: 0, top: 0, width: cellSize }, animatedStyle]}>
-    <MergeMatchHint active={matchHint != null && !motion} offsetX={matchHint?.x ?? 0} offsetY={matchHint?.y ?? 0}>
+    <Animated.View pointerEvents="none" style={[styles.spriteArtSurface, artLayoutStyle]}>
       {occupant.kind === 'generator'
-        ? <PersistentGeneratorArt artCache={artCache} generatorId={occupant.generatorId} level={generatorLevel} mossproutOnboarding={mossproutOnboarding} size={cellSize} />
-        : <PersistentMergeItemArt artCache={artCache} definitionId={occupant.definitionId} size={cellSize - 4} />}
-    </MergeMatchHint>
-    </Animated.View>;
+        ? <PersistentGeneratorArt artCache={artCache} fill generatorId={occupant.generatorId} level={generatorLevel} mossproutOnboarding={mossproutOnboarding} size={artBaseSize} />
+        : <PersistentMergeItemArt artCache={artCache} definitionId={occupant.definitionId} fill size={artBaseSize} />}
+    </Animated.View>
+  </Animated.View>;
 });
 
-function PersistentGeneratorArt({ artCache, generatorId, level, mossproutOnboarding, size }: { artCache: MergeArtCache; generatorId: string; level: number; mossproutOnboarding: boolean; size: number }) {
+function PersistentGeneratorArt({ artCache, fill = false, generatorId, level, mossproutOnboarding, size }: { artCache: MergeArtCache; fill?: boolean; generatorId: string; level: number; mossproutOnboarding: boolean; size: number }) {
   const art = mergeWorldGeneratorArt(generatorId, { mossproutOnboarding, level });
   const usesProgressionArt = (generatorId === 'wild-garden' && level > 1) || generatorId === 'memory-nursery';
   const source = usesProgressionArt ? art : artCache.get(mergeGeneratorArtCacheKey(generatorId, mossproutOnboarding)) ?? art;
-  return <View style={[styles.generatorSprite, { height: size, width: size }]}>
+  return <View style={[styles.generatorSprite, fill ? StyleSheet.absoluteFillObject : { height: size, width: size }]}>
     <GeneratorSparkles size={size} />
-    {source ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={`merge-generator-${generatorId}`} source={source} style={styles.generatorArt} transition={0} /> : null}
+    {source ? <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory" contentFit="contain" recyclingKey={`merge-generator-${generatorId}`} source={source} style={styles.generatorArt} transition={0} /> : null}
     <View style={styles.generatorBolt}>
       <IconSymbol color="#FFD45F" name="bolt.fill" size={13} />
     </View>
@@ -1716,17 +1771,17 @@ function mergeCellFromPointWorklet(x: number, y: number, cellSize: number, cellH
   return cellIndices?.[visualCell] ?? visualCell;
 }
 
-export function PersistentMergeItemArt({ artCache, desaturateOpacity = 0, definitionId, size }: { artCache?: MergeArtCache; desaturateOpacity?: number; definitionId: string; size: number }) {
+export function PersistentMergeItemArt({ artCache, desaturateOpacity = 0, definitionId, fill = false, size }: { artCache?: MergeArtCache; desaturateOpacity?: number; definitionId: string; fill?: boolean; size: number }) {
   const definition = MERGE_ITEMS_BY_ID.get(definitionId);
   if (!definition) return null;
   const authoredArt = mergeWorldItemArt(definitionId);
   const source = artCache?.get(mergeItemArtCacheKey(definitionId)) ?? authoredArt;
-  if (source) return <View style={[styles.familyArt, { height: size, width: size }]}>
-    <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={definitionId} source={source} style={{ height: size, width: size }} transition={0} />
-    {desaturateOpacity > 0 ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={`${definitionId}-dream-desaturate`} source={source} style={[StyleSheet.absoluteFillObject, { opacity: desaturateOpacity }]} tintColor="#A3A2AA" transition={0} /> : null}
+  if (source) return <View style={[styles.familyArt, fill ? StyleSheet.absoluteFillObject : { height: size, width: size }]}>
+    <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory" contentFit="contain" recyclingKey={definitionId} source={source} style={StyleSheet.absoluteFillObject} transition={0} />
+    {desaturateOpacity > 0 ? <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory" contentFit="contain" recyclingKey={`${definitionId}-dream-desaturate`} source={source} style={[StyleSheet.absoluteFillObject, { opacity: desaturateOpacity }]} tintColor="#A3A2AA" transition={0} /> : null}
   </View>;
   const desaturated = desaturateOpacity > 0;
-  return <View style={[styles.familyArt, { height: size, width: size }]}><View style={[styles.familyDisc, { backgroundColor: desaturated ? '#A3A2AA' : definition.color }]}><IconSymbol color={desaturated ? '#56555D' : '#4A291B'} name={definition.icon} size={Math.max(17, size * 0.48)} /></View></View>;
+  return <View style={[styles.familyArt, fill ? StyleSheet.absoluteFillObject : { height: size, width: size }]}><View style={[styles.familyDisc, { backgroundColor: desaturated ? '#A3A2AA' : definition.color }]}><IconSymbol color={desaturated ? '#56555D' : '#4A291B'} name={definition.icon} size={Math.max(17, size * 0.48)} /></View></View>;
 }
 
 function DreamEchoItemArt({ definitionId, size }: { definitionId: string; size: number }) {
@@ -1771,6 +1826,7 @@ const styles = StyleSheet.create({
   mistEchoGhost: { alignItems: 'center', justifyContent: 'center', position: 'absolute', zIndex: 2 },
   mistParticle: { borderRadius: 999, boxShadow: '0 0 7px rgba(211,239,255,0.7)', position: 'absolute', zIndex: 3 },
   sprite: { alignItems: 'center', justifyContent: 'center', position: 'absolute' },
+  spriteArtSurface: { position: 'absolute' },
   matchHint: { alignItems: 'center', justifyContent: 'center' },
   selectedCorners: { position: 'absolute', zIndex: 1300 },
   selectionCorner: { position: 'absolute' },

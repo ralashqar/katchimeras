@@ -23,6 +23,7 @@ import {
   kingdomSceneMetrics,
   kingdomWorldViewPoint,
   nearestKingdomFocusTarget,
+  screenPointIsInsideWorldFrame,
   screenPointToWorld,
 } from '../utils/kingdom-rendering';
 import { kingdomStructureArtFrame, kingdomTileArtFrame } from '../utils/kingdom-tile-alignment';
@@ -290,6 +291,22 @@ test('Kingdom entry camera places the home tile at the requested screen anchor',
   const resolved = screenPointToWorld(screenAnchor, scene, snapshot);
   assertClose(resolved.x, home.x);
   assertClose(resolved.y, home.y);
+});
+
+test('camera hit testing keeps a transformed merge-board frame reserved', () => {
+  const scene = { width: 720, height: 1304 };
+  const frame = { height: 420, left: 160, top: 720, width: 400 };
+  const camera = { scale: 1.05, tx: -24, ty: -310 };
+  const toScreen = (world: { x: number; y: number }) => ({
+    x: scene.width / 2 + camera.tx + (world.x - scene.width / 2) * camera.scale,
+    y: scene.height / 2 + camera.ty + (world.y - scene.height / 2) * camera.scale,
+  });
+
+  assert.equal(screenPointIsInsideWorldFrame(toScreen({ x: 160, y: 720 }), frame, scene, camera), true);
+  assert.equal(screenPointIsInsideWorldFrame(toScreen({ x: 360, y: 930 }), frame, scene, camera), true);
+  assert.equal(screenPointIsInsideWorldFrame(toScreen({ x: 559.9, y: 1139.9 }), frame, scene, camera), true);
+  assert.equal(screenPointIsInsideWorldFrame(toScreen({ x: 159.9, y: 930 }), frame, scene, camera), false);
+  assert.equal(screenPointIsInsideWorldFrame(toScreen({ x: 360, y: 1140.1 }), frame, scene, camera), false);
 });
 
 test('Kingdom entry discards stale camera state and mounts the complete scene', () => {

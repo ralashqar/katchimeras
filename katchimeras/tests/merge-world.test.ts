@@ -1441,6 +1441,27 @@ test('Merge FTUE commits before visual settlement and preserves all native anima
   assert.match(board, /DREAM_MIST_PARTICLES\.map/);
 });
 
+test('animated merge sprites retain their full-resolution authored textures', () => {
+  const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
+  const artCache = readFileSync('hooks/use-merge-art-cache.ts', 'utf8');
+  const persistentSprite = board.slice(
+    board.indexOf('const PersistentSprite'),
+    board.indexOf('function PersistentGeneratorArt'),
+  );
+
+  assert.match(artCache, /MERGE_ART_CACHE_EDGE_PX = 256/);
+  assert.match(artCache, /MERGE_ART_CACHE_REVISION = `full-\$\{MERGE_ART_CACHE_EDGE_PX\}`/);
+  assert.match(artCache, /maxHeight: MERGE_ART_CACHE_EDGE_PX/);
+  assert.match(artCache, /maxWidth: MERGE_ART_CACHE_EDGE_PX/);
+  assert.match(board, /function PersistentGeneratorArt[\s\S]*?allowDownscaling=\{false\}/);
+  assert.match(board, /function PersistentMergeItemArt[\s\S]*?allowDownscaling=\{false\}/);
+  assert.match(persistentSprite, /const visualScale = useDerivedValue/);
+  assert.match(persistentSprite, /height: renderedSize[\s\S]*?width: renderedSize/);
+  assert.match(persistentSprite, /styles\.spriteArtSurface, artLayoutStyle/);
+  assert.doesNotMatch(persistentSprite, /\{ scale:/);
+  assert.doesNotMatch(persistentSprite, /<MergeMatchHint/);
+});
+
 test('a companion journal grants no Merge Energy or starter item parcels', () => {
   const day = {
     id: 'day-2026-08-12', isoDate: '2026-08-12', promptAnswers: [], moments: [], capturedMeanings: [], stepsCount: 0,

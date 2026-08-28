@@ -9,12 +9,18 @@ import { waitForCriticalInteractionIdle } from '@/utils/critical-interaction';
 
 export type MergeArtCache = ReadonlyMap<string, ImageRef>;
 
+// Merge sprites animate above their resting size and the whole Haven can be
+// camera-scaled. Keep the authored 256 px texture in memory so those transforms
+// sample real source pixels instead of enlarging the old 96 px warmup decode.
+const MERGE_ART_CACHE_EDGE_PX = 256;
+const MERGE_ART_CACHE_REVISION = `full-${MERGE_ART_CACHE_EDGE_PX}`;
+
 export function mergeItemArtCacheKey(definitionId: string) {
-  return `item:${definitionId}`;
+  return `${MERGE_ART_CACHE_REVISION}:item:${definitionId}`;
 }
 
 export function mergeGeneratorArtCacheKey(generatorId: string, mossproutOnboarding: boolean) {
-  return `generator:${generatorId}:${mossproutOnboarding ? 'mossprout' : 'default'}`;
+  return `${MERGE_ART_CACHE_REVISION}:generator:${generatorId}:${mossproutOnboarding ? 'mossprout' : 'default'}`;
 }
 
 export function useMergeArtCache(
@@ -23,7 +29,7 @@ export function useMergeArtCache(
   onInitialArtReady?: () => void,
 ): MergeArtCache {
   const plan = useMemo(() => mergeArtWarmupPlan(state), [state]);
-  const signature = `${mossproutOnboarding ? '1' : '0'}|${plan.generatorIds.join(',')}|${plan.itemDefinitionIds.join(',')}`;
+  const signature = `${MERGE_ART_CACHE_REVISION}|${mossproutOnboarding ? '1' : '0'}|${plan.generatorIds.join(',')}|${plan.itemDefinitionIds.join(',')}`;
   const retainedRef = useRef(new Map<string, ImageRef>());
   const generationRef = useRef(0);
   const [cache, setCache] = useState<MergeArtCache>(() => new Map());
@@ -58,7 +64,10 @@ export function useMergeArtCache(
           await waitForCriticalInteractionIdle();
           const [key, source] = missing[cursor++];
           try {
-            const imageRef = await Image.loadAsync(source, { maxHeight: 96, maxWidth: 96 });
+            const imageRef = await Image.loadAsync(source, {
+              maxHeight: MERGE_ART_CACHE_EDGE_PX,
+              maxWidth: MERGE_ART_CACHE_EDGE_PX,
+            });
             if (cancelled || generation !== generationRef.current || !desired.has(key)) {
               imageRef.release();
               continue;
