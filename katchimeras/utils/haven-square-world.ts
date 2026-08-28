@@ -17,10 +17,10 @@ export type HavenSquareZone = {
 export const HAVEN_SQUARE_ZONE_SIZE = 600;
 /** Horizontal neighbors leave room for the shared suspension bridges. */
 export const HAVEN_SQUARE_COLUMN_PITCH = 720;
-/** Keep a slight seam overlap after lowering the garden by 15% of one zone. */
-export const HAVEN_SQUARE_ROW_PITCH = 570;
+/** Vertical frames overlap enough for their padded silhouettes to meet slightly. */
+export const HAVEN_SQUARE_ROW_PITCH = 480;
 export const HAVEN_SQUARE_SCENE_PADDING = 60;
-export const HAVEN_JUNCTION_MINI_ISLAND_SIZE = 140;
+export const HAVEN_JUNCTION_MINI_ISLAND_SIZE = 160;
 export const HAVEN_JUNCTION_MINI_ISLAND_SPACING = 130;
 export const HAVEN_JUNCTION_MINI_ISLAND_RISE = 10;
 export const HAVEN_JUNCTION_TRAY_SIZE = 95;
@@ -107,12 +107,12 @@ export function mossproutSquareSceneMetrics() {
   };
 }
 
-/** Four orthographic corners of the clear gridless playfield in the 1024 source. */
+/** Four calibrated corners of the clear gridless playfield in the 1024 source. */
 export const MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS = {
-  bottomLeft: { x: 205, y: 720 },
-  bottomRight: { x: 819, y: 720 },
-  topLeft: { x: 205, y: 195 },
-  topRight: { x: 819, y: 195 },
+  bottomLeft: { x: 220, y: 690 },
+  bottomRight: { x: 804, y: 690 },
+  topLeft: { x: 245, y: 215 },
+  topRight: { x: 779, y: 215 },
 } as const;
 
 /** Bounds enclosing the calibrated four-corner overlay. */
