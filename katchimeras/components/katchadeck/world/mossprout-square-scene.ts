@@ -6,7 +6,6 @@ import {
   MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS,
   MOSSPROUT_SQUARE_ZONES,
   mossproutEggHomeBridgeFrame,
-  mossproutGardenJunctionMiniIslandFrames,
   mossproutSquareSceneMetrics,
 } from '@/utils/haven-square-world';
 
@@ -14,14 +13,16 @@ const SOURCE_SIZE = { height: 1024, width: 1024 } as const;
 const FULL_BOUNDS = { bottom: 1024, left: 0, right: 1024, top: 0 } as const;
 const BRIDGE_SOURCE_SIZE = { height: 455, width: 1024 } as const;
 const BRIDGE_BOUNDS = { bottom: 364, left: 42, right: 982, top: 125 } as const;
-const MINI_ISLAND_SOURCE_SIZE = { height: 512, width: 512 } as const;
-const MINI_ISLAND_BOUNDS = { bottom: 512, left: 0, right: 512, top: 0 } as const;
 
 const ENVIRONMENT_SOURCES = {
   full: require('../../../assets/images/katchimeras/world/square/mossprout-main-environment.webp'),
   medium: require('../../../assets/images/katchimeras/world/square/mossprout-main-environment-512.webp'),
   thumb: require('../../../assets/images/katchimeras/world/square/mossprout-main-environment-256.webp'),
 };
+
+const MOSSPROUT_STANDING_RESIDENT_SOURCE = require(
+  '../../../assets/images/katchimeras/world/square/mossprout-standing-resident-512.webp',
+);
 
 const BARISTABBIT_CAFE_SOURCES = {
   full: require('../../../assets/images/katchimeras/world/square/baristabbit-cafe-island.webp'),
@@ -33,12 +34,6 @@ const GARDEN_SOURCES = {
   full: require('../../../assets/images/katchimeras/world/square/mossprout-merge-island-perspective.webp'),
   medium: require('../../../assets/images/katchimeras/world/square/mossprout-merge-island-perspective-512.webp'),
   thumb: require('../../../assets/images/katchimeras/world/square/mossprout-merge-island-perspective-256.webp'),
-};
-
-const JUNCTION_MINI_ISLAND_SOURCES = {
-  full: require('../../../assets/images/katchimeras/world/square/haven-junction-mini-island-512.webp'),
-  medium: require('../../../assets/images/katchimeras/world/square/haven-junction-mini-island-512.webp'),
-  thumb: require('../../../assets/images/katchimeras/world/square/haven-junction-mini-island-256.webp'),
 };
 
 const EGG_HOME_SOURCES = {
@@ -76,7 +71,6 @@ export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlo
   const environmentFrame = havenSquareZoneFrame(environmentZone.coord);
   const eggHomeFrame = havenSquareZoneFrame(eggHomeZone.coord);
   const gardenFrame = havenSquareZoneFrame(gardenZone.coord);
-  const junctionMiniIslandFrames = mossproutGardenJunctionMiniIslandFrames();
   const baristabbitBridgeFrame = baristabbitMossproutBridgeFrame();
   const eggHomeBridgeFrame = mossproutEggHomeBridgeFrame();
   const baristabbitTile: KingdomTileRender = {
@@ -130,6 +124,7 @@ export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlo
       x: environmentFrame.left + environmentFrame.width * 0.5,
       y: environmentFrame.top + environmentFrame.height * 0.47,
     },
+    residentSource: MOSSPROUT_STANDING_RESIDENT_SOURCE,
     source: ENVIRONMENT_SOURCES.full,
     sources: ENVIRONMENT_SOURCES,
     sourceSize: { width: SOURCE_SIZE.width, height: SOURCE_SIZE.height },
@@ -192,19 +187,6 @@ export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlo
     sourceSize: { width: SOURCE_SIZE.width, height: SOURCE_SIZE.height },
     squareCoord: gardenZone.coord,
   };
-  const junctionMiniIslandLayers: KingdomTileArtLayer[] = junctionMiniIslandFrames.map((frame, index) => ({
-    alphaBounds: MINI_ISLAND_BOUNDS,
-    coord: { q: 0, r: 1 },
-    custom: true,
-    depth: 3,
-    fallbackSource: null,
-    frame,
-    id: `decor:mossprout-garden-junction-mini-island-${['west', 'center', 'east'][index]}`,
-    kind: 'tile',
-    source: JUNCTION_MINI_ISLAND_SOURCES.full,
-    sources: JUNCTION_MINI_ISLAND_SOURCES,
-    sourceSize: MINI_ISLAND_SOURCE_SIZE,
-  }));
   const metrics = mossproutSquareSceneMetrics();
   return {
     centerTile: environmentTile,
@@ -216,7 +198,6 @@ export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlo
       environmentLayer,
       eggHomeLayer,
       gardenLayer,
-      ...junctionMiniIslandLayers,
     ].sort((left, right) => left.depth - right.depth),
     tileById: new Map([
       [baristabbitTile.id, baristabbitTile],

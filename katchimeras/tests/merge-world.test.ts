@@ -227,7 +227,10 @@ test('Merge board flattens its static cells into one native image without a Skia
   const radialSunburst = readFileSync('components/katchadeck/ui/radial-sunburst.tsx', 'utf8');
   assert.match(board, /source=\{layout\.baseSource \?\? MERGE_BOARD_BASE\}/);
   assert.match(boardGenerator, /CELL_LIGHT = "#E8CC98"/);
-  assert.match(boardGenerator, /CELL_DARK = "#DEBA7F"/);
+  assert.match(boardGenerator, /CELL_DARK = "#D5AD72"/);
+  assert.match(boardGenerator, /if \(column \+ row\) % 2 == 0:/);
+  assert.match(boardGenerator, /CELL_INSET = 4/);
+  assert.match(boardGenerator, /CORNER_RADIUS = 14/);
   assert.match(boardGenerator, /draw\.rounded_rectangle/);
   assert.match(boardGenerator, /OUTER_RADIUS = 10/);
   assert.match(boardGenerator, /image\.putalpha\(outer_mask\)/);

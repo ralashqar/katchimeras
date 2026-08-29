@@ -25,7 +25,7 @@ import {
   type MergeBoardLayout,
   type MergeBoardScreenMetrics,
 } from '@/components/katchadeck/games/feastle-persistent-merge-board';
-import { MergeOrderTrayCard, type MergeOrderTrayEntry } from '@/components/katchadeck/games/merge-order-rail';
+import { EmptyMergeOrderTrayCard, MergeOrderTrayCard, type MergeOrderTrayEntry } from '@/components/katchadeck/games/merge-order-rail';
 import { MergeServeRewardOverlay, type MergeScreenPoint, type MergeServeRewardFlight } from '@/components/katchadeck/games/merge-serve-reward-overlay';
 import { HavenUpgradeEffects } from '@/components/katchadeck/world/haven-upgrade-effects';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -166,6 +166,7 @@ const SQUARE_HAVEN_MERGE_BOARD_LAYOUT: MergeBoardLayout = {
   transparentSurface: true,
 };
 const HAVEN_ORDER_CARD_SIZE = 120;
+const HAVEN_ORDER_CARD_LOWERING = HAVEN_ORDER_CARD_SIZE * 0.2;
 const JUNCTION_TRAY_FRAMES = mossproutGardenJunctionTrayFrames();
 const HAVEN_ORDER_SLOT_FRAMES = [
   JUNCTION_TRAY_FRAMES[1],
@@ -721,6 +722,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             focusAnchorY={tile.cy}
             focusScale={focusScale}
             key={`creature-${tile.id}`}
+            source={artLayer?.residentSource}
             tile={tile}
             x={x}
             y={y}
@@ -871,41 +873,51 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           </View>
         </Animated.View>
       ) : null}
-      {squareWorld && mergeBoard?.orders?.length && interactionEnabled && !upgradePresentation ? (
+      {squareWorld && !upgradePresentation ? (
         <Animated.View
-          pointerEvents="box-none"
+          pointerEvents={interactionEnabled ? 'box-none' : 'none'}
           style={[
             styles.orderIslandInteractionLayer,
             { height: scene.height, width: scene.width },
             camera.worldStyle,
           ]}>
-          {mergeBoard.orders.slice(0, 3).map((entry, index) => {
-            const frame = HAVEN_ORDER_SLOT_FRAMES[index];
-            const orderGate = mergeBoard.orderInteractionGate ?? { kind: 'open' as const };
-            const orderAllowed = orderGate.kind === 'open'
-              || (orderGate.kind === 'serve' && orderGate.orderId === entry.order.id);
+          {HAVEN_ORDER_SLOT_FRAMES.map((frame, index) => {
+            const entry = mergeBoard?.orders?.[index];
+            const orderGate = mergeBoard?.orderInteractionGate ?? { kind: 'open' as const };
+            const orderAllowed = Boolean(entry) && (
+              orderGate.kind === 'open'
+              || (orderGate.kind === 'serve' && orderGate.orderId === entry?.order.id)
+            );
             return (
-              <Animated.View
-                entering={reduceMotion ? undefined : FadeInUp.duration(230)}
-                exiting={reduceMotion ? undefined : FadeOutUp.duration(240)}
-                key={entry.id}
+              <View
+                key={`haven-order-slot-${index}`}
                 style={{
                   height: HAVEN_ORDER_CARD_SIZE,
                   left: frame.left + (frame.width - HAVEN_ORDER_CARD_SIZE) / 2,
                   position: 'absolute',
-                  top: frame.top - 44,
+                  top: frame.top - 44 + HAVEN_ORDER_CARD_LOWERING,
                   width: HAVEN_ORDER_CARD_SIZE,
                 }}>
-                <MergeOrderTrayCard
-                  entry={entry}
-                  index={index}
-                  interactionAllowed={orderAllowed && !camera.isMoving && (!servingOrderId || servingOrderId === entry.order.id)}
-                  interactionLocked={!orderAllowed || camera.isMoving || servingOrderId != null}
-                  onReroll={() => mergeBoard.dispatch({ type: 'rerollOrder', orderId: entry.order.id, now: Date.now() })}
-                  onServe={(targets) => startHavenServe(entry.order, targets)}
-                  reduceMotion={reduceMotion}
-                />
-              </Animated.View>
+                {entry && mergeBoard ? (
+                  <Animated.View
+                    entering={reduceMotion ? undefined : FadeInUp.duration(230)}
+                    exiting={reduceMotion ? undefined : FadeOutUp.duration(240)}
+                    key={entry.id}
+                    style={StyleSheet.absoluteFill}>
+                    <MergeOrderTrayCard
+                      entry={entry}
+                      index={index}
+                      interactionAllowed={interactionEnabled && orderAllowed && !camera.isMoving && (!servingOrderId || servingOrderId === entry.order.id)}
+                      interactionLocked={!interactionEnabled || !orderAllowed || camera.isMoving || servingOrderId != null}
+                      onReroll={() => mergeBoard.dispatch({ type: 'rerollOrder', orderId: entry.order.id, now: Date.now() })}
+                      onServe={(targets) => startHavenServe(entry.order, targets)}
+                      reduceMotion={reduceMotion}
+                    />
+                  </Animated.View>
+                ) : (
+                  <EmptyMergeOrderTrayCard />
+                )}
+              </View>
             );
           })}
         </Animated.View>
@@ -1291,6 +1303,7 @@ type ResidentProps = {
   focusScale: number;
   onFocus: (x: number, y: number, options?: { id?: string }) => void;
   onSelectResident?: (creatureId: string, label: string) => void;
+  source?: ImageSourcePropType;
   statusGlyph?: KingdomResidentStatusGlyph;
   tile: KingdomTileRender;
   worldSize: number;
@@ -1306,6 +1319,7 @@ const ResidentCreature = memo(function ResidentCreature({
   focusScale,
   onFocus,
   onSelectResident,
+  source: sourceOverride,
   statusGlyph,
   tile,
   worldSize,
@@ -1313,7 +1327,9 @@ const ResidentCreature = memo(function ResidentCreature({
   y,
 }: ResidentProps) {
   const creature = tile.companion?.kind === 'owned' ? tile.companion.creature : null;
-  const source = creature ? worldAssetSource(`creature:${creature.visualKey}`, KINGDOM_RENDERING.havenImageLod) : null;
+  const source = creature
+    ? sourceOverride ?? worldAssetSource(`creature:${creature.visualKey}`, KINGDOM_RENDERING.havenImageLod)
+    : null;
   const [ready, setReady] = useState(false);
   const opacity = useSharedValue(0);
   const lift = useSharedValue(12);

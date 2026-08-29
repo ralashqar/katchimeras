@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the single static 7x9 Merge board cell base texture."""
+"""Generate the single static 7x9 Merge board checker base texture."""
 
 from __future__ import annotations
 
@@ -13,27 +13,30 @@ CELL = 128
 COLUMNS = 7
 ROWS = 9
 SCALE = 4
-CORNER_RADIUS = 7
+CORNER_RADIUS = 14
 OUTER_RADIUS = 10
-BOARD_GUTTER = "#D5AE72"
 CELL_LIGHT = "#E8CC98"
-CELL_DARK = "#DEBA7F"
+CELL_DARK = "#D5AD72"
+CELL_INSET = 4
 
 
 def main() -> None:
-    image = Image.new("RGBA", (COLUMNS * CELL * SCALE, ROWS * CELL * SCALE), BOARD_GUTTER)
+    # One uninterrupted light board surface sits underneath the checker. Only
+    # alternating cells are darkened, avoiding a visible line lattice.
+    image = Image.new("RGBA", (COLUMNS * CELL * SCALE, ROWS * CELL * SCALE), CELL_LIGHT)
     draw = ImageDraw.Draw(image)
     for row in range(ROWS):
         for column in range(COLUMNS):
-            left = column * CELL * SCALE
-            top = row * CELL * SCALE
-            right = (column + 1) * CELL * SCALE
-            bottom = (row + 1) * CELL * SCALE
-            color = CELL_DARK if (column + row) % 2 else CELL_LIGHT
+            if (column + row) % 2 == 0:
+                continue
+            left = (column * CELL + CELL_INSET) * SCALE
+            top = (row * CELL + CELL_INSET) * SCALE
+            right = ((column + 1) * CELL - CELL_INSET) * SCALE
+            bottom = ((row + 1) * CELL - CELL_INSET) * SCALE
             draw.rounded_rectangle(
                 (left, top, right, bottom),
                 radius=CORNER_RADIUS * SCALE,
-                fill=color,
+                fill=CELL_DARK,
             )
     outer_mask = Image.new("L", image.size, 0)
     ImageDraw.Draw(outer_mask).rounded_rectangle(

@@ -40,6 +40,7 @@ const TRAY_GAP = 10;
 const TRAY_HEIGHT = 120;
 const TRAY_ITEM_SIZE = 34;
 const TRAY_ART = require('../../../assets/images/katchimeras/merge-world/ui/order-service-tray.webp');
+const CHAIR_ART = require('../../../assets/images/katchimeras/merge-world/ui/order-chair.webp');
 const ORDER_REWARD_ART = {
   bond: require('../../../assets/images/katchimeras/merge-world/ui/bond.webp'),
   coins: require('../../../assets/images/katchimeras/merge-world/ui/coin.webp'),
@@ -131,6 +132,34 @@ export type MergeTrayEntry =
     };
 
 export type MergeOrderTrayEntry = Extract<MergeTrayEntry, { kind: 'order' }>;
+
+export function EmptyMergeOrderTrayCard() {
+  return (
+    <View
+      accessibilityLabel="Empty order tray"
+      pointerEvents="none"
+      style={styles.card}>
+      <Image
+        accessibilityIgnoresInvertColors
+        allowDownscaling
+        cachePolicy="memory"
+        contentFit="contain"
+        source={CHAIR_ART}
+        style={styles.chairArt}
+        transition={0}
+      />
+      <Image
+        accessibilityIgnoresInvertColors
+        allowDownscaling
+        cachePolicy="memory"
+        contentFit="contain"
+        source={TRAY_ART}
+        style={styles.trayArt}
+        transition={0}
+      />
+    </View>
+  );
+}
 
 export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel, onReroll, onServe, onBlockedInteraction, onRailTargetRef, interactionGate = { kind: 'open' }, parcelTargetRef }: {
   entries: readonly MergeTrayEntry[];
@@ -360,6 +389,7 @@ export function MergeOrderTrayCard({ entry, index, interactionAllowed, interacti
         </Animated.View>
       ) : null}
       {serving && !reduceMotion ? <TrayServeConfetti /> : null}
+      <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" source={CHAIR_ART} style={styles.chairArt} transition={0} />
       <Animated.View entering={reduceMotion ? FadeIn.duration(100) : FadeInUp.delay(Math.min(index, 5) * 42 + 45).duration(230)} style={styles.characterLayer}>
         <Pressable
           accessible={!interactionLocked}
@@ -554,7 +584,8 @@ const styles = StyleSheet.create({
   card: { height: TRAY_HEIGHT, overflow: 'visible', position: 'relative', zIndex: ORDER_RAIL_Z_INDEX, width: TRAY_WIDTH },
   readyGlow: { backgroundColor: 'rgba(184,224,112,0.42)', borderRadius: 999, boxShadow: '0 0 22px rgba(174,220,95,0.72)', height: 70, left: 25, position: 'absolute', top: 11, width: 70, zIndex: 0 },
   readyRays: { height: 84, left: 18, position: 'absolute', top: 5, width: 84, zIndex: 0 },
-  characterLayer: { bottom: 23.2, height: 110.4, left: 4.8, position: 'absolute', width: 110.4, zIndex: 1 },
+  chairArt: { bottom: 18, height: 154, left: -17, position: 'absolute', width: 154, zIndex: 1 },
+  characterLayer: { bottom: 23.2, height: 110.4, left: 4.8, position: 'absolute', width: 110.4, zIndex: 2 },
   characterButton: { height: '100%', width: '100%' },
   characterPressed: { transform: [{ scale: 0.96 }] },
   character: { height: '100%', width: '100%' },
@@ -562,9 +593,9 @@ const styles = StyleSheet.create({
   rewardRow: { alignItems: 'center', flexDirection: 'row', gap: 2, height: 17 },
   rewardIcon: { height: 16, width: 16 },
   rewardAmount: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 10.5, fontVariant: ['tabular-nums'], lineHeight: 14, textShadowColor: 'rgba(48,25,11,0.72)', textShadowOffset: { height: 1, width: 0 }, textShadowRadius: 1 },
-  trayArt: { bottom: 0, height: 58, left: -2, position: 'absolute', width: 124, zIndex: 2 },
-  items: { alignItems: 'center', bottom: 16, flexDirection: 'row', justifyContent: 'center', left: 4, position: 'absolute', right: 4, zIndex: 3 },
-  serveConfetti: { bottom: 0, left: 0, overflow: 'visible', position: 'absolute', right: 0, top: 0, zIndex: 1 },
+  trayArt: { bottom: 0, height: 58, left: -2, position: 'absolute', width: 124, zIndex: 3 },
+  items: { alignItems: 'center', bottom: 16, flexDirection: 'row', justifyContent: 'center', left: 4, position: 'absolute', right: 4, zIndex: 4 },
+  serveConfetti: { bottom: 0, left: 0, overflow: 'visible', position: 'absolute', right: 0, top: 0, zIndex: 5 },
   confettiParticle: { borderRadius: 1, height: 7, position: 'absolute', top: 58, width: 4 },
   confettiParticleRound: { borderRadius: 999, height: 6, width: 6 },
   item: { height: TRAY_ITEM_SIZE, position: 'relative', width: TRAY_ITEM_SIZE },

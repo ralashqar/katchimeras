@@ -175,6 +175,10 @@ test('the player Haven mounts the square scene and keeps the hex renderer as a f
     path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-hex-canvas.tsx'),
     'utf8',
   );
+  const gridGenerator = fs.readFileSync(
+    path.join(process.cwd(), 'scripts', 'generate-haven-merge-grid-overlay.py'),
+    'utf8',
+  );
   assert.match(screen, /squareWorld/);
   assert.match(screen, /familyId === 'mossprout'/);
   assert.doesNotMatch(screen, /YOUR HAVEN|Tap a home or a mist tile|Open World and Board Lab/);
@@ -187,6 +191,10 @@ test('the player Haven mounts the square scene and keeps the hex renderer as a f
   assert.match(canvas, /onItemsArrive=\{handleHavenServeItemsArrive\}/);
   assert.match(canvas, /onCoinArrive=\{handleHavenCoinArrive\}/);
   assert.doesNotMatch(canvas, /baseArtOpacity: 0\.34|merge-board-base-7x6\.webp/);
+  assert.match(gridGenerator, /if \(row \+ column\) % 2 == 0:/);
+  assert.match(gridGenerator, /CELL_RADIUS = 14/);
+  assert.match(gridGenerator, /draw\.polygon\(rounded, fill=DARK_CELL_OVERLAY\)/);
+  assert.doesNotMatch(gridGenerator, /draw\.line|outline=/);
   assert.match(canvas, /HAVEN_MERGE_BOARD_PROJECTION/);
   assert.match(canvas, /cellHeightToWidthRatio: MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO/);
   assert.match(canvas, /fillAvailableSpace: true/);
@@ -212,14 +220,31 @@ test('the player Haven mounts the square scene and keeps the hex renderer as a f
   assert.match(squareScene, /bridge-straight-horizontal-perspective\.webp/);
   assert.match(squareScene, /egg-home-island\.webp/);
   assert.match(squareScene, /mossprout-merge-island-perspective\.webp/);
-  assert.match(squareScene, /haven-junction-mini-island-512\.webp/);
+  assert.match(squareScene, /mossprout-standing-resident-512\.webp/);
+  assert.match(squareScene, /residentSource: MOSSPROUT_STANDING_RESIDENT_SOURCE/);
+  assert.match(canvas, /source=\{artLayer\?\.residentSource\}/);
+  assert.match(canvas, /sourceOverride \?\? worldAssetSource/);
+  assert.doesNotMatch(squareScene, /haven-junction-mini-island-512\.webp/);
   assert.doesNotMatch(squareScene, /haven-junction-mini-island-tray-512\.webp/);
   assert.doesNotMatch(orderRail, /haven-junction-mini-island-tray-512\.webp/);
+  assert.match(orderRail, /order-chair\.webp/);
   assert.match(orderRail, /order-service-tray\.webp/);
-  assert.match(squareScene, /junctionMiniIslandLayers/);
+  assert.match(orderRail, /export function EmptyMergeOrderTrayCard/);
+  assert.match(orderRail, /accessibilityLabel="Empty order tray"[\s\S]*?source=\{CHAIR_ART\}[\s\S]*?source=\{TRAY_ART\}/);
+  assert.match(orderRail, /source=\{CHAIR_ART\}[\s\S]*?style=\{styles\.characterLayer\}[\s\S]*?source=\{TRAY_ART\}/);
+  assert.match(orderRail, /chairArt: \{[^}]*height: 154[^}]*left: -17[^}]*width: 154[^}]*zIndex: 1/);
+  assert.match(orderRail, /characterLayer: \{[^}]*zIndex: 2/);
+  assert.match(orderRail, /trayArt: \{[^}]*zIndex: 3/);
+  assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'merge-world', 'ui', 'order-chair.webp')));
+  assert.doesNotMatch(squareScene, /junctionMiniIslandLayers|JUNCTION_MINI_ISLAND_SOURCES/);
   assert.match(canvas, /MergeOrderTrayCard/);
   assert.match(canvas, /HAVEN_ORDER_SLOT_FRAMES = \[\s*JUNCTION_TRAY_FRAMES\[1\],\s*JUNCTION_TRAY_FRAMES\[0\],\s*JUNCTION_TRAY_FRAMES\[2\]/);
-  assert.match(squareScene, /depth: 3/);
+  assert.match(canvas, /HAVEN_ORDER_CARD_LOWERING = HAVEN_ORDER_CARD_SIZE \* 0\.2/);
+  assert.match(canvas, /top: frame\.top - 44 \+ HAVEN_ORDER_CARD_LOWERING/);
+  assert.match(canvas, /HAVEN_ORDER_SLOT_FRAMES\.map\(\(frame, index\) =>/);
+  assert.match(canvas, /const entry = mergeBoard\?\.orders\?\.\[index\]/);
+  assert.match(canvas, /entry && mergeBoard[\s\S]*?<MergeOrderTrayCard[\s\S]*?: \([\s\S]*?<EmptyMergeOrderTrayCard/);
   assert.match(squareScene, /\.sort\(\(left, right\) => left\.depth - right\.depth\)/);
   assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'world', 'square', 'mossprout-merge-island-perspective-512.webp')));
+  assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'world', 'square', 'mossprout-standing-resident-512.webp')));
 });

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the transparent 7x6 grid painted over the gridless Haven island."""
+"""Build the transparent 7x6 checker overlay for the gridless Haven island."""
 
 from pathlib import Path
 from math import hypot
@@ -14,6 +14,9 @@ ROWS = 6
 CELL = 128
 SCALE = 4
 TOP_WIDTH_RATIO = 534 / 584
+DARK_CELL_OVERLAY = (38, 61, 10, 48)
+CELL_INSET = 5
+CELL_RADIUS = 14
 
 
 def rounded_polygon(
@@ -60,41 +63,26 @@ def main() -> None:
     height = ROWS * CELL
     image = Image.new("RGBA", (width * SCALE, height * SCALE), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
-    gap = 4 * SCALE
-
     for row in range(ROWS):
         for column in range(COLUMNS):
-            x0 = column * CELL + gap / SCALE / 2
-            x1 = (column + 1) * CELL - gap / SCALE / 2
-            y0 = row * CELL + gap / SCALE / 2
-            y1 = (row + 1) * CELL - gap / SCALE / 2
+            # The untouched cells expose the island grass. Only the alternate
+            # cells receive one soft, inset darkening pass, so there is no
+            # lattice of strokes or seams to read as grid lines.
+            if (row + column) % 2 == 0:
+                continue
+            x0 = column * CELL + CELL_INSET
+            x1 = (column + 1) * CELL - CELL_INSET
+            y0 = row * CELL + CELL_INSET
+            y1 = (row + 1) * CELL - CELL_INSET
             polygon = [
                 tuple(value * SCALE for value in project(x0, y0, width, height)),
                 tuple(value * SCALE for value in project(x1, y0, width, height)),
                 tuple(value * SCALE for value in project(x1, y1, width, height)),
                 tuple(value * SCALE for value in project(x0, y1, width, height)),
             ]
-            radii = [4 * SCALE] * 4
-            if row == 0 and column == 0:
-                radii[0] = 25 * SCALE
-            if row == 0 and column == COLUMNS - 1:
-                radii[1] = 25 * SCALE
-            if row == ROWS - 1 and column == COLUMNS - 1:
-                radii[2] = 25 * SCALE
-            if row == ROWS - 1 and column == 0:
-                radii[3] = 25 * SCALE
+            radii = [CELL_RADIUS * SCALE] * 4
             rounded = rounded_polygon(polygon, radii)
-            fill = (126, 154, 27, 30) if (row + column) % 2 == 0 else (105, 133, 20, 23)
-            draw.polygon(rounded, fill=fill)
-            draw.line(rounded + [rounded[0]], fill=(55, 78, 10, 76), width=2 * SCALE, joint="curve")
-            # A soft inner highlight gives the same broad toy bevel without
-            # baking gameplay objects or perspective into the island art.
-            inner = []
-            center_x = sum(point[0] for point in polygon) / 4
-            center_y = sum(point[1] for point in polygon) / 4
-            for point_x, point_y in polygon:
-                inner.append((center_x + (point_x - center_x) * 0.965, center_y + (point_y - center_y) * 0.94))
-            draw.line(inner[:2], fill=(213, 230, 102, 38), width=1 * SCALE)
+            draw.polygon(rounded, fill=DARK_CELL_OVERLAY)
 
     image = image.resize((width, height), Image.Resampling.LANCZOS)
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)

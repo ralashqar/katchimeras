@@ -53,6 +53,7 @@ export type KingdomTileArtLayer = {
   overlaySource?: ImageSourcePropType;
   overlaySources?: KingdomHexTileLodSources;
   residentAnchor?: { x: number; y: number };
+  residentSource?: ImageSourcePropType;
   sourceSize: { width: number; height: number };
   source: ImageSourcePropType;
   sources?: KingdomHexTileLodSources;
