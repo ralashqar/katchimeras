@@ -28,7 +28,7 @@ import { MERGE_WORLD_UI_ART } from '@/constants/merge-world-ui-art';
 import type { MergeRailInteractionGate } from '@/features/onboarding/merge-ftue';
 import type { HomeVisualKey } from '@/types/home';
 import type { MergeCharacterId, MergeOrder, MergeWorldArrival } from '@/types/merge-world';
-import { resolveCreatureArtSource } from '@/utils/creature-art';
+import { resolveCreatureArtSource, resolveCreatureOrderArtSource } from '@/utils/creature-art';
 import { MAX_MOUNTED_ORDER_TRAYS, orderMountWindow } from '@/utils/merge-world/order-window';
 
 import { PersistentMergeItemArt } from './feastle-persistent-merge-board';
@@ -326,7 +326,7 @@ export function MergeOrderTrayCard({ entry, index, interactionAllowed, interacti
   const recipient = order.recipientSkinId ? katchimeraSkinById.get(order.recipientSkinId) : null;
   const recipientName = recipient?.displayName ?? MERGE_CHARACTER_NAMES[order.characterId];
   const recipientVisualKey = recipient?.visualKey ?? CHARACTER_VISUALS[order.characterId];
-  const characterSource = resolveCreatureArtSource(recipientVisualKey, { lod: 'medium' });
+  const characterSource = resolveCreatureOrderArtSource(recipientVisualKey);
   const orderCardTargetKey = `order-card:${order.id}`;
   const serveTargetKey = `order-serve:${order.id}`;
   const setOrderCardTargetRef = useCallback(

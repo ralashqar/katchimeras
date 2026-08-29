@@ -342,7 +342,7 @@ test('Kingdom uses the resolved Today sky plate without legacy clouds or atmosph
 
   assert.match(worldSource, /todayAtmosphereBackgroundForDay\(today, days\)/);
   assert.match(worldSource, /background=\{kingdomBackground\}/);
-  assert.match(canvasSource, /source=\{background\.source\}/);
+  assert.match(canvasSource, /source=\{background\.havenSource\}/);
   assert.match(canvasSource, /cachePolicy="disk"/);
   assert.doesNotMatch(canvasSource, /KingdomSkyBackground|DevAtmosphereLayer/);
   assert.doesNotMatch(cameraSource, /skyCamera|skyOrigin/);
@@ -682,7 +682,9 @@ test('the merge island mounts the shared Merge board without giving cell taps or
   assert.match(canvas, /cellHeightToWidthRatio: MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO/);
   assert.match(canvas, /topWidthRatio: MOSSPROUT_GARDEN_TOP_WIDTH_RATIO/);
   assert.match(canvas, /farScale: 0\.94/);
-  assert.match(canvas, /baseSource: HAVEN_MERGE_GRID_SOURCE/);
+  assert.match(canvas, /checkerboardCellColor: 'rgba\(38, 61, 10, 0\.188\)'/);
+  assert.doesNotMatch(canvas, /HAVEN_MERGE_GRID_SOURCE|haven-merge-grid-7x6\.webp/);
+  assert.match(board, /checkerboardColor=\{layout\.checkerboardCellColor/);
   assert.match(board, /mergeLogicalPointFromProjectedWorklet/);
   assert.match(board, /RectangularHoverCellOverlay/);
   assert.match(canvas, /fillAvailableSpace: true/);

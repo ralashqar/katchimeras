@@ -81,6 +81,33 @@ test('every weather and mood combination resolves to a manifest scene', () => {
   }
 });
 
+test('every authored plate has a fixed 720x1280 Haven tier', () => {
+  const manifestPath = path.join(process.cwd(), 'design', 'today-atmosphere-backgrounds', 'manifest.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
+    havenCanvas: { height: number; width: number };
+    scenes: Record<string, { approved?: { asset?: string } }>;
+  };
+  const registrySource = fs.readFileSync(
+    path.join(process.cwd(), 'constants', 'today-atmosphere-background-sources.gen.ts'),
+    'utf8',
+  );
+
+  assert.deepEqual(manifest.havenCanvas, {
+    aspectRatio: '9:16',
+    height: 1280,
+    maxProductionBytes: 350000,
+    webpQuality: 86,
+    width: 720,
+  });
+  for (const scene of Object.values(manifest.scenes)) {
+    const asset = scene.approved?.asset;
+    assert.ok(asset);
+    const havenAsset = path.join(path.dirname(asset), 'haven', path.basename(asset));
+    assert.ok(fs.existsSync(path.join(process.cwd(), havenAsset)), havenAsset);
+  }
+  assert.equal((registrySource.match(/havenSource: require\(/g) ?? []).length, 10);
+});
+
 test('physical weather overrides journal mood for the authored weather plates', () => {
   for (const mood of MOODS) {
     assert.equal(resolveDayBackgroundSceneId(sky('stormy', mood)), 'storm');

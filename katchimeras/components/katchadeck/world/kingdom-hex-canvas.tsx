@@ -134,7 +134,6 @@ const EGG_WORLD_SCALE = kingdomWorldViewConfig.egg.globalScale * HAVEN_HOME_EGG_
 const EGG_WORLD_W = EGG_STAGE_W * EGG_WORLD_SCALE;
 const EGG_WORLD_H = EGG_STAGE_H * EGG_WORLD_SCALE;
 const KINGDOM_DREAM_MIST_LOCK_SOURCE = require('../../../assets/images/katchimeras/world/hex/kingdom_dream_mist_lock_v1_512.webp');
-const HAVEN_MERGE_GRID_SOURCE = require('../../../assets/images/katchimeras/merge-world/generated/haven-merge-grid-7x6.webp');
 const LOCKED_TILE_HIT_WIDTH = HEX_TILE_W * 0.62;
 const LOCKED_TILE_HIT_HEIGHT = HEX_TILE_H * 0.78;
 const LOCKED_TILE_LOCK_SIZE = 104;
@@ -145,10 +144,9 @@ const HAVEN_MERGE_BOARD_PROJECTION = {
 } as const;
 const HAVEN_MERGE_BOARD_LAYOUT: MergeBoardLayout = {
   accessibilityLabel: 'Haven merge board, seven columns by six rows',
-  baseArtOpacity: 1,
-  baseSource: HAVEN_MERGE_GRID_SOURCE,
   cellHeightToWidthRatio: 1.14,
   cellIndices: HAVEN_MERGE_BOARD_CELL_INDICES,
+  checkerboardCellColor: 'rgba(38, 61, 10, 0.188)',
   columns: HAVEN_MERGE_BOARD_COLUMNS,
   projection: HAVEN_MERGE_BOARD_PROJECTION,
   rows: HAVEN_MERGE_BOARD_ROWS,
@@ -156,10 +154,9 @@ const HAVEN_MERGE_BOARD_LAYOUT: MergeBoardLayout = {
 };
 const SQUARE_HAVEN_MERGE_BOARD_LAYOUT: MergeBoardLayout = {
   accessibilityLabel: 'Mossprout garden merge board, seven columns by six rows',
-  baseArtOpacity: 1,
-  baseSource: HAVEN_MERGE_GRID_SOURCE,
   cellHeightToWidthRatio: MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO,
   cellIndices: HAVEN_MERGE_BOARD_CELL_INDICES,
+  checkerboardCellColor: 'rgba(38, 61, 10, 0.188)',
   columns: HAVEN_MERGE_BOARD_COLUMNS,
   fillAvailableSpace: true,
   projection: HAVEN_MERGE_BOARD_PROJECTION,
@@ -756,7 +753,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         contentFit="cover"
         pointerEvents="none"
         recyclingKey={background.id}
-        source={background.source}
+        source={background.havenSource}
         style={StyleSheet.absoluteFill}
       />
       {/* Recreate the native handler whenever this tab regains focus. A camera

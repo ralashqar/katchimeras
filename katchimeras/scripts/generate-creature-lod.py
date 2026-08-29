@@ -112,6 +112,10 @@ def write_manifest(entries: dict[str, dict[str, Path]]) -> None:
                 "  },",
                 "};",
                 "",
+                "export const CREATURE_ORDER_SOURCES: Partial<Record<HomeVisualKey, ImageSourcePropType>> = {",
+                block("order"),
+                "};",
+                "",
             ]
         ),
         encoding="utf-8",
@@ -121,6 +125,7 @@ def write_manifest(entries: dict[str, dict[str, Path]]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--medium", type=int, default=512, help="Maximum medium LOD dimension.")
+    parser.add_argument("--order", type=int, default=384, help="Maximum order-card LOD dimension.")
     parser.add_argument("--thumb", type=int, default=256, help="Maximum thumb LOD dimension.")
     parser.add_argument("--quality", type=int, default=88, help="WebP quality for generated LOD files.")
     parser.add_argument(
@@ -131,6 +136,11 @@ def main() -> None:
         help="Generate only this mapped creature without clearing the shared LOD directory or rewriting the manifest. Repeatable.",
     )
     parser.add_argument("--report-only", action="store_true", help="Only print mapped assets; do not write files.")
+    parser.add_argument(
+        "--order-only",
+        action="store_true",
+        help="Generate the order-card tier and rewrite the manifest without touching existing medium/thumb files.",
+    )
     args = parser.parse_args()
 
     mapped_assets = mapped_creature_assets()
@@ -147,9 +157,25 @@ def main() -> None:
     if args.report_only:
         return
 
+    if args.order_only:
+        entries: dict[str, dict[str, Path]] = {"medium": {}, "order": {}, "thumb": {}}
+        for asset in mapped_assets:
+            medium = LOD_ROOT / f"{asset.key}_{args.medium}.webp"
+            thumb = LOD_ROOT / f"{asset.key}_{args.thumb}.webp"
+            order = LOD_ROOT / f"{asset.key}_{args.order}.webp"
+            if not medium.exists() or not thumb.exists():
+                raise FileNotFoundError(f"Generate existing LODs first for {asset.key}: {medium.name}, {thumb.name}")
+            entries["medium"][asset.key] = medium
+            entries["thumb"][asset.key] = thumb
+            entries["order"][asset.key] = order if order.exists() and order.stat().st_mtime >= asset.path.stat().st_mtime else generate_lod(asset, "order", args.order, args.quality)
+        write_manifest(entries)
+        print(f"Wrote {MANIFEST.relative_to(ROOT)} with {len(entries['order'])} order-card LODs")
+        return
+
     if requested:
         for asset in assets:
             generate_lod(asset, "medium", args.medium, args.quality)
+            generate_lod(asset, "order", args.order, args.quality)
             generate_lod(asset, "thumb", args.thumb, args.quality)
         print(f"Wrote targeted LODs: {', '.join(sorted(requested))}")
         return
@@ -158,9 +184,10 @@ def main() -> None:
         for stale in LOD_ROOT.glob("*.webp"):
             stale.unlink()
 
-    entries: dict[str, dict[str, Path]] = {"medium": {}, "thumb": {}}
+    entries: dict[str, dict[str, Path]] = {"medium": {}, "order": {}, "thumb": {}}
     for asset in assets:
         entries["medium"][asset.key] = generate_lod(asset, "medium", args.medium, args.quality)
+        entries["order"][asset.key] = generate_lod(asset, "order", args.order, args.quality)
         entries["thumb"][asset.key] = generate_lod(asset, "thumb", args.thumb, args.quality)
     write_manifest(entries)
     print(f"Wrote {MANIFEST.relative_to(ROOT)}")

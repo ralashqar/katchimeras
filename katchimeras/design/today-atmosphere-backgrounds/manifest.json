@@ -7,6 +7,13 @@
     "webpQuality": 92,
     "maxProductionBytes": 650000
   },
+  "havenCanvas": {
+    "width": 720,
+    "height": 1280,
+    "aspectRatio": "9:16",
+    "webpQuality": 86,
+    "maxProductionBytes": 350000
+  },
   "bootstrapReference": "assets/images/katchimeras/world/today/generic-tile-surround-meadow-v1.webp",
   "scenes": {
     "clear_day": {

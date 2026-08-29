@@ -54,6 +54,8 @@ export type MergeBoardLayout = {
   cellHeightToWidthRatio?: number;
   /** Fill the supplied width and maxHeight exactly so no parent gesture leaks through. */
   fillAvailableSpace?: boolean;
+  /** Optional native checkerboard tint used by transparent embedded boards. */
+  checkerboardCellColor?: string;
   /** Omit for the dedicated board's direct row-major cell order. */
   cellIndices?: readonly number[];
   columns: number;
@@ -1039,7 +1041,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       transition={0}
     /> : null}
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-      {renderedCellIndices.map((index) => {
+      {renderedCellIndices.map((index, visualIndex) => {
         const cell = presentation.board[index];
         if (!cell) return null;
         const frame = cellFrames[index];
@@ -1082,6 +1084,9 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
           accessibilityDisabled={gateKind === 'locked' || (gateKind === 'drag' && index !== gateFromCell) || (gateKind === 'generator' && index !== gateGeneratorCell)}
           accessibilityLabel={label}
           blocked={cell.locked && !occupant}
+          checkerboardColor={layout.checkerboardCellColor && (
+            (Math.floor(visualIndex / layout.columns) + visualIndex % layout.columns) % 2 === 1
+          ) ? layout.checkerboardCellColor : null}
           height={frame.bounds.height}
           index={index}
           invalid={invalidFeedback?.cell === index}
@@ -1142,11 +1147,12 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   </View>;
 });
 
-const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibilityDisabled, accessibilityLabel, blocked, invalid, index, left, top, width, height, matchHint, mist, onActivate }: {
+const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibilityDisabled, accessibilityLabel, blocked, checkerboardColor, invalid, index, left, top, width, height, matchHint, mist, onActivate }: {
   accessibilityActionLabel: string;
   accessibilityDisabled: boolean;
   accessibilityLabel: string;
   blocked: boolean;
+  checkerboardColor: string | null;
   invalid: boolean;
   index: number;
   left: number;
@@ -1157,6 +1163,8 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
   mist: MergeDreamMist | null;
   onActivate: (cell: number) => void;
 }) {
+  const checkerboardInset = Math.min(width, height) * (5 / 128);
+  const checkerboardRadius = Math.max(6, Math.min(width, height) * (14 / 128));
   const rootbound = mist?.kind === 'rootbound_echo' ? mist : null;
   const residentCard = mist?.kind === 'resident_card' ? mist : null;
   const lockedDefinitionId = mist?.kind === 'echo'
@@ -1171,6 +1179,16 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
       accessibilityState={{ disabled: accessibilityDisabled }}
       onAccessibilityAction={() => onActivate(index)}
       style={styles.cellPressable}>
+      {checkerboardColor ? <View pointerEvents="none" style={{
+        backgroundColor: checkerboardColor,
+        borderCurve: 'continuous',
+        borderRadius: checkerboardRadius,
+        bottom: checkerboardInset,
+        left: checkerboardInset,
+        position: 'absolute',
+        right: checkerboardInset,
+        top: checkerboardInset,
+      }} /> : null}
       {invalid ? <View pointerEvents="none" style={[
         styles.cellStateOverlay,
         invalid && styles.cellStateInvalid,

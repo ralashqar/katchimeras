@@ -50,7 +50,11 @@ const HORIZONTAL_BRIDGE_SOURCES = {
   thumb: require('../../../assets/images/katchimeras/world/square/bridge-straight-horizontal-perspective-256.webp'),
 };
 
-const NATURE_ISLAND_SOURCE_SIZE = { height: 512, width: 512 } as const;
+const NATURE_ISLAND_ORIGINAL_SOURCE_SIZE = { height: 512, width: 512 } as const;
+const WEST_NATURE_ISLAND_CROP = { bottom: 480, left: 79, right: 433, top: 32 } as const;
+const EAST_NATURE_ISLAND_CROP = { bottom: 480, left: 66, right: 445, top: 32 } as const;
+const WEST_NATURE_ISLAND_SOURCE_SIZE = { height: 448, width: 354 } as const;
+const EAST_NATURE_ISLAND_SOURCE_SIZE = { height: 448, width: 379 } as const;
 const NATURE_ISLAND_SOURCE = require('../../../assets/images/katchimeras/world/square/nature-island-512.webp');
 const NATURE_ISLAND_SOURCES = {
   full: NATURE_ISLAND_SOURCE,
@@ -63,6 +67,20 @@ const EAST_NATURE_ISLAND_SOURCES = {
   medium: EAST_NATURE_ISLAND_SOURCE,
   thumb: EAST_NATURE_ISLAND_SOURCE,
 };
+
+function cropArtFrame(
+  frame: { height: number; left: number; top: number; width: number },
+  crop: { bottom: number; left: number; right: number; top: number },
+) {
+  const scaleX = frame.width / NATURE_ISLAND_ORIGINAL_SOURCE_SIZE.width;
+  const scaleY = frame.height / NATURE_ISLAND_ORIGINAL_SOURCE_SIZE.height;
+  return {
+    height: (crop.bottom - crop.top) * scaleY,
+    left: frame.left + crop.left * scaleX,
+    top: frame.top + crop.top * scaleY,
+    width: (crop.right - crop.left) * scaleX,
+  };
+}
 
 function interactionFrame(frame: { left: number; top: number; width: number; height: number }) {
   const bounds = MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS;
@@ -89,8 +107,14 @@ export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlo
   const gardenFrame = havenSquareZoneFrame(gardenZone.coord);
   const baristabbitBridgeFrame = baristabbitMossproutBridgeFrame();
   const eggHomeBridgeFrame = mossproutEggHomeBridgeFrame();
-  const natureIslandFrame = mossproutGardenWestNatureIslandFrame();
-  const eastNatureIslandFrame = mossproutGardenEastNatureIslandFrame();
+  const natureIslandFrame = cropArtFrame(
+    mossproutGardenWestNatureIslandFrame(),
+    WEST_NATURE_ISLAND_CROP,
+  );
+  const eastNatureIslandFrame = cropArtFrame(
+    mossproutGardenEastNatureIslandFrame(),
+    EAST_NATURE_ISLAND_CROP,
+  );
   const baristabbitTile: KingdomTileRender = {
     companion: baristabbit,
     coord: { q: -1, r: 0 },
@@ -206,7 +230,12 @@ export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlo
     squareCoord: gardenZone.coord,
   };
   const natureIslandLayer: KingdomTileArtLayer = {
-    alphaBounds: { bottom: 512, left: 0, right: 512, top: 0 },
+    alphaBounds: {
+      bottom: WEST_NATURE_ISLAND_SOURCE_SIZE.height,
+      left: 0,
+      right: WEST_NATURE_ISLAND_SOURCE_SIZE.width,
+      top: 0,
+    },
     coord: { q: -1, r: 1 },
     custom: true,
     depth: 3,
@@ -216,7 +245,7 @@ export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlo
     kind: 'tile',
     source: NATURE_ISLAND_SOURCE,
     sources: NATURE_ISLAND_SOURCES,
-    sourceSize: NATURE_ISLAND_SOURCE_SIZE,
+    sourceSize: WEST_NATURE_ISLAND_SOURCE_SIZE,
   };
   const eastNatureIslandLayer: KingdomTileArtLayer = {
     ...natureIslandLayer,
@@ -225,6 +254,13 @@ export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlo
     id: 'decor:mossprout-garden-east-nature-island',
     source: EAST_NATURE_ISLAND_SOURCE,
     sources: EAST_NATURE_ISLAND_SOURCES,
+    alphaBounds: {
+      bottom: EAST_NATURE_ISLAND_SOURCE_SIZE.height,
+      left: 0,
+      right: EAST_NATURE_ISLAND_SOURCE_SIZE.width,
+      top: 0,
+    },
+    sourceSize: EAST_NATURE_ISLAND_SOURCE_SIZE,
   };
   const metrics = mossproutSquareSceneMetrics();
   return {

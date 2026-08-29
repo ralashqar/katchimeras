@@ -280,7 +280,11 @@ test('the junction mini-island and separate tray include fixed alpha tiers', () 
 });
 
 test('the paired nature islets are transparent decorative layers in the square Haven scene', () => {
-  for (const stem of ['nature-island-512.webp', 'nature-island-east-512.webp']) {
+  const specs = [
+    { height: 448, stem: 'nature-island-512.webp', width: 354 },
+    { height: 448, stem: 'nature-island-east-512.webp', width: 379 },
+  ] as const;
+  for (const { height, stem, width } of specs) {
     const asset = path.join(
       process.cwd(),
       'assets',
@@ -294,6 +298,9 @@ test('the paired nature islets are transparent decorative layers in the square H
     const bytes = fs.readFileSync(asset);
     assert.equal(bytes.toString('ascii', 12, 16), 'VP8X');
     assert.ok((bytes[20] & 0x10) !== 0, `${stem} must preserve alpha`);
+    const webpWidth = 1 + bytes[24] + (bytes[25] << 8) + (bytes[26] << 16);
+    const webpHeight = 1 + bytes[27] + (bytes[28] << 8) + (bytes[29] << 16);
+    assert.deepEqual({ height: webpHeight, width: webpWidth }, { height, width });
   }
 
   const scene = fs.readFileSync(
@@ -304,6 +311,9 @@ test('the paired nature islets are transparent decorative layers in the square H
   assert.match(scene, /id: 'decor:mossprout-garden-east-nature-island'/);
   assert.match(scene, /frame: natureIslandFrame/);
   assert.match(scene, /frame: eastNatureIslandFrame/);
+  assert.match(scene, /WEST_NATURE_ISLAND_SOURCE_SIZE = \{ height: 448, width: 354 \}/);
+  assert.match(scene, /EAST_NATURE_ISLAND_SOURCE_SIZE = \{ height: 448, width: 379 \}/);
+  assert.match(scene, /cropArtFrame\(/);
   assert.match(scene, /depth: 3/);
 });
 
@@ -316,8 +326,12 @@ test('the player Haven mounts the square scene and keeps the hex renderer as a f
     path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-hex-canvas.tsx'),
     'utf8',
   );
-  const gridGenerator = fs.readFileSync(
-    path.join(process.cwd(), 'scripts', 'generate-haven-merge-grid-overlay.py'),
+  const orderRail = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-order-rail.tsx'),
+    'utf8',
+  );
+  const creatureArt = fs.readFileSync(
+    path.join(process.cwd(), 'utils', 'creature-art.ts'),
     'utf8',
   );
   assert.match(screen, /squareWorld/);
@@ -332,10 +346,11 @@ test('the player Haven mounts the square scene and keeps the hex renderer as a f
   assert.match(canvas, /onItemsArrive=\{handleHavenServeItemsArrive\}/);
   assert.match(canvas, /onCoinArrive=\{handleHavenCoinArrive\}/);
   assert.doesNotMatch(canvas, /baseArtOpacity: 0\.34|merge-board-base-7x6\.webp/);
-  assert.match(gridGenerator, /if \(row \+ column\) % 2 == 0:/);
-  assert.match(gridGenerator, /CELL_RADIUS = 14/);
-  assert.match(gridGenerator, /draw\.polygon\(rounded, fill=DARK_CELL_OVERLAY\)/);
-  assert.doesNotMatch(gridGenerator, /draw\.line|outline=/);
+  assert.match(canvas, /checkerboardCellColor: 'rgba\(38, 61, 10, 0\.188\)'/);
+  assert.doesNotMatch(canvas, /haven-merge-grid-7x6\.webp/);
+  assert.match(orderRail, /resolveCreatureOrderArtSource\(recipientVisualKey\)/);
+  assert.match(creatureArt, /CREATURE_ORDER_SOURCES\[visualKey\]/);
+  assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'cutouts_lod', 'mossprout_384.webp')));
   assert.match(canvas, /HAVEN_MERGE_BOARD_PROJECTION/);
   assert.match(canvas, /cellHeightToWidthRatio: MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO/);
   assert.match(canvas, /fillAvailableSpace: true/);
@@ -349,10 +364,6 @@ test('the player Haven mounts the square scene and keeps the hex renderer as a f
   assert.match(canvas, /scene\.tiles\.find\(\(tile\) => tile\.kind === 'home'\)/);
   const squareScene = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'world', 'mossprout-square-scene.ts'),
-    'utf8',
-  );
-  const orderRail = fs.readFileSync(
-    path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-order-rail.tsx'),
     'utf8',
   );
   assert.match(squareScene, /baristabbitBridgeLayer/);

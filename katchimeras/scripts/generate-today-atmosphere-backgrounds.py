@@ -221,8 +221,14 @@ def download(url: str, path: Path) -> None:
     urllib.request.urlretrieve(url, path)
 
 
-def package_image(source: Path, destination: Path, spec: dict[str, Any]) -> dict[str, Any]:
-    canvas = spec["canvas"]
+def package_image(
+    source: Path,
+    destination: Path,
+    spec: dict[str, Any],
+    *,
+    canvas_key: str = "canvas",
+) -> dict[str, Any]:
+    canvas = spec[canvas_key]
     target = (int(canvas["width"]), int(canvas["height"]))
     with Image.open(source) as opened:
         source_size = opened.size
@@ -240,6 +246,29 @@ def package_image(source: Path, destination: Path, spec: dict[str, Any]) -> dict
     }
 
 
+def haven_asset_path(approved_asset: str) -> Path:
+    return ASSET_ROOT / "haven" / Path(approved_asset).name
+
+
+def sync_haven_tiers(spec: dict[str, Any]) -> list[dict[str, Any]]:
+    packaged: list[dict[str, Any]] = []
+    for scene_id, scene in spec["scenes"].items():
+        approved = scene.get("approved")
+        if not isinstance(approved, dict) or not isinstance(approved.get("asset"), str):
+            continue
+        source = project_path(approved["asset"], label=f"approved {scene_id} asset")
+        destination = haven_asset_path(approved["asset"])
+        result = package_image(source, destination, spec, canvas_key="havenCanvas")
+        maximum = int(spec["havenCanvas"]["maxProductionBytes"])
+        if result["bytes"] > maximum:
+            destination.unlink(missing_ok=True)
+            raise SystemExit(
+                f"Haven {scene_id} tier is {result['bytes']} bytes; maximum is {maximum}."
+            )
+        packaged.append({"sceneId": scene_id, **result})
+    return packaged
+
+
 def sync_registry(spec: dict[str, Any]) -> None:
     rows: list[str] = []
     for scene_id, scene in spec["scenes"].items():
@@ -250,6 +279,7 @@ def sync_registry(spec: dict[str, Any]) -> None:
             f"  {scene_id}: {{",
             f"    id: {json.dumps(str(approved['id']))},",
             f"    source: require('../{approved['asset']}'),",
+            f"    havenSource: require('../{str(haven_asset_path(approved['asset']).relative_to(ROOT)).replace(chr(92), '/')}'),",
             "  },",
         ])
     body = "\n".join([
@@ -261,6 +291,7 @@ def sync_registry(spec: dict[str, Any]) -> None:
         "export type BundledTodayAtmosphereBackground = {",
         "  id: string;",
         "  source: ImageSourcePropType;",
+        "  havenSource: ImageSourcePropType;",
         "};",
         "",
         "export const TODAY_ATMOSPHERE_BACKGROUND_SOURCES: Record<",
@@ -403,6 +434,7 @@ def cmd_promote(args: argparse.Namespace) -> None:
         "sha256": packaged["sha256"],
     }
     SPEC_PATH.write_text(json.dumps(spec, indent=2) + "\n", encoding="utf-8")
+    sync_haven_tiers(spec)
     sync_registry(spec)
     print(json.dumps({"promoted": scene["approved"], "package": packaged}, indent=2))
 
@@ -413,10 +445,22 @@ def cmd_sync_registry(_args: argparse.Namespace) -> None:
     print(REGISTRY_PATH.relative_to(ROOT))
 
 
+def cmd_sync_haven_tiers(_args: argparse.Namespace) -> None:
+    spec = load_spec()
+    packaged = sync_haven_tiers(spec)
+    sync_registry(spec)
+    print(json.dumps({"assets": packaged, "count": len(packaged)}, indent=2))
+
+
 def cmd_validate(_args: argparse.Namespace) -> None:
     spec = load_spec()
     expected = (int(spec["canvas"]["width"]), int(spec["canvas"]["height"]))
     maximum = int(spec["canvas"]["maxProductionBytes"])
+    haven_expected = (
+        int(spec["havenCanvas"]["width"]),
+        int(spec["havenCanvas"]["height"]),
+    )
+    haven_maximum = int(spec["havenCanvas"]["maxProductionBytes"])
     errors: list[str] = []
     for scene_id, scene in spec["scenes"].items():
         approved = scene.get("approved")
@@ -438,6 +482,21 @@ def cmd_validate(_args: argparse.Namespace) -> None:
             errors.append(f"{scene_id}: {path.stat().st_size} bytes exceeds {maximum}")
         if hashlib.sha256(path.read_bytes()).hexdigest() != approved.get("sha256"):
             errors.append(f"{scene_id}: sha256 does not match manifest")
+        haven_path = haven_asset_path(approved["asset"])
+        if not haven_path.exists():
+            errors.append(f"{scene_id}: missing Haven tier {haven_path.relative_to(ROOT)}")
+            continue
+        with Image.open(haven_path) as image:
+            if image.size != haven_expected:
+                errors.append(f"{scene_id}: Haven tier expected {haven_expected}, found {image.size}")
+            if image.mode != "RGB":
+                errors.append(f"{scene_id}: Haven tier expected RGB, found {image.mode}")
+        if haven_path.suffix.lower() != ".webp":
+            errors.append(f"{scene_id}: Haven tier is not WebP")
+        if haven_path.stat().st_size > haven_maximum:
+            errors.append(
+                f"{scene_id}: Haven tier {haven_path.stat().st_size} bytes exceeds {haven_maximum}"
+            )
     expected_registry = REGISTRY_PATH.read_text(encoding="utf-8") if REGISTRY_PATH.exists() else ""
     sync_registry(spec)
     if expected_registry and REGISTRY_PATH.read_text(encoding="utf-8") != expected_registry:
@@ -447,7 +506,10 @@ def cmd_validate(_args: argparse.Namespace) -> None:
         for error in errors:
             print(f"  - {error}")
         raise SystemExit(1)
-    print(f"Today atmosphere backgrounds OK: {len(spec['scenes'])} approved")
+    print(
+        f"Today atmosphere backgrounds OK: {len(spec['scenes'])} approved, "
+        f"Haven tiers {haven_expected[0]}x{haven_expected[1]}"
+    )
 
 
 def add_generation_args(parser: argparse.ArgumentParser) -> None:
@@ -485,6 +547,8 @@ def build_parser() -> argparse.ArgumentParser:
     promote.set_defaults(func=cmd_promote)
     sync = commands.add_parser("sync-registry")
     sync.set_defaults(func=cmd_sync_registry)
+    sync_haven = commands.add_parser("sync-haven-tiers")
+    sync_haven.set_defaults(func=cmd_sync_haven_tiers)
     validate = commands.add_parser("validate")
     validate.set_defaults(func=cmd_validate)
     return parser

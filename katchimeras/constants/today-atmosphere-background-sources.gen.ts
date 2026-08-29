@@ -6,6 +6,7 @@ import type { DayBackgroundSceneId } from '@/types/home';
 export type BundledTodayAtmosphereBackground = {
   id: string;
   source: ImageSourcePropType;
+  havenSource: ImageSourcePropType;
 };
 
 export const TODAY_ATMOSPHERE_BACKGROUND_SOURCES: Record<
@@ -15,41 +16,51 @@ export const TODAY_ATMOSPHERE_BACKGROUND_SOURCES: Record<
   clear_day: {
     id: "clear-sky-islands-v1",
     source: require('../assets/images/katchimeras/world/today-atmosphere/clear-day.webp'),
+    havenSource: require('../assets/images/katchimeras/world/today-atmosphere/haven/clear-day.webp'),
   },
   radiant_golden: {
     id: "radiant-golden-sky-v1",
     source: require('../assets/images/katchimeras/world/today-atmosphere/radiant-golden.webp'),
+    havenSource: require('../assets/images/katchimeras/world/today-atmosphere/haven/radiant-golden.webp'),
   },
   celebration_connected: {
     id: "celebration-connected-sky-v1",
     source: require('../assets/images/katchimeras/world/today-atmosphere/celebration-connected.webp'),
+    havenSource: require('../assets/images/katchimeras/world/today-atmosphere/haven/celebration-connected.webp'),
   },
   garden_bloom: {
     id: "garden-bloom-sky-v1",
     source: require('../assets/images/katchimeras/world/today-atmosphere/garden-bloom.webp'),
+    havenSource: require('../assets/images/katchimeras/world/today-atmosphere/haven/garden-bloom.webp'),
   },
   autumn_hearth: {
     id: "autumn-hearth-sky-v1",
     source: require('../assets/images/katchimeras/world/today-atmosphere/autumn-hearth.webp'),
+    havenSource: require('../assets/images/katchimeras/world/today-atmosphere/haven/autumn-hearth.webp'),
   },
   twilight_reflective: {
     id: "twilight-reflective-sky-v1",
     source: require('../assets/images/katchimeras/world/today-atmosphere/twilight-reflective.webp'),
+    havenSource: require('../assets/images/katchimeras/world/today-atmosphere/haven/twilight-reflective.webp'),
   },
   inspired_journey: {
     id: "inspired-journey-sky-v1",
     source: require('../assets/images/katchimeras/world/today-atmosphere/inspired-journey.webp'),
+    havenSource: require('../assets/images/katchimeras/world/today-atmosphere/haven/inspired-journey.webp'),
   },
   rain_overcast: {
     id: "rain-overcast-sky-v1",
     source: require('../assets/images/katchimeras/world/today-atmosphere/rain-overcast.webp'),
+    havenSource: require('../assets/images/katchimeras/world/today-atmosphere/haven/rain-overcast.webp'),
   },
   mist_cold: {
     id: "mist-cold-sky-v1",
     source: require('../assets/images/katchimeras/world/today-atmosphere/mist-cold.webp'),
+    havenSource: require('../assets/images/katchimeras/world/today-atmosphere/haven/mist-cold.webp'),
   },
   storm: {
     id: "storm-sky-v1",
     source: require('../assets/images/katchimeras/world/today-atmosphere/storm.webp'),
+    havenSource: require('../assets/images/katchimeras/world/today-atmosphere/haven/storm.webp'),
   },
 };

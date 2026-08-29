@@ -15,6 +15,7 @@ export type TodayAtmosphereBackground = {
   id: string;
   sceneId: DayBackgroundSceneId;
   source: (typeof TODAY_ATMOSPHERE_BACKGROUND_SOURCES)[DayBackgroundSceneId]['source'];
+  havenSource: (typeof TODAY_ATMOSPHERE_BACKGROUND_SOURCES)[DayBackgroundSceneId]['havenSource'];
 };
 
 export function todayAtmosphereBackgroundForSky(

@@ -4,7 +4,7 @@ import {
   CREATURE_HATCHLING_SOURCES,
   type CreatureHatchlingLod,
 } from '@/constants/creature-hatchling-sources.gen';
-import { CREATURE_LOD_SOURCES } from '@/constants/creature-lod-sources.gen';
+import { CREATURE_LOD_SOURCES, CREATURE_ORDER_SOURCES } from '@/constants/creature-lod-sources.gen';
 import { homeCreatureVisuals } from '@/constants/home-mvp';
 import type { HomeVisualKey } from '@/types/home';
 import { resolveCreatureVariantSource } from '@/utils/creature-variant';
@@ -76,4 +76,11 @@ export function resolveCreatureArtSource(
     if (source) return source;
   }
   return grownSource(visualKey, lod, variantCell);
+}
+
+/** Dedicated order-card tier: sharper than a thumbnail without retaining a 512px cutout. */
+export function resolveCreatureOrderArtSource(visualKey: HomeVisualKey): ImageSourcePropType {
+  return CREATURE_ORDER_SOURCES[visualKey]
+    ?? CREATURE_LOD_SOURCES.medium[visualKey]
+    ?? homeCreatureVisuals[visualKey].source;
 }
