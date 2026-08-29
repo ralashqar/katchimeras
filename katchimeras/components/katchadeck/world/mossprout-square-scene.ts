@@ -5,6 +5,7 @@ import {
   havenSquareZoneFrame,
   MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS,
   MOSSPROUT_SQUARE_ZONES,
+  STEPPLING_BOARD_PLAYFIELD_SOURCE_BOUNDS,
   mossproutEggHomeBridgeFrame,
   mossproutGardenEastNatureIslandFrame,
   mossproutGardenWestNatureIslandFrame,
@@ -24,6 +25,12 @@ const ENVIRONMENT_SOURCES = {
 
 const MOSSPROUT_STANDING_RESIDENT_SOURCE = require(
   '../../../assets/images/katchimeras/world/square/mossprout-standing-resident-512.webp',
+);
+const BARISTABBIT_STANDING_RESIDENT_SOURCE = require(
+  '../../../assets/images/katchimeras/cutouts_lod/baristabbit_512.webp',
+);
+const STEPPLING_STANDING_RESIDENT_SOURCE = require(
+  '../../../assets/images/katchimeras/world/square/steppling-standing-resident-512.webp',
 );
 
 const BARISTABBIT_CAFE_SOURCES = {
@@ -48,6 +55,18 @@ const HORIZONTAL_BRIDGE_SOURCES = {
   full: require('../../../assets/images/katchimeras/world/square/bridge-straight-horizontal-perspective.webp'),
   medium: require('../../../assets/images/katchimeras/world/square/bridge-straight-horizontal-perspective-512.webp'),
   thumb: require('../../../assets/images/katchimeras/world/square/bridge-straight-horizontal-perspective-256.webp'),
+};
+
+const STEPPLING_MOVEMENT_SOURCES = {
+  full: require('../../../assets/images/katchimeras/world/square/steppling-movement-island.webp'),
+  medium: require('../../../assets/images/katchimeras/world/square/steppling-movement-island-512.webp'),
+  thumb: require('../../../assets/images/katchimeras/world/square/steppling-movement-island-256.webp'),
+};
+
+const STEPPLING_BOARD_SOURCES = {
+  full: require('../../../assets/images/katchimeras/world/square/steppling-merge-island.webp'),
+  medium: require('../../../assets/images/katchimeras/world/square/steppling-merge-island-512.webp'),
+  thumb: require('../../../assets/images/katchimeras/world/square/steppling-merge-island-256.webp'),
 };
 
 const NATURE_ISLAND_ORIGINAL_SOURCE_SIZE = { height: 512, width: 512 } as const;
@@ -82,8 +101,10 @@ function cropArtFrame(
   };
 }
 
-function interactionFrame(frame: { left: number; top: number; width: number; height: number }) {
-  const bounds = MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS;
+function interactionFrame(
+  frame: { left: number; top: number; width: number; height: number },
+  bounds: { bottom: number; left: number; right: number; top: number } = MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS,
+) {
   return {
     height: ((bounds.bottom - bounds.top) / SOURCE_SIZE.height) * frame.height,
     left: frame.left + (bounds.left / SOURCE_SIZE.width) * frame.width,
@@ -97,13 +118,19 @@ export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlo
     ?? { id: 'family:baristabbit', familyId: 'baristabbit', kind: 'locked' as const, coord: { q: -1, r: 0 } };
   const mossprout = companionSlots.find((slot) => slot.familyId === 'mossprout')
     ?? { id: 'family:mossprout', familyId: 'mossprout', kind: 'locked' as const, coord: { q: 0, r: 0 } };
+  const steppling = companionSlots.find((slot) => slot.familyId === 'steppling')
+    ?? { id: 'family:steppling', familyId: 'steppling', kind: 'locked' as const, coord: { q: -1, r: 1 } };
   const baristabbitZone = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'baristabbit-cafe')!;
   const environmentZone = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'mossprout-environment')!;
   const eggHomeZone = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'egg-home')!;
+  const stepplingZone = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'steppling-movement')!;
+  const stepplingBoardZone = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'steppling-board')!;
   const gardenZone = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'mossprout-garden')!;
   const baristabbitFrame = havenSquareZoneFrame(baristabbitZone.coord);
   const environmentFrame = havenSquareZoneFrame(environmentZone.coord);
   const eggHomeFrame = havenSquareZoneFrame(eggHomeZone.coord);
+  const stepplingFrame = havenSquareZoneFrame(stepplingZone.coord);
+  const stepplingBoardFrame = havenSquareZoneFrame(stepplingBoardZone.coord);
   const gardenFrame = havenSquareZoneFrame(gardenZone.coord);
   const baristabbitBridgeFrame = baristabbitMossproutBridgeFrame();
   const eggHomeBridgeFrame = mossproutEggHomeBridgeFrame();
@@ -138,6 +165,7 @@ export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlo
       x: baristabbitFrame.left + baristabbitFrame.width * 0.5,
       y: baristabbitFrame.top + baristabbitFrame.height * 0.52,
     },
+    residentSource: BARISTABBIT_STANDING_RESIDENT_SOURCE,
     source: BARISTABBIT_CAFE_SOURCES.full,
     sources: BARISTABBIT_CAFE_SOURCES,
     sourceSize: SOURCE_SIZE,
@@ -171,6 +199,35 @@ export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlo
     sources: ENVIRONMENT_SOURCES,
     sourceSize: { width: SOURCE_SIZE.width, height: SOURCE_SIZE.height },
     squareCoord: environmentZone.coord,
+  };
+  const stepplingTile: KingdomTileRender = {
+    companion: steppling,
+    coord: { q: -1, r: 1 },
+    cx: stepplingFrame.left + stepplingFrame.width / 2,
+    cy: stepplingFrame.top + stepplingFrame.height / 2,
+    depth: 2,
+    id: steppling.id,
+    kind: 'companion',
+    squareCoord: stepplingZone.coord,
+  };
+  const stepplingLayer: KingdomTileArtLayer = {
+    alphaBounds: FULL_BOUNDS,
+    coord: stepplingTile.coord,
+    custom: true,
+    depth: 2,
+    fallbackSource: null,
+    frame: stepplingFrame,
+    id: stepplingTile.id,
+    kind: 'tile',
+    residentAnchor: {
+      x: stepplingFrame.left + stepplingFrame.width * 0.5,
+      y: stepplingFrame.top + stepplingFrame.height * 0.57,
+    },
+    residentSource: STEPPLING_STANDING_RESIDENT_SOURCE,
+    source: STEPPLING_MOVEMENT_SOURCES.full,
+    sources: STEPPLING_MOVEMENT_SOURCES,
+    sourceSize: SOURCE_SIZE,
+    squareCoord: stepplingZone.coord,
   };
   const eggHomeTile: KingdomTileRender = {
     coord: { q: 1, r: 0 },
@@ -229,6 +286,21 @@ export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlo
     sourceSize: { width: SOURCE_SIZE.width, height: SOURCE_SIZE.height },
     squareCoord: gardenZone.coord,
   };
+  const stepplingBoardLayer: KingdomTileArtLayer = {
+    alphaBounds: FULL_BOUNDS,
+    coord: { q: -1, r: 2 },
+    custom: true,
+    depth: 4,
+    fallbackSource: null,
+    frame: stepplingBoardFrame,
+    id: 'structure:steppling-square-board',
+    interactionFrame: interactionFrame(stepplingBoardFrame, STEPPLING_BOARD_PLAYFIELD_SOURCE_BOUNDS),
+    kind: 'structure',
+    source: STEPPLING_BOARD_SOURCES.full,
+    sources: STEPPLING_BOARD_SOURCES,
+    sourceSize: SOURCE_SIZE,
+    squareCoord: stepplingBoardZone.coord,
+  };
   const natureIslandLayer: KingdomTileArtLayer = {
     alphaBounds: {
       bottom: WEST_NATURE_ISLAND_SOURCE_SIZE.height,
@@ -272,7 +344,9 @@ export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlo
       baristabbitLayer,
       environmentLayer,
       eggHomeLayer,
+      stepplingLayer,
       gardenLayer,
+      stepplingBoardLayer,
       natureIslandLayer,
       eastNatureIslandLayer,
     ].sort((left, right) => left.depth - right.depth),
@@ -280,8 +354,9 @@ export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlo
       [baristabbitTile.id, baristabbitTile],
       [environmentTile.id, environmentTile],
       [eggHomeTile.id, eggHomeTile],
+      [stepplingTile.id, stepplingTile],
     ]),
-    tiles: [baristabbitTile, environmentTile, eggHomeTile],
+    tiles: [baristabbitTile, environmentTile, eggHomeTile, stepplingTile],
     width: metrics.width,
   };
 }

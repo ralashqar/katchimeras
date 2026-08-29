@@ -164,6 +164,39 @@ export function EmptyMergeOrderTrayCard() {
   );
 }
 
+export function FrozenMergeOrderTrayCard({ entry }: { entry: MergeOrderTrayEntry }) {
+  const recipient = entry.order.recipientSkinId ? katchimeraSkinById.get(entry.order.recipientSkinId) : null;
+  const visualKey = recipient?.visualKey ?? CHARACTER_VISUALS[entry.order.characterId];
+  const requestedItems = entry.order.requirements
+    .flatMap((requirement) => Array.from({ length: requirement.quantity }, () => requirement.definitionId))
+    .slice(0, 3);
+  return (
+    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" pointerEvents="none" style={styles.card}>
+      <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" source={CHAIR_ART} style={styles.chairArt} transition={0} />
+      <View style={styles.characterLayer}>
+        <Image
+          accessibilityIgnoresInvertColors
+          allowDownscaling
+          cachePolicy="memory"
+          contentFit="contain"
+          recyclingKey={`merge-order-frozen-${entry.order.recipientSkinId ?? entry.order.characterId}`}
+          source={resolveCreatureOrderArtSource(visualKey)}
+          style={styles.character}
+          transition={0}
+        />
+      </View>
+      <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" source={TRAY_ART} style={styles.trayArt} transition={0} />
+      <View style={styles.items}>
+        {requestedItems.map((definitionId, index) => (
+          <View key={`${definitionId}:${index}`} style={styles.item}>
+            <PersistentMergeItemArt definitionId={definitionId} size={TRAY_ITEM_SIZE} />
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel, onReroll, onServe, onBlockedInteraction, onRailTargetRef, interactionGate = { kind: 'open' }, parcelTargetRef }: {
   entries: readonly MergeTrayEntry[];
   focusOrderId?: string;

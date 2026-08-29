@@ -285,7 +285,7 @@ test('the Katchimeras tab permanently renders the hex Haven while companion Back
   const companionRoute = read('components', 'katchadeck', 'world', 'katchimera-companion-route-screen.tsx');
 
   assert.doesNotMatch(rosterRoute, /KatchimeraViewMode|current === 'grid'|<KatchimeraRosterScreen/);
-  assert.match(rosterRoute, /return isFocused \? <FocusedKatchimeraRoster \/> : null/);
+  assert.match(rosterRoute, /return isFocused \? <FocusedKatchimeraRosterBoundary \/> : null/);
   assert.match(rosterRoute, /<KatchimeraKingdomScreen/);
   assert.match(kingdomCanvas, /value: playerHavenHexTileSet\(\)/);
   assert.doesNotMatch(kingdomCanvas, /value: kingdomHexTileSet\(\)/);
@@ -311,6 +311,7 @@ test('the dev toggle exposes virtual companions across roster, companion, games,
   const read = (...segments: string[]) => fs.readFileSync(path.join(process.cwd(), ...segments), 'utf8');
   const devTab = read('app', '(tabs)', 'explore.tsx');
   const rosterRoute = read('components', 'katchadeck', 'roster', 'katchimera-roster-route-screen.tsx');
+  const kingdomScreen = read('components', 'katchadeck', 'roster', 'katchimera-kingdom-screen.tsx');
   const companionRoute = read('components', 'katchadeck', 'world', 'kingdom-companion-screen.tsx');
   const gamesRoute = read('components', 'katchadeck', 'games', 'game-hub-route-screen.tsx');
   const today = read('app', '(tabs)', 'today.tsx');
@@ -319,6 +320,14 @@ test('the dev toggle exposes virtual companions across roster, companion, games,
   assert.match(devTab, /Make all Katchimeras available/);
   assert.match(devTab, /setAllKatchimerasAvailableEnabled/);
   assert.match(rosterRoute, /withDevAvailableKatchimeras/);
+  assert.match(
+    kingdomScreen,
+    /companionSlots\.filter\(\(slot\) => \([\s\S]*slot\.familyId === 'mossprout'[\s\S]*slot\.familyId === 'baristabbit'[\s\S]*slot\.familyId === 'steppling'/,
+  );
+  assert.match(
+    kingdomScreen,
+    /havenMergeBoardActive[\s\S]*slot\.familyId === 'mossprout' && slot\.kind === 'owned'/,
+  );
   assert.match(companionRoute, /withDevAvailableKatchimeras/);
   assert.match(gamesRoute, /withDevAvailableKatchimeras/);
   assert.match(today, /allKatchimerasAvailable[\s\S]*katchimeraFamilies/);
@@ -338,6 +347,18 @@ test('production companion surfaces consume Merge World discovery ownership', ()
   assert.match(companionScreen, /withDiscoveredKatchimeras/);
   assert.match(gamesRoute, /useCompanionDiscoveryRecords/);
   assert.match(gamesRoute, /withDiscoveredKatchimeras/);
+});
+
+test('Haven supplies independently scoped Mossprout and Steppling merge boards', () => {
+  const kingdomScreen = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'roster', 'katchimera-kingdom-screen.tsx'),
+    'utf8',
+  );
+  assert.match(kingdomScreen, /mergeWorldStateForBoard\(mergeWorld, 'steppling'\)/);
+  assert.match(kingdomScreen, /boardId: 'steppling'/);
+  assert.match(kingdomScreen, /id: 'mossprout' as const/);
+  assert.match(kingdomScreen, /id: 'steppling' as const/);
+  assert.match(kingdomScreen, /mergeBoards=\{havenMergeBoards\}/);
 });
 
 test('the roster, companion, and Block Blast use isolated route boundaries', () => {
@@ -384,7 +405,7 @@ test('the roster, companion, and Block Blast use isolated route boundaries', () 
   assert.doesNotMatch(rosterCard, /FadeInUp|entering=|translateY/);
   assert.match(rosterRoute, /hasCompletedInitialFocus/);
   assert.match(rosterRoute, /useIsFocused/);
-  assert.match(rosterRoute, /isFocused \? <FocusedKatchimeraRoster[\s\S]*?\/> : null/);
+  assert.match(rosterRoute, /isFocused \? <FocusedKatchimeraRosterBoundary[\s\S]*?\/> : null/);
   assert.match(gameRoute, /BlockBlastQuest/);
   assert.match(gameRoute, /BlockBlastGameShell/);
   assert.match(gameShell, /cheerlet-exploration-v1\.png/);

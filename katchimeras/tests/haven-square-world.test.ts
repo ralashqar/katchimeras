@@ -21,6 +21,9 @@ import {
   MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS,
   MOSSPROUT_GARDEN_TOP_WIDTH_RATIO,
   MOSSPROUT_SQUARE_ZONES,
+  STEPPLING_BOARD_CELL_HEIGHT_TO_WIDTH_RATIO,
+  STEPPLING_BOARD_PLAYFIELD_SOURCE_CORNERS,
+  STEPPLING_BOARD_TOP_WIDTH_RATIO,
   mossproutEggHomeBridgeFrame,
   mossproutGardenEastNatureIslandFrame,
   mossproutGardenJunctionMiniIslandFrame,
@@ -35,11 +38,12 @@ import {
 import {
   devHavenOrderFillerSlot,
   devHavenOrderFillers,
+  devHavenOrderFillersForFamily,
   devHavenOrderFillersForSlots,
   isDevHavenOrderFiller,
 } from '../utils/merge-world/dev-haven-order-fillers';
 import { katchimeraSkins } from '../constants/katchimera-skins';
-import { createInitialMergeWorldState, reduceMergeWorld } from '../utils/merge-world/engine';
+import { createInitialMergeWorldState, mergeWorldStateForBoard, reduceMergeWorld } from '../utils/merge-world/engine';
 
 test('developer Haven order fillers are stable and use every non-base Mossprout skin', () => {
   const first = devHavenOrderFillers([], 3, 42);
@@ -65,6 +69,23 @@ test('developer Haven order fillers are stable and use every non-base Mossprout 
     .map((order) => order.recipientSkinId)
     .sort();
   assert.deepEqual(everyVariant, allMossproutVariants);
+});
+
+test('developer Haven order fillers use every non-base Steppling skin and Steppling requirements', () => {
+  const everyStepplingVariant = katchimeraSkins
+    .filter((skin) => skin.familyId === 'steppling' && skin.id !== 'steppling')
+    .map((skin) => skin.id)
+    .sort();
+  const orders = devHavenOrderFillersForFamily('steppling', [], everyStepplingVariant.length, 84);
+
+  assert.equal(orders.length, everyStepplingVariant.length);
+  assert.deepEqual(orders.map((order) => order.recipientSkinId).sort(), everyStepplingVariant);
+  assert.ok(orders.every((order) => order.characterId === 'steppling'));
+  assert.ok(orders.every((order) => order.recipientSkinId !== 'steppling'));
+  assert.ok(orders.every((order) => order.requirements.every((requirement) => (
+    requirement.definitionId.startsWith('adventure:trail:')
+    || requirement.definitionId.startsWith('adventure:travel:')
+  ))));
 });
 
 test('serving one developer Haven slot leaves every other generated slot unchanged', () => {
@@ -123,12 +144,58 @@ test('developer Haven order fillers can consume board items and award their ordi
   assert.equal(spoofed.changed, false);
 });
 
-test('square Haven places Baristabbit west of Mossprout and the merge island below it', () => {
+test('developer Steppling fillers serve from the resident board without touching Mossprout cells', () => {
+  const order = devHavenOrderFillersForFamily('steppling', [], 1, 84)[0]!;
+  const initial = createInitialMergeWorldState(1_000);
+  const requestedItems = order.requirements.flatMap((requirement) => Array.from(
+    { length: requirement.quantity },
+    () => requirement.definitionId,
+  ));
+  const resident = initial.haven.residentMergeBoards.steppling!;
+  const ready = {
+    ...initial,
+    haven: {
+      ...initial.haven,
+      residentMergeBoards: {
+        ...initial.haven.residentMergeBoards,
+        steppling: {
+          ...resident,
+          board: resident.board.map((cell, index) => index < requestedItems.length ? {
+            ...cell,
+            occupant: {
+              kind: 'item' as const,
+              instanceId: `dev-steppling-order-item:${index}`,
+              definitionId: requestedItems[index]!,
+            },
+          } : cell),
+        },
+      },
+    },
+  };
+  const mossproutBoard = ready.board;
+  const result = reduceMergeWorld(ready, {
+    type: 'serveDevHavenOrder',
+    boardId: 'steppling',
+    order,
+    now: 2_000,
+  });
+
+  assert.equal(result.changed, true);
+  assert.equal(result.state.board, mossproutBoard);
+  assert.equal(result.state.coins, ready.coins + order.reward.coins);
+  assert.ok(mergeWorldStateForBoard(result.state, 'steppling').board
+    .slice(0, requestedItems.length)
+    .every((cell) => cell.occupant === null));
+});
+
+test('square Haven places Steppling beneath Baristabbit and the merge island beneath Mossprout', () => {
   assert.deepEqual(MOSSPROUT_SQUARE_ZONES, [
     { id: 'baristabbit-cafe', coord: { column: 0, row: 0 } },
     { id: 'mossprout-environment', coord: { column: 1, row: 0 } },
     { id: 'egg-home', coord: { column: 2, row: 0 } },
+    { id: 'steppling-movement', coord: { column: 0, row: 1 } },
     { id: 'mossprout-garden', coord: { column: 1, row: 1 } },
+    { id: 'steppling-board', coord: { column: 0, row: 2 } },
   ]);
   assert.equal(HAVEN_SQUARE_COLUMN_PITCH, 720);
   assert.equal(HAVEN_MERGE_BOARD_AREA_LOWERING, HAVEN_SQUARE_ZONE_SIZE * 0.15);
@@ -137,7 +204,8 @@ test('square Haven places Baristabbit west of Mossprout and the merge island bel
   const baristabbit = havenSquareZoneFrame(MOSSPROUT_SQUARE_ZONES[0].coord);
   const environment = havenSquareZoneFrame(MOSSPROUT_SQUARE_ZONES[1].coord);
   const eggHome = havenSquareZoneFrame(MOSSPROUT_SQUARE_ZONES[2].coord);
-  const garden = havenSquareZoneFrame(MOSSPROUT_SQUARE_ZONES[3].coord);
+  const steppling = havenSquareZoneFrame(MOSSPROUT_SQUARE_ZONES[3].coord);
+  const garden = havenSquareZoneFrame(MOSSPROUT_SQUARE_ZONES[4].coord);
   const westernBridge = baristabbitMossproutBridgeFrame();
   const easternBridge = mossproutEggHomeBridgeFrame();
   const junctionMiniIsland = mossproutGardenJunctionMiniIslandFrame();
@@ -145,6 +213,8 @@ test('square Haven places Baristabbit west of Mossprout and the merge island bel
   const eastNatureIsland = mossproutGardenEastNatureIslandFrame();
   assert.equal(environment.left - (baristabbit.left + baristabbit.width), 120);
   assert.equal(eggHome.left - (environment.left + environment.width), 120);
+  assert.equal(steppling.left, baristabbit.left);
+  assert.equal(steppling.top, baristabbit.top + HAVEN_SQUARE_ROW_PITCH);
   assert.equal(garden.left, environment.left);
   assert.equal(garden.top, environment.top + HAVEN_SQUARE_ROW_PITCH);
   assert.equal(environment.top + environment.height - garden.top, 30);
@@ -189,7 +259,7 @@ test('square Haven places Baristabbit west of Mossprout and the merge island bel
     eastNatureIsland.left + eastNatureIsland.width / 2 - (environment.left + environment.width / 2),
     environment.left + environment.width / 2 - (westNatureIsland.left + westNatureIsland.width / 2),
   );
-  assert.deepEqual(mossproutSquareSceneMetrics(), { width: 2160, height: 1290 });
+  assert.deepEqual(mossproutSquareSceneMetrics(), { width: 2160, height: 1860 });
 });
 
 test('the compact merge island hosts all stable Haven cells on one 7x6 playfield', () => {
@@ -203,6 +273,9 @@ test('the compact merge island hosts all stable Haven cells on one 7x6 playfield
     topLeft: { x: 245, y: 215 },
     topRight: { x: 779, y: 215 },
   });
+  assert.deepEqual(STEPPLING_BOARD_PLAYFIELD_SOURCE_CORNERS, MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS);
+  assert.equal(STEPPLING_BOARD_CELL_HEIGHT_TO_WIDTH_RATIO, MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO);
+  assert.equal(STEPPLING_BOARD_TOP_WIDTH_RATIO, MOSSPROUT_GARDEN_TOP_WIDTH_RATIO);
   assert.equal((MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.right - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.left) / 7, 584 / 7);
   assert.equal((MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.bottom - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.top) / 6, 475 / 6);
   assert.equal(MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO, (475 / 6) / (584 / 7));
@@ -210,7 +283,13 @@ test('the compact merge island hosts all stable Haven cells on one 7x6 playfield
 });
 
 test('square Haven runtime art includes full, medium, and thumbnail tiers', () => {
-  for (const stem of ['baristabbit-cafe-island', 'mossprout-main-environment', 'mossprout-merge-island']) {
+  for (const stem of [
+    'baristabbit-cafe-island',
+    'mossprout-main-environment',
+    'mossprout-merge-island',
+    'steppling-movement-island',
+    'steppling-merge-island',
+  ]) {
     const master = fs.readFileSync(path.join(process.cwd(), 'design', 'square-haven-v1', `${stem}-1024.png`));
     assert.equal(master.readUInt32BE(16), 1024);
     assert.equal(master.readUInt32BE(20), 1024);
@@ -369,11 +448,16 @@ test('the player Haven mounts the square scene and keeps the hex renderer as a f
   assert.match(squareScene, /baristabbitBridgeLayer/);
   assert.match(squareScene, /eggHomeBridgeLayer/);
   assert.match(squareScene, /baristabbit-cafe-island\.webp/);
+  assert.match(squareScene, /steppling-movement-island\.webp/);
   assert.match(squareScene, /bridge-straight-horizontal-perspective\.webp/);
   assert.match(squareScene, /egg-home-island\.webp/);
   assert.match(squareScene, /mossprout-merge-island-perspective\.webp/);
   assert.match(squareScene, /mossprout-standing-resident-512\.webp/);
+  assert.match(squareScene, /BARISTABBIT_STANDING_RESIDENT_SOURCE[\s\S]*baristabbit_512\.webp/);
+  assert.match(squareScene, /STEPPLING_STANDING_RESIDENT_SOURCE[\s\S]*steppling-standing-resident-512\.webp/);
+  assert.match(squareScene, /residentSource: BARISTABBIT_STANDING_RESIDENT_SOURCE/);
   assert.match(squareScene, /residentSource: MOSSPROUT_STANDING_RESIDENT_SOURCE/);
+  assert.match(squareScene, /residentSource: STEPPLING_STANDING_RESIDENT_SOURCE/);
   assert.match(canvas, /source=\{artLayer\?\.residentSource\}/);
   assert.match(canvas, /sourceOverride \?\? worldAssetSource/);
   assert.doesNotMatch(squareScene, /haven-junction-mini-island-512\.webp/);
@@ -397,10 +481,11 @@ test('the player Haven mounts the square scene and keeps the hex renderer as a f
   assert.match(canvas, /MergeOrderTrayCard/);
   assert.match(canvas, /HAVEN_ORDER_SLOT_FRAMES = \[\s*JUNCTION_TRAY_FRAMES\[1\],\s*JUNCTION_TRAY_FRAMES\[0\],\s*JUNCTION_TRAY_FRAMES\[2\]/);
   assert.match(canvas, /HAVEN_ORDER_CARD_LOWERING = HAVEN_ORDER_CARD_SIZE \* 0\.15/);
-  assert.match(canvas, /top: frame\.top - 44 \+ HAVEN_ORDER_CARD_LOWERING/);
-  assert.match(canvas, /HAVEN_ORDER_SLOT_FRAMES\.map\(\(frame, index\) =>/);
-  assert.match(canvas, /const entry = mergeBoard\?\.orders\?\.\[index\]/);
-  assert.match(canvas, /entry && mergeBoard[\s\S]*?<MergeOrderTrayCard[\s\S]*?: \([\s\S]*?<EmptyMergeOrderTrayCard/);
+  assert.match(canvas, /STEPPLING_ORDER_CARD_RISE = 14/);
+  assert.match(canvas, /top: frame\.top - 44 \+ HAVEN_ORDER_CARD_LOWERING - \(board\.id === 'steppling' \? STEPPLING_ORDER_CARD_RISE : 0\)/);
+  assert.match(canvas, /mergeBoards\.flatMap\(\(board\) => havenOrderSlotFrames\(board\.id\)\.map\(\(frame, index\) =>/);
+  assert.match(canvas, /const entry = board\.orders\?\.\[index\]/);
+  assert.match(canvas, /entry \? live \? \([\s\S]*?<MergeOrderTrayCard[\s\S]*?<FrozenMergeOrderTrayCard entry=\{entry\} \/> : <EmptyMergeOrderTrayCard/);
   assert.match(squareScene, /\.sort\(\(left, right\) => left\.depth - right\.depth\)/);
   assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'world', 'square', 'mossprout-merge-island-perspective-512.webp')));
   assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'world', 'square', 'mossprout-standing-resident-512.webp')));

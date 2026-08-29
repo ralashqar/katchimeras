@@ -18,6 +18,7 @@ export type MergeCharacterId =
   | 'snuglet' | 'waglet' | 'tasklet' | 'errandimp' | 'pagelet'
   | 'relicoon' | 'museling' | 'encora' | 'flickerbun' | 'pixooka'
   | 'mossprout' | 'shellio' | 'skylo' | 'voyagle' | 'cheerlet';
+export type MergeBoardId = 'mossprout' | 'steppling';
 export type MergeOrderDifficulty = 'small' | 'medium' | 'major';
 export type MergeOrderPurpose = 'normal' | 'signature';
 
@@ -381,8 +382,18 @@ export type MergeStepEnergyDay = {
   receiptIds: string[];
 };
 
+export type HavenResidentMergeBoardState = {
+  board: MergeBoardCell[];
+  createdAt: number;
+  generators: Record<string, MergeGeneratorState>;
+  revision: number;
+  storage: MergeBoardItem[];
+  storageCapacity: number;
+  updatedAt: number;
+};
+
 export type MergeWorldState = {
-  version: 19;
+  version: 20;
   /** The first personal Merge World is owned by Mossprout. */
   ownerCharacterId: 'mossprout';
   revision: number;
@@ -431,20 +442,21 @@ export type MergeWorldState = {
     revealState: HavenRevealState;
     mossproutStoryLevel: number;
     nextProceduralOrder: number;
+    residentMergeBoards: Partial<Record<Exclude<MergeBoardId, 'mossprout'>, HavenResidentMergeBoardState>>;
   };
 };
 
 export type MergeWorldCommand =
-  | { type: 'refreshTime'; now: number }
-  | { type: 'tapGenerator'; generatorId: string; now: number; seed: string; spendEnergy?: boolean; activityOpportunityId?: string }
-  | { type: 'setGeneratorForcedDrop'; generatorId: string; definitionId: string | null; now: number }
-  | { type: 'upgradeGenerator'; generatorId: string; now: number }
-  | { type: 'move'; from: number; to: number; now: number }
-  | { type: 'serveOrder'; orderId: string; now: number }
-  | { type: 'serveDevHavenOrder'; order: MergeOrder; now: number }
-  | { type: 'storeItem'; cell: number; now: number }
-  | { type: 'restoreItem'; storageIndex: number; cell?: number; now: number }
-  | { type: 'sellItem'; cell: number; now: number }
+  | { type: 'refreshTime'; boardId?: MergeBoardId; now: number }
+  | { type: 'tapGenerator'; boardId?: MergeBoardId; generatorId: string; now: number; seed: string; spendEnergy?: boolean; activityOpportunityId?: string }
+  | { type: 'setGeneratorForcedDrop'; boardId?: MergeBoardId; generatorId: string; definitionId: string | null; now: number }
+  | { type: 'upgradeGenerator'; boardId?: MergeBoardId; generatorId: string; now: number }
+  | { type: 'move'; boardId?: MergeBoardId; from: number; to: number; now: number }
+  | { type: 'serveOrder'; boardId?: MergeBoardId; orderId: string; now: number }
+  | { type: 'serveDevHavenOrder'; boardId?: MergeBoardId; order: MergeOrder; now: number }
+  | { type: 'storeItem'; boardId?: MergeBoardId; cell: number; now: number }
+  | { type: 'restoreItem'; boardId?: MergeBoardId; storageIndex: number; cell?: number; now: number }
+  | { type: 'sellItem'; boardId?: MergeBoardId; cell: number; now: number }
   | { type: 'claimInbox'; entryId: string; now: number }
   | { type: 'claimArrival'; arrivalId: string; now: number }
   | { type: 'viewMemoryArrival'; arrivalId: string; now: number }
@@ -456,7 +468,7 @@ export type MergeWorldCommand =
   | { type: 'grantKatchimeraCard'; cardId: KatchimeraSkinId; familyId: MergeCharacterId; sourceReceiptId: string; now: number }
   | { type: 'purchaseKatchimeraCard'; cardId: KatchimeraSkinId; familyId: MergeCharacterId; cost: number; purchaseId: string; now: number }
   | { type: 'ackGeneratorUnlock'; receiptId: string; now: number }
-  | { type: 'rerollOrder'; orderId: string; now: number }
+  | { type: 'rerollOrder'; boardId?: MergeBoardId; orderId: string; now: number }
   | { type: 'startStepplingDiscovery'; now: number }
   | { type: 'openCompanionDiscoveryGate'; gateId: string; candidateIds: MergeCharacterId[]; recommendedCharacterId: MergeCharacterId | null; now: number }
   | { type: 'selectCompanionDiscoveryPath'; characterId: MergeCharacterId; now: number }

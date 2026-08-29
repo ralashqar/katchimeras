@@ -7,7 +7,9 @@ export type HavenSquareZoneId =
   | 'baristabbit-cafe'
   | 'egg-home'
   | 'mossprout-environment'
-  | 'mossprout-garden';
+  | 'mossprout-garden'
+  | 'steppling-board'
+  | 'steppling-movement';
 
 export type HavenSquareZone = {
   coord: HavenSquareCoord;
@@ -34,7 +36,9 @@ export const MOSSPROUT_SQUARE_ZONES: readonly HavenSquareZone[] = [
   { id: 'baristabbit-cafe', coord: { column: 0, row: 0 } },
   { id: 'mossprout-environment', coord: { column: 1, row: 0 } },
   { id: 'egg-home', coord: { column: 2, row: 0 } },
+  { id: 'steppling-movement', coord: { column: 0, row: 1 } },
   { id: 'mossprout-garden', coord: { column: 1, row: 1 } },
+  { id: 'steppling-board', coord: { column: 0, row: 2 } },
 ] as const;
 
 export function havenSquareZoneFrame(coord: HavenSquareCoord) {
@@ -72,6 +76,27 @@ export function mossproutGardenJunctionMiniIslandFrames() {
 
 export function mossproutGardenJunctionTrayFrames() {
   return mossproutGardenJunctionMiniIslandFrames().map((island) => ({
+    height: HAVEN_JUNCTION_TRAY_SIZE,
+    left: island.left + (island.width - HAVEN_JUNCTION_TRAY_SIZE) / 2,
+    top: island.top + HAVEN_JUNCTION_TRAY_TOP_OFFSET,
+    width: HAVEN_JUNCTION_TRAY_SIZE,
+  }));
+}
+
+export function stepplingBoardJunctionTrayFrames() {
+  const boardZone = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'steppling-board')!;
+  const boardFrame = havenSquareZoneFrame(boardZone.coord);
+  const center = {
+    height: HAVEN_JUNCTION_MINI_ISLAND_SIZE,
+    left: boardFrame.left + (boardFrame.width - HAVEN_JUNCTION_MINI_ISLAND_SIZE) / 2,
+    top: boardFrame.top - HAVEN_JUNCTION_MINI_ISLAND_RISE,
+    width: HAVEN_JUNCTION_MINI_ISLAND_SIZE,
+  };
+  return [
+    { ...center, left: center.left - HAVEN_JUNCTION_MINI_ISLAND_SPACING },
+    center,
+    { ...center, left: center.left + HAVEN_JUNCTION_MINI_ISLAND_SPACING },
+  ].map((island) => ({
     height: HAVEN_JUNCTION_TRAY_SIZE,
     left: island.left + (island.width - HAVEN_JUNCTION_TRAY_SIZE) / 2,
     top: island.top + HAVEN_JUNCTION_TRAY_TOP_OFFSET,
@@ -181,4 +206,32 @@ export const MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO = (
   (MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.bottom - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.top) / 6
 ) / (
   (MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.right - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.left) / 7
+);
+
+/**
+ * Keep every resident board on one world-space grid metric. The Steppling
+ * source has a larger clear floor than Mossprout, so its overlay deliberately
+ * uses the same centered 7x6 footprint instead of stretching to the rails.
+ */
+export const STEPPLING_BOARD_PLAYFIELD_SOURCE_CORNERS = MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS;
+
+export const STEPPLING_BOARD_PLAYFIELD_SOURCE_BOUNDS = {
+  bottom: STEPPLING_BOARD_PLAYFIELD_SOURCE_CORNERS.bottomLeft.y,
+  left: STEPPLING_BOARD_PLAYFIELD_SOURCE_CORNERS.bottomLeft.x,
+  right: STEPPLING_BOARD_PLAYFIELD_SOURCE_CORNERS.bottomRight.x,
+  top: STEPPLING_BOARD_PLAYFIELD_SOURCE_CORNERS.topLeft.y,
+} as const;
+
+export const STEPPLING_BOARD_TOP_WIDTH_RATIO = (
+  STEPPLING_BOARD_PLAYFIELD_SOURCE_CORNERS.topRight.x
+  - STEPPLING_BOARD_PLAYFIELD_SOURCE_CORNERS.topLeft.x
+) / (
+  STEPPLING_BOARD_PLAYFIELD_SOURCE_CORNERS.bottomRight.x
+  - STEPPLING_BOARD_PLAYFIELD_SOURCE_CORNERS.bottomLeft.x
+);
+
+export const STEPPLING_BOARD_CELL_HEIGHT_TO_WIDTH_RATIO = (
+  (STEPPLING_BOARD_PLAYFIELD_SOURCE_BOUNDS.bottom - STEPPLING_BOARD_PLAYFIELD_SOURCE_BOUNDS.top) / 6
+) / (
+  (STEPPLING_BOARD_PLAYFIELD_SOURCE_BOUNDS.right - STEPPLING_BOARD_PLAYFIELD_SOURCE_BOUNDS.left) / 7
 );

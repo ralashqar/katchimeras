@@ -672,12 +672,15 @@ test('the merge island mounts the shared Merge board without giving cell taps or
   assert.match(scene, /interactionFrame/);
   assert.match(canvas, /<FeastlePersistentMergeBoard/);
   assert.ok(canvas.indexOf('<FeastlePersistentMergeBoard') > canvas.indexOf('</GestureDetector>'));
-  assert.match(canvas, /key=\{`haven-merge-board-\$\{assetRevision\}`\}/);
-  assert.match(canvas, /pointerEvents="box-none"[\s\S]*?styles\.mergeBoardInteractionLayer/);
+  assert.match(canvas, /key=\{`haven-merge-board-\$\{activeMergeBoard\.id\}-\$\{assetRevision\}`\}/);
+  assert.match(canvas, /pointerEvents=\{liveMergeBoardReadyId === activeMergeBoard\.id \? 'box-none' : 'none'\}[\s\S]*?styles\.mergeBoardInteractionLayer/);
+  assert.match(canvas, /board\.id !== activeMergeBoardId \|\| liveMergeBoardReadyId !== board\.id/);
+  assert.match(canvas, /opacity: liveMergeBoardReadyId === activeMergeBoard\.id \? 1 : 0/);
+  assert.match(canvas, /onVisualReady=\{\(\) => handleMergeBoardVisualReady\(activeMergeBoard\.id\)\}/);
   assert.doesNotMatch(canvas, /externalPanGesture|camera\.panGesture/);
   assert.doesNotMatch(board, /blocksExternalGesture|externalPanGesture/);
   assert.doesNotMatch(camera, /panExclusionFrame|stateManager\.fail/);
-  assert.match(canvas, /layout=\{squareWorld \? SQUARE_HAVEN_MERGE_BOARD_LAYOUT : HAVEN_MERGE_BOARD_LAYOUT\}/);
+  assert.match(canvas, /layout=\{havenMergeBoardLayout\(activeMergeBoard\.id, squareWorld\)\}/);
   assert.match(canvas, /cellHeightToWidthRatio: 1\.14/);
   assert.match(canvas, /cellHeightToWidthRatio: MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO/);
   assert.match(canvas, /topWidthRatio: MOSSPROUT_GARDEN_TOP_WIDTH_RATIO/);
@@ -788,6 +791,6 @@ test('Haven merge board requests frame focus only after an in-grid tap or drag r
 
   assert.doesNotMatch(touchDownPath, /emitBoardReleaseFocus/);
   assert.ok((board.match(/releaseCell >= 0\) runOnJS\(emitBoardReleaseFocus\)\(\)/g) ?? []).length >= 3);
-  assert.match(canvas, /focusCameraFrame\(gardenBoardFrame/);
-  assert.match(canvas, /onBoardRelease=\{focusMergeBoard\}/);
+  assert.match(canvas, /focusCameraFrame\(frame/);
+  assert.match(canvas, /onBoardRelease=\{\(\) => focusMergeBoard\(activeMergeBoard\.id\)\}/);
 });

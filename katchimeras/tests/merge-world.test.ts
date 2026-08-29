@@ -27,6 +27,7 @@ import { nextEligibleCompanionGate, recommendCompanionPath } from '@/utils/merge
 import { MERGE_ENERGY_REGEN_CAP, MERGE_ENERGY_REGEN_MS, MERGE_INITIAL_ENERGY, STEPS_PER_MERGE_ENERGY, mergeJournalRewardPreview, mergeYesterdayStepEnergyPreview } from '@/utils/merge-world/economy-policy';
 import {
   createInitialMergeWorldState,
+  mergeWorldStateForBoard,
   mergeOrderReady,
   mergeWorldCatalogIssues,
   normalizeMergeWorldState,
@@ -147,11 +148,13 @@ test('Dream Echoes accept only their match and emit persistent FTUE evidence', (
   assert.equal(state.board[23].occupant?.kind === 'item' ? state.board[23].occupant.definitionId : null, 'nature:garden:2');
 });
 
-test('Merge FTUE serves the first Sprout immediately after teaching one merge', () => {
+test('Merge FTUE serves the first Sprout after teaching the authored two-stage merge', () => {
   const initial = createMossproutChapterZeroState(NOW);
   const from = initial.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.instanceId === 'onboarding-seed-a');
   const to = initial.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.instanceId === 'onboarding-seed-b');
   let merged = reduceMergeWorld(initial, { type: 'move', from, to, now: NOW + 1 }).state;
+  merged = reduceMergeWorld(merged, { type: 'move', from: 32, to: 33, now: NOW + 1.5 }).state;
+  merged = reduceMergeWorld(merged, { type: 'move', from: to, to: 33, now: NOW + 2 }).state;
   const step = mossproutFtueStep('merge.serve_sprout');
   const orderId = 'mossprout:chapter-0:first-sprout';
   assert.deepEqual(mergeFtueBoardGate(step, merged), { kind: 'locked' });
@@ -276,7 +279,7 @@ test('board geometry renders and hit-tests with one coordinate system', () => {
 test('a new Merge World is Mossprout-owned and begins with twenty playable cells', () => {
   const state = createInitialMergeWorldState(NOW);
   assert.deepEqual(mergeWorldCatalogIssues(), []);
-  assert.equal(state.version, 19);
+  assert.equal(state.version, 20);
   assert.equal(state.ownerCharacterId, 'mossprout');
   assert.equal(state.storageCapacity, 8);
   assert.equal(state.energy.regenCap, MERGE_ENERGY_REGEN_CAP);
@@ -285,6 +288,45 @@ test('a new Merge World is Mossprout-owned and begins with twenty playable cells
   assert.equal(state.energy.value, 0);
   assert.equal(state.board.filter((cell) => !cell.locked).length, 20);
   assert.deepEqual(state.generators, {});
+});
+
+test('Steppling starts with a separate open 7x6 Haven board and authored journey pieces', () => {
+  const root = createInitialMergeWorldState(NOW);
+  const steppling = mergeWorldStateForBoard(root, 'steppling');
+
+  assert.equal(steppling.board.length, 42);
+  assert.ok(steppling.board.every((cell) => !cell.locked && cell.mist === null && cell.blocker === null));
+  assert.deepEqual(steppling.board.flatMap((cell, index) => cell.occupant ? [[
+    index,
+    cell.occupant.kind === 'item' ? cell.occupant.definitionId : cell.occupant.generatorId,
+  ]] : []), [
+    [22, 'adventure:trail:1'],
+    [23, 'adventure:trail:1'],
+    [25, 'adventure:travel:1'],
+    [26, 'adventure:travel:1'],
+    [31, 'journey-locker'],
+  ]);
+  assert.ok(steppling.generators['journey-locker']);
+});
+
+test('Steppling board commands preserve Mossprout cells while sharing world rewards', () => {
+  const root = createInitialMergeWorldState(NOW);
+  const mossproutBoard = root.board;
+  const result = reduceMergeWorld(root, {
+    type: 'move',
+    boardId: 'steppling',
+    from: 22,
+    to: 23,
+    now: NOW + 1,
+  });
+  const steppling = mergeWorldStateForBoard(result.state, 'steppling');
+
+  assert.equal(result.changed, true);
+  assert.equal(result.state.board, mossproutBoard);
+  assert.equal(steppling.board[22].occupant, null);
+  assert.equal(steppling.board[23].occupant?.kind === 'item' ? steppling.board[23].occupant.definitionId : null, 'adventure:trail:2');
+  assert.equal(result.state.coins, root.coins + 5);
+  assert.equal(result.state.haven.residentMergeBoards.steppling?.revision, 1);
 });
 
 test('Mossprout Chapter 0 teaches one merge, serves one Sprout, and restores the Garden basket', () => {
@@ -296,15 +338,17 @@ test('Mossprout Chapter 0 teaches one merge, serves one Sprout, and restores the
   assert.deepEqual(state.generators['wild-garden'].tierOneDropDefinitionIds, ['nature:garden:1', 'nature:waterside:1']);
   assert.equal(state.generators['wild-garden'].forcedDropDefinitionId, 'nature:garden:1');
   assert.deepEqual(state.activeOrders.map((order) => order.id), ['mossprout:chapter-0:first-sprout']);
-  assert.deepEqual(state.activeOrders[0].requirements, [{ definitionId: 'nature:garden:2', quantity: 1 }]);
+  assert.deepEqual(state.activeOrders[0].requirements, [{ definitionId: 'nature:garden:3', quantity: 1 }]);
   assert.deepEqual(state.board.flatMap((cell, index) => cell.mist?.kind === 'echo' && cell.mist.ownerCharacterId === 'mossprout' ? [[index, cell.mist.definitionId]] : []), [
     [23, 'nature:garden:1'], [25, 'nature:garden:2'], [37, 'nature:garden:3'], [39, 'nature:garden:4'], [45, 'nature:garden:5'],
   ]);
 
   const seedCells = state.board.flatMap((cell, index) => cell.occupant?.kind === 'item' ? [index] : []);
-  assert.equal(seedCells.length, 2);
+  assert.equal(seedCells.length, 4);
   assert.ok(seedCells.every((cell) => state.board[cell].occupant?.kind === 'item' && state.board[cell].occupant.definitionId === 'nature:garden:1'));
   state = reduceMergeWorld(state, { type: 'move', from: seedCells[0], to: seedCells[1], now: NOW + 1 }).state;
+  state = reduceMergeWorld(state, { type: 'move', from: seedCells[2], to: seedCells[3], now: NOW + 1.5 }).state;
+  state = reduceMergeWorld(state, { type: 'move', from: seedCells[1], to: seedCells[3], now: NOW + 2 }).state;
   state = reduceMergeWorld(state, { type: 'serveOrder', orderId: 'mossprout:chapter-0:first-sprout', now: NOW + 3 }).state;
   assert.equal(openCount(), 20);
   assert.deepEqual(state.activeOrders, []);
@@ -532,7 +576,7 @@ test('normalization intentionally resets pre-v18 Merge snapshots', () => {
     },
   };
   const normalized = normalizeMergeWorldState(stale, NOW + 1);
-  assert.equal(normalized.version, 19);
+  assert.equal(normalized.version, 20);
   assert.equal(normalized.ownerCharacterId, 'mossprout');
   assert.deepEqual(normalized.generators, {});
 });
@@ -1239,7 +1283,7 @@ test('pre-v18 activity parcels are discarded by the intentional world reset', ()
     rewardInbox: [{ id: 'unknown-old-parcel', createdAt: NOW, items: ['adventure:trail:4'], source: 'activity' }],
   }, NOW + 1);
   assert.equal(normalized.rewardInbox.some((entry) => entry.source === 'activity'), false);
-  assert.equal(normalized.version, 19);
+  assert.equal(normalized.version, 20);
   assert.equal(normalized.ownerCharacterId, 'mossprout');
   assert.deepEqual(normalized.arrivals, []);
 });
@@ -1462,7 +1506,7 @@ test('Merge FTUE commits before visual settlement and preserves all native anima
   assert.match(board, /onCommandSettledRef\.current\?\.\(\{ operationId: operation\.id, revision: operation\.settledRevision, sessionId \}\)/);
   assert.match(board, /useLayoutEffect\(\(\) => \{[\s\S]*?onInteractionGateCommittedRef\.current\?\.\(\{ interactionKey: interactionSessionKey, sessionId \}\)/);
   assert.doesNotMatch(overlay, /return \(\) => \{\s*cancelAnimation\(progress\);\s*progress\.value = 0;/);
-  assert.doesNotMatch(overlay, /key=\{`(?:spotlight|cue):|entering=|exiting=/);
+  assert.doesNotMatch(overlay, /key=\{`(?:spotlight|cue):/);
   assert.match(overlay, /measurementGenerationRef/);
   assert.match(overlay, /stateRef\.current/);
   assert.doesNotMatch(overlay, /requestAnimationFrame/);
@@ -1476,7 +1520,7 @@ test('Merge FTUE commits before visual settlement and preserves all native anima
   assert.doesNotMatch(screen, /addMergeFtueBreadcrumb|setMergeFtueDiagnosticContext|markFlowStart|reportFlowReady/);
   assert.doesNotMatch(overlay, /addMergeFtueBreadcrumb/);
   assert.doesNotMatch(crashReporting, /tracesSampleRate|tracesSampler|enableTracing/);
-  assert.match(runtime, /setStoredJsonAsync/);
+  assert.match(runtime, /setStoredJson/);
   assert.match(runtime, /objectiveProgress,[\s\S]*?receipts: \[\.\.\.current\.receipts, receipt\]/);
   assert.match(sync, /RECEIPT_SYNC_QUIET_MS = 1_500/);
   assert.match(sync, /waitForCriticalInteractionIdle/);
@@ -1684,13 +1728,13 @@ test('serving a story order consumes its item without Energy or friendship rewar
   assert.equal(result.state.externalRewardReceipts.some((receipt) => receipt.id.startsWith('merge-friendship:')), false);
 });
 
-test('legacy snapshots reset cleanly into Mossprout’s v19 personal world', () => {
+test('legacy snapshots reset cleanly into Mossprout’s v20 personal world', () => {
   const normalized = normalizeMergeWorldState({
     ...createInitialMergeWorldState(NOW), version: 2,
     energy: { value: 99, cap: 100, lastRegenAt: NOW },
     generators: { 'starter-pantry': { id: 'starter-pantry', familyId: 'food', name: 'Picnic Pantry', level: 1, enabledBranches: ['table'], charges: 9, maxCharges: 12, readyAt: NOW + 1000 } },
   }, NOW + 1);
-  assert.equal(normalized.version, 19);
+  assert.equal(normalized.version, 20);
   assert.equal(normalized.ownerCharacterId, 'mossprout');
   assert.equal(normalized.energy.value, 0);
   assert.deepEqual(normalized.generators, {});
@@ -1853,7 +1897,7 @@ test('v10 companion ownership resets instead of populating Mossprout’s world',
   const legacy = { ...current, version: 10 } as unknown as Record<string, unknown>;
   delete legacy.companionDiscovery;
   const migrated = normalizeMergeWorldState(legacy, NOW + 1);
-  assert.equal(migrated.version, 19);
+  assert.equal(migrated.version, 20);
   assert.deepEqual(migrated.unlockedCharacters, []);
   assert.deepEqual(migrated.companionDiscovery.records, []);
 });

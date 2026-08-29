@@ -1,6 +1,6 @@
 import { katchimeraSkins, type KatchimeraSkinDefinition } from '@/constants/katchimera-skins';
 import { MERGE_ORDER_TEMPLATES, type MergeOrderTemplate } from '@/constants/merge-world-catalog';
-import type { MergeOrder } from '@/types/merge-world';
+import type { MergeCharacterId, MergeOrder } from '@/types/merge-world';
 
 export const DEV_HAVEN_ORDER_FILLER_PREFIX = 'dev-haven-order-filler:';
 
@@ -20,9 +20,19 @@ export function devHavenOrderFillersForSlots(
   templates: readonly MergeOrderTemplate[] = MERGE_ORDER_TEMPLATES,
   skins: readonly KatchimeraSkinDefinition[] = katchimeraSkins,
 ): MergeOrder[] {
-  const eligibleSkins = eligibleMossproutSkins(skins);
-  const mossproutTemplates = templates.filter((template) => template.characterId === 'mossprout');
-  if (eligibleSkins.length === 0 || mossproutTemplates.length === 0) return [];
+  return devHavenOrderFillersForFamilySlots('mossprout', existingOrders, slotSeeds, templates, skins);
+}
+
+export function devHavenOrderFillersForFamilySlots(
+  characterId: MergeCharacterId,
+  existingOrders: readonly MergeOrder[],
+  slotSeeds: readonly [number, number, number],
+  templates: readonly MergeOrderTemplate[] = MERGE_ORDER_TEMPLATES,
+  skins: readonly KatchimeraSkinDefinition[] = katchimeraSkins,
+): MergeOrder[] {
+  const eligibleSkins = eligibleFamilySkins(characterId, skins);
+  const familyTemplates = templates.filter((template) => template.characterId === characterId);
+  if (eligibleSkins.length === 0 || familyTemplates.length === 0) return [];
 
   const existingRecipientSkinIds = new Set(existingOrders.flatMap((order) => (
     order.recipientSkinId ? [order.recipientSkinId] : []
@@ -35,11 +45,12 @@ export function devHavenOrderFillersForSlots(
         seededRank(`${slotIndex}:${left.id}`, seed) - seededRank(`${slotIndex}:${right.id}`, seed)
         || left.id.localeCompare(right.id)
       ))[0] ?? eligibleSkins[0]!;
-    const template = [...mossproutTemplates].sort((left, right) => (
+    existingRecipientSkinIds.add(skin.id);
+    const template = [...familyTemplates].sort((left, right) => (
       seededRank(`${slotIndex}:${left.key}`, seed) - seededRank(`${slotIndex}:${right.key}`, seed)
       || left.key.localeCompare(right.key)
     ))[0]!;
-    return fillerOrder(skin, template, seed, slotIndex);
+    return fillerOrder(characterId, skin, template, seed, slotIndex);
   });
 }
 
@@ -50,13 +61,24 @@ export function devHavenOrderFillers(
   templates: readonly MergeOrderTemplate[] = MERGE_ORDER_TEMPLATES,
   skins: readonly KatchimeraSkinDefinition[] = katchimeraSkins,
 ): MergeOrder[] {
+  return devHavenOrderFillersForFamily('mossprout', existingOrders, count, seed, templates, skins);
+}
+
+export function devHavenOrderFillersForFamily(
+  characterId: MergeCharacterId,
+  existingOrders: readonly MergeOrder[],
+  count: number,
+  seed: number,
+  templates: readonly MergeOrderTemplate[] = MERGE_ORDER_TEMPLATES,
+  skins: readonly KatchimeraSkinDefinition[] = katchimeraSkins,
+): MergeOrder[] {
   if (count <= 0) return [];
 
   // This is deliberately sourced from the complete authored catalog rather than
-  // player ownership. The dev preview needs to exercise locked Mossprout forms.
-  const eligibleSkins = eligibleMossproutSkins(skins);
-  const mossproutTemplates = templates.filter((template) => template.characterId === 'mossprout');
-  if (eligibleSkins.length === 0 || mossproutTemplates.length === 0) return [];
+  // player ownership. The dev preview needs to exercise locked family forms.
+  const eligibleSkins = eligibleFamilySkins(characterId, skins);
+  const familyTemplates = templates.filter((template) => template.characterId === characterId);
+  if (eligibleSkins.length === 0 || familyTemplates.length === 0) return [];
 
   const existingRecipientSkinIds = new Set(existingOrders.flatMap((order) => (
     order.recipientSkinId ? [order.recipientSkinId] : []
@@ -65,7 +87,7 @@ export function devHavenOrderFillers(
     seededRank(left.id, seed) - seededRank(right.id, seed)
     || left.id.localeCompare(right.id)
   ));
-  const rankedTemplates = [...mossproutTemplates].sort((left, right) => (
+  const rankedTemplates = [...familyTemplates].sort((left, right) => (
     seededRank(left.key, seed) - seededRank(right.key, seed)
     || left.key.localeCompare(right.key)
   ));
@@ -75,23 +97,27 @@ export function devHavenOrderFillers(
     .slice(0, count)
     .map((skin, index) => {
       const template = rankedTemplates[index % rankedTemplates.length]!;
-      return fillerOrder(skin, template, seed, index);
+      return fillerOrder(characterId, skin, template, seed, index);
     });
 }
 
-function eligibleMossproutSkins(skins: readonly KatchimeraSkinDefinition[]): KatchimeraSkinDefinition[] {
-  return skins.filter((skin) => skin.familyId === 'mossprout' && skin.id !== 'mossprout');
+function eligibleFamilySkins(
+  characterId: MergeCharacterId,
+  skins: readonly KatchimeraSkinDefinition[],
+): KatchimeraSkinDefinition[] {
+  return skins.filter((skin) => skin.familyId === characterId && skin.id !== characterId);
 }
 
 function fillerOrder(
+  characterId: MergeCharacterId,
   skin: KatchimeraSkinDefinition,
   template: MergeOrderTemplate,
   seed: number,
   slotIndex: number,
 ): MergeOrder {
   return {
-    id: `${DEV_HAVEN_ORDER_FILLER_PREFIX}${slotIndex}:${seed}:${skin.id}:${template.key}`,
-    characterId: 'mossprout',
+    id: `${DEV_HAVEN_ORDER_FILLER_PREFIX}${slotIndex}:${seed}:${characterId}:${skin.id}:${template.key}`,
+    characterId,
     recipientSkinId: skin.id,
     title: `${skin.displayName}'s preview request`,
     difficulty: template.difficulty,

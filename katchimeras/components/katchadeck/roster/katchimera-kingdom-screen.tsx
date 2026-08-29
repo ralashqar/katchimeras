@@ -42,8 +42,9 @@ import { mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, m
 import { mossproutJourneyForDay, mossproutJourneyRuntimeDayId } from '@/game/katchimeras/relationship-progression';
 import { advanceHavenOrderFillerSlotSeed, isJourneyQuickModeEnabled } from '@/utils/dev-settings';
 import { mergeOrderItemReadiness, readyMergeOrderIds } from '@/utils/merge-world/engine';
+import { mergeWorldStateForBoard } from '@/utils/merge-world/engine';
 import { prioritizedVisibleMergeOrders } from '@/utils/merge-world/order-presentation';
-import { devHavenOrderFillerSlot, devHavenOrderFillersForSlots } from '@/utils/merge-world/dev-haven-order-fillers';
+import { devHavenOrderFillerSlot, devHavenOrderFillersForFamilySlots, devHavenOrderFillersForSlots } from '@/utils/merge-world/dev-haven-order-fillers';
 import type { MergeOrderTrayEntry } from '@/components/katchadeck/games/merge-order-rail';
 
 type Props = {
@@ -79,7 +80,8 @@ export function KatchimeraKingdomScreen({
   const window = useWindowDimensions();
   const avatar = useEggAvatar();
   const havenOrderFillersEnabled = useDevHavenOrderFillers();
-  const havenOrderFillerSlotSeeds = useDevHavenOrderFillerSlotSeeds();
+  const havenOrderFillerSlotSeeds = useDevHavenOrderFillerSlotSeeds('mossprout');
+  const stepplingOrderFillerSlotSeeds = useDevHavenOrderFillerSlotSeeds('steppling');
   const [lockedHintVisible, setLockedHintVisible] = useState(false);
   const [selectedCreatureId, setSelectedCreatureId] = useState<string | null>(null);
   const [detailCreatureId, setDetailCreatureId] = useState<string | null>(null);
@@ -106,10 +108,19 @@ export function KatchimeraKingdomScreen({
   const mergeWorldRef = useRef(mergeWorld);
   mergeWorldRef.current = mergeWorld;
   const visibleCompanionSlots = useMemo(
-    () => companionSlots.filter((slot) => slot.familyId === 'mossprout'),
+    () => companionSlots.filter((slot) => (
+      slot.familyId === 'mossprout'
+      || slot.familyId === 'baristabbit'
+      || slot.familyId === 'steppling'
+    )),
     [companionSlots],
   );
-  const havenMergeBoardActive = visibleCompanionSlots.some((slot) => slot.kind === 'owned');
+  const havenMergeBoardActive = visibleCompanionSlots.some((slot) => (
+    slot.familyId === 'mossprout' && slot.kind === 'owned'
+  ));
+  const stepplingMergeBoardActive = visibleCompanionSlots.some((slot) => (
+    slot.familyId === 'steppling' && slot.kind === 'owned'
+  ));
   const mossproutJourneyDayId = mossproutJourneyRuntimeDayId(
     relationships,
     localDayId(),
@@ -128,7 +139,7 @@ export function KatchimeraKingdomScreen({
     if (result) mergeWorldRef.current = result.state;
     if (result?.changed && command.type === 'serveDevHavenOrder') {
       const slotIndex = devHavenOrderFillerSlot(command.order);
-      if (slotIndex != null) advanceHavenOrderFillerSlotSeed(slotIndex);
+      if (slotIndex != null) advanceHavenOrderFillerSlotSeed(slotIndex, 'mossprout');
     }
     const event = mergeFtueEventForCommand(before, command, result);
     if (event) dispatchFtueEvent(event, `haven-merge-command:${event.revision}`);
@@ -173,12 +184,74 @@ export function KatchimeraKingdomScreen({
     ];
   }, [havenMergeBoardActive, havenOrderFillerSlotSeeds, havenOrderFillersEnabled, mergeWorld, mossproutJourney]);
   const havenMergeBoard = useMemo(() => havenMergeBoardActive ? ({
+    id: 'mossprout' as const,
     boardInteractionGate,
     dispatch: dispatchHavenMergeWorld,
     orderInteractionGate,
     orders: havenMergeOrders,
     state: mergeWorld,
   }) : null, [boardInteractionGate, dispatchHavenMergeWorld, havenMergeBoardActive, havenMergeOrders, mergeWorld, orderInteractionGate]);
+  const stepplingBoardState = useMemo(
+    () => mergeWorldStateForBoard(mergeWorld, 'steppling'),
+    [mergeWorld],
+  );
+  const dispatchStepplingMergeWorld = useCallback((command: MergeWorldCommand) => {
+    // The shared board component exposes the complete world command union, but
+    // only its board-scoped variants reach this adapter at runtime.
+    const result = dispatchMergeWorld({ ...command, boardId: 'steppling' } as MergeWorldCommand);
+    if (!result) return null;
+    mergeWorldRef.current = result.state;
+    if (result.changed && command.type === 'serveDevHavenOrder') {
+      const slotIndex = devHavenOrderFillerSlot(command.order);
+      if (slotIndex != null) advanceHavenOrderFillerSlotSeed(slotIndex, 'steppling');
+    }
+    return { ...result, state: mergeWorldStateForBoard(result.state, 'steppling') };
+  }, [dispatchMergeWorld]);
+  const stepplingMergeOrders = useMemo<MergeOrderTrayEntry[]>(() => {
+    if (!stepplingMergeBoardActive) return [];
+    const readyOrderIds = readyMergeOrderIds(stepplingBoardState);
+    const realEntries = stepplingBoardState.activeOrders
+      .filter((order) => order.characterId === 'steppling')
+      .slice(0, 3)
+      .map((order) => ({
+        id: order.id,
+        itemReadiness: mergeOrderItemReadiness(stepplingBoardState, order),
+        kind: 'order' as const,
+        order,
+        ready: readyOrderIds.has(order.id),
+      }));
+    if (!havenOrderFillersEnabled || realEntries.length >= 3) return realEntries;
+    const fillerOrders = devHavenOrderFillersForFamilySlots(
+      'steppling',
+      realEntries.map((entry) => entry.order),
+      stepplingOrderFillerSlotSeeds,
+    );
+    return [
+      ...realEntries,
+      ...fillerOrders.map((order) => {
+        const itemReadiness = mergeOrderItemReadiness(stepplingBoardState, order);
+        return {
+          id: order.id,
+          itemReadiness,
+          kind: 'order' as const,
+          order,
+          ready: itemReadiness.every(Boolean),
+        };
+      }),
+    ];
+  }, [havenOrderFillersEnabled, stepplingBoardState, stepplingMergeBoardActive, stepplingOrderFillerSlotSeeds]);
+  const stepplingMergeBoard = useMemo(() => stepplingMergeBoardActive ? ({
+    id: 'steppling' as const,
+    boardInteractionGate: { kind: 'open' as const },
+    dispatch: dispatchStepplingMergeWorld,
+    orderInteractionGate: { kind: 'open' as const },
+    orders: stepplingMergeOrders,
+    state: stepplingBoardState,
+  }) : null, [dispatchStepplingMergeWorld, stepplingBoardState, stepplingMergeBoardActive, stepplingMergeOrders]);
+  const havenMergeBoards = useMemo(
+    () => [havenMergeBoard, stepplingMergeBoard].filter((board): board is NonNullable<typeof board> => board != null),
+    [havenMergeBoard, stepplingMergeBoard],
+  );
   const tutorialCamera = useMemo<FtueCameraDirective | null>(() => {
     if (ftueStepId === 'haven.mossprout_reveal' && enteringGrove) {
       return { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: 1.25, anchorY: 0.46, durationMs: 360 };
@@ -220,7 +293,9 @@ export function KatchimeraKingdomScreen({
       return;
     }
     if (ftueRestoreStartedRef.current) return;
-    const mossprout = visibleCompanionSlots.find((slot) => slot.kind === 'owned');
+    const mossprout = visibleCompanionSlots.find((slot) => (
+      slot.familyId === 'mossprout' && slot.kind === 'owned'
+    ));
     if (mossprout?.kind === 'owned') {
       setSelectedCreatureId(mossprout.creature.creatureId);
       if (ftueStepId === 'haven.mossprout.restore') setDetailCreatureId(mossprout.creature.creatureId);
@@ -383,7 +458,7 @@ export function KatchimeraKingdomScreen({
         discoveryRevealFamilyId={ftueStepId === 'haven.mossprout_reveal' || ftueStepId === 'haven.first_bloom' ? 'mossprout' : null}
         highlightedLockedFamilyId={ftueStepId === 'haven.mossprout_focus' ? 'mossprout' : null}
         interactionEnabled={havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven'}
-        mergeBoard={havenMergeBoard}
+        mergeBoards={havenMergeBoards}
         mergeCoinTargetRef={coinHudRef}
         onMergeCoinPresentation={handleMergeCoinPresentation}
         onSelectHome={() => {

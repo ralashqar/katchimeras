@@ -43,6 +43,7 @@ type UseKingdomHexCameraArgs = {
     targets: readonly KingdomFocusTarget[];
   };
   minimumScale?: number;
+  onWorldTapRelease?: (x: number, y: number) => void;
   scene: KingdomSize;
   viewport: KingdomSize;
 };
@@ -67,6 +68,7 @@ export function useKingdomHexCamera({
   initialFitWorld = false,
   magneticFocus,
   minimumScale = 0.54,
+  onWorldTapRelease,
   scene,
   viewport,
 }: UseKingdomHexCameraArgs) {
@@ -83,6 +85,8 @@ export function useKingdomHexCamera({
   const initializedRef = useRef(false);
   const previousSceneRef = useRef(scene);
   const frameFocusKeyRef = useRef<string | null>(null);
+  const onWorldTapReleaseRef = useRef(onWorldTapRelease);
+  onWorldTapReleaseRef.current = onWorldTapRelease;
   const decayCompletions = useSharedValue(0);
   const [ready, setReady] = useState(false);
   const [focusedTileId, setFocusedTileId] = useState<string | null>(centerId ?? null);
@@ -321,7 +325,19 @@ export function useKingdomHexCamera({
     ]
   );
 
-  const gesture = useMemo(() => Gesture.Simultaneous(pan, pinch), [pan, pinch]);
+  const emitWorldTapRelease = useCallback((x: number, y: number) => {
+    onWorldTapReleaseRef.current?.(x, y);
+  }, []);
+  const worldTap = useMemo(() => Gesture.Tap()
+    .enabled(interactionEnabled && Boolean(onWorldTapReleaseRef.current))
+    .maxDistance(5)
+    .onEnd((event, success) => {
+      if (!success) return;
+      const worldX = (event.x - scene.width / 2 - tx.value) / scale.value + scene.width / 2;
+      const worldY = (event.y - scene.height / 2 - ty.value) / scale.value + scene.height / 2;
+      runOnJS(emitWorldTapRelease)(worldX, worldY);
+    }), [emitWorldTapRelease, interactionEnabled, scale, scene.height, scene.width, tx, ty]);
+  const gesture = useMemo(() => Gesture.Simultaneous(pan, pinch, worldTap), [pan, pinch, worldTap]);
   const worldStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
   }));
@@ -362,6 +378,7 @@ export function useKingdomHexCamera({
   const focusFrame = useCallback((frame: KingdomWorldFrame, options?: {
     durationMs?: number;
     horizontalPadding?: number;
+    onComplete?: () => void;
     screenCenterY?: number;
     verticalPadding?: number;
   }) => {
@@ -374,13 +391,17 @@ export function useKingdomHexCamera({
       verticalPadding: options?.verticalPadding,
     });
     const key = [target.tx, target.ty, target.scale].map((value) => value.toFixed(3)).join(':');
-    if (frameFocusKeyRef.current === key) return;
+    if (frameFocusKeyRef.current === key) {
+      options?.onComplete?.();
+      return;
+    }
     if (
       Math.abs(tx.value - target.tx) < 0.75
       && Math.abs(ty.value - target.ty) < 0.75
       && Math.abs(scale.value - target.scale) < 0.002
     ) {
       commitSnapshot(target.tx, target.ty, target.scale, false);
+      options?.onComplete?.();
       return;
     }
     frameFocusKeyRef.current = key;
@@ -393,6 +414,7 @@ export function useKingdomHexCamera({
       options?.durationMs ?? 360,
       () => {
         if (frameFocusKeyRef.current === key) frameFocusKeyRef.current = null;
+        options?.onComplete?.();
       },
     );
   }, [animateTo, commitSnapshot, maxScale, minScale, scale, scene, tx, ty, viewport]);

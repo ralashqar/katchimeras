@@ -28,7 +28,9 @@ import {
 import { AUTHORED_COHORT_ORDER_POOLS, BARISTABBIT_CHAPTER_ONE_ORDER_POOL, FEASTLE_ACT_TWO_ORDER_POOL, type AuthoredCohortFamilyId } from '@/utils/companion-story';
 import type {
   MergeBoardCell,
+  MergeBoardId,
   MergeBoardItem,
+  HavenResidentMergeBoardState,
   MergeCharacterId,
   MergeExternalRewardReceipt,
   MergeGeneratorState,
@@ -39,6 +41,44 @@ import type {
   MergeWorldCommandResult,
   MergeWorldState,
 } from '@/types/merge-world';
+
+const STEPPLING_HAVEN_BOARD_SIZE = 42;
+
+function createStepplingHavenBoard(now: number): HavenResidentMergeBoardState {
+  const board: MergeBoardCell[] = Array.from({ length: STEPPLING_HAVEN_BOARD_SIZE }, () => ({
+    blocker: null,
+    locked: false,
+    mist: null,
+    occupant: null,
+    regionId: 'central-clearing',
+  }));
+  board[22] = { ...board[22], occupant: { kind: 'item', definitionId: 'adventure:trail:1', instanceId: 'haven:steppling:starter:sock:1' } };
+  board[23] = { ...board[23], occupant: { kind: 'item', definitionId: 'adventure:trail:1', instanceId: 'haven:steppling:starter:sock:2' } };
+  board[25] = { ...board[25], occupant: { kind: 'item', definitionId: 'adventure:travel:1', instanceId: 'haven:steppling:starter:ticket:1' } };
+  board[26] = { ...board[26], occupant: { kind: 'item', definitionId: 'adventure:travel:1', instanceId: 'haven:steppling:starter:ticket:2' } };
+  board[31] = { ...board[31], occupant: { kind: 'generator', generatorId: 'journey-locker' } };
+  return {
+    board,
+    createdAt: now,
+    generators: { 'journey-locker': generatorState('journey-locker') },
+    revision: 0,
+    storage: [],
+    storageCapacity: 8,
+    updatedAt: now,
+  };
+}
+
+export function mergeWorldStateForBoard(state: MergeWorldState, boardId: MergeBoardId): MergeWorldState {
+  if (boardId === 'mossprout') return state;
+  const board = state.haven.residentMergeBoards.steppling ?? createStepplingHavenBoard(state.createdAt);
+  return {
+    ...state,
+    board: board.board,
+    generators: board.generators,
+    storage: board.storage,
+    storageCapacity: board.storageCapacity,
+  };
+}
 import { advanceMossproutChapterZero, enforceMossproutChapterZeroDropOverride } from '@/utils/merge-world/chapter-zero-policy';
 import { havenStageDefinition, havenStoryGateSatisfied, type HavenStage } from '@/constants/haven-catalog';
 import {
@@ -111,7 +151,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     occupant: null,
   }));
   let state: MergeWorldState = {
-    version: 19,
+    version: 20,
     ownerCharacterId: 'mossprout',
     revision: 0,
     createdAt: now,
@@ -156,7 +196,13 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     },
     residentCardDiscovery: { records: [], campaignMilestoneReceiptIds: [] },
     mossproutBoardProgression: emptyMossproutBoardProgression(),
-    haven: { tileStages: {}, revealState: 'hidden', mossproutStoryLevel: 0, nextProceduralOrder: 1 },
+    haven: {
+      tileStages: {},
+      revealState: 'hidden',
+      mossproutStoryLevel: 0,
+      nextProceduralOrder: 1,
+      residentMergeBoards: { steppling: createStepplingHavenBoard(now) },
+    },
   };
   state = reconcileCharacters(state, characterIds, now);
   if (state.unlockedCharacters.includes('mossprout')) {
@@ -167,6 +213,39 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
 }
 
 export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldCommand): MergeWorldCommandResult {
+  const boardId = 'boardId' in command ? command.boardId : undefined;
+  if (boardId === 'steppling') {
+    const previousBoard = state.haven.residentMergeBoards.steppling ?? createStepplingHavenBoard(state.createdAt);
+    const projected = mergeWorldStateForBoard(state, boardId);
+    const reduced = reduceMergeWorld(projected, { ...command, boardId: 'mossprout' } as MergeWorldCommand);
+    if (!reduced.changed) return { ...reduced, state };
+    const nextBoard = {
+      board: reduced.state.board,
+      createdAt: previousBoard.createdAt,
+      generators: reduced.state.generators,
+      revision: previousBoard.revision + 1,
+      storage: reduced.state.storage,
+      storageCapacity: reduced.state.storageCapacity,
+      updatedAt: command.now,
+    };
+    return {
+      ...reduced,
+      state: {
+        ...reduced.state,
+        board: state.board,
+        generators: state.generators,
+        storage: state.storage,
+        storageCapacity: state.storageCapacity,
+        haven: {
+          ...reduced.state.haven,
+          residentMergeBoards: {
+            ...reduced.state.haven.residentMergeBoards,
+            steppling: nextBoard,
+          },
+        },
+      },
+    };
+  }
   const current = refreshTime(state, command.now);
   switch (command.type) {
     case 'refreshTime':
@@ -483,14 +562,14 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   // v18 intentionally starts the first personal Merge World cleanly. Earlier
   // snapshots are shared-board prototypes and cannot be assigned safely to a
   // single companion without carrying their ownership compromises forward.
-  if ((rawVersion !== 18 && rawVersion !== 19) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
+  if ((rawVersion !== 18 && rawVersion !== 19 && rawVersion !== 20) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
     return createInitialMergeWorldState(now);
   }
   const fallback = createInitialMergeWorldState(now);
   let normalized: MergeWorldState = {
     ...fallback,
     ...source,
-    version: 19,
+    version: 20,
     ownerCharacterId: 'mossprout',
     revision: finite(source.revision, 0),
     createdAt: finite(source.createdAt, now),
@@ -576,7 +655,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     companionDiscovery: normalizeCompanionDiscovery(source.companionDiscovery, source.unlockedCharacters, source.activeOrders, rawVersion, now),
     residentCardDiscovery: normalizeResidentCardDiscovery(source.residentCardDiscovery, source.ownedKatchimeraCards, now),
     mossproutBoardProgression: normalizeMossproutBoardProgression(source.mossproutBoardProgression),
-    haven: normalizeHaven(source.haven, source, rawVersion),
+    haven: normalizeHaven(source.haven, source, rawVersion, now),
   };
   normalized = {
     ...normalized,
@@ -628,7 +707,7 @@ function upgradeHavenTile(state: MergeWorldState, characterId: MergeCharacterId,
   return { state: next, changed: true, havenUpgrade: { characterId, stage: requestedStage, coinCost: definition.coinCost }, message: `${definition.name} restored.` };
 }
 
-function normalizeHaven(value: unknown, source: Partial<MergeWorldState>, rawVersion: unknown): MergeWorldState['haven'] {
+function normalizeHaven(value: unknown, source: Partial<MergeWorldState>, rawVersion: unknown, now: number): MergeWorldState['haven'] {
   const raw = value && typeof value === 'object' ? value as Partial<MergeWorldState['haven']> : {};
   const tileStages: MergeWorldState['haven']['tileStages'] = {};
   if (raw.tileStages && typeof raw.tileStages === 'object') {
@@ -645,11 +724,28 @@ function normalizeHaven(value: unknown, source: Partial<MergeWorldState>, rawVer
   const revealState = raw.revealState === 'revealed' || raw.revealState === 'first_restore_complete'
     ? raw.revealState
     : tileStages.mossprout && tileStages.mossprout > 0 && rawVersion !== 16 && rawVersion !== 17 ? 'revealed' : 'hidden';
+  const stepplingFallback = createStepplingHavenBoard(now)!;
+  const rawSteppling = raw.residentMergeBoards?.steppling;
+  const steppling = rawSteppling && typeof rawSteppling === 'object'
+    && Array.isArray(rawSteppling.board) && rawSteppling.board.length === STEPPLING_HAVEN_BOARD_SIZE
+    ? {
+        board: rawSteppling.board.map((cell, index) => normalizeCell(cell, stepplingFallback.board[index], index)),
+        createdAt: finite(rawSteppling.createdAt, now),
+        generators: rawSteppling.generators && typeof rawSteppling.generators === 'object'
+          ? normalizeGenerators(rawSteppling.generators)
+          : stepplingFallback.generators,
+        revision: Math.max(0, Math.floor(finite(rawSteppling.revision, 0))),
+        storage: Array.isArray(rawSteppling.storage) ? rawSteppling.storage.filter(validBoardItem) : [],
+        storageCapacity: Math.max(8, Math.floor(finite(rawSteppling.storageCapacity, 8))),
+        updatedAt: finite(rawSteppling.updatedAt, now),
+      }
+    : stepplingFallback;
   return {
     tileStages,
     revealState,
     mossproutStoryLevel: Math.max(0, Math.floor(finite(raw.mossproutStoryLevel, 0))),
     nextProceduralOrder: Math.max(1, Math.floor(finite(raw.nextProceduralOrder, 1))),
+    residentMergeBoards: { steppling },
   };
 }
 
