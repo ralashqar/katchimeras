@@ -340,7 +340,8 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel
   );
 }
 
-export function MergeOrderTrayCard({ entry, index, interactionAllowed, interactionLocked, onBlockedInteraction, onRailTargetRef, onReroll, onServe, reduceMotion }: {
+export function MergeOrderTrayCard({ animateEntrance = true, entry, index, interactionAllowed, interactionLocked, onBlockedInteraction, onRailTargetRef, onReroll, onServe, reduceMotion }: {
+  animateEntrance?: boolean;
   entry: MergeOrderTrayEntry;
   index: number;
   interactionAllowed: boolean;
@@ -354,6 +355,7 @@ export function MergeOrderTrayCard({ entry, index, interactionAllowed, interacti
   const { itemReadiness, order, ready } = entry;
   const [rewardOpen, setRewardOpen] = useState(false);
   const [serving, setServing] = useState(false);
+  const [entryMotionEnabled, setEntryMotionEnabled] = useState(animateEntrance);
   const servingRef = useRef(false);
   const itemRefs = useRef<(View | null)[]>([]);
   const recipient = order.recipientSkinId ? katchimeraSkinById.get(order.recipientSkinId) : null;
@@ -379,6 +381,11 @@ export function MergeOrderTrayCard({ entry, index, interactionAllowed, interacti
     const timer = setTimeout(() => setRewardOpen(false), 3_200);
     return () => clearTimeout(timer);
   }, [rewardOpen]);
+  useEffect(() => {
+    if (entryMotionEnabled) return;
+    const frame = requestAnimationFrame(() => setEntryMotionEnabled(true));
+    return () => cancelAnimationFrame(frame);
+  }, [entryMotionEnabled]);
 
   const beginServe = async () => {
     if (!interactionAllowed) {
@@ -412,7 +419,7 @@ export function MergeOrderTrayCard({ entry, index, interactionAllowed, interacti
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       {ready ? (
         <Animated.View
-          entering={reduceMotion ? FadeIn.duration(70) : READY_GLOW_IN}
+          entering={!entryMotionEnabled ? undefined : reduceMotion ? FadeIn.duration(70) : READY_GLOW_IN}
           exiting={FadeOut.duration(reduceMotion ? 70 : 180)}
           key="ready-glow"
           pointerEvents="none"
@@ -420,13 +427,13 @@ export function MergeOrderTrayCard({ entry, index, interactionAllowed, interacti
         />
       ) : null}
       {ready ? (
-        <Animated.View entering={FadeIn.duration(reduceMotion ? 70 : 220)} exiting={FadeOut.duration(reduceMotion ? 70 : 180)} pointerEvents="none" style={styles.readyRays}>
+        <Animated.View entering={!entryMotionEnabled ? undefined : FadeIn.duration(reduceMotion ? 70 : 220)} exiting={FadeOut.duration(reduceMotion ? 70 : 180)} pointerEvents="none" style={styles.readyRays}>
           <RotatingRadialSunburst baseOpacity={0.72} rotationDurationMs={32_000} size={84} />
         </Animated.View>
       ) : null}
       {serving && !reduceMotion ? <TrayServeConfetti /> : null}
       <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" source={CHAIR_ART} style={styles.chairArt} transition={0} />
-      <Animated.View entering={reduceMotion ? FadeIn.duration(100) : FadeInUp.delay(Math.min(index, 5) * 42 + 45).duration(230)} style={styles.characterLayer}>
+      <Animated.View entering={!entryMotionEnabled ? undefined : reduceMotion ? FadeIn.duration(100) : FadeInUp.delay(Math.min(index, 5) * 42 + 45).duration(230)} style={styles.characterLayer}>
         <Pressable
           accessible={!interactionLocked}
           accessibilityHint="Shows the rewards for this request"
@@ -449,14 +456,14 @@ export function MergeOrderTrayCard({ entry, index, interactionAllowed, interacti
       <Animated.View pointerEvents="none" style={styles.items}>
         {requestedItems.map((definitionId, itemIndex) => (
           <Animated.View
-            entering={reduceMotion ? FadeIn.duration(90) : ZoomIn.delay(itemDelay + itemIndex * 35).duration(190).easing(CONTROLLED_EASE)}
+            entering={!entryMotionEnabled ? undefined : reduceMotion ? FadeIn.duration(90) : ZoomIn.delay(itemDelay + itemIndex * 35).duration(190).easing(CONTROLLED_EASE)}
             key={`${definitionId}:${itemIndex}`}
             ref={(node) => { itemRefs.current[itemIndex] = node as unknown as View; }}
             style={styles.item}>
             <PersistentMergeItemArt definitionId={definitionId} size={TRAY_ITEM_SIZE} />
             {itemReadiness[itemIndex] ? (
               <Animated.View
-                entering={reduceMotion ? FadeIn.duration(70) : READY_TICK_IN}
+                entering={!entryMotionEnabled ? undefined : reduceMotion ? FadeIn.duration(70) : READY_TICK_IN}
                 exiting={reduceMotion ? FadeOut.duration(70) : ITEM_TICK_OUT}
                 pointerEvents="none"
                 style={styles.itemReadyTick}>
@@ -468,7 +475,7 @@ export function MergeOrderTrayCard({ entry, index, interactionAllowed, interacti
       </Animated.View>
       {ready && !serving ? (
         <Animated.View
-          entering={reduceMotion ? FadeIn.duration(70) : SERVE_BUTTON_IN}
+          entering={!entryMotionEnabled ? undefined : reduceMotion ? FadeIn.duration(70) : SERVE_BUTTON_IN}
           exiting={FadeOut.duration(reduceMotion ? 70 : 150)}
           style={styles.serveButton}>
           <Pressable

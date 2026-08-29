@@ -794,3 +794,37 @@ test('Haven merge board requests frame focus only after an in-grid tap or drag r
   assert.match(canvas, /focusCameraFrame\(frame/);
   assert.match(canvas, /onBoardRelease=\{\(\) => focusMergeBoard\(activeMergeBoard\.id\)\}/);
 });
+
+test('Haven preserves already-visible order trays when activating a frozen board', () => {
+  const canvas = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-hex-canvas.tsx'),
+    'utf8',
+  );
+
+  assert.match(canvas, /activationOrderSnapshotRef = useRef/);
+  assert.match(canvas, /orderIds: havenOrderSlotFrames\(target\.id\)\.map\(\(_, index\) => target\.orders\?\.\[index\]\?\.id \?\? null\)/);
+  assert.match(canvas, /activationOrderSnapshot\.orderIds\[index\] !== entry\?\.id/);
+  assert.match(canvas, /entering=\{reduceMotion \|\| !animateEntry \? undefined : FadeInUp\.duration\(230\)\}/);
+  assert.match(canvas, /animateEntrance=\{animateEntry\}/);
+
+  const tray = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-order-rail.tsx'),
+    'utf8',
+  );
+  assert.match(tray, /animateEntrance = true/);
+  assert.match(tray, /useState\(animateEntrance\)/);
+  assert.ok((tray.match(/entering=\{!entryMotionEnabled \? undefined/g) ?? []).length >= 6);
+});
+
+test('inactive Haven merge boards retain full and lower locked-cell mist', () => {
+  const preview = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'games', 'frozen-merge-board-preview.tsx'),
+    'utf8',
+  );
+
+  assert.match(preview, /dream-mist-full\.webp/);
+  assert.match(preview, /dream-mist-lower\.webp/);
+  assert.match(preview, /const lowerMist = mist\?\.kind === 'echo'/);
+  assert.match(preview, /const fullMist = boardCell\.locked && !boardCell\.occupant && !lowerMist/);
+  assert.match(preview, /source=\{lowerMist \? DREAM_MIST_LOWER : DREAM_MIST_FULL\}/);
+});

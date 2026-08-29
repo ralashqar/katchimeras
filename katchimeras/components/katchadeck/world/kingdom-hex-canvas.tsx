@@ -248,6 +248,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const activeMergeBoard = activeMergeBoardId ? mergeBoardById.get(activeMergeBoardId) ?? null : null;
   const activeMergeBoardIdRef = useRef(activeMergeBoardId);
   activeMergeBoardIdRef.current = activeMergeBoardId;
+  const activationOrderSnapshotRef = useRef<{
+    boardId: MergeBoardId;
+    orderIds: readonly (string | null)[];
+  } | null>(null);
   const rootRef = useRef<View>(null);
   const mergeBoardMetricsRef = useRef<MergeBoardScreenMetrics | null>(null);
   const activeServeRef = useRef(false);
@@ -286,10 +290,12 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       setActiveMergeBoardId(null);
       setPendingMergeBoardId(null);
       setSelectedMergeCell(null);
+      activationOrderSnapshotRef.current = null;
       return () => {
         setActiveMergeBoardId(null);
         setPendingMergeBoardId(null);
         setSelectedMergeCell(null);
+        activationOrderSnapshotRef.current = null;
       };
     }, [])
   );
@@ -395,6 +401,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         && y >= frame.top && y <= frame.top + frame.height;
     });
     if (!target) return;
+    activationOrderSnapshotRef.current = {
+      boardId: target.id,
+      orderIds: havenOrderSlotFrames(target.id).map((_, index) => target.orders?.[index]?.id ?? null),
+    };
     setSelectedMergeCell(null);
     setActiveMergeBoardId(null);
     setLiveMergeBoardReadyId(null);
@@ -1030,6 +1040,11 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           {mergeBoards.flatMap((board) => havenOrderSlotFrames(board.id).map((frame, index) => {
             const entry = board.orders?.[index];
             const live = board.id === activeMergeBoardId;
+            const activationOrderSnapshot = activationOrderSnapshotRef.current;
+            const animateEntry = Boolean(entry) && (
+              activationOrderSnapshot?.boardId !== board.id
+              || activationOrderSnapshot.orderIds[index] !== entry?.id
+            );
             const orderGate = board.orderInteractionGate ?? { kind: 'open' as const };
             const orderAllowed = Boolean(entry) && (
               orderGate.kind === 'open'
@@ -1048,11 +1063,12 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 }}>
                 {entry ? live ? (
                   <Animated.View
-                    entering={reduceMotion ? undefined : FadeInUp.duration(230)}
+                    entering={reduceMotion || !animateEntry ? undefined : FadeInUp.duration(230)}
                     exiting={reduceMotion ? undefined : FadeOutUp.duration(240)}
                     key={entry.id}
                     style={StyleSheet.absoluteFill}>
                     <MergeOrderTrayCard
+                      animateEntrance={animateEntry}
                       entry={entry}
                       index={index}
                       interactionAllowed={interactionEnabled && orderAllowed && !camera.isMoving && (!servingOrderId || servingOrderId === entry.order.id)}

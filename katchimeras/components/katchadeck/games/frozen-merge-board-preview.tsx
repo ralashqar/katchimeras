@@ -7,6 +7,9 @@ import { mergeWorldGeneratorArt, mergeWorldItemArt } from '@/constants/merge-wor
 import type { MergeWorldState } from '@/types/merge-world';
 import { mergeCellFrame, type MergeBoardGeometry } from '@/utils/merge-world/board-geometry';
 
+const DREAM_MIST_FULL = require('../../../assets/images/katchimeras/merge-world/locked/dream-mist-full.webp');
+const DREAM_MIST_LOWER = require('../../../assets/images/katchimeras/merge-world/locked/dream-mist-lower.webp');
+
 type FrozenMergeBoardPreviewProps = {
   layout: MergeBoardLayout;
   maxHeight: number;
@@ -73,20 +76,30 @@ export const FrozenMergeBoardPreview = memo(function FrozenMergeBoardPreview({
         ) : null;
       })}
       {indices.map((cell) => {
-        const occupant = state.board[cell]?.occupant;
-        if (!occupant) return null;
+        const boardCell = state.board[cell];
+        const occupant = boardCell?.occupant;
+        const lockedDefinitionId = boardCell?.mist?.kind === 'echo'
+          ? boardCell.mist.definitionId
+          : boardCell?.mist?.kind === 'dreambound_item' ? boardCell.mist.boundDefinitionId : null;
+        if (!occupant && !lockedDefinitionId) return null;
         const frame = frames.get(cell)!;
-        const source = occupant.kind === 'item'
-          ? mergeWorldItemArt(occupant.definitionId)
-          : mergeWorldGeneratorArt(occupant.generatorId, { level: state.generators[occupant.generatorId]?.level ?? 1 });
+        const source = occupant
+          ? occupant.kind === 'item'
+            ? mergeWorldItemArt(occupant.definitionId)
+            : mergeWorldGeneratorArt(occupant.generatorId, { level: state.generators[occupant.generatorId]?.level ?? 1 })
+          : mergeWorldItemArt(lockedDefinitionId!);
         if (!source) return null;
         const size = Math.min(cellSize, frame.bounds.width, frame.bounds.height) * 0.94;
         return (
           <Image
             cachePolicy="memory-disk"
             contentFit="contain"
-            key={occupant.kind === 'item' ? occupant.instanceId : `generator:${occupant.generatorId}`}
-            recyclingKey={occupant.kind === 'item' ? occupant.definitionId : `generator:${occupant.generatorId}`}
+            key={occupant
+              ? occupant.kind === 'item' ? occupant.instanceId : `generator:${occupant.generatorId}`
+              : `mist-item:${cell}:${lockedDefinitionId}`}
+            recyclingKey={occupant
+              ? occupant.kind === 'item' ? occupant.definitionId : `generator:${occupant.generatorId}`
+              : `mist-item:${lockedDefinitionId}`}
             source={source}
             style={{
               height: size,
@@ -95,6 +108,36 @@ export const FrozenMergeBoardPreview = memo(function FrozenMergeBoardPreview({
               top: frame.center.y - size / 2,
               width: size,
             }}
+          />
+        );
+      })}
+      {indices.map((cell) => {
+        const boardCell = state.board[cell];
+        if (!boardCell) return null;
+        const mist = boardCell.mist;
+        const lowerMist = mist?.kind === 'echo'
+          || mist?.kind === 'dreambound_item'
+          || mist?.kind === 'rootbound_echo'
+          || mist?.kind === 'resident_card';
+        const fullMist = boardCell.locked && !boardCell.occupant && !lowerMist;
+        if (!lowerMist && !fullMist) return null;
+        const frame = frames.get(cell)!;
+        return (
+          <Image
+            allowDownscaling
+            cachePolicy="memory"
+            contentFit="fill"
+            key={`frozen-mist-${cell}-${lowerMist ? 'lower' : 'full'}`}
+            recyclingKey={lowerMist ? 'merge-dream-mist-lower' : 'merge-dream-mist-full'}
+            source={lowerMist ? DREAM_MIST_LOWER : DREAM_MIST_FULL}
+            style={{
+              height: frame.bounds.height,
+              left: frame.bounds.left,
+              position: 'absolute',
+              top: frame.bounds.top,
+              width: frame.bounds.width,
+            }}
+            transition={0}
           />
         );
       })}
