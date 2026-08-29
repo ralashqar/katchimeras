@@ -71,7 +71,8 @@ import {
 } from '@/utils/haven-upgrade-presentation';
 import { useScenePerformanceProbe } from '@/hooks/use-scene-performance-probe';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
-import { mergeOrderServingCells, readyMergeOrderIds } from '@/utils/merge-world/engine';
+import { mergeOrderReady, mergeOrderServingCells } from '@/utils/merge-world/engine';
+import { isDevHavenOrderFiller } from '@/utils/merge-world/dev-haven-order-fillers';
 import {
   playerHavenHexTileSet,
   kingdomHexTileOverlaySourceForLod,
@@ -209,7 +210,12 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const rootRef = useRef<View>(null);
   const mergeBoardMetricsRef = useRef<MergeBoardScreenMetrics | null>(null);
   const activeServeRef = useRef(false);
-  const activeServeOrderRef = useRef<{ coinAmount: number; orderId: string; startingCoins: number } | null>(null);
+  const activeServeOrderRef = useRef<{
+    coinAmount: number;
+    order: MergeOrderTrayEntry['order'];
+    orderId: string;
+    startingCoins: number;
+  } | null>(null);
   const coinPayoutStartedRef = useRef(false);
   const serveNonceRef = useRef(0);
   const mergeBoardStateRef = useRef(mergeBoard?.state ?? null);
@@ -540,10 +546,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const metrics = mergeBoardMetricsRef.current;
     if (!mergeBoard || !state || !metrics || activeServeRef.current) return false;
     const servingItems = mergeOrderServingCells(state, order);
-    if (servingItems.length !== itemTargets.length || !readyMergeOrderIds(state).has(order.id)) return false;
+    if (servingItems.length !== itemTargets.length || !mergeOrderReady(state, order)) return false;
     activeServeRef.current = true;
     coinPayoutStartedRef.current = false;
-    activeServeOrderRef.current = { coinAmount: order.reward.coins, orderId: order.id, startingCoins: state.coins };
+    activeServeOrderRef.current = { coinAmount: order.reward.coins, order, orderId: order.id, startingCoins: state.coins };
     setServingOrderId(order.id);
     const [rootRect, coinRect] = await Promise.all([
       measureViewInWindow(rootRef),
@@ -588,7 +594,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const handleHavenServeItemsArrive = useCallback(() => {
     const activeOrder = activeServeOrderRef.current;
     const state = mergeBoardStateRef.current;
-    if (!activeOrder || !state || !readyMergeOrderIds(state).has(activeOrder.orderId)) {
+    if (!activeOrder || !state || !mergeOrderReady(state, activeOrder.order)) {
       resetServePresentation(true);
       return;
     }
@@ -615,11 +621,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const finishHavenServe = useCallback(() => {
     const activeOrder = activeServeOrderRef.current;
     const state = mergeBoardStateRef.current;
-    if (!mergeBoard || !activeOrder || !state || !readyMergeOrderIds(state).has(activeOrder.orderId)) {
+    if (!mergeBoard || !activeOrder || !state || !mergeOrderReady(state, activeOrder.order)) {
       resetServePresentation(true);
       return;
     }
-    const result = mergeBoard.dispatch({ type: 'serveOrder', orderId: activeOrder.orderId, now: Date.now() });
+    const result = mergeBoard.dispatch(isDevHavenOrderFiller(activeOrder.order)
+      ? { type: 'serveDevHavenOrder', order: activeOrder.order, now: Date.now() }
+      : { type: 'serveOrder', orderId: activeOrder.orderId, now: Date.now() });
     resetServePresentation(!result?.changed);
   }, [mergeBoard, resetServePresentation]);
   const tileFocusScale = useCallback((tileId: string) => {

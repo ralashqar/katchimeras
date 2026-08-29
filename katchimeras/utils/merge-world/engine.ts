@@ -82,6 +82,7 @@ import {
   boardMistPartitionIssues,
   reconcileDiscoveryMist,
 } from '@/utils/merge-world/board-mist-progression';
+import { isDevHavenOrderFiller } from '@/utils/merge-world/dev-haven-order-fillers';
 
 const KNOWN_CHARACTERS = new Set<MergeCharacterId>(Object.keys(KATCHIMERA_MERGE_PROFILES) as MergeCharacterId[]);
 const RECENT_ORDER_LIMIT = 8;
@@ -180,6 +181,8 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
       return moveItem(current, command.from, command.to, command.now);
     case 'serveOrder':
       return serveOrder(current, command.orderId, command.now);
+    case 'serveDevHavenOrder':
+      return serveDevHavenOrder(current, command.order, command.now);
     case 'storeItem':
       return storeItem(current, command.cell, command.now);
     case 'restoreItem':
@@ -1358,15 +1361,7 @@ function moveItem(state: MergeWorldState, from: number, to: number, now: number)
 function serveOrder(state: MergeWorldState, orderId: string, now: number): MergeWorldCommandResult {
   const order = state.activeOrders.find((item) => item.id === orderId);
   if (!order || !mergeOrderReady(state, order)) return unchanged(state, 'The requested items are not ready yet.');
-  const remaining = new Map(order.requirements.map((requirement) => [requirement.definitionId, requirement.quantity]));
-  const board = state.board.map((cell) => {
-    const occupant = cell.occupant;
-    if (!occupant || occupant.kind !== 'item') return cell;
-    const needed = remaining.get(occupant.definitionId) ?? 0;
-    if (needed < 1) return cell;
-    remaining.set(occupant.definitionId, needed - 1);
-    return { ...cell, occupant: null };
-  });
+  const board = boardAfterServingOrder(state, order);
   const completedOrderCount = state.completedOrderCount + 1;
   const mergeXp = state.mergeXp + order.reward.mergeXp;
   const completesStoryBundle = !order.storyStepCount
@@ -1597,6 +1592,46 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
   if (!residentSequenceActive) next = ensureProceduralOrders(next, now);
   next = touch(next, now);
   return { state: next, changed: true, servedOrderId: order.id, energyGranted: 0, clearedMistCells, residentCardEarned, message: `${order.title} served.` };
+}
+
+/**
+ * Dev Haven fillers are intentionally absent from the persistent order queue.
+ * Serving one still consumes its board items and grants its ordinary currency
+ * rewards, but cannot advance story, resident, discovery, or order-deck state.
+ */
+function serveDevHavenOrder(state: MergeWorldState, order: MergeOrder, now: number): MergeWorldCommandResult {
+  if (!isDevHavenOrderFiller(order) || !mergeOrderReady(state, order)) {
+    return unchanged(state, 'The requested items are not ready yet.');
+  }
+  const mergeXp = state.mergeXp + order.reward.mergeXp;
+  const mergeLevel = mergeLevelForXp(mergeXp);
+  const next = touch({
+    ...state,
+    board: boardAfterServingOrder(state, order),
+    coins: state.coins + order.reward.coins,
+    mergeXp,
+    mergeLevel,
+    storageCapacity: storageCapacityForLevel(mergeLevel),
+  }, now);
+  return {
+    state: next,
+    changed: true,
+    servedOrderId: order.id,
+    energyGranted: 0,
+    message: `${order.title} served.`,
+  };
+}
+
+function boardAfterServingOrder(state: MergeWorldState, order: MergeOrder): MergeBoardCell[] {
+  const remaining = new Map(order.requirements.map((requirement) => [requirement.definitionId, requirement.quantity]));
+  return state.board.map((cell) => {
+    const occupant = cell.occupant;
+    if (!occupant || occupant.kind !== 'item') return cell;
+    const needed = remaining.get(occupant.definitionId) ?? 0;
+    if (needed < 1) return cell;
+    remaining.set(occupant.definitionId, needed - 1);
+    return { ...cell, occupant: null };
+  });
 }
 
 function storeItem(state: MergeWorldState, cell: number, now: number): MergeWorldCommandResult {

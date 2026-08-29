@@ -66,3 +66,29 @@ test('Journey developer tools expose scoped reset, quick mode, and full reset co
   assert.match(snapshots, /setJourneyQuickModeEnabled\(false\)/);
   assert.match(devPage, /await resetKatchimeraProgressForDebug\(\{ resetAt: Date\.now\(\) \}\);[\s\S]*?resetOnboardingProfile\(\)/);
 });
+
+test('developer tools can fill every empty Haven order tray without mutating real orders', () => {
+  const devPage = read('app/(tabs)/explore.tsx');
+  const settings = read('utils/dev-settings.ts');
+  const haven = read('components/katchadeck/roster/katchimera-kingdom-screen.tsx');
+  const canvas = read('components/katchadeck/world/kingdom-hex-canvas.tsx');
+  const fillers = read('utils/merge-world/dev-haven-order-fillers.ts');
+
+  assert.match(devPage, /Fill empty Haven order trays/);
+  assert.match(devPage, /setHavenOrderFillersEnabled/);
+  assert.match(settings, /HAVEN_ORDER_FILLERS_KEY/);
+  assert.match(settings, /HAVEN_ORDER_FILLER_SEED_KEY/);
+  assert.match(settings, /HAVEN_ORDER_FILLER_SLOT_SEEDS_KEY/);
+  assert.match(haven, /devHavenOrderFillersForSlots/);
+  assert.match(haven, /devHavenOrderFillerSlot\(command\.order\)/);
+  assert.match(haven, /itemReadiness\.every\(Boolean\)/);
+  assert.match(haven, /advanceHavenOrderFillerSlotSeed\(slotIndex\)/);
+  assert.match(canvas, /isDevHavenOrderFiller/);
+  assert.match(canvas, /type: 'serveDevHavenOrder'/);
+  assert.match(canvas, /mergeOrderReady\(state, activeOrder\.order\)/);
+  assert.doesNotMatch(canvas, /previewOnly/);
+  assert.match(fillers, /skin\.familyId === 'mossprout'/);
+  assert.match(fillers, /skin\.id !== 'mossprout'/);
+  assert.match(fillers, /recipientSkinId: skin\.id/);
+  assert.doesNotMatch(fillers, /ownedKatchimeraCards|mossproutResidentSkinIds/);
+});

@@ -23,6 +23,7 @@ import { createStarterReveal } from '@/constants/katchadeck';
 import { COMPANION_ACHIEVEMENT_CATALOG } from '@/constants/companion-achievements';
 import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
 import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
+import { useDevHavenOrderFillers } from '@/hooks/use-dev-haven-order-fillers';
 import { KatchaDeckUI } from '@/constants/theme';
 import { enrichBackfillReflections, runBackfillFoundation, runBackfillPhotosOnly } from '@/utils/day-backfill';
 import {
@@ -47,7 +48,12 @@ import { retryFtueSync } from '@/features/onboarding/ftue-sync';
 import { clearTodayPatch } from '@/utils/today-patch-storage';
 import { clearBaseCustomisation } from '@/utils/world-base-customisation';
 import { resetWorldIdentityOnboarding } from '@/utils/world-identity';
-import { isJourneyQuickModeEnabled, setAllKatchimerasAvailableEnabled, setJourneyQuickModeEnabled } from '@/utils/dev-settings';
+import {
+  isJourneyQuickModeEnabled,
+  setAllKatchimerasAvailableEnabled,
+  setHavenOrderFillersEnabled,
+  setJourneyQuickModeEnabled,
+} from '@/utils/dev-settings';
 import type { DayVisionSummary, PhotoVisionResult, StoredHomeDayRecord } from '@/types/home';
 import type { CompanionAchievementDef } from '@/types/companion-achievements';
 import type { StreakMilestone } from '@/types/streak';
@@ -82,6 +88,7 @@ export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const ftueRun = useFtueRun();
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
+  const havenOrderFillers = useDevHavenOrderFillers();
   const [profile, setProfile] = useState(loadOnboardingProfile());
   const [storedState, setStoredState] = useState(homeRepository.load());
   const [pickedVision, setPickedVision] = useState<{
@@ -591,6 +598,22 @@ export default function ExploreScreen() {
                     onValueChange={setAllKatchimerasAvailableEnabled}
                     trackColor={{ false: 'rgba(200,216,255,0.2)', true: '#5FA87B' }}
                     value={allKatchimerasAvailable}
+                  />
+                </View>
+                <View style={styles.devToggleRow}>
+                  <View style={styles.devToggleCopy}>
+                    <ThemedText selectable style={styles.devToggleTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+                      Fill empty Haven order trays
+                    </ThemedText>
+                    <ThemedText selectable style={styles.devToggleBody} lightColor="#C4D8FF" darkColor="#C4D8FF">
+                      Fills unused slots with serveable random non-base Mossprout forms, including locked forms, while preserving every real order.
+                    </ThemedText>
+                  </View>
+                  <Switch
+                    accessibilityLabel="Fill empty Haven order trays for testing"
+                    onValueChange={setHavenOrderFillersEnabled}
+                    trackColor={{ false: 'rgba(200,216,255,0.2)', true: '#5FA87B' }}
+                    value={havenOrderFillers}
                   />
                 </View>
                 <KatchaButton label="🔄 Reset to fresh profile (full first-run)" onPress={handleFreshProfile} variant="primary" />

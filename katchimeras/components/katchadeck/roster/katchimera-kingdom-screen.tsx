@@ -23,6 +23,7 @@ import { AppFontFamilies } from '@/constants/theme';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { useMergeWorldActions } from '@/features/merge-world/merge-world-provider';
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
+import { useDevHavenOrderFillerSlotSeeds, useDevHavenOrderFillers } from '@/hooks/use-dev-haven-order-fillers';
 import type { FtueCameraDirective } from '@/features/onboarding/ftue-types';
 import type { EggVisualState } from '@/types/home';
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
@@ -39,9 +40,10 @@ import { commitFtueAction, dispatchFtueEvent } from '@/features/onboarding/ftue-
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import { mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueStepForBoard } from '@/features/onboarding/merge-ftue';
 import { mossproutJourneyForDay, mossproutJourneyRuntimeDayId } from '@/game/katchimeras/relationship-progression';
-import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
+import { advanceHavenOrderFillerSlotSeed, isJourneyQuickModeEnabled } from '@/utils/dev-settings';
 import { mergeOrderItemReadiness, readyMergeOrderIds } from '@/utils/merge-world/engine';
 import { prioritizedVisibleMergeOrders } from '@/utils/merge-world/order-presentation';
+import { devHavenOrderFillerSlot, devHavenOrderFillersForSlots } from '@/utils/merge-world/dev-haven-order-fillers';
 import type { MergeOrderTrayEntry } from '@/components/katchadeck/games/merge-order-rail';
 
 type Props = {
@@ -76,6 +78,8 @@ export function KatchimeraKingdomScreen({
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
   const avatar = useEggAvatar();
+  const havenOrderFillersEnabled = useDevHavenOrderFillers();
+  const havenOrderFillerSlotSeeds = useDevHavenOrderFillerSlotSeeds();
   const [lockedHintVisible, setLockedHintVisible] = useState(false);
   const [selectedCreatureId, setSelectedCreatureId] = useState<string | null>(null);
   const [detailCreatureId, setDetailCreatureId] = useState<string | null>(null);
@@ -122,6 +126,10 @@ export function KatchimeraKingdomScreen({
     if (!mergeFtueAllowsCommand(activeStep, before, command)) return null;
     const result = dispatchMergeWorld(command);
     if (result) mergeWorldRef.current = result.state;
+    if (result?.changed && command.type === 'serveDevHavenOrder') {
+      const slotIndex = devHavenOrderFillerSlot(command.order);
+      if (slotIndex != null) advanceHavenOrderFillerSlotSeed(slotIndex);
+    }
     const event = mergeFtueEventForCommand(before, command, result);
     if (event) dispatchFtueEvent(event, `haven-merge-command:${event.revision}`);
     return result;
@@ -134,7 +142,7 @@ export function KatchimeraKingdomScreen({
       record.status !== 'locked' && record.status !== 'card_earned'
     ));
     const readyOrderIds = readyMergeOrderIds(mergeWorld);
-    return prioritizedVisibleMergeOrders(mergeWorld, {
+    const realEntries = prioritizedVisibleMergeOrders(mergeWorld, {
       activeResidentDiscoveryId: activeResidentDiscovery?.id,
       exclusiveJourney: Boolean(mossproutJourney && mossproutJourney.status !== 'complete'),
       journeyOrderIds,
@@ -145,7 +153,25 @@ export function KatchimeraKingdomScreen({
       order,
       ready: readyOrderIds.has(order.id),
     }));
-  }, [havenMergeBoardActive, mergeWorld, mossproutJourney]);
+    if (!havenOrderFillersEnabled || realEntries.length >= 3) return realEntries;
+    const fillerOrders = devHavenOrderFillersForSlots(
+      realEntries.map((entry) => entry.order),
+      havenOrderFillerSlotSeeds,
+    );
+    return [
+      ...realEntries,
+      ...fillerOrders.map((order) => {
+        const itemReadiness = mergeOrderItemReadiness(mergeWorld, order);
+        return {
+          id: order.id,
+          itemReadiness,
+          kind: 'order' as const,
+          order,
+          ready: itemReadiness.every(Boolean),
+        };
+      }),
+    ];
+  }, [havenMergeBoardActive, havenOrderFillerSlotSeeds, havenOrderFillersEnabled, mergeWorld, mossproutJourney]);
   const havenMergeBoard = useMemo(() => havenMergeBoardActive ? ({
     boardInteractionGate,
     dispatch: dispatchHavenMergeWorld,

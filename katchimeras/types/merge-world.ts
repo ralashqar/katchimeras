@@ -441,6 +441,7 @@ export type MergeWorldCommand =
   | { type: 'upgradeGenerator'; generatorId: string; now: number }
   | { type: 'move'; from: number; to: number; now: number }
   | { type: 'serveOrder'; orderId: string; now: number }
+  | { type: 'serveDevHavenOrder'; order: MergeOrder; now: number }
   | { type: 'storeItem'; cell: number; now: number }
   | { type: 'restoreItem'; storageIndex: number; cell?: number; now: number }
   | { type: 'sellItem'; cell: number; now: number }

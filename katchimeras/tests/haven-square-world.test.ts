@@ -32,6 +32,96 @@ import {
 import {
   HAVEN_MERGE_BOARD_CELL_INDICES,
 } from '../utils/merge-world/haven-sandbox';
+import {
+  devHavenOrderFillerSlot,
+  devHavenOrderFillers,
+  devHavenOrderFillersForSlots,
+  isDevHavenOrderFiller,
+} from '../utils/merge-world/dev-haven-order-fillers';
+import { katchimeraSkins } from '../constants/katchimera-skins';
+import { createInitialMergeWorldState, reduceMergeWorld } from '../utils/merge-world/engine';
+
+test('developer Haven order fillers are stable and use every non-base Mossprout skin', () => {
+  const first = devHavenOrderFillers([], 3, 42);
+  const repeated = devHavenOrderFillers([], 3, 42);
+  assert.deepEqual(repeated, first);
+  assert.equal(first.length, 3);
+  assert.equal(new Set(first.map((order) => order.id)).size, 3);
+  assert.ok(first.every((order) => order.characterId === 'mossprout'));
+  assert.ok(first.every((order) => order.recipientSkinId !== 'mossprout'));
+  assert.equal(new Set(first.map((order) => order.recipientSkinId)).size, 3);
+  assert.ok(first.every(isDevHavenOrderFiller));
+  assert.ok(first.every((order) => order.requirements.length > 0));
+
+  const remaining = devHavenOrderFillers([first[0]], 2, 42);
+  assert.equal(remaining.length, 2);
+  assert.ok(remaining.every((order) => order.recipientSkinId !== first[0].recipientSkinId));
+
+  const allMossproutVariants = katchimeraSkins
+    .filter((skin) => skin.familyId === 'mossprout' && skin.id !== 'mossprout')
+    .map((skin) => skin.id)
+    .sort();
+  const everyVariant = devHavenOrderFillers([], allMossproutVariants.length, 42)
+    .map((order) => order.recipientSkinId)
+    .sort();
+  assert.deepEqual(everyVariant, allMossproutVariants);
+});
+
+test('serving one developer Haven slot leaves every other generated slot unchanged', () => {
+  const realOrder = {
+    ...devHavenOrderFillers([], 1, 7)[0]!,
+    id: 'real-mossprout-order',
+    recipientSkinId: 'mossprout' as const,
+  };
+  const initialSeeds = [101, 202, 303] as const;
+  const initial = devHavenOrderFillersForSlots([realOrder], initialSeeds);
+  assert.equal(initial.length, 2);
+  assert.equal(devHavenOrderFillerSlot(initial[0]!), 1);
+  assert.equal(devHavenOrderFillerSlot(initial[1]!), 2);
+
+  const afterServingSlotOne = devHavenOrderFillersForSlots([realOrder], [101, 999, 303]);
+  assert.notEqual(afterServingSlotOne[0]!.id, initial[0]!.id);
+  assert.deepEqual(afterServingSlotOne[1], initial[1]);
+});
+
+test('developer Haven order fillers can consume board items and award their ordinary rewards', () => {
+  const order = devHavenOrderFillers([], 1, 42)[0]!;
+  const initial = createInitialMergeWorldState(1_000);
+  const requestedItems = order.requirements.flatMap((requirement) => Array.from(
+    { length: requirement.quantity },
+    () => requirement.definitionId,
+  ));
+  const ready = {
+    ...initial,
+    board: initial.board.map((cell, index) => index < requestedItems.length ? {
+      ...cell,
+      blocker: null,
+      locked: false,
+      mist: null,
+      occupant: {
+        kind: 'item' as const,
+        instanceId: `dev-order-item:${index}`,
+        definitionId: requestedItems[index]!,
+      },
+    } : cell),
+  };
+
+  const result = reduceMergeWorld(ready, { type: 'serveDevHavenOrder', order, now: 2_000 });
+  assert.equal(result.changed, true);
+  assert.equal(result.servedOrderId, order.id);
+  assert.equal(result.state.coins, ready.coins + order.reward.coins);
+  assert.equal(result.state.mergeXp, ready.mergeXp + order.reward.mergeXp);
+  assert.deepEqual(result.state.activeOrders, ready.activeOrders);
+  assert.equal(result.state.completedOrderCount, ready.completedOrderCount);
+  assert.ok(result.state.board.slice(0, requestedItems.length).every((cell) => cell.occupant == null));
+
+  const spoofed = reduceMergeWorld(ready, {
+    type: 'serveDevHavenOrder',
+    order: { ...order, id: 'ordinary-order' },
+    now: 2_000,
+  });
+  assert.equal(spoofed.changed, false);
+});
 
 test('square Haven places Baristabbit west of Mossprout and the merge island below it', () => {
   assert.deepEqual(MOSSPROUT_SQUARE_ZONES, [
