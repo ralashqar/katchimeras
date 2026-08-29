@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -161,6 +161,7 @@ function TrophyArchive({
   const visibleConstellationWispIds = constellation?.featuredWispIds ?? [];
   const [openHelpSectionId, setOpenHelpSectionId] = useState<string | null>(null);
   const sections = useMemo(() => companionAchievementSections(familyId), [familyId]);
+  const [visibleSectionCount, setVisibleSectionCount] = useState(1);
   const [cabinetFilter, setCabinetFilter] = useState('all');
   const [selectedTrophyId, setSelectedTrophyId] = useState<string | null>(null);
   const previousCabinetFilterRef = useRef<string | null>(null);
@@ -173,6 +174,15 @@ function TrophyArchive({
     [cabinetFilter, entries]
   );
   const cabinetEntryKey = cabinetEntries.map((entry) => entry.def.id).join('|');
+
+  useEffect(() => setVisibleSectionCount(1), [familyId]);
+  useEffect(() => {
+    if (visibleSectionCount >= sections.length) return;
+    const frame = requestAnimationFrame(() => {
+      setVisibleSectionCount((count) => Math.min(sections.length, count + 1));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [sections.length, visibleSectionCount]);
 
   useEffect(() => {
     const filterChanged = previousCabinetFilterRef.current !== cabinetFilter;
@@ -240,7 +250,8 @@ function TrophyArchive({
           initialNumToRender={8}
           keyExtractor={(entry) => entry.def.id}
           keyboardShouldPersistTaps="handled"
-          removeClippedSubviews={false}
+          maxToRenderPerBatch={4}
+          removeClippedSubviews={process.env.EXPO_OS === 'android'}
           renderItem={({ item }) => (
             <CarouselTrophy
               entry={item}
@@ -271,7 +282,7 @@ function TrophyArchive({
         </ScrollView>
       </View>
 
-      {sections.map((section, sectionIndex) => {
+      {sections.slice(0, visibleSectionCount).map((section, sectionIndex) => {
         const sectionEntries = entries.filter((entry) => entry.def.sectionId === section.id);
         const found = sectionEntries.filter((entry) => entry.record).length;
         const pillar = sectionEntries[0]?.def.pillar ?? 'domain';
@@ -319,6 +330,11 @@ function TrophyArchive({
           </Animated.View>
         );
       })}
+      {visibleSectionCount < sections.length ? (
+        <View accessibilityLabel="Loading more achievements" accessibilityLiveRegion="polite" style={styles.sectionLoading}>
+          <ActivityIndicator color="#806126" size="small" />
+        </View>
+      ) : null}
     </Animated.View>
   );
 }
@@ -438,6 +454,7 @@ const styles = StyleSheet.create({
   topCount: { ...KatchaUI.type.meta, fontSize: 10, fontVariant: ['tabular-nums'], textShadowColor: 'rgba(23,40,49,0.58)', textShadowOffset: { height: 1, width: 0 }, textShadowRadius: 2 },
   topBalance: { height: 44, width: 44 },
   archive: { backgroundColor: KatchaUI.companionPanel.background, borderColor: KatchaUI.companionPanel.border, borderCurve: 'continuous', borderRadius: 29, borderWidth: 1, boxShadow: KatchaUI.companionPanel.shadow, gap: 12, overflow: 'hidden', paddingBottom: 18, paddingHorizontal: 13, paddingTop: 15, position: 'relative', zIndex: 4 },
+  sectionLoading: { alignItems: 'center', justifyContent: 'center', minHeight: 56 },
   cabinet: { gap: 9 },
   constellation: { backgroundColor: 'rgba(116,95,151,0.08)', borderColor: 'rgba(98,77,137,0.18)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, gap: 8, padding: 11 },
   constellationHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },

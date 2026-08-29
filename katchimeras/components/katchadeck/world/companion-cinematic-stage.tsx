@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { type LayoutChangeEvent, Pressable, type StyleProp, StyleSheet, type TextStyle, useWindowDimensions, View, type View as ViewType } from 'react-native';
+import { type GestureResponderEvent, type LayoutChangeEvent, Pressable, type StyleProp, StyleSheet, type TextStyle, useWindowDimensions, View, type View as ViewType } from 'react-native';
 import Animated, {
   Easing,
   LinearTransition,
@@ -56,6 +56,7 @@ export function CompanionCinematicStage({
   sceneTranslateX,
   onSpeechBubbleHeightChange,
   onBackgroundReady,
+  onBackdropPress,
   onCreatureReady,
   onSpeechBubblePress,
   showSpeechBubble = true,
@@ -79,6 +80,7 @@ export function CompanionCinematicStage({
   sceneTranslateX?: SharedValue<number>;
   onSpeechBubbleHeightChange?: (height: number) => void;
   onBackgroundReady?: () => void;
+  onBackdropPress?: () => void;
   onCreatureReady?: () => void;
   onSpeechBubblePress?: () => void;
   showSpeechBubble?: boolean;
@@ -134,7 +136,8 @@ export function CompanionCinematicStage({
   const speechBubbleLayout = reduceMotion
     ? undefined
     : LinearTransition.duration(190).easing(Easing.out(Easing.cubic));
-  const handleSpeechBubblePress = () => {
+  const handleSpeechBubblePress = (event: GestureResponderEvent) => {
+    event.stopPropagation();
     if (!speechFullyRevealed) {
       setRevealAllSpeechKey(speechKey);
       return;
@@ -195,7 +198,7 @@ export function CompanionCinematicStage({
   }));
 
   return (
-    <View pointerEvents="box-none" style={styles.root}>
+    <Pressable accessible={false} disabled={!onBackdropPress} onPress={onBackdropPress} pointerEvents={onBackdropPress ? 'auto' : 'box-none'} style={styles.root}>
       {stagePresentation === 'full' ? <Animated.View pointerEvents="none" style={[styles.plane, liftStyle]}>
         <CompanionHomeEnvironmentStage
           backgroundKey={environmentKey}
@@ -312,7 +315,7 @@ export function CompanionCinematicStage({
           </Animated.View>
         ) : null}
       </Animated.View>
-    </View>
+    </Pressable>
   );
 }
 

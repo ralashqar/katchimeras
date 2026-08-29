@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
@@ -7,9 +7,11 @@ import * as Haptics from 'expo-haptics';
 import {
   KingdomHexCanvas,
   type KingdomMergeCoinPresentation,
+  type KingdomMergeBoardFocusRequest,
   type KingdomResidentScreenAnchor,
   type KingdomResidentStatusGlyph,
 } from '@/components/katchadeck/world/kingdom-hex-canvas';
+import { KatchimeraCompanionRouteScreen } from '@/components/katchadeck/world/katchimera-companion-route-screen';
 import { HavenTileHudLayer } from '@/components/katchadeck/world/haven-tile-hud-layer';
 import { HavenFtueOverlay } from '@/components/katchadeck/onboarding/haven-ftue-overlay';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
@@ -29,7 +31,8 @@ import type { EggVisualState } from '@/types/home';
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
 import { loadWorldIdentity, localDayId } from '@/utils/world-identity';
 import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
-import type { MergeCharacterId, MergeWorldCommand, MergeWorldState } from '@/types/merge-world';
+import type { MergeBoardId, MergeCharacterId, MergeWorldCommand, MergeWorldState } from '@/types/merge-world';
+import type { KatchimeraFamilyId } from '@/types/katchimera';
 import { HAVEN_ENVIRONMENTS, havenStoryGateSatisfied, type HavenEnvironmentStage, type HavenStage } from '@/constants/haven-catalog';
 import { completeMossproutHavenUpgrade } from '@/utils/companion-story-storage';
 import { reconcileStoredHavenStory, upgradeStoredHavenTile } from '@/utils/merge-world/repository';
@@ -62,6 +65,12 @@ type Props = {
   onFtueInspect?: () => void;
 };
 
+function mergeBoardIdForFamily(familyId?: KatchimeraFamilyId): MergeBoardId | null {
+  return familyId === 'mossprout'
+    ? 'mossprout'
+    : familyId === 'steppling' ? 'steppling' : null;
+}
+
 export function KatchimeraKingdomScreen({
   background,
   companionSlots,
@@ -84,6 +93,10 @@ export function KatchimeraKingdomScreen({
   const stepplingOrderFillerSlotSeeds = useDevHavenOrderFillerSlotSeeds('steppling');
   const [lockedHintVisible, setLockedHintVisible] = useState(false);
   const [selectedCreatureId, setSelectedCreatureId] = useState<string | null>(null);
+  const [interactionCreatureId, setInteractionCreatureId] = useState<string | null>(null);
+  const [interactionCameraReady, setInteractionCameraReady] = useState(false);
+  const [interactionLoadingVisible, setInteractionLoadingVisible] = useState(false);
+  const [mergeBoardFocusRequest, setMergeBoardFocusRequest] = useState<KingdomMergeBoardFocusRequest | null>(null);
   const [detailCreatureId, setDetailCreatureId] = useState<string | null>(null);
   const [residentAnchors, setResidentAnchors] = useState<KingdomResidentScreenAnchor[]>([]);
   const [ftueTargetRevision, setFtueTargetRevision] = useState(0);
@@ -99,6 +112,8 @@ export function KatchimeraKingdomScreen({
   const screenRef = useRef<View>(null);
   const ftueTargetRefs = useRef(new Map<string, View>());
   const upgradeNonceRef = useRef(0);
+  const mergeBoardFocusNonceRef = useRef(0);
+  const interactionCreatureIdRef = useRef<string | null>(null);
   const ftueRestoreStartedRef = useRef(false);
   const ftueRecoveryRef = useRef<string | null>(null);
   const enterGroveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -107,6 +122,7 @@ export function KatchimeraKingdomScreen({
   const relationships = useRelationshipProgression();
   const mergeWorldRef = useRef(mergeWorld);
   mergeWorldRef.current = mergeWorld;
+  interactionCreatureIdRef.current = interactionCreatureId;
   const visibleCompanionSlots = useMemo(
     () => companionSlots.filter((slot) => (
       slot.familyId === 'mossprout'
@@ -252,6 +268,13 @@ export function KatchimeraKingdomScreen({
     () => [havenMergeBoard, stepplingMergeBoard].filter((board): board is NonNullable<typeof board> => board != null),
     [havenMergeBoard, stepplingMergeBoard],
   );
+  const interactionSlot = useMemo(() => visibleCompanionSlots.find((slot) => (
+    slot.kind === 'owned' && slot.creature.creatureId === interactionCreatureId
+  )), [interactionCreatureId, visibleCompanionSlots]);
+  const interactionBoardId = mergeBoardIdForFamily(interactionSlot?.familyId);
+  const interactionHasMergeBoard = Boolean(
+    interactionBoardId && havenMergeBoards.some((board) => board.id === interactionBoardId),
+  );
   const tutorialCamera = useMemo<FtueCameraDirective | null>(() => {
     if (ftueStepId === 'haven.mossprout_reveal' && enteringGrove) {
       return { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: 1.25, anchorY: 0.46, durationMs: 360 };
@@ -264,6 +287,18 @@ export function KatchimeraKingdomScreen({
   useEffect(() => () => {
     if (enterGroveTimerRef.current) clearTimeout(enterGroveTimerRef.current);
   }, []);
+  useEffect(() => {
+    setInteractionLoadingVisible(false);
+    if (!interactionCreatureId || interactionCameraReady) return;
+    const loadingTimer = setTimeout(() => setInteractionLoadingVisible(true), 120);
+    const cameraFallbackTimer = setTimeout(() => {
+      if (interactionCreatureIdRef.current === interactionCreatureId) setInteractionCameraReady(true);
+    }, 900);
+    return () => {
+      clearTimeout(loadingTimer);
+      clearTimeout(cameraFallbackTimer);
+    };
+  }, [interactionCameraReady, interactionCreatureId]);
   const advanceOpening = useCallback(() => {
     if (ftueStepId !== 'haven.mossprout_reveal') {
       onFtueInspect?.();
@@ -446,7 +481,28 @@ export function KatchimeraKingdomScreen({
     if (ftueStepId === 'haven.mossprout.focus' && presentation?.characterId !== 'mossprout') return;
     if (ftueStepId === 'haven.mossprout.restore') return;
     setSelectedCreatureId(creatureId);
+    setDetailCreatureId(null);
+    setInteractionCameraReady(false);
+    setInteractionCreatureId(creatureId);
   }, [ftueStepId, havenPresentations]);
+
+  const completeResidentFocus = useCallback((creatureId: string) => {
+    if (interactionCreatureIdRef.current === creatureId) setInteractionCameraReady(true);
+  }, []);
+
+  const closeResidentInteraction = useCallback(() => {
+    setInteractionCameraReady(false);
+    setInteractionLoadingVisible(false);
+    setInteractionCreatureId(null);
+  }, []);
+
+  const openHostedMergeBoard = useCallback((orderId?: string | null, requestedFamilyId?: KatchimeraFamilyId) => {
+    const familyId = requestedFamilyId ?? interactionSlot?.familyId;
+    const boardId = mergeBoardIdForFamily(familyId);
+    if (!boardId || !havenMergeBoards.some((board) => board.id === boardId)) return;
+    closeResidentInteraction();
+    setMergeBoardFocusRequest({ boardId, nonce: ++mergeBoardFocusNonceRef.current, orderId });
+  }, [closeResidentInteraction, havenMergeBoards, interactionSlot?.familyId]);
 
   return (
     <View collapsable={false} onLayout={onContentReady} ref={screenRef} style={styles.screen}>
@@ -457,8 +513,10 @@ export function KatchimeraKingdomScreen({
         identity={identity}
         discoveryRevealFamilyId={ftueStepId === 'haven.mossprout_reveal' || ftueStepId === 'haven.first_bloom' ? 'mossprout' : null}
         highlightedLockedFamilyId={ftueStepId === 'haven.mossprout_focus' ? 'mossprout' : null}
-        interactionEnabled={havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven'}
+        interactionEnabled={!interactionCreatureId && (havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven')}
+        interactionResidentId={interactionCreatureId}
         mergeBoards={havenMergeBoards}
+        mergeBoardFocusRequest={mergeBoardFocusRequest}
         mergeCoinTargetRef={coinHudRef}
         onMergeCoinPresentation={handleMergeCoinPresentation}
         onSelectHome={() => {
@@ -472,6 +530,7 @@ export function KatchimeraKingdomScreen({
           if (!ftueStep || ftueStep.surface !== 'haven') setLockedHintVisible(true);
         }}
         onSelectResident={selectResident}
+        onResidentFocusComplete={completeResidentFocus}
         onResidentAnchorsChange={setResidentAnchors}
         onUpgradePresentationComplete={completeUpgradePresentation}
         recenterBottom={Math.max(insets.bottom, 12) + 68}
@@ -480,7 +539,7 @@ export function KatchimeraKingdomScreen({
         upgradePresentation={upgradePresentation}
         squareWorld
       />
-      {!upgradePresentation ? (
+      {!upgradePresentation && !interactionCreatureId ? (
         <HavenTileHudLayer
           anchors={residentAnchors}
           bottomInset={Math.max(insets.bottom, 12)}
@@ -494,7 +553,7 @@ export function KatchimeraKingdomScreen({
           width={window.width}
         />
       ) : null}
-      {!upgradePresentation ? (
+      {!upgradePresentation && !interactionCreatureId ? (
         <View pointerEvents="box-none" style={[styles.topHudLayer, { top: insets.top + 3 }]}>
           <GameHudBar
             content={<GameCurrencyHud balances={[{
@@ -528,6 +587,26 @@ export function KatchimeraKingdomScreen({
               />
             </Pressable>}
           />
+        </View>
+      ) : null}
+      {interactionCreatureId ? (
+        <View
+          accessibilityElementsHidden={!interactionCameraReady}
+          importantForAccessibility={interactionCameraReady ? 'auto' : 'no-hide-descendants'}
+          pointerEvents={interactionCameraReady ? 'auto' : 'none'}
+          style={[styles.companionOverlay, !interactionCameraReady && styles.companionOverlayPreparing]}>
+          <KatchimeraCompanionRouteScreen
+            creatureId={interactionCreatureId}
+            hostedInHaven
+            onHostedClose={closeResidentInteraction}
+            onHostedOpenMerge={interactionHasMergeBoard ? openHostedMergeBoard : undefined}
+            reuseUnderlyingStage
+          />
+        </View>
+      ) : null}
+      {interactionCreatureId && !interactionCameraReady && interactionLoadingVisible ? (
+        <View accessibilityLabel="Preparing Katchimera interaction" accessibilityLiveRegion="polite" pointerEvents="none" style={styles.interactionLoading}>
+          <ActivityIndicator color="#FFF4C7" size="small" />
         </View>
       ) : null}
       {lockedHintVisible ? (
@@ -639,6 +718,22 @@ export function KatchimeraKingdomScreen({
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: '#55A9E2', flex: 1 },
+  companionOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 45 },
+  companionOverlayPreparing: { opacity: 0 },
+  interactionLoading: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(31,44,30,0.72)',
+    borderRadius: 999,
+    height: 38,
+    justifyContent: 'center',
+    left: '50%',
+    marginLeft: -19,
+    marginTop: -19,
+    position: 'absolute',
+    top: '50%',
+    width: 38,
+    zIndex: 46,
+  },
   topHudLayer: {
     alignItems: 'center',
     left: 12,

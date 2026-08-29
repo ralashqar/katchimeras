@@ -233,7 +233,7 @@ test('legacy Merge return remains safe while Mossprout opens its character-owned
   assert.match(merge, /source: 'merge-world'/);
   assert.match(route, /source === 'merge-world' \? transitionTo\(\{/);
   assert.match(route, /navigate: \(\) => router\.dismissTo\('\/\(tabs\)\/katchimeras'\)/);
-  assert.match(route, /onOpenMerge=\{familyId === 'mossprout'/);
+  assert.match(route, /onOpenMerge=\{onHostedOpenMerge \?\? \(familyId === 'mossprout'/);
   assert.match(route, /pathname: '\/katchimera\/\[creatureId\]\/activity'/);
   assert.doesNotMatch(route, /onOpenMerge=.*pathname: '\/games'/);
   assert.match(interaction, /if \(!props\.active \|\| !receipt \|\| bondReward\) return/);
@@ -477,7 +477,7 @@ test('achievements open as a companion destination instead of remounting a route
     'utf8',
   );
   assert.match(interaction, /selectDestination\('achievements'\)/);
-  assert.match(interaction, /CompanionTrophyRoomScreen creatureId=\{props\.creatureId\} embedded/);
+  assert.match(interaction, /LazyCompanionTrophyRoomScreen creatureId=\{props\.creatureId\} embedded/);
   assert.match(interaction, /route\.kind === 'visit'/);
   assert.match(interaction, /<CompanionVisitScene/);
   assert.doesNotMatch(kingdom, /pathname:\s*['"]\/katchimera\/\[creatureId\]\/achievements/);

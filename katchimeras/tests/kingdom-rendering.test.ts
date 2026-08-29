@@ -828,3 +828,50 @@ test('inactive Haven merge boards retain full and lower locked-cell mist', () =>
   assert.match(preview, /const fullMist = boardCell\.locked && !boardCell\.occupant && !lowerMist/);
   assert.match(preview, /source=\{lowerMist \? DREAM_MIST_LOWER : DREAM_MIST_FULL\}/);
 });
+
+test('Haven hosts resident interaction over the focused world and freezes merge boards', () => {
+  const screen = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'roster', 'katchimera-kingdom-screen.tsx'),
+    'utf8',
+  );
+  const canvas = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-hex-canvas.tsx'),
+    'utf8',
+  );
+  const route = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'katchimera-companion-route-screen.tsx'),
+    'utf8',
+  );
+
+  assert.match(screen, /<KatchimeraCompanionRouteScreen[\s\S]*?hostedInHaven[\s\S]*?reuseUnderlyingStage/);
+  assert.match(screen, /interactionEnabled=\{!interactionCreatureId/);
+  assert.match(screen, /mergeBoardFocusRequest=\{mergeBoardFocusRequest\}/);
+  assert.match(screen, /interactionCreatureIdRef\.current === creatureId/);
+  assert.match(screen, /cameraFallbackTimer = setTimeout/);
+  assert.match(canvas, /if \(!interactionResidentId\) return;[\s\S]*?setActiveMergeBoardId\(null\)/);
+  assert.match(canvas, /handledMergeBoardRequestRef/);
+  assert.match(route, /onHostedClose/);
+  assert.match(route, /onHostedOpenMerge/);
+});
+
+test('hosted resident dashboard dismisses from the world while deep achievements mount progressively', () => {
+  const interaction = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'),
+    'utf8',
+  );
+  const stage = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-cinematic-stage.tsx'),
+    'utf8',
+  );
+  const trophies = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-trophy-room-screen.tsx'),
+    'utf8',
+  );
+
+  assert.match(interaction, /dismissOnSwipe: props\.reuseUnderlyingStage && dashboardRouteActive \? requestClose : undefined/);
+  assert.match(interaction, /onBackdropPress=\{props\.reuseUnderlyingStage && dashboardRouteActive \? requestClose : undefined\}/);
+  assert.match(interaction, /const LazyCompanionTrophyRoomScreen = lazy/);
+  assert.match(stage, /onBackdropPress/);
+  assert.match(trophies, /visibleSectionCount/);
+  assert.match(trophies, /maxToRenderPerBatch=\{4\}/);
+});

@@ -107,6 +107,12 @@ export type KingdomHavenMergeBoardDescriptor = {
   state: MergeWorldState;
 };
 
+export type KingdomMergeBoardFocusRequest = {
+  boardId: MergeBoardId;
+  nonce: number;
+  orderId?: string | null;
+};
+
 type Props = {
   background: TodayAtmosphereBackground;
   companionSlots: KingdomHexCompanionSlot[];
@@ -129,6 +135,9 @@ type Props = {
   mergeCoinTargetRef?: { current: View | null };
   onMergeCoinPresentation?: (event: KingdomMergeCoinPresentation) => void;
   mergeBoards?: readonly KingdomHavenMergeBoardDescriptor[];
+  mergeBoardFocusRequest?: KingdomMergeBoardFocusRequest | null;
+  interactionResidentId?: string | null;
+  onResidentFocusComplete?: (creatureId: string) => void;
   squareWorld?: boolean;
 };
 
@@ -227,6 +236,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   mergeCoinTargetRef,
   onMergeCoinPresentation,
   mergeBoards = [],
+  mergeBoardFocusRequest = null,
+  interactionResidentId = null,
+  onResidentFocusComplete,
   squareWorld = false,
 }: Props) {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
@@ -270,6 +282,14 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     mergeSessionRef.current = { boardId: activeMergeBoardId, session: createMergeBoardSession() };
   }
   const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (!interactionResidentId) return;
+    setActiveMergeBoardId(null);
+    setPendingMergeBoardId(null);
+    setLiveMergeBoardReadyId(null);
+    setSelectedMergeCell(null);
+  }, [interactionResidentId]);
 
   useEffect(() => {
     setLiveMergeBoardReadyId(null);
@@ -391,6 +411,21 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     return frames;
   }, [scene.tileArtLayers]);
   const activeMergeBoardFrame = activeMergeBoardId ? mergeBoardFrames.get(activeMergeBoardId) ?? null : null;
+  const handledMergeBoardRequestRef = useRef(0);
+  useEffect(() => {
+    if (!mergeBoardFocusRequest || handledMergeBoardRequestRef.current === mergeBoardFocusRequest.nonce) return;
+    const target = mergeBoardById.get(mergeBoardFocusRequest.boardId);
+    if (!target || !mergeBoardFrames.has(target.id)) return;
+    handledMergeBoardRequestRef.current = mergeBoardFocusRequest.nonce;
+    activationOrderSnapshotRef.current = {
+      boardId: target.id,
+      orderIds: havenOrderSlotFrames(target.id).map((_, index) => target.orders?.[index]?.id ?? null),
+    };
+    setSelectedMergeCell(null);
+    setActiveMergeBoardId(null);
+    setLiveMergeBoardReadyId(null);
+    setPendingMergeBoardId(target.id);
+  }, [mergeBoardById, mergeBoardFocusRequest, mergeBoardFrames]);
   const handleWorldTapRelease = useCallback((x: number, y: number) => {
     if (activeServeRef.current || upgradePresentation) return;
     const target = mergeBoards.find((board) => {
@@ -859,13 +894,14 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             worldSize={creatureWorldSize}
             onFocus={residentInteractionEnabled ? camera.focusResident : ignoreFocus}
             onSelectResident={residentInteractionEnabled ? onSelectResident : undefined}
+            onFocusComplete={onResidentFocusComplete}
           />
         ),
       });
     }
 
     return items.sort((a, b) => a.depth - b.depth).map((item) => item.node);
-  }, [allowedResidentCharacterId, artLayerById, camera.focusResident, creatureWorldSize, highlightedLockedFamilyId, ignoreFocus, interactionEnabled, onSelectLocked, onSelectResident, residentStatusGlyphs, scene.tiles, tileFocusScale, upgradePhase, upgradePresentation]);
+  }, [allowedResidentCharacterId, artLayerById, camera.focusResident, creatureWorldSize, highlightedLockedFamilyId, ignoreFocus, interactionEnabled, onResidentFocusComplete, onSelectLocked, onSelectResident, residentStatusGlyphs, scene.tiles, tileFocusScale, upgradePhase, upgradePresentation]);
 
   const home = homePreset(identity?.selectedHomeArchetypeId);
   const showEgg = Boolean(eggVisual);
@@ -1463,7 +1499,8 @@ type ResidentProps = {
   focusAnchorX: number;
   focusAnchorY: number;
   focusScale: number;
-  onFocus: (x: number, y: number, options?: { id?: string }) => void;
+  onFocus: (x: number, y: number, options?: { id?: string; onComplete?: () => void }) => void;
+  onFocusComplete?: (creatureId: string) => void;
   onSelectResident?: (creatureId: string, label: string) => void;
   source?: ImageSourcePropType;
   statusGlyph?: KingdomResidentStatusGlyph;
@@ -1480,6 +1517,7 @@ const ResidentCreature = memo(function ResidentCreature({
   focusAnchorY,
   focusScale,
   onFocus,
+  onFocusComplete,
   onSelectResident,
   source: sourceOverride,
   statusGlyph,
@@ -1534,9 +1572,9 @@ const ResidentCreature = memo(function ResidentCreature({
   }));
   const handlePress = useCallback(() => {
     if (!creature) return;
-    onFocus(x, y, { id: tile.id });
+    onFocus(x, y, { id: tile.id, onComplete: () => onFocusComplete?.(creature.creatureId) });
     onSelectResident?.(creature.creatureId, creature.name);
-  }, [creature, onFocus, onSelectResident, tile.id, x, y]);
+  }, [creature, onFocus, onFocusComplete, onSelectResident, tile.id, x, y]);
   const markReady = useCallback(() => setReady(true), []);
   const frame = {
     height: worldSize,

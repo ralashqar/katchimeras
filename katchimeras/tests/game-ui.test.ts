@@ -130,7 +130,7 @@ test('Mossprout collection buttons live in the bottom dock and swap embedded con
   ['discoveries', 'skins', 'trophies'].forEach((id) => {
     assert.match(navArt, new RegExp(`navigation/shared/${id}\\.webp`));
   });
-  assert.match(sheet, /destination === 'achievements'[\s\S]*?<CompanionTrophyRoomScreen creatureId=\{props\.creatureId\} embedded/);
+  assert.match(sheet, /destination === 'achievements'[\s\S]*?<LazyCompanionTrophyRoomScreen creatureId=\{props\.creatureId\} embedded/);
   assert.match(sheet, /destination === 'skins'[\s\S]*?<CompanionSkinsThread/);
 });
 

@@ -40,6 +40,7 @@ import {
   mossproutBondShareSelection,
 } from '@/features/onboarding/mossprout-bond-share';
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
+import type { KatchimeraFamilyId } from '@/types/katchimera';
 
 function isResidentFtueStep(stepId: string) {
   return stepId === 'companion.resident_affinity'
@@ -48,7 +49,7 @@ function isResidentFtueStep(stepId: string) {
     || stepId.startsWith('merge.resident_');
 }
 
-export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOrigin = false, ftueConversationDefinitionId, journeyReturnConversationDefinitionId, residentStoryResumeRequested = false, renderRegularStage = false, reuseUnderlyingStage = false, hostedInHaven = false, onVisibleCreatureRewardPulse }: {
+export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOrigin = false, ftueConversationDefinitionId, journeyReturnConversationDefinitionId, residentStoryResumeRequested = false, renderRegularStage = false, reuseUnderlyingStage = false, hostedInHaven = false, onHostedClose, onHostedOpenMerge, onVisibleCreatureRewardPulse }: {
   creatureId: string;
   source?: 'merge-world';
   ftueRouteOrigin?: boolean;
@@ -58,6 +59,8 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   renderRegularStage?: boolean;
   reuseUnderlyingStage?: boolean;
   hostedInHaven?: boolean;
+  onHostedClose?: () => void;
+  onHostedOpenMerge?: (orderId?: string | null, familyId?: KatchimeraFamilyId) => void;
   onVisibleCreatureRewardPulse?: () => void;
 }) {
   const isFocused = useIsFocused();
@@ -513,7 +516,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       onFtueProfileContinue={completeFtueProfileStep}
       onFtueOpenResidentParcel={openFtueResidentParcel}
       initialCreatureId={creatureId}
-      onCloseCompanion={() => ftueRouteOrigin && navigationFtueRun?.status !== 'active' ? transitionTo({
+      onCloseCompanion={() => hostedInHaven && onHostedClose ? onHostedClose() : ftueRouteOrigin && navigationFtueRun?.status !== 'active' ? transitionTo({
         announcement: 'Returning to Haven',
         target: 'katchimeras',
         navigate: () => router.dismissTo('/(tabs)/katchimeras'),
@@ -522,7 +525,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
         target: 'katchimeras',
         navigate: () => router.dismissTo('/(tabs)/katchimeras'),
       }) : router.back()}
-      onOpenMerge={familyId === 'mossprout' ? (orderId) => {
+      onOpenMerge={onHostedOpenMerge ?? (familyId === 'mossprout' ? (orderId) => {
         transitionTo({
           announcement: "Opening Mossprout's Garden",
           target: 'merge',
@@ -531,7 +534,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
             params: { creatureId, ...(orderId ? { focusOrderId: orderId } : {}) },
           }),
         });
-      } : undefined}
+      } : undefined)}
       onOpenQuestGame={(selectedCreatureId, questId) => {
         markFlowStart('katchimera-block-blast');
         router.push({

@@ -123,7 +123,6 @@ import type { GoalTaskSourceRect } from '@/components/katchadeck/goals/goal-task
 import { BondRewardFlightOverlay } from '@/components/katchadeck/goals/bond-reward-overlay';
 import { CompanionFtueCoachmark } from '@/components/katchadeck/onboarding/companion-ftue-coachmark';
 import { CompanionIntroduction } from './companion-introduction';
-import { CompanionTrophyRoomScreen } from './companion-trophy-room-screen';
 import { CompanionVisitScene } from './companion-visit-scene';
 import { CompanionDashboard } from './companion-dashboard';
 import { FeastleStoryStage } from './feastle-story-stage';
@@ -154,6 +153,11 @@ import { MOSSPROUT_GARDEN_INTRO_BEATS, mossproutGardenIntroBeat } from '@/featur
 const LazyQuestExperienceHost = lazy(async () => {
   const module = await import('./quests/quest-experience-host');
   return { default: module.QuestExperienceHost };
+});
+
+const LazyCompanionTrophyRoomScreen = lazy(async () => {
+  const module = await import('./companion-trophy-room-screen');
+  return { default: module.CompanionTrophyRoomScreen };
 });
 
 type Criterion = {
@@ -1071,6 +1075,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   );
   const environmentPan = useCompanionEnvironmentPan({
     activeKey: `${props.creatureId}:${props.homeEnvironmentKey ?? 'none'}`,
+    dismissOnSwipe: props.reuseUnderlyingStage && dashboardRouteActive ? requestClose : undefined,
     enabled: props.active !== false && !questGameVisible && !questionnaireExperience && Boolean(props.homeEnvironmentKey),
     visualKey: props.visualKey,
   });
@@ -1487,6 +1492,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             lifted
             name={props.name}
             onBackgroundReady={() => setTransitionBackgroundReady(true)}
+            onBackdropPress={props.reuseUnderlyingStage && dashboardRouteActive ? requestClose : undefined}
             onCreatureReady={() => setTransitionCreatureReady(true)}
             rewardPulseKey={rewardPulseKey}
             sceneTranslateX={environmentPan.translateX}
@@ -2142,7 +2148,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                 ) : null}
                 </View>
               ) : destination === 'achievements' ? (
-                <CompanionTrophyRoomScreen creatureId={props.creatureId} embedded />
+                <Suspense fallback={<View accessibilityLabel="Loading achievements" accessibilityLiveRegion="polite" style={styles.deepLoading}><ActivityIndicator color={KatchaUI.companionPanel.ink} size="small" /></View>}>
+                  <LazyCompanionTrophyRoomScreen creatureId={props.creatureId} embedded />
+                </Suspense>
               ) : destination === 'insight' ? (
                 <CompanionInsightThread
                   currentFamilyId={props.familyId}
@@ -2282,6 +2290,7 @@ const styles = StyleSheet.create({
   activeExperience: { flex: 1 },
   gameExperienceFrame: { flex: 1, minHeight: 0, position: 'relative', zIndex: 3 },
   gameLoading: { flex: 1, backgroundColor: '#11131B' },
+  deepLoading: { alignItems: 'center', minHeight: 220, justifyContent: 'center' },
   gameBackPosition: {
     left: 14,
     position: 'absolute',

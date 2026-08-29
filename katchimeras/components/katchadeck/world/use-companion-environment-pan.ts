@@ -1,15 +1,16 @@
 import { useEffect, useMemo } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { Gesture } from 'react-native-gesture-handler';
-import { cancelAnimation, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
+import { cancelAnimation, runOnJS, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import todayScene from '@/data/today-scene.json';
 import type { HomeVisualKey } from '@/types/home';
 import { companionHomeStageLayout } from '@/utils/companion-home-layout';
 import { resolveTodayExplorationDragTranslation } from '@/utils/today-exploration-gesture';
 
-export function useCompanionEnvironmentPan({ activeKey, enabled, visualKey }: {
+export function useCompanionEnvironmentPan({ activeKey, dismissOnSwipe, enabled, visualKey }: {
   activeKey: string;
+  dismissOnSwipe?: () => void;
   enabled: boolean;
   visualKey: HomeVisualKey;
 }) {
@@ -27,7 +28,7 @@ export function useCompanionEnvironmentPan({ activeKey, enabled, visualKey }: {
   }, [activeKey, translateX]);
 
   const gesture = useMemo(() => Gesture.Pan()
-    .enabled(enabled && maxPan > 0)
+    .enabled(enabled && (maxPan > 0 || Boolean(dismissOnSwipe)))
     .maxPointers(1)
     .activeOffsetX([-8, 8])
     .failOffsetY([-16, 16])
@@ -43,9 +44,14 @@ export function useCompanionEnvironmentPan({ activeKey, enabled, visualKey }: {
         translationX: event.translationX,
       });
     })
+    .onEnd((event) => {
+      if (dismissOnSwipe && (Math.abs(event.translationX) > 48 || Math.abs(event.velocityX) > 720)) {
+        runOnJS(dismissOnSwipe)();
+      }
+    })
     .onFinalize(() => {
       translateX.value = reduceMotion ? 0 : withSpring(0, spring);
-    }), [enabled, gestureStartX, maxPan, reduceMotion, spring, translateX]);
+    }), [dismissOnSwipe, enabled, gestureStartX, maxPan, reduceMotion, spring, translateX]);
 
   return { gesture, maxPan, translateX };
 }
