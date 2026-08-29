@@ -12,16 +12,21 @@ import {
   HAVEN_JUNCTION_MINI_ISLAND_RISE,
   HAVEN_JUNCTION_TRAY_SIZE,
   HAVEN_JUNCTION_TRAY_TOP_OFFSET,
+  HAVEN_MERGE_BOARD_AREA_LOWERING,
   HAVEN_SQUARE_ROW_PITCH,
+  HAVEN_SQUARE_ZONE_SIZE,
+  HAVEN_WEST_NATURE_ISLAND_SIZE,
   MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO,
   MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS,
   MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS,
   MOSSPROUT_GARDEN_TOP_WIDTH_RATIO,
   MOSSPROUT_SQUARE_ZONES,
   mossproutEggHomeBridgeFrame,
+  mossproutGardenEastNatureIslandFrame,
   mossproutGardenJunctionMiniIslandFrame,
   mossproutGardenJunctionMiniIslandFrames,
   mossproutGardenJunctionTrayFrames,
+  mossproutGardenWestNatureIslandFrame,
   mossproutSquareSceneMetrics,
 } from '../utils/haven-square-world';
 import {
@@ -36,7 +41,9 @@ test('square Haven places Baristabbit west of Mossprout and the merge island bel
     { id: 'mossprout-garden', coord: { column: 1, row: 1 } },
   ]);
   assert.equal(HAVEN_SQUARE_COLUMN_PITCH, 720);
-  assert.equal(HAVEN_SQUARE_ROW_PITCH, 480);
+  assert.equal(HAVEN_MERGE_BOARD_AREA_LOWERING, HAVEN_SQUARE_ZONE_SIZE * 0.15);
+  assert.equal(HAVEN_MERGE_BOARD_AREA_LOWERING, 90);
+  assert.equal(HAVEN_SQUARE_ROW_PITCH, 570);
   const baristabbit = havenSquareZoneFrame(MOSSPROUT_SQUARE_ZONES[0].coord);
   const environment = havenSquareZoneFrame(MOSSPROUT_SQUARE_ZONES[1].coord);
   const eggHome = havenSquareZoneFrame(MOSSPROUT_SQUARE_ZONES[2].coord);
@@ -44,11 +51,13 @@ test('square Haven places Baristabbit west of Mossprout and the merge island bel
   const westernBridge = baristabbitMossproutBridgeFrame();
   const easternBridge = mossproutEggHomeBridgeFrame();
   const junctionMiniIsland = mossproutGardenJunctionMiniIslandFrame();
+  const westNatureIsland = mossproutGardenWestNatureIslandFrame();
+  const eastNatureIsland = mossproutGardenEastNatureIslandFrame();
   assert.equal(environment.left - (baristabbit.left + baristabbit.width), 120);
   assert.equal(eggHome.left - (environment.left + environment.width), 120);
   assert.equal(garden.left, environment.left);
   assert.equal(garden.top, environment.top + HAVEN_SQUARE_ROW_PITCH);
-  assert.equal(environment.top + environment.height - garden.top, 120);
+  assert.equal(environment.top + environment.height - garden.top, 30);
   assert.ok(westernBridge.left < baristabbit.left + baristabbit.width);
   assert.ok(westernBridge.left + westernBridge.width > environment.left);
   assert.ok(easternBridge.left < environment.left + environment.width);
@@ -63,20 +72,34 @@ test('square Haven places Baristabbit west of Mossprout and the merge island bel
   assert.equal(HAVEN_JUNCTION_MINI_ISLAND_RISE, 10);
   assert.equal(HAVEN_JUNCTION_TRAY_SIZE, 95);
   assert.equal(HAVEN_JUNCTION_TRAY_TOP_OFFSET, 48);
-  assert.deepEqual(junctionMiniIsland, { height: 160, left: 1000, top: 530, width: 160 });
+  assert.equal(HAVEN_WEST_NATURE_ISLAND_SIZE, 330);
+  assert.deepEqual(junctionMiniIsland, { height: 160, left: 1000, top: 620, width: 160 });
   assert.deepEqual(junctionMiniIslands, [
-    { height: 160, left: 870, top: 530, width: 160 },
-    { height: 160, left: 1000, top: 530, width: 160 },
-    { height: 160, left: 1130, top: 530, width: 160 },
+    { height: 160, left: 870, top: 620, width: 160 },
+    { height: 160, left: 1000, top: 620, width: 160 },
+    { height: 160, left: 1130, top: 620, width: 160 },
   ]);
   assert.deepEqual(junctionTrays, [
-    { height: 95, left: 902.5, top: 578, width: 95 },
-    { height: 95, left: 1032.5, top: 578, width: 95 },
-    { height: 95, left: 1162.5, top: 578, width: 95 },
+    { height: 95, left: 902.5, top: 668, width: 95 },
+    { height: 95, left: 1032.5, top: 668, width: 95 },
+    { height: 95, left: 1162.5, top: 668, width: 95 },
   ]);
   assert.ok(junctionMiniIsland.top < environment.top + environment.height);
   assert.ok(junctionMiniIsland.top + junctionMiniIsland.height > garden.top);
-  assert.deepEqual(mossproutSquareSceneMetrics(), { width: 2160, height: 1200 });
+  assert.deepEqual(westNatureIsland, { height: 330, left: 555, top: 480, width: 330 });
+  assert.equal(westNatureIsland.left + westNatureIsland.width / 2, 720);
+  assert.equal(westNatureIsland.top + westNatureIsland.height / 2, 645);
+  assert.ok(westNatureIsland.left < environment.left);
+  assert.ok(westNatureIsland.top < environment.top + environment.height);
+  assert.ok(westNatureIsland.top + westNatureIsland.height > garden.top);
+  assert.deepEqual(eastNatureIsland, { height: 330, left: 1275, top: 480, width: 330 });
+  assert.equal(eastNatureIsland.top, westNatureIsland.top);
+  assert.equal(eastNatureIsland.width, westNatureIsland.width);
+  assert.equal(
+    eastNatureIsland.left + eastNatureIsland.width / 2 - (environment.left + environment.width / 2),
+    environment.left + environment.width / 2 - (westNatureIsland.left + westNatureIsland.width / 2),
+  );
+  assert.deepEqual(mossproutSquareSceneMetrics(), { width: 2160, height: 1290 });
 });
 
 test('the compact merge island hosts all stable Haven cells on one 7x6 playfield', () => {
@@ -166,6 +189,34 @@ test('the junction mini-island and separate tray include fixed alpha tiers', () 
   }
 });
 
+test('the paired nature islets are transparent decorative layers in the square Haven scene', () => {
+  for (const stem of ['nature-island-512.webp', 'nature-island-east-512.webp']) {
+    const asset = path.join(
+      process.cwd(),
+      'assets',
+      'images',
+      'katchimeras',
+      'world',
+      'square',
+      stem,
+    );
+    assert.ok(fs.existsSync(asset));
+    const bytes = fs.readFileSync(asset);
+    assert.equal(bytes.toString('ascii', 12, 16), 'VP8X');
+    assert.ok((bytes[20] & 0x10) !== 0, `${stem} must preserve alpha`);
+  }
+
+  const scene = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'mossprout-square-scene.ts'),
+    'utf8',
+  );
+  assert.match(scene, /id: 'decor:mossprout-garden-west-nature-island'/);
+  assert.match(scene, /id: 'decor:mossprout-garden-east-nature-island'/);
+  assert.match(scene, /frame: natureIslandFrame/);
+  assert.match(scene, /frame: eastNatureIslandFrame/);
+  assert.match(scene, /depth: 3/);
+});
+
 test('the player Haven mounts the square scene and keeps the hex renderer as a fallback', () => {
   const screen = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'roster', 'katchimera-kingdom-screen.tsx'),
@@ -235,11 +286,16 @@ test('the player Haven mounts the square scene and keeps the hex renderer as a f
   assert.match(orderRail, /chairArt: \{[^}]*height: 154[^}]*left: -17[^}]*width: 154[^}]*zIndex: 1/);
   assert.match(orderRail, /characterLayer: \{[^}]*zIndex: 2/);
   assert.match(orderRail, /trayArt: \{[^}]*zIndex: 3/);
+  assert.match(orderRail, /ORDER_TABLE_ART_SCALE = 0\.9/);
+  assert.match(orderRail, /height: ORDER_TABLE_ART_HEIGHT \* ORDER_TABLE_ART_SCALE/);
+  assert.match(orderRail, /left: \(TRAY_WIDTH - ORDER_TABLE_ART_WIDTH \* ORDER_TABLE_ART_SCALE\) \/ 2/);
+  assert.match(orderRail, /width: ORDER_TABLE_ART_WIDTH \* ORDER_TABLE_ART_SCALE/);
+  assert.match(orderRail, /items: \{[^}]*bottom: 22/);
   assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'merge-world', 'ui', 'order-chair.webp')));
   assert.doesNotMatch(squareScene, /junctionMiniIslandLayers|JUNCTION_MINI_ISLAND_SOURCES/);
   assert.match(canvas, /MergeOrderTrayCard/);
   assert.match(canvas, /HAVEN_ORDER_SLOT_FRAMES = \[\s*JUNCTION_TRAY_FRAMES\[1\],\s*JUNCTION_TRAY_FRAMES\[0\],\s*JUNCTION_TRAY_FRAMES\[2\]/);
-  assert.match(canvas, /HAVEN_ORDER_CARD_LOWERING = HAVEN_ORDER_CARD_SIZE \* 0\.2/);
+  assert.match(canvas, /HAVEN_ORDER_CARD_LOWERING = HAVEN_ORDER_CARD_SIZE \* 0\.15/);
   assert.match(canvas, /top: frame\.top - 44 \+ HAVEN_ORDER_CARD_LOWERING/);
   assert.match(canvas, /HAVEN_ORDER_SLOT_FRAMES\.map\(\(frame, index\) =>/);
   assert.match(canvas, /const entry = mergeBoard\?\.orders\?\.\[index\]/);

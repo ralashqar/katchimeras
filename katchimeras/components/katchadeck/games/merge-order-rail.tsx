@@ -39,6 +39,9 @@ const TRAY_WIDTH = 120;
 const TRAY_GAP = 10;
 const TRAY_HEIGHT = 120;
 const TRAY_ITEM_SIZE = 34;
+const ORDER_TABLE_ART_SCALE = 0.9;
+const ORDER_TABLE_ART_HEIGHT = 60;
+const ORDER_TABLE_ART_WIDTH = 136;
 const TRAY_ART = require('../../../assets/images/katchimeras/merge-world/ui/order-service-tray.webp');
 const CHAIR_ART = require('../../../assets/images/katchimeras/merge-world/ui/order-chair.webp');
 const ORDER_REWARD_ART = {
@@ -593,8 +596,15 @@ const styles = StyleSheet.create({
   rewardRow: { alignItems: 'center', flexDirection: 'row', gap: 2, height: 17 },
   rewardIcon: { height: 16, width: 16 },
   rewardAmount: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 10.5, fontVariant: ['tabular-nums'], lineHeight: 14, textShadowColor: 'rgba(48,25,11,0.72)', textShadowOffset: { height: 1, width: 0 }, textShadowRadius: 1 },
-  trayArt: { bottom: 0, height: 58, left: -2, position: 'absolute', width: 124, zIndex: 3 },
-  items: { alignItems: 'center', bottom: 16, flexDirection: 'row', justifyContent: 'center', left: 4, position: 'absolute', right: 4, zIndex: 4 },
+  trayArt: {
+    bottom: 0,
+    height: ORDER_TABLE_ART_HEIGHT * ORDER_TABLE_ART_SCALE,
+    left: (TRAY_WIDTH - ORDER_TABLE_ART_WIDTH * ORDER_TABLE_ART_SCALE) / 2,
+    position: 'absolute',
+    width: ORDER_TABLE_ART_WIDTH * ORDER_TABLE_ART_SCALE,
+    zIndex: 3,
+  },
+  items: { alignItems: 'center', bottom: 22, flexDirection: 'row', justifyContent: 'center', left: 4, position: 'absolute', right: 4, zIndex: 4 },
   serveConfetti: { bottom: 0, left: 0, overflow: 'visible', position: 'absolute', right: 0, top: 0, zIndex: 5 },
   confettiParticle: { borderRadius: 1, height: 7, position: 'absolute', top: 58, width: 4 },
   confettiParticleRound: { borderRadius: 999, height: 6, width: 6 },
