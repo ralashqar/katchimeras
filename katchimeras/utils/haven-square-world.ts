@@ -31,6 +31,8 @@ export const HAVEN_JUNCTION_TRAY_SIZE = 95;
 export const HAVEN_JUNCTION_TRAY_TOP_OFFSET = 48;
 /** Compact decorative nature islet placed west of the Mossprout/garden seam. */
 export const HAVEN_WEST_NATURE_ISLAND_SIZE = 330;
+/** Crop the unused western world column while retaining the authored spacing. */
+export const MOSSPROUT_WORLD_OFFSET_X = HAVEN_SQUARE_COLUMN_PITCH - HAVEN_SQUARE_SCENE_PADDING * 3;
 
 export const MOSSPROUT_SQUARE_ZONES: readonly HavenSquareZone[] = [
   { id: 'baristabbit-cafe', coord: { column: 0, row: 0 } },
@@ -56,7 +58,7 @@ export function havenSquareZoneFrame(coord: HavenSquareCoord) {
  */
 export function mossproutGardenJunctionMiniIslandFrame() {
   const gardenZone = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'mossprout-garden')!;
-  const gardenFrame = havenSquareZoneFrame(gardenZone.coord);
+  const gardenFrame = mossproutWorldFrame(havenSquareZoneFrame(gardenZone.coord));
   return {
     height: HAVEN_JUNCTION_MINI_ISLAND_SIZE,
     left: gardenFrame.left + (gardenFrame.width - HAVEN_JUNCTION_MINI_ISLAND_SIZE) / 2,
@@ -81,6 +83,10 @@ export function mossproutGardenJunctionTrayFrames() {
     top: island.top + HAVEN_JUNCTION_TRAY_TOP_OFFSET,
     width: HAVEN_JUNCTION_TRAY_SIZE,
   }));
+}
+
+export function mossproutWorldFrame(frame: { height: number; left: number; top: number; width: number }) {
+  return { ...frame, left: frame.left - MOSSPROUT_WORLD_OFFSET_X };
 }
 
 export function stepplingBoardJunctionTrayFrames() {
@@ -114,7 +120,7 @@ export function mossproutGardenWestNatureIslandFrame() {
   const gardenZone = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'mossprout-garden')!;
   const baristabbitFrame = havenSquareZoneFrame(baristabbitZone.coord);
   const environmentFrame = havenSquareZoneFrame(environmentZone.coord);
-  const gardenFrame = havenSquareZoneFrame(gardenZone.coord);
+  const gardenFrame = mossproutWorldFrame(havenSquareZoneFrame(gardenZone.coord));
   const horizontalGapCenter = (
     baristabbitFrame.left + baristabbitFrame.width + environmentFrame.left
   ) / 2;
@@ -122,18 +128,18 @@ export function mossproutGardenWestNatureIslandFrame() {
     environmentFrame.top + environmentFrame.height + gardenFrame.top
   ) / 2;
 
-  return {
+  return mossproutWorldFrame({
     height: HAVEN_WEST_NATURE_ISLAND_SIZE,
     left: horizontalGapCenter - HAVEN_WEST_NATURE_ISLAND_SIZE / 2,
     top: verticalOverlapCenter - HAVEN_WEST_NATURE_ISLAND_SIZE / 2,
     width: HAVEN_WEST_NATURE_ISLAND_SIZE,
-  };
+  });
 }
 
 /** Mirrors the west nature islet across the Mossprout environment centerline. */
 export function mossproutGardenEastNatureIslandFrame() {
   const environmentZone = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'mossprout-environment')!;
-  const environmentFrame = havenSquareZoneFrame(environmentZone.coord);
+  const environmentFrame = mossproutWorldFrame(havenSquareZoneFrame(environmentZone.coord));
   const westFrame = mossproutGardenWestNatureIslandFrame();
   const environmentCenterX = environmentFrame.left + environmentFrame.width / 2;
   const westCenterX = westFrame.left + westFrame.width / 2;
@@ -170,7 +176,14 @@ export function mossproutEggHomeBridgeFrame() {
 }
 
 export function mossproutSquareSceneMetrics() {
-  const frames = MOSSPROUT_SQUARE_ZONES.map((zone) => havenSquareZoneFrame(zone.coord));
+  const environment = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'mossprout-environment')!;
+  const garden = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'mossprout-garden')!;
+  const frames = [
+    mossproutWorldFrame(havenSquareZoneFrame(environment.coord)),
+    mossproutWorldFrame(havenSquareZoneFrame(garden.coord)),
+    mossproutGardenWestNatureIslandFrame(),
+    mossproutGardenEastNatureIslandFrame(),
+  ];
   return {
     height: Math.max(...frames.map((frame) => frame.top + frame.height)) + HAVEN_SQUARE_SCENE_PADDING,
     width: Math.max(...frames.map((frame) => frame.left + frame.width)) + HAVEN_SQUARE_SCENE_PADDING,

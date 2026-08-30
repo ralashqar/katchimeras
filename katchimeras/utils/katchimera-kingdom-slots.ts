@@ -5,7 +5,7 @@ import type { KingdomResident } from '@/utils/kingdom-residents';
 import type { HavenStage } from '@/constants/haven-catalog';
 import type { EggAvatarSkinId } from '@/types/egg-avatar';
 import { KINGDOM_FAMILY_SLOT_COORD_BY_ID } from '@/utils/kingdom-map-layout';
-import type { HexCoord } from '@/utils/world-hex';
+import { hexSpiral, type HexCoord } from '@/utils/world-hex';
 
 type KingdomHexCompanionSlotBase = {
   coord: HexCoord;
@@ -38,6 +38,21 @@ export type KingdomHexCompanionSlot =
 
 export function kingdomCompanionTileId(familyId: KatchimeraFamilyId): string {
   return `family:${familyId}`;
+}
+
+/**
+ * The world selector has no embedded structures, so it must not inherit the
+ * structure-aware holes used by the full Kingdom map. Catalog order stays
+ * stable while every family is packed into consecutive rings around Home.
+ */
+export function compactKingdomCompanionHexSlots(
+  slots: readonly KingdomHexCompanionSlot[],
+): KingdomHexCompanionSlot[] {
+  const coords = hexSpiral(slots.length, false);
+  return slots.map((slot, index) => ({
+    ...slot,
+    coord: coords[index] ?? slot.coord,
+  }));
 }
 
 /**

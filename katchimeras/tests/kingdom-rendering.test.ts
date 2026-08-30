@@ -8,7 +8,10 @@ import kingdomWorldViewConfig from '../constants/kingdom-world-view.json';
 import todayScene from '../data/today-scene.json';
 import { visiblePixelBoundsFromRgba } from '../utils/alpha-bounds';
 import { katchimeraFamilies } from '../constants/katchimera-skins';
-import { kingdomCompanionHexSlots } from '../utils/katchimera-kingdom-slots';
+import {
+  compactKingdomCompanionHexSlots,
+  kingdomCompanionHexSlots,
+} from '../utils/katchimera-kingdom-slots';
 import {
   KINGDOM_FAMILY_SLOT_COORD_BY_ID,
   MOSSPROUT_GARDEN_BOARD_BOTTOM,
@@ -45,6 +48,7 @@ import {
   HEX_TILE_H,
   HEX_TILE_W,
   KINGDOM_HEX_LAYOUT_PROFILES,
+  hexSpiral,
   hexTileTopPoints,
   hexToWorld,
 } from '../utils/world-hex';
@@ -171,6 +175,68 @@ test('Kingdom assigns every family to the stable structure-aware layout', () => 
   assert.ok(locked.every((slot) => !reserved.has(`${slot.coord.q}:${slot.coord.r}`)));
   assert.deepEqual(locked.find((slot) => slot.familyId === 'mossprout')?.coord, MOSSPROUT_GARDEN_BOARD_MOSSPROUT_COORD);
   assert.deepEqual(Object.fromEntries(locked.map((slot) => [slot.familyId, slot.coord])), KINGDOM_FAMILY_SLOT_COORD_BY_ID);
+});
+
+test('the top-level Haven selector packs every family into separated consecutive rings', () => {
+  const authored = kingdomCompanionHexSlots([], []);
+  const compact = compactKingdomCompanionHexSlots(authored);
+  assert.deepEqual(compact.map((slot) => slot.coord), hexSpiral(compact.length, false));
+  assert.deepEqual(authored.map((slot) => slot.coord), katchimeraFamilies.map((family) => (
+    KINGDOM_FAMILY_SLOT_COORD_BY_ID[family.id]
+  )));
+  assert.equal(new Set(compact.map((slot) => `${slot.coord.q}:${slot.coord.r}`)).size, compact.length);
+
+  const selector = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'haven-hex-selector-canvas.tsx'),
+    'utf8',
+  );
+  assert.match(selector, /compactKingdomCompanionHexSlots\(companionSlots\)/);
+  assert.match(selector, /layoutProfile: 'haven-selector-v1'/);
+  assert.deepEqual(kingdomWorldViewConfig.hexTiles.layoutProfiles['haven-selector-v1'], {
+    horizontalSpacing: 1.4,
+    verticalSpacing: 1.4,
+  });
+  assert.ok(
+    kingdomWorldViewConfig.hexTiles.layoutProfiles['haven-selector-v1'].horizontalSpacing
+      > kingdomWorldViewConfig.hexTiles.layoutProfiles['floating-neighborhood-v2'].horizontalSpacing,
+  );
+});
+
+test('top-level Haven selector environments ship independent transparent LODs and runtime mappings', () => {
+  const keys = [
+    'floating_neighborhood_v2_baristabbit_selector_cupheart_hex_tile',
+    'floating_neighborhood_v2_feastle_selector_harvest_hearth_hex_tile',
+    'floating_neighborhood_v2_mossprout_selector_emblem_hex_tile',
+    'floating_neighborhood_v2_steppling_selector_starstep_hex_tile',
+  ];
+  const bounds = fs.readFileSync(path.join(process.cwd(), 'constants', 'kingdom-hex-tile-bounds.gen.ts'), 'utf8');
+  for (const key of keys) {
+    for (const suffix of ['.webp', '_512.webp', '_256.webp']) {
+      const asset = path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'world', 'hex', `${key}${suffix}`);
+      assert.ok(fs.existsSync(asset), `missing ${asset}`);
+      assert.ok(fs.statSync(asset).size > 0, `empty ${asset}`);
+    }
+    assert.match(bounds, new RegExp(`${key}\\.webp`));
+  }
+  const visuals = fs.readFileSync(path.join(process.cwd(), 'utils', 'world-visuals.ts'), 'utf8');
+  const selector = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'haven-hex-selector-canvas.tsx'),
+    'utf8',
+  );
+  assert.match(
+    visuals,
+    /steppling:\s*{[\s\S]*?source: KINGDOM_FLOATING_NEIGHBORHOOD_V2_STEPPLING_SELECTOR_STARSTEP_HEX_TILE/,
+  );
+  assert.match(
+    visuals,
+    /baristabbit:\s*{[\s\S]*?source: KINGDOM_FLOATING_NEIGHBORHOOD_V2_BARISTABBIT_SELECTOR_CUPHEART_HEX_TILE/,
+  );
+  assert.match(
+    visuals,
+    /feastle:\s*{[\s\S]*?source: KINGDOM_FLOATING_NEIGHBORHOOD_V2_FEASTLE_SELECTOR_HARVEST_HEARTH_HEX_TILE/,
+  );
+  assert.match(visuals, /worldSelectorResidentTiles: FLOATING_NEIGHBORHOOD_V2_WORLD_SELECTOR_TILES/);
+  assert.match(selector, /useWorldSelectorTiles: true/);
 });
 
 test('Mossprout garden reserves two cells, four end ports, and sealed middle neighbours', () => {

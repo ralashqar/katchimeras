@@ -122,13 +122,10 @@ export default function YouScreen() {
       </View>
       <EggAvatarProfileScreen bottomInset={insets.bottom} days={days} />
       <Pressable
-        accessibilityHint="Returns to your Haven"
+        accessibilityHint="Returns to the top-level Haven map"
         accessibilityLabel="Back to Haven"
         accessibilityRole="button"
-        onPress={() => {
-          if (router.canGoBack()) router.back();
-          else router.navigate('/(tabs)/katchimeras');
-        }}
+        onPress={() => router.replace('/(tabs)/katchimeras')}
         style={({ pressed }) => [styles.backButton, { top: insets.top + 12 }, pressed && styles.backButtonPressed]}>
         <IconSymbol color="#47392E" name="chevron.left" size={26} weight="bold" />
       </Pressable>

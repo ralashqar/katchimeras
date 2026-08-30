@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
@@ -18,16 +18,14 @@ import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { GameCurrencyHud } from '@/components/katchadeck/ui/game-currency-hud';
 import { GameHudBar } from '@/components/katchadeck/ui/game-primitives';
-import { EggAvatar } from '@/components/katchadeck/egg-avatar/egg-avatar';
+import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
 import { ThemedText } from '@/components/themed-text';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import { AppFontFamilies } from '@/constants/theme';
-import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { useMergeWorldActions } from '@/features/merge-world/merge-world-provider';
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
 import { useDevHavenOrderFillerSlotSeeds, useDevHavenOrderFillers } from '@/hooks/use-dev-haven-order-fillers';
 import type { FtueCameraDirective } from '@/features/onboarding/ftue-types';
-import type { EggVisualState } from '@/types/home';
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
 import { loadWorldIdentity, localDayId } from '@/utils/world-identity';
 import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
@@ -45,17 +43,16 @@ import { mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, m
 import { mossproutJourneyForDay, mossproutJourneyRuntimeDayId } from '@/game/katchimeras/relationship-progression';
 import { advanceHavenOrderFillerSlotSeed, isJourneyQuickModeEnabled } from '@/utils/dev-settings';
 import { mergeOrderItemReadiness, readyMergeOrderIds } from '@/utils/merge-world/engine';
-import { mergeWorldStateForBoard } from '@/utils/merge-world/engine';
 import { prioritizedVisibleMergeOrders } from '@/utils/merge-world/order-presentation';
-import { devHavenOrderFillerSlot, devHavenOrderFillersForFamilySlots, devHavenOrderFillersForSlots } from '@/utils/merge-world/dev-haven-order-fillers';
+import { devHavenOrderFillerSlot, devHavenOrderFillersForSlots } from '@/utils/merge-world/dev-haven-order-fillers';
 import type { MergeOrderTrayEntry } from '@/components/katchadeck/games/merge-order-rail';
 
 type Props = {
   background: TodayAtmosphereBackground;
   companionSlots: KingdomHexCompanionSlot[];
-  eggVisual: EggVisualState | null;
   onContentReady?: () => void;
-  onOpenProfile: () => void;
+  onBackToHavenSelector: () => void;
+  navigationLocked?: boolean;
   onSelectCreature: (creatureId: string) => void;
   residentStatusGlyphs?: Partial<Record<string, KingdomResidentStatusGlyph>>;
   mergeWorld: MergeWorldState;
@@ -66,17 +63,15 @@ type Props = {
 };
 
 function mergeBoardIdForFamily(familyId?: KatchimeraFamilyId): MergeBoardId | null {
-  return familyId === 'mossprout'
-    ? 'mossprout'
-    : familyId === 'steppling' ? 'steppling' : null;
+  return familyId === 'mossprout' ? 'mossprout' : null;
 }
 
 export function KatchimeraKingdomScreen({
   background,
   companionSlots,
-  eggVisual,
   onContentReady,
-  onOpenProfile,
+  onBackToHavenSelector,
+  navigationLocked = false,
   onSelectCreature,
   residentStatusGlyphs,
   mergeWorld,
@@ -87,10 +82,8 @@ export function KatchimeraKingdomScreen({
 }: Props) {
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
-  const avatar = useEggAvatar();
   const havenOrderFillersEnabled = useDevHavenOrderFillers();
   const havenOrderFillerSlotSeeds = useDevHavenOrderFillerSlotSeeds('mossprout');
-  const stepplingOrderFillerSlotSeeds = useDevHavenOrderFillerSlotSeeds('steppling');
   const [lockedHintVisible, setLockedHintVisible] = useState(false);
   const [selectedCreatureId, setSelectedCreatureId] = useState<string | null>(null);
   const [interactionCreatureId, setInteractionCreatureId] = useState<string | null>(null);
@@ -124,18 +117,11 @@ export function KatchimeraKingdomScreen({
   mergeWorldRef.current = mergeWorld;
   interactionCreatureIdRef.current = interactionCreatureId;
   const visibleCompanionSlots = useMemo(
-    () => companionSlots.filter((slot) => (
-      slot.familyId === 'mossprout'
-      || slot.familyId === 'baristabbit'
-      || slot.familyId === 'steppling'
-    )),
+    () => companionSlots.filter((slot) => slot.familyId === 'mossprout'),
     [companionSlots],
   );
   const havenMergeBoardActive = visibleCompanionSlots.some((slot) => (
     slot.familyId === 'mossprout' && slot.kind === 'owned'
-  ));
-  const stepplingMergeBoardActive = visibleCompanionSlots.some((slot) => (
-    slot.familyId === 'steppling' && slot.kind === 'owned'
   ));
   const mossproutJourneyDayId = mossproutJourneyRuntimeDayId(
     relationships,
@@ -207,66 +193,9 @@ export function KatchimeraKingdomScreen({
     orders: havenMergeOrders,
     state: mergeWorld,
   }) : null, [boardInteractionGate, dispatchHavenMergeWorld, havenMergeBoardActive, havenMergeOrders, mergeWorld, orderInteractionGate]);
-  const stepplingBoardState = useMemo(
-    () => mergeWorldStateForBoard(mergeWorld, 'steppling'),
-    [mergeWorld],
-  );
-  const dispatchStepplingMergeWorld = useCallback((command: MergeWorldCommand) => {
-    // The shared board component exposes the complete world command union, but
-    // only its board-scoped variants reach this adapter at runtime.
-    const result = dispatchMergeWorld({ ...command, boardId: 'steppling' } as MergeWorldCommand);
-    if (!result) return null;
-    mergeWorldRef.current = result.state;
-    if (result.changed && command.type === 'serveDevHavenOrder') {
-      const slotIndex = devHavenOrderFillerSlot(command.order);
-      if (slotIndex != null) advanceHavenOrderFillerSlotSeed(slotIndex, 'steppling');
-    }
-    return { ...result, state: mergeWorldStateForBoard(result.state, 'steppling') };
-  }, [dispatchMergeWorld]);
-  const stepplingMergeOrders = useMemo<MergeOrderTrayEntry[]>(() => {
-    if (!stepplingMergeBoardActive) return [];
-    const readyOrderIds = readyMergeOrderIds(stepplingBoardState);
-    const realEntries = stepplingBoardState.activeOrders
-      .filter((order) => order.characterId === 'steppling')
-      .slice(0, 3)
-      .map((order) => ({
-        id: order.id,
-        itemReadiness: mergeOrderItemReadiness(stepplingBoardState, order),
-        kind: 'order' as const,
-        order,
-        ready: readyOrderIds.has(order.id),
-      }));
-    if (!havenOrderFillersEnabled || realEntries.length >= 3) return realEntries;
-    const fillerOrders = devHavenOrderFillersForFamilySlots(
-      'steppling',
-      realEntries.map((entry) => entry.order),
-      stepplingOrderFillerSlotSeeds,
-    );
-    return [
-      ...realEntries,
-      ...fillerOrders.map((order) => {
-        const itemReadiness = mergeOrderItemReadiness(stepplingBoardState, order);
-        return {
-          id: order.id,
-          itemReadiness,
-          kind: 'order' as const,
-          order,
-          ready: itemReadiness.every(Boolean),
-        };
-      }),
-    ];
-  }, [havenOrderFillersEnabled, stepplingBoardState, stepplingMergeBoardActive, stepplingOrderFillerSlotSeeds]);
-  const stepplingMergeBoard = useMemo(() => stepplingMergeBoardActive ? ({
-    id: 'steppling' as const,
-    boardInteractionGate: { kind: 'open' as const },
-    dispatch: dispatchStepplingMergeWorld,
-    orderInteractionGate: { kind: 'open' as const },
-    orders: stepplingMergeOrders,
-    state: stepplingBoardState,
-  }) : null, [dispatchStepplingMergeWorld, stepplingBoardState, stepplingMergeBoardActive, stepplingMergeOrders]);
   const havenMergeBoards = useMemo(
-    () => [havenMergeBoard, stepplingMergeBoard].filter((board): board is NonNullable<typeof board> => board != null),
-    [havenMergeBoard, stepplingMergeBoard],
+    () => havenMergeBoard ? [havenMergeBoard] : [],
+    [havenMergeBoard],
   );
   const interactionSlot = useMemo(() => visibleCompanionSlots.find((slot) => (
     slot.kind === 'owned' && slot.creature.creatureId === interactionCreatureId
@@ -509,7 +438,6 @@ export function KatchimeraKingdomScreen({
       <KingdomHexCanvas
         background={background}
         companionSlots={visibleCompanionSlots}
-        eggVisual={eggVisual}
         identity={identity}
         discoveryRevealFamilyId={ftueStepId === 'haven.mossprout_reveal' || ftueStepId === 'haven.first_bloom' ? 'mossprout' : null}
         highlightedLockedFamilyId={ftueStepId === 'haven.mossprout_focus' ? 'mossprout' : null}
@@ -556,6 +484,13 @@ export function KatchimeraKingdomScreen({
       {!upgradePresentation && !interactionCreatureId ? (
         <View pointerEvents="box-none" style={[styles.topHudLayer, { top: insets.top + 3 }]}>
           <GameHudBar
+            leading={<KatchimeraBackButton
+              accessibilityHint="Returns to the Katchimera world map"
+              accessibilityLabel="All Havens"
+              compact
+              disabled={navigationLocked}
+              onPress={onBackToHavenSelector}
+            />}
             content={<GameCurrencyHud balances={[{
               animateValue: presentedCoins != null,
               art: GAME_CURRENCY_ART.coins,
@@ -568,24 +503,6 @@ export function KatchimeraKingdomScreen({
             density="compact"
             style={styles.topHud}
             tone="glass"
-            trailing={<Pressable
-              accessibilityHint="Opens your avatar and cosmetics"
-              accessibilityLabel="Open You"
-              accessibilityRole="button"
-              onPress={() => {
-                if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                onOpenProfile();
-              }}
-              style={({ pressed }) => [styles.profileButton, pressed && styles.profileButtonPressed]}>
-              <EggAvatar
-                faceId={avatar.equippedFaceId}
-                hatId={avatar.equippedHatId}
-                heldAccessoryId={avatar.equippedHeldAccessoryId}
-                presentation="button"
-                size={42}
-                skinId={avatar.equippedSkinId}
-              />
-            </Pressable>}
           />
         </View>
       ) : null}
@@ -743,19 +660,6 @@ const styles = StyleSheet.create({
   },
   topHud: { maxWidth: 430, width: '100%' },
   currencyHud: { flex: 1 },
-  profileButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,249,231,0.94)',
-    borderColor: 'rgba(255,255,255,0.9)',
-    borderRadius: 27,
-    borderWidth: 2,
-    boxShadow: '0 4px 14px rgba(27,72,111,0.32)',
-    height: 54,
-    justifyContent: 'center',
-    overflow: 'hidden',
-    width: 54,
-  },
-  profileButtonPressed: { opacity: 0.82, transform: [{ scale: 0.96 }] },
   discoveryHint: {
     backgroundColor: 'rgba(214,203,242,0.09)',
     borderColor: 'rgba(214,203,242,0.2)',

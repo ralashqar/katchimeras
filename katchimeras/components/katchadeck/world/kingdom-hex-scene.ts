@@ -118,7 +118,8 @@ function artLayerFor(
   tile: KingdomTileRender,
   hexTiles: KingdomHexTileSelection,
   identity: Pick<WorldIdentityState, 'selectedHomeArchetypeId'> | null | undefined,
-  verticalAlignmentMode: KingdomHexVerticalAlignmentMode
+  verticalAlignmentMode: KingdomHexVerticalAlignmentMode,
+  useWorldSelectorTiles: boolean,
 ): KingdomTileArtLayer {
   const familyAnchor =
     tile.kind === 'companion' && tile.companion?.kind === 'owned' && tile.companion.creature.familyId
@@ -128,11 +129,15 @@ function artLayerFor(
     familyAnchor ?? (tile.kind === 'companion' && tile.companion?.kind === 'owned' && tile.companion.creature.aspectId
       ? lifeAspectById.get(tile.companion.creature.aspectId)?.anchorVisualKey ?? null
       : null);
+  const worldSelectorTile =
+    useWorldSelectorTiles && tile.kind === 'companion' && tile.companion && tile.companion.kind !== 'locked'
+      ? hexTiles.worldSelectorResidentTiles?.[tile.companion.familyId] ?? null
+      : null;
   const havenResidentTile =
     tile.kind === 'companion' && (tile.companion?.kind === 'owned' || tile.companion?.kind === 'revealed_egg')
       ? hexTiles.havenResidentTiles?.[tile.companion.familyId]?.[tile.companion.havenStage] ?? null
       : null;
-  const themedResidentTile = havenResidentTile ?? (
+  const themedResidentTile = worldSelectorTile ?? havenResidentTile ?? (
     tile.kind === 'companion' && tile.companion?.kind === 'owned'
       ? hexTiles.residentTiles?.[tile.companion.creature.visualKey]
         ?? (aspectAnchor ? hexTiles.residentTiles?.[aspectAnchor] : null)
@@ -241,12 +246,15 @@ export function buildKingdomHexScene(
   companionSlots: KingdomHexCompanionSlot[],
   hexTiles: KingdomHexTileSelection,
   identity?: Pick<WorldIdentityState, 'selectedHomeArchetypeId'> | null,
-  verticalAlignmentMode: KingdomHexVerticalAlignmentMode = 'ground-bottom'
+  verticalAlignmentMode: KingdomHexVerticalAlignmentMode = 'ground-bottom',
+  options: { includeMossproutGarden?: boolean; useWorldSelectorTiles?: boolean } = {},
 ): KingdomHexScene {
+  const includeMossproutGarden = options.includeMossproutGarden ?? true;
+  const useWorldSelectorTiles = options.useWorldSelectorTiles ?? false;
   const metrics = kingdomSceneMetrics(
     companionSlots.length + 1,
     hexTiles.layoutProfile,
-    MOSSPROUT_GARDEN_BOARD.footprint,
+    includeMossproutGarden ? MOSSPROUT_GARDEN_BOARD.footprint : [],
   );
   const { width, height } = metrics;
   const rawTiles: Omit<KingdomTileRender, 'cx' | 'cy' | 'depth'>[] = [
@@ -271,8 +279,10 @@ export function buildKingdomHexScene(
   const tileById = new Map(tiles.map((tile) => [tile.id, tile]));
 
   const tileArtLayers = [
-    ...tiles.map((tile) => artLayerFor(tile, hexTiles, identity, verticalAlignmentMode)),
-    mossproutGardenLayer(companionSlots, metrics.centerX, metrics.centerY, hexTiles.layoutProfile),
+    ...tiles.map((tile) => artLayerFor(tile, hexTiles, identity, verticalAlignmentMode, useWorldSelectorTiles)),
+    ...(includeMossproutGarden
+      ? [mossproutGardenLayer(companionSlots, metrics.centerX, metrics.centerY, hexTiles.layoutProfile)]
+      : []),
   ].sort((a, b) => a.depth - b.depth);
 
   return {

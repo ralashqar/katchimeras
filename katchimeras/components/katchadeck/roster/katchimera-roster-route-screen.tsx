@@ -1,9 +1,17 @@
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, BackHandler, Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { KatchimeraKingdomScreen } from '@/components/katchadeck/roster/katchimera-kingdom-screen';
+import {
+  HavenHexSelectorCanvas,
+  IMPLEMENTED_KATCHIMERA_WORLDS,
+  type HavenWorldMarker,
+} from '@/components/katchadeck/world/haven-hex-selector-canvas';
+import { GameCurrencyHud } from '@/components/katchadeck/ui/game-currency-hud';
+import { GameHudBar } from '@/components/katchadeck/ui/game-primitives';
+import { EggAvatar } from '@/components/katchadeck/egg-avatar/egg-avatar';
 import {
   type KingdomResidentStatusGlyph,
 } from '@/components/katchadeck/world/kingdom-hex-canvas';
@@ -13,7 +21,7 @@ import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-a
 import { homeRepository } from '@/storage/repositories/home-repository';
 import type { KingdomCreature } from '@/types/kingdom';
 import { loadCompanionBondState } from '@/utils/companion-bond-storage';
-import { todayAtmosphereBackgroundForDay } from '@/utils/day-background-scene';
+import { todayAtmosphereBackgroundForDay, type TodayAtmosphereBackground } from '@/utils/day-background-scene';
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import { loadCompanionQuests, questFor } from '@/utils/katchimera-quests';
 import { markFlowStart } from '@/utils/flow-performance';
@@ -26,17 +34,30 @@ import { withDiscoveredKatchimeras } from '@/utils/discovered-katchimera-availab
 import { kingdomCompanionHexSlots, type KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
 import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
+import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import { revealStoredHaven } from '@/utils/merge-world/repository';
 import { MergeWorldProvider, useMergeWorldState } from '@/features/merge-world/merge-world-provider';
 import { advanceFtueActionDurably, commitFtueAction, dispatchFtueEvent, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { useHavenTileStages } from '@/hooks/use-haven-tile-stages';
+import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
+import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
+import { ftueLocksSurfaceNavigation } from '@/features/onboarding/ftue-navigation-policy';
+import { loadWorldIdentity, localDayId } from '@/utils/world-identity';
 import { equipEggAvatarHat } from '@/utils/egg-avatar-storage';
 import { ensureMossproutFtueFirstResident, MOSSPROUT_FTUE_FIRST_RESIDENT_ID } from '@/features/onboarding/mossprout-profile';
 import { completeMossproutJourneyResolution, recordMossproutFirstGardenRestored, recordMossproutMatchedCard, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
-import { localDayId } from '@/utils/world-identity';
 import { deriveTomorrowDayRecord, hydrateAllDays } from '@/game/days';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
+import { katchimeraFamilyById } from '@/constants/katchimera-skins';
+import { resolveCreatureArtSource } from '@/utils/creature-art';
+import { deriveHavenTilePresentation } from '@/utils/haven-tile-presentation';
+import { readyMergeOrderIds } from '@/utils/merge-world/engine';
+
+const LazyKatchimeraKingdomScreen = lazy(async () => {
+  const module = await import('@/components/katchadeck/roster/katchimera-kingdom-screen');
+  return { default: module.KatchimeraKingdomScreen };
+});
 
 function hatchTimestamp(creature: KingdomCreature, index: number): number {
   const time = Date.parse(`${creature.isoDate}T00:00:00`);
@@ -122,8 +143,10 @@ function FocusedKatchimeraRoster({ days }: { days: ReturnType<typeof useAllDays>
   // same initial focus would rebuild the just-mounted grid a second time.
   const [persistentSnapshot, setPersistentSnapshot] = useState(loadRosterPersistentSnapshot);
   const [contentReady, setContentReady] = useState(false);
+  const [activeWorldFamilyId, setActiveWorldFamilyId] = useState<KatchimeraFamilyId | null>(null);
   const { state: mergeWorld } = useMergeWorldState();
   const relationshipTileStages = useHavenTileStages();
+  const worldIdentity = useMemo(loadWorldIdentity, []);
   const hasCompletedInitialFocus = useRef(false);
   const persistent = persistentSnapshot.state;
 
@@ -182,10 +205,6 @@ function FocusedKatchimeraRoster({ days }: { days: ReturnType<typeof useAllDays>
       return { ...base, kind: 'locked' as const };
     });
   }, [companionSlots, ftueRun?.status, ftueRun?.stepId]);
-  const eggVisual = useMemo(
-    () => days.find((day) => day.isToday)?.egg ?? days[days.length - 1]?.egg ?? null,
-    [days],
-  );
   const today = useMemo(() => days.find((day) => day.isToday) ?? null, [days]);
   const background = useMemo(
     () => todayAtmosphereBackgroundForDay(today, days),
@@ -198,6 +217,72 @@ function FocusedKatchimeraRoster({ days }: { days: ReturnType<typeof useAllDays>
     }
     return statuses;
   }, [kingdom.creatures, persistent.quests]);
+  const worldMarkers = useMemo<readonly HavenWorldMarker[]>(() => {
+    const world = presentationMergeWorld ?? mergeWorld;
+    if (!world) return [];
+    const readyOrderIds = readyMergeOrderIds(world);
+    const readyFamilies = new Set(
+      world.activeOrders
+        .filter((order) => readyOrderIds.has(order.id))
+        .map((order) => order.characterId),
+    );
+    return discoveryCompanionSlots.flatMap((slot) => {
+      if (slot.kind !== 'owned') return [];
+      const family = katchimeraFamilyById.get(slot.familyId);
+      if (!family) return [];
+      const haven = deriveHavenTilePresentation({
+        characterId: slot.familyId as MergeCharacterId,
+        creatureId: slot.creature.creatureId,
+        creatureName: family.displayName,
+        mergeWorld: world,
+      });
+      const notification: HavenWorldMarker['notification'] = readyFamilies.has(slot.familyId as MergeCharacterId)
+        ? 'ready'
+        : haven.hudState === 'affordable'
+          ? 'upgrade'
+          : statusByCreatureId[slot.creature.creatureId]
+            ? 'active'
+            : null;
+      return [{
+        displayName: family.displayName,
+        enterable: IMPLEMENTED_KATCHIMERA_WORLDS.has(slot.familyId),
+        familyId: slot.familyId,
+        notification,
+        portraitSource: resolveCreatureArtSource(slot.creature.visualKey, { lod: 'thumb', stage: 'grown' }),
+        restorationMaximum: 4,
+        restorationStage: slot.havenStage,
+      }];
+    });
+  }, [discoveryCompanionSlots, mergeWorld, presentationMergeWorld, statusByCreatureId]);
+  const havenNavigationLocked = ftueLocksSurfaceNavigation(ftueRun, 'haven');
+  useEffect(() => {
+    if (ftueRun?.status !== 'active') return;
+    if (
+      ftueRun.stepId === 'haven.mossprout_reveal'
+      || ftueRun.stepId === 'haven.mossprout.restore'
+      || ftueRun.stepId === 'haven.first_bloom'
+      || ftueRun.stepId === 'haven.reveal'
+    ) setActiveWorldFamilyId('mossprout');
+  }, [ftueRun?.status, ftueRun?.stepId]);
+  const closeWorld = useCallback(() => {
+    if (havenNavigationLocked) return;
+    transitionTo({
+      announcement: 'Returning to all Havens',
+      target: 'katchimeras',
+      navigate: () => {
+        setContentReady(false);
+        setActiveWorldFamilyId(null);
+      },
+    });
+  }, [havenNavigationLocked, transitionTo]);
+  useEffect(() => {
+    if (!activeWorldFamilyId || havenNavigationLocked) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      closeWorld();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [activeWorldFamilyId, closeWorld, havenNavigationLocked]);
   useGameSurfaceReadiness('katchimeras', {
     background: true,
     data: discovery.ready,
@@ -219,6 +304,20 @@ function FocusedKatchimeraRoster({ days }: { days: ReturnType<typeof useAllDays>
       navigate: () => router.push('/you'),
     });
   }, [router, transitionTo]);
+  const openFamilyWorld = useCallback((familyId: KatchimeraFamilyId) => {
+    if (familyId !== 'mossprout') return;
+    if (ftueRun?.status === 'active' && ftueRun.stepId === 'haven.mossprout_focus') {
+      commitFtueAction({ actionId: 'haven.reveal_mossprout_grove', evidenceRef: 'haven:mossprout:mist-cleared' });
+    }
+    transitionTo({
+      announcement: "Opening Mossprout's Haven",
+      target: 'katchimeras',
+      navigate: () => {
+        setContentReady(false);
+        setActiveWorldFamilyId('mossprout');
+      },
+    });
+  }, [ftueRun?.status, ftueRun?.stepId, transitionTo]);
   const continueFirstBloomToResident = useCallback(async () => {
     const now = Date.now();
     ensureMossproutFtueFirstResident();
@@ -252,11 +351,11 @@ function FocusedKatchimeraRoster({ days }: { days: ReturnType<typeof useAllDays>
   }, [router, transitionTo]);
   return discovery.ready && presentationMergeWorld ? (
     <View style={styles.screen}>
-      <KatchimeraKingdomScreen
+      {activeWorldFamilyId === 'mossprout' ? <Suspense fallback={<View accessibilityLabel="Loading Mossprout's Haven" style={styles.worldLoading}><ActivityIndicator color="#FFF0CE" /></View>}><LazyKatchimeraKingdomScreen
           background={background}
-          eggVisual={eggVisual}
           onContentReady={() => setContentReady(true)}
-          onOpenProfile={openProfile}
+          onBackToHavenSelector={closeWorld}
+          navigationLocked={havenNavigationLocked}
           onSelectCreature={openCreature}
           residentStatusGlyphs={statusByCreatureId}
           companionSlots={discoveryCompanionSlots}
@@ -288,11 +387,97 @@ function FocusedKatchimeraRoster({ days }: { days: ReturnType<typeof useAllDays>
               commitFtueAction({ actionId: 'haven.reveal_world', evidenceRef: 'haven:revealed' });
             });
           }}
-      />
+      /></Suspense> : <HavenSelectorPresentation
+        background={background}
+        companionSlots={discoveryCompanionSlots}
+        highlightedFamilyId={ftueRun?.status === 'active' && ftueRun.stepId === 'haven.mossprout_focus' ? 'mossprout' : null}
+        identity={worldIdentity}
+        mergeWorld={presentationMergeWorld}
+        onContentReady={() => setContentReady(true)}
+        onOpenProfile={openProfile}
+        onSelectFamily={openFamilyWorld}
+        onSelectHome={() => {
+          if (ftueRun?.status === 'active' && ftueRun.stepId === 'haven.home_notice') {
+            commitFtueAction({ actionId: 'haven.notice_glow', evidenceRef: 'haven:home:noticed-glow' });
+          }
+        }}
+        worldMarkers={worldMarkers}
+      />}
     </View>
   ) : null;
 }
 
+function HavenSelectorPresentation({
+  background,
+  companionSlots,
+  highlightedFamilyId,
+  identity,
+  mergeWorld,
+  onContentReady,
+  onOpenProfile,
+  onSelectFamily,
+  onSelectHome,
+  worldMarkers,
+}: {
+  background: TodayAtmosphereBackground;
+  companionSlots: KingdomHexCompanionSlot[];
+  highlightedFamilyId: KatchimeraFamilyId | null;
+  identity: ReturnType<typeof loadWorldIdentity>;
+  mergeWorld: MergeWorldState;
+  onContentReady: () => void;
+  onOpenProfile: () => void;
+  onSelectFamily: (familyId: KatchimeraFamilyId) => void;
+  onSelectHome: () => void;
+  worldMarkers: readonly HavenWorldMarker[];
+}) {
+  const insets = useSafeAreaInsets();
+  const avatar = useEggAvatar();
+  return <View style={styles.screen}>
+    <HavenHexSelectorCanvas
+      background={background}
+      companionSlots={companionSlots}
+      highlightedFamilyId={highlightedFamilyId}
+      identity={identity}
+      onContentReady={onContentReady}
+      onSelectFamily={onSelectFamily}
+      onSelectHome={onSelectHome}
+      recenterBottom={Math.max(insets.bottom, 12) + 68}
+      worldMarkers={worldMarkers}
+    />
+    <View pointerEvents="box-none" style={[styles.selectorHud, { top: insets.top + 3 }]}>
+      <GameHudBar
+        content={<GameCurrencyHud balances={[{ art: GAME_CURRENCY_ART.coins, id: 'coins', value: mergeWorld.coins }]} tone="glass" />}
+        density="compact"
+        tone="glass"
+        trailing={<Pressable
+          accessibilityHint="Opens your avatar and cosmetics"
+          accessibilityLabel="Open You"
+          accessibilityRole="button"
+          onPress={onOpenProfile}
+          style={({ pressed }) => [styles.selectorProfileButton, pressed && styles.selectorProfileButtonPressed]}>
+          <EggAvatar faceId={avatar.equippedFaceId} hatId={avatar.equippedHatId} heldAccessoryId={avatar.equippedHeldAccessoryId} presentation="button" size={42} skinId={avatar.equippedSkinId} />
+        </Pressable>}
+      />
+    </View>
+  </View>;
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  selectorHud: { left: 12, position: 'absolute', right: 12, zIndex: 20 },
+  selectorProfileButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,249,231,0.96)',
+    borderColor: 'rgba(255,255,255,0.92)',
+    borderCurve: 'continuous',
+    borderRadius: 25,
+    borderWidth: 2,
+    boxShadow: '0 4px 14px rgba(27,72,111,0.3)',
+    height: 50,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    width: 50,
+  },
+  selectorProfileButtonPressed: { opacity: 0.82, transform: [{ scale: 0.96 }] },
+  worldLoading: { alignItems: 'center', backgroundColor: '#55A9E2', flex: 1, justifyContent: 'center' },
 });
