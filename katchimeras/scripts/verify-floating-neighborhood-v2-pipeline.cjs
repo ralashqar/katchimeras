@@ -11,6 +11,9 @@ const required = [
   'design/floating-neighborhood-v2/floating-neutral-source.png',
   'design/floating-neighborhood-v2/floating-home-source.png',
   'scripts/promote-floating-neighborhood-v2-tile.py',
+  'design/mossprout-hex-neighborhood-v1/pipeline.json',
+  'docs/mossprout-hex-neighborhood-pipeline.md',
+  'scripts/generate-mossprout-hex-neighborhood.py',
 ];
 
 for (const relative of required) {
@@ -77,6 +80,11 @@ const generatorContracts = [
   'Do not add a center circle',
   'reference grass is allowed and expected',
   'zodiac sanctuary',
+  'floating-focused-v2',
+  "erase Image 1's continuous dark-green hedge/parapet completely",
+  'beneath it unchanged, and let the themed ground',
+  'deep tapered floating-island silhouette',
+  'floating-focused-v2 is an internal locked mode',
 ];
 for (const contract of generatorContracts) {
   if (!generator.includes(contract)) {

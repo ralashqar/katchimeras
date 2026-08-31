@@ -91,6 +91,14 @@ python scripts/asset-pipeline.py matte \
 python scripts/asset-pipeline.py verify --in assets/images/katchimeras/cutouts/lattelet.png
 ```
 
+### Mossprout focused-world hex environments
+
+Mossprout has one locked, project-specific workflow. Use only the
+[Mossprout hex-neighborhood runbook](mossprout-hex-neighborhood-pipeline.md)
+and its canonical runner. The underlying `floating-focused-v2` generator mode
+is intentionally inaccessible without that runner's pipeline lock. Do not copy
+an old command or invent a replacement prompt here.
+
 ### Hatchling-to-final evolution grids
 
 `scripts/generate-evolution-grid.py` creates an ordered 3x3 review sheet for

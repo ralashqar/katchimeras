@@ -1,0 +1,11 @@
+{
+  "method": "birefnet-heavy",
+  "model": "BiRefNet_lite",
+  "falModelInput": "General Use (Heavy)",
+  "endpoint": "remove-image-background",
+  "operatingResolution": "1024x1024",
+  "refineForeground": true,
+  "source": "design/mossprout-hex-neighborhood-v1/wildgrowth-grove-source.png",
+  "sourceSha256": "431d3d799208ec9dc615837a3d3eeb0bd1052ddab6905153a1875d4204f46bf5",
+  "postprocess": "source-backed-interior-repair+inward-rgb-padding+soft-edge-contraction"
+}

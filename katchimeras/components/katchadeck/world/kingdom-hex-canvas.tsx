@@ -23,7 +23,7 @@ import { HavenUpgradeEffects } from '@/components/katchadeck/world/haven-upgrade
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { KingdomTileArtLayer, KingdomTileRender } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { buildKingdomHexScene } from '@/components/katchadeck/world/kingdom-hex-scene';
-import { buildMossproutSquareScene } from '@/components/katchadeck/world/mossprout-square-scene';
+import { buildMossproutHexNeighborhoodScene } from '@/components/katchadeck/world/mossprout-hex-neighborhood-scene';
 import { SeamlessWorldImage } from '@/components/katchadeck/world/seamless-world-image';
 import { useKingdomHexCamera } from '@/components/katchadeck/world/use-kingdom-hex-camera';
 import { KINGDOM_RENDERING } from '@/constants/kingdom-rendering';
@@ -52,6 +52,7 @@ import {
 } from '@/utils/haven-upgrade-presentation';
 import { useScenePerformanceProbe } from '@/hooks/use-scene-performance-probe';
 import {
+  type KingdomHexTileLod,
   playerHavenHexTileSet,
   kingdomHexTileOverlaySourceForLod,
   kingdomHexTileSourceForLod,
@@ -91,7 +92,7 @@ type Props = {
   onOpenGarden?: (orderId?: string | null) => void;
   interactionResidentId?: string | null;
   onResidentFocusComplete?: (creatureId: string) => void;
-  squareWorld?: boolean;
+  focusedMossproutWorld?: boolean;
   mossproutNatureIslandLevels?: Record<MossproutNatureIslandId, MossproutNatureIslandLevel>;
   onSelectNatureIsland?: (islandId: MossproutNatureIslandId) => void;
 };
@@ -167,7 +168,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   onOpenGarden,
   interactionResidentId = null,
   onResidentFocusComplete,
-  squareWorld = false,
+  focusedMossproutWorld = false,
   mossproutNatureIslandLevels,
   onSelectNatureIsland,
 }: Props) {
@@ -194,8 +195,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     [assetRevision]
   );
   const scene = useMemo(
-    () => squareWorld
-      ? buildMossproutSquareScene(companionSlots, mossproutNatureIslandLevels ?? {
+    () => focusedMossproutWorld
+      ? buildMossproutHexNeighborhoodScene(companionSlots, mossproutNatureIslandLevels ?? {
           'seed-nursery': 0,
           'bloom-garden': 0,
           'pond-sanctuary': 0,
@@ -204,8 +205,11 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           'wildgrowth-grove': 0,
         })
       : buildKingdomHexScene(companionSlots, hexTileSelection.value, identity, verticalAlignmentSelection.value),
-    [companionSlots, hexTileSelection, identity, mossproutNatureIslandLevels, squareWorld, verticalAlignmentSelection]
+    [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutNatureIslandLevels, verticalAlignmentSelection]
   );
+  const sceneTileImageLod: KingdomHexTileLod = focusedMossproutWorld
+    ? 'full'
+    : KINGDOM_RENDERING.havenImageLod;
   const sceneHomeTile = useMemo(
     () => scene.tiles.find((tile) => tile.kind === 'home') ?? scene.centerTile,
     [scene.centerTile, scene.tiles]
@@ -215,7 +219,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const focusTargets = useMemo(
     () => [
       ...scene.tiles.map((tile) => ({ id: tile.id, x: tile.cx, y: tile.cy })),
-      ...(squareWorld ? scene.tileArtLayers
+      ...(focusedMossproutWorld ? scene.tileArtLayers
         .filter((layer) => layer.kind === 'structure')
         .map((layer) => ({
           id: layer.id,
@@ -223,16 +227,16 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           y: layer.frame.top + layer.frame.height / 2,
         })) : []),
     ],
-    [scene.tileArtLayers, scene.tiles, squareWorld]
+    [focusedMossproutWorld, scene.tileArtLayers, scene.tiles]
   );
   const upgradeLayers = useMemo(() => {
     if (!upgradePresentation) return null;
-    if (squareWorld && upgradePresentation.natureIslandId && mossproutNatureIslandLevels) {
+    if (focusedMossproutWorld && upgradePresentation.natureIslandId && mossproutNatureIslandLevels) {
       const islandId = upgradePresentation.natureIslandId;
       const fromLevels = { ...mossproutNatureIslandLevels, [islandId]: upgradePresentation.fromStage };
       const toLevels = { ...mossproutNatureIslandLevels, [islandId]: upgradePresentation.toStage };
-      const fromScene = buildMossproutSquareScene(companionSlots, fromLevels);
-      const toScene = buildMossproutSquareScene(companionSlots, toLevels);
+      const fromScene = buildMossproutHexNeighborhoodScene(companionSlots, fromLevels);
+      const toScene = buildMossproutHexNeighborhoodScene(companionSlots, toLevels);
       const baseLayerId = `nature:mossprout:${islandId}`;
       const growthLayerId = `${baseLayerId}:growth`;
       const fromLayer = fromScene.tileArtLayers.find((layer) => layer.id === growthLayerId)
@@ -257,17 +261,17 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     ));
     const fromSlots = slotsAtStage(upgradePresentation.fromStage);
     const toSlots = slotsAtStage(upgradePresentation.toStage);
-    const fromScene = squareWorld
-      ? buildMossproutSquareScene(fromSlots, mossproutNatureIslandLevels!)
+    const fromScene = focusedMossproutWorld
+      ? buildMossproutHexNeighborhoodScene(fromSlots, mossproutNatureIslandLevels!)
       : buildKingdomHexScene(fromSlots, hexTileSelection.value, identity, verticalAlignmentSelection.value);
-    const toScene = squareWorld
-      ? buildMossproutSquareScene(toSlots, mossproutNatureIslandLevels!)
+    const toScene = focusedMossproutWorld
+      ? buildMossproutHexNeighborhoodScene(toSlots, mossproutNatureIslandLevels!)
       : buildKingdomHexScene(toSlots, hexTileSelection.value, identity, verticalAlignmentSelection.value);
     const fromLayer = fromScene.tileArtLayers.find((layer) => layer.id === `family:${upgradePresentation.characterId}`);
     const toLayer = toScene.tileArtLayers.find((layer) => layer.id === `family:${upgradePresentation.characterId}`);
     const tile = toScene.tiles.find((candidate) => candidate.id === `family:${upgradePresentation.characterId}`);
     return fromLayer && toLayer && tile ? { fromLayer, tile, toLayer } : null;
-  }, [companionSlots, hexTileSelection, identity, mossproutNatureIslandLevels, squareWorld, upgradePresentation, verticalAlignmentSelection]);
+  }, [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutNatureIslandLevels, upgradePresentation, verticalAlignmentSelection]);
   const discoveryLayers = useMemo(() => {
     if (!discoveryRevealFamilyId) return null;
     const revealed = companionSlots.find((slot) => slot.familyId === discoveryRevealFamilyId && slot.kind === 'revealed_egg');
@@ -275,14 +279,14 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const lockedSlots = companionSlots.map((slot) => slot.familyId === discoveryRevealFamilyId
       ? { id: slot.id, coord: slot.coord, familyId: slot.familyId, kind: 'locked' as const }
       : slot);
-    const fromScene = squareWorld
-      ? buildMossproutSquareScene(lockedSlots, mossproutNatureIslandLevels!)
+    const fromScene = focusedMossproutWorld
+      ? buildMossproutHexNeighborhoodScene(lockedSlots, mossproutNatureIslandLevels!)
       : buildKingdomHexScene(lockedSlots, hexTileSelection.value, identity, verticalAlignmentSelection.value);
     const fromLayer = fromScene.tileArtLayers.find((layer) => layer.id === revealed.id);
     const toLayer = scene.tileArtLayers.find((layer) => layer.id === revealed.id);
     const tile = scene.tiles.find((candidate) => candidate.id === revealed.id);
     return fromLayer && toLayer && tile ? { fromLayer, tile, toLayer } : null;
-  }, [companionSlots, discoveryRevealFamilyId, hexTileSelection, identity, mossproutNatureIslandLevels, scene.tileArtLayers, scene.tiles, squareWorld, verticalAlignmentSelection]);
+  }, [companionSlots, discoveryRevealFamilyId, focusedMossproutWorld, hexTileSelection, identity, mossproutNatureIslandLevels, scene.tileArtLayers, scene.tiles, verticalAlignmentSelection]);
   useEffect(() => {
     if (!discoveryLayers) {
       setDiscoveryPhase('armed');
@@ -297,7 +301,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     };
   }, [discoveryLayers, reduceMotion]);
   const gardenFrame = useMemo(() => scene.tileArtLayers.find(
-    (layer) => layer.id === 'structure:mossprout-square-garden',
+    (layer) => layer.id === 'structure:mossprout-hex-garden',
   )?.interactionFrame ?? null, [scene.tileArtLayers]);
   const natureIslandFrames = useMemo(() => scene.tileArtLayers.flatMap((layer) => {
     if (!layer.id.startsWith('nature:mossprout:') || layer.id.endsWith(':growth') || !layer.interactionFrame) return [];
@@ -309,7 +313,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const camera = useKingdomHexCamera({
     center: { x: scene.centerTile.cx, y: scene.centerTile.cy },
     centerId: scene.centerTile.id,
-    initialFitWorld: squareWorld,
+    initialFitWorld: focusedMossproutWorld,
     initialSnapshot: initialCameraSnapshot,
     interactionEnabled: interactionEnabled && !upgradePresentation,
     magneticFocus: presentation?.focusMode === 'magnetic'
@@ -321,7 +325,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           targets: focusTargets,
         }
       : undefined,
-    minimumScale: squareWorld ? 0.28 : undefined,
+    minimumScale: focusedMossproutWorld ? 0.28 : undefined,
     onSnapshotChange: onCameraSnapshotChange,
     scene,
     viewport,
@@ -643,18 +647,12 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         <View style={StyleSheet.absoluteFill}>
           <Animated.View style={[styles.scene, { width: scene.width, height: scene.height }, camera.worldStyle]}>
             {scene.tileArtLayers.map((layer) => {
-              // The merge garden sits beneath many small interactive sprites
-              // and remains visible while zoomed. Give that single container
-              // its 1024 px tier without promoting every Haven tile globally.
-              const layerLod = squareWorld && layer.id === 'structure:mossprout-square-garden'
-                ? 'full'
-                : KINGDOM_RENDERING.havenImageLod;
-              const source = kingdomHexTileSourceForLod(layer, layerLod);
-              const overlaySource = kingdomHexTileOverlaySourceForLod(layer, layerLod);
+              const source = kingdomHexTileSourceForLod(layer, sceneTileImageLod);
+              const overlaySource = kingdomHexTileOverlaySourceForLod(layer, sceneTileImageLod);
               const fallbackSource = layer.fallbackSource
                 ? kingdomHexTileSourceForLod(
                     { source: layer.fallbackSource, sources: layer.fallbackSources },
-                    layerLod
+                    sceneTileImageLod
                   )
                 : null;
               return (
@@ -667,11 +665,12 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                     source={source}
                     overlaySource={overlaySource}
                     fallbackSource={fallbackSource}
-                    priority={layer.id === scene.centerTile.id || layer.id === 'structure:mossprout-square-garden' ? 'high' : 'normal'}
+                    priority={layer.id === scene.centerTile.id || layer.id === 'structure:mossprout-hex-garden' ? 'high' : 'normal'}
                   />
                   {upgradeLayers && upgradePresentation && layer.id === upgradeLayers.tile.id ? (
                     <HavenUpgradeTileArt
                       fromLayer={upgradeLayers.fromLayer}
+                      imageLod={sceneTileImageLod}
                       phase={upgradePhase}
                       reducedMotion={reduceMotion}
                       toLayer={upgradeLayers.toLayer}
@@ -680,6 +679,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                   {discoveryLayers && layer.id === discoveryLayers.tile.id && discoveryPhase !== 'complete' ? (
                     <HavenUpgradeTileArt
                       fromLayer={discoveryLayers.fromLayer}
+                      imageLod={sceneTileImageLod}
                       phase={discoveryPhase}
                       reducedMotion={reduceMotion}
                       toLayer={discoveryLayers.toLayer}
@@ -688,7 +688,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 </Fragment>
               );
             })}
-            {squareWorld && interactionEnabled && !upgradePresentation && gardenFrame && onOpenGarden ? (
+            {focusedMossproutWorld && interactionEnabled && !upgradePresentation && gardenFrame && onOpenGarden ? (
               <Pressable
                 accessibilityHint="Opens the dedicated Merge Garden"
                 accessibilityLabel="Mossprout Garden"
@@ -697,7 +697,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 style={[styles.gardenIslandHitTarget, gardenFrame]}
               />
             ) : null}
-            {squareWorld && interactionEnabled && !upgradePresentation && gardenFrame && onOpenGarden
+            {focusedMossproutWorld && interactionEnabled && !upgradePresentation && gardenFrame && onOpenGarden
               ? gardenOrders.slice(0, 3).map((entry, index) => (
                   <GardenOrderShortcut
                     entry={entry}
@@ -708,7 +708,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                   />
                 ))
               : null}
-            {squareWorld && interactionEnabled && !upgradePresentation ? natureIslandFrames.map(({ frame, islandId }) => {
+            {focusedMossproutWorld && interactionEnabled && !upgradePresentation ? natureIslandFrames.map(({ frame, islandId }) => {
               const definition = mossproutNatureIslandById.get(islandId);
               const level = mossproutNatureIslandLevels?.[islandId] ?? 0;
               return (
@@ -766,7 +766,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           presentation={upgradePresentation}
           reducedMotion={reduceMotion}
           silhouetteFrame={upgradeEffectGeometry.silhouetteFrame}
-          silhouetteSource={kingdomHexTileSourceForLod(upgradeLayers.toLayer, KINGDOM_RENDERING.havenImageLod)}
+          silhouetteSource={kingdomHexTileSourceForLod(upgradeLayers.toLayer, sceneTileImageLod)}
           target={upgradeEffectGeometry.target}
         />
       ) : null}
@@ -779,7 +779,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           showCoins={false}
           showReaction={false}
           silhouetteFrame={discoveryEffectGeometry.silhouetteFrame}
-          silhouetteSource={kingdomHexTileSourceForLod(discoveryLayers.toLayer, KINGDOM_RENDERING.havenImageLod)}
+          silhouetteSource={kingdomHexTileSourceForLod(discoveryLayers.toLayer, sceneTileImageLod)}
           target={discoveryEffectGeometry.target}
         />
       ) : null}
@@ -886,11 +886,13 @@ const KingdomTileArt = memo(function KingdomTileArt({
 
 const HavenUpgradeTileArt = memo(function HavenUpgradeTileArt({
   fromLayer,
+  imageLod,
   phase,
   reducedMotion,
   toLayer,
 }: {
   fromLayer: KingdomTileArtLayer;
+  imageLod: KingdomHexTileLod;
   phase: HavenUpgradePresentationPhase;
   reducedMotion: boolean;
   toLayer: KingdomTileArtLayer;
@@ -907,10 +909,10 @@ const HavenUpgradeTileArt = memo(function HavenUpgradeTileArt({
 
   const oldStyle = useAnimatedStyle(() => ({ opacity: oldOpacity.value }));
   const newStyle = useAnimatedStyle(() => ({ opacity: newOpacity.value }));
-  const oldSource = kingdomHexTileSourceForLod(fromLayer, KINGDOM_RENDERING.havenImageLod);
-  const newSource = kingdomHexTileSourceForLod(toLayer, KINGDOM_RENDERING.havenImageLod);
-  const oldOverlaySource = kingdomHexTileOverlaySourceForLod(fromLayer, KINGDOM_RENDERING.havenImageLod);
-  const newOverlaySource = kingdomHexTileOverlaySourceForLod(toLayer, KINGDOM_RENDERING.havenImageLod);
+  const oldSource = kingdomHexTileSourceForLod(fromLayer, imageLod);
+  const newSource = kingdomHexTileSourceForLod(toLayer, imageLod);
+  const oldOverlaySource = kingdomHexTileOverlaySourceForLod(fromLayer, imageLod);
+  const newOverlaySource = kingdomHexTileOverlaySourceForLod(toLayer, imageLod);
 
   return (
     <>

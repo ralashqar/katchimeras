@@ -1,0 +1,77 @@
+{
+  "pipelineId": "mossprout-hex-neighborhood-v2",
+  "generator": "scripts/generate-katchimera-hex-tile.py",
+  "kind": "floating-focused-v2",
+  "model": "nano",
+  "quality": "high",
+  "gptSize": 2048,
+  "requiredPromptContracts": [
+    "deep tapered floating-island silhouette, every",
+    "large cliff-block proportion, cliff depth",
+    "erase Image 1's continuous dark-green hedge/parapet completely",
+    "beneath it unchanged, and let the themed ground",
+    "there is no mandatory empty stage or U-shaped layout",
+    "the tallest feature must remain fully visible"
+  ],
+  "requiredMatteContracts": [
+    "Remove only neutral near-black backdrop connected to the canvas edge",
+    "single connected island component",
+    "artwork touches a canvas edge; regenerate with safe padding",
+    "BiRefNet Heavy is authoritative for the exterior silhouette",
+    "stale or invalid BiRefNet matte provenance"
+  ],
+  "generationOrder": [
+    "main",
+    "seed-nursery",
+    "bloom-garden",
+    "pond-sanctuary",
+    "orchard-grove",
+    "ancient-tree-grove",
+    "garden",
+    "wildgrowth-grove"
+  ],
+  "tiles": {
+    "main": {
+      "base": "design/floating-neighborhood-v2/floating-mossprout-source.png",
+      "guide": "assets/images/katchimeras/world/square/mossprout-main-environment.webp",
+      "theme": "A faithful Mossprout main garden using the original leaf-roof home, blue pond, short honey-timber fence segments, bench, lanterns, planters, rounded moss cushions, and the original island's soft scalloped moss boundary. Preserve Image 1's cliff, platform, stairs, camera, and rendering exactly. Delete the continuous dark-green hedge parapet from the top perimeter while leaving every cliff block beneath it unchanged. Use the original environment's scalloped moss and short honey-timber fence as the boundary, with no green wall behind or outside that fence. Use the center naturally."
+    },
+    "seed-nursery": {
+      "baseTile": "main",
+      "guide": "assets/images/katchimeras/world/square/mossprout-seed-nursery-l4.webp",
+      "theme": "A lush Mossprout propagation haven with a rounded timber-and-glass greenhouse, tiered seedling shelves, small sprout beds, a blue watering can, stepping stones, leafy ground plants, and small white flowers. Replace all unrelated Image 1 top-face content: no house, ornamental pond, bridge, circular paving, or inherited perimeter fence. Let the nursery occupy the center naturally. Use scalloped moss or open grass at the cliff edge; no hedge wall."
+    },
+    "bloom-garden": {
+      "baseTile": "main",
+      "guide": "assets/images/katchimeras/world/square/mossprout-bloom-garden-l4.webp",
+      "matte": "birefnet-heavy",
+      "theme": "A magical Mossprout bloom garden with a flower-covered timber arch, pink tulips, round raised beds of yellow, pink, and white flowers, one warm lantern, and a simple stepping-stone path through the center. Replace all unrelated Image 1 top-face content: no house, pond, bridge, circular paving, or inherited perimeter fence. Let layered flower beds reach naturally toward the edges; no hedge wall."
+    },
+    "pond-sanctuary": {
+      "baseTile": "main",
+      "guide": "assets/images/katchimeras/world/square/mossprout-pond-sanctuary-l4.webp",
+      "theme": "A calm Mossprout lotus sanctuary dominated by a broad clear turquoise pond, a small chunky stone waterfall at the rear, lily pads, pink lotus blooms, reeds, smooth stones, and restrained moss planting. Replace all unrelated Image 1 top-face content: no house, fence, bridge, circular paving, or inherited garden furniture. Let water occupy the center and meet scalloped moss naturally near the cliff edge; no hedge wall."
+    },
+    "orchard-grove": {
+      "baseTile": "main",
+      "guide": "assets/images/katchimeras/world/square/mossprout-orchard-grove-l4.webp",
+      "theme": "An abundant Mossprout orchard with three rounded fruit trees bearing red and golden fruit, visible chunky roots, a short harvest ladder, three small wooden produce crates, stepping stones, white flowers, and low moss planting. Replace all unrelated Image 1 top-face content: no house, pond, bridge, circular paving, or inherited perimeter fence. Use the whole center for the orchard composition and let scalloped moss meet the cliff edge; no hedge wall."
+    },
+    "ancient-tree-grove": {
+      "baseTile": "main",
+      "guide": "assets/images/katchimeras/world/square/mossprout-ancient-tree-grove-l4.webp",
+      "theme": "Mossprout's sacred Heart Tree grove with one majestic broad-canopy ancient tree, chunky exposed roots, three warm hanging lanterns, a carved heart medallion, a tiny spring at the roots, colorful fantasy mushrooms, white flowers, and a stepping-stone approach through the center. Replace all unrelated Image 1 top-face content: no house, fence, bridge, circular paving, or ornamental pond. Let roots and moss define the boundary naturally; no hedge wall."
+    },
+    "garden": {
+      "baseTile": "seed-nursery",
+      "guide": "assets/images/katchimeras/world/square/mossprout-garden-hub-v2.webp",
+      "theme": "A simple Mossprout working garden hub with exactly three raised seed beds of young heart-shaped sprouts, one small leaf-roof tool shed with gardening tools, broad open grassy work space through the center, and only a few low leafy accents. Replace every unrelated Image 1 top-face feature, including the greenhouse, nursery shelves, watering-can table, flowers, pots, and path. No house, ornamental pond, bridge, circular paving, fence, hedge, wall, or perimeter ring. Preserve Image 1's deep tapered cliff, cliff blocks, stairs, camera, scale, and rendering exactly. Open grass and scalloped moss terminate naturally at the cliff edge."
+    },
+    "wildgrowth-grove": {
+      "baseTile": "ancient-tree-grove",
+      "guide": "assets/images/katchimeras/world/square/mossprout-wildgrowth-grove-l4.webp",
+      "matte": "birefnet-heavy",
+      "theme": "Dense enchanted Mossprout wildgrowth with three oversized rounded fantasy mushrooms in purple, coral, and orange, one small arched hollow-log shelter, layered ferns, curling vines, moss cushions, white flowers, and a stepping-stone path through the center. Replace every unrelated Image 1 top-face feature, including the ancient tree, roots, lanterns, fountain, heart emblem, and previous mushrooms. No house, fence, hedge, wall, pond, bridge, circular paving, or perimeter ring. Preserve Image 1's deep tapered cliff, cliff blocks, stairs, camera, scale, and rendering exactly. Untamed moss and foliage terminate naturally at the cliff edge. Make the mushrooms shorter than the reference if necessary so every cap has generous black space above it and no artwork touches the canvas boundary."
+    }
+  }
+}

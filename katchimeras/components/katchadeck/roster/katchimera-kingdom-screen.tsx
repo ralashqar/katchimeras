@@ -481,7 +481,7 @@ export function KatchimeraKingdomScreen({
         residentStatusGlyphs={residentStatusGlyphs}
         tutorialCamera={tutorialCamera}
         upgradePresentation={upgradePresentation}
-        squareWorld
+        focusedMossproutWorld
       />
       {!upgradePresentation && !interactionCreatureId ? (
         <HavenTileHudLayer

@@ -221,6 +221,62 @@ test('the focused Mossprout world arranges six nature islands around its two cor
   assert.deepEqual(mossproutSquareSceneMetrics(), { width: 1320, height: 1353 });
 });
 
+test('the focused Mossprout replacement uses the top-level hex projection and authored axial topology', () => {
+  const scene = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'mossprout-hex-neighborhood-scene.ts'),
+    'utf8',
+  );
+  assert.match(scene, /LAYOUT_PROFILE = 'floating-neighborhood-v2'/);
+  assert.match(scene, /NEIGHBORHOOD_SPACING_SCALE = 1\.1/);
+  assert.match(scene, /const MAIN:[\s\S]*?coord: \{ q: 0, r: 0 \}/);
+  assert.match(scene, /const GARDEN:[\s\S]*?coord: \{ q: 0, r: 1 \}/);
+  for (const [id, q, r] of [
+    ['seed-nursery', -1, 1],
+    ['bloom-garden', 1, 0],
+    ['pond-sanctuary', -1, 2],
+    ['orchard-grove', 1, 1],
+    ['ancient-tree-grove', -1, 3],
+    ['wildgrowth-grove', 1, 2],
+  ] as const) {
+    assert.match(scene, new RegExp(`'${id}':[\\s\\S]*?coord: \\{ q: ${q}, r: ${r} \\}`));
+  }
+  assert.match(scene, /hexToWorld\(coord, LAYOUT_PROFILE\)/);
+  assert.match(scene, /x: point\.x \* NEIGHBORHOOD_SPACING_SCALE/);
+  assert.match(scene, /y: point\.y \* NEIGHBORHOOD_SPACING_SCALE/);
+  assert.match(scene, /mossproutHexPoint\(spec\.coord\)/);
+  assert.match(scene, /kingdomTileArtFrame\(/);
+  assert.match(scene, /hexDrawDepth\(point\)/);
+});
+
+test('focused Mossprout hex art ships alpha-preserving full, medium, and thumbnail tiers', () => {
+  for (const key of [
+    'main',
+    'garden',
+    'seed_nursery',
+    'bloom_garden',
+    'pond_sanctuary',
+    'orchard_grove',
+    'ancient_tree_grove',
+    'wildgrowth_grove',
+  ]) {
+    for (const suffix of ['', '_512', '_256']) {
+      const asset = path.join(
+        process.cwd(),
+        'assets',
+        'images',
+        'katchimeras',
+        'world',
+        'hex',
+        `mossprout_focused_v1_${key}_hex_tile${suffix}.webp`,
+      );
+      assert.ok(fs.existsSync(asset), `missing ${asset}`);
+      const bytes = fs.readFileSync(asset);
+      assert.equal(bytes.toString('ascii', 12, 16), 'VP8X');
+      assert.ok((bytes[20] & 0x10) !== 0, `${asset} must preserve alpha`);
+    }
+  }
+});
+
 test('the compact Garden island no longer exposes merge-board playfield geometry', () => {
   assert.deepEqual(MOSSPROUT_GARDEN_SOURCE_SIZE, { height: 1_024, width: 1_024 });
   assert.equal(STEPPLING_BOARD_CELL_HEIGHT_TO_WIDTH_RATIO, (475 / 6) / (584 / 7));
@@ -371,7 +427,7 @@ test('the six nature islands use the bespoke final-form art at every visible lev
   assert.doesNotMatch(scene, /decor:mossprout-garden-(?:west|east)-nature-island/);
 });
 
-test('the focused Mossprout Haven mounts only Mossprout-owned square-world art', () => {
+test('the focused Mossprout Haven mounts only Mossprout-owned hex-neighborhood art', () => {
   const screen = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'roster', 'katchimera-kingdom-screen.tsx'),
     'utf8',
@@ -392,7 +448,7 @@ test('the focused Mossprout Haven mounts only Mossprout-owned square-world art',
     path.join(process.cwd(), 'utils', 'creature-art.ts'),
     'utf8',
   );
-  assert.match(screen, /squareWorld/);
+  assert.match(screen, /focusedMossproutWorld/);
   assert.match(screen, /familyId === 'mossprout'/);
   assert.doesNotMatch(screen, /YOUR HAVEN|Tap a home or a mist tile|Open World and Board Lab/);
   assert.match(screen, /<GameHudBar[\s\S]*?<GameCurrencyHud[\s\S]*?GAME_CURRENCY_ART\.coins/);
@@ -401,7 +457,7 @@ test('the focused Mossprout Haven mounts only Mossprout-owned square-world art',
   assert.match(screen, /useGameScreenTransition\(\)/);
   assert.match(screen, /announcement: "Opening Mossprout's Garden"[\s\S]*?target: 'merge'[\s\S]*?onCovered: closeResidentInteraction[\s\S]*?router\.push/);
   assert.match(screen, /gardenOrders=\{gardenOrderEntries\}/);
-  assert.match(canvas, /buildMossproutSquareScene/);
+  assert.match(canvas, /buildMossproutHexNeighborhoodScene/);
   assert.match(canvas, /GardenOrderShortcut/);
   assert.match(canvas, /<FrozenMergeOrderTrayCard entry=\{entry\} \/>/);
   assert.match(canvas, /gardenOrders\.slice\(0, 3\)/);
@@ -415,33 +471,30 @@ test('the focused Mossprout Haven mounts only Mossprout-owned square-world art',
   assert.match(mergeSurface, /<MergeOrderRail[\s\S]*?<ServiceCounter[\s\S]*?<FeastlePersistentMergeBoard[\s\S]*?<MergeCellInspector/);
   assert.doesNotMatch(canvas, /boardLayout=/);
   assert.match(canvas, /buildKingdomHexScene/);
-  assert.match(canvas, /initialFitWorld: squareWorld/);
+  assert.match(canvas, /initialFitWorld: focusedMossproutWorld/);
   assert.match(canvas, /initialSnapshot: initialCameraSnapshot/);
   assert.match(canvas, /onSnapshotChange: onCameraSnapshotChange/);
-  assert.match(canvas, /minimumScale: squareWorld \? 0\.28 : undefined/);
+  assert.match(canvas, /minimumScale: focusedMossproutWorld \? 0\.28 : undefined/);
   assert.doesNotMatch(canvas, /panExclusionFrame/);
   assert.doesNotMatch(canvas, /focusedSquareZoneId/);
-  assert.match(canvas, /layer\.id === 'structure:mossprout-square-garden'[\s\S]*?\? 'full'/);
-  assert.match(canvas, /kingdomHexTileSourceForLod\(layer, layerLod\)/);
+  assert.match(canvas, /sceneTileImageLod: KingdomHexTileLod = focusedMossproutWorld[\s\S]*?\? 'full'[\s\S]*?: KINGDOM_RENDERING\.havenImageLod/);
+  assert.match(canvas, /kingdomHexTileSourceForLod\(layer, sceneTileImageLod\)/);
+  assert.match(canvas, /imageLod=\{sceneTileImageLod\}/);
   assert.match(canvas, /scene\.tiles\.find\(\(tile\) => tile\.kind === 'home'\)/);
-  const squareScene = fs.readFileSync(
-    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'mossprout-square-scene.ts'),
+  const hexScene = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'mossprout-hex-neighborhood-scene.ts'),
     'utf8',
   );
-  assert.doesNotMatch(squareScene, /baristabbitBridgeLayer|eggHomeBridgeLayer/);
-  assert.doesNotMatch(squareScene, /baristabbit-cafe-island\.webp/);
-  assert.doesNotMatch(squareScene, /steppling-movement-island\.webp/);
-  assert.doesNotMatch(squareScene, /bridge-straight-horizontal-perspective\.webp/);
-  assert.doesNotMatch(squareScene, /egg-home-island\.webp/);
-  assert.match(squareScene, /mossprout-garden-hub-v2\.webp/);
-  assert.match(squareScene, /mossprout-standing-resident-512\.webp/);
-  assert.match(squareScene, /residentSource: MOSSPROUT_STANDING_RESIDENT_SOURCE/);
-  assert.doesNotMatch(squareScene, /BARISTABBIT_STANDING_RESIDENT_SOURCE|STEPPLING_STANDING_RESIDENT_SOURCE/);
-  assert.match(squareScene, /tiles: \[environmentTile\]/);
+  assert.match(hexScene, /LAYOUT_PROFILE = 'floating-neighborhood-v2'/);
+  assert.match(hexScene, /mossprout_focused_v1_main_hex_tile\.webp/);
+  assert.match(hexScene, /mossprout_focused_v1_garden_hex_tile\.webp/);
+  assert.match(hexScene, /mossprout-standing-resident-512\.webp/);
+  assert.match(hexScene, /mainLayer\.residentSource = MAIN_RESIDENT_SOURCE/);
+  assert.match(hexScene, /tiles: \[centerTile\]/);
   assert.match(canvas, /source=\{artLayer\?\.residentSource\}/);
   assert.match(canvas, /sourceOverride \?\? worldAssetSource/);
-  assert.doesNotMatch(squareScene, /haven-junction-mini-island-512\.webp/);
-  assert.doesNotMatch(squareScene, /haven-junction-mini-island-tray-512\.webp/);
+  assert.doesNotMatch(hexScene, /haven-junction-mini-island-512\.webp/);
+  assert.doesNotMatch(hexScene, /haven-junction-mini-island-tray-512\.webp/);
   assert.doesNotMatch(orderRail, /haven-junction-mini-island-tray-512\.webp/);
   assert.match(orderRail, /order-chair\.webp/);
   assert.match(orderRail, /order-service-tray\.webp/);
@@ -457,11 +510,11 @@ test('the focused Mossprout Haven mounts only Mossprout-owned square-world art',
   assert.match(orderRail, /width: ORDER_TABLE_ART_WIDTH \* ORDER_TABLE_ART_SCALE/);
   assert.match(orderRail, /items: \{[^}]*bottom: 22/);
   assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'merge-world', 'ui', 'order-chair.webp')));
-  assert.doesNotMatch(squareScene, /junctionMiniIslandLayers|JUNCTION_MINI_ISLAND_SOURCES/);
+  assert.doesNotMatch(hexScene, /junctionMiniIslandLayers|JUNCTION_MINI_ISLAND_SOURCES/);
   assert.doesNotMatch(canvas, /trayEntries=\{board\.trayEntries\}/);
   assert.match(screen, /return \[\.\.\.realEntries, \.\.\.fillerEntries\]\.slice\(0, 3\)/);
   assert.match(screen, /prioritizedVisibleMergeOrders\([\s\S]*?\)\.slice\(0, 3\)/);
-  assert.match(squareScene, /\.sort\(\(left, right\) => left\.depth - right\.depth\)/);
+  assert.match(hexScene, /\.sort\(\(a, b\) => a\.depth - b\.depth\)/);
   assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'world', 'square', 'mossprout-merge-island-perspective-512.webp')));
   assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'world', 'square', 'mossprout-standing-resident-512.webp')));
 });

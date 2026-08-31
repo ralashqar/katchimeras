@@ -398,6 +398,46 @@ def prompt_for(visual_key: str, theme: str, variant_index: int) -> str:
     )
 
 
+def prompt_for_floating_focused_v2(visual_key: str, theme: str) -> str:
+    """Keep the approved floating-v2 island while freeing only its top perimeter."""
+    return structured_tile_prompt(
+        reference=(
+            "Edit image 1 as the authoritative Floating Neighbourhood V2 production tile. Preserve its exact "
+            "square canvas, flat-top six-corner hex footprint, position, scale, rotation, camera, perspective, "
+            "top-face elevation, centered recessed front stairs, deep tapered floating-island silhouette, every "
+            "large cliff-block proportion, cliff depth, cliff material scale, lighting, and padding. The complete "
+            "cliff and platform below the top surface must remain in the approved Image 1 art style; do not replace "
+            "it with a shallow soil slab, smooth vertical wall, realistic rock, or another island design. Image 2 "
+            f"is the authoritative {visual_key} environment-content reference. Translate only its boundary "
+            "language, structures, water, planting, furniture, and palette onto Image 1's exact top face. Do not "
+            "copy Image 2's camera, outer silhouette, cliff, or rendering style. Do not draw a character."
+        ),
+        art_style=(
+            "Match Image 1 and the approved Floating Neighbourhood V2 Katchimera tiles exactly: premium cozy "
+            "stylized 3D toy-diorama art, chunky rounded clay-like forms, broad soft bevels, matte simplified "
+            "materials, low-frequency surfaces, clean silhouettes, restrained warm light, and features readable "
+            "at 256px. Image 1 controls rendering style; Image 2 controls environment identity only."
+        ),
+        visuals=theme,
+        framing=(
+            "Change only the top-face environment. The perimeter hedge visible in Image 1 is not an invariant and "
+            "must not be automatically retained, repeated, or replaced by another continuous wall. When Image 2 "
+            "supplies its own boundary language, erase Image 1's continuous dark-green hedge/parapet completely; "
+            "it is removable top decoration, not part of the protected cliff. Preserve every cliff stone directly "
+            "beneath it unchanged, and let the themed ground or moss terminate cleanly at that cliff edge. The top face "
+            "may meet the cliff edge with open themed ground, scalloped moss, planting, water, stones, roots, or "
+            "short bespoke fence segments from Image 2. Use the whole top face naturally, including the center; "
+            "there is no mandatory empty stage or U-shaped layout. A bespoke fence must never sit inside, outside, "
+            "or behind a second hedge or perimeter wall. Keep all additions within the exact six-corner top-face "
+            "footprint, preserve the stairs, and leave the outer island silhouette readable. Preserve Image 1's "
+            "clear upper canvas padding: the tallest feature must remain fully visible and no content may touch or "
+            "be clipped by any square canvas edge. No text, number, UI, "
+            "creature, human, watermark, bridge, cloud, external ground, cast shadow, realistic texture, tiny "
+            "surface noise, or dense clutter."
+        ),
+    )
+
+
 def prompt_for_home(visual_key: str, theme: str) -> str:
     return structured_tile_prompt(
         reference=(
@@ -528,6 +568,14 @@ def main() -> None:
         ),
     )
     parser.add_argument("--creature", help="Path to Katchimera cutout; defaults to assets/images/katchimeras/cutouts/{visual-key}.png")
+    parser.add_argument(
+        "--guide",
+        help="Optional second image reference. For floating-focused-v2, use the authoritative environment artwork.",
+    )
+    parser.add_argument(
+        "--pipeline-lock",
+        help=argparse.SUPPRESS,
+    )
     parser.add_argument("--theme", help="Theme prompt override.")
     parser.add_argument(
         "--brief",
@@ -535,7 +583,11 @@ def main() -> None:
     )
     parser.add_argument("--quality", default="high")
     parser.add_argument("--gpt-size", type=int, default=2048)
-    parser.add_argument("--kind", choices=("resident", "floating-v2", "floating-home-v2", "home", "zodiac"), default="resident")
+    parser.add_argument(
+        "--kind",
+        choices=("resident", "floating-v2", "floating-focused-v2", "floating-home-v2", "home", "zodiac"),
+        default="resident",
+    )
     parser.add_argument(
         "--model",
         choices=("nano", "gpt", "seedream"),
@@ -549,15 +601,26 @@ def main() -> None:
     args = parser.parse_args()
     if args.count < 1:
         sys.exit("--count must be at least 1.")
+    if (
+        args.kind == "floating-focused-v2"
+        and args.pipeline_lock != "mossprout-hex-neighborhood-v2"
+    ):
+        sys.exit(
+            "floating-focused-v2 is an internal locked mode. Use "
+            "scripts/generate-mossprout-hex-neighborhood.py so the canonical manifest, references, "
+            "prompts, dependency order, and review flow cannot drift."
+        )
+    if args.creature and args.guide:
+        sys.exit("Use either --creature or --guide, not both.")
     if args.theme and args.brief:
         sys.exit("Use either --brief (preferred for v2) or --theme, not both.")
     if args.model is None:
-        args.model = "nano" if args.kind in {"floating-v2", "floating-home-v2", "zodiac"} else "gpt"
+        args.model = "nano" if args.kind in {"floating-v2", "floating-focused-v2", "floating-home-v2", "zodiac"} else "gpt"
 
     visual_key = args.visual_key
     default_base = (
         "design/floating-neighborhood-v2/floating-neutral-source.png"
-        if args.kind in {"floating-v2", "zodiac"}
+        if args.kind in {"floating-v2", "floating-focused-v2", "zodiac"}
         else "design/floating-neighborhood-v2/floating-home-source.png"
         if args.kind == "floating-home-v2"
         else "assets/images/katchimeras/world/hex/grass_hex_tile_dense_v2.webp"
@@ -568,9 +631,12 @@ def main() -> None:
             "V2 generation never accepts a creature reference. Describe identity through --brief or --theme; "
             "the live creature/egg is rendered separately."
         )
+    guide_argument = args.guide or args.creature
     creature_path = (
-        (ROOT / (args.creature or f"assets/images/katchimeras/cutouts/{visual_key}.png")).resolve()
-        if args.kind == "resident" or args.creature
+        (ROOT / guide_argument).resolve()
+        if guide_argument
+        else (ROOT / f"assets/images/katchimeras/cutouts/{visual_key}.png").resolve()
+        if args.kind == "resident"
         else None
     )
     if not base_path.exists():
@@ -583,7 +649,7 @@ def main() -> None:
     brief_path = (ROOT / args.brief).resolve() if args.brief else None
     brief_data = None
     if brief_path is not None:
-        if args.kind not in {"floating-v2", "floating-home-v2", "zodiac"}:
+        if args.kind not in {"floating-v2", "floating-focused-v2", "floating-home-v2", "zodiac"}:
             sys.exit("--brief is supported only for floating-v2 and zodiac kinds.")
         theme, brief_data = theme_from_brief(
             brief_path,
@@ -591,7 +657,7 @@ def main() -> None:
             kind=args.kind,
         )
     elif (
-        args.kind == "floating-v2"
+        args.kind in {"floating-v2", "floating-focused-v2"}
         and not args.theme
         and visual_key not in CAST_THEMES
     ) or (
@@ -624,6 +690,8 @@ def main() -> None:
             if args.kind == "home"
             else prompt_for_floating_home_v2(visual_key, theme)
             if args.kind == "floating-home-v2"
+            else prompt_for_floating_focused_v2(visual_key, theme)
+            if args.kind == "floating-focused-v2"
             else prompt_for_floating_v2(visual_key, theme)
             if args.kind == "floating-v2"
             else prompt_for_zodiac(visual_key, theme)
