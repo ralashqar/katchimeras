@@ -714,7 +714,7 @@ test('Haven keeps every configured tile in the persistent render set', () => {
   assert.equal(new Set(frames.map((frame) => frame.id)).size, frames.length);
 });
 
-test('the merge island mounts the shared Merge board without giving cell taps or drags to the camera', () => {
+test('the Garden island is navigation-only while the dedicated route retains the full Merge surface', () => {
   const scene = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-hex-scene.ts'),
     'utf8',
@@ -735,22 +735,17 @@ test('the merge island mounts the shared Merge board without giving cell taps or
     path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-play-surface.tsx'),
     'utf8',
   );
-  assert.match(scene, /id: MOSSPROUT_GARDEN_BOARD\.id/);
-  assert.match(scene, /mossprout && mossprout\.kind !== 'locked'[\s\S]*?art\.revealed[\s\S]*?art\.locked/);
   assert.match(scene, /kind: 'structure'/);
-  assert.match(scene, /overlaySource: art\.overlaySource/);
-  assert.match(scene, /interactionFrame/);
-  assert.match(canvas, /<MergePlaySurface/);
-  assert.ok(canvas.indexOf('<MergePlaySurface') > canvas.indexOf('</GestureDetector>'));
-  assert.match(canvas, /key=\{`haven-merge-play-surface-\$\{board\.id\}`\}/);
-  assert.match(canvas, /pointerEvents=\{interactionEnabled && activeMergeBoardId && !camera\.isMoving \? 'box-none' : 'none'\}/);
-  assert.match(canvas, /const live = interactionEnabled && board\.id === activeMergeBoardId && !camera\.isMoving && !serveFlight/);
+  assert.match(canvas, /accessibilityLabel="Mossprout Garden"/);
+  assert.match(canvas, /GardenOrderShortcut/);
+  assert.match(canvas, /<FrozenMergeOrderTrayCard entry=\{entry\} \/>/);
+  assert.match(canvas, /onOpenGarden\(entry\.order\.id\)/);
+  assert.doesNotMatch(canvas, /MergePlaySurface|activeMergeBoardId|serveFlight|mergeBoardFocusRequest/);
   assert.match(surface, /<MergeOrderRail[\s\S]*?<ServiceCounter[\s\S]*?<FeastlePersistentMergeBoard[\s\S]*?<MergeCellInspector/);
   assert.doesNotMatch(canvas, /externalPanGesture|camera\.panGesture/);
   assert.doesNotMatch(board, /blocksExternalGesture|externalPanGesture/);
   assert.doesNotMatch(camera, /panExclusionFrame|stateManager\.fail/);
   assert.doesNotMatch(canvas, /boardLayout=/);
-  assert.match(canvas, /height: frame\.height \+ MERGE_TRAY_HEIGHT \+ MERGE_INSPECTOR_HEIGHT/);
   assert.doesNotMatch(canvas, /HAVEN_MERGE_GRID_SOURCE|haven-merge-grid-7x6\.webp/);
   assert.match(board, /checkerboardColor=\{layout\.checkerboardCellColor/);
   assert.match(board, /mergeLogicalPointFromProjectedWorklet/);
@@ -841,60 +836,43 @@ test('Haven camera frame focus fits the complete merge grid with screen padding'
   assert.ok(snapshot.scale <= KINGDOM_RENDERING.havenMaxScale);
 });
 
-test('Haven merge board requests frame focus only after an in-grid tap or drag release', () => {
+test('Haven Garden order shortcuts open the dedicated route without board gestures', () => {
+  const canvas = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-hex-canvas.tsx'),
+    'utf8',
+  );
+  assert.match(canvas, /gardenOrders\.slice\(0, 3\)/);
+  assert.match(canvas, /\{ x: 0\.27, y: 0\.205 \}[\s\S]*?\{ x: 0\.5, y: 0\.185 \}[\s\S]*?\{ x: 0\.73, y: 0\.205 \}/);
+  assert.match(canvas, /accessibilityHint="Opens this order in the Garden"/);
+  assert.doesNotMatch(canvas, /emitBoardReleaseFocus|focusMergeBoard|onBoardRelease/);
+});
+
+test('Haven camera accepts and publishes a settled world snapshot', () => {
+  const canvas = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-hex-canvas.tsx'),
+    'utf8',
+  );
+  const camera = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'use-kingdom-hex-camera.ts'),
+    'utf8',
+  );
+  assert.match(canvas, /initialSnapshot: initialCameraSnapshot/);
+  assert.match(canvas, /onSnapshotChange: onCameraSnapshotChange/);
+  assert.match(camera, /initialSnapshot\?: KingdomCameraSnapshot \| null/);
+  assert.match(camera, /clampCameraTranslation\(initialSnapshot/);
+  assert.match(camera, /onSnapshotChangeRef\.current\?\.\(snapshot\)/);
+});
+
+test('the dedicated Merge page retains the full persistent board renderer', () => {
   const board = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'games', 'feastle-persistent-merge-board.tsx'),
     'utf8',
   );
-  const canvas = fs.readFileSync(
-    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-hex-canvas.tsx'),
-    'utf8',
-  );
-  const touchDownPath = board.slice(board.indexOf('.onTouchesDown'), board.indexOf('.onUpdate'));
-
-  assert.doesNotMatch(touchDownPath, /emitBoardReleaseFocus/);
-  assert.ok((board.match(/releaseCell >= 0\) runOnJS\(emitBoardReleaseFocus\)\(\)/g) ?? []).length >= 3);
-  assert.match(canvas, /focusCameraFrame\(frame/);
-  assert.match(canvas, /onBoardRelease=\{\(\) => focusMergeBoard\(board\.id\)\}/);
-});
-
-test('Haven keeps the canonical tray mounted while activating its play surface', () => {
-  const canvas = fs.readFileSync(
-    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-hex-canvas.tsx'),
-    'utf8',
-  );
-
-  assert.match(canvas, /mergeBoards\.map\(\(board\) =>/);
-  assert.match(canvas, /animateEntrance=\{false\}/);
-  assert.match(canvas, /trayEntries=\{board\.trayEntries\}/);
-  assert.doesNotMatch(canvas, /FrozenMergeOrderTrayCard|activationOrderSnapshotRef/);
-
-  const tray = fs.readFileSync(
-    path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-order-rail.tsx'),
-    'utf8',
-  );
-  assert.match(tray, /animateEntrance = true/);
-  assert.match(tray, /useState\(animateEntrance\)/);
-  assert.ok((tray.match(/entering=\{!entryMotionEnabled \? undefined/g) ?? []).length >= 6);
-});
-
-test('inactive Haven merge boards retain the full persistent board renderer', () => {
-  const canvas = fs.readFileSync(
-    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-hex-canvas.tsx'),
-    'utf8',
-  );
-  const board = fs.readFileSync(
-    path.join(process.cwd(), 'components', 'katchadeck', 'games', 'feastle-persistent-merge-board.tsx'),
-    'utf8',
-  );
-
-  assert.match(canvas, /interactionEnabled=\{live\}/);
-  assert.match(canvas, /state=\{board\.state\}/);
   assert.match(board, /dream-mist-full\.webp/);
   assert.match(board, /dream-mist-lower\.webp/);
 });
 
-test('Haven hosts resident interaction over the focused world and freezes merge boards', () => {
+test('Haven hosts resident interaction over the world and routes its Garden shortcut', () => {
   const screen = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'roster', 'katchimera-kingdom-screen.tsx'),
     'utf8',
@@ -910,11 +888,10 @@ test('Haven hosts resident interaction over the focused world and freezes merge 
 
   assert.match(screen, /<KatchimeraCompanionRouteScreen[\s\S]*?hostedInHaven[\s\S]*?reuseUnderlyingStage/);
   assert.match(screen, /interactionEnabled=\{!interactionCreatureId/);
-  assert.match(screen, /mergeBoardFocusRequest=\{mergeBoardFocusRequest\}/);
+  assert.match(screen, /onHostedOpenMerge=\{interactionHasGarden \? openGarden : undefined\}/);
   assert.match(screen, /interactionCreatureIdRef\.current === creatureId/);
   assert.match(screen, /cameraFallbackTimer = setTimeout/);
-  assert.match(canvas, /if \(!interactionResidentId\) return;[\s\S]*?setActiveMergeBoardId\(null\)/);
-  assert.match(canvas, /handledMergeBoardRequestRef/);
+  assert.doesNotMatch(canvas, /handledMergeBoardRequestRef|setActiveMergeBoardId/);
   assert.match(route, /onHostedClose/);
   assert.match(route, /onHostedOpenMerge/);
 });

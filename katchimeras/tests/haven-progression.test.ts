@@ -200,11 +200,11 @@ test('focused Haven owns one canonical Merge provider and no sandbox subscriptio
   const rosterRoute = readFileSync('components/katchadeck/roster/katchimera-roster-route-screen.tsx', 'utf8');
   const havenScreen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
 
-  assert.match(rosterRoute, /return isFocused \? <FocusedKatchimeraRosterBoundary \/> : null/);
+  assert.match(rosterRoute, /return isFocused \? \([\s\S]*?<FocusedKatchimeraRosterBoundary[\s\S]*?\) : null/);
   assert.match(rosterRoute, /<MergeWorldProvider[\s\S]*?active[\s\S]*?<FocusedKatchimeraRoster/);
   assert.doesNotMatch(rosterRoute, /loadMergeWorldState|subscribeMergeWorldSnapshots/);
-  assert.match(havenScreen, /useMergeWorldActions/);
+  assert.match(havenScreen, /mergeWorld: MergeWorldState/);
+  assert.match(havenScreen, /prioritizedVisibleMergeOrders\(mergeWorld/);
   assert.doesNotMatch(havenScreen, /useHavenMergeSandbox/);
-  assert.match(havenScreen, /mergeFtueAllowsCommand/);
-  assert.match(havenScreen, /mergeFtueEventForCommand/);
+  assert.doesNotMatch(havenScreen, /useMergeWorldActions|loadMergeWorldState|subscribeMergeWorldSnapshots/);
 });

@@ -7,7 +7,6 @@ import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
 import {
   havenSquareZoneFrame,
   mossproutGardenFrame,
-  MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS,
   MOSSPROUT_GARDEN_SOURCE_SIZE,
   MOSSPROUT_SQUARE_ZONES,
   mossproutNatureIslandFrame,
@@ -25,9 +24,9 @@ const ENVIRONMENT_SOURCES = {
   thumb: require('../../../assets/images/katchimeras/world/square/mossprout-main-environment-256.webp'),
 };
 const GARDEN_SOURCES = {
-  full: require('../../../assets/images/katchimeras/world/square/mossprout-merge-island-portrait-v1.webp'),
-  medium: require('../../../assets/images/katchimeras/world/square/mossprout-merge-island-portrait-v1-512.webp'),
-  thumb: require('../../../assets/images/katchimeras/world/square/mossprout-merge-island-portrait-v1-256.webp'),
+  full: require('../../../assets/images/katchimeras/world/square/mossprout-garden-hub-v2.webp'),
+  medium: require('../../../assets/images/katchimeras/world/square/mossprout-garden-hub-v2-512.webp'),
+  thumb: require('../../../assets/images/katchimeras/world/square/mossprout-garden-hub-v2-256.webp'),
 };
 const MOSSPROUT_STANDING_RESIDENT_SOURCE = require(
   '../../../assets/images/katchimeras/world/square/mossprout-standing-resident-512.webp',
@@ -81,16 +80,6 @@ const POSITIONS: Record<MossproutNatureIslandId, MossproutNatureIslandPosition> 
   'ancient-tree-grove': 'lower-left',
   'wildgrowth-grove': 'lower-right',
 };
-
-function interactionFrame(frame: { left: number; top: number; width: number; height: number }) {
-  const bounds = MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS;
-  return {
-    height: ((bounds.bottom - bounds.top) / MOSSPROUT_GARDEN_SOURCE_SIZE.height) * frame.height,
-    left: frame.left + (bounds.left / MOSSPROUT_GARDEN_SOURCE_SIZE.width) * frame.width,
-    top: frame.top + (bounds.top / MOSSPROUT_GARDEN_SOURCE_SIZE.height) * frame.height,
-    width: ((bounds.right - bounds.left) / MOSSPROUT_GARDEN_SOURCE_SIZE.width) * frame.width,
-  };
-}
 
 function natureIslandLayers(
   levels: Record<MossproutNatureIslandId, MossproutNatureIslandLevel>,
@@ -168,7 +157,7 @@ export function buildMossproutSquareScene(
     fallbackSource: null,
     frame: gardenFrame,
     id: 'structure:mossprout-square-garden',
-    interactionFrame: interactionFrame(gardenFrame),
+    interactionFrame: gardenFrame,
     kind: 'structure',
     source: GARDEN_SOURCES.full,
     sources: GARDEN_SOURCES,

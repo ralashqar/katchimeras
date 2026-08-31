@@ -33,6 +33,7 @@ type CameraRenderState = {
 type UseKingdomHexCameraArgs = {
   center: { x: number; y: number };
   centerId?: string;
+  initialSnapshot?: KingdomCameraSnapshot | null;
   interactionEnabled?: boolean;
   initialFitWorld?: boolean;
   magneticFocus?: {
@@ -43,6 +44,7 @@ type UseKingdomHexCameraArgs = {
     targets: readonly KingdomFocusTarget[];
   };
   minimumScale?: number;
+  onSnapshotChange?: (snapshot: KingdomCameraSnapshot) => void;
   onWorldTapRelease?: (x: number, y: number) => void;
   scene: KingdomSize;
   viewport: KingdomSize;
@@ -64,10 +66,12 @@ function workletClamp(value: number, bounds: [number, number]): number {
 export function useKingdomHexCamera({
   center,
   centerId,
+  initialSnapshot = null,
   interactionEnabled = true,
   initialFitWorld = false,
   magneticFocus,
   minimumScale = 0.54,
+  onSnapshotChange,
   onWorldTapRelease,
   scene,
   viewport,
@@ -87,6 +91,8 @@ export function useKingdomHexCamera({
   const frameFocusKeyRef = useRef<string | null>(null);
   const onWorldTapReleaseRef = useRef(onWorldTapRelease);
   onWorldTapReleaseRef.current = onWorldTapRelease;
+  const onSnapshotChangeRef = useRef(onSnapshotChange);
+  onSnapshotChangeRef.current = onSnapshotChange;
   const decayCompletions = useSharedValue(0);
   const [ready, setReady] = useState(false);
   const [focusedTileId, setFocusedTileId] = useState<string | null>(centerId ?? null);
@@ -109,6 +115,16 @@ export function useKingdomHexCamera({
     isMoving: false,
     snapshot: { tx: 0, ty: 0, scale: 1 },
   }));
+  const emittedSnapshotKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!ready || renderState.isMoving) return;
+    const snapshot = renderState.snapshot;
+    const key = `${snapshot.tx.toFixed(2)}:${snapshot.ty.toFixed(2)}:${snapshot.scale.toFixed(4)}`;
+    if (emittedSnapshotKeyRef.current === key) return;
+    emittedSnapshotKeyRef.current = key;
+    onSnapshotChangeRef.current?.(snapshot);
+  }, [ready, renderState]);
 
   const commitSnapshot = useCallback(
     (nextTx: number, nextTy: number, nextScale: number, moving = false) => {
@@ -194,16 +210,20 @@ export function useKingdomHexCamera({
     if (!viewport.width || !viewport.height || !scene.width || !scene.height) return;
 
     if (!initializedRef.current) {
-      const initialScale = initialFitWorld
-        ? Math.max(minScale, Math.min(baseScale * 0.78, viewport.width / scene.width, viewport.height / scene.height))
-        : baseScale;
-      const home = kingdomCameraSnapshotForTarget(
-        viewport,
-        scene,
-        { x: centerX, y: centerY },
-        initialScale,
-        { x: viewport.width / 2, y: viewport.height / 2 },
-      );
+      const initialScale = initialSnapshot
+        ? clampHavenCameraScale(initialSnapshot.scale, minScale)
+        : initialFitWorld
+          ? Math.max(minScale, Math.min(baseScale * 0.78, viewport.width / scene.width, viewport.height / scene.height))
+          : baseScale;
+      const home = initialSnapshot
+        ? { ...clampCameraTranslation(initialSnapshot, viewport, scene, initialScale), scale: initialScale }
+        : kingdomCameraSnapshotForTarget(
+            viewport,
+            scene,
+            { x: centerX, y: centerY },
+            initialScale,
+            { x: viewport.width / 2, y: viewport.height / 2 },
+          );
       tx.value = home.tx;
       ty.value = home.ty;
       scale.value = home.scale;
@@ -230,7 +250,7 @@ export function useKingdomHexCamera({
     ty.value = clamped.ty;
     scale.value = nextScale;
     commitSnapshot(clamped.tx, clamped.ty, nextScale, false);
-  }, [baseScale, centerX, centerY, commitSnapshot, initialFitWorld, minScale, pinchStartScale, scale, scene, tx, ty, viewport]);
+  }, [baseScale, centerX, centerY, commitSnapshot, initialFitWorld, initialSnapshot, minScale, pinchStartScale, scale, scene, tx, ty, viewport]);
 
   const pan = useMemo(
     () =>

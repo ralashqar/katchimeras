@@ -53,6 +53,7 @@ import { katchimeraFamilyById } from '@/constants/katchimera-skins';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
 import { deriveHavenTilePresentation } from '@/utils/haven-tile-presentation';
 import { readyMergeOrderIds } from '@/utils/merge-world/engine';
+import type { KingdomCameraSnapshot } from '@/utils/kingdom-rendering';
 
 const LazyKatchimeraKingdomScreen = lazy(async () => {
   const module = await import('@/components/katchadeck/roster/katchimera-kingdom-screen');
@@ -96,12 +97,32 @@ function loadRosterPersistentSnapshot() {
  * The tab owns only the collection read model. Companion, journey, discovery,
  * journal, and mini-game controllers mount on their dedicated routes.
  */
-export function KatchimeraRosterRouteScreen() {
+export type KatchimeraWorldSession = {
+  activeWorldFamilyId: KatchimeraFamilyId | null;
+  cameraSnapshot: KingdomCameraSnapshot | null;
+};
+
+type KatchimeraRosterRouteScreenProps = {
+  onWorldSessionChange?: (session: KatchimeraWorldSession) => void;
+  worldSession?: KatchimeraWorldSession;
+};
+
+const EMPTY_WORLD_SESSION: KatchimeraWorldSession = { activeWorldFamilyId: null, cameraSnapshot: null };
+
+export function KatchimeraRosterRouteScreen({
+  onWorldSessionChange,
+  worldSession = EMPTY_WORLD_SESSION,
+}: KatchimeraRosterRouteScreenProps = {}) {
   const isFocused = useIsFocused();
-  return isFocused ? <FocusedKatchimeraRosterBoundary /> : null;
+  return isFocused ? (
+    <FocusedKatchimeraRosterBoundary
+      onWorldSessionChange={onWorldSessionChange}
+      worldSession={worldSession}
+    />
+  ) : null;
 }
 
-function FocusedKatchimeraRosterBoundary() {
+function FocusedKatchimeraRosterBoundary({ onWorldSessionChange, worldSession }: Required<Pick<KatchimeraRosterRouteScreenProps, 'worldSession'>> & Pick<KatchimeraRosterRouteScreenProps, 'onWorldSessionChange'>) {
   const { days } = useAllDays({ refreshOnFocus: false });
   const mergePersistent = useMemo(() => {
     const now = new Date();
@@ -127,12 +148,16 @@ function FocusedKatchimeraRosterBoundary() {
       days={mergePersistent.activityDays}
       featuredCharacterId="mossprout"
       questState={mergePersistent.quests}>
-      <FocusedKatchimeraRoster days={days} />
+      <FocusedKatchimeraRoster days={days} onWorldSessionChange={onWorldSessionChange} worldSession={worldSession} />
     </MergeWorldProvider>
   );
 }
 
-function FocusedKatchimeraRoster({ days }: { days: ReturnType<typeof useAllDays>['days'] }) {
+function FocusedKatchimeraRoster({ days, onWorldSessionChange, worldSession }: {
+  days: ReturnType<typeof useAllDays>['days'];
+  onWorldSessionChange?: (session: KatchimeraWorldSession) => void;
+  worldSession: KatchimeraWorldSession;
+}) {
   const router = useRouter();
   const ftueRun = useFtueRun();
   const { transitionTo } = useGameScreenTransition();
@@ -143,7 +168,12 @@ function FocusedKatchimeraRoster({ days }: { days: ReturnType<typeof useAllDays>
   // same initial focus would rebuild the just-mounted grid a second time.
   const [persistentSnapshot, setPersistentSnapshot] = useState(loadRosterPersistentSnapshot);
   const [contentReady, setContentReady] = useState(false);
-  const [activeWorldFamilyId, setActiveWorldFamilyId] = useState<KatchimeraFamilyId | null>(null);
+  const [activeWorldFamilyId, setActiveWorldFamilyId] = useState<KatchimeraFamilyId | null>(worldSession.activeWorldFamilyId);
+  const cameraSnapshotRef = useRef<KingdomCameraSnapshot | null>(worldSession.cameraSnapshot);
+  const publishWorldSession = useCallback((familyId: KatchimeraFamilyId | null, snapshot = cameraSnapshotRef.current) => {
+    cameraSnapshotRef.current = familyId ? snapshot : null;
+    onWorldSessionChange?.({ activeWorldFamilyId: familyId, cameraSnapshot: familyId ? snapshot : null });
+  }, [onWorldSessionChange]);
   const { state: mergeWorld } = useMergeWorldState();
   const relationshipTileStages = useHavenTileStages();
   const worldIdentity = useMemo(loadWorldIdentity, []);
@@ -262,8 +292,11 @@ function FocusedKatchimeraRoster({ days }: { days: ReturnType<typeof useAllDays>
       || ftueRun.stepId === 'haven.mossprout.restore'
       || ftueRun.stepId === 'haven.first_bloom'
       || ftueRun.stepId === 'haven.reveal'
-    ) setActiveWorldFamilyId('mossprout');
-  }, [ftueRun?.status, ftueRun?.stepId]);
+    ) {
+      setActiveWorldFamilyId('mossprout');
+      publishWorldSession('mossprout');
+    }
+  }, [ftueRun?.status, ftueRun?.stepId, publishWorldSession]);
   const closeWorld = useCallback(() => {
     if (havenNavigationLocked) return;
     transitionTo({
@@ -272,9 +305,10 @@ function FocusedKatchimeraRoster({ days }: { days: ReturnType<typeof useAllDays>
       navigate: () => {
         setContentReady(false);
         setActiveWorldFamilyId(null);
+        publishWorldSession(null);
       },
     });
-  }, [havenNavigationLocked, transitionTo]);
+  }, [havenNavigationLocked, publishWorldSession, transitionTo]);
   useEffect(() => {
     if (!activeWorldFamilyId || havenNavigationLocked) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -315,9 +349,10 @@ function FocusedKatchimeraRoster({ days }: { days: ReturnType<typeof useAllDays>
       navigate: () => {
         setContentReady(false);
         setActiveWorldFamilyId('mossprout');
+        publishWorldSession('mossprout');
       },
     });
-  }, [ftueRun?.status, ftueRun?.stepId, transitionTo]);
+  }, [ftueRun?.status, ftueRun?.stepId, publishWorldSession, transitionTo]);
   const continueFirstBloomToResident = useCallback(async () => {
     const now = Date.now();
     ensureMossproutFtueFirstResident();
@@ -353,6 +388,8 @@ function FocusedKatchimeraRoster({ days }: { days: ReturnType<typeof useAllDays>
     <View style={styles.screen}>
       {activeWorldFamilyId === 'mossprout' ? <Suspense fallback={<View accessibilityLabel="Loading Mossprout's Haven" style={styles.worldLoading}><ActivityIndicator color="#FFF0CE" /></View>}><LazyKatchimeraKingdomScreen
           background={background}
+          initialCameraSnapshot={cameraSnapshotRef.current}
+          onCameraSnapshotChange={(snapshot) => publishWorldSession('mossprout', snapshot)}
           onContentReady={() => setContentReady(true)}
           onBackToHavenSelector={closeWorld}
           navigationLocked={havenNavigationLocked}

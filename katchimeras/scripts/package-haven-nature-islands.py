@@ -49,8 +49,11 @@ MAX_LEVEL_KEYS = (
 )
 
 
-def alpha_bounds(image: Image.Image) -> tuple[int, int, int, int] | None:
-    return image.convert("RGBA").getchannel("A").getbbox()
+def alpha_bounds(image: Image.Image, *, threshold: int = 0) -> tuple[int, int, int, int] | None:
+    alpha = image.convert("RGBA").getchannel("A")
+    if threshold:
+        alpha = alpha.point(lambda value: 255 if value > threshold else 0)
+    return alpha.getbbox()
 
 
 def package(spec: NatureIslandSpec, *, check: bool) -> tuple[int, int, int]:
@@ -94,7 +97,12 @@ def package(spec: NatureIslandSpec, *, check: bool) -> tuple[int, int, int]:
 
 def normalized_square(master: Image.Image, size: int) -> Image.Image:
     rgba = master.convert("RGBA")
-    bounds = alpha_bounds(rgba)
+    # Image-generation extraction can leave isolated 1-8 alpha pixels at the
+    # canvas edge. Discard those before measuring so every island receives the
+    # same authored scale instead of shrinking around invisible noise.
+    alpha = rgba.getchannel("A").point(lambda value: 0 if value <= 8 else value)
+    rgba.putalpha(alpha)
+    bounds = alpha_bounds(rgba, threshold=8)
     if bounds is None:
         raise SystemExit("Level 4 master contains no visible pixels")
     cropped = rgba.crop(bounds)
@@ -106,7 +114,11 @@ def normalized_square(master: Image.Image, size: int) -> Image.Image:
     )
     resized = resize_rgba_premultiplied(cropped, target)
     square = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    square.alpha_composite(resized, ((size - target[0]) // 2, (size - target[1]) // 2))
+    bottom_padding = round(size * 0.02)
+    square.alpha_composite(resized, (
+        (size - target[0]) // 2,
+        size - bottom_padding - target[1],
+    ))
     return square
 
 

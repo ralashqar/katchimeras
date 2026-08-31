@@ -1409,10 +1409,15 @@ test('Merge HUD stays board-specific with only back navigation and Coins', () =>
   assert.doesNotMatch(screen, /KatchimeraPageHeader/);
   assert.doesNotMatch(screen, /onOpenCards|onOpenTrophies/);
   assert.match(screen, /leading=\{<KatchimeraBackButton/);
+  assert.match(screen, /source === 'haven-world'/);
+  assert.match(screen, /announcement: "Returning to Mossprout's Haven"[\s\S]*?target: 'katchimeras'[\s\S]*?navigate: \(\) => \{/);
+  assert.match(screen, /router\.canGoBack\(\)\) router\.back\(\)/);
+  assert.match(screen, /router\.replace\('\/\(tabs\)\/katchimeras'\)/);
+  assert.match(screen, /Return to Mossprout's Haven/);
   assert.match(screen, /trailing=\{<GameCurrencyHud/);
   assert.doesNotMatch(screen, /GameHudItem|worldChapter|chapterRatio/);
   assert.doesNotMatch(screen, /<GameHudControl/);
-  assert.match(screen, /hudBar: \{ justifyContent: 'space-between' \}/);
+  assert.match(screen, /hudBar: \{ elevation: 100, justifyContent: 'space-between', position: 'relative', zIndex: 100 \}/);
   assert.match(screen, /currencyHud: \{ flex: 0, paddingLeft: 18, width: 106 \}/);
 });
 

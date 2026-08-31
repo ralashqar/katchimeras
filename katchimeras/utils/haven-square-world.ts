@@ -35,8 +35,10 @@ export const HAVEN_WEST_NATURE_ISLAND_SIZE = 330;
 export const MOSSPROUT_WORLD_OFFSET_X = 420;
 export const MOSSPROUT_NATURE_ISLAND_SIZE = 300;
 export const MOSSPROUT_NATURE_ISLAND_COLUMN_CENTERS = [180, 1_140] as const;
-export const MOSSPROUT_NATURE_ISLAND_ROW_CENTERS = [340, 800, 1_260] as const;
-export const MOSSPROUT_GARDEN_FRAME_HEIGHT = 872;
+/** Compact three-row orbit matched to the authored Mossprout layout guide. */
+export const MOSSPROUT_NATURE_ISLAND_ROW_CENTERS = [340, 660, 1_040] as const;
+/** Slightly oversize the Garden so its fixed 120px order stacks clear the perimeter fence. */
+export const MOSSPROUT_GARDEN_FRAME_SIZE = 726;
 
 export const MOSSPROUT_SQUARE_ZONES: readonly HavenSquareZone[] = [
   { id: 'baristabbit-cafe', coord: { column: 0, row: 0 } },
@@ -88,11 +90,17 @@ export function mossproutGardenJunctionTrayFrames() {
   }));
 }
 
-/** Portrait frame for the complete 7x9 Mossprout merge island. */
+/** Enlarged square frame for the dedicated Garden destination island. */
 export function mossproutGardenFrame() {
   const garden = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'mossprout-garden')!;
   const square = mossproutWorldFrame(havenSquareZoneFrame(garden.coord));
-  return { ...square, height: MOSSPROUT_GARDEN_FRAME_HEIGHT };
+  const growth = MOSSPROUT_GARDEN_FRAME_SIZE - HAVEN_SQUARE_ZONE_SIZE;
+  return {
+    height: MOSSPROUT_GARDEN_FRAME_SIZE,
+    left: square.left - growth / 2,
+    top: square.top - growth / 2,
+    width: MOSSPROUT_GARDEN_FRAME_SIZE,
+  };
 }
 
 export function mossproutWorldFrame(frame: { height: number; left: number; top: number; width: number }) {
@@ -232,38 +240,7 @@ export function mossproutSquareSceneMetrics() {
   };
 }
 
-export const MOSSPROUT_GARDEN_SOURCE_SIZE = { height: 1_488, width: 1_024 } as const;
-
-/** Four calibrated corners of the empty playfield in the portrait source. */
-export const MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS = {
-  bottomLeft: { x: 143, y: 1_100 },
-  bottomRight: { x: 880, y: 1_100 },
-  topLeft: { x: 167, y: 188 },
-  topRight: { x: 836, y: 188 },
-} as const;
-
-/** Bounds enclosing the calibrated four-corner overlay. */
-export const MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS = {
-  bottom: MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS.bottomLeft.y,
-  left: MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS.bottomLeft.x,
-  right: MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS.bottomRight.x,
-  top: MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS.topLeft.y,
-} as const;
-
-export const MOSSPROUT_GARDEN_TOP_WIDTH_RATIO = (
-  MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS.topRight.x
-  - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS.topLeft.x
-) / (
-  MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS.bottomRight.x
-  - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS.bottomLeft.x
-);
-
-/** Cell aspect derived from the complete 7x9 runtime playfield. */
-export const MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO = (
-  (MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.bottom - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.top) / 9
-) / (
-  (MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.right - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.left) / 7
-);
+export const MOSSPROUT_GARDEN_SOURCE_SIZE = { height: 1_024, width: 1_024 } as const;
 
 /**
  * Keep every resident board on one world-space grid metric. The Steppling

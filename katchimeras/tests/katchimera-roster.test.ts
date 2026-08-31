@@ -285,7 +285,7 @@ test('the Katchimeras tab renders the hex selector first while companion Back re
   const companionRoute = read('components', 'katchadeck', 'world', 'katchimera-companion-route-screen.tsx');
 
   assert.doesNotMatch(rosterRoute, /KatchimeraViewMode|current === 'grid'|<KatchimeraRosterScreen/);
-  assert.match(rosterRoute, /return isFocused \? <FocusedKatchimeraRosterBoundary \/> : null/);
+  assert.match(rosterRoute, /return isFocused \? \([\s\S]*?<FocusedKatchimeraRosterBoundary[\s\S]*?worldSession=\{worldSession\}[\s\S]*?\) : null/);
   assert.match(rosterRoute, /<HavenSelectorPresentation/);
   assert.match(rosterRoute, /<LazyKatchimeraKingdomScreen/);
   assert.match(kingdomCanvas, /value: playerHavenHexTileSet\(\)/);
@@ -355,15 +355,17 @@ test('production companion surfaces consume Merge World discovery ownership', ()
   assert.match(gamesRoute, /withDiscoveredKatchimeras/);
 });
 
-test('the Mossprout sub-world supplies only its Mossprout merge board', () => {
+test('the Mossprout sub-world routes Garden orders to the dedicated activity page', () => {
   const kingdomScreen = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'roster', 'katchimera-kingdom-screen.tsx'),
     'utf8',
   );
-  assert.match(kingdomScreen, /id: 'mossprout' as const/);
+  assert.match(kingdomScreen, /pathname: '\/katchimera\/\[creatureId\]\/activity'/);
+  assert.match(kingdomScreen, /source: 'haven-world'/);
+  assert.match(kingdomScreen, /focusOrderId: orderId/);
   assert.doesNotMatch(kingdomScreen, /mergeWorldStateForBoard\(mergeWorld, 'steppling'\)/);
-  assert.doesNotMatch(kingdomScreen, /boardId: 'steppling'|id: 'steppling' as const/);
-  assert.match(kingdomScreen, /mergeBoards=\{havenMergeBoards\}/);
+  assert.doesNotMatch(kingdomScreen, /mergeBoards=|mergeBoardFocusRequest=/);
+  assert.match(kingdomScreen, /gardenOrders=\{gardenOrderEntries\}/);
 });
 
 test('Haven uses the hex selector as its top level and lazy-mounts only implemented family worlds', () => {
@@ -447,7 +449,7 @@ test('the roster, companion, and Block Blast use isolated route boundaries', () 
   assert.doesNotMatch(rosterCard, /FadeInUp|entering=|translateY/);
   assert.match(rosterRoute, /hasCompletedInitialFocus/);
   assert.match(rosterRoute, /useIsFocused/);
-  assert.match(rosterRoute, /isFocused \? <FocusedKatchimeraRosterBoundary[\s\S]*?\/> : null/);
+  assert.match(rosterRoute, /isFocused \? \([\s\S]*?<FocusedKatchimeraRosterBoundary[\s\S]*?\) : null/);
   assert.match(gameRoute, /BlockBlastQuest/);
   assert.match(gameRoute, /BlockBlastGameShell/);
   assert.match(gameShell, /cheerlet-exploration-v1\.png/);

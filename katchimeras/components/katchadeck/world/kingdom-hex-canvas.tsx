@@ -18,12 +18,7 @@ import Animated, {
 
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
 import { EggAvatarArtwork } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
-import {
-  type MergeBoardScreenMetrics,
-} from '@/components/katchadeck/games/feastle-persistent-merge-board';
-import { MergePlaySurface } from '@/components/katchadeck/games/merge-play-surface';
-import type { MergeOrderTrayEntry, MergeTrayEntry } from '@/components/katchadeck/games/merge-order-rail';
-import { MergeServeRewardOverlay, type MergeScreenPoint, type MergeServeRewardFlight } from '@/components/katchadeck/games/merge-serve-reward-overlay';
+import { FrozenMergeOrderTrayCard, type MergeOrderTrayEntry } from '@/components/katchadeck/games/merge-order-rail';
 import { HavenUpgradeEffects } from '@/components/katchadeck/world/haven-upgrade-effects';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { KingdomTileArtLayer, KingdomTileRender } from '@/components/katchadeck/world/kingdom-hex-scene';
@@ -32,21 +27,19 @@ import { buildMossproutSquareScene } from '@/components/katchadeck/world/mosspro
 import { SeamlessWorldImage } from '@/components/katchadeck/world/seamless-world-image';
 import { useKingdomHexCamera } from '@/components/katchadeck/world/use-kingdom-hex-camera';
 import { KINGDOM_RENDERING } from '@/constants/kingdom-rendering';
-import { MERGE_WORLD_COLUMNS } from '@/constants/merge-world-catalog';
 import { mossproutNatureIslandById } from '@/constants/mossprout-nature-islands';
 import kingdomWorldViewConfig from '@/constants/kingdom-world-view.json';
 import { Lantern } from '@/constants/theme';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
-import { createMergeBoardSession } from '@/features/onboarding/merge-ftue-interaction-coordinator';
-import type { MergeBoardInteractionGate, MergeRailInteractionGate } from '@/features/onboarding/merge-ftue';
 import type { EggVisualState } from '@/types/home';
-import type { MergeBoardId, MergeCharacterId, MergeWorldCommand, MergeWorldCommandResult, MergeWorldState, MossproutNatureIslandId, MossproutNatureIslandLevel } from '@/types/merge-world';
+import type { MossproutNatureIslandId, MossproutNatureIslandLevel } from '@/types/merge-world';
 import type { FtueCameraDirective } from '@/features/onboarding/ftue-types';
 import type { WorldIdentityState } from '@/types/world-identity';
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
-import { homePreset, localDayId } from '@/utils/world-identity';
+import { homePreset } from '@/utils/world-identity';
 import { HEX_TILE_H, HEX_TILE_W, hexDrawDepth } from '@/utils/world-hex';
 import {
+  type KingdomCameraSnapshot,
   kingdomWorldViewPoint,
 } from '@/utils/kingdom-rendering';
 import { getDevKingdomHexVerticalAlignmentMode } from '@/utils/dev-asset-overrides';
@@ -58,9 +51,6 @@ import {
   type HavenUpgradePresentationPhase,
 } from '@/utils/haven-upgrade-presentation';
 import { useScenePerformanceProbe } from '@/hooks/use-scene-performance-probe';
-import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
-import { mergeOrderReady, mergeOrderServingCells } from '@/utils/merge-world/engine';
-import { isDevHavenOrderFiller } from '@/utils/merge-world/dev-haven-order-fillers';
 import {
   playerHavenHexTileSet,
   kingdomHexTileOverlaySourceForLod,
@@ -76,28 +66,6 @@ export type KingdomResidentScreenAnchor = {
   x: number;
   y: number;
 };
-export type KingdomMergeCoinPresentation =
-  | { type: 'prepare'; value: number }
-  | { durationMs: number; type: 'contact'; value: number }
-  | { type: 'pulse' }
-  | { type: 'reset' };
-
-export type KingdomHavenMergeBoardDescriptor = {
-  boardInteractionGate?: MergeBoardInteractionGate;
-  dispatch: (command: MergeWorldCommand) => MergeWorldCommandResult | null;
-  id: MergeBoardId;
-  orderInteractionGate?: MergeRailInteractionGate;
-  focusOrderId?: string;
-  state: MergeWorldState;
-  trayEntries: readonly MergeTrayEntry[];
-};
-
-export type KingdomMergeBoardFocusRequest = {
-  boardId: MergeBoardId;
-  nonce: number;
-  orderId?: string | null;
-};
-
 type Props = {
   background: TodayAtmosphereBackground;
   companionSlots: KingdomHexCompanionSlot[];
@@ -117,13 +85,10 @@ type Props = {
   upgradePresentation?: HavenTileUpgradePresentation | null;
   highlightedLockedFamilyId?: string | null;
   discoveryRevealFamilyId?: string | null;
-  mergeCoinTargetRef?: { current: View | null };
-  onMergeCoinPresentation?: (event: KingdomMergeCoinPresentation) => void;
-  mergeBoards?: readonly KingdomHavenMergeBoardDescriptor[];
-  mergeBoardFocusRequest?: KingdomMergeBoardFocusRequest | null;
-  mergeBoardExitRequestNonce?: number;
-  onMergeFocusChange?: (focused: boolean) => void;
-  onOpenMergeChat?: (characterId: MergeCharacterId, noteId: string) => void;
+  gardenOrders?: readonly MergeOrderTrayEntry[];
+  initialCameraSnapshot?: KingdomCameraSnapshot | null;
+  onCameraSnapshotChange?: (snapshot: KingdomCameraSnapshot) => void;
+  onOpenGarden?: (orderId?: string | null) => void;
   interactionResidentId?: string | null;
   onResidentFocusComplete?: (creatureId: string) => void;
   squareWorld?: boolean;
@@ -143,16 +108,39 @@ const KINGDOM_DREAM_MIST_LOCK_SOURCE = require('../../../assets/images/katchimer
 const LOCKED_TILE_HIT_WIDTH = HEX_TILE_W * 0.62;
 const LOCKED_TILE_HIT_HEIGHT = HEX_TILE_H * 0.78;
 const LOCKED_TILE_LOCK_SIZE = 104;
-const MERGE_TRAY_HEIGHT = 120;
-const MERGE_INSPECTOR_HEIGHT = 82;
+const GARDEN_ORDER_SLOT_CENTERS = [
+  { x: 0.27, y: 0.205 },
+  { x: 0.5, y: 0.185 },
+  { x: 0.73, y: 0.205 },
+] as const;
+const GARDEN_ORDER_CARD_WIDTH = 120;
+const GARDEN_ORDER_CARD_HEIGHT = 120;
 
-function mergePlaySurfaceFrame(frame: { height: number; left: number; top: number; width: number }) {
-  return {
-    height: frame.height + MERGE_TRAY_HEIGHT + MERGE_INSPECTOR_HEIGHT,
-    left: frame.left,
-    top: frame.top - MERGE_TRAY_HEIGHT,
-    width: frame.width,
-  };
+function GardenOrderShortcut({ entry, frame, index, onPress }: {
+  entry: MergeOrderTrayEntry;
+  frame: { height: number; left: number; top: number; width: number };
+  index: number;
+  onPress: () => void;
+}) {
+  const slot = GARDEN_ORDER_SLOT_CENTERS[index];
+  if (!slot) return null;
+  return (
+    <Pressable
+      accessibilityHint="Opens this order in the Garden"
+      accessibilityLabel={`${entry.order.title}${entry.ready ? ', ready to serve' : ''}`}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.gardenOrderShortcut,
+        {
+          left: frame.left + frame.width * slot.x - GARDEN_ORDER_CARD_WIDTH / 2,
+          top: frame.top + frame.height * slot.y - GARDEN_ORDER_CARD_HEIGHT / 2,
+        },
+        pressed && styles.gardenOrderShortcutPressed,
+      ]}>
+      <FrozenMergeOrderTrayCard entry={entry} />
+    </Pressable>
+  );
 }
 
 export const KingdomHexCanvas = memo(function KingdomHexCanvas({
@@ -173,13 +161,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   upgradePresentation,
   highlightedLockedFamilyId,
   discoveryRevealFamilyId = null,
-  mergeCoinTargetRef,
-  onMergeCoinPresentation,
-  mergeBoards = [],
-  mergeBoardFocusRequest = null,
-  mergeBoardExitRequestNonce = 0,
-  onMergeFocusChange,
-  onOpenMergeChat,
+  gardenOrders = [],
+  initialCameraSnapshot,
+  onCameraSnapshotChange,
+  onOpenGarden,
   interactionResidentId = null,
   onResidentFocusComplete,
   squareWorld = false,
@@ -190,67 +175,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const [assetRevision, setAssetRevision] = useState(0);
   const [upgradePhase, setUpgradePhase] = useState<HavenUpgradePresentationPhase>('armed');
   const [discoveryPhase, setDiscoveryPhase] = useState<HavenUpgradePresentationPhase>('armed');
-  const [selectedMergeCell, setSelectedMergeCell] = useState<number | null>(null);
-  const [activeMergeBoardId, setActiveMergeBoardId] = useState<MergeBoardId | null>(null);
-  const [pendingMergeBoardId, setPendingMergeBoardId] = useState<MergeBoardId | null>(null);
-  const [mergeMetricsRevision, setMergeMetricsRevision] = useState(0);
-  const [serveFlight, setServeFlight] = useState<MergeServeRewardFlight | null>(null);
-  const [serveHiddenItemIds, setServeHiddenItemIds] = useState<Set<string>>(() => new Set());
-  const mergeBoardById = useMemo(
-    () => new Map(mergeBoards.map((board) => [board.id, board])),
-    [mergeBoards],
-  );
-  const activeMergeBoard = activeMergeBoardId ? mergeBoardById.get(activeMergeBoardId) ?? null : null;
   const rootRef = useRef<View>(null);
-  const mergeParcelTargetRef = useRef<View>(null);
-  const mergeBoardMetricsRef = useRef<MergeBoardScreenMetrics | null>(null);
-  const activeServeRef = useRef(false);
-  const activeServeOrderRef = useRef<{
-    coinAmount: number;
-    order: MergeOrderTrayEntry['order'];
-    orderId: string;
-    startingCoins: number;
-  } | null>(null);
-  const coinPayoutStartedRef = useRef(false);
-  const serveNonceRef = useRef(0);
-  const mergeBoardStateRef = useRef(activeMergeBoard?.state ?? null);
-  mergeBoardStateRef.current = activeMergeBoard?.state ?? null;
-  const mergeSessionRef = useRef<{ boardId: MergeBoardId | null; session: ReturnType<typeof createMergeBoardSession> } | null>(null);
-  if (!mergeSessionRef.current || mergeSessionRef.current.boardId !== activeMergeBoardId) {
-    mergeSessionRef.current = { boardId: activeMergeBoardId, session: createMergeBoardSession() };
-  }
-  const mergeSessionId = mergeSessionRef.current.session.id;
   const reduceMotion = useReducedMotion();
-
-  useEffect(() => {
-    if (!interactionResidentId) return;
-    setActiveMergeBoardId(null);
-    setPendingMergeBoardId(null);
-    setSelectedMergeCell(null);
-  }, [interactionResidentId]);
-
-  useEffect(() => {
-    mergeBoardMetricsRef.current = null;
-    activeServeRef.current = false;
-    activeServeOrderRef.current = null;
-    coinPayoutStartedRef.current = false;
-    setSelectedMergeCell(null);
-    setServeFlight(null);
-    setServeHiddenItemIds(new Set());
-    setMergeMetricsRevision((revision) => revision + 1);
-  }, [activeMergeBoardId]);
 
   useFocusEffect(
     useCallback(() => {
       setAssetRevision((current) => current + 1);
-      setActiveMergeBoardId(null);
-      setPendingMergeBoardId(null);
-      setSelectedMergeCell(null);
-      return () => {
-        setActiveMergeBoardId(null);
-        setPendingMergeBoardId(null);
-        setSelectedMergeCell(null);
-      };
+      return undefined;
     }, [])
   );
 
@@ -365,15 +296,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       clearTimeout(completeTimer);
     };
   }, [discoveryLayers, reduceMotion]);
-  const mergeBoardFrames = useMemo(() => {
-    const frames = new Map<MergeBoardId, { height: number; left: number; top: number; width: number }>();
-    for (const layer of scene.tileArtLayers) {
-      if (!layer.interactionFrame) continue;
-      if (layer.id === 'structure:mossprout-square-garden') frames.set('mossprout', mergePlaySurfaceFrame(layer.interactionFrame));
-      if (layer.id === 'structure:steppling-square-board') frames.set('steppling', mergePlaySurfaceFrame(layer.interactionFrame));
-    }
-    return frames;
-  }, [scene.tileArtLayers]);
+  const gardenFrame = useMemo(() => scene.tileArtLayers.find(
+    (layer) => layer.id === 'structure:mossprout-square-garden',
+  )?.interactionFrame ?? null, [scene.tileArtLayers]);
   const natureIslandFrames = useMemo(() => scene.tileArtLayers.flatMap((layer) => {
     if (!layer.id.startsWith('nature:mossprout:') || layer.id.endsWith(':growth') || !layer.interactionFrame) return [];
     return [{
@@ -381,35 +306,12 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       islandId: layer.id.slice('nature:mossprout:'.length) as MossproutNatureIslandId,
     }];
   }), [scene.tileArtLayers]);
-  const handledMergeBoardRequestRef = useRef(0);
-  useEffect(() => {
-    if (!mergeBoardFocusRequest || handledMergeBoardRequestRef.current === mergeBoardFocusRequest.nonce) return;
-    const target = mergeBoardById.get(mergeBoardFocusRequest.boardId);
-    if (!target || !mergeBoardFrames.has(target.id)) return;
-    handledMergeBoardRequestRef.current = mergeBoardFocusRequest.nonce;
-    setSelectedMergeCell(null);
-    setActiveMergeBoardId(null);
-    setPendingMergeBoardId(target.id);
-  }, [mergeBoardById, mergeBoardFocusRequest, mergeBoardFrames]);
-  const handleWorldTapRelease = useCallback((x: number, y: number) => {
-    if (activeServeRef.current || upgradePresentation) return;
-    const target = mergeBoards.find((board) => {
-      if (board.id === activeMergeBoardId) return false;
-      const frame = mergeBoardFrames.get(board.id);
-      return frame
-        && x >= frame.left && x <= frame.left + frame.width
-        && y >= frame.top && y <= frame.top + frame.height;
-    });
-    if (!target) return;
-    setSelectedMergeCell(null);
-    setActiveMergeBoardId(null);
-    setPendingMergeBoardId(target.id);
-  }, [activeMergeBoardId, mergeBoardFrames, mergeBoards, upgradePresentation]);
   const camera = useKingdomHexCamera({
     center: { x: scene.centerTile.cx, y: scene.centerTile.cy },
     centerId: scene.centerTile.id,
     initialFitWorld: squareWorld,
-    interactionEnabled: interactionEnabled && !upgradePresentation && !activeMergeBoardId && !pendingMergeBoardId,
+    initialSnapshot: initialCameraSnapshot,
+    interactionEnabled: interactionEnabled && !upgradePresentation,
     magneticFocus: presentation?.focusMode === 'magnetic'
       ? {
           anchorY: presentation.snapAnchorY,
@@ -420,26 +322,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         }
       : undefined,
     minimumScale: squareWorld ? 0.28 : undefined,
-    onWorldTapRelease: squareWorld ? handleWorldTapRelease : undefined,
+    onSnapshotChange: onCameraSnapshotChange,
     scene,
     viewport,
   });
-  const mergeFocusActive = activeMergeBoardId != null || pendingMergeBoardId != null;
-  const exitMergeFocus = useCallback(() => {
-    setActiveMergeBoardId(null);
-    setPendingMergeBoardId(null);
-    setSelectedMergeCell(null);
-    camera.recenter();
-  }, [camera]);
-  useEffect(() => {
-    onMergeFocusChange?.(mergeFocusActive);
-  }, [mergeFocusActive, onMergeFocusChange]);
-  const handledMergeExitRequestRef = useRef(mergeBoardExitRequestNonce);
-  useEffect(() => {
-    if (handledMergeExitRequestRef.current === mergeBoardExitRequestNonce) return;
-    handledMergeExitRequestRef.current = mergeBoardExitRequestNonce;
-    if (mergeFocusActive) exitMergeFocus();
-  }, [exitMergeFocus, mergeBoardExitRequestNonce, mergeFocusActive]);
   const handleNatureIslandPress = useCallback((
     islandId: MossproutNatureIslandId,
     frame: { height: number; left: number; top: number; width: number },
@@ -452,41 +338,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     });
     onSelectNatureIsland?.(islandId);
   }, [camera, onSelectNatureIsland, reduceMotion, viewport.height]);
-  const focusCameraFrame = camera.focusFrame;
-  const focusMergeBoard = useCallback((boardId: MergeBoardId = activeMergeBoardId ?? 'mossprout') => {
-    const frame = mergeBoardFrames.get(boardId);
-    if (!frame) return;
-    focusCameraFrame(frame, {
-      durationMs: reduceMotion ? 0 : 360,
-      horizontalPadding: 6,
-      screenCenterY: viewport.height * 0.54,
-      verticalPadding: 52,
-    });
-  }, [activeMergeBoardId, focusCameraFrame, mergeBoardFrames, reduceMotion, viewport.height]);
-  useEffect(() => {
-    if (!pendingMergeBoardId) return;
-    const frame = mergeBoardFrames.get(pendingMergeBoardId);
-    if (!frame) {
-      setPendingMergeBoardId(null);
-      return;
-    }
-    focusCameraFrame(frame, {
-      durationMs: reduceMotion ? 0 : 360,
-      horizontalPadding: 6,
-      onComplete: () => {
-        mergeBoardById.get(pendingMergeBoardId)?.dispatch({ type: 'refreshTime', now: Date.now() });
-        setActiveMergeBoardId(pendingMergeBoardId);
-        setPendingMergeBoardId(null);
-      },
-      screenCenterY: viewport.height * 0.54,
-      verticalPadding: 52,
-    });
-  }, [focusCameraFrame, mergeBoardById, mergeBoardFrames, pendingMergeBoardId, reduceMotion, viewport.height]);
-  useEffect(() => {
-    if (!camera.ready || camera.isMoving) return;
-    const frame = requestAnimationFrame(() => setMergeMetricsRevision((value) => value + 1));
-    return () => cancelAnimationFrame(frame);
-  }, [camera.isMoving, camera.ready]);
   const tutorialCameraKey = tutorialCamera ? JSON.stringify(tutorialCamera) : 'none';
   const appliedTutorialCameraRef = useRef('none');
   const fitTutorialWorld = camera.fitWorld;
@@ -655,119 +506,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     () => new Map(scene.tileArtLayers.map((layer) => [layer.id, layer])),
     [scene.tileArtLayers]
   );
-  const selectMergeCell = useCallback((cell: number | null) => {
-    setSelectedMergeCell(cell);
-  }, []);
-  const handleMergeBoardMetrics = useCallback((metrics: MergeBoardScreenMetrics) => {
-    mergeBoardMetricsRef.current = metrics;
-  }, []);
-  const handleHiddenServeItemsRetired = useCallback((instanceIds: readonly string[]) => {
-    setServeHiddenItemIds((current) => {
-      if (!instanceIds.some((instanceId) => current.has(instanceId))) return current;
-      const next = new Set(current);
-      instanceIds.forEach((instanceId) => next.delete(instanceId));
-      return next;
-    });
-  }, []);
-  const resetServePresentation = useCallback((restoreItems: boolean) => {
-    activeServeRef.current = false;
-    activeServeOrderRef.current = null;
-    coinPayoutStartedRef.current = false;
-    setServeFlight(null);
-    if (restoreItems) setServeHiddenItemIds(new Set());
-    onMergeCoinPresentation?.({ type: 'reset' });
-  }, [onMergeCoinPresentation]);
-  const startHavenServe = useCallback(async (
-    order: MergeOrderTrayEntry['order'],
-    itemTargets: readonly MergeScreenPoint[],
-  ) => {
-    const state = mergeBoardStateRef.current;
-    const metrics = mergeBoardMetricsRef.current;
-    if (!activeMergeBoard || !state || !metrics || activeServeRef.current) return false;
-    const servingItems = mergeOrderServingCells(state, order);
-    if (servingItems.length !== itemTargets.length || !mergeOrderReady(state, order)) return false;
-    activeServeRef.current = true;
-    coinPayoutStartedRef.current = false;
-    activeServeOrderRef.current = { coinAmount: order.reward.coins, order, orderId: order.id, startingCoins: state.coins };
-    const [rootRect, coinRect] = await Promise.all([
-      measureViewInWindow(rootRef),
-      mergeCoinTargetRef ? measureViewInWindow(mergeCoinTargetRef) : Promise.resolve(null),
-    ]);
-    if (!rootRect || !coinRect || activeServeOrderRef.current?.orderId !== order.id) {
-      resetServePresentation(true);
-      return false;
-    }
-    const localTargets = itemTargets.map((target) => ({
-      x: target.x - rootRect.x,
-      y: target.y - rootRect.y,
-    }));
-    const items = servingItems.map((item, index) => ({
-      definitionId: item.definitionId,
-      from: havenServeOrigin(metrics, item.cell, rootRect),
-      instanceId: item.instanceId,
-      to: localTargets[index],
-    }));
-    const rewardOrigin = localTargets.reduce(
-      (point, target) => ({ x: point.x + target.x / localTargets.length, y: point.y + target.y / localTargets.length }),
-      { x: 0, y: 0 },
-    );
-    const coinTarget = {
-      x: coinRect.x - rootRect.x + coinRect.width / 2,
-      y: coinRect.y - rootRect.y + coinRect.height / 2,
-    };
-    serveNonceRef.current += 1;
-    setServeHiddenItemIds(new Set(items.map((item) => item.instanceId)));
-    setServeFlight({
-      coinAmount: order.reward.coins,
-      coinFrom: rewardOrigin,
-      coinTo: coinTarget,
-      energyAmount: 0,
-      energyTo: coinTarget,
-      items,
-      nonce: serveNonceRef.current,
-      phase: 'items',
-    });
-    return true;
-  }, [activeMergeBoard, mergeCoinTargetRef, resetServePresentation]);
-  const handleHavenServeItemsArrive = useCallback(() => {
-    const activeOrder = activeServeOrderRef.current;
-    const state = mergeBoardStateRef.current;
-    if (!activeOrder || !state || !mergeOrderReady(state, activeOrder.order)) {
-      resetServePresentation(true);
-      return;
-    }
-    onMergeCoinPresentation?.({ type: 'prepare', value: state.coins });
-    setServeFlight((current) => current ? { ...current, phase: 'rewards' } : null);
-    if (process.env.EXPO_OS === 'ios') {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-  }, [onMergeCoinPresentation, resetServePresentation]);
-  const handleHavenCoinArrive = useCallback((_amount: number, contactWindowMs: number) => {
-    const activeOrder = activeServeOrderRef.current;
-    if (!activeOrder) return;
-    if (!coinPayoutStartedRef.current) {
-      coinPayoutStartedRef.current = true;
-      onMergeCoinPresentation?.({
-        durationMs: contactWindowMs,
-        type: 'contact',
-        value: activeOrder.startingCoins + activeOrder.coinAmount,
-      });
-    }
-    onMergeCoinPresentation?.({ type: 'pulse' });
-    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, [onMergeCoinPresentation]);
-  const finishHavenServe = useCallback(() => {
-    const activeOrder = activeServeOrderRef.current;
-    const state = mergeBoardStateRef.current;
-    if (!activeMergeBoard || !activeOrder || !state || !mergeOrderReady(state, activeOrder.order)) {
-      resetServePresentation(true);
-      return;
-    }
-    const result = activeMergeBoard.dispatch(isDevHavenOrderFiller(activeOrder.order)
-      ? { type: 'serveDevHavenOrder', order: activeOrder.order, now: Date.now() }
-      : { type: 'serveOrder', orderId: activeOrder.orderId, now: Date.now() });
-    resetServePresentation(!result?.changed);
-  }, [activeMergeBoard, resetServePresentation]);
   const tileFocusScale = useCallback((tileId: string) => {
     if (!presentation || presentation.focusMode !== 'magnetic' || camera.isMoving || !camera.focusedTileId) return 1;
     if (tileId === camera.focusedTileId) return reduceMotion ? 1.04 : presentation.focusedScale;
@@ -950,6 +688,26 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 </Fragment>
               );
             })}
+            {squareWorld && interactionEnabled && !upgradePresentation && gardenFrame && onOpenGarden ? (
+              <Pressable
+                accessibilityHint="Opens the dedicated Merge Garden"
+                accessibilityLabel="Mossprout Garden"
+                accessibilityRole="button"
+                onPress={() => onOpenGarden()}
+                style={[styles.gardenIslandHitTarget, gardenFrame]}
+              />
+            ) : null}
+            {squareWorld && interactionEnabled && !upgradePresentation && gardenFrame && onOpenGarden
+              ? gardenOrders.slice(0, 3).map((entry, index) => (
+                  <GardenOrderShortcut
+                    entry={entry}
+                    frame={gardenFrame}
+                    index={index}
+                    key={`garden-order-shortcut-${entry.id}`}
+                    onPress={() => onOpenGarden(entry.order.id)}
+                  />
+                ))
+              : null}
             {squareWorld && interactionEnabled && !upgradePresentation ? natureIslandFrames.map(({ frame, islandId }) => {
               const definition = mossproutNatureIslandById.get(islandId);
               const level = mossproutNatureIslandLevels?.[islandId] ?? 0;
@@ -992,81 +750,11 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           </Animated.View>
         </View>
       </GestureDetector>
-      {/* Keep board input out of the camera handler's native gesture tree.
-          This sibling mirrors the world transform, while box-none lets every
-          point outside the board fall through to the camera underneath. */}
-      {mergeBoards.length > 0 && !upgradePresentation ? (
-        <Animated.View
-          key={`haven-merge-play-surfaces-${assetRevision}`}
-          pointerEvents={interactionEnabled && activeMergeBoardId && !camera.isMoving ? 'box-none' : 'none'}
-          style={[
-            styles.mergeBoardInteractionLayer,
-            { height: scene.height, width: scene.width },
-            camera.worldStyle,
-          ]}>
-          {mergeBoards.map((board) => {
-            const frame = mergeBoardFrames.get(board.id);
-            if (!frame) return null;
-            const live = interactionEnabled && board.id === activeMergeBoardId && !camera.isMoving && !serveFlight;
-            return (
-              <View
-                key={`haven-merge-play-surface-${board.id}`}
-                style={[
-                  styles.mergeBoardWorldFrame,
-                  { height: frame.height, left: frame.left, top: frame.top, width: frame.width },
-                ]}>
-                <MergePlaySurface
-                  animateEntrance={false}
-                  boardInteractionGate={board.boardInteractionGate}
-                  focusOrderId={mergeBoardFocusRequest?.boardId === board.id ? mergeBoardFocusRequest.orderId ?? undefined : board.focusOrderId}
-                  hiddenItemInstanceIds={serveHiddenItemIds}
-                  inspectedCell={selectedMergeCell}
-                  interactionEnabled={live}
-                  interactionSessionKey={mergeSessionId}
-                  maxHeight={frame.height}
-                  onBoardRelease={() => focusMergeBoard(board.id)}
-                  onCommand={board.dispatch}
-                  onHiddenItemsRetired={handleHiddenServeItemsRetired}
-                  onInspectMist={selectMergeCell}
-                  onInspectRootbound={(gateId) => {
-                    const cell = board.state.board.findIndex((candidate) => candidate.mist?.kind === 'rootbound_echo' && candidate.mist.gateId === gateId);
-                    if (cell >= 0) selectMergeCell(cell);
-                  }}
-                  onOpenChat={(characterId, noteId) => onOpenMergeChat?.(characterId, noteId)}
-                  onOpenParcel={(arrivalId) => {
-                    board.dispatch({ type: 'claimArrival', arrivalId, now: Date.now() });
-                  }}
-                  onReroll={(order) => board.dispatch({ type: 'rerollOrder', orderId: order.id, now: Date.now() })}
-                  onScreenMetrics={handleMergeBoardMetrics}
-                  onSelect={(cell) => selectMergeCell(cell)}
-                  onServe={startHavenServe}
-                  onUseGrovelight={(gateId) => board.dispatch({ type: 'useGrovelightResonance', gateId, dayId: localDayId(), now: Date.now() })}
-                  parcelTargetRef={mergeParcelTargetRef}
-                  railInteractionGate={board.orderInteractionGate}
-                  screenMetricsRevision={mergeMetricsRevision}
-                  selectedCell={selectedMergeCell}
-                  sessionId={mergeSessionId}
-                  state={board.state}
-                  trayEntries={board.trayEntries}
-                  width={frame.width}
-                />
-              </View>
-            );
-          })}
-        </Animated.View>
-      ) : null}
-      <MergeServeRewardOverlay
-        flight={serveFlight}
-        onCoinArrive={handleHavenCoinArrive}
-        onEnergyArrive={() => undefined}
-        onFinish={finishHavenServe}
-        onItemsArrive={handleHavenServeItemsArrive}
-      />
       {!upgradePresentation && interactionEnabled ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={mergeFocusActive ? 'Exit merge board' : 'Recenter kingdom'}
-          onPress={mergeFocusActive ? exitMergeFocus : camera.recenter}
+          accessibilityLabel="Recenter kingdom"
+          onPress={camera.recenter}
           style={[styles.recenter, { bottom: recenterBottom }]}>
           <IconSymbol name="scope" size={22} color={Lantern.moon50} />
         </Pressable>
@@ -1555,54 +1243,19 @@ const ResidentStatusGlyph = memo(function ResidentStatusGlyph({ status }: { stat
   );
 });
 
-function measureViewInWindow(ref: { current: View | null }): Promise<{ height: number; width: number; x: number; y: number } | null> {
-  return new Promise((resolve) => {
-    const view = ref.current;
-    if (!view) {
-      resolve(null);
-      return;
-    }
-    view.measureInWindow((x, y, width, height) => {
-      resolve(width > 0 && height > 0 ? { height, width, x, y } : null);
-    });
-  });
-}
-
-function havenServeOrigin(
-  metrics: MergeBoardScreenMetrics,
-  cell: number,
-  rootRect: { x: number; y: number },
-): MergeScreenPoint {
-  const { geometry } = metrics;
-  const visualIndex = geometry.cellIndices?.indexOf(cell) ?? cell;
-  if (visualIndex >= 0 && visualIndex < geometry.columns * geometry.rows) {
-    const center = mergeCellCenter(geometry, cell);
-    return {
-      x: metrics.x - rootRect.x + center.x,
-      y: metrics.y - rootRect.y + center.y,
-    };
-  }
-
-  const column = Math.max(0, Math.min(MERGE_WORLD_COLUMNS - 1, cell % MERGE_WORLD_COLUMNS));
-  const canonicalRow = Math.floor(cell / MERGE_WORLD_COLUMNS);
-  const useTopEdge = canonicalRow < 1;
-  const proxyRow = useTopEdge ? 1 : 6;
-  const proxyCell = proxyRow * MERGE_WORLD_COLUMNS + column;
-  const proxyCenter = mergeCellCenter(geometry, proxyCell);
-  const halfCellHeight = (geometry.cellHeight ?? geometry.cellSize) / 2;
-  return {
-    x: metrics.x - rootRect.x + proxyCenter.x,
-    y: metrics.y - rootRect.y + proxyCenter.y + (useTopEdge ? -halfCellHeight : halfCellHeight),
-  };
-}
-
 const styles = StyleSheet.create({
   root: { flex: 1, overflow: 'hidden' },
   scene: { position: 'relative' },
   focusLayer: { position: 'absolute' },
   tileArt: { position: 'absolute' },
-  mergeBoardWorldFrame: { alignItems: 'center', justifyContent: 'center', position: 'absolute' },
-  mergeBoardInteractionLayer: { left: 0, position: 'absolute', top: 0 },
+  gardenIslandHitTarget: { position: 'absolute', zIndex: 10 },
+  gardenOrderShortcut: {
+    height: GARDEN_ORDER_CARD_HEIGHT,
+    position: 'absolute',
+    width: GARDEN_ORDER_CARD_WIDTH,
+    zIndex: 20,
+  },
+  gardenOrderShortcutPressed: { opacity: 0.9, transform: [{ scale: 0.94 }] },
   eggLayer: { height: EGG_WORLD_H, position: 'absolute', width: EGG_WORLD_W },
   creature: { position: 'absolute' },
   lockedTileHitTarget: { alignItems: 'center', justifyContent: 'center', position: 'absolute' },

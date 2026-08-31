@@ -14,11 +14,7 @@ import {
   HAVEN_SQUARE_ROW_PITCH,
   HAVEN_SQUARE_ZONE_SIZE,
   MOSSPROUT_NATURE_ISLAND_SIZE,
-  MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO,
-  MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS,
-  MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS,
   MOSSPROUT_GARDEN_SOURCE_SIZE,
-  MOSSPROUT_GARDEN_TOP_WIDTH_RATIO,
   MOSSPROUT_SQUARE_ZONES,
   STEPPLING_BOARD_CELL_HEIGHT_TO_WIDTH_RATIO,
   STEPPLING_BOARD_PLAYFIELD_SOURCE_CORNERS,
@@ -31,9 +27,6 @@ import {
   mossproutSquareSceneMetrics,
   mossproutWorldFrame,
 } from '../utils/haven-square-world';
-import {
-  HAVEN_MERGE_BOARD_CELL_INDICES,
-} from '../utils/merge-world/haven-sandbox';
 import {
   devHavenOrderFillerSlot,
   devHavenOrderFillers,
@@ -196,8 +189,8 @@ test('the focused Mossprout world arranges six nature islands around its two cor
   const focusedGarden = mossproutGardenFrame();
   const junctionMiniIsland = mossproutGardenJunctionMiniIslandFrame();
   assert.deepEqual(focusedEnvironment, { height: 600, left: 360, top: 60, width: 600 });
-  assert.deepEqual(focusedGarden, { height: 872, left: 360, top: 630, width: 600 });
-  assert.equal(focusedEnvironment.top + focusedEnvironment.height - focusedGarden.top, 30);
+  assert.deepEqual(focusedGarden, { height: 726, left: 297, top: 567, width: 726 });
+  assert.equal(focusedEnvironment.top + focusedEnvironment.height - focusedGarden.top, 93);
   const junctionMiniIslands = mossproutGardenJunctionMiniIslandFrames();
   const junctionTrays = mossproutGardenJunctionTrayFrames();
   assert.equal(HAVEN_JUNCTION_MINI_ISLAND_SIZE, 160);
@@ -206,55 +199,40 @@ test('the focused Mossprout world arranges six nature islands around its two cor
   assert.equal(HAVEN_JUNCTION_TRAY_SIZE, 95);
   assert.equal(HAVEN_JUNCTION_TRAY_TOP_OFFSET, 48);
   assert.equal(MOSSPROUT_NATURE_ISLAND_SIZE, 300);
-  assert.deepEqual(junctionMiniIsland, { height: 160, left: 580, top: 620, width: 160 });
+  assert.deepEqual(junctionMiniIsland, { height: 160, left: 580, top: 557, width: 160 });
   assert.deepEqual(junctionMiniIslands, [
-    { height: 160, left: 450, top: 620, width: 160 },
-    { height: 160, left: 580, top: 620, width: 160 },
-    { height: 160, left: 710, top: 620, width: 160 },
+    { height: 160, left: 450, top: 557, width: 160 },
+    { height: 160, left: 580, top: 557, width: 160 },
+    { height: 160, left: 710, top: 557, width: 160 },
   ]);
   assert.deepEqual(junctionTrays, [
-    { height: 95, left: 482.5, top: 668, width: 95 },
-    { height: 95, left: 612.5, top: 668, width: 95 },
-    { height: 95, left: 742.5, top: 668, width: 95 },
+    { height: 95, left: 482.5, top: 605, width: 95 },
+    { height: 95, left: 612.5, top: 605, width: 95 },
+    { height: 95, left: 742.5, top: 605, width: 95 },
   ]);
   assert.ok(junctionMiniIsland.top < focusedEnvironment.top + focusedEnvironment.height);
   assert.ok(junctionMiniIsland.top + junctionMiniIsland.height > focusedGarden.top);
   assert.deepEqual(mossproutNatureIslandFrame('upper-left'), { height: 300, left: 30, top: 190, width: 300 });
   assert.deepEqual(mossproutNatureIslandFrame('upper-right'), { height: 300, left: 990, top: 190, width: 300 });
-  assert.deepEqual(mossproutNatureIslandFrame('middle-left'), { height: 300, left: 30, top: 650, width: 300 });
-  assert.deepEqual(mossproutNatureIslandFrame('middle-right'), { height: 300, left: 990, top: 650, width: 300 });
-  assert.deepEqual(mossproutNatureIslandFrame('lower-left'), { height: 300, left: 30, top: 1_110, width: 300 });
-  assert.deepEqual(mossproutNatureIslandFrame('lower-right'), { height: 300, left: 990, top: 1_110, width: 300 });
-  assert.deepEqual(mossproutSquareSceneMetrics(), { width: 1320, height: 1562 });
+  assert.deepEqual(mossproutNatureIslandFrame('middle-left'), { height: 300, left: 30, top: 510, width: 300 });
+  assert.deepEqual(mossproutNatureIslandFrame('middle-right'), { height: 300, left: 990, top: 510, width: 300 });
+  assert.deepEqual(mossproutNatureIslandFrame('lower-left'), { height: 300, left: 30, top: 890, width: 300 });
+  assert.deepEqual(mossproutNatureIslandFrame('lower-right'), { height: 300, left: 990, top: 890, width: 300 });
+  assert.deepEqual(mossproutSquareSceneMetrics(), { width: 1320, height: 1353 });
 });
 
-test('the portrait merge island hosts the complete Haven board on one 7x9 playfield', () => {
-  assert.equal(HAVEN_MERGE_BOARD_CELL_INDICES.length, 63);
-  assert.equal(new Set(HAVEN_MERGE_BOARD_CELL_INDICES).size, 63);
-  assert.deepEqual(HAVEN_MERGE_BOARD_CELL_INDICES, Array.from({ length: 63 }, (_, index) => index));
-  assert.deepEqual(MOSSPROUT_GARDEN_SOURCE_SIZE, { height: 1_488, width: 1_024 });
-  assert.ok(MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.right > MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.left);
-  assert.ok(MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.bottom > MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.top);
-  assert.deepEqual(MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS, {
-    bottomLeft: { x: 143, y: 1_100 },
-    bottomRight: { x: 880, y: 1_100 },
-    topLeft: { x: 167, y: 188 },
-    topRight: { x: 836, y: 188 },
-  });
-  assert.notDeepEqual(STEPPLING_BOARD_PLAYFIELD_SOURCE_CORNERS, MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS);
+test('the compact Garden island no longer exposes merge-board playfield geometry', () => {
+  assert.deepEqual(MOSSPROUT_GARDEN_SOURCE_SIZE, { height: 1_024, width: 1_024 });
   assert.equal(STEPPLING_BOARD_CELL_HEIGHT_TO_WIDTH_RATIO, (475 / 6) / (584 / 7));
   assert.equal(STEPPLING_BOARD_TOP_WIDTH_RATIO, 534 / 584);
-  assert.equal((MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.right - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.left) / 7, 737 / 7);
-  assert.equal((MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.bottom - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.top) / 9, 912 / 9);
-  assert.equal(MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO, (912 / 9) / (737 / 7));
-  assert.equal(MOSSPROUT_GARDEN_TOP_WIDTH_RATIO, 669 / 737);
+  assert.deepEqual(STEPPLING_BOARD_PLAYFIELD_SOURCE_CORNERS.bottomLeft, { x: 220, y: 690 });
 });
 
-test('portrait Mossprout merge art ships alpha-preserving full, medium, and thumbnail tiers', () => {
+test('compact Mossprout Garden art ships alpha-preserving full, medium, and thumbnail tiers', () => {
   const specs = [
-    { height: 1_488, suffix: '', width: 1_024 },
-    { height: 744, suffix: '-512', width: 512 },
-    { height: 372, suffix: '-256', width: 256 },
+    { suffix: '' },
+    { suffix: '-512' },
+    { suffix: '-256' },
   ] as const;
   for (const spec of specs) {
     const asset = path.join(
@@ -264,7 +242,7 @@ test('portrait Mossprout merge art ships alpha-preserving full, medium, and thum
       'katchimeras',
       'world',
       'square',
-      `mossprout-merge-island-portrait-v1${spec.suffix}.webp`,
+      `mossprout-garden-hub-v2${spec.suffix}.webp`,
     );
     const bytes = fs.readFileSync(asset);
     assert.equal(bytes.toString('ascii', 12, 16), 'VP8X');
@@ -418,25 +396,28 @@ test('the focused Mossprout Haven mounts only Mossprout-owned square-world art',
   assert.match(screen, /familyId === 'mossprout'/);
   assert.doesNotMatch(screen, /YOUR HAVEN|Tap a home or a mist tile|Open World and Board Lab/);
   assert.match(screen, /<GameHudBar[\s\S]*?<GameCurrencyHud[\s\S]*?GAME_CURRENCY_ART\.coins/);
-  assert.match(screen, /targetRef: coinHudRef/);
-  assert.match(screen, /animateValue: presentedCoins != null/);
+  assert.match(screen, /accessibilityLabel="Open Garden"/);
+  assert.match(screen, /source: 'haven-world'/);
+  assert.match(screen, /useGameScreenTransition\(\)/);
+  assert.match(screen, /announcement: "Opening Mossprout's Garden"[\s\S]*?target: 'merge'[\s\S]*?onCovered: closeResidentInteraction[\s\S]*?router\.push/);
+  assert.match(screen, /gardenOrders=\{gardenOrderEntries\}/);
   assert.match(canvas, /buildMossproutSquareScene/);
-  assert.match(canvas, /coinAmount: order\.reward\.coins/);
-  assert.match(canvas, /coinRect\.x - rootRect\.x \+ coinRect\.width \/ 2/);
-  assert.match(canvas, /onItemsArrive=\{handleHavenServeItemsArrive\}/);
-  assert.match(canvas, /onCoinArrive=\{handleHavenCoinArrive\}/);
+  assert.match(canvas, /GardenOrderShortcut/);
+  assert.match(canvas, /<FrozenMergeOrderTrayCard entry=\{entry\} \/>/);
+  assert.match(canvas, /gardenOrders\.slice\(0, 3\)/);
+  assert.match(canvas, /onOpenGarden\(entry\.order\.id\)/);
   assert.doesNotMatch(canvas, /baseArtOpacity: 0\.34|merge-board-base-7x6\.webp/);
   assert.doesNotMatch(canvas, /haven-merge-grid-7x6\.webp/);
   assert.match(orderRail, /resolveCreatureOrderArtSource\(recipientVisualKey\)/);
   assert.match(creatureArt, /CREATURE_ORDER_SOURCES\[visualKey\]/);
   assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'cutouts_lod', 'mossprout_384.webp')));
-  assert.match(canvas, /<MergePlaySurface/);
+  assert.doesNotMatch(canvas, /MergePlaySurface|MergeServeRewardOverlay|mergeBoardFocusRequest/);
   assert.match(mergeSurface, /<MergeOrderRail[\s\S]*?<ServiceCounter[\s\S]*?<FeastlePersistentMergeBoard[\s\S]*?<MergeCellInspector/);
   assert.doesNotMatch(canvas, /boardLayout=/);
-  assert.match(canvas, /MERGE_TRAY_HEIGHT = 120/);
-  assert.match(canvas, /MERGE_INSPECTOR_HEIGHT = 82/);
   assert.match(canvas, /buildKingdomHexScene/);
   assert.match(canvas, /initialFitWorld: squareWorld/);
+  assert.match(canvas, /initialSnapshot: initialCameraSnapshot/);
+  assert.match(canvas, /onSnapshotChange: onCameraSnapshotChange/);
   assert.match(canvas, /minimumScale: squareWorld \? 0\.28 : undefined/);
   assert.doesNotMatch(canvas, /panExclusionFrame/);
   assert.doesNotMatch(canvas, /focusedSquareZoneId/);
@@ -452,7 +433,7 @@ test('the focused Mossprout Haven mounts only Mossprout-owned square-world art',
   assert.doesNotMatch(squareScene, /steppling-movement-island\.webp/);
   assert.doesNotMatch(squareScene, /bridge-straight-horizontal-perspective\.webp/);
   assert.doesNotMatch(squareScene, /egg-home-island\.webp/);
-  assert.match(squareScene, /mossprout-merge-island-portrait-v1\.webp/);
+  assert.match(squareScene, /mossprout-garden-hub-v2\.webp/);
   assert.match(squareScene, /mossprout-standing-resident-512\.webp/);
   assert.match(squareScene, /residentSource: MOSSPROUT_STANDING_RESIDENT_SOURCE/);
   assert.doesNotMatch(squareScene, /BARISTABBIT_STANDING_RESIDENT_SOURCE|STEPPLING_STANDING_RESIDENT_SOURCE/);
@@ -477,9 +458,9 @@ test('the focused Mossprout Haven mounts only Mossprout-owned square-world art',
   assert.match(orderRail, /items: \{[^}]*bottom: 22/);
   assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'merge-world', 'ui', 'order-chair.webp')));
   assert.doesNotMatch(squareScene, /junctionMiniIslandLayers|JUNCTION_MINI_ISLAND_SOURCES/);
-  assert.match(canvas, /trayEntries=\{board\.trayEntries\}/);
-  assert.match(screen, /return \[\.\.\.parcelEntries, \.\.\.returnEntries, \.\.\.realEntries, \.\.\.fillerEntries\]/);
-  assert.doesNotMatch(screen, /prioritizedVisibleMergeOrders\([\s\S]*?\)\.slice\(0, 3\)/);
+  assert.doesNotMatch(canvas, /trayEntries=\{board\.trayEntries\}/);
+  assert.match(screen, /return \[\.\.\.realEntries, \.\.\.fillerEntries\]\.slice\(0, 3\)/);
+  assert.match(screen, /prioritizedVisibleMergeOrders\([\s\S]*?\)\.slice\(0, 3\)/);
   assert.match(squareScene, /\.sort\(\(left, right\) => left\.depth - right\.depth\)/);
   assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'world', 'square', 'mossprout-merge-island-perspective-512.webp')));
   assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'world', 'square', 'mossprout-standing-resident-512.webp')));

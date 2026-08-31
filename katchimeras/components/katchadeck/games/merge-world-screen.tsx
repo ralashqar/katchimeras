@@ -82,9 +82,10 @@ const EARLY_DISCOVERY_REVEAL_COPY: Partial<Record<MergeCharacterId, { descriptio
 export function MergeWorldScreen({ active = true, backgroundReady = true, playBoardEntrance = true }: { active?: boolean; backgroundReady?: boolean; playBoardEntrance?: boolean } = {}) {
   const router = useRouter();
   const { transitionTo } = useGameScreenTransition();
-  const { creatureId, focusOrderId } = useLocalSearchParams<{
+  const { creatureId, focusOrderId, source } = useLocalSearchParams<{
     creatureId?: string;
     focusOrderId?: string;
+    source?: string;
   }>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -95,6 +96,21 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const scriptedFtueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
   const ftueStep = useMemo(() => mergeFtueStepForBoard(state, scriptedFtueStep), [scriptedFtueStep, state]);
   const residentFtueActive = Boolean(ftueStep?.id.startsWith('merge.resident_'));
+  const returnFromGarden = useCallback(() => {
+    if (source === 'haven-world') {
+      transitionTo({
+        announcement: "Returning to Mossprout's Haven",
+        target: 'katchimeras',
+        navigate: () => {
+          if (router.canGoBack()) router.back();
+          else router.replace('/(tabs)/katchimeras');
+        },
+      });
+      return;
+    }
+    if (creatureId) router.back();
+    else router.push('/legacy-games');
+  }, [creatureId, router, source, transitionTo]);
   const returnToResidentStory = useCallback(() => {
     if (!creatureId) return;
     transitionTo({
@@ -803,13 +819,13 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
         <GameHudBar
           density="compact"
           leading={<KatchimeraBackButton
-            accessibilityLabel={creatureId ? 'Return to Mossprout' : 'Open legacy games'}
+            accessibilityLabel={source === 'haven-world' ? "Return to Mossprout's Haven" : creatureId ? 'Return to Mossprout' : 'Open legacy games'}
             disabled={ftueNavigationLocked && !residentFtueActive}
             onPress={() => residentFtueActive && creatureId
               ? returnToResidentStory()
               : ftueNavigationLocked || ftueExclusive
                 ? handleBlockedFtueInteraction()
-                : creatureId ? router.back() : router.push('/legacy-games')}
+                : returnFromGarden()}
             style={ftueNavigationLocked && !residentFtueActive ? styles.hiddenBackButton : undefined}
           />}
           style={styles.hudBar}
@@ -1050,7 +1066,7 @@ const styles = StyleSheet.create({
   game: { flex: 1, gap: 7, minHeight: 0 },
   loading: { alignItems: 'center', backgroundColor: '#2B1B13', flex: 1, gap: 12, justifyContent: 'center' },
   currencyHud: { flex: 0, paddingLeft: 18, width: 106 },
-  hudBar: { justifyContent: 'space-between' },
+  hudBar: { elevation: 100, justifyContent: 'space-between', position: 'relative', zIndex: 100 },
   hiddenBackButton: { opacity: 0 },
   mergeArea: { flex: 1, marginTop: 18, minHeight: 0, position: 'relative' },
   errorBanner: { alignSelf: 'center', maxWidth: 360, position: 'absolute', width: '92%', zIndex: GameUI.layer.notice },

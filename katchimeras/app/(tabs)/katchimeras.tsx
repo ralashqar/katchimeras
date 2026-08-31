@@ -1,4 +1,4 @@
-import { KatchimeraRosterRouteScreen } from '@/components/katchadeck/roster/katchimera-roster-route-screen';
+import { KatchimeraRosterRouteScreen, type KatchimeraWorldSession } from '@/components/katchadeck/roster/katchimera-roster-route-screen';
 import { KatchimeraCompanionRouteScreen } from '@/components/katchadeck/world/katchimera-companion-route-screen';
 import { MossproutEggFtueSurface } from '@/components/katchadeck/world/mossprout-egg-ftue-surface';
 import { mossproutFtueConversationDefinitionId } from '@/constants/mossprout-ftue-conversations';
@@ -47,6 +47,10 @@ export default function KatchimerasScreen() {
   const isFocused = useIsFocused();
   const ftueRun = useFtueRun();
   const ftueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
+  const [worldSession, setWorldSession] = useState<KatchimeraWorldSession>({
+    activeWorldFamilyId: null,
+    cameraSnapshot: null,
+  });
 
   const eggPresentationActive = ftueStep?.id === 'grove.egg_inspect'
     || ftueStep?.id === 'egg.opening'
@@ -81,7 +85,7 @@ export default function KatchimerasScreen() {
     );
   }
 
-  return <KatchimeraRosterRouteScreen />;
+  return <KatchimeraRosterRouteScreen onWorldSessionChange={setWorldSession} worldSession={worldSession} />;
 }
 
 const styles = StyleSheet.create({
