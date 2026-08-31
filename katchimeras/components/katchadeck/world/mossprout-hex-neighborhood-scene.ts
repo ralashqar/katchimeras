@@ -29,7 +29,7 @@ type ArtSpec = {
 
 const MAIN: ArtSpec = {
   alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['mossprout_focused_v1_main_hex_tile.webp'],
-  coord: { q: 0, r: 0 },
+  coord: { q: 0, r: 1 },
   sources: {
     full: require('../../../assets/images/katchimeras/world/hex/mossprout_focused_v1_main_hex_tile.webp'),
     medium: require('../../../assets/images/katchimeras/world/hex/mossprout_focused_v1_main_hex_tile_512.webp'),
@@ -39,7 +39,7 @@ const MAIN: ArtSpec = {
 
 const GARDEN: ArtSpec = {
   alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['mossprout_focused_v1_garden_hex_tile.webp'],
-  coord: { q: 0, r: 1 },
+  coord: { q: 0, r: 2 },
   sources: {
     full: require('../../../assets/images/katchimeras/world/hex/mossprout_focused_v1_garden_hex_tile.webp'),
     medium: require('../../../assets/images/katchimeras/world/hex/mossprout_focused_v1_garden_hex_tile_512.webp'),

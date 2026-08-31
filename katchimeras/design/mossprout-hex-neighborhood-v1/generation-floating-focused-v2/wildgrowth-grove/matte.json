@@ -6,6 +6,6 @@
   "operatingResolution": "1024x1024",
   "refineForeground": true,
   "source": "design/mossprout-hex-neighborhood-v1/wildgrowth-grove-source.png",
-  "sourceSha256": "431d3d799208ec9dc615837a3d3eeb0bd1052ddab6905153a1875d4204f46bf5",
+  "sourceSha256": "7c3da375ec6bd60d616b58a0846927473c553c14d62eede99034c79733a49986",
   "postprocess": "source-backed-interior-repair+inward-rgb-padding+soft-edge-contraction"
 }

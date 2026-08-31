@@ -45,7 +45,7 @@
       "baseTile": "main",
       "guide": "assets/images/katchimeras/world/square/mossprout-bloom-garden-l4.webp",
       "matte": "birefnet-heavy",
-      "theme": "A magical Mossprout bloom garden with a flower-covered timber arch, pink tulips, round raised beds of yellow, pink, and white flowers, one warm lantern, and a simple stepping-stone path through the center. Replace all unrelated Image 1 top-face content: no house, pond, bridge, circular paving, or inherited perimeter fence. Let layered flower beds reach naturally toward the edges; no hedge wall."
+      "theme": "A magical Mossprout bloom garden with a flower-covered timber arch, pink tulips, round raised beds of yellow, pink, and white flowers, one warm lantern, and a simple stepping-stone path through the center. STRICT SIMPLIFICATION: use very low detail density, very low texture detail, broad soft bevels, smooth matte clay-like materials, and only a few large cushiony flower and foliage masses; consolidate repeated tiny blossoms and leaves into bold shapes readable at 256px. Replace all unrelated Image 1 top-face content: no house, pond, bridge, circular paving, or inherited perimeter fence. Let the simplified flower beds reach naturally toward the edges; no hedge wall."
     },
     "pond-sanctuary": {
       "baseTile": "main",
@@ -71,7 +71,7 @@
       "baseTile": "ancient-tree-grove",
       "guide": "assets/images/katchimeras/world/square/mossprout-wildgrowth-grove-l4.webp",
       "matte": "birefnet-heavy",
-      "theme": "Dense enchanted Mossprout wildgrowth with three oversized rounded fantasy mushrooms in purple, coral, and orange, one small arched hollow-log shelter, layered ferns, curling vines, moss cushions, white flowers, and a stepping-stone path through the center. Replace every unrelated Image 1 top-face feature, including the ancient tree, roots, lanterns, fountain, heart emblem, and previous mushrooms. No house, fence, hedge, wall, pond, bridge, circular paving, or perimeter ring. Preserve Image 1's deep tapered cliff, cliff blocks, stairs, camera, scale, and rendering exactly. Untamed moss and foliage terminate naturally at the cliff edge. Make the mushrooms shorter than the reference if necessary so every cap has generous black space above it and no artwork touches the canvas boundary."
+      "theme": "A simplified Moss Patch with three oversized rounded fantasy mushrooms in purple, coral, and orange, one small arched hollow-log shelter, a few broad fern and curling-vine silhouettes, large moss cushions, a handful of white flowers, and a stepping-stone path through the center. STRICT SIMPLIFICATION: use very low detail density, very low texture detail, broad soft bevels, smooth matte clay-like materials, and only a few large cushiony foliage masses; remove tiny repeated fernlets, leaves, curls, flowers, stones, and surface noise so every shape reads at 256px. Replace every unrelated Image 1 top-face feature, including the ancient tree, roots, lanterns, fountain, and heart emblem. No house, fence, hedge, wall, pond, bridge, circular paving, or perimeter ring. Preserve Image 1's deep tapered cliff, cliff blocks, stairs, camera, and scale. Keep generous black space above every mushroom cap."
     }
   }
 }

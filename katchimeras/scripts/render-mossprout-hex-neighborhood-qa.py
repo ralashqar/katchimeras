@@ -19,10 +19,10 @@ Y_PITCH = TILE_SIZE * (math.sqrt(3) / 2) * 0.7 * 1.02 * NEIGHBORHOOD_SPACING_SCA
 PADDING = 120
 
 PLACEMENTS = (
-    ("main", 0, 0),
+    ("main", 0, 1),
     ("seed-nursery", -1, 1),
     ("bloom-garden", 1, 0),
-    ("garden", 0, 1),
+    ("garden", 0, 2),
     ("pond-sanctuary", -1, 2),
     ("orchard-grove", 1, 1),
     ("ancient-tree-grove", -1, 3),

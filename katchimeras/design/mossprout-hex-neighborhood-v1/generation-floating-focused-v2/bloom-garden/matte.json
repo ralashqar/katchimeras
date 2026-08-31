@@ -6,6 +6,6 @@
   "operatingResolution": "1024x1024",
   "refineForeground": true,
   "source": "design/mossprout-hex-neighborhood-v1/bloom-garden-source.png",
-  "sourceSha256": "a9ff61703a098514fc5936611c09c96a8e2bc1c9cf8430779a579dfdc9d7b27b",
+  "sourceSha256": "aa58787aedf07a1add2f534d9229729f734305d9cf944fdb3dea737f6695fc33",
   "postprocess": "source-backed-interior-repair+inward-rgb-padding+soft-edge-contraction"
 }

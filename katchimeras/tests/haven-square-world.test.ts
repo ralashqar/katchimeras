@@ -228,8 +228,8 @@ test('the focused Mossprout replacement uses the top-level hex projection and au
   );
   assert.match(scene, /LAYOUT_PROFILE = 'floating-neighborhood-v2'/);
   assert.match(scene, /NEIGHBORHOOD_SPACING_SCALE = 1\.1/);
-  assert.match(scene, /const MAIN:[\s\S]*?coord: \{ q: 0, r: 0 \}/);
-  assert.match(scene, /const GARDEN:[\s\S]*?coord: \{ q: 0, r: 1 \}/);
+  assert.match(scene, /const MAIN:[\s\S]*?coord: \{ q: 0, r: 1 \}/);
+  assert.match(scene, /const GARDEN:[\s\S]*?coord: \{ q: 0, r: 2 \}/);
   for (const [id, q, r] of [
     ['seed-nursery', -1, 1],
     ['bloom-garden', 1, 0],

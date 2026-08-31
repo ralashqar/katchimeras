@@ -1,0 +1,9 @@
+{
+  "method": "builtin-image-editor",
+  "intent": "precise-object-edit",
+  "inputRole": "direct edit target",
+  "outputSha256": "7c3da375ec6bd60d616b58a0846927473c553c14d62eede99034c79733a49986",
+  "output": "design/mossprout-hex-neighborhood-v1/wildgrowth-grove-source.png",
+  "outputSize": [1254, 1254],
+  "prompt": "style-edit-prompt.txt"
+}

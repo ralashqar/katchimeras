@@ -17,8 +17,8 @@ Runtime topology:
 
 | Tile | Axial coordinate |
 | --- | --- |
-| Main | `(0, 0)` |
-| Garden | `(0, 1)` |
+| Main | `(0, 1)` |
+| Garden | `(0, 2)` |
 | Seed Nursery / Bloom Garden | `(-1, 1)` / `(1, 0)` |
 | Pond Sanctuary / Orchard Grove | `(-1, 2)` / `(1, 1)` |
 | Ancient Tree Grove / Wildgrowth Grove | `(-1, 3)` / `(1, 2)` |
