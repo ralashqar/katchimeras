@@ -392,8 +392,18 @@ export type HavenResidentMergeBoardState = {
   updatedAt: number;
 };
 
+export type MossproutNatureIslandId =
+  | 'seed-nursery'
+  | 'bloom-garden'
+  | 'pond-sanctuary'
+  | 'orchard-grove'
+  | 'ancient-tree-grove'
+  | 'wildgrowth-grove';
+
+export type MossproutNatureIslandLevel = 0 | 1 | 2 | 3 | 4;
+
 export type MergeWorldState = {
-  version: 20;
+  version: 21;
   /** The first personal Merge World is owned by Mossprout. */
   ownerCharacterId: 'mossprout';
   revision: number;
@@ -439,6 +449,7 @@ export type MergeWorldState = {
   mossproutBoardProgression: MossproutBoardProgression;
   haven: {
     tileStages: Partial<Record<MergeCharacterId, HavenStage>>;
+    mossproutNatureIslands: Record<MossproutNatureIslandId, MossproutNatureIslandLevel>;
     revealState: HavenRevealState;
     mossproutStoryLevel: number;
     nextProceduralOrder: number;
@@ -484,6 +495,7 @@ export type MergeWorldCommand =
   | { type: 'reconcileStory'; familyId: MergeCharacterId; status: string; targetLevel: number; actPhase?: string; orderTemplateKeys?: string[]; servedOrderIds?: string[]; now: number }
   | { type: 'reconcileHavenStory'; characterId: MergeCharacterId; storyLevel: number; now: number }
   | { type: 'upgradeHavenTile'; characterId: MergeCharacterId; stage: HavenStage; now: number }
+  | { type: 'upgradeMossproutNatureIsland'; islandId: MossproutNatureIslandId; level: MossproutNatureIslandLevel; now: number }
   | { type: 'revealHaven'; now: number }
   | { type: 'ackExternalReward'; receiptId: string; now: number };
 
@@ -513,4 +525,5 @@ export type MergeWorldCommandResult = {
   stepEnergyClaim?: { consumedSteps: number; remainingClaimableSteps: number; beforeEnergy: number; afterEnergy: number; status: 'awarded' | 'below_threshold' | 'daily_cap' | 'duplicate' };
   itemsQueued?: number;
   havenUpgrade?: { characterId: MergeCharacterId; stage: HavenStage; coinCost: number };
+  natureIslandUpgrade?: { islandId: MossproutNatureIslandId; level: MossproutNatureIslandLevel; coinCost: number; completedTier: boolean };
 };

@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { ActivityIndicator, BackHandler, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import { ActivityIndicator, BackHandler, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, ZoomIn, useReducedMotion } from 'react-native-reanimated';
 
@@ -65,10 +65,10 @@ import { mossproutResidentById } from '@/constants/mossprout-residents';
 import { localDayId } from '@/utils/world-identity';
 import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
 
-import { FeastlePersistentMergeBoard, type MergeBoardScreenMetrics } from './feastle-persistent-merge-board';
-import { MergeCellInspector } from './merge-cell-inspector';
+import type { MergeBoardScreenMetrics } from './feastle-persistent-merge-board';
+import { MergePlaySurface } from './merge-play-surface';
 import { MergeParcelFlightOverlay, type MergeParcelFlight } from './merge-parcel-overlay';
-import { MergeOrderRail, type MergeTrayEntry } from './merge-order-rail';
+import type { MergeTrayEntry } from './merge-order-rail';
 import { MergeServeRewardOverlay, type MergeScreenPoint, type MergeServeRewardFlight } from './merge-serve-reward-overlay';
 import { MergeFtueOverlay } from './merge-ftue-overlay';
 
@@ -791,11 +791,6 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }, []);
 
-  const measureBoardArea = useCallback((event: LayoutChangeEvent) => {
-    const next = Math.floor(event.nativeEvent.layout.height);
-    setBoardAreaHeight((current) => current === next ? current : next);
-  }, []);
-
   if (loading || !state) {
     return <View style={styles.loading}><ActivityIndicator color={Lantern.ember300} size="large" /><ThemedText darkColor="#FFF0CE">Opening the pantry…</ThemedText></View>;
   }
@@ -834,56 +829,44 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
         {/* Static game geometry: onboarding guidance must never be inserted in
             this flex column. Future guidance belongs in an absolute world-space
             overlay so the tray, counter, and board retain identical frames. */}
-        <View style={styles.mergeArea}>
-          <MergeOrderRail
-            entries={trayEntries}
-            focusOrderId={focusOrderId}
-            onOpenChat={openCharacterReturn}
-            onOpenParcel={(arrivalId) => void openParcel(arrivalId)}
-            onReroll={(order) => rerollOrder(order.id)}
-            onServe={startServeAnimation}
-            onBlockedInteraction={handleBlockedFtueInteraction}
-            onRailTargetRef={handleRailTargetRef}
-            interactionGate={ftueRailGate}
-            parcelTargetRef={parcelRef}
-          />
-
-          <ServiceCounter viewportWidth={width} />
-
-          <View onLayout={measureBoardArea} style={styles.boardStage}>
-            {active && boardAreaHeight > 0 ? <FeastlePersistentMergeBoard
-              animateEntrance={playBoardEntrance}
-              hiddenItemInstanceIds={hiddenAnimatedItemIds}
-              interactionGate={ftueBoardGate}
-              interactionSessionKey={interactionSessionKey}
-              maxHeight={boardAreaHeight - 1}
-              onBlockedInteraction={handleBlockedFtueInteraction}
-              onCommand={dispatch}
-              onHiddenItemsRetired={handleHiddenItemsRetired}
-              onInspectMist={setInspectedCell}
-              onInspectRootbound={(gateId) => {
-                const cell = state.board.findIndex((candidate) => candidate.mist?.kind === 'rootbound_echo' && candidate.mist.gateId === gateId);
-                if (cell >= 0) setInspectedCell(cell);
-              }}
-              onSelect={(cell) => {
-                setSelectedCell(cell);
-                if (cell != null) setInspectedCell(cell);
-              }}
-              onScreenMetrics={handleBoardScreenMetrics}
-              onVisualReady={() => setBoardVisualReady(true)}
-              selectedCell={selectedCell}
-              state={state}
-              sessionId={mergeSessionId}
-              width={contentWidth}
-            /> : null}
-            {parcelFlight ? <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.boardInteractionShield} /> : null}
-          </View>
-          <MergeCellInspector
-            cell={inspectedCell}
-            onUseGrovelight={(gateId) => dispatch({ type: 'useGrovelightResonance', gateId, dayId: localDayId(), now: Date.now() })}
-            state={state}
-          />
-        </View>
+        <MergePlaySurface
+          animateEntrance={playBoardEntrance}
+          boardInteractionGate={ftueBoardGate}
+          focusOrderId={focusOrderId}
+          hiddenItemInstanceIds={hiddenAnimatedItemIds}
+          inspectedCell={inspectedCell}
+          interactionEnabled={active && !parcelFlight}
+          interactionSessionKey={interactionSessionKey}
+          onBlockedInteraction={handleBlockedFtueInteraction}
+          onBoardAreaHeight={setBoardAreaHeight}
+          onCommand={dispatch}
+          onHiddenItemsRetired={handleHiddenItemsRetired}
+          onInspectMist={setInspectedCell}
+          onInspectRootbound={(gateId) => {
+            const cell = state.board.findIndex((candidate) => candidate.mist?.kind === 'rootbound_echo' && candidate.mist.gateId === gateId);
+            if (cell >= 0) setInspectedCell(cell);
+          }}
+          onOpenChat={openCharacterReturn}
+          onOpenParcel={(arrivalId) => void openParcel(arrivalId)}
+          onRailTargetRef={handleRailTargetRef}
+          onReroll={(order) => rerollOrder(order.id)}
+          onScreenMetrics={handleBoardScreenMetrics}
+          onSelect={(cell) => {
+            setSelectedCell(cell);
+            if (cell != null) setInspectedCell(cell);
+          }}
+          onServe={startServeAnimation}
+          onUseGrovelight={(gateId) => dispatch({ type: 'useGrovelightResonance', gateId, dayId: localDayId(), now: Date.now() })}
+          onVisualReady={() => setBoardVisualReady(true)}
+          parcelTargetRef={parcelRef}
+          railInteractionGate={ftueRailGate}
+          selectedCell={selectedCell}
+          sessionId={mergeSessionId}
+          state={state}
+          style={styles.mergeArea}
+          trayEntries={trayEntries}
+          width={contentWidth}
+        />
 
       </View>
 
@@ -1052,23 +1035,6 @@ function MergeCommandFeedback() {
   return null;
 }
 
-function ServiceCounter({ viewportWidth }: { viewportWidth: number }) {
-  return (
-    <View
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      pointerEvents="none"
-      style={[styles.serviceCounter, { width: viewportWidth }]}>
-      <View style={styles.counterUpperLip} />
-      <View style={styles.counterInsetShade} />
-      <View style={styles.counterFaceEdge} />
-      <View style={styles.counterFace} />
-      <View style={styles.counterLowerEdge} />
-      <View style={styles.counterLowerFlat} />
-    </View>
-  );
-}
-
 function measureViewInWindow(ref: RefObject<View | null>): Promise<{ height: number; width: number; x: number; y: number } | null> {
   return new Promise((resolve) => {
     if (!ref.current) {
@@ -1087,15 +1053,6 @@ const styles = StyleSheet.create({
   hudBar: { justifyContent: 'space-between' },
   hiddenBackButton: { opacity: 0 },
   mergeArea: { flex: 1, marginTop: 18, minHeight: 0, position: 'relative' },
-  serviceCounter: { alignSelf: 'center', height: 32, marginTop: -29, position: 'relative', zIndex: 1 },
-  counterUpperLip: { backgroundColor: '#FFE876', height: 3, left: 0, position: 'absolute', right: 0, top: 0 },
-  counterInsetShade: { backgroundColor: '#A64F32', height: 5, left: 0, position: 'absolute', right: 0, top: 3 },
-  counterFaceEdge: { backgroundColor: '#FFE36A', height: 3, left: 0, position: 'absolute', right: 0, top: 8 },
-  counterFace: { backgroundColor: '#EEA621', bottom: 5, left: 0, position: 'absolute', right: 0, top: 11 },
-  counterLowerEdge: { backgroundColor: '#CB701D', bottom: 2, height: 3, left: 0, position: 'absolute', right: 0 },
-  counterLowerFlat: { backgroundColor: '#8F4932', bottom: 0, height: 2, left: 0, position: 'absolute', right: 0 },
-  boardStage: { alignItems: 'center', elevation: 0, flex: 1, justifyContent: 'flex-start', minHeight: 0, position: 'relative', zIndex: 0 },
-  boardInteractionShield: { ...StyleSheet.absoluteFillObject, zIndex: 50 },
   errorBanner: { alignSelf: 'center', maxWidth: 360, position: 'absolute', width: '92%', zIndex: GameUI.layer.notice },
   memoryCardOverlay: { alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(250,241,207,0.97)', borderColor: 'rgba(127,96,38,0.32)', borderRadius: 24, borderWidth: 1, gap: 8, left: 24, maxWidth: 360, padding: 18, position: 'absolute', right: 24, zIndex: GameUI.layer.modal },
   memoryCardArtWrap: { alignItems: 'center', height: 178, justifyContent: 'center', width: 148 },

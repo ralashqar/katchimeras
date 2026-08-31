@@ -6,6 +6,7 @@ import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorl
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import type { MergeWorldState } from '@/types/merge-world';
 import { prioritizedVisibleMergeOrders } from '@/utils/merge-world/order-presentation';
+import { MOSSPROUT_NATURE_ISLAND_IDS } from '@/constants/mossprout-nature-islands';
 
 const NOW = Date.UTC(2026, 7, 18, 12);
 
@@ -21,7 +22,7 @@ function mossproutWorld(): MergeWorldState {
   };
 }
 
-test('Haven upgrades are linear, story-gated, and debit Merge Coins atomically', () => {
+test('the first Haven restoration is linear, story-gated, and reveals six Level 1 islands', () => {
   let state = mossproutWorld();
   const skipped = reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 2, now: NOW + 1 });
   assert.equal(skipped.changed, false);
@@ -31,21 +32,88 @@ test('Haven upgrades are linear, story-gated, and debit Merge Coins atomically',
   assert.equal(first.state.haven.tileStages.mossprout, 1);
   assert.equal(first.state.coins, 1_950);
   assert.equal(first.state.haven.revealState, 'first_restore_complete');
-
-  const locked = reduceMergeWorld(first.state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 2, now: NOW + 3 });
-  assert.equal(locked.changed, false);
+  assert.deepEqual(Object.values(first.state.haven.mossproutNatureIslands), [1, 1, 1, 1, 1, 1]);
   state = reduceMergeWorld(first.state, { type: 'reconcileHavenStory', characterId: 'mossprout', storyLevel: 2, now: NOW + 4 }).state;
-  const second = reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 2, now: NOW + 5 });
-  assert.equal(second.changed, true);
-  assert.equal(second.state.haven.tileStages.mossprout, 2);
-  assert.equal(second.state.coins, 1_550);
+  assert.equal(reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 2, now: NOW + 5 }).changed, false);
 });
 
-test('v13 Mossprout saves reset into the v19 personal-world contract', () => {
+test('six Mossprout nature islands upgrade independently within the existing total Coin curve', () => {
+  let state = mossproutWorld();
+  state = reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, now: NOW + 1 }).state;
+  assert.deepEqual(Object.values(state.haven.mossproutNatureIslands), [1, 1, 1, 1, 1, 1]);
+
+  const storyReady = reduceMergeWorld(state, {
+    type: 'reconcileHavenStory',
+    characterId: 'mossprout',
+    storyLevel: 4,
+    now: NOW + 2,
+  }).state;
+  state = { ...storyReady, coins: 4_000 };
+
+  const seed = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 2, now: NOW + 3 });
+  assert.equal(seed.changed, true);
+  assert.equal(seed.state.coins, 3_940);
+  assert.equal(seed.state.haven.mossproutNatureIslands['seed-nursery'], 2);
+  assert.equal(seed.state.haven.mossproutNatureIslands['bloom-garden'], 1);
+  assert.equal(seed.natureIslandUpgrade?.completedTier, false);
+  assert.equal(seed.state.haven.tileStages.mossprout, 1);
+
+  state = seed.state;
+  const levelTwoCosts = [60, 65, 65, 75, 75];
+  for (const [index, islandId] of MOSSPROUT_NATURE_ISLAND_IDS.slice(1).entries()) {
+    const result = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId, level: 2, now: NOW + 4 + index });
+    assert.equal(result.changed, true);
+    state = result.state;
+    if (index === 4) assert.equal(result.natureIslandUpgrade?.completedTier, true);
+  }
+  assert.equal(state.coins, 3_600);
+  assert.equal(levelTwoCosts.reduce((sum, cost) => sum + cost, 60), 400);
+  assert.equal(state.haven.tileStages.mossprout, 2);
+
+  for (const islandId of MOSSPROUT_NATURE_ISLAND_IDS) {
+    state = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId, level: 3, now: NOW + 20 }).state;
+  }
+  assert.equal(state.coins, 2_700);
+  assert.equal(state.haven.tileStages.mossprout, 3);
+  for (const islandId of MOSSPROUT_NATURE_ISLAND_IDS) {
+    state = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId, level: 4, now: NOW + 30 }).state;
+  }
+  assert.equal(state.coins, 900);
+  assert.equal(state.haven.tileStages.mossprout, 4);
+});
+
+test('nature island upgrades reject skips, story locks, duplicate commands, and insufficient Coins', () => {
+  let state = mossproutWorld();
+  state = reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, now: NOW + 1 }).state;
+  assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 3, now: NOW + 2 }).changed, false);
+  assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 2, now: NOW + 3 }).changed, false);
+  state = reduceMergeWorld(state, { type: 'reconcileHavenStory', characterId: 'mossprout', storyLevel: 2, now: NOW + 4 }).state;
+  state = { ...state, coins: 59 };
+  assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 2, now: NOW + 5 }).changed, false);
+  state = { ...state, coins: 60 };
+  const upgraded = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 2, now: NOW + 6 });
+  assert.equal(upgraded.changed, true);
+  assert.equal(reduceMergeWorld(upgraded.state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 2, now: NOW + 7 }).changed, false);
+});
+
+test('v20 restored Havens keep their main stage but restart all new satellites at Level 1', () => {
+  const current = mossproutWorld();
+  const legacy = {
+    ...current,
+    version: 20,
+    haven: { ...current.haven, tileStages: { ...current.haven.tileStages, mossprout: 4 }, revealState: 'revealed' as const },
+  };
+  const migrated = normalizeMergeWorldState(legacy, NOW);
+  assert.equal(migrated.version, 21);
+  assert.equal(migrated.haven.tileStages.mossprout, 4);
+  assert.deepEqual(Object.values(migrated.haven.mossproutNatureIslands), [1, 1, 1, 1, 1, 1]);
+});
+
+test('v13 Mossprout saves reset into the v21 personal-world contract', () => {
   const current = mossproutWorld();
   const legacy = { ...current, version: 13, haven: undefined };
   const migrated = normalizeMergeWorldState(legacy, NOW);
-  assert.equal(migrated.version, 19);
+  assert.equal(migrated.version, 21);
   assert.equal(migrated.ownerCharacterId, 'mossprout');
   assert.equal(migrated.haven.tileStages.mossprout, undefined);
   assert.equal(migrated.haven.revealState, 'hidden');

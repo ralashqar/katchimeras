@@ -1,5 +1,5 @@
 import type { HavenStage } from '@/constants/haven-catalog';
-import type { MergeCharacterId } from '@/types/merge-world';
+import type { MergeCharacterId, MossproutNatureIslandId } from '@/types/merge-world';
 
 export type HavenUpgradePresentationStatus = 'armed' | 'playing';
 export type HavenUpgradePresentationPhase =
@@ -26,6 +26,7 @@ export type HavenTileUpgradePresentation = {
   creatureId: string;
   fromStage: HavenStage;
   nonce: number;
+  natureIslandId?: MossproutNatureIslandId;
   palette: HavenUpgradeEffectPalette;
   reactionLine: string;
   status: HavenUpgradePresentationStatus;

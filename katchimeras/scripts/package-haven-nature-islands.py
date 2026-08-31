@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Crop transparent padding from the two Haven nature-island runtime assets."""
+"""Package Haven nature-island sources and Mossprout Level 4 masters."""
 
 from __future__ import annotations
 
@@ -15,7 +15,11 @@ except ImportError as exc:
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSET_ROOT = ROOT / "assets" / "images" / "katchimeras" / "world" / "square"
+MASTER_ROOT = ROOT / "design" / "mossprout-nature-islands-v1" / "max-level"
 ORIGINAL_SIZE = (512, 512)
+RUNTIME_SIZES = (1024, 512, 256)
+
+from hex_tile_alpha import resize_rgba_premultiplied
 
 
 @dataclass(frozen=True)
@@ -32,6 +36,16 @@ class NatureIslandSpec:
 SPECS = (
     NatureIslandSpec(filename="nature-island-512.webp", crop=(79, 32, 433, 480)),
     NatureIslandSpec(filename="nature-island-east-512.webp", crop=(66, 32, 445, 480)),
+)
+
+
+MAX_LEVEL_KEYS = (
+    "seed-nursery",
+    "bloom-garden",
+    "pond-sanctuary",
+    "orchard-grove",
+    "ancient-tree-grove",
+    "wildgrowth-grove",
 )
 
 
@@ -78,6 +92,72 @@ def package(spec: NatureIslandSpec, *, check: bool) -> tuple[int, int, int]:
     return spec.packaged_size[0], spec.packaged_size[1], decoded_bytes
 
 
+def normalized_square(master: Image.Image, size: int) -> Image.Image:
+    rgba = master.convert("RGBA")
+    bounds = alpha_bounds(rgba)
+    if bounds is None:
+        raise SystemExit("Level 4 master contains no visible pixels")
+    cropped = rgba.crop(bounds)
+    max_art_size = round(size * 0.96)
+    scale = min(max_art_size / cropped.width, max_art_size / cropped.height)
+    target = (
+        max(1, round(cropped.width * scale)),
+        max(1, round(cropped.height * scale)),
+    )
+    resized = resize_rgba_premultiplied(cropped, target)
+    square = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    square.alpha_composite(resized, ((size - target[0]) // 2, (size - target[1]) // 2))
+    return square
+
+
+def max_level_runtime_path(key: str, size: int) -> Path:
+    suffix = "" if size == 1024 else f"-{size}"
+    return ASSET_ROOT / f"mossprout-{key}-l4{suffix}.webp"
+
+
+def package_max_level(key: str, *, check: bool) -> int:
+    master_path = MASTER_ROOT / f"{key}-l4-master.png"
+    if not master_path.exists():
+        raise SystemExit(f"Missing Level 4 master: {master_path.relative_to(ROOT)}")
+    with Image.open(master_path) as opened:
+        master = opened.convert("RGBA")
+    if master.getchannel("A").getextrema() != (0, 255):
+        raise SystemExit(f"{master_path.name}: expected genuine transparent and opaque pixels")
+
+    total_decoded_bytes = 0
+    for size in RUNTIME_SIZES:
+        path = max_level_runtime_path(key, size)
+        if check:
+            if not path.exists():
+                raise SystemExit(f"Missing Level 4 runtime asset: {path.relative_to(ROOT)}")
+            if path.stat().st_mtime < master_path.stat().st_mtime:
+                raise SystemExit(f"{path.name}: runtime asset is older than its master")
+            with Image.open(path) as opened:
+                runtime = opened.convert("RGBA")
+        else:
+            runtime = normalized_square(master, size)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            runtime.save(
+                path,
+                "WEBP",
+                quality=95 if size >= 512 else 90,
+                alpha_quality=100,
+                method=6,
+                exact=True,
+            )
+        if runtime.size != (size, size):
+            raise SystemExit(f"{path.name}: expected {size}x{size}, found {runtime.size}")
+        if runtime.getchannel("A").getextrema() != (0, 255):
+            raise SystemExit(f"{path.name}: expected genuine transparent and opaque pixels")
+        if any(runtime.getchannel("A").getpixel(point) for point in (
+            (0, 0), (size - 1, 0), (0, size - 1), (size - 1, size - 1),
+        )):
+            raise SystemExit(f"{path.name}: corners must remain transparent")
+        total_decoded_bytes += size * size * 4
+        print(f"{path.relative_to(ROOT)}: {size}x{size}, {path.stat().st_size // 1024} KiB")
+    return total_decoded_bytes
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="Validate without modifying assets")
@@ -93,6 +173,11 @@ def main() -> None:
     print(
         f"Nature islands: {total_decoded_bytes / 1048576:.3f} MiB decoded, "
         f"saving {saved / 1048576:.3f} MiB"
+    )
+    max_level_decoded_bytes = sum(package_max_level(key, check=args.check) for key in MAX_LEVEL_KEYS)
+    print(
+        f"Mossprout Level 4 islands: {max_level_decoded_bytes / 1048576:.3f} MiB decoded "
+        f"across {len(MAX_LEVEL_KEYS) * len(RUNTIME_SIZES)} LODs"
     )
 
 

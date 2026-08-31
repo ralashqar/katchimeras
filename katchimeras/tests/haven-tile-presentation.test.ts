@@ -33,10 +33,10 @@ test('Haven tile presentation keeps story and Coin progress as separate gates', 
   assert.equal(derive(world(200)).hudState, 'story_locked');
   const saving = derive(world(80, true), true);
   assert.equal(saving.hudState, 'saving');
-  const collecting = derive(world(75, true));
+  const collecting = derive(world(25, true));
   assert.equal(collecting.hudState, 'upgrade_ready');
   assert.equal(collecting.coinProgress, 0.5);
-  assert.equal(derive(world(150, true)).hudState, 'affordable');
+  assert.equal(derive(world(50, true)).hudState, 'affordable');
 });
 
 test('Coin progress clamps and completed tiles have no next objective', () => {

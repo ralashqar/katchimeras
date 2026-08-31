@@ -235,6 +235,18 @@ export function upgradeStoredHavenTile(characterId: import('@/types/merge-world'
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId, stage, now }), now);
 }
 
+/** Atomically spends Merge Coins and advances one Mossprout nature island. */
+export function upgradeStoredMossproutNatureIsland(
+  islandId: import('@/types/merge-world').MossproutNatureIslandId,
+  level: import('@/types/merge-world').MossproutNatureIslandLevel,
+  now = Date.now(),
+) {
+  return reduceStoredMergeWorld(
+    (state) => reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId, level, now }),
+    now,
+  );
+}
+
 export function revealStoredHaven(now = Date.now()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'revealHaven', now }), now);
 }

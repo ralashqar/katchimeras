@@ -40,6 +40,8 @@ import type {
   MergeWorldCommand,
   MergeWorldCommandResult,
   MergeWorldState,
+  MossproutNatureIslandId,
+  MossproutNatureIslandLevel,
 } from '@/types/merge-world';
 
 const STEPPLING_HAVEN_BOARD_SIZE = 42;
@@ -81,6 +83,12 @@ export function mergeWorldStateForBoard(state: MergeWorldState, boardId: MergeBo
 }
 import { advanceMossproutChapterZero, enforceMossproutChapterZeroDropOverride } from '@/utils/merge-world/chapter-zero-policy';
 import { havenStageDefinition, havenStoryGateSatisfied, type HavenStage } from '@/constants/haven-catalog';
+import {
+  MOSSPROUT_NATURE_ISLAND_IDS,
+  emptyMossproutNatureIslandLevels,
+  mossproutNatureIslandById,
+  mossproutNatureIslandLevelDefinition,
+} from '@/constants/mossprout-nature-islands';
 import {
   COMPANION_DISCOVERIES_BY_ID,
   DISCOVERY_FORK_ANCHOR_CELL,
@@ -151,7 +159,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     occupant: null,
   }));
   let state: MergeWorldState = {
-    version: 20,
+    version: 21,
     ownerCharacterId: 'mossprout',
     revision: 0,
     createdAt: now,
@@ -198,6 +206,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     mossproutBoardProgression: emptyMossproutBoardProgression(),
     haven: {
       tileStages: {},
+      mossproutNatureIslands: emptyMossproutNatureIslandLevels(),
       revealState: 'hidden',
       mossproutStoryLevel: 0,
       nextProceduralOrder: 1,
@@ -371,6 +380,8 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
     }
     case 'upgradeHavenTile':
       return upgradeHavenTile(current, command.characterId, command.stage, command.now);
+    case 'upgradeMossproutNatureIsland':
+      return upgradeMossproutNatureIsland(current, command.islandId, command.level, command.now);
     case 'revealHaven': {
       if (current.haven.revealState === 'revealed') return unchanged(current);
       return changed(touch({ ...current, haven: { ...current.haven, revealState: 'revealed' } }, command.now), 'The Haven awakens.');
@@ -562,14 +573,14 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   // v18 intentionally starts the first personal Merge World cleanly. Earlier
   // snapshots are shared-board prototypes and cannot be assigned safely to a
   // single companion without carrying their ownership compromises forward.
-  if ((rawVersion !== 18 && rawVersion !== 19 && rawVersion !== 20) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
+  if ((rawVersion !== 18 && rawVersion !== 19 && rawVersion !== 20 && rawVersion !== 21) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
     return createInitialMergeWorldState(now);
   }
   const fallback = createInitialMergeWorldState(now);
   let normalized: MergeWorldState = {
     ...fallback,
     ...source,
-    version: 20,
+    version: 21,
     ownerCharacterId: 'mossprout',
     revision: finite(source.revision, 0),
     createdAt: finite(source.createdAt, now),
@@ -686,6 +697,9 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
 
 function upgradeHavenTile(state: MergeWorldState, characterId: MergeCharacterId, requestedStage: HavenStage, now: number): MergeWorldCommandResult {
   if (!state.unlockedCharacters.includes(characterId)) return unchanged(state, 'Discover this Katchimera first.');
+  if (characterId === 'mossprout' && requestedStage > 1) {
+    return unchanged(state, 'Grow Mossprout’s six nature islands to deepen the Haven.');
+  }
   const currentStage = state.haven.tileStages[characterId] ?? 0;
   if (requestedStage !== currentStage + 1) return unchanged(state, 'Haven environments grow one stage at a time.');
   const definition = havenStageDefinition(characterId, requestedStage);
@@ -695,16 +709,68 @@ function upgradeHavenTile(state: MergeWorldState, characterId: MergeCharacterId,
   const revealState = characterId === 'mossprout' && requestedStage === 1 && state.haven.revealState === 'hidden'
     ? 'first_restore_complete' as const
     : state.haven.revealState;
+  const mossproutNatureIslands = characterId === 'mossprout' && requestedStage === 1
+    ? emptyMossproutNatureIslandLevels(1)
+    : state.haven.mossproutNatureIslands;
   const next = touch({
     ...state,
     coins: state.coins - definition.coinCost,
     haven: {
       ...state.haven,
       tileStages: { ...state.haven.tileStages, [characterId]: requestedStage },
+      mossproutNatureIslands,
       revealState,
     },
   }, now);
   return { state: next, changed: true, havenUpgrade: { characterId, stage: requestedStage, coinCost: definition.coinCost }, message: `${definition.name} restored.` };
+}
+
+function upgradeMossproutNatureIsland(
+  state: MergeWorldState,
+  islandId: MossproutNatureIslandId,
+  requestedLevel: MossproutNatureIslandLevel,
+  now: number,
+): MergeWorldCommandResult {
+  const island = mossproutNatureIslandById.get(islandId);
+  if (!island) return unchanged(state, 'That part of the garden is not available.');
+  if (!state.unlockedCharacters.includes('mossprout') || (state.haven.tileStages.mossprout ?? 0) < 1) {
+    return unchanged(state, 'Restore Mossprout’s Haven first.');
+  }
+  const currentLevel = state.haven.mossproutNatureIslands[islandId] ?? 0;
+  if (requestedLevel !== currentLevel + 1 || requestedLevel < 2 || requestedLevel > 4) {
+    return unchanged(state, 'Nature islands grow one level at a time.');
+  }
+  const definition = mossproutNatureIslandLevelDefinition(islandId, requestedLevel);
+  if (!definition) return unchanged(state, 'This island cannot grow any further.');
+  if (!havenStoryGateSatisfied(state, definition.storyGate)) {
+    return unchanged(state, 'Continue Mossprout’s story first.');
+  }
+  if (state.coins < definition.coinCost) {
+    return unchanged(state, 'Earn a few more Coins through Merge orders.');
+  }
+
+  const mossproutNatureIslands = {
+    ...state.haven.mossproutNatureIslands,
+    [islandId]: requestedLevel,
+  };
+  const completedTier = MOSSPROUT_NATURE_ISLAND_IDS.every((id) => mossproutNatureIslands[id] >= requestedLevel);
+  const existingStage = state.haven.tileStages.mossprout ?? 1;
+  const aggregateStage = completedTier ? Math.max(existingStage, requestedLevel) as HavenStage : existingStage;
+  const next = touch({
+    ...state,
+    coins: state.coins - definition.coinCost,
+    haven: {
+      ...state.haven,
+      mossproutNatureIslands,
+      tileStages: { ...state.haven.tileStages, mossprout: aggregateStage },
+    },
+  }, now);
+  return {
+    state: next,
+    changed: true,
+    message: `${island.name} grew into ${definition.name}.`,
+    natureIslandUpgrade: { islandId, level: requestedLevel, coinCost: definition.coinCost, completedTier },
+  };
 }
 
 function normalizeHaven(value: unknown, source: Partial<MergeWorldState>, rawVersion: unknown, now: number): MergeWorldState['haven'] {
@@ -724,6 +790,18 @@ function normalizeHaven(value: unknown, source: Partial<MergeWorldState>, rawVer
   const revealState = raw.revealState === 'revealed' || raw.revealState === 'first_restore_complete'
     ? raw.revealState
     : tileStages.mossprout && tileStages.mossprout > 0 && rawVersion !== 16 && rawVersion !== 17 ? 'revealed' : 'hidden';
+  const baselineIslandLevel: MossproutNatureIslandLevel = revealState === 'hidden' ? 0 : 1;
+  const mossproutNatureIslands = emptyMossproutNatureIslandLevels(baselineIslandLevel);
+  // v18-v20 deliberately restart the new satellite tracks at Level 1. v21+
+  // snapshots preserve their independent levels.
+  if (rawVersion === 21 && raw.mossproutNatureIslands && typeof raw.mossproutNatureIslands === 'object') {
+    for (const islandId of MOSSPROUT_NATURE_ISLAND_IDS) {
+      const level = raw.mossproutNatureIslands[islandId];
+      if (Number.isInteger(level) && Number(level) >= 0 && Number(level) <= 4) {
+        mossproutNatureIslands[islandId] = Number(level) as MossproutNatureIslandLevel;
+      }
+    }
+  }
   const stepplingFallback = createStepplingHavenBoard(now)!;
   const rawSteppling = raw.residentMergeBoards?.steppling;
   const steppling = rawSteppling && typeof rawSteppling === 'object'
@@ -742,6 +820,7 @@ function normalizeHaven(value: unknown, source: Partial<MergeWorldState>, rawVer
     : stepplingFallback;
   return {
     tileStages,
+    mossproutNatureIslands,
     revealState,
     mossproutStoryLevel: Math.max(0, Math.floor(finite(raw.mossproutStoryLevel, 0))),
     nextProceduralOrder: Math.max(1, Math.floor(finite(raw.nextProceduralOrder, 1))),

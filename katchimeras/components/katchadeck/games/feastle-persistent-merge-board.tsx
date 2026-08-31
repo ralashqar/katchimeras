@@ -54,6 +54,8 @@ export type MergeBoardLayout = {
   cellHeightToWidthRatio?: number;
   /** Fill the supplied width and maxHeight exactly so no parent gesture leaks through. */
   fillAvailableSpace?: boolean;
+  /** Override the default board padding when an embedded playfield is pixel-calibrated. */
+  contentInset?: number;
   /** Optional native checkerboard tint used by transparent embedded boards. */
   checkerboardCellColor?: string;
   /** Omit for the dedicated board's direct row-major cell order. */
@@ -191,7 +193,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   layout?: MergeBoardLayout;
 }) {
   const gap = 0;
-  const padding = width < 380 ? 5 : 6;
+  const padding = layout.contentInset ?? (width < 380 ? 5 : 6);
   const border = 0;
   const cellHeightToWidthRatio = layout.cellHeightToWidthRatio ?? 1;
   const widthCellSize = (width - (padding + border) * 2 - gap * (layout.columns - 1)) / layout.columns;

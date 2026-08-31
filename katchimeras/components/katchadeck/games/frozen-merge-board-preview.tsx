@@ -24,7 +24,7 @@ export const FrozenMergeBoardPreview = memo(function FrozenMergeBoardPreview({
   width,
 }: FrozenMergeBoardPreviewProps) {
   const gap = 0;
-  const padding = width < 380 ? 5 : 6;
+  const padding = layout.contentInset ?? (width < 380 ? 5 : 6);
   const inset = padding;
   const ratio = layout.cellHeightToWidthRatio ?? 1;
   const widthCellSize = (width - inset * 2) / layout.columns;

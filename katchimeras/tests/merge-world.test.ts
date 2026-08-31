@@ -37,15 +37,15 @@ import {
 
 const NOW = new Date('2026-08-12T12:00:00.000Z').getTime();
 
-test('Haven projects the complete Mossprout starter interaction area onto a 7x6 sandbox', () => {
+test('Haven projects the complete Mossprout starter interaction area onto a 7x9 sandbox', () => {
   const state = createHavenMergeSandboxState(NOW);
-  assert.equal(HAVEN_MERGE_BOARD_CELL_INDICES.length, 42);
-  assert.equal(new Set(HAVEN_MERGE_BOARD_CELL_INDICES).size, 42);
+  assert.equal(HAVEN_MERGE_BOARD_CELL_INDICES.length, 63);
+  assert.equal(new Set(HAVEN_MERGE_BOARD_CELL_INDICES).size, 63);
   assert.equal(HAVEN_MERGE_BOARD_COLUMNS, 7);
-  assert.equal(HAVEN_MERGE_BOARD_ROWS, 6);
+  assert.equal(HAVEN_MERGE_BOARD_ROWS, 9);
   assert.equal(state.activeOrders.length, 0);
   assert.equal(state.externalRewardReceipts.length, 0);
-  assert.ok(state.board.every((cell, index) => havenMergeCellIsVisible(index) || (cell.locked && !cell.occupant)));
+  assert.ok(state.board.every((_cell, index) => havenMergeCellIsVisible(index)));
 
   const starterCells = state.board.flatMap((cell, index) => cell.occupant ? [index] : []);
   assert.deepEqual(starterCells, [29, 30, 31, 32, 33]);
@@ -279,7 +279,7 @@ test('board geometry renders and hit-tests with one coordinate system', () => {
 test('a new Merge World is Mossprout-owned and begins with twenty playable cells', () => {
   const state = createInitialMergeWorldState(NOW);
   assert.deepEqual(mergeWorldCatalogIssues(), []);
-  assert.equal(state.version, 20);
+  assert.equal(state.version, 21);
   assert.equal(state.ownerCharacterId, 'mossprout');
   assert.equal(state.storageCapacity, 8);
   assert.equal(state.energy.regenCap, MERGE_ENERGY_REGEN_CAP);
@@ -576,7 +576,7 @@ test('normalization intentionally resets pre-v18 Merge snapshots', () => {
     },
   };
   const normalized = normalizeMergeWorldState(stale, NOW + 1);
-  assert.equal(normalized.version, 20);
+  assert.equal(normalized.version, 21);
   assert.equal(normalized.ownerCharacterId, 'mossprout');
   assert.deepEqual(normalized.generators, {});
 });
@@ -1283,7 +1283,7 @@ test('pre-v18 activity parcels are discarded by the intentional world reset', ()
     rewardInbox: [{ id: 'unknown-old-parcel', createdAt: NOW, items: ['adventure:trail:4'], source: 'activity' }],
   }, NOW + 1);
   assert.equal(normalized.rewardInbox.some((entry) => entry.source === 'activity'), false);
-  assert.equal(normalized.version, 20);
+  assert.equal(normalized.version, 21);
   assert.equal(normalized.ownerCharacterId, 'mossprout');
   assert.deepEqual(normalized.arrivals, []);
 });
@@ -1322,11 +1322,12 @@ test('Merge page keeps a stable parcel stack first in the tray and the board att
   const parcel = readFileSync('components/katchadeck/games/merge-parcel-overlay.tsx', 'utf8');
   const gameSurface = readFileSync('components/katchadeck/ui/game-surface.tsx', 'utf8');
   const rail = readFileSync('components/katchadeck/games/merge-order-rail.tsx', 'utf8');
+  const mergeSurface = readFileSync('components/katchadeck/games/merge-play-surface.tsx', 'utf8');
   assert.doesNotMatch(screen, /arrivalDock|Memory Shelf|worldChangeRow|basketButton/);
   assert.match(screen, /return \[\.\.\.parcelEntries, \.\.\.returnEntries, \.\.\.orderEntries\]/);
   assert.match(screen, /id: 'parcel-stack'/);
   assert.doesNotMatch(screen, /<MergeParcelButton/);
-  assert.match(screen, /boardStage: \{[^}]*justifyContent: 'flex-start'/);
+  assert.match(mergeSurface, /boardStage: \{[^}]*justifyContent: 'flex-start'/);
   assert.match(screen, /mergeArea: \{[^}]*marginTop: 18/);
   assert.match(parcel, /<GameBadge label=\{count\} style=\{styles\.countBadge\} tone="gold"/);
   assert.match(parcel, /arrival\.kind === 'discovery_parcel'[\s\S]*?<GameBadge icon="sparkles"/);
@@ -1349,9 +1350,10 @@ test('Merge board keeps a persistent selected-cell inspector below the playable 
   const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
   const inspector = readFileSync('components/katchadeck/games/merge-cell-inspector.tsx', 'utf8');
+  const mergeSurface = readFileSync('components/katchadeck/games/merge-play-surface.tsx', 'utf8');
   const playerCopy = readFileSync('utils/merge-world/merge-board-player-copy.ts', 'utf8');
 
-  assert.match(screen, /<View onLayout=\{measureBoardArea\} style=\{styles\.boardStage\}>[\s\S]*?<MergeCellInspector/);
+  assert.match(mergeSurface, /<View onLayout=\{measureBoardArea\} style=\{styles\.boardStage\}>[\s\S]*?<MergeCellInspector/);
   assert.match(screen, /if \(cell != null\) setInspectedCell\(cell\)/);
   assert.match(board, /if \(boardCell\?\.mist \|\| boardCell\?\.locked\) \{\s*onSelectRef\.current\(cell\)/);
   assert.match(inspector, /Tap an item or covered cell for details/);
@@ -1728,13 +1730,13 @@ test('serving a story order consumes its item without Energy or friendship rewar
   assert.equal(result.state.externalRewardReceipts.some((receipt) => receipt.id.startsWith('merge-friendship:')), false);
 });
 
-test('legacy snapshots reset cleanly into Mossprout’s v20 personal world', () => {
+test('legacy snapshots reset cleanly into Mossprout’s v21 personal world', () => {
   const normalized = normalizeMergeWorldState({
     ...createInitialMergeWorldState(NOW), version: 2,
     energy: { value: 99, cap: 100, lastRegenAt: NOW },
     generators: { 'starter-pantry': { id: 'starter-pantry', familyId: 'food', name: 'Picnic Pantry', level: 1, enabledBranches: ['table'], charges: 9, maxCharges: 12, readyAt: NOW + 1000 } },
   }, NOW + 1);
-  assert.equal(normalized.version, 20);
+  assert.equal(normalized.version, 21);
   assert.equal(normalized.ownerCharacterId, 'mossprout');
   assert.equal(normalized.energy.value, 0);
   assert.deepEqual(normalized.generators, {});
@@ -1897,7 +1899,7 @@ test('v10 companion ownership resets instead of populating Mossprout’s world',
   const legacy = { ...current, version: 10 } as unknown as Record<string, unknown>;
   delete legacy.companionDiscovery;
   const migrated = normalizeMergeWorldState(legacy, NOW + 1);
-  assert.equal(migrated.version, 20);
+  assert.equal(migrated.version, 21);
   assert.deepEqual(migrated.unlockedCharacters, []);
   assert.deepEqual(migrated.companionDiscovery.records, []);
 });

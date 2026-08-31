@@ -1,13 +1,19 @@
+import type { ImageSourcePropType } from 'react-native';
+
 import type { KingdomHexScene, KingdomTileArtLayer, KingdomTileRender } from '@/components/katchadeck/world/kingdom-hex-scene';
+import { MOSSPROUT_NATURE_ISLANDS } from '@/constants/mossprout-nature-islands';
+import type { MossproutNatureIslandId, MossproutNatureIslandLevel } from '@/types/merge-world';
 import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
 import {
   havenSquareZoneFrame,
+  mossproutGardenFrame,
   MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS,
+  MOSSPROUT_GARDEN_SOURCE_SIZE,
   MOSSPROUT_SQUARE_ZONES,
-  mossproutGardenEastNatureIslandFrame,
-  mossproutGardenWestNatureIslandFrame,
+  mossproutNatureIslandFrame,
   mossproutSquareSceneMetrics,
   mossproutWorldFrame,
+  type MossproutNatureIslandPosition,
 } from '@/utils/haven-square-world';
 
 const SOURCE_SIZE = { height: 1024, width: 1024 } as const;
@@ -19,56 +25,111 @@ const ENVIRONMENT_SOURCES = {
   thumb: require('../../../assets/images/katchimeras/world/square/mossprout-main-environment-256.webp'),
 };
 const GARDEN_SOURCES = {
-  full: require('../../../assets/images/katchimeras/world/square/mossprout-merge-island-perspective.webp'),
-  medium: require('../../../assets/images/katchimeras/world/square/mossprout-merge-island-perspective-512.webp'),
-  thumb: require('../../../assets/images/katchimeras/world/square/mossprout-merge-island-perspective-256.webp'),
+  full: require('../../../assets/images/katchimeras/world/square/mossprout-merge-island-portrait-v1.webp'),
+  medium: require('../../../assets/images/katchimeras/world/square/mossprout-merge-island-portrait-v1-512.webp'),
+  thumb: require('../../../assets/images/katchimeras/world/square/mossprout-merge-island-portrait-v1-256.webp'),
 };
 const MOSSPROUT_STANDING_RESIDENT_SOURCE = require(
   '../../../assets/images/katchimeras/world/square/mossprout-standing-resident-512.webp',
 );
 
-const NATURE_ISLAND_ORIGINAL_SOURCE_SIZE = { height: 512, width: 512 } as const;
-const WEST_NATURE_ISLAND_CROP = { bottom: 480, left: 79, right: 433, top: 32 } as const;
-const EAST_NATURE_ISLAND_CROP = { bottom: 480, left: 66, right: 445, top: 32 } as const;
-const WEST_NATURE_ISLAND_SOURCE_SIZE = { height: 448, width: 354 } as const;
-const EAST_NATURE_ISLAND_SOURCE_SIZE = { height: 448, width: 379 } as const;
-const NATURE_ISLAND_SOURCE = require('../../../assets/images/katchimeras/world/square/nature-island-512.webp');
-const EAST_NATURE_ISLAND_SOURCE = require('../../../assets/images/katchimeras/world/square/nature-island-east-512.webp');
+type NatureIslandSources = {
+  full: ImageSourcePropType;
+  medium: ImageSourcePropType;
+  thumb: ImageSourcePropType;
+};
 
-function cropArtFrame(
-  frame: { height: number; left: number; top: number; width: number },
-  crop: { bottom: number; left: number; right: number; top: number },
-) {
-  const scaleX = frame.width / NATURE_ISLAND_ORIGINAL_SOURCE_SIZE.width;
-  const scaleY = frame.height / NATURE_ISLAND_ORIGINAL_SOURCE_SIZE.height;
-  return {
-    height: (crop.bottom - crop.top) * scaleY,
-    left: frame.left + crop.left * scaleX,
-    top: frame.top + crop.top * scaleY,
-    width: (crop.right - crop.left) * scaleX,
-  };
-}
+/** Temporary art contract: every visible level uses the approved final-form master. */
+const NATURE_ISLAND_SOURCES: Record<MossproutNatureIslandId, NatureIslandSources> = {
+  'seed-nursery': {
+    full: require('../../../assets/images/katchimeras/world/square/mossprout-seed-nursery-l4.webp'),
+    medium: require('../../../assets/images/katchimeras/world/square/mossprout-seed-nursery-l4-512.webp'),
+    thumb: require('../../../assets/images/katchimeras/world/square/mossprout-seed-nursery-l4-256.webp'),
+  },
+  'bloom-garden': {
+    full: require('../../../assets/images/katchimeras/world/square/mossprout-bloom-garden-l4.webp'),
+    medium: require('../../../assets/images/katchimeras/world/square/mossprout-bloom-garden-l4-512.webp'),
+    thumb: require('../../../assets/images/katchimeras/world/square/mossprout-bloom-garden-l4-256.webp'),
+  },
+  'pond-sanctuary': {
+    full: require('../../../assets/images/katchimeras/world/square/mossprout-pond-sanctuary-l4.webp'),
+    medium: require('../../../assets/images/katchimeras/world/square/mossprout-pond-sanctuary-l4-512.webp'),
+    thumb: require('../../../assets/images/katchimeras/world/square/mossprout-pond-sanctuary-l4-256.webp'),
+  },
+  'orchard-grove': {
+    full: require('../../../assets/images/katchimeras/world/square/mossprout-orchard-grove-l4.webp'),
+    medium: require('../../../assets/images/katchimeras/world/square/mossprout-orchard-grove-l4-512.webp'),
+    thumb: require('../../../assets/images/katchimeras/world/square/mossprout-orchard-grove-l4-256.webp'),
+  },
+  'ancient-tree-grove': {
+    full: require('../../../assets/images/katchimeras/world/square/mossprout-ancient-tree-grove-l4.webp'),
+    medium: require('../../../assets/images/katchimeras/world/square/mossprout-ancient-tree-grove-l4-512.webp'),
+    thumb: require('../../../assets/images/katchimeras/world/square/mossprout-ancient-tree-grove-l4-256.webp'),
+  },
+  'wildgrowth-grove': {
+    full: require('../../../assets/images/katchimeras/world/square/mossprout-wildgrowth-grove-l4.webp'),
+    medium: require('../../../assets/images/katchimeras/world/square/mossprout-wildgrowth-grove-l4-512.webp'),
+    thumb: require('../../../assets/images/katchimeras/world/square/mossprout-wildgrowth-grove-l4-256.webp'),
+  },
+};
+
+const POSITIONS: Record<MossproutNatureIslandId, MossproutNatureIslandPosition> = {
+  'seed-nursery': 'upper-left',
+  'bloom-garden': 'upper-right',
+  'pond-sanctuary': 'middle-left',
+  'orchard-grove': 'middle-right',
+  'ancient-tree-grove': 'lower-left',
+  'wildgrowth-grove': 'lower-right',
+};
 
 function interactionFrame(frame: { left: number; top: number; width: number; height: number }) {
   const bounds = MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS;
   return {
-    height: ((bounds.bottom - bounds.top) / SOURCE_SIZE.height) * frame.height,
-    left: frame.left + (bounds.left / SOURCE_SIZE.width) * frame.width,
-    top: frame.top + (bounds.top / SOURCE_SIZE.height) * frame.height,
-    width: ((bounds.right - bounds.left) / SOURCE_SIZE.width) * frame.width,
+    height: ((bounds.bottom - bounds.top) / MOSSPROUT_GARDEN_SOURCE_SIZE.height) * frame.height,
+    left: frame.left + (bounds.left / MOSSPROUT_GARDEN_SOURCE_SIZE.width) * frame.width,
+    top: frame.top + (bounds.top / MOSSPROUT_GARDEN_SOURCE_SIZE.height) * frame.height,
+    width: ((bounds.right - bounds.left) / MOSSPROUT_GARDEN_SOURCE_SIZE.width) * frame.width,
   };
 }
 
+function natureIslandLayers(
+  levels: Record<MossproutNatureIslandId, MossproutNatureIslandLevel>,
+): KingdomTileArtLayer[] {
+  return MOSSPROUT_NATURE_ISLANDS.flatMap((island, index) => {
+    const level = levels[island.id] ?? 0;
+    if (level < 1) return [];
+    const frame = mossproutNatureIslandFrame(POSITIONS[island.id]);
+    const row = Math.floor(index / 2);
+    const depth = 1 + row * 3;
+    const sources = NATURE_ISLAND_SOURCES[island.id];
+    return [{
+      alphaBounds: FULL_BOUNDS,
+      coord: { q: index % 2 === 0 ? -1 : 1, r: row },
+      custom: true,
+      depth,
+      fallbackSource: null,
+      frame,
+      interactionFrame: frame,
+      id: `nature:mossprout:${island.id}`,
+      kind: 'tile',
+      source: sources.full,
+      sources,
+      sourceSize: SOURCE_SIZE,
+    } satisfies KingdomTileArtLayer];
+  });
+}
+
 /** The focused world contains only Mossprout-owned visual and interaction layers. */
-export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlot[]): KingdomHexScene {
+export function buildMossproutSquareScene(
+  companionSlots: KingdomHexCompanionSlot[],
+  natureIslandLevels: Record<MossproutNatureIslandId, MossproutNatureIslandLevel>,
+): KingdomHexScene {
   const mossprout = companionSlots.find((slot) => slot.familyId === 'mossprout')
     ?? { id: 'family:mossprout', familyId: 'mossprout', kind: 'locked' as const, coord: { q: 0, r: 0 } };
   const environmentZone = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'mossprout-environment')!;
   const gardenZone = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'mossprout-garden')!;
   const environmentFrame = mossproutWorldFrame(havenSquareZoneFrame(environmentZone.coord));
-  const gardenFrame = mossproutWorldFrame(havenSquareZoneFrame(gardenZone.coord));
-  const westNatureFrame = cropArtFrame(mossproutGardenWestNatureIslandFrame(), WEST_NATURE_ISLAND_CROP);
-  const eastNatureFrame = cropArtFrame(mossproutGardenEastNatureIslandFrame(), EAST_NATURE_ISLAND_CROP);
+  const gardenFrame = mossproutGardenFrame();
 
   const environmentTile: KingdomTileRender = {
     companion: mossprout,
@@ -100,10 +161,10 @@ export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlo
     squareCoord: environmentZone.coord,
   };
   const gardenLayer: KingdomTileArtLayer = {
-    alphaBounds: FULL_BOUNDS,
+    alphaBounds: { bottom: MOSSPROUT_GARDEN_SOURCE_SIZE.height, left: 0, right: MOSSPROUT_GARDEN_SOURCE_SIZE.width, top: 0 },
     coord: { q: 0, r: 1 },
     custom: true,
-    depth: 2,
+    depth: 5,
     fallbackSource: null,
     frame: gardenFrame,
     id: 'structure:mossprout-square-garden',
@@ -111,37 +172,14 @@ export function buildMossproutSquareScene(companionSlots: KingdomHexCompanionSlo
     kind: 'structure',
     source: GARDEN_SOURCES.full,
     sources: GARDEN_SOURCES,
-    sourceSize: SOURCE_SIZE,
+    sourceSize: MOSSPROUT_GARDEN_SOURCE_SIZE,
     squareCoord: gardenZone.coord,
-  };
-  const westNatureLayer: KingdomTileArtLayer = {
-    alphaBounds: { bottom: WEST_NATURE_ISLAND_SOURCE_SIZE.height, left: 0, right: WEST_NATURE_ISLAND_SOURCE_SIZE.width, top: 0 },
-    coord: { q: -1, r: 1 },
-    custom: true,
-    depth: 3,
-    fallbackSource: null,
-    frame: westNatureFrame,
-    id: 'decor:mossprout-garden-west-nature-island',
-    kind: 'tile',
-    source: NATURE_ISLAND_SOURCE,
-    sources: { full: NATURE_ISLAND_SOURCE, medium: NATURE_ISLAND_SOURCE, thumb: NATURE_ISLAND_SOURCE },
-    sourceSize: WEST_NATURE_ISLAND_SOURCE_SIZE,
-  };
-  const eastNatureLayer: KingdomTileArtLayer = {
-    ...westNatureLayer,
-    alphaBounds: { bottom: EAST_NATURE_ISLAND_SOURCE_SIZE.height, left: 0, right: EAST_NATURE_ISLAND_SOURCE_SIZE.width, top: 0 },
-    coord: { q: 1, r: 1 },
-    frame: eastNatureFrame,
-    id: 'decor:mossprout-garden-east-nature-island',
-    source: EAST_NATURE_ISLAND_SOURCE,
-    sources: { full: EAST_NATURE_ISLAND_SOURCE, medium: EAST_NATURE_ISLAND_SOURCE, thumb: EAST_NATURE_ISLAND_SOURCE },
-    sourceSize: EAST_NATURE_ISLAND_SOURCE_SIZE,
   };
   const metrics = mossproutSquareSceneMetrics();
   return {
     centerTile: environmentTile,
     height: metrics.height,
-    tileArtLayers: [environmentLayer, gardenLayer, westNatureLayer, eastNatureLayer]
+    tileArtLayers: [environmentLayer, gardenLayer, ...natureIslandLayers(natureIslandLevels)]
       .sort((left, right) => left.depth - right.depth),
     tileById: new Map([[environmentTile.id, environmentTile]]),
     tiles: [environmentTile],

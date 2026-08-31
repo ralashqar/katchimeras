@@ -55,6 +55,8 @@
     "art:haven:check": "node scripts/verify-haven-art-pipeline.cjs",
     "art:haven:nature-islands": "python scripts/package-haven-nature-islands.py",
     "art:haven:nature-islands:check": "python scripts/package-haven-nature-islands.py --check",
+    "art:haven:portrait-board": "python scripts/package-mossprout-portrait-merge-island.py",
+    "art:haven:portrait-board:qa": "python scripts/render-mossprout-portrait-board-qa.py",
     "art:cinematic-progression": "python scripts/prepare-cinematic-environment-progression.py --character mossprout",
     "art:cinematic-progression:check": "python scripts/prepare-cinematic-environment-progression.py --character mossprout --check",
     "art:today-scenes": "python scripts/generate-today-full-spread.py",

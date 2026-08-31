@@ -32,7 +32,11 @@ export const HAVEN_JUNCTION_TRAY_TOP_OFFSET = 48;
 /** Compact decorative nature islet placed west of the Mossprout/garden seam. */
 export const HAVEN_WEST_NATURE_ISLAND_SIZE = 330;
 /** Crop the unused western world column while retaining the authored spacing. */
-export const MOSSPROUT_WORLD_OFFSET_X = HAVEN_SQUARE_COLUMN_PITCH - HAVEN_SQUARE_SCENE_PADDING * 3;
+export const MOSSPROUT_WORLD_OFFSET_X = 420;
+export const MOSSPROUT_NATURE_ISLAND_SIZE = 300;
+export const MOSSPROUT_NATURE_ISLAND_COLUMN_CENTERS = [180, 1_140] as const;
+export const MOSSPROUT_NATURE_ISLAND_ROW_CENTERS = [340, 800, 1_260] as const;
+export const MOSSPROUT_GARDEN_FRAME_HEIGHT = 872;
 
 export const MOSSPROUT_SQUARE_ZONES: readonly HavenSquareZone[] = [
   { id: 'baristabbit-cafe', coord: { column: 0, row: 0 } },
@@ -57,8 +61,7 @@ export function havenSquareZoneFrame(coord: HavenSquareCoord) {
  * source padding keeps its visible cliff above the merge playfield.
  */
 export function mossproutGardenJunctionMiniIslandFrame() {
-  const gardenZone = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'mossprout-garden')!;
-  const gardenFrame = mossproutWorldFrame(havenSquareZoneFrame(gardenZone.coord));
+  const gardenFrame = mossproutGardenFrame();
   return {
     height: HAVEN_JUNCTION_MINI_ISLAND_SIZE,
     left: gardenFrame.left + (gardenFrame.width - HAVEN_JUNCTION_MINI_ISLAND_SIZE) / 2,
@@ -83,6 +86,13 @@ export function mossproutGardenJunctionTrayFrames() {
     top: island.top + HAVEN_JUNCTION_TRAY_TOP_OFFSET,
     width: HAVEN_JUNCTION_TRAY_SIZE,
   }));
+}
+
+/** Portrait frame for the complete 7x9 Mossprout merge island. */
+export function mossproutGardenFrame() {
+  const garden = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'mossprout-garden')!;
+  const square = mossproutWorldFrame(havenSquareZoneFrame(garden.coord));
+  return { ...square, height: MOSSPROUT_GARDEN_FRAME_HEIGHT };
 }
 
 export function mossproutWorldFrame(frame: { height: number; left: number; top: number; width: number }) {
@@ -151,6 +161,35 @@ export function mossproutGardenEastNatureIslandFrame() {
   };
 }
 
+export type MossproutNatureIslandPosition =
+  | 'upper-left'
+  | 'upper-right'
+  | 'middle-left'
+  | 'middle-right'
+  | 'lower-left'
+  | 'lower-right';
+
+const MOSSPROUT_NATURE_ISLAND_GRID: Record<MossproutNatureIslandPosition, readonly [number, number]> = {
+  'upper-left': [0, 0],
+  'upper-right': [1, 0],
+  'middle-left': [0, 1],
+  'middle-right': [1, 1],
+  'lower-left': [0, 2],
+  'lower-right': [1, 2],
+};
+
+export function mossproutNatureIslandFrame(position: MossproutNatureIslandPosition) {
+  const [column, row] = MOSSPROUT_NATURE_ISLAND_GRID[position];
+  const centerX = MOSSPROUT_NATURE_ISLAND_COLUMN_CENTERS[column];
+  const centerY = MOSSPROUT_NATURE_ISLAND_ROW_CENTERS[row];
+  return {
+    height: MOSSPROUT_NATURE_ISLAND_SIZE,
+    left: centerX - MOSSPROUT_NATURE_ISLAND_SIZE / 2,
+    top: centerY - MOSSPROUT_NATURE_ISLAND_SIZE / 2,
+    width: MOSSPROUT_NATURE_ISLAND_SIZE,
+  };
+}
+
 /**
  * The horizontal bridge is intentionally oversized past both shorelines. Its
  * transparent source frame places the visible deck in the upper-middle of the
@@ -177,25 +216,30 @@ export function mossproutEggHomeBridgeFrame() {
 
 export function mossproutSquareSceneMetrics() {
   const environment = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'mossprout-environment')!;
-  const garden = MOSSPROUT_SQUARE_ZONES.find((zone) => zone.id === 'mossprout-garden')!;
   const frames = [
     mossproutWorldFrame(havenSquareZoneFrame(environment.coord)),
-    mossproutWorldFrame(havenSquareZoneFrame(garden.coord)),
-    mossproutGardenWestNatureIslandFrame(),
-    mossproutGardenEastNatureIslandFrame(),
+    mossproutGardenFrame(),
+    mossproutNatureIslandFrame('upper-left'),
+    mossproutNatureIslandFrame('upper-right'),
+    mossproutNatureIslandFrame('middle-left'),
+    mossproutNatureIslandFrame('middle-right'),
+    mossproutNatureIslandFrame('lower-left'),
+    mossproutNatureIslandFrame('lower-right'),
   ];
   return {
     height: Math.max(...frames.map((frame) => frame.top + frame.height)) + HAVEN_SQUARE_SCENE_PADDING,
-    width: Math.max(...frames.map((frame) => frame.left + frame.width)) + HAVEN_SQUARE_SCENE_PADDING,
+    width: Math.max(...frames.map((frame) => frame.left + frame.width)) + HAVEN_SQUARE_SCENE_PADDING / 2,
   };
 }
 
-/** Four calibrated corners of the clear gridless playfield in the 1024 source. */
+export const MOSSPROUT_GARDEN_SOURCE_SIZE = { height: 1_488, width: 1_024 } as const;
+
+/** Four calibrated corners of the empty playfield in the portrait source. */
 export const MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS = {
-  bottomLeft: { x: 220, y: 690 },
-  bottomRight: { x: 804, y: 690 },
-  topLeft: { x: 245, y: 215 },
-  topRight: { x: 779, y: 215 },
+  bottomLeft: { x: 143, y: 1_100 },
+  bottomRight: { x: 880, y: 1_100 },
+  topLeft: { x: 167, y: 188 },
+  topRight: { x: 836, y: 188 },
 } as const;
 
 /** Bounds enclosing the calibrated four-corner overlay. */
@@ -214,9 +258,9 @@ export const MOSSPROUT_GARDEN_TOP_WIDTH_RATIO = (
   - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS.bottomLeft.x
 );
 
-/** Cell aspect derived from the complete 7x6 runtime playfield. */
+/** Cell aspect derived from the complete 7x9 runtime playfield. */
 export const MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO = (
-  (MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.bottom - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.top) / 6
+  (MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.bottom - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.top) / 9
 ) / (
   (MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.right - MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_BOUNDS.left) / 7
 );
@@ -226,7 +270,12 @@ export const MOSSPROUT_GARDEN_CELL_HEIGHT_TO_WIDTH_RATIO = (
  * source has a larger clear floor than Mossprout, so its overlay deliberately
  * uses the same centered 7x6 footprint instead of stretching to the rails.
  */
-export const STEPPLING_BOARD_PLAYFIELD_SOURCE_CORNERS = MOSSPROUT_GARDEN_PLAYFIELD_SOURCE_CORNERS;
+export const STEPPLING_BOARD_PLAYFIELD_SOURCE_CORNERS = {
+  bottomLeft: { x: 220, y: 690 },
+  bottomRight: { x: 804, y: 690 },
+  topLeft: { x: 245, y: 215 },
+  topRight: { x: 779, y: 215 },
+} as const;
 
 export const STEPPLING_BOARD_PLAYFIELD_SOURCE_BOUNDS = {
   bottom: STEPPLING_BOARD_PLAYFIELD_SOURCE_CORNERS.bottomLeft.y,
