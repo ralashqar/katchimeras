@@ -38,9 +38,9 @@ export type KingdomWorldViewPlacement = {
   verticalOffsetHexTileHeight: number;
 };
 
-export function clampHavenCameraScale(scale: number, minScale = 0.54): number {
+export function clampHavenCameraScale(scale: number, minScale = 0.54, maxScale: number = KINGDOM_RENDERING.havenMaxScale): number {
   'worklet';
-  return Math.min(KINGDOM_RENDERING.havenMaxScale, Math.max(minScale, scale));
+  return Math.min(maxScale, Math.max(minScale, scale));
 }
 
 export type KingdomFocusTarget = { id: string; x: number; y: number };

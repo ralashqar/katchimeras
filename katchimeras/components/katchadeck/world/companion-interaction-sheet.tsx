@@ -1073,10 +1073,26 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     (journeyQuestionnaireOpen && props.journeyDefinition) ||
     (checkInOpen && activeCheckIn)
   );
+  const hostedFtueInteraction = Boolean(
+    props.ftueNavigationLocked
+    || props.ftueCompanionSurfaceOwned
+    || props.ftueProfileStep
+    || props.ftueOrderPreviewActive
+    || props.ftueResidentHandoffActive
+    || props.ftueResidentMatchResultActive
+    || props.initialConversationDefinitionId?.includes(':ftue:')
+  );
+  const hostedSwipeDismiss = props.reuseUnderlyingStage && !hostedFtueInteraction
+    ? requestClose
+    : undefined;
   const environmentPan = useCompanionEnvironmentPan({
     activeKey: `${props.creatureId}:${props.homeEnvironmentKey ?? 'none'}`,
-    dismissOnSwipe: props.reuseUnderlyingStage && dashboardRouteActive ? requestClose : undefined,
-    enabled: props.active !== false && !questGameVisible && !questionnaireExperience && Boolean(props.homeEnvironmentKey),
+    dismissOnSwipe: hostedSwipeDismiss,
+    enabled: props.active !== false && !questGameVisible && (
+      Boolean(hostedSwipeDismiss)
+      || (!questionnaireExperience && Boolean(props.homeEnvironmentKey))
+    ),
+    panVisuals: !props.reuseUnderlyingStage,
     visualKey: props.visualKey,
   });
   useEffect(() => {
@@ -1495,7 +1511,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             onBackdropPress={props.reuseUnderlyingStage && dashboardRouteActive ? requestClose : undefined}
             onCreatureReady={() => setTransitionCreatureReady(true)}
             rewardPulseKey={rewardPulseKey}
-            sceneTranslateX={environmentPan.translateX}
+            sceneTranslateX={props.reuseUnderlyingStage ? undefined : environmentPan.translateX}
             onSpeechBubblePress={!residentStoryResumeDashboard && conversationExperience
               && !conversationFlow.requiresManualAdvance
               && conversationFlow.phase !== 'awaiting_choice'

@@ -1,0 +1,7 @@
+Use case: precise-object-edit
+Asset type: Katchimeras world-map floating hex Garden tile with three live order-card overlays
+Input images: Image 1 is the direct edit target and authoritative tile geometry/art source. Image 2 is a runtime layout reference showing the approximate visual size of the three order cards; its characters, cards, neighboring islands, background, and UI are not copied into the artwork.
+Primary request: Redesign only the top-face garden content so three live order cards display clearly in a triangular arrangement: one broad uncluttered grass presentation zone at upper center and two at lower left and lower right. Each zone is large, plain, low-contrast, and free of objects. Do not draw cards, trays, characters, panels, or placeholder outlines.
+Garden detail: Concentrate one tiny leaf-roof tool shed, two or three small chunky raised sprout beds, broad cushiony leaves, and minimal tools in the remaining middle gaps and side margins. Keep a clean route from the front stairs.
+Style: Cozy toy-diorama 3D, chunky rounded forms, broad soft bevels, smooth matte clay-like materials, very low texture detail, low surface noise, and few large shapes readable at 256px.
+Constraints: Preserve the square canvas, camera, perspective, scale, flat-top hex footprint, deep tapered cliff, cliff blocks, centered recessed stairs, moss edge, safe padding, and pure-black background. No UI, text, hedge wall, perimeter fence, scenery, realism, tiny plants, dense foliage, or micro-detail.

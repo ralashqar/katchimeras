@@ -1,23 +1,37 @@
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { Fragment, memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, LayoutChangeEvent, Pressable, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
+import {
+  BlendColor,
+  Canvas,
+  Circle,
+  Group,
+  Image as SkiaImage,
+  RadialGradient as SkiaRadialGradient,
+  useImage,
+  vec,
+} from '@shopify/react-native-skia';
+import { Fragment, memo, type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AccessibilityInfo, LayoutChangeEvent, Pressable, StyleSheet, Text, View, type ImageSourcePropType, type View as ViewType } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
   Easing,
   useAnimatedStyle,
+  useDerivedValue,
   useReducedMotion,
   useSharedValue,
   withSequence,
   withSpring,
   withTiming,
   withRepeat,
+  withDelay,
+  type SharedValue,
 } from 'react-native-reanimated';
 
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
-import { EggAvatarArtwork } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
+import { EggAvatarArtwork, eggAvatarBodyPresentationStyle } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
+import type { EggExpressionCue } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
 import { FrozenMergeOrderTrayCard, type MergeOrderTrayEntry } from '@/components/katchadeck/games/merge-order-rail';
 import { HavenUpgradeEffects } from '@/components/katchadeck/world/haven-upgrade-effects';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -25,6 +39,9 @@ import type { KingdomTileArtLayer, KingdomTileRender } from '@/components/katcha
 import { buildKingdomHexScene } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { buildMossproutHexNeighborhoodScene } from '@/components/katchadeck/world/mossprout-hex-neighborhood-scene';
 import { SeamlessWorldImage } from '@/components/katchadeck/world/seamless-world-image';
+import { CreatureAnimatedArt } from '@/components/katchadeck/world/creature-animated-art';
+import type { WorldFtueSubjectPresentation } from '@/components/katchadeck/world/world-ftue-subject-presentation';
+import { runRewardArrivalMotion } from '@/components/katchadeck/ui/reward-arrival-motion';
 import { useKingdomHexCamera } from '@/components/katchadeck/world/use-kingdom-hex-camera';
 import { KINGDOM_RENDERING } from '@/constants/kingdom-rendering';
 import { mossproutNatureIslandById } from '@/constants/mossprout-nature-islands';
@@ -43,6 +60,10 @@ import {
   kingdomWorldViewPoint,
 } from '@/utils/kingdom-rendering';
 import { getDevKingdomHexVerticalAlignmentMode } from '@/utils/dev-asset-overrides';
+import { resolveCreatureArtSource } from '@/utils/creature-art';
+import { FTUE_MOSSPROUT_CREATURE } from '@/features/onboarding/mossprout-ftue-creature';
+import { eggVisualGrowthForEnergyRatio } from '@/utils/today-growth';
+import type { TodayHatchPhase } from '@/utils/today-hatch-presentation';
 import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
 import {
   HAVEN_UPGRADE_REDUCED_TIMING,
@@ -74,6 +95,8 @@ type Props = {
   eggVisual?: EggVisualState | null;
   lanternColor?: string;
   interactionEnabled?: boolean;
+  cameraLocked?: boolean;
+  cameraMaximumScale?: number;
   allowedResidentCharacterId?: string | null;
   tutorialCamera?: FtueCameraDirective | null;
   onResidentAnchorsChange?: (anchors: KingdomResidentScreenAnchor[]) => void;
@@ -87,14 +110,18 @@ type Props = {
   highlightedLockedFamilyId?: string | null;
   discoveryRevealFamilyId?: string | null;
   gardenOrders?: readonly MergeOrderTrayEntry[];
+  gardenOrdersInteractive?: boolean;
   initialCameraSnapshot?: KingdomCameraSnapshot | null;
   onCameraSnapshotChange?: (snapshot: KingdomCameraSnapshot) => void;
   onOpenGarden?: (orderId?: string | null) => void;
   interactionResidentId?: string | null;
+  interactionRewardPulseKey?: number;
   onResidentFocusComplete?: (creatureId: string) => void;
   focusedMossproutWorld?: boolean;
   mossproutNatureIslandLevels?: Record<MossproutNatureIslandId, MossproutNatureIslandLevel>;
   onSelectNatureIsland?: (islandId: MossproutNatureIslandId) => void;
+  worldEggTargetRef?: RefObject<ViewType | null>;
+  worldSubjectPresentation?: WorldFtueSubjectPresentation | null;
 };
 
 const CREATURE_SIZE = 58;
@@ -110,26 +137,50 @@ const LOCKED_TILE_HIT_WIDTH = HEX_TILE_W * 0.62;
 const LOCKED_TILE_HIT_HEIGHT = HEX_TILE_H * 0.78;
 const LOCKED_TILE_LOCK_SIZE = 104;
 const GARDEN_ORDER_SLOT_CENTERS = [
-  { x: 0.27, y: 0.205 },
-  { x: 0.5, y: 0.185 },
-  { x: 0.73, y: 0.205 },
+  { x: 0.5, y: 0.096 },
+  { x: 0.3575, y: 0.539 },
+  { x: 0.6425, y: 0.539 },
 ] as const;
+const FTUE_GARDEN_ORDER_SLOT = { x: 0.5, y: 0.72 } as const;
 const GARDEN_ORDER_CARD_WIDTH = 120;
 const GARDEN_ORDER_CARD_HEIGHT = 120;
+const WORLD_FTUE_CRACK_ONE = require('../../../assets/images/katchimeras/egg-avatars/effects/crack-1.png');
+const WORLD_FTUE_CRACK_TWO = require('../../../assets/images/katchimeras/egg-avatars/effects/crack-2.png');
+const WORLD_FTUE_SOFT_RING = require('../../../assets/images/katchimeras/soft-ring.png');
+const WORLD_FTUE_MOSSPROUT_SOURCE = resolveCreatureArtSource(FTUE_MOSSPROUT_CREATURE.visualKey);
+const WORLD_FTUE_DISCOVERY_EXPRESSIONS: readonly EggExpressionCue[] = [
+  { faceId: 'curious', atMs: 180, durationMs: 150 },
+  { faceId: 'little-worried', atMs: 430, durationMs: 150 },
+  { faceId: 'big-surprise', atMs: 700, durationMs: 150 },
+  { faceId: 'happy-squint', atMs: 920, durationMs: 140 },
+];
+const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
+// Keep the Egg's native image plane larger than the largest composition of
+// world camera, tile focus, growth and reaction scales. It is therefore always
+// sampled down (never enlarged from a 108x139 intermediate texture).
+const WORLD_FTUE_EGG_NATIVE_SURFACE_SCALE = 2.7;
+const WORLD_FTUE_EGG_WIDTH = 108;
+const WORLD_FTUE_EGG_HEIGHT = 139;
+const WORLD_FTUE_EGG_STAGE_SCALE = WORLD_FTUE_EGG_WIDTH / 200;
+const WORLD_FTUE_REWARD_GLOW_SIZE = WORLD_FTUE_EGG_WIDTH * 0.84;
+const WORLD_FTUE_GLOW_ACCENT = '#F4CE7A';
+const WORLD_FTUE_GLOW_CORE = '#FFF1B8';
 
-function GardenOrderShortcut({ entry, frame, index, onPress }: {
+function GardenOrderShortcut({ entry, frame, index, onPress, slotOverride }: {
   entry: MergeOrderTrayEntry;
   frame: { height: number; left: number; top: number; width: number };
   index: number;
-  onPress: () => void;
+  onPress?: () => void;
+  slotOverride?: { x: number; y: number };
 }) {
-  const slot = GARDEN_ORDER_SLOT_CENTERS[index];
+  const slot = slotOverride ?? GARDEN_ORDER_SLOT_CENTERS[index];
   if (!slot) return null;
   return (
     <Pressable
       accessibilityHint="Opens this order in the Garden"
       accessibilityLabel={`${entry.order.title}${entry.ready ? ', ready to serve' : ''}`}
       accessibilityRole="button"
+      disabled={!onPress}
       onPress={onPress}
       style={({ pressed }) => [
         styles.gardenOrderShortcut,
@@ -150,6 +201,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   identity,
   eggVisual,
   interactionEnabled = true,
+  cameraLocked = false,
+  cameraMaximumScale,
   allowedResidentCharacterId,
   tutorialCamera,
   onResidentAnchorsChange,
@@ -163,14 +216,18 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   highlightedLockedFamilyId,
   discoveryRevealFamilyId = null,
   gardenOrders = [],
+  gardenOrdersInteractive = true,
   initialCameraSnapshot,
   onCameraSnapshotChange,
   onOpenGarden,
   interactionResidentId = null,
+  interactionRewardPulseKey = 0,
   onResidentFocusComplete,
   focusedMossproutWorld = false,
   mossproutNatureIslandLevels,
   onSelectNatureIsland,
+  worldEggTargetRef,
+  worldSubjectPresentation,
 }: Props) {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [assetRevision, setAssetRevision] = useState(0);
@@ -315,7 +372,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     centerId: scene.centerTile.id,
     initialFitWorld: focusedMossproutWorld,
     initialSnapshot: initialCameraSnapshot,
-    interactionEnabled: interactionEnabled && !upgradePresentation,
+    interactionEnabled: interactionEnabled && !cameraLocked && !upgradePresentation,
     magneticFocus: presentation?.focusMode === 'magnetic'
       ? {
           anchorY: presentation.snapAnchorY,
@@ -326,6 +383,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         }
       : undefined,
     minimumScale: focusedMossproutWorld ? 0.28 : undefined,
+    maximumScale: cameraMaximumScale,
     onSnapshotChange: onCameraSnapshotChange,
     scene,
     viewport,
@@ -342,7 +400,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     });
     onSelectNatureIsland?.(islandId);
   }, [camera, onSelectNatureIsland, reduceMotion, viewport.height]);
-  const tutorialCameraKey = tutorialCamera ? JSON.stringify(tutorialCamera) : 'none';
+  const tutorialCameraKey = tutorialCamera
+    ? `${JSON.stringify(tutorialCamera)}:${worldSubjectPresentation?.growthProgress ?? 'none'}`
+    : 'none';
   const appliedTutorialCameraRef = useRef('none');
   const fitTutorialWorld = camera.fitWorld;
   const focusTutorialResident = camera.focusResident;
@@ -360,6 +420,18 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     }
     const target = tutorialCamera.target;
     const targetCharacterId = target.kind === 'haven_tile' ? target.characterId : null;
+    if (target.kind === 'haven_garden_tile' && gardenFrame) {
+      focusTutorialResident(
+        gardenFrame.left + gardenFrame.width / 2,
+        gardenFrame.top + gardenFrame.height / 2,
+        {
+          anchorY: tutorialCamera.anchorY,
+          durationMs: tutorialCamera.durationMs,
+          zoom: tutorialCamera.zoom,
+        },
+      );
+      return;
+    }
     const tile = target.kind === 'haven_home'
       ? sceneHomeTile
       : targetCharacterId
@@ -369,12 +441,42 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           ))
         : null;
     if (!tile) return;
-    focusTutorialResident(tile.cx, tile.cy, {
+    const residentAnchor = tile.companion?.kind === 'revealed_egg'
+      ? scene.tileArtLayers.find((layer) => layer.id === tile.id)?.residentAnchor
+      : null;
+    const eggGrowthScale = 0.5
+      + eggVisualGrowthForEnergyRatio(worldSubjectPresentation?.growthProgress ?? 0) * 0.5;
+    const subjectCenterY = residentAnchor
+      ? residentAnchor.y - 8 - WORLD_FTUE_EGG_HEIGHT * eggGrowthScale / 2
+      : tile.cy;
+    focusTutorialResident(residentAnchor?.x ?? tile.cx, subjectCenterY, {
       anchorY: tutorialCamera.anchorY,
       durationMs: tutorialCamera.durationMs,
       zoom: tutorialCamera.zoom,
     });
-  }, [fitTutorialWorld, focusTutorialResident, scene.tiles, sceneHomeTile, tutorialCamera, tutorialCameraKey, tutorialCameraReady]);
+  }, [fitTutorialWorld, focusTutorialResident, gardenFrame, scene.tileArtLayers, scene.tiles, sceneHomeTile, tutorialCamera, tutorialCameraKey, tutorialCameraReady, worldSubjectPresentation?.growthProgress]);
+  const focusedInteractionResidentRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!interactionResidentId) {
+      focusedInteractionResidentRef.current = null;
+      return;
+    }
+    if (!tutorialCameraReady || focusedInteractionResidentRef.current === interactionResidentId) return;
+    const tile = scene.tiles.find((candidate) => (
+      candidate.kind === 'companion'
+      && candidate.companion?.kind === 'owned'
+      && candidate.companion.creature.creatureId === interactionResidentId
+    ));
+    if (!tile) return;
+    focusedInteractionResidentRef.current = interactionResidentId;
+    const residentAnchor = scene.tileArtLayers.find((layer) => layer.id === tile.id)?.residentAnchor;
+    focusTutorialResident(residentAnchor?.x ?? tile.cx, residentAnchor?.y ?? tile.cy, {
+      anchorY: 0.48,
+      durationMs: reduceMotion ? 80 : 520,
+      onComplete: () => onResidentFocusComplete?.(interactionResidentId),
+      zoom: cameraMaximumScale ?? KINGDOM_RENDERING.havenMaxScale,
+    });
+  }, [cameraMaximumScale, focusTutorialResident, interactionResidentId, onResidentFocusComplete, reduceMotion, scene.tileArtLayers, scene.tiles, tutorialCameraReady]);
   const upgradeCompletionRef = useRef(onUpgradePresentationComplete);
   const upgradeFocusRef = useRef(camera.focusUpgrade);
   const upgradeLayersRef = useRef(upgradeLayers);
@@ -545,6 +647,20 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     callback(anchors);
   }, [artLayerById, camera.isMoving, camera.ready, camera.snapshot, scene.height, scene.tiles, scene.width, tileFocusScale, upgradePresentation, viewport.height, viewport.width]);
 
+  const revealedEggProjection = useMemo(() => {
+    const tile = scene.tiles.find((candidate) => (
+      candidate.kind === 'companion' && candidate.companion?.kind === 'revealed_egg'
+    ));
+    if (!tile || tile.companion?.kind !== 'revealed_egg') return null;
+    const residentAnchor = artLayerById.get(tile.id)?.residentAnchor ?? { x: tile.cx, y: tile.cy };
+    return {
+      eggSkinId: tile.companion.eggSkinId,
+      familyId: tile.companion.familyId,
+      x: residentAnchor.x,
+      y: residentAnchor.y - 8,
+    };
+  }, [artLayerById, scene.tiles]);
+
   const creatureNodes = useMemo(() => {
     const items: { depth: number; node: ReactNode }[] = [];
     for (const tile of scene.tiles) {
@@ -573,21 +689,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         continue;
       }
       if (tile.companion.kind === 'revealed_egg') {
-        items.push({
-          depth: tile.depth + 3,
-          node: (
-            <RevealedCompanionEgg
-              eggSkinId={tile.companion.eggSkinId}
-              focusAnchorX={tile.cx}
-              focusAnchorY={tile.cy}
-              focusScale={focusScale}
-              key={`revealed-egg-${tile.id}`}
-              onPress={interactionEnabled ? () => onSelectLocked?.(tile.companion!.familyId) : undefined}
-              x={artLayer?.residentAnchor?.x ?? tile.cx}
-              y={(artLayer?.residentAnchor?.y ?? tile.cy) - 8}
-            />
-          ),
-        });
         continue;
       }
       const { x, y } = artLayer?.residentAnchor ?? kingdomWorldViewPoint(
@@ -599,8 +700,11 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         depth: hexDrawDepth({ x, y }, 4),
         node: (
           <ResidentCreature
+            animated={interactionResidentId === tile.companion.creature.creatureId}
             celebrationNonce={
-              upgradePresentation?.creatureId === tile.companion.creature.creatureId
+              interactionResidentId === tile.companion.creature.creatureId && interactionRewardPulseKey > 0
+                ? 1_000_000 + interactionRewardPulseKey
+              : upgradePresentation?.creatureId === tile.companion.creature.creatureId
               && (upgradePhase === 'react' || upgradePhase === 'complete')
                 ? upgradePresentation.nonce
                 : undefined
@@ -618,14 +722,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             worldSize={creatureWorldSize}
             onFocus={residentInteractionEnabled ? camera.focusResident : ignoreFocus}
             onSelectResident={residentInteractionEnabled ? onSelectResident : undefined}
-            onFocusComplete={onResidentFocusComplete}
           />
         ),
       });
     }
 
     return items.sort((a, b) => a.depth - b.depth).map((item) => item.node);
-  }, [allowedResidentCharacterId, artLayerById, camera.focusResident, creatureWorldSize, highlightedLockedFamilyId, ignoreFocus, interactionEnabled, onResidentFocusComplete, onSelectLocked, onSelectResident, residentStatusGlyphs, scene.tiles, tileFocusScale, upgradePhase, upgradePresentation]);
+  }, [allowedResidentCharacterId, artLayerById, camera.focusResident, creatureWorldSize, highlightedLockedFamilyId, ignoreFocus, interactionEnabled, interactionResidentId, interactionRewardPulseKey, onSelectLocked, onSelectResident, residentStatusGlyphs, scene.tiles, tileFocusScale, upgradePhase, upgradePresentation]);
 
   const home = homePreset(identity?.selectedHomeArchetypeId);
   const showEgg = Boolean(eggVisual);
@@ -688,7 +791,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 </Fragment>
               );
             })}
-            {focusedMossproutWorld && interactionEnabled && !upgradePresentation && gardenFrame && onOpenGarden ? (
+            {focusedMossproutWorld && interactionEnabled && gardenOrdersInteractive && !upgradePresentation && gardenFrame && onOpenGarden ? (
               <Pressable
                 accessibilityHint="Opens the dedicated Merge Garden"
                 accessibilityLabel="Mossprout Garden"
@@ -704,7 +807,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                     frame={gardenFrame}
                     index={index}
                     key={`garden-order-shortcut-${entry.id}`}
-                    onPress={() => onOpenGarden(entry.order.id)}
+                    onPress={gardenOrdersInteractive ? () => onOpenGarden(entry.order.id) : undefined}
+                    slotOverride={gardenOrdersInteractive ? undefined : FTUE_GARDEN_ORDER_SLOT}
                   />
                 ))
               : null}
@@ -750,6 +854,21 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           </Animated.View>
         </View>
       </GestureDetector>
+      {revealedEggProjection ? (
+        <RevealedCompanionEgg
+          cameraScale={camera.scaleValue}
+          cameraTranslateX={camera.translationXValue}
+          cameraTranslateY={camera.translationYValue}
+          eggSkinId={revealedEggProjection.eggSkinId}
+          onPress={interactionEnabled ? () => onSelectLocked?.(revealedEggProjection.familyId) : undefined}
+          presentation={worldSubjectPresentation}
+          sceneHeight={scene.height}
+          sceneWidth={scene.width}
+          targetRef={worldEggTargetRef}
+          x={revealedEggProjection.x}
+          y={revealedEggProjection.y}
+        />
+      ) : null}
       {!upgradePresentation && interactionEnabled ? (
         <Pressable
           accessibilityRole="button"
@@ -985,57 +1104,386 @@ const KingdomEgg = memo(function KingdomEgg({
 });
 
 const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
+  cameraScale,
+  cameraTranslateX,
+  cameraTranslateY,
   eggSkinId,
   x,
   y,
-  focusAnchorX,
-  focusAnchorY,
-  focusScale,
   onPress,
+  presentation,
+  sceneHeight,
+  sceneWidth,
+  targetRef,
 }: {
+  cameraScale: SharedValue<number>;
+  cameraTranslateX: SharedValue<number>;
+  cameraTranslateY: SharedValue<number>;
   eggSkinId: Extract<KingdomHexCompanionSlot, { kind: 'revealed_egg' }>['eggSkinId'];
   x: number;
   y: number;
-  focusAnchorX: number;
-  focusAnchorY: number;
-  focusScale: number;
   onPress?: () => void;
+  presentation?: WorldFtueSubjectPresentation | null;
+  sceneHeight: number;
+  sceneWidth: number;
+  targetRef?: RefObject<ViewType | null>;
 }) {
+  const { equippedFaceId } = useEggAvatar();
+  const reduceMotion = useReducedMotion();
   const opacity = useSharedValue(0);
-  const pulse = useSharedValue(1);
+  const visualGrowth = useSharedValue(eggVisualGrowthForEnergyRatio(presentation?.growthProgress ?? 0));
+  const feedbackPulse = useSharedValue(0);
+  const feedbackShake = useSharedValue(0);
+  const radianceFlare = useSharedValue(0);
+  const ripple = useSharedValue(1);
+  const rippleEcho = useSharedValue(1);
+  const hatchShake = useSharedValue(0);
+  const hatchPulse = useSharedValue(0);
+  const crackOne = useSharedValue(0);
+  const crackTwo = useSharedValue(0);
+  const eggExit = useSharedValue(presentation?.companionVisible ? 1 : 0);
+  const creatureEntry = useSharedValue(presentation?.companionVisible ? 1 : 0);
+  const rewardPulse = useSharedValue(0);
+  const rewardShake = useSharedValue(0);
+  const hatchPhase = presentation?.hatchPresentation?.phase ?? 'idle';
+  const feedExpressionSequence = useMemo<readonly EggExpressionCue[]>(() => [
+    { faceId: 'big-grin', atMs: 80, durationMs: 180 },
+    { faceId: 'happy-squint', atMs: 430, durationMs: 190 },
+    { faceId: equippedFaceId, atMs: 900, durationMs: 240 },
+  ], [equippedFaceId]);
   useEffect(() => {
     opacity.value = withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) });
-    pulse.value = withRepeat(withSequence(
-      withTiming(1.055, { duration: 760, easing: Easing.inOut(Easing.quad) }),
-      withTiming(1, { duration: 760, easing: Easing.inOut(Easing.quad) }),
-    ), -1);
-  }, [opacity, pulse]);
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ scale: pulse.value }],
+  }, [opacity]);
+  useEffect(() => {
+    visualGrowth.value = withTiming(eggVisualGrowthForEnergyRatio(presentation?.growthProgress ?? 0), {
+      duration: reduceMotion ? 90 : 280,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [presentation?.growthProgress, reduceMotion, visualGrowth]);
+  const triggerFeedArrivalFeedback = useCallback(() => {
+    runRewardArrivalMotion(feedbackPulse, feedbackShake, reduceMotion);
+    radianceFlare.value = withSequence(
+      withTiming(1, { duration: reduceMotion ? 65 : 90, easing: Easing.out(Easing.cubic) }),
+      withDelay(
+        reduceMotion ? 90 : 190,
+        withTiming(0, { duration: reduceMotion ? 240 : 420, easing: Easing.out(Easing.cubic) }),
+      ),
+    );
+    ripple.value = 0;
+    ripple.value = withTiming(1, {
+      duration: reduceMotion ? 220 : 420,
+      easing: Easing.out(Easing.cubic),
+    });
+    rippleEcho.value = 0;
+    rippleEcho.value = withDelay(
+      reduceMotion ? 50 : 120,
+      withTiming(1, {
+        duration: reduceMotion ? 220 : 420,
+        easing: Easing.out(Easing.cubic),
+      }),
+    );
+  }, [feedbackPulse, feedbackShake, radianceFlare, reduceMotion, ripple, rippleEcho]);
+  useEffect(() => {
+    if (!presentation?.feedbackKey) return;
+    triggerFeedArrivalFeedback();
+  }, [presentation?.feedbackKey, triggerFeedArrivalFeedback]);
+  useEffect(() => {
+    return () => {
+      cancelAnimation(feedbackPulse);
+      cancelAnimation(feedbackShake);
+      cancelAnimation(radianceFlare);
+      cancelAnimation(ripple);
+      cancelAnimation(rippleEcho);
+    };
+  }, [feedbackPulse, feedbackShake, radianceFlare, ripple, rippleEcho]);
+  useEffect(() => {
+    cancelAnimation(hatchShake);
+    cancelAnimation(hatchPulse);
+    if (!presentation?.hatchPresentation) {
+      hatchShake.value = 0;
+      hatchPulse.value = 0;
+      crackOne.value = 0;
+      crackTwo.value = 0;
+      eggExit.value = withTiming(presentation?.companionVisible ? 1 : 0, { duration: reduceMotion ? 1 : 240 });
+      creatureEntry.value = withTiming(presentation?.companionVisible ? 1 : 0, { duration: reduceMotion ? 1 : 320 });
+      return;
+    }
+    const shaking = (hatchPhase === 'preparing' || worldFtueHatchPhaseAtLeast(hatchPhase, 'shaking'))
+      && !worldFtueHatchPhaseAtLeast(hatchPhase, 'crossfading_subject');
+    hatchShake.value = shaking && !reduceMotion ? withRepeat(withSequence(
+      withTiming(1, { duration: 62, easing: Easing.linear }),
+      withTiming(-1, { duration: 62, easing: Easing.linear }),
+    ), -1, true) : withTiming(0, { duration: 80 });
+    hatchPulse.value = shaking ? withRepeat(
+      withTiming(1, { duration: reduceMotion ? 240 : 720, easing: Easing.out(Easing.cubic) }),
+      -1,
+      false,
+    ) : 0;
+    const cracking = worldFtueHatchPhaseAtLeast(hatchPhase, 'cracking');
+    crackOne.value = withTiming(cracking ? 1 : 0, { duration: reduceMotion ? 80 : 260 });
+    crackTwo.value = cracking
+      ? withDelay(reduceMotion ? 50 : 300, withTiming(1, { duration: reduceMotion ? 80 : 180 }))
+      : withTiming(0, { duration: 80 });
+    const revealed = worldFtueHatchPhaseAtLeast(hatchPhase, 'crossfading_subject');
+    eggExit.value = withTiming(revealed ? 1 : 0, { duration: reduceMotion ? 180 : 500, easing: Easing.out(Easing.cubic) });
+    creatureEntry.value = withTiming(revealed ? 1 : 0, { duration: reduceMotion ? 180 : 500, easing: reduceMotion ? Easing.out(Easing.cubic) : Easing.out(Easing.back(1.35)) });
+    return () => {
+      cancelAnimation(hatchShake);
+      cancelAnimation(hatchPulse);
+    };
+  }, [crackOne, crackTwo, creatureEntry, eggExit, hatchPhase, hatchPulse, hatchShake, presentation?.companionVisible, presentation?.hatchPresentation, reduceMotion]);
+  useEffect(() => {
+    if (!presentation?.rewardPulseKey) return;
+    runRewardArrivalMotion(rewardPulse, rewardShake, reduceMotion);
+    return () => {
+      cancelAnimation(rewardPulse);
+      cancelAnimation(rewardShake);
+    };
+  }, [presentation?.rewardPulseKey, reduceMotion, rewardPulse, rewardShake]);
+  const eggMotionStyle = useAnimatedStyle(() => {
+    const shake = feedbackShake.value + hatchShake.value * 2;
+    return {
+      opacity: opacity.value,
+      transform: [
+        // This plane is already in screen coordinates, so the canonical
+        // legacy amplitude can be used directly without world-scale dilution.
+        { translateX: hatchShake.value * 7 },
+        { rotateZ: `${shake * 2.8}deg` },
+        { scale: 1 - eggExit.value * 0.82 },
+      ],
+    };
+  });
+  const eggNativeSurfaceStyle = useAnimatedStyle(() => ({
+    transform: [{
+      scale: (0.5 + visualGrowth.value * 0.5)
+        * (1 + feedbackPulse.value * 0.045)
+        * cameraScale.value
+        / WORLD_FTUE_EGG_NATIVE_SURFACE_SCALE,
+    }],
   }));
-  const width = 82;
-  const height = 106;
-  const frame = { height, left: x - width / 2, top: y - height, width };
+  const eggFadeStyle = useAnimatedStyle(() => ({ opacity: 1 - eggExit.value }));
+  const crackOneStyle = useAnimatedStyle(() => ({ opacity: crackOne.value * (1 - crackTwo.value * 0.65) }));
+  const crackTwoStyle = useAnimatedStyle(() => ({ opacity: crackTwo.value }));
+  const hatchPulseOneStyle = useAnimatedStyle(() => ({
+    opacity: (1 - hatchPulse.value) * 0.36 * (1 - eggExit.value),
+    transform: [{ scale: (0.62 + hatchPulse.value * 0.72) * cameraScale.value }],
+  }));
+  const hatchPulseTwoStyle = useAnimatedStyle(() => ({
+    opacity: (1 - hatchPulse.value) * 0.22 * (1 - eggExit.value),
+    transform: [{ scale: (0.86 + hatchPulse.value * 0.72) * cameraScale.value }],
+  }));
+  const projectedEffectCameraStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: cameraScale.value }],
+  }));
+  const creatureStyle = useAnimatedStyle(() => ({
+    opacity: creatureEntry.value,
+    transform: [
+      { translateX: rewardShake.value * 5.5 },
+      { translateY: (1 - creatureEntry.value) * 14 },
+      { rotateZ: `${rewardShake.value * 2.2}deg` },
+      { scale: (0.72 + creatureEntry.value * 0.28 + rewardPulse.value * 0.055) * cameraScale.value },
+    ],
+  }));
+  const rewardGlowStyle = useAnimatedStyle(() => ({
+    opacity: rewardPulse.value * 0.84,
+    transform: [{ scale: 0.72 + rewardPulse.value * 0.55 }],
+  }));
+  const width = WORLD_FTUE_EGG_WIDTH;
+  const height = WORLD_FTUE_EGG_HEIGHT;
+  const projectionStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        translateX: sceneWidth / 2
+          + cameraTranslateX.value
+          + (x - sceneWidth / 2) * cameraScale.value
+          - width / 2,
+      },
+      {
+        translateY: sceneHeight / 2
+          + cameraTranslateY.value
+          + (y - sceneHeight / 2) * cameraScale.value
+          - height,
+      },
+    ],
+  }));
   return (
-    <TileFocusTransform anchorX={focusAnchorX} anchorY={focusAnchorY} frame={frame} scale={focusScale}>
-      <Animated.View style={[StyleSheet.absoluteFill, animatedStyle]}>
-        <Pressable accessibilityLabel="Inspect Mossprout Egg" accessibilityRole="button" onPress={onPress} style={StyleSheet.absoluteFill}>
-          <EggAvatarArtwork
-            faceId="curious"
-            hatId={null}
-            heldAccessoryId={null}
-            priority="high"
-            resolution="app"
-            showFace={false}
-            skinId={eggSkinId}
-            style={StyleSheet.absoluteFill}
-          />
-        </Pressable>
+    <Animated.View
+      pointerEvents="box-none"
+      style={[styles.worldFtueProjectedSubject, { height, width }, projectionStyle]}>
+      {presentation?.hatchPresentation ? <>
+        <Animated.View pointerEvents="none" style={[styles.worldFtueHatchRing, hatchPulseOneStyle]} />
+        <Animated.View pointerEvents="none" style={[styles.worldFtueHatchRing, hatchPulseTwoStyle]} />
+      </> : null}
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, projectedEffectCameraStyle]}>
+        <WorldEggRadiance flare={radianceFlare} growth={visualGrowth} />
+        <WorldEggRippleField primary={ripple} secondary={rippleEcho} />
       </Animated.View>
-    </TileFocusTransform>
+      <Animated.View
+        renderToHardwareTextureAndroid={false}
+        shouldRasterizeIOS={false}
+        style={[StyleSheet.absoluteFill, eggMotionStyle]}>
+        <Animated.View style={[StyleSheet.absoluteFill, eggFadeStyle]}>
+        <View collapsable={false} ref={targetRef} style={StyleSheet.absoluteFill}>
+        <Pressable accessibilityLabel="Mossprout Egg" accessibilityRole="button" disabled={!onPress} onPress={onPress} style={StyleSheet.absoluteFill}>
+          <Animated.View
+            collapsable={false}
+            renderToHardwareTextureAndroid={false}
+            shouldRasterizeIOS={false}
+            style={[
+              styles.worldFtueEggNativeSurface,
+              {
+                height: height * WORLD_FTUE_EGG_NATIVE_SURFACE_SCALE,
+                marginLeft: -width * WORLD_FTUE_EGG_NATIVE_SURFACE_SCALE / 2,
+                width: width * WORLD_FTUE_EGG_NATIVE_SURFACE_SCALE,
+              },
+              eggNativeSurfaceStyle,
+            ]}>
+            <EggAvatarArtwork
+              allowDownscaling={false}
+              expressionSequence={
+                presentation?.hatchPresentation
+                  ? WORLD_FTUE_DISCOVERY_EXPRESSIONS
+                  : presentation?.feedExpressionKey
+                    ? feedExpressionSequence
+                    : undefined
+              }
+              expressionSequenceKey={
+                presentation?.hatchPresentation
+                  ? `world-hatch:${presentation.hatchPresentation.animationKey}`
+                  : presentation?.feedExpressionKey
+                    ? `world-feed:${presentation.feedExpressionKey}`
+                    : 'world-sleeping'
+              }
+              faceId={(presentation?.growthProgress ?? 0) > 0 ? 'curious' : 'sleepy'}
+              hatId={null}
+              heldAccessoryId={null}
+              priority="high"
+              resolution="high"
+              showFace
+              skinId={eggSkinId}
+              style={StyleSheet.absoluteFill}
+              transition={0}
+            />
+            {presentation?.hatchPresentation ? <>
+              <AnimatedExpoImage
+                allowDownscaling={false}
+                cachePolicy="memory-disk"
+                contentFit="contain"
+                priority="high"
+                source={WORLD_FTUE_CRACK_ONE}
+                style={[StyleSheet.absoluteFill, eggAvatarBodyPresentationStyle(eggSkinId), crackOneStyle]}
+                transition={0}
+              />
+              <AnimatedExpoImage
+                allowDownscaling={false}
+                cachePolicy="memory-disk"
+                contentFit="contain"
+                priority="high"
+                source={WORLD_FTUE_CRACK_TWO}
+                style={[StyleSheet.absoluteFill, eggAvatarBodyPresentationStyle(eggSkinId), crackTwoStyle]}
+                transition={0}
+              />
+            </> : null}
+          </Animated.View>
+        </Pressable>
+        </View>
+        </Animated.View>
+      </Animated.View>
+      {presentation?.hatchPresentation || presentation?.companionVisible ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.worldFtueCreatureFrame, StyleSheet.absoluteFill, creatureStyle]}>
+          <Animated.View style={[styles.worldFtueRewardGlow, rewardGlowStyle]} />
+          <CreatureGroundShadow frameSize={width} stage="grown" visualKey="mossprout" widthMultiplier={1.6} />
+          <CreatureAnimatedArt
+            accessibilityLabel="Mossprout animated"
+            fallbackSource={WORLD_FTUE_MOSSPROUT_SOURCE}
+            onLoad={presentation.onHatchAssetsReady}
+            style={StyleSheet.absoluteFill}
+            visualKey="mossprout"
+          />
+        </Animated.View>
+      ) : null}
+    </Animated.View>
   );
 });
+
+function WorldEggRippleField({ primary, secondary }: {
+  primary: SharedValue<number>;
+  secondary: SharedValue<number>;
+}) {
+  const ringImage = useImage(WORLD_FTUE_SOFT_RING);
+  const canvasSize = 540 * WORLD_FTUE_EGG_STAGE_SCALE;
+  const center = canvasSize / 2;
+  const primarySize = 304 * WORLD_FTUE_EGG_STAGE_SCALE;
+  const secondarySize = 342 * WORLD_FTUE_EGG_STAGE_SCALE;
+  const primaryOpacity = useDerivedValue(() => (1 - primary.value) * 0.9);
+  const secondaryOpacity = useDerivedValue(() => (1 - secondary.value) * 0.58);
+  const primaryTransform = useDerivedValue(() => [{ scale: 0.42 + primary.value * 1.02 }]);
+  const secondaryTransform = useDerivedValue(() => [{ scale: 0.36 + secondary.value * 1.16 }]);
+  if (!ringImage) return null;
+  return (
+    <Canvas pointerEvents="none" style={[styles.worldFtueEggEffectCanvas, {
+      height: canvasSize,
+      left: (WORLD_FTUE_EGG_WIDTH - canvasSize) / 2,
+      top: (WORLD_FTUE_EGG_HEIGHT - canvasSize) / 2,
+      width: canvasSize,
+    }]}>
+      <Group opacity={primaryOpacity} origin={vec(center, center)} transform={primaryTransform}>
+        <SkiaImage fit="contain" height={primarySize} image={ringImage} width={primarySize} x={(canvasSize - primarySize) / 2} y={(canvasSize - primarySize) / 2}>
+          <BlendColor color={WORLD_FTUE_GLOW_ACCENT} mode="srcIn" />
+        </SkiaImage>
+      </Group>
+      <Group opacity={secondaryOpacity} origin={vec(center, center)} transform={secondaryTransform}>
+        <SkiaImage fit="contain" height={secondarySize} image={ringImage} width={secondarySize} x={(canvasSize - secondarySize) / 2} y={(canvasSize - secondarySize) / 2}>
+          <BlendColor color={WORLD_FTUE_GLOW_CORE} mode="srcIn" />
+        </SkiaImage>
+      </Group>
+    </Canvas>
+  );
+}
+
+function WorldEggRadiance({ flare, growth }: {
+  flare: SharedValue<number>;
+  growth: SharedValue<number>;
+}) {
+  const size = 460 * WORLD_FTUE_EGG_STAGE_SCALE;
+  const center = size / 2;
+  const outerRadius = 185 * WORLD_FTUE_EGG_STAGE_SCALE;
+  const innerRadius = 140 * WORLD_FTUE_EGG_STAGE_SCALE;
+  const outerOpacity = useDerivedValue(() => Math.min(1, 0.058 + growth.value * 0.25 + flare.value * 0.72));
+  const innerOpacity = useDerivedValue(() => Math.min(1, 0.127 + growth.value * 0.42 + flare.value * 0.68));
+  const outerTransform = useDerivedValue(() => [{ scale: 0.576 + growth.value * 0.38 + flare.value * 0.22 }]);
+  const innerTransform = useDerivedValue(() => [{ scale: 0.591 + growth.value * 0.36 + flare.value * 0.16 }]);
+  return (
+    <Canvas pointerEvents="none" style={[styles.worldFtueEggEffectCanvas, {
+      height: size,
+      left: (WORLD_FTUE_EGG_WIDTH - size) / 2,
+      top: (WORLD_FTUE_EGG_HEIGHT - size) / 2,
+      width: size,
+    }]}>
+      <Group opacity={outerOpacity} origin={vec(center, center)} transform={outerTransform}>
+        <Circle cx={center} cy={center} r={outerRadius}>
+          <SkiaRadialGradient c={vec(center, center)} colors={['rgba(255, 248, 188, 0.92)', 'rgba(255, 222, 91, 0.68)', 'rgba(255, 202, 47, 0.22)', 'rgba(255, 198, 42, 0)']} positions={[0, 0.28, 0.62, 1]} r={outerRadius} />
+        </Circle>
+      </Group>
+      <Group opacity={innerOpacity} origin={vec(center, center)} transform={innerTransform}>
+        <Circle cx={center} cy={center} r={innerRadius}>
+          <SkiaRadialGradient c={vec(center, center)} colors={[WORLD_FTUE_GLOW_CORE, WORLD_FTUE_GLOW_ACCENT, 'rgba(255, 216, 79, 0.28)', 'rgba(255, 208, 62, 0)']} positions={[0, 0.3, 0.68, 1]} r={innerRadius} />
+        </Circle>
+      </Group>
+    </Canvas>
+  );
+}
+
+function worldFtueHatchPhaseAtLeast(phase: TodayHatchPhase, target: TodayHatchPhase) {
+  const order: TodayHatchPhase[] = [
+    'idle', 'preparing', 'shaking', 'cracking', 'crossfading_subject', 'subject_settling',
+    'forming_card', 'assembling_deck', 'awaiting_claim', 'claiming', 'new_day_intro',
+    'restoring_today', 'awaiting_interaction', 'world_shift', 'dashboard_settling', 'complete',
+  ];
+  return order.indexOf(phase) >= order.indexOf(target);
+}
 
 const LockedCompanionTile = memo(function LockedCompanionTile({
   highlighted,
@@ -1123,13 +1571,13 @@ const LockedCompanionTile = memo(function LockedCompanionTile({
 });
 
 type ResidentProps = {
+  animated?: boolean;
   celebrationNonce?: number;
   disabled?: boolean;
   focusAnchorX: number;
   focusAnchorY: number;
   focusScale: number;
   onFocus: (x: number, y: number, options?: { id?: string; onComplete?: () => void }) => void;
-  onFocusComplete?: (creatureId: string) => void;
   onSelectResident?: (creatureId: string, label: string) => void;
   source?: ImageSourcePropType;
   statusGlyph?: KingdomResidentStatusGlyph;
@@ -1140,13 +1588,13 @@ type ResidentProps = {
 };
 
 const ResidentCreature = memo(function ResidentCreature({
+  animated = false,
   celebrationNonce,
   disabled,
   focusAnchorX,
   focusAnchorY,
   focusScale,
   onFocus,
-  onFocusComplete,
   onSelectResident,
   source: sourceOverride,
   statusGlyph,
@@ -1201,9 +1649,9 @@ const ResidentCreature = memo(function ResidentCreature({
   }));
   const handlePress = useCallback(() => {
     if (!creature) return;
-    onFocus(x, y, { id: tile.id, onComplete: () => onFocusComplete?.(creature.creatureId) });
+    onFocus(x, y, { id: tile.id });
     onSelectResident?.(creature.creatureId, creature.name);
-  }, [creature, onFocus, onFocusComplete, onSelectResident, tile.id, x, y]);
+  }, [creature, onFocus, onSelectResident, tile.id, x, y]);
   const markReady = useCallback(() => setReady(true), []);
   const frame = {
     height: worldSize,
@@ -1227,7 +1675,15 @@ const ResidentCreature = memo(function ResidentCreature({
               visualKey={creature.visualKey}
             />
           ) : null}
-          {source ? <SeamlessWorldImage source={source} priority="normal" onReady={markReady} onFailure={markReady} /> : null}
+          {creature && animated ? (
+            <CreatureAnimatedArt
+              accessibilityLabel={`${creature.name} animated`}
+              fallbackSource={resolveCreatureArtSource(creature.visualKey)}
+              onLoad={markReady}
+              style={StyleSheet.absoluteFill}
+              visualKey={creature.visualKey}
+            />
+          ) : source ? <SeamlessWorldImage source={source} priority="normal" onReady={markReady} onFailure={markReady} /> : null}
           {statusGlyph ? <ResidentStatusGlyph status={statusGlyph} /> : null}
         </Animated.View>
       </Pressable>
@@ -1269,6 +1725,52 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(150, 239, 113, 0.18)',
     borderRadius: LOCKED_TILE_LOCK_SIZE / 2,
     boxShadow: '0 0 26px rgba(150, 239, 113, 0.82)',
+  },
+  worldFtueRewardGlow: {
+    backgroundColor: 'rgba(255,205,92,0.34)',
+    borderColor: 'rgba(255,239,168,0.88)',
+    borderRadius: 999,
+    borderWidth: 2,
+    boxShadow: '0 0 22px rgba(255,193,65,0.72)',
+    height: WORLD_FTUE_REWARD_GLOW_SIZE,
+    left: (WORLD_FTUE_EGG_WIDTH - WORLD_FTUE_REWARD_GLOW_SIZE) / 2,
+    position: 'absolute',
+    top: (WORLD_FTUE_EGG_HEIGHT - WORLD_FTUE_REWARD_GLOW_SIZE) / 2,
+    width: WORLD_FTUE_REWARD_GLOW_SIZE,
+  },
+  worldFtueEggNativeSurface: {
+    bottom: 0,
+    left: '50%',
+    position: 'absolute',
+    transformOrigin: 'center bottom',
+  },
+  // Mossprout shares the Egg's ground anchor. Scaling this frame around its
+  // center pushed the enlarged lower half below that anchor and behind the
+  // dialogue choices; bottom-origin scaling retains the hatch position and
+  // lifts the visible character into the Egg's former centered composition.
+  worldFtueCreatureFrame: {
+    transformOrigin: 'center bottom',
+  },
+  worldFtueProjectedSubject: {
+    left: 0,
+    overflow: 'visible',
+    position: 'absolute',
+    top: 0,
+    zIndex: 18,
+  },
+  worldFtueEggEffectCanvas: {
+    position: 'absolute',
+  },
+  worldFtueHatchRing: {
+    backgroundColor: 'rgba(250,218,125,0.12)',
+    borderColor: 'rgba(255,236,174,0.55)',
+    borderRadius: 999,
+    borderWidth: 2,
+    height: WORLD_FTUE_EGG_WIDTH * 1.05,
+    left: -WORLD_FTUE_EGG_WIDTH * 0.025,
+    position: 'absolute',
+    top: WORLD_FTUE_EGG_HEIGHT * 0.08,
+    width: WORLD_FTUE_EGG_WIDTH * 1.05,
   },
   lockedTileLock: { height: '100%', width: '100%' },
   homeTileHitTarget: { height: 84, position: 'absolute', width: 108 },

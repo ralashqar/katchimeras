@@ -8,9 +8,7 @@ export type ActiveFtueNavigationPolicy = FtueNavigationDirective & {
 };
 
 const PRE_MOSSPROUT_CONVERSATION_STEPS = new Set([
-  'haven.home_notice',
-  'haven.mossprout_focus',
-  'haven.mossprout_reveal',
+  'world.egg_intro',
   'grove.egg_inspect',
   'egg.nature_theme',
   'egg.companion_identity',
@@ -19,9 +17,12 @@ const PRE_MOSSPROUT_CONVERSATION_STEPS = new Set([
   'egg.mind',
   'egg.ready',
   'companion.first_meeting',
+  'companion.bond_spotlight',
   'companion.day_one_action',
   'companion.garden_intro',
   'companion.order_preview',
+  'world.garden_arrival',
+  'world.garden_handoff',
 ]);
 
 const RESIDENT_COMPLETION_RECOVERY_STEPS = new Set([

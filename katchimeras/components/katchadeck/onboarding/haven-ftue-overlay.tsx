@@ -21,6 +21,7 @@ export function havenFtueTargetKey(target: FtueTarget): string | null {
   if (target.kind === 'haven_tile') return `tile:${target.characterId}`;
   if (target.kind === 'haven_tile_hud') return `hud:${target.characterId}`;
   if (target.kind === 'haven_upgrade_button') return `upgrade:${target.characterId}`;
+  if (target.kind === 'haven_garden_button') return `garden-button:${target.characterId}`;
   if (target.kind === 'haven_world') return 'world';
   return null;
 }

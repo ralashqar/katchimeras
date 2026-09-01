@@ -280,9 +280,12 @@ test('the Katchimeras tab renders the hex selector first while companion Back re
   const rosterRoute = read('components', 'katchadeck', 'roster', 'katchimera-roster-route-screen.tsx');
   const kingdomScreen = read('components', 'katchadeck', 'roster', 'katchimera-kingdom-screen.tsx');
   const kingdomCanvas = read('components', 'katchadeck', 'world', 'kingdom-hex-canvas.tsx');
+  const ftueScript = read('features', 'onboarding', 'mossprout-ftue-script.ts');
   const youRoute = read('app', '(tabs)', 'you.tsx');
   const worldVisuals = read('utils', 'world-visuals.ts');
   const companionRoute = read('components', 'katchadeck', 'world', 'katchimera-companion-route-screen.tsx');
+  const mossproutRoute = read('app', 'katchimera', '[creatureId].tsx');
+  const katchimerasTab = read('app', '(tabs)', 'katchimeras.tsx');
 
   assert.doesNotMatch(rosterRoute, /KatchimeraViewMode|current === 'grid'|<KatchimeraRosterScreen/);
   assert.match(rosterRoute, /return isFocused \? \([\s\S]*?<FocusedKatchimeraRosterBoundary[\s\S]*?worldSession=\{worldSession\}[\s\S]*?\) : null/);
@@ -291,13 +294,21 @@ test('the Katchimeras tab renders the hex selector first while companion Back re
   assert.match(kingdomCanvas, /value: playerHavenHexTileSet\(\)/);
   assert.doesNotMatch(kingdomCanvas, /value: kingdomHexTileSet\(\)/);
   assert.match(worldVisuals, /playerHavenHexTileSet[\s\S]*?set\.id === 'floating_neighborhood_v2'/);
-  assert.match(rosterRoute, /router\.push\(\{ pathname: '\/katchimera\/\[creatureId\]'/);
+  assert.match(mossproutRoute, /if \(isMossprout\)[\s\S]*?<Redirect href=\{\{[\s\S]*?pathname: '\/\(tabs\)\/katchimeras'/);
+  assert.match(katchimerasTab, /mossproutInteraction[\s\S]*?requestedWorldInteraction/);
+  assert.match(rosterRoute, /interactionRequest=\{interactionRequest\}[\s\S]*?onInteractionRequestConsumed=\{onInteractionRequestConsumed\}/);
   assert.match(kingdomScreen, /<KingdomHexCanvas[\s\S]*?onSelectResident=\{selectResident\}/);
+  assert.match(kingdomScreen, /interactionRequest[\s\S]*?setInteractionCreatureId\(interactionRequest\.creatureId\)/);
+  assert.match(kingdomScreen, /cameraMaximumScale=\{ftueEggFeedingCloseupActive[\s\S]*?MOSSPROUT_WORLD_EGG_CLOSE_ZOOM[\s\S]*?MOSSPROUT_WORLD_EGG_REST_ZOOM/);
+  assert.match(kingdomCanvas, /animated=\{interactionResidentId === tile\.companion\.creature\.creatureId\}/);
+  assert.match(kingdomCanvas, /<CreatureAnimatedArt[\s\S]*?visualKey=\{creature\.visualKey\}/);
   assert.match(kingdomScreen, /<HavenTileHudLayer[\s\S]*?onOpen=\{openHavenDetail\}/);
+  assert.match(kingdomScreen, /setGardenButtonNode = useCallback[\s\S]*?ref=\{setGardenButtonNode\}/);
+  assert.doesNotMatch(kingdomScreen, /ref=\{\(node\) => registerFtueTarget\('garden-button:mossprout'/);
   assert.match(kingdomScreen, /Hidden in the Dream Mist/);
   assert.match(kingdomScreen, /Keep living days and growing your relationships/);
-  assert.match(rosterRoute, /stepId === 'haven\.home_notice'/);
-  assert.match(rosterRoute, /stepId === 'haven\.mossprout_reveal'[\s\S]*?kind: 'revealed_egg'/);
+  assert.match(rosterRoute, /stepId === 'world\.egg_intro'/);
+  assert.match(rosterRoute, /eggVisible[\s\S]*?kind: 'revealed_egg'/);
   assert.match(rosterRoute, /const discoveryCompanionSlots[\s\S]*?kind: 'locked' as const/);
   assert.match(rosterRoute, /announcement: 'Opening You'[\s\S]*?router\.push\('\/you'\)/);
   assert.doesNotMatch(kingdomScreen, /EggAvatar|accessibilityLabel="Open You"/);
@@ -305,8 +316,8 @@ test('the Katchimeras tab renders the hex selector first while companion Back re
   assert.match(rosterRoute, /<HavenSelectorPresentation[\s\S]*?onOpenProfile=\{openProfile\}/);
   assert.match(rosterRoute, /style=\{\(\{ pressed \}\) => \[styles\.selectorProfileButton/);
   assert.match(rosterRoute, /selectorProfileButton: \{[\s\S]*?borderRadius: 25[\s\S]*?overflow: 'hidden'/);
-  assert.match(kingdomScreen, /characterId: 'mossprout'[\s\S]*?zoom: 1\.25/);
-  assert.match(kingdomScreen, /familyId === 'mossprout'\) advanceOpening/);
+  assert.match(ftueScript, /id: 'world\.egg_intro'[\s\S]*?characterId: 'mossprout'[\s\S]*?zoom: MOSSPROUT_WORLD_EGG_REST_ZOOM/);
+  assert.match(kingdomScreen, /'world\.egg_intro': 2_450[\s\S]*?onFtueInspectRef\.current\?\.\(\)/);
   assert.match(kingdomCanvas, /candidate\.companion\?\.familyId === targetCharacterId/);
   assert.match(youRoute, /accessibilityLabel="Back to Haven"[\s\S]*?router\.replace\('\/\(tabs\)\/katchimeras'\)/);
   assert.match(companionRoute, /onCloseCompanion=\{\(\) =>[\s\S]*?: router\.back\(\)\}/);
@@ -382,8 +393,12 @@ test('Haven uses the hex selector as its top level and lazy-mounts only implemen
     'utf8',
   );
 
-  assert.match(rosterRoute, /lazy\(async \(\) =>[\s\S]*katchimera-kingdom-screen/);
+  assert.match(rosterRoute, /loadKatchimeraKingdomScreenModule[\s\S]*?import\('@\/components\/katchadeck\/roster\/katchimera-kingdom-screen'\)/);
+  assert.match(rosterRoute, /openFamilyWorld[\s\S]*?loadKatchimeraKingdomScreenModule\(\)[\s\S]*?transitionTo\(\{/);
   assert.match(rosterRoute, /activeWorldFamilyId === 'mossprout' \? <Suspense/);
+  assert.doesNotMatch(rosterRoute, /Suspense fallback=\{<View[^>]*><ActivityIndicator/);
+  assert.match(rosterRoute, /mossproutWorldCompanionSlots[\s\S]*?filter\(\(slot\) => slot\.familyId === 'mossprout'\)/);
+  assert.match(rosterRoute, /<LazyKatchimeraKingdomScreen[\s\S]*?companionSlots=\{mossproutWorldCompanionSlots\}/);
   assert.match(rosterRoute, /<HavenSelectorPresentation/);
   assert.match(rosterRoute, /announcement: 'Returning to all Havens'/);
   assert.match(rosterRoute, /BackHandler\.addEventListener\('hardwareBackPress'/);

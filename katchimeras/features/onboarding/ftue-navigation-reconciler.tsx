@@ -31,6 +31,12 @@ function hrefForResumeTarget(target: FtueResumeTarget): Href {
       params: { creatureId: target.creatureId },
     };
   }
+  if (target.creatureId === 'companion:mossprout') {
+    return {
+      pathname: '/(tabs)/katchimeras',
+      params: { mossproutInteraction: '1', ...(target.ftue ? { interactionFtue: target.ftue } : {}) },
+    };
+  }
   return {
     pathname: '/katchimera/[creatureId]',
     params: { creatureId: target.creatureId, ...(target.ftue ? { ftue: target.ftue } : {}) },

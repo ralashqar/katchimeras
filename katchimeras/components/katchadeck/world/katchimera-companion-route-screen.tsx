@@ -8,7 +8,7 @@ import { markFlowStart, reportFlowReady } from '@/utils/flow-performance';
 import { companionIdForFamily, familyIdFromCompanionId } from '@/constants/katchimera-skins';
 import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
 import { advanceFtueActionDurably, commitFtueAction, flushFtuePersistence, ftueWispForRun, loadFtueRun, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
-import { activateStoredResidentCardDiscovery, installMossproutOnboardingMergeWorld, loadMergeWorldState, revealStoredHaven, seedStoredMossproutGardenAfterFtue } from '@/utils/merge-world/repository';
+import { activateStoredResidentCardDiscovery, installMossproutOnboardingMergeWorld, loadMergeWorldState, seedStoredMossproutGardenAfterFtue } from '@/utils/merge-world/repository';
 import { useGameScreenTransition } from '@/features/navigation/game-screen-transition';
 import { useCompanionDiscoveryRecords } from '@/hooks/use-companion-discovery-records';
 import { localDayId } from '@/utils/world-identity';
@@ -159,7 +159,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     let releaseSource: (() => void) | null = null;
     const sourceCovered = new Promise<void>((resolve) => { releaseSource = resolve; });
     const transitionAccepted = transitionTo({
-      announcement: 'Returning to your Haven',
+      announcement: 'Returning to Mossprout’s world',
       target: 'katchimeras',
       onCovered: () => releaseSource?.(),
       navigate: async () => {
@@ -176,7 +176,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
             expectedStepId: 'companion.resident_match_result',
             actionId: 'companion.ack_resident_match_result',
             evidenceRef: 'mossprout-resident-match-result',
-            nextStepId: 'haven.reveal',
+            nextStepId: 'world.complete',
           });
           ftueHandoffRef.current = false;
           finishResidentMergeSession();
@@ -234,7 +234,6 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
             if (result.run?.stepId !== 'haven.first_bloom') {
               throw new Error('The First Bloom did not accept FTUE ownership');
             }
-            await revealStoredHaven();
             await flushFtuePersistence();
             ftueHandoffRef.current = false;
             router.dismissTo('/(tabs)/katchimeras');
@@ -353,35 +352,26 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   const openFtueGarden = useCallback(async () => {
     if (ftueHandoffRef.current) return;
     ftueHandoffRef.current = true;
-    const transitionAccepted = transitionTo({
-      announcement: "Opening Mossprout's Garden",
-      target: 'merge',
-      navigate: async () => {
-        const run = loadFtueRun();
-        try {
-          await installMossproutOnboardingMergeWorld(Date.now(), ftueWispForRun(run));
-          updateFtueRun({ mergeInstalled: true });
-          const result = await advanceFtueActionDurably({
-            expectedStepId: 'companion.order_preview',
-            actionId: 'companion.open_garden',
-            evidenceRef: 'mossprout-order-preview',
-          });
-          if (result.run?.status !== 'active' || result.step?.surface !== 'merge') {
-            throw new Error('Mossprout Garden did not accept FTUE ownership');
-          }
-          router.push({ pathname: '/katchimera/[creatureId]/activity', params: { creatureId } });
-        } catch (error) {
-          ftueHandoffRef.current = false;
-          console.warn('Could not prepare Mossprout Garden', error);
-          throw error;
-        }
-      },
-    });
-    if (!transitionAccepted) {
-      // Another transition owns the curtain, so this request was not queued.
+    const run = loadFtueRun();
+    try {
+      await installMossproutOnboardingMergeWorld(Date.now(), ftueWispForRun(run));
+      updateFtueRun({ mergeInstalled: true });
+      const result = await advanceFtueActionDurably({
+        expectedStepId: 'companion.order_preview',
+        actionId: 'companion.open_garden',
+        evidenceRef: 'mossprout-order-preview',
+      });
+      if (result.run?.stepId !== 'world.garden_handoff') {
+        throw new Error('Mossprout world did not accept the Garden handoff');
+      }
+      await flushFtuePersistence();
+    } catch (error) {
       ftueHandoffRef.current = false;
+      console.warn('Could not prepare Mossprout Garden handoff', error);
+      throw error;
     }
-  }, [creatureId, router, transitionTo]);
+    ftueHandoffRef.current = false;
+  }, []);
   const openFtueResidentParcel = useCallback(async () => {
     if (residentParcelOpeningRef.current) return;
     residentParcelOpeningRef.current = true;

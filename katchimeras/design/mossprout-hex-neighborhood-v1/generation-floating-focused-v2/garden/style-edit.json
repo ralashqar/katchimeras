@@ -1,0 +1,9 @@
+{
+  "method": "builtin-image-editor",
+  "intent": "precise-object-edit",
+  "inputRoles": ["direct edit target", "runtime layout reference"],
+  "outputSha256": "8269d5fe8e09229fc6820796b0470c0e179d82aff9b34d3f8ef46bcf73f31807",
+  "output": "design/mossprout-hex-neighborhood-v1/garden-source.png",
+  "outputSize": [1254, 1254],
+  "prompt": "style-edit-prompt.txt"
+}

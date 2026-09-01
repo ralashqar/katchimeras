@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
@@ -29,13 +29,14 @@ type EggFeedRequest = {
 const EGG_FEED_TARGET_Y_RATIO = 0.64;
 const FEED_ARRIVAL_WATCHDOG_MS = 2_500;
 
-export function useEggFeedController() {
+export function useEggFeedController(externalEggTargetRef?: RefObject<View | null>) {
   const [eggFeed, setEggFeed] = useState<EggFeed | null>(null);
   const [eggFeedKey, setEggFeedKey] = useState(0);
   const [eggFeedLaunchKey, setEggFeedLaunchKey] = useState(0);
   const [eggFeedRewardRequestKey, setEggFeedRewardRequestKey] = useState(0);
   const [energyHudPulseNonce, setEnergyHudPulseNonce] = useState(0);
-  const eggTargetRef = useRef<View | null>(null);
+  const internalEggTargetRef = useRef<View | null>(null);
+  const eggTargetRef = externalEggTargetRef ?? internalEggTargetRef;
   const energyHudTargetRef = useRef<View | null>(null);
   const heroStageRef = useRef<View | null>(null);
   const pendingFeedCommit = useRef<(() => void) | null>(null);

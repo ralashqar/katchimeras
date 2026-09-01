@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState, type RefObject } from 'react';
+import { ActivityIndicator, StyleSheet, useWindowDimensions, View, type View as ViewType } from 'react-native';
 import { Gesture } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
@@ -51,6 +51,7 @@ import { todayGrowthSummary, TODAY_GROWTH_REWARDS, type TodayGrowthSummary } fro
 import { todayKatchimeraExplorationBackgroundKeyForEnvironment } from '@/utils/today-exploration-backgrounds';
 
 import { CompanionHomeEnvironmentStage } from './companion-home-environment-stage';
+import type { WorldFtueSubjectPresentation } from './world-ftue-subject-presentation';
 
 const ATTUNEMENT_ACTION_IDS = [
   'egg.desired_feeling',
@@ -62,10 +63,13 @@ const MOSSPROUT_ENVIRONMENT_KEY = todayKatchimeraExplorationBackgroundKeyForEnvi
 const MOSSPROUT_VISUAL = getCreatureVisual('mossprout', 'grown');
 
 const SUBJECT_HANDOFF_DURATION_MS = 420;
-export function MossproutEggFtueSurface({ companionStageActive = false, onCompanionVisualReady, rewardPulseKey = 0 }: {
+export function MossproutEggFtueSurface({ companionStageActive = false, onCompanionVisualReady, onWorldSubjectPresentationChange, rewardPulseKey = 0, worldEggTargetRef, worldHosted = false }: {
   companionStageActive?: boolean;
   onCompanionVisualReady?: () => void;
+  onWorldSubjectPresentationChange?: (presentation: WorldFtueSubjectPresentation | null) => void;
   rewardPulseKey?: number;
+  worldEggTargetRef?: RefObject<ViewType | null>;
+  worldHosted?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
@@ -121,7 +125,16 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
     handleEggFeedArrive,
     handleEnergyTokenArrive,
     handleMergeEnergyTokenArrive,
-  } = useEggFeedController();
+    pulseEgg,
+  } = useEggFeedController(worldHosted ? worldEggTargetRef : undefined);
+  const handleFtueEnergyTokenArrive = useCallback((amount: number, index: number, count: number) => {
+    handleEnergyTokenArrive(amount, index, count);
+    // Drive the retained world-map Egg from the actual final token landing.
+    // This is the same feedbackKey path used by the original screen-space Egg,
+    // without depending on a later global-store publication after the FTUE
+    // step has already committed.
+    if (worldHosted && index === count - 1) pulseEgg();
+  }, [handleEnergyTokenArrive, pulseEgg, worldHosted]);
   const completeSubjectHandoff = useCallback(() => {
     setSubjectHandoffSettled(true);
   }, []);
@@ -186,6 +199,35 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
       isReady: step?.id === 'egg.ready',
     };
   }, [answeredCount, day, step?.id]);
+
+  const worldSubjectPresentation = useMemo<WorldFtueSubjectPresentation | null>(() => (
+    worldHosted && growth ? {
+      companionVisible: companionStageActive,
+      feedbackKey: eggFeedKey,
+      feedExpressionKey: eggFeedLaunchKey,
+      growthProgress: growth.energyRatio,
+      growthStage: growth.stage,
+      hatchPresentation: isHatching ? hatchPresentation : null,
+      onHatchAssetsError: handleHatchSubjectError,
+      onHatchAssetsReady: handleHatchSubjectReady,
+      rewardPulseKey,
+    } : null
+  ), [
+    companionStageActive,
+    eggFeedKey,
+    eggFeedLaunchKey,
+    growth,
+    handleHatchSubjectError,
+    handleHatchSubjectReady,
+    hatchPresentation,
+    isHatching,
+    rewardPulseKey,
+    worldHosted,
+  ]);
+  useEffect(() => {
+    onWorldSubjectPresentationChange?.(worldSubjectPresentation);
+  }, [onWorldSubjectPresentationChange, worldSubjectPresentation]);
+  useEffect(() => () => onWorldSubjectPresentationChange?.(null), [onWorldSubjectPresentationChange]);
 
   const scriptedPanelAction = useMemo<RankedTodayCareAction | null>(() => day ? ({
     id: 'ftue:mossprout-attunement',
@@ -257,14 +299,14 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
 
   if (!day || !growth) {
     return (
-      <View style={styles.root}>
-        <CompanionHomeEnvironmentStage
+      <View style={[styles.root, worldHosted && styles.worldHostedRoot]}>
+        {!worldHosted ? <CompanionHomeEnvironmentStage
           backgroundKey={MOSSPROUT_ENVIRONMENT_KEY}
           creature={MOSSPROUT_VISUAL.source}
           layer="background"
           name="Mossprout"
           visualKey="mossprout"
-        />
+        /> : null}
         <ActivityIndicator color="#FFF3C0" size="small" style={styles.loading} />
       </View>
     );
@@ -279,7 +321,7 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
   return (
     <TodayEnvironmentMotionProvider motion={environmentMotion}>
     <ExplorationEnvironmentProgressionProvider stage={0}>
-      <View style={styles.root}>
+      <View style={[styles.root, worldHosted && styles.worldHostedRoot]}>
         <View style={styles.eggStage}>
           <TodayNurtureExperience
             actionListHidden={isHatching || companionStageActive}
@@ -290,10 +332,11 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
             careSwipeExternalGesture={inactiveGesture}
             completionEvent={null}
             day={day}
-            eggShowFace={false}
+            eggShowFace
             eggSkinId="moss"
             eggTargetRef={eggTargetRef}
             environmentGesture={inactiveGesture}
+            environmentContent={worldHosted ? <View /> : undefined}
             feedbackKey={eggFeedKey}
             feedExpressionKey={eggFeedLaunchKey}
             growth={growth}
@@ -337,10 +380,11 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
             subjectHandoffFades={false}
             subjectHandoffScale={subjectHandoffLayout.outgoingEndScale}
             subjectHandoffTranslateY={subjectHandoffLayout.outgoingEndTranslateY}
-            subjectHidden={subjectHandoffSettled}
+            subjectHidden={worldHosted || subjectHandoffSettled}
+            transparentBackground={worldHosted}
           />
         </View>
-        {companionStageActive && subjectHandoffSettled ? (
+        {!worldHosted && companionStageActive && subjectHandoffSettled ? (
           <Animated.View
             pointerEvents="none"
             style={[styles.regularSubject, {
@@ -361,7 +405,7 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
         {!companionStageActive ? <EggFeedOverlay
           feed={eggFeed}
           onArrive={handleEggFeedArrive}
-          onEnergyTokenArrive={handleEnergyTokenArrive}
+          onEnergyTokenArrive={handleFtueEnergyTokenArrive}
           onMergeEnergyTokenArrive={handleMergeEnergyTokenArrive}
         /> : null}
       </View>
@@ -377,4 +421,5 @@ const styles = StyleSheet.create({
   // above that persistent background after the hatch subject is retired.
   regularSubject: { ...StyleSheet.absoluteFillObject, zIndex: 41 },
   root: { backgroundColor: '#7DB8DD', flex: 1 },
+  worldHostedRoot: { backgroundColor: 'transparent' },
 });

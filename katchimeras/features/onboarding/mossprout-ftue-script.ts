@@ -4,6 +4,31 @@ import type { FtueScriptDefinition } from './ftue-types';
 import { STEPPLING_DISCOVERY_ID } from '@/constants/companion-discovery-catalog';
 import { MOSSPROUT_BOND_SHARE_PROMPTS } from './mossprout-bond-share';
 
+// 2.05 is the established, correctly framed world-map composition. Feeding
+// begins closer and retreats toward it; it must never retreat to the generic
+// 1x world camera because that makes the growing Egg lose its framing.
+export const MOSSPROUT_WORLD_EGG_REST_ZOOM = 2.05;
+export const MOSSPROUT_WORLD_EGG_CLOSE_ZOOM = 3.2;
+export function mossproutWorldEggZoom(stepId: string): number {
+  const close = MOSSPROUT_WORLD_EGG_CLOSE_ZOOM;
+  const rest = MOSSPROUT_WORLD_EGG_REST_ZOOM;
+  const equalRetreat = (feedsRemaining: number) => (
+    rest * Math.pow(close / rest, feedsRemaining / 3)
+  );
+  switch (stepId) {
+    case 'grove.egg_inspect':
+    case 'egg.opening':
+      return close;
+    case 'egg.context':
+      return equalRetreat(2);
+    case 'egg.mind':
+      return equalRetreat(1);
+    case 'egg.ready':
+    default:
+      return rest;
+  }
+}
+
 const mossproutCompanionResume = {
   lock: true,
   // This query parameter is part of the route identity, not decoration. It
@@ -31,6 +56,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
   {
     id: 'egg.opening', surface: 'haven',
     guide: { eyebrow: 'Question 1 of 3', title: 'It is listening.', body: 'It feels like something inside is listening.' },
+    camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('egg.opening'), anchorY: 0.5, durationMs: 460 },
     actions: [{
       id: 'egg.desired_feeling', title: 'What sounds best right now?', description: '', icon: 'leaf.fill',
       presentation: 'inline_choice', handlerId: 'player_profile', promptKind: 'day_focus', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
@@ -45,6 +71,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
   {
     id: 'egg.context', surface: 'haven',
     guide: { eyebrow: 'Question 2 of 3', title: 'It reacted!', body: 'How are you feeling right now?' },
+    camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('egg.context'), anchorY: 0.49, durationMs: 520 },
     actions: [{
       id: 'egg.main_difficulty', title: 'How are you feeling right now?', description: '', icon: 'heart.fill',
       presentation: 'inline_choice', handlerId: 'player_profile', promptKind: 'inner_weather', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
@@ -59,6 +86,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
   {
     id: 'egg.mind', surface: 'haven',
     guide: { eyebrow: 'Question 3 of 3', title: 'It is waking up.', body: 'One last answer.' },
+    camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('egg.mind'), anchorY: 0.51, durationMs: 520 },
     actions: [{
       id: 'egg.support_style', title: 'What would you like a little more of lately?', description: '', icon: 'sparkles',
       presentation: 'inline_choice', handlerId: 'player_profile', promptKind: 'day_focus', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
@@ -104,32 +132,21 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 33,
-  entryStepId: 'haven.home_notice',
+  version: 35,
+  entryStepId: 'world.egg_intro',
   terminalStepId: 'complete',
   steps: [
     {
-      id: 'haven.home_notice', surface: 'haven',
-      guide: { eyebrow: 'Your Haven', title: 'Did you see that?', body: 'Something moved in the mist beside your Home.' },
-      actions: [{ id: 'haven.notice_glow', title: 'Take a look', description: 'Look toward the green glow.', icon: 'sparkles', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'haven.mossprout_focus' }],
-      camera: { kind: 'focus_target', target: { kind: 'haven_home' }, zoom: 1.08, anchorY: 0.48, durationMs: 420 },
-    },
-    {
-      id: 'haven.mossprout_focus', surface: 'haven',
-      guide: { eyebrow: 'Something in the mist', title: 'There is something there.', body: 'Tap the glowing hex to clear the mist.' },
-      actions: [{ id: 'haven.reveal_mossprout_grove', title: 'Clear the mist', description: 'Reveal the nearby Grove.', icon: 'sparkles', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'haven.mossprout_reveal' }],
-      camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: 1.18, anchorY: 0.46, durationMs: 650 },
-    },
-    {
-      id: 'haven.mossprout_reveal', surface: 'haven',
-      guide: { eyebrow: 'Mossprout’s Grove', title: 'There’s something here.', body: 'An Egg is waiting in the middle of the Grove.' },
-      actions: [{ id: 'haven.inspect_mossprout_egg', title: 'Inspect Egg', description: 'Take a closer look.', icon: 'sparkles', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'grove.egg_inspect' }],
-      camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: 1.18, anchorY: 0.46, durationMs: 280 },
+      id: 'world.egg_intro', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
+      guide: { eyebrow: 'Mossprout’s world', title: 'Something is waiting here.', body: 'A small Egg rests at the heart of this quiet place. It feels like something inside is listening.' },
+      actions: [{ id: 'world.inspect_mossprout_egg', title: 'Inspect Egg', description: 'Move closer and see how the Egg responds.', icon: 'sparkles', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'grove.egg_inspect' }],
+      camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: MOSSPROUT_WORLD_EGG_REST_ZOOM, anchorY: 0.5, durationMs: 2_200 },
     },
     {
       id: 'grove.egg_inspect', surface: 'haven',
-      guide: { eyebrow: 'A faceless Egg', title: 'There’s something here.', body: 'It feels like something inside is listening.' },
+      guide: { eyebrow: 'A sleeping Egg', title: 'There’s something here.', body: 'Its little face is peaceful. Something inside is listening.' },
       actions: [{ id: 'grove.begin_attunement', title: 'Inspect Egg', description: 'See how the Egg responds to you.', icon: 'sparkles', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'egg.opening' }],
+      camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('grove.egg_inspect'), anchorY: 0.5, durationMs: 600 },
     },
     ...openingQuestionSteps,
     {
@@ -137,11 +154,12 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       guide: { eyebrow: 'A new beginning', title: "It's ready to hatch.", body: 'The Egg is awake.' },
       actions: [{ id: 'egg.hatch', title: 'Hatch', description: 'Meet the Katchimera inside.', icon: 'sparkles', presentation: 'cta_action', handlerId: 'discovery_hatch', nextStepId: 'companion.first_meeting', backendEvent: true }],
       blockingBeat: 'mossprout_intro',
+      camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('egg.ready'), anchorY: 0.5, durationMs: 520 },
     },
     {
       id: 'companion.first_meeting', surface: 'haven', navigation: mossproutHavenHostedCompanionResume,
       guide: { eyebrow: 'Your first Katchimera', title: 'Meet Mossprout.', body: '' },
-      actions: [{ id: 'companion.complete_first_meeting', title: 'Meet Mossprout', description: 'Say hello to your new companion.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'companion.day_one_action', backendEvent: true }],
+      actions: [{ id: 'companion.complete_first_meeting', title: 'Meet Mossprout', description: 'Say hello to your new companion.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'companion.bond_spotlight', backendEvent: true }],
       blockingBeat: 'mossprout_intro',
     },
     {
@@ -162,7 +180,24 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'companion.order_preview', surface: 'companion', navigation: mossproutHavenHostedCompanionResume,
       guide: { eyebrow: 'Restore the Garden', title: 'Make one corner welcoming again.', body: 'Match two Seeds to grow the first Sprout.' },
-      actions: [{ id: 'companion.open_garden', title: 'Let’s begin', description: 'Open Mossprout’s Garden and restore the first corner.', icon: 'leaf.fill', presentation: 'cta_action', handlerId: 'companion_order_preview', nextStepId: 'merge.seed_drag', backendEvent: true }],
+      actions: [{ id: 'companion.open_garden', title: 'Show me the Garden', description: 'Return to the world map and find the Garden below.', icon: 'leaf.fill', presentation: 'cta_action', handlerId: 'companion_order_preview', nextStepId: 'world.garden_arrival', backendEvent: true }],
+      blockingBeat: 'mossprout_intro',
+    },
+    {
+      id: 'world.garden_arrival', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
+      guide: { eyebrow: 'Mossprout’s world', title: 'This is the Garden.', body: 'It is quiet now, but the things you grow here can bring it back to life.' },
+      actions: [{ id: 'world.acknowledge_garden', title: 'Continue', description: 'Look over the Garden before entering.', icon: 'leaf.fill', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'world.garden_handoff' }],
+      camera: { kind: 'focus_target', target: { kind: 'haven_garden_tile', characterId: 'mossprout' }, zoom: 1.08, anchorY: 0.48, durationMs: 1_100 },
+      blockingBeat: 'mossprout_intro',
+    },
+    {
+      id: 'world.garden_handoff', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
+      guide: { eyebrow: 'Mossprout’s Garden', title: 'The Garden is just below.', body: 'Grow the Plant shown on the Garden tile.' },
+      actions: [{ id: 'world.open_garden', title: 'Open Garden', description: 'Enter the Garden and grow Mossprout’s first Plant.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'merge.seed_drag', backendEvent: true }],
+      interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_garden_button', characterId: 'mossprout' } } },
+      cue: { kind: 'tap', target: { kind: 'haven_garden_button', characterId: 'mossprout' } },
+      spotlight: { targets: [{ kind: 'haven_garden_button', characterId: 'mossprout' }], padding: 7, radius: 22, dimOpacity: 0.58 },
+      camera: { kind: 'focus_target', target: { kind: 'haven_garden_tile', characterId: 'mossprout' }, zoom: 1.08, anchorY: 0.48, durationMs: 720 },
       blockingBeat: 'mossprout_intro',
     },
     {
@@ -507,8 +542,8 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'companion.resident_match_result', surface: 'companion', navigation: mossproutCompanionResume,
-      guide: { eyebrow: 'Petalimp found a home', title: 'Your first resident card is here.', body: 'Return to the Haven with Mossprout.' },
-      actions: [{ id: 'companion.ack_resident_match_result', title: 'Return to Haven', description: 'Finish the first-session story with Mossprout.', icon: 'checkmark.circle.fill', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'haven.reveal', backendEvent: true }],
+      guide: { eyebrow: 'Petalimp found a home', title: 'Your first resident card is here.', body: 'Return to Mossprout’s world and see the Garden together.' },
+      actions: [{ id: 'companion.ack_resident_match_result', title: 'Return to Mossprout’s world', description: 'Finish the first-session story on Mossprout’s map.', icon: 'checkmark.circle.fill', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'world.complete', backendEvent: true }],
       blockingBeat: 'chapter_complete',
     },
     {
@@ -531,11 +566,11 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'haven.mossprout.restore', surface: 'haven',
       guide: { eyebrow: 'A little place to begin', title: 'Restore the Little Garden', body: 'Coins earned through Merge can permanently change this place.' },
-      actions: [{ id: 'haven.restore_mossprout', title: 'Restore · 150 Coins', description: 'Turn the forgotten clearing into Mossprout’s first garden.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'haven_upgrade', nextStepId: 'haven.reveal', backendEvent: true }],
+      actions: [{ id: 'haven.restore_mossprout', title: 'Restore · 150 Coins', description: 'Turn the forgotten clearing into Mossprout’s first garden.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'haven_upgrade', nextStepId: 'world.complete', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } } },
       cue: { kind: 'tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } },
       spotlight: { targets: [{ kind: 'haven_upgrade_button', characterId: 'mossprout' }], padding: 6, radius: 16, dimOpacity: 0.62 },
-      edges: [{ event: { type: 'haven_upgrade_completed', characterId: 'mossprout', stage: 1 }, commitActionId: 'haven.restore_mossprout', nextStepId: 'haven.reveal' }],
+      edges: [{ event: { type: 'haven_upgrade_completed', characterId: 'mossprout', stage: 1 }, commitActionId: 'haven.restore_mossprout', nextStepId: 'world.complete' }],
       blockingBeat: 'chapter_complete',
     },
     {
@@ -548,10 +583,10 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       edges: [{ event: { type: 'arrival_claimed', arrivalId: `arrival:discovery:${STEPPLING_DISCOVERY_ID}` }, commitActionId: 'discovery.steppling.parcel', nextStepId: 'discovery.steppling.sock' }],
     },
     {
-      id: 'haven.reveal', surface: 'haven',
+      id: 'world.complete', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
       guide: { eyebrow: 'Your world grew', title: 'Mossprout’s Garden', body: 'The First Bloom and Petalimp now live here.' },
-      actions: [{ id: 'haven.reveal_world', title: 'Finish', description: 'Your first day with Mossprout is complete.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'haven_reveal', nextStepId: 'complete', backendEvent: true }],
-      camera: { kind: 'fit_targets', targets: [{ kind: 'haven_world' }], padding: 28, durationMs: 680 },
+      actions: [{ id: 'world.finish', title: 'Finish', description: 'Your first day with Mossprout is complete.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'complete', backendEvent: true }],
+      camera: { kind: 'fit_targets', targets: [{ kind: 'haven_tile', characterId: 'mossprout' }, { kind: 'haven_garden_tile', characterId: 'mossprout' }], padding: 28, durationMs: 680 },
       blockingBeat: 'chapter_complete',
     },
     {
@@ -616,7 +651,7 @@ const stepsById = new Map(MOSSPROUT_FTUE_SCRIPT.steps.map((step) => [step.id, st
 // These authored beats remain available to old local/debug fixtures. The live
 // first-session route grows the First Bloom, then returns after one order.
 const retiredFirstSessionStepIds = new Set(MOSSPROUT_FTUE_SCRIPT.steps
-  .filter((step) => ['egg.nature_theme', 'egg.companion_identity', 'companion.nickname', 'companion.bond_intro', 'companion.bond_spotlight', 'companion.resident_affinity'].includes(step.id)
+  .filter((step) => ['egg.nature_theme', 'egg.companion_identity', 'companion.nickname', 'companion.bond_intro', 'companion.resident_affinity'].includes(step.id)
     || step.id.startsWith('merge.plant.')
     || step.id.startsWith('merge.energy')
     || step.id.startsWith('energy.')

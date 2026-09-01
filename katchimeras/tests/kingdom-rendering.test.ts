@@ -842,7 +842,8 @@ test('Haven Garden order shortcuts open the dedicated route without board gestur
     'utf8',
   );
   assert.match(canvas, /gardenOrders\.slice\(0, 3\)/);
-  assert.match(canvas, /\{ x: 0\.27, y: 0\.205 \}[\s\S]*?\{ x: 0\.5, y: 0\.185 \}[\s\S]*?\{ x: 0\.73, y: 0\.205 \}/);
+  assert.match(canvas, /\{ x: 0\.5, y: 0\.096 \}[\s\S]*?\{ x: 0\.3575, y: 0\.539 \}[\s\S]*?\{ x: 0\.6425, y: 0\.539 \}/);
+  assert.match(canvas, /FTUE_GARDEN_ORDER_SLOT = \{ x: 0\.5, y: 0\.72 \}/);
   assert.match(canvas, /accessibilityHint="Opens this order in the Garden"/);
   assert.doesNotMatch(canvas, /emitBoardReleaseFocus|focusMergeBoard|onBoardRelease/);
 });
@@ -910,7 +911,9 @@ test('hosted resident dashboard dismisses from the world while deep achievements
     'utf8',
   );
 
-  assert.match(interaction, /dismissOnSwipe: props\.reuseUnderlyingStage && dashboardRouteActive \? requestClose : undefined/);
+  assert.match(interaction, /const hostedSwipeDismiss = props\.reuseUnderlyingStage && !hostedFtueInteraction[\s\S]*?\? requestClose/);
+  assert.match(interaction, /panVisuals: !props\.reuseUnderlyingStage/);
+  assert.match(interaction, /sceneTranslateX=\{props\.reuseUnderlyingStage \? undefined : environmentPan\.translateX\}/);
   assert.match(interaction, /onBackdropPress=\{props\.reuseUnderlyingStage && dashboardRouteActive \? requestClose : undefined\}/);
   assert.match(interaction, /const LazyCompanionTrophyRoomScreen = lazy/);
   assert.match(stage, /onBackdropPress/);

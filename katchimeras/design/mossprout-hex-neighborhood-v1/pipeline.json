@@ -65,7 +65,8 @@
     "garden": {
       "baseTile": "seed-nursery",
       "guide": "assets/images/katchimeras/world/square/mossprout-garden-hub-v2.webp",
-      "theme": "A simple Mossprout working garden hub with exactly three raised seed beds of young heart-shaped sprouts, one small leaf-roof tool shed with gardening tools, broad open grassy work space through the center, and only a few low leafy accents. Replace every unrelated Image 1 top-face feature, including the greenhouse, nursery shelves, watering-can table, flowers, pots, and path. No house, ornamental pond, bridge, circular paving, fence, hedge, wall, or perimeter ring. Preserve Image 1's deep tapered cliff, cliff blocks, stairs, camera, scale, and rendering exactly. Open grass and scalloped moss terminate naturally at the cliff edge."
+      "matte": "birefnet-heavy",
+      "theme": "A simple Mossprout working garden hub designed for three live order-card overlays. Reserve exactly three broad, plain, low-contrast grass presentation zones in a triangle: one at upper center, one at lower left, and one at lower right. Keep every zone free of beds, buildings, plants, paths, stones, and high-detail objects; never draw cards, trays, characters, panels, or placeholder outlines into the art. Concentrate one tiny leaf-roof tool shed, two or three small chunky raised sprout beds, minimal tools, and a few broad cushiony leaves in the remaining middle gaps and side margins. Use very low detail density, smooth matte clay-like materials, and broad soft bevels. Keep a clean route from the centered front stairs. No ornamental pond, bridge, circular paving, fence, hedge, wall, or perimeter ring. Preserve Image 1's deep tapered cliff, cliff blocks, stairs, camera, and scale."
     },
     "wildgrowth-grove": {
       "baseTile": "ancient-tree-grove",

@@ -44,6 +44,7 @@ type UseKingdomHexCameraArgs = {
     targets: readonly KingdomFocusTarget[];
   };
   minimumScale?: number;
+  maximumScale?: number;
   onSnapshotChange?: (snapshot: KingdomCameraSnapshot) => void;
   onWorldTapRelease?: (x: number, y: number) => void;
   scene: KingdomSize;
@@ -71,6 +72,7 @@ export function useKingdomHexCamera({
   initialFitWorld = false,
   magneticFocus,
   minimumScale = 0.54,
+  maximumScale = KINGDOM_RENDERING.havenMaxScale,
   onSnapshotChange,
   onWorldTapRelease,
   scene,
@@ -110,7 +112,7 @@ export function useKingdomHexCamera({
     [viewport.height, viewport.width]
   );
   const minScale = minimumScale;
-  const maxScale = KINGDOM_RENDERING.havenMaxScale;
+  const maxScale = maximumScale;
   const [renderState, setRenderState] = useState<CameraRenderState>(() => ({
     isMoving: false,
     snapshot: { tx: 0, ty: 0, scale: 1 },
@@ -163,7 +165,7 @@ export function useKingdomHexCamera({
       cancelAnimation(ty);
       cancelAnimation(scale);
       beginMotion();
-      const clampedZoom = clampHavenCameraScale(zoom, minScale);
+      const clampedZoom = clampHavenCameraScale(zoom, minScale, maxScale);
       const nextTx = viewport.width / 2 - scene.width / 2 - (x - scene.width / 2) * clampedZoom;
       const nextTy = screenY - scene.height / 2 - (y - scene.height / 2) * clampedZoom;
       const clamped = clampCameraTranslation({ tx: nextTx, ty: nextTy }, viewport, scene, clampedZoom);
@@ -178,7 +180,7 @@ export function useKingdomHexCamera({
       });
       pinchStartScale.value = clampedZoom;
     },
-    [beginMotion, commitSnapshot, minScale, pinchStartScale, scale, scene, tx, ty, viewport]
+    [beginMotion, commitSnapshot, maxScale, minScale, pinchStartScale, scale, scene, tx, ty, viewport]
   );
 
   const settleAfterPan = useCallback((nextTx: number, nextTy: number, nextScale: number) => {
@@ -211,7 +213,7 @@ export function useKingdomHexCamera({
 
     if (!initializedRef.current) {
       const initialScale = initialSnapshot
-        ? clampHavenCameraScale(initialSnapshot.scale, minScale)
+        ? clampHavenCameraScale(initialSnapshot.scale, minScale, maxScale)
         : initialFitWorld
           ? Math.max(minScale, Math.min(baseScale * 0.78, viewport.width / scene.width, viewport.height / scene.height))
           : baseScale;
@@ -239,7 +241,7 @@ export function useKingdomHexCamera({
     const sceneDeltaX = (scene.width - previousScene.width) / 2;
     const sceneDeltaY = (scene.height - previousScene.height) / 2;
     previousSceneRef.current = scene;
-    const nextScale = clampHavenCameraScale(scale.value, minScale);
+    const nextScale = clampHavenCameraScale(scale.value, minScale, maxScale);
     const clamped = clampCameraTranslation(
       { tx: tx.value - sceneDeltaX, ty: ty.value - sceneDeltaY },
       viewport,
@@ -250,7 +252,7 @@ export function useKingdomHexCamera({
     ty.value = clamped.ty;
     scale.value = nextScale;
     commitSnapshot(clamped.tx, clamped.ty, nextScale, false);
-  }, [baseScale, centerX, centerY, commitSnapshot, initialFitWorld, initialSnapshot, minScale, pinchStartScale, scale, scene, tx, ty, viewport]);
+  }, [baseScale, centerX, centerY, commitSnapshot, initialFitWorld, initialSnapshot, maxScale, minScale, pinchStartScale, scale, scene, tx, ty, viewport]);
 
   const pan = useMemo(
     () =>
@@ -308,7 +310,7 @@ export function useKingdomHexCamera({
           runOnJS(beginMotion)();
         })
         .onChange((event) => {
-          const nextScale = clampHavenCameraScale(pinchStartScale.value * event.scale, minScale);
+          const nextScale = clampHavenCameraScale(pinchStartScale.value * event.scale, minScale, maxScale);
           const sceneCenterX = scene.width / 2;
           const sceneCenterY = scene.height / 2;
           const worldDeltaX = (pinchFocalX.value - sceneCenterX - pinchStartTx.value) / pinchStartScale.value;
@@ -329,6 +331,7 @@ export function useKingdomHexCamera({
       clearFrameFocus,
       commitSnapshot,
       interactionEnabled,
+      maxScale,
       minScale,
       pinchFocalX,
       pinchFocalY,
@@ -379,11 +382,16 @@ export function useKingdomHexCamera({
     (x: number, y: number, options?: { anchorY?: number; durationMs?: number; id?: string; onComplete?: () => void; zoom?: number }) => {
       clearFrameFocus();
       if (options?.id) setFocusedTileId(options.id);
-      const zoom = Math.min(maxScale, Math.max(scale.value, options?.zoom ?? maxScale));
+      // An explicit scripted zoom is a destination, not a minimum. The former
+      // max(current, requested) rule made FTUE camera retreat impossible after
+      // the opening close-up had reached its peak scale.
+      const zoom = options?.zoom == null
+        ? maxScale
+        : Math.min(maxScale, Math.max(minScale, options.zoom));
       const anchorY = options?.anchorY ?? 0.42;
       animateTo(x, y, zoom, viewport.height * anchorY, options?.durationMs ?? 420, options?.onComplete);
     },
-    [animateTo, clearFrameFocus, maxScale, scale, viewport.height]
+    [animateTo, clearFrameFocus, maxScale, minScale, viewport.height]
   );
 
   const fitWorld = useCallback((durationMs = 680, onComplete?: () => void) => {
@@ -483,6 +491,9 @@ export function useKingdomHexCamera({
     ready,
     recenter,
     snapshot: renderState.snapshot,
+    scaleValue: scale,
+    translationXValue: tx,
+    translationYValue: ty,
     worldStyle,
   };
 }

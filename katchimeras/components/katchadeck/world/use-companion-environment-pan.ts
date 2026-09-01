@@ -8,10 +8,11 @@ import type { HomeVisualKey } from '@/types/home';
 import { companionHomeStageLayout } from '@/utils/companion-home-layout';
 import { resolveTodayExplorationDragTranslation } from '@/utils/today-exploration-gesture';
 
-export function useCompanionEnvironmentPan({ activeKey, dismissOnSwipe, enabled, visualKey }: {
+export function useCompanionEnvironmentPan({ activeKey, dismissOnSwipe, enabled, panVisuals = true, visualKey }: {
   activeKey: string;
   dismissOnSwipe?: () => void;
   enabled: boolean;
+  panVisuals?: boolean;
   visualKey: HomeVisualKey;
 }) {
   const { height, width } = useWindowDimensions();
@@ -28,7 +29,7 @@ export function useCompanionEnvironmentPan({ activeKey, dismissOnSwipe, enabled,
   }, [activeKey, translateX]);
 
   const gesture = useMemo(() => Gesture.Pan()
-    .enabled(enabled && (maxPan > 0 || Boolean(dismissOnSwipe)))
+    .enabled(enabled && ((panVisuals && maxPan > 0) || Boolean(dismissOnSwipe)))
     .maxPointers(1)
     .activeOffsetX([-8, 8])
     .failOffsetY([-16, 16])
@@ -37,6 +38,7 @@ export function useCompanionEnvironmentPan({ activeKey, dismissOnSwipe, enabled,
       gestureStartX.value = translateX.value;
     })
     .onUpdate((event) => {
+      if (!panVisuals) return;
       translateX.value = resolveTodayExplorationDragTranslation({
         gestureStartX: gestureStartX.value,
         maxPan,
@@ -51,7 +53,7 @@ export function useCompanionEnvironmentPan({ activeKey, dismissOnSwipe, enabled,
     })
     .onFinalize(() => {
       translateX.value = reduceMotion ? 0 : withSpring(0, spring);
-    }), [dismissOnSwipe, enabled, gestureStartX, maxPan, reduceMotion, spring, translateX]);
+    }), [dismissOnSwipe, enabled, gestureStartX, maxPan, panVisuals, reduceMotion, spring, translateX]);
 
   return { gesture, maxPan, translateX };
 }

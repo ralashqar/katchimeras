@@ -351,6 +351,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
     );
     return () => cancelAnimation(discoveryCreatureHover);
   }, [animatedFtueMossprout, discoveryCreatureHover, discoveryPhase, reduceMotion]);
+
   const mountTransientEffects = useCallback(() => {
     if (transientEffectsTimerRef.current) clearTimeout(transientEffectsTimerRef.current);
     setTransientEffectsMounted(true);

@@ -109,7 +109,7 @@ export const KINGDOM_HEX_TILE_ALPHA_BOUNDS = {
   'home_nurturer_hex_tile.webp': { left: 14, top: 58, right: 1010, bottom: 965 },
   'mossprout_focused_v1_ancient_tree_grove_hex_tile.webp': { left: 43, top: 20, right: 981, bottom: 952 },
   'mossprout_focused_v1_bloom_garden_hex_tile.webp': { left: 30, top: 30, right: 994, bottom: 993 },
-  'mossprout_focused_v1_garden_hex_tile.webp': { left: 43, top: 91, right: 981, bottom: 952 },
+  'mossprout_focused_v1_garden_hex_tile.webp': { left: 38, top: 93, right: 986, bottom: 948 },
   'mossprout_focused_v1_main_hex_tile.webp': { left: 43, top: 35, right: 980, bottom: 952 },
   'mossprout_focused_v1_orchard_grove_hex_tile.webp': { left: 43, top: 27, right: 980, bottom: 951 },
   'mossprout_focused_v1_pond_sanctuary_hex_tile.webp': { left: 43, top: 39, right: 981, bottom: 952 },

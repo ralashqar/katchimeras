@@ -115,10 +115,6 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
     && run.scriptVersion === 32
     && run.stepId === 'haven.reveal'
     && !hasHavenRevealReceipt;
-  const needsPreParcelHavenReveal = run.status === 'active'
-    && run.scriptVersion < 16
-    && run.stepId === 'discovery.steppling.parcel'
-    && !hasHavenRevealReceipt;
   const needsResidentParcelConfirmation = run.status === 'active'
     && run.scriptVersion < 21
     && run.stepId === 'merge.resident_parcel';
@@ -141,14 +137,14 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
   };
   const removedMergeSteps = new Set(['merge.first', 'merge.flower', 'energy.capture', 'energy.awarded', 'merge.flower_return', 'merge.final']);
   const replacedDiscoverySteps = new Set(['discovery.steppling.seed', 'discovery.steppling.sprout', 'discovery.steppling.plant']);
+  const replacedWorldEntrySteps = new Set(['haven.home_notice', 'haven.mossprout_focus', 'haven.mossprout_reveal']);
+  const replacedWorldCompletionSteps = new Set(['haven.reveal', 'haven.mossprout.focus', 'haven.mossprout.restore']);
   const migratedStepId = needsV33FirstBloomBridge
     ? 'haven.first_bloom'
     : needsResidentParcelConfirmation
     ? 'companion.resident_parcel_ready'
-    : needsPreParcelHavenReveal
-    ? 'haven.reveal'
     : needsHavenFocus
-    ? 'haven.mossprout.focus'
+    ? 'world.complete'
     : run.status === 'active' && run.stepId === 'chapter.complete'
       ? 'merge.return_note'
       : run.stepId;
@@ -162,7 +158,11 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
         ? 'companion.order_preview'
         : replacedDiscoverySteps.has(migratedStepId)
           ? 'discovery.steppling.parcel'
-          : removedMergeSteps.has(migratedStepId) ? 'merge.seed_drag' : migratedStepId,
+          : replacedWorldEntrySteps.has(migratedStepId)
+            ? 'world.egg_intro'
+            : replacedWorldCompletionSteps.has(migratedStepId)
+              ? 'world.complete'
+              : removedMergeSteps.has(migratedStepId) ? 'merge.seed_drag' : migratedStepId,
     updatedAt: now,
     objectiveProgress: restartingLegacyMerge ? {} : run.objectiveProgress ?? {},
     mergeInstalled: restartingLegacyMerge ? false : run.mergeInstalled,

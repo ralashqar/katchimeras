@@ -153,6 +153,7 @@ type TodayNurtureExperienceProps = {
   subjectHandoffProgress?: SharedValue<number>;
   subjectHandoffScale?: number;
   subjectHandoffTranslateY?: number;
+  transparentBackground?: boolean;
   hatchPresentation?: TodayHatchPresentation | null;
   onHatchAssetsReady?: () => void;
   onHatchAssetsError?: () => void;
@@ -244,6 +245,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   subjectHandoffProgress,
   subjectHandoffScale = 1,
   subjectHandoffTranslateY = 0,
+  transparentBackground = false,
   hatchPresentation = null,
   onHatchAssetsReady,
   onHatchAssetsError,
@@ -750,7 +752,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   });
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, transparentBackground && styles.transparentRoot]}>
       <View pointerEvents="none" style={styles.focusSceneViewport}>
         <Animated.View style={[styles.focusSceneCamera, sceneHandoffStyle]}>
           <Animated.View style={[styles.focusSceneCamera, focusSceneStyle]}>
@@ -2280,6 +2282,7 @@ function GrowthMeter({ growth }: { growth: TodayGrowthSummary }) {
 
 const styles = StyleSheet.create({
   root: { ...StyleSheet.absoluteFillObject, backgroundColor: '#F7F1E2', zIndex: 40 },
+  transparentRoot: { backgroundColor: 'transparent' },
   // The viewport remains fixed while the camera plane moves within it. Moving
   // the clipping view itself exposes the page colour along the opposite edge.
   focusSceneViewport: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },

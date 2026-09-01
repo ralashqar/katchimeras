@@ -85,6 +85,8 @@ export type FtueTarget =
   | { kind: 'haven_tile'; characterId: string }
   | { kind: 'haven_tile_hud'; characterId: string }
   | { kind: 'haven_upgrade_button'; characterId: string }
+  | { kind: 'haven_garden_tile'; characterId: 'mossprout' }
+  | { kind: 'haven_garden_button'; characterId: 'mossprout' }
   | { kind: 'haven_home' }
   | { kind: 'haven_world' };
 

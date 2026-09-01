@@ -164,12 +164,16 @@ test('Haven order islands share canonical chapter, journey, and character priori
   );
 });
 
-test('Mossprout FTUE introduces one Bond answer before the Garden and returns to Haven', () => {
+test('Mossprout FTUE introduces one Bond answer before the Garden and ends on its world map', () => {
   assert.equal(mossproutFtueStep('egg.ready')?.actions[0]?.nextStepId, 'companion.first_meeting');
-  assert.equal(mossproutFtueStep('companion.first_meeting')?.actions[0]?.nextStepId, 'companion.day_one_action');
+  assert.equal(mossproutFtueStep('companion.first_meeting')?.actions[0]?.nextStepId, 'companion.bond_spotlight');
+  assert.equal(mossproutFtueStep('companion.bond_spotlight')?.actions[0]?.nextStepId, 'companion.day_one_action');
   assert.equal(mossproutFtueStep('companion.day_one_action')?.actions.find((action) => action.id === 'companion.choose_bond_share')?.options?.length, 4);
   assert.equal(mossproutFtueStep('companion.day_one_action')?.actions.find((action) => action.id === 'companion.complete_day_one_action')?.nextStepId, 'companion.garden_intro');
   assert.equal(mossproutFtueStep('companion.garden_intro')?.actions[0]?.nextStepId, 'companion.order_preview');
+  assert.equal(mossproutFtueStep('companion.order_preview')?.actions[0]?.nextStepId, 'world.garden_arrival');
+  assert.equal(mossproutFtueStep('world.garden_arrival')?.actions[0]?.nextStepId, 'world.garden_handoff');
+  assert.equal(mossproutFtueStep('world.garden_handoff')?.actions[0]?.nextStepId, 'merge.seed_drag');
   assert.equal(mossproutFtueStep('merge.serve_sprout')?.edges?.[0]?.nextStepId, 'companion.chapter_zero_return');
   assert.equal(mossproutFtueStep('companion.chapter_zero_return')?.actions[0]?.nextStepId, 'haven.first_bloom');
   assert.equal(mossproutFtueStep('haven.first_bloom')?.actions[0]?.nextStepId, 'companion.resident_parcel_ready');
@@ -177,22 +181,18 @@ test('Mossprout FTUE introduces one Bond answer before the Garden and returns to
   assert.equal(mossproutFtueStep('companion.resident_affinity')?.actions[0]?.nextStepId, 'companion.resident_parcel_ready');
   assert.equal(mossproutFtueStep('companion.resident_parcel_ready')?.actions[0]?.nextStepId, 'merge.resident_parcel');
   assert.equal(mossproutFtueStep('merge.resident_card_reward')?.edges?.[0]?.nextStepId, 'companion.resident_match_result');
-  assert.equal(mossproutFtueStep('companion.resident_match_result')?.actions[0]?.nextStepId, 'haven.reveal');
-  assert.equal(mossproutFtueStep('haven.reveal')?.surface, 'haven');
-  assert.equal(mossproutFtueStep('haven.reveal')?.actions[0]?.nextStepId, 'complete');
-  assert.equal(mossproutFtueStep('haven.reveal')?.actions[0]?.title, 'Finish');
+  assert.equal(mossproutFtueStep('companion.resident_match_result')?.actions[0]?.nextStepId, 'world.complete');
+  assert.equal(mossproutFtueStep('world.complete')?.surface, 'haven');
+  assert.equal(mossproutFtueStep('world.complete')?.actions[0]?.nextStepId, 'complete');
+  assert.equal(mossproutFtueStep('world.complete')?.actions[0]?.title, 'Finish');
 });
 
-test('the later Haven reveal remains standalone without reopening the global Merge route', () => {
+test('FTUE completion does not reveal, upgrade, or reopen the global Merge route', () => {
   const rosterRoute = readFileSync('components/katchadeck/roster/katchimera-roster-route-screen.tsx', 'utf8');
   const mergeRoute = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
-  const restoreHandler = rosterRoute.match(/onFtueRestore=\{\(\) => \{[\s\S]*?\n\s*\}\}\n\s*onFtueReveal=/)?.[0] ?? '';
 
-  assert.match(restoreHandler, /dispatchFtueEvent\(\{[\s\S]*?type: 'haven_upgrade_completed'/);
-  assert.doesNotMatch(restoreHandler, /beginMossproutChapterOne/);
-  assert.doesNotMatch(restoreHandler, /transitionTo|router\.(?:push|dismissTo)/);
-  assert.match(rosterRoute, /onFtueReveal=\{\(\) => \{[\s\S]*?commitFtueAction\(\{ actionId: 'haven\.reveal_world'/);
-  assert.doesNotMatch(rosterRoute, /onFtueReveal=\{\(\) => \{[\s\S]*?target: 'merge'/);
+  assert.doesNotMatch(rosterRoute, /onFtueRestore|onFtueReveal|haven_upgrade_completed|haven\.reveal_world/);
+  assert.match(rosterRoute, /stepId === 'world\.complete'[\s\S]*?actionId: 'world\.finish'/);
   assert.match(mergeRoute, /ftueRun\.stepId !== 'companion\.chapter_zero_return'[\s\S]*?target: 'companion'/);
 });
 

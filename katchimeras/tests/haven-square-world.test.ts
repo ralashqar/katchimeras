@@ -459,6 +459,7 @@ test('the focused Mossprout Haven mounts only Mossprout-owned hex-neighborhood a
   assert.match(screen, /gardenOrders=\{gardenOrderEntries\}/);
   assert.match(canvas, /buildMossproutHexNeighborhoodScene/);
   assert.match(canvas, /GardenOrderShortcut/);
+  assert.match(canvas, /GARDEN_ORDER_SLOT_CENTERS = \[[\s\S]*?\{ x: 0\.5, y: 0\.096 \}[\s\S]*?\{ x: 0\.3575, y: 0\.539 \}[\s\S]*?\{ x: 0\.6425, y: 0\.539 \}/);
   assert.match(canvas, /<FrozenMergeOrderTrayCard entry=\{entry\} \/>/);
   assert.match(canvas, /gardenOrders\.slice\(0, 3\)/);
   assert.match(canvas, /onOpenGarden\(entry\.order\.id\)/);
@@ -512,8 +513,9 @@ test('the focused Mossprout Haven mounts only Mossprout-owned hex-neighborhood a
   assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'merge-world', 'ui', 'order-chair.webp')));
   assert.doesNotMatch(hexScene, /junctionMiniIslandLayers|JUNCTION_MINI_ISLAND_SOURCES/);
   assert.doesNotMatch(canvas, /trayEntries=\{board\.trayEntries\}/);
-  assert.match(screen, /return \[\.\.\.realEntries, \.\.\.fillerEntries\]\.slice\(0, 3\)/);
-  assert.match(screen, /prioritizedVisibleMergeOrders\([\s\S]*?\)\.slice\(0, 3\)/);
+  assert.match(screen, /ftueStepId !== 'world\.garden_handoff'\) return \[\]/);
+  assert.match(screen, /filter\(\(order\) => order\.id === 'mossprout:chapter-0:first-sprout'\)\.slice\(0, 1\)/);
+  assert.doesNotMatch(screen, /fillerEntries/);
   assert.match(hexScene, /\.sort\(\(a, b\) => a\.depth - b\.depth\)/);
   assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'world', 'square', 'mossprout-merge-island-perspective-512.webp')));
   assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'world', 'square', 'mossprout-standing-resident-512.webp')));

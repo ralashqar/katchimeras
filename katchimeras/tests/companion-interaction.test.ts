@@ -630,7 +630,8 @@ test('companion scene panels share one palette, stay anchored, and bound speech 
   assert.match(conversation, /const shortPanelBottomLift = adaptivePanel\.scrollable/);
   assert.match(conversation, /paddingBottom: 20/);
   assert.match(interaction, /<GestureDetector gesture=\{environmentPan\.gesture\}>/);
-  assert.match(interaction, /sceneTranslateX=\{environmentPan\.translateX\}/);
+  assert.match(interaction, /sceneTranslateX=\{props\.reuseUnderlyingStage \? undefined : environmentPan\.translateX\}/);
+  assert.match(interaction, /panVisuals: !props\.reuseUnderlyingStage/);
   assert.match(cinematicPan, /resolveTodayExplorationDragTranslation/);
   assert.match(cinematicPan, /overscrollResistance: 0/);
   assert.match(cinematicPan, /onFinalize\(\(\) =>/);

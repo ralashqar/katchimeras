@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 
 import { KatchimeraCompanionRouteScreen } from '@/components/katchadeck/world/katchimera-companion-route-screen';
 import { MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID, mossproutFtueConversationDefinitionId } from '@/constants/mossprout-ftue-conversations';
@@ -25,6 +25,18 @@ export default function KatchimeraCompanionRoute() {
         journey.familyId === 'mossprout' && journey.status === 'resolution_ready'
       ))?.returnConversationId ?? undefined
     : undefined;
+  if (isMossprout) {
+    return <Redirect href={{
+      pathname: '/(tabs)/katchimeras',
+      params: {
+        mossproutInteraction: '1',
+        ...(source ? { interactionSource: source } : {}),
+        ...(story ? { interactionStory: story } : {}),
+        ...(ftue ? { interactionFtue: ftue } : {}),
+        ...(residentResume ? { interactionResidentResume: residentResume } : {}),
+      },
+    }} />;
+  }
   return (
     <KatchimeraCompanionRouteScreen
       creatureId={creatureId}

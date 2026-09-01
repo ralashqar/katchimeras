@@ -1,0 +1,11 @@
+{
+  "method": "birefnet-heavy",
+  "model": "BiRefNet_lite",
+  "falModelInput": "General Use (Heavy)",
+  "endpoint": "remove-image-background",
+  "operatingResolution": "1024x1024",
+  "refineForeground": true,
+  "source": "design/mossprout-hex-neighborhood-v1/garden-source.png",
+  "sourceSha256": "8269d5fe8e09229fc6820796b0470c0e179d82aff9b34d3f8ef46bcf73f31807",
+  "postprocess": "source-backed-interior-repair+inward-rgb-padding+soft-edge-contraction"
+}
