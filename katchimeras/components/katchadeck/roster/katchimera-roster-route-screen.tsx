@@ -24,7 +24,6 @@ import { loadCompanionBondState } from '@/utils/companion-bond-storage';
 import { todayAtmosphereBackgroundForDay, type TodayAtmosphereBackground } from '@/utils/day-background-scene';
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import { loadCompanionQuests, questFor } from '@/utils/katchimera-quests';
-import { markFlowStart } from '@/utils/flow-performance';
 import { applyWardrobeToKingdom } from '@/utils/katchimera-wardrobe';
 import { loadKatchimeraWardrobe } from '@/utils/katchimera-wardrobe-storage';
 import { deriveKingdom } from '@/utils/kingdom-engine';
@@ -36,15 +35,12 @@ import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/nav
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import { MergeWorldProvider, useMergeWorldState } from '@/features/merge-world/merge-world-provider';
-import { advanceFtueActionDurably, commitFtueAction, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { advanceFtueActionDurably, commitFtueAction, completeFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { useHavenTileStages } from '@/hooks/use-haven-tile-stages';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import { ftueLocksSurfaceNavigation } from '@/features/onboarding/ftue-navigation-policy';
-import { loadWorldIdentity, localDayId } from '@/utils/world-identity';
-import { ensureMossproutFtueFirstResident, MOSSPROUT_FTUE_FIRST_RESIDENT_ID } from '@/features/onboarding/mossprout-profile';
-import { completeMossproutJourneyResolution, recordMossproutFirstGardenRestored, recordMossproutMatchedCard, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
-import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
+import { loadWorldIdentity } from '@/utils/world-identity';
 import { deriveTomorrowDayRecord, hydrateAllDays } from '@/game/days';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { katchimeraFamilyById } from '@/constants/katchimera-skins';
@@ -276,7 +272,6 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
     const stepId = ftueRun?.status === 'active' ? ftueRun.stepId : null;
     if (!stepId) return companionSlots;
     const eggVisible = stepId === 'world.egg_intro'
-      || stepId === 'grove.egg_inspect'
       || stepId === 'egg.opening'
       || stepId === 'egg.context'
       || stepId === 'egg.mind'
@@ -352,9 +347,9 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
     if (ftueRun?.status !== 'active') return;
     if (
       ftueRun.stepId === 'world.egg_intro'
+      || ftueRun.stepId.startsWith('egg.')
       || ftueRun.stepId === 'world.garden_arrival'
       || ftueRun.stepId === 'world.garden_handoff'
-      || ftueRun.stepId === 'haven.first_bloom'
       || ftueRun.stepId === 'world.complete'
     ) {
       setActiveWorldFamilyId('mossprout');
@@ -430,44 +425,6 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
       },
     });
   }, [ftueRun, router, transitionTo]);
-  const continueFirstBloomToResident = useCallback(() => {
-    markFlowStart('katchimera-companion');
-    transitionTo({
-      announcement: 'Returning to Mossprout',
-      // Mossprout dialogue is hosted by the world map. Waiting for the
-      // retired companion route here leaves the universal curtain with no
-      // matching readiness reporter.
-      target: 'katchimeras',
-      navigate: async () => {
-        const now = Date.now();
-        ensureMossproutFtueFirstResident();
-        relationshipProgressionRepository.update((current) => {
-          let journey = [...current.journeyDays].reverse().find((candidate) => candidate.familyId === 'mossprout') ?? null;
-          let next = current;
-          if (!journey) {
-            const dayId = localDayId(new Date(now));
-            const started = startMossproutJourneyDay(current, dayId, now, 0, true);
-            next = recordMossproutFirstGardenRestored(started.state, dayId, 'ftue:first-bloom-recovery', now);
-            next = completeMossproutJourneyResolution(next, dayId, now);
-            journey = [...next.journeyDays].reverse().find((candidate) => candidate.familyId === 'mossprout') ?? null;
-          }
-          return journey ? recordMossproutMatchedCard(next, journey.dayId, MOSSPROUT_FTUE_FIRST_RESIDENT_ID) : next;
-        });
-        const result = await advanceFtueActionDurably({
-          expectedStepId: 'haven.first_bloom',
-          actionId: 'haven.continue_to_resident',
-          evidenceRef: 'haven:first-bloom-seen',
-        });
-        if (result.run?.stepId !== 'companion.resident_parcel_ready') {
-          throw new Error('Mossprout did not accept the first resident handoff');
-        }
-        router.setParams({
-          interactionFtue: '1',
-          mossproutInteraction: '1',
-        });
-      },
-    });
-  }, [router, transitionTo]);
   return discovery.ready && presentationMergeWorld ? (
     <View style={styles.screen}>
       {activeWorldFamilyId === 'mossprout' ? <Suspense fallback={<View style={styles.worldMountFallback} />}><LazyKatchimeraKingdomScreen
@@ -486,15 +443,15 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
           onFtueInspect={() => {
             const stepId = ftueRun?.status === 'active' ? ftueRun.stepId : null;
             if (stepId === 'world.egg_intro') {
-              commitFtueAction({ actionId: 'world.inspect_mossprout_egg', evidenceRef: 'mossprout-world:egg-inspected' });
-            } else if (stepId === 'grove.egg_inspect') {
-              commitFtueAction({ actionId: 'grove.begin_attunement', evidenceRef: 'mossprout-world:egg-close-up' });
+              commitFtueAction({ actionId: 'world.inspect_mossprout_egg', evidenceRef: 'mossprout-world:egg-intro-seen' });
             } else if (stepId === 'world.garden_arrival') {
               commitFtueAction({ actionId: 'world.acknowledge_garden', evidenceRef: 'mossprout-world:garden-arrival' });
-            } else if (stepId === 'haven.first_bloom') {
-              void continueFirstBloomToResident();
             } else if (stepId === 'world.complete') {
               commitFtueAction({ actionId: 'world.finish', evidenceRef: 'mossprout-world:ftue-complete' });
+              // A replayed terminal receipt is intentionally a no-op. Always
+              // release FTUE ownership so interrupted prior presses cannot
+              // leave Garden navigation locked after the ending disappears.
+              completeFtueRun();
             }
           }}
           onFtueOpenGarden={() => void openFtueGarden()}

@@ -47,6 +47,13 @@ const GARDEN: ArtSpec = {
   },
 };
 
+const DREAM_MIST_LOCKED_NATURE_SOURCES: TileSources = {
+  full: require('../../../assets/images/katchimeras/world/hex/dream_mist_locked_hex_tile_v1.webp'),
+  medium: require('../../../assets/images/katchimeras/world/hex/dream_mist_locked_hex_tile_v1_512.webp'),
+  thumb: require('../../../assets/images/katchimeras/world/hex/dream_mist_locked_hex_tile_v1_256.webp'),
+};
+const DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS = KINGDOM_HEX_TILE_ALPHA_BOUNDS['dream_mist_locked_hex_tile_v1.webp'];
+
 const NATURE: Record<MossproutNatureIslandId, ArtSpec> = {
   'seed-nursery': {
     alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['mossprout_focused_v1_seed_nursery_hex_tile.webp'],
@@ -144,6 +151,25 @@ function layerFor(id: string, kind: KingdomTileArtLayer['kind'], spec: ArtSpec):
   };
 }
 
+function natureLayerFor(
+  islandId: MossproutNatureIslandId,
+  level: MossproutNatureIslandLevel,
+): KingdomTileArtLayer {
+  const authored = NATURE[islandId];
+  const locked = level === 0;
+  const rendered = locked
+    ? {
+        alphaBounds: DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS,
+        coord: authored.coord,
+        sources: DREAM_MIST_LOCKED_NATURE_SOURCES,
+      }
+    : authored;
+  const result = layerFor(`nature:mossprout:${islandId}`, 'tile', rendered);
+  // A mist tile establishes the complete neighborhood silhouette but is not
+  // an upgrade target until progression replaces it with Level 1 island art.
+  return locked ? { ...result, interactionFrame: undefined } : result;
+}
+
 function shiftLayer(layer: KingdomTileArtLayer, dx: number, dy: number): KingdomTileArtLayer {
   const shift = (frame: { height: number; left: number; top: number; width: number }) => ({
     ...frame,
@@ -175,10 +201,9 @@ export function buildMossproutHexNeighborhoodScene(
   const rawLayers = [
     mainLayer,
     layerFor('structure:mossprout-hex-garden', 'structure', GARDEN),
-    ...MOSSPROUT_NATURE_ISLANDS.flatMap((island) => (
-      (natureIslandLevels[island.id] ?? 0) > 0
-        ? [layerFor(`nature:mossprout:${island.id}`, 'tile', NATURE[island.id])]
-        : []
+    ...MOSSPROUT_NATURE_ISLANDS.map((island) => natureLayerFor(
+      island.id,
+      natureIslandLevels[island.id] ?? 0,
     )),
   ];
   const left = Math.min(...rawLayers.map((layer) => layer.frame.left));

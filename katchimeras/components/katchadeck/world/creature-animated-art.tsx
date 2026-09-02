@@ -28,12 +28,14 @@ function logIdleDiagnostic(
 
 export function CreatureAnimatedArt({
   accessibilityLabel,
+  allowDownscaling = true,
   fallbackSource,
   onLoad,
   style,
   visualKey,
 }: {
   accessibilityLabel: string;
+  allowDownscaling?: boolean;
   fallbackSource: QuestionnaireImageSource;
   onLoad?: () => void;
   style: StyleProp<ImageStyle>;
@@ -137,6 +139,7 @@ export function CreatureAnimatedArt({
   return (
     <Image
       accessibilityLabel={accessibilityLabel}
+      allowDownscaling={allowDownscaling}
       autoplay={shouldAnimate}
       cachePolicy="memory-disk"
       contentFit="contain"

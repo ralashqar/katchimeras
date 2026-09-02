@@ -207,7 +207,6 @@ export function KatchimeraKingdomScreen({
   useEffect(() => {
     const delays: Partial<Record<string, number>> = {
       'world.egg_intro': 4_100,
-      'grove.egg_inspect': 1_650,
       'world.garden_arrival': 2_150,
     };
     const delay = ftueStepId ? delays[ftueStepId] : undefined;
@@ -222,14 +221,10 @@ export function KatchimeraKingdomScreen({
     setInteractionLoadingVisible(false);
     if (!interactionCreatureId || interactionCameraReady) return;
     const loadingTimer = setTimeout(() => setInteractionLoadingVisible(true), 120);
-    const cameraFallbackTimer = ftueStepId ? null : setTimeout(() => {
-      if (interactionCreatureIdRef.current === interactionCreatureId) setInteractionCameraReady(true);
-    }, 900);
     return () => {
       clearTimeout(loadingTimer);
-      if (cameraFallbackTimer) clearTimeout(cameraFallbackTimer);
     };
-  }, [ftueStepId, interactionCameraReady, interactionCreatureId]);
+  }, [interactionCameraReady, interactionCreatureId]);
   const advanceOpening = useCallback(() => {
     onFtueInspect?.();
   }, [onFtueInspect]);
@@ -284,19 +279,15 @@ export function KatchimeraKingdomScreen({
     })];
   }), [mergeWorld, upgradePresentation?.characterId, upgrading, visibleCompanionSlots]);
   const havenOpeningActive = ftueStepId === 'world.egg_intro'
-    || ftueStepId === 'grove.egg_inspect'
     || ftueStepId === 'world.garden_arrival'
     || ftueStepId === 'world.garden_handoff'
-    || ftueStepId === 'haven.first_bloom'
     || ftueStepId === 'world.complete';
   const ftueWorldCloseupActive = Boolean(ftueStepId && (
     ftueStepId === 'world.egg_intro'
-    || ftueStepId === 'grove.egg_inspect'
     || ftueStepId.startsWith('egg.')
     || ftueStepId.startsWith('companion.')
   ));
-  const ftueEggFeedingCloseupActive = ftueStepId === 'grove.egg_inspect'
-    || ftueStepId === 'world.egg_intro'
+  const ftueEggFeedingCloseupActive = ftueStepId === 'world.egg_intro'
     || Boolean(ftueStepId?.startsWith('egg.'));
   const gardenWorldGuidanceActive = ftueStepId === 'world.garden_arrival'
     || ftueStepId === 'world.garden_handoff';
@@ -558,9 +549,6 @@ export function KatchimeraKingdomScreen({
         onOpenGarden={openGarden}
         onSelectHome={() => {}}
         onSelectLocked={(familyId) => {
-          if (ftueStepId === 'world.egg_intro') {
-            return;
-          }
           if (!ftueStep || ftueStep.surface !== 'haven') setLockedHintVisible(true);
         }}
         onSelectNatureIsland={(islandId) => {
@@ -701,14 +689,14 @@ export function KatchimeraKingdomScreen({
           pointerEvents="box-none"
           style={[
             styles.discoveryCalloutLayer,
-            gardenWorldGuidanceActive
+            gardenWorldGuidanceActive || ftueStepId === 'world.egg_intro'
               ? { top: insets.top + 18 }
               : { bottom: Math.max(insets.bottom, 12) + 12 },
           ]}>
           <View pointerEvents="none" style={styles.discoveryCallout}>
             <FtueGuideCopy guide={ftueStep.guide} hero />
           </View>
-          {!['world.egg_intro', 'grove.egg_inspect', 'world.garden_arrival', 'world.garden_handoff'].includes(ftueStepId ?? '') ? <View style={styles.discoveryCalloutButton}>
+          {!['world.egg_intro', 'world.garden_arrival', 'world.garden_handoff'].includes(ftueStepId ?? '') ? <View style={styles.discoveryCalloutButton}>
             <KatchaButton fullWidth icon="sparkles" label={ftueStep.actions[0]?.title ?? 'Continue'} onPress={advanceOpening} />
           </View> : null}
         </View>
@@ -778,9 +766,7 @@ export function KatchimeraKingdomScreen({
           targetRevision={ftueTargetRevision}
         />
       ) : null}
-      {ftueStepId === 'world.egg_intro' ? (
-        <FtueOpeningFade />
-      ) : null}
+      {ftueStepId === 'world.egg_intro' ? <FtueOpeningFade /> : null}
     </View>
   );
 }

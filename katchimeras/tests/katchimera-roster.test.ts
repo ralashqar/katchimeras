@@ -307,7 +307,7 @@ test('the Katchimeras tab renders the hex selector first while companion Back re
   assert.doesNotMatch(kingdomScreen, /ref=\{\(node\) => registerFtueTarget\('garden-button:mossprout'/);
   assert.match(kingdomScreen, /Hidden in the Dream Mist/);
   assert.match(kingdomScreen, /Keep living days and growing your relationships/);
-  assert.match(rosterRoute, /stepId === 'world\.egg_intro'/);
+  assert.match(rosterRoute, /ftueRun\.stepId === 'world\.egg_intro'[\s\S]*?ftueRun\.stepId\.startsWith\('egg\.'\)/);
   assert.match(rosterRoute, /eggVisible[\s\S]*?kind: 'revealed_egg'/);
   assert.match(rosterRoute, /const discoveryCompanionSlots[\s\S]*?kind: 'locked' as const/);
   assert.match(rosterRoute, /announcement: 'Opening You'[\s\S]*?router\.push\('\/you'\)/);
@@ -316,8 +316,11 @@ test('the Katchimeras tab renders the hex selector first while companion Back re
   assert.match(rosterRoute, /<HavenSelectorPresentation[\s\S]*?onOpenProfile=\{openProfile\}/);
   assert.match(rosterRoute, /style=\{\(\{ pressed \}\) => \[styles\.selectorProfileButton/);
   assert.match(rosterRoute, /selectorProfileButton: \{[\s\S]*?borderRadius: 25[\s\S]*?overflow: 'hidden'/);
-  assert.match(ftueScript, /id: 'world\.egg_intro'[\s\S]*?characterId: 'mossprout'[\s\S]*?zoom: MOSSPROUT_WORLD_EGG_CLOSE_ZOOM[\s\S]*?durationMs: 3_900/);
-  assert.match(kingdomScreen, /'world\.egg_intro': 4_100[\s\S]*?onFtueInspectRef\.current\?\.\(\)/);
+  assert.match(ftueScript, /entryStepId: 'world\.egg_intro'/);
+  assert.match(ftueScript, /id: 'world\.egg_intro'[\s\S]*?Something is waiting here\.[\s\S]*?nextStepId: 'egg\.opening'[\s\S]*?durationMs: 3_900/);
+  assert.doesNotMatch(ftueScript, /There’s something here/);
+  assert.match(kingdomScreen, /initialFtueCameraScale = ftueStepId === 'world\.egg_intro'[\s\S]*?MOSSPROUT_WORLD_EGG_ENTRY_ZOOM/);
+  assert.match(kingdomScreen, /gardenWorldGuidanceActive \|\| ftueStepId === 'world\.egg_intro'[\s\S]*?top: insets\.top \+ 18/);
   assert.match(kingdomCanvas, /candidate\.companion\?\.familyId === targetCharacterId/);
   assert.match(youRoute, /accessibilityLabel="Back to Haven"[\s\S]*?router\.replace\('\/\(tabs\)\/katchimeras'\)/);
   assert.match(companionRoute, /onCloseCompanion=\{\(\) =>[\s\S]*?: router\.back\(\)\}/);

@@ -125,7 +125,8 @@ export default function KatchimerasScreen() {
     });
   }, [router]);
 
-  const eggPresentationActive = ftueStep?.id === 'egg.opening'
+  const eggPresentationActive = ftueStep?.id === 'world.egg_intro'
+    || ftueStep?.id === 'egg.opening'
     || ftueStep?.id === 'egg.context'
     || ftueStep?.id === 'egg.mind'
     || ftueStep?.id === 'egg.ready';

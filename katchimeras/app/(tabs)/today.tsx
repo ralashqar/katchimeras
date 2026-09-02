@@ -272,7 +272,6 @@ export function LegacyTodayScreen() {
   const ftueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
   const ftueTodayStep = ftueStep && (
     ftueStep.surface === 'today'
-    || ftueStep.id === 'grove.egg_inspect'
     || ftueStep.id === 'egg.opening'
     || ftueStep.id === 'egg.context'
     || ftueStep.id === 'egg.mind'
@@ -280,7 +279,7 @@ export function LegacyTodayScreen() {
   ) ? ftueStep : null;
   const ftueOpeningOwnsHome = ftueOwnsOpeningHome(ftueRun);
   const ftueOpeningFocus = Boolean(ftueRun?.status === 'active' && (
-    ftueRun.stepId === 'grove.egg_inspect' || ftueRun.stepId.startsWith('egg.')
+    ftueRun.stepId.startsWith('egg.')
   ));
   const ftueEnergyFocus = Boolean(ftueRun?.status === 'active' && ftueRun.stepId.startsWith('energy.'));
   const ftueEnergyBridgeStep = ftueRun?.stepId === 'energy.journal_reward';
@@ -1883,10 +1882,6 @@ export function LegacyTodayScreen() {
     if (ftueActionBusy) return;
     if (action.handlerId === 'discovery_hatch') {
       handleRevealPress();
-      return;
-    }
-    if (action.id === 'grove.begin_attunement') {
-      commitFtueAction({ actionId: action.id, evidenceRef: 'grove:mossprout:egg-close-up' });
       return;
     }
     if (action.id === 'energy.return') {

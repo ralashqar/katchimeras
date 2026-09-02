@@ -264,9 +264,6 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
       handleDiscoveryReveal(FTUE_MOSSPROUT_CREATURE);
       return;
     }
-    if (action.id === 'grove.begin_attunement') {
-      commitFtueAction({ actionId: action.id, evidenceRef: 'grove:mossprout:egg-close-up' });
-    }
   }, [actionBusy, ftueRun?.stepId, handleDiscoveryReveal]);
 
   const handleScriptedChoice = useCallback((

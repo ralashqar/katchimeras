@@ -137,10 +137,15 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
   };
   const removedMergeSteps = new Set(['merge.first', 'merge.flower', 'energy.capture', 'energy.awarded', 'merge.flower_return', 'merge.final']);
   const replacedDiscoverySteps = new Set(['discovery.steppling.seed', 'discovery.steppling.sprout', 'discovery.steppling.plant']);
-  const replacedWorldEntrySteps = new Set(['haven.home_notice', 'haven.mossprout_focus', 'haven.mossprout_reveal']);
+  const replacedWorldEntrySteps = new Set([
+    'haven.home_notice',
+    'haven.mossprout_focus',
+    'haven.mossprout_reveal',
+  ]);
+  const removedEggInspectSteps = new Set(['grove.egg_inspect']);
   const replacedWorldCompletionSteps = new Set(['haven.reveal', 'haven.mossprout.focus', 'haven.mossprout.restore']);
   const migratedStepId = needsV33FirstBloomBridge
-    ? 'haven.first_bloom'
+    ? 'companion.resident_parcel_ready'
     : needsResidentParcelConfirmation
     ? 'companion.resident_parcel_ready'
     : needsHavenFocus
@@ -148,6 +153,7 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
     : run.status === 'active' && run.stepId === 'chapter.complete'
       ? 'merge.return_note'
       : run.stepId;
+  const removedFrictionSteps = new Set(['haven.first_bloom']);
   return {
     ...run,
     schemaVersion: 6,
@@ -160,9 +166,13 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
           ? 'discovery.steppling.parcel'
           : replacedWorldEntrySteps.has(migratedStepId)
             ? 'world.egg_intro'
+            : removedEggInspectSteps.has(migratedStepId)
+              ? 'egg.opening'
             : replacedWorldCompletionSteps.has(migratedStepId)
               ? 'world.complete'
-              : removedMergeSteps.has(migratedStepId) ? 'merge.seed_drag' : migratedStepId,
+              : removedFrictionSteps.has(migratedStepId)
+                ? 'companion.resident_parcel_ready'
+                : removedMergeSteps.has(migratedStepId) ? 'merge.seed_drag' : migratedStepId,
     updatedAt: now,
     objectiveProgress: restartingLegacyMerge ? {} : run.objectiveProgress ?? {},
     mergeInstalled: restartingLegacyMerge ? false : run.mergeInstalled,

@@ -23,7 +23,7 @@ import {
 } from '@/features/onboarding/resident-ftue-navigation-session';
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
-import { recordMossproutMatchedCard } from '@/game/katchimeras/relationship-progression';
+import { completeMossproutJourneyResolution, recordMossproutFirstGardenRestored, recordMossproutMatchedCard, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
 import {
   ensureMossproutFtueFirstResident,
   MOSSPROUT_FTUE_FIRST_RESIDENT_ID,
@@ -47,6 +47,22 @@ function isResidentFtueStep(stepId: string) {
     || stepId === 'companion.resident_parcel_ready'
     || stepId === 'companion.resident_match_result'
     || stepId.startsWith('merge.resident_');
+}
+
+function prepareMossproutFirstResidentHandoff(now = Date.now()) {
+  ensureMossproutFtueFirstResident();
+  relationshipProgressionRepository.update((current) => {
+    let journey = [...current.journeyDays].reverse().find((candidate) => candidate.familyId === 'mossprout') ?? null;
+    let next = current;
+    if (!journey) {
+      const dayId = localDayId(new Date(now));
+      const started = startMossproutJourneyDay(current, dayId, now, 0, true);
+      next = recordMossproutFirstGardenRestored(started.state, dayId, 'ftue:first-bloom-recovery', now);
+      next = completeMossproutJourneyResolution(next, dayId, now);
+      journey = [...next.journeyDays].reverse().find((candidate) => candidate.familyId === 'mossprout') ?? null;
+    }
+    return journey ? recordMossproutMatchedCard(next, journey.dayId, MOSSPROUT_FTUE_FIRST_RESIDENT_ID) : next;
+  });
 }
 
 export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOrigin = false, ftueConversationDefinitionId, journeyReturnConversationDefinitionId, residentStoryResumeRequested = false, renderRegularStage = false, reuseUnderlyingStage = false, hostedInHaven = false, onHostedClose, onHostedFtueComplete, onHostedOpenMerge, onVisibleCreatureRewardPulse }: {
@@ -121,6 +137,11 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     && navigationFtueRun.stepId === 'companion.resident_match_result';
   const residentFtueGraphActive = navigationFtueRun?.status === 'active'
     && isResidentFtueStep(navigationFtueRun.stepId);
+  const activeFtueConversationDefinitionId = navigationFtueRun?.status === 'active'
+    && (navigationFtueRun.stepId === 'companion.first_meeting'
+      || navigationFtueRun.stepId === 'companion.chapter_zero_return')
+    ? ftueConversationDefinitionId
+    : undefined;
   useEffect(() => {
     if (!shouldRestoreResidentMatchResult) return;
     updateFtueRun({ stepId: 'companion.resident_match_result', status: 'active', completedAt: null });
@@ -222,37 +243,21 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     if (run?.stepId === 'companion.chapter_zero_return') {
       if (ftueHandoffRef.current) return;
       ftueHandoffRef.current = true;
-      let releaseSource: (() => void) | null = null;
-      const sourceCovered = new Promise<void>((resolve) => { releaseSource = resolve; });
-      const transitionAccepted = transitionTo({
-        announcement: 'Showing the First Bloom',
-        target: 'katchimeras',
-        onCovered: () => releaseSource?.(),
-        navigate: async () => {
-          try {
-            const result = await advanceFtueActionDurably({
-              expectedStepId: 'companion.chapter_zero_return',
-              actionId: 'companion.complete_chapter_zero_return',
-              evidenceRef: ftueConversationDefinitionId ?? 'mossprout-chapter-zero-return',
-              nextStepId: 'haven.first_bloom',
-            });
-            if (result.run?.stepId !== 'haven.first_bloom') {
-              throw new Error('The First Bloom did not accept FTUE ownership');
-            }
-            await flushFtuePersistence();
-            ftueHandoffRef.current = false;
-            router.dismissTo('/(tabs)/katchimeras');
-          } catch (error) {
-            ftueHandoffRef.current = false;
-            throw error;
-          }
-        },
-      });
-      if (!transitionAccepted) {
+      try {
+        prepareMossproutFirstResidentHandoff();
+        const result = await advanceFtueActionDurably({
+          expectedStepId: 'companion.chapter_zero_return',
+          actionId: 'companion.complete_chapter_zero_return',
+          evidenceRef: ftueConversationDefinitionId ?? 'mossprout-chapter-zero-return',
+          nextStepId: 'companion.resident_parcel_ready',
+        });
+        if (result.run?.stepId !== 'companion.resident_parcel_ready') {
+          throw new Error('Mossprout did not accept the first resident handoff');
+        }
+        await flushFtuePersistence();
+      } finally {
         ftueHandoffRef.current = false;
-        return;
       }
-      await sourceCovered;
       return;
     }
     if (run?.stepId === 'companion.resident_affinity') {
@@ -262,7 +267,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     if (run?.stepId === 'companion.resident_match_result') {
       await completeResidentResultExit('mossprout:ftue:resident-match-result');
     }
-  }, [completeResidentResultExit, ftueConversationDefinitionId, router, transitionTo]);
+  }, [completeResidentResultExit, ftueConversationDefinitionId]);
   const completeFtueProfileStep = useCallback((nickname?: string) => {
     const run = loadFtueRun();
     if (run?.status !== 'active') return;
@@ -387,6 +392,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       // move durable ownership to Merge and mount its route.
       navigate: async () => {
         try {
+          prepareMossproutFirstResidentHandoff();
           const currentRelationships = relationshipProgressionRepository.load();
           const journey = [...currentRelationships.journeyDays].reverse().find((candidate) => candidate.familyId === 'mossprout') ?? null;
           if (!journey) throw new Error('No Mossprout Journey exists for the resident parcel');
@@ -476,12 +482,12 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     <KingdomCompanionScreen
       active={surfaceActive}
       forceMossproutAvailable={hostedInHaven}
-      ftueConversationDefinitionId={ftueConversationDefinitionId}
+      ftueConversationDefinitionId={activeFtueConversationDefinitionId}
       initialConversationDefinitionId={!residentStoryResumeActive && navigationFtueRun?.status === 'active' && navigationFtueRun.stepId === 'companion.resident_affinity'
         ? 'mossprout:game:form-finder'
         : journeyReturnConversationDefinitionId}
       discoveryRecords={discovery.records}
-      onFtueConversationComplete={ftueConversationDefinitionId || residentFtueGraphActive ? completeFtueConversation : undefined}
+      onFtueConversationComplete={activeFtueConversationDefinitionId || residentFtueGraphActive ? completeFtueConversation : undefined}
       onCompletedConversationExit={completeResidentResultExit}
       ftueOrderPreviewActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.order_preview'}
       ftueProfileStep={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.intro_action'

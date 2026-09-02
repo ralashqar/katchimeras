@@ -73,7 +73,6 @@ export function mossproutGroveEggCameraPinchTarget(
 ): number | null {
   const maximum = Math.max(1, maxPinchScale);
   switch (stepId) {
-    case 'grove.egg_inspect':
     case 'egg.opening':
       return maximum;
     case 'egg.context':
@@ -89,7 +88,6 @@ export function mossproutGroveEggCameraPinchTarget(
 
 export function mossproutGroveEggCameraPanTarget(stepId: string | null | undefined): number {
   switch (stepId) {
-    case 'grove.egg_inspect':
     case 'egg.opening':
       return FTUE_OPENING_CAMERA_PAN_Y;
     case 'egg.context':
@@ -102,7 +100,7 @@ export function mossproutGroveEggCameraPanTarget(stepId: string | null | undefin
 }
 
 export function mossproutGroveEggCameraDuration(stepId: string | null | undefined): number {
-  return stepId === 'grove.egg_inspect' || stepId === 'egg.opening'
+  return stepId === 'egg.opening'
     ? FTUE_OPENING_CAMERA_DURATION_MS
     : FTUE_ANSWER_CAMERA_DURATION_MS;
 }

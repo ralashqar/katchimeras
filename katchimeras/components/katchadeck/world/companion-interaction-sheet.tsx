@@ -612,6 +612,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   } = experience;
   const residentFtueDashboard = props.familyId === 'mossprout'
     && Boolean(props.ftueResidentHandoffActive);
+  const residentResultFtueDashboard = props.familyId === 'mossprout'
+    && Boolean(props.ftueResidentMatchResultActive);
   const residentStoryResumeDashboard = residentFtueDashboard
     && Boolean(props.ftueResidentStoryResume);
   // The companion route is reused across the affinity conversation and its
@@ -619,6 +621,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   // the authored parcel or Continue Story dashboard.
   const dashboardRouteActive = route.kind === 'dashboard'
     || residentFtueDashboard
+    || residentResultFtueDashboard
     || Boolean(props.ftueCompanionSurfaceOwned && route.kind !== 'conversation');
   const mossproutActionDashboard = dashboardRouteActive
     && props.familyId === 'mossprout'
@@ -663,12 +666,12 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     requestStoryConversation(definitionId);
   }, [mossproutJourney?.id, mossproutJourney?.profileConversationId, mossproutJourney?.status, props.active, props.familyId, props.ftueBondSpotlightActive, props.ftueDayOneActionActive, props.ftueResidentHandoffActive, requestStoryConversation]);
   useEffect(() => {
-    if (!props.active || !residentFtueDashboard) return;
+    if (!props.active || (!residentFtueDashboard && !residentResultFtueDashboard)) return;
     pendingStoryConversationRef.current = null;
     openedStoryConversationRef.current = null;
     initialConversationDefinitionRef.current = null;
     showFeastleStoryHome();
-  }, [props.active, residentFtueDashboard, showFeastleStoryHome]);
+  }, [props.active, residentFtueDashboard, residentResultFtueDashboard, showFeastleStoryHome]);
   useLayoutEffect(() => {
     const definitionId = props.initialConversationDefinitionId;
     if (!definitionId) {

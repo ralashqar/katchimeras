@@ -164,6 +164,10 @@ const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
 // world camera, tile focus, growth and reaction scales. It is therefore always
 // sampled down (never enlarged from a 108x139 intermediate texture).
 const WORLD_FTUE_EGG_NATIVE_SURFACE_SCALE = 2.7;
+// Interaction residents live on a detached, oversized native plane just like
+// the FTUE Egg. The camera only downsamples this surface, so an animated WebP
+// is never first rasterized at its tiny world-map footprint and enlarged.
+const WORLD_INTERACTION_CREATURE_NATIVE_SURFACE_SCALE = 2.7;
 const WORLD_FTUE_EGG_WIDTH = 108;
 const WORLD_FTUE_EGG_HEIGHT = 139;
 const WORLD_FTUE_EGG_STAGE_SCALE = WORLD_FTUE_EGG_WIDTH / 200;
@@ -174,9 +178,23 @@ const WORLD_FTUE_GLOW_ACCENT = '#F4CE7A';
 const WORLD_FTUE_GLOW_CORE = '#FFF1B8';
 const MOSSPROUT_WORLD_BASELINE_LIFT = 8;
 const MOSSPROUT_DIALOGUE_SCREEN_ANCHOR_Y = 0.5;
+const REGULAR_RESIDENT_INTERACTION_SCREEN_ANCHOR_Y = 0.46;
 
 function mossproutDialogueSubjectCenterY(residentAnchorY: number) {
   return residentAnchorY - MOSSPROUT_WORLD_BASELINE_LIFT - WORLD_FTUE_EGG_HEIGHT / 2;
+}
+
+function residentCreatureFrame(x: number, y: number, worldSize: number, stableWorldPresentation: boolean) {
+  const width = stableWorldPresentation ? WORLD_FTUE_EGG_WIDTH : worldSize;
+  const height = stableWorldPresentation ? WORLD_FTUE_EGG_HEIGHT : worldSize;
+  return {
+    height,
+    left: x - width / 2,
+    top: stableWorldPresentation
+      ? y - MOSSPROUT_WORLD_BASELINE_LIFT - height
+      : y - CREATURE_SIZE * 0.63 - (worldSize - CREATURE_SIZE),
+    width,
+  };
 }
 
 function GardenOrderShortcut({ entry, frame, index, onPress, slotOverride }: {
@@ -428,6 +446,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const tutorialCameraKey = tutorialCamera
     ? `${JSON.stringify(tutorialCamera)}:${worldSubjectPresentation?.growthProgress ?? 'none'}`
     : 'none';
+  const residentInteractionScreenAnchorY = tutorialCamera?.kind === 'focus_target'
+    ? tutorialCamera.anchorY ?? MOSSPROUT_DIALOGUE_SCREEN_ANCHOR_Y
+    : REGULAR_RESIDENT_INTERACTION_SCREEN_ANCHOR_Y;
   // The first opening directive is started inside camera initialization so
   // the first drawable frame is already moving. Mark it applied here to keep
   // the post-ready effect from restarting the same zoom.
@@ -442,17 +463,16 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     if (!tile) return null;
     const residentAnchor = scene.tileArtLayers.find((layer) => layer.id === tile.id)?.residentAnchor;
     const isMossprout = tile.companion?.familyId === 'mossprout';
+    const subjectFrame = residentAnchor
+      ? residentCreatureFrame(residentAnchor.x, residentAnchor.y, creatureWorldSize, isMossprout)
+      : null;
     return {
       scale: cameraMaximumScale ?? KINGDOM_RENDERING.havenMaxScale,
-      screenY: viewport.height * (isMossprout ? MOSSPROUT_DIALOGUE_SCREEN_ANCHOR_Y : 0.48),
-      x: residentAnchor?.x ?? tile.cx,
-      y: residentAnchor
-        ? isMossprout
-          ? mossproutDialogueSubjectCenterY(residentAnchor.y)
-          : residentAnchor.y
-        : tile.cy,
+      screenY: viewport.height * residentInteractionScreenAnchorY,
+      x: subjectFrame ? subjectFrame.left + subjectFrame.width / 2 : tile.cx,
+      y: subjectFrame ? subjectFrame.top + subjectFrame.height / 2 : tile.cy,
     };
-  }, [cameraMaximumScale, interactionResidentId, scene.tileArtLayers, scene.tiles, viewport.height]);
+  }, [cameraMaximumScale, creatureWorldSize, interactionResidentId, residentInteractionScreenAnchorY, scene.tileArtLayers, scene.tiles, viewport.height]);
   const camera = useKingdomHexCamera({
     center: { x: scene.centerTile.cx, y: scene.centerTile.cy },
     centerId: scene.centerTile.id,
@@ -489,6 +509,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   }, [camera, onSelectNatureIsland, reduceMotion, viewport.height]);
   const fitTutorialWorld = camera.fitWorld;
   const focusTutorialResident = camera.focusResident;
+  const animateToCameraSnapshot = camera.animateToSnapshot;
+  const interactionCameraSnapshot = camera.snapshot;
   const tutorialCameraReady = camera.ready;
   useEffect(() => {
     if (!tutorialCamera) {
@@ -545,9 +567,11 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     });
   }, [cameraRestoreNonce, fitTutorialWorld, focusTutorialResident, gardenFrame, scene.tileArtLayers, scene.tiles, sceneHomeTile, tutorialCamera, tutorialCameraKey, tutorialCameraReady, worldSubjectPresentation?.growthProgress]);
   const focusedInteractionResidentRef = useRef<string | null>(null);
+  const interactionOriginSnapshotRef = useRef<KingdomCameraSnapshot | null>(null);
   useEffect(() => {
     if (!interactionResidentId) {
       focusedInteractionResidentRef.current = null;
+      interactionOriginSnapshotRef.current = null;
       return;
     }
     const interactionFocusKey = `${interactionResidentId}:${cameraRestoreNonce}`;
@@ -558,24 +582,35 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       && candidate.companion.creature.creatureId === interactionResidentId
     ));
     if (!tile) return;
+    interactionOriginSnapshotRef.current ??= interactionCameraSnapshot;
     focusedInteractionResidentRef.current = interactionFocusKey;
     const residentAnchor = scene.tileArtLayers.find((layer) => layer.id === tile.id)?.residentAnchor;
     const isMossprout = tile.companion?.familyId === 'mossprout';
-    const subjectCenterY = residentAnchor
-      ? isMossprout
-        ? mossproutDialogueSubjectCenterY(residentAnchor.y)
-        : residentAnchor.y
-      : tile.cy;
-    focusTutorialResident(residentAnchor?.x ?? tile.cx, subjectCenterY, {
-      anchorY: isMossprout ? MOSSPROUT_DIALOGUE_SCREEN_ANCHOR_Y : 0.48,
+    const subjectFrame = residentAnchor
+      ? residentCreatureFrame(residentAnchor.x, residentAnchor.y, creatureWorldSize, isMossprout)
+      : null;
+    focusTutorialResident(
+      subjectFrame ? subjectFrame.left + subjectFrame.width / 2 : tile.cx,
+      subjectFrame ? subjectFrame.top + subjectFrame.height / 2 : tile.cy,
+      {
+      anchorY: residentInteractionScreenAnchorY,
       durationMs: reduceMotion ? 80 : cameraRestoreNonce > 0 ? 0 : 520,
       onComplete: () => onResidentFocusComplete?.(interactionResidentId),
       zoom: cameraMaximumScale ?? KINGDOM_RENDERING.havenMaxScale,
     });
-  }, [cameraMaximumScale, cameraRestoreNonce, focusTutorialResident, interactionResidentId, onResidentFocusComplete, reduceMotion, scene.tileArtLayers, scene.tiles, tutorialCameraReady]);
+  }, [cameraMaximumScale, cameraRestoreNonce, creatureWorldSize, focusTutorialResident, interactionCameraSnapshot, interactionResidentId, onResidentFocusComplete, reduceMotion, residentInteractionScreenAnchorY, scene.tileArtLayers, scene.tiles, tutorialCameraReady]);
   const handledInteractionExitNonceRef = useRef(0);
   useEffect(() => {
     if (!interactionResidentId || interactionExitNonce <= handledInteractionExitNonceRef.current) return;
+    handledInteractionExitNonceRef.current = interactionExitNonce;
+    const interactionOrigin = interactionOriginSnapshotRef.current;
+    if (interactionOrigin) {
+      animateToCameraSnapshot(interactionOrigin, reduceMotion ? 80 : 440, () => {
+        interactionOriginSnapshotRef.current = null;
+        onInteractionExitFocusComplete?.();
+      });
+      return;
+    }
     const tile = scene.tiles.find((candidate) => (
       candidate.kind === 'companion'
       && candidate.companion?.kind === 'owned'
@@ -585,7 +620,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       onInteractionExitFocusComplete?.();
       return;
     }
-    handledInteractionExitNonceRef.current = interactionExitNonce;
     const residentAnchor = scene.tileArtLayers.find((layer) => layer.id === tile.id)?.residentAnchor;
     focusTutorialResident(residentAnchor?.x ?? tile.cx, residentAnchor?.y ?? tile.cy, {
       anchorY: 0.48,
@@ -593,7 +627,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       onComplete: onInteractionExitFocusComplete,
       zoom: KINGDOM_RENDERING.havenMaxScale,
     });
-  }, [focusTutorialResident, interactionExitNonce, interactionResidentId, onInteractionExitFocusComplete, reduceMotion, scene.tileArtLayers, scene.tiles]);
+  }, [animateToCameraSnapshot, focusTutorialResident, interactionExitNonce, interactionResidentId, onInteractionExitFocusComplete, reduceMotion, scene.tileArtLayers, scene.tiles]);
   const upgradeCompletionRef = useRef(onUpgradePresentationComplete);
   const upgradeFocusRef = useRef(camera.focusUpgrade);
   const upgradeLayersRef = useRef(upgradeLayers);
@@ -778,6 +812,27 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     };
   }, [artLayerById, scene.tiles]);
 
+  const interactionResidentProjection = useMemo(() => {
+    if (!interactionResidentId) return null;
+    const tile = scene.tiles.find((candidate) => (
+      candidate.kind === 'companion'
+      && candidate.companion?.kind === 'owned'
+      && candidate.companion.creature.creatureId === interactionResidentId
+    ));
+    if (!tile || tile.companion?.kind !== 'owned') return null;
+    const artLayer = artLayerById.get(tile.id);
+    const anchor = artLayer?.residentAnchor ?? kingdomWorldViewPoint(
+      { x: tile.cx, y: tile.cy },
+      kingdomWorldViewConfig.katchimera,
+    );
+    const stableWorldPresentation = tile.companion.familyId === 'mossprout';
+    return {
+      creature: tile.companion.creature,
+      frame: residentCreatureFrame(anchor.x, anchor.y, creatureWorldSize, stableWorldPresentation),
+      source: artLayer?.residentSource,
+    };
+  }, [artLayerById, creatureWorldSize, interactionResidentId, scene.tiles]);
+
   const creatureNodes = useMemo(() => {
     const items: { depth: number; node: ReactNode }[] = [];
     for (const tile of scene.tiles) {
@@ -808,6 +863,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       if (tile.companion.kind === 'revealed_egg') {
         continue;
       }
+      // The active interaction subject is drawn outside the transformed world
+      // below. Keeping the small world copy here would both duplicate it and
+      // preserve the blurry camera-scaled raster that FTUE already avoids.
+      if (tile.companion.creature.creatureId === interactionResidentId) continue;
       const { x, y } = artLayer?.residentAnchor ?? kingdomWorldViewPoint(
         { x: tile.cx, y: tile.cy },
         kingdomWorldViewConfig.katchimera
@@ -986,6 +1045,19 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           targetRef={worldEggTargetRef}
           x={revealedEggProjection.x}
           y={revealedEggProjection.y}
+        />
+      ) : null}
+      {interactionResidentProjection ? (
+        <ProjectedResidentCreature
+          cameraScale={camera.scaleValue}
+          cameraTranslateX={camera.translationXValue}
+          cameraTranslateY={camera.translationYValue}
+          creature={interactionResidentProjection.creature}
+          frame={interactionResidentProjection.frame}
+          rewardPulseKey={interactionRewardPulseKey}
+          sceneHeight={scene.height}
+          sceneWidth={scene.width}
+          source={interactionResidentProjection.source}
         />
       ) : null}
       {!upgradePresentation && interactionEnabled ? (
@@ -1759,6 +1831,127 @@ const LockedCompanionTile = memo(function LockedCompanionTile({
   );
 });
 
+const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
+  cameraScale,
+  cameraTranslateX,
+  cameraTranslateY,
+  creature,
+  frame,
+  rewardPulseKey,
+  sceneHeight,
+  sceneWidth,
+  source,
+}: {
+  cameraScale: SharedValue<number>;
+  cameraTranslateX: SharedValue<number>;
+  cameraTranslateY: SharedValue<number>;
+  creature: Extract<KingdomHexCompanionSlot, { kind: 'owned' }>['creature'];
+  frame: AbsoluteFrame;
+  rewardPulseKey: number;
+  sceneHeight: number;
+  sceneWidth: number;
+  source?: ImageSourcePropType;
+}) {
+  const reduceMotion = useReducedMotion();
+  const rewardPulse = useSharedValue(0);
+  const rewardShake = useSharedValue(0);
+  const handledRewardPulseKeyRef = useRef(rewardPulseKey);
+  const nativeWidth = frame.width * WORLD_INTERACTION_CREATURE_NATIVE_SURFACE_SCALE;
+  const nativeHeight = frame.height * WORLD_INTERACTION_CREATURE_NATIVE_SURFACE_SCALE;
+  const glowSize = nativeWidth * 0.84;
+
+  useEffect(() => {
+    if (rewardPulseKey <= handledRewardPulseKeyRef.current) return;
+    handledRewardPulseKeyRef.current = rewardPulseKey;
+    runRewardArrivalMotion(rewardPulse, rewardShake, reduceMotion);
+    return () => {
+      cancelAnimation(rewardPulse);
+      cancelAnimation(rewardShake);
+    };
+  }, [reduceMotion, rewardPulse, rewardPulseKey, rewardShake]);
+
+  const projectionStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        translateX: sceneWidth / 2
+          + cameraTranslateX.value
+          + (frame.left + frame.width / 2 - sceneWidth / 2) * cameraScale.value
+          - frame.width / 2,
+      },
+      {
+        translateY: sceneHeight / 2
+          + cameraTranslateY.value
+          + (frame.top + frame.height - sceneHeight / 2) * cameraScale.value
+          - frame.height,
+      },
+    ],
+  }));
+  const reactionStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: rewardShake.value * 5.5 },
+      { rotateZ: `${rewardShake.value * 2.2}deg` },
+    ],
+  }));
+  const nativeSurfaceStyle = useAnimatedStyle(() => ({
+    transform: [{
+      scale: cameraScale.value
+        * (1 + rewardPulse.value * 0.055)
+        / WORLD_INTERACTION_CREATURE_NATIVE_SURFACE_SCALE,
+    }],
+  }));
+  const rewardGlowStyle = useAnimatedStyle(() => ({
+    opacity: rewardPulse.value * 0.84,
+    transform: [{ scale: 0.72 + rewardPulse.value * 0.55 }],
+  }));
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.worldFtueProjectedSubject,
+        { height: frame.height, width: frame.width },
+        projectionStyle,
+      ]}>
+      <Animated.View
+        collapsable={false}
+        renderToHardwareTextureAndroid={false}
+        shouldRasterizeIOS={false}
+        style={[StyleSheet.absoluteFill, reactionStyle]}>
+        <Animated.View
+          collapsable={false}
+          renderToHardwareTextureAndroid={false}
+          shouldRasterizeIOS={false}
+          style={[
+            styles.worldInteractionCreatureNativeSurface,
+            { height: nativeHeight, marginLeft: -nativeWidth / 2, width: nativeWidth },
+            nativeSurfaceStyle,
+          ]}>
+          <Animated.View
+            style={[
+              styles.worldFtueRewardGlow,
+              {
+                height: glowSize,
+                left: (nativeWidth - glowSize) / 2,
+                top: (nativeHeight - glowSize) / 2,
+                width: glowSize,
+              },
+              rewardGlowStyle,
+            ]}
+          />
+          <CreatureGroundShadow frameSize={nativeWidth} visualKey={creature.visualKey} />
+          <CreatureAnimatedArt
+            accessibilityLabel={`${creature.name} animated`}
+            allowDownscaling={false}
+            fallbackSource={source ?? resolveCreatureArtSource(creature.visualKey)}
+            style={StyleSheet.absoluteFill}
+            visualKey={creature.visualKey}
+          />
+        </Animated.View>
+      </Animated.View>
+    </Animated.View>
+  );
+});
+
 type ResidentProps = {
   animated?: boolean;
   celebrationNonce?: number;
@@ -1845,23 +2038,18 @@ const ResidentCreature = memo(function ResidentCreature({
   }));
   const handlePress = useCallback(() => {
     if (!creature) return;
+    // The interaction effect owns the canonical FTUE-matched focus. Starting
+    // the old magnetic tile focus first caused a brief .42-anchor zoom before
+    // the resident was recentered at .5, producing a visible double move.
+    if (onSelectResident) {
+      onSelectResident(creature.creatureId, creature.name);
+      return;
+    }
     onFocus(x, y, { id: tile.id });
-    onSelectResident?.(creature.creatureId, creature.name);
   }, [creature, onFocus, onSelectResident, tile.id, x, y]);
   const markReady = useCallback(() => setReady(true), []);
-  const frameWidth = stableWorldPresentation ? WORLD_FTUE_EGG_WIDTH : worldSize;
-  const frameHeight = stableWorldPresentation ? WORLD_FTUE_EGG_HEIGHT : worldSize;
-  const frame = {
-    height: frameHeight,
-    left: x - frameWidth / 2,
-    // Mossprout's persistent world renderer inherits the hatch subject's
-    // complete 108x139 subject plane and baseline. Later dialogue therefore
-    // has the same scale and composition as the first post-hatch dialogue.
-    top: stableWorldPresentation
-      ? y - MOSSPROUT_WORLD_BASELINE_LIFT - frameHeight
-      : y - CREATURE_SIZE * 0.63 - (worldSize - CREATURE_SIZE),
-    width: frameWidth,
-  };
+  const frame = residentCreatureFrame(x, y, worldSize, stableWorldPresentation);
+  const frameWidth = frame.width;
 
   return (
     <TileFocusTransform anchorX={focusAnchorX} anchorY={focusAnchorY} frame={frame} scale={focusScale}>
@@ -1942,6 +2130,12 @@ const styles = StyleSheet.create({
     width: WORLD_FTUE_REWARD_GLOW_SIZE,
   },
   worldFtueEggNativeSurface: {
+    bottom: 0,
+    left: '50%',
+    position: 'absolute',
+    transformOrigin: 'center bottom',
+  },
+  worldInteractionCreatureNativeSurface: {
     bottom: 0,
     left: '50%',
     position: 'absolute',

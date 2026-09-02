@@ -175,8 +175,8 @@ test('Mossprout FTUE introduces one Bond answer before the Garden and ends on it
   assert.equal(mossproutFtueStep('world.garden_arrival')?.actions[0]?.nextStepId, 'world.garden_handoff');
   assert.equal(mossproutFtueStep('world.garden_handoff')?.actions[0]?.nextStepId, 'merge.seed_drag');
   assert.equal(mossproutFtueStep('merge.serve_sprout')?.edges?.[0]?.nextStepId, 'companion.chapter_zero_return');
-  assert.equal(mossproutFtueStep('companion.chapter_zero_return')?.actions[0]?.nextStepId, 'haven.first_bloom');
-  assert.equal(mossproutFtueStep('haven.first_bloom')?.actions[0]?.nextStepId, 'companion.resident_parcel_ready');
+  assert.equal(mossproutFtueStep('companion.chapter_zero_return')?.actions[0]?.nextStepId, 'companion.resident_parcel_ready');
+  assert.equal(mossproutFtueStep('haven.first_bloom'), null);
   // Retained as a recovery route for older resident-matching saves.
   assert.equal(mossproutFtueStep('companion.resident_affinity')?.actions[0]?.nextStepId, 'companion.resident_parcel_ready');
   assert.equal(mossproutFtueStep('companion.resident_parcel_ready')?.actions[0]?.nextStepId, 'merge.resident_parcel');
@@ -192,7 +192,7 @@ test('FTUE completion does not reveal, upgrade, or reopen the global Merge route
   const mergeRoute = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
 
   assert.doesNotMatch(rosterRoute, /onFtueRestore|onFtueReveal|haven_upgrade_completed|haven\.reveal_world/);
-  assert.match(rosterRoute, /stepId === 'world\.complete'[\s\S]*?actionId: 'world\.finish'/);
+  assert.match(rosterRoute, /stepId === 'world\.complete'[\s\S]*?actionId: 'world\.finish'[\s\S]*?completeFtueRun\(\)/);
   assert.match(mergeRoute, /ftueRun\.stepId !== 'companion\.chapter_zero_return'[\s\S]*?target: 'companion'/);
 });
 

@@ -9,7 +9,6 @@ export type ActiveFtueNavigationPolicy = FtueNavigationDirective & {
 
 const PRE_MOSSPROUT_CONVERSATION_STEPS = new Set([
   'world.egg_intro',
-  'grove.egg_inspect',
   'egg.nature_theme',
   'egg.companion_identity',
   'egg.opening',

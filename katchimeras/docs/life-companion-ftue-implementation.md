@@ -16,8 +16,8 @@ The first session establishes Eggs as the origin of companions, Mossprout as the
 
 ## Navigation ownership
 
-- `world.egg_intro` owns the cold-start route and the initial Mossprout Egg interaction.
-- Egg inspection is automated after the locked close world-camera move. Questions and Hatch remain over the focused world rather than mounting the cinematic environment.
+- `world.egg_intro` owns the cold-start route, presents “Something is waiting here” at the top, and gradually focuses the Mossprout Egg.
+- The intro advances automatically into the first action card once the locked camera move settles. The redundant “There’s something here” inspect beat remains retired. Questions and Hatch stay over the focused world rather than mounting the cinematic environment.
 - `companion.first_meeting` advances through `companion.bond_spotlight` before the first action card so Bond is taught in context.
 - `companion.order_preview` prepares the canonical tutorial Merge board, then advances to `world.garden_arrival` without navigating directly into Merge.
 - `world.garden_arrival` pans to the Garden and presents its unspotlighted introduction before advancing automatically.
@@ -35,7 +35,7 @@ The first session establishes Eggs as the origin of companions, Mossprout as the
 
 ## Cutover policy
 
-Active older runs migrate to the nearest safe current beat. Retired opening steps restart at `world.egg_intro`; retired reveal/upgrade completion steps resume at `world.complete`. Completed runs remain completed, and captured user content is untouched.
+Active older runs migrate to the nearest safe current beat. Superseded world-entry steps restart at `world.egg_intro`, while the retired inspect step resumes at `egg.opening`; retired reveal/upgrade completion steps resume at `world.complete`. Completed runs remain completed, and captured user content is untouched.
 
 ## Guardrails
 

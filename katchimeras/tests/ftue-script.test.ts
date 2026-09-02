@@ -51,6 +51,8 @@ test('Mossprout FTUE script has valid transitions and registered handlers', () =
   assert.deepEqual(validateMossproutFtueScript(), []);
   assert.equal(MOSSPROUT_FTUE_SCRIPT.entryStepId, 'world.egg_intro');
   assert.equal(MOSSPROUT_FTUE_SCRIPT.terminalStepId, 'complete');
+  assert.equal(mossproutFtueStep('world.egg_intro')?.actions[0]?.nextStepId, 'egg.opening');
+  assert.equal(mossproutFtueStep('grove.egg_inspect'), null);
   for (const step of MOSSPROUT_FTUE_SCRIPT.steps) {
     for (const action of step.actions) assert.ok(FTUE_HANDLER_REGISTRY[action.handlerId]);
   }
@@ -83,6 +85,8 @@ test('the Egg asks three lightweight attunement questions before Hatch', () => {
       ['Energy', 'Calm', 'Something new'],
     ],
   );
+  const eggSequenceStepIds = ['world.egg_intro', 'egg.opening', 'egg.context', 'egg.mind', 'egg.ready'];
+  assert.equal(eggSequenceStepIds.every((stepId) => mossproutFtueStep(stepId)?.guide.body === ''), true);
 });
 
 test('Mossprout dialogue FTUE steps own their durable world-camera framing', () => {
@@ -174,10 +178,14 @@ test('script migration collapses the mistaken parallel opening into the existing
   assert.match(runtime, /stepId: replacementOpeningStep[\s\S]*?\? replacementOpeningStep/);
   assert.match(runtime, /if \(snapshot === undefined\)[\s\S]*?const migrated = migrateCurrentScript\(snapshot\)/);
   assert.doesNotMatch(runtime, /if \(snapshot !== undefined\) return snapshot/);
-  assert.match(runtime, /replacedWorldEntrySteps[\s\S]*?'haven\.home_notice'[\s\S]*?'world\.egg_intro'/);
+  const replacedWorldEntrySet = runtime.match(/replacedWorldEntrySteps = new Set\(\[[\s\S]*?\]\);/)?.[0] ?? '';
+  assert.doesNotMatch(replacedWorldEntrySet, /world\.egg_intro|grove\.egg_inspect/);
+  assert.match(runtime, /replacedWorldEntrySteps\.has\(migratedStepId\)[\s\S]*?\? 'world\.egg_intro'/);
+  assert.match(runtime, /removedEggInspectSteps = new Set\(\['grove\.egg_inspect'\]\)[\s\S]*?\? 'egg\.opening'/);
   assert.match(runtime, /replacedWorldCompletionSteps[\s\S]*?'haven\.reveal'[\s\S]*?'world\.complete'/);
   assert.match(runtime, /needsResidentParcelConfirmation[\s\S]*?run\.scriptVersion < 21[\s\S]*?companion\.resident_parcel_ready/);
-  assert.match(runtime, /needsV33FirstBloomBridge[\s\S]*?run\.scriptVersion === 32[\s\S]*?run\.stepId === 'haven\.reveal'[\s\S]*?'haven\.first_bloom'/);
+  assert.match(runtime, /needsV33FirstBloomBridge[\s\S]*?run\.scriptVersion === 32[\s\S]*?run\.stepId === 'haven\.reveal'[\s\S]*?'companion\.resident_parcel_ready'/);
+  assert.match(runtime, /removedFrictionSteps = new Set\(\['haven\.first_bloom'\]\)[\s\S]*?'companion\.resident_parcel_ready'/);
 });
 
 test('the current fifth answer stays on Hatch instead of restarting the questionnaire', () => {
@@ -228,6 +236,9 @@ test('Supabase receipt allowlist matches every backend FTUE action', () => {
   const v33Migration = readFileSync('supabase/migrations/20260826211000_register_mossprout_ftue_v33.sql', 'utf8');
   const v34Migration = readFileSync('supabase/migrations/20260901120000_register_mossprout_ftue_v34.sql', 'utf8');
   const v35Migration = readFileSync('supabase/migrations/20260901153000_register_mossprout_ftue_v35.sql', 'utf8');
+  const v36Migration = readFileSync('supabase/migrations/20260902120000_register_mossprout_ftue_v36.sql', 'utf8');
+  const v37Migration = readFileSync('supabase/migrations/20260902143000_register_mossprout_ftue_v37.sql', 'utf8');
+  const v38Migration = readFileSync('supabase/migrations/20260902154500_register_mossprout_ftue_v38.sql', 'utf8');
   const v23Migration = readFileSync('supabase/migrations/20260825223000_register_mossprout_ftue_v23.sql', 'utf8');
   const v22Migration = readFileSync('supabase/migrations/20260825190000_register_mossprout_ftue_v22.sql', 'utf8');
   const v21Migration = readFileSync('supabase/migrations/20260825173000_register_mossprout_ftue_v21.sql', 'utf8');
@@ -237,7 +248,7 @@ test('Supabase receipt allowlist matches every backend FTUE action', () => {
   const v17Migration = readFileSync('supabase/migrations/20260822173032_register_mossprout_ftue_v17.sql', 'utf8');
   const priorMigration = readFileSync('supabase/migrations/20260818170000_register_mossprout_ftue_v16.sql', 'utf8');
   for (const item of FTUE_ACTION_CATALOG.filter((entry) => entry.backendEvent)) {
-    assert.match(`${priorMigration}\n${v17Migration}\n${v18Migration}\n${migration}\n${v20Migration}\n${v21Migration}\n${v22Migration}\n${v23Migration}\n${v24Migration}\n${v25Migration}\n${v26Migration}\n${v27Migration}\n${v28Migration}\n${v29Migration}\n${v30Migration}\n${v31Migration}\n${v32Migration}\n${v33Migration}\n${v34Migration}\n${v35Migration}`, new RegExp(`'${item.stepId}',\\s*'${item.actionId}'`));
+    assert.match(`${priorMigration}\n${v17Migration}\n${v18Migration}\n${migration}\n${v20Migration}\n${v21Migration}\n${v22Migration}\n${v23Migration}\n${v24Migration}\n${v25Migration}\n${v26Migration}\n${v27Migration}\n${v28Migration}\n${v29Migration}\n${v30Migration}\n${v31Migration}\n${v32Migration}\n${v33Migration}\n${v34Migration}\n${v35Migration}\n${v36Migration}\n${v37Migration}\n${v38Migration}`, new RegExp(`'${item.stepId}',\\s*'${item.actionId}'`));
   }
   assert.match(v24Migration, /script_version = 23/);
   assert.match(v25Migration, /script_version = 24/);
@@ -251,6 +262,12 @@ test('Supabase receipt allowlist matches every backend FTUE action', () => {
   assert.match(v33Migration, /script_version = 32/);
   assert.match(v34Migration, /script_version = 33/);
   assert.match(v35Migration, /script_version = 34/);
+  assert.match(v36Migration, /script_version = 35/);
+  assert.match(v36Migration, /not \(step_id = 'haven\.first_bloom' and action_id = 'haven\.continue_to_resident'\)/);
+  assert.match(v37Migration, /script_version = 36/);
+  assert.match(v37Migration, /step_id not in \('world\.egg_intro', 'grove\.egg_inspect'\)/);
+  assert.match(v38Migration, /script_version = 37/);
+  assert.match(v38Migration, /'world\.egg_intro', 'world\.inspect_mossprout_egg', 'haven'/);
   assert.match(v23Migration, /script_version = 22/);
   assert.match(v22Migration, /script_version = 21/);
   assert.match(migration, /script_version = 18/);
@@ -274,7 +291,7 @@ test('Chapter 0 uses four Seeds, two Sprouts, a First Bloom, then one request', 
   assert.equal(pairStep?.edges?.[0]?.event.type, 'dream_echo_cleared');
   assert.equal(pairStep?.edges?.[0]?.nextStepId, 'merge.serve_sprout');
   assert.equal(serveStep?.edges?.[0]?.nextStepId, 'companion.chapter_zero_return');
-  assert.equal(mossproutFtueAction('companion.chapter_zero_return', 'companion.complete_chapter_zero_return')?.nextStepId, 'haven.first_bloom');
+  assert.equal(mossproutFtueAction('companion.chapter_zero_return', 'companion.complete_chapter_zero_return')?.nextStepId, 'companion.resident_parcel_ready');
   assert.equal(mossproutFtueAction('companion.bond_intro', 'companion.acknowledge_friendship')?.nextStepId, 'companion.bond_spotlight');
   assert.equal(mossproutFtueAction('companion.bond_spotlight', 'companion.acknowledge_bond')?.nextStepId, 'companion.day_one_action');
   assert.equal(mossproutFtueAction('companion.day_one_action', 'companion.choose_bond_share')?.options?.length, 4);
@@ -288,7 +305,7 @@ test('Chapter 0 uses four Seeds, two Sprouts, a First Bloom, then one request', 
   assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.resident_orders')?.edges?.[0]?.requiredCount, undefined);
   assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.resident_orders')?.interaction?.mode, 'exclusive');
   assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.resident_card_reward')?.edges?.[0]?.nextStepId, 'companion.resident_match_result');
-  assert.equal(mossproutFtueAction('haven.first_bloom', 'haven.continue_to_resident')?.nextStepId, 'companion.resident_parcel_ready');
+  assert.equal(mossproutFtueStep('haven.first_bloom'), null);
   assert.equal(mossproutFtueAction('companion.resident_match_result', 'companion.ack_resident_match_result')?.nextStepId, 'world.complete');
   assert.equal(mossproutFtueAction('world.complete', 'world.finish')?.nextStepId, 'complete');
   assert.equal(finalServeStep?.edges?.[0]?.nextStepId, 'companion.chapter_zero_return');
@@ -559,13 +576,20 @@ test('route-changing FTUE actions persist before navigation and owned companion 
   assert.match(companion, /openFtueGarden = useCallback\(async \(\) => \{[\s\S]*?installMossproutOnboardingMergeWorld[\s\S]*?advanceFtueActionDurably[\s\S]*?result\.run\?\.stepId !== 'world\.garden_arrival'[\s\S]*?flushFtuePersistence/);
   assert.doesNotMatch(companion, /Could not prepare Mossprout Garden handoff'[\s\S]{0,120}?throw error/);
   assert.match(roster, /openFtueGarden = useCallback\(async \(\) => \{[\s\S]*?transitionTo\(\{[\s\S]*?target: 'merge'[\s\S]*?advanceFtueActionDurably[\s\S]*?result\.step\?\.surface !== 'merge'[\s\S]*?router\.push/);
-  assert.match(roster, /continueFirstBloomToResident = useCallback\(\(\) => \{[\s\S]*?target: 'katchimeras'[\s\S]*?navigate: async \(\) => \{[\s\S]*?actionId: 'haven\.continue_to_resident'[\s\S]*?mossproutInteraction: '1'/);
-  assert.doesNotMatch(roster, /continueFirstBloomToResident[\s\S]{0,1600}?target: 'companion'/);
+  assert.doesNotMatch(roster, /continueFirstBloomToResident|haven\.continue_to_resident/);
+  assert.match(companion, /run\?\.stepId === 'companion\.chapter_zero_return'[\s\S]*?prepareMossproutFirstResidentHandoff\(\)[\s\S]*?nextStepId: 'companion\.resident_parcel_ready'/);
+  assert.match(companion, /activeFtueConversationDefinitionId = navigationFtueRun\?\.status === 'active'[\s\S]*?companion\.first_meeting[\s\S]*?companion\.chapter_zero_return[\s\S]*?ftueConversationDefinitionId[\s\S]*?: undefined/);
+  assert.match(companion, /ftueConversationDefinitionId=\{activeFtueConversationDefinitionId\}/);
+  assert.match(companion, /onFtueConversationComplete=\{activeFtueConversationDefinitionId \|\| residentFtueGraphActive/);
   assert.match(haven, /companionActive && companionVisualReady[\s\S]*?<KatchimeraCompanionRouteScreen/);
   assert.doesNotMatch(reconciler, /hatch\.talk_to_mossprout|run\.stepId === 'hatch\.reveal'/);
   assert.match(companion, /ftueCompanionSurfaceOwned = Boolean\([\s\S]*?mossproutFtueStep\(navigationFtueRun\.stepId\)\?\.surface === 'companion'/);
   assert.match(interaction, /!showMossproutDashboard[\s\S]*?!props\.ftueCompanionSurfaceOwned \|\| residentFtueDashboard/);
   assert.match(interaction, /residentParcelHandoffActive=\{residentParcelGardenPanelActive\}/);
+  assert.match(interaction, /residentResultFtueDashboard = props\.familyId === 'mossprout'[\s\S]*?props\.ftueResidentMatchResultActive/);
+  assert.match(interaction, /dashboardRouteActive = route\.kind === 'dashboard'[\s\S]*?residentResultFtueDashboard/);
+  assert.match(interaction, /!residentFtueDashboard && !residentResultFtueDashboard[\s\S]*?showFeastleStoryHome\(\)/);
+  assert.match(roster, /stepId === 'world\.complete'[\s\S]*?actionId: 'world\.finish'[\s\S]*?completeFtueRun\(\)/);
 });
 
 test('every active FTUE node has a canonical cold-start route', () => {
@@ -642,7 +666,7 @@ test('resident discovery pauses on one standard Mossprout action card and resume
   assert.doesNotMatch(conversationScene, /Returning to \$\{name\}/);
   assert.match(conversationFlow, /session\.status === 'completed'[\s\S]*?if \(directResidentParcelHandoff\) return;[\s\S]*?onComplete/);
   assert.match(interaction, /\(route\.kind === 'visit' \|\| route\.kind === 'conversation'\) && !residentFtueDashboard/);
-  assert.match(interaction, /if \(!props\.active \|\| !residentFtueDashboard\) return;[\s\S]*?showFeastleStoryHome\(\)/);
+  assert.match(interaction, /if \(!props\.active \|\| \(!residentFtueDashboard && !residentResultFtueDashboard\)\) return;[\s\S]*?showFeastleStoryHome\(\)/);
   assert.match(interaction, /dashboardRouteActive && props\.familyId === 'mossprout'[\s\S]*?<MossproutStoryStage/);
   assert.match(interaction, /residentStoryResumeActive=\{props\.ftueResidentStoryResume\}/);
   assert.match(stage, /if \(residentStoryResumeActive\) return \[residentResumeAction\]/);
@@ -821,7 +845,7 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   const policy = readFileSync('features/onboarding/ftue-navigation-policy.ts', 'utf8');
   assert.match(policy, /'egg\.opening'/);
   assert.match(policy, /'world\.egg_intro'/);
-  assert.match(policy, /'grove\.egg_inspect'/);
+  assert.doesNotMatch(policy, /'grove\.egg_inspect'/);
   assert.match(tabLayout, /tabBar=\{\(\) => null\}/);
   assert.doesNotMatch(tabLayout, /MeadowTabBar|DayCaptureSession|ftueHidesBottomBar/);
   assert.match(havenRoute, /<MossproutEggFtueSurface/);
@@ -872,13 +896,23 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.match(kingdomCamera, /initialFocus[\s\S]*?kingdomCameraSnapshotForTarget\([\s\S]*?initialFocus\.x, y: initialFocus\.y[\s\S]*?y: initialFocus\.screenY/);
   assert.match(kingdomCamera, /startsWithMotion[\s\S]*?commitSnapshot\(home\.tx, home\.ty, home\.scale, startsWithMotion\)[\s\S]*?animateTo\([\s\S]*?initialFocus\.scale[\s\S]*?initialFocus\.durationMs/);
   assert.match(kingdomScreen, /'world\.egg_intro': 4_100/);
-  assert.match(kingdomScreen, /ftueEggFeedingCloseupActive = ftueStepId === 'grove\.egg_inspect'[\s\S]*?ftueStepId === 'world\.egg_intro'/);
+  assert.doesNotMatch(kingdomScreen, /'grove\.egg_inspect': 1_650/);
+  assert.match(kingdomScreen, /ftueEggFeedingCloseupActive = ftueStepId === 'world\.egg_intro'[\s\S]*?Boolean\(ftueStepId\?\.startsWith\('egg\.'\)\)/);
   assert.match(kingdomScreen, /gardenWorldGuidanceActive[\s\S]*?top: insets\.top \+ 18/);
   assert.match(kingdomScreen, /function FtueOpeningFade\(\)[\s\S]*?opacity\.value = withDelay\([\s\S]*?duration: reduceMotion \? 140 : 1_350/);
+  assert.match(kingdomScreen, /ftueStepId === 'world\.egg_intro' \? <FtueOpeningFade/);
+  assert.match(nurture, /styles\.onboardingHeroGuide, \{ top: topInset \+ \(onboardingTopHudVisible \? 82 : 22\) \}/);
   assert.match(kingdomScreen, /!upgradePresentation && !ftueStepId/);
   assert.match(kingdomScreen, /onPress=\{interactionCreatureId \? requestResidentInteractionExit : onBackToHavenSelector\}/);
-  assert.match(kingdomScreen, /cameraFallbackTimer = ftueStepId \? null : setTimeout/);
-  assert.match(kingdomCanvas, /initialInteractionFocus = useMemo[\s\S]*?MOSSPROUT_DIALOGUE_SCREEN_ANCHOR_Y[\s\S]*?mossproutDialogueSubjectCenterY\(residentAnchor\.y\)[\s\S]*?initialTutorialFocus \?\? initialInteractionFocus/);
+  assert.doesNotMatch(kingdomScreen, /cameraFallbackTimer/);
+  assert.match(kingdomScreen, /onResidentFocusComplete=\{completeResidentFocus\}/);
+  assert.match(kingdomCamera, /Scene data is refreshed while the interaction sheet loads/);
+  assert.match(kingdomCamera, /previousGeometry\.sceneWidth === nextGeometry\.sceneWidth[\s\S]*?return;/);
+  assert.match(kingdomCamera, /const animateToSnapshot = useCallback[\s\S]*?clampCameraTranslation\(snapshot, cameraViewport, cameraScene, nextScale\)[\s\S]*?withTiming\(nextScale, timing/);
+  assert.match(kingdomCanvas, /interactionOriginSnapshotRef\.current \?\?= interactionCameraSnapshot[\s\S]*?animateToCameraSnapshot\(interactionOrigin, reduceMotion \? 80 : 440/);
+  assert.match(kingdomCanvas, /REGULAR_RESIDENT_INTERACTION_SCREEN_ANCHOR_Y = 0\.46/);
+  assert.match(kingdomCanvas, /residentInteractionScreenAnchorY = tutorialCamera\?\.kind === 'focus_target'[\s\S]*?tutorialCamera\.anchorY \?\? MOSSPROUT_DIALOGUE_SCREEN_ANCHOR_Y[\s\S]*?: REGULAR_RESIDENT_INTERACTION_SCREEN_ANCHOR_Y/);
+  assert.match(kingdomCanvas, /initialInteractionFocus = useMemo[\s\S]*?residentCreatureFrame\(residentAnchor\.x, residentAnchor\.y, creatureWorldSize, isMossprout\)[\s\S]*?screenY: viewport\.height \* residentInteractionScreenAnchorY[\s\S]*?initialTutorialFocus \?\? initialInteractionFocus/);
   assert.match(kingdomCanvas, /handledInteractionExitNonceRef[\s\S]*?zoom: KINGDOM_RENDERING\.havenMaxScale/);
   assert.match(kingdomCanvas, /allowDownscaling=\{false\}[\s\S]*?resolution="high"[\s\S]*?showFace/);
   assert.match(kingdomCanvas, /faceId=\{\(presentation\?\.growthProgress \?\? 0\) > 0 \? 'curious' : 'sleepy'\}/);
@@ -899,9 +933,16 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.match(kingdomCanvas, /subjectCenterY = residentAnchor[\s\S]*?WORLD_FTUE_EGG_HEIGHT \* eggGrowthScale \/ 2/);
   assert.match(kingdomCanvas, /<CreatureAnimatedArt[\s\S]*?visualKey="mossprout"/);
   assert.match(kingdomCanvas, /stableWorldPresentation = tile\.companion\.familyId === 'mossprout'[\s\S]*?animated=\{stableWorldPresentation \|\| interactionResidentId/);
-  assert.match(kingdomCanvas, /frameWidth = stableWorldPresentation \? WORLD_FTUE_EGG_WIDTH : worldSize[\s\S]*?frameHeight = stableWorldPresentation \? WORLD_FTUE_EGG_HEIGHT : worldSize/);
-  assert.match(kingdomCanvas, /top: stableWorldPresentation[\s\S]*?y - MOSSPROUT_WORLD_BASELINE_LIFT - frameHeight/);
-  assert.match(kingdomCanvas, /focusTutorialResident\(residentAnchor\?\.x \?\? tile\.cx, subjectCenterY,[\s\S]*?anchorY: isMossprout \? MOSSPROUT_DIALOGUE_SCREEN_ANCHOR_Y : 0\.48/);
+  assert.match(kingdomCanvas, /const width = stableWorldPresentation \? WORLD_FTUE_EGG_WIDTH : worldSize[\s\S]*?const height = stableWorldPresentation \? WORLD_FTUE_EGG_HEIGHT : worldSize/);
+  assert.match(kingdomCanvas, /top: stableWorldPresentation[\s\S]*?y - MOSSPROUT_WORLD_BASELINE_LIFT - height/);
+  assert.match(kingdomCanvas, /focusedInteractionResidentRef[\s\S]*?residentCreatureFrame\(residentAnchor\.x, residentAnchor\.y, creatureWorldSize, isMossprout\)[\s\S]*?anchorY: residentInteractionScreenAnchorY/);
+  assert.match(kingdomCanvas, /WORLD_INTERACTION_CREATURE_NATIVE_SURFACE_SCALE = 2\.7/);
+  assert.match(kingdomCanvas, /tile\.companion\.creature\.creatureId === interactionResidentId\) continue/);
+  assert.match(kingdomCanvas, /if \(onSelectResident\) \{[\s\S]*?onSelectResident\(creature\.creatureId, creature\.name\);[\s\S]*?return;[\s\S]*?onFocus\(x, y, \{ id: tile\.id \}\)/);
+  assert.match(kingdomCanvas, /<ProjectedResidentCreature[\s\S]*?cameraScale=\{camera\.scaleValue\}[\s\S]*?rewardPulseKey=\{interactionRewardPulseKey\}/);
+  assert.match(kingdomCanvas, /ProjectedResidentCreature[\s\S]*?runRewardArrivalMotion\(rewardPulse, rewardShake, reduceMotion\)[\s\S]*?rewardShake\.value \* 5\.5[\s\S]*?rewardPulse\.value \* 0\.055/);
+  assert.match(kingdomCanvas, /renderToHardwareTextureAndroid=\{false\}[\s\S]*?shouldRasterizeIOS=\{false\}[\s\S]*?worldInteractionCreatureNativeSurface/);
+  assert.match(kingdomCanvas, /allowDownscaling=\{false\}[\s\S]*?fallbackSource=\{source \?\? resolveCreatureArtSource\(creature\.visualKey\)\}/);
   assert.match(kingdomCanvas, /styles\.worldFtueCreatureFrame[\s\S]*?creatureStyle/);
   assert.match(kingdomCanvas, /worldFtueCreatureFrame: \{[\s\S]*?transformOrigin: 'center bottom'/);
   assert.match(kingdomCanvas, /presentation\?\.hatchPresentation \? <>[\s\S]*?worldFtueHatchRing[\s\S]*?worldFtueHatchRing[\s\S]*?<\/>(?:\s*): null/);
@@ -934,8 +975,9 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.doesNotMatch(mossproutOpening, /restoreDiscoveryReveal/);
   assert.match(todayRoute, /<Redirect href="\/katchimeras"/);
   assert.deepEqual(activeFtueNavigationPolicy({ status: 'active', stepId: 'egg.opening' })?.resume, { kind: 'haven' });
-  assert.deepEqual(activeFtueNavigationPolicy({ status: 'active', stepId: 'grove.egg_inspect' })?.resume, { kind: 'haven' });
-  assert.equal(ftueOwnsOpeningHome({ status: 'active', stepId: 'grove.egg_inspect' }), true);
+  assert.deepEqual(activeFtueNavigationPolicy({ status: 'active', stepId: 'world.egg_intro' })?.resume, { kind: 'haven' });
+  assert.equal(activeFtueNavigationPolicy({ status: 'active', stepId: 'grove.egg_inspect' }), null);
+  assert.equal(ftueOwnsOpeningHome({ status: 'active', stepId: 'grove.egg_inspect' }), false);
   assert.equal(ftueOwnsOpeningHome({ status: 'active', stepId: 'companion.first_meeting' }), true);
   assert.match(devTools, /Restart first-session onboarding · keep profile/);
   assert.match(devTools, /beginFirstSession\(\{ restart: true \}\)/);
@@ -967,7 +1009,7 @@ test('FTUE starts a relationship before the Garden, shows First Bloom, and conti
   assert.match(merge, /trailing=\{<View>[\s\S]*?<GameCurrencyHud[\s\S]*?targetRef: coinHudRef/);
   assert.match(merge, /measureViewInWindow\(coinHudRef\)[\s\S]*?!coinRect[\s\S]*?return false/);
   assert.match(merge, /ftueRun\.stepId !== 'companion\.chapter_zero_return'[\s\S]*?target: 'companion'[\s\S]*?ftue: 'chapter-zero-return'/);
-  assert.match(companion, /actionId: 'companion\.complete_chapter_zero_return'[\s\S]*?nextStepId: 'haven\.first_bloom'/);
+  assert.match(companion, /actionId: 'companion\.complete_chapter_zero_return'[\s\S]*?nextStepId: 'companion\.resident_parcel_ready'/);
   assert.match(companion, /run\.stepId === 'companion\.nickname'[\s\S]*?saveMossproutPlayerNickname[\s\S]*?kind: 'friendship_started'[\s\S]*?actionId: 'companion\.save_nickname'/);
   assert.match(companion, /kind: 'friendship_started'[\s\S]*?queueCelebration: true/);
   assert.match(companion, /MOSSPROUT_FTUE_NAME_BOND_TARGET - companionBondProgress/);
@@ -1007,11 +1049,12 @@ test('FTUE starts a relationship before the Garden, shows First Bloom, and conti
   assert.match(ftueRuntime, /input\.actionId === 'companion\.complete_day_one_action'[\s\S]*?completeDayOneLesson/);
   assert.doesNotMatch(companion, /complete_resident_affinity'[\s\S]{0,500}?router\.push/);
   assert.match(companion, /stepId !== 'companion\.bond_spotlight'[\s\S]*?actionId: 'companion\.acknowledge_bond'/);
-  assert.match(companion, /Showing the First Bloom[\s\S]*?onCovered:[\s\S]*?navigate: async \(\) => \{[\s\S]*?await flushFtuePersistence\(\)[\s\S]*?router\.dismissTo\('\/\(tabs\)\/katchimeras'\)/);
+  assert.match(companion, /prepareMossproutFirstResidentHandoff\(\)[\s\S]*?actionId: 'companion\.complete_chapter_zero_return'[\s\S]*?nextStepId: 'companion\.resident_parcel_ready'[\s\S]*?await flushFtuePersistence\(\)/);
+  assert.doesNotMatch(companion, /Showing the First Bloom/);
   assert.doesNotMatch(companion, /revealStoredHaven/);
   assert.match(interaction, /Promise\.resolve\(onInitialConversationComplete\?\.\(\)\)[\s\S]*?\.then\(showFeastleStoryHome\)/);
   assert.match(interaction, /CompanionFtueCoachmark[\s\S]*?ftueBondSpotlightActive[\s\S]*?ftueDayOneActionActive/);
-  assert.match(companion, /advanceFtueActionDurably\([\s\S]*?companion\.complete_chapter_zero_return[\s\S]*?router\.dismissTo\('\/\(tabs\)\/katchimeras'\)/);
+  assert.doesNotMatch(companion, /companion\.complete_chapter_zero_return[\s\S]{0,800}?router\.dismissTo/);
   assert.match(repository, /seedStoredMossproutGardenAfterFtue[\s\S]*?completeMossproutChapterZeroSlice[\s\S]*?reconcileCharacterActivity[\s\S]*?status: 'complete'/);
   assert.match(kingdom, /ftueDayOneActionActive && receipt\.kind === 'journey_day_completed'[\s\S]*?variant: 'journey_complete'/);
   assert.match(kingdom, /ftueDayOneActionActive[\s\S]*?onFtueJourneyDayComplete\?\.\(\)[\s\S]*?continueFtueAfter/);
@@ -1171,7 +1214,7 @@ test('the Grove Egg inherits the authored camera retreat across its three feeds'
   const ratios = [openingScale / contextScale, contextScale / mindScale, mindScale / readyScale];
 
   assert.ok(ratios.every((ratio) => Math.abs(ratio - ratios[0]!) < 1e-9));
-  assert.equal(mossproutGroveEggCameraPinchTarget('grove.egg_inspect', 2), 2);
+  assert.equal(mossproutGroveEggCameraPinchTarget('grove.egg_inspect', 2), null);
   assert.equal(readyScale, 1);
   assert.equal(mossproutGroveEggCameraPinchTarget('companion.first_meeting', 2), null);
   const worldZooms = ['egg.opening', 'egg.context', 'egg.mind', 'egg.ready'].map((stepId) => {
@@ -1183,7 +1226,6 @@ test('the Grove Egg inherits the authored camera retreat across its three feeds'
   assert.equal(worldZooms.at(-1), MOSSPROUT_WORLD_EGG_REST_ZOOM);
   const worldRatios = [worldZooms[0]! / worldZooms[1]!, worldZooms[1]! / worldZooms[2]!, worldZooms[2]! / worldZooms[3]!];
   assert.ok(worldRatios.every((ratio) => Math.abs(ratio - worldRatios[0]!) < 1e-9));
-  assert.equal(mossproutWorldEggZoom('grove.egg_inspect'), MOSSPROUT_WORLD_EGG_CLOSE_ZOOM);
   assert.equal(mossproutWorldEggZoom('egg.ready'), MOSSPROUT_WORLD_EGG_REST_ZOOM);
   assert.match(camera, /options\?\.zoom == null[\s\S]*?Math\.min\(maxScale, Math\.max\(minScale, options\.zoom\)\)/);
   assert.doesNotMatch(camera, /Math\.max\(scale\.value, options\?\.zoom/);
