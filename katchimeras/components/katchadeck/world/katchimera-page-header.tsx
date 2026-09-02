@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type RefObject } from 'react';
+import { createContext, use, useEffect, useMemo, useState, type ReactNode, type RefObject } from 'react';
 import { StyleSheet, useWindowDimensions, View, type View as ViewType } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -20,6 +20,21 @@ import { useGameWallet } from '@/features/ui/game-wallet-provider';
 import { companionBondProgress, type CompanionBondProgress } from '@/utils/companion-bond';
 import { loadCompanionBondState, subscribeCompanionBondState } from '@/utils/companion-bond-storage';
 
+type KatchimeraPageHeaderChromeMode = 'standard' | 'hosted' | 'hidden';
+
+const KatchimeraPageHeaderChromeContext = createContext<KatchimeraPageHeaderChromeMode>('standard');
+
+export function KatchimeraPageHeaderChromeProvider({ children, mode }: {
+  children: ReactNode;
+  mode: KatchimeraPageHeaderChromeMode;
+}) {
+  return (
+    <KatchimeraPageHeaderChromeContext.Provider value={mode}>
+      {children}
+    </KatchimeraPageHeaderChromeContext.Provider>
+  );
+}
+
 export function KatchimeraPageHeader({
   bondProgress: suppliedBondProgress,
   creatureId,
@@ -39,6 +54,7 @@ export function KatchimeraPageHeader({
   navigationLocked?: boolean;
   onBack: () => void;
 }) {
+  const chromeMode = use(KatchimeraPageHeaderChromeContext);
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const compact = width < 360;
@@ -72,9 +88,10 @@ export function KatchimeraPageHeader({
     opacity: medallionGlow.value,
     transform: [{ scale: 0.82 + medallionGlow.value * 0.48 }],
   }));
+  if (chromeMode === 'hidden' || (chromeMode === 'hosted' && !bondProgress)) return null;
   return (
     <View style={[styles.root, includeSafeArea && { minHeight: insets.top + 58 }]}>
-      <View style={styles.backSlot}><KatchimeraBackButton compact={compact} disabled={navigationLocked} onPress={onBack} /></View>
+      {chromeMode === 'standard' ? <View style={styles.backSlot}><KatchimeraBackButton compact={compact} disabled={navigationLocked} onPress={onBack} /></View> : null}
       {bondProgress ? (
         <View
           ref={bondTargetRef}
@@ -104,13 +121,13 @@ export function KatchimeraPageHeader({
           </View>
         </View>
       ) : null}
-      <View style={styles.currencySlot}>
+      {chromeMode === 'standard' ? <View style={styles.currencySlot}>
         <GameCurrencyHud
           balances={[{ art: GAME_CURRENCY_ART.coins, id: 'coins', value: wallet.coins }]}
           style={styles.currencyHud}
           tone="glass"
         />
-      </View>
+      </View> : null}
     </View>
   );
 }

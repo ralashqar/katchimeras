@@ -430,35 +430,42 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
       },
     });
   }, [ftueRun, router, transitionTo]);
-  const continueFirstBloomToResident = useCallback(async () => {
-    const now = Date.now();
-    ensureMossproutFtueFirstResident();
-    relationshipProgressionRepository.update((current) => {
-      let journey = [...current.journeyDays].reverse().find((candidate) => candidate.familyId === 'mossprout') ?? null;
-      let next = current;
-      if (!journey) {
-        const dayId = localDayId(new Date(now));
-        const started = startMossproutJourneyDay(current, dayId, now, 0, true);
-        next = recordMossproutFirstGardenRestored(started.state, dayId, 'ftue:first-bloom-recovery', now);
-        next = completeMossproutJourneyResolution(next, dayId, now);
-        journey = [...next.journeyDays].reverse().find((candidate) => candidate.familyId === 'mossprout') ?? null;
-      }
-      return journey ? recordMossproutMatchedCard(next, journey.dayId, MOSSPROUT_FTUE_FIRST_RESIDENT_ID) : next;
-    });
-    const result = await advanceFtueActionDurably({
-      expectedStepId: 'haven.first_bloom',
-      actionId: 'haven.continue_to_resident',
-      evidenceRef: 'haven:first-bloom-seen',
-    });
-    if (result.run?.stepId !== 'companion.resident_parcel_ready') return;
+  const continueFirstBloomToResident = useCallback(() => {
     markFlowStart('katchimera-companion');
     transitionTo({
       announcement: 'Returning to Mossprout',
-      target: 'companion',
-      navigate: () => router.push({
-        pathname: '/katchimera/[creatureId]',
-        params: { creatureId: 'companion:mossprout', ftue: '1' },
-      }),
+      // Mossprout dialogue is hosted by the world map. Waiting for the
+      // retired companion route here leaves the universal curtain with no
+      // matching readiness reporter.
+      target: 'katchimeras',
+      navigate: async () => {
+        const now = Date.now();
+        ensureMossproutFtueFirstResident();
+        relationshipProgressionRepository.update((current) => {
+          let journey = [...current.journeyDays].reverse().find((candidate) => candidate.familyId === 'mossprout') ?? null;
+          let next = current;
+          if (!journey) {
+            const dayId = localDayId(new Date(now));
+            const started = startMossproutJourneyDay(current, dayId, now, 0, true);
+            next = recordMossproutFirstGardenRestored(started.state, dayId, 'ftue:first-bloom-recovery', now);
+            next = completeMossproutJourneyResolution(next, dayId, now);
+            journey = [...next.journeyDays].reverse().find((candidate) => candidate.familyId === 'mossprout') ?? null;
+          }
+          return journey ? recordMossproutMatchedCard(next, journey.dayId, MOSSPROUT_FTUE_FIRST_RESIDENT_ID) : next;
+        });
+        const result = await advanceFtueActionDurably({
+          expectedStepId: 'haven.first_bloom',
+          actionId: 'haven.continue_to_resident',
+          evidenceRef: 'haven:first-bloom-seen',
+        });
+        if (result.run?.stepId !== 'companion.resident_parcel_ready') {
+          throw new Error('Mossprout did not accept the first resident handoff');
+        }
+        router.setParams({
+          interactionFtue: '1',
+          mossproutInteraction: '1',
+        });
+      },
     });
   }, [router, transitionTo]);
   return discovery.ready && presentationMergeWorld ? (

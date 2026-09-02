@@ -9,5 +9,6 @@ export type WorldFtueSubjectPresentation = {
   hatchPresentation: TodayHatchPresentation | null;
   onHatchAssetsError: () => void;
   onHatchAssetsReady: () => void;
+  readyToHatch: boolean;
   rewardPulseKey: number;
 };

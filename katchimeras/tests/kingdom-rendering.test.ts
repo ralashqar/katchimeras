@@ -891,7 +891,7 @@ test('Haven hosts resident interaction over the world and routes its Garden shor
   assert.match(screen, /interactionEnabled=\{!interactionCreatureId/);
   assert.match(screen, /onHostedOpenMerge=\{interactionHasGarden \? openGarden : undefined\}/);
   assert.match(screen, /interactionCreatureIdRef\.current === creatureId/);
-  assert.match(screen, /cameraFallbackTimer = setTimeout/);
+  assert.match(screen, /cameraFallbackTimer = ftueStepId \? null : setTimeout/);
   assert.doesNotMatch(canvas, /handledMergeBoardRequestRef|setActiveMergeBoardId/);
   assert.match(route, /onHostedClose/);
   assert.match(route, /onHostedOpenMerge/);

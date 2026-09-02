@@ -300,7 +300,7 @@ test('the Katchimeras tab renders the hex selector first while companion Back re
   assert.match(kingdomScreen, /<KingdomHexCanvas[\s\S]*?onSelectResident=\{selectResident\}/);
   assert.match(kingdomScreen, /interactionRequest[\s\S]*?setInteractionCreatureId\(interactionRequest\.creatureId\)/);
   assert.match(kingdomScreen, /cameraMaximumScale=\{ftueEggFeedingCloseupActive[\s\S]*?MOSSPROUT_WORLD_EGG_CLOSE_ZOOM[\s\S]*?MOSSPROUT_WORLD_EGG_REST_ZOOM/);
-  assert.match(kingdomCanvas, /animated=\{interactionResidentId === tile\.companion\.creature\.creatureId\}/);
+  assert.match(kingdomCanvas, /animated=\{stableWorldPresentation \|\| interactionResidentId === tile\.companion\.creature\.creatureId\}/);
   assert.match(kingdomCanvas, /<CreatureAnimatedArt[\s\S]*?visualKey=\{creature\.visualKey\}/);
   assert.match(kingdomScreen, /<HavenTileHudLayer[\s\S]*?onOpen=\{openHavenDetail\}/);
   assert.match(kingdomScreen, /setGardenButtonNode = useCallback[\s\S]*?ref=\{setGardenButtonNode\}/);
@@ -316,8 +316,8 @@ test('the Katchimeras tab renders the hex selector first while companion Back re
   assert.match(rosterRoute, /<HavenSelectorPresentation[\s\S]*?onOpenProfile=\{openProfile\}/);
   assert.match(rosterRoute, /style=\{\(\{ pressed \}\) => \[styles\.selectorProfileButton/);
   assert.match(rosterRoute, /selectorProfileButton: \{[\s\S]*?borderRadius: 25[\s\S]*?overflow: 'hidden'/);
-  assert.match(ftueScript, /id: 'world\.egg_intro'[\s\S]*?characterId: 'mossprout'[\s\S]*?zoom: MOSSPROUT_WORLD_EGG_REST_ZOOM/);
-  assert.match(kingdomScreen, /'world\.egg_intro': 2_450[\s\S]*?onFtueInspectRef\.current\?\.\(\)/);
+  assert.match(ftueScript, /id: 'world\.egg_intro'[\s\S]*?characterId: 'mossprout'[\s\S]*?zoom: MOSSPROUT_WORLD_EGG_CLOSE_ZOOM[\s\S]*?durationMs: 3_900/);
+  assert.match(kingdomScreen, /'world\.egg_intro': 4_100[\s\S]*?onFtueInspectRef\.current\?\.\(\)/);
   assert.match(kingdomCanvas, /candidate\.companion\?\.familyId === targetCharacterId/);
   assert.match(youRoute, /accessibilityLabel="Back to Haven"[\s\S]*?router\.replace\('\/\(tabs\)\/katchimeras'\)/);
   assert.match(companionRoute, /onCloseCompanion=\{\(\) =>[\s\S]*?: router\.back\(\)\}/);

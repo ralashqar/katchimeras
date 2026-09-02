@@ -92,6 +92,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const { state, loading, error } = useMergeWorldState();
   const { dispatch: send, flush: flushMergeWorld } = useMergeWorldActions();
   const ftueRun = useFtueRun();
+  const ftueActive = ftueRun?.status === 'active';
   const ftueNavigationLocked = useFtueNavigationLock(ftueRun, 'merge', active);
   const scriptedFtueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
   const ftueStep = useMemo(() => mergeFtueStepForBoard(state, scriptedFtueStep), [scriptedFtueStep, state]);
@@ -115,7 +116,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     if (!creatureId) return;
     transitionTo({
       announcement: 'Returning to Mossprout',
-      target: 'companion',
+      target: creatureId === 'companion:mossprout' ? 'katchimeras' : 'companion',
       navigate: () => {
         pauseResidentMerge();
         // `navigate` reuses the companion route already beneath Merge,
@@ -820,17 +821,17 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
           density="compact"
           leading={<KatchimeraBackButton
             accessibilityLabel={source === 'haven-world' ? "Return to Mossprout's Haven" : creatureId ? 'Return to Mossprout' : 'Open legacy games'}
-            disabled={ftueNavigationLocked && !residentFtueActive}
+            disabled={ftueActive}
             onPress={() => residentFtueActive && creatureId
               ? returnToResidentStory()
               : ftueNavigationLocked || ftueExclusive
                 ? handleBlockedFtueInteraction()
                 : returnFromGarden()}
-            style={ftueNavigationLocked && !residentFtueActive ? styles.hiddenBackButton : undefined}
           />}
           style={styles.hudBar}
           tone="glass"
-          trailing={<GameCurrencyHud balances={[
+          trailing={<View>
+            <GameCurrencyHud balances={[
               {
                 animateValue: presentedCoins != null,
                 art: GAME_CURRENCY_ART.coins,
@@ -840,7 +841,8 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
                 value: presentedCoins ?? state.coins,
                 valueAnimationDurationMs: coinValueAnimationDurationMs,
               },
-            ]} style={styles.currencyHud} tone="glass" />}
+            ]} style={styles.currencyHud} tone="glass" />
+          </View>}
         />
         {/* Static game geometry: onboarding guidance must never be inserted in
             this flex column. Future guidance belongs in an absolute world-space
@@ -975,7 +977,10 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
             let handoffCommitted = false;
             const accepted = transitionTo({
               announcement: 'Returning to Mossprout',
-              target: 'companion',
+              // Mossprout's completed resident conversation lives inside the
+              // world-map host beneath Merge, not on the legacy companion
+              // route. Correlate the curtain with that mounted destination.
+              target: 'katchimeras',
               navigate: async () => {
                 if (!handoffCommitted) {
                   const result = dispatch({ type: 'ackResidentCardReveal', discoveryId: discovery.id, now: Date.now() });
@@ -1067,7 +1072,6 @@ const styles = StyleSheet.create({
   loading: { alignItems: 'center', backgroundColor: '#2B1B13', flex: 1, gap: 12, justifyContent: 'center' },
   currencyHud: { flex: 0, paddingLeft: 18, width: 106 },
   hudBar: { elevation: 100, justifyContent: 'space-between', position: 'relative', zIndex: 100 },
-  hiddenBackButton: { opacity: 0 },
   mergeArea: { flex: 1, marginTop: 18, minHeight: 0, position: 'relative' },
   errorBanner: { alignSelf: 'center', maxWidth: 360, position: 'absolute', width: '92%', zIndex: GameUI.layer.notice },
   memoryCardOverlay: { alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(250,241,207,0.97)', borderColor: 'rgba(127,96,38,0.32)', borderRadius: 24, borderWidth: 1, gap: 8, left: 24, maxWidth: 360, padding: 18, position: 'absolute', right: 24, zIndex: GameUI.layer.modal },

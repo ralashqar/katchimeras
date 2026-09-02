@@ -421,7 +421,9 @@ function roundedMultiCutoutSegments(
   radius: number,
   screen: { height: number; width: number },
 ): Frame[] {
-  const stepsPerCorner = 6;
+  // More samples keep multi-target holes visibly round at large phone-scale
+  // radii while retaining the lightweight native band renderer.
+  const stepsPerCorner = 12;
   const yStops = new Set<number>([0, screen.height]);
   frames.forEach((frame) => {
     const corner = Math.min(radius, frame.width / 2, frame.height / 2);
@@ -905,6 +907,7 @@ const styles = StyleSheet.create({
   eggGuideEmphasis: { fontWeight: '900' },
   multiCutoutSegment: { position: 'absolute' },
   nativeSpotlightRing: {
+    borderCurve: 'continuous',
     borderWidth: 2,
     position: 'absolute',
   },

@@ -83,6 +83,7 @@ export type FtueTarget =
   | { kind: 'active_resident_order_card' }
   | { kind: 'active_resident_order_serve' }
   | { kind: 'haven_tile'; characterId: string }
+  | { kind: 'haven_resident'; characterId: string }
   | { kind: 'haven_tile_hud'; characterId: string }
   | { kind: 'haven_upgrade_button'; characterId: string }
   | { kind: 'haven_garden_tile'; characterId: 'mossprout' }

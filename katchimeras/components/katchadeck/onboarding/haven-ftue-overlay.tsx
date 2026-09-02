@@ -74,21 +74,29 @@ export const HavenFtueOverlay = memo(function HavenFtueOverlay({
   if (!layout) return null;
   return (
     <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" pointerEvents="none" style={styles.overlay}>
-      <Spotlight focus={layout.focus} opacity={spotlight?.dimOpacity ?? 0.62} radius={spotlight?.radius ?? 16} />
+      <Spotlight focus={layout.focus} opacity={spotlight?.dimOpacity ?? 0.62} radius={spotlight?.radius ?? 16} screen={layout.screen} />
       {cue?.kind === 'tap' ? <Finger focus={layout.focus} resetKey={`${configKey}:${targetRevision}`} /> : null}
     </View>
   );
 });
 
-function Spotlight({ focus, opacity, radius }: { focus: Frame; opacity: number; radius: number }) {
-  const dim = { backgroundColor: `rgba(11,9,24,${opacity})`, position: 'absolute' as const };
+function Spotlight({ focus, opacity, radius, screen }: { focus: Frame; opacity: number; radius: number; screen: Frame }) {
+  const cornerRadius = Math.min(radius, focus.width / 2, focus.height / 2);
+  const spreadRadius = Math.max(1, Math.hypot(screen.width, screen.height));
   return (
     <View style={StyleSheet.absoluteFill}>
-      <View style={[dim, { height: focus.y, left: 0, right: 0, top: 0 }]} />
-      <View style={[dim, { bottom: 0, left: 0, right: 0, top: focus.y + focus.height }]} />
-      <View style={[dim, { height: focus.height, left: 0, top: focus.y, width: focus.x }]} />
-      <View style={[dim, { height: focus.height, left: focus.x + focus.width, right: 0, top: focus.y }]} />
-      <View style={[styles.ring, { borderRadius: radius, height: focus.height, left: focus.x, top: focus.y, width: focus.width }]} />
+      <View style={[
+        styles.dimMask,
+        {
+          borderRadius: cornerRadius,
+          boxShadow: `0 0 0 ${spreadRadius}px rgba(11,9,24,${opacity})`,
+          height: focus.height,
+          left: focus.x,
+          top: focus.y,
+          width: focus.width,
+        },
+      ]} />
+      <View style={[styles.ring, { borderRadius: cornerRadius, height: focus.height, left: focus.x, top: focus.y, width: focus.width }]} />
     </View>
   );
 }
@@ -133,9 +141,15 @@ function measure(view: View | null): Promise<Frame | null> {
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, zIndex: 80 },
+  overlay: { ...StyleSheet.absoluteFillObject, overflow: 'hidden', zIndex: 80 },
+  dimMask: {
+    backgroundColor: 'transparent',
+    borderCurve: 'continuous',
+    position: 'absolute',
+  },
   ring: {
     borderColor: 'rgba(214,255,190,0.96)',
+    borderCurve: 'continuous',
     borderWidth: 2,
     boxShadow: '0 0 18px rgba(154,239,112,0.9)',
     position: 'absolute',

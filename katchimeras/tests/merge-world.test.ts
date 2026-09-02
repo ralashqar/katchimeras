@@ -1414,7 +1414,7 @@ test('Merge HUD stays board-specific with only back navigation and Coins', () =>
   assert.match(screen, /router\.canGoBack\(\)\) router\.back\(\)/);
   assert.match(screen, /router\.replace\('\/\(tabs\)\/katchimeras'\)/);
   assert.match(screen, /Return to Mossprout's Haven/);
-  assert.match(screen, /trailing=\{<GameCurrencyHud/);
+  assert.match(screen, /trailing=\{<View>[\s\S]*?<GameCurrencyHud/);
   assert.doesNotMatch(screen, /GameHudItem|worldChapter|chapterRatio/);
   assert.doesNotMatch(screen, /<GameHudControl/);
   assert.match(screen, /hudBar: \{ elevation: 100, justifyContent: 'space-between', position: 'relative', zIndex: 100 \}/);

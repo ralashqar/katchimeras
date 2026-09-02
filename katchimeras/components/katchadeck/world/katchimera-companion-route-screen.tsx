@@ -49,7 +49,7 @@ function isResidentFtueStep(stepId: string) {
     || stepId.startsWith('merge.resident_');
 }
 
-export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOrigin = false, ftueConversationDefinitionId, journeyReturnConversationDefinitionId, residentStoryResumeRequested = false, renderRegularStage = false, reuseUnderlyingStage = false, hostedInHaven = false, onHostedClose, onHostedOpenMerge, onVisibleCreatureRewardPulse }: {
+export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOrigin = false, ftueConversationDefinitionId, journeyReturnConversationDefinitionId, residentStoryResumeRequested = false, renderRegularStage = false, reuseUnderlyingStage = false, hostedInHaven = false, onHostedClose, onHostedFtueComplete, onHostedOpenMerge, onVisibleCreatureRewardPulse }: {
   creatureId: string;
   source?: 'merge-world';
   ftueRouteOrigin?: boolean;
@@ -60,6 +60,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   reuseUnderlyingStage?: boolean;
   hostedInHaven?: boolean;
   onHostedClose?: () => void;
+  onHostedFtueComplete?: () => void;
   onHostedOpenMerge?: (orderId?: string | null, familyId?: KatchimeraFamilyId) => void;
   onVisibleCreatureRewardPulse?: () => void;
 }) {
@@ -181,7 +182,11 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
           ftueHandoffRef.current = false;
           finishResidentMergeSession();
           await flushFtuePersistence();
-          router.dismissTo('/(tabs)/katchimeras');
+          // A hosted interaction is already on the correct world route. A
+          // dismiss here can remount that same route while its readiness
+          // report is in flight, leaving the curtain permanently covered.
+          if (hostedInHaven && onHostedFtueComplete) onHostedFtueComplete();
+          else router.dismissTo('/(tabs)/katchimeras');
         } catch (error) {
           ftueHandoffRef.current = false;
           throw error;
@@ -196,7 +201,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     // resolves. Keep it mounted until the opaque curtain owns every pixel.
     await sourceCovered;
     return true;
-  }, [router, transitionTo]);
+  }, [hostedInHaven, onHostedFtueComplete, router, transitionTo]);
   useEffect(() => {
     if (!isFocused || ftueRun?.status !== 'complete') return;
     const repairKey = `${ftueRun.runId}:${ftueRun.completedAt ?? 'complete'}`;
@@ -361,14 +366,14 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
         actionId: 'companion.open_garden',
         evidenceRef: 'mossprout-order-preview',
       });
-      if (result.run?.stepId !== 'world.garden_handoff') {
+      if (result.run?.stepId !== 'world.garden_arrival') {
         throw new Error('Mossprout world did not accept the Garden handoff');
       }
       await flushFtuePersistence();
     } catch (error) {
       ftueHandoffRef.current = false;
       console.warn('Could not prepare Mossprout Garden handoff', error);
-      throw error;
+      return;
     }
     ftueHandoffRef.current = false;
   }, []);

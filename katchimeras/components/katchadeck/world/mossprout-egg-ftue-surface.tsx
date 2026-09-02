@@ -210,6 +210,9 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
       hatchPresentation: isHatching ? hatchPresentation : null,
       onHatchAssetsError: handleHatchSubjectError,
       onHatchAssetsReady: handleHatchSubjectReady,
+      // Match the original Egg hero: its readiness rays and reminder pulse
+      // yield to the dedicated crack/reveal effects as soon as Hatch begins.
+      readyToHatch: growth.isReady && !isHatching,
       rewardPulseKey,
     } : null
   ), [

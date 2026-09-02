@@ -33,6 +33,14 @@ type CameraRenderState = {
 type UseKingdomHexCameraArgs = {
   center: { x: number; y: number };
   centerId?: string;
+  initialFocus?: {
+    durationMs?: number;
+    initialScale?: number;
+    scale: number;
+    screenY: number;
+    x: number;
+    y: number;
+  } | null;
   initialSnapshot?: KingdomCameraSnapshot | null;
   interactionEnabled?: boolean;
   initialFitWorld?: boolean;
@@ -67,6 +75,7 @@ function workletClamp(value: number, bounds: [number, number]): number {
 export function useKingdomHexCamera({
   center,
   centerId,
+  initialFocus = null,
   initialSnapshot = null,
   interactionEnabled = true,
   initialFitWorld = false,
@@ -212,13 +221,23 @@ export function useKingdomHexCamera({
     if (!viewport.width || !viewport.height || !scene.width || !scene.height) return;
 
     if (!initializedRef.current) {
-      const initialScale = initialSnapshot
-        ? clampHavenCameraScale(initialSnapshot.scale, minScale, maxScale)
+      const initialScale = initialFocus
+        ? clampHavenCameraScale(initialFocus.initialScale ?? initialFocus.scale, minScale, maxScale)
+        : initialSnapshot
+          ? clampHavenCameraScale(initialSnapshot.scale, minScale, maxScale)
         : initialFitWorld
           ? Math.max(minScale, Math.min(baseScale * 0.78, viewport.width / scene.width, viewport.height / scene.height))
           : baseScale;
-      const home = initialSnapshot
-        ? { ...clampCameraTranslation(initialSnapshot, viewport, scene, initialScale), scale: initialScale }
+      const home = initialFocus
+        ? kingdomCameraSnapshotForTarget(
+            viewport,
+            scene,
+            { x: initialFocus.x, y: initialFocus.y },
+            initialScale,
+            { x: viewport.width / 2, y: initialFocus.screenY },
+          )
+        : initialSnapshot
+          ? { ...clampCameraTranslation(initialSnapshot, viewport, scene, initialScale), scale: initialScale }
         : kingdomCameraSnapshotForTarget(
             viewport,
             scene,
@@ -232,8 +251,25 @@ export function useKingdomHexCamera({
       pinchStartScale.value = home.scale;
       initializedRef.current = true;
       previousSceneRef.current = scene;
-      commitSnapshot(home.tx, home.ty, home.scale, false);
+      const startsWithMotion = Boolean(
+        initialFocus?.initialScale != null
+        && initialFocus.durationMs
+        && Math.abs(initialScale - initialFocus.scale) >= 0.001
+      );
+      commitSnapshot(home.tx, home.ty, home.scale, startsWithMotion);
       setReady(true);
+      if (startsWithMotion && initialFocus) {
+        // Start the authored opening move in the same layout commit that
+        // establishes the first camera frame. Waiting for a second React
+        // effect allowed a visible static pause before the FTUE zoom began.
+        animateTo(
+          initialFocus.x,
+          initialFocus.y,
+          initialFocus.scale,
+          initialFocus.screenY,
+          initialFocus.durationMs!,
+        );
+      }
       return;
     }
 
@@ -252,7 +288,7 @@ export function useKingdomHexCamera({
     ty.value = clamped.ty;
     scale.value = nextScale;
     commitSnapshot(clamped.tx, clamped.ty, nextScale, false);
-  }, [baseScale, centerX, centerY, commitSnapshot, initialFitWorld, initialSnapshot, maxScale, minScale, pinchStartScale, scale, scene, tx, ty, viewport]);
+  }, [animateTo, baseScale, centerX, centerY, commitSnapshot, initialFitWorld, initialFocus, initialSnapshot, maxScale, minScale, pinchStartScale, scale, scene, tx, ty, viewport]);
 
   const pan = useMemo(
     () =>

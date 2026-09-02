@@ -1,9 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View, useWindowDimensions, type View as ViewType } from 'react-native';
+import { ActivityIndicator, BackHandler, Pressable, StyleSheet, View, useWindowDimensions, type View as ViewType } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import Animated, {
+  Easing,
+  FadeIn,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
 
 import {
   KingdomHexCanvas,
@@ -39,6 +48,7 @@ import { deriveHavenTilePresentation } from '@/utils/haven-tile-presentation';
 import { commitFtueAction } from '@/features/onboarding/ftue-runtime';
 import {
   MOSSPROUT_WORLD_EGG_CLOSE_ZOOM,
+  MOSSPROUT_WORLD_EGG_ENTRY_ZOOM,
   MOSSPROUT_WORLD_EGG_REST_ZOOM,
   mossproutFtueStep,
 } from '@/features/onboarding/mossprout-ftue-script';
@@ -74,6 +84,24 @@ type Props = {
 
 const GARDEN_BUTTON_ART = require('../../../assets/images/katchimeras/world/square/mossprout-garden-button-v1-256.webp');
 
+function FtueOpeningFade() {
+  const reduceMotion = useReducedMotion();
+  const opacity = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+  useEffect(() => {
+    opacity.value = withDelay(
+      reduceMotion ? 0 : 120,
+      withTiming(0, {
+        duration: reduceMotion ? 140 : 1_350,
+        easing: Easing.out(Easing.cubic),
+      }),
+    );
+  }, [opacity, reduceMotion]);
+
+  return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.openingFade, animatedStyle]} />;
+}
+
 export function KatchimeraKingdomScreen({
   background,
   companionSlots,
@@ -97,10 +125,13 @@ export function KatchimeraKingdomScreen({
   const { transitionTo } = useGameScreenTransition();
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
+  const reduceMotion = useReducedMotion();
   const [lockedHintVisible, setLockedHintVisible] = useState(false);
   const [selectedCreatureId, setSelectedCreatureId] = useState<string | null>(null);
   const [interactionCreatureId, setInteractionCreatureId] = useState<string | null>(null);
   const [interactionCameraReady, setInteractionCameraReady] = useState(false);
+  const [interactionExiting, setInteractionExiting] = useState(false);
+  const [interactionExitNonce, setInteractionExitNonce] = useState(0);
   const [interactionLoadingVisible, setInteractionLoadingVisible] = useState(false);
   const [hostedInteractionRequest, setHostedInteractionRequest] = useState<MossproutWorldInteractionRequest | null>(null);
   const [interactionRewardPulseKey, setInteractionRewardPulseKey] = useState(0);
@@ -168,9 +199,14 @@ export function KatchimeraKingdomScreen({
   )), [interactionCreatureId, visibleCompanionSlots]);
   const interactionHasGarden = interactionSlot?.familyId === 'mossprout';
   const tutorialCamera = ftueStep?.camera ?? null;
+  const initialFtueCameraScale = ftueStepId === 'world.egg_intro'
+    ? MOSSPROUT_WORLD_EGG_ENTRY_ZOOM
+    : tutorialCamera?.kind === 'focus_target' && tutorialCamera.target.kind === 'haven_resident'
+      ? tutorialCamera.zoom ?? MOSSPROUT_WORLD_EGG_REST_ZOOM
+      : undefined;
   useEffect(() => {
     const delays: Partial<Record<string, number>> = {
-      'world.egg_intro': 2_450,
+      'world.egg_intro': 4_100,
       'grove.egg_inspect': 1_650,
       'world.garden_arrival': 2_150,
     };
@@ -186,14 +222,14 @@ export function KatchimeraKingdomScreen({
     setInteractionLoadingVisible(false);
     if (!interactionCreatureId || interactionCameraReady) return;
     const loadingTimer = setTimeout(() => setInteractionLoadingVisible(true), 120);
-    const cameraFallbackTimer = setTimeout(() => {
+    const cameraFallbackTimer = ftueStepId ? null : setTimeout(() => {
       if (interactionCreatureIdRef.current === interactionCreatureId) setInteractionCameraReady(true);
     }, 900);
     return () => {
       clearTimeout(loadingTimer);
-      clearTimeout(cameraFallbackTimer);
+      if (cameraFallbackTimer) clearTimeout(cameraFallbackTimer);
     };
-  }, [interactionCameraReady, interactionCreatureId]);
+  }, [ftueStepId, interactionCameraReady, interactionCreatureId]);
   const advanceOpening = useCallback(() => {
     onFtueInspect?.();
   }, [onFtueInspect]);
@@ -260,7 +296,10 @@ export function KatchimeraKingdomScreen({
     || ftueStepId.startsWith('companion.')
   ));
   const ftueEggFeedingCloseupActive = ftueStepId === 'grove.egg_inspect'
+    || ftueStepId === 'world.egg_intro'
     || Boolean(ftueStepId?.startsWith('egg.'));
+  const gardenWorldGuidanceActive = ftueStepId === 'world.garden_arrival'
+    || ftueStepId === 'world.garden_handoff';
   const measureRestoreOrigin = useCallback(() => new Promise<{ x: number; y: number }>((resolve) => {
     const fallback = { x: window.width / 2, y: window.height - Math.max(90, insets.bottom + 66) };
     const node = restoreButtonRef.current;
@@ -417,6 +456,7 @@ export function KatchimeraKingdomScreen({
     setDetailCreatureId(null);
     setHostedInteractionRequest(null);
     setInteractionCameraReady(false);
+    setInteractionExiting(false);
     setInteractionCreatureId(creatureId);
   }, [ftueStepId, havenPresentations]);
 
@@ -436,6 +476,7 @@ export function KatchimeraKingdomScreen({
     setDetailCreatureId(null);
     setHostedInteractionRequest(interactionRequest);
     setInteractionCameraReady(false);
+    setInteractionExiting(false);
     setInteractionCreatureId(interactionRequest.creatureId);
     onInteractionRequestConsumed?.();
   }, [ftueStepId, interactionRequest, onInteractionRequestConsumed, visibleCompanionSlots]);
@@ -446,10 +487,25 @@ export function KatchimeraKingdomScreen({
 
   const closeResidentInteraction = useCallback(() => {
     setInteractionCameraReady(false);
+    setInteractionExiting(false);
     setInteractionLoadingVisible(false);
     setHostedInteractionRequest(null);
     setInteractionCreatureId(null);
   }, []);
+  const requestResidentInteractionExit = useCallback(() => {
+    if (!interactionCreatureIdRef.current || ftueStepId) return;
+    setInteractionCameraReady(false);
+    setInteractionExiting(true);
+    setInteractionExitNonce((current) => current + 1);
+  }, [ftueStepId]);
+  useEffect(() => {
+    if (!interactionCreatureId || ftueStepId) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      requestResidentInteractionExit();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [ftueStepId, interactionCreatureId, requestResidentInteractionExit]);
   const pulseVisibleResident = useCallback(() => {
     setInteractionRewardPulseKey((current) => current + 1);
   }, []);
@@ -489,13 +545,16 @@ export function KatchimeraKingdomScreen({
         discoveryRevealFamilyId={null}
         highlightedLockedFamilyId={null}
         interactionEnabled={!interactionCreatureId && (havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven')}
+        interactionExitNonce={interactionExitNonce}
         interactionResidentId={interactionCreatureId}
         interactionRewardPulseKey={interactionRewardPulseKey}
         gardenOrders={gardenOrderEntries}
         gardenOrdersInteractive={ftueStepId !== 'world.garden_handoff'}
+        initialTutorialCameraScale={initialFtueCameraScale}
         initialCameraSnapshot={initialCameraSnapshot}
         mossproutNatureIslandLevels={mergeWorld.haven.mossproutNatureIslands}
         onCameraSnapshotChange={onCameraSnapshotChange}
+        onInteractionExitFocusComplete={closeResidentInteraction}
         onOpenGarden={openGarden}
         onSelectHome={() => {}}
         onSelectLocked={(familyId) => {
@@ -536,15 +595,15 @@ export function KatchimeraKingdomScreen({
           width={window.width}
         />
       ) : null}
-      {!upgradePresentation && !interactionCreatureId ? (
-        <View pointerEvents="box-none" style={[styles.topHudLayer, { top: insets.top + 3 }]}>
+      {!upgradePresentation && !ftueStepId ? (
+        <Animated.View entering={FadeIn.duration(reduceMotion ? 100 : 360)} pointerEvents="box-none" style={[styles.topHudLayer, { top: insets.top + 3 }]}>
           <GameHudBar
             leading={<KatchimeraBackButton
-              accessibilityHint="Returns to the Katchimera world map"
-              accessibilityLabel="All Havens"
+              accessibilityHint={interactionCreatureId ? "Returns to this Katchimera's world" : 'Returns to the Katchimera world map'}
+              accessibilityLabel={interactionCreatureId ? 'Exit interaction' : 'All Havens'}
               compact
-              disabled={navigationLocked}
-              onPress={onBackToHavenSelector}
+              disabled={interactionExiting || (!interactionCreatureId && navigationLocked)}
+              onPress={interactionCreatureId ? requestResidentInteractionExit : onBackToHavenSelector}
             />}
             content={<GameCurrencyHud balances={[{
               art: GAME_CURRENCY_ART.coins,
@@ -555,7 +614,7 @@ export function KatchimeraKingdomScreen({
             style={styles.topHud}
             tone="glass"
           />
-        </View>
+        </Animated.View>
       ) : null}
       {!upgradePresentation && !interactionCreatureId && havenMergeBoardActive && (!havenOpeningActive || ftueStepId === 'world.garden_handoff') ? (
         <Pressable
@@ -584,16 +643,17 @@ export function KatchimeraKingdomScreen({
       ) : null}
       {interactionCreatureId ? (
         <View
-          accessibilityElementsHidden={!interactionCameraReady}
-          importantForAccessibility={interactionCameraReady ? 'auto' : 'no-hide-descendants'}
-          pointerEvents={interactionCameraReady ? 'auto' : 'none'}
-          style={[styles.companionOverlay, !interactionCameraReady && styles.companionOverlayPreparing]}>
+          accessibilityElementsHidden={!interactionCameraReady || interactionExiting}
+          importantForAccessibility={interactionCameraReady && !interactionExiting ? 'auto' : 'no-hide-descendants'}
+          pointerEvents={interactionCameraReady && !interactionExiting ? 'auto' : 'none'}
+          style={[styles.companionOverlay, (!interactionCameraReady || interactionExiting) && styles.companionOverlayPreparing]}>
           <KatchimeraCompanionRouteScreen
             creatureId={interactionCreatureId}
             ftueConversationDefinitionId={hostedInteractionRequest?.ftueConversationDefinitionId}
             hostedInHaven
             journeyReturnConversationDefinitionId={hostedInteractionRequest?.journeyReturnConversationDefinitionId}
-            onHostedClose={closeResidentInteraction}
+            onHostedClose={requestResidentInteractionExit}
+            onHostedFtueComplete={closeResidentInteraction}
             onHostedOpenMerge={interactionHasGarden ? openGarden : undefined}
             onVisibleCreatureRewardPulse={pulseVisibleResident}
             residentStoryResumeRequested={hostedInteractionRequest?.residentStoryResumeRequested}
@@ -602,7 +662,7 @@ export function KatchimeraKingdomScreen({
           />
         </View>
       ) : null}
-      {interactionCreatureId && !interactionCameraReady && interactionLoadingVisible ? (
+      {interactionCreatureId && !interactionCameraReady && !interactionExiting && interactionLoadingVisible ? (
         <View accessibilityLabel="Preparing Katchimera interaction" accessibilityLiveRegion="polite" pointerEvents="none" style={styles.interactionLoading}>
           <ActivityIndicator color="#FFF4C7" size="small" />
         </View>
@@ -637,7 +697,14 @@ export function KatchimeraKingdomScreen({
         />
       ) : null}
       {havenOpeningActive && ftueStep ? (
-        <View pointerEvents="box-none" style={[styles.discoveryCalloutLayer, { bottom: Math.max(insets.bottom, 12) + 12 }]}>
+        <View
+          pointerEvents="box-none"
+          style={[
+            styles.discoveryCalloutLayer,
+            gardenWorldGuidanceActive
+              ? { top: insets.top + 18 }
+              : { bottom: Math.max(insets.bottom, 12) + 12 },
+          ]}>
           <View pointerEvents="none" style={styles.discoveryCallout}>
             <FtueGuideCopy guide={ftueStep.guide} hero />
           </View>
@@ -711,12 +778,16 @@ export function KatchimeraKingdomScreen({
           targetRevision={ftueTargetRevision}
         />
       ) : null}
+      {ftueStepId === 'world.egg_intro' ? (
+        <FtueOpeningFade />
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: '#55A9E2', flex: 1 },
+  openingFade: { backgroundColor: '#203447', zIndex: 100 },
   companionOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 45 },
   companionOverlayPreparing: { opacity: 0 },
   interactionLoading: {
@@ -738,7 +809,7 @@ const styles = StyleSheet.create({
     left: 12,
     position: 'absolute',
     right: 12,
-    zIndex: 30,
+    zIndex: 50,
   },
   topHud: { maxWidth: 430, width: '100%' },
   currencyHud: { flex: 1 },

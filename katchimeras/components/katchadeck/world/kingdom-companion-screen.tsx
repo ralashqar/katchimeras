@@ -71,6 +71,7 @@ import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability
 import { withDiscoveredKatchimeras } from '@/utils/discovered-katchimera-availability';
 import { mossproutJourneyDayNumberForCompletionEvent } from '@/game/katchimeras/mossprout-journey-handoff';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
+import { KatchimeraPageHeaderChromeProvider } from '@/components/katchadeck/world/katchimera-page-header';
 
 type QuestJournalReviewContext = {
   initialFlowId: string;
@@ -603,7 +604,12 @@ export function KingdomCompanionScreen({
     }
   };
 
+  // World-hosted interactions always retain the relationship context. The world
+  // owns navigation and currency chrome, while this header contributes Bond only.
+  const pageHeaderChromeMode = reuseUnderlyingStage ? 'hosted' : 'standard';
+
   return (
+    <KatchimeraPageHeaderChromeProvider mode={pageHeaderChromeMode}>
     <GestureHandlerRootView style={[styles.screen, reuseUnderlyingStage && styles.transparentScreen]}>
       {presentation === 'roster' || presentation === 'world' ? (
         <KatchimeraRosterScreen
@@ -1211,6 +1217,7 @@ export function KingdomCompanionScreen({
         tone="warning"
       />
     </GestureHandlerRootView>
+    </KatchimeraPageHeaderChromeProvider>
   );
 }
 
