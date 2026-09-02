@@ -897,6 +897,7 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.match(kingdomCamera, /startsWithMotion[\s\S]*?commitSnapshot\(home\.tx, home\.ty, home\.scale, startsWithMotion\)[\s\S]*?animateTo\([\s\S]*?initialFocus\.scale[\s\S]*?initialFocus\.durationMs/);
   assert.match(kingdomScreen, /'world\.egg_intro': 4_100/);
   assert.doesNotMatch(kingdomScreen, /'grove\.egg_inspect': 1_650/);
+  assert.match(mossproutOpening, /scriptedActions = stepId === 'world\.egg_intro'[\s\S]*?\? \[\][\s\S]*?: step\?\.actions\.filter/);
   assert.match(kingdomScreen, /ftueEggFeedingCloseupActive = ftueStepId === 'world\.egg_intro'[\s\S]*?Boolean\(ftueStepId\?\.startsWith\('egg\.'\)\)/);
   assert.match(kingdomScreen, /gardenWorldGuidanceActive[\s\S]*?top: insets\.top \+ 18/);
   assert.match(kingdomScreen, /function FtueOpeningFade\(\)[\s\S]*?opacity\.value = withDelay\([\s\S]*?duration: reduceMotion \? 140 : 1_350/);
@@ -1350,7 +1351,7 @@ test('later FTUE choice beats specialize the same inline check-in panel lifecycl
   const home = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
   assert.match(home, /function InlineScriptedChoice/);
   assert.match(home, /function InlineScriptedChoice[\s\S]*?<InlineCheckInPanel[\s\S]*?illustratedChoices/);
-  assert.match(home, /illustratedChoices \? styles\.illustratedChoiceGrid/);
+  assert.match(home, /illustratedChoices[\s\S]*?styles\.illustratedChoiceGrid/);
   assert.match(home, /function MeasuredIllustratedChoice/);
   assert.match(home, /getFtueChoiceArt\(option\)/);
   assert.match(home, /<FtueEnergyBadge amount=\{action\.growthReward\}/);
@@ -1363,11 +1364,14 @@ test('later FTUE choice beats specialize the same inline check-in panel lifecycl
   assert.match(home, /illustrated && !ftueQuestionLayout/);
   assert.match(home, /showGlint=\{!ftueQuestionLayout\}/);
   assert.match(home, /style=\{ftueQuestionLayout \? styles\.ftueQuestionReward : styles\.inlineReward\}/);
-  assert.match(home, /illustratedColumnCount = getFtueChoiceColumnCount\(choices\.length\)/);
   assert.match(home, /setIllustratedGridWidth\(\(current\) => current === measuredWidth \? current : measuredWidth\)/);
   assert.match(home, /setScriptedTextCompletion/);
   assert.match(home, /key=\{scriptedTextChoiceAction\.id\}/);
   assert.match(home, /scriptedRowActions = scriptedActions\.filter\(\(action\) => action\.presentation !== 'inline_choice' && action\.presentation !== 'route_action'\)/);
+  assert.match(home, /fullRowIllustratedChoices=\{action\.id\.startsWith\('egg\.'\)\}/);
+  assert.match(home, /illustratedColumnCount = fullRowIllustratedChoices \? 1 : getFtueChoiceColumnCount\(choices\.length\)/);
+  assert.match(home, /fullRowIllustratedChoiceGrid: \{ flexDirection: 'column', flexWrap: 'nowrap'/);
+  assert.match(home, /fullRowIllustratedChoice: \{ flexDirection: 'row'/);
 });
 
 test('sequential FTUE choice panels cannot consume the previous question completion', () => {

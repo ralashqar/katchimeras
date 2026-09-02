@@ -312,11 +312,16 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
     );
   }
 
-  const scriptedActions = step?.actions.filter((action) => (
-    action.presentation === 'inline_choice'
-    || action.presentation === 'cta_action'
-    || action.presentation === 'acknowledgement'
-  )) ?? [];
+  // The opening world message is a timed camera beat, not an interactive
+  // action. Its acknowledgement exists only so the FTUE runtime can commit the
+  // automatic handoff after the camera settles.
+  const scriptedActions = stepId === 'world.egg_intro'
+    ? []
+    : step?.actions.filter((action) => (
+      action.presentation === 'inline_choice'
+      || action.presentation === 'cta_action'
+      || action.presentation === 'acknowledgement'
+    )) ?? [];
 
   return (
     <TodayEnvironmentMotionProvider motion={environmentMotion}>

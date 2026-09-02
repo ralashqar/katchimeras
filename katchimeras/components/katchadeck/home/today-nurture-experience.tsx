@@ -1512,13 +1512,14 @@ function InlineSleep({ action, completionEvent, interactionLocked, onChoose, onF
   );
 }
 
-function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent, enterFromBottom = false, ftueQuestionLayout = false, illustratedChoices = false, interactionLocked, metric, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture, textChoices = false, wide = false }: {
+function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent, enterFromBottom = false, ftueQuestionLayout = false, fullRowIllustratedChoices = false, illustratedChoices = false, interactionLocked, metric, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture, textChoices = false, wide = false }: {
   action: RankedTodayCareAction;
   allowSkip?: boolean;
   choices: InlineChoice[];
   completionEvent: TodayCareCompletionEvent | null;
   enterFromBottom?: boolean;
   ftueQuestionLayout?: boolean;
+  fullRowIllustratedChoices?: boolean;
   illustratedChoices?: boolean;
   interactionLocked: boolean;
   metric?: InlineMetric;
@@ -1535,7 +1536,7 @@ function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent
   const [illustratedGridWidth, setIllustratedGridWidth] = useState(0);
   const illustratedFallbackWidth = Math.min(windowWidth - Meadow.space.page * 2, 980) - 28;
   const illustratedAvailableWidth = illustratedGridWidth || illustratedFallbackWidth;
-  const illustratedColumnCount = getFtueChoiceColumnCount(choices.length);
+  const illustratedColumnCount = fullRowIllustratedChoices ? 1 : getFtueChoiceColumnCount(choices.length);
   const illustratedTileWidth = Math.floor(
     (illustratedAvailableWidth - (illustratedColumnCount - 1) * 6) / illustratedColumnCount,
   );
@@ -1590,7 +1591,9 @@ function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent
               const measuredWidth = Math.floor(event.nativeEvent.layout.width);
               setIllustratedGridWidth((current) => current === measuredWidth ? current : measuredWidth);
             } : undefined}
-            style={illustratedChoices ? styles.illustratedChoiceGrid : textChoices ? styles.textChoiceGrid : wide ? styles.sleepGrid : styles.moodGrid}>
+            style={illustratedChoices
+              ? [styles.illustratedChoiceGrid, fullRowIllustratedChoices && styles.fullRowIllustratedChoiceGrid]
+              : textChoices ? styles.textChoiceGrid : wide ? styles.sleepGrid : styles.moodGrid}>
             {choices.map((choice) => illustratedChoices ? (
               <MeasuredIllustratedChoice
                 accent={choice.accent}
@@ -1620,6 +1623,7 @@ function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent
                 selected={ownedSelection?.id === choice.id}
                 showGlint={!ftueQuestionLayout}
                 surface={choice.surface ?? '#FFF7E8'}
+                fullRow={fullRowIllustratedChoices}
                 threeColumn={illustratedColumnCount === 3}
                 width={illustratedTileWidth}
               />
@@ -1770,10 +1774,11 @@ function FtueEnergyBadge({ amount, wide }: { amount: number; wide: boolean }) {
   );
 }
 
-function MeasuredIllustratedChoice({ accent, disabled, dimmed, icon, image, label, onPress, reduceMotion, selected, showGlint, surface, threeColumn, width }: {
+function MeasuredIllustratedChoice({ accent, disabled, dimmed, fullRow, icon, image, label, onPress, reduceMotion, selected, showGlint, surface, threeColumn, width }: {
   accent: string;
   disabled: boolean;
   dimmed: boolean;
+  fullRow: boolean;
   icon: IconSymbolName;
   image?: ImageSourcePropType | ImageRef;
   label: string;
@@ -1808,21 +1813,22 @@ function MeasuredIllustratedChoice({ accent, disabled, dimmed, icon, image, labe
       ref={tileRef}
       style={({ pressed }) => [
         styles.illustratedChoice,
+        fullRow && styles.fullRowIllustratedChoice,
         threeColumn && styles.illustratedChoiceThreeColumn,
         { backgroundColor: surface, borderColor: selected ? accent : `${accent}82`, width },
         selected && styles.illustratedChoiceSelected,
         dimmed && styles.choiceDimmed,
         pressed && styles.illustratedChoicePressed,
       ]}>
-      <View pointerEvents="none" style={[styles.illustratedChoiceHighlight, threeColumn && styles.illustratedChoiceHighlightThreeColumn]} />
-      <Animated.View style={[styles.illustratedChoiceArtFrame, threeColumn && styles.illustratedChoiceArtFrameThreeColumn, artStyle]}>
+      <View pointerEvents="none" style={[styles.illustratedChoiceHighlight, fullRow && styles.fullRowIllustratedChoiceHighlight, threeColumn && styles.illustratedChoiceHighlightThreeColumn]} />
+      <Animated.View style={[styles.illustratedChoiceArtFrame, fullRow && styles.fullRowIllustratedChoiceArtFrame, threeColumn && styles.illustratedChoiceArtFrameThreeColumn, artStyle]}>
         {image ? (
-          <Image contentFit="contain" source={image} style={[styles.illustratedChoiceArt, threeColumn && styles.illustratedChoiceArtThreeColumn]} transition={0} />
+          <Image contentFit="contain" source={image} style={[styles.illustratedChoiceArt, fullRow && styles.fullRowIllustratedChoiceArt, threeColumn && styles.illustratedChoiceArtThreeColumn]} transition={0} />
         ) : (
           <IconSymbol color={accent} name={icon} size={threeColumn ? 30 : 32} />
         )}
       </Animated.View>
-      <ThemedText numberOfLines={2} style={[styles.illustratedChoiceLabel, threeColumn && styles.illustratedChoiceLabelThreeColumn]} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+      <ThemedText numberOfLines={2} style={[styles.illustratedChoiceLabel, fullRow && styles.fullRowIllustratedChoiceLabel, threeColumn && styles.illustratedChoiceLabelThreeColumn]} lightColor={Meadow.ink} darkColor={Meadow.ink}>
         {label}
       </ThemedText>
       {showGlint ? (
@@ -2153,6 +2159,7 @@ function InlineScriptedChoice({ action, completionEvent, enterFromBottom = false
         completionEvent={completionEvent}
         enterFromBottom={enterFromBottom}
         ftueQuestionLayout
+        fullRowIllustratedChoices={action.id.startsWith('egg.')}
         illustratedChoices
         interactionLocked={interactionLocked}
         metric={metric}
@@ -2385,17 +2392,23 @@ const styles = StyleSheet.create({
   textChoice: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.48)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 5, minHeight: 34, paddingHorizontal: 12, paddingVertical: 5 },
   textChoiceLabel: KatchaDeckUI.typography.ftueChipLabel,
   illustratedChoiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, justifyContent: 'center' },
+  fullRowIllustratedChoiceGrid: { flexDirection: 'column', flexWrap: 'nowrap', gap: 6 },
   illustratedChoice: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1.25, boxShadow: '0 3px 8px rgba(86,66,34,0.13), inset 0 1px 0 rgba(255,255,255,0.82)', gap: 0, justifyContent: 'flex-end', minHeight: 70, overflow: 'hidden', paddingBottom: 4, paddingHorizontal: 4, paddingTop: 2, position: 'relative' },
+  fullRowIllustratedChoice: { flexDirection: 'row', gap: 10, justifyContent: 'flex-start', minHeight: 58, paddingHorizontal: 12, paddingVertical: 6 },
   illustratedChoiceThreeColumn: { minHeight: 66, paddingBottom: 3, paddingTop: 2 },
   illustratedChoiceSelected: { borderWidth: 2, boxShadow: '0 5px 13px rgba(86,66,34,0.20), inset 0 1px 0 rgba(255,255,255,0.9)' },
   illustratedChoicePressed: { opacity: 0.92, transform: [{ translateY: 1 }, { scale: 0.985 }] },
   illustratedChoiceHighlight: { backgroundColor: 'rgba(255,255,255,0.28)', borderRadius: 999, height: 27, left: 7, position: 'absolute', right: 7, top: 3 },
+  fullRowIllustratedChoiceHighlight: { bottom: 5, height: 'auto', left: 5, right: 5, top: 5 },
   illustratedChoiceHighlightThreeColumn: { height: 24, left: 5, right: 5, top: 2 },
   illustratedChoiceArtFrame: { alignItems: 'center', height: 39, justifyContent: 'center', width: '100%' },
+  fullRowIllustratedChoiceArtFrame: { flexShrink: 0, height: 44, width: 52 },
   illustratedChoiceArtFrameThreeColumn: { height: 36 },
   illustratedChoiceArt: { height: 40, width: 46 },
+  fullRowIllustratedChoiceArt: { height: 44, width: 50 },
   illustratedChoiceArtThreeColumn: { height: 37, width: 43 },
   illustratedChoiceLabel: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 10.5, letterSpacing: -0.15, lineHeight: 11.5, minHeight: 20, textAlign: 'center', textAlignVertical: 'center', width: '100%' },
+  fullRowIllustratedChoiceLabel: { flex: 1, fontSize: 15, letterSpacing: -0.2, lineHeight: 18, minHeight: 0, textAlign: 'left', width: 'auto' },
   illustratedChoiceLabelThreeColumn: { fontSize: 9.5, lineHeight: 10.5, minHeight: 19 },
   illustratedChoiceGlint: { alignItems: 'center', borderColor: 'rgba(255,255,255,0.74)', borderRadius: 999, borderWidth: 1, bottom: 3, height: 15, justifyContent: 'center', position: 'absolute', right: 3, width: 15 },
   moodChoiceCell: { flex: 1 },
