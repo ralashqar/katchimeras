@@ -1,4 +1,5 @@
 import type { HavenStage } from '@/constants/haven-catalog';
+import type { StoryWorldUpgradePresentationPayload } from '@/types/content-flow';
 import type { MergeCharacterId, MossproutNatureIslandId } from '@/types/merge-world';
 
 export type HavenUpgradePresentationStatus = 'armed' | 'playing';
@@ -29,9 +30,17 @@ export type HavenTileUpgradePresentation = {
   natureIslandId?: MossproutNatureIslandId;
   palette: HavenUpgradeEffectPalette;
   reactionLine: string;
+  /** Story camera operations can complete focus before the reveal begins. */
+  cameraAlreadyFocused?: boolean;
+  /** Some story upgrades are gifts, so their reveal should not imply payment. */
+  showCoins?: boolean;
   status: HavenUpgradePresentationStatus;
+  storyPresentationKey?: string;
   toStage: HavenStage;
   upgradeName: string;
+  /** World object that owns the reveal visuals; it can intentionally differ
+   * from the profile field committed by the upgrade. */
+  visualTarget?: StoryWorldUpgradePresentationPayload['target'];
 };
 
 export const HAVEN_UPGRADE_TIMING = {

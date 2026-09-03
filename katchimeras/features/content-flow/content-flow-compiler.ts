@@ -54,6 +54,14 @@ export function validateContentFlowDefinition(definition: ContentFlowDefinition)
       });
     }
     if (node.kind === 'presentation' && !node.replayPolicy) issues.push({ path: `nodes[${index}].replayPolicy`, message: 'Presentation replay policy must be explicit' });
+    if (node.kind === 'presentation' && node.presentationType === 'world.upgrade_reveal') {
+      const sourceNodeId = node.payload?.sourceEffectNodeId;
+      const sourceEffectId = node.payload?.sourceEffectId;
+      const source = typeof sourceNodeId === 'string' ? nodes.get(sourceNodeId) : null;
+      if (!source || source.kind !== 'effect' || source.effectType !== 'world.upgrade' || source.effectId !== sourceEffectId) {
+        issues.push({ path: `nodes[${index}].payload.sourceEffectNodeId`, message: 'Upgrade presentation must reference a world.upgrade effect node and effect id' });
+      }
+    }
     if (node.kind === 'route') {
       if (!isRegisteredStoryRoute(node.target)) issues.push({ path: `nodes[${index}].target`, message: `Route ${node.target.id} does not match the shared route registry` });
       if (node.surface !== node.target.surface) issues.push({ path: `nodes[${index}].surface`, message: 'Route node surface must match its target surface' });

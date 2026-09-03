@@ -1,6 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 import type { MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
+import type { StoryWorldUpgradeEffectPayload } from '@/types/content-flow';
 import type { HavenStage } from '@/constants/haven-catalog';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld, resetMergeActivityForDay } from '@/utils/merge-world/engine';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
@@ -245,6 +246,31 @@ export function upgradeStoredMossproutNatureIsland(
     (state) => reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId, level, now }),
     now,
   );
+}
+
+/** Exactly-once story upgrade. Retrying an effect key returns its original receipt. */
+export function upgradeStoredStoryWorldTarget(effectKey: string, payload: StoryWorldUpgradeEffectPayload, now = Date.now()) {
+  const economyMode = payload.economy.mode;
+  const grantedCoins = payload.economy.mode === 'grant' ? payload.economy.amount : 0;
+  return reduceStoredMergeWorld((state) => payload.target.kind === 'haven_tile'
+    ? reduceMergeWorld(state, {
+        type: 'upgradeHavenTile',
+        characterId: payload.target.familyId as import('@/types/merge-world').MergeCharacterId,
+        stage: payload.toLevel as HavenStage,
+        receiptId: effectKey,
+        economyMode,
+        grantedCoins,
+        now,
+      })
+    : reduceMergeWorld(state, {
+        type: 'upgradeMossproutNatureIsland',
+        islandId: payload.target.islandId as import('@/types/merge-world').MossproutNatureIslandId,
+        level: payload.toLevel as import('@/types/merge-world').MossproutNatureIslandLevel,
+        receiptId: effectKey,
+        economyMode,
+        grantedCoins,
+        now,
+      }), now);
 }
 
 export function revealStoredHaven(now = Date.now()) {

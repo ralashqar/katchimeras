@@ -350,7 +350,8 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
       || ftueRun.stepId.startsWith('egg.')
       || ftueRun.stepId === 'world.garden_arrival'
       || ftueRun.stepId === 'world.garden_handoff'
-      || ftueRun.stepId === 'world.complete'
+      || ftueRun.stepId === 'world.first_bloom_restore'
+      || ftueRun.stepId === 'companion.meditating'
     ) {
       setActiveWorldFamilyId('mossprout');
       publishWorldSession('mossprout');
@@ -446,8 +447,8 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
               commitFtueAction({ actionId: 'world.inspect_mossprout_egg', evidenceRef: 'mossprout-world:egg-intro-seen' });
             } else if (stepId === 'world.garden_arrival') {
               commitFtueAction({ actionId: 'world.acknowledge_garden', evidenceRef: 'mossprout-world:garden-arrival' });
-            } else if (stepId === 'world.complete') {
-              commitFtueAction({ actionId: 'world.finish', evidenceRef: 'mossprout-world:ftue-complete' });
+            } else if (stepId === 'companion.meditating') {
+              commitFtueAction({ actionId: 'companion.tend_garden', evidenceRef: 'mossprout-world:ftue-complete' });
               // A replayed terminal receipt is intentionally a no-op. Always
               // release FTUE ownership so interrupted prior presses cannot
               // leave Garden navigation locked after the ending disappears.

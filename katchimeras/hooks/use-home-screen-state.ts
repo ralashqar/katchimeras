@@ -70,7 +70,7 @@ import {
   type ActiveDayPrompt,
   type DayPromptPhotoCandidate,
 } from '@/utils/day-prompt-engine';
-import { earnedSeeds, selectDailySeeds, type DailySeed } from '@/utils/daily-seeds-engine';
+import { DAILY_SEEDS, earnedSeeds, selectDailySeeds, type DailySeed } from '@/utils/daily-seeds-engine';
 import { markPhotoProcessed } from '@/utils/processed-photos';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
@@ -322,7 +322,13 @@ export function useHomeScreenState({
   const dailySeeds = useMemo<(DailySeed & { earned: boolean })[]>(() => {
     if (todaySeedRecord.state === 'hatched') return [];
     const earnedIds = new Set(earnedSeeds(todaySeedRecord).map((seed) => seed.id));
-    return selectDailySeeds(todaySeedRecord).map((seed) => ({ ...seed, earned: earnedIds.has(seed.id) }));
+    const selected = selectDailySeeds(todaySeedRecord);
+    const waterTogetherAccepted = loadOnboardingProfile().mossproutAnswers.waterTogetherChoiceId === 'could_use_water';
+    const waterSeed = DAILY_SEEDS.find((seed) => seed.id === 'water');
+    const offered = waterTogetherAccepted && waterSeed && !earnedIds.has('water') && !selected.some((seed) => seed.id === 'water')
+      ? [waterSeed, ...selected].slice(0, 3)
+      : selected;
+    return offered.map((seed) => ({ ...seed, earned: earnedIds.has(seed.id) }));
   }, [todaySeedRecord]);
   const tomorrowDay = useMemo(
     () => deriveTomorrowDayRecord(viewModel.state, loadOnboardingProfile(), new Date()),

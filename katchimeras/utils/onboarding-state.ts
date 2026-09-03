@@ -4,6 +4,10 @@ import { resetEggAvatarSelection } from '@/utils/egg-avatar-storage';
 const ONBOARDING_STORAGE_KEY = 'katchadeck.onboarding-profile';
 
 export type MossproutOnboardingAnswers = {
+  dayTextureId?: string | null;
+  growthIntentId?: string | null;
+  waterTogetherChoiceId?: string | null;
+  firstSeedId?: string | null;
   attunementPlaceId?: string | null;
   currentFeelingId?: string | null;
   desiredMoreId?: string | null;
@@ -37,6 +41,10 @@ export const defaultOnboardingProfile: OnboardingProfile = {
   hatchHour: null,
   playerNickname: null,
   mossproutAnswers: {
+    dayTextureId: null,
+    growthIntentId: null,
+    waterTogetherChoiceId: null,
+    firstSeedId: null,
     attunementPlaceId: null,
     currentFeelingId: null,
     desiredMoreId: null,

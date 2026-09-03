@@ -301,6 +301,20 @@ export type KatchimeraStoryProgress = {
   updatedAt: number;
 };
 
+/** A durable period in which a companion is present but unavailable to act. */
+export type KatchimeraMeditationRecord = {
+  familyId: KatchimeraFamilyId;
+  startedAt: number;
+  availableAt: number;
+  reason: 'journey_rest';
+  /** Idempotency identity for story-owned rest transitions. */
+  sourceId?: string;
+};
+
+export type CompanionInteractionAvailability =
+  | { kind: 'available' }
+  | ({ kind: 'meditating' } & KatchimeraMeditationRecord);
+
 export type MossproutStoryFactKey =
   | 'garden_promise'
   | 'pond_approach'
@@ -324,4 +338,6 @@ export type RelationshipProgressState = {
   actionCompletions: ActionCompletionRecord[];
   actionPresentations: ActionPresentationRecord[];
   mossproutDailyActionDecks: MossproutDailyActionDeck[];
+  /** Optional for schema-7 save compatibility; normalization always supplies it. */
+  meditations?: KatchimeraMeditationRecord[];
 };

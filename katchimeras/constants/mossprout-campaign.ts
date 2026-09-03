@@ -36,7 +36,7 @@ export const MOSSPROUT_CAMPAIGN_EPISODES: readonly MossproutCampaignEpisode[] = 
   episode(2, 2, 'quiet-patch:pond-knock', 'mossprout:chapter:quiet-patch', 'The Pond Knocked Twice', 'mossprout:objective:pond-knock', [
     order('merge-story:mossprout:quiet-patch:listening-place', 'A Listening Place', 'Make a little waterside perch so we can listen without trampling the clues.', [['nature:waterside:2', 1]], 20),
     order('merge-story:mossprout:quiet-patch:path-for-water', 'A Path for Water', 'Give the hidden trickle a garden path back to the pond.', [['nature:garden:2', 1], ['nature:waterside:1', 1]], 25),
-  ], 'matched', null, 'playful'),
+  ], 'petalimp', null, 'playful'),
   episode(3, 8, 'returning-pond:place-for-rain', 'mossprout:chapter:dry-pond', 'A Place for Rain', 'mossprout:objective:place-for-rain', [
     order('merge-story:mossprout:dry-pond:rain-catcher', 'A Rain Catcher', 'Make somewhere for the first drops to land.', [['nature:waterside:2', 1]], 20),
     order('merge-story:mossprout:dry-pond:first-puddle', 'The First Puddle', 'Join water and green growth so the rain has a reason to stay.', [['nature:waterside:2', 1], ['nature:garden:2', 1]], 25),

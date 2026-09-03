@@ -393,6 +393,28 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     });
   }, [active, ftueRun?.status, ftueRun?.stepId, router, transitionTo]);
 
+  useEffect(() => {
+    if (!active
+      || ftueRun?.status !== 'active'
+      || ftueRun.stepId !== 'world.first_bloom_restore'
+      || storyNavigationPendingRef.current) return;
+    storyNavigationPendingRef.current = true;
+    const accepted = transitionTo({
+      announcement: 'Returning to the Garden',
+      target: 'katchimeras',
+      navigate: async () => {
+        try {
+          await flushFtuePersistence();
+          router.dismissTo('/(tabs)/katchimeras');
+        } catch (error) {
+          storyNavigationPendingRef.current = false;
+          throw error;
+        }
+      },
+    });
+    if (!accepted) storyNavigationPendingRef.current = false;
+  }, [active, ftueRun?.status, ftueRun?.stepId, router, transitionTo]);
+
   useLayoutEffect(() => {
     return () => ftueCoordinator.dispose();
   }, [ftueCoordinator]);

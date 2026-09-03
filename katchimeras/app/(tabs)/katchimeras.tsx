@@ -5,7 +5,7 @@ import type { MossproutWorldInteractionRequest } from '@/components/katchadeck/w
 import type { WorldFtueSubjectPresentation } from '@/components/katchadeck/world/world-ftue-subject-presentation';
 import { MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID, mossproutFtueConversationDefinitionId } from '@/constants/mossprout-ftue-conversations';
 import { ftuePersonalizationKey, useFtueRun } from '@/features/onboarding/ftue-runtime';
-import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
+import { mossproutFtueStep, mossproutFtueUsesHostedCompanionStage } from '@/features/onboarding/mossprout-ftue-script';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { useIsFocused } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -93,7 +93,8 @@ export default function KatchimerasScreen() {
     ));
   }, []);
   const requestedWorldInteraction = useMemo<MossproutWorldInteractionRequest | null>(() => {
-    if (mossproutInteraction !== '1') return null;
+    const meditationFtue = ftueRun?.status === 'active' && ftueRun.stepId === 'companion.meditating';
+    if (mossproutInteraction !== '1' && !meditationFtue) return null;
     const firstMeeting = ftueRun?.status === 'active' && ftueRun.stepId === 'companion.first_meeting';
     const chapterZeroReturn = ftueRun?.status === 'active' && ftueRun.stepId === 'companion.chapter_zero_return';
     const ftueConversationDefinitionId = interactionFtue === '1' && firstMeeting
@@ -110,7 +111,7 @@ export default function KatchimerasScreen() {
       creatureId: 'companion:mossprout',
       ftueConversationDefinitionId,
       journeyReturnConversationDefinitionId,
-      key: [interactionFtue, interactionResidentResume, interactionSource, interactionStory, ftueRun?.stepId].join(':'),
+      key: [interactionFtue, interactionResidentResume, interactionSource, interactionStory, meditationFtue ? 'meditation' : ftueRun?.stepId].join(':'),
       residentStoryResumeRequested: interactionResidentResume === '1',
       source: interactionSource === 'merge-world' ? 'merge-world' : undefined,
     };
@@ -134,11 +135,10 @@ export default function KatchimerasScreen() {
   // The route remains Haven throughout. These are presentation modes of the
   // adjacent Mossprout hex, so neither the retired Today page nor a companion
   // route is pushed during the opening sequence.
-  const havenHostedCompanionActive = ftueStep?.id === 'companion.first_meeting'
-    || ftueStep?.id === 'companion.bond_spotlight'
-    || ftueStep?.id === 'companion.day_one_action'
-    || ftueStep?.id === 'companion.garden_intro'
-    || ftueStep?.id === 'companion.order_preview';
+  // Most dialogue uses the companion surface. The first meeting deliberately
+  // remains a Haven node so the hatch never changes routes, but its authored
+  // conversation handler still transfers renderer ownership to this stage.
+  const havenHostedCompanionActive = mossproutFtueUsesHostedCompanionStage(ftueStep?.id);
   // Navigation retains tab and root-stack routes for history. Retain only a
   // lightweight shell while Haven is covered by Merge or another full page;
   // no hidden environment, creature animation, or companion controller may
@@ -163,8 +163,10 @@ export default function KatchimerasScreen() {
           <MossproutOpeningSurface
             companionActive={havenHostedCompanionActive}
             conversationDefinitionId={ftueStep?.id === 'companion.first_meeting'
-              ? mossproutFtueConversationDefinitionId(ftueRun?.answers['egg.support_style']?.optionId ?? 'default')
-              : undefined}
+              ? mossproutFtueConversationDefinitionId(ftueRun?.answers['egg.day_texture']?.optionId ?? 'default')
+              : ftueStep?.id === 'companion.chapter_zero_return'
+                ? MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID
+                : undefined}
             onWorldSubjectPresentationChange={setWorldSubjectPresentation}
             worldEggTargetRef={worldEggTargetRef}
           />

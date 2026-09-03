@@ -251,7 +251,7 @@ export function KingdomCompanionScreen({
   onFtueConversationComplete?: () => void | Promise<void>;
   onCompletedConversationExit?: (definitionId: string) => boolean | Promise<boolean>;
   ftueOrderPreviewActive?: boolean;
-  ftueProfileStep?: 'intro_action' | 'nickname' | 'bond' | 'bond_choice' | 'garden_intro' | 'resident_result' | null;
+  ftueProfileStep?: 'intro_action' | 'nickname' | 'bond' | 'bond_choice' | 'garden_intro' | 'water_together' | 'water_response' | 'first_insight' | 'meditating' | 'resident_result' | null;
   ftueBondSpotlightActive?: boolean;
   ftueDayOneActionActive?: boolean;
   ftueDayOneActionAnswerId?: string | null;

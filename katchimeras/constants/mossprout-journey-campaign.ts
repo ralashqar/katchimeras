@@ -16,8 +16,11 @@ export const MOSSPROUT_JOURNEY_CAMPAIGN = assertValidJourneyCampaign({
       steps.push({ id: `${prefix}:orders`, kind: 'merge_orders', objectiveId: episode.objectiveId!, orders: episode.mergeOrders });
       if (episode.resolutionConversationId) steps.push({ id: `${prefix}:resolution`, kind: 'conversation', conversationId: episode.resolutionConversationId, role: 'resolution' });
       if (episode.optionalAction) steps.push({ id: `${prefix}:optional`, kind: 'optional_action', action: episode.optionalAction });
-      steps.push({ id: `${prefix}:affinity`, kind: 'questionnaire', conversationId: 'mossprout:game:form-finder', result: 'resident_affinity' });
-      steps.push({ id: `${prefix}:resident`, kind: 'resident_discovery', selection: 'matched', nodeMode: 'fixed_campaign_node' });
+    } else if (episode.episodeNumber === 2) {
+      steps.push({ id: `${prefix}:orders`, kind: 'merge_orders', objectiveId: episode.objectiveId!, orders: episode.mergeOrders });
+      steps.push({ id: `${prefix}:resident`, kind: 'resident_discovery', selection: 'petalimp', nodeMode: 'fixed_campaign_node' });
+      if (episode.resolutionConversationId) steps.push({ id: `${prefix}:resolution`, kind: 'conversation', conversationId: episode.resolutionConversationId, role: 'resolution' });
+      if (episode.optionalAction) steps.push({ id: `${prefix}:optional`, kind: 'optional_action', action: episode.optionalAction });
     } else if (episode.episodeNumber >= 3 && episode.episodeNumber <= 9) {
       steps.push({ id: `${prefix}:resident`, kind: 'resident_discovery', selection: 'next_unearned', nodeMode: 'fixed_campaign_node' });
       if (episode.resolutionConversationId) steps.push({ id: `${prefix}:resolution`, kind: 'conversation', conversationId: episode.resolutionConversationId, role: 'resolution' });
@@ -41,4 +44,3 @@ export const MOSSPROUT_JOURNEY_CAMPAIGN = assertValidJourneyCampaign({
     };
   }),
 });
-

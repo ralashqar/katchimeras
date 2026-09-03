@@ -23,9 +23,11 @@ import type { CompanionBondAwardReceipt } from '@/utils/companion-bond';
 import { useFtueRun } from '@/features/onboarding/ftue-runtime';
 import {
   MOSSPROUT_BOND_SHARE_PROMPTS,
+  MOSSPROUT_WATER_TOGETHER_OPTIONS,
   MOSSPROUT_FTUE_BOND_SHARE_REWARD_PREVIEW,
   MOSSPROUT_FTUE_NAME_BOND_REWARD_PREVIEW,
   mossproutBondShareSelection,
+  mossproutFirstSeedForIntent,
 } from '@/features/onboarding/mossprout-bond-share';
 
 const INTRODUCTION_REWARD = { amount: MOSSPROUT_FTUE_NAME_BOND_REWARD_PREVIEW, kind: 'bond' as const };
@@ -36,7 +38,7 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
   activeBondQuestionId?: string | null;
   gardenStoryActionIcon?: string;
   gardenStoryActionLabel?: string;
-  mode?: 'intro_action' | 'nickname' | 'bond' | 'bond_choice' | 'garden_intro' | 'resident_result' | 'garden';
+  mode?: 'intro_action' | 'nickname' | 'bond' | 'bond_choice' | 'garden_intro' | 'water_together' | 'water_response' | 'first_insight' | 'meditating' | 'resident_result' | 'garden';
   nickname?: string | null;
   onBondQuestionChange?: (promptId: string | null) => void;
   onBondRewardRequest?: (source: DayActionSourceRect, onArrive: () => void, receipt: CompanionBondAwardReceipt) => void;
@@ -47,7 +49,8 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
   const ftueRun = useFtueRun();
   const [nameModalOpen, setNameModalOpen] = useState(false);
   const [draft, setDraft] = useState(nickname ?? '');
-  const selectedBondShare = mossproutBondShareSelection(ftueRun?.answers['companion.choose_bond_share']?.optionId);
+  const selectedBondShare = mossproutBondShareSelection(ftueRun?.answers['companion.choose_growth_intent']?.optionId);
+  const firstSeed = mossproutFirstSeedForIntent(ftueRun?.answers['companion.choose_growth_intent']?.optionId);
   const completedBondShareReward = {
     amount: pendingBondCelebration?.points ?? MOSSPROUT_FTUE_BOND_SHARE_REWARD_PREVIEW,
     kind: 'bond' as const,
@@ -188,6 +191,41 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
   if (mode === 'garden_intro') return (
     <Animated.View entering={FadeInUp.duration(220)} style={styles.actionStage}>
       <PrimaryAction icon={gardenStoryActionIcon} label={gardenStoryActionLabel} onPress={() => onContinue?.()} />
+    </Animated.View>
+  );
+
+  if (mode === 'water_together') return (
+    <Animated.View entering={FadeInUp.duration(220)} style={styles.plainActionStage}>
+      <View style={styles.bondChoiceStack}>
+        {MOSSPROUT_WATER_TOGETHER_OPTIONS.map((option) => (
+          <DayActionActiveRow animateLayout={false} key={option.id} label={option.label}>
+            <Pressable accessibilityRole="button" onPress={() => onContinue?.(option.id)} style={({ pressed }) => pressed && styles.pressed}>
+              <DayActionCardSurface artwork={<DayActionIcon icon={option.icon} />} title={option.label} />
+            </Pressable>
+          </DayActionActiveRow>
+        ))}
+      </View>
+    </Animated.View>
+  );
+
+  if (mode === 'water_response') return (
+    <Animated.View entering={FadeInUp.duration(220)} style={styles.actionStage}>
+      <PrimaryAction icon="leaf.fill" label="Keep going" onPress={() => onContinue?.()} />
+    </Animated.View>
+  );
+
+  if (mode === 'first_insight') return (
+    <Animated.View entering={FadeInUp.duration(220)} style={styles.actionStage}>
+      <ThemedText selectable style={styles.resultEyebrow} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>
+        {firstSeed.name.toUpperCase()}
+      </ThemedText>
+      <ThemedText lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>
+        {firstSeed.message}
+      </ThemedText>
+      <ThemedText lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>
+        I think this might be where you are right now. I might be wrong. I’ll learn.
+      </ThemedText>
+      <PrimaryAction icon="leaf.fill" label="Keep this Seed" onPress={() => onContinue?.()} />
     </Animated.View>
   );
 

@@ -15,13 +15,14 @@ type ReminderRecord = {
 export async function scheduleMossproutJourneyDayReminder(
   completedDayId: string,
   now = new Date(),
+  exactTarget?: Date,
 ) {
   const Notifications = await getNotifications();
   if (!Notifications) return;
   const permission = await Notifications.getPermissionsAsync().catch(() => null);
   if (!permission?.granted) return;
 
-  const target = nextMossproutJourneyReminderDate(completedDayId);
+  const target = exactTarget ?? nextMossproutJourneyReminderDate(completedDayId);
   if (!target || target <= now) return;
 
   const existing = getStoredJson<ReminderRecord | null>(STORAGE_KEY, null);
@@ -38,7 +39,7 @@ export async function scheduleMossproutJourneyDayReminder(
 
   const identifier = await Notifications.scheduleNotificationAsync({
     content: {
-      body: 'Mossprout noticed something near the pond.',
+      body: 'Mossprout is awake—and ready to learn a little more about you.',
       data: {
         creatureId: 'companion:mossprout',
         destination: 'companion',

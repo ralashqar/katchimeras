@@ -196,3 +196,42 @@ export async function resumeActiveContentFlows(): Promise<ContentFlowRun[]> {
   }
   return results;
 }
+
+/**
+ * Developer preview only: moves an existing journaled run to an authored node.
+ * Durable effect receipts are deliberately retained, so previewing can never
+ * charge or grant twice. Presentation/navigation receipts for the destination
+ * are cleared so visual operations can be replayed.
+ */
+export async function previewContentFlowNodeForDebug(runId: string, nodeId: string): Promise<ContentFlowRun | null> {
+  const current = await loadContentFlowRun(runId);
+  if (!current) return null;
+  const definition = contentFlowDefinition(current.definitionId, current.definitionVersion);
+  const node = definition?.nodes.find((candidate) => candidate.id === nodeId);
+  if (!definition || !node) throw new Error(`Unknown preview node ${nodeId}`);
+  const now = Date.now();
+  const result = await reduceContentFlowRunAtomically({
+    runId,
+    reduce: (run) => {
+      const presentationReceipts = { ...run.presentationReceipts };
+      const navigationReceipts = { ...run.navigationReceipts };
+      const objectiveProgress = Object.fromEntries(Object.entries(run.objectiveProgress).filter(([key]) => !key.startsWith(`${nodeId}:`)));
+      if (node.kind === 'presentation') delete presentationReceipts[`${run.runId}:${node.id}:presentation:${node.presentationId}`];
+      if (node.kind === 'route') delete navigationReceipts[`${run.runId}:${node.id}:navigation:${node.routeId}`];
+      return stabilizeContentFlow(definition, {
+        ...run,
+        completedAt: null,
+        error: null,
+        navigationReceipts,
+        nodeId,
+        objectiveProgress,
+        phase: 'entering',
+        presentationReceipts,
+        status: 'active',
+        updatedAt: now,
+      }, now).run;
+    },
+  });
+  if (!result.run) return null;
+  return runPendingEffects(definition, result.run, stabilizeContentFlow(definition, result.run, now).pendingWork);
+}

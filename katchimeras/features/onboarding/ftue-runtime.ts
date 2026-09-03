@@ -149,10 +149,12 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
     : needsResidentParcelConfirmation
     ? 'companion.resident_parcel_ready'
     : needsHavenFocus
-    ? 'world.complete'
+    ? 'companion.meditating'
     : run.status === 'active' && run.stepId === 'chapter.complete'
       ? 'merge.return_note'
-      : run.stepId;
+      : run.status === 'active' && run.stepId === 'world.complete'
+        ? 'companion.meditating'
+        : run.stepId;
   const removedFrictionSteps = new Set(['haven.first_bloom']);
   return {
     ...run,
@@ -169,7 +171,7 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
             : removedEggInspectSteps.has(migratedStepId)
               ? 'egg.opening'
             : replacedWorldCompletionSteps.has(migratedStepId)
-              ? 'world.complete'
+              ? 'companion.meditating'
               : removedFrictionSteps.has(migratedStepId)
                 ? 'companion.resident_parcel_ready'
                 : removedMergeSteps.has(migratedStepId) ? 'merge.seed_drag' : migratedStepId,
@@ -562,11 +564,15 @@ export function useFtueSurface(surface: FtueSurface) {
 }
 
 export function ftuePersonalizedLine(run = loadFtueRun()) {
-  const companionGoal = run?.answers['egg.support_style'] ?? run?.answers['egg.desired_feeling'] ?? run?.answers['egg.companion_goal'];
+  const companionGoal = run?.answers['egg.day_texture'] ?? run?.answers['egg.support_style'] ?? run?.answers['egg.desired_feeling'] ?? run?.answers['egg.companion_goal'];
   const context = run?.answers['egg.context.activity'];
   const opening = Object.values(run?.answers ?? {}).find((answer) => answer.actionId.startsWith('egg.') && !answer.private);
   const id = companionGoal?.optionId ?? context?.optionId ?? opening?.optionId;
   const lines: Record<string, string> = {
+    trying_to_start: 'I felt that in there—like a little root pushing against hard soil.',
+    too_much_at_once: 'I felt the rain drumming on my shell. We can hold one small piece at a time.',
+    pretty_good: 'I felt that warm patch of sunlight. I think it helped me hatch.',
+    mostly_drifting: 'I felt the breeze carrying us. Drifting can still bring you somewhere new.',
     more_calm: 'You wanted more calm. We can grow it one small piece at a time.',
     more_energy: 'You wanted more energy. This garden definitely does too.',
     something_new: 'You wanted something new. Well… this is pretty new.',
@@ -587,17 +593,17 @@ export function ftuePersonalizedLine(run = loadFtueRun()) {
 }
 
 export function ftuePersonalizationKey(run = loadFtueRun()) {
-  const companionGoal = run?.answers['egg.support_style'] ?? run?.answers['egg.desired_feeling'] ?? run?.answers['egg.companion_goal'];
+  const companionGoal = run?.answers['egg.day_texture'] ?? run?.answers['egg.support_style'] ?? run?.answers['egg.desired_feeling'] ?? run?.answers['egg.companion_goal'];
   const context = run?.answers['egg.context.activity'];
   const opening = Object.values(run?.answers ?? {}).find((answer) => answer.actionId.startsWith('egg.') && !answer.private);
   const id = companionGoal?.optionId ?? context?.optionId ?? opening?.optionId ?? 'default';
-  return ['more_energy', 'more_calm', 'something_new', 'more_confidence', 'more_fun', 'more_connection', 'calm', 'encouragement', 'fun', 'company', 'discovery', 'outside', 'family', 'friends', 'relaxing', 'work', 'tired', 'rough', 'home'].includes(id)
+  return ['trying_to_start', 'too_much_at_once', 'pretty_good', 'mostly_drifting', 'more_energy', 'more_calm', 'something_new', 'more_confidence', 'more_fun', 'more_connection', 'calm', 'encouragement', 'fun', 'company', 'discovery', 'outside', 'family', 'friends', 'relaxing', 'work', 'tired', 'rough', 'home'].includes(id)
     ? id
     : 'default';
 }
 
 export function ftueWispForRun(run = loadFtueRun()) {
-  const answer = run?.answers['egg.support_style'] ?? run?.answers['egg.desired_feeling'] ?? run?.answers['egg.context.activity'] ?? Object.values(run?.answers ?? {}).find((item) => !item.private);
+  const answer = run?.answers['egg.day_texture'] ?? run?.answers['egg.support_style'] ?? run?.answers['egg.desired_feeling'] ?? run?.answers['egg.context.activity'] ?? Object.values(run?.answers ?? {}).find((item) => !item.private);
   if (answer?.optionId === 'more_connection' || answer?.optionId === 'family' || answer?.optionId === 'friends' || answer?.optionId === 'people') return 'heartlet';
   if (answer?.optionId === 'more_calm' || answer?.optionId === 'relaxing' || answer?.optionId === 'rest') return 'moonlit';
   return 'sprout';

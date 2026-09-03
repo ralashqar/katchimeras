@@ -5,8 +5,12 @@ import {
   saveOnboardingProfile,
   type MossproutOnboardingAnswers,
 } from '@/utils/onboarding-state';
+import { mossproutFirstSeedForIntent } from './mossprout-bond-share';
 
 const ACTION_FIELDS: Readonly<Record<string, keyof MossproutOnboardingAnswers>> = {
+  'egg.day_texture': 'dayTextureId',
+  'companion.choose_growth_intent': 'growthIntentId',
+  'companion.choose_water_together': 'waterTogetherChoiceId',
   'egg.desired_feeling': 'attunementPlaceId',
   'egg.main_difficulty': 'currentFeelingId',
   'egg.support_style': 'desiredMoreId',
@@ -42,8 +46,8 @@ export function recordMossproutOnboardingAnswer(actionId: string, optionId: stri
     : profile.matchedResidentId;
   const next = {
     ...profile,
-    aspirationId: field === 'desiredMoreId' ? optionId : profile.aspirationId,
-    painPointIds: field === 'currentFeelingId' ? [optionId] : profile.painPointIds,
+    aspirationId: field === 'desiredMoreId' || field === 'growthIntentId' ? optionId : profile.aspirationId,
+    painPointIds: field === 'currentFeelingId' || field === 'dayTextureId' ? [optionId] : profile.painPointIds,
     preferenceIds: field === 'attunementPlaceId' || field === 'lifePriorityId'
       ? [optionId, ...profile.preferenceIds.filter((id) => id !== optionId)]
       : profile.preferenceIds,
@@ -69,4 +73,14 @@ export function saveMossproutPlayerNickname(value: string) {
   const playerNickname = sanitizePlayerNickname(value);
   saveOnboardingProfile({ ...profile, playerNickname });
   return playerNickname;
+}
+
+export function keepMossproutFirstSeed() {
+  const profile = loadOnboardingProfile();
+  const seed = mossproutFirstSeedForIntent(profile.mossproutAnswers.growthIntentId);
+  saveOnboardingProfile({
+    ...profile,
+    mossproutAnswers: { ...profile.mossproutAnswers, firstSeedId: seed.id },
+  });
+  return seed;
 }

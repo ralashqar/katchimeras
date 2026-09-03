@@ -54,9 +54,7 @@ import { CompanionHomeEnvironmentStage } from './companion-home-environment-stag
 import type { WorldFtueSubjectPresentation } from './world-ftue-subject-presentation';
 
 const ATTUNEMENT_ACTION_IDS = [
-  'egg.desired_feeling',
-  'egg.main_difficulty',
-  'egg.support_style',
+  'egg.day_texture',
 ] as const;
 
 const MOSSPROUT_ENVIRONMENT_KEY = todayKatchimeraExplorationBackgroundKeyForEnvironment('mossprout') ?? 'mossprout';
@@ -186,7 +184,7 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
     if (!day) return null;
     const base = todayGrowthSummary(day, 0);
     // Reuse Today's authored Egg size curve: start at half physical size and
-    // traverse its full growth range in three equal feed-driven steps.
+    // traverse its full growth range in one decisive, feed-driven step.
     const energyRatio = mossproutGroveEggEnergyRatio(answeredCount);
     const stage = Math.min(6, Math.max(0, Math.round(energyRatio * 6))) as TodayGrowthSummary['stage'];
     return {

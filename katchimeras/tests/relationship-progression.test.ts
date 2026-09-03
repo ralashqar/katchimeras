@@ -3,7 +3,10 @@ import test from 'node:test';
 
 import {
   acknowledgeKatchimeraActionCompletion,
+  activeKatchimeraMeditation,
   attachKatchimeraActionRewardReceipt,
+  beginKatchimeraMeditation,
+  companionInteractionAvailability,
   beginMossproutJourneyReturn,
   completeMossproutJourneyConversation,
   completeMossproutJourneyDay,
@@ -13,6 +16,7 @@ import {
   completeMossproutResidentCardDiscovery,
   emptyRelationshipProgressState,
   isMossproutFtueRoutineActionId,
+  katchimeraMeditationRecord,
   makeMossproutResolutionAvailable,
   mossproutDailyActionDeck,
   mossproutJourneyForDay,
@@ -84,13 +88,14 @@ function finishDayOneResident(state: RelationshipProgressState, dayId: string, n
 
 test('first Journey Day handoff changes from completion to waiting and then Day 2 ready', () => {
   const relationships = firstJourneyCompleteState();
-  assert.equal(resolveMossproutJourneyHandoff({ dayId: '2026-08-23', ftueStatus: 'active', relationships })?.state, 'completed_today');
+  const completedAt = relationships.journeyDays[0]!.completedAt!;
+  assert.equal(resolveMossproutJourneyHandoff({ dayId: '2026-08-23', ftueStatus: 'active', relationships, now: completedAt })?.state, 'completed_today');
 
-  const waiting = resolveMossproutJourneyHandoff({ dayId: '2026-08-23', ftueStatus: 'complete', relationships });
+  const waiting = resolveMossproutJourneyHandoff({ dayId: '2026-08-23', ftueStatus: 'complete', relationships, now: completedAt + 1 });
   assert.equal(waiting?.state, 'waiting_for_next_day');
-  assert.match(waiting?.body ?? '', /Garden orders are still available today/);
+  assert.match(waiting?.body ?? '', /eight hours/);
 
-  const ready = resolveMossproutJourneyHandoff({ dayId: '2026-08-24', ftueStatus: 'complete', relationships });
+  const ready = resolveMossproutJourneyHandoff({ dayId: '2026-08-23', ftueStatus: 'complete', relationships, now: completedAt + 8 * 60 * 60 * 1000 });
   assert.equal(ready?.state, 'ready_to_begin');
   assert.equal(ready?.title, 'Journey Day 2 is ready');
   assert.equal(mossproutJourneyDayNumber(relationships, '2026-08-24'), 2);
@@ -110,6 +115,47 @@ test('starting Day 2 removes the initial Home handoff hook', () => {
     startedAt: new Date('2026-08-24T09:00:00').getTime(),
   });
   assert.equal(resolveMossproutJourneyHandoff({ dayId: '2026-08-24', ftueStatus: 'complete', relationships }), null);
+});
+
+test('the eight-hour rest can start Journey Day 2 on the same calendar date', () => {
+  const state = firstJourneyCompleteState();
+  const completedAt = state.journeyDays[0]!.completedAt!;
+  assert.equal(startMossproutJourneyDay(state, '2026-08-23', completedAt + 8 * 60 * 60 * 1000 - 1, 1).reason, 'existing');
+  const started = startMossproutJourneyDay(state, '2026-08-23', completedAt + 8 * 60 * 60 * 1000, 1);
+  assert.equal(started.reason, 'started');
+  assert.equal(started.journey?.beatId, 'quiet-patch:pond-knock');
+  assert.equal(started.journey?.dayId, '2026-08-23:mossprout-journey-02');
+  assert.equal(mossproutJourneyDayNumber(started.state, '2026-08-23'), 2);
+});
+
+test('meditation is durable Katchimera state and owns the Journey wake time', () => {
+  const journeyCompletedAt = new Date('2026-08-23T11:00:00').getTime();
+  const meditationStartedAt = journeyCompletedAt + 20_000;
+  const availableAt = meditationStartedAt + 8 * 60 * 60 * 1000;
+  const state = beginKatchimeraMeditation(
+    firstJourneyCompleteState(),
+    'mossprout',
+    meditationStartedAt,
+    8 * 60 * 60 * 1000,
+  );
+
+  assert.equal(katchimeraMeditationRecord(state, 'mossprout')?.availableAt, availableAt);
+  assert.equal(activeKatchimeraMeditation(state, 'mossprout', availableAt - 1)?.reason, 'journey_rest');
+  assert.equal(activeKatchimeraMeditation(state, 'mossprout', availableAt), null);
+  assert.equal(resolveMossproutJourneyHandoff({ dayId: '2026-08-23', ftueStatus: 'complete', relationships: state, now: availableAt - 1 })?.availableAt, availableAt);
+  assert.equal(startMossproutJourneyDay(state, '2026-08-23', availableAt - 1, 1).reason, 'existing');
+  assert.equal(startMossproutJourneyDay(state, '2026-08-23', availableAt, 1).reason, 'started');
+});
+
+test('meditation commands are idempotent by story source and gate companion actions', () => {
+  const initial = emptyRelationshipProgressState();
+  const once = beginKatchimeraMeditation(initial, 'mossprout', 1_000, 8_000, 'ftue:run:first-rest');
+  const replayed = beginKatchimeraMeditation(once, 'mossprout', 5_000, 8_000, 'ftue:run:first-rest');
+
+  assert.equal(replayed, once);
+  assert.equal(katchimeraMeditationRecord(replayed, 'mossprout')?.availableAt, 9_000);
+  assert.equal(companionInteractionAvailability(replayed, 'mossprout', 8_999).kind, 'meditating');
+  assert.equal(companionInteractionAvailability(replayed, 'mossprout', 9_000).kind, 'available');
 });
 
 test('Journey Day 1 supports a complete manual narrative flow without FTUE', () => {
@@ -132,8 +178,6 @@ test('Journey Day 1 supports a complete manual narrative flow without FTUE', () 
   assert.equal(mossproutJourneyForDay(state, dayId)?.returnConversationId, 'mossprout:ftue:chapter-zero-return');
 
   state = completeMossproutJourneyConversation(state, 'mossprout:ftue:chapter-zero-return', 4);
-  assert.equal(mossproutJourneyForDay(state, dayId)?.status, 'profile_available');
-  state = finishDayOneResident(state, dayId, 5);
   assert.equal(mossproutJourneyForDay(state, dayId)?.status, 'complete');
 });
 
@@ -1398,9 +1442,10 @@ test('the modular Mossprout campaign validates and gives every day one authored 
   assert.equal(MOSSPROUT_JOURNEY_CAMPAIGN.days.length, 13);
   assert.equal(new Set(MOSSPROUT_JOURNEY_CAMPAIGN.days.map((day) => day.insightKey)).size, 13);
   assert.deepEqual(MOSSPROUT_JOURNEY_CAMPAIGN.days[0]?.steps.map((step) => step.kind), [
-    'conversation', 'merge_orders', 'conversation', 'optional_action', 'questionnaire', 'resident_discovery', 'complete',
+    'conversation', 'merge_orders', 'conversation', 'optional_action', 'complete',
   ]);
   assert.equal(MOSSPROUT_JOURNEY_CAMPAIGN.days[1]?.steps.some((step) => step.kind === 'merge_orders'), true);
+  assert.equal(MOSSPROUT_JOURNEY_CAMPAIGN.days[1]?.steps.some((step) => step.kind === 'resident_discovery' && step.selection === 'petalimp'), true);
   assert.equal(MOSSPROUT_JOURNEY_CAMPAIGN.days.slice(2, 9).every((day) => day.steps.some((step) => step.kind === 'resident_discovery')), true);
   assert.equal(MOSSPROUT_JOURNEY_CAMPAIGN.days.slice(2, 9).every((day) => day.steps.every((step) => step.kind !== 'merge_orders')), true);
 });

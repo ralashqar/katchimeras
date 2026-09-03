@@ -1,6 +1,6 @@
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import type { ConversationSession } from '@/types/companion-conversation';
-import type { ActionCompletionRecord, ActionPresentationRecord, JourneyDayActionRecord, JourneyDayRecord, KatchimeraActionCompletionRecord, KatchimeraActionOrigin, KatchimeraActionRewardReceipt, KatchimeraActionSlotId, KatchimeraDayAction, KatchimeraStoryProgress, MossproutDailyActionDeck, MossproutStoryFactKey, RelationshipProgressState } from '@/types/relationship-progression';
+import type { ActionCompletionRecord, ActionPresentationRecord, JourneyDayActionRecord, JourneyDayRecord, KatchimeraActionCompletionRecord, KatchimeraActionOrigin, KatchimeraActionRewardReceipt, KatchimeraActionSlotId, KatchimeraDayAction, KatchimeraMeditationRecord, KatchimeraStoryProgress, MossproutDailyActionDeck, MossproutStoryFactKey, RelationshipProgressState } from '@/types/relationship-progression';
 import { MOSSPROUT_HEARTWOOD_CHAPTER_ID, mossproutExtendedBeatById } from '@/constants/mossprout-journey-chapters';
 import {
   MOSSPROUT_CAMPAIGN_EPISODES,
@@ -57,6 +57,7 @@ export function emptyRelationshipProgressState(): RelationshipProgressState {
     actionCompletions: [],
     actionPresentations: [],
     mossproutDailyActionDecks: [],
+    meditations: [],
   };
 }
 
@@ -88,7 +89,20 @@ export function normalizeRelationshipProgressState(value: unknown): Relationship
   const normalizedDecks = Array.isArray(candidate.mossproutDailyActionDecks)
     ? candidate.mossproutDailyActionDecks.map(normalizeMossproutDailyActionDeck).filter((deck): deck is MossproutDailyActionDeck => Boolean(deck)).slice(-14)
     : [];
-  return { schemaVersion: 7, journeyDays, stories, milestones, skippedActionIds, actionCompletions, actionPresentations, mossproutDailyActionDecks: normalizedDecks };
+  const meditations = Array.isArray(candidate.meditations)
+    ? candidate.meditations.filter(isKatchimeraMeditationRecord).slice(-20)
+    : [];
+  return { schemaVersion: 7, journeyDays, stories, milestones, skippedActionIds, actionCompletions, actionPresentations, mossproutDailyActionDecks: normalizedDecks, meditations };
+}
+
+function isKatchimeraMeditationRecord(value: unknown): value is KatchimeraMeditationRecord {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Partial<KatchimeraMeditationRecord>;
+  return typeof record.familyId === 'string'
+    && typeof record.startedAt === 'number'
+    && typeof record.availableAt === 'number'
+    && record.availableAt > record.startedAt
+    && record.reason === 'journey_rest';
 }
 
 function isActionCompletionRecord(value: unknown): value is ActionCompletionRecord {
@@ -385,8 +399,62 @@ export function journeyForDay(state: RelationshipProgressState, dayId: string) {
 }
 
 export function mossproutJourneyForDay(state: RelationshipProgressState, dayId: string) {
-  const journey = journeyForDay(state, dayId);
+  const journey = [...state.journeyDays].reverse().find((candidate) => (
+    candidate.dayId === dayId
+    || candidate.dayId.startsWith(`${dayId}:mossprout-journey-`)
+  )) ?? null;
   return journey?.familyId === 'mossprout' ? journey : null;
+}
+
+export const MOSSPROUT_FTUE_REST_MS = 8 * 60 * 60 * 1000;
+
+export function beginKatchimeraMeditation(
+  state: RelationshipProgressState,
+  familyId: KatchimeraFamilyId,
+  startedAt: number,
+  durationMs: number,
+  sourceId?: string,
+): RelationshipProgressState {
+  const existing = sourceId
+    ? (state.meditations ?? []).find((item) => item.familyId === familyId && item.sourceId === sourceId)
+    : null;
+  if (existing) return state;
+  const record: KatchimeraMeditationRecord = {
+    familyId,
+    startedAt,
+    availableAt: startedAt + Math.max(1, durationMs),
+    reason: 'journey_rest',
+    ...(sourceId ? { sourceId } : {}),
+  };
+  return {
+    ...state,
+    meditations: [...(state.meditations ?? []).filter((item) => item.familyId !== familyId), record],
+  };
+}
+
+export function companionInteractionAvailability(
+  state: RelationshipProgressState,
+  familyId: KatchimeraFamilyId,
+  now = Date.now(),
+): import('@/types/relationship-progression').CompanionInteractionAvailability {
+  const meditation = activeKatchimeraMeditation(state, familyId, now);
+  return meditation ? { kind: 'meditating', ...meditation } : { kind: 'available' };
+}
+
+export function katchimeraMeditationRecord(
+  state: RelationshipProgressState,
+  familyId: KatchimeraFamilyId,
+): KatchimeraMeditationRecord | null {
+  return [...(state.meditations ?? [])].reverse().find((record) => record.familyId === familyId) ?? null;
+}
+
+export function activeKatchimeraMeditation(
+  state: RelationshipProgressState,
+  familyId: KatchimeraFamilyId,
+  now = Date.now(),
+): KatchimeraMeditationRecord | null {
+  const record = katchimeraMeditationRecord(state, familyId);
+  return record && now < record.availableAt ? record : null;
 }
 
 export function lastMossproutJourney(state: RelationshipProgressState): JourneyDayRecord | null {
@@ -418,10 +486,22 @@ export function startMossproutJourneyDay(
   activeDayCount = 0,
   allowEarlyStart = false,
 ): { state: RelationshipProgressState; journey: JourneyDayRecord | null; reason: 'started' | 'existing' | 'another_companion' | 'resting' } {
-  const existing = journeyForDay(state, dayId);
-  if (existing) return { state, journey: existing.familyId === 'mossprout' ? existing : null, reason: existing.familyId === 'mossprout' ? 'existing' : 'another_companion' };
+  const existing = mossproutJourneyForDay(state, dayId) ?? journeyForDay(state, dayId);
+  const firstBloomMeditation = katchimeraMeditationRecord(state, 'mossprout');
+  const firstBloomRestComplete = existing?.familyId === 'mossprout'
+    && existing.beatId === 'quiet-patch:first-flower'
+    && existing.status === 'complete'
+    && existing.completedAt != null
+    && now >= (firstBloomMeditation?.availableAt ?? existing.completedAt + MOSSPROUT_FTUE_REST_MS);
+  if (existing && !firstBloomRestComplete) return { state, journey: existing.familyId === 'mossprout' ? existing : null, reason: existing.familyId === 'mossprout' ? 'existing' : 'another_companion' };
   const story = mossproutStory(state, now);
-  const campaignDay = nextJourneyCampaignDay(MOSSPROUT_JOURNEY_CAMPAIGN, story.completedBeatIds ?? []);
+  // Completion records are the durable source of truth. Include them when an
+  // older or partially-written story summary has not caught up yet.
+  const completedBeatIds = unique([
+    ...(story.completedBeatIds ?? []),
+    ...state.journeyDays.filter((journey) => journey.familyId === 'mossprout' && journey.status === 'complete').map((journey) => journey.beatId),
+  ]);
+  const campaignDay = nextJourneyCampaignDay(MOSSPROUT_JOURNEY_CAMPAIGN, completedBeatIds);
   const nextEpisode = campaignDay ? mossproutCampaignEpisodeByBeatId.get(campaignDay.id) ?? null : null;
   // activeDayCount counts days already played; this starts the day about to begin.
   if (!campaignDay || !nextEpisode || (!allowEarlyStart && activeDayCount + 1 < campaignDay.unlockActiveDay)) {
@@ -430,9 +510,10 @@ export function startMossproutJourneyDay(
   const chapterId = nextEpisode.chapterId;
   const beatId = nextEpisode.beatId;
   const openingConversationId = nextEpisode.openingConversationId;
+  const journeyDayId = firstBloomRestComplete ? `${dayId}:mossprout-journey-${String(campaignDay.number).padStart(2, '0')}` : dayId;
   const journey: JourneyDayRecord = {
-    id: `journey-day:${dayId}:mossprout`,
-    dayId,
+    id: `journey-day:${journeyDayId}:mossprout`,
+    dayId: journeyDayId,
     familyId: 'mossprout',
     status: 'opening',
     chapterId,
@@ -614,12 +695,11 @@ export function completeMossproutJourneyResolution(
   const journey = mossproutJourneyForDay(state, dayId);
   if (!journey || journey.status !== 'resolution_ready') return state;
   if (journey.beatId === 'quiet-patch:first-flower') {
-    return replaceJourney(state, journey.id, {
-      ...journey,
-      status: 'profile_available',
-      profileConversationId: 'mossprout:game:form-finder',
+    return completeMossproutJourneyDay(state, dayId, {
+      objectiveId: 'mossprout:objective:first-sprout',
+      activityReceiptId: journey.activityReceiptIds.at(-1) ?? 'merge-order:mossprout:chapter-0:first-sprout',
       resolutionId: journey.returnConversationId ?? 'mossprout:ftue:chapter-zero-return',
-    });
+    }, now);
   }
   return completeMossproutJourneyDay(state, dayId, {
     objectiveId: journey.beatId === 'quiet-patch:first-flower' ? 'mossprout:objective:first-sprout' : journey.activity?.objectiveId,

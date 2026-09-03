@@ -402,6 +402,17 @@ export type MossproutNatureIslandId =
 
 export type MossproutNatureIslandLevel = 0 | 1 | 2 | 3 | 4;
 
+export type StoryWorldMutationReceipt = {
+  id: string;
+  kind: 'haven_upgrade';
+  target: { kind: 'haven_tile'; characterId: MergeCharacterId } | { kind: 'haven_nature_island'; islandId: MossproutNatureIslandId };
+  fromLevel: number;
+  toLevel: number;
+  economyMode: 'normal' | 'free' | 'grant';
+  coinCost: number;
+  createdAt: number;
+};
+
 export type MergeWorldState = {
   version: 21;
   /** The first personal Merge World is owned by Mossprout. */
@@ -444,6 +455,8 @@ export type MergeWorldState = {
   lastFreeRerollDayId: string | null;
   characterProgress: Partial<Record<MergeCharacterId, MergeCharacterProgress>>;
   externalRewardReceipts: MergeExternalRewardReceipt[];
+  /** Exactly-once receipts for story-authored world mutations. */
+  storyWorldMutationReceipts: StoryWorldMutationReceipt[];
   companionDiscovery: CompanionDiscoveryProgress;
   residentCardDiscovery: ResidentCardDiscoveryProgress;
   mossproutBoardProgression: MossproutBoardProgression;
@@ -494,8 +507,8 @@ export type MergeWorldCommand =
   | { type: 'revealMemoryCard'; cardId: string; now: number }
   | { type: 'reconcileStory'; familyId: MergeCharacterId; status: string; targetLevel: number; actPhase?: string; orderTemplateKeys?: string[]; servedOrderIds?: string[]; now: number }
   | { type: 'reconcileHavenStory'; characterId: MergeCharacterId; storyLevel: number; now: number }
-  | { type: 'upgradeHavenTile'; characterId: MergeCharacterId; stage: HavenStage; now: number }
-  | { type: 'upgradeMossproutNatureIsland'; islandId: MossproutNatureIslandId; level: MossproutNatureIslandLevel; now: number }
+  | { type: 'upgradeHavenTile'; characterId: MergeCharacterId; stage: HavenStage; now: number; receiptId?: string; economyMode?: 'normal' | 'free' | 'grant'; grantedCoins?: number }
+  | { type: 'upgradeMossproutNatureIsland'; islandId: MossproutNatureIslandId; level: MossproutNatureIslandLevel; now: number; receiptId?: string; economyMode?: 'normal' | 'free' | 'grant'; grantedCoins?: number }
   | { type: 'revealHaven'; now: number }
   | { type: 'ackExternalReward'; receiptId: string; now: number };
 
@@ -526,4 +539,5 @@ export type MergeWorldCommandResult = {
   itemsQueued?: number;
   havenUpgrade?: { characterId: MergeCharacterId; stage: HavenStage; coinCost: number };
   natureIslandUpgrade?: { islandId: MossproutNatureIslandId; level: MossproutNatureIslandLevel; coinCost: number; completedTier: boolean };
+  storyWorldMutationReceipt?: StoryWorldMutationReceipt;
 };

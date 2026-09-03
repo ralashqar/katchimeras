@@ -1,4 +1,6 @@
 import type { ContentFlowNode } from '@/types/content-flow';
+import { validateStoryTarget } from './story-targets';
+import { STORY_CAMERA_PRESENTATION, STORY_WORLD_UPGRADE_EFFECT, STORY_WORLD_UPGRADE_PRESENTATION } from './story-world-operations';
 
 export type StoryCapabilityKind = ContentFlowNode['kind'];
 
@@ -18,6 +20,45 @@ function requiredString(key: string) {
     : `${key} must be a non-empty string`;
 }
 
+function validateCameraPayload(payload: Readonly<Record<string, unknown>>) {
+  if (payload.operation !== 'focus' && payload.operation !== 'fit' && payload.operation !== 'restore') return 'operation must be focus, fit, or restore';
+  if (payload.operation === 'focus') return validateStoryTarget(payload.target);
+  if (payload.operation === 'fit') {
+    if (!Array.isArray(payload.targets) || payload.targets.length === 0) return 'fit camera requires at least one target';
+    return payload.targets.map(validateStoryTarget).find(Boolean) ?? null;
+  }
+  return typeof payload.snapshotId === 'string' && payload.snapshotId ? null : 'restore camera requires snapshotId';
+}
+
+function validateUpgradeEffect(payload: Readonly<Record<string, unknown>>) {
+  const targetError = validateStoryTarget(payload.target);
+  if (targetError) return targetError;
+  const target = payload.target as { kind?: unknown };
+  if (target.kind !== 'haven_tile' && target.kind !== 'haven_nature_island') return 'world.upgrade target must be a Haven tile or nature island';
+  if (!Number.isInteger(payload.toLevel) || Number(payload.toLevel) < 1) return 'toLevel must be a positive integer';
+  if (!payload.economy || typeof payload.economy !== 'object') return 'economy policy is required';
+  const economy = payload.economy as { mode?: unknown; amount?: unknown; reason?: unknown };
+  if (economy.mode === 'normal') return null;
+  if (economy.mode === 'free') return typeof economy.reason === 'string' && economy.reason ? null : 'free upgrades require a reason';
+  if (economy.mode === 'grant') {
+    if (!Number.isFinite(economy.amount) || Number(economy.amount) <= 0) return 'grant upgrades require a positive amount';
+    return typeof economy.reason === 'string' && economy.reason ? null : 'grant upgrades require a reason';
+  }
+  return 'economy.mode must be normal, free, or grant';
+}
+
+function validateUpgradePresentation(payload: Readonly<Record<string, unknown>>) {
+  return requiredString('sourceEffectNodeId')(payload)
+    ?? requiredString('sourceEffectId')(payload)
+    ?? requiredString('preset')(payload);
+}
+
+function validateMeditationEffect(payload: Readonly<Record<string, unknown>>) {
+  if (typeof payload.familyId !== 'string' || !payload.familyId) return 'familyId must be a non-empty string';
+  if (!Number.isFinite(payload.durationMs) || Number(payload.durationMs) <= 0) return 'durationMs must be positive';
+  return payload.reason === 'journey_rest' ? null : 'reason must be journey_rest';
+}
+
 const BUILT_INS: readonly StoryCapabilityDefinition[] = [
   { id: 'legacy.ftue.scene', kind: 'scene' },
   { id: 'legacy.ftue.task', kind: 'task' },
@@ -30,11 +71,15 @@ const BUILT_INS: readonly StoryCapabilityDefinition[] = [
   { id: 'resident.dialogue', kind: 'presentation' },
   { id: 'resident.card_reward', kind: 'presentation' },
   { id: 'story.reward', kind: 'presentation' },
+  { id: STORY_CAMERA_PRESENTATION, kind: 'presentation', validatePayload: validateCameraPayload },
+  { id: STORY_WORLD_UPGRADE_PRESENTATION, kind: 'presentation', validatePayload: validateUpgradePresentation },
   { id: 'story.route', kind: 'route' },
   { id: 'resident.grant_parcel', kind: 'effect', idempotent: true },
   { id: 'optional_action.publish', kind: 'effect', idempotent: true },
   { id: 'relationship.complete_day_one_lesson', kind: 'effect', idempotent: true },
+  { id: 'relationship.begin_meditation', kind: 'effect', idempotent: true, validatePayload: validateMeditationEffect },
   { id: 'story.reward_effect', kind: 'effect', idempotent: true },
+  { id: STORY_WORLD_UPGRADE_EFFECT, kind: 'effect', idempotent: true, validatePayload: validateUpgradeEffect },
 ];
 
 BUILT_INS.forEach((capability) => capabilities.set(capability.id, capability));

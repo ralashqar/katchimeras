@@ -22,6 +22,7 @@ export function havenFtueTargetKey(target: FtueTarget): string | null {
   if (target.kind === 'haven_tile_hud') return `hud:${target.characterId}`;
   if (target.kind === 'haven_upgrade_button') return `upgrade:${target.characterId}`;
   if (target.kind === 'haven_garden_button') return `garden-button:${target.characterId}`;
+  if (target.kind === 'haven_garden_order') return `garden-order:${target.characterId}:${target.orderId}`;
   if (target.kind === 'haven_world') return 'world';
   return null;
 }
@@ -39,7 +40,7 @@ export const HavenFtueOverlay = memo(function HavenFtueOverlay({
   targetRefs: RefObject<Map<string, View>>;
   targetRevision: number;
 }) {
-  const [layout, setLayout] = useState<{ focus: Frame; screen: Frame } | null>(null);
+  const [layout, setLayout] = useState<{ cueFocus: Frame | null; focus: Frame; screen: Frame } | null>(null);
   const configKey = useMemo(() => JSON.stringify([cue, spotlight]), [cue, spotlight]);
 
   useEffect(() => {
@@ -56,7 +57,10 @@ export const HavenFtueOverlay = memo(function HavenFtueOverlay({
         const key = havenFtueTargetKey(target);
         return key ? measure(targetRefs.current.get(key) ?? null) : null;
       }));
-      if (cancelled || frames.some((frame) => frame == null)) return;
+      const cueFrame = cue?.kind === 'tap'
+        ? await measure(targetRefs.current.get(havenFtueTargetKey(cue.target) ?? '') ?? null)
+        : null;
+      if (cancelled || frames.some((frame) => frame == null) || (cue?.kind === 'tap' && !cueFrame)) return;
       const valid = frames as Frame[];
       const padding = spotlight?.padding ?? 6;
       const left = Math.max(screen.x, Math.min(...valid.map((frame) => frame.x)) - padding);
@@ -64,6 +68,12 @@ export const HavenFtueOverlay = memo(function HavenFtueOverlay({
       const right = Math.min(screen.x + screen.width, Math.max(...valid.map((frame) => frame.x + frame.width)) + padding);
       const bottom = Math.min(screen.y + screen.height, Math.max(...valid.map((frame) => frame.y + frame.height)) + padding);
       setLayout({
+        cueFocus: cueFrame ? {
+          x: cueFrame.x - screen.x,
+          y: cueFrame.y - screen.y,
+          width: cueFrame.width,
+          height: cueFrame.height,
+        } : null,
         focus: { x: left - screen.x, y: top - screen.y, width: right - left, height: bottom - top },
         screen: { x: 0, y: 0, width: screen.width, height: screen.height },
       });
@@ -75,7 +85,7 @@ export const HavenFtueOverlay = memo(function HavenFtueOverlay({
   return (
     <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" pointerEvents="none" style={styles.overlay}>
       <Spotlight focus={layout.focus} opacity={spotlight?.dimOpacity ?? 0.62} radius={spotlight?.radius ?? 16} screen={layout.screen} />
-      {cue?.kind === 'tap' ? <Finger focus={layout.focus} resetKey={`${configKey}:${targetRevision}`} /> : null}
+      {cue?.kind === 'tap' ? <Finger focus={layout.cueFocus ?? layout.focus} resetKey={`${configKey}:${targetRevision}`} /> : null}
     </View>
   );
 });

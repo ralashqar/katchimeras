@@ -305,6 +305,7 @@ export function LegacyTodayScreen() {
       dayId: localDayId(growthNow),
       ftueStatus: ftueRun?.status ?? null,
       relationships,
+      now: growthNow.getTime(),
     });
     // The Day 1 completion already has a dedicated endcap on Mossprout's
     // screen. Today should only surface the next actionable Journey Day.

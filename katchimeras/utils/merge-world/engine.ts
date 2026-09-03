@@ -42,6 +42,7 @@ import type {
   MergeWorldState,
   MossproutNatureIslandId,
   MossproutNatureIslandLevel,
+  StoryWorldMutationReceipt,
 } from '@/types/merge-world';
 
 const STEPPLING_HAVEN_BOARD_SIZE = 42;
@@ -199,6 +200,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     lastFreeRerollDayId: null,
     characterProgress: { feastle: { friendshipLevel: 1, completedChapterIds: [] } },
     externalRewardReceipts: [],
+    storyWorldMutationReceipts: [],
     companionDiscovery: {
       records: [], openedGateIds: [], completedGateIds: [], queuedGateIds: [], active: null, lastStartedDayId: null, events: [],
     },
@@ -379,9 +381,9 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
       }, command.now));
     }
     case 'upgradeHavenTile':
-      return upgradeHavenTile(current, command.characterId, command.stage, command.now);
+      return upgradeHavenTile(current, command.characterId, command.stage, command.now, command.receiptId, command.economyMode, command.grantedCoins);
     case 'upgradeMossproutNatureIsland':
-      return upgradeMossproutNatureIsland(current, command.islandId, command.level, command.now);
+      return upgradeMossproutNatureIsland(current, command.islandId, command.level, command.now, command.receiptId, command.economyMode, command.grantedCoins);
     case 'revealHaven': {
       if (current.haven.revealState === 'revealed') return unchanged(current);
       return changed(touch({ ...current, haven: { ...current.haven, revealState: 'revealed' } }, command.now), 'The Haven awakens.');
@@ -663,6 +665,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
       ? source.characterProgress
       : fallback.characterProgress,
     externalRewardReceipts: Array.isArray(source.externalRewardReceipts) ? source.externalRewardReceipts : [],
+    storyWorldMutationReceipts: normalizeStoryWorldMutationReceipts(source.storyWorldMutationReceipts),
     companionDiscovery: normalizeCompanionDiscovery(source.companionDiscovery, source.unlockedCharacters, source.activeOrders, rawVersion, now),
     residentCardDiscovery: normalizeResidentCardDiscovery(source.residentCardDiscovery, source.ownedKatchimeraCards, now),
     mossproutBoardProgression: normalizeMossproutBoardProgression(source.mossproutBoardProgression),
@@ -695,26 +698,81 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   return refreshTime(normalized, now);
 }
 
-function upgradeHavenTile(state: MergeWorldState, characterId: MergeCharacterId, requestedStage: HavenStage, now: number): MergeWorldCommandResult {
+function upgradeHavenTile(
+  state: MergeWorldState,
+  characterId: MergeCharacterId,
+  requestedStage: HavenStage,
+  now: number,
+  receiptId?: string,
+  economyMode: 'normal' | 'free' | 'grant' = 'normal',
+  grantedCoins = 0,
+): MergeWorldCommandResult {
+  const existingReceipt = receiptId ? state.storyWorldMutationReceipts.find((receipt) => receipt.id === receiptId) : null;
+  if (existingReceipt) {
+    return {
+      ...unchanged(state, 'This story upgrade was already applied.'),
+      havenUpgrade: { characterId, stage: existingReceipt.toLevel as HavenStage, coinCost: existingReceipt.coinCost },
+      storyWorldMutationReceipt: existingReceipt,
+    };
+  }
   if (!state.unlockedCharacters.includes(characterId)) return unchanged(state, 'Discover this Katchimera first.');
   if (characterId === 'mossprout' && requestedStage > 1) {
     return unchanged(state, 'Grow Mossprout’s six nature islands to deepen the Haven.');
   }
   const currentStage = state.haven.tileStages[characterId] ?? 0;
+  // A released story may have applied this level before world-upgrade receipts
+  // existed. Adopt the already-satisfied state into the new effect journal so
+  // recovery can still play its reveal without charging or mutating twice.
+  if (receiptId && requestedStage === currentStage) {
+    const receipt: StoryWorldMutationReceipt = {
+      id: receiptId,
+      kind: 'haven_upgrade',
+      target: { kind: 'haven_tile', characterId },
+      fromLevel: currentStage,
+      toLevel: requestedStage,
+      economyMode,
+      coinCost: 0,
+      createdAt: now,
+    };
+    const next = touch({
+      ...state,
+      storyWorldMutationReceipts: [...state.storyWorldMutationReceipts, receipt],
+    }, now);
+    return {
+      state: next,
+      changed: true,
+      havenUpgrade: { characterId, stage: requestedStage, coinCost: 0 },
+      storyWorldMutationReceipt: receipt,
+      message: 'This story upgrade was already present and has been recovered.',
+    };
+  }
   if (requestedStage !== currentStage + 1) return unchanged(state, 'Haven environments grow one stage at a time.');
   const definition = havenStageDefinition(characterId, requestedStage);
   if (!definition) return unchanged(state, 'This environment is not ready yet.');
   if (!havenStoryGateSatisfied(state, definition.storyGate)) return unchanged(state, 'Continue this Katchimera’s story first.');
-  if (state.coins < definition.coinCost) return unchanged(state, 'Earn a few more Coins through Merge orders.');
+  const grant = economyMode === 'grant' ? Math.max(0, Math.floor(grantedCoins)) : 0;
+  const coinCost = economyMode === 'free' ? 0 : definition.coinCost;
+  if (state.coins + grant < coinCost) return unchanged(state, 'Earn a few more Coins through Merge orders.');
   const revealState = characterId === 'mossprout' && requestedStage === 1 && state.haven.revealState === 'hidden'
     ? 'first_restore_complete' as const
     : state.haven.revealState;
   const mossproutNatureIslands = characterId === 'mossprout' && requestedStage === 1
     ? emptyMossproutNatureIslandLevels(1)
     : state.haven.mossproutNatureIslands;
+  const receipt: StoryWorldMutationReceipt | null = receiptId ? {
+    id: receiptId,
+    kind: 'haven_upgrade',
+    target: { kind: 'haven_tile', characterId },
+    fromLevel: currentStage,
+    toLevel: requestedStage,
+    economyMode,
+    coinCost,
+    createdAt: now,
+  } : null;
   const next = touch({
     ...state,
-    coins: state.coins - definition.coinCost,
+    coins: state.coins + grant - coinCost,
+    storyWorldMutationReceipts: receipt ? [...state.storyWorldMutationReceipts, receipt] : state.storyWorldMutationReceipts,
     haven: {
       ...state.haven,
       tileStages: { ...state.haven.tileStages, [characterId]: requestedStage },
@@ -722,7 +780,7 @@ function upgradeHavenTile(state: MergeWorldState, characterId: MergeCharacterId,
       revealState,
     },
   }, now);
-  return { state: next, changed: true, havenUpgrade: { characterId, stage: requestedStage, coinCost: definition.coinCost }, message: `${definition.name} restored.` };
+  return { state: next, changed: true, havenUpgrade: { characterId, stage: requestedStage, coinCost }, storyWorldMutationReceipt: receipt ?? undefined, message: `${definition.name} restored.` };
 }
 
 function upgradeMossproutNatureIsland(
@@ -730,7 +788,18 @@ function upgradeMossproutNatureIsland(
   islandId: MossproutNatureIslandId,
   requestedLevel: MossproutNatureIslandLevel,
   now: number,
+  receiptId?: string,
+  economyMode: 'normal' | 'free' | 'grant' = 'normal',
+  grantedCoins = 0,
 ): MergeWorldCommandResult {
+  const existingReceipt = receiptId ? state.storyWorldMutationReceipts.find((receipt) => receipt.id === receiptId) : null;
+  if (existingReceipt) {
+    return {
+      ...unchanged(state, 'This story upgrade was already applied.'),
+      natureIslandUpgrade: { islandId, level: existingReceipt.toLevel as MossproutNatureIslandLevel, coinCost: existingReceipt.coinCost, completedTier: false },
+      storyWorldMutationReceipt: existingReceipt,
+    };
+  }
   const island = mossproutNatureIslandById.get(islandId);
   if (!island) return unchanged(state, 'That part of the garden is not available.');
   if (!state.unlockedCharacters.includes('mossprout') || (state.haven.tileStages.mossprout ?? 0) < 1) {
@@ -745,7 +814,9 @@ function upgradeMossproutNatureIsland(
   if (!havenStoryGateSatisfied(state, definition.storyGate)) {
     return unchanged(state, 'Continue Mossprout’s story first.');
   }
-  if (state.coins < definition.coinCost) {
+  const grant = economyMode === 'grant' ? Math.max(0, Math.floor(grantedCoins)) : 0;
+  const coinCost = economyMode === 'free' ? 0 : definition.coinCost;
+  if (state.coins + grant < coinCost) {
     return unchanged(state, 'Earn a few more Coins through Merge orders.');
   }
 
@@ -756,9 +827,20 @@ function upgradeMossproutNatureIsland(
   const completedTier = MOSSPROUT_NATURE_ISLAND_IDS.every((id) => mossproutNatureIslands[id] >= requestedLevel);
   const existingStage = state.haven.tileStages.mossprout ?? 1;
   const aggregateStage = completedTier ? Math.max(existingStage, requestedLevel) as HavenStage : existingStage;
+  const receipt: StoryWorldMutationReceipt | null = receiptId ? {
+    id: receiptId,
+    kind: 'haven_upgrade',
+    target: { kind: 'haven_nature_island', islandId },
+    fromLevel: currentLevel,
+    toLevel: requestedLevel,
+    economyMode,
+    coinCost,
+    createdAt: now,
+  } : null;
   const next = touch({
     ...state,
-    coins: state.coins - definition.coinCost,
+    coins: state.coins + grant - coinCost,
+    storyWorldMutationReceipts: receipt ? [...state.storyWorldMutationReceipts, receipt] : state.storyWorldMutationReceipts,
     haven: {
       ...state.haven,
       mossproutNatureIslands,
@@ -769,8 +851,41 @@ function upgradeMossproutNatureIsland(
     state: next,
     changed: true,
     message: `${island.name} grew into ${definition.name}.`,
-    natureIslandUpgrade: { islandId, level: requestedLevel, coinCost: definition.coinCost, completedTier },
+    natureIslandUpgrade: { islandId, level: requestedLevel, coinCost, completedTier },
+    storyWorldMutationReceipt: receipt ?? undefined,
   };
+}
+
+function normalizeStoryWorldMutationReceipts(value: unknown): StoryWorldMutationReceipt[] {
+  if (!Array.isArray(value)) return [];
+  const ids = new Set<string>();
+  return value.flatMap((candidate) => {
+    if (!candidate || typeof candidate !== 'object') return [];
+    const receipt = candidate as Partial<StoryWorldMutationReceipt>;
+    if (typeof receipt.id !== 'string' || !receipt.id || ids.has(receipt.id) || receipt.kind !== 'haven_upgrade') return [];
+    const target = receipt.target;
+    const normalizedTarget: StoryWorldMutationReceipt['target'] | null = target?.kind === 'haven_tile'
+      && typeof target.characterId === 'string'
+      && KNOWN_CHARACTERS.has(target.characterId as MergeCharacterId)
+      ? { kind: 'haven_tile', characterId: target.characterId as MergeCharacterId }
+      : target?.kind === 'haven_nature_island'
+        && MOSSPROUT_NATURE_ISLAND_IDS.includes(target.islandId as MossproutNatureIslandId)
+        ? { kind: 'haven_nature_island', islandId: target.islandId as MossproutNatureIslandId }
+        : null;
+    if (!normalizedTarget || !Number.isInteger(receipt.fromLevel) || !Number.isInteger(receipt.toLevel)) return [];
+    if (receipt.economyMode !== 'normal' && receipt.economyMode !== 'free' && receipt.economyMode !== 'grant') return [];
+    ids.add(receipt.id);
+    return [{
+      id: receipt.id,
+      kind: 'haven_upgrade' as const,
+      target: normalizedTarget,
+      fromLevel: receipt.fromLevel!,
+      toLevel: receipt.toLevel!,
+      economyMode: receipt.economyMode,
+      coinCost: Math.max(0, Math.floor(Number(receipt.coinCost) || 0)),
+      createdAt: Number(receipt.createdAt) || 0,
+    }];
+  });
 }
 
 function normalizeHaven(value: unknown, source: Partial<MergeWorldState>, rawVersion: unknown, now: number): MergeWorldState['haven'] {
@@ -1766,7 +1881,15 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
   const residentSequenceActive = next.residentCardDiscovery.records.some((record) => record.status !== 'locked' && record.status !== 'card_earned');
   if (!residentSequenceActive) next = ensureProceduralOrders(next, now);
   next = touch(next, now);
-  return { state: next, changed: true, servedOrderId: order.id, energyGranted: 0, clearedMistCells, residentCardEarned, message: `${order.title} served.` };
+  return {
+    state: next,
+    changed: true,
+    servedOrderId: order.id,
+    energyGranted: 0,
+    clearedMistCells,
+    residentCardEarned,
+    message: `${order.title} served.`,
+  };
 }
 
 /**

@@ -88,6 +88,7 @@ export type FtueTarget =
   | { kind: 'haven_upgrade_button'; characterId: string }
   | { kind: 'haven_garden_tile'; characterId: 'mossprout' }
   | { kind: 'haven_garden_button'; characterId: 'mossprout' }
+  | { kind: 'haven_garden_order'; characterId: 'mossprout'; orderId: string }
   | { kind: 'haven_home' }
   | { kind: 'haven_world' };
 
@@ -162,7 +163,7 @@ export type FtueEventMatcher =
   | { type: 'haven_upgrade_completed'; characterId?: string; stage?: number };
 
 export type FtueCameraDirective =
-  | { kind: 'focus_target'; target: FtueTarget; zoom?: number; anchorY?: number; durationMs?: number }
+  | { kind: 'focus_target'; target: FtueTarget; zoom?: number; anchorY?: number; durationMs?: number; projectionOnly?: boolean }
   | { kind: 'fit_targets'; targets: readonly FtueTarget[]; padding?: number; durationMs?: number };
 
 export type FtueGraphEdge = {

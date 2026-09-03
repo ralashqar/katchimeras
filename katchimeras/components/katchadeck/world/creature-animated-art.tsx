@@ -30,6 +30,7 @@ export function CreatureAnimatedArt({
   accessibilityLabel,
   allowDownscaling = true,
   fallbackSource,
+  forceStatic = false,
   onLoad,
   style,
   visualKey,
@@ -37,6 +38,10 @@ export function CreatureAnimatedArt({
   accessibilityLabel: string;
   allowDownscaling?: boolean;
   fallbackSource: QuestionnaireImageSource;
+  /** Keep the full-resolution still visible while a large parent transform is
+   * moving. Animated WebP frames are intentionally smaller and can otherwise
+   * be rasterized softly during a camera zoom. */
+  forceStatic?: boolean;
   onLoad?: () => void;
   style: StyleProp<ImageStyle>;
   visualKey: HomeVisualKey;
@@ -49,8 +54,8 @@ export function CreatureAnimatedArt({
   const [animationReady, setAnimationReady] = useState(false);
   const animationSource = resolveCreatureIdleAnimationSource(visualKey);
   const idleFallbackSource = resolveCreatureIdleFallbackSource(visualKey) ?? fallbackSource;
-  const shouldAnimate = Boolean(animationSource) && !animationFailed && !reduceMotion && isFocused && appState === 'active';
-  const source = animationSource && !animationFailed && !reduceMotion ? animationSource : idleFallbackSource;
+  const shouldAnimate = Boolean(animationSource) && !animationFailed && !forceStatic && !reduceMotion && isFocused && appState === 'active';
+  const source = animationSource && !animationFailed && !forceStatic && !reduceMotion ? animationSource : idleFallbackSource;
 
   useEffect(() => {
     if (!animationSource) return;
@@ -70,6 +75,7 @@ export function CreatureAnimatedArt({
     animationReady,
     animationSource,
     appState,
+    forceStatic,
     isFocused,
     reduceMotion,
     shouldAnimate,
@@ -84,7 +90,7 @@ export function CreatureAnimatedArt({
 
   useEffect(() => {
     const image = imageRef.current;
-    if (!image || !animationSource || !animationReady || animationFailed || reduceMotion) return;
+    if (!image || !animationSource || !animationReady || animationFailed || forceStatic || reduceMotion) return;
     logIdleDiagnostic('info', 'playback-command', {
       command: shouldAnimate ? 'start' : 'stop',
       visualKey,
@@ -102,7 +108,7 @@ export function CreatureAnimatedArt({
         visualKey,
       });
     });
-  }, [animationFailed, animationReady, animationSource, reduceMotion, shouldAnimate, visualKey]);
+  }, [animationFailed, animationReady, animationSource, forceStatic, reduceMotion, shouldAnimate, visualKey]);
 
   const handleLoad = (event: ImageLoadEventData) => {
     const loadedAnimationSource = Boolean(animationSource && source === animationSource);

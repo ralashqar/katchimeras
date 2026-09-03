@@ -6,32 +6,12 @@ export type MossproutGardenIntroBeat = {
 
 export const MOSSPROUT_GARDEN_INTRO_BEATS: readonly MossproutGardenIntroBeat[] = [
   {
-    line: 'Thank you for telling me. Can I share something too?',
-    actionLabel: 'Of course',
-    icon: 'bubble.left.fill',
-  },
-  {
-    line: 'This Garden used to be bright and full of little friends.',
+    line: 'If we’re growing something, I suppose my Garden should start growing too.',
     actionLabel: 'Continue',
     icon: 'arrow.right',
   },
   {
-    line: 'But it grew wild, and they stopped visiting.',
-    actionLabel: 'Continue',
-    icon: 'arrow.right',
-  },
-  {
-    line: 'I tried to care for it alone. I couldn\'t keep up.',
-    actionLabel: 'Continue',
-    icon: 'arrow.right',
-  },
-  {
-    line: 'If we restore it together, maybe my friends will come home.',
-    actionLabel: 'Continue',
-    icon: 'heart.fill',
-  },
-  {
-    line: 'Come on. I\'ll show you our Garden.',
+    line: 'Four tiny Seeds can become one First Bloom. When it grows, this place will remember what we began together.',
     actionLabel: 'Show me the Garden',
     icon: 'leaf.fill',
   },

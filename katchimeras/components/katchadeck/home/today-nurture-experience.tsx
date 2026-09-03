@@ -445,7 +445,8 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   // world-space buffer before the egg's measured visual top.
   const growthMeterTop = eggVisualTop - 81;
   const scenePinchFocusY = stageTop + sceneLift + explorationEggFrame.centerY;
-  const openingQuestionAwaitingAnswer = scriptedTextChoiceAction?.id === 'egg.desired_feeling'
+  const openingQuestionAwaitingAnswer = (scriptedTextChoiceAction?.id === 'egg.day_texture'
+    || scriptedTextChoiceAction?.id === 'egg.desired_feeling')
     && !currentScriptedTextSelection;
   const onboardingEggSleeping = Boolean(onboardingFocus && (
     (scriptedMoodAction && !scriptedMoodSelection)

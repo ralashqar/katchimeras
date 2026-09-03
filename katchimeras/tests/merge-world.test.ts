@@ -329,7 +329,7 @@ test('Steppling board commands preserve Mossprout cells while sharing world rewa
   assert.equal(result.state.haven.residentMergeBoards.steppling?.revision, 1);
 });
 
-test('Mossprout Chapter 0 teaches one merge, serves one Sprout, and restores the Garden basket', () => {
+test('Mossprout Chapter 0 teaches one merge and leaves its Garden upgrade to the story operation', () => {
   let state = createMossproutChapterZeroState(NOW, 'heartlet');
   const openCount = () => state.board.filter((cell) => !cell.locked).length;
   assert.equal(openCount(), 20);
@@ -349,7 +349,8 @@ test('Mossprout Chapter 0 teaches one merge, serves one Sprout, and restores the
   state = reduceMergeWorld(state, { type: 'move', from: seedCells[0], to: seedCells[1], now: NOW + 1 }).state;
   state = reduceMergeWorld(state, { type: 'move', from: seedCells[2], to: seedCells[3], now: NOW + 1.5 }).state;
   state = reduceMergeWorld(state, { type: 'move', from: seedCells[1], to: seedCells[3], now: NOW + 2 }).state;
-  state = reduceMergeWorld(state, { type: 'serveOrder', orderId: 'mossprout:chapter-0:first-sprout', now: NOW + 3 }).state;
+  const firstBloom = reduceMergeWorld(state, { type: 'serveOrder', orderId: 'mossprout:chapter-0:first-sprout', now: NOW + 3 });
+  state = firstBloom.state;
   assert.equal(openCount(), 20);
   assert.deepEqual(state.activeOrders, []);
   assert.equal(state.energy.value, 0);
@@ -357,6 +358,10 @@ test('Mossprout Chapter 0 teaches one merge, serves one Sprout, and restores the
   assert.equal(state.generators['wild-garden'].forcedDropDefinitionId, null);
   assert.deepEqual(state.generators['wild-garden'].tierOneDropDefinitionIds, ['nature:garden:1', 'nature:waterside:1']);
   assert.equal(Boolean(state.characterProgress.mossprout?.completedChapterIds.includes('mossprout-chapter-0')), true);
+  assert.equal(firstBloom.havenUpgrade, undefined);
+  assert.equal(state.haven.tileStages.mossprout, undefined);
+  assert.equal(state.haven.revealState, 'hidden');
+  assert.deepEqual(Object.values(state.haven.mossproutNatureIslands), [0, 0, 0, 0, 0, 0]);
   assert.ok(state.externalRewardReceipts.some((receipt) => receipt.id === 'merge-story-served:mossprout:chapter-0:first-sprout'));
   assert.equal(state.externalRewardReceipts.some((receipt) => receipt.kind === 'wisp'), false);
 

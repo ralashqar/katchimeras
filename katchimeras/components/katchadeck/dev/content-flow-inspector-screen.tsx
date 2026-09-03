@@ -6,18 +6,22 @@ import { ThemedText } from '@/components/themed-text';
 import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 import { contentFlowDefinition, registeredContentFlowDefinitions } from '@/features/content-flow/content-flow-catalog';
 import { bootstrapContentFlowCatalog } from '@/features/content-flow/content-flow-bootstrap';
-import { dispatchContentFlowCommand } from '@/features/content-flow/content-flow-director';
+import { dispatchContentFlowCommand, previewContentFlowNodeForDebug } from '@/features/content-flow/content-flow-director';
 import { listContentFlowRuns, subscribeContentFlowJournal } from '@/features/content-flow/content-flow-repository';
 import { storyFlowDiagnostics, subscribeStoryFlowDiagnostics, type StoryFlowDiagnostic } from '@/features/content-flow/story-flow-diagnostics';
 import type { ContentFlowRun } from '@/types/content-flow';
+import { registeredStoryVariantSets, selectStoryVariantForDebug, selectedStoryVariant } from '@/features/content-flow/story-variant-registry';
 
-function FlowRunCard({ onRetry, run }: { onRetry: () => void; run: ContentFlowRun }) {
+function FlowRunCard({ onPreview, onRetry, run }: { onPreview: (nodeId: string) => void; onRetry: () => void; run: ContentFlowRun }) {
   const definition = contentFlowDefinition(run.definitionId, run.definitionVersion);
   const node = definition?.nodes.find((candidate) => candidate.id === run.nodeId);
   const effectCount = Object.keys(run.effectReceipts).length;
   const presentationCount = Object.keys(run.presentationReceipts).length;
   const navigationCount = Object.keys(run.navigationReceipts).length;
   const target = node?.kind === 'route' ? node.target.pathname : null;
+  const nodeIndex = definition?.nodes.findIndex((candidate) => candidate.id === run.nodeId) ?? -1;
+  const previousNode = nodeIndex > 0 ? definition?.nodes[nodeIndex - 1] : null;
+  const nextNode = nodeIndex >= 0 ? definition?.nodes[nodeIndex + 1] : null;
   return <View style={styles.card}>
     <View style={styles.row}>
       <ThemedText selectable style={styles.title}>{run.definitionId}</ThemedText>
@@ -30,6 +34,11 @@ function FlowRunCard({ onRetry, run }: { onRetry: () => void; run: ContentFlowRu
     {typeof run.variables.shadowLastComparison === 'string' ? <ThemedText selectable style={run.variables.shadowLastComparison.startsWith('matched:') ? styles.match : styles.error}>{run.variables.shadowLastComparison}</ThemedText> : null}
     {run.error ? <ThemedText selectable style={styles.error}>{run.error}</ThemedText> : null}
     {run.status === 'failed_recoverable' ? <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retry}><ThemedText style={styles.refreshLabel}>Retry node</ThemedText></Pressable> : null}
+    {definition ? <View style={styles.previewRow}>
+      <Pressable accessibilityRole="button" disabled={!previousNode} onPress={() => previousNode && onPreview(previousNode.id)} style={[styles.preview, !previousNode && styles.previewDisabled]}><ThemedText style={styles.previewLabel}>Previous</ThemedText></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => onPreview(run.nodeId)} style={styles.preview}><ThemedText style={styles.previewLabel}>Replay node</ThemedText></Pressable>
+      <Pressable accessibilityRole="button" disabled={!nextNode} onPress={() => nextNode && onPreview(nextNode.id)} style={[styles.preview, !nextNode && styles.previewDisabled]}><ThemedText style={styles.previewLabel}>Next</ThemedText></Pressable>
+    </View> : null}
     {Object.keys(run.objectiveProgress).length ? <ThemedText selectable style={styles.code}>{JSON.stringify(run.objectiveProgress, null, 2)}</ThemedText> : null}
   </View>;
 }
@@ -61,7 +70,16 @@ export function ContentFlowInspectorScreen() {
         <Pressable accessibilityRole="button" onPress={refresh} style={styles.refresh}><ThemedText style={styles.refreshLabel}>Refresh</ThemedText></Pressable>
       </View>
       {error ? <ThemedText selectable style={styles.error}>{error}</ThemedText> : null}
-      {runs.length ? runs.map((run) => <FlowRunCard key={run.runId} onRetry={() => { void dispatchContentFlowCommand(run.runId, { type: 'retry' }); }} run={run} />) : <View style={styles.card}><ThemedText selectable style={styles.detail}>No flow runs have been recorded yet.</ThemedText></View>}
+      {runs.length ? runs.map((run) => <FlowRunCard key={run.runId} onPreview={(nodeId) => { void previewContentFlowNodeForDebug(run.runId, nodeId).catch((caught) => setError(caught instanceof Error ? caught.message : 'Could not preview node.')); }} onRetry={() => { void dispatchContentFlowCommand(run.runId, { type: 'retry' }); }} run={run} />) : <View style={styles.card}><ThemedText selectable style={styles.detail}>No flow runs have been recorded yet.</ThemedText></View>}
+      <ThemedText selectable style={styles.sectionHeading}>Local variants</ThemedText>
+      {registeredStoryVariantSets().map((set) => <View key={set.id} style={styles.card}>
+        <ThemedText selectable style={styles.title}>{set.id}</ThemedText>
+        <ThemedText selectable style={styles.detail}>Selection applies to newly started runs.</ThemedText>
+        <View style={styles.previewRow}>{set.variants.map((variant) => {
+          const selected = selectedStoryVariant(set.id).id === variant.id;
+          return <Pressable accessibilityRole="button" key={variant.id} onPress={() => { selectStoryVariantForDebug(set.id, variant.id); refresh(); }} style={[styles.preview, selected && styles.previewSelected]}><ThemedText style={styles.previewLabel}>{selected ? '✓ ' : ''}{variant.label}</ThemedText></Pressable>;
+        })}</View>
+      </View>)}
       <ThemedText selectable style={styles.sectionHeading}>Registered graphs</ThemedText>
       {registeredContentFlowDefinitions().map((definition) => <View key={`${definition.id}@${definition.version}`} style={styles.card}>
         <ThemedText selectable style={styles.title}>{definition.id} · v{definition.version}</ThemedText>
@@ -92,6 +110,11 @@ const styles = StyleSheet.create({
   node: { color: '#36543A', fontSize: 16, fontWeight: '800' },
   refresh: { backgroundColor: '#36543A', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
   refreshLabel: { color: '#FFF', fontSize: 13, fontWeight: '800' },
+  preview: { backgroundColor: '#536F56', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
+  previewDisabled: { opacity: 0.35 },
+  previewLabel: { color: '#FFF', fontSize: 12, fontWeight: '800' },
+  previewRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  previewSelected: { backgroundColor: '#2D4E32' },
   retry: { alignSelf: 'flex-start', backgroundColor: '#A34D36', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
   row: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
   title: { color: '#302B22', flex: 1, fontSize: 17, fontWeight: '800' },

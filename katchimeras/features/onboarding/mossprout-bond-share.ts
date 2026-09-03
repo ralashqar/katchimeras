@@ -24,19 +24,47 @@ export type MossproutBondSharePrompt = {
 
 export const MOSSPROUT_BOND_SHARE_PROMPTS = [
   {
-    id: 'hard-day-help',
-    cardLabel: 'What helps on a hard day?',
+    id: 'growth-intent',
+    cardLabel: 'What we’ll grow',
     icon: 'leaf.fill',
-    prompt: 'What usually helps when your day isn’t going well?',
-    reply: 'I’ll remember that.',
+    prompt: 'Is it something you want more of… or something you’re trying to fix?',
+    reply: 'Good. I don’t need to know everything today. We can grow it bit by bit.',
     options: [
-      { id: 'getting_outside', icon: 'leaf.fill', label: 'Getting outside', reply: 'Fresh air does make things feel less stuck.' },
-      { id: 'being_with_someone', icon: 'person.2.fill', label: 'Being with someone', reply: 'It’s easier when you’re not carrying everything alone.' },
-      { id: 'having_time_alone', icon: 'house.fill', label: 'Having time alone', reply: 'Quiet helps some things grow.' },
-      { id: 'doing_something_enjoyable', icon: 'sparkles', label: 'Doing something I enjoy', reply: 'Maybe fun is more useful than people give it credit for.' },
+      { id: 'want_to_grow', icon: 'sparkles', label: 'Something I want to grow', reply: 'Then we’ll begin with one small, living thing.' },
+      { id: 'want_to_improve', icon: 'puzzlepiece.fill', label: 'Something I want to improve', reply: 'We can make it better without asking it to become perfect.' },
+      { id: 'not_sure_yet', icon: 'questionmark', label: 'I’m not really sure yet', reply: 'That’s all right. A seed doesn’t need to know its whole shape.' },
     ],
   },
 ] as const satisfies readonly MossproutBondSharePrompt[];
+
+export const MOSSPROUT_WATER_TOGETHER_OPTIONS = [
+  { id: 'could_use_water', icon: 'drop.fill', label: 'I could probably use some water', reply: 'Then let’s both have a drink today. Nothing grand—just one little watering.' },
+  { id: 'already_good', icon: 'checkmark.circle.fill', label: 'I’m good', reply: 'Look at you, already watered. I’ll try to keep up.' },
+  { id: 'dont_start', icon: 'face.smiling.fill', label: 'Mossprout, don’t start', reply: 'Ha! All right, all right. I’ll tend my roots and mind my leaves.' },
+] as const;
+
+export function mossproutWaterTogetherReply(choiceId: string | null | undefined): string {
+  return MOSSPROUT_WATER_TOGETHER_OPTIONS.find((option) => option.id === choiceId)?.reply
+    ?? 'We can look after ourselves a little at a time.';
+}
+
+export function mossproutFirstSeedForIntent(intentId: string | null | undefined) {
+  if (intentId === 'growth-intent:want_to_improve') return {
+    id: 'seed-of-patience',
+    name: 'Seed of Patience',
+    message: 'Make one small thing kinder than it was yesterday.',
+  };
+  if (intentId === 'growth-intent:not_sure_yet') return {
+    id: 'seed-of-curiosity',
+    name: 'Seed of Curiosity',
+    message: 'Notice what gives you a little more life.',
+  };
+  return {
+    id: 'seed-of-momentum',
+    name: 'Seed of Momentum',
+    message: 'Start small enough that starting isn’t scary.',
+  };
+}
 
 export function mossproutBondSharePrompt(promptId: string | null | undefined) {
   return MOSSPROUT_BOND_SHARE_PROMPTS.find((prompt) => prompt.id === promptId) ?? null;

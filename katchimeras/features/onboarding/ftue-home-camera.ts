@@ -63,9 +63,8 @@ export function ftueHomeCameraPanTarget(stepId: string | null | undefined): numb
 }
 
 /**
- * The Grove opening has three answers rather than the retired five-answer
- * route. Preserve the same logarithmic camera retreat, divided into three
- * equal visual steps so every feed removes the same amount of zoom.
+ * The relationship-first Grove opening asks one meaningful question. Its
+ * answer completes the camera retreat in one clear magical response.
  */
 export function mossproutGroveEggCameraPinchTarget(
   stepId: string | null | undefined,
@@ -107,11 +106,11 @@ export function mossproutGroveEggCameraDuration(stepId: string | null | undefine
 
 /**
  * Today maps Energy 0..0.5 onto the Egg's complete physical 0.5x..1x growth
- * range. Divide that exact range evenly across the Grove's three answers.
+ * range. The one authored answer completes that range.
  */
 export function mossproutGroveEggEnergyRatio(answeredCount: number): number {
-  const completed = Math.min(3, Math.max(0, answeredCount));
-  return completed / 6;
+  const completed = Math.min(1, Math.max(0, answeredCount));
+  return completed / 2;
 }
 
 export function clampFtueCameraPanToCoverage({

@@ -11,13 +11,16 @@ import {
   reduceContentFlow,
 } from '@/features/content-flow/content-flow-interpreter';
 import { compileJourneyCampaignFlows } from '@/features/content-flow/journey-flow-compiler';
-import { compileFtueFlow } from '@/features/content-flow/ftue-flow-adapter';
 import { rewardedChildActionFlow } from '@/features/content-flow/content-flow-templates';
 import { MOSSPROUT_FTUE_SCRIPT } from '@/features/onboarding/mossprout-ftue-script';
+import { MOSSPROUT_FTUE_FLOW } from '@/features/onboarding/mossprout-ftue-flow';
 import type { ContentFlowDefinition, ContentFlowEvent } from '@/types/content-flow';
 import { storyRoute } from '@/features/content-flow/story-route-registry';
 import { defineStory, story } from '@/features/content-flow/story-manifest';
 import { clearContentFlowCatalogForTests, registerContentFlowDefinition } from '@/features/content-flow/content-flow-catalog';
+import { contentFlowEffectResult, upgradeWorldTargetRecipe } from '@/features/content-flow/story-world-operations';
+import { StoryTargetRegistry, waitForStoryTargets } from '@/features/content-flow/story-targets';
+import { clearStoryVariantRegistryForTests, defineStoryVariants, registerStoryVariantSet, selectStoryVariantForDebug, selectedStoryVariant } from '@/features/content-flow/story-variant-registry';
 
 const COMPLETE_FLOW = defineContentFlow({
   id: 'test:durable',
@@ -173,13 +176,16 @@ test('all Mossprout Journey days compile as executable, terminal graphs', () => 
     assert.equal(flow.nodes.at(-1)?.kind, 'complete');
   }
   const dayOne = flows[0]!;
-  assert.ok(dayOne.nodes.some((node) => node.kind === 'effect' && node.effectType === 'resident.grant_parcel'));
-  assert.ok(dayOne.nodes.some((node) => node.kind === 'presentation' && node.presentationType === 'resident.card_reward'));
+  const dayTwo = flows[1]!;
+  assert.equal(dayOne.nodes.some((node) => node.kind === 'effect' && node.effectType === 'resident.grant_parcel'), false);
+  assert.ok(dayTwo.nodes.some((node) => node.kind === 'effect' && node.effectType === 'resident.grant_parcel'));
+  assert.ok(dayTwo.nodes.some((node) => node.kind === 'presentation' && node.presentationType === 'resident.card_reward'));
 });
 
-test('the existing FTUE graph compiles without screen-owned step semantics', () => {
-  const flow = compileFtueFlow(MOSSPROUT_FTUE_SCRIPT);
+test('the shipping FTUE is a direct data-driven Content Flow manifest', () => {
+  const flow = MOSSPROUT_FTUE_FLOW;
   assert.deepEqual(validateContentFlowDefinition(flow), []);
+  assert.equal(flow.metadata.authoring, 'content-flow');
   assert.equal(flow.entryNodeId, MOSSPROUT_FTUE_SCRIPT.entryStepId);
   assert.equal(flow.nodes.find((node) => node.id === MOSSPROUT_FTUE_SCRIPT.terminalStepId)?.kind, 'complete');
   const dayOneEffect = flow.nodes.find((node) => node.kind === 'effect' && node.effectType === 'relationship.complete_day_one_lesson');
@@ -191,13 +197,13 @@ test('the existing FTUE graph compiles without screen-owned step semantics', () 
   const opening = flow.nodes.find((node) => node.id === 'egg.opening');
   assert.equal(opening?.kind, 'scene');
   if (opening?.kind === 'scene') {
-    assert.deepEqual(new Set(opening.actions.map((action) => action.next)), new Set(['egg.context']));
+    assert.deepEqual(new Set(opening.actions.map((action) => action.next)), new Set(['egg.ready']));
   }
   assert.equal(flow.nodes.some((node) => node.id === 'egg.nature_theme'), false);
 });
 
 test('Day 1 Content Flow completion durably crosses the relationship effect before Garden', () => {
-  const flow = compileFtueFlow(MOSSPROUT_FTUE_SCRIPT);
+  const flow = MOSSPROUT_FTUE_FLOW;
   const base = createContentFlowRun(flow, { runId: 'ftue-day-one', now: 1 });
   const atLesson = { ...base, nodeId: 'companion.day_one_action', phase: 'awaiting_input' as const };
   const effect = reduceContentFlow(flow, atLesson, { type: 'submit_scene', actionId: 'companion.complete_day_one_action', now: 2 });
@@ -206,6 +212,87 @@ test('Day 1 Content Flow completion durably crosses the relationship effect befo
   if (effect.pendingWork.kind !== 'effect') return;
   assert.equal(effect.pendingWork.effectType, 'relationship.complete_day_one_lesson');
   const advanced = reduceContentFlow(flow, effect.run, { type: 'effect_completed', effectKey: effect.pendingWork.key, now: 3 });
-  assert.equal(advanced.run.nodeId, 'companion.garden_intro');
+  assert.equal(advanced.run.nodeId, 'companion.bond_spotlight');
   assert.equal(Object.keys(advanced.run.effectReceipts).length, 1);
+});
+
+test('world upgrade recipes expand into focus, atomic commit, and receipt-backed reveal', () => {
+  const operationNodes = upgradeWorldTargetRecipe({
+    id: 'restore.first-corner',
+    target: { kind: 'haven_tile', familyId: 'mossprout' },
+    toLevel: 1,
+    economy: { mode: 'free', reason: 'FTUE first bloom' },
+    focusTarget: { kind: 'haven_structure', structureId: 'mossprout-hex-garden' },
+    next: 'complete',
+    presentation: { reactionLine: 'The garden remembered.', showCoins: false },
+  });
+  const flow = defineStory({
+    id: 'test:world-upgrade',
+    version: 1,
+    entryNodeId: operationNodes[0]!.id,
+    nodes: [...operationNodes, story.complete()],
+    metadata: { kind: 'story' as const },
+  });
+  assert.deepEqual(flow.nodes.map((node) => node.kind), ['presentation', 'effect', 'presentation', 'complete']);
+  const focus = flow.nodes[0];
+  assert.deepEqual(focus.kind === 'presentation' ? focus.payload?.target : null, { kind: 'haven_structure', structureId: 'mossprout-hex-garden' });
+  const reveal = flow.nodes[2];
+  assert.equal(reveal.kind === 'presentation' ? reveal.payload?.sourceEffectNodeId : null, 'restore.first-corner.commit');
+  assert.deepEqual(reveal.kind === 'presentation' ? reveal.payload?.target : null, { kind: 'haven_structure', structureId: 'mossprout-hex-garden' });
+  assert.equal(reveal.kind === 'presentation' ? reveal.payload?.showCoins : null, false);
+  const receiptKey = 'run:restore.first-corner.commit:effect:restore.first-corner.commit';
+  assert.deepEqual(contentFlowEffectResult({ [receiptKey]: { result: { toLevel: 1 } } }, 'run', 'restore.first-corner.commit', 'restore.first-corner.commit'), { toLevel: 1 });
+});
+
+test('world upgrade authoring rejects unsafe targets, missing economy reasons, and mismatched reveal receipts', () => {
+  assert.throws(() => defineStory({
+    id: 'test:bad-upgrade',
+    version: 1,
+    entryNodeId: 'upgrade',
+    nodes: [
+      { id: 'upgrade', kind: 'effect', capability: 'world.upgrade', effectId: 'upgrade', effectType: 'world.upgrade', payload: { target: { kind: 'haven_home' }, toLevel: 1, economy: { mode: 'free', reason: '' } }, next: 'complete' },
+      story.complete(),
+    ],
+    metadata: { kind: 'story' as const },
+  }), /world\.upgrade target|require a reason/);
+
+  const issues = validateContentFlowDefinition({
+    id: 'test:orphan-reveal', version: 1, entryNodeId: 'reveal', nodes: [
+      { id: 'reveal', kind: 'presentation', capability: 'world.upgrade_reveal', surface: 'haven', presentationId: 'reveal', presentationType: 'world.upgrade_reveal', replayPolicy: 'replay', payload: { sourceEffectNodeId: 'missing', sourceEffectId: 'missing', preset: 'growth' }, next: 'complete' },
+      { id: 'complete', kind: 'complete' },
+    ],
+  });
+  assert.ok(issues.some((issue) => issue.message.includes('must reference a world.upgrade effect')));
+});
+
+test('semantic targets wait for layout readiness and stale cleanup cannot remove a newer registration', async () => {
+  const registry = new StoryTargetRegistry();
+  const target = { kind: 'haven_tile', familyId: 'mossprout' } as const;
+  const firstCleanup = registry.register(target, { frame: { left: 0, top: 0, width: 10, height: 10 }, interactive: true, ready: false });
+  const ready = waitForStoryTargets(registry, [target], 100);
+  const secondCleanup = registry.register(target, { frame: { left: 2, top: 3, width: 20, height: 20 }, interactive: true, ready: true });
+  firstCleanup();
+  await ready;
+  assert.equal(registry.resolve(target)?.frame.left, 2);
+  secondCleanup();
+  assert.equal(registry.resolve(target), null);
+});
+
+test('local story variants select only registered versioned manifests', () => {
+  clearStoryVariantRegistryForTests();
+  const alternate = defineStory({ ...MOSSPROUT_FTUE_FLOW, version: MOSSPROUT_FTUE_FLOW.version + 1, metadata: { ...MOSSPROUT_FTUE_FLOW.metadata, variantId: 'alternate' } });
+  const variants = defineStoryVariants({
+    id: 'test:variants',
+    defaultVariantId: 'default',
+    variants: [
+      { id: 'default', label: 'Default', definition: MOSSPROUT_FTUE_FLOW },
+      { id: 'alternate', label: 'Alternate', definition: alternate },
+    ],
+  });
+  registerStoryVariantSet(variants);
+  assert.equal(selectedStoryVariant(variants.id).id, 'default');
+  selectStoryVariantForDebug(variants.id, 'alternate');
+  assert.equal(selectedStoryVariant(variants.id).definition.version, MOSSPROUT_FTUE_FLOW.version + 1);
+  assert.throws(() => selectStoryVariantForDebug(variants.id, 'missing'), /Unknown variant/);
+  clearStoryVariantRegistryForTests();
 });

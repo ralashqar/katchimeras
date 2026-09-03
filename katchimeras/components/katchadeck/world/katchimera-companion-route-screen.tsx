@@ -23,10 +23,12 @@ import {
 } from '@/features/onboarding/resident-ftue-navigation-session';
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
-import { completeMossproutJourneyResolution, recordMossproutFirstGardenRestored, recordMossproutMatchedCard, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
+import { beginKatchimeraMeditation, completeMossproutJourneyResolution, katchimeraMeditationRecord, MOSSPROUT_FTUE_REST_MS, recordMossproutFirstGardenRestored, recordMossproutMatchedCard, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
 import {
   ensureMossproutFtueFirstResident,
+  keepMossproutFirstSeed,
   MOSSPROUT_FTUE_FIRST_RESIDENT_ID,
+  recordMossproutOnboardingAnswer,
   saveMossproutPlayerNickname,
 } from '@/features/onboarding/mossprout-profile';
 import { companionBondProgress, recordCompanionBondEvent } from '@/utils/companion-bond';
@@ -41,6 +43,7 @@ import {
 } from '@/features/onboarding/mossprout-bond-share';
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
+import { MOSSPROUT_FIRST_REST_CONVERSATION_ID } from '@/constants/mossprout-ftue-conversations';
 
 function isResidentFtueStep(stepId: string) {
   return stepId === 'companion.resident_affinity'
@@ -139,8 +142,11 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     && isResidentFtueStep(navigationFtueRun.stepId);
   const activeFtueConversationDefinitionId = navigationFtueRun?.status === 'active'
     && (navigationFtueRun.stepId === 'companion.first_meeting'
-      || navigationFtueRun.stepId === 'companion.chapter_zero_return')
-    ? ftueConversationDefinitionId
+      || navigationFtueRun.stepId === 'companion.chapter_zero_return'
+      || navigationFtueRun.stepId === 'companion.first_rest')
+    ? navigationFtueRun.stepId === 'companion.first_rest'
+      ? MOSSPROUT_FIRST_REST_CONVERSATION_ID
+      : ftueConversationDefinitionId
     : undefined;
   useEffect(() => {
     if (!shouldRestoreResidentMatchResult) return;
@@ -150,6 +156,19 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   useEffect(() => {
     if (isFocused && isResidentMergePaused()) residentParcelOpeningRef.current = false;
   }, [isFocused]);
+  useEffect(() => {
+    if (ftueRun?.status !== 'active' || ftueRun.stepId !== 'companion.meditating') return;
+    if (katchimeraMeditationRecord(relationships, 'mossprout')) return;
+    // Repair an older/in-flight FTUE save that reached the closing beat before
+    // meditation became durable game state. The repository guard prevents a
+    // live timer from ever being restarted by a rerender.
+    const now = Date.now();
+    relationshipProgressionRepository.update((current) => (
+      katchimeraMeditationRecord(current, 'mossprout')
+        ? current
+        : beginKatchimeraMeditation(current, 'mossprout', now, MOSSPROUT_FTUE_REST_MS, `ftue:${ftueRun.runId}:first-rest`)
+    ));
+  }, [ftueRun?.runId, ftueRun?.status, ftueRun?.stepId, relationships]);
   const completeResidentResultExit = useCallback(async (definitionId: string) => {
     const run = loadFtueRun();
     if (run?.status !== 'active') return false;
@@ -198,7 +217,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
             expectedStepId: 'companion.resident_match_result',
             actionId: 'companion.ack_resident_match_result',
             evidenceRef: 'mossprout-resident-match-result',
-            nextStepId: 'world.complete',
+            nextStepId: 'companion.meditating',
           });
           ftueHandoffRef.current = false;
           finishResidentMergeSession();
@@ -244,16 +263,46 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       if (ftueHandoffRef.current) return;
       ftueHandoffRef.current = true;
       try {
-        prepareMossproutFirstResidentHandoff();
         const result = await advanceFtueActionDurably({
           expectedStepId: 'companion.chapter_zero_return',
           actionId: 'companion.complete_chapter_zero_return',
           evidenceRef: ftueConversationDefinitionId ?? 'mossprout-chapter-zero-return',
-          nextStepId: 'companion.resident_parcel_ready',
+          nextStepId: 'companion.water_together',
         });
-        if (result.run?.stepId !== 'companion.resident_parcel_ready') {
-          throw new Error('Mossprout did not accept the first resident handoff');
+        if (result.run?.stepId !== 'companion.water_together') {
+          throw new Error('Mossprout did not accept the Water Together handoff');
         }
+        await flushFtuePersistence();
+      } finally {
+        ftueHandoffRef.current = false;
+      }
+      return;
+    }
+    if (run?.stepId === 'companion.first_rest') {
+      if (ftueHandoffRef.current) return;
+      ftueHandoffRef.current = true;
+      try {
+        const now = Date.now();
+        const sourceId = `ftue:${run.runId}:first-rest`;
+        relationshipProgressionRepository.update((current) => beginKatchimeraMeditation(
+          current,
+          'mossprout',
+          now,
+          MOSSPROUT_FTUE_REST_MS,
+          sourceId,
+        ));
+        const result = await advanceFtueActionDurably({
+          expectedStepId: 'companion.first_rest',
+          actionId: 'companion.begin_rest',
+          evidenceRef: MOSSPROUT_FIRST_REST_CONVERSATION_ID,
+          nextStepId: 'companion.meditating',
+        });
+        if (result.run?.stepId !== 'companion.meditating') throw new Error('Mossprout did not enter meditation');
+        void scheduleMossproutJourneyDayReminder(
+          localDayId(new Date(now)),
+          new Date(now),
+          new Date(now + MOSSPROUT_FTUE_REST_MS),
+        ).catch(() => {});
         await flushFtuePersistence();
       } finally {
         ftueHandoffRef.current = false;
@@ -305,7 +354,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       return;
     }
     if (run.stepId === 'companion.day_one_action') {
-      const existingAnswer = run.answers['companion.choose_bond_share'];
+      const existingAnswer = run.answers['companion.choose_growth_intent'];
       if (!existingAnswer) {
         const selection = mossproutBondShareSelection(nickname);
         if (!selection) return;
@@ -326,9 +375,10 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
           occurredAt: Date.now(),
         }, { queueCelebration: true });
         if (result.awarded) saveCompanionBondState(result.state);
+        recordMossproutOnboardingAnswer('companion.choose_growth_intent', selection.id);
         commitFtueAction({
-          actionId: 'companion.choose_bond_share',
-          evidenceRef: `bond-share:${selection.id}`,
+          actionId: 'companion.choose_growth_intent',
+          evidenceRef: `growth-intent:${selection.id}`,
           nextStepId: 'companion.day_one_action',
           optionId: selection.id,
           optionLabel: `${selection.prompt.cardLabel}: ${selection.answer.label}`,
@@ -338,10 +388,40 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       commitFtueAction({ actionId: 'companion.complete_day_one_action', evidenceRef: 'mossprout-first-bond-share' });
       return;
     }
+    if (run.stepId === 'companion.water_together') {
+      const choiceId = nickname?.trim();
+      if (!choiceId) return;
+      recordMossproutOnboardingAnswer('companion.choose_water_together', choiceId);
+      commitFtueAction({
+        actionId: 'companion.choose_water_together',
+        evidenceRef: `water-together:${choiceId}`,
+        optionId: choiceId,
+        optionLabel: choiceId,
+      });
+      return;
+    }
+    if (run.stepId === 'companion.water_response') {
+      commitFtueAction({ actionId: 'companion.ack_water_response', evidenceRef: 'water-together:heard' });
+      return;
+    }
+    if (run.stepId === 'companion.first_insight') {
+      const seed = keepMossproutFirstSeed();
+      const nextRun = commitFtueAction({ actionId: 'companion.keep_first_seed', evidenceRef: `first-seed:${seed.id}` });
+      if (nextRun?.status !== 'active' || nextRun.stepId !== 'companion.first_rest') return;
+      return;
+    }
+    if (run.stepId === 'companion.meditating') {
+      const nextRun = commitFtueAction({ actionId: 'companion.tend_garden', evidenceRef: 'mossprout-world:ftue-complete' });
+      if (nextRun?.status === 'complete') {
+        if (hostedInHaven) onHostedClose?.();
+        else router.dismissTo('/(tabs)/katchimeras');
+      }
+      return;
+    }
     if (run.stepId === 'companion.garden_intro') {
       commitFtueAction({ actionId: 'companion.acknowledge_garden_intro', evidenceRef: 'garden-intro:seen' });
     }
-  }, [completeResidentResultExit]);
+  }, [completeResidentResultExit, hostedInHaven, onHostedClose, router]);
   const completeFtueJourneyDay = useCallback(() => {
     const run = loadFtueRun();
     if (run?.status !== 'active' || run.stepId !== 'companion.day_one_action') return;
@@ -500,12 +580,20 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
             ? 'bond_choice'
           : ftueRun?.status === 'active' && ftueRun.stepId === 'companion.garden_intro'
             ? 'garden_intro'
+            : ftueRun?.status === 'active' && ftueRun.stepId === 'companion.water_together'
+              ? 'water_together'
+            : ftueRun?.status === 'active' && ftueRun.stepId === 'companion.water_response'
+              ? 'water_response'
+            : ftueRun?.status === 'active' && ftueRun.stepId === 'companion.first_insight'
+              ? 'first_insight'
+            : ftueRun?.status === 'active' && ftueRun.stepId === 'companion.meditating'
+              ? 'meditating'
             : ftueRun?.status === 'active' && ftueRun.stepId === 'companion.resident_match_result'
               ? 'resident_result'
             : null}
       ftueBondSpotlightActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.bond_spotlight'}
       ftueDayOneActionActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.day_one_action'}
-      ftueDayOneActionAnswerId={ftueRun?.answers['companion.choose_bond_share']?.optionId ?? null}
+      ftueDayOneActionAnswerId={ftueRun?.answers['companion.choose_growth_intent']?.optionId ?? null}
       ftueResidentHandoffActive={ftueResidentHandoffActive}
       ftueResidentMatchResultActive={residentMatchResultActive}
       ftueResidentStoryResume={residentStoryResumeActive}

@@ -100,13 +100,14 @@ function resolution(number: number, story: DayStory): ConversationDefinition {
 
 const STORIES: Readonly<Record<number, DayStory>> = {
   2: {
-    opening: 'I heard it at dawn: knock, knock, from underneath the dry pond. I was deciding whether ponds have manners when {{guest}} arrived. How should we answer?',
+    opening: 'I remembered what you told me. Before we follow that knock by the pond: when you’re stuck, what should I do?',
     openingChoices: [
-      ['approach-knock', 'Knock back', 'I tap twice. Something answers once, then twice, as if it is learning our rhythm.'],
-      ['approach-mud', 'Inspect the mud', 'I find tiny wet footprints going in—and none coming out. That is either a clue or excellent pond mischief.'],
-      ['approach-help', 'Ask if it needs help', 'I ask. One bubble pushes through the dust. I am counting that as a yes.'],
+      ['support-tiny', 'Give me one tiny thing to try', 'Small enough to begin. I can do that.'],
+      ['support-reflect', 'Help me think it through', 'We can look before we leap—or before I trip over a root.'],
+      ['support-push', 'Give me a push', 'A kind push, then. No catapults.'],
+      ['support-company', 'Mostly keep me company', 'I’m very good at being nearby. {{guest}} is too—meet Petalimp.'],
     ],
-    bridge: 'I can hear a thin trickle below us. Let’s make a listening place, then give that water a path home. Two small jobs. No heroic pond-diving.',
+    bridge: '{{guest}} heard the pond knock too. Let’s make a listening place, then give the water a path home. Two small jobs. No heroic pond-diving.',
     returnPrompt: 'You did it. The water followed your path, and {{guest}} has been staring into the first puddle as if expecting an encore. What do you notice?',
     returnChoices: [
       ['pond-listen', 'We listened first', 'Yes. We did not force an answer; we made enough quiet for one to arrive.'],
