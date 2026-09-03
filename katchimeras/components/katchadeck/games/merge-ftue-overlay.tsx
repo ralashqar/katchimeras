@@ -611,11 +611,14 @@ function FtueFingerCue({ blockedPulseNonce, cue, points, resetKey, theme }: {
   );
 }
 
-export function MergeFtueEggGuide({ anchor, guide, screen, children }: {
+export function MergeFtueEggGuide({ anchor, guide, screen, children, hideAvatar = false, inlineWidth }: {
   anchor: Frame;
   guide: FtueGuide;
   screen: { height: number; width: number };
   children?: React.ReactNode;
+  hideAvatar?: boolean;
+  /** Embed the shared bubble in a measured parent, with its tail pointing right. */
+  inlineWidth?: number;
 }) {
   const { equippedFaceId, equippedSkinId } = useEggAvatar();
   const reduceMotion = useReducedMotion();
@@ -629,6 +632,7 @@ export function MergeFtueEggGuide({ anchor, guide, screen, children }: {
   }));
 
   useEffect(() => {
+    if (hideAvatar) return;
     let cancelled = false;
     let reactionTimer: ReturnType<typeof setTimeout> | null = null;
     let restoreTimer: ReturnType<typeof setTimeout> | null = null;
@@ -666,9 +670,9 @@ export function MergeFtueEggGuide({ anchor, guide, screen, children }: {
       cancelAnimation(avatarWobble);
       avatarWobble.value = 0;
     };
-  }, [avatarWobble, equippedFaceId, reduceMotion]);
+  }, [avatarWobble, equippedFaceId, hideAvatar, reduceMotion]);
 
-  const calloutWidth = Math.min(326, screen.width - 28);
+  const calloutWidth = inlineWidth ?? Math.min(326, screen.width - 28);
   const [measuredHeight, setMeasuredHeight] = useState(0);
   const estimatedHeight = measuredHeight || (children ? 170 : 96);
   const calloutLeft = clamp(
@@ -696,20 +700,21 @@ export function MergeFtueEggGuide({ anchor, guide, screen, children }: {
       style={[
         styles.eggGuideCallout,
         { left: calloutLeft, top: calloutTop, width: calloutWidth },
+        inlineWidth != null && { position: 'relative', left: 0, top: 0, minHeight: 72 },
       ]}>
       <View pointerEvents="none" style={[
         styles.eggGuideTail,
-        calloutBelow ? styles.eggGuideTailAbove : styles.eggGuideTailBelow,
-        { left: tailLeft },
+        inlineWidth != null ? { right: -8, top: Math.max(72, measuredHeight) / 2 - 10 } : calloutBelow ? styles.eggGuideTailAbove : styles.eggGuideTailBelow,
+        inlineWidth == null && { left: tailLeft },
       ]} />
       <View style={styles.eggGuideContentRow}>
-      <Animated.View
+      {!hideAvatar ? <Animated.View
         accessibilityLabel="Your Egg is showing you around"
         pointerEvents="none"
         style={[styles.eggGuideAvatar, avatarMotionStyle]}>
         <EggAvatar faceId={guideFaceId} presentation="button" size={76} skinId={equippedSkinId} />
-      </Animated.View>
-      <ThemedText style={[styles.eggGuideMessage, styles.eggGuideMessageLayout, { width: calloutWidth - 24 - 76 - 9 }]} lightColor="#35422F" darkColor="#35422F">
+      </Animated.View> : null}
+      <ThemedText style={[styles.eggGuideMessage, styles.eggGuideMessageLayout, { width: hideAvatar ? calloutWidth - 24 : calloutWidth - 24 - 76 - 9 }]} lightColor="#35422F" darkColor="#35422F">
         <ThemedText style={[styles.eggGuideMessage, styles.eggGuideEmphasis]} lightColor="#668A49" darkColor="#668A49">
           {guide.title}
         </ThemedText>

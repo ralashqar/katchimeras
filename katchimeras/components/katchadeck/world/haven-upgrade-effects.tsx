@@ -152,7 +152,7 @@ export const HavenUpgradeEffects = memo(function HavenUpgradeEffects({
         </>
       ) : null}
 
-      {showReaction ? (
+      {showReaction && presentation.reactionLine.trim() ? (
         <Animated.View style={[styles.reaction, { left: Math.max(16, target.x - 112), top: Math.max(74, target.y - 148) }]}>
           <Text selectable style={styles.reactionText}>{presentation.reactionLine}</Text>
         </Animated.View>

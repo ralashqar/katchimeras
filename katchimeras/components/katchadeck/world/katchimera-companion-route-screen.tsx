@@ -1,6 +1,6 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { KingdomCompanionScreen } from '@/components/katchadeck/world/kingdom-companion-screen';
@@ -94,6 +94,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   const { transitionTo } = useGameScreenTransition();
   const familyId = familyIdFromCompanionId(creatureId);
   const ftueHandoffRef = useRef(false);
+  const [mistHandoffActive, setMistHandoffActive] = useState(false);
   const postFtueGardenRepairRef = useRef<string | null>(null);
   const ftueRun = useFtueRun();
   const discovery = useCompanionDiscoveryRecords();
@@ -440,9 +441,15 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       if (hostedInHaven) {
         // The map is already mounted behind this interaction. Hand it back
         // directly; gateway.focus owns the in-world pan/zoom after dismissal.
+        // Keep this latched through journal updates and the host's exit pan:
+        // losing the FTUE profile must not briefly reveal normal action cards.
+        setMistHandoffActive(true);
         void advanceFtueActionDurably({ expectedStepId: 'companion.meditating', actionId: 'companion.tend_garden', evidenceRef: 'mossprout:playable-handoff' })
           .then(() => onHostedClose?.())
-          .catch((error) => console.warn('Could not start mist exploration', error))
+          .catch((error) => {
+            setMistHandoffActive(false);
+            console.warn('Could not start mist exploration', error);
+          })
           .finally(() => { ftueHandoffRef.current = false; });
         return;
       }
@@ -597,6 +604,8 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   // retain the kingdom, interaction sheet, image stage, subscriptions, or
   // animation worklets behind Today, Merge, or a quest. All durable companion
   // progress already lives in the repositories and is rehydrated on focus.
+  if (hostedInHaven && mistHandoffActive) return null;
+
   if (!surfaceActive || (!discovery.ready && !hostedInHaven) || (residentMergeFtueActive && !residentStoryResumeActive)) {
     return <View style={styles.inactiveScreen} />;
   }

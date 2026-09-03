@@ -1761,14 +1761,11 @@ function InlineHeading({ action, allowSkip, disabled, ftueQuestionLayout = false
 
 function FtueEnergyBadge({ amount, wide }: { amount: number; wide: boolean }) {
   return (
-    <View accessibilityLabel={`Plus ${amount} Energy`} style={[styles.ftueEnergyBadge, wide && styles.ftueEnergyBadgeWide]}>
+    <View accessibilityLabel={`Plus ${amount} Bond`} style={[styles.ftueEnergyBadge, wide && styles.ftueEnergyBadgeWide]}>
       <Image contentFit="contain" source={GAME_CURRENCY_ART.energy} style={[styles.ftueEnergyBadgeArt, wide && styles.ftueEnergyBadgeArtWide]} transition={0} />
       <View style={styles.ftueEnergyBadgeCopy}>
         <ThemedText style={[styles.ftueEnergyBadgeAmount, wide && styles.ftueEnergyBadgeAmountWide]} lightColor={KatchaDeckUI.ftue.goldDeep} darkColor={KatchaDeckUI.ftue.goldDeep}>
           +{amount}
-        </ThemedText>
-        <ThemedText style={styles.ftueEnergyBadgeLabel} lightColor={KatchaDeckUI.ftue.goldDeep} darkColor={KatchaDeckUI.ftue.goldDeep}>
-          Energy
         </ThemedText>
       </View>
     </View>
@@ -2378,7 +2375,6 @@ const styles = StyleSheet.create({
   ftueEnergyBadgeCopy: { alignItems: 'flex-start', gap: 0 },
   ftueEnergyBadgeAmount: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 15, lineHeight: 17 },
   ftueEnergyBadgeAmountWide: { fontSize: 18, lineHeight: 20 },
-  ftueEnergyBadgeLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 8, fontWeight: '900', lineHeight: 9 },
   inlineMetric: { alignItems: 'center', alignSelf: 'center', flexDirection: 'row', gap: 9, justifyContent: 'center', minHeight: 62, paddingHorizontal: 12 },
   inlineMetricArt: { height: 54, width: 54 },
   inlineMetricCopy: { alignItems: 'flex-start', gap: 0 },

@@ -17,6 +17,8 @@ export type MergePlaySurfaceLayout = {
 };
 
 export type MergePlaySurfaceProps = {
+  /** Decorative counter bleed, independent of board and tray layout. */
+  counterWidth?: number;
   animateEntrance?: boolean;
   boardInteractionGate?: MergeBoardInteractionGate;
   boardLayout?: MergeBoardLayout;
@@ -62,6 +64,7 @@ export const MergePlaySurface = memo(function MergePlaySurface({
   animateEntrance = true,
   boardInteractionGate = { kind: 'open' },
   boardLayout,
+  counterWidth,
   focusOrderId,
   hiddenItemInstanceIds,
   inspectedCell,
@@ -125,7 +128,7 @@ export const MergePlaySurface = memo(function MergePlaySurface({
         onServe={onServe}
         parcelTargetRef={parcelTargetRef}
       />
-      <ServiceCounter viewportWidth={width} />
+      <ServiceCounter viewportWidth={counterWidth ?? width} />
       <View onLayout={measureBoardArea} style={styles.boardStage}>
         {boardAreaHeight > 0 ? (
           <FeastlePersistentMergeBoard

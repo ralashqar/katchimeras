@@ -44,7 +44,6 @@ const ORDER_TABLE_ART_SCALE = 0.9;
 const ORDER_TABLE_ART_HEIGHT = 60;
 const ORDER_TABLE_ART_WIDTH = 136;
 const TRAY_ART = require('../../../assets/images/katchimeras/merge-world/ui/order-service-tray.webp');
-const CHAIR_ART = require('../../../assets/images/katchimeras/merge-world/ui/order-chair.webp');
 const ORDER_REWARD_ART = {
   bond: require('../../../assets/images/katchimeras/merge-world/ui/bond.webp'),
   coins: GAME_CURRENCY_ART.coins,
@@ -148,15 +147,6 @@ export function EmptyMergeOrderTrayCard() {
         allowDownscaling
         cachePolicy="memory"
         contentFit="contain"
-        source={CHAIR_ART}
-        style={styles.chairArt}
-        transition={0}
-      />
-      <Image
-        accessibilityIgnoresInvertColors
-        allowDownscaling
-        cachePolicy="memory"
-        contentFit="contain"
         source={TRAY_ART}
         style={styles.trayArt}
         transition={0}
@@ -165,7 +155,7 @@ export function EmptyMergeOrderTrayCard() {
   );
 }
 
-export function FrozenMergeOrderTrayCard({ entry, hideChair = false }: { entry: MergeOrderTrayEntry; hideChair?: boolean }) {
+export function FrozenMergeOrderTrayCard({ entry }: { entry: MergeOrderTrayEntry }) {
   const recipient = entry.order.recipientSkinId ? katchimeraSkinById.get(entry.order.recipientSkinId) : null;
   const visualKey = recipient?.visualKey ?? CHARACTER_VISUALS[entry.order.characterId];
   const requestedItems = entry.order.requirements
@@ -173,7 +163,6 @@ export function FrozenMergeOrderTrayCard({ entry, hideChair = false }: { entry: 
     .slice(0, 3);
   return (
     <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" pointerEvents="none" style={styles.card}>
-      {!hideChair ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" source={CHAIR_ART} style={styles.chairArt} transition={0} /> : null}
       <View style={styles.characterLayer}>
         <Image
           accessibilityIgnoresInvertColors
@@ -435,7 +424,6 @@ export function MergeOrderTrayCard({ animateEntrance = true, entry, index, inter
         </Animated.View>
       ) : null}
       {serving && !reduceMotion ? <TrayServeConfetti /> : null}
-      <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" source={CHAIR_ART} style={styles.chairArt} transition={0} />
       <Animated.View entering={!entryMotionEnabled ? undefined : reduceMotion ? FadeIn.duration(100) : FadeInUp.delay(Math.min(index, 5) * 42 + 45).duration(230)} style={styles.characterLayer}>
         <Pressable
           accessible={!ready && !interactionLocked}
@@ -638,7 +626,6 @@ const styles = StyleSheet.create({
   card: { height: TRAY_HEIGHT, overflow: 'visible', position: 'relative', zIndex: ORDER_RAIL_Z_INDEX, width: TRAY_WIDTH },
   readyGlow: { backgroundColor: 'rgba(184,224,112,0.42)', borderRadius: 999, boxShadow: '0 0 22px rgba(174,220,95,0.72)', height: 70, left: 25, position: 'absolute', top: 11, width: 70, zIndex: 0 },
   readyRays: { height: 84, left: 18, position: 'absolute', top: 5, width: 84, zIndex: 0 },
-  chairArt: { bottom: 18, height: 154, left: -17, position: 'absolute', width: 154, zIndex: 1 },
   characterLayer: { bottom: 23.2, height: 110.4, left: 4.8, position: 'absolute', width: 110.4, zIndex: 2 },
   characterButton: { height: '100%', width: '100%' },
   characterPressed: { transform: [{ scale: 0.96 }] },

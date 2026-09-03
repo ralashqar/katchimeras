@@ -133,7 +133,7 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
       economy: { mode: 'normal' },
       camera: MOSSPROUT_GARDEN_FOCUS_CAMERA,
       cameraAlreadyFocused: true,
-      presentation: { preset: 'growth', reactionLine: 'The Garden remembered.', showCoins: true },
+      presentation: { preset: 'growth', reactionLine: '', showCoins: true },
       next: 'effect.haven.grow_first_memory',
     }),
     story.effect({

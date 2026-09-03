@@ -24,11 +24,9 @@ export const GLOW_REPEAT_LESSON: readonly MergeLessonBeat[] = [
 ];
 export const GLOW_ALL_LESSON_BEATS = [...GLOW_LESSON, ...GLOW_REPEAT_LESSON];
 export const GLOW_DISCOVERY_FLOW = defineStory({
-  id: 'glow-steppling-discovery', version: 3, entryNodeId: 'gateway.focus', metadata: { kind: 'story' },
+  id: 'glow-steppling-discovery', version: 4, entryNodeId: 'gateway.focus', metadata: { kind: 'story' },
   nodes: [
-    storyOperations.focusCamera({ id: 'gateway.focus', target: STEPPLING_STORY_TARGET, zoom: 1.2, anchorY: 0.46, durationMs: 900, next: 'gateway.goal' }),
-    worldActionScene({ id: 'gateway.goal', actionId: 'learn', next: 'garden.focus', view: { kind: 'goal', guide: { eyebrow: 'Misty clearing', title: 'What’s hiding here?', body: 'Complete Garden requests to earn Glow and clear the mist.' }, actionLabel: 'Find Glow' } }),
-    storyOperations.focusCamera({ id: 'garden.focus', target: { kind: 'haven_structure', structureId: 'mossprout-hex-garden' }, zoom: 1.05, anchorY: 0.42, next: 'garden.open' }),
+    storyOperations.focusCamera({ id: 'gateway.focus', target: STEPPLING_STORY_TARGET, zoom: 1.2, anchorY: 0.46, durationMs: 900, next: 'garden.open' }),
     worldActionScene({ id: 'garden.open', actionId: 'open', next: 'lesson.prepare', view: { kind: 'garden', guide: { eyebrow: 'Light a path', title: 'Back to the Garden.', body: 'Complete requests to earn Glow.' }, actionLabel: 'Open Garden' } }),
     story.effect({ id: 'lesson.prepare', capability: 'glow.lesson.prepare', next: 'lesson.spawn' }),
     ...mergeLessonRecipe(GLOW_LESSON, 'lesson.repeat.prepare', 'glow'),
@@ -41,6 +39,8 @@ export const GLOW_DISCOVERY_FLOW = defineStory({
     worldActionScene({ id: 'gateway.egg', actionId: 'done', next: 'complete', view: { kind: 'discovery', guide: { eyebrow: 'A new beginning', title: 'An Egg!', body: 'A new friend is resting inside.' }, actionLabel: 'Continue' } }), story.complete(),
   ],
   migrations: {
+    'gateway.goal': 'garden.open',
+    'garden.focus': 'gateway.focus',
     'lesson.repeat': 'lesson.repeat.prepare',
     'gateway.purchase': 'gateway.purchase.focus',
     'egg.transfer': 'gateway.egg', 'world.choose': 'gateway.egg',

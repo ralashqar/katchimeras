@@ -16,6 +16,14 @@ import { validateContentFlowDefinition } from '@/features/content-flow/content-f
 import { mergeFtueAllowsCommand } from '@/features/onboarding/merge-ftue';
 
 const NOW = Date.UTC(2026, 8, 3, 12);
+test('meditation handoff hides normal interaction UI before the durable FTUE step advances', () => {
+  const source = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
+  assert.match(source, /import \{[^}]*\buseState\b[^}]*\} from 'react';/);
+  assert.match(source, /setMistHandoffActive\(true\);\s*void advanceFtueActionDurably\(\{ expectedStepId: 'companion.meditating'/);
+  assert.match(source, /if \(hostedInHaven && mistHandoffActive\) return null;/);
+  assert.match(source, /catch\(\(error\) => \{\s*setMistHandoffActive\(false\)/);
+  assert.doesNotMatch(source, /finally\([^;]*setMistHandoffActive\(false\)/);
+});
 test('enough Glow highlights the HUD with an actionable Egg bubble instead of a banner', () => {
   const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   const guide = readFileSync('components/katchadeck/games/merge-glow-ready-guide.tsx', 'utf8');
@@ -30,7 +38,7 @@ test('enough Glow highlights the HUD with an actionable Egg bubble instead of a 
   const bubble = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
   assert.match(bubble, /eggGuideContentRow: \{[^\n]*flexShrink: 0/);
   assert.match(bubble, /eggGuideActionRow: \{[^\n]*flexShrink: 0/);
-  assert.match(bubble, /width: calloutWidth - 24 - 76 - 9/);
+  assert.match(bubble, /width: hideAvatar \? calloutWidth - 24 : calloutWidth - 24 - 76 - 9/);
   assert.doesNotMatch(bubble, /minHeight: estimatedHeight/);
   assert.match(bubble, /onLayout=\{\(event\) => setMeasuredHeight/);
 });
@@ -344,7 +352,9 @@ test('discovery story has valid capabilities and resumes through each persisted 
   assert.equal(run.status, 'completed');
   assert.ok(visited.indexOf('gateway.purchase.commit') < visited.indexOf('gateway.purchase.reveal'));
   assert.ok(visited.indexOf('gateway.purchase.reveal') < visited.indexOf('gateway.egg'));
-  assert.ok(visited.indexOf('garden.focus') < visited.indexOf('garden.open'));
+  assert.ok(visited.indexOf('gateway.focus') < visited.indexOf('garden.open'));
+  assert.ok(!visited.includes('garden.focus'));
+  assert.ok(!visited.includes('gateway.goal'));
   assert.ok(visited.indexOf('gateway.return') < visited.indexOf('gateway.buy'));
   assert.ok(!visited.some((id) => id.startsWith('steppling.') || id === 'world.choose' || id === 'egg.transfer'));
   assert.ok(visited.includes('lesson.repeat.prepare'));

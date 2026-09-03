@@ -34,6 +34,7 @@ import { PersistentMergeItemArt } from '@/components/katchadeck/games/feastle-pe
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { GameCurrencyHud } from '@/components/katchadeck/ui/game-currency-hud';
+import { MergeFtueEggGuide } from '@/components/katchadeck/games/merge-ftue-overlay';
 import { GameHudBar } from '@/components/katchadeck/ui/game-primitives';
 import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
 import { ThemedText } from '@/components/themed-text';
@@ -1001,7 +1002,8 @@ export function KatchimeraKingdomScreen({
               disabled={interactionExiting || (!interactionCreatureId && (navigationLocked || glowDiscoveryLocksCamera(glowRun)))}
               onPress={interactionCreatureId ? requestResidentInteractionExit : onBackToHavenSelector}
             />}
-            content={<GameCurrencyHud balances={[{
+            content={<View />}
+            trailing={<GameCurrencyHud balances={[{
               art: GAME_CURRENCY_ART.coins,
               id: 'coins',
               value: mergeWorld.coins,
@@ -1022,7 +1024,7 @@ export function KatchimeraKingdomScreen({
           style={[styles.gardenButtonCluster, { bottom: Math.max(insets.bottom, 12) + 10 }]}>
           {ftueStepId === 'world.seed_planted' && !firstSeedPlacementFailed ? (
             <View accessibilityLabel="Mossprout's first Garden order" collapsable={false} ref={setGardenHandoffOrderNode} style={{ paddingTop: 48, paddingHorizontal: 18, marginBottom: 4 }}>
-              {gardenHandoffOrder ? <FrozenMergeOrderTrayCard entry={gardenHandoffOrder} hideChair /> : null}
+              {gardenHandoffOrder ? <FrozenMergeOrderTrayCard entry={gardenHandoffOrder} /> : null}
             </View>
           ) : ftueStepId === 'world.garden_handoff' && !firstSeedPlacementFailed ? (
             <View
@@ -1260,9 +1262,16 @@ export function KatchimeraKingdomScreen({
         />
       ) : null}
       {ftueStepId === 'world.egg_intro' ? <FtueOpeningFade /> : null}
+      {screenFocused && ftueCameraSettled && glowRun?.status === 'active' && glowScene?.view.kind === 'garden' && !activeInteractionResidentId && !upgradePresentation ? (
+        <View collapsable={false} ref={setHavenGuideNode} pointerEvents="none" style={{ position: 'absolute', right: 148, bottom: Math.max(insets.bottom, 12) + 30, width: Math.min(250, window.width - 164), zIndex: 85 }}>
+          <MergeFtueEggGuide hideAvatar inlineWidth={Math.min(250, window.width - 164)}
+            anchor={{ x: 0, y: 0, width: 0, height: 0 }} screen={window}
+            guide={{ eyebrow: '', title: 'Tap Garden.', body: 'Merge to earn Glow and clear the mist!' }} />
+        </View>
+      ) : null}
       {screenFocused && ftueCameraSettled && glowRun?.status === 'active' && glowPanelOpen && glowWorldTarget && !activeInteractionResidentId && !upgradePresentation ? <HavenFtueOverlay
         cue={glowWorldTarget.kind === 'haven_garden_button' ? { kind: 'tap', target: glowWorldTarget } : null}
-        spotlight={{ targets: [glowWorldTarget] }} screenRef={screenRef} targetRefs={ftueTargetRefs} targetRevision={ftueTargetRevision}
+        spotlight={{ targets: glowScene?.view.kind === 'garden' ? [glowWorldTarget, { kind: 'haven_guide' }] : [glowWorldTarget], grouping: 'bounding_rect' }} screenRef={screenRef} targetRefs={ftueTargetRefs} targetRevision={ftueTargetRevision}
       /> : null}
     </View>
   );
@@ -1295,7 +1304,7 @@ const styles = StyleSheet.create({
     zIndex: 50,
   },
   topHud: { maxWidth: 430, width: '100%' },
-  currencyHud: { flex: 1 },
+  currencyHud: { flex: 0, paddingLeft: 18, width: 106 },
   gardenButton: {
     height: 132,
     width: 132,

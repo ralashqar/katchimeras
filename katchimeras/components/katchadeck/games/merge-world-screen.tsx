@@ -908,6 +908,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
             this flex column. Future guidance belongs in an absolute world-space
             overlay so the tray, counter, and board retain identical frames. */}
         <MergePlaySurface
+          counterWidth={width}
           animateEntrance={playBoardEntrance}
           boardInteractionGate={ftueBoardGate}
           focusOrderId={focusOrderId}

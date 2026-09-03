@@ -78,7 +78,7 @@ test('planted Seed highlights top copy and the tray/button cluster as two separa
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   const tray = screen.slice(screen.indexOf("{ftueStepId === 'world.seed_planted' && !firstSeedPlacementFailed ? ("), screen.indexOf(") : ftueStepId === 'world.garden_handoff'"));
   assert.match(tray, /FrozenMergeOrderTrayCard entry=\{gardenHandoffOrder\}/);
-  assert.match(tray, /FrozenMergeOrderTrayCard entry=\{gardenHandoffOrder\} hideChair/);
+  assert.doesNotMatch(readFileSync('components/katchadeck/games/merge-order-rail.tsx', 'utf8'), /CHAIR_ART|chairArt|order-chair/);
   assert.doesNotMatch(tray, /gardenRequestBubble/);
   assert.match(screen, /ref=\{setGardenClusterNode\}/);
 });
