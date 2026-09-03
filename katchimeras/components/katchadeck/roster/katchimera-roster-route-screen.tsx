@@ -349,8 +349,10 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
       ftueRun.stepId === 'world.egg_intro'
       || ftueRun.stepId.startsWith('egg.')
       || ftueRun.stepId === 'world.garden_arrival'
+      || ftueRun.stepId === 'world.seed_planted'
       || ftueRun.stepId === 'world.garden_handoff'
       || ftueRun.stepId === 'world.first_bloom_restore'
+      || ftueRun.stepId === 'world.first_seed_grew'
       || ftueRun.stepId === 'companion.meditating'
     ) {
       setActiveWorldFamilyId('mossprout');
@@ -445,8 +447,21 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
             const stepId = ftueRun?.status === 'active' ? ftueRun.stepId : null;
             if (stepId === 'world.egg_intro') {
               commitFtueAction({ actionId: 'world.inspect_mossprout_egg', evidenceRef: 'mossprout-world:egg-intro-seen' });
-            } else if (stepId === 'world.garden_arrival') {
-              commitFtueAction({ actionId: 'world.acknowledge_garden', evidenceRef: 'mossprout-world:garden-arrival' });
+            } else if (stepId === 'world.seed_planted') {
+              commitFtueAction({ actionId: 'world.acknowledge_seed_dormant', evidenceRef: 'mossprout-world:seed-planted' });
+            } else if (stepId === 'world.first_seed_grew') {
+              const next = commitFtueAction({ actionId: 'world.acknowledge_first_seed_growth', evidenceRef: 'mossprout-world:first-seed-grew' });
+              if (next?.stepId === 'companion.chapter_zero_return') {
+                transitionTo({
+                  announcement: 'Returning to Mossprout',
+                  target: 'companion',
+                  navigate: () => router.setParams({
+                    interactionFtue: 'chapter-zero-return',
+                    interactionSource: 'haven-world',
+                    mossproutInteraction: '1',
+                  }),
+                });
+              }
             } else if (stepId === 'companion.meditating') {
               commitFtueAction({ actionId: 'companion.tend_garden', evidenceRef: 'mossprout-world:ftue-complete' });
               // A replayed terminal receipt is intentionally a no-op. Always

@@ -148,9 +148,9 @@ test('You questionnaires advance on selection while consequential tasks retain c
   assert.doesNotMatch(zodiac, /label="Save reflection"/);
   assert.match(interaction, /Your goals and next steps/);
   assert.match(interaction, /emphasized=\{Boolean\(activeJourneyFocus/);
-  assert.match(interaction, /bubbleBody=\{mossproutFtueSpeechTitle[\s\S]*?: idealSkinPreparing/);
+  assert.match(interaction, /bubbleBody=\{companionSpeechTitle[\s\S]*?: idealSkinPreparing/);
   assert.match(interaction, /quickGoalPickerOpen \? 'Choose one for today, or make a small goal of your own\.' : destinationHeroBody/);
-  assert.match(interaction, /bubbleVariant=\{quickGoalPickerOpen && !mossproutFtueSpeechTitle \? 'questionnaire' : 'default'\}/);
+  assert.match(interaction, /bubbleVariant=\{quickGoalPickerOpen && !companionSpeechTitle \? 'questionnaire' : 'default'\}/);
   assert.match(interaction, /showSpeechBubble/);
   assert.doesNotMatch(interaction, /styles\.youHeading|styles\.youIntro/);
   assert.match(interaction, /backgroundColor: KatchaUI\.companionPanel\.background/);
@@ -675,7 +675,7 @@ test('Mossprout owns a compact Journey action stack without redundant headings o
   assert.match(mossprout, /requestAnimationFrame\(\(\) => \{[\s\S]*?commitReplacement\?\.\(\)[\s\S]*?phase: 'revealing'/);
   assert.match(mossprout, /hiddenPresentationSlot = localReplacementTransition\?\.phase === 'concealed'/);
   assert.doesNotMatch(sharedRows, /\.withCallback\(/);
-  assert.match(interaction, /const entranceTimer = setTimeout\([\s\S]*?setMossproutHubEntranceSettled\(true\)/);
+  assert.doesNotMatch(interaction, /const entranceTimer = setTimeout/);
   assert.doesNotMatch(interaction, /enteringBase\.withCallback/);
   assert.doesNotMatch(interaction, /runOnJS\(markMossproutHubEntranceSettled\)/);
   assert.match(sharedRows, /export const DAY_ACTION_MOTION/);
@@ -859,7 +859,7 @@ test('active Journey presentation hides optional cards and Merge tray entries', 
   const kingdom = fs.readFileSync('components/katchadeck/world/kingdom-companion-screen.tsx', 'utf8');
   const questHook = fs.readFileSync('hooks/use-kingdom-quests.ts', 'utf8');
   assert.match(stage, /const journeyExclusive = Boolean\(journey && journey\.status !== 'complete'\)/);
-  assert.match(stage, /if \(journeyExclusive\) return resolvedVisibleActions/);
+  assert.match(stage, /if \(journeyExclusive \|\| !selfCompletingGoalAction\) return visible/);
   assert.match(stage, /relationships\.actionPresentations/);
   assert.match(stage, /actionPresentationAsDayAction/);
   assert.match(stage, /const journeyMergeActive = journey\?\.status === 'activity_available' \|\| journey\?\.status === 'activity_in_progress'/);
@@ -877,15 +877,15 @@ test('active Journey presentation hides optional cards and Merge tray entries', 
   assert.doesNotMatch(journeyPanel, /TODAY’S JOURNEY/);
   assert.match(stage, /journey\.status === 'activity_available' \? 'Go to the Garden' : 'Continue in the Garden'/);
   assert.match(stage, /served: servedOrderIds\.has\(order\.id\)/);
-  assert.match(merge, /mossproutJourneyExclusive[\s\S]*?state\.activeOrders\.filter\(\(order\) => journeyOrderIds\.has\(order\.id\)\)/);
+  assert.match(merge, /prioritizedVisibleMergeOrders\(state, \{[\s\S]*?exclusiveJourney: mossproutJourneyExclusive,[\s\S]*?journeyOrderIds/);
   assert.match(merge, /mossproutJourneyExclusive[\s\S]*?journeyReturnReady \? \[mossproutReturnEntry\] : \[\]/);
-  assert.match(merge, /!chapterZeroActive && !mossproutJourneyExclusive && pendingParcel/);
+  assert.match(merge, /!chapterZeroActive && pendingParcel && \(!mossproutJourneyExclusive \|\| pendingParcel\.kind === 'resident_card_parcel'\)/);
   assert.match(merge, /beginMossproutJourneyReturn\(current, mossproutJourneyDayId\)/);
   assert.match(merge, /params: \{ creatureId: `companion:\$\{characterId\}`, source: 'merge-world', story: 'return' \}/);
   assert.match(route, /source === 'merge-world' && story === 'return'/);
   assert.match(route, /journey\.familyId === 'mossprout' && journey\.status === 'resolution_ready'/);
   assert.match(route, /journeyReturnConversationDefinitionId=\{journeyReturnConversationDefinitionId\}/);
-  assert.match(routeScreen, /initialConversationDefinitionId=\{journeyReturnConversationDefinitionId\}/);
+  assert.match(routeScreen, /initialConversationDefinitionId=\{!residentStoryResumeActive[\s\S]*?: journeyReturnConversationDefinitionId\}/);
   assert.match(kingdom, /initialConversationDefinitionId=\{ftueConversationDefinitionId \?\? initialConversationDefinitionId\}/);
   assert.match(questHook, /mossproutJourneyRuntimeDayId\(relationships, dayId, isJourneyQuickModeEnabled\(\)\)/);
   assert.match(stage, /mossproutActionOrigin\(action, dayId, journey\)/);
@@ -929,7 +929,7 @@ test('Journey narrative replies and task bridge wait for the player', () => {
   assert.match(questHook, /settleMossproutConversationCompletion\(nextSession, selectedConversationDefinition\)/);
   assert.match(completion, /\[\.\.\.current\.journeyDays\]\.reverse\(\)\.find/);
   const mergeScreen = fs.readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
-  assert.match(mergeScreen, /onPress=\{\(\) => ftueExclusive \? handleBlockedFtueInteraction\(\) : creatureId \? router\.back\(\)/);
+  assert.match(mergeScreen, /onPress=\{\(\) => residentFtueActive && creatureId[\s\S]*?: ftueNavigationLocked \|\| ftueExclusive[\s\S]*?\? handleBlockedFtueInteraction\(\)[\s\S]*?: returnFromGarden\(\)/);
   const provider = fs.readFileSync('features/merge-world/merge-world-provider.tsx', 'utf8');
   assert.match(provider, /dropDefinitionIds: mossproutCampaignOrderDrops\(journeyEpisode\)/);
 });
@@ -1000,7 +1000,7 @@ test('form questionnaires gate launch companions while Katchimera Cards remain c
   assert.match(interaction, /startConversation\(\{ definitionId: idealSkinDefinitionId \}\)/);
   assert.match(interaction, /if \(!hasActiveIdealSkinQuestionnaire\) \{\s*startConversation\(\{ definitionId: idealSkinDefinitionId \}\);/);
   assert.match(interaction, /if \(!hasActiveIdealSkinQuestionnaire \|\| route\.kind === 'conversation'\) return;\s*showConversation\(\);/);
-  assert.doesNotMatch(interaction, /useLayoutEffect/);
+  assert.match(interaction, /useLayoutEffect/);
   assert.match(interaction, /setInterval\(\(\) => \{\s*startConversation\(\{ definitionId: idealSkinDefinitionId \}\);\s*\}, 250\)/);
   assert.match(questHook, /const existingExplicitSession = input\.definitionId/);
   assert.match(questHook, /if \(existingExplicitSession\) \{[\s\S]*?actionOrigin: input\.actionOrigin/);
@@ -1011,7 +1011,7 @@ test('form questionnaires gate launch companions while Katchimera Cards remain c
   assert.match(cards, /A new visitor will bring the first card during an early Journey Day/);
   assert.match(cards, /KatchimeraCardDeckCarousel/);
   assert.match(cardHook, /card\.owned && card\.id !== familyId/);
-  assert.match(companionRoute, /if \(!isFocused \|\| !discovery\.ready\) return <View style=\{styles\.inactiveScreen\} \/>;/);
+  assert.match(companionRoute, /if \(!surfaceActive \|\| \(!discovery\.ready && !hostedInHaven\)[\s\S]*?return <View style=\{styles\.inactiveScreen\} \/>/);
   assert.match(interaction, /if \(!props\.active \|\| !idealSkinOnboardingRequired/);
   assert.match(interaction, /selectExperienceDestination\('insight'\)/);
   assert.match(profile, /Reset Katchimeras progress/);
@@ -1087,7 +1087,7 @@ test('goal picker returns to the dedicated goals destination', () => {
   assert.match(interaction, /route\.kind === 'visit' \|\| route\.kind === 'conversation'\s*\? visitStageSpeech/);
   assert.match(interaction, /backLabel=\{quickGoalPickerOpen \? 'Goals'/);
   assert.match(interaction, /\) : !questionnaireExperience \? \(\s*<CompanionCinematicStage/);
-  assert.match(interaction, /route\.kind === 'destination' \|\| route\.kind === 'dashboard' \|\| route\.kind === 'shared_history' \|\| quickGoalPickerOpen/);
+  assert.match(interaction, /route\.kind === 'destination' \|\| dashboardRouteActive \|\| route\.kind === 'shared_history' \|\| quickGoalPickerOpen/);
   assert.match(quickGoals, /backgroundColor: KatchaUI\.companionPanel\.background/);
   assert.match(quickGoals, /styles\.scopedPresetRow/);
   assert.match(quickGoals, /<QuickGoalComposerModal/);
@@ -1214,9 +1214,9 @@ test('companion viewport resets across destinations and content-shape transition
   );
   assert.match(interaction, /route\.kind === 'dashboard'[\s\S]*?scrollToEnd\(\{ animated: false \}\)/);
   assert.match(interaction, /onContentSizeChange=\{activeAttemptId \|\| \(route\.kind === 'dashboard' && !mossproutActionDashboard\) \? resetViewport : undefined\}/);
-  assert.match(interaction, /bounces=\{!activeAttemptId && !mossproutActionDashboard\}/);
-  assert.match(interaction, /overScrollMode=\{activeAttemptId \|\| mossproutActionDashboard \? 'never' : 'auto'\}/);
-  assert.match(interaction, /scrollEnabled=\{!activeAttemptId && !questionnaireExperience && !mossproutActionDashboard\}/);
+  assert.match(interaction, /bounces=\{!activeAttemptId && \(!mossproutActionDashboard \|\| Boolean\(meditation\)\)\}/);
+  assert.match(interaction, /overScrollMode=\{activeAttemptId \|\| \(mossproutActionDashboard && !meditation\) \? 'never' : 'auto'\}/);
+  assert.match(interaction, /scrollEnabled=\{!activeAttemptId && !questionnaireExperience && \(!mossproutActionDashboard \|\| Boolean\(meditation\)\)\}/);
   assert.match(interaction, /mossproutActionDashboard && styles\.mossproutActionStageSpacer/);
   assert.match(interaction, /mossproutActionStageSpacer: \{ flex: 1, minHeight: 0 \}/);
 });

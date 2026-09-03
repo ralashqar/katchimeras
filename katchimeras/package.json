@@ -62,6 +62,7 @@
     "art:haven:portrait-board": "python scripts/package-mossprout-portrait-merge-island.py",
     "art:haven:portrait-board:qa": "python scripts/render-mossprout-portrait-board-qa.py",
     "art:haven:garden-entry": "python scripts/package-mossprout-garden-entry.py",
+    "art:mossprout:memory-garden": "python scripts/package-mossprout-memory-garden.py",
     "art:cinematic-progression": "python scripts/prepare-cinematic-environment-progression.py --character mossprout",
     "art:cinematic-progression:check": "python scripts/prepare-cinematic-environment-progression.py --character mossprout --check",
     "art:today-scenes": "python scripts/generate-today-full-spread.py",

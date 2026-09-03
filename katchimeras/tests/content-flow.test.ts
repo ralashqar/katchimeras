@@ -197,8 +197,10 @@ test('the shipping FTUE is a direct data-driven Content Flow manifest', () => {
   const opening = flow.nodes.find((node) => node.id === 'egg.opening');
   assert.equal(opening?.kind, 'scene');
   if (opening?.kind === 'scene') {
-    assert.deepEqual(new Set(opening.actions.map((action) => action.next)), new Set(['egg.ready']));
+    assert.deepEqual(new Set(opening.actions.map((action) => action.next)), new Set(['egg.context']));
   }
+  const context = flow.nodes.find((node) => node.id === 'egg.context');
+  assert.equal(context?.kind === 'scene' ? context.actions[0]?.next : null, 'egg.ready');
   assert.equal(flow.nodes.some((node) => node.id === 'egg.nature_theme'), false);
 });
 
@@ -211,9 +213,34 @@ test('Day 1 Content Flow completion durably crosses the relationship effect befo
   assert.equal(effect.pendingWork.kind, 'effect');
   if (effect.pendingWork.kind !== 'effect') return;
   assert.equal(effect.pendingWork.effectType, 'relationship.complete_day_one_lesson');
-  const advanced = reduceContentFlow(flow, effect.run, { type: 'effect_completed', effectKey: effect.pendingWork.key, now: 3 });
+  const seeded = reduceContentFlow(flow, effect.run, { type: 'effect_completed', effectKey: effect.pendingWork.key, now: 3 });
+  assert.equal(seeded.run.nodeId, 'effect.haven.grant_first_memory');
+  assert.equal(seeded.pendingWork.kind, 'effect');
+  if (seeded.pendingWork.kind !== 'effect') return;
+  assert.equal(seeded.pendingWork.effectType, 'haven.grant_first_memory');
+  const advanced = reduceContentFlow(flow, seeded.run, { type: 'effect_completed', effectKey: seeded.pendingWork.key, now: 4 });
   assert.equal(advanced.run.nodeId, 'companion.bond_spotlight');
-  assert.equal(Object.keys(advanced.run.effectReceipts).length, 1);
+  assert.equal(Object.keys(advanced.run.effectReceipts).length, 2);
+});
+
+test('the first memory is planted by its own world action and growth remains visible before companion return', () => {
+  const flow = MOSSPROUT_FTUE_FLOW;
+  const base = createContentFlowRun(flow, { runId: 'ftue-first-seed', now: 1 });
+  const arrival = { ...base, nodeId: 'world.garden_arrival', phase: 'awaiting_input' as const };
+  const placing = reduceContentFlow(flow, arrival, { type: 'submit_scene', actionId: 'world.plant_first_seed', now: 2 });
+  assert.equal(placing.run.nodeId, 'effect.haven.place_first_memory');
+  assert.equal(placing.pendingWork.kind, 'effect');
+  if (placing.pendingWork.kind !== 'effect') return;
+  assert.equal(placing.pendingWork.effectType, 'haven.place_first_memory');
+  const planted = reduceContentFlow(flow, placing.run, { type: 'effect_completed', effectKey: placing.pendingWork.key, now: 3 });
+  assert.equal(planted.run.nodeId, 'world.seed_planted');
+
+  const beforeGrowth = { ...base, nodeId: 'effect.haven.grow_first_memory', phase: 'awaiting_effect' as const };
+  const growthWork = reduceContentFlow(flow, beforeGrowth, { type: 'retry', now: 4 });
+  assert.equal(growthWork.pendingWork.kind, 'effect');
+  if (growthWork.pendingWork.kind !== 'effect') return;
+  const grown = reduceContentFlow(flow, growthWork.run, { type: 'effect_completed', effectKey: growthWork.pendingWork.key, now: 5 });
+  assert.equal(grown.run.nodeId, 'world.first_seed_grew');
 });
 
 test('world upgrade recipes expand into focus, atomic commit, and receipt-backed reveal', () => {

@@ -1,4 +1,5 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
 
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
@@ -18,12 +19,16 @@ export function CompanionMeditationStage({
   companionName,
   now,
   onExitToGarden,
+  onMeditationAction,
 }: {
   availableAt: number;
   companionName: string;
   now: number;
   onExitToGarden?: () => void;
+  onMeditationAction?: (action: 'tend_together' | 'share_moment', optionId?: string) => void;
 }) {
+  const [sharingMoment, setSharingMoment] = useState(false);
+  const [completedAction, setCompletedAction] = useState<'tend_together' | 'share_moment' | null>(null);
   const countdown = formatMeditationCountdown(availableAt, now);
   return (
     <View accessibilityLabel={`${companionName} is meditating. Ready in ${countdown}`} style={styles.stage}>
@@ -43,12 +48,57 @@ export function CompanionMeditationStage({
           OUR NEXT JOURNEY
         </ThemedText>
         <ThemedText style={styles.title} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>
-          {companionName} is resting
+          {companionName} is reflecting
         </ThemedText>
         <ThemedText style={styles.note} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>
-          When he wakes, you can decide what to grow next. The Garden is still open while he rests.
+          He is thinking about what you shared. Meditation pauses Journey dialogue, not your Garden.
         </ThemedText>
-        {onExitToGarden ? <KatchaButton fullWidth icon="leaf.fill" label="Tend the Garden" onPress={onExitToGarden} /> : null}
+        {sharingMoment ? (
+          <View style={styles.thoughtPanel}>
+            <ThemedText style={styles.thoughtTitle}>One thing… when a day gets difficult, what disappears first?</ThemedText>
+            {[
+              ['sleep', '😴 Sleep'],
+              ['movement', '🚶 Moving around'],
+              ['time_for_myself', '🧘 Time for myself'],
+              ['organisation', '🧹 Staying organised'],
+              ['depends', '🤷 It depends'],
+            ].map(([id, label]) => (
+              <Pressable
+                accessibilityRole="button"
+                key={id}
+                onPress={() => {
+                  onMeditationAction?.('share_moment', id);
+                  setCompletedAction('share_moment');
+                  setSharingMoment(false);
+                }}
+                style={({ pressed }) => [styles.thoughtOption, pressed && styles.pressed]}>
+                <ThemedText style={styles.thoughtOptionLabel}>{label}</ThemedText>
+              </Pressable>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.actions}>
+            <KatchaButton
+              disabled={completedAction === 'tend_together'}
+              fullWidth
+              icon="drop.fill"
+              label={completedAction === 'tend_together' ? 'Water Together · Done' : 'Tend Together'}
+              onPress={() => {
+                onMeditationAction?.('tend_together');
+                setCompletedAction('tend_together');
+              }}
+            />
+            {onExitToGarden ? <KatchaButton fullWidth icon="leaf.fill" label="Tend the Garden" onPress={onExitToGarden} variant="secondary" /> : null}
+            <KatchaButton
+              disabled={completedAction === 'share_moment'}
+              fullWidth
+              icon="bubble.left.fill"
+              label={completedAction === 'share_moment' ? 'Moment shared' : 'Share a Moment'}
+              onPress={() => setSharingMoment(true)}
+              variant="secondary"
+            />
+          </View>
+        )}
       </View>
     </View>
   );
@@ -85,4 +135,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 11,
   },
+  actions: { gap: 8 },
+  thoughtPanel: { gap: 7, paddingTop: 2 },
+  thoughtTitle: { fontSize: 16, fontWeight: '800', lineHeight: 22 },
+  thoughtOption: { backgroundColor: KatchaUI.companionScenePanel.optionBackground, borderColor: KatchaUI.companionScenePanel.optionBorder, borderRadius: 14, borderWidth: 1, minHeight: 44, justifyContent: 'center', paddingHorizontal: 13 },
+  thoughtOptionLabel: { fontSize: 14, fontWeight: '800' },
+  pressed: { opacity: 0.76, transform: [{ scale: 0.99 }] },
 });

@@ -238,6 +238,7 @@ export function KingdomCompanionScreen({
   onFtueJourneyDayComplete,
   onFtueOpenMerge,
   onFtueProfileContinue,
+  onFtueMeditationAction,
   onFtueOpenResidentParcel,
   discoveryRecords = [],
 }: {
@@ -267,6 +268,7 @@ export function KingdomCompanionScreen({
   onFtueJourneyDayComplete?: () => void;
   onFtueOpenMerge?: () => void;
   onFtueProfileContinue?: (nickname?: string) => void;
+  onFtueMeditationAction?: (action: 'tend_together' | 'share_moment', optionId?: string) => void;
   onFtueOpenResidentParcel?: () => void;
   discoveryRecords?: readonly CompanionDiscoveryRecord[];
   active?: boolean;
@@ -656,6 +658,7 @@ export function KingdomCompanionScreen({
           onFtueBondSpotlightComplete={onFtueBondSpotlightComplete}
           onFtueOpenMerge={onFtueOpenMerge}
           onFtueProfileContinue={onFtueProfileContinue}
+          onFtueMeditationAction={onFtueMeditationAction}
           onFtueOpenResidentParcel={onFtueOpenResidentParcel}
           onSelectDestination={quests.selectDestination}
           onClose={() => {

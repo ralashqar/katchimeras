@@ -402,6 +402,58 @@ export type MossproutNatureIslandId =
 
 export type MossproutNatureIslandLevel = 0 | 1 | 2 | 3 | 4;
 
+export type MossproutGardenPlantSlotId =
+  | 'back-left'
+  | 'back-centre'
+  | 'back-right'
+  | 'front-left'
+  | 'front-centre'
+  | 'front-right';
+
+export type MossproutMemoryPlantId =
+  | 'momentum'
+  | 'stillness'
+  | 'renewal'
+  | 'warmth'
+  | 'curiosity';
+
+export type PlantableMemorySource = {
+  kind: 'ftue' | 'journey' | 'tending' | 'moment';
+  sourceId: string;
+};
+
+export type PlantableMemoryInstance = {
+  id: string;
+  definitionId: MossproutMemoryPlantId;
+  status: 'earned' | 'planted';
+  slotId: MossproutGardenPlantSlotId | null;
+  growthPoints: number;
+  source: PlantableMemorySource;
+  earnedAt: number;
+  plantedAt: number | null;
+};
+
+export type MossproutGardenFeatureId = 'spring' | 'path';
+
+export type HavenStructureProgress = {
+  level: number;
+  featureLevels: Record<MossproutGardenFeatureId, number>;
+};
+
+export type MossproutMovementEggProgress = {
+  status: 'hidden' | 'revealed' | 'stirring';
+  observedSteps: number;
+  manualMovementLogs: number;
+  updatedAt: number | null;
+};
+
+export type HavenMutationReceipt = {
+  id: string;
+  kind: 'plantable_grant' | 'plantable_place' | 'plantable_growth' | 'structure_upgrade' | 'feature_upgrade' | 'movement_egg';
+  targetId: string;
+  createdAt: number;
+};
+
 export type StoryWorldMutationReceipt = {
   id: string;
   kind: 'haven_upgrade';
@@ -414,7 +466,7 @@ export type StoryWorldMutationReceipt = {
 };
 
 export type MergeWorldState = {
-  version: 21;
+  version: 22;
   /** The first personal Merge World is owned by Mossprout. */
   ownerCharacterId: 'mossprout';
   revision: number;
@@ -467,6 +519,12 @@ export type MergeWorldState = {
     mossproutStoryLevel: number;
     nextProceduralOrder: number;
     residentMergeBoards: Partial<Record<Exclude<MergeBoardId, 'mossprout'>, HavenResidentMergeBoardState>>;
+    structures: {
+      mossproutGarden: HavenStructureProgress;
+    };
+    plantableMemories: PlantableMemoryInstance[];
+    mutationReceipts: HavenMutationReceipt[];
+    movementEgg: MossproutMovementEggProgress;
   };
 };
 
@@ -510,6 +568,13 @@ export type MergeWorldCommand =
   | { type: 'upgradeHavenTile'; characterId: MergeCharacterId; stage: HavenStage; now: number; receiptId?: string; economyMode?: 'normal' | 'free' | 'grant'; grantedCoins?: number }
   | { type: 'upgradeMossproutNatureIsland'; islandId: MossproutNatureIslandId; level: MossproutNatureIslandLevel; now: number; receiptId?: string; economyMode?: 'normal' | 'free' | 'grant'; grantedCoins?: number }
   | { type: 'revealHaven'; now: number }
+  | { type: 'grantPlantableMemory'; definitionId: MossproutMemoryPlantId; source: PlantableMemorySource; receiptId: string; now: number }
+  | { type: 'placePlantableMemory'; instanceId: string; slotId: MossproutGardenPlantSlotId; receiptId: string; now: number }
+  | { type: 'growPlantableMemory'; instanceId: string; amount: number; receiptId: string; now: number }
+  | { type: 'upgradeHavenStructure'; structureId: 'mossprout-garden'; level: number; receiptId: string; now: number }
+  | { type: 'upgradeHavenFeature'; structureId: 'mossprout-garden'; featureId: MossproutGardenFeatureId; level: number; receiptId: string; now: number }
+  | { type: 'revealMovementEgg'; receiptId: string; now: number }
+  | { type: 'recordMovementEggProgress'; observedSteps?: number; manualMovement?: boolean; receiptId: string; now: number }
   | { type: 'ackExternalReward'; receiptId: string; now: number };
 
 export type MergeWorldFailureReason =

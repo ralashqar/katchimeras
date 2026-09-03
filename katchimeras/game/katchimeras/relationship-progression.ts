@@ -90,7 +90,13 @@ export function normalizeRelationshipProgressState(value: unknown): Relationship
     ? candidate.mossproutDailyActionDecks.map(normalizeMossproutDailyActionDeck).filter((deck): deck is MossproutDailyActionDeck => Boolean(deck)).slice(-14)
     : [];
   const meditations = Array.isArray(candidate.meditations)
-    ? candidate.meditations.filter(isKatchimeraMeditationRecord).slice(-20)
+    ? candidate.meditations.filter(isKatchimeraMeditationRecord).map((record) => ({
+        ...record,
+        settlementReceiptIds: Array.isArray(record.settlementReceiptIds)
+          ? [...new Set(record.settlementReceiptIds.filter((id): id is string => typeof id === 'string'))].slice(-20)
+          : [],
+        settledMs: Math.max(0, Number(record.settledMs) || 0),
+      })).slice(-20)
     : [];
   return { schemaVersion: 7, journeyDays, stories, milestones, skippedActionIds, actionCompletions, actionPresentations, mossproutDailyActionDecks: normalizedDecks, meditations };
 }
@@ -424,12 +430,40 @@ export function beginKatchimeraMeditation(
     startedAt,
     availableAt: startedAt + Math.max(1, durationMs),
     reason: 'journey_rest',
+    settlementReceiptIds: [],
+    settledMs: 0,
     ...(sourceId ? { sourceId } : {}),
   };
   return {
     ...state,
     meditations: [...(state.meditations ?? []).filter((item) => item.familyId !== familyId), record],
   };
+}
+
+export function settleKatchimeraMeditation(
+  state: RelationshipProgressState,
+  familyId: KatchimeraFamilyId,
+  amountMs: number,
+  receiptId: string,
+  now = Date.now(),
+): RelationshipProgressState {
+  const amount = Math.max(0, Math.floor(amountMs));
+  if (!amount || !receiptId) return state;
+  let changed = false;
+  const meditations = (state.meditations ?? []).map((record) => {
+    if (record.familyId !== familyId || now >= record.availableAt || record.settlementReceiptIds?.includes(receiptId)) return record;
+    const settledMs = Math.min(30 * 60 * 1000, (record.settledMs ?? 0) + amount);
+    const applied = settledMs - (record.settledMs ?? 0);
+    if (applied <= 0) return record;
+    changed = true;
+    return {
+      ...record,
+      availableAt: Math.max(record.startedAt + 1, record.availableAt - applied),
+      settledMs,
+      settlementReceiptIds: [...(record.settlementReceiptIds ?? []), receiptId],
+    };
+  });
+  return changed ? { ...state, meditations } : state;
 }
 
 export function companionInteractionAvailability(

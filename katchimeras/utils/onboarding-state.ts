@@ -8,6 +8,7 @@ export type MossproutOnboardingAnswers = {
   growthIntentId?: string | null;
   waterTogetherChoiceId?: string | null;
   firstSeedId?: string | null;
+  reflectionAccuracyId?: string | null;
   attunementPlaceId?: string | null;
   currentFeelingId?: string | null;
   desiredMoreId?: string | null;
@@ -45,6 +46,7 @@ export const defaultOnboardingProfile: OnboardingProfile = {
     growthIntentId: null,
     waterTogetherChoiceId: null,
     firstSeedId: null,
+    reflectionAccuracyId: null,
     attunementPlaceId: null,
     currentFeelingId: null,
     desiredMoreId: null,

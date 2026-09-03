@@ -24,23 +24,36 @@ export type MossproutBondSharePrompt = {
 
 export const MOSSPROUT_BOND_SHARE_PROMPTS = [
   {
-    id: 'growth-intent',
-    cardLabel: 'What we’ll grow',
+    id: 'desired-help',
+    cardLabel: 'What would help',
     icon: 'leaf.fill',
-    prompt: 'Is it something you want more of… or something you’re trying to fix?',
-    reply: 'Good. I don’t need to know everything today. We can grow it bit by bit.',
+    prompt: 'What would help most right now?',
+    reply: 'Good. We do not have to grow a whole forest today.',
     options: [
-      { id: 'want_to_grow', icon: 'sparkles', label: 'Something I want to grow', reply: 'Then we’ll begin with one small, living thing.' },
-      { id: 'want_to_improve', icon: 'puzzlepiece.fill', label: 'Something I want to improve', reply: 'We can make it better without asking it to become perfect.' },
-      { id: 'not_sure_yet', icon: 'questionmark', label: 'I’m not really sure yet', reply: 'That’s all right. A seed doesn’t need to know its whole shape.' },
+      { id: 'progress', icon: 'leaf.fill', label: 'Making a little progress', reply: 'Then we will begin with one small, living thing.' },
+      { id: 'calm', icon: 'wind', label: 'Finding a little calm', reply: 'Then let us make a little room for quiet.' },
+      { id: 'feel_like_myself', icon: 'sun.max.fill', label: 'Feeling more like myself', reply: 'Then let us grow a little more light for whatever today needs.' },
     ],
   },
 ] as const satisfies readonly MossproutBondSharePrompt[];
+
+export const MOSSPROUT_SUPPORT_STYLE_OPTIONS = [
+  { id: 'tiny_step', icon: 'leaf.fill', label: 'Give me one small thing to try', reply: 'Small is good. Tiny roots still count.' },
+  { id: 'reflect', icon: 'bubble.left.fill', label: 'Help me think it through', reply: 'Oh, good. I like thinking. Possibly too much.' },
+  { id: 'push', icon: 'bolt.fill', label: 'Give me a push', reply: 'All right. I can be surprisingly stern for something this leafy.' },
+  { id: 'company', icon: 'heart.fill', label: 'Mostly just keep me company', reply: 'I can do that. We do not always need to turn everything into a project.' },
+] as const;
 
 export const MOSSPROUT_WATER_TOGETHER_OPTIONS = [
   { id: 'could_use_water', icon: 'drop.fill', label: 'I could probably use some water', reply: 'Then let’s both have a drink today. Nothing grand—just one little watering.' },
   { id: 'already_good', icon: 'checkmark.circle.fill', label: 'I’m good', reply: 'Look at you, already watered. I’ll try to keep up.' },
   { id: 'dont_start', icon: 'face.smiling.fill', label: 'Mossprout, don’t start', reply: 'Ha! All right, all right. I’ll tend my roots and mind my leaves.' },
+] as const;
+
+const LEGACY_DESIRED_HELP_OPTIONS = [
+  { id: 'energy', icon: 'bolt.fill', label: 'Getting some energy back', reply: 'Fresh starts can be very small.' },
+  { id: 'good_day', icon: 'heart.fill', label: 'Just having a good day', reply: 'A good day is worth noticing while it is here.' },
+  { id: 'unsure', icon: 'questionmark', label: 'I’m not sure yet', reply: 'That is all right. A seed does not need to know its whole shape.' },
 ] as const;
 
 export function mossproutWaterTogetherReply(choiceId: string | null | undefined): string {
@@ -49,21 +62,12 @@ export function mossproutWaterTogetherReply(choiceId: string | null | undefined)
 }
 
 export function mossproutFirstSeedForIntent(intentId: string | null | undefined) {
-  if (intentId === 'growth-intent:want_to_improve') return {
-    id: 'seed-of-patience',
-    name: 'Seed of Patience',
-    message: 'Make one small thing kinder than it was yesterday.',
-  };
-  if (intentId === 'growth-intent:not_sure_yet') return {
-    id: 'seed-of-curiosity',
-    name: 'Seed of Curiosity',
-    message: 'Notice what gives you a little more life.',
-  };
-  return {
-    id: 'seed-of-momentum',
-    name: 'Seed of Momentum',
-    message: 'Start small enough that starting isn’t scary.',
-  };
+  if (intentId === 'desired-help:calm') return { id: 'stillness', name: 'Seed of Stillness', message: 'Quiet can be something you grow, not something you wait for.' } as const;
+  if (intentId === 'desired-help:feel_like_myself') return { id: 'renewal', name: 'Seed of Renewal', message: 'A little more light can help you feel like yourself again.' } as const;
+  if (intentId === 'desired-help:energy') return { id: 'renewal', name: 'Seed of Renewal', message: 'Fresh starts can arrive one small unfurling at a time.' } as const;
+  if (intentId === 'desired-help:good_day') return { id: 'warmth', name: 'Seed of Warmth', message: 'A good day is worth noticing while it is here.' } as const;
+  if (intentId === 'desired-help:unsure') return { id: 'curiosity', name: 'Seed of Curiosity', message: 'Not knowing can still be a place to begin.' } as const;
+  return { id: 'momentum', name: 'Seed of Momentum', message: 'Start small enough that starting isn’t scary.' } as const;
 }
 
 export function mossproutBondSharePrompt(promptId: string | null | undefined) {
@@ -74,6 +78,10 @@ export function mossproutBondShareSelection(optionId: string | null | undefined)
   if (!optionId) return null;
   const [promptId, answerId] = optionId.split(':');
   const prompt = mossproutBondSharePrompt(promptId);
-  const answer = prompt?.options.find((option) => option.id === answerId) ?? null;
+  const answer = prompt?.options.find((option) => option.id === answerId)
+    ?? (promptId === 'desired-help'
+      ? LEGACY_DESIRED_HELP_OPTIONS.find((option) => option.id === answerId)
+      : null)
+    ?? null;
   return prompt && answer ? { answer, id: optionId, prompt } : null;
 }

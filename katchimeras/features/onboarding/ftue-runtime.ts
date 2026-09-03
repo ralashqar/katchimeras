@@ -90,7 +90,7 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
   // The life-companion pivot intentionally restarts unfinished prototype FTUE
   // runs at the Haven. This resets only the guided run; saved life captures and
   // source photos remain untouched in their existing repositories.
-  if (run.status === 'active' && run.scriptVersion < 32) {
+  if (run.status === 'active' && run.scriptVersion < 42) {
     return freshRun(new Date(run.startedAt));
   }
   const replayDreamMistChapter = run.scriptVersion < 10;
@@ -573,6 +573,7 @@ export function ftuePersonalizedLine(run = loadFtueRun()) {
     too_much_at_once: 'I felt the rain drumming on my shell. We can hold one small piece at a time.',
     pretty_good: 'I felt that warm patch of sunlight. I think it helped me hatch.',
     mostly_drifting: 'I felt the breeze carrying us. Drifting can still bring you somewhere new.',
+    taking_today_as_it_comes: 'I felt a soft breeze and a little warmth. Maybe today can move at its own pace.',
     more_calm: 'You wanted more calm. We can grow it one small piece at a time.',
     more_energy: 'You wanted more energy. This garden definitely does too.',
     something_new: 'You wanted something new. Well… this is pretty new.',
@@ -597,7 +598,7 @@ export function ftuePersonalizationKey(run = loadFtueRun()) {
   const context = run?.answers['egg.context.activity'];
   const opening = Object.values(run?.answers ?? {}).find((answer) => answer.actionId.startsWith('egg.') && !answer.private);
   const id = companionGoal?.optionId ?? context?.optionId ?? opening?.optionId ?? 'default';
-  return ['trying_to_start', 'too_much_at_once', 'pretty_good', 'mostly_drifting', 'more_energy', 'more_calm', 'something_new', 'more_confidence', 'more_fun', 'more_connection', 'calm', 'encouragement', 'fun', 'company', 'discovery', 'outside', 'family', 'friends', 'relaxing', 'work', 'tired', 'rough', 'home'].includes(id)
+  return ['trying_to_start', 'too_much_at_once', 'pretty_good', 'mostly_drifting', 'taking_today_as_it_comes', 'more_energy', 'more_calm', 'something_new', 'more_confidence', 'more_fun', 'more_connection', 'calm', 'encouragement', 'fun', 'company', 'discovery', 'outside', 'family', 'friends', 'relaxing', 'work', 'tired', 'rough', 'home'].includes(id)
     ? id
     : 'default';
 }

@@ -42,8 +42,14 @@ import type {
   MergeWorldState,
   MossproutNatureIslandId,
   MossproutNatureIslandLevel,
+  MossproutGardenPlantSlotId,
+  PlantableMemoryInstance,
   StoryWorldMutationReceipt,
 } from '@/types/merge-world';
+
+const MOSSPROUT_GARDEN_PLANT_SLOTS: readonly MossproutGardenPlantSlotId[] = [
+  'back-left', 'back-centre', 'back-right', 'front-left', 'front-centre', 'front-right',
+];
 
 const STEPPLING_HAVEN_BOARD_SIZE = 42;
 
@@ -82,7 +88,7 @@ export function mergeWorldStateForBoard(state: MergeWorldState, boardId: MergeBo
     storageCapacity: board.storageCapacity,
   };
 }
-import { advanceMossproutChapterZero, enforceMossproutChapterZeroDropOverride } from '@/utils/merge-world/chapter-zero-policy';
+import { advanceMossproutChapterZero, enforceMossproutChapterZeroDropOverride, MOSSPROUT_FTUE_GARDEN_MISSION_ORDER_ID } from '@/utils/merge-world/chapter-zero-policy';
 import { havenStageDefinition, havenStoryGateSatisfied, type HavenStage } from '@/constants/haven-catalog';
 import {
   MOSSPROUT_NATURE_ISLAND_IDS,
@@ -160,7 +166,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     occupant: null,
   }));
   let state: MergeWorldState = {
-    version: 21,
+    version: 22,
     ownerCharacterId: 'mossprout',
     revision: 0,
     createdAt: now,
@@ -213,6 +219,10 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
       mossproutStoryLevel: 0,
       nextProceduralOrder: 1,
       residentMergeBoards: { steppling: createStepplingHavenBoard(now) },
+      structures: { mossproutGarden: { level: 0, featureLevels: { spring: 0, path: 0 } } },
+      plantableMemories: [],
+      mutationReceipts: [],
+      movementEgg: { status: 'hidden', observedSteps: 0, manualMovementLogs: 0, updatedAt: null },
     },
   };
   state = reconcileCharacters(state, characterIds, now);
@@ -388,6 +398,30 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
       if (current.haven.revealState === 'revealed') return unchanged(current);
       return changed(touch({ ...current, haven: { ...current.haven, revealState: 'revealed' } }, command.now), 'The Haven awakens.');
     }
+    case 'grantPlantableMemory':
+      return grantPlantableMemory(current, command);
+    case 'placePlantableMemory':
+      return placePlantableMemory(current, command);
+    case 'growPlantableMemory':
+      return growPlantableMemory(current, command);
+    case 'upgradeHavenStructure':
+      return upgradeHavenStructure(current, command);
+    case 'upgradeHavenFeature':
+      return upgradeHavenFeature(current, command);
+    case 'revealMovementEgg':
+      return mutateMovementEgg(current, command.receiptId, command.now, (egg) => ({ ...egg, status: 'revealed', updatedAt: command.now }));
+    case 'recordMovementEggProgress':
+      return mutateMovementEgg(current, command.receiptId, command.now, (egg) => {
+        const observedSteps = Math.max(egg.observedSteps, Math.floor(command.observedSteps ?? egg.observedSteps));
+        const manualMovementLogs = egg.manualMovementLogs + (command.manualMovement ? 1 : 0);
+        return {
+          ...egg,
+          observedSteps,
+          manualMovementLogs,
+          status: observedSteps >= 500 || manualMovementLogs > 0 ? 'stirring' : egg.status === 'hidden' ? 'revealed' : egg.status,
+          updatedAt: command.now,
+        };
+      });
     case 'ackExternalReward': {
       const receipts = current.externalRewardReceipts.map((receipt) => receipt.id === command.receiptId && receipt.appliedAt == null
         ? { ...receipt, appliedAt: command.now }
@@ -396,6 +430,137 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
       return changed(touch({ ...current, externalRewardReceipts: receipts }, command.now));
     }
   }
+}
+
+function hasHavenMutationReceipt(state: MergeWorldState, receiptId: string) {
+  return state.haven.mutationReceipts.some((receipt) => receipt.id === receiptId);
+}
+
+function withHavenMutationReceipt(
+  state: MergeWorldState,
+  input: { id: string; kind: MergeWorldState['haven']['mutationReceipts'][number]['kind']; targetId: string; createdAt: number },
+) {
+  return {
+    ...state.haven,
+    mutationReceipts: [...state.haven.mutationReceipts, input],
+  };
+}
+
+function grantPlantableMemory(
+  state: MergeWorldState,
+  command: Extract<MergeWorldCommand, { type: 'grantPlantableMemory' }>,
+): MergeWorldCommandResult {
+  if (hasHavenMutationReceipt(state, command.receiptId)) return unchanged(state, 'This memory was already gathered.');
+  const instanceId = `memory-plant:${command.receiptId}`;
+  const plant: PlantableMemoryInstance = {
+    id: instanceId,
+    definitionId: command.definitionId,
+    status: 'earned',
+    slotId: null,
+    growthPoints: 0,
+    source: command.source,
+    earnedAt: command.now,
+    plantedAt: null,
+  };
+  const haven = withHavenMutationReceipt(state, {
+    id: command.receiptId, kind: 'plantable_grant', targetId: instanceId, createdAt: command.now,
+  });
+  return changed(touch({
+    ...state,
+    haven: { ...haven, plantableMemories: [...haven.plantableMemories, plant] },
+  }, command.now), `${command.definitionId} Seed gathered.`);
+}
+
+function placePlantableMemory(
+  state: MergeWorldState,
+  command: Extract<MergeWorldCommand, { type: 'placePlantableMemory' }>,
+): MergeWorldCommandResult {
+  if (hasHavenMutationReceipt(state, command.receiptId)) return unchanged(state, 'This planting was already saved.');
+  if (!MOSSPROUT_GARDEN_PLANT_SLOTS.includes(command.slotId)) return unchanged(state, 'That Garden plot does not exist.');
+  const selected = state.haven.plantableMemories.find((plant) => plant.id === command.instanceId);
+  if (!selected) return unchanged(state, 'That memory Seed is not available.');
+  const displaced = state.haven.plantableMemories.find((plant) => plant.slotId === command.slotId && plant.id !== command.instanceId);
+  const previousSlot = selected.slotId;
+  const plantableMemories = state.haven.plantableMemories.map((plant): PlantableMemoryInstance => {
+    if (plant.id === selected.id) return { ...plant, status: 'planted', slotId: command.slotId, plantedAt: plant.plantedAt ?? command.now };
+    if (plant.id === displaced?.id) return previousSlot
+      ? { ...plant, status: 'planted', slotId: previousSlot }
+      : { ...plant, status: 'earned', slotId: null };
+    return plant;
+  });
+  const haven = withHavenMutationReceipt(state, {
+    id: command.receiptId, kind: 'plantable_place', targetId: `${selected.id}:${command.slotId}`, createdAt: command.now,
+  });
+  return changed(touch({ ...state, haven: { ...haven, plantableMemories } }, command.now), 'The memory Seed is planted.');
+}
+
+function growPlantableMemory(
+  state: MergeWorldState,
+  command: Extract<MergeWorldCommand, { type: 'growPlantableMemory' }>,
+): MergeWorldCommandResult {
+  if (hasHavenMutationReceipt(state, command.receiptId)) return unchanged(state, 'This growth was already counted.');
+  if (!Number.isFinite(command.amount) || command.amount <= 0) return unchanged(state, 'Growth must be positive.');
+  const selected = state.haven.plantableMemories.find((plant) => plant.id === command.instanceId);
+  if (!selected) return unchanged(state, 'That memory plant is not available.');
+  const plantableMemories = state.haven.plantableMemories.map((plant) => plant.id === selected.id
+    ? { ...plant, growthPoints: plant.growthPoints + Math.floor(command.amount) }
+    : plant);
+  const haven = withHavenMutationReceipt(state, {
+    id: command.receiptId, kind: 'plantable_growth', targetId: selected.id, createdAt: command.now,
+  });
+  return changed(touch({ ...state, haven: { ...haven, plantableMemories } }, command.now), 'A small thing helped this memory grow.');
+}
+
+function upgradeHavenStructure(
+  state: MergeWorldState,
+  command: Extract<MergeWorldCommand, { type: 'upgradeHavenStructure' }>,
+): MergeWorldCommandResult {
+  if (hasHavenMutationReceipt(state, command.receiptId)) return unchanged(state, 'This Garden restoration was already applied.');
+  const current = state.haven.structures.mossproutGarden.level;
+  if (command.level !== current + 1) return unchanged(state, 'Garden structures restore one level at a time.');
+  const haven = withHavenMutationReceipt(state, {
+    id: command.receiptId, kind: 'structure_upgrade', targetId: command.structureId, createdAt: command.now,
+  });
+  return changed(touch({
+    ...state,
+    haven: { ...haven, structures: { ...haven.structures, mossproutGarden: { ...haven.structures.mossproutGarden, level: command.level } } },
+  }, command.now), 'The Garden has somewhere good for memories to grow.');
+}
+
+function upgradeHavenFeature(
+  state: MergeWorldState,
+  command: Extract<MergeWorldCommand, { type: 'upgradeHavenFeature' }>,
+): MergeWorldCommandResult {
+  if (hasHavenMutationReceipt(state, command.receiptId)) return unchanged(state, 'This Garden feature was already restored.');
+  const garden = state.haven.structures.mossproutGarden;
+  const current = garden.featureLevels[command.featureId];
+  if (garden.level < 1) return unchanged(state, 'Restore the Garden before repairing its features.');
+  if (command.level !== current + 1) return unchanged(state, 'Garden features restore one level at a time.');
+  const haven = withHavenMutationReceipt(state, {
+    id: command.receiptId, kind: 'feature_upgrade', targetId: `${command.structureId}:${command.featureId}`, createdAt: command.now,
+  });
+  return changed(touch({
+    ...state,
+    haven: {
+      ...haven,
+      structures: {
+        ...haven.structures,
+        mossproutGarden: { ...garden, featureLevels: { ...garden.featureLevels, [command.featureId]: command.level } },
+      },
+    },
+  }, command.now), `The Garden ${command.featureId} is flowing again.`);
+}
+
+function mutateMovementEgg(
+  state: MergeWorldState,
+  receiptId: string,
+  now: number,
+  mutate: (current: MergeWorldState['haven']['movementEgg']) => MergeWorldState['haven']['movementEgg'],
+): MergeWorldCommandResult {
+  if (hasHavenMutationReceipt(state, receiptId)) return unchanged(state, 'This movement was already noticed.');
+  const movementEgg = mutate(state.haven.movementEgg);
+  const haven = withHavenMutationReceipt(state, { id: receiptId, kind: 'movement_egg', targetId: 'movement-egg', createdAt: now });
+  return changed(touch({ ...state, haven: { ...haven, movementEgg } }, now), 'Something inside the egg moved.');
 }
 
 function grantRetiredRootMilestones(state: MergeWorldState, activeDays: number, now: number): MergeWorldState {
@@ -575,14 +740,14 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   // v18 intentionally starts the first personal Merge World cleanly. Earlier
   // snapshots are shared-board prototypes and cannot be assigned safely to a
   // single companion without carrying their ownership compromises forward.
-  if ((rawVersion !== 18 && rawVersion !== 19 && rawVersion !== 20 && rawVersion !== 21) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
+  if ((rawVersion !== 18 && rawVersion !== 19 && rawVersion !== 20 && rawVersion !== 21 && rawVersion !== 22) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
     return createInitialMergeWorldState(now);
   }
   const fallback = createInitialMergeWorldState(now);
   let normalized: MergeWorldState = {
     ...fallback,
     ...source,
-    version: 21,
+    version: 22,
     ownerCharacterId: 'mossprout',
     revision: finite(source.revision, 0),
     createdAt: finite(source.createdAt, now),
@@ -756,9 +921,18 @@ function upgradeHavenTile(
   const revealState = characterId === 'mossprout' && requestedStage === 1 && state.haven.revealState === 'hidden'
     ? 'first_restore_complete' as const
     : state.haven.revealState;
+  // Restore the established satellite progression baseline here. Visibility
+  // remains a presentation concern until the later Haven reveal; keeping the
+  // levels initialized preserves every existing upgrade invariant.
   const mossproutNatureIslands = characterId === 'mossprout' && requestedStage === 1
     ? emptyMossproutNatureIslandLevels(1)
     : state.haven.mossproutNatureIslands;
+  const structures = characterId === 'mossprout' && requestedStage === 1
+    ? {
+        ...state.haven.structures,
+        mossproutGarden: { ...state.haven.structures.mossproutGarden, level: Math.max(1, state.haven.structures.mossproutGarden.level) },
+      }
+    : state.haven.structures;
   const receipt: StoryWorldMutationReceipt | null = receiptId ? {
     id: receiptId,
     kind: 'haven_upgrade',
@@ -777,6 +951,7 @@ function upgradeHavenTile(
       ...state.haven,
       tileStages: { ...state.haven.tileStages, [characterId]: requestedStage },
       mossproutNatureIslands,
+      structures,
       revealState,
     },
   }, now);
@@ -909,7 +1084,7 @@ function normalizeHaven(value: unknown, source: Partial<MergeWorldState>, rawVer
   const mossproutNatureIslands = emptyMossproutNatureIslandLevels(baselineIslandLevel);
   // v18-v20 deliberately restart the new satellite tracks at Level 1. v21+
   // snapshots preserve their independent levels.
-  if (rawVersion === 21 && raw.mossproutNatureIslands && typeof raw.mossproutNatureIslands === 'object') {
+  if ((rawVersion === 21 || rawVersion === 22) && raw.mossproutNatureIslands && typeof raw.mossproutNatureIslands === 'object') {
     for (const islandId of MOSSPROUT_NATURE_ISLAND_IDS) {
       const level = raw.mossproutNatureIslands[islandId];
       if (Number.isInteger(level) && Number(level) >= 0 && Number(level) <= 4) {
@@ -933,6 +1108,10 @@ function normalizeHaven(value: unknown, source: Partial<MergeWorldState>, rawVer
         updatedAt: finite(rawSteppling.updatedAt, now),
       }
     : stepplingFallback;
+  const structures = normalizeHavenStructures(raw.structures);
+  if ((tileStages.mossprout ?? 0) > 0 && structures.mossproutGarden.level === 0) {
+    structures.mossproutGarden.level = 1;
+  }
   return {
     tileStages,
     mossproutNatureIslands,
@@ -940,6 +1119,75 @@ function normalizeHaven(value: unknown, source: Partial<MergeWorldState>, rawVer
     mossproutStoryLevel: Math.max(0, Math.floor(finite(raw.mossproutStoryLevel, 0))),
     nextProceduralOrder: Math.max(1, Math.floor(finite(raw.nextProceduralOrder, 1))),
     residentMergeBoards: { steppling },
+    structures,
+    plantableMemories: normalizePlantableMemories(raw.plantableMemories),
+    mutationReceipts: normalizeHavenMutationReceipts(raw.mutationReceipts),
+    movementEgg: normalizeMovementEgg(raw.movementEgg),
+  };
+}
+
+function normalizeHavenStructures(value: unknown): MergeWorldState['haven']['structures'] {
+  const raw = value && typeof value === 'object' ? value as Partial<MergeWorldState['haven']['structures']> : {};
+  const garden = raw.mossproutGarden && typeof raw.mossproutGarden === 'object' ? raw.mossproutGarden : null;
+  return {
+    mossproutGarden: {
+      level: Math.max(0, Math.floor(finite(garden?.level, 0))),
+      featureLevels: {
+        spring: Math.max(0, Math.floor(finite(garden?.featureLevels?.spring, 0))),
+        path: Math.max(0, Math.floor(finite(garden?.featureLevels?.path, 0))),
+      },
+    },
+  };
+}
+
+function normalizePlantableMemories(value: unknown): MergeWorldState['haven']['plantableMemories'] {
+  if (!Array.isArray(value)) return [];
+  const ids = new Set<string>();
+  const slots = new Set<string>();
+  return value.flatMap((candidate): PlantableMemoryInstance[] => {
+    if (!candidate || typeof candidate !== 'object') return [];
+    const raw = candidate as Partial<PlantableMemoryInstance>;
+    if (typeof raw.id !== 'string' || ids.has(raw.id)) return [];
+    if (!['momentum', 'stillness', 'renewal', 'warmth', 'curiosity'].includes(raw.definitionId ?? '')) return [];
+    const requestedSlot = raw.slotId && MOSSPROUT_GARDEN_PLANT_SLOTS.includes(raw.slotId) ? raw.slotId : null;
+    const slotId = requestedSlot && !slots.has(requestedSlot) ? requestedSlot : null;
+    ids.add(raw.id);
+    if (slotId) slots.add(slotId);
+    return [{
+      id: raw.id,
+      definitionId: raw.definitionId!,
+      status: slotId ? 'planted' : 'earned',
+      slotId,
+      growthPoints: Math.max(0, Math.floor(finite(raw.growthPoints, 0))),
+      source: raw.source && ['ftue', 'journey', 'tending', 'moment'].includes(raw.source.kind) && typeof raw.source.sourceId === 'string'
+        ? raw.source
+        : { kind: 'journey', sourceId: 'migration' },
+      earnedAt: finite(raw.earnedAt, 0),
+      plantedAt: slotId ? finite(raw.plantedAt, 0) : null,
+    }];
+  });
+}
+
+function normalizeHavenMutationReceipts(value: unknown): MergeWorldState['haven']['mutationReceipts'] {
+  if (!Array.isArray(value)) return [];
+  const ids = new Set<string>();
+  return value.flatMap((candidate): MergeWorldState['haven']['mutationReceipts'] => {
+    if (!candidate || typeof candidate !== 'object') return [];
+    const raw = candidate as MergeWorldState['haven']['mutationReceipts'][number];
+    if (typeof raw.id !== 'string' || ids.has(raw.id) || typeof raw.targetId !== 'string') return [];
+    if (!['plantable_grant', 'plantable_place', 'plantable_growth', 'structure_upgrade', 'feature_upgrade', 'movement_egg'].includes(raw.kind)) return [];
+    ids.add(raw.id);
+    return [{ ...raw, createdAt: finite(raw.createdAt, 0) }];
+  });
+}
+
+function normalizeMovementEgg(value: unknown): MergeWorldState['haven']['movementEgg'] {
+  const raw = value && typeof value === 'object' ? value as Partial<MergeWorldState['haven']['movementEgg']> : {};
+  return {
+    status: raw.status === 'revealed' || raw.status === 'stirring' ? raw.status : 'hidden',
+    observedSteps: Math.max(0, Math.floor(finite(raw.observedSteps, 0))),
+    manualMovementLogs: Math.max(0, Math.floor(finite(raw.manualMovementLogs, 0))),
+    updatedAt: raw.updatedAt == null ? null : finite(raw.updatedAt, 0),
   };
 }
 
@@ -1782,6 +2030,34 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
     };
   }
   next = advanceMossproutChapterZero(next, order.id, now);
+  if (order.id === MOSSPROUT_FTUE_GARDEN_MISSION_ORDER_ID) {
+    const missionReceiptIds = new Set(next.haven.mutationReceipts.map((receipt) => receipt.id));
+    const missionReceipts = [
+      { id: `${order.id}:spring`, kind: 'feature_upgrade' as const, targetId: 'mossprout-garden:spring', createdAt: now },
+      { id: `${order.id}:path`, kind: 'feature_upgrade' as const, targetId: 'mossprout-garden:path', createdAt: now },
+      { id: `${order.id}:egg`, kind: 'movement_egg' as const, targetId: 'movement-egg', createdAt: now },
+    ].filter((receipt) => !missionReceiptIds.has(receipt.id));
+    next = {
+      ...next,
+      generators: next.generators['wild-garden'] ? {
+        ...next.generators,
+        'wild-garden': { ...next.generators['wild-garden'], forcedDropDefinitionId: null },
+      } : next.generators,
+      haven: {
+        ...next.haven,
+        revealState: 'revealed',
+        structures: {
+          ...next.haven.structures,
+          mossproutGarden: {
+            ...next.haven.structures.mossproutGarden,
+            featureLevels: { spring: 1, path: 1 },
+          },
+        },
+        movementEgg: { ...next.haven.movementEgg, status: 'revealed', updatedAt: now },
+        mutationReceipts: [...next.haven.mutationReceipts, ...missionReceipts],
+      },
+    };
+  }
   if (order.storyArcId === `${order.characterId}:discovery`) {
     const discoveryRecord = next.companionDiscovery.records.find((record) => record.characterId === order.characterId);
     const discoveryProgress = recordDiscoveryEvent({

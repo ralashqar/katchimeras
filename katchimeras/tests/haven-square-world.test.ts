@@ -229,7 +229,7 @@ test('the focused Mossprout replacement uses the top-level hex projection and au
   assert.match(scene, /LAYOUT_PROFILE = 'floating-neighborhood-v2'/);
   assert.match(scene, /NEIGHBORHOOD_SPACING_SCALE = 1\.1/);
   assert.match(scene, /const MAIN:[\s\S]*?coord: \{ q: 0, r: 1 \}/);
-  assert.match(scene, /const GARDEN:[\s\S]*?coord: \{ q: 0, r: 2 \}/);
+  assert.match(scene, /const GARDEN_LEVELS:[\s\S]*?coord: \{ q: 0, r: 2 \}/);
   for (const [id, q, r] of [
     ['seed-nursery', -1, 1],
     ['bloom-garden', 1, 0],
@@ -492,7 +492,9 @@ test('the focused Mossprout Haven mounts only Mossprout-owned hex-neighborhood a
   );
   assert.match(hexScene, /LAYOUT_PROFILE = 'floating-neighborhood-v2'/);
   assert.match(hexScene, /mossprout_focused_v1_main_hex_tile\.webp/);
-  assert.match(hexScene, /mossprout_focused_v1_garden_hex_tile\.webp/);
+  assert.match(hexScene, /mossprout_memory_garden_level_0\.webp/);
+  assert.match(hexScene, /mossprout_memory_garden_level_1\.webp/);
+  assert.match(hexScene, /mossprout_memory_garden_level_2\.webp/);
   assert.match(hexScene, /mossprout-standing-resident-512\.webp/);
   assert.match(hexScene, /mainLayer\.residentSource = MAIN_RESIDENT_SOURCE/);
   assert.match(hexScene, /tiles: \[centerTile\]/);

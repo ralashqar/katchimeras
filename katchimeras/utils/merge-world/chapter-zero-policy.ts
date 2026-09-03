@@ -4,6 +4,7 @@ import type { WispId } from '@/types/wisp';
 const ORDER_PREFIX = 'mossprout:chapter-0:';
 const FTUE_GARDEN_GENERATOR_ID = 'wild-garden';
 const FTUE_SEED_DEFINITION_ID = 'nature:garden:1';
+export const MOSSPROUT_FTUE_GARDEN_MISSION_ORDER_ID = 'mossprout:ftue:help-garden-wake';
 
 export const MOSSPROUT_CHAPTER_ZERO_REQUESTS = [
   {
@@ -77,6 +78,22 @@ export function mossproutChapterZeroEnergyPlantOrder(now: number, rewardWispId: 
     purpose: 'normal',
     chapterId: 'mossprout-chapter-0',
     storyArcId: 'mossprout-chapter-0',
+  };
+}
+
+export function mossproutFtueGardenMissionOrder(now: number): MergeOrder {
+  return {
+    id: MOSSPROUT_FTUE_GARDEN_MISSION_ORDER_ID,
+    characterId: 'mossprout',
+    title: 'Help the Garden Wake Up',
+    description: 'Create one more Bloom to repair the old path and let the spring reach the mist.',
+    difficulty: 'small',
+    requirements: [{ definitionId: 'nature:garden:3', quantity: 1 }],
+    reward: { coins: 0, mergeXp: 0, friendshipXp: 0, energy: 0 },
+    createdAt: now,
+    signature: false,
+    purpose: 'normal',
+    storyArcId: 'mossprout:ftue-garden-mission',
   };
 }
 

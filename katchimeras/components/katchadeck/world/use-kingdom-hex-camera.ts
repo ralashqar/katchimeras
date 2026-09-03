@@ -99,8 +99,6 @@ export function useKingdomHexCamera({
   const pinchFocalY = useSharedValue(0);
   const initializedRef = useRef(false);
   const previousGeometryRef = useRef<{
-    maximumScale: number;
-    minimumScale: number;
     sceneHeight: number;
     sceneWidth: number;
     viewportHeight: number;
@@ -266,8 +264,6 @@ export function useKingdomHexCamera({
       pinchStartScale.value = home.scale;
       initializedRef.current = true;
       previousGeometryRef.current = {
-        maximumScale: maxScale,
-        minimumScale: minScale,
         sceneHeight: cameraScene.height,
         sceneWidth: cameraScene.width,
         viewportHeight: cameraViewport.height,
@@ -297,8 +293,6 @@ export function useKingdomHexCamera({
 
     const previousGeometry = previousGeometryRef.current;
     const nextGeometry = {
-      maximumScale: maxScale,
-      minimumScale: minScale,
       sceneHeight: cameraScene.height,
       sceneWidth: cameraScene.width,
       viewportHeight: cameraViewport.height,
@@ -306,18 +300,19 @@ export function useKingdomHexCamera({
     };
     previousGeometryRef.current = nextGeometry;
 
-    // Scene data is refreshed while the interaction sheet loads. Reassigning a
-    // Reanimated shared value during that refresh cancels its active timing,
-    // even when the world geometry is identical. Only reconcile the camera
-    // when a dimension or a scale boundary actually changed.
+    // Camera limits describe valid destinations and gesture bounds; they are
+    // not presentation state. In particular, closing a close-up interaction
+    // lowers maximumScale before the next authored camera move begins. Never
+    // clamp the currently visible frame merely because those limits changed:
+    // doing so creates a one-frame jump before the real transition. Explicit
+    // camera moves always animate from the live shared values and clamp only
+    // their destination.
     if (
       previousGeometry
       && previousGeometry.sceneWidth === nextGeometry.sceneWidth
       && previousGeometry.sceneHeight === nextGeometry.sceneHeight
       && previousGeometry.viewportWidth === nextGeometry.viewportWidth
       && previousGeometry.viewportHeight === nextGeometry.viewportHeight
-      && previousGeometry.minimumScale === nextGeometry.minimumScale
-      && previousGeometry.maximumScale === nextGeometry.maximumScale
     ) {
       return;
     }
@@ -514,6 +509,15 @@ export function useKingdomHexCamera({
     pinchStartScale.value = nextScale;
   }, [beginMotion, cameraScene, cameraViewport, clearFrameFocus, commitSnapshot, maxScale, minScale, pinchStartScale, scale, tx, ty]);
 
+  // React's settled snapshot intentionally updates only when motion completes.
+  // Handoffs, however, must capture the exact frame currently on screen, even
+  // midway through another move. Keep that distinction explicit.
+  const getSnapshot = useCallback((): KingdomCameraSnapshot => ({
+    scale: scale.value,
+    tx: tx.value,
+    ty: ty.value,
+  }), [scale, tx, ty]);
+
   const focusFrame = useCallback((frame: KingdomWorldFrame, options?: {
     durationMs?: number;
     horizontalPadding?: number;
@@ -564,31 +568,16 @@ export function useKingdomHexCamera({
         onComplete();
         return;
       }
-      cancelAnimation(tx);
-      cancelAnimation(ty);
-      cancelAnimation(scale);
-      beginMotion();
-      const zoom = maxScale;
-      const screenY = viewport.height * 0.46;
-      const nextTx = viewport.width / 2 - scene.width / 2 - (x - scene.width / 2) * zoom;
-      const nextTy = screenY - scene.height / 2 - (y - scene.height / 2) * zoom;
-      const clamped = clampCameraTranslation({ tx: nextTx, ty: nextTy }, viewport, scene, zoom);
-      const timing = {
-        duration: reducedMotion ? HAVEN_UPGRADE_REDUCED_TIMING.cameraMs : HAVEN_UPGRADE_TIMING.cameraMs,
-        easing: Easing.out(Easing.cubic),
-      };
-      const finish = () => {
-        commitSnapshot(clamped.tx, clamped.ty, zoom, false);
-        onComplete();
-      };
-      tx.value = withTiming(clamped.tx, timing);
-      ty.value = withTiming(clamped.ty, timing);
-      scale.value = withTiming(zoom, timing, (finished) => {
-        if (finished) runOnJS(finish)();
-      });
-      pinchStartScale.value = zoom;
+      animateTo(
+        x,
+        y,
+        maxScale,
+        viewport.height * 0.46,
+        reducedMotion ? HAVEN_UPGRADE_REDUCED_TIMING.cameraMs : HAVEN_UPGRADE_TIMING.cameraMs,
+        onComplete,
+      );
     },
-    [beginMotion, commitSnapshot, maxScale, pinchStartScale, scale, scene, tx, ty, viewport]
+    [animateTo, maxScale, viewport.height, viewport.width]
   );
 
   return {
@@ -598,6 +587,7 @@ export function useKingdomHexCamera({
     focusResident,
     focusUpgrade,
     focusedTileId,
+    getSnapshot,
     gesture,
     isMoving: renderState.isMoving,
     ready,

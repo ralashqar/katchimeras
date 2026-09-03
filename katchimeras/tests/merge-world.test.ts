@@ -279,7 +279,7 @@ test('board geometry renders and hit-tests with one coordinate system', () => {
 test('a new Merge World is Mossprout-owned and begins with twenty playable cells', () => {
   const state = createInitialMergeWorldState(NOW);
   assert.deepEqual(mergeWorldCatalogIssues(), []);
-  assert.equal(state.version, 21);
+  assert.equal(state.version, 22);
   assert.equal(state.ownerCharacterId, 'mossprout');
   assert.equal(state.storageCapacity, 8);
   assert.equal(state.energy.regenCap, MERGE_ENERGY_REGEN_CAP);
@@ -581,7 +581,7 @@ test('normalization intentionally resets pre-v18 Merge snapshots', () => {
     },
   };
   const normalized = normalizeMergeWorldState(stale, NOW + 1);
-  assert.equal(normalized.version, 21);
+  assert.equal(normalized.version, 22);
   assert.equal(normalized.ownerCharacterId, 'mossprout');
   assert.deepEqual(normalized.generators, {});
 });
@@ -1288,7 +1288,7 @@ test('pre-v18 activity parcels are discarded by the intentional world reset', ()
     rewardInbox: [{ id: 'unknown-old-parcel', createdAt: NOW, items: ['adventure:trail:4'], source: 'activity' }],
   }, NOW + 1);
   assert.equal(normalized.rewardInbox.some((entry) => entry.source === 'activity'), false);
-  assert.equal(normalized.version, 21);
+  assert.equal(normalized.version, 22);
   assert.equal(normalized.ownerCharacterId, 'mossprout');
   assert.deepEqual(normalized.arrivals, []);
 });
@@ -1740,13 +1740,13 @@ test('serving a story order consumes its item without Energy or friendship rewar
   assert.equal(result.state.externalRewardReceipts.some((receipt) => receipt.id.startsWith('merge-friendship:')), false);
 });
 
-test('legacy snapshots reset cleanly into Mossprout’s v21 personal world', () => {
+test('legacy snapshots reset cleanly into Mossprout’s v22 personal world', () => {
   const normalized = normalizeMergeWorldState({
     ...createInitialMergeWorldState(NOW), version: 2,
     energy: { value: 99, cap: 100, lastRegenAt: NOW },
     generators: { 'starter-pantry': { id: 'starter-pantry', familyId: 'food', name: 'Picnic Pantry', level: 1, enabledBranches: ['table'], charges: 9, maxCharges: 12, readyAt: NOW + 1000 } },
   }, NOW + 1);
-  assert.equal(normalized.version, 21);
+  assert.equal(normalized.version, 22);
   assert.equal(normalized.ownerCharacterId, 'mossprout');
   assert.equal(normalized.energy.value, 0);
   assert.deepEqual(normalized.generators, {});
@@ -1909,7 +1909,7 @@ test('v10 companion ownership resets instead of populating Mossprout’s world',
   const legacy = { ...current, version: 10 } as unknown as Record<string, unknown>;
   delete legacy.companionDiscovery;
   const migrated = normalizeMergeWorldState(legacy, NOW + 1);
-  assert.equal(migrated.version, 21);
+  assert.equal(migrated.version, 22);
   assert.deepEqual(migrated.unlockedCharacters, []);
   assert.deepEqual(migrated.companionDiscovery.records, []);
 });

@@ -9,7 +9,11 @@ import { mossproutFirstSeedForIntent } from './mossprout-bond-share';
 
 const ACTION_FIELDS: Readonly<Record<string, keyof MossproutOnboardingAnswers>> = {
   'egg.day_texture': 'dayTextureId',
+  'egg.desired_help': 'growthIntentId',
   'companion.choose_growth_intent': 'growthIntentId',
+  'companion.choose_support_style': 'supportStyleId',
+  'companion.confirm_first_reflection': 'reflectionAccuracyId',
+  'companion.meditation_friction': 'mainDifficultyId',
   'companion.choose_water_together': 'waterTogetherChoiceId',
   'egg.desired_feeling': 'attunementPlaceId',
   'egg.main_difficulty': 'currentFeelingId',
@@ -48,7 +52,7 @@ export function recordMossproutOnboardingAnswer(actionId: string, optionId: stri
     ...profile,
     aspirationId: field === 'desiredMoreId' || field === 'growthIntentId' ? optionId : profile.aspirationId,
     painPointIds: field === 'currentFeelingId' || field === 'dayTextureId' ? [optionId] : profile.painPointIds,
-    preferenceIds: field === 'attunementPlaceId' || field === 'lifePriorityId'
+    preferenceIds: field === 'attunementPlaceId' || field === 'lifePriorityId' || field === 'supportStyleId'
       ? [optionId, ...profile.preferenceIds.filter((id) => id !== optionId)]
       : profile.preferenceIds,
     mossproutAnswers,

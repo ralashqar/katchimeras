@@ -714,7 +714,7 @@ test('Haven keeps every configured tile in the persistent render set', () => {
   assert.equal(new Set(frames.map((frame) => frame.id)).size, frames.length);
 });
 
-test('the Garden island is navigation-only while the dedicated route retains the full Merge surface', () => {
+test('only Garden order buttons navigate while the dedicated route retains the full Merge surface', () => {
   const scene = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-hex-scene.ts'),
     'utf8',
@@ -736,7 +736,7 @@ test('the Garden island is navigation-only while the dedicated route retains the
     'utf8',
   );
   assert.match(scene, /kind: 'structure'/);
-  assert.match(canvas, /accessibilityLabel="Mossprout Garden"/);
+  assert.doesNotMatch(canvas, /accessibilityLabel="Mossprout Garden"/);
   assert.match(canvas, /GardenOrderShortcut/);
   assert.match(canvas, /<FrozenMergeOrderTrayCard entry=\{entry\} \/>/);
   assert.match(canvas, /onOpenGarden\(entry\.order\.id\)/);
@@ -843,7 +843,8 @@ test('Haven Garden order shortcuts open the dedicated route without board gestur
   );
   assert.match(canvas, /gardenOrders\.slice\(0, 3\)/);
   assert.match(canvas, /\{ x: 0\.5, y: 0\.096 \}[\s\S]*?\{ x: 0\.3575, y: 0\.539 \}[\s\S]*?\{ x: 0\.6425, y: 0\.539 \}/);
-  assert.match(canvas, /FTUE_GARDEN_ORDER_SLOT = \{ x: 0\.5, y: 0\.72 \}/);
+  assert.match(canvas, /FTUE_GARDEN_ORDER_SLOT = \{ x: 0\.5, y: 0\.78 \}/);
+  assert.match(canvas, /callout \? false : gardenOrderCallout|gardenOrdersInteractive \? false : gardenOrderCallout/);
   assert.match(canvas, /accessibilityHint="Opens this order in the Garden"/);
   assert.doesNotMatch(canvas, /emitBoardReleaseFocus|focusMergeBoard|onBoardRelease/);
 });
@@ -894,11 +895,24 @@ test('Haven hosts resident interaction over the world and routes its Garden shor
   assert.doesNotMatch(screen, /cameraFallbackTimer/);
   assert.match(screen, /onResidentFocusComplete=\{completeResidentFocus\}/);
   assert.match(canvas, /onComplete: \(\) => onResidentFocusComplete\?\.\(interactionResidentId\)/);
-  assert.match(canvas, /interactionOriginSnapshotRef\.current \?\?= interactionCameraSnapshot/);
+  assert.match(canvas, /interactionOriginSnapshotRef\.current \?\?= readLiveCameraSnapshot\(\)/);
   assert.match(canvas, /animateToCameraSnapshot\(interactionOrigin, reduceMotion \? 80 : 440/);
   assert.doesNotMatch(canvas, /handledMergeBoardRequestRef|setActiveMergeBoardId/);
   assert.match(route, /onHostedClose/);
   assert.match(route, /onHostedOpenMerge/);
+});
+
+test('Mossprout Garden scene publication stays referentially stable across anchor updates', () => {
+  const screen = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'roster', 'katchimera-kingdom-screen.tsx'),
+    'utf8',
+  );
+
+  assert.match(screen, /const mossproutGardenScene = useMemo\(\(\) => \(\{/);
+  assert.match(screen, /mossproutGarden=\{mossproutGardenScene\}/);
+  assert.doesNotMatch(screen, /mossproutGarden=\{\{/);
+  assert.match(screen, /residentScreenAnchorsEqual\(current, next\) \? current : next/);
+  assert.match(screen, /onResidentAnchorsChange=\{updateResidentAnchors\}/);
 });
 
 test('hosted resident dashboard dismisses from the world while deep achievements mount progressively', () => {

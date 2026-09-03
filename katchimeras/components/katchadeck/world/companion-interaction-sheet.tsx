@@ -148,7 +148,7 @@ import { useGameSurfaceReadiness } from '@/features/navigation/game-screen-trans
 import { localDayId } from '@/utils/world-identity';
 import { mossproutCampaignEpisodeByOpeningId } from '@/constants/mossprout-campaign';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
-import { MOSSPROUT_BOND_SHARE_PROMPTS, mossproutBondSharePrompt, mossproutBondShareSelection, mossproutWaterTogetherReply } from '@/features/onboarding/mossprout-bond-share';
+import { MOSSPROUT_BOND_SHARE_PROMPTS, MOSSPROUT_SUPPORT_STYLE_OPTIONS, mossproutBondSharePrompt, mossproutBondShareSelection, mossproutFirstSeedForIntent, mossproutWaterTogetherReply } from '@/features/onboarding/mossprout-bond-share';
 import { MOSSPROUT_GARDEN_INTRO_BEATS, mossproutGardenIntroBeat } from '@/features/onboarding/mossprout-garden-intro';
 
 const LazyQuestExperienceHost = lazy(async () => {
@@ -197,6 +197,7 @@ export type CompanionInteractionSheetProps = {
   onFtueBondSpotlightComplete?: () => void;
   onFtueOpenMerge?: () => void;
   onFtueProfileContinue?: (nickname?: string) => void;
+  onFtueMeditationAction?: (action: 'tend_together' | 'share_moment', optionId?: string) => void;
   onFtueOpenResidentParcel?: () => void;
   onSelectDestination?: (destination: CompanionDestination | null) => void;
   onClose: () => void;
@@ -1452,7 +1453,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       : props.ftueProfileStep === 'bond'
         ? `Nice to meet you, ${loadOnboardingProfile().playerNickname || 'friend'}! We are friends now.`
         : props.ftueProfileStep === 'bond_choice'
-          ? ftueBondShare?.answer.reply
+          ? MOSSPROUT_SUPPORT_STYLE_OPTIONS.find((option) => option.id === loadOnboardingProfile().mossproutAnswers.supportStyleId)?.reply
+            ?? (ftueBondShare ? 'What kind of help do you usually want when something feels stuck?' : null)
+            ?? ftueBondShare?.answer.reply
             ?? ftueBondShare?.prompt.reply
             ?? ftueBondQuestion?.prompt
             ?? MOSSPROUT_BOND_SHARE_PROMPTS[0].prompt
@@ -1463,7 +1466,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           : props.ftueProfileStep === 'water_response'
             ? mossproutWaterTogetherReply(loadOnboardingProfile().mossproutAnswers.waterTogetherChoiceId)
           : props.ftueProfileStep === 'first_insight'
-            ? 'Your answer left something behind. A Seed we can grow together.'
+            ? `${mossproutFirstSeedForIntent(loadOnboardingProfile().mossproutAnswers.growthIntentId).message} Did I get that right?`
           : props.ftueProfileStep === 'resident_result'
             ? `I think ${katchimeraSkinById.get(loadOnboardingProfile().matchedResidentId as KatchimeraSkinId)?.displayName ?? 'this resident'} is your closest match right now.`
           : props.ftueOrderPreviewActive
@@ -1896,6 +1899,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   companionName={props.name}
                   now={meditationNow}
                   onExitToGarden={props.ftueProfileStep === 'meditating' ? () => props.onFtueProfileContinue?.() : undefined}
+                  onMeditationAction={props.ftueProfileStep === 'meditating' ? props.onFtueMeditationAction : undefined}
                 />
               ) : idealSkinOnboardingRequired ? null : dashboardRouteActive && (props.familyId === 'steppling' || props.familyId === 'voyagle' || props.familyId === 'flexel' || props.familyId === 'bedrotte') && !showJourneyCohortDashboard ? (
                 <JourneyCohortStoryStage

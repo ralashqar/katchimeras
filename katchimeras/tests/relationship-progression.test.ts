@@ -30,6 +30,7 @@ import {
   recordMossproutMatchedCard,
   resetLastMossproutJourneyForDebug,
   resetRelationshipProgressForDayForDebug,
+  settleKatchimeraMeditation,
   skipKatchimeraDayAction,
   startMossproutJourneyActivity,
   startMossproutJourneyDay,
@@ -156,6 +157,17 @@ test('meditation commands are idempotent by story source and gate companion acti
   assert.equal(katchimeraMeditationRecord(replayed, 'mossprout')?.availableAt, 9_000);
   assert.equal(companionInteractionAvailability(replayed, 'mossprout', 8_999).kind, 'meditating');
   assert.equal(companionInteractionAvailability(replayed, 'mossprout', 9_000).kind, 'available');
+});
+
+test('meditation settling is capped and idempotent per optional interaction', () => {
+  const initial = beginKatchimeraMeditation(emptyRelationshipProgressState(), 'mossprout', 1_000, 8 * 60 * 60 * 1000, 'ftue:rest');
+  const water = settleKatchimeraMeditation(initial, 'mossprout', 20 * 60 * 1000, 'water', 2_000);
+  const replay = settleKatchimeraMeditation(water, 'mossprout', 20 * 60 * 1000, 'water', 2_001);
+  const thought = settleKatchimeraMeditation(replay, 'mossprout', 10 * 60 * 1000, 'thought', 2_002);
+  const capped = settleKatchimeraMeditation(thought, 'mossprout', 60 * 60 * 1000, 'extra', 2_003);
+  assert.equal(katchimeraMeditationRecord(replay, 'mossprout')?.availableAt, katchimeraMeditationRecord(water, 'mossprout')?.availableAt);
+  assert.equal(katchimeraMeditationRecord(capped, 'mossprout')?.settledMs, 30 * 60 * 1000);
+  assert.equal(katchimeraMeditationRecord(capped, 'mossprout')?.settlementReceiptIds?.length, 2);
 });
 
 test('Journey Day 1 supports a complete manual narrative flow without FTUE', () => {

@@ -379,7 +379,10 @@ test('the Mossprout sub-world routes Garden orders to the dedicated activity pag
   assert.match(kingdomScreen, /focusOrderId: orderId/);
   assert.doesNotMatch(kingdomScreen, /mergeWorldStateForBoard\(mergeWorld, 'steppling'\)/);
   assert.doesNotMatch(kingdomScreen, /mergeBoards=|mergeBoardFocusRequest=/);
-  assert.match(kingdomScreen, /gardenOrders=\{gardenOrderEntries\}/);
+  assert.match(kingdomScreen, /gardenOrders=\{ftueStepId === 'world\.garden_handoff' \? \[\] : gardenOrderEntries\}/);
+  assert.match(kingdomScreen, /gardenRequestBubble[\s\S]*?<PersistentMergeItemArt[\s\S]*?gardenRequestBubbleTail/);
+  assert.match(kingdomScreen, /gardenRequestBubble[\s\S]*?gardenButton/);
+  assert.match(kingdomScreen, /discoveryCalloutLayerAboveSpotlight: \{ zIndex: 90 \}/);
 });
 
 test('Haven uses the hex selector as its top level and lazy-mounts only implemented family worlds', () => {

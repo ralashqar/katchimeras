@@ -309,6 +309,9 @@ export type KatchimeraMeditationRecord = {
   reason: 'journey_rest';
   /** Idempotency identity for story-owned rest transitions. */
   sourceId?: string;
+  /** Exactly-once tending/thought reductions applied while this rest is active. */
+  settlementReceiptIds?: string[];
+  settledMs?: number;
 };
 
 export type CompanionInteractionAvailability =

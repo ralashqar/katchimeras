@@ -31,28 +31,30 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
-import { EggAvatar } from '@/components/katchadeck/egg-avatar/egg-avatar';
 import { EggAvatarArtwork, eggAvatarBodyPresentationStyle } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
 import type { EggExpressionCue } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
 import { FrozenMergeOrderTrayCard, type MergeOrderTrayEntry } from '@/components/katchadeck/games/merge-order-rail';
+import { PersistentMergeItemArt } from '@/components/katchadeck/games/feastle-persistent-merge-board';
 import { HavenUpgradeEffects } from '@/components/katchadeck/world/haven-upgrade-effects';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import type { KingdomTileArtLayer, KingdomTileRender } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { buildKingdomHexScene } from '@/components/katchadeck/world/kingdom-hex-scene';
-import { buildMossproutHexNeighborhoodScene } from '@/components/katchadeck/world/mossprout-hex-neighborhood-scene';
+import { buildMossproutHexNeighborhoodScene, mossproutGardenPlantSlotFrame, MOSSPROUT_GARDEN_PLANT_SLOT_IDS, type MossproutGardenSceneState } from '@/components/katchadeck/world/mossprout-hex-neighborhood-scene';
 import { SeamlessWorldImage } from '@/components/katchadeck/world/seamless-world-image';
 import { CreatureAnimatedArt } from '@/components/katchadeck/world/creature-animated-art';
 import type { WorldFtueSubjectPresentation } from '@/components/katchadeck/world/world-ftue-subject-presentation';
 import { runRewardArrivalMotion } from '@/components/katchadeck/ui/reward-arrival-motion';
 import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
+import { CelebrationParticles } from '@/components/katchadeck/world/companion-achievement-celebration';
 import { useKingdomHexCamera } from '@/components/katchadeck/world/use-kingdom-hex-camera';
 import { KINGDOM_RENDERING } from '@/constants/kingdom-rendering';
 import { mossproutNatureIslandById } from '@/constants/mossprout-nature-islands';
+import { mossproutMemoryPlantById, mossproutMemoryPlantStage } from '@/constants/mossprout-memory-plants';
 import kingdomWorldViewConfig from '@/constants/kingdom-world-view.json';
 import { Lantern } from '@/constants/theme';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import type { EggVisualState } from '@/types/home';
-import type { MossproutNatureIslandId, MossproutNatureIslandLevel } from '@/types/merge-world';
+import type { MossproutGardenPlantSlotId, MossproutNatureIslandId, MossproutNatureIslandLevel } from '@/types/merge-world';
 import type { FtueCameraDirective } from '@/features/onboarding/ftue-types';
 import type { StoryCameraPresentationPayload, StoryTarget } from '@/types/content-flow';
 import { STORY_CAMERA_PRESENTATION } from '@/features/content-flow/story-world-operations';
@@ -99,9 +101,10 @@ export type KingdomResidentScreenAnchor = {
 export type KingdomTileUpgradeOffer = {
   accessibilityHint: string;
   anchor?: { x: number; y: number };
+  icon?: IconSymbolName;
   label: string;
   target: Extract<StoryTarget, {
-    kind: 'haven_home' | 'haven_nature_island' | 'haven_structure' | 'haven_tile';
+    kind: 'haven_garden_plot' | 'haven_home' | 'haven_nature_island' | 'haven_structure' | 'haven_tile';
   }>;
 };
 type Props = {
@@ -127,8 +130,9 @@ type Props = {
   discoveryRevealFamilyId?: string | null;
   gardenOrders?: readonly MergeOrderTrayEntry[];
   gardenOrdersInteractive?: boolean;
-  gardenOrderCallout?: string | null;
+  gardenOrderCallout?: boolean;
   onGardenOrderTargetChange?: (orderId: string, node: ViewType | null) => void;
+  onGardenPlotTargetChange?: (slotId: MossproutGardenPlantSlotId, node: ViewType | null) => void;
   initialTutorialCameraScale?: number;
   initialCameraSnapshot?: KingdomCameraSnapshot | null;
   onCameraSnapshotChange?: (snapshot: KingdomCameraSnapshot) => void;
@@ -143,7 +147,10 @@ type Props = {
   onResidentFocusComplete?: (creatureId: string) => void;
   focusedMossproutWorld?: boolean;
   mossproutNatureIslandLevels?: Record<MossproutNatureIslandId, MossproutNatureIslandLevel>;
+  mossproutGarden?: MossproutGardenSceneState;
   onSelectNatureIsland?: (islandId: MossproutNatureIslandId) => void;
+  onSelectMemoryPlant?: (instanceId: string) => void;
+  onSelectMovementEgg?: () => void;
   worldEggTargetRef?: RefObject<ViewType | null>;
   worldSubjectPresentation?: WorldFtueSubjectPresentation | null;
 };
@@ -165,12 +172,10 @@ const GARDEN_ORDER_SLOT_CENTERS = [
   { x: 0.3575, y: 0.539 },
   { x: 0.6425, y: 0.539 },
 ] as const;
-const FTUE_GARDEN_ORDER_SLOT = { x: 0.5, y: 0.72 } as const;
+const FTUE_GARDEN_ORDER_SLOT = { x: 0.5, y: 0.78 } as const;
 const GARDEN_ORDER_CARD_WIDTH = 120;
 const GARDEN_ORDER_CARD_HEIGHT = 120;
-const GARDEN_ORDER_CALLOUT_WIDTH = 202;
-const GARDEN_ORDER_CALLOUT_HEIGHT = 64;
-const GARDEN_ORDER_CALLOUT_GAP = 8;
+const FTUE_GARDEN_REQUEST_BUBBLE_SIZE = 94;
 const TILE_UPGRADE_OFFER_WIDTH = 206;
 const TILE_UPGRADE_OFFER_HEIGHT = 44;
 const WORLD_FTUE_CRACK_ONE = require('../../../assets/images/katchimeras/egg-avatars/effects/crack-1.png');
@@ -196,6 +201,7 @@ const WORLD_FTUE_EGG_NATIVE_SURFACE_SCALE = 2.7;
 // camera. The high-resolution still is held during motion so this surface is
 // never rasterized from a small in-world copy while zooming.
 const WORLD_INTERACTION_CREATURE_NATIVE_SURFACE_SCALE = 2.7;
+const MEMORY_PLANT_NATIVE_SURFACE_SCALE = 3.2;
 const WORLD_FTUE_EGG_WIDTH = 108;
 const WORLD_FTUE_EGG_HEIGHT = 139;
 const WORLD_FTUE_EGG_STAGE_SCALE = WORLD_FTUE_EGG_WIDTH / 200;
@@ -226,7 +232,7 @@ function residentCreatureFrame(x: number, y: number, worldSize: number, stableWo
 }
 
 function GardenOrderShortcut({ callout, entry, frame, index, onPress, onTargetChange, slotOverride }: {
-  callout?: string | null;
+  callout?: boolean;
   entry: MergeOrderTrayEntry;
   frame: { height: number; left: number; top: number; width: number };
   index: number;
@@ -235,14 +241,16 @@ function GardenOrderShortcut({ callout, entry, frame, index, onPress, onTargetCh
   slotOverride?: { x: number; y: number };
 }) {
   const reduceMotion = useReducedMotion();
-  const { equippedFaceId, equippedSkinId } = useEggAvatar();
   const slot = slotOverride ?? GARDEN_ORDER_SLOT_CENTERS[index];
   const setTargetNode = useCallback((node: ViewType | null) => {
     onTargetChange?.(entry.order.id, node);
   }, [entry.order.id, onTargetChange]);
   if (!slot) return null;
-  const groupWidth = callout ? GARDEN_ORDER_CALLOUT_WIDTH : GARDEN_ORDER_CARD_WIDTH;
-  const calloutOffset = callout ? GARDEN_ORDER_CALLOUT_HEIGHT + GARDEN_ORDER_CALLOUT_GAP : 0;
+  const groupWidth = callout ? FTUE_GARDEN_REQUEST_BUBBLE_SIZE : GARDEN_ORDER_CARD_WIDTH;
+  const groupTop = callout
+    ? frame.top + frame.height * slot.y + GARDEN_ORDER_CARD_HEIGHT / 2 - FTUE_GARDEN_REQUEST_BUBBLE_SIZE
+    : frame.top + frame.height * slot.y - GARDEN_ORDER_CARD_HEIGHT / 2;
+  const requestedDefinitionId = entry.order.requirements[0]?.definitionId ?? null;
   return (
     <Animated.View
       entering={FadeIn.duration(reduceMotion ? 80 : 260).delay(reduceMotion ? 0 : 100 + index * 50)}
@@ -250,24 +258,22 @@ function GardenOrderShortcut({ callout, entry, frame, index, onPress, onTargetCh
         styles.gardenOrderShortcutGroup,
         {
           left: frame.left + frame.width * slot.x - groupWidth / 2,
-          top: frame.top + frame.height * slot.y - GARDEN_ORDER_CARD_HEIGHT / 2 - calloutOffset,
+          top: groupTop,
           width: groupWidth,
         },
       ]}>
       <View collapsable={false} ref={setTargetNode} style={styles.gardenOrderShortcutTarget}>
         {callout ? (
-          <View pointerEvents="none" style={styles.gardenOrderCallout}>
-            <EggAvatar
-              faceId={equippedFaceId}
-              presentation="button"
-              size={46}
-              skinId={equippedSkinId}
-            />
-            <Text style={styles.gardenOrderCalloutText}>{callout}</Text>
+          <View
+            accessibilityLabel="First Bloom needed"
+            pointerEvents="none"
+            style={styles.gardenOrderRequestBubble}>
+            {requestedDefinitionId ? (
+              <PersistentMergeItemArt definitionId={requestedDefinitionId} size={68} />
+            ) : <IconSymbol color="#6E4C22" name="leaf.fill" size={42} />}
             <View style={styles.gardenOrderCalloutTail} />
           </View>
-        ) : null}
-        <Pressable
+        ) : <Pressable
           accessibilityHint="Opens this order in the Garden"
           accessibilityLabel={`${entry.order.title}${entry.ready ? ', ready to serve' : ''}`}
           accessibilityRole="button"
@@ -278,7 +284,7 @@ function GardenOrderShortcut({ callout, entry, frame, index, onPress, onTargetCh
             pressed && styles.gardenOrderShortcutPressed,
           ]}>
           <FrozenMergeOrderTrayCard entry={entry} />
-        </Pressable>
+        </Pressable>}
       </View>
     </Animated.View>
   );
@@ -312,11 +318,33 @@ function TileUpgradeOffer({
         },
         pressed && styles.tileUpgradeOfferPressed,
       ]}>
-      <IconSymbol color="#3D2A12" name="sparkles" size={18} />
+      <IconSymbol color="#3D2A12" name={offer.icon ?? 'sparkles'} size={18} />
       <Text numberOfLines={1} style={styles.tileUpgradeOfferLabel}>{offer.label}</Text>
     </Pressable>
   );
 }
+
+const GardenPlotTarget = memo(function GardenPlotTarget({
+  frame,
+  onTargetChange,
+  slotId,
+}: {
+  frame: AbsoluteFrame;
+  onTargetChange: (slotId: MossproutGardenPlantSlotId, node: ViewType | null) => void;
+  slotId: MossproutGardenPlantSlotId;
+}) {
+  const setNode = useCallback((node: ViewType | null) => {
+    onTargetChange(slotId, node);
+  }, [onTargetChange, slotId]);
+  return (
+    <View
+      collapsable={false}
+      pointerEvents="none"
+      ref={setNode}
+      style={[styles.gardenPlotTarget, frame]}
+    />
+  );
+});
 
 export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   background,
@@ -340,8 +368,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   discoveryRevealFamilyId = null,
   gardenOrders = [],
   gardenOrdersInteractive = true,
-  gardenOrderCallout = null,
+  gardenOrderCallout = false,
   onGardenOrderTargetChange,
+  onGardenPlotTargetChange,
   initialTutorialCameraScale,
   initialCameraSnapshot,
   onCameraSnapshotChange,
@@ -356,7 +385,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   onResidentFocusComplete,
   focusedMossproutWorld = false,
   mossproutNatureIslandLevels,
+  mossproutGarden,
   onSelectNatureIsland,
+  onSelectMemoryPlant,
+  onSelectMovementEgg,
   worldEggTargetRef,
   worldSubjectPresentation,
 }: Props) {
@@ -406,9 +438,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           'orchard-grove': 0,
           'ancient-tree-grove': 0,
           'wildgrowth-grove': 0,
-        })
+        }, mossproutGarden)
       : buildKingdomHexScene(companionSlots, hexTileSelection.value, identity, verticalAlignmentSelection.value),
-    [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutNatureIslandLevels, verticalAlignmentSelection]
+    [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutGarden, mossproutNatureIslandLevels, verticalAlignmentSelection]
   );
   const sceneTileImageLod: KingdomHexTileLod = focusedMossproutWorld
     ? 'full'
@@ -438,8 +470,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       const islandId = upgradePresentation.natureIslandId;
       const fromLevels = { ...mossproutNatureIslandLevels, [islandId]: upgradePresentation.fromStage };
       const toLevels = { ...mossproutNatureIslandLevels, [islandId]: upgradePresentation.toStage };
-      const fromScene = buildMossproutHexNeighborhoodScene(companionSlots, fromLevels);
-      const toScene = buildMossproutHexNeighborhoodScene(companionSlots, toLevels);
+      const fromScene = buildMossproutHexNeighborhoodScene(companionSlots, fromLevels, mossproutGarden);
+      const toScene = buildMossproutHexNeighborhoodScene(companionSlots, toLevels, mossproutGarden);
       const baseLayerId = `nature:mossprout:${islandId}`;
       const growthLayerId = `${baseLayerId}:growth`;
       const fromLayer = fromScene.tileArtLayers.find((layer) => layer.id === growthLayerId)
@@ -465,10 +497,16 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const fromSlots = slotsAtStage(upgradePresentation.fromStage);
     const toSlots = slotsAtStage(upgradePresentation.toStage);
     const fromScene = focusedMossproutWorld
-      ? buildMossproutHexNeighborhoodScene(fromSlots, mossproutNatureIslandLevels!)
+      ? buildMossproutHexNeighborhoodScene(fromSlots, mossproutNatureIslandLevels!, upgradePresentation.visualTarget?.kind === 'haven_structure'
+        && upgradePresentation.visualTarget.structureId === 'mossprout-hex-garden'
+        ? { level: upgradePresentation.fromStage, plantableMemories: mossproutGarden?.plantableMemories ?? [] }
+        : mossproutGarden)
       : buildKingdomHexScene(fromSlots, hexTileSelection.value, identity, verticalAlignmentSelection.value);
     const toScene = focusedMossproutWorld
-      ? buildMossproutHexNeighborhoodScene(toSlots, mossproutNatureIslandLevels!)
+      ? buildMossproutHexNeighborhoodScene(toSlots, mossproutNatureIslandLevels!, upgradePresentation.visualTarget?.kind === 'haven_structure'
+        && upgradePresentation.visualTarget.structureId === 'mossprout-hex-garden'
+        ? { level: upgradePresentation.toStage, plantableMemories: mossproutGarden?.plantableMemories ?? [] }
+        : mossproutGarden)
       : buildKingdomHexScene(toSlots, hexTileSelection.value, identity, verticalAlignmentSelection.value);
     if (upgradePresentation.visualTarget?.kind === 'haven_structure') {
       const layerId = upgradePresentation.visualTarget.structureId.startsWith('structure:')
@@ -491,7 +529,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const toLayer = toScene.tileArtLayers.find((layer) => layer.id === `family:${upgradePresentation.characterId}`);
     const tile = toScene.tiles.find((candidate) => candidate.id === `family:${upgradePresentation.characterId}`);
     return fromLayer && toLayer && tile ? { fromLayer, tile, toLayer } : null;
-  }, [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutNatureIslandLevels, upgradePresentation, verticalAlignmentSelection]);
+  }, [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutGarden, mossproutNatureIslandLevels, upgradePresentation, verticalAlignmentSelection]);
   const discoveryLayers = useMemo(() => {
     if (!discoveryRevealFamilyId) return null;
     const revealed = companionSlots.find((slot) => slot.familyId === discoveryRevealFamilyId && slot.kind === 'revealed_egg');
@@ -500,13 +538,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       ? { id: slot.id, coord: slot.coord, familyId: slot.familyId, kind: 'locked' as const }
       : slot);
     const fromScene = focusedMossproutWorld
-      ? buildMossproutHexNeighborhoodScene(lockedSlots, mossproutNatureIslandLevels!)
+      ? buildMossproutHexNeighborhoodScene(lockedSlots, mossproutNatureIslandLevels!, mossproutGarden)
       : buildKingdomHexScene(lockedSlots, hexTileSelection.value, identity, verticalAlignmentSelection.value);
     const fromLayer = fromScene.tileArtLayers.find((layer) => layer.id === revealed.id);
     const toLayer = scene.tileArtLayers.find((layer) => layer.id === revealed.id);
     const tile = scene.tiles.find((candidate) => candidate.id === revealed.id);
     return fromLayer && toLayer && tile ? { fromLayer, tile, toLayer } : null;
-  }, [companionSlots, discoveryRevealFamilyId, focusedMossproutWorld, hexTileSelection, identity, mossproutNatureIslandLevels, scene.tileArtLayers, scene.tiles, verticalAlignmentSelection]);
+  }, [companionSlots, discoveryRevealFamilyId, focusedMossproutWorld, hexTileSelection, identity, mossproutGarden, mossproutNatureIslandLevels, scene.tileArtLayers, scene.tiles, verticalAlignmentSelection]);
   useEffect(() => {
     if (!discoveryLayers) {
       setDiscoveryPhase('armed');
@@ -525,6 +563,12 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   ) ?? null, [scene.tileArtLayers]);
   const gardenFrame = gardenLayer?.interactionFrame ?? null;
   const gardenFocusFrame = gardenLayer?.frame ?? null;
+  const gardenPlotFrames = useMemo(() => gardenFocusFrame
+    ? MOSSPROUT_GARDEN_PLANT_SLOT_IDS.map((slotId) => ({
+        frame: mossproutGardenPlantSlotFrame(gardenFocusFrame, slotId),
+        slotId,
+      }))
+    : [], [gardenFocusFrame]);
   const natureIslandFrames = useMemo(() => scene.tileArtLayers.flatMap((layer) => {
     if (!layer.id.startsWith('nature:mossprout:') || layer.id.endsWith(':growth') || !layer.interactionFrame) return [];
     return [{
@@ -532,6 +576,42 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       islandId: layer.id.slice('nature:mossprout:'.length) as MossproutNatureIslandId,
     }];
   }), [scene.tileArtLayers]);
+  const memoryPlantFrames = useMemo(() => scene.tileArtLayers.flatMap((layer) => (
+    layer.id.startsWith('plant:') && layer.interactionFrame
+      ? [{ frame: layer.interactionFrame, instanceId: layer.id.slice('plant:'.length) }]
+      : []
+  )), [scene.tileArtLayers]);
+  const memoryPlantProjections = useMemo(() => scene.tileArtLayers.flatMap((layer) => {
+    if (!layer.id.startsWith('plant:')) return [];
+    const instanceId = layer.id.slice('plant:'.length);
+    const plant = mossproutGarden?.plantableMemories.find((candidate) => candidate.id === instanceId);
+    const definition = plant ? mossproutMemoryPlantById.get(plant.definitionId) : null;
+    if (!plant || !definition) return [];
+    const stage = mossproutMemoryPlantStage(plant.growthPoints);
+    return [{
+      color: definition.color,
+      frame: layer.frame,
+      instanceId,
+      source: definition.art[stage],
+      visualKey: `${instanceId}:${stage}`,
+    }];
+  }), [mossproutGarden?.plantableMemories, scene.tileArtLayers]);
+  const previousPlantVisualKeysRef = useRef<Set<string> | null>(null);
+  const currentPlantVisualKeys = useMemo(
+    () => new Set(memoryPlantProjections.map((plant) => plant.visualKey)),
+    [memoryPlantProjections],
+  );
+  const memoryPlantRevealKeys = useMemo(() => {
+    const previous = previousPlantVisualKeysRef.current;
+    if (!previous) return new Set<string>();
+    return new Set(memoryPlantProjections
+      .filter((plant) => !previous.has(plant.visualKey))
+      .map((plant) => plant.visualKey));
+  }, [memoryPlantProjections]);
+  useEffect(() => {
+    previousPlantVisualKeysRef.current = currentPlantVisualKeys;
+  }, [currentPlantVisualKeys]);
+  const movementEggFrame = scene.tileArtLayers.find((layer) => layer.id === 'structure:mossprout-movement-egg')?.interactionFrame ?? null;
   const initialTutorialFocus = useMemo(() => {
     if (!initialTutorialCameraScale || !tutorialCamera || tutorialCamera.kind !== 'focus_target') return null;
     const target = tutorialCamera.target;
@@ -641,7 +721,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const fitTutorialWorld = camera.fitWorld;
   const focusTutorialResident = camera.focusResident;
   const animateToCameraSnapshot = camera.animateToSnapshot;
-  const interactionCameraSnapshot = camera.snapshot;
+  const readLiveCameraSnapshot = camera.getSnapshot;
   const tutorialCameraReady = camera.ready;
   useEffect(() => {
     if (!tutorialCamera) {
@@ -655,7 +735,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const applicationKey = `${tutorialCameraKey}:${cameraRestoreNonce}`;
     if (!tutorialCameraReady || appliedTutorialCameraRef.current === applicationKey) return;
     appliedTutorialCameraRef.current = applicationKey;
-    const durationMs = cameraRestoreNonce > 0 ? 0 : tutorialCamera.durationMs;
+    const durationMs = tutorialCamera.durationMs;
     if (tutorialCamera.kind === 'fit_targets') {
       fitTutorialWorld(durationMs);
       return;
@@ -710,6 +790,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     }
     if (target.kind === 'haven_nature_island') return natureIslandFrames.find((candidate) => candidate.islandId === target.islandId)?.frame ?? null;
     if (target.kind === 'haven_structure') return scene.tileArtLayers.find((candidate) => candidate.id === target.structureId || candidate.id === `structure:${target.structureId}`)?.frame ?? null;
+    if (target.kind === 'haven_garden_plot') return gardenPlotFrames.find((candidate) => candidate.slotId === target.slotId)?.frame ?? null;
     if (target.kind === 'haven_tile' || target.kind === 'haven_resident') {
       const tile = scene.tiles.find((candidate) => candidate.kind === 'companion' && candidate.companion?.familyId === target.familyId);
       if (!tile) return null;
@@ -721,7 +802,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       return layer?.frame ?? { left: tile.cx - HEX_TILE_W / 2, top: tile.cy - HEX_TILE_H / 2, width: HEX_TILE_W, height: HEX_TILE_H };
     }
     return null;
-  }, [creatureWorldSize, natureIslandFrames, scene.height, scene.tileArtLayers, scene.tiles, scene.width, sceneHomeTile]);
+  }, [creatureWorldSize, gardenPlotFrames, natureIslandFrames, scene.height, scene.tileArtLayers, scene.tiles, scene.width, sceneHomeTile]);
   const havenTargetRegistry = useMemo(() => storyTargetRegistry('haven'), []);
   const registeredStoryTargets = useMemo<StoryTarget[]>(() => [
     { kind: 'haven_world' },
@@ -733,7 +814,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       ? [{ kind: 'haven_structure', structureId: layer.id.slice('structure:'.length) }]
       : []),
     ...natureIslandFrames.map<StoryTarget>((entry) => ({ kind: 'haven_nature_island', islandId: entry.islandId })),
-  ], [natureIslandFrames, scene.tileArtLayers, scene.tiles]);
+    ...gardenPlotFrames.map<StoryTarget>((entry) => ({ kind: 'haven_garden_plot', slotId: entry.slotId })),
+  ], [gardenPlotFrames, natureIslandFrames, scene.tileArtLayers, scene.tiles]);
   useEffect(() => {
     const unregister = registeredStoryTargets.flatMap((target) => {
       const frame = storyTargetFrame(target);
@@ -753,7 +835,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     await waitForStoryTargets(havenTargetRegistry, targets);
     const frames = targets.map(storyTargetFrame);
     if (!frames.length || frames.some((frame) => !frame)) throw new Error('The authored camera target is not ready');
-    if (!storyCameraSnapshotsRef.current.has('entry')) storyCameraSnapshotsRef.current.set('entry', camera.snapshot);
+    if (!storyCameraSnapshotsRef.current.has('entry')) storyCameraSnapshotsRef.current.set('entry', readLiveCameraSnapshot());
     if (payload.operation === 'focus' && frames.length === 1 && payload.target?.kind !== 'haven_world') {
       const frame = frames[0]!;
       await new Promise<void>((resolve) => camera.focusResident(
@@ -809,7 +891,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       && candidate.companion.creature.creatureId === interactionResidentId
     ));
     if (!tile) return;
-    interactionOriginSnapshotRef.current ??= interactionCameraSnapshot;
+    interactionOriginSnapshotRef.current ??= readLiveCameraSnapshot();
     focusedInteractionResidentRef.current = interactionFocusKey;
     const residentAnchor = scene.tileArtLayers.find((layer) => layer.id === tile.id)?.residentAnchor;
     const isMossprout = tile.companion?.familyId === 'mossprout';
@@ -821,11 +903,11 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       subjectFrame ? subjectFrame.top + subjectFrame.height / 2 : tile.cy,
       {
       anchorY: residentInteractionScreenAnchorY,
-      durationMs: reduceMotion ? 80 : cameraRestoreNonce > 0 ? 0 : 520,
+      durationMs: reduceMotion ? 80 : 520,
       onComplete: () => onResidentFocusComplete?.(interactionResidentId),
       zoom: cameraMaximumScale ?? KINGDOM_RENDERING.havenMaxScale,
     });
-  }, [cameraMaximumScale, cameraRestoreNonce, creatureWorldSize, focusTutorialResident, interactionCameraSnapshot, interactionResidentId, onResidentFocusComplete, reduceMotion, residentInteractionScreenAnchorY, scene.tileArtLayers, scene.tiles, tutorialCameraReady]);
+  }, [cameraMaximumScale, cameraRestoreNonce, creatureWorldSize, focusTutorialResident, interactionResidentId, onResidentFocusComplete, readLiveCameraSnapshot, reduceMotion, residentInteractionScreenAnchorY, scene.tileArtLayers, scene.tiles, tutorialCameraReady]);
   const handledInteractionExitNonceRef = useRef(0);
   useEffect(() => {
     if (!interactionResidentId || interactionExitNonce <= handledInteractionExitNonceRef.current) return;
@@ -1163,6 +1245,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         <View style={StyleSheet.absoluteFill}>
           <Animated.View style={[styles.scene, { width: scene.width, height: scene.height }, camera.worldStyle]}>
             {scene.tileArtLayers.map((layer) => {
+              // Memory plants are drawn on oversized, screen-projected native
+              // surfaces below. A second camera-scaled copy here would soften
+              // when the Garden is focused and can briefly double the reveal.
+              if (layer.id.startsWith('plant:')) return null;
               const source = kingdomHexTileSourceForLod(layer, sceneTileImageLod);
               const overlaySource = kingdomHexTileOverlaySourceForLod(layer, sceneTileImageLod);
               const fallbackSource = layer.fallbackSource
@@ -1204,6 +1290,16 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 </Fragment>
               );
             })}
+            {focusedMossproutWorld && onGardenPlotTargetChange
+              ? gardenPlotFrames.map(({ frame, slotId }) => (
+                  <GardenPlotTarget
+                    frame={frame}
+                    key={`garden-plot-target-${slotId}`}
+                    onTargetChange={onGardenPlotTargetChange}
+                    slotId={slotId}
+                  />
+                ))
+              : null}
             {interactionEnabled
               && !upgradePresentation
               && tileUpgradeOffer
@@ -1218,7 +1314,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             {focusedMossproutWorld && interactionEnabled && !upgradePresentation && gardenFrame && onOpenGarden
               ? gardenOrders.slice(0, 3).map((entry, index) => (
                   <GardenOrderShortcut
-                    callout={gardenOrdersInteractive ? null : gardenOrderCallout}
+                    callout={gardenOrdersInteractive ? false : gardenOrderCallout}
                     entry={entry}
                     frame={gardenFrame}
                     index={index}
@@ -1243,6 +1339,27 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 />
               );
             }) : null}
+            {focusedMossproutWorld && interactionEnabled && !upgradePresentation && onSelectMemoryPlant
+              ? memoryPlantFrames.map(({ frame, instanceId }) => (
+                  <Pressable
+                    accessibilityHint="Shows what this memory means and how it has grown"
+                    accessibilityLabel="Open planted memory"
+                    accessibilityRole="button"
+                    key={`memory-plant-hit-target-${instanceId}`}
+                    onPress={() => onSelectMemoryPlant(instanceId)}
+                    style={[styles.natureIslandHitTarget, frame]}
+                  />
+                ))
+              : null}
+            {focusedMossproutWorld && interactionEnabled && !upgradePresentation && movementEggFrame && onSelectMovementEgg ? (
+              <Pressable
+                accessibilityHint="Shows what the mysterious egg responds to"
+                accessibilityLabel="Open mysterious movement egg"
+                accessibilityRole="button"
+                onPress={onSelectMovementEgg}
+                style={[styles.natureIslandHitTarget, movementEggFrame]}
+              />
+            ) : null}
             {showEgg ? (
               <KingdomEgg
                 {...kingdomWorldViewPoint(
@@ -1300,6 +1417,21 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           source={interactionResidentProjection.source}
         />
       ) : null}
+      {memoryPlantProjections.map((plant) => (
+        <ProjectedMemoryPlant
+          animateReveal={memoryPlantRevealKeys.has(plant.visualKey)}
+          cameraScale={camera.scaleValue}
+          cameraTranslateX={camera.translationXValue}
+          cameraTranslateY={camera.translationYValue}
+          color={plant.color}
+          frame={plant.frame}
+          key={plant.instanceId}
+          sceneHeight={scene.height}
+          sceneWidth={scene.width}
+          source={plant.source}
+          visualKey={plant.visualKey}
+        />
+      ))}
       {!upgradePresentation && interactionEnabled ? (
         <Pressable
           accessibilityRole="button"
@@ -1842,7 +1974,7 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
                     ? `world-feed:${presentation.feedExpressionKey}`
                     : 'world-sleeping'
               }
-              faceId={(presentation?.growthProgress ?? 0) > 0 ? 'curious' : 'sleepy'}
+              faceId={(presentation?.growthStage ?? 0) > 0 ? 'curious' : 'sleepy'}
               hatId={null}
               heldAccessoryId={null}
               priority="high"
@@ -2199,6 +2331,174 @@ const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
   );
 });
 
+/**
+ * Memory plants use a detached, oversized image plane. The Garden camera only
+ * ever downsamples this full-resolution surface, avoiding the soft texture that
+ * results when a tiny world-space view is rasterized and then enlarged.
+ */
+const ProjectedMemoryPlant = memo(function ProjectedMemoryPlant({
+  animateReveal,
+  cameraScale,
+  cameraTranslateX,
+  cameraTranslateY,
+  color,
+  frame,
+  sceneHeight,
+  sceneWidth,
+  source,
+  visualKey,
+}: {
+  animateReveal: boolean;
+  cameraScale: SharedValue<number>;
+  cameraTranslateX: SharedValue<number>;
+  cameraTranslateY: SharedValue<number>;
+  color: string;
+  frame: AbsoluteFrame;
+  sceneHeight: number;
+  sceneWidth: number;
+  source: ImageSourcePropType;
+  visualKey: string;
+}) {
+  const reduceMotion = useReducedMotion();
+  const revealOpacity = useSharedValue(animateReveal ? 0 : 1);
+  const revealScale = useSharedValue(animateReveal ? 0.48 : 1);
+  const revealLift = useSharedValue(animateReveal ? 12 : 0);
+  const celebrationOpacity = useSharedValue(0);
+  const handledVisualKeyRef = useRef(animateReveal ? null : visualKey);
+  const [showCelebration, setShowCelebration] = useState(animateReveal);
+  const nativeWidth = frame.width * MEMORY_PLANT_NATIVE_SURFACE_SCALE;
+  const nativeHeight = frame.height * MEMORY_PLANT_NATIVE_SURFACE_SCALE;
+  const raySize = nativeWidth * 1.85;
+
+  useEffect(() => {
+    if (!animateReveal || handledVisualKeyRef.current === visualKey) return;
+    handledVisualKeyRef.current = visualKey;
+    setShowCelebration(true);
+    revealOpacity.value = 0;
+    revealScale.value = reduceMotion ? 0.88 : 0.48;
+    revealLift.value = reduceMotion ? 4 : 12;
+    celebrationOpacity.value = 0;
+    revealOpacity.value = withTiming(1, {
+      duration: reduceMotion ? 100 : 220,
+      easing: Easing.out(Easing.cubic),
+    });
+    revealLift.value = withTiming(0, {
+      duration: reduceMotion ? 100 : 440,
+      easing: Easing.out(Easing.cubic),
+    });
+    revealScale.value = reduceMotion
+      ? withTiming(1, { duration: 140, easing: Easing.out(Easing.cubic) })
+      : withSequence(
+          withTiming(1.14, { duration: 340, easing: Easing.out(Easing.cubic) }),
+          withTiming(1, { duration: 180, easing: Easing.inOut(Easing.cubic) }),
+        );
+    celebrationOpacity.value = withSequence(
+      withTiming(1, { duration: reduceMotion ? 80 : 150 }),
+      withDelay(
+        reduceMotion ? 180 : 760,
+        withTiming(0, { duration: reduceMotion ? 140 : 360, easing: Easing.in(Easing.cubic) }),
+      ),
+    );
+    const timer = setTimeout(() => setShowCelebration(false), reduceMotion ? 520 : 1_360);
+    return () => {
+      clearTimeout(timer);
+      cancelAnimation(revealOpacity);
+      cancelAnimation(revealScale);
+      cancelAnimation(revealLift);
+      cancelAnimation(celebrationOpacity);
+    };
+  }, [animateReveal, celebrationOpacity, reduceMotion, revealLift, revealOpacity, revealScale, visualKey]);
+
+  const projectionStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        translateX: sceneWidth / 2
+          + cameraTranslateX.value
+          + (frame.left + frame.width / 2 - sceneWidth / 2) * cameraScale.value
+          - frame.width / 2,
+      },
+      {
+        translateY: sceneHeight / 2
+          + cameraTranslateY.value
+          + (frame.top + frame.height / 2 - sceneHeight / 2) * cameraScale.value
+          - frame.height / 2,
+      },
+    ],
+  }));
+  const nativeSurfaceStyle = useAnimatedStyle(() => ({
+    opacity: revealOpacity.value,
+    transform: [{
+      scale: cameraScale.value * revealScale.value / MEMORY_PLANT_NATIVE_SURFACE_SCALE,
+    }],
+  }));
+  const liftStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: revealLift.value * cameraScale.value }],
+  }));
+  const celebrationStyle = useAnimatedStyle(() => ({ opacity: celebrationOpacity.value }));
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.projectedMemoryPlant,
+        { height: frame.height, width: frame.width },
+        projectionStyle,
+      ]}>
+      <Animated.View
+        collapsable={false}
+        renderToHardwareTextureAndroid={false}
+        shouldRasterizeIOS={false}
+        style={[StyleSheet.absoluteFill, liftStyle]}>
+        <Animated.View
+          collapsable={false}
+          renderToHardwareTextureAndroid={false}
+          shouldRasterizeIOS={false}
+          style={[
+            styles.memoryPlantNativeSurface,
+            {
+              height: nativeHeight,
+              marginLeft: -nativeWidth / 2,
+              marginTop: -nativeHeight / 2,
+              width: nativeWidth,
+            },
+            nativeSurfaceStyle,
+          ]}>
+          {showCelebration ? (
+            <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, celebrationStyle]}>
+              <RotatingRadialSunburst
+                baseOpacity={0.86}
+                rotationDurationMs={18_000}
+                size={raySize}
+                style={{
+                  left: (nativeWidth - raySize) / 2,
+                  top: (nativeHeight - raySize) / 2,
+                }}
+              />
+              <CelebrationParticles
+                key={`memory-plant-confetti-${visualKey}`}
+                layerStyle={{ left: nativeWidth / 2, top: nativeHeight * 0.48 }}
+                tier={2}
+                tint={color}
+              />
+            </Animated.View>
+          ) : null}
+          <Image
+            accessibilityIgnoresInvertColors
+            allowDownscaling={false}
+            cachePolicy="memory-disk"
+            contentFit="contain"
+            priority="high"
+            recyclingKey={visualKey}
+            source={source}
+            style={StyleSheet.absoluteFill}
+            transition={0}
+          />
+        </Animated.View>
+      </Animated.View>
+    </Animated.View>
+  );
+});
+
 type ResidentProps = {
   animated?: boolean;
   celebrationNonce?: number;
@@ -2370,22 +2670,18 @@ const styles = StyleSheet.create({
   },
   gardenOrderShortcutTarget: {
     alignItems: 'center',
-    gap: GARDEN_ORDER_CALLOUT_GAP,
   },
-  gardenOrderCallout: {
+  gardenOrderRequestBubble: {
     alignItems: 'center',
     backgroundColor: '#FFF8D8',
     borderColor: 'rgba(95,67,31,0.24)',
     borderCurve: 'continuous',
-    borderRadius: 16,
+    borderRadius: 28,
     borderWidth: 1,
-    boxShadow: '0 6px 16px rgba(49,36,19,0.22)',
-    flexDirection: 'row',
-    gap: 7,
-    height: GARDEN_ORDER_CALLOUT_HEIGHT,
+    boxShadow: '0 7px 18px rgba(49,36,19,0.24)',
+    height: FTUE_GARDEN_REQUEST_BUBBLE_SIZE,
     justifyContent: 'center',
-    paddingHorizontal: 12,
-    width: GARDEN_ORDER_CALLOUT_WIDTH,
+    width: FTUE_GARDEN_REQUEST_BUBBLE_SIZE,
   },
   gardenOrderCalloutTail: {
     backgroundColor: '#FFF8D8',
@@ -2394,13 +2690,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     transform: [{ rotate: '45deg' }],
     width: 10,
-  },
-  gardenOrderCalloutText: {
-    color: '#4B331B',
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '900',
-    textAlign: 'center',
   },
   gardenOrderShortcut: {
     height: GARDEN_ORDER_CARD_HEIGHT,
@@ -2443,6 +2732,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     transformOrigin: 'center bottom',
   },
+  memoryPlantNativeSurface: {
+    left: '50%',
+    position: 'absolute',
+    top: '50%',
+    transformOrigin: 'center center',
+  },
+  projectedMemoryPlant: {
+    left: 0,
+    overflow: 'visible',
+    position: 'absolute',
+    top: 0,
+    zIndex: 16,
+  },
   // Mossprout shares the Egg's ground anchor. Scaling this frame around its
   // center pushed the enlarged lower half below that anchor and behind the
   // dialogue choices; bottom-origin scaling retains the hatch position and
@@ -2481,6 +2783,7 @@ const styles = StyleSheet.create({
   lockedTileLock: { height: '100%', width: '100%' },
   homeTileHitTarget: { height: 84, position: 'absolute', width: 108 },
   natureIslandHitTarget: { position: 'absolute' },
+  gardenPlotTarget: { position: 'absolute' },
   statusGlyphWrap: {
     alignItems: 'center',
     left: 0,

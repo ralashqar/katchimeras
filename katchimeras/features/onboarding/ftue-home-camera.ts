@@ -62,10 +62,7 @@ export function ftueHomeCameraPanTarget(stepId: string | null | undefined): numb
   }
 }
 
-/**
- * The relationship-first Grove opening asks one meaningful question. Its
- * answer completes the camera retreat in one clear magical response.
- */
+/** The relationship-first Grove opening retreats once per Egg answer. */
 export function mossproutGroveEggCameraPinchTarget(
   stepId: string | null | undefined,
   maxPinchScale: number,
@@ -105,12 +102,20 @@ export function mossproutGroveEggCameraDuration(stepId: string | null | undefine
 }
 
 /**
- * Today maps Energy 0..0.5 onto the Egg's complete physical 0.5x..1x growth
- * range. The one authored answer completes that range.
+ * Keep the Grove Egg on Today's established visual curve while reserving a
+ * distinct size for each of the two authored answers:
+ *
+ *   waiting  -> 0.60x
+ *   answer 1 -> 0.80x
+ *   answer 2 -> 1.00x
+ *
+ * The non-zero starting ratio deliberately makes the opening Egg a little
+ * larger than the generic daily Egg without making the first answer look
+ * hatch-ready.
  */
 export function mossproutGroveEggEnergyRatio(answeredCount: number): number {
-  const completed = Math.min(1, Math.max(0, answeredCount));
-  return completed / 2;
+  const completed = Math.min(2, Math.max(0, answeredCount));
+  return 0.1 + completed * 0.2;
 }
 
 export function clampFtueCameraPanToCoverage({

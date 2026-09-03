@@ -55,6 +55,7 @@ import type { WorldFtueSubjectPresentation } from './world-ftue-subject-presenta
 
 const ATTUNEMENT_ACTION_IDS = [
   'egg.day_texture',
+  'egg.desired_help',
 ] as const;
 
 const MOSSPROUT_ENVIRONMENT_KEY = todayKatchimeraExplorationBackgroundKeyForEnvironment('mossprout') ?? 'mossprout';
@@ -183,10 +184,10 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
   const growth = useMemo<TodayGrowthSummary | null>(() => {
     if (!day) return null;
     const base = todayGrowthSummary(day, 0);
-    // Reuse Today's authored Egg size curve: start at half physical size and
-    // traverse its full growth range in one decisive, feed-driven step.
+    // Reuse Today's authored Egg size curve with a dedicated two-answer FTUE
+    // mapping, so both answers produce a visible step before Hatch.
     const energyRatio = mossproutGroveEggEnergyRatio(answeredCount);
-    const stage = Math.min(6, Math.max(0, Math.round(energyRatio * 6))) as TodayGrowthSummary['stage'];
+    const stage = Math.min(2, Math.max(0, answeredCount)) as TodayGrowthSummary['stage'];
     return {
       ...base,
       activeEnergy: Math.round(base.energyTarget * energyRatio),
@@ -319,7 +320,22 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
       action.presentation === 'inline_choice'
       || action.presentation === 'cta_action'
       || action.presentation === 'acknowledgement'
-    )) ?? [];
+    )).map((action) => {
+      if (action.id !== 'egg.desired_help' || !action.options) return action;
+      const firstAnswer = ftueRun?.answers['egg.day_texture']?.optionId;
+      const preferred = firstAnswer === 'too_much_at_once'
+        ? ['calm', 'progress', 'feel_like_myself']
+        : firstAnswer === 'taking_today_as_it_comes'
+          ? ['feel_like_myself', 'progress', 'calm']
+          : ['progress', 'calm', 'feel_like_myself'];
+      const rank = new Map(preferred.map((id, index) => [id, index]));
+      return {
+        ...action,
+        options: [...action.options].sort((left, right) => (
+          (rank.get(left.id) ?? preferred.length) - (rank.get(right.id) ?? preferred.length)
+        )),
+      };
+    }) ?? [];
 
   return (
     <TodayEnvironmentMotionProvider motion={environmentMotion}>
@@ -346,7 +362,11 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
             hatchPresentation={isHatching ? hatchPresentation : null}
             microcopy={null}
             onboardingFocus
-            onboardingGuide={companionStageActive ? null : step?.guide ?? null}
+            onboardingGuide={
+              companionStageActive || (worldHosted && stepId === 'world.egg_intro')
+                ? null
+                : step?.guide ?? null
+            }
             onboardingCameraDurationMs={mossproutGroveEggCameraDuration(stepId)}
             onboardingCameraPanY={mossproutGroveEggCameraPanTarget(stepId)}
             onboardingUiVisible={!companionStageActive}

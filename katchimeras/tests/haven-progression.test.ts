@@ -8,6 +8,7 @@ import type { MergeWorldState } from '@/types/merge-world';
 import { prioritizedVisibleMergeOrders } from '@/utils/merge-world/order-presentation';
 import { MOSSPROUT_NATURE_ISLAND_IDS } from '@/constants/mossprout-nature-islands';
 import { MOSSPROUT_FTUE_FLOW } from '@/features/onboarding/mossprout-ftue-flow';
+import { mossproutFtueGardenMissionOrder } from '@/utils/merge-world/chapter-zero-policy';
 
 const NOW = Date.UTC(2026, 7, 18, 12);
 
@@ -23,7 +24,7 @@ function mossproutWorld(): MergeWorldState {
   };
 }
 
-test('the first Haven restoration is linear, story-gated, and reveals six Level 1 islands', () => {
+test('the first Haven restoration is linear, story-gated, and keeps neighbouring islands veiled', () => {
   let state = mossproutWorld();
   const skipped = reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 2, now: NOW + 1 });
   assert.equal(skipped.changed, false);
@@ -36,6 +37,68 @@ test('the first Haven restoration is linear, story-gated, and reveals six Level 
   assert.deepEqual(Object.values(first.state.haven.mossproutNatureIslands), [1, 1, 1, 1, 1, 1]);
   state = reduceMergeWorld(first.state, { type: 'reconcileHavenStory', characterId: 'mossprout', storyLevel: 2, now: NOW + 4 }).state;
   assert.equal(reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 2, now: NOW + 5 }).changed, false);
+});
+
+test('memory plants grant, plant, swap, and grow exactly once across six durable plots', () => {
+  let state = mossproutWorld();
+  const granted = reduceMergeWorld(state, {
+    type: 'grantPlantableMemory', definitionId: 'momentum', source: { kind: 'ftue', sourceId: 'run-1' }, receiptId: 'grant-1', now: NOW + 1,
+  });
+  assert.equal(granted.changed, true);
+  state = granted.state;
+  const plantId = 'memory-plant:grant-1';
+  assert.equal(reduceMergeWorld(state, {
+    type: 'grantPlantableMemory', definitionId: 'momentum', source: { kind: 'ftue', sourceId: 'run-1' }, receiptId: 'grant-1', now: NOW + 2,
+  }).changed, false);
+  state = reduceMergeWorld(state, { type: 'placePlantableMemory', instanceId: plantId, slotId: 'front-centre', receiptId: 'place-1', now: NOW + 3 }).state;
+  state = reduceMergeWorld(state, { type: 'growPlantableMemory', instanceId: plantId, amount: 1, receiptId: 'grow-1', now: NOW + 4 }).state;
+  assert.equal(state.haven.plantableMemories[0].slotId, 'front-centre');
+  assert.equal(state.haven.plantableMemories[0].growthPoints, 1);
+  assert.equal(reduceMergeWorld(state, { type: 'growPlantableMemory', instanceId: plantId, amount: 1, receiptId: 'grow-1', now: NOW + 5 }).changed, false);
+
+  state = reduceMergeWorld(state, {
+    type: 'grantPlantableMemory', definitionId: 'stillness', source: { kind: 'journey', sourceId: 'day-2' }, receiptId: 'grant-2', now: NOW + 6,
+  }).state;
+  state = reduceMergeWorld(state, { type: 'placePlantableMemory', instanceId: 'memory-plant:grant-2', slotId: 'front-centre', receiptId: 'place-2', now: NOW + 7 }).state;
+  assert.equal(state.haven.plantableMemories.find((plant) => plant.id === plantId)?.slotId, null);
+  assert.equal(state.haven.plantableMemories.find((plant) => plant.id === 'memory-plant:grant-2')?.slotId, 'front-centre');
+});
+
+test('Garden structure, spring, path, and movement egg advance independently with receipts', () => {
+  let state = mossproutWorld();
+  state = reduceMergeWorld(state, { type: 'upgradeHavenStructure', structureId: 'mossprout-garden', level: 1, receiptId: 'garden-1', now: NOW + 1 }).state;
+  state = reduceMergeWorld(state, { type: 'upgradeHavenFeature', structureId: 'mossprout-garden', featureId: 'spring', level: 1, receiptId: 'spring-1', now: NOW + 2 }).state;
+  assert.equal(state.haven.structures.mossproutGarden.level, 1);
+  assert.equal(state.haven.structures.mossproutGarden.featureLevels.spring, 1);
+  assert.equal(state.haven.structures.mossproutGarden.featureLevels.path, 0);
+  state = reduceMergeWorld(state, { type: 'revealMovementEgg', receiptId: 'egg-reveal', now: NOW + 3 }).state;
+  state = reduceMergeWorld(state, { type: 'recordMovementEggProgress', manualMovement: true, receiptId: 'egg-manual', now: NOW + 4 }).state;
+  assert.equal(state.haven.movementEgg.status, 'stirring');
+  assert.equal(state.haven.movementEgg.manualMovementLogs, 1);
+});
+
+test('the post-FTUE Bloom mission atomically wakes the Garden and reveals the movement Egg', () => {
+  let state = reduceMergeWorld(mossproutWorld(), {
+    type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, economyMode: 'free', receiptId: 'first-bloom', now: NOW + 1,
+  }).state;
+  const mission = mossproutFtueGardenMissionOrder(NOW + 2);
+  state = {
+    ...state,
+    activeOrders: [mission],
+    board: state.board.map((cell, index) => index === 0 ? {
+      ...cell,
+      occupant: { kind: 'item', instanceId: 'post-ftue-bloom', definitionId: 'nature:garden:3' },
+    } : cell),
+  };
+
+  const completed = reduceMergeWorld(state, { type: 'serveOrder', orderId: mission.id, now: NOW + 3 });
+  assert.equal(completed.changed, true);
+  assert.equal(completed.state.activeOrders.some((order) => order.id === mission.id), false);
+  assert.deepEqual(completed.state.haven.structures.mossproutGarden.featureLevels, { spring: 1, path: 1 });
+  assert.equal(completed.state.haven.movementEgg.status, 'revealed');
+  assert.equal(completed.state.haven.revealState, 'revealed');
+  assert.equal(completed.state.coins, state.coins);
+  assert.equal(completed.state.haven.mutationReceipts.filter((receipt) => receipt.id.startsWith(mission.id)).length, 3);
 });
 
 test('authored Haven upgrades are atomic, economy-explicit, and idempotent by receipt', () => {
@@ -151,16 +214,16 @@ test('v20 restored Havens keep their main stage but restart all new satellites a
     haven: { ...current.haven, tileStages: { ...current.haven.tileStages, mossprout: 4 }, revealState: 'revealed' as const },
   };
   const migrated = normalizeMergeWorldState(legacy, NOW);
-  assert.equal(migrated.version, 21);
+  assert.equal(migrated.version, 22);
   assert.equal(migrated.haven.tileStages.mossprout, 4);
   assert.deepEqual(Object.values(migrated.haven.mossproutNatureIslands), [1, 1, 1, 1, 1, 1]);
 });
 
-test('v13 Mossprout saves reset into the v21 personal-world contract', () => {
+test('v13 Mossprout saves reset into the v22 personal-world contract', () => {
   const current = mossproutWorld();
   const legacy = { ...current, version: 13, haven: undefined };
   const migrated = normalizeMergeWorldState(legacy, NOW);
-  assert.equal(migrated.version, 21);
+  assert.equal(migrated.version, 22);
   assert.equal(migrated.ownerCharacterId, 'mossprout');
   assert.equal(migrated.haven.tileStages.mossprout, undefined);
   assert.equal(migrated.haven.revealState, 'hidden');
@@ -219,8 +282,13 @@ test('Mossprout FTUE turns one Bond answer into a Garden upgrade and an intimate
   assert.equal(mossproutFtueStep('companion.bond_spotlight')?.actions[0]?.nextStepId, 'companion.garden_intro');
   assert.equal(mossproutFtueStep('companion.garden_intro')?.actions[0]?.nextStepId, 'companion.order_preview');
   assert.equal(mossproutFtueStep('companion.order_preview')?.actions[0]?.nextStepId, 'world.garden_arrival');
-  assert.equal(mossproutFtueStep('world.garden_arrival')?.actions[0]?.nextStepId, 'world.garden_handoff');
+  assert.equal(mossproutFtueStep('world.garden_arrival')?.actions[0]?.nextStepId, 'world.seed_planted');
+  assert.equal(mossproutFtueStep('world.seed_planted')?.actions[0]?.nextStepId, 'world.garden_handoff');
   const gardenArrivalProjection = mossproutFtueStep('world.garden_arrival')?.camera;
+  const gardenArrival = mossproutFtueStep('world.garden_arrival');
+  assert.equal(gardenArrival?.actions[0]?.presentation, 'cta_action');
+  assert.equal(gardenArrival?.cue, undefined);
+  assert.equal(gardenArrival?.spotlight, undefined);
   const gardenHandoffProjection = mossproutFtueStep('world.garden_handoff')?.camera;
   assert.equal(gardenArrivalProjection?.kind === 'focus_target' ? gardenArrivalProjection.projectionOnly : false, true);
   assert.equal(gardenHandoffProjection?.kind === 'focus_target' ? gardenHandoffProjection.projectionOnly : false, true);
@@ -236,7 +304,8 @@ test('Mossprout FTUE turns one Bond answer into a Garden upgrade and an intimate
   }
   assert.equal(mossproutFtueStep('world.garden_handoff')?.actions[0]?.nextStepId, 'merge.seed_drag');
   assert.equal(mossproutFtueStep('merge.serve_sprout')?.edges?.[0]?.nextStepId, 'world.first_bloom_restore');
-  assert.equal(mossproutFtueStep('world.first_bloom_restore')?.edges?.[0]?.nextStepId, 'companion.chapter_zero_return');
+  assert.equal(mossproutFtueStep('world.first_bloom_restore')?.edges?.[0]?.nextStepId, 'world.first_seed_grew');
+  assert.equal(mossproutFtueStep('world.first_seed_grew')?.actions[0]?.nextStepId, 'companion.chapter_zero_return');
   const firstBloomProjection = mossproutFtueStep('world.first_bloom_restore')?.camera;
   assert.equal(firstBloomProjection?.kind === 'focus_target' ? firstBloomProjection.projectionOnly : false, true);
   assert.equal(mossproutFtueStep('companion.chapter_zero_return')?.actions[0]?.nextStepId, 'companion.water_together');
@@ -270,9 +339,30 @@ test('FTUE upgrade is explicit and meditation exits without reopening Merge', ()
   assert.match(havenScreen, /tileUpgradeOffer=\{ftueStepId === 'world\.first_bloom_restore'[\s\S]*?FIRST_BLOOM_GARDEN_UPGRADE_OFFER/);
   assert.match(canvas, /function TileUpgradeOffer[\s\S]*?frame\.top \+ frame\.height \* anchor\.y[\s\S]*?styles\.tileUpgradeOffer/);
   assert.match(canvas, /camera\.isMoving \? null : tileUpgradeOfferNodeRef\.current/);
-  assert.match(havenScreen, /nextRun\?\.status === 'active'[\s\S]*?nextRun\.stepId === 'companion\.chapter_zero_return'[\s\S]*?announcement: 'Returning to Mossprout'[\s\S]*?target: 'companion'[\s\S]*?interactionFtue: 'chapter-zero-return'[\s\S]*?mossproutInteraction: '1'/);
+  assert.match(canvas, /const ProjectedMemoryPlant[\s\S]*?allowDownscaling=\{false\}/);
+  assert.match(canvas, /MEMORY_PLANT_NATIVE_SURFACE_SCALE[\s\S]*?revealScale\.value[\s\S]*?withSequence\([\s\S]*?withTiming\(1\.14[\s\S]*?withTiming\(1,/);
+  assert.match(canvas, /RotatingRadialSunburst[\s\S]*?CelebrationParticles[\s\S]*?memory-plant-confetti-/);
+  assert.doesNotMatch(canvas, /animatePlant/);
+  assert.match(havenScreen, /glow=\{ftueStepId === 'world\.garden_arrival'\}/);
+  assert.match(havenScreen, /icon=\{ftueStep\.actions\[0\]\?\.icon \?\? 'sparkles'\}/);
+  assert.match(havenScreen, /onPress=\{ftueStepId === 'world\.garden_arrival' \? beginFirstSeedPlanting : advanceOpening\}/);
+  assert.doesNotMatch(havenScreen, /garden-plant-button:mossprout/);
+  assert.match(rosterRoute, /stepId === 'world\.first_seed_grew'[\s\S]*?world\.acknowledge_first_seed_growth'[\s\S]*?announcement: 'Returning to Mossprout'[\s\S]*?target: 'companion'[\s\S]*?interactionFtue: 'chapter-zero-return'[\s\S]*?mossproutInteraction: '1'/);
   assert.doesNotMatch(canvas, /gardenIslandHitTarget/);
   assert.doesNotMatch(havenScreen, /collapsable=\{false\} ref=\{setFirstBloomRestoreButtonNode\}/);
+});
+
+test('live Chapter 0 board installation preserves the planted Haven memory', () => {
+  const companionRoute = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
+  const repository = readFileSync('utils/merge-world/repository.ts', 'utf8');
+  const havenScreen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
+
+  assert.match(companionRoute, /installMossproutOnboardingMergeWorld\(Date\.now\(\), ftueWispForRun\(run\), \{ preserveHaven: true \}\)/);
+  assert.match(repository, /options: \{ preserveHaven\?: boolean \}/);
+  assert.match(repository, /options\.preserveHaven[\s\S]*?haven: current\.haven/);
+  assert.match(havenScreen, /beginFirstSeedPlanting[\s\S]*?evidenceRef: 'garden-plot:front-left'/);
+  assert.match(havenScreen, /world\.seed_planted'[\s\S]*?firstSeedPlanted/);
+  assert.match(havenScreen, /world\.first_seed_grew'[\s\S]*?firstSeedGrown/);
 });
 
 test('focused Haven owns one canonical Merge provider and no sandbox subscription', () => {

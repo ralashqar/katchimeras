@@ -5,7 +5,7 @@ import type { StoryWorldUpgradeEffectPayload } from '@/types/content-flow';
 import type { HavenStage } from '@/constants/haven-catalog';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld, resetMergeActivityForDay } from '@/utils/merge-world/engine';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
-import { completeMossproutChapterZeroSlice } from '@/utils/merge-world/chapter-zero-policy';
+import { completeMossproutChapterZeroSlice, mossproutFtueGardenMissionOrder, MOSSPROUT_FTUE_GARDEN_MISSION_ORDER_ID } from '@/utils/merge-world/chapter-zero-policy';
 import { MOSSPROUT_FTUE_JOURNAL_ENERGY } from '@/utils/merge-world/economy-policy';
 
 const DATABASE_NAME = 'katchimeras-merge-world.db';
@@ -277,6 +277,68 @@ export function revealStoredHaven(now = Date.now()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'revealHaven', now }), now);
 }
 
+export function grantStoredPlantableMemory(
+  definitionId: import('@/types/merge-world').MossproutMemoryPlantId,
+  source: import('@/types/merge-world').PlantableMemorySource,
+  receiptId: string,
+  now = Date.now(),
+) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'grantPlantableMemory', definitionId, source, receiptId, now,
+  }), now);
+}
+
+export function placeStoredPlantableMemory(
+  instanceId: string,
+  slotId: import('@/types/merge-world').MossproutGardenPlantSlotId,
+  receiptId: string,
+  now = Date.now(),
+) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'placePlantableMemory', instanceId, slotId, receiptId, now,
+  }), now);
+}
+
+export function growStoredPlantableMemory(instanceId: string, amount: number, receiptId: string, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'growPlantableMemory', instanceId, amount, receiptId, now,
+  }), now);
+}
+
+export function upgradeStoredHavenStructure(level: number, receiptId: string, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'upgradeHavenStructure', structureId: 'mossprout-garden', level, receiptId, now,
+  }), now);
+}
+
+export function upgradeStoredHavenFeature(
+  featureId: import('@/types/merge-world').MossproutGardenFeatureId,
+  level: number,
+  receiptId: string,
+  now = Date.now(),
+) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'upgradeHavenFeature', structureId: 'mossprout-garden', featureId, level, receiptId, now,
+  }), now);
+}
+
+export function revealStoredMovementEgg(receiptId: string, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'revealMovementEgg', receiptId, now }), now);
+}
+
+export function recordStoredMovementEggProgress(input: {
+  observedSteps?: number;
+  manualMovement?: boolean;
+  receiptId: string;
+}, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => {
+    const progress = reduceMergeWorld(state, { type: 'recordMovementEggProgress', ...input, now });
+    if (progress.state.haven.movementEgg.status !== 'stirring') return progress;
+    const discovery = reduceMergeWorld(progress.state, { type: 'startStepplingDiscovery', now });
+    return discovery.changed ? discovery : progress;
+  }, now);
+}
+
 export function reconcileStoredHavenStory(characterId: import('@/types/merge-world').MergeCharacterId, storyLevel: number, now = Date.now()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'reconcileHavenStory', characterId, storyLevel, now }), now);
 }
@@ -284,7 +346,30 @@ export function reconcileStoredHavenStory(characterId: import('@/types/merge-wor
 /** Completes the Chapter Zero handoff by publishing today's normal Garden batch immediately. */
 export function seedStoredMossproutGardenAfterFtue(dayId: string, now = Date.now()) {
   return reduceStoredMergeWorld((state) => {
+    const missionComplete = state.haven.structures.mossproutGarden.featureLevels.path > 0;
+    const missionPresent = state.activeOrders.some((order) => order.id === MOSSPROUT_FTUE_GARDEN_MISSION_ORDER_ID);
+    if (!missionComplete && missionPresent) {
+      return reduceMergeWorld(state, {
+        type: 'setGeneratorForcedDrop', generatorId: 'wild-garden', definitionId: 'nature:garden:1', now,
+      });
+    }
+
     const completedChapterZero = completeMossproutChapterZeroSlice(state, now);
+    if (!missionComplete && !missionPresent) {
+      const forced = reduceMergeWorld(completedChapterZero, {
+        type: 'setGeneratorForcedDrop', generatorId: 'wild-garden', definitionId: 'nature:garden:1', now,
+      }).state;
+      const next: MergeWorldState = {
+        ...forced,
+        revision: forced.revision + 1,
+        updatedAt: now,
+        activeOrders: [
+          ...forced.activeOrders.filter((order) => order.storyArcId !== 'mossprout:casual-garden'),
+          mossproutFtueGardenMissionOrder(now),
+        ],
+      };
+      return { state: next, changed: true, message: 'Help the Garden Wake Up is ready.' };
+    }
     return reduceMergeWorld(completedChapterZero, {
       type: 'reconcileCharacterActivity',
       familyId: 'mossprout',
@@ -384,31 +469,52 @@ export async function installMergeWorldStateForDebug(input: unknown, now = Date.
   return installed;
 }
 
-/** One-time product migration: archives the old snapshot as backup and installs Chapter 0. */
-export async function installMossproutOnboardingMergeWorld(now = Date.now(), rewardWispId: import('@/types/wisp').WispId = 'sprout'): Promise<MergeWorldState> {
+/**
+ * Installs Chapter 0's board. Live FTUE entry preserves the player's Haven;
+ * debug/reset callers retain the historical destructive behavior by default.
+ */
+export async function installMossproutOnboardingMergeWorld(
+  now = Date.now(),
+  rewardWispId: import('@/types/wisp').WispId = 'sprout',
+  options: { preserveHaven?: boolean } = {},
+): Promise<MergeWorldState> {
   await serializeWrite(async () => undefined);
   resetGeneration += 1;
   resetInProgress = true;
-  const freshState = createMossproutChapterZeroState(now, rewardWispId);
+  let installedState = createMossproutChapterZeroState(now, rewardWispId);
   try {
     await serializeWrite(async () => {
       const db = await database();
       const existing = await db.getFirstAsync<{ state_json: string }>('SELECT state_json FROM merge_world_snapshot WHERE profile_id = ?', [LOCAL_PROFILE_ID]);
+      if (options.preserveHaven && existing?.state_json) {
+        try {
+          const current = normalizeMergeWorldState(JSON.parse(existing.state_json), now);
+          installedState = {
+            ...installedState,
+            haven: current.haven,
+            revision: Math.max(installedState.revision, current.revision) + 1,
+            updatedAt: now,
+          };
+        } catch {
+          // A corrupt prior snapshot must not prevent the recoverable FTUE board
+          // from being installed. Its backup remains available below.
+        }
+      }
       await db.runAsync(
         `INSERT INTO merge_world_snapshot (profile_id, schema_version, revision, updated_at, state_json, backup_json)
          VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT(profile_id) DO UPDATE SET schema_version = excluded.schema_version, revision = excluded.revision,
          updated_at = excluded.updated_at, backup_json = COALESCE(merge_world_snapshot.backup_json, merge_world_snapshot.state_json), state_json = excluded.state_json`,
-        [LOCAL_PROFILE_ID, freshState.version, freshState.revision, freshState.updatedAt, JSON.stringify(freshState), existing?.state_json ?? null],
+        [LOCAL_PROFILE_ID, installedState.version, installedState.revision, installedState.updatedAt, JSON.stringify(installedState), existing?.state_json ?? null],
       );
       await db.runAsync('DELETE FROM merge_world_outbox');
     });
   } finally {
     resetInProgress = false;
   }
-  resetListeners.forEach((listener) => listener(freshState));
-  publishSnapshot(freshState);
-  return freshState;
+  resetListeners.forEach((listener) => listener(installedState));
+  publishSnapshot(installedState);
+  return installedState;
 }
 
 export type MossproutMergeFtueStepId =

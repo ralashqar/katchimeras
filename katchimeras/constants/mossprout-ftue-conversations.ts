@@ -9,6 +9,7 @@ const openingLines: Record<string, string> = {
   too_much_at_once: 'Oh! I felt the rain drumming on my shell. We don’t have to hold all of it at once.',
   pretty_good: 'Oh! I felt that warm patch of sunlight. I think it helped me hatch.',
   mostly_drifting: 'Oh! I felt the breeze carrying us along. Drifting can still bring you somewhere new.',
+  taking_today_as_it_comes: 'Oh! I felt a soft breeze and a little warmth. Maybe today can move at its own pace.',
   more_energy: 'You said you wanted more energy. This garden definitely does.',
   more_calm: 'You said you wanted more calm. I think this place could use some too.',
   something_new: 'You wanted something new. Well… this is pretty new.',

@@ -19,6 +19,7 @@ export type StoryTarget =
   | { kind: 'haven_tile'; familyId: string }
   | { kind: 'haven_resident'; familyId: string }
   | { kind: 'haven_structure'; structureId: string }
+  | { kind: 'haven_garden_plot'; slotId: MossproutGardenPlantSlotId }
   | { kind: 'haven_nature_island'; islandId: string }
   | { kind: 'merge_cell'; cell: number }
   | { kind: 'merge_item'; instanceId: string }
@@ -256,3 +257,4 @@ export type ContentFlowSurfaceViewModel = {
   pendingWork: ContentFlowPendingWork;
   conflictRunIds: readonly string[];
 };
+import type { MossproutGardenPlantSlotId } from '@/types/merge-world';

@@ -6,13 +6,13 @@ export type MossproutGardenIntroBeat = {
 
 export const MOSSPROUT_GARDEN_INTRO_BEATS: readonly MossproutGardenIntroBeat[] = [
   {
-    line: 'If we’re growing something, I suppose my Garden should start growing too.',
+    line: 'You said you wanted something to grow. So I made a little Seed from it.',
     actionLabel: 'Continue',
     icon: 'arrow.right',
   },
   {
-    line: 'Four tiny Seeds can become one First Bloom. When it grows, this place will remember what we began together.',
-    actionLabel: 'Show me the Garden',
+    line: 'It belongs to you. Let’s find it a place in my Garden.',
+    actionLabel: 'Plant the Seed',
     icon: 'leaf.fill',
   },
 ] as const;

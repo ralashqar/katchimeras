@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Image } from 'expo-image';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -23,12 +24,14 @@ import type { CompanionBondAwardReceipt } from '@/utils/companion-bond';
 import { useFtueRun } from '@/features/onboarding/ftue-runtime';
 import {
   MOSSPROUT_BOND_SHARE_PROMPTS,
+  MOSSPROUT_SUPPORT_STYLE_OPTIONS,
   MOSSPROUT_WATER_TOGETHER_OPTIONS,
   MOSSPROUT_FTUE_BOND_SHARE_REWARD_PREVIEW,
   MOSSPROUT_FTUE_NAME_BOND_REWARD_PREVIEW,
   mossproutBondShareSelection,
   mossproutFirstSeedForIntent,
 } from '@/features/onboarding/mossprout-bond-share';
+import { mossproutMemoryPlantById } from '@/constants/mossprout-memory-plants';
 
 const INTRODUCTION_REWARD = { amount: MOSSPROUT_FTUE_NAME_BOND_REWARD_PREVIEW, kind: 'bond' as const };
 const BOND_SHARE_REWARD = { amount: MOSSPROUT_FTUE_BOND_SHARE_REWARD_PREVIEW, kind: 'bond' as const };
@@ -49,8 +52,15 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
   const ftueRun = useFtueRun();
   const [nameModalOpen, setNameModalOpen] = useState(false);
   const [draft, setDraft] = useState(nickname ?? '');
-  const selectedBondShare = mossproutBondShareSelection(ftueRun?.answers['companion.choose_growth_intent']?.optionId);
-  const firstSeed = mossproutFirstSeedForIntent(ftueRun?.answers['companion.choose_growth_intent']?.optionId);
+  const selectedBondShare = mossproutBondShareSelection(
+    ftueRun?.answers['companion.choose_growth_intent']?.optionId
+      ?? (ftueRun?.answers['egg.desired_help']?.optionId
+        ? `desired-help:${ftueRun.answers['egg.desired_help'].optionId}`
+        : null),
+  );
+  const selectedSupportStyleId = ftueRun?.answers['companion.choose_support_style']?.optionId ?? null;
+  const firstSeed = mossproutFirstSeedForIntent(selectedBondShare?.id);
+  const firstSeedDefinition = mossproutMemoryPlantById.get(firstSeed.id);
   const completedBondShareReward = {
     amount: pendingBondCelebration?.points ?? MOSSPROUT_FTUE_BOND_SHARE_REWARD_PREVIEW,
     kind: 'bond' as const,
@@ -83,7 +93,7 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
   if (mode === 'bond_choice') return (
     <Animated.View entering={FadeInUp.duration(220)} style={styles.plainActionStage}>
       <View ref={actionStackTargetRef} style={styles.bondChoiceStack}>
-        {selectedBondShare ? (
+        {selectedBondShare && selectedSupportStyleId ? (
           <DayActionCompletedRow
             animateLayout={false}
             artwork={<DayActionIcon completed icon={selectedBondShare.prompt.icon} />}
@@ -97,7 +107,16 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
             subtitle={selectedBondShare.answer.label}
             title={selectedBondShare.prompt.cardLabel}
           />
-        ) : MOSSPROUT_BOND_SHARE_PROMPTS[0].options.map((option) => (
+        ) : selectedBondShare ? MOSSPROUT_SUPPORT_STYLE_OPTIONS.map((option) => (
+          <DayActionActiveRow animateLayout={false} key={option.id} label={option.label}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => onContinue?.(option.id)}
+              style={({ pressed }) => pressed && styles.pressed}>
+              <DayActionCardSurface artwork={<DayActionIcon icon={option.icon} />} title={option.label} />
+            </Pressable>
+          </DayActionActiveRow>
+        )) : MOSSPROUT_BOND_SHARE_PROMPTS[0].options.map((option) => (
           <DayActionActiveRow animateLayout={false} key={option.id} label={option.label}>
             <Pressable
               accessibilityRole="button"
@@ -190,6 +209,14 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
 
   if (mode === 'garden_intro') return (
     <Animated.View entering={FadeInUp.duration(220)} style={styles.actionStage}>
+      {firstSeedDefinition ? <DayActionCardSurface
+        artwork={<Image contentFit="contain" source={firstSeedDefinition.art.seed} style={styles.seedArt} />}
+        eyebrow="YOUR FIRST MEMORY SEED"
+        style={styles.seedRewardCard}
+        subtitle={firstSeedDefinition.description}
+        title={firstSeedDefinition.name}
+        trailing={<View />}
+      /> : null}
       <PrimaryAction icon={gardenStoryActionIcon} label={gardenStoryActionLabel} onPress={() => onContinue?.()} />
     </Animated.View>
   );
@@ -215,17 +242,23 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
   );
 
   if (mode === 'first_insight') return (
-    <Animated.View entering={FadeInUp.duration(220)} style={styles.actionStage}>
+    <Animated.View entering={FadeInUp.duration(220)} style={styles.plainActionStage}>
       <ThemedText selectable style={styles.resultEyebrow} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>
-        {firstSeed.name.toUpperCase()}
+        TODAY I LEARNED
       </ThemedText>
-      <ThemedText lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>
-        {firstSeed.message}
-      </ThemedText>
-      <ThemedText lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>
-        I think this might be where you are right now. I might be wrong. I’ll learn.
-      </ThemedText>
-      <PrimaryAction icon="leaf.fill" label="Keep this Seed" onPress={() => onContinue?.()} />
+      <View style={styles.bondChoiceStack}>
+        {[
+          { id: 'pretty_much', label: 'Pretty much', icon: 'checkmark.circle.fill' },
+          { id: 'sometimes', label: 'Sometimes', icon: 'arrow.left.arrow.right' },
+          { id: 'not_really', label: 'Not really', icon: 'xmark.circle.fill' },
+        ].map((option) => (
+          <DayActionActiveRow animateLayout={false} key={option.id} label={option.label}>
+            <Pressable accessibilityRole="button" onPress={() => onContinue?.(option.id)} style={({ pressed }) => pressed && styles.pressed}>
+              <DayActionCardSurface artwork={<DayActionIcon icon={option.icon} />} title={option.label} />
+            </Pressable>
+          </DayActionActiveRow>
+        ))}
+      </View>
     </Animated.View>
   );
 
@@ -283,6 +316,8 @@ const styles = StyleSheet.create({
   input: { backgroundColor: KatchaUI.companionScenePanel.optionBackground, borderColor: KatchaUI.companionScenePanel.optionBorder, borderRadius: 14, borderWidth: 1, color: KatchaUI.companionScenePanel.optionInk, fontSize: 17, fontWeight: '700', minHeight: 50, paddingHorizontal: 13 },
   privateNote: { fontSize: 12, lineHeight: 17 },
   resultEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.1, paddingHorizontal: 4, paddingTop: 2 },
+  seedArt: { height: 66, width: 66 },
+  seedRewardCard: { minHeight: 82 },
   primary: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.accent, borderCurve: 'continuous', borderRadius: 15, flexDirection: 'row', gap: 8, minHeight: 46, paddingHorizontal: 12 },
   primaryLabel: { flex: 1, fontSize: 14, fontWeight: '900' },
   pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
