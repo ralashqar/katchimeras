@@ -19,6 +19,7 @@ const HAND_ART = require('../../../assets/images/katchimeras/merge-world/ui/ftue
 type Frame = { height: number; width: number; x: number; y: number };
 
 export function havenFtueTargetKey(target: FtueTarget): string | null {
+  if (target.kind === 'haven_gateway') return 'shared-world:steppling-home';
   if (target.kind === 'haven_tile') return `tile:${target.characterId}`;
   if (target.kind === 'haven_tile_hud') return `hud:${target.characterId}`;
   if (target.kind === 'haven_upgrade_button') return `upgrade:${target.characterId}`;

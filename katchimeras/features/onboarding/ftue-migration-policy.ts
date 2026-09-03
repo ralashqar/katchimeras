@@ -4,6 +4,8 @@ import type { FtueRunState } from './ftue-types';
 export function streamlinedFtueStep(run: Pick<FtueRunState, 'stepId' | 'status'>): string {
   if (run.status === 'complete') return 'complete';
   const replacement: Record<string, string> = {
+    'merge.handoff.spawn': 'companion.meditating',
+    'merge.handoff.merge': 'companion.meditating',
     'companion.day_one_action': 'companion.garden_intro',
     'companion.nickname': 'companion.garden_intro',
     'companion.bond_intro': 'companion.garden_intro',

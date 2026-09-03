@@ -62,7 +62,7 @@ export function havenTileHudAccessibilityLabel(presentation: HavenTilePresentati
   if (!presentation.next) return `${level}. Signature Haven complete.`;
   if (!presentation.storyReady) return `${level}. ${presentation.next.name} is locked. Continue the story to unlock it.`;
   if (!presentation.affordable) {
-    return `${level}. ${presentation.next.name} is ready. ${presentation.coins} of ${presentation.coinCost} Coins.`;
+    return `${level}. ${presentation.next.name} is ready. ${presentation.coins} of ${presentation.coinCost} Glow.`;
   }
-  return `${level}. ${presentation.next.name} is ready to restore for ${presentation.coinCost} Coins.`;
+  return `${level}. ${presentation.next.name} is ready to restore for ${presentation.coinCost} Glow.`;
 }

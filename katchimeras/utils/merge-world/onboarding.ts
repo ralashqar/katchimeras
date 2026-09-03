@@ -37,7 +37,7 @@ export function createMossproutChapterZeroState(now = Date.now(), rewardWispId: 
       restDurationMs: 18 * 60_000, restStartedAt: null,
     } },
     energy: { value: 0, regenCap: 0, lastRegenAt: now, regenPaused: false },
-    coins: 100,
+    coins: 0,
     discoveries: ['nature:garden:1'],
     unlockedFamilies: ['nature'],
     unlockedChains: ['nature:garden'],

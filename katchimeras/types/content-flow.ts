@@ -49,7 +49,7 @@ export type StoryCameraPresentationPayload = {
 };
 
 export type StoryWorldUpgradeEffectPayload = {
-  target: Extract<StoryTarget, { kind: 'haven_tile' | 'haven_nature_island' }>;
+  target: Extract<StoryTarget, { kind: 'haven_tile' | 'haven_nature_island' | 'haven_structure' }>;
   toLevel: number;
   economy: StoryUpgradeEconomyPolicy;
 };

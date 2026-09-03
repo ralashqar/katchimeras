@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import { useCallback, useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
@@ -18,7 +19,7 @@ import { splitEnergyAcrossTokens } from '@/utils/energy-payout';
 
 import { PersistentMergeItemArt } from './feastle-persistent-merge-board';
 
-const COIN_ART = require('../../../assets/images/katchimeras/merge-world/ui/coin.webp');
+const COIN_ART = GAME_CURRENCY_ART.coins;
 const ENERGY_ART = require('../../../assets/images/katchimeras/merge-world/ui/energy.webp');
 const ITEM_SIZE = 38;
 const REWARD_TOKEN_SIZE = 35;

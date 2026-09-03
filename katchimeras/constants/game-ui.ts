@@ -66,6 +66,6 @@ export type GameCurrencyId = 'energy' | 'coins' | 'gems';
 
 export const GAME_CURRENCY_CATALOG = {
   energy: { icon: 'bolt.fill' as const, label: 'Energy', tint: GameUI.color.energy },
-  coins: { icon: 'circle.fill' as const, label: 'Coins', tint: GameUI.color.coin },
+  coins: { icon: 'sparkles' as const, label: 'Glow', tint: GameUI.color.coin },
   gems: { icon: 'diamond.fill' as const, label: 'Gems', tint: GameUI.color.gem },
-} satisfies Record<GameCurrencyId, { icon: 'bolt.fill' | 'circle.fill' | 'diamond.fill'; label: string; tint: string }>;
+} satisfies Record<GameCurrencyId, { icon: 'bolt.fill' | 'sparkles' | 'circle.fill' | 'diamond.fill'; label: string; tint: string }>;

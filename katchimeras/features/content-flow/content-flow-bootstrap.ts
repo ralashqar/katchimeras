@@ -1,6 +1,10 @@
 import { MOSSPROUT_JOURNEY_CAMPAIGN } from '@/constants/mossprout-journey-campaign';
 import { nextUnearnedMossproutResident } from '@/constants/resident-card-discovery';
 import { MOSSPROUT_FTUE_VARIANTS } from '@/features/onboarding/mossprout-ftue-flow';
+import { GLOW_DISCOVERY_FLOW } from '@/features/onboarding/glow-discovery-flow';
+import { startGlowDiscovery } from '@/features/onboarding/glow-discovery-runtime';
+import { applyStoredGlowDiscovery } from '@/utils/merge-world/repository';
+import { GLOW_GATEWAY_ID } from '@/utils/merge-world/glow-discovery-policy';
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 import type { StoryWorldUpgradeEffectPayload } from '@/types/content-flow';
 import { activateStoredResidentCardDiscovery, ensureStoredFirstFtueMemoryPlacement, grantStoredPlantableMemory, growStoredPlantableMemory, loadMergeWorldState, revealStoredHaven, revealStoredMovementEgg, seedStoredMossproutGardenAfterFtue, upgradeStoredHavenFeature, upgradeStoredStoryWorldTarget } from '@/utils/merge-world/repository';
@@ -31,6 +35,21 @@ export function bootstrapContentFlowCatalog() {
   if (bootstrapped) return;
   registerStoryVariantSet(MOSSPROUT_FTUE_VARIANTS);
   MOSSPROUT_FTUE_VARIANTS.variants.forEach((variant) => registerContentFlowDefinition(variant.definition));
+  registerContentFlowDefinition(GLOW_DISCOVERY_FLOW);
+  registerContentFlowEffect('haven.start_glow_discovery', async ({ effectKey }) => {
+    await seedStoredMossproutGardenAfterFtue(localDayId());
+    await startGlowDiscovery();
+    return { effectKey };
+  });
+  for (const [capability, type] of [
+    ['glow.lesson.prepare', 'prepareGlowDiscoveryLesson'],
+  ] as const) {
+    registerContentFlowEffect(capability, async () => {
+      const result = await applyStoredGlowDiscovery({ type, now: Date.now() });
+      if (!result.changed && result.message) throw new Error(result.message);
+      return { targetId: GLOW_GATEWAY_ID, revision: result.state.revision };
+    });
+  }
   compileJourneyCampaignFlows(MOSSPROUT_JOURNEY_CAMPAIGN).forEach(registerContentFlowDefinition);
   registerContentFlowEffect('resident.grant_parcel', async ({ run, effectKey, payload }) => {
     const world = await loadMergeWorldState();

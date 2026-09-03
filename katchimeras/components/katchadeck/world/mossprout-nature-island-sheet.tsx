@@ -71,7 +71,7 @@ export function MossproutNatureIslandSheet({
             </View>
             <ThemedText selectable style={styles.requirement} lightColor={storyReady ? '#E8EFD8' : '#E8C889'} darkColor={storyReady ? '#E8EFD8' : '#E8C889'}>
               {storyReady
-                ? `${mergeWorld.coins.toLocaleString()} / ${next.coinCost.toLocaleString()} Coins`
+                ? `${mergeWorld.coins.toLocaleString()} / ${next.coinCost.toLocaleString()} Glow`
                 : 'Continue Mossprout’s story to unlock this growth.'}
             </ThemedText>
             {error ? (
@@ -84,7 +84,7 @@ export function MossproutNatureIslandSheet({
               disabled={!storyReady || !affordable}
               fullWidth
               glow={storyReady && affordable}
-              label={storyReady ? `Grow for ${next.coinCost} Coins` : 'Story locked'}
+              label={storyReady ? `${currentLevel === 0 ? 'Clear mist' : 'Upgrade'} · ${next.coinCost} Glow` : 'Story locked'}
               loading={saving}
               onPress={() => onUpgrade(islandId, next.level)}
             />

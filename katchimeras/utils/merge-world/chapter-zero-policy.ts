@@ -90,12 +90,19 @@ export function mossproutFtueGardenMissionOrder(now: number): MergeOrder {
     description: MOSSPROUT_FTUE_COPY.nextRequest,
     difficulty: 'small',
     requirements: [{ definitionId: 'nature:garden:3', quantity: 1 }],
-    reward: { coins: 0, mergeXp: 0, friendshipXp: 0, energy: 0 },
+    reward: { coins: 20, mergeXp: 15, friendshipXp: 0, energy: 0 },
     createdAt: now,
     signature: false,
     purpose: 'normal',
     storyArcId: 'mossprout:ftue-garden-mission',
   };
+}
+
+/** Old unfinished requests now pay Glow; never grant retroactive currency. */
+export function migrateMossproutGardenMissionOrder(order: MergeOrder): MergeOrder {
+  return order.id === MOSSPROUT_FTUE_GARDEN_MISSION_ORDER_ID
+    ? { ...order, description: MOSSPROUT_FTUE_COPY.nextRequest, reward: { ...order.reward, coins: 20 } }
+    : order;
 }
 
 export function advanceMossproutChapterZero(state: MergeWorldState, servedOrderId: string, now: number): MergeWorldState {

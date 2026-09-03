@@ -37,7 +37,7 @@ import {
 
 const NOW = new Date('2026-08-12T12:00:00.000Z').getTime();
 
-test('the handoff Basket stays free, creates Seeds, and teaches an actionable merge', () => {
+test('the post-chapter Basket supports free scripted Seeds that can be merged', () => {
   let state = createMossproutChapterZeroState(NOW);
   const cells = (definitionId: string) => state.board.flatMap((cell, index) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === definitionId ? [index] : []);
   for (const definitionId of ['nature:garden:1', 'nature:garden:1', 'nature:garden:2']) {
@@ -52,7 +52,6 @@ test('the handoff Basket stays free, creates Seeds, and teaches an actionable me
   const energyBefore = state.energy;
   for (let index = 0; index < 2; index++) {
     const command = { type: 'tapGenerator' as const, generatorId: 'wild-garden', spendEnergy: false, seed: `handoff:${index}`, now: NOW + 5 + index };
-    assert.equal(mergeFtueAllowsCommand(mossproutFtueStep('merge.handoff.spawn'), state, command), true);
     const result = reduceMergeWorld(state, command);
     assert.equal(result.changed, true);
     state = result.state;
@@ -61,7 +60,6 @@ test('the handoff Basket stays free, creates Seeds, and teaches an actionable me
   assert.equal(cells('nature:garden:1').length, 2);
   const [from, to] = cells('nature:garden:1');
   const move = { type: 'move' as const, from, to, now: NOW + 10 };
-  assert.equal(mergeFtueAllowsCommand(mossproutFtueStep('merge.handoff.merge'), state, move), true);
   state = reduceMergeWorld(state, move).state;
   assert.equal(cells('nature:garden:2').length, 1);
 });

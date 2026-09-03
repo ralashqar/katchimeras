@@ -18,6 +18,8 @@ import {
   MOSSPROUT_ROOTBOUND_GATES_BY_ID,
   mergeLevelForXp,
 } from '@/constants/merge-world-catalog';
+import { advanceGlowRequests, glowTutorialDrop, normalizeGlowDiscoveryFields, reduceGlowDiscovery } from './glow-discovery-policy';
+import { sharedWorldPurchase } from '@/constants/shared-world';
 import {
   MERGE_ENERGY_REGEN_CAP,
   MERGE_ENERGY_REGEN_MS,
@@ -88,7 +90,7 @@ export function mergeWorldStateForBoard(state: MergeWorldState, boardId: MergeBo
     storageCapacity: board.storageCapacity,
   };
 }
-import { advanceMossproutChapterZero, enforceMossproutChapterZeroDropOverride, MOSSPROUT_FTUE_GARDEN_MISSION_ORDER_ID } from '@/utils/merge-world/chapter-zero-policy';
+import { advanceMossproutChapterZero, enforceMossproutChapterZeroDropOverride, isMossproutChapterZeroActive, migrateMossproutGardenMissionOrder } from '@/utils/merge-world/chapter-zero-policy';
 import { havenStageDefinition, havenStoryGateSatisfied, type HavenStage } from '@/constants/haven-catalog';
 import {
   MOSSPROUT_NATURE_ISLAND_IDS,
@@ -181,7 +183,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     generatorUnlockReceipts: [],
     generators: {},
     energy: { value: MERGE_INITIAL_ENERGY, regenCap: MERGE_ENERGY_REGEN_CAP, lastRegenAt: now, regenPaused: false },
-    coins: 100,
+    coins: 0,
     mergeXp: 0,
     mergeLevel: 1,
     discoveries: [],
@@ -271,8 +273,13 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
   switch (command.type) {
     case 'refreshTime':
       return result(state, current, current === state ? undefined : 'The garden is ready again.');
-    case 'tapGenerator':
-      return tapGenerator(current, command.generatorId, command.now, command.seed, command.activityOpportunityId);
+    case 'tapGenerator': {
+      const result = tapGenerator(current, command.generatorId, command.now, command.seed, command.activityOpportunityId);
+      if (result.changed && command.generatorId === 'wild-garden' && result.state.glowDiscoveryLesson && !result.state.glowDiscoveryLesson.spawnedAt) {
+        return { ...result, state: { ...result.state, glowDiscoveryLesson: { ...result.state.glowDiscoveryLesson, spawnedAt: command.now } } };
+      }
+      return result;
+    }
     case 'setGeneratorForcedDrop':
       return setGeneratorForcedDrop(current, command.generatorId, command.definitionId, command.now);
     case 'upgradeGenerator':
@@ -408,6 +415,11 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
       return upgradeHavenStructure(current, command);
     case 'upgradeHavenFeature':
       return upgradeHavenFeature(current, command);
+    case 'unlockWorldTarget':
+    case 'transferDiscoveryEgg':
+    case 'hatchWorldEgg':
+    case 'prepareGlowDiscoveryLesson':
+      return reduceGlowDiscovery(current, command);
     case 'revealMovementEgg':
       return mutateMovementEgg(current, command.receiptId, command.now, (egg) => ({ ...egg, status: 'revealed', updatedAt: command.now }));
     case 'recordMovementEggProgress':
@@ -747,6 +759,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   let normalized: MergeWorldState = {
     ...fallback,
     ...source,
+    ...normalizeGlowDiscoveryFields(source),
     version: 22,
     ownerCharacterId: 'mossprout',
     revision: finite(source.revision, 0),
@@ -780,7 +793,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     // Order capacity is a presentation concern: the horizontal rail can hold
     // every authored request, so normalization must never silently discard
     // off-screen orders.
-    activeOrders: Array.isArray(source.activeOrders) ? source.activeOrders.map(normalizeOrder) : [],
+    activeOrders: Array.isArray(source.activeOrders) ? source.activeOrders.map(normalizeOrder).map(migrateMossproutGardenMissionOrder) : [],
     mossproutDailyGardenOrders: normalizeMossproutDailyGardenOrders(source.mossproutDailyGardenOrders),
     characterActivityOpportunities: Array.isArray(source.characterActivityOpportunities)
       ? source.characterActivityOpportunities.filter((opportunity) => (
@@ -917,16 +930,13 @@ function upgradeHavenTile(
   if (!havenStoryGateSatisfied(state, definition.storyGate)) return unchanged(state, 'Continue this Katchimera’s story first.');
   const grant = economyMode === 'grant' ? Math.max(0, Math.floor(grantedCoins)) : 0;
   const coinCost = economyMode === 'free' ? 0 : definition.coinCost;
-  if (state.coins + grant < coinCost) return unchanged(state, 'Earn a few more Coins through Merge orders.');
+  if (state.coins + grant < coinCost) return unchanged(state, 'Earn a few more Glow through Merge orders.');
   const revealState = characterId === 'mossprout' && requestedStage === 1 && state.haven.revealState === 'hidden'
     ? 'first_restore_complete' as const
     : state.haven.revealState;
-  // Restore the established satellite progression baseline here. Visibility
-  // remains a presentation concern until the later Haven reveal; keeping the
-  // levels initialized preserves every existing upgrade invariant.
-  const mossproutNatureIslands = characterId === 'mossprout' && requestedStage === 1
-    ? emptyMossproutNatureIslandLevels(1)
-    : state.haven.mossproutNatureIslands;
+  // Restoration improves this tile only. Each mist-covered neighbour is a
+  // separate, explicit Glow purchase; existing unlocked neighbours stay intact.
+  const mossproutNatureIslands = state.haven.mossproutNatureIslands;
   const structures = characterId === 'mossprout' && requestedStage === 1
     ? {
         ...state.haven.structures,
@@ -981,7 +991,7 @@ function upgradeMossproutNatureIsland(
     return unchanged(state, 'Restore Mossprout’s Haven first.');
   }
   const currentLevel = state.haven.mossproutNatureIslands[islandId] ?? 0;
-  if (requestedLevel !== currentLevel + 1 || requestedLevel < 2 || requestedLevel > 4) {
+  if (requestedLevel !== currentLevel + 1 || requestedLevel < 1 || requestedLevel > 4) {
     return unchanged(state, 'Nature islands grow one level at a time.');
   }
   const definition = mossproutNatureIslandLevelDefinition(islandId, requestedLevel);
@@ -992,7 +1002,7 @@ function upgradeMossproutNatureIsland(
   const grant = economyMode === 'grant' ? Math.max(0, Math.floor(grantedCoins)) : 0;
   const coinCost = economyMode === 'free' ? 0 : definition.coinCost;
   if (state.coins + grant < coinCost) {
-    return unchanged(state, 'Earn a few more Coins through Merge orders.');
+    return unchanged(state, 'Earn a few more Glow through Merge orders.');
   }
 
   const mossproutNatureIslands = {
@@ -1046,7 +1056,9 @@ function normalizeStoryWorldMutationReceipts(value: unknown): StoryWorldMutation
       : target?.kind === 'haven_nature_island'
         && MOSSPROUT_NATURE_ISLAND_IDS.includes(target.islandId as MossproutNatureIslandId)
         ? { kind: 'haven_nature_island', islandId: target.islandId as MossproutNatureIslandId }
-        : null;
+        : target?.kind === 'haven_structure' && typeof target.structureId === 'string' && sharedWorldPurchase(target.structureId)
+          ? { kind: 'haven_structure', structureId: target.structureId }
+          : null;
     if (!normalizedTarget || !Number.isInteger(receipt.fromLevel) || !Number.isInteger(receipt.toLevel)) return [];
     if (receipt.economyMode !== 'normal' && receipt.economyMode !== 'free' && receipt.economyMode !== 'grant') return [];
     ids.add(receipt.id);
@@ -1194,16 +1206,17 @@ function normalizeMovementEgg(value: unknown): MergeWorldState['haven']['movemen
 function tapGenerator(state: MergeWorldState, generatorId: string, now: number, seed: string, activityOpportunityId?: string): MergeWorldCommandResult {
   const generator = state.generators[generatorId];
   if (!generator) return unchanged(state, 'That item maker is not available yet.');
-  const opportunity = activityOpportunityId
+  const tutorialDrop = glowTutorialDrop(state, generatorId);
+  const opportunity = activityOpportunityId && !tutorialDrop
     ? state.characterActivityOpportunities.find((candidate) => candidate.id === activityOpportunityId)
     : null;
-  if (activityOpportunityId && (!opportunity || opportunity.generatorId !== generatorId)) {
+  if (!tutorialDrop && activityOpportunityId && (!opportunity || opportunity.generatorId !== generatorId)) {
     return unchanged(state, 'Mossprout has not found anything else for the Garden today.');
   }
   if (opportunity && !MERGE_GENERATORS_UNLIMITED && opportunity.usedCount >= opportunity.dropDefinitionIds.length) {
     return unchanged(state, "That's everything Mossprout found today.");
   }
-  if (!MERGE_GENERATORS_UNLIMITED && !opportunity && generator.charges < 1) {
+  if (!tutorialDrop && !MERGE_GENERATORS_UNLIMITED && !opportunity && generator.charges < 1) {
     return unchanged(state, `${generator.name} is growing more supplies.`, 'generator_resting');
   }
   const cell = firstEmptyCell(state.board, hash(`${seed}:cell`));
@@ -1217,9 +1230,9 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
   const authoredDefinitionId = authoredDropIndex >= 0
     ? opportunity?.dropDefinitionIds[authoredDropIndex]
     : undefined;
-  const baseDefinitionId = authoredDefinitionId ?? generator.forcedDropDefinitionId ?? generator.tierOneDropDefinitionIds[dropIndex];
+  const baseDefinitionId = tutorialDrop ?? authoredDefinitionId ?? generator.forcedDropDefinitionId ?? generator.tierOneDropDefinitionIds[dropIndex];
   const betterDropRoll = randomUnit(`${seed}:upgrade:${state.revision}`);
-  const bonusTier = authoredDefinitionId || generator.forcedDropDefinitionId ? 0 : generator.level >= 4 && betterDropRoll < 0.05
+  const bonusTier = tutorialDrop || authoredDefinitionId || generator.forcedDropDefinitionId ? 0 : generator.level >= 4 && betterDropRoll < 0.05
     ? 2
     : betterDropRoll < Math.max(0, generator.level - 1) * 0.1 ? 1 : 0;
   const definitionId = bonusTier ? baseDefinitionId.replace(/:1$/, `:${1 + bonusTier}`) : baseDefinitionId;
@@ -1227,7 +1240,7 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
   const item: MergeBoardItem = { kind: 'item', instanceId: `merge-item:${state.nextInstance}`, definitionId };
   const board = [...state.board];
   board[cell] = { ...board[cell], occupant: item };
-  const usesCapacity = !MERGE_GENERATORS_UNLIMITED && !opportunity;
+  const usesCapacity = !tutorialDrop && !MERGE_GENERATORS_UNLIMITED && !opportunity;
   const charges = usesCapacity ? Math.max(0, generator.charges - 1) : generator.charges;
   const nextGenerator = usesCapacity ? {
     ...generator,
@@ -2030,34 +2043,7 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
     };
   }
   next = advanceMossproutChapterZero(next, order.id, now);
-  if (order.id === MOSSPROUT_FTUE_GARDEN_MISSION_ORDER_ID) {
-    const missionReceiptIds = new Set(next.haven.mutationReceipts.map((receipt) => receipt.id));
-    const missionReceipts = [
-      { id: `${order.id}:spring`, kind: 'feature_upgrade' as const, targetId: 'mossprout-garden:spring', createdAt: now },
-      { id: `${order.id}:path`, kind: 'feature_upgrade' as const, targetId: 'mossprout-garden:path', createdAt: now },
-      { id: `${order.id}:egg`, kind: 'movement_egg' as const, targetId: 'movement-egg', createdAt: now },
-    ].filter((receipt) => !missionReceiptIds.has(receipt.id));
-    next = {
-      ...next,
-      generators: next.generators['wild-garden'] ? {
-        ...next.generators,
-        'wild-garden': { ...next.generators['wild-garden'], forcedDropDefinitionId: null },
-      } : next.generators,
-      haven: {
-        ...next.haven,
-        revealState: 'revealed',
-        structures: {
-          ...next.haven.structures,
-          mossproutGarden: {
-            ...next.haven.structures.mossproutGarden,
-            featureLevels: { spring: 1, path: 1 },
-          },
-        },
-        movementEgg: { ...next.haven.movementEgg, status: 'revealed', updatedAt: now },
-        mutationReceipts: [...next.haven.mutationReceipts, ...missionReceipts],
-      },
-    };
-  }
+  next = advanceGlowRequests(next, order.id, now);
   if (order.storyArcId === `${order.characterId}:discovery`) {
     const discoveryRecord = next.companionDiscovery.records.find((record) => record.characterId === order.characterId);
     const discoveryProgress = recordDiscoveryEvent({
@@ -2237,7 +2223,7 @@ function sellItem(state: MergeWorldState, cell: number, now: number): MergeWorld
   const definition = MERGE_ITEMS_BY_ID.get(occupant.definitionId);
   const board = [...state.board];
   board[cell] = { ...board[cell], occupant: null };
-  return changed(touch({ ...state, board, coins: state.coins + (definition?.sellValue ?? 1) }, now), `Sold for ${definition?.sellValue ?? 1} Coins.`);
+  return changed(touch({ ...state, board, coins: state.coins + (definition?.sellValue ?? 1) }, now), `Sold for ${definition?.sellValue ?? 1} Glow.`);
 }
 
 function claimInbox(state: MergeWorldState, entryId: string, now: number): MergeWorldCommandResult {
@@ -2837,7 +2823,7 @@ function purchaseKatchimeraCard(
   }
   const familyCollectionOpen = state.ownedKatchimeraCards.some((card) => card.familyId === familyId && card.acquisition === 'journey_match');
   if (!familyCollectionOpen) return unchanged(state, 'Discover your matched card first.');
-  if (state.coins < coinCost) return unchanged(state, `You need ${coinCost} Coins for this card.`);
+  if (state.coins < coinCost) return unchanged(state, `You need ${coinCost} Glow for this card.`);
   return changed(touch({
     ...state,
     coins: state.coins - coinCost,
@@ -3301,7 +3287,9 @@ function applyDiscovery(state: MergeWorldState, definitionId: string, now: numbe
     state: touch({
       ...state,
       discoveries: [...state.discoveries, definitionId],
-      coins: state.coins + 5,
+      // The first lesson teaches one explicit source: serving a request.
+      // Retain the established discovery bonus after that introduction.
+      coins: state.coins + (isMossproutChapterZeroActive(state) ? 0 : 5),
       mergeXp,
       mergeLevel: mergeLevelForXp(mergeXp),
     }, now),

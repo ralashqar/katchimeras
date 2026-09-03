@@ -3,6 +3,7 @@ import type { ImageSourcePropType } from 'react-native';
 import type { KingdomHexScene, KingdomTileArtLayer, KingdomTileRender } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { KINGDOM_HEX_TILE_ALPHA_BOUNDS } from '@/constants/kingdom-hex-tile-bounds.gen';
 import { MOSSPROUT_NATURE_ISLANDS } from '@/constants/mossprout-nature-islands';
+import { STEPPLING_TILE, SHARED_WORLD_TILES } from '@/constants/shared-world';
 import { mossproutMemoryPlantById, mossproutMemoryPlantStage } from '@/constants/mossprout-memory-plants';
 import type { MossproutGardenPlantSlotId, MossproutNatureIslandId, MossproutNatureIslandLevel, PlantableMemoryInstance } from '@/types/merge-world';
 import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
@@ -33,7 +34,7 @@ type ArtSpec = {
 
 const MAIN: ArtSpec = {
   alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['mossprout_focused_v1_main_hex_tile.webp'],
-  coord: { q: 0, r: 1 },
+  coord: SHARED_WORLD_TILES['mossprout-home'].coord,
   sources: {
     full: require('../../../assets/images/katchimeras/world/hex/mossprout_focused_v1_main_hex_tile.webp'),
     medium: require('../../../assets/images/katchimeras/world/hex/mossprout_focused_v1_main_hex_tile_512.webp'),
@@ -85,6 +86,7 @@ const GARDEN_LAYOUT_BOUNDS = Object.values(GARDEN_LEVELS).reduce<ArtSpec['alphaB
 );
 
 export type MossproutGardenSceneState = {
+  gateway?: 'locked' | 'egg' | 'open';
   level: number;
   plantableMemories: readonly PlantableMemoryInstance[];
   featureLevels?: { spring: number; path: number };
@@ -284,19 +286,32 @@ export function buildMossproutHexNeighborhoodScene(
       sourceSize: { width: 384, height: 384 },
     }];
   });
+  const stepplingLayer = (locked: boolean) => layerFor('structure:steppling-home', 'structure', {
+      coord: STEPPLING_TILE.coord,
+      alphaBounds: locked ? DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS : KINGDOM_HEX_TILE_ALPHA_BOUNDS['floating_neighborhood_v2_steppling_haven_stage_0_hex_tile.webp'],
+      sources: locked ? DREAM_MIST_LOCKED_NATURE_SOURCES : {
+        full: require('../../../assets/images/katchimeras/world/hex/floating_neighborhood_v2_steppling_haven_stage_0_hex_tile.webp'),
+        medium: require('../../../assets/images/katchimeras/world/hex/floating_neighborhood_v2_steppling_haven_stage_0_hex_tile_512.webp'),
+        thumb: require('../../../assets/images/katchimeras/world/hex/floating_neighborhood_v2_steppling_haven_stage_0_hex_tile_256.webp'),
+      },
+    });
+  const lockedSteppling = stepplingLayer(true);
+  const revealedSteppling = stepplingLayer(false);
+  revealedSteppling.residentAnchor = mossproutHexPoint(STEPPLING_TILE.coord);
   const rawLayers = [
-    mainLayer,
-    gardenLayer,
-    ...plantLayers,
+    mainLayer, gardenLayer, ...plantLayers,
+    !gardenState.gateway || gardenState.gateway === 'locked' ? lockedSteppling : revealedSteppling,
     ...MOSSPROUT_NATURE_ISLANDS.map((island) => natureLayerFor(
       island.id,
       natureIslandLevels[island.id] ?? 0,
     )),
   ];
-  const left = Math.min(...rawLayers.map((layer) => layer.frame.left));
-  const top = Math.min(...rawLayers.map((layer) => layer.frame.top));
-  const right = Math.max(...rawLayers.map((layer) => layer.frame.left + layer.frame.width));
-  const bottom = Math.max(...rawLayers.map((layer) => layer.frame.top + layer.frame.height));
+  // Reserve both art envelopes so changing mist to terrain never shifts the world.
+  const boundsLayers = [...rawLayers, lockedSteppling, revealedSteppling];
+  const left = Math.min(...boundsLayers.map((layer) => layer.frame.left));
+  const top = Math.min(...boundsLayers.map((layer) => layer.frame.top));
+  const right = Math.max(...boundsLayers.map((layer) => layer.frame.left + layer.frame.width));
+  const bottom = Math.max(...boundsLayers.map((layer) => layer.frame.top + layer.frame.height));
   const dx = SCENE_PADDING - left;
   const dy = SCENE_PADDING - top;
   const layers = rawLayers.map((layer) => shiftLayer(layer, dx, dy)).sort((a, b) => a.depth - b.depth);
@@ -310,12 +325,22 @@ export function buildMossproutHexNeighborhoodScene(
     id: mossprout.id,
     kind: 'companion',
   };
+  const residentTiles: KingdomTileRender[] = Object.values(SHARED_WORLD_TILES).flatMap((entry) => {
+    if (entry.companion === 'mossprout') return [];
+    // Discovery-only tiles never inherit an owned/dev resident projection.
+    if ('residentVisible' in entry && !entry.residentVisible) return [];
+    const slot = companionSlots.find((candidate) => candidate.familyId === entry.companion && candidate.kind === 'owned');
+    if (!slot) return [];
+    const point = mossproutHexPoint(entry.coord);
+    return [{ companion: slot, coord: entry.coord, cx: point.x + dx, cy: point.y + dy, depth: hexDrawDepth(point), id: slot.id, kind: 'companion' as const }];
+  });
+  const tiles = [centerTile, ...residentTiles];
   return {
     centerTile,
     height: Math.ceil(bottom - top + SCENE_PADDING * 2),
     tileArtLayers: layers,
-    tileById: new Map([[centerTile.id, centerTile]]),
-    tiles: [centerTile],
+    tileById: new Map(tiles.map((tile) => [tile.id, tile])),
+    tiles,
     width: Math.ceil(right - left + SCENE_PADDING * 2),
   };
 }

@@ -337,7 +337,7 @@ test('the Katchimeras tab renders the hex selector first while companion Back re
   assert.match(rosterRoute, /style=\{\(\{ pressed \}\) => \[styles\.selectorProfileButton/);
   assert.match(rosterRoute, /selectorProfileButton: \{[\s\S]*?borderRadius: 25[\s\S]*?overflow: 'hidden'/);
   assert.match(ftueScript, /entryStepId: 'world\.egg_intro'/);
-  assert.match(ftueScript, /id: 'world\.egg_intro'[\s\S]*?Something is waiting here\.[\s\S]*?nextStepId: 'egg\.opening'[\s\S]*?durationMs: 3_900/);
+  assert.match(ftueScript, /id: 'world\.egg_intro'[\s\S]*?title: COPY\.opening[\s\S]*?nextStepId: 'egg\.opening'[\s\S]*?durationMs: 3_900/);
   assert.doesNotMatch(ftueScript, /There’s something here/);
   assert.match(kingdomScreen, /initialFtueCameraScale = ftueStepId === 'world\.egg_intro'[\s\S]*?MOSSPROUT_WORLD_EGG_ENTRY_ZOOM/);
   assert.match(kingdomScreen, /gardenWorldGuidanceActive \|\| ftueStepId === 'world\.egg_intro'[\s\S]*?top: insets\.top \+ 18/);
@@ -361,9 +361,9 @@ test('the dev toggle exposes virtual companions across roster, companion, games,
   assert.match(rosterRoute, /withDevAvailableKatchimeras/);
   assert.match(
     kingdomScreen,
-    /companionSlots\.filter\(\(slot\) => slot\.familyId === 'mossprout'\)/,
+    /companionSlots\.filter\(\(slot\) => sharedWorldIncludesCompanion\(slot\.familyId\)\)/,
   );
-  assert.match(rosterRoute, /companionSlots=\{discoveryCompanionSlots\}/);
+  assert.match(rosterRoute, /companionSlots=\{selectorSlots\}/);
   assert.match(
     kingdomScreen,
     /havenMergeBoardActive[\s\S]*slot\.familyId === 'mossprout' && slot\.kind === 'owned'/,
@@ -423,12 +423,12 @@ test('Haven uses the hex selector as its top level and lazy-mounts only implemen
   assert.match(rosterRoute, /openFamilyWorld[\s\S]*?loadKatchimeraKingdomScreenModule\(\)[\s\S]*?transitionTo\(\{/);
   assert.match(rosterRoute, /activeWorldFamilyId === 'mossprout' \? <Suspense/);
   assert.doesNotMatch(rosterRoute, /Suspense fallback=\{<View[^>]*><ActivityIndicator/);
-  assert.match(rosterRoute, /mossproutWorldCompanionSlots[\s\S]*?filter\(\(slot\) => slot\.familyId === 'mossprout'\)/);
+  assert.match(rosterRoute, /mossproutWorldCompanionSlots[\s\S]*?filter\(\(slot\) => sharedWorldIncludesCompanion\(slot\.familyId\)\)/);
   assert.match(rosterRoute, /<LazyKatchimeraKingdomScreen[\s\S]*?companionSlots=\{mossproutWorldCompanionSlots\}/);
   assert.match(rosterRoute, /<HavenSelectorPresentation/);
   assert.match(rosterRoute, /announcement: 'Returning to all Havens'/);
   assert.match(rosterRoute, /BackHandler\.addEventListener\('hardwareBackPress'/);
-  assert.match(selector, /IMPLEMENTED_KATCHIMERA_WORLDS = new Set<KatchimeraFamilyId>\(\['mossprout'\]\)/);
+  assert.match(selector, /IMPLEMENTED_KATCHIMERA_WORLDS = new Set<KatchimeraFamilyId>\(\['mossprout', 'steppling'\]\)/);
   assert.match(selector, /includeMossproutGarden: false/);
   assert.match(selector, /HavenSelectorWorldMarker/);
   assert.match(selector, /left: x - 116,[\s\S]*?top: y - 25/);
@@ -441,7 +441,7 @@ test('Haven uses the hex selector as its top level and lazy-mounts only implemen
   assert.match(rosterRoute, /readyMergeOrderIds/);
   assert.match(rosterRoute, /const world = presentationMergeWorld \?\? mergeWorld;[\s\S]*?if \(!world\) return \[\];[\s\S]*?readyMergeOrderIds\(world\)/);
   assert.match(rosterRoute, /deriveHavenTilePresentation/);
-  assert.match(selector, /if \(!tile\.companion \|\| !IMPLEMENTED_KATCHIMERA_WORLDS\.has/);
+  assert.match(selector, /if \(!tile\.companion \|\| tile\.companion\.kind === 'locked' \|\| !IMPLEMENTED_KATCHIMERA_WORLDS\.has/);
   assert.doesNotMatch(selector, /WorldCreatureCutout|residentSource|EggAvatar/);
   assert.match(scene, /includeMossproutGarden[\s\S]*?\? \[mossproutGardenLayer/);
 });

@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { type NativeScrollEvent, type NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
@@ -46,7 +47,7 @@ const TRAY_ART = require('../../../assets/images/katchimeras/merge-world/ui/orde
 const CHAIR_ART = require('../../../assets/images/katchimeras/merge-world/ui/order-chair.webp');
 const ORDER_REWARD_ART = {
   bond: require('../../../assets/images/katchimeras/merge-world/ui/bond.webp'),
-  coins: require('../../../assets/images/katchimeras/merge-world/ui/coin.webp'),
+  coins: GAME_CURRENCY_ART.coins,
   energy: require('../../../assets/images/katchimeras/merge-world/ui/energy.webp'),
 } as const;
 const CONTROLLED_EASE = Easing.bezier(0.22, 1, 0.36, 1);
@@ -524,7 +525,7 @@ function OrderRewardPopup({ order, reduceMotion }: {
 }) {
   const rows = [
     { amount: order.reward.friendshipXp, art: ORDER_REWARD_ART.bond, id: 'bond', label: 'Bond' },
-    { amount: order.reward.coins, art: ORDER_REWARD_ART.coins, id: 'coins', label: 'Coins' },
+    { amount: order.reward.coins, art: ORDER_REWARD_ART.coins, id: 'coins', label: 'Glow' },
     { amount: order.reward.energy, art: ORDER_REWARD_ART.energy, id: 'energy', label: 'Energy' },
   ].filter((row) => row.amount > 0);
 

@@ -228,7 +228,7 @@ test('the focused Mossprout replacement uses the top-level hex projection and au
   );
   assert.match(scene, /LAYOUT_PROFILE = 'floating-neighborhood-v2'/);
   assert.match(scene, /NEIGHBORHOOD_SPACING_SCALE = 1\.1/);
-  assert.match(scene, /const MAIN:[\s\S]*?coord: \{ q: 0, r: 1 \}/);
+  assert.match(scene, /const MAIN:[\s\S]*?coord: SHARED_WORLD_TILES\['mossprout-home'\]\.coord/);
   assert.match(scene, /const GARDEN_LEVELS:[\s\S]*?coord: \{ q: 0, r: 2 \}/);
   for (const [id, q, r] of [
     ['seed-nursery', -1, 1],
@@ -431,7 +431,7 @@ test('the six nature islands use the bespoke final-form art at every visible lev
   assert.doesNotMatch(scene, /decor:mossprout-garden-(?:west|east)-nature-island/);
 });
 
-test('the focused Mossprout Haven mounts only Mossprout-owned hex-neighborhood art', () => {
+test('the shared Haven keeps its authored neighborhood art and adds only owned residents', () => {
   const screen = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'roster', 'katchimera-kingdom-screen.tsx'),
     'utf8',
@@ -499,7 +499,8 @@ test('the focused Mossprout Haven mounts only Mossprout-owned hex-neighborhood a
   assert.match(hexScene, /mossprout_memory_garden_level_2\.webp/);
   assert.match(hexScene, /mossprout-standing-resident-512\.webp/);
   assert.match(hexScene, /mainLayer\.residentSource = MAIN_RESIDENT_SOURCE/);
-  assert.match(hexScene, /tiles: \[centerTile\]/);
+  assert.match(hexScene, /const tiles = \[centerTile, \.\.\.residentTiles\]/);
+  assert.match(hexScene, /candidate\.kind === 'owned'/);
   assert.match(canvas, /source=\{artLayer\?\.residentSource\}/);
   assert.match(canvas, /sourceOverride \?\? worldAssetSource/);
   assert.doesNotMatch(hexScene, /haven-junction-mini-island-512\.webp/);

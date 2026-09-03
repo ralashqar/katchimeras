@@ -211,7 +211,9 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
     onReadinessChange?.(Boolean((!cue && !spotlight) || presentationReady));
     return () => onReadinessChange?.(false);
   }, [cue, onReadinessChange, presentationReady, spotlight]);
-  const spotlightReady = Boolean(presentationReady && currentLayout?.spotlightFrames.length);
+  // Keep the prior cutout visible while measuring the next target. Readiness
+  // still gates input above; only an explicit null spotlight dismisses the mask.
+  const spotlightReady = Boolean(spotlight && currentLayout?.spotlightFrames.length);
   const guideKey = guide && presentationReady ? `${configKey}:${guide.title}:${guide.body}` : null;
   // One authored flag owns the complete guidance presentation. By default the
   // spotlight, finger, and Egg copy persist until the required command changes

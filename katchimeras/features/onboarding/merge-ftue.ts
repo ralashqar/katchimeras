@@ -54,6 +54,7 @@ export function mergeFtueStepForBoard(
   scriptedStep: FtueStepDefinition | null,
 ) {
   if (!state) return scriptedStep;
+  if (scriptedStep?.id.startsWith('glow.lesson.')) return scriptedStep;
   const residentStepId = residentFtueCanonicalStep(state);
   if (!residentStepId?.startsWith('merge.resident_')) return scriptedStep;
   return mossproutFtueStep(residentStepId) ?? scriptedStep;
@@ -161,6 +162,7 @@ function nthDefinitionCell(state: MergeWorldState, definitionId: string, occurre
 export function mergeFtueBoardGate(step: FtueStepDefinition | null, state: MergeWorldState): MergeBoardInteractionGate {
   const policy = step?.surface === 'merge' ? step.interaction : null;
   if (!policy || policy.mode === 'none') return { kind: 'open' };
+  if (policy.mode === 'blocked') return { kind: 'locked' };
   if (policy.allowed.kind === 'generator_tap') {
     const cell = resolveFtueBoardCell(state, policy.allowed.target);
     if (cell == null || policy.allowed.target.kind !== 'board_generator') return { kind: 'locked' };
@@ -175,6 +177,7 @@ export function mergeFtueBoardGate(step: FtueStepDefinition | null, state: Merge
 export function mergeFtueRailGate(step: FtueStepDefinition | null, state?: MergeWorldState): MergeRailInteractionGate {
   const policy = step?.surface === 'merge' ? step.interaction : null;
   if (!policy || policy.mode === 'none') return { kind: 'open' };
+  if (policy.mode === 'blocked') return { kind: 'locked' };
   if (policy.allowed.kind === 'chat_note_tap' && policy.allowed.target.kind === 'tray_chat_note') {
     return { kind: 'chat_note', noteId: policy.allowed.target.noteId };
   }
@@ -190,6 +193,7 @@ export function mergeFtueRailGate(step: FtueStepDefinition | null, state?: Merge
 export function mergeFtueAllowsChatNote(step: FtueStepDefinition | null, noteId: string) {
   const policy = step?.surface === 'merge' ? step.interaction : null;
   if (!policy || policy.mode === 'none') return true;
+  if (policy.mode === 'blocked') return false;
   return policy.allowed.kind === 'chat_note_tap'
     && policy.allowed.target.kind === 'tray_chat_note'
     && policy.allowed.target.noteId === noteId;
@@ -198,6 +202,7 @@ export function mergeFtueAllowsChatNote(step: FtueStepDefinition | null, noteId:
 export function mergeFtueAllowsCommand(step: FtueStepDefinition | null, state: MergeWorldState, command: MergeWorldCommand) {
   const policy = step?.surface === 'merge' ? step.interaction : null;
   if (!policy || policy.mode === 'none') return true;
+  if (policy.mode === 'blocked') return false;
   if (policy.allowed.kind === 'board_drag') {
     const from = resolveFtueBoardCell(state, policy.allowed.from);
     const to = resolveFtueBoardCell(state, policy.allowed.to);

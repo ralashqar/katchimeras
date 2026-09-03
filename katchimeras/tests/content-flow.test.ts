@@ -56,7 +56,7 @@ test('compiler rejects unreachable nodes, dead ends, bad targets, and empty task
   assert.ok(issues.some((issue) => issue.message.includes('at least one requirement')));
 });
 
-test('streamlined FTUE resumes at every boundary and reaches independent Merge with four merges and two Basket taps', () => {
+test('streamlined introduction resumes at every boundary and hands off to the separate discovery chapter', () => {
   const flow = MOSSPROUT_FTUE_FLOW;
   let run = createContentFlowRun(flow, { runId: 'streamlined-ftue', now: 1 });
   const visited = new Set<string>();
@@ -88,8 +88,9 @@ test('streamlined FTUE resumes at every boundary and reaches independent Merge w
     } else assert.fail(`Unhandled FTUE node ${node.id}`);
   }
   assert.equal(run.status, 'completed');
-  assert.equal(events.filter((type) => type === 'ftue.merge_completed').length, 4);
-  assert.equal(events.filter((type) => type === 'ftue.item_spawned').length, 2);
+  assert.equal(events.filter((type) => type === 'ftue.merge_completed').length, 3);
+  assert.equal(events.filter((type) => type === 'ftue.item_spawned').length, 0);
+  assert.ok(visited.has('effect.haven.start_glow_discovery'));
   assert.ok(visited.has('world.seed_planted'));
   assert.ok(visited.has('world.first_seed_grew'));
   for (const removed of ['companion.day_one_action', 'companion.bond_spotlight', 'companion.order_preview', 'world.garden_handoff', 'companion.chapter_zero_return', 'companion.water_response', 'companion.first_insight'] as const) {

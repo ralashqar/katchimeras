@@ -60,7 +60,7 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
   id: 'mossprout-first-session',
   // Independent from the legacy FTUE schema version. Bumping this lets v39
   // journal runs migrate onto the direct manifest without mutating a release.
-  version: 45,
+  version: 46,
   entryNodeId: 'world.egg_intro',
   metadata: {
     kind: 'ftue' as const,
@@ -130,10 +130,10 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
       target: { kind: 'haven_tile', familyId: 'mossprout' },
       focusTarget: MOSSPROUT_GARDEN_FOCUS_TARGET,
       toLevel: 1,
-      economy: { mode: 'free', reason: 'First Bloom story reward' },
+      economy: { mode: 'normal' },
       camera: MOSSPROUT_GARDEN_FOCUS_CAMERA,
       cameraAlreadyFocused: true,
-      presentation: { preset: 'growth', reactionLine: 'The Garden remembered.', showCoins: false },
+      presentation: { preset: 'growth', reactionLine: 'The Garden remembered.', showCoins: true },
       next: 'effect.haven.grow_first_memory',
     }),
     story.effect({
@@ -155,18 +155,14 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
       payload: { familyId: 'mossprout', durationMs: MOSSPROUT_FTUE_REST_MS, reason: 'journey_rest' },
       next: 'companion.meditating',
     }),
-    scene('companion.meditating', 'companion', [{ id: 'companion.tend_garden', next: 'effect.haven.prepare_merge_handoff' }]),
-    story.effect({ id: 'effect.haven.prepare_merge_handoff', capability: 'haven.prepare_merge_handoff', next: 'merge.handoff.spawn' }),
-    task('merge.handoff.spawn', 'merge', {
-      id: 'merge.handoff.spawn', event: ftueEvent('item_spawned', { generatorId: 'wild-garden', definitionId: 'nature:garden:1' }),
-      count: 2, next: 'merge.handoff.merge',
-    }),
-    task('merge.handoff.merge', 'merge', {
-      id: 'merge.handoff.merge', event: ftueEvent('merge_completed', { resultDefinitionId: 'nature:garden:2' }), next: 'complete',
-    }),
+    scene('companion.meditating', 'companion', [{ id: 'companion.tend_garden', next: 'effect.haven.start_glow_discovery' }]),
+    story.effect({ id: 'effect.haven.start_glow_discovery', capability: 'haven.start_glow_discovery', next: 'complete' }),
     story.complete(),
   ],
   migrations: {
+    'effect.haven.prepare_merge_handoff': 'effect.haven.start_glow_discovery',
+    'merge.handoff.spawn': 'effect.haven.start_glow_discovery',
+    'merge.handoff.merge': 'effect.haven.start_glow_discovery',
     'world.complete': 'companion.meditating',
     'haven.first_bloom': 'world.first_bloom_restore',
     'effect.haven.seed_first_memory': 'effect.haven.grant_first_memory',

@@ -1,5 +1,7 @@
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
+import { GLOW_GATEWAY_ID } from '@/utils/merge-world/glow-discovery-policy';
+import { sharedWorldIncludesCompanion } from '@/constants/shared-world';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { BackHandler, Pressable, StyleSheet, View, type View as ViewType } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -111,6 +113,7 @@ function loadRosterPersistentSnapshot() {
  * journal, and mini-game controllers mount on their dedicated routes.
  */
 export type KatchimeraWorldSession = {
+  cameraSnapshots?: Partial<Record<KatchimeraFamilyId, KingdomCameraSnapshot>>;
   activeWorldFamilyId: KatchimeraFamilyId | null;
   cameraSnapshot: KingdomCameraSnapshot | null;
 };
@@ -198,16 +201,18 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
   const [persistentSnapshot, setPersistentSnapshot] = useState(loadRosterPersistentSnapshot);
   const [contentReady, setContentReady] = useState(false);
   const [activeWorldFamilyId, setActiveWorldFamilyId] = useState<KatchimeraFamilyId | null>(
-    worldSession.activeWorldFamilyId ?? (ftueRun?.status === 'active' || interactionRequest ? 'mossprout' : null),
+    worldSession.activeWorldFamilyId === 'steppling' ? 'mossprout' : worldSession.activeWorldFamilyId ?? (ftueRun?.status === 'active' || interactionRequest ? 'mossprout' : null),
   );
   const cameraSnapshotRef = useRef<KingdomCameraSnapshot | null>(worldSession.cameraSnapshot);
+  const cameraSnapshotsRef = useRef(worldSession.cameraSnapshots ?? (worldSession.activeWorldFamilyId && worldSession.cameraSnapshot ? { [worldSession.activeWorldFamilyId]: worldSession.cameraSnapshot } : {}));
   const publishedWorldFamilyRef = useRef<KatchimeraFamilyId | null>(worldSession.activeWorldFamilyId);
-  const publishWorldSession = useCallback((familyId: KatchimeraFamilyId | null, snapshot = cameraSnapshotRef.current) => {
+  const publishWorldSession = useCallback((familyId: KatchimeraFamilyId | null, snapshot = familyId ? cameraSnapshotsRef.current[familyId] ?? null : null) => {
     const nextSnapshot = familyId ? snapshot : null;
     if (publishedWorldFamilyRef.current === familyId && cameraSnapshotsEqual(cameraSnapshotRef.current, nextSnapshot)) return;
     publishedWorldFamilyRef.current = familyId;
     cameraSnapshotRef.current = nextSnapshot;
-    onWorldSessionChange?.({ activeWorldFamilyId: familyId, cameraSnapshot: nextSnapshot });
+    if (familyId && nextSnapshot) cameraSnapshotsRef.current[familyId] = nextSnapshot;
+    onWorldSessionChange?.({ activeWorldFamilyId: familyId, cameraSnapshot: nextSnapshot, cameraSnapshots: { ...cameraSnapshotsRef.current } });
   }, [onWorldSessionChange]);
   const markContentReady = useCallback(() => {
     setContentReady(true);
@@ -294,9 +299,10 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
     eggVisible,
   ]);
   const mossproutWorldCompanionSlots = useMemo(
-    () => discoveryCompanionSlots.filter((slot) => slot.familyId === 'mossprout'),
+    () => discoveryCompanionSlots.filter((slot) => sharedWorldIncludesCompanion(slot.familyId)),
     [discoveryCompanionSlots],
   );
+  const selectorSlots = discoveryCompanionSlots;
   const today = useMemo(() => days.find((day) => day.isToday) ?? null, [days]);
   const background = useMemo(
     () => todayAtmosphereBackgroundForDay(today, days),
@@ -397,7 +403,10 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
     });
   }, [router, transitionTo]);
   const openFamilyWorld = useCallback((familyId: KatchimeraFamilyId) => {
-    if (familyId !== 'mossprout') return;
+    if (familyId === 'steppling') {
+      if (!mergeWorld?.worldUnlocks?.[GLOW_GATEWAY_ID] && !discovery.records.some((record) => record.characterId === 'steppling')) return;
+    }
+    if (familyId !== 'mossprout' && familyId !== 'steppling') return;
     // Start resolving the focused-world bundle while the universal curtain is
     // moving down. The destination mounts only once the curtain is opaque.
     void loadKatchimeraKingdomScreenModule();
@@ -410,7 +419,7 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
         publishWorldSession('mossprout');
       },
     });
-  }, [publishWorldSession, transitionTo]);
+  }, [discovery.records, mergeWorld?.worldUnlocks, publishWorldSession, transitionTo]);
   const openFtueGarden = useCallback(async () => {
     if (ftueRun?.status !== 'active' || !['world.garden_handoff', 'world.seed_planted'].includes(ftueRun.stepId)) return;
     transitionTo({
@@ -462,7 +471,7 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
           worldSubjectPresentation={worldSubjectPresentation}
       /></Suspense> : <HavenSelectorPresentation
         background={background}
-        companionSlots={discoveryCompanionSlots}
+        companionSlots={selectorSlots}
         highlightedFamilyId={null}
         identity={worldIdentity}
         mergeWorld={presentationMergeWorld}

@@ -15,7 +15,7 @@ type PresentationWork = Extract<ContentFlowPendingWork, { kind: 'presentation' }
 export function useStoryPresentationOperation(
   surface: ContentFlowSurface,
   presentationType: string,
-  execute: (work: PresentationWork, run: ContentFlowRun) => void | (() => void) | Promise<void>,
+  execute: (work: PresentationWork, run: ContentFlowRun, signal: AbortSignal) => void | (() => void) | Promise<void>,
   enabled = true,
 ) {
   const model = useContentFlowSurface(surface);
@@ -36,10 +36,14 @@ export function useStoryPresentationOperation(
     const activeRun = runRef.current;
     if (!activeWork || !activeRun || !runId) return;
     let live = true;
+    const controller = new AbortController();
     let cleanup: void | (() => void);
-    Promise.resolve(executeRef.current(activeWork, activeRun)).then((result) => {
-      cleanup = result;
+    Promise.resolve().then(() => {
       if (!live) return;
+      return executeRef.current(activeWork, activeRun, controller.signal);
+    }).then((result) => {
+      cleanup = result;
+      if (!live) { cleanup?.(); return; }
       return dispatchContentFlowCommand(runId, { type: 'presentation_acknowledged', presentationKey: activeWork.key });
     }).catch((caught) => {
       if (!live) return;
@@ -50,6 +54,7 @@ export function useStoryPresentationOperation(
     });
     return () => {
       live = false;
+      controller.abort();
       cleanup?.();
     };
   // The stable operation key is the execution boundary. Journal refreshes can

@@ -87,13 +87,16 @@ function scheduleReceiptSync() {
 }
 
 function migrateCurrentScript(run: FtueRunState): FtueRunState {
+  if (run.scriptVersion === 43) {
+    return { ...run, scriptVersion: MOSSPROUT_FTUE_SCRIPT.version, stepId: streamlinedFtueStep(run), updatedAt: new Date().toISOString() };
+  }
   if (run.scriptVersion < 43 && run.scriptVersion >= 42) {
-    return { ...run, scriptVersion: 43, stepId: streamlinedFtueStep(run), updatedAt: new Date().toISOString() };
+    return { ...run, scriptVersion: MOSSPROUT_FTUE_SCRIPT.version, stepId: streamlinedFtueStep(run), updatedAt: new Date().toISOString() };
   }
   // Keep unfinished prototype checkpoints and their domain data when upgrading.
   if (run.status === 'active' && run.scriptVersion < 42) {
     const stepId = streamlinedFtueStep(run);
-    return { ...run, schemaVersion: 6, scriptVersion: 43, stepId: mossproutFtueStep(stepId) ? stepId : 'companion.meditating', objectiveProgress: run.objectiveProgress ?? {}, updatedAt: new Date().toISOString() };
+    return { ...run, schemaVersion: 6, scriptVersion: MOSSPROUT_FTUE_SCRIPT.version, stepId: mossproutFtueStep(stepId) ? stepId : 'companion.meditating', objectiveProgress: run.objectiveProgress ?? {}, updatedAt: new Date().toISOString() };
   }
   const replayDreamMistChapter = run.scriptVersion < 10;
   const restartingLegacyMerge = run.status === 'active'

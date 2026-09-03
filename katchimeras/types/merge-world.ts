@@ -457,7 +457,7 @@ export type HavenMutationReceipt = {
 export type StoryWorldMutationReceipt = {
   id: string;
   kind: 'haven_upgrade';
-  target: { kind: 'haven_tile'; characterId: MergeCharacterId } | { kind: 'haven_nature_island'; islandId: MossproutNatureIslandId };
+  target: { kind: 'haven_tile'; characterId: MergeCharacterId } | { kind: 'haven_nature_island'; islandId: MossproutNatureIslandId } | { kind: 'haven_structure'; structureId: string };
   fromLevel: number;
   toLevel: number;
   economyMode: 'normal' | 'free' | 'grant';
@@ -466,6 +466,8 @@ export type StoryWorldMutationReceipt = {
 };
 
 export type MergeWorldState = {
+  worldUnlocks?: Record<string, { unlockedAt: number; paid: number; destination: MergeCharacterId; transferredAt: number | null; hatchedAt: number | null }>;
+  glowDiscoveryLesson?: { preparedAt: number; servedOrderIds: string[]; spawnedAt?: number; guidedOrderIndex?: 0 | 1 };
   version: 22;
   /** The first personal Merge World is owned by Mossprout. */
   ownerCharacterId: 'mossprout';
@@ -529,6 +531,10 @@ export type MergeWorldState = {
 };
 
 export type MergeWorldCommand =
+  | { type: 'unlockWorldTarget'; targetId: string; now: number; receiptId?: string }
+  | { type: 'transferDiscoveryEgg'; targetId: 'mossprout:overgrown-trail'; now: number }
+  | { type: 'hatchWorldEgg'; targetId: 'mossprout:overgrown-trail'; now: number }
+  | { type: 'prepareGlowDiscoveryLesson'; now: number }
   | { type: 'refreshTime'; boardId?: MergeBoardId; now: number }
   | { type: 'tapGenerator'; boardId?: MergeBoardId; generatorId: string; now: number; seed: string; spendEnergy?: boolean; activityOpportunityId?: string }
   | { type: 'setGeneratorForcedDrop'; boardId?: MergeBoardId; generatorId: string; definitionId: string | null; now: number }

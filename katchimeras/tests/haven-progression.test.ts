@@ -86,9 +86,9 @@ test('the first Haven restoration is linear, story-gated, and keeps neighbouring
   const first = reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, now: NOW + 2 });
   assert.equal(first.changed, true);
   assert.equal(first.state.haven.tileStages.mossprout, 1);
-  assert.equal(first.state.coins, 1_950);
+  assert.equal(first.state.coins, 1_980);
   assert.equal(first.state.haven.revealState, 'first_restore_complete');
-  assert.deepEqual(Object.values(first.state.haven.mossproutNatureIslands), [1, 1, 1, 1, 1, 1]);
+  assert.deepEqual(Object.values(first.state.haven.mossproutNatureIslands), [0, 0, 0, 0, 0, 0]);
   state = reduceMergeWorld(first.state, { type: 'reconcileHavenStory', characterId: 'mossprout', storyLevel: 2, now: NOW + 4 }).state;
   assert.equal(reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 2, now: NOW + 5 }).changed, false);
 });
@@ -131,7 +131,7 @@ test('Garden structure, spring, path, and movement egg advance independently wit
   assert.equal(state.haven.movementEgg.manualMovementLogs, 1);
 });
 
-test('the post-FTUE Bloom mission atomically wakes the Garden and reveals the movement Egg', () => {
+test('legacy post-FTUE Bloom requests pay Glow without silently upgrading or revealing an Egg', () => {
   let state = reduceMergeWorld(mossproutWorld(), {
     type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, economyMode: 'free', receiptId: 'first-bloom', now: NOW + 1,
   }).state;
@@ -148,11 +148,11 @@ test('the post-FTUE Bloom mission atomically wakes the Garden and reveals the mo
   const completed = reduceMergeWorld(state, { type: 'serveOrder', orderId: mission.id, now: NOW + 3 });
   assert.equal(completed.changed, true);
   assert.equal(completed.state.activeOrders.some((order) => order.id === mission.id), false);
-  assert.deepEqual(completed.state.haven.structures.mossproutGarden.featureLevels, { spring: 1, path: 1 });
-  assert.equal(completed.state.haven.movementEgg.status, 'revealed');
-  assert.equal(completed.state.haven.revealState, 'revealed');
-  assert.equal(completed.state.coins, state.coins);
-  assert.equal(completed.state.haven.mutationReceipts.filter((receipt) => receipt.id.startsWith(mission.id)).length, 3);
+  assert.deepEqual(completed.state.haven.structures, state.haven.structures);
+  assert.deepEqual(completed.state.haven.movementEgg, state.haven.movementEgg);
+  assert.equal(completed.state.haven.revealState, state.haven.revealState);
+  assert.equal(completed.state.coins, state.coins + 20);
+  assert.equal(completed.state.haven.mutationReceipts.filter((receipt) => receipt.id.startsWith(mission.id)).length, 0);
 });
 
 test('authored Haven upgrades are atomic, economy-explicit, and idempotent by receipt', () => {
@@ -184,6 +184,7 @@ test('authored Haven upgrades are atomic, economy-explicit, and idempotent by re
   assert.equal(duplicate.state.storyWorldMutationReceipts.length, 1);
 
   let islandState = reduceMergeWorld(mossproutWorld(), { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, now: NOW + 3 }).state;
+  islandState = reduceMergeWorld(islandState, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 1, now: NOW + 3 }).state;
   islandState = reduceMergeWorld(islandState, { type: 'reconcileHavenStory', characterId: 'mossprout', storyLevel: 2, now: NOW + 4 }).state;
   islandState = { ...islandState, coins: 0 };
   const granted = reduceMergeWorld(islandState, {
@@ -201,9 +202,15 @@ test('authored Haven upgrades are atomic, economy-explicit, and idempotent by re
   assert.equal(granted.storyWorldMutationReceipt?.economyMode, 'grant');
 });
 
-test('six Mossprout nature islands upgrade independently within the existing total Coin curve', () => {
+test('six Mossprout nature islands each cost 40 Glow to unlock then retain the established upgrade curve', () => {
   let state = mossproutWorld();
   state = reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, now: NOW + 1 }).state;
+  assert.deepEqual(Object.values(state.haven.mossproutNatureIslands), [0, 0, 0, 0, 0, 0]);
+  const beforeUnlocks = state.coins;
+  for (const islandId of MOSSPROUT_NATURE_ISLAND_IDS) {
+    state = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId, level: 1, now: NOW + 1 }).state;
+  }
+  assert.equal(state.coins, beforeUnlocks - 240);
   assert.deepEqual(Object.values(state.haven.mossproutNatureIslands), [1, 1, 1, 1, 1, 1]);
 
   const storyReady = reduceMergeWorld(state, {
@@ -246,9 +253,11 @@ test('six Mossprout nature islands upgrade independently within the existing tot
   assert.equal(state.haven.tileStages.mossprout, 4);
 });
 
-test('nature island upgrades reject skips, story locks, duplicate commands, and insufficient Coins', () => {
+test('nature island upgrades reject skips, story locks, duplicate commands, and insufficient Glow', () => {
   let state = mossproutWorld();
   state = reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, now: NOW + 1 }).state;
+  assert.equal(reduceMergeWorld({ ...state, coins: 39 }, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 1, now: NOW + 1 }).changed, false);
+  state = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 1, now: NOW + 1 }).state;
   assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 3, now: NOW + 2 }).changed, false);
   assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 2, now: NOW + 3 }).changed, false);
   state = reduceMergeWorld(state, { type: 'reconcileHavenStory', characterId: 'mossprout', storyLevel: 2, now: NOW + 4 }).state;
@@ -388,7 +397,7 @@ test('Mossprout FTUE turns one Bond answer into a Garden upgrade and an intimate
   assert.equal(mossproutFtueStep('companion.water_response')?.actions[0]?.nextStepId, 'companion.first_insight');
   assert.equal(mossproutFtueStep('companion.first_insight')?.actions[0]?.nextStepId, 'companion.first_rest');
   assert.equal(mossproutFtueStep('companion.first_rest')?.actions[0]?.nextStepId, 'companion.meditating');
-  assert.equal(mossproutFtueStep('companion.meditating')?.actions[0]?.nextStepId, 'merge.handoff.spawn');
+  assert.equal(mossproutFtueStep('companion.meditating')?.actions[0]?.nextStepId, 'complete');
   assert.equal(mossproutFtueStep('haven.first_bloom'), null);
   // Retained as a recovery route for older resident-matching saves.
   assert.equal(mossproutFtueStep('companion.resident_affinity')?.actions[0]?.nextStepId, 'companion.resident_parcel_ready');

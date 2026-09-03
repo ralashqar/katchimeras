@@ -66,6 +66,7 @@ export type FtueActionDefinition = {
 export type FtueGuide = { eyebrow: string; title: string; body: string };
 
 export type FtueTarget =
+  | { kind: 'haven_gateway' }
   | { kind: 'board_item'; instanceId: string }
   | { kind: 'board_items'; definitionId: string; occurrence: number }
   | { kind: 'board_generator'; generatorId: string }
@@ -112,6 +113,7 @@ export type FtueSpotlightDefinition = {
 
 export type FtueInteractionPolicy =
   | { mode: 'none' }
+  | { mode: 'blocked' }
   | { mode: 'exclusive'; allowed: { kind: 'target_tap'; target: FtueTarget } }
   | { mode: 'exclusive'; allowed: { kind: 'board_drag'; from: FtueTarget; to: FtueTarget } }
   | { mode: 'exclusive'; allowed: { kind: 'generator_tap'; target: FtueTarget } }

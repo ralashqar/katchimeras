@@ -28,6 +28,7 @@ expo-env.d.ts
 /tmp/imagegen/
 /tmp/today-growth-energy-v2/
 /assets/images/katchimeras/merge-world/ui/*.png
+!/assets/images/katchimeras/merge-world/ui/glow.png
 /artifacts/merge-world-existing-contact.png
 /artifacts/merge-world-v4/sources/
 /artifacts/merge-world-v4/*-contact*.png

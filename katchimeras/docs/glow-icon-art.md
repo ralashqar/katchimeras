@@ -1,0 +1,7 @@
+# Glow icon
+
+Generated with the built-in image-generation tool. Runtime asset: `assets/images/katchimeras/merge-world/ui/glow.png`. Shared reference: `GAME_CURRENCY_ART.coins` (the persisted currency field remains `coins`). The previous SVG is retained but no longer used by the shared currency reference.
+
+## Final generation prompt
+
+Use case: stylized-concept. Create a production-ready square transparent-background game currency icon for Glow in a cozy life-companion merge game. Subject: ONE solid chunky four-point golden light-spark, a plump sculpted toy shape with rounded tips, thick soft bevels, a warm pale buttery-gold front and honey amber side thickness. Front-facing with a very subtle three-quarter 3D depth. Large simple unmistakable sparkle silhouette, balanced vertically and horizontally, centered filling about 85% of canvas. Style: cozy 3D toy diorama, soft molded satin material, broad smooth color areas, very low texture detail, softly lit from upper left, gently luminous face with controlled highlights. Must read instantly at 24 to 32 pixels on both light and dark UI. Darker amber outer edge provides clear silhouette contrast. No inner symbols, no coins or coin rims, no gem facets, no text, no face, no eyes, no tiny secondary stars, no particles, no pedestal or scenery, no surrounding glow cloud, no blur. Actual transparent alpha background, not a checkerboard drawn into the image. The shape itself conveys magical warm light. Single isolated finished asset, not a presentation sheet.

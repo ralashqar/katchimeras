@@ -1,11 +1,12 @@
 import * as SQLite from 'expo-sqlite';
 
-import type { MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
+import type { MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
 import type { StoryWorldUpgradeEffectPayload } from '@/types/content-flow';
+import { sharedWorldPurchase } from '@/constants/shared-world';
 import type { HavenStage } from '@/constants/haven-catalog';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld, resetMergeActivityForDay } from '@/utils/merge-world/engine';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
-import { completeMossproutChapterZeroSlice, mossproutFtueGardenMissionOrder, MOSSPROUT_FTUE_GARDEN_MISSION_ORDER_ID } from '@/utils/merge-world/chapter-zero-policy';
+import { completeMossproutChapterZeroSlice } from '@/utils/merge-world/chapter-zero-policy';
 import { MOSSPROUT_FTUE_JOURNAL_ENERGY } from '@/utils/merge-world/economy-policy';
 import { firstFtueMemoryForSource, reduceFirstFtueMemoryPlacement } from '@/utils/merge-world/first-ftue-memory';
 import { MOSSPROUT_FIRST_MEMORY_SLOT_ID } from '@/utils/mossprout-garden-layout';
@@ -233,12 +234,12 @@ export function grantJournalCaptureEnergy(input: {
   }), now);
 }
 
-/** Atomically spends Merge Coins and advances one linear Haven environment. */
+/** Atomically spends Merge Glow and advances one linear Haven environment. */
 export function upgradeStoredHavenTile(characterId: import('@/types/merge-world').MergeCharacterId, stage: HavenStage, now = Date.now()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId, stage, now }), now);
 }
 
-/** Atomically spends Merge Coins and advances one Mossprout nature island. */
+/** Atomically spends Merge Glow and advances one Mossprout nature island. */
 export function upgradeStoredMossproutNatureIsland(
   islandId: import('@/types/merge-world').MossproutNatureIslandId,
   level: import('@/types/merge-world').MossproutNatureIslandLevel,
@@ -252,12 +253,20 @@ export function upgradeStoredMossproutNatureIsland(
 
 /** Exactly-once story upgrade. Retrying an effect key returns its original receipt. */
 export function upgradeStoredStoryWorldTarget(effectKey: string, payload: StoryWorldUpgradeEffectPayload, now = Date.now()) {
+  const target = payload.target;
+  if (target.kind === 'haven_structure') {
+    const purchase = sharedWorldPurchase(target.structureId);
+    if (!purchase || payload.toLevel !== 1 || payload.economy.mode !== 'normal') throw new Error('Unknown shared-world purchase');
+    return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+      type: 'unlockWorldTarget', targetId: purchase.unlockId, receiptId: effectKey, now,
+    }), now);
+  }
   const economyMode = payload.economy.mode;
   const grantedCoins = payload.economy.mode === 'grant' ? payload.economy.amount : 0;
-  return reduceStoredMergeWorld((state) => payload.target.kind === 'haven_tile'
+  return reduceStoredMergeWorld((state) => target.kind === 'haven_tile'
     ? reduceMergeWorld(state, {
         type: 'upgradeHavenTile',
-        characterId: payload.target.familyId as import('@/types/merge-world').MergeCharacterId,
+        characterId: target.familyId as import('@/types/merge-world').MergeCharacterId,
         stage: payload.toLevel as HavenStage,
         receiptId: effectKey,
         economyMode,
@@ -266,7 +275,7 @@ export function upgradeStoredStoryWorldTarget(effectKey: string, payload: StoryW
       })
     : reduceMergeWorld(state, {
         type: 'upgradeMossproutNatureIsland',
-        islandId: payload.target.islandId as import('@/types/merge-world').MossproutNatureIslandId,
+        islandId: target.islandId as import('@/types/merge-world').MossproutNatureIslandId,
         level: payload.toLevel as import('@/types/merge-world').MossproutNatureIslandLevel,
         receiptId: effectKey,
         economyMode,
@@ -367,30 +376,7 @@ export function reconcileStoredHavenStory(characterId: import('@/types/merge-wor
 /** Completes the Chapter Zero handoff by publishing today's normal Garden batch immediately. */
 export function seedStoredMossproutGardenAfterFtue(dayId: string, now = Date.now()) {
   return reduceStoredMergeWorld((state) => {
-    const missionComplete = state.haven.structures.mossproutGarden.featureLevels.path > 0;
-    const missionPresent = state.activeOrders.some((order) => order.id === MOSSPROUT_FTUE_GARDEN_MISSION_ORDER_ID);
-    if (!missionComplete && missionPresent) {
-      return reduceMergeWorld(state, {
-        type: 'setGeneratorForcedDrop', generatorId: 'wild-garden', definitionId: 'nature:garden:1', now,
-      });
-    }
-
     const completedChapterZero = completeMossproutChapterZeroSlice(state, now);
-    if (!missionComplete && !missionPresent) {
-      const forced = reduceMergeWorld(completedChapterZero, {
-        type: 'setGeneratorForcedDrop', generatorId: 'wild-garden', definitionId: 'nature:garden:1', now,
-      }).state;
-      const next: MergeWorldState = {
-        ...forced,
-        revision: forced.revision + 1,
-        updatedAt: now,
-        activeOrders: [
-          ...forced.activeOrders.filter((order) => order.storyArcId !== 'mossprout:casual-garden'),
-          mossproutFtueGardenMissionOrder(now),
-        ],
-      };
-      return { state: next, changed: true, message: 'Help the Garden Wake Up is ready.' };
-    }
     return reduceMergeWorld(completedChapterZero, {
       type: 'reconcileCharacterActivity',
       familyId: 'mossprout',
@@ -400,6 +386,11 @@ export function seedStoredMossproutGardenAfterFtue(dayId: string, now = Date.now
       now,
     });
   }, now);
+}
+
+/** Serialize purchases and Egg ownership against the latest persisted balance. */
+export function applyStoredGlowDiscovery(command: Extract<MergeWorldCommand, { type: 'unlockWorldTarget' | 'transferDiscoveryEgg' | 'hatchWorldEgg' | 'prepareGlowDiscoveryLesson' }>) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, command), command.now);
 }
 
 export function grantStoredKatchimeraCard(

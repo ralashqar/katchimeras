@@ -1,4 +1,6 @@
 import type { ContentFlowNode } from '@/types/content-flow';
+import { MERGE_GENERATORS_BY_ID, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
+import { sharedWorldPurchase } from '@/constants/shared-world';
 import { validateStoryTarget } from './story-targets';
 import { STORY_CAMERA_PRESENTATION, STORY_WORLD_UPGRADE_EFFECT, STORY_WORLD_UPGRADE_PRESENTATION } from './story-world-operations';
 
@@ -34,8 +36,9 @@ function validateCameraPayload(payload: Readonly<Record<string, unknown>>) {
 function validateUpgradeEffect(payload: Readonly<Record<string, unknown>>) {
   const targetError = validateStoryTarget(payload.target);
   if (targetError) return targetError;
-  const target = payload.target as { kind?: unknown };
-  if (target.kind !== 'haven_tile' && target.kind !== 'haven_nature_island') return 'world.upgrade target must be a Haven tile or nature island';
+  const target = payload.target as { kind?: unknown; structureId?: unknown };
+  if (target.kind === 'haven_structure' && (typeof target.structureId !== 'string' || !sharedWorldPurchase(target.structureId) || payload.toLevel !== 1 || (payload.economy as { mode?: string })?.mode !== 'normal')) return 'Unknown shared-world purchase';
+  if (target.kind !== 'haven_tile' && target.kind !== 'haven_nature_island' && target.kind !== 'haven_structure') return 'world.upgrade target must be a Haven tile, shared-world tile, or nature island';
   if (!Number.isInteger(payload.toLevel) || Number(payload.toLevel) < 1) return 'toLevel must be a positive integer';
   if (!payload.economy || typeof payload.economy !== 'object') return 'economy policy is required';
   const economy = payload.economy as { mode?: unknown; amount?: unknown; reason?: unknown };
@@ -61,6 +64,21 @@ function validateMeditationEffect(payload: Readonly<Record<string, unknown>>) {
 }
 
 const BUILT_INS: readonly StoryCapabilityDefinition[] = [
+  { id: 'world.action', kind: 'scene', validatePayload: (payload) => {
+    const view = payload.worldAction as { kind?: string; actionLabel?: string; guide?: { title?: string; body?: string } } | undefined;
+    return view && ['goal', 'garden', 'return', 'purchase', 'discovery'].includes(view.kind ?? '') && view.actionLabel && view.guide?.title && view.guide.body ? null : 'World action needs a view, guide and action label';
+  } },
+  { id: 'merge.lesson', kind: 'task', validatePayload: (payload) => {
+    const beat = payload.beat as Record<string, unknown> | undefined;
+    if (!beat || typeof beat.id !== 'string' || !beat.guide) return 'Lesson needs an id and guide';
+    if (beat.kind === 'spawn') return typeof beat.generatorId === 'string' && MERGE_GENERATORS_BY_ID.has(beat.generatorId) ? null : 'Lesson needs a known generator';
+    if (beat.kind === 'match') return typeof beat.definitionId === 'string' && MERGE_ITEMS_BY_ID.has(beat.definitionId) && typeof beat.echoId === 'string' && beat.echoId ? null : 'Lesson needs a known item and bound target';
+    if (beat.kind === 'serve' || beat.kind === 'practice') return typeof beat.orderId === 'string' && beat.orderId ? null : 'Lesson needs a request';
+    return 'Unknown lesson kind';
+  } },
+  { id: 'glow.discovery.scene', kind: 'scene' },
+  { id: 'glow.discovery.task', kind: 'task' },
+  ...['haven.start_glow_discovery', 'glow.lesson.prepare'].map((id) => ({ id, kind: 'effect' as const, idempotent: true })),
   { id: 'legacy.ftue.scene', kind: 'scene' },
   { id: 'legacy.ftue.task', kind: 'task' },
   { id: 'story.conversation', kind: 'scene' },

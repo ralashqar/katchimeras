@@ -13,6 +13,17 @@ export const STORY_WORLD_UPGRADE_EFFECT = 'world.upgrade';
 export const STORY_WORLD_UPGRADE_PRESENTATION = 'world.upgrade_reveal';
 
 type WorldUpgradeTarget = StoryWorldUpgradeEffectPayload['target'];
+export type WorldActionView = {
+  kind: 'goal' | 'garden' | 'return' | 'purchase' | 'discovery';
+  guide: { eyebrow: string; title: string; body: string };
+  actionLabel: string;
+};
+
+/** Scene copy and presentation intent are authored alongside the transition. */
+export function worldActionScene(input: { id: string; actionId: string; next: string; view: WorldActionView }): ContentFlowNode {
+  return { id: input.id, kind: 'scene', capability: 'world.action', surface: 'haven', sceneId: input.id,
+    actions: [{ id: input.actionId, next: input.next }], payload: { worldAction: input.view } };
+}
 type WorldUpgradePresentationTarget = StoryWorldUpgradePresentationPayload['target'];
 
 function isWorldUpgradePresentationTarget(target: StoryTarget | undefined): target is WorldUpgradePresentationTarget {

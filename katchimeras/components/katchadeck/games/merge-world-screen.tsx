@@ -31,6 +31,8 @@ import { Lantern } from '@/constants/theme';
 import { useMergeWorldActions, useMergeWorldLastResult, useMergeWorldState } from '@/features/merge-world/merge-world-provider';
 import { advanceFtueActionDurably, commitFtueAction, completeFtueRun, dispatchFtueEvent, flushFtuePersistence, loadFtueRun, registerFtueObjectiveBaseline, repairFtueStep, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { MOSSPROUT_FTUE_COPY } from '@/features/onboarding/mossprout-ftue-copy';
+import { useGlowDiscovery, reconcileGlowLesson, submitGlowAction } from '@/features/onboarding/glow-discovery-runtime';
+import { glowDiscoveryBoardStep, glowDiscoveryScene } from '@/features/onboarding/glow-discovery-flow';
 import { MOSSPROUT_FTUE_RETURN_NOTE_ID, mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, mergeFtueStepForBoard, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
 import type { FtueCueDefinition, FtueSpotlightDefinition } from '@/features/onboarding/ftue-types';
@@ -94,6 +96,8 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const { state, loading, error } = useMergeWorldState();
   const { dispatch: send, flush: flushMergeWorld } = useMergeWorldActions();
   const ftueRun = useFtueRun();
+  const glowRun = useGlowDiscovery();
+  const glowScene = glowRun ? glowDiscoveryScene(glowRun.nodeId) : null;
   const navigation = useNavigation();
   const handoffActive = ftueRun?.status === 'active' && ftueRun.stepId.startsWith('merge.handoff.');
   const handoffFeedback = useGameFeedback();
@@ -115,7 +119,8 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   }, [active, handoffActive, navigation]);
   const ftueActive = ftueRun?.status === 'active';
   const ftueNavigationLocked = useFtueNavigationLock(ftueRun, 'merge', active);
-  const scriptedFtueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
+  const scriptedFtueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId)
+    : glowRun?.status === 'active' ? glowDiscoveryBoardStep(glowRun.nodeId, state) : null;
   const ftueStep = useMemo(() => mergeFtueStepForBoard(state, scriptedFtueStep), [scriptedFtueStep, state]);
   const residentFtueActive = Boolean(ftueStep?.id.startsWith('merge.resident_'));
   const returnFromGarden = useCallback(() => {
@@ -179,6 +184,12 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   }));
   const [returnCharacterId, setReturnCharacterId] = useState<MergeOrder['characterId'] | null>(null);
   const [serveFlight, setServeFlight] = useState<MergeServeRewardFlight | null>(null);
+  useEffect(() => {
+    if (!active || !state || serveFlight || !glowRun?.nodeId.startsWith('lesson.')) return;
+    let alive = true;
+    void flushMergeWorld().then(() => { if (alive) return reconcileGlowLesson(state); }).catch(() => {});
+    return () => { alive = false; };
+  }, [active, flushMergeWorld, glowRun?.nodeId, serveFlight, state]);
   const [serveHiddenItemIds, setServeHiddenItemIds] = useState<Set<string>>(() => new Set());
   const [parcelFlight, setParcelFlight] = useState<MergeParcelFlight | null>(null);
   const [parcelHiddenItemIds, setParcelHiddenItemIds] = useState<Set<string>>(() => new Set());
@@ -578,7 +589,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       const result = send(effectiveCommand);
       if (result) stateRef.current = result.state;
       const event = mergeFtueEventForCommand(currentState, command, result);
-      if (event) {
+      if (event && currentRun?.status === 'active') {
         const nextRun = dispatchFtueEvent(
           event,
           `merge-command:${mergeSessionId}:${event.revision}`,
@@ -948,6 +959,9 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
         spotlight={mergeGuidanceVisible ? mergeGuidanceSpotlight : null}
         targetRevision={ftueTargetRevision}
       />
+      {active && glowScene?.view.kind === 'return' && !serveFlight ? <View style={{ position: 'absolute', top: insets.top + 68, left: 24, right: 24, zIndex: 90 }}>
+        <KatchaButton fullWidth glow label={`${glowScene.view.actionLabel} · 40 Glow ready`} icon="sparkles" onPress={() => { returnFromGarden(); void submitGlowAction(glowScene.actionId).catch(() => { /* The world retains the return scene for retry. */ }); }} />
+      </View> : null}
 
       {active && memoryCardPresentation ? <KatchaSurfaceProvider surface="parchment"><View style={[styles.memoryCardOverlay, { bottom: Math.max(insets.bottom + 20, 28) }]}>
         <View style={styles.memoryCardArtWrap}>

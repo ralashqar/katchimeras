@@ -141,7 +141,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 43,
+  version: 44,
   entryStepId: 'world.egg_intro',
   terminalStepId: 'complete',
   steps: [
@@ -324,9 +324,9 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'world.first_bloom_restore', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'First Bloom', title: 'Your Plant can help this place grow again.', body: '' },
+      guide: { eyebrow: 'First Glow', title: 'Your request brought a little light.', body: 'Use 20 Glow to restore the Garden.' },
       actions: [
-        { id: 'world.restore_with_first_bloom', title: 'Restore Garden', description: 'Use your Plant to wake the Garden.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'world.first_bloom_restore', backendEvent: true },
+        { id: 'world.restore_with_first_bloom', title: 'Restore Garden', description: 'Use 20 Glow to wake the Garden.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'world.first_bloom_restore', backendEvent: true },
         { id: 'world.complete_first_bloom_restore', title: 'Garden restored', description: 'Continue after the Garden transformation.', icon: 'checkmark.circle.fill', presentation: 'observed_game_action', handlerId: 'haven_upgrade', nextStepId: 'world.first_seed_grew', backendEvent: true },
       ],
       interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } } },
@@ -588,27 +588,9 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'companion.meditating', surface: 'companion', navigation: { ...mossproutCompanionResume, lock: false },
       camera: mossproutMeditationCamera,
-      guide: { eyebrow: 'Resting', title: COPY.meditation, body: 'Go to Merge when you’re ready, or use Back to return to the Garden.' },
-      actions: [{ id: 'companion.tend_garden', title: 'Go to Merge', description: 'Try the Garden Basket.', icon: 'leaf.fill', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'merge.handoff.spawn', backendEvent: true }],
+      guide: { eyebrow: 'Resting', title: COPY.meditation, body: 'The world is still yours to explore.' },
+      actions: [{ id: 'companion.tend_garden', title: 'Explore the mist', description: 'Find a path beyond the Garden.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'complete', backendEvent: true }],
       blockingBeat: 'chapter_complete',
-    },
-    {
-      id: 'merge.handoff.spawn', surface: 'merge', navigation: mossproutMergeResume,
-      guide: { eyebrow: 'Keep growing', title: 'More Seeds start here.', body: 'Tap the Garden Basket twice.' },
-      actions: [{ id: 'merge.handoff.spawn', title: 'Make two Seeds', description: 'Tap the Garden Basket twice.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_generator_spawned', backendEvent: true }],
-      interaction: { mode: 'exclusive', allowed: { kind: 'generator_tap', target: { kind: 'board_generator', generatorId: 'wild-garden' } } },
-      cue: { kind: 'tap', target: { kind: 'board_generator', generatorId: 'wild-garden' } },
-      spotlight: { targets: [{ kind: 'board_generator', generatorId: 'wild-garden' }], padding: 6, radius: 14, dimOpacity: 0.58 },
-      edges: [{ event: { type: 'item_spawned', generatorId: 'wild-garden', definitionId: 'nature:garden:1' }, requiredCount: 2, commitActionId: 'merge.handoff.spawn', nextStepId: 'merge.handoff.merge' }],
-    },
-    {
-      id: 'merge.handoff.merge', surface: 'merge', navigation: mossproutMergeResume,
-      guide: { eyebrow: 'Keep growing', title: 'Your turn.', body: 'Merge those Seeds into a Sprout.' },
-      actions: [{ id: 'merge.handoff.merge', title: 'Make a Sprout', description: 'Merge the two Seeds.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
-      interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 }, to: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 1 } } },
-      cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 }, to: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 1 } },
-      spotlight: { targets: [{ kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 }, { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 1 }], grouping: 'bounding_rect', padding: 3, radius: 11, dimOpacity: 0.58 },
-      edges: [{ event: { type: 'merge_completed', resultDefinitionId: 'nature:garden:2' }, commitActionId: 'merge.handoff.merge', nextStepId: 'complete' }],
     },
     {
       id: 'companion.resident_affinity', surface: 'companion', navigation: mossproutCompanionResume,
@@ -698,7 +680,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'haven.mossprout.focus', surface: 'haven',
-      guide: { eyebrow: 'A little place to begin', title: 'Mossprout has a home here.', body: 'Tap the garden marker to see what your Coins can restore.' },
+      guide: { eyebrow: 'A little place to begin', title: 'Mossprout has a home here.', body: 'Tap the garden marker to see what your Glow can restore.' },
       actions: [{ id: 'haven.open_mossprout_upgrade', title: 'Open Mossprout’s Haven', description: 'See the first permanent garden upgrade.', icon: 'leaf.fill', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'haven.mossprout.restore' }],
       camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: 1.25, anchorY: 0.46, durationMs: 420 },
       interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_tile_hud', characterId: 'mossprout' } } },
@@ -708,8 +690,8 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'haven.mossprout.restore', surface: 'haven',
-      guide: { eyebrow: 'A little place to begin', title: 'Restore the Little Garden', body: 'Coins earned through Merge can permanently change this place.' },
-      actions: [{ id: 'haven.restore_mossprout', title: 'Restore · 150 Coins', description: 'Turn the forgotten clearing into Mossprout’s first garden.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'haven_upgrade', nextStepId: 'companion.meditating', backendEvent: true }],
+      guide: { eyebrow: 'A little place to begin', title: 'Restore the Little Garden', body: 'Glow earned through Merge can permanently change this place.' },
+      actions: [{ id: 'haven.restore_mossprout', title: 'Restore · 20 Glow', description: 'Turn the forgotten clearing into Mossprout’s first garden.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'haven_upgrade', nextStepId: 'companion.meditating', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } } },
       cue: { kind: 'tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } },
       spotlight: { targets: [{ kind: 'haven_upgrade_button', characterId: 'mossprout' }], padding: 6, radius: 16, dimOpacity: 0.62 },

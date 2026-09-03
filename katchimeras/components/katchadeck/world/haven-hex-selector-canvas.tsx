@@ -21,7 +21,7 @@ import {
 } from '@/utils/katchimera-kingdom-slots';
 import { kingdomHexTileOverlaySourceForLod, kingdomHexTileSourceForLod, playerHavenHexTileSet } from '@/utils/world-visuals';
 
-export const IMPLEMENTED_KATCHIMERA_WORLDS = new Set<KatchimeraFamilyId>(['mossprout']);
+export const IMPLEMENTED_KATCHIMERA_WORLDS = new Set<KatchimeraFamilyId>(['mossprout', 'steppling']);
 
 export type HavenWorldMarker = {
   displayName: string;
@@ -132,7 +132,7 @@ export function HavenHexSelectorCanvas({
                   width: bounds.right - bounds.left,
                 }]} />;
               }
-              if (!tile.companion || !IMPLEMENTED_KATCHIMERA_WORLDS.has(tile.companion.familyId)) return null;
+              if (!tile.companion || tile.companion.kind === 'locked' || !IMPLEMENTED_KATCHIMERA_WORLDS.has(tile.companion.familyId)) return null;
               const highlighted = highlightedFamilyId === tile.companion.familyId;
               return <Pressable
                 accessibilityHint="Opens this Katchimera world"

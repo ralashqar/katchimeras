@@ -1,6 +1,7 @@
 import type { TodayHatchPresentation } from '@/utils/today-hatch-presentation';
 
 export type WorldFtueSubjectPresentation = {
+  hatchFamilyId?: 'mossprout' | 'steppling';
   companionVisible: boolean;
   feedbackKey: number;
   feedExpressionKey: number;

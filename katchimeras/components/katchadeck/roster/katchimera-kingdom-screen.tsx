@@ -2,6 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import { ActivityIndicator, BackHandler, Pressable, StyleSheet, View, useWindowDimensions, type View as ViewType } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import { useIsFocused } from '@react-navigation/native';
+import { GlowGatewayGuide } from '@/components/katchadeck/world/glow-gateway-guide';
+import { startGlowDiscovery, submitGlowAction, useGlowDiscovery } from '@/features/onboarding/glow-discovery-runtime';
+import { glowDiscoveryScene } from '@/features/onboarding/glow-discovery-flow';
+import { glowGatewayState } from '@/utils/merge-world/glow-discovery-policy';
+import { sharedWorldIncludesCompanion } from '@/constants/shared-world';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import Animated, {
@@ -101,9 +107,9 @@ const FIRST_SEED_GARDEN_PLANT_OFFER = {
   target: { kind: 'haven_garden_plot', slotId: MOSSPROUT_FIRST_MEMORY_SLOT_ID },
 } as const satisfies KingdomTileUpgradeOffer;
 const FIRST_BLOOM_GARDEN_UPGRADE_OFFER = {
-  accessibilityHint: "Uses your Plant to restore Mossprout's Garden",
+  accessibilityHint: 'Spends 20 Glow earned from requests to restore the Garden',
   anchor: { x: 0.5, y: 0.76 },
-  label: 'Restore Garden',
+  label: 'Restore Garden · 20 Glow',
   target: { kind: 'haven_structure', structureId: 'mossprout-hex-garden' },
 } as const satisfies KingdomTileUpgradeOffer;
 
@@ -146,6 +152,12 @@ export function KatchimeraKingdomScreen({
 }: Props) {
   const router = useRouter();
   const { transitionTo } = useGameScreenTransition();
+  const glowRun = useGlowDiscovery();
+  const screenFocused = useIsFocused();
+  const [glowPanelOpen, setGlowPanelOpen] = useState(true);
+  useEffect(() => { setGlowPanelOpen(glowRun?.status !== 'completed'); }, [glowRun?.status, glowRun?.nodeId]);
+  const glowGatewayActive = Boolean(glowRun);
+  const glowScene = glowRun ? glowDiscoveryScene(glowRun.nodeId) : null;
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
   const reduceMotion = useReducedMotion();
@@ -192,14 +204,18 @@ export function KatchimeraKingdomScreen({
   mergeWorldRef.current = mergeWorld;
   interactionCreatureIdRef.current = interactionCreatureId;
   const visibleCompanionSlots = useMemo(
-    () => companionSlots.filter((slot) => slot.familyId === 'mossprout'),
+    () => companionSlots.filter((slot) => sharedWorldIncludesCompanion(slot.familyId)),
     [companionSlots],
   );
   useEffect(() => {
     cameraSettleRevisionRef.current += 1;
     setFtueCameraSettled(false);
   }, [ftueStepId]);
-  const handleCameraMotionChange = useCallback((moving: boolean) => {
+  const handleCameraMotionChange = useMemo(() => {
+    // Refresh the settled notification when the tutorial changes while the
+    // camera is already stationary. The canvas immediately reports its state.
+    void ftueStepId;
+    return (moving: boolean) => {
     const revision = ++cameraSettleRevisionRef.current;
     if (moving) {
       setFtueCameraSettled(false);
@@ -208,12 +224,16 @@ export function KatchimeraKingdomScreen({
     requestAnimationFrame(() => requestAnimationFrame(() => {
       if (cameraSettleRevisionRef.current === revision) setFtueCameraSettled(true);
     }));
-  }, []);
+    };
+  }, [ftueStepId]);
+  const gatewayState = glowGatewayState(mergeWorld);
   const mossproutGardenScene = useMemo(() => ({
+    gateway: gatewayState,
     level: mergeWorld.haven.structures.mossproutGarden.level,
     plantableMemories: mergeWorld.haven.plantableMemories,
     featureLevels: mergeWorld.haven.structures.mossproutGarden.featureLevels,
   }), [
+    gatewayState,
     mergeWorld.haven.plantableMemories,
     mergeWorld.haven.structures.mossproutGarden.featureLevels,
     mergeWorld.haven.structures.mossproutGarden.level,
@@ -240,6 +260,9 @@ export function KatchimeraKingdomScreen({
   );
   const mossproutJourney = mossproutJourneyForDay(relationships, mossproutJourneyDayId);
   const ftueStep = ftueStepId ? mossproutFtueStep(ftueStepId) ?? null : null;
+  const glowWorldTarget = glowScene?.view.kind === 'garden'
+    ? { kind: 'haven_garden_button' as const, characterId: 'mossprout' as const }
+    : glowScene?.view.kind === 'goal' || glowScene?.view.kind === 'purchase' ? { kind: 'haven_gateway' as const } : null;
   const gardenOrderEntries = useMemo<MergeOrderTrayEntry[]>(() => {
     if (!havenMergeBoardActive || !['world.garden_handoff', 'world.seed_planted'].includes(ftueStepId ?? '')) return [];
     const journeyOrderIds = new Set(mossproutJourney?.activity?.mergeOrderIds
@@ -327,6 +350,9 @@ export function KatchimeraKingdomScreen({
   }, [registerFtueTarget]);
   const setGardenButtonNode = useCallback((node: View | null) => {
     registerFtueTarget('garden-button:mossprout', node);
+  }, [registerFtueTarget]);
+  const setGatewayNode = useCallback((node: View | null) => {
+    registerFtueTarget('shared-world:steppling-home', node);
   }, [registerFtueTarget]);
   const setGardenOrderNode = useCallback((orderId: string, node: View | null) => {
     registerFtueTarget(`garden-order:mossprout:${orderId}`, node);
@@ -531,12 +557,12 @@ export function KatchimeraKingdomScreen({
     } catch {
       setUpgradePresentation(null);
       setSelectedNatureIslandId(islandId);
-      setNatureUpgradeError('The growth did not complete. Your Coins and island have not changed. Please try again.');
+      setNatureUpgradeError('The growth did not complete. Your Glow and island have not changed. Please try again.');
       setUpgrading(false);
     }
   }, [measureRestoreOrigin, upgradePresentation, upgrading, visibleCompanionSlots]);
 
-  useStoryPresentationOperation('haven', STORY_WORLD_UPGRADE_PRESENTATION, async (work, run) => {
+  useStoryPresentationOperation('haven', STORY_WORLD_UPGRADE_PRESENTATION, async (work, run, signal) => {
     const payload = work.payload as StoryWorldUpgradePresentationPayload;
     const receipt = contentFlowEffectResult<StoryWorldMutationReceipt>(
       run.effectReceipts,
@@ -548,6 +574,7 @@ export function KatchimeraKingdomScreen({
 
     const mossproutSlot = visibleCompanionSlots.find((slot) => slot.kind === 'owned' && slot.familyId === 'mossprout');
     const coinOrigin = await measureRestoreOrigin();
+    if (signal.aborted) return;
     let presentation: HavenTileUpgradePresentation;
     if (receipt.target.kind === 'haven_tile') {
       const characterId = receipt.target.characterId;
@@ -577,6 +604,15 @@ export function KatchimeraKingdomScreen({
         toStage: receipt.toLevel as HavenStage,
         upgradeName: stage.name,
         visualTarget: payload.target,
+      };
+    } else if (receipt.target.kind === 'haven_structure') {
+      presentation = {
+        cameraAlreadyFocused: true, characterId: 'steppling', coinCost: receipt.coinCost, coinOrigin,
+        creatureId: 'steppling', creatureName: 'A new friend', fromStage: receipt.fromLevel as HavenStage,
+        toStage: 1, nonce: ++upgradeNonceRef.current,
+        palette: { accent: '#FFE28A', glow: '#FFD98C', mist: 'rgba(226,255,213,0.88)', primary: '#4F9F57' },
+        reactionLine: payload.reactionLine ?? 'A new beginning.', showCoins: receipt.coinCost > 0,
+        status: 'playing', storyPresentationKey: work.key, upgradeName: 'Misty clearing', visualTarget: payload.target,
       };
     } else {
       const island = mossproutNatureIslandById.get(receipt.target.islandId);
@@ -612,8 +648,16 @@ export function KatchimeraKingdomScreen({
     setDetailCreatureId(null);
     setSelectedNatureIslandId(null);
     setUpgradePresentation(presentation);
-    await new Promise<void>((resolve) => storyUpgradeResolversRef.current.set(work.key, resolve));
-  });
+    await new Promise<void>((resolve) => {
+      storyUpgradeResolversRef.current.set(work.key, resolve);
+      signal.addEventListener('abort', () => {
+        storyUpgradeResolversRef.current.delete(work.key);
+        setUpgradePresentation((current) => current?.storyPresentationKey === work.key ? null : current);
+        setUpgrading(false);
+        resolve();
+      }, { once: true });
+    });
+  }, screenFocused && !activeInteractionResidentId && !interactionExiting);
 
   const completeUpgradePresentation = useCallback((presentation: HavenTileUpgradePresentation) => {
     if (presentation.storyPresentationKey) {
@@ -919,6 +963,12 @@ export function KatchimeraKingdomScreen({
           setSelectedNatureIslandId(islandId);
         }}
         onSelectMemoryPlant={setSelectedMemoryPlantId}
+        onGatewayTargetChange={setGatewayNode}
+        storyOperationsEnabled={screenFocused && !activeInteractionResidentId && !interactionExiting}
+        onSelectGateway={() => {
+          setGlowPanelOpen(true);
+          void startGlowDiscovery().catch(() => setNatureUpgradeError('The path could not open. Please try again.'));
+        }}
         onSelectResident={selectResident}
         onResidentFocusComplete={completeResidentFocus}
         onUpgradePresentationComplete={completeUpgradePresentation}
@@ -962,13 +1012,17 @@ export function KatchimeraKingdomScreen({
             .duration(reduceMotion ? 80 : 260)
             .delay(ftueStepId === 'world.garden_handoff' && !reduceMotion ? 260 : 0)}
           style={[styles.gardenButtonCluster, { bottom: Math.max(insets.bottom, 12) + 10 }]}>
-          {['world.garden_handoff', 'world.seed_planted'].includes(ftueStepId ?? '') && !firstSeedPlacementFailed ? (
+          {(['world.garden_handoff', 'world.seed_planted'].includes(ftueStepId ?? '') || glowScene?.view.kind === 'garden') && !firstSeedPlacementFailed ? (
             <View
               accessibilityLabel="Plant needed for Mossprout's first Garden order"
               collapsable={false}
               ref={setGardenHandoffOrderNode}
               style={styles.gardenRequestBubble}>
-              <PersistentMergeItemArt definitionId={gardenHandoffPlantDefinitionId} size={68} />
+              <PersistentMergeItemArt definitionId={gardenHandoffPlantDefinitionId} size={52} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                <Image source={GAME_CURRENCY_ART.coins} style={{ width: 18, height: 18 }} />
+                <ThemedText>+20 Glow</ThemedText>
+              </View>
               <View style={styles.gardenRequestBubbleTail} />
             </View>
           ) : null}
@@ -978,7 +1032,11 @@ export function KatchimeraKingdomScreen({
               accessibilityLabel="Open Garden"
               accessibilityRole="button"
               disabled={navigationLocked && !['world.garden_handoff', 'world.seed_planted'].includes(ftueStepId ?? '')}
-              onPress={['world.garden_handoff', 'world.seed_planted'].includes(ftueStepId ?? '') ? onFtueOpenGarden : () => openGarden()}
+              onPress={['world.garden_handoff', 'world.seed_planted'].includes(ftueStepId ?? '') ? onFtueOpenGarden : () => {
+                if (glowScene?.view.kind === 'garden') {
+                  void submitGlowAction(glowScene.actionId).then((run) => { if (run?.status === 'active') openGarden(); }).catch(() => setNatureUpgradeError('The Garden could not open. Please try again.'));
+                } else openGarden();
+              }}
               ref={setGardenButtonNode}
               style={({ pressed }) => [
                 styles.gardenButtonPressable,
@@ -1024,6 +1082,11 @@ export function KatchimeraKingdomScreen({
           <ActivityIndicator color="#FFF4C7" size="small" />
         </View>
       ) : null}
+      {screenFocused && !activeInteractionResidentId && !ftueStepId && !upgradePresentation && glowPanelOpen && (ftueCameraSettled || glowRun?.status === 'failed_recoverable') && glowGatewayActive && (glowRun?.status === 'failed_recoverable' || glowRun?.status === 'completed' || (glowScene && glowScene.view.kind !== 'garden') || glowRun?.nodeId.startsWith('lesson.')) ? <GlowGatewayGuide
+        world={mergeWorld}
+        onClose={() => setGlowPanelOpen(false)}
+        onOpenMerge={() => openGarden()}
+      /> : null}
       {lockedHintVisible ? (
         <KatchaSheet
           header={{
@@ -1139,7 +1202,7 @@ export function KatchimeraKingdomScreen({
                 disabled={!storyReady || mergeWorld.coins < next.coinCost || upgrading}
                 fullWidth
                 icon="sparkles"
-                label={`Restore · ${next.coinCost} Coins`}
+                label={`Restore · ${next.coinCost} Glow`}
                 onPress={() => void beginUpgrade(characterId, slot.creature.creatureId, slot.creature.name, currentStage, next)}
               />
             </View> : null}
@@ -1185,6 +1248,10 @@ export function KatchimeraKingdomScreen({
         />
       ) : null}
       {ftueStepId === 'world.egg_intro' ? <FtueOpeningFade /> : null}
+      {screenFocused && ftueCameraSettled && glowRun?.status === 'active' && glowPanelOpen && glowWorldTarget && !activeInteractionResidentId && !upgradePresentation ? <HavenFtueOverlay
+        cue={glowWorldTarget.kind === 'haven_garden_button' ? { kind: 'tap', target: glowWorldTarget } : null}
+        spotlight={{ targets: [glowWorldTarget] }} screenRef={screenRef} targetRefs={ftueTargetRefs} targetRevision={ftueTargetRevision}
+      /> : null}
     </View>
   );
 }

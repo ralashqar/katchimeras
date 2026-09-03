@@ -17,8 +17,10 @@ export function prioritizedVisibleMergeOrders(
   context: MergeOrderPresentationContext = {},
 ): MergeOrder[] {
   const chapterZeroOrders = state.activeOrders.filter((order) => order.id.startsWith('mossprout:chapter-0:'));
+  const discoveryOrders = state.activeOrders.filter((order) => order.storyArcId === 'mossprout:glow-discovery');
   const visibleOrders = chapterZeroOrders.length > 0
     ? chapterZeroOrders.slice(0, 1)
+    : discoveryOrders.length ? discoveryOrders
     : context.exclusiveJourney
       ? state.activeOrders.filter((order) => (
           context.journeyOrderIds?.has(order.id)

@@ -1763,7 +1763,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   },
                 ]}>
                 {props.ftueProfileStep === 'meditating' ? <KatchaButton
-                  fullWidth label="Go to Merge" icon="leaf.fill"
+                  fullWidth label="Explore the mist" icon="sparkles"
                   onPress={() => props.onFtueProfileContinue?.()}
                 /> : <MossproutStoryStage
                   activeQuestId={props.activeQuest?.questId}

@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useEffect } from 'react';
 import { StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
@@ -18,7 +19,7 @@ import type {
   HavenUpgradePresentationPhase,
 } from '@/utils/haven-upgrade-presentation';
 
-const COIN_ART = require('../../../assets/images/katchimeras/merge-world/ui/coin.webp');
+const COIN_ART = GAME_CURRENCY_ART.coins;
 const COIN_SIZE = 34;
 
 const COIN_VECTORS = [

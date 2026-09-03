@@ -27,7 +27,7 @@ function levels(
   levelTwoCost: number,
 ): readonly MossproutNatureIslandLevelDefinition[] {
   return [
-    { coinCost: 0, description: descriptions[0], level: 1, name: names[0], storyGate: 'chapter_zero_complete' },
+    { coinCost: 40, description: descriptions[0], level: 1, name: names[0], storyGate: 'chapter_zero_complete' },
     { coinCost: levelTwoCost, description: descriptions[1], level: 2, name: names[1], storyGate: 'story_level_2' },
     { coinCost: 150, description: descriptions[2], level: 3, name: names[2], storyGate: 'story_level_3' },
     { coinCost: 300, description: descriptions[3], level: 4, name: names[3], storyGate: 'story_level_4' },
