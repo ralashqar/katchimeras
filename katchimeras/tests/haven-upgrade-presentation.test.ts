@@ -41,3 +41,16 @@ test('upgrade energy follows the tile silhouette without central capsule layers'
   assert.match(scene, /alphaBounds: selectedBounds/);
   assert.match(canvas, /layer\.alphaBounds\.left \/ layer\.sourceSize\.width[\s\S]*?layer\.alphaBounds\.bottom \/ layer\.sourceSize\.height/);
 });
+
+test('upgrade art has one forward-only crossfade owned by the presentation renderer', () => {
+  const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
+
+  assert.match(canvas, /upgradeOwnsLayer[\s\S]*?havenUpgradeLayerArtChanges/);
+  assert.match(canvas, /<KingdomTileArt[\s\S]*?settlingOwnsLayer[\s\S]*?finishSettlingUpgrade/);
+  assert.match(canvas, /setSettlingUpgrade\(\{ layers, nonce: presentation\.nonce \}\)/);
+  assert.match(canvas, /phase=\{upgradeOwnsLayer \? upgradePhase : 'complete'\}/);
+  assert.match(canvas, /const revealProgress = useSharedValue\(revealActive \? 1 : 0\)/);
+  assert.match(canvas, /opacity: 1 - revealProgress\.value[\s\S]*?opacity: revealProgress\.value/);
+  assert.doesNotMatch(canvas, /oldOpacity\.value = withTiming\(0/);
+  assert.doesNotMatch(canvas, /newOpacity\.value = withTiming\(1/);
+});

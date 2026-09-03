@@ -48,6 +48,14 @@ const mossproutWorldDialogueCamera = {
   anchorY: 0.5,
   durationMs: 520,
 } as const;
+// Keep the intimate dialogue scale while looking slightly farther down the
+// world. Mossprout settles higher in the viewport, leaving a clear lane for
+// the meditation timer and action cards beneath him.
+const mossproutMeditationCamera = {
+  ...mossproutWorldDialogueCamera,
+  anchorY: 0.46,
+  durationMs: 420,
+} as const;
 const mossproutMergeResume = {
   // Merge remains the durable cold-start destination, but Back is a supported
   // escape to Mossprout's single Continue story card.
@@ -572,7 +580,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'companion.meditating', surface: 'companion', navigation: mossproutCompanionResume,
-      camera: mossproutWorldDialogueCamera,
+      camera: mossproutMeditationCamera,
       guide: { eyebrow: 'Our next Journey', title: 'Mossprout is resting', body: 'The Garden is still open while Mossprout rests.' },
       actions: [{ id: 'companion.tend_garden', title: 'Tend the Garden', description: 'Your first moment with Mossprout is complete.', icon: 'leaf.fill', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'complete', backendEvent: true }],
       blockingBeat: 'chapter_complete',

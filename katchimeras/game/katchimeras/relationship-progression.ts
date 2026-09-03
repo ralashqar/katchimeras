@@ -13,7 +13,9 @@ import {
 } from '@/constants/mossprout-campaign';
 import { MOSSPROUT_JOURNEY_CAMPAIGN } from '@/constants/mossprout-journey-campaign';
 import { nextJourneyCampaignDay } from '@/game/katchimeras/journey-campaign';
-import { actionCommandFromOrigin, attachActionRewardReceipt, commitActionCompletion, dismissActionPresentation } from '@/game/katchimeras/action-runtime';
+import { actionCommandFromOrigin, attachActionRewardReceipt, commitActionCompletion, dismissActionPresentation, KATCHIMERA_MEDITATION_MAX_SETTLEMENT_MS } from '@/game/katchimeras/action-runtime';
+
+export { KATCHIMERA_MEDITATION_MAX_SETTLEMENT_MS } from '@/game/katchimeras/action-runtime';
 
 export const MOSSPROUT_QUIET_PATCH_CHAPTER_ID = 'mossprout:chapter:quiet-patch';
 export const MOSSPROUT_DRY_POND_CHAPTER_ID = 'mossprout:chapter:dry-pond';
@@ -413,7 +415,6 @@ export function mossproutJourneyForDay(state: RelationshipProgressState, dayId: 
 }
 
 export const MOSSPROUT_FTUE_REST_MS = 8 * 60 * 60 * 1000;
-
 export function beginKatchimeraMeditation(
   state: RelationshipProgressState,
   familyId: KatchimeraFamilyId,
@@ -452,7 +453,7 @@ export function settleKatchimeraMeditation(
   let changed = false;
   const meditations = (state.meditations ?? []).map((record) => {
     if (record.familyId !== familyId || now >= record.availableAt || record.settlementReceiptIds?.includes(receiptId)) return record;
-    const settledMs = Math.min(30 * 60 * 1000, (record.settledMs ?? 0) + amount);
+    const settledMs = Math.min(KATCHIMERA_MEDITATION_MAX_SETTLEMENT_MS, (record.settledMs ?? 0) + amount);
     const applied = settledMs - (record.settledMs ?? 0);
     if (applied <= 0) return record;
     changed = true;

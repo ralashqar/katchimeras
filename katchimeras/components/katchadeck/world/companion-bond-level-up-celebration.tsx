@@ -187,13 +187,19 @@ export function CompanionBondLevelUpCelebration({ autoContinue = true, continueL
             ) : null}
             {companionSource ? (
               <Animated.View
+                collapsable={false}
                 entering={reduceMotion ? FadeIn.duration(100) : FadeIn.duration(280).delay(70)}
+                renderToHardwareTextureAndroid={false}
+                shouldRasterizeIOS={false}
                 style={[styles.heroCreature, { height: heroSize, width: heroSize }]}>
                 <Image
                   accessibilityLabel={journeyComplete
                     ? `${family?.displayName ?? 'Katchimera'} after completing today's Journey`
                     : `${family?.displayName ?? 'Katchimera'} at its new bond level`}
+                  allowDownscaling={false}
+                  cachePolicy="memory-disk"
                   contentFit="contain"
+                  priority="high"
                   source={companionSource}
                   style={StyleSheet.absoluteFill}
                   transition={0}

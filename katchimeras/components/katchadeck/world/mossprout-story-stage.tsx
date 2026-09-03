@@ -127,6 +127,7 @@ export function MossproutStoryStage({
   dayOneActionChoiceActive = false,
   actionStackTargetRef,
   navigationLocked = false,
+  meditationMode = false,
   tutorialInteractionLocked = false,
   residentParcelHandoffActive = false,
   residentStoryResumeActive = false,
@@ -157,6 +158,7 @@ export function MossproutStoryStage({
   dayOneActionChoiceActive?: boolean;
   actionStackTargetRef?: RefObject<ViewType | null>;
   navigationLocked?: boolean;
+  meditationMode?: boolean;
   tutorialInteractionLocked?: boolean;
   residentParcelHandoffActive?: boolean;
   residentStoryResumeActive?: boolean;
@@ -276,6 +278,7 @@ export function MossproutStoryStage({
     goals: goals.map((item) => ({ id: item.goal.id, templateId: item.goal.templateId, title: item.goal.title, completed: Boolean(item.completion) })),
     hasActiveFocus,
     includeActionIds: dayOneActionChoiceActive ? dayOneChoiceActionIds : undefined,
+    includeJourneyAction: !meditationMode,
     journey,
     journeyDayNumber,
     journeyGardenRequest,
@@ -283,7 +286,7 @@ export function MossproutStoryStage({
     skippedActionIds: relationships.skippedActionIds,
     slotSequences: mossproutDailyActionDeck(relationships, dayId).slotSequences,
     storyComplete,
-  }), [activeQuestId, conversations, dayId, dayOneActionChoiceActive, dayOneChoiceActionIds, dayOneLessonCompleted, gardenRequests, goals, hasActiveFocus, journey, journeyDayNumber, journeyGardenRequest, offers, relationships, storyComplete]);
+  }), [activeQuestId, conversations, dayId, dayOneActionChoiceActive, dayOneChoiceActionIds, dayOneLessonCompleted, gardenRequests, goals, hasActiveFocus, journey, journeyDayNumber, journeyGardenRequest, meditationMode, offers, relationships, storyComplete]);
   // The Day 1 Bond lesson temporarily scopes the normal resolver to its three
   // authored relationship choices. Coin-only requests remain in the Garden
   // and return to this rotation after FTUE completes.
@@ -573,9 +576,11 @@ export function MossproutStoryStage({
       ? styles.residentParcelStage
       : journeyMergeActive && !residentStoryResumeActive
         ? styles.journeyRequestStage
-        : styles.actionStage,
+        : meditationMode
+          ? styles.meditationActionStage
+          : styles.actionStage,
   ]}>
-    {journey && !storyComplete && !journeyMergeActive && !residentParcelHandoffActive && !residentStoryResumeActive ? (
+    {journey && !meditationMode && !storyComplete && !journeyMergeActive && !residentParcelHandoffActive && !residentStoryResumeActive ? (
       <KatchimeraJourneyStatusPlaque
         dayNumber={journeyDayNumber}
         revealKey={journey.id}
@@ -751,7 +756,7 @@ export function MossproutStoryStage({
       />
     ) : null}
 
-    {!residentParcelHandoffActive && !residentStoryResumeActive ? <KatchimeraBottomDock
+    {!meditationMode && !residentParcelHandoffActive && !residentStoryResumeActive ? <KatchimeraBottomDock
       disabled={navigationLocked}
       featuredId="garden"
       items={[
@@ -794,6 +799,7 @@ function ActionRewardChip({ reward }: {
 const styles = StyleSheet.create({
   stage: { alignSelf: 'stretch', gap: 8, overflow: 'visible', paddingBottom: 3 },
   actionStage: { height: ACTION_TRAY_HEIGHT },
+  meditationActionStage: { height: ACTION_TRAY_HEIGHT, justifyContent: 'flex-end' },
   journeyRequestStage: { height: JOURNEY_REQUEST_TRAY_HEIGHT },
   residentParcelStage: { justifyContent: 'flex-end' },
   actionStack: { height: ACTION_STACK_HEIGHT },

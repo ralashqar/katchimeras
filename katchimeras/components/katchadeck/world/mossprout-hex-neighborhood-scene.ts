@@ -40,7 +40,7 @@ const MAIN: ArtSpec = {
 
 const GARDEN_LEVELS: Record<0 | 1 | 2, ArtSpec> = {
   0: {
-  alphaBounds: { left: 29, top: 69, right: 999, bottom: 966 },
+  alphaBounds: { left: 25, top: 59, right: 995, bottom: 961 },
   coord: { q: 0, r: 2 },
   sources: {
     full: require('../../../assets/images/katchimeras/world/hex/mossprout_memory_garden_level_0.webp'),
@@ -49,7 +49,7 @@ const GARDEN_LEVELS: Record<0 | 1 | 2, ArtSpec> = {
   },
   },
   1: {
-    alphaBounds: { left: 28, top: 69, right: 997, bottom: 967 },
+    alphaBounds: { left: 11, top: 48, right: 1000, bottom: 992 },
     coord: { q: 0, r: 2 },
     sources: {
       full: require('../../../assets/images/katchimeras/world/hex/mossprout_memory_garden_level_1.webp'),
@@ -58,7 +58,7 @@ const GARDEN_LEVELS: Record<0 | 1 | 2, ArtSpec> = {
     },
   },
   2: {
-    alphaBounds: { left: 29, top: 69, right: 995, bottom: 966 },
+    alphaBounds: { left: 11, top: 48, right: 1000, bottom: 992 },
     coord: { q: 0, r: 2 },
     sources: {
       full: require('../../../assets/images/katchimeras/world/hex/mossprout_memory_garden_level_2.webp'),
@@ -89,13 +89,19 @@ export type MossproutGardenSceneState = {
 };
 
 const GARDEN_PLANT_SLOT_POSITIONS = {
-  'back-left': { x: 0.39, y: 0.42 },
-  'back-centre': { x: 0.55, y: 0.35 },
-  'back-right': { x: 0.72, y: 0.37 },
-  'front-left': { x: 0.29, y: 0.52 },
+  // Optical centres of the authored soil beds. These deliberately do not use
+  // an even grid: the isometric tile foreshortens and staggers each patch.
+  'back-left': { x: 0.37, y: 0.45 },
+  'back-centre': { x: 0.53, y: 0.34 },
+  'back-right': { x: 0.75, y: 0.33 },
+  'front-left': { x: 0.245, y: 0.525 },
   'front-centre': { x: 0.50, y: 0.50 },
-  'front-right': { x: 0.69, y: 0.49 },
+  'front-right': { x: 0.74, y: 0.48 },
 } as const;
+
+// Every memory-plant export is normalized to a 384px square with its planting
+// contact at y=366. Anchor that contact—not the image box—to the bed centre.
+const MEMORY_PLANT_ART_CONTACT_Y = 366 / 384;
 
 export const MOSSPROUT_GARDEN_PLANT_SLOT_IDS = Object.keys(GARDEN_PLANT_SLOT_POSITIONS) as MossproutGardenPlantSlotId[];
 
@@ -297,7 +303,7 @@ export function buildMossproutHexNeighborhoodScene(
       custom: true,
       depth: gardenLayer.depth + 1 + position.y,
       fallbackSource: null,
-      frame: { left: baseX - size / 2, top: baseY - size * 0.82, width: size, height: size },
+      frame: { left: baseX - size / 2, top: baseY - size * MEMORY_PLANT_ART_CONTACT_Y, width: size, height: size },
       interactionFrame: mossproutGardenPlantSlotFrame(gardenLayer.frame, plant.slotId),
       id: `plant:${plant.id}`,
       kind: 'structure',

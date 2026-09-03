@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { FTUE_ACTION_CATALOG, FTUE_HANDLER_REGISTRY } from '@/features/onboarding/ftue-action-registry';
@@ -610,12 +610,16 @@ test('route-changing FTUE actions persist before navigation and owned companion 
   assert.match(roster, /stepId === 'companion\.meditating'[\s\S]*?actionId: 'companion\.tend_garden'[\s\S]*?completeFtueRun\(\)/);
 });
 
-test('meditation stays inside companion interaction and suppresses ordinary action UI', () => {
+test('meditation stays inside companion interaction with compact action-card UI', () => {
   const haven = readFileSync('app/(tabs)/katchimeras.tsx', 'utf8');
   const havenWorld = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   const companion = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
   const interaction = readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
   const meditationStage = readFileSync('components/katchadeck/world/companion-meditation-stage.tsx', 'utf8');
+  const cinematicStage = readFileSync('components/katchadeck/world/companion-cinematic-stage.tsx', 'utf8');
+  const homeStage = readFileSync('components/katchadeck/world/companion-home-environment-stage.tsx', 'utf8');
+  const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
+  const creatureArt = readFileSync('utils/creature-art.ts', 'utf8');
 
   assert.match(haven, /meditationFtue = ftueRun\?\.status === 'active' && ftueRun\.stepId === 'companion\.meditating'[\s\S]*?!meditationFtue/);
   assert.match(havenWorld, /havenOpeningActive && ftueStep && !activeInteractionResidentId/);
@@ -623,14 +627,36 @@ test('meditation stays inside companion interaction and suppresses ordinary acti
   assert.match(havenWorld, /if \(ftueStepId && loadFtueRun\(\)\?\.status !== 'complete'\) return;[\s\S]*?setInteractionExiting\(true\)/);
   assert.match(companion, /ftueRun\.stepId === 'companion\.meditating'[\s\S]*?\? 'meditating'/);
   assert.match(interaction, /companionInteractionAvailability\(relationships, props\.familyId, meditationNow\)/);
-  assert.match(interaction, /<CompanionDestinationSurface[\s\S]*?styles\.destinationStageSpacer[\s\S]*?: meditation \? \([\s\S]*?<CompanionMeditationStage/);
+  assert.match(interaction, /meditationDashboardActive && meditation \? \([\s\S]*?styles\.meditationWorldTimer[\s\S]*?<CompanionMeditationStage/);
   assert.match(interaction, /initialConversationHandoffPending \? null : route\.kind === 'chat_lobby'[\s\S]*?&& !meditation/);
-  assert.match(interaction, /CompanionDestinationHeader[\s\S]*?\) && !questGameVisible && !questionnaireExperience && !meditation \? \(/);
-  assert.match(interaction, /companionSpeechTitle = meditation \? 'Meditating'/);
+  assert.match(interaction, /\(route\.kind === 'destination' \|\| dashboardRouteActive[\s\S]*?&& !questGameVisible && !questionnaireExperience \? \([\s\S]*?<CompanionDestinationHeader/);
+  assert.match(interaction, /meditationDashboardActive = Boolean\(meditation && route\.kind !== 'conversation'/);
+  assert.match(interaction, /companionSpeechTitle = meditationDashboardActive \? 'Meditating'/);
+  assert.match(interaction, /meditating=\{Boolean\(meditation\)\}/);
+  assert.match(cinematicStage, /meditating=\{meditating\}/);
+  assert.match(homeStage, /withTiming\(meditating \? 1 : 0,[\s\S]*?duration: 520/);
+  assert.match(homeStage, /<RotatingRadialSunburst[\s\S]*?<Image[\s\S]*?source=\{meditationCreature\}/);
+  assert.match(havenWorld, /activeKatchimeraMeditation\(relationships, 'mossprout'\)/);
+  assert.match(havenWorld, /mossproutMeditating=\{mossproutMeditating\}/);
+  assert.match(canvas, /<ResidentCreature[\s\S]*?meditating=\{tile\.companion\.familyId === 'mossprout' && mossproutMeditating\}/);
+  assert.match(canvas, /residentMeditationAura[\s\S]*?<RotatingRadialSunburst[\s\S]*?source=\{meditationSource\}/);
+  assert.match(canvas, /meditationProgress\.value = reduceMotion[\s\S]*?withTiming\(meditating \? 1 : 0/);
+  assert.match(canvas, /<RotatingRadialSunburst[\s\S]*?source=\{meditationSource\}/);
+  assert.match(creatureArt, /mossprout-meditating\.png/);
+  assert.equal(existsSync('assets/images/katchimeras/cutouts/mossprout-meditating.png'), true);
   assert.match(meditationStage, /formatMeditationCountdown/);
-  assert.match(meditationStage, /NEXT JOURNEY/);
-  assert.match(meditationStage, /onExitToGarden/);
-  assert.doesNotMatch(meditationStage, /DayAction|CompanionDashboard|MossproutStoryStage/);
+  assert.match(meditationStage, /meditationProgress/);
+  assert.match(interaction, /styles\.meditationActionsOverlay[\s\S]*?<MossproutStoryStage[\s\S]*?meditationMode/);
+  assert.match(interaction, /meditationActionsOverlay: \{ position: 'absolute', zIndex: 25 \}/);
+  assert.match(interaction, /bottom: Math\.max\(8, insets\.bottom \+ 4\)/);
+  assert.match(interaction, /scrollEnabled=\{!activeAttemptId && !questionnaireExperience && !meditationDashboardActive/);
+  assert.doesNotMatch(interaction, /meditationActionStack/);
+  assert.match(interaction, /meditationTimerScreenTop = Math\.max\(390, Math\.min\(510, viewportHeight \* 0\.58\)\)/);
+  assert.match(interaction, /meditationTimerSurfaceTop = Math\.max\([\s\S]*?meditationTimerScreenTop - \(insets\.top \+ 58 \+ KatchaUI\.spacing\.xs\)/);
+  assert.match(interaction, /meditationWorldTimer[\s\S]*?top: meditationTimerSurfaceTop/);
+  assert.doesNotMatch(interaction, /meditationStageSpacer/);
+  assert.match(readFileSync('features/onboarding/mossprout-ftue-script.ts', 'utf8'), /const mossproutMeditationCamera[\s\S]*?anchorY: 0\.46[\s\S]*?id: 'companion\.meditating'[\s\S]*?camera: mossproutMeditationCamera/);
+  assert.doesNotMatch(meditationStage, /DayActionCardSurface|While .* reflects|Small moments grow Bond|messagePanel|OUR NEXT JOURNEY/);
 });
 
 test('every active FTUE node has a canonical cold-start route', () => {
@@ -1008,7 +1034,11 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.match(kingdomCanvas, /presentation\?\.hatchPresentation \? <>[\s\S]*?worldFtueHatchRing[\s\S]*?worldFtueHatchRing[\s\S]*?<\/>(?:\s*): null/);
   assert.match(kingdomCanvas, /styles\.worldFtueCreatureFrame[\s\S]*?presentation\?\.hatchPresentation \? <>[\s\S]*?<RotatingRadialSunburst[\s\S]*?WORLD_FTUE_SOFT_GLOW[\s\S]*?worldFtueHatchGlow/);
   assert.match(kingdomCanvas, /WORLD_FTUE_REWARD_GLOW_SIZE = WORLD_FTUE_EGG_WIDTH \* 0\.84/);
-  assert.match(kingdomCanvas, /worldFtueRewardGlow: \{[\s\S]*?height: WORLD_FTUE_REWARD_GLOW_SIZE[\s\S]*?width: WORLD_FTUE_REWARD_GLOW_SIZE/);
+  assert.match(kingdomCanvas, /WORLD_FTUE_CREATURE_NATIVE_SURFACE_SCALE = 2\.7[\s\S]*?creatureNativeSurfaceStyle[\s\S]*?WORLD_FTUE_CREATURE_NATIVE_SURFACE_SCALE/);
+  assert.match(kingdomCanvas, /renderToHardwareTextureAndroid=\{false\}[\s\S]*?shouldRasterizeIOS=\{false\}[\s\S]*?styles\.worldFtueCreatureNativeSurface/);
+  assert.match(kingdomCanvas, /WORLD_FTUE_PULSE_RING_NATIVE_SURFACE_SCALE = 2[\s\S]*?hatchPulseRingSize/);
+  assert.match(kingdomCanvas, /worldFtueRewardGlow[\s\S]*?borderWidth: 2 \* WORLD_FTUE_CREATURE_NATIVE_SURFACE_SCALE[\s\S]*?creatureRewardGlowSize/);
+  assert.match(kingdomCanvas, /accessibilityLabel="Mossprout animated"[\s\S]*?allowDownscaling=\{false\}/);
   assert.match(mossproutOpening, /handleFtueEnergyTokenArrive[\s\S]*?index === count - 1[\s\S]*?pulseEgg\(\)/);
   assert.match(mossproutOpening, /onEnergyTokenArrive=\{handleFtueEnergyTokenArrive\}/);
   assert.match(mossproutOpening, /companionStageActive && subjectHandoffSettled[\s\S]*?<CompanionHomeEnvironmentStage/);

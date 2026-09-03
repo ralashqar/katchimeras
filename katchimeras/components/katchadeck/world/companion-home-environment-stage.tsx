@@ -1,6 +1,7 @@
 import { memo, useEffect, type RefObject } from 'react';
 import { StyleSheet, useWindowDimensions, View, type View as ViewType } from 'react-native';
-import Animated, { cancelAnimation, type SharedValue, useAnimatedStyle, useReducedMotion, useSharedValue } from 'react-native-reanimated';
+import { Image } from 'expo-image';
+import Animated, { cancelAnimation, Easing, type SharedValue, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
 import { TodayExplorationBackground } from '@/components/katchadeck/home/today-exploration-background';
@@ -9,8 +10,12 @@ import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-ba
 import type { QuestionnaireImageSource } from '@/utils/companion-questionnaire-presentation';
 import { companionHomeStageLayout } from '@/utils/companion-home-layout';
 import { runRewardArrivalMotion } from '@/components/katchadeck/ui/reward-arrival-motion';
+import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
+import { resolveCreatureMeditationArtSource } from '@/utils/creature-art';
 
 import { CreatureAnimatedArt } from './creature-animated-art';
+
+const REWARD_GLOW_NATIVE_SURFACE_SCALE = 2;
 
 export const CompanionHomeEnvironmentStage = memo(
   function CompanionHomeEnvironmentStage({
@@ -19,6 +24,7 @@ export const CompanionHomeEnvironmentStage = memo(
     creatureVerticalOffset = 0,
     creatureTargetRef,
     layer = 'both',
+    meditating = false,
     name,
     onBackgroundReady,
     onCreatureReady,
@@ -31,6 +37,7 @@ export const CompanionHomeEnvironmentStage = memo(
     creatureVerticalOffset?: number;
     creatureTargetRef?: RefObject<ViewType | null>;
     layer?: 'background' | 'creature' | 'both';
+    meditating?: boolean;
     name: string;
     onBackgroundReady?: () => void;
     onCreatureReady?: () => void;
@@ -42,7 +49,9 @@ export const CompanionHomeEnvironmentStage = memo(
     const reduceMotion = useReducedMotion();
     const feedback = useSharedValue(0);
     const shake = useSharedValue(0);
+    const meditationProgress = useSharedValue(meditating ? 1 : 0);
     const layout = companionHomeStageLayout(width, height, visualKey);
+    const meditationCreature = resolveCreatureMeditationArtSource(visualKey);
     const stageTransform = useAnimatedStyle(() => ({
       transform: [
         { translateX: layout.translateX + (sceneTranslateX?.value ?? 0) },
@@ -51,6 +60,8 @@ export const CompanionHomeEnvironmentStage = memo(
     }));
     const showBackground = layer === 'background' || layer === 'both';
     const showCreature = layer === 'creature' || layer === 'both';
+    const rewardGlowSize = layout.creatureFrame.size * 0.82;
+    const rewardGlowNativeSize = rewardGlowSize * REWARD_GLOW_NATIVE_SURFACE_SCALE;
     useEffect(() => {
       if (!rewardPulseKey) return;
       runRewardArrivalMotion(feedback, shake, reduceMotion);
@@ -61,6 +72,15 @@ export const CompanionHomeEnvironmentStage = memo(
         shake.value = 0;
       };
     }, [feedback, reduceMotion, rewardPulseKey, shake]);
+    useEffect(() => {
+      meditationProgress.value = reduceMotion
+        ? meditating ? 1 : 0
+        : withTiming(meditating ? 1 : 0, {
+            duration: 520,
+            easing: Easing.inOut(Easing.cubic),
+          });
+      return () => cancelAnimation(meditationProgress);
+    }, [meditating, meditationProgress, reduceMotion]);
     const creatureFeedbackStyle = useAnimatedStyle(() => ({
       transform: [
         { translateX: shake.value * 7 },
@@ -70,7 +90,19 @@ export const CompanionHomeEnvironmentStage = memo(
     }));
     const glowStyle = useAnimatedStyle(() => ({
       opacity: feedback.value * 0.82,
-      transform: [{ scale: 0.72 + feedback.value * 0.55 }],
+      transform: [{
+        scale: (0.72 + feedback.value * 0.55) / REWARD_GLOW_NATIVE_SURFACE_SCALE,
+      }],
+    }));
+    const regularCreatureStyle = useAnimatedStyle(() => ({
+      opacity: meditationCreature ? 1 - meditationProgress.value : 1,
+    }));
+    const meditationCreatureStyle = useAnimatedStyle(() => ({
+      opacity: meditationProgress.value,
+    }));
+    const meditationAuraStyle = useAnimatedStyle(() => ({
+      opacity: meditationProgress.value * 0.78,
+      transform: [{ scale: 0.92 + meditationProgress.value * 0.08 }],
     }));
 
     return (
@@ -93,7 +125,9 @@ export const CompanionHomeEnvironmentStage = memo(
         {showCreature ? <Animated.View style={[styles.creaturePlane, stageTransform]}>
           <Animated.View
             collapsable={false}
+            renderToHardwareTextureAndroid={false}
             ref={creatureTargetRef}
+            shouldRasterizeIOS={false}
             style={[
               styles.creatureFrame,
               {
@@ -103,20 +137,61 @@ export const CompanionHomeEnvironmentStage = memo(
                 width: layout.creatureFrame.size,
               }, creatureFeedbackStyle,
             ]}>
-            <Animated.View style={[styles.rewardGlow, glowStyle]} />
+            <Animated.View
+              collapsable={false}
+              renderToHardwareTextureAndroid={false}
+              shouldRasterizeIOS={false}
+              style={[
+                styles.rewardGlow,
+                {
+                  height: rewardGlowNativeSize,
+                  left: (layout.creatureFrame.size - rewardGlowNativeSize) / 2,
+                  top: (layout.creatureFrame.size - rewardGlowNativeSize) / 2,
+                  width: rewardGlowNativeSize,
+                },
+                glowStyle,
+              ]}
+            />
             <CreatureGroundShadow
               frameSize={layout.creatureFrame.size}
               stage="grown"
               visualKey={visualKey}
               widthMultiplier={1.65}
             />
-            <CreatureAnimatedArt
-              accessibilityLabel={`${name}, your Katchimera`}
-              fallbackSource={creature}
-              onLoad={onCreatureReady}
-              style={StyleSheet.absoluteFill}
-              visualKey={visualKey}
-            />
+            {meditationCreature ? (
+              <Animated.View pointerEvents="none" style={[styles.meditationAura, meditationAuraStyle]}>
+                <RotatingRadialSunburst
+                  baseOpacity={0.6}
+                  nativeSurfaceScale={2}
+                  size={layout.creatureFrame.size * 1.08}
+                />
+              </Animated.View>
+            ) : null}
+            <Animated.View style={[StyleSheet.absoluteFill, regularCreatureStyle]}>
+              <CreatureAnimatedArt
+                accessibilityLabel={`${name}, your Katchimera`}
+                allowDownscaling={false}
+                fallbackSource={creature}
+                onLoad={onCreatureReady}
+                style={StyleSheet.absoluteFill}
+                visualKey={visualKey}
+              />
+            </Animated.View>
+            {meditationCreature ? (
+              <Animated.View style={[StyleSheet.absoluteFill, meditationCreatureStyle]}>
+                <Image
+                  accessibilityIgnoresInvertColors
+                  accessibilityLabel={`${name}, meditating`}
+                  allowDownscaling={false}
+                  cachePolicy="memory-disk"
+                  contentFit="contain"
+                  onLoad={meditating ? onCreatureReady : undefined}
+                  source={meditationCreature}
+                  style={StyleSheet.absoluteFill}
+                  transition={0}
+                />
+              </Animated.View>
+            ) : null}
           </Animated.View>
         </Animated.View> : null}
       </View>
@@ -142,7 +217,18 @@ const styles = StyleSheet.create({
   },
   rewardGlow: {
     backgroundColor: 'rgba(255,205,92,0.34)', borderColor: 'rgba(255,239,168,0.86)', borderRadius: 999,
-    borderWidth: 3, bottom: '9%', boxShadow: '0 0 28px rgba(255,193,65,0.72)', left: '9%', position: 'absolute',
-    right: '9%', top: '9%',
+    borderWidth: 6, boxShadow: '0 0 56px rgba(255,193,65,0.72)', position: 'absolute',
+  },
+  meditationAura: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,220,125,0.16)',
+    borderRadius: 999,
+    boxShadow: '0 0 42px rgba(255,210,92,0.42)',
+    height: '76%',
+    justifyContent: 'center',
+    left: '12%',
+    position: 'absolute',
+    top: '13%',
+    width: '76%',
   },
 });

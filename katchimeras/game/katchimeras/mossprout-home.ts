@@ -264,6 +264,7 @@ export function resolveMossproutDayActions(input: {
   goals: readonly MossproutActionGoal[];
   hasActiveFocus?: boolean;
   includeActionIds?: readonly string[];
+  includeJourneyAction?: boolean;
   gardenRequests?: readonly MossproutActionGardenRequest[];
   journeyGardenRequest?: MossproutActionGardenRequest | null;
   journeyDayNumber?: number;
@@ -278,7 +279,7 @@ export function resolveMossproutDayActions(input: {
   const journey = input.journey;
   const includedActionIds = input.includeActionIds ? new Set(input.includeActionIds) : null;
   const mainRecord = journey?.actions.find((action) => action.kind === 'journey') ?? null;
-  if (!journey) actions.push({
+  if (!journey && input.includeJourneyAction !== false) actions.push({
     id: 'mossprout:start-journey', kind: 'story_chat', title: input.journeyDayNumber && input.journeyDayNumber > 1
       ? `Begin Journey Day ${input.journeyDayNumber}`
       : 'Spend today with Mossprout',
@@ -289,12 +290,12 @@ export function resolveMossproutDayActions(input: {
     disabled: false, status: 'ready', reward: { kind: 'bond', amount: 12 }, destination: { kind: 'journey' },
     completedAt: null, outroAcknowledgedAt: null,
   });
-  else if (journey.status !== 'complete' && !input.storyComplete) actions.push(activeJourneyAction(journey, mainRecord, input.journeyGardenRequest));
+  else if (journey && journey.status !== 'complete' && !input.storyComplete && input.includeJourneyAction !== false) actions.push(activeJourneyAction(journey, mainRecord, input.journeyGardenRequest));
 
   // An active Journey Day owns the action stack. Its opening, required Merge
   // work, and return scene must read as one uninterrupted story; routine goals,
   // conversations, quests, and Garden requests resume only after completion.
-  if (journey && journey.status !== 'complete') {
+  if (journey && journey.status !== 'complete' && input.includeJourneyAction !== false) {
     const journeyAction = actions[0];
     if (!journeyAction) return [];
     return [journeyAction].map((action) => {

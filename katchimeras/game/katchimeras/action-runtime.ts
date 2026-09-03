@@ -12,6 +12,9 @@ import type {
 const SLOT_IDS = ['together', 'field', 'garden'] as const;
 const MAX_COMPLETIONS = 160;
 const MAX_PRESENTATIONS = 80;
+const MEDITATION_SETTLEMENT_PER_BOND_POINT_MS = 5 * 60 * 1000;
+const MEDITATION_SETTLEMENT_PER_ACTION_MAX_MS = 30 * 60 * 1000;
+export const KATCHIMERA_MEDITATION_MAX_SETTLEMENT_MS = 2 * 60 * 60 * 1000;
 
 export function actionCommandFromOrigin(
   origin: KatchimeraActionOrigin,
@@ -123,6 +126,39 @@ export function commitActionCompletion(
       dismissedAt: null,
     };
     next = { ...next, actionPresentations: [...next.actionPresentations, presentation].slice(-MAX_PRESENTATIONS) };
+  }
+
+  // Ordinary Bond actions remain useful while a companion is reflecting.
+  // The completion command is the receipt, so retries cannot reduce the same
+  // meditation twice and the durable total can never exceed two hours.
+  if (command.outcome === 'completed' && command.rewardIntent?.kind === 'bond' && command.rewardIntent.amount > 0) {
+    const receiptId = `action-settlement:${command.commandId}`;
+    const requestedMs = Math.min(
+      MEDITATION_SETTLEMENT_PER_ACTION_MAX_MS,
+      command.rewardIntent.amount * MEDITATION_SETTLEMENT_PER_BOND_POINT_MS,
+    );
+    next = {
+      ...next,
+      meditations: (next.meditations ?? []).map((record) => {
+        if (
+          record.familyId !== command.familyId
+          || command.completedAt >= record.availableAt
+          || record.settlementReceiptIds?.includes(receiptId)
+        ) return record;
+        const settledMs = Math.min(
+          KATCHIMERA_MEDITATION_MAX_SETTLEMENT_MS,
+          (record.settledMs ?? 0) + requestedMs,
+        );
+        const appliedMs = settledMs - (record.settledMs ?? 0);
+        if (appliedMs <= 0) return record;
+        return {
+          ...record,
+          availableAt: Math.max(record.startedAt + 1, record.availableAt - appliedMs),
+          settledMs,
+          settlementReceiptIds: [...(record.settlementReceiptIds ?? []), receiptId],
+        };
+      }),
+    };
   }
 
   return next;

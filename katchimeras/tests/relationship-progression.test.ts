@@ -159,15 +159,32 @@ test('meditation commands are idempotent by story source and gate companion acti
   assert.equal(companionInteractionAvailability(replayed, 'mossprout', 9_000).kind, 'available');
 });
 
-test('meditation settling is capped and idempotent per optional interaction', () => {
+test('meditation settling is capped at two hours and idempotent per optional interaction', () => {
   const initial = beginKatchimeraMeditation(emptyRelationshipProgressState(), 'mossprout', 1_000, 8 * 60 * 60 * 1000, 'ftue:rest');
   const water = settleKatchimeraMeditation(initial, 'mossprout', 20 * 60 * 1000, 'water', 2_000);
   const replay = settleKatchimeraMeditation(water, 'mossprout', 20 * 60 * 1000, 'water', 2_001);
   const thought = settleKatchimeraMeditation(replay, 'mossprout', 10 * 60 * 1000, 'thought', 2_002);
-  const capped = settleKatchimeraMeditation(thought, 'mossprout', 60 * 60 * 1000, 'extra', 2_003);
+  const capped = settleKatchimeraMeditation(thought, 'mossprout', 3 * 60 * 60 * 1000, 'extra', 2_003);
   assert.equal(katchimeraMeditationRecord(replay, 'mossprout')?.availableAt, katchimeraMeditationRecord(water, 'mossprout')?.availableAt);
-  assert.equal(katchimeraMeditationRecord(capped, 'mossprout')?.settledMs, 30 * 60 * 1000);
-  assert.equal(katchimeraMeditationRecord(capped, 'mossprout')?.settlementReceiptIds?.length, 2);
+  assert.equal(katchimeraMeditationRecord(capped, 'mossprout')?.settledMs, 2 * 60 * 60 * 1000);
+  assert.equal(katchimeraMeditationRecord(capped, 'mossprout')?.settlementReceiptIds?.length, 3);
+});
+
+test('ordinary Bond actions settle meditation from their durable completion receipt', () => {
+  const resting = beginKatchimeraMeditation(emptyRelationshipProgressState(), 'mossprout', 1_000, 8 * 60 * 60 * 1000, 'rest');
+  const input = {
+    dayId: '2026-08-21', familyId: 'mossprout' as const, actionId: 'mossprout:conversation:playful',
+    instanceId: '2026-08-21:together:0:mossprout:conversation:playful', slotId: 'together' as const, sequence: 0,
+    kind: 'fun_chat' as const, title: 'A playful question', subtitle: 'Spend a moment together',
+    icon: 'bubble.left.fill' as const, artworkDefinitionIds: [], reward: { kind: 'bond' as const, amount: 4 }, completedAt: 2_000,
+  };
+  const once = recordKatchimeraActionCompletion(resting, input);
+  const replayed = recordKatchimeraActionCompletion(once, input);
+  const meditation = katchimeraMeditationRecord(replayed, 'mossprout');
+
+  assert.equal(meditation?.settledMs, 20 * 60 * 1000);
+  assert.equal(meditation?.availableAt, 1_000 + 8 * 60 * 60 * 1000 - 20 * 60 * 1000);
+  assert.equal(meditation?.settlementReceiptIds?.length, 1);
 });
 
 test('Journey Day 1 supports a complete manual narrative flow without FTUE', () => {
@@ -551,6 +568,25 @@ test('Mossprout resolver hides a skipped optional action only on that day', () =
   assert.equal(hidden.some((action) => action.id === MOSSPROUT_DAILY_FIELD_NOTE_ACTION_ID), false);
   assert.equal(tomorrow.some((action) => action.id === MOSSPROUT_DAILY_FIELD_NOTE_ACTION_ID), true);
   assert.equal(hidden.some((action) => action.required), true);
+});
+
+test('meditation replaces the Journey launcher with ordinary Mossprout actions', () => {
+  const actions = resolveMossproutDayActions({
+    conversations: [
+      { definitionId: 'playful-question', mode: 'play', title: 'A playful question' },
+      { definitionId: 'small-reflection', mode: 'talk', actionKind: 'journal_prompt', title: 'A small reflection' },
+    ],
+    dayId: '2026-08-21',
+    goals: [],
+    includeJourneyAction: false,
+    journey: null,
+    offers: [],
+    storyComplete: false,
+  });
+
+  assert.equal(actions.some((action) => action.destination.kind === 'journey'), false);
+  assert.equal(actions.some((action) => action.kind === 'fun_chat'), true);
+  assert.equal(actions.some((action) => action.kind === 'journal_prompt'), true);
 });
 
 test('Mossprout offers only one field-note flow per day after it is skipped', () => {

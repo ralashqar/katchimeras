@@ -352,9 +352,13 @@ test('FTUE upgrade is explicit and meditation exits without reopening Merge', ()
   assert.match(canvas, /const committedScene = useMemo[\s\S]*?const upgradeFromScene = useMemo[\s\S]*?upgradePresentation\.fromStage[\s\S]*?complete rendered world on the receipt's from-state[\s\S]*?storySceneGuard\?\.scene \?\? committedScene/);
   assert.match(canvas, /payload\.operation === 'preserve'[\s\S]*?payload\.holdWorldState[\s\S]*?setStorySceneGuard[\s\S]*?requestAnimationFrame/);
   assert.match(readFileSync('components/katchadeck/world/mossprout-hex-neighborhood-scene.ts', 'utf8'), /GARDEN_LAYOUT_BOUNDS = Object\.values\(GARDEN_LEVELS\)\.reduce[\s\S]*?GARDEN_LEVELS\[gardenArtLevel\],[\s\S]*?GARDEN_LAYOUT_BOUNDS/);
+  assert.match(readFileSync('components/katchadeck/world/mossprout-hex-neighborhood-scene.ts', 'utf8'), /'front-left': \{ x: 0\.245, y: 0\.525 \}[\s\S]*?MEMORY_PLANT_ART_CONTACT_Y = 366 \/ 384[\s\S]*?baseY - size \* MEMORY_PLANT_ART_CONTACT_Y/);
   assert.match(canvas, /const ProjectedMemoryPlant[\s\S]*?allowDownscaling=\{false\}/);
   assert.match(canvas, /MEMORY_PLANT_NATIVE_SURFACE_SCALE[\s\S]*?revealScale\.value[\s\S]*?withSequence\([\s\S]*?withTiming\(1\.14[\s\S]*?withTiming\(1,/);
+  assert.match(canvas, /revealRequestedForVisualKeyRef[\s\S]*?if \(animateReveal\) revealRequestedForVisualKeyRef\.current = visualKey[\s\S]*?revealRequestedForVisualKeyRef\.current !== visualKey/);
+  assert.doesNotMatch(canvas, /\}, \[animateReveal, celebrationOpacity/);
   assert.match(canvas, /RotatingRadialSunburst[\s\S]*?CelebrationParticles[\s\S]*?memory-plant-confetti-/);
+  assert.match(canvas, /Centre the celebration on the planted[\s\S]*?top: \(nativeHeight - raySize\) \/ 2 \+ nativeHeight \* 0\.14/);
   assert.doesNotMatch(canvas, /animatePlant/);
   assert.match(havenScreen, /glow=\{ftueStepId === 'world\.garden_arrival'\}/);
   assert.match(havenScreen, /icon=\{ftueStep\.actions\[0\]\?\.icon \?\? 'sparkles'\}/);
@@ -377,6 +381,8 @@ test('live Chapter 0 board installation preserves the planted Haven memory', () 
   assert.match(repository, /options: \{ preserveHaven\?: boolean \}/);
   assert.match(repository, /options\.preserveHaven[\s\S]*?haven: current\.haven/);
   assert.match(havenScreen, /beginFirstSeedPlanting[\s\S]*?evidenceRef: 'garden-plot:front-left'/);
+  assert.match(repository, /ensureStoredFirstFtueMemoryPlacement[\s\S]*?placeStoredPlantableMemory\(plant\.id, 'front-left', receiptId\)/);
+  assert.match(havenScreen, /run\.stepId === 'world\.seed_planted'[\s\S]*?ensureStoredFirstFtueMemoryPlacement/);
   assert.match(havenScreen, /world\.seed_planted'[\s\S]*?firstSeedPlanted/);
   assert.match(havenScreen, /world\.first_seed_grew'[\s\S]*?firstSeedGrown/);
 });

@@ -302,7 +302,7 @@ test('the Katchimeras tab renders the hex selector first while companion Back re
   assert.match(kingdomScreen, /cameraMaximumScale=\{ftueEggFeedingCloseupActive[\s\S]*?MOSSPROUT_WORLD_EGG_CLOSE_ZOOM[\s\S]*?MOSSPROUT_WORLD_EGG_REST_ZOOM/);
   assert.match(kingdomCanvas, /animated=\{stableWorldPresentation \|\| interactionResidentId === tile\.companion\.creature\.creatureId\}/);
   assert.match(kingdomCanvas, /<CreatureAnimatedArt[\s\S]*?visualKey=\{creature\.visualKey\}/);
-  assert.match(kingdomScreen, /<HavenTileHudLayer[\s\S]*?onOpen=\{openHavenDetail\}/);
+  assert.doesNotMatch(kingdomScreen, /HavenTileHudLayer|openHavenDetail|onResidentAnchorsChange/);
   assert.match(kingdomScreen, /setGardenButtonNode = useCallback[\s\S]*?ref=\{setGardenButtonNode\}/);
   assert.doesNotMatch(kingdomScreen, /ref=\{\(node\) => registerFtueTarget\('garden-button:mossprout'/);
   assert.match(kingdomScreen, /Hidden in the Dream Mist/);

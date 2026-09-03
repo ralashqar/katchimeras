@@ -70,7 +70,7 @@ import {
   kingdomWorldViewPoint,
 } from '@/utils/kingdom-rendering';
 import { getDevKingdomHexVerticalAlignmentMode } from '@/utils/dev-asset-overrides';
-import { resolveCreatureArtSource } from '@/utils/creature-art';
+import { resolveCreatureArtSource, resolveCreatureMeditationArtSource } from '@/utils/creature-art';
 import { FTUE_MOSSPROUT_CREATURE } from '@/features/onboarding/mossprout-ftue-creature';
 import { eggVisualGrowthForEnergyRatio } from '@/utils/today-growth';
 import type { TodayHatchPhase } from '@/utils/today-hatch-presentation';
@@ -141,6 +141,7 @@ type Props = {
   onTileUpgradeOfferPress?: () => void;
   onTileUpgradeOfferTargetChange?: (node: ViewType | null) => void;
   interactionResidentId?: string | null;
+  mossproutMeditating?: boolean;
   interactionResidentAnchorY?: number;
   interactionExitNonce?: number;
   interactionRewardPulseKey?: number;
@@ -154,6 +155,12 @@ type Props = {
   onSelectMovementEgg?: () => void;
   worldEggTargetRef?: RefObject<ViewType | null>;
   worldSubjectPresentation?: WorldFtueSubjectPresentation | null;
+};
+
+type HavenUpgradeLayers = {
+  fromLayer: KingdomTileArtLayer;
+  tile: { id: string; cx: number; cy: number };
+  toLayer: KingdomTileArtLayer;
 };
 
 const CREATURE_SIZE = 58;
@@ -195,6 +202,8 @@ const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
 // world camera, tile focus, growth and reaction scales. It is therefore always
 // sampled down (never enlarged from a 108x139 intermediate texture).
 const WORLD_FTUE_EGG_NATIVE_SURFACE_SCALE = 2.7;
+const WORLD_FTUE_CREATURE_NATIVE_SURFACE_SCALE = 2.7;
+const WORLD_FTUE_PULSE_RING_NATIVE_SURFACE_SCALE = 2;
 // Interaction residents live on a detached, oversized native plane just like
 // the FTUE Egg. The camera only downsamples this surface, so an animated WebP
 // is never first rasterized at its tiny world-map footprint and enlarged.
@@ -380,6 +389,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   onTileUpgradeOfferPress,
   onTileUpgradeOfferTargetChange,
   interactionResidentId = null,
+  mossproutMeditating = false,
   interactionResidentAnchorY,
   interactionExitNonce = 0,
   interactionRewardPulseKey = 0,
@@ -397,12 +407,21 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [assetRevision, setAssetRevision] = useState(0);
   const [upgradePhase, setUpgradePhase] = useState<HavenUpgradePresentationPhase>('armed');
+  const [settlingUpgrade, setSettlingUpgrade] = useState<{
+    layers: HavenUpgradeLayers;
+    nonce: number;
+  } | null>(null);
   const [storySceneGuard, setStorySceneGuard] = useState<{ key: string; scene: KingdomHexScene } | null>(null);
   const [discoveryPhase, setDiscoveryPhase] = useState<HavenUpgradePresentationPhase>('armed');
   const rootRef = useRef<View>(null);
   const reduceMotion = useReducedMotion();
   const [cameraRestoreNonce, setCameraRestoreNonce] = useState(0);
   const cameraRestoreArmedRef = useRef(false);
+  const settlingUpgradeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (settlingUpgradeTimerRef.current) clearTimeout(settlingUpgradeTimerRef.current);
+  }, []);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
@@ -1016,6 +1035,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     };
     const finish = () => {
       setUpgradePhase('complete');
+      // The parent commits the new scene and clears the presentation in the
+      // same turn. Retain this already-visible top layer until the persistent
+      // tile beneath it confirms that its new source has loaded and faded in.
+      setSettlingUpgrade({ layers, nonce: presentation.nonce });
       void AccessibilityInfo.announceForAccessibility(
         `${presentation.creatureName}'s ${presentation.upgradeName} restored`,
       );
@@ -1051,6 +1074,22 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       timers.forEach(clearTimeout);
     };
   }, [upgradePresentation?.nonce, upgradePresentation?.status]);
+
+  const finishSettlingUpgrade = useCallback((nonce: number) => {
+    if (settlingUpgradeTimerRef.current) clearTimeout(settlingUpgradeTimerRef.current);
+    settlingUpgradeTimerRef.current = setTimeout(() => {
+      settlingUpgradeTimerRef.current = null;
+      setSettlingUpgrade((current) => current?.nonce === nonce ? null : current);
+    }, KINGDOM_RENDERING.imageCrossfadeMs + 34);
+  }, []);
+
+  useEffect(() => {
+    if (!settlingUpgrade) return;
+    // A changed overlay can disappear rather than load a replacement source.
+    // Keep a bounded fallback so that case cannot retain an inert layer.
+    const timer = setTimeout(() => finishSettlingUpgrade(settlingUpgrade.nonce), 1_000);
+    return () => clearTimeout(timer);
+  }, [finishSettlingUpgrade, settlingUpgrade]);
 
   const cameraSnapshot = camera.snapshot;
   const upgradeEffectGeometry = useMemo(() => {
@@ -1252,6 +1291,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             focusAnchorY={tile.cy}
             focusScale={focusScale}
             key={`creature-${tile.id}`}
+            meditating={tile.companion.familyId === 'mossprout' && mossproutMeditating}
             source={artLayer?.residentSource}
             stableWorldPresentation={stableWorldPresentation}
             tile={tile}
@@ -1267,7 +1307,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     }
 
     return items.sort((a, b) => a.depth - b.depth).map((item) => item.node);
-  }, [allowedResidentCharacterId, artLayerById, camera.focusResident, creatureWorldSize, highlightedLockedFamilyId, ignoreFocus, interactionEnabled, interactionResidentId, interactionRewardPulseKey, onSelectLocked, onSelectResident, residentStatusGlyphs, scene.tiles, tileFocusScale, upgradePhase, upgradePresentation]);
+  }, [allowedResidentCharacterId, artLayerById, camera.focusResident, creatureWorldSize, highlightedLockedFamilyId, ignoreFocus, interactionEnabled, interactionResidentId, interactionRewardPulseKey, mossproutMeditating, onSelectLocked, onSelectResident, residentStatusGlyphs, scene.tiles, tileFocusScale, upgradePhase, upgradePresentation]);
 
   const home = homePreset(identity?.selectedHomeArchetypeId);
   const showEgg = Boolean(eggVisual);
@@ -1301,6 +1341,26 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                     sceneTileImageLod
                   )
                 : null;
+              const upgradeOwnsLayer = Boolean(
+                upgradeLayers
+                && upgradePresentation
+                && layer.id === upgradeLayers.tile.id
+                && havenUpgradeLayerArtChanges(upgradeLayers.fromLayer, upgradeLayers.toLayer, sceneTileImageLod),
+              );
+              const settlingOwnsLayer = Boolean(
+                settlingUpgrade
+                && layer.id === settlingUpgrade.layers.tile.id
+                && havenUpgradeLayerArtChanges(
+                  settlingUpgrade.layers.fromLayer,
+                  settlingUpgrade.layers.toLayer,
+                  sceneTileImageLod,
+                )
+              );
+              const transitionLayers = upgradeOwnsLayer
+                ? upgradeLayers
+                : settlingOwnsLayer
+                  ? settlingUpgrade?.layers ?? null
+                  : null;
               return (
                 <Fragment key={`tile-stack-${layer.id}`}>
                   <KingdomTileArt
@@ -1311,15 +1371,18 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                     source={source}
                     overlaySource={overlaySource}
                     fallbackSource={fallbackSource}
+                    onReady={settlingOwnsLayer && settlingUpgrade
+                      ? () => finishSettlingUpgrade(settlingUpgrade.nonce)
+                      : undefined}
                     priority={layer.id === scene.centerTile.id || layer.id === 'structure:mossprout-hex-garden' ? 'high' : 'normal'}
                   />
-                  {upgradeLayers && upgradePresentation && layer.id === upgradeLayers.tile.id ? (
+                  {transitionLayers ? (
                     <HavenUpgradeTileArt
-                      fromLayer={upgradeLayers.fromLayer}
+                      fromLayer={transitionLayers.fromLayer}
                       imageLod={sceneTileImageLod}
-                      phase={upgradePhase}
+                      phase={upgradeOwnsLayer ? upgradePhase : 'complete'}
                       reducedMotion={reduceMotion}
-                      toLayer={upgradeLayers.toLayer}
+                      toLayer={transitionLayers.toLayer}
                     />
                   ) : null}
                   {discoveryLayers && layer.id === discoveryLayers.tile.id && discoveryPhase !== 'complete' ? (
@@ -1455,6 +1518,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           cameraTranslateY={camera.translationYValue}
           creature={interactionResidentProjection.creature}
           frame={interactionResidentProjection.frame}
+          meditating={mossproutMeditating}
           rewardPulseKey={interactionRewardPulseKey}
           sceneHeight={scene.height}
           sceneWidth={scene.width}
@@ -1578,6 +1642,7 @@ type TileArtProps = {
   priority: 'low' | 'normal' | 'high';
   source: ImageSourcePropType;
   overlaySource: ImageSourcePropType | null;
+  onReady?: () => void;
 };
 
 const KingdomTileArt = memo(function KingdomTileArt({
@@ -1589,6 +1654,7 @@ const KingdomTileArt = memo(function KingdomTileArt({
   priority,
   source,
   overlaySource,
+  onReady,
 }: TileArtProps) {
   return (
     <TileFocusTransform anchorX={focusAnchorX} anchorY={focusAnchorY} frame={frame} scale={focusScale}>
@@ -1597,11 +1663,13 @@ const KingdomTileArt = memo(function KingdomTileArt({
           allowDownscaling
           source={source}
           fallbackSource={fallbackSource}
+          onReady={onReady}
           priority={priority}
         />
         {overlaySource ? (
           <SeamlessWorldImage
             allowDownscaling
+            onReady={onReady}
             source={overlaySource}
             priority={priority}
           />
@@ -1624,23 +1692,27 @@ const HavenUpgradeTileArt = memo(function HavenUpgradeTileArt({
   reducedMotion: boolean;
   toLayer: KingdomTileArtLayer;
 }) {
-  const oldOpacity = useSharedValue(1);
-  const newOpacity = useSharedValue(0);
+  const revealActive = phase === 'reveal' || phase === 'react' || phase === 'complete';
+  // A presentation can be reconstructed while its persisted world commit is
+  // publishing. Initialize from the current phase so a remount after reveal
+  // can never flash the old art, then only ever move this value forward.
+  const revealProgress = useSharedValue(revealActive ? 1 : 0);
 
   useEffect(() => {
-    if (phase !== 'reveal' && phase !== 'react' && phase !== 'complete') return;
-    const timing = { duration: reducedMotion ? 180 : 480, easing: Easing.inOut(Easing.cubic) };
-    oldOpacity.value = withTiming(0, timing);
-    newOpacity.value = withTiming(1, timing);
-  }, [newOpacity, oldOpacity, phase, reducedMotion]);
+    if (!revealActive) return;
+    revealProgress.value = withTiming(1, {
+      duration: reducedMotion ? 180 : 480,
+      easing: Easing.inOut(Easing.cubic),
+    });
+  }, [reducedMotion, revealActive, revealProgress]);
 
-  const oldStyle = useAnimatedStyle(() => ({ opacity: oldOpacity.value }));
-  const newStyle = useAnimatedStyle(() => ({ opacity: newOpacity.value }));
+  const oldStyle = useAnimatedStyle(() => ({ opacity: 1 - revealProgress.value }));
+  const newStyle = useAnimatedStyle(() => ({ opacity: revealProgress.value }));
   const oldSource = kingdomHexTileSourceForLod(fromLayer, imageLod);
   const newSource = kingdomHexTileSourceForLod(toLayer, imageLod);
   const oldOverlaySource = kingdomHexTileOverlaySourceForLod(fromLayer, imageLod);
   const newOverlaySource = kingdomHexTileOverlaySourceForLod(toLayer, imageLod);
-  const artChanges = oldSource !== newSource || oldOverlaySource !== newOverlaySource;
+  const artChanges = havenUpgradeLayerArtChanges(fromLayer, toLayer, imageLod);
 
   if (!artChanges) return null;
 
@@ -1915,11 +1987,19 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
   const crackTwoStyle = useAnimatedStyle(() => ({ opacity: crackTwo.value }));
   const hatchPulseOneStyle = useAnimatedStyle(() => ({
     opacity: (1 - hatchPulse.value) * 0.36 * (1 - eggExit.value),
-    transform: [{ scale: (0.62 + hatchPulse.value * 0.72) * cameraScale.value }],
+    transform: [{
+      scale: (0.62 + hatchPulse.value * 0.72)
+        * cameraScale.value
+        / WORLD_FTUE_PULSE_RING_NATIVE_SURFACE_SCALE,
+    }],
   }));
   const hatchPulseTwoStyle = useAnimatedStyle(() => ({
     opacity: (1 - hatchPulse.value) * 0.22 * (1 - eggExit.value),
-    transform: [{ scale: (0.86 + hatchPulse.value * 0.72) * cameraScale.value }],
+    transform: [{
+      scale: (0.86 + hatchPulse.value * 0.72)
+        * cameraScale.value
+        / WORLD_FTUE_PULSE_RING_NATIVE_SURFACE_SCALE,
+    }],
   }));
   const projectedEffectCameraStyle = useAnimatedStyle(() => ({
     transform: [{ scale: cameraScale.value }],
@@ -1930,8 +2010,14 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
       { translateX: rewardShake.value * 5.5 },
       { translateY: (1 - creatureEntry.value) * 14 },
       { rotateZ: `${rewardShake.value * 2.2}deg` },
-      { scale: (0.72 + creatureEntry.value * 0.28 + rewardPulse.value * 0.055) * cameraScale.value },
     ],
+  }));
+  const creatureNativeSurfaceStyle = useAnimatedStyle(() => ({
+    transform: [{
+      scale: (0.72 + creatureEntry.value * 0.28 + rewardPulse.value * 0.055)
+        * cameraScale.value
+        / WORLD_FTUE_CREATURE_NATIVE_SURFACE_SCALE,
+    }],
   }));
   const rewardGlowStyle = useAnimatedStyle(() => ({
     opacity: rewardPulse.value * 0.84,
@@ -1943,6 +2029,12 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
   }));
   const width = WORLD_FTUE_EGG_WIDTH;
   const height = WORLD_FTUE_EGG_HEIGHT;
+  const creatureNativeWidth = width * WORLD_FTUE_CREATURE_NATIVE_SURFACE_SCALE;
+  const creatureNativeHeight = height * WORLD_FTUE_CREATURE_NATIVE_SURFACE_SCALE;
+  const creatureRaySize = WORLD_FTUE_HATCH_SUNBURST_SIZE * WORLD_FTUE_CREATURE_NATIVE_SURFACE_SCALE;
+  const creatureRewardGlowSize = WORLD_FTUE_REWARD_GLOW_SIZE * WORLD_FTUE_CREATURE_NATIVE_SURFACE_SCALE;
+  const hatchPulseRingSize = WORLD_FTUE_EGG_WIDTH * 1.05 * WORLD_FTUE_PULSE_RING_NATIVE_SURFACE_SCALE;
+  const hatchPulseRingCenterY = WORLD_FTUE_EGG_HEIGHT * 0.08 + WORLD_FTUE_EGG_WIDTH * 1.05 / 2;
   const projectionStyle = useAnimatedStyle(() => ({
     transform: [
       {
@@ -1964,8 +2056,20 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
       pointerEvents="box-none"
       style={[styles.worldFtueProjectedSubject, { height, width }, projectionStyle]}>
       {presentation?.hatchPresentation ? <>
-        <Animated.View pointerEvents="none" style={[styles.worldFtueHatchRing, hatchPulseOneStyle]} />
-        <Animated.View pointerEvents="none" style={[styles.worldFtueHatchRing, hatchPulseTwoStyle]} />
+        <Animated.View pointerEvents="none" style={[styles.worldFtueHatchRing, {
+          borderWidth: 2 * WORLD_FTUE_PULSE_RING_NATIVE_SURFACE_SCALE,
+          height: hatchPulseRingSize,
+          left: (WORLD_FTUE_EGG_WIDTH - hatchPulseRingSize) / 2,
+          top: hatchPulseRingCenterY - hatchPulseRingSize / 2,
+          width: hatchPulseRingSize,
+        }, hatchPulseOneStyle]} />
+        <Animated.View pointerEvents="none" style={[styles.worldFtueHatchRing, {
+          borderWidth: 2 * WORLD_FTUE_PULSE_RING_NATIVE_SURFACE_SCALE,
+          height: hatchPulseRingSize,
+          left: (WORLD_FTUE_EGG_WIDTH - hatchPulseRingSize) / 2,
+          top: hatchPulseRingCenterY - hatchPulseRingSize / 2,
+          width: hatchPulseRingSize,
+        }, hatchPulseTwoStyle]} />
       </> : null}
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, projectedEffectCameraStyle]}>
         {presentation?.readyToHatch ? <>
@@ -2055,39 +2159,77 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
       </Animated.View>
       {presentation?.hatchPresentation || presentation?.companionVisible ? (
         <Animated.View
+          collapsable={false}
           pointerEvents="none"
+          renderToHardwareTextureAndroid={false}
+          shouldRasterizeIOS={false}
           style={[styles.worldFtueCreatureFrame, StyleSheet.absoluteFill, creatureStyle]}>
-          {presentation?.hatchPresentation ? <>
-            <RotatingRadialSunburst
-              baseOpacity={0.9}
-              size={WORLD_FTUE_HATCH_SUNBURST_SIZE}
-              style={{
-                left: (WORLD_FTUE_EGG_WIDTH - WORLD_FTUE_HATCH_SUNBURST_SIZE) / 2,
-                top: (WORLD_FTUE_EGG_HEIGHT - WORLD_FTUE_HATCH_SUNBURST_SIZE) / 2,
-              }}
+          <Animated.View
+            collapsable={false}
+            renderToHardwareTextureAndroid={false}
+            shouldRasterizeIOS={false}
+            style={[
+              styles.worldFtueCreatureNativeSurface,
+              {
+                height: creatureNativeHeight,
+                marginLeft: -creatureNativeWidth / 2,
+                width: creatureNativeWidth,
+              },
+              creatureNativeSurfaceStyle,
+            ]}>
+            {presentation?.hatchPresentation ? <>
+              <RotatingRadialSunburst
+                baseOpacity={0.9}
+                nativeSurfaceScale={1}
+                size={creatureRaySize}
+                style={{
+                  left: (creatureNativeWidth - creatureRaySize) / 2,
+                  top: (creatureNativeHeight - creatureRaySize) / 2,
+                }}
+              />
+              <AnimatedExpoImage
+                allowDownscaling={false}
+                cachePolicy="memory-disk"
+                contentFit="contain"
+                priority="high"
+                source={WORLD_FTUE_SOFT_GLOW}
+                style={[styles.worldFtueHatchGlow, hatchGlowStyle]}
+                tintColor={FTUE_MOSSPROUT_CREATURE.accentColor}
+                transition={0}
+              />
+            </> : null}
+            <Animated.View style={[styles.worldFtueRewardGlow, {
+              borderWidth: 2 * WORLD_FTUE_CREATURE_NATIVE_SURFACE_SCALE,
+              boxShadow: `0 0 ${22 * WORLD_FTUE_CREATURE_NATIVE_SURFACE_SCALE}px rgba(255,193,65,0.72)`,
+              height: creatureRewardGlowSize,
+              left: (creatureNativeWidth - creatureRewardGlowSize) / 2,
+              top: (creatureNativeHeight - creatureRewardGlowSize) / 2,
+              width: creatureRewardGlowSize,
+            }, rewardGlowStyle]} />
+            <CreatureGroundShadow frameSize={creatureNativeWidth} stage="grown" visualKey="mossprout" widthMultiplier={1.6} />
+            <CreatureAnimatedArt
+              accessibilityLabel="Mossprout animated"
+              allowDownscaling={false}
+              fallbackSource={WORLD_FTUE_MOSSPROUT_SOURCE}
+              onLoad={presentation.onHatchAssetsReady}
+              style={StyleSheet.absoluteFill}
+              visualKey="mossprout"
             />
-            <AnimatedExpoImage
-              contentFit="contain"
-              source={WORLD_FTUE_SOFT_GLOW}
-              style={[styles.worldFtueHatchGlow, hatchGlowStyle]}
-              tintColor={FTUE_MOSSPROUT_CREATURE.accentColor}
-              transition={0}
-            />
-          </> : null}
-          <Animated.View style={[styles.worldFtueRewardGlow, rewardGlowStyle]} />
-          <CreatureGroundShadow frameSize={width} stage="grown" visualKey="mossprout" widthMultiplier={1.6} />
-          <CreatureAnimatedArt
-            accessibilityLabel="Mossprout animated"
-            fallbackSource={WORLD_FTUE_MOSSPROUT_SOURCE}
-            onLoad={presentation.onHatchAssetsReady}
-            style={StyleSheet.absoluteFill}
-            visualKey="mossprout"
-          />
+          </Animated.View>
         </Animated.View>
       ) : null}
     </Animated.View>
   );
 });
+
+function havenUpgradeLayerArtChanges(
+  fromLayer: KingdomTileArtLayer,
+  toLayer: KingdomTileArtLayer,
+  imageLod: KingdomHexTileLod,
+) {
+  return kingdomHexTileSourceForLod(fromLayer, imageLod) !== kingdomHexTileSourceForLod(toLayer, imageLod)
+    || kingdomHexTileOverlaySourceForLod(fromLayer, imageLod) !== kingdomHexTileOverlaySourceForLod(toLayer, imageLod);
+}
 
 function WorldEggRippleField({ primary, secondary }: {
   primary: SharedValue<number>;
@@ -2258,6 +2400,7 @@ const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
   cameraTranslateY,
   creature,
   frame,
+  meditating,
   rewardPulseKey,
   sceneHeight,
   sceneWidth,
@@ -2269,6 +2412,7 @@ const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
   cameraTranslateY: SharedValue<number>;
   creature: Extract<KingdomHexCompanionSlot, { kind: 'owned' }>['creature'];
   frame: AbsoluteFrame;
+  meditating: boolean;
   rewardPulseKey: number;
   sceneHeight: number;
   sceneWidth: number;
@@ -2277,10 +2421,12 @@ const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
   const reduceMotion = useReducedMotion();
   const rewardPulse = useSharedValue(0);
   const rewardShake = useSharedValue(0);
+  const meditationProgress = useSharedValue(meditating ? 1 : 0);
   const handledRewardPulseKeyRef = useRef(rewardPulseKey);
   const nativeWidth = frame.width * WORLD_INTERACTION_CREATURE_NATIVE_SURFACE_SCALE;
   const nativeHeight = frame.height * WORLD_INTERACTION_CREATURE_NATIVE_SURFACE_SCALE;
   const glowSize = nativeWidth * 0.84;
+  const meditationSource = resolveCreatureMeditationArtSource(creature.visualKey);
 
   useEffect(() => {
     if (rewardPulseKey <= handledRewardPulseKeyRef.current) return;
@@ -2291,6 +2437,15 @@ const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
       cancelAnimation(rewardShake);
     };
   }, [reduceMotion, rewardPulse, rewardPulseKey, rewardShake]);
+  useEffect(() => {
+    meditationProgress.value = reduceMotion
+      ? meditating ? 1 : 0
+      : withTiming(meditating ? 1 : 0, {
+          duration: 520,
+          easing: Easing.inOut(Easing.cubic),
+        });
+    return () => cancelAnimation(meditationProgress);
+  }, [meditating, meditationProgress, reduceMotion]);
 
   const projectionStyle = useAnimatedStyle(() => ({
     transform: [
@@ -2325,6 +2480,16 @@ const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
     opacity: rewardPulse.value * 0.84,
     transform: [{ scale: 0.72 + rewardPulse.value * 0.55 }],
   }));
+  const regularCreatureStyle = useAnimatedStyle(() => ({
+    opacity: meditationSource ? 1 - meditationProgress.value : 1,
+  }));
+  const meditationCreatureStyle = useAnimatedStyle(() => ({
+    opacity: meditationProgress.value,
+  }));
+  const meditationAuraStyle = useAnimatedStyle(() => ({
+    opacity: meditationProgress.value * 0.82,
+    transform: [{ scale: 0.92 + meditationProgress.value * 0.08 }],
+  }));
 
   return (
     <Animated.View
@@ -2352,6 +2517,8 @@ const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
             style={[
               styles.worldFtueRewardGlow,
               {
+                borderWidth: 2 * WORLD_INTERACTION_CREATURE_NATIVE_SURFACE_SCALE,
+                boxShadow: `0 0 ${22 * WORLD_INTERACTION_CREATURE_NATIVE_SURFACE_SCALE}px rgba(255,193,65,0.72)`,
                 height: glowSize,
                 left: (nativeWidth - glowSize) / 2,
                 top: (nativeHeight - glowSize) / 2,
@@ -2360,15 +2527,51 @@ const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
               rewardGlowStyle,
             ]}
           />
+          {meditationSource ? (
+            <Animated.View
+              style={[
+                styles.worldMeditationAura,
+                {
+                  height: nativeWidth * 0.82,
+                  left: nativeWidth * 0.09,
+                  top: nativeHeight * 0.13,
+                  width: nativeWidth * 0.82,
+                },
+                meditationAuraStyle,
+              ]}>
+              <RotatingRadialSunburst
+                baseOpacity={0.58}
+                nativeSurfaceScale={1}
+                size={nativeWidth * 0.98}
+                style={{ left: -nativeWidth * 0.08, top: -nativeWidth * 0.08 }}
+              />
+            </Animated.View>
+          ) : null}
           <CreatureGroundShadow frameSize={nativeWidth} visualKey={creature.visualKey} />
-          <CreatureAnimatedArt
-            accessibilityLabel={`${creature.name} animated`}
-            allowDownscaling={false}
-            fallbackSource={source ?? resolveCreatureArtSource(creature.visualKey)}
-            forceStatic={cameraMoving}
-            style={StyleSheet.absoluteFill}
-            visualKey={creature.visualKey}
-          />
+          <Animated.View style={[StyleSheet.absoluteFill, regularCreatureStyle]}>
+            <CreatureAnimatedArt
+              accessibilityLabel={`${creature.name} animated`}
+              allowDownscaling={false}
+              fallbackSource={source ?? resolveCreatureArtSource(creature.visualKey)}
+              forceStatic={cameraMoving}
+              style={StyleSheet.absoluteFill}
+              visualKey={creature.visualKey}
+            />
+          </Animated.View>
+          {meditationSource ? (
+            <Animated.View style={[StyleSheet.absoluteFill, meditationCreatureStyle]}>
+              <Image
+                accessibilityIgnoresInvertColors
+                accessibilityLabel={`${creature.name}, meditating`}
+                allowDownscaling={false}
+                cachePolicy="memory-disk"
+                contentFit="contain"
+                source={meditationSource}
+                style={StyleSheet.absoluteFill}
+                transition={0}
+              />
+            </Animated.View>
+          ) : null}
         </Animated.View>
       </Animated.View>
     </Animated.View>
@@ -2409,13 +2612,19 @@ const ProjectedMemoryPlant = memo(function ProjectedMemoryPlant({
   const revealLift = useSharedValue(animateReveal ? 12 : 0);
   const celebrationOpacity = useSharedValue(0);
   const handledVisualKeyRef = useRef(animateReveal ? null : visualKey);
+  // `animateReveal` is an event emitted by the projection diff, not durable
+  // display state. Latch it to the visual key so the following parent render
+  // cannot switch it back to false and cancel this animation's cleanup-bound
+  // Reanimated sequences before they reach their final values.
+  const revealRequestedForVisualKeyRef = useRef<string | null>(animateReveal ? visualKey : null);
+  if (animateReveal) revealRequestedForVisualKeyRef.current = visualKey;
   const [showCelebration, setShowCelebration] = useState(animateReveal);
   const nativeWidth = frame.width * MEMORY_PLANT_NATIVE_SURFACE_SCALE;
   const nativeHeight = frame.height * MEMORY_PLANT_NATIVE_SURFACE_SCALE;
   const raySize = nativeWidth * 1.85;
 
   useEffect(() => {
-    if (!animateReveal || handledVisualKeyRef.current === visualKey) return;
+    if (revealRequestedForVisualKeyRef.current !== visualKey || handledVisualKeyRef.current === visualKey) return;
     handledVisualKeyRef.current = visualKey;
     setShowCelebration(true);
     revealOpacity.value = 0;
@@ -2451,7 +2660,7 @@ const ProjectedMemoryPlant = memo(function ProjectedMemoryPlant({
       cancelAnimation(revealLift);
       cancelAnimation(celebrationOpacity);
     };
-  }, [animateReveal, celebrationOpacity, reduceMotion, revealLift, revealOpacity, revealScale, visualKey]);
+  }, [celebrationOpacity, reduceMotion, revealLift, revealOpacity, revealScale, visualKey]);
 
   const projectionStyle = useAnimatedStyle(() => ({
     transform: [
@@ -2511,11 +2720,15 @@ const ProjectedMemoryPlant = memo(function ProjectedMemoryPlant({
             <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, celebrationStyle]}>
               <RotatingRadialSunburst
                 baseOpacity={0.86}
+                nativeSurfaceScale={1}
                 rotationDurationMs={18_000}
                 size={raySize}
                 style={{
                   left: (nativeWidth - raySize) / 2,
-                  top: (nativeHeight - raySize) / 2,
+                  // Memory-plant artwork is grounded in the lower half of its
+                  // transparent plane. Centre the celebration on the planted
+                  // subject rather than the empty canvas above it.
+                  top: (nativeHeight - raySize) / 2 + nativeHeight * 0.14,
                 }}
               />
               <CelebrationParticles
@@ -2550,6 +2763,7 @@ type ResidentProps = {
   focusAnchorX: number;
   focusAnchorY: number;
   focusScale: number;
+  meditating?: boolean;
   onFocus: (x: number, y: number, options?: { id?: string; onComplete?: () => void }) => void;
   onSelectResident?: (creatureId: string, label: string) => void;
   source?: ImageSourcePropType;
@@ -2568,6 +2782,7 @@ const ResidentCreature = memo(function ResidentCreature({
   focusAnchorX,
   focusAnchorY,
   focusScale,
+  meditating = false,
   onFocus,
   onSelectResident,
   source: sourceOverride,
@@ -2588,7 +2803,11 @@ const ResidentCreature = memo(function ResidentCreature({
   const reactionLift = useSharedValue(0);
   const reactionRotation = useSharedValue(0);
   const reactionScale = useSharedValue(1);
+  const meditationProgress = useSharedValue(meditating ? 1 : 0);
   const reduceMotion = useReducedMotion();
+  const meditationSource = creature
+    ? resolveCreatureMeditationArtSource(creature.visualKey)
+    : null;
 
   useEffect(() => {
     if (stableWorldPresentation) {
@@ -2619,6 +2838,16 @@ const ResidentCreature = memo(function ResidentCreature({
     );
   }, [celebrationNonce, reactionLift, reactionRotation, reactionScale, reduceMotion]);
 
+  useEffect(() => {
+    meditationProgress.value = reduceMotion
+      ? meditating ? 1 : 0
+      : withTiming(meditating ? 1 : 0, {
+          duration: 520,
+          easing: Easing.inOut(Easing.cubic),
+        });
+    return () => cancelAnimation(meditationProgress);
+  }, [meditating, meditationProgress, reduceMotion]);
+
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [
@@ -2626,6 +2855,16 @@ const ResidentCreature = memo(function ResidentCreature({
       { rotateZ: `${reactionRotation.value}deg` },
       { scale: reactionScale.value },
     ],
+  }));
+  const regularCreatureStyle = useAnimatedStyle(() => ({
+    opacity: meditationSource ? 1 - meditationProgress.value : 1,
+  }));
+  const meditationCreatureStyle = useAnimatedStyle(() => ({
+    opacity: meditationProgress.value,
+  }));
+  const meditationAuraStyle = useAnimatedStyle(() => ({
+    opacity: meditationProgress.value * 0.82,
+    transform: [{ scale: 0.92 + meditationProgress.value * 0.08 }],
   }));
   const handlePress = useCallback(() => {
     if (!creature) return;
@@ -2651,21 +2890,46 @@ const ResidentCreature = memo(function ResidentCreature({
         onPress={handlePress}
         style={StyleSheet.absoluteFill}>
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, animatedStyle]}>
+          {meditationSource ? (
+            <Animated.View style={[styles.residentMeditationAura, meditationAuraStyle]}>
+              <RotatingRadialSunburst
+                baseOpacity={0.58}
+                size={frameWidth * 1.12}
+                style={{ left: -frameWidth * 0.15, top: -frameWidth * 0.15 }}
+              />
+            </Animated.View>
+          ) : null}
           {creature ? (
             <CreatureGroundShadow
               frameSize={frameWidth}
               visualKey={creature.visualKey}
             />
           ) : null}
-          {creature && animated ? (
-            <CreatureAnimatedArt
-              accessibilityLabel={`${creature.name} animated`}
-              fallbackSource={resolveCreatureArtSource(creature.visualKey)}
-              onLoad={markReady}
-              style={StyleSheet.absoluteFill}
-              visualKey={creature.visualKey}
-            />
-          ) : source ? <SeamlessWorldImage source={source} priority="normal" onReady={markReady} onFailure={markReady} /> : null}
+          <Animated.View style={[StyleSheet.absoluteFill, regularCreatureStyle]}>
+            {creature && animated ? (
+              <CreatureAnimatedArt
+                accessibilityLabel={`${creature.name} animated`}
+                fallbackSource={resolveCreatureArtSource(creature.visualKey)}
+                onLoad={markReady}
+                style={StyleSheet.absoluteFill}
+                visualKey={creature.visualKey}
+              />
+            ) : source ? <SeamlessWorldImage source={source} priority="normal" onReady={markReady} onFailure={markReady} /> : null}
+          </Animated.View>
+          {meditationSource ? (
+            <Animated.View style={[StyleSheet.absoluteFill, meditationCreatureStyle]}>
+              <Image
+                accessibilityIgnoresInvertColors
+                accessibilityLabel={`${creature?.name ?? 'Katchimera'}, meditating`}
+                allowDownscaling={false}
+                cachePolicy="memory-disk"
+                contentFit="contain"
+                source={meditationSource}
+                style={StyleSheet.absoluteFill}
+                transition={0}
+              />
+            </Animated.View>
+          ) : null}
           {statusGlyph ? <ResidentStatusGlyph status={statusGlyph} /> : null}
         </Animated.View>
       </Pressable>
@@ -2685,6 +2949,18 @@ const ResidentStatusGlyph = memo(function ResidentStatusGlyph({ status }: { stat
 
 const styles = StyleSheet.create({
   root: { flex: 1, overflow: 'hidden' },
+  residentMeditationAura: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,220,125,0.16)',
+    borderRadius: 999,
+    boxShadow: '0 0 22px rgba(255,210,92,0.46)',
+    height: '82%',
+    justifyContent: 'center',
+    left: '9%',
+    position: 'absolute',
+    top: '9%',
+    width: '82%',
+  },
   scene: { position: 'relative' },
   focusLayer: { position: 'absolute' },
   tileArt: { position: 'absolute' },
@@ -2756,13 +3032,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,205,92,0.34)',
     borderColor: 'rgba(255,239,168,0.88)',
     borderRadius: 999,
-    borderWidth: 2,
-    boxShadow: '0 0 22px rgba(255,193,65,0.72)',
-    height: WORLD_FTUE_REWARD_GLOW_SIZE,
-    left: (WORLD_FTUE_EGG_WIDTH - WORLD_FTUE_REWARD_GLOW_SIZE) / 2,
     position: 'absolute',
-    top: (WORLD_FTUE_EGG_HEIGHT - WORLD_FTUE_REWARD_GLOW_SIZE) / 2,
-    width: WORLD_FTUE_REWARD_GLOW_SIZE,
   },
   worldFtueEggNativeSurface: {
     bottom: 0,
@@ -2775,6 +3045,14 @@ const styles = StyleSheet.create({
     left: '50%',
     position: 'absolute',
     transformOrigin: 'center bottom',
+  },
+  worldMeditationAura: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,220,125,0.16)',
+    borderRadius: 999,
+    boxShadow: '0 0 80px rgba(255,210,92,0.44)',
+    justifyContent: 'center',
+    position: 'absolute',
   },
   memoryPlantNativeSurface: {
     left: '50%',
@@ -2796,6 +3074,12 @@ const styles = StyleSheet.create({
   worldFtueCreatureFrame: {
     transformOrigin: 'center bottom',
   },
+  worldFtueCreatureNativeSurface: {
+    bottom: 0,
+    left: '50%',
+    position: 'absolute',
+    transformOrigin: 'center bottom',
+  },
   worldFtueProjectedSubject: {
     left: 0,
     overflow: 'visible',
@@ -2810,12 +3094,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(250,218,125,0.12)',
     borderColor: 'rgba(255,236,174,0.55)',
     borderRadius: 999,
-    borderWidth: 2,
-    height: WORLD_FTUE_EGG_WIDTH * 1.05,
-    left: -WORLD_FTUE_EGG_WIDTH * 0.025,
     position: 'absolute',
-    top: WORLD_FTUE_EGG_HEIGHT * 0.08,
-    width: WORLD_FTUE_EGG_WIDTH * 1.05,
   },
   worldFtueHatchGlow: {
     bottom: '-20%',

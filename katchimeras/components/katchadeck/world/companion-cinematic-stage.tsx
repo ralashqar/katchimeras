@@ -49,6 +49,7 @@ export function CompanionCinematicStage({
   environmentKey,
   houseLevel,
   lifted,
+  meditating = false,
   name,
   nameplateEyebrow,
   nameplateTitle,
@@ -73,6 +74,7 @@ export function CompanionCinematicStage({
   environmentKey: TodayExplorationBackgroundKey | null;
   houseLevel?: number;
   lifted: boolean;
+  meditating?: boolean;
   name: string;
   nameplateEyebrow?: string;
   nameplateTitle?: string;
@@ -293,6 +295,7 @@ export function CompanionCinematicStage({
           creatureVerticalOffset={interactionCreatureDrop}
           creatureTargetRef={creatureTargetRef}
           layer="creature"
+          meditating={meditating}
           name={name}
           onCreatureReady={onCreatureReady}
           rewardPulseKey={rewardPulseKey}

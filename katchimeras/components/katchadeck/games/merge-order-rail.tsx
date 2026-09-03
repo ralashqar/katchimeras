@@ -410,11 +410,13 @@ export function MergeOrderTrayCard({ animateEntrance = true, entry, index, inter
 
   return (
     <Pressable
-      accessible={!interactionLocked}
+      accessible={interactionAllowed}
+      accessibilityHint={ready ? 'Serves the completed request' : undefined}
       accessibilityLabel={`${recipientName} order, ${order.title}${ready ? ', ready to serve' : ''}`}
+      accessibilityRole="button"
       accessibilityState={{ disabled: interactionLocked && !interactionAllowed }}
       onLongPress={interactionLocked ? onBlockedInteraction : onReroll}
-      onPress={interactionLocked ? onBlockedInteraction : ready ? beginServe : undefined}
+      onPress={!interactionAllowed ? onBlockedInteraction : ready ? beginServe : undefined}
       ref={setOrderCardTargetRef}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       {ready ? (
@@ -435,12 +437,20 @@ export function MergeOrderTrayCard({ animateEntrance = true, entry, index, inter
       <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" source={CHAIR_ART} style={styles.chairArt} transition={0} />
       <Animated.View entering={!entryMotionEnabled ? undefined : reduceMotion ? FadeIn.duration(100) : FadeInUp.delay(Math.min(index, 5) * 42 + 45).duration(230)} style={styles.characterLayer}>
         <Pressable
-          accessible={!interactionLocked}
-          accessibilityHint="Shows the rewards for this request"
+          accessible={!ready && !interactionLocked}
+          accessibilityHint={ready ? undefined : 'Shows the rewards for this request'}
           accessibilityLabel={`${recipientName} reward details`}
           accessibilityRole="button"
           onPress={(event) => {
             event.stopPropagation();
+            if (!interactionAllowed) {
+              onBlockedInteraction?.();
+              return;
+            }
+            if (ready) {
+              void beginServe();
+              return;
+            }
             if (interactionLocked) {
               onBlockedInteraction?.();
               return;

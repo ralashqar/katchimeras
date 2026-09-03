@@ -1,10 +1,10 @@
-import { Pressable, StyleSheet, View } from 'react-native';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
-import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { KatchaUI } from '@/constants/katcha-ui';
+import { Meadow } from '@/constants/meadow-theme';
 
 export function formatMeditationCountdown(availableAt: number, now: number): string {
   const seconds = Math.max(0, Math.ceil((availableAt - now) / 1000));
@@ -14,131 +14,108 @@ export function formatMeditationCountdown(availableAt: number, now: number): str
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
 }
 
+export function meditationProgress(input: {
+  availableAt: number;
+  now: number;
+  settledMs?: number;
+  startedAt: number;
+}) {
+  const naturalAvailableAt = input.availableAt + Math.max(0, input.settledMs ?? 0);
+  const duration = Math.max(1, naturalAvailableAt - input.startedAt);
+  return Math.max(0, Math.min(1, 1 - Math.max(0, input.availableAt - input.now) / duration));
+}
+
 export function CompanionMeditationStage({
   availableAt,
   companionName,
   now,
-  onExitToGarden,
-  onMeditationAction,
+  settledMs = 0,
+  startedAt,
 }: {
   availableAt: number;
   companionName: string;
   now: number;
-  onExitToGarden?: () => void;
-  onMeditationAction?: (action: 'tend_together' | 'share_moment', optionId?: string) => void;
+  settledMs?: number;
+  startedAt: number;
 }) {
-  const [sharingMoment, setSharingMoment] = useState(false);
-  const [completedAction, setCompletedAction] = useState<'tend_together' | 'share_moment' | null>(null);
+  const [trackWidth, setTrackWidth] = useState(0);
   const countdown = formatMeditationCountdown(availableAt, now);
+  const progress = useMemo(
+    () => meditationProgress({ availableAt, now, settledMs, startedAt }),
+    [availableAt, now, settledMs, startedAt],
+  );
+  const animatedProgress = useSharedValue(progress);
+
+  useEffect(() => {
+    animatedProgress.value = withTiming(progress, { duration: 260 });
+  }, [animatedProgress, progress]);
+
+  const fillStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: animatedProgress.value }] }));
+  const markerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: Math.max(0, trackWidth - 18) * animatedProgress.value }],
+  }));
+
   return (
-    <View accessibilityLabel={`${companionName} is meditating. Ready in ${countdown}`} style={styles.stage}>
-      <View style={styles.timerPill}>
-        <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name="timer" size={18} />
-        <View style={styles.timerCopy}>
-          <ThemedText style={styles.eyebrow} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>
-            NEXT JOURNEY
-          </ThemedText>
-          <ThemedText style={styles.countdown} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>
-            {countdown}
+    <View accessibilityLabel={`${companionName} is meditating. Ready in ${countdown}`} style={styles.card}>
+      <View style={styles.header}>
+        <View style={styles.titleRow}>
+          <IconSymbol color={Meadow.leafDeep} name="timer" size={13} />
+          <ThemedText style={styles.label} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+            Reflecting
           </ThemedText>
         </View>
+        <ThemedText style={styles.countdown} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+          {countdown}
+        </ThemedText>
       </View>
-      <View style={styles.messagePanel}>
-        <ThemedText style={styles.messageEyebrow} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>
-          OUR NEXT JOURNEY
-        </ThemedText>
-        <ThemedText style={styles.title} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>
-          {companionName} is reflecting
-        </ThemedText>
-        <ThemedText style={styles.note} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>
-          He is thinking about what you shared. Meditation pauses Journey dialogue, not your Garden.
-        </ThemedText>
-        {sharingMoment ? (
-          <View style={styles.thoughtPanel}>
-            <ThemedText style={styles.thoughtTitle}>One thing… when a day gets difficult, what disappears first?</ThemedText>
-            {[
-              ['sleep', '😴 Sleep'],
-              ['movement', '🚶 Moving around'],
-              ['time_for_myself', '🧘 Time for myself'],
-              ['organisation', '🧹 Staying organised'],
-              ['depends', '🤷 It depends'],
-            ].map(([id, label]) => (
-              <Pressable
-                accessibilityRole="button"
-                key={id}
-                onPress={() => {
-                  onMeditationAction?.('share_moment', id);
-                  setCompletedAction('share_moment');
-                  setSharingMoment(false);
-                }}
-                style={({ pressed }) => [styles.thoughtOption, pressed && styles.pressed]}>
-                <ThemedText style={styles.thoughtOptionLabel}>{label}</ThemedText>
-              </Pressable>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.actions}>
-            <KatchaButton
-              disabled={completedAction === 'tend_together'}
-              fullWidth
-              icon="drop.fill"
-              label={completedAction === 'tend_together' ? 'Water Together · Done' : 'Tend Together'}
-              onPress={() => {
-                onMeditationAction?.('tend_together');
-                setCompletedAction('tend_together');
-              }}
-            />
-            {onExitToGarden ? <KatchaButton fullWidth icon="leaf.fill" label="Tend the Garden" onPress={onExitToGarden} variant="secondary" /> : null}
-            <KatchaButton
-              disabled={completedAction === 'share_moment'}
-              fullWidth
-              icon="bubble.left.fill"
-              label={completedAction === 'share_moment' ? 'Moment shared' : 'Share a Moment'}
-              onPress={() => setSharingMoment(true)}
-              variant="secondary"
-            />
-          </View>
-        )}
+      <View onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)} style={styles.track}>
+        <Animated.View style={[styles.fill, fillStyle]} />
+        <Animated.View pointerEvents="none" style={[styles.marker, markerStyle]}>
+          <IconSymbol color="#FFF9E9" name="leaf.fill" size={9} />
+        </Animated.View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  countdown: { fontSize: 24, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: 0.8, lineHeight: 29 },
-  eyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
-  messageEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
-  messagePanel: {
-    backgroundColor: KatchaUI.companionScenePanel.background,
-    borderColor: KatchaUI.companionScenePanel.border,
+  card: {
+    backgroundColor: 'rgba(255,249,229,0.94)',
+    borderColor: 'rgba(113,91,48,0.16)',
     borderCurve: 'continuous',
-    borderRadius: 22,
+    borderRadius: 14,
     borderWidth: 1,
-    boxShadow: KatchaUI.companionScenePanel.shadow,
-    gap: 10,
-    padding: 18,
+    boxShadow: '0 4px 11px rgba(46,36,24,0.1)',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  note: { fontSize: 15, lineHeight: 22 },
-  stage: { gap: 12, paddingBottom: 4 },
-  title: { fontSize: 26, fontWeight: '900', letterSpacing: -0.4, lineHeight: 31 },
-  timerCopy: { alignItems: 'flex-start' },
-  timerPill: {
+  countdown: { fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: 0.25 },
+  fill: {
+    backgroundColor: Meadow.leaf,
+    borderRadius: 999,
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    transformOrigin: 'left center',
+  },
+  header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  label: { fontSize: 11, fontWeight: '900' },
+  marker: {
     alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: KatchaUI.companionScenePanel.optionBackground,
-    borderColor: KatchaUI.companionScenePanel.optionBorder,
-    borderRadius: 18,
+    backgroundColor: Meadow.leafDeep,
+    borderColor: '#FFF9E9',
+    borderRadius: 999,
     borderWidth: 1,
-    flexDirection: 'row',
-    gap: 10,
-    minWidth: 190,
-    paddingHorizontal: 16,
-    paddingVertical: 11,
+    height: 18,
+    justifyContent: 'center',
+    left: 0,
+    position: 'absolute',
+    top: -6,
+    width: 18,
   },
-  actions: { gap: 8 },
-  thoughtPanel: { gap: 7, paddingTop: 2 },
-  thoughtTitle: { fontSize: 16, fontWeight: '800', lineHeight: 22 },
-  thoughtOption: { backgroundColor: KatchaUI.companionScenePanel.optionBackground, borderColor: KatchaUI.companionScenePanel.optionBorder, borderRadius: 14, borderWidth: 1, minHeight: 44, justifyContent: 'center', paddingHorizontal: 13 },
-  thoughtOptionLabel: { fontSize: 14, fontWeight: '800' },
-  pressed: { opacity: 0.76, transform: [{ scale: 0.99 }] },
+  titleRow: { alignItems: 'center', flexDirection: 'row', gap: 5 },
+  track: { backgroundColor: 'rgba(80,109,66,0.16)', borderRadius: 999, height: 6, marginHorizontal: 1, position: 'relative' },
 });

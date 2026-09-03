@@ -197,6 +197,7 @@ export type CompanionInteractionSheetProps = {
   onFtueBondSpotlightComplete?: () => void;
   onFtueOpenMerge?: () => void;
   onFtueProfileContinue?: (nickname?: string) => void;
+  /** Retained for host compatibility; meditation now uses ordinary daily actions. */
   onFtueMeditationAction?: (action: 'tend_together' | 'share_moment', optionId?: string) => void;
   onFtueOpenResidentParcel?: () => void;
   onSelectDestination?: (destination: CompanionDestination | null) => void;
@@ -1473,7 +1474,20 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             ? 'Let\'s make this little corner welcoming again.'
             : null
     : null;
-  const companionSpeechTitle = meditation ? 'Meditating' : mossproutFtueSpeechTitle;
+  // Meditation is the creature's persistent visual state, not a navigation
+  // lock. Once an action opens a conversation, its prompt must reclaim the
+  // speech bubble while the meditating artwork remains in the world.
+  const meditationDashboardActive = Boolean(meditation && route.kind !== 'conversation' && route.kind !== 'visit');
+  const companionSpeechTitle = meditationDashboardActive ? 'Meditating' : mossproutFtueSpeechTitle;
+  // The cinematic creature is positioned in full-screen coordinates, while
+  // this overlay lives inside the surface below the safe-area page header.
+  // Convert the desired screen-space position into that local coordinate so
+  // restoring the Bond/back header cannot push the timer beneath the cards.
+  const meditationTimerScreenTop = Math.max(390, Math.min(510, viewportHeight * 0.58));
+  const meditationTimerSurfaceTop = Math.max(
+    0,
+    meditationTimerScreenTop - (insets.top + 58 + KatchaUI.spacing.xs),
+  );
 
   return (
     <ExplorationEnvironmentProgressionProvider stage={props.homeEnvironmentStage ?? null}>
@@ -1513,13 +1527,14 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             environmentKey={props.homeEnvironmentKey ?? null}
             houseLevel={props.houseLevel}
             lifted
+            meditating={Boolean(meditation)}
             name={props.name}
             onBackgroundReady={() => setTransitionBackgroundReady(true)}
             onBackdropPress={props.reuseUnderlyingStage && dashboardRouteActive ? requestClose : undefined}
             onCreatureReady={() => setTransitionCreatureReady(true)}
             rewardPulseKey={rewardPulseKey}
             sceneTranslateX={props.reuseUnderlyingStage ? undefined : environmentPan.translateX}
-            onSpeechBubblePress={!meditation && !residentStoryResumeDashboard && conversationExperience
+            onSpeechBubblePress={(!meditation || route.kind === 'conversation') && !residentStoryResumeDashboard && conversationExperience
               && !conversationFlow.requiresManualAdvance
               && conversationFlow.phase !== 'awaiting_choice'
               && conversationFlow.phase !== 'committing'
@@ -1566,7 +1581,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             simplified={props.familyId === 'mossprout'}
             starters={props.conversationStarters}
           />
-        ) : (route.kind === 'visit' || route.kind === 'conversation') && !residentFtueDashboard && !meditation ? (
+        ) : (route.kind === 'visit' || route.kind === 'conversation') && !residentFtueDashboard ? (
           conversationExperience ? <CompanionConversationScene
             bondIconTargetRef={bondRewardTargetRef}
             bondProgress={displayedBondProgress}
@@ -1684,7 +1699,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             <CompanionBackAction label="Kingdom" onPress={props.onClose} />
           </View>
         ) : null}
-        {(route.kind === 'destination' || dashboardRouteActive || route.kind === 'shared_history' || quickGoalPickerOpen) && !questGameVisible && !questionnaireExperience && !meditation ? (
+        {(route.kind === 'destination' || dashboardRouteActive || route.kind === 'shared_history' || quickGoalPickerOpen) && !questGameVisible && !questionnaireExperience ? (
           <CompanionDestinationHeader
             backLabel={quickGoalPickerOpen ? 'Goals' : destination === 'quest' && directQuestOrigin ? props.name : destination === 'quest' && canReturnToQuestList ? 'Quest list' : dashboardRouteActive ? 'Kingdom' : 'Dashboard'}
             bondIconTargetRef={bondRewardTargetRef}
@@ -1716,6 +1731,70 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           fullWidth={mossproutActionDashboard}
           immersive={Boolean(questGameVisible || questionnaireExperience)}>
         <View key="interaction-content" style={styles.contentFrame}>
+          {meditationDashboardActive && meditation ? (
+            <>
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.meditationWorldTimer,
+                  {
+                    left: KatchaUI.layout.phoneGutter + 4,
+                    right: KatchaUI.layout.phoneGutter + 4,
+                    top: meditationTimerSurfaceTop,
+                  },
+                ]}>
+                <CompanionMeditationStage
+                  availableAt={meditation.availableAt}
+                  companionName={props.name}
+                  now={meditationNow}
+                  settledMs={meditation.settledMs}
+                  startedAt={meditation.startedAt}
+                />
+              </View>
+              <View
+                style={[
+                  styles.meditationActionsOverlay,
+                  {
+                    bottom: Math.max(8, insets.bottom + 4),
+                    left: KatchaUI.layout.phoneGutter + 4,
+                    right: KatchaUI.layout.phoneGutter + 4,
+                  },
+                ]}>
+                <MossproutStoryStage
+                  activeQuestId={props.activeQuest?.questId}
+                  conversationSession={props.conversationSession}
+                  conversations={props.mossproutActionCandidates}
+                  goals={goalsToday}
+                  hasActiveFocus={Boolean(activeJourneyFocus)}
+                  meditationMode
+                  offers={props.actionOffers}
+                  relationships={relationships}
+                  onCompleteGoal={props.onCompleteQuickGoal}
+                  onRememberGoal={props.onRememberQuickGoal}
+                  onSkipGoal={props.onSkipQuickGoal}
+                  onSnoozeGoal={props.onSnoozeQuickGoal}
+                  onUndoGoal={props.onUndoQuickGoal}
+                  onDashboard={openHistory}
+                  onOpenConversation={(definitionId, actionOrigin) => {
+                    pendingStoryConversationRef.current = null;
+                    openedStoryConversationRef.current = null;
+                    requestStoryConversation(definitionId, actionOrigin);
+                  }}
+                  onOpenCards={() => selectDestination('skins')}
+                  onOpenFocusDirection={openJourneyFocus}
+                  onOpenMerge={(orderId) => {
+                    if (props.ftueProfileStep === 'meditating') props.onFtueProfileContinue?.();
+                    else props.onOpenMerge?.(orderId, props.familyId);
+                  }}
+                  onOpenQuestDirect={(questId, originActionId) => openQuestOffer(questId, originActionId)}
+                  onOpenTrophies={() => selectDestination('achievements')}
+                  onBondRewardRequest={requestStoryReward}
+                  navigationLocked={props.ftueNavigationLocked}
+                  swipeExternalGesture={environmentPan.gesture}
+                />
+              </View>
+            </>
+          ) : null}
           {questGameContent ? (
             <View
               style={[
@@ -1751,7 +1830,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             onContentSizeChange={activeAttemptId || (route.kind === 'dashboard' && !mossproutActionDashboard) ? resetViewport : undefined}
             onLayout={activeAttemptId || (route.kind === 'dashboard' && !mossproutActionDashboard) ? resetViewport : undefined}
             overScrollMode={activeAttemptId || (mossproutActionDashboard && !meditation) ? 'never' : 'auto'}
-            scrollEnabled={!activeAttemptId && !questionnaireExperience && (!mossproutActionDashboard || Boolean(meditation))}
+            scrollEnabled={!activeAttemptId && !questionnaireExperience && !meditationDashboardActive && (!mossproutActionDashboard || Boolean(meditation))}
             style={mossproutActionDashboard ? styles.mossproutActionViewport : undefined}
             showsVerticalScrollIndicator={false}>
             <Animated.View
@@ -1775,7 +1854,6 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                     },
                     dashboardRouteActive && styles.dashboardStageSpacer,
                     mossproutActionDashboard && styles.mossproutActionStageSpacer,
-                    meditation && styles.meditationStageSpacer,
                     destination === 'quest' && {
                       minHeight: companionQuestListSpacer(viewportHeight),
                     },
@@ -1893,15 +1971,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   resultReady={Boolean(journeyQuestionnaireSessionId && !props.journeyConversation)}
                   visualKey={props.visualKey}
                 />
-              ) : meditation ? (
-                <CompanionMeditationStage
-                  availableAt={meditation.availableAt}
-                  companionName={props.name}
-                  now={meditationNow}
-                  onExitToGarden={props.ftueProfileStep === 'meditating' ? () => props.onFtueProfileContinue?.() : undefined}
-                  onMeditationAction={props.ftueProfileStep === 'meditating' ? props.onFtueMeditationAction : undefined}
-                />
-              ) : idealSkinOnboardingRequired ? null : dashboardRouteActive && (props.familyId === 'steppling' || props.familyId === 'voyagle' || props.familyId === 'flexel' || props.familyId === 'bedrotte') && !showJourneyCohortDashboard ? (
+              ) : meditation ? null : idealSkinOnboardingRequired ? null : dashboardRouteActive && (props.familyId === 'steppling' || props.familyId === 'voyagle' || props.familyId === 'flexel' || props.familyId === 'bedrotte') && !showJourneyCohortDashboard ? (
                 <JourneyCohortStoryStage
                   familyId={props.familyId}
                   onBegin={beginJourneyCohortIntroduction}
@@ -2315,10 +2385,11 @@ const styles = StyleSheet.create({
   dashboardScrollContent: { flexGrow: 1 },
   mossproutActionScrollContent: { flexGrow: 1, overflow: 'hidden', paddingHorizontal: KatchaUI.layout.phoneGutter + 4 },
   meditationScrollContent: { overflow: 'visible', paddingBottom: 28 },
+  meditationActionsOverlay: { position: 'absolute', zIndex: 25 },
+  meditationWorldTimer: { position: 'absolute', zIndex: 24 },
   mossproutActionExperience: { flex: 1, minHeight: 0 },
   meditationExperience: { flex: 0, minHeight: undefined },
   mossproutActionStageSpacer: { flex: 1, minHeight: 0 },
-  meditationStageSpacer: { flex: 0, minHeight: 244 },
   mossproutActionViewport: { flex: 1 },
   dashboardExperience: { flexGrow: 1 },
   dashboardStageSpacer: { flexGrow: 1 },

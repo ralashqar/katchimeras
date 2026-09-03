@@ -23,7 +23,7 @@ import {
 } from '@/features/onboarding/resident-ftue-navigation-session';
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
-import { beginKatchimeraMeditation, completeMossproutJourneyResolution, katchimeraMeditationRecord, MOSSPROUT_FTUE_REST_MS, recordMossproutFirstGardenRestored, recordMossproutMatchedCard, settleKatchimeraMeditation, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
+import { beginKatchimeraMeditation, completeMossproutJourneyResolution, katchimeraMeditationRecord, MOSSPROUT_FTUE_REST_MS, recordMossproutFirstGardenRestored, recordMossproutMatchedCard, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
 import {
   ensureMossproutFtueFirstResident,
   keepMossproutFirstSeed,
@@ -445,27 +445,6 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       commitFtueAction({ actionId: 'companion.acknowledge_garden_intro', evidenceRef: 'garden-intro:seen' });
     }
   }, [completeResidentResultExit, hostedInHaven, onHostedClose, router]);
-  const completeFtueMeditationAction = useCallback((action: 'tend_together' | 'share_moment', optionId?: string) => {
-    const run = loadFtueRun();
-    if (run?.status !== 'active' || run.stepId !== 'companion.meditating') return;
-    const receiptId = `ftue:${run.runId}:meditation:${action}${optionId ? `:${optionId}` : ''}`;
-    relationshipProgressionRepository.update((state) => settleKatchimeraMeditation(
-      state,
-      'mossprout',
-      action === 'tend_together' ? 20 * 60 * 1000 : 10 * 60 * 1000,
-      receiptId,
-    ));
-    if (action === 'share_moment' && optionId) {
-      recordMossproutOnboardingAnswer('companion.meditation_friction', optionId);
-    }
-    void loadMergeWorldState().then((world) => {
-      const plant = world.haven.plantableMemories.find((candidate) => candidate.source.kind === 'ftue');
-      if (!plant || action !== 'tend_together') return;
-      return import('@/utils/merge-world/repository').then(({ growStoredPlantableMemory }) => (
-        growStoredPlantableMemory(plant.id, 1, `${receiptId}:plant-growth`)
-      ));
-    }).catch((error) => console.warn('Could not apply meditation tending', error));
-  }, []);
   const completeFtueJourneyDay = useCallback(() => {
     const run = loadFtueRun();
     if (run?.status !== 'active' || run.stepId !== 'companion.day_one_action') return;
@@ -648,7 +627,6 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       onFtueJourneyDayComplete={completeFtueJourneyDay}
       onFtueOpenMerge={openFtueGarden}
       onFtueProfileContinue={completeFtueProfileStep}
-      onFtueMeditationAction={completeFtueMeditationAction}
       onFtueOpenResidentParcel={openFtueResidentParcel}
       initialCreatureId={creatureId}
       onCloseCompanion={() => hostedInHaven && onHostedClose ? onHostedClose() : ftueRouteOrigin && navigationFtueRun?.status !== 'active' ? transitionTo({

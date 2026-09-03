@@ -299,6 +299,29 @@ export function placeStoredPlantableMemory(
   }), now);
 }
 
+/**
+ * Idempotent repair boundary for the FTUE's first planted memory.
+ *
+ * The authored graph and the legacy resume snapshot are persisted separately.
+ * If the app is interrupted between those writes, this operation safely
+ * finishes the world mutation without requiring a screen to own Merge state.
+ */
+export async function ensureStoredFirstFtueMemoryPlacement(sourceId: string | null, receiptId: string) {
+  const world = await loadMergeWorldState();
+  const plant = world.haven.plantableMemories.find((candidate) => (
+    candidate.source.kind === 'ftue' && (!sourceId || candidate.source.sourceId === sourceId)
+  )) ?? world.haven.plantableMemories.find((candidate) => candidate.source.kind === 'ftue');
+  if (!plant) return { placed: false, state: world };
+  if (plant.status === 'planted' && plant.slotId === 'front-left') return { placed: true, state: world };
+  const result = await placeStoredPlantableMemory(plant.id, 'front-left', receiptId);
+  return {
+    placed: result.state.haven.plantableMemories.some((candidate) => (
+      candidate.id === plant.id && candidate.status === 'planted' && candidate.slotId === 'front-left'
+    )),
+    state: result.state,
+  };
+}
+
 export function growStoredPlantableMemory(instanceId: string, amount: number, receiptId: string, now = Date.now()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'growPlantableMemory', instanceId, amount, receiptId, now,

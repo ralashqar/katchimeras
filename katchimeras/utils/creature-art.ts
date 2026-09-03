@@ -84,3 +84,13 @@ export function resolveCreatureOrderArtSource(visualKey: HomeVisualKey): ImageSo
     ?? CREATURE_LOD_SOURCES.medium[visualKey]
     ?? homeCreatureVisuals[visualKey].source;
 }
+
+/** Optional full-resolution pose used while a companion is in durable meditation state. */
+export function resolveCreatureMeditationArtSource(
+  visualKey: HomeVisualKey,
+): ImageSourcePropType | null {
+  if (visualKey === 'mossprout') {
+    return require('../assets/images/katchimeras/cutouts/mossprout-meditating.png');
+  }
+  return null;
+}

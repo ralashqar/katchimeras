@@ -889,7 +889,7 @@ test('Haven hosts resident interaction over the world and routes its Garden shor
   );
 
   assert.match(screen, /<KatchimeraCompanionRouteScreen[\s\S]*?hostedInHaven[\s\S]*?reuseUnderlyingStage/);
-  assert.match(screen, /interactionEnabled=\{!interactionCreatureId/);
+  assert.match(screen, /interactionEnabled=\{!activeInteractionResidentId/);
   assert.match(screen, /onHostedOpenMerge=\{interactionHasGarden \? openGarden : undefined\}/);
   assert.match(screen, /interactionCreatureIdRef\.current === creatureId/);
   assert.doesNotMatch(screen, /cameraFallbackTimer/);
@@ -902,7 +902,7 @@ test('Haven hosts resident interaction over the world and routes its Garden shor
   assert.match(route, /onHostedOpenMerge/);
 });
 
-test('Mossprout Garden scene publication stays referentially stable across anchor updates', () => {
+test('Mossprout Garden scene publication stays referentially stable across world updates', () => {
   const screen = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'roster', 'katchimera-kingdom-screen.tsx'),
     'utf8',
@@ -911,8 +911,8 @@ test('Mossprout Garden scene publication stays referentially stable across ancho
   assert.match(screen, /const mossproutGardenScene = useMemo\(\(\) => \(\{/);
   assert.match(screen, /mossproutGarden=\{mossproutGardenScene\}/);
   assert.doesNotMatch(screen, /mossproutGarden=\{\{/);
-  assert.match(screen, /residentScreenAnchorsEqual\(current, next\) \? current : next/);
-  assert.match(screen, /onResidentAnchorsChange=\{updateResidentAnchors\}/);
+  assert.match(screen, /mergeWorld\.haven\.plantableMemories,[\s\S]*?mergeWorld\.haven\.structures\.mossproutGarden\.level/);
+  assert.doesNotMatch(screen, /onResidentAnchorsChange=\{/);
 });
 
 test('hosted resident dashboard dismisses from the world while deep achievements mount progressively', () => {

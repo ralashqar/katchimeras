@@ -26,6 +26,22 @@ import { commandToJournalRecord, submissionToJournalCommand } from '@/utils/jour
 import { questCaptureBelongsTo } from '@/utils/quest-capture-session';
 import { evidenceProvider, isLateNightHour, withCaptureTimeSignals } from '@/utils/signals/providers/evidence';
 
+test('bond arrival art stays full-resolution throughout creature and halo pulse transforms', () => {
+  const environmentStage = fs.readFileSync(
+    'components/katchadeck/world/companion-home-environment-stage.tsx',
+    'utf8',
+  );
+  const bondCelebration = fs.readFileSync(
+    'components/katchadeck/world/companion-bond-level-up-celebration.tsx',
+    'utf8',
+  );
+
+  assert.match(environmentStage, /REWARD_GLOW_NATIVE_SURFACE_SCALE = 2/);
+  assert.match(environmentStage, /renderToHardwareTextureAndroid=\{false\}[\s\S]*?shouldRasterizeIOS=\{false\}[\s\S]*?styles\.rewardGlow/);
+  assert.match(environmentStage, /CreatureAnimatedArt[\s\S]*?allowDownscaling=\{false\}/);
+  assert.match(bondCelebration, /styles\.heroCreature[\s\S]*?allowDownscaling=\{false\}[\s\S]*?priority="high"/);
+});
+
 test('Today and companion goals share deliberate task-row interactions', () => {
   const row = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'goals', 'goal-task-row.tsx'),
@@ -743,6 +759,24 @@ test('completed action rows preserve their outro while Bond reward renders updat
   assert.doesNotMatch(sharedRows, /\[chargeGlow, onFinished,/);
 });
 
+test('meditation reclaims the hidden bottom dock space for its action cards', () => {
+  const stage = fs.readFileSync('components/katchadeck/world/mossprout-story-stage.tsx', 'utf8');
+  const interaction = fs.readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
+
+  assert.match(stage, /meditationMode\s*\? styles\.meditationActionStage\s*:\s*styles\.actionStage/);
+  assert.match(stage, /meditationActionStage:\s*\{ height: ACTION_TRAY_HEIGHT, justifyContent: 'flex-end' \}/);
+  assert.match(stage, /!meditationMode && !residentParcelHandoffActive[\s\S]*?<KatchimeraBottomDock/);
+  assert.match(interaction, /meditationDashboardActive = Boolean\(meditation && route\.kind !== 'conversation'/);
+  assert.match(interaction, /styles\.meditationActionsOverlay[\s\S]*?<MossproutStoryStage[\s\S]*?meditationMode/);
+  assert.match(interaction, /bottom: Math\.max\(8, insets\.bottom \+ 4\)/);
+  assert.match(interaction, /meditationTimerScreenTop - \(insets\.top \+ 58 \+ KatchaUI\.spacing\.xs\)/);
+  assert.match(interaction, /styles\.meditationWorldTimer[\s\S]*?top: meditationTimerSurfaceTop/);
+  assert.match(interaction, /\(route\.kind === 'visit' \|\| route\.kind === 'conversation'\) && !residentFtueDashboard \? \(/);
+  assert.doesNotMatch(interaction, /\(route\.kind === 'visit' \|\| route\.kind === 'conversation'\) && !residentFtueDashboard && !meditation/);
+  assert.match(interaction, /\(route\.kind === 'destination' \|\| dashboardRouteActive[\s\S]*?&& !questGameVisible && !questionnaireExperience \? \([\s\S]*?<CompanionDestinationHeader/);
+  assert.doesNotMatch(interaction, /!questGameVisible && !questionnaireExperience && !meditation \? \([\s\S]*?<CompanionDestinationHeader/);
+});
+
 test('Mossprout normal actions survive the FTUE encounter handoff', () => {
   const quests = fs.readFileSync(
     path.join(process.cwd(), 'hooks', 'use-kingdom-quests.ts'),
@@ -870,7 +904,7 @@ test('active Journey presentation hides optional cards and Merge tray entries', 
   assert.match(stage, /const JOURNEY_REQUEST_TRAY_HEIGHT = 348/);
   assert.match(stage, /journeyMergeActive && !residentStoryResumeActive[\s\S]*?styles\.journeyRequestStage/);
   assert.match(stage, /journeyRequestPanel:[\s\S]*?flex: 1/);
-  assert.match(stage, /journey && !storyComplete && !journeyMergeActive/);
+  assert.match(stage, /journey && !meditationMode && !storyComplete && !journeyMergeActive/);
   assert.match(journeyPanel, /COMPANION_MERGE_REQUEST_PALETTE/);
   assert.match(journeyPanel, /standalone && styles\.standalone/);
   assert.match(journeyPanel, /backgroundColor: KatchaUI\.companionScenePanel\.background/);
@@ -1216,7 +1250,7 @@ test('companion viewport resets across destinations and content-shape transition
   assert.match(interaction, /onContentSizeChange=\{activeAttemptId \|\| \(route\.kind === 'dashboard' && !mossproutActionDashboard\) \? resetViewport : undefined\}/);
   assert.match(interaction, /bounces=\{!activeAttemptId && \(!mossproutActionDashboard \|\| Boolean\(meditation\)\)\}/);
   assert.match(interaction, /overScrollMode=\{activeAttemptId \|\| \(mossproutActionDashboard && !meditation\) \? 'never' : 'auto'\}/);
-  assert.match(interaction, /scrollEnabled=\{!activeAttemptId && !questionnaireExperience && \(!mossproutActionDashboard \|\| Boolean\(meditation\)\)\}/);
+  assert.match(interaction, /scrollEnabled=\{!activeAttemptId && !questionnaireExperience && !meditationDashboardActive && \(!mossproutActionDashboard \|\| Boolean\(meditation\)\)\}/);
   assert.match(interaction, /mossproutActionDashboard && styles\.mossproutActionStageSpacer/);
   assert.match(interaction, /mossproutActionStageSpacer: \{ flex: 1, minHeight: 0 \}/);
 });

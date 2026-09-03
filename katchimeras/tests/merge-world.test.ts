@@ -227,6 +227,7 @@ test('Merge board flattens its static cells into one native image without a Skia
   const boardGenerator = readFileSync('scripts/generate-merge-board-base.py', 'utf8');
   const spawnEffects = readFileSync('components/katchadeck/games/merge-spawn-effects-layer.tsx', 'utf8');
   const ftueOverlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
+  const orderRail = readFileSync('components/katchadeck/games/merge-order-rail.tsx', 'utf8');
   const radialSunburst = readFileSync('components/katchadeck/ui/radial-sunburst.tsx', 'utf8');
   assert.match(board, /source=\{layout\.baseSource \?\? MERGE_BOARD_BASE\}/);
   assert.match(boardGenerator, /CELL_LIGHT = "#E8CC98"/);
@@ -260,7 +261,11 @@ test('Merge board flattens its static cells into one native image without a Skia
   assert.doesNotMatch(ftueOverlay, /@shopify\/react-native-skia|<Canvas|usePathValue/);
   assert.doesNotMatch(radialSunburst, /@shopify\/react-native-skia|<Canvas|Skia\.Path|usePathValue/);
   assert.match(radialSunburst, /radial-sunburst\.png/);
-  assert.match(radialSunburst, /<Image[\s\S]*?cachePolicy="memory"/);
+  assert.match(radialSunburst, /SUNBURST_NATIVE_SURFACE_SCALE = 2/);
+  assert.match(radialSunburst, /renderToHardwareTextureAndroid=\{false\}[\s\S]*?shouldRasterizeIOS=\{false\}/);
+  assert.match(radialSunburst, /<Image[\s\S]*?allowDownscaling=\{false\}[\s\S]*?cachePolicy="memory"/);
+  assert.match(orderRail, /onPress=\{!interactionAllowed \? onBlockedInteraction : ready \? beginServe : undefined\}/);
+  assert.match(orderRail, /if \(ready\) \{[\s\S]*?void beginServe\(\);[\s\S]*?return;/);
 });
 
 test('board geometry renders and hit-tests with one coordinate system', () => {
