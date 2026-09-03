@@ -187,6 +187,11 @@ export async function resumeActiveContentFlows(): Promise<ContentFlowRun[]> {
   const runs = await listContentFlowRuns({ activeOnly: true });
   for (const run of runs) {
     if (run.executionMode !== 'live' || run.phase === 'suspended') continue;
+    if (!contentFlowDefinition(run.definitionId, run.definitionVersion)) {
+      const migrated = await dispatchContentFlowCommand(run.runId, { type: 'retry' });
+      if (migrated) results.push(migrated);
+      continue;
+    }
     const definition = contentFlowDefinition(run.definitionId, run.definitionVersion) ?? latestContentFlowDefinition(run.definitionId);
     if (!definition) continue;
     const stabilized = await reduceContentFlowRunAtomically({ runId: run.runId, reduce: (current) => stabilizeContentFlow(definition, current).run });

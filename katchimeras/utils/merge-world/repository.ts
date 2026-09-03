@@ -7,6 +7,8 @@ import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorl
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
 import { completeMossproutChapterZeroSlice, mossproutFtueGardenMissionOrder, MOSSPROUT_FTUE_GARDEN_MISSION_ORDER_ID } from '@/utils/merge-world/chapter-zero-policy';
 import { MOSSPROUT_FTUE_JOURNAL_ENERGY } from '@/utils/merge-world/economy-policy';
+import { firstFtueMemoryForSource, reduceFirstFtueMemoryPlacement } from '@/utils/merge-world/first-ftue-memory';
+import { MOSSPROUT_FIRST_MEMORY_SLOT_ID } from '@/utils/mossprout-garden-layout';
 
 const DATABASE_NAME = 'katchimeras-merge-world.db';
 const LOCAL_PROFILE_ID = 'local';
@@ -307,17 +309,13 @@ export function placeStoredPlantableMemory(
  * finishes the world mutation without requiring a screen to own Merge state.
  */
 export async function ensureStoredFirstFtueMemoryPlacement(sourceId: string | null, receiptId: string) {
-  const world = await loadMergeWorldState();
-  const plant = world.haven.plantableMemories.find((candidate) => (
-    candidate.source.kind === 'ftue' && (!sourceId || candidate.source.sourceId === sourceId)
-  )) ?? world.haven.plantableMemories.find((candidate) => candidate.source.kind === 'ftue');
-  if (!plant) return { placed: false, state: world };
-  if (plant.status === 'planted' && plant.slotId === 'front-left') return { placed: true, state: world };
-  const result = await placeStoredPlantableMemory(plant.id, 'front-left', receiptId);
+  const now = Date.now();
+  const result = await reduceStoredMergeWorld((state) => (
+    reduceFirstFtueMemoryPlacement(state, sourceId, receiptId, now)
+  ), now);
+  const plant = firstFtueMemoryForSource(result.state, sourceId);
   return {
-    placed: result.state.haven.plantableMemories.some((candidate) => (
-      candidate.id === plant.id && candidate.status === 'planted' && candidate.slotId === 'front-left'
-    )),
+    placed: plant?.status === 'planted' && plant.slotId === MOSSPROUT_FIRST_MEMORY_SLOT_ID,
     state: result.state,
   };
 }

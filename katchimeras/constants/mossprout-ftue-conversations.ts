@@ -1,15 +1,16 @@
 import type { ConversationDefinition } from '@/types/companion-conversation';
+import { MOSSPROUT_GREETING_OPTIONS, MOSSPROUT_FTUE_COPY } from '@/features/onboarding/mossprout-ftue-copy';
 
 export const MOSSPROUT_FTUE_CONVERSATION_PREFIX = 'mossprout:ftue:first-meeting';
 export const MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID = 'mossprout:ftue:chapter-zero-return';
 export const MOSSPROUT_FIRST_REST_CONVERSATION_ID = 'mossprout:ftue:first-rest';
 
 const openingLines: Record<string, string> = {
-  trying_to_start: 'Oh! I felt that in there. Like a little root pushing against hard soil.',
-  too_much_at_once: 'Oh! I felt the rain drumming on my shell. We don’t have to hold all of it at once.',
-  pretty_good: 'Oh! I felt that warm patch of sunlight. I think it helped me hatch.',
+  trying_to_start: 'Oh! Getting started can be tricky. Hatching took me a while too.',
+  too_much_at_once: 'Oh! There was a lot going on out there. We can start with one small thing.',
+  pretty_good: 'Oh! That little patch of sunshine was you.',
   mostly_drifting: 'Oh! I felt the breeze carrying us along. Drifting can still bring you somewhere new.',
-  taking_today_as_it_comes: 'Oh! I felt a soft breeze and a little warmth. Maybe today can move at its own pace.',
+  taking_today_as_it_comes: 'Oh! We’re seeing where today takes us. I like that.',
   more_energy: 'You said you wanted more energy. This garden definitely does.',
   more_calm: 'You said you wanted more calm. I think this place could use some too.',
   something_new: 'You wanted something new. Well… this is pretty new.',
@@ -32,7 +33,7 @@ const openingLines: Record<string, string> = {
 function definition(key: string, opening: string): ConversationDefinition {
   return {
     id: `${MOSSPROUT_FTUE_CONVERSATION_PREFIX}:${key}`,
-    version: 6,
+    version: 7,
     familyId: 'mossprout',
     title: 'Meet Mossprout',
     trigger: 'evergreen',
@@ -50,13 +51,9 @@ function definition(key: string, opening: string): ConversationDefinition {
     nodes: [
       {
         id: 'hello', kind: 'choice', phase: 'opening', prompt: `${opening}\n\nI’m Mossprout.`,
-        options: [
-          { id: 'hello', label: 'Hi Mossprout.', reply: 'Hi. I’m glad it was your moment that found me.', nextNodeId: 'end' },
-          { id: 'garden', label: 'What happened here?', reply: 'It fell quiet. Maybe we can wake one piece of it together.', nextNodeId: 'end' },
-          { id: 'tiny', label: 'You’re tiny.', reply: 'The garden is enormous. Both things can be true.', nextNodeId: 'end' },
-        ],
+        options: MOSSPROUT_GREETING_OPTIONS.map((option) => ({ ...option, nextNodeId: 'end' })),
       },
-      { id: 'end', kind: 'end', message: 'Tell me one more thing, then let’s start with something small.' },
+      { id: 'end', kind: 'end', message: MOSSPROUT_FTUE_COPY.seedOrigin },
     ],
   };
 }

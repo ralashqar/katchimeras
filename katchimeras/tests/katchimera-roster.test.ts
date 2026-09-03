@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { mossproutWorldUsesEggRenderer } from '@/components/katchadeck/world/world-ftue-subject-presentation';
 
 import type { CompanionBondProgress } from '@/utils/companion-bond';
 import type { KingdomCreature } from '@/types/kingdom';
@@ -18,6 +19,25 @@ import {
   reconcileKatchimeraRoster,
   type KatchimeraOwnedRosterItem,
 } from '@/utils/katchimera-roster';
+
+test('Mossprout never falls back to the Egg during post-hatch world and dialogue steps', () => {
+  const companion = { companionVisible: true, hatchPresentation: null };
+  for (const step of ['world.egg_intro', 'egg.opening', 'egg.context', 'egg.mind', 'egg.ready']) {
+    assert.equal(mossproutWorldUsesEggRenderer(step, null), true, step);
+  }
+  assert.equal(mossproutWorldUsesEggRenderer('companion.first_meeting', companion), true);
+  assert.equal(mossproutWorldUsesEggRenderer('companion.first_meeting', null), false);
+  assert.equal(mossproutWorldUsesEggRenderer('companion.first_meeting', { companionVisible: false, hatchPresentation: null }), false);
+  for (const step of [
+    'companion.day_one_action', 'companion.bond_spotlight', 'companion.garden_intro',
+    'companion.order_preview', 'world.garden_arrival', 'world.seed_planted',
+    'world.first_bloom_restore', 'companion.chapter_zero_return', 'companion.meditating',
+    'complete', null,
+  ]) {
+    assert.equal(mossproutWorldUsesEggRenderer(step, null), false, String(step));
+    assert.equal(mossproutWorldUsesEggRenderer(step, companion), false, String(step));
+  }
+});
 
 function bond(totalPoints: number): CompanionBondProgress {
   return {
@@ -323,7 +343,7 @@ test('the Katchimeras tab renders the hex selector first while companion Back re
   assert.match(kingdomScreen, /gardenWorldGuidanceActive \|\| ftueStepId === 'world\.egg_intro'[\s\S]*?top: insets\.top \+ 18/);
   assert.match(kingdomCanvas, /candidate\.companion\?\.familyId === targetCharacterId/);
   assert.match(youRoute, /accessibilityLabel="Back to Haven"[\s\S]*?router\.replace\('\/\(tabs\)\/katchimeras'\)/);
-  assert.match(companionRoute, /onCloseCompanion=\{\(\) =>[\s\S]*?: router\.back\(\)\}/);
+  assert.match(companionRoute, /onCloseCompanion=\{\(\) =>[\s\S]*?: router\.back\(\);\s*\}\}/);
 });
 
 test('the dev toggle exposes virtual companions across roster, companion, games, goals, and Dex surfaces', () => {

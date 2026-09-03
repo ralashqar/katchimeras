@@ -1,4 +1,5 @@
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
+import { MOSSPROUT_WATER_OPTIONS, normalizeMossproutIntent } from './mossprout-ftue-copy';
 
 // The name exchange starts the meter without granting a relationship rank.
 // Sharing something personal completes the first 50-point Bond level.
@@ -44,11 +45,7 @@ export const MOSSPROUT_SUPPORT_STYLE_OPTIONS = [
   { id: 'company', icon: 'heart.fill', label: 'Mostly just keep me company', reply: 'I can do that. We do not always need to turn everything into a project.' },
 ] as const;
 
-export const MOSSPROUT_WATER_TOGETHER_OPTIONS = [
-  { id: 'could_use_water', icon: 'drop.fill', label: 'I could probably use some water', reply: 'Then let’s both have a drink today. Nothing grand—just one little watering.' },
-  { id: 'already_good', icon: 'checkmark.circle.fill', label: 'I’m good', reply: 'Look at you, already watered. I’ll try to keep up.' },
-  { id: 'dont_start', icon: 'face.smiling.fill', label: 'Mossprout, don’t start', reply: 'Ha! All right, all right. I’ll tend my roots and mind my leaves.' },
-] as const;
+export const MOSSPROUT_WATER_TOGETHER_OPTIONS = MOSSPROUT_WATER_OPTIONS;
 
 const LEGACY_DESIRED_HELP_OPTIONS = [
   { id: 'energy', icon: 'bolt.fill', label: 'Getting some energy back', reply: 'Fresh starts can be very small.' },
@@ -62,6 +59,7 @@ export function mossproutWaterTogetherReply(choiceId: string | null | undefined)
 }
 
 export function mossproutFirstSeedForIntent(intentId: string | null | undefined) {
+  if (intentId) intentId = normalizeMossproutIntent(intentId);
   if (intentId === 'desired-help:calm') return { id: 'stillness', name: 'Seed of Stillness', message: 'Quiet can be something you grow, not something you wait for.' } as const;
   if (intentId === 'desired-help:feel_like_myself') return { id: 'renewal', name: 'Seed of Renewal', message: 'A little more light can help you feel like yourself again.' } as const;
   if (intentId === 'desired-help:energy') return { id: 'renewal', name: 'Seed of Renewal', message: 'Fresh starts can arrive one small unfurling at a time.' } as const;

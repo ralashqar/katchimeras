@@ -53,7 +53,6 @@ import { mossproutMemoryPlantById, mossproutMemoryPlantStage } from '@/constants
 import kingdomWorldViewConfig from '@/constants/kingdom-world-view.json';
 import { Lantern } from '@/constants/theme';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
-import type { EggVisualState } from '@/types/home';
 import type { MossproutGardenPlantSlotId, MossproutNatureIslandId, MossproutNatureIslandLevel } from '@/types/merge-world';
 import type { FtueCameraDirective } from '@/features/onboarding/ftue-types';
 import type { StoryCameraPresentationPayload, StoryTarget } from '@/types/content-flow';
@@ -70,6 +69,7 @@ import {
   kingdomWorldViewPoint,
 } from '@/utils/kingdom-rendering';
 import { getDevKingdomHexVerticalAlignmentMode } from '@/utils/dev-asset-overrides';
+import { worldTileActionFrame, type WorldTileActionPlacement } from '@/utils/world-tile-action-layout';
 import { resolveCreatureArtSource, resolveCreatureMeditationArtSource } from '@/utils/creature-art';
 import { FTUE_MOSSPROUT_CREATURE } from '@/features/onboarding/mossprout-ftue-creature';
 import { eggVisualGrowthForEnergyRatio } from '@/utils/today-growth';
@@ -98,9 +98,8 @@ export type KingdomResidentScreenAnchor = {
   x: number;
   y: number;
 };
-export type KingdomTileUpgradeOffer = {
+export type KingdomTileUpgradeOffer = WorldTileActionPlacement & {
   accessibilityHint: string;
-  anchor?: { x: number; y: number };
   icon?: IconSymbolName;
   label: string;
   target: Extract<StoryTarget, {
@@ -111,7 +110,6 @@ type Props = {
   background: TodayAtmosphereBackground;
   companionSlots: KingdomHexCompanionSlot[];
   identity?: WorldIdentityState | null;
-  eggVisual?: EggVisualState | null;
   lanternColor?: string;
   interactionEnabled?: boolean;
   cameraLocked?: boolean;
@@ -136,6 +134,7 @@ type Props = {
   initialTutorialCameraScale?: number;
   initialCameraSnapshot?: KingdomCameraSnapshot | null;
   onCameraSnapshotChange?: (snapshot: KingdomCameraSnapshot) => void;
+  onCameraMotionChange?: (moving: boolean) => void;
   onOpenGarden?: (orderId?: string | null) => void;
   tileUpgradeOffer?: KingdomTileUpgradeOffer | null;
   onTileUpgradeOfferPress?: () => void;
@@ -152,7 +151,6 @@ type Props = {
   mossproutGarden?: MossproutGardenSceneState;
   onSelectNatureIsland?: (islandId: MossproutNatureIslandId) => void;
   onSelectMemoryPlant?: (instanceId: string) => void;
-  onSelectMovementEgg?: () => void;
   worldEggTargetRef?: RefObject<ViewType | null>;
   worldSubjectPresentation?: WorldFtueSubjectPresentation | null;
 };
@@ -165,12 +163,6 @@ type HavenUpgradeLayers = {
 
 const CREATURE_SIZE = 58;
 const CREATURE_WORLD_SCALE = kingdomWorldViewConfig.katchimera.globalScale;
-const EGG_STAGE_W = 200;
-const EGG_STAGE_H = 258;
-const HAVEN_HOME_EGG_AVATAR_SCALE = 1.2;
-const EGG_WORLD_SCALE = kingdomWorldViewConfig.egg.globalScale * HAVEN_HOME_EGG_AVATAR_SCALE;
-const EGG_WORLD_W = EGG_STAGE_W * EGG_WORLD_SCALE;
-const EGG_WORLD_H = EGG_STAGE_H * EGG_WORLD_SCALE;
 const KINGDOM_DREAM_MIST_LOCK_SOURCE = require('../../../assets/images/katchimeras/world/hex/kingdom_dream_mist_lock_v1_512.webp');
 const LOCKED_TILE_HIT_WIDTH = HEX_TILE_W * 0.62;
 const LOCKED_TILE_HIT_HEIGHT = HEX_TILE_H * 0.78;
@@ -311,7 +303,10 @@ function TileUpgradeOffer({
   onPress?: () => void;
   targetRef: (node: ViewType | null) => void;
 }) {
-  const anchor = offer.anchor ?? { x: 0.5, y: 0.76 };
+  const actionFrame = worldTileActionFrame(frame, {
+    width: TILE_UPGRADE_OFFER_WIDTH,
+    height: TILE_UPGRADE_OFFER_HEIGHT,
+  }, offer);
   return (
     <Pressable
       accessibilityHint={offer.accessibilityHint}
@@ -322,10 +317,7 @@ function TileUpgradeOffer({
       ref={targetRef}
       style={({ pressed }) => [
         styles.tileUpgradeOffer,
-        {
-          left: frame.left + frame.width * anchor.x - TILE_UPGRADE_OFFER_WIDTH / 2,
-          top: frame.top + frame.height * anchor.y - TILE_UPGRADE_OFFER_HEIGHT / 2,
-        },
+        actionFrame,
         pressed && styles.tileUpgradeOfferPressed,
       ]}>
       <IconSymbol color="#3D2A12" name={offer.icon ?? 'sparkles'} size={18} />
@@ -360,7 +352,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   background,
   companionSlots,
   identity,
-  eggVisual,
   interactionEnabled = true,
   cameraLocked = false,
   cameraMaximumScale,
@@ -384,6 +375,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   initialTutorialCameraScale,
   initialCameraSnapshot,
   onCameraSnapshotChange,
+  onCameraMotionChange,
   onOpenGarden,
   tileUpgradeOffer = null,
   onTileUpgradeOfferPress,
@@ -400,7 +392,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   mossproutGarden,
   onSelectNatureIsland,
   onSelectMemoryPlant,
-  onSelectMovementEgg,
   worldEggTargetRef,
   worldSubjectPresentation,
 }: Props) {
@@ -656,7 +647,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   useEffect(() => {
     previousPlantVisualKeysRef.current = currentPlantVisualKeys;
   }, [currentPlantVisualKeys]);
-  const movementEggFrame = scene.tileArtLayers.find((layer) => layer.id === 'structure:mossprout-movement-egg')?.interactionFrame ?? null;
   const initialTutorialFocus = useMemo(() => {
     if (!initialTutorialCameraScale || !tutorialCamera || tutorialCamera.kind !== 'focus_target') return null;
     const target = tutorialCamera.target;
@@ -748,6 +738,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     minimumScale: focusedMossproutWorld ? 0.28 : undefined,
     maximumScale: cameraMaximumScale,
     onSnapshotChange: onCameraSnapshotChange,
+    onMotionChange: onCameraMotionChange,
     scene,
     viewport,
   });
@@ -1310,7 +1301,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   }, [allowedResidentCharacterId, artLayerById, camera.focusResident, creatureWorldSize, highlightedLockedFamilyId, ignoreFocus, interactionEnabled, interactionResidentId, interactionRewardPulseKey, mossproutMeditating, onSelectLocked, onSelectResident, residentStatusGlyphs, scene.tiles, tileFocusScale, upgradePhase, upgradePresentation]);
 
   const home = homePreset(identity?.selectedHomeArchetypeId);
-  const showEgg = Boolean(eggVisual);
 
   return (
     <View collapsable={false} ref={rootRef} style={styles.root} onLayout={onLayout}>
@@ -1408,6 +1398,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 ))
               : null}
             {interactionEnabled
+              && !camera.isMoving
               && !upgradePresentation
               && tileUpgradeOffer
               && tileUpgradeOfferFrame ? (
@@ -1458,31 +1449,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                   />
                 ))
               : null}
-            {focusedMossproutWorld && interactionEnabled && !upgradePresentation && movementEggFrame && onSelectMovementEgg ? (
-              <Pressable
-                accessibilityHint="Shows what the mysterious egg responds to"
-                accessibilityLabel="Open mysterious movement egg"
-                accessibilityRole="button"
-                onPress={onSelectMovementEgg}
-                style={[styles.natureIslandHitTarget, movementEggFrame]}
-              />
-            ) : null}
-            {showEgg ? (
-              <KingdomEgg
-                {...kingdomWorldViewPoint(
-                  { x: sceneHomeTile.cx, y: sceneHomeTile.cy },
-                  kingdomWorldViewConfig.egg
-                )}
-                focusAnchorX={sceneHomeTile.cx}
-                focusAnchorY={sceneHomeTile.cy}
-                focusScale={tileFocusScale(sceneHomeTile.id)}
-                onPress={interactionEnabled ? () => camera.focusResident(
-                  sceneHomeTile.cx,
-                  sceneHomeTile.cy,
-                  { anchorY: 0.46, id: sceneHomeTile.id, zoom: 1.05 }
-                ) : undefined}
-              />
-            ) : null}
             {identity?.selectedHomeArchetypeId ? (
               <HomeTileHitTarget
                 accessibilityLabel={`${home.name} home`}
@@ -1727,62 +1693,6 @@ const HavenUpgradeTileArt = memo(function HavenUpgradeTileArt({
         {newOverlaySource ? <SeamlessWorldImage priority="high" source={newOverlaySource} /> : null}
       </Animated.View>
     </>
-  );
-});
-
-const KingdomEgg = memo(function KingdomEgg({
-  x,
-  y,
-  focusAnchorX,
-  focusAnchorY,
-  focusScale,
-  onPress,
-}: {
-  x: number;
-  y: number;
-  focusAnchorX: number;
-  focusAnchorY: number;
-  focusScale: number;
-  onPress?: () => void;
-}) {
-  const avatar = useEggAvatar();
-  const [ready, setReady] = useState(false);
-  const opacity = useSharedValue(0);
-  const lift = useSharedValue(10);
-
-  useEffect(() => {
-    if (!ready) return;
-    opacity.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) });
-    lift.value = withSpring(0, { damping: 14, stiffness: 190 });
-  }, [lift, opacity, ready]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: lift.value }],
-  }));
-  const markReady = useCallback(() => setReady(true), []);
-  const frame = { height: EGG_WORLD_H, left: x - EGG_WORLD_W / 2, top: y - EGG_WORLD_H / 2, width: EGG_WORLD_W };
-
-  return (
-    <TileFocusTransform anchorX={focusAnchorX} anchorY={focusAnchorY} frame={frame} scale={focusScale}>
-      <Animated.View style={[StyleSheet.absoluteFill, animatedStyle]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Kingdom egg" onPress={onPress} style={StyleSheet.absoluteFill}>
-          <EggAvatarArtwork
-            allowDownscaling
-            faceId={avatar.equippedFaceId}
-            hatId={avatar.equippedHatId}
-            heldAccessoryId={avatar.equippedHeldAccessoryId}
-            onError={markReady}
-            onLoad={markReady}
-            priority="high"
-            resolution="app"
-            skinId={avatar.equippedSkinId}
-            style={StyleSheet.absoluteFill}
-            transition={0}
-          />
-        </Pressable>
-      </Animated.View>
-    </TileFocusTransform>
   );
 });
 
@@ -3016,7 +2926,6 @@ const styles = StyleSheet.create({
     width: GARDEN_ORDER_CARD_WIDTH,
   },
   gardenOrderShortcutPressed: { opacity: 0.9, transform: [{ scale: 0.94 }] },
-  eggLayer: { height: EGG_WORLD_H, position: 'absolute', width: EGG_WORLD_W },
   creature: { position: 'absolute' },
   lockedTileHitTarget: { alignItems: 'center', justifyContent: 'center', position: 'absolute' },
   lockedTileLockWrap: {

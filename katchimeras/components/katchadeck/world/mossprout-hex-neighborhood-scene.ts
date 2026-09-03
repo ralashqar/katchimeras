@@ -9,6 +9,9 @@ import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
 import { kingdomTileArtFrame } from '@/utils/kingdom-tile-alignment';
 import { hexDrawDepth, hexToWorld, type HexCoord } from '@/utils/world-hex';
 import { tileVisibleBounds } from '@/components/katchadeck/world/kingdom-hex-scene';
+import { GARDEN_PLANT_SLOT_POSITIONS, mossproutGardenPlantSlotFrame } from '@/utils/mossprout-garden-layout';
+
+export { mossproutGardenPlantSlotFrame } from '@/utils/mossprout-garden-layout';
 
 const SOURCE_SIZE = { height: 1024, width: 1024 } as const;
 const LAYOUT_PROFILE = 'floating-neighborhood-v2' as const;
@@ -84,44 +87,14 @@ const GARDEN_LAYOUT_BOUNDS = Object.values(GARDEN_LEVELS).reduce<ArtSpec['alphaB
 export type MossproutGardenSceneState = {
   level: number;
   plantableMemories: readonly PlantableMemoryInstance[];
-  movementEggStatus?: 'hidden' | 'revealed' | 'stirring';
   featureLevels?: { spring: number; path: number };
 };
-
-const GARDEN_PLANT_SLOT_POSITIONS = {
-  // Optical centres of the authored soil beds. These deliberately do not use
-  // an even grid: the isometric tile foreshortens and staggers each patch.
-  'back-left': { x: 0.37, y: 0.45 },
-  'back-centre': { x: 0.53, y: 0.34 },
-  'back-right': { x: 0.75, y: 0.33 },
-  'front-left': { x: 0.245, y: 0.525 },
-  'front-centre': { x: 0.50, y: 0.50 },
-  'front-right': { x: 0.74, y: 0.48 },
-} as const;
 
 // Every memory-plant export is normalized to a 384px square with its planting
 // contact at y=366. Anchor that contact—not the image box—to the bed centre.
 const MEMORY_PLANT_ART_CONTACT_Y = 366 / 384;
 
 export const MOSSPROUT_GARDEN_PLANT_SLOT_IDS = Object.keys(GARDEN_PLANT_SLOT_POSITIONS) as MossproutGardenPlantSlotId[];
-
-export function mossproutGardenPlantSlotFrame(
-  gardenFrame: { height: number; left: number; top: number; width: number },
-  slotId: MossproutGardenPlantSlotId,
-) {
-  const position = GARDEN_PLANT_SLOT_POSITIONS[slotId];
-  // This is the semantic planting patch, not merely the visible Seed cutout.
-  // Keep it generous enough for spotlighting and future direct placement.
-  const size = gardenFrame.width * 0.24;
-  const baseX = gardenFrame.left + gardenFrame.width * position.x;
-  const baseY = gardenFrame.top + gardenFrame.height * position.y;
-  return {
-    left: baseX - size * 0.5,
-    top: baseY - size * 0.64,
-    width: size,
-    height: size * 0.7,
-  };
-}
 
 const DREAM_MIST_LOCKED_NATURE_SOURCES: TileSources = {
   full: require('../../../assets/images/katchimeras/world/hex/dream_mist_locked_hex_tile_v1.webp'),
@@ -311,31 +284,10 @@ export function buildMossproutHexNeighborhoodScene(
       sourceSize: { width: 384, height: 384 },
     }];
   });
-  const movementEggLayer: KingdomTileArtLayer | null = gardenState.movementEggStatus && gardenState.movementEggStatus !== 'hidden'
-    ? (() => {
-        const size = gardenLayer.frame.width * 0.17;
-        const baseX = gardenLayer.frame.left + gardenLayer.frame.width * 0.80;
-        const baseY = gardenLayer.frame.top + gardenLayer.frame.height * 0.27;
-        return {
-          alphaBounds: { left: 0, top: 0, right: 1024, bottom: 1024 },
-          coord: GARDEN_LEVELS[0].coord,
-          custom: true,
-          depth: gardenLayer.depth + 1.25,
-          fallbackSource: null,
-          frame: { left: baseX - size / 2, top: baseY - size * 0.82, width: size, height: size },
-          interactionFrame: { left: baseX - size * 0.35, top: baseY - size * 0.68, width: size * 0.7, height: size * 0.7 },
-          id: 'structure:mossprout-movement-egg',
-          kind: 'structure',
-          source: require('../../../assets/images/katchimeras/cutouts/egg-base.webp'),
-          sourceSize: SOURCE_SIZE,
-        };
-      })()
-    : null;
   const rawLayers = [
     mainLayer,
     gardenLayer,
     ...plantLayers,
-    ...(movementEggLayer ? [movementEggLayer] : []),
     ...MOSSPROUT_NATURE_ISLANDS.map((island) => natureLayerFor(
       island.id,
       natureIslandLevels[island.id] ?? 0,

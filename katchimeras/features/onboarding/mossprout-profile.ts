@@ -6,8 +6,10 @@ import {
   type MossproutOnboardingAnswers,
 } from '@/utils/onboarding-state';
 import { mossproutFirstSeedForIntent } from './mossprout-bond-share';
+import { normalizeMossproutIntent } from './mossprout-ftue-copy';
 
 const ACTION_FIELDS: Readonly<Record<string, keyof MossproutOnboardingAnswers>> = {
+  'companion.greeting': 'firstGreetingId',
   'egg.day_texture': 'dayTextureId',
   'egg.desired_help': 'growthIntentId',
   'companion.choose_growth_intent': 'growthIntentId',
@@ -43,6 +45,7 @@ export function mossproutResidentForPlace(placeId: string | null | undefined): K
 export function recordMossproutOnboardingAnswer(actionId: string, optionId: string) {
   const field = ACTION_FIELDS[actionId];
   if (!field) return loadOnboardingProfile();
+  if (field === 'growthIntentId') optionId = normalizeMossproutIntent(optionId);
   const profile = loadOnboardingProfile();
   const mossproutAnswers = { ...profile.mossproutAnswers, [field]: optionId };
   const matchedResidentId = field === 'companionPlaceId'

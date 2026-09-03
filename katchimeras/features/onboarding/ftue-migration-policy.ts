@@ -1,5 +1,25 @@
 import type { FtueRunState } from './ftue-types';
 
+/** Forward-only v43 projection. Never restart a player or discard their receipts. */
+export function streamlinedFtueStep(run: Pick<FtueRunState, 'stepId' | 'status'>): string {
+  if (run.status === 'complete') return 'complete';
+  const replacement: Record<string, string> = {
+    'companion.day_one_action': 'companion.garden_intro',
+    'companion.nickname': 'companion.garden_intro',
+    'companion.bond_intro': 'companion.garden_intro',
+    'companion.bond_spotlight': 'companion.garden_intro',
+    'companion.order_preview': 'companion.garden_intro',
+    'world.garden_handoff': 'world.seed_planted',
+    'companion.chapter_zero_return': 'companion.water_together',
+    'companion.water_response': 'companion.first_rest',
+    'companion.first_insight': 'companion.first_rest',
+    'egg.mind': 'egg.ready',
+    'egg.nature_theme': 'egg.ready',
+    'egg.companion_identity': 'egg.ready',
+  };
+  return replacement[run.stepId] ?? run.stepId;
+}
+
 const V28_REWRITTEN_EGG_QUESTION_STEPS = new Set([
   'egg.opening',
   'egg.context',

@@ -54,6 +54,7 @@ type UseKingdomHexCameraArgs = {
   minimumScale?: number;
   maximumScale?: number;
   onSnapshotChange?: (snapshot: KingdomCameraSnapshot) => void;
+  onMotionChange?: (moving: boolean) => void;
   onWorldTapRelease?: (x: number, y: number) => void;
   scene: KingdomSize;
   viewport: KingdomSize;
@@ -83,6 +84,7 @@ export function useKingdomHexCamera({
   minimumScale = 0.54,
   maximumScale = KINGDOM_RENDERING.havenMaxScale,
   onSnapshotChange,
+  onMotionChange,
   onWorldTapRelease,
   scene,
   viewport,
@@ -140,6 +142,10 @@ export function useKingdomHexCamera({
     snapshot: { tx: 0, ty: 0, scale: 1 },
   }));
   const emittedSnapshotKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    onMotionChange?.(!ready || renderState.isMoving);
+  }, [onMotionChange, ready, renderState.isMoving]);
 
   useEffect(() => {
     if (!ready || renderState.isMoving) return;

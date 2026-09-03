@@ -3,6 +3,7 @@ import { memo, useEffect, useMemo, useState, type RefObject } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
+  FadeIn,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -22,6 +23,7 @@ export function havenFtueTargetKey(target: FtueTarget): string | null {
   if (target.kind === 'haven_tile_hud') return `hud:${target.characterId}`;
   if (target.kind === 'haven_upgrade_button') return `upgrade:${target.characterId}`;
   if (target.kind === 'haven_garden_button') return `garden-button:${target.characterId}`;
+  if (target.kind === 'haven_garden_plant_button') return `garden-plant-button:${target.characterId}`;
   if (target.kind === 'haven_garden_order') return `garden-order:${target.characterId}:${target.orderId}`;
   if (target.kind === 'haven_garden_plot') return `garden-plot:${target.characterId}:${target.slotId}`;
   if (target.kind === 'haven_guide') return 'haven-guide';
@@ -42,6 +44,7 @@ export const HavenFtueOverlay = memo(function HavenFtueOverlay({
   targetRefs: RefObject<Map<string, View>>;
   targetRevision: number;
 }) {
+  const reduceMotion = useReducedMotion();
   const [layout, setLayout] = useState<{ cueFocus: Frame | null; focus: Frame; screen: Frame } | null>(null);
   const configKey = useMemo(() => JSON.stringify([cue, spotlight]), [cue, spotlight]);
 
@@ -85,10 +88,15 @@ export const HavenFtueOverlay = memo(function HavenFtueOverlay({
 
   if (!layout) return null;
   return (
-    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" pointerEvents="none" style={styles.overlay}>
+    <Animated.View
+      accessibilityElementsHidden
+      entering={FadeIn.duration(reduceMotion ? 80 : 180)}
+      importantForAccessibility="no-hide-descendants"
+      pointerEvents="none"
+      style={styles.overlay}>
       <Spotlight focus={layout.focus} opacity={spotlight?.dimOpacity ?? 0.62} radius={spotlight?.radius ?? 16} screen={layout.screen} />
       {cue?.kind === 'tap' ? <Finger focus={layout.cueFocus ?? layout.focus} resetKey={`${configKey}:${targetRevision}`} /> : null}
-    </View>
+    </Animated.View>
   );
 });
 

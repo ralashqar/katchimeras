@@ -1,5 +1,6 @@
 import type { MergeOrder, MergeWorldState } from '@/types/merge-world';
 import type { WispId } from '@/types/wisp';
+import { MOSSPROUT_FTUE_COPY } from '@/features/onboarding/mossprout-ftue-copy';
 
 const ORDER_PREFIX = 'mossprout:chapter-0:';
 const FTUE_GARDEN_GENERATOR_ID = 'wild-garden';
@@ -11,7 +12,7 @@ export const MOSSPROUT_CHAPTER_ZERO_REQUESTS = [
     id: `${ORDER_PREFIX}first-sprout`,
     badge: 'FIRST',
     title: 'The First Bloom',
-    description: 'Bring two Sprouts together to make the Grove grow again.',
+    description: 'Merge two Sprouts to grow a Plant for the Garden.',
     definitionId: 'nature:garden:3',
   },
   {
@@ -35,7 +36,7 @@ export function mossproutChapterZeroOrder(now: number, rewardWispId: WispId = 's
     id: MOSSPROUT_CHAPTER_ZERO_REQUESTS[0].id,
     characterId: 'mossprout',
     title: 'The First Bloom',
-    description: 'Bring two Sprouts together to make the Grove grow again.',
+    description: 'Merge two Sprouts to grow a Plant for the Garden.',
     difficulty: 'small',
     requirements: [{ definitionId: 'nature:garden:3', quantity: 1 }],
     reward: { coins: 20, mergeXp: 15, friendshipXp: 0, energy: 0 },
@@ -86,7 +87,7 @@ export function mossproutFtueGardenMissionOrder(now: number): MergeOrder {
     id: MOSSPROUT_FTUE_GARDEN_MISSION_ORDER_ID,
     characterId: 'mossprout',
     title: 'Help the Garden Wake Up',
-    description: 'Create one more Bloom to repair the old path and let the spring reach the mist.',
+    description: MOSSPROUT_FTUE_COPY.nextRequest,
     difficulty: 'small',
     requirements: [{ definitionId: 'nature:garden:3', quantity: 1 }],
     reward: { coins: 0, mergeXp: 0, friendshipXp: 0, energy: 0 },

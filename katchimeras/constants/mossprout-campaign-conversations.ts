@@ -100,12 +100,12 @@ function resolution(number: number, story: DayStory): ConversationDefinition {
 
 const STORIES: Readonly<Record<number, DayStory>> = {
   2: {
-    opening: 'I remembered what you told me. Before we follow that knock by the pond: when you’re stuck, what should I do?',
+    opening: 'Before we follow that knock by the pond: when you want a hand, what helps?',
     openingChoices: [
-      ['support-tiny', 'Give me one tiny thing to try', 'Small enough to begin. I can do that.'],
-      ['support-reflect', 'Help me think it through', 'We can look before we leap—or before I trip over a root.'],
-      ['support-push', 'Give me a push', 'A kind push, then. No catapults.'],
-      ['support-company', 'Mostly keep me company', 'I’m very good at being nearby. {{guest}} is too—meet Petalimp.'],
+      ['support-tiny', 'One small step', 'Small enough to begin. I can do that.'],
+      ['support-reflect', 'Talking it through', 'We can look before we leap—or before I trip over a root.'],
+      ['support-push', 'A little encouragement', 'A kind push, then. No catapults.'],
+      ['support-company', 'Just some company', 'I’m very good at being nearby. {{guest}} is too—meet Petalimp.'],
     ],
     bridge: '{{guest}} heard the pond knock too. Let’s make a listening place, then give the water a path home. Two small jobs. No heroic pond-diving.',
     returnPrompt: 'You did it. The water followed your path, and {{guest}} has been staring into the first puddle as if expecting an encore. What do you notice?',

@@ -963,7 +963,7 @@ test('Journey narrative replies and task bridge wait for the player', () => {
   assert.match(questHook, /settleMossproutConversationCompletion\(nextSession, selectedConversationDefinition\)/);
   assert.match(completion, /\[\.\.\.current\.journeyDays\]\.reverse\(\)\.find/);
   const mergeScreen = fs.readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
-  assert.match(mergeScreen, /onPress=\{\(\) => residentFtueActive && creatureId[\s\S]*?: ftueNavigationLocked \|\| ftueExclusive[\s\S]*?\? handleBlockedFtueInteraction\(\)[\s\S]*?: returnFromGarden\(\)/);
+  assert.match(mergeScreen, /onPress=\{\(\) => handoffActive \? returnFromGarden\(\) : residentFtueActive && creatureId[\s\S]*?: ftueNavigationLocked \|\| ftueExclusive[\s\S]*?\? handleBlockedFtueInteraction\(\)[\s\S]*?: returnFromGarden\(\)/);
   const provider = fs.readFileSync('features/merge-world/merge-world-provider.tsx', 'utf8');
   assert.match(provider, /dropDefinitionIds: mossproutCampaignOrderDrops\(journeyEpisode\)/);
 });

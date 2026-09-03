@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { useNavigation } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
@@ -28,7 +29,8 @@ import { RARE_MEMORY_CARD_REVEAL_ART, VEILED_MEMORY_CARD_ART, memoryCardArt } fr
 import { COMPANION_DISCOVERY_CATALOG } from '@/constants/companion-discovery-catalog';
 import { Lantern } from '@/constants/theme';
 import { useMergeWorldActions, useMergeWorldLastResult, useMergeWorldState } from '@/features/merge-world/merge-world-provider';
-import { advanceFtueActionDurably, commitFtueAction, dispatchFtueEvent, flushFtuePersistence, registerFtueObjectiveBaseline, repairFtueStep, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { advanceFtueActionDurably, commitFtueAction, completeFtueRun, dispatchFtueEvent, flushFtuePersistence, loadFtueRun, registerFtueObjectiveBaseline, repairFtueStep, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { MOSSPROUT_FTUE_COPY } from '@/features/onboarding/mossprout-ftue-copy';
 import { MOSSPROUT_FTUE_RETURN_NOTE_ID, mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, mergeFtueStepForBoard, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
 import type { FtueCueDefinition, FtueSpotlightDefinition } from '@/features/onboarding/ftue-types';
@@ -92,12 +94,32 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const { state, loading, error } = useMergeWorldState();
   const { dispatch: send, flush: flushMergeWorld } = useMergeWorldActions();
   const ftueRun = useFtueRun();
+  const navigation = useNavigation();
+  const handoffActive = ftueRun?.status === 'active' && ftueRun.stepId.startsWith('merge.handoff.');
+  const handoffFeedback = useGameFeedback();
+  const handoffWasActive = useRef(false);
+  useEffect(() => {
+    if (!active) return;
+    if (handoffActive) handoffWasActive.current = true;
+    if (handoffWasActive.current && ftueRun?.status === 'complete') {
+      handoffWasActive.current = false;
+      handoffFeedback.show({ id: `${ftueRun.runId}:independent-play`, message: MOSSPROUT_FTUE_COPY.freePlayHint, durationMs: 6_000 });
+    }
+  }, [active, ftueRun?.runId, ftueRun?.status, handoffActive, handoffFeedback]);
+  useEffect(() => {
+    if (!active || !handoffActive) return;
+    return navigation.addListener('beforeRemove', () => {
+      const run = loadFtueRun();
+      if (run?.status === 'active' && run.stepId.startsWith('merge.handoff.')) completeFtueRun();
+    });
+  }, [active, handoffActive, navigation]);
   const ftueActive = ftueRun?.status === 'active';
   const ftueNavigationLocked = useFtueNavigationLock(ftueRun, 'merge', active);
   const scriptedFtueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
   const ftueStep = useMemo(() => mergeFtueStepForBoard(state, scriptedFtueStep), [scriptedFtueStep, state]);
   const residentFtueActive = Boolean(ftueStep?.id.startsWith('merge.resident_'));
   const returnFromGarden = useCallback(() => {
+    if (loadFtueRun()?.stepId.startsWith('merge.handoff.')) completeFtueRun();
     if (source === 'haven-world') {
       transitionTo({
         announcement: "Returning to Mossprout's Haven",
@@ -109,7 +131,10 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       });
       return;
     }
-    if (creatureId) router.back();
+    if (creatureId) {
+      if (router.canGoBack()) router.back();
+      else router.replace('/(tabs)/katchimeras');
+    }
     else router.push('/legacy-games');
   }, [creatureId, router, source, transitionTo]);
   const returnToResidentStory = useCallback(() => {
@@ -843,8 +868,8 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
           density="compact"
           leading={<KatchimeraBackButton
             accessibilityLabel={source === 'haven-world' ? "Return to Mossprout's Haven" : creatureId ? 'Return to Mossprout' : 'Open legacy games'}
-            disabled={ftueActive}
-            onPress={() => residentFtueActive && creatureId
+            disabled={ftueActive && !handoffActive}
+            onPress={() => handoffActive ? returnFromGarden() : residentFtueActive && creatureId
               ? returnToResidentStory()
               : ftueNavigationLocked || ftueExclusive
                 ? handleBlockedFtueInteraction()

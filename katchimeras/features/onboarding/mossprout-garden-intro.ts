@@ -5,16 +5,7 @@ export type MossproutGardenIntroBeat = {
 };
 
 export const MOSSPROUT_GARDEN_INTRO_BEATS: readonly MossproutGardenIntroBeat[] = [
-  {
-    line: 'You said you wanted something to grow. So I made a little Seed from it.',
-    actionLabel: 'Continue',
-    icon: 'arrow.right',
-  },
-  {
-    line: 'It belongs to you. Let’s find it a place in my Garden.',
-    actionLabel: 'Plant the Seed',
-    icon: 'leaf.fill',
-  },
+  { line: 'This Seed came from what you shared.', actionLabel: 'Continue', icon: 'arrow.right' },
 ] as const;
 
 export function mossproutGardenIntroBeat(index: number) {

@@ -81,6 +81,7 @@ const BUILT_INS: readonly StoryCapabilityDefinition[] = [
   { id: 'relationship.first_bloom_bond', kind: 'effect', idempotent: true },
   { id: 'relationship.begin_meditation', kind: 'effect', idempotent: true, validatePayload: validateMeditationEffect },
   { id: 'haven.grant_first_memory', kind: 'effect', idempotent: true },
+  { id: 'haven.prepare_merge_handoff', kind: 'effect', idempotent: true },
   { id: 'haven.place_first_memory', kind: 'effect', idempotent: true },
   { id: 'haven.grow_first_memory', kind: 'effect', idempotent: true },
   { id: 'haven.feature.upgrade', kind: 'effect', idempotent: true },

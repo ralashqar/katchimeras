@@ -48,7 +48,7 @@ import { resolveCreatureArtSource } from '@/utils/creature-art';
 import { deriveHavenTilePresentation } from '@/utils/haven-tile-presentation';
 import { readyMergeOrderIds } from '@/utils/merge-world/engine';
 import type { KingdomCameraSnapshot } from '@/utils/kingdom-rendering';
-import type { WorldFtueSubjectPresentation } from '@/components/katchadeck/world/world-ftue-subject-presentation';
+import { mossproutWorldUsesEggRenderer, type WorldFtueSubjectPresentation } from '@/components/katchadeck/world/world-ftue-subject-presentation';
 import type { MossproutWorldInteractionRequest } from '@/components/katchadeck/world/mossprout-world-interaction';
 
 type KatchimeraKingdomScreenModule = typeof import('@/components/katchadeck/roster/katchimera-kingdom-screen');
@@ -268,19 +268,18 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
   );
   // A first-session restart must still look like a first discovery when the
   // developer keeps an established profile and past days.
+  const eggVisible = mossproutWorldUsesEggRenderer(
+    ftueRun?.status === 'active' ? ftueRun.stepId : null,
+    worldSubjectPresentation,
+  );
   const discoveryCompanionSlots = useMemo<KingdomHexCompanionSlot[]>(() => {
     const stepId = ftueRun?.status === 'active' ? ftueRun.stepId : null;
     if (!stepId) return companionSlots;
-    const eggVisible = stepId === 'world.egg_intro'
-      || stepId === 'egg.opening'
-      || stepId === 'egg.context'
-      || stepId === 'egg.mind'
-      || stepId === 'egg.ready'
-      || stepId === 'companion.first_meeting'
-      || stepId === 'companion.bond_spotlight'
-      || stepId === 'companion.day_one_action'
-      || stepId === 'companion.garden_intro'
-      || stepId === 'companion.order_preview';
+    // Keep the revealed-Egg renderer only for the terminal hatch-to-creature
+    // handoff. Post-hatch dialogue must use the durable owned Mossprout slot.
+    // Previously those later steps stayed typed as `revealed_egg`, so a brief
+    // null presentation while the hosted interaction mounted exposed a
+    // sleeping Egg in Mossprout's place.
     return companionSlots.map((slot) => {
       const base = { id: slot.id, coord: slot.coord, familyId: slot.familyId };
       if (eggVisible && slot.familyId === 'mossprout') {
@@ -288,7 +287,12 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
       }
       return slot.familyId === 'mossprout' ? slot : { ...base, kind: 'locked' as const };
     });
-  }, [companionSlots, ftueRun?.status, ftueRun?.stepId]);
+  }, [
+    companionSlots,
+    ftueRun?.status,
+    ftueRun?.stepId,
+    eggVisible,
+  ]);
   const mossproutWorldCompanionSlots = useMemo(
     () => discoveryCompanionSlots.filter((slot) => slot.familyId === 'mossprout'),
     [discoveryCompanionSlots],
@@ -408,14 +412,14 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
     });
   }, [publishWorldSession, transitionTo]);
   const openFtueGarden = useCallback(async () => {
-    if (ftueRun?.status !== 'active' || ftueRun.stepId !== 'world.garden_handoff') return;
+    if (ftueRun?.status !== 'active' || !['world.garden_handoff', 'world.seed_planted'].includes(ftueRun.stepId)) return;
     transitionTo({
       announcement: "Opening Mossprout's Garden",
       target: 'merge',
       navigate: async () => {
         const result = await advanceFtueActionDurably({
-          expectedStepId: 'world.garden_handoff',
-          actionId: 'world.open_garden',
+          expectedStepId: ftueRun.stepId,
+          actionId: ftueRun.stepId === 'world.seed_planted' ? 'world.acknowledge_seed_dormant' : 'world.open_garden',
           evidenceRef: 'mossprout-world:garden-button',
         });
         if (result.run?.status !== 'active' || result.step?.surface !== 'merge') {
@@ -448,12 +452,8 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
             if (stepId === 'world.egg_intro') {
               commitFtueAction({ actionId: 'world.inspect_mossprout_egg', evidenceRef: 'mossprout-world:egg-intro-seen' });
             } else if (stepId === 'world.seed_planted') {
-              commitFtueAction({ actionId: 'world.acknowledge_seed_dormant', evidenceRef: 'mossprout-world:seed-planted' });
+              void openFtueGarden();
             } else if (stepId === 'companion.meditating') {
-              commitFtueAction({ actionId: 'companion.tend_garden', evidenceRef: 'mossprout-world:ftue-complete' });
-              // A replayed terminal receipt is intentionally a no-op. Always
-              // release FTUE ownership so interrupted prior presses cannot
-              // leave Garden navigation locked after the ending disappears.
               completeFtueRun();
             }
           }}

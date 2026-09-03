@@ -12,3 +12,18 @@ export type WorldFtueSubjectPresentation = {
   readyToHatch: boolean;
   rewardPulseKey: number;
 };
+
+/** The Egg is an opening actor, never a fallback for a post-hatch resident. */
+export function mossproutWorldUsesEggRenderer(
+  stepId: string | null | undefined,
+  presentation?: Pick<WorldFtueSubjectPresentation, 'companionVisible' | 'hatchPresentation'> | null,
+) {
+  const preHatch = stepId === 'world.egg_intro'
+    || stepId === 'egg.opening'
+    || stepId === 'egg.context'
+    || stepId === 'egg.mind'
+    || stepId === 'egg.ready';
+  const liveHandoff = stepId === 'companion.first_meeting'
+    && Boolean(presentation?.hatchPresentation || presentation?.companionVisible);
+  return preHatch || liveHandoff;
+}

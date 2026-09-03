@@ -2,12 +2,12 @@ import { useSyncExternalStore } from 'react';
 
 import { createClientId } from '@/utils/client-id';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
-import { dispatchFtueActionToContentFlow, dispatchFtueEventToContentFlow } from '@/features/content-flow/ftue-content-flow-runtime';
+import { dismissFtueContentFlow, dispatchFtueActionToContentFlow, dispatchFtueEventToContentFlow } from '@/features/content-flow/ftue-content-flow-runtime';
 import { completeDayOneLesson } from '@/game/katchimeras/action-runtime';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 
 import { MOSSPROUT_FTUE_SCRIPT, mossproutFtueAction, mossproutFtueStep } from './mossprout-ftue-script';
-import { ftueNeedsV28QuestionnaireRestart, ftueV28QuestionnaireLoopRecoveryStep } from './ftue-migration-policy';
+import { ftueNeedsV28QuestionnaireRestart, ftueV28QuestionnaireLoopRecoveryStep, streamlinedFtueStep } from './ftue-migration-policy';
 import { activeFtueNavigationPolicy } from './ftue-navigation-policy';
 import type {
   FtueAnswer,
@@ -87,11 +87,13 @@ function scheduleReceiptSync() {
 }
 
 function migrateCurrentScript(run: FtueRunState): FtueRunState {
-  // The life-companion pivot intentionally restarts unfinished prototype FTUE
-  // runs at the Haven. This resets only the guided run; saved life captures and
-  // source photos remain untouched in their existing repositories.
+  if (run.scriptVersion < 43 && run.scriptVersion >= 42) {
+    return { ...run, scriptVersion: 43, stepId: streamlinedFtueStep(run), updatedAt: new Date().toISOString() };
+  }
+  // Keep unfinished prototype checkpoints and their domain data when upgrading.
   if (run.status === 'active' && run.scriptVersion < 42) {
-    return freshRun(new Date(run.startedAt));
+    const stepId = streamlinedFtueStep(run);
+    return { ...run, schemaVersion: 6, scriptVersion: 43, stepId: mossproutFtueStep(stepId) ? stepId : 'companion.meditating', objectiveProgress: run.objectiveProgress ?? {}, updatedAt: new Date().toISOString() };
   }
   const replayDreamMistChapter = run.scriptVersion < 10;
   const restartingLegacyMerge = run.status === 'active'
@@ -120,7 +122,7 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
     && run.stepId === 'merge.resident_parcel';
   if (run.schemaVersion === 6 && run.scriptVersion === MOSSPROUT_FTUE_SCRIPT.version && !replacementOpeningStep) return run;
   const now = new Date().toISOString();
-  if (replayDreamMistChapter) return {
+  if (replayDreamMistChapter && run.status !== 'complete') return {
     ...run,
     schemaVersion: 6,
     runId: createClientId('ftue'),
@@ -228,6 +230,7 @@ export function updateFtueRun(patch: Partial<Pick<FtueRunState, 'stepId' | 'stat
 export function completeFtueRun() {
   const current = loadFtueRun();
   if (!current) return null;
+  void dismissFtueContentFlow(current.runId).catch((error) => console.warn('Could not dismiss FTUE coaching', error));
   if (current.status === 'complete' && current.stepId === MOSSPROUT_FTUE_SCRIPT.terminalStepId) return current;
   const completedAt = new Date().toISOString();
   return publish({

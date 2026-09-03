@@ -56,6 +56,48 @@ test('compiler rejects unreachable nodes, dead ends, bad targets, and empty task
   assert.ok(issues.some((issue) => issue.message.includes('at least one requirement')));
 });
 
+test('streamlined FTUE resumes at every boundary and reaches independent Merge with four merges and two Basket taps', () => {
+  const flow = MOSSPROUT_FTUE_FLOW;
+  let run = createContentFlowRun(flow, { runId: 'streamlined-ftue', now: 1 });
+  const visited = new Set<string>();
+  const events: string[] = [];
+  let commands = 0;
+  while (run.status !== 'completed' && commands++ < 80) {
+    run = JSON.parse(JSON.stringify(run));
+    visited.add(run.nodeId);
+    const state = reduceContentFlow(flow, run, { type: 'retry', now: commands + 1 });
+    run = state.run;
+    const work = state.pendingWork;
+    const node = flow.nodes.find((candidate) => candidate.id === run.nodeId)!;
+    if (work.kind === 'effect') {
+      const next = reduceContentFlow(flow, run, { type: 'effect_completed', effectKey: work.key, now: commands + 2 });
+      const replay = reduceContentFlow(flow, next.run, { type: 'effect_completed', effectKey: work.key, now: commands + 3 });
+      assert.equal(replay.run.nodeId, next.run.nodeId);
+      assert.deepEqual(replay.run.effectReceipts, next.run.effectReceipts);
+      run = replay.run;
+    } else if (work.kind === 'presentation') {
+      run = reduceContentFlow(flow, run, { type: 'presentation_acknowledged', presentationKey: work.key }).run;
+    } else if (node.kind === 'scene') {
+      run = reduceContentFlow(flow, run, { type: 'submit_scene', actionId: node.actions[0].id }).run;
+    } else if (node.kind === 'task') {
+      const requirement = node.requirements[0];
+      const event = { eventId: `command:${commands}`, type: requirement.event.type, runId: run.runId, nodeId: run.nodeId, payload: requirement.event.where ?? {}, occurredAt: commands };
+      assert.equal(reduceContentFlow(flow, run, { type: 'record_event', event: { ...event, runId: 'unrelated' } }).run.nodeId, run.nodeId);
+      events.push(event.type);
+      run = reduceContentFlow(flow, run, { type: 'record_event', event }).run;
+    } else assert.fail(`Unhandled FTUE node ${node.id}`);
+  }
+  assert.equal(run.status, 'completed');
+  assert.equal(events.filter((type) => type === 'ftue.merge_completed').length, 4);
+  assert.equal(events.filter((type) => type === 'ftue.item_spawned').length, 2);
+  assert.ok(visited.has('world.seed_planted'));
+  assert.ok(visited.has('world.first_seed_grew'));
+  for (const removed of ['companion.day_one_action', 'companion.bond_spotlight', 'companion.order_preview', 'world.garden_handoff', 'companion.chapter_zero_return', 'companion.water_response', 'companion.first_insight'] as const) {
+    assert.equal(visited.has(removed), false);
+    assert.ok(flow.migrations?.[removed]);
+  }
+});
+
 test('typed story manifests provide shared capabilities, routes, readiness and back policy', () => {
   const manifest = defineStory({
     id: 'test:typed-story',
@@ -190,9 +232,9 @@ test('the shipping FTUE is a direct data-driven Content Flow manifest', () => {
   assert.equal(flow.nodes.find((node) => node.id === MOSSPROUT_FTUE_SCRIPT.terminalStepId)?.kind, 'complete');
   const dayOneEffect = flow.nodes.find((node) => node.kind === 'effect' && node.effectType === 'relationship.complete_day_one_lesson');
   assert.ok(dayOneEffect);
-  const dayOneScene = flow.nodes.find((node) => node.kind === 'scene' && node.actions.some((action) => action.id === 'companion.complete_day_one_action'));
+  const dayOneScene = flow.nodes.find((node) => node.kind === 'scene' && node.actions.some((action) => action.id === 'companion.complete_first_meeting'));
   assert.equal(dayOneScene?.kind === 'scene'
-    ? dayOneScene.actions.find((action) => action.id === 'companion.complete_day_one_action')?.next
+    ? dayOneScene.actions.find((action) => action.id === 'companion.complete_first_meeting')?.next
     : null, dayOneEffect.id);
   const opening = flow.nodes.find((node) => node.id === 'egg.opening');
   assert.equal(opening?.kind, 'scene');
@@ -207,8 +249,8 @@ test('the shipping FTUE is a direct data-driven Content Flow manifest', () => {
 test('Day 1 Content Flow completion durably crosses the relationship effect before Garden', () => {
   const flow = MOSSPROUT_FTUE_FLOW;
   const base = createContentFlowRun(flow, { runId: 'ftue-day-one', now: 1 });
-  const atLesson = { ...base, nodeId: 'companion.day_one_action', phase: 'awaiting_input' as const };
-  const effect = reduceContentFlow(flow, atLesson, { type: 'submit_scene', actionId: 'companion.complete_day_one_action', now: 2 });
+  const atLesson = { ...base, nodeId: 'companion.first_meeting', phase: 'awaiting_input' as const };
+  const effect = reduceContentFlow(flow, atLesson, { type: 'submit_scene', actionId: 'companion.complete_first_meeting', now: 2 });
   assert.equal(effect.run.phase, 'awaiting_effect');
   assert.equal(effect.pendingWork.kind, 'effect');
   if (effect.pendingWork.kind !== 'effect') return;
@@ -219,7 +261,7 @@ test('Day 1 Content Flow completion durably crosses the relationship effect befo
   if (seeded.pendingWork.kind !== 'effect') return;
   assert.equal(seeded.pendingWork.effectType, 'haven.grant_first_memory');
   const advanced = reduceContentFlow(flow, seeded.run, { type: 'effect_completed', effectKey: seeded.pendingWork.key, now: 4 });
-  assert.equal(advanced.run.nodeId, 'companion.bond_spotlight');
+  assert.equal(advanced.run.nodeId, 'companion.garden_intro');
   assert.equal(Object.keys(advanced.run.effectReceipts).length, 2);
 });
 

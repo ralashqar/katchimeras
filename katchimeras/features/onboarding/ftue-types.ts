@@ -89,6 +89,7 @@ export type FtueTarget =
   | { kind: 'haven_upgrade_button'; characterId: string }
   | { kind: 'haven_garden_tile'; characterId: 'mossprout' }
   | { kind: 'haven_garden_button'; characterId: 'mossprout' }
+  | { kind: 'haven_garden_plant_button'; characterId: 'mossprout' }
   | { kind: 'haven_garden_order'; characterId: 'mossprout'; orderId: string }
   | { kind: 'haven_garden_plot'; characterId: 'mossprout'; slotId: MossproutGardenPlantSlotId }
   | { kind: 'haven_guide' }
@@ -179,6 +180,8 @@ export type FtueGraphEdge = {
 export type FtueStepDefinition = {
   id: string;
   surface: FtueSurface;
+  /** Advance the first authored action after this quiet presentation beat. */
+  autoAdvanceMs?: number;
   navigation?: FtueNavigationDirective;
   guide: FtueGuide;
   actions: readonly FtueActionDefinition[];

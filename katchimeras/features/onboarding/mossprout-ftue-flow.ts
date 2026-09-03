@@ -60,7 +60,7 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
   id: 'mossprout-first-session',
   // Independent from the legacy FTUE schema version. Bumping this lets v39
   // journal runs migrate onto the direct manifest without mutating a release.
-  version: 44,
+  version: 45,
   entryNodeId: 'world.egg_intro',
   metadata: {
     kind: 'ftue' as const,
@@ -73,12 +73,7 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
     scene('egg.opening', 'haven', [{ id: 'egg.day_texture', next: 'egg.context' }]),
     scene('egg.context', 'haven', [{ id: 'egg.desired_help', next: 'egg.ready' }]),
     scene('egg.ready', 'haven', [{ id: 'egg.hatch', next: 'companion.first_meeting' }]),
-    scene('companion.first_meeting', 'haven', [{ id: 'companion.complete_first_meeting', next: 'companion.day_one_action' }]),
-    scene('companion.day_one_action', 'companion', [
-      { id: 'companion.choose_growth_intent', next: 'companion.day_one_action' },
-      { id: 'companion.choose_support_style', next: 'companion.day_one_action' },
-      { id: 'companion.complete_day_one_action', next: 'effect.relationship.complete_day_one_lesson' },
-    ]),
+    scene('companion.first_meeting', 'haven', [{ id: 'companion.complete_first_meeting', next: 'effect.relationship.complete_day_one_lesson' }]),
     story.effect({
       id: 'effect.relationship.complete_day_one_lesson',
       capability: 'relationship.complete_day_one_lesson',
@@ -87,11 +82,9 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
     story.effect({
       id: 'effect.haven.grant_first_memory',
       capability: 'haven.grant_first_memory',
-      next: 'companion.bond_spotlight',
+      next: 'companion.garden_intro',
     }),
-    scene('companion.bond_spotlight', 'companion', [{ id: 'companion.acknowledge_bond', next: 'companion.garden_intro' }]),
-    scene('companion.garden_intro', 'companion', [{ id: 'companion.acknowledge_garden_intro', next: 'companion.order_preview' }]),
-    scene('companion.order_preview', 'companion', [{ id: 'companion.open_garden', next: 'garden.first-visit.focus' }]),
+    scene('companion.garden_intro', 'companion', [{ id: 'companion.continue_to_planting', next: 'garden.first-visit.focus' }]),
     storyOperations.focusCamera({
       id: 'garden.first-visit.focus',
       target: MOSSPROUT_GARDEN_FOCUS_TARGET,
@@ -104,8 +97,7 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
       capability: 'haven.place_first_memory',
       next: 'world.seed_planted',
     }),
-    scene('world.seed_planted', 'haven', [{ id: 'world.acknowledge_seed_dormant', next: 'world.garden_handoff' }]),
-    scene('world.garden_handoff', 'haven', [{ id: 'world.open_garden', next: 'merge.seed_drag' }]),
+    scene('world.seed_planted', 'haven', [{ id: 'world.acknowledge_seed_dormant', next: 'merge.seed_drag' }]),
     task('merge.seed_drag', 'merge', {
       id: 'merge.create_sprout',
       event: ftueEvent('merge_completed', { resultDefinitionId: 'nature:garden:2' }),
@@ -153,31 +145,38 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
     story.effect({
       id: 'effect.relationship.first_bloom_bond',
       capability: 'relationship.first_bloom_bond',
-      next: 'companion.chapter_zero_return',
+      next: 'companion.water_together',
     }),
-    scene('companion.chapter_zero_return', 'companion', [{ id: 'companion.complete_chapter_zero_return', next: 'companion.water_together' }]),
-    scene('companion.water_together', 'companion', [{ id: 'companion.choose_water_together', next: 'companion.water_response' }]),
-    scene('companion.water_response', 'companion', [{ id: 'companion.ack_water_response', next: 'companion.first_insight' }]),
-    scene('companion.first_insight', 'companion', [{ id: 'companion.confirm_first_reflection', next: 'companion.first_rest' }]),
-    story.conversation({
-      id: 'companion.first_rest',
-      conversationId: 'mossprout:ftue:first-rest',
-      actions: [{ id: 'companion.begin_rest', next: 'effect.relationship.begin_meditation' }],
-      next: 'effect.relationship.begin_meditation',
-    }),
+    scene('companion.water_together', 'companion', [{ id: 'companion.choose_water_together', next: 'companion.first_rest' }]),
+    scene('companion.first_rest', 'companion', [{ id: 'companion.begin_rest', next: 'effect.relationship.begin_meditation' }]),
     story.effect({
       id: 'effect.relationship.begin_meditation',
       capability: 'relationship.begin_meditation',
       payload: { familyId: 'mossprout', durationMs: MOSSPROUT_FTUE_REST_MS, reason: 'journey_rest' },
       next: 'companion.meditating',
     }),
-    scene('companion.meditating', 'companion', [{ id: 'companion.tend_garden', next: 'complete' }]),
+    scene('companion.meditating', 'companion', [{ id: 'companion.tend_garden', next: 'effect.haven.prepare_merge_handoff' }]),
+    story.effect({ id: 'effect.haven.prepare_merge_handoff', capability: 'haven.prepare_merge_handoff', next: 'merge.handoff.spawn' }),
+    task('merge.handoff.spawn', 'merge', {
+      id: 'merge.handoff.spawn', event: ftueEvent('item_spawned', { generatorId: 'wild-garden', definitionId: 'nature:garden:1' }),
+      count: 2, next: 'merge.handoff.merge',
+    }),
+    task('merge.handoff.merge', 'merge', {
+      id: 'merge.handoff.merge', event: ftueEvent('merge_completed', { resultDefinitionId: 'nature:garden:2' }), next: 'complete',
+    }),
     story.complete(),
   ],
   migrations: {
     'world.complete': 'companion.meditating',
     'haven.first_bloom': 'world.first_bloom_restore',
     'effect.haven.seed_first_memory': 'effect.haven.grant_first_memory',
+    'companion.day_one_action': 'effect.relationship.complete_day_one_lesson',
+    'companion.bond_spotlight': 'companion.garden_intro',
+    'companion.order_preview': 'companion.garden_intro',
+    'world.garden_handoff': 'world.seed_planted',
+    'companion.chapter_zero_return': 'companion.water_together',
+    'companion.water_response': 'companion.first_rest',
+    'companion.first_insight': 'companion.first_rest',
   },
 });
 

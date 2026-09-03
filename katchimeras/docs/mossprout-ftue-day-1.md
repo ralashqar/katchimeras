@@ -1,47 +1,58 @@
-# Mossprout FTUE — relationship-first first session
+# Mossprout FTUE — a little of your world, growing in mine
 
 ## Product promise
 
-The first session should make three ideas felt, not explained:
+The player should feel that Mossprout heard them, that their answer made something real, and that both the Garden and the relationship can keep growing. The experience teaches Merge through play, not a menu tour.
 
-1. Mossprout heard something real from me.
-2. My answer changed his world.
-3. This relationship will continue.
+## Shipping sequence (script v43, Content Flow v45)
 
-## Live sequence (script v39)
+| Beat | Player action | Purpose |
+| --- | --- | --- |
+| Egg in the quiet Garden | Watch the existing world reveal | Establish a place worth caring for. |
+| “How has today felt?” | Choose one of three short answers | Include good, busy, and neutral days. |
+| “What would feel good right now?” | Progress, calm, or unsure | Give the personal Seed an honest origin. |
+| Hatch and meeting | Hatch, then choose a playful greeting | Mossprout echoes the day answer. |
+| Your memory Seed | Continue | Show the named Seed, acknowledge the greeting, explain Bond inline. |
+| A place of its own | Plant Seed | Place this exact personal Seed in the world. |
+| Wake the Garden | Open Merge | Hold the explanation until the player is ready; preview the requested Plant. |
+| Seed → Sprout → Plant | Three merges, then Serve | Four board Seeds become two Sprouts, then one Plant. |
+| The First Bloom | Restore Garden | One explicit free restoration; watch the same personal Seed grow. |
+| Shared moment | Continue, then answer Water Together | Move directly back to Mossprout. Water is optional. |
+| Farewell | Rest, Mossprout | Acknowledge the water answer and explain the next Journey in one beat. |
+| Meditation | Enter interaction, then Go to Merge or Back | Show the compact eight-hour next-Journey timer inside Mossprout’s normal interaction UI. |
+| Basket handoff | Tap twice, merge the two Seeds | Teach where pieces come from; then release coaching immediately. |
 
-1. Enter Mossprout's neglected Garden with the Egg already present.
-2. Ask one non-clinical question: “What has today felt most like?”
-3. Feed the answer into the Egg and hatch Mossprout immediately.
-4. Mossprout's first line reflects the exact answer back.
-5. Ask whether the player wants to grow something, improve something, or is not sure yet.
-6. Award the first meaningful Bond increase and reassure the player that precision is not required.
-7. Turn the answer into a named Seed of Momentum, Patience, or Curiosity.
-8. Introduce the existing four-Seed merge lesson as the way the shared intention becomes tangible.
-9. Serve the First Bloom, return to the focused world, and press the world-anchored `Restore with First Bloom` action. The shared upgrade recipe restores Haven stage 1 and all six level-1 nature islands for zero Coins with the full particle/crossfade sequence.
-10. Offer Water Together. Mossprout responds to every answer; accepting it pins the existing optional water Daily Seed until completed, while declining has no penalty.
-11. Show the first Seed insight with “I might be wrong. I’ll learn.”
-12. Let Mossprout explain that roots need quiet, then enter his durable meditating state inside the normal close-up interaction UI. The timer sits below Mossprout, ordinary action cards stay hidden, and only `Tend the Garden` exits the FTUE close-up. Merge/Garden play remains available while relationship content rests for exactly eight hours.
+The first request's story title remains “The First Bloom”; its merge item is consistently called a Plant. The personal memory Seed is a separate world object, not a board ingredient or currency.
 
-Petalimp and resident-card teaching are not part of the first session. Journey Day 2 starts with a natural support-preference question and introduces Petalimp as the first visitor.
+## Voice and choices
 
-## Persistence
+Shared copy lives in `features/onboarding/mossprout-ftue-copy.ts`. Keep prose short, concrete, friendly, and gently playful. Avoid diagnosis, false insight, compulsory positivity, or promises about changing someone's life.
 
-- `FtueRunState.answers` owns interruption-safe choice receipts.
-- `OnboardingProfile.mossproutAnswers` owns `dayTextureId`, `growthIntentId`, `waterTogetherChoiceId`, and `firstSeedId`.
-- Relationship progression owns the completed first Journey and the eight-hour availability rule.
-- Merge World owns the First Bloom and permanent Garden restoration.
-- Daily Seeds owns completion of Water Together.
+- Progress → Seed of Momentum.
+- Calm → Seed of Stillness.
+- Unsure → Seed of Curiosity.
+- Greeting replies acknowledge “Hi”, “What is this place?”, and “You’re tiny.”
+- Water answers are “I’ll get some.”, “Already had some.”, and “Not now, Mossprout.” None blocks progress or marks water completed.
+- Support preference remains in Journey 2, where it is saved without repeating the first-session question.
+- “Your Bond grows through little moments together” replaces a separate Bond tutorial acknowledgement.
 
-## Acceptance checks
+## Free play and meditation
 
-- Exactly one Egg question precedes Hatch.
-- Every Egg answer has a distinct first line from Mossprout.
-- The live path contains only two personal questions before Merge.
-- Four Seeds become two Sprouts and one First Bloom.
-- Serving that Bloom visibly and durably restores the first Garden without spending Coins.
-- Water Together is optional and the humorous refusal is accepted.
-- A named Seed is saved before FTUE completion.
-- No collection, map tutorial, currency tutorial, resident questionnaire, or resident-card lesson appears.
-- Day 2 becomes available eight hours after Day 1 completion, even on the same calendar date.
-- The Garden remains playable during the rest period.
+The Garden Basket currently does not spend Energy on the companion activity board. Do not teach a cost or add an Energy top-up. The tutorial uses that same behavior.
+
+“Go to Merge” opens Merge. After the Basket lesson, the existing “Help the Garden Wake Up” Plant request remains: repair the path and bring back the spring. Back dismisses the optional coaching, not the request or the player's board.
+
+Meditation gates the next Journey, not all play. The compact timer says “Next Journey in”; the interaction offers Go to Merge and the normal Back exit. Preserve the existing eight-hour duration and existing shortening rules. The Steppling movement Egg is never rendered in Mossprout’s world map.
+
+## Device acceptance pass
+
+1. Try every Egg answer, including “Pretty good” and “I’m not sure yet”; verify the named Seed and first line.
+2. Check small screens, large text, reduced motion, and screen-reader labels.
+3. Double-tap Continue/Plant/Rest; verify one Seed, one restoration, one meditation start.
+4. Cold launch at planting, after Serve, during growth, after Rest, and after the first Basket tap.
+5. Confirm planting copy waits for Open Merge; no repeated Garden handoff or insight-accuracy question appears.
+6. Confirm every water answer reaches the same farewell and only acceptance pins optional water.
+7. Confirm Rest enters Mossprout’s interaction UI and the compact timer remains readable. Use both Go to Merge and Back.
+8. Finish the Basket lesson, then independently grow and serve the next Plant.
+9. Back out midway through coaching; return and confirm the board/request survive without forced coaching.
+10. Upgrade an active v42 save at each removed beat and a completed save. No questionnaire replay, duplicate rewards, or reset timer.

@@ -32,6 +32,7 @@ import {
   mossproutFirstSeedForIntent,
 } from '@/features/onboarding/mossprout-bond-share';
 import { mossproutMemoryPlantById } from '@/constants/mossprout-memory-plants';
+import { MOSSPROUT_FTUE_COPY as COPY } from '@/features/onboarding/mossprout-ftue-copy';
 
 const INTRODUCTION_REWARD = { amount: MOSSPROUT_FTUE_NAME_BOND_REWARD_PREVIEW, kind: 'bond' as const };
 const BOND_SHARE_REWARD = { amount: MOSSPROUT_FTUE_BOND_SHARE_REWARD_PREVIEW, kind: 'bond' as const };
@@ -211,12 +212,13 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
     <Animated.View entering={FadeInUp.duration(220)} style={styles.actionStage}>
       {firstSeedDefinition ? <DayActionCardSurface
         artwork={<Image contentFit="contain" source={firstSeedDefinition.art.seed} style={styles.seedArt} />}
-        eyebrow="YOUR FIRST MEMORY SEED"
+        eyebrow="YOUR MEMORY SEED"
         style={styles.seedRewardCard}
-        subtitle={firstSeedDefinition.description}
+        subtitle={COPY.seedOrigin}
         title={firstSeedDefinition.name}
         trailing={<View />}
       /> : null}
+      <ThemedText style={styles.privateNote} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{COPY.bond}</ThemedText>
       <PrimaryAction icon={gardenStoryActionIcon} label={gardenStoryActionLabel} onPress={() => onContinue?.()} />
     </Animated.View>
   );
@@ -237,7 +239,7 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
 
   if (mode === 'water_response') return (
     <Animated.View entering={FadeInUp.duration(220)} style={styles.actionStage}>
-      <PrimaryAction icon="leaf.fill" label="Keep going" onPress={() => onContinue?.()} />
+      <PrimaryAction icon="moon.stars.fill" label={COPY.restAction} onPress={() => onContinue?.()} />
     </Animated.View>
   );
 

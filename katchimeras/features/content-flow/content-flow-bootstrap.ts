@@ -3,12 +3,15 @@ import { nextUnearnedMossproutResident } from '@/constants/resident-card-discove
 import { MOSSPROUT_FTUE_VARIANTS } from '@/features/onboarding/mossprout-ftue-flow';
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 import type { StoryWorldUpgradeEffectPayload } from '@/types/content-flow';
-import { activateStoredResidentCardDiscovery, grantStoredPlantableMemory, growStoredPlantableMemory, loadMergeWorldState, placeStoredPlantableMemory, revealStoredHaven, revealStoredMovementEgg, upgradeStoredHavenFeature, upgradeStoredStoryWorldTarget } from '@/utils/merge-world/repository';
+import { activateStoredResidentCardDiscovery, ensureStoredFirstFtueMemoryPlacement, grantStoredPlantableMemory, growStoredPlantableMemory, loadMergeWorldState, revealStoredHaven, revealStoredMovementEgg, seedStoredMossproutGardenAfterFtue, upgradeStoredHavenFeature, upgradeStoredStoryWorldTarget } from '@/utils/merge-world/repository';
+import { firstFtueMemoryForSource } from '@/utils/merge-world/first-ftue-memory';
 import { completeDayOneLesson } from '@/game/katchimeras/action-runtime';
-import { beginKatchimeraMeditation, katchimeraMeditationRecord } from '@/game/katchimeras/relationship-progression';
+import { beginKatchimeraMeditation, completeMossproutJourneyResolution, katchimeraMeditationRecord } from '@/game/katchimeras/relationship-progression';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
-import { MOSSPROUT_FTUE_FAMILIAR_BOND_TARGET, mossproutFirstSeedForIntent } from '@/features/onboarding/mossprout-bond-share';
+import { MOSSPROUT_FTUE_FAMILIAR_BOND_TARGET, MOSSPROUT_FTUE_NAME_BOND_TARGET, mossproutFirstSeedForIntent } from '@/features/onboarding/mossprout-bond-share';
+import { localDayId } from '@/utils/world-identity';
+import { keepMossproutFirstSeed } from '@/features/onboarding/mossprout-profile';
 import { companionIdForFamily } from '@/constants/katchimera-skins';
 import { companionBondProgress, recordCompanionBondEvent } from '@/utils/companion-bond';
 import { loadCompanionBondState, saveCompanionBondState } from '@/utils/companion-bond-storage';
@@ -51,9 +54,27 @@ export function bootstrapContentFlowCatalog() {
   registerContentFlowEffect('relationship.complete_day_one_lesson', async ({ run, effectKey }) => {
     const completedAt = Date.now();
     relationshipProgressionRepository.update((state) => completeDayOneLesson(state, { completedAt, flowRunId: run.runId }));
+    const homeState = homeRepository.load();
+    const resolveCompanionId = companionIdResolverForHomeState(homeState);
+    const bondState = loadCompanionBondState(loadCompanionQuests(resolveCompanionId), resolveCompanionId, homeState);
+    const creatureId = companionIdForFamily('mossprout');
+    const points = Math.max(0, MOSSPROUT_FTUE_NAME_BOND_TARGET - companionBondProgress(bondState, creatureId).totalPoints);
+    if (points > 0) {
+      const result = recordCompanionBondEvent(bondState, { id: `ftue-bond-share:${String(run.variables.ftueRunId ?? run.runId)}`, creatureId, kind: 'check_in_completed', points, occurredAt: completedAt });
+      if (result.awarded) saveCompanionBondState(result.state);
+    }
+    keepMossproutFirstSeed();
     return { effectKey, completedAt, flowRunId: run.runId };
   });
+  registerContentFlowEffect('haven.prepare_merge_handoff', async ({ effectKey }) => {
+    await seedStoredMossproutGardenAfterFtue(localDayId());
+    return { effectKey };
+  });
   registerContentFlowEffect('relationship.first_bloom_bond', async ({ effectKey }) => {
+    relationshipProgressionRepository.update((state) => {
+      const journey = [...state.journeyDays].reverse().find((day) => day.familyId === 'mossprout' && day.beatId === 'quiet-patch:first-flower');
+      return journey ? completeMossproutJourneyResolution(state, journey.dayId) : state;
+    });
     const homeState = homeRepository.load();
     const resolveCompanionId = companionIdResolverForHomeState(homeState);
     const questState = loadCompanionQuests(resolveCompanionId);
@@ -92,6 +113,8 @@ export function bootstrapContentFlowCatalog() {
     const profile = loadOnboardingProfile();
     const seed = mossproutFirstSeedForIntent(profile.mossproutAnswers.growthIntentId);
     const sourceId = typeof run.variables.ftueRunId === 'string' ? run.variables.ftueRunId : run.runId;
+    const existing = firstFtueMemoryForSource(await loadMergeWorldState(), sourceId);
+    if (existing) return { effectKey, definitionId: existing.definitionId, instanceId: existing.id };
     const granted = await grantStoredPlantableMemory(seed.id, { kind: 'ftue', sourceId }, effectKey);
     const instanceId = `memory-plant:${effectKey}`;
     if (!granted.changed) {
@@ -103,16 +126,13 @@ export function bootstrapContentFlowCatalog() {
     return { effectKey, definitionId: seed.id, instanceId };
   });
   registerContentFlowEffect('haven.place_first_memory', async ({ run, effectKey }) => {
-    const world = await loadMergeWorldState();
     const sourceId = typeof run.variables.ftueRunId === 'string' ? run.variables.ftueRunId : run.runId;
-    const plant = world.haven.plantableMemories.find((candidate) => candidate.source.kind === 'ftue' && candidate.source.sourceId === sourceId)
-      ?? world.haven.plantableMemories.find((candidate) => candidate.source.kind === 'ftue');
-    if (!plant) throw new Error('The first memory Seed is missing');
-    const placed = await placeStoredPlantableMemory(plant.id, 'front-left', effectKey);
-    if (!placed.changed && !placed.state.haven.plantableMemories.some((candidate) => candidate.id === plant.id && candidate.slotId === 'front-left')) {
+    const placed = await ensureStoredFirstFtueMemoryPlacement(sourceId, effectKey);
+    const plant = firstFtueMemoryForSource(placed.state, sourceId);
+    if (!placed.placed || !plant) {
       throw new Error('The first memory Seed could not be planted');
     }
-    return { effectKey, definitionId: plant.definitionId, instanceId: plant.id, slotId: 'front-left' };
+    return { effectKey, definitionId: plant.definitionId, instanceId: plant.id, slotId: plant.slotId };
   });
   registerContentFlowEffect('haven.grow_first_memory', async ({ run, effectKey }) => {
     const world = await loadMergeWorldState();

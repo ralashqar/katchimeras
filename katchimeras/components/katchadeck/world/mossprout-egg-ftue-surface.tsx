@@ -320,22 +320,7 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
       action.presentation === 'inline_choice'
       || action.presentation === 'cta_action'
       || action.presentation === 'acknowledgement'
-    )).map((action) => {
-      if (action.id !== 'egg.desired_help' || !action.options) return action;
-      const firstAnswer = ftueRun?.answers['egg.day_texture']?.optionId;
-      const preferred = firstAnswer === 'too_much_at_once'
-        ? ['calm', 'progress', 'feel_like_myself']
-        : firstAnswer === 'taking_today_as_it_comes'
-          ? ['feel_like_myself', 'progress', 'calm']
-          : ['progress', 'calm', 'feel_like_myself'];
-      const rank = new Map(preferred.map((id, index) => [id, index]));
-      return {
-        ...action,
-        options: [...action.options].sort((left, right) => (
-          (rank.get(left.id) ?? preferred.length) - (rank.get(right.id) ?? preferred.length)
-        )),
-      };
-    }) ?? [];
+    )) ?? [];
 
   return (
     <TodayEnvironmentMotionProvider motion={environmentMotion}>

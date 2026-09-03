@@ -37,6 +37,35 @@ import {
 
 const NOW = new Date('2026-08-12T12:00:00.000Z').getTime();
 
+test('the handoff Basket stays free, creates Seeds, and teaches an actionable merge', () => {
+  let state = createMossproutChapterZeroState(NOW);
+  const cells = (definitionId: string) => state.board.flatMap((cell, index) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === definitionId ? [index] : []);
+  for (const definitionId of ['nature:garden:1', 'nature:garden:1', 'nature:garden:2']) {
+    const [from, to] = cells(definitionId);
+    const merged = reduceMergeWorld(state, { type: 'move', from, to, now: NOW + 1 });
+    assert.equal(merged.changed, true);
+    state = merged.state;
+  }
+  state = reduceMergeWorld(state, { type: 'serveOrder', orderId: 'mossprout:chapter-0:first-sprout', now: NOW + 2 }).state;
+  state = completeMossproutChapterZeroSlice(state, NOW + 3);
+  state = reduceMergeWorld(state, { type: 'setGeneratorForcedDrop', generatorId: 'wild-garden', definitionId: 'nature:garden:1', now: NOW + 4 }).state;
+  const energyBefore = state.energy;
+  for (let index = 0; index < 2; index++) {
+    const command = { type: 'tapGenerator' as const, generatorId: 'wild-garden', spendEnergy: false, seed: `handoff:${index}`, now: NOW + 5 + index };
+    assert.equal(mergeFtueAllowsCommand(mossproutFtueStep('merge.handoff.spawn'), state, command), true);
+    const result = reduceMergeWorld(state, command);
+    assert.equal(result.changed, true);
+    state = result.state;
+    assert.deepEqual(state.energy, energyBefore);
+  }
+  assert.equal(cells('nature:garden:1').length, 2);
+  const [from, to] = cells('nature:garden:1');
+  const move = { type: 'move' as const, from, to, now: NOW + 10 };
+  assert.equal(mergeFtueAllowsCommand(mossproutFtueStep('merge.handoff.merge'), state, move), true);
+  state = reduceMergeWorld(state, move).state;
+  assert.equal(cells('nature:garden:2').length, 1);
+});
+
 test('Haven projects the complete Mossprout starter interaction area onto a 7x9 sandbox', () => {
   const state = createHavenMergeSandboxState(NOW);
   assert.equal(HAVEN_MERGE_BOARD_CELL_INDICES.length, 63);

@@ -491,6 +491,8 @@ test('the focused Mossprout Haven mounts only Mossprout-owned hex-neighborhood a
     'utf8',
   );
   assert.match(hexScene, /LAYOUT_PROFILE = 'floating-neighborhood-v2'/);
+  assert.doesNotMatch(hexScene, /movementEggStatus|structure:mossprout-movement-egg/);
+  assert.doesNotMatch(canvas, /onSelectMovementEgg|Open mysterious movement egg/);
   assert.match(hexScene, /mossprout_focused_v1_main_hex_tile\.webp/);
   assert.match(hexScene, /mossprout_memory_garden_level_0\.webp/);
   assert.match(hexScene, /mossprout_memory_garden_level_1\.webp/);
@@ -519,7 +521,7 @@ test('the focused Mossprout Haven mounts only Mossprout-owned hex-neighborhood a
   assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'merge-world', 'ui', 'order-chair.webp')));
   assert.doesNotMatch(hexScene, /junctionMiniIslandLayers|JUNCTION_MINI_ISLAND_SOURCES/);
   assert.doesNotMatch(canvas, /trayEntries=\{board\.trayEntries\}/);
-  assert.match(screen, /ftueStepId !== 'world\.garden_handoff'\) return \[\]/);
+  assert.match(screen, /!\['world\.garden_handoff', 'world\.seed_planted'\]\.includes\(ftueStepId \?\? ''\)\) return \[\]/);
   assert.match(screen, /filter\(\(order\) => order\.id === 'mossprout:chapter-0:first-sprout'\)\.slice\(0, 1\)/);
   assert.doesNotMatch(screen, /fillerEntries/);
   assert.match(hexScene, /\.sort\(\(a, b\) => a\.depth - b\.depth\)/);
