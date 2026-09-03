@@ -5,7 +5,8 @@ import { Image } from 'expo-image';
 import { useIsFocused } from '@react-navigation/native';
 import { GlowGatewayGuide } from '@/components/katchadeck/world/glow-gateway-guide';
 import { startGlowDiscovery, submitGlowAction, useGlowDiscovery } from '@/features/onboarding/glow-discovery-runtime';
-import { glowDiscoveryScene } from '@/features/onboarding/glow-discovery-flow';
+import { glowDiscoveryLocksCamera, glowDiscoveryScene } from '@/features/onboarding/glow-discovery-flow';
+import { ftueLocksCamera } from '@/features/onboarding/ftue-camera-policy';
 import { glowGatewayState } from '@/utils/merge-world/glow-discovery-policy';
 import { sharedWorldIncludesCompanion } from '@/constants/shared-world';
 import * as Haptics from 'expo-haptics';
@@ -65,7 +66,7 @@ import { activeKatchimeraMeditation, mossproutJourneyForDay, mossproutJourneyRun
 import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
 import { mergeOrderItemReadiness, readyMergeOrderIds } from '@/utils/merge-world/engine';
 import { prioritizedVisibleMergeOrders } from '@/utils/merge-world/order-presentation';
-import type { MergeOrderTrayEntry } from '@/components/katchadeck/games/merge-order-rail';
+import { FrozenMergeOrderTrayCard, type MergeOrderTrayEntry } from '@/components/katchadeck/games/merge-order-rail';
 import type { KingdomCameraSnapshot } from '@/utils/kingdom-rendering';
 import { useGameScreenTransition } from '@/features/navigation/game-screen-transition';
 import type { WorldFtueSubjectPresentation } from '@/components/katchadeck/world/world-ftue-subject-presentation';
@@ -207,18 +208,17 @@ export function KatchimeraKingdomScreen({
     () => companionSlots.filter((slot) => sharedWorldIncludesCompanion(slot.familyId)),
     [companionSlots],
   );
-  useEffect(() => {
-    cameraSettleRevisionRef.current += 1;
-    setFtueCameraSettled(false);
-  }, [ftueStepId]);
+  // The canvas owns motion readiness. A parent step-reset effect runs after
+  // its child's settled notification and can invalidate the only notification
+  // when adjacent FTUE steps share an already-stationary camera.
   const handleCameraMotionChange = useMemo(() => {
     // Refresh the settled notification when the tutorial changes while the
     // camera is already stationary. The canvas immediately reports its state.
     void ftueStepId;
     return (moving: boolean) => {
     const revision = ++cameraSettleRevisionRef.current;
+    setFtueCameraSettled(false);
     if (moving) {
-      setFtueCameraSettled(false);
       return;
     }
     requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -350,6 +350,9 @@ export function KatchimeraKingdomScreen({
   }, [registerFtueTarget]);
   const setGardenButtonNode = useCallback((node: View | null) => {
     registerFtueTarget('garden-button:mossprout', node);
+  }, [registerFtueTarget]);
+  const setGardenClusterNode = useCallback((node: View | null) => {
+    registerFtueTarget('garden-cluster:mossprout', node);
   }, [registerFtueTarget]);
   const setGatewayNode = useCallback((node: View | null) => {
     registerFtueTarget('shared-world:steppling-home', node);
@@ -919,7 +922,7 @@ export function KatchimeraKingdomScreen({
     <View collapsable={false} onLayout={onContentReady} ref={screenRef} style={styles.screen}>
       <KingdomHexCanvas
         background={background}
-        cameraLocked={Boolean(ftueStep && ftueStep.surface === 'haven')}
+        cameraLocked={ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun)}
         cameraMaximumScale={ftueEggFeedingCloseupActive
           ? MOSSPROUT_WORLD_EGG_CLOSE_ZOOM
           : ftueReturnResidentZoom != null
@@ -937,7 +940,7 @@ export function KatchimeraKingdomScreen({
         interactionResidentId={activeInteractionResidentId}
         mossproutMeditating={mossproutMeditating}
         interactionRewardPulseKey={interactionRewardPulseKey}
-        gardenOrders={ftueStepId === 'world.garden_handoff' ? [] : gardenOrderEntries}
+        gardenOrders={['world.garden_handoff', 'world.seed_planted'].includes(ftueStepId ?? '') ? [] : gardenOrderEntries}
         gardenOrdersInteractive={false}
         initialTutorialCameraScale={initialFtueCameraScale}
         initialCameraSnapshot={initialCameraSnapshot}
@@ -969,7 +972,10 @@ export function KatchimeraKingdomScreen({
           setGlowPanelOpen(true);
           void startGlowDiscovery().catch(() => setNatureUpgradeError('The path could not open. Please try again.'));
         }}
-        onSelectResident={selectResident}
+        onSelectResident={(creatureId) => {
+          if (glowDiscoveryLocksCamera(glowRun)) return;
+          selectResident(creatureId);
+        }}
         onResidentFocusComplete={completeResidentFocus}
         onUpgradePresentationComplete={completeUpgradePresentation}
         recenterBottom={Math.max(insets.bottom, 12) + 150}
@@ -992,7 +998,7 @@ export function KatchimeraKingdomScreen({
               accessibilityHint={interactionCreatureId ? "Returns to this Katchimera's world" : 'Returns to the Katchimera world map'}
               accessibilityLabel={interactionCreatureId ? 'Exit interaction' : 'All Havens'}
               compact
-              disabled={interactionExiting || (!interactionCreatureId && navigationLocked)}
+              disabled={interactionExiting || (!interactionCreatureId && (navigationLocked || glowDiscoveryLocksCamera(glowRun)))}
               onPress={interactionCreatureId ? requestResidentInteractionExit : onBackToHavenSelector}
             />}
             content={<GameCurrencyHud balances={[{
@@ -1008,11 +1014,17 @@ export function KatchimeraKingdomScreen({
       ) : null}
       {!upgradePresentation && !activeInteractionResidentId && havenMergeBoardActive && (!havenOpeningActive || ['world.garden_handoff', 'world.seed_planted'].includes(ftueStepId ?? '')) ? (
         <Animated.View
+          collapsable={false}
+          ref={setGardenClusterNode}
           entering={FadeIn
             .duration(reduceMotion ? 80 : 260)
             .delay(ftueStepId === 'world.garden_handoff' && !reduceMotion ? 260 : 0)}
           style={[styles.gardenButtonCluster, { bottom: Math.max(insets.bottom, 12) + 10 }]}>
-          {(['world.garden_handoff', 'world.seed_planted'].includes(ftueStepId ?? '') || glowScene?.view.kind === 'garden') && !firstSeedPlacementFailed ? (
+          {ftueStepId === 'world.seed_planted' && !firstSeedPlacementFailed ? (
+            <View accessibilityLabel="Mossprout's first Garden order" collapsable={false} ref={setGardenHandoffOrderNode} style={{ paddingTop: 48, paddingHorizontal: 18, marginBottom: 4 }}>
+              {gardenHandoffOrder ? <FrozenMergeOrderTrayCard entry={gardenHandoffOrder} hideChair /> : null}
+            </View>
+          ) : ftueStepId === 'world.garden_handoff' && !firstSeedPlacementFailed ? (
             <View
               accessibilityLabel="Plant needed for Mossprout's first Garden order"
               collapsable={false}
@@ -1238,7 +1250,7 @@ export function KatchimeraKingdomScreen({
           </View>
         </KatchaSheet>;
       })() : null}
-      {ftueCameraSettled && !upgradePresentation && !interactionCreatureId && (ftueStepId === 'haven.mossprout.focus' || ftueStepId === 'haven.mossprout.restore' || ftueStepId === 'world.garden_arrival' || ftueStepId === 'world.garden_handoff' || ftueStepId === 'world.first_bloom_restore') ? (
+      {ftueCameraSettled && !upgradePresentation && !interactionCreatureId && (ftueStepId === 'haven.mossprout.focus' || ftueStepId === 'haven.mossprout.restore' || ftueStepId === 'world.garden_arrival' || (ftueStepId === 'world.seed_planted' && firstSeedPlanted && !firstSeedPlacementBusy && !firstSeedPlacementFailed) || ftueStepId === 'world.garden_handoff' || ftueStepId === 'world.first_bloom_restore') ? (
         <HavenFtueOverlay
           cue={ftueStep?.cue ?? null}
           screenRef={screenRef}

@@ -1,7 +1,7 @@
 import { defineStory, story } from '@/features/content-flow/story-manifest';
 import { storyOperations, upgradeWorldTargetRecipe, worldActionScene, type WorldActionView } from '@/features/content-flow/story-world-operations';
 import { STEPPLING_STORY_TARGET } from '@/constants/shared-world';
-import type { ContentFlowSurface } from '@/types/content-flow';
+import type { ContentFlowRun, ContentFlowSurface } from '@/types/content-flow';
 import type { MergeWorldState } from '@/types/merge-world';
 import type { FtueStepDefinition } from './ftue-types';
 import { mergeLessonRecipe, mergeLessonBoardStep, mergeLessonEvidenceReady, type MergeLessonBeat } from '@/features/content-flow/merge-lesson-recipe';
@@ -50,6 +50,22 @@ export const GLOW_DISCOVERY_FLOW = defineStory({
 
 export function glowDiscoverySurface(nodeId: string): ContentFlowSurface {
   return nodeId.startsWith('lesson.') ? 'merge' : 'haven';
+}
+
+/** Lock across camera, scene, effect and recovery boundaries, not just animations. */
+export function glowDiscoveryLocksCamera(run: Pick<ContentFlowRun, 'nodeId' | 'status'> | null): boolean {
+  return Boolean(run && run.status !== 'completed' && glowDiscoveryScene(run.nodeId)?.view.lockCamera !== false);
+}
+
+/** Keep the reveal framed until the final Continue is durably completed, including retries. */
+export function glowDiscoveryRevealLocked(run: Pick<ContentFlowRun, 'nodeId' | 'status'> | null): boolean {
+  return Boolean(run && run.status !== 'completed' && (
+    run.nodeId === 'gateway.return'
+    || run.nodeId === 'gateway.buy'
+    || run.nodeId.startsWith('gateway.purchase.')
+    || run.nodeId === 'gateway.egg'
+    || run.nodeId === 'complete'
+  ));
 }
 
 export function glowDiscoveryScene(nodeId: string) {

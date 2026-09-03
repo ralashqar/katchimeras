@@ -75,6 +75,7 @@ import { MergeParcelFlightOverlay, type MergeParcelFlight } from './merge-parcel
 import type { MergeTrayEntry } from './merge-order-rail';
 import { MergeServeRewardOverlay, type MergeScreenPoint, type MergeServeRewardFlight } from './merge-serve-reward-overlay';
 import { MergeFtueOverlay } from './merge-ftue-overlay';
+import { MergeGlowReadyGuide } from './merge-glow-ready-guide';
 
 const EARLY_DISCOVERY_REVEAL_COPY: Partial<Record<MergeCharacterId, { description: string; rewardBody: string }>> = {
   steppling: { description: 'Every path starts somewhere.', rewardBody: 'The final trail marker became a Journey Locker.' },
@@ -205,6 +206,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const [screenLayoutNonce, setScreenLayoutNonce] = useState(0);
   const screenRef = useRef<View>(null);
   const coinHudRef = useRef<View>(null);
+  const coinHudPillRef = useRef<View>(null);
   const boardMetricsRef = useRef<MergeBoardScreenMetrics | null>(null);
   const railTargetRefs = useRef(new Map<string, View>());
   const parcelRef = useRef<View>(null);
@@ -888,7 +890,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
           />}
           style={styles.hudBar}
           tone="glass"
-          trailing={<View>
+          trailing={<View collapsable={false} ref={coinHudPillRef}>
             <GameCurrencyHud balances={[
               {
                 animateValue: presentedCoins != null,
@@ -959,9 +961,13 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
         spotlight={mergeGuidanceVisible ? mergeGuidanceSpotlight : null}
         targetRevision={ftueTargetRevision}
       />
-      {active && glowScene?.view.kind === 'return' && !serveFlight ? <View style={{ position: 'absolute', top: insets.top + 68, left: 24, right: 24, zIndex: 90 }}>
-        <KatchaButton fullWidth glow label={`${glowScene.view.actionLabel} · 40 Glow ready`} icon="sparkles" onPress={() => { returnFromGarden(); void submitGlowAction(glowScene.actionId).catch(() => { /* The world retains the return scene for retry. */ }); }} />
-      </View> : null}
+      {active && glowScene?.view.kind === 'return' && !serveFlight ? <MergeGlowReadyGuide
+        screenRef={screenRef} currencyRef={coinHudRef} currencyPillRef={coinHudPillRef} layoutNonce={screenLayoutNonce}
+        onProceed={async () => {
+          await submitGlowAction(glowScene.actionId);
+          returnFromGarden();
+        }}
+      /> : null}
 
       {active && memoryCardPresentation ? <KatchaSurfaceProvider surface="parchment"><View style={[styles.memoryCardOverlay, { bottom: Math.max(insets.bottom + 20, 28) }]}>
         <View style={styles.memoryCardArtWrap}>

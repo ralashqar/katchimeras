@@ -460,7 +460,7 @@ test('the shared Haven keeps its authored neighborhood art and adds only owned r
   assert.match(screen, /source: 'haven-world'/);
   assert.match(screen, /useGameScreenTransition\(\)/);
   assert.match(screen, /announcement: "Opening Mossprout's Garden"[\s\S]*?target: 'merge'[\s\S]*?onCovered: closeResidentInteraction[\s\S]*?router\.push/);
-  assert.match(screen, /gardenOrders=\{ftueStepId === 'world\.garden_handoff' \? \[\] : gardenOrderEntries\}/);
+  assert.match(screen, /gardenOrders=\{\['world.garden_handoff', 'world.seed_planted'\].includes\(ftueStepId \?\? ''\) \? \[\] : gardenOrderEntries\}/);
   assert.match(canvas, /buildMossproutHexNeighborhoodScene/);
   assert.match(canvas, /GardenOrderShortcut/);
   assert.match(canvas, /GARDEN_ORDER_SLOT_CENTERS = \[[\s\S]*?\{ x: 0\.5, y: 0\.096 \}[\s\S]*?\{ x: 0\.3575, y: 0\.539 \}[\s\S]*?\{ x: 0\.6425, y: 0\.539 \}/);

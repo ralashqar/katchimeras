@@ -437,6 +437,15 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     if (run.stepId === 'companion.meditating') {
       if (ftueHandoffRef.current) return;
       ftueHandoffRef.current = true;
+      if (hostedInHaven) {
+        // The map is already mounted behind this interaction. Hand it back
+        // directly; gateway.focus owns the in-world pan/zoom after dismissal.
+        void advanceFtueActionDurably({ expectedStepId: 'companion.meditating', actionId: 'companion.tend_garden', evidenceRef: 'mossprout:playable-handoff' })
+          .then(() => onHostedClose?.())
+          .catch((error) => console.warn('Could not start mist exploration', error))
+          .finally(() => { ftueHandoffRef.current = false; });
+        return;
+      }
       const accepted = transitionTo({
         announcement: 'Exploring the mist', target: 'katchimeras',
         navigate: async () => {

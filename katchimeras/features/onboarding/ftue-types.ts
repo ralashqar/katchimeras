@@ -90,6 +90,7 @@ export type FtueTarget =
   | { kind: 'haven_upgrade_button'; characterId: string }
   | { kind: 'haven_garden_tile'; characterId: 'mossprout' }
   | { kind: 'haven_garden_button'; characterId: 'mossprout' }
+  | { kind: 'haven_garden_cluster'; characterId: 'mossprout' }
   | { kind: 'haven_garden_plant_button'; characterId: 'mossprout' }
   | { kind: 'haven_garden_order'; characterId: 'mossprout'; orderId: string }
   | { kind: 'haven_garden_plot'; characterId: 'mossprout'; slotId: MossproutGardenPlantSlotId }
@@ -104,6 +105,8 @@ export type FtueCueDefinition =
 export type FtueSpotlightDefinition = {
   targets: readonly FtueTarget[];
   grouping?: 'individual' | 'bounding_rect';
+  /** Haven: target indices to combine into each spotlight opening. */
+  targetGroups?: readonly (readonly number[])[];
   padding?: number;
   radius?: number;
   dimOpacity?: number;
@@ -191,6 +194,9 @@ export type FtueStepDefinition = {
   cue?: FtueCueDefinition;
   spotlight?: FtueSpotlightDefinition;
   camera?: FtueCameraDirective;
+  /** Lock player pan, zoom, recenter and tap-to-focus until this step advances.
+   * Scripted camera transitions and required CTA controls remain available. */
+  lockCamera?: boolean;
   edges?: readonly FtueGraphEdge[];
   blockingBeat?: 'mossprout_intro' | 'energy_connection' | 'energy_awarded' | 'chapter_complete';
 };

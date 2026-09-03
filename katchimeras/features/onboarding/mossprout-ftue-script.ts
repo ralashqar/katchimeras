@@ -220,6 +220,8 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'world.seed_planted', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
       guide: { eyebrow: 'Grow together', title: COPY.planted, body: COPY.mergePurpose },
+      cue: { kind: 'tap', target: { kind: 'haven_garden_button', characterId: 'mossprout' } },
+      spotlight: { targets: [{ kind: 'haven_guide' }, { kind: 'haven_garden_cluster', characterId: 'mossprout' }, { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: MOSSPROUT_FIRST_MEMORY_SLOT_ID }], grouping: 'individual', targetGroups: [[0, 2], [1]], padding: 7 },
       actions: [{ id: 'world.acknowledge_seed_dormant', title: 'Open Merge', description: COPY.mergePurpose, icon: 'leaf.fill', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'merge.seed_drag', backendEvent: true }],
       camera: { kind: 'focus_target', target: { kind: 'haven_garden_tile', characterId: 'mossprout' }, zoom: 1.28, anchorY: 0.55, durationMs: 900, projectionOnly: true },
       blockingBeat: 'mossprout_intro',

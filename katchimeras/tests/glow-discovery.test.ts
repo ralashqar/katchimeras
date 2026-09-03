@@ -7,12 +7,70 @@ import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding'
 import { normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 import { GLOW_ECHO_IDS, GLOW_REPEAT_ECHO_IDS, GLOW_GATEWAY_ID, GLOW_ORDER_IDS, glowGatewayState } from '@/utils/merge-world/glow-discovery-policy';
 import type { MergeWorldCommand, MergeWorldState } from '@/types/merge-world';
-import { GLOW_DISCOVERY_FLOW, glowDiscoveryBoardStep, glowDiscoveryLessonReady, GLOW_LESSON, GLOW_REPEAT_LESSON } from '@/features/onboarding/glow-discovery-flow';
+import { GLOW_DISCOVERY_FLOW, glowDiscoveryBoardStep, glowDiscoveryLessonReady, glowDiscoveryRevealLocked, glowDiscoveryLocksCamera, GLOW_LESSON, GLOW_REPEAT_LESSON } from '@/features/onboarding/glow-discovery-flow';
+import { ftueLocksCamera } from '@/features/onboarding/ftue-camera-policy';
+import { MOSSPROUT_FTUE_SCRIPT } from '@/features/onboarding/mossprout-ftue-script';
+import { worldActionScene } from '@/features/content-flow/story-world-operations';
 import { createContentFlowRun, reduceContentFlow } from '@/features/content-flow/content-flow-interpreter';
 import { validateContentFlowDefinition } from '@/features/content-flow/content-flow-compiler';
 import { mergeFtueAllowsCommand } from '@/features/onboarding/merge-ftue';
 
 const NOW = Date.UTC(2026, 8, 3, 12);
+test('enough Glow highlights the HUD with an actionable Egg bubble instead of a banner', () => {
+  const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
+  const guide = readFileSync('components/katchadeck/games/merge-glow-ready-guide.tsx', 'utf8');
+  assert.doesNotMatch(screen, /40 Glow ready/);
+  assert.match(screen, /view.kind === 'return' && !serveFlight \? <MergeGlowReadyGuide/);
+  assert.match(screen, /currencyRef=\{coinHudRef\}/);
+  assert.match(screen, /await submitGlowAction\(glowScene.actionId\);\s*returnFromGarden\(\);/);
+  assert.match(guide, /roundedMultiCutoutSegments\(\[layout.target\]/);
+  assert.match(guide, /<MergeFtueEggGuide anchor=\{layout.target\}/);
+  assert.match(guide, /label="Let’s go!" loading=\{busy\}/);
+  assert.match(guide, /catch \{ setError\(true\); setBusy\(false\); \}/);
+  const bubble = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
+  assert.match(bubble, /eggGuideContentRow: \{[^\n]*flexShrink: 0/);
+  assert.match(bubble, /eggGuideActionRow: \{[^\n]*flexShrink: 0/);
+  assert.match(bubble, /width: calloutWidth - 24 - 76 - 9/);
+  assert.doesNotMatch(bubble, /minHeight: estimatedHeight/);
+  assert.match(bubble, /onLayout=\{\(event\) => setMeasuredHeight/);
+});
+test('Egg reveal keeps the camera locked through final Continue and recovery, then releases it', () => {
+  const nodes = GLOW_DISCOVERY_FLOW.nodes.filter((node) => node.id.startsWith('gateway.purchase.') || ['gateway.return', 'gateway.buy', 'gateway.egg', 'complete'].includes(node.id));
+  assert.ok(nodes.some((node) => node.id === 'gateway.egg'));
+  for (const { id: nodeId } of nodes) {
+    for (const status of ['active', 'failed_recoverable'] as const) {
+      assert.equal(glowDiscoveryRevealLocked({ nodeId, status }), true, `${nodeId}:${status}`);
+      assert.equal(glowDiscoveryRevealLocked(JSON.parse(JSON.stringify({ nodeId, status }))), true);
+    }
+    assert.equal(glowDiscoveryRevealLocked({ nodeId, status: 'completed' }), false);
+  }
+  assert.equal(glowDiscoveryRevealLocked(null), false);
+  assert.equal(glowDiscoveryRevealLocked({ nodeId: 'garden.open', status: 'active' }), false);
+  const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
+  const guide = readFileSync('components/katchadeck/world/glow-gateway-guide.tsx', 'utf8');
+  assert.match(screen, /cameraLocked=\{ftueLocksCamera\(ftueStep\) \|\| glowDiscoveryLocksCamera\(glowRun\)/);
+  assert.match(guide, /!glowDiscoveryLocksCamera\(run\) \? <Pressable/);
+});
+test('every guided step locks camera input until it advances, with an author opt-out', () => {
+  for (const step of MOSSPROUT_FTUE_SCRIPT.steps) {
+    assert.equal(ftueLocksCamera(step), step.id !== 'complete', step.id);
+    assert.equal(ftueLocksCamera({ ...step, lockCamera: false }), false);
+  }
+  assert.equal(ftueLocksCamera(null), false);
+  for (const node of GLOW_DISCOVERY_FLOW.nodes) {
+    assert.equal(glowDiscoveryLocksCamera({ nodeId: node.id, status: 'active' }), true, node.id);
+    assert.equal(glowDiscoveryLocksCamera({ nodeId: node.id, status: 'failed_recoverable' }), true);
+    assert.equal(glowDiscoveryLocksCamera({ nodeId: node.id, status: 'completed' }), false);
+  }
+  const scene = worldActionScene({ id: 'free', actionId: 'next', next: 'complete', view: {
+    kind: 'goal', actionLabel: 'Continue', guide: { eyebrow: '', title: '', body: '' }, lockCamera: false,
+  } });
+  assert.ok(scene.kind === 'scene');
+  assert.equal((scene.payload?.worldAction as { lockCamera: boolean }).lockCamera, false);
+  const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
+  assert.match(canvas, /interactionEnabled && !cameraLocked && !storyCameraInputLocked \? \(/);
+  assert.match(canvas, /residentInteractionEnabled && !cameraLocked \? camera.focusResident/);
+});
 const reload = (state: MergeWorldState) => normalizeMergeWorldState(JSON.parse(JSON.stringify(state)), NOW);
 const cells = (state: MergeWorldState, tier: number) => state.board.flatMap((cell, index) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === `nature:garden:${tier}` ? [index] : []);
 function apply(state: MergeWorldState, command: MergeWorldCommand) {
@@ -232,6 +290,20 @@ test('setup boundaries never fall back to a spawner spotlight', () => {
     assert.equal(step.interaction?.mode, 'blocked');
     assert.ok(step.id.startsWith('glow.lesson.'));
   }
+});
+
+test('hosted meditation hands off to the existing map without a transition curtain', () => {
+  const route = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
+  const handoff = route.slice(route.indexOf("if (run.stepId === 'companion.meditating')"), route.indexOf("if (run.stepId === 'companion.garden_intro')"));
+  const hosted = handoff.slice(handoff.indexOf('if (hostedInHaven)'), handoff.indexOf('const accepted = transitionTo'));
+  assert.match(hosted, /advanceFtueActionDurably/);
+  assert.match(hosted, /onHostedClose\?\.\(\)/);
+  assert.match(hosted, /finally\(\(\) => \{ ftueHandoffRef.current = false/);
+  assert.doesNotMatch(hosted, /transitionTo|router\./);
+  const camera = GLOW_DISCOVERY_FLOW.nodes.find((node) => node.id === 'gateway.focus');
+  assert.equal(camera?.kind, 'presentation');
+  assert.equal(camera?.payload?.zoom, 1.2);
+  assert.equal(camera?.payload?.durationMs, 900);
 });
 
 test('locked tutorial matches retain half mist and spotlight cutouts survive measurement', () => {

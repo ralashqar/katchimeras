@@ -14,6 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import type { FtueCueDefinition, FtueSpotlightDefinition, FtueTarget } from '@/features/onboarding/ftue-types';
+import { roundedMultiCutoutSegments } from '@/features/onboarding/spotlight-geometry';
 
 const HAND_ART = require('../../../assets/images/katchimeras/merge-world/ui/ftue-hand.webp');
 type Frame = { height: number; width: number; x: number; y: number };
@@ -24,6 +25,7 @@ export function havenFtueTargetKey(target: FtueTarget): string | null {
   if (target.kind === 'haven_tile_hud') return `hud:${target.characterId}`;
   if (target.kind === 'haven_upgrade_button') return `upgrade:${target.characterId}`;
   if (target.kind === 'haven_garden_button') return `garden-button:${target.characterId}`;
+  if (target.kind === 'haven_garden_cluster') return `garden-cluster:${target.characterId}`;
   if (target.kind === 'haven_garden_plant_button') return `garden-plant-button:${target.characterId}`;
   if (target.kind === 'haven_garden_order') return `garden-order:${target.characterId}:${target.orderId}`;
   if (target.kind === 'haven_garden_plot') return `garden-plot:${target.characterId}:${target.slotId}`;
@@ -46,19 +48,24 @@ export const HavenFtueOverlay = memo(function HavenFtueOverlay({
   targetRevision: number;
 }) {
   const reduceMotion = useReducedMotion();
-  const [layout, setLayout] = useState<{ cueFocus: Frame | null; focus: Frame; screen: Frame } | null>(null);
+  const [layout, setLayout] = useState<{ cueFocus: Frame | null; focus: Frame; focuses: Frame[]; screen: Frame } | null>(null);
   const configKey = useMemo(() => JSON.stringify([cue, spotlight]), [cue, spotlight]);
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
+    let retryFrame: number | undefined;
+    const retry = () => {
+      if (!cancelled) retryFrame = requestAnimationFrame(() => { void measureTargets(); });
+    };
+    const measureTargets = async () => {
       if (!cue && !spotlight) {
         setLayout(null);
         return;
       }
       const screen = await measure(screenRef.current);
       const targets = spotlight?.targets ?? (cue?.kind === 'tap' ? [cue.target] : []);
-      if (!screen || targets.length === 0) return;
+      if (cancelled || targets.length === 0) return;
+      if (!screen) { retry(); return; }
       const frames = await Promise.all(targets.map(async (target) => {
         const key = havenFtueTargetKey(target);
         return key ? measure(targetRefs.current.get(key) ?? null) : null;
@@ -66,8 +73,19 @@ export const HavenFtueOverlay = memo(function HavenFtueOverlay({
       const cueFrame = cue?.kind === 'tap'
         ? await measure(targetRefs.current.get(havenFtueTargetKey(cue.target) ?? '') ?? null)
         : null;
-      if (cancelled || frames.some((frame) => frame == null) || (cue?.kind === 'tap' && !cueFrame)) return;
+      if (cancelled) return;
+      // Native refs may exist before their first layout. Retry instead of
+      // leaving this authored spotlight invisible for the rest of the step.
+      if (frames.some((frame) => frame == null) || (cue?.kind === 'tap' && !cueFrame)) { retry(); return; }
       const valid = frames as Frame[];
+      const grouped = spotlight?.targetGroups?.map((indices) => {
+        const members = indices.flatMap((index) => valid[index] ? [valid[index]] : []);
+        if (!members.length) return null;
+        const x = Math.min(...members.map((frame) => frame.x));
+        const y = Math.min(...members.map((frame) => frame.y));
+        return { x, y, width: Math.max(...members.map((frame) => frame.x + frame.width)) - x,
+          height: Math.max(...members.map((frame) => frame.y + frame.height)) - y };
+      }).filter((frame): frame is Frame => frame !== null) ?? valid;
       const padding = spotlight?.padding ?? 6;
       const left = Math.max(screen.x, Math.min(...valid.map((frame) => frame.x)) - padding);
       const top = Math.max(screen.y, Math.min(...valid.map((frame) => frame.y)) - padding);
@@ -81,10 +99,20 @@ export const HavenFtueOverlay = memo(function HavenFtueOverlay({
           height: cueFrame.height,
         } : null,
         focus: { x: left - screen.x, y: top - screen.y, width: right - left, height: bottom - top },
+        focuses: spotlight?.grouping === 'individual' ? grouped.map((frame) => {
+          const x = Math.max(0, frame.x - screen.x - padding);
+          const y = Math.max(0, frame.y - screen.y - padding);
+          return { x, y, width: Math.min(screen.width, frame.x - screen.x + frame.width + padding) - x,
+            height: Math.min(screen.height, frame.y - screen.y + frame.height + padding) - y };
+        }) : [{ x: left - screen.x, y: top - screen.y, width: right - left, height: bottom - top }],
         screen: { x: 0, y: 0, width: screen.width, height: screen.height },
       });
-    })();
-    return () => { cancelled = true; };
+    };
+    retry();
+    return () => {
+      cancelled = true;
+      if (retryFrame !== undefined) cancelAnimationFrame(retryFrame);
+    };
   }, [configKey, cue, screenRef, spotlight, targetRefs, targetRevision]);
 
   if (!layout) return null;
@@ -95,11 +123,21 @@ export const HavenFtueOverlay = memo(function HavenFtueOverlay({
       importantForAccessibility="no-hide-descendants"
       pointerEvents="none"
       style={styles.overlay}>
-      <Spotlight focus={layout.focus} opacity={spotlight?.dimOpacity ?? 0.62} radius={spotlight?.radius ?? 16} screen={layout.screen} />
+      {layout.focuses.length > 1
+        ? <MultipleSpotlights frames={layout.focuses} opacity={spotlight?.dimOpacity ?? 0.62} radius={spotlight?.radius ?? 16} screen={layout.screen} />
+        : <Spotlight focus={layout.focus} opacity={spotlight?.dimOpacity ?? 0.62} radius={spotlight?.radius ?? 16} screen={layout.screen} />}
       {cue?.kind === 'tap' ? <Finger focus={layout.cueFocus ?? layout.focus} resetKey={`${configKey}:${targetRevision}`} /> : null}
     </Animated.View>
   );
 });
+
+function MultipleSpotlights({ frames, opacity, radius, screen }: { frames: Frame[]; opacity: number; radius: number; screen: Frame }) {
+  const segments = useMemo(() => roundedMultiCutoutSegments(frames, radius, screen), [frames, radius, screen]);
+  return <View style={StyleSheet.absoluteFill}>
+    {segments.map((segment, index) => <View key={index} style={{ position: 'absolute', left: segment.x, top: segment.y, width: segment.width, height: segment.height, backgroundColor: `rgba(11,9,24,${opacity})` }} />)}
+    {frames.map((frame, index) => <View key={index} style={[styles.ring, { left: frame.x, top: frame.y, width: frame.width, height: frame.height, borderRadius: Math.min(radius, frame.width / 2, frame.height / 2) }]} />)}
+  </View>;
+}
 
 function Spotlight({ focus, opacity, radius, screen }: { focus: Frame; opacity: number; radius: number; screen: Frame }) {
   const cornerRadius = Math.min(radius, focus.width / 2, focus.height / 2);

@@ -17,12 +17,14 @@ export type WorldActionView = {
   kind: 'goal' | 'garden' | 'return' | 'purchase' | 'discovery';
   guide: { eyebrow: string; title: string; body: string };
   actionLabel: string;
+  /** Hold camera input through the scene's required action; false allows exploration. */
+  lockCamera?: boolean;
 };
 
 /** Scene copy and presentation intent are authored alongside the transition. */
 export function worldActionScene(input: { id: string; actionId: string; next: string; view: WorldActionView }): ContentFlowNode {
   return { id: input.id, kind: 'scene', capability: 'world.action', surface: 'haven', sceneId: input.id,
-    actions: [{ id: input.actionId, next: input.next }], payload: { worldAction: input.view } };
+    actions: [{ id: input.actionId, next: input.next }], payload: { worldAction: { lockCamera: true, ...input.view } } };
 }
 type WorldUpgradePresentationTarget = StoryWorldUpgradePresentationPayload['target'];
 

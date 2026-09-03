@@ -317,7 +317,7 @@ test('the Katchimeras tab renders the hex selector first while companion Back re
   assert.match(mossproutRoute, /if \(isMossprout\)[\s\S]*?<Redirect href=\{\{[\s\S]*?pathname: '\/\(tabs\)\/katchimeras'/);
   assert.match(katchimerasTab, /mossproutInteraction[\s\S]*?requestedWorldInteraction/);
   assert.match(rosterRoute, /interactionRequest=\{interactionRequest\}[\s\S]*?onInteractionRequestConsumed=\{onInteractionRequestConsumed\}/);
-  assert.match(kingdomScreen, /<KingdomHexCanvas[\s\S]*?onSelectResident=\{selectResident\}/);
+  assert.match(kingdomScreen, /<KingdomHexCanvas[\s\S]*?onSelectResident=\{\(creatureId\) => \{\s*if \(glowDiscoveryLocksCamera\(glowRun\)\) return;\s*selectResident\(creatureId\);/);
   assert.match(kingdomScreen, /interactionRequest[\s\S]*?setInteractionCreatureId\(interactionRequest\.creatureId\)/);
   assert.match(kingdomScreen, /cameraMaximumScale=\{ftueEggFeedingCloseupActive[\s\S]*?MOSSPROUT_WORLD_EGG_CLOSE_ZOOM[\s\S]*?MOSSPROUT_WORLD_EGG_REST_ZOOM/);
   assert.match(kingdomCanvas, /animated=\{stableWorldPresentation \|\| interactionResidentId === tile\.companion\.creature\.creatureId\}/);
@@ -399,7 +399,7 @@ test('the Mossprout sub-world routes Garden orders to the dedicated activity pag
   assert.match(kingdomScreen, /focusOrderId: orderId/);
   assert.doesNotMatch(kingdomScreen, /mergeWorldStateForBoard\(mergeWorld, 'steppling'\)/);
   assert.doesNotMatch(kingdomScreen, /mergeBoards=|mergeBoardFocusRequest=/);
-  assert.match(kingdomScreen, /gardenOrders=\{ftueStepId === 'world\.garden_handoff' \? \[\] : gardenOrderEntries\}/);
+  assert.match(kingdomScreen, /gardenOrders=\{\['world.garden_handoff', 'world.seed_planted'\].includes\(ftueStepId \?\? ''\) \? \[\] : gardenOrderEntries\}/);
   assert.match(kingdomScreen, /gardenRequestBubble[\s\S]*?<PersistentMergeItemArt[\s\S]*?gardenRequestBubbleTail/);
   assert.match(kingdomScreen, /gardenRequestBubble[\s\S]*?gardenButton/);
   assert.match(kingdomScreen, /discoveryCalloutLayerAboveSpotlight: \{ zIndex: 90 \}/);

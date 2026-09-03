@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
+import { roundedMultiCutoutSegments } from '@/features/onboarding/spotlight-geometry';
+
 
 import { FTUE_ACTION_CATALOG, FTUE_HANDLER_REGISTRY } from '@/features/onboarding/ftue-action-registry';
 import {
@@ -48,6 +50,38 @@ import {
 } from '@/features/onboarding/ftue-home-camera';
 import { eggScaleForEnergyRatio } from '@/utils/today-growth';
 import { MOSSPROUT_HELP_OPTIONS, MOSSPROUT_DAY_OPTIONS, MOSSPROUT_WATER_OPTIONS, mossproutSeedIntroduction } from '@/features/onboarding/mossprout-ftue-copy';
+
+test('hero copy fits three lines without captions and Haven spotlight retries native layout', () => {
+  const copy = readFileSync('components/katchadeck/onboarding/ftue-guide-copy.tsx', 'utf8');
+  assert.equal(copy.match(/numberOfLines=\{hero \? 3 : 2\}/g)?.length, 2);
+  assert.equal(copy.match(/adjustsFontSizeToFit=\{hero\}/g)?.length, 2);
+  assert.match(copy, /!hero && guide.body/);
+  const overlay = readFileSync('components/katchadeck/onboarding/haven-ftue-overlay.tsx', 'utf8');
+  assert.match(overlay, /requestAnimationFrame\(\(\) => \{ void measureTargets\(\); \}\)/);
+  assert.match(overlay, /cancelAnimationFrame\(retryFrame\)/);
+  const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
+  assert.doesNotMatch(screen, /cameraSettleRevisionRef.current \+= 1/);
+});
+
+test('planted Seed highlights top copy and the tray/button cluster as two separate openings', () => {
+  const step = mossproutFtueStep('world.seed_planted')!;
+  assert.deepEqual(step.cue, { kind: 'tap', target: { kind: 'haven_garden_button', characterId: 'mossprout' } });
+  assert.deepEqual(step.spotlight?.targets, [{ kind: 'haven_guide' }, { kind: 'haven_garden_cluster', characterId: 'mossprout' }, { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: 'back-centre' }]);
+  assert.deepEqual(step.spotlight?.targetGroups, [[0, 2], [1]]);
+  assert.equal(step.spotlight?.grouping, 'individual');
+  const holes = [{ x: 20, y: 30, width: 280, height: 130 }, { x: 180, y: 480, width: 160, height: 240 }];
+  const mask = roundedMultiCutoutSegments(holes, 16, { width: 360, height: 780 });
+  const dimmed = (x: number, y: number) => mask.some((r) => x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height);
+  assert.equal(dimmed(150, 90), false);
+  assert.equal(dimmed(260, 600), false);
+  assert.equal(dimmed(180, 300), true);
+  const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
+  const tray = screen.slice(screen.indexOf("{ftueStepId === 'world.seed_planted' && !firstSeedPlacementFailed ? ("), screen.indexOf(") : ftueStepId === 'world.garden_handoff'"));
+  assert.match(tray, /FrozenMergeOrderTrayCard entry=\{gardenHandoffOrder\}/);
+  assert.match(tray, /FrozenMergeOrderTrayCard entry=\{gardenHandoffOrder\} hideChair/);
+  assert.doesNotMatch(tray, /gardenRequestBubble/);
+  assert.match(screen, /ref=\{setGardenClusterNode\}/);
+});
 
 test('all opening answers are inclusive, stable, and produce the correct personal Seed', () => {
   assert.deepEqual(MOSSPROUT_HELP_OPTIONS.map((option) => mossproutFirstSeedForIntent(option.id).id), ['momentum', 'stillness', 'curiosity']);
@@ -543,7 +577,7 @@ test('Merge FTUE spotlight uses a lifecycle-safe native rounded cutout', () => {
   assert.match(overlay, /roundedMultiCutoutSegments\(frames, radius, screen\)/);
   assert.match(overlay, /Math\.hypot\(screen\.width, screen\.height\)/);
   assert.match(overlay, /borderRadius: slot\.corner\.value/);
-  assert.match(overlay, /const stepsPerCorner = 12/);
+  assert.match(readFileSync('features/onboarding/spotlight-geometry.ts', 'utf8'), /const stepsPerCorner = 12/);
   assert.match(overlay, /nativeSpotlightRing: \{[\s\S]*?borderCurve: 'continuous'/);
   assert.match(overlay, /boxShadow: `0 0 0 \$\{spreadRadius\}px \$\{color\}`/);
   assert.doesNotMatch(overlay, /SpotlightCornerFillers|spotlightCornerFiller/);
@@ -1173,7 +1207,7 @@ test('FTUE starts a relationship before the Garden, shows First Bloom, and conti
   const contentFlow = readFileSync('features/content-flow/content-flow-bootstrap.ts', 'utf8');
   assert.match(merge, /ftueActive = ftueRun\?\.status === 'active'/);
   assert.match(merge, /leading=\{<KatchimeraBackButton[\s\S]*?disabled=\{ftueActive && !handoffActive\}/);
-  assert.match(merge, /trailing=\{<View>[\s\S]*?<GameCurrencyHud[\s\S]*?targetRef: coinHudRef/);
+  assert.match(merge, /trailing=\{<View collapsable=\{false\} ref=\{coinHudPillRef\}>[\s\S]*?<GameCurrencyHud[\s\S]*?targetRef: coinHudRef/);
   assert.match(merge, /measureViewInWindow\(coinHudRef\)[\s\S]*?!coinRect[\s\S]*?return false/);
   assert.match(merge, /ftueRun\.stepId !== 'companion\.chapter_zero_return'[\s\S]*?target: 'companion'[\s\S]*?ftue: 'chapter-zero-return'/);
   assert.match(companion, /actionId: 'companion\.complete_chapter_zero_return'[\s\S]*?nextStepId: 'companion\.water_together'/);

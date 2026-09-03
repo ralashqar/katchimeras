@@ -30,21 +30,23 @@ export function FtueGuideCopy({ guide, hero = false }: {
         <View accessibilityLabel={guide.title} style={styles.titleStack}>
           <ThemedText
             accessibilityElementsHidden
-            numberOfLines={2}
+            numberOfLines={hero ? 3 : 2}
+            adjustsFontSizeToFit={hero}
             style={[titleStyle, styles.titleShadow]}
             lightColor={KatchaDeckUI.ftue.goldDeep}
             darkColor={KatchaDeckUI.ftue.goldDeep}>
             {guide.title}
           </ThemedText>
           <ThemedText
-            numberOfLines={2}
+            numberOfLines={hero ? 3 : 2}
+            adjustsFontSizeToFit={hero}
             style={titleStyle}
             lightColor={KatchaDeckUI.ftue.gold}
             darkColor={KatchaDeckUI.ftue.gold}>
             {guide.title}
           </ThemedText>
         </View>
-        {guide.body ? (
+        {!hero && guide.body ? (
           <ThemedText
             style={styles.body}
             lightColor={KatchaDeckUI.ftue.contentText}

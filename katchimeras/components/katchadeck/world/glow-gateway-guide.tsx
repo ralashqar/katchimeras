@@ -7,7 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { FtueGuideCopy } from '@/components/katchadeck/onboarding/ftue-guide-copy';
 import { submitGlowAction, useGlowDiscovery } from '@/features/onboarding/glow-discovery-runtime';
-import { glowDiscoveryScene } from '@/features/onboarding/glow-discovery-flow';
+import { glowDiscoveryLocksCamera, glowDiscoveryScene } from '@/features/onboarding/glow-discovery-flow';
 import { dispatchContentFlowCommand } from '@/features/content-flow/content-flow-director';
 import { GLOW } from '@/constants/glow';
 import type { MergeWorldState } from '@/types/merge-world';
@@ -65,6 +65,6 @@ export function GlowGatewayGuide({ world, onClose, onOpenMerge }: {
     {error || failed ? <ThemedText accessibilityRole="alert">{error ?? run.error ?? 'Please try again.'}</ThemedText> : null}
     <KatchaButton fullWidth loading={busy} label={failedPurchase && !affordable ? 'Earn Glow in Merge' : failed ? 'Try again' : inLesson ? 'Continue in Merge' : buying ? !affordable ? 'Earn Glow in Merge' : !artReady ? 'Load clearing' : `${scene?.view.actionLabel} · ${GLOW.mistUnlockCost} Glow` : scene?.view.actionLabel ?? 'Continue'} icon="sparkles" onPress={() => void perform()} />
     {failed && inLesson ? <KatchaButton label="Make room in Merge" onPress={onOpenMerge} /> : null}
-    <Pressable accessibilityRole="button" accessibilityLabel="Explore later" onPress={onClose} style={{ alignSelf: 'center', padding: 12 }}><ThemedText lightColor="#FFF4D4" darkColor="#FFF4D4">Explore later</ThemedText></Pressable>
+    {!glowDiscoveryLocksCamera(run) ? <Pressable accessibilityRole="button" accessibilityLabel="Explore later" onPress={onClose} style={{ alignSelf: 'center', padding: 12 }}><ThemedText lightColor="#FFF4D4" darkColor="#FFF4D4">Explore later</ThemedText></Pressable> : null}
   </Animated.View>;
 }

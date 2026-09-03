@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { roundedMultiCutoutSegments } from '@/features/onboarding/spotlight-geometry';
 import { memo, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
@@ -418,66 +419,6 @@ function NativeMultiSpotlightDimMask({ color, frames, opacity, radius, screen }:
  * two native rounded views from one shadow, so a small set of horizontal bands
  * preserves two independent holes without mounting a Canvas during FTUE.
  */
-function roundedMultiCutoutSegments(
-  frames: readonly Frame[],
-  radius: number,
-  screen: { height: number; width: number },
-): Frame[] {
-  // More samples keep multi-target holes visibly round at large phone-scale
-  // radii while retaining the lightweight native band renderer.
-  const stepsPerCorner = 12;
-  const yStops = new Set<number>([0, screen.height]);
-  frames.forEach((frame) => {
-    const corner = Math.min(radius, frame.width / 2, frame.height / 2);
-    yStops.add(clamp(frame.y, 0, screen.height));
-    yStops.add(clamp(frame.y + frame.height, 0, screen.height));
-    for (let step = 1; step <= stepsPerCorner; step += 1) {
-      const offset = corner * step / stepsPerCorner;
-      yStops.add(clamp(frame.y + offset, 0, screen.height));
-      yStops.add(clamp(frame.y + frame.height - offset, 0, screen.height));
-    }
-  });
-
-  const sortedStops = [...yStops].sort((a, b) => a - b);
-  const segments: Frame[] = [];
-  for (let index = 0; index < sortedStops.length - 1; index += 1) {
-    const top = sortedStops[index];
-    const bottom = sortedStops[index + 1];
-    if (bottom - top <= 0.1) continue;
-    const midY = top + (bottom - top) / 2;
-    const openings = frames
-      .flatMap((frame) => {
-        const range = roundedFrameRangeAtY(frame, radius, midY);
-        return range ? [range] : [];
-      })
-      .sort((a, b) => a.left - b.left);
-    let cursor = 0;
-    openings.forEach((opening) => {
-      const left = clamp(opening.left, 0, screen.width);
-      const right = clamp(opening.right, 0, screen.width);
-      if (left > cursor) segments.push({ x: cursor, y: top, width: left - cursor, height: bottom - top });
-      cursor = Math.max(cursor, right);
-    });
-    if (cursor < screen.width) segments.push({ x: cursor, y: top, width: screen.width - cursor, height: bottom - top });
-  }
-  return segments;
-}
-
-function roundedFrameRangeAtY(frame: Frame, radius: number, y: number) {
-  if (y < frame.y || y > frame.y + frame.height) return null;
-  const corner = Math.min(radius, frame.width / 2, frame.height / 2);
-  if (corner <= 0) return { left: frame.x, right: frame.x + frame.width };
-  const localY = y - frame.y;
-  const distanceFromCornerCenter = localY < corner
-    ? corner - localY
-    : localY > frame.height - corner
-      ? localY - (frame.height - corner)
-      : 0;
-  const inset = distanceFromCornerCenter > 0
-    ? corner - Math.sqrt(Math.max(0, corner * corner - distanceFromCornerCenter * distanceFromCornerCenter))
-    : 0;
-  return { left: frame.x + inset, right: frame.x + frame.width - inset };
-}
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.max(minimum, Math.min(maximum, value));
@@ -670,10 +611,11 @@ function FtueFingerCue({ blockedPulseNonce, cue, points, resetKey, theme }: {
   );
 }
 
-function MergeFtueEggGuide({ anchor, guide, screen }: {
+export function MergeFtueEggGuide({ anchor, guide, screen, children }: {
   anchor: Frame;
   guide: FtueGuide;
   screen: { height: number; width: number };
+  children?: React.ReactNode;
 }) {
   const { equippedFaceId, equippedSkinId } = useEggAvatar();
   const reduceMotion = useReducedMotion();
@@ -727,7 +669,8 @@ function MergeFtueEggGuide({ anchor, guide, screen }: {
   }, [avatarWobble, equippedFaceId, reduceMotion]);
 
   const calloutWidth = Math.min(326, screen.width - 28);
-  const estimatedHeight = 96;
+  const [measuredHeight, setMeasuredHeight] = useState(0);
+  const estimatedHeight = measuredHeight || (children ? 170 : 96);
   const calloutLeft = clamp(
     anchor.x + anchor.width / 2 - calloutWidth / 2,
     14,
@@ -748,28 +691,32 @@ function MergeFtueEggGuide({ anchor, guide, screen }: {
     <View
       accessibilityLabel={`${guide.title} ${guide.body}`}
       accessibilityLiveRegion="polite"
-      pointerEvents="none"
+      pointerEvents={children ? 'auto' : 'none'}
+      onLayout={(event) => setMeasuredHeight(event.nativeEvent.layout.height)}
       style={[
         styles.eggGuideCallout,
-        { left: calloutLeft, minHeight: estimatedHeight, top: calloutTop, width: calloutWidth },
+        { left: calloutLeft, top: calloutTop, width: calloutWidth },
       ]}>
       <View pointerEvents="none" style={[
         styles.eggGuideTail,
         calloutBelow ? styles.eggGuideTailAbove : styles.eggGuideTailBelow,
         { left: tailLeft },
       ]} />
+      <View style={styles.eggGuideContentRow}>
       <Animated.View
         accessibilityLabel="Your Egg is showing you around"
         pointerEvents="none"
         style={[styles.eggGuideAvatar, avatarMotionStyle]}>
         <EggAvatar faceId={guideFaceId} presentation="button" size={76} skinId={equippedSkinId} />
       </Animated.View>
-      <ThemedText style={[styles.eggGuideMessage, styles.eggGuideMessageLayout]} lightColor="#35422F" darkColor="#35422F">
+      <ThemedText style={[styles.eggGuideMessage, styles.eggGuideMessageLayout, { width: calloutWidth - 24 - 76 - 9 }]} lightColor="#35422F" darkColor="#35422F">
         <ThemedText style={[styles.eggGuideMessage, styles.eggGuideEmphasis]} lightColor="#668A49" darkColor="#668A49">
           {guide.title}
         </ThemedText>
         {' '}{guide.body}
       </ThemedText>
+      </View>
+      {children ? <View style={styles.eggGuideActionRow}>{children}</View> : null}
     </View>
   );
 }
@@ -866,9 +813,9 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     borderWidth: 1,
     boxShadow: '0 12px 30px rgba(25,42,25,0.28)',
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: 9,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     paddingHorizontal: 11,
     paddingVertical: 9,
     position: 'absolute',
@@ -897,13 +844,15 @@ const styles = StyleSheet.create({
     bottom: -10,
   },
   eggGuideAvatar: { flexShrink: 0, height: 76, width: 76, zIndex: 1 },
+  eggGuideContentRow: { alignItems: 'flex-start', flexDirection: 'row', flexShrink: 0, gap: 9, width: '100%' },
+  eggGuideActionRow: { alignItems: 'flex-end', flexShrink: 0, width: '100%' },
   eggGuideMessage: {
     ...KatchaDeckUI.typography.ftueHeroTitle,
     fontSize: 16.5,
     lineHeight: 21,
   },
   eggGuideMessageLayout: {
-    flex: 1,
+    flexShrink: 0,
     zIndex: 1,
   },
   eggGuideEmphasis: { fontWeight: '900' },

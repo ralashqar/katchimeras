@@ -760,6 +760,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     islandId: MossproutNatureIslandId,
     frame: { height: number; left: number; top: number; width: number },
   ) => {
+    if (cameraLocked || storyCameraInputLocked) return;
     camera.focusFrame(frame, {
       durationMs: reduceMotion ? 0 : 280,
       horizontalPadding: 70,
@@ -767,7 +768,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       verticalPadding: 140,
     });
     onSelectNatureIsland?.(islandId);
-  }, [camera, onSelectNatureIsland, reduceMotion, viewport.height]);
+  }, [camera, cameraLocked, storyCameraInputLocked, onSelectNatureIsland, reduceMotion, viewport.height]);
   const fitTutorialWorld = camera.fitWorld;
   const focusTutorialResident = camera.focusResident;
   const animateToCameraSnapshot = camera.animateToSnapshot;
@@ -1262,7 +1263,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               focusAnchorY={tile.cy}
               focusScale={focusScale}
               focusId={tile.id}
-              onFocus={interactionEnabled ? camera.focusResident : ignoreFocus}
+              onFocus={interactionEnabled && !cameraLocked ? camera.focusResident : ignoreFocus}
               onSelectLocked={interactionEnabled ? () => onSelectLocked?.(lockedFamilyId) : undefined}
               x={tile.cx}
               y={tile.cy}
@@ -1310,7 +1311,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             y={y}
             statusGlyph={residentStatusGlyphs?.[tile.companion.creature.creatureId] === 'ready' ? undefined : residentStatusGlyphs?.[tile.companion.creature.creatureId]}
             worldSize={creatureWorldSize}
-            onFocus={residentInteractionEnabled ? camera.focusResident : ignoreFocus}
+            onFocus={residentInteractionEnabled && !cameraLocked ? camera.focusResident : ignoreFocus}
             onSelectResident={residentInteractionEnabled ? onSelectResident : undefined}
           />
         ),
@@ -1318,7 +1319,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     }
 
     return items.sort((a, b) => a.depth - b.depth).map((item) => item.node);
-  }, [allowedResidentCharacterId, artLayerById, camera.focusResident, creatureWorldSize, highlightedLockedFamilyId, ignoreFocus, interactionEnabled, interactionResidentId, interactionRewardPulseKey, mossproutMeditating, onSelectLocked, onSelectResident, residentStatusGlyphs, scene.tiles, tileFocusScale, upgradePhase, upgradePresentation]);
+  }, [allowedResidentCharacterId, artLayerById, camera.focusResident, cameraLocked, creatureWorldSize, highlightedLockedFamilyId, ignoreFocus, interactionEnabled, interactionResidentId, interactionRewardPulseKey, mossproutMeditating, onSelectLocked, onSelectResident, residentStatusGlyphs, scene.tiles, tileFocusScale, upgradePhase, upgradePresentation]);
 
   const home = homePreset(identity?.selectedHomeArchetypeId);
 
@@ -1539,7 +1540,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           visualKey={plant.visualKey}
         />
       ))}
-      {!upgradePresentation && interactionEnabled ? (
+      {!upgradePresentation && interactionEnabled && !cameraLocked && !storyCameraInputLocked ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Recenter kingdom"

@@ -165,7 +165,7 @@ export function EmptyMergeOrderTrayCard() {
   );
 }
 
-export function FrozenMergeOrderTrayCard({ entry }: { entry: MergeOrderTrayEntry }) {
+export function FrozenMergeOrderTrayCard({ entry, hideChair = false }: { entry: MergeOrderTrayEntry; hideChair?: boolean }) {
   const recipient = entry.order.recipientSkinId ? katchimeraSkinById.get(entry.order.recipientSkinId) : null;
   const visualKey = recipient?.visualKey ?? CHARACTER_VISUALS[entry.order.characterId];
   const requestedItems = entry.order.requirements
@@ -173,7 +173,7 @@ export function FrozenMergeOrderTrayCard({ entry }: { entry: MergeOrderTrayEntry
     .slice(0, 3);
   return (
     <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" pointerEvents="none" style={styles.card}>
-      <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" source={CHAIR_ART} style={styles.chairArt} transition={0} />
+      {!hideChair ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" source={CHAIR_ART} style={styles.chairArt} transition={0} /> : null}
       <View style={styles.characterLayer}>
         <Image
           accessibilityIgnoresInvertColors
