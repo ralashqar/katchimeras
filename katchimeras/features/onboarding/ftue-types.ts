@@ -91,6 +91,7 @@ export type FtueTarget =
   | { kind: 'haven_garden_button'; characterId: 'mossprout' }
   | { kind: 'haven_garden_order'; characterId: 'mossprout'; orderId: string }
   | { kind: 'haven_garden_plot'; characterId: 'mossprout'; slotId: MossproutGardenPlantSlotId }
+  | { kind: 'haven_guide' }
   | { kind: 'haven_home' }
   | { kind: 'haven_world' };
 

@@ -140,6 +140,7 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
       toLevel: 1,
       economy: { mode: 'free', reason: 'First Bloom story reward' },
       camera: MOSSPROUT_GARDEN_FOCUS_CAMERA,
+      cameraAlreadyFocused: true,
       presentation: { preset: 'growth', reactionLine: 'The Garden remembered.', showCoins: false },
       next: 'effect.haven.grow_first_memory',
     }),

@@ -460,7 +460,7 @@ test('the focused Mossprout Haven mounts only Mossprout-owned hex-neighborhood a
   assert.match(screen, /source: 'haven-world'/);
   assert.match(screen, /useGameScreenTransition\(\)/);
   assert.match(screen, /announcement: "Opening Mossprout's Garden"[\s\S]*?target: 'merge'[\s\S]*?onCovered: closeResidentInteraction[\s\S]*?router\.push/);
-  assert.match(screen, /gardenOrders=\{gardenOrderEntries\}/);
+  assert.match(screen, /gardenOrders=\{ftueStepId === 'world\.garden_handoff' \? \[\] : gardenOrderEntries\}/);
   assert.match(canvas, /buildMossproutHexNeighborhoodScene/);
   assert.match(canvas, /GardenOrderShortcut/);
   assert.match(canvas, /GARDEN_ORDER_SLOT_CENTERS = \[[\s\S]*?\{ x: 0\.5, y: 0\.096 \}[\s\S]*?\{ x: 0\.3575, y: 0\.539 \}[\s\S]*?\{ x: 0\.6425, y: 0\.539 \}/);

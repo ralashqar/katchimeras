@@ -68,6 +68,19 @@ const GARDEN_LEVELS: Record<0 | 1 | 2, ArtSpec> = {
   },
 };
 
+// Every Garden level is authored on the same 1024px canvas. Use one union
+// silhouette for layout so tiny alpha-edge differences between exports can
+// never move or resize the world object when its source changes.
+const GARDEN_LAYOUT_BOUNDS = Object.values(GARDEN_LEVELS).reduce<ArtSpec['alphaBounds']>(
+  (bounds, level) => ({
+    bottom: Math.max(bounds.bottom, level.alphaBounds.bottom),
+    left: Math.min(bounds.left, level.alphaBounds.left),
+    right: Math.max(bounds.right, level.alphaBounds.right),
+    top: Math.min(bounds.top, level.alphaBounds.top),
+  }),
+  { bottom: 0, left: SOURCE_SIZE.width, right: 0, top: SOURCE_SIZE.height },
+);
+
 export type MossproutGardenSceneState = {
   level: number;
   plantableMemories: readonly PlantableMemoryInstance[];
@@ -178,12 +191,17 @@ function mossproutHexPoint(coord: HexCoord) {
   };
 }
 
-function layerFor(id: string, kind: KingdomTileArtLayer['kind'], spec: ArtSpec): KingdomTileArtLayer {
+function layerFor(
+  id: string,
+  kind: KingdomTileArtLayer['kind'],
+  spec: ArtSpec,
+  layoutBounds = spec.alphaBounds,
+): KingdomTileArtLayer {
   const point = mossproutHexPoint(spec.coord);
   const target = tileVisibleBounds(point.x, point.y);
   const frame = kingdomTileArtFrame({
     alignmentMode: 'ground-bottom',
-    assetBounds: spec.alphaBounds,
+    assetBounds: layoutBounds,
     referenceBounds: REFERENCE_BOUNDS,
     target,
   });
@@ -263,6 +281,7 @@ export function buildMossproutHexNeighborhoodScene(
     'structure:mossprout-hex-garden',
     'structure',
     GARDEN_LEVELS[gardenArtLevel],
+    GARDEN_LAYOUT_BOUNDS,
   );
   const plantLayers = gardenState.plantableMemories.flatMap((plant): KingdomTileArtLayer[] => {
     if (plant.status !== 'planted' || !plant.slotId) return [];

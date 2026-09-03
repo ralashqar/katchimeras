@@ -159,6 +159,7 @@ export function KatchimeraKingdomScreen({
   const [lockedHintVisible, setLockedHintVisible] = useState(false);
   const [selectedCreatureId, setSelectedCreatureId] = useState<string | null>(null);
   const [interactionCreatureId, setInteractionCreatureId] = useState<string | null>(null);
+  const [ftueReturnFocusCreatureId, setFtueReturnFocusCreatureId] = useState<string | null>(null);
   const [interactionCameraReady, setInteractionCameraReady] = useState(false);
   const [interactionExiting, setInteractionExiting] = useState(false);
   const [interactionExitNonce, setInteractionExitNonce] = useState(0);
@@ -187,7 +188,7 @@ export function KatchimeraKingdomScreen({
   const ftueRestoreStartedRef = useRef(false);
   const firstBloomRestoreStartedRef = useRef(false);
   const firstSeedPlantStartedRef = useRef(false);
-  const firstBloomReturnStartedRef = useRef(false);
+  const firstSeedReturnStartedRef = useRef(false);
   const ftueRecoveryRef = useRef<string | null>(null);
   const autoAdvancedStepRef = useRef<string | null>(null);
   const onFtueInspectRef = useRef(onFtueInspect);
@@ -265,8 +266,18 @@ export function KatchimeraKingdomScreen({
   const interactionSlot = useMemo(() => visibleCompanionSlots.find((slot) => (
     slot.kind === 'owned' && slot.creature.creatureId === interactionCreatureId
   )), [interactionCreatureId, visibleCompanionSlots]);
+  const activeInteractionResidentId = interactionCreatureId ?? ftueReturnFocusCreatureId;
   const interactionHasGarden = interactionSlot?.familyId === 'mossprout';
   const tutorialCamera = ftueStep?.camera ?? null;
+  const ftueReturnCamera = ftueReturnFocusCreatureId
+    ? mossproutFtueStep('companion.chapter_zero_return')?.camera ?? null
+    : null;
+  const ftueReturnResidentAnchorY = ftueReturnCamera?.kind === 'focus_target'
+    ? ftueReturnCamera.anchorY
+    : undefined;
+  const ftueReturnResidentZoom = ftueReturnCamera?.kind === 'focus_target'
+    ? ftueReturnCamera.zoom
+    : undefined;
   const initialFtueCameraScale = ftueStepId === 'world.egg_intro'
     ? MOSSPROUT_WORLD_EGG_ENTRY_ZOOM
     : tutorialCamera?.kind === 'focus_target' && tutorialCamera.projectionOnly
@@ -320,12 +331,16 @@ export function KatchimeraKingdomScreen({
   const setFirstBloomRestoreButtonNode = useCallback((node: View | null) => {
     registerFtueTarget('upgrade:mossprout', ftueStepId === 'world.first_bloom_restore' ? node : null);
   }, [ftueStepId, registerFtueTarget]);
+  const setHavenGuideNode = useCallback((node: View | null) => {
+    registerFtueTarget('haven-guide', node);
+  }, [registerFtueTarget]);
   useEffect(() => {
-    if (ftueStepId === 'world.first_bloom_restore') {
-      firstBloomReturnStartedRef.current = false;
-      return;
-    }
     firstBloomRestoreStartedRef.current = false;
+  }, [ftueStepId]);
+  useEffect(() => {
+    if (ftueStepId === 'world.first_seed_grew') return;
+    firstSeedReturnStartedRef.current = false;
+    setFtueReturnFocusCreatureId(null);
   }, [ftueStepId]);
   useEffect(() => {
     if (ftueStepId !== 'world.garden_arrival') firstSeedPlantStartedRef.current = false;
@@ -383,6 +398,9 @@ export function KatchimeraKingdomScreen({
     || ftueStepId === 'world.seed_planted'
     || ftueStepId === 'world.garden_handoff'
     || ftueStepId === 'world.first_bloom_restore'
+    || ftueStepId === 'world.first_seed_grew';
+  const gardenWorldBottomCtaActive = ftueStepId === 'world.garden_arrival'
+    || ftueStepId === 'world.seed_planted'
     || ftueStepId === 'world.first_seed_grew';
   const measureRestoreOrigin = useCallback(() => new Promise<{ x: number; y: number }>((resolve) => {
     const fallback = { x: window.width / 2, y: window.height - Math.max(90, insets.bottom + 66) };
@@ -599,29 +617,12 @@ export function KatchimeraKingdomScreen({
       && presentation.characterId === 'mossprout'
       && presentation.toStage === 1
     ) {
-      const nextRun = dispatchFtueEvent({
+      dispatchFtueEvent({
         type: 'haven_upgrade_completed',
         characterId: 'mossprout',
         stage: 1,
         revision: mergeWorldRef.current.revision,
       }, presentation.storyPresentationKey ?? 'first-bloom-upgrade');
-      if (
-        nextRun?.status === 'active'
-        && nextRun.stepId === 'companion.chapter_zero_return'
-        && !firstBloomReturnStartedRef.current
-      ) {
-        firstBloomReturnStartedRef.current = true;
-        const accepted = transitionTo({
-          announcement: 'Returning to Mossprout',
-          target: 'companion',
-          navigate: () => router.setParams({
-            interactionFtue: 'chapter-zero-return',
-            interactionSource: 'haven-world',
-            mossproutInteraction: '1',
-          }),
-        });
-        if (!accepted) firstBloomReturnStartedRef.current = false;
-      }
     }
     if (
       ftueStepId === 'haven.mossprout.restore'
@@ -631,7 +632,7 @@ export function KatchimeraKingdomScreen({
       ftueRecoveryRef.current = ftueStepId;
       onFtueRestore?.();
     }
-  }, [ftueStepId, onFtueRestore, router, transitionTo]);
+  }, [ftueStepId, onFtueRestore]);
 
   const beginFirstBloomRestore = useCallback(() => {
     if (ftueStepId !== 'world.first_bloom_restore' || firstBloomRestoreStartedRef.current) return;
@@ -658,6 +659,18 @@ export function KatchimeraKingdomScreen({
       firstSeedPlantStartedRef.current = false;
     });
   }, [ftueStepId]);
+
+  const beginFirstSeedReturn = useCallback(() => {
+    if (ftueStepId !== 'world.first_seed_grew' || firstSeedReturnStartedRef.current) return;
+    const mossprout = visibleCompanionSlots.find((slot) => (
+      slot.kind === 'owned' && slot.familyId === 'mossprout'
+    ));
+    if (!mossprout || mossprout.kind !== 'owned') return;
+    firstSeedReturnStartedRef.current = true;
+    setSelectedCreatureId(mossprout.creature.creatureId);
+    setDetailCreatureId(null);
+    setFtueReturnFocusCreatureId(mossprout.creature.creatureId);
+  }, [ftueStepId, visibleCompanionSlots]);
 
   const openHavenDetail = useCallback((creatureId: string) => {
     const presentation = havenPresentations.find((candidate) => candidate.creatureId === creatureId);
@@ -710,8 +723,24 @@ export function KatchimeraKingdomScreen({
   }, [ftueStep?.id, interactionRequest, onInteractionRequestConsumed, visibleCompanionSlots]);
 
   const completeResidentFocus = useCallback((creatureId: string) => {
+    if (ftueReturnFocusCreatureId === creatureId) {
+      void advanceFtueActionDurably({
+        expectedStepId: 'world.first_seed_grew',
+        actionId: 'world.acknowledge_first_seed_growth',
+        evidenceRef: 'mossprout-world:first-seed-grew',
+        nextStepId: 'companion.chapter_zero_return',
+      }).then((result) => {
+        if (result.run?.stepId === 'companion.chapter_zero_return') return;
+        firstSeedReturnStartedRef.current = false;
+        setFtueReturnFocusCreatureId(null);
+      }).catch(() => {
+        firstSeedReturnStartedRef.current = false;
+        setFtueReturnFocusCreatureId(null);
+      });
+      return;
+    }
     if (interactionCreatureIdRef.current === creatureId) setInteractionCameraReady(true);
-  }, []);
+  }, [ftueReturnFocusCreatureId]);
 
   const closeResidentInteraction = useCallback(() => {
     setInteractionCameraReady(false);
@@ -777,16 +806,19 @@ export function KatchimeraKingdomScreen({
         cameraLocked={Boolean(ftueStep && ftueStep.surface === 'haven')}
         cameraMaximumScale={ftueEggFeedingCloseupActive
           ? MOSSPROUT_WORLD_EGG_CLOSE_ZOOM
-          : ftueWorldCloseupActive || Boolean(interactionCreatureId)
-            ? MOSSPROUT_WORLD_EGG_REST_ZOOM
-            : undefined}
+          : ftueReturnResidentZoom != null
+            ? ftueReturnResidentZoom
+            : ftueWorldCloseupActive || Boolean(activeInteractionResidentId)
+              ? MOSSPROUT_WORLD_EGG_REST_ZOOM
+              : undefined}
         companionSlots={visibleCompanionSlots}
         identity={identity}
         discoveryRevealFamilyId={null}
         highlightedLockedFamilyId={null}
-        interactionEnabled={!interactionCreatureId && (havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven')}
+        interactionEnabled={!activeInteractionResidentId && (havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven')}
         interactionExitNonce={interactionExitNonce}
-        interactionResidentId={interactionCreatureId}
+        interactionResidentAnchorY={ftueReturnResidentAnchorY}
+        interactionResidentId={activeInteractionResidentId}
         interactionRewardPulseKey={interactionRewardPulseKey}
         gardenOrders={ftueStepId === 'world.garden_handoff' ? [] : gardenOrderEntries}
         gardenOrdersInteractive={false}
@@ -826,7 +858,7 @@ export function KatchimeraKingdomScreen({
         worldEggTargetRef={worldEggTargetRef}
         worldSubjectPresentation={worldSubjectPresentation}
       />
-      {!upgradePresentation && !interactionCreatureId ? (
+      {!upgradePresentation && !activeInteractionResidentId ? (
         <HavenTileHudLayer
           anchors={residentAnchors}
           bottomInset={Math.max(insets.bottom, 12)}
@@ -861,7 +893,7 @@ export function KatchimeraKingdomScreen({
           />
         </Animated.View>
       ) : null}
-      {!upgradePresentation && !interactionCreatureId && havenMergeBoardActive && (!havenOpeningActive || ftueStepId === 'world.garden_handoff') ? (
+      {!upgradePresentation && !activeInteractionResidentId && havenMergeBoardActive && (!havenOpeningActive || ftueStepId === 'world.garden_handoff') ? (
         <Animated.View
           entering={FadeIn
             .duration(reduceMotion ? 80 : 260)
@@ -1041,13 +1073,13 @@ export function KatchimeraKingdomScreen({
           </View>
         </KatchaSheet>
       ) : null}
-      {havenOpeningActive && ftueStep && !interactionCreatureId ? (
+      {havenOpeningActive && ftueStep && !activeInteractionResidentId ? (
         <View
           pointerEvents="box-none"
           style={[
             styles.discoveryCalloutLayer,
             ftueStepId === 'world.garden_handoff' && styles.discoveryCalloutLayerAboveSpotlight,
-            ftueStepId === 'world.garden_arrival'
+            gardenWorldBottomCtaActive
               ? {
                   bottom: Math.max(insets.bottom, 12) + 22,
                   justifyContent: 'space-between',
@@ -1057,7 +1089,7 @@ export function KatchimeraKingdomScreen({
               ? { top: insets.top + 18 }
               : { bottom: Math.max(insets.bottom, 12) + 12 },
           ]}>
-          <View pointerEvents="none" style={styles.discoveryCallout}>
+          <View collapsable={false} pointerEvents="none" ref={setHavenGuideNode} style={styles.discoveryCallout}>
             <FtueGuideCopy guide={ftueStep.guide} hero />
           </View>
           {!['world.egg_intro', 'world.garden_handoff', 'world.first_bloom_restore'].includes(ftueStepId ?? '')
@@ -1068,7 +1100,11 @@ export function KatchimeraKingdomScreen({
               glow={ftueStepId === 'world.garden_arrival'}
               icon={ftueStep.actions[0]?.icon ?? 'sparkles'}
               label={ftueStep.actions[0]?.title ?? 'Continue'}
-              onPress={ftueStepId === 'world.garden_arrival' ? beginFirstSeedPlanting : advanceOpening}
+              onPress={ftueStepId === 'world.garden_arrival'
+                ? beginFirstSeedPlanting
+                : ftueStepId === 'world.first_seed_grew'
+                  ? beginFirstSeedReturn
+                  : advanceOpening}
             />
           </View> : null}
         </View>

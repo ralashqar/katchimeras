@@ -464,6 +464,7 @@ test('Merge FTUE never inserts guide panels into the fixed board layout', () => 
 test('Merge FTUE spotlight uses a lifecycle-safe native rounded cutout', () => {
   const overlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
   const havenOverlay = readFileSync('components/katchadeck/onboarding/haven-ftue-overlay.tsx', 'utf8');
+  const kingdomScreen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   const merge = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   assert.match(overlay, /StyleSheet\.absoluteFillObject/);
   assert.match(overlay, /pointerEvents="none"/);
@@ -483,6 +484,8 @@ test('Merge FTUE spotlight uses a lifecycle-safe native rounded cutout', () => {
   assert.match(havenOverlay, /boxShadow: `0 0 0 \$\{spreadRadius\}px rgba\(11,9,24,\$\{opacity\}\)`/);
   assert.match(havenOverlay, /dimMask: \{[\s\S]*?borderCurve: 'continuous'/);
   assert.match(havenOverlay, /const cueFrame = cue\?\.kind === 'tap'[\s\S]*?<Finger focus=\{layout\.cueFocus \?\? layout\.focus\}/);
+  assert.match(havenOverlay, /target\.kind === 'haven_guide'\) return 'haven-guide'/);
+  assert.match(kingdomScreen, /collapsable=\{false\}[\s\S]*?ref=\{setHavenGuideNode\}[\s\S]*?<FtueGuideCopy/);
   assert.doesNotMatch(havenOverlay, /const dim =|\[dim,/);
   assert.match(overlay, /spotlightTransitionDurationMs: 420/);
   assert.match(overlay, /withTiming\(frame\.x, timing\)/);
@@ -615,7 +618,7 @@ test('meditation stays inside companion interaction and suppresses ordinary acti
   const meditationStage = readFileSync('components/katchadeck/world/companion-meditation-stage.tsx', 'utf8');
 
   assert.match(haven, /meditationFtue = ftueRun\?\.status === 'active' && ftueRun\.stepId === 'companion\.meditating'[\s\S]*?!meditationFtue/);
-  assert.match(havenWorld, /havenOpeningActive && ftueStep && !interactionCreatureId/);
+  assert.match(havenWorld, /havenOpeningActive && ftueStep && !activeInteractionResidentId/);
   assert.match(havenWorld, /setHostedInteractionRequest\(interactionRequest\);[\s\S]*?if \(interactionCreatureIdRef\.current !== interactionRequest\.creatureId\) \{[\s\S]*?setInteractionCameraReady\(false\)/);
   assert.match(havenWorld, /if \(ftueStepId && loadFtueRun\(\)\?\.status !== 'complete'\) return;[\s\S]*?setInteractionExiting\(true\)/);
   assert.match(companion, /ftueRun\.stepId === 'companion\.meditating'[\s\S]*?\? 'meditating'/);
@@ -945,6 +948,8 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.match(mossproutOpening, /companionStageActive \|\| \(worldHosted && stepId === 'world\.egg_intro'\)[\s\S]*?\? null/);
   assert.match(kingdomScreen, /ftueEggFeedingCloseupActive = ftueStepId === 'world\.egg_intro'[\s\S]*?Boolean\(ftueStepId\?\.startsWith\('egg\.'\)\)/);
   assert.match(kingdomScreen, /gardenWorldGuidanceActive[\s\S]*?top: insets\.top \+ 18/);
+  assert.match(kingdomScreen, /gardenWorldBottomCtaActive = ftueStepId === 'world\.garden_arrival'[\s\S]*?ftueStepId === 'world\.seed_planted'[\s\S]*?ftueStepId === 'world\.first_seed_grew'/);
+  assert.match(kingdomScreen, /gardenWorldBottomCtaActive[\s\S]*?bottom: Math\.max\(insets\.bottom, 12\) \+ 22[\s\S]*?justifyContent: 'space-between'[\s\S]*?top: insets\.top \+ 18/);
   assert.match(kingdomScreen, /function FtueOpeningFade\(\)[\s\S]*?opacity\.value = withDelay\([\s\S]*?duration: reduceMotion \? 140 : 1_350/);
   assert.match(kingdomScreen, /ftueStepId === 'world\.egg_intro' \? <FtueOpeningFade/);
   assert.match(nurture, /styles\.onboardingHeroGuide, \{ top: topInset \+ \(onboardingTopHudVisible \? 82 : 22\) \}/);
@@ -962,7 +967,7 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.doesNotMatch(kingdomCamera, /previousGeometry\.maximumScale === nextGeometry\.maximumScale/);
   assert.match(kingdomCamera, /const getSnapshot = useCallback[\s\S]*?scale: scale\.value[\s\S]*?tx: tx\.value[\s\S]*?ty: ty\.value/);
   assert.match(kingdomCanvas, /REGULAR_RESIDENT_INTERACTION_SCREEN_ANCHOR_Y = 0\.46/);
-  assert.match(kingdomCanvas, /residentInteractionScreenAnchorY = tutorialCamera\?\.kind === 'focus_target'[\s\S]*?tutorialCamera\.anchorY \?\? MOSSPROUT_DIALOGUE_SCREEN_ANCHOR_Y[\s\S]*?: REGULAR_RESIDENT_INTERACTION_SCREEN_ANCHOR_Y/);
+  assert.match(kingdomCanvas, /residentInteractionScreenAnchorY = interactionResidentAnchorY \?\? \(tutorialCamera\?\.kind === 'focus_target'[\s\S]*?tutorialCamera\.anchorY \?\? MOSSPROUT_DIALOGUE_SCREEN_ANCHOR_Y[\s\S]*?: REGULAR_RESIDENT_INTERACTION_SCREEN_ANCHOR_Y\)/);
   assert.match(kingdomCanvas, /initialInteractionFocus = useMemo[\s\S]*?residentCreatureFrame\(residentAnchor\.x, residentAnchor\.y, creatureWorldSize, isMossprout\)[\s\S]*?screenY: viewport\.height \* residentInteractionScreenAnchorY[\s\S]*?initialTutorialFocus \?\? initialInteractionFocus/);
   assert.match(kingdomCanvas, /handledInteractionExitNonceRef[\s\S]*?zoom: KINGDOM_RENDERING\.havenMaxScale/);
   assert.match(kingdomCanvas, /allowDownscaling=\{false\}[\s\S]*?resolution="high"[\s\S]*?showFace/);

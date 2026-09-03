@@ -62,6 +62,15 @@ export const storyOperations = {
     const payload: StoryCameraPresentationPayload = { operation: 'restore', snapshotId: input.snapshotId, durationMs: input.durationMs, lockInput: true };
     return { id: input.id, kind: 'presentation', capability: STORY_CAMERA_PRESENTATION, surface: input.surface ?? 'haven', presentationId: input.id, presentationType: STORY_CAMERA_PRESENTATION, payload, replayPolicy: 'replay', next: input.next };
   },
+
+  preserveCamera(input: { id: string; next: string; holdWorldState?: boolean; lockInput?: boolean; surface?: ContentFlowSurface }): ContentFlowNode {
+    const payload: StoryCameraPresentationPayload = {
+      operation: 'preserve',
+      holdWorldState: input.holdWorldState,
+      lockInput: input.lockInput ?? true,
+    };
+    return { id: input.id, kind: 'presentation', capability: STORY_CAMERA_PRESENTATION, surface: input.surface ?? 'haven', presentationId: input.id, presentationType: STORY_CAMERA_PRESENTATION, payload, replayPolicy: 'replay', next: input.next };
+  },
 };
 
 export function upgradeWorldTargetRecipe(input: {
@@ -74,6 +83,9 @@ export function upgradeWorldTargetRecipe(input: {
    * Garden structure that visually represents a resident's Haven tile). */
   focusTarget?: StoryTarget;
   camera?: { zoom?: number; anchorY?: number; durationMs?: number };
+  /** Keep the current camera transform when an earlier story operation has
+   * already established the exact composition for the upgrade control. */
+  cameraAlreadyFocused?: boolean;
   presentation?: { preset?: string; reactionLine?: string; showCoins?: boolean };
 }): ContentFlowNode[] {
   const focusId = `${input.id}.focus`;
@@ -88,8 +100,11 @@ export function upgradeWorldTargetRecipe(input: {
     reactionLine: input.presentation?.reactionLine,
     showCoins: input.presentation?.showCoins ?? input.economy.mode === 'normal',
   };
+  const cameraNode = input.cameraAlreadyFocused
+    ? storyOperations.preserveCamera({ id: focusId, next: effectId, holdWorldState: true })
+    : storyOperations.focusCamera({ id: focusId, target: input.focusTarget ?? input.target, next: effectId, ...input.camera });
   return [
-    storyOperations.focusCamera({ id: focusId, target: input.focusTarget ?? input.target, next: effectId, ...input.camera }),
+    cameraNode,
     { id: effectId, kind: 'effect', capability: STORY_WORLD_UPGRADE_EFFECT, effectId, effectType: STORY_WORLD_UPGRADE_EFFECT, payload: effectPayload, next: revealId },
     { id: revealId, kind: 'presentation', capability: STORY_WORLD_UPGRADE_PRESENTATION, surface: 'haven', presentationId: revealId, presentationType: STORY_WORLD_UPGRADE_PRESENTATION, payload: presentationPayload, replayPolicy: 'replay', next: input.next },
   ];

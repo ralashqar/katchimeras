@@ -21,8 +21,9 @@ function requiredString(key: string) {
 }
 
 function validateCameraPayload(payload: Readonly<Record<string, unknown>>) {
-  if (payload.operation !== 'focus' && payload.operation !== 'fit' && payload.operation !== 'restore') return 'operation must be focus, fit, or restore';
+  if (payload.operation !== 'focus' && payload.operation !== 'fit' && payload.operation !== 'preserve' && payload.operation !== 'restore') return 'operation must be focus, fit, preserve, or restore';
   if (payload.operation === 'focus') return validateStoryTarget(payload.target);
+  if (payload.operation === 'preserve') return null;
   if (payload.operation === 'fit') {
     if (!Array.isArray(payload.targets) || payload.targets.length === 0) return 'fit camera requires at least one target';
     return payload.targets.map(validateStoryTarget).find(Boolean) ?? null;

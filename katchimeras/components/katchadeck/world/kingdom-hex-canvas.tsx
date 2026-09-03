@@ -37,7 +37,7 @@ import { FrozenMergeOrderTrayCard, type MergeOrderTrayEntry } from '@/components
 import { PersistentMergeItemArt } from '@/components/katchadeck/games/feastle-persistent-merge-board';
 import { HavenUpgradeEffects } from '@/components/katchadeck/world/haven-upgrade-effects';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
-import type { KingdomTileArtLayer, KingdomTileRender } from '@/components/katchadeck/world/kingdom-hex-scene';
+import type { KingdomHexScene, KingdomTileArtLayer, KingdomTileRender } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { buildKingdomHexScene } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { buildMossproutHexNeighborhoodScene, mossproutGardenPlantSlotFrame, MOSSPROUT_GARDEN_PLANT_SLOT_IDS, type MossproutGardenSceneState } from '@/components/katchadeck/world/mossprout-hex-neighborhood-scene';
 import { SeamlessWorldImage } from '@/components/katchadeck/world/seamless-world-image';
@@ -141,6 +141,7 @@ type Props = {
   onTileUpgradeOfferPress?: () => void;
   onTileUpgradeOfferTargetChange?: (node: ViewType | null) => void;
   interactionResidentId?: string | null;
+  interactionResidentAnchorY?: number;
   interactionExitNonce?: number;
   interactionRewardPulseKey?: number;
   onInteractionExitFocusComplete?: () => void;
@@ -379,6 +380,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   onTileUpgradeOfferPress,
   onTileUpgradeOfferTargetChange,
   interactionResidentId = null,
+  interactionResidentAnchorY,
   interactionExitNonce = 0,
   interactionRewardPulseKey = 0,
   onInteractionExitFocusComplete,
@@ -395,6 +397,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [assetRevision, setAssetRevision] = useState(0);
   const [upgradePhase, setUpgradePhase] = useState<HavenUpgradePresentationPhase>('armed');
+  const [storySceneGuard, setStorySceneGuard] = useState<{ key: string; scene: KingdomHexScene } | null>(null);
   const [discoveryPhase, setDiscoveryPhase] = useState<HavenUpgradePresentationPhase>('armed');
   const rootRef = useRef<View>(null);
   const reduceMotion = useReducedMotion();
@@ -429,7 +432,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     () => ({ revision: assetRevision, value: getDevKingdomHexVerticalAlignmentMode() }),
     [assetRevision]
   );
-  const scene = useMemo(
+  const committedScene = useMemo(
     () => focusedMossproutWorld
       ? buildMossproutHexNeighborhoodScene(companionSlots, mossproutNatureIslandLevels ?? {
           'seed-nursery': 0,
@@ -442,6 +445,29 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       : buildKingdomHexScene(companionSlots, hexTileSelection.value, identity, verticalAlignmentSelection.value),
     [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutGarden, mossproutNatureIslandLevels, verticalAlignmentSelection]
   );
+  const upgradeFromScene = useMemo(() => {
+    if (!focusedMossproutWorld || !upgradePresentation || !mossproutNatureIslandLevels) return committedScene;
+    const fromSlots = companionSlots.map((slot) => (
+      slot.kind === 'owned' && slot.familyId === upgradePresentation.characterId
+        ? { ...slot, havenStage: upgradePresentation.fromStage }
+        : slot
+    ));
+    const fromNatureLevels = upgradePresentation.natureIslandId
+      ? { ...mossproutNatureIslandLevels, [upgradePresentation.natureIslandId]: upgradePresentation.fromStage as MossproutNatureIslandLevel }
+      : mossproutNatureIslandLevels;
+    const fromGarden = upgradePresentation.visualTarget?.kind === 'haven_structure'
+      && upgradePresentation.visualTarget.structureId === 'mossprout-hex-garden'
+      ? { ...(mossproutGarden ?? { plantableMemories: [] }), level: upgradePresentation.fromStage }
+      : mossproutGarden;
+    // A persisted upgrade can publish before its presentation mounts. Keep
+    // the complete rendered world on the receipt's from-state until the
+    // reveal finishes; otherwise the base image changes frame/source one
+    // render before the guarded crossfade is ready.
+    return buildMossproutHexNeighborhoodScene(fromSlots, fromNatureLevels, fromGarden);
+  }, [committedScene, companionSlots, focusedMossproutWorld, mossproutGarden, mossproutNatureIslandLevels, upgradePresentation]);
+  const scene = upgradePresentation
+    ? upgradeFromScene
+    : storySceneGuard?.scene ?? committedScene;
   const sceneTileImageLod: KingdomHexTileLod = focusedMossproutWorld
     ? 'full'
     : KINGDOM_RENDERING.havenImageLod;
@@ -653,9 +679,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const tutorialCameraKey = tutorialCamera
     ? `${JSON.stringify(tutorialCamera)}:${worldSubjectPresentation?.growthProgress ?? 'none'}`
     : 'none';
-  const residentInteractionScreenAnchorY = tutorialCamera?.kind === 'focus_target'
+  const residentInteractionScreenAnchorY = interactionResidentAnchorY ?? (tutorialCamera?.kind === 'focus_target'
     ? tutorialCamera.anchorY ?? MOSSPROUT_DIALOGUE_SCREEN_ANCHOR_Y
-    : REGULAR_RESIDENT_INTERACTION_SCREEN_ANCHOR_Y;
+    : REGULAR_RESIDENT_INTERACTION_SCREEN_ANCHOR_Y);
   // The first opening directive is started inside camera initialization so
   // the first drawable frame is already moving. Mark it applied here to keep
   // the post-ready effect from restarting the same zoom.
@@ -825,6 +851,18 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   }, [havenTargetRegistry, registeredStoryTargets, storyTargetFrame, tutorialCameraReady]);
   useStoryPresentationOperation('haven', STORY_CAMERA_PRESENTATION, async (work) => {
     const payload = work.payload as StoryCameraPresentationPayload;
+    if (payload.operation === 'preserve') {
+      if (payload.holdWorldState) {
+        setStorySceneGuard((current) => current?.key === work.key
+          ? current
+          : { key: work.key, scene: committedScene });
+        // Do not acknowledge the pre-commit operation until React has mounted
+        // the frozen scene. The following persistence effect may publish its
+        // new level immediately after this acknowledgement.
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      }
+      return;
+    }
     if (payload.operation === 'restore') {
       const snapshot = payload.snapshotId ? storyCameraSnapshotsRef.current.get(payload.snapshotId) : null;
       if (!snapshot) throw new Error(`Camera snapshot ${payload.snapshotId ?? ''} is not available`);
@@ -855,6 +893,12 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       { durationMs: reduceMotion ? 0 : payload.durationMs, horizontalPadding: payload.padding, verticalPadding: payload.padding, onComplete: resolve },
     ));
   }, tutorialCameraReady);
+  useEffect(() => {
+    if (!upgradePresentation || !storySceneGuard) return;
+    // The receipt-backed presentation now reconstructs the same from-state,
+    // so it can take over without changing a single rendered frame.
+    setStorySceneGuard(null);
+  }, [storySceneGuard, upgradePresentation]);
   const tileUpgradeOfferFrame = tileUpgradeOffer
     ? storyTargetFrame(tileUpgradeOffer.target)
     : null;

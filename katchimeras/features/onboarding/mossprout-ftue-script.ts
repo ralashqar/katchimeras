@@ -312,7 +312,16 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       ],
       interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } } },
       cue: { kind: 'tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } },
-      spotlight: { targets: [{ kind: 'haven_upgrade_button', characterId: 'mossprout' }], padding: 7, radius: 18, dimOpacity: 0.58 },
+      spotlight: {
+        targets: [
+          { kind: 'haven_guide' },
+          { kind: 'haven_upgrade_button', characterId: 'mossprout' },
+        ],
+        grouping: 'bounding_rect',
+        padding: 7,
+        radius: 22,
+        dimOpacity: 0.58,
+      },
       edges: [{ event: { type: 'haven_upgrade_completed', characterId: 'mossprout', stage: 1 }, commitActionId: 'world.complete_first_bloom_restore', nextStepId: 'world.first_seed_grew' }],
       camera: { kind: 'focus_target', target: { kind: 'haven_garden_tile', characterId: 'mossprout' }, zoom: 1.28, anchorY: 0.55, durationMs: 900, projectionOnly: true },
       blockingBeat: 'chapter_complete',

@@ -33,7 +33,7 @@ export type StoryUpgradeEconomyPolicy =
   | { mode: 'grant'; amount: number; reason: string };
 
 export type StoryCameraPresentationPayload = {
-  operation: 'focus' | 'fit' | 'restore';
+  operation: 'focus' | 'fit' | 'preserve' | 'restore';
   target?: StoryTarget;
   targets?: readonly StoryTarget[];
   snapshotId?: string;
@@ -42,6 +42,10 @@ export type StoryCameraPresentationPayload = {
   padding?: number;
   durationMs?: number;
   lockInput?: boolean;
+  /** Keep the currently rendered world mounted until the next upgrade
+   * presentation takes ownership. Used to bridge an atomic persistence
+   * commit without exposing its new art for one frame. */
+  holdWorldState?: boolean;
 };
 
 export type StoryWorldUpgradeEffectPayload = {
