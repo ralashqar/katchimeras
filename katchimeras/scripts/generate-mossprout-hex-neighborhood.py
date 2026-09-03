@@ -58,12 +58,27 @@ def candidate_source(key: str) -> Path:
     return OUT_ROOT / key / "candidate-1.png"
 
 
+def completed_candidate(key: str) -> Path | None:
+    candidate = candidate_source(key)
+    records_path = candidate.parent / "candidates.json"
+    if not candidate.exists() or not records_path.exists():
+        return None
+    try:
+        records = json.loads(records_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    record = records[0] if isinstance(records, list) and len(records) == 1 else None
+    if not isinstance(record, dict) or record.get("status") != "generated" or record.get("visualKey") != key:
+        return None
+    return candidate
+
+
 def resolve_base(tile: dict, generated: set[str]) -> Path:
     if tile.get("base"):
         return ROOT / tile["base"]
     dependency = str(tile["baseTile"])
-    candidate = candidate_source(dependency)
-    if dependency in generated and candidate.exists():
+    candidate = completed_candidate(dependency)
+    if candidate is not None:
         return candidate
     return published_source(dependency)
 

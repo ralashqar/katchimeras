@@ -28,6 +28,8 @@
     "orchard-grove",
     "ancient-tree-grove",
     "garden",
+    "memory-garden-unrestored",
+    "memory-garden-restored",
     "wildgrowth-grove"
   ],
   "tiles": {
@@ -67,6 +69,16 @@
       "guide": "assets/images/katchimeras/world/square/mossprout-garden-hub-v2.webp",
       "matte": "birefnet-heavy",
       "theme": "A simple Mossprout working garden hub designed for three live order-card overlays. Reserve exactly three broad, plain, low-contrast grass presentation zones in a triangle: one at upper center, one at lower left, and one at lower right. Keep every zone free of beds, buildings, plants, paths, stones, and high-detail objects; never draw cards, trays, characters, panels, or placeholder outlines into the art. Concentrate one tiny leaf-roof tool shed, two or three small chunky raised sprout beds, minimal tools, and a few broad cushiony leaves in the remaining middle gaps and side margins. Use very low detail density, smooth matte clay-like materials, and broad soft bevels. Keep a clean route from the centered front stairs. No ornamental pond, bridge, circular paving, fence, hedge, wall, or perimeter ring. Preserve Image 1's deep tapered cliff, cliff blocks, stairs, camera, and scale."
+    },
+    "memory-garden-unrestored": {
+      "baseTile": "seed-nursery",
+      "guide": "design/mossprout-memory-garden-v1/garden-level-0-source.png",
+      "theme": "Mossprout's neglected Memory Garden before its first restoration. Preserve the guide's functional layout exactly: five large empty rounded rectangular planting patches in the same two-left, center-rear, and two-right arrangement; one tiny leaf-roof tool shed at upper-left; one dry round stone well at upper-center; and one broad cracked stepping-stone route from the centered front stairs. Keep every planting patch fully empty and visually clear for separately rendered live Memory Seed sprites. Make most of the top face warm dry brown soil with only a few broad muted olive moss remnants, visibly dusty and dormant but still charming. The well is empty and the garden is clearly unrestored. STRICT STYLE MATCH: translate this layout into Image 1's exact premium cozy 3D toy-diorama language with very low texture detail, very low detail density, broad cushiony shapes, large smooth matte surfaces, and soft rounded bevels. Remove realistic dirt granules, cracks, leaf litter, grass blades, tiny stones, tiny weeds, and photographic texture. No planted seed, sprout, bloom, character, UI, text, fence, hedge, wall, pond, bridge, or perimeter ring. Preserve Image 1's deep tapered cliff, cliff blocks, front stairs, camera, scale, and black background."
+    },
+    "memory-garden-restored": {
+      "baseTile": "memory-garden-unrestored",
+      "guide": "design/mossprout-memory-garden-v1/garden-level-1-source.png",
+      "theme": "Restore the exact Memory Garden shown in Image 1 without moving or resizing any gameplay anchor. Keep precisely the same five empty rounded rectangular planting patches, tiny leaf-roof tool shed at upper-left, round stone well at upper-center, centered front stairs, and broad stepping-stone route. Every planting patch must remain fully empty and clear for separately rendered live Memory Seed sprites. Transform the dry top face into a healthy broad cushiony green garden floor; repair and gently brighten the planting-bed borders; fill the restored well with a simple readable blue water surface; refresh the shed and path; and add only a handful of oversized simple leaf or white-flower accents around the outer gaps. Make the before/after contrast obvious at 256px while preserving identical geometry. STRICT STYLE MATCH: retain Image 1's premium cozy 3D toy-diorama language with very low texture detail, very low detail density, broad cushiony shapes, large smooth matte surfaces, and soft rounded bevels. No realistic grass strands, soil granules, cracks, leaf litter, tiny stones, tiny flowers, planted seed, sprout, bloom, character, UI, text, fence, hedge, wall, pond, bridge, or perimeter ring. Preserve Image 1's deep tapered cliff, cliff blocks, front stairs, camera, scale, and black background."
     },
     "wildgrowth-grove": {
       "baseTile": "ancient-tree-grove",

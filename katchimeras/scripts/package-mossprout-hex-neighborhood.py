@@ -23,6 +23,9 @@ MANIFEST_PATH = DESIGN_ROOT / "pipeline.json"
 ASSETS = (
     ("main", "mossprout_focused_v1_main_hex_tile"),
     ("garden", "mossprout_focused_v1_garden_hex_tile"),
+    ("memory-garden-unrestored", "mossprout_memory_garden_level_0"),
+    ("memory-garden-restored", "mossprout_memory_garden_level_1"),
+    ("memory-garden-restored", "mossprout_memory_garden_level_2"),
     ("seed-nursery", "mossprout_focused_v1_seed_nursery_hex_tile"),
     ("bloom-garden", "mossprout_focused_v1_bloom_garden_hex_tile"),
     ("pond-sanctuary", "mossprout_focused_v1_pond_sanctuary_hex_tile"),

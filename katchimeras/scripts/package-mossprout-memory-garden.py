@@ -11,6 +11,7 @@ from PIL import Image, ImageChops, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_DIR = ROOT / "design" / "mossprout-memory-garden-v1"
+GENERATED_GARDEN_DIR = ROOT / "design" / "mossprout-hex-neighborhood-v1"
 HEX_DIR = ROOT / "assets" / "images" / "katchimeras" / "world" / "hex"
 PLANT_DIR = ROOT / "assets" / "images" / "katchimeras" / "world" / "memory-plants"
 FAMILIES = ("momentum", "stillness", "renewal", "warmth", "curiosity")
@@ -53,8 +54,15 @@ def remove_connected_checkerboard(source: Image.Image) -> Image.Image:
 
 
 def package_garden(level: int) -> None:
-    with Image.open(SOURCE_DIR / f"garden-level-{level}-source.png") as opened:
-        garden = remove_connected_checkerboard(opened)
+    generated_stem = "memory-garden-unrestored" if level == 0 else "memory-garden-restored"
+    generated_alpha = GENERATED_GARDEN_DIR / f"{generated_stem}-alpha.png"
+    if not generated_alpha.exists():
+        raise RuntimeError(
+            f"Missing Nano Banana garden master: {generated_alpha.relative_to(ROOT)}. "
+            "Generate and promote it through scripts/generate-mossprout-hex-neighborhood.py first."
+        )
+    with Image.open(generated_alpha) as opened:
+        garden = opened.convert("RGBA")
     garden = resize_premultiplied(garden, (1024, 1024))
     for side, suffix in ((1024, ""), (512, "_512"), (256, "_256")):
         output = HEX_DIR / f"mossprout_memory_garden_level_{level}{suffix}.webp"
