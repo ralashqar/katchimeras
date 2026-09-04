@@ -1,0 +1,15 @@
+{
+  "model": "fal-ai/nano-banana-2/edit",
+  "resolution": 2048,
+  "createdAt": "2026-09-04T00:43:08.471532+00:00",
+  "references": [
+    {
+      "path": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "sha256": "64b441e4c33b1d3a02e418f22fd474c4b994557243e43869a89cf8e530df0f2a"
+    }
+  ],
+  "prompt": "Use Image 1 as the authoritative camera, framing, deep tapered floating hex-island geometry and rendering reference. Preserve its six-sided top footprint, broad chunky cliff blocks, deep tapered underside, centered recessed front stairs, lighting direction and square framing. Keep the entire silhouette comfortably inside the canvas with black padding on all four sides. Perfectly flat pure-black #000000 background for BiRefNet Heavy matting; no ground plane, external drop shadow, text, numbers, UI, watermark, characters or eggs.\n\nPremium cozy 3D toy diorama matching the Mossprout reference: very low detail density, very low texture detail, broad cushiony shapes, soft rounded bevels, smooth matte clay-like surfaces, large readable color blocks, soft upper-left daylight and restrained ambient occlusion. No photographic texture, grain, tiny repeated details, speckles, cracks, grass blades, pine needles or surface noise. Every main shape must read at 256 pixels.\n\nTurn this into the GENERIC fully mist-locked floating hex tile. Remove every building, plant, flower, fence, bridge, pond, path and furnishing. A dense opaque blanket of magical mist covers the ENTIRE top face from edge to edge, completely hiding its ground and contents. The mist also wraps over the entire rim and spills across the front stairs: no bare green ring, no hedge border, no exposed flat patch, no gap showing ground, no object peeking out, no creature or Egg. Sculpt the mist as a small number of large rounded cushiony cloud masses, softly interlocking and lower near the front, with creamy pearl highlights, pale powder-blue midtones and gentle muted lavender recesses. No glitter, stars, tiny bubbles, particle dots, wispy noisy smoke or photographic vapor texture. Maintain a clear broad six-sided island footprint. The deep tapered chunky cliff underside can remain visible below the enveloping mist, in quiet warm sandstone and muted grey-blue, matching the reference's large block scale and soft bevels; cloud lobes obscure its top edge all around. This is a solid readable toy-diorama locked environment, not a flat fog decal, not a cloud floating above an uncovered island, and not mist trapped inside a visible wall. Keep the complete deep floating-island silhouette, exact camera and comfortable square canvas padding.",
+  "assetKey": "dream_mist_locked_hex_tile_v2",
+  "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/dream-mist-locked-hex-tile-v2/1788482627336_grid.png",
+  "sourceSha256": "c0a0085f3eaa013b986a260531a1d31f6d1221287441106a2670c6edce3ff7a0"
+}

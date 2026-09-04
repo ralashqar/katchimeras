@@ -100,11 +100,11 @@ const MEMORY_PLANT_ART_CONTACT_Y = 366 / 384;
 export const MOSSPROUT_GARDEN_PLANT_SLOT_IDS = Object.keys(GARDEN_PLANT_SLOT_POSITIONS) as MossproutGardenPlantSlotId[];
 
 const DREAM_MIST_LOCKED_NATURE_SOURCES: TileSources = {
-  full: require('../../../assets/images/katchimeras/world/hex/dream_mist_locked_hex_tile_v1.webp'),
-  medium: require('../../../assets/images/katchimeras/world/hex/dream_mist_locked_hex_tile_v1_512.webp'),
-  thumb: require('../../../assets/images/katchimeras/world/hex/dream_mist_locked_hex_tile_v1_256.webp'),
+  full: require('../../../assets/images/katchimeras/world/hex/dream_mist_locked_hex_tile_v2.webp'),
+  medium: require('../../../assets/images/katchimeras/world/hex/dream_mist_locked_hex_tile_v2_512.webp'),
+  thumb: require('../../../assets/images/katchimeras/world/hex/dream_mist_locked_hex_tile_v2_256.webp'),
 };
-const DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS = KINGDOM_HEX_TILE_ALPHA_BOUNDS['dream_mist_locked_hex_tile_v1.webp'];
+const DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS = KINGDOM_HEX_TILE_ALPHA_BOUNDS['dream_mist_locked_hex_tile_v2.webp'];
 
 const NATURE: Record<MossproutNatureIslandId, ArtSpec> = {
   'seed-nursery': {
@@ -286,11 +286,11 @@ export function buildMossproutHexNeighborhoodScene(
   });
   const stepplingLayer = (locked: boolean) => layerFor('structure:steppling-home', 'structure', {
       coord: STEPPLING_TILE.coord,
-      alphaBounds: locked ? DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS : KINGDOM_HEX_TILE_ALPHA_BOUNDS['floating_neighborhood_v2_steppling_haven_stage_0_hex_tile.webp'],
+      alphaBounds: locked ? DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS : KINGDOM_HEX_TILE_ALPHA_BOUNDS['shared_world_steppling_trailhead_hex_tile_v1.webp'],
       sources: locked ? DREAM_MIST_LOCKED_NATURE_SOURCES : {
-        full: require('../../../assets/images/katchimeras/world/hex/floating_neighborhood_v2_steppling_haven_stage_0_hex_tile.webp'),
-        medium: require('../../../assets/images/katchimeras/world/hex/floating_neighborhood_v2_steppling_haven_stage_0_hex_tile_512.webp'),
-        thumb: require('../../../assets/images/katchimeras/world/hex/floating_neighborhood_v2_steppling_haven_stage_0_hex_tile_256.webp'),
+        full: require('../../../assets/images/katchimeras/world/hex/shared_world_steppling_trailhead_hex_tile_v1.webp'),
+        medium: require('../../../assets/images/katchimeras/world/hex/shared_world_steppling_trailhead_hex_tile_v1_512.webp'),
+        thumb: require('../../../assets/images/katchimeras/world/hex/shared_world_steppling_trailhead_hex_tile_v1_256.webp'),
       },
     });
   const lockedSteppling = stepplingLayer(true);

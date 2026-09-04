@@ -246,10 +246,32 @@ test('the focused Mossprout replacement uses the top-level hex projection and au
   assert.match(scene, /mossproutHexPoint\(spec\.coord\)/);
   assert.match(scene, /kingdomTileArtFrame\(/);
   assert.match(scene, /hexDrawDepth\(point\)/);
-  assert.match(scene, /DREAM_MIST_LOCKED_NATURE_SOURCES[\s\S]*?dream_mist_locked_hex_tile_v1\.webp[\s\S]*?dream_mist_locked_hex_tile_v1_512\.webp[\s\S]*?dream_mist_locked_hex_tile_v1_256\.webp/);
+  assert.match(scene, /DREAM_MIST_LOCKED_NATURE_SOURCES[\s\S]*?dream_mist_locked_hex_tile_v2\.webp[\s\S]*?dream_mist_locked_hex_tile_v2_512\.webp[\s\S]*?dream_mist_locked_hex_tile_v2_256\.webp/);
   assert.match(scene, /function natureLayerFor[\s\S]*?const locked = level === 0[\s\S]*?interactionFrame: undefined/);
   assert.match(scene, /MOSSPROUT_NATURE_ISLANDS\.map\(\(island\) => natureLayerFor/);
   assert.doesNotMatch(scene, /MOSSPROUT_NATURE_ISLANDS\.flatMap[\s\S]*?natureIslandLevels/);
+});
+
+test('shared discovery uses developed Steppling art and full-cover mist at every LOD', () => {
+  const scene = fs.readFileSync(path.join(process.cwd(), 'components/katchadeck/world/mossprout-hex-neighborhood-scene.ts'), 'utf8');
+  const registry = fs.readFileSync(path.join(process.cwd(), 'utils/world-visuals.ts'), 'utf8');
+  const bounds = fs.readFileSync(path.join(process.cwd(), 'constants/kingdom-hex-tile-bounds.gen.ts'), 'utf8');
+  assert.doesNotMatch(scene, /floating_neighborhood_v2_steppling_haven_stage_0_hex_tile/);
+  assert.doesNotMatch(scene, /dream_mist_locked_hex_tile_v1/);
+  assert.doesNotMatch(registry, /dream_mist_locked_hex_tile_v1|floating_neighborhood_v2_steppling_hex_tile/);
+  for (const key of ['shared_world_steppling_trailhead_hex_tile_v1', 'dream_mist_locked_hex_tile_v2']) {
+    assert.ok(bounds.includes(`${key}.webp`), `${key} must have regenerated alpha bounds`);
+    for (const [suffix, size] of [['', 1024], ['_512', 512], ['_256', 256]] as const) {
+      const filename = `${key}${suffix}.webp`;
+      assert.ok(scene.includes(filename), `shared neighborhood must use ${filename}`);
+      assert.ok(registry.includes(filename), `regular world registry must use ${filename}`);
+      const bytes = fs.readFileSync(path.join(process.cwd(), 'assets/images/katchimeras/world/hex', filename));
+      assert.equal(bytes.toString('ascii', 12, 16), 'VP8X');
+      assert.ok((bytes[20] & 0x10) !== 0, `${filename} must preserve alpha`);
+      assert.equal(bytes.readUIntLE(24, 3) + 1, size);
+      assert.equal(bytes.readUIntLE(27, 3) + 1, size);
+    }
+  }
 });
 
 test('focused Mossprout hex art ships alpha-preserving full, medium, and thumbnail tiers', () => {
