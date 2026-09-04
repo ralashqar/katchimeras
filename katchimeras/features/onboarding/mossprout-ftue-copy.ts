@@ -5,13 +5,13 @@ export const MOSSPROUT_FTUE_COPY = {
   opening: 'A little of your day can wake something here.',
   dayQuestion: 'How has today felt?',
   helpQuestion: 'What would feel good right now?',
-  seedOrigin: 'This Seed came from what you shared.',
+  seedOrigin: 'Something you shared has become a Seed.',
   bond: 'Your Bond grows through little moments together.',
-  planted: 'There. A place of its own. Let’s wake the Garden so it can grow.',
+  planted: 'There. A place of its own. Let’s help the Garden wake up around it.',
   mergePurpose: 'Merge a Plant. Complete its request to earn Glow and restore the Garden.',
-  growth: 'Look—your Seed is growing. A little of your world, growing in mine.',
-  waterQuestion: 'We’ve watered the Garden. Fancy a drink of water too?',
-  farewell: 'Roots need a little quiet. There’s something beyond those clouds. You can explore while I rest.',
+  growth: 'Look—our Seed is growing. This little place has a story now. Ours.',
+  waterQuestion: 'We’ve done something for the Garden. Would you like a small daily moment for yourself, too?',
+  farewell: 'Roots need a little quiet after growing. I’ll rest for eight hours. You can tend the Garden or visit our Journal while I do.',
   restAction: 'Rest, Mossprout',
   meditation: 'Mossprout is meditating',
   meditationAvailable: 'Mossprout is resting. Let’s see what’s nearby.',
@@ -35,7 +35,7 @@ export const MOSSPROUT_HELP_OPTIONS = [
 
 export const MOSSPROUT_GREETING_OPTIONS = [
   { id: 'hello', label: 'Hi, Mossprout.', reply: 'Hi. I’m glad you’re here.' },
-  { id: 'garden', label: 'What is this place?', reply: 'My Garden. It’s been quiet for a while.' },
+  { id: 'garden', label: 'What is this place?', reply: 'My Garden. It’s been quiet for a while. I think we could give it some stories.' },
   { id: 'tiny', label: 'You’re tiny.', reply: 'The Garden is enormous. Both things can be true.' },
 ] as const;
 

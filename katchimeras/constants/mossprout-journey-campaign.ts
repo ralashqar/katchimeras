@@ -6,6 +6,12 @@ export const MOSSPROUT_JOURNEY_CAMPAIGN = assertValidJourneyCampaign({
   id: 'mossprout:journey',
   version: MOSSPROUT_CAMPAIGN_VERSION + 1,
   familyId: 'mossprout',
+  chapters: [
+    ['mossprout:chapter:quiet-patch', 'A Little Place to Begin', 'Make room for care and learn how we can support each other.'],
+    ['mossprout:chapter:dry-pond', 'The Returning Pond', 'Notice what a place needs and help life return.'],
+    ['mossprout:chapter:memory-nursery', 'The Memory Nursery', 'Give the moments that matter somewhere to grow.'],
+    ['mossprout:chapter:heartwood', 'Heartwood', 'Bring our discoveries together into a place that holds us.'],
+  ].map(([id, title, purpose]) => ({ id, title, purpose, episodeIds: MOSSPROUT_CAMPAIGN_EPISODES.filter((episode) => episode.chapterId === id).map((episode) => episode.beatId) })),
   days: MOSSPROUT_CAMPAIGN_EPISODES.map((episode) => {
     const prefix = `mossprout:journey:${episode.beatId}`;
     const steps: JourneyCampaignStep[] = [

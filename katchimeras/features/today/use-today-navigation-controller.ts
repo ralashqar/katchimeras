@@ -15,7 +15,6 @@ import todayScene from '@/data/today-scene.json';
 import { consumeCaptureFeed } from '@/utils/capture-feed-signal';
 import { consumeSelectedDay } from '@/utils/selected-day-signal';
 import type { HomeTimelineDay } from '@/types/home';
-import { useScenePerformanceProbe } from '@/hooks/use-scene-performance-probe';
 import {
   todayTileTransitionIndices,
   todayTileWindowIndices,
@@ -55,7 +54,6 @@ export function useTodayNavigationController({
   const initialIndex = Math.max(0, timelineDays.findIndex((day) => day.id === selectedDayId));
   const cameraProgress = useSharedValue(initialIndex);
   const cameraTransitionActive = useSharedValue(0);
-  useScenePerformanceProbe('today-camera', cameraTransitionActive);
   const visualIndexRef = useRef(initialIndex);
   const transitionTokenRef = useRef(0);
   const [renderedIndices, setRenderedIndices] = useState(() =>
@@ -199,6 +197,7 @@ export function useTodayNavigationController({
 
   return {
     cameraProgress,
+    cameraTransitionActive,
     goToAdjacentDay,
     navigateToDay,
     renderedIndices,

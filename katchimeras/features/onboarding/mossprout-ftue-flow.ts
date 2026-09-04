@@ -60,7 +60,7 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
   id: 'mossprout-first-session',
   // Independent from the legacy FTUE schema version. Bumping this lets v39
   // journal runs migrate onto the direct manifest without mutating a release.
-  version: 46,
+  version: 47,
   entryNodeId: 'world.egg_intro',
   metadata: {
     kind: 'ftue' as const,

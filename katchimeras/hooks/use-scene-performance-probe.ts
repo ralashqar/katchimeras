@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { createElement, useEffect, useRef } from 'react';
 import {
   runOnJS,
   useFrameCallback,
@@ -6,7 +6,8 @@ import {
   type SharedValue,
 } from 'react-native-reanimated';
 
-export const SCENE_PERF_ENABLED = __DEV__ && process.env.EXPO_PUBLIC_SCENE_PERF === '1';
+import { SCENE_PERF_ENABLED } from '@/constants/diagnostics';
+export { SCENE_PERF_ENABLED } from '@/constants/diagnostics';
 
 type SceneFrameSample = {
   droppedFrames: number;
@@ -56,7 +57,11 @@ function reportSceneFrameSample(
   console[level](`[scene-perf] ${label}`, completed);
 }
 
-export function useSceneImagePerformanceTrace(sceneKey: string, sourceKey: string) {
+type ImageTraceProps = { sceneKey: string; sourceKey: string };
+export function SceneImagePerformanceTrace(props: ImageTraceProps) {
+  return SCENE_PERF_ENABLED ? createElement(EnabledSceneImagePerformanceTrace, props) : null;
+}
+function EnabledSceneImagePerformanceTrace({ sceneKey, sourceKey }: ImageTraceProps) {
   const previousSourceRef = useRef(sourceKey);
 
   useEffect(() => {
@@ -74,17 +79,17 @@ export function useSceneImagePerformanceTrace(sceneKey: string, sourceKey: strin
       previousSourceRef.current = sourceKey;
     }
   }, [sceneKey, sourceKey]);
+  return null;
 }
 
 /**
- * Development-only UI-thread frame probe. Enable with
- * EXPO_PUBLIC_SCENE_PERF=1; production builds keep the callback inactive.
+ * Opt-in UI-thread sampling, mounted only in explicitly instrumented bundles.
  */
-export function useScenePerformanceProbe(
-  label: string,
-  transitionActive: SharedValue<number>,
-  sceneKey = label,
-) {
+type SceneProbeProps = { label: string; transitionActive: SharedValue<number>; sceneKey?: string };
+export function ScenePerformanceProbe(props: SceneProbeProps) {
+  return SCENE_PERF_ENABLED ? createElement(EnabledScenePerformanceProbe, props) : null;
+}
+function EnabledScenePerformanceProbe({ label, transitionActive, sceneKey = label }: SceneProbeProps) {
   const wasActive = useSharedValue(0);
   const startedAt = useSharedValue(0);
   const droppedFrames = useSharedValue(0);
@@ -117,4 +122,5 @@ export function useScenePerformanceProbe(
       totalFrames: totalFrames.value,
     });
   }, SCENE_PERF_ENABLED);
+  return null;
 }

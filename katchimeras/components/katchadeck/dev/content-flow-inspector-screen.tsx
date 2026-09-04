@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useIsFocused } from '@react-navigation/native';
+import { useAppForeground } from '@/hooks/use-app-foreground';
+import { DIAGNOSTICS_ENABLED } from '@/constants/diagnostics';
+import { createVisibleDiagnosticRefresh } from '@/utils/visible-diagnostic-refresh';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Stack } from 'expo-router';
 
@@ -47,17 +51,25 @@ export function ContentFlowInspectorScreen() {
   const [runs, setRuns] = useState<ContentFlowRun[]>([]);
   const [diagnostics, setDiagnostics] = useState<StoryFlowDiagnostic[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const refresh = useCallback(() => {
-    bootstrapContentFlowCatalog();
-    setDiagnostics(storyFlowDiagnostics());
-    void listContentFlowRuns().then(setRuns).catch((caught) => setError(caught instanceof Error ? caught.message : 'Could not load the flow journal.'));
-  }, []);
+  const focused = useIsFocused();
+  const foreground = useAppForeground();
+  const visible = DEV_TOOLS_ENABLED && focused && foreground;
+  const reader = useMemo(() => createVisibleDiagnosticRefresh(
+    async () => {
+      bootstrapContentFlowCatalog();
+      return { runs: await listContentFlowRuns(), diagnostics: storyFlowDiagnostics() };
+    },
+    (result) => { setRuns(result.runs); setDiagnostics(result.diagnostics); setError(null); },
+    (caught) => setError(caught instanceof Error ? caught.message : 'Could not load the flow journal.'),
+  ), []);
+  const refresh = reader.request;
   useEffect(() => {
-    refresh();
+    if (!visible) return;
+    reader.setActive(true);
     const unsubscribeJournal = subscribeContentFlowJournal(refresh);
     const unsubscribeDiagnostics = subscribeStoryFlowDiagnostics(refresh);
-    return () => { unsubscribeJournal(); unsubscribeDiagnostics(); };
-  }, [refresh]);
+    return () => { reader.setActive(false); unsubscribeJournal(); unsubscribeDiagnostics(); };
+  }, [reader, refresh, visible]);
   if (!DEV_TOOLS_ENABLED) return <View style={styles.center}><ThemedText>Content Flow Inspector is available in developer builds.</ThemedText></View>;
   return <>
     <Stack.Screen options={{ title: 'Content Flow Inspector' }} />
@@ -70,6 +82,7 @@ export function ContentFlowInspectorScreen() {
         <Pressable accessibilityRole="button" onPress={refresh} style={styles.refresh}><ThemedText style={styles.refreshLabel}>Refresh</ThemedText></Pressable>
       </View>
       {error ? <ThemedText selectable style={styles.error}>{error}</ThemedText> : null}
+      {!DIAGNOSTICS_ENABLED ? <ThemedText style={styles.detail}>Diagnostic history collection is off. Saved flow journals remain available.</ThemedText> : null}
       {runs.length ? runs.map((run) => <FlowRunCard key={run.runId} onPreview={(nodeId) => { void previewContentFlowNodeForDebug(run.runId, nodeId).catch((caught) => setError(caught instanceof Error ? caught.message : 'Could not preview node.')); }} onRetry={() => { void dispatchContentFlowCommand(run.runId, { type: 'retry' }); }} run={run} />) : <View style={styles.card}><ThemedText selectable style={styles.detail}>No flow runs have been recorded yet.</ThemedText></View>}
       <ThemedText selectable style={styles.sectionHeading}>Local variants</ThemedText>
       {registeredStoryVariantSets().map((set) => <View key={set.id} style={styles.card}>

@@ -1,3 +1,4 @@
+import { STEPPLING_TRAIL_CONVERSATIONS } from '@/constants/steppling-activities';
 import type {
   ConversationDefinition,
   ConversationOption,
@@ -921,6 +922,7 @@ function familyPack(
 
 export const companionConversationDefinitionsV2: readonly ConversationDefinition[] = [
   stepplingDayOneConversation,
+  ...STEPPLING_TRAIL_CONVERSATIONS,
   ...mossproutFtueConversationDefinitions,
   ...mossproutCampaignConversationDefinitions,
   ...mossproutStoryConversationDefinitions,

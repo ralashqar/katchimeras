@@ -89,7 +89,7 @@ export async function listContentFlowRuns(options: { activeOnly?: boolean } = {}
   });
 }
 
-async function writeRun(db: Awaited<ReturnType<typeof database>>, run: ContentFlowRun) {
+async function writeRun(db: Awaited<ReturnType<typeof database>>, run: ContentFlowRun, previous?: ContentFlowRun) {
   await db.runAsync(
     `INSERT INTO content_flow_runs (run_id, definition_id, definition_version, parent_run_id, status, node_id, phase, updated_at, run_json)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -105,6 +105,9 @@ async function writeRun(db: Awaited<ReturnType<typeof database>>, run: ContentFl
     [run.runId, run.definitionId, run.definitionVersion, run.parentRunId, run.status, run.nodeId, run.phase, run.updatedAt, JSON.stringify(run)],
   );
   for (const [effectKey, receipt] of Object.entries(run.effectReceipts)) {
+    // Receipts are immutable and already durable in the same transaction as
+    // their run. Only insert newly recorded receipts, not the entire history.
+    if (previous?.effectReceipts[effectKey]) continue;
     const marker = ':effect:';
     const markerIndex = effectKey.indexOf(marker);
     const nodeId = markerIndex < 0 ? run.nodeId : effectKey.slice(run.runId.length + 1, markerIndex);
@@ -142,6 +145,7 @@ export async function reduceContentFlowRunAtomically(input: {
   event?: ContentFlowEvent;
   reduce: (current: ContentFlowRun) => ContentFlowRun;
 }): Promise<{ run: ContentFlowRun | null; eventRecorded: boolean }> {
+  let changed = false;
   const result = await serialized(async () => {
     const db = await database();
     let output: { run: ContentFlowRun | null; eventRecorded: boolean } = { run: null, eventRecorded: false };
@@ -162,14 +166,20 @@ export async function reduceContentFlowRunAtomically(input: {
           [input.event.eventId, input.event.runId, input.event.nodeId, input.event.type, input.event.occurredAt, JSON.stringify(input.event)],
         );
       }
-      const reduced = normalizeRun(input.reduce(current));
+      const reduction = input.reduce(current);
+      if (!input.event && (reduction === current || JSON.stringify(reduction) === JSON.stringify(current))) {
+        output = { run: current, eventRecorded: false };
+        return;
+      }
+      const reduced = normalizeRun(reduction);
       const next = { ...reduced, revision: current.revision + 1 };
-      await writeRun(db, next);
+      await writeRun(db, next, current);
+      changed = true;
       output = { run: next, eventRecorded: Boolean(input.event) };
     });
     return output;
   });
-  if (result.run) listeners.forEach((listener) => listener());
+  if (changed) listeners.forEach((listener) => listener());
   return result;
 }
 

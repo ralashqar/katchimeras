@@ -1,8 +1,9 @@
+import { createElement } from 'react';
 import { runOnJS, useFrameCallback, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import { mergePerformanceSnapshot } from '@/utils/merge-world/performance';
 import { lifecycleResourceSnapshot } from '@/utils/lifecycle-performance';
 
-const MERGE_BOARD_PERF_ENABLED = process.env.EXPO_PUBLIC_MERGE_BOARD_PERF === '1';
+import { MERGE_PERF_ENABLED as MERGE_BOARD_PERF_ENABLED } from '@/constants/diagnostics';
 
 type MergeBoardFrameSample = {
   frames: number;
@@ -20,7 +21,11 @@ function reportMergeBoardFrameSample(sample: MergeBoardFrameSample) {
 }
 
 /** Opt-in UI-frame sampling for warm board gestures, spawns, and merges. */
-export function useMergeBoardFrameProbe(active: boolean, dragPhase: SharedValue<number>, effectsActivity?: SharedValue<number>) {
+type ProbeProps = { active: boolean; dragPhase: SharedValue<number>; effectsActivity?: SharedValue<number> };
+export function MergeBoardFrameProbe(props: ProbeProps) {
+  return MERGE_BOARD_PERF_ENABLED ? createElement(EnabledMergeBoardFrameProbe, props) : null;
+}
+function EnabledMergeBoardFrameProbe({ active, dragPhase, effectsActivity }: ProbeProps) {
   const wasActive = useSharedValue(0);
   const frames = useSharedValue(0);
   const slowFrames = useSharedValue(0);
@@ -84,4 +89,5 @@ export function useMergeBoardFrameProbe(active: boolean, dragPhase: SharedValue<
       slowFrames: slowFrames.value,
     });
   }, MERGE_BOARD_PERF_ENABLED);
+  return null;
 }

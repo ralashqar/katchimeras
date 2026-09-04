@@ -13,7 +13,7 @@ import {
   vec,
 } from '@shopify/react-native-skia';
 import { Fragment, memo, type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, AppState, LayoutChangeEvent, PixelRatio, Pressable, StyleSheet, Text, View, type ImageSourcePropType, type View as ViewType } from 'react-native';
+import { AccessibilityInfo, LayoutChangeEvent, PixelRatio, Pressable, StyleSheet, Text, View, type ImageSourcePropType, type View as ViewType } from 'react-native';
 import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
 import { useExitRetention } from '@/hooks/use-exit-retention';
 import { worldTileImageLod } from '@/utils/world-image-resolution';
@@ -22,6 +22,7 @@ import Animated, {
   cancelAnimation,
   Easing,
   FadeIn,
+  runOnJS,
   useAnimatedStyle,
   useDerivedValue,
   useReducedMotion,
@@ -44,7 +45,7 @@ import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import type { KingdomHexScene, KingdomTileArtLayer, KingdomTileRender } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { buildKingdomHexScene } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { buildMossproutHexNeighborhoodScene, mossproutGardenPlantSlotFrame, MOSSPROUT_GARDEN_PLANT_SLOT_IDS, type MossproutGardenSceneState } from '@/components/katchadeck/world/mossprout-hex-neighborhood-scene';
-import { SeamlessWorldImage } from '@/components/katchadeck/world/seamless-world-image';
+import { SeamlessWorldImage, worldImageSourceKey } from '@/components/katchadeck/world/seamless-world-image';
 import { CreatureAnimatedArt } from '@/components/katchadeck/world/creature-animated-art';
 import { worldEggReadyEffectsVisible, type WorldFtueSubjectPresentation } from '@/components/katchadeck/world/world-ftue-subject-presentation';
 import { runRewardArrivalMotion } from '@/components/katchadeck/ui/reward-arrival-motion';
@@ -82,10 +83,12 @@ import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
 import {
   HAVEN_UPGRADE_REDUCED_TIMING,
   HAVEN_UPGRADE_TIMING,
+  havenUpgradePhaseForPresentation,
+  type HavenUpgradePhaseState,
   type HavenTileUpgradePresentation,
   type HavenUpgradePresentationPhase,
 } from '@/utils/haven-upgrade-presentation';
-import { useScenePerformanceProbe } from '@/hooks/use-scene-performance-probe';
+import { ScenePerformanceProbe } from '@/hooks/use-scene-performance-probe';
 import {
   type KingdomHexTileLod,
   playerHavenHexTileSet,
@@ -419,35 +422,24 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     return release;
   }, []);
   const [assetRevision, setAssetRevision] = useState(0);
-  const [upgradePhase, setUpgradePhase] = useState<HavenUpgradePresentationPhase>('armed');
+  const [upgradePhaseState, setUpgradePhaseState] = useState<HavenUpgradePhaseState>({ nonce: null, phase: 'armed' });
+  const upgradePhase = havenUpgradePhaseForPresentation(upgradePhaseState, upgradePresentation?.nonce);
   const [settlingUpgrade, setSettlingUpgrade] = useState<{
     layers: HavenUpgradeLayers;
     nonce: number;
   } | null>(null);
   const [storySceneGuard, setStorySceneGuard] = useState<{ key: string; scene: KingdomHexScene } | null>(null);
   const [discoveryPhase, setDiscoveryPhase] = useState<HavenUpgradePresentationPhase>('armed');
+  const upgradeBlendRef = useRef<{ nonce: number; complete: boolean; finish: (() => void) | null } | null>(null);
+  const handleUpgradeBlendComplete = useCallback((nonce: number) => {
+    const blend = upgradeBlendRef.current;
+    if (!blend || blend.nonce !== nonce || blend.complete) return;
+    blend.complete = true;
+    blend.finish?.();
+    blend.finish = null;
+  }, []);
   const rootRef = useRef<View>(null);
   const reduceMotion = useReducedMotion();
-  const [cameraRestoreNonce, setCameraRestoreNonce] = useState(0);
-  const cameraRestoreArmedRef = useRef(false);
-  const settlingUpgradeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => () => {
-    if (settlingUpgradeTimerRef.current) clearTimeout(settlingUpgradeTimerRef.current);
-  }, []);
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'background' || nextState === 'inactive') {
-        cameraRestoreArmedRef.current = true;
-        return;
-      }
-      if (nextState !== 'active' || !cameraRestoreArmedRef.current) return;
-      cameraRestoreArmedRef.current = false;
-      setCameraRestoreNonce((current) => current + 1);
-    });
-    return () => subscription.remove();
-  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -724,7 +716,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   // The first opening directive is started inside camera initialization so
   // the first drawable frame is already moving. Mark it applied here to keep
   // the post-ready effect from restarting the same zoom.
-  const appliedTutorialCameraRef = useRef(initialTutorialFocus ? `${tutorialCameraKey}:0` : 'none');
+  const appliedTutorialCameraRef = useRef(initialTutorialFocus ? tutorialCameraKey : 'none');
   const initialInteractionFocus = useMemo(() => {
     if (!interactionResidentId) return null;
     const tile = scene.tiles.find((candidate) => (
@@ -828,7 +820,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     // cold launch. Their live transitions are owned by Content Flow and must
     // never restart from this legacy compatibility effect.
     if (tutorialCamera.kind === 'focus_target' && tutorialCamera.projectionOnly) return;
-    const applicationKey = `${tutorialCameraKey}:${cameraRestoreNonce}`;
+    const applicationKey = tutorialCameraKey;
     if (!tutorialCameraReady || appliedTutorialCameraRef.current === applicationKey) return;
     appliedTutorialCameraRef.current = applicationKey;
     const durationMs = tutorialCamera.durationMs;
@@ -881,7 +873,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       durationMs,
       zoom: tutorialCamera.zoom,
     });
-  }, [cameraRestoreNonce, fitTutorialWorld, focusTutorialResident, gardenFrame, scene.tileArtLayers, scene.tiles, sceneHomeTile, tutorialCamera, tutorialCameraKey, tutorialCameraReady, worldSubjectPresentation?.growthProgress]);
+  }, [fitTutorialWorld, focusTutorialResident, gardenFrame, scene.tileArtLayers, scene.tiles, sceneHomeTile, tutorialCamera, tutorialCameraKey, tutorialCameraReady, worldSubjectPresentation?.growthProgress]);
   const storyCameraSnapshotsRef = useRef(new Map<string, KingdomCameraSnapshot>());
   const storyTargetFrame = useCallback((target: StoryTarget) => {
     if (target.kind === 'haven_world') return { left: 0, top: 0, width: scene.width, height: scene.height };
@@ -1002,7 +994,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       interactionOriginSnapshotRef.current = null;
       return;
     }
-    const interactionFocusKey = `${interactionResidentId}:${cameraRestoreNonce}`;
+    const interactionFocusKey = interactionResidentId;
     if (!tutorialCameraReady || focusedInteractionResidentRef.current === interactionFocusKey) return;
     const tile = scene.tiles.find((candidate) => (
       candidate.kind === 'companion'
@@ -1026,7 +1018,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       onComplete: () => onResidentFocusComplete?.(interactionResidentId),
       zoom: cameraMaximumScale ?? KINGDOM_RENDERING.havenMaxScale,
     });
-  }, [cameraMaximumScale, cameraRestoreNonce, creatureWorldSize, focusTutorialResident, interactionResidentId, onResidentFocusComplete, readLiveCameraSnapshot, reduceMotion, residentInteractionScreenAnchorY, scene.tileArtLayers, scene.tiles, tutorialCameraReady]);
+  }, [cameraMaximumScale, creatureWorldSize, focusTutorialResident, interactionResidentId, onResidentFocusComplete, readLiveCameraSnapshot, reduceMotion, residentInteractionScreenAnchorY, scene.tileArtLayers, scene.tiles, tutorialCameraReady]);
   const handledInteractionExitNonceRef = useRef(0);
   useEffect(() => {
     if (!interactionResidentId || interactionExitNonce <= handledInteractionExitNonceRef.current) return;
@@ -1073,6 +1065,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const presentation = upgradePresentationRef.current;
     const layers = upgradeLayersRef.current;
     const motionReduced = reduceMotionRef.current;
+    const setUpgradePhase = (phase: HavenUpgradePresentationPhase) => {
+      setUpgradePhaseState({ nonce: presentation?.nonce ?? null, phase });
+    };
     if (!presentation) {
       setUpgradePhase('armed');
       return;
@@ -1083,6 +1078,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     }
 
     let cancelled = false;
+    const blend = { nonce: presentation.nonce, complete: !havenUpgradeLayerArtChanges(layers.fromLayer, layers.toLayer, sceneTileImageLod), finish: null as (() => void) | null };
+    upgradeBlendRef.current = blend;
     const timers: ReturnType<typeof setTimeout>[] = [];
     const schedule = (callback: () => void, delay: number) => {
       timers.push(setTimeout(() => {
@@ -1090,11 +1087,17 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       }, delay));
     };
     const finish = () => {
+      if (!blend.complete) {
+        blend.finish = finish;
+        return;
+      }
       setUpgradePhase('complete');
       // The parent commits the new scene and clears the presentation in the
       // same turn. Retain this already-visible top layer until the persistent
       // tile beneath it confirms that its new source has loaded and faded in.
-      setSettlingUpgrade({ layers, nonce: presentation.nonce });
+      if (havenUpgradeLayerArtChanges(layers.fromLayer, layers.toLayer, sceneTileImageLod)) {
+        setSettlingUpgrade({ layers, nonce: presentation.nonce });
+      }
       void AccessibilityInfo.announceForAccessibility(
         `${presentation.creatureName}'s ${presentation.upgradeName} restored`,
       );
@@ -1127,25 +1130,14 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     else upgradeFocusRef.current(layers.tile.cx, layers.tile.cy, motionReduced, afterFocus);
     return () => {
       cancelled = true;
+      if (upgradeBlendRef.current === blend) upgradeBlendRef.current = null;
       timers.forEach(clearTimeout);
     };
-  }, [upgradePresentation?.nonce, upgradePresentation?.status]);
+  }, [sceneTileImageLod, upgradePresentation?.nonce, upgradePresentation?.status]);
 
   const finishSettlingUpgrade = useCallback((nonce: number) => {
-    if (settlingUpgradeTimerRef.current) clearTimeout(settlingUpgradeTimerRef.current);
-    settlingUpgradeTimerRef.current = setTimeout(() => {
-      settlingUpgradeTimerRef.current = null;
-      setSettlingUpgrade((current) => current?.nonce === nonce ? null : current);
-    }, KINGDOM_RENDERING.imageCrossfadeMs + 34);
+    setSettlingUpgrade((current) => current?.nonce === nonce ? null : current);
   }, []);
-
-  useEffect(() => {
-    if (!settlingUpgrade) return;
-    // A changed overlay can disappear rather than load a replacement source.
-    // Keep a bounded fallback so that case cannot retain an inert layer.
-    const timer = setTimeout(() => finishSettlingUpgrade(settlingUpgrade.nonce), 1_000);
-    return () => clearTimeout(timer);
-  }, [finishSettlingUpgrade, settlingUpgrade]);
 
   const cameraSnapshot = camera.snapshot;
   const upgradeEffectGeometry = useMemo(() => {
@@ -1214,7 +1206,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   useEffect(() => {
     cameraTransitionActive.value = camera.isMoving ? 1 : 0;
   }, [camera.isMoving, cameraTransitionActive]);
-  useScenePerformanceProbe('kingdom-camera', cameraTransitionActive, 'kingdom');
   const artLayerById = useMemo(
     () => {
       const layers = new Map(scene.tileArtLayers.map((layer) => [layer.id, layer]));
@@ -1376,6 +1367,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
 
   return (
     <View collapsable={false} ref={rootRef} style={styles.root} onLayout={onLayout}>
+      <ScenePerformanceProbe label="kingdom-camera" transitionActive={cameraTransitionActive} sceneKey="kingdom" />
       <Image
         cachePolicy="disk"
         contentFit="cover"
@@ -1427,9 +1419,14 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 : settlingOwnsLayer
                   ? settlingUpgrade?.layers ?? null
                   : null;
+              const discoveryOwnsLayer = Boolean(discoveryLayers && layer.id === discoveryLayers.tile.id && discoveryPhase !== 'complete');
+              // Retain the base image for decode/readiness handoff, but only
+              // the transition may draw it: an opaque copy underneath prevents
+              // the wider mist silhouette from fading out until the final swap.
               return (
                 <Fragment key={`tile-stack-${layer.id}`}>
                   <KingdomTileArt
+                    hidden={upgradeOwnsLayer || settlingOwnsLayer || discoveryOwnsLayer}
                     focusAnchorX={scene.tileById.get(layer.id)?.cx ?? layer.frame.left + layer.frame.width / 2}
                     focusAnchorY={scene.tileById.get(layer.id)?.cy ?? layer.frame.top + layer.frame.height / 2}
                     focusScale={tileFocusScale(layer.id)}
@@ -1437,15 +1434,20 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                     source={source}
                     overlaySource={overlaySource}
                     fallbackSource={fallbackSource}
-                    onReady={settlingOwnsLayer && settlingUpgrade
+                    onSettled={settlingOwnsLayer && settlingUpgrade
+                      && !havenUpgradeLayerArtChanges(layer, settlingUpgrade.layers.toLayer, sceneTileImageLod)
                       ? () => finishSettlingUpgrade(settlingUpgrade.nonce)
                       : undefined}
                     priority={layer.id === scene.centerTile.id || layer.id === 'structure:mossprout-hex-garden' ? 'high' : 'normal'}
                   />
                   {transitionLayers ? (
                     <HavenUpgradeTileArt
+                      key={`upgrade:${upgradeOwnsLayer ? upgradePresentation?.nonce : settlingUpgrade?.nonce}`}
                       fromLayer={transitionLayers.fromLayer}
                       imageLod={sceneTileImageLod}
+                      onRevealComplete={upgradeOwnsLayer && upgradePresentation
+                        ? () => handleUpgradeBlendComplete(upgradePresentation.nonce)
+                        : undefined}
                       phase={upgradeOwnsLayer ? upgradePhase : 'complete'}
                       reducedMotion={reduceMotion}
                       toLayer={transitionLayers.toLayer}
@@ -1606,6 +1608,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       ) : null}
       {upgradePresentation && upgradeEffectGeometry && upgradeLayers ? (
         <HavenUpgradeEffects
+          key={`upgrade-effects:${upgradePresentation.nonce}`}
           area={upgradeEffectGeometry.area}
           phase={upgradePhase}
           presentation={upgradePresentation}
@@ -1689,6 +1692,7 @@ const TileFocusTransform = memo(function TileFocusTransform({
 });
 
 type TileArtProps = {
+  hidden?: boolean;
   fallbackSource: ImageSourcePropType | null;
   focusAnchorX: number;
   focusAnchorY: number;
@@ -1697,10 +1701,11 @@ type TileArtProps = {
   priority: 'low' | 'normal' | 'high';
   source: ImageSourcePropType;
   overlaySource: ImageSourcePropType | null;
-  onReady?: () => void;
+  onSettled?: () => void;
 };
 
 const KingdomTileArt = memo(function KingdomTileArt({
+  hidden = false,
   fallbackSource,
   focusAnchorX,
   focusAnchorY,
@@ -1709,22 +1714,31 @@ const KingdomTileArt = memo(function KingdomTileArt({
   priority,
   source,
   overlaySource,
-  onReady,
+  onSettled,
 }: TileArtProps) {
+  const sourceKey = worldImageSourceKey(source);
+  const overlayKey = overlaySource ? worldImageSourceKey(overlaySource) : null;
+  const [settledSource, setSettledSource] = useState<string | null>(null);
+  const [settledOverlay, setSettledOverlay] = useState<string | null>(null);
+  const handleSourceSettled = useCallback(() => setSettledSource(sourceKey), [sourceKey]);
+  const handleOverlaySettled = useCallback(() => setSettledOverlay(overlayKey), [overlayKey]);
+  useEffect(() => {
+    if (settledSource === sourceKey && (!overlayKey || settledOverlay === overlayKey)) onSettled?.();
+  }, [onSettled, overlayKey, settledOverlay, settledSource, sourceKey]);
   return (
     <TileFocusTransform anchorX={focusAnchorX} anchorY={focusAnchorY} frame={frame} scale={focusScale}>
-      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, hidden && { opacity: 0 }]}>
         <SeamlessWorldImage
           allowDownscaling
           source={source}
           fallbackSource={fallbackSource}
-          onReady={onReady}
+          onSettled={handleSourceSettled}
           priority={priority}
         />
         {overlaySource ? (
           <SeamlessWorldImage
             allowDownscaling
-            onReady={onReady}
+            onSettled={handleOverlaySettled}
             source={overlaySource}
             priority={priority}
           />
@@ -1737,49 +1751,64 @@ const KingdomTileArt = memo(function KingdomTileArt({
 const HavenUpgradeTileArt = memo(function HavenUpgradeTileArt({
   fromLayer,
   imageLod,
+  onRevealComplete,
   phase,
   reducedMotion,
   toLayer,
 }: {
   fromLayer: KingdomTileArtLayer;
   imageLod: KingdomHexTileLod;
+  onRevealComplete?: () => void;
   phase: HavenUpgradePresentationPhase;
   reducedMotion: boolean;
   toLayer: KingdomTileArtLayer;
 }) {
   const revealActive = phase === 'reveal' || phase === 'react' || phase === 'complete';
-  // A presentation can be reconstructed while its persisted world commit is
-  // publishing. Initialize from the current phase so a remount after reveal
-  // can never flash the old art, then only ever move this value forward.
-  const revealProgress = useSharedValue(revealActive ? 1 : 0);
-
-  useEffect(() => {
-    if (!revealActive) return;
-    revealProgress.value = withTiming(1, {
-      duration: reducedMotion ? 180 : 480,
-      easing: Easing.inOut(Easing.cubic),
-    });
-  }, [reducedMotion, revealActive, revealProgress]);
-
-  const oldStyle = useAnimatedStyle(() => ({ opacity: 1 - revealProgress.value }));
-  const newStyle = useAnimatedStyle(() => ({ opacity: revealProgress.value }));
   const oldSource = kingdomHexTileSourceForLod(fromLayer, imageLod);
   const newSource = kingdomHexTileSourceForLod(toLayer, imageLod);
   const oldOverlaySource = kingdomHexTileOverlaySourceForLod(fromLayer, imageLod);
   const newOverlaySource = kingdomHexTileOverlaySourceForLod(toLayer, imageLod);
+  const sourceKey = worldImageSourceKey(newSource);
+  const overlayKey = newOverlaySource ? worldImageSourceKey(newOverlaySource) : null;
+  const [readySource, setReadySource] = useState<string | null>(null);
+  const [readyOverlay, setReadyOverlay] = useState<string | null>(null);
+  const handleSourceReady = useCallback(() => setReadySource(sourceKey), [sourceKey]);
+  const handleOverlayReady = useCallback(() => setReadyOverlay(overlayKey), [overlayKey]);
+  const targetReady = readySource === sourceKey && (!overlayKey || readyOverlay === overlayKey);
+  const onRevealCompleteRef = useRef(onRevealComplete);
+  onRevealCompleteRef.current = onRevealComplete;
+  const finishReveal = useCallback(() => onRevealCompleteRef.current?.(), []);
+  // Starting the reveal is not proof that its terminal frame was drawn.
+  // Late-mounted reveal/react layers must still blend from the old tile.
+  // Only the completed handoff may begin with the restored art fully visible.
+  const revealProgress = useSharedValue(phase === 'complete' ? 1 : 0);
+
+  useEffect(() => {
+    if (!revealActive || !targetReady) return;
+    revealProgress.value = withTiming(1, {
+      duration: reducedMotion ? 180 : 480,
+      easing: Easing.inOut(Easing.cubic),
+    }, (finished) => {
+      if (finished) runOnJS(finishReveal)();
+    });
+    return () => cancelAnimation(revealProgress);
+  }, [finishReveal, reducedMotion, revealActive, revealProgress, targetReady]);
+
+  const oldStyle = useAnimatedStyle(() => ({ opacity: 1 - revealProgress.value }));
+  const newStyle = useAnimatedStyle(() => ({ opacity: revealProgress.value }));
   const artChanges = havenUpgradeLayerArtChanges(fromLayer, toLayer, imageLod);
 
   if (!artChanges) return null;
 
   return (
     <>
-      <Animated.View pointerEvents="none" style={[styles.tileArt, fromLayer.frame, oldStyle]}>
-        <SeamlessWorldImage priority="high" source={oldSource} />
-        {oldOverlaySource ? <SeamlessWorldImage priority="high" source={oldOverlaySource} /> : null}
+      <Animated.View collapsable={false} needsOffscreenAlphaCompositing pointerEvents="none" style={[styles.tileArt, fromLayer.frame, oldStyle]}>
+        <SeamlessWorldImage priority="high" source={oldSource} transitionDuration={0} />
+        {oldOverlaySource ? <SeamlessWorldImage priority="high" source={oldOverlaySource} transitionDuration={0} /> : null}
       </Animated.View>
-      <Animated.View pointerEvents="none" style={[styles.tileArt, toLayer.frame, newStyle]}>
-        <SeamlessWorldImage priority="high" source={newSource} />
-        {newOverlaySource ? <SeamlessWorldImage priority="high" source={newOverlaySource} /> : null}
+      <Animated.View collapsable={false} needsOffscreenAlphaCompositing pointerEvents="none" style={[styles.tileArt, toLayer.frame, newStyle]}>
+        <SeamlessWorldImage priority="high" source={newSource} transitionDuration={0} onSettled={handleSourceReady} />
+        {newOverlaySource ? <SeamlessWorldImage priority="high" source={newOverlaySource} transitionDuration={0} onSettled={handleOverlayReady} /> : null}
       </Animated.View>
     </>
   );

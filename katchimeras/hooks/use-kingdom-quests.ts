@@ -1,3 +1,4 @@
+import { legacyMossproutPondConversation } from '@/constants/mossprout-campaign-conversations';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -155,6 +156,10 @@ import {
 } from '@/utils/companion-conversation';
 import { reconcileConversationJournalSignals } from '@/utils/companion-conversation-signals';
 import { loadCompanionContentState, saveCompanionContentState, subscribeCompanionContentResets } from '@/utils/companion-content-storage';
+import { resolveMossproutFtueConversation } from '@/constants/mossprout-ftue-conversations';
+import { legacyStepplingDayOneConversation } from '@/constants/steppling-day-one-conversation';
+import { recordLifeConversation } from '@/utils/companion-life-recording';
+import { loadOnboardingProfile as loadLifeOnboardingProfile } from '@/utils/onboarding-state';
 import { loadCompanionJourneyState, saveCompanionJourneyState } from '@/utils/companion-journey-storage';
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import type { KingdomResident } from '@/utils/kingdom-residents';
@@ -254,15 +259,16 @@ function settleMossproutJourneyBond(dayId: string) {
   if (result.awarded) saveCompanionBondState(result.state);
 }
 
-function settleMossproutConversationCompletion(
+function settleActionConversationCompletion(
   session: ConversationSession,
   definition: ConversationDefinition | null | undefined,
 ) {
-  if (!definition || definition.familyId !== 'mossprout') return;
+  if (!definition || (definition.familyId !== 'mossprout' && !session.actionOrigin)) return;
   commitKatchimeraActionCompletion({ session, definition });
 }
 
 function conversationHasIndependentBond(definitionId: string, dayId?: string | null) {
+  if (definitionId.startsWith('steppling:trail-chat:')) return false;
   if (!definitionId.startsWith('mossprout:') || !dayId) return true;
   const relationships = relationshipProgressionRepository.load();
   const runtimeDayId = mossproutJourneyRuntimeDayId(relationships, dayId, isJourneyQuickModeEnabled());
@@ -997,19 +1003,24 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   const selectedConversationDefinition = useMemo(() => {
     if (!selectedConversationSession) return null;
     const definition = companionConversationDefinitionById.get(selectedConversationSession.definitionId) ?? null;
+    if (definition?.id === 'steppling:journey:day-one' && selectedConversationSession.definitionVersion < 2) return legacyStepplingDayOneConversation;
     if (!definition || definition.familyId !== 'mossprout') return definition;
+    if (definition.id.startsWith('mossprout:ftue:first-meeting:')) return resolveMossproutFtueConversation(definition, loadLifeOnboardingProfile().mossproutAnswers.growthIntentId, selectedConversationSession.definitionVersion);
     return resolveMossproutCampaignConversation(
-      definition,
+      selectedConversationSession.definitionVersion < 5 ? legacyMossproutPondConversation(definition.id) ?? definition : definition,
       relationshipProgressionRepository.load().stories.mossprout,
       selectedConversationSession.turns,
     );
   }, [selectedConversationSession]);
   useEffect(() => {
+    if (selectedConversationSession && selectedConversationDefinition) recordLifeConversation(selectedConversationSession, selectedConversationDefinition);
+  }, [selectedConversationSession, selectedConversationDefinition]);
+  useEffect(() => {
     if (!selectedConversationSession || selectedConversationSession.preview || selectedConversationSession.status !== 'completed') return;
     const completedAt = selectedConversationSession.completedAt ?? selectedConversationSession.updatedAt;
     const match = /^feastle:friendship:(\d+)$/.exec(selectedConversationSession.definitionId);
     if (match) completeFeastleConversation(Number(match[1]), completedAt);
-    settleMossproutConversationCompletion(selectedConversationSession, selectedConversationDefinition);
+    settleActionConversationCompletion(selectedConversationSession, selectedConversationDefinition);
     const authoredMatch = /^(baristabbit|steppling|voyagle|flexel|bedrotte):story:(\d+)$/.exec(selectedConversationSession.definitionId);
     if (authoredMatch && isAuthoredCohortFamily(authoredMatch[1])) completeAuthoredCohortConversation(authoredMatch[1], Number(authoredMatch[2]), completedAt);
   }, [selectedConversationDefinition, selectedConversationSession]);
@@ -2056,7 +2067,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       // immediately after this callback. Publish the durable action receipt
       // before navigation can unmount this hook; the effect below is recovery,
       // not the owner of the normal completion handoff.
-      settleMossproutConversationCompletion(nextSession, selectedConversationDefinition);
+      settleActionConversationCompletion(nextSession, selectedConversationDefinition);
     }
     let enteredNode = selectedConversationDefinition.nodes.find((node) => node.id === nextSession.currentNodeId);
     if (enteredNode?.kind === 'quest_handoff' && !nextSession.preview) {
@@ -2346,7 +2357,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         destinationLabel: isFormInsight ? 'See all my insights' : 'See what you remember',
       }, occurredAt);
     }
-    settleMossproutConversationCompletion(outcomeSession, selectedConversationDefinition);
+    settleActionConversationCompletion(outcomeSession, selectedConversationDefinition);
     setCompanionContentState((current) => {
       let next = current;
       if (!selectedConversationSession.preview) next = recordConversationTelemetry(next, {
@@ -2489,7 +2500,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         ...(!displayOnly ? { destination: 'insight' as const, destinationLabel: 'See all my insights' } : {}),
       }, occurredAt);
     }
-    settleMossproutConversationCompletion(outcomeSession, selectedConversationDefinition);
+    settleActionConversationCompletion(outcomeSession, selectedConversationDefinition);
     setCompanionContentState((current) => {
       let next = current;
       if (accept && !displayOnly && !selectedConversationSession.preview) next = upsertCompanionInsight(next, {
@@ -2655,7 +2666,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         celebrate: false,
       }, occurredAt);
     }
-    settleMossproutConversationCompletion(outcomeSession, selectedConversationDefinition);
+    settleActionConversationCompletion(outcomeSession, selectedConversationDefinition);
     setCompanionContentState((current) => {
       let next = selectedConversationSession.preview ? current : recordConversationTelemetry(current, {
         id: `${selectedConversationSession.id}:${node.id}:proposed`,
@@ -2697,7 +2708,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       occurredAt
     );
     outcomeSession = continueConversation(outcomeSession, selectedConversationDefinition, occurredAt);
-    if (accept) {
+    if (accept && !node.storyDaily) {
       outcomeSession = withConversationOutcome(outcomeSession, {
         kind: 'task',
         eyebrow: selectedConversationSession.preview
@@ -2714,7 +2725,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         destinationLabel: 'View all goals',
       }, occurredAt);
     }
-    settleMossproutConversationCompletion(outcomeSession, selectedConversationDefinition);
+    settleActionConversationCompletion(outcomeSession, selectedConversationDefinition);
     setCompanionContentState((current) => {
       const next = upsertConversationSession(current, outcomeSession);
       saveCompanionContentState(next);
@@ -2767,7 +2778,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     ) {
       nextSession = continueConversation(nextSession, selectedConversationDefinition, occurredAt);
     }
-    settleMossproutConversationCompletion(nextSession, selectedConversationDefinition);
+    settleActionConversationCompletion(nextSession, selectedConversationDefinition);
     setCompanionContentState((current) => {
       let next = current;
       if (!selectedConversationSession.preview) next = recordConversationTelemetry(next, {
@@ -2842,7 +2853,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         destinationLabel: 'View this quest',
       }, occurredAt);
     }
-    settleMossproutConversationCompletion(outcomeSession, selectedConversationDefinition);
+    settleActionConversationCompletion(outcomeSession, selectedConversationDefinition);
     setCompanionContentState((current) => {
       const next = upsertConversationSession(current, outcomeSession);
       saveCompanionContentState(next);
@@ -2874,7 +2885,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     if (selectedConversationDefinition) {
       // Publish completion before the focused conversation route returns. A
       // post-render effect is too late when the route immediately unmounts.
-      settleMossproutConversationCompletion(dismissedSelectedSession, selectedConversationDefinition);
+      settleActionConversationCompletion(dismissedSelectedSession, selectedConversationDefinition);
     }
     const authoredMatch = selectedConversationDefinition?.id.match(/^(baristabbit|steppling|voyagle|flexel|bedrotte):story:(\d+)$/);
     if (authoredMatch && isAuthoredCohortFamily(authoredMatch[1])) completeAuthoredCohortConversation(authoredMatch[1], Number(authoredMatch[2]));

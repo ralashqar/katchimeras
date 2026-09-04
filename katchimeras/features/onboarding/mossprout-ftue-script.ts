@@ -1,3 +1,4 @@
+import { LIFE_HABITS } from '@/constants/companion-life-content';
 import { TODAY_GROWTH_REWARDS } from '@/utils/today-growth';
 import { MOSSPROUT_FIRST_MEMORY_SLOT_ID } from '@/utils/mossprout-garden-layout';
 
@@ -142,21 +143,21 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 44,
+  version: 45,
   entryStepId: 'world.egg_intro',
   terminalStepId: 'complete',
   steps: [
     {
       id: 'world.egg_intro', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
       guide: { eyebrow: 'Meet Mossprout', title: COPY.opening, body: '' },
-      actions: [{ id: 'world.inspect_mossprout_egg', title: 'Continue', description: 'Move closer and see how the Egg responds.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'egg.opening' }],
+      actions: [{ id: 'world.inspect_mossprout_egg', title: 'Say hello', description: 'Move closer and see how the Egg responds.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'egg.opening' }],
       camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: MOSSPROUT_WORLD_EGG_CLOSE_ZOOM, anchorY: 0.5, durationMs: 3_900 },
     },
     ...openingQuestionSteps,
     {
       id: 'egg.ready', surface: 'haven',
       guide: { eyebrow: 'Meet Mossprout', title: 'Someone’s waking up.', body: '' },
-      actions: [{ id: 'egg.hatch', title: 'Hatch', description: 'Meet the Katchimera inside.', icon: 'sparkles', presentation: 'cta_action', handlerId: 'discovery_hatch', nextStepId: 'companion.first_meeting', backendEvent: true }],
+      actions: [{ id: 'egg.hatch', title: 'Meet your Katchimera', description: 'Meet the Katchimera inside.', icon: 'sparkles', presentation: 'cta_action', handlerId: 'discovery_hatch', nextStepId: 'companion.first_meeting', backendEvent: true }],
       blockingBeat: 'mossprout_intro',
       camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('egg.ready'), anchorY: 0.5, durationMs: 520 },
     },
@@ -184,7 +185,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       camera: mossproutWorldDialogueCamera,
       guide: { eyebrow: 'Grow together', title: COPY.seedOrigin, body: COPY.bond },
       actions: [
-        { id: 'companion.continue_to_planting', title: 'Continue', description: 'Find a place for your Seed.', icon: 'arrow.right', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'world.garden_arrival', backendEvent: true },
+        { id: 'companion.continue_to_planting', title: 'Plant our Seed', description: 'Find a place for your Seed.', icon: 'arrow.right', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'world.garden_arrival', backendEvent: true },
         // Receipt lookup for older saves; never shown as a second control.
         { id: 'companion.acknowledge_garden_intro', title: 'Continue', description: '', icon: 'arrow.right', presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'world.garden_arrival', backendEvent: true },
       ],
@@ -555,11 +556,11 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'companion.water_together', surface: 'companion', navigation: mossproutCompanionResume,
       camera: mossproutWorldDialogueCamera,
-      guide: { eyebrow: 'Keep growing · optional', title: 'Water Together', body: COPY.waterQuestion },
+      guide: { eyebrow: 'Keep growing · optional', title: 'A little moment for you', body: COPY.waterQuestion },
       actions: [{
-        id: 'companion.choose_water_together', title: 'How are you doing on water?', description: 'Any answer is okay.', icon: 'drop.fill',
-        presentation: 'inline_choice', handlerId: 'player_profile', nextStepId: 'companion.first_rest',
-        options: MOSSPROUT_WATER_OPTIONS,
+        id: 'companion.choose_water_together', title: 'Choose a daily habit', description: 'Appears each day. You can skip, change, or pause it.', icon: 'drop.fill',
+        presentation: 'observed_game_action', handlerId: 'player_profile', nextStepId: 'companion.first_rest',
+        options: [...MOSSPROUT_WATER_OPTIONS, ...LIFE_HABITS.filter((habit) => habit.familyId === 'mossprout').map((habit) => ({ id: `habit:${habit.id}`, label: habit.title, icon: 'leaf.fill' as const })), { id: 'habit:declined', label: 'Not now', icon: 'arrow.right' }],
       }],
     },
     {

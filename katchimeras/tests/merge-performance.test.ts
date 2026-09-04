@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import './helpers/enable-diagnostics';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { createMergeSaveDeadline } from '@/utils/merge-world/save-deadline';
@@ -12,6 +13,36 @@ import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding'
 import { acquireLifecycleResource, foregroundLifecycleViolations, resetLifecycleResourcesForTests } from '@/utils/lifecycle-performance';
 import { canReuseSpawnSprites, createMergeBoardEffects, MERGE_EFFECT_SLOT_IDS, mergeEffectRetentionMs } from '@/utils/merge-world/board-effects';
 import { reduceMergeWorld } from '@/utils/merge-world/engine';
+import { rewardTokenClock, rewardTokenTiming } from '@/utils/merge-world/reward-flight';
+
+test('reward batch timeline preserves stagger and freezes each coin at its endpoint', () => {
+  for (const reduced of [false, true]) {
+    for (const energy of [false, true]) {
+      for (let index = 0; index < 5; index++) {
+        const timing = rewardTokenTiming(index, reduced, energy);
+        assert.equal(timing.arrivalMs, (reduced ? 400 : 670) + index * (reduced ? 25 : 65) + (energy ? 28 : 0));
+        assert.equal(rewardTokenClock(-1, timing.arrivalMs), 0);
+        assert.equal(rewardTokenClock(timing.arrivalMs - 1, timing.arrivalMs), timing.arrivalMs - 1);
+        for (let elapsed = timing.arrivalMs; elapsed < timing.arrivalMs + 500; elapsed += 16) {
+          assert.equal(rewardTokenClock(elapsed, timing.arrivalMs), timing.arrivalMs);
+        }
+      }
+    }
+  }
+});
+
+test('coin contacts update only the HUD and no longer start per-token hover loops', () => {
+  const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
+  const arrival = screen.slice(screen.indexOf('const handleCoinArrive'), screen.indexOf('const handleEnergyArrive'));
+  assert.doesNotMatch(arrival, /setCoinPulseNonce|setPresentedCoins|setCoinValueAnimationDurationMs/);
+  assert.match(arrival, /coinPresentation.publish/);
+  assert.match(arrival, /Haptics.impactAsync/);
+  const overlay = readFileSync('components/katchadeck/games/merge-serve-reward-overlay.tsx', 'utf8');
+  assert.doesNotMatch(overlay, /withRepeat/);
+  assert.match(overlay, /if \(!arrived \|\| notified.value\) return/);
+  assert.match(overlay, /cancelAnimation\(elapsed\)/);
+  assert.match(overlay, /cancelAnimation\(landed\)/);
+});
 
 test('burst pool preserves unchanged effects and notifies only its subscribers', () => {
   const pool = createMergeBoardEffects();
@@ -30,6 +61,55 @@ test('burst pool preserves unchanged effects and notifies only its subscribers',
   unsubscribe();
   pool.clear();
   assert.equal(updates, 3);
+});
+
+test('rapid spawns share one origin burst without restarting it or notifying subscribers', () => {
+  const pool = createMergeBoardEffects();
+  let notifications = 0;
+  pool.subscribe(() => notifications++);
+  const first = pool.emit(3, 'spawn-origin');
+  const snapshot = pool.getSnapshot();
+  for (let tap = 0; tap < 20; tap++) assert.equal(pool.emit(3, 'spawn-origin'), first);
+  assert.equal(pool.getSnapshot(), snapshot);
+  assert.equal(notifications, 1);
+  const other = pool.emit(4, 'spawn-origin');
+  assert.notEqual(other, first);
+  const landing = pool.emit(3, 'spawn-settle');
+  assert.notEqual(landing, first);
+  pool.retire(first.id);
+  assert.notEqual(pool.emit(3, 'spawn-origin'), first);
+  assert.equal(pool.getSnapshot().includes(landing), true);
+});
+
+test('landing particles use an idle clock while glow and ring keep their animation', () => {
+  const source = readFileSync('components/katchadeck/games/merge-spawn-effects-layer.tsx', 'utf8');
+  assert.match(source, /effect.kind === 'spawn-settle' \|\| reduceMotion \? idleParticleProgress : progress/);
+  assert.match(source, /<MergeEffectParticle[\s\S]*?progress=\{particleProgress\}/);
+  assert.match(source, /<MergeEffectGlow[^\n]*progress=\{progress\}/);
+  assert.match(source, /<MergeEffectRing[^\n]*progress=\{progress\}/);
+});
+
+test('shared authored frames preserve every spawn and merge phase including terminal ghosts', () => {
+  const source = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
+  const body = source.match(/const authoredFrame = useDerivedValue\(\(\) => \{([\s\S]*?)\n  \},/);
+  assert.ok(body);
+  const sample = new Function('animating', 'activeMotionKind', 'progress', 'reduceMotion', 'spawnSpriteMotionFrame', 'mergeSpriteMotionFrame', body[1]);
+  for (const reduced of [false, true]) {
+    for (let step = 0; step <= 100; step++) {
+      const p = step / 100;
+      for (const kind of ['spawn', 'merge-source', 'merge-target', 'merge-result'] as const) {
+        const frame = sample({ value: 1 }, { value: kind }, { value: p }, reduced, spawnSpriteMotionFrame, mergeSpriteMotionFrame);
+        const expected = kind === 'spawn' ? spawnSpriteMotionFrame(p, reduced)
+          : { ...mergeSpriteMotionFrame(kind, p, reduced), travel: p, arc: 0, settleY: 0 };
+        assert.deepEqual(frame, expected);
+      }
+    }
+  }
+  assert.equal(sample({ value: 0 }, { value: 'spawn' }, { value: 0.5 }, false, spawnSpriteMotionFrame, mergeSpriteMotionFrame), null);
+  const styles = source.slice(source.indexOf('const visualScale = useDerivedValue'), source.indexOf('function PersistentGeneratorArt'));
+  assert.doesNotMatch(styles, /spawnSpriteMotionFrame\(|mergeSpriteMotionFrame\(/);
+  assert.match(source, /useState\(\(\) => \(\{ ids: occupancyIdsFromState\(state\)/);
+  assert.match(source, /\[initialSpriteDelays\] = useState\(\(\) => new Map/);
 });
 
 test('slot reuse cancels ownership of old effects even when earlier slots have expired', () => {
@@ -104,7 +184,7 @@ test('spawn effects have a local subscription and timers, while landing receipts
   assert.match(board, /if \(!canReuseSpawnSprites[\s\S]*?const canonicalSprites = spritesFromState/);
   assert.match(board, /sprites: reconciledSprites,[\s\S]*?onCommandSettledRef.current\?\.\(/);
   assert.match(board, /!operation.remaining.has\(instanceId\)/);
-  assert.match(board, /useMergeBoardFrameProbe\(busy, dragPhase, effectsActivity\)/);
+  assert.match(board, /<MergeBoardFrameProbe active=\{busy\} dragPhase=\{dragPhase\} effectsActivity=\{effectsActivity\}/);
 });
 
 test('retained snapshots are distinct from active scene work across repeated switches', () => {
@@ -252,6 +332,52 @@ test('settled image tiers include density and sharpness headroom', () => {
   assert.equal(worldTileImageLod(100, 1, 2), 'thumb');
   assert.equal(worldTileImageLod(200, 1, 2), 'medium');
   assert.equal(worldTileImageLod(200, 1.25, 3), 'full');
+});
+
+test('drag coordinates are filtered before stationary sprite style work', () => {
+  const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
+  const selector = board.match(/const dragPosition = useDerivedValue\(\(\) => \{([\s\S]*?)\n  \},/);
+  assert.ok(selector);
+  const activeDragId = { value: 'moving' };
+  const dragPhase = { value: 1 };
+  const grabX = { value: 20 }, grabY = { value: 30 };
+  const dragTranslationX = { value: 0 }, dragTranslationY = { value: 0 };
+  const read = new Function('instanceId', 'activeDragId', 'dragPhase', 'grabX', 'grabY', 'dragTranslationX', 'dragTranslationY', selector[1]);
+  const position = (id: string) => read(id, activeDragId, dragPhase, grabX, grabY, dragTranslationX, dragTranslationY);
+  for (let frame = 0; frame < 60; frame++) {
+    dragTranslationX.value = frame;
+    dragTranslationY.value = -frame;
+    assert.equal(position('stationary'), null);
+    assert.deepEqual(position('moving'), { x: 20 + frame, y: 30 - frame });
+  }
+  dragPhase.value = 2;
+  assert.deepEqual(position('moving'), { x: 79, y: -29 });
+  dragPhase.value = 0;
+  assert.equal(position('moving'), null);
+  const style = board.slice(board.indexOf('const animatedStyle = useAnimatedStyle', selector.index), board.indexOf('return <Animated.View pointerEvents="none"', selector.index));
+  assert.doesNotMatch(style, /activeDragId|dragTranslationX|dragTranslationY|grabX|grabY|dragPhase/);
+});
+
+test('occupancy echoes are deduplicated but rejected drops still repair optimistic maps', () => {
+  const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
+  assert.match(board, /if \(!force && occupancyBoardRef.current === nextState.board\) return/);
+  assert.match(board, /syncOccupancy\(state\)/);
+  assert.match(board, /syncOccupancy\(nextState, true\)/);
+  assert.equal((board.match(/occupancyIdsFromState\(nextState\)/g) ?? []).length, 1);
+});
+
+test('pooled bursts retain their glow without per-particle shadow blur or frame trigonometry', () => {
+  const effects = readFileSync('components/katchadeck/games/merge-spawn-effects-layer.tsx', 'utf8');
+  assert.match(effects, /source=\{SOFT_GLOW\}/);
+  assert.doesNotMatch(effects, /boxShadow:/);
+  const particle = effects.slice(effects.indexOf('const MergeEffectParticle'));
+  const frame = particle.slice(particle.indexOf('const style = useAnimatedStyle'), particle.indexOf('return <Animated.View'));
+  assert.doesNotMatch(frame, /Math\.(cos|sin)/);
+  const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
+  assert.doesNotMatch(board, /mistParticle:.*boxShadow/);
+  const mist = board.slice(board.indexOf('function DreamMistParticle'), board.indexOf('function HoverCellOverlay'));
+  assert.doesNotMatch(mist.slice(mist.indexOf('const style = useAnimatedStyle')), /Math\.(cos|sin)/);
+  assert.match(board, /source=\{DREAM_MIST_LOWER\}/);
 });
 
 test('native integration retains ghost images and lifecycle flush paths', () => {

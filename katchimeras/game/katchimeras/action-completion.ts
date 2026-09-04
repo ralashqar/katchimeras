@@ -31,7 +31,7 @@ export type KatchimeraActionCompletionCommit = {
 };
 
 /**
- * The single Mossprout action completion boundary. It is intentionally safe to
+ * The shared action-card conversation completion boundary. It is intentionally safe to
  * call from the direct handler and again from the mounted recovery effect.
  */
 export function commitKatchimeraActionCompletion(input: {
@@ -39,7 +39,7 @@ export function commitKatchimeraActionCompletion(input: {
   definition: ConversationDefinition;
 }): KatchimeraActionCompletionCommit {
   const { definition, session } = input;
-  if (session.preview || session.status !== 'completed' || session.familyId !== 'mossprout') {
+  if (session.preview || session.status !== 'completed' || (session.familyId !== 'mossprout' && (!session.actionOrigin || session.actionOrigin.familyId !== session.familyId))) {
     return { completion: null, rewardReceipt: null };
   }
   const completedAt = session.completedAt ?? session.updatedAt;
@@ -48,7 +48,7 @@ export function commitKatchimeraActionCompletion(input: {
 
   let relationships = relationshipProgressionRepository.update((current) => {
     const relatedJourney = [...current.journeyDays].reverse().find((journey) => (
-      journey.familyId === 'mossprout'
+      session.familyId === 'mossprout' && journey.familyId === 'mossprout'
       && (journey.openingConversationId === session.definitionId
         || journey.profileConversationId === session.definitionId
         || journey.returnConversationId === session.definitionId
@@ -65,7 +65,7 @@ export function commitKatchimeraActionCompletion(input: {
       // daily action deck and occupy one of its three rows after FTUE exits.
       : definition.tags?.includes('ftue')
         ? null
-        : legacyConversationOrigin(progressed, session, definition, completedAt);
+        : session.familyId === 'mossprout' ? legacyConversationOrigin(progressed, session, definition, completedAt) : null;
     if (!origin) return progressed;
 
     // A Journey card remains active across its opening and Merge interlude.
@@ -116,7 +116,7 @@ export function commitKatchimeraActionCompletion(input: {
     const rewardEventId = completion.rewardEventId ?? `katchimera-action:${completion.id}`;
     const result = recordCompanionBondEvent(bondState, {
       id: rewardEventId,
-      creatureId: companionIdForFamily('mossprout'),
+      creatureId: companionIdForFamily(origin.familyId),
       kind: 'conversation_completed',
       points: origin.reward.amount,
       occurredAt: completedAt,

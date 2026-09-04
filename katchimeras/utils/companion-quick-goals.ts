@@ -43,6 +43,7 @@ export type CompanionQuickGoalDismissal = {
 
 export type CompanionQuickGoalState = {
   schemaVersion: 2 | 3;
+  storyHabitIds?: Partial<Record<KatchimeraFamilyId, string>>;
   goals: CompanionQuickGoal[];
   completions: CompanionQuickGoalCompletion[];
   dismissals: CompanionQuickGoalDismissal[];
@@ -100,7 +101,9 @@ export function normaliseCompanionQuickGoalState(value: unknown): CompanionQuick
         isValidDismissal(dismissal) && goalIds.has(dismissal.goalId)
       ).map((dismissal) => ({ ...dismissal, familyId: canonicalFamilyId(dismissal.familyId) ?? dismissal.familyId })))
     : [];
-  return { schemaVersion: 3, goals, completions, dismissals };
+  const storyHabitIds = Object.fromEntries(Object.entries(candidate.storyHabitIds ?? {}).filter(([familyId, id]) =>
+    goals.some((goal) => goal.id === id && goal.familyId === familyId && goal.status !== 'archived')));
+  return { schemaVersion: 3, goals, completions, dismissals, ...(Object.keys(storyHabitIds).length ? { storyHabitIds } : {}) };
 }
 
 export function cadenceFromTemplate(

@@ -23,6 +23,7 @@ export type CompanionStoryStatus =
   | 'arc_complete';
 
 export type CompanionStoryArc = {
+  journeyManaged?: boolean;
   id: string;
   familyId: string;
   version: number;
@@ -351,6 +352,9 @@ export function markAuthoredCohortOrderServed(familyId: AuthoredCohortFamilyId, 
   const orderDeck = current.orderDeck
     ? { ...current.orderDeck, servedOrderIds: [...new Set([...current.orderDeck.servedOrderIds, orderId])] }
     : null;
+  if (current.journeyManaged) return saveAuthoredCohortStory(familyId, {
+    ...current, completedOrderIds, orderDeck, activeOrderId: null, updatedAt: now,
+  });
   const prefix = `merge-story:${familyId}:chapter-1:`;
   if (orderId === `${prefix}${AUTHORED_STORY_CONFIG[familyId].signatureKey}`) return saveAuthoredCohortStory(familyId, {
     ...current, currentLevel: 8, targetLevel: 8, status: 'return_available', actPhase: 'finale_return',

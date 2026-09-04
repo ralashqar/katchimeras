@@ -19,20 +19,24 @@ export function DayActionCardSurface({
   completed = false,
   eyebrow,
   overlay,
+  progress,
   reward,
   style,
   subtitle,
   title,
+  titleNumberOfLines = 2,
   trailing,
 }: {
   artwork: ReactNode;
   completed?: boolean;
   eyebrow?: string | null;
   overlay?: ReactNode;
+  progress?: ReactNode;
   reward?: ReactNode;
   style?: StyleProp<ViewStyle>;
   subtitle?: string | null;
   title: string;
+  titleNumberOfLines?: number;
   trailing?: ReactNode;
 }) {
   return <GameSurface contentStyle={styles.content} style={[styles.card, style]} tone="cream">
@@ -40,8 +44,9 @@ export function DayActionCardSurface({
     <View style={[styles.artwork, completed && styles.artworkCompleted]}>{artwork}</View>
     <View style={styles.copy}>
       {eyebrow ? <ThemedText numberOfLines={1} selectable style={styles.eyebrow} lightColor={completed ? Meadow.leafDeep : Meadow.goldDeep} darkColor={completed ? Meadow.leafDeep : Meadow.goldDeep}>{eyebrow}</ThemedText> : null}
-      <ThemedText numberOfLines={2} selectable style={styles.title} lightColor={Meadow.ink} darkColor={Meadow.ink}>{title}</ThemedText>
+      <ThemedText numberOfLines={titleNumberOfLines} selectable style={styles.title} lightColor={Meadow.ink} darkColor={Meadow.ink}>{title}</ThemedText>
       {subtitle ? <ThemedText numberOfLines={2} selectable style={[styles.subtitle, completed && styles.subtitleCompleted]} lightColor={completed ? Meadow.leafDeep : Meadow.inkSoft} darkColor={completed ? Meadow.leafDeep : Meadow.inkSoft}>{subtitle}</ThemedText> : null}
+      {progress}
     </View>
     {reward}
     {trailing ?? <IconSymbol color={Meadow.inkSoft} name="chevron.right" size={17} />}

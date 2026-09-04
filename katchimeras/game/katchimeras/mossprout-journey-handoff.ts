@@ -1,5 +1,7 @@
 import type { JourneyDayRecord, RelationshipProgressState } from '@/types/relationship-progression';
 import { katchimeraMeditationRecord, MOSSPROUT_FTUE_REST_MS } from './relationship-progression';
+import { currentJourneyCycle } from './companion-journey-cycle';
+import { MOSSPROUT_CAMPAIGN_EPISODES } from '@/constants/mossprout-campaign';
 
 export type MossproutJourneyHandoffState =
   | 'completed_today'
@@ -38,6 +40,11 @@ export function resolveMossproutJourneyHandoff(input: {
   const availableAt = katchimeraMeditationRecord(input.relationships, 'mossprout')?.availableAt
     ?? (firstJourney.completedAt ?? firstJourney.startedAt) + MOSSPROUT_FTUE_REST_MS;
   const now = input.now ?? Date.now();
+  const cycle = currentJourneyCycle(input.relationships, 'mossprout');
+  if (input.ftueStatus === 'complete' && cycle && cycle.returnedAt == null && now >= availableAt) return {
+    availableAt, body: 'Mossprout has a chapter moment to share before your next Journey.',
+    dayNumber: cycle.number, eyebrow: 'Mossprout · Welcome back', state: 'ready_to_begin', title: 'Mossprout has returned',
+  };
   if (input.ftueStatus === 'complete' && now >= availableAt) return {
     availableAt,
     body: 'Mossprout is awake and ready to learn how you like to be supported.',
@@ -76,7 +83,10 @@ export function mossproutJourneyDayNumber(
   ));
   const currentIndex = currentJourney ? journeys.findIndex((journey) => journey.id === currentJourney.id) : -1;
   if (currentIndex >= 0) return currentIndex + 1;
-  return journeys.filter((journey) => journey.dayId < dayId).length + 1;
+  const active = [...journeys].reverse().find((journey) => journey.status !== 'complete');
+  const activeEpisode = active && MOSSPROUT_CAMPAIGN_EPISODES.find((episode) => episode.beatId === active.beatId);
+  if (activeEpisode) return activeEpisode.episodeNumber;
+  return journeys.filter((journey) => journey.status === 'complete').length + 1;
 }
 
 export function mossproutJourneyDayNumberForCompletionEvent(

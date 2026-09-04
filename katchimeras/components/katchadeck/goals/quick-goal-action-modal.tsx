@@ -35,6 +35,7 @@ type GoalAction = 'complete' | 'done' | 'remember' | 'skip' | 'snooze' | 'undo';
 
 export function QuickGoalActionModal({
   item,
+  simple = false,
   onComplete,
   onCompleteFromOrigin,
   onDismiss,
@@ -44,6 +45,7 @@ export function QuickGoalActionModal({
   onUndo,
 }: {
   item: CompanionQuickGoalForDay;
+  simple?: boolean;
   onComplete: () => CompanionQuickGoalCompletionReceipt;
   onCompleteFromOrigin?: () => void;
   onDismiss: () => void;
@@ -311,13 +313,13 @@ export function QuickGoalActionModal({
           </ThemedText>
 
           <View style={styles.actions}>
-            <GoalActionButton
+            {!simple || complete ? <GoalActionButton
               disabled={busy}
               icon={complete ? 'arrow.counterclockwise' : 'clock'}
               label={complete ? 'Undo' : 'Snooze'}
               onPress={() => handleAction(complete ? 'undo' : 'snooze')}
               reduceMotion={reduceMotion}
-            />
+            /> : null}
             <GoalActionButton
               disabled={busy}
               emphasized
@@ -326,13 +328,13 @@ export function QuickGoalActionModal({
               onPress={() => handleAction(complete ? 'done' : 'complete')}
               reduceMotion={reduceMotion}
             />
-            <GoalActionButton
+            {!simple || !complete ? <GoalActionButton
               disabled={busy}
               icon={complete ? 'square.and.pencil' : 'arrow.right'}
               label={complete ? 'Remember' : 'Skip'}
               onPress={() => handleAction(complete ? 'remember' : 'skip')}
               reduceMotion={reduceMotion}
-            />
+            /> : null}
           </View>
         </Animated.View>
         {celebrating ? (

@@ -252,6 +252,7 @@ export type KatchimeraActionCompletionRecord = Omit<KatchimeraActionOrigin, 'sou
 };
 
 export type JourneyDayRecord = {
+  participation?: import('./companion-journey-cycle').JourneyParticipation;
   id: string;
   dayId: string;
   familyId: KatchimeraFamilyId;
@@ -303,6 +304,7 @@ export type KatchimeraStoryProgress = {
 
 /** A durable period in which a companion is present but unavailable to act. */
 export type KatchimeraMeditationRecord = {
+  cycleId?: string;
   familyId: KatchimeraFamilyId;
   startedAt: number;
   availableAt: number;
@@ -330,6 +332,8 @@ export type MossproutStoryFactKey =
 export type MossproutStoryFacts = Partial<Record<MossproutStoryFactKey, string>>;
 
 export type RelationshipProgressState = {
+  /** Versioned episode/cycle extension; absent in legacy schema-7 saves. */
+  journeyCycles?: import('./companion-journey-cycle').CompanionJourneyCycle[];
   schemaVersion: 7;
   journeyDays: JourneyDayRecord[];
   stories: Partial<Record<KatchimeraFamilyId, KatchimeraStoryProgress>>;

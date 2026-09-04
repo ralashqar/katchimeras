@@ -12,6 +12,7 @@ import 'react-native-reanimated';
 
 import { Colors } from '@/constants/theme';
 import { DEV_TOOLS_ENABLED } from '@/constants/dev';
+import { SENTRY_TOUCH_TRACKING_ENABLED } from '@/constants/diagnostics';
 import { EggAvatarProvider } from '@/features/egg-avatar/egg-avatar-provider';
 import { WispProvider } from '@/features/wisps/wisp-provider';
 import { SceneProvider } from '@/features/scenes/scene-provider';
@@ -190,4 +191,5 @@ function RootLayout() {
   );
 }
 
-export default Sentry.wrap(RootLayout);
+// Crash capture is initialized separately; automatic touch instrumentation is opt-in.
+export default SENTRY_TOUCH_TRACKING_ENABLED ? Sentry.wrap(RootLayout) : RootLayout;

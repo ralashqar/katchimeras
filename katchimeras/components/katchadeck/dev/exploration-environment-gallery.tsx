@@ -1,3 +1,4 @@
+import { ScenePerformanceProbe } from '@/hooks/use-scene-performance-probe';
 import { useCallback, useState } from 'react';
 import {
   Pressable,
@@ -90,6 +91,7 @@ export function ExplorationEnvironmentGallery() {
 
   return (
     <View style={styles.screen}>
+      <ScenePerformanceProbe label="today-exploration-page" transitionActive={motion.transitionActive} />
       <GestureDetector gesture={motion.gesture}>
         <View style={styles.preview}>
           <TodayExplorationBackground

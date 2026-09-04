@@ -1,8 +1,10 @@
 import { MOSSPROUT_JOURNEY_CAMPAIGN } from '@/constants/mossprout-journey-campaign';
+import { registerCompanionJourneyFlows } from '@/features/companion/companion-journey-service';
 import { nextUnearnedMossproutResident } from '@/constants/resident-card-discovery';
 import { MOSSPROUT_FTUE_VARIANTS } from '@/features/onboarding/mossprout-ftue-flow';
 import { GLOW_DISCOVERY_FLOW } from '@/features/onboarding/glow-discovery-flow';
 import { STEPPLING_DAY_ONE_FLOW } from './steppling-day-one-flow';
+import { LEGACY_STEPPLING_DAY_ONE_FLOW } from './steppling-day-one-flow-v1';
 import { grantStoredGeneratorParcel } from '@/utils/merge-world/repository';
 import { startGlowDiscovery } from '@/features/onboarding/glow-discovery-runtime';
 import { applyStoredGlowDiscovery } from '@/utils/merge-world/repository';
@@ -35,9 +37,11 @@ let bootstrapped = false;
 
 export function bootstrapContentFlowCatalog() {
   if (bootstrapped) return;
+  registerCompanionJourneyFlows();
   registerStoryVariantSet(MOSSPROUT_FTUE_VARIANTS);
   MOSSPROUT_FTUE_VARIANTS.variants.forEach((variant) => registerContentFlowDefinition(variant.definition));
   registerContentFlowDefinition(GLOW_DISCOVERY_FLOW);
+  registerContentFlowDefinition(LEGACY_STEPPLING_DAY_ONE_FLOW);
   registerContentFlowDefinition(STEPPLING_DAY_ONE_FLOW);
   registerContentFlowEffect('journey.grant_generator_parcel', async ({ run, payload }) => {
     const generatorId = String(payload.generatorId);

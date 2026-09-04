@@ -55,6 +55,9 @@ const steppling: readonly CompanionQuickGoalTemplate[] = [
   template('steppling', 'explore-turn', 'Try a nearby route that feels safe', { kind: 'once' }),
   template('steppling', 'weekday-steps', 'Fit a short walk into a weekday', { kind: 'weekdays', weekdays: [1, 2, 3, 4, 5] }),
   template('steppling', 'notice-route', 'Notice one thing along my route', { kind: 'once' }),
+  template('steppling', 'adapted-break', 'Take a brief movement break in a way that suits me', { kind: 'daily' }),
+  template('steppling', 'rest-break', 'Take a deliberate rest break', { kind: 'daily' }),
+  template('steppling', 'two-minute-walk', 'Take a two-minute walk', { kind: 'daily' }),
 ];
 
 const feastle: readonly CompanionQuickGoalTemplate[] = [
@@ -94,6 +97,9 @@ const mossprout: readonly CompanionQuickGoalTemplate[] = [
   template('mossprout', 'same-place', 'Return to a familiar outdoor place', { kind: 'once' }),
   template('mossprout', 'season-change', 'Notice one sign of the season', { kind: 'once' }),
   template('mossprout', 'window-view', 'Notice nature from a window', { kind: 'once' }),
+  template('mossprout', 'quiet-minute', 'Take one quiet minute', { kind: 'daily' }),
+  template('mossprout', 'drink-water', 'Drink a glass of water', { kind: 'daily' }),
+  template('mossprout', 'check-plant', 'Check on a plant', { kind: 'daily' }),
 ];
 
 const flickerbun: readonly CompanionQuickGoalTemplate[] = [

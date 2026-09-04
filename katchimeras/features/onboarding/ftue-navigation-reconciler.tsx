@@ -1,3 +1,4 @@
+import { DIAGNOSTICS_ENABLED } from '@/constants/diagnostics';
 import { useGlobalSearchParams, usePathname, useRootNavigationState, useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
@@ -81,7 +82,7 @@ export function FtueNavigationReconciler() {
     }
     if (decision === 'none') return true;
     const normalizedPathname = decodeURIComponent(currentPathname).replace(/\/$/, '');
-    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    if (DIAGNOSTICS_ENABLED) {
       console.info('[resident-ftue-navigation] Restoring presented Merge route', {
         pathname: normalizedPathname,
         phase: session.phase,

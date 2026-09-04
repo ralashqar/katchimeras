@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isAppForeground, useAppForeground } from '@/hooks/use-app-foreground';
+import { createPendingVisualCompletion } from '@/utils/pending-visual-completion';
 import { Gesture } from 'react-native-gesture-handler';
 import {
   cancelAnimation,
@@ -142,6 +144,9 @@ export function useKingdomHexCamera({
     snapshot: { tx: 0, ty: 0, scale: 1 },
   }));
   const emittedSnapshotKeyRef = useRef<string | null>(null);
+  const foreground = useAppForeground();
+  const [pendingMove] = useState(() => createPendingVisualCompletion<KingdomCameraSnapshot>());
+  const resumeNeededRef = useRef(false);
 
   useEffect(() => {
     onMotionChange?.(!ready || renderState.isMoving);
@@ -181,7 +186,49 @@ export function useKingdomHexCamera({
 
   const clearFrameFocus = useCallback(() => {
     frameFocusKeyRef.current = null;
-  }, []);
+    pendingMove.cancel();
+  }, [pendingMove]);
+
+  const completeCameraMove = useCallback((id: number) => {
+    const move = pendingMove.peek();
+    if (move?.id !== id || !isAppForeground()) return;
+    commitSnapshot(move.target.tx, move.target.ty, move.target.scale, false);
+    pendingMove.finish(id);
+  }, [commitSnapshot, pendingMove]);
+
+  useEffect(() => {
+    if (!foreground) {
+      resumeNeededRef.current = true;
+      cancelAnimation(tx);
+      cancelAnimation(ty);
+      cancelAnimation(scale);
+      return;
+    }
+    if (!resumeNeededRef.current) return;
+    resumeNeededRef.current = false;
+    // A settled camera needs no replay. Only finish an interrupted authored
+    // move, or publish the current frame of an interrupted free pan/pinch.
+    const move = pendingMove.peek();
+    if (move) {
+      cancelAnimation(tx);
+      cancelAnimation(ty);
+      cancelAnimation(scale);
+      tx.value = move.target.tx;
+      ty.value = move.target.ty;
+      scale.value = move.target.scale;
+      pinchStartScale.value = move.target.scale;
+      completeCameraMove(move.id);
+    } else {
+      commitSnapshot(tx.value, ty.value, scale.value, false);
+    }
+  }, [commitSnapshot, completeCameraMove, foreground, pendingMove, pinchStartScale, scale, tx, ty]);
+
+  useEffect(() => () => {
+    pendingMove.cancel();
+    cancelAnimation(tx);
+    cancelAnimation(ty);
+    cancelAnimation(scale);
+  }, [pendingMove, scale, tx, ty]);
 
   const animateTo = useCallback(
     (x: number, y: number, zoom: number, screenY: number, duration: number, onComplete?: () => void) => {
@@ -197,18 +244,18 @@ export function useKingdomHexCamera({
       const nextTx = cameraViewport.width / 2 - cameraScene.width / 2 - (x - cameraScene.width / 2) * clampedZoom;
       const nextTy = screenY - cameraScene.height / 2 - (y - cameraScene.height / 2) * clampedZoom;
       const clamped = clampCameraTranslation({ tx: nextTx, ty: nextTy }, cameraViewport, cameraScene, clampedZoom);
+      const moveId = pendingMove.begin({ ...clamped, scale: clampedZoom }, onComplete);
       const timing = { duration, easing: Easing.out(Easing.cubic) };
       tx.value = withTiming(clamped.tx, timing);
       ty.value = withTiming(clamped.ty, timing);
       scale.value = withTiming(clampedZoom, timing, (finished) => {
         if (finished) {
-          runOnJS(commitSnapshot)(clamped.tx, clamped.ty, clampedZoom, false);
-          if (onComplete) runOnJS(onComplete)();
+          runOnJS(completeCameraMove)(moveId);
         }
       });
       pinchStartScale.value = clampedZoom;
     },
-    [beginMotion, cameraScene, cameraViewport, commitSnapshot, maxScale, minScale, pinchStartScale, scale, tx, ty]
+    [beginMotion, cameraScene, cameraViewport, completeCameraMove, maxScale, minScale, pendingMove, pinchStartScale, scale, tx, ty]
   );
 
   const settleAfterPan = useCallback((nextTx: number, nextTy: number, nextScale: number) => {
@@ -341,7 +388,7 @@ export function useKingdomHexCamera({
   const pan = useMemo(
     () =>
       Gesture.Pan()
-        .enabled(interactionEnabled)
+        .enabled(interactionEnabled && foreground)
         .maxPointers(1)
         .activeOffsetX([-6, 6])
         .activeOffsetY([-6, 6])
@@ -374,13 +421,13 @@ export function useKingdomHexCamera({
           tx.value = withDecay({ velocity: event.velocityX, deceleration: 0.996, clamp: xBounds }, completeDecay);
           ty.value = withDecay({ velocity: event.velocityY, deceleration: 0.996, clamp: yBounds }, completeDecay);
         }),
-    [beginMotion, clearFrameFocus, decayCompletions, interactionEnabled, panStartTx, panStartTy, scale, scene, settleAfterPan, tx, ty, viewport.height, viewport.width]
+    [beginMotion, clearFrameFocus, decayCompletions, foreground, interactionEnabled, panStartTx, panStartTy, scale, scene, settleAfterPan, tx, ty, viewport.height, viewport.width]
   );
 
   const pinch = useMemo(
     () =>
       Gesture.Pinch()
-        .enabled(interactionEnabled)
+        .enabled(interactionEnabled && foreground)
         .onBegin((event) => {
           cancelAnimation(tx);
           cancelAnimation(ty);
@@ -414,6 +461,7 @@ export function useKingdomHexCamera({
       beginMotion,
       clearFrameFocus,
       commitSnapshot,
+      foreground,
       interactionEnabled,
       maxScale,
       minScale,
@@ -436,14 +484,14 @@ export function useKingdomHexCamera({
     onWorldTapReleaseRef.current?.(x, y);
   }, []);
   const worldTap = useMemo(() => Gesture.Tap()
-    .enabled(interactionEnabled && Boolean(onWorldTapReleaseRef.current))
+    .enabled(interactionEnabled && foreground && Boolean(onWorldTapReleaseRef.current))
     .maxDistance(5)
     .onEnd((event, success) => {
       if (!success) return;
       const worldX = (event.x - scene.width / 2 - tx.value) / scale.value + scene.width / 2;
       const worldY = (event.y - scene.height / 2 - ty.value) / scale.value + scene.height / 2;
       runOnJS(emitWorldTapRelease)(worldX, worldY);
-    }), [emitWorldTapRelease, interactionEnabled, scale, scene.height, scene.width, tx, ty]);
+    }), [emitWorldTapRelease, foreground, interactionEnabled, scale, scene.height, scene.width, tx, ty]);
   const gesture = useMemo(() => Gesture.Simultaneous(pan, pinch, worldTap), [pan, pinch, worldTap]);
   const worldStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
@@ -504,16 +552,16 @@ export function useKingdomHexCamera({
     beginMotion();
     const nextScale = clampHavenCameraScale(snapshot.scale, minScale, maxScale);
     const target = clampCameraTranslation(snapshot, cameraViewport, cameraScene, nextScale);
+    const moveId = pendingMove.begin({ ...target, scale: nextScale }, onComplete);
     const timing = { duration: durationMs, easing: Easing.out(Easing.cubic) };
     tx.value = withTiming(target.tx, timing);
     ty.value = withTiming(target.ty, timing);
     scale.value = withTiming(nextScale, timing, (finished) => {
       if (!finished) return;
-      runOnJS(commitSnapshot)(target.tx, target.ty, nextScale, false);
-      if (onComplete) runOnJS(onComplete)();
+      runOnJS(completeCameraMove)(moveId);
     });
     pinchStartScale.value = nextScale;
-  }, [beginMotion, cameraScene, cameraViewport, clearFrameFocus, commitSnapshot, maxScale, minScale, pinchStartScale, scale, tx, ty]);
+  }, [beginMotion, cameraScene, cameraViewport, clearFrameFocus, completeCameraMove, maxScale, minScale, pendingMove, pinchStartScale, scale, tx, ty]);
 
   // React's settled snapshot intentionally updates only when motion completes.
   // Handoffs, however, must capture the exact frame currently on screen, even

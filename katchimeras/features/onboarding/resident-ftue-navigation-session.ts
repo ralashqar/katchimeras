@@ -1,3 +1,4 @@
+import { DIAGNOSTICS_ENABLED } from '@/constants/diagnostics';
 export type ResidentFtueNavigationPhase =
   | 'idle'
   | 'handoff'
@@ -55,7 +56,7 @@ function dispatchResidentFtueNavigationEvent(event: ResidentFtueNavigationEvent)
   const next = reduceResidentFtueNavigationSession(previous, event);
   if (next === previous) return next;
   snapshot = next;
-  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+  if (DIAGNOSTICS_ENABLED) {
     console.info('[resident-ftue-navigation] Session changed', {
       event: event.type,
       from: previous.phase,

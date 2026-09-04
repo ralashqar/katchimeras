@@ -1,3 +1,4 @@
+import { CompanionJournalButton } from '@/components/katchadeck/world/companion-life-actions';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ActivityIndicator, BackHandler, Pressable, StyleSheet, View, useWindowDimensions, type View as ViewType } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -1027,6 +1028,9 @@ export function KatchimeraKingdomScreen({
         worldEggTargetRef={worldEggTargetRef}
         worldSubjectPresentation={worldSubjectPresentation}
       />
+      {!activeInteractionResidentId && !interactionCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && (!ftueStepId || ftueStepId === 'companion.meditating') ? <View style={{ position: 'absolute', left: 16, bottom: Math.max(insets.bottom, 12) + 10, zIndex: 30 }}>
+        <CompanionJournalButton familyId="mossprout" />
+      </View> : null}
       {screenFocused && stepplingEncounter.open ? <StepplingEncounterPanel
         encounter={stepplingEncounter}
         egg={stepplingEncounter.egg}

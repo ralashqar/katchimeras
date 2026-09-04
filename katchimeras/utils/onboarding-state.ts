@@ -4,6 +4,7 @@ import { resetEggAvatarSelection } from '@/utils/egg-avatar-storage';
 const ONBOARDING_STORAGE_KEY = 'katchadeck.onboarding-profile';
 
 export type MossproutOnboardingAnswers = {
+  lifeFollowupId?: string | null;
   firstGreetingId?: string | null;
   dayTextureId?: string | null;
   growthIntentId?: string | null;

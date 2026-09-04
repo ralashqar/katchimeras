@@ -88,6 +88,8 @@ export type ConversationNode =
   | {
       id: string;
       kind: 'choice';
+      /** Navigation and habit management are not reflective questions. */
+      interactionKind?: 'navigation';
       prompt: string;
       helperText?: string;
       options: readonly ConversationOption[];
@@ -162,6 +164,8 @@ export type ConversationNode =
   | {
       id: string;
       kind: 'quick_goal_proposal';
+      /** Explicit daily story habit: replace only this companion's selected story habit. */
+      storyDaily?: boolean;
       prompt: string;
       templateId: string;
       title: string;

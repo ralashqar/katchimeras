@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EggAvatarArtwork } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useScenePerformanceProbe } from '@/hooks/use-scene-performance-probe';
+import { ScenePerformanceProbe } from '@/hooks/use-scene-performance-probe';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
 import { safeGoBack } from '@/utils/safe-navigation';
 import {
@@ -115,7 +115,6 @@ export function WorldBoardLabScreen() {
   useEffect(() => {
     transitionActive.value = camera.moving ? 1 : 0;
   }, [camera.moving, transitionActive]);
-  useScenePerformanceProbe('world-board-lab-camera', transitionActive);
 
   const surfaceMesh = useMemo(() => buildWorldBoardSurfaceMesh(manifest), [manifest]);
   const meshEdges = useMemo(() => {
@@ -173,6 +172,7 @@ export function WorldBoardLabScreen() {
 
   return (
     <View onLayout={onLayout} style={styles.screen}>
+      <ScenePerformanceProbe label="world-board-lab-camera" transitionActive={transitionActive} />
       <LinearGradient colors={['#4BACE0', '#81CCDA', '#E8F4DB']} end={{ x: 0.5, y: 1 }} start={{ x: 0.5, y: 0 }} style={StyleSheet.absoluteFill} />
       <GestureDetector gesture={stageGesture}>
         <View style={styles.viewport}>

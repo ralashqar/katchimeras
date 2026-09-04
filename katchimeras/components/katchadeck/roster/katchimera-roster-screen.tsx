@@ -1,3 +1,4 @@
+import { SCENE_PERF_ENABLED } from '@/constants/diagnostics';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -138,7 +139,7 @@ function KatchimeraRosterScreenComponent({
   const handleLoad = useCallback(({ elapsedTimeInMs }: { elapsedTimeInMs: number }) => {
     if (hasCompletedInitialLoad.current) return;
     hasCompletedInitialLoad.current = true;
-    if (__DEV__ && process.env.EXPO_PUBLIC_SCENE_PERF === '1') {
+    if (SCENE_PERF_ENABLED) {
       console.info('[roster-perf] initial-grid', { readyMs: Math.round(elapsedTimeInMs * 10) / 10 });
     }
   }, []);

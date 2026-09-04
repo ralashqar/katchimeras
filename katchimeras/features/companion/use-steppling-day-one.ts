@@ -1,3 +1,4 @@
+import { recordLifeFlow } from '@/utils/companion-life-recording';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { STEPPLING_DAY_ONE_CONVERSATION_ID } from '@/constants/steppling-day-one-conversation';
 import { loadCompanionContentState } from '@/utils/companion-content-storage';
@@ -7,6 +8,8 @@ import { bootstrapContentFlowCatalog } from '@/features/content-flow/content-flo
 import { startContentFlow, dispatchContentFlowCommand } from '@/features/content-flow/content-flow-director';
 import { loadContentFlowRun } from '@/features/content-flow/content-flow-repository';
 import { STEPPLING_DAY_ONE_FLOW, STEPPLING_DAY_ONE_RUN_ID } from '@/features/content-flow/steppling-day-one-flow';
+import { LEGACY_STEPPLING_DAY_ONE_FLOW } from '@/features/content-flow/steppling-day-one-flow-v1';
+import { contentFlowDefinition } from '@/features/content-flow/content-flow-catalog';
 
 /** Conversation owns presentation/answers; the journey journal owns its one-shot parcel effect. */
 export async function settleStepplingDayOne() {
@@ -15,9 +18,10 @@ export async function settleStepplingDayOne() {
   if (!session) return false;
   bootstrapContentFlowCatalog();
   let run = await loadContentFlowRun(STEPPLING_DAY_ONE_RUN_ID)
-    ?? await startContentFlow(STEPPLING_DAY_ONE_FLOW, { runId: STEPPLING_DAY_ONE_RUN_ID, variables: { dayId: localDayId() } });
-  for (let guard = 0; guard < STEPPLING_DAY_ONE_FLOW.nodes.length && run.status !== 'completed'; guard += 1) {
-    const node = STEPPLING_DAY_ONE_FLOW.nodes.find((candidate) => candidate.id === run.nodeId);
+    ?? await startContentFlow(session.definitionVersion < 2 ? LEGACY_STEPPLING_DAY_ONE_FLOW : STEPPLING_DAY_ONE_FLOW, { runId: STEPPLING_DAY_ONE_RUN_ID, variables: { dayId: localDayId() } });
+  const definition = contentFlowDefinition(run.definitionId, run.definitionVersion)!;
+  for (let guard = 0; guard < definition.nodes.length * 2 && run.status !== 'completed'; guard += 1) {
+    const node = definition.nodes.find((candidate) => candidate.id === run.nodeId);
     // A process can stop after the closing answer was saved but before its
     // parcel effect ran. Resume that effect too, not only explicit failures.
     if (run.status === 'failed_recoverable' || node?.kind === 'effect') {
@@ -28,14 +32,15 @@ export async function settleStepplingDayOne() {
       continue;
     }
     if (node?.kind !== 'scene') throw new Error('Journey reward is still pending');
-    const answer = session.turns.find((turn) => turn.nodeId === node.id)?.optionId;
-    const actionId = node.id === 'reflection' ? String(run.variables.movementChoice ?? answer ?? '') : 'continue';
+    const answer = [...session.turns].reverse().find((turn) => turn.nodeId === node.id)?.optionId;
+    const actionId = answer ?? (node.actions?.length === 1 ? node.actions[0].id : '');
     if (!node.actions?.some((action) => action.id === actionId)) throw new Error('Journey answer is missing');
     const advanced = await dispatchContentFlowCommand(run.runId, { type: 'submit_scene', actionId });
     if (!advanced) throw new Error('Journey could not be restored');
     run = advanced;
   }
   if (run.status !== 'completed') throw new Error('Journey reward is still pending');
+  recordLifeFlow(run);
   return true;
 }
 

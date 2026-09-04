@@ -1,3 +1,4 @@
+import { CREATURE_PERF_ENABLED } from '@/constants/diagnostics';
 import { useIsFocused } from '@react-navigation/native';
 import {
   Image,
@@ -23,7 +24,7 @@ function logIdleDiagnostic(
   event: string,
   details: Record<string, unknown>,
 ) {
-  if (!__DEV__ || process.env.EXPO_PUBLIC_CREATURE_IDLE_PERF !== '1') return;
+  if (!CREATURE_PERF_ENABLED) return;
   console[level](`${IDLE_LOG_PREFIX} ${event}`, details);
 }
 
@@ -65,7 +66,7 @@ export function CreatureAnimatedArt({
   }, [animationReady, shouldAnimate, visualKey]);
 
   useEffect(() => {
-    if (!animationSource) return;
+    if (!CREATURE_PERF_ENABLED || !animationSource) return;
     logIdleDiagnostic('info', 'state', {
       animationFailed,
       animationReady,
@@ -98,18 +99,18 @@ export function CreatureAnimatedArt({
   useEffect(() => {
     const image = imageRef.current;
     if (!image || !animationSource || !animationReady || animationFailed || forceStatic || reduceMotion) return;
-    logIdleDiagnostic('info', 'playback-command', {
+    if (CREATURE_PERF_ENABLED) logIdleDiagnostic('info', 'playback-command', {
       command: shouldAnimate ? 'start' : 'stop',
       visualKey,
     });
     const operation = shouldAnimate ? image.startAnimating() : image.stopAnimating();
     void operation.then(() => {
-      logIdleDiagnostic('info', 'playback-command-resolved', {
+      if (CREATURE_PERF_ENABLED) logIdleDiagnostic('info', 'playback-command-resolved', {
         command: shouldAnimate ? 'start' : 'stop',
         visualKey,
       });
     }).catch((error: unknown) => {
-      logIdleDiagnostic('warn', 'playback-command-failed', {
+      if (CREATURE_PERF_ENABLED) logIdleDiagnostic('warn', 'playback-command-failed', {
         command: shouldAnimate ? 'start' : 'stop',
         error: error instanceof Error ? error.message : String(error),
         visualKey,
@@ -119,29 +120,30 @@ export function CreatureAnimatedArt({
 
   const handleLoad = (event: ImageLoadEventData) => {
     const loadedAnimationSource = Boolean(animationSource && source === animationSource);
-    const details = {
-      cacheType: event.cacheType,
-      height: event.source.height,
-      isAnimated: event.source.isAnimated ?? null,
-      mediaType: event.source.mediaType,
-      source: loadedAnimationSource ? 'animated' : 'fallback',
-      url: event.source.url,
-      visualKey,
-      width: event.source.width,
-    };
-    logIdleDiagnostic(
-      loadedAnimationSource && event.source.isAnimated !== true ? 'warn' : 'info',
-      loadedAnimationSource && event.source.isAnimated !== true
-        ? 'loaded-source-is-not-animated'
-        : 'load',
-      details,
-    );
+    if (CREATURE_PERF_ENABLED) {
+      logIdleDiagnostic(
+        loadedAnimationSource && event.source.isAnimated !== true ? 'warn' : 'info',
+        loadedAnimationSource && event.source.isAnimated !== true
+          ? 'loaded-source-is-not-animated'
+          : 'load',
+        {
+          cacheType: event.cacheType,
+          height: event.source.height,
+          isAnimated: event.source.isAnimated ?? null,
+          mediaType: event.source.mediaType,
+          source: loadedAnimationSource ? 'animated' : 'fallback',
+          url: event.source.url,
+          visualKey,
+          width: event.source.width,
+        },
+      );
+    }
     if (loadedAnimationSource) setAnimationReady(true);
     onLoad?.();
   };
 
   const handleError = (event: ImageErrorEventData) => {
-    logIdleDiagnostic('warn', 'load-failed', {
+    if (CREATURE_PERF_ENABLED) logIdleDiagnostic('warn', 'load-failed', {
       error: event.error,
       source: 'animated',
       visualKey,
@@ -156,12 +158,12 @@ export function CreatureAnimatedArt({
       autoplay={shouldAnimate}
       cachePolicy="memory-disk"
       contentFit="contain"
-      onDisplay={animationSource && source === animationSource ? () => {
+      onDisplay={CREATURE_PERF_ENABLED && animationSource && source === animationSource ? () => {
         logIdleDiagnostic('info', 'display', { source: 'animated', visualKey });
       } : undefined}
       onError={animationSource && source === animationSource ? handleError : undefined}
       onLoad={handleLoad}
-      onLoadStart={animationSource && source === animationSource ? () => {
+      onLoadStart={CREATURE_PERF_ENABLED && animationSource && source === animationSource ? () => {
         logIdleDiagnostic('info', 'load-start', { source: 'animated', visualKey });
       } : undefined}
       placeholder={idleFallbackSource}

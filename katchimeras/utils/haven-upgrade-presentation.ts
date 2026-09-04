@@ -12,6 +12,13 @@ export type HavenUpgradePresentationPhase =
   | 'react'
   | 'complete';
 
+export type HavenUpgradePhaseState = { nonce: number | null; phase: HavenUpgradePresentationPhase };
+
+/** Phase belongs to one receipt, never to the next restoration's first render. */
+export function havenUpgradePhaseForPresentation(state: HavenUpgradePhaseState, nonce: number | null | undefined): HavenUpgradePresentationPhase {
+  return nonce != null && state.nonce === nonce ? state.phase : 'armed';
+}
+
 export type HavenUpgradeEffectPalette = {
   accent: string;
   glow: string;

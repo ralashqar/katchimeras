@@ -1,3 +1,4 @@
+import { DIAGNOSTICS_ENABLED } from '@/constants/diagnostics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -164,8 +165,13 @@ export function GameScreenTransitionProvider({ children }: PropsWithChildren) {
       ...next,
       route: currentRequest.expectedPathname ? pathnameRef.current === currentRequest.expectedPathname : next.route ?? true,
     };
+    const previous = readinessRef.current;
+    const changed = DIAGNOSTICS_ENABLED && (!previous || previous.background !== correlated.background
+      || previous.data !== correlated.data || previous.foreground !== correlated.foreground
+      || previous.interaction_target !== correlated.interaction_target
+      || previous.layout !== correlated.layout || previous.route !== correlated.route);
     readinessRef.current = correlated;
-    if (__DEV__) {
+    if (DIAGNOSTICS_ENABLED && changed) {
       console.info('[screen-transition] Destination readiness changed', {
         pathname: pathnameRef.current,
         navigationKey: currentRequest.navigationKey,

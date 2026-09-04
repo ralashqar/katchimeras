@@ -19,6 +19,7 @@ export function MossproutJourneyRequestPanel({
   eyebrow = 'GARDEN REQUESTS',
   fitContent = false,
   onAction,
+  onRequestPress,
   requests,
   standalone = false,
   title,
@@ -30,6 +31,7 @@ export function MossproutJourneyRequestPanel({
   eyebrow?: string;
   fitContent?: boolean;
   onAction?: () => void;
+  onRequestPress?: (orderId: string) => void;
   requests: readonly CompanionMergeRequest[];
   standalone?: boolean;
   title: string;
@@ -53,6 +55,7 @@ export function MossproutJourneyRequestPanel({
         eyebrow={eyebrow}
         palette={COMPANION_MERGE_REQUEST_PALETTE}
         requests={requests}
+        onRequestPress={onRequestPress}
       />
       {onAction ? (
         <Pressable

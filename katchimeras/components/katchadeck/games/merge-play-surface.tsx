@@ -10,7 +10,7 @@ import { MergeCellInspector } from './merge-cell-inspector';
 import { MergeOrderRail, type MergeTrayEntry } from './merge-order-rail';
 import type { MergeScreenPoint } from './merge-serve-reward-overlay';
 import { useMergeWorldSelector } from '@/features/merge-world/merge-world-provider';
-import { reuseShallowRows } from '@/utils/merge-world/selector-store';
+import { reuseShallowRows, reuseShallowValue } from '@/utils/merge-world/selector-store';
 
 const selectBoard = (snapshot: { state: MergeWorldState | null }) => snapshot.state;
 const sameBoardPresentation = (a: MergeWorldState | null, b: MergeWorldState | null) => a === b || Boolean(a && b
@@ -27,6 +27,8 @@ export type MergePlaySurfaceLayout = {
 };
 
 export type MergePlaySurfaceProps = {
+  effectsActive?: boolean;
+  servingOrderId?: string | null;
   /** Decorative counter bleed, independent of board and tray layout. */
   counterWidth?: number;
   animateEntrance?: boolean;
@@ -71,6 +73,8 @@ export type MergePlaySurfaceProps = {
  * this exact rail/counter/board/inspector stack so their geometry cannot drift.
  */
 export const MergePlaySurface = memo(function MergePlaySurface({
+  effectsActive = true,
+  servingOrderId,
   animateEntrance = true,
   boardInteractionGate = { kind: 'open' },
   boardLayout,
@@ -110,6 +114,8 @@ export const MergePlaySurface = memo(function MergePlaySurface({
 }: MergePlaySurfaceProps) {
   const [boardAreaHeight, setBoardAreaHeight] = useState(0);
   const retainedEntries = useRef<readonly MergeTrayEntry[]>([]);
+  const retainedRailGate = useRef(railInteractionGate);
+  retainedRailGate.current = reuseShallowValue(retainedRailGate.current, railInteractionGate);
   const stableEntries = useMemo(() => {
     retainedEntries.current = reuseShallowRows(retainedEntries.current, trayEntries);
     return retainedEntries.current;
@@ -132,9 +138,11 @@ export const MergePlaySurface = memo(function MergePlaySurface({
       pointerEvents={interactionEnabled ? 'auto' : 'none'}
       style={[styles.surface, maxHeight == null ? styles.flexSurface : { height: maxHeight }, { width }, style]}>
       <MergeOrderRail
+        active={effectsActive}
+        servingOrderId={servingOrderId}
         entries={stableEntries}
         focusOrderId={focusOrderId}
-        interactionGate={railInteractionGate}
+        interactionGate={retainedRailGate.current}
         onBlockedInteraction={onBlockedInteraction}
         onOpenChat={onOpenChat}
         onOpenParcel={onOpenParcel}

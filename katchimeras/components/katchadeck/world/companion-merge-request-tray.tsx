@@ -1,11 +1,16 @@
 import { Image } from 'expo-image';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { PersistentMergeItemArt } from '@/components/katchadeck/games/feastle-persistent-merge-board';
 import { ThemedText } from '@/components/themed-text';
+import { GameSurface } from '@/components/katchadeck/ui/game-surface';
 import { KatchaUI } from '@/constants/katcha-ui';
 import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import { MERGE_WORLD_UI_ART } from '@/constants/merge-world-ui-art';
+
+export const COMPANION_STORY_PANEL_STYLE = StyleSheet.create({
+  panel: { backgroundColor: KatchaUI.companionScenePanel.background, borderColor: KatchaUI.companionScenePanel.border, borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, boxShadow: KatchaUI.companionScenePanel.shadow, gap: 7, padding: 10 },
+}).panel;
 
 export type CompanionMergeRequest = {
   id: string;
@@ -49,14 +54,37 @@ export function CompanionMergeRequestTray({
   eyebrow,
   palette,
   requests,
+  onRequestPress,
+  compact = false,
 }: {
   accessibilityLabel: string;
   countLabel?: string;
   eyebrow: string;
   palette: CompanionMergeRequestPalette;
   requests: readonly CompanionMergeRequest[];
+  onRequestPress?: (orderId: string) => void;
+  compact?: boolean;
 }) {
   if (!requests.length) return null;
+  if (compact) return <GameSurface tone="cream" contentStyle={styles.compactContent}>
+    <View style={styles.heading}>
+      <ThemedText style={styles.compactHeading}>{eyebrow}</ThemedText>
+      <ThemedText style={styles.compactHint}>Swipe to see requests</ThemedText>
+    </View>
+    <ScrollView accessibilityLabel={accessibilityLabel} horizontal directionalLockEnabled nestedScrollEnabled
+      showsHorizontalScrollIndicator={false} contentContainerStyle={styles.compactRail}>
+      {requests.map((request) => <Pressable key={request.id} accessibilityRole="button"
+        accessibilityLabel={[request.title, request.badge, request.served ? 'Completed' : 'Open order'].filter(Boolean).join('. ')}
+        accessibilityState={{ disabled: !onRequestPress || Boolean(request.served) }} disabled={!onRequestPress || request.served}
+        onPress={() => onRequestPress?.(request.id)} style={styles.compactRequest}>
+        {request.definitionIds.map((id) => <PersistentMergeItemArt key={id} definitionId={id} size={36} />)}
+        <View style={styles.compactCopy}>
+          <ThemedText numberOfLines={2} style={styles.compactTitle}>{request.title}</ThemedText>
+          <ThemedText numberOfLines={1} style={styles.compactHint}>{request.served ? 'Completed' : request.badge}</ThemedText>
+        </View>
+      </Pressable>)}
+    </ScrollView>
+  </GameSurface>;
   return (
     <View
       accessibilityLabel={accessibilityLabel}
@@ -82,8 +110,12 @@ export function CompanionMergeRequestTray({
           const single = requests.length === 1;
           const itemNames = request.definitionIds.map((id) => MERGE_ITEMS_BY_ID.get(id)?.name ?? 'Merge item').join(' + ');
           return (
-            <View
+            <Pressable
               accessible
+              accessibilityRole={onRequestPress ? 'button' : undefined}
+              accessibilityState={onRequestPress ? { disabled: Boolean(request.served) } : undefined}
+              disabled={!onRequestPress || request.served}
+              onPress={() => onRequestPress?.(request.id)}
               accessibilityLabel={[request.title, itemNames, request.description, request.served ? 'Served' : null].filter(Boolean).join('. ')}
               key={request.id}
               style={[styles.card, single && styles.singleCard, request.served && styles.cardServed, { backgroundColor: palette.rowBackground }]}
@@ -98,7 +130,7 @@ export function CompanionMergeRequestTray({
                   <ThemedText selectable numberOfLines={2} style={styles.title} lightColor={palette.title} darkColor={palette.title}>{request.title}</ThemedText>
                   {request.badge ? (
                     <View style={[styles.badge, { backgroundColor: palette.badgeBackground }]}>
-                      <ThemedText style={styles.badgeText} lightColor={palette.badgeText} darkColor={palette.badgeText}>{request.badge}</ThemedText>
+                      <ThemedText numberOfLines={1} style={styles.badgeText} lightColor={palette.badgeText} darkColor={palette.badgeText}>{request.badge}</ThemedText>
                     </View>
                   ) : null}
                 </View>
@@ -116,7 +148,7 @@ export function CompanionMergeRequestTray({
                   <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" source={MERGE_WORLD_UI_ART.readyTick} style={styles.servedTickArt} transition={0} />
                 </View>
               ) : null}
-            </View>
+            </Pressable>
           );
         })}
       </ScrollView>
@@ -125,6 +157,13 @@ export function CompanionMergeRequestTray({
 }
 
 const styles = StyleSheet.create({
+  compactContent: { gap: 3, paddingHorizontal: 10, paddingVertical: 7 },
+  compactHeading: { color: '#49351F', fontSize: 11, lineHeight: 14, fontWeight: '900' },
+  compactHint: { color: '#786348', fontSize: 9, lineHeight: 12 },
+  compactRail: { alignItems: 'center' },
+  compactRequest: { flexDirection: 'row', alignItems: 'center', gap: 7, width: 180, minHeight: 52, paddingRight: 12 },
+  compactCopy: { flex: 1, gap: 2 },
+  compactTitle: { color: '#49351F', fontSize: 11, lineHeight: 14, fontWeight: '800' },
   tray: { borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, gap: 5, padding: 7 },
   heading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 3 },
   eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 },
@@ -141,7 +180,7 @@ const styles = StyleSheet.create({
   title: { flexShrink: 1, fontSize: 11.5, fontWeight: '900', lineHeight: 14, textAlign: 'center' },
   itemName: { fontSize: 9.5, fontWeight: '800', lineHeight: 12, textAlign: 'center' },
   badge: { borderRadius: 999, paddingHorizontal: 5, paddingVertical: 2 },
-  badgeText: { fontSize: 8, fontWeight: '900', letterSpacing: 0.6 },
+  badgeText: { fontSize: 8, lineHeight: 10, fontWeight: '900', letterSpacing: 0.6 },
   quantity: { alignItems: 'center', borderRadius: 999, justifyContent: 'center', minWidth: 25, paddingHorizontal: 5, paddingVertical: 3, position: 'absolute', right: 5, top: 5 },
   quantityText: { fontSize: 9.5, fontWeight: '900', fontVariant: ['tabular-nums'] },
   servedTick: { height: 24, position: 'absolute', right: 5, top: 5, width: 24, zIndex: 3 },

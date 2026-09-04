@@ -142,9 +142,10 @@ export function nextMossproutCampaignEpisode(completedBeatIds: readonly string[]
   return MOSSPROUT_CAMPAIGN_EPISODES.find((episodeDefinition) => !completed.has(episodeDefinition.beatId)) ?? null;
 }
 
-export function mossproutCampaignEpisodeAvailable(episodeDefinition: MossproutCampaignEpisode | null, activeGardenDays: number) {
-  // activeGardenDays counts days already played; select for the day about to begin.
-  return Boolean(episodeDefinition && activeGardenDays + 1 >= episodeDefinition.unlockGardenDay);
+export function mossproutCampaignEpisodeAvailable(episodeDefinition: MossproutCampaignEpisode | null, _activeGardenDays: number) {
+  // The relationship coordinator owns meditation/return eligibility. Historical
+  // active-day thresholds remain readable but no longer gate the narrative.
+  return Boolean(episodeDefinition);
 }
 
 export const MOSSPROUT_STORY_FACT_BY_OPTION_ID: Readonly<Record<string, { key: MossproutStoryFactKey; value: string }>> = {

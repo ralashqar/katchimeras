@@ -77,6 +77,10 @@ const MergeBoardEffectSlot = memo(function MergeBoardEffectSlot({ effect, geomet
   recordMergeRender('effect-slot');
   const timers = useDisposableTimers('merge:effect-slot');
   const progress = useSharedValue(0);
+  // Keep the particle pool mounted, but do not subscribe landing particles to
+  // the running clock. Their zero progress is fully transparent and idle.
+  const idleParticleProgress = useSharedValue(0);
+  const particleProgress = !effect || effect.kind === 'spawn-settle' || reduceMotion ? idleParticleProgress : progress;
   const center = effect ? mergeCellCenter(geometry, effect.cell) : { x: 0, y: 0 };
   const centerX = center.x;
   const centerY = center.y;
@@ -109,7 +113,7 @@ const MergeBoardEffectSlot = memo(function MergeBoardEffectSlot({ effect, geomet
           key={index}
           kind={effect?.kind ?? 'spawn-origin'}
           particle={particle}
-          progress={progress}
+          progress={particleProgress}
           reduceMotion={reduceMotion}
           size={size}
         />
@@ -192,21 +196,24 @@ const MergeEffectParticle = memo(function MergeEffectParticle({ centerX, centerY
   reduceMotion: boolean;
   size: number;
 }) {
+  const directionX = Math.cos(particle.angle);
+  const directionY = Math.sin(particle.angle);
+  const distanceScale = kind === 'merge' ? 1.18 : kind === 'spawn-settle' ? 0.82 : 1;
+  const travelEnd = size * particle.distance * distanceScale;
   const style = useAnimatedStyle(() => {
     if (reduceMotion) return { opacity: 0, transform: [{ translateX: 0 }, { translateY: 0 }, { scale: 0 }] };
     const base = effectProgress(progress.value, kind);
     const delayed = Math.max(0, Math.min(1, (base - index * 0.014) / (1 - index * 0.014)));
-    const distanceScale = kind === 'merge' ? 1.18 : kind === 'spawn-settle' ? 0.82 : 1;
-    const travel = interpolate(delayed, [0, 1], [size * 0.06, size * particle.distance * distanceScale]);
+    const travel = interpolate(delayed, [0, 1], [size * 0.06, travelEnd]);
     return {
       opacity: interpolate(delayed, [0, 0.16, 0.7, 1], [0, 1, 0.68, 0]),
       transform: [
-        { translateX: Math.cos(particle.angle) * travel },
-        { translateY: Math.sin(particle.angle) * travel + delayed * delayed * size * 0.08 },
+        { translateX: directionX * travel },
+        { translateY: directionY * travel + delayed * delayed * size * 0.08 },
         { scale: interpolate(delayed, [0, 0.24, 1], [0.3, kind === 'merge' ? 1.24 : 1.06, 0.2]) },
       ],
     };
-  }, [index, kind, particle.angle, particle.distance, reduceMotion, size]);
+  }, [directionX, directionY, index, kind, reduceMotion, size, travelEnd]);
   return <Animated.View style={[styles.particle, {
     backgroundColor: kind === 'merge' ? '#FFF0B0' : '#FFE4A0',
     height: particle.size,
@@ -218,6 +225,8 @@ const MergeEffectParticle = memo(function MergeEffectParticle({ centerX, centerY
 
 const styles = StyleSheet.create({
   glow: { position: 'absolute' },
-  particle: { borderRadius: 999, boxShadow: '0 0 6px rgba(255,231,165,0.66)', position: 'absolute' },
-  ring: { borderRadius: 999, borderWidth: 1.5, boxShadow: '0 0 10px rgba(255,205,112,0.5)', position: 'absolute' },
+  // The shared glow sprite supplies the halo; avoid a blurred shadow on every
+  // moving particle and ring (up to 42 simultaneous shadow-bearing views).
+  particle: { borderRadius: 999, position: 'absolute' },
+  ring: { borderRadius: 999, borderWidth: 1.5, position: 'absolute' },
 });

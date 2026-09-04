@@ -9,6 +9,7 @@ import { mossproutFirstSeedForIntent } from './mossprout-bond-share';
 import { normalizeMossproutIntent } from './mossprout-ftue-copy';
 
 const ACTION_FIELDS: Readonly<Record<string, keyof MossproutOnboardingAnswers>> = {
+  'companion.life_followup': 'lifeFollowupId',
   'companion.greeting': 'firstGreetingId',
   'egg.day_texture': 'dayTextureId',
   'egg.desired_help': 'growthIntentId',

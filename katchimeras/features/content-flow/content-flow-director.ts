@@ -182,10 +182,11 @@ export async function acknowledgeActiveContentFlowNavigation(surface: string): P
 }
 
 /** Re-drives durable automatic work after a cold launch or foreground. */
-export async function resumeActiveContentFlows(): Promise<ContentFlowRun[]> {
+export async function resumeActiveContentFlows(isActive: () => boolean = () => true): Promise<ContentFlowRun[]> {
   const results: ContentFlowRun[] = [];
   const runs = await listContentFlowRuns({ activeOnly: true });
   for (const run of runs) {
+    if (!isActive()) break;
     if (run.executionMode !== 'live' || run.phase === 'suspended') continue;
     if (!contentFlowDefinition(run.definitionId, run.definitionVersion)) {
       const migrated = await dispatchContentFlowCommand(run.runId, { type: 'retry' });
@@ -196,6 +197,7 @@ export async function resumeActiveContentFlows(): Promise<ContentFlowRun[]> {
     if (!definition) continue;
     const stabilized = await reduceContentFlowRunAtomically({ runId: run.runId, reduce: (current) => stabilizeContentFlow(definition, current).run });
     if (!stabilized.run) continue;
+    if (!isActive()) break;
     const resumed = await runPendingEffects(definition, stabilized.run, stabilizeContentFlow(definition, stabilized.run).pendingWork);
     results.push(resumed);
   }

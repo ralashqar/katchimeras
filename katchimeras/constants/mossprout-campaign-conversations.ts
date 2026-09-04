@@ -1,3 +1,4 @@
+import { lifeHabitById } from '@/constants/companion-life-content';
 import {
   MOSSPROUT_CAMPAIGN_EPISODES,
   mossproutCampaignEpisodeByOpeningId,
@@ -36,7 +37,7 @@ const episode = (number: number) => MOSSPROUT_CAMPAIGN_EPISODES[number - 1]!;
 function base(id: string, title: string, nodes: ConversationDefinition['nodes']): ConversationDefinition {
   return {
     id,
-    version: 3,
+    version: 4,
     familyId: 'mossprout',
     title,
     actionTitle: title,
@@ -62,7 +63,15 @@ function choiceOptions(choices: readonly Choice[], nextNodeId: string): Conversa
 function opening(number: number, story: OpeningStory): ConversationDefinition {
   const definition = episode(number);
   return base(definition.openingConversationId, definition.title, [
-    { id: 'scene', kind: 'choice', phase: 'deepen', prompt: story.opening, options: choiceOptions(story.openingChoices, 'bridge') },
+    { id: 'scene', kind: 'choice', phase: 'deepen', prompt: story.opening, options: choiceOptions(story.openingChoices, number > 1 ? 'life_context' : 'bridge') },
+    ...(number > 1 ? [{ id: 'life_context', kind: 'choice' as const, phase: 'explore' as const,
+      prompt: 'Before we begin, has there been a little room for nature or quiet in your own day?',
+      options: choiceOptions([
+        ['journey-life:noticed', 'I noticed something living', 'A leaf, a bird, a stubborn little weed—there is room for small discoveries here.'],
+        ['journey-life:rest', 'I took a quiet moment', 'A little room to pause belongs in our Garden too.'],
+        ['journey-life:not_yet', 'Not today', 'Then we can start right where we are. Nothing to catch up on.'],
+      ], 'bridge'),
+    }] : []),
     { id: 'bridge', kind: 'end', message: story.bridge },
   ]);
 }
@@ -113,7 +122,7 @@ const STORIES: Readonly<Record<number, DayStory>> = {
       ['pond-listen', 'We listened first', 'Yes. We did not force an answer; we made enough quiet for one to arrive.'],
       ['pond-move', 'A small path changed everything', 'That is my favourite kind of change: small enough to miss, important enough to bring water home.'],
     ],
-    insight: { key: 'mossprout-journey-2-mystery', category: 'Curiosity', title: 'What I noticed about you', end: 'The pond is only a puddle, but it has started talking. Tomorrow, we listen for what comes next.', results: [
+    insight: { key: 'mossprout-journey-2-mystery', category: 'Curiosity', title: 'What I noticed about you', end: 'The pond is only a puddle, but it has started talking. After a little reflection, we listen for what comes next.', results: [
       ['listen-first', 'You listen before you solve', 'When something is unclear, you make room for the clue before choosing the answer.', ['pond-listen']],
       ['gentle-change', 'You trust small changes', 'You notice how one thoughtful move can change the direction of a whole problem.', ['pond-move']],
     ] },
@@ -244,9 +253,37 @@ const STORIES: Readonly<Record<number, DayStory>> = {
   },
 };
 
+const pondOpening = (): ConversationDefinition => ({ ...base(episode(2).openingConversationId, episode(2).title, [
+  { id: 'scene', kind: 'choice', phase: 'opening', prompt: 'The pond knocked twice while I was resting. I knocked back. We may now have an appointment.\n\nBefore we investigate: when something needs figuring out, what kind of help feels good?', options: choiceOptions([
+    ['support-tiny', 'One small thing to try.', 'One thing at a time. I’ll keep the wheelbarrow of suggestions parked.'],
+    ['support-reflect', 'Talking it through.', 'We’ll look at the clues together before deciding.'],
+    ['support-push', 'A little encouragement.', 'I can do encouraging. “Excellent noticing!” See?'],
+    ['support-company', 'Just some company.', 'Then I’ll stay nearby. We don’t have to solve everything aloud.'],
+  ], 'life_context') },
+  { id: 'life_context', kind: 'choice', phase: 'explore', prompt: 'I’m making a place to listen. Where could a little nature fit into your day?', options: [
+    { id: 'nature-window', label: 'Through a window.', reply: 'A view counts. Nature is not checking whether you wore shoes.', nextNodeId: 'habit.mossprout:window-view' },
+    { id: 'nature-route', label: 'On a route I already take.', reply: 'Then we’ll borrow a moment from a path you already know.', nextNodeId: 'habit.mossprout:notice-living-thing' },
+    { id: 'nature-plant', label: 'With a plant I look after.', reply: 'We can start by seeing what it needs today.', nextNodeId: 'habit.mossprout:check-plant' },
+    { id: 'nature-unsure', label: 'Nowhere comes to mind.', reply: 'Then we’ll leave that question open. Come hear this pond.', nextNodeId: 'bridge' },
+  ] },
+  ...['mossprout:window-view', 'mossprout:notice-living-thing', 'mossprout:check-plant'].map((id) => ({ id: `habit.${id}`, kind: 'quick_goal_proposal' as const, storyDaily: true, prompt: 'Would you like to make room for this each day?', templateId: id, title: lifeHabitById.get(id)!.title, nextNodeId: 'bridge' })),
+  { id: 'bridge', kind: 'end', message: 'Petalimp heard it too. Let’s make a listening place, then give the trickle a path home.' },
+]), version: 5 });
+const pondResolution = (): ConversationDefinition => ({ ...base(episode(2).resolutionConversationId!, `${episode(2).title}: return`, [
+  { id: 'scene', kind: 'choice', phase: 'resolve', prompt: 'Water! I was preparing a very polite speech to a frog.\n\nWhat would you like to remember about this?', options: choiceOptions([
+    ['pond-listen', 'We stopped to listen.', 'We gave the quiet part a chance to be heard.'],
+    ['pond-move', 'A small change made room.', 'A little path. An unexpectedly large puddle.'],
+    ['pond-together', 'We worked it out together.', 'And nobody had to become a pond expert alone.'],
+  ], 'end') },
+  { id: 'end', kind: 'end', message: 'Our little beginning has become somewhere we can return to. I wonder what the rain will bring.' },
+]), version: 5 });
+export function legacyMossproutPondConversation(id: string): ConversationDefinition | null {
+  return id === episode(2).openingConversationId ? opening(2, STORIES[2]) : id === episode(2).resolutionConversationId ? resolution(2, STORIES[2]) : null;
+}
+
 const campaignScenes: readonly ConversationDefinition[] = Object.entries(STORIES).flatMap(([number, story]) => {
   const day = Number(number);
-  return [opening(day, story), resolution(day, story)];
+  return day === 2 ? [pondOpening(), pondResolution()] : [opening(day, story), resolution(day, story)];
 });
 
 function optionalScene(id: string, title: string, prompt: string): ConversationDefinition {

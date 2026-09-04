@@ -60,12 +60,12 @@ export function mossproutWaterTogetherReply(choiceId: string | null | undefined)
 
 export function mossproutFirstSeedForIntent(intentId: string | null | undefined) {
   if (intentId) intentId = normalizeMossproutIntent(intentId);
-  if (intentId === 'desired-help:calm') return { id: 'stillness', name: 'Seed of Stillness', message: 'Quiet can be something you grow, not something you wait for.' } as const;
+  if (intentId === 'desired-help:calm') return { id: 'stillness', name: 'Seed of Stillness', message: 'Today, you wanted a little room to pause.' } as const;
   if (intentId === 'desired-help:feel_like_myself') return { id: 'renewal', name: 'Seed of Renewal', message: 'A little more light can help you feel like yourself again.' } as const;
   if (intentId === 'desired-help:energy') return { id: 'renewal', name: 'Seed of Renewal', message: 'Fresh starts can arrive one small unfurling at a time.' } as const;
   if (intentId === 'desired-help:good_day') return { id: 'warmth', name: 'Seed of Warmth', message: 'A good day is worth noticing while it is here.' } as const;
-  if (intentId === 'desired-help:unsure') return { id: 'curiosity', name: 'Seed of Curiosity', message: 'Not knowing can still be a place to begin.' } as const;
-  return { id: 'momentum', name: 'Seed of Momentum', message: 'Start small enough that starting isn’t scary.' } as const;
+  if (intentId === 'desired-help:unsure') return { id: 'curiosity', name: 'Seed of Curiosity', message: 'Today, you left room to discover what feels right.' } as const;
+  return { id: 'momentum', name: 'Seed of Momentum', message: 'Today, you wanted a small beginning.' } as const;
 }
 
 export function mossproutBondSharePrompt(promptId: string | null | undefined) {

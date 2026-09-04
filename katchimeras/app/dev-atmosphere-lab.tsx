@@ -1,6 +1,10 @@
+import { useDiagnosticFps } from '@/hooks/use-diagnostic-fps';
 import { Image } from 'expo-image';
+import { useIsFocused } from '@react-navigation/native';
+import { useAppForeground } from '@/hooks/use-app-foreground';
+import { DIAGNOSTICS_ENABLED } from '@/constants/diagnostics';
 import { Redirect, router, Stack } from 'expo-router';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -42,6 +46,9 @@ export default function DevAtmosphereLabScreen() {
 }
 
 function AtmosphereLab() {
+  const focused = useIsFocused();
+  const foreground = useAppForeground();
+  const visible = focused && foreground;
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
   const devState = useDevAtmosphereState();
@@ -61,7 +68,7 @@ function AtmosphereLab() {
     weather: skyWeather,
   }), [devState.accentSettings.seed, skyIntensity, skyMood, skyWeather]);
   const bespokeBackground = useMemo(() => todayAtmosphereBackgroundForSky(sky), [sky]);
-  const fps = useApproximateFps();
+  const fps = useDiagnosticFps(visible && DIAGNOSTICS_ENABLED);
   const quality = resolvedAtmosphereQuality(devState.settings.quality, width);
   const particleCount = atmosphereParticleCount(devState.settings.preset, devState.settings.quality, width, devState.settings.intensity)
     + atmosphereParticleCount(devState.accentSettings.preset, devState.accentSettings.quality, width, devState.accentSettings.intensity);
@@ -95,7 +102,7 @@ function AtmosphereLab() {
       ) : (
         <StaticKingdomSkyBackground sky={sky} />
       )}
-      {showBackground && !(useBespokeBackground && bespokeBackground) ? (
+      {visible && showBackground && !(useBespokeBackground && bespokeBackground) ? (
         <>
           <AtmosphereLayer plane="background" reduceMotionOverride={simulateReducedMotion} renderer={devState.renderer} settings={devState.settings} />
           <AtmosphereLayer plane="background" reduceMotionOverride={simulateReducedMotion} renderer={devState.renderer} settings={devState.accentSettings} />
@@ -106,7 +113,7 @@ function AtmosphereLab() {
           <Image cachePolicy="memory-disk" contentFit="contain" source={PREVIEW_TILE} style={{ height: tileWidth, width: tileWidth }} transition={0} />
         </View>
       )}
-      {showForeground ? (
+      {visible && showForeground ? (
         <>
           <AtmosphereLayer plane="foreground" reduceMotionOverride={simulateReducedMotion} renderer={devState.renderer} settings={devState.settings} />
           <AtmosphereLayer plane="foreground" reduceMotionOverride={simulateReducedMotion} renderer={devState.renderer} settings={devState.accentSettings} />
@@ -119,7 +126,7 @@ function AtmosphereLab() {
 
       <View pointerEvents="none" style={[styles.diagnostics, { top: insets.top + 12 }]}>
         <ThemedText selectable style={styles.diagnosticText} lightColor="#F8FBFF" darkColor="#F8FBFF">
-          {fps} JS fps · {particleCount} particles · {quality} · {Math.round(width)}×{Math.round(height)}
+          {DIAGNOSTICS_ENABLED ? `${fps} JS fps` : 'FPS tracking off'} · {particleCount} particles · {quality} · {Math.round(width)}×{Math.round(height)}
         </ThemedText>
         <ThemedText selectable style={styles.diagnosticText} lightColor="#C8D7EF" darkColor="#C8D7EF">
           {devState.settings.paused || simulateReducedMotion ? 'frozen' : 'active'} · {devState.renderer} · {devState.settings.preset} + {devState.accentSettings.preset}
@@ -243,31 +250,6 @@ function DevSlider({ label, maximum, minimum, onChange, step, value, valueLabel 
 
 function ToggleRow({ compact = false, label, onChange, value }: { compact?: boolean; label: string; onChange: (value: boolean) => void; value: boolean }) {
   return <View style={[styles.toggleRow, compact ? styles.toggleCompact : null]}><ThemedText selectable style={styles.toggleLabel} lightColor="#E8EEFF" darkColor="#E8EEFF">{label}</ThemedText><Switch value={value} onValueChange={onChange} /></View>;
-}
-
-function useApproximateFps(): number {
-  const [fps, setFps] = useState(60);
-  const frameCount = useRef(0);
-  const startedAt = useRef(0);
-  useEffect(() => {
-    let frame = 0;
-    let cancelled = false;
-    const tick = (now: number) => {
-      if (cancelled) return;
-      if (!startedAt.current) startedAt.current = now;
-      frameCount.current += 1;
-      const elapsed = now - startedAt.current;
-      if (elapsed >= 750) {
-        setFps(Math.round((frameCount.current * 1000) / elapsed));
-        frameCount.current = 0;
-        startedAt.current = now;
-      }
-      frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => { cancelled = true; cancelAnimationFrame(frame); };
-  }, []);
-  return fps;
 }
 
 function windLabel(wind: number): string {

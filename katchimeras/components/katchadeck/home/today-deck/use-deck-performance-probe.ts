@@ -1,6 +1,8 @@
+import { createElement } from 'react';
 import { useFrameCallback, useSharedValue, type SharedValue, runOnJS } from 'react-native-reanimated';
 
-export const DECK_PERF_ENABLED = __DEV__ && process.env.EXPO_PUBLIC_DECK_PERF === '1';
+import { DECK_PERF_ENABLED } from '@/constants/diagnostics';
+export { DECK_PERF_ENABLED } from '@/constants/diagnostics';
 
 type DeckFrameSample = {
   droppedFrames: number;
@@ -14,7 +16,11 @@ function reportDeckFrameSample(sample: DeckFrameSample) {
   console[level]('[today-deck] transition', sample);
 }
 
-export function useDeckPerformanceProbe(transitionActive: SharedValue<number>) {
+type ProbeProps = { transitionActive: SharedValue<number> };
+export function DeckPerformanceProbe(props: ProbeProps) {
+  return DECK_PERF_ENABLED ? createElement(EnabledDeckPerformanceProbe, props) : null;
+}
+function EnabledDeckPerformanceProbe({ transitionActive }: ProbeProps) {
   const wasActive = useSharedValue(0);
   const startedAt = useSharedValue(0);
   const droppedFrames = useSharedValue(0);
@@ -42,4 +48,5 @@ export function useDeckPerformanceProbe(transitionActive: SharedValue<number>) {
       longestFrameMs: longestFrameMs.value,
     });
   }, DECK_PERF_ENABLED);
+  return null;
 }

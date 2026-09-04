@@ -503,7 +503,7 @@ test('FTUE Energy recovery uses one general reflection with no journal hierarchy
 
 test('Mossprout remembers the day, reflects it back, then offers one narrative Garden objective', () => {
   const firstMeetings = mossproutFtueConversationDefinitions.filter((definition) => definition.id.startsWith('mossprout:ftue:first-meeting:'));
-  assert.ok(firstMeetings.every((definition) => definition.version === 7));
+  assert.ok(firstMeetings.every((definition) => definition.version === 8));
   for (const definition of firstMeetings) {
     const hello = definition.nodes.find((node) => node.id === 'hello');
     assert.equal(hello?.kind, 'choice');
@@ -734,8 +734,8 @@ test('meditation stays inside companion interaction with compact action-card UI'
   assert.match(interaction, /meditationDashboardActive && meditation \? \([\s\S]*?styles\.meditationWorldTimer[\s\S]*?<CompanionMeditationStage/);
   assert.match(interaction, /initialConversationHandoffPending \? null : route\.kind === 'chat_lobby'[\s\S]*?&& !meditation/);
   assert.match(interaction, /\(route\.kind === 'destination' \|\| dashboardRouteActive[\s\S]*?&& !questGameVisible && !questionnaireExperience \? \([\s\S]*?<CompanionDestinationHeader/);
-  assert.match(interaction, /meditationDashboardActive = Boolean\(meditation && route\.kind !== 'conversation'/);
-  assert.match(interaction, /companionSpeechTitle = meditationDashboardActive \? MOSSPROUT_FTUE_COPY\.meditation/);
+  assert.match(interaction, /meditationDashboardActive = Boolean\(!quickGoalPickerOpen && !unifiedJourneyActive && meditation && route\.kind !== 'conversation'/);
+  assert.match(interaction, /companionSpeechTitle = dashboardRouteActive && !quickGoalPickerOpen && unifiedJourneyActive && journeyNarration \? journeyNarration : meditationDashboardActive \? MOSSPROUT_FTUE_COPY\.meditation/);
   assert.match(interaction, /meditating=\{Boolean\(meditation\)\}/);
   assert.match(cinematicStage, /meditating=\{meditating\}/);
   assert.match(homeStage, /withTiming\(meditating \? 1 : 0,[\s\S]*?duration: 520/);
@@ -753,7 +753,7 @@ test('meditation stays inside companion interaction with compact action-card UI'
   assert.match(interaction, /styles\.meditationActionsOverlay[\s\S]*?<MossproutStoryStage[\s\S]*?meditationMode/);
   assert.match(interaction, /meditationActionsOverlay: \{ position: 'absolute', zIndex: 25 \}/);
   assert.match(interaction, /bottom: Math\.max\(8, insets\.bottom \+ 4\)/);
-  assert.match(interaction, /scrollEnabled=\{!activeAttemptId && !questionnaireExperience && !meditationDashboardActive/);
+  assert.match(interaction, /scrollEnabled=\{!\(dashboardRouteActive && unifiedJourneyActive\) && !activeAttemptId && !questionnaireExperience && !meditationDashboardActive/);
   assert.doesNotMatch(interaction, /meditationActionStack/);
   assert.match(interaction, /meditationTimerScreenTop = Math\.max\(390, Math\.min\(510, viewportHeight \* 0\.58\)\)/);
   assert.match(interaction, /meditationTimerSurfaceTop = Math\.max\([\s\S]*?meditationTimerScreenTop - \(insets\.top \+ 58 \+ KatchaUI\.spacing\.xs\)/);
@@ -1066,9 +1066,10 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.match(kingdomCanvas, /durationMs: tutorialCamera\.durationMs[\s\S]*?initialScale: initialTutorialCameraScale[\s\S]*?scale: tutorialCamera\.zoom \?\? initialTutorialCameraScale/);
   assert.match(kingdomCanvas, /target\.kind !== 'haven_tile' && target\.kind !== 'haven_resident'/);
   assert.match(kingdomCanvas, /target\.kind === 'haven_resident'[\s\S]*?mossproutDialogueSubjectCenterY\(residentAnchor\.y\)/);
-  assert.match(kingdomCanvas, /appliedTutorialCameraRef = useRef\(initialTutorialFocus \? `\$\{tutorialCameraKey\}:0` : 'none'\)/);
-  assert.match(kingdomCanvas, /cameraRestoreArmedRef\.current = true[\s\S]*?nextState !== 'active'[\s\S]*?setCameraRestoreNonce/);
-  assert.match(kingdomCanvas, /applicationKey = `\$\{tutorialCameraKey\}:\$\{cameraRestoreNonce\}`/);
+  assert.match(kingdomCanvas, /appliedTutorialCameraRef = useRef\(initialTutorialFocus \? tutorialCameraKey : 'none'\)/);
+  assert.doesNotMatch(kingdomCanvas, /cameraRestoreNonce|cameraRestoreArmedRef/);
+  assert.match(kingdomCanvas, /applicationKey = tutorialCameraKey/);
+  assert.match(kingdomCamera, /if \(!resumeNeededRef.current\) return[\s\S]*?completeCameraMove\(move.id\)/);
   assert.match(kingdomCanvas, /durationMs = tutorialCamera\.durationMs/);
   assert.match(kingdomCamera, /initialFocus[\s\S]*?kingdomCameraSnapshotForTarget\([\s\S]*?initialFocus\.x, y: initialFocus\.y[\s\S]*?y: initialFocus\.screenY/);
   assert.match(kingdomCamera, /startsWithMotion[\s\S]*?commitSnapshot\(home\.tx, home\.ty, home\.scale, startsWithMotion\)[\s\S]*?animateTo\([\s\S]*?initialFocus\.scale[\s\S]*?initialFocus\.durationMs/);
@@ -1529,7 +1530,7 @@ test('opening FTUE removes the white environment fade and introduces UI from bel
   const home = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
   assert.match(home, /!onboardingFocus \? <View pointerEvents="none" style=\{styles\.environmentFade\} \/> : null/);
   assert.match(home, /entering=\{FadeInDown\.duration\(260\)\.easing\(Easing\.out\(Easing\.cubic\)\)\}/);
-  assert.match(home, /enterFromBottom \? FadeInDown : FadeInUp/);
+  assert.match(readFileSync('features/today/use-shared-action-panel-lifecycle.ts', 'utf8'), /enterFromBottom \? FadeInDown : FadeInUp/);
   assert.ok((home.match(/enterFromBottom/g) ?? []).length >= 8);
 });
 
@@ -1586,7 +1587,7 @@ test('sequential FTUE choice panels cannot consume the previous question complet
   assert.match(home, /ownedSelection = selection\?\.action\.instanceId === action\.instanceId/);
   assert.match(home, /ownedCompletionEvent = completionEvent\?\.action\.instanceId === action\.instanceId/);
   assert.match(home, /completionKey: ownedCompletionEvent\?\.id/);
-  assert.match(home, /if \(!completionKey \|\| completedKeyRef\.current === completionKey\) return/);
+  assert.match(readFileSync('features/today/use-shared-action-panel-lifecycle.ts', 'utf8'), /if \(!completionKey \|\| completedKeyRef\.current === completionKey\) return/);
 });
 
 test('Steppling discovery spotlights the exact parcel before any board merge', () => {

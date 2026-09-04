@@ -25,7 +25,6 @@ import { useFtueRun } from '@/features/onboarding/ftue-runtime';
 import {
   MOSSPROUT_BOND_SHARE_PROMPTS,
   MOSSPROUT_SUPPORT_STYLE_OPTIONS,
-  MOSSPROUT_WATER_TOGETHER_OPTIONS,
   MOSSPROUT_FTUE_BOND_SHARE_REWARD_PREVIEW,
   MOSSPROUT_FTUE_NAME_BOND_REWARD_PREVIEW,
   mossproutBondShareSelection,
@@ -33,6 +32,10 @@ import {
 } from '@/features/onboarding/mossprout-bond-share';
 import { mossproutMemoryPlantById } from '@/constants/mossprout-memory-plants';
 import { MOSSPROUT_FTUE_COPY as COPY } from '@/features/onboarding/mossprout-ftue-copy';
+import { DailyHabitOffer, LifeButton } from './companion-life-actions';
+import { mossproutFollowupChoice } from '@/constants/companion-life-content';
+import { loadOnboardingProfile } from '@/utils/onboarding-state';
+import { MOSSPROUT_LIFE_ENTRY } from '@/utils/companion-life-recording';
 
 const INTRODUCTION_REWARD = { amount: MOSSPROUT_FTUE_NAME_BOND_REWARD_PREVIEW, kind: 'bond' as const };
 const BOND_SHARE_REWARD = { amount: MOSSPROUT_FTUE_BOND_SHARE_REWARD_PREVIEW, kind: 'bond' as const };
@@ -214,28 +217,22 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
         artwork={<Image contentFit="contain" source={firstSeedDefinition.art.seed} style={styles.seedArt} />}
         eyebrow="YOUR MEMORY SEED"
         style={styles.seedRewardCard}
-        subtitle={COPY.seedOrigin}
+        subtitle={firstSeed.message}
         title={firstSeedDefinition.name}
         trailing={<View />}
       /> : null}
-      <ThemedText style={styles.privateNote} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{COPY.bond}</ThemedText>
+      <ThemedText style={styles.privateNote} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>We can plant it here. Our Journal will remember how it began.</ThemedText>
       <PrimaryAction icon={gardenStoryActionIcon} label={gardenStoryActionLabel} onPress={() => onContinue?.()} />
     </Animated.View>
   );
 
-  if (mode === 'water_together') return (
-    <Animated.View entering={FadeInUp.duration(220)} style={styles.plainActionStage}>
-      <View style={styles.bondChoiceStack}>
-        {MOSSPROUT_WATER_TOGETHER_OPTIONS.map((option) => (
-          <DayActionActiveRow animateLayout={false} key={option.id} label={option.label}>
-            <Pressable accessibilityRole="button" onPress={() => onContinue?.(option.id)} style={({ pressed }) => pressed && styles.pressed}>
-              <DayActionCardSurface artwork={<DayActionIcon icon={option.icon} />} title={option.label} />
-            </Pressable>
-          </DayActionActiveRow>
-        ))}
-      </View>
-    </Animated.View>
-  );
+  if (mode === 'water_together') {
+    const followup = mossproutFollowupChoice(loadOnboardingProfile().mossproutAnswers.lifeFollowupId);
+    return <Animated.View entering={FadeInUp.duration(220)} style={styles.actionStage}>
+      {followup?.habitId === null ? <><ThemedText lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>We’ve made a beginning. That’s plenty for today.</ThemedText><LifeButton label="Continue" onPress={() => onContinue?.('habit:declined')} /></>
+        : <DailyHabitOffer familyId="mossprout" suggestedId={followup?.habitId ?? 'mossprout:quiet-minute'} entryId={MOSSPROUT_LIFE_ENTRY} onDecision={(id) => onContinue?.(id ? `habit:${id}` : 'habit:declined')} />}
+    </Animated.View>;
+  }
 
   if (mode === 'water_response') return (
     <Animated.View entering={FadeInUp.duration(220)} style={styles.actionStage}>

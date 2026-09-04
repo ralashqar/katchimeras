@@ -1,3 +1,4 @@
+import { DIAGNOSTICS_ENABLED } from '@/constants/diagnostics';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { ContentFlowRun, ContentFlowSurface, ContentFlowSurfaceViewModel } from '@/types/content-flow';
@@ -46,7 +47,7 @@ export function useContentFlowSurface(surface: ContentFlowSurface): ContentFlowS
       const run = matching[0] ?? null;
       const conflicts = matching.slice(1).map((candidate) => candidate.runId);
       setSelection({ run, conflicts });
-      if (run && conflicts.length) recordStoryFlowDiagnostic({ category: 'ownership', message: 'Multiple flows requested one surface; child/newest run won', details: { conflicts, owner: run.runId, surface } });
+      if (DIAGNOSTICS_ENABLED && run && conflicts.length) recordStoryFlowDiagnostic({ category: 'ownership', message: 'Multiple flows requested one surface; child/newest run won', details: { conflicts, owner: run.runId, surface } });
     });
   }, [surface]);
   useEffect(() => {

@@ -128,6 +128,7 @@ export function MossproutStoryStage({
   actionStackTargetRef,
   navigationLocked = false,
   meditationMode = false,
+  visibleActionCount = 3,
   tutorialInteractionLocked = false,
   residentParcelHandoffActive = false,
   residentStoryResumeActive = false,
@@ -154,11 +155,13 @@ export function MossproutStoryStage({
   onOpenMerge: (orderId?: string | null) => void;
   onOpenQuestDirect: (questId: string, originActionId: string) => void;
   onOpenTrophies: () => void;
+  onVisitSeed?: () => void;
   onBondRewardRequest: (source: DayActionSourceRect, onArrive: () => void, receipt?: NonNullable<KatchimeraDayAction['rewardReceipt']>) => void;
   dayOneActionChoiceActive?: boolean;
   actionStackTargetRef?: RefObject<ViewType | null>;
   navigationLocked?: boolean;
   meditationMode?: boolean;
+  visibleActionCount?: 2 | 3;
   tutorialInteractionLocked?: boolean;
   residentParcelHandoffActive?: boolean;
   residentStoryResumeActive?: boolean;
@@ -393,9 +396,9 @@ export function MossproutStoryStage({
     ].slice(0, MAX_VISIBLE_ACTIONS);
   }, [actionId, activeConversationAction, journeyExclusive, residentResumeAction, residentStoryResumeActive, resolvedVisibleActions, selfCompletingGoalAction]);
 
-  const boardSnapshot = useMemo(() => createActionBoardSnapshot(dayId, sourceActions, relationships.actionPresentations), [dayId, relationships.actionPresentations, sourceActions]);
+  const boardSnapshot = useMemo(() => createActionBoardSnapshot(dayId, sourceActions, relationships.actionPresentations.filter((item) => relationships.actionCompletions.some((completion) => completion.id === item.completionId && completion.familyId === 'mossprout'))), [dayId, relationships.actionPresentations, relationships.actionCompletions, sourceActions]);
   const nextPresentation = boardSnapshot.presentations[0] ?? null;
-  const claimedPresentation = relationships.actionPresentations.find((item) => item.dayId === dayId && item.status === 'claimed') ?? null;
+  const claimedPresentation = relationships.actionPresentations.find((item) => item.dayId === dayId && item.status === 'claimed' && relationships.actionCompletions.some((completion) => completion.id === item.completionId && completion.familyId === 'mossprout')) ?? null;
   const controllerPresentation = claimedPresentation ?? nextPresentation;
   const presentationController = useActionPresentationController({
     presentationId: nextPresentation?.id ?? null,
@@ -570,6 +573,8 @@ export function MossproutStoryStage({
     tutorialInteractionLocked,
   ]);
 
+
+
   return <View style={[
     styles.stage,
     residentParcelHandoffActive
@@ -577,7 +582,7 @@ export function MossproutStoryStage({
       : journeyMergeActive && !residentStoryResumeActive
         ? styles.journeyRequestStage
         : meditationMode
-          ? styles.meditationActionStage
+          ? [styles.meditationActionStage, visibleActionCount === 2 && { height: 139 }]
           : styles.actionStage,
   ]}>
     {journey && !meditationMode && !storyComplete && !journeyMergeActive && !residentParcelHandoffActive && !residentStoryResumeActive ? (
@@ -610,9 +615,9 @@ export function MossproutStoryStage({
         standalone
         title={journeyEpisode.title}
       />
-    </View> : <View ref={actionStackTargetRef} accessibilityLabel="Mossprout Journey Day actions" style={styles.actionStack}>
-      <View style={styles.actionSlot}>
-      {boardSnapshot.slots.map((slot) => {
+    </View> : <View ref={actionStackTargetRef} accessibilityLabel="Mossprout Journey Day actions" style={[styles.actionStack, visibleActionCount === 2 && { height: 139 }]}>
+      <View style={[styles.actionSlot, visibleActionCount === 2 && { height: 139 }]}>
+      {boardSnapshot.slots.slice(0, visibleActionCount).map((slot) => {
         const presentedAction = slot.action;
         const enteringEnabled = presentationController.revealingSlotId === slot.slotId
           || (localReplacementTransition?.phase === 'revealing' && localReplacementTransition.slotId === slot.slotId);
@@ -631,6 +636,7 @@ export function MossproutStoryStage({
           const goalId = presentedAction.destination.goalId;
           return wrapSlot(
           <DayActionGoalRow
+            completeOnPress
             animateLayout
             artwork={<MossproutActionArtwork action={presentedAction} />}
             disabled={stackInteractionLocked}

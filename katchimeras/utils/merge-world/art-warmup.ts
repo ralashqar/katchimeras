@@ -11,7 +11,7 @@ export type MergeArtWarmupPlan = {
  * show next. Higher tiers beyond the generator's bounded bonus drop are loaded
  * naturally when they first become reachable through merging.
  */
-export function mergeArtWarmupPlan(state: MergeWorldState): MergeArtWarmupPlan {
+export function mergeArtWarmupPlan(state: Pick<MergeWorldState, 'board' | 'generators'>): MergeArtWarmupPlan {
   const generatorIds = new Set<string>();
   const itemDefinitionIds = new Set<string>();
 

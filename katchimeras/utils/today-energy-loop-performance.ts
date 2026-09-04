@@ -1,3 +1,5 @@
+import { TODAY_PERF_ENABLED as PERF_ENABLED, diagnosticNoop } from '../constants/diagnostics';
+
 export type TodayEnergyLoopPhase =
   | 'action_press'
   | 'destination_open'
@@ -24,17 +26,17 @@ type ActiveTrace = {
   lastAt: number;
 };
 
-const PERF_ENABLED = typeof __DEV__ !== 'undefined'
-  && __DEV__
-  && process.env.EXPO_PUBLIC_TODAY_LOOP_PERF === '1';
 const active = new Map<string, ActiveTrace>();
 const listeners = new Set<(metric: TodayEnergyLoopMetric) => void>();
 let sequence = 0;
 
 export function startTodayEnergyTrace(actionId: string): string {
-  const now = performance.now();
   sequence += 1;
+  // Transaction identity is functional; timing and retained trace data are not.
+  const now = PERF_ENABLED ? performance.now() : Date.now();
   const transactionId = `${actionId}:${Math.round(now)}:${sequence}`;
+  if (!PERF_ENABLED) return transactionId;
+  if (active.size >= 200) active.delete(active.keys().next().value!);
   active.set(transactionId, { actionId, startedAt: now, lastAt: now });
   markTodayEnergyPhase(transactionId, 'action_press');
   return transactionId;
@@ -45,6 +47,7 @@ export function markTodayEnergyPhase(
   phase: TodayEnergyLoopPhase,
   detail?: TodayEnergyLoopMetric['detail'],
 ): void {
+  if (!PERF_ENABLED) return;
   const trace = active.get(transactionId);
   if (!trace) return;
   const now = performance.now();
@@ -64,6 +67,7 @@ export function markTodayEnergyPhase(
 }
 
 export function subscribeTodayEnergyMetrics(listener: (metric: TodayEnergyLoopMetric) => void): () => void {
+  if (!PERF_ENABLED) return diagnosticNoop;
   listeners.add(listener);
   return () => listeners.delete(listener);
 }

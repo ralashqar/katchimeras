@@ -134,7 +134,7 @@ export function useCompanionQuickGoals({
     if (!template || !availableFamilySet.has(template.familyId)) {
       return { added: false, reason: 'invalid_template' as const };
     }
-    const current = rollCompanionQuickGoalsToDay(state, dayId);
+    const current = rollCompanionQuickGoalsToDay(loadCompanionQuickGoalState(), dayId);
     const result = addCompanionQuickGoal(current, {
       familyId: template.familyId,
       templateId: template.id,
@@ -145,11 +145,11 @@ export function useCompanionQuickGoals({
     commit(result.state);
     awardGoalCreation(template.familyId);
     return { added: true, reason: null };
-  }, [availableFamilySet, awardGoalCreation, commit, dayId, state]);
+  }, [availableFamilySet, awardGoalCreation, commit, dayId]);
 
   const addTemplates = useCallback((templateIds: readonly string[]) => {
     if (!dayId) return [];
-    let next = rollCompanionQuickGoalsToDay(state, dayId);
+    let next = rollCompanionQuickGoalsToDay(loadCompanionQuickGoalState(), dayId);
     const addedTemplateIds: string[] = [];
     const startedAt = Date.now();
     for (const [index, templateId] of templateIds.entries()) {
@@ -178,13 +178,13 @@ export function useCompanionQuickGoals({
   ) => {
     if (!dayId) return { added: false, reason: 'missing_day' as const };
     if (!availableFamilySet.has(familyId)) return { added: false, reason: 'invalid_family' as const };
-    const current = rollCompanionQuickGoalsToDay(state, dayId);
+    const current = rollCompanionQuickGoalsToDay(loadCompanionQuickGoalState(), dayId);
     const result = addCompanionQuickGoal(current, { familyId, title, cadence });
     if (!result.goal) return { added: false, reason: result.reason };
     commit(result.state);
     awardGoalCreation(familyId);
     return { added: true, reason: null };
-  }, [availableFamilySet, awardGoalCreation, commit, dayId, state]);
+  }, [availableFamilySet, awardGoalCreation, commit, dayId]);
 
   const editGoal = useCallback((
     goalId: string,
@@ -194,13 +194,13 @@ export function useCompanionQuickGoals({
       status?: CompanionQuickGoalStatus;
     }
   ) => {
-    const next = updateCompanionQuickGoal(state, goalId, updates);
+    const next = updateCompanionQuickGoal(loadCompanionQuickGoalState(), goalId, updates);
     if (next !== state) commit(next);
   }, [commit, state]);
 
   const completeGoal = useCallback((goalId: string): CompanionQuickGoalCompletionReceipt => {
     if (!dayId) return { bondAward: null, completion: null, newlyCompleted: false };
-    const result = completeCompanionQuickGoal(state, goalId, dayId);
+    const result = completeCompanionQuickGoal(loadCompanionQuickGoalState(), goalId, dayId);
     if (!result.completed || !result.completion) {
       return { bondAward: null, completion: result.completion, newlyCompleted: false };
     }
@@ -230,11 +230,11 @@ export function useCompanionQuickGoals({
       completion: result.completion,
       newlyCompleted: true,
     };
-  }, [commit, dayId, onBondChanged, state]);
+  }, [commit, dayId, onBondChanged]);
 
   const undoGoal = useCallback((goalId: string) => {
     if (!dayId) return false;
-    const result = undoCompanionQuickGoal(state, goalId, dayId);
+    const result = undoCompanionQuickGoal(loadCompanionQuickGoalState(), goalId, dayId);
     if (!result.undone || !result.completion) return false;
     commit(result.state);
 
@@ -249,26 +249,26 @@ export function useCompanionQuickGoals({
     if (removed.removed) saveCompanionBondState(removed.state);
     onBondChanged?.();
     return true;
-  }, [commit, dayId, onBondChanged, state]);
+  }, [commit, dayId, onBondChanged]);
 
   const snoozeGoal = useCallback((goalId: string) => {
     if (!dayId) return false;
-    const result = snoozeCompanionQuickGoal(state, goalId, dayId);
+    const result = snoozeCompanionQuickGoal(loadCompanionQuickGoalState(), goalId, dayId);
     if (!result.snoozed) return false;
     commit(result.state);
     return true;
-  }, [commit, dayId, state]);
+  }, [commit, dayId]);
 
   const skipGoal = useCallback((goalId: string) => {
     if (!dayId) return false;
-    const result = skipCompanionQuickGoal(state, goalId, dayId);
+    const result = skipCompanionQuickGoal(loadCompanionQuickGoalState(), goalId, dayId);
     if (!result.skipped) return false;
     commit(result.state);
     return true;
-  }, [commit, dayId, state]);
+  }, [commit, dayId]);
 
   const markJournaled = useCallback((completionId: string) => {
-    const next = markQuickGoalCompletionJournaled(state, completionId);
+    const next = markQuickGoalCompletionJournaled(loadCompanionQuickGoalState(), completionId);
     if (next !== state) commit(next);
   }, [commit, state]);
 

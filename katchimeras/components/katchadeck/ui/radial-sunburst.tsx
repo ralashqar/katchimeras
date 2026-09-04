@@ -16,12 +16,15 @@ const RADIAL_SUNBURST_ART = require('../../../assets/images/katchimeras/ui/radia
 const SUNBURST_NATIVE_SURFACE_SCALE = 2;
 
 export const RotatingRadialSunburst = memo(function RotatingRadialSunburst({
+  active = true,
   baseOpacity = 0.76,
   nativeSurfaceScale = SUNBURST_NATIVE_SURFACE_SCALE,
   rotationDurationMs = 32_000,
   size,
   style,
 }: {
+  /** Pause repeating work when the owning surface or decoration is hidden. */
+  active?: boolean;
   baseOpacity?: number;
   /** Set to 1 when the sunburst already lives inside an oversized native
    * surface that is counter-scaled by its parent. */
@@ -39,7 +42,7 @@ export const RotatingRadialSunburst = memo(function RotatingRadialSunburst({
   useEffect(() => {
     cancelAnimation(rotation);
     cancelAnimation(breath);
-    if (reduceMotion) {
+    if (reduceMotion || !active) {
       rotation.value = 0;
       breath.value = 0.45;
       return;
@@ -60,7 +63,7 @@ export const RotatingRadialSunburst = memo(function RotatingRadialSunburst({
       cancelAnimation(rotation);
       cancelAnimation(breath);
     };
-  }, [breath, reduceMotion, rotation, rotationDurationMs]);
+  }, [active, breath, reduceMotion, rotation, rotationDurationMs]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: Math.min(1, baseOpacity + breath.value * 0.1),

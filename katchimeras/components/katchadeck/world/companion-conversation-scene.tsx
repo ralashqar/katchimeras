@@ -1,3 +1,5 @@
+import { DailyHabitOffer } from './companion-life-actions';
+import { lifeHabitById } from '@/constants/companion-life-content';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useEffect, useState, type ReactNode, type RefObject } from 'react';
@@ -283,7 +285,7 @@ export function CompanionConversationScene({
             requiresManualAdvance={requiresManualAdvance}
           />
         ) : node?.kind === 'choice' ? (
-          <CompanionChoiceList options={node.options} onSelect={answer} />
+          <CompanionChoiceList options={node.id.startsWith('habit.') ? node.options.filter((option) => option.id !== 'choose') : node.options} onSelect={answer} />
         ) : node?.kind === 'poll' ? (
           <CompanionChoiceList options={node.options} onSelect={answer} />
         ) : node?.kind === 'profile_game' || node?.kind === 'insight_game' ? (
@@ -296,6 +298,9 @@ export function CompanionConversationScene({
           <MemoryProposal node={node} onDecision={onMemoryDecision} session={session} />
         ) : node?.kind === 'goal_proposal' ? (
           <GoalBundleProposal hasActiveGoalPlan={hasActiveFocus} node={node} onDecision={onGoalDecision} />
+        ) : node?.kind === 'quick_goal_proposal' && node.storyDaily && (definition.familyId === 'mossprout' || definition.familyId === 'steppling') ? (
+          <DailyHabitOffer key={node.id} familyId={definition.familyId} suggestedId={node.templateId} preview={Boolean(session.preview)} saveOnAccept={false}
+            onDecision={(id) => onQuickGoalDecision(Boolean(id), { ...node, templateId: id ?? node.templateId, title: id ? lifeHabitById.get(id)?.title ?? node.title : node.title })} />
         ) : node?.kind === 'quick_goal_proposal' ? (
           <View style={{ gap: 10 }}>
             <ThemedText selectable style={{ fontSize: 16, fontWeight: '900', lineHeight: 22 }} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>{node.title}</ThemedText>

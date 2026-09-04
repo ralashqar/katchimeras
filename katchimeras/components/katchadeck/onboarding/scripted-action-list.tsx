@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useRef } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View, type View as ViewType } from 'react-native';
 import Animated, { Easing, FadeIn, FadeInUp, FadeOutUp, LinearTransition, useReducedMotion } from 'react-native-reanimated';
 
@@ -14,8 +14,11 @@ import { Meadow } from '@/constants/meadow-theme';
 import { KatchaDeckUI } from '@/constants/theme';
 import type { FtueActionDefinition } from '@/features/onboarding/ftue-types';
 import { playEggActionHaptic } from '@/features/today/egg-haptics';
+import { useSharedActionPanelLifecycle } from '@/features/today/use-shared-action-panel-lifecycle';
 
-export function ScriptedActionList({ actions, locked, onAction, stepCount, stepEnergy }: {
+export function ScriptedActionList({ actions, completionKey, locked, onAction, onFinished, stepCount, stepEnergy }: {
+  completionKey?: string | null;
+  onFinished?: (completionKey: string) => void;
   actions: readonly FtueActionDefinition[];
   locked?: boolean;
   onAction: (action: FtueActionDefinition, from: FeedSourceRect) => void;
@@ -26,6 +29,8 @@ export function ScriptedActionList({ actions, locked, onAction, stepCount, stepE
   return <Animated.View layout={LinearTransition.duration(220)} style={styles.list}>
     {actions.filter((action) => action.presentation !== 'inline_choice').map((action) => (
       <ScriptedActionCard
+        completionKey={completionKey}
+        onFinished={onFinished}
         action={action}
         key={action.id}
         locked={locked}
@@ -38,7 +43,9 @@ export function ScriptedActionList({ actions, locked, onAction, stepCount, stepE
   </Animated.View>;
 }
 
-function ScriptedActionCard({ action, locked, reduceMotion, onAction, stepCount, stepEnergy }: {
+function ScriptedActionCard({ action, completionKey, locked, reduceMotion, onAction, onFinished, stepCount, stepEnergy }: {
+  completionKey?: string | null;
+  onFinished?: (completionKey: string) => void;
   action: FtueActionDefinition;
   locked?: boolean;
   reduceMotion: boolean;
@@ -76,10 +83,7 @@ function ScriptedActionCard({ action, locked, reduceMotion, onAction, stepCount,
     </Animated.View>;
   }
   if ((action.id === 'energy.convert_steps' || action.id === 'egg.feed_steps') && stepCount != null && stepEnergy != null) {
-    return <Animated.View
-      entering={reduceMotion ? FadeIn.duration(80) : FadeInUp.duration(300).easing(Easing.out(Easing.cubic))}
-      exiting={reduceMotion ? FadeOutUp.duration(80) : FadeOutUp.duration(230).easing(Easing.in(Easing.cubic))}
-      layout={LinearTransition.duration(220)}>
+    return <StepFeedPanelMotion completionKey={completionKey} onFinished={onFinished} reduceMotion={reduceMotion}>
       <GameSurface contentStyle={styles.stepsSurfaceContent} density="regular" style={styles.card} tone="cream">
         <Pressable
           accessibilityLabel={action.id === 'egg.feed_steps' ? `Feed ${stepCount.toLocaleString()} steps to the Egg for ${stepEnergy} Bond` : `Turn ${stepCount.toLocaleString()} steps into ${stepEnergy} Energy`}
@@ -102,7 +106,7 @@ function ScriptedActionCard({ action, locked, reduceMotion, onAction, stepCount,
           </View>
         </Pressable>
       </GameSurface>
-    </Animated.View>;
+    </StepFeedPanelMotion>;
   }
   return <Animated.View
     entering={reduceMotion ? FadeIn.duration(80) : FadeInUp.duration(300).easing(Easing.out(Easing.cubic))}
@@ -123,6 +127,26 @@ function ScriptedActionCard({ action, locked, reduceMotion, onAction, stepCount,
         <IconSymbol color={Meadow.inkFaint} name="arrow.right" size={19} />
       </Pressable>
     </GameSurface>
+  </Animated.View>;
+}
+
+const ignorePanelFinished = () => {};
+function StepFeedPanelMotion({ children, completionKey, onFinished = ignorePanelFinished, reduceMotion }: {
+  children: ReactNode;
+  completionKey?: string | null;
+  onFinished?: (completionKey: string) => void;
+  reduceMotion: boolean;
+}) {
+  const { entering, panelStyle } = useSharedActionPanelLifecycle({
+    completionKey, enterFromBottom: true, onFinished, reduceMotion,
+    // The steps button already owns its press haptic; reading/locking is not a selection.
+    selectionActive: false,
+  });
+  return <Animated.View
+    entering={entering}
+    exiting={onFinished === ignorePanelFinished ? FadeOutUp.duration(reduceMotion ? 80 : 230).easing(Easing.in(Easing.cubic)) : undefined}
+    layout={LinearTransition.duration(220)}>
+    <Animated.View collapsable={false} style={panelStyle}>{children}</Animated.View>
   </Animated.View>;
 }
 

@@ -11,6 +11,13 @@ export function createMergeBoardEffects() {
   return {
     ...store,
     emit(cell: number, kind: MergeBoardEffectKind) {
+      // A rapid tap burst shares its launch decoration, never its game command
+      // or item flight. Let the existing burst finish rather than stacking six
+      // particle systems at the same generator or restarting them every tap.
+      if (kind === 'spawn-origin') {
+        const existing = store.getSnapshot().find((entry) => entry.kind === kind && entry.cell === cell);
+        if (existing) return existing;
+      }
       const effect = { cell, kind, id: ++sequence };
       const slot = effect.id % MERGE_EFFECT_SLOT_IDS.length;
       store.publish([...store.getSnapshot().filter((entry) => entry.id % MERGE_EFFECT_SLOT_IDS.length !== slot), effect]);

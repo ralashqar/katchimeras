@@ -1,3 +1,5 @@
+import { acceptDailyStoryHabit } from '@/utils/companion-life-storage';
+import { lifeConversationEntryId } from '@/utils/companion-life-recording';
 import * as Haptics from 'expo-haptics';
 import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -829,7 +831,9 @@ export function KingdomCompanionScreen({
           onInsightConversationDecision={quests.decideSelectedConversationInsight}
           onQuickGoalConversationDecision={(accept, node) => {
             const added = accept && !quests.selectedConversationSession?.preview
-              ? quickGoals.addTemplates([node.templateId]).includes(node.templateId)
+              ? node.storyDaily && (quests.selectedConversationDefinition?.familyId === 'mossprout' || quests.selectedConversationDefinition?.familyId === 'steppling')
+                ? Boolean(acceptDailyStoryHabit(quests.selectedConversationDefinition.familyId, node.templateId, lifeConversationEntryId(quests.selectedConversationDefinition.id) ?? undefined))
+                : quickGoals.addTemplates([node.templateId]).includes(node.templateId)
               : false;
             quests.decideSelectedConversationQuickGoal(accept, added, node);
           }}

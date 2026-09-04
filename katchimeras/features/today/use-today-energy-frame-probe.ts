@@ -1,4 +1,6 @@
+import { createElement } from 'react';
 import { useFrameCallback, useSharedValue, runOnJS } from 'react-native-reanimated';
+import { TODAY_PERF_ENABLED } from '@/constants/diagnostics';
 
 import { todayEnergyPerformanceEnabled } from '@/utils/today-energy-loop-performance';
 
@@ -17,14 +19,17 @@ function reportFrameSample(sample: FrameSample) {
   });
 }
 
-export function useTodayEnergyFrameProbe(active: boolean): void {
+export function TodayEnergyFrameProbe(props: { active: boolean }) {
+  return TODAY_PERF_ENABLED ? createElement(EnabledTodayEnergyFrameProbe, props) : null;
+}
+function EnabledTodayEnergyFrameProbe({ active }: { active: boolean }) {
   const wasActive = useSharedValue(0);
   const frames = useSharedValue(0);
   const slowFrames = useSharedValue(0);
   const longestFrameMs = useSharedValue(0);
 
   useFrameCallback((frame) => {
-    if (!todayEnergyPerformanceEnabled()) return;
+    if (!TODAY_PERF_ENABLED) return;
     if (active) {
       if (wasActive.value === 0) {
         wasActive.value = 1;
@@ -45,5 +50,6 @@ export function useTodayEnergyFrameProbe(active: boolean): void {
       slowFrames: slowFrames.value,
       longestFrameMs: Math.round(longestFrameMs.value * 10) / 10,
     });
-  }, todayEnergyPerformanceEnabled());
+  }, TODAY_PERF_ENABLED);
+  return null;
 }

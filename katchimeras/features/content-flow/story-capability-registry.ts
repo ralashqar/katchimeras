@@ -64,6 +64,10 @@ function validateMeditationEffect(payload: Readonly<Record<string, unknown>>) {
 }
 
 const BUILT_INS: readonly StoryCapabilityDefinition[] = [
+  { id: 'companion.life.habit', kind: 'effect', idempotent: true },
+  { id: 'journey.orders', kind: 'task' },
+  { id: 'journey.cycle.rest', kind: 'effect', idempotent: true },
+  { id: 'journey.cycle.return', kind: 'effect', idempotent: true },
   { id: 'journey.reflection', kind: 'scene', validatePayload: requiredString('text') },
   { id: 'journey.grant_generator_parcel', kind: 'effect', idempotent: true, validatePayload: (payload) =>
     typeof payload.generatorId === 'string' && MERGE_GENERATORS_BY_ID.has(payload.generatorId) ? requiredString('rewardId')(payload) : 'A known generator is required' },

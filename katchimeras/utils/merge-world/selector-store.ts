@@ -28,16 +28,21 @@ export function selectedSnapshot<T, S>(read: () => T, select: (value: T) => S, e
   };
 }
 
+export function reuseShallowValue<T extends object>(previous: T, next: T): T {
+  if (previous === next) return previous;
+  const keys = Object.keys(next) as (keyof T)[];
+  return keys.length === Object.keys(previous).length && keys.every((key) => {
+    const a = previous[key], b = next[key];
+    return Object.is(a, b) || (Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((value, index) => Object.is(value, b[index])));
+  }) ? previous : next;
+}
+
 export function reuseShallowRows<T extends { id: string }>(previous: readonly T[], next: readonly T[]): readonly T[] {
   const byId = new Map(previous.map((row) => [row.id, row]));
   const rows = next.map((row) => {
     const old = byId.get(row.id);
     if (!old) return row;
-    const keys = Object.keys(row) as (keyof T)[];
-    return keys.length === Object.keys(old).length && keys.every((key) => {
-      const a = old[key], b = row[key];
-      return Object.is(a, b) || (Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((value, index) => Object.is(value, b[index])));
-    }) ? old : row;
+    return reuseShallowValue(old, row);
   });
   return rows.length === previous.length && rows.every((row, index) => row === previous[index]) ? previous : rows;
 }

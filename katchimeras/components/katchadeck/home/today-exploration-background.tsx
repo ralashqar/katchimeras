@@ -28,7 +28,6 @@ import {
 } from '@/utils/today-exploration-gesture';
 import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-backgrounds';
 import { TODAY_EXPLORATION_BACKGROUND_SOURCES } from '@/constants/today-exploration-background-sources.gen';
-import { useScenePerformanceProbe } from '@/hooks/use-scene-performance-probe';
 
 type TodayExplorationBackgroundMotionOptions = {
   activeKey?: string | null;
@@ -73,7 +72,6 @@ export function useTodayExplorationBackgroundMotion({
     return transitionStartX.value
       + (targetX - transitionStartX.value) * transitionProgress.value;
   });
-  useScenePerformanceProbe('today-exploration-page', transitionActive);
 
   const resetAfterCommit = useCallback(() => {
     cancelAnimation(transitionProgress);

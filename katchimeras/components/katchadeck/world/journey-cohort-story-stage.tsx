@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 
-import { COMPANION_MERGE_REQUEST_PALETTE, CompanionMergeRequestTray } from '@/components/katchadeck/world/companion-merge-request-tray';
+import { COMPANION_STORY_PANEL_STYLE, COMPANION_MERGE_REQUEST_PALETTE, CompanionMergeRequestTray } from '@/components/katchadeck/world/companion-merge-request-tray';
 import { BondIconArt } from '@/components/katchadeck/ui/bond-icon-art';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -114,7 +114,7 @@ export function JourneyCohortStoryStage({ familyId, onBegin, onJournal, onMore, 
 }
 
 const styles = StyleSheet.create({
-  stage: { backgroundColor: KatchaUI.companionScenePanel.background, borderColor: KatchaUI.companionScenePanel.border, borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, boxShadow: KatchaUI.companionScenePanel.shadow, gap: 7, padding: 10 },
+  stage: COMPANION_STORY_PANEL_STYLE,
   heading: { alignItems: 'center', flexDirection: 'row', gap: 9 }, level: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.accent, borderRadius: 15, height: 40, justifyContent: 'center', width: 40 }, levelText: { fontSize: 17, fontWeight: '900' },
   copy: { flex: 1, gap: 1 }, eyebrow: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.9 }, title: { fontSize: 18, fontWeight: '900', letterSpacing: -0.3, lineHeight: 21 }, body: { fontSize: 11.5, lineHeight: 16 },
   bond: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: KatchaUI.companionScenePanel.accent, borderRadius: 999, flexDirection: 'row', gap: 7, minHeight: 34, paddingHorizontal: 12 }, bondText: { fontSize: 11.5, fontWeight: '900' },

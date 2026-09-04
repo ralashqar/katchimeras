@@ -37,6 +37,7 @@ import {
 } from '../game/katchimeras/relationship-progression';
 import { mossproutStoryConversationDefinitions } from '../constants/mossprout-story-conversations';
 import { MOSSPROUT_CAMPAIGN_EPISODES } from '../constants/mossprout-campaign';
+import { currentJourneyCycle, finishJourneyReturn, JOURNEY_REST_MS } from '../game/katchimeras/companion-journey-cycle';
 import { MOSSPROUT_JOURNEY_CAMPAIGN } from '../constants/mossprout-journey-campaign';
 import { validateJourneyCampaign } from '../game/katchimeras/journey-campaign';
 import { mossproutCampaignConversationDefinitions } from '../constants/mossprout-campaign-conversations';
@@ -121,12 +122,12 @@ test('starting Day 2 removes the initial Home handoff hook', () => {
 test('the eight-hour rest can start Journey Day 2 on the same calendar date', () => {
   const state = firstJourneyCompleteState();
   const completedAt = state.journeyDays[0]!.completedAt!;
-  assert.equal(startMossproutJourneyDay(state, '2026-08-23', completedAt + 8 * 60 * 60 * 1000 - 1, 1).reason, 'existing');
+  assert.equal(startMossproutJourneyDay(state, '2026-08-23', completedAt + 8 * 60 * 60 * 1000 - 1, 1).reason, 'resting');
   const started = startMossproutJourneyDay(state, '2026-08-23', completedAt + 8 * 60 * 60 * 1000, 1);
   assert.equal(started.reason, 'started');
   assert.equal(started.journey?.beatId, 'quiet-patch:pond-knock');
-  assert.equal(started.journey?.dayId, '2026-08-23:mossprout-journey-02');
-  assert.equal(mossproutJourneyDayNumber(started.state, '2026-08-23'), 2);
+  assert.equal(started.journey?.dayId, 'mossprout:episode:quiet-patch:pond-knock');
+  assert.equal(mossproutJourneyDayNumber(started.state, started.journey!.dayId), 2);
 });
 
 test('meditation is durable Katchimera state and owns the Journey wake time', () => {
@@ -144,7 +145,7 @@ test('meditation is durable Katchimera state and owns the Journey wake time', ()
   assert.equal(activeKatchimeraMeditation(state, 'mossprout', availableAt - 1)?.reason, 'journey_rest');
   assert.equal(activeKatchimeraMeditation(state, 'mossprout', availableAt), null);
   assert.equal(resolveMossproutJourneyHandoff({ dayId: '2026-08-23', ftueStatus: 'complete', relationships: state, now: availableAt - 1 })?.availableAt, availableAt);
-  assert.equal(startMossproutJourneyDay(state, '2026-08-23', availableAt - 1, 1).reason, 'existing');
+  assert.equal(startMossproutJourneyDay(state, '2026-08-23', availableAt - 1, 1).reason, 'resting');
   assert.equal(startMossproutJourneyDay(state, '2026-08-23', availableAt, 1).reason, 'started');
 });
 
@@ -228,7 +229,7 @@ test('Journey Day 2 runs opening, two authored orders, return, and completion', 
     resolutionId: 'mossprout:ftue:chapter-zero-return',
   }, 2);
 
-  const started = startMossproutJourneyDay(state, '2026-08-24', 3, 1);
+  const started = startMossproutJourneyDay(state, '2026-08-24', 3, 1, true);
   assert.equal(started.reason, 'started');
   assert.equal(started.journey?.status, 'opening');
   assert.equal(started.journey?.beatId, 'quiet-patch:pond-knock');
@@ -273,7 +274,7 @@ test('Journey Day 2 runs opening, two authored orders, return, and completion', 
 
 test('an active Journey Day exclusively owns Mossprout action cards', () => {
   let state = firstJourneyCompleteState('2026-08-23');
-  state = startMossproutJourneyDay(state, '2026-08-24', 3, 1).state;
+  state = startMossproutJourneyDay(state, '2026-08-24', 3, 1, true).state;
   let journey = mossproutJourneyForDay(state, '2026-08-24');
   const optionalInput = {
     dayId: '2026-08-24',
@@ -315,7 +316,7 @@ test('reset latest Journey Day rewinds Day 2 while preserving Day 1', () => {
     activityReceiptId: 'merge-order:mossprout:chapter-0:first-sprout',
     resolutionId: 'mossprout:ftue:chapter-zero-return',
   }, 2);
-  state = startMossproutJourneyDay(state, '2026-08-24', 3, 1).state;
+  state = startMossproutJourneyDay(state, '2026-08-24', 3, 1, true).state;
   state = completeMossproutJourneyOpening(state, '2026-08-24', 4);
   state = startMossproutJourneyActivity(state, '2026-08-24');
   state = recordMossproutJourneyOrderServed(state, 'merge-story:mossprout:quiet-patch:listening-place', 5);
@@ -708,7 +709,7 @@ test('Mossprout hides unavailable and competing real-life requests instead of lo
 test('Mossprout never selects a disabled Journey row into a visible slot', () => {
   let state = startMossproutJourneyDay(emptyRelationshipProgressState(), '2026-08-21', 1).state;
   state = completeMossproutJourneyDay(state, '2026-08-21', { objectiveId: 'first-sprout', activityReceiptId: 'sprout', resolutionId: 'ftue' }, 2);
-  state = startMossproutJourneyDay(state, '2026-08-22', 3).state;
+  state = startMossproutJourneyDay(state, '2026-08-22', 3, 0, true).state;
   state = completeMossproutJourneyOpening(state, '2026-08-22', 4);
 
   const actions = resolveMossproutDayActions({
@@ -719,7 +720,7 @@ test('Mossprout never selects a disabled Journey row into a visible slot', () =>
   assert.equal(actions.some((action) => action.title === 'Mossprout is still noticing today'), false);
 });
 
-test('only one companion can own a real day', () => {
+test('reopening a companion resumes its unfinished episode', () => {
   const started = startMossproutJourneyDay(emptyRelationshipProgressState(), '2026-08-21', 1);
   assert.equal(started.reason, 'started');
   const repeated = startMossproutJourneyDay(started.state, '2026-08-21', 2);
@@ -753,14 +754,12 @@ test('the first Garden order unlocks the return insight before completing Day 1'
 test('a Journey Garden card uses the live order title, reward, and every requested item', () => {
   let state = startMossproutJourneyDay(emptyRelationshipProgressState(), '2026-08-21', 1).state;
   state = completeMossproutJourneyDay(state, '2026-08-21', { objectiveId: 'first-sprout', activityReceiptId: 'sprout', resolutionId: 'ftue' }, 2);
-  state = startMossproutJourneyDay(state, '2026-08-22', 3, 6).state;
+  state = startMossproutJourneyDay(state, '2026-08-22', 3, 6, true).state;
   state = completeMossproutJourneyOpening(state, '2026-08-22', 4);
-  state = startMossproutJourneyDay(state, '2026-08-23', 5, 7).state;
-  state = completeMossproutJourneyOpening(state, '2026-08-23', 6);
 
   const actions = resolveMossproutDayActions({
     goals: [],
-    journey: mossproutJourneyForDay(state, '2026-08-23'),
+    journey: mossproutJourneyForDay(state, '2026-08-22'),
     journeyGardenRequest: {
       id: 'live-order', title: 'The order on the board', description: 'Bring these exact pieces.', difficulty: 'major',
       requirements: [
@@ -1251,7 +1250,8 @@ test('resetting one relationship day restores empty slots without erasing other 
     destination: { kind: 'conversation', definitionId: 'journal' }, completedAt: null, outroAcknowledgedAt: null,
   });
   state = startMossproutJourneyDay(state, dayOne, 1).state;
-  state = startMossproutJourneyDay(state, dayTwo, 2).state;
+  state = completeMossproutJourneyDay(state, dayOne, { activityReceiptId: 'fixture-plant', resolutionId: 'fixture-resolution' }, 2);
+  state = startMossproutJourneyDay(state, dayTwo, 3, 0, true).state;
   const storyBefore = state.stories;
 
   const reset = resetRelationshipProgressForDayForDebug(state, dayOne);
@@ -1448,22 +1448,25 @@ test.skip('legacy over-threshold saves play every Memory Nursery and Heartwood b
   assert.equal(startMossproutJourneyDay(state, '2026-08-20', 200, 28).reason, 'resting');
 });
 
-test('Campaign V2 serves all thirteen anchors on their upcoming active Garden Days', () => {
+test('all thirteen anchors advance after rest and return, without active-day gates', () => {
   let state = emptyRelationshipProgressState();
   for (const episode of MOSSPROUT_CAMPAIGN_EPISODES) {
     const dayId = `2026-09-${String(episode.episodeNumber).padStart(2, '0')}`;
-    if (episode.unlockGardenDay > 1) {
-      const tooEarly = startMossproutJourneyDay(state, dayId, episode.episodeNumber * 10, episode.unlockGardenDay - 2);
+    const now = episode.episodeNumber * (JOURNEY_REST_MS + 100);
+    if (episode.episodeNumber > 1) {
+      const tooEarly = startMossproutJourneyDay(state, dayId, (episode.episodeNumber - 1) * (JOURNEY_REST_MS + 100) + 2, 999);
       assert.equal(tooEarly.reason, 'resting');
     }
-    const started = startMossproutJourneyDay(state, dayId, episode.episodeNumber * 10, episode.unlockGardenDay - 1);
+    const cycle = currentJourneyCycle(state, 'mossprout');
+    if (cycle) state = finishJourneyReturn(state, cycle.id, now);
+    const started = startMossproutJourneyDay(state, dayId, now, 0);
     assert.equal(started.reason, 'started');
     assert.equal(started.journey?.beatId, episode.beatId);
     state = completeMossproutJourneyDay(started.state, dayId, {
       objectiveId: episode.objectiveId ?? undefined,
       activityReceiptId: `campaign-v2:${episode.episodeNumber}`,
       resolutionId: episode.resolutionConversationId ?? episode.openingConversationId,
-    }, episode.episodeNumber * 10 + 1);
+    }, now + 1);
   }
   assert.deepEqual(mossproutStory(state).completedBeatIds, MOSSPROUT_CAMPAIGN_EPISODES.map((episode) => episode.beatId));
   assert.equal(mossproutStory(state).habitatStage, 4);

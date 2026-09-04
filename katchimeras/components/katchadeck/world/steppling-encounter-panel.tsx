@@ -30,6 +30,11 @@ export function StepplingEncounterPanel({ encounter, egg, cameraReady }: {
   const gesture = useMemo(() => Gesture.Pan().enabled(false), []);
   const [steps, setSteps] = useState<number | null>(null);
   const [reading, setReading] = useState(true);
+  // Camera readiness gates the entrance, not the lifetime of an answering card.
+  // A settled notification / app resume must not tear down its native animation.
+  const [hasEntered, setHasEntered] = useState(cameraReady);
+  useEffect(() => { if (cameraReady) setHasEntered(true); }, [cameraReady]);
+  const [answerSteps, setAnswerSteps] = useState<number | null | undefined>();
   const readRevision = useRef(0);
   const sourceDayId = egg?.sourceDayId;
   const readSteps = useCallback(async () => {
@@ -55,10 +60,13 @@ export function StepplingEncounterPanel({ encounter, egg, cameraReady }: {
     return () => { readRevision.current += 1; subscription.remove(); };
   }, [readSteps]);
 
-  if (!cameraReady) return null;
+  if (!hasEntered && !cameraReady) return null;
+  // Freeze *all* inputs selecting the current card, not just the saved Egg.
+  // Health permission/step refreshes may resolve while Bond is flying.
+  const displayedSteps = encounter.busy && answerSteps !== undefined ? answerSteps : steps;
   const ready = stepplingEggReady(egg);
-  const stepOffer = stepplingStepFeedOffer(egg, steps ?? 0);
-  const movementFallback = steps != null && stepOffer.steps === 0;
+  const stepOffer = stepplingStepFeedOffer(egg, displayedSteps ?? 0);
+  const movementFallback = displayedSteps != null && stepOffer.steps === 0;
   const question = egg && (!egg.intent || movementFallback && !ready) ? eggQuestionAction(
     !egg.intent ? 'egg.steppling.intent' : 'egg.steppling.movement',
     !egg.intent ? 'What would you like more of?' : 'What movement suits you today?',
@@ -73,16 +81,22 @@ export function StepplingEncounterPanel({ encounter, egg, cameraReady }: {
     </GameSurface> : null}
     {!egg ? <KatchaButton label="Try again" onPress={() => void encounter.enter()} disabled={encounter.busy} />
       : question ? <EggQuestionPanel
-        key={question.id} action={question} completionEvent={null} enterFromBottom
-        interactionLocked={encounter.busy} onSkip={() => {}} selection={null}
+        key={question.id} action={question}
+        completionEvent={encounter.feedCompletionKey ? { action: question, id: encounter.feedCompletionKey } : null}
+        onFinished={encounter.finishFeedPanel} enterFromBottom
+        interactionLocked={encounter.busy || !cameraReady} onSkip={() => {}} selection={null}
         options={!egg.intent ? INTENT_CHOICES : MOVEMENT_CHOICES}
         reduceMotion={reduceMotion} swipeExternalGesture={gesture}
-        onChoose={(option, _from, currencyFrom) => void encounter.feed(
-          { kind: !egg.intent ? 'intent' : 'alternative', answer: option.id }, currencyFrom,
-        )}
+        onChoose={(option, _from, currencyFrom) => {
+          setAnswerSteps(steps);
+          void encounter.feed({ kind: !egg.intent ? 'intent' : 'alternative', answer: option.id }, currencyFrom);
+        }}
       /> : encounter.hatching || egg.hatchedAt ? null
         : ready ? <ScriptedActionList actions={[{ id: 'egg.steppling.hatch', title: 'Hatch', description: 'Your little friend is ready.', icon: 'sparkles', presentation: 'cta_action', handlerId: 'discovery_hatch' }]} locked={encounter.busy} onAction={() => void encounter.send({ kind: 'hatch' })} />
-          : stepOffer.steps > 0 ? <ScriptedActionList actions={[{ id: 'egg.feed_steps', title: 'Feed steps', description: '', icon: 'heart.fill', presentation: 'route_action', handlerId: 'pedometer_steps' }]} stepCount={stepOffer.steps} stepEnergy={stepOffer.bond} locked={encounter.busy || reading} onAction={(_action, from) => void encounter.feed({ kind: 'feed', sourceDayId: egg.sourceDayId, observedSteps: steps ?? 0 }, from)} />
+          : stepOffer.steps > 0 ? <ScriptedActionList completionKey={encounter.feedCompletionKey} onFinished={encounter.finishFeedPanel} actions={[{ id: 'egg.feed_steps', title: 'Feed steps', description: '', icon: 'heart.fill', presentation: 'route_action', handlerId: 'pedometer_steps' }]} stepCount={stepOffer.steps} stepEnergy={stepOffer.bond} locked={encounter.busy || reading || !cameraReady} onAction={(_action, from) => {
+            setAnswerSteps(steps);
+            void encounter.feed({ kind: 'feed', sourceDayId: egg.sourceDayId, observedSteps: steps ?? 0 }, from);
+          }} />
             : <ScriptedActionList actions={[{ id: 'egg.read_steps', title: 'Reading yesterday’s steps…', description: '', icon: 'figure.walk', presentation: 'route_action', handlerId: 'pedometer_steps' }]} locked onAction={() => {}} />}
   </EggActionDock>;
 }

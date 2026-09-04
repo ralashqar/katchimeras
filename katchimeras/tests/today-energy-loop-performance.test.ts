@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import './helpers/enable-diagnostics';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -153,7 +154,8 @@ test('yesterday step Energy is a required top action with synchronized counters'
   assert.match(stepConversionSource, /setYesterdayStepEnergyCompletionKey\(offer\.dayId\)/);
   assert.doesNotMatch(stepConversionSource, /setYesterdayStepEnergyOffer\(null\)/);
   assert.match(todaySource, /const finishYesterdayStepEnergyPanel = useCallback[\s\S]*?setYesterdayStepEnergyOffer[\s\S]*?setYesterdayStepEnergyBusy\(false\)/);
-  assert.match(nurtureSource, /function useSharedActionPanelLifecycle/);
+  assert.match(nurtureSource, /import \{ useSharedActionPanelLifecycle \} from '@\/features\/today\/use-shared-action-panel-lifecycle'/);
+  assert.match(readFileSync('features/today/use-shared-action-panel-lifecycle.ts', 'utf8'), /export function useSharedActionPanelLifecycle/);
   assert.match(nurtureSource, /function InlineCheckInPanel[\s\S]*?useSharedActionPanelLifecycle\(\{/);
   assert.match(nurtureSource, /function YesterdayStepEnergyRow[\s\S]*?useSharedActionPanelLifecycle\(\{/);
 });
@@ -234,7 +236,7 @@ test.skip('retired Today nurture presentation does not mount a second scene unde
   assert.match(heroSource, /skinId=\{equippedSkinId\}/);
   assert.match(heroSource, /faceId=\{forceSleeping \? 'sleepy' : equippedFaceId\}/);
   assert.doesNotMatch(heroSource, /cutouts\/egg-base/);
-  assert.match(nurtureSource, /\(enterFromBottom \? FadeInDown : FadeInUp\)\.delay\(55\)\.duration\(320\)/);
+  assert.match(readFileSync('features/today/use-shared-action-panel-lifecycle.ts', 'utf8'), /\(enterFromBottom \? FadeInDown : FadeInUp\)\.delay\(55\)\.duration\(320\)/);
   assert.match(nurtureSource, /const actionHandoffLayout = useMemo\([\s\S]*?LinearTransition\.duration\(300\)/);
   assert.ok((nurtureSource.match(/layout=\{actionHandoffLayout\}/g) ?? []).length >= 2);
     assert.match(nurtureSource, /<Animated\.View[\s\S]*?layout=\{actionHandoffLayout\}[\s\S]*?onLayout=\{handleCheckInGroupLayout\}[\s\S]*?minHeight: checkInSlotHeight/);

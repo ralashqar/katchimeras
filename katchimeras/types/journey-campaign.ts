@@ -28,11 +28,18 @@ export type JourneyDayDefinition = {
 };
 
 export type JourneyCampaignDefinition = {
+  chapters?: readonly JourneyChapterDefinition[];
   id: string;
   version: number;
   familyId: KatchimeraFamilyId;
   days: readonly JourneyDayDefinition[];
 };
 
-export type JourneyCampaignValidationIssue = { path: string; message: string };
+export type JourneyChapterDefinition = {
+  id: string;
+  title: string;
+  purpose: string;
+  episodeIds: readonly string[];
+};
 
+export type JourneyCampaignValidationIssue = { path: string; message: string };

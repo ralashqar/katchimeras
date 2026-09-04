@@ -7,16 +7,18 @@ import Animated, {
   cancelAnimation,
   interpolate,
   runOnJS,
+  useAnimatedReaction,
   useAnimatedStyle,
+  useDerivedValue,
   useReducedMotion,
   useSharedValue,
   withDelay,
-  withRepeat,
+  type SharedValue,
   withTiming,
 } from 'react-native-reanimated';
 
 import { splitEnergyAcrossTokens } from '@/utils/energy-payout';
-import { rewardIconFlightScale, type RewardIconSize } from '@/utils/merge-world/reward-flight';
+import { rewardIconFlightScale, rewardTokenClock, rewardTokenTiming, type RewardIconSize } from '@/utils/merge-world/reward-flight';
 
 import { PersistentMergeItemArt } from './feastle-persistent-merge-board';
 
@@ -26,9 +28,6 @@ const ITEM_SIZE = 38;
 const REWARD_TOKEN_SIZE = 35;
 const ITEM_FLIGHT_MS = 390;
 const ITEM_STAGGER_MS = 55;
-const COIN_RISE_MS = 140;
-const COIN_HOVER_MS = 150;
-const COIN_FLIGHT_MS = 380;
 const COIN_STAGGER_MS = 65;
 
 const COIN_BURST = [
@@ -196,6 +195,14 @@ function RewardPayout({ amount, art, from, nonce, onArrive, onFinish, to, target
   variant: 'coin' | 'energy';
 }) {
   const tokenAmounts = splitEnergyAcrossTokens(amount, 5);
+  const elapsed = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
+  const duration = rewardTokenTiming(Math.max(0, tokenAmounts.length - 1), reduceMotion, variant === 'energy').arrivalMs;
+  useEffect(() => {
+    elapsed.value = 0;
+    elapsed.value = withTiming(duration, { duration, easing: Easing.linear });
+    return () => cancelAnimation(elapsed);
+  }, [duration, elapsed, nonce]);
 
   useEffect(() => {
     if (tokenAmounts.length) return;
@@ -205,6 +212,7 @@ function RewardPayout({ amount, art, from, nonce, onArrive, onFinish, to, target
 
   return tokenAmounts.map((tokenAmount, index) => (
     <RewardToken
+      elapsed={elapsed}
       amount={tokenAmount}
       art={art}
       count={tokenAmounts.length}
@@ -221,7 +229,8 @@ function RewardPayout({ amount, art, from, nonce, onArrive, onFinish, to, target
   ));
 }
 
-function RewardToken({ amount, art, count, from, index, onArrive, onFinish, to, targetSize, totalAmount, variant }: {
+function RewardToken({ elapsed, amount, art, count, from, index, onArrive, onFinish, to, targetSize, totalAmount, variant }: {
+  elapsed: SharedValue<number>;
   amount: number;
   art: number;
   count: number;
@@ -234,63 +243,54 @@ function RewardToken({ amount, art, count, from, index, onArrive, onFinish, to, 
   totalAmount: number;
   variant: 'coin' | 'energy';
 }) {
-  const rise = useSharedValue(0);
-  const flight = useSharedValue(0);
-  const hover = useSharedValue(0);
   const landed = useSharedValue(0);
+  const notified = useSharedValue(false);
   const reduceMotion = useReducedMotion();
+  const { arrivalMs, riseMs, flightStartMs, flightMs } = rewardTokenTiming(index, reduceMotion, variant === 'energy');
+  const clock = useDerivedValue(() => rewardTokenClock(elapsed.value, arrivalMs), [arrivalMs, elapsed]);
   const contactWindowMs = mergeRewardContactWindowMs(count, reduceMotion);
   const baseVector = COIN_BURST[index] ?? COIN_BURST[COIN_BURST.length - 1];
   const vector = variant === 'energy'
     ? { ...baseVector, rotation: -baseVector.rotation, x: baseVector.x + 8, y: baseVector.y + 5 }
     : baseVector;
 
-  useEffect(() => {
-    const riseMs = reduceMotion ? 90 : COIN_RISE_MS;
-    const hoverMs = reduceMotion ? 70 : COIN_HOVER_MS;
-    const staggerOffset = variant === 'energy' ? 28 : 0;
-    const stagger = (reduceMotion ? index * 25 : index * COIN_STAGGER_MS) + staggerOffset;
-    rise.value = withTiming(1, { duration: riseMs, easing: Easing.out(Easing.cubic) });
-    hover.value = reduceMotion
-      ? withTiming(1, { duration: 450, easing: Easing.linear })
-      : withRepeat(withTiming(1, { duration: 720, easing: Easing.linear }), -1, false);
-    flight.value = withDelay(riseMs + hoverMs + stagger, withTiming(1, {
-      duration: reduceMotion ? 240 : COIN_FLIGHT_MS,
-      easing: Easing.in(Easing.cubic),
-    }, (finished) => {
-      if (!finished) return;
+  useAnimatedReaction(
+    () => clock.value >= arrivalMs,
+    (arrived) => {
+      if (!arrived || notified.value) return;
+      notified.value = true;
       runOnJS(onArrive)(amount, contactWindowMs, index, totalAmount);
       // Present the exact aligned endpoint before retiring the sprite/batch.
       landed.value = withDelay(variant === 'coin' ? 32 : 0, withTiming(1, { duration: 0 }, (retired) => {
         if (retired && index === count - 1) runOnJS(onFinish)();
       }));
-    }));
-    return () => {
-      cancelAnimation(flight);
-      cancelAnimation(hover);
-      cancelAnimation(rise);
-      cancelAnimation(landed);
-    };
-  }, [amount, contactWindowMs, count, flight, hover, index, landed, onArrive, onFinish, reduceMotion, rise, totalAmount, variant]);
+    },
+    [amount, arrivalMs, clock, contactWindowMs, count, index, landed, notified, onArrive, onFinish, totalAmount, variant],
+  );
+  useEffect(() => () => cancelAnimation(landed), [landed]);
 
   const motionStyle = useAnimatedStyle(() => {
-    const stagedX = from.x + vector.x * rise.value;
-    const stagedY = from.y + vector.y * rise.value;
-    const value = flight.value;
+    const time = clock.value;
+    const riseProgress = Math.min(1, time / riseMs);
+    const rise = 1 - Math.pow(1 - riseProgress, 3);
+    const travelProgress = Math.max(0, Math.min(1, (time - flightStartMs) / flightMs));
+    const value = travelProgress * travelProgress * travelProgress;
+    const stagedX = from.x + vector.x * rise;
+    const stagedY = from.y + vector.y * rise;
     const inverse = 1 - value;
     const controlX = (stagedX + to.x) / 2 + (index % 2 === 0 ? -22 : 22);
     const controlY = Math.min(stagedY, to.y) - 76 - index * 2;
     const baseX = value === 0 ? stagedX : inverse * inverse * stagedX + 2 * inverse * value * controlX + value * value * to.x;
     const baseY = value === 0 ? stagedY : inverse * inverse * stagedY + 2 * inverse * value * controlY + value * value * to.y;
-    const phase = hover.value * Math.PI * 2 + index * 0.92;
-    const hoverEnvelope = rise.value * inverse;
+    const phase = (reduceMotion ? Math.min(1, time / 450) : time / 720) * Math.PI * 2 + index * 0.92;
+    const hoverEnvelope = rise * inverse;
     const x = baseX + Math.cos(phase) * 3 * hoverEnvelope;
     const y = baseY + Math.sin(phase) * 4 * hoverEnvelope;
     const scale = variant === 'coin' && targetSize
-      ? rewardIconFlightScale(rise.value, value, REWARD_TOKEN_SIZE, targetSize)
-      : { scaleX: (0.58 + rise.value * 0.48) * (1 - value * 0.72), scaleY: (0.58 + rise.value * 0.48) * (1 - value * 0.72) };
+      ? rewardIconFlightScale(rise, value, REWARD_TOKEN_SIZE, targetSize)
+      : { scaleX: (0.58 + rise * 0.48) * (1 - value * 0.72), scaleY: (0.58 + rise * 0.48) * (1 - value * 0.72) };
     return {
-      opacity: variant === 'coin' ? rise.value * (1 - landed.value) : value < 0.9 ? rise.value : Math.max(0, (1 - value) / 0.1),
+      opacity: variant === 'coin' ? rise * (1 - landed.value) : value < 0.9 ? rise : Math.max(0, (1 - value) / 0.1),
       transform: [
         { translateX: x - REWARD_TOKEN_SIZE / 2 },
         { translateY: y - REWARD_TOKEN_SIZE / 2 },
@@ -299,7 +299,7 @@ function RewardToken({ amount, art, count, from, index, onArrive, onFinish, to, 
         { scaleY: scale.scaleY },
       ],
     };
-  }, [from.x, from.y, index, targetSize, to.x, to.y, variant, vector.rotation, vector.x, vector.y]);
+  }, [clock, flightMs, flightStartMs, from.x, from.y, index, landed, reduceMotion, riseMs, targetSize, to.x, to.y, variant, vector.rotation, vector.x, vector.y]);
 
   return <Animated.View style={[styles.rewardToken, motionStyle]}><Image accessibilityIgnoresInvertColors contentFit="contain" source={art} style={styles.rewardTokenArt} transition={0} /></Animated.View>;
 }

@@ -103,7 +103,7 @@ export function stabilizeContentFlow(definition: ContentFlowDefinition, input: C
         run = { ...run, nodeId: node.next, phase: 'entering', updatedAt: now };
         continue;
       }
-      run = { ...run, phase: 'awaiting_effect', updatedAt: now };
+      if (run.phase !== 'awaiting_effect') run = { ...run, phase: 'awaiting_effect', updatedAt: now };
       return { run, pendingWork: pendingWorkFor(run, node), consumedEvent: false };
     }
     if (node.kind === 'presentation') {
@@ -112,7 +112,7 @@ export function stabilizeContentFlow(definition: ContentFlowDefinition, input: C
         run = { ...run, nodeId: node.next, phase: 'entering', updatedAt: now };
         continue;
       }
-      run = { ...run, phase: 'awaiting_presentation', updatedAt: now };
+      if (run.phase !== 'awaiting_presentation') run = { ...run, phase: 'awaiting_presentation', updatedAt: now };
       return { run, pendingWork: pendingWorkFor(run, node), consumedEvent: false };
     }
     if (node.kind === 'route') {
@@ -121,10 +121,11 @@ export function stabilizeContentFlow(definition: ContentFlowDefinition, input: C
         run = { ...run, nodeId: node.next, phase: 'entering', updatedAt: now };
         continue;
       }
-      run = { ...run, phase: 'awaiting_navigation', updatedAt: now };
+      if (run.phase !== 'awaiting_navigation') run = { ...run, phase: 'awaiting_navigation', updatedAt: now };
       return { run, pendingWork: pendingWorkFor(run, node), consumedEvent: false };
     }
-    run = { ...run, phase: node.kind === 'scene' ? 'awaiting_input' : 'awaiting_event', updatedAt: now };
+    const phase = node.kind === 'scene' ? 'awaiting_input' : 'awaiting_event';
+    if (run.phase !== phase) run = { ...run, phase, updatedAt: now };
     return { run, pendingWork: { kind: 'none' }, consumedEvent: false };
   }
   return {

@@ -129,6 +129,9 @@ import { FeastleStoryStage } from './feastle-story-stage';
 import { BaristabbitStoryStage } from './baristabbit-story-stage';
 import { MossproutFtueStoryStage } from './mossprout-ftue-story-stage';
 import { CompanionMeditationStage } from './companion-meditation-stage';
+import { CompanionJourneyCycleStage } from './companion-journey-cycle-stage';
+import { currentJourneyCycle } from '@/game/katchimeras/companion-journey-cycle';
+import { adoptMossproutCycle } from '@/features/companion/companion-journey-service';
 import { beginAuthoredCohortStory, beginBaristabbitStory, beginFeastleStory, isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory } from '@/utils/companion-story-storage';
 import { MossproutStoryStage } from './mossprout-story-stage';
 import { JourneyCohortStoryStage } from './journey-cohort-story-stage';
@@ -352,9 +355,14 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const shownFtueMemoryNoticeRef = useRef<string | null>(null);
   const shownFtueBondMemoryNoticeRef = useRef<string | null>(null);
   const relationships = useRelationshipProgression();
+  const journeyCycle = currentJourneyCycle(relationships, props.familyId);
+  useEffect(() => {
+    if (props.familyId === 'mossprout' && !props.ftueProfileStep) adoptMossproutCycle();
+  }, [props.familyId, props.ftueProfileStep, relationships.journeyDays]);
   const storedMeditation = katchimeraMeditationRecord(relationships, props.familyId);
   const meditationAvailableAt = storedMeditation?.availableAt;
   const [meditationNow, setMeditationNow] = useState(Date.now());
+  const [journeyNarration, setJourneyNarration] = useState<string | null>(null);
   // The FTUE's closing beat remains an explicit interaction until the player
   // chooses Tend the Garden, even if its wake timer elapsed while the app was
   // closed. Outside FTUE, an elapsed meditation naturally restores actions.
@@ -455,6 +463,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const [showFeastleDashboard, setShowFeastleDashboard] = useState(false);
   const [showBaristabbitDashboard, setShowBaristabbitDashboard] = useState(false);
   const [showJourneyCohortDashboard, setShowJourneyCohortDashboard] = useState(false);
+  const unifiedJourneyActive = !props.ftueProfileStep && !showJourneyCohortDashboard && (
+    props.familyId === 'steppling' || (props.familyId === 'mossprout' && journeyCycle != null && journeyCycle.returnedAt == null)
+  );
   const [showMossproutDashboard, setShowMossproutDashboard] = useState(false);
   const [directQuestOrigin, setDirectQuestOrigin] = useState<{ actionId: string; questId: string } | null>(null);
   const onBondCelebrationComplete = props.onBondCelebrationComplete;
@@ -1470,8 +1481,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   // Meditation is the creature's persistent visual state, not a navigation
   // lock. Once an action opens a conversation, its prompt must reclaim the
   // speech bubble while the meditating artwork remains in the world.
-  const meditationDashboardActive = Boolean(meditation && route.kind !== 'conversation' && route.kind !== 'visit');
-  const companionSpeechTitle = meditationDashboardActive ? MOSSPROUT_FTUE_COPY.meditation : mossproutFtueSpeechTitle;
+  const meditationDashboardActive = Boolean(!quickGoalPickerOpen && !unifiedJourneyActive && meditation && route.kind !== 'conversation' && route.kind !== 'visit');
+  const companionSpeechTitle = dashboardRouteActive && !quickGoalPickerOpen && unifiedJourneyActive && journeyNarration ? journeyNarration : meditationDashboardActive ? MOSSPROUT_FTUE_COPY.meditation : mossproutFtueSpeechTitle;
   // The cinematic creature is positioned in full-screen coordinates, while
   // this overlay lives inside the surface below the safe-area page header.
   // Convert the desired screen-space position into that local coordinate so
@@ -1591,7 +1602,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             onAdvance={conversationFlow.advance}
             onAnswer={(optionId) => {
               if (conversationExperience?.definition.id.startsWith('mossprout:ftue:first-meeting:')) {
-                recordMossproutOnboardingAnswer('companion.greeting', optionId);
+                recordMossproutOnboardingAnswer(optionId.startsWith('life:') ? 'companion.life_followup' : 'companion.greeting', optionId);
               }
               if (conversationExperience?.definition.id.includes('quiet-patch:pond-knock') && optionId.startsWith('support-')) {
                 const support = optionId.slice('support-'.length);
@@ -1703,7 +1714,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         ) : null}
         {(route.kind === 'destination' || dashboardRouteActive || route.kind === 'shared_history' || quickGoalPickerOpen) && !questGameVisible && !questionnaireExperience ? (
           <CompanionDestinationHeader
-            backLabel={quickGoalPickerOpen ? 'Goals' : destination === 'quest' && directQuestOrigin ? props.name : destination === 'quest' && canReturnToQuestList ? 'Quest list' : dashboardRouteActive ? 'Kingdom' : 'Dashboard'}
+            backLabel={quickGoalPickerOpen ? 'Back' : destination === 'quest' && directQuestOrigin ? props.name : destination === 'quest' && canReturnToQuestList ? 'Quest list' : dashboardRouteActive ? 'Kingdom' : 'Dashboard'}
             bondIconTargetRef={bondRewardTargetRef}
             bondProgress={displayedBondProgress}
             bondRewardPulseKey={rewardPulseKey}
@@ -1715,7 +1726,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             titleTone={destination === 'achievements' ? 'gold' : 'default'}
             onBack={
               quickGoalPickerOpen
-                ? experience.returnToDestination
+                ? experience.showHome
                 : destination === 'quest' && directQuestOrigin
                 ? () => {
                     setDirectQuestOrigin(null);
@@ -1733,6 +1744,67 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           fullWidth={mossproutActionDashboard}
           immersive={Boolean(questGameVisible || questionnaireExperience)}>
         <View key="interaction-content" style={styles.contentFrame}>
+          {dashboardRouteActive && !quickGoalPickerOpen && unifiedJourneyActive && (props.familyId === 'steppling' || props.familyId === 'mossprout') ? (
+            <View style={[styles.meditationActionsOverlay, {
+              bottom: Math.max(8, insets.bottom + 4),
+              left: Math.max(KatchaUI.layout.phoneGutter, insets.left),
+              right: Math.max(KatchaUI.layout.phoneGutter, insets.right),
+            }]}>
+                <CompanionJourneyCycleStage
+                  onOpenConversation={requestStoryConversation}
+                  onBondRewardRequest={requestStoryReward}
+                  externalGesture={environmentPan.gesture}
+                  familyId={props.familyId}
+                  onNarration={setJourneyNarration}
+                  onVisitSeed={props.onClose}
+                  routineActions={<MossproutStoryStage
+                  onVisitSeed={props.onClose}
+                  visibleActionCount={meditation ? 2 : 3}
+                  activeQuestId={props.activeQuest?.questId}
+                  conversationSession={props.conversationSession}
+                  conversations={props.mossproutActionCandidates}
+                  goals={goalsToday}
+                  hasActiveFocus={Boolean(activeJourneyFocus)}
+                  meditationMode
+                  offers={props.actionOffers}
+                  relationships={relationships}
+                  onCompleteGoal={props.onCompleteQuickGoal}
+                  onRememberGoal={props.onRememberQuickGoal}
+                  onSkipGoal={props.onSkipQuickGoal}
+                  onSnoozeGoal={props.onSnoozeQuickGoal}
+                  onUndoGoal={props.onUndoQuickGoal}
+                  onDashboard={openHistory}
+                  onOpenConversation={(definitionId, actionOrigin) => {
+                    pendingStoryConversationRef.current = null;
+                    openedStoryConversationRef.current = null;
+                    requestStoryConversation(definitionId, actionOrigin);
+                  }}
+                  onOpenCards={() => selectDestination('skins')}
+                  onOpenFocusDirection={openJourneyFocus}
+                  onOpenMerge={(orderId) => {
+                    if (props.ftueProfileStep === 'meditating') props.onFtueProfileContinue?.();
+                    else props.onOpenMerge?.(orderId, props.familyId);
+                  }}
+                  onOpenQuestDirect={(questId, originActionId) => openQuestOffer(questId, originActionId)}
+                  onOpenTrophies={() => selectDestination('achievements')}
+                  onBondRewardRequest={requestStoryReward}
+                  navigationLocked={props.ftueNavigationLocked}
+                  swipeExternalGesture={environmentPan.gesture}
+                />}
+                  onOpenMerge={(orderId) => props.onOpenMerge?.(orderId, props.familyId)}
+                  onMore={() => { if (meditation) openHistory(); else setShowJourneyCohortDashboard(true); }}
+                  onJournal={props.onJournalFood}
+                  onGoal={() => experience.openQuickGoalPicker()}
+                  fallback={props.familyId === 'steppling' ? <JourneyCohortStoryStage
+                    familyId="steppling" onBegin={beginJourneyCohortIntroduction} onJournal={props.onJournalFood}
+                    onMore={() => setShowJourneyCohortDashboard(true)}
+                    onOpenConversation={(definitionId) => requestStoryConversation(definitionId)}
+                    onOpenMerge={(orderId) => props.onOpenMerge?.(orderId, props.familyId)}
+                  /> : null}
+                />
+            </View>
+          ) : null}
+
           {meditationDashboardActive && meditation ? (
             <>
               <View
@@ -1766,6 +1838,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   fullWidth label="Explore the mist" icon="sparkles"
                   onPress={() => props.onFtueProfileContinue?.()}
                 /> : <MossproutStoryStage
+                  onVisitSeed={props.onClose}
                   activeQuestId={props.activeQuest?.questId}
                   conversationSession={props.conversationSession}
                   conversations={props.mossproutActionCandidates}
@@ -1835,7 +1908,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             onContentSizeChange={activeAttemptId || (route.kind === 'dashboard' && !mossproutActionDashboard) ? resetViewport : undefined}
             onLayout={activeAttemptId || (route.kind === 'dashboard' && !mossproutActionDashboard) ? resetViewport : undefined}
             overScrollMode={activeAttemptId || (mossproutActionDashboard && !meditation) ? 'never' : 'auto'}
-            scrollEnabled={!activeAttemptId && !questionnaireExperience && !meditationDashboardActive && (!mossproutActionDashboard || Boolean(meditation))}
+            scrollEnabled={!(dashboardRouteActive && unifiedJourneyActive) && !activeAttemptId && !questionnaireExperience && !meditationDashboardActive && (!mossproutActionDashboard || Boolean(meditation))}
             style={mossproutActionDashboard ? styles.mossproutActionViewport : undefined}
             showsVerticalScrollIndicator={false}>
             <Animated.View
@@ -1976,6 +2049,16 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   resultReady={Boolean(journeyQuestionnaireSessionId && !props.journeyConversation)}
                   visualKey={props.visualKey}
                 />
+              ) : quickGoalPickerOpen ? (
+                <CompanionQuickGoalPicker
+                  dayId={props.quickGoalDayId}
+                  familyId={props.familyId}
+                  onAddCustom={props.onAddCustomQuickGoal}
+                  onAddTemplate={props.onAddQuickGoalTemplate}
+                  state={props.quickGoalState}
+                />
+              ) : dashboardRouteActive && !quickGoalPickerOpen && unifiedJourneyActive && (props.familyId === 'steppling' || props.familyId === 'mossprout') ? (
+                null
               ) : meditation ? null : idealSkinOnboardingRequired ? null : dashboardRouteActive && (props.familyId === 'steppling' || props.familyId === 'voyagle' || props.familyId === 'flexel' || props.familyId === 'bedrotte') && !showJourneyCohortDashboard ? (
                 <JourneyCohortStoryStage
                   familyId={props.familyId}
@@ -2011,6 +2094,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                 && !showMossproutDashboard
                 && (!props.ftueCompanionSurfaceOwned || residentFtueDashboard) ? (
                 <MossproutStoryStage
+                  onVisitSeed={props.onClose}
                   activeQuestId={props.activeQuest?.questId}
                   conversationSession={props.conversationSession}
                   conversations={props.mossproutActionCandidates}
@@ -2100,14 +2184,6 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   memories={props.memories}
                   onUpdateMemory={props.onUpdateMemory}
                   onResetMemory={props.onResetMemory}
-                />
-              ) : quickGoalPickerOpen ? (
-                <CompanionQuickGoalPicker
-                  dayId={props.quickGoalDayId}
-                  familyId={props.familyId}
-                  onAddCustom={props.onAddCustomQuickGoal}
-                  onAddTemplate={props.onAddQuickGoalTemplate}
-                  state={props.quickGoalState}
                 />
               ) : props.memorySaved ? (
                 <View accessibilityLiveRegion="polite" style={styles.saved}>

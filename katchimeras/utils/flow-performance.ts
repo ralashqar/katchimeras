@@ -1,4 +1,4 @@
-const FLOW_PERF_ENABLED = __DEV__ && process.env.EXPO_PUBLIC_SCENE_PERF === '1';
+import { SCENE_PERF_ENABLED as FLOW_PERF_ENABLED, diagnosticNoop } from '../constants/diagnostics';
 const starts = new Map<string, number>();
 
 export function markFlowStart(label: string): void {
@@ -6,7 +6,7 @@ export function markFlowStart(label: string): void {
 }
 
 export function reportFlowReady(label: string): () => void {
-  if (!FLOW_PERF_ENABLED) return () => undefined;
+  if (!FLOW_PERF_ENABLED) return diagnosticNoop;
   let secondFrame: number | null = null;
   const firstFrame = requestAnimationFrame(() => {
     secondFrame = requestAnimationFrame(() => {

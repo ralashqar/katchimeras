@@ -2,9 +2,11 @@ import * as Haptics from 'expo-haptics';
 import { useNavigation } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
+import { createSelectorStore } from '@/utils/merge-world/selector-store';
 import { ActivityIndicator, BackHandler, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { isAppForeground, useAppForeground } from '@/hooks/use-app-foreground';
 import Animated, { FadeIn, FadeOut, ZoomIn, useReducedMotion } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
@@ -84,7 +86,10 @@ const EARLY_DISCOVERY_REVEAL_COPY: Partial<Record<MergeCharacterId, { descriptio
   bedrotte: { description: 'The quiet hollow finally felt safe enough to open.', rewardBody: 'The Dreambound Pillow became a Comfort Chest.' },
 };
 
-export function MergeWorldScreen({ active = true, backgroundReady = true, playBoardEntrance = true }: { active?: boolean; backgroundReady?: boolean; playBoardEntrance?: boolean } = {}) {
+export function MergeWorldScreen({ active: routeActive = true, backgroundReady = true, playBoardEntrance = true }: { active?: boolean; backgroundReady?: boolean; playBoardEntrance?: boolean } = {}) {
+  const foreground = useAppForeground();
+  const active = routeActive && foreground;
+  const visualGenerationRef = useRef(0);
   const router = useRouter();
   const { transitionTo } = useGameScreenTransition();
   const { creatureId, focusOrderId, source } = useLocalSearchParams<{
@@ -197,8 +202,9 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const [parcelFlight, setParcelFlight] = useState<MergeParcelFlight | null>(null);
   const [parcelHiddenItemIds, setParcelHiddenItemIds] = useState<Set<string>>(() => new Set());
   const [parcelShakeNonce, setParcelShakeNonce] = useState(0);
-  const [presentedCoins, setPresentedCoins] = useState<number | null>(null);
-  const [coinValueAnimationDurationMs, setCoinValueAnimationDurationMs] = useState(0);
+  // Only the HUD subscribes; token contacts must not rerender this screen.
+  const [coinPresentation] = useState(() => createSelectorStore<number | null>(null));
+  const setPresentedCoins = coinPresentation.publish;
   const [coinPulseNonce, setCoinPulseNonce] = useState(0);
   const [blockedFtuePulseNonce, setBlockedFtuePulseNonce] = useState(0);
   const [boardMetrics, setBoardMetrics] = useState<MergeBoardScreenMetrics | null>(null);
@@ -216,7 +222,6 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const activeServeRef = useRef(false);
   const activeParcelRef = useRef(false);
   const activeServeOrderRef = useRef<{ coinAmount: number; energyAmount: number; orderId: string } | null>(null);
-  const coinPayoutStartedRef = useRef(false);
   const serveNonceRef = useRef(0);
   const parcelNonceRef = useRef(0);
   const storyNavigationPendingRef = useRef(false);
@@ -360,16 +365,24 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   useEffect(() => {
     if (active) storyNavigationPendingRef.current = false;
     else {
+      visualGenerationRef.current += 1;
       activeParcelRef.current = false;
       setParcelFlight(null);
       setParcelHiddenItemIds(new Set());
+      // Serving commits only when its reward flight finishes. An interrupted
+      // flight is cancelled, leaving the order/items available to serve again.
+      activeServeRef.current = false;
+      activeServeOrderRef.current = null;
+      setServeFlight(null);
+      setServeHiddenItemIds(new Set());
+      setPresentedCoins(null);
     }
-  }, [active]);
+  }, [active, setPresentedCoins]);
 
   const openCharacterReturn = useCallback((characterId: MergeOrder['characterId'], noteId: string) => {
     if (!active || storyNavigationPendingRef.current) return;
     if (noteId === MOSSPROUT_FTUE_RETURN_NOTE_ID) {
-      if (!mergeFtueAllowsChatNote(ftueStep, noteId)) {
+      if (!mergeFtueAllowsChatNote(ftueStepRef.current, noteId)) {
         setBlockedFtuePulseNonce((current) => current + 1);
         if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         return;
@@ -380,7 +393,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
         target: 'companion',
         navigate: async () => {
           try {
-            const nextRun = dispatchFtueEvent({ type: 'chat_note_opened', noteId, revision: state?.revision ?? 0 });
+            const nextRun = dispatchFtueEvent({ type: 'chat_note_opened', noteId, revision: stateRef.current?.revision ?? 0 });
             if (nextRun?.stepId !== 'companion.chapter_zero_return') {
               throw new Error('Mossprout did not accept the chapter-zero return');
             }
@@ -416,7 +429,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       },
     });
     if (!accepted) storyNavigationPendingRef.current = false;
-  }, [active, ftueStep, mossproutJourneyDayId, router, state?.revision, transitionTo]);
+  }, [active, mossproutJourneyDayId, router, transitionTo]);
 
   useEffect(() => {
     if (!active
@@ -690,16 +703,18 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   }, [active, activeResidentDiscovery?.id, authoredStories, focusOrderId, ftueStep?.id, mossproutJourney?.activity, mossproutJourney?.beatId, mossproutJourney?.dayId, mossproutJourney?.status, mossproutJourneyExclusive, parcelFlight, parcelShakeNonce, pendingParcel, pendingParcels.length, readyOrderIds, returnCharacterId, serveFlight, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
 
   const startServeAnimation = useCallback(async (order: MergeOrder, itemTargets: readonly MergeScreenPoint[]) => {
-    if (!state || activeServeRef.current || activeParcelRef.current || parcelFlight) return false;
+    const state = stateRef.current;
+    if (!isAppForeground() || !state || activeServeRef.current || activeParcelRef.current) return false;
+    const generation = visualGenerationRef.current;
     activeServeRef.current = true;
-    coinPayoutStartedRef.current = false;
     const boardMetrics = boardMetricsRef.current;
     const servingItems = mergeOrderServingCells(state, order);
     const [screenRect, coinRect] = await Promise.all([
       measureViewInWindow(screenRef),
       measureViewInWindow(coinArtRef),
     ]);
-    if (!boardMetrics || !screenRect || !coinRect || servingItems.length !== itemTargets.length) {
+    if (generation !== visualGenerationRef.current) return false;
+    if (!isAppForeground() || !boardMetrics || !screenRect || !coinRect || servingItems.length !== itemTargets.length) {
       activeServeRef.current = false;
       return false;
     }
@@ -725,7 +740,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     setServeHiddenItemIds(new Set(items.map((item) => item.instanceId)));
     setServeFlight({ coinAmount: order.reward.coins, coinFrom, coinTo, coinTargetSize: { width: coinRect.width, height: coinRect.height }, energyAmount: 0, energyTo, items, nonce: serveNonceRef.current, phase: 'items' });
     return true;
-  }, [parcelFlight, state]);
+  }, []);
 
   const handleServeItemsArrive = useCallback(async () => {
     const activeOrder = activeServeOrderRef.current;
@@ -744,12 +759,11 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       measureViewInWindow(screenRef),
       measureViewInWindow(coinArtRef),
     ]);
-    if (activeServeOrderRef.current !== activeOrder) return;
+    if (!isAppForeground() || activeServeOrderRef.current !== activeOrder) return;
     // Keep the order and its consumed board items in state until every reward
     // token has reached the HUD. Removing the order here would start the tray
     // outro while the coin flight is still running.
     setPresentedCoins(state.coins);
-    setCoinValueAnimationDurationMs(0);
     setServeFlight((current) => current ? {
       ...current,
       ...(screenRect && coinRect ? {
@@ -760,23 +774,18 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       phase: 'rewards',
     } : null);
     if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [readyOrderIds, state]);
+  }, [readyOrderIds, setPresentedCoins, state]);
 
-  const handleCoinArrive = useCallback((_amount: number, contactWindowMs: number, _index: number, totalAmount: number) => {
-    if (!coinPayoutStartedRef.current) {
-      coinPayoutStartedRef.current = true;
-      setCoinValueAnimationDurationMs(contactWindowMs);
-      setPresentedCoins((current) => (
-        (current ?? stateRef.current?.coins ?? 0) + (activeServeOrderRef.current?.coinAmount ?? totalAmount)
-      ));
-    }
-    setCoinPulseNonce((current) => current + 1);
+  const handleCoinArrive = useCallback((amount: number, _contactWindowMs: number, _index: number, _totalAmount: number) => {
+    if (!isAppForeground() || !activeServeOrderRef.current) return;
+    coinPresentation.publish((coinPresentation.getSnapshot() ?? stateRef.current?.coins ?? 0) + amount);
     if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, []);
+  }, [coinPresentation]);
 
   const handleEnergyArrive = useCallback((_amount: number, _contactWindowMs: number, _index: number, _totalAmount: number) => undefined, []);
 
   const finishServeAnimation = useCallback(() => {
+    if (!isAppForeground()) return;
     const activeOrder = activeServeOrderRef.current;
     if (!activeOrder) return;
     const servedOrder = state?.activeOrders.find((order) => order.id === activeOrder.orderId);
@@ -795,13 +804,12 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       setRevealedKatchimeraCardId(servedOrder.reward.katchimeraCardId);
     }
     setPresentedCoins(null);
-    setCoinValueAnimationDurationMs(0);
+    setCoinPulseNonce((current) => current + 1);
     if (!result?.changed) setServeHiddenItemIds(new Set());
     setServeFlight(null);
     activeServeRef.current = false;
-    coinPayoutStartedRef.current = false;
     activeServeOrderRef.current = null;
-  }, [dispatch, state?.activeOrders]);
+  }, [dispatch, setPresentedCoins, state?.activeOrders]);
   const handleHiddenItemsRetired = useCallback((instanceIds: readonly string[]) => {
     setServeHiddenItemIds((current) => {
       if (!instanceIds.some((instanceId) => current.has(instanceId))) return current;
@@ -826,14 +834,17 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   }, [dispatch]);
 
   const openParcel = useCallback(async (arrivalId: string) => {
-    if (!state || activeParcelRef.current || parcelFlight || serveFlight) return;
+    const state = stateRef.current;
+    if (!isAppForeground() || !state || activeParcelRef.current || activeServeRef.current) return;
+    const generation = visualGenerationRef.current;
     activeParcelRef.current = true;
     const boardMetrics = boardMetricsRef.current;
     const [screenRect, parcelRect] = await Promise.all([
       measureViewInWindow(screenRef),
       measureViewInWindow(parcelRef),
     ]);
-    if (!boardMetrics || !screenRect || !parcelRect) {
+    if (generation !== visualGenerationRef.current) return;
+    if (!isAppForeground() || !boardMetrics || !screenRect || !parcelRect) {
       activeParcelRef.current = false;
       return;
     }
@@ -870,7 +881,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     const arrival = state.arrivals.find((candidate) => candidate.id === arrivalId);
     setParcelFlight({ nonce: parcelNonceRef.current, from, items, rootMatch: arrival?.kind === 'root_match_parcel' });
     if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  }, [dispatch, parcelFlight, serveFlight, state]);
+  }, [dispatch]);
 
   const handleParcelItemArrive = useCallback((instanceId: string) => {
     setParcelHiddenItemIds((current) => {
@@ -925,13 +936,15 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
           style={styles.hudBar}
           tone="glass"
           trailing={<View collapsable={false} ref={coinHudPillRef}>
-            <MergeCoinHud artRef={coinArtRef} hudRef={coinHudRef} presentedCoins={presentedCoins} pulseNonce={serveFlight ? 0 : coinPulseNonce} durationMs={coinValueAnimationDurationMs} />
+            <MergeCoinHud artRef={coinArtRef} hudRef={coinHudRef} presentation={coinPresentation} pulseNonce={serveFlight ? 0 : coinPulseNonce} />
           </View>}
         />
         {/* Static game geometry: onboarding guidance must never be inserted in
             this flex column. Future guidance belongs in an absolute world-space
             overlay so the tray, counter, and board retain identical frames. */}
         <MergePlaySurface
+          effectsActive={active}
+          servingOrderId={serveFlight ? activeServeOrderRef.current?.orderId ?? null : null}
           counterWidth={width}
           animateEntrance={playBoardEntrance}
           boardInteractionGate={ftueBoardGate}
@@ -1097,14 +1110,15 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
 }
 
 const selectCoins = (snapshot: { state: MergeWorldState | null }) => snapshot.state?.coins ?? 0;
-const MergeCoinHud = memo(function MergeCoinHud({ artRef, hudRef, presentedCoins, pulseNonce, durationMs }: {
-  artRef: RefObject<View | null>; hudRef: RefObject<View | null>; presentedCoins: number | null; pulseNonce: number; durationMs: number;
+const MergeCoinHud = memo(function MergeCoinHud({ artRef, hudRef, presentation, pulseNonce }: {
+  artRef: RefObject<View | null>; hudRef: RefObject<View | null>; presentation: ReturnType<typeof createSelectorStore<number | null>>; pulseNonce: number;
 }) {
+  const presentedCoins = useSyncExternalStore(presentation.subscribe, presentation.getSnapshot, presentation.getSnapshot);
   const coins = useMergeWorldSelector(selectCoins);
   recordMergeRender('coin-hud');
-  return <GameCurrencyHud balances={[{ animateValue: presentedCoins != null, art: GAME_CURRENCY_ART.coins,
+  return <GameCurrencyHud balances={[{ animateValue: false, art: GAME_CURRENCY_ART.coins,
     artTargetRef: artRef, id: 'coins', pulseNonce, targetRef: hudRef, value: presentedCoins ?? coins,
-    valueAnimationDurationMs: durationMs }]} style={styles.currencyHud} tone="glass" />;
+    valueAnimationDurationMs: 0 }]} style={styles.currencyHud} tone="glass" />;
 });
 
 function ResidentRevealDialogue({ residentId, onContinue }: { residentId: KatchimeraSkinId; onContinue: () => void }) {

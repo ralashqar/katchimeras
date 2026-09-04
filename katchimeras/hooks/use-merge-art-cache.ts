@@ -32,9 +32,9 @@ export function useMergeArtCache(
   onInitialArtReady?: () => void,
   visibleItemDefinitionIds: readonly string[] = [],
 ): MergeArtCache {
-  const plan = useMemo(() => mergeArtWarmupPlan(state), [state]);
-  const pinnedItems = [...new Set([...plan.itemDefinitionIds, ...visibleItemDefinitionIds])].sort();
-  const signature = `${MERGE_ART_CACHE_REVISION}|${mossproutOnboarding ? '1' : '0'}|${plan.generatorIds.join(',')}|${pinnedItems.join(',')}`;
+  const plan = useMemo(() => mergeArtWarmupPlan({ board: state.board, generators: state.generators }), [state.board, state.generators]);
+  const pinnedItems = useMemo(() => [...new Set([...plan.itemDefinitionIds, ...visibleItemDefinitionIds])].sort(), [plan.itemDefinitionIds, visibleItemDefinitionIds]);
+  const signature = useMemo(() => `${MERGE_ART_CACHE_REVISION}|${mossproutOnboarding ? '1' : '0'}|${plan.generatorIds.join(',')}|${pinnedItems.join(',')}`, [mossproutOnboarding, pinnedItems, plan.generatorIds]);
   const retainedRef = useRef(new Map<string, ImageRef>());
   const generationRef = useRef(0);
   const [workQueue] = useState(createSerialWorkQueue);

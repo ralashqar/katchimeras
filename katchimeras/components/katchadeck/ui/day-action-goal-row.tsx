@@ -23,6 +23,11 @@ const COMPLETION_WATCHDOG_MS = 3_200;
 
 export function DayActionGoalRow({
   animateLayout,
+  autoComplete = false,
+  progress,
+  accessibilityHint,
+  completeOnPress = false,
+  hideCompletionControl = completeOnPress,
   artwork,
   disabled = false,
   enteringEnabled = true,
@@ -36,8 +41,14 @@ export function DayActionGoalRow({
   onSkip,
   reward,
   title,
+  subtitle,
 }: {
   animateLayout: boolean;
+  autoComplete?: boolean;
+  progress?: ReactNode;
+  accessibilityHint?: string;
+  completeOnPress?: boolean;
+  hideCompletionControl?: boolean;
   artwork: ReactNode;
   disabled?: boolean;
   enteringEnabled?: boolean;
@@ -51,6 +62,7 @@ export function DayActionGoalRow({
   onSkip?: () => void;
   reward?: ReactNode;
   title: string;
+  subtitle?: string;
 }) {
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
@@ -192,6 +204,12 @@ export function DayActionGoalRow({
     });
   };
 
+  const beginCompletionRef = useRef(beginCompletion);
+  beginCompletionRef.current = beginCompletion;
+  useEffect(() => {
+    if (autoComplete && !disabled) beginCompletionRef.current();
+  }, [autoComplete, disabled]);
+
   return (
     <DayActionActiveRow
       animateLayout={animateLayout}
@@ -204,18 +222,21 @@ export function DayActionGoalRow({
       <Animated.View style={[styles.motionViewport, motionViewportStyle]}>
         <Animated.View style={rowStyle}>
           <Pressable
-            accessibilityHint="Opens goal options"
+            accessibilityHint={accessibilityHint ?? (completeOnPress ? (onSkip ? "Completes this task. Swipe right to skip." : "Completes this task.") : "Opens goal options")}
             accessibilityLabel={title}
             accessibilityRole="button"
             disabled={completing || disabled}
-            onPress={() => onOpen(beginCompletion)}
+            onPress={() => completeOnPress ? beginCompletion() : onOpen(beginCompletion)}
             style={({ pressed }) => pressed && styles.pressed}>
             <DayActionCardSurface
               artwork={<Animated.View style={artStyle}>{artwork}</Animated.View>}
               overlay={<Animated.View pointerEvents="none" style={[styles.glow, glowStyle]} />}
               reward={reward ? <View collapsable={false} ref={rewardRef}>{reward}</View> : undefined}
               title={title}
-              trailing={(
+              progress={progress}
+              subtitle={subtitle}
+              titleNumberOfLines={completeOnPress ? 0 : 2}
+              trailing={hideCompletionControl ? false : (
                 <View collapsable={false} ref={completionControlRef}>
                   <Pressable
                     accessibilityHint="Completes this goal now"

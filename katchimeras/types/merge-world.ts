@@ -194,6 +194,7 @@ export type MergeOrder = {
   purpose: MergeOrderPurpose;
   chapterId?: string;
   rerollAvailableAt?: number;
+  expiresAt?: number;
   storyArcId?: string;
   storyBeatId?: string;
   storyTargetLevel?: number;
@@ -535,6 +536,8 @@ export type MergeWorldState = {
 export type MergeWorldCommand =
   | { type: 'stepplingEgg'; action: import('@/features/onboarding/steppling-egg-policy').StepplingEggAction; now: number }
   | { type: 'grantGeneratorParcel'; generatorId: string; rewardId: string; dayId: string; now: number }
+  | { type: 'reconcileJourneyMeditation'; cycle: import('./companion-journey-cycle').CompanionJourneyCycle; availableAt: number; now: number }
+  | { type: 'grantJourneyReturn'; cycle: import('./companion-journey-cycle').CompanionJourneyCycle; dayId: string; now: number }
   | { type: 'unlockWorldTarget'; targetId: string; now: number; receiptId?: string }
   | { type: 'transferDiscoveryEgg'; targetId: 'mossprout:overgrown-trail'; now: number }
   | { type: 'hatchWorldEgg'; targetId: 'mossprout:overgrown-trail'; now: number }

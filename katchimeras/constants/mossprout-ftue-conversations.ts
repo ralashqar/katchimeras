@@ -1,5 +1,6 @@
 import type { ConversationDefinition } from '@/types/companion-conversation';
 import { MOSSPROUT_GREETING_OPTIONS, MOSSPROUT_FTUE_COPY } from '@/features/onboarding/mossprout-ftue-copy';
+import { mossproutFollowup } from '@/constants/companion-life-content';
 
 export const MOSSPROUT_FTUE_CONVERSATION_PREFIX = 'mossprout:ftue:first-meeting';
 export const MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID = 'mossprout:ftue:chapter-zero-return';
@@ -7,10 +8,10 @@ export const MOSSPROUT_FIRST_REST_CONVERSATION_ID = 'mossprout:ftue:first-rest';
 
 const openingLines: Record<string, string> = {
   trying_to_start: 'Oh! Getting started can be tricky. Hatching took me a while too.',
-  too_much_at_once: 'Oh! There was a lot going on out there. We can start with one small thing.',
-  pretty_good: 'Oh! That little patch of sunshine was you.',
+  too_much_at_once: 'There was a lot happening outside my shell. We can start with one thing.',
+  pretty_good: 'So that little patch of sunshine was you.',
   mostly_drifting: 'Oh! I felt the breeze carrying us along. Drifting can still bring you somewhere new.',
-  taking_today_as_it_comes: 'Oh! We’re seeing where today takes us. I like that.',
+  taking_today_as_it_comes: 'Seeing where the day takes us? I’ve only just acquired feet. Excellent timing.',
   more_energy: 'You said you wanted more energy. This garden definitely does.',
   more_calm: 'You said you wanted more calm. I think this place could use some too.',
   something_new: 'You wanted something new. Well… this is pretty new.',
@@ -33,7 +34,7 @@ const openingLines: Record<string, string> = {
 function definition(key: string, opening: string): ConversationDefinition {
   return {
     id: `${MOSSPROUT_FTUE_CONVERSATION_PREFIX}:${key}`,
-    version: 7,
+    version: 8,
     familyId: 'mossprout',
     title: 'Meet Mossprout',
     trigger: 'evergreen',
@@ -51,11 +52,23 @@ function definition(key: string, opening: string): ConversationDefinition {
     nodes: [
       {
         id: 'hello', kind: 'choice', phase: 'opening', prompt: `${opening}\n\nI’m Mossprout.`,
-        options: MOSSPROUT_GREETING_OPTIONS.map((option) => ({ ...option, nextNodeId: 'end' })),
+        options: MOSSPROUT_GREETING_OPTIONS.map((option) => ({ ...option, nextNodeId: 'followup' })),
       },
+      { id: 'followup', kind: 'choice', prompt: mossproutFollowup('progress').prompt,
+        options: mossproutFollowup('progress').options.map((option) => ({ id: `life:${option.id}`, label: option.label, reply: option.reply, nextNodeId: 'end' })) },
       { id: 'end', kind: 'end', message: MOSSPROUT_FTUE_COPY.seedOrigin },
     ],
   };
+}
+
+export function resolveMossproutFtueConversation(definition: ConversationDefinition, intent: string | null | undefined, savedVersion: number) {
+  if (!definition.id.startsWith(MOSSPROUT_FTUE_CONVERSATION_PREFIX)) return definition;
+  const followup = mossproutFollowup(intent);
+  return { ...definition, nodes: definition.nodes.filter((node) => savedVersion >= 8 || node.id !== 'followup').map((node) => {
+    if (node.id === 'hello' && node.kind === 'choice' && savedVersion < 8) return { ...node, options: node.options.map((option) => ({ ...option, nextNodeId: 'end' })) };
+    if (node.id !== 'followup') return node;
+    return { id: 'followup', kind: 'choice' as const, prompt: followup.prompt, options: followup.options.map((option) => ({ id: `life:${option.id}`, label: option.label, reply: option.reply, nextNodeId: 'end' })) };
+  }) };
 }
 
 const chapterZeroReturnDefinition: ConversationDefinition = {

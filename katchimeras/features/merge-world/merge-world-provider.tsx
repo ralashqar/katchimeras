@@ -1,5 +1,6 @@
 import { createContext, type PropsWithChildren, use, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AppState } from 'react-native';
+import { isAppForeground, useAppForeground } from '@/hooks/use-app-foreground';
 
 import { companionIdForFamily, katchimeraSkinById } from '@/constants/katchimera-skins';
 import { MOSSPROUT_CAMPAIGN_EPISODES, mossproutCampaignEpisodeByBeatId, mossproutCampaignOrderDrops } from '@/constants/mossprout-campaign';
@@ -25,6 +26,7 @@ import { measureMergeWork } from '@/utils/merge-world/performance';
 import { createSelectorStore, selectedSnapshot } from '@/utils/merge-world/selector-store';
 import { loadFirstSession } from '@/features/onboarding/first-session';
 import { completeMossproutResidentCardDiscovery, mossproutDailyActionDeck, mossproutJourneyForDay, mossproutJourneyRuntimeDayId, mossproutStory, recordKatchimeraActionCompletion, recordMossproutFirstGardenRestored, recordMossproutJourneyOrderServed, recordMossproutMatchedCard, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
+import { completeMeditationRequest, currentJourneyCycle } from '@/game/katchimeras/companion-journey-cycle';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { completeMossproutChapterZeroSlice, isMossproutChapterZeroActive } from '@/utils/merge-world/chapter-zero-policy';
 import { loadMergeWorldState, saveMergeWorldState, subscribeMergeWorldResets, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
@@ -113,13 +115,15 @@ function delay(ms: number) {
 }
 
 export function MergeWorldProvider({
-  active = true,
+  active: routeActive = true,
   characterIds,
   days,
   featuredCharacterId,
   questState,
   children,
 }: PropsWithChildren<{ active?: boolean; characterIds: string[]; days: readonly HomeDayRecord[]; featuredCharacterId?: MergeCharacterId | null; questState: CompanionQuestState }>) {
+  const foreground = useAppForeground();
+  const active = routeActive && foreground;
   const wisps = useWisps();
   const [state, setState] = useState<MergeWorldState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -196,6 +200,14 @@ export function MergeWorldProvider({
   }, []);
 
   const applyReceiptSideEffect = useCallback((receipt: MergeExternalRewardReceipt) => {
+    if (receipt.kind === 'story_order_served' && receipt.id.startsWith('merge-story-served:journey-cycle:')) {
+      relationshipProgressionRepository.update((state) => {
+        const cycle = currentJourneyCycle(state, receipt.characterId);
+        const request = cycle?.requests.find((item) => `merge-story-served:${item.orderId}` === receipt.id);
+        return cycle && request ? completeMeditationRequest(state, cycle.id, request.id, receipt.id, receipt.createdAt) : state;
+      });
+      return;
+    }
     if (receipt.kind === 'story_order_served') {
       if (receipt.characterId === 'feastle') {
         guardStoryReceiptMutation(() => {
@@ -319,6 +331,17 @@ export function MergeWorldProvider({
       servedOrderIds: story.orderDeck?.servedOrderIds,
       now,
     });
+    if (story.journeyManaged && story.actPhase === 'regular_orders') {
+      const episode = (currentJourneyCycle(relationshipProgressionRepository.load(), familyId)?.number ?? 1) + 1;
+      const completedCount = story.orderDeck?.templateKeys.filter((key) => story.completedOrderIds.includes(`merge-story:${familyId}:chapter-1:${key}`)).length ?? 0;
+      const nextKey = story.orderDeck?.templateKeys.find((key) => !story.completedOrderIds.includes(`merge-story:${familyId}:chapter-1:${key}`));
+      result.state = { ...result.state, activeOrders: result.state.activeOrders.filter((order) => order.storyArcId !== story.id || (completedCount < episode - 1 && order.id === `merge-story:${familyId}:chapter-1:${nextKey}`)) };
+    }
+    const cycle = currentJourneyCycle(relationshipProgressionRepository.load(), familyId);
+    if (cycle) {
+      const rest = relationshipProgressionRepository.load().meditations?.find((item) => (item.cycleId ?? item.sourceId) === cycle.id);
+      result.state = reduceMergeWorld(result.state, { type: 'reconcileJourneyMeditation', cycle, availableAt: rest?.availableAt ?? cycle.completedAt, now }).state;
+    }
     const storyOrder = result.state.activeOrders.find((order) => order.storyArcId === story.id);
     const activeStoryOrderStillExists = result.state.activeOrders.some((order) => order.id === story.activeOrderId);
     if (storyOrder && !activeStoryOrderStillExists) markAuthoredCohortOrderActive(familyId, storyOrder.id, now);
@@ -379,6 +402,11 @@ export function MergeWorldProvider({
     }
     if (characterId !== 'feastle' && characterId !== 'mossprout' && !isAuthoredCohortFamily(characterId)) {
       next = reconcileFeaturedStory(next, characterId, now);
+    }
+    const mossCycle = currentJourneyCycle(relationshipProgressionRepository.load(), 'mossprout');
+    if (mossCycle) {
+      const rest = relationshipProgressionRepository.load().meditations?.find((item) => (item.cycleId ?? item.sourceId) === mossCycle.id);
+      next = reduceMergeWorld(next, { type: 'reconcileJourneyMeditation', cycle: mossCycle, availableAt: rest?.availableAt ?? mossCycle.completedAt, now }).state;
     }
     return next;
   }, [reconcileAuthoredCohortStory, reconcileFeastleStory, reconcileFeaturedStory, reconcileMossproutStory, resolveFeaturedCharacter]);
@@ -623,6 +651,21 @@ export function MergeWorldProvider({
   }, [applyReceiptSideEffect, enqueuePersistence, featureAndReconcile, flush, refreshFriendshipLevels]);
 
   useEffect(() => {
+    if (!active || loading) return;
+    let cancelled = false;
+    // A previous foreground worker may still be unwinding its saved batch.
+    // Wait for it before restarting, rather than mistaking it for new work.
+    void (async () => {
+      await externalWorkerRef.current;
+      if (cancelled || !activeRef.current || !isAppForeground()) return;
+      if (stateRef.current?.externalRewardReceipts.some((receipt) => receipt.appliedAt == null)) {
+        await applyPendingExternalRewards();
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [active, applyPendingExternalRewards, loading]);
+
+  useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
@@ -693,16 +736,19 @@ export function MergeWorldProvider({
   }, [active]);
 
   useEffect(() => {
-    if (!active) return;
+    if (!routeActive) return;
     const release = acquireLifecycleResource('app_state_listener', 'merge:app-state');
+    let wasActive = isAppForeground();
     const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState !== 'active') void flush();
+      const nextActive = nextState === 'active';
+      if (wasActive && !nextActive) void flush();
+      wasActive = nextActive;
     });
     return () => {
       subscription.remove();
       release();
     };
-  }, [active, flush]);
+  }, [routeActive, flush]);
 
   useEffect(() => {
     if (!active || loading) return;
@@ -765,13 +811,22 @@ export function MergeWorldProvider({
   }, [active, characterIds, days, enqueuePersistence, featureAndReconcile, journeyRevision, loading, questState, quickGoalRevision, refreshFriendshipLevels, wisps.state.inventory]);
 
   const dispatch = useCallback((command: MergeWorldCommand): MergeWorldCommandResult | null => {
-    if (!activeRef.current) return null;
+    if (!activeRef.current || !isAppForeground()) return null;
     const current = stateRef.current;
     if (!current) return null;
     const servedOrder = command.type === 'serveOrder'
       ? current.activeOrders.find((order) => order.id === command.orderId) ?? null
       : null;
     const servedCharacterId = servedOrder?.characterId ?? null;
+    if (command.type === 'serveOrder' && command.orderId.startsWith('journey-cycle:')) {
+      const relationships = relationshipProgressionRepository.load();
+      const cycle = servedCharacterId ? currentJourneyCycle(relationships, servedCharacterId) : null;
+      const rest = relationships.meditations?.find((item) => (item.cycleId ?? item.sourceId) === cycle?.id);
+      const request = cycle?.requests.find((item) => item.orderId === command.orderId);
+      if (!rest || !request || request.completedAt != null || cycle?.returnedAt != null || command.now >= rest.availableAt) {
+        return { state: current, changed: false, message: 'Your companion is ready to return. These items are yours to keep.' };
+      }
+    }
     const claimedArrival = command.type === 'claimArrival'
       ? current.arrivals.find((arrival) => arrival.id === command.arrivalId) ?? null
       : null;

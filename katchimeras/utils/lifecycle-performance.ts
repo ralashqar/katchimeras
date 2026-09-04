@@ -1,3 +1,5 @@
+import { SCENE_PERF_ENABLED, diagnosticNoop } from '../constants/diagnostics';
+
 export type LifecycleResourceKind =
   | 'world_canvas'
   | 'active_merge_provider'
@@ -47,11 +49,10 @@ const RESOURCE_KINDS: readonly LifecycleResourceKind[] = [
 
 const activeResources = new Map<number, { kind: LifecycleResourceKind; label: string }>();
 let nextResourceId = 0;
-const lifecyclePerfEnabled = typeof __DEV__ === 'undefined'
-  || process.env.EXPO_PUBLIC_SCENE_PERF === '1';
+const lifecyclePerfEnabled = SCENE_PERF_ENABLED;
 
 export function acquireLifecycleResource(kind: LifecycleResourceKind, label: string): () => void {
-  if (!lifecyclePerfEnabled) return () => undefined;
+  if (!lifecyclePerfEnabled) return diagnosticNoop;
   const id = ++nextResourceId;
   activeResources.set(id, { kind, label });
   let released = false;

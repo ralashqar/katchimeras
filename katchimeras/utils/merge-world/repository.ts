@@ -397,6 +397,14 @@ export function grantStoredGeneratorParcel(generatorId: string, rewardId: string
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'grantGeneratorParcel', generatorId, rewardId, dayId, now }), now);
 }
 
+export function reconcileStoredJourneyMeditation(cycle: import('@/types/companion-journey-cycle').CompanionJourneyCycle, availableAt: number, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'reconcileJourneyMeditation', cycle, availableAt, now }), now);
+}
+
+export function grantStoredJourneyReturn(cycle: import('@/types/companion-journey-cycle').CompanionJourneyCycle, dayId: string, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'grantJourneyReturn', cycle, dayId, now }), now);
+}
+
 export function reconcileStoredHavenStory(characterId: import('@/types/merge-world').MergeCharacterId, storyLevel: number, now = Date.now()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'reconcileHavenStory', characterId, storyLevel, now }), now);
 }

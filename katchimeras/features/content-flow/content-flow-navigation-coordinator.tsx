@@ -1,3 +1,4 @@
+import { DIAGNOSTICS_ENABLED } from '@/constants/diagnostics';
 import { usePathname, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -71,21 +72,21 @@ export function ContentFlowNavigationCoordinator() {
       navigate,
       navigationKey: owner.work.key,
       onReady: () => {
-        recordStoryFlowDiagnostic({ category: 'navigation', message: 'Destination acknowledged', details: { key: owner.work.key, pathname: owner.work.target.pathname, runId: owner.run.runId } });
+        if (DIAGNOSTICS_ENABLED) recordStoryFlowDiagnostic({ category: 'navigation', message: 'Destination acknowledged', details: { key: owner.work.key, pathname: owner.work.target.pathname, runId: owner.run.runId } });
         void dispatchContentFlowCommand(owner.run.runId, { type: 'navigation_acknowledged', navigationKey: owner.work.key });
       },
       onReturn: () => {
         pausedKeyRef.current = owner.work.key;
         attemptedKeyRef.current = null;
         router.replace('/katchimera/mossprout/activity');
-        recordStoryFlowDiagnostic({ category: 'navigation', message: 'Player returned from recoverable navigation', details: { key: owner.work.key, runId: owner.run.runId } });
+        if (DIAGNOSTICS_ENABLED) recordStoryFlowDiagnostic({ category: 'navigation', message: 'Player returned from recoverable navigation', details: { key: owner.work.key, runId: owner.run.runId } });
       },
       requiredReadiness: owner.work.readiness,
       target: targetSurface,
     });
     if (accepted) {
       attemptedKeyRef.current = owner.work.key;
-      recordStoryFlowDiagnostic({ category: 'navigation', message: 'Started correlated navigation', details: { key: owner.work.key, pathname: owner.work.target.pathname, runId: owner.run.runId } });
+      if (DIAGNOSTICS_ENABLED) recordStoryFlowDiagnostic({ category: 'navigation', message: 'Started correlated navigation', details: { key: owner.work.key, pathname: owner.work.target.pathname, runId: owner.run.runId } });
     }
   }, [owner, pathname, phase, router, transitionTo]);
 

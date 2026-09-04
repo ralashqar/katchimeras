@@ -1,13 +1,14 @@
 // Opt-in only, including release profiling builds. Never log every frame.
-export const MERGE_PERF_ENABLED = process.env.EXPO_PUBLIC_MERGE_BOARD_PERF === '1';
+import { MERGE_PERF_ENABLED, diagnosticNoop } from '../../constants/diagnostics';
+export { MERGE_PERF_ENABLED } from '../../constants/diagnostics';
 const samples = new Map<string, number[]>();
 const renderCalls = new Map<string, number>();
 /** Render attempts, not React commit counts; compare deltas in a warm burst. */
-export function recordMergeRender(component: 'board' | 'sprite' | 'order-rail' | 'coin-hud' | 'effects-layer' | 'effect-slot') {
+export function recordMergeRender(component: 'board' | 'sprite' | 'order-rail' | 'order-card' | 'coin-hud' | 'effects-layer' | 'effect-slot') {
   if (MERGE_PERF_ENABLED) renderCalls.set(component, (renderCalls.get(component) ?? 0) + 1);
 }
 export function measureMergeWork(label: string): () => void {
-  if (!MERGE_PERF_ENABLED) return () => undefined;
+  if (!MERGE_PERF_ENABLED) return diagnosticNoop;
   const start = performance.now();
   return () => {
     const values = samples.get(label) ?? [];

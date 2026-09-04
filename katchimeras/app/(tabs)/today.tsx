@@ -113,7 +113,8 @@ import { useTodayCategoryModel } from '@/features/today/use-today-category-model
 import { useTodayNavigationController } from '@/features/today/use-today-navigation-controller';
 import { useTodayHatchRevealController } from '@/features/today/use-today-hatch-reveal-controller';
 import { useTodayEnergyLoop } from '@/features/today/use-today-energy-loop';
-import { useTodayEnergyFrameProbe } from '@/features/today/use-today-energy-frame-probe';
+import { TodayEnergyFrameProbe } from '@/features/today/use-today-energy-frame-probe';
+import { ScenePerformanceProbe } from '@/hooks/use-scene-performance-probe';
 import { TodayEnergyProfiler } from '@/features/today/today-energy-profiler';
 import { useAppActivity } from '@/features/performance/app-activity';
 import { advanceFtueActionDurably, beginFtueAction, commitFtueAction, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
@@ -388,10 +389,6 @@ export function LegacyTodayScreen() {
     if (!energyLoopBusy) return;
     return beginCriticalInteraction();
   }, [beginCriticalInteraction, energyLoopBusy]);
-  useTodayEnergyFrameProbe(
-    energyLoopStatus === 'rewarding'
-      || energyLoopStatus === 'entering',
-  );
   const [quickGoalJournal, setQuickGoalJournal] = useState<{
     completion: CompanionQuickGoalCompletion;
     goal: CompanionQuickGoal;
@@ -2186,6 +2183,7 @@ export function LegacyTodayScreen() {
   const {
     goToAdjacentDay,
     navigateToDay,
+    cameraTransitionActive,
   } = useTodayNavigationController({
     windowWidth,
     windowHeight,
@@ -2428,6 +2426,9 @@ export function LegacyTodayScreen() {
     <TodayEnvironmentMotionProvider motion={environmentMotion}>
     <GestureDetector gesture={pageGesture}>
     <View onLayout={() => setTransitionLayoutReady(true)} style={styles.screen}>
+      <TodayEnergyFrameProbe active={energyLoopStatus === 'rewarding' || energyLoopStatus === 'entering'} />
+      <ScenePerformanceProbe label="today-camera" transitionActive={cameraTransitionActive} />
+      <ScenePerformanceProbe label="today-exploration-page" transitionActive={explorationMotion.transitionActive} />
       {!isForming ? (
       <>
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, goalsSceneLiftStyle]}>

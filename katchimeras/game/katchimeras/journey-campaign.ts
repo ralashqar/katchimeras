@@ -32,6 +32,20 @@ export function validateJourneyCampaign(definition: JourneyCampaignDefinition): 
       }
     });
   });
+  if (definition.chapters) {
+    const chapterIds = new Set<string>();
+    const assigned = new Set<string>();
+    definition.chapters.forEach((chapter, index) => {
+      const path = `chapters[${index}]`;
+      if (chapterIds.has(chapter.id) || !chapter.title.trim() || !chapter.purpose.trim() || !chapter.episodeIds.length) issues.push({ path, message: 'Chapters need a unique identity, title, purpose, and episodes' });
+      chapterIds.add(chapter.id);
+      chapter.episodeIds.forEach((id) => {
+        if (assigned.has(id) || definition.days.find((day) => day.id === id)?.chapterId !== chapter.id) issues.push({ path, message: `Episode ${id} must belong to exactly one matching chapter` });
+        assigned.add(id);
+      });
+    });
+    if (definition.days.some((day) => !assigned.has(day.id))) issues.push({ path: 'chapters', message: 'Every episode needs a chapter' });
+  }
   return issues;
 }
 

@@ -17,7 +17,7 @@ import {
 import { FormingEggItem } from '@/components/katchadeck/home/today-deck/forming-egg-item';
 import { HatchCardTransition } from '@/components/katchadeck/home/today-deck/hatch-card-transition';
 import { useDeckController } from '@/components/katchadeck/home/today-deck/use-deck-controller';
-import { DECK_PERF_ENABLED, useDeckPerformanceProbe } from '@/components/katchadeck/home/today-deck/use-deck-performance-probe';
+import { DECK_PERF_ENABLED, DeckPerformanceProbe } from '@/components/katchadeck/home/today-deck/use-deck-performance-probe';
 import type { HomeTimelineDay } from '@/types/home';
 
 type TodayDeckCarouselProps = {
@@ -74,7 +74,6 @@ export function TodayDeckCarousel({
     selectedId,
     stride,
   });
-  useDeckPerformanceProbe(transitionActive);
 
   // Keep the complete deck mounted. The recent deck is deliberately small,
   // and stable card instances are more valuable here than virtualization:
@@ -86,6 +85,7 @@ export function TodayDeckCarousel({
 
   const deck = (
     <CompactDailyCardSizeProvider size={cardSize}>
+        <DeckPerformanceProbe transitionActive={transitionActive} />
         <GestureDetector gesture={swipeGesture}>
           <View style={[styles.stage, { height: cardSize.height }]}>
           {deckIndices.map((cardIndex) => {

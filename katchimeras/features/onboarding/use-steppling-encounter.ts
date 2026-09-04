@@ -18,6 +18,9 @@ export function useStepplingEncounter(world: MergeWorldState) {
   const [busy, setBusy] = useState(false);
   const [feeding, setFeeding] = useState(false);
   const [feedingEgg, setFeedingEgg] = useState<StepplingEggProgress>();
+  const [feedCompletionKey, setFeedCompletionKey] = useState<string | null>(null);
+  const feedCompletionRef = useRef<string | null>(null);
+  const feedSequenceRef = useRef(0);
   const feedingRef = useRef(false);
   const feedController = useEggFeedController();
   const { startEggFeed, eggFeedLaunchKey } = feedController;
@@ -48,6 +51,17 @@ export function useStepplingEncounter(world: MergeWorldState) {
     await send({ kind: 'begin', sourceDayId: localDayId(yesterday) });
   }, [send]);
   const close = useCallback(() => { if (!pending.current && !feedingRef.current && !hatching) { setOpen(false); setPhase('idle'); } }, [hatching]);
+  const releaseFeedPanel = useCallback(() => {
+    feedCompletionRef.current = null;
+    setFeedCompletionKey(null);
+    feedingRef.current = false;
+    setFeeding(false);
+    setFeedingEgg(undefined);
+  }, []);
+  const finishFeedPanel = useCallback((completionKey: string) => {
+    if (feedCompletionRef.current !== completionKey) return;
+    releaseFeedPanel();
+  }, [releaseFeedPanel]);
   const feed = useCallback(async (action: StepplingEggAction, from: FeedSourceRect) => {
     if (pending.current || feedingRef.current) return;
     // Calculate against the pre-feed snapshot, exactly like the displayed card.
@@ -56,11 +70,19 @@ export function useStepplingEncounter(world: MergeWorldState) {
       : action.kind === 'intent' ? STEPPLING_INTENT_BOND : STEPPLING_MOVEMENT_BOND;
     feedingRef.current = true; setFeeding(true); setFeedingEgg(egg);
     const ok = await send(action, false);
-    const arrive = () => { if (ok) setFeedback((value) => value + 1); feedingRef.current = false; setFeeding(false); setFeedingEgg(undefined); };
+    const arrive = () => {
+      if (!ok) { releaseFeedPanel(); return; }
+      setFeedback((value) => value + 1);
+      // Bond arrival starts the same panel outro as the first Egg. Keep the
+      // pre-answer card and interaction lock until its onFinished handoff.
+      const completionKey = `steppling:feed:${++feedSequenceRef.current}`;
+      feedCompletionRef.current = completionKey;
+      setFeedCompletionKey(completionKey);
+    };
     if (!ok || reduceMotion || bondAmount <= 0) { arrive(); return; }
     // Same batched Bond flight and launch/arrival Egg effects as question cards.
     startEggFeed(from, eggBondFeedPayload(bondAmount, from), arrive);
-  }, [egg, reduceMotion, send, startEggFeed]);
+  }, [egg, reduceMotion, releaseFeedPanel, send, startEggFeed]);
   const finish = useCallback(async () => {
     const ok = await send({ kind: 'finish' });
     // Keep the revealed subject mounted until the world ownership projection
@@ -111,5 +133,5 @@ export function useStepplingEncounter(world: MergeWorldState) {
     hatchPresentation: open && (hatching || egg?.hatchedAt) ? { ...IDLE_TODAY_HATCH_PRESENTATION, animationKey: egg?.hatchStartedAt ?? 0, phase, policy: 'ftue_discovery' } : null,
     onHatchAssetsReady: onAssetsReady, onHatchAssetsError: onAssetsReady,
   }), [egg, eggFeedLaunchKey, feedback, feedingEgg, hatching, onAssetsReady, open, phase]);
-  return { open, enter, close, finish, egg: feedingEgg ?? egg, busy: busy || feeding, error, send, feed, feedController, hatching, phase, presentation };
+  return { open, enter, close, finish, egg: feedingEgg ?? egg, busy: busy || feeding, error, send, feed, feedCompletionKey, finishFeedPanel, feedController, hatching, phase, presentation };
 }

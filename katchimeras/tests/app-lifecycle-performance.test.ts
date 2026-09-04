@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import './helpers/enable-diagnostics';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -133,7 +134,7 @@ test('game mode releases background UI work and avoids full Kingdom hydration', 
   assert.match(mergeBoardSource, /animateEntrance[\s\S]*?\? spritesFromState/);
   assert.match(mergeProviderSource, /if \(!active\) return;[\s\S]*?subscribeCompanionQuickGoals/);
   assert.match(mergeProviderSource, /if \(!active \|\| loading\) return;/);
-  assert.match(mergeProviderSource, /if \(!activeRef\.current\) return null;/);
+  assert.match(mergeProviderSource, /if \(!activeRef\.current \|\| !isAppForeground\(\)\) return null;/);
   assert.match(companionRouteSource, /const surfaceActive = hostedInHaven \|\| isFocused/);
   assert.match(companionRouteSource, /if \(!surfaceActive \|\| \(!discovery\.ready && !hostedInHaven\) \|\| \(residentMergeFtueActive && !residentStoryResumeActive\)\) \{[\s\S]*?return <View style=\{styles\.inactiveScreen\} \/>;/);
   assert.match(companionSheetSource, /if \(!props\.active \|\| !idealSkinOnboardingRequired/);

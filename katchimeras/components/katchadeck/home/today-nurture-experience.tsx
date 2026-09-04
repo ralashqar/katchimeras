@@ -1,6 +1,6 @@
 import { Image, type ImageRef } from 'expo-image';
 import * as Haptics from 'expo-haptics';
-import { playEggActionHaptic } from '@/features/today/egg-haptics';
+import { useSharedActionPanelLifecycle } from '@/features/today/use-shared-action-panel-lifecycle';
 import { memo, type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { InteractionManager, Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type ImageSourcePropType, type LayoutChangeEvent, type View as ViewType } from 'react-native';
 import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
@@ -11,7 +11,6 @@ import Animated, {
   FadeInDown,
   FadeInUp,
   LinearTransition,
-  runOnJS,
   type SharedValue,
   useAnimatedStyle,
   useDerivedValue,
@@ -1345,99 +1344,6 @@ const FTUE_CAMERA_COVERAGE_BLEED = 2;
 const NURTURE_ACTION_CLUSTER_FALLBACK_HEIGHT = 67;
 const NURTURE_TOAST_TOP_GAP = 6;
 
-/**
- * One lifecycle for every specialized Today action panel. Content can vary,
- * but selection feedback, entry, and the completion handoff must not.
- */
-function useSharedActionPanelLifecycle({
-  completionKey,
-  enterFromBottom = false,
-  onFinished,
-  reduceMotion,
-  selectionActive,
-}: {
-  completionKey?: string | null;
-  enterFromBottom?: boolean;
-  onFinished: (completionKey: string) => void;
-  reduceMotion: boolean;
-  selectionActive: boolean;
-}) {
-  const { width: windowWidth } = useWindowDimensions();
-  const panelPulse = useSharedValue(0);
-  const panelScale = useSharedValue(1);
-  const panelX = useSharedValue(0);
-  const panelOpacity = useSharedValue(1);
-  const completedKeyRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!selectionActive) {
-      if (!completionKey) {
-        panelPulse.value = withTiming(0, { duration: reduceMotion ? 60 : 140 });
-        panelScale.value = withTiming(1, { duration: reduceMotion ? 60 : 180 });
-      }
-      return;
-    }
-    playEggActionHaptic();
-    if (reduceMotion) {
-      panelPulse.value = withTiming(0.55, { duration: 100 });
-      return;
-    }
-    panelPulse.value = withSequence(
-      withTiming(1, { duration: 120, easing: Easing.out(Easing.cubic) }),
-      withTiming(0.62, { duration: 240, easing: Easing.out(Easing.cubic) }),
-    );
-    panelScale.value = withSequence(
-      withTiming(1.024, { duration: 115, easing: Easing.out(Easing.cubic) }),
-      withTiming(1.012, { duration: 180, easing: Easing.out(Easing.cubic) }),
-    );
-  }, [completionKey, panelPulse, panelScale, reduceMotion, selectionActive]);
-
-  useEffect(() => {
-    if (!completionKey || completedKeyRef.current === completionKey) return;
-    completedKeyRef.current = completionKey;
-    const exitDelay = reduceMotion ? 40 : 220;
-    if (!reduceMotion) {
-      panelPulse.value = withSequence(
-        withTiming(1, { duration: 90, easing: Easing.out(Easing.cubic) }),
-        withDelay(70, withTiming(0, { duration: 280, easing: Easing.out(Easing.cubic) })),
-      );
-      panelScale.value = withSequence(
-        withTiming(1.032, { duration: 105, easing: Easing.out(Easing.cubic) }),
-        withDelay(45, withTiming(0.99, { duration: 280, easing: Easing.in(Easing.cubic) })),
-      );
-    }
-    panelX.value = withDelay(
-      exitDelay,
-      withTiming(windowWidth + 24, {
-        duration: reduceMotion ? 100 : 330,
-        easing: Easing.in(Easing.cubic),
-      }, (finished) => {
-        if (finished) runOnJS(onFinished)(completionKey);
-      }),
-    );
-    panelOpacity.value = withDelay(
-      exitDelay + (reduceMotion ? 20 : 105),
-      withTiming(0, {
-        duration: reduceMotion ? 80 : 190,
-        easing: Easing.in(Easing.quad),
-      }),
-    );
-  }, [completionKey, onFinished, panelOpacity, panelPulse, panelScale, panelX, reduceMotion, windowWidth]);
-
-  const entering = useMemo(
-    () => reduceMotion
-      ? FadeIn.duration(70)
-      : (enterFromBottom ? FadeInDown : FadeInUp).delay(55).duration(320).easing(Easing.out(Easing.cubic)),
-    [enterFromBottom, reduceMotion],
-  );
-  const panelStyle = useAnimatedStyle(() => ({
-    opacity: panelOpacity.value,
-    transform: [{ translateX: panelX.value }, { scale: panelScale.value }],
-  }));
-  const pulseStyle = useAnimatedStyle(() => ({ opacity: panelPulse.value * 0.28 }));
-
-  return { entering, panelStyle, pulseStyle };
-}
 
 function InlineMood({ action, allowSkip = true, completionEvent, enterFromBottom = false, interactionLocked, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture }: {
   action: RankedTodayCareAction;
@@ -1565,7 +1471,7 @@ function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent
         externalGesture={swipeExternalGesture}
         label={action.title}
         onDismiss={onSkip}>
-        <Animated.View style={panelStyle}>
+        <Animated.View collapsable={false} style={panelStyle}>
           <GameSurface
             contentStyle={[styles.inlineCardContent, illustratedChoices && styles.illustratedCardContent]}
             style={[styles.inlineCard, illustratedChoices && styles.illustratedCard]}

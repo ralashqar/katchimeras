@@ -473,7 +473,7 @@ function maximumQuestionCount(definition: ConversationDefinition): number {
     const nextSeen = new Set(seen).add(nodeId);
     if (node.kind === 'profile_game') return maximumProfileQuestionCount(node) + visit(node.revealNodeId, nextSeen);
     if (node.kind === 'insight_game') return node.questions.length + visit(node.revealNodeId, nextSeen);
-    const own = node.kind === 'choice' || node.kind === 'poll' ? 1 : 0;
+    const own = (node.kind === 'choice' && node.options.length > 1 && node.interactionKind !== 'navigation') || node.kind === 'poll' ? 1 : 0;
     return own + Math.max(0, ...referencedNodeIds(node).map((next) => next ? visit(next, nextSeen) : 0));
   };
   return visit(definition.entryNodeId, new Set());

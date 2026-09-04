@@ -9,6 +9,7 @@ import {
   contentFlowPresentationKey,
   createContentFlowRun,
   reduceContentFlow,
+  stabilizeContentFlow,
 } from '@/features/content-flow/content-flow-interpreter';
 import { compileJourneyCampaignFlows } from '@/features/content-flow/journey-flow-compiler';
 import { rewardedChildActionFlow } from '@/features/content-flow/content-flow-templates';
@@ -42,6 +43,18 @@ const COMPLETE_FLOW = defineContentFlow({
 function event(runId: string, nodeId: string, orderId: string, eventId = orderId): ContentFlowEvent {
   return { eventId, type: 'merge.order_served', runId, nodeId, objectiveId: 'pond', payload: { objectiveId: 'pond', orderId }, occurredAt: 10 };
 }
+
+test('foreground stabilization preserves identity, timestamps and revisions at every waiting node', () => {
+  for (const nodeId of ['opening', 'grant', 'garden', 'orders', 'reward', 'done']) {
+    const initial = { ...createContentFlowRun(COMPLETE_FLOW, { runId: `resume:${nodeId}`, now: 1 }), nodeId };
+    const stable = stabilizeContentFlow(COMPLETE_FLOW, initial, 2);
+    for (let cycle = 0; cycle < 30; cycle++) {
+      const resumed = stabilizeContentFlow(COMPLETE_FLOW, stable.run, 100 + cycle);
+      assert.equal(resumed.run, stable.run, nodeId);
+      assert.deepEqual(resumed.pendingWork, stable.pendingWork, nodeId);
+    }
+  }
+});
 
 test('compiler rejects unreachable nodes, dead ends, bad targets, and empty tasks', () => {
   const issues = validateContentFlowDefinition({

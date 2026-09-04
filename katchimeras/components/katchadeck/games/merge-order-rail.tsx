@@ -8,6 +8,7 @@ import Animated, {
   FadeInUp,
   FadeOut,
   Keyframe,
+  LayoutAnimationConfig,
   LinearTransition,
   type SharedValue,
   ZoomIn,
@@ -27,10 +28,11 @@ import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import { MERGE_CHARACTER_NAMES } from '@/constants/merge-world-catalog';
 import { MERGE_WORLD_UI_ART } from '@/constants/merge-world-ui-art';
 import type { MergeRailInteractionGate } from '@/features/onboarding/merge-ftue';
+import { isAppForeground, useAppForeground } from '@/hooks/use-app-foreground';
 import type { HomeVisualKey } from '@/types/home';
 import type { MergeCharacterId, MergeOrder, MergeWorldArrival } from '@/types/merge-world';
 import { resolveCreatureArtSource, resolveCreatureOrderArtSource } from '@/utils/creature-art';
-import { MAX_MOUNTED_ORDER_TRAYS, orderMountWindow } from '@/utils/merge-world/order-window';
+import { orderMountWindow, orderViewportWindows } from '@/utils/merge-world/order-window';
 import { recordMergeRender } from '@/utils/merge-world/performance';
 
 import { PersistentMergeItemArt } from './feastle-persistent-merge-board';
@@ -40,11 +42,14 @@ import type { MergeScreenPoint } from './merge-serve-reward-overlay';
 const TRAY_WIDTH = 120;
 const TRAY_GAP = 10;
 const TRAY_HEIGHT = 120;
+// Extend beyond the 110.4px character frame so the rays aren't hidden by it.
+const READY_RAYS_SIZE = 148;
 const TRAY_ITEM_SIZE = 34;
 const ORDER_TABLE_ART_SCALE = 0.9;
 const ORDER_TABLE_ART_HEIGHT = 60;
 const ORDER_TABLE_ART_WIDTH = 136;
 const TRAY_ART = require('../../../assets/images/katchimeras/merge-world/ui/order-service-tray.webp');
+const READY_GLOW_ART = require('../../../assets/images/katchimeras/soft-glow.png');
 const ORDER_REWARD_ART = {
   bond: require('../../../assets/images/katchimeras/merge-world/ui/bond.webp'),
   coins: GAME_CURRENCY_ART.coins,
@@ -188,7 +193,9 @@ export function FrozenMergeOrderTrayCard({ entry }: { entry: MergeOrderTrayEntry
   );
 }
 
-export const MergeOrderRail = memo(function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel, onReroll, onServe, onBlockedInteraction, onRailTargetRef, interactionGate = { kind: 'open' }, parcelTargetRef }: {
+export const MergeOrderRail = memo(function MergeOrderRail({ active = true, servingOrderId, entries, focusOrderId, onOpenChat, onOpenParcel, onReroll, onServe, onBlockedInteraction, onRailTargetRef, interactionGate = { kind: 'open' }, parcelTargetRef }: {
+  active?: boolean;
+  servingOrderId?: string | null;
   entries: readonly MergeTrayEntry[];
   focusOrderId?: string;
   onOpenChat: (characterId: MergeCharacterId, noteId: string) => void;
@@ -202,10 +209,15 @@ export const MergeOrderRail = memo(function MergeOrderRail({ entries, focusOrder
 }) {
   recordMergeRender('order-rail');
   const reduceMotion = useReducedMotion();
+  const foreground = useAppForeground();
+  const effectsActive = active && foreground;
   const scrollRef = useRef<ScrollView>(null);
   const lastAutoFocusKeyRef = useRef<string | null>(null);
   const pendingWindowFrameRef = useRef<number | null>(null);
-  const [mountedWindow, setMountedWindow] = useState(() => orderMountWindow(0, entries.length));
+  const [windows, setWindows] = useState(() => ({ mounted: orderMountWindow(0, entries.length), visible: { start: 0, end: 0 } }));
+  const { mounted: mountedWindow, visible: visibleWindow } = windows;
+  const requestedWindowsRef = useRef(windows);
+  const viewportRef = useRef({ offset: 0, width: 0 });
   const firstEntryId = entries[0]?.id ?? null;
   const parcelArrivalId = entries.find((entry) => entry.kind === 'parcel')?.arrival.id ?? null;
   const handleParcelTargetRef = useCallback((view: View | null) => {
@@ -213,24 +225,28 @@ export const MergeOrderRail = memo(function MergeOrderRail({ entries, focusOrder
     if (parcelArrivalId) onRailTargetRef?.(`tray-parcel:${parcelArrivalId}`, view);
   }, [onRailTargetRef, parcelArrivalId, parcelTargetRef]);
 
-  const moveMountedWindow = useCallback((centerIndex: number) => {
-    if (pendingWindowFrameRef.current != null) cancelAnimationFrame(pendingWindowFrameRef.current);
+  const moveMountedWindow = useCallback(() => {
+    const { offset, width } = viewportRef.current;
+    const { mounted, visible } = orderViewportWindows(offset, width, entries.length, TRAY_WIDTH + TRAY_GAP, TRAY_WIDTH, 3);
+    const previous = requestedWindowsRef.current;
+    // Pixel-by-pixel scroll events need no React work until a card boundary changes.
+    if (mounted.start === previous.mounted.start && mounted.end === previous.mounted.end
+      && visible.start === previous.visible.start && visible.end === previous.visible.end) return;
+    requestedWindowsRef.current = { mounted, visible };
+    if (pendingWindowFrameRef.current != null) return;
     // Defer image/card mounting until after the scroll event is delivered. It
     // keeps gestures responsive and coalesces several fast scroll events.
     pendingWindowFrameRef.current = requestAnimationFrame(() => {
       pendingWindowFrameRef.current = null;
-      const next = orderMountWindow(centerIndex, entries.length);
-      setMountedWindow((current) => current.start === next.start && current.end === next.end ? current : next);
+      setWindows(requestedWindowsRef.current);
     });
   }, [entries.length]);
 
   useEffect(() => {
-    setMountedWindow((current) => {
-      const center = Math.min(Math.max(current.start + Math.floor(MAX_MOUNTED_ORDER_TRAYS / 2), 0), Math.max(0, entries.length - 1));
-      const next = orderMountWindow(center, entries.length);
-      return current.start === next.start && current.end === next.end ? current : next;
-    });
-  }, [entries.length]);
+    // Clamp a stale offset when serving/rerolling shrinks the row.
+    viewportRef.current.offset = Math.min(viewportRef.current.offset, Math.max(0, entries.length * (TRAY_WIDTH + TRAY_GAP) + 21 - viewportRef.current.width));
+    moveMountedWindow();
+  }, [entries.length, moveMountedWindow]);
 
   useEffect(() => () => {
     if (pendingWindowFrameRef.current != null) cancelAnimationFrame(pendingWindowFrameRef.current);
@@ -245,9 +261,8 @@ export const MergeOrderRail = memo(function MergeOrderRail({ entries, focusOrder
         ? entries.findIndex((entry) => entry.kind === 'order' && entry.order.id === focusOrderId)
         : -1;
     if (targetIndex < 0) return;
-    lastAutoFocusKeyRef.current = autoFocusKey;
-    setMountedWindow(orderMountWindow(targetIndex, entries.length));
     const frame = requestAnimationFrame(() => {
+      lastAutoFocusKeyRef.current = autoFocusKey;
       scrollRef.current?.scrollTo({ x: targetIndex * (TRAY_WIDTH + TRAY_GAP), y: 0, animated: !reduceMotion });
     });
     return () => cancelAnimationFrame(frame);
@@ -255,12 +270,9 @@ export const MergeOrderRail = memo(function MergeOrderRail({ entries, focusOrder
 
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, layoutMeasurement } = event.nativeEvent;
-    const centerIndex = Math.max(0, Math.min(
-      entries.length - 1,
-      Math.floor((contentOffset.x + layoutMeasurement.width / 2) / (TRAY_WIDTH + TRAY_GAP)),
-    ));
-    moveMountedWindow(centerIndex);
-  }, [entries.length, moveMountedWindow]);
+    viewportRef.current = { offset: Math.max(0, contentOffset.x), width: layoutMeasurement.width };
+    moveMountedWindow();
+  }, [moveMountedWindow]);
 
   if (!entries.length) return <View accessibilityLabel="No active Katchimera requests" style={styles.emptyRail} />;
 
@@ -273,15 +285,19 @@ export const MergeOrderRail = memo(function MergeOrderRail({ entries, focusOrder
       horizontal
       scrollEnabled={interactionGate.kind === 'open'}
       onScroll={handleScroll}
+      onLayout={(event) => {
+        viewportRef.current.width = event.nativeEvent.layout.width;
+        moveMountedWindow();
+      }}
       ref={scrollRef}
       scrollEventThrottle={16}
       showsHorizontalScrollIndicator={false}
       snapToAlignment="start"
       snapToInterval={TRAY_WIDTH + TRAY_GAP}
       style={styles.rail}>
-      {mountedWindow.start > 0 ? <View style={{ width: mountedWindow.start * (TRAY_WIDTH + TRAY_GAP) }} /> : null}
-      {entries.slice(mountedWindow.start, mountedWindow.end).map((entry, windowIndex) => {
-        const index = mountedWindow.start + windowIndex;
+      {entries.map((entry, index) => {
+        const mounted = index >= mountedWindow.start && index < mountedWindow.end;
+        const visible = index >= visibleWindow.start && index < visibleWindow.end;
         return (
         <Animated.View
           entering={reduceMotion
@@ -291,6 +307,10 @@ export const MergeOrderRail = memo(function MergeOrderRail({ entries, focusOrder
           key={entry.id}
           layout={reduceMotion ? undefined : LinearTransition.duration(220).easing(CONTROLLED_EASE)}
           style={styles.entry}>
+          {/* Lightweight keyed slots stay put. Only real order removals run
+              their outro; virtualized artwork is detached without animation. */}
+          {mounted ? <LayoutAnimationConfig skipEntering skipExiting>
+          <View collapsable={false} style={styles.card}>
           {entry.kind === 'parcel' ? (
             <MergeParcelTrayCard
               arrival={entry.arrival}
@@ -302,6 +322,10 @@ export const MergeOrderRail = memo(function MergeOrderRail({ entries, focusOrder
             />
           ) : entry.kind === 'order' ? (
             <StableOrderTray
+              animateEntrance={false}
+              effectsActive={effectsActive && visible}
+              surfaceActive={effectsActive}
+              serveInFlight={servingOrderId === undefined ? undefined : servingOrderId === entry.order.id}
               entry={entry}
               index={index}
               interactionAllowed={interactionGate.kind === 'open' || (interactionGate.kind === 'serve' && interactionGate.orderId === entry.order.id)}
@@ -322,12 +346,11 @@ export const MergeOrderRail = memo(function MergeOrderRail({ entries, focusOrder
               reduceMotion={reduceMotion}
             />
           )}
+          </View>
+          </LayoutAnimationConfig> : null}
         </Animated.View>
         );
       })}
-      {mountedWindow.end < entries.length
-        ? <View style={{ width: (entries.length - mountedWindow.end) * (TRAY_WIDTH + TRAY_GAP) }} />
-        : null}
     </ScrollView>
   );
 });
@@ -343,7 +366,10 @@ const StableOrderTray = memo(function StableOrderTray({ onReroll, onServe, ...pr
   return <MergeOrderTrayCard {...props} onReroll={reroll} onServe={serve} />;
 });
 
-export function MergeOrderTrayCard({ animateEntrance = true, entry, index, interactionAllowed, interactionLocked, onBlockedInteraction, onRailTargetRef, onReroll, onServe, reduceMotion }: {
+export function MergeOrderTrayCard({ animateEntrance = true, effectsActive = true, surfaceActive = true, serveInFlight, entry, index, interactionAllowed, interactionLocked, onBlockedInteraction, onRailTargetRef, onReroll, onServe, reduceMotion }: {
+  effectsActive?: boolean;
+  surfaceActive?: boolean;
+  serveInFlight?: boolean;
   animateEntrance?: boolean;
   entry: MergeOrderTrayEntry;
   index: number;
@@ -355,11 +381,13 @@ export function MergeOrderTrayCard({ animateEntrance = true, entry, index, inter
   onServe: (itemTargets: readonly MergeScreenPoint[]) => boolean | Promise<boolean>;
   reduceMotion: boolean;
 }) {
+  recordMergeRender('order-card');
   const { itemReadiness, order, ready } = entry;
   const [rewardOpen, setRewardOpen] = useState(false);
   const [serving, setServing] = useState(false);
   const [entryMotionEnabled, setEntryMotionEnabled] = useState(animateEntrance);
   const servingRef = useRef(false);
+  const serveAttemptRef = useRef(0);
   const itemRefs = useRef<(View | null)[]>([]);
   const recipient = order.recipientSkinId ? katchimeraSkinById.get(order.recipientSkinId) : null;
   const recipientName = recipient?.displayName ?? MERGE_CHARACTER_NAMES[order.characterId];
@@ -390,23 +418,35 @@ export function MergeOrderTrayCard({ animateEntrance = true, entry, index, inter
     return () => cancelAnimationFrame(frame);
   }, [entryMotionEnabled]);
 
+  useEffect(() => {
+    if (!surfaceActive || serveInFlight === false) {
+      serveAttemptRef.current += 1;
+      servingRef.current = false;
+      setServing(false);
+      setRewardOpen(false);
+    }
+    return () => { serveAttemptRef.current += 1; };
+  }, [serveInFlight, surfaceActive]);
+
   const beginServe = async () => {
     if (!interactionAllowed) {
       onBlockedInteraction?.();
       return;
     }
-    if (!ready || servingRef.current) return;
+    if (!surfaceActive || !isAppForeground() || !ready || servingRef.current || serveInFlight) return;
+    const attempt = ++serveAttemptRef.current;
     setRewardOpen(false);
     servingRef.current = true;
     setServing(true);
     const targets = await Promise.all(requestedItems.map((_, itemIndex) => measureViewCenter(itemRefs.current[itemIndex])));
+    if (attempt !== serveAttemptRef.current || !isAppForeground()) return;
     if (targets.some((target) => target == null)) {
       servingRef.current = false;
       setServing(false);
       return;
     }
     const launched = await onServe(targets as MergeScreenPoint[]);
-    if (launched) return;
+    if (launched || attempt !== serveAttemptRef.current) return;
     servingRef.current = false;
     setServing(false);
   };
@@ -429,11 +469,11 @@ export function MergeOrderTrayCard({ animateEntrance = true, entry, index, inter
           key="ready-glow"
           pointerEvents="none"
           style={styles.readyGlow}
-        />
+        ><Image accessibilityIgnoresInvertColors contentFit="contain" source={READY_GLOW_ART} style={StyleSheet.absoluteFill} tintColor="#AEDC5F" transition={0} /></Animated.View>
       ) : null}
       {ready ? (
         <Animated.View entering={!entryMotionEnabled ? undefined : FadeIn.duration(reduceMotion ? 70 : 220)} exiting={FadeOut.duration(reduceMotion ? 70 : 180)} pointerEvents="none" style={styles.readyRays}>
-          <RotatingRadialSunburst baseOpacity={0.72} rotationDurationMs={32_000} size={84} />
+          <RotatingRadialSunburst active={effectsActive} baseOpacity={0.86} rotationDurationMs={32_000} size={READY_RAYS_SIZE} />
         </Animated.View>
       ) : null}
       {serving && !reduceMotion ? <TrayServeConfetti /> : null}
@@ -485,7 +525,7 @@ export function MergeOrderTrayCard({ animateEntrance = true, entry, index, inter
           </Animated.View>
         ))}
       </Animated.View>
-      {ready && !serving ? (
+      {ready && !serving && !serveInFlight ? (
         <Animated.View
           entering={!entryMotionEnabled ? undefined : reduceMotion ? FadeIn.duration(70) : SERVE_BUTTON_IN}
           exiting={FadeOut.duration(reduceMotion ? 70 : 150)}
@@ -637,8 +677,8 @@ const styles = StyleSheet.create({
   emptyRail: { height: TRAY_HEIGHT },
   entry: { height: TRAY_HEIGHT, marginRight: TRAY_GAP, position: 'relative', zIndex: ORDER_RAIL_Z_INDEX, width: TRAY_WIDTH },
   card: { height: TRAY_HEIGHT, overflow: 'visible', position: 'relative', zIndex: ORDER_RAIL_Z_INDEX, width: TRAY_WIDTH },
-  readyGlow: { backgroundColor: 'rgba(184,224,112,0.42)', borderRadius: 999, boxShadow: '0 0 22px rgba(174,220,95,0.72)', height: 70, left: 25, position: 'absolute', top: 11, width: 70, zIndex: 0 },
-  readyRays: { height: 84, left: 18, position: 'absolute', top: 5, width: 84, zIndex: 0 },
+  readyGlow: { height: 114, left: 3, position: 'absolute', top: -11, width: 114, zIndex: 0 },
+  readyRays: { height: READY_RAYS_SIZE, left: (TRAY_WIDTH - READY_RAYS_SIZE) / 2, position: 'absolute', top: TRAY_HEIGHT - 23.2 - 110.4 / 2 - READY_RAYS_SIZE / 2, width: READY_RAYS_SIZE, zIndex: 1 },
   characterLayer: { bottom: 23.2, height: 110.4, left: 4.8, position: 'absolute', width: 110.4, zIndex: 2 },
   characterButton: { height: '100%', width: '100%' },
   characterPressed: { transform: [{ scale: 0.96 }] },

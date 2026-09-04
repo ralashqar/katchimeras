@@ -7,24 +7,27 @@ import { KatchaDeckUI } from '@/constants/theme';
 type ProgressBarProps = {
   current: number;
   total: number;
+  color?: string;
+  trackColor?: string;
+  minimumPercent?: number;
 };
 
-export function ProgressBar({ current, total }: ProgressBarProps) {
-  const progress = useSharedValue(current / total);
+export function ProgressBar({ current, total, color, trackColor, minimumPercent = 6 }: ProgressBarProps) {
+  const progress = useSharedValue(total > 0 ? Math.min(1, Math.max(0, current / total)) : 0);
 
   useEffect(() => {
-    progress.value = withTiming(current / total, {
+    progress.value = withTiming(total > 0 ? Math.min(1, Math.max(0, current / total)) : 0, {
       duration: KatchaDeckUI.motion.base,
     });
   }, [current, progress, total]);
 
   const fillStyle = useAnimatedStyle(() => ({
-    width: `${Math.max(progress.value * 100, 6)}%`,
+    width: `${Math.min(100, Math.max(progress.value * 100, minimumPercent))}%`,
   }));
 
   return (
-    <View style={styles.track}>
-      <Animated.View style={[styles.fill, fillStyle]} />
+    <View style={[styles.track, trackColor ? { backgroundColor: trackColor } : undefined]}>
+      <Animated.View style={[styles.fill, color ? { backgroundColor: color } : undefined, fillStyle]} />
     </View>
   );
 }

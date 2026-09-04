@@ -21,6 +21,7 @@ import {
 import { advanceGlowRequests, glowTutorialDrop, normalizeGlowDiscoveryFields, reduceGlowDiscovery } from './glow-discovery-policy';
 import { normalizeStepplingEgg, reduceStepplingEgg } from '@/features/onboarding/steppling-egg-policy';
 import { sharedWorldPurchase } from '@/constants/shared-world';
+import { COMPANION_JOURNEY_PROFILES, JOURNEY_MEDITATION_ORDER_GLOW, JOURNEY_MEDITATION_ORDER_MINUTES } from '@/constants/companion-journey-profiles';
 import {
   MERGE_ENERGY_REGEN_CAP,
   MERGE_ENERGY_REGEN_MS,
@@ -309,6 +310,40 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
         id: command.rewardId, kind: 'contextual_parcel', generatorId: command.generatorId, createdAt: command.now, dayId: command.dayId,
         label: definition.name, theme: 'memory', familyId: item.familyId, chainId: definition.chainIds[0],
         source: 'companion_story', itemDefinitionIds: [], claimedAt: null, seenAt: null,
+      }] }, command.now));
+    }
+    case 'reconcileJourneyMeditation': {
+      const { cycle, now } = command;
+      if (cycle.familyId !== 'steppling' && cycle.familyId !== 'mossprout') return unchanged(current);
+      const characterId = cycle.familyId;
+      const prefix = `journey-cycle:${characterId}:`;
+      const kept = current.activeOrders.filter((order) => !order.id.startsWith(prefix));
+      const orders: MergeOrder[] = now < command.availableAt && cycle.returnedAt == null ? cycle.requests.flatMap((request) => {
+        if (request.kind !== 'merge' || !request.orderId || !request.definitionId || request.completedAt != null || current.externalRewardReceipts.some((receipt) => receipt.id === `merge-story-served:${request.orderId}`)) return [];
+        const saved = current.activeOrders.find((order) => order.id === request.orderId);
+        const rewarded = saved ? ensureOrderGlowReward(saved) : undefined;
+        const description = 'Optional: brings your companion back ' + JOURNEY_MEDITATION_ORDER_MINUTES + ' minutes sooner.';
+        const existing = rewarded && rewarded.description !== description ? { ...rewarded, description } : rewarded;
+        return [existing ? (existing.expiresAt === command.availableAt ? existing : { ...existing, expiresAt: command.availableAt }) : { id: request.orderId, characterId, title: request.title, description, difficulty: 'small', expiresAt: command.availableAt,
+          requirements: [{ definitionId: request.definitionId, quantity: 1 }], reward: { coins: JOURNEY_MEDITATION_ORDER_GLOW, mergeXp: 0, friendshipXp: 0, energy: 0 }, createdAt: cycle.completedAt,
+          signature: false, purpose: 'normal', storyArcId: `${cycle.id}:meditation`, storyTargetLevel: 0 }];
+      }) : [];
+      const activeOrders = [...kept, ...orders];
+      if (activeOrders.length === current.activeOrders.length && activeOrders.every((order, index) => order === current.activeOrders[index])) return unchanged(current);
+      return changed(touch({ ...current, activeOrders }, now));
+    }
+    case 'grantJourneyReturn': {
+      const { cycle } = command;
+      const profile = COMPANION_JOURNEY_PROFILES[cycle.familyId];
+      if (!profile) return unchanged(current);
+      if (cycle.finale || cycle.migrated || current.processedActivityReceiptIds.includes(cycle.rewardId) || current.arrivals.some((arrival) => arrival.id === cycle.rewardId)) return unchanged(current);
+      const definitionId = `${profile.mergeChainId}:1`;
+      const item = MERGE_ITEMS_BY_ID.get(definitionId)!;
+      return changed(touch({ ...current, processedActivityReceiptIds: [...current.processedActivityReceiptIds, cycle.rewardId], arrivals: [...current.arrivals, {
+        id: cycle.rewardId, kind: 'contextual_parcel', createdAt: command.now, dayId: command.dayId,
+        label: `${cycle.title} — a little gift`, theme: profile.theme,
+        familyId: item.familyId, chainId: item.chainId, characterId: cycle.familyId as MergeCharacterId,
+        source: 'companion_story', itemDefinitionIds: [definitionId, definitionId], claimedAt: null, seenAt: null,
       }] }, command.now));
     }
     case 'claimArrival':
@@ -1924,9 +1959,20 @@ function moveItem(state: MergeWorldState, from: number, to: number, now: number)
 }
 
 function serveOrder(state: MergeWorldState, orderId: string, now: number): MergeWorldCommandResult {
-  const order = state.activeOrders.find((item) => item.id === orderId);
+  const storedOrder = state.activeOrders.find((item) => item.id === orderId);
+  const order = storedOrder ? ensureOrderGlowReward(storedOrder) : undefined;
+  if (orderId.startsWith('journey-cycle:') && (!order?.expiresAt || now >= order.expiresAt)) {
+    return unchanged(state, 'Your companion is ready to return. These items are yours to keep.');
+  }
   if (!order || !mergeOrderReady(state, order)) return unchanged(state, 'The requested items are not ready yet.');
   const board = boardAfterServingOrder(state, order);
+  if (orderId.startsWith('journey-cycle:')) return { ...changed(touch({
+    ...state, board, coins: state.coins + order.reward.coins, activeOrders: state.activeOrders.filter((item) => item.id !== orderId),
+    externalRewardReceipts: [...state.externalRewardReceipts, {
+      id: `merge-story-served:${orderId}`, kind: 'story_order_served', characterId: order.characterId,
+      amount: 0, sourceId: order.storyArcId ?? orderId, createdAt: now, appliedAt: null,
+    }],
+  }, now), `+${order.reward.coins} Glow and a little help for your companion’s return.`), servedOrderId: order.id };
   const completedOrderCount = state.completedOrderCount + 1;
   const mergeXp = state.mergeXp + order.reward.mergeXp;
   const completesStoryBundle = !order.storyStepCount
@@ -3293,7 +3339,7 @@ function ensureProceduralOrders(state: MergeWorldState, now: number): MergeWorld
     rerollAvailableAt: now + 86_400_000,
     signature: false,
     purpose: 'normal',
-  }));
+  })).map(ensureOrderGlowReward);
   return {
     ...state,
     activeOrders: [...state.activeOrders, ...orders],
@@ -3476,7 +3522,8 @@ function normalizeArrivals(value: unknown): MergeWorldArrival[] {
         : arrival.kind === 'goal_chest'
           ? 'goal'
           : arrival.id.includes('companion-story-starter') ? 'companion_story' : arrival.kind === 'memory_arrival' ? 'journal' : 'legacy',
-      itemDefinitionIds: uniqueStrings(arrival.itemDefinitionIds).filter((id) => MERGE_ITEMS_BY_ID.has(id)),
+      itemDefinitionIds: (arrival.id.startsWith('journey-cycle:') && Array.isArray(arrival.itemDefinitionIds)
+        ? arrival.itemDefinitionIds.filter((id): id is string => typeof id === 'string') : uniqueStrings(arrival.itemDefinitionIds)).filter((id) => MERGE_ITEMS_BY_ID.has(id)),
       generatorId: typeof arrival.generatorId === 'string' && MERGE_GENERATORS_BY_ID.has(arrival.generatorId) ? arrival.generatorId : undefined,
       discoveryId: typeof arrival.discoveryId === 'string' ? arrival.discoveryId : undefined,
       progressionGateId: typeof arrival.progressionGateId === 'string' && (MOSSPROUT_ROOTBOUND_GATES_BY_ID.has(arrival.progressionGateId) || MOSSPROUT_RESIDENT_CARD_NODE_BY_GATE.has(arrival.progressionGateId)) ? arrival.progressionGateId : undefined,
@@ -3933,7 +3980,13 @@ export function mergeOrderEnergyRefund(order: MergeOrder): number {
   return order.difficulty === 'medium' ? 3 : order.difficulty === 'major' ? 5 : 2;
 }
 
+function ensureOrderGlowReward(order: MergeOrder): MergeOrder {
+  if (Number.isFinite(order.reward.coins) && order.reward.coins > 0) return order;
+  return { ...order, reward: { ...order.reward, coins: JOURNEY_MEDITATION_ORDER_GLOW } };
+}
+
 function normalizeOrder(value: MergeOrder): MergeOrder {
+  value = ensureOrderGlowReward(value);
   const recipientSkinId = value.characterId === 'mossprout'
     && typeof value.recipientSkinId === 'string'
     && mossproutResidentById.has(value.recipientSkinId)
@@ -3971,6 +4024,7 @@ export function mergeWorldCatalogIssues(): string[] {
     if (item.nextItemId && !MERGE_ITEMS_BY_ID.has(item.nextItemId)) issues.push(`${item.id} has missing next item ${item.nextItemId}`);
   }
   for (const template of MERGE_ORDER_TEMPLATES) {
+    if (!Number.isFinite(template.reward.coins) || template.reward.coins <= 0) issues.push(`${template.key} must award Glow`);
     for (const requirement of template.requirements) {
       if (!MERGE_ITEMS_BY_ID.has(requirement.definitionId)) issues.push(`${template.key} requests missing ${requirement.definitionId}`);
     }

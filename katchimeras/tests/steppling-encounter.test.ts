@@ -101,7 +101,8 @@ test('Steppling uses shared prompt, Bond landing and hatch phase haptics', () =>
   assert.match(host, /onEnergyTokenArrive=\{stepplingEncounter.feedController.handleEnergyTokenArrive\}/);
   assert.match(card, /if \(locked\) return/);
   assert.match(card, /action.id.startsWith\('egg.'\)\) playEggActionHaptic\(\)/);
-  assert.match(questions, /playEggActionHaptic\(\)/);
+  assert.match(questions, /useSharedActionPanelLifecycle/);
+  assert.match(readFileSync('features/today/use-shared-action-panel-lifecycle.ts', 'utf8'), /playEggActionHaptic\(\)/);
   assert.match(steppling, /hatchHaptics.advance\(next as TodayHatchPhase\)/);
   assert.match(steppling, /timers.forEach\(clearTimeout\)/);
   assert.match(original, /hatchHaptics.advance\('shaking'\)/);
@@ -201,7 +202,7 @@ test('Day 1 runs through the regular conversation engine for every movement choi
     for (let guard = 0; guard < 20 && session.status !== 'completed'; guard += 1) {
       const node = stepplingDayOneConversation.nodes.find((candidate) => candidate.id === session.currentNodeId);
       if (session.pendingReply !== undefined || node?.kind === 'end') session = continueConversation(session, stepplingDayOneConversation, NOW);
-      else session = answerConversation(session, stepplingDayOneConversation, node?.id === 'reflection' ? id : 'continue', NOW).session;
+      else session = answerConversation(session, stepplingDayOneConversation, node?.id === 'reflection' ? id : node?.kind === 'choice' ? (node.options.find((option) => option.id === 'skip') ?? node.options[0]).id : 'continue', NOW).session;
       session = JSON.parse(JSON.stringify(session));
     }
     assert.equal(session.status, 'completed');
@@ -259,7 +260,7 @@ test('steps pay one Bond per 300, rounded cumulatively, independently of the hat
 test('second Egg beat has only the steps card or automatic shared fallback', () => {
   const panel = readFileSync('components/katchadeck/world/steppling-encounter-panel.tsx', 'utf8');
   assert.doesNotMatch(panel, /Find my own pace|Check steps|steps fed\.|Feed yesterday’s steps|setAlternative|stepsMessage/);
-  assert.match(panel, /movementFallback = steps != null && stepOffer.steps === 0/);
+  assert.match(panel, /movementFallback = displayedSteps != null && stepOffer.steps === 0/);
   assert.match(panel, /stepCount=\{stepOffer.steps\} stepEnergy=\{stepOffer.bond\}/);
   const repository = readFileSync('utils/merge-world/repository.ts', 'utf8');
   assert.match(repository, /syncCompanionBondEvent\(bond, \{ id: 'steppling:egg:steps'[\s\S]*?points: stepplingStepsBond/);
@@ -276,7 +277,7 @@ test('steps launch the shared Bond batch from the right-hand reward section into
   assert.match(controller, /startEggFeed\(from, eggBondFeedPayload\(bondAmount, from\), arrive\)/);
   assert.match(payload, /currencyFrom, energyAmount: amount, energyOnly: true/);
   assert.match(controller, /feedExpressionKey: eggFeedLaunchKey/);
-  assert.match(controller, /if \(ok\) setFeedback\(\(value\) => value \+ 1\)/);
+  assert.match(controller, /if \(!ok\) \{ releaseFeedPanel\(\); return; \}\s*setFeedback\(\(value\) => value \+ 1\)/);
   assert.match(controller, /!ok \|\| reduceMotion \|\| bondAmount <= 0/);
   assert.doesNotMatch(controller, /DASHBOARD_STAT_ART.steps|framelessImage: true/);
 });
@@ -330,7 +331,11 @@ test('Day 1 is a normal resumable journey; every answer reaches one parcel effec
   assert.equal(STEPPLING_DAY_ONE_FLOW.nodes.some((node) => node.kind === 'route' || node.kind === 'task' || node.kind === 'presentation'), false);
   for (const { id } of STEPPLING_MOVEMENT_OPTIONS) {
     let run = createContentFlowRun(STEPPLING_DAY_ONE_FLOW, { runId: `test:${id}`, now: NOW });
-    for (const actionId of ['continue', id, 'continue', 'continue']) {
+    for (let guard = 0; guard < STEPPLING_DAY_ONE_FLOW.nodes.length && run.nodeId !== 'parcel'; guard++) {
+      const node = STEPPLING_DAY_ONE_FLOW.nodes.find((item) => item.id === run.nodeId)!;
+      assert.equal(node.kind, 'scene');
+      if (node.kind !== 'scene') break;
+      const actionId = node.id === 'reflection' ? id : (node.actions?.find((action) => action.id === 'skip') ?? node.actions![0]).id;
       run = reduceContentFlow(STEPPLING_DAY_ONE_FLOW, JSON.parse(JSON.stringify(run)), { type: 'submit_scene', actionId }).run;
     }
     assert.equal(run.nodeId, 'parcel');

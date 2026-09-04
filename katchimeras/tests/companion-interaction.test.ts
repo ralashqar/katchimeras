@@ -750,8 +750,8 @@ test('completed action rows preserve their outro while Bond reward renders updat
   const completion = fs.readFileSync(path.join(process.cwd(), 'game', 'katchimeras', 'action-completion.ts'), 'utf8');
   const actionRuntime = fs.readFileSync(path.join(process.cwd(), 'game', 'katchimeras', 'action-runtime.ts'), 'utf8');
   assert.doesNotMatch(mossprout, /rewardAnimationId=/);
-  assert.match(quests, /const completedNow = nextSession\.status === 'completed'[\s\S]*?settleMossproutConversationCompletion\(nextSession, selectedConversationDefinition\)/);
-  assert.match(quests, /settleMossproutConversationCompletion\(dismissedSelectedSession, selectedConversationDefinition\)/);
+  assert.match(quests, /const completedNow = nextSession\.status === 'completed'[\s\S]*?settleActionConversationCompletion\(nextSession, selectedConversationDefinition\)/);
+  assert.match(quests, /settleActionConversationCompletion\(dismissedSelectedSession, selectedConversationDefinition\)/);
   assert.match(completion, /commitActionCompletion\(progressed, actionCommandFromOrigin\(origin, completedAt\)\)/);
   assert.match(completion, /recordCompanionBondEvent\([\s\S]*?queueCelebration: false/);
   assert.match(actionRuntime, /rewardReceipt: completion\.rewardReceipt/);
@@ -766,7 +766,7 @@ test('meditation reclaims the hidden bottom dock space for its action cards', ()
   assert.match(stage, /meditationMode\s*\? styles\.meditationActionStage\s*:\s*styles\.actionStage/);
   assert.match(stage, /meditationActionStage:\s*\{ height: ACTION_TRAY_HEIGHT, justifyContent: 'flex-end' \}/);
   assert.match(stage, /!meditationMode && !residentParcelHandoffActive[\s\S]*?<KatchimeraBottomDock/);
-  assert.match(interaction, /meditationDashboardActive = Boolean\(meditation && route\.kind !== 'conversation'/);
+  assert.match(interaction, /meditationDashboardActive = Boolean\(!unifiedJourneyActive && meditation && route\.kind !== 'conversation'/);
   assert.match(interaction, /styles\.meditationActionsOverlay[\s\S]*?<MossproutStoryStage[\s\S]*?meditationMode/);
   assert.match(interaction, /bottom: Math\.max\(8, insets\.bottom \+ 4\)/);
   assert.match(interaction, /meditationTimerScreenTop - \(insets\.top \+ 58 \+ KatchaUI\.spacing\.xs\)/);
@@ -919,7 +919,7 @@ test('active Journey presentation hides optional cards and Merge tray entries', 
   assert.match(route, /source === 'merge-world' && story === 'return'/);
   assert.match(route, /journey\.familyId === 'mossprout' && journey\.status === 'resolution_ready'/);
   assert.match(route, /journeyReturnConversationDefinitionId=\{journeyReturnConversationDefinitionId\}/);
-  assert.match(routeScreen, /initialConversationDefinitionId=\{!residentStoryResumeActive[\s\S]*?: journeyReturnConversationDefinitionId\}/);
+  assert.match(routeScreen, /initialConversationDefinitionId=\{!residentStoryResumeActive[\s\S]*?: journeyReturnConversationDefinitionId \?\? stepplingDayOne\.definitionId\}/);
   assert.match(kingdom, /initialConversationDefinitionId=\{ftueConversationDefinitionId \?\? initialConversationDefinitionId\}/);
   assert.match(questHook, /mossproutJourneyRuntimeDayId\(relationships, dayId, isJourneyQuickModeEnabled\(\)\)/);
   assert.match(stage, /mossproutActionOrigin\(action, dayId, journey\)/);
@@ -960,7 +960,7 @@ test('Journey narrative replies and task bridge wait for the player', () => {
   assert.match(flow, /if \(journeyNarrative && !skipCompletedTransition\) \{[\s\S]*?onContinue\(\);[\s\S]*?onComplete\(\);/);
   const questHook = fs.readFileSync('hooks/use-kingdom-quests.ts', 'utf8');
   const completion = fs.readFileSync('game/katchimeras/action-completion.ts', 'utf8');
-  assert.match(questHook, /settleMossproutConversationCompletion\(nextSession, selectedConversationDefinition\)/);
+  assert.match(questHook, /settleActionConversationCompletion\(nextSession, selectedConversationDefinition\)/);
   assert.match(completion, /\[\.\.\.current\.journeyDays\]\.reverse\(\)\.find/);
   const mergeScreen = fs.readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   assert.match(mergeScreen, /onPress=\{\(\) => handoffActive \? returnFromGarden\(\) : residentFtueActive && creatureId[\s\S]*?: ftueNavigationLocked \|\| ftueExclusive[\s\S]*?\? handleBlockedFtueInteraction\(\)[\s\S]*?: returnFromGarden\(\)/);

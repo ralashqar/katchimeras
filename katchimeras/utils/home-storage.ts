@@ -1,3 +1,4 @@
+import { TODAY_PERF_ENABLED } from '@/constants/diagnostics';
 import { getStoredJson, getStoredRaw, removeStoredValue, setStoredRaw, setStoredRawAsync } from '@/utils/app-storage';
 import { HOME_STORAGE_KEY } from '@/constants/home-mvp';
 import type { StoredHomeState } from '@/types/home';
@@ -172,7 +173,7 @@ function writePartitionedSync(state: StoredHomeState, writeArchive: boolean): vo
 }
 
 async function writePartitionedDeferred(state: StoredHomeState, writeArchive: boolean): Promise<void> {
-  const startedAt = performance.now();
+  const startedAt = TODAY_PERF_ENABLED ? performance.now() : 0;
   let archiveBytes = 0;
   // Archive first: an active envelope is never published before the archive it
   // references is durable. The legacy monolith remains as migration fallback.
@@ -185,9 +186,9 @@ async function writePartitionedDeferred(state: StoredHomeState, writeArchive: bo
   }
   activeRevision += 1;
   const activeRaw = serializeActive(state, activeRevision);
-  const serializedAt = performance.now();
+  const serializedAt = TODAY_PERF_ENABLED ? performance.now() : 0;
   await setStoredRawAsync(HOME_ACTIVE_STORAGE_KEY, activeRaw);
-  if (typeof __DEV__ !== 'undefined' && __DEV__ && process.env.EXPO_PUBLIC_TODAY_LOOP_PERF === '1') {
+  if (TODAY_PERF_ENABLED) {
     console.info('[today-energy-loop] persistence', {
       activeBytes: activeRaw.length,
       archiveBytes,
