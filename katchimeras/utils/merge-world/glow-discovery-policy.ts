@@ -31,7 +31,8 @@ export function glowTutorialDrop(state: MergeWorldState, generatorId: string) {
 export const WORLD_UNLOCK_CATALOG = Object.fromEntries(SHARED_WORLD_PURCHASES.map((tile) => [tile.unlockId, { ...tile, destination: tile.companion }]));
 
 /** Paid exploration is independent of relationship-based environment stages. */
-export function glowGatewayState(state: MergeWorldState): 'egg' | 'locked' | undefined {
+export function glowGatewayState(state: MergeWorldState): 'egg' | 'open' | 'locked' | undefined {
+  if (state.companionDiscovery.records.some((record) => record.characterId === 'steppling')) return 'open';
   if (state.worldUnlocks?.[GLOW_GATEWAY_ID]) return 'egg';
   return (state.haven.tileStages.mossprout ?? 0) >= 1 ? 'locked' : undefined;
 }

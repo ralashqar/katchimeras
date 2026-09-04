@@ -506,12 +506,11 @@ test('the shared Haven keeps its authored neighborhood art and adds only owned r
   assert.doesNotMatch(hexScene, /haven-junction-mini-island-512\.webp/);
   assert.doesNotMatch(hexScene, /haven-junction-mini-island-tray-512\.webp/);
   assert.doesNotMatch(orderRail, /haven-junction-mini-island-tray-512\.webp/);
-  assert.match(orderRail, /order-chair\.webp/);
+  assert.doesNotMatch(orderRail, /order-chair\.webp|CHAIR_ART|chairArt/);
   assert.match(orderRail, /order-service-tray\.webp/);
   assert.match(orderRail, /export function EmptyMergeOrderTrayCard/);
-  assert.match(orderRail, /accessibilityLabel="Empty order tray"[\s\S]*?source=\{CHAIR_ART\}[\s\S]*?source=\{TRAY_ART\}/);
-  assert.match(orderRail, /source=\{CHAIR_ART\}[\s\S]*?style=\{styles\.characterLayer\}[\s\S]*?source=\{TRAY_ART\}/);
-  assert.match(orderRail, /chairArt: \{[^}]*height: 154[^}]*left: -17[^}]*width: 154[^}]*zIndex: 1/);
+  assert.match(orderRail, /accessibilityLabel="Empty order tray"[\s\S]*?source=\{TRAY_ART\}/);
+  assert.match(orderRail, /style=\{styles\.characterLayer\}[\s\S]*?source=\{TRAY_ART\}/);
   assert.match(orderRail, /characterLayer: \{[^}]*zIndex: 2/);
   assert.match(orderRail, /trayArt: \{[^}]*zIndex: 3/);
   assert.match(orderRail, /ORDER_TABLE_ART_SCALE = 0\.9/);

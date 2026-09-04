@@ -1,4 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
+import { SHARED_RESIDENT_WIDTH, SHARED_RESIDENT_HEIGHT, SHARED_RESIDENT_BASELINE_LIFT, SHARED_EGG_REST_ZOOM, SHARED_EGG_SCREEN_ANCHOR_Y, SHARED_RESIDENT_SCREEN_ANCHOR_Y, SHARED_RESIDENT_FOCUS_DURATION_MS, sharedResidentCenterY, residentArtLayerId, usesSharedResidentStage } from './shared-resident-presentation';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import {
@@ -42,7 +43,7 @@ import { buildKingdomHexScene } from '@/components/katchadeck/world/kingdom-hex-
 import { buildMossproutHexNeighborhoodScene, mossproutGardenPlantSlotFrame, MOSSPROUT_GARDEN_PLANT_SLOT_IDS, type MossproutGardenSceneState } from '@/components/katchadeck/world/mossprout-hex-neighborhood-scene';
 import { SeamlessWorldImage } from '@/components/katchadeck/world/seamless-world-image';
 import { CreatureAnimatedArt } from '@/components/katchadeck/world/creature-animated-art';
-import type { WorldFtueSubjectPresentation } from '@/components/katchadeck/world/world-ftue-subject-presentation';
+import { worldEggReadyEffectsVisible, type WorldFtueSubjectPresentation } from '@/components/katchadeck/world/world-ftue-subject-presentation';
 import { runRewardArrivalMotion } from '@/components/katchadeck/ui/reward-arrival-motion';
 import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
 import { CelebrationParticles } from '@/components/katchadeck/world/companion-achievement-celebration';
@@ -156,6 +157,9 @@ type Props = {
   storyOperationsEnabled?: boolean;
   worldEggTargetRef?: RefObject<ViewType | null>;
   worldSubjectPresentation?: WorldFtueSubjectPresentation | null;
+  discoveredEggPresentation?: WorldFtueSubjectPresentation | null;
+  discoveredEggInteraction?: boolean;
+  discoveredEggTargetRef?: RefObject<ViewType | null>;
 };
 
 type HavenUpgradeLayers = {
@@ -207,20 +211,20 @@ const WORLD_FTUE_PULSE_RING_NATIVE_SURFACE_SCALE = 2;
 // never rasterized from a small in-world copy while zooming.
 const WORLD_INTERACTION_CREATURE_NATIVE_SURFACE_SCALE = 2.7;
 const MEMORY_PLANT_NATIVE_SURFACE_SCALE = 3.2;
-const WORLD_FTUE_EGG_WIDTH = 108;
-const WORLD_FTUE_EGG_HEIGHT = 139;
+const WORLD_FTUE_EGG_WIDTH = SHARED_RESIDENT_WIDTH;
+const WORLD_FTUE_EGG_HEIGHT = SHARED_RESIDENT_HEIGHT;
 const WORLD_FTUE_EGG_STAGE_SCALE = WORLD_FTUE_EGG_WIDTH / 200;
 const WORLD_FTUE_READY_SUNBURST_SIZE = 440 * WORLD_FTUE_EGG_STAGE_SCALE;
 const WORLD_FTUE_HATCH_SUNBURST_SIZE = WORLD_FTUE_EGG_WIDTH * 1.8;
 const WORLD_FTUE_REWARD_GLOW_SIZE = WORLD_FTUE_EGG_WIDTH * 0.84;
 const WORLD_FTUE_GLOW_ACCENT = '#F4CE7A';
 const WORLD_FTUE_GLOW_CORE = '#FFF1B8';
-const MOSSPROUT_WORLD_BASELINE_LIFT = 8;
-const MOSSPROUT_DIALOGUE_SCREEN_ANCHOR_Y = 0.5;
-const REGULAR_RESIDENT_INTERACTION_SCREEN_ANCHOR_Y = 0.46;
+const MOSSPROUT_WORLD_BASELINE_LIFT = SHARED_RESIDENT_BASELINE_LIFT;
+const MOSSPROUT_DIALOGUE_SCREEN_ANCHOR_Y = SHARED_EGG_SCREEN_ANCHOR_Y;
+const REGULAR_RESIDENT_INTERACTION_SCREEN_ANCHOR_Y = SHARED_RESIDENT_SCREEN_ANCHOR_Y;
 
 function mossproutDialogueSubjectCenterY(residentAnchorY: number) {
-  return residentAnchorY - MOSSPROUT_WORLD_BASELINE_LIFT - WORLD_FTUE_EGG_HEIGHT / 2;
+  return sharedResidentCenterY(residentAnchorY);
 }
 
 function residentCreatureFrame(x: number, y: number, worldSize: number, stableWorldPresentation: boolean) {
@@ -400,6 +404,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   storyOperationsEnabled = true,
   worldEggTargetRef,
   worldSubjectPresentation,
+  discoveredEggPresentation,
+  discoveredEggInteraction = false,
+  discoveredEggTargetRef,
 }: Props) {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [assetRevision, setAssetRevision] = useState(0);
@@ -695,7 +702,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       y: residentAnchor
         ? target.kind === 'haven_resident'
           ? mossproutDialogueSubjectCenterY(residentAnchor.y)
-          : residentAnchor.y - 8 - WORLD_FTUE_EGG_HEIGHT * eggGrowthScale / 2
+          : sharedResidentCenterY(residentAnchor.y, eggGrowthScale)
         : tile.cy,
     };
   }, [gardenFocusFrame, initialTutorialCameraScale, scene.tileArtLayers, scene.tiles, tutorialCamera, viewport.height, worldSubjectPresentation?.growthProgress]);
@@ -717,8 +724,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       && candidate.companion.creature.creatureId === interactionResidentId
     ));
     if (!tile) return null;
-    const residentAnchor = scene.tileArtLayers.find((layer) => layer.id === tile.id)?.residentAnchor;
-    const isMossprout = tile.companion?.familyId === 'mossprout';
+    const residentAnchor = scene.tileArtLayers.find((layer) => layer.id === residentArtLayerId(tile.id, tile.companion?.familyId))?.residentAnchor;
+    const isMossprout = usesSharedResidentStage(tile.companion?.familyId);
     const subjectFrame = residentAnchor
       ? residentCreatureFrame(residentAnchor.x, residentAnchor.y, creatureWorldSize, isMossprout)
       : null;
@@ -774,6 +781,32 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const animateToCameraSnapshot = camera.animateToSnapshot;
   const readLiveCameraSnapshot = camera.getSnapshot;
   const tutorialCameraReady = camera.ready;
+  const discoveredEggOriginRef = useRef<KingdomCameraSnapshot | null>(null);
+  const interactionOriginSnapshotRef = useRef<KingdomCameraSnapshot | null>(null);
+  useEffect(() => {
+    if (!tutorialCameraReady) return;
+    if (!discoveredEggInteraction) {
+      const origin = discoveredEggOriginRef.current;
+      if (origin) {
+        discoveredEggOriginRef.current = null;
+        // Hatching hands ownership to the same resident interaction camera.
+        // Preserve the pre-Egg world view for Back; never zoom out in between.
+        if (interactionResidentId) interactionOriginSnapshotRef.current = origin;
+        else animateToCameraSnapshot(origin, reduceMotion ? 0 : 440);
+      }
+      return;
+    }
+    if (discoveredEggOriginRef.current) return;
+    const layer = scene.tileArtLayers.find((candidate) => candidate.id === 'structure:steppling-home');
+    if (!layer) return;
+    const anchor = layer.residentAnchor ?? { x: layer.frame.left + layer.frame.width / 2, y: layer.frame.top + layer.frame.height / 2 };
+    discoveredEggOriginRef.current = readLiveCameraSnapshot();
+    focusTutorialResident(anchor.x, sharedResidentCenterY(anchor.y), {
+      anchorY: SHARED_EGG_SCREEN_ANCHOR_Y,
+      zoom: SHARED_EGG_REST_ZOOM,
+      durationMs: reduceMotion ? 0 : SHARED_RESIDENT_FOCUS_DURATION_MS,
+    });
+  }, [animateToCameraSnapshot, discoveredEggInteraction, focusTutorialResident, interactionResidentId, readLiveCameraSnapshot, reduceMotion, scene.tileArtLayers, tutorialCameraReady]);
   useEffect(() => {
     if (!tutorialCamera) {
       appliedTutorialCameraRef.current = 'none';
@@ -829,7 +862,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const subjectCenterY = residentAnchor
       ? target.kind === 'haven_resident'
         ? mossproutDialogueSubjectCenterY(residentAnchor.y)
-        : residentAnchor.y - 8 - WORLD_FTUE_EGG_HEIGHT * eggGrowthScale / 2
+        : sharedResidentCenterY(residentAnchor.y, eggGrowthScale)
       : tile.cy;
     focusTutorialResident(residentAnchor?.x ?? tile.cx, subjectCenterY, {
       anchorY: tutorialCamera.anchorY,
@@ -951,7 +984,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     );
   }, [camera.isMoving, tileUpgradeOffer]);
   const focusedInteractionResidentRef = useRef<string | null>(null);
-  const interactionOriginSnapshotRef = useRef<KingdomCameraSnapshot | null>(null);
   useEffect(() => {
     if (!interactionResidentId) {
       focusedInteractionResidentRef.current = null;
@@ -968,8 +1000,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     if (!tile) return;
     interactionOriginSnapshotRef.current ??= readLiveCameraSnapshot();
     focusedInteractionResidentRef.current = interactionFocusKey;
-    const residentAnchor = scene.tileArtLayers.find((layer) => layer.id === tile.id)?.residentAnchor;
-    const isMossprout = tile.companion?.familyId === 'mossprout';
+    const residentAnchor = scene.tileArtLayers.find((layer) => layer.id === residentArtLayerId(tile.id, tile.companion?.familyId))?.residentAnchor;
+    const isMossprout = usesSharedResidentStage(tile.companion?.familyId);
     const subjectFrame = residentAnchor
       ? residentCreatureFrame(residentAnchor.x, residentAnchor.y, creatureWorldSize, isMossprout)
       : null;
@@ -978,7 +1010,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       subjectFrame ? subjectFrame.top + subjectFrame.height / 2 : tile.cy,
       {
       anchorY: residentInteractionScreenAnchorY,
-      durationMs: reduceMotion ? 80 : 520,
+      durationMs: reduceMotion ? 80 : SHARED_RESIDENT_FOCUS_DURATION_MS,
       onComplete: () => onResidentFocusComplete?.(interactionResidentId),
       zoom: cameraMaximumScale ?? KINGDOM_RENDERING.havenMaxScale,
     });
@@ -1172,8 +1204,15 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   }, [camera.isMoving, cameraTransitionActive]);
   useScenePerformanceProbe('kingdom-camera', cameraTransitionActive, 'kingdom');
   const artLayerById = useMemo(
-    () => new Map(scene.tileArtLayers.map((layer) => [layer.id, layer])),
-    [scene.tileArtLayers]
+    () => {
+      const layers = new Map(scene.tileArtLayers.map((layer) => [layer.id, layer]));
+      for (const tile of scene.tiles) {
+        const layer = layers.get(residentArtLayerId(tile.id, tile.companion?.familyId));
+        if (layer) layers.set(tile.id, layer);
+      }
+      return layers;
+    },
+    [scene.tileArtLayers, scene.tiles]
   );
   const tileFocusScale = useCallback((tileId: string) => {
     if (!presentation || presentation.focusMode !== 'magnetic' || camera.isMoving || !camera.focusedTileId) return 1;
@@ -1237,7 +1276,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       { x: tile.cx, y: tile.cy },
       kingdomWorldViewConfig.katchimera,
     );
-    const stableWorldPresentation = tile.companion.familyId === 'mossprout';
+    const stableWorldPresentation = usesSharedResidentStage(tile.companion.familyId);
     return {
       creature: tile.companion.creature,
       frame: residentCreatureFrame(anchor.x, anchor.y, creatureWorldSize, stableWorldPresentation),
@@ -1283,7 +1322,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         { x: tile.cx, y: tile.cy },
         kingdomWorldViewConfig.katchimera
       );
-      const stableWorldPresentation = tile.companion.familyId === 'mossprout';
+      const stableWorldPresentation = usesSharedResidentStage(tile.companion.familyId);
       const residentInteractionEnabled = interactionEnabled || allowedResidentCharacterId === tile.companion.familyId;
       items.push({
         depth: hexDrawDepth({ x, y }, 4),
@@ -1509,20 +1548,20 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           cameraTranslateY={camera.translationYValue}
           creature={interactionResidentProjection.creature}
           frame={interactionResidentProjection.frame}
-          meditating={mossproutMeditating}
+          meditating={interactionResidentProjection.creature.familyId === 'mossprout' && mossproutMeditating}
           rewardPulseKey={interactionRewardPulseKey}
           sceneHeight={scene.height}
           sceneWidth={scene.width}
           source={interactionResidentProjection.source}
         />
       ) : null}
-      {focusedMossproutWorld && mossproutGarden?.gateway === 'egg' && !upgradePresentation && !storySceneGuard ? (() => {
+      {focusedMossproutWorld && (mossproutGarden?.gateway === 'egg' || discoveredEggInteraction) && !upgradePresentation && !storySceneGuard ? (() => {
         const layer = scene.tileArtLayers.find((candidate) => candidate.id === 'structure:steppling-home');
         if (!layer) return null;
         const anchor = layer.residentAnchor ?? { x: layer.frame.left + layer.frame.width / 2, y: layer.frame.top + layer.frame.height / 2 };
-        return <RevealedCompanionEgg idleDiscovery eggSkinId="classic"
+        return <RevealedCompanionEgg idleDiscovery={!discoveredEggInteraction} fullSize eggSkinId="moss" presentation={discoveredEggPresentation} targetRef={discoveredEggTargetRef}
           cameraScale={camera.scaleValue} cameraTranslateX={camera.translationXValue} cameraTranslateY={camera.translationYValue}
-          sceneHeight={scene.height} sceneWidth={scene.width} x={anchor.x} y={anchor.y}
+          sceneHeight={scene.height} sceneWidth={scene.width} x={anchor.x} y={anchor.y - SHARED_RESIDENT_BASELINE_LIFT}
           onPress={interactionEnabled ? onSelectGateway : undefined} />;
       })() : null}
       {memoryPlantProjections.map((plant) => (
@@ -1743,6 +1782,7 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
   sceneWidth,
   targetRef,
   idleDiscovery = false,
+  fullSize = false,
 }: {
   cameraScale: SharedValue<number>;
   cameraTranslateX: SharedValue<number>;
@@ -1756,11 +1796,13 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
   sceneWidth: number;
   targetRef?: RefObject<ViewType | null>;
   idleDiscovery?: boolean;
+  fullSize?: boolean;
 }) {
   const { equippedFaceId } = useEggAvatar();
   const reduceMotion = useReducedMotion();
   const opacity = useSharedValue(0);
-  const visualGrowth = useSharedValue(eggVisualGrowthForEnergyRatio(presentation?.growthProgress ?? 0));
+  const growthProgress = fullSize ? 1 : presentation?.growthProgress ?? 0;
+  const visualGrowth = useSharedValue(eggVisualGrowthForEnergyRatio(growthProgress));
   const feedbackPulse = useSharedValue(0);
   const feedbackShake = useSharedValue(0);
   const radianceFlare = useSharedValue(0);
@@ -1777,6 +1819,8 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
   const rewardPulse = useSharedValue(0);
   const rewardShake = useSharedValue(0);
   const hatchPhase = presentation?.hatchPresentation?.phase ?? 'idle';
+  const showReadyEffects = worldEggReadyEffectsVisible(presentation);
+  const showDiscoveryReminder = idleDiscovery && !presentation?.hatchPresentation && !presentation?.companionVisible;
   const feedExpressionSequence = useMemo<readonly EggExpressionCue[]>(() => [
     { faceId: 'big-grin', atMs: 80, durationMs: 180 },
     { faceId: 'happy-squint', atMs: 430, durationMs: 190 },
@@ -1786,11 +1830,11 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
     opacity.value = withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) });
   }, [opacity]);
   useEffect(() => {
-    visualGrowth.value = withTiming(eggVisualGrowthForEnergyRatio(presentation?.growthProgress ?? 0), {
+    visualGrowth.value = withTiming(eggVisualGrowthForEnergyRatio(growthProgress), {
       duration: reduceMotion ? 90 : 280,
       easing: Easing.out(Easing.cubic),
     });
-  }, [presentation?.growthProgress, reduceMotion, visualGrowth]);
+  }, [growthProgress, reduceMotion, visualGrowth]);
   const triggerFeedArrivalFeedback = useCallback(() => {
     runRewardArrivalMotion(feedbackPulse, feedbackShake, reduceMotion);
     radianceFlare.value = withSequence(
@@ -1830,7 +1874,7 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
   useEffect(() => {
     cancelAnimation(readyShake);
     cancelAnimation(readyRipple);
-    if ((!presentation?.readyToHatch && !idleDiscovery) || reduceMotion) {
+    if ((!showReadyEffects && !showDiscoveryReminder) || reduceMotion) {
       readyShake.value = withTiming(0, { duration: 120 });
       readyRipple.value = 1;
       return;
@@ -1862,7 +1906,7 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
       cancelAnimation(readyShake);
       cancelAnimation(readyRipple);
     };
-  }, [idleDiscovery, presentation?.readyToHatch, readyRipple, readyShake, reduceMotion]);
+  }, [showDiscoveryReminder, showReadyEffects, readyRipple, readyShake, reduceMotion]);
   useEffect(() => {
     cancelAnimation(hatchShake);
     cancelAnimation(hatchPulse);
@@ -2018,7 +2062,7 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
         }, hatchPulseTwoStyle]} />
       </> : null}
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, projectedEffectCameraStyle]}>
-        {presentation?.readyToHatch ? <>
+        {showReadyEffects ? <>
           <RotatingRadialSunburst
             baseOpacity={0.9}
             size={WORLD_FTUE_READY_SUNBURST_SIZE}
@@ -2030,7 +2074,7 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
           <WorldEggRippleField primary={readyRipple} />
         </> : null}
         <WorldEggRadiance flare={radianceFlare} growth={visualGrowth} />
-        {idleDiscovery ? <WorldEggRippleField primary={readyRipple} /> : null}
+        {showDiscoveryReminder ? <WorldEggRippleField primary={readyRipple} /> : null}
         <WorldEggRippleField primary={ripple} secondary={rippleEcho} />
       </Animated.View>
       <Animated.View
@@ -2104,7 +2148,7 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
         </View>
         </Animated.View>
       </Animated.View>
-      {presentation?.hatchPresentation || presentation?.companionVisible ? (
+      {presentation?.hatchPresentation || presentation?.companionVisible || presentation?.preloadHatch ? (
         <Animated.View
           collapsable={false}
           pointerEvents="none"

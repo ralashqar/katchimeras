@@ -1,6 +1,8 @@
 import type { TodayHatchPresentation } from '@/utils/today-hatch-presentation';
 
 export type WorldFtueSubjectPresentation = {
+  /** Load the resident behind the Egg without starting hatch expressions. */
+  preloadHatch?: boolean;
   hatchFamilyId?: 'mossprout' | 'steppling';
   companionVisible: boolean;
   feedbackKey: number;
@@ -13,6 +15,13 @@ export type WorldFtueSubjectPresentation = {
   readyToHatch: boolean;
   rewardPulseKey: number;
 };
+
+/** Never layer the waiting Egg's rays/shake over a live hatch or resident. */
+export function worldEggReadyEffectsVisible(
+  presentation?: Pick<WorldFtueSubjectPresentation, 'readyToHatch' | 'hatchPresentation' | 'companionVisible'> | null,
+) {
+  return Boolean(presentation?.readyToHatch && !presentation.hatchPresentation && !presentation.companionVisible);
+}
 
 /** The Egg is an opening actor, never a fallback for a post-hatch resident. */
 export function mossproutWorldUsesEggRenderer(

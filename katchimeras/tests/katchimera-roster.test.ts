@@ -318,8 +318,9 @@ test('the Katchimeras tab renders the hex selector first while companion Back re
   assert.match(katchimerasTab, /mossproutInteraction[\s\S]*?requestedWorldInteraction/);
   assert.match(rosterRoute, /interactionRequest=\{interactionRequest\}[\s\S]*?onInteractionRequestConsumed=\{onInteractionRequestConsumed\}/);
   assert.match(kingdomScreen, /<KingdomHexCanvas[\s\S]*?onSelectResident=\{\(creatureId\) => \{\s*if \(glowDiscoveryLocksCamera\(glowRun\)\) return;\s*selectResident\(creatureId\);/);
+  assert.doesNotMatch(kingdomScreen, /StepplingDayOnePanel|setStepplingDayOpen/);
   assert.match(kingdomScreen, /interactionRequest[\s\S]*?setInteractionCreatureId\(interactionRequest\.creatureId\)/);
-  assert.match(kingdomScreen, /cameraMaximumScale=\{ftueEggFeedingCloseupActive[\s\S]*?MOSSPROUT_WORLD_EGG_CLOSE_ZOOM[\s\S]*?MOSSPROUT_WORLD_EGG_REST_ZOOM/);
+  assert.match(kingdomScreen, /cameraMaximumScale=\{stepplingEncounter.open \? SHARED_EGG_REST_ZOOM : ftueEggFeedingCloseupActive[\s\S]*?MOSSPROUT_WORLD_EGG_CLOSE_ZOOM[\s\S]*?MOSSPROUT_WORLD_EGG_REST_ZOOM/);
   assert.match(kingdomCanvas, /animated=\{stableWorldPresentation \|\| interactionResidentId === tile\.companion\.creature\.creatureId\}/);
   assert.match(kingdomCanvas, /<CreatureAnimatedArt[\s\S]*?visualKey=\{creature\.visualKey\}/);
   assert.doesNotMatch(kingdomScreen, /HavenTileHudLayer|openHavenDetail|onResidentAnchorsChange/);

@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { KingdomCompanionScreen } from '@/components/katchadeck/world/kingdom-companion-screen';
+import { useStepplingDayOne } from '@/features/companion/use-steppling-day-one';
+import { STEPPLING_DAY_ONE_CONVERSATION_ID } from '@/constants/steppling-day-one-conversation';
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { markFlowStart, reportFlowReady } from '@/utils/flow-performance';
 import { companionIdForFamily, familyIdFromCompanionId } from '@/constants/katchimera-skins';
 import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
@@ -93,6 +96,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   const router = useRouter();
   const { transitionTo } = useGameScreenTransition();
   const familyId = familyIdFromCompanionId(creatureId);
+  const stepplingDayOne = useStepplingDayOne(familyId === 'steppling' && surfaceActive);
   const ftueHandoffRef = useRef(false);
   const [mistHandoffActive, setMistHandoffActive] = useState(false);
   const postFtueGardenRepairRef = useRef<string | null>(null);
@@ -606,6 +610,14 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   // progress already lives in the repositories and is rehydrated on focus.
   if (hostedInHaven && mistHandoffActive) return null;
 
+  if (familyId === 'steppling' && (!stepplingDayOne.ready || stepplingDayOne.error)) {
+    return <View pointerEvents="box-none" style={styles.inactiveScreen}>
+      {stepplingDayOne.error ? <View style={{ position: 'absolute', bottom: 40, left: 24, right: 24 }}>
+        <KatchaButton label="Try again" onPress={stepplingDayOne.retry} />
+      </View> : null}
+    </View>;
+  }
+
   if (!surfaceActive || (!discovery.ready && !hostedInHaven) || (residentMergeFtueActive && !residentStoryResumeActive)) {
     return <View style={styles.inactiveScreen} />;
   }
@@ -617,10 +629,12 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       ftueConversationDefinitionId={activeFtueConversationDefinitionId}
       initialConversationDefinitionId={!residentStoryResumeActive && navigationFtueRun?.status === 'active' && navigationFtueRun.stepId === 'companion.resident_affinity'
         ? 'mossprout:game:form-finder'
-        : journeyReturnConversationDefinitionId}
+        : journeyReturnConversationDefinitionId ?? stepplingDayOne.definitionId}
+      onInitialConversationComplete={familyId === 'steppling' ? async () => { await stepplingDayOne.complete(); } : undefined}
       discoveryRecords={discovery.records}
       onFtueConversationComplete={activeFtueConversationDefinitionId || residentFtueGraphActive ? completeFtueConversation : undefined}
-      onCompletedConversationExit={completeResidentResultExit}
+      onCompletedConversationExit={async (definitionId) => definitionId === STEPPLING_DAY_ONE_CONVERSATION_ID
+        ? stepplingDayOne.complete() : completeResidentResultExit(definitionId)}
       ftueOrderPreviewActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.order_preview'}
       ftueProfileStep={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.intro_action'
         ? 'intro_action'

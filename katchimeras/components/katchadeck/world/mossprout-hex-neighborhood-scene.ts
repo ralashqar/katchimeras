@@ -1,4 +1,5 @@
 import type { ImageSourcePropType } from 'react-native';
+import { sharedResidentAnchor } from './shared-resident-presentation';
 
 import type { KingdomHexScene, KingdomTileArtLayer, KingdomTileRender } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { KINGDOM_HEX_TILE_ALPHA_BOUNDS } from '@/constants/kingdom-hex-tile-bounds.gen';
@@ -251,10 +252,7 @@ export function buildMossproutHexNeighborhoodScene(
     ?? { id: 'family:mossprout', familyId: 'mossprout', kind: 'locked' as const, coord: MAIN.coord };
   const mainLayer = layerFor(mossprout.id, 'tile', MAIN);
   mainLayer.residentSource = MAIN_RESIDENT_SOURCE;
-  mainLayer.residentAnchor = {
-    x: mainLayer.frame.left + mainLayer.frame.width * 0.5,
-    y: mainLayer.frame.top + mainLayer.frame.height * 0.49,
-  };
+  mainLayer.residentAnchor = sharedResidentAnchor(mainLayer.frame);
   const gardenArtLevel: 0 | 1 | 2 = gardenState.level <= 0
     ? 0
     : (gardenState.featureLevels?.spring ?? 0) > 0 && (gardenState.featureLevels?.path ?? 0) > 0 ? 2 : 1;
@@ -297,7 +295,7 @@ export function buildMossproutHexNeighborhoodScene(
     });
   const lockedSteppling = stepplingLayer(true);
   const revealedSteppling = stepplingLayer(false);
-  revealedSteppling.residentAnchor = mossproutHexPoint(STEPPLING_TILE.coord);
+  revealedSteppling.residentAnchor = sharedResidentAnchor(revealedSteppling.frame);
   const rawLayers = [
     mainLayer, gardenLayer, ...plantLayers,
     !gardenState.gateway || gardenState.gateway === 'locked' ? lockedSteppling : revealedSteppling,
@@ -328,7 +326,7 @@ export function buildMossproutHexNeighborhoodScene(
   const residentTiles: KingdomTileRender[] = Object.values(SHARED_WORLD_TILES).flatMap((entry) => {
     if (entry.companion === 'mossprout') return [];
     // Discovery-only tiles never inherit an owned/dev resident projection.
-    if ('residentVisible' in entry && !entry.residentVisible) return [];
+    if ('residentVisible' in entry && !entry.residentVisible && !(entry.companion === 'steppling' && gardenState.gateway === 'open')) return [];
     const slot = companionSlots.find((candidate) => candidate.familyId === entry.companion && candidate.kind === 'owned');
     if (!slot) return [];
     const point = mossproutHexPoint(entry.coord);

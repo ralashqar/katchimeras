@@ -206,6 +206,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const [screenLayoutNonce, setScreenLayoutNonce] = useState(0);
   const screenRef = useRef<View>(null);
   const coinHudRef = useRef<View>(null);
+  const coinArtRef = useRef<View>(null);
   const coinHudPillRef = useRef<View>(null);
   const boardMetricsRef = useRef<MergeBoardScreenMetrics | null>(null);
   const railTargetRefs = useRef(new Map<string, View>());
@@ -611,7 +612,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
   const pendingParcels = useMemo(() => state?.arrivals.filter((arrival) => (
     arrival.claimedAt == null
     && (arrival.kind === 'discovery_parcel' || arrival.kind === 'root_match_parcel' || arrival.kind === 'resident_card_parcel' || arrival.kind === 'contextual_parcel' || arrival.kind === 'goal_chest')
-    && arrival.itemDefinitionIds.length > 0
+    && (arrival.itemDefinitionIds.length > 0 || Boolean(arrival.generatorId))
   )).sort((left, right) => left.createdAt - right.createdAt) ?? [], [state?.arrivals]);
   const pendingParcel = pendingParcels[0] ?? null;
   const pendingMemoryCard = state?.ownedMemoryCards.find((card) => card.revealedAt == null) ?? null;
@@ -696,7 +697,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
     const servingItems = mergeOrderServingCells(state, order);
     const [screenRect, coinRect] = await Promise.all([
       measureViewInWindow(screenRef),
-      measureViewInWindow(coinHudRef),
+      measureViewInWindow(coinArtRef),
     ]);
     if (!boardMetrics || !screenRect || !coinRect || servingItems.length !== itemTargets.length) {
       activeServeRef.current = false;
@@ -722,11 +723,11 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       orderId: order.id,
     };
     setServeHiddenItemIds(new Set(items.map((item) => item.instanceId)));
-    setServeFlight({ coinAmount: order.reward.coins, coinFrom, coinTo, energyAmount: 0, energyTo, items, nonce: serveNonceRef.current, phase: 'items' });
+    setServeFlight({ coinAmount: order.reward.coins, coinFrom, coinTo, coinTargetSize: { width: coinRect.width, height: coinRect.height }, energyAmount: 0, energyTo, items, nonce: serveNonceRef.current, phase: 'items' });
     return true;
   }, [parcelFlight, state]);
 
-  const handleServeItemsArrive = useCallback(() => {
+  const handleServeItemsArrive = useCallback(async () => {
     const activeOrder = activeServeOrderRef.current;
     const orderStillReady = state?.activeOrders.some((order) => order.id === activeOrder?.orderId)
       && readyOrderIds.has(activeOrder?.orderId ?? '');
@@ -737,12 +738,27 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       setServeFlight(null);
       return;
     }
+    // Re-measure after the item flight: any previous HUD pulse has now stopped,
+    // so the reward batch uses the artwork's resting bounds, not its old scale.
+    const [screenRect, coinRect] = await Promise.all([
+      measureViewInWindow(screenRef),
+      measureViewInWindow(coinArtRef),
+    ]);
+    if (activeServeOrderRef.current !== activeOrder) return;
     // Keep the order and its consumed board items in state until every reward
     // token has reached the HUD. Removing the order here would start the tray
     // outro while the coin flight is still running.
     setPresentedCoins(state.coins);
     setCoinValueAnimationDurationMs(0);
-    setServeFlight((current) => current ? { ...current, energyAmount: 0, phase: 'rewards' } : null);
+    setServeFlight((current) => current ? {
+      ...current,
+      ...(screenRect && coinRect ? {
+        coinTo: { x: coinRect.x - screenRect.x + coinRect.width / 2, y: coinRect.y - screenRect.y + coinRect.height / 2 },
+        coinTargetSize: { width: coinRect.width, height: coinRect.height },
+      } : {}),
+      energyAmount: 0,
+      phase: 'rewards',
+    } : null);
     if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }, [readyOrderIds, state]);
 
@@ -822,7 +838,7 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       return;
     }
     const result = dispatch({ type: 'claimArrival', arrivalId, now: Date.now() });
-    if (!result?.changed || !result.spawnedItems?.length) {
+    if (!result?.changed || (!result.spawnedItems?.length && !result.spawnedGenerator)) {
       activeParcelRef.current = false;
       setParcelShakeNonce((value) => value + 1);
       if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -833,11 +849,16 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
       x: parcelRect.x - screenRect.x + parcelRect.width / 2,
       y: parcelRect.y - screenRect.y + parcelRect.height / 2,
     };
-    const items = result.spawnedItems.map((item) => {
+    const parcelContents = [
+      ...(result.spawnedItems ?? []).map((item) => ({ ...item, generatorId: undefined as string | undefined })),
+      ...(result.spawnedGenerator ? [{ ...result.spawnedGenerator, instanceId: `generator:${result.spawnedGenerator.generatorId}`, definitionId: undefined }] : []),
+    ];
+    const items = parcelContents.map((item) => {
       const center = mergeCellCenter(boardMetrics.geometry, item.cell);
       return {
         instanceId: item.instanceId,
         definitionId: item.definitionId,
+        generatorId: item.generatorId,
         destinationSize: boardMetrics.geometry.cellSize - 4,
         to: {
           x: boardMetrics.x - screenRect.x + center.x,
@@ -895,8 +916,10 @@ export function MergeWorldScreen({ active = true, backgroundReady = true, playBo
               {
                 animateValue: presentedCoins != null,
                 art: GAME_CURRENCY_ART.coins,
+                artTargetRef: coinArtRef,
                 id: 'coins',
-                pulseNonce: coinPulseNonce,
+                // Keep the measured destination still until the entire batch lands.
+                pulseNonce: serveFlight ? 0 : coinPulseNonce,
                 targetRef: coinHudRef,
                 value: presentedCoins ?? state.coins,
                 valueAnimationDurationMs: coinValueAnimationDurationMs,

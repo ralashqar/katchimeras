@@ -19,6 +19,7 @@ import {
   mergeLevelForXp,
 } from '@/constants/merge-world-catalog';
 import { advanceGlowRequests, glowTutorialDrop, normalizeGlowDiscoveryFields, reduceGlowDiscovery } from './glow-discovery-policy';
+import { normalizeStepplingEgg, reduceStepplingEgg } from '@/features/onboarding/steppling-egg-policy';
 import { sharedWorldPurchase } from '@/constants/shared-world';
 import {
   MERGE_ENERGY_REGEN_CAP,
@@ -298,6 +299,18 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
       return sellItem(current, command.cell, command.now);
     case 'claimInbox':
       return claimInbox(current, command.entryId, command.now);
+    case 'stepplingEgg':
+      return reduceStepplingEgg(current, command.action, command.now);
+    case 'grantGeneratorParcel': {
+      const definition = MERGE_GENERATORS_BY_ID.get(command.generatorId);
+      if (!definition || current.arrivals.some((arrival) => arrival.id === command.rewardId) || current.generators[command.generatorId]) return unchanged(current);
+      const item = MERGE_ITEMS_BY_ID.get(definition.tierOneDropDefinitionIds[0])!;
+      return changed(touch({ ...current, arrivals: [...current.arrivals, {
+        id: command.rewardId, kind: 'contextual_parcel', generatorId: command.generatorId, createdAt: command.now, dayId: command.dayId,
+        label: definition.name, theme: 'memory', familyId: item.familyId, chainId: definition.chainIds[0],
+        source: 'companion_story', itemDefinitionIds: [], claimedAt: null, seenAt: null,
+      }] }, command.now));
+    }
     case 'claimArrival':
       return claimArrival(current, command.arrivalId, command.now);
     case 'viewMemoryArrival':
@@ -760,6 +773,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     ...fallback,
     ...source,
     ...normalizeGlowDiscoveryFields(source),
+    stepplingEgg: normalizeStepplingEgg(source.stepplingEgg),
     version: 22,
     ownerCharacterId: 'mossprout',
     revision: finite(source.revision, 0),
@@ -2242,6 +2256,20 @@ function claimInbox(state: MergeWorldState, entryId: string, now: number): Merge
 function claimArrival(state: MergeWorldState, arrivalId: string, now: number): MergeWorldCommandResult {
   const arrival = state.arrivals.find((item) => item.id === arrivalId);
   if (!arrival || arrival.claimedAt != null) return unchanged(state);
+  if (arrival.generatorId) {
+    const generatorId = arrival.generatorId;
+    if (!MERGE_GENERATORS_BY_ID.has(generatorId)) return unchanged(state, 'This parcel could not be opened.');
+    const alreadyInstalled = Boolean(state.generators[generatorId]) || state.board.some((cell) => cell.occupant?.kind === 'generator' && cell.occupant.generatorId === generatorId);
+    const cell = state.board.findIndex((entry) => !entry.locked && !entry.mist && !entry.occupant);
+    if (!alreadyInstalled && cell < 0) return unchanged(state, `Make one space in the Garden for the ${MERGE_GENERATORS_BY_ID.get(generatorId)!.name}.`);
+    const board = [...state.board];
+    if (!alreadyInstalled) board[cell] = { ...board[cell], occupant: { kind: 'generator', generatorId } };
+    const installed = reconcileUnlockedCatalog({ ...state, board,
+      generators: state.generators[generatorId] ? state.generators : { ...state.generators, [generatorId]: generatorState(generatorId) },
+      arrivals: state.arrivals.map((entry) => entry.id === arrivalId ? { ...entry, claimedAt: now, seenAt: now } : entry),
+    });
+    return { ...changed(touch(ensureProceduralOrders(installed, now), now)), spawnedGenerator: alreadyInstalled ? undefined : { generatorId, cell } };
+  }
   if (arrival.kind === 'memory_arrival') {
     return changed(touch({
       ...state,
@@ -2843,6 +2871,9 @@ function reconcileStory(
   story: Extract<MergeWorldCommand, { type: 'reconcileStory' }>,
   now: number,
 ): MergeWorldState {
+  // This discovery path delivers the generator through Day 1's parcel, not
+  // through the retired companion story's automatic starter installation.
+  if (story.familyId === 'steppling' && state.stepplingEgg && !state.generators['journey-locker']) return state;
   // A midpoint return is an interlude inside the five-order bundle, not the
   // end of it. Keep the unserved requests on the rail while the companion's
   // note is waiting or open; only the served IDs should rotate out.
@@ -3221,7 +3252,8 @@ function ensureCharacterGenerators(state: MergeWorldState, characterId: MergeCha
 function ensureProceduralOrders(state: MergeWorldState, now: number): MergeWorldState {
   // Chapter 0 is still teaching the authored loop. The repeatable economy
   // begins after the first non-Mossprout companion completes their introduction.
-  const unlocked = state.companionDiscovery.records.some((record) => record.characterId !== 'mossprout' && record.firstOrderCompletedAt != null);
+  const unlocked = state.companionDiscovery.records.some((record) => record.characterId !== 'mossprout' && record.firstOrderCompletedAt != null)
+    || Boolean(state.stepplingEgg?.hatchedAt && state.arrivals.some((arrival) => arrival.generatorId === 'journey-locker' && arrival.claimedAt != null));
   if (!unlocked) return state;
   const procedural = state.activeOrders.filter((order) => !order.storyArcId);
   if (procedural.length >= 3) return state;
@@ -3441,13 +3473,14 @@ function normalizeArrivals(value: unknown): MergeWorldArrival[] {
           ? 'goal'
           : arrival.id.includes('companion-story-starter') ? 'companion_story' : arrival.kind === 'memory_arrival' ? 'journal' : 'legacy',
       itemDefinitionIds: uniqueStrings(arrival.itemDefinitionIds).filter((id) => MERGE_ITEMS_BY_ID.has(id)),
+      generatorId: typeof arrival.generatorId === 'string' && MERGE_GENERATORS_BY_ID.has(arrival.generatorId) ? arrival.generatorId : undefined,
       discoveryId: typeof arrival.discoveryId === 'string' ? arrival.discoveryId : undefined,
       progressionGateId: typeof arrival.progressionGateId === 'string' && (MOSSPROUT_ROOTBOUND_GATES_BY_ID.has(arrival.progressionGateId) || MOSSPROUT_RESIDENT_CARD_NODE_BY_GATE.has(arrival.progressionGateId)) ? arrival.progressionGateId : undefined,
       memoryRef,
       claimedAt: arrival.claimedAt == null ? null : finite(arrival.claimedAt, 0),
       seenAt: arrival.seenAt == null ? null : finite(arrival.seenAt, 0),
     }];
-  }).slice(-40);
+  }).filter((arrival, index, arrivals) => arrival.claimedAt == null || index >= arrivals.length - 40);
 }
 
 function migrateActivityInbox(state: MergeWorldState): MergeWorldState {

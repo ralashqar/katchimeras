@@ -4,6 +4,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useIsFocused } from '@react-navigation/native';
 import { GlowGatewayGuide } from '@/components/katchadeck/world/glow-gateway-guide';
+import { StepplingEncounterPanel } from '@/components/katchadeck/world/steppling-encounter-panel';
+import { SHARED_EGG_REST_ZOOM, usesSharedResidentStage } from '@/components/katchadeck/world/shared-resident-presentation';
+import { EggFeedOverlay } from '@/components/katchadeck/home/egg-feed-overlay';
+import { useStepplingEncounter } from '@/features/onboarding/use-steppling-encounter';
 import { startGlowDiscovery, submitGlowAction, useGlowDiscovery } from '@/features/onboarding/glow-discovery-runtime';
 import { glowDiscoveryLocksCamera, glowDiscoveryScene } from '@/features/onboarding/glow-discovery-flow';
 import { ftueLocksCamera } from '@/features/onboarding/ftue-camera-policy';
@@ -155,6 +159,17 @@ export function KatchimeraKingdomScreen({
   const router = useRouter();
   const { transitionTo } = useGameScreenTransition();
   const glowRun = useGlowDiscovery();
+  const stepplingEncounter = useStepplingEncounter(mergeWorld);
+  const stepplingSurfaceOpen = stepplingEncounter.open;
+  const { open: stepplingEggOpen, close: closeStepplingEgg } = stepplingEncounter;
+  useEffect(() => {
+    if (!stepplingSurfaceOpen) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (stepplingEggOpen) closeStepplingEgg();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [stepplingSurfaceOpen, stepplingEggOpen, closeStepplingEgg]);
   const screenFocused = useIsFocused();
   const [glowPanelOpen, setGlowPanelOpen] = useState(true);
   useEffect(() => { setGlowPanelOpen(glowRun?.status !== 'completed'); }, [glowRun?.status, glowRun?.nodeId]);
@@ -229,12 +244,13 @@ export function KatchimeraKingdomScreen({
   }, [ftueStepId]);
   const gatewayState = glowGatewayState(mergeWorld);
   const mossproutGardenScene = useMemo(() => ({
-    gateway: gatewayState,
+    gateway: stepplingEncounter.open ? 'egg' as const : gatewayState,
     level: mergeWorld.haven.structures.mossproutGarden.level,
     plantableMemories: mergeWorld.haven.plantableMemories,
     featureLevels: mergeWorld.haven.structures.mossproutGarden.featureLevels,
   }), [
     gatewayState,
+    stepplingEncounter.open,
     mergeWorld.haven.plantableMemories,
     mergeWorld.haven.structures.mossproutGarden.featureLevels,
     mergeWorld.haven.structures.mossproutGarden.level,
@@ -295,7 +311,7 @@ export function KatchimeraKingdomScreen({
   const activeInteractionResidentId = interactionCreatureId ?? ftueReturnFocusCreatureId;
   const mossproutMeditating = ftueStepId === 'companion.meditating'
     || Boolean(activeKatchimeraMeditation(relationships, 'mossprout'));
-  const interactionHasGarden = interactionSlot?.familyId === 'mossprout';
+  const interactionHasGarden = usesSharedResidentStage(interactionSlot?.familyId);
   const tutorialCamera = ftueStep?.camera ?? null;
   const ftueReturnCamera = ftueReturnFocusCreatureId
     ? mossproutFtueStep('companion.chapter_zero_return')?.camera ?? null
@@ -817,6 +833,16 @@ export function KatchimeraKingdomScreen({
   }, [ftueStepId, havenPresentations]);
 
   useEffect(() => {
+    if (!stepplingEggOpen || !mergeWorld.stepplingEgg?.hatchedAt) return;
+    const resident = companionSlots.find((slot) => slot.kind === 'owned' && slot.familyId === 'steppling');
+    if (resident?.kind !== 'owned') return;
+    // Swap the hatch actor and hosted resident together, after durable ownership
+    // has arrived. The canvas carries the Egg camera origin into normal Back.
+    selectResident(resident.creature.creatureId);
+    closeStepplingEgg();
+  }, [closeStepplingEgg, companionSlots, mergeWorld.stepplingEgg?.hatchedAt, selectResident, stepplingEggOpen]);
+
+  useEffect(() => {
     if (!interactionRequest || handledInteractionRequestRef.current === interactionRequest.key) return;
     if (mossproutFtueUsesHostedCompanionStage(ftueStep?.id)) {
       handledInteractionRequestRef.current = interactionRequest.key;
@@ -901,7 +927,7 @@ export function KatchimeraKingdomScreen({
 
   const openGarden = useCallback((orderId?: string | null, requestedFamilyId?: KatchimeraFamilyId) => {
     const familyId = requestedFamilyId ?? interactionSlot?.familyId ?? 'mossprout';
-    if (familyId !== 'mossprout' || !havenMergeBoardActive) return;
+    if (!usesSharedResidentStage(familyId) || !havenMergeBoardActive) return;
     transitionTo({
       announcement: "Opening Mossprout's Garden",
       target: 'merge',
@@ -923,8 +949,11 @@ export function KatchimeraKingdomScreen({
     <View collapsable={false} onLayout={onContentReady} ref={screenRef} style={styles.screen}>
       <KingdomHexCanvas
         background={background}
-        cameraLocked={ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun)}
-        cameraMaximumScale={ftueEggFeedingCloseupActive
+        cameraLocked={ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun) || stepplingEncounter.open}
+        discoveredEggInteraction={stepplingEncounter.open}
+        discoveredEggPresentation={stepplingEncounter.presentation}
+        discoveredEggTargetRef={stepplingEncounter.feedController.eggTargetRef}
+        cameraMaximumScale={stepplingEncounter.open ? SHARED_EGG_REST_ZOOM : ftueEggFeedingCloseupActive
           ? MOSSPROUT_WORLD_EGG_CLOSE_ZOOM
           : ftueReturnResidentZoom != null
             ? ftueReturnResidentZoom
@@ -935,7 +964,7 @@ export function KatchimeraKingdomScreen({
         identity={identity}
         discoveryRevealFamilyId={null}
         highlightedLockedFamilyId={null}
-        interactionEnabled={!activeInteractionResidentId && (havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven')}
+        interactionEnabled={!activeInteractionResidentId && !stepplingEncounter.open && (havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven')}
         interactionExitNonce={interactionExitNonce}
         interactionResidentAnchorY={ftueReturnResidentAnchorY}
         interactionResidentId={activeInteractionResidentId}
@@ -970,6 +999,12 @@ export function KatchimeraKingdomScreen({
         onGatewayTargetChange={setGatewayNode}
         storyOperationsEnabled={screenFocused && !activeInteractionResidentId && !interactionExiting}
         onSelectGateway={() => {
+          if (gatewayState === 'egg' && !glowDiscoveryLocksCamera(glowRun)) {
+            setFtueCameraSettled(false);
+            setGlowPanelOpen(false);
+            void stepplingEncounter.enter();
+            return;
+          }
           setGlowPanelOpen(true);
           void startGlowDiscovery().catch(() => setNatureUpgradeError('The path could not open. Please try again.'));
         }}
@@ -992,6 +1027,18 @@ export function KatchimeraKingdomScreen({
         worldEggTargetRef={worldEggTargetRef}
         worldSubjectPresentation={worldSubjectPresentation}
       />
+      {screenFocused && stepplingEncounter.open ? <StepplingEncounterPanel
+        encounter={stepplingEncounter}
+        egg={stepplingEncounter.egg}
+        cameraReady={ftueCameraSettled}
+      /> : null}
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { zIndex: 120 }]}>
+        <EggFeedOverlay
+          feed={stepplingEncounter.feedController.eggFeed}
+          onArrive={stepplingEncounter.feedController.handleEggFeedArrive}
+          onEnergyTokenArrive={stepplingEncounter.feedController.handleEnergyTokenArrive}
+        />
+      </View>
       {!upgradePresentation && (!ftueStepId || ftueStepId === 'companion.meditating') ? (
         <Animated.View entering={FadeIn.duration(reduceMotion ? 100 : 360)} pointerEvents="box-none" style={[styles.topHudLayer, { top: insets.top + 3 }]}>
           <GameHudBar
@@ -999,8 +1046,8 @@ export function KatchimeraKingdomScreen({
               accessibilityHint={interactionCreatureId ? "Returns to this Katchimera's world" : 'Returns to the Katchimera world map'}
               accessibilityLabel={interactionCreatureId ? 'Exit interaction' : 'All Havens'}
               compact
-              disabled={interactionExiting || (!interactionCreatureId && (navigationLocked || glowDiscoveryLocksCamera(glowRun)))}
-              onPress={interactionCreatureId ? requestResidentInteractionExit : onBackToHavenSelector}
+              disabled={stepplingEncounter.busy || stepplingEncounter.hatching || interactionExiting || (!interactionCreatureId && (navigationLocked || glowDiscoveryLocksCamera(glowRun)))}
+              onPress={stepplingEncounter.open ? stepplingEncounter.close : interactionCreatureId ? requestResidentInteractionExit : onBackToHavenSelector}
             />}
             content={<View />}
             trailing={<GameCurrencyHud balances={[{
@@ -1014,7 +1061,7 @@ export function KatchimeraKingdomScreen({
           />
         </Animated.View>
       ) : null}
-      {!upgradePresentation && !activeInteractionResidentId && havenMergeBoardActive && (!havenOpeningActive || ['world.garden_handoff', 'world.seed_planted'].includes(ftueStepId ?? '')) ? (
+      {!stepplingSurfaceOpen && !upgradePresentation && !activeInteractionResidentId && havenMergeBoardActive && (!havenOpeningActive || ['world.garden_handoff', 'world.seed_planted'].includes(ftueStepId ?? '')) ? (
         <Animated.View
           collapsable={false}
           ref={setGardenClusterNode}

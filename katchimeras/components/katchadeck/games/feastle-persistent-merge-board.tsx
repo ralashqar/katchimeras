@@ -403,9 +403,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
 
   useEffect(() => {
     if (!hiddenItemInstanceIds?.size || !onHiddenItemsRetired) return;
-    const mountedItemIds = new Set(sprites.flatMap((sprite) => sprite.occupant.kind === 'item'
-      ? [sprite.occupant.instanceId]
-      : []));
+    const mountedItemIds = new Set(sprites.map(spriteId));
     const retiredIds = [...hiddenItemInstanceIds].filter((instanceId) => !mountedItemIds.has(instanceId));
     if (retiredIds.length) onHiddenItemsRetired(retiredIds);
   }, [hiddenItemInstanceIds, onHiddenItemsRetired, sprites]);
@@ -1105,7 +1103,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     </View>
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       <MergeBoardEffectsLayer effects={boardEffects} geometry={geometry} reduceMotion={reduceMotion} size={cellSize} />
-      {sprites.filter((sprite) => visibleCellSet.has(sprite.cell) && (sprite.occupant.kind !== 'item' || !hiddenItemInstanceIds?.has(sprite.occupant.instanceId))).map((sprite) => {
+      {sprites.filter((sprite) => visibleCellSet.has(sprite.cell) && !hiddenItemInstanceIds?.has(spriteId(sprite))).map((sprite) => {
         const frame = cellFrames[sprite.cell];
         const id = spriteId(sprite);
         const matchHint = sprite.occupant.kind === 'item' ? matchHintForCell(sprite.cell) : null;

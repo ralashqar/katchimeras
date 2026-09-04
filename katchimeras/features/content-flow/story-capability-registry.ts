@@ -64,6 +64,9 @@ function validateMeditationEffect(payload: Readonly<Record<string, unknown>>) {
 }
 
 const BUILT_INS: readonly StoryCapabilityDefinition[] = [
+  { id: 'journey.reflection', kind: 'scene', validatePayload: requiredString('text') },
+  { id: 'journey.grant_generator_parcel', kind: 'effect', idempotent: true, validatePayload: (payload) =>
+    typeof payload.generatorId === 'string' && MERGE_GENERATORS_BY_ID.has(payload.generatorId) ? requiredString('rewardId')(payload) : 'A known generator is required' },
   { id: 'world.action', kind: 'scene', validatePayload: (payload) => {
     const view = payload.worldAction as { kind?: string; actionLabel?: string; guide?: { title?: string; body?: string } } | undefined;
     return view && ['goal', 'garden', 'return', 'purchase', 'discovery'].includes(view.kind ?? '') && view.actionLabel && view.guide?.title && view.guide.body ? null : 'World action needs a view, guide and action label';

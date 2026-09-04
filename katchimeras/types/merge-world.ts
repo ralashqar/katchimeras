@@ -337,6 +337,7 @@ export type MergeLifeTheme =
   | 'connection' | 'celebration' | 'focus' | 'learning' | 'creativity' | 'play' | 'memory';
 
 export type MergeWorldArrival = {
+  generatorId?: string;
   id: string;
   kind: 'contextual_parcel' | 'memory_arrival' | 'goal_chest' | 'discovery_parcel' | 'root_match_parcel' | 'resident_card_parcel';
   createdAt: number;
@@ -466,6 +467,7 @@ export type StoryWorldMutationReceipt = {
 };
 
 export type MergeWorldState = {
+  stepplingEgg?: import('@/features/onboarding/steppling-egg-policy').StepplingEggProgress;
   worldUnlocks?: Record<string, { unlockedAt: number; paid: number; destination: MergeCharacterId; transferredAt: number | null; hatchedAt: number | null }>;
   glowDiscoveryLesson?: { preparedAt: number; servedOrderIds: string[]; spawnedAt?: number; guidedOrderIndex?: 0 | 1 };
   version: 22;
@@ -531,6 +533,8 @@ export type MergeWorldState = {
 };
 
 export type MergeWorldCommand =
+  | { type: 'stepplingEgg'; action: import('@/features/onboarding/steppling-egg-policy').StepplingEggAction; now: number }
+  | { type: 'grantGeneratorParcel'; generatorId: string; rewardId: string; dayId: string; now: number }
   | { type: 'unlockWorldTarget'; targetId: string; now: number; receiptId?: string }
   | { type: 'transferDiscoveryEgg'; targetId: 'mossprout:overgrown-trail'; now: number }
   | { type: 'hatchWorldEgg'; targetId: 'mossprout:overgrown-trail'; now: number }
@@ -591,6 +595,7 @@ export type MergeWorldFailureReason =
   | 'sealed_mist';
 
 export type MergeWorldCommandResult = {
+  spawnedGenerator?: { generatorId: string; cell: number };
   state: MergeWorldState;
   changed: boolean;
   message?: string;

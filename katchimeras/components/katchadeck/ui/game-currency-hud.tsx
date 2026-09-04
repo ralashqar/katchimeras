@@ -15,6 +15,8 @@ const CURRENCY_SUFFIX_COLOR = 'rgb(126, 106, 77)';
 export type GameCurrencyBalance = {
   animateValue?: boolean;
   art?: ImageSource | number;
+  /** Exact artwork bounds for reward flights; targetRef remains the guide target. */
+  artTargetRef?: RefObject<View | null>;
   countdownSeconds?: number;
   id: GameCurrencyId;
   pulseNonce?: number;
@@ -35,11 +37,15 @@ export const GameCurrencyHud = memo(function GameCurrencyHud({ balances, compact
   </View>;
 });
 
-const GameCurrencyPill = memo(function GameCurrencyPill({ animateValue = false, art, compact, countdownSeconds, id, pulseNonce = 0, suffix, targetRef, tone, value, valueAnimationDurationMs = 220 }: GameCurrencyBalance & { compact: boolean; tone: 'default' | 'glass' }) {
+const GameCurrencyPill = memo(function GameCurrencyPill({ animateValue = false, art, artTargetRef, compact, countdownSeconds, id, pulseNonce = 0, suffix, targetRef, tone, value, valueAnimationDurationMs = 220 }: GameCurrencyBalance & { compact: boolean; tone: 'default' | 'glass' }) {
   const definition = GAME_CURRENCY_CATALOG[id];
   const pulse = useSharedValue(0);
   useEffect(() => {
-    if (pulseNonce < 1) return;
+    if (pulseNonce < 1) {
+      cancelAnimation(pulse);
+      pulse.value = 0;
+      return;
+    }
     pulse.value = withSequence(withTiming(1, { duration: 90 }), withTiming(0, { duration: 150 }));
     return () => cancelAnimation(pulse);
   }, [pulse, pulseNonce]);
@@ -49,7 +55,9 @@ const GameCurrencyPill = memo(function GameCurrencyPill({ animateValue = false, 
   return <Animated.View accessibilityLabel={`${definition.label}: ${value}${suffix ?? ''}${countdown ? `. Next in ${countdown}` : ''}`} style={[styles.pill, compact && styles.pillCompact, glass && styles.pillGlass, animatedStyle]}>
     <GameSurface contentStyle={[styles.pillContent, compact && styles.pillContentCompact]} density="compact" radius={14} style={styles.pillSurface} tone="cream">
       <View collapsable={false} ref={targetRef} style={[styles.currencyIcon, compact && styles.currencyIconCompact, glass && styles.currencyIconGlass]}>
-        {art ? <Image accessibilityIgnoresInvertColors contentFit="contain" source={art} style={[styles.art, compact && styles.artCompact, glass && styles.artGlass]} transition={0} /> : <IconSymbol color={definition.tint} name={definition.icon} size={compact ? 21 : glass ? 33 : 30} />}
+        {art ? <View collapsable={false} ref={artTargetRef} style={[styles.art, compact && styles.artCompact, glass && styles.artGlass]}>
+          <Image accessibilityIgnoresInvertColors contentFit="contain" source={art} style={StyleSheet.absoluteFill} transition={0} />
+        </View> : <IconSymbol color={definition.tint} name={definition.icon} size={compact ? 21 : glass ? 33 : 30} />}
       </View>
       <AnimatedIntegerText
         durationMs={animateValue ? valueAnimationDurationMs : 0}

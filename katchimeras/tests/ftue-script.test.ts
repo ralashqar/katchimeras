@@ -1062,7 +1062,7 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.equal(MOSSPROUT_WORLD_EGG_ENTRY_ZOOM, 1.35);
   assert.match(kingdomScreen, /initialFtueCameraScale = ftueStepId === 'world\.egg_intro'[\s\S]*?tutorialCamera\.target\.kind === 'haven_resident'[\s\S]*?tutorialCamera\.zoom \?\? MOSSPROUT_WORLD_EGG_REST_ZOOM/);
   assert.match(kingdomScreen, /initialTutorialCameraScale=\{initialFtueCameraScale\}/);
-  assert.match(kingdomCanvas, /initialTutorialFocus = useMemo[\s\S]*?residentAnchor\.y - 8 - WORLD_FTUE_EGG_HEIGHT \* eggGrowthScale \/ 2[\s\S]*?initialFocus: initialTutorialFocus/);
+  assert.match(kingdomCanvas, /initialTutorialFocus = useMemo[\s\S]*?sharedResidentCenterY\(residentAnchor\.y, eggGrowthScale\)[\s\S]*?initialFocus: initialTutorialFocus/);
   assert.match(kingdomCanvas, /durationMs: tutorialCamera\.durationMs[\s\S]*?initialScale: initialTutorialCameraScale[\s\S]*?scale: tutorialCamera\.zoom \?\? initialTutorialCameraScale/);
   assert.match(kingdomCanvas, /target\.kind !== 'haven_tile' && target\.kind !== 'haven_resident'/);
   assert.match(kingdomCanvas, /target\.kind === 'haven_resident'[\s\S]*?mossproutDialogueSubjectCenterY\(residentAnchor\.y\)/);
@@ -1088,7 +1088,7 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.match(kingdomScreen, /ftueStepId === 'world\.egg_intro' \? <FtueOpeningFade/);
   assert.match(nurture, /styles\.onboardingHeroGuide, \{ top: topInset \+ \(onboardingTopHudVisible \? 82 : 22\) \}/);
   assert.match(kingdomScreen, /!upgradePresentation && \(!ftueStepId \|\| ftueStepId === 'companion\.meditating'\)/);
-  assert.match(kingdomScreen, /onPress=\{interactionCreatureId \? requestResidentInteractionExit : onBackToHavenSelector\}/);
+  assert.match(kingdomScreen, /onPress=\{stepplingEncounter.open \? stepplingEncounter.close : interactionCreatureId \? requestResidentInteractionExit : onBackToHavenSelector\}/);
   assert.doesNotMatch(kingdomScreen, /cameraFallbackTimer/);
   assert.match(kingdomScreen, /onResidentFocusComplete=\{completeResidentFocus\}/);
   assert.match(kingdomScreen, /onCameraMotionChange=\{handleCameraMotionChange\}/);
@@ -1102,19 +1102,20 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.match(kingdomCamera, /Camera limits describe valid destinations and gesture bounds[\s\S]*?previousGeometry\.viewportHeight === nextGeometry\.viewportHeight[\s\S]*?return;/);
   assert.doesNotMatch(kingdomCamera, /previousGeometry\.maximumScale === nextGeometry\.maximumScale/);
   assert.match(kingdomCamera, /const getSnapshot = useCallback[\s\S]*?scale: scale\.value[\s\S]*?tx: tx\.value[\s\S]*?ty: ty\.value/);
-  assert.match(kingdomCanvas, /REGULAR_RESIDENT_INTERACTION_SCREEN_ANCHOR_Y = 0\.46/);
+  assert.match(kingdomCanvas, /REGULAR_RESIDENT_INTERACTION_SCREEN_ANCHOR_Y = SHARED_RESIDENT_SCREEN_ANCHOR_Y/);
   assert.match(kingdomCanvas, /residentInteractionScreenAnchorY = interactionResidentAnchorY \?\? \(tutorialCamera\?\.kind === 'focus_target'[\s\S]*?tutorialCamera\.anchorY \?\? MOSSPROUT_DIALOGUE_SCREEN_ANCHOR_Y[\s\S]*?: REGULAR_RESIDENT_INTERACTION_SCREEN_ANCHOR_Y\)/);
   assert.match(kingdomCanvas, /initialInteractionFocus = useMemo[\s\S]*?residentCreatureFrame\(residentAnchor\.x, residentAnchor\.y, creatureWorldSize, isMossprout\)[\s\S]*?screenY: viewport\.height \* residentInteractionScreenAnchorY[\s\S]*?initialTutorialFocus \?\? initialInteractionFocus/);
   assert.match(kingdomCanvas, /handledInteractionExitNonceRef[\s\S]*?zoom: KINGDOM_RENDERING\.havenMaxScale/);
   assert.match(kingdomCanvas, /allowDownscaling=\{false\}[\s\S]*?resolution="high"[\s\S]*?showFace/);
   assert.match(kingdomCanvas, /faceId=\{\(presentation\?\.growthStage \?\? 0\) > 0 \? 'curious' : 'sleepy'\}/);
   assert.match(kingdomCanvas, /WORLD_FTUE_EGG_NATIVE_SURFACE_SCALE = 2\.7/);
-  assert.match(kingdomCanvas, /eggVisualGrowthForEnergyRatio\(presentation\?\.growthProgress \?\? 0\)/);
+  assert.match(kingdomCanvas, /growthProgress = fullSize \? 1 : presentation\?\.growthProgress \?\? 0/);
+  assert.match(kingdomCanvas, /eggVisualGrowthForEnergyRatio\(growthProgress\)/);
   assert.match(kingdomCanvas, /hatchShake\.value \* 7/);
   assert.match(kingdomCanvas, /rotateZ: `\$\{shake \* 2\.8\}deg`/);
   assert.match(kingdomCanvas, /<WorldEggRadiance[\s\S]*?<WorldEggRippleField/);
   assert.match(mossproutOpening, /readyToHatch: growth\.isReady && !isHatching/);
-  assert.match(kingdomCanvas, /presentation\?\.readyToHatch[\s\S]*?<RotatingRadialSunburst[\s\S]*?<WorldEggRippleField primary=\{readyRipple\}/);
+  assert.match(kingdomCanvas, /showReadyEffects \? <>[\s\S]*?<RotatingRadialSunburst[\s\S]*?<WorldEggRippleField primary=\{readyRipple\}/);
   assert.match(kingdomCanvas, /Preserve the original 3\.06-second readiness reminder[\s\S]*?readyShake\.value = withRepeat[\s\S]*?readyRipple\.value = withRepeat/);
   assert.match(kingdomCanvas, /feedbackShake\.value \+ readyShake\.value \+ hatchShake\.value \* 2/);
   assert.match(kingdomCanvas, /triggerFeedArrivalFeedback[\s\S]*?runRewardArrivalMotion\(feedbackPulse, feedbackShake, reduceMotion\)[\s\S]*?radianceFlare\.value = withSequence[\s\S]*?rippleEcho\.value = withDelay/);
@@ -1122,9 +1123,9 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.match(kingdomCanvas, /cameraTranslateX=\{camera\.translationXValue\}[\s\S]*?cameraTranslateY=\{camera\.translationYValue\}/);
   assert.match(kingdomCanvas, /worldFtueProjectedSubject[\s\S]*?projectionStyle/);
   assert.doesNotMatch(kingdomCanvas, /<TileFocusTransform[\s\S]{0,260}<RevealedCompanionEgg/);
-  assert.match(kingdomCanvas, /subjectCenterY = residentAnchor[\s\S]*?WORLD_FTUE_EGG_HEIGHT \* eggGrowthScale \/ 2/);
+  assert.match(kingdomCanvas, /subjectCenterY = residentAnchor[\s\S]*?sharedResidentCenterY\(residentAnchor\.y, eggGrowthScale\)/);
   assert.match(kingdomCanvas, /<CreatureAnimatedArt[\s\S]*?visualKey=\{presentation\?\.hatchFamilyId \?\? 'mossprout'\}/);
-  assert.match(kingdomCanvas, /stableWorldPresentation = tile\.companion\.familyId === 'mossprout'[\s\S]*?animated=\{stableWorldPresentation \|\| interactionResidentId/);
+  assert.match(kingdomCanvas, /stableWorldPresentation = usesSharedResidentStage\(tile\.companion\.familyId\)[\s\S]*?animated=\{stableWorldPresentation \|\| interactionResidentId/);
   assert.match(kingdomCanvas, /const width = stableWorldPresentation \? WORLD_FTUE_EGG_WIDTH : worldSize[\s\S]*?const height = stableWorldPresentation \? WORLD_FTUE_EGG_HEIGHT : worldSize/);
   assert.match(kingdomCanvas, /top: stableWorldPresentation[\s\S]*?y - MOSSPROUT_WORLD_BASELINE_LIFT - height/);
   assert.match(kingdomCanvas, /focusedInteractionResidentRef[\s\S]*?residentCreatureFrame\(residentAnchor\.x, residentAnchor\.y, creatureWorldSize, isMossprout\)[\s\S]*?anchorY: residentInteractionScreenAnchorY/);
@@ -1208,7 +1209,7 @@ test('FTUE starts a relationship before the Garden, shows First Bloom, and conti
   assert.match(merge, /ftueActive = ftueRun\?\.status === 'active'/);
   assert.match(merge, /leading=\{<KatchimeraBackButton[\s\S]*?disabled=\{ftueActive && !handoffActive\}/);
   assert.match(merge, /trailing=\{<View collapsable=\{false\} ref=\{coinHudPillRef\}>[\s\S]*?<GameCurrencyHud[\s\S]*?targetRef: coinHudRef/);
-  assert.match(merge, /measureViewInWindow\(coinHudRef\)[\s\S]*?!coinRect[\s\S]*?return false/);
+  assert.match(merge, /measureViewInWindow\(coinArtRef\)[\s\S]*?!coinRect[\s\S]*?return false/);
   assert.match(merge, /ftueRun\.stepId !== 'companion\.chapter_zero_return'[\s\S]*?target: 'companion'[\s\S]*?ftue: 'chapter-zero-return'/);
   assert.match(companion, /actionId: 'companion\.complete_chapter_zero_return'[\s\S]*?nextStepId: 'companion\.water_together'/);
   assert.match(companion, /run\.stepId === 'companion\.nickname'[\s\S]*?saveMossproutPlayerNickname[\s\S]*?kind: 'friendship_started'[\s\S]*?actionId: 'companion\.save_nickname'/);
@@ -1550,8 +1551,8 @@ test('mood and sleep reuse the compact illustrated answer-card treatment', () =>
 
 test('later FTUE choice beats specialize the same inline check-in panel lifecycle', () => {
   const home = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
-  assert.match(home, /function InlineScriptedChoice/);
-  assert.match(home, /function InlineScriptedChoice[\s\S]*?<InlineCheckInPanel[\s\S]*?illustratedChoices/);
+  assert.match(home, /export function EggQuestionPanel/);
+  assert.match(home, /function EggQuestionPanel[\s\S]*?<InlineCheckInPanel[\s\S]*?illustratedChoices/);
   assert.match(home, /illustratedChoices[\s\S]*?styles\.illustratedChoiceGrid/);
   assert.match(home, /function MeasuredIllustratedChoice/);
   assert.match(home, /getFtueChoiceArt\(option\)/);
@@ -1599,7 +1600,7 @@ test('Steppling discovery spotlights the exact parcel before any board merge', (
 test('FTUE inline questions wrap cleanly and do not expose daily-action skip controls', () => {
   const home = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
   assert.match(home, /<InlineMood[\s\S]*?allowSkip=\{false\}/);
-  assert.match(home, /function InlineScriptedChoice[\s\S]*?<InlineCheckInPanel[\s\S]*?allowSkip=\{false\}/);
+  assert.match(home, /function EggQuestionPanel[\s\S]*?<InlineCheckInPanel[\s\S]*?allowSkip=\{false\}/);
   assert.match(home, /disabled=\{interactionLocked \|\| !allowSkip\}/);
   assert.match(home, /\{allowSkip \? \([\s\S]*?accessibilityLabel=\{`Skip \$\{action\.title\} for today`\}/);
   assert.match(home, /numberOfLines=\{2\}[\s\S]*?inlineQuestionRequired/);

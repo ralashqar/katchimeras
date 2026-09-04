@@ -219,6 +219,7 @@ export function KingdomCompanionScreen({
   onOpenQuestGame,
   ftueConversationDefinitionId,
   initialConversationDefinitionId,
+  onInitialConversationComplete,
   onFtueConversationComplete,
   onCompletedConversationExit,
   ftueOrderPreviewActive = false,
@@ -249,6 +250,7 @@ export function KingdomCompanionScreen({
   onOpenQuestGame?: (creatureId: string, questId: string) => void;
   ftueConversationDefinitionId?: string;
   initialConversationDefinitionId?: string;
+  onInitialConversationComplete?: () => void | Promise<void>;
   onFtueConversationComplete?: () => void | Promise<void>;
   onCompletedConversationExit?: (definitionId: string) => boolean | Promise<boolean>;
   ftueOrderPreviewActive?: boolean;
@@ -643,7 +645,7 @@ export function KingdomCompanionScreen({
           houseLevel={quests.selectedResident.resident.houseLevel}
           initialDestination={quests.selectedResident.destination}
           initialConversationDefinitionId={ftueConversationDefinitionId ?? initialConversationDefinitionId}
-          onInitialConversationComplete={onFtueConversationComplete}
+          onInitialConversationComplete={onInitialConversationComplete ?? onFtueConversationComplete}
           onCompletedConversationExit={onCompletedConversationExit}
           ftueOrderPreviewActive={ftueOrderPreviewActive}
           ftueProfileStep={ftueProfileStep}
@@ -788,7 +790,7 @@ export function KingdomCompanionScreen({
           conversationStarters={quests.selectedConversationStarters}
           mossproutActionCandidates={quests.selectedMossproutActionCandidates}
           idealSkinDefinitionId={quests.selectedIdealSkinDefinitionId}
-          idealSkinOnboardingRequired={quests.selectedIdealSkinOnboardingRequired}
+          idealSkinOnboardingRequired={quests.selectedIdealSkinOnboardingRequired && !(reuseUnderlyingStage && quests.selectedResident.creature.familyId === 'steppling')}
           conversationQuestOffer={quests.selectedConversationQuestOffer}
           onAnswerConversation={quests.answerSelectedConversation}
           onContinueConversation={quests.continueSelectedConversation}

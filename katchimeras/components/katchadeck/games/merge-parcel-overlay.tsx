@@ -16,7 +16,7 @@ import Animated, {
 
 import { GameBadge } from '@/components/katchadeck/ui/game-surface';
 import type { MergeWorldArrival } from '@/types/merge-world';
-import { MOSSPROUT_PROGRESSION_ART } from '@/constants/merge-world-art';
+import { MOSSPROUT_PROGRESSION_ART, mergeWorldGeneratorArt } from '@/constants/merge-world-art';
 
 import { PersistentMergeItemArt } from './feastle-persistent-merge-board';
 import type { MergeScreenPoint } from './merge-serve-reward-overlay';
@@ -32,7 +32,7 @@ const HANDOFF_FADE_MS = 120;
 export type MergeParcelFlight = {
   nonce: number;
   from: MergeScreenPoint;
-  items: { instanceId: string; definitionId: string; destinationSize: number; to: MergeScreenPoint }[];
+  items: { instanceId: string; definitionId?: string; generatorId?: string; destinationSize: number; to: MergeScreenPoint }[];
   rootMatch?: boolean;
 };
 
@@ -61,7 +61,7 @@ export const MergeParcelTrayCard = forwardRef<NativeView, {
   return (
     <Pressable
       accessibilityHint="Opens the parcel and sends its items into open board spaces"
-      accessibilityLabel={`${character}${arrival.itemDefinitionIds.length} items. ${count} ${count === 1 ? 'parcel' : 'parcels'} waiting`}
+      accessibilityLabel={`${character}${arrival.generatorId ? '1 spawner' : `${arrival.itemDefinitionIds.length} items`}. ${count} ${count === 1 ? 'parcel' : 'parcels'} waiting`}
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
@@ -198,7 +198,7 @@ function ParcelFlyingItem({ count, flightNonce, from, index, item, onFinish, onI
 
   return <Animated.View style={[styles.flyingItem, { height: item.destinationSize, left: 0, top: 0, width: item.destinationSize }, style]}>
     <Animated.View style={[styles.landingGlow, { height: item.destinationSize + 6, width: item.destinationSize + 6 }, landingStyle]} />
-    <PersistentMergeItemArt definitionId={item.definitionId} size={item.destinationSize} />
+    {item.generatorId ? <Image source={mergeWorldGeneratorArt(item.generatorId)} contentFit="contain" style={{ width: item.destinationSize, height: item.destinationSize }} transition={0} /> : item.definitionId ? <PersistentMergeItemArt definitionId={item.definitionId} size={item.destinationSize} /> : null}
   </Animated.View>;
 }
 

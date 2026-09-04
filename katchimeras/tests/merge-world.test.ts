@@ -14,6 +14,7 @@ import { mergeCellFeedbackForFailure } from '@/utils/merge-board-feedback';
 import { MERGE_MORPH_DURATION_MS, SPAWN_MOTION_DURATION_MS, isMistMergeTransition, mergeSpriteMotionFrame, spawnSpriteMotionFrame } from '@/utils/merge-board-motion';
 import { mergeArtWarmupPlan } from '@/utils/merge-world/art-warmup';
 import { mergeActivityRewards } from '@/utils/merge-world/activity-rewards';
+import { rewardIconFlightScale } from '@/utils/merge-world/reward-flight';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
 import {
   createHavenMergeSandboxState,
@@ -1429,7 +1430,15 @@ test('Merge coin rewards land on the visible HUD coin and count across the conta
 
   assert.match(currencyHud, /<View collapsable=\{false\} ref=\{targetRef\} style=\{\[styles\.currencyIcon/);
   assert.doesNotMatch(currencyHud, /<Animated\.View[^>]*ref=\{targetRef\}/);
-  assert.match(screen, /measureViewInWindow\(coinHudRef\)/);
+  assert.match(screen, /measureViewInWindow\(coinArtRef\)/);
+  assert.match(currencyHud, /ref=\{artTargetRef\} style=\{\[styles.art/);
+  assert.match(screen, /artTargetRef: coinArtRef/);
+  assert.match(screen, /coinTargetSize: \{ width: coinRect.width, height: coinRect.height \}/);
+  assert.match(screen, /pulseNonce: serveFlight \? 0 : coinPulseNonce/);
+  assert.match(rewardOverlay, /targetSize=\{flight.coinTargetSize\}/);
+  assert.match(rewardOverlay, /rewardIconFlightScale\(rise.value, value, REWARD_TOKEN_SIZE, targetSize\)/);
+  assert.match(rewardOverlay, /opacity: variant === 'coin' \? rise.value \* \(1 - landed.value\)/);
+  assert.match(rewardOverlay, /withDelay\(variant === 'coin' \? 32 : 0/);
   assert.match(screen, /coinTo = \{ x: coinRect\.x - screenRect\.x \+ coinRect\.width \/ 2, y: coinRect\.y - screenRect\.y \+ coinRect\.height \/ 2 \}/);
   assert.match(rewardOverlay, /const contactWindowMs = mergeRewardContactWindowMs\(count, reduceMotion\)/);
   assert.match(rewardOverlay, /runOnJS\(onArrive\)\(amount, contactWindowMs, index, totalAmount\)/);
@@ -1438,6 +1447,23 @@ test('Merge coin rewards land on the visible HUD coin and count across the conta
   assert.match(screen, /if \(!coinPayoutStartedRef\.current\)[\s\S]*?setCoinValueAnimationDurationMs\(contactWindowMs\)[\s\S]*?totalAmount/);
   assert.match(screen, /animateValue: presentedCoins != null[\s\S]*?valueAnimationDurationMs: coinValueAnimationDurationMs/);
   assert.match(currencyHud, /durationMs=\{animateValue \? valueAnimationDurationMs : 0\}[\s\S]*?easing="linear"/);
+});
+
+test('reward coins finish at the measured artwork size without a shrinking-out tail', () => {
+  const tokenSize = 35;
+  for (const size of [27, 40, 42, 63]) {
+    const target = { width: size, height: size };
+    const end = rewardIconFlightScale(1, 1, tokenSize, target);
+    assert.equal(end.scaleX * tokenSize, size);
+    assert.equal(end.scaleY * tokenSize, size);
+  }
+  let previous = tokenSize * 1.06;
+  for (const progress of [0, 0.25, 0.5, 0.9, 0.99, 1]) {
+    const size = rewardIconFlightScale(1, progress, tokenSize, { width: 42, height: 42 }).scaleX * tokenSize;
+    assert.ok(size >= previous);
+    assert.ok(size <= 42);
+    previous = size;
+  }
 });
 
 test('Merge HUD stays board-specific with only back navigation and Coins', () => {
@@ -1451,7 +1477,7 @@ test('Merge HUD stays board-specific with only back navigation and Coins', () =>
   assert.match(screen, /router\.canGoBack\(\)\) router\.back\(\)/);
   assert.match(screen, /router\.replace\('\/\(tabs\)\/katchimeras'\)/);
   assert.match(screen, /Return to Mossprout's Haven/);
-  assert.match(screen, /trailing=\{<View>[\s\S]*?<GameCurrencyHud/);
+  assert.match(screen, /trailing=\{<View collapsable=\{false\} ref=\{coinHudPillRef\}>[\s\S]*?<GameCurrencyHud/);
   assert.doesNotMatch(screen, /GameHudItem|worldChapter|chapterRatio/);
   assert.doesNotMatch(screen, /<GameHudControl/);
   assert.match(screen, /hudBar: \{ elevation: 100, justifyContent: 'space-between', position: 'relative', zIndex: 100 \}/);

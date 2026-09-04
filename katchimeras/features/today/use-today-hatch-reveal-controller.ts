@@ -1,7 +1,8 @@
-import * as Haptics from 'expo-haptics';
-import { useCallback, useEffect, useReducer, useRef, type RefObject } from 'react';
+import { createEggHatchHaptics } from '@/features/today/egg-haptics';
+import { useCallback, useEffect, useMemo, useReducer, useRef, type RefObject } from 'react';
 import { AppState } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
+import { HATCH_PHASE_DELAYS_MS as PHASE_DELAYS_MS, REDUCED_HATCH_PHASE_DELAYS_MS as REDUCED_PHASE_DELAYS_MS } from '@/utils/hatch-reveal-timing';
 
 import type { HomeDayRecord, HomeTimelineDay, LocalCreatureRecord } from '@/types/home';
 import type { HatchClaimResult, HatchCommitResult } from '@/features/today/use-hatch-controller';
@@ -21,16 +22,6 @@ type UseTodayHatchRevealControllerParams = {
 
 const HATCH_REVEAL_WATCHDOG_MS = 12_000;
 const DISCOVERY_ASSET_WATCHDOG_MS = 8_000;
-const PHASE_DELAYS_MS = {
-  shaking: 80,
-  cracking: 500,
-  crossfadingSubject: 1_050,
-  subjectSettling: 1_550,
-  postReveal: 1_750,
-  formCard: 2_050,
-  assembleDeck: 2_650,
-  awaitClaim: 3_300,
-} as const;
 const DAILY_CRACKED_SHAKE_HOLD_MS = 1_000;
 // The second crack finishes drawing at roughly 980 ms. Daily Hatch used to
 // crossfade the Egg at 1,050 ms, leaving the completed cracks readable for only
@@ -45,16 +36,6 @@ const DAILY_PHASE_DELAYS_MS = {
   assembleDeck: PHASE_DELAYS_MS.assembleDeck + DAILY_CRACKED_SHAKE_HOLD_MS,
   awaitClaim: PHASE_DELAYS_MS.awaitClaim + DAILY_CRACKED_SHAKE_HOLD_MS,
 } as const;
-const REDUCED_PHASE_DELAYS_MS = {
-  shaking: 20,
-  cracking: 70,
-  crossfadingSubject: 150,
-  subjectSettling: 360,
-  postReveal: 500,
-  formCard: 580,
-  assembleDeck: 680,
-  awaitClaim: 760,
-} as const;
 
 export function useTodayHatchRevealController({
   selectedDay,
@@ -65,6 +46,7 @@ export function useTodayHatchRevealController({
   onDiscoveryAnimationComplete,
 }: UseTodayHatchRevealControllerParams) {
   const reduceMotion = useReducedMotion();
+  const hatchHaptics = useMemo(() => createEggHatchHaptics(reduceMotion), [reduceMotion]);
   const [presentation, dispatch] = useReducer(
     todayHatchPresentationReducer,
     IDLE_TODAY_HATCH_PRESENTATION,
@@ -82,13 +64,14 @@ export function useTodayHatchRevealController({
   const appIsActiveRef = useRef(AppState.currentState === 'active');
 
   const clearTimers = useCallback(() => {
+    hatchHaptics.stop();
     if (watchdogRef.current !== null) {
       clearTimeout(watchdogRef.current);
       watchdogRef.current = null;
     }
     phaseTimersRef.current.forEach(clearTimeout);
     phaseTimersRef.current = [];
-  }, []);
+  }, [hatchHaptics]);
 
   const handleHatchComplete = useCallback(() => {
     if (!hatchingActiveRef.current) return;
@@ -141,11 +124,11 @@ export function useTodayHatchRevealController({
     };
     schedule(0, () => {
       dispatch({ type: 'advance', phase: 'crossfading_subject' });
-      if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      hatchHaptics.advance('crossfading_subject');
     });
     schedule(phaseDelays.subjectSettling - phaseDelays.crossfadingSubject, () => {
       dispatch({ type: 'advance', phase: 'subject_settling' });
-      if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      hatchHaptics.advance('subject_settling');
     });
     schedule(phaseDelays.postReveal - phaseDelays.crossfadingSubject, () => {
       dispatch({ type: 'advance', phase: 'awaiting_interaction' });
@@ -153,7 +136,7 @@ export function useTodayHatchRevealController({
       clearTimers();
       onDiscoveryAnimationComplete?.();
     });
-  }, [clearTimers, onDiscoveryAnimationComplete, reduceMotion]);
+  }, [clearTimers, hatchHaptics, onDiscoveryAnimationComplete, reduceMotion]);
 
   const schedulePresentation = useCallback((runId: number) => {
     if (
@@ -172,15 +155,21 @@ export function useTodayHatchRevealController({
       }, delay));
     };
     const phaseDelays = reduceMotion ? REDUCED_PHASE_DELAYS_MS : DAILY_PHASE_DELAYS_MS;
-    schedule(phaseDelays.shaking, () => dispatch({ type: 'advance', phase: 'shaking' }));
-    schedule(phaseDelays.cracking, () => dispatch({ type: 'advance', phase: 'cracking' }));
+    schedule(phaseDelays.shaking, () => {
+      dispatch({ type: 'advance', phase: 'shaking' });
+      hatchHaptics.advance('shaking');
+    });
+    schedule(phaseDelays.cracking, () => {
+      dispatch({ type: 'advance', phase: 'cracking' });
+      hatchHaptics.advance('cracking');
+    });
     schedule(phaseDelays.crossfadingSubject, () => {
       dispatch({ type: 'advance', phase: 'crossfading_subject' });
-      if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      hatchHaptics.advance('crossfading_subject');
     });
     schedule(phaseDelays.subjectSettling, () => {
       dispatch({ type: 'advance', phase: 'subject_settling' });
-      if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      hatchHaptics.advance('subject_settling');
     });
     schedule(phaseDelays.formCard, () => dispatch({ type: 'advance', phase: 'forming_card' }));
     schedule(phaseDelays.assembleDeck, () => dispatch({ type: 'advance', phase: 'assembling_deck' }));
@@ -189,7 +178,7 @@ export function useTodayHatchRevealController({
       hatchingActiveRef.current = false;
       clearTimers();
     });
-  }, [clearTimers, reduceMotion]);
+  }, [clearTimers, hatchHaptics, reduceMotion]);
 
   const markHatchAssetReady = useCallback((kind: 'environment' | 'subject') => {
     const runId = committedRunIdRef.current;
@@ -280,10 +269,16 @@ export function useTodayHatchRevealController({
     dispatch({ type: 'begin_discovery', animationKey: runId, day: daySnapshot, creature });
     const phaseDelays = reduceMotion ? REDUCED_PHASE_DELAYS_MS : PHASE_DELAYS_MS;
     phaseTimersRef.current.push(setTimeout(() => {
-      if (runIdRef.current === runId && hatchingActiveRef.current) dispatch({ type: 'advance', phase: 'shaking' });
+      if (runIdRef.current === runId && hatchingActiveRef.current) {
+        dispatch({ type: 'advance', phase: 'shaking' });
+        hatchHaptics.advance('shaking');
+      }
     }, phaseDelays.shaking));
     phaseTimersRef.current.push(setTimeout(() => {
-      if (runIdRef.current === runId && hatchingActiveRef.current) dispatch({ type: 'advance', phase: 'cracking' });
+      if (runIdRef.current === runId && hatchingActiveRef.current) {
+        dispatch({ type: 'advance', phase: 'cracking' });
+        hatchHaptics.advance('cracking');
+      }
     }, phaseDelays.cracking));
     phaseTimersRef.current.push(setTimeout(() => {
       if (runIdRef.current !== runId || !hatchingActiveRef.current) return;
@@ -293,7 +288,7 @@ export function useTodayHatchRevealController({
     watchdogRef.current = setTimeout(() => {
       if (runIdRef.current === runId) failHatchReveal('Mossprout could not appear. Tap Hatch to try again.');
     }, DISCOVERY_ASSET_WATCHDOG_MS);
-  }, [failHatchReveal, reduceMotion, scheduleDiscoveryReveal, selectedDay]);
+  }, [failHatchReveal, hatchHaptics, reduceMotion, scheduleDiscoveryReveal, selectedDay]);
 
   const restoreDiscoveryReveal = useCallback((creature: LocalCreatureRecord) => {
     if (selectedDay?.kind !== 'day') return;

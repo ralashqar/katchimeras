@@ -287,7 +287,7 @@ test('paid mist stays revealed with an Egg despite relationship stage zero or st
   assert.equal(glowGatewayState({ ...relationshipProjection, worldUnlocks: {}, storyWorldMutationReceipts: [] }), undefined);
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   assert.match(screen, /gatewayState = glowGatewayState\(mergeWorld\)/);
-  assert.match(screen, /gateway: gatewayState/);
+  assert.match(screen, /gateway: stepplingEncounter.open \? 'egg' as const : gatewayState/);
 });
 
 test('setup boundaries never fall back to a spawner spotlight', () => {
@@ -391,7 +391,7 @@ test('shared-world tile layout and presentation keep one map and one Egg reveal'
   assert.match(scene, /'residentVisible' in entry && !entry.residentVisible/);
   const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
   assert.match(canvas, /tutorialCameraReady && storyOperationsEnabled/);
-  assert.match(canvas, /gateway === 'egg' && !upgradePresentation && !storySceneGuard/);
+  assert.match(canvas, /gateway === 'egg' \|\| discoveredEggInteraction\) && !upgradePresentation && !storySceneGuard/);
   assert.match(canvas, /<RevealedCompanionEgg\s+idleDiscovery/);
   const route = readFileSync('components/katchadeck/roster/katchimera-roster-route-screen.tsx', 'utf8');
   assert.doesNotMatch(route, /StepplingWorldScreen|world\.choose|Following the glow/);

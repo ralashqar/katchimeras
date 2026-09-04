@@ -2,6 +2,8 @@ import { MOSSPROUT_JOURNEY_CAMPAIGN } from '@/constants/mossprout-journey-campai
 import { nextUnearnedMossproutResident } from '@/constants/resident-card-discovery';
 import { MOSSPROUT_FTUE_VARIANTS } from '@/features/onboarding/mossprout-ftue-flow';
 import { GLOW_DISCOVERY_FLOW } from '@/features/onboarding/glow-discovery-flow';
+import { STEPPLING_DAY_ONE_FLOW } from './steppling-day-one-flow';
+import { grantStoredGeneratorParcel } from '@/utils/merge-world/repository';
 import { startGlowDiscovery } from '@/features/onboarding/glow-discovery-runtime';
 import { applyStoredGlowDiscovery } from '@/utils/merge-world/repository';
 import { GLOW_GATEWAY_ID } from '@/utils/merge-world/glow-discovery-policy';
@@ -36,6 +38,14 @@ export function bootstrapContentFlowCatalog() {
   registerStoryVariantSet(MOSSPROUT_FTUE_VARIANTS);
   MOSSPROUT_FTUE_VARIANTS.variants.forEach((variant) => registerContentFlowDefinition(variant.definition));
   registerContentFlowDefinition(GLOW_DISCOVERY_FLOW);
+  registerContentFlowDefinition(STEPPLING_DAY_ONE_FLOW);
+  registerContentFlowEffect('journey.grant_generator_parcel', async ({ run, payload }) => {
+    const generatorId = String(payload.generatorId);
+    const rewardId = String(payload.rewardId);
+    const result = await grantStoredGeneratorParcel(generatorId, rewardId, String(run.variables.dayId ?? localDayId()));
+    if (!result.changed && !result.state.generators[generatorId] && !result.state.arrivals.some((arrival) => arrival.id === rewardId)) throw new Error('The Garden parcel could not be delivered. Please try again.');
+    return { rewardId, generatorId };
+  });
   registerContentFlowEffect('haven.start_glow_discovery', async ({ effectKey }) => {
     await seedStoredMossproutGardenAfterFtue(localDayId());
     await startGlowDiscovery();

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type RefObject } from 'react';
+import { eggQuestionAction } from '@/features/onboarding/egg-question-action';
+import { eggBondFeedPayload } from '@/features/today/egg-bond-feed';
 import { ActivityIndicator, StyleSheet, useWindowDimensions, View, type View as ViewType } from 'react-native';
 import { Gesture } from 'react-native-gesture-handler';
 import Animated, {
@@ -18,13 +20,11 @@ import {
   useTodayEnvironmentMotion,
 } from '@/components/katchadeck/home/today-environment-motion';
 import { TodayNurtureExperience } from '@/components/katchadeck/home/today-nurture-experience';
-import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import {
   HOME_FTUE_CAMERA_SCALE,
   HOME_FTUE_CAMERA_Y_OFFSET,
   HOME_SCENE_Y_OFFSET,
 } from '@/constants/home-loop-layout';
-import { Lantern } from '@/constants/theme';
 import todayScene from '@/data/today-scene.json';
 import {
   mossproutGroveEggCameraDuration,
@@ -231,28 +231,9 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
   }, [onWorldSubjectPresentationChange, worldSubjectPresentation]);
   useEffect(() => () => onWorldSubjectPresentationChange?.(null), [onWorldSubjectPresentationChange]);
 
-  const scriptedPanelAction = useMemo<RankedTodayCareAction | null>(() => day ? ({
-    id: 'ftue:mossprout-attunement',
-    instanceId: `${day.isoDate}:ftue:mossprout-attunement`,
-    title: 'Attune the Egg',
-    description: 'Choose the answer that feels closest.',
-    icon: 'sparkles',
-    artKey: 'reflection',
-    category: 'memory',
-    completionKey: 'ftue:mossprout-attunement',
-    completionMode: 'artifact',
-    destination: { kind: 'reflection', promptId: 'day_focus' },
-    growthSource: 'reflection',
-    growthReward: TODAY_GROWTH_REWARDS.reflection,
-    priority: 100,
-    eligibleTimeOfDay: ['morning', 'midday', 'afternoon', 'evening'],
-    journalFocused: false,
-    canReplaceSkipped: false,
-    aiGenerated: false,
-    source: 'system',
-    completed: false,
-    completedAt: null,
-  }) : null, [day]);
+  const scriptedPanelAction = useMemo<RankedTodayCareAction | null>(() => day ? eggQuestionAction(
+    'ftue:mossprout-attunement', 'Attune the Egg', TODAY_GROWTH_REWARDS.reflection, day.isoDate,
+  ) : null, [day]);
 
   const handleScriptedAction = useCallback((action: FtueActionDefinition) => {
     if (actionBusy) return;
@@ -276,14 +257,7 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
     if (!receipt || receipt.status !== 'pending') return;
     setActionBusy(true);
     const reward = action.growthReward ?? TODAY_GROWTH_REWARDS.reflection;
-    startEggFeed(from, {
-      currencyFrom: currencyFrom ?? from,
-      energyAmount: reward,
-      energyOnly: true,
-      imageSource: GAME_CURRENCY_ART.energy,
-      label: option.label,
-      tint: Lantern.ember300,
-    }, () => {
+    startEggFeed(from, eggBondFeedPayload(reward, currencyFrom ?? from, option.label), () => {
       recordMossproutOnboardingAnswer(action.id, option.id);
       commitFtueAction({
         actionId: action.id,

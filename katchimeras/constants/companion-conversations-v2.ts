@@ -11,6 +11,7 @@ import { baristabbitStoryConversationDefinitions } from '@/constants/baristabbit
 import { journeyCohortStoryConversationDefinitions } from '@/constants/journey-cohort-story-conversations';
 import { mossproutFtueConversationDefinitions } from '@/constants/mossprout-ftue-conversations';
 import { mossproutStoryConversationDefinitions } from '@/constants/mossprout-story-conversations';
+import { stepplingDayOneConversation } from '@/constants/steppling-day-one-conversation';
 import { mossproutCampaignConversationDefinitions } from '@/constants/mossprout-campaign-conversations';
 import {
   authoredConversationTopics,
@@ -919,6 +920,7 @@ function familyPack(
 }
 
 export const companionConversationDefinitionsV2: readonly ConversationDefinition[] = [
+  stepplingDayOneConversation,
   ...mossproutFtueConversationDefinitions,
   ...mossproutCampaignConversationDefinitions,
   ...mossproutStoryConversationDefinitions,

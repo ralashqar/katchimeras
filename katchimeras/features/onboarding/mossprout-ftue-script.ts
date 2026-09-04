@@ -9,9 +9,10 @@ import { MOSSPROUT_FTUE_COPY as COPY, MOSSPROUT_DAY_OPTIONS, MOSSPROUT_HELP_OPTI
 // 2.05 is the established, correctly framed world-map composition. Feeding
 // begins closer and retreats toward it; it must never retreat to the generic
 // 1x world camera because that makes the growing Egg lose its framing.
-export const MOSSPROUT_WORLD_EGG_REST_ZOOM = 2.05;
-export const MOSSPROUT_WORLD_EGG_CLOSE_ZOOM = 3.2;
-export const MOSSPROUT_WORLD_EGG_ENTRY_ZOOM = 1.35;
+import { SHARED_EGG_REST_ZOOM, SHARED_EGG_CLOSE_ZOOM, SHARED_EGG_ENTRY_ZOOM } from '@/components/katchadeck/world/shared-resident-presentation';
+export const MOSSPROUT_WORLD_EGG_REST_ZOOM = SHARED_EGG_REST_ZOOM;
+export const MOSSPROUT_WORLD_EGG_CLOSE_ZOOM = SHARED_EGG_CLOSE_ZOOM;
+export const MOSSPROUT_WORLD_EGG_ENTRY_ZOOM = SHARED_EGG_ENTRY_ZOOM;
 export function mossproutWorldEggZoom(stepId: string): number {
   const close = MOSSPROUT_WORLD_EGG_CLOSE_ZOOM;
   const rest = MOSSPROUT_WORLD_EGG_REST_ZOOM;

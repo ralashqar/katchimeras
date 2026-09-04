@@ -363,10 +363,35 @@ export function recordStoredMovementEggProgress(input: {
 }, now = Date.now()) {
   return reduceStoredMergeWorld((state) => {
     const progress = reduceMergeWorld(state, { type: 'recordMovementEggProgress', ...input, now });
-    if (progress.state.haven.movementEgg.status !== 'stirring') return progress;
-    const discovery = reduceMergeWorld(progress.state, { type: 'startStepplingDiscovery', now });
-    return discovery.changed ? discovery : progress;
+    return progress;
   }, now);
+}
+
+export async function applyStoredStepplingEgg(action: import('@/features/onboarding/steppling-egg-policy').StepplingEggAction) {
+  const now = Date.now();
+  const result = await reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'stepplingEgg', action, now }), now);
+  // Reconcile advertised question rewards from saved answers, including retry
+  // after interruption between the two stores. Stable IDs prevent double pay.
+  const egg = result.state.stepplingEgg;
+  if (egg?.intent) {
+    const [{ loadCompanionBondState, saveCompanionBondState }, { recordCompanionBondEvent, syncCompanionBondEvent }, { STEPPLING_INTENT_BOND, STEPPLING_MOVEMENT_BOND, stepplingStepsBond }] = await Promise.all([
+      import('@/utils/companion-bond-storage'), import('@/utils/companion-bond'), import('@/features/onboarding/steppling-egg-policy'),
+    ]);
+    let bond = loadCompanionBondState();
+    for (const [id, points] of [['intent', STEPPLING_INTENT_BOND], ...(egg.alternative ? [['movement', STEPPLING_MOVEMENT_BOND] as const] : [])] as const) {
+      bond = recordCompanionBondEvent(bond, { id: `steppling:egg:${id}`, creatureId: 'companion:steppling', kind: 'reflection_saved', points, occurredAt: now, dayId: egg.sourceDayId }).state;
+    }
+    if ((egg.bondFedSteps ?? 0) > 0) {
+      bond = syncCompanionBondEvent(bond, { id: 'steppling:egg:steps', creatureId: 'companion:steppling', kind: 'check_in_completed', points: stepplingStepsBond(egg.bondFedSteps!), occurredAt: now, dayId: egg.sourceDayId }).state;
+    }
+    saveCompanionBondState(bond);
+  }
+  return result;
+}
+
+export function grantStoredGeneratorParcel(generatorId: string, rewardId: string, dayId: string) {
+  const now = Date.now();
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'grantGeneratorParcel', generatorId, rewardId, dayId, now }), now);
 }
 
 export function reconcileStoredHavenStory(characterId: import('@/types/merge-world').MergeCharacterId, storyLevel: number, now = Date.now()) {

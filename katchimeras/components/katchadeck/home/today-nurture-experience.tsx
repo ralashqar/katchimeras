@@ -1,5 +1,6 @@
 import { Image, type ImageRef } from 'expo-image';
 import * as Haptics from 'expo-haptics';
+import { playEggActionHaptic } from '@/features/today/egg-haptics';
 import { memo, type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { InteractionManager, Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type ImageSourcePropType, type LayoutChangeEvent, type View as ViewType } from 'react-native';
 import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
@@ -963,8 +964,8 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
               />
             </View>
           ) : scriptedTextChoiceAction && scriptedPanelCareAction && onScriptedChoice ? (
-            <View style={[styles.onboardingActionStage, { bottom: actionDockBottom }]}>
-              <InlineScriptedChoice
+            <EggActionDock bottomInset={onboardingFocus ? bottomInset : tabBarHeight}>
+              <EggQuestionPanel
                 action={{
                   ...scriptedPanelCareAction,
                   id: scriptedTextChoiceAction.id,
@@ -1026,7 +1027,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
                 selection={currentScriptedTextSelection}
                 swipeExternalGesture={careSwipeExternalGesture}
               />
-            </View>
+            </EggActionDock>
           ) : scriptedRowActions.length && onScriptedAction ? (
             <Animated.View
               entering={FadeInDown.delay(100).duration(260).easing(Easing.out(Easing.cubic))}
@@ -1376,7 +1377,7 @@ function useSharedActionPanelLifecycle({
       }
       return;
     }
-    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    playEggActionHaptic();
     if (reduceMotion) {
       panelPulse.value = withTiming(0.55, { duration: 100 });
       return;
@@ -2124,7 +2125,12 @@ type InlineMetric = {
   value: number;
 };
 
-function InlineScriptedChoice({ action, completionEvent, enterFromBottom = false, interactionLocked, metric, onChoose, onFinished, onSkip, options, reduceMotion, selection, swipeExternalGesture }: {
+/** Shared by the first Egg and every later world Egg. Keep their layout identical. */
+export function EggActionDock({ bottomInset, children }: { bottomInset: number; children: ReactNode }) {
+  return <View pointerEvents="box-none" style={[styles.onboardingActionStage, { bottom: bottomInset + HOME_ACTIONS_TAB_BAR_GAP }]}>{children}</View>;
+}
+
+export function EggQuestionPanel({ action, completionEvent, enterFromBottom = false, interactionLocked, metric, onChoose, onFinished, onSkip, options, reduceMotion, selection, swipeExternalGesture }: {
   action: RankedTodayCareAction;
   completionEvent: TodayCareCompletionEvent | null;
   enterFromBottom?: boolean;
@@ -2139,6 +2145,8 @@ function InlineScriptedChoice({ action, completionEvent, enterFromBottom = false
   swipeExternalGesture: GestureType;
 }) {
   const sourceRef = useRef<ViewType | null>(null);
+  const [localSelection, setLocalSelection] = useState<CheckInSelection | null>(null);
+  useEffect(() => { if (!interactionLocked) setLocalSelection(null); }, [interactionLocked]);
   const visibleOptions = options.slice(0, 4);
   return (
     <View collapsable={false} ref={sourceRef}>
@@ -2163,12 +2171,15 @@ function InlineScriptedChoice({ action, completionEvent, enterFromBottom = false
         metric={metric}
         onChoose={(choice, from, currencyFrom) => {
           const option = visibleOptions.find((candidate) => candidate.id === choice.id);
-          if (option) onChoose(option, from, currencyFrom);
+          if (option) {
+            setLocalSelection({ accent: Meadow.gold, action, id: option.id, image: GAME_CURRENCY_ART.energy, kind: 'scripted', label: option.label });
+            onChoose(option, from, currencyFrom);
+          }
         }}
         onFinished={onFinished ?? (() => {})}
         onSkip={() => sourceRef.current?.measureInWindow((x, y, w, h) => onSkip({ x, y, w, h }))}
         reduceMotion={reduceMotion}
-        selection={selection}
+        selection={selection ?? localSelection}
         swipeExternalGesture={swipeExternalGesture}
       />
     </View>

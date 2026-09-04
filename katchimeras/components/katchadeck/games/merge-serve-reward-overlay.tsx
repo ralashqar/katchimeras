@@ -16,6 +16,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { splitEnergyAcrossTokens } from '@/utils/energy-payout';
+import { rewardIconFlightScale, type RewardIconSize } from '@/utils/merge-world/reward-flight';
 
 import { PersistentMergeItemArt } from './feastle-persistent-merge-board';
 
@@ -55,6 +56,7 @@ export type MergeServeRewardFlight = {
   coinAmount: number;
   coinFrom: MergeScreenPoint;
   coinTo: MergeScreenPoint;
+  coinTargetSize: RewardIconSize;
   energyAmount: number;
   energyTo: MergeScreenPoint;
   items: readonly MergeServeItemFlight[];
@@ -166,6 +168,7 @@ function ParallelRewardPayout({ flight, onCoinArrive, onEnergyArrive, onFinish }
       onArrive={onCoinArrive}
       onFinish={finishGroup}
       to={flight.coinTo}
+      targetSize={flight.coinTargetSize}
       variant="coin"
     /> : null}
     {flight.energyAmount > 0 ? <RewardPayout
@@ -181,7 +184,7 @@ function ParallelRewardPayout({ flight, onCoinArrive, onEnergyArrive, onFinish }
   </>;
 }
 
-function RewardPayout({ amount, art, from, nonce, onArrive, onFinish, to, variant }: {
+function RewardPayout({ amount, art, from, nonce, onArrive, onFinish, to, targetSize, variant }: {
   amount: number;
   art: number;
   from: MergeScreenPoint;
@@ -189,6 +192,7 @@ function RewardPayout({ amount, art, from, nonce, onArrive, onFinish, to, varian
   onArrive: MergeRewardArrivalHandler;
   onFinish: () => void;
   to: MergeScreenPoint;
+  targetSize?: RewardIconSize;
   variant: 'coin' | 'energy';
 }) {
   const tokenAmounts = splitEnergyAcrossTokens(amount, 5);
@@ -210,13 +214,14 @@ function RewardPayout({ amount, art, from, nonce, onArrive, onFinish, to, varian
       onArrive={onArrive}
       onFinish={onFinish}
       to={to}
+      targetSize={targetSize}
       totalAmount={amount}
       variant={variant}
     />
   ));
 }
 
-function RewardToken({ amount, art, count, from, index, onArrive, onFinish, to, totalAmount, variant }: {
+function RewardToken({ amount, art, count, from, index, onArrive, onFinish, to, targetSize, totalAmount, variant }: {
   amount: number;
   art: number;
   count: number;
@@ -225,12 +230,14 @@ function RewardToken({ amount, art, count, from, index, onArrive, onFinish, to, 
   onArrive: MergeRewardArrivalHandler;
   onFinish: () => void;
   to: MergeScreenPoint;
+  targetSize?: RewardIconSize;
   totalAmount: number;
   variant: 'coin' | 'energy';
 }) {
   const rise = useSharedValue(0);
   const flight = useSharedValue(0);
   const hover = useSharedValue(0);
+  const landed = useSharedValue(0);
   const reduceMotion = useReducedMotion();
   const contactWindowMs = mergeRewardContactWindowMs(count, reduceMotion);
   const baseVector = COIN_BURST[index] ?? COIN_BURST[COIN_BURST.length - 1];
@@ -253,14 +260,18 @@ function RewardToken({ amount, art, count, from, index, onArrive, onFinish, to, 
     }, (finished) => {
       if (!finished) return;
       runOnJS(onArrive)(amount, contactWindowMs, index, totalAmount);
-      if (index === count - 1) runOnJS(onFinish)();
+      // Present the exact aligned endpoint before retiring the sprite/batch.
+      landed.value = withDelay(variant === 'coin' ? 32 : 0, withTiming(1, { duration: 0 }, (retired) => {
+        if (retired && index === count - 1) runOnJS(onFinish)();
+      }));
     }));
     return () => {
       cancelAnimation(flight);
       cancelAnimation(hover);
       cancelAnimation(rise);
+      cancelAnimation(landed);
     };
-  }, [amount, contactWindowMs, count, flight, hover, index, onArrive, onFinish, reduceMotion, rise, totalAmount, variant]);
+  }, [amount, contactWindowMs, count, flight, hover, index, landed, onArrive, onFinish, reduceMotion, rise, totalAmount, variant]);
 
   const motionStyle = useAnimatedStyle(() => {
     const stagedX = from.x + vector.x * rise.value;
@@ -275,16 +286,20 @@ function RewardToken({ amount, art, count, from, index, onArrive, onFinish, to, 
     const hoverEnvelope = rise.value * inverse;
     const x = baseX + Math.cos(phase) * 3 * hoverEnvelope;
     const y = baseY + Math.sin(phase) * 4 * hoverEnvelope;
+    const scale = variant === 'coin' && targetSize
+      ? rewardIconFlightScale(rise.value, value, REWARD_TOKEN_SIZE, targetSize)
+      : { scaleX: (0.58 + rise.value * 0.48) * (1 - value * 0.72), scaleY: (0.58 + rise.value * 0.48) * (1 - value * 0.72) };
     return {
-      opacity: value < 0.9 ? rise.value : Math.max(0, (1 - value) / 0.1),
+      opacity: variant === 'coin' ? rise.value * (1 - landed.value) : value < 0.9 ? rise.value : Math.max(0, (1 - value) / 0.1),
       transform: [
         { translateX: x - REWARD_TOKEN_SIZE / 2 },
         { translateY: y - REWARD_TOKEN_SIZE / 2 },
         { rotateZ: `${vector.rotation * inverse}deg` },
-        { scale: (0.58 + rise.value * 0.48) * (1 - value * 0.72) },
+        { scaleX: scale.scaleX },
+        { scaleY: scale.scaleY },
       ],
     };
-  }, [from.x, from.y, index, reduceMotion, to.x, to.y]);
+  }, [from.x, from.y, index, targetSize, to.x, to.y, variant, vector.rotation, vector.x, vector.y]);
 
   return <Animated.View style={[styles.rewardToken, motionStyle]}><Image accessibilityIgnoresInvertColors contentFit="contain" source={art} style={styles.rewardTokenArt} transition={0} /></Animated.View>;
 }

@@ -13,6 +13,7 @@ import { DASHBOARD_STAT_ART } from '@/constants/journal-art-sources';
 import { Meadow } from '@/constants/meadow-theme';
 import { KatchaDeckUI } from '@/constants/theme';
 import type { FtueActionDefinition } from '@/features/onboarding/ftue-types';
+import { playEggActionHaptic } from '@/features/today/egg-haptics';
 
 export function ScriptedActionList({ actions, locked, onAction, stepCount, stepEnergy }: {
   actions: readonly FtueActionDefinition[];
@@ -46,8 +47,16 @@ function ScriptedActionCard({ action, locked, reduceMotion, onAction, stepCount,
   stepEnergy?: number | null;
 }) {
   const cardRef = useRef<ViewType>(null);
+  const bondSourceRef = useRef<ViewType>(null);
   const invoke = (callback: (rect: FeedSourceRect) => void) => {
-    cardRef.current?.measureInWindow((x, y, w, h) => callback({ x, y, w, h }));
+    if (locked) return;
+    const sourceRef = action.id === 'egg.feed_steps' ? bondSourceRef : cardRef;
+    sourceRef.current?.measureInWindow((x, y, w, h) => {
+      if (w > 0 && h > 0) {
+        if (action.id.startsWith('egg.')) playEggActionHaptic();
+        callback({ x, y, w, h });
+      }
+    });
   };
   if (action.presentation === 'cta_action') {
     return <Animated.View
@@ -66,14 +75,14 @@ function ScriptedActionCard({ action, locked, reduceMotion, onAction, stepCount,
       />
     </Animated.View>;
   }
-  if (action.id === 'energy.convert_steps' && stepCount != null && stepEnergy != null) {
+  if ((action.id === 'energy.convert_steps' || action.id === 'egg.feed_steps') && stepCount != null && stepEnergy != null) {
     return <Animated.View
       entering={reduceMotion ? FadeIn.duration(80) : FadeInUp.duration(300).easing(Easing.out(Easing.cubic))}
       exiting={reduceMotion ? FadeOutUp.duration(80) : FadeOutUp.duration(230).easing(Easing.in(Easing.cubic))}
       layout={LinearTransition.duration(220)}>
       <GameSurface contentStyle={styles.stepsSurfaceContent} density="regular" style={styles.card} tone="cream">
         <Pressable
-          accessibilityLabel={`Turn ${stepCount.toLocaleString()} steps into ${stepEnergy} Energy`}
+          accessibilityLabel={action.id === 'egg.feed_steps' ? `Feed ${stepCount.toLocaleString()} steps to the Egg for ${stepEnergy} Bond` : `Turn ${stepCount.toLocaleString()} steps into ${stepEnergy} Energy`}
           accessibilityRole="button"
           disabled={locked}
           onPress={() => invoke((rect) => onAction(action, rect))}
@@ -87,8 +96,8 @@ function ScriptedActionCard({ action, locked, reduceMotion, onAction, stepCount,
             </View>
           </View>
           <IconSymbol color={Meadow.inkFaint} name="arrow.right" size={21} />
-          <View style={styles.energyValueGroup}>
-            <Image contentFit="contain" source={GAME_CURRENCY_ART.energy} style={styles.energyArt} />
+          <View collapsable={false} ref={bondSourceRef} style={styles.energyValueGroup}>
+            <Image contentFit="contain" source={action.id === 'egg.feed_steps' ? GAME_CURRENCY_ART.bond : GAME_CURRENCY_ART.energy} style={styles.energyArt} />
             <ThemedText style={styles.energyValue} lightColor={KatchaDeckUI.ftue.goldDeep} darkColor={KatchaDeckUI.ftue.goldDeep}>+{stepEnergy}</ThemedText>
           </View>
         </Pressable>
