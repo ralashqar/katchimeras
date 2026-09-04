@@ -495,7 +495,8 @@ test('the shared Haven keeps its authored neighborhood art and adds only owned r
   assert.match(creatureArt, /CREATURE_ORDER_SOURCES\[visualKey\]/);
   assert.ok(fs.existsSync(path.join(process.cwd(), 'assets', 'images', 'katchimeras', 'cutouts_lod', 'mossprout_384.webp')));
   assert.doesNotMatch(canvas, /MergePlaySurface|MergeServeRewardOverlay|mergeBoardFocusRequest/);
-  assert.match(mergeSurface, /<MergeOrderRail[\s\S]*?<ServiceCounter[\s\S]*?<FeastlePersistentMergeBoard[\s\S]*?<MergeCellInspector/);
+  assert.match(mergeSurface, /<MergeOrderRail[\s\S]*?<ServiceCounter[\s\S]*?<SubscribedMergeBoard[\s\S]*?<MergeCellInspector/);
+  assert.match(mergeSurface, /<FeastlePersistentMergeBoard \{\.\.\.props\} state=\{state\}/);
   assert.doesNotMatch(canvas, /boardLayout=/);
   assert.match(canvas, /buildKingdomHexScene/);
   assert.match(canvas, /initialFitWorld: focusedMossproutWorld/);
@@ -505,7 +506,8 @@ test('the shared Haven keeps its authored neighborhood art and adds only owned r
   assert.doesNotMatch(canvas, /panExclusionFrame/);
   assert.doesNotMatch(canvas, /focusedSquareZoneId/);
   assert.match(canvas, /sceneTileImageLod: KingdomHexTileLod = focusedMossproutWorld[\s\S]*?\? 'full'[\s\S]*?: KINGDOM_RENDERING\.havenImageLod/);
-  assert.match(canvas, /kingdomHexTileSourceForLod\(layer, sceneTileImageLod\)/);
+  assert.match(canvas, /kingdomHexTileSourceForLod\(layer, layerLod\)/);
+  assert.match(canvas, /worldTileImageLod\(layer.frame.width, settledImageScale, PixelRatio.get\(\)\)/);
   assert.match(canvas, /imageLod=\{sceneTileImageLod\}/);
   assert.match(canvas, /scene\.tiles\.find\(\(tile\) => tile\.kind === 'home'\)/);
   const hexScene = fs.readFileSync(

@@ -1208,7 +1208,8 @@ test('FTUE starts a relationship before the Garden, shows First Bloom, and conti
   const contentFlow = readFileSync('features/content-flow/content-flow-bootstrap.ts', 'utf8');
   assert.match(merge, /ftueActive = ftueRun\?\.status === 'active'/);
   assert.match(merge, /leading=\{<KatchimeraBackButton[\s\S]*?disabled=\{ftueActive && !handoffActive\}/);
-  assert.match(merge, /trailing=\{<View collapsable=\{false\} ref=\{coinHudPillRef\}>[\s\S]*?<GameCurrencyHud[\s\S]*?targetRef: coinHudRef/);
+  assert.match(merge, /trailing=\{<View collapsable=\{false\} ref=\{coinHudPillRef\}>[\s\S]*?<MergeCoinHud[\s\S]*?hudRef=\{coinHudRef\}/);
+  assert.match(merge, /<GameCurrencyHud[\s\S]*?targetRef: hudRef/);
   assert.match(merge, /measureViewInWindow\(coinArtRef\)[\s\S]*?!coinRect[\s\S]*?return false/);
   assert.match(merge, /ftueRun\.stepId !== 'companion\.chapter_zero_return'[\s\S]*?target: 'companion'[\s\S]*?ftue: 'chapter-zero-return'/);
   assert.match(companion, /actionId: 'companion\.complete_chapter_zero_return'[\s\S]*?nextStepId: 'companion\.water_together'/);

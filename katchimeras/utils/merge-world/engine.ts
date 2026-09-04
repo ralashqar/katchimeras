@@ -3377,12 +3377,16 @@ function generatorState(id: string): MergeGeneratorState {
   };
 }
 
+const boardCountsCache = new WeakMap<MergeWorldState['board'], Map<string, number>>();
 function boardItemCounts(state: MergeWorldState) {
+  const cached = boardCountsCache.get(state.board);
+  if (cached) return cached;
   const counts = new Map<string, number>();
   for (const cell of state.board) {
     if (cell.occupant?.kind !== 'item') continue;
     counts.set(cell.occupant.definitionId, (counts.get(cell.occupant.definitionId) ?? 0) + 1);
   }
+  boardCountsCache.set(state.board, counts);
   return counts;
 }
 

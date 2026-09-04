@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { memo, useEffect } from 'react';
+import { memo, useEffect, useSyncExternalStore } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -12,11 +12,14 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { mergeCellCenter, type MergeBoardGeometry } from '@/utils/merge-world/board-geometry';
+import { MERGE_EFFECT_SLOT_IDS, mergeEffectRetentionMs, type MergeBoardEffect, type MergeBoardEffectKind, type MergeBoardEffects } from '@/utils/merge-world/board-effects';
+import { recordMergeRender } from '@/utils/merge-world/performance';
+import { useDisposableTimers } from '@/hooks/use-disposable-timers';
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 const SOFT_GLOW = require('../../../assets/images/katchimeras/soft-glow.png');
 
-export const MERGE_EFFECT_SLOT_IDS = [0, 1, 2, 3, 4, 5] as const;
+export { MERGE_EFFECT_SLOT_IDS } from '@/utils/merge-world/board-effects';
 
 export const MERGE_EFFECT_PARTICLES = [
   { angle: -2.68, distance: 0.72, size: 5 },
@@ -27,21 +30,27 @@ export const MERGE_EFFECT_PARTICLES = [
   { angle: 2.3, distance: 0.68, size: 4 },
 ] as const;
 
-export type MergeBoardEffectKind = 'spawn-origin' | 'spawn-settle' | 'merge';
-export type MergeBoardEffect = { id: number; cell: number; kind: MergeBoardEffectKind };
+export type { MergeBoardEffect, MergeBoardEffectKind } from '@/utils/merge-world/board-effects';
 
 /** Fixed native/Reanimated slots shared by generator, landing, and merge feedback. */
 export const MergeBoardEffectsLayer = memo(function MergeBoardEffectsLayer({
-  effects,
+  controller,
+  activity,
   geometry,
   reduceMotion,
   size,
 }: {
-  effects: readonly MergeBoardEffect[];
+  controller: MergeBoardEffects;
+  activity: SharedValue<number>;
   geometry: MergeBoardGeometry;
   reduceMotion: boolean;
   size: number;
 }) {
+  recordMergeRender('effects-layer');
+  const effects = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
+  const active = effects.length > 0;
+  useEffect(() => { activity.value = active ? 1 : 0; }, [active, activity]);
+  useEffect(() => () => { controller.clear(); activity.value = 0; }, [activity, controller]);
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       {MERGE_EFFECT_SLOT_IDS.map((slotId) => (
@@ -49,6 +58,7 @@ export const MergeBoardEffectsLayer = memo(function MergeBoardEffectsLayer({
           effect={effects.find((entry) => entry.id % MERGE_EFFECT_SLOT_IDS.length === slotId) ?? null}
           geometry={geometry}
           key={slotId}
+          onRetire={controller.retire}
           reduceMotion={reduceMotion}
           size={size}
         />
@@ -57,12 +67,15 @@ export const MergeBoardEffectsLayer = memo(function MergeBoardEffectsLayer({
   );
 });
 
-function MergeBoardEffectSlot({ effect, geometry, reduceMotion, size }: {
+const MergeBoardEffectSlot = memo(function MergeBoardEffectSlot({ effect, geometry, onRetire, reduceMotion, size }: {
   effect: MergeBoardEffect | null;
   geometry: MergeBoardGeometry;
+  onRetire: (id: number) => void;
   reduceMotion: boolean;
   size: number;
 }) {
+  recordMergeRender('effect-slot');
+  const timers = useDisposableTimers('merge:effect-slot');
   const progress = useSharedValue(0);
   const center = effect ? mergeCellCenter(geometry, effect.cell) : { x: 0, y: 0 };
   const centerX = center.x;
@@ -77,6 +90,12 @@ function MergeBoardEffectSlot({ effect, geometry, reduceMotion, size }: {
     }
     return () => cancelAnimation(progress);
   }, [effect, progress, reduceMotion]);
+
+  useEffect(() => {
+    if (!effect) return;
+    const timer = timers.schedule(() => onRetire(effect.id), mergeEffectRetentionMs(effect.kind, reduceMotion));
+    return () => timers.cancel(timer);
+  }, [effect, onRetire, reduceMotion, timers]);
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
@@ -97,7 +116,7 @@ function MergeBoardEffectSlot({ effect, geometry, reduceMotion, size }: {
       ))}
     </View>
   );
-}
+});
 
 function effectProgress(value: number, kind: MergeBoardEffectKind) {
   'worklet';
@@ -105,7 +124,7 @@ function effectProgress(value: number, kind: MergeBoardEffectKind) {
   return Math.max(0, Math.min(1, (value - 0.1) / 0.9));
 }
 
-function MergeEffectGlow({ centerX, centerY, kind, progress, reduceMotion, size }: {
+const MergeEffectGlow = memo(function MergeEffectGlow({ centerX, centerY, kind, progress, reduceMotion, size }: {
   centerX: number;
   centerY: number;
   kind: MergeBoardEffectKind;
@@ -136,9 +155,9 @@ function MergeEffectGlow({ centerX, centerY, kind, progress, reduceMotion, size 
       transition={0}
     />
   );
-}
+});
 
-function MergeEffectRing({ centerX, centerY, kind, progress, reduceMotion, size }: {
+const MergeEffectRing = memo(function MergeEffectRing({ centerX, centerY, kind, progress, reduceMotion, size }: {
   centerX: number;
   centerY: number;
   kind: MergeBoardEffectKind;
@@ -161,9 +180,9 @@ function MergeEffectRing({ centerX, centerY, kind, progress, reduceMotion, size 
     top: centerY - diameter / 2,
     width: diameter,
   }, style]} />;
-}
+});
 
-function MergeEffectParticle({ centerX, centerY, index, kind, particle, progress, reduceMotion, size }: {
+const MergeEffectParticle = memo(function MergeEffectParticle({ centerX, centerY, index, kind, particle, progress, reduceMotion, size }: {
   centerX: number;
   centerY: number;
   index: number;
@@ -195,7 +214,7 @@ function MergeEffectParticle({ centerX, centerY, index, kind, particle, progress
     top: centerY - particle.size / 2,
     width: particle.size,
   }, style]} />;
-}
+});
 
 const styles = StyleSheet.create({
   glow: { position: 'absolute' },

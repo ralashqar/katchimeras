@@ -12,7 +12,9 @@ export function GameWalletProvider({ children }: PropsWithChildren) {
   const economy = useEconomy();
   const [merge, setMerge] = useState(() => EMPTY_WALLET);
   const applyMerge = useCallback((state: Awaited<ReturnType<typeof loadMergeWorldState>>) => {
-    setMerge({ coins: state.coins, energy: state.energy.value, energyCap: state.energy.regenCap, gems: 0, ready: true });
+    setMerge((current) => current.ready && current.coins === state.coins && current.energy === state.energy.value && current.energyCap === state.energy.regenCap
+      ? current
+      : { coins: state.coins, energy: state.energy.value, energyCap: state.energy.regenCap, gems: 0, ready: true });
   }, []);
   useEffect(() => {
     let active = true;

@@ -741,7 +741,8 @@ test('only Garden order buttons navigate while the dedicated route retains the f
   assert.match(canvas, /<FrozenMergeOrderTrayCard entry=\{entry\} \/>/);
   assert.match(canvas, /onOpenGarden\(entry\.order\.id\)/);
   assert.doesNotMatch(canvas, /MergePlaySurface|activeMergeBoardId|serveFlight|mergeBoardFocusRequest/);
-  assert.match(surface, /<MergeOrderRail[\s\S]*?<ServiceCounter[\s\S]*?<FeastlePersistentMergeBoard[\s\S]*?<MergeCellInspector/);
+  assert.match(surface, /<MergeOrderRail[\s\S]*?<ServiceCounter[\s\S]*?<SubscribedMergeBoard[\s\S]*?<MergeCellInspector/);
+  assert.match(surface, /<FeastlePersistentMergeBoard \{\.\.\.props\} state=\{state\}/);
   assert.doesNotMatch(canvas, /externalPanGesture|camera\.panGesture/);
   assert.doesNotMatch(board, /blocksExternalGesture|externalPanGesture/);
   assert.doesNotMatch(camera, /panExclusionFrame|stateManager\.fail/);

@@ -1,6 +1,8 @@
 import { runOnJS, useFrameCallback, useSharedValue, type SharedValue } from 'react-native-reanimated';
+import { mergePerformanceSnapshot } from '@/utils/merge-world/performance';
+import { lifecycleResourceSnapshot } from '@/utils/lifecycle-performance';
 
-const MERGE_BOARD_PERF_ENABLED = __DEV__ && process.env.EXPO_PUBLIC_MERGE_BOARD_PERF === '1';
+const MERGE_BOARD_PERF_ENABLED = process.env.EXPO_PUBLIC_MERGE_BOARD_PERF === '1';
 
 type MergeBoardFrameSample = {
   frames: number;
@@ -12,11 +14,13 @@ type MergeBoardFrameSample = {
 
 function reportMergeBoardFrameSample(sample: MergeBoardFrameSample) {
   if (!MERGE_BOARD_PERF_ENABLED) return;
-  console[sample.slowFrameRatio > 5 ? 'warn' : 'info']('[merge-board] animation-frames', sample);
+  console[sample.slowFrameRatio > 5 ? 'warn' : 'info']('[merge-board] animation-frames', {
+    ...sample, work: mergePerformanceSnapshot(), resources: lifecycleResourceSnapshot(),
+  });
 }
 
 /** Opt-in UI-frame sampling for warm board gestures, spawns, and merges. */
-export function useMergeBoardFrameProbe(active: boolean, dragPhase: SharedValue<number>) {
+export function useMergeBoardFrameProbe(active: boolean, dragPhase: SharedValue<number>, effectsActivity?: SharedValue<number>) {
   const wasActive = useSharedValue(0);
   const frames = useSharedValue(0);
   const slowFrames = useSharedValue(0);
@@ -31,7 +35,7 @@ export function useMergeBoardFrameProbe(active: boolean, dragPhase: SharedValue<
 
   useFrameCallback((frame) => {
     if (!MERGE_BOARD_PERF_ENABLED) return;
-    const sampling = active || dragPhase.value !== 0;
+    const sampling = active || dragPhase.value !== 0 || (effectsActivity?.value ?? 0) !== 0;
     if (sampling) {
       if (wasActive.value === 0) {
         wasActive.value = 1;

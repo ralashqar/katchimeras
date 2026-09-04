@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { memo, useCallback, useEffect, useRef, useState, type ComponentProps, type RefObject } from 'react';
 import { type NativeScrollEvent, type NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
@@ -31,6 +31,7 @@ import type { HomeVisualKey } from '@/types/home';
 import type { MergeCharacterId, MergeOrder, MergeWorldArrival } from '@/types/merge-world';
 import { resolveCreatureArtSource, resolveCreatureOrderArtSource } from '@/utils/creature-art';
 import { MAX_MOUNTED_ORDER_TRAYS, orderMountWindow } from '@/utils/merge-world/order-window';
+import { recordMergeRender } from '@/utils/merge-world/performance';
 
 import { PersistentMergeItemArt } from './feastle-persistent-merge-board';
 import { MergeParcelTrayCard } from './merge-parcel-overlay';
@@ -187,7 +188,7 @@ export function FrozenMergeOrderTrayCard({ entry }: { entry: MergeOrderTrayEntry
   );
 }
 
-export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel, onReroll, onServe, onBlockedInteraction, onRailTargetRef, interactionGate = { kind: 'open' }, parcelTargetRef }: {
+export const MergeOrderRail = memo(function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel, onReroll, onServe, onBlockedInteraction, onRailTargetRef, interactionGate = { kind: 'open' }, parcelTargetRef }: {
   entries: readonly MergeTrayEntry[];
   focusOrderId?: string;
   onOpenChat: (characterId: MergeCharacterId, noteId: string) => void;
@@ -199,6 +200,7 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel
   interactionGate?: MergeRailInteractionGate;
   parcelTargetRef: RefObject<View | null>;
 }) {
+  recordMergeRender('order-rail');
   const reduceMotion = useReducedMotion();
   const scrollRef = useRef<ScrollView>(null);
   const lastAutoFocusKeyRef = useRef<string | null>(null);
@@ -299,15 +301,15 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel
               shakeNonce={entry.shakeNonce}
             />
           ) : entry.kind === 'order' ? (
-            <MergeOrderTrayCard
+            <StableOrderTray
               entry={entry}
               index={index}
               interactionAllowed={interactionGate.kind === 'open' || (interactionGate.kind === 'serve' && interactionGate.orderId === entry.order.id)}
               interactionLocked={interactionGate.kind !== 'open'}
               onBlockedInteraction={onBlockedInteraction}
               onRailTargetRef={onRailTargetRef}
-              onReroll={() => onReroll(entry.order)}
-              onServe={(itemTargets) => onServe(entry.order, itemTargets)}
+              onReroll={onReroll}
+              onServe={onServe}
               reduceMotion={reduceMotion}
             />
           ) : (
@@ -328,7 +330,18 @@ export function MergeOrderRail({ entries, focusOrderId, onOpenChat, onOpenParcel
         : null}
     </ScrollView>
   );
-}
+});
+
+const StableOrderTray = memo(function StableOrderTray({ onReroll, onServe, ...props }:
+  Omit<ComponentProps<typeof MergeOrderTrayCard>, 'onReroll' | 'onServe'> & {
+    onReroll: (order: MergeOrder) => void;
+    onServe: (order: MergeOrder, targets: readonly MergeScreenPoint[]) => boolean | Promise<boolean>;
+  }) {
+  const order = props.entry.order;
+  const reroll = useCallback(() => onReroll(order), [onReroll, order]);
+  const serve = useCallback((targets: readonly MergeScreenPoint[]) => onServe(order, targets), [onServe, order]);
+  return <MergeOrderTrayCard {...props} onReroll={reroll} onServe={serve} />;
+});
 
 export function MergeOrderTrayCard({ animateEntrance = true, entry, index, interactionAllowed, interactionLocked, onBlockedInteraction, onRailTargetRef, onReroll, onServe, reduceMotion }: {
   animateEntrance?: boolean;

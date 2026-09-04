@@ -1,4 +1,5 @@
 import type { MergeWorldState } from '@/types/merge-world';
+import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 
 export type MergeArtWarmupPlan = {
   generatorIds: readonly string[];
@@ -19,9 +20,8 @@ export function mergeArtWarmupPlan(state: MergeWorldState): MergeArtWarmupPlan {
     if (cell.occupant?.kind === 'item') itemDefinitionIds.add(cell.occupant.definitionId);
   });
 
-  // Static Dream Echoes are already resident in the board atlas. Warm only
-  // generators which are actually mounted and the outputs they can emit next;
-  // this avoids decoding order and mist artwork a second time through Expo Image.
+  // Mist/echo art has its own renderer. Warm only mounted generators and the
+  // outputs they can emit next, rather than the entire item catalog.
   [...generatorIds].forEach((generatorId) => {
     const generator = state.generators[generatorId];
     if (!generator) return;
@@ -33,6 +33,11 @@ export function mergeArtWarmupPlan(state: MergeWorldState): MergeArtWarmupPlan {
     if (generator.forcedDropDefinitionId) itemDefinitionIds.add(generator.forcedDropDefinitionId);
   });
 
+  // One lookahead tier only: cold result decoding must not start on a merge.
+  [...itemDefinitionIds].forEach((id) => {
+    const next = MERGE_ITEMS_BY_ID.get(id)?.nextItemId;
+    if (next) itemDefinitionIds.add(next);
+  });
   return {
     generatorIds: [...generatorIds].sort(),
     itemDefinitionIds: [...itemDefinitionIds].sort(),

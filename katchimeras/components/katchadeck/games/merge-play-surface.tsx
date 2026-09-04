@@ -1,4 +1,4 @@
-import { memo, useCallback, useState, type RefObject } from 'react';
+import { memo, useCallback, useMemo, useRef, useState, type ComponentProps, type RefObject } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent, type ViewStyle } from 'react-native';
 
 import type { MergeBoardInteractionGate, MergeRailInteractionGate } from '@/features/onboarding/merge-ftue';
@@ -9,6 +9,16 @@ import { FeastlePersistentMergeBoard, type MergeBoardLayout, type MergeBoardScre
 import { MergeCellInspector } from './merge-cell-inspector';
 import { MergeOrderRail, type MergeTrayEntry } from './merge-order-rail';
 import type { MergeScreenPoint } from './merge-serve-reward-overlay';
+import { useMergeWorldSelector } from '@/features/merge-world/merge-world-provider';
+import { reuseShallowRows } from '@/utils/merge-world/selector-store';
+
+const selectBoard = (snapshot: { state: MergeWorldState | null }) => snapshot.state;
+const sameBoardPresentation = (a: MergeWorldState | null, b: MergeWorldState | null) => a === b || Boolean(a && b
+  && a.board === b.board && a.generators === b.generators && a.activeOrders === b.activeOrders);
+const SubscribedMergeBoard = memo(function SubscribedMergeBoard(props: Omit<ComponentProps<typeof FeastlePersistentMergeBoard>, 'state'>) {
+  const state = useMergeWorldSelector(selectBoard, sameBoardPresentation);
+  return state ? <FeastlePersistentMergeBoard {...props} state={state} /> : null;
+});
 
 export type MergePlaySurfaceLayout = {
   boardHeight: number;
@@ -99,6 +109,11 @@ export const MergePlaySurface = memo(function MergePlaySurface({
   width,
 }: MergePlaySurfaceProps) {
   const [boardAreaHeight, setBoardAreaHeight] = useState(0);
+  const retainedEntries = useRef<readonly MergeTrayEntry[]>([]);
+  const stableEntries = useMemo(() => {
+    retainedEntries.current = reuseShallowRows(retainedEntries.current, trayEntries);
+    return retainedEntries.current;
+  }, [trayEntries]);
   const measureBoardArea = useCallback((event: LayoutChangeEvent) => {
     const next = Math.floor(event.nativeEvent.layout.height);
     setBoardAreaHeight((current) => current === next ? current : next);
@@ -117,7 +132,7 @@ export const MergePlaySurface = memo(function MergePlaySurface({
       pointerEvents={interactionEnabled ? 'auto' : 'none'}
       style={[styles.surface, maxHeight == null ? styles.flexSurface : { height: maxHeight }, { width }, style]}>
       <MergeOrderRail
-        entries={[...trayEntries]}
+        entries={stableEntries}
         focusOrderId={focusOrderId}
         interactionGate={railInteractionGate}
         onBlockedInteraction={onBlockedInteraction}
@@ -131,7 +146,7 @@ export const MergePlaySurface = memo(function MergePlaySurface({
       <ServiceCounter viewportWidth={counterWidth ?? width} />
       <View onLayout={measureBoardArea} style={styles.boardStage}>
         {boardAreaHeight > 0 ? (
-          <FeastlePersistentMergeBoard
+          <SubscribedMergeBoard
             animateEntrance={animateEntrance}
             hiddenItemInstanceIds={hiddenItemInstanceIds}
             interactionGate={boardInteractionGate}
@@ -150,7 +165,6 @@ export const MergePlaySurface = memo(function MergePlaySurface({
             screenMetricsRevision={screenMetricsRevision}
             selectedCell={selectedCell}
             sessionId={sessionId}
-            state={state}
             width={width}
           />
         ) : null}

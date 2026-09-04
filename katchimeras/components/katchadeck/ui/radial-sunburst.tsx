@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 import { memo, useEffect } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
@@ -43,6 +44,7 @@ export const RotatingRadialSunburst = memo(function RotatingRadialSunburst({
       breath.value = 0.45;
       return;
     }
+    const releaseLoop = acquireLifecycleResource('animation_loop', 'radial-sunburst');
     rotation.value = withRepeat(
       withTiming(1, { duration: rotationDurationMs, easing: Easing.linear }),
       -1,
@@ -54,6 +56,7 @@ export const RotatingRadialSunburst = memo(function RotatingRadialSunburst({
       true,
     );
     return () => {
+      releaseLoop();
       cancelAnimation(rotation);
       cancelAnimation(breath);
     };

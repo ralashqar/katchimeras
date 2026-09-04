@@ -6,6 +6,9 @@ import { mergeWorldGeneratorArt, mergeWorldItemArt } from '@/constants/merge-wor
 import type { MergeWorldState } from '@/types/merge-world';
 import { mergeArtWarmupPlan } from '@/utils/merge-world/art-warmup';
 import { waitForCriticalInteractionIdle } from '@/utils/critical-interaction';
+import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
+import { measureMergeWork } from '@/utils/merge-world/performance';
+import { createSerialWorkQueue } from '@/utils/merge-world/serial-work-queue';
 
 export type MergeArtCache = ReadonlyMap<string, ImageRef>;
 
@@ -27,20 +30,27 @@ export function useMergeArtCache(
   state: MergeWorldState,
   mossproutOnboarding: boolean,
   onInitialArtReady?: () => void,
+  visibleItemDefinitionIds: readonly string[] = [],
 ): MergeArtCache {
   const plan = useMemo(() => mergeArtWarmupPlan(state), [state]);
-  const signature = `${MERGE_ART_CACHE_REVISION}|${mossproutOnboarding ? '1' : '0'}|${plan.generatorIds.join(',')}|${plan.itemDefinitionIds.join(',')}`;
+  const pinnedItems = [...new Set([...plan.itemDefinitionIds, ...visibleItemDefinitionIds])].sort();
+  const signature = `${MERGE_ART_CACHE_REVISION}|${mossproutOnboarding ? '1' : '0'}|${plan.generatorIds.join(',')}|${pinnedItems.join(',')}`;
   const retainedRef = useRef(new Map<string, ImageRef>());
   const generationRef = useRef(0);
+  const [workQueue] = useState(createSerialWorkQueue);
   const [cache, setCache] = useState<MergeArtCache>(() => new Map());
+  const retiredRef = useRef<ImageRef[]>([]);
+  // Release only after consumers have committed replacement sources.
+  useEffect(() => { retiredRef.current.splice(0).forEach((image) => image.release()); }, [cache]);
   const onInitialArtReadyRef = useRef(onInitialArtReady);
   onInitialArtReadyRef.current = onInitialArtReady;
 
   useEffect(() => {
     const generation = ++generationRef.current;
     let cancelled = false;
+    const cancellation = new AbortController();
     const desired = new Map<string, number>();
-    plan.itemDefinitionIds.forEach((definitionId) => {
+    pinnedItems.forEach((definitionId) => {
       const source = mergeWorldItemArt(definitionId);
       if (source) desired.set(mergeItemArtCacheKey(definitionId), source);
     });
@@ -49,20 +59,31 @@ export function useMergeArtCache(
       if (source) desired.set(mergeGeneratorArtCacheKey(generatorId, mossproutOnboarding), source);
     });
 
-    retainedRef.current.forEach((imageRef, key) => {
-      if (desired.has(key)) return;
-      imageRef.release();
-      retainedRef.current.delete(key);
-    });
-    setCache(new Map(retainedRef.current));
-
+    const publishCache = () => {
+      if (cancelled || generation !== generationRef.current) return;
+      // Trim even on a cache hit: a previously larger pinned set can shrink.
+      retainedRef.current.forEach((image, key) => {
+        if (retainedRef.current.size <= Math.max(96, desired.size) || desired.has(key)) return;
+        retiredRef.current.push(image);
+        retainedRef.current.delete(key);
+      });
+      const nextCache = new Map(retainedRef.current);
+      setCache((current) => current.size === nextCache.size && [...nextCache].every(([key, value]) => current.get(key) === value)
+        ? current : nextCache);
+      onInitialArtReadyRef.current?.();
+    };
     const loadDesiredArt = () => {
+      if (cancelled || generation !== generationRef.current) return;
       const missing = [...desired].filter(([key]) => !retainedRef.current.has(key));
+      if (!missing.length) { publishCache(); return; }
       let cursor = 0;
       const loadWorker = async () => {
         while (cursor < missing.length) {
-          await waitForCriticalInteractionIdle();
+          if (cancelled || generation !== generationRef.current) return;
+          await waitForCriticalInteractionIdle(cancellation.signal);
+          if (cancelled || generation !== generationRef.current) return;
           const [key, source] = missing[cursor++];
+          const finishDecode = measureMergeWork('image:decode');
           try {
             const imageRef = await Image.loadAsync(source, {
               maxHeight: MERGE_ART_CACHE_EDGE_PX,
@@ -70,22 +91,23 @@ export function useMergeArtCache(
             });
             if (cancelled || generation !== generationRef.current || !desired.has(key)) {
               imageRef.release();
-              continue;
+              return;
             }
             retainedRef.current.set(key, imageRef);
           } catch {
             // The ordinary static source remains the recovery path.
-          }
+          } finally { finishDecode(); }
         }
       };
       // Decode serially after interactions. Parallel image decoding competes
       // with the JS/native input pipeline during the first FTUE tap burst.
       const workerCount = Math.min(1, missing.length);
-      void Promise.all(Array.from({ length: workerCount }, loadWorker)).then(() => {
-        if (!cancelled && generation === generationRef.current) {
-          setCache(new Map(retainedRef.current));
-          onInitialArtReadyRef.current?.();
-        }
+      void workQueue.enqueue(async () => {
+        if (cancelled || generation !== generationRef.current) return;
+        const releaseWorker = acquireLifecycleResource('art_worker', 'merge:art-warmup');
+        try { await Promise.all(Array.from({ length: workerCount }, loadWorker)); }
+        finally { releaseWorker(); }
+        publishCache();
       });
     };
     // A transition curtain is already shielding this initial decode. Waiting
@@ -98,6 +120,7 @@ export function useMergeArtCache(
 
     return () => {
       cancelled = true;
+      cancellation.abort();
       task?.cancel();
     };
     // The stable signature prevents a spawn revision from restarting identical work.
@@ -108,6 +131,7 @@ export function useMergeArtCache(
     generationRef.current += 1;
     retainedRef.current.forEach((imageRef) => imageRef.release());
     retainedRef.current.clear();
+    retiredRef.current.splice(0).forEach((image) => image.release());
   }, []);
 
   return cache;

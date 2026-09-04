@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { measureMergeWork } from './performance';
 
 import type { MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
 import type { StoryWorldUpgradeEffectPayload } from '@/types/content-flow';
@@ -90,7 +91,9 @@ export async function saveMergeWorldState(state: MergeWorldState, receiptIds?: r
   // destructive reset and restore generators after the database is cleared.
   if (resetInProgress) return;
   const generation = resetGeneration;
+  const finishSerialization = measureMergeWork('save:serialize');
   const serialized = JSON.stringify(state);
+  finishSerialization();
   const selectedReceipts = receiptIds == null
     ? state.externalRewardReceipts
     : state.externalRewardReceipts.filter((receipt) => receiptIds.includes(receipt.id));

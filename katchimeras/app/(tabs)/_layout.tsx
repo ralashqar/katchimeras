@@ -63,7 +63,8 @@ export default function TabLayout() {
         <Tabs.Screen
           name="katchimeras"
           options={{
-            freezeOnBlur: true,
+            // The focus boundary tears down the world and its worklets on blur.
+            freezeOnBlur: false,
             title: 'Haven',
           }}
         />

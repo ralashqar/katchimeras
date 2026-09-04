@@ -3,6 +3,9 @@ export type MergeBoardMotionKind = 'move' | 'swap' | 'return' | 'spawn' | 'merge
 export const MERGE_MORPH_DURATION_MS = 460;
 export const MERGE_MORPH_REDUCED_MOTION_DURATION_MS = 100;
 export const SPAWN_MOTION_DURATION_MS = 760;
+// 1.18 spawn peak × 1.08 entrance × 1.055 hint < 1.5. Allocate once,
+// then shrink with a transform; never resize the native image on each frame.
+export const MERGE_SPRITE_SURFACE_SCALE = 1.5;
 
 export function isMistMergeTransition(
   targetMistKind: string | null | undefined,

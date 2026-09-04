@@ -1,4 +1,4 @@
-import { createContext, type PropsWithChildren, use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, type PropsWithChildren, use, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AppState } from 'react-native';
 
 import { companionIdForFamily, katchimeraSkinById } from '@/constants/katchimera-skins';
@@ -20,6 +20,9 @@ import { buildCompanionAffinityProfile, nextEligibleCompanionGate, recommendComp
 import { reduceMergeWorld } from '@/utils/merge-world/engine';
 import { mossproutFocusStage } from '@/utils/merge-world/mossprout-focus-progression';
 import { mergeWorldPendingPersistence, type MergeWorldPendingPersistence } from '@/utils/merge-world/persistence-buffer';
+import { createMergeSaveDeadline } from '@/utils/merge-world/save-deadline';
+import { measureMergeWork } from '@/utils/merge-world/performance';
+import { createSelectorStore, selectedSnapshot } from '@/utils/merge-world/selector-store';
 import { loadFirstSession } from '@/features/onboarding/first-session';
 import { completeMossproutResidentCardDiscovery, mossproutDailyActionDeck, mossproutJourneyForDay, mossproutJourneyRuntimeDayId, mossproutStory, recordKatchimeraActionCompletion, recordMossproutFirstGardenRestored, recordMossproutJourneyOrderServed, recordMossproutMatchedCard, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
@@ -50,6 +53,7 @@ const MergeWorldContext = createContext<MergeWorldContextValue | null>(null);
 const MergeWorldStateContext = createContext<MergeWorldStateContextValue | null>(null);
 const MergeWorldActionsContext = createContext<MergeWorldActionsContextValue | null>(null);
 const MergeWorldLastResultContext = createContext<MergeWorldCommandResult | null | undefined>(undefined);
+const MergeWorldSelectorContext = createContext<ReturnType<typeof createSelectorStore<MergeWorldStateContextValue>> | null>(null);
 const SIGNATURE_LEVELS = new Set([4, 8, 12, 16, 20]);
 const AUTHORED_COHORT_FAMILIES: readonly AuthoredCohortFamilyId[] = [
   'baristabbit', 'steppling', 'voyagle', 'flexel', 'bedrotte',
@@ -129,6 +133,7 @@ export function MergeWorldProvider({
   const mountedRef = useRef(true);
   const pendingPersistenceRef = useRef<MergeWorldPendingPersistence | null>(null);
   const persistenceWorkerRef = useRef<Promise<void> | null>(null);
+  const saveDeadlineRef = useRef<ReturnType<typeof createMergeSaveDeadline> | null>(null);
   const persistenceGenerationRef = useRef(0);
   const externalWorkerRef = useRef<Promise<void> | null>(null);
   const externalGenerationRef = useRef(0);
@@ -137,6 +142,7 @@ export function MergeWorldProvider({
   activeRef.current = active;
 
   useEffect(() => acquireLifecycleResource('merge_provider', 'merge-world-provider'), []);
+  useEffect(() => active ? acquireLifecycleResource('active_merge_provider', 'merge:foreground-owner') : undefined, [active]);
   useEffect(() => {
     if (!active) return;
     const release = acquireLifecycleResource('store_subscription', 'merge:quick-goals');
@@ -382,21 +388,22 @@ export function MergeWorldProvider({
     // subscription alive for the lifetime of the provider so a debug reset or
     // FTUE board install cannot be missed while Games is hidden. Otherwise the
     // retained stateRef prevents initial hydration when the tab is reopened.
-    const release = acquireLifecycleResource('store_subscription', 'merge:world-resets');
+    const release = acquireLifecycleResource('retained_subscription', 'merge:world-resets');
     const unsubscribe = subscribeMergeWorldResets((freshState) => {
       if (!mountedRef.current) return;
       persistenceGenerationRef.current += 1;
+      saveDeadlineRef.current?.cancel();
       externalGenerationRef.current += 1;
       pendingPersistenceRef.current = null;
       persistenceWorkerRef.current = null;
       externalWorkerRef.current = null;
-      const reconciledState = featureAndReconcile(freshState);
+      const reconciledState = activeRef.current ? featureAndReconcile(freshState) : freshState;
       stateRef.current = reconciledState;
       setState(reconciledState);
       setLastResult(null);
       setError(null);
       setLoading(false);
-      refreshFriendshipLevels();
+      if (activeRef.current) refreshFriendshipLevels();
     });
     return () => {
       unsubscribe();
@@ -408,10 +415,11 @@ export function MergeWorldProvider({
     // Today can award Merge Energy while this retained tab is unfocused. Adopt
     // newer repository snapshots immediately and invalidate any stale buffered
     // write so reopening Games cannot overwrite or hide that reward.
-    const release = acquireLifecycleResource('store_subscription', 'merge:world-snapshots');
+    const release = acquireLifecycleResource('retained_subscription', 'merge:world-snapshots');
     const unsubscribe = subscribeMergeWorldSnapshots((freshState) => {
       if (!mountedRef.current || freshState.revision <= (stateRef.current?.revision ?? -1)) return;
       persistenceGenerationRef.current += 1;
+      saveDeadlineRef.current?.cancel();
       pendingPersistenceRef.current = null;
       persistenceWorkerRef.current = null;
       stateRef.current = freshState;
@@ -473,9 +481,14 @@ export function MergeWorldProvider({
     return persistenceWorkerRef.current;
   }, [drainPersistence]);
 
-  const enqueuePersistence = useCallback((next: MergeWorldState, receiptIds: readonly string[] = []) => {
+  if (!saveDeadlineRef.current) saveDeadlineRef.current = createMergeSaveDeadline(() => { void startPersistenceWorker(); });
+
+  const enqueuePersistence = useCallback((next: MergeWorldState, receiptIds: readonly string[] = [], bufferOrdinaryCommand = false) => {
     pendingPersistenceRef.current = mergeWorldPendingPersistence(pendingPersistenceRef.current, next, receiptIds);
-    void startPersistenceWorker();
+    if (receiptIds.length || !bufferOrdinaryCommand) {
+      saveDeadlineRef.current?.cancel();
+      void startPersistenceWorker();
+    } else saveDeadlineRef.current?.enqueue();
   }, [startPersistenceWorker]);
 
   useEffect(() => {
@@ -543,6 +556,7 @@ export function MergeWorldProvider({
   }, [active, enqueuePersistence, reconcileMossproutStory]);
 
   const flush = useCallback(async () => {
+    saveDeadlineRef.current?.cancel();
     const worker = startPersistenceWorker();
     if (worker) await worker;
   }, [startPersistenceWorker]);
@@ -767,7 +781,9 @@ export function MergeWorldProvider({
           && (journey.activity?.mergeOrderIds ?? (journey.activity ? [journey.activity.mergeOrderId] : [])).includes(command.orderId)
         ))?.activity?.objectiveId
       : undefined;
-    const reduced = reduceMergeWorld(current, command);
+    const finishReduction = measureMergeWork(`reduce:${command.type}`);
+    let reduced: MergeWorldCommandResult;
+    try { reduced = reduceMergeWorld(current, command); } finally { finishReduction(); }
     if (reduced.changed && command.type === 'serveOrder') void publishContentFlowDomainEvent({
       eventId: `merge-order-served:${command.orderId}:${reduced.state.revision}`,
       type: 'merge.order_served',
@@ -851,7 +867,7 @@ export function MergeWorldProvider({
     stateRef.current = result.state;
     setState(result.state);
     setError(null);
-    enqueuePersistence(result.state, receiptIds);
+    enqueuePersistence(result.state, receiptIds, command.type === 'move' || command.type === 'tapGenerator');
     if (result.state.externalRewardReceipts.some((receipt) => receipt.appliedAt == null)) {
       void applyPendingExternalRewards();
     }
@@ -860,11 +876,13 @@ export function MergeWorldProvider({
 
   const value = useMemo<MergeWorldContextValue>(() => ({ state, loading, error, lastResult, friendshipLevels, dispatch, flush }), [dispatch, error, flush, friendshipLevels, lastResult, loading, state]);
   const stateValue = useMemo<MergeWorldStateContextValue>(() => ({ state, loading, error }), [error, loading, state]);
+  const [selectorStore] = useState(() => createSelectorStore(stateValue));
+  useLayoutEffect(() => { selectorStore.publish(stateValue); }, [selectorStore, stateValue]);
   const actionsValue = useMemo<MergeWorldActionsContextValue>(() => ({ dispatch, flush }), [dispatch, flush]);
   return <MergeWorldContext value={value}>
     <MergeWorldStateContext value={stateValue}>
       <MergeWorldActionsContext value={actionsValue}>
-        <MergeWorldLastResultContext value={lastResult}>{children}</MergeWorldLastResultContext>
+        <MergeWorldLastResultContext value={lastResult}><MergeWorldSelectorContext value={selectorStore}>{children}</MergeWorldSelectorContext></MergeWorldLastResultContext>
       </MergeWorldActionsContext>
     </MergeWorldStateContext>
   </MergeWorldContext>;
@@ -880,6 +898,13 @@ export function useMergeWorldState() {
   const value = use(MergeWorldStateContext);
   if (!value) throw new Error('useMergeWorldState must be used inside MergeWorldProvider.');
   return value;
+}
+
+export function useMergeWorldSelector<S>(select: (snapshot: MergeWorldStateContextValue) => S, equal: (a: S, b: S) => boolean = Object.is): S {
+  const store = use(MergeWorldSelectorContext);
+  if (!store) throw new Error('useMergeWorldSelector must be used inside MergeWorldProvider.');
+  const getSnapshot = useMemo(() => selectedSnapshot(store.getSnapshot, select, equal), [equal, select, store]);
+  return useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot);
 }
 
 /**

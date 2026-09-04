@@ -245,7 +245,8 @@ test('Merge art warm-up stays bounded to visible and immediately reachable artwo
   const plan = mergeArtWarmupPlan(state);
   assert.deepEqual(plan.generatorIds, ['wild-garden']);
   assert.ok(plan.itemDefinitionIds.includes('nature:garden:1'));
-  assert.equal(plan.itemDefinitionIds.includes('nature:garden:2'), false);
+  assert.equal(plan.itemDefinitionIds.includes('nature:garden:2'), true);
+  assert.equal(plan.itemDefinitionIds.includes('nature:garden:3'), false);
   assert.equal(new Set(plan.itemDefinitionIds).size, plan.itemDefinitionIds.length);
   assert.equal(plan.itemDefinitionIds.includes('food:table:6'), false);
 });
@@ -1062,9 +1063,9 @@ test('generator spawn pops from its source, arcs short, then slides into the des
   assert.match(board, /duration: motion\.kind === 'spawn' \? SPAWN_MOTION_DURATION_MS/);
   assert.match(board, /spawnFrame \? arcHeight\.value \* spawnFrame\.arc \+ cellSize \* spawnFrame\.settleY/);
   const spawnEffects = readFileSync('components/katchadeck/games/merge-spawn-effects-layer.tsx', 'utf8');
-  assert.match(board, /<MergeBoardEffectsLayer effects=\{boardEffects\}/);
+  assert.match(board, /<MergeBoardEffectsLayer controller=\{boardEffects\}/);
   assert.match(board, /emitBoardEffect\(settledSprite\.cell, 'spawn-settle'\)/);
-  assert.match(spawnEffects, /MERGE_EFFECT_SLOT_IDS = \[0, 1, 2, 3, 4, 5\]/);
+  assert.match(readFileSync('utils/merge-world/board-effects.ts', 'utf8'), /MERGE_EFFECT_SLOT_IDS = \[0, 1, 2, 3, 4, 5\]/);
   assert.match(spawnEffects, /MERGE_EFFECT_PARTICLES\.map/);
   assert.match(spawnEffects, /<View pointerEvents="none" style=\{StyleSheet\.absoluteFill\}>/);
   assert.doesNotMatch(spawnEffects, /@shopify\/react-native-skia|<Canvas|usePathValue/);
@@ -1432,9 +1433,10 @@ test('Merge coin rewards land on the visible HUD coin and count across the conta
   assert.doesNotMatch(currencyHud, /<Animated\.View[^>]*ref=\{targetRef\}/);
   assert.match(screen, /measureViewInWindow\(coinArtRef\)/);
   assert.match(currencyHud, /ref=\{artTargetRef\} style=\{\[styles.art/);
-  assert.match(screen, /artTargetRef: coinArtRef/);
+  assert.match(screen, /artRef=\{coinArtRef\}/);
+  assert.match(screen, /artTargetRef: artRef/);
   assert.match(screen, /coinTargetSize: \{ width: coinRect.width, height: coinRect.height \}/);
-  assert.match(screen, /pulseNonce: serveFlight \? 0 : coinPulseNonce/);
+  assert.match(screen, /pulseNonce=\{serveFlight \? 0 : coinPulseNonce\}/);
   assert.match(rewardOverlay, /targetSize=\{flight.coinTargetSize\}/);
   assert.match(rewardOverlay, /rewardIconFlightScale\(rise.value, value, REWARD_TOKEN_SIZE, targetSize\)/);
   assert.match(rewardOverlay, /opacity: variant === 'coin' \? rise.value \* \(1 - landed.value\)/);
@@ -1445,7 +1447,8 @@ test('Merge coin rewards land on the visible HUD coin and count across the conta
   assert.doesNotMatch(rewardOverlay, /runOnJS\(onArrive\)\(\{[\s\S]*?mergeRewardContactWindowMs/);
   assert.match(rewardOverlay, /Math\.max\(0, count - 1\) \* \(reduceMotion \? 25 : COIN_STAGGER_MS\)/);
   assert.match(screen, /if \(!coinPayoutStartedRef\.current\)[\s\S]*?setCoinValueAnimationDurationMs\(contactWindowMs\)[\s\S]*?totalAmount/);
-  assert.match(screen, /animateValue: presentedCoins != null[\s\S]*?valueAnimationDurationMs: coinValueAnimationDurationMs/);
+  assert.match(screen, /durationMs=\{coinValueAnimationDurationMs\}/);
+  assert.match(screen, /animateValue: presentedCoins != null[\s\S]*?valueAnimationDurationMs: durationMs/);
   assert.match(currencyHud, /durationMs=\{animateValue \? valueAnimationDurationMs : 0\}[\s\S]*?easing="linear"/);
 });
 
@@ -1595,10 +1598,10 @@ test('Merge FTUE commits before visual settlement and preserves all native anima
   assert.match(sync, /RECEIPT_SYNC_QUIET_MS = 1_500/);
   assert.match(sync, /waitForCriticalInteractionIdle/);
   assert.match(artCache, /workerCount = Math\.min\(1, missing\.length\)/);
-  assert.match(artCache, /await waitForCriticalInteractionIdle\(\)/);
+  assert.match(artCache, /await waitForCriticalInteractionIdle\(cancellation.signal\)/);
   const spawnEffects = readFileSync('components/katchadeck/games/merge-spawn-effects-layer.tsx', 'utf8');
   assert.match(spawnEffects, /MERGE_EFFECT_PARTICLES\.map/);
-  assert.match(spawnEffects, /'spawn-origin' \| 'spawn-settle' \| 'merge'/);
+  assert.match(readFileSync('utils/merge-world/board-effects.ts', 'utf8'), /'spawn-origin' \| 'spawn-settle' \| 'merge'/);
   assert.doesNotMatch(spawnEffects, /@shopify\/react-native-skia|<Canvas/);
   assert.match(board, /DREAM_MIST_PARTICLES\.map/);
 });
@@ -1618,9 +1621,10 @@ test('animated merge sprites retain their full-resolution authored textures', ()
   assert.match(board, /function PersistentGeneratorArt[\s\S]*?allowDownscaling=\{false\}/);
   assert.match(board, /function PersistentMergeItemArt[\s\S]*?allowDownscaling=\{false\}/);
   assert.match(persistentSprite, /const visualScale = useDerivedValue/);
-  assert.match(persistentSprite, /height: renderedSize[\s\S]*?width: renderedSize/);
-  assert.match(persistentSprite, /styles\.spriteArtSurface, artLayoutStyle/);
-  assert.doesNotMatch(persistentSprite, /\{ scale:/);
+  assert.match(persistentSprite, /height: nativeArtSize[\s\S]*?width: nativeArtSize/);
+  assert.match(persistentSprite, /styles\.spriteArtSurface,[\s\S]*?artLayoutStyle/);
+  assert.match(persistentSprite, /scale: visualScale.value \/ MERGE_SPRITE_SURFACE_SCALE/);
+  assert.doesNotMatch(persistentSprite, /height: renderedSize|width: renderedSize/);
   assert.doesNotMatch(persistentSprite, /<MergeMatchHint/);
 });
 
@@ -1767,7 +1771,7 @@ test('Merge provider reconciles story projection after guarded receipt applicati
 
 test('a retained hidden Merge provider receives debug resets before Games is reopened', () => {
   const provider = readFileSync('features/merge-world/merge-world-provider.tsx', 'utf8');
-  const subscriptionStart = provider.indexOf("acquireLifecycleResource('store_subscription', 'merge:world-resets')");
+  const subscriptionStart = provider.indexOf("acquireLifecycleResource('retained_subscription', 'merge:world-resets')");
   const subscriptionEnd = provider.indexOf('const drainPersistence', subscriptionStart);
   assert.ok(subscriptionStart >= 0 && subscriptionEnd > subscriptionStart);
   const subscription = provider.slice(subscriptionStart, subscriptionEnd);

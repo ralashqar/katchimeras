@@ -14,6 +14,7 @@ import {
 } from '@/constants/creature-idle-animation-sources';
 import type { HomeVisualKey } from '@/types/home';
 import type { QuestionnaireImageSource } from '@/utils/companion-questionnaire-presentation';
+import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 
 const IDLE_LOG_PREFIX = '[creature-idle]';
 
@@ -22,7 +23,7 @@ function logIdleDiagnostic(
   event: string,
   details: Record<string, unknown>,
 ) {
-  if (!__DEV__) return;
+  if (!__DEV__ || process.env.EXPO_PUBLIC_CREATURE_IDLE_PERF !== '1') return;
   console[level](`${IDLE_LOG_PREFIX} ${event}`, details);
 }
 
@@ -31,6 +32,7 @@ export function CreatureAnimatedArt({
   allowDownscaling = true,
   fallbackSource,
   forceStatic = false,
+  playbackActive = true,
   onLoad,
   style,
   visualKey,
@@ -42,6 +44,7 @@ export function CreatureAnimatedArt({
    * moving. Animated WebP frames are intentionally smaller and can otherwise
    * be rasterized softly during a camera zoom. */
   forceStatic?: boolean;
+  playbackActive?: boolean;
   onLoad?: () => void;
   style: StyleProp<ImageStyle>;
   visualKey: HomeVisualKey;
@@ -54,8 +57,12 @@ export function CreatureAnimatedArt({
   const [animationReady, setAnimationReady] = useState(false);
   const animationSource = resolveCreatureIdleAnimationSource(visualKey);
   const idleFallbackSource = resolveCreatureIdleFallbackSource(visualKey) ?? fallbackSource;
-  const shouldAnimate = Boolean(animationSource) && !animationFailed && !forceStatic && !reduceMotion && isFocused && appState === 'active';
+  const shouldAnimate = playbackActive && Boolean(animationSource) && !animationFailed && !forceStatic && !reduceMotion && isFocused && appState === 'active';
   const source = animationSource && !animationFailed && !forceStatic && !reduceMotion ? animationSource : idleFallbackSource;
+  useEffect(() => {
+    if (!shouldAnimate || !animationReady) return;
+    return acquireLifecycleResource('animation_loop', `creature-idle:${visualKey}`);
+  }, [animationReady, shouldAnimate, visualKey]);
 
   useEffect(() => {
     if (!animationSource) return;

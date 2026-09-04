@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
+import { Image, type ImageRef } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, StyleSheet, View, type ImageSourcePropType } from 'react-native';
@@ -25,7 +25,8 @@ import Animated, {
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
-import { MergeBoardEffectsLayer, type MergeBoardEffect, type MergeBoardEffectKind } from '@/components/katchadeck/games/merge-spawn-effects-layer';
+import { MergeBoardEffectsLayer } from '@/components/katchadeck/games/merge-spawn-effects-layer';
+import { canReuseSpawnSprites, createMergeBoardEffects } from '@/utils/merge-world/board-effects';
 import { mergeWorldGeneratorArt, mergeWorldItemArt, mossproutRootRewardArt, RESIDENT_CARD_ART } from '@/constants/merge-world-art';
 import { MERGE_CHARACTER_NAMES, MERGE_GENERATORS_BY_ID, MERGE_HYBRID_RECIPES, MERGE_ITEMS_BY_ID, MERGE_WORLD_COLUMNS, MERGE_WORLD_ROWS, MOSSPROUT_ROOTBOUND_GATES_BY_ID } from '@/constants/merge-world-catalog';
 import { COMPANION_DISCOVERIES_BY_ID } from '@/constants/companion-discovery-catalog';
@@ -35,9 +36,11 @@ import { useMergeBoardFrameProbe } from '@/features/merge-world/use-merge-board-
 import { useDisposableTimers } from '@/hooks/use-disposable-timers';
 import { mergeGeneratorArtCacheKey, mergeItemArtCacheKey, useMergeArtCache, type MergeArtCache } from '@/hooks/use-merge-art-cache';
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
+import { beginCriticalInteractionWork } from '@/utils/critical-interaction';
+import { recordMergeRender } from '@/utils/merge-world/performance';
 import type { MergeBoardOccupant, MergeDreamMist, MergeWorldCommand, MergeWorldCommandResult, MergeWorldFailureReason, MergeWorldState } from '@/types/merge-world';
 import { mergeCellFeedbackForFailure, type MergeCellFeedbackTone } from '@/utils/merge-board-feedback';
-import { MERGE_MORPH_DURATION_MS, MERGE_MORPH_REDUCED_MOTION_DURATION_MS, SPAWN_MOTION_DURATION_MS, isMistMergeTransition, mergeMotionPiecewise, mergeSpriteMotionFrame, spawnSpriteMotionFrame, type MergeBoardMotionKind } from '@/utils/merge-board-motion';
+import { MERGE_MORPH_DURATION_MS, MERGE_MORPH_REDUCED_MOTION_DURATION_MS, MERGE_SPRITE_SURFACE_SCALE, SPAWN_MOTION_DURATION_MS, isMistMergeTransition, mergeMotionPiecewise, mergeSpriteMotionFrame, spawnSpriteMotionFrame, type MergeBoardMotionKind } from '@/utils/merge-board-motion';
 import { mergeCellCenter, mergeCellFrame, mergeCellFromPoint, mergeNeighborCellInDirection, type MergeBoardGeometry, type MergeBoardProjection } from '@/utils/merge-world/board-geometry';
 import { MERGE_GENERATORS_UNLIMITED } from '@/utils/merge-world/economy-policy';
 import { mossproutRootConditionCopy, mossproutRootReadyCopy, mossproutRootRewardCopy } from '@/utils/merge-world/merge-board-player-copy';
@@ -192,6 +195,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   hiddenItemInstanceIds?: ReadonlySet<string>;
   layout?: MergeBoardLayout;
 }) {
+  recordMergeRender('board');
   const gap = 0;
   const padding = layout.contentInset ?? (width < 380 ? 5 : 6);
   const border = 0;
@@ -269,16 +273,19 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   const spritesRef = useRef(sprites);
   const motionsRef = useRef(motions);
   const [invalidFeedback, setInvalidFeedback] = useState<{ id: number; cell: number } | null>(null);
-  const [boardEffects, setBoardEffects] = useState<MergeBoardEffect[]>([]);
+  const [boardEffects] = useState(createMergeBoardEffects);
+  const effectsActivity = useSharedValue(0);
   const [cellFeedback, setCellFeedback] = useState<MergeCellFeedback[]>([]);
   const [mistDissipations, setMistDissipations] = useState<DreamMistDissipationRecord[]>([]);
   const operationSequence = useRef(0);
   const motionSequence = useRef(0);
-  const effectSequence = useRef(0);
   const invalidFeedbackSequence = useRef(0);
   const cellFeedbackSequence = useRef(0);
   const mistDissipationSequence = useRef(0);
   const activeOperations = useRef(new Map<number, ActiveOperation>());
+  const operationLeases = useRef(new Map<number, () => void>());
+  const dragLease = useRef<(() => void) | null>(null);
+  const releaseDragLease = useCallback(() => { dragLease.current?.(); dragLease.current = null; }, []);
   const committedStateRef = useRef(state);
   const onSelectRef = useRef(onSelect);
   const onCommandSettledRef = useRef(onCommandSettled);
@@ -299,18 +306,13 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   const mossproutOnboarding = presentation.activeOrders.some((order) => order.id.startsWith('mossprout:chapter-0:'));
   const [baseArtDisplayed, setBaseArtDisplayed] = useState(!showBaseArt);
   const [cellArtReady, setCellArtReady] = useState(false);
-  const artCache = useMergeArtCache(presentation, mossproutOnboarding, () => setCellArtReady(true));
+  const visibleItemDefinitionIds = useMemo(() => sprites.flatMap((sprite) => sprite.occupant.kind === 'item' ? [sprite.occupant.definitionId] : []), [sprites]);
+  const artCache = useMergeArtCache(presentation, mossproutOnboarding, () => setCellArtReady(true), visibleItemDefinitionIds);
   useEffect(() => {
     if (baseArtDisplayed && cellArtReady) onVisualReady?.();
   }, [baseArtDisplayed, cellArtReady, onVisualReady]);
-  useMergeBoardFrameProbe(busy || boardEffects.length > 0, dragPhase);
-
-  const emitBoardEffect = useCallback((cell: number, kind: MergeBoardEffectKind) => {
-    const effect: MergeBoardEffect = { cell, id: ++effectSequence.current, kind };
-    setBoardEffects((current) => [...current.slice(-5), effect]);
-    const duration = reduceMotion ? 220 : kind === 'merge' ? 700 : kind === 'spawn-settle' ? 620 : 520;
-    timers.schedule(() => setBoardEffects((current) => current.filter((entry) => entry.id !== effect.id)), duration);
-  }, [reduceMotion, timers]);
+  useMergeBoardFrameProbe(busy, dragPhase, effectsActivity);
+  const emitBoardEffect = boardEffects.emit;
 
   presentationRef.current = presentation;
   spritesRef.current = sprites;
@@ -365,14 +367,18 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
 
   useEffect(() => {
     const mountedOperations = activeOperations.current;
+    const mountedLeases = operationLeases.current;
     // A retained tab must not carry pending operation bookkeeping into a new
     // GestureDetector tree.
     return () => {
       timers.cancelAll();
       mountedOperations.clear();
+      mountedLeases.forEach((release) => release());
+      mountedLeases.clear();
+      releaseDragLease();
       motionsRef.current = {};
     };
-  }, [timers]);
+  }, [releaseDragLease, timers]);
 
   useLayoutEffect(() => {
     // A retained tab can return with worklet gesture ownership from the prior
@@ -380,6 +386,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     // board animations remain intact and continue reconciling normally.
     activeDragId.value = '';
     activeSourceCell.value = -1;
+    releaseDragLease();
     dragPhase.value = 0;
     dragTranslationX.value = 0;
     dragTranslationY.value = 0;
@@ -387,7 +394,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     gestureFinished.value = true;
     onSelectRef.current(null);
     onInteractionGateCommittedRef.current?.({ interactionKey: interactionSessionKey, sessionId });
-  }, [activeDragId, activeSourceCell, dragPhase, dragTranslationX, dragTranslationY, gestureFinished, hoverCell, interactionSessionKey, sessionId]);
+  }, [activeDragId, activeSourceCell, dragPhase, dragTranslationX, dragTranslationY, gestureFinished, hoverCell, interactionSessionKey, releaseDragLease, sessionId]);
 
   useEffect(() => {
     if (state.revision < committedStateRef.current.revision) return;
@@ -415,19 +422,24 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       committedStateRef.current = operation.finalState;
     }
     activeOperations.current.delete(operationId);
+    operationLeases.current.get(operationId)?.();
+    operationLeases.current.delete(operationId);
     const remainingMotions = Object.fromEntries(Object.entries(motionsRef.current).filter(([, motion]) => motion.operationId !== operationId));
     motionsRef.current = remainingMotions;
     const finalState = committedStateRef.current;
-    const canonicalSprites = spritesFromState(finalState);
-    const canonicalIds = new Set(canonicalSprites.map(spriteId));
-    // A merge temporarily keeps its consumed sprites mounted so they can fade
-    // out. Remove those ghosts as soon as their own operation completes, while
-    // retaining ghosts that still belong to another concurrent animation.
-    const activeGhosts = spritesRef.current.filter((sprite) => {
-      const id = spriteId(sprite);
-      return !canonicalIds.has(id) && remainingMotions[id] !== undefined;
-    });
-    const reconciledSprites = [...canonicalSprites, ...activeGhosts];
+    let reconciledSprites = spritesRef.current;
+    if (!canReuseSpawnSprites(operation.kind, presentationRef.current.board, finalState.board)) {
+      const canonicalSprites = spritesFromState(finalState);
+      const canonicalIds = new Set(canonicalSprites.map(spriteId));
+      // A merge temporarily keeps its consumed sprites mounted so they can fade
+      // out. Remove those ghosts as soon as their own operation completes, while
+      // retaining ghosts that still belong to another concurrent animation.
+      const activeGhosts = spritesRef.current.filter((sprite) => {
+        const id = spriteId(sprite);
+        return !canonicalIds.has(id) && remainingMotions[id] !== undefined;
+      });
+      reconciledSprites = [...canonicalSprites, ...activeGhosts];
+    }
     presentationRef.current = finalState;
     spritesRef.current = reconciledSprites;
     const hasOperations = activeOperations.current.size > 0;
@@ -445,7 +457,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
 
   const completeMotion = useCallback((operationId: number, instanceId: string) => {
     const operation = activeOperations.current.get(operationId);
-    if (!operation) return;
+    if (!operation || !operation.remaining.has(instanceId)) return;
     const completedMotion = motionsRef.current[instanceId];
     if (completedMotion?.kind === 'spawn') {
       const settledSprite = spritesRef.current.find((entry) => spriteId(entry) === instanceId);
@@ -479,6 +491,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     settledRevision?: number | null;
   }) => {
     const operationId = ++operationSequence.current;
+    operationLeases.current.set(operationId, beginCriticalInteractionWork());
     const boundMotions = Object.fromEntries(Object.entries(nextMotions).map(([instanceId, motion]) => [instanceId, {
       ...motion,
       operationId,
@@ -493,7 +506,8 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     const combinedMotions = { ...motionsRef.current, ...boundMotions };
     motionsRef.current = combinedMotions;
     dispatchVisual({ type: 'begin', motions: combinedMotions, presentation: nextState, sprites: nextSprites });
-  }, [occupancyDefinitions, occupancyIds]);
+    if (!Object.keys(boundMotions).length) finishOperationIfReady(operationId);
+  }, [finishOperationIfReady, occupancyDefinitions, occupancyIds]);
 
   const returnSpriteHome = useCallback((sprite: SpriteRecord, dx: number, dy: number, invalid?: number) => {
     if (invalid != null) {
@@ -666,6 +680,8 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   launchGeneratorRef.current = launchGenerator;
 
   const pickSprite = useCallback((_instanceId: string) => {
+    dragLease.current?.();
+    dragLease.current = beginCriticalInteractionWork();
     if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, []);
 
@@ -725,9 +741,15 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   boardDropRef.current = dropFromBoard;
   boardTapRef.current = tapFromBoard;
   boardCancelRef.current = cancelFromBoard;
-  const emitBoardDrop = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number, intendedTargetCell: number | null) => boardDropRef.current(instanceId, worldX, worldY, epoch, intendedTargetCell), []);
-  const emitBoardTap = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number) => boardTapRef.current(instanceId, worldX, worldY, epoch), []);
-  const emitBoardCancel = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number) => boardCancelRef.current(instanceId, worldX, worldY, epoch), []);
+  const emitBoardDrop = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number, intendedTargetCell: number | null) => {
+    try { boardDropRef.current(instanceId, worldX, worldY, epoch, intendedTargetCell); } finally { releaseDragLease(); }
+  }, [releaseDragLease]);
+  const emitBoardTap = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number) => {
+    try { boardTapRef.current(instanceId, worldX, worldY, epoch); } finally { releaseDragLease(); }
+  }, [releaseDragLease]);
+  const emitBoardCancel = useCallback((instanceId: string, worldX: number, worldY: number, epoch: number) => {
+    try { boardCancelRef.current(instanceId, worldX, worldY, epoch); } finally { releaseDragLease(); }
+  }, [releaseDragLease]);
   const tapEmptyCell = useCallback((cell: number) => {
     const boardCell = presentationRef.current.board[cell];
     if (boardCell?.mist?.kind === 'rootbound_echo') {
@@ -839,16 +861,25 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     const timeout = setTimeout(() => setMatchHintActive(true), 2800);
     return () => clearTimeout(timeout);
   }, [matchingCellsKey, reduceMotion, selectedCell, selectedDefinitionId, selectedHintTarget]);
-  const matchHintForCell = useCallback((cell: number) => {
-    if (!matchHintActive || selectedCell == null) return null;
-    const target = cell === selectedCell ? selectedHintTarget : matchingCellSet.has(cell) ? selectedCell : null;
-    if (target == null) return null;
-    const from = mergeCellCenter(geometry, cell);
-    const to = mergeCellCenter(geometry, target);
-    const distance = Math.max(1, Math.hypot(to.x - from.x, to.y - from.y));
-    const strength = Math.min(2.25, cellSize * 0.045);
-    return { x: (to.x - from.x) / distance * strength, y: (to.y - from.y) / distance * strength };
-  }, [cellSize, geometry, matchHintActive, matchingCellSet, selectedCell, selectedHintTarget]);
+  const matchHints = useMemo(() => {
+    const hints = new Map<number, { x: number; y: number }>();
+    const resolveHint = (cell: number) => {
+      if (!matchHintActive || selectedCell == null) return null;
+      const target = cell === selectedCell ? selectedHintTarget : matchingCellSet.has(cell) ? selectedCell : null;
+      if (target == null) return null;
+      const from = mergeCellCenter(geometry, cell);
+      const to = mergeCellCenter(geometry, target);
+      const distance = Math.max(1, Math.hypot(to.x - from.x, to.y - from.y));
+      const strength = Math.min(2.25, cellSize * 0.045);
+      return { x: (to.x - from.x) / distance * strength, y: (to.y - from.y) / distance * strength };
+    };
+    for (const cell of visibleCellSet) {
+      const hint = resolveHint(cell);
+      if (hint) hints.set(cell, hint);
+    }
+    return hints;
+  }, [cellSize, geometry, matchHintActive, matchingCellSet, selectedCell, selectedHintTarget, visibleCellSet]);
+  const matchHintForCell = useCallback((cell: number) => matchHints.get(cell) ?? null, [matchHints]);
 
   const boardGesture = useMemo(() => Gesture.Pan()
     .enabled(entranceInteractive)
@@ -1102,7 +1133,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       <HoverCellOverlay geometry={geometry} hoverCell={hoverCell} />
     </View>
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-      <MergeBoardEffectsLayer effects={boardEffects} geometry={geometry} reduceMotion={reduceMotion} size={cellSize} />
+      <MergeBoardEffectsLayer controller={boardEffects} activity={effectsActivity} geometry={geometry} reduceMotion={reduceMotion} size={cellSize} />
       {sprites.filter((sprite) => visibleCellSet.has(sprite.cell) && !hiddenItemInstanceIds?.has(spriteId(sprite))).map((sprite) => {
         const frame = cellFrames[sprite.cell];
         const id = spriteId(sprite);
@@ -1123,7 +1154,9 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
           key={id}
           motion={motions[id]}
           matchHint={matchHint}
-          artCache={artCache}
+          cachedSource={sprite.occupant.kind === 'item'
+            ? artCache.get(mergeItemArtCacheKey(sprite.occupant.definitionId))
+            : artCache.get(mergeGeneratorArtCacheKey(sprite.occupant.generatorId, mossproutOnboarding))}
           generatorLevel={sprite.occupant.kind === 'generator' ? presentation.generators[sprite.occupant.generatorId]?.level ?? 1 : 1}
           mossproutOnboarding={mossproutOnboarding}
           occupant={sprite.occupant}
@@ -1407,7 +1440,7 @@ function MergeMatchHint({ active, children, offsetX, offsetY }: { active: boolea
   return <Animated.View style={[styles.matchHint, style]}>{children}</Animated.View>;
 }
 
-const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, baseY, cellSize, activeDragId, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, entranceDelay, generatorLevel, grabX, grabY, matchHint, motion, artCache, mossproutOnboarding, projection, projectionGridHeight, projectionInset, reduceMotion, onComplete, occupant }: {
+const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, baseY, cellSize, activeDragId, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, entranceDelay, generatorLevel, grabX, grabY, matchHint, motion, cachedSource, mossproutOnboarding, projection, projectionGridHeight, projectionInset, reduceMotion, onComplete, occupant }: {
   instanceId: string;
   baseX: number;
   baseY: number;
@@ -1423,7 +1456,7 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   grabY: SharedValue<number>;
   matchHint: { x: number; y: number } | null;
   motion?: SpriteMotion;
-  artCache: MergeArtCache;
+  cachedSource?: ImageRef;
   mossproutOnboarding: boolean;
   projection?: MergeBoardProjection;
   projectionGridHeight: number;
@@ -1432,6 +1465,7 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   onComplete: (operationId: number, instanceId: string) => void;
   occupant: MergeBoardOccupant;
 }) {
+  recordMergeRender('sprite');
   const x = useSharedValue(baseX);
   const y = useSharedValue(baseY);
   const targetX = useSharedValue(baseX);
@@ -1591,8 +1625,7 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
     cancelAnimation(y);
   }, [entranceProgress, matchHintProgress, progress, scale, spriteOpacity, x, y]);
 
-  // Resize the native image view for scale animation instead of transforming
-  // a cell-sized compositor texture. The resting image remains true 1x.
+  // Keep enough native pixels for the peak scale without per-frame layout.
   const visualScale = useDerivedValue(() => {
     const p = progress.value;
     const moving = animating.value === 1;
@@ -1618,15 +1651,10 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
       * (1 + matchHintProgress.value * 0.055);
   }, [cellSize, projection, projectionGridHeight, projectionInset, reduceMotion]);
 
-  const artLayoutStyle = useAnimatedStyle(() => {
-    const renderedSize = artBaseSize * visualScale.value;
-    return {
-      height: renderedSize,
-      left: (cellSize - renderedSize) / 2,
-      top: (cellSize - renderedSize) / 2,
-      width: renderedSize,
-    };
-  }, [artBaseSize, cellSize]);
+  const nativeArtSize = artBaseSize * MERGE_SPRITE_SURFACE_SCALE;
+  const artLayoutStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: visualScale.value / MERGE_SPRITE_SURFACE_SCALE }],
+  }));
 
   const animatedStyle = useAnimatedStyle(() => {
     const p = progress.value;
@@ -1663,23 +1691,23 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   }, [activeDragId, activeMotionKind, animating, arcHeight, cellSize, dragPhase, dragTranslationX, dragTranslationY, entranceProgress, grabX, grabY, instanceId, matchHintOffsetX, matchHintOffsetY, matchHintProgress, projection, reduceMotion, spriteOpacity, targetX, targetY, visualScale]);
 
   return <Animated.View pointerEvents="none" style={[styles.sprite, { height: cellSize, left: 0, top: 0, width: cellSize }, animatedStyle]}>
-    <Animated.View pointerEvents="none" style={[styles.spriteArtSurface, artLayoutStyle]}>
+    <Animated.View pointerEvents="none" style={[styles.spriteArtSurface, { height: nativeArtSize, width: nativeArtSize, left: (cellSize - nativeArtSize) / 2, top: (cellSize - nativeArtSize) / 2 }, artLayoutStyle]}>
       {occupant.kind === 'generator'
-        ? <PersistentGeneratorArt artCache={artCache} fill generatorId={occupant.generatorId} level={generatorLevel} mossproutOnboarding={mossproutOnboarding} size={artBaseSize} />
-        : <PersistentMergeItemArt artCache={artCache} definitionId={occupant.definitionId} fill size={artBaseSize} />}
+        ? <PersistentGeneratorArt cachedSource={cachedSource} fill generatorId={occupant.generatorId} level={generatorLevel} mossproutOnboarding={mossproutOnboarding} size={nativeArtSize} />
+        : <PersistentMergeItemArt cachedSource={cachedSource} definitionId={occupant.definitionId} fill size={nativeArtSize} />}
     </Animated.View>
   </Animated.View>;
 });
 
-function PersistentGeneratorArt({ artCache, fill = false, generatorId, level, mossproutOnboarding, size }: { artCache: MergeArtCache; fill?: boolean; generatorId: string; level: number; mossproutOnboarding: boolean; size: number }) {
+function PersistentGeneratorArt({ cachedSource, fill = false, generatorId, level, mossproutOnboarding, size }: { cachedSource?: ImageRef; fill?: boolean; generatorId: string; level: number; mossproutOnboarding: boolean; size: number }) {
   const art = mergeWorldGeneratorArt(generatorId, { mossproutOnboarding, level });
   const usesProgressionArt = (generatorId === 'wild-garden' && level > 1) || generatorId === 'memory-nursery';
-  const source = usesProgressionArt ? art : artCache.get(mergeGeneratorArtCacheKey(generatorId, mossproutOnboarding)) ?? art;
+  const source = usesProgressionArt ? art : cachedSource ?? art;
   return <View style={[styles.generatorSprite, fill ? StyleSheet.absoluteFillObject : { height: size, width: size }]}>
     <GeneratorSparkles size={size} />
     {source ? <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory" contentFit="contain" recyclingKey={`merge-generator-${generatorId}`} source={source} style={styles.generatorArt} transition={0} /> : null}
-    <View style={styles.generatorBolt}>
-      <IconSymbol color="#FFD45F" name="bolt.fill" size={13} />
+    <View style={[styles.generatorBolt, { height: 20 * MERGE_SPRITE_SURFACE_SCALE, width: 20 * MERGE_SPRITE_SURFACE_SCALE, bottom: MERGE_SPRITE_SURFACE_SCALE, right: MERGE_SPRITE_SURFACE_SCALE, borderWidth: MERGE_SPRITE_SURFACE_SCALE }]}>
+      <IconSymbol color="#FFD45F" name="bolt.fill" size={13 * MERGE_SPRITE_SURFACE_SCALE} />
     </View>
   </View>;
 }
@@ -1856,11 +1884,11 @@ function mergeCellFromPointWorklet(x: number, y: number, cellSize: number, cellH
   return cellIndices?.[visualCell] ?? visualCell;
 }
 
-export function PersistentMergeItemArt({ artCache, desaturateOpacity = 0, definitionId, fill = false, size }: { artCache?: MergeArtCache; desaturateOpacity?: number; definitionId: string; fill?: boolean; size: number }) {
+export function PersistentMergeItemArt({ artCache, cachedSource, desaturateOpacity = 0, definitionId, fill = false, size }: { artCache?: MergeArtCache; cachedSource?: ImageRef; desaturateOpacity?: number; definitionId: string; fill?: boolean; size: number }) {
   const definition = MERGE_ITEMS_BY_ID.get(definitionId);
   if (!definition) return null;
   const authoredArt = mergeWorldItemArt(definitionId);
-  const source = artCache?.get(mergeItemArtCacheKey(definitionId)) ?? authoredArt;
+  const source = cachedSource ?? artCache?.get(mergeItemArtCacheKey(definitionId)) ?? authoredArt;
   if (source) return <View style={[styles.familyArt, fill ? StyleSheet.absoluteFillObject : { height: size, width: size }]}>
     <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory" contentFit="contain" recyclingKey={definitionId} source={source} style={StyleSheet.absoluteFillObject} transition={0} />
     {desaturateOpacity > 0 ? <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory" contentFit="contain" recyclingKey={`${definitionId}-dream-desaturate`} source={source} style={[StyleSheet.absoluteFillObject, { opacity: desaturateOpacity }]} tintColor="#A3A2AA" transition={0} /> : null}

@@ -159,10 +159,13 @@ function nthDefinitionCell(state: MergeWorldState, definitionId: string, occurre
   return cells[occurrence] ?? null;
 }
 
+const OPEN_GATE = { kind: 'open' } as const;
+const LOCKED_GATE = { kind: 'locked' } as const;
+
 export function mergeFtueBoardGate(step: FtueStepDefinition | null, state: MergeWorldState): MergeBoardInteractionGate {
   const policy = step?.surface === 'merge' ? step.interaction : null;
-  if (!policy || policy.mode === 'none') return { kind: 'open' };
-  if (policy.mode === 'blocked') return { kind: 'locked' };
+  if (!policy || policy.mode === 'none') return OPEN_GATE;
+  if (policy.mode === 'blocked') return LOCKED_GATE;
   if (policy.allowed.kind === 'generator_tap') {
     const cell = resolveFtueBoardCell(state, policy.allowed.target);
     if (cell == null || policy.allowed.target.kind !== 'board_generator') return { kind: 'locked' };
@@ -176,8 +179,8 @@ export function mergeFtueBoardGate(step: FtueStepDefinition | null, state: Merge
 
 export function mergeFtueRailGate(step: FtueStepDefinition | null, state?: MergeWorldState): MergeRailInteractionGate {
   const policy = step?.surface === 'merge' ? step.interaction : null;
-  if (!policy || policy.mode === 'none') return { kind: 'open' };
-  if (policy.mode === 'blocked') return { kind: 'locked' };
+  if (!policy || policy.mode === 'none') return OPEN_GATE;
+  if (policy.mode === 'blocked') return LOCKED_GATE;
   if (policy.allowed.kind === 'chat_note_tap' && policy.allowed.target.kind === 'tray_chat_note') {
     return { kind: 'chat_note', noteId: policy.allowed.target.noteId };
   }

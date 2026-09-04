@@ -19,7 +19,17 @@ export function criticalInteractionWorkActive(): boolean {
   return activeCount > 0;
 }
 
-export function waitForCriticalInteractionIdle(): Promise<void> {
-  if (activeCount === 0) return Promise.resolve();
-  return new Promise((resolve) => idleWaiters.add(resolve));
+export async function waitForCriticalInteractionIdle(signal?: AbortSignal): Promise<void> {
+  while (activeCount > 0 && !signal?.aborted) {
+    await new Promise<void>((resolve) => {
+      const done = () => {
+        idleWaiters.delete(done);
+        signal?.removeEventListener('abort', done);
+        resolve();
+      };
+      idleWaiters.add(done);
+      signal?.addEventListener('abort', done, { once: true });
+      if (signal?.aborted) done();
+    });
+  }
 }

@@ -13,7 +13,10 @@ import {
   vec,
 } from '@shopify/react-native-skia';
 import { Fragment, memo, type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, AppState, LayoutChangeEvent, Pressable, StyleSheet, Text, View, type ImageSourcePropType, type View as ViewType } from 'react-native';
+import { AccessibilityInfo, AppState, LayoutChangeEvent, PixelRatio, Pressable, StyleSheet, Text, View, type ImageSourcePropType, type View as ViewType } from 'react-native';
+import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
+import { useExitRetention } from '@/hooks/use-exit-retention';
+import { worldTileImageLod } from '@/utils/world-image-resolution';
 import { GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
@@ -409,6 +412,12 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   discoveredEggTargetRef,
 }: Props) {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const [settledImageScale, setSettledImageScale] = useState(initialCameraSnapshot?.scale ?? 1.25);
+  useEffect(() => {
+    const release = acquireLifecycleResource('world_canvas', 'haven:canvas');
+    scheduleForegroundLifecycleAudit('world');
+    return release;
+  }, []);
   const [assetRevision, setAssetRevision] = useState(0);
   const [upgradePhase, setUpgradePhase] = useState<HavenUpgradePresentationPhase>('armed');
   const [settlingUpgrade, setSettlingUpgrade] = useState<{
@@ -763,6 +772,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     scene,
     viewport,
   });
+  useEffect(() => {
+    if (!camera.isMoving) setSettledImageScale(camera.snapshot.scale);
+  }, [camera.isMoving, camera.snapshot.scale]);
   const handleNatureIslandPress = useCallback((
     islandId: MossproutNatureIslandId,
     frame: { height: number; left: number; top: number; width: number },
@@ -1383,12 +1395,16 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               // surfaces below. A second camera-scaled copy here would soften
               // when the Garden is focused and can briefly double the reveal.
               if (layer.id.startsWith('plant:')) return null;
-              const source = kingdomHexTileSourceForLod(layer, sceneTileImageLod);
-              const overlaySource = kingdomHexTileOverlaySourceForLod(layer, sceneTileImageLod);
+              // Authored focus/reveals retain full art before the camera moves.
+              // Free-pan LOD changes only from the last settled snapshot.
+              const layerLod = focusedMossproutWorld && !storyCameraInputLocked && !tutorialCamera && !interactionResidentId && !discoveredEggInteraction && !upgradePresentation && !discoveryRevealFamilyId && !settlingUpgrade
+                ? worldTileImageLod(layer.frame.width, settledImageScale, PixelRatio.get()) : sceneTileImageLod;
+              const source = kingdomHexTileSourceForLod(layer, layerLod);
+              const overlaySource = kingdomHexTileOverlaySourceForLod(layer, layerLod);
               const fallbackSource = layer.fallbackSource
                 ? kingdomHexTileSourceForLod(
                     { source: layer.fallbackSource, sources: layer.fallbackSources },
-                    sceneTileImageLod
+                    layerLod
                   )
                 : null;
               const upgradeOwnsLayer = Boolean(
@@ -2418,6 +2434,7 @@ const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
   const nativeHeight = frame.height * WORLD_INTERACTION_CREATURE_NATIVE_SURFACE_SCALE;
   const glowSize = nativeWidth * 0.84;
   const meditationSource = resolveCreatureMeditationArtSource(creature.visualKey);
+  const showMeditation = useExitRetention(Boolean(meditationSource && meditating), reduceMotion ? 0 : 520);
 
   useEffect(() => {
     if (rewardPulseKey <= handledRewardPulseKeyRef.current) return;
@@ -2518,7 +2535,7 @@ const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
               rewardGlowStyle,
             ]}
           />
-          {meditationSource ? (
+          {showMeditation ? (
             <Animated.View
               style={[
                 styles.worldMeditationAura,
@@ -2545,11 +2562,12 @@ const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
               allowDownscaling={false}
               fallbackSource={source ?? resolveCreatureArtSource(creature.visualKey)}
               forceStatic={cameraMoving}
+              playbackActive={!meditating}
               style={StyleSheet.absoluteFill}
               visualKey={creature.visualKey}
             />
           </Animated.View>
-          {meditationSource ? (
+          {showMeditation ? (
             <Animated.View style={[StyleSheet.absoluteFill, meditationCreatureStyle]}>
               <Image
                 accessibilityIgnoresInvertColors
@@ -2799,6 +2817,7 @@ const ResidentCreature = memo(function ResidentCreature({
   const meditationSource = creature
     ? resolveCreatureMeditationArtSource(creature.visualKey)
     : null;
+  const showMeditation = useExitRetention(Boolean(meditationSource && meditating), reduceMotion ? 0 : 520);
 
   useEffect(() => {
     if (stableWorldPresentation) {
@@ -2881,7 +2900,7 @@ const ResidentCreature = memo(function ResidentCreature({
         onPress={handlePress}
         style={StyleSheet.absoluteFill}>
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, animatedStyle]}>
-          {meditationSource ? (
+          {showMeditation ? (
             <Animated.View style={[styles.residentMeditationAura, meditationAuraStyle]}>
               <RotatingRadialSunburst
                 baseOpacity={0.58}
@@ -2900,6 +2919,7 @@ const ResidentCreature = memo(function ResidentCreature({
             {creature && animated ? (
               <CreatureAnimatedArt
                 accessibilityLabel={`${creature.name} animated`}
+                playbackActive={!meditating}
                 fallbackSource={resolveCreatureArtSource(creature.visualKey)}
                 onLoad={markReady}
                 style={StyleSheet.absoluteFill}
@@ -2907,7 +2927,7 @@ const ResidentCreature = memo(function ResidentCreature({
               />
             ) : source ? <SeamlessWorldImage source={source} priority="normal" onReady={markReady} onFailure={markReady} /> : null}
           </Animated.View>
-          {meditationSource ? (
+          {showMeditation ? (
             <Animated.View style={[StyleSheet.absoluteFill, meditationCreatureStyle]}>
               <Image
                 accessibilityIgnoresInvertColors
