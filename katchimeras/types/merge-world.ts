@@ -470,7 +470,7 @@ export type StoryWorldMutationReceipt = {
 export type MergeWorldState = {
   stepplingEgg?: import('@/features/onboarding/steppling-egg-policy').StepplingEggProgress;
   worldUnlocks?: Record<string, { unlockedAt: number; paid: number; destination: MergeCharacterId; transferredAt: number | null; hatchedAt: number | null }>;
-  glowDiscoveryLesson?: { preparedAt: number; servedOrderIds: string[]; spawnedAt?: number; guidedOrderIndex?: 0 | 1 };
+  glowDiscoveryLesson?: { preparedAt: number; servedOrderIds: string[]; spawnedAt?: number; guidedOrderIndex?: 0 | 1; layoutVersion?: 2 };
   stepplingGardenLesson?: { preparedAt: number; servedAt?: number };
   version: 22;
   /** The first personal Merge World is owned by Mossprout. */

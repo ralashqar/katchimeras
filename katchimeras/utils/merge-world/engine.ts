@@ -333,7 +333,7 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
       return next === current ? unchanged(current) : changed(touch(next, command.now));
     }
     case 'ensureCompanionDailyGarden': {
-      const next = ensureCompanionDailyGarden(current, command.familyId, command.now);
+      const next = ensureProceduralOrders(ensureCompanionDailyGarden(current, command.familyId, command.now), command.now);
       return next === current ? unchanged(current) : changed(touch(next, command.now));
     }
     case 'reconcileJourneyMeditation': {
@@ -1992,7 +1992,7 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
   if (order.storyArcId === DAILY_GARDEN_ARC) {
     const next = completeDailyGardenOrder({ ...state, board, coins: state.coins + order.reward.coins, completedOrderCount: state.completedOrderCount + 1, activeOrders: state.activeOrders.filter((item) => item.id !== orderId) }, order, now);
     const bonus = next.coins - state.coins > order.reward.coins;
-    return { ...changed(touch(next, now), bonus ? `Today’s garden complete! +${order.reward.coins} Glow + ${DAILY_GARDEN_BONUS} bonus Glow.` : `+${order.reward.coins} Glow`), servedOrderId: order.id };
+    return { ...changed(touch(ensureProceduralOrders(next, now), now), bonus ? `Today’s garden complete! +${order.reward.coins} Glow + ${DAILY_GARDEN_BONUS} bonus Glow.` : `+${order.reward.coins} Glow`), servedOrderId: order.id };
   }
   if (orderId.startsWith('journey-cycle:')) return { ...changed(touch({
     ...state, board, coins: state.coins + order.reward.coins, activeOrders: state.activeOrders.filter((item) => item.id !== orderId),
@@ -3330,10 +3330,14 @@ function ensureProceduralOrders(state: MergeWorldState, now: number): MergeWorld
   // Chapter 0 is still teaching the authored loop. The repeatable economy
   // begins after the first non-Mossprout companion completes their introduction.
   const unlocked = state.companionDiscovery.records.some((record) => record.characterId !== 'mossprout' && record.firstOrderCompletedAt != null)
+    || stepplingShoeServed(state)
+    || Object.values(state.companionDailyGarden ?? {}).some((batch) => Boolean(batch?.bonusReceiptId))
     || Boolean(state.stepplingEgg?.hatchedAt && state.arrivals.some((arrival) => arrival.generatorId === 'journey-locker' && arrival.claimedAt != null));
   if (!unlocked) return state;
+  // Rehydrate the same batches displayed by Tend garden, including older saves
+  // whose daily requests were removed by story reconciliation.
+  for (const familyId of ['mossprout', 'steppling'] as const) state = ensureCompanionDailyGarden(state, familyId, now);
   const procedural = state.activeOrders.filter((order) => !order.storyArcId);
-  if (procedural.length >= 3) return state;
   const existingKeys = new Set(procedural.map(templateKeyForOrder));
   const recent = new Set(state.recentOrderKeys);
   const eligible = MERGE_REPEATABLE_ORDER_TEMPLATES.filter((template) => {
@@ -3357,9 +3361,17 @@ function ensureProceduralOrders(state: MergeWorldState, now: number): MergeWorld
     return proceduralOrderRank(left.key, state.completedOrderCount + state.haven.nextProceduralOrder)
       - proceduralOrderRank(right.key, state.completedOrderCount + state.haven.nextProceduralOrder);
   });
-  const count = Math.min(3 - procedural.length, ranked.length);
+  const represented = new Set(procedural.map((order) => order.characterId));
+  const guaranteed = ranked.filter((template) => {
+    if (represented.has(template.characterId)) return false;
+    represented.add(template.characterId);
+    return true;
+  });
+  const selected = [...guaranteed, ...ranked.filter((template) => !guaranteed.includes(template))]
+    .slice(0, Math.max(guaranteed.length, 3 - procedural.length));
+  const count = selected.length;
   if (count < 1) return state;
-  const orders = ranked.slice(0, count).map((template, index): MergeOrder => ({
+  const orders = selected.map((template, index): MergeOrder => ({
     id: `merge-order:${state.haven.nextProceduralOrder + index}:${template.key}`,
     characterId: template.characterId,
     title: template.title,

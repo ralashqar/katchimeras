@@ -34,14 +34,14 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
     scale: frame.width * MARKER_TILE_WIDTH_RATIO / MARKER_SIZE * cameraScale.value * pulse.value,
   }] }));
   return <Animated.View pointerEvents="box-none" style={[styles.position, projection]}>
-    <Animated.View style={motion}>
+    <Animated.View collapsable={false} style={motion}>
       <Pressable ref={target} collapsable={false} accessibilityRole="button" accessibilityLabel={`${offer.action} ${offer.name}, ${offer.cost} Glow`}
         accessibilityHint={offer.affordable ? 'Opens upgrade details' : `${offer.missingGlow} more Glow needed. Opens upgrade details.`}
         disabled={moving} onPress={() => onPress(offer)} style={({ pressed }) => [styles.bubble, pressed && styles.pressed]}>
         <Image source={offer.action === 'Clear mist' ? CLEAR_MIST_ART : UPGRADE_ART}
           style={styles.icon} contentFit="contain" transition={0} accessible={false} />
+        <View pointerEvents="none" style={styles.tail} />
       </Pressable>
-      <View pointerEvents="none" style={styles.tail} />
     </Animated.View>
   </Animated.View>;
 }

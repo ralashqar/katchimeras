@@ -5,9 +5,9 @@ import { SHARED_WORLD_TILES } from '@/constants/shared-world';
 import { mergeLessonEvidenceReady } from '@/features/content-flow/merge-lesson-recipe';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
-import { GLOW_ECHO_IDS, GLOW_REPEAT_ECHO_IDS, GLOW_GATEWAY_ID, GLOW_ORDER_IDS, glowGatewayState } from '@/utils/merge-world/glow-discovery-policy';
+import { GLOW_ECHO_IDS, GLOW_GATEWAY_ID, GLOW_ORDER_IDS, glowGatewayState, glowDiscoveryOrder } from '@/utils/merge-world/glow-discovery-policy';
 import type { MergeWorldCommand, MergeWorldState } from '@/types/merge-world';
-import { GLOW_DISCOVERY_FLOW, glowDiscoveryAllowsGarden, glowDiscoveryBoardStep, glowDiscoveryLessonReady, glowDiscoveryRevealLocked, glowDiscoveryLocksCamera, GLOW_LESSON, GLOW_REPEAT_LESSON } from '@/features/onboarding/glow-discovery-flow';
+import { GLOW_DISCOVERY_FLOW, glowDiscoveryAllowsGarden, glowDiscoveryBoardStep, glowDiscoveryLessonReady, glowDiscoveryRevealLocked, glowDiscoveryLocksCamera, GLOW_LESSON } from '@/features/onboarding/glow-discovery-flow';
 import { ftueLocksCamera } from '@/features/onboarding/ftue-camera-policy';
 import { MOSSPROUT_FTUE_SCRIPT } from '@/features/onboarding/mossprout-ftue-script';
 import { worldActionScene } from '@/features/content-flow/story-world-operations';
@@ -117,159 +117,98 @@ function firstBloom() {
   return state;
 }
 
-test('Glow teaches a repeatable loop, survives every reload, and stops at an unhatched shared-world Egg', () => {
-  let state = firstBloom();
-  state = apply(state, { type: 'prepareGlowDiscoveryLesson', now: NOW });
-  const beforePrepare = state;
+test('one Glow request starts with two Seeds, survives reloads, and pays for mist', () => {
+  let state = apply(firstBloom(), { type: 'prepareGlowDiscoveryLesson', now: NOW });
+  assert.equal(state.activeOrders.filter((order) => order.storyArcId === 'mossprout:glow-discovery').length, 1);
+  assert.equal(state.activeOrders.some((order) => order.id === GLOW_ORDER_IDS[0]), false);
+  const order = state.activeOrders.find((order) => order.id === GLOW_ORDER_IDS[1])!;
+  assert.deepEqual(order.requirements, [{ definitionId: 'nature:garden:5', quantity: 1 }]);
+  assert.equal(order.reward.coins, 40);
+  assert.equal(state.board.some((cell) => cell.mist?.kind === 'echo' && cell.mist.definitionId === 'nature:garden:1'), false);
   assert.equal(reduceMergeWorld(state, { type: 'prepareGlowDiscoveryLesson', now: NOW }).changed, false);
-  const spawn = { type: 'tapGenerator', generatorId: 'wild-garden', spendEnergy: false, seed: 'glow:1', now: NOW } as const;
-  const spawnStep = glowDiscoveryBoardStep('lesson.spawn');
-  assert.ok(spawnStep);
-  assert.equal(mergeFtueAllowsCommand(spawnStep, state, spawn), true);
-  assert.equal(mergeFtueAllowsCommand(spawnStep, state, { ...spawn, generatorId: 'wrong-generator' }), false);
-  state = apply(state, spawn);
-  for (const [index, echoId] of GLOW_ECHO_IDS.entries()) {
-    const from = cells(state, index + 1)[0];
-    const to = state.board.findIndex((cell) => cell.mist?.kind === 'echo' && cell.mist.id === echoId);
-    const command = { type: 'move', from, to, now: NOW } as const;
-    const step = glowDiscoveryBoardStep(index === 0 ? 'lesson.seed' : 'lesson.sprout');
-    assert.ok(step);
-    assert.equal(mergeFtueAllowsCommand(step, state, command), true);
-    assert.equal(mergeFtueAllowsCommand(step, state, { ...command, from: to, to: from }), false);
-    state = apply(state, command);
-    assert.equal(state.board[to].locked, false);
+  const spawn = { type: 'tapGenerator', generatorId: 'wild-garden', spendEnergy: false, seed: 'single', now: NOW } as const;
+  for (let count = 0; count < 2; count++) {
+    const step = glowDiscoveryBoardStep('lesson.single.spawn', state)!;
+    assert.equal(mergeFtueAllowsCommand(step, state, spawn), true);
+    state = apply(state, spawn);
+    assert.equal(cells(state, 1).length, count + 1);
+    assert.equal(glowDiscoveryLessonReady('lesson.single.spawn', state), count === 1);
   }
-  state = apply(state, { type: 'serveOrder', orderId: GLOW_ORDER_IDS[0], now: NOW });
-  assert.equal(state.coins, 20);
-  assert.ok(state.activeOrders.some((order) => order.id === GLOW_ORDER_IDS[1]));
-  assert.equal(reduceMergeWorld(state, { type: 'serveOrder', orderId: GLOW_ORDER_IDS[0], now: NOW }).changed, false);
-  state = apply(state, { type: 'prepareGlowDiscoveryLesson', now: NOW });
-  assert.equal(state.glowDiscoveryLesson?.spawnedAt, undefined);
-  assert.equal(reduceMergeWorld(state, { type: 'prepareGlowDiscoveryLesson', now: NOW }).changed, false);
-  assert.equal(state.activeOrders.find((order) => order.id === GLOW_ORDER_IDS[1])?.requirements[0].definitionId, 'nature:garden:6');
-  // Every tap, higher-tier locked match, and Serve has an exclusive cue after reload.
-  for (const beat of GLOW_REPEAT_LESSON) {
-    state = reload(state);
-    assert.equal(glowDiscoveryLessonReady(beat.id, state), false, beat.id);
+  for (const beat of GLOW_LESSON.slice(1)) {
     const step = glowDiscoveryBoardStep(beat.id, state)!;
-    assert.ok(step.cue, beat.id);
-    assert.ok(step.spotlight, beat.id);
-    assert.equal(step.interaction?.mode, 'exclusive', beat.id);
-    const command: MergeWorldCommand = beat.kind === 'spawn' ? spawn : beat.kind === 'match'
-      ? { type: 'move', from: cells(state, Number(beat.definitionId.split(':').at(-1)))[0], to: state.board.findIndex((cell) => cell.mist?.kind === 'echo' && cell.mist.id === beat.echoId), now: NOW }
-      : { type: 'serveOrder', orderId: GLOW_ORDER_IDS[1], now: NOW };
+    assert.ok(step.cue);
+    assert.ok(step.spotlight);
+    const command: MergeWorldCommand = beat.kind === 'pair'
+      ? { type: 'move', from: cells(state, 1)[0], to: cells(state, 1)[1], now: NOW }
+      : beat.kind === 'match'
+        ? { type: 'move', from: cells(state, Number(beat.definitionId.split(':').at(-1)))[0], to: state.board.findIndex((cell) => cell.mist?.kind === 'echo' && cell.mist.id === beat.echoId), now: NOW }
+        : { type: 'serveOrder', orderId: GLOW_ORDER_IDS[1], now: NOW };
     assert.equal(mergeFtueAllowsCommand(step, state, command), true, beat.id);
-    assert.equal(mergeFtueAllowsCommand(step, state, { type: 'tapGenerator', generatorId: 'wrong-generator', spendEnergy: false, seed: 'wrong', now: NOW }), false);
     state = apply(state, command);
     assert.equal(glowDiscoveryLessonReady(beat.id, state), true, beat.id);
-    // Render the old journal node against the newly committed board, before its
-    // asynchronous completion event: immediately project the next authored target.
-    const betweenSteps = glowDiscoveryBoardStep(beat.id, state)!;
-    const nextBeat = GLOW_REPEAT_LESSON[GLOW_REPEAT_LESSON.indexOf(beat) + 1];
-    if (nextBeat) {
-      assert.deepEqual(betweenSteps, glowDiscoveryBoardStep(nextBeat.id, state), beat.id);
-      assert.ok(betweenSteps.spotlight, beat.id);
-      assert.ok(betweenSteps.cue, beat.id);
-      // Even a journal several steps behind cannot rewind the presentation.
-      assert.deepEqual(glowDiscoveryBoardStep('lesson.repeat.spawn', state), betweenSteps);
-    } else {
-      assert.equal(betweenSteps.interaction?.mode, 'blocked', beat.id);
-    }
-    assert.equal(mergeFtueAllowsCommand(betweenSteps, state, spawn), false, beat.id);
-    if (beat.kind === 'match') assert.ok(!state.board.some((cell) => cell.mist?.kind === 'echo' && cell.mist.id === beat.echoId));
+    if (beat.kind !== 'serve') assert.deepEqual(glowDiscoveryBoardStep('lesson.single.spawn', state), glowDiscoveryBoardStep(beat.id, state), 'stale journal projects the current target');
   }
-  assert.ok(!state.board.some((cell) => cell.mist?.kind === 'echo' && ['mossprout-plant-echo', 'mossprout-flower-echo', 'mossprout-garden-echo'].includes(cell.mist.id)));
-  assert.ok(state.coins >= 40);
+  assert.deepEqual(state.glowDiscoveryLesson?.servedOrderIds, [GLOW_ORDER_IDS[1]]);
+  assert.ok(state.coins >= 40, 'the single request covers the unlock, even without bonus Glow');
   const earnedGlow = state.coins;
-  assert.deepEqual(state.glowDiscoveryLesson?.servedOrderIds, [...GLOW_ORDER_IDS]);
   assert.equal(state.generators['wild-garden'].forcedDropDefinitionId, null);
-  assert.equal(state.haven.movementEgg.status, beforePrepare.haven.movementEgg.status);
-  const purchase = { type: 'unlockWorldTarget', targetId: GLOW_GATEWAY_ID, receiptId: 'test:mist-reveal', now: NOW } as const;
-  const boardBeforePurchase = state.board;
-  const generatorsBeforePurchase = state.generators;
-  state = apply(state, purchase);
+  assert.equal(reduceMergeWorld(state, { type: 'serveOrder', orderId: GLOW_ORDER_IDS[1], now: NOW }).changed, false);
+  const board = state.board;
+  state = apply(state, { type: 'unlockWorldTarget', targetId: GLOW_GATEWAY_ID, receiptId: 'single:unlock', now: NOW });
   assert.equal(state.coins, earnedGlow - 40);
-  assert.equal(reduceMergeWorld(state, purchase).changed, false);
-  assert.equal(state.unlockedCharacters.includes('steppling'), false);
-  assert.equal(state.storyWorldMutationReceipts[0]?.target.kind, 'haven_tile');
-  const receipt = reduceMergeWorld(state, purchase).storyWorldMutationReceipt;
-  assert.equal(receipt?.coinCost, 40);
-  assert.deepEqual(receipt?.target, { kind: 'haven_structure', structureId: 'steppling-home' });
-  assert.equal(state.worldUnlocks?.[GLOW_GATEWAY_ID].transferredAt, null);
+  assert.equal(glowGatewayState(state), 'egg');
+  assert.deepEqual(state.board, board);
   assert.equal(state.worldUnlocks?.[GLOW_GATEWAY_ID].hatchedAt, null);
-  assert.equal(reduceMergeWorld(state, { type: 'hatchWorldEgg', targetId: GLOW_GATEWAY_ID, now: NOW }).changed, false);
-  assert.equal(state.companionDiscovery.records.filter((record) => record.characterId === 'steppling').length, 0);
-  assert.deepEqual(state.board, boardBeforePurchase);
-  assert.deepEqual(state.generators, generatorsBeforePurchase);
+  assert.equal(reduceMergeWorld(state, { type: 'unlockWorldTarget', targetId: GLOW_GATEWAY_ID, receiptId: 'single:unlock', now: NOW }).changed, false);
 });
 
-test('tutorial overrides Shell rewards and repairs missing sources without deleting items', () => {
+test('old unfinished lessons become one request without deleting items or charging Glow', () => {
+  const migrations = GLOW_DISCOVERY_FLOW.migrations as Record<string, string>;
+  for (const id of ['lesson.prepare', 'lesson.spawn', 'lesson.seed', 'lesson.sprout', 'lesson.serve', 'lesson.repeat.prepare', 'lesson.repeat.spawn', ...[1, 2, 3, 4, 5].map((tier) => `lesson.repeat.match-${tier}`), 'lesson.repeat.serve']) {
+    assert.equal(migrations[id], 'lesson.single.prepare', `resume ${id} through the new board setup`);
+  }
+  for (const servedOrderIds of [[], [GLOW_ORDER_IDS[0]]]) {
+    const original = firstBloom();
+    original.glowDiscoveryLesson = { preparedAt: NOW, servedOrderIds, guidedOrderIndex: 1 };
+    original.coins = servedOrderIds.length ? 20 : 0;
+    original.activeOrders = [glowDiscoveryOrder(0, NOW), { ...glowDiscoveryOrder(1, NOW), requirements: [{ definitionId: 'nature:garden:6', quantity: 1 }], reward: { coins: 20, energy: 0, mergeXp: 15, friendshipXp: 0 } }];
+    const occupied = original.board.filter((cell) => cell.occupant).map((cell) => cell.occupant);
+    const upgraded = apply(original, { type: 'prepareGlowDiscoveryLesson', now: NOW });
+    assert.equal(upgraded.coins, original.coins);
+    assert.deepEqual(upgraded.board.filter((cell) => cell.occupant).map((cell) => cell.occupant), occupied);
+    assert.equal(upgraded.activeOrders.length, 1);
+    assert.equal(upgraded.activeOrders[0].id, GLOW_ORDER_IDS[1]);
+    assert.equal(upgraded.activeOrders[0].requirements[0].definitionId, 'nature:garden:5');
+    assert.equal(upgraded.glowDiscoveryLesson?.layoutVersion, 2);
+    assert.equal(reduceMergeWorld(upgraded, { type: 'prepareGlowDiscoveryLesson', now: NOW }).changed, false);
+  }
+  const completed = firstBloom();
+  completed.glowDiscoveryLesson = { preparedAt: NOW, servedOrderIds: [...GLOW_ORDER_IDS] };
+  assert.equal(reduceMergeWorld(completed, { type: 'prepareGlowDiscoveryLesson', now: NOW }).changed, false, 'completed legacy requests are never replayed');
+});
+
+test('a lost Sprout is rebuilt from two Seeds, even with an upgraded generator and Shell opportunity', () => {
   let state = apply(firstBloom(), { type: 'prepareGlowDiscoveryLesson', now: NOW });
-  state.generators['wild-garden'] = { ...state.generators['wild-garden'], forcedDropDefinitionId: null, level: 4 };
+  state.generators['wild-garden'] = { ...state.generators['wild-garden'], level: 4, forcedDropDefinitionId: null };
   state.characterActivityOpportunities = [{ id: 'shell-basket', familyId: 'mossprout', dayId: '2026-09-03', generatorId: 'wild-garden', dropDefinitionIds: ['nature:waterside:1'], usedCount: 0, createdAt: NOW }];
-  state.board.find((cell) => !cell.locked && !cell.mist && !cell.occupant)!.occupant = { kind: 'item', instanceId: 'legacy-wrong-shell', definitionId: 'nature:waterside:1' };
-  state.glowDiscoveryLesson!.spawnedAt = NOW;
-  const spawn = { type: 'tapGenerator', generatorId: 'wild-garden', activityOpportunityId: 'shell-basket', spendEnergy: false, seed: 'recovery', now: NOW } as const;
-  for (const [index, echoId] of GLOW_ECHO_IDS.entries()) {
-    state.board = state.board.map((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === `nature:garden:${index + 1}` ? { ...cell, occupant: null } : cell);
-    state = reload(state);
-    const step = glowDiscoveryBoardStep(index === 0 ? 'lesson.seed' : 'lesson.sprout', state)!;
-    assert.equal(mergeFtueAllowsCommand(step, state, spawn), true);
+  const spawn = { type: 'tapGenerator', generatorId: 'wild-garden', activityOpportunityId: 'shell-basket', spendEnergy: false, seed: 'repair', now: NOW } as const;
+  for (let count = 0; count < 2; count++) {
+    assert.equal(mergeFtueAllowsCommand(glowDiscoveryBoardStep('lesson.single.match-2', state)!, state, spawn), true);
     state = apply(state, spawn);
-    assert.equal(state.characterActivityOpportunities[0].usedCount, 0);
-    const from = cells(state, index + 1)[0];
-    assert.notEqual(from, undefined);
-    const to = state.board.findIndex((cell) => cell.mist?.kind === 'echo' && cell.mist.id === echoId);
-    state = apply(state, { type: 'move', from, to, now: NOW });
+    assert.equal(cells(state, 1).length, count + 1);
+    assert.equal(cells(state, 2).length, 0);
   }
-  assert.ok(state.board.some((cell) => cell.occupant?.kind === 'item' && cell.occupant.instanceId === 'legacy-wrong-shell'));
-  state.board = state.board.map((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:3' ? { ...cell, occupant: null } : cell);
-  state = apply(state, { ...spawn, activityOpportunityId: 'stale-opportunity' });
-  assert.equal(cells(state, 3).length, 1);
-  state.glowDiscoveryLesson!.servedOrderIds = [...GLOW_ORDER_IDS];
-  state.generators['wild-garden'].forcedDropDefinitionId = null;
-  state = apply(state, spawn);
-  assert.equal(state.characterActivityOpportunities[0].usedCount, 1);
-  assert.equal(state.board.filter((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:waterside:1').length, 2);
-});
-
-test('old second-request saves upgrade safely and recover every missing higher-tier source', () => {
-  let state = apply(firstBloom(), { type: 'prepareGlowDiscoveryLesson', now: NOW });
-  state.glowDiscoveryLesson = { preparedAt: NOW, spawnedAt: NOW, servedOrderIds: [GLOW_ORDER_IDS[0]] };
-  state.coins = 20;
-  const oldOrder = { ...state.activeOrders.find((order) => order.id === GLOW_ORDER_IDS[0])!, id: GLOW_ORDER_IDS[1] };
-  state.activeOrders = [oldOrder];
-  assert.equal(glowDiscoveryLessonReady('lesson.repeat.match-5', state), false);
-  const originalHigherCells = [3, 4, 5].map((tier) => state.board.findIndex((cell) => cell.mist?.kind === 'echo' && cell.mist.definitionId === `nature:garden:${tier}`));
-  state = apply(state, { type: 'prepareGlowDiscoveryLesson', now: NOW + 1 });
-  assert.equal(state.coins, 20);
-  assert.equal(state.activeOrders.length, 1);
-  assert.equal(state.activeOrders[0].requirements[0].definitionId, 'nature:garden:6');
-  assert.equal(state.glowDiscoveryLesson?.spawnedAt, undefined);
-  for (const [index, slot] of originalHigherCells.entries()) assert.equal(state.board[slot].mist?.kind === 'echo' && state.board[slot].mist.id, GLOW_REPEAT_ECHO_IDS[index + 2]);
-  const spawn = { type: 'tapGenerator', generatorId: 'wild-garden', activityOpportunityId: 'old-shell-reward', spendEnergy: false, seed: 'higher-recovery', now: NOW + 2 } as const;
-  for (const [index, echoId] of GLOW_REPEAT_ECHO_IDS.entries()) {
-    const tier = index + 1;
-    state.board = state.board.map((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === `nature:garden:${tier}` ? { ...cell, occupant: null } : cell);
-    state = reload(state);
-    const step = glowDiscoveryBoardStep(`lesson.repeat.match-${tier}`, state)!;
-    assert.equal(mergeFtueAllowsCommand(step, state, spawn), true);
-    state = apply(state, spawn);
-    state = apply(state, { type: 'move', from: cells(state, tier)[0], to: state.board.findIndex((cell) => cell.mist?.kind === 'echo' && cell.mist.id === echoId), now: NOW + 3 });
-  }
-  state.board = state.board.map((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:6' ? { ...cell, occupant: null } : cell);
-  assert.equal(mergeFtueAllowsCommand(glowDiscoveryBoardStep('lesson.repeat.serve', state)!, state, spawn), true);
-  state = apply(state, spawn);
-  assert.equal(cells(state, 6).length, 1);
-  state = apply(state, { type: 'serveOrder', orderId: GLOW_ORDER_IDS[1], now: NOW + 4 });
-  assert.ok(state.coins >= 40);
-  assert.equal(reduceMergeWorld(state, { type: 'prepareGlowDiscoveryLesson', now: NOW + 5 }).changed, false);
+  const merge = { type: 'move', from: cells(state, 1)[0], to: cells(state, 1)[1], now: NOW } as const;
+  assert.equal(mergeFtueAllowsCommand(glowDiscoveryBoardStep('lesson.single.match-2', state)!, state, merge), true);
+  state = apply(state, merge);
+  assert.equal(cells(state, 2).length, 1);
+  assert.equal(state.characterActivityOpportunities[0].usedCount, 0);
 });
 
 test('a full recovery board leaves input available to make room', () => {
   const state = apply(firstBloom(), { type: 'prepareGlowDiscoveryLesson', now: NOW });
   state.board = state.board.map((cell, index) => cell.locked || cell.occupant || cell.mist ? cell : { ...cell, occupant: { kind: 'item', instanceId: `shell:${index}`, definitionId: 'nature:waterside:1' } });
-  const step = glowDiscoveryBoardStep('lesson.seed', state)!;
+  const step = glowDiscoveryBoardStep('lesson.single.seeds', state)!;
   assert.equal(step.interaction, undefined);
   assert.match(step.guide!.body!, /Merge or store/);
 });
@@ -376,10 +315,11 @@ test('discovery story has valid capabilities and resumes through each persisted 
   assert.ok(!visited.includes('gateway.return'), 'camera completion cannot gate the upgrade');
   assert.ok(visited.indexOf('gateway.offer') < visited.indexOf('gateway.buy'));
   assert.ok(!visited.some((id) => id.startsWith('steppling.') || id === 'world.choose' || id === 'egg.transfer'));
-  assert.ok(visited.includes('lesson.repeat.prepare'));
-  assert.ok(visited.includes('lesson.repeat.match-5'));
-  assert.ok(visited.indexOf('lesson.repeat.serve') < visited.indexOf('gateway.ready'));
-  assert.equal(GLOW_DISCOVERY_FLOW.migrations?.['lesson.repeat'], 'lesson.repeat.prepare');
+  assert.ok(visited.includes('lesson.single.prepare'));
+  assert.ok(visited.includes('lesson.single.match-4'));
+  assert.ok(!visited.includes('lesson.repeat.serve'));
+  assert.ok(visited.indexOf('lesson.single.serve') < visited.indexOf('gateway.ready'));
+  assert.equal((GLOW_DISCOVERY_FLOW.migrations as Record<string, string>)['lesson.repeat'], 'lesson.single.prepare');
 });
 
 test('a prior unlock carries into the shared reveal for free, even with a different receipt', () => {
@@ -396,7 +336,7 @@ test('a prior unlock carries into the shared reveal for free, even with a differ
 test('lesson evidence requires a real spawn and validates authored references', () => {
   assert.equal(mergeLessonEvidenceReady(GLOW_LESSON[0], { spawned: false, remainingEchoIds: [...GLOW_ECHO_IDS], servedOrderIds: [] }), false);
   assert.equal(mergeLessonEvidenceReady(GLOW_LESSON[0], { spawned: true, remainingEchoIds: [...GLOW_ECHO_IDS], servedOrderIds: [] }), true);
-  const invalid = { ...GLOW_DISCOVERY_FLOW, nodes: GLOW_DISCOVERY_FLOW.nodes.map((node) => node.id === 'lesson.spawn' ? { ...node, payload: { beat: { ...GLOW_LESSON[0], generatorId: 'missing-generator' } } } : node) };
+  const invalid = { ...GLOW_DISCOVERY_FLOW, nodes: GLOW_DISCOVERY_FLOW.nodes.map((node) => node.id === 'lesson.single.spawn' ? { ...node, payload: { beat: { ...GLOW_LESSON[0], generatorId: 'missing-generator' } } } : node) };
   assert.ok(validateContentFlowDefinition(invalid).some((issue) => issue.message.includes('known generator')));
   for (const old of ['egg.transfer', 'world.choose', 'steppling.hatch', 'steppling.claim'] as const) assert.equal(GLOW_DISCOVERY_FLOW.migrations?.[old], 'gateway.egg');
 });

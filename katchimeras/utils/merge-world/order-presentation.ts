@@ -20,7 +20,7 @@ export function prioritizedVisibleMergeOrders(
   const focusedCharacterId = context.focusOrderId
     ? state.activeOrders.find((order) => order.id === context.focusOrderId)?.characterId ?? null
     : null;
-  const characterId = context.characterId ?? focusedCharacterId ?? state.favouriteCharacterId;
+  const characterId = focusedCharacterId ?? context.characterId ?? state.favouriteCharacterId;
   const families = [...new Set(state.activeOrders.map((order) => order.characterId))];
   const familyRank = (order: MergeOrder) => order.characterId === characterId ? -1 : families.indexOf(order.characterId);
   const journeyIds = [...(context.journeyOrderIds ?? [])];
@@ -54,6 +54,12 @@ export function prioritizedVisibleMergeOrders(
       // Tutorials first, then each companion's listed requests, then free play.
       const bucket = (value: number) => value < 3 ? value : value < 6 ? 3 : 6;
       const category = bucket(leftPriority) - bucket(rightPriority);
+      // Tutorials stay global. Otherwise finish the selected companion's queue,
+      // including their repeatable request, before switching to another family.
+      if (leftPriority >= 3 && rightPriority >= 3) {
+        const selectedFamily = Number(right.order.characterId === characterId) - Number(left.order.characterId === characterId);
+        if (selectedFamily) return selectedFamily;
+      }
       if (category) return category;
       // Opening a later preview may choose a companion, never skip their queue.
       const family = familyRank(left.order) - familyRank(right.order);

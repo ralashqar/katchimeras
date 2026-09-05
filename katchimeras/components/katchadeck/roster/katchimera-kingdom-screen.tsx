@@ -833,6 +833,7 @@ export function KatchimeraKingdomScreen({
           pathname: '/katchimera/[creatureId]/activity',
           params: {
             creatureId: 'companion:mossprout',
+            requestCharacterId: familyId,
             source: 'haven-world',
             ...(orderId ? { focusOrderId: orderId } : {}),
           },

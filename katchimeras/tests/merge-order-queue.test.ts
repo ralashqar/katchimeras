@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createInitialMergeWorldState, normalizeMergeWorldState } from '../utils/merge-world/engine';
+import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '../utils/merge-world/engine';
 import { prioritizedVisibleMergeOrders } from '../utils/merge-world/order-presentation';
 import { MERGE_ITEMS_BY_ID, MERGE_REPEATABLE_ORDER_TEMPLATES } from '../constants/merge-world-catalog';
 import type { MergeOrder } from '../types/merge-world';
@@ -32,6 +32,52 @@ test('tutorial request takes precedence over later daily or selected requests', 
   const tutorial = order('mossprout:chapter-0:first-sprout');
   const state = { ...createInitialMergeWorldState(now), activeOrders: [order('repeat'), tutorial] };
   assert.deepEqual(prioritizedVisibleMergeOrders(state, { focusOrderId: 'repeat' }), [tutorial]);
+});
+
+test('Steppling preview selects his queue on the shared Mossprout board, then keeps replenishing', () => {
+  let state = createInitialMergeWorldState(now, ['mossprout', 'steppling']);
+  state = reduceMergeWorld(state, { type: 'featureCharacter', characterId: 'steppling', now }).state;
+  state = reduceMergeWorld(state, { type: 'featureCharacter', characterId: 'mossprout', now }).state;
+  state.stepplingGardenLesson = { preparedAt: now - 1000, servedAt: now };
+  state.unlockedChains = ['nature:garden', 'nature:waterside', 'adventure:trail', 'adventure:travel'];
+  state = normalizeMergeWorldState(state, now);
+  const batch = state.companionDailyGarden!.steppling!;
+  assert.equal(batch.orders.length, 2);
+  // A preview of the second request must still start at the first request.
+  const oldLink = { characterId: 'mossprout', focusOrderId: batch.orders[1].id };
+  assert.equal(prioritizedVisibleMergeOrders(state, oldLink)[0]?.id, batch.orders[0].id);
+  const context = { characterId: 'steppling', focusOrderId: batch.orders[1].id };
+  for (let index = 0; index < 5; index++) {
+    const [current] = prioritizedVisibleMergeOrders(state, context);
+    assert.ok(current, `request ${index + 1} exists`);
+    assert.equal(current.characterId, 'steppling');
+    if (index < 2) assert.equal(current.id, batch.orders[index].id);
+    else assert.equal(current.storyArcId, undefined, 'daily requests are followed by repeatable requests');
+    const definitions = current.requirements.flatMap((item) => Array.from({ length: item.quantity }, () => item.definitionId));
+    state = { ...state, board: state.board.map((cell, slot) => ({ ...cell, locked: false, blocker: null, mist: null,
+      occupant: definitions[slot] ? { kind: 'item' as const, definitionId: definitions[slot], instanceId: `serve:${index}:${slot}` } : null })) };
+    const result = reduceMergeWorld(state, { type: 'serveOrder', orderId: current.id, now });
+    assert.equal(result.changed, true, result.message);
+    state = result.state;
+    assert.ok(prioritizedVisibleMergeOrders(state, context).length, 'serving refills immediately, without a reload');
+    state = normalizeMergeWorldState(JSON.parse(JSON.stringify(state)), now);
+  }
+  assert.equal(Object.keys(state.companionDailyGarden!.steppling!.served).length, 2);
+  assert.ok(state.activeOrders.some((item) => item.characterId === 'mossprout' && !item.storyArcId));
+});
+
+test('three existing Mossprout repeatables cannot crowd Steppling out; missing daily requests are repaired', () => {
+  let state = createInitialMergeWorldState(now, ['mossprout', 'steppling']);
+  state = reduceMergeWorld(state, { type: 'featureCharacter', characterId: 'steppling', now }).state;
+  state.stepplingGardenLesson = { preparedAt: now - 1000, servedAt: now };
+  state.unlockedChains = ['nature:garden', 'nature:waterside', 'adventure:trail', 'adventure:travel'];
+  state = normalizeMergeWorldState(state, now);
+  const batch = state.companionDailyGarden!.steppling!;
+  state.activeOrders = [order('repeat:1'), order('repeat:2'), order('repeat:3')];
+  state = normalizeMergeWorldState(state, now);
+  assert.deepEqual(state.companionDailyGarden!.steppling, batch);
+  assert.ok(batch.orders.every((item) => state.activeOrders.some((candidate) => candidate.id === item.id)));
+  assert.ok(state.activeOrders.some((item) => item.characterId === 'steppling' && !item.storyArcId));
 });
 
 test('new repeatable requests require a tier four item or a substantial combination at low Bond', () => {

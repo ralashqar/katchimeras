@@ -8,6 +8,7 @@ export const GLOW_GATEWAY_ID = 'mossprout:overgrown-trail' as const;
 export const GLOW_ORDER_IDS = ['mossprout:glow:plant-1', 'mossprout:glow:plant-2'] as const;
 export const GLOW_ECHO_IDS = ['glow:seed', 'glow:sprout'] as const;
 export const GLOW_REPEAT_ECHO_IDS = ['glow:repeat:seed', 'glow:repeat:sprout', 'glow:repeat:plant', 'glow:repeat:flower', 'glow:repeat:rare-flower'] as const;
+export const GLOW_SINGLE_ECHO_IDS = GLOW_REPEAT_ECHO_IDS.slice(1, 4);
 export const GLOW_GENERATOR_RULE: TutorialGeneratorRule = {
   generatorId: 'wild-garden', defaultDefinitionId: 'nature:garden:1',
   matches: GLOW_ECHO_IDS.map((echoId, index) => ({ echoId, definitionId: `nature:garden:${index + 1}` })),
@@ -15,18 +16,20 @@ export const GLOW_GENERATOR_RULE: TutorialGeneratorRule = {
 };
 export const GLOW_REPEAT_GENERATOR_RULE: TutorialGeneratorRule = {
   generatorId: 'wild-garden', defaultDefinitionId: 'nature:garden:1',
-  matches: GLOW_REPEAT_ECHO_IDS.map((echoId, index) => ({ echoId, definitionId: `nature:garden:${index + 1}` })),
-  orderId: GLOW_ORDER_IDS[1], orderDefinitionId: 'nature:garden:6',
+  matches: GLOW_SINGLE_ECHO_IDS.map((echoId, index) => ({ echoId, definitionId: `nature:garden:${index + 2}` })),
+  orderId: GLOW_ORDER_IDS[1], orderDefinitionId: 'nature:garden:5',
 };
 
-export function glowGeneratorRule(state: MergeWorldState) {
-  return state.glowDiscoveryLesson?.servedOrderIds.includes(GLOW_ORDER_IDS[0]) ? GLOW_REPEAT_GENERATOR_RULE : GLOW_GENERATOR_RULE;
+export function glowGeneratorRule() {
+  return GLOW_REPEAT_GENERATOR_RULE;
 }
 
 export function glowTutorialDrop(state: MergeWorldState, generatorId: string) {
   const lesson = state.glowDiscoveryLesson;
-  if (!lesson || generatorId !== GLOW_GENERATOR_RULE.generatorId || GLOW_ORDER_IDS.every((id) => lesson.servedOrderIds.includes(id))) return null;
-  return tutorialGeneratorDrop(state, glowGeneratorRule(state), lesson.servedOrderIds);
+  if (!lesson || generatorId !== GLOW_GENERATOR_RULE.generatorId || lesson.servedOrderIds.includes(GLOW_ORDER_IDS[1])) return null;
+  // The first Sprout must come from two spawned Seeds, never a direct tier-two drop.
+  if (state.board.some((cell) => cell.mist?.kind === 'echo' && cell.mist.id === GLOW_SINGLE_ECHO_IDS[0])) return 'nature:garden:1';
+  return tutorialGeneratorDrop(state, glowGeneratorRule(), lesson.servedOrderIds);
 }
 export const WORLD_UNLOCK_CATALOG = Object.fromEntries(SHARED_WORLD_PURCHASES.map((tile) => [tile.unlockId, { ...tile, destination: tile.companion }]));
 
@@ -40,9 +43,9 @@ export function glowGatewayState(state: MergeWorldState): 'egg' | 'open' | 'lock
 export function glowDiscoveryOrder(index: 0 | 1, now: number): MergeOrder {
   return {
     id: GLOW_ORDER_IDS[index], characterId: 'mossprout', title: index === 0 ? 'A little light' : 'Keep the Garden growing',
-    description: index === 0 ? 'Grow a Plant to earn 20 Glow.' : 'Free the bound pieces and grow a Magical Plant for 20 more Glow.', difficulty: index === 0 ? 'small' : 'medium',
-    requirements: [{ definitionId: index === 0 ? 'nature:garden:3' : 'nature:garden:6', quantity: 1 }],
-    reward: { coins: GLOW.tutorialRequestReward, energy: 0, mergeXp: 15, friendshipXp: 0 },
+    description: index === 0 ? 'Grow a Plant to earn 20 Glow.' : 'Grow a Rare Flower to earn enough Glow to clear the mist.', difficulty: index === 0 ? 'small' : 'medium',
+    requirements: [{ definitionId: index === 0 ? 'nature:garden:3' : 'nature:garden:5', quantity: 1 }],
+    reward: { coins: index === 0 ? GLOW.tutorialRequestReward : GLOW.mistUnlockCost, energy: 0, mergeXp: 15, friendshipXp: 0 },
     createdAt: now, signature: false, purpose: 'normal', storyArcId: 'mossprout:glow-discovery',
   };
 }
@@ -55,28 +58,33 @@ export function reduceGlowDiscovery(state: MergeWorldState, command: Extract<Mer
   const no = (message?: string): MergeWorldCommandResult => ({ state, changed: false, message });
   if (command.type === 'prepareGlowDiscoveryLesson') {
     const lesson = state.glowDiscoveryLesson;
-    const orderIndex = lesson?.servedOrderIds.includes(GLOW_ORDER_IDS[0]) ? 1 : 0;
-    if (lesson && (lesson.servedOrderIds.includes(GLOW_ORDER_IDS[1]) || (lesson.guidedOrderIndex ?? 0) === orderIndex)) return no();
+    const orderIndex = 1;
+    if (lesson && (lesson.servedOrderIds.includes(GLOW_ORDER_IDS[1]) || lesson.layoutVersion === 2)) return no();
     const generator = state.generators['wild-garden'];
     if (!generator) return no('Open the Garden first.');
     const board = state.board.map((cell) => ({ ...cell }));
-    const echoIds = orderIndex === 0 ? GLOW_ECHO_IDS : GLOW_REPEAT_ECHO_IDS;
+    // Retire obsolete seed/extra-tier targets without touching owned items.
+    const retiredIds: readonly string[] = [...GLOW_ECHO_IDS, GLOW_REPEAT_ECHO_IDS[0], GLOW_REPEAT_ECHO_IDS[4], MOSSPROUT_DREAM_ECHOES[0].id];
+    for (const cell of board) {
+      if (!cell.occupant && cell.mist?.kind === 'echo' && retiredIds.includes(cell.mist.id)) cell.mist = { kind: 'dormant' };
+    }
+    const echoIds = GLOW_SINGLE_ECHO_IDS;
     for (const [index, id] of echoIds.entries()) {
       if (board.some((cell) => cell.mist?.kind === 'echo' && cell.mist.id === id)) continue;
-      const existing = board.findIndex((cell) => !cell.occupant && cell.mist?.kind === 'echo' && cell.mist.id === MOSSPROUT_DREAM_ECHOES[index].id);
+      const existing = board.findIndex((cell) => !cell.occupant && cell.mist?.kind === 'echo' && cell.mist.id === MOSSPROUT_DREAM_ECHOES[index + 1].id);
       // Expand nearby mist first: do not re-lock the spaces just freed by request one.
-      const anchor = MOSSPROUT_DREAM_ECHOES[index].cell;
+      const anchor = MOSSPROUT_DREAM_ECHOES[index + 1].cell;
       const distance = (slot: number) => Math.abs(slot % MERGE_WORLD_COLUMNS - anchor % MERGE_WORLD_COLUMNS) + Math.abs(Math.floor(slot / MERGE_WORLD_COLUMNS) - Math.floor(anchor / MERGE_WORLD_COLUMNS));
       const candidates = board.flatMap((cell, slot) => !cell.occupant && (!cell.mist || cell.mist.kind === 'dormant') ? [slot] : []);
       candidates.sort((a, b) => Number(board[b].mist?.kind === 'dormant') - Number(board[a].mist?.kind === 'dormant') || distance(a) - distance(b));
       const slot = existing >= 0 ? existing : candidates[0] ?? -1;
       if (slot < 0) return no('Make room in the Garden, then try again.');
-      board[slot] = { ...board[slot], locked: true, blocker: 'vines', mist: { kind: 'echo', id, definitionId: `nature:garden:${index + 1}`, ownerCharacterId: 'mossprout' } };
+      board[slot] = { ...board[slot], locked: true, blocker: 'vines', mist: { kind: 'echo', id, definitionId: `nature:garden:${index + 2}`, ownerCharacterId: 'mossprout' } };
     }
     return changed(state, {
-      ...state, board, glowDiscoveryLesson: { preparedAt: lesson?.preparedAt ?? command.now, servedOrderIds: lesson?.servedOrderIds ?? [], guidedOrderIndex: orderIndex },
+      ...state, board, glowDiscoveryLesson: { preparedAt: lesson?.preparedAt ?? command.now, servedOrderIds: lesson?.servedOrderIds ?? [], guidedOrderIndex: orderIndex, layoutVersion: 2 },
       generators: { ...state.generators, 'wild-garden': { ...generator, forcedDropDefinitionId: 'nature:garden:1' } },
-      activeOrders: [...state.activeOrders.filter((order) => order.id !== 'mossprout:ftue:help-garden-wake' && order.id !== GLOW_ORDER_IDS[orderIndex]), glowDiscoveryOrder(orderIndex, command.now)],
+      activeOrders: [...state.activeOrders.filter((order) => order.id !== 'mossprout:ftue:help-garden-wake' && !(GLOW_ORDER_IDS as readonly string[]).includes(order.id)), glowDiscoveryOrder(orderIndex, command.now)],
     }, command.now);
   }
   const definition = Object.prototype.hasOwnProperty.call(WORLD_UNLOCK_CATALOG, command.targetId) ? WORLD_UNLOCK_CATALOG[command.targetId] : undefined;
@@ -151,6 +159,7 @@ export function normalizeGlowDiscoveryFields(source: Partial<MergeWorldState>): 
   return { worldUnlocks, glowDiscoveryLesson: lesson && time(lesson.preparedAt) ? {
     preparedAt: lesson.preparedAt, spawnedAt: time(lesson.spawnedAt) ? lesson.spawnedAt : undefined,
     guidedOrderIndex: lesson.guidedOrderIndex === 1 ? 1 : 0,
+    layoutVersion: lesson.layoutVersion === 2 ? 2 : undefined,
     servedOrderIds: Array.isArray(lesson.servedOrderIds) ? [...new Set(lesson.servedOrderIds.filter((id) => (GLOW_ORDER_IDS as readonly string[]).includes(id)))] : [],
   } : undefined };
 }

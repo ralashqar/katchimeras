@@ -5,7 +5,7 @@ import type { ContentFlowRun, ContentFlowSurface } from '@/types/content-flow';
 import type { MergeWorldState } from '@/types/merge-world';
 import type { FtueCameraDirective, FtueStepDefinition } from './ftue-types';
 import { mergeLessonRecipe, mergeLessonBoardStep, mergeLessonEvidenceReady, type MergeLessonBeat } from '@/features/content-flow/merge-lesson-recipe';
-import { GLOW_ORDER_IDS, GLOW_ECHO_IDS, GLOW_REPEAT_ECHO_IDS, glowGeneratorRule } from '@/utils/merge-world/glow-discovery-policy';
+import { GLOW_ORDER_IDS, GLOW_SINGLE_ECHO_IDS, glowGeneratorRule } from '@/utils/merge-world/glow-discovery-policy';
 
 const MIST_CLOSE_UP = { zoom: 1.2, anchorY: 0.46, durationMs: 900 } as const;
 const MIST_UPGRADE_CAMERA: FtueCameraDirective = {
@@ -31,29 +31,22 @@ export function glowDiscoveryResumeWorld(run: Pick<ContentFlowRun, 'status'> | n
 
 export const GLOW_DISCOVERY_RUN_ID = 'story:glow-steppling-v1';
 export const GLOW_LESSON: readonly MergeLessonBeat[] = [
-  { id: 'lesson.spawn', kind: 'spawn', generatorId: 'wild-garden', guide: { eyebrow: 'Light a path', title: 'More Seeds start here.', body: 'Tap the Garden Basket.' } },
-  { id: 'lesson.seed', kind: 'match', definitionId: 'nature:garden:1', echoId: GLOW_ECHO_IDS[0], guide: { eyebrow: 'Free a little space', title: 'Match the bound Seed.', body: 'Drag your Seed onto its identical match to free this space.' } },
-  { id: 'lesson.sprout', kind: 'match', definitionId: 'nature:garden:2', echoId: GLOW_ECHO_IDS[1], guide: { coaching: 'practice', eyebrow: 'Free a little space', title: 'Now match the Sprout.', body: 'Drag your Sprout onto its identical match.' } },
-  { id: 'lesson.serve', kind: 'serve', orderId: GLOW_ORDER_IDS[0], guide: { eyebrow: 'Light a path', title: 'A Plant, and a little Glow.', body: 'Serve this request to earn 20 Glow.' } },
-];
-export const GLOW_REPEAT_LESSON: readonly MergeLessonBeat[] = [
-  { id: 'lesson.repeat.spawn', kind: 'spawn', generatorId: 'wild-garden', guide: { eyebrow: 'Keep gathering Glow', title: 'One more request.', body: 'Let’s grow a Magical Plant. Tap the Garden Basket for a Seed.' } },
-  ...['Seed', 'Sprout', 'Plant', 'Flower', 'Rare Flower'].map((name, index): MergeLessonBeat => ({
-    id: `lesson.repeat.match-${index + 1}`, kind: 'match', definitionId: `nature:garden:${index + 1}`, echoId: GLOW_REPEAT_ECHO_IDS[index],
-    guide: { coaching: 'practice', eyebrow: 'Clear the mist', title: 'Grow a Magical Plant.', body: `Next: match two ${name === 'Rare Flower' ? 'Rare Flowers' : name + 's'}.` },
+  { id: 'lesson.single.spawn', kind: 'spawn', generatorId: 'wild-garden', guide: { eyebrow: 'Light a path', title: 'Start with two Seeds.', body: 'Tap the Garden Basket twice.' } },
+  { id: 'lesson.single.seeds', kind: 'pair', definitionId: 'nature:garden:1', guide: { eyebrow: 'A little growth', title: 'Merge your Seeds.', body: 'Drag one Seed onto the other to grow a Sprout.' } },
+  ...['Sprout', 'Plant', 'Flower'].map((name, index): MergeLessonBeat => ({
+    id: `lesson.single.match-${index + 2}`, kind: 'match', definitionId: `nature:garden:${index + 2}`, echoId: GLOW_SINGLE_ECHO_IDS[index],
+    guide: { coaching: index === 0 ? undefined : 'practice', eyebrow: 'Clear the mist', title: `Match the bound ${name}.`, body: `Drag your ${name} onto its match to free this space and grow the next tier.` },
   })),
-  { id: 'lesson.repeat.serve', kind: 'serve', orderId: GLOW_ORDER_IDS[1], guide: { eyebrow: '20 more Glow', title: 'A Magical Plant!', body: 'Serve this request. Then we can clear the mist.' } },
+  { id: 'lesson.single.serve', kind: 'serve', orderId: GLOW_ORDER_IDS[1], guide: { eyebrow: '40 Glow', title: 'A Rare Flower!', body: 'Serve this request to earn enough Glow to clear the mist.' } },
 ];
-export const GLOW_ALL_LESSON_BEATS = [...GLOW_LESSON, ...GLOW_REPEAT_LESSON];
+export const GLOW_ALL_LESSON_BEATS = GLOW_LESSON;
 export const GLOW_DISCOVERY_FLOW = defineStory({
-  id: 'glow-steppling-discovery', version: 7, entryNodeId: 'gateway.focus', metadata: { kind: 'story' },
+  id: 'glow-steppling-discovery', version: 8, entryNodeId: 'gateway.focus', metadata: { kind: 'story' },
   nodes: [
     storyOperations.focusCamera({ id: 'gateway.focus', target: STEPPLING_STORY_TARGET, ...MIST_CLOSE_UP, next: 'garden.open' }),
-    worldActionScene({ id: 'garden.open', actionId: 'open', next: 'lesson.prepare', view: { kind: 'garden', guide: { eyebrow: 'Light a path', title: 'Back to the Garden.', body: 'Complete requests to earn Glow.' }, actionLabel: 'Open Garden' } }),
-    story.effect({ id: 'lesson.prepare', capability: 'glow.lesson.prepare', next: 'lesson.spawn' }),
-    ...mergeLessonRecipe(GLOW_LESSON, 'lesson.repeat.prepare', 'glow'),
-    story.effect({ id: 'lesson.repeat.prepare', capability: 'glow.lesson.prepare', next: 'lesson.repeat.spawn' }),
-    ...mergeLessonRecipe(GLOW_REPEAT_LESSON, 'gateway.ready', 'glow'),
+    worldActionScene({ id: 'garden.open', actionId: 'open', next: 'lesson.single.prepare', view: { kind: 'garden', guide: { eyebrow: 'Light a path', title: 'Back to the Garden.', body: 'One request will earn the Glow we need.' }, actionLabel: 'Open Garden' } }),
+    story.effect({ id: 'lesson.single.prepare', capability: 'glow.lesson.prepare', next: 'lesson.single.spawn' }),
+    ...mergeLessonRecipe(GLOW_LESSON, 'gateway.ready', 'glow'),
     worldActionScene({ id: 'gateway.ready', actionId: 'return', next: 'gateway.offer', view: { kind: 'return', guide: { eyebrow: 'Light a path', title: 'Enough Glow!', body: 'Let’s clear the mist.' }, actionLabel: 'Back to world' } }),
     // Returning to the world exposes the upgrade immediately. Camera framing
     // stays at the existing close-up and must never gate this actionable checkpoint.
@@ -68,7 +61,7 @@ export const GLOW_DISCOVERY_FLOW = defineStory({
     'gateway.return': 'gateway.offer',
     'gateway.goal': 'garden.open',
     'garden.focus': 'gateway.focus',
-    'lesson.repeat': 'lesson.repeat.prepare',
+    ...Object.fromEntries(['lesson.prepare', 'lesson.spawn', 'lesson.seed', 'lesson.sprout', 'lesson.serve', 'lesson.repeat', 'lesson.repeat.prepare', 'lesson.repeat.spawn', 'lesson.repeat.match-1', 'lesson.repeat.match-2', 'lesson.repeat.match-3', 'lesson.repeat.match-4', 'lesson.repeat.match-5', 'lesson.repeat.serve'].map((id) => [id, 'lesson.single.prepare'])),
     'gateway.purchase': 'gateway.purchase.focus',
     'egg.transfer': 'gateway.egg', 'world.choose': 'gateway.egg',
     'steppling.hatch': 'gateway.egg', 'steppling.claim': 'gateway.egg', 'steppling.welcome': 'complete',
@@ -104,7 +97,7 @@ export function glowDiscoveryScene(nodeId: string) {
 
 /** Feed the established board/finger compositor without owning the legacy FTUE checkpoint. */
 export function glowDiscoveryBoardStep(nodeId: string, state?: MergeWorldState | null): FtueStepDefinition | null {
-  const lesson = nodeId.startsWith('lesson.repeat') ? GLOW_REPEAT_LESSON : GLOW_LESSON;
+  const lesson = GLOW_LESSON;
   let beat = lesson.find((candidate) => candidate.id === nodeId);
   // Project the next actionable authored beat synchronously from board evidence.
   // The durable journal may lag several inputs; it is not an animation clock.
@@ -112,32 +105,38 @@ export function glowDiscoveryBoardStep(nodeId: string, state?: MergeWorldState |
   if (state && beat) {
     const start = lesson.indexOf(beat);
     beat = lesson.slice(start).find((candidate) => !glowDiscoveryLessonReady(candidate.id, state));
-  } else if (state && nodeId.endsWith('.prepare') && state.glowDiscoveryLesson
-    && (nodeId === 'lesson.prepare' || state.glowDiscoveryLesson.guidedOrderIndex === 1)) {
+  } else if (state && nodeId.endsWith('.prepare') && state.glowDiscoveryLesson?.layoutVersion === 2) {
     beat = lesson.find((candidate) => !glowDiscoveryLessonReady(candidate.id, state));
   }
   if (nodeId.startsWith('lesson.') && !beat) return {
     id: `glow.${nodeId}`, surface: 'merge' as const, actions: [], guide: { eyebrow: 'The Garden', title: 'A little magic is growing.', body: 'Getting the next request ready.' },
     interaction: { mode: 'blocked' as const },
   };
-  const rule = state ? glowGeneratorRule(state) : null;
+  const rule = state ? glowGeneratorRule() : null;
+  // If a Sprout was lost, rebuild it from Seeds using the same two guided beats.
+  if (state && beat?.kind === 'match' && beat.definitionId === 'nature:garden:2'
+    && !state.board.some((cell) => !cell.locked && cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:2')) {
+    const seeds = state.board.filter((cell) => !cell.locked && cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:1').length;
+    beat = lesson[seeds >= 2 ? 1 : 0];
+  }
   return mergeLessonBoardStep(beat, 'glow', state ? {
     board: state.board, generatorId: rule!.generatorId,
-    requiredDefinitionId: beat?.kind === 'match' ? beat.definitionId : beat?.kind === 'serve' ? rule!.orderDefinitionId : rule!.defaultDefinitionId,
+    requiredDefinitionId: beat?.kind === 'match' || beat?.kind === 'pair' ? beat.definitionId : beat?.kind === 'serve' ? rule!.orderDefinitionId : rule!.defaultDefinitionId,
   } : undefined);
 }
 
-/** Durable evidence, including the second lesson's setup boundary on older saves. */
+/** Board evidence survives reloads and delayed journal events without replaying input. */
 export function glowDiscoveryLessonReady(nodeId: string, world: MergeWorldState) {
   const lesson = world.glowDiscoveryLesson;
   const beat = GLOW_ALL_LESSON_BEATS.find((candidate) => candidate.id === nodeId);
   if (!lesson || !beat) return false;
-  const repeat = nodeId.startsWith('lesson.repeat.');
-  if (lesson.servedOrderIds.includes(GLOW_ORDER_IDS[repeat ? 1 : 0])) return true;
-  if (repeat && lesson.guidedOrderIndex !== 1) return false;
+  if (lesson.servedOrderIds.includes(GLOW_ORDER_IDS[1])) return true;
+  if (lesson.layoutVersion !== 2) return false;
   const remainingEchoIds = world.board.flatMap((cell) => cell.mist?.kind === 'echo' ? [cell.mist.id] : []);
+  const pairMerged = !remainingEchoIds.includes(GLOW_SINGLE_ECHO_IDS[0]) || world.board.some((cell) => !cell.locked && cell.occupant?.kind === 'item' && /^nature:garden:[2-9]$/.test(cell.occupant.definitionId));
   return mergeLessonEvidenceReady(beat, {
-    spawned: Boolean(lesson.spawnedAt && world.board.some((cell) => !cell.locked && cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:1')) || !remainingEchoIds.includes(repeat ? GLOW_REPEAT_ECHO_IDS[0] : GLOW_ECHO_IDS[0]),
+    spawned: pairMerged || Boolean(lesson.spawnedAt && world.board.filter((cell) => !cell.locked && cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:1').length >= 2),
+    pairMerged,
     remainingEchoIds, servedOrderIds: lesson.servedOrderIds,
   });
 }

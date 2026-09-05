@@ -719,7 +719,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
           target: 'merge',
           navigate: () => router.push({
             pathname: '/katchimera/[creatureId]/activity',
-            params: { creatureId: familyId === 'steppling' ? 'companion:mossprout' : creatureId, ...(orderId ? { focusOrderId: orderId } : {}) },
+            params: { creatureId: familyId === 'steppling' ? 'companion:mossprout' : creatureId, requestCharacterId: familyId, ...(orderId ? { focusOrderId: orderId } : {}) },
           }),
         });
       } : undefined)}

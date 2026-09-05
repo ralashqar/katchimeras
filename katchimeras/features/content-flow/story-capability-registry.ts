@@ -80,6 +80,7 @@ const BUILT_INS: readonly StoryCapabilityDefinition[] = [
     const beat = payload.beat as Record<string, unknown> | undefined;
     if (!beat || typeof beat.id !== 'string' || !beat.guide) return 'Lesson needs an id and guide';
     if (beat.kind === 'spawn') return typeof beat.generatorId === 'string' && MERGE_GENERATORS_BY_ID.has(beat.generatorId) ? null : 'Lesson needs a known generator';
+    if (beat.kind === 'pair') return typeof beat.definitionId === 'string' && MERGE_ITEMS_BY_ID.has(beat.definitionId) ? null : 'Lesson needs a known item';
     if (beat.kind === 'match') return typeof beat.definitionId === 'string' && MERGE_ITEMS_BY_ID.has(beat.definitionId) && typeof beat.echoId === 'string' && beat.echoId ? null : 'Lesson needs a known item and bound target';
     if (beat.kind === 'serve' || beat.kind === 'practice') return typeof beat.orderId === 'string' && beat.orderId ? null : 'Lesson needs a request';
     return 'Unknown lesson kind';
