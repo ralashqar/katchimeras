@@ -76,6 +76,12 @@ case and reducer action instead.
 
 ## Component choices
 
+- World upgrades use `WorldUpgradeSheet` with the shared sheet's `game`
+  appearance: cream surface, gold rim, Fredoka title, a compact art/level row,
+  and the shared currency CTA. Show shortage and failure messages only when
+  needed. Purchases require Glow and the next sequential level; story chapters,
+  friendship, and resident discovery are not purchase prerequisites. Tutorial
+  guidance still controls which action is presented during the guided lesson.
 - All game CTAs use `KatchaButton`, including the companion and legacy Meadow
   action wrappers. `constants/game-cta.ts` owns the gold face, connected rim,
   soft bevel, and uppercase FredokaBold label. Do not copy button styles or
@@ -101,6 +107,12 @@ case and reducer action instead.
   objects. Keep game-specific configuration inside the session.
 
 ## Adding a companion subflow
+
+Single dialogue CTAs sit directly on the scene, without a dark backplate. The first-memory seed reward keeps its shared cream card beside its separate CTA. First-rest FTUE shows only Explore mist until the discovery handoff is accepted.
+
+Panel height changes are immediate during dialogue and navigation. Only completed action rows arm `CompanionStackRemovalContext` before removal; the shared stack then smoothly closes the gap. FTUE one-off cards disable row layout animations. Hero guidance stays above the spotlight and uses the same safe-area top anchor whether currency is visible or not.
+
+Garden displays one active merge request. Introductory requests lead, followed by the companion's Journey and daily batch in preview order, then the saved free-play queue. New free-play requests require a tier-4 item or tier-3 combination; daily batch completion and bonus receipts remain unchanged.
 
 1. Add a discriminated `CompanionRoute` case and reducer actions.
 2. Add pure reducer and back-navigation tests.

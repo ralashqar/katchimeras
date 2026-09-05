@@ -44,6 +44,7 @@ import { KatchimeraCompanionRouteScreen } from '@/components/katchadeck/world/ka
 import { MossproutNatureIslandSheet } from '@/components/katchadeck/world/mossprout-nature-island-sheet';
 import { HavenFtueOverlay } from '@/components/katchadeck/onboarding/haven-ftue-overlay';
 import { FtueGuideCopy } from '@/components/katchadeck/onboarding/ftue-guide-copy';
+import { FTUE_SCENE_LAYERS } from '@/constants/ftue-scene-layers';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { GameCurrencyHud } from '@/components/katchadeck/ui/game-currency-hud';
@@ -61,7 +62,7 @@ import { loadWorldIdentity } from '@/utils/world-identity';
 import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
 import type { MergeCharacterId, MergeWorldState, MossproutGardenPlantSlotId, MossproutNatureIslandId, MossproutNatureIslandLevel, StoryWorldMutationReceipt } from '@/types/merge-world';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
-import { HAVEN_ENVIRONMENTS, havenStoryGateSatisfied, type HavenStage } from '@/constants/haven-catalog';
+import { HAVEN_ENVIRONMENTS, type HavenStage } from '@/constants/haven-catalog';
 import { ensureStoredFirstFtueMemoryPlacement } from '@/utils/merge-world/repository';
 import { mossproutNatureIslandById, mossproutNatureIslandLevelDefinition } from '@/constants/mossprout-nature-islands';
 import { havenHexTileSpec, kingdomHexTileSourceForLod } from '@/utils/world-visuals';
@@ -290,9 +291,15 @@ export function KatchimeraKingdomScreen({
     gateway: stepplingEncounter.open ? 'egg' as const : gatewayState,
     level: mergeWorld.haven.structures.mossproutGarden.level,
     plantableMemories: mergeWorld.haven.plantableMemories,
+    previewMemoryId: ftueStepId === 'world.garden_arrival'
+      ? mergeWorld.haven.plantableMemories.find((plant) => plant.source.kind === 'ftue'
+        && (!activeFtueRunId || plant.source.sourceId === activeFtueRunId) && plant.status !== 'planted')?.id
+      : undefined,
     featureLevels: mergeWorld.haven.structures.mossproutGarden.featureLevels,
   }), [
     gatewayState,
+    ftueStepId,
+    activeFtueRunId,
     stepplingEncounter.open,
     mergeWorld.haven.plantableMemories,
     mergeWorld.haven.structures.mossproutGarden.featureLevels,
@@ -460,7 +467,9 @@ export function KatchimeraKingdomScreen({
   ));
   const ftueEggFeedingCloseupActive = ftueStepId === 'world.egg_intro'
     || Boolean(ftueStepId?.startsWith('egg.'));
-  const gardenWorldGuidanceActive = Boolean(ftueStepId && mossproutFtueShowsWorldGarden(ftueStepId));
+  const gardenWorldGuidanceActive = Boolean(ftueStepId && (
+    mossproutFtueShowsWorldGarden(ftueStepId) || ftueStepId === 'world.first_seed_grew'
+  ));
   const gardenWorldBottomCtaActive = (ftueStepId === 'world.seed_planted' && firstSeedPlacementFailed)
     || ftueStepId === 'world.first_seed_grew';
   const measureRestoreOrigin = useCallback(() => new Promise<{ x: number; y: number }>((resolve) => {
@@ -524,7 +533,7 @@ export function KatchimeraKingdomScreen({
         creatureId: 'steppling', creatureName: 'A new friend', fromStage: receipt.fromLevel as HavenStage,
         toStage: 1, nonce: ++upgradeNonceRef.current,
         palette: { accent: '#FFE28A', glow: '#FFD98C', mist: 'rgba(226,255,213,0.88)', primary: '#4F9F57' },
-        reactionLine: payload.reactionLine ?? 'A new beginning.', showCoins: receipt.coinCost > 0,
+        reactionLine: '', showCoins: receipt.coinCost > 0,
         status: 'playing', storyPresentationKey: work.key, upgradeName: 'Misty clearing', visualTarget: payload.target,
       };
     } else {
@@ -1017,7 +1026,7 @@ export function KatchimeraKingdomScreen({
           />
         </Animated.View>
       ) : null}
-      {!stepplingSurfaceOpen && !upgradePresentation && !activeInteractionResidentId && havenMergeBoardActive && mossproutFtueShowsWorldGarden(ftueStepId) ? (
+      {!stepplingSurfaceOpen && !upgradePresentation && !activeInteractionResidentId && havenMergeBoardActive && mossproutFtueShowsWorldGarden(ftueStepId) && !gardenWorldBottomCtaActive ? (
         <Animated.View
           collapsable={false}
           ref={setGardenClusterNode}
@@ -1159,8 +1168,6 @@ export function KatchimeraKingdomScreen({
           pointerEvents="box-none"
           style={[
             styles.discoveryCalloutLayer,
-            (ftueStepId === 'world.garden_arrival' || ftueStepId === 'world.garden_handoff')
-              && styles.discoveryCalloutLayerAboveSpotlight,
             gardenWorldBottomCtaActive
               ? {
                   bottom: Math.max(insets.bottom, 12) + 22,
@@ -1168,7 +1175,7 @@ export function KatchimeraKingdomScreen({
                   top: insets.top + 18,
                 }
               : gardenWorldGuidanceActive || ftueStepId === 'world.egg_intro'
-              ? { top: insets.top + (ftueGardenUpgradeActive ? 76 : 18) }
+              ? { top: insets.top + 18 }
               : { bottom: Math.max(insets.bottom, 12) + 12 },
           ]}>
           <View collapsable={false} pointerEvents="none" ref={setHavenGuideNode} style={styles.discoveryCallout}>
@@ -1206,14 +1213,13 @@ export function KatchimeraKingdomScreen({
         const next = characterId === 'mossprout' && currentStage >= 1
           ? undefined
           : environment?.stages[currentStage + 1];
-        const storyReady = next ? havenStoryGateSatisfied(mergeWorld, next.storyGate) : false;
         const currentArt = havenHexTileSpec(characterId, currentStage);
         const nextArt = next ? havenHexTileSpec(characterId, next.stage) : null;
         return <KatchaSheet
           footer={<View style={styles.actions}>
             {next ? <View ref={characterId === 'mossprout' ? setRestoreButtonNode : undefined} style={styles.restoreButtonAnchor}>
               <KatchaButton
-                disabled={!storyReady || mergeWorld.coins < next.coinCost || upgrading}
+                disabled={mergeWorld.coins < next.coinCost || upgrading}
                 fullWidth
                 icon="sparkles"
                 label="Restore"
@@ -1237,7 +1243,7 @@ export function KatchimeraKingdomScreen({
                 <ThemedText style={styles.previewLabel} lightColor="#D7E2D1" darkColor="#D7E2D1">CURRENT</ThemedText>
               </View> : null}
               {nextArt ? <View style={styles.previewCell}>
-                <Image blurRadius={storyReady ? 0 : 8} contentFit="contain" source={kingdomHexTileSourceForLod(nextArt, 'medium')} style={[styles.previewImage, !storyReady && styles.previewLocked]} />
+                <Image contentFit="contain" source={kingdomHexTileSourceForLod(nextArt, 'medium')} style={styles.previewImage} />
                 <ThemedText style={styles.previewLabel} lightColor="#D7E2D1" darkColor="#D7E2D1">NEXT</ThemedText>
               </View> : null}
             </View>
@@ -1245,8 +1251,7 @@ export function KatchimeraKingdomScreen({
               <ThemedText style={styles.nextTitle} lightColor="#F8FCFF" darkColor="#F8FCFF">Next: {next.name}</ThemedText>
               <ThemedText style={styles.discoveryHintText} lightColor="#D7E2D1" darkColor="#D7E2D1">{next.narrative}</ThemedText>
               <View style={styles.requirementRow}>
-                <ThemedText style={styles.requirement} lightColor={storyReady ? '#CBEBA5' : '#E8C889'} darkColor={storyReady ? '#CBEBA5' : '#E8C889'}>{storyReady ? '✓ Story ready' : '◌ Story locked'}</ThemedText>
-                <ThemedText style={styles.requirement} lightColor="#FFE19A" darkColor="#FFE19A">Grows through Journey Days</ThemedText>
+                <ThemedText style={styles.requirement} lightColor="#FFE19A" darkColor="#FFE19A">{next.coinCost.toLocaleString()} Glow</ThemedText>
               </View>
             </> : <ThemedText style={styles.nextTitle} lightColor="#FFE19A" darkColor="#FFE19A">Signature Haven complete</ThemedText>}
             {upgradeError ? <ThemedText selectable style={styles.upgradeError} lightColor="#FFD2C8" darkColor="#FFD2C8">{upgradeError}</ThemedText> : null}
@@ -1350,9 +1355,8 @@ const styles = StyleSheet.create({
     left: 16,
     position: 'absolute',
     right: 16,
-    zIndex: 40,
+    zIndex: FTUE_SCENE_LAYERS.hero,
   },
-  discoveryCalloutLayerAboveSpotlight: { zIndex: 90 },
   discoveryCallout: {
     alignItems: 'center',
     alignSelf: 'center',
@@ -1371,7 +1375,6 @@ const styles = StyleSheet.create({
   previewRow: { flexDirection: 'row', gap: 10 },
   previewCell: { alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.18)', borderRadius: 16, flex: 1, overflow: 'hidden', padding: 6 },
   previewImage: { aspectRatio: 1, width: '100%' },
-  previewLocked: { opacity: 0.58 },
   previewLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9, fontWeight: '900', letterSpacing: 1 },
   memoryPlantDetail: { alignItems: 'center', gap: 12, paddingBottom: 8 },
   memoryPlantArt: { height: 210, width: 210 },

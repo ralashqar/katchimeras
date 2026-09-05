@@ -1,3 +1,4 @@
+import { FTUE_SCENE_LAYERS } from '@/constants/ftue-scene-layers';
 import { Image } from 'expo-image';
 import { memo, useEffect, useMemo, useState, type RefObject } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -202,7 +203,7 @@ function measure(view: View | null): Promise<Frame | null> {
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, overflow: 'hidden', zIndex: 80 },
+  overlay: { ...StyleSheet.absoluteFillObject, overflow: 'hidden', zIndex: FTUE_SCENE_LAYERS.spotlight },
   dimMask: {
     backgroundColor: 'transparent',
     borderCurve: 'continuous',

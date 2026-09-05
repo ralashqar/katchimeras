@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { deriveHavenTilePresentation } from '@/utils/haven-tile-presentation';
-import { createInitialMergeWorldState, normalizeMergeWorldState } from '@/utils/merge-world/engine';
+import { createInitialMergeWorldState } from '@/utils/merge-world/engine';
 
 const NOW = Date.UTC(2026, 7, 18, 12);
 
@@ -29,8 +29,8 @@ const derive = (mergeWorld: ReturnType<typeof world>, saving = false) => deriveH
   saving,
 });
 
-test('Haven tile presentation keeps story and Coin progress as separate gates', () => {
-  assert.equal(derive(world(200)).hudState, 'story_locked');
+test('Haven tile presentation depends on Glow rather than story progress', () => {
+  assert.equal(derive(world(200)).hudState, 'affordable');
   const saving = derive(world(80, true), true);
   assert.equal(saving.hudState, 'saving');
   const collecting = derive(world(10, true));

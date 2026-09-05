@@ -6,6 +6,8 @@ import type { WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-
 
 const UPGRADE_ART = require('../../../assets/images/katchimeras/world/ui/upgrade-toy-v1.png');
 const CLEAR_MIST_ART = require('../../../assets/images/katchimeras/world/ui/clear-mist-toy-v1.png');
+const MARKER_SIZE = 68;
+const MARKER_TILE_WIDTH_RATIO = 0.18;
 
 export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY, sceneWidth, sceneHeight, moving, onPress, onTargetChange }: {
   offer: WorldUpgradeOffer; frame: { left: number; top: number; width: number; height: number };
@@ -22,12 +24,15 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
     return () => cancelAnimation(pulse);
   }, [offer.affordable, pulse, reduced]);
   // Center the bubble on the stairs in the bottom-middle of the tile artwork.
-  // Its screen-space layer sits above projected world artwork (plants use 16).
+  // Keep the overlay above plants, but size its entire visual and hit target in
+  // world space so the bubble retains its proportions at every camera zoom.
   const projection = useAnimatedStyle(() => ({ transform: [
     { translateX: sceneWidth / 2 + cameraX.value + (frame.left + frame.width / 2 - sceneWidth / 2) * cameraScale.value - 34 },
     { translateY: sceneHeight / 2 + cameraY.value + (frame.top + frame.height * 0.72 - sceneHeight / 2) * cameraScale.value - 34 },
   ] }));
-  const motion = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
+  const motion = useAnimatedStyle(() => ({ transform: [{
+    scale: frame.width * MARKER_TILE_WIDTH_RATIO / MARKER_SIZE * cameraScale.value * pulse.value,
+  }] }));
   return <Animated.View pointerEvents="box-none" style={[styles.position, projection]}>
     <Animated.View style={motion}>
       <Pressable ref={target} collapsable={false} accessibilityRole="button" accessibilityLabel={`${offer.action} ${offer.name}, ${offer.cost} Glow`}

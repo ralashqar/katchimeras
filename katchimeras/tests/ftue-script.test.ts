@@ -1715,11 +1715,12 @@ test('world Garden stays hidden through Mossprout dialogue and Grow, but returns
       assert.equal(mossproutFtueShowsWorldGarden(step.id), false, step.id);
     }
   }
-  for (const stepId of ['world.garden_arrival', 'world.seed_planted', 'world.garden_handoff', 'world.first_bloom_restore', 'world.first_seed_grew']) {
+  for (const stepId of ['world.garden_arrival', 'world.seed_planted', 'world.garden_handoff', 'world.first_bloom_restore']) {
     assert.equal(mossproutFtueShowsWorldGarden(stepId), true, stepId);
   }
   for (const stepId of [undefined, null, 'complete']) assert.equal(mossproutFtueShowsWorldGarden(stepId), true);
   assert.equal(mossproutFtueShowsWorldGarden('world.egg_intro'), false);
+  assert.equal(mossproutFtueShowsWorldGarden('world.first_seed_grew'), false, 'Continue back to Mossprout owns this step');
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   assert.match(screen, /!stepplingSurfaceOpen && !upgradePresentation && !activeInteractionResidentId && havenMergeBoardActive && mossproutFtueShowsWorldGarden\(ftueStepId\)/);
 });

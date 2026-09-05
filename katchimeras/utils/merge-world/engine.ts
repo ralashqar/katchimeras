@@ -11,6 +11,7 @@ import {
   MERGE_ITEM_CATALOG,
   MERGE_ITEMS_BY_ID,
   MERGE_ORDER_TEMPLATES,
+  MERGE_REPEATABLE_ORDER_TEMPLATES,
   MERGE_CHAIN_IDS,
   MERGE_CHAPTER_LANDMARKS,
   MERGE_CHARACTER_NAMES,
@@ -96,7 +97,7 @@ export function mergeWorldStateForBoard(state: MergeWorldState, boardId: MergeBo
   };
 }
 import { advanceMossproutChapterZero, enforceMossproutChapterZeroDropOverride, isMossproutChapterZeroActive, migrateMossproutGardenMissionOrder } from '@/utils/merge-world/chapter-zero-policy';
-import { havenStageDefinition, havenStoryGateSatisfied, type HavenStage } from '@/constants/haven-catalog';
+import { havenStageDefinition, type HavenStage } from '@/constants/haven-catalog';
 import {
   MOSSPROUT_NATURE_ISLAND_IDS,
   emptyMossproutNatureIslandLevels,
@@ -968,7 +969,6 @@ function upgradeHavenTile(
       storyWorldMutationReceipt: existingReceipt,
     };
   }
-  if (!state.unlockedCharacters.includes(characterId)) return unchanged(state, 'Discover this Katchimera first.');
   if (characterId === 'mossprout' && requestedStage > 1) {
     return unchanged(state, 'Grow Mossprout’s six nature islands to deepen the Haven.');
   }
@@ -1002,7 +1002,6 @@ function upgradeHavenTile(
   if (requestedStage !== currentStage + 1) return unchanged(state, 'Haven environments grow one stage at a time.');
   const definition = havenStageDefinition(characterId, requestedStage);
   if (!definition) return unchanged(state, 'This environment is not ready yet.');
-  if (!havenStoryGateSatisfied(state, definition.storyGate)) return unchanged(state, 'Continue this Katchimera’s story first.');
   const grant = economyMode === 'grant' ? Math.max(0, Math.floor(grantedCoins)) : 0;
   const coinCost = economyMode === 'free' ? 0 : definition.coinCost;
   if (state.coins + grant < coinCost) return unchanged(state, 'Earn a few more Glow through Merge orders.');
@@ -1062,18 +1061,12 @@ function upgradeMossproutNatureIsland(
   }
   const island = mossproutNatureIslandById.get(islandId);
   if (!island) return unchanged(state, 'That part of the garden is not available.');
-  if (!state.unlockedCharacters.includes('mossprout') || (state.haven.tileStages.mossprout ?? 0) < 1) {
-    return unchanged(state, 'Restore Mossprout’s Haven first.');
-  }
   const currentLevel = state.haven.mossproutNatureIslands[islandId] ?? 0;
   if (requestedLevel !== currentLevel + 1 || requestedLevel < 1 || requestedLevel > 4) {
     return unchanged(state, 'Nature islands grow one level at a time.');
   }
   const definition = mossproutNatureIslandLevelDefinition(islandId, requestedLevel);
   if (!definition) return unchanged(state, 'This island cannot grow any further.');
-  if (!havenStoryGateSatisfied(state, definition.storyGate)) {
-    return unchanged(state, 'Continue Mossprout’s story first.');
-  }
   const grant = economyMode === 'grant' ? Math.max(0, Math.floor(grantedCoins)) : 0;
   const coinCost = economyMode === 'free' ? 0 : definition.coinCost;
   if (state.coins + grant < coinCost) {
@@ -2777,7 +2770,9 @@ function mossproutDailyGardenOrder(
   residentSkinIds: readonly KatchimeraSkinId[],
 ): MergeOrder {
   const authored = sequence <= 3;
-  const step = authored ? sequence : ((sequence - 4) % 3) + 1;
+  // Follow-up requests alternate combinations and higher tiers; never restart
+  // the easy introductory request after the daily batch has been served.
+  const step = authored ? sequence : 2 + ((sequence - 4) % 2);
   const recipientSkinId = mossproutResidentForOrder(dayId, sequence, residentSkinIds);
   const resident = mossproutResidentById.get(recipientSkinId) ?? mossproutResidentById.get('mossprout')!;
   const theme = resident.requestThemes[proceduralOrderRank(`${dayId}:${sequence}`, 17) % resident.requestThemes.length];
@@ -2795,7 +2790,7 @@ function mossproutDailyGardenOrder(
         : step === 1
           ? [{ definitionId: `${primary}:${chapterId === 'quiet-patch' ? 2 : chapterId === 'returning-pond' ? 3 : 4}`, quantity: 1 }]
           : step === 2
-            ? [{ definitionId: `${secondary}:${chapterId === 'quiet-patch' ? 2 : 3}`, quantity: 1 }, { definitionId: `${primary}:${chapterId === 'quiet-patch' ? 2 : 3}`, quantity: 1 }]
+            ? [{ definitionId: `${secondary}:${authored && chapterId === 'quiet-patch' ? 2 : 3}`, quantity: 1 }, { definitionId: `${primary}:${authored && chapterId === 'quiet-patch' ? 2 : 3}`, quantity: 1 }]
             : [{ definitionId: `${primary}:${chapterId === 'quiet-patch' ? 4 : 5}`, quantity: 1 }, { definitionId: `${secondary}:${chapterId === 'quiet-patch' ? 3 : 4}`, quantity: 1 }];
   const difficulty = step === 1 ? 'small' as const : step === 2 ? 'medium' as const : 'major' as const;
   const copy = resident.requestCopy[proceduralOrderRank(`${dayId}:${sequence}`, 29) % resident.requestCopy.length]!;
@@ -3341,7 +3336,7 @@ function ensureProceduralOrders(state: MergeWorldState, now: number): MergeWorld
   if (procedural.length >= 3) return state;
   const existingKeys = new Set(procedural.map(templateKeyForOrder));
   const recent = new Set(state.recentOrderKeys);
-  const eligible = MERGE_ORDER_TEMPLATES.filter((template) => {
+  const eligible = MERGE_REPEATABLE_ORDER_TEMPLATES.filter((template) => {
     if (template.signature || template.chapterId || !state.unlockedCharacters.includes(template.characterId)) return false;
     if (existingKeys.has(template.key)) return false;
     const friendship = state.characterProgress[template.characterId]?.friendshipLevel ?? 1;
@@ -4059,7 +4054,7 @@ export function mergeWorldCatalogIssues(): string[] {
   for (const item of MERGE_ITEM_CATALOG) {
     if (item.nextItemId && !MERGE_ITEMS_BY_ID.has(item.nextItemId)) issues.push(`${item.id} has missing next item ${item.nextItemId}`);
   }
-  for (const template of MERGE_ORDER_TEMPLATES) {
+  for (const template of [...MERGE_ORDER_TEMPLATES, ...MERGE_REPEATABLE_ORDER_TEMPLATES]) {
     if (!Number.isFinite(template.reward.coins) || template.reward.coins <= 0) issues.push(`${template.key} must award Glow`);
     for (const requirement of template.requirements) {
       if (!MERGE_ITEMS_BY_ID.has(requirement.definitionId)) issues.push(`${template.key} requests missing ${requirement.definitionId}`);

@@ -28,7 +28,7 @@ import type { ContentFlowRun } from '@/types/content-flow';
 import { type CompanionMergeRequest } from './companion-merge-request-tray';
 import { CompanionSceneCards } from './companion-scene-cards';
 import { companionSceneModel } from '@/game/katchimeras/companion-scene-model';
-import { CompanionMeditationStage } from './companion-meditation-stage';
+import { CompanionMeditationStage, journeyForeshadowLine } from './companion-meditation-stage';
 
 function JourneyText(props: ComponentProps<typeof ThemedText>) {
   return <ThemedText {...props} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink} />;
@@ -206,7 +206,7 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
     {!onNarration && !submenuOpen ? <JourneyText style={styles.prompt}>{narration}</JourneyText> : null}
     {initialized && !error ? <CompanionSceneCards
       hideJourney={submenuOpen || routineSubmenuOpen} model={model} onJourney={onStory} disabled={busy}
-      timer={pending && !ready && rest ? <CompanionMeditationStage title={model.journey.eyebrow} availableAt={rest.availableAt} startedAt={rest.startedAt} settledMs={rest.settledMs} now={now} companionName={familyId === 'steppling' ? 'Steppling' : 'Mossprout'} /> : undefined}>
+      timer={pending && !ready && rest ? <CompanionMeditationStage onPress={() => setReaction(journeyForeshadowLine(familyId))} title={model.journey.eyebrow} availableAt={rest.availableAt} startedAt={rest.startedAt} settledMs={rest.settledMs} now={now} companionName={familyId === 'steppling' ? 'Steppling' : 'Mossprout'} /> : undefined}>
       {familyId === 'steppling' ? <StepplingActions onReaction={setReaction} onOpenConversation={onOpenConversation}
         externalGesture={externalGesture} onBondRewardRequest={onBondRewardRequest} onSubmenuChange={setSubmenuOpen}
         onOpenMerge={onOpenMerge} requests={requests} /> : routineActions}

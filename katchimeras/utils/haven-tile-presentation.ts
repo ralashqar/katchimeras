@@ -1,4 +1,4 @@
-import { HAVEN_ENVIRONMENTS, havenStoryGateSatisfied, type HavenEnvironmentStage, type HavenStage } from '@/constants/haven-catalog';
+import { HAVEN_ENVIRONMENTS, type HavenEnvironmentStage, type HavenStage } from '@/constants/haven-catalog';
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 
 export type HavenTileHudState = 'story_locked' | 'saving' | 'upgrade_ready' | 'affordable' | 'complete';
@@ -28,7 +28,7 @@ export function deriveHavenTilePresentation(input: {
   const environment = HAVEN_ENVIRONMENTS[characterId];
   const currentStage = (mergeWorld.haven.tileStages[characterId] ?? 0) as HavenStage;
   const next = environment?.stages[currentStage + 1] ?? null;
-  const storyReady = next ? havenStoryGateSatisfied(mergeWorld, next.storyGate) : false;
+  const storyReady = Boolean(next);
   const coinCost = next?.coinCost ?? 0;
   const affordable = Boolean(next && mergeWorld.coins >= coinCost);
   const coinProgress = next && coinCost > 0 ? Math.min(1, Math.max(0, mergeWorld.coins / coinCost)) : 1;
@@ -36,9 +36,7 @@ export function deriveHavenTilePresentation(input: {
     ? 'complete'
     : saving
       ? 'saving'
-      : !storyReady
-        ? 'story_locked'
-        : affordable
+      : affordable
           ? 'affordable'
           : 'upgrade_ready';
 
@@ -60,7 +58,6 @@ export function deriveHavenTilePresentation(input: {
 export function havenTileHudAccessibilityLabel(presentation: HavenTilePresentation): string {
   const level = `${presentation.creatureName}, Haven level ${presentation.currentStage}`;
   if (!presentation.next) return `${level}. Signature Haven complete.`;
-  if (!presentation.storyReady) return `${level}. ${presentation.next.name} is locked. Continue the story to unlock it.`;
   if (!presentation.affordable) {
     return `${level}. ${presentation.next.name} is ready. ${presentation.coins} of ${presentation.coinCost} Glow.`;
   }

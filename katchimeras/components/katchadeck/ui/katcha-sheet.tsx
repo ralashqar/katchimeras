@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -29,6 +30,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaSurfacePalette, KatchaUI, type KatchaSurface } from '@/constants/katcha-ui';
 import { Meadow } from '@/constants/meadow-theme';
+import { GameUI } from '@/constants/game-ui';
 
 export type KatchaSheetSize = 'compact' | 'tall' | 'full';
 export type KatchaSheetCloseReason = 'button' | 'backdrop' | 'swipe' | 'hardwareBack';
@@ -43,6 +45,7 @@ export type KatchaSheetHeader = {
 };
 
 export type KatchaSheetProps = {
+  appearance?: 'standard' | 'game';
   children: ReactNode;
   footer?: ReactNode;
   overlay?: ReactNode;
@@ -64,6 +67,7 @@ export type KatchaSheetProps = {
 };
 
 export function KatchaSheet({
+  appearance = 'standard',
   children,
   entranceMotion = 'sheet',
   footer,
@@ -183,7 +187,13 @@ export function KatchaSheet({
               paddingHorizontal: size === 'full' ? 0 : 16,
               paddingTop: size === 'full' ? 0 : 10,
             },
+            appearance === 'game' && !transparent && styles.gamePanel,
           ]}>
+        {appearance === 'game' && !transparent ? <LinearGradient
+          pointerEvents="none"
+          colors={[GameUI.surface.cream.top, GameUI.surface.cream.bottom]}
+          style={[StyleSheet.absoluteFill, { borderRadius: KatchaUI.radius.sheet - 2 }]}
+        /> : null}
         {size !== 'full' ? (
           <GestureDetector gesture={dismissPan}>
             <Pressable accessible={false} onPress={() => close('backdrop')} style={StyleSheet.absoluteFill} />
@@ -198,7 +208,7 @@ export function KatchaSheet({
             size === 'full' && !fullBleed && { paddingBottom: insets.bottom + 10, paddingHorizontal: Math.max(16, insets.left, insets.right), paddingTop: insets.top + 8 },
             size === 'full' && fullBleed && styles.fullBleedContent,
           ]}>
-          {header ? <KatchaSheetHeading header={header} surface={surface} /> : null}
+          {header ? <KatchaSheetHeading header={header} surface={surface} game={appearance === 'game'} /> : null}
           <View style={[styles.body, expanded && styles.expanded]}>{body}</View>
           {footer ? <View style={[styles.footer, { borderTopColor: palette.border }]}>{footer}</View> : null}
         </KeyboardAvoidingView>
@@ -211,9 +221,10 @@ export function KatchaSheet({
             style={({ pressed }) => [
               styles.close,
               { backgroundColor: palette.subtle, borderColor: palette.borderStrong },
+              appearance === 'game' && styles.gameClose,
               pressed && styles.pressed,
             ]}>
-            <IconSymbol name="xmark" size={13} color={palette.textSecondary} />
+            <IconSymbol name="xmark" size={appearance === 'game' ? 18 : 13} color={palette.textSecondary} />
           </Pressable>
         ) : null}
         </Animated.View>
@@ -238,17 +249,17 @@ export function KatchaSheet({
   );
 }
 
-function KatchaSheetHeading({ header, surface }: { header: KatchaSheetHeader; surface: KatchaSurface }) {
+function KatchaSheetHeading({ header, surface, game = false }: { header: KatchaSheetHeader; surface: KatchaSurface; game?: boolean }) {
   const palette = KatchaSurfacePalette[surface];
   return (
-    <View pointerEvents="none" style={styles.header}>
+    <View pointerEvents="none" style={[styles.header, game && styles.gameHeader]}>
       {header.step ? (
         <ThemedText style={styles.step} lightColor={palette.textTertiary} darkColor={palette.textTertiary}>
           {`Step ${header.step.current} of ${header.step.total}`}
         </ThemedText>
       ) : null}
       {header.eyebrow ? <ThemedText style={styles.eyebrow} lightColor={surface === 'parchment' ? palette.textTertiary : palette.accent} darkColor={surface === 'parchment' ? palette.textTertiary : palette.accent}>{header.eyebrow}</ThemedText> : null}
-      {header.title ? <ThemedText maxFontSizeMultiplier={1.35} style={[styles.title, surface === 'parchment' && header.titleVariant !== 'strong' && styles.parchmentTitle, header.titleVariant === 'strong' && styles.strongTitle]} lightColor={palette.text} darkColor={palette.text}>{header.title}</ThemedText> : null}
+      {header.title ? <ThemedText maxFontSizeMultiplier={1.35} style={[styles.title, surface === 'parchment' && header.titleVariant !== 'strong' && styles.parchmentTitle, header.titleVariant === 'strong' && styles.strongTitle, game && styles.gameTitle]} lightColor={palette.text} darkColor={palette.text}>{header.title}</ThemedText> : null}
       {header.subtitle ? <ThemedText style={styles.subtitle} lightColor={palette.textSecondary} darkColor={palette.textSecondary}>{header.subtitle}</ThemedText> : null}
     </View>
   );
@@ -260,6 +271,10 @@ const styles = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFillObject },
   sheetFrame: { position: 'absolute' },
   sheet: { gap: 8 },
+  gamePanel: { borderColor: GameUI.surface.cream.rim, borderWidth: 2, boxShadow: GameUI.shadow.floating, backgroundColor: GameUI.surface.cream.bottom },
+  gameHeader: { minHeight: 42, justifyContent: 'center', paddingRight: 50 },
+  gameTitle: { ...GameUI.type.title, fontSize: 24, lineHeight: 28, fontWeight: 'normal' },
+  gameClose: { backgroundColor: GameUI.surface.cream.top, borderColor: GameUI.surface.cream.rim, borderRadius: 14, borderWidth: 2, width: 44, height: 44 },
   transparentSheet: { backgroundColor: 'transparent', borderColor: 'transparent', boxShadow: 'none' },
   content: { gap: 10 },
   fullBleedContent: { gap: 0, paddingBottom: 0, paddingHorizontal: 0, paddingTop: 0 },

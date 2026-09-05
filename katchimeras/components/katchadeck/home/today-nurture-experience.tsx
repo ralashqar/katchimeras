@@ -889,7 +889,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
       {!hatchReadyFocus && !onboardingFocus ? <MicrocopyToast message={microcopy} placementStyle={{ top: nurtureToastTop }} /> : null}
       {onboardingFocus && onboardingUiVisible && onboardingGuide && !actionListHidden ? (
         <>
-          <EggHeroGuide guide={onboardingGuide} topInset={topInset} topHudVisible={onboardingTopHudVisible} />
+          <EggHeroGuide guide={onboardingGuide} topInset={topInset} />
           {scriptedRouteChoiceActions.length > 1 && scriptedPanelCareAction && onScriptedAction ? (
             <View style={[styles.onboardingActionStage, { bottom: actionDockBottom }]}>
               <InlineRouteActionChoice

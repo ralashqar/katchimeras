@@ -14,7 +14,7 @@ import {
   type View as ViewType,
 } from 'react-native';
 import type { RefObject } from 'react';
-import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { DayActionCardSurface, DayActionIcon, DayActionRewardChip } from '@/components/katchadeck/ui/day-action-card';
 import { DayActionActiveRow, DayActionCompletedRow, type DayActionSourceRect } from '@/components/katchadeck/ui/day-action-row';
@@ -81,7 +81,7 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
   if (mode === 'notice_bond') return null;
 
   if (mode === 'intro_action') return (
-    <Animated.View entering={FadeInUp.duration(220)} style={styles.plainActionStage}>
+    <Animated.View style={styles.plainActionStage}>
       <DayActionActiveRow animateLayout={false} label="Introduce yourself">
         <Pressable accessibilityRole="button" onPress={() => onContinue?.()} style={({ pressed }) => pressed && styles.pressed}>
           <DayActionCardSurface
@@ -97,7 +97,7 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
   );
 
   if (mode === 'bond_choice') return (
-    <Animated.View entering={FadeInUp.duration(220)} style={styles.plainActionStage}>
+    <Animated.View style={styles.plainActionStage}>
       <View ref={actionStackTargetRef} style={styles.bondChoiceStack}>
         {selectedBondShare && selectedSupportStyleId ? (
           <DayActionCompletedRow
@@ -142,7 +142,7 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
 
   if (mode === 'nickname') return (
     <>
-      <Animated.View entering={FadeInUp.duration(220)} style={styles.actionStage}>
+      <Animated.View style={styles.actionStage}>
         <PrimaryAction icon="bubble.left.fill" label="Answer Mossprout" onPress={() => setNameModalOpen(true)} />
       </Animated.View>
       <Modal
@@ -198,7 +198,7 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
   );
 
   if (mode === 'bond') return (
-    <Animated.View entering={FadeInUp.duration(220)} style={styles.actionStage}>
+    <Animated.View style={styles.actionStage}>
       <DayActionCompletedRow
         animateLayout={false}
         artwork={<DayActionIcon completed icon="person.2.fill" />}
@@ -214,18 +214,17 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
   );
 
   if (mode === 'garden_intro') return (
-    <Animated.View entering={FadeInUp.duration(220)} style={styles.actionStage}>
+    <View accessibilityLabel="Your memory seed" style={styles.seedReveal}>
       {firstSeedDefinition ? <DayActionCardSurface
         artwork={<Image contentFit="contain" source={firstSeedDefinition.art.seed} style={styles.seedArt} />}
-        eyebrow="YOUR MEMORY SEED"
+        eyebrow="MEMORY SEED"
         style={styles.seedRewardCard}
         subtitle={firstSeed.message}
         title={firstSeedDefinition.name}
         trailing={<View />}
       /> : null}
-      <ThemedText style={styles.privateNote} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>We can plant it here. Our Journal will remember how it began.</ThemedText>
       <PrimaryAction icon={gardenStoryActionIcon} label={gardenStoryActionLabel} onPress={() => onContinue?.()} />
-    </Animated.View>
+    </View>
   );
 
   if (mode === 'water_together' || mode === 'first_grow') {
@@ -233,13 +232,13 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
   }
 
   if (mode === 'water_response') return (
-    <Animated.View entering={FadeInUp.duration(220)} style={styles.actionStage}>
+    <Animated.View style={styles.actionStage}>
       <MossproutFtueRestAction onNarration={onNarration} onRest={onContinue} />
     </Animated.View>
   );
 
   if (mode === 'first_insight') return (
-    <Animated.View entering={FadeInUp.duration(220)} style={styles.plainActionStage}>
+    <Animated.View style={styles.plainActionStage}>
       <ThemedText selectable style={styles.resultEyebrow} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>
         TODAY I LEARNED
       </ThemedText>
@@ -260,7 +259,7 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
   );
 
   if (mode === 'resident_result') return (
-    <Animated.View entering={FadeInUp.duration(220)} style={styles.actionStage}>
+    <Animated.View style={styles.actionStage}>
       <ThemedText selectable style={styles.resultEyebrow} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>
         CLOSEST MATCH FOUND
       </ThemedText>
@@ -269,7 +268,7 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
   );
 
   return (
-    <Animated.View entering={FadeInUp.duration(220)} style={styles.orderStage}>
+    <Animated.View style={styles.orderStage}>
       <CompanionMergeRequestTray
         accessibilityLabel="Mossprout's first request"
         eyebrow="FIRST GARDEN ORDER"
@@ -293,7 +292,7 @@ function PrimaryAction({ icon = 'arrow.right', label, onPress }: { icon?: string
 }
 
 const styles = StyleSheet.create({
-  actionStage: { backgroundColor: KatchaUI.companionScenePanel.background, borderColor: KatchaUI.companionScenePanel.border, borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, boxShadow: KatchaUI.companionScenePanel.shadow, gap: 9, padding: 10 },
+  actionStage: { gap: 10 },
   plainActionStage: { gap: 7 },
   bondChoiceStack: { gap: 7 },
   answerPanel: { gap: 10 },
@@ -311,6 +310,7 @@ const styles = StyleSheet.create({
   privateNote: { fontSize: 12, lineHeight: 17 },
   resultEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.1, paddingHorizontal: 4, paddingTop: 2 },
   seedArt: { height: 66, width: 66 },
+  seedReveal: { gap: 12, backgroundColor: 'transparent' },
   seedRewardCard: { minHeight: 82 },
   pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
 });

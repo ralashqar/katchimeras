@@ -1,5 +1,4 @@
-import { glowGatewayAvailable } from '@/utils/merge-world/glow-discovery-policy';
-import { HAVEN_ENVIRONMENTS, havenStoryGateSatisfied, type HavenStoryGate } from '@/constants/haven-catalog';
+import { HAVEN_ENVIRONMENTS } from '@/constants/haven-catalog';
 import { MOSSPROUT_NATURE_ISLANDS } from '@/constants/mossprout-nature-islands';
 import { SHARED_WORLD_PURCHASES } from '@/constants/shared-world';
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
@@ -14,7 +13,6 @@ export type WorldUpgradeDefinition = {
   description: string;
   nextLevel: number;
   cost: number;
-  gate: HavenStoryGate;
   action: 'Clear mist' | 'Restore' | 'Upgrade';
   unlockId?: string;
 };
@@ -33,19 +31,19 @@ export const WORLD_UPGRADE_DEFINITIONS: readonly WorldUpgradeDefinition[] = [
       visualTarget: environment!.characterId === 'mossprout' ? { kind: 'haven_structure', structureId: 'mossprout-hex-garden' } : { kind: 'haven_tile', familyId: environment!.characterId },
       name: environment!.characterId === 'mossprout' ? 'Mossprout’s Garden' : stage.name,
       nextName: stage.name, description: stage.narrative, nextLevel: stage.stage, cost: stage.coinCost,
-      gate: stage.storyGate, action: stage.stage === 1 ? 'Restore' : 'Upgrade',
+      action: stage.stage === 1 ? 'Restore' : 'Upgrade',
     }))),
   ...MOSSPROUT_NATURE_ISLANDS.flatMap((island) => island.levels.map((level): WorldUpgradeDefinition => ({
     id: `nature:${island.id}`, target: { kind: 'haven_nature_island', islandId: island.id },
     visualTarget: { kind: 'haven_nature_island', islandId: island.id }, name: island.name, nextName: level.name,
-    description: level.description, nextLevel: level.level, cost: level.coinCost, gate: level.storyGate,
+    description: level.description, nextLevel: level.level, cost: level.coinCost,
     action: level.level === 1 ? 'Clear mist' : 'Upgrade',
   }))),
   ...SHARED_WORLD_PURCHASES.map((purchase): WorldUpgradeDefinition => ({
     id: `mist:${purchase.tileId}`, target: { kind: 'haven_structure', structureId: purchase.tileId },
     visualTarget: { kind: 'haven_structure', structureId: purchase.tileId }, name: purchase.name,
     nextName: 'A new clearing', description: 'Clear the mist and discover who is waiting here.',
-    nextLevel: 1, cost: purchase.price, gate: 'chapter_zero_complete', action: 'Clear mist', unlockId: purchase.unlockId,
+    nextLevel: 1, cost: purchase.price, action: 'Clear mist', unlockId: purchase.unlockId,
   })),
 ];
 
@@ -56,9 +54,8 @@ export function worldUpgradeOffers(world: MergeWorldState): WorldUpgradeOffer[] 
       : target.kind === 'haven_nature_island' ? world.haven.mossproutNatureIslands[target.islandId as keyof typeof world.haven.mossproutNatureIslands] ?? 0
       : world.worldUnlocks?.[definition.unlockId!] ? 1 : 0;
     if (currentLevel + 1 !== definition.nextLevel) return [];
-    const residentAvailable = target.kind === 'haven_tile' ? world.unlockedCharacters.includes(target.familyId as MergeCharacterId)
-      : world.unlockedCharacters.includes('mossprout') && (world.haven.tileStages.mossprout ?? 0) >= 1;
-    return [{ ...definition, currentLevel, eligible: target.kind === 'haven_structure' ? glowGatewayAvailable(world) : residentAvailable && havenStoryGateSatisfied(world, definition.gate),
+    // Authored next levels are available independently of story/companion progress.
+    return [{ ...definition, currentLevel, eligible: true,
       affordable: world.coins >= definition.cost, missingGlow: Math.max(0, definition.cost - world.coins) }];
   });
 }

@@ -291,6 +291,27 @@ const familyOrderTemplates = (entry: KatchimeraMergeProfile): MergeOrderTemplate
 
 export const MERGE_ORDER_TEMPLATES: readonly MergeOrderTemplate[] = Object.values(KATCHIMERA_MERGE_PROFILES).flatMap(familyOrderTemplates);
 
+/** After the introductory/day requests, keep free play worth merging for even at Bond level one. */
+export const MERGE_REPEATABLE_ORDER_TEMPLATES: readonly MergeOrderTemplate[] = Object.values(KATCHIMERA_MERGE_PROFILES).flatMap((entry): MergeOrderTemplate[] => {
+  const [first, second] = entry.coreChains;
+  return [
+    ...entry.coreChains.map((chain): MergeOrderTemplate => ({
+      key: `${entry.characterId}:garden-grown:${chain}`, characterId: entry.characterId,
+      title: 'Something taking shape', difficulty: 'medium',
+      requirements: [{ definitionId: `${chain}:4`, quantity: 1 }],
+      reward: { coins: 48, mergeXp: 38, friendshipXp: 22, energy: 3 },
+    })),
+    { key: `${entry.characterId}:garden-pair`, characterId: entry.characterId,
+      title: 'Better together', difficulty: 'medium',
+      requirements: [{ definitionId: `${first}:3`, quantity: 1 }, { definitionId: `${second}:3`, quantity: 1 }],
+      reward: { coins: 48, mergeXp: 38, friendshipXp: 22, energy: 3 } },
+    { key: `${entry.characterId}:garden-flourish`, characterId: entry.characterId,
+      title: 'A little more to grow', difficulty: 'major', minimumFriendshipLevel: 4,
+      requirements: [{ definitionId: `${first}:4`, quantity: 1 }, { definitionId: `${second}:3`, quantity: 1 }],
+      reward: { coins: 72, mergeXp: 58, friendshipXp: 34, energy: 4 } },
+  ];
+});
+
 export const MERGE_HYBRID_RECIPES = new Map([
   [['adventure:trail:5', 'food:table:4'].sort().join('+'), 'hybrid:picnic-pack'],
   [['nature:garden:4', 'nature:keepsake:2'].sort().join('+'), 'hybrid:memory-bloom'],

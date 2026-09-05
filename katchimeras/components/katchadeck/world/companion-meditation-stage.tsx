@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { DayActionCardSurface, DayActionIcon } from '@/components/katchadeck/ui/day-action-card';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Meadow } from '@/constants/meadow-theme';
+
+export function journeyForeshadowLine(familyId: string): string {
+  if (familyId === 'steppling') return 'I’ve got an idea for our next little adventure. I’ll tell you when I’ve rested!';
+  if (familyId === 'mossprout') return 'Something lovely is taking root. I’ll have more to share with you when I wake.';
+  return 'I’ll have something for us to discover together when I’m rested.';
+}
 
 export function formatMeditationCountdown(availableAt: number, now: number): string {
   const seconds = Math.max(0, Math.ceil((availableAt - now) / 1000));
@@ -30,6 +36,7 @@ export function CompanionMeditationStage({
   availableAt,
   companionName,
   now,
+  onPress,
   settledMs = 0,
   startedAt,
   title,
@@ -37,6 +44,7 @@ export function CompanionMeditationStage({
   availableAt: number;
   companionName: string;
   now: number;
+  onPress?: () => void;
   settledMs?: number;
   startedAt: number;
   title?: string;
@@ -59,7 +67,10 @@ export function CompanionMeditationStage({
   }));
 
   return (
-    <View accessibilityLabel={`${companionName} is meditating. Ready in ${countdown}`}>
+    <Pressable accessibilityLabel={`${companionName} is meditating. Ready in ${countdown}`}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityHint={onPress ? 'Hear about your next journey' : undefined}
+      disabled={!onPress} onPress={onPress}>
       <DayActionCardSurface
         artwork={<DayActionIcon icon="moon.fill" />}
         title={title ?? 'Next Journey in'}
@@ -81,7 +92,7 @@ export function CompanionMeditationStage({
           </View>
         </View>}
       />
-    </View>
+    </Pressable>
   );
 }
 

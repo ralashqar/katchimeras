@@ -719,6 +719,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
       ?? (mossproutJourney?.activity ? [mossproutJourney.activity.mergeOrderId] : []));
     const prioritizedOrders = prioritizedVisibleMergeOrders(state, {
       activeResidentDiscoveryId: activeResidentDiscovery?.id,
+      characterId: activityFamilyId,
       exclusiveJourney: mossproutJourneyExclusive,
       focusOrderId,
       journeyOrderIds,
@@ -741,7 +742,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
     // Midpoint notes sit before the remaining requests so the story beat is
     // immediately visible without replacing or hiding any unserved order.
     return [...parcelEntries, ...returnEntries, ...orderEntries];
-  }, [stepplingLesson.active, active, activeResidentDiscovery?.id, authoredStories, focusOrderId, ftueStep?.id, mossproutJourney?.activity, mossproutJourney?.beatId, mossproutJourney?.dayId, mossproutJourney?.status, mossproutJourneyExclusive, parcelFlight, parcelShakeNonce, pendingParcel, pendingParcels.length, readyOrderIds, returnCharacterId, serveFlight, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
+  }, [stepplingLesson.active, active, activeResidentDiscovery?.id, activityFamilyId, authoredStories, focusOrderId, ftueStep?.id, mossproutJourney?.activity, mossproutJourney?.beatId, mossproutJourney?.dayId, mossproutJourney?.status, mossproutJourneyExclusive, parcelFlight, parcelShakeNonce, pendingParcel, pendingParcels.length, readyOrderIds, returnCharacterId, serveFlight, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
 
   const startServeAnimation = useCallback(async (order: MergeOrder, itemTargets: readonly MergeScreenPoint[]) => {
     const state = stateRef.current;

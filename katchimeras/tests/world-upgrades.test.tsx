@@ -27,8 +27,7 @@ function restored(coins = 2000) {
 }
 
 test('all nature island levels use the shared purchase flow, survive reload, and charge only once', () => {
-  let state = restored(10_000);
-  state = reduceMergeWorld(state, { type: 'reconcileHavenStory', characterId: 'mossprout', storyLevel: 4, now: NOW }).state;
+  let state = { ...createInitialMergeWorldState(NOW, ['mossprout']), coins: 10_000 };
   for (const island of MOSSPROUT_NATURE_ISLANDS) {
     for (const level of island.levels) {
       const offer = visibleWorldUpgradeOffers(worldUpgradeOffers(state), undefined, null)
@@ -104,7 +103,8 @@ test('mist islands are targetable and every reveal keeps other tiles and camera 
 
 test('only the next authored level is offered, preserving costs and aggregate Haven progression', () => {
   const initial = worldUpgradeOffers(world());
-  assert.deepEqual(initial.filter((offer) => offer.eligible).map((offer) => [offer.id, offer.cost]), [['haven:mossprout', 20]]);
+  assert.ok(initial.every((offer) => offer.eligible));
+  assert.equal(initial.find((offer) => offer.id === 'haven:mossprout')?.cost, 20);
   const offers = worldUpgradeOffers(restored());
   assert.equal(offers.some((offer) => offer.id === 'haven:mossprout'), false);
   assert.equal(offers.find((offer) => offer.id === 'mist:steppling-home')?.cost, 40);
@@ -116,12 +116,33 @@ test('only the next authored level is offered, preserving costs and aggregate Ha
   assert.equal(new Set(WORLD_UPGRADE_DEFINITIONS.map(worldUpgradeRunId)).size, WORLD_UPGRADE_DEFINITIONS.length);
 });
 
-test('unaffordable spots remain discoverable and distinguish story gates from Glow shortages', () => {
+test('unaffordable spots remain discoverable without story or resident prerequisites', () => {
   const offers = worldUpgradeOffers({ ...restored(), coins: 3 });
   const mist = offers.find((offer) => offer.id === 'mist:steppling-home')!;
   assert.equal(mist.eligible, true); assert.equal(mist.affordable, false); assert.equal(mist.missingGlow, 37);
   const locked = worldUpgradeOffers(createInitialMergeWorldState(NOW, ['mossprout']));
-  assert.equal(locked.some((offer) => offer.eligible), false);
+  assert.ok(locked.every((offer) => offer.eligible));
+});
+
+test('45 Glow unlocks Pond Sanctuary before any story progress, with no duplicate charge', () => {
+  const state = { ...createInitialMergeWorldState(NOW, []), coins: 45 };
+  const offer = worldUpgradeOffers(state).find((candidate) => candidate.id === 'nature:pond-sanctuary')!;
+  assert.equal(offer.eligible, true);
+  assert.equal(offer.affordable, true);
+  const command = { type: 'upgradeMossproutNatureIsland' as const, islandId: 'pond-sanctuary' as const,
+    level: 1 as const, receiptId: 'pond:glow-only', now: NOW };
+  const paid = reduceMergeWorld(state, command);
+  assert.equal(paid.changed, true);
+  assert.equal(paid.state.coins, 5);
+  assert.equal(paid.state.haven.mossproutNatureIslands['pond-sanctuary'], 1);
+  assert.deepEqual(paid.state.characterProgress, state.characterProgress);
+  const reloaded = normalizeMergeWorldState(JSON.parse(JSON.stringify(paid.state)), NOW);
+  assert.equal(reduceMergeWorld(reloaded, command).state.coins, 5);
+  const mist = reduceMergeWorld(state, { type: 'unlockWorldTarget', targetId: 'mossprout:overgrown-trail', receiptId: 'mist:glow-only', now: NOW });
+  assert.equal(mist.changed, true);
+  assert.equal(mist.state.coins, 5);
+  assert.equal(reduceMergeWorld({ ...state, coins: 39 }, { type: 'unlockWorldTarget', targetId: 'mossprout:overgrown-trail', now: NOW }).changed, false);
+  assert.equal(reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, now: NOW }).changed, true);
 });
 
 test('completed mist and max-level islands no longer expose upgrade offers', () => {
@@ -182,6 +203,9 @@ test('shared sheet sends insufficient Glow to Garden, confirms once affordable, 
     '@/components/themed-text': { ThemedText: host('Text') },
     '@/constants/game-currency-art': { GAME_CURRENCY_ART: { coins: 1 } },
     '@/constants/theme': { AppFontFamilies: { fredokaBold: 'Fredoka', manrope: 'Manrope' } },
+    '@/constants/game-ui': loadNativeModule('constants/game-ui.ts', {
+      '@/constants/theme': { AppFontFamilies: { fredokaBold: 'Fredoka', manrope: 'Manrope' } },
+    }),
     '@/components/katchadeck/onboarding/companion-ftue-coachmark': { CompanionFtueCoachmark: host('Coachmark') },
   }, { setTimeout, clearTimeout });
   const Sheet = module.WorldUpgradeSheet as React.ComponentType<Record<string, unknown>>;
@@ -190,6 +214,11 @@ test('shared sheet sends insufficient Glow to Garden, confirms once affordable, 
     onConfirm: () => confirms++, onGarden: () => gardens++, onClose: () => closes++ };
   let tree: ReactTestRenderer;
   await act(async () => { tree = create(<Sheet {...props} />); });
+  assert.equal(tree!.root.findByType(host('Sheet')).props.appearance, 'game');
+  assert.equal(tree!.root.findByType(host('Sheet')).props.header.titleVariant, 'strong');
+  assert.equal(tree!.root.findByType(host('Sheet')).props.header.eyebrow, undefined);
+  const copy = tree!.root.findAllByType(host('Text')).map((node) => node.props.children).flat().join(' ');
+  assert.doesNotMatch(copy, /Continue Mossprout|You have|Help Mossprout/);
   let button = tree!.root.findByType(host('Button'));
   assert.equal(button.props.cost, undefined);
   assert.equal(button.props.label, 'Tend garden'); await act(async () => button.props.onPress());
@@ -233,7 +262,7 @@ test('mist upgrade stays available with a lagging FTUE or legacy chapter snapsho
   state.characterProgress.mossprout = { friendshipLevel: 1, completedChapterIds: [] };
   const offers = worldUpgradeOffers(state);
   assert.equal(offers.find((offer) => offer.id === 'mist:steppling-home')?.eligible, true);
-  assert.equal(offers.some((offer) => offer.id.startsWith('nature:') && offer.eligible), false);
+  assert.equal(offers.some((offer) => offer.id.startsWith('nature:') && offer.eligible), true);
   for (const nodeId of ['gateway.ready', 'gateway.return', 'gateway.offer', 'gateway.buy']) {
     assert.deepEqual(visibleWorldUpgradeOffers(offers, 'companion.meditating', { nodeId, status: 'active' }).map((offer) => offer.id), ['mist:steppling-home']);
   }
@@ -417,7 +446,7 @@ test('legacy Garden restoration and finished mist requests enable the same paid 
     const poor = reduceMergeWorld({ ...state, coins: 39 }, command);
     assert.equal(poor.changed, false);
   }
-  assert.equal(worldUpgradeOffers({ ...initial, coins: 55 }).find((offer) => offer.id === 'mist:steppling-home')?.eligible, false);
+  assert.equal(worldUpgradeOffers({ ...initial, coins: 55 }).find((offer) => offer.id === 'mist:steppling-home')?.eligible, true);
 });
 
 

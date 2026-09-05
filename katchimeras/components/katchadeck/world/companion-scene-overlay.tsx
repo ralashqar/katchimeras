@@ -1,6 +1,6 @@
 import Animated from 'react-native-reanimated';
 import { useCompanionActionSlide } from '@/hooks/use-companion-action-slide';
-import { useCompanionStackLayout } from '@/hooks/use-companion-stack-layout';
+import { CompanionStackRemovalContext, useCompanionStackLayout } from '@/hooks/use-companion-stack-layout';
 import { createContext, useContext, useLayoutEffect, useRef, useState, useId, useSyncExternalStore, type ReactNode } from 'react';
 import { StyleSheet, View, type ViewProps } from 'react-native';
 
@@ -34,12 +34,12 @@ function OverlayOutlet({ store }: { store: ReturnType<typeof createOverlayStore>
  * into the next measurement, including through the action ScrollViews.
  */
 function CompanionStackFrame({ children, style, overlay, ...props }: ViewProps & { overlay?: ReactNode }) {
-  const { measured, frameStyle, onContentLayout } = useCompanionStackLayout();
-  return <Animated.View {...props} collapsable={false} style={[style, frameStyle]}>
+  const { measured, frameStyle, onContentLayout, prepareRemoval } = useCompanionStackLayout();
+  return <CompanionStackRemovalContext.Provider value={prepareRemoval}><Animated.View {...props} collapsable={false} style={[style, frameStyle]}>
     <View collapsable={false} pointerEvents="box-none" onLayout={onContentLayout}
       style={measured ? styles.measuredContent : undefined}>{children}</View>
     {overlay}
-  </Animated.View>;
+  </Animated.View></CompanionStackRemovalContext.Provider>;
 }
 
 /** Orders sit outside the card ScrollView and never contribute to its height. */

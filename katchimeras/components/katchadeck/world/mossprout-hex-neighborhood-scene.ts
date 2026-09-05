@@ -11,7 +11,7 @@ import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
 import { kingdomTileArtFrame } from '@/utils/kingdom-tile-alignment';
 import { hexDrawDepth, hexToWorld, type HexCoord } from '@/utils/world-hex';
 import { tileVisibleBounds } from '@/components/katchadeck/world/kingdom-hex-scene';
-import { GARDEN_PLANT_SLOT_POSITIONS, mossproutGardenPlantSlotFrame } from '@/utils/mossprout-garden-layout';
+import { GARDEN_PLANT_SLOT_POSITIONS, MOSSPROUT_FIRST_MEMORY_SLOT_ID, mossproutGardenPlantSlotFrame } from '@/utils/mossprout-garden-layout';
 
 export { mossproutGardenPlantSlotFrame } from '@/utils/mossprout-garden-layout';
 
@@ -90,6 +90,7 @@ export type MossproutGardenSceneState = {
   gateway?: 'locked' | 'egg' | 'open';
   level: number;
   plantableMemories: readonly PlantableMemoryInstance[];
+  previewMemoryId?: string;
   featureLevels?: { spring: number; path: number };
 };
 
@@ -270,9 +271,11 @@ export function buildMossproutHexNeighborhoodScene(
     GARDEN_LAYOUT_BOUNDS,
   );
   const plantLayers = gardenState.plantableMemories.flatMap((plant): KingdomTileArtLayer[] => {
-    if (plant.status !== 'planted' || !plant.slotId) return [];
+    const preview = gardenState.previewMemoryId === plant.id && plant.status !== 'planted';
+    const slotId = preview ? MOSSPROUT_FIRST_MEMORY_SLOT_ID : plant.slotId;
+    if ((!preview && plant.status !== 'planted') || !slotId) return [];
     const definition = mossproutMemoryPlantById.get(plant.definitionId);
-    const position = GARDEN_PLANT_SLOT_POSITIONS[plant.slotId];
+    const position = GARDEN_PLANT_SLOT_POSITIONS[slotId];
     if (!definition || !position) return [];
     const size = gardenLayer.frame.width * 0.18;
     const baseX = gardenLayer.frame.left + gardenLayer.frame.width * position.x;
@@ -284,7 +287,7 @@ export function buildMossproutHexNeighborhoodScene(
       depth: gardenLayer.depth + 1 + position.y,
       fallbackSource: null,
       frame: { left: baseX - size / 2, top: baseY - size * MEMORY_PLANT_ART_CONTACT_Y, width: size, height: size },
-      interactionFrame: mossproutGardenPlantSlotFrame(gardenLayer.frame, plant.slotId),
+      interactionFrame: preview ? undefined : mossproutGardenPlantSlotFrame(gardenLayer.frame, slotId),
       id: `plant:${plant.id}`,
       kind: 'structure',
       source: definition.art[mossproutMemoryPlantStage(plant.growthPoints)],

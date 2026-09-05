@@ -1,3 +1,4 @@
+import { FTUE_SCENE_LAYERS } from '@/constants/ftue-scene-layers';
 import { normalizeSpeechText } from '@/utils/speech-text';
 import Animated, { Easing, FadeInDown } from 'react-native-reanimated';
 import { Meadow } from '@/constants/meadow-theme';
@@ -12,13 +13,13 @@ export type FtueGuide = {
   body: string;
 };
 
-/** Original first-Egg hero framing, shared by both hatch sequences. */
-export function EggHeroGuide({ guide, topInset, topHudVisible = false }: {
-  guide: FtueGuide; topInset: number; topHudVisible?: boolean;
+/** Explicit scene anchor, independent of currency/HUD visibility. */
+export function EggHeroGuide({ guide, topInset, topOffset = 22 }: {
+  guide: FtueGuide; topInset: number; topOffset?: number;
 }) {
   return <Animated.View key={`focus:${normalizeSpeechText(guide.title)}`} pointerEvents="none"
     entering={FadeInDown.duration(260).easing(Easing.out(Easing.cubic))}
-    style={[styles.eggHero, { top: topInset + (topHudVisible ? 82 : 22) }]}>
+    style={[styles.eggHero, { top: topInset + topOffset }]}>
     <FtueGuideCopy guide={guide} hero />
   </Animated.View>;
 }
@@ -74,7 +75,7 @@ export function FtueGuideCopy({ guide, hero = false }: {
 }
 
 const styles = StyleSheet.create({
-  eggHero: { alignItems: 'center', gap: 4, left: Meadow.space.page, position: 'absolute', right: Meadow.space.page, zIndex: 18 },
+  eggHero: { alignItems: 'center', gap: 4, left: Meadow.space.page, position: 'absolute', right: Meadow.space.page, zIndex: FTUE_SCENE_LAYERS.hero },
   heroCopy: { alignItems: 'center', gap: 8, maxWidth: 360, width: '100%' },
   inlineCopy: { alignItems: 'center', gap: 7, maxWidth: 350, width: '100%' },
   eyebrowPill: {

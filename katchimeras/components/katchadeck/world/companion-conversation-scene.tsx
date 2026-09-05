@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useEffect, useState, type ReactNode, type RefObject } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, useWindowDimensions, View, type View as ViewType } from 'react-native';
-import Animated, { FadeInUp, LinearTransition, useReducedMotion } from 'react-native-reanimated';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -30,7 +30,6 @@ import type { CompanionBondProgress } from '@/utils/companion-bond';
 import type { CompanionConversationPresentationPhase } from '@/features/companion/use-companion-conversation-flow';
 import {
   companionChoiceColumnCount,
-  COMPANION_PANEL_LAYOUT_DURATION_MS,
   estimatedCompanionChoiceContentHeight,
   useCompanionAdaptivePanel,
 } from '@/hooks/use-companion-adaptive-panel';
@@ -141,7 +140,6 @@ export function CompanionConversationScene({
 }) {
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
-  const reduceMotion = useReducedMotion();
   const node = conversationNode(definition, session.currentNodeId);
   const journeyNarrative = definition.purpose === 'journey' && definition.format === 'narrative';
   const journeyRequestHandoffVisible = !session.outcomePresentation
@@ -184,7 +182,12 @@ export function CompanionConversationScene({
     safeAreaTop: insets.top,
     viewportHeight: height,
   });
-  const shortPanelBottomLift = adaptivePanel.scrollable
+  const standaloneContinue = !session.outcomePresentation && !developerContent && (
+    (session.status === 'completed' && !session.preview)
+    || (session.pendingReply !== undefined && journeyNarrative)
+    || (node?.kind === 'end' && session.status !== 'completed' && !journeyRequestHandoffVisible)
+  );
+  const shortPanelBottomLift = standaloneContinue || adaptivePanel.scrollable
     ? 0
     : Math.min(22, Math.max(0, (adaptivePanel.maxHeight - adaptivePanel.panelHeight) * 0.1));
   useEffect(() => {
@@ -212,10 +215,13 @@ export function CompanionConversationScene({
 
       <View accessibilityElementsHidden pointerEvents="none" style={{ flex: 1, minHeight: 120 }} />
 
-      <CompanionNarrativePanel
+      {standaloneContinue ? (session.status === 'completed'
+        ? definition.id === 'steppling:journey:day-one' && definition.version >= 3 ? null
+          : <PrimaryAction label="Continue" onPress={onCompletedExit} />
+        : requiresManualAdvance ? <PrimaryAction
+        label={node?.kind === 'end' && journeyNarrative ? 'Finish Journey' : 'Continue'}
+        onPress={onAdvance} /> : null) : <CompanionNarrativePanel
         accessibilityLabel={`Conversation ${flowPhase.replace('_', ' ')}`}
-        entering={reduceMotion ? undefined : FadeInUp.duration(220)}
-        layout={reduceMotion || journeyRequestHandoffVisible ? undefined : LinearTransition.duration(COMPANION_PANEL_LAYOUT_DURATION_MS)}
         style={{
           height: adaptivePanel.panelHeight,
           paddingTop: showConversationProgress ? 12 : 8,
@@ -346,7 +352,7 @@ export function CompanionConversationScene({
         ) : null}
         {developerContent}
         </ScrollView>
-      </CompanionNarrativePanel>
+      </CompanionNarrativePanel>}
     </View>
   );
 }
@@ -523,10 +529,9 @@ function MemoryProposal({ node, onDecision, session }: {
 }
 
 function ConversationCompletion({ label, onContinue }: { label: string; onContinue: () => void }) {
-  return <Animated.View accessibilityLabel={label} entering={FadeInUp.duration(180)} style={{ gap: 10 }}>
-    <ThemedText selectable style={{ fontSize: 13.5, fontWeight: '900', lineHeight: 18, textAlign: 'center' }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{label}</ThemedText>
+  return <View accessibilityLabel={label}>
     <PrimaryAction label="Continue" onPress={onContinue} />
-  </Animated.View>;
+  </View>;
 }
 
 function NarrativeTransition({ actionLabel = 'Continue', label, onAdvance, requiresManualAdvance = false }: {

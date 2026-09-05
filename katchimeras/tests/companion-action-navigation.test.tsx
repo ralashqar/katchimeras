@@ -186,11 +186,16 @@ for (const reducedMotion of [false, true]) {
   test(`row removal retains and animates the measured tray footprint (reduced motion: ${reducedMotion})`, async () => {
     const clock = nativeMotionHarness();
     const overlay = loadCompanionOverlay(clock, reducedMotion);
+    const removals: (() => void)[] = [];
+    function RemovalSignal({ index }: { index: number }) {
+      removals[index] = overlay.useCompanionStackRemoval();
+      return null;
+    }
     const Host = overlay.CompanionSceneOverlayHost as React.ComponentType<{ children: React.ReactNode }>;
     const Overlay = overlay.CompanionSceneOverlay as React.ComponentType<{ visible: boolean; children: React.ReactNode }>;
     const render = (removed: boolean) => <Host>
-      {React.createElement('SurvivingCard')}{removed ? null : React.createElement('ExitingCard')}
-      <Overlay visible>{React.createElement('GrowCards')}{removed ? null : React.createElement('ExitingGrowCard')}</Overlay>
+      <RemovalSignal index={0} />{React.createElement('SurvivingCard')}{removed ? null : React.createElement('ExitingCard')}
+      <Overlay visible><RemovalSignal index={1} />{React.createElement('GrowCards')}{removed ? null : React.createElement('ExitingGrowCard')}</Overlay>
     </Host>;
     let tree: ReactTestRenderer;
     await act(async () => { tree = create(render(false)); });
@@ -209,7 +214,7 @@ for (const reducedMotion of [false, true]) {
 
     // Remove the actual bottom nodes, then deliver their native content-size
     // measurements. Neither React removal nor measurement may shrink instantly.
-    await act(async () => tree!.update(render(true)));
+    await act(async () => { removals.forEach((prepare) => prepare()); tree!.update(render(true)); });
     assert.equal(tree!.root.findAllByType('ExitingCard' as React.ElementType).length, 0);
     assert.equal(tree!.root.findAllByType('ExitingGrowCard' as React.ElementType).length, 0);
     assert.equal(footprint(0), 300);
@@ -230,15 +235,19 @@ for (const reducedMotion of [false, true]) {
     assert.equal(tree!.root.findByType('SurvivingCard' as React.ElementType), survivor);
     assert.equal(tree!.root.findByType('GrowCards' as React.ElementType), grow);
 
-    await act(async () => measure(0, 180));
+    await act(async () => { removals[0](); measure(0, 180); });
     await act(async () => clock.advance(duration / 2));
     assert.equal(footprint(0), 200);
-    await act(async () => measure(0, 140));
+    await act(async () => { removals[0](); measure(0, 140); });
     assert.equal(footprint(0), 200, 'a second removal starts from the visible height');
     await act(async () => clock.advance(duration));
     assert.equal(footprint(0), 140);
     await act(async () => measure(0, 140));
     assert.equal(footprint(0), 140, 'equal-sized replacements leave the footprint stable');
+    await act(async () => measure(0, 250));
+    assert.equal(footprint(0), 250, 'opening a new panel uses its final height immediately');
+    await act(async () => measure(0, 64));
+    assert.equal(footprint(0), 64, 'switching to Continue does not slide down from the previous panel height');
     await act(async () => measure(0, 180, 500));
     assert.equal(footprint(0), 180, 'orientation changes lay out at the new width immediately');
     await act(async () => measure(1, 0));

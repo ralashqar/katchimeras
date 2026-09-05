@@ -78,7 +78,7 @@ test('first-memory live effect and recovery share one slot regardless of executi
   assert.equal(reduceFirstFtueMemoryPlacement(repaired.state, 'run-1', 'repair', NOW + 4).changed, false);
 });
 
-test('the first Haven restoration is linear, story-gated, and keeps neighbouring islands veiled', () => {
+test('the first Haven restoration is linear, Glow-funded, and keeps neighbouring islands veiled', () => {
   let state = mossproutWorld();
   const skipped = reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 2, now: NOW + 1 });
   assert.equal(skipped.changed, false);
@@ -253,14 +253,13 @@ test('six Mossprout nature islands each cost 40 Glow to unlock then retain the e
   assert.equal(state.haven.tileStages.mossprout, 4);
 });
 
-test('nature island upgrades reject skips, story locks, duplicate commands, and insufficient Glow', () => {
+test('nature island upgrades reject skips, duplicate commands, and insufficient Glow without story requirements', () => {
   let state = mossproutWorld();
   state = reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, now: NOW + 1 }).state;
   assert.equal(reduceMergeWorld({ ...state, coins: 39 }, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 1, now: NOW + 1 }).changed, false);
   state = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 1, now: NOW + 1 }).state;
   assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 3, now: NOW + 2 }).changed, false);
-  assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 2, now: NOW + 3 }).changed, false);
-  state = reduceMergeWorld(state, { type: 'reconcileHavenStory', characterId: 'mossprout', storyLevel: 2, now: NOW + 4 }).state;
+  assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 2, now: NOW + 3 }).changed, true);
   state = { ...state, coins: 59 };
   assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 2, now: NOW + 5 }).changed, false);
   state = { ...state, coins: 60 };
@@ -292,7 +291,7 @@ test('v13 Mossprout saves reset into the v22 personal-world contract', () => {
   assert.equal(migrated.haven.revealState, 'hidden');
 });
 
-test('procedural Merge orders fill three slots and remain separate from story orders', () => {
+test('procedural Merge orders keep a saved queue separate from story orders', () => {
   const fresh = createInitialMergeWorldState(NOW, ['mossprout', 'steppling']);
   fresh.unlockedChains = ['nature:garden', 'nature:waterside', 'adventure:trail', 'adventure:travel'];
   const state = normalizeMergeWorldState(fresh, NOW);
@@ -304,10 +303,10 @@ test('procedural Merge orders fill three slots and remain separate from story or
 test('Haven order islands share canonical chapter, journey, and character priority', () => {
   const fresh = normalizeMergeWorldState(createInitialMergeWorldState(NOW, ['mossprout', 'steppling']), NOW);
   const template = fresh.activeOrders[0]!;
-  const normal = { ...template, id: 'normal:steppling', characterId: 'steppling' as const };
-  const favourite = { ...template, id: 'normal:baristabbit', characterId: 'baristabbit' as const };
-  const focused = { ...template, id: 'focus:mossprout', characterId: 'mossprout' as const };
-  const sameCharacter = { ...template, id: 'normal:mossprout', characterId: 'mossprout' as const };
+  const normal = { ...template, storyArcId: undefined, id: 'normal:steppling', characterId: 'steppling' as const };
+  const favourite = { ...normal, id: 'normal:baristabbit', characterId: 'baristabbit' as const };
+  const focused = { ...normal, id: 'focus:mossprout', characterId: 'mossprout' as const };
+  const sameCharacter = { ...normal, id: 'normal:mossprout', characterId: 'mossprout' as const };
   const state = {
     ...fresh,
     activeOrders: [normal, favourite, sameCharacter, focused],
@@ -316,7 +315,7 @@ test('Haven order islands share canonical chapter, journey, and character priori
 
   assert.deepEqual(
     prioritizedVisibleMergeOrders(state, { focusOrderId: focused.id }).map((order) => order.id),
-    [focused.id, sameCharacter.id, favourite.id, normal.id],
+    [sameCharacter.id],
   );
 
   const journey = { ...normal, id: 'journey:only' };
@@ -327,7 +326,7 @@ test('Haven order islands share canonical chapter, journey, and character priori
       exclusiveJourney: true,
       journeyOrderIds: new Set([journey.id]),
     }).map((order) => order.id),
-    [resident.id, journey.id],
+    [resident.id],
   );
 
   const chapter = { ...focused, id: 'mossprout:chapter-0:first-sprout' };

@@ -677,9 +677,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       frame: layer.frame,
       instanceId,
       source: definition.art[stage],
-      visualKey: `${instanceId}:${stage}`,
+      preview: mossproutGarden?.previewMemoryId === instanceId && plant.status !== 'planted',
+      visualKey: `${instanceId}:${stage}:${plant.status}`,
     }];
-  }), [mossproutGarden?.plantableMemories, scene.tileArtLayers]);
+  }), [mossproutGarden?.plantableMemories, mossproutGarden?.previewMemoryId, scene.tileArtLayers]);
   const previousPlantVisualKeysRef = useRef<Set<string> | null>(null);
   const currentPlantVisualKeys = useMemo(
     () => new Set(memoryPlantProjections.map((plant) => plant.visualKey)),
@@ -1679,7 +1680,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       })() : null}
       {memoryPlantProjections.map((plant) => (
         <ProjectedMemoryPlant
-          animateReveal={memoryPlantRevealKeys.has(plant.visualKey)}
+          animateReveal={!plant.preview && memoryPlantRevealKeys.has(plant.visualKey)}
+          opacity={plant.preview ? 0.2 : 1}
           cameraScale={camera.scaleValue}
           cameraTranslateX={camera.translationXValue}
           cameraTranslateY={camera.translationYValue}
@@ -2747,6 +2749,7 @@ const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
  */
 const ProjectedMemoryPlant = memo(function ProjectedMemoryPlant({
   animateReveal,
+  opacity = 1,
   cameraScale,
   cameraTranslateX,
   cameraTranslateY,
@@ -2758,6 +2761,7 @@ const ProjectedMemoryPlant = memo(function ProjectedMemoryPlant({
   visualKey,
 }: {
   animateReveal: boolean;
+  opacity?: number;
   cameraScale: SharedValue<number>;
   cameraTranslateX: SharedValue<number>;
   cameraTranslateY: SharedValue<number>;
@@ -2841,7 +2845,7 @@ const ProjectedMemoryPlant = memo(function ProjectedMemoryPlant({
     ],
   }));
   const nativeSurfaceStyle = useAnimatedStyle(() => ({
-    opacity: revealOpacity.value,
+    opacity: revealOpacity.value * opacity,
     transform: [{
       scale: cameraScale.value * revealScale.value / MEMORY_PLANT_NATIVE_SURFACE_SCALE,
     }],

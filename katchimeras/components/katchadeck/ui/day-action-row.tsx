@@ -20,6 +20,7 @@ import Animated, {
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppFontFamilies } from '@/constants/theme';
+import { useCompanionStackRemoval } from '@/hooks/use-companion-stack-layout';
 
 import { DayActionCardSurface, DayActionCompletedTick } from './day-action-card';
 
@@ -283,7 +284,11 @@ export function DayActionCompletedRow({
 
   onFinishedRef.current = onFinished;
   onRewardRequestRef.current = onRewardRequest;
-  const notifyFinished = useCallback(() => onFinishedRef.current(), []);
+  const prepareRemoval = useCompanionStackRemoval();
+  const notifyFinished = useCallback(() => {
+    if (animateLayout) prepareRemoval?.();
+    onFinishedRef.current();
+  }, [animateLayout, prepareRemoval]);
   const entryAnimation = !enteringEnabled
     ? undefined
     : reduceMotion

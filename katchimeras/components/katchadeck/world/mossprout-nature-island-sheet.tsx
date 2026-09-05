@@ -3,7 +3,6 @@ import { StyleSheet, View } from 'react-native';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { ThemedText } from '@/components/themed-text';
-import { havenStoryGateSatisfied } from '@/constants/haven-catalog';
 import { mossproutNatureIslandById } from '@/constants/mossprout-nature-islands';
 import { AppFontFamilies } from '@/constants/theme';
 import type {
@@ -33,7 +32,6 @@ export function MossproutNatureIslandSheet({
   const currentLevel = mergeWorld.haven.mossproutNatureIslands[islandId] ?? 0;
   const current = island.levels.find((candidate) => candidate.level === currentLevel) ?? island.levels[0];
   const next = island.levels.find((candidate) => candidate.level === currentLevel + 1) ?? null;
-  const storyReady = next ? havenStoryGateSatisfied(mergeWorld, next.storyGate) : false;
   const affordable = Boolean(next && mergeWorld.coins >= next.coinCost);
   const progress = next?.coinCost ? Math.min(1, mergeWorld.coins / next.coinCost) : 1;
 
@@ -69,10 +67,8 @@ export function MossproutNatureIslandSheet({
             <View style={styles.track}>
               <View style={[styles.fill, { backgroundColor: island.accent, width: `${Math.round(progress * 100)}%` }]} />
             </View>
-            <ThemedText selectable style={styles.requirement} lightColor={storyReady ? '#E8EFD8' : '#E8C889'} darkColor={storyReady ? '#E8EFD8' : '#E8C889'}>
-              {storyReady
-                ? `You have ${mergeWorld.coins.toLocaleString()} Glow`
-                : 'Continue Mossprout’s story to unlock this growth.'}
+            <ThemedText selectable style={styles.requirement} lightColor="#E8EFD8" darkColor="#E8EFD8">
+              {`You have ${mergeWorld.coins.toLocaleString()} Glow`}
             </ThemedText>
             {error ? (
               <ThemedText accessibilityLiveRegion="polite" selectable style={styles.error} lightColor="#FFB9AE" darkColor="#FFB9AE">
@@ -81,10 +77,9 @@ export function MossproutNatureIslandSheet({
             ) : null}
             <KatchaButton
               accessibilityHint={`Advances ${island.name} to level ${next.level}`}
-              disabled={!storyReady || !affordable}
+              disabled={!affordable}
               fullWidth
-              glow={storyReady && affordable}
-              label={storyReady ? currentLevel === 0 ? 'Clear mist' : 'Upgrade' : 'Story locked'}
+              label={currentLevel === 0 ? 'Clear mist' : 'Upgrade'}
               cost={{ currency: 'coins', amount: next.coinCost }}
               loading={saving}
               onPress={() => onUpgrade(islandId, next.level)}

@@ -642,10 +642,10 @@ test('companion scene panels share one palette, stay anchored, and bound speech 
   assert.match(conversation, /height: adaptivePanel\.panelHeight/);
   assert.match(conversation, /activeGameQuestion\?\.id \?\? 'no-question'/);
   assert.match(conversation, /key=\{panelContentKey\}/);
-  assert.match(conversation, /LinearTransition\.duration\(COMPANION_PANEL_LAYOUT_DURATION_MS\)/);
+  assert.doesNotMatch(conversation, /layout=\{|entering=\{reduceMotion/);
   assert.match(conversation, /useCompanionAdaptivePanel/);
   assert.match(conversation, /onContentSizeChange=\{\(_, contentHeight\) => adaptivePanel\.onContentHeightChange\(contentHeight\)\}/);
-  assert.match(conversation, /const shortPanelBottomLift = adaptivePanel\.scrollable/);
+  assert.match(conversation, /const shortPanelBottomLift = standaloneContinue \|\| adaptivePanel\.scrollable/);
   assert.match(conversation, /paddingBottom: 20/);
   assert.match(interaction, /<GestureDetector gesture=\{environmentPan\.gesture\}>/);
   assert.match(interaction, /sceneTranslateX=\{props\.reuseUnderlyingStage \? undefined : environmentPan\.translateX\}/);
@@ -941,7 +941,7 @@ test('Journey narrative replies and task bridge wait for the player', () => {
   assert.match(flow, /screenReaderEnabled \|\| journeyNarrativeAdvanceReady/);
   assert.match(scene, /journeyTaskHandoff \? 'Go to the Garden' : 'Finish Journey'/);
   assert.match(scene, /<MossproutJourneyRequestPanel/);
-  assert.match(scene, /journeyRequestHandoffVisible \? undefined : LinearTransition/);
+  assert.doesNotMatch(scene, /LinearTransition/);
   assert.doesNotMatch(scene, /journeyRequestHandoffVisible && \{ flexGrow: 1, justifyContent: 'center' \}/);
   assert.match(scene, /journeyRequestHandoffVisible \? 'journey-handoff' : 'standard'/);
   assert.match(scene, /<MossproutJourneyRequestPanel[\s\S]*?animateEntrance=\{false\}/);

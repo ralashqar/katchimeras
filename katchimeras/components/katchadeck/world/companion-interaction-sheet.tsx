@@ -132,7 +132,7 @@ import { CompanionDashboard } from './companion-dashboard';
 import { FeastleStoryStage } from './feastle-story-stage';
 import { BaristabbitStoryStage } from './baristabbit-story-stage';
 import { MossproutFtueStoryStage } from './mossprout-ftue-story-stage';
-import { CompanionMeditationStage } from './companion-meditation-stage';
+import { CompanionMeditationStage, journeyForeshadowLine } from './companion-meditation-stage';
 import { CompanionJourneyCycleStage } from './companion-journey-cycle-stage';
 import { currentJourneyCycle } from '@/game/katchimeras/companion-journey-cycle';
 import { adoptMossproutCycle } from '@/features/companion/companion-journey-service';
@@ -1488,6 +1488,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   // speech bubble while the meditating artwork remains in the world.
   const meditationDashboardActive = Boolean((!props.ftueCompanionSurfaceOwned || props.ftueProfileStep === 'meditating') && !quickGoalPickerOpen && !unifiedJourneyActive && meditation && route.kind !== 'conversation' && route.kind !== 'visit');
   const companionSpeechTitle = dashboardRouteActive && actionNarration ? actionNarration : dashboardRouteActive && !quickGoalPickerOpen && unifiedJourneyActive && journeyNarration ? journeyNarration : meditationDashboardActive ? MOSSPROUT_FTUE_COPY.meditation : mossproutFtueSpeechTitle;
+  const ftueActionDockVisible = dashboardRouteActive && props.familyId === 'mossprout'
+    && Boolean(props.ftueProfileStep && props.onFtueProfileContinue)
+    && !meditation && !quickGoalPickerOpen && !questionnaireExperience && !activeAttemptId;
   // The cinematic creature is positioned in full-screen coordinates, while
   // this overlay lives inside the surface below the safe-area page header.
   // Convert the desired screen-space position into that local coordinate so
@@ -1819,7 +1822,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           {meditationDashboardActive && meditation ? (
             <>
               {props.ftueProfileStep !== 'meditating' ? <View
-                pointerEvents="none"
+                pointerEvents="box-none"
                 style={[
                   styles.meditationWorldTimer,
                   {
@@ -1829,6 +1832,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   },
                 ]}>
                 <CompanionMeditationStage
+                  onPress={() => setActionNarration(journeyForeshadowLine(props.familyId))}
                   availableAt={meditation.availableAt}
                   companionName={props.name}
                   now={meditationNow}
@@ -2088,21 +2092,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   onOpenMerge={(orderId) => props.onOpenMerge?.(orderId, props.familyId)}
                 />
               ) : dashboardRouteActive && props.familyId === 'mossprout' && props.ftueProfileStep && props.onFtueProfileContinue ? (
-                <MossproutFtueStoryStage
-                  actionStackTargetRef={ftueActionTargetRef}
-                  activeBondQuestionId={ftueBondQuestionId}
-                  mode={props.ftueProfileStep}
-                  nickname={loadOnboardingProfile().playerNickname}
-                  onNarration={setActionNarration}
-                  onBondQuestionChange={setFtueBondQuestionId}
-                  onBondRewardRequest={requestStoryReward}
-                  onContinue={props.ftueProfileStep === 'garden_intro'
-                    ? props.onFtueOpenMerge
-                    : props.onFtueProfileContinue}
-                  pendingBondCelebration={props.pendingBondCelebration}
-                  gardenStoryActionIcon={ftueGardenStoryBeat.icon}
-                  gardenStoryActionLabel={ftueGardenStoryBeat.actionLabel}
-                />
+                null
               ) : dashboardRouteActive && props.familyId === 'mossprout' && props.ftueOrderPreviewActive && props.onFtueOpenMerge ? (
                 <MossproutFtueStoryStage onOpenMerge={props.onFtueOpenMerge} />
               ) : dashboardRouteActive
@@ -2381,6 +2371,24 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         </CompanionDestinationSurface>
         </>
         )}
+        {ftueActionDockVisible ? <View collapsable={false} style={[
+          styles.ftueActionDock,
+          { bottom: Math.max(12, insets.bottom + 8) },
+        ]}>
+          <MossproutFtueStoryStage
+            actionStackTargetRef={ftueActionTargetRef}
+            activeBondQuestionId={ftueBondQuestionId}
+            mode={props.ftueProfileStep ?? undefined}
+            nickname={loadOnboardingProfile().playerNickname}
+            onNarration={setActionNarration}
+            onBondQuestionChange={setFtueBondQuestionId}
+            onBondRewardRequest={requestStoryReward}
+            onContinue={props.ftueProfileStep === 'garden_intro' ? props.onFtueOpenMerge : props.onFtueProfileContinue}
+            pendingBondCelebration={props.pendingBondCelebration}
+            gardenStoryActionIcon={ftueGardenStoryBeat.icon}
+            gardenStoryActionLabel={ftueGardenStoryBeat.actionLabel}
+          />
+        </View> : null}
         <KatchaDialog
           body="This run will stop, but the quest stays active. You can reopen it from Do whenever you want."
           cancelLabel="Keep playing"
@@ -2484,6 +2492,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
 const styles = StyleSheet.create({
   environmentPanFrame: { flex: 1, minHeight: 0 },
   contentFrame: { flex: 1, minHeight: 0 },
+  ftueActionDock: { position: 'absolute', left: KatchaUI.layout.phoneGutter + 4, right: KatchaUI.layout.phoneGutter + 4, zIndex: 25 },
   destinationStageSpacer: { minHeight: 244 },
   youStageSpacer: { minHeight: 188 },
   scrollContent: { paddingBottom: 12, paddingHorizontal: 4 },

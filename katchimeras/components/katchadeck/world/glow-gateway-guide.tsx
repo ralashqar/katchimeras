@@ -1,3 +1,4 @@
+import { FTUE_SCENE_LAYERS } from '@/constants/ftue-scene-layers';
 import { useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Image } from 'expo-image';
@@ -55,7 +56,7 @@ export function GlowGatewayGuide({ world, onClose, onOpenMerge }: {
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Please try again.'); }
     finally { pending.current = false; setBusy(false); }
   };
-  return <Animated.View entering={FadeIn.duration(200)} style={{ position: 'absolute', left: 20, right: 20, bottom: insets.bottom + 20, gap: 10, zIndex: 85 }}>
+  return <Animated.View entering={FadeIn.duration(200)} style={{ position: 'absolute', left: 20, right: 20, bottom: insets.bottom + 20, gap: 10, zIndex: FTUE_SCENE_LAYERS.hero }}>
     <View pointerEvents="none" accessibilityElementsHidden style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
       <Image key={artAttempt} source={require('../../../assets/images/katchimeras/world/hex/floating_neighborhood_v2_steppling_haven_stage_0_hex_tile.webp')} style={{ width: 1, height: 1 }} onLoad={() => setArtReady(true)} onError={() => setError('The clearing could not load. Tap to try again.')} />
     </View>

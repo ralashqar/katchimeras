@@ -274,11 +274,11 @@ test('a full recovery board leaves input available to make room', () => {
   assert.match(step.guide!.body!, /Merge or store/);
 });
 
-test('purchase requires restoration and enough Glow; saves keep their existing balance and islands', () => {
+test('purchase only requires enough Glow; saves keep their existing balance and islands', () => {
   const purchase = { type: 'unlockWorldTarget', targetId: GLOW_GATEWAY_ID, now: NOW } as const;
   const fresh = createMossproutChapterZeroState(NOW);
   assert.equal(reduceMergeWorld(fresh, { type: 'unlockWorldTarget', targetId: '__proto__', now: NOW }).changed, false);
-  assert.equal(reduceMergeWorld({ ...fresh, coins: 100 }, purchase).changed, false);
+  assert.equal(reduceMergeWorld({ ...fresh, coins: 100 }, purchase).changed, true);
   const restored = firstBloom();
   const poor = { ...restored, coins: 39 };
   assert.equal(reduceMergeWorld(poor, purchase).changed, false);
@@ -302,7 +302,7 @@ test('paid mist stays revealed with an Egg despite relationship stage zero or st
   assert.equal(reduceMergeWorld(repaired, { type: 'unlockWorldTarget', targetId: GLOW_GATEWAY_ID, receiptId: 'persisted:mist', now: NOW }).changed, false);
   // The restored Garden structure still makes unpaid mist available even if the relationship projection resets.
   assert.equal(glowGatewayState({ ...relationshipProjection, worldUnlocks: {}, storyWorldMutationReceipts: [] }), 'locked');
-  assert.equal(glowGatewayState(createInitialMergeWorldState(NOW, ['mossprout'])), undefined);
+  assert.equal(glowGatewayState(createInitialMergeWorldState(NOW, ['mossprout'])), 'locked');
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   assert.match(screen, /gatewayState = glowGatewayState\(mergeWorld\)/);
   assert.match(screen, /gateway: stepplingEncounter.open \? 'egg' as const : gatewayState/);

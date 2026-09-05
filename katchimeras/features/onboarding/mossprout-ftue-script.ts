@@ -815,11 +815,11 @@ const retiredFirstSessionStepIds = new Set(MOSSPROUT_FTUE_SCRIPT.steps
   .map((step) => step.id));
 export function mossproutFtueStep(stepId: string) { return stepsById.get(stepId) ?? null; }
 export function mossproutFtueAction(stepId: string, actionId: string) { return mossproutFtueStep(stepId)?.actions.find((action) => action.id === actionId) ?? null; }
-/** World chrome must not leak through the separately hosted FTUE dialogue. */
+/** Hide Garden during dialogue and the post-restoration Continue handoff. */
 export function mossproutFtueShowsWorldGarden(stepId: string | null | undefined) {
   return !stepId || stepId === 'complete' || [
     'world.garden_arrival', 'world.seed_planted', 'world.garden_handoff',
-    'world.first_bloom_offer', 'world.first_bloom_restore', 'world.first_seed_grew',
+    'world.first_bloom_offer', 'world.first_bloom_restore',
   ].includes(stepId);
 }
 export function mossproutFtueUsesHostedCompanionStage(stepId: string | null | undefined) {

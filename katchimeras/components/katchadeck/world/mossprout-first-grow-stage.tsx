@@ -13,7 +13,6 @@ import { acknowledgeMossproutLifeCompletion, commitMossproutLifeCompletion, type
 import { COMPANION_BOND_REWARDS, type CompanionBondAwardReceipt } from '@/utils/companion-bond';
 import { CompanionNarrativePanel } from './companion-narrative-panel';
 import { CompanionChoiceList } from './companion-choice-list';
-import { CompanionSceneOverlayHost, CompanionSlidingSubmenu } from './companion-scene-overlay';
 import { MossproutNoticeChoices } from './mossprout-notice-choices';
 
 export function MossproutFirstGrowStage({ onNarration, onBondRewardRequest }: {
@@ -64,33 +63,32 @@ export function MossproutFirstGrowStage({ onNarration, onBondRewardRequest }: {
   const artwork = <Image contentFit="contain" transition={0} source={katchimeraActionArt('mossprout:nature-observation')} style={{ width: 48, height: 48 }} />;
   const reward = <DayActionRewardChip reward={{ kind: 'bond', amount: COMPANION_BOND_REWARDS.life_activity_completed }} />;
   const retryCard = error ? <KatchaButton label="Try again" onPress={() => void perform(retry.current)} disabled={busy} /> : null;
-  return <CompanionSceneOverlayHost>
-    {dialogue.hasNext && !open ? <KatchaButton label="Continue" onPress={dialogue.next} /> : returning ? <CompanionNarrativePanel style={{ paddingVertical: 12 }}>
+  // FTUE replaces a single control group at its natural height. It does not
+  // need a retained root, measured footprint, or submenu navigation animation.
+  return <View collapsable={false} style={{ gap: 8 }}>
+    {open && !returning ? <View style={{ gap: 8 }}>
+      {dialogue.hasNext ? <KatchaButton label="Continue" onPress={dialogue.next} /> : flight ? <DayActionCompletedRow animateLayout={false} enteringEnabled={false} artwork={artwork} title="Notice one small thing" reward={reward}
+        onRewardRequest={flight.receipt && onBondRewardRequest ? (source, arrive) => onBondRewardRequest(source, arrive, flight.receipt!) : undefined}
+        onFinished={() => void perform(async () => {
+          acknowledgeMossproutLifeCompletion(flight.id);
+          await advance('companion.complete_first_notice', flight.answer);
+        })} /> : <MossproutNoticeChoices disabled={busy} options={[...MOSSPROUT_FIRST_NOTICE.choices, { id: 'later', label: 'Not now' }]}
+          onSelect={(id) => void perform(async () => {
+            if (id === 'later') await advance('companion.skip_first_notice', 'skipped');
+            else await present(await completeFirstNotice(id));
+          })} />}
+      {retryCard}
+    </View> : dialogue.hasNext ? <KatchaButton label="Continue" onPress={dialogue.next} /> : returning ? <CompanionNarrativePanel style={{ paddingVertical: 12 }}>
       <CompanionChoiceList disabled={busy} options={MOSSPROUT_GARDEN_RETURN.choices} onSelect={(id) => void perform(async () => {
         await advanceFtueActionDurably({ expectedStepId: 'companion.water_together', actionId: 'companion.choose_garden_return', optionId: id });
       })} />{retryCard}
     </CompanionNarrativePanel> : <View style={{ gap: 8 }}>
-      <DayActionActiveRow enteringEnabled={false} label="Notice one small thing">
+      <DayActionActiveRow animateLayout={false} enteringEnabled={false} label="Notice one small thing">
         <Pressable accessibilityRole="button" disabled={busy} onPress={() => void perform(async () => {
           if (run?.stepId === 'companion.first_grow') await advanceFtueActionDurably({ expectedStepId: 'companion.first_grow', actionId: 'companion.open_first_grow' });
           if (alive.current) setOpen(true);
         })}><DayActionCardSurface artwork={artwork} title="Notice one small thing" reward={reward} /></Pressable>
       </DayActionActiveRow>{!open ? retryCard : null}
     </View>}
-    <CompanionSlidingSubmenu visible={open && !returning}>
-      <View style={{ gap: 8 }}>
-        {dialogue.hasNext ? <KatchaButton label="Continue" onPress={dialogue.next} /> : flight ? <DayActionCompletedRow enteringEnabled={false} artwork={artwork} title="Notice one small thing" reward={reward}
-          onRewardRequest={flight.receipt && onBondRewardRequest ? (source, arrive) => onBondRewardRequest(source, arrive, flight.receipt!) : undefined}
-          onFinished={() => void perform(async () => {
-            acknowledgeMossproutLifeCompletion(flight.id);
-            await advance('companion.complete_first_notice', flight.answer);
-          })} /> : <MossproutNoticeChoices disabled={busy} options={[...MOSSPROUT_FIRST_NOTICE.choices, { id: 'later', label: 'Not now' }]}
-            onSelect={(id) => void perform(async () => {
-              if (id === 'later') await advance('companion.skip_first_notice', 'skipped');
-              else await present(await completeFirstNotice(id));
-            })} />}
-        {retryCard}
-      </View>
-    </CompanionSlidingSubmenu>
-  </CompanionSceneOverlayHost>;
+  </View>;
 }

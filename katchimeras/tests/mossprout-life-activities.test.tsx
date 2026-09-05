@@ -379,7 +379,6 @@ test('first Grow shares the daily noticing receipt, survives interruption, and r
 
 test('FTUE opens noticing choices with one action tap, keeps Back hidden, and supports skipping', async () => {
   const copy = await import('../features/onboarding/mossprout-first-grow');
-  const overlay = loadCompanionOverlay();
   let run = { runId: 'first-grow', stepId: 'companion.water_together', answers: {} as Record<string, { optionId: string }> };
   const listeners = new Set<() => void>();
   const actions: string[] = [];
@@ -403,7 +402,6 @@ test('FTUE opens noticing choices with one action tap, keeps Back hidden, and su
         run = { ...run, stepId, answers: { ...run.answers, [actionId]: { optionId } } }; listeners.forEach((listener) => listener());
       },
     },
-    './companion-scene-overlay': overlay,
     './companion-narrative-panel': { CompanionNarrativePanel: 'NarrativePanel' },
     './companion-choice-list': { CompanionChoiceList: 'Choices' },
     './mossprout-notice-choices': { MossproutNoticeChoices: 'NoticeChoices' },
@@ -416,9 +414,16 @@ test('FTUE opens noticing choices with one action tap, keeps Back hidden, and su
   assert.match(narration!, /trying to look mysterious/);
   const press = (title: string) => act(async () => tree!.root.findByProps({ title }).parent!.props.onPress());
   assert.equal(tree!.root.findAllByProps({ title: 'Grow with Mossprout' }).length, 0, 'read the reply before the invitation');
+  const continueButton = tree!.root.findByProps({ label: 'Continue' });
+  await act(async () => tree!.update(<Stage onNarration={onNarration} />));
+  assert.equal(tree!.root.findByProps({ label: 'Continue' }), continueButton, 'rerenders retain the current control');
   await act(async () => tree!.root.findByProps({ label: 'Continue' }).props.onPress());
   assert.equal(tree!.root.findAllByProps({ title: 'Grow with Mossprout' }).length, 0, 'FTUE skips the Grow gateway');
+  const noticeRow = tree!.root.findByType('Active' as React.ElementType);
+  assert.equal(noticeRow.props.animateLayout, false, 'FTUE changes do not animate a list gap');
+  assert.equal(noticeRow.props.enteringEnabled, false, 'the notice card starts at its final position');
   await press('Notice one small thing');
+  assert.equal(tree!.root.findAllByType('Active' as React.ElementType).length, 0, 'choices replace the invitation instead of retaining a second layout');
   assert.equal(tree!.root.findAllByProps({ label: 'Back' }).length, 0);
   assert.equal(narration, copy.MOSSPROUT_FIRST_NOTICE.prompt);
   await act(async () => tree!.root.findByType('NoticeChoices' as React.ElementType).props.onSelect('later'));
