@@ -9,7 +9,7 @@ export type MergeOrderPresentationContext = {
 };
 
 /**
- * One current request. Keep the remaining requests in saved state so serving
+ * One current request per companion. Keep remaining requests in saved state so serving
  * advances the queue without regenerating the day's batch or its bonus.
  * Parcels and return notes remain presentation-specific.
  */
@@ -46,7 +46,7 @@ export function prioritizedVisibleMergeOrders(
     return order.storyStep ?? sourceIndex;
   };
 
-  return state.activeOrders
+  const ranked = state.activeOrders
     .map((order, sourceIndex) => ({ order, sourceIndex }))
     .sort((left, right) => {
       const leftPriority = priority(left.order);
@@ -71,6 +71,14 @@ export function prioritizedVisibleMergeOrders(
       }
       return left.sourceIndex - right.sourceIndex;
     })
-    .slice(0, 1)
     .map(({ order }) => order);
+  // A guided tutorial owns the rail. In normal play, limiting the whole rail
+  // to one request hides every other companion indefinitely behind Mossprout.
+  if (ranked[0] && priority(ranked[0]) < 3) return [ranked[0]];
+  const visibleFamilies = new Set<MergeOrder['characterId']>();
+  return ranked.filter((order) => {
+    if (visibleFamilies.has(order.characterId)) return false;
+    visibleFamilies.add(order.characterId);
+    return true;
+  });
 }

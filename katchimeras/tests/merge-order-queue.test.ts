@@ -34,6 +34,22 @@ test('tutorial request takes precedence over later daily or selected requests', 
   assert.deepEqual(prioritizedVisibleMergeOrders(state, { focusOrderId: 'repeat' }), [tutorial]);
 });
 
+test('normal shared board always shows one current request for both Mossprout and Steppling', () => {
+  const moss = order('moss:daily', 'companion:daily-garden');
+  const stepA = { ...order('step:daily:1', 'companion:daily-garden'), characterId: 'steppling' as const };
+  const stepB = { ...order('step:daily:2', 'companion:daily-garden'), characterId: 'steppling' as const };
+  const repeat = { ...order('step:repeat'), characterId: 'steppling' as const };
+  let state = { ...createInitialMergeWorldState(now), activeOrders: [moss, stepB, repeat, stepA],
+    companionDailyGarden: { steppling: { dayId: '2026-09-05', orders: [stepA, stepB], served: {}, bonusReceiptId: null } } };
+  // No Steppling deep link: reopening the shared Garden must still show him.
+  for (const expected of [stepA, stepB, repeat]) {
+    const visible = prioritizedVisibleMergeOrders(state, { characterId: 'mossprout' });
+    assert.deepEqual(visible.map((item) => item.id), [moss.id, expected.id]);
+    assert.equal(visible.filter((item) => item.characterId === 'steppling').length, 1);
+    state = { ...state, activeOrders: state.activeOrders.filter((item) => item.id !== expected.id) };
+  }
+});
+
 test('Steppling preview selects his queue on the shared Mossprout board, then keeps replenishing', () => {
   let state = createInitialMergeWorldState(now, ['mossprout', 'steppling']);
   state = reduceMergeWorld(state, { type: 'featureCharacter', characterId: 'steppling', now }).state;
