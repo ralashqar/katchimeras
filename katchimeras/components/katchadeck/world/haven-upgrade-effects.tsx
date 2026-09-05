@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useEffect } from 'react';
-import { StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   cancelAnimation,
@@ -74,8 +74,6 @@ type Props = {
   phase: HavenUpgradePresentationPhase;
   presentation: HavenTileUpgradePresentation;
   reducedMotion: boolean;
-  silhouetteFrame: EffectRect;
-  silhouetteSource: ImageSourcePropType;
   target: { x: number; y: number };
   showCoins?: boolean;
   showReaction?: boolean;
@@ -86,8 +84,6 @@ export const HavenUpgradeEffects = memo(function HavenUpgradeEffects({
   phase,
   presentation,
   reducedMotion,
-  silhouetteFrame,
-  silhouetteSource,
   target,
   showCoins: coinsEnabled = true,
   showReaction: reactionEnabled = true,
@@ -105,10 +101,6 @@ export const HavenUpgradeEffects = memo(function HavenUpgradeEffects({
     };
   }, [cover, phase, reducedMotion, reveal]);
 
-  const silhouetteStyle = useAnimatedStyle(() => ({
-    opacity: cover.value * interpolate(reveal.value, [0, 0.22, 1], [0.28, 0.2, 0]),
-    transform: [{ translateY: interpolate(reveal.value, [0, 1], [5, -10]) }],
-  }));
   const raysStyle = useAnimatedStyle(() => ({
     opacity: cover.value * interpolate(reveal.value, [0, 0.55, 1], [0.56, 0.3, 0]),
     transform: [{ translateY: interpolate(reveal.value, [0, 1], [18, -22]) }],
@@ -126,9 +118,8 @@ export const HavenUpgradeEffects = memo(function HavenUpgradeEffects({
 
       {showEnergy ? (
         <>
-          <Animated.View pointerEvents="none" style={[styles.silhouette, silhouetteFrame, silhouetteStyle]}>
-            <Image contentFit="contain" source={silhouetteSource} style={StyleSheet.absoluteFill} tintColor={presentation.palette.glow} transition={0} />
-          </Animated.View>
+          {/* Tile artwork belongs exclusively to HavenUpgradeTileArt. Drawing
+              the target here revealed its silhouette before the real blend. */}
           <View pointerEvents="none" style={[styles.energyArea, area]}>
             <Animated.View style={[StyleSheet.absoluteFill, raysStyle]}>
               {LIGHT_RAYS.map((ray, index) => (
@@ -262,6 +253,5 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   reactionText: { color: '#FFF9DF', fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '800', lineHeight: 19, textAlign: 'center' },
-  silhouette: { position: 'absolute' },
   upArrow: { fontFamily: AppFontFamilies.manrope, fontSize: 25, fontWeight: '900', position: 'absolute', textAlign: 'center', top: -5, width: 28 },
 });

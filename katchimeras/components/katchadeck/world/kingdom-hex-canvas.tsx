@@ -424,6 +424,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const [assetRevision, setAssetRevision] = useState(0);
   const [upgradePhaseState, setUpgradePhaseState] = useState<HavenUpgradePhaseState>({ nonce: null, phase: 'armed' });
   const upgradePhase = havenUpgradePhaseForPresentation(upgradePhaseState, upgradePresentation?.nonce);
+  const [paintedTransitionKeys, setPaintedTransitionKeys] = useState<Record<string, string | null>>({});
+  const [settledDiscoveryFamily, setSettledDiscoveryFamily] = useState<string | null>(null);
   const [settlingUpgrade, setSettlingUpgrade] = useState<{
     layers: HavenUpgradeLayers;
     nonce: number;
@@ -606,14 +608,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   useEffect(() => {
     if (!discoveryLayers) {
       setDiscoveryPhase('armed');
+      setSettledDiscoveryFamily(null);
       return;
     }
     setDiscoveryPhase('cover');
     const revealTimer = setTimeout(() => setDiscoveryPhase('reveal'), reduceMotion ? 80 : 360);
-    const completeTimer = setTimeout(() => setDiscoveryPhase('complete'), reduceMotion ? 360 : 1_120);
     return () => {
       clearTimeout(revealTimer);
-      clearTimeout(completeTimer);
     };
   }, [discoveryLayers, reduceMotion]);
   const gardenLayer = useMemo(() => scene.tileArtLayers.find(
@@ -1419,25 +1420,39 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 : settlingOwnsLayer
                   ? settlingUpgrade?.layers ?? null
                   : null;
-              const discoveryOwnsLayer = Boolean(discoveryLayers && layer.id === discoveryLayers.tile.id && discoveryPhase !== 'complete');
-              // Retain the base image for decode/readiness handoff, but only
-              // the transition may draw it: an opaque copy underneath prevents
-              // the wider mist silhouette from fading out until the final swap.
+              const discoveryOwnsLayer = Boolean(discoveryLayers && layer.id === discoveryLayers.tile.id
+                && (discoveryPhase !== 'complete' || settledDiscoveryFamily !== discoveryRevealFamilyId));
+              const activeTransition = transitionLayers ?? (discoveryOwnsLayer ? discoveryLayers : null);
+              const transitionKey = activeTransition ? JSON.stringify([
+                layer.id, upgradeOwnsLayer ? upgradePresentation?.nonce : settlingOwnsLayer ? settlingUpgrade?.nonce : discoveryRevealFamilyId,
+                worldImageSourceKey(kingdomHexTileSourceForLod(activeTransition.fromLayer, sceneTileImageLod)),
+                worldImageSourceKey(kingdomHexTileSourceForLod(activeTransition.toLayer, sceneTileImageLod)),
+                kingdomHexTileOverlaySourceForLod(activeTransition.fromLayer, sceneTileImageLod),
+                kingdomHexTileOverlaySourceForLod(activeTransition.toLayer, sceneTileImageLod),
+              ]) : null;
+              const transitionHasPainted = transitionKey !== null && paintedTransitionKeys[layer.id] === transitionKey;
+              const confirmOutgoingPainted = () => setPaintedTransitionKeys((current) => current[layer.id] === transitionKey
+                ? current : { ...current, [layer.id]: transitionKey });
+              // Keep the already-painted old tile until the transition's old
+              // copy has displayed. Hide it BEFORE blending, otherwise wider
+              // mist edges remain opaque beneath the outgoing transition.
               return (
                 <Fragment key={`tile-stack-${layer.id}`}>
                   <KingdomTileArt
-                    hidden={upgradeOwnsLayer || settlingOwnsLayer || discoveryOwnsLayer}
+                    hidden={transitionHasPainted}
                     focusAnchorX={scene.tileById.get(layer.id)?.cx ?? layer.frame.left + layer.frame.width / 2}
                     focusAnchorY={scene.tileById.get(layer.id)?.cy ?? layer.frame.top + layer.frame.height / 2}
                     focusScale={tileFocusScale(layer.id)}
-                    frame={layer.frame}
-                    source={source}
-                    overlaySource={overlaySource}
+                    frame={activeTransition && !transitionHasPainted ? activeTransition.fromLayer.frame : layer.frame}
+                    source={activeTransition && !transitionHasPainted ? kingdomHexTileSourceForLod(activeTransition.fromLayer, sceneTileImageLod) : source}
+                    overlaySource={activeTransition && !transitionHasPainted ? kingdomHexTileOverlaySourceForLod(activeTransition.fromLayer, sceneTileImageLod) : overlaySource}
                     fallbackSource={fallbackSource}
                     onSettled={settlingOwnsLayer && settlingUpgrade
                       && !havenUpgradeLayerArtChanges(layer, settlingUpgrade.layers.toLayer, sceneTileImageLod)
                       ? () => finishSettlingUpgrade(settlingUpgrade.nonce)
-                      : undefined}
+                      : discoveryOwnsLayer && discoveryPhase === 'complete'
+                        ? () => setSettledDiscoveryFamily(discoveryRevealFamilyId)
+                        : undefined}
                     priority={layer.id === scene.centerTile.id || layer.id === 'structure:mossprout-hex-garden' ? 'high' : 'normal'}
                   />
                   {transitionLayers ? (
@@ -1445,6 +1460,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                       key={`upgrade:${upgradeOwnsLayer ? upgradePresentation?.nonce : settlingUpgrade?.nonce}`}
                       fromLayer={transitionLayers.fromLayer}
                       imageLod={sceneTileImageLod}
+                      takeoverConfirmed={transitionHasPainted}
+                      onOutgoingReady={confirmOutgoingPainted}
                       onRevealComplete={upgradeOwnsLayer && upgradePresentation
                         ? () => handleUpgradeBlendComplete(upgradePresentation.nonce)
                         : undefined}
@@ -1453,10 +1470,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                       toLayer={transitionLayers.toLayer}
                     />
                   ) : null}
-                  {discoveryLayers && layer.id === discoveryLayers.tile.id && discoveryPhase !== 'complete' ? (
+                  {discoveryLayers && discoveryOwnsLayer ? (
                     <HavenUpgradeTileArt
                       fromLayer={discoveryLayers.fromLayer}
                       imageLod={sceneTileImageLod}
+                      takeoverConfirmed={transitionHasPainted}
+                      onOutgoingReady={confirmOutgoingPainted}
+                      onRevealComplete={() => setDiscoveryPhase('complete')}
                       phase={discoveryPhase}
                       reducedMotion={reduceMotion}
                       toLayer={discoveryLayers.toLayer}
@@ -1614,8 +1634,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           presentation={upgradePresentation}
           reducedMotion={reduceMotion}
           showCoins={upgradePresentation.showCoins}
-          silhouetteFrame={upgradeEffectGeometry.silhouetteFrame}
-          silhouetteSource={kingdomHexTileSourceForLod(upgradeLayers.toLayer, sceneTileImageLod)}
           target={upgradeEffectGeometry.target}
         />
       ) : null}
@@ -1627,8 +1645,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           reducedMotion={reduceMotion}
           showCoins={false}
           showReaction={false}
-          silhouetteFrame={discoveryEffectGeometry.silhouetteFrame}
-          silhouetteSource={kingdomHexTileSourceForLod(discoveryLayers.toLayer, sceneTileImageLod)}
           target={discoveryEffectGeometry.target}
         />
       ) : null}
@@ -1730,6 +1746,7 @@ const KingdomTileArt = memo(function KingdomTileArt({
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, hidden && { opacity: 0 }]}>
         <SeamlessWorldImage
           allowDownscaling
+          retainOutgoingOpacity
           source={source}
           fallbackSource={fallbackSource}
           onSettled={handleSourceSettled}
@@ -1738,6 +1755,7 @@ const KingdomTileArt = memo(function KingdomTileArt({
         {overlaySource ? (
           <SeamlessWorldImage
             allowDownscaling
+            retainOutgoingOpacity
             onSettled={handleOverlaySettled}
             source={overlaySource}
             priority={priority}
@@ -1752,6 +1770,8 @@ const HavenUpgradeTileArt = memo(function HavenUpgradeTileArt({
   fromLayer,
   imageLod,
   onRevealComplete,
+  onOutgoingReady,
+  takeoverConfirmed = true,
   phase,
   reducedMotion,
   toLayer,
@@ -1759,6 +1779,8 @@ const HavenUpgradeTileArt = memo(function HavenUpgradeTileArt({
   fromLayer: KingdomTileArtLayer;
   imageLod: KingdomHexTileLod;
   onRevealComplete?: () => void;
+  onOutgoingReady?: () => void;
+  takeoverConfirmed?: boolean;
   phase: HavenUpgradePresentationPhase;
   reducedMotion: boolean;
   toLayer: KingdomTileArtLayer;
@@ -1775,6 +1797,16 @@ const HavenUpgradeTileArt = memo(function HavenUpgradeTileArt({
   const handleSourceReady = useCallback(() => setReadySource(sourceKey), [sourceKey]);
   const handleOverlayReady = useCallback(() => setReadyOverlay(overlayKey), [overlayKey]);
   const targetReady = readySource === sourceKey && (!overlayKey || readyOverlay === overlayKey);
+  const oldKey = worldImageSourceKey(oldSource);
+  const oldOverlayKey = oldOverlaySource ? worldImageSourceKey(oldOverlaySource) : null;
+  const [paintedOld, setPaintedOld] = useState<string | null>(null);
+  const [paintedOldOverlay, setPaintedOldOverlay] = useState<string | null>(null);
+  const handleOldReady = useCallback(() => setPaintedOld(oldKey), [oldKey]);
+  const handleOldOverlayReady = useCallback(() => setPaintedOldOverlay(oldOverlayKey), [oldOverlayKey]);
+  const outgoingReady = paintedOld === oldKey && (!oldOverlayKey || paintedOldOverlay === oldOverlayKey);
+  useEffect(() => {
+    if (outgoingReady && (phase !== 'complete' || targetReady)) onOutgoingReady?.();
+  }, [onOutgoingReady, outgoingReady, phase, targetReady]);
   const onRevealCompleteRef = useRef(onRevealComplete);
   onRevealCompleteRef.current = onRevealComplete;
   const finishReveal = useCallback(() => onRevealCompleteRef.current?.(), []);
@@ -1784,7 +1816,7 @@ const HavenUpgradeTileArt = memo(function HavenUpgradeTileArt({
   const revealProgress = useSharedValue(phase === 'complete' ? 1 : 0);
 
   useEffect(() => {
-    if (!revealActive || !targetReady) return;
+    if (!revealActive || !targetReady || !outgoingReady || !takeoverConfirmed) return;
     revealProgress.value = withTiming(1, {
       duration: reducedMotion ? 180 : 480,
       easing: Easing.inOut(Easing.cubic),
@@ -1792,7 +1824,7 @@ const HavenUpgradeTileArt = memo(function HavenUpgradeTileArt({
       if (finished) runOnJS(finishReveal)();
     });
     return () => cancelAnimation(revealProgress);
-  }, [finishReveal, reducedMotion, revealActive, revealProgress, targetReady]);
+  }, [finishReveal, reducedMotion, revealActive, revealProgress, targetReady, outgoingReady, takeoverConfirmed]);
 
   const oldStyle = useAnimatedStyle(() => ({ opacity: 1 - revealProgress.value }));
   const newStyle = useAnimatedStyle(() => ({ opacity: revealProgress.value }));
@@ -1803,8 +1835,8 @@ const HavenUpgradeTileArt = memo(function HavenUpgradeTileArt({
   return (
     <>
       <Animated.View collapsable={false} needsOffscreenAlphaCompositing pointerEvents="none" style={[styles.tileArt, fromLayer.frame, oldStyle]}>
-        <SeamlessWorldImage priority="high" source={oldSource} transitionDuration={0} />
-        {oldOverlaySource ? <SeamlessWorldImage priority="high" source={oldOverlaySource} transitionDuration={0} /> : null}
+        <SeamlessWorldImage priority="high" source={oldSource} transitionDuration={0} onSettled={handleOldReady} />
+        {oldOverlaySource ? <SeamlessWorldImage priority="high" source={oldOverlaySource} transitionDuration={0} onSettled={handleOldOverlayReady} /> : null}
       </Animated.View>
       <Animated.View collapsable={false} needsOffscreenAlphaCompositing pointerEvents="none" style={[styles.tileArt, toLayer.frame, newStyle]}>
         <SeamlessWorldImage priority="high" source={newSource} transitionDuration={0} onSettled={handleSourceReady} />

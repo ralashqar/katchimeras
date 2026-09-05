@@ -86,7 +86,7 @@ function ScriptedActionCard({ action, completionKey, locked, reduceMotion, onAct
     return <StepFeedPanelMotion completionKey={completionKey} onFinished={onFinished} reduceMotion={reduceMotion}>
       <GameSurface contentStyle={styles.stepsSurfaceContent} density="regular" style={styles.card} tone="cream">
         <Pressable
-          accessibilityLabel={action.id === 'egg.feed_steps' ? `Feed ${stepCount.toLocaleString()} steps to the Egg for ${stepEnergy} Bond` : `Turn ${stepCount.toLocaleString()} steps into ${stepEnergy} Energy`}
+          accessibilityLabel={action.id === 'egg.feed_steps' ? `Feed ${stepCount.toLocaleString()} steps from yesterday to the Egg for ${stepEnergy} Bond` : `Turn ${stepCount.toLocaleString()} steps into ${stepEnergy} Energy`}
           accessibilityRole="button"
           disabled={locked}
           onPress={() => invoke((rect) => onAction(action, rect))}
@@ -96,7 +96,7 @@ function ScriptedActionCard({ action, completionKey, locked, reduceMotion, onAct
             <Image contentFit="contain" source={DASHBOARD_STAT_ART.steps} style={styles.stepsArt} />
             <View style={styles.stepsCopy}>
               <ThemedText style={styles.stepsValue} lightColor={KatchaDeckUI.ftue.goldDeep} darkColor={KatchaDeckUI.ftue.goldDeep}>{stepCount.toLocaleString()}</ThemedText>
-              <ThemedText style={styles.stepsLabel} lightColor={KatchaDeckUI.ftue.ink} darkColor={KatchaDeckUI.ftue.ink}>steps</ThemedText>
+              <ThemedText style={styles.stepsLabel} lightColor={KatchaDeckUI.ftue.ink} darkColor={KatchaDeckUI.ftue.ink}>{action.id === 'egg.feed_steps' ? 'steps yesterday' : 'steps'}</ThemedText>
             </View>
           </View>
           <IconSymbol color={Meadow.inkFaint} name="arrow.right" size={21} />

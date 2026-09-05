@@ -91,6 +91,9 @@ test('original Egg, Steppling questions and steps all use the same panel lifecyc
   const panel = readFileSync('components/katchadeck/world/steppling-encounter-panel.tsx', 'utf8');
   const nurture = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
   const steps = readFileSync('components/katchadeck/onboarding/scripted-action-list.tsx', 'utf8');
+  assert.match(panel, /<EggHeroGuide guide=\{guide\} topInset=\{insets.top\}/);
+  assert.match(nurture, /<EggHeroGuide guide=\{onboardingGuide\} topInset=\{topInset\}/);
+  for (const stage of ['intent', 'movement', 'steps', 'reading', 'ready']) assert.ok(panel.includes(`STEPPLING_EGG_GUIDES.${stage}`));
   const lifecycle = readFileSync('features/today/use-shared-action-panel-lifecycle.ts', 'utf8');
   for (const content of [nurture, steps]) assert.match(content, /import \{ useSharedActionPanelLifecycle \} from '@\/features\/today\/use-shared-action-panel-lifecycle'/);
   assert.match(panel, /completionEvent=\{encounter.feedCompletionKey \? \{ action: question, id: encounter.feedCompletionKey \} : null\}/);

@@ -1,3 +1,4 @@
+import { EggHeroGuide } from '@/components/katchadeck/onboarding/ftue-guide-copy';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { Gesture } from 'react-native-gesture-handler';
@@ -9,7 +10,7 @@ import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ScriptedActionList } from '@/components/katchadeck/onboarding/scripted-action-list';
 import { EggActionDock, EggQuestionPanel } from '@/components/katchadeck/home/today-nurture-experience';
 import { eggQuestionAction } from '@/features/onboarding/egg-question-action';
-import { STEPPLING_INTENT_OPTIONS, STEPPLING_MOVEMENT_OPTIONS, STEPPLING_INTENT_BOND, STEPPLING_MOVEMENT_BOND, stepplingEggReady, stepplingStepFeedOffer, type StepplingEggProgress } from '@/features/onboarding/steppling-egg-policy';
+import { STEPPLING_EGG_GUIDES, STEPPLING_INTENT_OPTIONS, STEPPLING_MOVEMENT_OPTIONS, STEPPLING_INTENT_BOND, STEPPLING_MOVEMENT_BOND, stepplingEggReady, stepplingStepFeedOffer, type StepplingEggProgress } from '@/features/onboarding/steppling-egg-policy';
 import type { useStepplingEncounter } from '@/features/onboarding/use-steppling-encounter';
 import type { FtueChoiceOption } from '@/features/onboarding/ftue-types';
 
@@ -75,7 +76,13 @@ export function StepplingEncounterPanel({ encounter, egg, cameraReady }: {
   ) : null;
   // No cards or extra claim CTA during the shared hatch choreography.
   if ((encounter.hatching || egg?.hatchedAt) && !encounter.error) return null;
-  return <EggActionDock bottomInset={insets.bottom}>
+  const guide = !egg?.intent ? STEPPLING_EGG_GUIDES.intent
+    : ready ? STEPPLING_EGG_GUIDES.ready
+      : question ? STEPPLING_EGG_GUIDES.movement
+        : stepOffer.steps > 0 ? STEPPLING_EGG_GUIDES.steps : STEPPLING_EGG_GUIDES.reading;
+  return <>
+    <EggHeroGuide guide={guide} topInset={insets.top} />
+    <EggActionDock bottomInset={insets.bottom}>
     {encounter.error ? <GameSurface><ThemedText accessibilityRole="alert">{encounter.error}</ThemedText>
       {encounter.hatching ? <KatchaButton label="Try again" disabled={encounter.busy} onPress={() => void encounter.finish()} /> : null}
     </GameSurface> : null}
@@ -98,5 +105,6 @@ export function StepplingEncounterPanel({ encounter, egg, cameraReady }: {
             void encounter.feed({ kind: 'feed', sourceDayId: egg.sourceDayId, observedSteps: steps ?? 0 }, from);
           }} />
             : <ScriptedActionList actions={[{ id: 'egg.read_steps', title: 'Reading yesterday’s steps…', description: '', icon: 'figure.walk', presentation: 'route_action', handlerId: 'pedometer_steps' }]} locked onAction={() => {}} />}
-  </EggActionDock>;
+    </EggActionDock>
+  </>;
 }

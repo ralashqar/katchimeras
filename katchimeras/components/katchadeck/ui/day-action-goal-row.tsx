@@ -23,7 +23,7 @@ const COMPLETION_WATCHDOG_MS = 3_200;
 
 export function DayActionGoalRow({
   animateLayout,
-  autoComplete = false,
+  highlighted = false,
   progress,
   accessibilityHint,
   completeOnPress = false,
@@ -44,7 +44,7 @@ export function DayActionGoalRow({
   subtitle,
 }: {
   animateLayout: boolean;
-  autoComplete?: boolean;
+  highlighted?: boolean;
   progress?: ReactNode;
   accessibilityHint?: string;
   completeOnPress?: boolean;
@@ -105,7 +105,7 @@ export function DayActionGoalRow({
   }));
   const tickStyle = useAnimatedStyle(() => ({ transform: [{ scale: tickScale.value }] }));
   const glowStyle = useAnimatedStyle(() => ({
-    opacity: chargeGlow.value,
+    opacity: Math.max(chargeGlow.value, highlighted ? 0.65 : 0),
     transform: [{ scale: 0.985 + chargeGlow.value * 0.025 }],
   }));
 
@@ -203,12 +203,6 @@ export function DayActionGoalRow({
       y: windowHeight * 0.68,
     });
   };
-
-  const beginCompletionRef = useRef(beginCompletion);
-  beginCompletionRef.current = beginCompletion;
-  useEffect(() => {
-    if (autoComplete && !disabled) beginCompletionRef.current();
-  }, [autoComplete, disabled]);
 
   return (
     <DayActionActiveRow

@@ -95,3 +95,8 @@ Steppling now mounts MossproutJourneyRequestPanel directly with standalone/fitCo
 Steppling's step card displays the existing ProgressBar in Meadow green with today's measured count and target. Progress starts at zero and clamps at 100%. Reaching the target automatically starts DayActionGoalRow's original completion/reward animation, with no check-off or claim tap. Pending chat presentations finish first, then reached step milestones animate one at a time. Tapping the step card only syncs the pedometer or requests motion permission. The next milestone remains gated by the actual recorded step count.
 
 Validation: 152 flow checks pass, including a render of the original row that begins automatically once, waits for Bond arrival, and finishes without a completion tap.
+
+
+## Tap to claim step milestones (supersedes automatic completion)
+
+Measured steps fill the existing green progress bar. Reaching the target highlights the original action row using its existing gold glow, but grants no reward until tapped. A claim runs the original Bond flight and row exit before showing a celebration in Steppling’s existing speech bubble and revealing the next milestone. Tapping before the target is reached reports the remaining steps in that same bubble and refreshes the pedometer. Milestone persistence and measured-step gating are unchanged.

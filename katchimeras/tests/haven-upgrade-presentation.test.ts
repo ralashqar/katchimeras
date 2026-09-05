@@ -38,7 +38,8 @@ test('upgrade energy follows the tile silhouette without central capsule layers'
   assert.doesNotMatch(effects, /styles\.(?:aura|mist)|borderRadius:\s*999[^\n]*height:\s*(?:142|210)/);
   assert.match(effects, /RISING_PARTICLES = Array\.from\(\{ length: 34 \}/);
   assert.match(effects, /LIGHT_RAYS[\s\S]*?RisingArrow/);
-  assert.match(effects, /silhouetteSource[\s\S]*?tintColor=\{presentation\.palette\.glow\}/);
+  assert.doesNotMatch(effects, /silhouetteSource|silhouetteStyle|tintColor/);
+  assert.doesNotMatch(canvas, /silhouetteSource=/);
   assert.match(scene, /alphaBounds: selectedBounds/);
   assert.match(canvas, /layer\.alphaBounds\.left \/ layer\.sourceSize\.width[\s\S]*?layer\.alphaBounds\.bottom \/ layer\.sourceSize\.height/);
 });
@@ -63,7 +64,8 @@ test('upgrade art has one forward-only crossfade owned by the presentation rende
   assert.match(canvas, /opacity: 1 - revealProgress\.value[\s\S]*?opacity: revealProgress\.value/);
   // The persistent from-state image must not remain opaque underneath the
   // outgoing crossfade layer (especially visible around the larger mist art).
-  assert.match(canvas, /<KingdomTileArt\s+hidden=\{upgradeOwnsLayer \|\| settlingOwnsLayer \|\| discoveryOwnsLayer\}/);
+  assert.match(canvas, /<KingdomTileArt\s+hidden=\{transitionHasPainted\}/);
+  assert.match(canvas, /!targetReady \|\| !outgoingReady \|\| !takeoverConfirmed/);
   assert.doesNotMatch(canvas, /settlingUpgradeTimerRef|setTimeout\(\(\) => finishSettlingUpgrade/);
   assert.match(canvas, /onSettled=\{settlingOwnsLayer[\s\S]*?!havenUpgradeLayerArtChanges\(layer, settlingUpgrade.layers.toLayer/);
   assert.match(canvas, /function KingdomTileArt[\s\S]*?hidden && \{ opacity: 0 \}/);

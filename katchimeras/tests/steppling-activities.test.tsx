@@ -68,25 +68,29 @@ test('Steppling keeps the claimed row through its flight, uses the legacy tray, 
   }, { setInterval, clearInterval });
   const Cards = module.StepplingActions as React.ComponentType<Record<string, unknown>>;
   let tree: ReactTestRenderer;
-  const props = { onOpenConversation: (id: string, actionOrigin: KatchimeraActionOrigin) => { definitionId = id; origin = actionOrigin; }, requests: [{ id: 'order-one', title: 'A garden path', definitionIds: ['trail'], badge: '+8 Glow · 5 min sooner' }], onOpenMerge: (id: string) => opened.push(id), onBondRewardRequest: (_source: unknown, arrive: () => void, receipt: { points: number }) => { flights++; assert.ok([5, 8].includes(receipt.points)); finishFlight = arrive; } };
+  let reaction = '';
+  const props = { onReaction: (text: string) => { reaction = text; }, onOpenConversation: (id: string, actionOrigin: KatchimeraActionOrigin) => { definitionId = id; origin = actionOrigin; }, requests: [{ id: 'order-one', title: 'A garden path', definitionIds: ['trail'], badge: '+8 Glow · 5 min sooner' }], onOpenMerge: (id: string) => opened.push(id), onBondRewardRequest: (_source: unknown, arrive: () => void, receipt: { points: number }) => { flights++; assert.ok([5, 8].includes(receipt.points)); finishFlight = arrive; } };
   await act(async () => { tree = create(<Cards {...props} />); });
   const row = () => tree!.root.findByType('GoalRow' as React.ElementType);
   const press = async (label: string) => act(async () => { tree!.root.findAllByType('Pressable' as React.ElementType).find((item) => item.props.accessibilityLabel === label)!.props.onPress(); });
-  assert.equal(row().props.completeOnPress, undefined);
-  assert.equal(row().props.autoComplete, false);
+  assert.equal(row().props.completeOnPress, false);
+  assert.equal(row().props.highlighted, false);
   assert.equal(row().props.progress.props.children.props.current, 499);
   assert.equal(row().props.progress.props.children.props.total, 500);
   assert.equal(row().props.hideCompletionControl, true);
   steps = 2500;
   await act(async () => { row().props.onOpen(); });
-  assert.equal(row().props.completeOnPress, undefined);
-  assert.equal(row().props.autoComplete, true);
+  assert.equal(row().props.completeOnPress, true);
+  assert.equal(row().props.highlighted, true);
+  assert.equal(bond.events.length, 0, 'reaching the target does not claim until tapped');
+  assert.match(reaction, /1 more step to/);
   await act(async () => row().props.onBeginCompletion());
   await act(async () => row().props.onCompletionRequest({ x: 1, y: 1, width: 30, height: 30 }, () => arrived++));
   assert.equal(flights, 1); assert.equal(arrived, 0);
   assert.equal(row().props.title, 'Walk 500 steps');
   await act(async () => { finishFlight(); row().props.onFinished(); });
   assert.equal(arrived, 1);
+  assert.match(reaction, /500 steps!/);
   assert.equal(row().props.title, 'Walk 2,000 steps');
   assert.equal(row().props.reward.props.reward.amount, 8);
   await press('Tend garden');
@@ -167,7 +171,7 @@ test('shared conversation completion awards Steppling once and preserves Mosspro
 });
 
 
-test('pedometer fulfillment starts the original row animation without a completion tap', async () => {
+test('ready steps wait for a tap, then use the original row reward and exit sequence', async () => {
   const motion = nativeMotionHarness();
   const timers = new Map<number, { callback: () => void; delay: number }>();
   let timerId = 0;
@@ -188,11 +192,13 @@ test('pedometer fulfillment starts the original row animation without a completi
     onOpen: () => {}, onBeginCompletion: () => began++, onFinished: () => finished++,
     onCompletionRequest: (_source: unknown, onArrive: () => void) => { rewards++; arrive = onArrive; } };
   let tree: ReactTestRenderer;
-  await act(async () => { tree = create(<Row {...props} autoComplete={false} />); });
+  await act(async () => { tree = create(<Row {...props} completeOnPress={false} />); });
   assert.equal(began, 0);
-  await act(async () => tree!.update(<Row {...props} autoComplete />));
+  await act(async () => tree!.update(<Row {...props} completeOnPress highlighted />));
+  assert.equal(began, 0, 'readiness alone never claims the reward');
+  await act(async () => tree!.root.findByType('Pressable' as React.ElementType).props.onPress());
   assert.equal(began, 1);
-  await act(async () => tree!.update(<Row {...props} autoComplete />));
+  await act(async () => tree!.update(<Row {...props} completeOnPress highlighted />));
   assert.equal(began, 1, 'repeated sensor updates cannot start duplicate completion');
   await act(async () => { [...timers.values()].find((timer) => timer.delay === 190)!.callback(); motion.advance(1000); });
   assert.equal(rewards, 1);

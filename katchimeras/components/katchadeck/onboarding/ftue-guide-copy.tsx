@@ -1,3 +1,5 @@
+import Animated, { Easing, FadeInDown } from 'react-native-reanimated';
+import { Meadow } from '@/constants/meadow-theme';
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -8,6 +10,17 @@ export type FtueGuide = {
   title: string;
   body: string;
 };
+
+/** Original first-Egg hero framing, shared by both hatch sequences. */
+export function EggHeroGuide({ guide, topInset, topHudVisible = false }: {
+  guide: FtueGuide; topInset: number; topHudVisible?: boolean;
+}) {
+  return <Animated.View key={`focus:${guide.title}`} pointerEvents="none"
+    entering={FadeInDown.duration(260).easing(Easing.out(Easing.cubic))}
+    style={[styles.eggHero, { top: topInset + (topHudVisible ? 82 : 22) }]}>
+    <FtueGuideCopy guide={guide} hero />
+  </Animated.View>;
+}
 
 export function FtueGuideCopy({ guide, hero = false }: {
   guide: FtueGuide;
@@ -60,6 +73,7 @@ export function FtueGuideCopy({ guide, hero = false }: {
 }
 
 const styles = StyleSheet.create({
+  eggHero: { alignItems: 'center', gap: 4, left: Meadow.space.page, position: 'absolute', right: Meadow.space.page, zIndex: 18 },
   heroCopy: { alignItems: 'center', gap: 8, maxWidth: 360, width: '100%' },
   inlineCopy: { alignItems: 'center', gap: 7, maxWidth: 350, width: '100%' },
   eyebrowPill: {

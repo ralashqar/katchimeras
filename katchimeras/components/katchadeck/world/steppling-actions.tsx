@@ -36,7 +36,8 @@ function todaySteps(dayId: string) {
   const day = home && [home.today, ...home.archivedDays].find((item) => (item.stepsCountDayId ?? item.isoDate) === dayId);
   return Math.max(0, day?.stepsCount ?? 0);
 }
-export function StepplingActions({ onOpenConversation, requests, onOpenMerge, onSubmenuChange, onStory, storyLabel, onBondRewardRequest, externalGesture }: {
+export function StepplingActions({ onReaction, onOpenConversation, requests, onOpenMerge, onSubmenuChange, onStory, storyLabel, onBondRewardRequest, externalGesture }: {
+  onReaction?: (text: string) => void;
   onOpenConversation?: (definitionId: string, origin: KatchimeraActionOrigin) => void;
   requests: readonly CompanionMergeRequest[]; onOpenMerge: (id?: string) => void;
   onSubmenuChange?: (open: boolean) => void; onStory?: () => void; storyLabel?: string;
@@ -53,6 +54,7 @@ export function StepplingActions({ onOpenConversation, requests, onOpenMerge, on
   const [completing, setCompleting] = useState<{ dayId: string; steps: number; bond: number } | null>(null);
   const [attempt, setAttempt] = useState(0);
   const syncing = useRef(false);
+  const claimedSteps = useRef<number | null>(null);
   const mounted = useRef(true);
   const syncSteps = useCallback(async (ask = false) => {
     if (syncing.current) return;
@@ -134,13 +136,17 @@ export function StepplingActions({ onOpenConversation, requests, onOpenMerge, on
   return <View style={{ gap: 7 }}>
     {goal ? <DayActionGoalRow key={`${completing?.dayId ?? dayId}:${goal.steps}:${attempt}`} animateLayout entryDelayMs={DAY_ACTION_MOTION.entryBaseDelayMs} externalGesture={externalGesture}
       label={`Walk ${goal.steps.toLocaleString()} steps today`} title={`Walk ${goal.steps.toLocaleString()} steps`}
-      subtitle={`${steps.toLocaleString()} / ${goal.steps.toLocaleString()} steps today`}
+      subtitle={ready ? `${goal.steps.toLocaleString()} steps reached · tap to celebrate` : `${steps.toLocaleString()} / ${goal.steps.toLocaleString()} steps today`}
       progress={<View accessibilityRole="progressbar" accessibilityLabel="Daily step progress" accessibilityValue={{ min: 0, max: goal.steps, now: Math.min(steps, goal.steps) }} style={{ paddingTop: 5 }}>
         <ProgressBar current={steps} total={goal.steps} color={Meadow.leaf} trackColor="rgba(101,139,81,0.18)" minimumPercent={0} />
       </View>}
       artwork={art('movement')} reward={<DayActionRewardChip reward={{ kind: 'bond', amount: goal.bond }} />}
-      accessibilityHint="Tracks pedometer steps and completes automatically at the target. Tap to sync or allow motion access."
-      hideCompletionControl autoComplete={ready && !error && !pending && !displayed && AppState.currentState === 'active'} disabled={Boolean(completing)} onOpen={() => { void syncSteps(true); }}
+      accessibilityHint={ready ? "Tap to claim your step reward." : "Hear how many steps remain and refresh your pedometer."}
+      hideCompletionControl highlighted={ready} completeOnPress={ready} disabled={Boolean(completing) || Boolean(pending || displayed)} onOpen={() => {
+        const remaining = Math.max(0, goal.steps - steps);
+        onReaction?.(`Not quite yet—${remaining.toLocaleString()} more ${remaining === 1 ? "step" : "steps"} to this little milestone. We can take them at your pace.`);
+        void syncSteps(true);
+      }}
       onBeginCompletion={() => setCompleting({ ...goal, dayId })}
       onCompletionRequest={(source, onArrive) => {
         try {
@@ -148,18 +154,25 @@ export function StepplingActions({ onOpenConversation, requests, onOpenMerge, on
           const result = claimedDay === localDayId() ? claimStepplingMilestone(loadCompanionBondState(), claimedDay, goal.steps, steps) : null;
           if (result?.awarded) {
             saveCompanionBondState(result.state);
+            claimedSteps.current = goal.steps;
             if (source && onBondRewardRequest && result.receipt) onBondRewardRequest(source, onArrive, result.receipt);
             else onArrive();
           } else onArrive();
         } catch { setError('Your reward could not be saved. Please try again.'); onArrive(); }
       }}
-      onFinished={() => { setBond(loadCompanionBondState()); setCompleting(null); setAttempt((value) => value + 1); }}
+      onFinished={() => {
+        if (claimedSteps.current != null) {
+          onReaction?.(`${claimedSteps.current.toLocaleString()} steps! Look how far those little moments carried us. I’m glad we’re finding our rhythm together.`);
+          claimedSteps.current = null;
+        }
+        setBond(loadCompanionBondState()); setCompleting(null); setAttempt((value) => value + 1);
+      }}
     /> : null}
     {action('Tend garden', 'quest', () => setMode('garden'), 1)}
     <View>
       <DayActionReplacementSlot concealed={concealChat} ready={Boolean(onStory || (nextChat && onOpenConversation))} revealing={presentation.phase === 'revealing'}>
-        {onStory ? action(storyLabel ?? 'A note from Steppling', 'reflection', onStory, 2) : nextChat && onOpenConversation ? <DayActionActiveRow animateLayout enteringEnabled={false} entryDelayMs={0} disabled={Boolean(completing) || ready || concealChat} externalGesture={externalGesture} label={nextChat.title}>
-          <Pressable accessibilityRole="button" accessibilityLabel={nextChat.title} disabled={Boolean(completing) || ready || concealChat} onPress={openChat}>
+        {onStory ? action(storyLabel ?? 'A note from Steppling', 'reflection', onStory, 2) : nextChat && onOpenConversation ? <DayActionActiveRow animateLayout enteringEnabled={false} entryDelayMs={0} disabled={Boolean(completing) || concealChat} externalGesture={externalGesture} label={nextChat.title}>
+          <Pressable accessibilityRole="button" accessibilityLabel={nextChat.title} disabled={Boolean(completing) || concealChat} onPress={openChat}>
             <DayActionCardSurface artwork={art('reflection')} title={nextChat.title} reward={<DayActionRewardChip reward={{ kind: 'bond', amount: 8 }} />} />
           </Pressable>
         </DayActionActiveRow> : null}

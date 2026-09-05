@@ -11,6 +11,29 @@ const host = (name: string) => name as unknown as React.ComponentType<Record<str
 const lifecyclePath = 'features/today/use-shared-action-panel-lifecycle.ts';
 const seamlessPath = 'components/katchadeck/world/seamless-world-image.tsx';
 
+test('restoration effects never draw replacement tile artwork before or during the blend', async () => {
+  const clock = nativeMotionHarness();
+  const module = loadNativeModule('components/katchadeck/world/haven-upgrade-effects.tsx', {
+    'react-native': nativeViews,
+    'react-native-reanimated': { ...clock.animated, default: { ...clock.animated.default, Text: host('AnimatedText') } },
+    'expo-image': { Image: host('Image') }, 'expo-linear-gradient': { LinearGradient: host('Gradient') },
+    '@/constants/game-currency-art': { GAME_CURRENCY_ART: { coins: 1 } },
+    '@/constants/theme': { AppFontFamilies: { manrope: 'test' } },
+  });
+  const Effects = module.HavenUpgradeEffects as unknown as React.ComponentType<Record<string, unknown>>;
+  const props = { area: { left: 0, top: 0, width: 200, height: 200 }, target: { x: 100, y: 100 },
+    presentation: { nonce: 1, reactionLine: '', palette: { accent: '#fff', glow: '#fff', primary: '#fff' } },
+    showCoins: false, showReaction: false, reducedMotion: false };
+  let tree: ReactTestRenderer;
+  await act(async () => { tree = create(<Effects {...props} phase="armed" />); });
+  for (const phase of ['payment', 'cover', 'reveal', 'react', 'complete']) {
+    await act(async () => { tree!.update(<Effects {...props} phase={phase} />); clock.advance(100); });
+    assert.equal(tree!.root.findAllByType(host('Image')).length, 0, `${phase} must not overlay a copy of the restored tile`);
+    if (phase === 'cover' || phase === 'reveal') assert.equal(tree!.root.findAllByType(host('Gradient')).length, 7, 'keep the light rays');
+  }
+  await act(async () => { tree!.unmount(); });
+});
+
 test('shared Egg panel remains visible halfway through the slide and releases only at its last frame', async () => {
   const clock = nativeMotionHarness();
   const { useSharedActionPanelLifecycle } = loadNativeModule(lifecyclePath, {
@@ -85,7 +108,7 @@ test('Steppling retains the answering card across camera unsettles and changed s
   await act(async () => { tree!.unmount(); });
 });
 
-test('world image crossfades BOTH images and reports settled only after removing the old image', async () => {
+test('world image crossfades both images but preserves the painted native view at promotion', async () => {
   const clock = nativeMotionHarness();
   const module = loadNativeModule(seamlessPath, {
     'react-native': nativeViews, 'react-native-reanimated': clock.animated,
@@ -97,10 +120,11 @@ test('world image crossfades BOTH images and reports settled only after removing
   let settled = 0;
   let tree: ReactTestRenderer;
   await act(async () => { tree = create(<WorldImage source={1} />); });
-  await act(async () => { tree!.root.findByType(host('Image')).props.onLoad(); clock.advance(100); });
+  await act(async () => { tree!.root.findByType(host('Image')).props.onDisplay(); });
   await act(async () => { tree!.update(<WorldImage source={2} onSettled={() => { settled++; }} />); });
   assert.equal(settled, 0);
-  await act(async () => { tree!.root.findAllByType(host('Image'))[1].props.onLoad(); clock.advance(50); });
+  const incoming = tree!.root.findAllByType(host('Image'))[1];
+  await act(async () => { incoming.props.onDisplay(); clock.advance(50); });
   const layers = tree!.root.findAllByType(host('AnimatedView'));
   assert.equal(layers[0].props.style[1].read().opacity, 0.5);
   assert.equal(layers[1].props.style[1].read().opacity, 0.5);
@@ -108,9 +132,42 @@ test('world image crossfades BOTH images and reports settled only after removing
   await act(async () => { clock.advance(50); });
   assert.equal(tree!.root.findAllByType(host('Image')).length, 1);
   assert.equal(tree!.root.findByType(host('Image')).props.source, 2);
-  assert.equal(settled, 0, 'React commit is not proof that the native replacement has painted');
-  await act(async () => { tree!.root.findByType(host('Image')).props.onDisplay(); });
+  assert.equal(tree!.root.findByType(host('Image')), incoming, 'the native image that already painted must not remount');
+  assert.equal(tree!.root.findByType(host('AnimatedView')).props.style[1].opacity, 1, 'promotion cannot inherit the outgoing zero-opacity mapper');
   assert.equal(settled, 1);
+  await act(async () => { tree!.unmount(); });
+});
+
+test('zoom LOD swaps retain coverage and a quick reversal discards stale candidate callbacks', async () => {
+  const clock = nativeMotionHarness();
+  const module = loadNativeModule(seamlessPath, {
+    'react-native': nativeViews, 'react-native-reanimated': clock.animated,
+    'expo-image': { Image: host('Image') },
+    '@/constants/kingdom-rendering': { KINGDOM_RENDERING: { imageCrossfadeMs: 100 } },
+    '@/hooks/use-scene-performance-probe': { SceneImagePerformanceTrace() { return null; } },
+  });
+  const WorldImage = module.SeamlessWorldImage as unknown as React.ComponentType<Record<string, unknown>>;
+  let tree: ReactTestRenderer;
+  await act(async () => { tree = create(<WorldImage source={1} retainOutgoingOpacity />); });
+  await act(async () => { tree!.root.findByType(host('Image')).props.onDisplay(); });
+  const original = tree!.root.findByType(host('Image'));
+  await act(async () => { tree!.update(<WorldImage source={2} retainOutgoingOpacity />); });
+  const candidate = tree!.root.findAllByType(host('Image'))[1];
+  const staleDisplay = candidate.props.onDisplay;
+  await act(async () => { clock.advance(500); });
+  let layers = tree!.root.findAllByType(host('AnimatedView'));
+  assert.equal(layers[0].props.style[1].read().opacity, 1, 'no fade before candidate displays');
+  assert.equal(layers[1].props.style[1].read().opacity, 0);
+  await act(async () => { candidate.props.onDisplay(); clock.advance(50); });
+  layers = tree!.root.findAllByType(host('AnimatedView'));
+  assert.equal(layers[0].props.style[1].read().opacity, 1, 'LOD fade must not expose bright background');
+  assert.equal(layers[1].props.style[1].read().opacity, 0.5);
+  await act(async () => { tree!.update(<WorldImage source={1} retainOutgoingOpacity />); });
+  await act(async () => { staleDisplay(); clock.advance(200); });
+  assert.equal(tree!.root.findAllByType(host('Image')).length, 1);
+  assert.equal(tree!.root.findByType(host('Image')), original);
+  assert.equal(original.props.source, 1);
+  assert.equal(tree!.root.findByType(host('AnimatedView')).props.style[1].opacity, 1);
   await act(async () => { tree!.unmount(); });
 });
 
@@ -126,13 +183,22 @@ test('restoration waits for decoded target and finishes on the actual crossfade 
   }, 'HavenUpgradeTileArt');
   const Tile = module.HavenUpgradeTileArt as unknown as React.ComponentType<Record<string, unknown>>;
   let finishes = 0;
-  const props = { fromLayer: { source: 1, frame: {} }, toLayer: { source: 2, frame: {} }, imageLod: 'full', reducedMotion: false, onRevealComplete: () => { finishes++; } };
+  let outgoingReady = 0;
+  const props = { fromLayer: { source: 1, frame: {} }, toLayer: { source: 2, frame: {} }, imageLod: 'full', reducedMotion: false, onRevealComplete: () => { finishes++; }, onOutgoingReady: () => { outgoingReady++; }, takeoverConfirmed: false };
   let tree: ReactTestRenderer;
   await act(async () => { tree = create(<Tile {...props} phase="cover" />); });
   await act(async () => { tree!.update(<Tile {...props} phase="reveal" />); clock.advance(2500); });
   const frames = () => tree!.root.findAllByType(host('AnimatedView')).map((layer) => layer.props.style[2].read().opacity);
   assert.deepEqual(frames(), [1, 0], 'keep the old tile until the new art is ready');
   await act(async () => { tree!.root.findAllByType(host('WorldImage'))[1].props.onSettled(); });
+  await act(async () => { clock.advance(1000); });
+  assert.deepEqual(frames(), [1, 0], 'a cached target must not start the fade before the outgoing copy displays');
+  await act(async () => { tree!.root.findAllByType(host('WorldImage'))[0].props.onSettled(); });
+  assert.equal(outgoingReady, 1);
+  await act(async () => { clock.advance(1000); });
+  assert.deepEqual(frames(), [1, 0], 'do not fade until the host has hidden the persistent base');
+  props.takeoverConfirmed = true;
+  await act(async () => { tree!.update(<Tile {...props} phase="reveal" />); });
   await act(async () => { clock.advance(240); });
   assert.deepEqual(frames(), [0.5, 0.5]);
   assert.equal(finishes, 0);
@@ -185,6 +251,7 @@ for (const phase of ['reveal', 'react']) {
     const opacity = () => tree!.root.findAllByType(host('AnimatedView')).map((layer) => layer.props.style[2].read().opacity);
     assert.deepEqual(opacity(), [1, 0]);
     await act(async () => { tree!.root.findAllByType(host('WorldImage'))[1].props.onSettled(); });
+    await act(async () => { tree!.root.findAllByType(host('WorldImage'))[0].props.onSettled(); });
     assert.deepEqual(opacity(), [1, 0], 'decoding the restored art must not jump to the end');
     await act(async () => { clock.advance(reducedMotion ? 90 : 240); });
     assert.deepEqual(opacity(), [0.5, 0.5]);

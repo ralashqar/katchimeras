@@ -1087,7 +1087,8 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.match(kingdomScreen, /gardenWorldBottomCtaActive[\s\S]*?bottom: Math\.max\(insets\.bottom, 12\) \+ 22[\s\S]*?justifyContent: 'space-between'[\s\S]*?top: insets\.top \+ 18/);
   assert.match(kingdomScreen, /function FtueOpeningFade\(\)[\s\S]*?opacity\.value = withDelay\([\s\S]*?duration: reduceMotion \? 140 : 1_350/);
   assert.match(kingdomScreen, /ftueStepId === 'world\.egg_intro' \? <FtueOpeningFade/);
-  assert.match(nurture, /styles\.onboardingHeroGuide, \{ top: topInset \+ \(onboardingTopHudVisible \? 82 : 22\) \}/);
+  assert.match(nurture, /<EggHeroGuide guide=\{onboardingGuide\} topInset=\{topInset\} topHudVisible=\{onboardingTopHudVisible\}/);
+  assert.match(readFileSync('components/katchadeck/onboarding/ftue-guide-copy.tsx', 'utf8'), /top: topInset \+ \(topHudVisible \? 82 : 22\)/);
   assert.match(kingdomScreen, /!upgradePresentation && \(!ftueStepId \|\| ftueStepId === 'companion\.meditating'\)/);
   assert.match(kingdomScreen, /onPress=\{stepplingEncounter.open \? stepplingEncounter.close : interactionCreatureId \? requestResidentInteractionExit : onBackToHavenSelector\}/);
   assert.doesNotMatch(kingdomScreen, /cameraFallbackTimer/);
@@ -1529,7 +1530,7 @@ test('FTUE CTA actions use the shared glowing primary button without a post-hatc
 test('opening FTUE removes the white environment fade and introduces UI from below', () => {
   const home = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
   assert.match(home, /!onboardingFocus \? <View pointerEvents="none" style=\{styles\.environmentFade\} \/> : null/);
-  assert.match(home, /entering=\{FadeInDown\.duration\(260\)\.easing\(Easing\.out\(Easing\.cubic\)\)\}/);
+  assert.match(readFileSync('components/katchadeck/onboarding/ftue-guide-copy.tsx', 'utf8'), /entering=\{FadeInDown\.duration\(260\)\.easing\(Easing\.out\(Easing\.cubic\)\)\}/);
   assert.match(readFileSync('features/today/use-shared-action-panel-lifecycle.ts', 'utf8'), /enterFromBottom \? FadeInDown : FadeInUp/);
   assert.ok((home.match(/enterFromBottom/g) ?? []).length >= 8);
 });
@@ -1623,7 +1624,7 @@ test('FTUE copy uses the shared cozy-game type hierarchy and stays concise', () 
   assert.match(theme, /ftueHeroTitle:[\s\S]*?AppFontFamilies\.fredokaBold/);
   assert.match(theme, /ftueBody:[\s\S]*?AppFontFamilies\.manrope/);
   assert.match(theme, /ftuePanelTitle:[\s\S]*?AppFontFamilies\.fredokaBold/);
-  assert.match(home, /import \{ FtueGuideCopy \} from '@\/components\/katchadeck\/onboarding\/ftue-guide-copy'/);
+  assert.match(home, /import \{ EggHeroGuide, FtueGuideCopy \} from '@\/components\/katchadeck\/onboarding\/ftue-guide-copy'/);
   assert.match(guide, /KatchaDeckUI\.typography\.ftueHeroTitle/);
   assert.match(home, /KatchaDeckUI\.typography\.ftuePanelTitle/);
   assert.match(actions, /KatchaDeckUI\.typography\.ftuePanelTitle/);

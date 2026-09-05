@@ -48,6 +48,7 @@ export function CompanionJourneyCycleStage({ onOpenConversation, familyId, onOpe
   const [now, setNow] = useState(Date.now());
   const [checkInOpen, setCheckInOpen] = useState(false);
   const [submenuOpen, setSubmenuOpen] = useState(false);
+  const [reaction, setReaction] = useState<string | null>(null);
   const refreshRef = useRef<() => Promise<void>>(async () => undefined);
   const mounted = useRef(true);
   const actionPending = useRef(false);
@@ -108,7 +109,8 @@ export function CompanionJourneyCycleStage({ onOpenConversation, familyId, onOpe
   const mossChapter = MOSSPROUT_JOURNEY_CAMPAIGN.chapters?.find((chapter) => chapter.id === cycle?.chapterId);
   const story = familyId === 'steppling' ? loadAuthoredCohortStory('steppling') : null;
   const nextOrder = story?.orderDeck?.templateKeys.find((key) => !story.completedOrderIds.includes('merge-story:steppling:chapter-1:' + key));
-  const narration = error ?? (!initialized ? 'Finding our place…' : pending
+  useEffect(() => { setReaction(null); }, [familyId, cycle?.id, run?.nodeId, submenuOpen]);
+  const narration = error ?? reaction ?? (!initialized ? 'Finding our place…' : pending
     ? ready ? journeyReturnLine(cycle)
       : checkInOpen ? 'What have you made room for since we paused?'
         : familyId === 'steppling' ? 'I’m reflecting for a little while. We can count today’s steps, tend the garden, or share a trail question.' : 'I’m reflecting for a little while. These little requests can bring me back sooner.'
@@ -176,6 +178,7 @@ export function CompanionJourneyCycleStage({ onOpenConversation, familyId, onOpe
     {!onNarration && !submenuOpen ? <JourneyText style={styles.prompt}>{narration}</JourneyText> : null}
     {!submenuOpen && pending && !ready && rest ? <CompanionMeditationStage availableAt={rest.availableAt} startedAt={rest.startedAt} settledMs={rest.settledMs} now={now} companionName={familyId === 'steppling' ? 'Steppling' : 'Mossprout'} /> : null}
     {familyId === 'steppling' && initialized && !error && !checkInOpen && node?.kind !== 'scene' ? <StepplingActions
+      onReaction={setReaction}
       onOpenConversation={onOpenConversation} externalGesture={externalGesture} onBondRewardRequest={onBondRewardRequest} onSubmenuChange={setSubmenuOpen} onOpenMerge={onOpenMerge}
       storyLabel={pending && ready ? (cycle.finale ? 'Remember this chapter' : 'Hear what we brought back') : `Begin Journey Day ${day?.number ?? 1}`}
       onStory={pending && ready ? () => void perform(() => claimCompanionJourneyReturn(cycle.id)) : !pending && day && !node ? () => void perform(beginNextStepplingEpisode) : undefined}

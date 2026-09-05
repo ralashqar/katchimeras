@@ -79,7 +79,7 @@ import {
 import { useTodayEnergyFeedback } from '@/features/today/today-energy-feedback';
 import { eggAvatarCustomizerCamera } from '@/utils/egg-avatar-customizer-camera';
 import { ScriptedActionList } from '@/components/katchadeck/onboarding/scripted-action-list';
-import { FtueGuideCopy } from '@/components/katchadeck/onboarding/ftue-guide-copy';
+import { EggHeroGuide, FtueGuideCopy } from '@/components/katchadeck/onboarding/ftue-guide-copy';
 import type { FtueActionDefinition, FtueChoiceOption } from '@/features/onboarding/ftue-types';
 import { clampFtueCameraPanToCoverage } from '@/features/onboarding/ftue-home-camera';
 import type { TodayHatchPresentation } from '@/utils/today-hatch-presentation';
@@ -890,13 +890,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
       {!hatchReadyFocus && !onboardingFocus ? <MicrocopyToast message={microcopy} placementStyle={{ top: nurtureToastTop }} /> : null}
       {onboardingFocus && onboardingUiVisible && onboardingGuide && !actionListHidden ? (
         <>
-          <Animated.View
-            entering={FadeInDown.duration(260).easing(Easing.out(Easing.cubic))}
-            key={`focus:${onboardingGuide.title}`}
-            pointerEvents="none"
-            style={[styles.onboardingHeroGuide, { top: topInset + (onboardingTopHudVisible ? 82 : 22) }]}>
-            <FtueGuideCopy guide={onboardingGuide} hero />
-          </Animated.View>
+          <EggHeroGuide guide={onboardingGuide} topInset={topInset} topHudVisible={onboardingTopHudVisible} />
           {scriptedRouteChoiceActions.length > 1 && scriptedPanelCareAction && onScriptedAction ? (
             <View style={[styles.onboardingActionStage, { bottom: actionDockBottom }]}>
               <InlineRouteActionChoice
@@ -2253,7 +2247,6 @@ const styles = StyleSheet.create({
   rowPressed: { backgroundColor: 'rgba(255,244,204,0.72)', transform: [{ translateY: 1 }, { scale: 0.985 }] },
   careSection: { gap: 6, paddingHorizontal: Meadow.space.page, paddingTop: 12 },
   onboardingGuide: { alignItems: 'center', paddingBottom: 12, paddingHorizontal: 12 },
-  onboardingHeroGuide: { alignItems: 'center', gap: 4, left: Meadow.space.page, position: 'absolute', right: Meadow.space.page, zIndex: 18 },
   onboardingActionStage: { left: Meadow.space.page, position: 'absolute', right: Meadow.space.page, zIndex: 19 },
   checkInGroup: { gap: 6, justifyContent: 'flex-end' },
   inlineCard: { overflow: 'hidden' },

@@ -74,7 +74,7 @@ export const MOSSPROUT_FTUE_RETURN_NOTE_ID = 'mossprout:chapter-0:return-note';
 const openingQuestionSteps: FtueScriptDefinition['steps'] = [
   {
     id: 'egg.opening', surface: 'haven',
-    guide: { eyebrow: 'A moment from your world', title: 'It is listening.', body: '' },
+    guide: { eyebrow: 'A moment from your world', title: 'It’s listening to your day.', body: '' },
     camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('egg.opening'), anchorY: 0.5, durationMs: 520 },
     actions: [{
       id: 'egg.day_texture', title: COPY.dayQuestion, description: '', icon: 'leaf.fill',
@@ -85,7 +85,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
   },
   {
     id: 'egg.context', surface: 'haven',
-    guide: { eyebrow: 'A second little spark', title: 'It reacted!', body: '' },
+    guide: { eyebrow: 'A second little spark', title: 'Your answer made it stir.', body: '' },
     camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('egg.context'), anchorY: 0.49, durationMs: 520 },
     actions: [{
       id: 'egg.desired_help', title: COPY.helpQuestion, description: '', icon: 'heart.fill',
@@ -96,7 +96,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
   },
   {
     id: 'egg.mind', surface: 'haven',
-    guide: { eyebrow: 'Question 3 of 3', title: 'It is waking up.', body: '' },
+    guide: { eyebrow: 'Question 3 of 3', title: 'Each answer helps it wake.', body: '' },
     camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('egg.mind'), anchorY: 0.51, durationMs: 520 },
     actions: [{
       id: 'egg.support_style', title: 'What would you like a little more of lately?', description: '', icon: 'sparkles',
@@ -111,7 +111,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
   },
   {
     id: 'egg.nature_theme', surface: 'today',
-    guide: { eyebrow: 'Question 4 of 5', title: 'A tiny leaf appeared.', body: '' },
+    guide: { eyebrow: 'Question 4 of 5', title: 'Your answer is taking root.', body: '' },
     actions: [{
       id: 'egg.life_priority', title: 'What would you like to make more room for?', description: '', icon: 'leaf.fill',
       presentation: 'inline_choice', handlerId: 'player_profile', promptKind: 'activity', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
@@ -126,7 +126,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
   },
   {
     id: 'egg.companion_identity', surface: 'today',
-    guide: { eyebrow: 'Question 5 of 5', title: 'One last answer.', body: '' },
+    guide: { eyebrow: 'Question 5 of 5', title: 'One spark before we meet.', body: '' },
     actions: [{
       id: 'egg.companion_place', title: 'Which kind of place feels most like you?', description: '', icon: 'map.fill',
       presentation: 'inline_choice', handlerId: 'player_profile', promptKind: 'activity', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,

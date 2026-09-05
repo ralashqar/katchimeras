@@ -20,6 +20,8 @@ type Props = {
   /** Called after the outgoing native image has actually been retired. */
   onSettled?: () => void;
   transitionDuration?: number;
+  /** Resolution-only swaps retain coverage while the sharper/coarser copy paints. */
+  retainOutgoingOpacity?: boolean;
   priority?: 'low' | 'normal' | 'high';
   source: ImageSourcePropType;
 };
@@ -40,6 +42,7 @@ export const SeamlessWorldImage = memo(function SeamlessWorldImage({
   onReady,
   onSettled,
   transitionDuration = KINGDOM_RENDERING.imageCrossfadeMs,
+  retainOutgoingOpacity = false,
   priority = 'normal',
   source,
 }: Props) {
@@ -54,6 +57,7 @@ export const SeamlessWorldImage = memo(function SeamlessWorldImage({
   candidateRef.current = candidate;
   const requestedKeyRef = useRef(sourceKey);
   requestedKeyRef.current = sourceKey;
+  const fadingKeyRef = useRef<string | null>(null);
 
   useEffect(() => () => cancelAnimation(fade), [fade]);
   useEffect(() => {
@@ -62,7 +66,17 @@ export const SeamlessWorldImage = memo(function SeamlessWorldImage({
   }, [candidate, displayed, onSettled, paintedKey, sourceKey]);
 
   useEffect(() => {
-    if (displayed?.key === sourceKey || candidate?.key === sourceKey) return;
+    if (displayed?.key === sourceKey) {
+      if (candidate) {
+        cancelAnimation(fade);
+        fade.value = 0;
+        fadingKeyRef.current = null;
+        setPaintedKey(displayed.key);
+        setCandidate(null);
+      }
+      return;
+    }
+    if (candidate?.key === sourceKey) return;
     if (
       failedPrimaryRef.current === sourceKey &&
       (displayed?.key === fallbackKey || candidate?.key === fallbackKey)
@@ -72,23 +86,30 @@ export const SeamlessWorldImage = memo(function SeamlessWorldImage({
     failedPrimaryRef.current = null;
     cancelAnimation(fade);
     fade.value = 0;
+    fadingKeyRef.current = null;
     setCandidate({ fallback: false, key: sourceKey, source });
-  }, [candidate?.key, displayed?.key, fade, fallbackKey, source, sourceKey]);
+  }, [candidate, displayed?.key, fade, fallbackKey, source, sourceKey]);
 
   const commitCandidate = useCallback((key: string, nextSource: ImageSourcePropType, fallback: boolean) => {
     // A completion queued by the UI thread can arrive after a newer source.
     if (candidateRef.current?.key !== key || (!fallback && requestedKeyRef.current !== key)) return;
     if (fallback && failedPrimaryRef.current !== requestedKeyRef.current) return;
-    setPaintedKey(null);
+    // Promote the same keyed native view; do not discard a painted image and
+    // mount a blank replacement at the end of a zoom/LOD transition.
     setDisplayed({ fallback, key, source: nextSource });
     setCandidate((current) => (current?.key === key ? null : current));
   }, []);
 
-  const handleLoad = useCallback(() => {
+  const handleDisplay = useCallback(() => {
     if (!candidate) return;
+    if (candidateRef.current?.key !== candidate.key) return;
+    if (!candidate.fallback && requestedKeyRef.current !== candidate.key) return;
+    if (fadingKeyRef.current === candidate.key) return;
+    fadingKeyRef.current = candidate.key;
+    setPaintedKey(candidate.key);
     onReady?.();
     const loaded = candidate;
-    if (transitionDuration === 0) {
+    if (!displayed || transitionDuration === 0) {
       fade.value = 1;
       commitCandidate(loaded.key, loaded.source, loaded.fallback);
       return;
@@ -96,13 +117,16 @@ export const SeamlessWorldImage = memo(function SeamlessWorldImage({
     fade.value = withTiming(1, { duration: transitionDuration }, (finished) => {
       if (finished) runOnJS(commitCandidate)(loaded.key, loaded.source, loaded.fallback);
     });
-  }, [candidate, commitCandidate, fade, onReady, transitionDuration]);
+  }, [candidate, commitCandidate, displayed, fade, onReady, transitionDuration]);
 
   const handleError = useCallback(() => {
     if (!candidate) return;
+    if (candidateRef.current?.key !== candidate.key) return;
+    if (!candidate.fallback && requestedKeyRef.current !== candidate.key) return;
     if (!candidate.fallback && fallbackSource && fallbackKey && fallbackKey !== candidate.key) {
       failedPrimaryRef.current = candidate.key;
       fade.value = 0;
+      fadingKeyRef.current = null;
       setCandidate({ fallback: true, key: fallbackKey, source: fallbackSource });
       return;
     }
@@ -110,43 +134,33 @@ export const SeamlessWorldImage = memo(function SeamlessWorldImage({
   }, [candidate, fade, fallbackKey, fallbackSource, onFailure]);
 
   const candidateStyle = useAnimatedStyle(() => ({ opacity: fade.value }));
-  const displayedStyle = useAnimatedStyle(() => ({ opacity: candidate ? 1 - fade.value : 1 }));
+  const displayedStyle = useAnimatedStyle(() => ({ opacity: candidate && !retainOutgoingOpacity ? 1 - fade.value : 1 }));
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <SceneImagePerformanceTrace sceneKey="kingdom" sourceKey={sourceKey} />
-      {displayed ? (
-        <Animated.View style={[StyleSheet.absoluteFill, displayedStyle]}>
+      {[displayed, candidate].filter((entry): entry is Candidate => entry != null).map((entry) => (
+        <Animated.View key={entry.key} style={[StyleSheet.absoluteFill,
+          // A promoted candidate must not inherit the outgoing mapper's last
+          // opacity (zero) while its new worklet subscription is installed.
+          !candidate ? { opacity: 1 } : entry === candidate ? candidateStyle : displayedStyle,
+        ]}>
           <Image
-            key={displayed.key}
-            source={displayed.source}
+            source={entry.source}
             contentFit="contain"
             allowDownscaling={allowDownscaling}
             cachePolicy="memory"
-            recyclingKey={displayed.key}
+            recyclingKey={entry.key}
             transition={0}
             priority={priority}
-            onDisplay={() => setPaintedKey(displayed.key)}
+            // onLoad only means decoded. Never uncover a tile until the native
+            // image reports it has actually displayed its pixels.
+            onDisplay={entry === candidate ? handleDisplay : undefined}
+            onError={entry === candidate ? handleError : undefined}
             style={StyleSheet.absoluteFill}
           />
         </Animated.View>
-      ) : null}
-      {candidate ? (
-        <Animated.View key={candidate.key} style={[StyleSheet.absoluteFill, candidateStyle]}>
-          <Image
-            source={candidate.source}
-            contentFit="contain"
-            allowDownscaling={allowDownscaling}
-            cachePolicy="memory"
-            recyclingKey={candidate.key}
-            transition={0}
-            priority={priority}
-            onLoad={handleLoad}
-            onError={handleError}
-            style={StyleSheet.absoluteFill}
-          />
-        </Animated.View>
-      ) : null}
+      ))}
     </View>
   );
 });
