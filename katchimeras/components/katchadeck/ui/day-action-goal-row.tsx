@@ -56,7 +56,7 @@ export function DayActionGoalRow({
   externalGesture?: GestureType;
   label: string;
   onBeginCompletion?: () => void;
-  onCompletionRequest: (source: DayActionSourceRect | null, onRewardArrive: () => void) => void;
+  onCompletionRequest: (source: DayActionSourceRect | null, onRewardArrive: () => void, onFailed: () => void) => void;
   onFinished?: () => void;
   onOpen: (completeFromOrigin: () => void) => void;
   onSkip?: () => void;
@@ -184,7 +184,20 @@ export function DayActionGoalRow({
       rowOpacity.value = withDelay(710, withTiming(0, { duration: 185, easing: Easing.in(Easing.quad) }));
     }
 
-    schedule(() => onCompletionRequest(source, markRewardArrived), reduceMotion ? 40 : REWARD_REQUEST_DELAY_MS);
+    const abortCompletion = () => {
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
+      completingRef.current = false;
+      exitFinishedRef.current = false;
+      rewardArrivedRef.current = false;
+      finishedRef.current = false;
+      setCompleting(false);
+      setCelebrationSource(null);
+      rowX.value = 0; rowOpacity.value = 1; rowScale.value = 1;
+      artX.value = 0; artRotation.value = 0; artScale.value = 1;
+      tickScale.value = 1; chargeGlow.value = 0;
+    };
+    schedule(() => onCompletionRequest(source, markRewardArrived, abortCompletion), reduceMotion ? 40 : REWARD_REQUEST_DELAY_MS);
     schedule(markRewardArrived, COMPLETION_WATCHDOG_MS);
   };
 
@@ -216,6 +229,8 @@ export function DayActionGoalRow({
       <Animated.View style={[styles.motionViewport, motionViewportStyle]}>
         <Animated.View style={rowStyle}>
           <Pressable
+            accessibilityActions={onSkip && !completing && !disabled ? [{ name: 'skip', label: 'Skip for today' }] : undefined}
+            onAccessibilityAction={(event) => { if (event.nativeEvent.actionName === 'skip' && !completing && !disabled) onSkip?.(); }}
             accessibilityHint={accessibilityHint ?? (completeOnPress ? (onSkip ? "Completes this task. Swipe right to skip." : "Completes this task.") : "Opens goal options")}
             accessibilityLabel={title}
             accessibilityRole="button"

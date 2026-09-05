@@ -26,7 +26,7 @@ import { measureMergeWork } from '@/utils/merge-world/performance';
 import { createSelectorStore, selectedSnapshot } from '@/utils/merge-world/selector-store';
 import { loadFirstSession } from '@/features/onboarding/first-session';
 import { completeMossproutResidentCardDiscovery, mossproutDailyActionDeck, mossproutJourneyForDay, mossproutJourneyRuntimeDayId, mossproutStory, recordKatchimeraActionCompletion, recordMossproutFirstGardenRestored, recordMossproutJourneyOrderServed, recordMossproutMatchedCard, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
-import { completeMeditationRequest, currentJourneyCycle } from '@/game/katchimeras/companion-journey-cycle';
+import { completeMeditationRequest, currentJourneyCycle, settleDailyGardenDelivery } from '@/game/katchimeras/companion-journey-cycle';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { completeMossproutChapterZeroSlice, isMossproutChapterZeroActive } from '@/utils/merge-world/chapter-zero-policy';
 import { loadMergeWorldState, saveMergeWorldState, subscribeMergeWorldResets, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
@@ -200,6 +200,10 @@ export function MergeWorldProvider({
   }, []);
 
   const applyReceiptSideEffect = useCallback((receipt: MergeExternalRewardReceipt) => {
+    if (receipt.kind === 'story_order_served' && receipt.sourceId === 'companion:daily-garden') {
+      relationshipProgressionRepository.update((state) => settleDailyGardenDelivery(state, receipt.characterId, receipt.id, receipt.createdAt));
+      return;
+    }
     if (receipt.kind === 'story_order_served' && receipt.id.startsWith('merge-story-served:journey-cycle:')) {
       relationshipProgressionRepository.update((state) => {
         const cycle = currentJourneyCycle(state, receipt.characterId);
@@ -402,6 +406,9 @@ export function MergeWorldProvider({
     }
     if (characterId !== 'feastle' && characterId !== 'mossprout' && !isAuthoredCohortFamily(characterId)) {
       next = reconcileFeaturedStory(next, characterId, now);
+    }
+    if (firstSessionComplete) for (const familyId of ['mossprout', 'steppling'] as const) {
+      next = reduceMergeWorld(next, { type: 'ensureCompanionDailyGarden', familyId, now }).state;
     }
     const mossCycle = currentJourneyCycle(relationshipProgressionRepository.load(), 'mossprout');
     if (mossCycle) {
@@ -980,4 +987,8 @@ export function useMergeWorldLastResult() {
   const value = use(MergeWorldLastResultContext);
   if (value === undefined) throw new Error('useMergeWorldLastResult must be used inside MergeWorldProvider.');
   return value;
+}
+
+export function useOptionalMergeWorldActions() {
+  return use(MergeWorldActionsContext);
 }

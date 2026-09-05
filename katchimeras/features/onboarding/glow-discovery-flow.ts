@@ -11,14 +11,14 @@ export const GLOW_DISCOVERY_RUN_ID = 'story:glow-steppling-v1';
 export const GLOW_LESSON: readonly MergeLessonBeat[] = [
   { id: 'lesson.spawn', kind: 'spawn', generatorId: 'wild-garden', guide: { eyebrow: 'Light a path', title: 'More Seeds start here.', body: 'Tap the Garden Basket.' } },
   { id: 'lesson.seed', kind: 'match', definitionId: 'nature:garden:1', echoId: GLOW_ECHO_IDS[0], guide: { eyebrow: 'Free a little space', title: 'Match the bound Seed.', body: 'Drag your Seed onto its identical match to free this space.' } },
-  { id: 'lesson.sprout', kind: 'match', definitionId: 'nature:garden:2', echoId: GLOW_ECHO_IDS[1], guide: { eyebrow: 'Free a little space', title: 'Now match the Sprout.', body: 'Drag your Sprout onto its identical match.' } },
+  { id: 'lesson.sprout', kind: 'match', definitionId: 'nature:garden:2', echoId: GLOW_ECHO_IDS[1], guide: { coaching: 'practice', eyebrow: 'Free a little space', title: 'Now match the Sprout.', body: 'Drag your Sprout onto its identical match.' } },
   { id: 'lesson.serve', kind: 'serve', orderId: GLOW_ORDER_IDS[0], guide: { eyebrow: 'Light a path', title: 'A Plant, and a little Glow.', body: 'Serve this request to earn 20 Glow.' } },
 ];
 export const GLOW_REPEAT_LESSON: readonly MergeLessonBeat[] = [
   { id: 'lesson.repeat.spawn', kind: 'spawn', generatorId: 'wild-garden', guide: { eyebrow: 'Keep gathering Glow', title: 'One more request.', body: 'Let’s grow a Magical Plant. Tap the Garden Basket for a Seed.' } },
   ...['Seed', 'Sprout', 'Plant', 'Flower', 'Rare Flower'].map((name, index): MergeLessonBeat => ({
     id: `lesson.repeat.match-${index + 1}`, kind: 'match', definitionId: `nature:garden:${index + 1}`, echoId: GLOW_REPEAT_ECHO_IDS[index],
-    guide: { eyebrow: 'Grow a little magic', title: `Match the bound ${name}.`, body: `Drag your ${name} onto its match to free it and grow ${['a Sprout', 'a Plant', 'a Flower', 'a Rare Flower', 'a Magical Plant'][index]}.` },
+    guide: { coaching: 'practice', eyebrow: 'Clear the mist', title: 'Grow a Magical Plant.', body: `Next: match two ${name === 'Rare Flower' ? 'Rare Flowers' : name + 's'}.` },
   })),
   { id: 'lesson.repeat.serve', kind: 'serve', orderId: GLOW_ORDER_IDS[1], guide: { eyebrow: '20 more Glow', title: 'A Magical Plant!', body: 'Serve this request. Then we can clear the mist.' } },
 ];
@@ -36,7 +36,7 @@ export const GLOW_DISCOVERY_FLOW = defineStory({
     storyOperations.focusCamera({ id: 'gateway.return', target: STEPPLING_STORY_TARGET, zoom: 1.2, anchorY: 0.46, next: 'gateway.buy' }),
     worldActionScene({ id: 'gateway.buy', actionId: 'unlock', next: 'gateway.purchase.focus', view: { kind: 'purchase', guide: { eyebrow: 'Misty clearing', title: 'Let’s clear the mist.', body: 'Your Glow can make room for something new.' }, actionLabel: 'Clear mist' } }),
     ...upgradeWorldTargetRecipe({ id: 'gateway.purchase', target: STEPPLING_STORY_TARGET, toLevel: 1, economy: { mode: 'normal' }, cameraAlreadyFocused: true, presentation: { preset: 'mist-clear', reactionLine: 'A new beginning.', showCoins: true }, next: 'gateway.egg' }),
-    worldActionScene({ id: 'gateway.egg', actionId: 'done', next: 'complete', view: { kind: 'discovery', guide: { eyebrow: 'A new beginning', title: 'An Egg!', body: 'A new friend is resting inside.' }, actionLabel: 'Continue' } }), story.complete(),
+    worldActionScene({ id: 'gateway.egg', actionId: 'done', next: 'complete', view: { kind: 'discovery', guide: { eyebrow: 'A new beginning', title: 'An Egg!', body: 'A new friend is resting inside. Your Garden is open—explore at your own pace.' }, actionLabel: 'Continue' } }), story.complete(),
   ],
   migrations: {
     'gateway.goal': 'garden.open',

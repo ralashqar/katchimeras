@@ -1,3 +1,5 @@
+import { CompanionEnvironmentGestureContext } from './companion-environment-gesture-context';
+import { CompanionFirstRestCards } from './companion-first-rest-cards';
 import * as Haptics from 'expo-haptics';
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -155,7 +157,6 @@ import { MOSSPROUT_BOND_SHARE_PROMPTS, MOSSPROUT_SUPPORT_STYLE_OPTIONS, mossprou
 import { mossproutGardenIntroBeat } from '@/features/onboarding/mossprout-garden-intro';
 import { MOSSPROUT_FTUE_COPY, MOSSPROUT_GREETING_OPTIONS, mossproutSeedIntroduction } from '@/features/onboarding/mossprout-ftue-copy';
 import { recordMossproutOnboardingAnswer } from '@/features/onboarding/mossprout-profile';
-import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 
 const LazyQuestExperienceHost = lazy(async () => {
   const module = await import('./quests/quest-experience-host');
@@ -362,6 +363,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const storedMeditation = katchimeraMeditationRecord(relationships, props.familyId);
   const meditationAvailableAt = storedMeditation?.availableAt;
   const [meditationNow, setMeditationNow] = useState(Date.now());
+  const [actionSubmenuOpen, setActionSubmenuOpen] = useState(false);
+  const [actionNarration, setActionNarration] = useState<string | null>(null);
   const [journeyNarration, setJourneyNarration] = useState<string | null>(null);
   // The FTUE's closing beat remains an explicit interaction until the player
   // chooses Tend the Garden, even if its wake timer elapsed while the app was
@@ -1482,7 +1485,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   // lock. Once an action opens a conversation, its prompt must reclaim the
   // speech bubble while the meditating artwork remains in the world.
   const meditationDashboardActive = Boolean(!quickGoalPickerOpen && !unifiedJourneyActive && meditation && route.kind !== 'conversation' && route.kind !== 'visit');
-  const companionSpeechTitle = dashboardRouteActive && !quickGoalPickerOpen && unifiedJourneyActive && journeyNarration ? journeyNarration : meditationDashboardActive ? MOSSPROUT_FTUE_COPY.meditation : mossproutFtueSpeechTitle;
+  const companionSpeechTitle = dashboardRouteActive && actionNarration ? actionNarration : dashboardRouteActive && !quickGoalPickerOpen && unifiedJourneyActive && journeyNarration ? journeyNarration : meditationDashboardActive ? MOSSPROUT_FTUE_COPY.meditation : mossproutFtueSpeechTitle;
   // The cinematic creature is positioned in full-screen coordinates, while
   // this overlay lives inside the surface below the safe-area page header.
   // Convert the desired screen-space position into that local coordinate so
@@ -1506,6 +1509,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           showClose={false}
           surface={questGameVisible ? 'night' : 'parchment'}
           transparent={Boolean(props.reuseUnderlyingStage && !questGameVisible)}>
+        <CompanionEnvironmentGestureContext.Provider value={environmentPan.gesture}>
         <GestureDetector gesture={environmentPan.gesture}>
         <View style={styles.environmentPanFrame}>
         {questGameVisible ? (
@@ -1741,7 +1745,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           />
         ) : null}
         <CompanionDestinationSurface
-          fullWidth={mossproutActionDashboard}
+          fullWidth={dashboardRouteActive}
           immersive={Boolean(questGameVisible || questionnaireExperience)}>
         <View key="interaction-content" style={styles.contentFrame}>
           {dashboardRouteActive && !quickGoalPickerOpen && unifiedJourneyActive && (props.familyId === 'steppling' || props.familyId === 'mossprout') ? (
@@ -1751,6 +1755,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               right: Math.max(KatchaUI.layout.phoneGutter, insets.right),
             }]}>
                 <CompanionJourneyCycleStage
+                  routineSubmenuOpen={actionSubmenuOpen}
                   onOpenConversation={requestStoryConversation}
                   onBondRewardRequest={requestStoryReward}
                   externalGesture={environmentPan.gesture}
@@ -1758,6 +1763,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   onNarration={setJourneyNarration}
                   onVisitSeed={props.onClose}
                   routineActions={<MossproutStoryStage
+                  onActionNarration={setActionNarration}
+                  onSubmenuChange={setActionSubmenuOpen}
+                  onAddTask={() => experience.openQuickGoalPicker()}
                   onVisitSeed={props.onClose}
                   visibleActionCount={meditation ? 2 : 3}
                   activeQuestId={props.activeQuest?.questId}
@@ -1807,7 +1815,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
 
           {meditationDashboardActive && meditation ? (
             <>
-              <View
+              {props.ftueProfileStep !== 'meditating' ? <View
                 pointerEvents="none"
                 style={[
                   styles.meditationWorldTimer,
@@ -1824,7 +1832,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   settledMs={meditation.settledMs}
                   startedAt={meditation.startedAt}
                 />
-              </View>
+              </View> : null}
               <View
                 style={[
                   styles.meditationActionsOverlay,
@@ -1834,10 +1842,13 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                     right: KatchaUI.layout.phoneGutter + 4,
                   },
                 ]}>
-                {props.ftueProfileStep === 'meditating' ? <KatchaButton
-                  fullWidth label="Explore the mist" icon="sparkles"
-                  onPress={() => props.onFtueProfileContinue?.()}
+                {props.ftueProfileStep === 'meditating' ? <CompanionFirstRestCards
+                  availableAt={meditation.availableAt} startedAt={meditation.startedAt} settledMs={meditation.settledMs} now={meditationNow}
+                  onExplore={() => props.onFtueProfileContinue?.()}
                 /> : <MossproutStoryStage
+                  onActionNarration={setActionNarration}
+                  onSubmenuChange={setActionSubmenuOpen}
+                  onAddTask={() => experience.openQuickGoalPicker()}
                   onVisitSeed={props.onClose}
                   activeQuestId={props.activeQuest?.questId}
                   conversationSession={props.conversationSession}
@@ -2094,6 +2105,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                 && !showMossproutDashboard
                 && (!props.ftueCompanionSurfaceOwned || residentFtueDashboard) ? (
                 <MossproutStoryStage
+                  onActionNarration={setActionNarration}
+                  onSubmenuChange={setActionSubmenuOpen}
+                  onAddTask={() => experience.openQuickGoalPicker()}
                   onVisitSeed={props.onClose}
                   activeQuestId={props.activeQuest?.questId}
                   conversationSession={props.conversationSession}
@@ -2451,6 +2465,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         ) : null}
         </View>
         </GestureDetector>
+        </CompanionEnvironmentGestureContext.Provider>
         </CompanionSheetShell>
       </>
     </ExplorationEnvironmentProgressionProvider>
@@ -2463,8 +2478,9 @@ const styles = StyleSheet.create({
   destinationStageSpacer: { minHeight: 244 },
   youStageSpacer: { minHeight: 188 },
   scrollContent: { paddingBottom: 12, paddingHorizontal: 4 },
-  dashboardScrollContent: { flexGrow: 1 },
-  mossproutActionScrollContent: { flexGrow: 1, overflow: 'hidden', paddingHorizontal: KatchaUI.layout.phoneGutter + 4 },
+  // The dashboard owns card gutters for every family; the outer surface adds none.
+  dashboardScrollContent: { flexGrow: 1, paddingHorizontal: KatchaUI.layout.phoneGutter + 4 },
+  mossproutActionScrollContent: { overflow: 'hidden' },
   meditationScrollContent: { overflow: 'visible', paddingBottom: 28 },
   meditationActionsOverlay: { position: 'absolute', zIndex: 25 },
   meditationWorldTimer: { position: 'absolute', zIndex: 24 },

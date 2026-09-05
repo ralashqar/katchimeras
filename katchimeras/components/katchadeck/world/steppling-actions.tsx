@@ -1,3 +1,5 @@
+import { CompanionGardenAction } from './companion-garden-action';
+import { useDailyCompanionConversation } from '@/hooks/use-daily-companion-conversation';
 import { ProgressBar } from '@/components/katchadeck/progress-bar';
 import { Meadow } from '@/constants/meadow-theme';
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
@@ -11,12 +13,10 @@ import { AppState, Pressable, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Pedometer } from 'expo-sensors';
 import type { GestureType } from 'react-native-gesture-handler';
-import { ThemedText } from '@/components/themed-text';
 import { DayActionCardSurface, DayActionRewardChip } from '@/components/katchadeck/ui/day-action-card';
 import { DayActionGoalRow } from '@/components/katchadeck/ui/day-action-goal-row';
 import { DayActionActiveRow, DayActionCompletedRow, DayActionReplacementSlot, DAY_ACTION_MOTION, type DayActionSourceRect } from '@/components/katchadeck/ui/day-action-row';
 import { katchimeraActionArt } from '@/constants/katchimera-action-art';
-import { KatchaUI } from '@/constants/katcha-ui';
 import { STEPPLING_TRAIL_CHATS } from '@/constants/steppling-activities';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import { loadCompanionBondState, saveCompanionBondState, subscribeCompanionBondState } from '@/utils/companion-bond-storage';
@@ -24,13 +24,9 @@ import type { CompanionBondAwardReceipt } from '@/utils/companion-bond';
 import { loadCompanionLife } from '@/utils/companion-life-storage';
 import { claimStepplingMilestone, nextStepplingMilestone } from '@/utils/steppling-activities';
 import { localDayId } from '@/utils/world-identity';
-import { MossproutJourneyRequestPanel } from './mossprout-journey-request-panel';
-import { COMPANION_STORY_PANEL_STYLE, type CompanionMergeRequest } from './companion-merge-request-tray';
+import { type CompanionMergeRequest } from './companion-merge-request-tray';
 
 const chatId = (chat: typeof STEPPLING_TRAIL_CHATS[number]) => `steppling:trail-chat:${chat.id}`;
-function Copy({ children }: { children: React.ReactNode }) {
-  return <ThemedText lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink} style={KatchaUI.type.body}>{children}</ThemedText>;
-}
 function todaySteps(dayId: string) {
   const home = homeRepository.load();
   const day = home && [home.today, ...home.archivedDays].find((item) => (item.stepsCountDayId ?? item.isoDate) === dayId);
@@ -48,34 +44,28 @@ export function StepplingActions({ onReaction, onOpenConversation, requests, onO
   const [reading, setReading] = useState(() => ({ dayId: localDayId(), steps: todaySteps(localDayId()) }));
   const [bond, setBond] = useState(loadCompanionBondState);
   const relationships = useRelationshipProgression();
-  const [mode, setMode] = useState<'home' | 'garden'>('home');
-  const [error, setError] = useState<string | null>(null);
-  const [stepHint, setStepHint] = useState<string | null>(null);
   const [completing, setCompleting] = useState<{ dayId: string; steps: number; bond: number } | null>(null);
   const [attempt, setAttempt] = useState(0);
   const syncing = useRef(false);
   const claimedSteps = useRef<number | null>(null);
   const mounted = useRef(true);
-  const syncSteps = useCallback(async (ask = false) => {
+  const syncSteps = useCallback(async () => {
     if (syncing.current) return;
     syncing.current = true;
     const day = localDayId();
     setDayId(day);
     let steps = todaySteps(day);
-    let hint: string | null = null;
     try {
       const available = await Pedometer.isAvailableAsync();
-      let permission = available ? await Pedometer.getPermissionsAsync() : null;
-      if (available && ask && !permission?.granted) permission = await Pedometer.requestPermissionsAsync();
+      const permission = available ? await Pedometer.getPermissionsAsync() : null;
       if (permission?.granted) {
         const start = new Date(); start.setHours(0, 0, 0, 0);
         steps = Math.max(steps, (await Pedometer.getStepCountAsync(start, new Date())).steps);
-      } else if (ask) hint = available ? 'Allow motion access in Settings to sync steps.' : 'Steps will update from your activity tracking.';
-    } catch { if (ask) hint = 'Steps will update from your activity tracking.'; }
+      }
+    } catch { /* Keep the latest stored reading when the pedometer is unavailable. */ }
     finally {
       if (mounted.current && day === localDayId()) {
         setReading((old) => ({ dayId: day, steps: Math.max(steps, old.dayId === day ? old.steps : 0) }));
-        if (ask) setStepHint(hint);
       }
       syncing.current = false;
     }
@@ -89,15 +79,16 @@ export function StepplingActions({ onReaction, onOpenConversation, requests, onO
     const timer = setInterval(() => { if (AppState.currentState === 'active') void syncSteps(); }, 30000);
     return () => { mounted.current = false; home(); bonds(); app.remove(); clearInterval(timer); };
   }, [syncSteps]);
-  useEffect(() => { onSubmenuChange?.(mode !== 'home'); return () => onSubmenuChange?.(false); }, [mode, onSubmenuChange]);
   const goal = completing ?? nextStepplingMilestone(bond, dayId);
   const steps = reading.dayId === dayId ? reading.steps : 0;
   const ready = Boolean(goal && steps >= goal.steps);
   const content = loadCompanionContentState();
   // Respect the previous release's saved answers without maintaining a second chat engine.
   const legacyAnswers = loadCompanionLife().entries;
-  const nextChat = STEPPLING_TRAIL_CHATS.find((item) => !legacyAnswers.some((entry) => entry.id === chatId(item))
-    && !content.conversationSessions.some((session) => session.definitionId === chatId(item) && !session.preview && session.status === 'completed'));
+  const completedChats = new Set(STEPPLING_TRAIL_CHATS.filter((item) => legacyAnswers.some((entry) => entry.id === chatId(item))
+    || content.conversationSessions.some((session) => session.definitionId === chatId(item) && !session.preview && session.status === 'completed')).map((item) => item.id));
+  const nextChat = useDailyCompanionConversation('steppling', STEPPLING_TRAIL_CHATS, completedChats);
+  const chatComplete = Boolean(nextChat && completedChats.has(nextChat.id));
   const presentations = relationships.actionPresentations.filter((item) => item.status !== 'dismissed'
     && relationships.actionCompletions.some((completion) => completion.id === item.completionId && completion.familyId === 'steppling'));
   const pending = presentations.find((item) => item.status === 'pending') ?? null;
@@ -111,7 +102,7 @@ export function StepplingActions({ onReaction, onOpenConversation, requests, onO
   const receipt = displayed ? relationships.actionCompletions.find((item) => item.id === displayed.completionId)?.rewardReceipt : null;
   const concealChat = presentation.phase !== 'revealing' && Boolean(displayed ?? pending);
   const openChat = () => {
-    if (!nextChat) return;
+    if (!nextChat || chatComplete) return;
     const id = chatId(nextChat);
     onOpenConversation?.(id, {
       dayId, familyId: 'steppling', actionId: id, instanceId: id, sourceSlotId: 'together', slotId: 'together', sequence: 0,
@@ -123,17 +114,8 @@ export function StepplingActions({ onReaction, onOpenConversation, requests, onO
   const action = (title: string, kind: 'quest' | 'reflection', onPress: () => void, index: number) => <DayActionActiveRow animateLayout entryDelayMs={DAY_ACTION_MOTION.entryBaseDelayMs + index * DAY_ACTION_MOTION.entryStaggerMs} disabled={Boolean(completing)} externalGesture={externalGesture} label={title}>
     <Pressable accessibilityRole="button" accessibilityLabel={title} disabled={Boolean(completing)} onPress={onPress}><DayActionCardSurface artwork={art(kind)} title={title} /></Pressable>
   </DayActionActiveRow>;
-  const back = () => { setMode('home'); setError(null); };
-  if (mode === 'garden') return <MossproutJourneyRequestPanel
-    standalone fitContent title={requests.length ? 'Tend garden' : 'The garden is caught up'}
-    actionLabel="Back" onAction={back} onRequestPress={onOpenMerge}
-    requests={requests.map(({ badge, ...request }) => ({
-      ...request,
-      // Reward details belong to the order description, not the legacy tiny badge.
-      description: [request.description, badge].filter(Boolean).join(' · '),
-    }))}
-  />;
-  return <View style={{ gap: 7 }}>
+  return <CompanionGardenAction familyId="steppling" onOpenMerge={onOpenMerge} storyRequests={requests} onSubmenuChange={onSubmenuChange}>
+    {(gardenCard) => <View style={{ gap: 7 }}>
     {goal ? <DayActionGoalRow key={`${completing?.dayId ?? dayId}:${goal.steps}:${attempt}`} animateLayout entryDelayMs={DAY_ACTION_MOTION.entryBaseDelayMs} externalGesture={externalGesture}
       label={`Walk ${goal.steps.toLocaleString()} steps today`} title={`Walk ${goal.steps.toLocaleString()} steps`}
       subtitle={ready ? `${goal.steps.toLocaleString()} steps reached · tap to celebrate` : `${steps.toLocaleString()} / ${goal.steps.toLocaleString()} steps today`}
@@ -145,10 +127,10 @@ export function StepplingActions({ onReaction, onOpenConversation, requests, onO
       hideCompletionControl highlighted={ready} completeOnPress={ready} disabled={Boolean(completing) || Boolean(pending || displayed)} onOpen={() => {
         const remaining = Math.max(0, goal.steps - steps);
         onReaction?.(`Not quite yet—${remaining.toLocaleString()} more ${remaining === 1 ? "step" : "steps"} to this little milestone. We can take them at your pace.`);
-        void syncSteps(true);
+        void syncSteps();
       }}
       onBeginCompletion={() => setCompleting({ ...goal, dayId })}
-      onCompletionRequest={(source, onArrive) => {
+      onCompletionRequest={(source, onArrive, onFailed) => {
         try {
           const claimedDay = completing?.dayId ?? dayId;
           const result = claimedDay === localDayId() ? claimStepplingMilestone(loadCompanionBondState(), claimedDay, goal.steps, steps) : null;
@@ -157,8 +139,8 @@ export function StepplingActions({ onReaction, onOpenConversation, requests, onO
             claimedSteps.current = goal.steps;
             if (source && onBondRewardRequest && result.receipt) onBondRewardRequest(source, onArrive, result.receipt);
             else onArrive();
-          } else onArrive();
-        } catch { setError('Your reward could not be saved. Please try again.'); onArrive(); }
+          } else { setCompleting(null); onFailed(); }
+        } catch { onReaction?.('Your reward could not be saved. Please try again.'); setCompleting(null); onFailed(); }
       }}
       onFinished={() => {
         if (claimedSteps.current != null) {
@@ -168,11 +150,11 @@ export function StepplingActions({ onReaction, onOpenConversation, requests, onO
         setBond(loadCompanionBondState()); setCompleting(null); setAttempt((value) => value + 1);
       }}
     /> : null}
-    {action('Tend garden', 'quest', () => setMode('garden'), 1)}
-    <View>
-      <DayActionReplacementSlot concealed={concealChat} ready={Boolean(onStory || (nextChat && onOpenConversation))} revealing={presentation.phase === 'revealing'}>
-        {onStory ? action(storyLabel ?? 'A note from Steppling', 'reflection', onStory, 2) : nextChat && onOpenConversation ? <DayActionActiveRow animateLayout enteringEnabled={false} entryDelayMs={0} disabled={Boolean(completing) || concealChat} externalGesture={externalGesture} label={nextChat.title}>
-          <Pressable accessibilityRole="button" accessibilityLabel={nextChat.title} disabled={Boolean(completing) || concealChat} onPress={openChat}>
+    {gardenCard}
+    <View style={displayed ? { minHeight: 66 } : undefined}>
+      <DayActionReplacementSlot concealed={concealChat} ready={Boolean(onStory || (nextChat && !chatComplete && onOpenConversation))} revealing={presentation.phase === 'revealing'}>
+        {onStory ? action(storyLabel ?? 'A note from Steppling', 'reflection', onStory, 2) : nextChat && !chatComplete && onOpenConversation ? <DayActionActiveRow animateLayout enteringEnabled={false} entryDelayMs={0} disabled={Boolean(completing) || concealChat} externalGesture={externalGesture} label={nextChat.title}>
+          <Pressable accessibilityRole="button" accessibilityLabel={nextChat.title} disabled={Boolean(completing) || concealChat || chatComplete} onPress={openChat}>
             <DayActionCardSurface artwork={art('reflection')} title={nextChat.title} reward={<DayActionRewardChip reward={{ kind: 'bond', amount: 8 }} />} />
           </Pressable>
         </DayActionActiveRow> : null}
@@ -184,6 +166,6 @@ export function StepplingActions({ onReaction, onOpenConversation, requests, onO
           onRewardRequest={receipt && onBondRewardRequest ? (source, onArrive) => onBondRewardRequest(source, onArrive, receipt) : undefined} />
       </View> : null}
     </View>
-    {error || stepHint ? <View style={COMPANION_STORY_PANEL_STYLE}><Copy>{error ?? stepHint}</Copy></View> : null}
-  </View>;
+  </View>}
+  </CompanionGardenAction>;
 }

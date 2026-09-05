@@ -503,7 +503,7 @@ test('FTUE Energy recovery uses one general reflection with no journal hierarchy
 
 test('Mossprout remembers the day, reflects it back, then offers one narrative Garden objective', () => {
   const firstMeetings = mossproutFtueConversationDefinitions.filter((definition) => definition.id.startsWith('mossprout:ftue:first-meeting:'));
-  assert.ok(firstMeetings.every((definition) => definition.version === 8));
+  assert.ok(firstMeetings.every((definition) => definition.version === 9));
   for (const definition of firstMeetings) {
     const hello = definition.nodes.find((node) => node.id === 'hello');
     assert.equal(hello?.kind, 'choice');
@@ -735,7 +735,7 @@ test('meditation stays inside companion interaction with compact action-card UI'
   assert.match(interaction, /initialConversationHandoffPending \? null : route\.kind === 'chat_lobby'[\s\S]*?&& !meditation/);
   assert.match(interaction, /\(route\.kind === 'destination' \|\| dashboardRouteActive[\s\S]*?&& !questGameVisible && !questionnaireExperience \? \([\s\S]*?<CompanionDestinationHeader/);
   assert.match(interaction, /meditationDashboardActive = Boolean\(!quickGoalPickerOpen && !unifiedJourneyActive && meditation && route\.kind !== 'conversation'/);
-  assert.match(interaction, /companionSpeechTitle = dashboardRouteActive && !quickGoalPickerOpen && unifiedJourneyActive && journeyNarration \? journeyNarration : meditationDashboardActive \? MOSSPROUT_FTUE_COPY\.meditation/);
+  assert.match(interaction, /companionSpeechTitle = dashboardRouteActive && actionNarration \? actionNarration : dashboardRouteActive && !quickGoalPickerOpen && unifiedJourneyActive && journeyNarration \? journeyNarration : meditationDashboardActive \? MOSSPROUT_FTUE_COPY\.meditation/);
   assert.match(interaction, /meditating=\{Boolean\(meditation\)\}/);
   assert.match(cinematicStage, /meditating=\{meditating\}/);
   assert.match(homeStage, /withTiming\(meditating \? 1 : 0,[\s\S]*?duration: 520/);
@@ -760,7 +760,8 @@ test('meditation stays inside companion interaction with compact action-card UI'
   assert.match(interaction, /meditationWorldTimer[\s\S]*?top: meditationTimerSurfaceTop/);
   assert.doesNotMatch(interaction, /meditationStageSpacer/);
   assert.match(readFileSync('features/onboarding/mossprout-ftue-script.ts', 'utf8'), /const mossproutMeditationCamera[\s\S]*?anchorY: 0\.46[\s\S]*?id: 'companion\.meditating'[\s\S]*?camera: mossproutMeditationCamera/);
-  assert.doesNotMatch(meditationStage, /DayActionCardSurface|While .* reflects|Small moments grow Bond|messagePanel|OUR NEXT JOURNEY/);
+  assert.match(meditationStage, /<DayActionCardSurface[\s\S]*?artwork=\{<DayActionIcon icon="moon.fill" \/>\}[\s\S]*?title=\{title \?\? 'Next Journey in'\}/);
+  assert.doesNotMatch(meditationStage, /While .* reflects|Small moments grow Bond|messagePanel|OUR NEXT JOURNEY/);
 });
 
 test('every active FTUE node has a canonical cold-start route', () => {
@@ -1098,7 +1099,7 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.match(kingdomCamera, /Camera limits describe valid destinations and gesture bounds/);
   assert.match(kingdomCamera, /previousGeometry\.sceneWidth === nextGeometry\.sceneWidth[\s\S]*?return;/);
   assert.match(kingdomCamera, /const animateToSnapshot = useCallback[\s\S]*?clampCameraTranslation\(snapshot, cameraViewport, cameraScene, nextScale\)[\s\S]*?withTiming\(nextScale, timing/);
-  assert.match(kingdomCanvas, /interactionOriginSnapshotRef\.current \?\?= readLiveCameraSnapshot\(\)[\s\S]*?animateToCameraSnapshot\(interactionOrigin, reduceMotion \? 80 : 440/);
+  assert.match(kingdomCanvas, /interactionOriginSnapshotRef\.current \?\?= readLiveCameraSnapshot\(\)[\s\S]*?if \(origin\) \{[\s\S]*?animateToCameraSnapshot\(origin, durationMs, onComplete\)[\s\S]*?focusInteractionTile\(frame,/);
   assert.match(kingdomCanvas, /const durationMs = tutorialCamera\.durationMs/);
   assert.doesNotMatch(kingdomCanvas, /cameraRestoreNonce > 0 \? 0 : tutorialCamera\.durationMs/);
   assert.match(kingdomCamera, /Camera limits describe valid destinations and gesture bounds[\s\S]*?previousGeometry\.viewportHeight === nextGeometry\.viewportHeight[\s\S]*?return;/);
@@ -1107,7 +1108,7 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.match(kingdomCanvas, /REGULAR_RESIDENT_INTERACTION_SCREEN_ANCHOR_Y = SHARED_RESIDENT_SCREEN_ANCHOR_Y/);
   assert.match(kingdomCanvas, /residentInteractionScreenAnchorY = interactionResidentAnchorY \?\? \(tutorialCamera\?\.kind === 'focus_target'[\s\S]*?tutorialCamera\.anchorY \?\? MOSSPROUT_DIALOGUE_SCREEN_ANCHOR_Y[\s\S]*?: REGULAR_RESIDENT_INTERACTION_SCREEN_ANCHOR_Y\)/);
   assert.match(kingdomCanvas, /initialInteractionFocus = useMemo[\s\S]*?residentCreatureFrame\(residentAnchor\.x, residentAnchor\.y, creatureWorldSize, isMossprout\)[\s\S]*?screenY: viewport\.height \* residentInteractionScreenAnchorY[\s\S]*?initialTutorialFocus \?\? initialInteractionFocus/);
-  assert.match(kingdomCanvas, /handledInteractionExitNonceRef[\s\S]*?zoom: KINGDOM_RENDERING\.havenMaxScale/);
+  assert.match(kingdomCanvas, /handledInteractionExitNonceRef[\s\S]*?layer\?\.interactionFrame[\s\S]*?focusInteractionTile\(frame,/);
   assert.match(kingdomCanvas, /allowDownscaling=\{false\}[\s\S]*?resolution="high"[\s\S]*?showFace/);
   assert.match(kingdomCanvas, /faceId=\{\(presentation\?\.growthStage \?\? 0\) > 0 \? 'curious' : 'sleepy'\}/);
   assert.match(kingdomCanvas, /WORLD_FTUE_EGG_NATIVE_SURFACE_SCALE = 2\.7/);

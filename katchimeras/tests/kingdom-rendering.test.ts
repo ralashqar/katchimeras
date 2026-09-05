@@ -896,8 +896,8 @@ test('Haven hosts resident interaction over the world and routes its Garden shor
   assert.doesNotMatch(screen, /cameraFallbackTimer/);
   assert.match(screen, /onResidentFocusComplete=\{completeResidentFocus\}/);
   assert.match(canvas, /onComplete: \(\) => onResidentFocusComplete\?\.\(interactionResidentId\)/);
-  assert.match(canvas, /interactionOriginSnapshotRef\.current \?\?= readLiveCameraSnapshot\(\)/);
-  assert.match(canvas, /animateToCameraSnapshot\(interactionOrigin, reduceMotion \? 80 : 440/);
+  assert.match(canvas, /if \(hadWorldCameraRef\.current\) interactionOriginSnapshotRef\.current \?\?= readLiveCameraSnapshot\(\)/);
+  assert.match(canvas, /if \(origin\) \{[\s\S]*?animateToCameraSnapshot\(origin, durationMs, onComplete\)[\s\S]*?focusInteractionTile\(frame,/);
   assert.doesNotMatch(canvas, /handledMergeBoardRequestRef|setActiveMergeBoardId/);
   assert.match(route, /onHostedClose/);
   assert.match(route, /onHostedOpenMerge/);
@@ -938,4 +938,26 @@ test('hosted resident dashboard dismisses from the world while deep achievements
   assert.match(stage, /onBackdropPress/);
   assert.match(trophies, /visibleSectionCount/);
   assert.match(trophies, /maxToRenderPerBatch=\{4\}/);
+});
+
+
+test('resident exit fallback fits a full tile without retreating to the whole world', () => {
+  const scene = { width: 4000, height: 4000 };
+  const frame = { left: 1800, top: 1800, width: HEX_TILE_W, height: HEX_TILE_H };
+  for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) {
+    const snapshot = kingdomCameraSnapshotForFrame(viewport, scene, frame, {
+      horizontalPadding: 20, verticalPadding: 40, minimumScale: 0.28, maximumScale: 3.2,
+    });
+    const project = (x: number, y: number) => ({
+      x: scene.width / 2 + snapshot.tx + (x - scene.width / 2) * snapshot.scale,
+      y: scene.height / 2 + snapshot.ty + (y - scene.height / 2) * snapshot.scale,
+    });
+    const topLeft = project(frame.left, frame.top);
+    const bottomRight = project(frame.left + frame.width, frame.top + frame.height);
+    assert.ok(topLeft.x >= 19.99 && topLeft.y >= 39.99);
+    assert.ok(bottomRight.x <= viewport.width - 19.99 && bottomRight.y <= viewport.height - 39.99);
+    assert.ok(Math.abs(frame.width * snapshot.scale - (viewport.width - 40)) < 0.01
+      || Math.abs(frame.height * snapshot.scale - (viewport.height - 80)) < 0.01, 'tile fills one viewport dimension');
+    assert.ok(snapshot.scale > Math.min(viewport.width / scene.width, viewport.height / scene.height) * 2, 'fallback stays near the tile');
+  }
 });

@@ -1,58 +1,54 @@
-# Mossprout FTUE — a little of your world, growing in mine
+# Mossprout FTUE: a companion who listens, a Garden you can grow
 
-## Product promise
+## Current implementation
 
-The player should feel that Mossprout heard them, that their answer made something real, and that both the Garden and the relationship can keep growing. The experience teaches Merge through play, not a menu tour.
+Content Flow v47 owns the first-session graph; Glow discovery v4 owns the second act. First-meeting conversation v9 moves the deeper life question after the first Bloom. Existing v8 conversations finish their original follow-up; earlier conversations retain their short route. No flow IDs, receipt IDs, boards, currencies, meditation deadlines, or completed checkpoints are reset.
 
-## Shipping sequence (script v43, Content Flow v45)
+This supersedes the old v45/two-Basket-tap handoff description. The shipping path contains two guided requests after Mossprout rests, followed by clearing the mist and discovering Steppling's Egg.
 
-| Beat | Player action | Purpose |
+## First-session blueprint
+
+| Beat | Player interaction | Outcome |
 | --- | --- | --- |
-| Egg in the quiet Garden | Watch the existing world reveal | Establish a place worth caring for. |
-| “How has today felt?” | Choose one of three short answers | Include good, busy, and neutral days. |
-| “What would feel good right now?” | Progress, calm, or unsure | Give the personal Seed an honest origin. |
-| Hatch and meeting | Hatch, then choose a playful greeting | Mossprout echoes the day answer. |
-| Your memory Seed | Continue | Show the named Seed, acknowledge the greeting, explain Bond inline. |
-| A place of its own | Plant Seed | Place this exact personal Seed in the world. |
-| Wake the Garden | Open Merge | Hold the explanation until the player is ready; preview the requested Plant. |
-| Seed → Sprout → Plant | Three merges, then Serve | Four board Seeds become two Sprouts, then one Plant. |
-| The First Bloom | Restore Garden | One explicit free restoration; watch the same personal Seed grow. |
-| Shared moment | Continue, then answer Water Together | Move directly back to Mossprout. Water is optional. |
-| Farewell | Rest, Mossprout | Acknowledge the water answer and explain the next Journey in one beat. |
-| Meditation | Enter interaction, then Go to Merge or Back | Show the compact eight-hour next-Journey timer inside Mossprout’s normal interaction UI. |
-| Basket handoff | Tap twice, merge the two Seeds | Teach where pieces come from; then release coaching immediately. |
+| Egg | Inspect; answer how today feels, then progress/calm/unsure | Egg stirs; answers determine greeting and Memory Seed |
+| Greeting | Hi / What is this place? / You're tiny | One playful response, then the Memory Seed |
+| Planting | Plant my Seed | This exact personal memory gets a place in the Garden |
+| First Plant | Merge four Seeds into two Sprouts, then a Plant; serve | First merge is demonstrated; practice merges offer a manual hint and reveal the hand after six seconds |
+| First Bloom | Restore; watch the same Memory Seed grow | Concrete payoff connecting the player's answer to their world |
+| Personal moment | Intent-specific follow-up; add its daily action or Not now | Answer is saved before the offer; accepting creates a habit, never a completion |
+| First rest | Rest, Mossprout | Existing eight-hour meditation; introduce compact Journey info and flat water / Tend Garden cards |
+| Light a path | Explore mist; Basket, bound Seed, bound Sprout, serve | Learn generation and bound-item matching; earn the existing Glow |
+| Grow a Magical Plant | Complete the second request | Keep the objective visible; let the player practise with optional hints |
+| Discovery | Clear mist; see Steppling's Egg | End the directed onboarding; free navigation, hatching as a later invitation |
 
-The first request's story title remains “The First Bloom”; its merge item is consistently called a Plant. The personal memory Seed is a separate world object, not a board ingredient or currency.
+The first-rest scene explains: “Journey Days follow our story, at your pace.” The Garden card owns the discovery handoff. The water-break card previews its daily slot without marking anything done. The required discovery remains resumable and does not reset meditation.
 
-## Voice and choices
+## Choice and narrative contract
 
-Shared copy lives in `features/onboarding/mossprout-ftue-copy.ts`. Keep prose short, concrete, friendly, and gently playful. Avoid diagnosis, false insight, compulsory positivity, or promises about changing someone's life.
+- Progress, calm and unsure retain their existing Seed of Momentum, Stillness and Curiosity mappings.
+- Greeting replies remain short and playful. New greetings lead directly to the Seed; v8 saves retain their original follow-up.
+- Post-Bloom follow-ups use `MOSSPROUT_FOLLOWUPS`: calm offers quiet/window moments; progress offers noticing/water/plant care; unsure offers quiet/noticing/company.
+- Every option has its own authored reply. Company creates no habit. “Add to my daily actions” explicitly commits; “Not now” advances without one.
+- A saved follow-up skips the question on resume, including saves that answered during the old first meeting. A failed save keeps the choices available and shows a retryable error.
+- Memory Seed refers to the personal planted memory. Seeds on the merge board are ingredients; never consume the Memory Seed as a merge piece.
+- Bond is relationship progress; Glow comes from requests and funds world work. The existing first-rest duration, free Basket policy and reward amounts are unchanged.
+- Resting narration describes available background activity. Optional acceleration does not improve the earned return gift. Return dialogue continues to use actual participation evidence.
 
-- Progress → Seed of Momentum.
-- Calm → Seed of Stillness.
-- Unsure → Seed of Curiosity.
-- Greeting replies acknowledge “Hi”, “What is this place?”, and “You’re tiny.”
-- Water answers are “I’ll get some.”, “Already had some.”, and “Not now, Mossprout.” None blocks progress or marks water completed.
-- Support preference remains in Journey 2, where it is saved without repeating the first-session question.
-- “Your Bond grows through little moments together” replaces a separate Bond tutorial acknowledgement.
+## Device acceptance (not yet performed for this revision)
 
-## Free play and meditation
+1. Fresh install: all day answers and all nine follow-up choices; verify greeting, Seed, reply and offered habit. Test company and Not now.
+2. Confirm the first merge is demonstrated; practice starts with the objective visible and no hand. Show hint immediately; otherwise wait six seconds. Progress before six seconds must cancel the previous hint.
+3. Plant, serve, restore and rest twice rapidly: one domain effect and one reward only.
+4. Kill/relaunch at the Seed, restoration, saved follow-up, habit acceptance, rest, both discovery requests, mist purchase and Egg reveal.
+5. Upgrade v7/v8/v9 first-meeting conversations mid-node. No repeated answered question, duplicate habit, changed board or reset timer.
+6. Finish discovery independently. No required second companion hatch before free navigation.
+7. Small phone, large text, reduced motion and screen reader: cards readable, all three activities directly reachable, no blocked drag target behind the hint button.
+8. Complete a life action honestly, skip another, and open a conversation then return: stable slot and no reward replay.
+9. Both companions: active, resting, return-ready and completed chapters; expire the timer while a check-in or another screen is open.
+10. Permission denial, cross-midnight steps, full-board gifts, foreground refresh, and notification rescheduling retain their existing behavior.
 
-The Garden Basket currently does not spend Energy on the companion activity board. Do not teach a cost or add an Energy top-up. The tutorial uses that same behavior.
+## Usability measurement
 
-“Go to Merge” opens Merge. After the Basket lesson, the existing “Help the Garden Wake Up” Plant request remains: repair the path and bring back the spring. Back dismisses the optional coaching, not the request or the player's board.
+Run five cozy-game newcomers through the entire session. Record time to first merge, first Bloom and Egg discovery, manual/automatic hints, exits, and first return. Existing durable flow receipts establish completed milestones; observe hint use and confusion in the device session. Do not treat local tests as retention analytics.
 
-Meditation gates the next Journey, not all play. The compact timer says “Next Journey in”; the interaction offers Go to Merge and the normal Back exit. Preserve the existing eight-hour duration and existing shortening rules. The Steppling movement Egg is never rendered in Mossprout’s world map.
-
-## Device acceptance pass
-
-1. Try every Egg answer, including “Pretty good” and “I’m not sure yet”; verify the named Seed and first line.
-2. Check small screens, large text, reduced motion, and screen-reader labels.
-3. Double-tap Continue/Plant/Rest; verify one Seed, one restoration, one meditation start.
-4. Cold launch at planting, after Serve, during growth, after Rest, and after the first Basket tap.
-5. Confirm planting copy waits for Open Merge; no repeated Garden handoff or insight-accuracy question appears.
-6. Confirm every water answer reaches the same farewell and only acceptance pins optional water.
-7. Confirm Rest enters Mossprout’s interaction UI and the compact timer remains readable. Use both Go to Merge and Back.
-8. Finish the Basket lesson, then independently grow and serve the next Plant.
-9. Back out midway through coaching; return and confirm the board/request survive without forced coaching.
-10. Upgrade an active v42 save at each removed beat and a completed save. No questionnaire replay, duplicate rewards, or reset timer.
+Target four of five who can complete discovery and explain how merging helps the Garden, how their day connects to the companion, and what remains available during meditation. These are acceptance targets, not measured results.

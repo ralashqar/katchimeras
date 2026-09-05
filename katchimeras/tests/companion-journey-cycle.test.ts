@@ -134,8 +134,15 @@ test('Mossprout resumes an unfinished episode across dates without creating anot
   assert.equal(startMossproutJourneyDay(completed, '2026-09-05', at + JOURNEY_REST_MS + 2, 0).reason, 'started');
 });
 
+function legacyCycle(familyId: 'mossprout' | 'steppling' = 'steppling') {
+  const value = cycle(familyId);
+  return { ...value, dailyGardenVersion: undefined, requests: value.requests.map((request, index) => request.kind !== 'merge' ? request : {
+    ...request, definitionId: `${familyId === 'mossprout' ? 'nature:garden' : 'adventure:trail'}:${index + 1}`, orderId: `${value.id}:request:${index + 1}`,
+  }) };
+}
+
 test('expired meditation orders preserve items, including after a shortened deadline', () => {
-  const pending = cycle();
+  const pending = legacyCycle();
   const availableAt = at + JOURNEY_REST_MS;
   const initial = reduceMergeWorld(createInitialMergeWorldState(at), { type: 'reconcileJourneyMeditation', cycle: pending, availableAt, now: at }).state;
   const order = initial.activeOrders.find((item) => item.id === pending.requests[0].orderId)!;
@@ -151,7 +158,7 @@ test('expired meditation orders preserve items, including after a shortened dead
 
 test('meditation requests pay Glow once, preserve time receipts, and repair saved zero rewards', () => {
   for (const familyId of ['mossprout', 'steppling'] as const) {
-    const pending = cycle(familyId);
+    const pending = legacyCycle(familyId);
     const initial = reduceMergeWorld(createInitialMergeWorldState(at), { type: 'reconcileJourneyMeditation', cycle: pending, availableAt: at + JOURNEY_REST_MS, now: at }).state;
     const order = initial.activeOrders.find((item) => item.id === pending.requests[0].orderId)!;
     assert.equal(order.reward.coins, 8);

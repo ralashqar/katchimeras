@@ -25,14 +25,24 @@ honest nature/quiet/not-today check-in; optional insight saving is unchanged.
 
 ## Ownership and persistence
 
-The companion surface uses the original routine action resolver, illustrated
-cards, swipe-to-skip and completion/reward presentation while resting. The timer
-sits above all action cards, followed by two routine cards. A single compact
-mission card is pinned at the bottom, completing the three-card layout. Its requests scroll horizontally
-inside one cream surface, with no individually framed order tiles. Tapping an
-unserved mission opens its order. Narrative uses the existing speech bubble; authored return and
-episode choices still acknowledge the durable Journey flow. No scrolling
-Journey dashboard replaces the companion scene.
+The companion scene has a compact chapter name / Journey Day header. Active
+Journey dialogue opens through Continue Journey. Meditation reuses DayActionCardSurface: the original warm gradient, rim, shadow,
+left moon icon, and the exact action-card title typography for the chapter/day.
+“Next Journey in”, the countdown, animated progress bar and leaf marker fit inside
+the same panel with compact spacing; ready and finished states retain one compact action.
+
+Below it are the original illustrated cards, in fixed order: companion tracker,
+Tend Garden, and one named playful conversation. Steppling tracks real steps;
+Mossprout offers “Log a glass of water” through the existing daily habit repository.
+Every completion uses the original slide-out animation, then disappears. Repeatable
+water logging slides in a fresh card with today’s count; Bond pays once per day. The narrative card is selected
+once per calendar day, survives reopening, resumes unfinished work, and respects
+content cooldowns. Exhaustion leaves two cards. There is no Your day / More actions
+hierarchy. Conversations remain available while the next Journey is resting.
+
+Resident and FTUE choreography remain dedicated. The first-rest preview uses the
+compact header and water / Tend Garden cards, with Garden still owning the required
+mist/Steppling discovery. The surrounding scene scrolls on small phones.
 
 - Content Flow owns Steppling episode answers, order gates, rest effects, and
   both families' return reward effects. Stable run/effect identities allow retry
@@ -54,28 +64,54 @@ Journey dashboard replaces the companion scene.
 
 ## Meditation and evidence
 
-Each cycle freezes two small merge requests (5 minutes each) and one life
-request (60 minutes). All acceleration, including ordinary existing Bond
-actions, shares a two-hour cap. A listed request cannot also award generic
-acceleration. The list is optional and does not improve the earned return gift.
-Each meditation Merge request also pays 8 Glow on serving. Currency payout and
-its time-reduction receipt are recorded together; serving again cannot pay twice.
-Saved zero-reward orders are repaired, and procedural templates must award Glow.
+New cycles keep two settlement slots rather than creating their own merge orders.
+Each companion receives two optional calendar-day Garden requests: a two-item
+combination and one higher-tier item. Early tiers are 3+3 / 4, established 4+3 / 5,
+and advanced 5+4 / 6. Generation uses owned generators and their currently available
+outputs; forced drops constrain eligibility. Requirements are frozen for that day.
+The initial bands use progression counts 0–3 / 4–11 / 12+, with Steppling using its
+existing friendship level. These are initial tuning values.
 
-Steppling offers 500 new steps, adapted movement, or an honest rest check-in.
-It reads Motion only when already permitted; no permission prompt is forced.
+Each order pays 8 Glow. Serving both grants an automatic 8 Glow bonus in the same
+Merge transaction, protected by a durable receipt. Orders are never replenished
+within the day. Midnight refresh preserves inventory and required story orders.
+Tend Garden reveals the original MossproutJourneyRequestPanel over the action
+list. Cards and Journey chrome remain mounted in their original layout, hidden
+with opacity and excluded from touches/accessibility. Back restores visibility
+without replaying entrance animations. Visibility wrappers explicitly disable
+native view flattening so toggling opacity cannot reparent the animated rows.
+Orders use a bottom-anchored overlay outside the card scroll area and reserve no
+height in the normal layout, including when only one action remains. Daily and chapter orders use the original request
+art, description, scrolling and tap-to-open behavior. No inline expansion or new
+request grouping is introduced.
+Daily completion never gates episodes or their return gift.
+
+Only the first two eligible deliveries during each new meditation shorten it by
+five minutes each. Earlier deliveries are not banked. The existing eight-hour
+rest and shared two-hour acceleration cap remain. Delivery receipts are routed
+away from chapter progression. Water completion links its existing goal receipt
+to the life request before ordinary action settlement, preventing double reduction.
+
+Steppling’s steps card has no submenu. Below its target, a tap only speaks the
+remaining-step dialogue and silently refreshes permitted readings. At or above its
+target, a tap immediately starts the existing reward flight and card exit sequence.
+Meditation can also settle from 500 new steps. Authored journey conversations retain
+their movement/rest choices. Motion is read only when already permitted.
 Supported devices query the exact meditation window. Stored step aggregates
 retain their source dates and baselines, including across midnight. Overlapping
 sources take the maximum rather than being added. Unsupported devices and
-denied permissions retain the adapted/rest paths. Rest never fabricates steps.
+denied permissions retain stored readings and the authored story alternatives. Rest
+never fabricates steps.
 Day 1's movement choice is an intention, not completed activity evidence.
 
-Mossprout offers a living detail or quiet moment. These explicit check-ins do
-not fabricate goal, wellness, or semantic-quest completion. Optional journal
-and goal buttons hand off to their existing tools.
+Mossprout’s “Log a glass of water” card is an explicit checkoff after drinking.
+The count persists across reopening and starts fresh on each local calendar day.
+The outgoing card retains its count until its animation finishes. Any needed
+clarification uses the existing character speech and multiple-choice flow, replacing
+the action list; no explanatory text or buttons expand beneath a card.
 
-Requests expire when the companion is ready and their unserved orders leave
-the board. Return context freezes when presented. Ordinary returns queue two
+Legacy meditation requests expire when the companion is ready. New optional
+daily requests expire at the local calendar-day boundary. Return context freezes when presented. Ordinary returns queue two
 tier-one resources through the existing parcel UI; finales retain their existing
 world reward instead. A full board leaves the parcel queued. A permanent reward
 receipt survives arrival-history trimming. Reminders reschedule to the actual
@@ -89,6 +125,11 @@ nodes before migration. Existing Day 1 run and generator-parcel identities are
 unchanged. Completed chapters remain complete. Mossprout keeps all original
 journey records and adopts its latest completed episode into the cycle while
 preserving an existing meditation's deadline, reductions and source identity.
+
+Existing legacy Garden batches finish under their saved rules for the current
+day; the next calendar day adopts the shared pair. Saved meditation cycles keep
+their old order identities until return. No existing board items, rewards, chapter
+orders, or conversation sessions are reset.
 
 For the next family:
 
@@ -118,3 +159,9 @@ Motion permission denial and live readings, background/foreground, notification
 rescheduling, parcel flights with a full board, and process termination at
 resolution, rest, and return. Render tests verify component behavior; they do
 not establish iPhone visual or sensor correctness.
+
+
+Leaving a companion restores the live camera snapshot captured before entry,
+including pan and zoom. Egg-to-resident handoffs retain their pre-Egg snapshot.
+A direct entry with no world-camera history instead fits that resident's complete
+tile with a small margin, rather than backing out to the entire kingdom.

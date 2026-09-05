@@ -1,45 +1,29 @@
-# Life Companion FTUE implementation
+# Life companion FTUE and shared scene implementation
 
-## Architecture
+## Ownership
 
-Script v43 is the native presentation/checkpoint projection. Content Flow v45 owns the live graph and durable effect receipts. Existing Egg, conversation, Bond, memory planting, Merge, Haven, Daily Seeds, and meditation systems are reused; no parallel quest, timer, or currency system was introduced.
+The FTUE manifest remains v47 and Glow discovery remains v4: no progression edge or receipt identifier changed. The first meeting is conversation v9. Its resolver preserves v8 follow-ups and pre-v8 short conversations; new greetings lead directly to the Memory Seed. The existing `companion.water_together` checkpoint now renders the post-Bloom personal question and habit offer. Its historic name remains save data.
 
-## State ownership
+The question saves `lifeFollowupId` through the existing onboarding profile before revealing the offer. Resuming with an answer shows the matching reply/offer. Habit acceptance uses the existing idempotent life-action service. Company and decline create no goal or completion. No backend migration or new permission is required by this revision.
 
-- `egg.day_texture` selects the personalized first meeting; `egg.desired_help` determines the personal Seed.
-- Profile growth intent is normalized to `desired-help:<id>`; both old unprefixed and canonical values resolve correctly.
-- Greeting selection is stored locally as `firstGreetingId`. Journey 2 saves the existing support-style answer.
-- First-meeting completion runs the existing Day 1 relationship effect, brings Bond to the existing first target, and grants the memory Seed. Granting checks its source before creating another.
-- Continue on the Seed reveal prepares the board once and crosses the existing camera presentation into planting.
-- Planting commits the existing world-memory placement. Open Merge is the next explicit action, with no timed dismissal.
-- Serving the first Plant unlocks the existing receipt-backed free world upgrade. The same memory instance receives its first growth.
-- Growth Continue completes the first Journey resolution and existing Bond milestone before Water Together.
-- Water choice is optional; accepting only pins the normal manual Daily Seed. It never fabricates wellness completion.
-- Rest starts the existing eight-hour meditation with the stable FTUE source ID, then enters Mossprout’s normal interaction UI with its compact next-Journey timer.
-- Go to Merge prepares the existing post-FTUE Garden mission, opens the activity board, and starts two event-driven handoff nodes. Back exits to the Garden.
-- Two successful Basket spawns and one Seed merge finish coaching. No modal follows. The existing path/spring request remains independent.
-- The Mossprout activity Basket remains free (`spendEnergy: false`); no Energy reward or economy change accompanies the handoff.
+## Shared scenes
 
-## Compatibility and interruption recovery
+`companionSceneModel` derives active/meditating/ready/finished presentation without owning domain state. `CompanionSceneCards` renders compact chapter/day information and a timer or continuation button above the original flat activity cards. Resident and FTUE choreography retain their dedicated presentations.
 
-Removed v42 checkpoints map forward to their closest surviving scene. Run IDs, answers, receipts, board contents, and meditation records are retained; completed saves stay completed. Retired script actions remain available for old offline receipt synchronization.
+`StepplingActions` owns actual step milestones; `MossproutWaterAction` uses explicit confirmation and the existing quick-goal repository. Completed trackers stay in place. Water settlement is shared across completion entry points and cannot receive both listed and ordinary meditation acceleration. Failed saves abort the completion animation and allow retry.
 
-The Seed reveal uses a new `companion.continue_to_planting` action ID, so an old acknowledgement receipt cannot swallow its new Continue action.
+`CompanionGardenAction` uses the shared per-companion calendar-day batch in Merge state. Its detail view groups optional daily orders and required Journey orders. Two frozen, obtainable orders pay 8 Glow each plus an automatic 8 Glow batch bonus. Item consumption, rewards and receipts are one persisted transaction. Existing legacy batches finish before adopting new daily pairs. See `unified-companion-journeys.md` for tuning and migration.
 
-Older flow journals migrate before replaying automatic effects. A legacy checkpoint without a flow journal is reconstructed at its saved position; the Seed reveal re-drives idempotent relationship/Seed effects if needed. Partial objective progress is retained. Recovered Basket facts include item instance IDs in event identity.
+The daily conversation selector persists one eligible authored activity. Its completed card remains for the day; unfinished conversations carry across midnight. Existing conversation engines and insight storage remain authoritative. No eligible activity means two cards, with no generic action picker or replacement filler.
 
-Back during meditation or Basket coaching writes the terminal checkpoint and dismisses only that FTUE flow, without inventing merge events. Startup reconciles a completed checkpoint before resuming flow work, covering interruption between those two writes.
+## Guidance and accessibility
 
-Mossprout’s map never renders the Steppling movement Egg. That progression data remains independent, but has no art or interaction path on this world surface.
+`FtueGuide.coaching = 'practice'` suppresses only the demonstration hand until six seconds have elapsed or Show hint is pressed. It does not change board evidence, input permissions or readiness. First-time mechanics retain immediate demonstrations. Text stays visible and is exposed to assistive technology.
 
-## Receipt deployment
-
-`supabase/migrations/20260903180000_register_mossprout_ftue_v43.sql` copies the v42 allowlist and adds the new Continue and two handoff actions. It contains no answer labels or personal text. Apply this migration through the normal deployment process before releasing the v43 client; it has not been deployed by this change.
+The shared scene scrolls when it exceeds the available scene area. Expandable action cards do not truncate title/subtitle text; goal rows support accessible Skip for today. Choice semantics, existing motion and reduced-motion handling are reused.
 
 ## Verification
 
-Automated coverage includes graph reachability, serialized replay at each boundary, duplicate effect acknowledgements, ignored unrelated events, two-spawn counting, one final merge, Seed mappings, forward checkpoint mapping, navigation exits, receipt allowlisting, free Basket behavior, and existing Merge/Haven/relationship regressions.
+`npm run verify:story-flows` includes `companion-scene.test.tsx`: all nine life follow-up branches, failed-save retry, remount recovery, v7/v8/v9 conversations, phase/slot identity and native-rendered scene behavior. Cycle component tests cover return double submission and flat cards during meditation. Daily Garden tests cover multi-item consumption, saved batches, midnight, bonus receipts and capped rest settlement. Daily action tests cover water confirmation, failure/retry, double-reduction prevention and conversation persistence. Existing merge, relationship, lifecycle and accessibility checks remain relevant.
 
-Native visual and process-kill acceptance checks remain in `docs/mossprout-ftue-day-1.md`. Passing reducer/source-contract tests is not a substitute for that device pass.
-
-The broader `test:roles` run reports three failures in the untouched Mossprout form-finder: a missing terminal end node, missing Mossprout affinity/reveal coverage, and no winning path for that form. These are outside the first-session flow and remain unresolved here.
+Device acceptance and five-person usability validation are listed in `mossprout-ftue-day-1.md`. This revision does not claim an on-device walkthrough or measured engagement improvement.

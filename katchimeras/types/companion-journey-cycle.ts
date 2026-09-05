@@ -1,6 +1,6 @@
 import type { KatchimeraFamilyId } from './katchimera';
 
-export type JourneyParticipation = 'walk' | 'adapted' | 'rest' | 'not_yet' | 'noticed';
+export type JourneyParticipation = 'walk' | 'adapted' | 'rest' | 'not_yet' | 'noticed' | 'water';
 export type JourneyMeditationRequest = {
   id: string;
   kind: 'merge' | 'life';
@@ -10,6 +10,7 @@ export type JourneyMeditationRequest = {
   definitionId?: string;
   completedAt: number | null;
   evidenceId: string | null;
+  goalId?: string;
 };
 
 /** Episode identities are independent of calendar days and equipped skins. */
@@ -32,4 +33,5 @@ export type CompanionJourneyCycle = {
   rewardId: string;
   finale: boolean;
   migrated?: boolean;
+  dailyGardenVersion?: 1;
 };

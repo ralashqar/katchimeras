@@ -1104,10 +1104,9 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
           dayId: today.isoDate,
           bondLevel: selectedBondProgress.level,
           friendshipLevel: selectedFriendshipProgress.level,
-          // The action stack is a rotating daily surface. Once all authored
-          // entries in a family have been seen recently, reuse an authored
-          // after-cooldown entry rather than permanently shrinking the stack.
-          allowCooldownFallback: true,
+          // Daily conversation cards respect authored cooldowns; an exhausted
+          // pool leaves the tracker and Garden cards available.
+          allowCooldownFallback: false,
         });
         if (!next) return selected;
         selected.push(next);
@@ -1126,7 +1125,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
           dayId: today.isoDate,
           bondLevel: selectedBondProgress.level,
           friendshipLevel: selectedFriendshipProgress.level,
-          allowCooldownFallback: true,
+          allowCooldownFallback: false,
         });
         if (!next) return selected;
         selected.push(next);

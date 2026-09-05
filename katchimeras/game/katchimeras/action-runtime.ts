@@ -143,7 +143,7 @@ export function commitActionCompletion(
         if (
           record.familyId !== command.familyId
           || command.completedAt < record.startedAt
-          || next.journeyCycles?.some((cycle) => cycle.id === (record.cycleId ?? record.sourceId) && cycle.requests.some((request) => request.orderId === (command.owner.kind === 'garden' ? command.owner.orderId : '') || request.evidenceId === command.commandId))
+          || next.journeyCycles?.some((cycle) => cycle.id === (record.cycleId ?? record.sourceId) && cycle.requests.some((request) => request.orderId === (command.owner.kind === 'garden' ? command.owner.orderId : '') || request.evidenceId === command.commandId || (command.owner.kind === 'goal' && request.goalId === command.owner.goalId)))
           || command.completedAt >= record.availableAt
           || record.settlementReceiptIds?.includes(receiptId)
         ) return record;

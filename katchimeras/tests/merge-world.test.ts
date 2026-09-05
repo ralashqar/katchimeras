@@ -36,6 +36,8 @@ import {
   resetMergeActivityForDay,
 } from '@/utils/merge-world/engine';
 
+const legacyGardenState = (state: MergeWorldState): MergeWorldState => ({ ...state, companionDailyGardenVersion: undefined, companionDailyGarden: undefined });
+
 const NOW = new Date('2026-08-12T12:00:00.000Z').getTime();
 
 test('the post-chapter Basket supports free scripted Seeds that can be merged', () => {
@@ -688,7 +690,7 @@ test('Mossprout Journey baskets emit authored drops atomically and cycle without
   assert.equal(exhausted.message?.includes('everything Mossprout found today'), false);
 });
 
-test('an active Mossprout Journey suppresses routine orders through its return handoff', () => {
+test('legacy saves: an active Mossprout Journey suppresses routine orders through its return handoff', () => {
   const activity = {
     objectiveId: 'mossprout:objective:pond-knock',
     mergeOrderId: 'merge-story:mossprout:quiet-patch:listening-place',
@@ -697,7 +699,7 @@ test('an active Mossprout Journey suppresses routine orders through its return h
     generatorId: 'wild-garden',
     dropDefinitionIds: [],
   };
-  let state = completeMossproutChapterZeroSlice(createMossproutChapterZeroState(NOW), NOW + 1);
+  let state = completeMossproutChapterZeroSlice(legacyGardenState(createMossproutChapterZeroState(NOW)), NOW + 1);
   state = reduceMergeWorld(state, {
     type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23', status: 'complete', activity: null, now: NOW + 2,
   }).state;
@@ -808,17 +810,17 @@ test('ordinary Mossprout Journey orders never grant resident cards', () => {
   assert.deepEqual(storyProjection.mossproutResidentSkinIds, ['mossprout']);
 });
 
-test('advanced Mossprout orders show one different unlocked resident per request', () => {
+test('legacy saves: advanced Mossprout orders show one different unlocked resident per request', () => {
   const activeDayIds = Array.from({ length: 28 }, (_, index) => `2026-07-${String(index + 1).padStart(2, '0')}`);
   const base = {
-    ...createMossproutChapterZeroState(NOW),
+    ...legacyGardenState(createMossproutChapterZeroState(NOW)),
     ownedKatchimeraCards: ['petalimp', 'fernip', 'blossle'].map((cardId, index) => ({
       cardId, familyId: 'mossprout' as const, acquisition: 'resident_discovery' as const,
       sourceReceiptId: `resident-test:${cardId}`, acquiredAt: NOW + index, coinCost: 0,
     })),
     mossproutResidentSkinIds: ['mossprout', 'petalimp', 'fernip', 'blossle'],
     mossproutBoardProgression: {
-      ...createMossproutChapterZeroState(NOW).mossproutBoardProgression,
+      ...legacyGardenState(createMossproutChapterZeroState(NOW)).mossproutBoardProgression,
       activeDayIds,
     },
   };
@@ -832,11 +834,11 @@ test('advanced Mossprout orders show one different unlocked resident per request
   assert.ok(orders.every((order) => state.mossproutResidentSkinIds.includes(order.recipientSkinId!)));
 });
 
-test('an early Mossprout day serves its authored batch before continuing one order at a time', () => {
+test('legacy saves: an early Mossprout day serves its authored batch before continuing one order at a time', () => {
   const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   assert.doesNotMatch(screen, /mossprout:\$\{localDayId\(\)\}:unavailable/);
   assert.match(screen, /mossproutJourney\?\.status === 'activity_in_progress'/);
-  let state = completeMossproutChapterZeroSlice(createMossproutChapterZeroState(NOW), NOW + 1);
+  let state = completeMossproutChapterZeroSlice(legacyGardenState(createMossproutChapterZeroState(NOW)), NOW + 1);
   assert.equal(state.activeOrders.some((order) => order.id.startsWith('mossprout:chapter-0:')), false);
   assert.equal(state.energy.regenPaused, false);
   const reconciled = reduceMergeWorld(state, {
@@ -917,8 +919,8 @@ test('Reset Today replaces an exhausted Mossprout Garden ledger with the first o
   assert.equal(reset.mossproutDailyGardenOrders?.activeOrderId, gardenOrders[0]?.id);
 });
 
-test('Mossprout order windows ramp by chapter and remain frozen for the current day', () => {
-  const base = completeMossproutChapterZeroSlice(createMossproutChapterZeroState(NOW), NOW + 1);
+test('legacy saves: Mossprout order windows ramp by chapter and remain frozen for the current day', () => {
+  const base = completeMossproutChapterZeroSlice(legacyGardenState(createMossproutChapterZeroState(NOW)), NOW + 1);
   const withDays = (count: number) => ({
     ...base,
     activeOrders: base.activeOrders.filter((order) => order.storyArcId !== 'mossprout:casual-garden'),
@@ -941,8 +943,8 @@ test('Mossprout order windows ramp by chapter and remain frozen for the current 
   assert.equal(advancedSameDay.activeOrders.filter((order) => order.storyArcId === 'mossprout:casual-garden').length, 2);
 });
 
-test('a Mossprout story request preempts routine Garden orders', () => {
-  let state = completeMossproutChapterZeroSlice(createMossproutChapterZeroState(NOW), NOW + 1);
+test('legacy saves: a Mossprout story request preempts routine Garden orders', () => {
+  let state = completeMossproutChapterZeroSlice(legacyGardenState(createMossproutChapterZeroState(NOW)), NOW + 1);
   state = reduceMergeWorld(state, { type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23', status: 'complete', activity: null, now: NOW + 2 }).state;
   state = reduceMergeWorld(state, {
     type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23', status: 'activity_in_progress',

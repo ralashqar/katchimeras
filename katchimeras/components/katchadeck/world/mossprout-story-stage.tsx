@@ -1,3 +1,11 @@
+import { CompanionChoiceList } from './companion-choice-list';
+import { CompanionSceneCards } from './companion-scene-cards';
+import { MossproutWaterAction } from './mossprout-water-action';
+import { CompanionGardenAction } from './companion-garden-action';
+import { useDailyCompanionConversation } from '@/hooks/use-daily-companion-conversation';
+import { useCompanionCalendarDay } from '@/hooks/use-companion-calendar-day';
+import { companionSceneModel } from '@/game/katchimeras/companion-scene-model';
+import { MOSSPROUT_JOURNEY_CAMPAIGN } from '@/constants/mossprout-journey-campaign';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
@@ -105,6 +113,8 @@ function useMossproutMergeWorldState() {
 
 export function MossproutStoryStage({
   activeQuestId,
+  onActionNarration,
+  onSubmenuChange,
   conversationSession,
   conversations,
   goals,
@@ -136,6 +146,8 @@ export function MossproutStoryStage({
   onResumeResidentStory,
   swipeExternalGesture,
 }: {
+  onSubmenuChange?: (open: boolean) => void;
+  onActionNarration?: (text: string | null) => void;
   activeQuestId?: string | null;
   conversationSession: ConversationSession | null;
   conversations: readonly CompanionChatStarter[];
@@ -149,6 +161,7 @@ export function MossproutStoryStage({
   onSnoozeGoal: (goalId: string) => boolean;
   onUndoGoal: (goalId: string) => boolean;
   onDashboard: () => void;
+  onAddTask?: () => void;
   onOpenConversation: (definitionId: string, actionOrigin?: KatchimeraActionOrigin) => void;
   onOpenCards: () => void;
   onOpenFocusDirection: (actionOrigin?: KatchimeraActionOrigin) => void;
@@ -169,6 +182,11 @@ export function MossproutStoryStage({
   onResumeResidentStory?: () => void;
   swipeExternalGesture?: GestureType;
 }) {
+
+  const [gardenOpen, setGardenOpen] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  useEffect(() => { onSubmenuChange?.(gardenOpen || Boolean(actionError)); return () => onSubmenuChange?.(false); }, [actionError, gardenOpen, onSubmenuChange]);
+  useEffect(() => { onActionNarration?.(actionError); return () => onActionNarration?.(null); }, [actionError, onActionNarration]);
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [selfCompletingGoalAction, setSelfCompletingGoalAction] = useState<KatchimeraDayAction | null>(null);
   const [localReplacementTransition, setLocalReplacementTransition] = useState<{
@@ -423,7 +441,7 @@ export function MossproutStoryStage({
     : null, [displayedPresentation, relationships.actionCompletions]);
 
   const openJourney = (sourceAction?: KatchimeraDayAction) => {
-    if (!journey) {
+    if (!journey || journey.status === 'complete') {
       const activeDayCount = mergeWorldState?.mossproutBoardProgression.activeDayIds.length ?? 0;
       const started = relationshipProgressionRepository.update((current) => startMossproutJourneyDay(current, dayId, Date.now(), activeDayCount, quickMode).state);
       const startedJourney = mossproutJourneyForDay(started, dayId);
@@ -575,7 +593,16 @@ export function MossproutStoryStage({
 
 
 
-  return <View style={[
+  const calendarDay = useCompanionCalendarDay();
+  const narrativeCandidates = resolveMossproutDayActions({ conversations, goals: [], offers: [], dayId: calendarDay,
+    journey: null, storyComplete: false, includeJourneyAction: false, includeActionIds: undefined, hasActiveFocus: true, dayOneLessonCompleted: true })
+    .filter((action) => ['fun_chat', 'insight_chat'].includes(action.kind) && !action.disabled && action.status !== 'completed');
+  const narrativeTimes = Object.fromEntries(relationships.actionCompletions.filter((item) => item.familyId === 'mossprout')
+    .map((item) => [item.actionId, item.completedAt]));
+  const completedNarratives = new Set(Object.keys(narrativeTimes).filter((id) => narrativeTimes[id] >= new Date(`${calendarDay}T00:00:00`).getTime()));
+  const narrative = useDailyCompanionConversation('mossprout', narrativeCandidates, completedNarratives, narrativeTimes);
+  const narrativeDone = Boolean(narrative && completedNarratives.has(narrative.id));
+  const legacyContent = <View style={[
     styles.stage,
     residentParcelHandoffActive
       ? styles.residentParcelStage
@@ -773,6 +800,42 @@ export function MossproutStoryStage({
       ]}
     /> : null}
   </View>;
+  const guided = dayOneActionChoiceActive || navigationLocked || tutorialInteractionLocked || residentParcelHandoffActive || residentStoryResumeActive;
+  if (guided) return legacyContent;
+  if (actionError) return <CompanionChoiceList options={[
+    { id: 'retry', label: 'Try again' }, { id: 'back', label: 'Later' },
+  ]} onSelect={() => setActionError(null)} />;
+  const completedBeats = new Set(relationships.journeyDays.filter((item) => item.familyId === 'mossprout' && item.status === 'complete').map((item) => item.beatId));
+  const displayEpisode = journey && journey.status !== 'complete' ? journeyEpisode : MOSSPROUT_JOURNEY_CAMPAIGN.days.find((item) => !completedBeats.has(item.id));
+  const chapter = MOSSPROUT_JOURNEY_CAMPAIGN.chapters?.find((item) => item.id === displayEpisode?.chapterId);
+  const model = companionSceneModel({ familyId: 'mossprout', episodeId: journey?.beatId ?? 'next', dayNumber: journeyDayNumber,
+    chapterTitle: chapter?.title ?? 'Our Garden', episodeTitle: displayEpisode?.title ?? 'A little way together',
+    phase: storyComplete ? 'finished' : 'active' });
+  const flatCards = <CompanionGardenAction onSubmenuChange={setGardenOpen} familyId="mossprout" onOpenMerge={(id) => {
+      if (journey?.status === 'activity_available' && journeyRequestPreviews.some((request) => request.id === id)) relationshipProgressionRepository.update((current) => startMossproutJourneyActivity(current, dayId));
+      onOpenMerge(id);
+    }} storyRequests={journeyRequestPreviews}>
+    {(gardenCard) => <View style={{ gap: 8 }}>
+    <MossproutWaterAction onBondRewardRequest={onBondRewardRequest} onError={setActionError} />
+    {gardenCard}
+    {presentationAction && displayedPresentation ? <DayActionCompletedRow animateLayout={false}
+      artwork={<MossproutActionArtwork action={presentationAction} />} enteringEnabled={false}
+      onFinished={() => presentationController.finish(displayedPresentation.id)}
+      onRewardRequest={presentationAction.rewardReceipt ? (source, arrive) => onBondRewardRequest(source, arrive, presentationAction.rewardReceipt!) : undefined}
+      reward={presentationAction.reward ? <ActionRewardChip reward={presentationAction.reward} /> : undefined}
+      start={presentationController.phase === 'animating'} title={presentationAction.title} />
+      : narrative && !narrativeDone ? <DayActionActiveRow label={narrative.title} animateLayout><Pressable accessibilityRole="button" accessibilityLabel={narrative.title} disabled={narrativeDone} onPress={() => openAction(narrative)}>
+        <DayActionCardSurface artwork={<MossproutActionArtwork action={narrative} />} title={narrative.title}
+          subtitle={narrative.subtitle}
+          reward={narrative.reward ? <ActionRewardChip reward={narrative.reward} /> : undefined} />
+      </Pressable></DayActionActiveRow> : null}
+  </View>}
+  </CompanionGardenAction>;
+  if (meditationMode) return flatCards;
+  return <CompanionSceneCards hideJourney={gardenOpen} model={model}
+    onJourney={storyComplete ? onDashboard : () => openJourney(actions.find((action) => action.destination.kind === 'journey'))}>
+    {flatCards}
+  </CompanionSceneCards>;
 }
 
 function MossproutActionArtwork({ action }: { action: KatchimeraDayAction }) {

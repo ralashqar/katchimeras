@@ -1,9 +1,11 @@
+import { useContext, useMemo } from 'react';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { CompanionEnvironmentGestureContext } from './companion-environment-gesture-context';
 import { Image } from 'expo-image';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { PersistentMergeItemArt } from '@/components/katchadeck/games/feastle-persistent-merge-board';
 import { ThemedText } from '@/components/themed-text';
-import { GameSurface } from '@/components/katchadeck/ui/game-surface';
 import { KatchaUI } from '@/constants/katcha-ui';
 import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import { MERGE_WORLD_UI_ART } from '@/constants/merge-world-ui-art';
@@ -55,7 +57,6 @@ export function CompanionMergeRequestTray({
   palette,
   requests,
   onRequestPress,
-  compact = false,
 }: {
   accessibilityLabel: string;
   countLabel?: string;
@@ -63,28 +64,15 @@ export function CompanionMergeRequestTray({
   palette: CompanionMergeRequestPalette;
   requests: readonly CompanionMergeRequest[];
   onRequestPress?: (orderId: string) => void;
-  compact?: boolean;
 }) {
+  const environmentGesture = useContext(CompanionEnvironmentGestureContext);
+  const scrollGesture = useMemo(() => {
+    const native = Gesture.Native().shouldActivateOnStart(true).disallowInterruption(true);
+    // The outer pan must wait even when the carousel reaches either end.
+    // A drag begun on an order must never become a page-dismiss gesture.
+    return environmentGesture ? native.blocksExternalGesture(environmentGesture) : native;
+  }, [environmentGesture]);
   if (!requests.length) return null;
-  if (compact) return <GameSurface tone="cream" contentStyle={styles.compactContent}>
-    <View style={styles.heading}>
-      <ThemedText style={styles.compactHeading}>{eyebrow}</ThemedText>
-      <ThemedText style={styles.compactHint}>Swipe to see requests</ThemedText>
-    </View>
-    <ScrollView accessibilityLabel={accessibilityLabel} horizontal directionalLockEnabled nestedScrollEnabled
-      showsHorizontalScrollIndicator={false} contentContainerStyle={styles.compactRail}>
-      {requests.map((request) => <Pressable key={request.id} accessibilityRole="button"
-        accessibilityLabel={[request.title, request.badge, request.served ? 'Completed' : 'Open order'].filter(Boolean).join('. ')}
-        accessibilityState={{ disabled: !onRequestPress || Boolean(request.served) }} disabled={!onRequestPress || request.served}
-        onPress={() => onRequestPress?.(request.id)} style={styles.compactRequest}>
-        {request.definitionIds.map((id) => <PersistentMergeItemArt key={id} definitionId={id} size={36} />)}
-        <View style={styles.compactCopy}>
-          <ThemedText numberOfLines={2} style={styles.compactTitle}>{request.title}</ThemedText>
-          <ThemedText numberOfLines={1} style={styles.compactHint}>{request.served ? 'Completed' : request.badge}</ThemedText>
-        </View>
-      </Pressable>)}
-    </ScrollView>
-  </GameSurface>;
   return (
     <View
       accessibilityLabel={accessibilityLabel}
@@ -96,6 +84,7 @@ export function CompanionMergeRequestTray({
           {countLabel ?? `${requests.length} ${requests.length === 1 ? 'order' : 'orders'}`}
         </ThemedText>
       </View>
+      <GestureDetector gesture={scrollGesture}>
       <ScrollView
         contentContainerStyle={[styles.rail, requests.length === 1 && styles.singleRail]}
         contentInsetAdjustmentBehavior="never"
@@ -121,8 +110,8 @@ export function CompanionMergeRequestTray({
               style={[styles.card, single && styles.singleCard, request.served && styles.cardServed, { backgroundColor: palette.rowBackground }]}
             >
               <View style={[styles.art, single && styles.singleArt]}>
-                {request.definitionIds.map((definitionId) => (
-                  <PersistentMergeItemArt definitionId={definitionId} key={definitionId} size={request.definitionIds.length > 1 ? 36 : 44} />
+                {request.definitionIds.map((definitionId, index) => (
+                  <PersistentMergeItemArt definitionId={definitionId} key={`${definitionId}:${index}`} size={request.definitionIds.length > 1 ? 36 : 44} />
                 ))}
               </View>
               <View style={styles.copy}>
@@ -152,18 +141,12 @@ export function CompanionMergeRequestTray({
           );
         })}
       </ScrollView>
+      </GestureDetector>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  compactContent: { gap: 3, paddingHorizontal: 10, paddingVertical: 7 },
-  compactHeading: { color: '#49351F', fontSize: 11, lineHeight: 14, fontWeight: '900' },
-  compactHint: { color: '#786348', fontSize: 9, lineHeight: 12 },
-  compactRail: { alignItems: 'center' },
-  compactRequest: { flexDirection: 'row', alignItems: 'center', gap: 7, width: 180, minHeight: 52, paddingRight: 12 },
-  compactCopy: { flex: 1, gap: 2 },
-  compactTitle: { color: '#49351F', fontSize: 11, lineHeight: 14, fontWeight: '800' },
   tray: { borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, gap: 5, padding: 7 },
   heading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 3 },
   eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 },

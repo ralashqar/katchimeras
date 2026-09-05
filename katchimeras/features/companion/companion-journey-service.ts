@@ -1,6 +1,6 @@
 import { STEPPLING_CHAPTER_ID, STEPPLING_JOURNEY_DAYS, stepplingEpisodeFlow, stepplingEpisodeId } from '@/constants/steppling-journey-campaign';
 import { MOSSPROUT_CAMPAIGN_EPISODES } from '@/constants/mossprout-campaign';
-import { beginJourneyReturnPresentation, completeMeditationRequest, createJourneyCycle, currentJourneyCycle, finishJourneyReturn, installJourneyCycle, journeyCycleReady, observeJourneySteps, observeJourneyStepWindow } from '@/game/katchimeras/companion-journey-cycle';
+import { beginJourneyReturnPresentation, completeMeditationRequest, settleDailyGardenDelivery, createJourneyCycle, currentJourneyCycle, finishJourneyReturn, installJourneyCycle, journeyCycleReady, observeJourneySteps, observeJourneyStepWindow } from '@/game/katchimeras/companion-journey-cycle';
 import { relationshipProgressionRepository as repository } from '@/storage/repositories/relationship-progression-repository';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import { beginAuthoredCohortStory, loadAuthoredCohortStory, saveAuthoredCohortStory } from '@/utils/companion-story-storage';
@@ -220,6 +220,12 @@ export async function reconcileCompanionMeditation(familyId: string) {
     for (const request of cycle.requests) {
       const receipt = world.externalRewardReceipts.find((item) => item.id === `merge-story-served:${request.orderId}`);
       if (receipt) state = completeMeditationRequest(state, cycle.id, request.id, receipt.id, receipt.createdAt);
+    }
+    if (cycle.dailyGardenVersion === 1) {
+      const deliveries = world.externalRewardReceipts.filter((item) => item.sourceId === 'companion:daily-garden' && item.characterId === familyId && item.createdAt >= cycle.completedAt).sort((a, b) => a.createdAt - b.createdAt);
+      for (const receipt of deliveries) {
+        state = settleDailyGardenDelivery(state, familyId, receipt.id, receipt.createdAt);
+      }
     }
     if (familyId === 'steppling') {
       const home = homeRepository.load();

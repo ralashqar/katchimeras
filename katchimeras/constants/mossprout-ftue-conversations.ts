@@ -34,7 +34,7 @@ const openingLines: Record<string, string> = {
 function definition(key: string, opening: string): ConversationDefinition {
   return {
     id: `${MOSSPROUT_FTUE_CONVERSATION_PREFIX}:${key}`,
-    version: 8,
+    version: 9,
     familyId: 'mossprout',
     title: 'Meet Mossprout',
     trigger: 'evergreen',
@@ -52,10 +52,8 @@ function definition(key: string, opening: string): ConversationDefinition {
     nodes: [
       {
         id: 'hello', kind: 'choice', phase: 'opening', prompt: `${opening}\n\nI’m Mossprout.`,
-        options: MOSSPROUT_GREETING_OPTIONS.map((option) => ({ ...option, nextNodeId: 'followup' })),
+        options: MOSSPROUT_GREETING_OPTIONS.map((option) => ({ ...option, nextNodeId: 'end' })),
       },
-      { id: 'followup', kind: 'choice', prompt: mossproutFollowup('progress').prompt,
-        options: mossproutFollowup('progress').options.map((option) => ({ id: `life:${option.id}`, label: option.label, reply: option.reply, nextNodeId: 'end' })) },
       { id: 'end', kind: 'end', message: MOSSPROUT_FTUE_COPY.seedOrigin },
     ],
   };
@@ -64,8 +62,10 @@ function definition(key: string, opening: string): ConversationDefinition {
 export function resolveMossproutFtueConversation(definition: ConversationDefinition, intent: string | null | undefined, savedVersion: number) {
   if (!definition.id.startsWith(MOSSPROUT_FTUE_CONVERSATION_PREFIX)) return definition;
   const followup = mossproutFollowup(intent);
-  return { ...definition, nodes: definition.nodes.filter((node) => savedVersion >= 8 || node.id !== 'followup').map((node) => {
-    if (node.id === 'hello' && node.kind === 'choice' && savedVersion < 8) return { ...node, options: node.options.map((option) => ({ ...option, nextNodeId: 'end' })) };
+  // Version 8 conversations already in progress finish in place. New meetings
+  // save the deeper question for the first Bloom; pre-v8 meetings remain short.
+  return { ...definition, nodes: [...definition.nodes.filter((node) => node.id !== 'followup'), ...(savedVersion === 8 ? [{ id: 'followup', kind: 'choice' as const, prompt: followup.prompt, options: [] }] : [])].map((node) => {
+    if (node.id === 'hello' && node.kind === 'choice') return { ...node, options: node.options.map((option) => ({ ...option, nextNodeId: savedVersion === 8 ? 'followup' : 'end' })) };
     if (node.id !== 'followup') return node;
     return { id: 'followup', kind: 'choice' as const, prompt: followup.prompt, options: followup.options.map((option) => ({ id: `life:${option.id}`, label: option.label, reply: option.reply, nextNodeId: 'end' })) };
   }) };

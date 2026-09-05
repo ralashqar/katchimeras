@@ -63,7 +63,7 @@ export type FtueActionDefinition = {
   backendEvent?: boolean;
 };
 
-export type FtueGuide = { eyebrow: string; title: string; body: string };
+export type FtueGuide = { eyebrow: string; title: string; body: string; coaching?: 'practice' };
 
 export type FtueTarget =
   | { kind: 'haven_gateway' }

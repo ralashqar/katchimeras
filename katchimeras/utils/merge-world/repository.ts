@@ -675,3 +675,7 @@ export function subscribeMergeWorldSnapshots(listener: (state: MergeWorldState) 
   snapshotListeners.add(listener);
   return () => snapshotListeners.delete(listener);
 }
+
+export function ensureStoredCompanionDailyGarden(familyId: 'mossprout' | 'steppling', now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'ensureCompanionDailyGarden', familyId, now }), now);
+}

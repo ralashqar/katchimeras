@@ -496,6 +496,8 @@ export type MergeWorldState = {
   unlockedCharacters: MergeCharacterId[];
   favouriteCharacterId: MergeCharacterId | null;
   activeOrders: MergeOrder[];
+  companionDailyGardenVersion?: 1;
+  companionDailyGarden?: Partial<Record<'mossprout' | 'steppling', import('@/utils/merge-world/companion-daily-garden').CompanionDailyGardenBatch>>;
   mossproutDailyGardenOrders: MossproutDailyGardenOrders | null;
   characterActivityOpportunities: MergeCharacterActivityOpportunity[];
   ownedKatchimeraCards: OwnedKatchimeraCard[];
@@ -537,6 +539,7 @@ export type MergeWorldCommand =
   | { type: 'stepplingEgg'; action: import('@/features/onboarding/steppling-egg-policy').StepplingEggAction; now: number }
   | { type: 'grantGeneratorParcel'; generatorId: string; rewardId: string; dayId: string; now: number }
   | { type: 'reconcileJourneyMeditation'; cycle: import('./companion-journey-cycle').CompanionJourneyCycle; availableAt: number; now: number }
+  | { type: 'ensureCompanionDailyGarden'; familyId: 'mossprout' | 'steppling'; now: number }
   | { type: 'grantJourneyReturn'; cycle: import('./companion-journey-cycle').CompanionJourneyCycle; dayId: string; now: number }
   | { type: 'unlockWorldTarget'; targetId: string; now: number; receiptId?: string }
   | { type: 'transferDiscoveryEgg'; targetId: 'mossprout:overgrown-trail'; now: number }

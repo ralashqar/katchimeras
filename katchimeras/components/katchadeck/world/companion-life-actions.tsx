@@ -9,6 +9,7 @@ import { KatchaUI } from '@/constants/katcha-ui';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { COMPANION_BOND_REWARDS } from '@/utils/companion-bond';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
+import { acknowledgeKatchimeraActionCompletion, mossproutDailyActionDeck, mossproutJourneyRuntimeDayId, recordHandledKatchimeraActionCompletion } from '@/game/katchimeras/relationship-progression';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,7 +49,7 @@ export function DailyHabitOffer({ familyId, suggestedId, onDecision, entryId, pr
       try { if (!preview && saveOnAccept) acceptDailyStoryHabit(familyId, habit.id, entryId); onDecision(habit.id); }
       catch { setError('That action could not be saved. Please try again.'); setBusy(false); }
     }} />
-    <LifeButton disabled={busy} label="Skip" onPress={() => onDecision(null)} />
+    <LifeButton disabled={busy} label="Not now" onPress={() => onDecision(null)} />
   </View>;
 }
 
@@ -126,25 +127,27 @@ function LifeActionArtwork({ kind, completed = false }: { kind: 'movement' | 're
   return <Image source={katchimeraActionArt(`today:${kind}`)} contentFit="contain" transition={0} style={{ width: 48, height: 48, opacity: completed ? 0.94 : 1 }} />;
 }
 
-export function CompanionLifeActions({ familyId, storyLabel, onStory, onBuild, buildLabel, buildContent, onAddTask, onBondRewardRequest, externalGesture, onSubmenuChange }: {
+export function CompanionLifeActions({ familyId, storyLabel, onStory, onBuild, buildLabel, buildContent, onAddTask, onBondRewardRequest, externalGesture, onSubmenuChange, lifeOnly = false, disabled = false }: {
   onBondRewardRequest?: (source: DayActionSourceRect, onArrive: () => void) => void; externalGesture?: GestureType;
   familyId: LifeCompanionFamily; storyLabel: string; onStory?: () => void; onBuild: () => void; buildLabel: string;
-  buildContent?: ReactNode; entryId?: string; returnCheckIn?: boolean; onVisitSeed?: () => void; stepsLabel?: string; onMovementCheckIn?: () => void;
+  buildContent?: ReactNode; stepsLabel?: string; onMovementCheckIn?: () => void;
   onAddTask?: () => void;
   onSubmenuChange?: (open: boolean) => void;
+  lifeOnly?: boolean;
+  disabled?: boolean;
 }) {
   const [completionAttempt, setCompletionAttempt] = useState(0);
   const [completingGoal, setCompletingGoal] = useState<CompanionQuickGoal | null>(null);
   const [dayId, setDayId] = useState(localDayId);
   const goals = useCompanionQuickGoals({ dayId, availableFamilyIds: families });
-  const [selectedId, setSelectedId] = useState<string | null>(() => chooseCompanionTask(goals.state, familyId, dayId)?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => chooseCompanionTask(goals.state, familyId, dayId, null, lifeOnly ? () => 0 : Math.random)?.id ?? null);
   const [mode, setMode] = useState<'home' | 'build'>('home');
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { const timer = setInterval(() => setDayId(localDayId()), 30000); return () => clearInterval(timer); }, []);
   useEffect(() => { onSubmenuChange?.(mode !== 'home'); return () => onSubmenuChange?.(false); }, [mode, onSubmenuChange]);
   useEffect(() => {
-    if (!completingGoal) setSelectedId((id) => chooseCompanionTask(goals.state, familyId, dayId, id)?.id ?? null);
-  }, [goals.state, familyId, dayId, completingGoal]);
+    if (!completingGoal) setSelectedId((id) => chooseCompanionTask(goals.state, familyId, dayId, id, lifeOnly ? () => 0 : Math.random)?.id ?? null);
+  }, [goals.state, familyId, dayId, completingGoal, lifeOnly]);
   const goal = completingGoal ?? goals.state.goals.find((item) => item.id === selectedId) ?? null;
   const taskVisible = Boolean(goal);
   const change = (work: () => void) => { try { work(); setError(null); } catch { setError('That task could not be saved. Please try again.'); } };
@@ -158,26 +161,44 @@ export function CompanionLifeActions({ familyId, storyLabel, onStory, onBuild, b
     </Pressable>
   </DayActionActiveRow>;
   return <View style={{ gap: 7 }}>
-    {onStory ? card(storyLabel, 'reflection', onStory, 0) : null}
-    {onAddTask ? card('Add task', 'reflection', onAddTask, 0) : null}
+    {!lifeOnly && onStory ? card(storyLabel, 'reflection', onStory, 0) : null}
+    {!lifeOnly && onAddTask ? card('Add task', 'reflection', onAddTask, 0) : null}
     {taskVisible && goal ? <DayActionGoalRow
+      subtitle={lifeOnly ? 'Your day · tap when you’ve done it' : undefined}
+      accessibilityHint="Mark this action complete only when you have done it."
       key={`${goal.id}:${dayId}:${completionAttempt}`} animateLayout completeOnPress entryDelayMs={DAY_ACTION_MOTION.entryBaseDelayMs + DAY_ACTION_MOTION.entryStaggerMs}
-      externalGesture={externalGesture} disabled={Boolean(completingGoal)} label={goal.title} title={goal.title}
+      externalGesture={externalGesture} disabled={disabled || Boolean(completingGoal)} label={goal.title} title={goal.title}
       artwork={<LifeActionArtwork kind={familyId === 'steppling' ? 'movement' : 'reflection'} />}
       reward={<DayActionRewardChip reward={{ kind: 'bond', amount: COMPANION_BOND_REWARDS.quick_goal_completed }} />}
       onOpen={(complete) => complete()}
       onSkip={() => change(() => { goals.skipGoal(goal.id); })}
       onBeginCompletion={() => setCompletingGoal(goal)}
-      onCompletionRequest={(source, onArrive) => {
+      onCompletionRequest={(source, onArrive, onFailed) => {
         try {
           const receipt = goals.completeGoal(goal.id);
+          // This row owns the completion animation. Mark its existing action
+          // receipt handled so the older activity directory cannot replay it.
+          if (lifeOnly && receipt.completion) relationshipProgressionRepository.update((current) => {
+            const actionDay = familyId === 'mossprout' ? mossproutJourneyRuntimeDayId(current, dayId) : dayId;
+            const actionId = `${familyId}:goal:${goal.id}`;
+            const existing = current.actionCompletions.find((item) => item.dayId === actionDay && item.actionId === actionId);
+            if (existing) return acknowledgeKatchimeraActionCompletion(current, existing.id, receipt.completion!.completedAt);
+            const sequence = familyId === 'mossprout' ? mossproutDailyActionDeck(current, actionDay).slotSequences.together : 0;
+            return recordHandledKatchimeraActionCompletion(current, {
+              dayId: actionDay, familyId, actionId, instanceId: `${actionDay}:together:${sequence}:${actionId}`,
+              slotId: 'together', sequence, kind: 'goal_checkoff', title: goal.title,
+              subtitle: 'A small promise kept', icon: 'checkmark.circle.fill', artworkDefinitionIds: [],
+              reward: { kind: 'bond', amount: receipt.bondAward?.points ?? COMPANION_BOND_REWARDS.quick_goal_completed },
+              completedAt: receipt.completion!.completedAt,
+            });
+          });
           if (receipt.bondAward && source && onBondRewardRequest) onBondRewardRequest(source, onArrive);
           else onArrive();
-        } catch { setError('That task could not be saved. Please try again.'); onArrive(); }
+        } catch { setError('That task could not be saved. Please try again.'); setCompletingGoal(null); onFailed(); }
       }}
-      onFinished={() => { setSelectedId(chooseCompanionTask(loadCompanionQuickGoalState(), familyId, dayId)?.id ?? null); setCompletingGoal(null); setCompletionAttempt((value) => value + 1); goals.refresh(); }}
+      onFinished={() => { setSelectedId(chooseCompanionTask(loadCompanionQuickGoalState(), familyId, dayId, null, lifeOnly ? () => 0 : Math.random)?.id ?? null); setCompletingGoal(null); setCompletionAttempt((value) => value + 1); goals.refresh(); }}
     /> : null}
-    {card(buildLabel, 'quest', () => buildContent ? setMode('build') : onBuild(), 2)}
+    {!lifeOnly ? card(buildLabel, 'quest', () => buildContent ? setMode('build') : onBuild(), 2) : null}
     {error ? <Copy>{error}</Copy> : null}
   </View>;
 }

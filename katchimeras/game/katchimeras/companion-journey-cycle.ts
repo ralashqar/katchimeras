@@ -16,16 +16,15 @@ export function createJourneyCycle(input: Pick<CompanionJourneyCycle, 'id' | 'fa
 }): CompanionJourneyCycle {
   const profile = COMPANION_JOURNEY_PROFILES[input.familyId];
   if (!profile) throw new Error(`Journey content has not been authored for ${input.familyId}`);
-  const prefix = profile.mergeChainId;
   return {
-    ...input, participation: input.participation ?? 'not_yet',
+    ...input, dailyGardenVersion: 1, participation: input.participation ?? 'not_yet',
     stepBaselines: input.stepBaselines ?? {}, observedSteps: {}, stepProgress: 0,
     returnStartedAt: null, returnedAt: null, rewardId: `${input.id}:return-gift`,
     requests: [
       ...[1, 2].map((tier) => ({
         id: `${input.id}:request:${tier}`, kind: 'merge' as const,
         title: profile.requestTitles[tier - 1],
-        definitionId: `${prefix}:${tier}`, orderId: `${input.id}:request:${tier}`,
+        // Daily garden receipts fill these settlement slots; no separate orders are created.
         reductionMs: JOURNEY_MEDITATION_ORDER_MINUTES * 60 * 1000, completedAt: null, evidenceId: null,
       })),
       { id: `${input.id}:request:life`, kind: 'life',
@@ -122,6 +121,7 @@ export function journeyReturnLine(cycle: CompanionJourneyCycle): string {
     walk: `You shared some walking with me. I kept a little of that journey for ${name}.`,
     adapted: `You found a way to move that suited you. There is room for that in ${name}.`,
     rest: `You chose a gentler moment. There is room to pause beside ${name}.`,
+    water: `You made a little room to care for yourself. I brought that gentleness back to ${name}.`,
     noticed: `You stopped to notice something. I brought that attention back to ${name}.`,
     not_yet: `Welcome back. We can pick up ${name} from right here.`,
   };
@@ -134,9 +134,30 @@ export function normalizeJourneyCycles(value: unknown): CompanionJourneyCycle[] 
   return value.filter((item): item is CompanionJourneyCycle => {
     if (!item || typeof item.id !== 'string' || seen.has(item.id) || typeof item.familyId !== 'string' || !Number.isFinite(item.completedAt) || !Array.isArray(item.requests)) return false;
     seen.add(item.id); return true;
-  }).map((item) => ({ ...item, participation: ['walk', 'adapted', 'rest', 'noticed', 'not_yet'].includes(item.participation) ? item.participation : 'not_yet',
+  }).map((item) => ({ ...item, participation: ['walk', 'adapted', 'rest', 'noticed', 'water', 'not_yet'].includes(item.participation) ? item.participation : 'not_yet',
     stepBaselines: item.stepBaselines ?? {}, observedSteps: item.observedSteps ?? {}, stepProgress: Math.max(0, Math.min(500, item.stepProgress || 0)),
     requests: item.requests.filter((request) => request && typeof request.id === 'string' && (request.kind === 'merge' || request.kind === 'life')).map((request) => request.kind === 'merge' && request.completedAt == null ? { ...request, reductionMs: JOURNEY_MEDITATION_ORDER_MINUTES * 60 * 1000 } : request),
     returnedAt: Number.isFinite(item.returnedAt) ? item.returnedAt : null, returnStartedAt: Number.isFinite(item.returnStartedAt) ? item.returnStartedAt : null,
   }));
+}
+
+/** A daily delivery can settle only one of this rest's two merge slots. */
+export function settleDailyGardenDelivery(state: RelationshipProgressState, familyId: string, receiptId: string, occurredAt: number): RelationshipProgressState {
+  const cycle = currentJourneyCycle(state, familyId);
+  if (!cycle || cycle.dailyGardenVersion !== 1 || cycle.requests.some((item) => item.evidenceId === receiptId)) return state;
+  const slot = cycle.requests.find((item) => item.kind === 'merge' && item.completedAt == null);
+  return slot ? completeMeditationRequest(state, cycle.id, slot.id, receiptId, occurredAt) : state;
+}
+
+/** Link water's existing goal receipt before an action card can apply generic acceleration. */
+export function settleCompanionWaterBreak(state: RelationshipProgressState, goalId: string, evidenceId: string, occurredAt: number): RelationshipProgressState {
+  const cycle = currentJourneyCycle(state, 'mossprout');
+  const request = cycle?.requests.find((item) => item.kind === 'life');
+  if (!cycle || !request || request.completedAt != null) return state;
+  // An older release may already have settled this goal as an ordinary Bond action.
+  if (state.actionCompletions.some((item) => item.actionId === `mossprout:goal:${goalId}` && item.completedAt === occurredAt)) return state;
+  const next = completeMeditationRequest(state, cycle.id, request.id, evidenceId, occurredAt, 'water');
+  if (next === state) return state;
+  return { ...next, journeyCycles: next.journeyCycles!.map((item) => item.id !== cycle.id ? item : { ...item,
+    requests: item.requests.map((candidate) => candidate.id === request.id ? { ...candidate, goalId } : candidate) }) };
 }

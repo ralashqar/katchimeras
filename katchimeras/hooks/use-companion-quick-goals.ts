@@ -1,3 +1,5 @@
+import { settleCompanionWaterBreak } from '@/game/katchimeras/companion-journey-cycle';
+import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -201,10 +203,13 @@ export function useCompanionQuickGoals({
   const completeGoal = useCallback((goalId: string): CompanionQuickGoalCompletionReceipt => {
     if (!dayId) return { bondAward: null, completion: null, newlyCompleted: false };
     const result = completeCompanionQuickGoal(loadCompanionQuickGoalState(), goalId, dayId);
-    if (!result.completed || !result.completion) {
+    if (!result.completion) {
       return { bondAward: null, completion: result.completion, newlyCompleted: false };
     }
-    commit(result.state);
+    if (result.completed) commit(result.state);
+    if (result.state.goals.find((goal) => goal.id === goalId)?.templateId === 'mossprout:drink-water') {
+      relationshipProgressionRepository.update((current) => settleCompanionWaterBreak(current, goalId, result.completion!.id, result.completion!.completedAt));
+    }
 
     const homeState = homeRepository.load();
     const resolveCompanionId = companionIdResolverForHomeState(homeState);
@@ -228,7 +233,7 @@ export function useCompanionQuickGoals({
           }
         : null,
       completion: result.completion,
-      newlyCompleted: true,
+      newlyCompleted: result.completed,
     };
   }, [commit, dayId, onBondChanged]);
 

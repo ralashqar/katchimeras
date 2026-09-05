@@ -1,3 +1,4 @@
+import { ensureCompanionDailyGarden, completeDailyGardenOrder, DAILY_GARDEN_ARC, DAILY_GARDEN_BONUS } from './companion-daily-garden';
 import {
   FEASTLE_STORY_REQUESTS,
   GENERATOR_BY_CHAIN,
@@ -194,6 +195,8 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     unlockedCharacters: [],
     favouriteCharacterId: null,
     activeOrders: [],
+    companionDailyGardenVersion: 1,
+    companionDailyGarden: {},
     mossproutDailyGardenOrders: null,
     characterActivityOpportunities: [],
     ownedKatchimeraCards: [],
@@ -311,6 +314,10 @@ export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldComm
         label: definition.name, theme: 'memory', familyId: item.familyId, chainId: definition.chainIds[0],
         source: 'companion_story', itemDefinitionIds: [], claimedAt: null, seenAt: null,
       }] }, command.now));
+    }
+    case 'ensureCompanionDailyGarden': {
+      const next = ensureCompanionDailyGarden(current, command.familyId, command.now);
+      return next === current ? unchanged(current) : changed(touch(next, command.now));
     }
     case 'reconcileJourneyMeditation': {
       const { cycle, now } = command;
@@ -808,6 +815,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     ...fallback,
     ...source,
     ...normalizeGlowDiscoveryFields(source),
+    companionDailyGardenVersion: source.companionDailyGardenVersion,
     stepplingEgg: normalizeStepplingEgg(source.stepplingEgg),
     version: 22,
     ownerCharacterId: 'mossprout',
@@ -1965,7 +1973,13 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
     return unchanged(state, 'Your companion is ready to return. These items are yours to keep.');
   }
   if (!order || !mergeOrderReady(state, order)) return unchanged(state, 'The requested items are not ready yet.');
+  if (order.storyArcId === DAILY_GARDEN_ARC && order.storyBeatId !== localDayId(now)) return unchanged(state, 'New garden requests are ready for today. Your items are yours to keep.');
   const board = boardAfterServingOrder(state, order);
+  if (order.storyArcId === DAILY_GARDEN_ARC) {
+    const next = completeDailyGardenOrder({ ...state, board, coins: state.coins + order.reward.coins, completedOrderCount: state.completedOrderCount + 1, activeOrders: state.activeOrders.filter((item) => item.id !== orderId) }, order, now);
+    const bonus = next.coins - state.coins > order.reward.coins;
+    return { ...changed(touch(next, now), bonus ? `Today’s garden complete! +${order.reward.coins} Glow + ${DAILY_GARDEN_BONUS} bonus Glow.` : `+${order.reward.coins} Glow`), servedOrderId: order.id };
+  }
   if (orderId.startsWith('journey-cycle:')) return { ...changed(touch({
     ...state, board, coins: state.coins + order.reward.coins, activeOrders: state.activeOrders.filter((item) => item.id !== orderId),
     externalRewardReceipts: [...state.externalRewardReceipts, {
@@ -2645,7 +2659,7 @@ function reconcileCharacterActivity(
     : authoredStoryOrder;
   let activeOrders = storyOrder ? [...keepOrders, storyOrder] : keepOrders;
   let dailyGarden = next.mossproutDailyGardenOrders;
-  if (!showsOrder && !journeyExclusive) {
+  if (!showsOrder && !journeyExclusive && !next.companionDailyGarden?.mossprout && (!next.companionDailyGardenVersion || next.mossproutDailyGardenOrders?.dayId === localDayId(now))) {
     const sameDay = dailyGarden?.dayId === command.dayId;
     const chapterId = sameDay && dailyGarden?.chapterId
       ? dailyGarden.chapterId
@@ -2945,7 +2959,7 @@ function reconcileStory(
           .filter((order) => !servedIds.has(order.id))
           .slice(0, effectiveActPhase === 'regular_orders' ? 3 : undefined)
       : [];
-    const keep = next.activeOrders.filter((order) => order.characterId !== story.familyId || !order.storyArcId);
+    const keep = next.activeOrders.filter((order) => order.characterId !== story.familyId || !order.storyArcId || order.storyArcId === DAILY_GARDEN_ARC || order.id.startsWith('journey-cycle:'));
     const activeOrders = [...keep, ...wanted.map((order) => existing.find((item) => item.id === order.id
       && JSON.stringify(item.requirements) === JSON.stringify(order.requirements)) ?? order)];
     if (activeOrders.length !== next.activeOrders.length || activeOrders.some((order, index) => order.id !== next.activeOrders[index]?.id)) {

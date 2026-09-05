@@ -216,6 +216,13 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
   // still gates input above; only an explicit null spotlight dismisses the mask.
   const spotlightReady = Boolean(spotlight && currentLayout?.spotlightFrames.length);
   const guideKey = guide && presentationReady ? `${configKey}:${guide.title}:${guide.body}` : null;
+  const [hintKey, setHintKey] = useState<string | null>(null);
+  const practice = guide?.coaching === 'practice';
+  useEffect(() => {
+    if (!practice || !guideKey) return;
+    const timer = setTimeout(() => setHintKey(guideKey), 6000);
+    return () => clearTimeout(timer);
+  }, [practice, guideKey]);
   // One authored flag owns the complete guidance presentation. By default the
   // spotlight, finger, and Egg copy persist until the required command changes
   // the FTUE node. Only explicitly transient beats (currently the resident
@@ -228,6 +235,7 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
   // the same native finger view is reused for the next presentation.
   const showCue = Boolean(
     presentationReady
+      && (!practice || hintKey === guideKey)
       && currentLayout.cue
       && currentLayout.cuePoints,
   );
@@ -250,10 +258,12 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
   };
   return (
     <View
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
       pointerEvents="box-none"
       style={styles.overlay}>
+      {practice && guideKey ? <Pressable accessibilityRole="button" accessibilityLabel="Show merge hint"
+        onPress={() => setHintKey(guideKey)} style={styles.hintButton}>
+        <ThemedText style={styles.hintLabel}>Show hint</ThemedText>
+      </Pressable> : null}
       {!spotlightDismissed ? (
         <FtueSpotlight
           frames={showSpotlight ? currentLayout?.spotlightFrames ?? [] : []}
@@ -275,6 +285,8 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
             entering={FadeIn.duration(150)}
             exiting={FadeOut.duration(150)}
             pointerEvents="none"
+            accessible
+            accessibilityLabel={[guide.title, guide.body].filter(Boolean).join('. ')}
             style={StyleSheet.absoluteFill}>
             <MergeFtueEggGuide
               anchor={guideAnchorFrame(spotlight, currentLayout.spotlightFrames)}
@@ -806,6 +818,8 @@ function measureView(view: View | null): Promise<Frame | null> {
 }
 
 const styles = StyleSheet.create({
+  hintButton: { position: 'absolute', top: 64, right: 16, minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 16, backgroundColor: '#FFF9E9', zIndex: 3 },
+  hintLabel: { color: '#35422F', fontSize: 14, fontWeight: '700' },
   overlay: { ...StyleSheet.absoluteFillObject, zIndex: 250 },
   guideDismissLayer: { ...StyleSheet.absoluteFillObject, zIndex: 1 },
   hand: { position: 'absolute', zIndex: 4 },

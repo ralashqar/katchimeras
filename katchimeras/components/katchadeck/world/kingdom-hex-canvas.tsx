@@ -783,6 +783,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   }, [camera, cameraLocked, storyCameraInputLocked, onSelectNatureIsland, reduceMotion, viewport.height]);
   const fitTutorialWorld = camera.fitWorld;
   const focusTutorialResident = camera.focusResident;
+  const focusInteractionTile = camera.focusFrame;
   const animateToCameraSnapshot = camera.animateToSnapshot;
   const readLiveCameraSnapshot = camera.getSnapshot;
   const tutorialCameraReady = camera.ready;
@@ -989,8 +990,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     );
   }, [camera.isMoving, tileUpgradeOffer]);
   const focusedInteractionResidentRef = useRef<string | null>(null);
+  const hadWorldCameraRef = useRef(false);
   useEffect(() => {
     if (!interactionResidentId) {
+      if (tutorialCameraReady) hadWorldCameraRef.current = true;
       focusedInteractionResidentRef.current = null;
       interactionOriginSnapshotRef.current = null;
       return;
@@ -1003,7 +1006,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       && candidate.companion.creature.creatureId === interactionResidentId
     ));
     if (!tile) return;
-    interactionOriginSnapshotRef.current ??= readLiveCameraSnapshot();
+    // A direct/cold entry initializes the camera at the resident close-up;
+    // it is not a world view to restore. Egg handoffs already supply an origin.
+    if (hadWorldCameraRef.current) interactionOriginSnapshotRef.current ??= readLiveCameraSnapshot();
     focusedInteractionResidentRef.current = interactionFocusKey;
     const residentAnchor = scene.tileArtLayers.find((layer) => layer.id === residentArtLayerId(tile.id, tile.companion?.familyId))?.residentAnchor;
     const isMossprout = usesSharedResidentStage(tile.companion?.familyId);
@@ -1024,31 +1029,34 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   useEffect(() => {
     if (!interactionResidentId || interactionExitNonce <= handledInteractionExitNonceRef.current) return;
     handledInteractionExitNonceRef.current = interactionExitNonce;
-    const interactionOrigin = interactionOriginSnapshotRef.current;
-    if (interactionOrigin) {
-      animateToCameraSnapshot(interactionOrigin, reduceMotion ? 80 : 440, () => {
-        interactionOriginSnapshotRef.current = null;
-        onInteractionExitFocusComplete?.();
-      });
+    const onComplete = () => {
+      interactionOriginSnapshotRef.current = null;
+      onInteractionExitFocusComplete?.();
+    };
+    const durationMs = reduceMotion ? 80 : 440;
+    const origin = interactionOriginSnapshotRef.current;
+    if (origin) {
+      animateToCameraSnapshot(origin, durationMs, onComplete);
       return;
     }
+    // Without an entry view, fit just this tile instead of the whole kingdom.
     const tile = scene.tiles.find((candidate) => (
       candidate.kind === 'companion'
       && candidate.companion?.kind === 'owned'
       && candidate.companion.creature.creatureId === interactionResidentId
-    ));
-    if (!tile) {
-      onInteractionExitFocusComplete?.();
-      return;
-    }
-    const residentAnchor = scene.tileArtLayers.find((layer) => layer.id === tile.id)?.residentAnchor;
-    focusTutorialResident(residentAnchor?.x ?? tile.cx, residentAnchor?.y ?? tile.cy, {
-      anchorY: 0.48,
-      durationMs: reduceMotion ? 80 : 440,
-      onComplete: onInteractionExitFocusComplete,
-      zoom: KINGDOM_RENDERING.havenMaxScale,
+    )) ?? scene.centerTile;
+    const layer = scene.tileArtLayers.find((candidate) => candidate.id === residentArtLayerId(tile.id, tile.companion?.familyId));
+    const frame = layer?.interactionFrame ?? {
+      left: tile.cx - HEX_TILE_W / 2, top: tile.cy - HEX_TILE_H / 2,
+      width: HEX_TILE_W, height: HEX_TILE_H,
+    };
+    focusInteractionTile(frame, {
+      durationMs,
+      horizontalPadding: 20,
+      verticalPadding: 40,
+      onComplete,
     });
-  }, [animateToCameraSnapshot, focusTutorialResident, interactionExitNonce, interactionResidentId, onInteractionExitFocusComplete, reduceMotion, scene.tileArtLayers, scene.tiles]);
+  }, [animateToCameraSnapshot, focusInteractionTile, interactionExitNonce, interactionResidentId, onInteractionExitFocusComplete, reduceMotion, scene.centerTile, scene.tileArtLayers, scene.tiles]);
   const upgradeCompletionRef = useRef(onUpgradePresentationComplete);
   const upgradeFocusRef = useRef(camera.focusUpgrade);
   const upgradeLayersRef = useRef(upgradeLayers);

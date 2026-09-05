@@ -715,8 +715,8 @@ test('Mossprout owns a compact Journey action stack without redundant headings o
   assert.match(sharedRows, /paddingHorizontal: windowWidth/);
   assert.match(sharedRows, /skipFramePositionStyle = useMemo\(\(\) => \(\{ left: windowWidth \}\)/);
   assert.match(sharedRows, /skipFrame: \{[^}]*borderRadius: 20[^}]*overflow: 'hidden'/);
-  assert.match(interaction, /fullWidth=\{mossproutActionDashboard\}/);
-  assert.match(interaction, /mossproutActionScrollContent: \{ flexGrow: 1, overflow: 'hidden', paddingHorizontal: KatchaUI\.layout\.phoneGutter \+ 4 \}/);
+  assert.match(interaction, /fullWidth=\{dashboardRouteActive\}/);
+  assert.match(interaction, /dashboardScrollContent: \{ flexGrow: 1, paddingHorizontal: KatchaUI\.layout\.phoneGutter \+ 4 \}/);
   assert.match(mossprout, /const ACTION_STACK_HEIGHT = 212/);
   assert.match(mossprout, /actionSlot: \{[^}]*height: ACTION_STACK_HEIGHT[^}]*justifyContent: 'flex-end'/);
   assert.match(mossprout, /const ACTION_TRAY_HEIGHT = 284/);

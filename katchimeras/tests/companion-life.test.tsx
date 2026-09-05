@@ -145,8 +145,8 @@ test('Steppling uses original animated rows, retains its goal through completion
   const Offer = component.DailyHabitOffer as React.ComponentType<Record<string, unknown>>;
   const decisions: (string | null)[] = [];
   await act(async () => { tree = create(<Offer familyId="mossprout" suggestedId="mossprout:window-view" preview onDecision={(id: string | null) => decisions.push(id)} />); });
-  assert.deepEqual(tree!.root.findAllByType('ActionCard' as React.ElementType).map((card) => card.props.title), ['Notice nature from a window', 'Skip']);
-  await press('Skip');
+  assert.deepEqual(tree!.root.findAllByType('ActionCard' as React.ElementType).map((card) => card.props.title), ['Notice nature from a window', 'Not now']);
+  await press('Not now');
   assert.deepEqual(decisions, [null]);
   await act(async () => tree!.unmount());
 });

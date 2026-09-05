@@ -31,7 +31,7 @@ test('Steppling milestones require real progress, pay once in order, grow reward
   assert.equal(state.pendingCelebrations?.length, 5);
 });
 
-test('Steppling keeps the claimed row through its flight, uses the legacy tray, and exhausts saved chats', async () => {
+test('Steppling keeps the claimed row through its flight, restores Garden navigation and removes completed chats', async () => {
   let bond = emptyCompanionBondState();
   let relationships = emptyRelationshipProgressState();
   const sessions: ConversationSession[] = [];
@@ -63,7 +63,8 @@ test('Steppling keeps the claimed row through its flight, uses the legacy tray, 
     '@/hooks/use-relationship-progression': { useRelationshipProgression: () => relationships },
     '@/storage/repositories/relationship-progression-repository': { relationshipProgressionRepository: { update: (work: (state: typeof relationships) => typeof relationships) => { relationships = work(relationships); } } },
     '@/utils/world-identity': { localDayId: () => '2026-09-04' },
-    './mossprout-journey-request-panel': { MossproutJourneyRequestPanel: 'LegacyGardenPanel' },
+    './companion-garden-action': { CompanionGardenAction: ({ children, ...props }: { children: (card: React.ReactNode) => React.ReactNode }) => children(React.createElement('GardenCard', props)) },
+    '@/hooks/use-daily-companion-conversation': { useDailyCompanionConversation: () => STEPPLING_TRAIL_CHATS[0] },
     './companion-merge-request-tray': { CompanionMergeRequestTray: 'Tray', COMPANION_MERGE_REQUEST_PALETTE: {}, COMPANION_STORY_PANEL_STYLE: panel },
   }, { setInterval, clearInterval });
   const Cards = module.StepplingActions as React.ComponentType<Record<string, unknown>>;
@@ -80,6 +81,9 @@ test('Steppling keeps the claimed row through its flight, uses the legacy tray, 
   assert.equal(row().props.hideCompletionControl, true);
   steps = 2500;
   await act(async () => { row().props.onOpen(); });
+  assert.equal(tree!.root.findAllByType('GoalRow' as React.ElementType).length, 1, 'unfinished steps only speak and keep the card visible');
+  assert.equal(tree!.root.findAllByType('Choices' as React.ElementType).length, 0, 'steps never open a submenu');
+  assert.equal(flights, 0, 'unfinished steps do not start the reward sequence');
   assert.equal(row().props.completeOnPress, true);
   assert.equal(row().props.highlighted, true);
   assert.equal(bond.events.length, 0, 'reaching the target does not claim until tapped');
@@ -93,17 +97,12 @@ test('Steppling keeps the claimed row through its flight, uses the legacy tray, 
   assert.match(reaction, /500 steps!/);
   assert.equal(row().props.title, 'Walk 2,000 steps');
   assert.equal(row().props.reward.props.reward.amount, 8);
-  await press('Tend garden');
-  const tray = tree!.root.findByType('LegacyGardenPanel' as React.ElementType);
-  assert.equal(tray.props.standalone, true);
-  assert.equal(tray.props.fitContent, true);
-  assert.equal(tray.props.actionLabel, 'Back');
-  assert.equal(tray.props.requests[0].badge, undefined);
-  assert.equal(tray.props.requests[0].description, '+8 Glow · 5 min sooner');
-  await act(async () => tray.props.onRequestPress('order-one'));
+  const garden = tree!.root.findByType('GardenCard' as React.ElementType);
+  assert.equal(garden.props.familyId, 'steppling');
+  assert.equal(garden.props.storyRequests[0].id, 'order-one');
+  await act(async () => garden.props.onOpenMerge('order-one'));
   assert.deepEqual(opened, ['order-one']);
-  await act(async () => tray.props.onAction());
-  for (const chat of STEPPLING_TRAIL_CHATS) {
+  for (const chat of STEPPLING_TRAIL_CHATS.slice(0, 1)) {
     await press(chat.title);
     assert.equal(tree!.root.findAllByType('Choices' as React.ElementType).length, 0, 'no bespoke chat panel');
     const definition = STEPPLING_TRAIL_CONVERSATIONS.find((item) => item.id === definitionId)!;
@@ -132,9 +131,9 @@ test('Steppling keeps the claimed row through its flight, uses the legacy tray, 
     assert.equal(relationships.actionPresentations.at(-1)?.status, 'dismissed');
     await act(async () => new Promise((resolve) => setTimeout(resolve, 380)));
   }
-  assert.equal(tree!.root.findAllByType('ActiveRow' as React.ElementType).length, 1);
+  assert.equal(tree!.root.findAllByType('Card' as React.ElementType).some((card) => card.props.title === STEPPLING_TRAIL_CHATS[0].title), false);
   await act(async () => { tree!.unmount(); tree = create(<Cards {...props} />); });
-  assert.equal(tree!.root.findAllByType('ActiveRow' as React.ElementType).length, 1, 'answered chats stay exhausted after reopening');
+  assert.equal(tree!.root.findAllByType('Card' as React.ElementType).some((card) => card.props.title === STEPPLING_TRAIL_CHATS[0].title), false, 'completed conversation stays gone after reopening');
   assert.equal(row().props.title, 'Walk 2,000 steps');
   await act(async () => tree!.unmount());
 });
@@ -205,5 +204,14 @@ test('ready steps wait for a tap, then use the original row reward and exit sequ
   assert.equal(finished, 0, 'replacement waits for the reward arrival');
   await act(async () => arrive());
   assert.equal(finished, 1);
+  await act(async () => tree!.unmount());
+  await act(async () => { tree = create(<Row {...props} completeOnPress
+    onCompletionRequest={(_source: unknown, _arrive: () => void, fail: () => void) => fail()} />); });
+  await act(async () => tree!.root.findByType('Pressable' as React.ElementType).props.onPress());
+  await act(async () => [...timers.values()].find((timer) => timer.delay === 190)!.callback());
+  assert.equal(timers.size, 0, 'failed saves cancel the success watchdog');
+  await act(async () => motion.advance(4000));
+  assert.equal(finished, 1, 'a failed save never finishes the completion presentation');
+  assert.equal(tree!.root.findByType('Pressable' as React.ElementType).props.disabled, false, 'the same action can be retried');
   await act(async () => tree!.unmount());
 });

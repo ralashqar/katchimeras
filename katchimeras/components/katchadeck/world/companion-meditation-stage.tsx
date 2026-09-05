@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import { DayActionCardSurface, DayActionIcon } from '@/components/katchadeck/ui/day-action-card';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Meadow } from '@/constants/meadow-theme';
@@ -31,12 +32,14 @@ export function CompanionMeditationStage({
   now,
   settledMs = 0,
   startedAt,
+  title,
 }: {
   availableAt: number;
   companionName: string;
   now: number;
   settledMs?: number;
   startedAt: number;
+  title?: string;
 }) {
   const [trackWidth, setTrackWidth] = useState(0);
   const countdown = formatMeditationCountdown(availableAt, now);
@@ -56,40 +59,34 @@ export function CompanionMeditationStage({
   }));
 
   return (
-    <View accessibilityLabel={`${companionName} is meditating. Ready in ${countdown}`} style={styles.card}>
-      <View style={styles.header}>
-        <View style={styles.titleRow}>
-          <IconSymbol color={Meadow.leafDeep} name="timer" size={13} />
-          <ThemedText style={styles.label} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-            Reflecting
-          </ThemedText>
-        </View>
-        <ThemedText style={styles.countdown} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-          {countdown}
-        </ThemedText>
-      </View>
-      <View onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)} style={styles.track}>
-        <Animated.View style={[styles.fill, fillStyle]} />
-        <Animated.View pointerEvents="none" style={[styles.marker, markerStyle]}>
-          <IconSymbol color="#FFF9E9" name="leaf.fill" size={9} />
-        </Animated.View>
-      </View>
+    <View accessibilityLabel={`${companionName} is meditating. Ready in ${countdown}`}>
+      <DayActionCardSurface
+        artwork={<DayActionIcon icon="moon.fill" />}
+        title={title ?? 'Next Journey in'}
+        trailing={<View />}
+        progress={<View style={styles.progress}>
+          <View style={styles.header}>
+            {title ? <ThemedText style={styles.label} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+              Next Journey in
+            </ThemedText> : null}
+            <ThemedText style={styles.countdown} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+              {countdown}
+            </ThemedText>
+          </View>
+          <View onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)} style={styles.track}>
+            <Animated.View style={[styles.fill, fillStyle]} />
+            <Animated.View pointerEvents="none" style={[styles.marker, markerStyle]}>
+              <IconSymbol color="#FFF9E9" name="leaf.fill" size={9} />
+            </Animated.View>
+          </View>
+        </View>}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: 'rgba(255,249,229,0.94)',
-    borderColor: 'rgba(113,91,48,0.16)',
-    borderCurve: 'continuous',
-    borderRadius: 14,
-    borderWidth: 1,
-    boxShadow: '0 4px 11px rgba(46,36,24,0.1)',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
+  progress: { gap: 8, paddingTop: 4, paddingBottom: 4 },
   countdown: { fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: 0.25 },
   fill: {
     backgroundColor: Meadow.leaf,
@@ -116,6 +113,5 @@ const styles = StyleSheet.create({
     top: -6,
     width: 18,
   },
-  titleRow: { alignItems: 'center', flexDirection: 'row', gap: 5 },
   track: { backgroundColor: 'rgba(80,109,66,0.16)', borderRadius: 999, height: 6, marginHorizontal: 1, position: 'relative' },
 });

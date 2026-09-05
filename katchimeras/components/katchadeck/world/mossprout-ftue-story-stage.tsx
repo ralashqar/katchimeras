@@ -1,3 +1,4 @@
+import { MossproutFirstLifeMoment } from './mossprout-first-life-moment';
 import { useEffect, useState } from 'react';
 import { Image } from 'expo-image';
 import {
@@ -32,10 +33,6 @@ import {
 } from '@/features/onboarding/mossprout-bond-share';
 import { mossproutMemoryPlantById } from '@/constants/mossprout-memory-plants';
 import { MOSSPROUT_FTUE_COPY as COPY } from '@/features/onboarding/mossprout-ftue-copy';
-import { DailyHabitOffer, LifeButton } from './companion-life-actions';
-import { mossproutFollowupChoice } from '@/constants/companion-life-content';
-import { loadOnboardingProfile } from '@/utils/onboarding-state';
-import { MOSSPROUT_LIFE_ENTRY } from '@/utils/companion-life-recording';
 
 const INTRODUCTION_REWARD = { amount: MOSSPROUT_FTUE_NAME_BOND_REWARD_PREVIEW, kind: 'bond' as const };
 const BOND_SHARE_REWARD = { amount: MOSSPROUT_FTUE_BOND_SHARE_REWARD_PREVIEW, kind: 'bond' as const };
@@ -227,11 +224,7 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
   );
 
   if (mode === 'water_together') {
-    const followup = mossproutFollowupChoice(loadOnboardingProfile().mossproutAnswers.lifeFollowupId);
-    return <Animated.View entering={FadeInUp.duration(220)} style={styles.actionStage}>
-      {followup?.habitId === null ? <><ThemedText lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>We’ve made a beginning. That’s plenty for today.</ThemedText><LifeButton label="Continue" onPress={() => onContinue?.('habit:declined')} /></>
-        : <DailyHabitOffer familyId="mossprout" suggestedId={followup?.habitId ?? 'mossprout:quiet-minute'} entryId={MOSSPROUT_LIFE_ENTRY} onDecision={(id) => onContinue?.(id ? `habit:${id}` : 'habit:declined')} />}
-    </Animated.View>;
+    return <MossproutFirstLifeMoment onContinue={onContinue} />;
   }
 
   if (mode === 'water_response') return (
@@ -288,6 +281,7 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
     </Animated.View>
   );
 }
+
 
 function PrimaryAction({ icon = 'arrow.right', label, onPress }: { icon?: string; label: string; onPress: () => void }) {
   return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
