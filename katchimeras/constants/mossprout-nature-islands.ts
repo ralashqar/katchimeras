@@ -24,13 +24,13 @@ export type MossproutNatureIslandDefinition = {
 function levels(
   names: readonly [string, string, string, string],
   descriptions: readonly [string, string, string, string],
-  levelTwoCost: number,
+  costs: readonly [number, number, number, number],
 ): readonly MossproutNatureIslandLevelDefinition[] {
   return [
-    { coinCost: 40, description: descriptions[0], level: 1, name: names[0], storyGate: 'chapter_zero_complete' },
-    { coinCost: levelTwoCost, description: descriptions[1], level: 2, name: names[1], storyGate: 'story_level_2' },
-    { coinCost: 150, description: descriptions[2], level: 3, name: names[2], storyGate: 'story_level_3' },
-    { coinCost: 300, description: descriptions[3], level: 4, name: names[3], storyGate: 'story_level_4' },
+    { coinCost: costs[0], description: descriptions[0], level: 1, name: names[0], storyGate: 'chapter_zero_complete' },
+    { coinCost: costs[1], description: descriptions[1], level: 2, name: names[1], storyGate: 'story_level_2' },
+    { coinCost: costs[2], description: descriptions[2], level: 3, name: names[2], storyGate: 'story_level_3' },
+    { coinCost: costs[3], description: descriptions[3], level: 4, name: names[3], storyGate: 'story_level_4' },
   ];
 }
 
@@ -49,7 +49,7 @@ export const MOSSPROUT_NATURE_ISLANDS: readonly MossproutNatureIslandDefinition[
         'Trellises and labelled beds turn the patch into a true nursery.',
         'Rare glowing seedlings fill a lush propagation haven.',
       ],
-      60,
+      [40, 60, 150, 300],
     ),
   },
   {
@@ -66,7 +66,7 @@ export const MOSSPROUT_NATURE_ISLANDS: readonly MossproutNatureIslandDefinition[
         'A winding path and floral arch welcome butterflies.',
         'Layered flowers and glowing blossoms cover the garden.',
       ],
-      60,
+      [40, 60, 150, 300],
     ),
   },
   {
@@ -83,7 +83,7 @@ export const MOSSPROUT_NATURE_ISLANDS: readonly MossproutNatureIslandDefinition[
         'A waterfall and small stream bring the island to life.',
         'Lotus blooms and gentle glow fill a lush water sanctuary.',
       ],
-      65,
+      [40, 65, 150, 300],
     ),
   },
   {
@@ -100,7 +100,7 @@ export const MOSSPROUT_NATURE_ISLANDS: readonly MossproutNatureIslandDefinition[
         'Mature fruit trees gather around baskets and harvest crates.',
         'Oversized fruit and blossom canopies crown a magical grove.',
       ],
-      65,
+      [40, 65, 150, 300],
     ),
   },
   {
@@ -117,7 +117,7 @@ export const MOSSPROUT_NATURE_ISLANDS: readonly MossproutNatureIslandDefinition[
         'An old tree rises above mushrooms and hanging ornaments.',
         'A majestic glowing canopy reveals the soul of the biome.',
       ],
-      75,
+      [40, 75, 150, 300],
     ),
   },
   {
@@ -134,7 +134,7 @@ export const MOSSPROUT_NATURE_ISLANDS: readonly MossproutNatureIslandDefinition[
         'Fantasy mushrooms, vines, and layered foliage take over.',
         'Luminous fungi fill a dense enchanted wildgrowth zone.',
       ],
-      75,
+      [40, 75, 150, 300],
     ),
   },
 ] as const;

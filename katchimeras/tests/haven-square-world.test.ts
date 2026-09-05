@@ -247,7 +247,7 @@ test('the focused Mossprout replacement uses the top-level hex projection and au
   assert.match(scene, /kingdomTileArtFrame\(/);
   assert.match(scene, /hexDrawDepth\(point\)/);
   assert.match(scene, /DREAM_MIST_LOCKED_NATURE_SOURCES[\s\S]*?dream_mist_locked_hex_tile_v2\.webp[\s\S]*?dream_mist_locked_hex_tile_v2_512\.webp[\s\S]*?dream_mist_locked_hex_tile_v2_256\.webp/);
-  assert.match(scene, /function natureLayerFor[\s\S]*?const locked = level === 0[\s\S]*?interactionFrame: undefined/);
+  assert.doesNotMatch(scene, /return locked \? \{ \.\.\.result, interactionFrame: undefined \}/);
   assert.match(scene, /MOSSPROUT_NATURE_ISLANDS\.map\(\(island\) => natureLayerFor/);
   assert.doesNotMatch(scene, /MOSSPROUT_NATURE_ISLANDS\.flatMap[\s\S]*?natureIslandLevels/);
 });

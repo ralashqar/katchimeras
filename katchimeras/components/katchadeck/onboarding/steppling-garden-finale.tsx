@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, useWindowDimensions } from 'react-native';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
@@ -16,6 +16,9 @@ export function StepplingGardenFinale({ summary, hosted }: { summary: boolean; h
 
   const pending = useRef(false);
   const insets = useSafeAreaInsets();
+  const window = useWindowDimensions();
+  // Scenic bleed covers tall phones; wider screens can scroll the complete art.
+  const summaryScrolls = window.width / window.height > 0.52;
 
   const advance = async () => {
     if (pending.current) return;
@@ -33,20 +36,20 @@ export function StepplingGardenFinale({ summary, hosted }: { summary: boolean; h
     {!summary ? <View style={[styles.footer, { bottom: insets.bottom + 24 }]}>
       {failed ? <ThemedText accessibilityRole="alert">Couldn’t save. Please try again.</ThemedText> : null}
       <KatchaButton fullWidth label="Our adventure" loading={busy} onPress={() => void advance()} />
-    </View> : <KatchaSheet size="full" fullBleed surface="parchment" showClose={false} entranceMotion="fade" scroll
-      scrollContentStyle={{ paddingTop: insets.top, paddingBottom: 0 }}
+    </View> : <KatchaSheet size="full" fullBleed surface="parchment" showClose={false} entranceMotion="fade" scroll={summaryScrolls}
+      scrollContentStyle={{ paddingBottom: 0 }}
       onRequestClose={() => {}}
-      footer={<View style={[styles.summaryFooter, {
-        paddingBottom: insets.bottom + 10,
-        paddingLeft: Math.max(16, insets.left),
-        paddingRight: Math.max(16, insets.right),
+      overlay={<View style={[styles.summaryFooter, {
+        bottom: insets.bottom + 10,
+        left: Math.max(16, insets.left),
+        right: Math.max(16, insets.right),
       }]}>{failed ? <ThemedText accessibilityRole="alert">Couldn’t save. Please try again.</ThemedText> : null}
         <KatchaButton fullWidth label="Let’s explore" loading={busy} onPress={() => void advance()} /></View>}>
-      <GameLoopSummary />
+      <GameLoopSummary scrolling={summaryScrolls} />
     </KatchaSheet>}
   </View>;
 }
 const styles = StyleSheet.create({
   footer: { position: 'absolute', left: 24, right: 24, gap: 10 },
-  summaryFooter: { gap: 8 },
+  summaryFooter: { position: 'absolute', gap: 8 },
 });

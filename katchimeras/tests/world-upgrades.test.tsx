@@ -9,7 +9,10 @@ import { MOSSPROUT_FTUE_FLOW } from '@/features/onboarding/mossprout-ftue-flow';
 import { createContentFlowRun, reduceContentFlow, stabilizeContentFlow } from '@/features/content-flow/content-flow-interpreter';
 import { GLOW_DISCOVERY_FLOW, glowDiscoveryResumeCamera, glowDiscoveryResumeWorld } from '@/features/onboarding/glow-discovery-flow';
 import { MOSSPROUT_NATURE_ISLANDS } from '@/constants/mossprout-nature-islands';
-import { createInitialMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
+import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
+import { readFileSync } from 'node:fs';
+import { sharedResidentAnchor } from '@/components/katchadeck/world/shared-resident-presentation';
+import type { KingdomHexScene } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { loadNativeModule, nativeViews } from './helpers/native-motion-harness';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -22,6 +25,82 @@ function world(coins = 2000) {
 function restored(coins = 2000) {
   return reduceMergeWorld(world(coins), { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, now: NOW }).state;
 }
+
+test('all nature island levels use the shared purchase flow, survive reload, and charge only once', () => {
+  let state = restored(10_000);
+  state = reduceMergeWorld(state, { type: 'reconcileHavenStory', characterId: 'mossprout', storyLevel: 4, now: NOW }).state;
+  for (const island of MOSSPROUT_NATURE_ISLANDS) {
+    for (const level of island.levels) {
+      const offer = visibleWorldUpgradeOffers(worldUpgradeOffers(state), undefined, null)
+        .find((candidate) => candidate.id === `nature:${island.id}`)!;
+      assert.ok(offer, `${island.id} level ${level.level} has a marker`);
+      assert.equal(offer.cost, level.coinCost);
+      assert.equal(offer.nextLevel, level.level);
+      assert.equal(offer.action, level.level === 1 ? 'Clear mist' : 'Upgrade');
+      assert.ok(WORLD_UPGRADE_FLOWS.some((flow) => flow.id === worldUpgradeRunId(offer)));
+      const command = { type: 'upgradeMossproutNatureIsland' as const, islandId: island.id,
+        level: level.level, receiptId: worldUpgradeRunId(offer), now: NOW };
+      const before = state.coins;
+      const paid = reduceMergeWorld(state, command);
+      assert.equal(paid.changed, true);
+      assert.equal(paid.state.coins, before - level.coinCost);
+      state = normalizeMergeWorldState(JSON.parse(JSON.stringify(paid.state)), NOW);
+      assert.equal(state.haven.mossproutNatureIslands[island.id], level.level);
+      assert.equal(reduceMergeWorld(state, command).state.coins, state.coins);
+    }
+    assert.equal(worldUpgradeOffers(state).some((offer) => offer.id === `nature:${island.id}`), false);
+  }
+  assert.equal(state.haven.tileStages.mossprout, 4);
+});
+
+test('mist islands are targetable and every reveal keeps other tiles and camera bounds stable', () => {
+  const file = 'components/katchadeck/world/mossprout-hex-neighborhood-scene.ts';
+  const mocks: Record<string, unknown> = {
+    './shared-resident-presentation': { sharedResidentAnchor },
+    '@/constants/mossprout-memory-plants': { mossproutMemoryPlantById: new Map() },
+    '@/components/katchadeck/world/kingdom-hex-scene': {
+      tileVisibleBounds: (x: number, y: number) => ({ left: x - 200, top: y - 200, right: x + 200, bottom: y + 200 }),
+    },
+  };
+  for (const match of readFileSync(file, 'utf8').matchAll(/require\('([^']+)'\)/g)) mocks[match[1]] = match[1];
+  const module = loadNativeModule(file, mocks);
+  const levels = { ...restored().haven.mossproutNatureIslands };
+  const build = () => module.buildMossproutHexNeighborhoodScene([], levels) as KingdomHexScene;
+  const baseline = build();
+  for (const island of MOSSPROUT_NATURE_ISLANDS) {
+    const id = `nature:mossprout:${island.id}`;
+    const locked = baseline.tileArtLayers.find((layer) => layer.id === id)!;
+    assert.ok(locked.interactionFrame, `${id} must be tappable while covered in mist`);
+    let fallback: unknown;
+    for (const level of island.levels) {
+      const before = build();
+      levels[island.id] = level.level;
+      const scene = build();
+      assert.equal(scene.width, baseline.width);
+      assert.equal(scene.height, baseline.height);
+      for (const layer of before.tileArtLayers.filter((candidate) => candidate.id !== id)) {
+        assert.deepEqual(scene.tileArtLayers.find((candidate) => candidate.id === layer.id)?.frame, layer.frame);
+      }
+      const revealed = scene.tileArtLayers.find((layer) => layer.id === id)!;
+      assert.notEqual(revealed.source, locked.source);
+      assert.deepEqual(revealed.interactionFrame, locked.interactionFrame);
+      if (level.level === 1) fallback = revealed.source;
+      else assert.equal(revealed.source, fallback, 'missing bespoke art reuses the island fallback');
+    }
+  }
+  const catalog = module.MOSSPROUT_NATURE_ISLAND_ART as unknown as typeof import('@/components/katchadeck/world/mossprout-hex-neighborhood-scene').MOSSPROUT_NATURE_ISLAND_ART;
+  const seed = catalog['seed-nursery'];
+  const bespoke = catalog['pond-sanctuary'];
+  seed.levelArt = { 2: { sources: bespoke.sources, alphaBounds: bespoke.alphaBounds } };
+  levels['seed-nursery'] = 2;
+  const withBespoke = build();
+  assert.equal(withBespoke.tileArtLayers.find((layer) => layer.id === 'nature:mossprout:seed-nursery')?.source, bespoke.sources.full);
+  levels['seed-nursery'] = 3;
+  const withFallback = build();
+  assert.equal(withFallback.tileArtLayers.find((layer) => layer.id === 'nature:mossprout:seed-nursery')?.source, seed.sources.full);
+  assert.equal(withBespoke.width, withFallback.width);
+  assert.equal(withBespoke.height, withFallback.height);
+});
 
 test('only the next authored level is offered, preserving costs and aggregate Haven progression', () => {
   const initial = worldUpgradeOffers(world());

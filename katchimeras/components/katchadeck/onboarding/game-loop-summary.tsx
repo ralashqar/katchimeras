@@ -1,7 +1,7 @@
 import { Image as NativeImage, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 
-const SUMMARY_ART = require('../../../assets/images/katchimeras/world/ui/ftue-game-loop-baked-v3.png');
+const SUMMARY_ART = require('../../../assets/images/katchimeras/world/ui/ftue-game-loop-baked-v5.png');
 const { width, height } = NativeImage.resolveAssetSource(SUMMARY_ART);
 const SUMMARY_DESCRIPTION = [
   'Game Loop.',
@@ -14,11 +14,11 @@ const SUMMARY_DESCRIPTION = [
 ].join(' ');
 
 /** All visible copy, icons, arrows and scenery are baked into this one portrait. */
-export function GameLoopSummary() {
+export function GameLoopSummary({ scrolling = false }: { scrolling?: boolean }) {
   return <Image
     source={SUMMARY_ART}
-    style={styles.art}
-    contentFit="contain"
+    style={scrolling ? styles.scrollingArt : styles.art}
+    contentFit={scrolling ? 'contain' : 'cover'}
     transition={0}
     accessible
     accessibilityRole="image"
@@ -27,5 +27,6 @@ export function GameLoopSummary() {
 }
 
 const styles = StyleSheet.create({
-  art: { width: '100%', aspectRatio: width / height },
+  art: { width: '100%', height: '100%' },
+  scrollingArt: { width: '100%', aspectRatio: width / height },
 });

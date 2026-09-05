@@ -106,7 +106,12 @@ const DREAM_MIST_LOCKED_NATURE_SOURCES: TileSources = {
 };
 const DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS = KINGDOM_HEX_TILE_ALPHA_BOUNDS['dream_mist_locked_hex_tile_v2.webp'];
 
-const NATURE: Record<MossproutNatureIslandId, ArtSpec> = {
+// Each island's existing art is the fallback for every unlocked level.
+// Add a levelArt entry with bundled LODs and measured bounds when bespoke art exists.
+type NatureArtSpec = ArtSpec & {
+  levelArt?: Partial<Record<Exclude<MossproutNatureIslandLevel, 0>, Omit<ArtSpec, 'coord'>>>;
+};
+export const MOSSPROUT_NATURE_ISLAND_ART: Record<MossproutNatureIslandId, NatureArtSpec> = {
   'seed-nursery': {
     alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['mossprout_focused_v1_seed_nursery_hex_tile.webp'],
     coord: { q: -1, r: 1 },
@@ -212,7 +217,10 @@ function natureLayerFor(
   islandId: MossproutNatureIslandId,
   level: MossproutNatureIslandLevel,
 ): KingdomTileArtLayer {
-  const authored = NATURE[islandId];
+  const fallback = MOSSPROUT_NATURE_ISLAND_ART[islandId];
+  const authored = level > 0
+    ? { ...fallback, ...fallback.levelArt?.[level as Exclude<MossproutNatureIslandLevel, 0>] }
+    : fallback;
   const locked = level === 0;
   const rendered = locked
     ? {
@@ -221,10 +229,9 @@ function natureLayerFor(
         sources: DREAM_MIST_LOCKED_NATURE_SOURCES,
       }
     : authored;
-  const result = layerFor(`nature:mossprout:${islandId}`, 'tile', rendered);
-  // A mist tile establishes the complete neighborhood silhouette but is not
-  // an upgrade target until progression replaces it with Level 1 island art.
-  return locked ? { ...result, interactionFrame: undefined } : result;
+  // Mist is a real upgrade target too. The shared offers/FTUE gate owns when
+  // it can be pressed; don't remove its camera and interaction footprint.
+  return layerFor(`nature:mossprout:${islandId}`, 'tile', rendered);
 }
 
 function shiftLayer(layer: KingdomTileArtLayer, dx: number, dy: number): KingdomTileArtLayer {
@@ -305,7 +312,11 @@ export function buildMossproutHexNeighborhoodScene(
     )),
   ];
   // Reserve both art envelopes so changing mist to terrain never shifts the world.
-  const boundsLayers = [...rawLayers, lockedSteppling, revealedSteppling];
+  // Include every island's mist, fallback and authored stages in the bounds.
+  // A reveal must never shift the scene origin (and every other island/camera).
+  const natureBoundsLayers = MOSSPROUT_NATURE_ISLANDS.flatMap((island) =>
+    [natureLayerFor(island.id, 0), ...island.levels.map((level) => natureLayerFor(island.id, level.level))]);
+  const boundsLayers = [...rawLayers, lockedSteppling, revealedSteppling, ...natureBoundsLayers];
   const left = Math.min(...boundsLayers.map((layer) => layer.frame.left));
   const top = Math.min(...boundsLayers.map((layer) => layer.frame.top));
   const right = Math.max(...boundsLayers.map((layer) => layer.frame.left + layer.frame.width));
