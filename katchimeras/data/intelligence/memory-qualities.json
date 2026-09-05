@@ -26,6 +26,7 @@
     { "id": "subject.group", "domain": "people", "aliases": ["group", "crowd", "family", "friends", "gathering"], "physicalOnly": true, "assignmentSeedId": "social_gathering" },
     { "id": "subject.food", "domain": "food", "aliases": ["food", "meal", "dish", "coffee", "bakery", "pizza", "sushi", "ramen", "dessert", "bubble tea"], "physicalOnly": true, "assignmentSeedId": "feast" },
     { "id": "subject.drink", "domain": "food", "aliases": ["drink", "beverage", "coffee", "tea", "juice", "cocktail"], "physicalOnly": true, "assignmentSeedId": "feast" },
+    { "id": "nature.plants", "domain": "nature", "aliases": ["plant", "plants", "houseplant", "houseplants", "potted plant", "tree", "trees", "leaf", "leaves", "foliage", "vegetation", "greenery"], "physicalOnly": true },
     { "id": "nature.flowers", "domain": "nature", "aliases": ["flowers", "flower", "bloom", "bouquet"], "physicalOnly": true, "assignmentSeedId": "garden" },
     { "id": "nature.water", "domain": "nature", "aliases": ["water", "lake", "river", "ocean", "sea", "waterfall"], "physicalOnly": true, "assignmentSeedId": "still_water" },
     { "id": "nature.mountains", "domain": "nature", "aliases": ["mountains", "mountain", "hill", "peak", "summit"], "physicalOnly": true, "assignmentSeedId": "summit" },

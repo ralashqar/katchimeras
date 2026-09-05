@@ -1,6 +1,7 @@
 import { CompanionChoiceList } from './companion-choice-list';
 import { CompanionSceneCards } from './companion-scene-cards';
-import { MossproutWaterAction } from './mossprout-water-action';
+import { MossproutLifeActivityCard } from './mossprout-life-activity-card';
+import { CompanionSceneOverlayHost } from './companion-scene-overlay';
 import { CompanionGardenAction } from './companion-garden-action';
 import { useDailyCompanionConversation } from '@/hooks/use-daily-companion-conversation';
 import { useCompanionCalendarDay } from '@/hooks/use-companion-calendar-day';
@@ -184,8 +185,9 @@ export function MossproutStoryStage({
 }) {
 
   const [gardenOpen, setGardenOpen] = useState(false);
+  const [lifeOpen, setLifeOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  useEffect(() => { onSubmenuChange?.(gardenOpen || Boolean(actionError)); return () => onSubmenuChange?.(false); }, [actionError, gardenOpen, onSubmenuChange]);
+  useEffect(() => { onSubmenuChange?.(gardenOpen || lifeOpen || Boolean(actionError)); return () => onSubmenuChange?.(false); }, [actionError, gardenOpen, lifeOpen, onSubmenuChange]);
   useEffect(() => { onActionNarration?.(actionError); return () => onActionNarration?.(null); }, [actionError, onActionNarration]);
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [selfCompletingGoalAction, setSelfCompletingGoalAction] = useState<KatchimeraDayAction | null>(null);
@@ -816,7 +818,7 @@ export function MossproutStoryStage({
       onOpenMerge(id);
     }} storyRequests={journeyRequestPreviews}>
     {(gardenCard) => <View style={{ gap: 8 }}>
-    <MossproutWaterAction onBondRewardRequest={onBondRewardRequest} onError={setActionError} />
+    <MossproutLifeActivityCard onBondRewardRequest={onBondRewardRequest} onOpenChange={setLifeOpen} onNarration={onActionNarration} />
     {gardenCard}
     {presentationAction && displayedPresentation ? <DayActionCompletedRow animateLayout={false}
       artwork={<MossproutActionArtwork action={presentationAction} />} enteringEnabled={false}
@@ -831,8 +833,8 @@ export function MossproutStoryStage({
       </Pressable></DayActionActiveRow> : null}
   </View>}
   </CompanionGardenAction>;
-  if (meditationMode) return flatCards;
-  return <CompanionSceneCards hideJourney={gardenOpen} model={model}
+  if (meditationMode) return <CompanionSceneOverlayHost>{flatCards}</CompanionSceneOverlayHost>;
+  return <CompanionSceneCards hideJourney={gardenOpen || lifeOpen} model={model}
     onJourney={storyComplete ? onDashboard : () => openJourney(actions.find((action) => action.destination.kind === 'journey'))}>
     {flatCards}
   </CompanionSceneCards>;

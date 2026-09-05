@@ -1,3 +1,4 @@
+import { useCompanionCameraCover } from '@/hooks/use-companion-camera-cover';
 import { KatchimeraRosterRouteScreen, type KatchimeraWorldSession } from '@/components/katchadeck/roster/katchimera-roster-route-screen';
 import { KatchimeraCompanionRouteScreen } from '@/components/katchadeck/world/katchimera-companion-route-screen';
 import { MossproutEggFtueSurface } from '@/components/katchadeck/world/mossprout-egg-ftue-surface';
@@ -62,6 +63,7 @@ function MossproutOpeningSurface({ companionActive, conversationDefinitionId, on
 
 export default function KatchimerasScreen() {
   const isFocused = useIsFocused();
+  const cameraCovered = useCompanionCameraCover('/katchimeras');
   const router = useRouter();
   const {
     interactionFtue,
@@ -142,8 +144,9 @@ export default function KatchimerasScreen() {
   // Navigation retains tab and root-stack routes for history. Retain only a
   // lightweight shell while Haven is covered by Merge or another full page;
   // no hidden environment, creature animation, or companion controller may
-  // continue rendering behind the focused destination.
-  if (!isFocused) return <View style={styles.inactiveScreen} />;
+  // continue rendering behind the focused destination. The originating companion
+  // camera is a temporary cover: retain its exact interaction and camera pose.
+  if (!isFocused && !cameraCovered) return <View style={styles.inactiveScreen} />;
 
   // Keep one transparent interaction host alive across the hatch boundary.
   // Mossprout's world remains the sole environment and camera owner.

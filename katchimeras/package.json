@@ -17,7 +17,7 @@
     "verify:story-flows": "node ./scripts/verify-story-flows.cjs",
     "test:kingdom": "tsx --test tests/kingdom-rendering.test.ts tests/katchimera-roster.test.ts tests/steppling-encounter.test.ts tests/steppling-panel-transition.test.ts tests/native-transition-regressions.test.tsx",
     "test:game-hub": "tsx --test tests/game-hub.test.ts && node scripts/verify-companion-quest-repair.cjs",
-    "test:merge-world": "tsx --test tests/merge-world.test.ts tests/merge-performance.test.ts tests/merge-order-window.test.ts tests/merge-order-performance.test.ts tests/mossprout-board-progression.test.ts tests/merge-ftue-interaction-coordinator.test.ts tests/player-profile-snapshots.test.ts tests/haven-progression.test.ts tests/haven-upgrade-presentation.test.ts tests/haven-tile-presentation.test.ts tests/haven-square-world.test.ts",
+    "test:merge-world": "tsx --test tests/merge-world.test.ts tests/merge-order-requirements.test.ts tests/merge-performance.test.ts tests/merge-order-window.test.ts tests/merge-order-performance.test.ts tests/mossprout-board-progression.test.ts tests/merge-ftue-interaction-coordinator.test.ts tests/player-profile-snapshots.test.ts tests/haven-progression.test.ts tests/haven-upgrade-presentation.test.ts tests/haven-tile-presentation.test.ts tests/haven-square-world.test.ts",
     "test:character-progression": "tsx --test tests/relationship-progression.test.ts",
     "test:meta": "tsx --test tests/daily-journey.test.ts tests/wisp-collections.test.ts tests/season-engine.test.ts",
     "test:game-ui": "tsx --test tests/game-ui.test.ts",

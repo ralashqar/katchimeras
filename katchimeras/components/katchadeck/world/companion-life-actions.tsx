@@ -1,3 +1,4 @@
+import { CompanionSceneOverlayHost, CompanionSlidingSubmenu } from './companion-scene-overlay';
 import { chooseCompanionTask } from '@/utils/companion-task-slot';
 import type { CompanionQuickGoal } from '@/utils/companion-quick-goals';
 import { Image } from 'expo-image';
@@ -107,6 +108,7 @@ function CompanionJournalSheet({ familyId, onClose, onVisitSeed }: { familyId: L
             <JournalCopy>{journalSummary(entry)}</JournalCopy>
           </Pressable>
           {expanded === entry.id ? <>
+            {entry.photo ? <Image source={{ uri: entry.photo.uri }} contentFit="contain" accessibilityLabel={entry.title} style={{ width: '100%', height: 220, borderRadius: 12 }} /> : null}
             {entry.note ? <JournalCopy>{entry.note}</JournalCopy> : null}
             {entry.goalId ? <JournalCopy>Habit history: {goals.completions.filter((item) => item.goalId === entry.goalId).map((item) => new Date(item.completedAt).toLocaleDateString()).join(', ') || 'No completion recorded yet.'}</JournalCopy> : null}
             {editing ? <><TextInput accessibilityLabel={editing === 'summary' ? 'Edit summary' : 'Add a note'} multiline value={draft} onChangeText={setDraft} style={{ minHeight: 100, color: ink, backgroundColor: '#FFFAEF', borderRadius: 12, padding: 12, textAlignVertical: 'top' }} /><KatchaButton label="Save" onPress={() => modify(entry.id, editing === 'summary' ? { summaryOverride: draft } : { note: draft })} /><KatchaButton label="Cancel" onPress={() => setEditing(null)} /></> : <>
@@ -127,7 +129,11 @@ function LifeActionArtwork({ kind, completed = false }: { kind: 'movement' | 're
   return <Image source={katchimeraActionArt(`today:${kind}`)} contentFit="contain" transition={0} style={{ width: 48, height: 48, opacity: completed ? 0.94 : 1 }} />;
 }
 
-export function CompanionLifeActions({ familyId, storyLabel, onStory, onBuild, buildLabel, buildContent, onAddTask, onBondRewardRequest, externalGesture, onSubmenuChange, lifeOnly = false, disabled = false }: {
+export function CompanionLifeActions(props: React.ComponentProps<typeof CompanionLifeActionsContent>) {
+  return <CompanionSceneOverlayHost><CompanionLifeActionsContent {...props} /></CompanionSceneOverlayHost>;
+}
+
+function CompanionLifeActionsContent({ familyId, storyLabel, onStory, onBuild, buildLabel, buildContent, onAddTask, onBondRewardRequest, externalGesture, onSubmenuChange, lifeOnly = false, disabled = false }: {
   onBondRewardRequest?: (source: DayActionSourceRect, onArrive: () => void) => void; externalGesture?: GestureType;
   familyId: LifeCompanionFamily; storyLabel: string; onStory?: () => void; onBuild: () => void; buildLabel: string;
   buildContent?: ReactNode; stepsLabel?: string; onMovementCheckIn?: () => void;
@@ -151,16 +157,12 @@ export function CompanionLifeActions({ familyId, storyLabel, onStory, onBuild, b
   const goal = completingGoal ?? goals.state.goals.find((item) => item.id === selectedId) ?? null;
   const taskVisible = Boolean(goal);
   const change = (work: () => void) => { try { work(); setError(null); } catch { setError('That task could not be saved. Please try again.'); } };
-  if (mode === 'build') return <View style={{ gap: 7 }}>
-    {buildContent}
-    <LifeButton label="Back" onPress={() => setMode('home')} />
-  </View>;
   const card = (label: string, kind: 'reflection' | 'quest', action: () => void, index: number) => <DayActionActiveRow animateLayout entryDelayMs={DAY_ACTION_MOTION.entryBaseDelayMs + index * DAY_ACTION_MOTION.entryStaggerMs} externalGesture={externalGesture} disabled={Boolean(completingGoal)} label={label}>
     <Pressable disabled={Boolean(completingGoal)} accessibilityRole="button" accessibilityLabel={label} onPress={action}>
       <DayActionCardSurface artwork={<LifeActionArtwork kind={kind} />} title={label} />
     </Pressable>
   </DayActionActiveRow>;
-  return <View style={{ gap: 7 }}>
+  return <><View style={{ gap: 7 }}>
     {!lifeOnly && onStory ? card(storyLabel, 'reflection', onStory, 0) : null}
     {!lifeOnly && onAddTask ? card('Add task', 'reflection', onAddTask, 0) : null}
     {taskVisible && goal ? <DayActionGoalRow
@@ -200,5 +202,9 @@ export function CompanionLifeActions({ familyId, storyLabel, onStory, onBuild, b
     /> : null}
     {!lifeOnly ? card(buildLabel, 'quest', () => buildContent ? setMode('build') : onBuild(), 2) : null}
     {error ? <Copy>{error}</Copy> : null}
-  </View>;
+  </View>
+    <CompanionSlidingSubmenu visible={mode === 'build'}>
+      <View style={{ gap: 7 }}>{buildContent}<LifeButton label="Back" onPress={() => setMode('home')} /></View>
+    </CompanionSlidingSubmenu>
+  </>;
 }

@@ -1,3 +1,4 @@
+import { CompanionSceneOverlayHost, CompanionSlidingSubmenu } from './companion-scene-overlay';
 import type { KatchimeraActionOrigin } from '@/types/relationship-progression';
 import { StepplingActions } from './steppling-actions';
 import { AUTHORED_COHORT_ORDER_POOLS } from '@/utils/companion-story';
@@ -33,7 +34,11 @@ function JourneyText(props: ComponentProps<typeof ThemedText>) {
   return <ThemedText {...props} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink} />;
 }
 
-export function CompanionJourneyCycleStage({ onOpenConversation, familyId, onOpenMerge, onMore, onJournal, onGoal, onNarration, routineActions, routineSubmenuOpen = false, fallback, onBondRewardRequest, externalGesture }: {
+export function CompanionJourneyCycleStage(props: ComponentProps<typeof CompanionJourneyCycleStageContent>) {
+  return <CompanionSceneOverlayHost><CompanionJourneyCycleStageContent {...props} /></CompanionSceneOverlayHost>;
+}
+
+function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpenMerge, onMore, onJournal, onGoal, onNarration, routineActions, routineSubmenuOpen = false, fallback, onBondRewardRequest, externalGesture }: {
   onBondRewardRequest?: (source: DayActionSourceRect, onArrive: () => void, receipt?: CompanionBondAwardReceipt) => void; externalGesture?: GestureType;
   onOpenConversation?: (definitionId: string, origin: KatchimeraActionOrigin) => void;
   routineSubmenuOpen?: boolean;
@@ -196,22 +201,30 @@ export function CompanionJourneyCycleStage({ onOpenConversation, familyId, onOpe
     : !pending && day && !node ? () => { setJourneyOpen(true); void perform(beginNextStepplingEpisode); }
       : node?.kind === 'scene' ? () => setJourneyOpen(true) : node?.kind === 'task' ? openBuild : onMore;
 
+  const dialogueOpen = checkInOpen || (journeyOpen && node?.kind === 'scene');
   return <View style={styles.stage}>
     {!onNarration && !submenuOpen ? <JourneyText style={styles.prompt}>{narration}</JourneyText> : null}
-    {initialized && !error && !checkInOpen && !(journeyOpen && node?.kind === 'scene') ? <CompanionSceneCards
+    {initialized && !error ? <CompanionSceneCards
       hideJourney={submenuOpen || routineSubmenuOpen} model={model} onJourney={onStory} disabled={busy}
       timer={pending && !ready && rest ? <CompanionMeditationStage title={model.journey.eyebrow} availableAt={rest.availableAt} startedAt={rest.startedAt} settledMs={rest.settledMs} now={now} companionName={familyId === 'steppling' ? 'Steppling' : 'Mossprout'} /> : undefined}>
       {familyId === 'steppling' ? <StepplingActions onReaction={setReaction} onOpenConversation={onOpenConversation}
         externalGesture={externalGesture} onBondRewardRequest={onBondRewardRequest} onSubmenuChange={setSubmenuOpen}
         onOpenMerge={onOpenMerge} requests={requests} /> : routineActions}
     </CompanionSceneCards> : <ScrollView accessibilityLabel="Journey actions" style={{ maxHeight: 340 }} contentContainerStyle={styles.actions} keyboardShouldPersistTaps="handled">
-      {journeyOpen && node?.kind === 'scene' ? <Pressable accessibilityRole="button" onPress={() => setJourneyOpen(false)} style={{ minHeight: 44 }}><JourneyText>Back to companion</JourneyText></Pressable> : null}
-      {checkInOpen || node?.kind === 'scene' ? <CompanionChoiceList disabled={busy} options={actions.map((action) => ({ id: action.id, label: action.title }))} onSelect={(id) => actions.find((action) => action.id === id)?.onPress()} /> : actions.map((action) => <Pressable key={action.id} accessibilityRole="button" accessibilityLabel={action.title}
+
+      {actions.map((action) => <Pressable key={action.id} accessibilityRole="button" accessibilityLabel={action.title}
         accessibilityState={{ disabled: busy }} disabled={busy} onPress={action.onPress}
         style={({ pressed }) => [pressed && styles.pressed, busy && styles.disabled]}>
         <DayActionCardSurface artwork={<DayActionIcon icon={action.icon} />} title={action.title} subtitle={action.subtitle} />
       </Pressable>)}
     </ScrollView>}
+    <CompanionSlidingSubmenu visible={dialogueOpen}>
+      <ScrollView accessibilityLabel="Journey choices" style={{ maxHeight: 340 }} contentContainerStyle={styles.actions} keyboardShouldPersistTaps="handled">
+        <CompanionChoiceList disabled={busy} options={actions.filter((action) => action.id !== 'back').map((action) => ({ id: action.id, label: action.title }))} onSelect={(id) => actions.find((action) => action.id === id)?.onPress()} />
+        <Pressable accessibilityRole="button" accessibilityLabel="Back to companion" disabled={busy}
+          onPress={() => { setJourneyOpen(false); setCheckInOpen(false); }} style={{ minHeight: 44 }}><JourneyText>Back to companion</JourneyText></Pressable>
+      </ScrollView>
+    </CompanionSlidingSubmenu>
 
   </View>;
 }

@@ -166,6 +166,7 @@ export type KatchimeraActionRewardReceipt = {
     | 'real_life_quest_completed'
     | 'mini_game_completed'
     | 'quick_goal_completed'
+    | 'life_activity_completed'
     | 'discovery_answered'
     | 'quest_completed'
     | 'reflection_saved'

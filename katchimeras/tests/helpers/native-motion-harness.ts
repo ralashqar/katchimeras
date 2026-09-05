@@ -106,3 +106,16 @@ export function loadNativeModule(path: string, mocks: Record<string, unknown>, g
 }
 
 export const nativeViews = { View: 'View', StyleSheet: { absoluteFill: {}, create: (styles: object) => styles }, useWindowDimensions: () => ({ width: 400, height: 800 }) };
+
+
+export function loadCompanionOverlay(clock = nativeMotionHarness(), reducedMotion = true) {
+  const animated = { ...clock.animated, useReducedMotion: () => reducedMotion };
+  const slide = loadNativeModule('hooks/use-companion-action-slide.ts', {
+    'react-native': nativeViews, 'react-native-reanimated': animated,
+  });
+  return loadNativeModule('components/katchadeck/world/companion-scene-overlay.tsx', {
+    'react-native': nativeViews, 'react-native-reanimated': animated,
+    '@/hooks/use-companion-action-slide': slide,
+    '@/hooks/use-companion-stack-layout': loadNativeModule('hooks/use-companion-stack-layout.ts', { 'react-native-reanimated': animated }),
+  });
+}

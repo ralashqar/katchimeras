@@ -1,3 +1,4 @@
+import { useCompanionCameraCover } from '@/hooks/use-companion-camera-cover';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { GLOW_GATEWAY_ID } from '@/utils/merge-world/glow-discovery-policy';
@@ -138,7 +139,8 @@ export function KatchimeraRosterRouteScreen({
   worldSubjectPresentation = null,
 }: KatchimeraRosterRouteScreenProps = {}) {
   const isFocused = useIsFocused();
-  return isFocused ? (
+  const cameraCovered = useCompanionCameraCover('/katchimeras');
+  return isFocused || cameraCovered ? (
     <FocusedKatchimeraRosterBoundary
       interactionRequest={interactionRequest}
       onInteractionRequestConsumed={onInteractionRequestConsumed}

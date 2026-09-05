@@ -5,7 +5,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { companionSceneModel, type CompanionScenePhase } from '../game/katchimeras/companion-scene-model';
 import { mossproutFtueConversationDefinitions, resolveMossproutFtueConversation } from '../constants/mossprout-ftue-conversations';
 import { MOSSPROUT_FOLLOWUPS } from '../constants/companion-life-content';
-import { loadNativeModule, nativeViews, nativeMotionHarness } from './helpers/native-motion-harness';
+import { loadCompanionOverlay, loadNativeModule, nativeViews, nativeMotionHarness } from './helpers/native-motion-harness';
 import { emptyRelationshipProgressState } from '../game/katchimeras/relationship-progression';
 import { createJourneyCycle, installJourneyCycle } from '../game/katchimeras/companion-journey-cycle';
 import { addCompanionQuickGoal, completeCompanionQuickGoal, emptyCompanionQuickGoalState } from '../utils/companion-quick-goals';
@@ -20,6 +20,7 @@ for (const familyId of ['mossprout', 'steppling'] as const) {
     }));
     let flights = 0;
     const loaded = loadNativeModule('components/katchadeck/world/companion-life-actions.tsx', {
+      './companion-scene-overlay': loadCompanionOverlay(),
       'react-native': { ...nativeViews, Pressable: 'Pressable', ScrollView: 'ScrollView', Modal: 'Modal', TextInput: 'TextInput' },
       'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
       'expo-image': { Image: 'Image' },
@@ -92,7 +93,7 @@ test('new greetings lead to play, while v8 saves retain their intent-specific fo
 test('native scene keeps an inert rest card, accessible actions, and a scrollable layout', async () => {
   const loaded = loadNativeModule('components/katchadeck/world/companion-scene-cards.tsx', {
     'react-native': { ...nativeViews, Pressable: 'Pressable', ScrollView: 'ScrollView', useWindowDimensions: () => ({ width: 320, height: 568, fontScale: 2 }) },
-    './companion-scene-overlay': loadNativeModule('components/katchadeck/world/companion-scene-overlay.tsx', { 'react-native': nativeViews }),
+    './companion-scene-overlay': loadCompanionOverlay(),
     '@/components/themed-text': { ThemedText: 'Text' },
     '@/constants/katcha-ui': { KatchaUI: { companionScenePanel: { ink: '#352F23' } } },
     '@/components/katchadeck/ui/day-action-card': { DayActionCardSurface: 'Card', DayActionIcon: 'Icon' },
@@ -120,9 +121,9 @@ test('native scene keeps an inert rest card, accessible actions, and a scrollabl
   await act(async () => tree!.update(<Scene {...readyProps} hideJourney />));
   assert.equal(tree!.root.findByType('Card' as React.ElementType), journeyCard, 'Journey remains mounted to preserve card positions');
   assert.equal(journeyLayer.props.collapsable, false, 'hidden Journey keeps the same native stacking context');
-  assert.equal(journeyLayer.props.style.opacity, 0);
-  assert.equal(journeyLayer.props.pointerEvents, 'none');
-  assert.equal(journeyLayer.props.importantForAccessibility, 'no-hide-descendants');
+  assert.equal(journeyLayer.props.style.opacity, 1, 'the slide host owns visibility; submenu state cannot blink the panel');
+  assert.equal(journeyLayer.props.pointerEvents, 'auto');
+  assert.equal(journeyLayer.props.importantForAccessibility, 'auto');
   assert.equal(journeyLayer.props.style.display, undefined);
   await act(async () => tree!.update(<Scene {...readyProps} />));
   assert.equal(tree!.root.findByType('Card' as React.ElementType), journeyCard);
@@ -174,4 +175,62 @@ for (const [intent, question] of Object.entries(MOSSPROUT_FOLLOWUPS)) {
       await act(async () => tree!.unmount());
     });
   }
+}
+
+
+for (const reducedMotion of [false, true]) {
+  test(`Journey timer stays painted through repeated submenu returns (reduced motion: ${reducedMotion})`, async () => {
+    const clock = nativeMotionHarness();
+    const overlay = loadCompanionOverlay(clock, reducedMotion);
+    let navigation: any;
+    let mounts = 0;
+    const opacityCommits: number[] = [];
+    function NativeView(props: any) {
+      React.useLayoutEffect(() => {
+        if (props.accessibilityLabel === 'Journey') opacityCommits.push(props.style.opacity);
+      });
+      return React.createElement('View', props);
+    }
+    function Timer() {
+      React.useEffect(() => { mounts++; }, []);
+      return React.createElement('Timer', { label: 'Next Journey in' });
+    }
+    function Actions() {
+      navigation = overlay.useCompanionActionNavigation();
+      return React.createElement('ActionCards');
+    }
+    const loaded = loadNativeModule('components/katchadeck/world/companion-scene-cards.tsx', {
+      'react-native': { ...nativeViews, View: NativeView, Pressable: 'Pressable', ScrollView: 'ScrollView' },
+      './companion-scene-overlay': overlay,
+      '@/components/katchadeck/ui/day-action-card': { DayActionCardSurface: 'Card', DayActionIcon: 'Icon' },
+    });
+    const Scene = loaded.CompanionSceneCards as React.ComponentType<Record<string, unknown>>;
+    const model = companionSceneModel({ familyId: 'mossprout', episodeId: 'one', dayNumber: 1,
+      chapterTitle: 'First', episodeTitle: 'Bloom', phase: 'meditating' });
+    const render = (hidden: boolean) => <Scene model={model} hideJourney={hidden} timer={<Timer />}><Actions /></Scene>;
+    let tree: ReactTestRenderer;
+    await act(async () => { tree = create(render(false)); });
+    const timer = tree!.root.findByType('Timer' as React.ElementType);
+    const actions = tree!.root.findByType('ActionCards' as React.ElementType);
+    const x = () => navigation.rootStyle.read().transform[0].translateX || 0;
+    for (let trip = 0; trip < 3; trip++) {
+      await act(async () => { navigation.navigate(true); tree!.update(render(true)); });
+      await act(async () => clock.advance(440));
+      assert.equal(x(), -432);
+      await act(async () => navigation.navigate(false));
+      for (let frame = 0; frame < 4; frame++) {
+        await act(async () => clock.advance(110));
+      }
+      assert.equal(x(), 0);
+      assert.equal(navigation.active, false);
+      // Grow clears its parent submenu flag after the slide's completion callback.
+      // Even during that render gap the timer must remain visible and mounted.
+      assert.ok(opacityCommits.every((opacity) => opacity === 1), 'no transient hide at slide completion');
+      await act(async () => tree!.update(render(false)));
+      assert.equal(tree!.root.findByType('Timer' as React.ElementType), timer);
+      assert.equal(tree!.root.findByType('ActionCards' as React.ElementType), actions);
+    }
+    assert.equal(mounts, 1, 'returning never replays timer entry animations');
+    await act(async () => tree!.unmount());
+  });
 }

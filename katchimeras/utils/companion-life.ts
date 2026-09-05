@@ -3,7 +3,8 @@ import { addCompanionQuickGoal, updateCompanionQuickGoal, type CompanionQuickGoa
 
 export type CompanionJournalEntry = {
   id: string; familyId: LifeCompanionFamily; title: string; createdAt: number; updatedAt: number;
-  facts: Record<string, string>; goalId?: string; seedId?: string; kind: 'conversation' | 'chapter';
+  facts: Record<string, string>; goalId?: string; seedId?: string; kind: 'conversation' | 'chapter' | 'activity';
+  photo?: { uri: string; memoryId: string; confirmedSubject?: string };
   summaryOverride?: string; note?: string; removedAt?: number;
 };
 export type CompanionLifeState = {

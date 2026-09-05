@@ -15,6 +15,8 @@ const result = spawnSync(process.platform === 'win32' ? 'npx.cmd' : 'npx', [
   'tests/companion-scene.test.tsx',
   'tests/companion-daily-garden.test.ts',
   'tests/companion-daily-actions.test.tsx',
+  'tests/mossprout-life-activities.test.tsx',
+  'tests/companion-action-navigation.test.tsx',
   'tests/steppling-activities.test.tsx',
 ], { cwd: process.cwd(), shell: process.platform === 'win32', stdio: 'inherit' });
 

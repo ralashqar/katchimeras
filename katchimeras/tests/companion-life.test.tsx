@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
-import { loadNativeModule, nativeViews } from './helpers/native-motion-harness';
+import { loadCompanionOverlay, loadNativeModule, nativeViews } from './helpers/native-motion-harness';
 import { emptyCompanionLifeState, journalSummary, selectedStoryHabit, selectDailyStoryHabit, upsertCompanionJournal, type CompanionJournalEntry } from '../utils/companion-life';
 import { addCompanionQuickGoal, completeCompanionQuickGoal, emptyCompanionQuickGoalState, normaliseCompanionQuickGoalState, quickGoalsForDay, skipCompanionQuickGoal, updateCompanionQuickGoal } from '../utils/companion-quick-goals';
 import { STEPPLING_DAY_ONE_FLOW } from '../features/content-flow/steppling-day-one-flow';
@@ -84,6 +84,7 @@ test('Steppling uses original animated rows, retains its goal through completion
   let pickerOpens = 0;
   const entry = { ...moment, goalId: goalState.goals[0].id };
   const component = loadNativeModule('components/katchadeck/world/companion-life-actions.tsx', {
+      './companion-scene-overlay': loadCompanionOverlay(),
     'react-native': { ...nativeViews, Pressable: 'Pressable', ScrollView: 'ScrollView', Modal: 'Modal', TextInput: 'TextInput' },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
     'expo-image': { Image: 'Image' },
@@ -134,7 +135,9 @@ test('Steppling uses original animated rows, retains its goal through completion
   assert.equal(tree!.root.findAllByType('ActionCard' as React.ElementType).some((card) => card.props.completed), false, 'completed tasks leave the list');
   await press('Grow the Garden');
   assert.equal(tree!.root.findAllByType('OrderList' as React.ElementType).length, 1);
-  assert.deepEqual(tree!.root.findAllByType('ActionCard' as React.ElementType).map((card) => card.props.title), ['Back']);
+  assert.equal(tree!.root.findAllByType('ActionCard' as React.ElementType).at(-1)?.props.title, 'Back');
+  const rootLayer = tree!.root.findAllByType('AnimatedView' as React.ElementType).find((node) => node.props.accessibilityElementsHidden === true)!;
+  assert.equal(rootLayer.props.pointerEvents, 'none', 'retained main cards are inert while build is open');
   await press('Back');
   assert.equal(tree!.root.findAllByType('OrderList' as React.ElementType).length, 0);
   await press('Add task');

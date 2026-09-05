@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { DayActionCardSurface, DayActionIcon } from '@/components/katchadeck/ui/day-action-card';
-import { CompanionSceneOverlayHost } from './companion-scene-overlay';
+import { CompanionSceneOverlayHost, useCompanionActionNavigation } from './companion-scene-overlay';
 import type { CompanionSceneModel } from '@/game/katchimeras/companion-scene-model';
 
 /** One compact story status above the original, equal-weight activity cards. */
@@ -20,19 +20,28 @@ export function CompanionSceneCards({ model, onJourney, timer, children, life, g
     removeClippedSubviews={false} showsVerticalScrollIndicator={false}
     style={{ marginHorizontal: -width, maxHeight: Math.max(240, height * 0.53) }}
     contentContainerStyle={[styles.stack, { paddingHorizontal: width }]} keyboardShouldPersistTaps="handled">
-    <View collapsable={false} accessibilityLabel="Journey" accessibilityElementsHidden={hideJourney}
-      importantForAccessibility={hideJourney ? 'no-hide-descendants' : 'auto'}
-      pointerEvents={hideJourney ? 'none' : 'auto'} style={{ opacity: hideJourney ? 0 : 1 }}>
+    <JourneyVisibility hidden={hideJourney}>
       {waiting ? timer : <Pressable accessibilityRole="button" accessibilityLabel={label}
         accessibilityState={{ disabled: disabled || !onJourney }} disabled={disabled || !onJourney} onPress={onJourney}>
         <DayActionCardSurface
           artwork={<DayActionIcon icon={model.phase === 'ready' ? 'gift.fill' : 'book.closed.fill'} />}
           title={model.journey.eyebrow} subtitle={label} />
       </Pressable>}
-    </View>
+    </JourneyVisibility>
     {children ?? <>{life}{garden}</>}
   </ScrollView></CompanionSceneOverlayHost>;
 }
 const styles = StyleSheet.create({
   stack: { gap: 8, paddingBottom: 4 },
 });
+
+function JourneyVisibility({ hidden, children }: { hidden: boolean; children: ReactNode }) {
+  const navigation = useCompanionActionNavigation();
+  // The shared navigation host moves the entire root offscreen and owns its
+  // interaction visibility. Do not toggle this panel's opacity at slide end:
+  // submenu state can clear one render after navigation.active becomes false.
+  const concealed = hidden && !navigation;
+  return <View collapsable={false} accessibilityLabel="Journey" accessibilityElementsHidden={concealed}
+    importantForAccessibility={concealed ? 'no-hide-descendants' : 'auto'} pointerEvents={concealed ? 'none' : 'auto'}
+    style={{ opacity: concealed ? 0 : 1 }}>{children}</View>;
+}

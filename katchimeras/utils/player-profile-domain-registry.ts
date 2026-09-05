@@ -1,6 +1,7 @@
 import { getStoredKeys, getStoredRaw, removeStoredValue, setStoredRaw } from '@/utils/app-storage';
 
 const EXACT_PROFILE_KEYS = new Set([
+  'companion:mossprout-life-activities:v1',
   'katchadeck.onboarding-profile',
   'katchadeck.home-v1',
   'katchadeck.home-v1:active-v1',

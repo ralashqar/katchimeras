@@ -1,3 +1,4 @@
+import { useCompanionCameraCover } from '@/hooks/use-companion-camera-cover';
 import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -87,12 +88,13 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   onVisibleCreatureRewardPulse?: () => void;
 }) {
   const isFocused = useIsFocused();
+  const cameraCovered = useCompanionCameraCover(`/katchimera/${creatureId}`);
   // During the opening FTUE this controller is a presentation layer inside
   // Haven, not a route of its own. React Navigation focus/readiness can briefly
   // fall false while the app backgrounds or the FTUE graph changes steps. The
   // Haven host remains the owner, so its companion layer must not replace the
   // whole scene with the standalone route's empty inactive fallback.
-  const surfaceActive = hostedInHaven || isFocused;
+  const surfaceActive = hostedInHaven || isFocused || cameraCovered;
   const router = useRouter();
   const { transitionTo } = useGameScreenTransition();
   const familyId = familyIdFromCompanionId(creatureId);
@@ -608,6 +610,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   // retain the kingdom, interaction sheet, image stage, subscriptions, or
   // animation worklets behind Today, Merge, or a quest. All durable companion
   // progress already lives in the repositories and is rehydrated on focus.
+  // A camera opened here retains this subtree so its Back restores the same menu.
   if (hostedInHaven && mistHandoffActive) return null;
 
   if (familyId === 'steppling' && (!stepplingDayOne.ready || stepplingDayOne.error)) {

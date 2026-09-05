@@ -17,6 +17,7 @@ export type CompanionBondEventKind =
   | 'real_life_quest_completed'
   | 'mini_game_completed'
   | 'quick_goal_completed'
+  | 'life_activity_completed'
   | 'discovery_answered'
   | 'quest_completed'
   | 'reflection_saved'
@@ -83,6 +84,7 @@ export const COMPANION_BOND_REWARDS: Record<CompanionBondEventKind, number> = {
   real_life_quest_completed: 25,
   mini_game_completed: 8,
   quick_goal_completed: 5,
+  life_activity_completed: 5,
   discovery_answered: 15,
   // Retained for events created before quest lanes existed.
   quest_completed: 25,

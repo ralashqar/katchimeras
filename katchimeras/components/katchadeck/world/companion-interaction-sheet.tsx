@@ -1,3 +1,4 @@
+import { useCompanionDestinationMotion } from '@/hooks/use-companion-destination-motion';
 import { CompanionEnvironmentGestureContext } from './companion-environment-gesture-context';
 import { CompanionFirstRestCards } from './companion-first-rest-cards';
 import * as Haptics from 'expo-haptics';
@@ -12,7 +13,7 @@ import {
   View,
   type View as ViewType,
 } from 'react-native';
-import Animated, { FadeIn, FadeInLeft, FadeInRight, FadeOut, useReducedMotion } from 'react-native-reanimated';
+import Animated, { useReducedMotion } from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -1127,7 +1128,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         ? null
       : null;
   const visibleFooter = quickGoalPickerOpen || questionnaireExperience ? null : actionFooter;
-  const entering = reduceMotion ? FadeIn.duration(100) : direction > 0 ? FadeInRight.duration(210) : FadeInLeft.duration(210);
+  const destinationMotion = useCompanionDestinationMotion(direction);
   const destinationLabel =
     destination === 'quest'
       ? directQuestOrigin ? 'With Mossprout' : 'Quests'
@@ -1898,7 +1899,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             </View>
           ) : (
           <ScrollView
-            key={viewportResetKey}
+            collapsable={false}
             ref={contentRef}
             automaticallyAdjustContentInsets={false}
             automaticallyAdjustKeyboardInsets={false}
@@ -1924,8 +1925,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             showsVerticalScrollIndicator={false}>
             <Animated.View
               key={destination ?? route.kind}
-              entering={entering}
-              exiting={FadeOut.duration(100)}
+              collapsable={false}
+              entering={destinationMotion.entering}
+              exiting={destinationMotion.exiting}
               style={[
                 activeAttemptId || questionnaireExperience ? styles.activeExperience : undefined,
                 dashboardRouteActive && styles.dashboardExperience,

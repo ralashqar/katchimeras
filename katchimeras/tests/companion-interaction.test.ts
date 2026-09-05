@@ -628,7 +628,9 @@ test('companion scene panels share one palette, stay anchored, and bound speech 
   assert.match(cinematic, /typewriterMeasure: \{[\s\S]*?left: 0,[\s\S]*?position: 'absolute',[\s\S]*?top: 0/);
   assert.doesNotMatch(cinematic, /adjustsFontSizeToFit=\{Boolean\(numberOfLines && needsFontScale\)\}/);
   assert.match(cinematic, /minimumFontScale=\{0\.48\}/);
-  for (const panel of [chat, visit, questionnaire, conversation, story]) {
+  const narrativePanel = fs.readFileSync(path.join(worldPath, 'companion-narrative-panel.tsx'), 'utf8');
+  assert.match(conversation, /<CompanionNarrativePanel/);
+  for (const panel of [chat, visit, questionnaire, narrativePanel, story]) {
     assert.match(panel, /KatchaUI\.companionScenePanel\.background/);
   }
   for (const panel of [chat, visit, conversation]) {

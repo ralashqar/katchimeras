@@ -1,3 +1,4 @@
+import { ensureOrdersRequireMerge } from './order-requirements';
 import { ensureCompanionDailyGarden, completeDailyGardenOrder, DAILY_GARDEN_ARC, DAILY_GARDEN_BONUS } from './companion-daily-garden';
 import {
   FEASTLE_STORY_REQUESTS,
@@ -241,6 +242,16 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
 }
 
 export function reduceMergeWorld(state: MergeWorldState, command: MergeWorldCommand): MergeWorldCommandResult {
+  // Normalize before serving as well as after generating/reconciling requests.
+  // This also upgrades an old in-memory request without consuming its tier-one item.
+  const prepared = ensureOrdersRequireMerge(state);
+  const result = reduceMergeWorldCommand(prepared, command);
+  const next = ensureOrdersRequireMerge(result.state);
+  if (prepared === state && next === result.state) return result;
+  return { ...result, state: result.changed ? next : touch(next, command.now), changed: true };
+}
+
+function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldCommand): MergeWorldCommandResult {
   const boardId = 'boardId' in command ? command.boardId : undefined;
   if (boardId === 'steppling') {
     const previousBoard = state.haven.residentMergeBoards.steppling ?? createStepplingHavenBoard(state.createdAt);
@@ -930,7 +941,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   // Version 1/2 Pantry charges, cooldowns, and parcels intentionally disappear.
   // Version 3's five single-chain generators migrate into the shared eight.
   normalized = ensureProceduralOrders(normalized, now);
-  return refreshTime(normalized, now);
+  return ensureOrdersRequireMerge(refreshTime(normalized, now));
 }
 
 function upgradeHavenTile(

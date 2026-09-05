@@ -117,6 +117,44 @@ world reward instead. A full board leaves the parcel queued. A permanent reward
 receipt survives arrival-history trimming. Reminders reschedule to the actual
 reduced deadline and cancel after return; permission denial is nonblocking.
 
+## Mossprout life activities
+
+After the guided opening, both the active and meditation dashboards use one
+“Grow with Mossprout” action card. It opens three original-style cards with a
+Back button: water, a nature photo, and a daily noticing prompt. Garden and the
+journey conversation remain their own top-level actions. Steppling is unchanged.
+The shared action-card surfaces, art and typography are reused throughout.
+
+Each activity earns its own 5 Bond reward once per local calendar day. Water
+retains its existing checkoff, count and reward settlement. After completion the
+player stays in the activity menu: photo and noticing exit, while water exits
+and a new counted card enters. Opening Grow slides the mounted root action section (including Journey) left,
+then brings the submenu in from the right. Back slides the submenu right, then
+returns the root from the left. A shared transform preserves height and card
+identity; reduced motion switches immediately. Clarification and reflection
+use character speech and the existing multiple-choice flow.
+
+Nature photos use the existing camera and on-device intelligence. Low-confidence
+or unavailable detection asks the player what they found; an unrelated photo
+can be retaken. No reward or memory is committed until the final answer. Accepted
+photos are copied out of the camera cache, saved to their capture date in Home,
+and included in Mossprout’s companion journal. Daily completion records and Bond
+receipts support retries after interrupted writes without another reward. A photo
+started before midnight remains on its capture date; noticing uses completion day.
+
+Automated coverage includes reward limits, partial-write recovery, uncertain
+classification, camera cancellation, photo-file ownership, overlay ownership,
+and repeated Back navigation. The camera carries its originating route; Haven
+and standalone companion controllers retain their interaction only while that
+camera covers them. Both cancellation and completion pop one camera route,
+preserving the submenu and camera position. Camera copy uses the shared cream
+surfaces and typography, with a bounded header below the safe-area Back button.
+Native acceptance still needs an iPhone/device:
+check compact and large text layouts, camera denial/cancellation, return gestures,
+card exits and fresh water entry, Garden horizontal scrolling, and relaunch during
+a photo save or reward flight. Host render tests cannot establish native visual
+correctness.
+
 ## Migration and adding a family
 
 Steppling maps already served legacy routes to completed episodes without
@@ -165,3 +203,37 @@ Leaving a companion restores the live camera snapshot captured before entry,
 including pan and zoom. Egg-to-resident handoffs retain their pre-Egg snapshot.
 A direct entry with no world-camera history instead fits that resident's complete
 tile with a small margin, rather than backing out to the entire kingdom.
+
+
+All merge requests must include a merge result. A request made entirely of
+spawnable tier-one drops upgrades its first requirement to the next item in that
+same chain. This rule runs on load and before/after board commands, including
+legacy meditation reconciliation. IDs, quantities, rewards and served history
+are preserved; combinations that already include merged items are unchanged.
+
+
+## Shared companion submenu motion
+
+Tend garden (all families), Grow, legacy build menus, and Journey/check-in choices
+use the same two-leg horizontal transition: the root leaves left before the next
+page enters from the right; Back sends the submenu right before returning the
+root from the left. Root native views stay mounted, retain their measured height,
+and become inert while covered. Submenus retain their outgoing content until the
+return completes, including rapid reversals and live order updates. Garden keeps
+its existing order-panel styling and horizontal scrolling.
+
+Other interaction destination panels use the same directions and timing instead
+of a short slide-in followed by a fade-out. Their scroll container stays mounted;
+existing viewport-reset logic still positions the newly selected destination.
+Reduced-motion settings are respected. Automated motion tests validate direction,
+sequencing, retained identity and input gating; on-device visual review remains
+necessary for native rendering and gestures.
+
+
+Noticing uses the shared conversation panel and responsive narrative choices.
+Choosing an answer saves the moment and starts the normal card reward/exit
+sequence immediately, keeping Mossprout's reply in the speech bubble; there is
+no final confirmation. Resetting companion/profile progress clears these daily
+activities and pending captures, including any completion still being presented.
+Activity state belongs to profile snapshots, so loading a fresh profile also
+restores the noticing card.

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
-import { loadNativeModule, nativeViews } from './helpers/native-motion-harness';
+import { loadCompanionOverlay, loadNativeModule, nativeViews } from './helpers/native-motion-harness';
 import { addCompanionQuickGoal, completeCompanionQuickGoal, emptyCompanionQuickGoalState } from '../utils/companion-quick-goals';
 import { emptyRelationshipProgressState } from '../game/katchimeras/relationship-progression';
 import { createJourneyCycle, installJourneyCycle } from '../game/katchimeras/companion-journey-cycle';
@@ -122,7 +122,7 @@ for (const familyId of ['mossprout', 'steppling'] as const) {
     let snapshot: (value: typeof world) => void = () => {};
     const storage = new Map<string, unknown>();
     const opened: string[] = [];
-    const overlayModule = loadNativeModule('components/katchadeck/world/companion-scene-overlay.tsx', { 'react-native': nativeViews });
+    const overlayModule = loadCompanionOverlay();
     const module = loadNativeModule('components/katchadeck/world/companion-garden-action.tsx', {
       './companion-scene-overlay': overlayModule,
       'react-native': { ...nativeViews, Pressable: 'Pressable' },
@@ -150,36 +150,28 @@ for (const familyId of ['mossprout', 'steppling'] as const) {
     const tracker = tree!.root.findByType('Tracker' as React.ElementType);
     const narrative = tree!.root.findByType('NarrativeCard' as React.ElementType);
     const gardenRow = tree!.root.findByType('ActiveRow' as React.ElementType);
-    const panel = tree!.root.findByType('RequestPanel' as React.ElementType);
-    const ordersLayer = panel.parent!;
     const cardsLayer = tracker.parent!;
     const container = cardsLayer.parent!;
-    assert.equal(container.props.style, undefined, 'orders reserve no height in the bottom-aligned card section');
-    assert.equal(container.props.collapsable, false);
-    assert.equal(cardsLayer.props.collapsable, false, 'opacity toggles cannot reparent native animated rows');
-    assert.equal(ordersLayer.props.style[0].position, 'absolute');
-    assert.equal(ordersLayer.props.style[0].bottom, 0);
-    assert.equal(cardsLayer.props.style.opacity, 1);
-    assert.equal(ordersLayer.props.pointerEvents, 'none');
+    assert.equal(container.props.style, undefined, 'orders reserve no height in the card section');
+    assert.equal(cardsLayer.props.collapsable, false);
+    assert.equal(tree!.root.findAllByType('RequestPanel' as React.ElementType).length, 0);
     for (let visit = 0; visit < 3; visit++) {
       await act(async () => tree!.root.findByType('Pressable' as React.ElementType).props.onPress());
+      const panel = tree!.root.findByType('RequestPanel' as React.ElementType);
       assert.equal(tree!.root.findByType('Tracker' as React.ElementType), tracker);
       assert.equal(tree!.root.findByType('NarrativeCard' as React.ElementType), narrative);
       assert.equal(tree!.root.findByType('ActiveRow' as React.ElementType), gardenRow, 'no unmount or entrance replay');
-      assert.equal(cardsLayer.props.style.opacity, 0);
-      assert.equal(cardsLayer.props.style.display, undefined, 'hidden cards keep their layout');
-      assert.equal(cardsLayer.props.pointerEvents, 'none');
-      assert.equal(cardsLayer.props.importantForAccessibility, 'no-hide-descendants');
-      assert.equal(ordersLayer.props.pointerEvents, 'auto');
-      assert.equal(container.props.style, undefined, 'navigation adds no height to the card layout');
-      assert.equal(cardsLayer.props.collapsable, false);
+      assert.equal(cardsLayer.props.style.opacity, 1, 'root remains painted so it can slide away');
+      const root = tree!.root.findAllByType('AnimatedView' as React.ElementType).find((node) => node.props.accessibilityElementsHidden === true)!;
+      assert.equal(root.props.style.read().transform[0].translateX, -432);
+      assert.equal(root.props.pointerEvents, 'none');
       await act(async () => panel.props.onAction());
-      assert.equal(cardsLayer.props.style.opacity, 1);
-      assert.equal(cardsLayer.props.pointerEvents, 'auto');
-      assert.equal(ordersLayer.props.pointerEvents, 'none');
-      assert.equal(ordersLayer.props.importantForAccessibility, 'no-hide-descendants');
+      assert.equal(root.props.pointerEvents, 'auto');
+      assert.equal(Math.abs(root.props.style.read().transform[0].translateX), 0);
+      assert.equal(tree!.root.findAllByType('RequestPanel' as React.ElementType).length, 0);
     }
     await act(async () => tree!.root.findByType('Pressable' as React.ElementType).props.onPress());
+    const panel = tree!.root.findByType('RequestPanel' as React.ElementType);
     assert.equal(panel.props.animateEntrance, false);
     assert.equal(panel.props.standalone, true);
     assert.equal(panel.props.fitContent, true);
@@ -212,7 +204,7 @@ for (const familyId of ['mossprout', 'steppling'] as const) {
 
 
 test('Garden orders are outside the card scroll layout even when taller than the remaining actions', async () => {
-  const module = loadNativeModule('components/katchadeck/world/companion-scene-overlay.tsx', { 'react-native': nativeViews });
+  const module = loadCompanionOverlay();
   const Host = module.CompanionSceneOverlayHost as React.ComponentType<{ children: React.ReactNode }>;
   const Overlay = module.CompanionSceneOverlay as React.ComponentType<{ visible: boolean; children: React.ReactNode }>;
   let mounts = 0;
@@ -236,7 +228,8 @@ test('Garden orders are outside the card scroll layout even when taller than the
     const panel = tree!.root.findByType('RequestPanel' as React.ElementType);
     assert.equal(panel.parent!.props.style.position, 'absolute');
     assert.equal(panel.parent!.props.style.bottom, 0);
-    assert.equal(viewport.parent!.props.style, undefined, 'host adds no minHeight');
+    assert.equal(viewport.parent!.props.style.read().minHeight, undefined, 'navigation transform adds no minHeight');
+    assert.equal(viewport.parent!.props.style.read().height, undefined, 'navigation transform does not change the root height');
     await act(async () => tree!.update(render(true, 3)));
     assert.equal(tree!.root.findByType('RequestPanel' as React.ElementType).props.requestCount, 3, 'open orders continue receiving live updates');
     await act(async () => tree!.update(render(false)));

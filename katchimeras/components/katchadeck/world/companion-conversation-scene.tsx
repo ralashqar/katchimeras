@@ -1,3 +1,4 @@
+import { CompanionNarrativePanel } from './companion-narrative-panel';
 import { DailyHabitOffer } from './companion-life-actions';
 import { lifeHabitById } from '@/constants/companion-life-content';
 import * as Haptics from 'expo-haptics';
@@ -210,20 +211,12 @@ export function CompanionConversationScene({
 
       <View accessibilityElementsHidden pointerEvents="none" style={{ flex: 1, minHeight: 120 }} />
 
-      <Animated.View
+      <CompanionNarrativePanel
         accessibilityLabel={`Conversation ${flowPhase.replace('_', ' ')}`}
         entering={reduceMotion ? undefined : FadeInUp.duration(220)}
         layout={reduceMotion || journeyRequestHandoffVisible ? undefined : LinearTransition.duration(COMPANION_PANEL_LAYOUT_DURATION_MS)}
         style={{
-          backgroundColor: KatchaUI.companionScenePanel.background,
-          borderColor: KatchaUI.companionScenePanel.border,
-          borderCurve: 'continuous',
-          borderRadius: 30,
-          borderWidth: 1,
-          boxShadow: KatchaUI.companionScenePanel.shadow,
           height: adaptivePanel.panelHeight,
-          overflow: 'hidden',
-          paddingHorizontal: 12,
           paddingTop: showConversationProgress ? 12 : 8,
         }}>
         {showConversationProgress ? <>
@@ -352,7 +345,7 @@ export function CompanionConversationScene({
         ) : null}
         {developerContent}
         </ScrollView>
-      </Animated.View>
+      </CompanionNarrativePanel>
     </View>
   );
 }

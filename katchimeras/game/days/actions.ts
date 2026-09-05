@@ -869,7 +869,7 @@ export function applyCapturedMomentForDay(
   const historical = base.state === 'hatched';
   const applied = applyCaptureToDayRecord(state, base, capture, eventDate, {
     allowHatched: true,
-    journalOnly: historical,
+    journalOnly: historical || capture.captureMode === 'evidence_only',
   });
   const sourceId = capture.sourceId ?? capture.meaning?.sourceId ?? null;
   const nextDay = sourceId

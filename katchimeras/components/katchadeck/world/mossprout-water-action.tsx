@@ -1,5 +1,5 @@
 import { acknowledgeKatchimeraActionCompletion, mossproutJourneyRuntimeDayId, mossproutDailyActionDeck, recordHandledKatchimeraActionCompletion } from '@/game/katchimeras/relationship-progression';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Image } from 'expo-image';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { localDayId } from '@/utils/world-identity';
@@ -17,6 +17,9 @@ import { settleCompanionWaterBreak } from '@/game/katchimeras/companion-journey-
 
 const families = ['mossprout'] as const;
 type WaterActionProps = {
+  enteringEnabled?: boolean;
+  disabled?: boolean;
+  onBusyChange?: (busy: boolean) => void;
   onBondRewardRequest?: (source: DayActionSourceRect, onArrive: () => void) => void;
   onError: (message: string) => void;
 };
@@ -29,24 +32,25 @@ export function MossproutWaterAction(props: WaterActionProps) {
   const dayId = useCompanionCalendarDay();
   return <WaterDayAction key={dayId} {...props} dayId={dayId} />;
 }
-function WaterDayAction({ onBondRewardRequest, onError, dayId }: WaterActionProps & { dayId: string }) {
+function WaterDayAction({ onBondRewardRequest, onError, dayId, enteringEnabled = true, disabled = false, onBusyChange }: WaterActionProps & { dayId: string }) {
   const goals = useCompanionQuickGoals({ dayId, availableFamilyIds: families });
   const goal = goals.state.goals.find((item) => item.templateId === 'mossprout:drink-water' && item.status !== 'archived');
   const completion = goals.state.completions.find((item) => item.goalId === goal?.id && item.dayId === dayId);
   // Freeze the visible count until the outgoing row and reward flight finish.
   const [count, setCount] = useState(() => Math.max(savedCount(dayId), completion ? 1 : 0));
+  const initialCount = useRef(count);
   useEffect(() => {
     if (!completion) return;
     relationshipProgressionRepository.update((state) => settleCompanionWaterBreak(state, completion.goalId, completion.id, completion.completedAt));
   }, [completion]);
   const art = <Image source={katchimeraActionArt('today:reflection')} contentFit="contain" style={{ width: 48, height: 48 }} />;
-  return <DayActionGoalRow animateLayout entryDelayMs={0} key={`${dayId}:${count}`} label="Log a glass of water" title="Log a glass of water"
+  return <DayActionGoalRow disabled={disabled} onBeginCompletion={() => onBusyChange?.(true)} enteringEnabled={enteringEnabled || count !== initialCount.current} animateLayout entryDelayMs={0} key={`${dayId}:${count}`} label="Log a glass of water" title="Log a glass of water"
       subtitle={count ? `${count} ${count === 1 ? 'glass' : 'glasses'} logged today` : 'Tap after you’ve had some water'} artwork={art}
       reward={count === 0 ? <DayActionRewardChip reward={{ kind: 'bond', amount: COMPANION_BOND_REWARDS.quick_goal_completed }} /> : undefined}
       completeOnPress hideCompletionControl onOpen={(finish) => finish()}
       onCompletionRequest={(source, onArrive, onFailed) => {
         try {
-          if (dayId !== localDayId()) { onFailed(); return; }
+          if (dayId !== localDayId()) { onFailed(); onBusyChange?.(false); return; }
           let id = goal?.id;
           if (!id) {
             const result = addCompanionQuickGoal(loadCompanionQuickGoalState(), { familyId: 'mossprout', templateId: 'mossprout:drink-water', title: 'Drink a glass of water', cadence: { kind: 'daily' } });
@@ -70,6 +74,6 @@ function WaterDayAction({ onBondRewardRequest, onError, dayId }: WaterActionProp
           });
           setStoredJson(countKey(dayId), Math.max(savedCount(dayId), count + 1));
           if (source && result.bondAward && onBondRewardRequest) onBondRewardRequest(source, onArrive); else onArrive();
-        } catch { onFailed(); onError('Your water break could not be saved. Shall we try again?'); }
-      }} onFinished={() => { setCount(savedCount(dayId)); goals.refresh(); }} />;
+        } catch { onFailed(); onBusyChange?.(false); onError('Your water break could not be saved. Shall we try again?'); }
+      }} onFinished={() => { setCount(savedCount(dayId)); goals.refresh(); onBusyChange?.(false); }} />;
 }

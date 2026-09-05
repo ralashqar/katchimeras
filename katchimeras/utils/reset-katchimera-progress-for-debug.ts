@@ -1,3 +1,4 @@
+import { resetMossproutLifeActivities } from '@/utils/mossprout-life-activity-storage';
 import { resetCompanionAchievementsForDebug } from '@/utils/companion-achievements-storage';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { resetAllKatchimeraBondsForDebug } from '@/utils/companion-bond-storage';
@@ -20,6 +21,7 @@ export async function resetKatchimeraProgressForDebug({
   resetAt?: number;
   resetDevAccess?: boolean;
 } = {}): Promise<void> {
+  resetMossproutLifeActivities();
   setJourneyQuickModeEnabled(false);
   resetAllKatchimeraContentForDebug();
   resetKatchimeraWardrobeForDebug();

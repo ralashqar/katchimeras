@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
-import { loadNativeModule, nativeViews } from './helpers/native-motion-harness';
+import { loadCompanionOverlay, loadNativeModule, nativeViews } from './helpers/native-motion-harness';
 import { emptyRelationshipProgressState } from '../game/katchimeras/relationship-progression';
 import { createContentFlowRun } from '../features/content-flow/content-flow-interpreter';
 import { stepplingEpisodeFlow } from '../constants/steppling-journey-campaign';
@@ -20,6 +20,7 @@ test('return UI blocks the next episode until receipt completion and prevents do
   let activeRun: ContentFlowRun | null = null;
   let resolveClaim: () => void = () => {};
   const module = loadNativeModule('components/katchadeck/world/companion-journey-cycle-stage.tsx', {
+      './companion-scene-overlay': loadCompanionOverlay(),
     'react-native': { ...nativeViews, ScrollView: 'ScrollView', Pressable: Button, AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) } },
     '@/constants/katcha-ui': { KatchaUI: { companionScenePanel: { ink: '#fff' } } },
     '@/components/themed-text': { ThemedText: 'Text' },
@@ -53,11 +54,16 @@ test('return UI blocks the next episode until receipt completion and prevents do
   assert.equal(claims, 1);
   await act(async () => { resolveClaim(); });
   assert.equal(life().props.model.journey.eyebrow, 'The Path Outside · Journey Day 2');
+  const rootCards = life();
   await act(async () => { life().props.onJourney(); });
+  assert.equal(life(), rootCards, 'opening Journey retains the root card section');
   const seen = tree!.root.findByType('Choices' as React.ElementType).props.options.map((option: { label: string }) => option.label);
   const flow = stepplingEpisodeFlow(2);
   const opening = flow.nodes.find((node) => node.id === flow.entryNodeId)!;
   if (opening.kind === 'scene') for (const [, label] of opening.payload!.choices as string[][]) assert.ok(seen.includes(label));
+  await act(async () => tree!.root.findByProps({ accessibilityLabel: 'Back to companion' }).props.onPress());
+  assert.equal(life(), rootCards);
+  assert.equal(tree!.root.findAllByType('Choices' as React.ElementType).length, 0);
   await act(async () => { tree!.unmount(); });
 });
 
@@ -68,6 +74,7 @@ for (const familyId of ['mossprout', 'steppling'] as const) {
     const opened: string[] = [];
     let narration: string | null = null;
     const module = loadNativeModule('components/katchadeck/world/companion-journey-cycle-stage.tsx', {
+      './companion-scene-overlay': loadCompanionOverlay(),
       'react-native': { ...nativeViews, ScrollView: 'ScrollView', Pressable: Button, AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) } },
       '@/constants/katcha-ui': { KatchaUI: { companionScenePanel: { ink: '#fff' } } },
     '@/components/themed-text': { ThemedText: 'Text' },

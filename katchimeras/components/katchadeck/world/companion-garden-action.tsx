@@ -1,11 +1,11 @@
 import { mergeOrderReady, mergeWorldStateForBoard } from '@/utils/merge-world/engine';
 import { useOptionalMergeWorldState, useOptionalMergeWorldActions } from '@/features/merge-world/merge-world-provider';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ComponentProps, type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { Image } from 'expo-image';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { DayActionActiveRow, DayActionCompletedRow } from '@/components/katchadeck/ui/day-action-row';
-import { CompanionSceneOverlay } from './companion-scene-overlay';
+import { CompanionSceneOverlayHost, CompanionSlidingSubmenu, useCompanionActionNavigation } from './companion-scene-overlay';
 import { MossproutJourneyRequestPanel } from './mossprout-journey-request-panel';
 import { DayActionCardSurface } from '@/components/katchadeck/ui/day-action-card';
 import { katchimeraActionArt } from '@/constants/katchimera-action-art';
@@ -15,15 +15,22 @@ import { DAILY_GARDEN_BONUS, type DailyGardenFamily } from '@/utils/merge-world/
 import type { MergeOrder, MergeWorldState } from '@/types/merge-world';
 import { type CompanionMergeRequest } from './companion-merge-request-tray';
 
-export function CompanionGardenAction({ familyId, onOpenMerge, storyRequests = [], children, onSubmenuChange }: {
+export function CompanionGardenAction(props: ComponentProps<typeof CompanionGardenActionContent>) {
+  return <CompanionSceneOverlayHost><CompanionGardenActionContent {...props} /></CompanionSceneOverlayHost>;
+}
+
+function CompanionGardenActionContent({ familyId, onOpenMerge, storyRequests = [], children, onSubmenuChange, concealed = false }: {
+  concealed?: boolean;
   children: (card: ReactNode) => ReactNode; onSubmenuChange?: (open: boolean) => void;
   familyId: DailyGardenFamily; onOpenMerge: (id?: string) => void; storyRequests?: readonly CompanionMergeRequest[];
 }) {
+  const navigation = useCompanionActionNavigation();
   const dayId = useCompanionCalendarDay();
   const provided = useOptionalMergeWorldState();
   const actions = useOptionalMergeWorldActions();
   const [world, setWorld] = useState<MergeWorldState | null>(null);
   const [open, setOpen] = useState(false);
+  const hidden = concealed || (open && !navigation);
   const [error, setError] = useState(false);
   const [dismissedDay, setDismissedDay] = useState(() => getStoredJson<string | null>(`companion:garden-outro:${familyId}`, null));
   useEffect(() => { onSubmenuChange?.(open); return () => onSubmenuChange?.(false); }, [open, onSubmenuChange]);
@@ -81,11 +88,11 @@ export function CompanionGardenAction({ familyId, onOpenMerge, storyRequests = [
   // Explicit native containers prevent Fabric flattening/unflattening on opacity
   // changes from reparenting animated rows and replaying their native entrances.
   return <View collapsable={false}>
-    <View collapsable={false} accessibilityElementsHidden={open} importantForAccessibility={open ? 'no-hide-descendants' : 'auto'}
-      pointerEvents={open ? 'none' : 'auto'} style={{ opacity: open ? 0 : 1 }}>
+    <View collapsable={false} accessibilityElementsHidden={hidden} importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
+      pointerEvents={hidden ? 'none' : 'auto'} style={{ opacity: hidden ? 0 : 1 }}>
       {children(card)}
     </View>
-    <CompanionSceneOverlay visible={open}>
+    <CompanionSlidingSubmenu visible={open}>
       <MossproutJourneyRequestPanel
         standalone fitContent animateEntrance={false} title={requests.length ? 'Tend garden' : 'The garden is caught up'}
         actionLabel="Back" onAction={() => setOpen(false)} onRequestPress={onOpenMerge}
@@ -93,6 +100,6 @@ export function CompanionGardenAction({ familyId, onOpenMerge, storyRequests = [
           ...request, description: [request.description, badge].filter(Boolean).join(' · '),
         }))}
       />
-    </CompanionSceneOverlay>
+    </CompanionSlidingSubmenu>
   </View>;
 }
