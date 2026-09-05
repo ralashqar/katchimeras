@@ -1,5 +1,7 @@
 import { BlurMask, Canvas, Group, RoundedRect, SweepGradient, vec } from '@shopify/react-native-skia';
 import { useEffect, useState } from 'react';
+import { useAppForeground } from '@/hooks/use-app-foreground';
+import { roundedBorderGradient } from '@/utils/rounded-border-track';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import {
   cancelAnimation,
@@ -69,31 +71,41 @@ export function AnimatedBorderHighlight({
   const progress = useSharedValue(0);
   const [size, setSize] = useState({ height: 0, width: 0 });
   const reduceMotion = useReducedMotion();
+  const foreground = useAppForeground();
 
   useEffect(() => {
     progress.value = 0;
-    if (!reduceMotion) {
+    if (!reduceMotion && foreground && !(paused?.value)) {
       progress.value = withRepeat(withTiming(1, { duration: cycleDuration, easing: Easing.linear }), -1);
     }
     return () => cancelAnimation(progress);
-  }, [cycleDuration, progress, reduceMotion]);
+  }, [cycleDuration, foreground, paused, progress, reduceMotion]);
 
   useAnimatedReaction(
     () => paused?.value ?? 0,
     (isPaused, wasPaused) => {
-      if (isPaused === wasPaused || reduceMotion) return;
+      if (isPaused === wasPaused || reduceMotion || !foreground) return;
       cancelAnimation(progress);
       if (isPaused === 0) progress.value = withRepeat(withTiming(1, { duration: cycleDuration, easing: Easing.linear }), -1);
     },
-    [cycleDuration, reduceMotion],
+    [cycleDuration, foreground, reduceMotion],
   );
 
-  const gradientTransform = useDerivedValue(() => {
-    if (reduceMotion) return [{ rotate: staticAngle * Math.PI * 2 }];
+  const safeInset = Math.max(0, inset);
+  const width = Math.max(0, size.width - safeInset * 2);
+  const height = Math.max(0, size.height - safeInset * 2);
+  const center = vec(size.width / 2, size.height / 2);
+  const radius = Math.min(width / 2, height / 2, Math.max(0, borderRadius - safeInset));
+  const stops = positions.length === colors.length
+    ? positions
+    : colors.map((_, index) => index / Math.max(1, colors.length - 1));
+  const gradient = useDerivedValue(() => {
     const elapsed = progress.value * cycleDuration;
-    const orbitProgress = Math.min(elapsed / orbitDuration, 1);
-    return [{ rotate: orbitProgress * Math.PI * 2 }];
+    const orbitProgress = reduceMotion ? staticAngle : Math.min(elapsed / orbitDuration, 1);
+    return roundedBorderGradient(width, height, radius, orbitProgress, stops);
   });
+  const gradientTransform = useDerivedValue(() => [{ rotate: gradient.value.rotation }]);
+  const gradientPositions = useDerivedValue(() => gradient.value.positions);
   const rimOpacity = useDerivedValue(() => {
     if (reduceMotion) return 1;
     const elapsed = progress.value * cycleDuration;
@@ -104,13 +116,6 @@ export function AnimatedBorderHighlight({
     if (elapsed < orbitDuration) return 1 - (elapsed - fadeOutStartsAt) / fadeDuration;
     return 0;
   });
-
-  const safeInset = Math.max(0, inset);
-  const width = Math.max(0, size.width - safeInset * 2);
-  const height = Math.max(0, size.height - safeInset * 2);
-  const center = vec(size.width / 2, size.height / 2);
-  const radius = Math.max(0, borderRadius - safeInset);
-  const gradientPositions = positions.length === colors.length ? positions : undefined;
 
   return (
     <View

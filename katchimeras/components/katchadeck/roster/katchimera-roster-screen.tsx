@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { SCENE_PERF_ENABLED } from '@/constants/diagnostics';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
@@ -327,12 +328,7 @@ function RosterHero({
             </ThemedText>
           </View>
         ) : (
-          <Pressable accessibilityRole="button" onPress={onGoToday} style={styles.emptyCta}>
-            <IconSymbol name="moon.stars.fill" size={15} color="#34260B" />
-            <ThemedText style={styles.emptyCtaText} lightColor="#34260B" darkColor="#34260B">
-              Live today to meet one
-            </ThemedText>
-          </Pressable>
+          <KatchaButton onPress={onGoToday} icon="moon.stars.fill" style={{alignSelf: 'flex-start', marginTop: 8}} label="Live today to meet one" />
         )}
       </View>
       {featured ? renderArtwork ? (
@@ -432,17 +428,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 35,
   },
-  emptyCta: {
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: '#EBC55C',
-    borderRadius: 999,
-    flexDirection: 'row',
-    gap: 7,
-    marginTop: 8,
-    minHeight: 38,
-    paddingHorizontal: 13,
-  },
   callingSection: { gap: 10, paddingBottom: 16, paddingTop: 4 },
   callingHeading: { gap: 2, paddingHorizontal: 4 },
   callingTitle: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 20 },
@@ -454,11 +439,6 @@ const styles = StyleSheet.create({
   callingCopy: { flex: 1, gap: 2 },
   callingName: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 14 },
   callingStatus: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '800' },
-  emptyCtaText: {
-    fontFamily: AppFontFamilies.manrope,
-    fontSize: 11,
-    fontWeight: '900',
-  },
   cardCell: { alignItems: 'center', paddingTop: 9 },
   fullBleedItem: { marginHorizontal: -14 },
   stickyFilters: { backgroundColor: '#171A12', marginHorizontal: -14, zIndex: 4 },

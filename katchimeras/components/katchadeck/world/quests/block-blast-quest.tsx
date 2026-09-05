@@ -1,7 +1,8 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, AppState, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, AppState, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { Easing, FadeIn, FadeInUp, FadeOutUp, Keyframe, useReducedMotion } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
@@ -512,10 +513,7 @@ function StreakWordmark({ combo }: { combo: number }) {
 
 function ResultAction({ label, onPress, primary = false }: { label: string; onPress: () => void; primary?: boolean }) {
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.resultAction, primary && styles.resultActionPrimary, pressed && styles.pressed]}>
-      <ThemedText style={styles.resultActionLabel} lightColor="#5D351F" darkColor="#5D351F">{label}</ThemedText>
-      <IconSymbol name={primary ? 'arrow.right' : 'heart.fill'} size={17} color={primary ? '#5D351F' : '#C94F79'} />
-    </Pressable>
+    <KatchaButton onPress={onPress} icon={primary ? 'arrow.right' : 'heart.fill'} variant={primary ? 'primary' : 'secondary'} label={(label)} />
   );
 }
 
@@ -547,7 +545,6 @@ const styles = StyleSheet.create({
   traySlotActive: { zIndex: 50 },
   traySlotUsed: { opacity: 0.48 },
   usedDot: { backgroundColor: 'rgba(124,76,43,0.22)', borderRadius: 99, height: 5, width: 5 },
-  pressed: { opacity: 0.72, transform: [{ scale: 0.985 }] },
   previewMedia: { height: 128, position: 'relative', width: 144 },
   previewBoard: { backgroundColor: '#111326', borderColor: '#3B3B61', borderCurve: 'continuous', borderRadius: 15, borderWidth: 4, flexDirection: 'row', flexWrap: 'wrap', gap: 2, height: 94, left: 0, padding: 7, position: 'absolute', top: 15, transform: [{ rotate: '-5deg' }], width: 94 },
   previewCell: { backgroundColor: '#252846', borderRadius: 3, height: 13, width: 13 },
@@ -563,7 +560,4 @@ const styles = StyleSheet.create({
   finalScore: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 52, fontVariant: ['tabular-nums'], letterSpacing: -1.4, lineHeight: 57 },
   finalLabel: { fontSize: 9, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: 0.65 },
   resultActions: { gap: 8 },
-  resultAction: { alignItems: 'center', backgroundColor: 'rgba(255,244,214,0.94)', borderColor: 'rgba(151,96,49,0.28)', borderCurve: 'continuous', borderRadius: 19, borderWidth: 1, flexDirection: 'row', gap: 10, justifyContent: 'center', minHeight: 54, paddingHorizontal: 18 },
-  resultActionPrimary: { backgroundColor: '#FFC875', borderColor: 'rgba(142,84,41,0.32)', boxShadow: '0 8px 18px rgba(74,41,24,0.20), inset 0 2px 0 rgba(255,255,255,0.45)' },
-  resultActionLabel: { fontSize: 15, fontWeight: '900' },
 });

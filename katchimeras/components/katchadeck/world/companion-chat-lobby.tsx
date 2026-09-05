@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
@@ -172,9 +173,7 @@ export function CompanionChatLobby({
               <ThemedText selectable style={styles.emptyTitle} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>That is everything Mossprout has for today</ThemedText>
               <ThemedText selectable style={styles.emptyBody} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>Your Garden, saved insights, and goals are still waiting on Mossprout’s page.</ThemedText>
             </View>
-            <Pressable accessibilityRole="button" onPress={onBack} style={({ pressed }) => [styles.emptyAction, pressed && styles.pressed]}>
-              <ThemedText style={styles.emptyActionLabel} lightColor={KatchaUI.companionScenePanel.accentInk} darkColor={KatchaUI.companionScenePanel.accentInk}>Back to today</ThemedText>
-            </Pressable>
+            <KatchaButton onPress={onBack} label="Back to today" />
           </View> : null}
 
           {!simplified ? <View style={styles.secondaryActions}>
@@ -251,8 +250,6 @@ const styles = StyleSheet.create({
   emptyCopy: { gap: 4 },
   emptyTitle: { fontSize: 15, fontWeight: '900', lineHeight: 20, textAlign: 'center' },
   emptyBody: { fontSize: 12, lineHeight: 17, textAlign: 'center' },
-  emptyAction: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.accent, borderRadius: 15, justifyContent: 'center', minHeight: 42, paddingHorizontal: 16 },
-  emptyActionLabel: { fontSize: 12, fontWeight: '900' },
   metaText: { fontSize: 9.5, fontWeight: '800', lineHeight: 13 },
   secondaryActions: { flexDirection: 'row', gap: 8 },
   secondaryAction: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.softBackground, borderRadius: 16, flex: 1, flexDirection: 'row', gap: 7, justifyContent: 'center', minHeight: 46, paddingHorizontal: 10 },

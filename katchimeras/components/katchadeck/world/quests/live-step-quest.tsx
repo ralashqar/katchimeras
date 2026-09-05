@@ -1,10 +1,11 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { Canvas, Circle, Path, Skia } from '@shopify/react-native-skia';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Pressable, StyleSheet, View } from 'react-native';
+import { AppState, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import type { QuestResult } from '@/utils/quests/experiences/types';
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
@@ -292,7 +293,7 @@ export function LiveStepQuest({ config, onAttemptStart, onAttemptCancel, onCompl
 }
 
 function Action({ label, icon, onPress, quiet = false }: { label: string; icon: 'xmark' | 'checkmark' | 'figure.walk'; onPress: () => void; quiet?: boolean }) {
-  return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.action, quiet && styles.actionQuiet, pressed && styles.pressed]}><IconSymbol name={icon} size={18} color={quiet ? Lantern.moon300 : Lantern.emberInk} /><ThemedText style={styles.actionLabel} lightColor={quiet ? Lantern.moon300 : Lantern.emberInk} darkColor={quiet ? Lantern.moon300 : Lantern.emberInk}>{label}</ThemedText></Pressable>;
+  return <KatchaButton onPress={onPress} icon={icon} variant={quiet ? 'tertiary' : 'primary'} style={{alignSelf: 'stretch'}} label={(label)} />;
 }
 
 function arcPath(ratio: number) {
@@ -313,6 +314,4 @@ const styles = StyleSheet.create({
   clock: { height: 176, width: 176 }, canvas: { height: 176, width: 176 }, clockText: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   steps: { fontSize: 42, fontVariant: ['tabular-nums'], fontWeight: '900', lineHeight: 45 }, unit: { fontSize: 11.5, fontWeight: '700' }, timer: { fontSize: 15, fontVariant: ['tabular-nums'], fontWeight: '900', paddingTop: 5 },
   message: { fontSize: 13, lineHeight: 19, textAlign: 'center' }, safety: { fontSize: 11.5, lineHeight: 17, textAlign: 'center' },
-  action: { alignItems: 'center', alignSelf: 'stretch', backgroundColor: Lantern.ember300, borderCurve: 'continuous', borderRadius: 18, flexDirection: 'row', gap: 9, justifyContent: 'center', minHeight: 54, paddingHorizontal: 18 },
-  actionQuiet: { backgroundColor: 'transparent', borderColor: 'rgba(201,194,232,0.2)', borderWidth: 1 }, actionLabel: { fontSize: 15, fontWeight: '900' }, pressed: { opacity: 0.78, transform: [{ scale: 0.99 }] },
 });

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
+import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -52,24 +53,12 @@ export function CompanionReflectionThread({
               </ThemedText>
             </View>
           ) : null}
-          <Pressable
+          <KatchaButton
             accessibilityHint="Opens a popup where you can type or record"
-            accessibilityRole="button"
+            icon="mic.fill"
+            label={savedDraft ? 'Edit my note' : composerTitle}
             onPress={() => setOpen(true)}
-            style={({ pressed }) => [styles.launchButton, pressed && styles.pressed]}>
-            <View style={styles.launchIcon}>
-              <IconSymbol color={Meadow.ink} name="mic.fill" size={16} />
-            </View>
-            <View style={styles.launchCopy}>
-              <ThemedText style={styles.launchTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-                {savedDraft ? 'Edit my note' : composerTitle}
-              </ThemedText>
-              <ThemedText style={styles.launchHint} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-                Type it or use your voice
-              </ThemedText>
-            </View>
-            <IconSymbol color={Meadow.ink} name="arrow.right" size={17} />
-          </Pressable>
+          />
         </View>
       ) : null}
 
@@ -149,12 +138,6 @@ const styles = StyleSheet.create({
   prompt: { fontFamily: AppFontFamilies.manrope, fontSize: 20, fontWeight: '900', letterSpacing: -0.25, lineHeight: 27 },
   draftPreview: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.52)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 9, minHeight: 54, paddingHorizontal: 12, paddingVertical: 9 },
   draftPreviewText: { flex: 1, fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '700', lineHeight: 17 },
-  launchButton: { alignItems: 'center', backgroundColor: '#F2C967', borderColor: '#D7A93C', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: '0 7px 18px rgba(92,57,20,0.24), inset 0 1px 0 rgba(255,255,255,0.4)', flexDirection: 'row', gap: 9, minHeight: 56, paddingHorizontal: 13 },
-  launchIcon: { alignItems: 'center', backgroundColor: 'rgba(255,248,231,0.42)', borderRadius: 999, height: 32, justifyContent: 'center', width: 32 },
-  launchCopy: { flex: 1, gap: 1 },
-  launchTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '900' },
-  launchHint: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '700' },
-  pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
   reviewRoot: { gap: 22, paddingBottom: 20, paddingTop: 8 },
   reviewIntro: { alignItems: 'center', backgroundColor: 'rgba(231,185,81,0.13)', borderColor: 'rgba(160,113,30,0.18)', borderCurve: 'continuous', borderRadius: 20, borderWidth: 1, flexDirection: 'row', gap: 12, padding: 14 },
   reviewIcon: { alignItems: 'center', backgroundColor: 'rgba(231,185,81,0.20)', borderRadius: 16, height: 48, justifyContent: 'center', width: 48 },

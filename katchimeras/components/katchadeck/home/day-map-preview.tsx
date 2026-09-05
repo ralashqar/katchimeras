@@ -69,14 +69,7 @@ export function DayMapPreview({
         </View>
         <View style={styles.actions}>
           {canImportHealthRoute ? (
-            <Pressable
-              disabled={isImportingHealthRoutes}
-              onPress={() => setShowHealthExplainer((current) => !current)}
-              style={[styles.importButton, isImportingHealthRoutes ? styles.importButtonDisabled : null]}>
-              <ThemedText style={styles.importButtonLabel} lightColor="#F8FBFF" darkColor="#F8FBFF">
-                {isImportingHealthRoutes ? 'Importing...' : 'Import walk route'}
-              </ThemedText>
-            </Pressable>
+            <KatchaButton disabled={isImportingHealthRoutes} onPress={() => setShowHealthExplainer((current) => !current)} size="compact" label={(isImportingHealthRoutes ? 'Importing...' : 'Import walk route')} />
           ) : null}
           <KatchaButton icon="arrow.right" label="View day map" onPress={onPress} variant="secondary" />
         </View>
@@ -161,22 +154,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 10,
   },
-  importButton: {
-    backgroundColor: 'rgba(18, 27, 47, 0.92)',
-    borderColor: 'rgba(208,221,255,0.24)',
-    borderCurve: 'continuous',
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
   importButtonDisabled: {
     opacity: 0.52,
-  },
-  importButtonLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 18,
   },
   explainerPanel: {
     gap: 10,

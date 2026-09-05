@@ -1,6 +1,7 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -139,9 +140,7 @@ export function BlockBlastRouteScreen({
         <ThemedText selectable style={styles.invalidTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
           This party is no longer available
         </ThemedText>
-        <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.backButton}>
-          <ThemedText style={styles.backLabel} lightColor="#17121F" darkColor="#17121F">Back to Cheerlet</ThemedText>
-        </Pressable>
+        <KatchaButton onPress={() => router.back()} label="Back to Cheerlet" />
       </View>
     );
   }
@@ -165,6 +164,5 @@ export function BlockBlastRouteScreen({
 const styles = StyleSheet.create({
   invalid: { alignItems: 'center', backgroundColor: '#11131B', flex: 1, gap: 18, justifyContent: 'center', paddingHorizontal: 28 },
   invalidTitle: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 28, lineHeight: 34, textAlign: 'center' },
-  backButton: { backgroundColor: Lantern.ember300, borderCurve: 'continuous', borderRadius: 999, minHeight: 44, justifyContent: 'center', paddingHorizontal: 18 },
   backLabel: { fontSize: 13, fontWeight: '900' },
 });

@@ -28,7 +28,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { CelebrationParticles } from '@/components/katchadeck/world/companion-achievement-celebration';
 import { familyIdFromCompanionId, katchimeraFamilyById } from '@/constants/katchimera-skins';
-import { AppFontFamilies, KatchaDeckUI } from '@/constants/theme';
+import { AppFontFamilies } from '@/constants/theme';
 import { TODAY_ATMOSPHERE_BACKGROUND_SOURCES } from '@/constants/today-atmosphere-background-sources.gen';
 import { getCreatureVisual } from '@/game/days';
 import type { CompanionBondAwardReceipt } from '@/utils/companion-bond';
@@ -287,7 +287,6 @@ export function CompanionBondLevelUpCelebration({ autoContinue = true, continueL
               fullWidth
               glow
               label={continueLabel ?? (screenReaderEnabled ? 'Return to story' : 'Return now')}
-              labelStyle={KatchaDeckUI.typography.ftuePanelTitle}
               onPress={onContinue}
             />
           </View>

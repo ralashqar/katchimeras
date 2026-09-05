@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
 
@@ -57,11 +58,7 @@ export function HatchPayoffReveal({
         ) : null}
 
         <View style={styles.actions}>
-          <Pressable accessibilityRole="button" onPress={onOpenChronicle} style={styles.primary}>
-            <ThemedText style={styles.primaryLabel} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>
-              Read Chronicle
-            </ThemedText>
-          </Pressable>
+          <KatchaButton onPress={onOpenChronicle} style={{flex: 1}} label="Read Chronicle" />
           <Pressable accessibilityRole="button" onPress={onOpenMemories} style={styles.secondary}>
             <ThemedText style={styles.secondaryLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
               View Memories
@@ -109,16 +106,6 @@ const styles = StyleSheet.create({
   sourceDot: { width: 6, height: 6, borderRadius: 999, backgroundColor: Lantern.auroraTeal },
   sourceText: { maxWidth: '92%', fontSize: 12.5, fontWeight: '800' },
   actions: { flexDirection: 'row', gap: 10, paddingTop: 8 },
-  primary: {
-    flex: 1,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 18,
-    borderCurve: 'continuous',
-    backgroundColor: Lantern.ember300,
-  },
-  primaryLabel: { fontSize: 13.5, fontWeight: '900' },
   secondary: {
     flex: 1,
     minHeight: 48,

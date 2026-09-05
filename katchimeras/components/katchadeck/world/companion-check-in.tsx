@@ -1,5 +1,6 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -79,12 +80,7 @@ export function CompanionCheckInCard({
           </ThemedText>
         </View>
       </View>
-      <Pressable accessibilityRole="button" onPress={onOpen} style={({ pressed }) => [styles.cardButton, pressed && styles.pressed]}>
-        <ThemedText style={styles.cardButtonLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-          {complete ? 'View check-in' : inProgress ? 'Continue' : 'Start check-in'}
-        </ThemedText>
-        <IconSymbol color={Meadow.ink} name="arrow.right" size={16} />
-      </Pressable>
+      <KatchaButton onPress={onOpen} icon="arrow.right" style={{alignSelf: 'stretch'}} label={(complete ? 'View check-in' : inProgress ? 'Continue' : 'Start check-in')} />
     </View>
   );
 }
@@ -293,8 +289,6 @@ const styles = StyleSheet.create({
   eyebrow: { ...KatchaUI.type.meta, fontSize: 10.5, fontWeight: '900', letterSpacing: 1.2 },
   cardTitle: { ...KatchaUI.type.sectionTitle, fontSize: 18, lineHeight: 23, marginTop: 3 },
   body: { ...KatchaUI.type.companionBody, fontSize: 12.5, lineHeight: 18, marginTop: 4 },
-  cardButton: { alignItems: 'center', alignSelf: 'stretch', backgroundColor: '#E9C66F', borderColor: '#D3A94C', borderRadius: 14, borderWidth: 1, flexDirection: 'row', justifyContent: 'center', minHeight: 46, paddingHorizontal: 14 },
-  cardButtonLabel: { ...KatchaUI.type.companionAction, fontSize: 13, fontWeight: '900', marginRight: 7 },
   page: { gap: 18, paddingBottom: 28 },
   header: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   back: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.62)', borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, height: 42, justifyContent: 'center', width: 42 },
@@ -306,7 +300,6 @@ const styles = StyleSheet.create({
   helper: { fontSize: 14, lineHeight: 21 },
   options: { gap: 10 },
   option: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.70)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 12, minHeight: 62, paddingHorizontal: 16, paddingVertical: 12 },
-  optionPressed: { backgroundColor: 'rgba(231,185,81,0.18)', borderColor: Meadow.goldDeep, transform: [{ scale: 0.99 }] },
   optionLabel: { flex: 1, fontSize: 15, fontWeight: '800', lineHeight: 21 },
   result: { alignItems: 'center', gap: 9, paddingHorizontal: 12, paddingVertical: 4 },
   resultMark: { alignItems: 'center', backgroundColor: Meadow.leafDeep, borderRadius: 999, height: 54, justifyContent: 'center', width: 54 },
@@ -321,16 +314,8 @@ const styles = StyleSheet.create({
   taskTitle: { ...KatchaUI.type.sectionTitle, fontSize: 17, lineHeight: 22 },
   taskRow: { alignItems: 'center', flexDirection: 'row', gap: 9, paddingVertical: 3 },
   taskLabel: { ...KatchaUI.type.companionAction, flex: 1, fontSize: 13.5 },
-  primary: { alignItems: 'center', backgroundColor: Meadow.goldDeep, borderRadius: 15, flexDirection: 'row', gap: 7, justifyContent: 'center', minHeight: 48, paddingHorizontal: 16 },
-  primaryLabel: { ...KatchaUI.type.companionAction, fontSize: 13.5, fontWeight: '900' },
-  secondary: { alignItems: 'center', borderColor: Meadow.cardBorder, borderRadius: 15, borderWidth: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 46, paddingHorizontal: 14 },
-  secondaryLabel: { ...KatchaUI.type.companionAction, fontSize: 12.5 },
-  textButton: { alignItems: 'center', alignSelf: 'center', flexDirection: 'row', gap: 6, minHeight: 38, paddingHorizontal: 10 },
-  textButtonLabel: { ...KatchaUI.type.companionAction, fontSize: 12.5 },
   statusRow: { alignItems: 'center', backgroundColor: 'rgba(91,132,91,0.09)', borderRadius: 14, flexDirection: 'row', gap: 8, padding: 12 },
   statusText: { ...KatchaUI.type.companionAction, flex: 1, fontSize: 12.5 },
   detail: { gap: 12 },
   resultActions: { gap: 8 },
-  pressed: { opacity: 0.74, transform: [{ scale: 0.985 }] },
-  disabled: { opacity: 0.45 },
 });

@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import * as Haptics from 'expo-haptics';
 import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -91,7 +92,7 @@ export function TriviaQuest({ config, seed, recentQuestionIds, onAttemptStart, o
 }
 
 function Header({ title, body }: { title: string; body: string }) { return <View style={styles.header}><ThemedText style={styles.eyebrow} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>QUICK TRIVIA</ThemedText><ThemedText selectable style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{title}</ThemedText><ThemedText selectable style={styles.body} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{body}</ThemedText></View>; }
-function Action({ label, onPress }: { label: string; onPress: () => void }) { return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.action, pressed && styles.pressed]}><ThemedText style={styles.actionText} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>{label}</ThemedText><IconSymbol name="arrow.right" size={17} color={Lantern.emberInk} /></Pressable>; }
+function Action({ label, onPress }: { label: string; onPress: () => void }) { return <KatchaButton onPress={onPress} icon="arrow.right" label={(label)} />; }
 
 const styles = StyleSheet.create({
   root: { gap: 18, paddingBottom: 20, paddingTop: 8 }, scrollRoot: { flexGrow: 1 }, header: { gap: 8 }, eyebrow: { fontSize: 10.5, fontWeight: '900', letterSpacing: 1.05 },
@@ -103,7 +104,6 @@ const styles = StyleSheet.create({
   choiceChosen: { backgroundColor: 'rgba(255,195,107,0.08)', borderColor: Lantern.ember300 }, choiceCorrect: { backgroundColor: 'rgba(125,232,205,0.08)', borderColor: Lantern.auroraTeal },
   choiceIndex: { alignItems: 'center', backgroundColor: Lantern.dusk700, borderRadius: 999, height: 30, justifyContent: 'center', width: 30 }, choiceIndexText: { fontSize: 12, fontWeight: '900' }, choiceText: { flex: 1, fontSize: 13.5, fontWeight: '800', lineHeight: 19 },
   feedback: { backgroundColor: 'rgba(201,194,232,0.07)', borderCurve: 'continuous', borderRadius: 17, gap: 5, padding: 14 }, feedbackTitle: { fontSize: 14, fontWeight: '900' }, feedbackBody: { fontSize: 12.5, lineHeight: 18 },
-  action: { alignItems: 'center', backgroundColor: Lantern.ember300, borderCurve: 'continuous', borderRadius: 18, flexDirection: 'row', gap: 9, justifyContent: 'center', minHeight: 54, paddingHorizontal: 18 }, actionText: { fontSize: 15, fontWeight: '900' },
   cancel: { alignItems: 'center', minHeight: 44, justifyContent: 'center' }, cancelText: { fontSize: 13, fontWeight: '800' },
   resultRoot: { flex: 1, justifyContent: 'space-between', minHeight: 0, paddingBottom: 4, paddingTop: 10 },
   resultContent: { flex: 1, gap: 20, justifyContent: 'center', minHeight: 0 },

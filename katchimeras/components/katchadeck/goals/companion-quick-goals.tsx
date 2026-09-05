@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useEffect, useRef, useState } from 'react';
@@ -1065,11 +1066,7 @@ function GoalEditor({
             Cancel
           </ThemedText>
         </Pressable>
-        <Pressable accessibilityRole="button" onPress={onSave} style={({ pressed }) => [styles.saveButton, pressed && styles.pressed]}>
-          <ThemedText style={styles.saveButtonText} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
-            {editing ? 'Save changes' : 'Add goal'}
-          </ThemedText>
-        </Pressable>
+        <KatchaButton onPress={onSave} size="compact" label={(editing ? 'Save changes' : 'Add goal')} />
       </View>
     </View>
   );
@@ -1327,8 +1324,6 @@ const styles = StyleSheet.create({
   editorActions: { flexDirection: 'row', gap: 8, justifyContent: 'flex-end', paddingTop: 2 },
   cancelButton: { alignItems: 'center', borderColor: Meadow.cardBorder, borderRadius: 12, borderWidth: 1, minHeight: 40, justifyContent: 'center', paddingHorizontal: 12 },
   cancelButtonText: { fontFamily: AppFontFamilies.manrope, fontSize: 11, fontWeight: '900' },
-  saveButton: { alignItems: 'center', backgroundColor: Meadow.goldDeep, borderCurve: 'continuous', borderRadius: 12, minHeight: 40, justifyContent: 'center', paddingHorizontal: 13 },
-  saveButtonText: { fontFamily: AppFontFamilies.manrope, fontSize: 11, fontWeight: '900' },
   manageList: { gap: 4 },
   manageRow: { alignItems: 'center', borderBottomColor: Meadow.cardBorder, borderBottomWidth: 1, flexDirection: 'row', gap: 6, minHeight: 58, paddingVertical: 7 },
   manageIcon: { alignItems: 'center', borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, height: 34, justifyContent: 'center', width: 34 },

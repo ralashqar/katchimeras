@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* global __dirname */
 
 const { existsSync, readFileSync } = require('node:fs');
 const { join } = require('node:path');
@@ -99,7 +100,8 @@ if (/color=\{item\.accent\}|(?:light|dark)Color=\{item\.accent\}/.test(moments))
 
 const button = readFileSync(join(root, 'components/katchadeck/ui/katcha-button.tsx'), 'utf8');
 if (button.includes('styles.sheen')) failures.push('KatchaButton reintroduced the clipped highlight bar');
-if (!button.includes('styles.rimLight')) failures.push('KatchaButton is missing its restrained rim light');
+if (!button.includes('<AnimatedBorderHighlight') || !button.includes('GAME_CTA.face')) failures.push('KatchaButton is missing the shared game face or animated rim');
+if (button.includes('styles.rimLight')) failures.push('KatchaButton reintroduced the detached highlight line');
 
 const cardBackground = '#F0DDC1';
 const sheetBackground = '#E6CDA7';

@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { Image } from 'expo-image';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
@@ -298,16 +299,7 @@ function PhotoCaptureAction({
           <ThemedText selectable style={styles.photoCaptureRequirement} lightColor={Meadow.ink} darkColor={Meadow.ink}>{requirement}</ThemedText>
         </View>
       </View>
-      <Pressable
-        accessibilityHint={detail}
-        accessibilityLabel={buttonLabel}
-        accessibilityRole="button"
-        onPress={onPress}
-        style={({ pressed }) => [styles.photoCaptureButton, pressed && styles.photoCaptureButtonPressed]}>
-        <IconSymbol name={action.icon} size={18} color={Meadow.ink} />
-        <ThemedText style={styles.photoCaptureButtonText} lightColor={Meadow.ink} darkColor={Meadow.ink}>{buttonLabel}</ThemedText>
-        <IconSymbol name="arrow.right" size={16} color={Meadow.ink} />
-      </Pressable>
+      <KatchaButton accessibilityHint={detail} accessibilityLabel={buttonLabel} onPress={onPress} icon={action.icon} label={(buttonLabel)} />
       <ThemedText selectable style={styles.photoCaptureHint} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
         It will stay attached here while the quest checks the match.
       </ThemedText>
@@ -449,9 +441,6 @@ const styles = StyleSheet.create({
   photoCaptureCopy: { flex: 1, gap: 1, minWidth: 0 },
   photoCaptureKicker: { fontSize: 9.5, fontWeight: '900', letterSpacing: 0.75, textTransform: 'uppercase' },
   photoCaptureRequirement: { fontSize: 13.5, fontWeight: '900', lineHeight: 18 },
-  photoCaptureButton: { alignItems: 'center', backgroundColor: '#E8BA50', borderColor: 'rgba(255,246,216,0.78)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, boxShadow: '0 5px 12px rgba(115,78,24,0.20), inset 0 1px 0 rgba(255,255,255,0.54)', flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 50, paddingHorizontal: 14 },
-  photoCaptureButtonPressed: { opacity: 0.84, transform: [{ scale: 0.98 }] },
-  photoCaptureButtonText: { flex: 1, fontSize: 13, fontWeight: '900', textAlign: 'center' },
   photoCaptureHint: { fontSize: 10.5, lineHeight: 14, paddingHorizontal: 2 },
   inlineStatus: { alignItems: 'flex-start', backgroundColor: 'rgba(255,248,232,0.38)', borderCurve: 'continuous', borderRadius: 13, flexDirection: 'row', gap: 7, paddingHorizontal: 9, paddingVertical: 8 },
   inlineStatusText: { flex: 1, fontSize: 11, lineHeight: 15 },

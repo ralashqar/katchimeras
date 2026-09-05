@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import * as Haptics from 'expo-haptics';
 import { Image, useImage, type ImageProps, type ImageSource } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -135,7 +136,7 @@ export function RewardSplash({ items, onItemSeen, onComplete, preview = false }:
               </View>
               <View style={styles.actions}>
                 {item.shareMessage ? <Pressable accessibilityRole="button" disabled={advancing} onPress={share} style={({ pressed }) => [styles.shareButton, pressed && styles.pressed]}><IconSymbol color="#31536B" name="square.and.arrow.up" size={17} /><ThemedText lightColor="#31536B" darkColor="#31536B" style={styles.shareLabel}>Share</ThemedText></Pressable> : null}
-                <Pressable accessibilityRole="button" disabled={advancing} onPress={advance} style={({ pressed }) => [styles.continueButton, pressed && styles.pressed]}><ThemedText lightColor="#FFF9EC" darkColor="#FFF9EC" style={styles.continueLabel}>{index < queue.length - 1 ? item.nextLabel ?? 'Next reward' : 'Continue'}</ThemedText></Pressable>
+                <KatchaButton disabled={advancing} onPress={advance} loading={advancing} style={{flex: 1}} label={(index < queue.length - 1 ? item.nextLabel ?? 'Next reward' : 'Continue')} />
               </View>
             </View>
           </View>
@@ -245,6 +246,6 @@ const styles = StyleSheet.create({
   bottomDock: { alignItems: 'center', flexShrink: 0, maxWidth: 520, width: '100%', zIndex: 5 }, bottomBlock: { alignItems: 'center', gap: 9, width: '100%' },
   detailChip: { backgroundColor: 'rgba(255,249,224,0.9)', borderColor: 'rgba(255,255,255,0.82)', borderCurve: 'continuous', borderRadius: 13, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 7 }, detail: { fontFamily: 'Manrope', fontSize: 13, fontWeight: '800', lineHeight: 18, textAlign: 'center' },
   rewardCard: { alignItems: 'center', backgroundColor: 'rgba(255,246,219,0.93)', borderColor: 'rgba(255,255,255,0.78)', borderCurve: 'continuous', borderRadius: 22, borderWidth: 1.5, boxShadow: '0 12px 28px rgba(52,94,118,0.2)', flexDirection: 'row', gap: 10, minHeight: 92, paddingHorizontal: 14, paddingVertical: 10, width: '100%' }, supportingImage: { height: 86, marginVertical: -7, width: 86 }, fallback: { alignItems: 'center', height: 62, justifyContent: 'center', width: 62 }, rewardCopy: { flex: 1, gap: 2 }, rewardTitle: { fontFamily: 'FredokaBold', fontSize: 16, lineHeight: 20 }, rewardBody: { fontFamily: 'Manrope', fontSize: 12.5, fontWeight: '700', lineHeight: 17 },
-  actions: { flexDirection: 'row', gap: 10, width: '100%' }, shareButton: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.44)', borderColor: 'rgba(36,88,125,0.2)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, flexDirection: 'row', gap: 7, justifyContent: 'center', minHeight: 50, paddingHorizontal: 16 }, shareLabel: { ...KatchaUI.type.action }, continueButton: { alignItems: 'center', backgroundColor: '#315F7D', borderCurve: 'continuous', borderRadius: 17, boxShadow: '0 8px 18px rgba(34,73,99,0.28)', flex: 1, justifyContent: 'center', minHeight: 50, paddingHorizontal: 18 }, continueLabel: { ...KatchaUI.type.action, textAlign: 'center' }, pressed: { opacity: 0.88, transform: [{ scale: 0.98 }] },
+  actions: { flexDirection: 'row', gap: 10, width: '100%' }, shareButton: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.44)', borderColor: 'rgba(36,88,125,0.2)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, flexDirection: 'row', gap: 7, justifyContent: 'center', minHeight: 50, paddingHorizontal: 16 }, shareLabel: { ...KatchaUI.type.action }, pressed: { opacity: 0.88, transform: [{ scale: 0.98 }] },
   particles: { alignItems: 'center', height: 1, justifyContent: 'center', left: '50%', position: 'absolute', top: '46%', width: 1, zIndex: 2 }, spark: { borderRadius: 4, position: 'absolute' },
 });

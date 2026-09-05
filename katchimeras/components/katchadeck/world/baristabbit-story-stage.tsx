@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
@@ -72,19 +73,11 @@ export function BaristabbitStoryStage({ onBegin, onJournal, onMore, onOpenConver
       palette={COMPANION_MERGE_REQUEST_PALETTE}
       requests={requests.map((request) => ({ id: request.title, title: request.title, description: request.description, definitionIds: [request.definitionId], served: request.served }))}
     />
-    {!complete ? <Pressable accessibilityRole="button" onPress={() => {
+    {!complete ? <KatchaButton onPress={() => {
       if (returnReady && story.pendingConversationId) { beginBaristabbitReturn(); onOpenConversation(story.pendingConversationId); }
       else if (needsBeginning) onBegin();
       else onOpenMerge(story.activeOrderId);
-    }} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
-      <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name={returnReady ? 'bubble.left.and.bubble.right.fill' : 'cup.and.saucer.fill'} size={19} />
-      <ThemedText style={styles.primaryLabel} lightColor={KatchaUI.companionScenePanel.accentInk} darkColor={KatchaUI.companionScenePanel.accentInk}>{returnReady ? 'Read Baristabbit’s note' : needsBeginning ? 'Meet Baristabbit' : requests.length > 1 ? 'Open all orders' : 'Make the request'}</ThemedText>
-      <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name="arrow.right" size={17} />
-    </Pressable> : <Pressable accessibilityRole="button" onPress={onMore} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
-      <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name="bubble.left.and.bubble.right.fill" size={19} />
-      <ThemedText style={styles.primaryLabel} lightColor={KatchaUI.companionScenePanel.accentInk} darkColor={KatchaUI.companionScenePanel.accentInk}>More with Baristabbit</ThemedText>
-      <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name="arrow.right" size={17} />
-    </Pressable>}
+    }} icon={returnReady ? 'bubble.left.and.bubble.right.fill' : 'cup.and.saucer.fill'} label={(returnReady ? 'Read Baristabbit’s note' : needsBeginning ? 'Meet Baristabbit' : requests.length > 1 ? 'Open all orders' : 'Make the request')} /> : <KatchaButton onPress={onMore} icon="bubble.left.and.bubble.right.fill" label="More with Baristabbit" />}
     {!needsBeginning ? <Pressable accessibilityRole="button" onPress={onJournal} style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
       <View style={styles.secondaryCopy}><IconSymbol color={KatchaUI.companionScenePanel.inkSoft} name="book.closed.fill" size={17} /><ThemedText style={styles.secondaryLabel} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>Journal a drink pause</ThemedText></View>
       <IconSymbol color={KatchaUI.companionScenePanel.inkSoft} name="arrow.right" size={15} />
@@ -101,6 +94,5 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: '900', letterSpacing: -0.25, lineHeight: 22 }, body: { fontSize: 12, lineHeight: 17 },
   bondSummary: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: KatchaUI.companionScenePanel.accent, borderCurve: 'continuous', borderRadius: 999, flexDirection: 'row', gap: 7, minHeight: 34, paddingHorizontal: 12 },
   bondSummaryText: { fontSize: 11.5, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  primary: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.accent, borderCurve: 'continuous', borderRadius: 15, flexDirection: 'row', gap: 8, minHeight: 43, paddingHorizontal: 12 }, primaryLabel: { flex: 1, fontSize: 13, fontWeight: '900' },
   secondary: { alignItems: 'center', borderRadius: 14, flexDirection: 'row', justifyContent: 'space-between', minHeight: 36, paddingHorizontal: 10 }, secondaryCopy: { alignItems: 'center', flexDirection: 'row', gap: 7 }, secondaryLabel: { fontSize: 11, fontWeight: '900' }, pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
 });

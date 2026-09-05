@@ -77,7 +77,6 @@ function ScriptedActionCard({ action, completionKey, locked, reduceMotion, onAct
         glow
         icon={action.icon}
         label={action.title}
-        labelStyle={KatchaDeckUI.typography.ftuePanelTitle}
         onPress={() => invoke((rect) => onAction(action, rect))}
       />
     </Animated.View>;

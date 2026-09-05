@@ -881,7 +881,6 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
             glow
             icon="sparkles"
             label={hatchReadyLabel.toUpperCase()}
-            labelStyle={styles.hatchReadyActionLabel}
             onPress={onReveal}
             variant="primary"
           />
@@ -2213,7 +2212,6 @@ const styles = StyleSheet.create({
   topHudFixed: { left: 0, paddingHorizontal: 14, position: 'absolute', right: 0, zIndex: 20 },
   fixedActionCluster: { alignItems: 'center', gap: 6, left: 0, position: 'absolute', right: 0, zIndex: 12 },
   hatchReadyAction: { alignSelf: 'center', left: 30, position: 'absolute', right: 30, zIndex: 12 },
-  hatchReadyActionLabel: { ...KatchaDeckUI.typography.kingdomDisplay, fontSize: 18, letterSpacing: 0.8, lineHeight: 22, textTransform: 'uppercase' },
   quietDayAction: { alignItems: 'center', backgroundColor: 'rgba(255,247,225,0.94)', borderColor: 'rgba(139,101,37,0.24)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 6, minHeight: 34, paddingHorizontal: 13 },
   quietDayLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '900' },
   actionPressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },

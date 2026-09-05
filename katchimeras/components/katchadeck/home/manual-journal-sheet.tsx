@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
@@ -830,33 +831,12 @@ export function JournalComposer({
 
         {stage === 'details' && choice ? (
           <View style={styles.footer}>
-            <Pressable
-              accessibilityHint={requiredContextMissing ? `Choose an option under ${contextTitleOverride ?? 'A little more'} first` : 'Adds this memory to today'}
-              accessibilityLabel={saveLabel}
-              accessibilityRole="button"
-              disabled={voice.phase === 'transcribing' || requiredContextMissing}
-              onPress={save}
-              style={({ pressed }) => [styles.save, pressed && styles.savePressed, (voice.phase === 'transcribing' || requiredContextMissing) && styles.disabled]}>
-              <IconSymbol name="checkmark" size={18} color={Meadow.ink} />
-              <ThemedText style={styles.saveText} lightColor={Meadow.ink} darkColor={Meadow.ink}>{saveLabel}</ThemedText>
-            </Pressable>
+            <KatchaButton accessibilityHint={requiredContextMissing ? `Choose an option under ${contextTitleOverride ?? 'A little more'} first` : 'Adds this memory to today'} accessibilityLabel={saveLabel} disabled={voice.phase === 'transcribing' || requiredContextMissing} onPress={save} icon="checkmark" label={(saveLabel)} />
           </View>
         ) : null}
         {stage === 'flow' && quickVoiceAvailable ? (
           <View style={styles.footer}>
-            <Pressable
-              accessibilityHint="Records a voice memory, then suggests where it belongs"
-              accessibilityLabel={voice.phase === 'recording' ? 'Finish quick voice memory' : 'Quick add with voice'}
-              accessibilityRole="button"
-              disabled={voice.phase === 'transcribing' || voiceRouting}
-              onPress={toggleQuickVoice}
-              style={({ pressed }) => [styles.quickVoice, pressed && styles.savePressed, (voice.phase === 'transcribing' || voiceRouting) && styles.disabled]}>
-              {voice.phase === 'transcribing' || voiceRouting ? <ActivityIndicator color={Meadow.ink} /> : <IconSymbol name={voice.phase === 'recording' ? 'stop.fill' : 'mic.fill'} size={20} color={Meadow.ink} />}
-              <ThemedText style={styles.quickVoiceText} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-                {voice.phase === 'recording' ? `Finish recording · 0:${String(voice.elapsed).padStart(2, '0')}` : voice.phase === 'transcribing' || voiceRouting ? 'Finding the right place…' : 'Quick add with voice'}
-              </ThemedText>
-              {voice.phase === 'idle' || voice.phase === 'ready' ? <IconSymbol name="sparkles" size={16} color={Meadow.ink} /> : null}
-            </Pressable>
+            <KatchaButton accessibilityHint="Records a voice memory, then suggests where it belongs" accessibilityLabel={voice.phase === 'recording' ? 'Finish quick voice memory' : 'Quick add with voice'} disabled={voice.phase === 'transcribing' || voiceRouting} onPress={toggleQuickVoice} loading={voice.phase === 'transcribing' || voiceRouting} icon={voice.phase === 'recording' ? 'stop.fill' : 'mic.fill'} label={(voice.phase === 'recording' ? `Finish recording · 0:${String(voice.elapsed).padStart(2, '0')}` : voice.phase === 'transcribing' || voiceRouting ? 'Finding the right place…' : 'Quick add with voice')} />
             {voice.error ? <ThemedText accessibilityRole="alert" selectable style={styles.footerError} lightColor="#8C3F36" darkColor="#8C3F36">{voice.error}</ThemedText> : null}
           </View>
         ) : null}
@@ -1237,12 +1217,9 @@ const styles = StyleSheet.create({
   reading: { alignItems: 'center', flexDirection: 'row', gap: 8, minHeight: 44 },
   error: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, lineHeight: 18 },
   footer: { borderTopColor: 'rgba(122,84,44,0.16)', borderTopWidth: 1, gap: 6, paddingHorizontal: 4, paddingTop: 12 },
-  save: { alignItems: 'center', backgroundColor: '#E7B951', borderColor: 'rgba(255,244,204,0.72)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: '-3px 6px 16px rgba(92,57,20,0.25), inset 0 1px 0 rgba(255,252,234,0.78)', flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 54, paddingHorizontal: 18 },
   quickVoice: { alignItems: 'center', backgroundColor: '#E7B951', borderColor: 'rgba(255,244,204,0.72)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: '-3px 6px 16px rgba(92,57,20,0.25), inset 0 1px 0 rgba(255,252,234,0.78)', flexDirection: 'row', gap: 10, justifyContent: 'center', minHeight: 56, paddingHorizontal: 18 },
   quickVoiceText: { fontFamily: AppFontFamilies.manrope, fontSize: 14.5, fontWeight: '900' },
   footerError: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '700', lineHeight: 16, textAlign: 'center' },
-  savePressed: { backgroundColor: '#D6A640', transform: [{ scale: 0.985 }] },
-  saveText: { fontFamily: AppFontFamilies.manrope, fontSize: 14.5, fontWeight: '800' },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.72, transform: [{ scale: 0.98 }] },
 });

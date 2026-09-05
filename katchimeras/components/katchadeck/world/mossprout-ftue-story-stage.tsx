@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { MossproutFtueRestAction } from './mossprout-ftue-rest-action';
 import { MossproutFirstGrowStage } from './mossprout-first-grow-stage';
 import { useEffect, useState } from 'react';
@@ -19,7 +20,7 @@ import { DayActionCardSurface, DayActionIcon, DayActionRewardChip } from '@/comp
 import { DayActionActiveRow, DayActionCompletedRow, type DayActionSourceRect } from '@/components/katchadeck/ui/day-action-row';
 import { COMPANION_MERGE_REQUEST_PALETTE, CompanionMergeRequestTray } from '@/components/katchadeck/world/companion-merge-request-tray';
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+
 import { KatchaUI } from '@/constants/katcha-ui';
 import { MOSSPROUT_CHAPTER_ZERO_REQUESTS } from '@/utils/merge-world/chapter-zero-policy';
 import type { CompanionBondAwardReceipt } from '@/utils/companion-bond';
@@ -288,11 +289,7 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
 
 
 function PrimaryAction({ icon = 'arrow.right', label, onPress }: { icon?: string; label: string; onPress: () => void }) {
-  return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
-    <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name={icon as never} size={19} />
-    <ThemedText style={styles.primaryLabel} lightColor={KatchaUI.companionScenePanel.accentInk} darkColor={KatchaUI.companionScenePanel.accentInk}>{label}</ThemedText>
-    <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name="arrow.right" size={17} />
-  </Pressable>;
+  return <KatchaButton onPress={onPress} icon={icon as never} label={(label)} />;
 }
 
 const styles = StyleSheet.create({
@@ -315,7 +312,5 @@ const styles = StyleSheet.create({
   resultEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.1, paddingHorizontal: 4, paddingTop: 2 },
   seedArt: { height: 66, width: 66 },
   seedRewardCard: { minHeight: 82 },
-  primary: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.accent, borderCurve: 'continuous', borderRadius: 15, flexDirection: 'row', gap: 8, minHeight: 46, paddingHorizontal: 12 },
-  primaryLabel: { flex: 1, fontSize: 14, fontWeight: '900' },
   pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
 });

@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { useEffect, useState } from 'react';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { Image } from 'expo-image';
@@ -111,15 +112,7 @@ export function JourneyDetailSheet({
       surface="night">
       <JourneyBody day={day} recentAvgSteps={recentAvgSteps} onViewMemories={onViewMemories} />
       {!interpretation && onInterpret ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={onInterpret}
-          style={({ pressed }) => [styles.addPhoto, pressed && styles.addPhotoPressed]}>
-          <IconSymbol name="figure.walk" size={16} color={Lantern.ember300} />
-          <ThemedText style={styles.addPhotoLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            What kind of journey was it?
-          </ThemedText>
-        </Pressable>
+        <KatchaButton onPress={onInterpret} icon="figure.walk" size="compact" label="What kind of journey was it?" />
       ) : null}
     </KatchaSheet>
   );
@@ -298,15 +291,7 @@ function MemoryBody({ day, onAddPhoto }: { day: HomeDayRecord; onAddPhoto?: () =
     <View style={styles.body}>
       {onAddPhoto ? (
         <View style={styles.addRow}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={onAddPhoto}
-            style={({ pressed }) => [styles.addPhoto, pressed && styles.addPhotoPressed]}>
-            <IconSymbol name="camera.fill" size={18} color={Lantern.ember300} />
-            <ThemedText style={styles.addPhotoLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-              Capture
-            </ThemedText>
-          </Pressable>
+          <KatchaButton onPress={onAddPhoto} icon="camera.fill" size="compact" label="Capture" />
         </View>
       ) : null}
       {empty ? (
@@ -357,15 +342,7 @@ function NotesBody({ day, onAddNote }: { day: HomeDayRecord; onAddNote?: () => v
     <View style={styles.body}>
       {onAddNote ? (
         <View style={styles.addRow}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={onAddNote}
-            style={({ pressed }) => [styles.addPhoto, pressed && styles.addPhotoPressed]}>
-            <IconSymbol name="mic.fill" size={18} color={Lantern.ember300} />
-            <ThemedText style={styles.addPhotoLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-              Add a note
-            </ThemedText>
-          </Pressable>
+          <KatchaButton onPress={onAddNote} icon="mic.fill" size="compact" label="Add a note" />
         </View>
       ) : null}
       {empty ? (
@@ -661,19 +638,6 @@ const styles = StyleSheet.create({
   placePhotoRow: { gap: 8, paddingTop: 2 },
   placePhoto: { width: 72, height: 72, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.06)' },
   addRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  addPhoto: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255,195,107,0.5)',
-    backgroundColor: 'rgba(255,195,107,0.12)',
-  },
-  addPhotoPressed: { backgroundColor: 'rgba(255,195,107,0.22)' },
-  addPhotoLabel: { fontSize: 13.5, fontWeight: '800' },
   bigStat: { fontSize: 40, fontWeight: '900', lineHeight: 44 },
   statUnit: { fontSize: 13, fontWeight: '700', marginTop: -4 },
   bodyLine: { fontSize: 14, fontWeight: '600', lineHeight: 20 },

@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -218,11 +219,7 @@ export function ObservatorySheet({
                   ) : null}
                 </>
               ) : travelMemory.onEnable ? (
-                <Pressable accessibilityRole="button" onPress={travelMemory.onEnable} style={styles.travelPrimaryAction}>
-                  <ThemedText style={styles.travelPrimaryText} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>
-                    Enable
-                  </ThemedText>
-                </Pressable>
+                <KatchaButton onPress={travelMemory.onEnable} label="Enable" />
               ) : null}
               {travelMemory.backgroundPlaceCount > 0 && travelMemory.onDeleteTodayPlaces ? (
                 <Pressable accessibilityRole="button" onPress={travelMemory.onDeleteTodayPlaces} style={styles.travelDangerAction}>
@@ -331,12 +328,7 @@ export function ObservatorySheet({
               {prompt}
             </ThemedText>
             {onReflect ? (
-              <Pressable accessibilityRole="button" onPress={onReflect} style={styles.reflectAction}>
-                <IconSymbol name="square.and.pencil" size={14} color={Lantern.emberInk} />
-                <ThemedText style={styles.reflectActionText} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>
-                  Reflect
-                </ThemedText>
-              </Pressable>
+              <KatchaButton onPress={onReflect} icon="square.and.pencil" style={{alignSelf: 'flex-start'}} size="compact" label="Reflect" />
             ) : null}
           </View>
         ) : null}
@@ -428,13 +420,6 @@ const styles = StyleSheet.create({
   travelBody: { fontSize: 12.5, fontWeight: '600', lineHeight: 17 },
   travelCount: { fontSize: 11.5, fontWeight: '800', paddingTop: 2 },
   travelActions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, paddingLeft: 40 },
-  travelPrimaryAction: {
-    borderRadius: 999,
-    backgroundColor: Lantern.ember300,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  travelPrimaryText: { fontSize: 12, fontWeight: '900' },
   travelSecondaryAction: {
     borderRadius: 999,
     borderWidth: 1,
@@ -509,15 +494,4 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,195,107,0.22)',
   },
   promptText: { fontSize: 14, fontWeight: '700', lineHeight: 20 },
-  reflectAction: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    paddingVertical: 9,
-    paddingHorizontal: 13,
-    borderRadius: 999,
-    backgroundColor: Lantern.ember300,
-  },
-  reflectActionText: { fontSize: 13, fontWeight: '900' },
 });

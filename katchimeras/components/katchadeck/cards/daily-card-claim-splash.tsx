@@ -5,10 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { Easing, FadeIn, FadeInUp, useReducedMotion } from 'react-native-reanimated';
 
 import { DailyCardViewer } from '@/components/katchadeck/cards/daily-card-viewer';
-import { AnimatedBorderHighlight } from '@/components/katchadeck/ui/animated-border-highlight';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
-import { KatchaUI } from '@/constants/katcha-ui';
 import { TODAY_ATMOSPHERE_BACKGROUND_SOURCES } from '@/constants/today-atmosphere-background-sources.gen';
 import type { DailyCreatureCard, HomeDayRecord } from '@/types/home';
 
@@ -91,12 +89,6 @@ export function DailyCardClaimSplash({ card, claimAvailable, claiming, day, onCl
                   label="Claim Day Card"
                   onPress={onClaim}
                 />
-                <AnimatedBorderHighlight
-                  borderRadius={KatchaUI.radius.pill}
-                  inset={1}
-                  orbitDurationMs={2200}
-                  pauseDurationMs={700}
-                />
               </Animated.View>
             ) : null}
           </View>
@@ -116,7 +108,6 @@ const styles = StyleSheet.create({
   },
   action: {
     backgroundColor: 'transparent',
-    borderRadius: KatchaUI.radius.pill,
     position: 'relative',
     width: '100%',
   },

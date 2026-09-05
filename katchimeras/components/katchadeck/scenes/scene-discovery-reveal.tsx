@@ -1,5 +1,6 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { Image } from 'expo-image';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
@@ -17,12 +18,8 @@ export function SceneDiscoveryReveal({ id, onDismiss, onEquip }: { id: SceneVari
         <ThemedText selectable style={styles.title} lightColor="#3B2B1C" darkColor="#3B2B1C">{scene.name}</ThemedText>
         <ThemedText selectable style={styles.copy} lightColor="#6D5943" darkColor="#6D5943">Scenes you discover can decorate your Today page.</ThemedText>
         <View style={styles.actions}>
-          <Pressable accessibilityRole="button" onPress={onDismiss} style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
-            <ThemedText style={styles.secondaryText} lightColor="#5D7046" darkColor="#5D7046">Keep current</ThemedText>
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={onEquip} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
-            <ThemedText style={styles.primaryText} lightColor="#FFF8E8" darkColor="#FFF8E8">Equip Scene</ThemedText>
-          </Pressable>
+          <KatchaButton onPress={onDismiss} variant="secondary" size="compact" style={{flex: 1}} label="Keep current" />
+          <KatchaButton onPress={onEquip} size="compact" style={{flex: 1}} label="Equip Scene" />
         </View>
       </Animated.View>
     </Animated.View>
@@ -37,9 +34,4 @@ const styles = StyleSheet.create({
   title: { fontFamily: 'InstrumentSerif', fontSize: 36, lineHeight: 41, paddingHorizontal: 20, paddingTop: 16, textAlign: 'center' },
   copy: { fontSize: 14, lineHeight: 21, paddingHorizontal: 24, paddingTop: 6, textAlign: 'center' },
   actions: { flexDirection: 'row', gap: 10, paddingHorizontal: 18, paddingTop: 18, width: '100%' },
-  primary: { alignItems: 'center', backgroundColor: '#5D7046', borderRadius: 17, flex: 1, paddingVertical: 13 },
-  secondary: { alignItems: 'center', borderColor: 'rgba(93,112,70,0.35)', borderRadius: 17, borderWidth: 1, flex: 1, paddingVertical: 13 },
-  primaryText: { fontSize: 13, fontWeight: '900' },
-  secondaryText: { fontSize: 13, fontWeight: '900' },
-  pressed: { opacity: 0.84, transform: [{ scale: 0.98 }] },
 });

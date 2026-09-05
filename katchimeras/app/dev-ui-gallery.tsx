@@ -30,6 +30,10 @@ function SurfaceGallery({ surface }: { surface: KatchaSurface }) {
       <ThemedText style={styles.title} lightColor={tokens.text} darkColor={tokens.text}>{surface === 'parchment' ? 'Keep a piece of today' : 'Return to your collection'}</ThemedText>
       <ThemedText style={styles.body} lightColor={tokens.textSecondary} darkColor={tokens.textSecondary}>Development gallery for shared surface states, spacing, contrast, and enlarged-copy checks.</ThemedText>
       <KatchaSectionHeading>Actions</KatchaSectionHeading>
+      <KatchaButton fullWidth label="Restore" cost={{ currency: 'coins', amount: 40 }} onPress={() => {}} />
+      <KatchaButton fullWidth label="Complete and return to your companion" onPress={() => {}} />
+      <KatchaButton fullWidth label="Restore" cost={{ currency: 'coins', amount: 40 }} loading />
+      <KatchaButton fullWidth label="Continue" disabled />
       <View style={styles.row}>
         <KatchaButton label="Primary" onPress={() => {}} size="compact" />
         <KatchaButton label="Secondary" onPress={() => {}} size="compact" variant="secondary" />

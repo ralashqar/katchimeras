@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
@@ -276,20 +277,7 @@ export function CompanionReflectionComposerModal({
                 </ThemedText>
               ) : null}
 
-              <Pressable
-                accessibilityRole="button"
-                disabled={busy || (!text.trim() && !voiceDraft?.audioUri)}
-                onPress={save}
-                style={({ pressed }) => [
-                  styles.saveButton,
-                  (busy || (!text.trim() && !voiceDraft?.audioUri)) && styles.disabled,
-                  pressed && !busy && styles.pressed,
-                ]}>
-                <ThemedText style={styles.saveButtonText} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-                  {saveLabel}
-                </ThemedText>
-                <IconSymbol color={Meadow.ink} name="arrow.right" size={17} />
-              </Pressable>
+              <KatchaButton disabled={busy || (!text.trim() && !voiceDraft?.audioUri)} onPress={save} icon="arrow.right" loading={busy} size="compact" label={(saveLabel)} />
             </ScrollView>
           </Animated.View>
         </KeyboardAvoidingView>
@@ -344,8 +332,6 @@ const styles = StyleSheet.create({
   audioButtonText: { fontFamily: AppFontFamilies.manrope, fontSize: 11, fontWeight: '800' },
   audioRemove: { alignItems: 'center', backgroundColor: 'rgba(255,249,234,0.52)', borderColor: 'rgba(140,63,54,0.22)', borderRadius: 999, borderWidth: 1, height: 38, justifyContent: 'center', width: 38 },
   error: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '800', lineHeight: 16, textAlign: 'center' },
-  saveButton: { alignItems: 'center', backgroundColor: '#F2C967', borderColor: '#D7A93C', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: '0 7px 18px rgba(92,57,20,0.24), inset 0 1px 0 rgba(255,255,255,0.4)', flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 52 },
-  saveButtonText: { fontFamily: AppFontFamilies.manrope, fontSize: 13.5, fontWeight: '900' },
   disabled: { opacity: 0.46 },
   pressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
 });

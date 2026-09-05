@@ -1,7 +1,8 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { normalizeSpeechText } from '@/utils/speech-text';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Image } from 'expo-image';
-import { Pressable, StyleSheet, useWindowDimensions, View, type View as ViewType } from 'react-native';
+import { StyleSheet, useWindowDimensions, View, type View as ViewType } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -16,7 +17,7 @@ import Animated, {
 
 import { EggAvatar } from '@/components/katchadeck/egg-avatar/egg-avatar';
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+
 import { KatchaDeckUI } from '@/constants/theme';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import type { EggAvatarFaceId } from '@/types/egg-avatar';
@@ -218,15 +219,7 @@ export function CompanionFtueCoachmark({
             ))}
           </ThemedText>
           {buttonLabel && onContinue ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ busy: continuing, disabled: continuing }}
-              disabled={continuing}
-              onPress={continueStep}
-              style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
-              <ThemedText style={styles.buttonLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">{continueFailed ? 'Try again' : buttonLabel}</ThemedText>
-              <IconSymbol color="#FFF9E9" name="arrow.right" size={15} />
-            </Pressable>
+            <KatchaButton disabled={continuing} onPress={continueStep} icon="arrow.right" loading={continuing} style={{alignSelf: 'stretch', marginTop: 5}} label={(continueFailed ? 'Try again' : buttonLabel)} />
           ) : null}
         </View>
       </View>
@@ -309,7 +302,4 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   messageEmphasis: { fontWeight: '900' },
-  button: { alignItems: 'center', alignSelf: 'stretch', backgroundColor: '#668A49', borderRadius: 15, flexDirection: 'row', justifyContent: 'center', marginTop: 5, minHeight: 45, gap: 8 },
-  buttonLabel: { fontSize: 13, fontWeight: '900' },
-  pressed: { opacity: 0.84, transform: [{ scale: 0.99 }] },
 });

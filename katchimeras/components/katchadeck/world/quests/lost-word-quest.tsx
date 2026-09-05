@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
@@ -258,7 +259,7 @@ function Header({ eyebrow, title, body }: { eyebrow: string; title: string; body
 }
 
 function Action({ label, onPress }: { label: string; onPress: () => void }) {
-  return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.action, pressed && styles.pressed]}><ThemedText style={styles.actionText} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>{label}</ThemedText><IconSymbol name="arrow.right" size={17} color={Lantern.emberInk} /></Pressable>;
+  return <KatchaButton onPress={onPress} icon="arrow.right" label={(label)} />;
 }
 
 function tileStatusStyle(status: LostWordLetterStatus) {
@@ -322,8 +323,6 @@ const styles = StyleSheet.create({
   cancel: { alignItems: 'center', flexDirection: 'row', gap: 6, justifyContent: 'center', minHeight: 44 },
   cancelCompact: { minHeight: 36 },
   cancelText: { fontSize: 13, fontWeight: '800' },
-  action: { alignItems: 'center', backgroundColor: Lantern.ember300, borderCurve: 'continuous', borderRadius: 18, flexDirection: 'row', gap: 9, justifyContent: 'center', minHeight: 54, paddingHorizontal: 18 },
-  actionText: { fontSize: 15, fontWeight: '900' },
   resultCard: { alignItems: 'center', backgroundColor: 'rgba(255,195,107,0.07)', borderCurve: 'continuous', borderRadius: 24, gap: 8, justifyContent: 'center', minHeight: 190, paddingHorizontal: 22, paddingVertical: 24 },
   answer: { fontSize: 38, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: 5, lineHeight: 52, paddingVertical: 2, textAlign: 'center' },
   explanation: { fontSize: 13, lineHeight: 19, textAlign: 'center' },

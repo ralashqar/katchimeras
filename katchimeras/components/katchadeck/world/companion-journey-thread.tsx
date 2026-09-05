@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState, type RefObject } from 'react';
 import { Pressable, StyleSheet, TextInput, View, type View as ViewType } from 'react-native';
@@ -90,15 +91,7 @@ export function CompanionJourneyDiscoveryThread({
           </ThemedText>
         </View>
       </View>
-      <Pressable
-        accessibilityRole="button"
-        onPress={onOpenQuestionnaire}
-        style={({ pressed }) => [styles.primaryButton, styles.startButton, pressed && styles.pressed]}>
-        <ThemedText style={styles.primaryButtonLabel} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
-          {conversation ? 'Continue' : definition.conversationStartLabel}
-        </ThemedText>
-        <IconSymbol color={Meadow.chipLabel} name="arrow.right" size={17} />
-      </Pressable>
+      <KatchaButton onPress={onOpenQuestionnaire} icon="arrow.right" style={{alignSelf: 'stretch'}} label={(conversation ? 'Continue' : definition.conversationStartLabel)} />
     </View>
   );
 
@@ -263,16 +256,7 @@ export function LegacyCompanionJourneyDiscoveryThread({
                     style={styles.input}
                     value={draft}
                   />
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={!draft.trim()}
-                    onPress={() => answer(draft)}
-                    style={({ pressed }) => [styles.primaryButton, !draft.trim() && styles.disabled, pressed && styles.pressed]}>
-                    <ThemedText style={styles.primaryButtonLabel} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
-                      Use my answer
-                    </ThemedText>
-                    <IconSymbol color={Meadow.chipLabel} name="arrow.right" size={17} />
-                  </Pressable>
+                  <KatchaButton disabled={!draft.trim()} onPress={() => answer(draft)} icon="arrow.right" style={{alignSelf: 'flex-start'}} label="Use my answer" />
                 </View>
               ) : null}
             </>
@@ -287,16 +271,7 @@ export function LegacyCompanionJourneyDiscoveryThread({
                 style={styles.input}
                 value={draft}
               />
-              <Pressable
-                accessibilityRole="button"
-                disabled={!draft.trim()}
-                onPress={() => answer(draft)}
-                style={({ pressed }) => [styles.primaryButton, !draft.trim() && styles.disabled, pressed && styles.pressed]}>
-                <ThemedText style={styles.primaryButtonLabel} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
-                  Keep this direction
-                </ThemedText>
-                <IconSymbol color={Meadow.chipLabel} name="arrow.right" size={17} />
-              </Pressable>
+              <KatchaButton disabled={!draft.trim()} onPress={() => answer(draft)} icon="arrow.right" style={{alignSelf: 'flex-start'}} label="Keep this direction" />
             </View>
           )}
         </View>
@@ -310,15 +285,7 @@ export function LegacyCompanionJourneyDiscoveryThread({
               I’ll ask three questions, then suggest a direction and a few optional goals. Your existing goals stay available.
             </ThemedText>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            onPress={onStart}
-            style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
-            <IconSymbol color={Meadow.chipLabel} name="sparkles" size={17} />
-            <ThemedText style={styles.primaryButtonLabel} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
-              {definition.conversationStartLabel}
-            </ThemedText>
-          </Pressable>
+          <KatchaButton onPress={onStart} icon="sparkles" style={{alignSelf: 'flex-start'}} label={(definition.conversationStartLabel)} />
         </View>
       )}
 
@@ -346,14 +313,7 @@ export function LegacyCompanionJourneyDiscoveryThread({
             })}
           </View>
           <View style={styles.goalActions}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => onAddQuickGoalSuggestions?.(quickGoalSuggestionIds)}
-              style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
-              <ThemedText style={styles.primaryButtonLabel} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
-                Add these goals
-              </ThemedText>
-            </Pressable>
+            <KatchaButton onPress={() => onAddQuickGoalSuggestions?.(quickGoalSuggestionIds)} style={{alignSelf: 'flex-start'}} label="Add these goals" />
             <Pressable accessibilityRole="button" onPress={onDismissQuickGoalSuggestions} style={({ pressed }) => [styles.smallButton, pressed && styles.pressed]}>
               <ThemedText style={styles.smallButtonLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
                 Not now
@@ -685,28 +645,12 @@ export function CompanionJourneyProgressCard({
                   style={styles.momentInput}
                   value={momentNote}
                 />
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={!momentNote.trim()}
-                  onPress={() => onLogMoment?.('other', momentNote)}
-                  style={({ pressed }) => [styles.primaryButton, !momentNote.trim() && styles.disabled, pressed && styles.pressed]}>
-                  <ThemedText style={styles.primaryButtonLabel} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
-                    Log this moment
-                  </ThemedText>
-                </Pressable>
+                <KatchaButton disabled={!momentNote.trim()} onPress={() => onLogMoment?.('other', momentNote)} style={{alignSelf: 'flex-start'}} label="Log this moment" />
               </View>
             ) : null}
           </View>
         ) : (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setCheckInOpen(true)}
-            style={({ pressed }) => [styles.logMomentButton, pressed && styles.pressed]}>
-            <IconSymbol color={Meadow.chipLabel} name="plus" size={16} />
-            <ThemedText style={styles.primaryButtonLabel} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
-              Log a moment
-            </ThemedText>
-          </Pressable>
+          <KatchaButton onPress={() => setCheckInOpen(true)} icon="plus" style={{alignSelf: 'flex-start'}} size="compact" label="Log a moment" />
         )
       ) : null}
     </View>
@@ -757,15 +701,12 @@ const styles = StyleSheet.create({
   customOptionText: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '800' },
   editor: { gap: 9 },
   input: { backgroundColor: '#FFF9EA', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, color: Meadow.ink, fontFamily: AppFontFamilies.manrope, fontSize: 14, minHeight: 92, padding: 12, textAlignVertical: 'top' },
-  primaryButton: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: Meadow.goldDeep, borderCurve: 'continuous', borderRadius: 14, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 44, paddingHorizontal: 14 },
-  primaryButtonLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '900' },
   startCard: { backgroundColor: KatchaUI.companionPanel.cardBackground, borderColor: KatchaUI.companionPanel.cardBorder, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: KatchaUI.companionPanel.cardShadow, gap: 14, padding: 16 },
   youStartCard: { backgroundColor: KatchaUI.companionPanel.cardBackground, borderColor: KatchaUI.companionPanel.cardBorder },
   startCardPrimary: { borderColor: Meadow.goldDeep, borderWidth: 1.5 },
   startHeading: { alignItems: 'flex-start', flexDirection: 'row', gap: 12 },
   startIcon: { alignItems: 'center', backgroundColor: Meadow.goldSoft, borderRadius: 15, height: 44, justifyContent: 'center', width: 44 },
   youStartIcon: { backgroundColor: 'rgba(128,97,38,0.14)', borderColor: 'rgba(128,97,38,0.24)', borderWidth: 1 },
-  startButton: { alignSelf: 'stretch' },
   suggestionCard: { backgroundColor: 'rgba(255,248,232,0.62)', borderColor: Meadow.goldDeep, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, gap: 12, padding: 15 },
   suggestionList: { gap: 7 },
   suggestionRow: { alignItems: 'center', backgroundColor: Meadow.goldSoft, borderRadius: 13, flexDirection: 'row', gap: 8, minHeight: 40, paddingHorizontal: 11 },
@@ -809,7 +750,6 @@ const styles = StyleSheet.create({
   checkInPrompt: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '900', lineHeight: 19 },
   momentOption: { alignItems: 'center', backgroundColor: Meadow.goldSoft, borderCurve: 'continuous', borderRadius: 13, flexDirection: 'row', gap: 8, justifyContent: 'space-between', minHeight: 43, paddingHorizontal: 12 },
   momentInput: { backgroundColor: '#FFF9EA', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, color: Meadow.ink, fontFamily: AppFontFamilies.manrope, fontSize: 14, minHeight: 72, padding: 12, textAlignVertical: 'top' },
-  logMomentButton: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: Meadow.leafDeep, borderCurve: 'continuous', borderRadius: 14, flexDirection: 'row', gap: 7, minHeight: 42, paddingHorizontal: 13 },
   loggedToday: { alignItems: 'center', backgroundColor: 'rgba(111,139,102,0.12)', borderCurve: 'continuous', borderRadius: 13, flexDirection: 'row', gap: 7, minHeight: 40, paddingHorizontal: 12 },
   loggedTodayText: { fontFamily: AppFontFamilies.manrope, fontSize: 12, fontWeight: '900' },
   questContext: { alignItems: 'center', backgroundColor: 'rgba(111,139,102,0.10)', borderColor: 'rgba(78,112,72,0.28)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 9, marginBottom: 10, paddingHorizontal: 12, paddingVertical: 10 },
@@ -828,7 +768,6 @@ const styles = StyleSheet.create({
   questionnaireHelper: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '600', lineHeight: 21 },
   questionnaireOptions: { gap: 10 },
   questionnaireOption: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.76)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 12, justifyContent: 'space-between', minHeight: 64, paddingHorizontal: 17, paddingVertical: 12 },
-  questionnaireOptionPressed: { backgroundColor: Meadow.goldSoft, borderColor: Meadow.goldDeep, transform: [{ scale: 0.99 }] },
   questionnaireOptionText: { flex: 1, fontFamily: AppFontFamilies.manrope, fontSize: 15, fontWeight: '800', lineHeight: 21 },
   questionnaireCustom: { alignItems: 'center', alignSelf: 'flex-start', borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 7, minHeight: 42, paddingHorizontal: 14 },
   questionnaireEditor: { gap: 12 },
@@ -846,11 +785,5 @@ const styles = StyleSheet.create({
   resultTaskCheck: { alignItems: 'center', backgroundColor: 'rgba(111,139,102,0.15)', borderRadius: 999, height: 28, justifyContent: 'center', width: 28 },
   resultTaskLabel: { flex: 1, fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '800', lineHeight: 18 },
   resultTaskMeta: { fontFamily: AppFontFamilies.manrope, fontSize: 8.5, fontWeight: '900', letterSpacing: 0.7 },
-  resultActions: { alignSelf: 'stretch', gap: 8 },
-  resultPrimaryButton: { alignItems: 'center', alignSelf: 'stretch', backgroundColor: Meadow.goldDeep, borderCurve: 'continuous', borderRadius: 16, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 52, paddingHorizontal: 16 },
-  resultPrimaryLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '900' },
-  resultSecondaryButton: { alignItems: 'center', alignSelf: 'stretch', justifyContent: 'center', minHeight: 44 },
-  resultSecondaryLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 12, fontWeight: '800' },
-  disabled: { opacity: 0.42 },
   pressed: { opacity: 0.76, transform: [{ scale: 0.985 }] },
 });

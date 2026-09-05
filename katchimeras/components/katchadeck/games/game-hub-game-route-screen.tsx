@@ -1,6 +1,7 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, Pressable, StyleSheet, View } from 'react-native';
+import { BackHandler, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KatchaDialog } from '@/components/katchadeck/ui/katcha-dialog';
@@ -203,9 +204,7 @@ export function GameHubGameRouteScreen() {
         <IconSymbol name="exclamationmark.triangle.fill" size={29} color={Lantern.ember300} />
         <ThemedText selectable style={styles.invalidTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>This game is no longer ready</ThemedText>
         <ThemedText selectable style={styles.invalidBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Return and launch a fresh round.</ThemedText>
-        <Pressable accessibilityRole="button" onPress={abandon} style={styles.returnButton}>
-          <ThemedText style={styles.returnLabel} lightColor="#23170A" darkColor="#23170A">Back to {fromTodayCare ? 'Today' : 'Games'}</ThemedText>
-        </Pressable>
+        <KatchaButton onPress={abandon} style={{marginTop: 8}} label={["Back to ",(fromTodayCare ? 'Today' : 'Games')].join('')} />
       </View>
     );
   }
@@ -280,6 +279,4 @@ const styles = StyleSheet.create({
   invalid: { alignItems: 'center', backgroundColor: '#11131B', flex: 1, gap: 12, justifyContent: 'center', paddingHorizontal: 28 },
   invalidTitle: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 28, lineHeight: 33, textAlign: 'center' },
   invalidBody: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '600', lineHeight: 20, textAlign: 'center' },
-  returnButton: { alignItems: 'center', backgroundColor: Lantern.ember300, borderRadius: 999, justifyContent: 'center', marginTop: 8, minHeight: 44, paddingHorizontal: 18 },
-  returnLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '900' },
 });

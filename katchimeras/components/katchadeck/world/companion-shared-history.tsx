@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { useState, type ComponentProps, type ReactNode } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
@@ -216,17 +217,11 @@ function MemoryRow({
             <Pressable accessibilityRole="button" onPress={() => { setDraft(memory.summary); setEditing(false); }} style={styles.textAction}>
               <ThemedText style={styles.textActionLabel} lightColor="#795B34" darkColor="#795B34">Cancel</ThemedText>
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              disabled={!draft.trim()}
-              onPress={() => {
+            <KatchaButton size="compact" disabled={!draft.trim()} onPress={() => {
                 if (!draft.trim()) return;
                 onUpdate({ memoryId: memory.id, status: 'confirmed', summary: draft.trim() });
                 setEditing(false);
-              }}
-              style={styles.saveAction}>
-              <ThemedText style={styles.saveActionLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">Save correction</ThemedText>
-            </Pressable>
+              }} label="Save correction" />
           </View>
         </View>
       ) : null}
@@ -276,8 +271,6 @@ const styles = StyleSheet.create({
   editor: { gap: 8 },
   input: { backgroundColor: 'rgba(255,255,255,0.7)', borderColor: 'rgba(109,78,43,0.16)', borderRadius: 14, borderWidth: 1, color: '#3F3022', fontSize: 14, lineHeight: 19, minHeight: 72, padding: 11, textAlignVertical: 'top' },
   editorActions: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'flex-end' },
-  saveAction: { backgroundColor: '#6B7E58', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
-  saveActionLabel: { fontSize: 11, fontWeight: '900' },
   empty: { fontSize: 13, lineHeight: 19 },
   plusCard: { alignItems: 'flex-start', backgroundColor: '#443A35', borderCurve: 'continuous', borderRadius: 22, flexDirection: 'row', gap: 12, padding: 15 },
   plusIcon: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 999, height: 38, justifyContent: 'center', width: 38 },

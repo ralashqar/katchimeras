@@ -332,17 +332,26 @@ test('returning to mist exposes the upgrade bubble until tapped, including resum
 
 
 test('currency button renders project art and amount, announces cost, and retains cost while loading', async () => {
+  let haptics = 0;
+  let hapticsUnavailable = false;
   const host = (name: string) => name as unknown as React.ComponentType<Record<string, unknown>>;
   const module = loadNativeModule('components/katchadeck/ui/katcha-button.tsx', {
     'react-native': { ...nativeViews, Pressable: 'Pressable', ActivityIndicator: 'Spinner' },
     'react-native-reanimated': { __esModule: true, default: { View: 'AnimatedView' } },
     'expo-image': { Image: 'Image' },
+    'expo-haptics': { selectionAsync: async () => {
+      haptics++;
+      if (hapticsUnavailable) throw new Error('Haptics unavailable');
+    } },
     'expo-linear-gradient': { LinearGradient: 'Gradient' },
     '@/components/katchadeck/motion': { usePressMotion: () => ({}) },
     '@/components/katchadeck/ui/katcha-surface': { useKatchaSurface: () => ({ tokens: {} }) },
     '@/components/themed-text': { ThemedText: 'Text' },
     '@/components/ui/icon-symbol': { IconSymbol: 'Icon' },
-    '@/constants/katcha-ui': { KatchaUI: { radius: { pill: 99 }, type: { action: {} } } },
+    './animated-border-highlight': { AnimatedBorderHighlight: 'BorderHighlight' },
+    '@/constants/game-cta': loadNativeModule('constants/game-cta.ts', {
+      '@/constants/theme': { AppFontFamilies: { fredokaBold: 'FredokaBold' } },
+    }),
     '@/constants/game-currency-art': { GAME_CURRENCY_ART: { coins: 'glow-art', energy: 'energy-art' } },
   });
   const Button = module.KatchaButton as React.ComponentType<Record<string, unknown>>;
@@ -350,15 +359,37 @@ test('currency button renders project art and amount, announces cost, and retain
   await act(async () => { tree = create(<Button fullWidth label="Restore" cost={{ currency: 'coins', amount: 20 }} />); });
   assert.equal(tree!.root.findByType(host('Pressable')).props.accessibilityLabel, 'Restore, 20 Glow');
   assert.equal(tree!.root.findByType(host('Image')).props.source, 'glow-art');
+  assert.equal(tree!.root.findAllByType(host('BorderHighlight')).length, 1);
   assert.deepEqual(tree!.root.findAllByType(host('Text')).map((node) => node.props.children), ['Restore', '20']);
   await act(async () => tree!.update(<Button label="Feed" loading size="compact" cost={{ currency: 'energy', amount: 5 }} />));
   assert.equal(tree!.root.findByType(host('Pressable')).props.disabled, true);
   assert.equal(tree!.root.findByType(host('Pressable')).props.accessibilityLabel, 'Feed, 5 Energy');
   assert.equal(tree!.root.findByType(host('Image')).props.source, 'energy-art');
   assert.equal(tree!.root.findAllByType(host('Spinner')).length, 1);
+  assert.equal(tree!.root.findAllByType(host('BorderHighlight')).length, 0);
   await act(async () => tree!.update(<Button label="Continue" />));
   assert.equal(tree!.root.findAllByType(host('Image')).length, 0);
   assert.equal(tree!.root.findByType(host('Pressable')).props.accessibilityLabel, 'Continue');
+  assert.equal(tree!.root.findAllByType(host('BorderHighlight')).length, 1);
+  await act(async () => tree!.update(<Button label="Restore" disabled />));
+  assert.equal(tree!.root.findAllByType(host('BorderHighlight')).length, 0);
+  await act(async () => tree!.update(<Button label="Cancel" variant="secondary" />));
+  assert.equal(tree!.root.findAllByType(host('BorderHighlight')).length, 0);
+  let presses = 0;
+  await act(async () => tree!.update(<Button label="Continue" onPress={() => presses++} />));
+  await act(async () => tree!.root.findByType(host('Pressable')).props.onPress());
+  assert.equal(presses, 1);
+  assert.equal(haptics, 1, 'one haptic per accepted CTA tap');
+  await act(async () => tree!.update(<Button label="Continue" disabled onPress={() => presses++} />));
+  await act(async () => tree!.root.findByType(host('Pressable')).props.onPress());
+  await act(async () => tree!.update(<Button label="Continue" loading onPress={() => presses++} />));
+  await act(async () => tree!.root.findByType(host('Pressable')).props.onPress());
+  assert.equal(presses, 1, 'disabled and loading CTAs cannot dispatch');
+  assert.equal(haptics, 1, 'disabled and loading CTAs stay silent');
+  hapticsUnavailable = true;
+  await act(async () => tree!.update(<Button label="Continue" onPress={() => presses++} />));
+  await act(async () => tree!.root.findByType(host('Pressable')).props.onPress());
+  assert.equal(presses, 2, 'unavailable haptics never block the action');
   await act(async () => tree!.unmount());
 });
 

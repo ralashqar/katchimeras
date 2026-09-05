@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -208,10 +209,7 @@ export function TodayGoalsExperience({
 
           {contentReady ? (
             <>
-              <Pressable accessibilityRole="button" onPress={onAdd} style={({ pressed }) => [styles.add, pressed && styles.pressed]}>
-                <IconSymbol color={Meadow.ink} name="plus" size={18} />
-                <ThemedText style={styles.addText} lightColor={Meadow.ink} darkColor={Meadow.ink}>Add small goal</ThemedText>
-              </Pressable>
+              <KatchaButton onPress={onAdd} icon="plus" label="Add small goal" />
               <Pressable accessibilityRole="button" onPress={onManage} style={({ pressed }) => [styles.manage, pressed && styles.pressed]}>
                 <IconSymbol color={Meadow.inkFaint} name="gearshape.fill" size={13} />
                 <ThemedText style={styles.manageText} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>Manage repeating goals</ThemedText>
@@ -271,7 +269,6 @@ const styles = StyleSheet.create({
   emptyTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 13.5, fontWeight: '900' },
   emptyBody: { fontFamily: AppFontFamilies.manrope, fontSize: 11, fontWeight: '600', lineHeight: 15 },
   feedback: { fontFamily: AppFontFamilies.manrope, fontSize: 11, fontWeight: '900', textAlign: 'center' },
-  add: { alignItems: 'center', backgroundColor: '#F2BD43', borderColor: '#D8A32E', borderRadius: 17, borderWidth: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 52 },
   addText: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '900' },
   manage: { alignItems: 'center', alignSelf: 'center', flexDirection: 'row', gap: 5, minHeight: 40, paddingHorizontal: 10 },
   manageText: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '800' },

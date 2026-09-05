@@ -1,13 +1,6 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import type { ReactNode } from 'react';
-import {
-  Pressable,
-  type StyleProp,
-  StyleSheet,
-  TextInput,
-  type TextInputProps,
-  View,
-  type ViewStyle,
-} from 'react-native';
+import { type StyleProp, StyleSheet, TextInput, type TextInputProps, View, type ViewStyle } from 'react-native';
 
 import { StatusBadge, type StatusTone } from '@/components/katchadeck/ui/status-badge';
 import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
@@ -24,28 +17,15 @@ export function MeadowPrimaryAction({
   label, icon, onPress, disabled = false,
 }: { label: string; icon: IconSymbolName; onPress: () => void; disabled?: boolean }) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [styles.primary, pressed && styles.pressed, disabled && styles.disabled]}>
-      <IconSymbol name={icon} size={17} color={Meadow.ink} />
-      <ThemedText style={styles.primaryText} lightColor={Meadow.ink} darkColor={Meadow.ink}>{label}</ThemedText>
-    </Pressable>
+    <KatchaButton accessibilityLabel={label} disabled={disabled} onPress={onPress} icon={icon} style={{width: '100%'}} label={(label)} />
   );
 }
 
 export function MeadowSecondaryAction({
   label, icon, onPress, destructive = false,
 }: { label: string; icon?: IconSymbolName; onPress: () => void; destructive?: boolean }) {
-  const color = destructive ? '#A84F43' : Meadow.inkSoft;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
-      {icon ? <IconSymbol name={icon} size={15} color={color} /> : null}
-      <ThemedText style={styles.secondaryText} lightColor={color} darkColor={color}>{label}</ThemedText>
-    </Pressable>
+    <KatchaButton label={label} icon={icon} onPress={onPress} size="compact" variant={destructive ? 'destructive' : 'secondary'} />
   );
 }
 
@@ -111,18 +91,6 @@ export function MeadowNumberField({ label, ...props }: { label: string } & TextI
 const raisedSurface = '-3px 4px 8px rgba(58,38,18,0.16), inset 0 1px 0 rgba(255,248,230,0.55)';
 
 const styles = StyleSheet.create({
-  primary: {
-    alignItems: 'center', backgroundColor: '#E7B951', borderColor: 'rgba(255,244,204,0.72)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1,
-    boxShadow: '-3px 6px 16px rgba(92,57,20,0.28), inset 0 1px 0 rgba(255,252,234,0.78)', flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 52, paddingHorizontal: 18, width: '100%',
-  },
-  primaryText: { fontSize: 15, fontWeight: '900' },
-  secondary: {
-    alignItems: 'center', alignSelf: 'flex-start', backgroundColor: 'rgba(255,248,232,0.36)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 16, borderWidth: 1,
-    boxShadow: '-2px 3px 7px rgba(58,38,18,0.15), inset 0 1px 0 rgba(255,248,230,0.54)', flexDirection: 'row', gap: 7, minHeight: 44, paddingHorizontal: 14,
-  },
-  secondaryText: { fontSize: 13.5, fontWeight: '800' },
-  pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
-  disabled: { opacity: 0.45 },
   section: { gap: 10 },
   sectionLabel: { fontSize: 10.5, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase' },
   surfaceCard: {

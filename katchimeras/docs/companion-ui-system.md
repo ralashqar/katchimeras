@@ -69,12 +69,28 @@ case and reducer action instead.
   surface provider rather than copied color or shadow literals.
 - Use Fredoka-backed `companionDisplay`, `companionPageTitle`,
   `companionCardTitle`, and `companionSectionTitle` for companion headings.
-  Use Manrope-backed `companionBody` and `companionAction` for copy and controls.
+  Use Manrope-backed `companionBody` for body copy. CTAs use the shared
+  FredokaBold typography owned by `KatchaButton`.
 - Use transform and opacity for transitions. Respect reduced motion and avoid
   remounting stable artwork to replay entrance animations.
 
 ## Component choices
 
+- All game CTAs use `KatchaButton`, including the companion and legacy Meadow
+  action wrappers. `constants/game-cta.ts` owns the gold face, connected rim,
+  soft bevel, and uppercase FredokaBold label. Do not copy button styles or
+  override label typography in individual screens.
+- Enabled primary CTAs include `AnimatedBorderHighlight` automatically. Do not
+  add another highlight around the button. Loading/disabled buttons omit it;
+  backgrounding pauses it, and reduced motion leaves a static rim highlight.
+- The highlight's gradient stops follow distance around the rounded outline,
+  keeping travel speed uniform on wide buttons. Accepted CTA taps issue one
+  selection haptic centrally; do not add another tap haptic in screen wrappers.
+  Disabled/loading taps stay silent, and haptic failures never block actions.
+- Use the `cost` prop for spending currency, `size="compact"` for smaller
+  controls, and semantic secondary/tertiary/destructive variants as needed.
+  Keep external button styles to layout. Action cards and icon navigation keep
+  their existing shared components.
 - Use `CompanionPrimaryAction` for the single main action in a view.
 - Use `CompanionSecondaryAction` for reversible or less prominent actions.
 - Use `CompanionBackAction` for focused subflow navigation.

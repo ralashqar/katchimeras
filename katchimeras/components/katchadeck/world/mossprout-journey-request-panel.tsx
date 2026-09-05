@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
+import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
@@ -58,13 +59,7 @@ export function MossproutJourneyRequestPanel({
         onRequestPress={onRequestPress}
       />
       {onAction ? (
-        <Pressable
-          accessibilityRole="button"
-          disabled={disabled}
-          onPress={onAction}
-          style={({ pressed }) => [styles.action, disabled && styles.actionDisabled, pressed && !disabled && styles.actionPressed]}>
-          <ThemedText selectable style={styles.actionLabel} lightColor={KatchaUI.companionScenePanel.accentInk} darkColor={KatchaUI.companionScenePanel.accentInk}>{actionLabel}</ThemedText>
-        </Pressable>
+        <KatchaButton disabled={disabled} onPress={onAction} label={(actionLabel)} />
       ) : null}
     </Animated.View>
   );
@@ -88,8 +83,4 @@ const styles = StyleSheet.create({
   mark: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.accent, borderRadius: 12, height: 34, justifyContent: 'center', width: 34 },
   headingCopy: { flex: 1, justifyContent: 'center' },
   title: { fontSize: 17, fontWeight: '900', lineHeight: 21 },
-  action: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.accent, borderCurve: 'continuous', borderRadius: 17, justifyContent: 'center', minHeight: 52, paddingHorizontal: 16 },
-  actionDisabled: { opacity: 0.42 },
-  actionPressed: { opacity: 0.82, transform: [{ scale: 0.985 }] },
-  actionLabel: { fontSize: 15, fontWeight: '900' },
 });

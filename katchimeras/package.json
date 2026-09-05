@@ -20,7 +20,7 @@
     "test:merge-world": "tsx --test tests/merge-world.test.ts tests/merge-order-requirements.test.ts tests/merge-performance.test.ts tests/merge-order-window.test.ts tests/merge-order-performance.test.ts tests/mossprout-board-progression.test.ts tests/merge-ftue-interaction-coordinator.test.ts tests/player-profile-snapshots.test.ts tests/haven-progression.test.ts tests/haven-upgrade-presentation.test.ts tests/haven-tile-presentation.test.ts tests/haven-square-world.test.ts",
     "test:character-progression": "tsx --test tests/relationship-progression.test.ts",
     "test:meta": "tsx --test tests/daily-journey.test.ts tests/wisp-collections.test.ts tests/season-engine.test.ts",
-    "test:game-ui": "tsx --test tests/game-ui.test.ts",
+    "test:game-ui": "tsx --test tests/game-ui.test.ts tests/game-cta.test.tsx",
     "test:diagnostics": "tsx --test tests/diagnostics-performance.test.tsx",
     "test:lifecycle": "tsx --test tests/app-lifecycle-performance.test.ts tests/foreground-resume.test.ts tests/content-flow-repository.test.ts",
     "test:merge-performance": "tsx --test tests/merge-performance.test.ts tests/merge-order-window.test.ts tests/merge-order-performance.test.ts",

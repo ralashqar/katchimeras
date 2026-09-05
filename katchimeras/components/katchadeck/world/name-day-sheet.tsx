@@ -1,10 +1,11 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { KatchaSurfacePalette } from '@/constants/katcha-ui';
-import { Lantern } from '@/constants/theme';
+
 
 const PARCHMENT = KatchaSurfacePalette.parchment;
 
@@ -51,15 +52,7 @@ export function NameDaySheet({ initialName, suggestion, onSave, onClose }: NameD
           </Pressable>
         ) : null}
 
-        <Pressable
-          accessibilityRole="button"
-          disabled={trimmed.length === 0}
-          onPress={() => save(value)}
-          style={[styles.save, trimmed.length === 0 ? styles.saveDisabled : null]}>
-          <ThemedText style={styles.saveLabel} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>
-            Name it
-          </ThemedText>
-        </Pressable>
+        <KatchaButton disabled={trimmed.length === 0} onPress={() => save(value)} style={{marginTop: 2}} label="Name it" />
       </View>
     </KatchaSheet>
   );
@@ -81,13 +74,4 @@ const styles = StyleSheet.create({
   },
   suggestion: { alignSelf: 'flex-start', paddingVertical: 4 },
   suggestionText: { fontSize: 13, fontWeight: '700' },
-  save: {
-    marginTop: 2,
-    alignItems: 'center',
-    paddingVertical: 13,
-    borderRadius: 16,
-    backgroundColor: Lantern.ember300,
-  },
-  saveDisabled: { opacity: 0.4 },
-  saveLabel: { fontSize: 14, fontWeight: '800' },
 });

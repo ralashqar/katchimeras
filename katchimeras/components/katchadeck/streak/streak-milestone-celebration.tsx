@@ -1,6 +1,7 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
-import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeInUp, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -76,9 +77,7 @@ export function StreakMilestoneCelebration({
                 <ThemedText selectable style={styles.rewardBody} lightColor="#5D4730" darkColor="#5D4730">Added to your life milestones</ThemedText>
               </View>
             </View>
-            <Pressable accessibilityRole="button" onPress={onDismiss} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
-              <ThemedText style={styles.buttonLabel} lightColor="#FFF9EC" darkColor="#FFF9EC">Let’s keep going</ThemedText>
-            </Pressable>
+            <KatchaButton onPress={onDismiss} label="Let’s keep going" />
           </View>
         </ScrollView>
       </View>
@@ -136,7 +135,4 @@ const styles = StyleSheet.create({
   rewardCopy: { flex: 1 },
   rewardTitle: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 16 },
   rewardBody: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '700', marginTop: 2 },
-  button: { alignItems: 'center', backgroundColor: '#75450A', borderRadius: 999, boxShadow: '0 10px 24px rgba(83,52,14,0.2)', minHeight: 55, justifyContent: 'center' },
-  buttonLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 15, fontWeight: '900' },
-  pressed: { opacity: 0.86, transform: [{ scale: 0.98 }] },
 });

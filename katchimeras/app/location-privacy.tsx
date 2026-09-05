@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, Switch, View } from 'react-native';
+import { Alert, ScrollView, Switch, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -113,34 +114,22 @@ export default function LocationPrivacyScreen() {
               {progress.scanned} scanned · {progress.located} geotagged · {progress.resolved} resolved
             </ThemedText>
           ) : null}
-          <Pressable
-            accessibilityRole="button"
+          <KatchaButton
+            label={controllerRef.current ? 'Stop scan' : 'Find places in older photos'}
             disabled={!settings.enabled}
             onPress={controllerRef.current ? () => controllerRef.current?.abort() : startBackfill}
-            style={({ pressed }) => ({
-              alignItems: 'center',
-              backgroundColor: Lantern.ember500,
-              borderRadius: 16,
-              justifyContent: 'center',
-              minHeight: 52,
-              opacity: !settings.enabled ? 0.4 : pressed ? 0.72 : 1,
-            })}>
-            <ThemedText style={{ color: '#21152B', fontWeight: '900' }}>
-              {controllerRef.current ? 'Stop scan' : 'Find places in older photos'}
-            </ThemedText>
-          </Pressable>
+          />
         </View>
 
         <View style={{ gap: 8 }}>
           <ThemedText selectable style={{ opacity: 0.65 }}>
             {counts.resolutions} photo resolutions · {counts.personalPlaces} personal places stored locally
           </ThemedText>
-          <Pressable
-            accessibilityRole="button"
+          <KatchaButton
+            label="Delete saved photo places"
+            variant="destructive"
             onPress={clearData}
-            style={{ alignItems: 'center', borderColor: 'rgba(220,70,70,0.28)', borderRadius: 15, borderWidth: 1, justifyContent: 'center', minHeight: 50 }}>
-            <ThemedText style={{ color: '#C94F4F', fontWeight: '900' }}>Delete saved photo places</ThemedText>
-          </Pressable>
+          />
         </View>
       </ScrollView>
     </>

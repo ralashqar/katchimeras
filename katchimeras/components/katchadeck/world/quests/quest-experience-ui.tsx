@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { Image, type ImageSource } from 'expo-image';
 import {
   createContext,
@@ -7,7 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { AppState, Pressable, StyleSheet, View } from 'react-native';
+import { AppState, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { KatchaUI } from '@/constants/katcha-ui';
@@ -34,7 +35,7 @@ export function ExperienceHeader({ eyebrow, title, body }: { eyebrow: string; ti
 }
 
 export function ExperienceAction({ label, onPress, quiet = false, disabled = false }: { label: string; onPress: () => void; quiet?: boolean; disabled?: boolean }) {
-  return <Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.action, quiet && styles.quiet, disabled && styles.disabled, pressed && styles.pressed]}><ThemedText style={[styles.actionText, quiet && styles.quietText]} lightColor={quiet ? Lantern.moon300 : Lantern.emberInk} darkColor={quiet ? Lantern.moon300 : Lantern.emberInk}>{label}</ThemedText>{!quiet ? <IconSymbol name="arrow.right" size={17} color={Lantern.emberInk} /> : null}</Pressable>;
+  return <KatchaButton disabled={disabled} onPress={onPress} variant={quiet ? 'tertiary' : 'primary'} icon={quiet ? undefined : 'arrow.right'} label={label} />;
 }
 
 export function QuestExperiencePreview({
@@ -117,12 +118,6 @@ const styles = StyleSheet.create({
   eyebrow: { ...KatchaUI.type.label, fontSize: 10.5, letterSpacing: 1.05 },
   title: { ...KatchaUI.type.screenTitle, fontSize: 29, lineHeight: 35 },
   body: { ...KatchaUI.type.companionBody, fontSize: 14, lineHeight: 21 },
-  action: { alignItems: 'center', backgroundColor: Lantern.ember300, borderCurve: 'continuous', borderRadius: 18, flexDirection: 'row', gap: 9, justifyContent: 'center', minHeight: 54, paddingHorizontal: 18 },
-  quiet: { backgroundColor: 'transparent', borderColor: 'rgba(201,194,232,0.16)', borderWidth: 1 },
-  actionText: { ...KatchaUI.type.companionAction, fontSize: 15 },
-  quietText: { color: Lantern.moon300 },
-  disabled: { opacity: 0.45 },
-  pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
   previewRoot: { flex: 1, gap: 14, justifyContent: 'space-between', minHeight: 0, padding: 2 },
   previewMain: { alignItems: 'center', flexDirection: 'row', gap: 14 },
   previewMedia: { alignItems: 'center', aspectRatio: 1, backgroundColor: 'rgba(255,248,232,0.06)', borderCurve: 'continuous', borderRadius: 20, borderWidth: 1, justifyContent: 'center', overflow: 'hidden', position: 'relative', width: 108 },

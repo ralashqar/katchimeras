@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import * as Haptics from 'expo-haptics';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
@@ -160,15 +161,7 @@ export function CompanionDiscoveryThread({
                       <ThemedText style={styles.secondaryLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Cancel</ThemedText>
                     </Pressable>
                   ) : null}
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={!draft.trim()}
-                    onPress={() => submit(prompt, draft)}
-                    style={({ pressed }) => [styles.saveButton, !draft.trim() && styles.disabled, pressed && styles.pressed]}>
-                    <ThemedText style={styles.saveLabel} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
-                      Remember this
-                    </ThemedText>
-                  </Pressable>
+                  <KatchaButton disabled={!draft.trim()} onPress={() => submit(prompt, draft)} size="compact" label="Remember this" />
                 </View>
               </View>
             )}
@@ -227,8 +220,5 @@ const styles = StyleSheet.create({
   editorActions: { flexDirection: 'row', gap: 8, justifyContent: 'flex-end' },
   secondaryButton: { borderCurve: 'continuous', borderRadius: 13, justifyContent: 'center', minHeight: 40, paddingHorizontal: 13 },
   secondaryLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 12, fontWeight: '800' },
-  saveButton: { backgroundColor: Meadow.goldDeep, borderCurve: 'continuous', borderRadius: 13, justifyContent: 'center', minHeight: 40, paddingHorizontal: 14 },
-  saveLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 12, fontWeight: '900' },
-  disabled: { opacity: 0.4 },
   pressed: { opacity: 0.75, transform: [{ scale: 0.985 }] },
 });

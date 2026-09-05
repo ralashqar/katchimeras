@@ -1,4 +1,5 @@
 import { WorldUpgradeMarker } from './world-upgrade-marker';
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import type { WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
 import { useFocusEffect } from '@react-navigation/native';
 import { SHARED_RESIDENT_WIDTH, SHARED_RESIDENT_HEIGHT, SHARED_RESIDENT_BASELINE_LIFT, SHARED_EGG_REST_ZOOM, SHARED_EGG_SCREEN_ANCHOR_Y, SHARED_RESIDENT_SCREEN_ANCHOR_Y, SHARED_RESIDENT_FOCUS_DURATION_MS, sharedResidentCenterY, residentArtLayerId, usesSharedResidentStage } from './shared-resident-presentation';
@@ -199,7 +200,7 @@ const GARDEN_ORDER_CARD_WIDTH = 120;
 const GARDEN_ORDER_CARD_HEIGHT = 120;
 const FTUE_GARDEN_REQUEST_BUBBLE_SIZE = 94;
 const TILE_UPGRADE_OFFER_WIDTH = 206;
-const TILE_UPGRADE_OFFER_HEIGHT = 44;
+const TILE_UPGRADE_OFFER_HEIGHT = 58;
 const WORLD_FTUE_CRACK_ONE = require('../../../assets/images/katchimeras/egg-avatars/effects/crack-1.png');
 const WORLD_FTUE_CRACK_TWO = require('../../../assets/images/katchimeras/egg-avatars/effects/crack-2.png');
 const WORLD_FTUE_SOFT_RING = require('../../../assets/images/katchimeras/soft-ring.png');
@@ -330,21 +331,22 @@ function TileUpgradeOffer({
     height: TILE_UPGRADE_OFFER_HEIGHT,
   }, offer);
   return (
-    <Pressable
-      accessibilityHint={offer.accessibilityHint}
-      accessibilityLabel={offer.label}
-      accessibilityRole="button"
-      disabled={!onPress}
-      onPress={onPress}
+    <View
+      collapsable={false}
       ref={targetRef}
-      style={({ pressed }) => [
+      style={[
         styles.tileUpgradeOffer,
         actionFrame,
-        pressed && styles.tileUpgradeOfferPressed,
       ]}>
-      <IconSymbol color="#3D2A12" name={offer.icon ?? 'sparkles'} size={18} />
-      <Text numberOfLines={1} style={styles.tileUpgradeOfferLabel}>{offer.label}</Text>
-    </Pressable>
+      <KatchaButton
+        fullWidth
+        accessibilityHint={offer.accessibilityHint}
+        disabled={!onPress}
+        icon={offer.icon ?? 'sparkles'}
+        label={offer.label}
+        onPress={onPress}
+      />
+    </View>
   );
 }
 
@@ -3127,24 +3129,11 @@ const styles = StyleSheet.create({
   focusLayer: { position: 'absolute' },
   tileArt: { position: 'absolute' },
   tileUpgradeOffer: {
-    alignItems: 'center',
-    backgroundColor: '#F6D774',
-    borderColor: 'rgba(255,250,210,0.96)',
-    borderCurve: 'continuous',
-    borderRadius: 16,
-    borderWidth: 2,
-    boxShadow: '0 7px 18px rgba(47,35,15,0.28)',
-    flexDirection: 'row',
-    gap: 8,
     height: TILE_UPGRADE_OFFER_HEIGHT,
-    justifyContent: 'center',
-    paddingHorizontal: 13,
     position: 'absolute',
     width: TILE_UPGRADE_OFFER_WIDTH,
     zIndex: 30,
   },
-  tileUpgradeOfferLabel: { color: '#3D2A12', flexShrink: 1, fontSize: 14, fontWeight: '900' },
-  tileUpgradeOfferPressed: { opacity: 0.86, transform: [{ scale: 0.97 }] },
   gardenOrderShortcutGroup: {
     alignItems: 'center',
     position: 'absolute',

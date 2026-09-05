@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { useEffect, useMemo, useState } from 'react';
@@ -225,7 +226,7 @@ function PlacesOverview({ candidates, candidateNames, editable, locationPermissi
         </Pressable>
       ))}
 
-      {editable ? <Pressable accessibilityRole="button" onPress={onAdd} style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}><IconSymbol name="plus" size={17} color={Meadow.ink} /><ThemedText style={styles.addButtonText} lightColor={Meadow.ink} darkColor={Meadow.ink}>Add a place</ThemedText></Pressable> : null}
+      {editable ? <KatchaButton onPress={onAdd} icon="plus" style={{marginTop: 8}} label="Add a place" /> : null}
       {onOpenMap && (saved.length || candidates.length) ? <Pressable accessibilityRole="button" onPress={onOpenMap} style={({ pressed }) => [styles.mapButton, pressed && styles.pressed]}><IconSymbol name="map.fill" size={16} color={Meadow.goldDeep} /><ThemedText style={styles.mapButtonText} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>View day map</ThemedText></Pressable> : null}
       <Link href={'/location-privacy' as Href} asChild>
         <Pressable accessibilityRole="button" style={({ pressed }) => [styles.mapButton, pressed && styles.pressed]}>
@@ -314,8 +315,6 @@ const styles = StyleSheet.create({
   quietSmall: { alignItems: 'center', borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 40, paddingHorizontal: 12 },
   quietSmallText: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '700' },
   savedRow: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.34)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 10, minHeight: 66, padding: 10 },
-  addButton: { alignItems: 'center', backgroundColor: '#E7B951', borderColor: 'rgba(255,244,204,0.72)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: '-3px 6px 16px rgba(92,57,20,0.20)', flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 54, paddingHorizontal: 18, marginTop: 8 },
-  addButtonText: { fontFamily: AppFontFamilies.manrope, fontSize: 14.5, fontWeight: '800' },
   mapButton: { alignItems: 'center', flexDirection: 'row', gap: 7, justifyContent: 'center', minHeight: 44 },
   mapButtonText: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '800' },
   searchWrap: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.42)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 9, minHeight: 52, paddingHorizontal: 13 },

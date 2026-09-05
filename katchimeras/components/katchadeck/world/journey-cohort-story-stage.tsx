@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
@@ -99,16 +100,12 @@ export function JourneyCohortStoryStage({ familyId, onBegin, onJournal, onMore, 
       palette={COMPANION_MERGE_REQUEST_PALETTE}
       requests={requests.map((request) => ({ id: request.title, title: request.title, definitionIds: [request.definitionId], served: request.served }))}
     />
-    <Pressable accessibilityRole="button" onPress={() => {
+    <KatchaButton onPress={() => {
       if (complete) onMore();
       else if (returnReady && story.pendingConversationId) { beginAuthoredCohortReturn(familyId); onOpenConversation(story.pendingConversationId); }
       else if (needsBeginning) onBegin();
       else onOpenMerge(story.activeOrderId);
-    }} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
-      <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name={returnReady ? 'bubble.left.and.bubble.right.fill' : copy.icon} size={19} />
-      <ThemedText style={styles.primaryText} lightColor={KatchaUI.companionScenePanel.accentInk} darkColor={KatchaUI.companionScenePanel.accentInk}>{complete ? 'More together' : returnReady ? 'Read the note' : needsBeginning ? `Meet ${COMPANION_NAMES[familyId]}` : requests.length > 1 ? 'Open all orders' : 'Make the request'}</ThemedText>
-      <IconSymbol color={KatchaUI.companionScenePanel.accentInk} name="arrow.right" size={17} />
-    </Pressable>
+    }} icon={returnReady ? 'bubble.left.and.bubble.right.fill' : copy.icon} label={(complete ? 'More together' : returnReady ? 'Read the note' : needsBeginning ? `Meet ${COMPANION_NAMES[familyId]}` : requests.length > 1 ? 'Open all orders' : 'Make the request')} />
     {!needsBeginning ? <Pressable accessibilityRole="button" onPress={onJournal} style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}><View style={styles.secondaryCopy}><IconSymbol color={KatchaUI.companionScenePanel.inkSoft} name="book.closed.fill" size={17} /><ThemedText style={styles.secondaryText} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{copy.journal}</ThemedText></View><IconSymbol color={KatchaUI.companionScenePanel.inkSoft} name="arrow.right" size={15} /></Pressable> : null}
   </Animated.View>;
 }
@@ -117,6 +114,5 @@ const styles = StyleSheet.create({
   stage: COMPANION_STORY_PANEL_STYLE,
   heading: { alignItems: 'center', flexDirection: 'row', gap: 9 }, level: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.accent, borderRadius: 15, height: 40, justifyContent: 'center', width: 40 }, levelText: { fontSize: 17, fontWeight: '900' },
   copy: { flex: 1, gap: 1 }, eyebrow: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.9 }, title: { fontSize: 18, fontWeight: '900', letterSpacing: -0.3, lineHeight: 21 }, body: { fontSize: 11.5, lineHeight: 16 },
-  bond: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: KatchaUI.companionScenePanel.accent, borderRadius: 999, flexDirection: 'row', gap: 7, minHeight: 34, paddingHorizontal: 12 }, bondText: { fontSize: 11.5, fontWeight: '900' },
-  primary: { alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.accent, borderRadius: 15, flexDirection: 'row', gap: 8, minHeight: 43, paddingHorizontal: 12 }, primaryText: { flex: 1, fontSize: 13, fontWeight: '900' }, secondary: { alignItems: 'center', borderRadius: 14, flexDirection: 'row', justifyContent: 'space-between', minHeight: 36, paddingHorizontal: 10 }, secondaryCopy: { alignItems: 'center', flexDirection: 'row', gap: 7 }, secondaryText: { fontSize: 11, fontWeight: '900' }, pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
+  bond: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: KatchaUI.companionScenePanel.accent, borderRadius: 999, flexDirection: 'row', gap: 7, minHeight: 34, paddingHorizontal: 12 }, bondText: { fontSize: 11.5, fontWeight: '900' }, secondary: { alignItems: 'center', borderRadius: 14, flexDirection: 'row', justifyContent: 'space-between', minHeight: 36, paddingHorizontal: 10 }, secondaryCopy: { alignItems: 'center', flexDirection: 'row', gap: 7 }, secondaryText: { fontSize: 11, fontWeight: '900' }, pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
 });

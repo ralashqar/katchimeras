@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
 
@@ -19,9 +20,7 @@ export function WispDiscoveryReveal({ id, onDismiss, onEquip }: { id: WispId; on
           <Pressable accessibilityRole="button" onPress={onDismiss} style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
             <ThemedText style={styles.secondaryText} lightColor="#5D7046" darkColor="#5D7046">Not now</ThemedText>
           </Pressable>
-          <Pressable accessibilityRole="button" onPress={onEquip ?? onDismiss} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
-            <ThemedText style={styles.buttonText} lightColor="#FFF8E8" darkColor="#FFF8E8">Stay beside Egg</ThemedText>
-          </Pressable>
+          <KatchaButton onPress={onEquip ?? onDismiss} style={{flex: 1}} label="Stay beside Egg" />
         </View>
       </Animated.View>
     </Animated.View>
@@ -36,9 +35,7 @@ const styles = StyleSheet.create({
   title: { fontFamily: 'InstrumentSerif', fontSize: 35, lineHeight: 39, textAlign: 'center' },
   copy: { fontSize: 14, lineHeight: 21, marginTop: 7, textAlign: 'center' },
   actions: { flexDirection: 'row', gap: 10, marginTop: 20, width: '100%' },
-  button: { alignItems: 'center', backgroundColor: '#5D7046', borderRadius: 17, flex: 1, paddingHorizontal: 14, paddingVertical: 13 },
   secondary: { alignItems: 'center', borderColor: 'rgba(93,112,70,0.35)', borderRadius: 17, borderWidth: 1, flex: 1, paddingVertical: 13 },
   secondaryText: { fontSize: 13, fontWeight: '900' },
-  buttonText: { fontSize: 13.5, fontWeight: '900' },
   pressed: { opacity: 0.84, transform: [{ scale: 0.98 }] },
 });

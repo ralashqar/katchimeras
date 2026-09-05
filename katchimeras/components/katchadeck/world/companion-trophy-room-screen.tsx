@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -77,9 +78,7 @@ export function CompanionTrophyRoomScreen({ creatureId, embedded = false }: { cr
     return (
       <View style={styles.missing}>
         <ThemedText selectable style={styles.missingTitle} lightColor="#FFF7E5" darkColor="#FFF7E5">Trophy room unavailable</ThemedText>
-        <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.missingButton}>
-          <ThemedText style={styles.missingButtonLabel} lightColor="#352517" darkColor="#352517">Go back</ThemedText>
-        </Pressable>
+        <KatchaButton onPress={() => router.back()} label="Go back" />
       </View>
     );
   }
@@ -519,6 +518,4 @@ const styles = StyleSheet.create({
   earnedDate: { ...KatchaUI.type.meta, fontSize: 9, fontVariant: ['tabular-nums'] },
   missing: { alignItems: 'center', backgroundColor: '#171711', flex: 1, gap: 18, justifyContent: 'center', padding: 28 },
   missingTitle: { ...KatchaUI.type.display, textAlign: 'center' },
-  missingButton: { backgroundColor: '#E7B951', borderRadius: 15, minHeight: 44, paddingHorizontal: 20, paddingVertical: 12 },
-  missingButtonLabel: { ...KatchaUI.type.action },
 });

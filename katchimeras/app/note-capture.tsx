@@ -1,3 +1,4 @@
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   RecordingPresets,
@@ -367,11 +368,7 @@ export default function NoteCaptureScreen() {
             </View>
           ) : null}
 
-          <Pressable disabled={!semanticChoiceMade} onPress={() => setJournalReviewOpen(true)} style={[styles.cta, !semanticChoiceMade && styles.ctaDisabled]}>
-            <ThemedText style={styles.ctaLabel} lightColor={Lantern.ink900} darkColor={Lantern.ink900}>
-              Add to {targetLabel}
-            </ThemedText>
-          </Pressable>
+          <KatchaButton disabled={!semanticChoiceMade} onPress={() => setJournalReviewOpen(true)} style={{marginTop: 'auto', marginBottom: 16}} label={[" Add to ",(targetLabel)].join('')} />
         </View>
       ) : null}
       {journalReviewOpen && result ? (
@@ -488,16 +485,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
   playbackLabel: { fontSize: 13.5, fontWeight: '800' },
-  cta: {
-    marginTop: 'auto',
-    marginBottom: 16,
-    alignItems: 'center',
-    paddingVertical: 15,
-    borderRadius: 999,
-    backgroundColor: Lantern.moon50,
-  },
   ctaDisabled: { opacity: 0.4 },
-  ctaLabel: { fontSize: 15, fontWeight: '800' },
   transcript: { borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.05)', padding: 16 },
   transcriptText: { fontSize: 15.5, fontWeight: '600', lineHeight: 22, fontStyle: 'italic' },
   meaningChip: {

@@ -1,4 +1,5 @@
 import { CompanionNarrativePanel } from './companion-narrative-panel';
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { DailyHabitOffer } from './companion-life-actions';
 import { lifeHabitById } from '@/constants/companion-life-content';
 import * as Haptics from 'expo-haptics';
@@ -541,15 +542,11 @@ function NarrativeTransition({ actionLabel = 'Continue', label, onAdvance, requi
 }
 
 function PrimaryAction({ disabled = false, label, onPress }: { disabled?: boolean; label: string; onPress: () => void }) {
-  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={({ pressed }) => ({ alignItems: 'center', backgroundColor: KatchaUI.companionScenePanel.accent, borderCurve: 'continuous', borderRadius: 17, minHeight: 52, justifyContent: 'center', opacity: disabled ? 0.42 : pressed ? 0.82 : 1, paddingHorizontal: 16, transform: [{ scale: pressed && !disabled ? 0.985 : 1 }] })}>
-    <ThemedText selectable style={{ fontSize: 15, fontWeight: '900' }} lightColor={KatchaUI.companionScenePanel.accentInk} darkColor={KatchaUI.companionScenePanel.accentInk}>{label}</ThemedText>
-  </Pressable>;
+  return <KatchaButton disabled={disabled} onPress={onPress} label={label} />;
 }
 
 function SecondaryAction({ label, onPress }: { label: string; onPress: () => void }) {
-  return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => ({ alignItems: 'center', borderRadius: 15, minHeight: 42, justifyContent: 'center', opacity: pressed ? 0.62 : 1, paddingHorizontal: 12 })}>
-    <ThemedText selectable style={{ fontSize: 13, fontWeight: '800' }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{label}</ThemedText>
-  </Pressable>;
+  return <KatchaButton onPress={onPress} label={label} size="compact" variant="tertiary" />;
 }
 
 function optionLabel(definition: ConversationDefinition, session: ConversationSession, optionId: string | null): string | null {
