@@ -19,9 +19,9 @@ const NOW = Date.UTC(2026, 8, 3, 12);
 test('meditation handoff hides normal interaction UI before the durable FTUE step advances', () => {
   const source = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
   assert.match(source, /import \{[^}]*\buseState\b[^}]*\} from 'react';/);
-  assert.match(source, /setMistHandoffActive\(true\);\s*void advanceFtueActionDurably\(\{ expectedStepId: 'companion.meditating'/);
-  assert.match(source, /if \(hostedInHaven && mistHandoffActive\) return null;/);
-  assert.match(source, /catch\(\(error\) => \{\s*setMistHandoffActive\(false\)/);
+  assert.match(source, /setMistHandoffActive\(true\);[\s\S]*?await advanceFtueActionDurably\(\{ expectedStepId: 'companion.meditating'/);
+  assert.match(source, /if \(mistHandoffActive \|\| pendingMistExit\) return <View/);
+  assert.match(source, /catch \{\s*setMistHandoffError\(true\)/);
   assert.doesNotMatch(source, /finally\([^;]*setMistHandoffActive\(false\)/);
 });
 test('enough Glow highlights the HUD with an actionable Egg bubble instead of a banner', () => {
@@ -302,11 +302,11 @@ test('setup boundaries never fall back to a spawner spotlight', () => {
 
 test('hosted meditation hands off to the existing map without a transition curtain', () => {
   const route = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
-  const handoff = route.slice(route.indexOf("if (run.stepId === 'companion.meditating')"), route.indexOf("if (run.stepId === 'companion.garden_intro')"));
+  const handoff = route.slice(route.indexOf('const continueToMist'), route.indexOf("if (run.stepId === 'companion.garden_intro')"));
   const hosted = handoff.slice(handoff.indexOf('if (hostedInHaven)'), handoff.indexOf('const accepted = transitionTo'));
-  assert.match(hosted, /advanceFtueActionDurably/);
+  assert.match(handoff, /await advanceFtueActionDurably[\s\S]*?await startGlowDiscovery[\s\S]*?if \(hostedInHaven\)/);
   assert.match(hosted, /onHostedClose\?\.\(\)/);
-  assert.match(hosted, /finally\(\(\) => \{ ftueHandoffRef.current = false/);
+  assert.match(handoff, /finally \{ ftueHandoffRef.current = false/);
   assert.doesNotMatch(hosted, /transitionTo|router\./);
   const camera = GLOW_DISCOVERY_FLOW.nodes.find((node) => node.id === 'gateway.focus');
   assert.equal(camera?.kind, 'presentation');

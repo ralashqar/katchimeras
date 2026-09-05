@@ -6,7 +6,7 @@ import { loadFtueRun } from '@/features/onboarding/ftue-runtime';
 import { bootstrapContentFlowCatalog } from './content-flow-bootstrap';
 import { flushContentFlowJournal } from './content-flow-repository';
 import { resumeActiveContentFlows } from './content-flow-director';
-import { dismissFtueContentFlow } from './ftue-content-flow-runtime';
+import { dismissFtueContentFlow, reconcileFtueCheckpoint } from './ftue-content-flow-runtime';
 import { createForegroundTask } from '@/utils/foreground-task';
 import { isAppForeground } from '@/hooks/use-app-foreground';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
@@ -18,7 +18,15 @@ async function resumeStoryFlows(isActive: () => boolean) {
   // Recover a process kill between the synchronous terminal checkpoint and
   // its asynchronous flow-journal write. Completed FTUE must never reappear.
   const ftue = loadFtueRun();
-  if (ftue?.status === 'complete') await dismissFtueContentFlow(ftue.runId);
+  if (ftue?.status === 'complete') {
+    if (ftue.receipts.some((receipt) => receipt.actionId === 'companion.tend_garden' && receipt.status !== 'pending')) {
+      const { startGlowDiscovery } = await import('@/features/onboarding/glow-discovery-runtime');
+      await startGlowDiscovery();
+    }
+    await dismissFtueContentFlow(ftue.runId);
+  } else if (ftue && ['companion.water_together', 'companion.first_grow', 'companion.first_notice', 'companion.notice_bond_spotlight', 'companion.first_rest', 'companion.meditating'].includes(ftue.stepId)) {
+    await reconcileFtueCheckpoint(ftue);
+  }
   if (isActive()) await resumeActiveContentFlows(isActive);
   if (isActive()) await resumeCompanionJourneys();
 }

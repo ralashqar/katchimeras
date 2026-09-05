@@ -79,6 +79,7 @@ export function CompanionDestinationHeader({
   bondTargetRef,
   compactHub = false,
   hideTitle = false,
+  hideBack = false,
   label,
   navigationLocked = false,
   onBack,
@@ -91,6 +92,7 @@ export function CompanionDestinationHeader({
   bondTargetRef?: RefObject<ViewType | null>;
   compactHub?: boolean;
   hideTitle?: boolean;
+  hideBack?: boolean;
   label: string;
   navigationLocked?: boolean;
   onBack: () => void;
@@ -105,6 +107,7 @@ export function CompanionDestinationHeader({
         bondRewardPulseKey={bondRewardPulseKey}
         bondTargetRef={bondTargetRef}
         navigationLocked={navigationLocked}
+        hideBack={hideBack}
         onBack={onBack}
       />
       {!hideTitle ? <View style={styles.destinationHeading}>

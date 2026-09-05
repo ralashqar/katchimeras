@@ -25,6 +25,7 @@ import {
   mossproutFtueUsesHostedCompanionStage,
   mossproutWorldEggZoom,
   validateMossproutFtueScript,
+  mossproutFtueShowsWorldGarden,
 } from '@/features/onboarding/mossprout-ftue-script';
 import { ftueNeedsV28QuestionnaireRestart, ftueV28QuestionnaireLoopRecoveryStep, streamlinedFtueStep } from '@/features/onboarding/ftue-migration-policy';
 import { MOSSPROUT_BOND_SHARE_PROMPTS, MOSSPROUT_SUPPORT_STYLE_OPTIONS, mossproutBondShareSelection, mossproutFirstSeedForIntent } from '@/features/onboarding/mossprout-bond-share';
@@ -93,7 +94,7 @@ test('all opening answers are inclusive, stable, and produce the correct persona
     assert.ok(mossproutFtueConversationDefinitions.some((definition) => definition.id === `mossprout:ftue:first-meeting:${option.id}`));
   }
   assert.deepEqual(MOSSPROUT_WATER_OPTIONS.map((option) => option.id), ['could_use_water', 'already_good', 'dont_start']);
-  assert.equal(mossproutFtueAction('companion.water_together', 'companion.choose_water_together')?.nextStepId, 'companion.first_rest');
+  assert.equal(mossproutFtueAction('companion.water_together', 'companion.choose_garden_return')?.nextStepId, 'companion.first_grow');
   assert.equal(mossproutFtueStep('companion.first_rest')?.actions.length, 1);
 });
 
@@ -126,7 +127,7 @@ test('old Basket checkpoints migrate to the meditation bridge without locking Ba
   const merge = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   assert.match(merge, /beforeRemove[\s\S]*?completeFtueRun\(\)/);
   const provider = readFileSync('features/content-flow/content-flow-provider.tsx', 'utf8');
-  assert.match(provider, /status === 'complete'\) await dismissFtueContentFlow[\s\S]*?await resumeActiveContentFlows/);
+  assert.match(provider, /status === 'complete'[\s\S]*?await startGlowDiscovery[\s\S]*?await dismissFtueContentFlow[\s\S]*?await resumeActiveContentFlows/);
 });
 
 test('terminal meditation restores Back and finishes FTUE before exiting interaction', () => {
@@ -140,11 +141,11 @@ test('terminal meditation restores Back and finishes FTUE before exiting interac
   const route = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
   assert.match(kingdom, /!upgradePresentation && \(!ftueStepId \|\| ftueStepId === 'companion\.meditating'\)/);
   const exitHandler = kingdom.slice(kingdom.indexOf('const requestResidentInteractionExit'), kingdom.indexOf('const pulseVisibleResident'));
-  assert.match(exitHandler, /run\?\.status === 'active' && run\.stepId === 'companion\.meditating'[\s\S]*?completeFtueRun\(\)[\s\S]*?setInteractionExitNonce/);
+  assert.match(exitHandler, /run\?\.status === 'active' && run\.stepId === 'companion\.meditating'[\s\S]*?advanceFtueActionDurably[\s\S]*?setInteractionExitNonce/);
   assert.match(exitHandler, /else if \(ftueStepId && run\?\.status !== 'complete'\) return/);
   assert.match(exitHandler, /ftueStepId && ftueStepId !== 'companion\.meditating'[\s\S]*?hardwareBackPress[\s\S]*?requestResidentInteractionExit\(\)/);
-  assert.match(route, /onCloseCompanion=\{\(\) => \{[\s\S]*?run\.stepId === 'companion\.meditating'[\s\S]*?completeFtueRun\(\)/);
-  assert.match(route, /if \(run\.stepId === 'companion\.meditating'\)[\s\S]*?commitFtueAction\([\s\S]*?completeFtueRun\(\)[\s\S]*?onHostedClose\?\.\(\)/);
+  assert.match(route, /onCloseCompanion=\{\(\) => \{[\s\S]*?run\.stepId === 'companion\.meditating'[\s\S]*?completeFtueProfileStep\(\)/);
+  assert.match(route, /if \(run\.stepId === 'companion\.meditating'\) return continueToMist\(\)/);
 });
 
 test('Mossprout FTUE script has valid transitions and registered handlers', () => {
@@ -162,13 +163,11 @@ test('the Egg asks two meaningful real-life questions before Hatch', () => {
   const step = mossproutFtueStep('egg.opening');
   assert.equal(step?.actions.length, 1);
   assert.equal(step?.actions[0]?.handlerId, 'player_profile');
-  assert.equal(step?.actions[0]?.options?.length, 3);
+  assert.equal(step?.actions[0]?.options?.length, 5);
   assert.equal(mossproutFtueAction('egg.opening', 'egg.day_texture')?.nextStepId, 'egg.context');
-  assert.equal(step?.actions[0]?.title, 'How has today felt?');
+  assert.equal(step?.actions[0]?.title, 'How do you feel?');
   assert.deepEqual(step?.actions[0]?.options?.map((option) => option.label), [
-    'Pretty good',
-    'A lot going on',
-    'Taking it as it comes',
+    'Radiant', 'Light', 'Meh', 'Heavy', 'Stormy',
   ]);
   const desiredHelp = mossproutFtueStep('egg.context')?.actions[0];
   assert.equal(desiredHelp?.id, 'egg.desired_help');
@@ -710,8 +709,8 @@ test('route-changing FTUE actions persist before navigation and owned companion 
   assert.match(interaction, /dashboardRouteActive = route\.kind === 'dashboard'[\s\S]*?residentResultFtueDashboard/);
   assert.match(interaction, /!residentFtueDashboard && !residentResultFtueDashboard[\s\S]*?showFeastleStoryHome\(\)/);
   assert.match(companion, /run\?\.stepId === 'companion\.first_rest'[\s\S]*?beginKatchimeraMeditation\([\s\S]*?MOSSPROUT_FTUE_REST_MS,[\s\S]*?sourceId[\s\S]*?actionId: 'companion\.begin_rest'/);
-  assert.match(companion, /run\.stepId === 'companion\.meditating'[\s\S]*?actionId: 'companion\.tend_garden'[\s\S]*?if \(hostedInHaven\) onHostedClose\?\.\(\)/);
-  assert.match(roster, /stepId === 'companion\.meditating'[\s\S]*?completeFtueRun\(\)/);
+  assert.match(companion, /continueToMist = useCallback[\s\S]*?actionId: 'companion\.tend_garden'[\s\S]*?await startGlowDiscovery\(\)[\s\S]*?if \(hostedInHaven\) onHostedClose\?\.\(\)/);
+  assert.match(roster, /stepId === 'companion\.meditating'[\s\S]*?advanceFtueActionDurably/);
 });
 
 test('meditation stays inside companion interaction with compact action-card UI', () => {
@@ -734,7 +733,7 @@ test('meditation stays inside companion interaction with compact action-card UI'
   assert.match(interaction, /meditationDashboardActive && meditation \? \([\s\S]*?styles\.meditationWorldTimer[\s\S]*?<CompanionMeditationStage/);
   assert.match(interaction, /initialConversationHandoffPending \? null : route\.kind === 'chat_lobby'[\s\S]*?&& !meditation/);
   assert.match(interaction, /\(route\.kind === 'destination' \|\| dashboardRouteActive[\s\S]*?&& !questGameVisible && !questionnaireExperience \? \([\s\S]*?<CompanionDestinationHeader/);
-  assert.match(interaction, /meditationDashboardActive = Boolean\(!quickGoalPickerOpen && !unifiedJourneyActive && meditation && route\.kind !== 'conversation'/);
+  assert.match(interaction, /meditationDashboardActive = Boolean\(\(!props\.ftueCompanionSurfaceOwned \|\| props\.ftueProfileStep === 'meditating'\) && !quickGoalPickerOpen && !unifiedJourneyActive && meditation && route\.kind !== 'conversation'/);
   assert.match(interaction, /companionSpeechTitle = dashboardRouteActive && actionNarration \? actionNarration : dashboardRouteActive && !quickGoalPickerOpen && unifiedJourneyActive && journeyNarration \? journeyNarration : meditationDashboardActive \? MOSSPROUT_FTUE_COPY\.meditation/);
   assert.match(interaction, /meditating=\{Boolean\(meditation\)\}/);
   assert.match(cinematicStage, /meditating=\{meditating\}/);
@@ -941,7 +940,7 @@ test('the first resident Garden handoff uses one shared parcel panel without a s
   const conversation = readFileSync('constants/mossprout-story-conversations.ts', 'utf8');
   const conversationFlow = readFileSync('features/companion/use-companion-conversation-flow.ts', 'utf8');
   assert.match(interaction, /residentParcelGardenPanelActive = props\.ftueResidentHandoffActive[\s\S]*?!props\.ftueResidentStoryResume/);
-  assert.match(interaction, /showSpeechBubble=\{!initialConversationHandoffPending && \(Boolean\(companionSpeechTitle\) \|\| !residentParcelGardenPanelActive\)\}/);
+  assert.match(interaction, /showSpeechBubble=\{props\.ftueProfileStep !== 'notice_bond' && !initialConversationHandoffPending && \(Boolean\(companionSpeechTitle\) \|\| !residentParcelGardenPanelActive\)\}/);
   assert.match(interaction, /residentParcelHandoffActive=\{residentParcelGardenPanelActive\}/);
   assert.match(stage, /residentParcelHandoffActive \? <View[\s\S]*?<MossproutJourneyRequestPanel/);
   assert.match(stage, /actionLabel="Go to the Garden"[\s\S]*?eyebrow="GARDEN PARCEL"/);
@@ -1299,7 +1298,7 @@ test('FTUE starts a relationship before the Garden, shows First Bloom, and conti
   assert.match(coachmark, /translateY: -2/);
   assert.match(coachmark, /callout: \{[\s\S]*?flexDirection: 'row'[\s\S]*?guideAvatar: \{ flexShrink: 0/);
   assert.doesNotMatch(coachmark, /styles\.(eyebrow|title|body)/);
-  assert.match(interaction, /message=\{\[[\s\S]*?emphasis: true, text: 'Bond\.'[\s\S]*?emphasis: true, text: 'one card'/);
+  assert.match(interaction, /message=\{[\s\S]*?emphasis: true, text: 'Bond\.'[\s\S]*?emphasis: true, text: 'one card'/);
   assert.match(today, /resolveMossproutJourneyHandoff[\s\S]*?companionJourneyHook=\{mossproutJourneyHandoff\}[\s\S]*?onOpenCompanionJourney=\{openMossproutJourney\}/);
   assert.match(today, /handoff\?\.state === 'ready_to_begin' \? handoff : null/);
   assert.match(route, /ftueRun\?\.status === 'active'[\s\S]*?ftueRun\.stepId === 'companion\.chapter_zero_return'[\s\S]*?MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID/);
@@ -1565,7 +1564,7 @@ test('later FTUE choice beats specialize the same inline check-in panel lifecycl
   assert.match(home, /function getFtueChoiceColumnCount\(choiceCount: number\)/);
   assert.match(home, /if \(choiceCount <= 3\) return Math\.max\(1, choiceCount\)/);
   assert.match(home, /if \(choiceCount === 4\) return 2/);
-  assert.match(home, /const visibleOptions = options\.slice\(0, 4\)/);
+  assert.match(home, /const visibleOptions = options\.slice\(0, moodQuestion \? 5 : 4\)/);
   assert.match(home, /ftueQuestionLayout && styles\.ftueQuestionAnchor/);
   assert.match(home, /illustrated && !ftueQuestionLayout/);
   assert.match(home, /showGlint=\{!ftueQuestionLayout\}/);
@@ -1574,7 +1573,7 @@ test('later FTUE choice beats specialize the same inline check-in panel lifecycl
   assert.match(home, /setScriptedTextCompletion/);
   assert.match(home, /key=\{scriptedTextChoiceAction\.id\}/);
   assert.match(home, /scriptedRowActions = scriptedActions\.filter\(\(action\) => action\.presentation !== 'inline_choice' && action\.presentation !== 'route_action'\)/);
-  assert.match(home, /fullRowIllustratedChoices=\{action\.id\.startsWith\('egg\.'\)\}/);
+  assert.match(home, /fullRowIllustratedChoices=\{action\.id\.startsWith\('egg\.'\) && !moodQuestion\}/);
   assert.match(home, /illustratedColumnCount = fullRowIllustratedChoices \? 1 : getFtueChoiceColumnCount\(choices\.length\)/);
   assert.match(home, /fullRowIllustratedChoiceGrid: \{ flexDirection: 'column', flexWrap: 'nowrap'/);
   assert.match(home, /fullRowIllustratedChoice: \{ flexDirection: 'row'/);
@@ -1619,7 +1618,6 @@ test('FTUE copy uses the shared cozy-game type hierarchy and stays concise', () 
   const guide = readFileSync('components/katchadeck/onboarding/ftue-guide-copy.tsx', 'utf8');
   const actions = readFileSync('components/katchadeck/onboarding/scripted-action-list.tsx', 'utf8');
   const conversation = readFileSync('constants/mossprout-ftue-conversations.ts', 'utf8');
-  const interaction = readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
   const theme = readFileSync('constants/theme.ts', 'utf8');
   const eggSteps = MOSSPROUT_FTUE_SCRIPT.steps.filter((step) => step.id.startsWith('egg.'));
   assert.match(theme, /ftueHeroTitle:[\s\S]*?AppFontFamilies\.fredokaBold/);
@@ -1707,4 +1705,20 @@ test('Discovery Hatch freezes Home motion without resetting its camera values', 
   assert.match(exploration, /if \(frozen\) \{[\s\S]*?cancelAnimation\(translateX\);/);
   assert.match(route, /frozen: dailyHatchActive \|\| discoveryHatchInPlace/);
   assert.match(route, /const explorationBackgroundActive = isForming[\s\S]*?\|\| !dailyHatchActive/);
+});
+
+
+test('world Garden stays hidden through Mossprout dialogue and Grow, but returns for planting and restoration', () => {
+  for (const step of MOSSPROUT_FTUE_SCRIPT.steps) {
+    if (step.surface === 'companion' || step.id.startsWith('egg.') || step.id === 'companion.first_meeting') {
+      assert.equal(mossproutFtueShowsWorldGarden(step.id), false, step.id);
+    }
+  }
+  for (const stepId of ['world.garden_arrival', 'world.seed_planted', 'world.garden_handoff', 'world.first_bloom_restore', 'world.first_seed_grew']) {
+    assert.equal(mossproutFtueShowsWorldGarden(stepId), true, stepId);
+  }
+  for (const stepId of [undefined, null, 'complete']) assert.equal(mossproutFtueShowsWorldGarden(stepId), true);
+  assert.equal(mossproutFtueShowsWorldGarden('world.egg_intro'), false);
+  const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
+  assert.match(screen, /!stepplingSurfaceOpen && !upgradePresentation && !activeInteractionResidentId && havenMergeBoardActive && mossproutFtueShowsWorldGarden\(ftueStepId\)/);
 });

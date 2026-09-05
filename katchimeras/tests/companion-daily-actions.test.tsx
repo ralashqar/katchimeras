@@ -226,8 +226,12 @@ test('Garden orders are outside the card scroll layout even when taller than the
     await act(async () => tree!.update(render(true)));
     assert.equal(viewport.findAllByType('RequestPanel' as React.ElementType).length, 0, 'orders cannot change scroll height or be clipped by it');
     const panel = tree!.root.findByType('RequestPanel' as React.ElementType);
-    assert.equal(panel.parent!.props.style.position, 'absolute');
-    assert.equal(panel.parent!.props.style.bottom, 0);
+    const measuredContent = panel.parent!;
+    await act(async () => measuredContent.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 360, height: 260 } } }));
+    const outlet = measuredContent.parent!;
+    assert.equal(outlet.props.style[0].position, 'absolute');
+    assert.equal(outlet.props.style[0].bottom, 0);
+    assert.equal(outlet.props.style[1].read().height, 260, 'tall orders keep their own measured footprint');
     assert.equal(viewport.parent!.props.style.read().minHeight, undefined, 'navigation transform adds no minHeight');
     assert.equal(viewport.parent!.props.style.read().height, undefined, 'navigation transform does not change the root height');
     await act(async () => tree!.update(render(true, 3)));

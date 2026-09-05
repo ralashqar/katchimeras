@@ -3,7 +3,7 @@ import test from 'node:test';
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { readFileSync } from 'node:fs';
-import { loadCompanionOverlay, loadNativeModule, nativeViews } from './helpers/native-motion-harness';
+import { loadCompanionOverlay, loadNativeModule, nativeMotionHarness, nativeViews } from './helpers/native-motion-harness';
 import { emptyCompanionBondState, recordCompanionBondEvent, acknowledgeCompanionBondCelebration, COMPANION_BOND_REWARDS } from '../utils/companion-bond';
 import { buildPhotoIntelligence } from '../utils/intelligence/photo-intelligence';
 import { MOSSPROUT_NOTICE_PROMPTS, mossproutNoticePrompt, naturePhotoMatch, mossproutLifeActivityId } from '../utils/mossprout-life-activities';
@@ -133,7 +133,11 @@ test('native menu keeps the main card mounted, completes an option, and handles 
     '@/utils/mossprout-life-activity-storage': h.module,
     './companion-scene-overlay': overlay, './companion-choice-list': { CompanionChoiceList: 'Choices' },
     './mossprout-water-action': { MossproutWaterAction: 'Water' },
-    './companion-narrative-panel': { CompanionNarrativePanel: 'NarrativePanel' },
+    './mossprout-notice-choices': loadNativeModule('components/katchadeck/world/mossprout-notice-choices.tsx', {
+      'react-native': { ...nativeViews, ScrollView: 'ScrollView' },
+      './companion-narrative-panel': { CompanionNarrativePanel: 'NarrativePanel' },
+      './companion-choice-list': { CompanionChoiceList: 'Choices' },
+    }),
   });
   const Card = module.MossproutLifeActivityCard as React.ComponentType<Record<string, unknown>>;
   let tree: ReactTestRenderer;
@@ -340,4 +344,154 @@ test('reset prevents an in-flight activity from restoring completion or rewards'
   assert.equal(Object.keys(h.module.loadMossproutLifeActivities().completions).length, 0);
   assert.equal(h.bond().events.length, 0);
   assert.equal(h.journal.size, 0);
+});
+
+
+test('first Grow shares the daily noticing receipt, survives interruption, and resets with the activity journal', async () => {
+  const h = storageHarness();
+  const copy = await import('../features/onboarding/mossprout-first-grow');
+  let savedDay: string | undefined;
+  const runtime = loadNativeModule('features/onboarding/mossprout-first-grow-runtime.ts', {
+    '@/utils/onboarding-state': { loadOnboardingProfile: () => ({ mossproutAnswers: { firstNoticeDayId: savedDay } }) },
+    '@/utils/world-identity-rules': { localDayId: () => dayId },
+    '@/utils/mossprout-life-activity-storage': h.module,
+    '@/utils/mossprout-life-activities': { mossproutLifeActivityId },
+    './mossprout-profile': { recordMossproutOnboardingAnswer: (_key: string, value: string) => { savedDay = value; } },
+    './mossprout-first-grow': copy,
+  });
+  assert.equal(runtime.loadFirstNoticeCompletion(), undefined);
+  assert.equal(savedDay, dayId);
+  h.failAfterAward();
+  await assert.rejects(runtime.completeFirstNotice('light'));
+  h.recover();
+  const done = await runtime.completeFirstNotice('light');
+  assert.equal(done.dayId, dayId);
+  assert.equal(h.bond().events.length, 1);
+  assert.equal(h.journal.size, 1);
+  assert.equal(runtime.loadFirstNoticeCompletion().id, done.id);
+  assert.equal((await runtime.completeFirstNotice('sound')).id, done.id);
+  assert.equal(h.bond().events.length, 1);
+  h.module.acknowledgeMossproutLifeCompletion(done.id);
+  assert.ok(runtime.loadFirstNoticeCompletion().presentedAt);
+  h.module.resetMossproutLifeActivities(); savedDay = undefined;
+  assert.equal(runtime.loadFirstNoticeCompletion(), undefined);
+});
+
+test('FTUE opens noticing choices with one action tap, keeps Back hidden, and supports skipping', async () => {
+  const copy = await import('../features/onboarding/mossprout-first-grow');
+  const overlay = loadCompanionOverlay();
+  let run = { runId: 'first-grow', stepId: 'companion.water_together', answers: {} as Record<string, { optionId: string }> };
+  const listeners = new Set<() => void>();
+  const actions: string[] = [];
+  let narration: string | null = null;
+  const onNarration = (value: string | null) => { narration = value; };
+  const module = loadNativeModule('components/katchadeck/world/mossprout-first-grow-stage.tsx', {
+    'react-native': { ...nativeViews, Pressable: 'Pressable' }, 'expo-image': { Image: 'Image' },
+    '@/components/katchadeck/ui/day-action-row': { DayActionActiveRow: 'Active', DayActionCompletedRow: 'Completed' },
+    '@/components/katchadeck/ui/day-action-card': { DayActionCardSurface: 'Card', DayActionRewardChip: 'Reward' },
+    '@/components/katchadeck/ui/katcha-button': { KatchaButton: 'Button' },
+    '@/constants/katchimera-action-art': { katchimeraActionArt: () => 1 },
+    '@/utils/companion-bond': { COMPANION_BOND_REWARDS },
+    '@/features/onboarding/mossprout-first-grow': copy,
+    '@/features/onboarding/mossprout-first-grow-runtime': { loadFirstNoticeCompletion: () => undefined, completeFirstNotice: () => assert.fail('skip must not reward') },
+    '@/utils/mossprout-life-activity-storage': {},
+    '@/features/onboarding/ftue-runtime': {
+      useFtueRun: () => React.useSyncExternalStore((listener) => { listeners.add(listener); return () => listeners.delete(listener); }, () => run),
+      advanceFtueActionDurably: async ({ actionId, optionId }: { actionId: string; optionId: string }) => {
+        actions.push(actionId);
+        const stepId = actionId === 'companion.choose_garden_return' ? 'companion.first_grow' : actionId === 'companion.open_first_grow' ? 'companion.first_notice' : 'companion.first_rest';
+        run = { ...run, stepId, answers: { ...run.answers, [actionId]: { optionId } } }; listeners.forEach((listener) => listener());
+      },
+    },
+    './companion-scene-overlay': overlay,
+    './companion-narrative-panel': { CompanionNarrativePanel: 'NarrativePanel' },
+    './companion-choice-list': { CompanionChoiceList: 'Choices' },
+    './mossprout-notice-choices': { MossproutNoticeChoices: 'NoticeChoices' },
+  });
+  const Stage = module.MossproutFirstGrowStage as React.ComponentType<{ onNarration: typeof onNarration }>;
+  let tree: ReactTestRenderer;
+  await act(async () => { tree = create(<Stage onNarration={onNarration} />); });
+  assert.equal(narration, copy.MOSSPROUT_GARDEN_RETURN.prompt);
+  await act(async () => tree!.root.findByType('Choices' as React.ElementType).props.onSelect('pleased'));
+  assert.match(narration!, /trying to look mysterious/);
+  const press = (title: string) => act(async () => tree!.root.findByProps({ title }).parent!.props.onPress());
+  assert.equal(tree!.root.findAllByProps({ title: 'Grow with Mossprout' }).length, 0, 'read the reply before the invitation');
+  await act(async () => tree!.root.findByProps({ label: 'Continue' }).props.onPress());
+  assert.equal(tree!.root.findAllByProps({ title: 'Grow with Mossprout' }).length, 0, 'FTUE skips the Grow gateway');
+  await press('Notice one small thing');
+  assert.equal(tree!.root.findAllByProps({ label: 'Back' }).length, 0);
+  assert.equal(narration, copy.MOSSPROUT_FIRST_NOTICE.prompt);
+  await act(async () => tree!.root.findByType('NoticeChoices' as React.ElementType).props.onSelect('later'));
+  assert.equal(run.stepId, 'companion.first_rest');
+  assert.deepEqual(actions, ['companion.choose_garden_return', 'companion.open_first_grow', 'companion.skip_first_notice']);
+  assert.equal(tree!.root.findAllByType('Completed' as React.ElementType).length, 0);
+  await act(async () => tree!.unmount());
+  run = { ...run, stepId: 'companion.first_notice' };
+  await act(async () => { tree = create(<Stage onNarration={onNarration} />); });
+  assert.equal(tree!.root.findAllByProps({ title: 'Grow with Mossprout' }).length, 0);
+  assert.equal(tree!.root.findAllByType('NoticeChoices' as React.ElementType).length, 1, 'resume opens the saved noticing conversation directly');
+  assert.equal(narration, copy.MOSSPROUT_FIRST_NOTICE.prompt);
+  await act(async () => tree!.unmount());
+});
+
+
+test('FTUE speech pages preserve the copy within the 120-character limit', async () => {
+  const { ftueDialoguePages, FTUE_DIALOGUE_MAX_CHARACTERS } = await import('../features/onboarding/ftue-dialogue-pages');
+  const { MOSSPROUT_FTUE_COPY } = await import('../features/onboarding/mossprout-ftue-copy');
+  const pages = ftueDialoguePages(MOSSPROUT_FTUE_COPY.farewell);
+  assert.equal(pages.length, 3);
+  for (const text of [MOSSPROUT_FTUE_COPY.farewell, 'A longer sentence with several words. '.repeat(12), 'x'.repeat(250)]) {
+    const split = ftueDialoguePages(text);
+    assert.ok(split.every((page) => page.length <= FTUE_DIALOGUE_MAX_CHARACTERS));
+    assert.equal(split.join('').replace(/\s/g, ''), text.replace(/\s/g, ''), 'no truncated words or omitted sentences');
+  }
+});
+
+test('Rest follows two Continue beats; failed saves retry the final action without replaying dialogue', async () => {
+  const copy = await import('../features/onboarding/mossprout-ftue-copy');
+  const { ftueDialoguePages } = await import('../features/onboarding/ftue-dialogue-pages');
+  const module = loadNativeModule('components/katchadeck/world/mossprout-ftue-rest-action.tsx', {
+    '@/components/katchadeck/ui/katcha-button': { KatchaButton: 'Button' },
+    '@/features/onboarding/mossprout-ftue-copy': copy,
+  });
+  const Rest = module.MossproutFtueRestAction as React.ComponentType<{ onNarration: (text: string | null) => void; onRest: () => Promise<void> }>;
+  let narration: string | null = null; let saves = 0; let fail = true;
+  const onRest = async () => { saves++; if (fail) throw new Error('save failed'); };
+  let tree: ReactTestRenderer;
+  await act(async () => { tree = create(<Rest onNarration={(text) => { narration = text; }} onRest={onRest} />); });
+  const pages = ftueDialoguePages(copy.MOSSPROUT_FTUE_COPY.farewell);
+  assert.equal(narration, pages[0]);
+  await act(async () => tree!.root.findByProps({ label: 'Continue' }).props.onPress());
+  assert.equal(narration, pages[1]); assert.equal(saves, 0);
+  await act(async () => tree!.root.findByProps({ label: 'Continue' }).props.onPress());
+  assert.equal(narration, pages[2]); assert.equal(saves, 0);
+  await act(async () => { const press = tree!.root.findByProps({ label: copy.MOSSPROUT_FTUE_COPY.restAction }).props.onPress; press(); press(); });
+  assert.equal(saves, 1); assert.equal(narration, pages[2]);
+  fail = false;
+  await act(async () => tree!.root.findByProps({ label: 'Try again' }).props.onPress());
+  assert.equal(saves, 2);
+  await act(async () => tree!.unmount());
+});
+
+test('hiding header Back removes the button while preserving the currency header', async () => {
+  const module = loadNativeModule('components/katchadeck/world/katchimera-page-header.tsx', {
+    'react-native': nativeViews, 'react-native-reanimated': nativeMotionHarness().animated,
+    'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 20, bottom: 0, left: 0, right: 0 }) },
+    '@/components/katchadeck/ui/bond-icon-art': { BondIconArt: 'Bond' },
+    '@/components/katchadeck/ui/reward-arrival-motion': {},
+    '@/components/katchadeck/ui/game-currency-hud': { GameCurrencyHud: 'Currency' },
+    '@/components/katchadeck/ui/katchimera-back-button': { KatchimeraBackButton: 'Back' },
+    '@/components/themed-text': { ThemedText: 'Text' }, '@/constants/theme': { AppFontFamilies: {} },
+    '@/constants/game-currency-art': { GAME_CURRENCY_ART: {} }, '@/constants/game-ui': { GameUI: { type: { title: {}, numeric: {} } } },
+    '@/features/ui/game-wallet-provider': { useGameWallet: () => ({ coins: 20 }) },
+    '@/utils/companion-bond': {}, '@/utils/companion-bond-storage': { loadCompanionBondState: () => ({}), subscribeCompanionBondState: () => () => {} },
+  });
+  const Header = module.KatchimeraPageHeader as React.ComponentType<{ hideBack?: boolean; navigationLocked: boolean; onBack: () => void }>;
+  let tree: ReactTestRenderer;
+  await act(async () => { tree = create(<Header hideBack navigationLocked onBack={() => {}} />); });
+  assert.equal(tree!.root.findAllByType('Back' as React.ElementType).length, 0);
+  assert.equal(tree!.root.findAllByType('Currency' as React.ElementType).length, 1);
+  await act(async () => tree!.update(<Header navigationLocked={false} onBack={() => {}} />));
+  assert.equal(tree!.root.findAllByType('Back' as React.ElementType).length, 1, 'regular interactions retain Back');
+  await act(async () => tree!.unmount());
 });

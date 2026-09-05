@@ -2047,7 +2047,9 @@ export function EggQuestionPanel({ action, completionEvent, enterFromBottom = fa
   const sourceRef = useRef<ViewType | null>(null);
   const [localSelection, setLocalSelection] = useState<CheckInSelection | null>(null);
   useEffect(() => { if (!interactionLocked) setLocalSelection(null); }, [interactionLocked]);
-  const visibleOptions = options.slice(0, 4);
+  // Only the first FTUE question uses the original five mood faces (3 + 2).
+  const moodQuestion = action.id === 'egg.day_texture';
+  const visibleOptions = options.slice(0, moodQuestion ? 5 : 4);
   return (
     <View collapsable={false} ref={sourceRef}>
       <InlineCheckInPanel
@@ -2058,14 +2060,16 @@ export function EggQuestionPanel({ action, completionEvent, enterFromBottom = fa
           feedImage: GAME_CURRENCY_ART.energy,
           icon: option.icon,
           id: option.id,
-          image: getFtueChoiceArt(option),
+          image: moodQuestion
+            ? MOOD_ART[MOOD_CHOICES.find((choice) => choice.id === option.domainChoiceId)?.state ?? 'meh']
+            : getFtueChoiceArt(option),
           label: option.label,
           surface: FTUE_CHOICE_TONES[index % FTUE_CHOICE_TONES.length].surface,
         }))}
         completionEvent={completionEvent}
         enterFromBottom={enterFromBottom}
         ftueQuestionLayout
-        fullRowIllustratedChoices={action.id.startsWith('egg.')}
+        fullRowIllustratedChoices={action.id.startsWith('egg.') && !moodQuestion}
         illustratedChoices
         interactionLocked={interactionLocked}
         metric={metric}

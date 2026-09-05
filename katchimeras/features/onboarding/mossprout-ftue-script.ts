@@ -1,11 +1,11 @@
-import { LIFE_HABITS } from '@/constants/companion-life-content';
+import { MOSSPROUT_GARDEN_RETURN, MOSSPROUT_FIRST_NOTICE } from './mossprout-first-grow';
 import { TODAY_GROWTH_REWARDS } from '@/utils/today-growth';
 import { MOSSPROUT_FIRST_MEMORY_SLOT_ID } from '@/utils/mossprout-garden-layout';
 
 import type { FtueScriptDefinition } from './ftue-types';
 import { STEPPLING_DISCOVERY_ID } from '@/constants/companion-discovery-catalog';
 import { MOSSPROUT_BOND_SHARE_PROMPTS } from './mossprout-bond-share';
-import { MOSSPROUT_FTUE_COPY as COPY, MOSSPROUT_DAY_OPTIONS, MOSSPROUT_HELP_OPTIONS, MOSSPROUT_WATER_OPTIONS } from './mossprout-ftue-copy';
+import { MOSSPROUT_FTUE_COPY as COPY, MOSSPROUT_DAY_OPTIONS, MOSSPROUT_HELP_OPTIONS } from './mossprout-ftue-copy';
 
 // 2.05 is the established, correctly framed world-map composition. Feeding
 // begins closer and retreats toward it; it must never retreat to the generic
@@ -143,7 +143,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 45,
+  version: 47,
   entryStepId: 'world.egg_intro',
   terminalStepId: 'complete',
   steps: [
@@ -556,12 +556,33 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'companion.water_together', surface: 'companion', navigation: mossproutCompanionResume,
       camera: mossproutWorldDialogueCamera,
-      guide: { eyebrow: 'Keep growing · optional', title: 'A little moment for you', body: COPY.waterQuestion },
-      actions: [{
-        id: 'companion.choose_water_together', title: 'Choose a daily habit', description: 'Appears each day. You can skip, change, or pause it.', icon: 'drop.fill',
-        presentation: 'observed_game_action', handlerId: 'player_profile', nextStepId: 'companion.first_rest',
-        options: [...MOSSPROUT_WATER_OPTIONS, ...LIFE_HABITS.filter((habit) => habit.familyId === 'mossprout').map((habit) => ({ id: `habit:${habit.id}`, label: habit.title, icon: 'leaf.fill' as const })), { id: 'habit:declined', label: 'Not now', icon: 'arrow.right' }],
-      }],
+      guide: { eyebrow: 'Our first garden', title: MOSSPROUT_GARDEN_RETURN.prompt, body: '' },
+      actions: [{ id: 'companion.choose_garden_return', title: 'A moment with Mossprout', description: '', icon: 'leaf.fill',
+        presentation: 'observed_game_action', handlerId: 'player_profile', nextStepId: 'companion.first_grow',
+        options: MOSSPROUT_GARDEN_RETURN.choices.map(({ id, label }) => ({ id, label, icon: 'leaf.fill' })) }],
+    },
+    {
+      id: 'companion.first_grow', surface: 'companion', navigation: mossproutCompanionResume,
+      camera: mossproutWorldDialogueCamera,
+      guide: { eyebrow: 'A little time together', title: MOSSPROUT_GARDEN_RETURN.invitation, body: '' },
+      actions: [{ id: 'companion.open_first_grow', title: 'Notice one small thing', description: 'Notice one small thing together.', icon: 'leaf.fill',
+        presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'companion.first_notice' }],
+    },
+    {
+      id: 'companion.first_notice', surface: 'companion', navigation: mossproutCompanionResume,
+      camera: mossproutWorldDialogueCamera,
+      guide: { eyebrow: 'Notice one small thing', title: MOSSPROUT_FIRST_NOTICE.prompt, body: '' },
+      actions: [
+        { id: 'companion.complete_first_notice', title: 'Notice one small thing', description: '', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'player_profile', nextStepId: 'companion.notice_bond_spotlight' },
+        { id: 'companion.skip_first_notice', title: 'Not now', description: '', icon: 'arrow.right', presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'companion.first_rest' },
+      ],
+    },
+    {
+      id: 'companion.notice_bond_spotlight', surface: 'companion', navigation: mossproutCompanionResume,
+      camera: mossproutWorldDialogueCamera,
+      guide: { eyebrow: 'Your Bond', title: 'That little moment grew your Bond.', body: 'Sharing everyday moments brings you and Mossprout closer.' },
+      actions: [{ id: 'companion.acknowledge_notice_bond', title: 'Continue', description: '', icon: 'arrow.right',
+        presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'companion.first_rest' }],
     },
     {
       id: 'companion.water_response', surface: 'companion', navigation: mossproutCompanionResume,
@@ -787,6 +808,13 @@ const retiredFirstSessionStepIds = new Set(MOSSPROUT_FTUE_SCRIPT.steps
   .map((step) => step.id));
 export function mossproutFtueStep(stepId: string) { return stepsById.get(stepId) ?? null; }
 export function mossproutFtueAction(stepId: string, actionId: string) { return mossproutFtueStep(stepId)?.actions.find((action) => action.id === actionId) ?? null; }
+/** World chrome must not leak through the separately hosted FTUE dialogue. */
+export function mossproutFtueShowsWorldGarden(stepId: string | null | undefined) {
+  return !stepId || stepId === 'complete' || [
+    'world.garden_arrival', 'world.seed_planted', 'world.garden_handoff',
+    'world.first_bloom_restore', 'world.first_seed_grew',
+  ].includes(stepId);
+}
 export function mossproutFtueUsesHostedCompanionStage(stepId: string | null | undefined) {
   // Meditation belongs to the world's real interaction host, with its own
   // camera entry, Back exit, and compact timer—not the opening Egg overlay.

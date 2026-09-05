@@ -1,6 +1,6 @@
 import { EggHeroGuide } from '@/components/katchadeck/onboarding/ftue-guide-copy';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, View } from 'react-native';
 import { Gesture } from 'react-native-gesture-handler';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,11 +21,14 @@ const movementChoices = (options: readonly { id: string; label: string }[]): Ftu
 const INTENT_CHOICES = movementChoices(STEPPLING_INTENT_OPTIONS);
 const MOVEMENT_CHOICES = movementChoices(STEPPLING_MOVEMENT_OPTIONS);
 
-export function StepplingEncounterPanel({ encounter, egg, cameraReady }: {
+export function StepplingEncounterPanel({ encounter, egg, cameraReady, onReady }: {
   encounter: ReturnType<typeof useStepplingEncounter>;
   egg?: StepplingEggProgress;
   cameraReady: boolean;
+  onReady?: () => void;
 }) {
+  const [laidOut, setLaidOut] = useState(false);
+  useEffect(() => { if (laidOut && cameraReady && egg) onReady?.(); }, [laidOut, cameraReady, egg, onReady]);
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const gesture = useMemo(() => Gesture.Pan().enabled(false), []);
@@ -81,6 +84,7 @@ export function StepplingEncounterPanel({ encounter, egg, cameraReady }: {
       : question ? STEPPLING_EGG_GUIDES.movement
         : stepOffer.steps > 0 ? STEPPLING_EGG_GUIDES.steps : STEPPLING_EGG_GUIDES.reading;
   return <>
+    <View pointerEvents="none" style={{ position: 'absolute', width: 1, height: 1 }} onLayout={() => setLaidOut(true)} />
     <EggHeroGuide guide={guide} topInset={insets.top} />
     <EggActionDock bottomInset={insets.bottom}>
     {encounter.error ? <GameSurface><ThemedText accessibilityRole="alert">{encounter.error}</ThemedText>

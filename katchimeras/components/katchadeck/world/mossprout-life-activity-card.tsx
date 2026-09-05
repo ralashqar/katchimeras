@@ -1,4 +1,4 @@
-import { CompanionNarrativePanel } from './companion-narrative-panel';
+import { MossproutNoticeChoices } from './mossprout-notice-choices';
 import Animated from 'react-native-reanimated';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
@@ -195,12 +195,7 @@ export function MossproutLifeActivityCard({ onOpenChange, onNarration, onBondRew
           <KatchaButton label="Back" disabled={mode === 'saving' || Boolean(flight) || waterBusy} onPress={back} />
         </ScrollView>
         {mode !== 'menu' ? <View style={{ position: 'absolute', bottom: 64, left: 0, right: 0 }}>
-          {mode === 'notice' ? <CompanionNarrativePanel accessibilityLabel="Noticing conversation" style={{ paddingTop: 8 }}>
-            <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} style={{ maxHeight: Math.max(180, height * 0.45) }}
-              contentContainerStyle={{ paddingTop: 6, paddingBottom: 20 }}>
-              <CompanionChoiceList options={choices} onSelect={select} />
-            </ScrollView>
-          </CompanionNarrativePanel> : <CompanionChoiceList presentation="single-column" disabled={mode === 'saving'} options={choices} onSelect={select} />}
+          {mode === 'notice' ? <MossproutNoticeChoices options={choices} onSelect={select} /> : <CompanionChoiceList presentation="single-column" disabled={mode === 'saving'} options={choices} onSelect={select} />}
         </View> : null}
       </Animated.View>
     </CompanionSceneOverlay>

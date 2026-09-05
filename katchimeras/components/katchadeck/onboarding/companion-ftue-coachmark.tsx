@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, useWindowDimensions, View, type View as ViewType } from 'react-native';
 import Animated, {
@@ -45,7 +45,7 @@ export function CompanionFtueCoachmark({
 }: {
   buttonLabel?: string;
   message: readonly GuideMessagePart[];
-  onContinue?: () => void;
+  onContinue?: () => void | Promise<void>;
   placement: 'above' | 'below';
   showFinger?: boolean;
   targetRef: RefObject<ViewType | null>;
@@ -53,6 +53,18 @@ export function CompanionFtueCoachmark({
   const { height, width } = useWindowDimensions();
   const { equippedFaceId, equippedSkinId } = useEggAvatar();
   const reduceMotion = useReducedMotion();
+  const continuingRef = useRef(false);
+  const [continuing, setContinuing] = useState(false);
+  const [continueFailed, setContinueFailed] = useState(false);
+  const continueStep = async () => {
+    if (continuingRef.current || !onContinue) return;
+    continuingRef.current = true;
+    setContinuing(true);
+    setContinueFailed(false);
+    try { await onContinue(); }
+    catch { setContinueFailed(true); }
+    finally { continuingRef.current = false; setContinuing(false); }
+  };
   const [focus, setFocus] = useState<Frame | null>(null);
   const [guideFaceId, setGuideFaceId] = useState<EggAvatarFaceId>(equippedFaceId);
   const avatarWobble = useSharedValue(0);
@@ -205,9 +217,11 @@ export function CompanionFtueCoachmark({
           {buttonLabel && onContinue ? (
             <Pressable
               accessibilityRole="button"
-              onPress={onContinue}
+              accessibilityState={{ busy: continuing, disabled: continuing }}
+              disabled={continuing}
+              onPress={continueStep}
               style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
-              <ThemedText style={styles.buttonLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">{buttonLabel}</ThemedText>
+              <ThemedText style={styles.buttonLabel} lightColor="#FFF9E9" darkColor="#FFF9E9">{continueFailed ? 'Try again' : buttonLabel}</ThemedText>
               <IconSymbol color="#FFF9E9" name="arrow.right" size={15} />
             </Pressable>
           ) : null}

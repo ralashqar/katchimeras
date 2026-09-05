@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Image } from 'expo-image';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -21,21 +21,21 @@ export function GlowGatewayGuide({ world, onClose, onOpenMerge }: {
   const [error, setError] = useState<string | null>(null);
   const [artReady, setArtReady] = useState(false);
   const [artAttempt, setArtAttempt] = useState(0);
-  if (!run) return null;
-  const complete = run.status === 'completed';
-  const scene = glowDiscoveryScene(complete ? 'gateway.egg' : run.nodeId);
-  const egg = complete || scene?.view.kind === 'discovery';
+  const pending = useRef(false);
+  if (!run || run.status === 'completed' || run.nodeId === 'egg.enter') return null;
+  const scene = glowDiscoveryScene(run.nodeId);
+  const egg = scene?.view.kind === 'discovery';
   const buying = scene?.view.kind === 'purchase';
   const affordable = world.coins >= GLOW.mistUnlockCost;
   const failed = run.status === 'failed_recoverable';
   const inLesson = run.nodeId.startsWith('lesson.');
   const failedPurchase = failed && run.nodeId.startsWith('gateway.purchase');
   const perform = async () => {
-    if (busy) return;
+    if (pending.current) return;
+    pending.current = true;
     setBusy(true); setError(null);
     try {
       if (failedPurchase && !affordable) { onOpenMerge(); return; }
-      if (complete) { onClose(); return; }
       if (failed) {
         const result = await dispatchContentFlowCommand(run.runId, { type: 'retry' });
         if (result?.nodeId.startsWith('lesson.') && result.status === 'active') onOpenMerge();
@@ -46,13 +46,14 @@ export function GlowGatewayGuide({ world, onClose, onOpenMerge }: {
       if (buying && !artReady) {
         setArtAttempt((value) => value + 1);
       } else if (scene) {
-        await submitGlowAction(scene.actionId);
+        const result = await submitGlowAction(scene.actionId);
+        if (!result || result.status === 'failed_recoverable' || result.nodeId === run.nodeId) throw new Error('That didn’t save. Please try again.');
         if (egg) onClose();
       } else {
         onOpenMerge();
       }
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Please try again.'); }
-    finally { setBusy(false); }
+    finally { pending.current = false; setBusy(false); }
   };
   return <Animated.View entering={FadeIn.duration(200)} style={{ position: 'absolute', left: 20, right: 20, bottom: insets.bottom + 20, gap: 10, zIndex: 85 }}>
     <View pointerEvents="none" accessibilityElementsHidden style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>

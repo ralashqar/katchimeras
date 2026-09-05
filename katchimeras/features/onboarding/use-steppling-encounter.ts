@@ -7,7 +7,7 @@ import { localDayId } from '@/utils/world-identity';
 import { IDLE_TODAY_HATCH_PRESENTATION, type TodayHatchPhase } from '@/utils/today-hatch-presentation';
 import { HATCH_PHASE_DELAYS_MS, REDUCED_HATCH_PHASE_DELAYS_MS } from '@/utils/hatch-reveal-timing';
 import type { WorldFtueSubjectPresentation } from '@/components/katchadeck/world/world-ftue-subject-presentation';
-import { stepplingEggReady, stepplingStepFeedOffer, STEPPLING_INTENT_BOND, STEPPLING_MOVEMENT_BOND, type StepplingEggAction, type StepplingEggProgress } from './steppling-egg-policy';
+import { stepplingEggHasBeenFed, stepplingEggReady, stepplingStepFeedOffer, STEPPLING_INTENT_BOND, STEPPLING_MOVEMENT_BOND, type StepplingEggAction, type StepplingEggProgress } from './steppling-egg-policy';
 import { useEggFeedController } from '@/features/today/use-egg-feed-controller';
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import { eggBondFeedPayload } from '@/features/today/egg-bond-feed';
@@ -48,7 +48,7 @@ export function useStepplingEncounter(world: MergeWorldState) {
   const enter = useCallback(async () => {
     setOpen(true);
     const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
-    await send({ kind: 'begin', sourceDayId: localDayId(yesterday) });
+    return send({ kind: 'begin', sourceDayId: localDayId(yesterday) });
   }, [send]);
   const close = useCallback(() => { if (!pending.current && !feedingRef.current && !hatching) { setOpen(false); setPhase('idle'); } }, [hatching]);
   const releaseFeedPanel = useCallback(() => {
@@ -128,7 +128,7 @@ export function useStepplingEncounter(world: MergeWorldState) {
   const presentation = useMemo<WorldFtueSubjectPresentation>(() => ({
     hatchFamilyId: 'steppling', companionVisible: Boolean(open && egg?.hatchedAt),
     preloadHatch: open,
-    feedbackKey: feedback, feedExpressionKey: eggFeedLaunchKey, growthProgress: 1, growthStage: 6,
+    feedbackKey: feedback, feedExpressionKey: eggFeedLaunchKey, growthProgress: 1, growthStage: stepplingEggHasBeenFed(feedingEgg ?? egg) ? 6 : 0,
     readyToHatch: stepplingEggReady(feedingEgg ?? egg) && !hatching && !egg?.hatchedAt, rewardPulseKey: 0,
     hatchPresentation: open && (hatching || egg?.hatchedAt) ? { ...IDLE_TODAY_HATCH_PRESENTATION, animationKey: egg?.hatchStartedAt ?? 0, phase, policy: 'ftue_discovery' } : null,
     onHatchAssetsReady: onAssetsReady, onHatchAssetsError: onAssetsReady,

@@ -9,6 +9,11 @@ export const MOSSPROUT_FIRST_REST_CONVERSATION_ID = 'mossprout:ftue:first-rest';
 const openingLines: Record<string, string> = {
   trying_to_start: 'Oh! Getting started can be tricky. Hatching took me a while too.',
   too_much_at_once: 'There was a lot happening outside my shell. We can start with one thing.',
+  radiant: 'I felt a little burst of sunshine in there. I’m glad we get to share it.',
+  light: 'There was a gentle warmth around my shell. I think that was you.',
+  meh: 'A quiet sort of day? We don’t have to make it into anything bigger.',
+  heavy: 'A heavy day. We can take our time here. I’m glad you came.',
+  stormy: 'Sounds like there’s a lot moving around inside. We can start with one small thing.',
   pretty_good: 'So that little patch of sunshine was you.',
   mostly_drifting: 'Oh! I felt the breeze carrying us along. Drifting can still bring you somewhere new.',
   taking_today_as_it_comes: 'Seeing where the day takes us? I’ve only just acquired feet. Excellent timing.',

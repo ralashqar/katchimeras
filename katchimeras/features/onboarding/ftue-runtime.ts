@@ -87,6 +87,11 @@ function scheduleReceiptSync() {
 }
 
 function migrateCurrentScript(run: FtueRunState): FtueRunState {
+  if (run.scriptVersion >= 44 && run.scriptVersion < 46) {
+    const completedHabitOffer = run.stepId === 'companion.water_together' && Boolean(run.answers['companion.choose_water_together']);
+    return { ...run, scriptVersion: MOSSPROUT_FTUE_SCRIPT.version,
+      stepId: completedHabitOffer ? 'companion.first_rest' : streamlinedFtueStep(run), updatedAt: new Date().toISOString() };
+  }
   if (run.scriptVersion === 43) {
     return { ...run, scriptVersion: MOSSPROUT_FTUE_SCRIPT.version, stepId: streamlinedFtueStep(run), updatedAt: new Date().toISOString() };
   }
@@ -575,6 +580,12 @@ export function ftuePersonalizedLine(run = loadFtueRun()) {
   const opening = Object.values(run?.answers ?? {}).find((answer) => answer.actionId.startsWith('egg.') && !answer.private);
   const id = companionGoal?.optionId ?? context?.optionId ?? opening?.optionId;
   const lines: Record<string, string> = {
+    radiant: 'I felt a little burst of sunshine in there. I’m glad we get to share it.',
+    light: 'There was a gentle warmth around my shell. I think that was you.',
+    meh: 'A quiet sort of day? We don’t have to make it into anything bigger.',
+    heavy: 'A heavy day. We can take our time here. I’m glad you came.',
+    stormy: 'Sounds like there’s a lot moving around inside. We can start with one small thing.',
+
     trying_to_start: 'I felt that in there—like a little root pushing against hard soil.',
     too_much_at_once: 'I felt the rain drumming on my shell. We can hold one small piece at a time.',
     pretty_good: 'I felt that warm patch of sunlight. I think it helped me hatch.',
@@ -604,7 +615,7 @@ export function ftuePersonalizationKey(run = loadFtueRun()) {
   const context = run?.answers['egg.context.activity'];
   const opening = Object.values(run?.answers ?? {}).find((answer) => answer.actionId.startsWith('egg.') && !answer.private);
   const id = companionGoal?.optionId ?? context?.optionId ?? opening?.optionId ?? 'default';
-  return ['trying_to_start', 'too_much_at_once', 'pretty_good', 'mostly_drifting', 'taking_today_as_it_comes', 'more_energy', 'more_calm', 'something_new', 'more_confidence', 'more_fun', 'more_connection', 'calm', 'encouragement', 'fun', 'company', 'discovery', 'outside', 'family', 'friends', 'relaxing', 'work', 'tired', 'rough', 'home'].includes(id)
+  return ['radiant', 'light', 'meh', 'heavy', 'stormy', 'trying_to_start', 'too_much_at_once', 'pretty_good', 'mostly_drifting', 'taking_today_as_it_comes', 'more_energy', 'more_calm', 'something_new', 'more_confidence', 'more_fun', 'more_connection', 'calm', 'encouragement', 'fun', 'company', 'discovery', 'outside', 'family', 'friends', 'relaxing', 'work', 'tired', 'rough', 'home'].includes(id)
     ? id
     : 'default';
 }

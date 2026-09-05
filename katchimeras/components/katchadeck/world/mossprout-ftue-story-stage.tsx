@@ -1,4 +1,5 @@
-import { MossproutFirstLifeMoment } from './mossprout-first-life-moment';
+import { MossproutFtueRestAction } from './mossprout-ftue-rest-action';
+import { MossproutFirstGrowStage } from './mossprout-first-grow-stage';
 import { useEffect, useState } from 'react';
 import { Image } from 'expo-image';
 import {
@@ -32,18 +33,18 @@ import {
   mossproutFirstSeedForIntent,
 } from '@/features/onboarding/mossprout-bond-share';
 import { mossproutMemoryPlantById } from '@/constants/mossprout-memory-plants';
-import { MOSSPROUT_FTUE_COPY as COPY } from '@/features/onboarding/mossprout-ftue-copy';
 
 const INTRODUCTION_REWARD = { amount: MOSSPROUT_FTUE_NAME_BOND_REWARD_PREVIEW, kind: 'bond' as const };
 const BOND_SHARE_REWARD = { amount: MOSSPROUT_FTUE_BOND_SHARE_REWARD_PREVIEW, kind: 'bond' as const };
 
-export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActionIcon = 'leaf.fill', gardenStoryActionLabel = 'Show me the Garden', mode = 'garden', nickname, onBondRewardRequest, onContinue, onOpenMerge, pendingBondCelebration }: {
+export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActionIcon = 'leaf.fill', gardenStoryActionLabel = 'Show me the Garden', mode = 'garden', nickname, onNarration, onBondRewardRequest, onContinue, onOpenMerge, pendingBondCelebration }: {
   actionStackTargetRef?: RefObject<ViewType | null>;
   activeBondQuestionId?: string | null;
   gardenStoryActionIcon?: string;
   gardenStoryActionLabel?: string;
-  mode?: 'intro_action' | 'nickname' | 'bond' | 'bond_choice' | 'garden_intro' | 'water_together' | 'water_response' | 'first_insight' | 'meditating' | 'resident_result' | 'garden';
+  mode?: 'intro_action' | 'nickname' | 'bond' | 'bond_choice' | 'garden_intro' | 'water_together' | 'first_grow' | 'notice_bond' | 'water_response' | 'first_insight' | 'meditating' | 'resident_result' | 'garden';
   nickname?: string | null;
+  onNarration?: (text: string | null) => void;
   onBondQuestionChange?: (promptId: string | null) => void;
   onBondRewardRequest?: (source: DayActionSourceRect, onArrive: () => void, receipt: CompanionBondAwardReceipt) => void;
   onContinue?: (nickname?: string) => void;
@@ -74,6 +75,9 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
   useEffect(() => {
     setDraft(nickname ?? '');
   }, [nickname]);
+
+  // The shared header coachmark owns this step; no action cards behind it.
+  if (mode === 'notice_bond') return null;
 
   if (mode === 'intro_action') return (
     <Animated.View entering={FadeInUp.duration(220)} style={styles.plainActionStage}>
@@ -223,13 +227,13 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
     </Animated.View>
   );
 
-  if (mode === 'water_together') {
-    return <MossproutFirstLifeMoment onContinue={onContinue} />;
+  if (mode === 'water_together' || mode === 'first_grow') {
+    return <MossproutFirstGrowStage onNarration={onNarration} onBondRewardRequest={onBondRewardRequest} />;
   }
 
   if (mode === 'water_response') return (
     <Animated.View entering={FadeInUp.duration(220)} style={styles.actionStage}>
-      <PrimaryAction icon="moon.stars.fill" label={COPY.restAction} onPress={() => onContinue?.()} />
+      <MossproutFtueRestAction onNarration={onNarration} onRest={onContinue} />
     </Animated.View>
   );
 

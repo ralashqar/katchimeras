@@ -83,6 +83,7 @@ test('Steppling retains the answering card across camera unsettles and changed s
     '@/components/katchadeck/ui/game-surface': { GameSurface: host('Surface') },
     '@/components/katchadeck/ui/katcha-button': { KatchaButton: host('Button') },
     '@/components/katchadeck/onboarding/scripted-action-list': { ScriptedActionList: List },
+    '@/components/katchadeck/onboarding/ftue-guide-copy': { EggHeroGuide: host('Guide') },
     '@/components/katchadeck/home/today-nurture-experience': { EggActionDock: host('Dock'), EggQuestionPanel: Question },
     '@/features/onboarding/egg-question-action': { eggQuestionAction },
     '@/features/onboarding/steppling-egg-policy': stepplingPolicy,
@@ -260,4 +261,63 @@ for (const phase of ['reveal', 'react']) {
     await act(async () => { tree!.unmount(); });
   });
 }
+}
+
+
+for (const reducedMotion of [false, true]) {
+  test(`Steppling Egg shares every tile reveal frame and stays asleep before feeding (reduced motion: ${reducedMotion})`, async () => {
+    const clock = nativeMotionHarness();
+    const canvasPath = 'components/katchadeck/world/kingdom-hex-canvas.tsx';
+    const globals = {
+      ...React, ...clock.animated, useReducedMotion: () => true,
+      Animated: clock.animated.default, View: host('View'), Pressable: host('Pressable'),
+      StyleSheet: nativeViews.StyleSheet, styles: {},
+      SeamlessWorldImage: host('WorldImage'), worldImageSourceKey: String,
+      kingdomHexTileSourceForLod: (layer: { source: number }) => layer.source,
+      kingdomHexTileOverlaySourceForLod: () => null, havenUpgradeLayerArtChanges: () => true,
+      useEggAvatar: () => ({ equippedFaceId: 'gentle-smile' }),
+      eggVisualGrowthForEnergyRatio: (value: number) => value,
+      worldEggReadyEffectsVisible: () => false,
+      EggAvatarArtwork: host('EggArt'), WorldEggRadiance: host('Radiance'), WorldEggRippleField: host('Ripple'),
+      WORLD_FTUE_EGG_WIDTH: 100, WORLD_FTUE_EGG_HEIGHT: 120, WORLD_FTUE_EGG_NATIVE_SURFACE_SCALE: 2,
+      WORLD_FTUE_CREATURE_NATIVE_SURFACE_SCALE: 2, WORLD_FTUE_HATCH_SUNBURST_SIZE: 100,
+      WORLD_FTUE_REWARD_GLOW_SIZE: 100, WORLD_FTUE_PULSE_RING_NATIVE_SURFACE_SCALE: 2,
+    };
+    const Tile = loadNativeModule(canvasPath, {}, globals, 'HavenUpgradeTileArt').HavenUpgradeTileArt as React.ComponentType<Record<string, unknown>>;
+    const Egg = loadNativeModule(canvasPath, {}, globals, 'RevealedCompanionEgg').RevealedCompanionEgg as React.ComponentType<Record<string, unknown>>;
+    function Scene({ handoff = false, fed = false, feeding = false }: { handoff?: boolean; fed?: boolean; feeding?: boolean }) {
+      const progress = clock.animated.useSharedValue(0);
+      return <>
+        {!handoff && <Tile fromLayer={{ source: 1, frame: {} }} toLayer={{ source: 2, frame: {} }} imageLod="full" phase="reveal" reducedMotion={reducedMotion} sharedRevealProgress={progress} />}
+        <Egg fullSize idleDiscovery={!feeding} revealProgress={handoff ? undefined : progress}
+          cameraScale={{ value: 1 }} cameraTranslateX={{ value: 0 }} cameraTranslateY={{ value: 0 }}
+          x={100} y={100} sceneWidth={400} sceneHeight={800} eggSkinId="moss"
+          presentation={{ growthStage: fed ? 6 : 0, feedExpressionKey: feeding ? 1 : 0 }} />
+      </>;
+    }
+    let tree: ReactTestRenderer;
+    await act(async () => { tree = create(<Scene />); });
+    const egg = () => tree!.root.findByType((Egg as unknown as { type: React.ElementType }).type);
+    const eggAlpha = () => egg().findAllByType(host('AnimatedView'))[0].props.style[2].read().opacity;
+    const tileAlpha = () => tree!.root.findByType((Tile as unknown as { type: React.ElementType }).type).findAllByType(host('AnimatedView'))[1].props.style[2].read().opacity;
+    await act(async () => clock.advance(1500));
+    assert.equal(eggAlpha(), 0, 'no early Egg while the tile is decoding');
+    assert.equal(egg().findByType(host('EggArt')).props.faceId, 'sleepy');
+    assert.equal(egg().findByType(host('EggArt')).props.expressionSequence, undefined);
+    await act(async () => { tree!.root.findAllByType(host('WorldImage')).forEach((image) => image.props.onSettled()); });
+    await act(async () => clock.advance(reducedMotion ? 90 : 240));
+    assert.equal(tileAlpha(), 0.5); assert.equal(eggAlpha(), tileAlpha());
+    await act(async () => clock.advance(reducedMotion ? 90 : 240));
+    assert.equal(tileAlpha(), 1); assert.equal(eggAlpha(), 1);
+    const originalEgg = egg();
+    await act(async () => tree!.update(<Scene handoff />));
+    assert.equal(egg(), originalEgg, 'reveal-to-interaction handoff retains the Egg');
+    assert.equal(eggAlpha(), 1, 'no second entrance fade');
+    assert.equal(egg().findByType(host('EggArt')).props.faceId, 'sleepy');
+    await act(async () => tree!.update(<Scene handoff feeding />));
+    assert.equal(egg().findByType(host('EggArt')).props.expressionSequence[0].faceId, 'big-grin', 'feeding uses the shared wake/reaction sequence');
+    await act(async () => tree!.update(<Scene handoff fed />));
+    assert.equal(egg().findByType(host('EggArt')).props.faceId, 'curious', 'saved feeding keeps the Egg awake');
+    await act(async () => tree!.unmount());
+  });
 }

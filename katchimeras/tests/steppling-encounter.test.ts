@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
 import { normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 import { GLOW_GATEWAY_ID, glowGatewayState } from '@/utils/merge-world/glow-discovery-policy';
-import { stepplingEggReady, stepplingStepFeedOffer, stepplingStepsBond, STEPPLING_INTENT_OPTIONS, STEPPLING_MOVEMENT_OPTIONS, type StepplingEggAction } from '@/features/onboarding/steppling-egg-policy';
+import { stepplingEggHasBeenFed, stepplingEggReady, stepplingStepFeedOffer, stepplingStepsBond, STEPPLING_INTENT_OPTIONS, STEPPLING_MOVEMENT_OPTIONS, type StepplingEggAction } from '@/features/onboarding/steppling-egg-policy';
 import { STEPPLING_DAY_ONE_FLOW, STEPPLING_PARCEL_REWARD_ID } from '@/features/content-flow/steppling-day-one-flow';
 import { validateContentFlowDefinition } from '@/features/content-flow/content-flow-compiler';
 import { createContentFlowRun, reduceContentFlow, contentFlowEffectKey } from '@/features/content-flow/content-flow-interpreter';
@@ -342,5 +342,15 @@ test('Day 1 is a normal resumable journey; every answer reaches one parcel effec
     assert.equal(run.variables.movementChoice, id);
     run = reduceContentFlow(STEPPLING_DAY_ONE_FLOW, run, { type: 'effect_completed', effectKey: contentFlowEffectKey(run, 'parcel'), result: { rewardId: STEPPLING_PARCEL_REWARD_ID } }).run;
     assert.equal(run.status, 'completed');
+  }
+});
+
+
+test('Steppling sleeps on discovery and entry; successful feeding stays awake across reload', () => {
+  assert.equal(stepplingEggHasBeenFed(undefined), false);
+  const sleeping = { sourceDayId: '2026-09-05', intent: null, fedSteps: 0, alternative: null, hatchStartedAt: null, hatchedAt: null };
+  assert.equal(stepplingEggHasBeenFed(sleeping), false);
+  for (const fed of [{ ...sleeping, intent: 'own-pace' }, { ...sleeping, fedSteps: 100 }, { ...sleeping, alternative: 'rest' }]) {
+    assert.equal(stepplingEggHasBeenFed(JSON.parse(JSON.stringify(fed))), true);
   }
 });

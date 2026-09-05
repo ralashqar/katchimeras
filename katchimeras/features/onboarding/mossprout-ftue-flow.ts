@@ -60,7 +60,7 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
   id: 'mossprout-first-session',
   // Independent from the legacy FTUE schema version. Bumping this lets v39
   // journal runs migrate onto the direct manifest without mutating a release.
-  version: 47,
+  version: 49,
   entryNodeId: 'world.egg_intro',
   metadata: {
     kind: 'ftue' as const,
@@ -147,7 +147,13 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
       capability: 'relationship.first_bloom_bond',
       next: 'companion.water_together',
     }),
-    scene('companion.water_together', 'companion', [{ id: 'companion.choose_water_together', next: 'companion.first_rest' }]),
+    scene('companion.water_together', 'companion', [{ id: 'companion.choose_garden_return', next: 'companion.first_grow' }]),
+    scene('companion.first_grow', 'companion', [{ id: 'companion.open_first_grow', next: 'companion.first_notice' }]),
+    scene('companion.first_notice', 'companion', [
+      { id: 'companion.complete_first_notice', next: 'companion.notice_bond_spotlight' },
+      { id: 'companion.skip_first_notice', next: 'companion.first_rest' },
+    ]),
+    scene('companion.notice_bond_spotlight', 'companion', [{ id: 'companion.acknowledge_notice_bond', next: 'companion.first_rest' }]),
     scene('companion.first_rest', 'companion', [{ id: 'companion.begin_rest', next: 'effect.relationship.begin_meditation' }]),
     story.effect({
       id: 'effect.relationship.begin_meditation',

@@ -1,3 +1,6 @@
+import { useFtueMistHandoff } from '@/features/onboarding/use-ftue-mist-handoff';
+import { isMossproutFirstGrowStep } from '@/features/onboarding/mossprout-first-grow';
+import { startGlowDiscovery } from '@/features/onboarding/glow-discovery-runtime';
 import { useCompanionCameraCover } from '@/hooks/use-companion-camera-cover';
 import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -11,7 +14,7 @@ import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { markFlowStart, reportFlowReady } from '@/utils/flow-performance';
 import { companionIdForFamily, familyIdFromCompanionId } from '@/constants/katchimera-skins';
 import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
-import { advanceFtueActionDurably, commitFtueAction, completeFtueRun, flushFtuePersistence, ftueWispForRun, loadFtueRun, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { advanceFtueActionDurably, commitFtueAction, flushFtuePersistence, ftueWispForRun, loadFtueRun, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { activateStoredResidentCardDiscovery, installMossproutOnboardingMergeWorld, loadMergeWorldState, seedStoredMossproutGardenAfterFtue } from '@/utils/merge-world/repository';
 import { useGameScreenTransition } from '@/features/navigation/game-screen-transition';
 import { useCompanionDiscoveryRecords } from '@/hooks/use-companion-discovery-records';
@@ -101,6 +104,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   const stepplingDayOne = useStepplingDayOne(familyId === 'steppling' && surfaceActive);
   const ftueHandoffRef = useRef(false);
   const [mistHandoffActive, setMistHandoffActive] = useState(false);
+  const [mistHandoffError, setMistHandoffError] = useState(false);
   const postFtueGardenRepairRef = useRef<string | null>(null);
   const ftueRun = useFtueRun();
   const discovery = useCompanionDiscoveryRecords();
@@ -121,8 +125,9 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     ? { ...ftueRun, stepId: 'companion.resident_match_result' }
     : ftueRun;
   const ftueCompanionSurfaceOwned = Boolean(
-    navigationFtueRun?.status === 'active'
-    && mossproutFtueStep(navigationFtueRun.stepId)?.surface === 'companion'
+    (navigationFtueRun?.status === 'active'
+    && mossproutFtueStep(navigationFtueRun.stepId)?.surface === 'companion')
+    || mistHandoffActive
   );
   const ftueNavigationLocked = useFtueNavigationLock(navigationFtueRun, 'companion', surfaceActive);
   const latestMossproutJourney = [...relationships.journeyDays].reverse().find((journey) => journey.familyId === 'mossprout') ?? null;
@@ -321,12 +326,33 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       await completeResidentResultExit('mossprout:ftue:resident-match-result');
     }
   }, [completeResidentResultExit, ftueConversationDefinitionId]);
+  const continueToMist = useCallback(async () => {
+    if (ftueHandoffRef.current) return;
+    ftueHandoffRef.current = true;
+    setMistHandoffActive(true);
+    setMistHandoffError(false);
+    try {
+      await advanceFtueActionDurably({ expectedStepId: 'companion.meditating', actionId: 'companion.tend_garden', evidenceRef: 'mossprout:playable-handoff' });
+      await startGlowDiscovery();
+      if (hostedInHaven) onHostedClose?.();
+      else {
+        const accepted = transitionTo({ announcement: 'Exploring the mist', target: 'katchimeras', navigate: () => router.replace('/(tabs)/katchimeras') });
+        if (!accepted) throw new Error('The world is not ready');
+      }
+    } catch {
+      setMistHandoffError(true);
+    } finally { ftueHandoffRef.current = false; }
+  }, [hostedInHaven, onHostedClose, router, transitionTo]);
+  const pendingMistExit = useFtueMistHandoff({ run: ftueRun,
+    active: surfaceActive && familyId === 'mossprout', handoffActive: mistHandoffActive, onHandoff: continueToMist });
+  useEffect(() => {
+    if (!surfaceActive) { setMistHandoffActive(false); setMistHandoffError(false); }
+  }, [surfaceActive]);
   const completeFtueProfileStep = useCallback((nickname?: string) => {
     const run = loadFtueRun();
     if (run?.status !== 'active') return;
     if (run.stepId === 'companion.first_rest') {
-      void completeFtueConversation().catch((error) => console.warn('Could not start Mossprout meditation', error));
-      return;
+      return completeFtueConversation();
     }
     if (run.stepId === 'companion.resident_match_result') {
       void completeResidentResultExit('mossprout:ftue:resident-match-result');
@@ -441,41 +467,11 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       if (nextRun?.status !== 'active' || nextRun.stepId !== 'companion.first_rest') return;
       return;
     }
-    if (run.stepId === 'companion.meditating') {
-      if (ftueHandoffRef.current) return;
-      ftueHandoffRef.current = true;
-      if (hostedInHaven) {
-        // The map is already mounted behind this interaction. Hand it back
-        // directly; gateway.focus owns the in-world pan/zoom after dismissal.
-        // Keep this latched through journal updates and the host's exit pan:
-        // losing the FTUE profile must not briefly reveal normal action cards.
-        setMistHandoffActive(true);
-        void advanceFtueActionDurably({ expectedStepId: 'companion.meditating', actionId: 'companion.tend_garden', evidenceRef: 'mossprout:playable-handoff' })
-          .then(() => onHostedClose?.())
-          .catch((error) => {
-            setMistHandoffActive(false);
-            console.warn('Could not start mist exploration', error);
-          })
-          .finally(() => { ftueHandoffRef.current = false; });
-        return;
-      }
-      const accepted = transitionTo({
-        announcement: 'Exploring the mist', target: 'katchimeras',
-        navigate: async () => {
-          try {
-            await advanceFtueActionDurably({ expectedStepId: 'companion.meditating', actionId: 'companion.tend_garden', evidenceRef: 'mossprout:playable-handoff' });
-            onHostedClose?.();
-            if (!hostedInHaven) router.replace('/(tabs)/katchimeras');
-          } finally { ftueHandoffRef.current = false; }
-        },
-      });
-      if (!accepted) ftueHandoffRef.current = false;
-      return;
-    }
+    if (run.stepId === 'companion.meditating') return continueToMist();
     if (run.stepId === 'companion.garden_intro') {
       commitFtueAction({ actionId: 'companion.acknowledge_garden_intro', evidenceRef: 'garden-intro:seen' });
     }
-  }, [completeFtueConversation, completeResidentResultExit, hostedInHaven, onHostedClose, router, transitionTo]);
+  }, [completeFtueConversation, completeResidentResultExit, continueToMist]);
   const completeFtueJourneyDay = useCallback(() => {
     const run = loadFtueRun();
     if (run?.status !== 'active' || run.stepId !== 'companion.day_one_action') return;
@@ -488,8 +484,13 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     });
     void scheduleMossproutJourneyDayReminder(completedDayId).catch(() => {});
   }, []);
-  const acknowledgeFtueBond = useCallback(() => {
+  const acknowledgeFtueBond = useCallback(async () => {
     const run = loadFtueRun();
+    if (run?.status === 'active' && run.stepId === 'companion.notice_bond_spotlight') {
+      await advanceFtueActionDurably({ expectedStepId: 'companion.notice_bond_spotlight',
+        actionId: 'companion.acknowledge_notice_bond', evidenceRef: 'mossprout-first-notice-bond-spotlight' });
+      return;
+    }
     if (run?.status !== 'active' || run.stepId !== 'companion.bond_spotlight') return;
     commitFtueAction({ actionId: 'companion.acknowledge_bond', evidenceRef: 'mossprout-bond-meter-spotlight' });
   }, []);
@@ -611,7 +612,11 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   // animation worklets behind Today, Merge, or a quest. All durable companion
   // progress already lives in the repositories and is rehydrated on focus.
   // A camera opened here retains this subtree so its Back restores the same menu.
-  if (hostedInHaven && mistHandoffActive) return null;
+  if (mistHandoffActive || pendingMistExit) return <View pointerEvents="box-none" style={styles.inactiveScreen}>
+    {mistHandoffError ? <View style={{ position: 'absolute', bottom: 40, left: 24, right: 24 }}>
+      <KatchaButton label="Explore the mist · Try again" onPress={() => void continueToMist()} />
+    </View> : null}
+  </View>;
 
   if (familyId === 'steppling' && (!stepplingDayOne.ready || stepplingDayOne.error)) {
     return <View pointerEvents="box-none" style={styles.inactiveScreen}>
@@ -649,8 +654,10 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
             ? 'bond_choice'
           : ftueRun?.status === 'active' && ftueRun.stepId === 'companion.garden_intro'
             ? 'garden_intro'
-            : ftueRun?.status === 'active' && ftueRun.stepId === 'companion.water_together'
-              ? 'water_together'
+            : ftueRun?.status === 'active' && ftueRun.stepId === 'companion.notice_bond_spotlight'
+              ? 'notice_bond'
+            : ftueRun?.status === 'active' && isMossproutFirstGrowStep(ftueRun.stepId)
+              ? 'first_grow'
             : ftueRun?.status === 'active' && (ftueRun.stepId === 'companion.water_response' || ftueRun.stepId === 'companion.first_rest')
               ? 'water_response'
             : ftueRun?.status === 'active' && ftueRun.stepId === 'companion.first_insight'
@@ -660,7 +667,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
             : ftueRun?.status === 'active' && ftueRun.stepId === 'companion.resident_match_result'
               ? 'resident_result'
             : null}
-      ftueBondSpotlightActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.bond_spotlight'}
+      ftueBondSpotlightActive={ftueRun?.status === 'active' && (ftueRun.stepId === 'companion.bond_spotlight' || ftueRun.stepId === 'companion.notice_bond_spotlight')}
       ftueDayOneActionActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.day_one_action'}
       ftueDayOneActionAnswerId={ftueRun?.answers['companion.choose_growth_intent']?.optionId
         ?? (ftueRun?.answers['egg.desired_help']?.optionId ? `desired-help:${ftueRun.answers['egg.desired_help'].optionId}` : null)}
@@ -678,10 +685,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       onCloseCompanion={() => {
         const run = loadFtueRun();
         if (run?.status === 'active' && run.stepId === 'companion.meditating') {
-          completeFtueRun();
-          if (hostedInHaven) onHostedClose?.();
-          else router.dismissTo('/(tabs)/katchimeras');
-          return;
+          return completeFtueProfileStep();
         }
         return hostedInHaven && onHostedClose ? onHostedClose() : ftueRouteOrigin && navigationFtueRun?.status !== 'active' ? transitionTo({
         announcement: 'Returning to Haven',

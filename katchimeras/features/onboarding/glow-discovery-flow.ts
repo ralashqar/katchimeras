@@ -24,7 +24,7 @@ export const GLOW_REPEAT_LESSON: readonly MergeLessonBeat[] = [
 ];
 export const GLOW_ALL_LESSON_BEATS = [...GLOW_LESSON, ...GLOW_REPEAT_LESSON];
 export const GLOW_DISCOVERY_FLOW = defineStory({
-  id: 'glow-steppling-discovery', version: 4, entryNodeId: 'gateway.focus', metadata: { kind: 'story' },
+  id: 'glow-steppling-discovery', version: 5, entryNodeId: 'gateway.focus', metadata: { kind: 'story' },
   nodes: [
     storyOperations.focusCamera({ id: 'gateway.focus', target: STEPPLING_STORY_TARGET, zoom: 1.2, anchorY: 0.46, durationMs: 900, next: 'garden.open' }),
     worldActionScene({ id: 'garden.open', actionId: 'open', next: 'lesson.prepare', view: { kind: 'garden', guide: { eyebrow: 'Light a path', title: 'Back to the Garden.', body: 'Complete requests to earn Glow.' }, actionLabel: 'Open Garden' } }),
@@ -36,7 +36,9 @@ export const GLOW_DISCOVERY_FLOW = defineStory({
     storyOperations.focusCamera({ id: 'gateway.return', target: STEPPLING_STORY_TARGET, zoom: 1.2, anchorY: 0.46, next: 'gateway.buy' }),
     worldActionScene({ id: 'gateway.buy', actionId: 'unlock', next: 'gateway.purchase.focus', view: { kind: 'purchase', guide: { eyebrow: 'Misty clearing', title: 'Let’s clear the mist.', body: 'Your Glow can make room for something new.' }, actionLabel: 'Clear mist' } }),
     ...upgradeWorldTargetRecipe({ id: 'gateway.purchase', target: STEPPLING_STORY_TARGET, toLevel: 1, economy: { mode: 'normal' }, cameraAlreadyFocused: true, presentation: { preset: 'mist-clear', reactionLine: 'A new beginning.', showCoins: true }, next: 'gateway.egg' }),
-    worldActionScene({ id: 'gateway.egg', actionId: 'done', next: 'complete', view: { kind: 'discovery', guide: { eyebrow: 'A new beginning', title: 'An Egg!', body: 'A new friend is resting inside. Your Garden is open—explore at your own pace.' }, actionLabel: 'Continue' } }), story.complete(),
+    worldActionScene({ id: 'gateway.egg', actionId: 'done', next: 'egg.enter', view: { kind: 'discovery', guide: { eyebrow: 'A new beginning', title: 'An Egg!', body: 'Someone is stirring inside. Let’s go and say hello.' }, actionLabel: 'Meet the egg' } }),
+    story.task({ id: 'egg.enter', capability: 'glow.discovery.task', surface: 'haven', taskId: 'egg.enter', requirements: [{ id: 'entered', event: { type: 'glow.egg.entered' } }], next: 'complete' }),
+    story.complete(),
   ],
   migrations: {
     'gateway.goal': 'garden.open',
@@ -64,6 +66,7 @@ export function glowDiscoveryRevealLocked(run: Pick<ContentFlowRun, 'nodeId' | '
     || run.nodeId === 'gateway.buy'
     || run.nodeId.startsWith('gateway.purchase.')
     || run.nodeId === 'gateway.egg'
+    || run.nodeId === 'egg.enter'
     || run.nodeId === 'complete'
   ));
 }

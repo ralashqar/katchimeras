@@ -2,7 +2,7 @@ import Animated from 'react-native-reanimated';
 import { useCompanionActionSlide } from '@/hooks/use-companion-action-slide';
 import { useCompanionStackLayout } from '@/hooks/use-companion-stack-layout';
 import { createContext, useContext, useLayoutEffect, useRef, useState, useId, useSyncExternalStore, type ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type ViewProps } from 'react-native';
 
 const ActionNavigationContext = createContext<ReturnType<typeof useCompanionActionSlide> | null>(null);
 export const useCompanionActionNavigation = () => useContext(ActionNavigationContext);
@@ -26,8 +26,20 @@ const OverlayContext = createContext<ReturnType<typeof createOverlayStore> | nul
 
 function OverlayOutlet({ store }: { store: ReturnType<typeof createOverlayStore> }) {
   const content = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
-  const layout = useCompanionStackLayout();
-  return <Animated.View collapsable={false} layout={layout} pointerEvents={content ? 'box-none' : 'none'} style={styles.overlay}>{content}</Animated.View>;
+  return <CompanionStackFrame pointerEvents={content ? 'box-none' : 'none'} style={styles.overlay}>{content}</CompanionStackFrame>;
+}
+
+/** Keep content top-aligned while its bottom-anchored footprint closes the gap.
+ * Measuring an unconstrained inner view avoids feeding the animated height back
+ * into the next measurement, including through the action ScrollViews.
+ */
+function CompanionStackFrame({ children, style, overlay, ...props }: ViewProps & { overlay?: ReactNode }) {
+  const { measured, frameStyle, onContentLayout } = useCompanionStackLayout();
+  return <Animated.View {...props} collapsable={false} style={[style, frameStyle]}>
+    <View collapsable={false} pointerEvents="box-none" onLayout={onContentLayout}
+      style={measured ? styles.measuredContent : undefined}>{children}</View>
+    {overlay}
+  </Animated.View>;
 }
 
 /** Orders sit outside the card ScrollView and never contribute to its height. */
@@ -35,16 +47,14 @@ export function CompanionSceneOverlayHost({ children }: { children: ReactNode })
   const inherited = useContext(OverlayContext);
   const [store] = useState(createOverlayStore);
   const navigation = useCompanionActionSlide();
-  const layout = useCompanionStackLayout(true);
   if (inherited) return <>{children}</>;
   return <OverlayContext.Provider value={store}><ActionNavigationContext.Provider value={navigation}>
-    <Animated.View collapsable={false} layout={layout}>
+    <CompanionStackFrame overlay={<OverlayOutlet store={store} />}>
       <Animated.View collapsable={false} style={navigation.rootStyle} pointerEvents={navigation.active ? 'none' : 'auto'}
         accessibilityElementsHidden={navigation.active} importantForAccessibility={navigation.active ? 'no-hide-descendants' : 'auto'}>
         {children}
       </Animated.View>
-      <OverlayOutlet store={store} />
-    </Animated.View>
+    </CompanionStackFrame>
   </ActionNavigationContext.Provider></OverlayContext.Provider>;
 }
 
@@ -63,6 +73,7 @@ export function CompanionSceneOverlay({ visible, children }: { visible: boolean;
 }
 
 const styles = StyleSheet.create({
+  measuredContent: { position: 'absolute', top: 0, left: 0, right: 0 },
   overlay: { position: 'absolute', bottom: 0, left: 0, right: 0 },
 });
 

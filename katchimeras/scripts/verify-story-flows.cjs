@@ -6,6 +6,7 @@ const result = spawnSync(process.platform === 'win32' ? 'npx.cmd' : 'npx', [
   'tests/content-flow.test.ts',
   'tests/ftue-script.test.ts',
   'tests/glow-discovery.test.ts',
+  'tests/glow-egg-handoff.test.tsx',
   'tests/steppling-encounter.test.ts',
   'tests/companion-journey-cycle.test.ts',
   'tests/companion-journey-service.test.ts',

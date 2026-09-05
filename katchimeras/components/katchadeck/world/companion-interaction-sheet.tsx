@@ -1,3 +1,4 @@
+import { ftueDialoguePages } from '@/features/onboarding/ftue-dialogue-pages';
 import { useCompanionDestinationMotion } from '@/hooks/use-companion-destination-motion';
 import { CompanionEnvironmentGestureContext } from './companion-environment-gesture-context';
 import { CompanionFirstRestCards } from './companion-first-rest-cards';
@@ -154,7 +155,7 @@ import { useGameSurfaceReadiness } from '@/features/navigation/game-screen-trans
 import { localDayId } from '@/utils/world-identity';
 import { mossproutCampaignEpisodeByOpeningId } from '@/constants/mossprout-campaign';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
-import { MOSSPROUT_BOND_SHARE_PROMPTS, MOSSPROUT_SUPPORT_STYLE_OPTIONS, mossproutBondSharePrompt, mossproutBondShareSelection, mossproutFirstSeedForIntent, mossproutWaterTogetherReply } from '@/features/onboarding/mossprout-bond-share';
+import { MOSSPROUT_BOND_SHARE_PROMPTS, MOSSPROUT_SUPPORT_STYLE_OPTIONS, mossproutBondSharePrompt, mossproutBondShareSelection, mossproutFirstSeedForIntent } from '@/features/onboarding/mossprout-bond-share';
 import { mossproutGardenIntroBeat } from '@/features/onboarding/mossprout-garden-intro';
 import { MOSSPROUT_FTUE_COPY, MOSSPROUT_GREETING_OPTIONS, mossproutSeedIntroduction } from '@/features/onboarding/mossprout-ftue-copy';
 import { recordMossproutOnboardingAnswer } from '@/features/onboarding/mossprout-profile';
@@ -192,7 +193,7 @@ export type CompanionInteractionSheetProps = {
   onInitialConversationComplete?: () => void | Promise<void>;
   onCompletedConversationExit?: (definitionId: string) => boolean | Promise<boolean>;
   ftueOrderPreviewActive?: boolean;
-  ftueProfileStep?: 'intro_action' | 'nickname' | 'bond' | 'bond_choice' | 'garden_intro' | 'water_together' | 'water_response' | 'first_insight' | 'meditating' | 'resident_result' | null;
+  ftueProfileStep?: 'intro_action' | 'nickname' | 'bond' | 'bond_choice' | 'garden_intro' | 'water_together' | 'first_grow' | 'notice_bond' | 'water_response' | 'first_insight' | 'meditating' | 'resident_result' | null;
   ftueBondSpotlightActive?: boolean;
   ftueDayOneActionActive?: boolean;
   ftueDayOneActionAnswerId?: string | null;
@@ -202,7 +203,7 @@ export type CompanionInteractionSheetProps = {
   ftueNavigationLocked?: boolean;
   /** Active FTUE owns this companion surface; normal dashboard must fail closed. */
   ftueCompanionSurfaceOwned?: boolean;
-  onFtueBondSpotlightComplete?: () => void;
+  onFtueBondSpotlightComplete?: () => void | Promise<void>;
   onFtueOpenMerge?: () => void;
   onFtueProfileContinue?: (nickname?: string) => void;
   /** Retained for host compatibility; meditation now uses ordinary daily actions. */
@@ -359,8 +360,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const relationships = useRelationshipProgression();
   const journeyCycle = currentJourneyCycle(relationships, props.familyId);
   useEffect(() => {
-    if (props.familyId === 'mossprout' && !props.ftueProfileStep) adoptMossproutCycle();
-  }, [props.familyId, props.ftueProfileStep, relationships.journeyDays]);
+    if (props.familyId === 'mossprout' && !props.ftueCompanionSurfaceOwned && !props.ftueProfileStep) adoptMossproutCycle();
+  }, [props.familyId, props.ftueCompanionSurfaceOwned, props.ftueProfileStep, relationships.journeyDays]);
   const storedMeditation = katchimeraMeditationRecord(relationships, props.familyId);
   const meditationAvailableAt = storedMeditation?.availableAt;
   const [meditationNow, setMeditationNow] = useState(Date.now());
@@ -467,7 +468,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const [showFeastleDashboard, setShowFeastleDashboard] = useState(false);
   const [showBaristabbitDashboard, setShowBaristabbitDashboard] = useState(false);
   const [showJourneyCohortDashboard, setShowJourneyCohortDashboard] = useState(false);
-  const unifiedJourneyActive = !props.ftueProfileStep && !showJourneyCohortDashboard && (
+  const unifiedJourneyActive = !props.ftueCompanionSurfaceOwned && !props.ftueProfileStep && !showJourneyCohortDashboard && (
     props.familyId === 'steppling' || (props.familyId === 'mossprout' && journeyCycle != null && journeyCycle.returnedAt == null)
   );
   const [showMossproutDashboard, setShowMossproutDashboard] = useState(false);
@@ -1473,7 +1474,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           : props.ftueProfileStep === 'water_together'
             ? MOSSPROUT_FTUE_COPY.waterQuestion
           : props.ftueProfileStep === 'water_response'
-            ? `${mossproutWaterTogetherReply(ftueProfile.waterTogetherChoiceId)}\n\n${MOSSPROUT_FTUE_COPY.farewell}`
+            ? ftueDialoguePages(MOSSPROUT_FTUE_COPY.farewell)[0]
           : props.ftueProfileStep === 'first_insight'
             ? `${mossproutFirstSeedForIntent(loadOnboardingProfile().mossproutAnswers.growthIntentId).message} Did I get that right?`
           : props.ftueProfileStep === 'resident_result'
@@ -1485,7 +1486,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   // Meditation is the creature's persistent visual state, not a navigation
   // lock. Once an action opens a conversation, its prompt must reclaim the
   // speech bubble while the meditating artwork remains in the world.
-  const meditationDashboardActive = Boolean(!quickGoalPickerOpen && !unifiedJourneyActive && meditation && route.kind !== 'conversation' && route.kind !== 'visit');
+  const meditationDashboardActive = Boolean((!props.ftueCompanionSurfaceOwned || props.ftueProfileStep === 'meditating') && !quickGoalPickerOpen && !unifiedJourneyActive && meditation && route.kind !== 'conversation' && route.kind !== 'visit');
   const companionSpeechTitle = dashboardRouteActive && actionNarration ? actionNarration : dashboardRouteActive && !quickGoalPickerOpen && unifiedJourneyActive && journeyNarration ? journeyNarration : meditationDashboardActive ? MOSSPROUT_FTUE_COPY.meditation : mossproutFtueSpeechTitle;
   // The cinematic creature is positioned in full-screen coordinates, while
   // this overlay lives inside the surface below the safe-area page header.
@@ -1549,7 +1550,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               && conversationFlow.phase !== 'committing'
               ? conversationFlow.advance
               : undefined}
-            showSpeechBubble={!initialConversationHandoffPending && (Boolean(companionSpeechTitle) || !residentParcelGardenPanelActive)}
+            showSpeechBubble={props.ftueProfileStep !== 'notice_bond' && !initialConversationHandoffPending && (Boolean(companionSpeechTitle) || !residentParcelGardenPanelActive)}
             showNameplate={route.kind === 'dashboard' && props.familyId !== 'mossprout'}
             stagePresentation={props.reuseUnderlyingStage && !props.renderRegularStage ? 'speech-only' : 'full'}
             title={companionSpeechTitle ?? (residentStoryResumeDashboard
@@ -1726,6 +1727,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             bondTargetRef={dashboardRouteActive && props.familyId === 'mossprout' ? ftueBondTargetRef : undefined}
             compactHub={dashboardRouteActive}
             hideTitle={dashboardRouteActive}
+            hideBack={props.familyId === 'mossprout' && (props.ftueProfileStep === 'first_grow' || props.ftueProfileStep === 'notice_bond' || props.ftueProfileStep === 'water_together')}
             navigationLocked={props.ftueNavigationLocked}
             label={dashboardRouteActive ? 'Dashboard' : route.kind === 'shared_history' ? props.familyId === 'feastle' ? 'Recipe Book' : 'Shared history' : destinationLabel}
             titleTone={destination === 'achievements' ? 'gold' : 'default'}
@@ -2091,6 +2093,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   activeBondQuestionId={ftueBondQuestionId}
                   mode={props.ftueProfileStep}
                   nickname={loadOnboardingProfile().playerNickname}
+                  onNarration={setActionNarration}
                   onBondQuestionChange={setFtueBondQuestionId}
                   onBondRewardRequest={requestStoryReward}
                   onContinue={props.ftueProfileStep === 'garden_intro'
@@ -2442,8 +2445,12 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         ) : null}
         {props.active !== false && mossproutActionDashboard && props.ftueBondSpotlightActive ? (
           <CompanionFtueCoachmark
-            buttonLabel="Try a Bond action"
-            message={[
+            buttonLabel={props.ftueProfileStep === 'notice_bond' ? 'Continue' : 'Try a Bond action'}
+            message={props.ftueProfileStep === 'notice_bond' ? [
+              { text: 'That little moment grew your ' },
+              { emphasis: true, text: 'Bond.' },
+              { text: ' Sharing everyday moments brings you and Mossprout closer.' },
+            ] : [
               { text: 'This is your ' },
               { emphasis: true, text: 'Bond.' },
               { text: ' It grows when you share things and spend time with Mossprout.' },

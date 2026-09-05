@@ -38,7 +38,7 @@ import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/nav
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import { MergeWorldProvider, useMergeWorldState } from '@/features/merge-world/merge-world-provider';
-import { advanceFtueActionDurably, commitFtueAction, completeFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { advanceFtueActionDurably, commitFtueAction, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { useHavenTileStages } from '@/hooks/use-haven-tile-stages';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
@@ -465,7 +465,7 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
             } else if (stepId === 'world.seed_planted') {
               void openFtueGarden();
             } else if (stepId === 'companion.meditating') {
-              completeFtueRun();
+              void advanceFtueActionDurably({ expectedStepId: 'companion.meditating', actionId: 'companion.tend_garden' }).catch(() => {});
             }
           }}
           onFtueOpenGarden={() => void openFtueGarden()}

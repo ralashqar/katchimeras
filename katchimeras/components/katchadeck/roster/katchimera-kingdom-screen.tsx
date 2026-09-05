@@ -1,3 +1,4 @@
+import { useGlowEggHandoff } from '@/features/onboarding/use-glow-egg-handoff';
 import { CompanionJournalButton } from '@/components/katchadeck/world/companion-life-actions';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ActivityIndicator, BackHandler, Pressable, StyleSheet, View, useWindowDimensions, type View as ViewType } from 'react-native';
@@ -60,13 +61,14 @@ import { mossproutNatureIslandById, mossproutNatureIslandLevelDefinition } from 
 import { havenHexTileSpec, kingdomHexTileSourceForLod } from '@/utils/world-visuals';
 import type { HavenTileUpgradePresentation } from '@/utils/haven-upgrade-presentation';
 import { deriveHavenTilePresentation } from '@/utils/haven-tile-presentation';
-import { advanceFtueActionDurably, commitFtueAction, completeFtueRun, dispatchFtueEvent, loadFtueRun } from '@/features/onboarding/ftue-runtime';
+import { advanceFtueActionDurably, commitFtueAction, dispatchFtueEvent, loadFtueRun } from '@/features/onboarding/ftue-runtime';
 import {
   MOSSPROUT_WORLD_EGG_CLOSE_ZOOM,
   MOSSPROUT_WORLD_EGG_ENTRY_ZOOM,
   MOSSPROUT_WORLD_EGG_REST_ZOOM,
   mossproutFtueStep,
   mossproutFtueUsesHostedCompanionStage,
+  mossproutFtueShowsWorldGarden,
 } from '@/features/onboarding/mossprout-ftue-script';
 import { activeKatchimeraMeditation, mossproutJourneyForDay, mossproutJourneyRuntimeDayId } from '@/game/katchimeras/relationship-progression';
 import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
@@ -195,6 +197,10 @@ export function KatchimeraKingdomScreen({
   const [upgrading, setUpgrading] = useState(false);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const [upgradePresentation, setUpgradePresentation] = useState<HavenTileUpgradePresentation | null>(null);
+  const prepareEggEntry = useCallback(() => { setFtueCameraSettled(false); setGlowPanelOpen(false); }, []);
+  const eggHandoff = useGlowEggHandoff({ run: glowRun, world: mergeWorld, focused: screenFocused,
+    available: !interactionCreatureId && !upgradePresentation, open: stepplingEggOpen,
+    enter: stepplingEncounter.enter, onOpening: prepareEggEntry });
   const [selectedNatureIslandId, setSelectedNatureIslandId] = useState<MossproutNatureIslandId | null>(null);
   const [selectedMemoryPlantId, setSelectedMemoryPlantId] = useState<string | null>(null);
   const [natureUpgradeError, setNatureUpgradeError] = useState<string | null>(null);
@@ -454,11 +460,7 @@ export function KatchimeraKingdomScreen({
   ));
   const ftueEggFeedingCloseupActive = ftueStepId === 'world.egg_intro'
     || Boolean(ftueStepId?.startsWith('egg.'));
-  const gardenWorldGuidanceActive = ftueStepId === 'world.garden_arrival'
-    || ftueStepId === 'world.seed_planted'
-    || ftueStepId === 'world.garden_handoff'
-    || ftueStepId === 'world.first_bloom_restore'
-    || ftueStepId === 'world.first_seed_grew';
+  const gardenWorldGuidanceActive = Boolean(ftueStepId && mossproutFtueShowsWorldGarden(ftueStepId));
   const gardenWorldBottomCtaActive = (ftueStepId === 'world.seed_planted' && firstSeedPlacementFailed)
     || ftueStepId === 'world.first_seed_grew';
   const measureRestoreOrigin = useCallback(() => new Promise<{ x: number; y: number }>((resolve) => {
@@ -903,12 +905,17 @@ export function KatchimeraKingdomScreen({
     // while the FTUE spotlight can still point at them.
     closeResidentInteraction();
   }, [closeResidentInteraction, ftueStepId, interactionCreatureId]);
+  const [mistExitError, setMistExitError] = useState(false);
   const requestResidentInteractionExit = useCallback(() => {
     if (!interactionCreatureIdRef.current) return;
     const run = loadFtueRun();
-    // Back dismisses optional coaching without opening or resetting the board.
+    // Back accepts the same durable mist handoff as the tutorial card.
+    // The hosted controller opens the destination before calling us to exit.
     if (run?.status === 'active' && run.stepId === 'companion.meditating') {
-      completeFtueRun();
+      setMistExitError(false);
+      void advanceFtueActionDurably({ expectedStepId: 'companion.meditating', actionId: 'companion.tend_garden' })
+        .catch(() => setMistExitError(true));
+      return;
     } else if (ftueStepId && run?.status !== 'complete') return;
     setInteractionCameraReady(false);
     setInteractionExiting(true);
@@ -1031,10 +1038,17 @@ export function KatchimeraKingdomScreen({
       {!activeInteractionResidentId && !interactionCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && (!ftueStepId || ftueStepId === 'companion.meditating') ? <View style={{ position: 'absolute', left: 16, bottom: Math.max(insets.bottom, 12) + 10, zIndex: 30 }}>
         <CompanionJournalButton familyId="mossprout" />
       </View> : null}
+      {screenFocused && mistExitError ? <View style={{ position: 'absolute', bottom: insets.bottom + 20, left: 24, right: 24, zIndex: 120 }}>
+        <KatchaButton label="Explore the mist · Try again" onPress={requestResidentInteractionExit} />
+      </View> : null}
+      {screenFocused && eggHandoff.error ? <View style={{ position: 'absolute', bottom: insets.bottom + 20, left: 24, right: 24, zIndex: 120 }}>
+        <KatchaButton label="Try again" onPress={eggHandoff.retry} />
+      </View> : null}
       {screenFocused && stepplingEncounter.open ? <StepplingEncounterPanel
         encounter={stepplingEncounter}
         egg={stepplingEncounter.egg}
         cameraReady={ftueCameraSettled}
+        onReady={eggHandoff.onReady}
       /> : null}
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, { zIndex: 120 }]}>
         <EggFeedOverlay
@@ -1065,7 +1079,7 @@ export function KatchimeraKingdomScreen({
           />
         </Animated.View>
       ) : null}
-      {!stepplingSurfaceOpen && !upgradePresentation && !activeInteractionResidentId && havenMergeBoardActive && (!havenOpeningActive || ['world.garden_handoff', 'world.seed_planted'].includes(ftueStepId ?? '')) ? (
+      {!stepplingSurfaceOpen && !upgradePresentation && !activeInteractionResidentId && havenMergeBoardActive && mossproutFtueShowsWorldGarden(ftueStepId) ? (
         <Animated.View
           collapsable={false}
           ref={setGardenClusterNode}
@@ -1147,7 +1161,7 @@ export function KatchimeraKingdomScreen({
           <ActivityIndicator color="#FFF4C7" size="small" />
         </View>
       ) : null}
-      {screenFocused && !activeInteractionResidentId && !ftueStepId && !upgradePresentation && glowPanelOpen && (ftueCameraSettled || glowRun?.status === 'failed_recoverable') && glowGatewayActive && (glowRun?.status === 'failed_recoverable' || glowRun?.status === 'completed' || (glowScene && glowScene.view.kind !== 'garden') || glowRun?.nodeId.startsWith('lesson.')) ? <GlowGatewayGuide
+      {screenFocused && !activeInteractionResidentId && !ftueStepId && !upgradePresentation && !stepplingEggOpen && glowRun?.status !== 'completed' && glowPanelOpen && (ftueCameraSettled || glowRun?.status === 'failed_recoverable') && glowGatewayActive && (glowRun?.status === 'failed_recoverable' || (glowScene && glowScene.view.kind !== 'garden') || glowRun?.nodeId.startsWith('lesson.')) ? <GlowGatewayGuide
         world={mergeWorld}
         onClose={() => setGlowPanelOpen(false)}
         onOpenMerge={() => openGarden()}

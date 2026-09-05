@@ -183,60 +183,66 @@ test('general destination pages use the latest Back direction for their outgoing
 
 
 for (const reducedMotion of [false, true]) {
-  test(`card removal settles both the root tray and Grow overlay (reduced motion: ${reducedMotion})`, async () => {
+  test(`row removal retains and animates the measured tray footprint (reduced motion: ${reducedMotion})`, async () => {
     const clock = nativeMotionHarness();
     const overlay = loadCompanionOverlay(clock, reducedMotion);
     const Host = overlay.CompanionSceneOverlayHost as React.ComponentType<{ children: React.ReactNode }>;
     const Overlay = overlay.CompanionSceneOverlay as React.ComponentType<{ visible: boolean; children: React.ReactNode }>;
-    let origin: any;
-    let height: any;
-    function Probe() {
-      origin = clock.animated.useSharedValue(0);
-      height = clock.animated.useSharedValue(0);
-      return React.createElement('SurvivingCard');
-    }
     const render = (removed: boolean) => <Host>
-      <Probe />{removed ? null : React.createElement('ExitingCard')}
-      <Overlay visible>{React.createElement('GrowCards')}</Overlay>
+      {React.createElement('SurvivingCard')}{removed ? null : React.createElement('ExitingCard')}
+      <Overlay visible>{React.createElement('GrowCards')}{removed ? null : React.createElement('ExitingGrowCard')}</Overlay>
     </Host>;
     let tree: ReactTestRenderer;
     await act(async () => { tree = create(render(false)); });
     const survivor = tree!.root.findByType('SurvivingCard' as React.ElementType);
-    const frames = () => tree!.root.findAllByType('AnimatedView' as React.ElementType).filter((view) => view.props.layout);
-    assert.equal(frames().length, 2, 'the root and bottom-anchored outlet both animate their bounds');
-    const layouts = frames().map((frame) => frame.props.layout);
+    const grow = tree!.root.findByType('GrowCards' as React.ElementType);
+    const measurements = tree!.root.findAllByType('View' as React.ElementType).filter((view) => view.props.onLayout);
+    assert.equal(measurements.length, 2, 'root and Grow outlet each measure their own content');
+    const measure = (index: number, height: number, width = 360) => measurements[index].props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width, height } } });
+    const footprint = (index: number) => measurements[index].parent!.props.style[1].read().height;
+    assert.equal(footprint(0), undefined, 'first layout uses intrinsic content height');
+    await act(async () => { measure(0, 300); measure(1, 240); });
+    assert.equal(footprint(0), 300);
+    assert.equal(footprint(1), 240);
+    assert.ok(measurements.every((view) => view.props.style.position === 'absolute' && view.props.style.top === 0), 'content remains top-aligned and independent of the animated footprint');
+    assert.ok(measurements.every((view) => view.parent!.props.layout === undefined), 'does not rely on native layout-transition dispatch');
+
+    // Remove the actual bottom nodes, then deliver their native content-size
+    // measurements. Neither React removal nor measurement may shrink instantly.
     await act(async () => tree!.update(render(true)));
-    assert.equal(tree!.root.findByType('SurvivingCard' as React.ElementType), survivor);
     assert.equal(tree!.root.findAllByType('ExitingCard' as React.ElementType).length, 0);
-    assert.ok(frames().every((frame) => !frame.props.entering && !frame.props.exiting), 'settling never replays page entrances');
-    const values = { currentOriginX: 0, targetOriginX: 0, currentWidth: 360, targetWidth: 360,
-      currentHeight: 300, targetHeight: 220, currentOriginY: 0, targetOriginY: 0,
-      currentGlobalOriginY: 500, targetGlobalOriginY: 580 };
+    assert.equal(tree!.root.findAllByType('ExitingGrowCard' as React.ElementType).length, 0);
+    assert.equal(footprint(0), 300);
+    assert.equal(footprint(1), 240);
+    await act(async () => { measure(0, 220); measure(1, 160); });
+    assert.equal(footprint(0), 300, 'old root footprint survives the removal commit');
+    assert.equal(footprint(1), 240, 'old submenu footprint survives the removal commit');
     const duration = reducedMotion ? 100 : 300;
-    // Root local Y is unchanged: its unanimated bottom-aligned ancestor moved.
-    // Overlay local Y itself changes: its host height remains fixed during Grow.
-    for (const [index, input, initialY, finalY] of [
-      [0, values, -80, 0],
-      [1, { ...values, currentOriginY: 200, targetOriginY: 280 }, 200, 280],
-    ] as const) {
-      const transition = layouts[index](input);
-      assert.equal(transition.initialValues.originY, initialY);
-      assert.equal(transition.animations.originY.duration, duration);
-      origin.value = initialY;
-      height.value = transition.initialValues.height;
-      origin.value = transition.animations.originY;
-      height.value = transition.animations.height;
-      assert.equal(origin.value, initialY, 'first frame preserves the previous position');
-      clock.advance(duration / 2);
-      assert.equal(origin.value, (initialY + finalY) / 2, 'cards move through the gap instead of snapping');
-      assert.equal(height.value, 260);
-      clock.advance(duration / 2);
-      assert.equal(origin.value, finalY);
-      assert.equal(height.value, 220);
-    }
-    const replacement = layouts[0]({ ...values, targetHeight: 300, targetGlobalOriginY: 500 });
-    assert.equal(replacement.initialValues.originY, 0, 'same-size replacement has no vertical jump');
-    assert.equal(replacement.animations.height.to, 300);
+    await act(async () => clock.advance(duration / 2));
+    assert.equal(footprint(0), 260);
+    assert.equal(footprint(1), 200);
+    assert.equal(800 - footprint(0), 540, 'bottom-anchored upper cards move down through the gap');
+    // Repeated onLayout events must not restart the settle or create a loop.
+    await act(async () => { measure(0, 220); measure(1, 160); });
+    await act(async () => clock.advance(duration / 2));
+    assert.equal(footprint(0), 220);
+    assert.equal(footprint(1), 160);
+    assert.equal(tree!.root.findByType('SurvivingCard' as React.ElementType), survivor);
+    assert.equal(tree!.root.findByType('GrowCards' as React.ElementType), grow);
+
+    await act(async () => measure(0, 180));
+    await act(async () => clock.advance(duration / 2));
+    assert.equal(footprint(0), 200);
+    await act(async () => measure(0, 140));
+    assert.equal(footprint(0), 200, 'a second removal starts from the visible height');
+    await act(async () => clock.advance(duration));
+    assert.equal(footprint(0), 140);
+    await act(async () => measure(0, 140));
+    assert.equal(footprint(0), 140, 'equal-sized replacements leave the footprint stable');
+    await act(async () => measure(0, 180, 500));
+    assert.equal(footprint(0), 180, 'orientation changes lay out at the new width immediately');
+    await act(async () => measure(1, 0));
+    assert.equal(footprint(1), 0, 'a dismissed submenu does not leave a shrinking empty overlay');
     await act(async () => tree!.unmount());
   });
 }

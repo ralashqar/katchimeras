@@ -1,29 +1,27 @@
-import { useCallback } from 'react';
-import { Easing, type LayoutAnimationFunction, useReducedMotion, withTiming } from 'react-native-reanimated';
+import { useCallback, useRef, useState } from 'react';
+import type { LayoutChangeEvent } from 'react-native';
+import { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
-/** Resize the anchored tray as rows disappear, separately from horizontal navigation. */
-export function useCompanionStackLayout(screenAnchored = false) {
+/** Hold the tray footprint across row removal, then shrink it on the UI thread. */
+export function useCompanionStackLayout() {
   const reduceMotion = useReducedMotion();
-  return useCallback<LayoutAnimationFunction>((values) => {
-    'worklet';
-    // Match the action rows' 300 ms settle. A bottom-aligned ancestor may move
-    // without changing this frame's local origin, so preserve its screen Y too.
-    const options = { duration: reduceMotion ? 100 : 300, easing: Easing.inOut(Easing.cubic) };
-    return {
-      initialValues: {
-        originX: values.currentOriginX,
-        originY: screenAnchored
-          ? values.targetOriginY + values.currentGlobalOriginY - values.targetGlobalOriginY
-          : values.currentOriginY,
-        width: values.currentWidth,
-        height: values.currentHeight,
-      },
-      animations: {
-        originX: withTiming(values.targetOriginX, options),
-        originY: withTiming(values.targetOriginY, options),
-        width: withTiming(values.targetWidth, options),
-        height: withTiming(values.targetHeight, options),
-      },
-    };
-  }, [reduceMotion, screenAnchored]);
+  const [measured, setMeasured] = useState(false);
+  const previous = useRef<{ width: number; height: number } | null>(null);
+  const height = useSharedValue(0);
+  const onContentLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = event.nativeEvent.layout;
+    const before = previous.current;
+    if (before?.width === next.width && before.height === next.height) return;
+    previous.current = { width: next.width, height: next.height };
+    // First presentation, dismissal and orientation changes should not resize
+    // into view. Subsequent content changes retain their old footprint first.
+    const animate = before && before.width === next.width && before.height > 0 && next.height > 0;
+    height.value = animate ? withTiming(next.height, {
+      duration: reduceMotion ? 100 : 300,
+      easing: Easing.inOut(Easing.cubic),
+    }) : next.height;
+    setMeasured(true);
+  }, [height, reduceMotion]);
+  const frameStyle = useAnimatedStyle(() => ({ height: measured ? height.value : undefined }), [measured]);
+  return { measured, frameStyle, onContentLayout };
 }

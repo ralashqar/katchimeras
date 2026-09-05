@@ -256,7 +256,7 @@ export function KingdomCompanionScreen({
   onFtueConversationComplete?: () => void | Promise<void>;
   onCompletedConversationExit?: (definitionId: string) => boolean | Promise<boolean>;
   ftueOrderPreviewActive?: boolean;
-  ftueProfileStep?: 'intro_action' | 'nickname' | 'bond' | 'bond_choice' | 'garden_intro' | 'water_together' | 'water_response' | 'first_insight' | 'meditating' | 'resident_result' | null;
+  ftueProfileStep?: 'intro_action' | 'nickname' | 'bond' | 'bond_choice' | 'garden_intro' | 'water_together' | 'first_grow' | 'notice_bond' | 'water_response' | 'first_insight' | 'meditating' | 'resident_result' | null;
   ftueBondSpotlightActive?: boolean;
   ftueDayOneActionActive?: boolean;
   ftueDayOneActionAnswerId?: string | null;
@@ -268,7 +268,7 @@ export function KingdomCompanionScreen({
   renderRegularStage?: boolean;
   reuseUnderlyingStage?: boolean;
   onVisibleCreatureRewardPulse?: () => void;
-  onFtueBondSpotlightComplete?: () => void;
+  onFtueBondSpotlightComplete?: () => void | Promise<void>;
   onFtueJourneyDayComplete?: () => void;
   onFtueOpenMerge?: () => void;
   onFtueProfileContinue?: (nickname?: string) => void;

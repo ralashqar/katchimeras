@@ -12,7 +12,24 @@ async function ensureLiveFtueRun(ftue: FtueRunState) {
   const selected = selectedStoryVariant(MOSSPROUT_FTUE_VARIANTS.id).definition;
   if (!contentFlowDefinition(selected.id, selected.version)) registerContentFlowDefinition(selected);
   const runId = `flow:${ftue.runId}`;
-  const existing = await loadContentFlowRun(runId);
+  let existing = await loadContentFlowRun(runId);
+  // Older completed observations already continued into rest. Do not replay the
+  // newly inserted coaching step when repairing their lagging journal.
+  const oldNoticeNodes = ['companion.water_together', 'companion.first_grow', 'companion.first_notice'];
+  if (existing && existing.definitionVersion < 49 && oldNoticeNodes.includes(existing.nodeId)
+    && ['companion.first_rest', 'companion.meditating', 'complete'].includes(ftue.stepId)
+    && ftue.receipts.some((receipt) => receipt.stepId === 'companion.first_notice'
+      && receipt.actionId === 'companion.complete_first_notice' && receipt.status !== 'pending')) {
+    const result = await reduceContentFlowRunAtomically({ runId, reduce: (current) => current.definitionVersion < 49 && oldNoticeNodes.includes(current.nodeId)
+      ? { ...current, definitionVersion: selected.version, nodeId: 'companion.first_rest', phase: 'entering', error: null } : current });
+    existing = result.run;
+  }
+  if (existing?.definitionVersion && existing.definitionVersion < 48 && existing.nodeId === 'companion.water_together'
+    && ftue.answers['companion.choose_water_together']) {
+    const result = await reduceContentFlowRunAtomically({ runId, reduce: (current) => current.definitionVersion < 48 && current.nodeId === 'companion.water_together'
+      ? { ...current, definitionVersion: selected.version, nodeId: 'companion.first_rest', phase: 'entering', error: null } : current });
+    existing = result.run;
+  }
   if (existing) {
     if (!contentFlowDefinition(existing.definitionId, existing.definitionVersion)) {
       return await dispatchContentFlowCommand(existing.runId, { type: 'retry' }) ?? existing;
@@ -51,7 +68,7 @@ export async function dismissFtueContentFlow(ftueRunId: string) {
 }
 
 export async function dispatchFtueActionToContentFlow(before: FtueRunState, actionId: string, expectedNodeId: string) {
-  const run = await ensureLiveFtueRun(before);
+  const run = await reconcileFtueCheckpoint(before);
   if (run.executionMode !== 'live' || run.nodeId !== before.stepId) return run;
   const definition = contentFlowDefinition(run.definitionId, run.definitionVersion);
   const node = definition?.nodes.find((candidate) => candidate.id === before.stepId);
@@ -65,7 +82,7 @@ export async function dispatchFtueActionToContentFlow(before: FtueRunState, acti
 }
 
 export async function dispatchFtueEventToContentFlow(before: FtueRunState, event: FtueEvent, _expectedNodeId: string) {
-  const run = await ensureLiveFtueRun(before);
+  const run = await reconcileFtueCheckpoint(before);
   if (run.executionMode !== 'live' || run.nodeId !== before.stepId) return run;
   const { type, ...payload } = event;
   return dispatchContentFlowCommand(run.runId, {
@@ -83,4 +100,27 @@ export async function dispatchFtueEventToContentFlow(before: FtueRunState, event
 
 export function ftueContentFlowDefinitionAvailable() {
   return MOSSPROUT_FTUE_VARIANTS.variants.some((variant) => Boolean(contentFlowDefinition(variant.definition.id, variant.definition.version)));
+}
+
+/** Replay committed scene edges when the checkpoint outlived its journal write. */
+export async function reconcileFtueCheckpoint(ftue: FtueRunState) {
+  let run = await ensureLiveFtueRun(ftue);
+  if (run.status === 'failed_recoverable' || run.phase === 'entering') run = await dispatchContentFlowCommand(run.runId, { type: 'retry' }) ?? run;
+  for (let attempts = 0; attempts < 20 && run.nodeId !== ftue.stepId && run.status !== 'completed'; attempts++) {
+    if (run.status === 'failed_recoverable' || run.phase === 'entering' || run.phase === 'awaiting_effect') {
+      const retried = await dispatchContentFlowCommand(run.runId, { type: 'retry' });
+      if (!retried || retried.status === 'failed_recoverable') break;
+      run = retried;
+      if (run.nodeId === ftue.stepId) break;
+    }
+    const node = contentFlowDefinition(run.definitionId, run.definitionVersion)?.nodes.find((node) => node.id === run.nodeId);
+    if (node?.kind !== 'scene') break;
+    const receipt = ftue.receipts.find((receipt) => receipt.stepId === run.nodeId && receipt.status !== 'pending'
+      && node.actions.some((action) => action.id === receipt.actionId));
+    if (!receipt) break;
+    const next = await dispatchContentFlowCommand(run.runId, { type: 'submit_scene', actionId: receipt.actionId });
+    if (!next || next.nodeId === run.nodeId) break;
+    run = next;
+  }
+  return run;
 }

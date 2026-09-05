@@ -3,7 +3,7 @@ import type { FtueChoiceOption } from './ftue-types';
 /** Shared by the authored graph and its native presentations. IDs are save data. */
 export const MOSSPROUT_FTUE_COPY = {
   opening: 'A little of your day can wake something here.',
-  dayQuestion: 'How has today felt?',
+  dayQuestion: 'How do you feel?',
   helpQuestion: 'What would feel good right now?',
   seedOrigin: 'Your answer became a Memory Seed. Let’s give it a place in the Garden.',
   bond: 'Your Bond grows through little moments together.',
@@ -11,20 +11,22 @@ export const MOSSPROUT_FTUE_COPY = {
   mergePurpose: 'Merge a Plant. Complete its request to earn Glow and restore the Garden.',
   growth: 'Look—your Memory Seed is growing. You gave it a beginning. We made it bloom together.',
   waterQuestion: 'We made something for the Garden. Let’s make a little room for you, too.',
-  farewell: 'I’m going to rest for eight hours. You can keep tending the Garden while I’m quiet. There’s something beyond that mist…',
+  farewell: 'I’m going to rest for a while. When I wake, we’ll have another Journey together.\n\nYou can still tend the garden or leave me a little moment while I’m quiet.\n\nSee that mist? Let’s use some Glow to find out what’s beyond it.',
   restAction: 'Rest, Mossprout',
   meditation: 'Mossprout is meditating',
   meditationAvailable: 'Mossprout is resting. Let’s see what’s nearby.',
-  meditationHelp: 'Only our next Journey waits. Optional activities can shorten my rest; your gift is already earned.',
+  meditationHelp: 'Only our next Journey waits. The garden is still open while Mossprout rests.',
   keepGrowing: 'Keep growing',
   nextRequest: 'Complete requests to earn Glow. Restore places, or clear a path through the mist.',
   freePlayHint: 'Make another Sprout, then merge the pair.',
 } as const;
 
 export const MOSSPROUT_DAY_OPTIONS = [
-  { id: 'pretty_good', label: 'Pretty good', icon: 'sun.max.fill' },
-  { id: 'too_much_at_once', label: 'A lot going on', icon: 'cloud.rain.fill' },
-  { id: 'taking_today_as_it_comes', label: 'Taking it as it comes', icon: 'cloud.sun.fill' },
+  { id: 'radiant', label: 'Radiant', icon: 'face.very_happy', domainChoiceId: 'energized' },
+  { id: 'light', label: 'Light', icon: 'face.happy', domainChoiceId: 'good' },
+  { id: 'meh', label: 'Meh', icon: 'face.neutral', domainChoiceId: 'meh' },
+  { id: 'heavy', label: 'Heavy', icon: 'face.sad', domainChoiceId: 'drained' },
+  { id: 'stormy', label: 'Stormy', icon: 'face.very_sad', domainChoiceId: 'stressed' },
 ] as const satisfies readonly FtueChoiceOption[];
 
 export const MOSSPROUT_HELP_OPTIONS = [

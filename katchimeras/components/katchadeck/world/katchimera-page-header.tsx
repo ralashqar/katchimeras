@@ -43,6 +43,7 @@ export function KatchimeraPageHeader({
   bondRewardPulseKey = 0,
   bondTargetRef,
   navigationLocked = false,
+  hideBack = false,
   onBack,
 }: {
   bondProgress?: CompanionBondProgress;
@@ -52,6 +53,7 @@ export function KatchimeraPageHeader({
   bondRewardPulseKey?: number;
   bondTargetRef?: RefObject<ViewType | null>;
   navigationLocked?: boolean;
+  hideBack?: boolean;
   onBack: () => void;
 }) {
   const chromeMode = use(KatchimeraPageHeaderChromeContext);
@@ -91,7 +93,7 @@ export function KatchimeraPageHeader({
   if (chromeMode === 'hidden' || (chromeMode === 'hosted' && !bondProgress)) return null;
   return (
     <View style={[styles.root, includeSafeArea && { minHeight: insets.top + 58 }]}>
-      {chromeMode === 'standard' ? <View style={styles.backSlot}><KatchimeraBackButton compact={compact} disabled={navigationLocked} onPress={onBack} /></View> : null}
+      {chromeMode === 'standard' ? <View style={styles.backSlot}>{!hideBack ? <KatchimeraBackButton compact={compact} disabled={navigationLocked} onPress={onBack} /> : null}</View> : null}
       {bondProgress ? (
         <View
           ref={bondTargetRef}

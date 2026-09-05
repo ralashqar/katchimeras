@@ -12,7 +12,7 @@ import {
   useImage,
   vec,
 } from '@shopify/react-native-skia';
-import { Fragment, memo, type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, LayoutChangeEvent, PixelRatio, Pressable, StyleSheet, Text, View, type ImageSourcePropType, type View as ViewType } from 'react-native';
 import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
 import { useExitRetention } from '@/hooks/use-exit-retention';
@@ -424,6 +424,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const [assetRevision, setAssetRevision] = useState(0);
   const [upgradePhaseState, setUpgradePhaseState] = useState<HavenUpgradePhaseState>({ nonce: null, phase: 'armed' });
   const upgradePhase = havenUpgradePhaseForPresentation(upgradePhaseState, upgradePresentation?.nonce);
+  const revealingStepplingEgg = upgradePresentation?.visualTarget?.kind === 'haven_structure'
+    && upgradePresentation.visualTarget.structureId === 'steppling-home' && upgradePresentation.fromStage === 0;
+  // One clock owns both the restored tile and its Egg, including slow art loads.
+  const stepplingRevealProgress = useSharedValue(0);
+  useLayoutEffect(() => {
+    if (revealingStepplingEgg) stepplingRevealProgress.value = 0;
+  }, [revealingStepplingEgg, stepplingRevealProgress, upgradePresentation?.nonce]);
   const [paintedTransitionKeys, setPaintedTransitionKeys] = useState<Record<string, string | null>>({});
   const [settledDiscoveryFamily, setSettledDiscoveryFamily] = useState<string | null>(null);
   const [settlingUpgrade, setSettlingUpgrade] = useState<{
@@ -1467,6 +1474,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                     <HavenUpgradeTileArt
                       key={`upgrade:${upgradeOwnsLayer ? upgradePresentation?.nonce : settlingUpgrade?.nonce}`}
                       fromLayer={transitionLayers.fromLayer}
+                      sharedRevealProgress={transitionLayers.toLayer.id === 'structure:steppling-home' ? stepplingRevealProgress : undefined}
                       imageLod={sceneTileImageLod}
                       takeoverConfirmed={transitionHasPainted}
                       onOutgoingReady={confirmOutgoingPainted}
@@ -1601,14 +1609,17 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           source={interactionResidentProjection.source}
         />
       ) : null}
-      {focusedMossproutWorld && (mossproutGarden?.gateway === 'egg' || discoveredEggInteraction) && !upgradePresentation && !storySceneGuard ? (() => {
-        const layer = scene.tileArtLayers.find((candidate) => candidate.id === 'structure:steppling-home');
+      {focusedMossproutWorld && (revealingStepplingEgg || ((mossproutGarden?.gateway === 'egg' || discoveredEggInteraction) && !upgradePresentation && !storySceneGuard)) ? (() => {
+        // The guarded scene still contains mist; anchor the Egg to the incoming tile.
+        const layer = revealingStepplingEgg ? upgradeLayers?.toLayer
+          : scene.tileArtLayers.find((candidate) => candidate.id === 'structure:steppling-home');
         if (!layer) return null;
         const anchor = layer.residentAnchor ?? { x: layer.frame.left + layer.frame.width / 2, y: layer.frame.top + layer.frame.height / 2 };
         return <RevealedCompanionEgg idleDiscovery={!discoveredEggInteraction} fullSize eggSkinId="moss" presentation={discoveredEggPresentation} targetRef={discoveredEggTargetRef}
+          revealProgress={revealingStepplingEgg || settlingUpgrade?.layers.toLayer.id === 'structure:steppling-home' ? stepplingRevealProgress : undefined}
           cameraScale={camera.scaleValue} cameraTranslateX={camera.translationXValue} cameraTranslateY={camera.translationYValue}
           sceneHeight={scene.height} sceneWidth={scene.width} x={anchor.x} y={anchor.y - SHARED_RESIDENT_BASELINE_LIFT}
-          onPress={interactionEnabled ? onSelectGateway : undefined} />;
+          onPress={interactionEnabled && !upgradePresentation && !storySceneGuard ? onSelectGateway : undefined} />;
       })() : null}
       {memoryPlantProjections.map((plant) => (
         <ProjectedMemoryPlant
@@ -1780,6 +1791,7 @@ const HavenUpgradeTileArt = memo(function HavenUpgradeTileArt({
   onRevealComplete,
   onOutgoingReady,
   takeoverConfirmed = true,
+  sharedRevealProgress,
   phase,
   reducedMotion,
   toLayer,
@@ -1789,6 +1801,7 @@ const HavenUpgradeTileArt = memo(function HavenUpgradeTileArt({
   onRevealComplete?: () => void;
   onOutgoingReady?: () => void;
   takeoverConfirmed?: boolean;
+  sharedRevealProgress?: SharedValue<number>;
   phase: HavenUpgradePresentationPhase;
   reducedMotion: boolean;
   toLayer: KingdomTileArtLayer;
@@ -1821,7 +1834,8 @@ const HavenUpgradeTileArt = memo(function HavenUpgradeTileArt({
   // Starting the reveal is not proof that its terminal frame was drawn.
   // Late-mounted reveal/react layers must still blend from the old tile.
   // Only the completed handoff may begin with the restored art fully visible.
-  const revealProgress = useSharedValue(phase === 'complete' ? 1 : 0);
+  const localRevealProgress = useSharedValue(phase === 'complete' ? 1 : 0);
+  const revealProgress = sharedRevealProgress ?? localRevealProgress;
 
   useEffect(() => {
     if (!revealActive || !targetReady || !outgoingReady || !takeoverConfirmed) return;
@@ -1868,6 +1882,7 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
   targetRef,
   idleDiscovery = false,
   fullSize = false,
+  revealProgress,
 }: {
   cameraScale: SharedValue<number>;
   cameraTranslateX: SharedValue<number>;
@@ -1882,10 +1897,11 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
   targetRef?: RefObject<ViewType | null>;
   idleDiscovery?: boolean;
   fullSize?: boolean;
+  revealProgress?: SharedValue<number>;
 }) {
   const { equippedFaceId } = useEggAvatar();
   const reduceMotion = useReducedMotion();
-  const opacity = useSharedValue(0);
+  const opacity = useSharedValue(fullSize ? 1 : 0);
   const growthProgress = fullSize ? 1 : presentation?.growthProgress ?? 0;
   const visualGrowth = useSharedValue(eggVisualGrowthForEnergyRatio(growthProgress));
   const feedbackPulse = useSharedValue(0);
@@ -1905,15 +1921,15 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
   const rewardShake = useSharedValue(0);
   const hatchPhase = presentation?.hatchPresentation?.phase ?? 'idle';
   const showReadyEffects = worldEggReadyEffectsVisible(presentation);
-  const showDiscoveryReminder = idleDiscovery && !presentation?.hatchPresentation && !presentation?.companionVisible;
+  const showDiscoveryReminder = idleDiscovery && (presentation?.growthStage ?? 0) > 0 && !presentation?.hatchPresentation && !presentation?.companionVisible;
   const feedExpressionSequence = useMemo<readonly EggExpressionCue[]>(() => [
     { faceId: 'big-grin', atMs: 80, durationMs: 180 },
     { faceId: 'happy-squint', atMs: 430, durationMs: 190 },
     { faceId: equippedFaceId, atMs: 900, durationMs: 240 },
   ], [equippedFaceId]);
   useEffect(() => {
-    opacity.value = withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) });
-  }, [opacity]);
+    if (!fullSize) opacity.value = withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) });
+  }, [fullSize, opacity]);
   useEffect(() => {
     visualGrowth.value = withTiming(eggVisualGrowthForEnergyRatio(growthProgress), {
       duration: reduceMotion ? 90 : 280,
@@ -2111,6 +2127,7 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
   const hatchPulseRingSize = WORLD_FTUE_EGG_WIDTH * 1.05 * WORLD_FTUE_PULSE_RING_NATIVE_SURFACE_SCALE;
   const hatchPulseRingCenterY = WORLD_FTUE_EGG_HEIGHT * 0.08 + WORLD_FTUE_EGG_WIDTH * 1.05 / 2;
   const projectionStyle = useAnimatedStyle(() => ({
+    opacity: revealProgress?.value ?? 1,
     transform: [
       {
         translateX: sceneWidth / 2

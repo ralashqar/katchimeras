@@ -1,4 +1,4 @@
-import { Pressable, View } from 'react-native';
+import { Pressable } from 'react-native';
 import { DayActionCardSurface, DayActionIcon } from '@/components/katchadeck/ui/day-action-card';
 import { companionSceneModel } from '@/game/katchimeras/companion-scene-model';
 import { CompanionSceneCards } from './companion-scene-cards';
@@ -13,10 +13,8 @@ export function CompanionFirstRestCards({ availableAt, startedAt, settledMs, now
   model.journey.subtitle = 'Journey Days follow our story, at your pace. The Garden is still open.';
   return <CompanionSceneCards model={model}
     timer={<CompanionMeditationStage title={model.journey.eyebrow} availableAt={availableAt} startedAt={startedAt} settledMs={settledMs} now={now} companionName="Mossprout" />}
-    life={<DayActionCardSurface artwork={<DayActionIcon icon="heart.fill" />}
-      title="Take a water break" subtitle="Your daily water break will be here after our discovery." trailing={<View />} />}
     garden={<Pressable accessibilityRole="button" accessibilityLabel="Explore the mist" onPress={onExplore}>
       <DayActionCardSurface artwork={<DayActionIcon icon="sparkles" />}
-        title="Tend Garden" subtitle="Make two requests, earn Glow, and find what’s beyond the Garden." />
+        title="Explore the mist" subtitle="Complete two garden requests to earn the Glow we need." />
     </Pressable>} />;
 }

@@ -49,6 +49,8 @@ export type StepplingEggAction =
   | { kind: 'alternative'; answer: string }
   | { kind: 'hatch' }
   | { kind: 'finish' };
+// A discovered Egg sleeps until a saved answer/feed gives it its first Bond.
+export const stepplingEggHasBeenFed = (egg?: StepplingEggProgress) => Boolean(egg && (egg.intent || egg.fedSteps > 0 || egg.alternative));
 export const stepplingEggReady = (egg?: StepplingEggProgress) => Boolean(egg && (egg.fedSteps >= STEPPLING_EGG_TARGET || egg.alternative));
 
 export function normalizeStepplingEgg(raw: StepplingEggProgress | undefined): StepplingEggProgress | undefined {
